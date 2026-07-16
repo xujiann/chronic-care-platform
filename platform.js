@@ -79,6 +79,7 @@ let activeEditSnapshot = null;
 let platformCapabilityMap = null;
 let platformGoLiveSlices = null;
 let platformStandardsLedgers = null;
+let platformStandardsLedgerDetail = null;
 let platformCapabilityOperationsCenter = {
   productionReady: false,
   summary: { capabilityDomains: 0, repositoryEvidenceReady: 0, reviewedPreproduction: 0, improvementRequired: 0, pendingReview: 0, evidenceRecorded: 0, productionReady: 0, mvpRequiredModules: 0, productionBlockers: 0, blockersOpen: 0, blockersInProgress: 0, blockerEvidenceSubmitted: 0, blockerEvidenceReviewed: 0, blockerEvidenceRecorded: 0 },
@@ -744,6 +745,106 @@ function renderPlatformStandardsLedgers() {
       <p>${platformEscapeHtml((item.onsiteBlockers || []).join("；"))}</p>
     </article>
   `).join("");
+  populatePlatformStandardsLedgerSelect();
+}
+
+function populatePlatformStandardsLedgerSelect() {
+  const select = document.querySelector("#platform-standards-ledger-select");
+  if (!select) return;
+  const selected = select.value;
+  select.innerHTML = (platformStandardsLedgers?.ledgers || []).map((item) => `
+    <option value="${platformEscapeHtml(item.id)}">${platformEscapeHtml(item.title)}</option>
+  `).join("");
+  if (selected && Array.from(select.options).some((option) => option.value === selected)) select.value = selected;
+}
+
+function platformStandardsLedgerFilterParams(includeFormat = false) {
+  const params = new URLSearchParams();
+  const query = document.querySelector("#platform-standards-ledger-query")?.value.trim() || "";
+  const status = document.querySelector("#platform-standards-ledger-row-status")?.value || "";
+  const collection = document.querySelector("#platform-standards-ledger-collection")?.value || "";
+  if (query) params.set("q", query);
+  if (status) params.set("status", status);
+  if (collection) params.set("collection", collection);
+  if (includeFormat) params.set("format", "markdown");
+  return params;
+}
+
+function populatePlatformStandardsLedgerFacet(selector, values, emptyLabel) {
+  const select = document.querySelector(selector);
+  if (!select) return;
+  const selected = select.value;
+  select.innerHTML = `<option value="">${platformEscapeHtml(emptyLabel)}</option>${(values || []).map((value) => `
+    <option value="${platformEscapeHtml(value)}">${platformEscapeHtml(value)}</option>
+  `).join("")}`;
+  if (selected && (values || []).includes(selected)) select.value = selected;
+}
+
+function renderPlatformStandardsLedgerDetail() {
+  const statusTarget = document.querySelector("#platform-standards-ledger-detail-status");
+  const acceptanceTarget = document.querySelector("#platform-standards-ledger-acceptance");
+  const detailTarget = document.querySelector("#platform-standards-ledger-detail");
+  if (!statusTarget || !acceptanceTarget || !detailTarget) return;
+  if (!platformStandardsLedgerDetail) {
+    statusTarget.textContent = "明细未加载";
+    statusTarget.className = "badge warn";
+    acceptanceTarget.innerHTML = "";
+    detailTarget.innerHTML = `<p class="muted">请连接动态后端并选择台账。</p>`;
+    return;
+  }
+  const detail = platformStandardsLedgerDetail;
+  populatePlatformStandardsLedgerFacet("#platform-standards-ledger-row-status", detail.facets?.statuses, "全部状态");
+  populatePlatformStandardsLedgerFacet("#platform-standards-ledger-collection", detail.facets?.collections, "全部来源");
+  statusTarget.textContent = `${detail.summary?.filteredRows || 0}/${detail.summary?.totalRows || 0} 条；${detail.ledger.formalGoLiveState === "ready" ? "正式上线就绪" : "待现场证据"}`;
+  statusTarget.className = detail.ledger.formalGoLiveState === "ready" ? "badge success" : "badge warn";
+  acceptanceTarget.innerHTML = (detail.acceptanceItems || []).map((item) => `
+    <article class="evidence-card" data-platform-ledger-acceptance="${platformEscapeHtml(item.id)}">
+      <h3>${platformEscapeHtml(item.criterion)}</h3>
+      <p>${platformEscapeHtml(item.automatedCheck || "人工复核")}</p>
+      <small>${platformEscapeHtml(item.evidenceRef || "待归档证据")}；${platformEscapeHtml(item.formalGoLiveState)}</small>
+    </article>
+  `).join("");
+  const rows = detail.rows || [];
+  detailTarget.innerHTML = `
+    <table>
+      <thead><tr><th>来源集合</th><th>事项</th><th>责任方</th><th>状态</th><th>证据摘要</th></tr></thead>
+      <tbody>${rows.length ? rows.map((item) => `
+        <tr>
+          <td>${platformEscapeHtml(item.collection)}</td>
+          <td>${platformEscapeHtml(item.title)}</td>
+          <td>${platformEscapeHtml(item.owner || "待明确")}</td>
+          <td><span class="badge ${item.productionReady ? "success" : "warn"}">${platformEscapeHtml(item.status)}</span></td>
+          <td>${platformEscapeHtml(item.evidence || "待补证据")}</td>
+        </tr>
+      `).join("") : `<tr><td colspan="5">当前筛选条件下无台账记录。</td></tr>`}</tbody>
+    </table>
+    <p class="muted">${platformEscapeHtml(detail.boundary)}</p>
+  `;
+}
+
+async function loadPlatformStandardsLedgerDetail() {
+  const ledgerId = document.querySelector("#platform-standards-ledger-select")?.value;
+  if (!PLATFORM_API_BASE || !ledgerId) {
+    platformStandardsLedgerDetail = null;
+    renderPlatformStandardsLedgerDetail();
+    return;
+  }
+  const statusTarget = document.querySelector("#platform-standards-ledger-detail-status");
+  if (statusTarget) {
+    statusTarget.textContent = "正在加载";
+    statusTarget.className = "badge info";
+  }
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  try {
+    const params = platformStandardsLedgerFilterParams();
+    const suffix = params.toString() ? `?${params}` : "";
+    const response = await request(`${PLATFORM_API_BASE}/platform/standards-ledgers/${encodeURIComponent(ledgerId)}${suffix}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    platformStandardsLedgerDetail = await response.json();
+  } catch (error) {
+    platformStandardsLedgerDetail = null;
+  }
+  renderPlatformStandardsLedgerDetail();
 }
 
 function renderCapabilities(state, capabilities) {
@@ -2187,6 +2288,18 @@ function bindPlatformEditor() {
   document.querySelector("#export-platform-capability-map")?.addEventListener("click", exportPlatformCapabilityMap);
   document.querySelector("#export-platform-go-live-slices")?.addEventListener("click", exportPlatformGoLiveSlices);
   document.querySelector("#export-platform-standards-ledgers")?.addEventListener("click", exportPlatformStandardsLedgers);
+  document.querySelector("#platform-standards-ledger-filters")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    loadPlatformStandardsLedgerDetail();
+  });
+  document.querySelector("#platform-standards-ledger-select")?.addEventListener("change", () => {
+    const status = document.querySelector("#platform-standards-ledger-row-status");
+    const collection = document.querySelector("#platform-standards-ledger-collection");
+    if (status) status.value = "";
+    if (collection) collection.value = "";
+    loadPlatformStandardsLedgerDetail();
+  });
+  document.querySelector("#export-platform-standards-ledger-detail")?.addEventListener("click", exportPlatformStandardsLedgerDetail);
   const filters = document.querySelector("#platform-report-filters");
   filters?.addEventListener("input", refreshReportSummary);
   filters?.addEventListener("change", refreshReportSummary);
@@ -2229,6 +2342,8 @@ async function loadPlatformStandardsLedgers() {
     const response = await request(`${PLATFORM_API_BASE}/platform/standards-ledgers`);
     if (!response.ok) return;
     platformStandardsLedgers = await response.json();
+    populatePlatformStandardsLedgerSelect();
+    await loadPlatformStandardsLedgerDetail();
   } catch (error) {
     platformStandardsLedgers = null;
   }
@@ -3211,6 +3326,25 @@ async function exportPlatformStandardsLedgers() {
     downloadText(`卫生健康信息平台六类台账-${todayStamp()}.md`, text);
   } catch (error) {
     downloadText(`卫生健康信息平台六类台账导出失败-${todayStamp()}.md`, `# 导出失败\n\n${error.message || "unknown error"}\n`);
+  }
+}
+
+async function exportPlatformStandardsLedgerDetail() {
+  const ledgerId = document.querySelector("#platform-standards-ledger-select")?.value;
+  const title = platformStandardsLedgerDetail?.ledger?.title || "平台台账明细";
+  if (!PLATFORM_API_BASE || !ledgerId) {
+    downloadText(`${title}-导出失败-${todayStamp()}.md`, "# 导出失败\n\n请连接动态后端并选择台账。\n");
+    return;
+  }
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  try {
+    const params = platformStandardsLedgerFilterParams(true);
+    const response = await request(`${PLATFORM_API_BASE}/platform/standards-ledgers/${encodeURIComponent(ledgerId)}?${params}`);
+    const text = await response.text();
+    if (!response.ok) throw new Error(text || `HTTP ${response.status}`);
+    downloadText(`${title}-${todayStamp()}.md`, text);
+  } catch (error) {
+    downloadText(`${title}-导出失败-${todayStamp()}.md`, `# 导出失败\n\n${error.message || "unknown error"}\n`);
   }
 }
 

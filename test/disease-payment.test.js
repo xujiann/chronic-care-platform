@@ -86,3 +86,40 @@ test("DIP 2.0 profile preserves official catalog statistics and treatment supple
   assert.deepEqual(profile.icd10Coverage, { chapters: 20, sections: 218, categories: 1133, subcategories: 3332, codingVersion: "ICD-10疾病诊断医保2.0版" });
   assert.ok(profile.supplementedTreatments.includes("肿瘤免疫治疗"));
 });
+
+test("DRG 2.0 profile preserves the official three-level structure and composition", () => {
+  const profile = Service.seedDiseasePaymentState().drg2LibraryProfile;
+  assert.equal(profile.mdcCount, 26);
+  assert.equal(profile.adrgCount, 409);
+  assert.equal(profile.drgCount, 634);
+  assert.equal(profile.surgicalGroups + profile.nonOperatingRoomProcedureGroups + profile.medicalGroups, profile.drgCount);
+  assert.equal(profile.excludedDiagnosisItems, 1849);
+  assert.equal(profile.excludedProcedureItems, 1827);
+});
+
+test("DRG preview explains MDC, ADRG, complication split and non-binding authority", () => {
+  const state = Service.seedDiseasePaymentState();
+  const preview = Service.simulateDrgCase(state, { caseId: "dp-case-001" });
+  assert.equal(preview.binding, false);
+  assert.equal(preview.calculation.grouping.mdcCode, "MDCB");
+  assert.equal(preview.calculation.grouping.adrgCode, "BR2");
+  assert.equal(preview.calculation.grouping.groupCode, "BR23");
+  assert.equal(preview.calculation.grouping.complicationLevel, "CC");
+  assert.deepEqual(preview.calculation.grouping.groupingBasis.matchedComplicationDiagnoses, ["I10"]);
+});
+
+test("DRG preview handles MCC, excluded principal diagnoses and performance analytics", () => {
+  const state = Service.seedDiseasePaymentState();
+  const mccCase = { ...state.cases[2], id: "drg-mcc", settlementListNo: "DRG-MCC-001", otherDiagnoses: ["J96.0"] };
+  const mcc = Service.calculateCase(state, mccCase, "DRG");
+  assert.equal(mcc.grouping.groupCode, "FZ11");
+  assert.equal(mcc.grouping.complicationLevel, "MCC");
+  const excluded = Service.calculateCase(state, { ...mccCase, id: "drg-excluded", settlementListNo: "DRG-EXCLUDED-001", principalDiagnosis: "Z00.0" }, "DRG");
+  assert.equal(excluded.grouping.reasonCode, "EXCLUDED_PRINCIPAL_DIAGNOSIS");
+  const calculated = Service.calculateAll(state, "tester");
+  const analytics = Service.buildDrgAnalytics(calculated);
+  assert.equal(analytics.groupedCount, 3);
+  assert.ok(analytics.cmi > 0);
+  assert.equal(analytics.mdcCount, 3);
+  assert.equal(analytics.groupDistribution.length, 3);
+});

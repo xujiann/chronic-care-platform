@@ -2,7 +2,12 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
-const { buildPlatformStandardsLedgers, renderPlatformStandardsLedgersMarkdown } = require("../platform-standards-ledgers");
+const {
+  buildPlatformStandardsLedgerDetail,
+  buildPlatformStandardsLedgers,
+  renderPlatformStandardsLedgerDetailMarkdown,
+  renderPlatformStandardsLedgersMarkdown
+} = require("../platform-standards-ledgers");
 const { buildPlatformStandardsLedgersReport, parseArgs, writeOutput } = require("../scripts/platform-standards-ledgers");
 
 function sampleData() {
@@ -35,6 +40,22 @@ test("policy register uses the existing runtime seed when the static snapshot om
   assert.equal(ledger.functionalState, "implemented");
   assert.equal(ledger.missingCollections.length, 0);
   assert.equal(ledger.rows.some((item) => item.collection === "digitalHospitalPolicyRegister"), true);
+});
+
+test("ledger detail supports auditable filters and preserves the go-live boundary", () => {
+  const detail = buildPlatformStandardsLedgerDetail(sampleData(), "interface-exchange-register", {
+    collection: "integrationContracts",
+    q: "sample"
+  });
+  assert.equal(detail.ok, true);
+  assert.equal(detail.ledger.formalGoLiveState, "blocked-until-onsite-evidence");
+  assert.equal(detail.summary.filteredRows, 1);
+  assert.equal(detail.acceptanceItems.length, 4);
+  assert.deepEqual(detail.facets.collections, ["integrationContracts", "interfaceRequirements", "phase2GatewayTraces", "platformInterfaces"]);
+  assert.equal(detail.rows.every((item) => item.collection === "integrationContracts"), true);
+  assert.match(renderPlatformStandardsLedgerDetailMarkdown(detail), /接口与交换服务台账/);
+  assert.match(renderPlatformStandardsLedgerDetailMarkdown(detail), /筛选结果：1\/4/);
+  assert.equal(buildPlatformStandardsLedgerDetail(sampleData(), "unknown-register"), null);
 });
 
 test("standards ledger readiness report exports json and markdown", (t) => {

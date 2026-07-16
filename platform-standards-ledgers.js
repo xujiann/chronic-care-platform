@@ -164,6 +164,73 @@ function buildPlatformStandardsLedgers(data = {}, context = {}) {
   };
 }
 
+function groupBy(items, key) {
+  return items.reduce((acc, item) => {
+    const value = item[key] || "unknown";
+    acc[value] = (acc[value] || 0) + 1;
+    return acc;
+  }, {});
+}
+
+function buildPlatformStandardsLedgerDetail(data = {}, ledgerId = "", options = {}) {
+  const report = buildPlatformStandardsLedgers(data, options.context || {});
+  const ledger = report.ledgers.find((item) => item.id === String(ledgerId || "").trim());
+  if (!ledger) return null;
+  const query = String(options.query || options.q || "").trim().toLowerCase();
+  const status = String(options.status || "").trim();
+  const collection = String(options.collection || "").trim();
+  const rows = ledger.rows.filter((item) => {
+    const blob = [item.id, item.title, item.owner, item.status, item.collection, item.evidence].join(" ").toLowerCase();
+    return (!query || blob.includes(query))
+      && (!status || item.status === status)
+      && (!collection || item.collection === collection);
+  });
+  const acceptanceItems = ledger.acceptanceCriteria.map((criterion, index) => ({
+    id: `${ledger.id}-acceptance-${index + 1}`,
+    criterion,
+    verificationMode: index < ledger.automatedChecks.length ? "automated-and-review" : "manual-review",
+    automatedCheck: ledger.automatedChecks[index] || "",
+    evidenceRef: ledger.evidenceRefs[index] || "",
+    status: ledger.functionalState === "implemented" ? "platform-verifiable" : "gap-open",
+    formalGoLiveState: ledger.formalGoLiveState
+  }));
+  return {
+    ok: report.ok && ledger.functionalState === "implemented",
+    generatedAt: new Date().toISOString(),
+    ledger: {
+      id: ledger.id,
+      title: ledger.title,
+      owner: ledger.owner,
+      purpose: ledger.purpose,
+      functionalState: ledger.functionalState,
+      formalGoLiveState: ledger.formalGoLiveState,
+      standardRefs: ledger.standardRefs,
+      sourceCollections: ledger.sourceCollections,
+      evidenceRefs: ledger.evidenceRefs,
+      automatedChecks: ledger.automatedChecks,
+      onsiteBlockers: ledger.onsiteBlockers
+    },
+    filters: { query, status, collection },
+    summary: {
+      totalRows: ledger.rows.length,
+      filteredRows: rows.length,
+      sourceCollections: ledger.sourceCollections.length,
+      acceptanceItems: acceptanceItems.length,
+      onsiteBlockers: ledger.onsiteBlockers.length,
+      productionReadyRows: rows.filter((item) => item.productionReady).length
+    },
+    byCollection: groupBy(rows, "collection"),
+    byStatus: groupBy(rows, "status"),
+    facets: {
+      collections: Object.keys(groupBy(ledger.rows, "collection")).sort(),
+      statuses: Object.keys(groupBy(ledger.rows, "status")).sort()
+    },
+    acceptanceItems,
+    rows: rows.slice(0, 100),
+    boundary: report.boundary
+  };
+}
+
 function cleanCell(value) {
   return String(value ?? "").replace(/\|/g, "/").replace(/\r?\n/g, " ");
 }
@@ -203,8 +270,38 @@ function renderPlatformStandardsLedgersMarkdown(report) {
   ].join("\n");
 }
 
+function renderPlatformStandardsLedgerDetailMarkdown(detail) {
+  if (!detail) return "# 平台台账未找到\n";
+  const acceptanceRows = detail.acceptanceItems.map((item) => `| ${cleanCell(item.criterion)} | ${cleanCell(item.verificationMode)} | ${cleanCell(item.automatedCheck)} | ${cleanCell(item.evidenceRef)} | ${cleanCell(item.formalGoLiveState)} |`);
+  const dataRows = detail.rows.map((item) => `| ${cleanCell(item.collection)} | ${cleanCell(item.title)} | ${cleanCell(item.owner)} | ${cleanCell(item.status)} | ${cleanCell(item.evidence)} |`);
+  return [
+    `# ${detail.ledger.title}`,
+    "",
+    `- 责任方：${detail.ledger.owner}`,
+    `- 功能状态：${detail.ledger.functionalState}`,
+    `- 正式上线状态：${detail.ledger.formalGoLiveState}`,
+    `- 筛选结果：${detail.summary.filteredRows}/${detail.summary.totalRows}`,
+    `- 边界：${detail.boundary}`,
+    "",
+    "## 验收口径",
+    "",
+    "| 验收口径 | 验证方式 | 自动检查 | 证据引用 | 正式上线状态 |",
+    "|---|---|---|---|---|",
+    ...acceptanceRows,
+    "",
+    "## 台账记录",
+    "",
+    "| 来源集合 | 事项 | 责任方 | 状态 | 证据摘要 |",
+    "|---|---|---|---|---|",
+    ...dataRows,
+    ""
+  ].join("\n");
+}
+
 module.exports = {
   LEDGER_DEFINITIONS,
+  buildPlatformStandardsLedgerDetail,
   buildPlatformStandardsLedgers,
+  renderPlatformStandardsLedgerDetailMarkdown,
   renderPlatformStandardsLedgersMarkdown
 };

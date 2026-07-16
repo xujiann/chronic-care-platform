@@ -83,6 +83,22 @@
         </div>
         <div id="platform-standards-ledgers-metrics" class="metric-grid"></div>
         <div id="platform-standards-ledgers-grid" class="evidence-grid"></div>
+        <div class="panel-title">
+          <h3>台账验收明细</h3>
+          <span id="platform-standards-ledger-detail-status" class="badge warn">等待选择</span>
+        </div>
+        <form id="platform-standards-ledger-filters" class="filter-grid">
+          <label>台账<select id="platform-standards-ledger-select"></select></label>
+          <label>状态<select id="platform-standards-ledger-row-status"><option value="">全部状态</option></select></label>
+          <label>来源<select id="platform-standards-ledger-collection"><option value="">全部来源</option></select></label>
+          <label>关键词<input id="platform-standards-ledger-query" type="search" placeholder="事项、责任方或证据" /></label>
+          <div class="action-row">
+            <button class="primary-button" type="submit">查询</button>
+            <button class="ghost-button" type="button" id="export-platform-standards-ledger-detail">导出当前台账</button>
+          </div>
+        </form>
+        <div id="platform-standards-ledger-acceptance" class="evidence-grid"></div>
+        <div id="platform-standards-ledger-detail" class="table-wrap"></div>
       </section>
 
       <section class="portal-grid">

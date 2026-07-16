@@ -1266,6 +1266,20 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(standardsLedgersMarkdown.status, 200);
     assert.match(await standardsLedgersMarkdown.text(), /六类可验收台账/);
 
+    const standardsLedgerDetail = await api(baseUrl, "/api/platform/standards-ledgers/interface-exchange-register?collection=integrationContracts", authorized(accountLogin.body.token));
+    assert.equal(standardsLedgerDetail.response.status, 200);
+    assert.equal(standardsLedgerDetail.body.acceptanceItems.length, 4);
+    assert.equal(standardsLedgerDetail.body.summary.filteredRows >= 1, true);
+    assert.equal(standardsLedgerDetail.body.rows.every((item) => item.collection === "integrationContracts"), true);
+    assert.equal(standardsLedgerDetail.body.ledger.formalGoLiveState, "blocked-until-onsite-evidence");
+
+    const standardsLedgerDetailMarkdown = await fetch(`${baseUrl}/api/platform/standards-ledgers/interface-exchange-register?collection=integrationContracts&format=markdown`, authorized(accountLogin.body.token));
+    assert.equal(standardsLedgerDetailMarkdown.status, 200);
+    assert.match(await standardsLedgerDetailMarkdown.text(), /接口与交换服务台账/);
+
+    const unknownStandardsLedger = await api(baseUrl, "/api/platform/standards-ledgers/unknown-register", authorized(accountLogin.body.token));
+    assert.equal(unknownStandardsLedger.response.status, 404);
+
     const blockerRegister = await api(baseUrl, "/api/platform/blocker-register", authorized(accountLogin.body.token));
     assert.equal(blockerRegister.response.status, 200);
     assert.equal(blockerRegister.body.summary.open >= 1, true);

@@ -46,14 +46,58 @@ function seedDiseasePaymentState() {
       relatedOperationCostThreshold: 0.1,
       supplementedTreatments: ["肿瘤基因治疗", "肿瘤分子治疗", "肿瘤免疫治疗", "放射治疗"]
     },
+    drg2LibraryProfile: {
+      id: "national-drg-2.0",
+      name: "DRG付费2.0版国家分组方案",
+      sourceCases: 53710000,
+      sourceCities: 78,
+      mdcCount: 26,
+      adrgCount: 409,
+      drgCount: 634,
+      surgicalGroups: 251,
+      nonOperatingRoomProcedureGroups: 57,
+      medicalGroups: 326,
+      excludedDiagnosisItems: 1849,
+      excludedProcedureItems: 1827,
+      groupingRate: 0.928,
+      riv: 0.71,
+      optimizedDisciplines: 13,
+      hierarchy: ["MDC", "ADRG", "DRG"],
+      complicationLevels: ["MCC", "CC", "NONE"],
+      authority: "国家核心分组统一，本地细分组和支付参数按规定配置"
+    },
+    drgPreviewRules: {
+      id: "drg-preview-rules-2026",
+      name: "DRG 2.0本地可解释模拟规则",
+      authority: "non-binding",
+      lowMultiplier: 0.35,
+      highMultiplier: 2,
+      complicationCatalog: {
+        MCC: ["A41", "J96", "N17"],
+        CC: ["I10", "E11", "N18"]
+      },
+      principalDiagnosisExclusions: [
+        { prefix: "Z00", reason: "本地预览排除：一般检查类诊断不能作为模拟分组主诊断" },
+        { prefix: "Z02", reason: "本地预览排除：行政性检查类诊断不能作为模拟分组主诊断" }
+      ],
+      operationExclusions: [
+        { prefix: "89.01", reason: "本地预览排除：常规小操作不作为ADRG入组条件" }
+      ]
+    },
     parameterVersions: [
       { id: "param-drg-2026", mode: "DRG", schemeId: "drg-demo-2026", name: "2026年度DRG支付参数", rateMethod: "固定费率法", rate: 10800, status: "已发布", effectiveFrom: "2026-01-01", approvedBy: "演示医保经办" },
       { id: "param-dip-2026", mode: "DIP", schemeId: "dip-demo-2026", name: "2026年度DIP支付参数", rateMethod: "浮动费率法", rate: 112.5, status: "草案", effectiveFrom: "2026-01-01", approvedBy: "待审批" }
     ],
     groupCatalog: [
-      { code: "FZ15", mode: "DRG", name: "循环系统疾病伴一般并发症", diagnosisPrefixes: ["I10", "I11", "I12", "I13", "I15"], weight: 0.82, adjustment: 1, primaryCare: true },
-      { code: "KZ13", mode: "DRG", name: "代谢性疾病伴一般并发症", diagnosisPrefixes: ["E10", "E11", "E13", "E14"], weight: 0.94, adjustment: 1, primaryCare: true },
-      { code: "BR23", mode: "DRG", name: "脑血管疾病伴严重并发症", diagnosisPrefixes: ["I60", "I61", "I62", "I63", "I64"], weight: 2.35, adjustment: 1.06, primaryCare: false },
+      { code: "FZ11", mode: "DRG", name: "循环系统疾病伴严重并发症", mdcCode: "MDCF", mdcName: "循环系统疾病及功能障碍", adrgCode: "FZ1", adrgName: "循环系统内科诊疗组", groupType: "medical", complicationLevel: "MCC", diagnosisPrefixes: ["I10", "I11", "I12", "I13", "I15"], weight: 1.28, adjustment: 1, primaryCare: false },
+      { code: "FZ13", mode: "DRG", name: "循环系统疾病伴一般并发症", mdcCode: "MDCF", mdcName: "循环系统疾病及功能障碍", adrgCode: "FZ1", adrgName: "循环系统内科诊疗组", groupType: "medical", complicationLevel: "CC", diagnosisPrefixes: ["I10", "I11", "I12", "I13", "I15"], weight: 0.98, adjustment: 1, primaryCare: true },
+      { code: "FZ15", mode: "DRG", name: "循环系统疾病不伴并发症", mdcCode: "MDCF", mdcName: "循环系统疾病及功能障碍", adrgCode: "FZ1", adrgName: "循环系统内科诊疗组", groupType: "medical", complicationLevel: "NONE", diagnosisPrefixes: ["I10", "I11", "I12", "I13", "I15"], weight: 0.82, adjustment: 1, primaryCare: true },
+      { code: "KZ11", mode: "DRG", name: "代谢性疾病伴严重并发症", mdcCode: "MDCK", mdcName: "内分泌、营养及代谢疾病", adrgCode: "KZ1", adrgName: "代谢性疾病内科诊疗组", groupType: "medical", complicationLevel: "MCC", diagnosisPrefixes: ["E10", "E11", "E13", "E14"], weight: 1.36, adjustment: 1, primaryCare: false },
+      { code: "KZ13", mode: "DRG", name: "代谢性疾病伴一般并发症", mdcCode: "MDCK", mdcName: "内分泌、营养及代谢疾病", adrgCode: "KZ1", adrgName: "代谢性疾病内科诊疗组", groupType: "medical", complicationLevel: "CC", diagnosisPrefixes: ["E10", "E11", "E13", "E14"], weight: 0.94, adjustment: 1, primaryCare: true },
+      { code: "KZ15", mode: "DRG", name: "代谢性疾病不伴并发症", mdcCode: "MDCK", mdcName: "内分泌、营养及代谢疾病", adrgCode: "KZ1", adrgName: "代谢性疾病内科诊疗组", groupType: "medical", complicationLevel: "NONE", diagnosisPrefixes: ["E10", "E11", "E13", "E14"], weight: 0.72, adjustment: 1, primaryCare: true },
+      { code: "BR21", mode: "DRG", name: "脑血管疾病伴严重并发症", mdcCode: "MDCB", mdcName: "神经系统疾病及功能障碍", adrgCode: "BR2", adrgName: "脑血管疾病内科诊疗组", groupType: "medical", complicationLevel: "MCC", diagnosisPrefixes: ["I60", "I61", "I62", "I63", "I64"], weight: 2.82, adjustment: 1.08, primaryCare: false },
+      { code: "BR23", mode: "DRG", name: "脑血管疾病伴一般并发症", mdcCode: "MDCB", mdcName: "神经系统疾病及功能障碍", adrgCode: "BR2", adrgName: "脑血管疾病内科诊疗组", groupType: "medical", complicationLevel: "CC", diagnosisPrefixes: ["I60", "I61", "I62", "I63", "I64"], weight: 2.35, adjustment: 1.06, primaryCare: false },
+      { code: "BR25", mode: "DRG", name: "脑血管疾病不伴并发症", mdcCode: "MDCB", mdcName: "神经系统疾病及功能障碍", adrgCode: "BR2", adrgName: "脑血管疾病内科诊疗组", groupType: "medical", complicationLevel: "NONE", diagnosisPrefixes: ["I60", "I61", "I62", "I63", "I64"], weight: 1.72, adjustment: 1.03, primaryCare: false },
       { code: "DIP-I10", mode: "DIP", name: "高血压病种组合", diagnosisPrefixes: ["I10", "I11", "I12", "I13", "I15"], score: 78, adjustment: 1, primaryCare: true },
       { code: "DIP-E11", mode: "DIP", name: "糖尿病病种组合", diagnosisPrefixes: ["E10", "E11", "E13", "E14"], score: 91, adjustment: 1, primaryCare: true }
       ,{ code: "DIP-O82-741X01", mode: "DIP", name: "选择性剖宫产-子宫下段横切口", diagnosisPrefixes: ["O82.0"], mainOperationPrefixes: ["74.1X01"], score: 126, adjustment: 1, primaryCare: false }
@@ -116,7 +160,20 @@ function seedDiseasePaymentState() {
 function normalizeState(input) {
   const seed = seedDiseasePaymentState();
   const state = input && typeof input === "object" ? input : {};
-  return Object.fromEntries(Object.entries(seed).map(([key, value]) => [key, state[key] ?? value]));
+  const normalized = Object.fromEntries(Object.entries(seed).map(([key, value]) => [key, state[key] ?? value]));
+  normalized.drg2LibraryProfile = { ...seed.drg2LibraryProfile, ...(state.drg2LibraryProfile || {}) };
+  normalized.drgPreviewRules = {
+    ...seed.drgPreviewRules,
+    ...(state.drgPreviewRules || {}),
+    complicationCatalog: { ...seed.drgPreviewRules.complicationCatalog, ...(state.drgPreviewRules?.complicationCatalog || {}) }
+  };
+  const storedCatalog = Array.isArray(state.groupCatalog) ? state.groupCatalog : [];
+  const storedByCode = new Map(storedCatalog.map((item) => [item.code, item]));
+  normalized.groupCatalog = [
+    ...seed.groupCatalog.map((item) => ({ ...item, ...(storedByCode.get(item.code) || {}) })),
+    ...storedCatalog.filter((item) => !seed.groupCatalog.some((seedItem) => seedItem.code === item.code))
+  ];
+  return normalized;
 }
 
 function validateCase(item) {
@@ -153,22 +210,81 @@ function dipCatalogMatch(state, item) {
     || candidates.find((group) => !group.mainOperationPrefixes && !group.treatmentTags);
 }
 
-function groupCase(state, item, mode = state.mode || "DRG") {
-  const code = String(item.principalDiagnosis || "").toUpperCase();
-  const catalog = mode === "DIP" ? dipCatalogMatch(state, item) : state.groupCatalog.find((group) => group.mode === mode && group.diagnosisPrefixes.some((prefix) => code.startsWith(prefix)));
-  if (!catalog) return { ok: false, mode, groupCode: "UNGROUPED", groupName: "未入组", reason: "演示目录未覆盖该主要诊断，需调用正式分组器", groupedAt: new Date().toISOString() };
-  const operations = operationRows(item);
-  const relatedThreshold = Number(state.dip2LibraryProfile?.relatedOperationCostThreshold || 0.1);
-  return { ok: true, mode, groupCode: catalog.code, groupName: catalog.name, weight: catalog.weight, score: catalog.score, adjustment: catalog.adjustment || 1, primaryCare: catalog.primaryCare, schemeId: state.schemeVersions.find((scheme) => scheme.mode === mode && scheme.status === "已发布")?.id, groupedAt: new Date().toISOString(), grouper: "本地可解释联调适配器", groupingBasis: mode === "DIP" ? { principalDiagnosis: code, mainOperation: operations.find((row) => row.role === "main")?.code || operations[0]?.code || "", includedRelatedOperations: operations.filter((row, index) => index > 0 && row.cost / Math.max(1, Number(item.totalAmount)) >= relatedThreshold).map((row) => row.code), excludedRelatedOperations: operations.filter((row, index) => index > 0 && row.cost / Math.max(1, Number(item.totalAmount)) < relatedThreshold).map((row) => row.code), relatedOperationCostThreshold: relatedThreshold } : undefined };
+function matchesPrefix(value, prefixes = []) {
+  const code = String(value || "").toUpperCase();
+  return prefixes.some((prefix) => code.startsWith(String(prefix).toUpperCase()));
 }
 
-function detectRisks(item, grouping, paymentStandard) {
+function inferDrgComplicationLevel(state, item) {
+  const explicit = String(item.complicationLevel || "").toUpperCase();
+  if (["MCC", "CC", "NONE"].includes(explicit)) return { level: explicit, source: "病例标记", matchedDiagnoses: [] };
+  const diagnoses = (item.otherDiagnoses || []).map((diagnosis) => typeof diagnosis === "string" ? diagnosis : diagnosis.code).filter(Boolean);
+  const catalog = state.drgPreviewRules?.complicationCatalog || {};
+  const mcc = diagnoses.filter((diagnosis) => matchesPrefix(diagnosis, catalog.MCC));
+  if (mcc.length) return { level: "MCC", source: "本地预览并发症表", matchedDiagnoses: mcc };
+  const cc = diagnoses.filter((diagnosis) => matchesPrefix(diagnosis, catalog.CC));
+  if (cc.length) return { level: "CC", source: "本地预览并发症表", matchedDiagnoses: cc };
+  return { level: "NONE", source: "本地预览并发症表", matchedDiagnoses: [] };
+}
+
+function drgCatalogMatch(state, item) {
+  const diagnosis = String(item.principalDiagnosis || "").toUpperCase();
+  const diagnosisExclusion = (state.drgPreviewRules?.principalDiagnosisExclusions || []).find((rule) => diagnosis.startsWith(String(rule.prefix).toUpperCase()));
+  if (diagnosisExclusion) {
+    return { catalog: null, stage: "MDC", reasonCode: "EXCLUDED_PRINCIPAL_DIAGNOSIS", reason: diagnosisExclusion.reason, diagnosis };
+  }
+  const candidates = state.groupCatalog.filter((group) => group.mode === "DRG" && (group.diagnosisPrefixes || []).some((prefix) => diagnosis.startsWith(prefix)));
+  if (!candidates.length) return { catalog: null, stage: "MDC", reasonCode: "MDC_NOT_FOUND", reason: "本地模拟目录未覆盖该主要诊断，需调用正式分组器", diagnosis };
+  const complication = inferDrgComplicationLevel(state, item);
+  const catalog = candidates.find((group) => group.complicationLevel === complication.level)
+    || candidates.find((group) => group.complicationLevel === "NONE")
+    || candidates[0];
+  const operations = operationRows(item);
+  const excludedOperations = operations.filter((operation) => (state.drgPreviewRules?.operationExclusions || []).some((rule) => operation.code.startsWith(String(rule.prefix).toUpperCase())));
+  return { catalog, stage: "DRG", reasonCode: "GROUPED", reason: "本地模拟分组完成", diagnosis, complication, operations, excludedOperations };
+}
+
+function groupCase(state, item, mode = state.mode || "DRG") {
+  const code = String(item.principalDiagnosis || "").toUpperCase();
+  const drgMatch = mode === "DRG" ? drgCatalogMatch(state, item) : null;
+  const catalog = mode === "DIP" ? dipCatalogMatch(state, item) : drgMatch.catalog;
+  if (!catalog) return { ok: false, mode, groupCode: "UNGROUPED", groupName: "未入组", reasonCode: drgMatch?.reasonCode || "CATALOG_NOT_FOUND", stage: drgMatch?.stage || "病种目录", reason: drgMatch?.reason || "演示目录未覆盖该主要诊断，需调用正式分组器", groupedAt: new Date().toISOString(), authority: "non-binding" };
+  const operations = operationRows(item);
+  const relatedThreshold = Number(state.dip2LibraryProfile?.relatedOperationCostThreshold || 0.1);
+  return {
+    ok: true,
+    mode,
+    groupCode: catalog.code,
+    groupName: catalog.name,
+    mdcCode: catalog.mdcCode,
+    mdcName: catalog.mdcName,
+    adrgCode: catalog.adrgCode,
+    adrgName: catalog.adrgName,
+    groupType: catalog.groupType,
+    complicationLevel: catalog.complicationLevel,
+    weight: catalog.weight,
+    score: catalog.score,
+    adjustment: catalog.adjustment || 1,
+    primaryCare: catalog.primaryCare,
+    schemeId: state.schemeVersions.find((scheme) => scheme.mode === mode && scheme.status === "已发布")?.id,
+    groupedAt: new Date().toISOString(),
+    grouper: "本地可解释联调适配器",
+    authority: "non-binding",
+    groupingBasis: mode === "DIP"
+      ? { principalDiagnosis: code, mainOperation: operations.find((row) => row.role === "main")?.code || operations[0]?.code || "", includedRelatedOperations: operations.filter((row, index) => index > 0 && row.cost / Math.max(1, Number(item.totalAmount)) >= relatedThreshold).map((row) => row.code), excludedRelatedOperations: operations.filter((row, index) => index > 0 && row.cost / Math.max(1, Number(item.totalAmount)) < relatedThreshold).map((row) => row.code), relatedOperationCostThreshold: relatedThreshold }
+      : { principalDiagnosis: code, mdc: catalog.mdcCode, adrg: catalog.adrgCode, complicationSource: drgMatch.complication.source, matchedComplicationDiagnoses: drgMatch.complication.matchedDiagnoses, includedOperations: drgMatch.operations.filter((operation) => !drgMatch.excludedOperations.includes(operation)).map((operation) => operation.code), excludedOperations: drgMatch.excludedOperations.map((operation) => operation.code) }
+  };
+}
+
+function detectRisks(state, item, grouping, paymentStandard, mode) {
   const risks = [];
   const ratio = paymentStandard ? Number(item.totalAmount) / paymentStandard : 0;
   const stayDays = Math.max(1, Math.round((new Date(item.dischargeDate) - new Date(item.admissionDate)) / 86400000));
+  const lowMultiplier = mode === "DRG" ? Number(state.drgPreviewRules?.lowMultiplier || 0.35) : 0.35;
+  const highMultiplier = mode === "DRG" ? Number(state.drgPreviewRules?.highMultiplier || 2) : 2;
   if (!grouping.ok) risks.push({ code: "UNGROUPED", level: "高", name: "病例未入组" });
-  if (ratio > 2) risks.push({ code: "HIGH_OUTLIER", level: "高", name: "高倍率病例", value: round(ratio) });
-  if (ratio > 0 && ratio < 0.35) risks.push({ code: "LOW_OUTLIER", level: "中", name: "低倍率病例", value: round(ratio) });
+  if (ratio > highMultiplier) risks.push({ code: "HIGH_OUTLIER", level: "高", name: "高倍率病例", value: round(ratio), threshold: highMultiplier });
+  if (ratio > 0 && ratio < lowMultiplier) risks.push({ code: "LOW_OUTLIER", level: "中", name: "低倍率病例", value: round(ratio), threshold: lowMultiplier });
   if (stayDays <= 1 && Number(item.totalAmount) < 3000) risks.push({ code: "SPLIT_ADMISSION", level: "中", name: "疑似分解住院线索" });
   if ((item.otherDiagnoses || []).length >= 5) risks.push({ code: "UPCODING", level: "中", name: "高编高套复核线索" });
   return risks;
@@ -182,7 +298,9 @@ function calculateCase(state, item, mode = state.mode || "DRG") {
   if (!parameter) return { ok: false, quality, grouping, error: "没有可用支付参数" };
   const unit = mode === "DRG" ? Number(grouping.weight || 0) : Number(grouping.score || 0);
   const standard = round(unit * Number(parameter.rate) * Number(grouping.adjustment || 1));
-  const risks = detectRisks(item, grouping, standard);
+  const risks = detectRisks(state, item, grouping, standard, mode);
+  const costRatio = standard > 0 ? round(Number(item.totalAmount) / standard, 4) : 0;
+  const outlierType = risks.some((risk) => risk.code === "HIGH_OUTLIER") ? "HIGH" : risks.some((risk) => risk.code === "LOW_OUTLIER") ? "LOW" : grouping.ok ? "NORMAL" : "UNGROUPED";
   return {
     ok: grouping.ok,
     quality,
@@ -194,6 +312,8 @@ function calculateCase(state, item, mode = state.mode || "DRG") {
     paymentStandard: standard,
     variance: round(Number(item.totalAmount) - standard),
     projectedBalance: round(standard - Number(item.totalAmount)),
+    costRatio,
+    outlierType,
     risks,
     calculatedAt: new Date().toISOString()
   };
@@ -290,6 +410,59 @@ function applyGovernanceAction(input, resource, id, payload, actor) {
   return { state, row };
 }
 
+function buildDrgAnalytics(input) {
+  const state = normalizeState(input);
+  const rows = state.cases.map((item) => ({ item, calculation: item.calculation })).filter(({ calculation }) => calculation?.grouping?.mode === "DRG");
+  const grouped = rows.filter(({ calculation }) => calculation.grouping.ok);
+  const weightTotal = round(grouped.reduce((sum, { calculation }) => sum + Number(calculation.grouping.weight || 0), 0), 4);
+  const groupMap = new Map();
+  grouped.forEach(({ item, calculation }) => {
+    const grouping = calculation.grouping;
+    const current = groupMap.get(grouping.groupCode) || { groupCode: grouping.groupCode, groupName: grouping.groupName, mdcCode: grouping.mdcCode, adrgCode: grouping.adrgCode, caseCount: 0, totalCost: 0, paymentStandard: 0, weightTotal: 0 };
+    current.caseCount += 1;
+    current.totalCost += Number(item.totalAmount || 0);
+    current.paymentStandard += Number(calculation.paymentStandard || 0);
+    current.weightTotal += Number(grouping.weight || 0);
+    groupMap.set(grouping.groupCode, current);
+  });
+  const groupDistribution = [...groupMap.values()].map((row) => ({ ...row, totalCost: round(row.totalCost), paymentStandard: round(row.paymentStandard), weightTotal: round(row.weightTotal, 4), balance: round(row.paymentStandard - row.totalCost) })).sort((a, b) => b.caseCount - a.caseCount || a.groupCode.localeCompare(b.groupCode));
+  return {
+    caseCount: rows.length,
+    groupedCount: grouped.length,
+    ungroupedCount: rows.length - grouped.length,
+    groupingRate: rows.length ? round(grouped.length / rows.length, 4) : 0,
+    totalWeight: weightTotal,
+    cmi: grouped.length ? round(weightTotal / grouped.length, 4) : 0,
+    mdcCount: new Set(grouped.map(({ calculation }) => calculation.grouping.mdcCode).filter(Boolean)).size,
+    adrgCount: new Set(grouped.map(({ calculation }) => calculation.grouping.adrgCode).filter(Boolean)).size,
+    drgCount: new Set(grouped.map(({ calculation }) => calculation.grouping.groupCode).filter(Boolean)).size,
+    mccCases: grouped.filter(({ calculation }) => calculation.grouping.complicationLevel === "MCC").length,
+    ccCases: grouped.filter(({ calculation }) => calculation.grouping.complicationLevel === "CC").length,
+    normalCases: rows.filter(({ calculation }) => calculation.outlierType === "NORMAL").length,
+    highOutliers: rows.filter(({ calculation }) => calculation.outlierType === "HIGH").length,
+    lowOutliers: rows.filter(({ calculation }) => calculation.outlierType === "LOW").length,
+    groupDistribution
+  };
+}
+
+function buildDrgCatalogView(input) {
+  const state = normalizeState(input);
+  const groups = state.groupCatalog.filter((item) => item.mode === "DRG");
+  const hierarchy = [...new Map(groups.map((group) => [group.mdcCode, { code: group.mdcCode, name: group.mdcName }])).values()].filter((item) => item.code).map((mdc) => ({
+    ...mdc,
+    adrgs: [...new Map(groups.filter((group) => group.mdcCode === mdc.code).map((group) => [group.adrgCode, { code: group.adrgCode, name: group.adrgName }])).values()].map((adrg) => ({ ...adrg, groups: groups.filter((group) => group.adrgCode === adrg.code) }))
+  }));
+  return { profile: state.drg2LibraryProfile, previewRules: state.drgPreviewRules, schemeVersions: state.schemeVersions.filter((item) => item.mode === "DRG"), parameterVersions: state.parameterVersions.filter((item) => item.mode === "DRG"), hierarchy, groups };
+}
+
+function simulateDrgCase(input, payload = {}) {
+  const state = normalizeState(input);
+  const item = payload.caseId ? state.cases.find((row) => row.id === payload.caseId) : (payload.case || payload);
+  if (!item) throw new Error("病例不存在");
+  const calculation = calculateCase(state, item, "DRG");
+  return { caseId: item.id || null, settlementListNo: item.settlementListNo || "", environment: "simulation", authority: "non-binding", binding: false, profileVersion: state.drg2LibraryProfile.id, calculation };
+}
+
 function buildOverview(input) {
   const state = DiseasePaymentIntake.ensureIntakeState(normalizeState(input));
   const calculated = state.cases.filter((item) => item.calculation?.ok);
@@ -301,7 +474,7 @@ function buildOverview(input) {
     return { institution, caseCount: cases.length, totalCost: round(cases.reduce((sum, item) => sum + Number(item.totalAmount || 0), 0)), standardAmount: round(cases.reduce((sum, item) => sum + Number(item.calculation?.paymentStandard || 0), 0)), riskCount: cases.reduce((sum, item) => sum + (item.calculation?.risks?.length || 0), 0) };
   });
   const specialCapRate = state.mode === "DRG" ? 0.05 : 0.005;
-  return { state, summary: { caseCount: state.cases.length, calculatedCount: calculated.length, ungroupedCount: state.cases.filter((item) => item.calculation?.grouping && !item.calculation.grouping.ok).length, totalCost, paymentStandard, projectedBalance: round(paymentStandard - totalCost), riskCount: risks.length, specialPending: state.specialCases.filter((item) => item.status === "待评审").length, specialCapRate, specialUsageRate: round(state.specialCases.filter((item) => !["不予通过", "已撤回"].includes(item.status)).length / Math.max(1, state.cases.length), 4), settlementPending: state.settlementBatches.filter((item) => item.status !== "已拨付").length, prepaymentPending: state.prepayments.filter((item) => item.status === "待审批").length, unpaidPending: state.unpaidItems.filter((item) => item.status !== "已支付").length, negotiationPending: state.negotiationRounds.filter((item) => item.status !== "已达成一致").length, trainingPending: state.trainings.filter((item) => item.status !== "已完成").length, intake: DiseasePaymentIntake.buildIntakeSummary(state) }, institutions };
+  return { state, summary: { caseCount: state.cases.length, calculatedCount: calculated.length, ungroupedCount: state.cases.filter((item) => item.calculation?.grouping && !item.calculation.grouping.ok).length, totalCost, paymentStandard, projectedBalance: round(paymentStandard - totalCost), riskCount: risks.length, specialPending: state.specialCases.filter((item) => item.status === "待评审").length, specialCapRate, specialUsageRate: round(state.specialCases.filter((item) => !["不予通过", "已撤回"].includes(item.status)).length / Math.max(1, state.cases.length), 4), settlementPending: state.settlementBatches.filter((item) => item.status !== "已拨付").length, prepaymentPending: state.prepayments.filter((item) => item.status === "待审批").length, unpaidPending: state.unpaidItems.filter((item) => item.status !== "已支付").length, negotiationPending: state.negotiationRounds.filter((item) => item.status !== "已达成一致").length, trainingPending: state.trainings.filter((item) => item.status !== "已完成").length, intake: DiseasePaymentIntake.buildIntakeSummary(state), drg: buildDrgAnalytics(state) }, institutions };
 }
 
-module.exports = { POLICY, applyGovernanceAction, buildOverview, calculateAll, calculateCase, createSettlementBatch, createSpecialCase, normalizeState, reconcileBatch, reviewSpecialCase, seedDiseasePaymentState, validateCase };
+module.exports = { POLICY, applyGovernanceAction, buildDrgAnalytics, buildDrgCatalogView, buildOverview, calculateAll, calculateCase, createSettlementBatch, createSpecialCase, drgCatalogMatch, inferDrgComplicationLevel, normalizeState, reconcileBatch, reviewSpecialCase, seedDiseasePaymentState, simulateDrgCase, validateCase };

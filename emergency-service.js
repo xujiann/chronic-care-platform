@@ -11,7 +11,7 @@ const ROLE_ACTIONS = {
   institution: new Set(["vehicle-update", "clinical-update", "hospital-confirm", "handover"])
 };
 
-const SOS_SIGNALS = new Set(["collapse", "chest-pain", "breathing-difficulty", "stroke-suspected", "manual-sos"]);
+const SOS_SIGNALS = new Set(["collapse", "chest-pain", "breathing-difficulty", "stroke-suspected", "manual-sos", "fall-detected", "cardiac-risk", "hypoxia-risk", "no-motion"]);
 
 function now() {
   return new Date().toISOString();

@@ -21,10 +21,12 @@ function buildReport(options = {}) {
   const page = read("physical-examination.html");
   const client = read("physical-examination.js");
   const service = read("physical-examination-service.js");
+  const highlights = read("physical-examination-highlights.js");
   const standards = read("physical-examination-standards.js");
   const standardsBaseline = read("docs/体检系统信息化规范基线-2026-07-15.md");
   const traceability = read("docs/体检系统规范需求追溯矩阵-2026-07-15.md");
   const citizen = read("citizen.js");
+  const citizenPage = read("citizen.html");
   const checks = [
     check("contracts:exam-center", overview.sourceContracts.some((item) => item.sourceType === "exam-center"), "体检中心标准接入契约"),
     check("contracts:hospital", overview.sourceContracts.some((item) => item.sourceType === "hospital"), "医院体检结果接入契约"),
@@ -51,10 +53,17 @@ function buildReport(options = {}) {
     check("care:family-doctor-suggestion", overview.summary.familyDoctorSuggestions === overview.summary.careLinkedReports && server.includes("familyDoctorSuggestion") && client.includes("慢病与家医联动"), `${overview.summary.familyDoctorSuggestions} 条可追溯家医签约/服务包建议`),
     check("care:resident-task", overview.summary.residentRiskTasks === overview.summary.careLinkedReports && citizen.includes('item.sourceType === "physical-exam" ? "体检异常"'), `${overview.summary.residentRiskTasks} 条居民待办复用 chronicScreeningTasks`),
     check("care:idempotency", service.includes("sourceReportId === report.id") && service.includes("physicalExamCareLink"), "报告、风险任务和居民消息按来源报告幂等"),
+    check("highlights:engine", highlights.includes("buildTrajectories") && highlights.includes("translateReport") && highlights.includes("buildExamPlan") && highlights.includes("buildRepeatAvoidance"), "健康时光机、报告翻译、个性计划和重复检查共享引擎"),
+    check("highlights:care-actions", highlights.includes("appointmentHref") && highlights.includes("request-review") && highlights.includes("acknowledge-action") && server.includes("/api/physical-exams/highlights/actions"), "异常行动卡接入复查申请、居民确认、家医和待办"),
+    check("highlights:radiation", highlights.includes("buildRadiationLedger") && highlights.includes("governanceStatus"), "放射正当化、告知、防护和剂量台账"),
+    check("highlights:quality-governance", highlights.includes("reviewReportQuality") && highlights.includes("buildInstitutionBenchmarks") && highlights.includes("buildStandardsImpact"), "报告啄木鸟、机构质量画像和规范影响分析"),
+    check("highlights:privacy", highlights.includes("suppressed-small-cell") && highlights.includes("consentRequired") && highlights.includes("risk-signals-only"), "城市雷达小单元抑制及家庭成员逐人授权"),
+    check("highlights:resident-wallet", highlights.includes("create-passport") && highlights.includes("revoke-passport") && highlights.includes("buildSimulation"), "居民健康护照可创建/撤销，趋势模拟保持健康教育边界"),
     check("site:evidence-required", service.includes("现场验收通过必须提供证据编号或附件引用") && service.includes("上线签署必须提供验收单编号或签字附件引用"), "现场联调和上线签署强制证据引用"),
     check("ui:management", page.includes("历史体检报告") && page.includes("physical-exam-import-form"), "体检管理与报告接入界面"),
     check("ui:launch-workbench", page.includes("上线门禁") && page.includes("异常结果闭环") && page.includes("机构联调验收") && client.includes("renderGatewayEvents"), "上线门禁、异常闭环、联调与死信工作台"),
     check("ui:resident-history", citizen.includes('{ key: "physical-exam", label: "体检报告" }') && citizen.includes("renderPhysicalExamMeta"), "居民健康档案体检分类与详情"),
+    check("ui:highlight-experience", page.includes("健康时光机") && page.includes("报告质量啄木鸟") && citizenPage.includes("我的体检健康时光机") && citizen.includes("renderCitizenPhysicalExamHighlights"), "管理端和居民端完整亮点体验"),
     check("ui:idempotency", client.includes("检测到 ${result.duplicates} 份重复报告"), "前端反馈幂等去重结果")
   ];
   const passed = checks.filter((item) => item.passed).length;
@@ -86,7 +95,7 @@ function buildReport(options = {}) {
       "由各机构与平台上线负责人完成验收单签署后，生产门禁才可转为可上线。"
     ],
     boundaries: [
-      "代码侧已实现标准化签名接入、幂等归档、死信补偿、授权查询、异常闭环、原报告安全关联和居民历史报告展示。",
+      "代码侧已实现标准化签名接入、幂等归档、死信补偿、授权查询、异常闭环、原报告安全关联、居民历史报告以及体检创新亮点工作台。",
       "真实密钥、生产对象存储与机构现场签字属于外部上线证据，未完成前系统会保持上线阻断。"
     ],
     evidence: {

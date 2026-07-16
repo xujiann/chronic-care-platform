@@ -70,7 +70,15 @@ function buildBloodSystemReadinessReport(options = {}) {
     ,["All BIS and BTIS business domains", server.includes("BloodBusinessService.dashboard") && readText("blood-business-service.js").includes("autologous-treatment")],
     ["Business records and governed actions", server.includes("BloodBusinessService.create") && server.includes("BloodBusinessService.action")]
     ,["Role-scoped business operations UI", readText("blood-business.html").includes("血液业务中心") && readText("blood-business.js").includes("business/resources")],
-    ["All business page entry", html.includes("blood-business.html")]
+    ["All business page entry", html.includes("blood-business.html")],
+    ["Thirteen innovation capabilities", readText("blood-innovation-service.js").includes('"pda-bedside"') && require(path.join(ROOT, "blood-innovation-service.js")).capabilities.length === 13],
+    ["Digital twin and regional inventory", readText("blood-innovation-service.js").includes("function twin") && readText("blood-innovation-service.js").includes("function inventoryNodes")],
+    ["Forecast recruitment and rational-use engine", readText("blood-innovation-service.js").includes("function forecast") && readText("blood-innovation-service.js").includes("function rationalUse")],
+    ["PDA and automated compliance actions", server.includes("BloodInnovationService.execute") && readText("blood-innovation-service.js").includes('capabilityId === "pda-bedside"') && readText("blood-innovation-service.js").includes('capabilityId === "compliance-check"')],
+    ["Innovation command center UI", html.includes("blood-innovation.html") && readText("blood-innovation.html").includes("13项亮点能力") && readText("blood-innovation.js").includes("/api/blood-system/innovation")],
+    ["Cross-module blood event contracts", require(path.join(ROOT, "blood-event-hub.js")).contracts.length === 6 && readText("blood-event-hub.js").includes('"quality-safety"') && readText("blood-event-hub.js").includes('"health-dashboard"')],
+    ["Event idempotency dead letter and retry", readText("blood-event-hub.js").includes("stableId") && readText("blood-event-hub.js").includes('status: options.failConsumer === consumer ? "dead_letter"') && server.includes("BloodEventHub.retry")],
+    ["Cross-module event operations UI", readText("blood-innovation.html").includes("跨模块事件枢纽") && readText("blood-innovation.js").includes("publish-events") && server.includes('url.pathname === "/api/blood-system/events/publish"')]
   ];
   const normalizedChecks = checks.map((item) => ({ name: item?.[0] || "Unnamed check", ok: Boolean(item?.[1]) }));
   return {

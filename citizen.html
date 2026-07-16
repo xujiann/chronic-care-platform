@@ -114,6 +114,26 @@
         <div id="citizen-trend-grid" class="citizen-trend-grid"></div>
       </section>
 
+      <section class="panel physical-exam-highlight-panel" data-service-pane="health-record">
+        <div class="panel-title">
+          <div><h2>我的体检健康时光机</h2><span>历史变化、异常行动、年度计划和隐私授权集中查看</span></div>
+          <a class="small-button" href="./physical-examination.html">进入全部体检报告</a>
+        </div>
+        <div id="citizen-exam-highlight-summary" class="citizen-exam-highlight-summary"></div>
+        <div class="citizen-exam-highlight-grid">
+          <article><h3>健康时间轴</h3><div id="citizen-exam-timeline"></div></article>
+          <article><h3>异常行动卡</h3><div id="citizen-exam-actions"></div></article>
+          <article><h3>报告翻译器</h3><div id="citizen-exam-translations"></div></article>
+          <article><h3>下一年度计划</h3><div id="citizen-exam-plan"></div></article>
+          <article><h3>重复检查与辐射</h3><div id="citizen-exam-radiation"></div></article>
+          <article><h3>家庭健康地图</h3><div id="citizen-exam-family-map"></div></article>
+          <article><h3>健康成就</h3><div id="citizen-exam-achievements"></div></article>
+          <article><h3>居民健康护照</h3><div id="citizen-exam-passport"></div></article>
+          <article class="wide"><h3>“如果这样做”健康教育模拟</h3><div id="citizen-exam-simulation"></div></article>
+        </div>
+        <p class="citizen-exam-boundary" id="citizen-exam-boundary"></p>
+      </section>
+
       <section class="panel service-task-panel" data-service-pane="health-record">
         <div class="panel-title">
           <h2>服务待办中心</h2>
@@ -131,6 +151,16 @@
         </div>
         <div class="service-order-metrics" id="service-order-metrics"></div>
         <div id="service-order-cards" class="service-order-grid"></div>
+      </section>
+
+      <section class="panel citizen-highlight-panel" id="citizen-highlight-center" data-service-pane="health-record" aria-labelledby="citizen-highlight-title">
+        <div class="panel-title">
+          <div>
+            <h2 id="citizen-highlight-title">C端亮点中心</h2>
+            <span id="citizen-highlight-summary">健康时间轴、订单、隐私、适老、家庭、提醒、上线包和急救辅助</span>
+          </div>
+        </div>
+        <div class="citizen-highlight-grid" id="citizen-highlight-grid"></div>
       </section>
 
       <section class="panel citizen-notification-panel" data-service-pane="health-record">

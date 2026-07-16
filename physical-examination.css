@@ -99,9 +99,46 @@
 .finding-table th, .finding-table td { padding: 9px; border-bottom: 1px solid var(--line); text-align: left; }
 .finding-table tr.abnormal td { color: #9a4500; background: #fff9ec; }
 .toast { position: fixed; right: 22px; bottom: 22px; display: none; padding: 12px 16px; border-radius: 9px; color: #fff; background: #142d29; z-index: 20; }
+.highlight-command-panel { background: linear-gradient(135deg, #f4fbf8, #fff); }
+.highlight-summary-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; }
+.highlight-summary-grid article { display: grid; gap: 4px; min-width: 0; padding: 13px; border: 1px solid #cfe7df; border-radius: 12px; background: #fff; }
+.highlight-summary-grid span, .highlight-summary-grid small { color: var(--muted); }
+.highlight-summary-grid strong { color: var(--exam-dark); font-size: 22px; }
+.highlight-feature-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.highlight-list { display: grid; gap: 10px; }
+.highlight-list article, .trajectory-card, .translation-card, .plan-card { display: grid; gap: 7px; padding: 13px; border: 1px solid var(--line); border-radius: 11px; background: #fff; }
+.highlight-list header, .trajectory-card > div:first-child, .translation-card header, .plan-card header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.highlight-list p, .translation-card p, .plan-card p { margin: 0; line-height: 1.55; }
+.highlight-list small, .highlight-list em, .trajectory-card small, .trajectory-card em, .translation-card small, .translation-card em, .plan-card small, .plan-card em { color: var(--muted); font-size: 12px; font-style: normal; }
+.mini-bars { display: flex; align-items: end; gap: 5px; min-height: 70px; padding: 6px 2px; }
+.mini-bars span { flex: 1; max-width: 24px; min-width: 7px; border-radius: 5px 5px 2px 2px; background: #85c8b8; }
+.mini-bars span.warn { background: #f1a65a; }
+.tag-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag-row span { padding: 4px 7px; border-radius: 999px; color: var(--exam-dark); background: var(--exam-soft); font-size: 12px; }
+.translation-card.abnormal, .translation-card.high-risk { border-left: 5px solid #dc7b31; }
+.translation-card.high-risk { border-left-color: #b3261e; }
+.ok-card { border-color: #b9dfd3 !important; background: var(--exam-soft) !important; }
+.quality-review-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.quality-review-card { display: grid; gap: 8px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+.quality-review-card.blocked { border-top: 4px solid #b3261e; }
+.quality-review-card.review { border-top: 4px solid #d9892f; }
+.quality-review-card.passed { border-top: 4px solid var(--exam); }
+.quality-review-card header { display: flex; justify-content: space-between; gap: 10px; }
+.quality-review-card p { margin: 0; color: var(--muted); }
+.quality-review-card > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.issue { padding: 5px 7px; border-radius: 7px; color: #744100; background: #fff0d7; font-size: 12px; }
+.issue.blocking { color: #8c1d18; background: #fde7e5; }
+.issue.passed { color: var(--exam-dark); background: var(--exam-soft); }
+.critical-steps { display: flex; flex-wrap: wrap; gap: 6px; }
+.critical-steps span { padding: 5px 7px; border-radius: 7px; font-size: 12px; }
+.critical-steps .done { color: var(--exam-dark); background: var(--exam-soft); }
+.critical-steps .pending { color: #7a4300; background: #ffefcf; }
+.critical-path-card.overdue { border-left: 5px solid #b3261e; }
 @media (max-width: 980px) {
-  .physical-exam-hero, .physical-exam-layout, .operations-grid { grid-template-columns: 1fr; }
+  .physical-exam-hero, .physical-exam-layout, .operations-grid, .highlight-feature-grid { grid-template-columns: 1fr; }
   .readiness-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .highlight-summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .quality-review-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hero-actions { justify-content: flex-start; }
   .import-panel { position: static; }
 }
@@ -116,4 +153,5 @@
   .gateway-list article { grid-template-columns: 1fr auto; }
   .gateway-list small { grid-column: 1 / -1; }
   .attachment-link { align-items: stretch; flex-direction: column; }
+  .highlight-summary-grid, .quality-review-grid { grid-template-columns: 1fr; }
 }

@@ -4,6 +4,7 @@ const test = require("node:test");
 const {
   REQUIRED_API_MARKERS,
   REQUIRED_CONTROL_ACTION_MARKERS,
+  REQUIRED_SELF_ASSESSMENT_ACTION_MARKERS,
   REQUIRED_LAUNCH_MARKERS,
   REQUIRED_SOURCE_MARKERS,
   REQUIRED_STANDARD_MARKERS,
@@ -18,6 +19,7 @@ test("digital hospital standards readiness verifies runnable page docs and relea
   assert.equal(report.summary.officialSources, REQUIRED_SOURCE_MARKERS.length);
   assert.equal(report.summary.apiMarkers, REQUIRED_API_MARKERS.length);
   assert.equal(report.summary.controlActions, REQUIRED_CONTROL_ACTION_MARKERS.length);
+  assert.equal(report.summary.selfAssessmentActions, REQUIRED_SELF_ASSESSMENT_ACTION_MARKERS.length);
   assert.equal(report.summary.launchMarkers, REQUIRED_LAUNCH_MARKERS.length);
   assert.equal(report.summary.evidenceModes >= 5, true);
   assert.equal(report.summary.pilotRows >= 5, true);
@@ -27,5 +29,6 @@ test("digital hospital standards readiness verifies runnable page docs and relea
   assert.match(renderMarkdown(report), /Digital hospital standards readiness report/);
   assert.match(renderMarkdown(report), new RegExp(`API markers: ${REQUIRED_API_MARKERS.length}`));
   assert.match(renderMarkdown(report), new RegExp(`Control actions: ${REQUIRED_CONTROL_ACTION_MARKERS.length}`));
+  assert.match(renderMarkdown(report), new RegExp(`Self-assessment actions: ${REQUIRED_SELF_ASSESSMENT_ACTION_MARKERS.length}`));
   assert.match(renderMarkdown(report), new RegExp(`Launch markers: ${REQUIRED_LAUNCH_MARKERS.length}`));
 });

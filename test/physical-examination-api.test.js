@@ -72,6 +72,9 @@ test("体检 API 完成机构接入、幂等归档和居民历史报告授权查
   assert.deepEqual(before.body.years, ["2026", "2025"]);
   assert.equal(before.body.readiness.codeReady, true);
   assert.equal(typeof before.body.readiness.blockers, "number");
+  assert.equal(before.body.highlights.version, "physical-exam-highlights-v1");
+  assert.equal(before.body.highlights.trajectories.some((item) => item.code === "SBP"), true);
+  assert.equal(before.body.highlights.translations.some((item) => item.code === "BP"), true);
 
   const payload = {
     sourceType: "hospital",
@@ -129,6 +132,16 @@ test("体检 API 完成机构接入、幂等归档和居民历史报告授权查
   const archive = await request(baseUrl, "/api/personal-records?residentId=r1&category=physical-exam", citizenLogin.body.token);
   assert.equal(archive.status, 200);
   assert.equal(archive.body.some((item) => item.meta.externalId === payload.externalId), true);
+
+  const passport = await request(baseUrl, "/api/physical-exams/highlights/actions", citizenLogin.body.token, { method: "POST", body: JSON.stringify({ action: "create-passport", residentId: "r1", scopes: ["reports", "trends", "abnormal-findings"], expiresInDays: 7 }) });
+  assert.equal(passport.status, 200);
+  assert.equal(passport.body.result.item.status, "active");
+  assert.equal(passport.body.highlights.healthPassports.some((item) => item.status === "active"), true);
+  const reviewRequest = await request(baseUrl, "/api/physical-exams/highlights/actions", citizenLogin.body.token, { method: "POST", body: JSON.stringify({ action: "request-review", residentId: "r1", reportId: imported.body.records[0].id, department: "心内科", preferredDate: "2026-07-22" }) });
+  assert.equal(reviewRequest.status, 200);
+  assert.equal(reviewRequest.body.result.item.status, "pending-slot");
+  const forbiddenHighlight = await request(baseUrl, "/api/physical-exams/highlights/actions", citizenLogin.body.token, { method: "POST", body: JSON.stringify({ action: "create-passport", residentId: "r2", scopes: ["reports"] }) });
+  assert.equal(forbiddenHighlight.status, 403);
 
   const forbiddenImport = await request(baseUrl, "/api/physical-exams/import", citizenLogin.body.token, { method: "POST", body: JSON.stringify(payload) });
   assert.equal(forbiddenImport.status, 403);

@@ -13,6 +13,8 @@ test("solution A is wired into the authenticated imaging cloud API", () => {
   assert.match(server, /Governance Evidence Required/);
   assert.match(server, /synthetic-test-data/);
   assert.match(server, /publishImagingStudyToFhir/);
+  assert.match(server, /publishDiagnosticReportToFhir/);
+  assert.match(server, /FHIR DiagnosticReport Sync Failed/);
   assert.match(server, /FHIR Sync Failed/);
   assert.match(server, /\/api\/imaging-cloud\/studies\/:id\/viewer/);
   assert.match(server, /buildOhifStudyUrl/);

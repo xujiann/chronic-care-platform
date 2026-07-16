@@ -730,7 +730,8 @@ function digitalHospitalStandardsChecks(digitalHospitalStandards) {
     check("digitalHospitalStandards:launchReadiness", (digitalHospitalStandards.summary?.launchMarkers || 0) >= 16, `${digitalHospitalStandards.summary?.launchMarkers || 0} launch readiness markers`, "error", "digital-hospital-standards"),
     check("digitalHospitalStandards:evidence", (digitalHospitalStandards.summary?.evidenceModes || 0) >= 5 && (digitalHospitalStandards.summary?.workflowMarkers || 0) >= 6, `${digitalHospitalStandards.summary?.evidenceModes || 0} evidence modes / ${digitalHospitalStandards.summary?.workflowMarkers || 0} workflow markers`, "error", "digital-hospital-standards"),
     check("digitalHospitalStandards:policyGovernance", (digitalHospitalStandards.summary?.policyRecords || 0) >= 18 && (digitalHospitalStandards.summary?.policyControls || 0) >= 12, `${digitalHospitalStandards.summary?.policyRecords || 0} policy records / ${digitalHospitalStandards.summary?.policyControls || 0} six-domain controls`, "error", "digital-hospital-standards"),
-    check("digitalHospitalStandards:controlRemediation", (digitalHospitalStandards.summary?.controlActions || 0) >= 5, `${digitalHospitalStandards.summary?.controlActions || 0} auditable control actions`, "error", "digital-hospital-standards")
+    check("digitalHospitalStandards:controlRemediation", (digitalHospitalStandards.summary?.controlActions || 0) >= 5, `${digitalHospitalStandards.summary?.controlActions || 0} auditable control actions`, "error", "digital-hospital-standards"),
+    check("digitalHospitalStandards:selfAssessment", (digitalHospitalStandards.summary?.selfAssessmentActions || 0) >= 5, `${digitalHospitalStandards.summary?.selfAssessmentActions || 0} institution-scoped self-assessment actions`, "error", "digital-hospital-standards")
   ];
 }
 
@@ -1067,6 +1068,7 @@ function platformStandardsLedgersChecks(platformStandardsLedgers) {
     check("platformStandardsLedgers:implemented", platformStandardsLedgers.summary?.implemented === 6, `${platformStandardsLedgers.summary?.implemented || 0}/6 ledger structures implemented`, "error", "governance"),
     check("platformStandardsLedgers:acceptanceCriteria", platformStandardsLedgers.summary?.acceptanceCriteria >= 24, `${platformStandardsLedgers.summary?.acceptanceCriteria || 0} acceptance criteria`, "error", "governance"),
     check("platformStandardsLedgers:automation", platformStandardsLedgers.summary?.automatedChecks >= 18, `${platformStandardsLedgers.summary?.automatedChecks || 0} automated checks`, "error", "governance"),
+    check("platformStandardsLedgers:detailInspection", platformStandardsLedgers.ledgers?.every((item) => Array.isArray(item.rows) && item.acceptanceCriteria?.length >= 4 && item.sourceCollections?.length >= 4), "all six ledgers expose normalized rows, acceptance criteria and source facets", "error", "governance"),
     check("platformStandardsLedgers:productionBoundary", platformStandardsLedgers.summary?.formalGoLiveReady === 0 && platformStandardsLedgers.summary?.onsiteBlockers >= 6, "onsite evidence remains explicitly blocked", "error", "governance")
   ];
 }

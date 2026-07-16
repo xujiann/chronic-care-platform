@@ -32,11 +32,14 @@ const BloodTransactionService = require("./blood-transaction-service");
 const BloodMasterData = require("./blood-master-data");
 const BloodIntegrationGateway = require("./blood-integration-gateway");
 const BloodBusinessService = require("./blood-business-service");
+const BloodInnovationService = require("./blood-innovation-service");
+const BloodEventHub = require("./blood-event-hub");
 const DiseasePaymentService = require("./disease-payment-service");
 const DiseasePaymentIntake = require("./disease-payment-intake");
 const PhysicalExaminationService = require("./physical-examination-service");
 const PHYSICAL_EXAM_CONTRACT_ID = "physical-exam-report-v1";
 const EmergencyService = require("./emergency-service");
+const EmergencyLifeChain = require("./emergency-lifechain");
 const EmergencyProduction = require("./emergency-production");
 const { buildOhifStudyUrl, listOrthancStudySummaries, publishDiagnosticReportToFhir, publishImagingStudyToFhir, solutionAHealth } = require("./solution-a-connectors");
 const {
@@ -98,7 +101,9 @@ const {
   renderPlatformGoLiveSlicesMarkdown
 } = require("./platform-go-live-slices");
 const {
+  buildPlatformStandardsLedgerDetail,
   buildPlatformStandardsLedgers,
+  renderPlatformStandardsLedgerDetailMarkdown,
   renderPlatformStandardsLedgersMarkdown
 } = require("./platform-standards-ledgers");
 const {
@@ -982,6 +987,7 @@ function seedState() {
     policyAlignment: seedPolicyAlignment(),
     emergencySignals: seedEmergencySignals(),
     ...EmergencyService.seed(),
+    ...EmergencyLifeChain.seed(),
     ...EmergencyProduction.seed(),
     seniorServices: seedSeniorServices(),
     dataAccessLogs: seedDataAccessLogs(),
@@ -2157,7 +2163,7 @@ function seedIntegrationContracts() {
     { id: "emr-summary-v1", domain: "EMR", version: "1.0.0", direction: "inbound", resource: "MedicalSummary", requiredFields: ["externalId", "residentId", "diagnosis", "recordDate"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "3 次指数退避", status: "ready" },
     { id: "lis-report-v1", domain: "LIS", version: "1.0.0", direction: "inbound", resource: "LabReport", requiredFields: ["externalId", "residentId", "item", "result", "reportedAt"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "3 次指数退避", status: "ready" },
     { id: "pacs-report-v1", domain: "PACS", version: "1.0.0", direction: "inbound", resource: "ImagingReport", requiredFields: ["externalId", "residentId", "modality", "conclusion", "reportedAt"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "3 次指数退避", status: "ready" },
-    { id: "physical-exam-report-v1", domain: "体检", version: "2.0.0", direction: "inbound", resource: "AdultPhysicalExamDocument", profile: "WS/T 483.16-2016 JSON projection", requiredFields: ["externalId", "residentId", "sourceType", "institutionId", "institutionName", "examDate", "summary"], productionRequiredFields: ["documentProfile", "institutionQualification", "processingBasis", "signature", "sourceDocumentHash"], dataElementStandard: "WS/T 363-2023", valueDomainStandard: "WS/T 364-2023", idempotencyKey: "sourceType+institutionId+externalId", signature: "HMAC-SHA256 transport + WS/T 847-2024 medical document signature", retryPolicy: "3 次重试后进入死信与人工对账", status: "standards-ready" },
+    { id: "physical-exam-report-v1", domain: "体检", version: "3.0.0", direction: "inbound", resource: "AdultPhysicalExamDocument", profile: "WS/T 483.16-2016 JSON projection + 2025 adult exam guide", requiredFields: ["externalId", "residentId", "sourceType", "institutionId", "institutionName", "examDate", "summary"], productionRequiredFields: ["documentProfile", "institutionQualification", "sectionSignatures", "healthQuestionnaire", "processingBasis", "signature", "sourceDocumentHash", "radiationExaminations(if applicable)"], dataElementStandard: "WS/T 363-2023", valueDomainStandard: "WS/T 364-2023", idempotencyKey: "sourceType+institutionId+externalId", signature: "HMAC-SHA256 transport + WS/T 847-2024 medical document signature", retryPolicy: "3 次重试后进入死信与人工对账", derivedServices: ["health-timeline", "resident-translation", "action-cards", "personalized-plan", "repeat-avoidance", "radiation-ledger", "quality-review"], status: "standards-ready" },
     { id: "appointment-order-v1", domain: "Appointment", version: "1.0.0", direction: "inbound", resource: "AppointmentOrderStatus", requiredFields: ["externalId", "residentId", "orderNo", "slotId", "eventType", "orderStatus", "occurredAt"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "3 attempts then dead letter and reconciliation", status: "ready" },
     { id: "payment-transaction-v1", domain: "Payment", version: "1.0.0", direction: "bidirectional", resource: "PaymentTransaction", requiredFields: ["externalId", "orderNo", "amountFen", "currency"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "3 attempts then dead letter and reconciliation", status: "ready" },
     { id: "insurance-settlement-v1", domain: "医保", version: "1.0.0", direction: "bidirectional", resource: "SettlementStatus", requiredFields: ["externalId", "residentId", "claimStatus", "amount"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "失败进入补偿队列", status: "ready" },
@@ -7605,8 +7611,18 @@ function normalizeState(data) {
     emergencySignals: Array.isArray(data.emergencySignals) ? data.emergencySignals : seedEmergencySignals(),
     emergencyResources: Array.isArray(data.emergencyResources) ? data.emergencyResources : EmergencyService.seed().emergencyResources,
     emergencyHospitals: Array.isArray(data.emergencyHospitals) ? data.emergencyHospitals : EmergencyService.seed().emergencyHospitals,
+    emergencyAedSites: Array.isArray(data.emergencyAedSites) ? data.emergencyAedSites : EmergencyService.seed().emergencyAedSites,
     emergencyEvents: Array.isArray(data.emergencyEvents) ? data.emergencyEvents : EmergencyService.seed().emergencyEvents,
     emergencyAuditEvents: Array.isArray(data.emergencyAuditEvents) ? data.emergencyAuditEvents.slice(0, 1000) : [],
+    emergencySosAuthorizations: Array.isArray(data.emergencySosAuthorizations) ? data.emergencySosAuthorizations.slice(0, 1000) : [],
+    emergencyFamilyContacts: Array.isArray(data.emergencyFamilyContacts) ? data.emergencyFamilyContacts.slice(0, 1000) : [],
+    emergencyResponderProfiles: Array.isArray(data.emergencyResponderProfiles) ? data.emergencyResponderProfiles : EmergencyLifeChain.seed().emergencyResponderProfiles,
+    emergencyFirstAidTasks: Array.isArray(data.emergencyFirstAidTasks) ? data.emergencyFirstAidTasks.slice(0, 5000) : [],
+    emergencyGreenChannelPreparations: Array.isArray(data.emergencyGreenChannelPreparations) ? data.emergencyGreenChannelPreparations.slice(0, 5000) : [],
+    emergencyFamilyNotifications: Array.isArray(data.emergencyFamilyNotifications) ? data.emergencyFamilyNotifications.slice(0, 5000) : [],
+    emergencyFallbackDeliveries: Array.isArray(data.emergencyFallbackDeliveries) ? data.emergencyFallbackDeliveries.slice(0, 5000) : [],
+    emergencySosSignalLog: Array.isArray(data.emergencySosSignalLog) ? data.emergencySosSignalLog.slice(0, 5000) : [],
+    emergencyQualityReviews: Array.isArray(data.emergencyQualityReviews) ? data.emergencyQualityReviews.slice(0, 5000) : [],
     emergencyIntegrationEndpoints: Array.isArray(data.emergencyIntegrationEndpoints) ? data.emergencyIntegrationEndpoints : EmergencyProduction.seed().emergencyIntegrationEndpoints,
     emergencyDeliveryQueue: Array.isArray(data.emergencyDeliveryQueue) ? data.emergencyDeliveryQueue.slice(0, 5000) : EmergencyProduction.seed().emergencyDeliveryQueue,
     emergencyDrills: Array.isArray(data.emergencyDrills) ? data.emergencyDrills : EmergencyProduction.seed().emergencyDrills,
@@ -19256,6 +19272,29 @@ async function handleApi(req, res) {
     return;
   }
 
+  const platformStandardsLedgerDetailMatch = url.pathname.match(/^\/api\/platform\/standards-ledgers\/([^/]+)$/);
+  if (req.method === "GET" && platformStandardsLedgerDetailMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/platform/standards-ledgers/:id");
+    if (!user) return;
+    const data = readDatabase();
+    const ledgerId = decodeURIComponent(platformStandardsLedgerDetailMatch[1]);
+    const detail = buildPlatformStandardsLedgerDetail(data, ledgerId, {
+      query: url.searchParams.get("q") || "",
+      status: url.searchParams.get("status") || "",
+      collection: url.searchParams.get("collection") || ""
+    });
+    if (!detail) {
+      sendJson(res, 404, { error: "Not Found", message: "Platform standards ledger not found" });
+      return;
+    }
+    if (url.searchParams.get("format") === "markdown") {
+      sendText(res, 200, renderPlatformStandardsLedgerDetailMarkdown(detail), "text/markdown; charset=utf-8");
+      return;
+    }
+    sendJson(res, 200, detail);
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/auth/identity/preview") {
     const user = requireApiRole(req, res, ["commission"], "/api/auth/identity/preview");
     if (!user) return;
@@ -19755,6 +19794,54 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/emergency/life-chain/overview") {
+    const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/emergency/life-chain/overview");
+    if (!user) return;
+    try { sendJson(res, 200, redactSensitiveResponse(EmergencyLifeChain.buildOverview(readDatabase(), user, url.searchParams.get("eventId") || ""), user)); }
+    catch (error) { sendJson(res, error.status || 400, { error:error.status === 403 ? "Forbidden" : "Bad Request", message:error.message }); }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/emergency/life-chain/command-center") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/emergency/life-chain/command-center");
+    if (!user) return;
+    try { sendJson(res, 200, EmergencyLifeChain.buildCommandCenter(readDatabase(), user)); }
+    catch (error) { sendJson(res, error.status || 400, { error:error.status === 403 ? "Forbidden" : "Bad Request", message:error.message }); }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/emergency/life-chain/quality") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/emergency/life-chain/quality");
+    if (!user) return;
+    try { sendJson(res, 200, EmergencyLifeChain.buildQualityDashboard(readDatabase(), user)); }
+    catch (error) { sendJson(res, error.status || 400, { error:error.status === 403 ? "Forbidden" : "Bad Request", message:error.message }); }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/emergency/life-chain/authorizations") {
+    const user = requireApiRole(req, res, ["citizen"], "/api/emergency/life-chain/authorizations");
+    if (!user) return;
+    try { const data=readDatabase(); const item=EmergencyLifeChain.createAuthorization(data, user, await collectJson(req)); writeDatabase(data); sendJson(res, 201, { ok:true, item }); }
+    catch (error) { sendJson(res, error.status || 400, { error:error.status === 403 ? "Forbidden" : "Bad Request", message:error.message }); }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/emergency/life-chain/family-contacts") {
+    const user = requireApiRole(req, res, ["citizen"], "/api/emergency/life-chain/family-contacts");
+    if (!user) return;
+    try { const data=readDatabase(); const item=EmergencyLifeChain.addFamilyContact(data, user, await collectJson(req)); writeDatabase(data); sendJson(res, 201, { ok:true, item }); }
+    catch (error) { sendJson(res, error.status || 400, { error:error.status === 403 ? "Forbidden" : "Bad Request", message:error.message }); }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/emergency/life-chain/device-sos") {
+    const user = requireApiRole(req, res, ["citizen"], "/api/emergency/life-chain/device-sos");
+    if (!user) return;
+    try { const data=readDatabase(); const event=EmergencyLifeChain.createAutomaticSos(data, user, await collectJson(req), EmergencyService); writeDatabase(data); sendJson(res, 201, { ok:true, event, callInstruction:{ telUri:"tel:120", requiresDeviceConfirmation:true, message:"A pre-authorized device SOS was submitted to the 120 information queue. The device must still obtain native call confirmation for 120." } }); }
+    catch (error) { sendJson(res, error.status || 400, { error:error.status === 403 ? "Forbidden" : "Bad Request", message:error.message }); }
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/emergency/aed-map") {
     const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/emergency/aed-map");
     if (!user) return;
@@ -19788,11 +19875,30 @@ async function handleApi(req, res) {
     try {
       const data = readDatabase();
       const event = EmergencyService.createSosCall(data, user, await collectJson(req));
+      EmergencyLifeChain.coordinateEvent(data, user, event, event.sos || {});
       writeDatabase(data);
       sendJson(res, 201, { ok:true, event, callInstruction:{ telUri:"tel:120", requiresDeviceConfirmation:true, message:"SOS information was submitted to the 120 acceptance queue. Confirm the mobile system call to reach 120." } });
     } catch (error) {
       sendJson(res, error.status || 400, { error:error.status === 403 ? "Forbidden" : "Bad Request", message:error.message });
     }
+    return;
+  }
+
+  const lifeChainCoordinateMatch = url.pathname.match(/^\/api\/emergency\/events\/([^/]+)\/life-chain\/coordinate$/);
+  if (req.method === "POST" && lifeChainCoordinateMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/emergency/events/:id/life-chain/coordinate");
+    if (!user) return;
+    try { const data=readDatabase(); const event=data.emergencyEvents.find((item) => item.id === decodeURIComponent(lifeChainCoordinateMatch[1])); const lifeChain=EmergencyLifeChain.coordinateEvent(data, user, event, await collectJson(req)); writeDatabase(data); sendJson(res, 200, { ok:true, lifeChain }); }
+    catch (error) { sendJson(res, error.status || 400, { error:error.status === 404 ? "Not Found" : error.status === 403 ? "Forbidden" : "Bad Request", message:error.message }); }
+    return;
+  }
+
+  const greenChannelConfirmMatch = url.pathname.match(/^\/api\/emergency\/events\/([^/]+)\/green-channel\/confirm$/);
+  if (req.method === "POST" && greenChannelConfirmMatch) {
+    const user = requireApiRole(req, res, ["institution"], "/api/emergency/events/:id/green-channel/confirm");
+    if (!user) return;
+    try { const data=readDatabase(); const item=EmergencyLifeChain.confirmGreenChannel(data, user, decodeURIComponent(greenChannelConfirmMatch[1]), await collectJson(req)); writeDatabase(data); sendJson(res, 200, { ok:true, item }); }
+    catch (error) { sendJson(res, error.status || 400, { error:error.status === 404 ? "Not Found" : error.status === 403 ? "Forbidden" : "Bad Request", message:error.message }); }
     return;
   }
 
@@ -24699,15 +24805,26 @@ async function handleApi(req, res) {
       sampledAt: new Date().toISOString(),
       comment: String(payload.comment || "质控记录已回写影像云。").trim()
     };
-    data.imageCloudStudies[index] = {
+    const updatedStudy = {
       ...data.imageCloudStudies[index],
       qcStatus: review.result,
       updatedAt: new Date().toISOString(),
       emrSyncStatus: /通过|合格|passed/i.test(review.result) ? "已写入电子病历索引" : data.imageCloudStudies[index].emrSyncStatus
     };
+    let fhirReportSync;
+    try { fhirReportSync = await publishDiagnosticReportToFhir(updatedStudy, review); }
+    catch (error) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "sync DiagnosticReport to FHIR", target: studyId, result: "failed", detail: error.message });
+      sendJson(res, 502, { error: "FHIR DiagnosticReport Sync Failed", message: error.message });
+      return;
+    }
+    updatedStudy.fhirDiagnosticReportId = fhirReportSync.diagnosticReport.id;
+    updatedStudy.fhirReportSyncStatus = "synced";
+    updatedStudy.fhirReportSyncedAt = new Date().toISOString();
+    data.imageCloudStudies[index] = updatedStudy;
     data.imageCloudQualityReviews = [review, ...(Array.isArray(data.imageCloudQualityReviews) ? data.imageCloudQualityReviews : [])].slice(0, 300);
     writeDatabase(data);
-    sendJson(res, 200, { study: data.imageCloudStudies[index], review });
+    sendJson(res, 200, { study: data.imageCloudStudies[index], review, fhirReportSync });
     return;
   }
 
@@ -25035,6 +25152,31 @@ async function handleApi(req, res) {
     if (!user) return;
     const data = readDatabase();
     sendJson(res, 200, DiseasePaymentService.buildOverview(data.diseasePayment));
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/drg/catalog" && req.method === "GET") {
+    const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    sendJson(res, 200, DiseasePaymentService.buildDrgCatalogView(data.diseasePayment));
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/drg/analytics" && req.method === "GET") {
+    const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    sendJson(res, 200, DiseasePaymentService.buildDrgAnalytics(data.diseasePayment));
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/drg/simulate" && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    const result = DiseasePaymentService.simulateDrgCase(data.diseasePayment, await collectJson(req));
+    sendJson(res, 200, result);
     return;
   }
 
@@ -25836,6 +25978,54 @@ async function handleApi(req, res) {
     appendDataAccessLog(data, user, residentId, "授权与访问历史", "复核居民授权与访问记录");
     writeDatabase(data);
     sendJson(res, 200, redactSensitiveResponse({ residentId, authorizations, accessLogs }, user));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/blood-system/innovation") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/innovation");
+    if (!user) return;
+    const data = readDatabase();
+    sendJson(res, 200, { ...BloodInnovationService.dashboard(data, user, url.searchParams.get("code") || ""), eventHub: BloodEventHub.dashboard(data, user) });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/blood-system/events") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/events");
+    if (!user) return;
+    sendJson(res, 200, BloodEventHub.dashboard(readDatabase(), user));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/blood-system/events/publish") {
+    const user = requireApiRole(req, res, ["commission"], "/api/blood-system/events/publish");
+    if (!user) return;
+    const data = readDatabase();
+    const payload = await collectJson(req);
+    const result = BloodEventHub.publish(data, user, { correlationId: payload.correlationId || "", failConsumer: payload.failConsumer || "" });
+    writeDatabase(data);
+    sendJson(res, 200, { ...result, dashboard: BloodEventHub.dashboard(data, user) });
+    return;
+  }
+
+  const bloodEventRetryMatch = url.pathname.match(/^\/api\/blood-system\/events\/deliveries\/([^/]+)\/retry$/);
+  if (req.method === "POST" && bloodEventRetryMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/blood-system/events/deliveries/:id/retry");
+    if (!user) return;
+    const data = readDatabase();
+    const result = BloodEventHub.retry(data, user, decodeURIComponent(bloodEventRetryMatch[1]));
+    if (result.status < 500) writeDatabase(data);
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  const bloodInnovationMatch = url.pathname.match(/^\/api\/blood-system\/innovation\/([^/]+)\/execute$/);
+  if (req.method === "POST" && bloodInnovationMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/innovation/actions");
+    if (!user) return;
+    const data = readDatabase();
+    const result = BloodInnovationService.execute(data, user, decodeURIComponent(bloodInnovationMatch[1]), await collectJson(req));
+    if (result.status < 500) writeDatabase(data);
+    sendJson(res, result.status, result.body);
     return;
   }
 

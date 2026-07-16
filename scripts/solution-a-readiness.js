@@ -4,7 +4,7 @@ const { solutionAConfiguration } = require("../solution-a-connectors");
 const ROOT = path.resolve(__dirname, "..");
 
 function buildSolutionAReadiness(env = process.env) {
-  const required = ["deploy/solution-a/docker-compose.yml", "deploy/solution-a/ohif-app-config.js", "deploy/solution-a/.env.example", "solution-a-connectors.js", "docs/solution-a-deployment.md", "server.js", "imaging-cloud.html", "imaging-cloud.js", "scripts/solution-a-acceptance.js"];
+  const required = ["deploy/solution-a/docker-compose.yml", "deploy/solution-a/ohif-app-config.js", "deploy/solution-a/.env.example", "solution-a-connectors.js", "docs/solution-a-deployment.md", "docs/方案A医院系统对接方案.md", "server.js", "imaging-cloud.html", "imaging-cloud.js", "scripts/solution-a-acceptance.js"];
   const files = required.map((file) => ({ file, exists: fs.existsSync(path.join(ROOT, file)) }));
   const config = solutionAConfiguration(env);
   const checks = [

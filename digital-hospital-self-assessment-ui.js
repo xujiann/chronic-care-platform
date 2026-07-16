@@ -271,6 +271,7 @@ function digitalSelfActionPayload() {
 
 async function recordDigitalSelfAssessmentAction(event) {
   event.preventDefault();
+  const form = event.currentTarget;
   const feedback = document.getElementById("digital-self-assessment-feedback");
   const assessmentId = document.getElementById("digital-self-assessment-id")?.value || digitalSelfAssessmentState.selectedId;
   try {
@@ -287,7 +288,7 @@ async function recordDigitalSelfAssessmentAction(event) {
     const payload = await digitalSelfAssessmentJson(response);
     digitalSelfAssessmentState.board = payload.board;
     digitalSelfAssessmentState.selectedId = payload.assessment.id;
-    event.currentTarget.reset();
+    form.reset();
     renderDigitalSelfAssessmentBoard();
     if (feedback) {
       feedback.className = "badge info";
@@ -303,6 +304,7 @@ async function recordDigitalSelfAssessmentAction(event) {
 
 async function assignDigitalSelfAssessment(event) {
   event.preventDefault();
+  const form = event.currentTarget;
   const feedback = document.getElementById("digital-self-assessment-assignment-feedback");
   const payload = {
     action: "assign-assessment",
@@ -328,7 +330,7 @@ async function assignDigitalSelfAssessment(event) {
     const result = await digitalSelfAssessmentJson(response);
     digitalSelfAssessmentState.board = result.board;
     digitalSelfAssessmentState.selectedId = result.assessment.id;
-    event.currentTarget.reset();
+    form.reset();
     renderDigitalSelfAssessmentBoard();
     if (feedback) {
       feedback.className = "badge info";

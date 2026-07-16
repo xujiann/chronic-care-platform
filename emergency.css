@@ -33,5 +33,14 @@ textarea { min-height:72px; resize:vertical; }
 .aed-site-card small { color:#475569; }
 .aed-highlight { margin:0; padding:10px; border-radius:8px; background:#dcfce7; color:#166534; }
 .aed-unavailable { background:#fff7ed; color:#9a3412; }
+.lifechain-panel { border:1px solid #93c5fd; background:linear-gradient(180deg,#f8fbff,#fff); }
+.lifechain-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.lifechain-card { padding:14px; border:1px solid #dbeafe; border-radius:12px; background:#fff; }
+.lifechain-card h3,.lifechain-card p { margin-top:0; }
+.lifechain-wide { grid-column:span 1; }
+.lifechain-row,.lifechain-summary { display:flex; justify-content:space-between; gap:12px; padding:9px 0; border-bottom:1px solid #e2e8f0; font-size:14px; }
+.lifechain-summary { border-radius:9px; padding:10px; background:#eff6ff; flex-wrap:wrap; }
+.lifechain-boundary { margin:14px 0 0; color:#1e3a8a; font-size:13px; }
+@media(max-width:800px){.lifechain-grid{grid-template-columns:1fr}.lifechain-wide{grid-column:auto}.lifechain-row{flex-direction:column}}
 @media(max-width:800px){.production-board{grid-template-columns:1fr}}
 @media(max-width:720px){.emergency-event header{align-items:flex-start;flex-direction:column}.emergency-header nav{display:grid;grid-template-columns:1fr 1fr}.call-120{grid-column:1/-1;text-align:center}}

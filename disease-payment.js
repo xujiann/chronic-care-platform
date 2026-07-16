@@ -1,4 +1,4 @@
-const paymentFallback = { state: { policy: {}, cases: [], specialCases: [], settlementBatches: [], budgets: [], feedbacks: [], auditTrail: [], schemeVersions: [], parameterVersions: [], externalDependencies: [] }, summary: {}, institutions: [] };
+const paymentFallback = { state: { policy: {}, cases: [], specialCases: [], settlementBatches: [], budgets: [], feedbacks: [], auditTrail: [], schemeVersions: [], parameterVersions: [], externalDependencies: [], groupCatalog: [], drg2LibraryProfile: {}, drgPreviewRules: {} }, summary: {}, institutions: [] };
 let paymentView = paymentFallback;
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -51,6 +51,12 @@ async function handleAction(event) {
     if (button.dataset.paymentAction === "import-sample") await importSample(false);
     if (button.dataset.paymentAction === "import-error-sample") await importSample(true);
     if (button.dataset.paymentAction === "run-simulation") await requestPayment("/grouping-runs", { method: "POST", body: JSON.stringify({ environment: "simulation", mode: document.querySelector("#payment-mode").value }) });
+    if (button.dataset.paymentAction === "preview-drg") {
+      const preview = await requestPayment("/drg/simulate", { method: "POST", body: JSON.stringify({ caseId: button.dataset.id }) });
+      const group = preview.calculation?.grouping;
+      message(group?.ok ? `DRG模拟：${group.mdcCode} → ${group.adrgCode} → ${group.groupCode}（非正式结果）` : `DRG模拟未入组：${group?.reason || preview.calculation?.error || "请复核病例"}`, !group?.ok);
+      return;
+    }
     if (button.dataset.paymentAction === "retry-import") await requestPayment(`/intake/retries/${encodeURIComponent(button.dataset.id)}`, { method: "POST", body: JSON.stringify({ institutionCode: "HOSP-DEMO", totalAmount: 1200, declaredFundAmount: 900, costItems: [{ itemCode: "TEST-001", itemName: "补正诊疗项目", amount: 1200, catalogVersion: "2026" }] }) });
     await refresh(); message("业务状态已更新并记录审计");
   } catch (error) { message(error.message, true); }
@@ -60,7 +66,16 @@ function render() {
   const { state, summary, institutions } = paymentView;
   document.querySelector("#payment-mode").value = state.mode || "DRG";
   document.querySelector("#payment-metrics").innerHTML = [["住院病例", summary.caseCount, `已测算 ${summary.calculatedCount || 0}`],["支付标准", fmt(summary.paymentStandard), `总费用 ${fmt(summary.totalCost)}`],["预计结余", fmt(summary.projectedBalance), "负值表示费用超出标准"],["监管线索", summary.riskCount, `未入组 ${summary.ungroupedCount || 0}`],["特例待评", summary.specialPending, "支持复杂危重与新药新技术"],["待办批次", summary.settlementPending, "月结算与年度清算"]].map(([label,value,hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><small>${hint}</small></article>`).join("");
-  renderIntake(state, summary.intake || {}); renderCases(state); renderPolicy(state); renderVersions(state); renderSpecial(state); renderSettlements(state); renderMonitoring(state, institutions); renderGovernance(state); renderFeedback(state); renderAudit(state);
+  renderDrgWorkbench(state, summary.drg || {}); renderIntake(state, summary.intake || {}); renderCases(state); renderPolicy(state); renderVersions(state); renderSpecial(state); renderSettlements(state); renderMonitoring(state, institutions); renderGovernance(state); renderFeedback(state); renderAudit(state);
+}
+
+function renderDrgWorkbench(state, analytics) {
+  const profile = state.drg2LibraryProfile || {};
+  document.querySelector("#drg-profile").innerHTML = [["MDC", profile.mdcCount, "主要诊断大类"],["ADRG", profile.adrgCount, "核心分组"],["DRG", profile.drgCount, "细分病组"],["外科组", profile.surgicalGroups, "手术室操作"],["非手术室操作组", profile.nonOperatingRoomProcedureGroups, "操作分组"],["内科组", profile.medicalGroups, "内科诊疗"]].map(([label,value,hint]) => `<div class="drg-profile-card"><span>${label}</span><strong>${value ?? "-"}</strong><small>${hint}</small></div>`).join("");
+  const groups = (state.groupCatalog || []).filter((item) => item.mode === "DRG");
+  const adrgs = [...new Map(groups.map((group) => [group.adrgCode, group])).values()].filter((group) => group.adrgCode);
+  document.querySelector("#drg-hierarchy").innerHTML = adrgs.map((group) => { const children = groups.filter((item) => item.adrgCode === group.adrgCode); return `<div class="drg-hierarchy-row"><strong>${escapeHtml(group.mdcCode)} ${escapeHtml(group.mdcName)} → ${escapeHtml(group.adrgCode)} ${escapeHtml(group.adrgName)}</strong><small>${children.map((item) => `${escapeHtml(item.code)}（${escapeHtml(item.complicationLevel)}，权重${item.weight}）`).join(" · ")}</small></div>`; }).join("") || `<p class="muted">本地预览目录尚未配置。</p>`;
+  document.querySelector("#drg-analytics").innerHTML = [["入组率", `${Math.round(Number(analytics.groupingRate || 0) * 1000) / 10}%`],["CMI", Number(analytics.cmi || 0).toFixed(3)],["总权重", Number(analytics.totalWeight || 0).toFixed(2)],["覆盖MDC", analytics.mdcCount || 0],["覆盖ADRG", analytics.adrgCount || 0],["覆盖DRG", analytics.drgCount || 0],["MCC病例", analytics.mccCases || 0],["高倍率", analytics.highOutliers || 0],["低倍率", analytics.lowOutliers || 0]].map(([label,value]) => `<div class="drg-analytics-card"><span>${label}</span><strong>${value}</strong></div>`).join("");
 }
 
 async function importSample(withError) {
@@ -79,7 +94,7 @@ function renderIntake(state, summary) {
 
 function renderCases(state) {
   document.querySelector("#case-count").textContent = `${state.cases.length}例`;
-  document.querySelector("#case-list").innerHTML = `<table class="payment-table"><thead><tr><th>病例/机构</th><th>诊断</th><th>费用</th><th>分组结果</th><th>支付测算</th><th>监管</th><th>操作</th></tr></thead><tbody>${state.cases.map((item) => { const c = item.calculation || {}; const g = c.grouping || {}; const risks = c.risks || []; return `<tr><td><strong>${escapeHtml(item.patientName)}</strong><small>${escapeHtml(item.settlementListNo)} · ${escapeHtml(item.institution)}</small></td><td>${escapeHtml(item.principalDiagnosis)} ${escapeHtml(item.principalDiagnosisName)}<small>${item.admissionDate} 至 ${item.dischargeDate}</small></td><td>${fmt(item.totalAmount)}<small>申报基金 ${fmt(item.declaredFundAmount)}</small></td><td><strong>${escapeHtml(g.groupCode || "待分组")}</strong><small>${escapeHtml(g.groupName || item.qualityStatus)}</small></td><td>${c.paymentStandard == null ? "待测算" : fmt(c.paymentStandard)}<small>${escapeHtml(c.formula || "")}</small></td><td><div class="risk-list">${risks.length ? risks.map((risk) => `<span class="risk-pill">${escapeHtml(risk.name)}</span>`).join("") : `<span class="ok-pill">未发现线索</span>`}</div></td><td><div class="case-actions">${item.specialCaseStatus === "未申报" ? `<button data-payment-action="special" data-id="${item.id}">特例申报</button>` : `<span>${item.specialCaseStatus}</span>`}</div></td></tr>`; }).join("")}</tbody></table>`;
+  document.querySelector("#case-list").innerHTML = `<table class="payment-table"><thead><tr><th>病例/机构</th><th>诊断</th><th>费用</th><th>分组结果</th><th>支付测算</th><th>监管</th><th>操作</th></tr></thead><tbody>${state.cases.map((item) => { const c = item.calculation || {}; const g = c.grouping || {}; const risks = c.risks || []; const hierarchy = g.mode === "DRG" && g.mdcCode ? `${g.mdcCode} → ${g.adrgCode} → ${g.groupCode} · ${g.complicationLevel}` : g.groupCode || "待分组"; return `<tr><td><strong>${escapeHtml(item.patientName)}</strong><small>${escapeHtml(item.settlementListNo)} · ${escapeHtml(item.institution)}</small></td><td>${escapeHtml(item.principalDiagnosis)} ${escapeHtml(item.principalDiagnosisName)}<small>${item.admissionDate} 至 ${item.dischargeDate}</small></td><td>${fmt(item.totalAmount)}<small>申报基金 ${fmt(item.declaredFundAmount)}</small></td><td><strong>${escapeHtml(hierarchy)}</strong><small>${escapeHtml(g.groupName || item.qualityStatus)}</small></td><td>${c.paymentStandard == null ? "待测算" : fmt(c.paymentStandard)}<small>${escapeHtml(c.formula || "")}${c.costRatio ? ` · 倍率${Number(c.costRatio).toFixed(2)}` : ""}</small></td><td><div class="risk-list">${risks.length ? risks.map((risk) => `<span class="risk-pill">${escapeHtml(risk.name)}</span>`).join("") : `<span class="ok-pill">未发现线索</span>`}</div></td><td><div class="case-actions"><button class="secondary" data-payment-action="preview-drg" data-id="${item.id}">DRG试分组</button>${item.specialCaseStatus === "未申报" ? `<button data-payment-action="special" data-id="${item.id}">特例申报</button>` : `<span>${item.specialCaseStatus}</span>`}</div></td></tr>`; }).join("")}</tbody></table>`;
 }
 
 function renderPolicy(state) {

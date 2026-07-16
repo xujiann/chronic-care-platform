@@ -47,6 +47,7 @@ function buildFallbackOverview() {
 function renderPhysicalExamSystem() {
   const overview = physicalExamState.overview || buildFallbackOverview();
   renderPhysicalExamSummary(overview.summary || {});
+  renderPhysicalExamHighlights(overview.highlights || {});
   renderSourceContracts(overview.sourceContracts || []);
   renderStandards(overview.standards || window.PhysicalExaminationStandards?.STANDARD_CATALOG || []);
   renderQualityIndicators(overview.qualityIndicators || []);
@@ -78,6 +79,96 @@ function renderPhysicalExamSummary(summary) {
     ["死信事件", summary.deadLetters || 0, "需补偿的接入事件"]
   ];
   document.querySelector("#physical-exam-summary").innerHTML = cards.map(([label, value, hint]) => `<article class="metric-card"><span>${escapeExamHtml(label)}</span><strong>${escapeExamHtml(value)}</strong><small>${escapeExamHtml(hint)}</small></article>`).join("");
+}
+
+function renderPhysicalExamHighlights(highlights) {
+  const summary = highlights.summary || {};
+  const summaryTarget = document.querySelector("#physical-exam-highlight-summary");
+  if (summaryTarget) {
+    const cards = [
+      ["健康轨迹", summary.trajectories || 0, "跨年度可计算指标"],
+      ["居民解释", summary.translatedFindings || 0, "专业报告分层翻译"],
+      ["行动卡", summary.openActions || 0, "异常到复查/家医"],
+      ["重复候选", summary.repeatCandidates || 0, "医师判断能否互认"],
+      ["放射记录", summary.radiationRecords || 0, "正当化与剂量台账"],
+      ["质量问题", summary.qualityIssues || 0, "报告啄木鸟发现"],
+      ["健康护照", summary.activePassports || 0, "居民授权的数据范围"]
+    ];
+    summaryTarget.innerHTML = cards.map(([name, value, detail]) => `<article><span>${escapeExamHtml(name)}</span><strong>${escapeExamHtml(value)}</strong><small>${escapeExamHtml(detail)}</small></article>`).join("");
+  }
+  renderHighlightTrajectories(highlights.trajectories || []);
+  renderHighlightTranslations(highlights.translations || []);
+  renderHighlightPlans(highlights.examPlans || []);
+  renderRepeatRadiation(highlights.repeatAvoidance || [], highlights.radiationLedger || []);
+  renderQualityReviews(highlights.qualityReviews || []);
+  renderInstitutionBenchmarks(highlights.institutionBenchmarks || []);
+  renderCityRadar(highlights.cityRadar || []);
+  renderStandardsImpact(highlights.standardsImpact || []);
+  renderCriticalPaths(highlights.criticalPaths || []);
+}
+
+function renderHighlightTrajectories(rows) {
+  const target = document.querySelector("#physical-exam-trajectories");
+  if (!target) return;
+  target.innerHTML = rows.slice(0, 12).map((item) => {
+    const values = (item.points || []).map((point) => Number(point.value)).filter(Number.isFinite);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = Math.max(1, max - min);
+    const bars = (item.points || []).map((point) => `<span title="${escapeExamHtml(`${point.date} ${point.value}${point.unit || ""}`)}" style="height:${24 + ((Number(point.value) - min) / range) * 42}px" class="${point.abnormal ? "warn" : "ok"}"></span>`).join("");
+    return `<article class="trajectory-card"><div><strong>${escapeExamHtml(item.name)}</strong><small>${escapeExamHtml(item.latest ? `${item.latest.value}${item.latest.unit || ""}` : "-")} · ${escapeExamHtml(item.evidenceLevel)}</small></div><div class="mini-bars">${bars}</div><em>${item.delta === null ? "建立基线" : `较上次 ${item.delta > 0 ? "+" : ""}${escapeExamHtml(item.delta)}`}</em></article>`;
+  }).join("") || `<p class="muted">接入至少一份含结构化数值的报告后生成健康时间轴。</p>`;
+}
+
+function renderHighlightTranslations(rows) {
+  const target = document.querySelector("#physical-exam-translations");
+  if (!target) return;
+  const prioritized = [...rows].sort((a, b) => Number(b.status !== "within-report-range") - Number(a.status !== "within-report-range"));
+  target.innerHTML = prioritized.slice(0, 8).map((item) => `<article class="translation-card ${item.status}"><header><strong>${escapeExamHtml(item.title)}</strong><span>${escapeExamHtml(item.value)}</span></header><p>${escapeExamHtml(item.plainMeaning)}</p><small>下一步：${escapeExamHtml(item.nextStep)} · ${escapeExamHtml(item.department)}</small><em>${escapeExamHtml(item.boundary)}</em></article>`).join("") || `<p class="muted">暂无可翻译的结构化项目。</p>`;
+}
+
+function renderHighlightPlans(rows) {
+  const target = document.querySelector("#physical-exam-plans");
+  if (!target) return;
+  target.innerHTML = rows.map((item) => `<article class="plan-card"><header><strong>${escapeExamHtml(item.nextExamDate || "下次日期待医师确认")}</strong><span>医师待审核</span></header><p>${escapeExamHtml(item.reason)}</p><div class="tag-row">${(item.personalizedItems || []).map((value) => `<span>${escapeExamHtml(value)}</span>`).join("") || "<span>保持基础体检项目</span>"}</div>${(item.reduceOrReview || []).map((value) => `<small>${escapeExamHtml(value)}</small>`).join("")}<em>${escapeExamHtml(item.ruleVersion)}</em></article>`).join("") || `<p class="muted">暂无居民体检计划。</p>`;
+}
+
+function renderRepeatRadiation(repeats, radiation) {
+  const target = document.querySelector("#physical-exam-repeat-radiation");
+  if (!target) return;
+  const repeatHtml = repeats.map((item) => `<article><strong>重复检查候选 · ${escapeExamHtml(item.name || item.code)}</strong><p>${escapeExamHtml(item.previousDate)} 至 ${escapeExamHtml(item.date)}，间隔 ${escapeExamHtml(item.intervalDays)} 天</p><small>${escapeExamHtml(item.recommendation)}</small></article>`).join("") || `<article class="ok-card"><strong>未发现30天内重复项目</strong><p>继续在接入新报告时自动检查。</p></article>`;
+  const radiationHtml = radiation.map((item) => `<article><strong>${escapeExamHtml(item.modality)} · ${escapeExamHtml(item.date)}</strong><p>${escapeExamHtml(item.purpose || "检查目的待补")} · ${escapeExamHtml(item.dose ?? "-")}${escapeExamHtml(item.doseUnit || "")}</p><small>${item.governanceStatus === "complete" ? "正当化、告知、防护与剂量记录完整" : "放射治理记录待复核"}</small></article>`).join("") || `<article class="ok-card"><strong>暂无放射剂量记录</strong><p>不是“零辐射”结论，仅表示当前接入数据无记录。</p></article>`;
+  target.innerHTML = repeatHtml + radiationHtml;
+}
+
+function renderQualityReviews(rows) {
+  const target = document.querySelector("#physical-exam-quality-reviews");
+  if (!target) return;
+  target.innerHTML = rows.map((item) => `<article class="quality-review-card ${item.status}"><header><strong>${escapeExamHtml(item.institution)}</strong><span>${escapeExamHtml(item.score)}分</span></header><p>${escapeExamHtml(item.reportId)} · ${escapeExamHtml(item.date)}</p><div>${(item.issues || []).slice(0, 5).map((issue) => `<span class="issue ${issue.level}">${escapeExamHtml(issue.message)}</span>`).join("") || `<span class="issue passed">自动检查未发现结构缺口</span>`}</div></article>`).join("") || `<p class="muted">暂无报告质检结果。</p>`;
+}
+
+function renderInstitutionBenchmarks(rows) {
+  const target = document.querySelector("#physical-exam-benchmarks");
+  if (!target) return;
+  target.innerHTML = rows.map((item) => `<article><strong>${escapeExamHtml(item.institutionName)}</strong><p>报告 ${escapeExamHtml(item.reports)} · 异常任务 ${escapeExamHtml(item.abnormalCases)}</p><small>通知率 ${item.notificationRate === null ? "暂无分母" : `${escapeExamHtml(item.notificationRate)}%`} · 随访率 ${item.followupRate === null ? "暂无分母" : `${escapeExamHtml(item.followupRate)}%`}</small><em>${item.comparisonStatus === "sample-too-small" ? "样本不足，不排名" : "需完成风险校正后比较"}</em></article>`).join("") || `<p class="muted">暂无机构质量画像。</p>`;
+}
+
+function renderCityRadar(rows) {
+  const target = document.querySelector("#physical-exam-city-radar");
+  if (!target) return;
+  target.innerHTML = rows.map((item) => `<article><strong>${escapeExamHtml(item.name)}</strong><p>异常报告 ${escapeExamHtml(item.abnormalReports)} · 来源机构 ${escapeExamHtml(item.institutionCount)}</p><small>${escapeExamHtml(item.message)}</small><em>${escapeExamHtml(item.privacyStatus)}</em></article>`).join("") || `<p class="muted">暂无可聚合异常趋势。</p>`;
+}
+
+function renderStandardsImpact(rows) {
+  const target = document.querySelector("#physical-exam-standards-impact");
+  if (!target) return;
+  target.innerHTML = rows.map((item) => `<article><strong>${escapeExamHtml(item.code)} · ${escapeExamHtml(item.affectedReports)}份</strong><div class="tag-row">${(item.affectedLayers || []).map((layer) => `<span>${escapeExamHtml(layer)}</span>`).join("")}</div><small>${escapeExamHtml(item.nextAction)}</small></article>`).join("") || `<p class="muted">当前没有规范影响项。</p>`;
+}
+
+function renderCriticalPaths(rows) {
+  const target = document.querySelector("#physical-exam-critical-paths");
+  if (!target) return;
+  target.innerHTML = rows.map((item) => `<article class="critical-path-card ${item.overdue ? "overdue" : ""}"><header><strong>${item.classification === "high-risk" ? "高危异常" : "重要异常"}</strong><span>${escapeExamHtml(item.status)}</span></header><div class="critical-steps">${(item.steps || []).map((step) => `<span class="${step.completed ? "done" : "pending"}">${step.completed ? "✓" : "○"} ${escapeExamHtml(step.name)}</span>`).join("")}</div><small>时限 ${escapeExamHtml(item.dueAt || "待确定")} · ${escapeExamHtml(item.escalation)}</small></article>`).join("") || `<p class="muted">暂无重要异常生命通道任务。</p>`;
 }
 
 function renderProductionReadiness(readiness) {

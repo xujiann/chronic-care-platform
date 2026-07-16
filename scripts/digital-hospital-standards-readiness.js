@@ -8,6 +8,9 @@ const DEFAULT_MARKDOWN = path.join(ROOT, "release", "digital-hospital-standards-
 
 const REQUIRED_FILES = [
   "digital-hospital-governance.js",
+  "digital-hospital-self-assessment.js",
+  "digital-hospital-self-assessment.html",
+  "digital-hospital-self-assessment-ui.js",
   "digital-hospital-standards.html",
   "digital-hospital-standards.js",
   "docs/数智医院标准平台研发报告.md",
@@ -72,6 +75,14 @@ const REQUIRED_CONTROL_ACTION_MARKERS = [
   "mark-not-applicable"
 ];
 
+const REQUIRED_SELF_ASSESSMENT_ACTION_MARKERS = [
+  "assign-assessment",
+  "save-draft",
+  "submit-assessment",
+  "request-correction",
+  "accept-assessment"
+];
+
 const REQUIRED_LAUNCH_MARKERS = [
   "/api/digital-hospital/launch-readiness",
   "/api/digital-hospital/production-evidence-packets",
@@ -123,6 +134,9 @@ function buildDigitalHospitalStandardsReadiness(options = {}) {
   const doc = options.doc || read("docs/数智医院标准平台研发报告.md");
   const controlDoc = options.controlDoc || read("docs/数智医院六域规范控制矩阵-2026.md");
   const governance = options.governance || read("digital-hospital-governance.js");
+  const selfAssessmentModel = options.selfAssessmentModel || read("digital-hospital-self-assessment.js");
+  const selfAssessmentHtml = options.selfAssessmentHtml || read("digital-hospital-self-assessment.html");
+  const selfAssessmentUi = options.selfAssessmentUi || read("digital-hospital-self-assessment-ui.js");
   const manifest = options.manifest || read("scripts/release-artifact-manifest.js");
   const deployCheck = options.deployCheck || read("scripts/deploy-check.js");
   const releaseReport = options.releaseReport || read("scripts/release-report.js");
@@ -135,6 +149,7 @@ function buildDigitalHospitalStandardsReadiness(options = {}) {
   const sourceMarkersPresent = REQUIRED_SOURCE_MARKERS.filter((marker) => js.includes(marker) || doc.includes(marker));
   const apiMarkersPresent = REQUIRED_API_MARKERS.filter((marker) => server.includes(marker) || js.includes(marker));
   const controlActionMarkersPresent = REQUIRED_CONTROL_ACTION_MARKERS.filter((marker) => governance.includes(marker) && (html.includes(marker) || js.includes(marker)));
+  const selfAssessmentActionMarkersPresent = REQUIRED_SELF_ASSESSMENT_ACTION_MARKERS.filter((marker) => selfAssessmentModel.includes(marker) && (selfAssessmentHtml.includes(marker) || selfAssessmentUi.includes(marker)));
   const launchMarkersPresent = REQUIRED_LAUNCH_MARKERS.filter((marker) => server.includes(marker) || js.includes(marker) || doc.includes(marker));
   const sectionCount = countMatches(html, "data-digital-hospital-section=");
   const evidencePackCount = countMatches(js, "id: \"(interface|template|material|sample|audit)\"");
@@ -153,6 +168,7 @@ function buildDigitalHospitalStandardsReadiness(options = {}) {
     check("digitalHospital:apiContract", apiMarkersPresent.length === REQUIRED_API_MARKERS.length && js.includes("HealthCityAuth?.authFetch"), `${apiMarkersPresent.length}/${REQUIRED_API_MARKERS.length} API markers and frontend auth fetch wiring`),
     check("digitalHospital:policyGovernance", policyRecordCount >= 18 && controlCount >= 12 && html.includes("data-digital-hospital-section=\"policy-register\"") && html.includes("data-digital-hospital-section=\"control-matrix\"") && js.includes("recordDigitalHospitalPolicyReview") && governance.includes("historical-planning") && controlDoc.includes("2026 年现行基线"), `${policyRecordCount} policy records / ${controlCount} controls with lifecycle and review workflow`),
     check("digitalHospital:controlRemediation", controlActionMarkersPresent.length === REQUIRED_CONTROL_ACTION_MARKERS.length && html.includes("digital-hospital-control-action-form") && html.includes("digital-hospital-control-no-pii") && js.includes("loadDigitalHospitalControlMatrixApi") && server.includes("/api/digital-hospital/control-matrix/:id/actions") && governance.includes("independent reviewer"), `${controlActionMarkersPresent.length}/${REQUIRED_CONTROL_ACTION_MARKERS.length} control actions with minimized evidence and independent review`),
+    check("digitalHospital:selfAssessment", selfAssessmentActionMarkersPresent.length === REQUIRED_SELF_ASSESSMENT_ACTION_MARKERS.length && selfAssessmentModel.includes("DIGITAL_HOSPITAL_SELF_ASSESSMENT_INDICATORS") && countMatches(selfAssessmentModel, "id: \"dhsi-") >= 12 && selfAssessmentHtml.includes('requireRole(["commission", "institution"])') && selfAssessmentHtml.includes("digital-self-assessment-action-form") && selfAssessmentHtml.includes("digital-self-assessment-no-pii") && selfAssessmentUi.includes("recordDigitalSelfAssessmentAction") && server.includes("/api/digital-hospital/self-assessments/:id/actions") && auth.includes('"digital-hospital-self-assessment.html": ["commission", "institution"]'), `${selfAssessmentActionMarkersPresent.length}/${REQUIRED_SELF_ASSESSMENT_ACTION_MARKERS.length} self-assessment actions with 12 indicators, institution scope and independent review`),
     check("digitalHospital:launchReadiness", launchMarkersPresent.length === REQUIRED_LAUNCH_MARKERS.length && html.includes("data-digital-hospital-section=\"launch-readiness\"") && html.includes("data-digital-hospital-section=\"production-evidence-packets\"") && html.includes("data-digital-hospital-section=\"launch-command-briefs\"") && html.includes("data-digital-hospital-section=\"formal-cutover-approvals\"") && js.includes("recordDigitalHospitalLaunchEvidence") && js.includes("recordDigitalHospitalProductionEvidence") && js.includes("recordDigitalHospitalLaunchCommandBrief") && js.includes("recordDigitalHospitalFormalCutoverApproval"), `${launchMarkersPresent.length}/${REQUIRED_LAUNCH_MARKERS.length} launch readiness markers`),
     check("digitalHospital:docs", doc.includes("flowchart TD") && doc.includes("npm.cmd run digital-hospital:standards-readiness") && doc.includes("数智医院标准平台研发报告"), "module report has workflow diagram and acceptance command"),
     check("digitalHospital:releaseWiring", Boolean(pkg.scripts?.["digital-hospital:standards-readiness"]) && manifest.includes("digital-hospital-standards-readiness-report.md") && deployCheck.includes("digitalHospitalStandards") && releaseReport.includes("digitalHospitalStandards") && ci.includes("digital-hospital:standards-readiness"), "package, manifest, deploy check, release report and CI are wired")
@@ -168,6 +184,7 @@ function buildDigitalHospitalStandardsReadiness(options = {}) {
       officialSources: sourceMarkersPresent.length,
       apiMarkers: apiMarkersPresent.length,
       controlActions: controlActionMarkersPresent.length,
+      selfAssessmentActions: selfAssessmentActionMarkersPresent.length,
       launchMarkers: launchMarkersPresent.length,
       uiSections: sectionCount,
       evidenceModes: evidencePackCount,
@@ -196,6 +213,7 @@ function renderMarkdown(report) {
     `- Workflow markers: ${report.summary.workflowMarkers}`,
     `- API markers: ${report.summary.apiMarkers}`,
     `- Control actions: ${report.summary.controlActions}`,
+    `- Self-assessment actions: ${report.summary.selfAssessmentActions}`,
     `- Launch markers: ${report.summary.launchMarkers}`,
     `- UI sections: ${report.summary.uiSections}`,
     `- Evidence modes: ${report.summary.evidenceModes}`,
@@ -260,6 +278,7 @@ module.exports = {
   REQUIRED_SOURCE_MARKERS,
   REQUIRED_API_MARKERS,
   REQUIRED_CONTROL_ACTION_MARKERS,
+  REQUIRED_SELF_ASSESSMENT_ACTION_MARKERS,
   REQUIRED_LAUNCH_MARKERS,
   REQUIRED_STANDARD_MARKERS,
   REQUIRED_WORKFLOW_MARKERS,

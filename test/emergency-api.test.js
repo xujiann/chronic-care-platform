@@ -59,10 +59,40 @@ test("emergency HTTP API enforces citizen scope and produces verifiable exports"
   assert.equal(citizenBefore.response.status, 200);
   assert.equal(citizenBefore.body.events.length, 0, "unlinked dispatch seed data must not leak to citizens");
 
+  const authorization = await jsonRequest(baseUrl, "/api/emergency/life-chain/authorizations", citizenToken, {
+    method:"POST", body:JSON.stringify({ deviceId:"wearable-api-01", confirmed:true })
+  });
+  assert.equal(authorization.response.status, 201);
+  const familyContact = await jsonRequest(baseUrl, "/api/emergency/life-chain/family-contacts", citizenToken, {
+    method:"POST", body:JSON.stringify({ contactName:"API family", relation:"spouse", phoneMasked:"138****0000", confirmed:true })
+  });
+  assert.equal(familyContact.response.status, 201);
+
   const aedMap = await jsonRequest(baseUrl, "/api/emergency/aed-map?latitude=38.92&longitude=121.65", citizenToken);
   assert.equal(aedMap.response.status, 200);
   assert.equal(aedMap.body.nearestAvailable.status, "available");
   assert.ok(aedMap.body.sites.every((site, index, rows) => index === 0 || site.distanceMeters >= rows[index - 1].distanceMeters));
+
+  const deviceSos = await jsonRequest(baseUrl, "/api/emergency/life-chain/device-sos", citizenToken, {
+    method:"POST",
+    body:JSON.stringify({ deviceId:"wearable-api-01", detectedSignal:"cardiac-risk", riskScore:86, address:"Device SOS test location", latitude:38.92, longitude:121.65, networkStatus:"weak" })
+  });
+  assert.equal(deviceSos.response.status, 201, JSON.stringify(deviceSos.body));
+  assert.equal(deviceSos.body.event.sos.autoAuthorized, true);
+  assert.equal(deviceSos.body.event.lifeChain.firstAidTaskIds.length > 0, true);
+  const lifeChain = await jsonRequest(baseUrl, `/api/emergency/life-chain/overview?eventId=${encodeURIComponent(deviceSos.body.event.id)}`, citizenToken);
+  assert.equal(lifeChain.response.status, 200);
+  assert.equal(lifeChain.body.familyNotifications.length, 1);
+  assert.equal(lifeChain.body.fallbackDeliveries.length, 1);
+  const commandCenter = await jsonRequest(baseUrl, "/api/emergency/life-chain/command-center", commissionToken);
+  assert.equal(commandCenter.response.status, 200);
+  assert.equal(commandCenter.body.coverage.availableAed >= 1, true);
+  const greenConfirmed = await jsonRequest(baseUrl, `/api/emergency/events/${encodeURIComponent(deviceSos.body.event.id)}/green-channel/confirm`, institutionToken, { method:"POST", body:JSON.stringify({ note:"API hospital pre-alert confirmed" }) });
+  assert.equal(greenConfirmed.response.status, 200);
+  assert.equal(greenConfirmed.body.item.status, "hospital-confirmed");
+  const lifeChainQuality = await jsonRequest(baseUrl, "/api/emergency/life-chain/quality", commissionToken);
+  assert.equal(lifeChainQuality.response.status, 200);
+  assert.equal(lifeChainQuality.body.summary.automaticSos, 1);
 
   const rejectedSos = await jsonRequest(baseUrl, "/api/emergency/sos", citizenToken, {
     method:"POST",
@@ -86,7 +116,7 @@ test("emergency HTTP API enforces citizen scope and produces verifiable exports"
   const eventId = created.body.event.id;
 
   const citizenAfter = await jsonRequest(baseUrl, "/api/emergency/dashboard", citizenToken);
-  assert.deepEqual(citizenAfter.body.events.map((item) => item.id).sort(), [eventId, sos.body.event.id].sort());
+  assert.deepEqual(citizenAfter.body.events.map((item) => item.id).sort(), [eventId, sos.body.event.id, deviceSos.body.event.id].sort());
   const deniedSeedPackage = await jsonRequest(baseUrl, "/api/emergency/events/emg-demo-001/evidence-package", citizenToken);
   assert.equal(deniedSeedPackage.response.status, 403);
 

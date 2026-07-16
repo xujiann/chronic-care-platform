@@ -380,6 +380,7 @@ let citizenExtra = loadCitizenExtra();
 let escortDashboard = null;
 let registrationDashboard = null;
 let familyDoctorDashboard = null;
+const physicalExamHighlightsCache = new Map();
 let serviceOrderCenter = null;
 let citizenMessages = [];
 let citizenOperationsPublicFeed = {
@@ -1208,8 +1209,10 @@ function renderCitizen(residentId) {
 
   renderSummary(resident, diseases, followups, records);
   renderHealthTrends(resident);
+  renderCitizenPhysicalExamHighlights(resident.id);
   renderReminderCenter(resident.id);
   renderServiceOrderCenter(resident.id);
+  renderCitizenHighlightCenter(resident, diseases, followups, records);
   renderCitizenNotifications(resident.id);
   renderLifeCycle(resident, diseases, followups, records);
   renderVault(resident, diseases, followups, records);
@@ -1379,6 +1382,94 @@ function buildResidentServiceTasks(residentId) {
       priority: item.date < todayOffset(0) ? "high" : "normal"
     }))
   ].sort((a, b) => String(a.due || "9999-12-31").localeCompare(String(b.due || "9999-12-31")));
+}
+
+function renderCitizenPhysicalExamHighlights(residentId) {
+  const engine = window.PhysicalExaminationHighlights;
+  if (!engine) return;
+  const reports = (state.personalRecords || []).filter((item) => item.residentId === residentId && (item.category === "physical-exam" || item.meta?.physicalExam === true));
+  const cases = (state.physicalExamAbnormalCases || []).filter((item) => item.residentId === residentId);
+  const highlights = physicalExamHighlightsCache.get(residentId) || engine.build(state, reports, cases, { minimumAggregate: 3 });
+  const summaryTarget = document.querySelector("#citizen-exam-highlight-summary");
+  if (!summaryTarget) return;
+  const summary = highlights.summary || {};
+  summaryTarget.innerHTML = [
+    ["历史报告", reports.length],
+    ["健康轨迹", summary.trajectories || 0],
+    ["待处理行动", summary.openActions || 0],
+    ["放射记录", summary.radiationRecords || 0],
+    ["健康护照", summary.activePassports || 0]
+  ].map(([name, value]) => `<article><span>${escapeHtml(name)}</span><strong>${escapeHtml(value)}</strong></article>`).join("");
+
+  const trajectories = (highlights.trajectories || []).filter((item) => item.residentId === residentId);
+  setCitizenExamHtml("citizen-exam-timeline", trajectories.map((item) => `<div class="exam-highlight-row"><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(item.latest ? `${item.latest.value}${item.latest.unit || ""}` : "-")}</span><small>${item.delta === null ? "已建立基线" : `较上次 ${item.delta > 0 ? "+" : ""}${escapeHtml(item.delta)}`} · ${(item.points || []).length}个时间点</small></div>`).join("") || citizenExamEmpty("接入结构化报告后生成趋势。"));
+
+  const actions = (highlights.actionCards || []).filter((item) => item.residentId === residentId);
+  setCitizenExamHtml("citizen-exam-actions", actions.map((item) => `<div class="exam-action-card ${item.priority}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml((item.evidence || []).join("；"))}</p><small>${escapeHtml(item.nextStep)} · ${escapeHtml(item.dueAt || "尽快")}</small><div class="exam-action-buttons"><button type="button" data-exam-ack="${escapeHtml(item.id)}">我已了解</button><button type="button" data-exam-review="${escapeHtml(item.reportId)}" data-exam-department="${escapeHtml(item.appointmentDepartment)}">申请复查</button><a href="${escapeHtml(citizenPageHref("family-doctor"))}">联系家医</a></div><ol>${(item.steps || []).map((step) => `<li class="${step.completed ? "done" : "pending"}">${step.completed ? "✓" : "○"} ${escapeHtml(step.name)}</li>`).join("")}</ol></div>`).join("") || citizenExamEmpty("当前没有需要处理的体检异常。"));
+
+  const translations = (highlights.translations || []).filter((item) => item.residentId === residentId).sort((a, b) => Number(b.status !== "within-report-range") - Number(a.status !== "within-report-range"));
+  setCitizenExamHtml("citizen-exam-translations", translations.slice(0, 5).map((item) => `<details class="exam-translation"><summary><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.value)}</span></summary><p>${escapeHtml(item.plainMeaning)}</p><small>下一步：${escapeHtml(item.nextStep)} · ${escapeHtml(item.department)}</small><em>${escapeHtml(item.boundary)}</em></details>`).join("") || citizenExamEmpty("暂无可解释的结构化项目。"));
+
+  const plan = (highlights.examPlans || []).find((item) => item.residentId === residentId);
+  setCitizenExamHtml("citizen-exam-plan", plan ? `<div class="exam-plan"><strong>${escapeHtml(plan.nextExamDate || "日期待医师确认")}</strong><p>${escapeHtml(plan.reason)}</p><div>${(plan.personalizedItems || []).map((item) => `<span>${escapeHtml(item)}</span>`).join("") || "<span>基础年度体检</span>"}</div><small>生成方案须经医师审核，不能替代医学判断。</small></div>` : citizenExamEmpty("完成一次体检后生成下一年度计划。"));
+
+  const repeats = (highlights.repeatAvoidance || []).filter((item) => item.residentId === residentId);
+  const radiation = (highlights.radiationLedger || []).filter((item) => item.residentId === residentId);
+  setCitizenExamHtml("citizen-exam-radiation", `${repeats.map((item) => `<div class="exam-highlight-row warn"><strong>${escapeHtml(item.name || item.code)}可能重复</strong><span>${escapeHtml(item.intervalDays)}天</span><small>${escapeHtml(item.recommendation)}</small></div>`).join("") || `<div class="exam-highlight-row ok"><strong>未发现30天内重复项目</strong><small>是否复用结果仍由医师决定。</small></div>`}${radiation.map((item) => `<div class="exam-highlight-row"><strong>${escapeHtml(item.modality)} · ${escapeHtml(item.date)}</strong><span>${escapeHtml(item.dose ?? "-")}${escapeHtml(item.doseUnit || "")}</span><small>${escapeHtml(item.purpose || "检查目的待补")} · ${item.governanceStatus === "complete" ? "治理记录完整" : "待复核"}</small></div>`).join("") || `<div class="exam-highlight-row"><strong>暂无放射剂量记录</strong><small>不等于没有接受过放射检查。</small></div>`}`);
+
+  const familyMap = (highlights.familyRiskMaps || [])[0];
+  setCitizenExamHtml("citizen-exam-family-map", familyMap ? `<div class="family-risk-map"><p>${escapeHtml(familyMap.boundary)}</p>${(familyMap.members || []).map((member) => `<div class="family-risk-member ${member.authorized ? "authorized" : "locked"}"><strong>${escapeHtml(member.relation)} · ${escapeHtml(member.name)}</strong><span>${member.authorized ? escapeHtml((member.riskSignals || []).join("、") || "暂无风险线索") : "🔒 未授权不展示"}</span>${member.consentRequired && member.residentId === residentId ? `<button type="button" data-exam-family-consent data-account-id="${escapeHtml(familyMap.accountId)}">授权展示风险线索</button>` : ""}</div>`).join("")}</div>` : citizenExamEmpty("当前账户没有可展示的家庭成员。"));
+
+  const achievements = (highlights.achievements || []).filter((item) => item.residentId === residentId);
+  setCitizenExamHtml("citizen-exam-achievements", achievements.map((item) => `<div class="exam-achievement ${item.achieved ? "achieved" : "locked"}"><span>${item.achieved ? "★" : "☆"}</span><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.detail)}</small></div></div>`).join("") || citizenExamEmpty("归集报告后点亮健康里程碑。"));
+
+  const passports = (highlights.healthPassports || []).filter((item) => item.residentId === residentId);
+  setCitizenExamHtml("citizen-exam-passport", `<div class="passport-actions"><button type="button" data-exam-create-passport>创建7天健康护照</button><small>默认仅授权报告、趋势、异常和建议；所有访问需审计。</small></div>${passports.map((item) => `<div class="health-passport ${item.status}"><strong>${escapeHtml(item.accessRef)}</strong><span>${escapeHtml(item.status)} · 至 ${escapeHtml(item.expiresAt)}</span><small>${escapeHtml((item.scopes || []).join("、"))}</small>${item.status === "active" ? `<button type="button" data-exam-revoke-passport="${escapeHtml(item.id)}">撤销</button>` : ""}</div>`).join("")}`);
+
+  const simulation = (highlights.simulations || []).find((item) => item.residentId === residentId);
+  setCitizenExamHtml("citizen-exam-simulation", simulation ? `<div class="simulation-baseline"><span>当前教育基线</span><strong>${escapeHtml(simulation.baselineScore)}分</strong></div><div class="simulation-options">${(simulation.scenarios || []).map((item) => `<button type="button" data-exam-scenario="${escapeHtml(item.id)}" data-score="${escapeHtml(item.simulatedScore)}" data-range="${escapeHtml(item.changeRange)}">${escapeHtml(item.name)}</button>`).join("")}</div><div id="citizen-exam-simulation-result" class="simulation-result">选择一个情景查看方向性变化区间。</div><small>${escapeHtml(simulation.boundary)}</small>` : citizenExamEmpty("暂无可模拟的体检风险基线。"));
+  document.querySelector("#citizen-exam-boundary").textContent = highlights.safetyBoundary || "";
+  bindCitizenPhysicalExamHighlightActions(residentId);
+}
+
+function setCitizenExamHtml(id, html) {
+  const target = document.querySelector(`#${id}`);
+  if (target) target.innerHTML = html;
+}
+
+function citizenExamEmpty(message) {
+  return `<p class="muted">${escapeHtml(message)}</p>`;
+}
+
+function bindCitizenPhysicalExamHighlightActions(residentId) {
+  document.querySelectorAll("[data-exam-scenario]").forEach((button) => button.addEventListener("click", () => {
+    const target = document.querySelector("#citizen-exam-simulation-result");
+    if (target) target.innerHTML = `<strong>模拟分值 ${escapeHtml(button.dataset.score)}</strong><span>${escapeHtml(button.dataset.range)}</span><small>这是健康教育情景，不预测个人疗效。</small>`;
+  }));
+  document.querySelectorAll("[data-exam-ack]").forEach((button) => button.addEventListener("click", () => performPhysicalExamHighlightAction({ action: "acknowledge-action", residentId, actionCardId: button.dataset.examAck }, "已记录您了解该异常行动")));
+  document.querySelectorAll("[data-exam-review]").forEach((button) => button.addEventListener("click", () => performPhysicalExamHighlightAction({ action: "request-review", residentId, reportId: button.dataset.examReview, department: button.dataset.examDepartment, preferredDate: todayOffset(7), reason: "居民根据体检异常行动卡申请复查" }, "复查申请已进入号源确认队列")));
+  document.querySelector("[data-exam-create-passport]")?.addEventListener("click", () => performPhysicalExamHighlightAction({ action: "create-passport", residentId, scopes: ["reports", "trends", "abnormal-findings", "recommendations"], expiresInDays: 7, purpose: "转诊或复诊资料调阅" }, "7天健康护照授权已创建"));
+  document.querySelectorAll("[data-exam-revoke-passport]").forEach((button) => button.addEventListener("click", () => performPhysicalExamHighlightAction({ action: "revoke-passport", residentId, passportId: button.dataset.examRevokePassport }, "健康护照授权已撤销")));
+  document.querySelector("[data-exam-family-consent]")?.addEventListener("click", (event) => performPhysicalExamHighlightAction({ action: "authorize-family-map", residentId, accountId: event.currentTarget.dataset.accountId }, "家庭健康地图授权已记录"));
+}
+
+async function performPhysicalExamHighlightAction(payload, successMessage) {
+  try {
+    if (!API_BASE) {
+      window.PhysicalExaminationHighlights.applyAction(state, payload, { actor: "static-resident", canAccessResident: (id) => id === payload.residentId });
+      physicalExamHighlightsCache.delete(payload.residentId);
+    } else {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/physical-exams/highlights/actions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || `操作失败：${response.status}`);
+      physicalExamHighlightsCache.set(payload.residentId, result.highlights);
+    }
+    renderCitizenPhysicalExamHighlights(payload.residentId);
+    showToast(successMessage);
+  } catch (error) {
+    showToast(error.message);
+  }
 }
 
 function serviceOrderStatusClass(status = "") {
@@ -1560,6 +1651,162 @@ function renderServiceOrderCenter(residentId) {
       <span class="status ${item.statusClass}">${escapeHtml(item.lifecycle)} · ${escapeHtml(item.status)}</span>
     </div>
   </article>`).join("") || `<p class="muted">暂无服务订单。提交护理、陪诊、挂号、体检或家医申请后会统一汇总在这里。</p>`;
+}
+
+function buildCitizenHighlightItems(resident, diseases = [], followups = [], records = []) {
+  const residentId = resident.id;
+  const physicalExams = getPersonalRecords(residentId, "physical-exam");
+  const labs = getPersonalRecords(residentId, "labs");
+  const medications = getPersonalRecords(residentId, "medications");
+  const authorizations = getPersonalRecords(residentId, "authorizations");
+  const activeAuthorizations = authorizations.filter((item) => !isRevoked(item));
+  const accessLogs = (state.dataAccessLogs || []).filter((item) => item.residentId === residentId).slice(0, 6);
+  const orders = buildUnifiedServiceOrders(residentId);
+  const reminders = buildResidentServiceTasks(residentId);
+  const account = getCurrentAccount();
+  const familyMembers = (account?.members || []).filter((item) => item.residentId !== residentId);
+  const launchChannel = citizenClientChannels.find((item) => item.key === activeClientChannel) || citizenClientChannels[0];
+  const openOrders = orders.filter((item) => !["已完成", "已终止", "completed", "closed"].includes(item.lifecycle));
+  const vaultData = collectVaultData(resident, diseases, followups, records);
+  const healthEvents = vaultData.timeline.slice(0, 5);
+  const urgentReminders = reminders.filter((item) => item.priority === "high" || serviceTaskStatusClass(item.status, item.due) === "danger");
+  const onsiteMaterials = launchChannel?.productionMaterials || [];
+  const onsitePending = onsiteMaterials.filter((item) => String(item.status || "").includes("现场补齐") || String(item.status || "").includes("待")).length;
+  return [
+    {
+      id: "health-timeline-2",
+      title: "个人健康时间轴 2.0",
+      status: `${healthEvents.length} 条近期事件`,
+      metric: `${records.length + physicalExams.length + labs.length + medications.length}`,
+      action: "查看时间轴",
+      href: citizenPageHref("health-record"),
+      detail: healthEvents.length ? healthEvents.map((item) => `${item.date || "待确认"} ${item.categoryLabel || item.category || "记录"}: ${item.name}`).join("；") : "暂无新增档案事件，上传报告或同步病历后自动进入时间轴。",
+      evidence: "健康档案、电子病历、体检、检查检验和用药记录统一排序。",
+      ready: Boolean(healthEvents.length)
+    },
+    {
+      id: "service-order-center-plus",
+      title: "统一服务订单中心深化",
+      status: `${orders.length} 单 / ${openOrders.length} 未完成`,
+      metric: openOrders.length,
+      action: "查看订单",
+      href: citizenPageHref("health-record"),
+      detail: orders.slice(0, 4).map((item) => `${item.service}:${item.lifecycle}`).join("；") || "护理、陪诊、挂号、体检、家医提交后统一进入 serviceOrders。",
+      evidence: "/api/service-orders 正式接口优先，保留本地聚合回退。",
+      ready: true
+    },
+    {
+      id: "privacy-control-deck",
+      title: "居民授权与隐私驾驶舱",
+      status: `${activeAuthorizations.length}/${authorizations.length} 有效授权`,
+      metric: accessLogs.length,
+      action: "管理授权",
+      href: citizenPageHref("health-record"),
+      detail: accessLogs.length ? accessLogs.map((item) => `${item.actor || item.role || "系统"} ${item.action || item.reason || "访问"}`).join("；") : "暂无近期访问日志，授权、撤权和复核会进入审计记录。",
+      evidence: "授权记录、撤权入口、访问日志和消息回执集中呈现。",
+      ready: true
+    },
+    {
+      id: "senior-accessibility",
+      title: "适老化与无障碍增强",
+      status: document.body.classList.contains("large-mode") ? "大字模式开启" : "大字模式可用",
+      metric: "44px+",
+      action: "切换大字",
+      command: "toggle-large-mode",
+      detail: "大字模式、底部导航、触控按钮、单列卡片和手机预览共同服务老人单手操作。",
+      evidence: "居民端按钮、表单、底部导航和移动预览均按触控尺寸设计。",
+      ready: true
+    },
+    {
+      id: "family-health-collaboration",
+      title: "家庭健康协同",
+      status: `${familyMembers.length} 名家庭成员`,
+      metric: familyMembers.length + 1,
+      action: "切换成员",
+      href: citizenPageHref("health-record"),
+      detail: familyMembers.length ? familyMembers.map((member) => `${member.relation}:${residentDisplayName(member.residentId)}`).join("；") : "当前账号暂无其他家庭成员，可接入监护或亲情代办关系。",
+      evidence: "家庭成员、授权范围、代办服务和家医签约统一按居民范围裁剪。",
+      ready: true
+    },
+    {
+      id: "smart-reminder-center",
+      title: "智能提醒但不替代诊疗",
+      status: `${reminders.length} 项提醒`,
+      metric: urgentReminders.length,
+      action: "查看提醒",
+      href: citizenPageHref("health-record"),
+      detail: reminders.slice(0, 4).map((item) => `${item.service}:${item.title}`).join("；") || "复诊、用药、体检异常、授权到期和服务回访会自动进入提醒。",
+      evidence: "提醒只做服务导航和复核提示，不生成诊断结论。",
+      ready: true
+    },
+    {
+      id: "mobile-launch-pack",
+      title: "小程序/APP 上线包",
+      status: `${launchChannel?.label || "居民端"} / ${onsitePending} 项待补`,
+      metric: onsiteMaterials.length,
+      action: "复制材料",
+      command: "copy-launch-pack",
+      detail: onsiteMaterials.slice(0, 4).map((item) => `${item.label}:${item.status}`).join("；") || "生产域名、HTTPS、隐私协议、签名包、推送证书和真机截图待现场归档。",
+      evidence: "mobile-preview、manifest、service worker、验收摘要和材料清单已串联。",
+      ready: onsitePending === 0
+    },
+    {
+      id: "emergency-assist-entry",
+      title: "院前急救辅助入口",
+      status: "拨打120优先",
+      metric: "120",
+      action: "进入急救",
+      href: "./emergency.html",
+      detail: "只提供拨打120、位置与健康摘要授权补充、紧急联系人和状态通知，不替代急救中心统一调度。",
+      evidence: "院前急救入口复用居民身份、授权和健康摘要，正式出车必须进入120指挥调度。",
+      ready: true
+    }
+  ];
+}
+
+function renderCitizenHighlightCenter(resident, diseases, followups, records) {
+  const summary = document.querySelector("#citizen-highlight-summary");
+  const grid = document.querySelector("#citizen-highlight-grid");
+  if (!summary || !grid || !resident) return;
+  const items = buildCitizenHighlightItems(resident, diseases, followups, records);
+  const ready = items.filter((item) => item.ready).length;
+  summary.textContent = `${items.length} 项亮点 · ${ready} 项已形成可操作闭环 · ${items.length - ready} 项待现场材料补齐`;
+  grid.innerHTML = items.map((item, index) => `<article class="citizen-highlight-card" data-highlight="${item.id}">
+    <div class="citizen-highlight-card-head">
+      <span>${String(index + 1).padStart(2, "0")}</span>
+      <strong>${escapeHtml(item.title)}</strong>
+      <em class="${item.ready ? "ready" : "pending"}">${item.ready ? "已实现" : "待补齐"}</em>
+    </div>
+    <div class="citizen-highlight-metric">
+      <b>${escapeHtml(String(item.metric))}</b>
+      <small>${escapeHtml(item.status)}</small>
+    </div>
+    <p>${escapeHtml(item.detail)}</p>
+    <small>${escapeHtml(item.evidence)}</small>
+    <div class="citizen-highlight-actions">
+      ${item.href ? `<a class="service-task-action" href="${item.href}">${escapeHtml(item.action)}</a>` : ""}
+      ${item.command ? `<button type="button" class="service-task-action" data-highlight-command="${item.command}">${escapeHtml(item.action)}</button>` : ""}
+    </div>
+  </article>`).join("");
+  grid.querySelectorAll("[data-highlight-command]").forEach((button) => {
+    button.addEventListener("click", () => runCitizenHighlightCommand(button.dataset.highlightCommand));
+  });
+}
+
+function runCitizenHighlightCommand(command) {
+  if (command === "toggle-large-mode") {
+    document.querySelector("#large-mode")?.click();
+    renderCitizen(currentResidentId);
+    return;
+  }
+  if (command === "copy-launch-pack") {
+    const channel = citizenClientChannels.find((item) => item.key === activeClientChannel) || citizenClientChannels[0];
+    copyLaunchMaterials(channel, clientChannelEntry(channel.key, activeServiceTab));
+  }
+}
+
+function residentDisplayName(residentId) {
+  return (state.residents || []).find((item) => item.id === residentId)?.name || residentId || "家庭成员";
 }
 
 function renderServiceTaskButtons(item) {

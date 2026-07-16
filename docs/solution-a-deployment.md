@@ -2,6 +2,8 @@
 
 本增量部署 HAPI FHIR、PostgreSQL、Orthanc 与 OHIF，并通过 `solution-a-connectors.js` 向现有平台提供健康检查和影像调阅地址。它是试点集成环境，不替代医院生产 HIS、EMR 或 PACS。
 
+受控关联会同步FHIR Patient与ImagingStudy；影像质控完成后同步DiagnosticReport，并保持Patient、ImagingStudy、DiagnosticReport引用闭环。医院生产接入的接口矩阵、安全边界和实施计划见[方案A医院系统对接方案](./方案A医院系统对接方案.md)。
+
 ## 启动
 
 1. 将 `deploy/solution-a/.env.example` 复制为 `.env`，设置强密码且不要提交。

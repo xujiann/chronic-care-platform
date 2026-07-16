@@ -1,11 +1,28 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { buildOhifStudyUrl, createSyntheticDicom, normalizeDicomWebStudy, publishImagingStudyToFhir, queryDicomWebStudies, queryOrthancStudies, readFhirPatient, solutionAConfiguration, solutionAHealth, upsertFhirPatient, upsertFhirResource, validateFhirPatient } = require("../solution-a-connectors");
+const { buildOhifStudyUrl, createSyntheticDicom, normalizeDicomWebStudy, publishDiagnosticReportToFhir, publishImagingStudyToFhir, queryDicomWebStudies, queryOrthancStudies, readFhirPatient, solutionAConfiguration, solutionAHealth, upsertFhirPatient, upsertFhirResource, validateFhirPatient } = require("../solution-a-connectors");
 
 test("solution A exposes safe default local endpoints", () => {
   const config = solutionAConfiguration({});
   assert.equal(config.hapiFhir.baseUrl, "http://127.0.0.1:8080/fhir");
   assert.equal(config.orthanc.baseUrl, "http://127.0.0.1:8042");
+});
+
+test("publishes a quality review as a linked FHIR DiagnosticReport", async () => {
+  let written;
+  const fetchImpl = async (_url, options) => {
+    written = JSON.parse(options.body);
+    return { ok: true, status: 200, text: async () => JSON.stringify({ ...written, meta: { versionId: "3" } }) };
+  };
+  const result = await publishDiagnosticReportToFhir({
+    studyInstanceUID: "1.2.3.4", studyDate: "20260713",
+    fhirPatientId: "platform-patient-1", fhirImagingStudyId: "imaging-study-1"
+  }, { result: "质控通过", comment: "影像与报告质控通过" }, { env: {}, fetchImpl });
+  assert.equal(written.resourceType, "DiagnosticReport");
+  assert.equal(written.status, "final");
+  assert.equal(written.subject.reference, "Patient/platform-patient-1");
+  assert.equal(written.imagingStudy[0].reference, "ImagingStudy/imaging-study-1");
+  assert.equal(result.diagnosticReport.versionId, "3");
 });
 test("OHIF study URL validates DICOM UID", () => {
   assert.match(buildOhifStudyUrl("1.2.840.113619.2.55.3"), /StudyInstanceUIDs=1.2.840/);

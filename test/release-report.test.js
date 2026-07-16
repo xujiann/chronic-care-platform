@@ -297,6 +297,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "digitalHospitalStandards:api" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "digitalHospitalStandards:launchReadiness" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "digitalHospitalStandards:controlRemediation" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "digitalHospitalStandards:selfAssessment" && item.passed), true);
   assert.equal(report.digitalHospitalStandards.ok, true);
   assert.equal(report.platformProductionAudit.ok, true);
   assert.equal(report.platformProductionAudit.productionReady, false);

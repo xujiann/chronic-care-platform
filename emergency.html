@@ -65,6 +65,23 @@
       </article>
     </section>
 
+    <section class="panel wide lifechain-panel" id="emergency-life-chain" data-emergency-panel="golden-four-minutes">
+      <div class="panel-title"><h2>黄金 4 分钟生命链</h2><span>设备预警、急救员、家属、绿色通道、弱网和质控</span></div>
+      <div class="portal-grid lifechain-grid">
+        <article class="lifechain-card"><h3>2. 预授权设备自动 SOS</h3><p>仅已由患者明确授权的设备可基于高风险信号自动提交 120 信息队列。</p>
+          <form id="lifechain-authorization-form" class="filter-grid compact-form"><label>设备编号<input name="deviceId" required value="wearable-demo-01" /></label><label class="sos-confirm"><input name="confirmed" type="checkbox" value="true" required /> 我确认启用自动 SOS 预授权</label><button type="submit">保存预授权</button></form>
+          <form id="lifechain-device-sos-form" class="filter-grid compact-form"><label>风险信号<select name="detectedSignal"><option value="fall-detected">跌倒识别</option><option value="cardiac-risk">心脏风险</option><option value="hypoxia-risk">低氧风险</option><option value="no-motion">持续无活动</option></select></label><label>风险分<input name="riskScore" type="number" min="60" max="100" value="82" required /></label><label>设备编号<input name="deviceId" required value="wearable-demo-01" /></label><label>位置<input name="address" required value="大连市中山区人民路示范点" /></label><label>纬度<input name="latitude" type="number" step="0.000001" value="38.920000" required /></label><label>经度<input name="longitude" type="number" step="0.000001" value="121.650000" required /></label><label>网络<select name="networkStatus"><option value="online">正常网络</option><option value="weak">弱网</option><option value="offline">离线降级</option></select></label><button type="submit" class="sos-button">模拟设备自动 SOS</button></form>
+        </article>
+        <article class="lifechain-card"><h3>4. 家属急救协同</h3><p>只向患者授权的紧急联系人生成通知任务；真实短信/电话需接入签约通道。</p>
+          <form id="lifechain-family-form" class="filter-grid compact-form"><label>联系人<input name="contactName" required value="紧急联系人" /></label><label>关系<input name="relation" value="家属" /></label><label>脱敏电话<input name="phoneMasked" required value="138****8000" /></label><label class="sos-confirm"><input name="confirmed" type="checkbox" value="true" required /> 我确认授权紧急通知</label><button type="submit">保存联系人</button></form>
+        </article>
+        <article class="lifechain-card lifechain-wide"><h3>1 / 3 / 5 / 6. 生命链态势</h3><div id="lifechain-overview" class="production-list" aria-live="polite"><p>正在加载生命链态势…</p></div></article>
+        <article class="lifechain-card lifechain-wide"><h3>5. 急救指挥态势投影</h3><div id="lifechain-command-center" class="production-list" aria-live="polite"><p>正在加载指挥态势…</p></div></article>
+        <article class="lifechain-card lifechain-wide"><h3>7. 急救质量与复盘</h3><div id="lifechain-quality" class="production-list" aria-live="polite"><p>正在加载质控指标…</p></div></article>
+      </div>
+      <p class="lifechain-boundary">自动 SOS 仅在预授权、可信设备和风险阈值满足时提交信息队列；急救员、医院接诊、短信与车辆/AED实时数据均须由现场签约系统确认。</p>
+    </section>
+
     <section class="panel wide" id="emergency-production-center" data-emergency-panel="production-center">
       <div class="panel-title"><h2>生产前上线控制中心</h2><span id="production-state">加载中</span></div>
       <div class="metric-grid" id="production-metrics"></div>
@@ -147,5 +164,6 @@
     </section>
   </main>
   <script src="./emergency.js"></script>
+  <script src="./emergency-lifechain-ui.js"></script>
 </body>
 </html>

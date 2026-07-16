@@ -28,11 +28,12 @@ test("role pages keep explicit page guards", () => {
   Object.entries(guards).forEach(([file, role]) => {
     assert.match(read(file), new RegExp(`requireRole\\(\\[\\"${role}\\"\\]\\)`), `${file} 缺少 ${role} 页面守卫`);
   });
+  assert.match(read("digital-hospital-self-assessment.html"), /requireRole\(\["commission", "institution"\]\)/);
 });
 
 test("citizen pages do not expose cross-role module links or management collections", () => {
   const citizenHtml = `${read("citizen.html")}\n${read("mobile-preview.html")}`;
-  ["institution.html", "insurance.html", "county.html", "index.html", "platform.html", "digital-hospital-standards.html", "workbench.html", "quality-safety.html", "health-dashboard.html", "public-health.html"].forEach((target) => {
+  ["institution.html", "insurance.html", "county.html", "index.html", "platform.html", "digital-hospital-standards.html", "digital-hospital-self-assessment.html", "workbench.html", "quality-safety.html", "health-dashboard.html", "public-health.html"].forEach((target) => {
     assert.doesNotMatch(citizenHtml, new RegExp(`href=[\\"']\\./${target}`), `居民页面不应链接到 ${target}`);
   });
 
@@ -43,7 +44,7 @@ test("citizen pages do not expose cross-role module links or management collecti
 });
 
 test("application pages avoid placeholder navigation", () => {
-  const pages = ["about.html", "citizen.html", "mobile-preview.html", "doctor.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "digital-hospital-standards.html", "workbench.html", "quality-safety.html", "health-dashboard.html", "public-health.html"];
+  const pages = ["about.html", "citizen.html", "mobile-preview.html", "doctor.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "digital-hospital-standards.html", "digital-hospital-self-assessment.html", "workbench.html", "quality-safety.html", "health-dashboard.html", "public-health.html"];
   pages.forEach((file) => assert.doesNotMatch(read(file), /href=["']#["']/, `${file} 存在空链接占位`));
 });
 
@@ -1178,6 +1179,9 @@ test("data governance foundation exposes platform cards API and release evidence
 test("digital hospital standards platform exposes standards center workflow and release evidence", () => {
   const html = read("digital-hospital-standards.html");
   const js = read("digital-hospital-standards.js");
+  const selfAssessmentHtml = read("digital-hospital-self-assessment.html");
+  const selfAssessmentUi = read("digital-hospital-self-assessment-ui.js");
+  const selfAssessmentModel = read("digital-hospital-self-assessment.js");
   const portalCss = read("portal.css");
   const doc = read("docs/数智医院标准平台研发报告.md");
   const readiness = read("scripts/digital-hospital-standards-readiness.js");
@@ -1198,6 +1202,19 @@ test("digital hospital standards platform exposes standards center workflow and 
   assert.match(html, /control-blocking-filter/);
   assert.match(html, /digital-hospital-control-no-pii/);
   assert.match(portalCss, /\.filter-grid \.digital-control-action-field\[hidden\]\s*\{\s*display:\s*none;/);
+  assert.match(portalCss, /\.digital-self-assessment-action-field\[hidden\]/);
+  assert.match(selfAssessmentHtml, /digital-self-assessment-action-form/);
+  assert.match(selfAssessmentHtml, /digital-self-assessment-assignment-form/);
+  assert.match(selfAssessmentHtml, /digital-self-assessment-no-pii/);
+  assert.match(selfAssessmentHtml, /requireRole\(\["commission", "institution"\]\)/);
+  assert.match(selfAssessmentUi, /DIGITAL_SELF_ASSESSMENT_ENDPOINT/);
+  assert.match(selfAssessmentUi, /recordDigitalSelfAssessmentAction/);
+  assert.match(selfAssessmentUi, /assignDigitalSelfAssessment/);
+  assert.doesNotMatch(selfAssessmentUi, /event\.currentTarget\.reset\(\)/);
+  assert.match(selfAssessmentUi, /const form = event\.currentTarget;[\s\S]*form\.reset\(\)/);
+  assert.match(selfAssessmentModel, /DIGITAL_HOSPITAL_SELF_ASSESSMENT_INDICATORS/);
+  assert.match(selfAssessmentModel, /normalizeDigitalHospitalSelfAssessmentAction/);
+  assert.match(selfAssessmentModel, /自评提交人与审核人必须独立/);
   assert.match(html, /digital-hospital-standards\.js/);
   assert.match(js, /DIGITAL_HOSPITAL_STANDARD_DOMAINS/);
   assert.match(js, /DIGITAL_HOSPITAL_API_ENDPOINT/);
@@ -1241,6 +1258,7 @@ test("digital hospital standards platform exposes standards center workflow and 
   assert.match(readiness, /digitalHospital:standardDomains/);
   assert.match(readiness, /digitalHospital:apiContract/);
   assert.match(readiness, /digitalHospital:controlRemediation/);
+  assert.match(readiness, /digitalHospital:selfAssessment/);
   assert.match(readiness, /digitalHospital:launchReadiness/);
   assert.match(readiness, /digitalHospital:releaseWiring/);
   assert.match(server, /\/api\/digital-hospital\/standards/);
@@ -1248,6 +1266,11 @@ test("digital hospital standards platform exposes standards center workflow and 
   assert.match(server, /\/api\/digital-hospital\/policy-register\/:id\/actions/);
   assert.match(server, /\/api\/digital-hospital\/control-matrix/);
   assert.match(server, /\/api\/digital-hospital\/control-matrix\/:id\/actions/);
+  assert.match(server, /\/api\/digital-hospital\/self-assessments/);
+  assert.match(server, /\/api\/digital-hospital\/self-assessments\/:id\/actions/);
+  assert.match(server, /digital-hospital-self-assessment-action/);
+  assert.match(server, /buildDigitalHospitalSelfAssessmentBoard/);
+  assert.match(server, /normalizeDigitalHospitalSelfAssessmentAction/);
   assert.match(server, /buildDigitalHospitalPolicyRegisterBoard/);
   assert.match(server, /buildDigitalHospitalControlMatrixBoard/);
   assert.match(server, /normalizeDigitalHospitalControlAction/);
@@ -1276,14 +1299,17 @@ test("digital hospital standards platform exposes standards center workflow and 
   assert.match(server, /digitalHospitalEvidencePackets/);
   assert.match(server, /digitalHospitalRiskItems/);
   assert.match(read("auth.js"), /"digital-hospital-standards\.html": \["commission"\]/);
+  assert.match(read("auth.js"), /"digital-hospital-self-assessment\.html": \["commission", "institution"\]/);
   assert.match(read("platform.html"), /digital-hospital-standards\.html/);
   assert.match(read("package.json"), /digital-hospital:standards-readiness/);
   assert.match(read("scripts/release-report.js"), /digitalHospitalStandards:readiness/);
   assert.match(read("scripts/release-report.js"), /digitalHospitalStandards:api/);
   assert.match(read("scripts/release-report.js"), /digitalHospitalStandards:launchReadiness/);
   assert.match(read("scripts/release-report.js"), /digitalHospitalStandards:policyGovernance/);
+  assert.match(read("scripts/release-report.js"), /digitalHospitalStandards:selfAssessment/);
   assert.match(read("scripts/release-artifact-manifest.js"), /digital-hospital-standards-readiness-report\.md/);
   assert.match(read("scripts/deploy-check.js"), /api:digitalHospitalStandards/);
+  assert.match(read("scripts/deploy-check.js"), /api:digitalHospitalSelfAssessment/);
   assert.match(read("scripts/launch-smoke.js"), /\/api\/digital-hospital\/launch-readiness/);
   assert.match(read("scripts/launch-smoke.js"), /\/api\/digital-hospital\/production-evidence-packets/);
   assert.match(read("scripts/launch-smoke.js"), /\/api\/digital-hospital\/launch-command-briefs/);
@@ -1770,9 +1796,10 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.equal(manifest.shortcuts.some((item) => item.url === "./citizen.html?client=app&page=escort#service-escort"), true);
   assert.equal(manifest.shortcuts.some((item) => item.url === "./mobile-preview.html?client=app"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v47-physical-examination-standards/);
+  assert.match(serviceWorker, /chronic-care-citizen-v48-physical-examination-highlights/);
   assert.match(serviceWorker, /physical-examination-standards\.js/);
-  assert.match(citizenHtml, /physical-examination-standards\.js[\s\S]*physical-examination-service\.js/);
+  assert.match(serviceWorker, /physical-examination-highlights\.js/);
+  assert.match(citizenHtml, /physical-examination-standards\.js[\s\S]*physical-examination-highlights\.js[\s\S]*physical-examination-service\.js/);
   assert.match(serviceWorker, /internet-nursing\.js\?v=20260629prod/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627preview/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages/);
@@ -1980,6 +2007,9 @@ test("citizen portal aggregates cross-service resident tasks", () => {
   assert.match(citizenHtml, /服务订单中心/);
   assert.match(citizenHtml, /service-order-metrics/);
   assert.match(citizenHtml, /service-order-cards/);
+  assert.match(citizenHtml, /citizen-highlight-center/);
+  assert.match(citizenHtml, /C端亮点中心/);
+  assert.match(citizenHtml, /citizen-highlight-grid/);
   assert.match(citizenHtml, /citizen-notification-panel/);
   assert.match(citizenHtml, /居民通知/);
   assert.match(citizenJs, /buildResidentServiceTasks/);
@@ -1989,6 +2019,17 @@ test("citizen portal aggregates cross-service resident tasks", () => {
   assert.match(citizenJs, /\/service-orders/);
   assert.match(citizenJs, /officialServiceOrdersForResident/);
   assert.match(citizenJs, /renderServiceOrderCenter/);
+  assert.match(citizenJs, /buildCitizenHighlightItems/);
+  assert.match(citizenJs, /renderCitizenHighlightCenter/);
+  assert.match(citizenJs, /个人健康时间轴 2\.0/);
+  assert.match(citizenJs, /统一服务订单中心深化/);
+  assert.match(citizenJs, /居民授权与隐私驾驶舱/);
+  assert.match(citizenJs, /适老化与无障碍增强/);
+  assert.match(citizenJs, /家庭健康协同/);
+  assert.match(citizenJs, /智能提醒但不替代诊疗/);
+  assert.match(citizenJs, /小程序\/APP 上线包/);
+  assert.match(citizenJs, /院前急救辅助入口/);
+  assert.match(citizenJs, /runCitizenHighlightCommand/);
   assert.match(citizenJs, /serviceOrderLifecycle/);
   assert.match(citizenJs, /serviceOrderStatusClass/);
   assert.match(citizenJs, /bindResidentTaskActions/);
@@ -2018,6 +2059,9 @@ test("citizen portal aggregates cross-service resident tasks", () => {
   assert.match(citizenCss, /service-order-metrics/);
   assert.match(citizenCss, /service-order-grid/);
   assert.match(citizenCss, /service-order-card/);
+  assert.match(citizenCss, /citizen-highlight-panel/);
+  assert.match(citizenCss, /citizen-highlight-grid/);
+  assert.match(citizenCss, /citizen-highlight-card/);
   assert.match(citizenCss, /service-task-action/);
   assert.match(citizenCss, /service-task-buttons/);
   assert.match(citizenCss, /citizen-notification-card/);
@@ -3161,11 +3205,18 @@ test("six platform standards ledgers expose API page export and release gates", 
 
   assert.match(server, /\/api\/platform\/standards-ledgers/);
   assert.match(server, /renderPlatformStandardsLedgersMarkdown/);
+  assert.match(server, /buildPlatformStandardsLedgerDetail/);
   assert.match(html, /id="platform-standards-ledgers-panel"/);
   assert.match(html, /id="export-platform-standards-ledgers"/);
+  assert.match(html, /id="platform-standards-ledger-filters"/);
+  assert.match(html, /id="platform-standards-ledger-detail"/);
+  assert.match(html, /id="export-platform-standards-ledger-detail"/);
   assert.match(js, /loadPlatformStandardsLedgers/);
   assert.match(js, /renderPlatformStandardsLedgers/);
   assert.match(js, /exportPlatformStandardsLedgers/);
+  assert.match(js, /loadPlatformStandardsLedgerDetail/);
+  assert.match(js, /renderPlatformStandardsLedgerDetail/);
+  assert.match(js, /exportPlatformStandardsLedgerDetail/);
   assert.match(js, /data-platform-standards-ledger/);
   assert.match(js, /待现场证据/);
   assert.match(builder, /project-document-register/);
@@ -3174,6 +3225,7 @@ test("six platform standards ledgers expose API page export and release gates", 
   assert.match(builder, /interface-exchange-register/);
   assert.match(builder, /security-compliance-register/);
   assert.match(builder, /acceptance-operations-register/);
+  assert.match(builder, /renderPlatformStandardsLedgerDetailMarkdown/);
   assert.equal(Boolean(pkg.scripts["platform:standards-ledgers"]), true);
   assert.match(releaseReport, /platformStandardsLedgers:readiness/);
   assert.match(releaseReport, /platform-standards-ledgers\.json/);
