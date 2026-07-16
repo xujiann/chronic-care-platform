@@ -653,6 +653,85 @@ body.service-paged-mode .citizen-shell {
   outline-offset: 2px;
 }
 
+.citizen-action-dock {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.7fr) minmax(0, 1.3fr);
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(216, 226, 231, 0.9);
+  border-radius: 10px;
+  padding: 10px;
+  background: #fff;
+}
+
+.citizen-action-dock-copy,
+.citizen-action-dock-copy span,
+.citizen-action-dock-copy strong,
+.citizen-action-dock-copy small {
+  min-width: 0;
+}
+
+.citizen-action-dock-copy {
+  display: grid;
+  gap: 3px;
+}
+
+.citizen-action-dock-copy span,
+.citizen-action-dock-copy small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.citizen-action-dock-copy strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.citizen-action-dock-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.citizen-action-chip {
+  display: inline-grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #f8fbfd;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.citizen-action-chip.primary {
+  border-color: var(--blue);
+  background: var(--blue);
+  color: #fff;
+}
+
+.citizen-action-chip:focus-visible {
+  outline: 3px solid rgba(39, 110, 241, 0.35);
+  outline-offset: 2px;
+}
+
 .birth-health-summary-strip {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -3174,6 +3253,50 @@ dialog::backdrop {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(96px, 0.7fr);
     gap: 8px;
+  }
+
+  .citizen-action-dock {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 9px;
+  }
+
+  .citizen-action-dock-copy {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .citizen-action-dock-copy span,
+  .citizen-action-dock-copy small {
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .citizen-action-dock-copy strong {
+    font-size: 15px;
+  }
+
+  .citizen-action-dock-actions {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(92px, 1fr);
+    grid-template-columns: none;
+    gap: 7px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-padding-inline: 4px;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+  }
+
+  .citizen-action-dock-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .citizen-action-chip {
+    min-height: 48px;
+    padding: 8px;
+    scroll-snap-align: start;
   }
 
   body.service-paged-mode .mobile-service-rail {

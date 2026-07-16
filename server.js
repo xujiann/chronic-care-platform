@@ -79,6 +79,7 @@ const {
   dispatchAlert,
   validateAlert
 } = require("./observability-alerting");
+const { buildInternetNursingInnovationCenter } = require("./internet-nursing-highlights");
 const {
   applyObjectLifecycle,
   createObjectDownloadIntent,
@@ -12036,6 +12037,10 @@ function buildInternetNursingDashboard(data, user) {
   const institutionById = new Map(institutions.map((item) => [item.id, item]));
   const openOrders = orders.filter((item) => !isClosedTaskStatus(item.status));
   const riskQueue = orders.filter((item) => /high|urgent|overdue/i.test(`${item.riskLevel || ""} ${item.status || ""}`));
+  const dispatchRecommendations = buildInternetNursingDispatchRecommendations(openOrders, nurseRows);
+  const regulatoryMonthlyReport = buildInternetNursingRegulatoryMonthlyReport(orders, institutionRows);
+  const paymentReadiness = buildInternetNursingPaymentReadiness(policy, orders);
+  const siteCutoverPack = buildInternetNursingCutoverPack(policy);
   return {
     ok: true,
     policy,
@@ -12065,15 +12070,25 @@ function buildInternetNursingDashboard(data, user) {
     })),
     riskQueue,
     nurseQueue: openOrders.filter((item) => item.status === "dispatched" || item.status === "requested" || item.status === "accepted"),
-    dispatchRecommendations: buildInternetNursingDispatchRecommendations(openOrders, nurseRows),
-    regulatoryMonthlyReport: buildInternetNursingRegulatoryMonthlyReport(orders, institutionRows),
+    dispatchRecommendations,
+    regulatoryMonthlyReport,
     regulatoryAlerts: buildInternetNursingRegulatoryAlerts(institutionRows, nurseRows),
     regulatoryContract: policy.regulatoryContract || seedInternetNursingPolicy().regulatoryContract,
     productionIntegration: buildInternetNursingProductionIntegration(policy, orders),
-    paymentReadiness: buildInternetNursingPaymentReadiness(policy, orders),
+    paymentReadiness,
     deviceVerification: buildInternetNursingDeviceVerification(policy, orders, nurseRows),
     regulatorySubmission: buildInternetNursingRegulatorySubmission(policy, orders, institutionRows),
-    siteCutoverPack: buildInternetNursingCutoverPack(policy)
+    siteCutoverPack,
+    innovationCenter: buildInternetNursingInnovationCenter({
+      policy,
+      institutions: institutionRows,
+      nurses: nurseRows,
+      orders,
+      dispatchRecommendations,
+      regulatoryMonthlyReport,
+      paymentReadiness,
+      siteCutoverPack
+    })
   };
 }
 

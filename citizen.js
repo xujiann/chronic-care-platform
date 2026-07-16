@@ -266,6 +266,56 @@ function mobileServiceBadgeLabel(tab, active) {
   return active ? "当前" : `${serviceNavigationMeta(tab).featureCount}项`;
 }
 
+const citizenActionDockFallbacks = {
+  "health-record": [
+    { label: "看时间轴", target: "#citizen-highlight-center", tone: "primary" },
+    { label: "查订单", target: ".service-order-center-panel" },
+    { label: "隐私授权", target: ".data-governance-panel" }
+  ],
+  emr: [
+    { label: "看病历", target: "#service-emr", tone: "primary" },
+    { label: "查检验", target: ".vault-panel" },
+    { label: "授权记录", target: ".data-governance-panel" }
+  ],
+  nursing: [
+    { label: "预约护理", target: "#service-nursing", tone: "primary" },
+    { label: "长期照护", target: "#long-term-care-assessment-panel" },
+    { label: "查订单", target: ".service-order-center-panel" }
+  ],
+  escort: [
+    { label: "约陪诊", target: "#service-escort", tone: "primary" },
+    { label: "服务订单", target: ".service-order-center-panel" },
+    { label: "通知待办", target: ".service-task-panel" }
+  ],
+  "family-doctor": [
+    { label: "签约家医", target: "#service-family-doctor", tone: "primary" },
+    { label: "履约进度", target: "#family-doctor-contract-panel" },
+    { label: "家庭成员", target: ".member-panel" }
+  ],
+  registration: [
+    { label: "预约挂号", target: "#service-registration", tone: "primary" },
+    { label: "候补号源", target: "#registration-waitlist-panel" },
+    { label: "查订单", target: ".service-order-center-panel" }
+  ]
+};
+
+function citizenActionDockItems(tab) {
+  const items = [];
+  if (tab) {
+    items.push({
+      label: tab.actionLabel || "进入服务",
+      key: tab.key,
+      href: tab.actionHref || citizenPageHref(tab.key),
+      primary: true,
+      internal: !tab.actionHref
+    });
+  }
+  (citizenActionDockFallbacks[tab?.key] || []).forEach((item) => {
+    if (!items.some((existing) => existing.label === item.label)) items.push(item);
+  });
+  return items.slice(0, 4);
+}
+
 const registrationSchedules = [
   { id: "reg-sch-cardio-am", hospital: "大连市中心医院", department: "心内科", doctor: "王医生", date: todayOffset(2), period: "上午", remaining: 6, fee: 18, cancelBeforeHours: 24, source: "医院号源池", tags: ["高血压复诊", "支持陪诊"] },
   { id: "reg-sch-cardio-waitlist-am", hospital: "大连市中心医院", department: "心内科", doctor: "孙医生", date: todayOffset(1), period: "上午", remaining: 0, fee: 18, cancelBeforeHours: 12, source: "医院号源池", tags: ["号源已满", "支持候补"] },
@@ -564,6 +614,44 @@ function renderMobileServicePagebar() {
   });
   target.querySelector("[data-mobile-feature-list]")?.addEventListener("click", () => {
     document.querySelector("#service-summary .service-subnav")?.scrollIntoView({ block: "start", behavior: "smooth" });
+  });
+}
+
+function renderCitizenActionDock() {
+  const target = document.querySelector("#citizen-action-dock");
+  if (!target) return;
+  const active = getActiveCitizenService();
+  const meta = serviceNavigationMeta(active);
+  const items = citizenActionDockItems(active);
+  target.innerHTML = `<div class="citizen-action-dock-copy">
+    <span>常用操作</span>
+    <strong>${active.label}</strong>
+    <small>${meta.featureCount} 项可用能力</small>
+  </div>
+  <div class="citizen-action-dock-actions">
+    ${items.map((item) => {
+      if (item.href) {
+        return `<a class="citizen-action-chip ${item.primary ? "primary" : ""}" href="${item.href}" data-action-dock-service="${item.internal ? item.key : ""}">${item.label}</a>`;
+      }
+      return `<button type="button" class="citizen-action-chip ${item.tone === "primary" ? "primary" : ""}" data-action-dock-target="${item.target || ""}">${item.label}</button>`;
+    }).join("")}
+  </div>`;
+  target.querySelectorAll("[data-action-dock-service]").forEach((link) => {
+    if (!link.dataset.actionDockService) return;
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      invokeInternalServiceAction(event.currentTarget.dataset.actionDockService);
+    });
+  });
+  target.querySelectorAll("[data-action-dock-target]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const selector = button.dataset.actionDockTarget;
+      const destination = selector ? document.querySelector(selector) : null;
+      if (destination?.closest("[data-service-pane]")?.hidden) {
+        setServiceTab(destination.closest("[data-service-pane]").dataset.servicePane, { pushState: true, scrollToPane: false });
+      }
+      (destination || getServicePageTarget(active.key))?.scrollIntoView({ block: "start", behavior: "smooth" });
+    });
   });
 }
 
@@ -888,6 +976,7 @@ function updateServicePanes() {
   document.body.dataset.activeServicePage = activeServiceTab;
   renderServiceSummary();
   renderMobileServicePagebar();
+  renderCitizenActionDock();
   renderMobileServiceRail();
   renderResidentFunctionAudit();
   renderClientChannels();

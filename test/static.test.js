@@ -2122,6 +2122,8 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenHtml, /mobile-service-nav/);
   assert.match(citizenHtml, /service-summary/);
   assert.match(citizenHtml, /service-mobile-pagebar/);
+  assert.match(citizenHtml, /citizen-action-dock/);
+  assert.match(citizenHtml, /当前服务常用操作/);
   assert.match(citizenHtml, /service-health-record/);
   assert.match(citizenHtml, /service-emr/);
   assert.match(citizenHtml, /service-nursing/);
@@ -2165,6 +2167,10 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /renderDataGovernance/);
   assert.match(citizenJs, /citizenPipelineAudit/);
   assert.match(citizenJs, /renderCitizenPipelineAudit/);
+  assert.match(citizenJs, /citizenActionDockFallbacks/);
+  assert.match(citizenJs, /renderCitizenActionDock/);
+  assert.match(citizenJs, /data-action-dock-target/);
+  assert.match(citizenJs, /常用操作/);
   assert.match(citizenJs, /registration:integration-readiness/);
   assert.match(citizenJs, /onsiteAcceptance/);
   assert.match(citizenJs, /现场动作/);
@@ -2295,6 +2301,8 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /service-page-step/);
   assert.match(citizenCss, /service-mobile-actionbar/);
   assert.match(citizenCss, /service-mobile-action/);
+  assert.match(citizenCss, /citizen-action-dock/);
+  assert.match(citizenCss, /citizen-action-chip/);
   assert.match(citizenJs, /data-service-state/);
   assert.match(citizenJs, /service-tab-boundary/);
   assert.match(citizenJs, /service-summary-meta/);

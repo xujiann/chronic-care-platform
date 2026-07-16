@@ -34,6 +34,10 @@ function buildStaticInternetNursingDashboard(state) {
   const institutionById = new Map(institutions.map((item) => [item.id, item]));
   const nurseById = new Map(nurses.map((item) => [item.id, item]));
   const policy = state.internetNursingPolicy || defaultNursingPolicy();
+  const dispatchRecommendations = buildStaticDispatchRecommendations(orders, nurses);
+  const regulatoryMonthlyReport = buildStaticRegulatoryMonthlyReport(orders, institutions);
+  const paymentReadiness = buildStaticPaymentReadiness(policy, orders);
+  const siteCutoverPack = buildStaticSiteCutoverPack(policy);
   return {
     ok: true,
     policy,
@@ -56,15 +60,25 @@ function buildStaticInternetNursingDashboard(state) {
     orders: orders.map((item) => ({ ...item, institution: institutionById.get(item.institutionId), nurse: nurseById.get(item.nurseId) })),
     nurseQueue: orders,
     riskQueue: orders.filter((item) => item.riskLevel === "high"),
-    dispatchRecommendations: buildStaticDispatchRecommendations(orders, nurses),
-    regulatoryMonthlyReport: buildStaticRegulatoryMonthlyReport(orders, institutions),
+    dispatchRecommendations,
+    regulatoryMonthlyReport,
     regulatoryAlerts: buildStaticRegulatoryAlerts(institutions, nurses),
     regulatoryContract: policy.regulatoryContract || defaultRegulatoryContract(),
     productionIntegration: buildStaticProductionIntegration(policy, orders),
-    paymentReadiness: buildStaticPaymentReadiness(policy, orders),
+    paymentReadiness,
     deviceVerification: buildStaticDeviceVerification(policy, orders, nurses),
     regulatorySubmission: buildStaticRegulatorySubmission(policy, orders, institutions),
-    siteCutoverPack: buildStaticSiteCutoverPack(policy)
+    siteCutoverPack,
+    innovationCenter: window.InternetNursingHighlights?.buildInternetNursingInnovationCenter({
+      policy,
+      institutions,
+      nurses,
+      orders,
+      dispatchRecommendations,
+      regulatoryMonthlyReport,
+      paymentReadiness,
+      siteCutoverPack
+    })
   };
 }
 
@@ -307,6 +321,7 @@ function renderInternetNursingDashboard(dashboard) {
   renderDeviceVerification(dashboard.deviceVerification || {});
   renderRegulatorySubmission(dashboard.regulatorySubmission || {});
   renderSiteCutoverPack(dashboard.siteCutoverPack || {});
+  renderNursingInnovationCenter(dashboard.innovationCenter || {});
   const citizenSummary = document.querySelector("#nursing-citizen-summary");
   if (citizenSummary) citizenSummary.textContent = `${dashboard.summary?.publishedInstitutions || 0} 家已发布机构`;
   const nurseSummary = document.querySelector("#nursing-nurse-summary");

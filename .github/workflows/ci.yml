@@ -33,6 +33,8 @@ jobs:
         run: npm run blood-system:readiness
       - name: Run emergency collaboration API gate
         run: npm run emergency:test
+      - name: Run physical examination innovation and API gate
+        run: npm run physical-examination:test
       - name: Run commercial crypto adapter tests
         run: node --test test/commercial-crypto-readiness.test.js
       - name: Run API regression tests
@@ -107,6 +109,8 @@ jobs:
         run: npm run priority-apps:templates
       - name: Generate maternal child readiness report
         run: npm run maternal-child:readiness
+      - name: Generate physical examination readiness report
+        run: npm run physical-examination:readiness
       - name: Generate policy coverage report
         run: npm run policy:coverage
       - name: Generate production database readiness report
