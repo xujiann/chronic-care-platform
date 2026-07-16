@@ -17,8 +17,8 @@ test("chronic institution interface report covers pre-launch contracts", () => {
   const report = buildChronicInstitutionInterfaceReport({ data });
 
   assert.equal(report.ok, true);
-  assert.equal(report.summary.contracts, 14);
-  assert.equal(report.summary.readyContracts, 14);
+  assert.equal(report.summary.contracts, 17);
+  assert.equal(report.summary.readyContracts, 17);
   assert.equal(report.contracts.every((item) => item.routeReady && item.docReady && item.testReady), true);
   assert.equal(report.contracts.some((item) => item.id === "chronic-device-measurement-v1" && item.requiredFields.includes("externalId?")), true);
   assert.equal(report.contracts.some((item) => item.id === "chronic-followup-escalation-v1" && item.path === "/api/chronic/followup-escalations"), true);
@@ -27,6 +27,9 @@ test("chronic institution interface report covers pre-launch contracts", () => {
   assert.equal(report.contracts.some((item) => item.id === "chronic-pathway-quality-v1" && item.path === "/api/chronic/pathway-quality"), true);
   assert.equal(report.contracts.some((item) => item.id === "chronic-pharmacy-insurance-closure-v1" && item.path === "/api/chronic/pharmacy-insurance-closure"), true);
   assert.equal(report.contracts.some((item) => item.id === "chronic-production-safety-v1" && item.path === "/api/chronic/production-safety"), true);
+  assert.equal(report.contracts.some((item) => item.id === "chronic-production-safety-evidence-v1" && item.path === "/api/chronic/production-safety-evidence"), true);
+  assert.equal(report.contracts.some((item) => item.id === "chronic-interoperability-profiles-v1" && item.path === "/api/chronic/interoperability-profiles"), true);
+  assert.equal(report.contracts.some((item) => item.id === "chronic-interoperability-validation-v1" && item.path === "/api/chronic/interoperability-validation"), true);
   assert.equal(report.launchEvidence.authorization, true);
   assert.equal(report.launchEvidence.seedEvidence, true);
 });
@@ -59,4 +62,7 @@ test("chronic institution interface report renders and writes release artifacts"
   assert.match(fs.readFileSync(written.markdown, "utf8"), /chronic-pathway-quality-v1/);
   assert.match(fs.readFileSync(written.markdown, "utf8"), /chronic-pharmacy-insurance-closure-v1/);
   assert.match(fs.readFileSync(written.markdown, "utf8"), /chronic-production-safety-v1/);
+  assert.match(fs.readFileSync(written.markdown, "utf8"), /chronic-production-safety-evidence-v1/);
+  assert.match(fs.readFileSync(written.markdown, "utf8"), /chronic-interoperability-profiles-v1/);
+  assert.match(fs.readFileSync(written.markdown, "utf8"), /chronic-interoperability-validation-v1/);
 });

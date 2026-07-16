@@ -51,14 +51,25 @@ const REQUIRED_SOURCE_MARKERS = [
 const REQUIRED_API_MARKERS = [
   "/api/digital-hospital/standards",
   "/api/digital-hospital/policy-register",
+  "/api/digital-hospital/control-matrix",
   "buildDigitalHospitalStandardsOverview",
   "buildDigitalHospitalPolicyRegisterBoard",
+  "buildDigitalHospitalControlMatrixBoard",
+  "normalizeDigitalHospitalControlAction",
   "normalizeDigitalHospitalPolicyReview",
   "seedDigitalHospitalStandards",
   "seedDigitalHospitalPolicyRegister",
   "seedDigitalHospitalControlMatrix",
   "digitalHospitalEvidencePackets",
   "digitalHospitalRiskItems"
+];
+
+const REQUIRED_CONTROL_ACTION_MARKERS = [
+  "assign-control",
+  "record-evidence",
+  "verify-control",
+  "reopen-control",
+  "mark-not-applicable"
 ];
 
 const REQUIRED_LAUNCH_MARKERS = [
@@ -123,6 +134,7 @@ function buildDigitalHospitalStandardsReadiness(options = {}) {
   const workflowMarkersPresent = REQUIRED_WORKFLOW_MARKERS.filter((marker) => js.includes(marker) || doc.includes(marker));
   const sourceMarkersPresent = REQUIRED_SOURCE_MARKERS.filter((marker) => js.includes(marker) || doc.includes(marker));
   const apiMarkersPresent = REQUIRED_API_MARKERS.filter((marker) => server.includes(marker) || js.includes(marker));
+  const controlActionMarkersPresent = REQUIRED_CONTROL_ACTION_MARKERS.filter((marker) => governance.includes(marker) && (html.includes(marker) || js.includes(marker)));
   const launchMarkersPresent = REQUIRED_LAUNCH_MARKERS.filter((marker) => server.includes(marker) || js.includes(marker) || doc.includes(marker));
   const sectionCount = countMatches(html, "data-digital-hospital-section=");
   const evidencePackCount = countMatches(js, "id: \"(interface|template|material|sample|audit)\"");
@@ -140,6 +152,7 @@ function buildDigitalHospitalStandardsReadiness(options = {}) {
     check("digitalHospital:officialSources", sourceMarkersPresent.length === REQUIRED_SOURCE_MARKERS.length, `${sourceMarkersPresent.length}/${REQUIRED_SOURCE_MARKERS.length} official source markers present`),
     check("digitalHospital:apiContract", apiMarkersPresent.length === REQUIRED_API_MARKERS.length && js.includes("HealthCityAuth?.authFetch"), `${apiMarkersPresent.length}/${REQUIRED_API_MARKERS.length} API markers and frontend auth fetch wiring`),
     check("digitalHospital:policyGovernance", policyRecordCount >= 18 && controlCount >= 12 && html.includes("data-digital-hospital-section=\"policy-register\"") && html.includes("data-digital-hospital-section=\"control-matrix\"") && js.includes("recordDigitalHospitalPolicyReview") && governance.includes("historical-planning") && controlDoc.includes("2026 年现行基线"), `${policyRecordCount} policy records / ${controlCount} controls with lifecycle and review workflow`),
+    check("digitalHospital:controlRemediation", controlActionMarkersPresent.length === REQUIRED_CONTROL_ACTION_MARKERS.length && html.includes("digital-hospital-control-action-form") && html.includes("digital-hospital-control-no-pii") && js.includes("loadDigitalHospitalControlMatrixApi") && server.includes("/api/digital-hospital/control-matrix/:id/actions") && governance.includes("independent reviewer"), `${controlActionMarkersPresent.length}/${REQUIRED_CONTROL_ACTION_MARKERS.length} control actions with minimized evidence and independent review`),
     check("digitalHospital:launchReadiness", launchMarkersPresent.length === REQUIRED_LAUNCH_MARKERS.length && html.includes("data-digital-hospital-section=\"launch-readiness\"") && html.includes("data-digital-hospital-section=\"production-evidence-packets\"") && html.includes("data-digital-hospital-section=\"launch-command-briefs\"") && html.includes("data-digital-hospital-section=\"formal-cutover-approvals\"") && js.includes("recordDigitalHospitalLaunchEvidence") && js.includes("recordDigitalHospitalProductionEvidence") && js.includes("recordDigitalHospitalLaunchCommandBrief") && js.includes("recordDigitalHospitalFormalCutoverApproval"), `${launchMarkersPresent.length}/${REQUIRED_LAUNCH_MARKERS.length} launch readiness markers`),
     check("digitalHospital:docs", doc.includes("flowchart TD") && doc.includes("npm.cmd run digital-hospital:standards-readiness") && doc.includes("数智医院标准平台研发报告"), "module report has workflow diagram and acceptance command"),
     check("digitalHospital:releaseWiring", Boolean(pkg.scripts?.["digital-hospital:standards-readiness"]) && manifest.includes("digital-hospital-standards-readiness-report.md") && deployCheck.includes("digitalHospitalStandards") && releaseReport.includes("digitalHospitalStandards") && ci.includes("digital-hospital:standards-readiness"), "package, manifest, deploy check, release report and CI are wired")
@@ -154,6 +167,7 @@ function buildDigitalHospitalStandardsReadiness(options = {}) {
       workflowMarkers: workflowMarkersPresent.length,
       officialSources: sourceMarkersPresent.length,
       apiMarkers: apiMarkersPresent.length,
+      controlActions: controlActionMarkersPresent.length,
       launchMarkers: launchMarkersPresent.length,
       uiSections: sectionCount,
       evidenceModes: evidencePackCount,
@@ -181,6 +195,7 @@ function renderMarkdown(report) {
     `- Standard domains: ${report.summary.standardDomains}`,
     `- Workflow markers: ${report.summary.workflowMarkers}`,
     `- API markers: ${report.summary.apiMarkers}`,
+    `- Control actions: ${report.summary.controlActions}`,
     `- Launch markers: ${report.summary.launchMarkers}`,
     `- UI sections: ${report.summary.uiSections}`,
     `- Evidence modes: ${report.summary.evidenceModes}`,
@@ -244,6 +259,7 @@ module.exports = {
   REQUIRED_FILES,
   REQUIRED_SOURCE_MARKERS,
   REQUIRED_API_MARKERS,
+  REQUIRED_CONTROL_ACTION_MARKERS,
   REQUIRED_LAUNCH_MARKERS,
   REQUIRED_STANDARD_MARKERS,
   REQUIRED_WORKFLOW_MARKERS,

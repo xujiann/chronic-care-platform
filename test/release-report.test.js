@@ -296,6 +296,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "digitalHospitalStandards:readiness" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "digitalHospitalStandards:api" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "digitalHospitalStandards:launchReadiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "digitalHospitalStandards:controlRemediation" && item.passed), true);
   assert.equal(report.digitalHospitalStandards.ok, true);
   assert.equal(report.platformProductionAudit.ok, true);
   assert.equal(report.platformProductionAudit.productionReady, false);
@@ -753,6 +754,8 @@ test("release report writes standalone production cutover and storage artifacts"
   const platformCapabilityMapMarkdown = fs.readFileSync(path.join(outputDir, "platform-capability-map.md"), "utf8");
   const platformGoLiveSlicesJson = JSON.parse(fs.readFileSync(path.join(outputDir, "platform-go-live-slices.json"), "utf8"));
   const platformGoLiveSlicesMarkdown = fs.readFileSync(path.join(outputDir, "platform-go-live-slices.md"), "utf8");
+  const platformStandardsLedgersJson = JSON.parse(fs.readFileSync(path.join(outputDir, "platform-standards-ledgers.json"), "utf8"));
+  const platformStandardsLedgersMarkdown = fs.readFileSync(path.join(outputDir, "platform-standards-ledgers.md"), "utf8");
   assert.equal(cutoverJson.checklist.some((item) => item.id === "cutover-identity"), true);
   assert.match(cutoverMarkdown, /cutover-storage-adapter/);
   assert.equal(storageJson.storageModel.jsonSnapshot.present, true);
@@ -767,6 +770,10 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.equal(platformGoLiveSlicesJson.summary.masterDataDomains >= 6, true);
   assert.match(platformGoLiveSlicesMarkdown, /Platform go-live slices readiness/);
   assert.match(platformGoLiveSlicesMarkdown, /Unified Blocker Register/);
+  assert.equal(platformStandardsLedgersJson.ok, true);
+  assert.equal(platformStandardsLedgersJson.summary.ledgers, 6);
+  assert.equal(platformStandardsLedgersJson.summary.formalGoLiveReady, 0);
+  assert.match(platformStandardsLedgersMarkdown, /六类可验收台账/);
   assert.equal(identityJson.identityContract.ok, true);
   assert.match(identityMarkdown, /Required external claims/);
   assert.equal(auditJson.auditRetention.ok, true);

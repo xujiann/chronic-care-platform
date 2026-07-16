@@ -11,6 +11,8 @@ const ROLE_ACTIONS = {
   institution: new Set(["vehicle-update", "clinical-update", "hospital-confirm", "handover"])
 };
 
+const SOS_SIGNALS = new Set(["collapse", "chest-pain", "breathing-difficulty", "stroke-suspected", "manual-sos"]);
+
 function now() {
   return new Date().toISOString();
 }
@@ -25,6 +27,12 @@ function seed() {
     emergencyHospitals: [
       { id: "hosp-central", name: "大连市中心医院", orgCode: "MR1", emergencyStatus: "available", traumaCenter: true, strokeCenter: true, chestPainCenter: true, etaMinutes: 8 },
       { id: "hosp-friendship", name: "大连市友谊医院", orgCode: "MR2", emergencyStatus: "available", traumaCenter: true, strokeCenter: false, chestPainCenter: true, etaMinutes: 12 }
+    ],
+    emergencyAedSites: [
+      { id:"aed-zs-001", name:"People's Square AED", address:"Dalian Zhongshan District People's Road demonstration point", latitude:38.9202, longitude:121.6496, status:"available", access:"24x7", custodian:"Emergency public facility" },
+      { id:"aed-zs-002", name:"Metro interchange AED", address:"Dalian Zhongshan District metro interchange", latitude:38.9186, longitude:121.6468, status:"available", access:"station operating hours", custodian:"Metro operations" },
+      { id:"aed-zs-003", name:"Hospital entrance AED", address:"Dalian Central Hospital emergency entrance", latitude:38.9169, longitude:121.6424, status:"maintenance", access:"emergency entrance", custodian:"Hospital security" },
+      { id:"aed-zs-004", name:"Waterfront mall AED", address:"Dalian Zhongshan District waterfront mall service desk", latitude:38.9228, longitude:121.6531, status:"available", access:"mall operating hours", custodian:"Mall service desk" }
     ],
     emergencyEvents: [{
       id: "emg-demo-001", eventNo: "120-20260715-0001", source: "120-phone", callerName: "居民家属", callerPhoneMasked: "138****8000",
@@ -67,7 +75,7 @@ function appendAudit(data, user, action, target, detail) {
 
 function buildDashboard(input, user = {}) {
   const data = ensureState(input);
-  const events = data.emergencyEvents.filter((item) => user.role !== "citizen" || !item.residentId || item.residentId === user.residentId);
+  const events = data.emergencyEvents.filter((item) => user.role !== "citizen" || item.residentId === user.residentId);
   return {
     ok: true,
     generatedAt: now(),
@@ -85,6 +93,31 @@ function buildDashboard(input, user = {}) {
     hospitals: data.emergencyHospitals,
     audit: user.role === "commission" ? data.emergencyAuditEvents.slice(0, 50) : []
   };
+}
+
+function distanceMeters(latitudeA, longitudeA, latitudeB, longitudeB) {
+  const toRadians = (value) => Number(value) * Math.PI / 180;
+  const earthRadius = 6371000;
+  const dLat = toRadians(latitudeB - latitudeA);
+  const dLon = toRadians(longitudeB - longitudeA);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRadians(latitudeA)) * Math.cos(toRadians(latitudeB)) * Math.sin(dLon / 2) ** 2;
+  return Math.round(earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+function buildAedMap(input, user = {}, options = {}) {
+  const data = ensureState(input);
+  if (!["commission", "institution", "citizen"].includes(user.role)) throw Object.assign(new Error("Current role cannot access AED map"), { status: 403 });
+  const latitude = Number(options.latitude);
+  const longitude = Number(options.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) throw Object.assign(new Error("AED map requires a valid latitude and longitude"), { status: 400 });
+  const limit = Math.max(1, Math.min(10, Number(options.limit) || 5));
+  const sites = data.emergencyAedSites.map((site) => ({
+    ...site,
+    distanceMeters: distanceMeters(latitude, longitude, site.latitude, site.longitude),
+    availableForUse: site.status === "available",
+    guidance: site.status === "available" ? "Send a bystander to retrieve the AED while continuing CPR and following dispatcher instructions." : "Do not rely on this device; choose the next available AED."
+  })).sort((left, right) => left.distanceMeters - right.distanceMeters).slice(0, limit);
+  return { ok:true, generatedAt:now(), origin:{ latitude, longitude }, sites, nearestAvailable:sites.find((site) => site.availableForUse) || null, safetyNote:"AED locations are operational references. Confirm device availability on site and follow 120 dispatcher instructions." };
 }
 
 function makeEvidenceSection(id, title, present, records = [], required = true) {
@@ -269,7 +302,7 @@ function createCall(data, user, payload = {}) {
   const createdAt = now();
   const event = {
     id: randomUUID(), eventNo: `120-${createdAt.slice(0, 10).replaceAll("-", "")}-${String(data.emergencyEvents.length + 1).padStart(4, "0")}`,
-    source: payload.source === "silent-text" ? "silent-text" : "citizen-assist", callerName: safeText(payload.callerName || user.name, 80),
+    source: ["silent-text", "device-sos"].includes(payload.source) ? payload.source : "citizen-assist", callerName: safeText(payload.callerName || user.name, 80),
     callerPhoneMasked: safeText(payload.callerPhoneMasked || "已认证居民", 40), location: { address, latitude: Number(payload.latitude) || null, longitude: Number(payload.longitude) || null, confidence: Number(payload.confidence) || 0 },
     chiefComplaint, triageLevel: ["P1", "P2", "P3", "P4"].includes(payload.triageLevel) ? payload.triageLevel : "pending-dispatch-triage", patientCount: Math.max(1, Math.min(99, Number(payload.patientCount) || 1)),
     status: "accepted", residentId: user.residentId || "", createdAt, updatedAt: createdAt, mission: null,
@@ -279,6 +312,22 @@ function createCall(data, user, payload = {}) {
   };
   data.emergencyEvents.unshift(event);
   appendAudit(data, user, "create-assisted-call", event.id, `${address}; ${chiefComplaint}`);
+  return event;
+}
+
+function createSosCall(data, user, payload = {}) {
+  if (user.role !== "citizen") throw Object.assign(new Error("Only citizens can trigger a personal SOS call"), { status: 403 });
+  if (![true, "true", "confirmed", "CONFIRM"].includes(payload.confirmed)) throw Object.assign(new Error("SOS submission requires explicit confirmation"), { status: 400 });
+  const signal = SOS_SIGNALS.has(String(payload.detectedSignal || "")) ? String(payload.detectedSignal) : "manual-sos";
+  const event = createCall(data, user, {
+    ...payload,
+    source:"device-sos",
+    triageLevel:"P1",
+    chiefComplaint:safeText(payload.chiefComplaint || `SOS signal: ${signal}`, 500)
+  });
+  event.sos = { status:"submitted-to-120-queue", detectedSignal:signal, detectedAt:safeText(payload.detectedAt || event.createdAt, 40), confirmationAt:now(), autoDialUri:"tel:120", deviceRef:safeText(payload.deviceRef, 120) };
+  event.timeline[0].note = "Confirmed SOS signal submitted to the 120 acceptance queue; mobile device should open tel:120 for the official call.";
+  appendAudit(data, user, "create-confirmed-sos", event.id, `${signal}; ${event.location.address}`);
   return event;
 }
 
@@ -344,4 +393,4 @@ function applyAction(data, user, eventId, payload = {}) {
   return event;
 }
 
-module.exports = { STATE_FLOW, applyAction, buildDashboard, buildEvidencePackage, buildEvidenceExport, createCall, ensureState, seed, stableJson };
+module.exports = { STATE_FLOW, applyAction, buildAedMap, buildDashboard, buildEvidencePackage, buildEvidenceExport, createCall, createSosCall, ensureState, seed, stableJson };

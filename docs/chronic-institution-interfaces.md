@@ -153,6 +153,36 @@ Runtime audit endpoint: `GET /api/chronic/institution-interfaces`.
 - Evidence basis: production environment control status, chronic launch-core evidence, pharmacy/insurance closure, audit retention, monitoring, disaster-recovery, and cutover signoffs.
 - Launch check: `ready-for-site-safety-evidence` only means the module can collect site evidence. `ready-for-production-approval` still requires all controls, formal assessment results, external joint-test receipts, and signed go/no-go approval.
 
+### chronic-production-safety-evidence-v1
+
+- Endpoint: `GET /api/chronic/production-safety-evidence`
+- Owner: security operations and chronic-launch coordination
+- Roles: `institution`, `commission`
+- Direction: authorized, read-only bridge from verified site-launch evidence to chronic production-safety controls.
+- Response fields: `summary`, `rows`, `boundary`
+- Evidence basis: only `verified` rows from the unified `siteLaunchEvidence` ledger, mapped to chronic launch-core, audit retention, institution interface, insurance settlement, monitoring, and disaster-recovery controls.
+- Launch check: a mapped record proves that a material has been retained and verified in the unified ledger. It does not alter environment configuration, close pharmacy reconciliation exceptions, substitute security or commercial-crypto assessment, or approve production go-live.
+
+### chronic-interoperability-profiles-v1
+
+- Endpoint: `GET /api/chronic/interoperability-profiles`
+- Owner: health-information standards and chronic-launch coordination
+- Roles: `institution`, `commission`
+- Direction: authorized, read-only standards baseline for referral return, device-observation writeback, and pharmacy/insurance status messages.
+- Response fields: `summary`, `profiles`, `boundary`
+- Standards basis: `WS/T 303-2023`, the relevant `WS/T 363/364-2023` data elements and value domains, `WS/T 846-2024` interaction services, and `WS/T 847-2024` signature evidence boundary.
+- Launch check: profiles are platform-side prevalidation guidance. The receiving hospital, pharmacy, insurance, and regional-platform specifications still govern production field mapping and acceptance.
+
+### chronic-interoperability-validation-v1
+
+- Endpoint: `POST /api/chronic/interoperability-validation`
+- Owner: health-information standards and chronic-launch coordination
+- Roles: `institution`, `commission`
+- Direction: non-persistent inbound message prevalidation
+- Required body fields: `profileId`, `message`
+- Response fields: `profile`, `fields`, `formatChecks`, `missingFields`, `invalidDateFields`, `boundary`
+- Launch check: the validator applies resident scope, required-field, and date-format checks only. It neither authenticates an external sender nor verifies a production signature, submits a medical document, settles insurance, or approves an interface for production use.
+
 ### chronic-followup-escalation-v1
 
 - Endpoint: `POST /api/chronic/followup-escalations`

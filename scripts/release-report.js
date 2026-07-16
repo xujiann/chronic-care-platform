@@ -59,6 +59,7 @@ const { buildQualitySafetyReport, renderMarkdown: renderQualitySafetyMarkdown } 
 const { buildReleaseArtifactManifest, renderMarkdown: renderReleaseArtifactManifestMarkdown } = require("./release-artifact-manifest");
 const { buildCapabilityMap, renderCapabilityMapMarkdown } = require("../platform-capability-map");
 const { buildPlatformGoLiveSlices, renderPlatformGoLiveSlicesMarkdown } = require("../platform-go-live-slices");
+const { buildPlatformStandardsLedgers, renderPlatformStandardsLedgersMarkdown } = require("../platform-standards-ledgers");
 const { buildReferralTeleconsultationReadinessReport, renderMarkdown: renderReferralTeleconsultationReadinessMarkdown } = require("./referral-teleconsultation-readiness");
 const { buildResearchSandboxReadiness, renderMarkdown: renderResearchSandboxMarkdown } = require("./research-sandbox-readiness");
 const { buildSiteReadinessPack, renderMarkdown: renderSiteReadinessMarkdown, writeTemplateReadmes } = require("./site-readiness-pack");
@@ -728,7 +729,8 @@ function digitalHospitalStandardsChecks(digitalHospitalStandards) {
     check("digitalHospitalStandards:api", (digitalHospitalStandards.summary?.apiMarkers || 0) >= 5, `${digitalHospitalStandards.summary?.apiMarkers || 0} API contract markers`, "error", "digital-hospital-standards"),
     check("digitalHospitalStandards:launchReadiness", (digitalHospitalStandards.summary?.launchMarkers || 0) >= 16, `${digitalHospitalStandards.summary?.launchMarkers || 0} launch readiness markers`, "error", "digital-hospital-standards"),
     check("digitalHospitalStandards:evidence", (digitalHospitalStandards.summary?.evidenceModes || 0) >= 5 && (digitalHospitalStandards.summary?.workflowMarkers || 0) >= 6, `${digitalHospitalStandards.summary?.evidenceModes || 0} evidence modes / ${digitalHospitalStandards.summary?.workflowMarkers || 0} workflow markers`, "error", "digital-hospital-standards"),
-    check("digitalHospitalStandards:policyGovernance", (digitalHospitalStandards.summary?.policyRecords || 0) >= 18 && (digitalHospitalStandards.summary?.policyControls || 0) >= 12, `${digitalHospitalStandards.summary?.policyRecords || 0} policy records / ${digitalHospitalStandards.summary?.policyControls || 0} six-domain controls`, "error", "digital-hospital-standards")
+    check("digitalHospitalStandards:policyGovernance", (digitalHospitalStandards.summary?.policyRecords || 0) >= 18 && (digitalHospitalStandards.summary?.policyControls || 0) >= 12, `${digitalHospitalStandards.summary?.policyRecords || 0} policy records / ${digitalHospitalStandards.summary?.policyControls || 0} six-domain controls`, "error", "digital-hospital-standards"),
+    check("digitalHospitalStandards:controlRemediation", (digitalHospitalStandards.summary?.controlActions || 0) >= 5, `${digitalHospitalStandards.summary?.controlActions || 0} auditable control actions`, "error", "digital-hospital-standards")
   ];
 }
 
@@ -1024,6 +1026,7 @@ function packageChecks(pkg) {
     "postgres:adapter-verify",
     "platform:capability-map",
     "platform:go-live-slices",
+    "platform:standards-ledgers",
     "evaluation:evidence",
     "regional-data-sharing:report",
     "storage:backup",
@@ -1054,6 +1057,17 @@ function platformGoLiveSlicesChecks(platformGoLiveSlices) {
     check("platformGoLiveSlices:serviceOrderCenter", platformGoLiveSlices.summary?.serviceOrders >= 8 && platformGoLiveSlices.summary?.serviceTypes >= 4, `${platformGoLiveSlices.summary?.serviceOrders || 0} orders / ${platformGoLiveSlices.summary?.serviceTypes || 0} service types`, "error", "governance"),
     check("platformGoLiveSlices:masterDataDirectory", platformGoLiveSlices.summary?.masterDataDomains >= 6, `${platformGoLiveSlices.summary?.masterDataDomains || 0} master data domains`, "error", "governance"),
     check("platformGoLiveSlices:productionBoundary", platformGoLiveSlices.summary?.onsiteMasterDataGaps >= 1, `${platformGoLiveSlices.summary?.onsiteMasterDataGaps || 0} onsite master-data gaps remain explicit`, "error", "governance")
+  ];
+}
+
+function platformStandardsLedgersChecks(platformStandardsLedgers) {
+  return [
+    check("platformStandardsLedgers:readiness", platformStandardsLedgers.ok, platformStandardsLedgers.ok ? "six platform standards ledgers are structurally ready" : "platform standards ledger checks failed", "error", "governance"),
+    check("platformStandardsLedgers:sixRegisters", platformStandardsLedgers.summary?.ledgers === 6, `${platformStandardsLedgers.summary?.ledgers || 0}/6 ledgers`, "error", "governance"),
+    check("platformStandardsLedgers:implemented", platformStandardsLedgers.summary?.implemented === 6, `${platformStandardsLedgers.summary?.implemented || 0}/6 ledger structures implemented`, "error", "governance"),
+    check("platformStandardsLedgers:acceptanceCriteria", platformStandardsLedgers.summary?.acceptanceCriteria >= 24, `${platformStandardsLedgers.summary?.acceptanceCriteria || 0} acceptance criteria`, "error", "governance"),
+    check("platformStandardsLedgers:automation", platformStandardsLedgers.summary?.automatedChecks >= 18, `${platformStandardsLedgers.summary?.automatedChecks || 0} automated checks`, "error", "governance"),
+    check("platformStandardsLedgers:productionBoundary", platformStandardsLedgers.summary?.formalGoLiveReady === 0 && platformStandardsLedgers.summary?.onsiteBlockers >= 6, "onsite evidence remains explicitly blocked", "error", "governance")
   ];
 }
 
@@ -1150,6 +1164,7 @@ function buildReleaseReport(options = {}) {
   const platformCapabilityManifest = buildReleaseArtifactManifest({ pkg, releaseReport: { summary: { total: 0 }, checks: [] } });
   const platformCapabilityMap = buildCapabilityMap({ data, pkg, manifest: platformCapabilityManifest });
   const platformGoLiveSlices = buildPlatformGoLiveSlices(data, platformCapabilityMap);
+  const platformStandardsLedgers = buildPlatformStandardsLedgers(data, { manifest: platformCapabilityManifest });
   const siteReadinessPack = buildSiteReadinessPack({ data, pkg, envFile: options.envFile || ".env.example", env: options.env || process.env, identityContract, interfaceMapping, monitoringReadiness });
   const onsiteLaunchRequirements = buildOnsiteLaunchRequirements({ pkg, sitePack: siteReadinessPack, releaseReport: { ok: true }, envFile: options.envFile || ".env.example", env: options.env || process.env });
   const checks = [
@@ -1215,6 +1230,7 @@ function buildReleaseReport(options = {}) {
     ...policyCoverageChecks(policyCoverage),
     ...platformCapabilityMapChecks(platformCapabilityMap),
     ...platformGoLiveSlicesChecks(platformGoLiveSlices),
+    ...platformStandardsLedgersChecks(platformStandardsLedgers),
     ...env.checks,
     ...commandChecks(options.runCommands)
   ];
@@ -1291,7 +1307,8 @@ function buildReleaseReport(options = {}) {
     bloodSystemReadiness,
     policyCoverage,
     platformCapabilityMap,
-    platformGoLiveSlices
+    platformGoLiveSlices,
+    platformStandardsLedgers
   };
 }
 
@@ -2037,6 +2054,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(platformCapabilityMapJson, JSON.stringify(report.platformCapabilityMap, null, 2), "utf8");
     const platformGoLiveSlicesJson = path.join(path.dirname(output), "platform-go-live-slices.json");
     fs.writeFileSync(platformGoLiveSlicesJson, JSON.stringify(report.platformGoLiveSlices, null, 2), "utf8");
+    const platformStandardsLedgersJson = path.join(path.dirname(output), "platform-standards-ledgers.json");
+    fs.writeFileSync(platformStandardsLedgersJson, JSON.stringify(report.platformStandardsLedgers, null, 2), "utf8");
     const releaseArtifactManifest = buildReleaseArtifactManifest({ releaseReport: report });
     const releaseArtifactManifestJson = path.join(path.dirname(output), "release-artifact-manifest.json");
     fs.writeFileSync(releaseArtifactManifestJson, JSON.stringify({
@@ -2166,6 +2185,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(platformCapabilityMapMarkdown, renderCapabilityMapMarkdown(report.platformCapabilityMap), "utf8");
     const platformGoLiveSlicesMarkdown = path.join(path.dirname(markdown), "platform-go-live-slices.md");
     fs.writeFileSync(platformGoLiveSlicesMarkdown, renderPlatformGoLiveSlicesMarkdown(report.platformGoLiveSlices), "utf8");
+    const platformStandardsLedgersMarkdown = path.join(path.dirname(markdown), "platform-standards-ledgers.md");
+    fs.writeFileSync(platformStandardsLedgersMarkdown, renderPlatformStandardsLedgersMarkdown(report.platformStandardsLedgers), "utf8");
     const releaseArtifactManifestMarkdown = path.join(path.dirname(markdown), "release-artifact-manifest.md");
     fs.writeFileSync(releaseArtifactManifestMarkdown, renderReleaseArtifactManifestMarkdown(buildReleaseArtifactManifest({ releaseReport: report })), "utf8");
   }

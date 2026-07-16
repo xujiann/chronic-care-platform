@@ -3,9 +3,11 @@ const FLOW_LABELS = { accepted:"已受理", dispatched:"已派车", departed:"�
 let emergencyDashboard;
 let emergencyProductionCenter;
 let emergencyEvidencePackage;
+let emergencyAedMap;
 
 document.addEventListener("DOMContentLoaded", async () => {
-  ["emergency-call-form","dispatch-form","vehicle-form","clinical-form","hospital-form","handover-form"].forEach((id) => document.querySelector(`#${id}`)?.addEventListener("submit", submitForm));
+  ["emergency-call-form","emergency-sos-form","dispatch-form","vehicle-form","clinical-form","hospital-form","handover-form"].forEach((id) => document.querySelector(`#${id}`)?.addEventListener("submit", submitForm));
+  document.querySelector("#aed-map-form")?.addEventListener("submit", loadAedMap);
   ["endpoint-probe-form","drill-complete-form","requirement-sign-form","quality-validate-form","quality-resolve-form","alert-action-form","cutover-approval-form","handoff-accept-form","command-brief-form","observation-record-form","launch-incident-form","incident-resolve-form"].forEach((id)=>document.querySelector(`#${id}`)?.addEventListener("submit",submitProductionForm));
   document.querySelector("#emergency-events")?.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-evidence-event]");
@@ -16,6 +18,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (button) await downloadEvidencePackage(button.dataset.evidenceExport, button.dataset.evidenceFormat || "json");
   });
   await loadDashboard();
+  await loadAedMap();
   await loadProductionCenter();
 });
 
@@ -67,6 +70,35 @@ async function loadDashboard() {
   renderDashboard();
 }
 
+async function loadAedMap(event) {
+  event?.preventDefault();
+  const form = document.querySelector("#aed-map-form");
+  const payload = form ? Object.fromEntries(new FormData(form).entries()) : { latitude:38.92, longitude:121.65 };
+  try {
+    const query = `?latitude=${encodeURIComponent(payload.latitude)}&longitude=${encodeURIComponent(payload.longitude)}`;
+    emergencyAedMap = EMERGENCY_API ? await request(`/aed-map${query}`) : staticAedMap(payload);
+    renderAedMap();
+  } catch (error) {
+    showMessage(error.message, true);
+  }
+}
+
+function renderAedMap() {
+  const node = document.querySelector("#emergency-aed-map");
+  if (!node) return;
+  const item = emergencyAedMap;
+  if (!item?.sites?.length) {
+    node.innerHTML = "<p>No AED reference is available for this location.</p>";
+    return;
+  }
+  const nearest = item.nearestAvailable;
+  node.innerHTML = [
+    nearest ? `<p class="aed-highlight">Nearest available AED: <strong>${escapeHtml(nearest.name)}</strong> (${escapeHtml(nearest.distanceMeters)} m)</p>` : "<p class=\"aed-highlight aed-unavailable\">No available AED is currently listed in this search range.</p>",
+    `<div class="aed-map-grid">${item.sites.map((site) => `<article class="aed-site-card ${site.availableForUse ? "available" : "unavailable"}"><h3>${escapeHtml(site.name)}</h3><p>${escapeHtml(site.distanceMeters)} m · ${escapeHtml(site.status)}</p><p>${escapeHtml(site.address)}</p><small>${escapeHtml(site.access)} · ${escapeHtml(site.guidance)}</small></article>`).join("")}</div>`,
+    `<p class="aed-safety">${escapeHtml(item.safetyNote)}</p>`
+  ].join("");
+}
+
 async function loadEvidencePackage(eventId) {
   if (!eventId) return;
   try {
@@ -107,6 +139,13 @@ async function submitForm(event) {
     if (form.id === "emergency-call-form") {
       await request("/calls", { method:"POST", body:JSON.stringify(payload) });
       location.href = "tel:120";
+    } else if (form.id === "emergency-sos-form") {
+      const result = await request("/sos", { method:"POST", body:JSON.stringify(payload) });
+      showMessage("Confirmed SOS submitted. Confirm the system call to reach 120.", false);
+      await loadDashboard();
+      await loadAedMap();
+      if (result.callInstruction?.telUri) location.href = result.callInstruction.telUri;
+      return;
     } else {
       const eventId = payload.eventId; delete payload.eventId;
       const actionByForm = { "dispatch-form":"dispatch", "vehicle-form":"vehicle-update", "clinical-form":"clinical-update", "hospital-form":"hospital-confirm", "handover-form":"handover" };
@@ -143,6 +182,7 @@ function fill(id, rows, label) { const node=document.querySelector(`#${id}`); if
 function showMessage(text, error){const node=document.querySelector("#emergency-message");node.hidden=false;node.textContent=text;node.style.color=error?"#b91c1c":"#166534";}
 function escapeHtml(value){return String(value??"").replace(/[&<>'"]/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]));}
 function staticDashboard(){return {summary:{total:0,active:0,p1:0,availableAmbulances:0,hospitalsAvailable:0,pendingHandover:0},events:[],resources:[],hospitals:[]};}
+function staticAedMap(payload){return { origin:{latitude:Number(payload.latitude),longitude:Number(payload.longitude)}, sites:[], nearestAvailable:null, safetyNote:"AED map requires the platform API." };}
 
 function renderEvent(event) {
   const latestVital = event.clinical?.vitals?.at(-1);

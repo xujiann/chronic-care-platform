@@ -25,6 +25,33 @@
 
       <section class="metric-grid physical-exam-metrics" id="physical-exam-summary" aria-label="体检系统运行指标"></section>
 
+      <section class="panel highlight-command-panel">
+        <div class="panel-header">
+          <div><h2>体检创新亮点工作台</h2><p>把历史报告转为健康时间轴、居民解释、行动计划、质量治理和隐私保护的数据服务。</p></div>
+          <span class="status-chip ok">Highlights v1</span>
+        </div>
+        <div class="highlight-summary-grid" id="physical-exam-highlight-summary"></div>
+      </section>
+
+      <div class="highlight-feature-grid">
+        <section class="panel"><div class="panel-header"><div><h2>健康时光机</h2><p>跨机构、跨年度指标变化及首次异常节点。</p></div></div><div id="physical-exam-trajectories" class="highlight-list"></div></section>
+        <section class="panel"><div class="panel-header"><div><h2>报告翻译器</h2><p>专业结果转为居民可理解解释，并保留医师审核边界。</p></div></div><div id="physical-exam-translations" class="highlight-list"></div></section>
+        <section class="panel"><div class="panel-header"><div><h2>个性化体检计划</h2><p>依据年龄、问卷和历史异常生成下一年度医师待审核方案。</p></div></div><div id="physical-exam-plans" class="highlight-list"></div></section>
+        <section class="panel"><div class="panel-header"><div><h2>重复检查与辐射管家</h2><p>发现近期重复项目，记录放射正当化、告知、防护和剂量。</p></div></div><div id="physical-exam-repeat-radiation" class="highlight-list"></div></section>
+      </div>
+
+      <section class="panel">
+        <div class="panel-header"><div><h2>报告质量啄木鸟</h2><p>自动发现缺签名、资质、单位、参考范围、字典映射和原文绑定问题。</p></div><span class="status-chip warn">机器检查 + 人工复核</span></div>
+        <div id="physical-exam-quality-reviews" class="quality-review-grid"></div>
+      </section>
+
+      <div class="highlight-feature-grid operations-panel">
+        <section class="panel"><div class="panel-header"><div><h2>跨机构质量画像</h2><p>小样本不排名，正式比较前执行人群风险校正。</p></div></div><div id="physical-exam-benchmarks" class="highlight-list"></div></section>
+        <section class="panel"><div class="panel-header"><div><h2>城市健康雷达</h2><p>仅显示达到最小聚合阈值的去标识化异常趋势。</p></div></div><div id="physical-exam-city-radar" class="highlight-list"></div></section>
+        <section class="panel"><div class="panel-header"><div><h2>规范影响分析</h2><p>从报告缺口反查接口、主数据、页面和上线门禁。</p></div></div><div id="physical-exam-standards-impact" class="highlight-list"></div></section>
+        <section class="panel"><div class="panel-header"><div><h2>重要异常生命通道</h2><p>确认、通知、复查/专科、随访和关闭全流程可视。</p></div></div><div id="physical-exam-critical-paths" class="highlight-list"></div></section>
+      </div>
+
       <section class="panel">
         <div class="panel-header">
           <div>
@@ -129,6 +156,7 @@
     </dialog>
     <div class="toast" id="physical-exam-toast" role="status"></div>
     <script src="./physical-examination-standards.js"></script>
+    <script src="./physical-examination-highlights.js"></script>
     <script src="./physical-examination-service.js"></script>
     <script src="./physical-examination.js"></script>
   </body>

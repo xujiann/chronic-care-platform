@@ -130,6 +130,39 @@ const CONTRACTS = [
     evidence: ["safe environment control status", "cutover signoffs", "pharmacy settlement closure", "formal production boundary"]
   },
   {
+    id: "chronic-production-safety-evidence-v1",
+    method: "GET",
+    path: "/api/chronic/production-safety-evidence",
+    owner: "security-operations-and-chronic-launch",
+    direction: "outbound",
+    roles: ["institution", "commission"],
+    requiredFields: ["summary", "rows", "boundary"],
+    targetCollections: ["siteLaunchEvidence", "chronicLaunchCoreSignoffs", "securityEvents"],
+    evidence: ["verified site launch evidence", "control-to-template mapping", "non-approval boundary"]
+  },
+  {
+    id: "chronic-interoperability-profiles-v1",
+    method: "GET",
+    path: "/api/chronic/interoperability-profiles",
+    owner: "health-information-standards-and-chronic-launch",
+    direction: "outbound",
+    roles: ["institution", "commission"],
+    requiredFields: ["summary", "profiles", "boundary"],
+    targetCollections: ["personalRecords", "referralSystem", "medicationPickups", "insuranceClaims"],
+    evidence: ["WS/T 303 data-element rules", "WS/T 363/364 data elements and value domains", "WS/T 846 interaction profiles", "WS/T 847 signature evidence boundary"]
+  },
+  {
+    id: "chronic-interoperability-validation-v1",
+    method: "POST",
+    path: "/api/chronic/interoperability-validation",
+    owner: "health-information-standards-and-chronic-launch",
+    direction: "inbound-validation",
+    roles: ["institution", "commission"],
+    requiredFields: ["profileId", "message"],
+    targetCollections: ["residents", "personalRecords", "referralSystem", "medicationPickups", "insuranceClaims"],
+    evidence: ["resident scope guard", "required-field validation", "date-format validation", "non-persistent validation boundary"]
+  },
+  {
     id: "chronic-archive-standard-v1",
     method: "GET",
     path: "/api/chronic/archive-standard",

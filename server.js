@@ -98,11 +98,23 @@ const {
   renderPlatformGoLiveSlicesMarkdown
 } = require("./platform-go-live-slices");
 const {
+  buildPlatformStandardsLedgers,
+  renderPlatformStandardsLedgersMarkdown
+} = require("./platform-standards-ledgers");
+const {
+  buildDigitalHospitalControlMatrixBoard,
   buildDigitalHospitalPolicyRegisterBoard,
+  normalizeDigitalHospitalControlAction,
   normalizeDigitalHospitalPolicyReview,
   seedDigitalHospitalControlMatrix,
   seedDigitalHospitalPolicyRegister
 } = require("./digital-hospital-governance");
+const {
+  buildDigitalHospitalSelfAssessmentBoard,
+  createDigitalHospitalSelfAssessment,
+  normalizeDigitalHospitalSelfAssessmentAction,
+  seedDigitalHospitalSelfAssessments
+} = require("./digital-hospital-self-assessment");
 const {
   applyRegistrationDisruptionAction,
   applyRegistrationJourneyAction,
@@ -989,6 +1001,7 @@ function seedState() {
     digitalHospitalStandards: seedDigitalHospitalStandards(),
     digitalHospitalPolicyRegister: seedDigitalHospitalPolicyRegister(),
     digitalHospitalControlMatrix: seedDigitalHospitalControlMatrix(),
+    digitalHospitalSelfAssessments: seedDigitalHospitalSelfAssessments(),
     digitalHospitalEvaluationTasks: seedDigitalHospitalEvaluationTasks(),
     digitalHospitalEvidencePackets: seedDigitalHospitalEvidencePackets(),
     digitalHospitalRiskItems: seedDigitalHospitalRiskItems(),
@@ -1061,6 +1074,10 @@ function seedState() {
     personalRecords: PhysicalExaminationService.mergeSeedRecords(seedPersonalRecords()),
     physicalExamAbnormalCases: PhysicalExaminationService.seedAbnormalCases(),
     physicalExamJointTests: PhysicalExaminationService.seedJointTests(),
+    physicalExamHealthPassports: [],
+    physicalExamReviewRequests: [],
+    physicalExamFamilyRiskConsents: [],
+    physicalExamHighlightActions: [],
     taskMessages: []
   };
 }
@@ -2927,6 +2944,8 @@ function buildDigitalHospitalStandardsOverview(data) {
   const evidencePackets = Array.isArray(data.digitalHospitalEvidencePackets) ? data.digitalHospitalEvidencePackets : seedDigitalHospitalEvidencePackets();
   const riskItems = Array.isArray(data.digitalHospitalRiskItems) ? data.digitalHospitalRiskItems : seedDigitalHospitalRiskItems();
   const policyBoard = buildDigitalHospitalPolicyRegisterBoard(data);
+  const controlBoard = buildDigitalHospitalControlMatrixBoard(data);
+  const selfAssessmentBoard = buildDigitalHospitalSelfAssessmentBoard(data, { role: "commission" });
   const domainSet = new Set(standards.map((item) => item.domain).filter(Boolean));
   const p0Standards = standards.filter((item) => item.level === "P0");
   const openTasks = evaluationTasks.filter((item) => !/closed|done|complete|ready$/i.test(String(item.status || "")));
@@ -2944,7 +2963,9 @@ function buildDigitalHospitalStandardsOverview(data) {
     { id: "digitalHospitalApi:evidenceBoundary", passed: evidencePackets.length >= 5 && noPatientPii, detail: `${evidencePackets.length} evidence packets; no patient PII=${noPatientPii}` },
     { id: "digitalHospitalApi:workflow", passed: evaluationTasks.length >= 6 && evaluationTasks.some((item) => item.stage === "rectification-loop"), detail: `${evaluationTasks.length} evaluation task stages` },
     { id: "digitalHospitalApi:blockers", passed: blockers.length >= 4, detail: `${blockers.length} open or tracking blockers` },
-    { id: "digitalHospitalApi:policyRegister", passed: policyBoard.ok && policyBoard.summary.domains >= 6, detail: `${policyBoard.summary.policies} policies / ${policyBoard.summary.controls} controls / ${policyBoard.summary.domains} domains` }
+    { id: "digitalHospitalApi:policyRegister", passed: policyBoard.ok && policyBoard.summary.domains >= 6, detail: `${policyBoard.summary.policies} policies / ${policyBoard.summary.controls} controls / ${policyBoard.summary.domains} domains` },
+    { id: "digitalHospitalApi:controlRemediation", passed: controlBoard.ok && controlBoard.summary.controls >= 12, detail: `${controlBoard.summary.verifiedControls} verified / ${controlBoard.summary.blockingControls} blocking / ${controlBoard.summary.evidenceRecordedControls} with evidence` },
+    { id: "digitalHospitalApi:selfAssessment", passed: selfAssessmentBoard.ok && selfAssessmentBoard.indicators.length >= 12, detail: `${selfAssessmentBoard.summary.assessments} assignments / ${selfAssessmentBoard.indicators.length} indicators / ${selfAssessmentBoard.summary.correctionRequired} corrections` }
   ];
   return {
     ok: checks.every((item) => item.passed),
@@ -2964,14 +2985,25 @@ function buildDigitalHospitalStandardsOverview(data) {
       mandatoryPolicies: policyBoard.summary.mandatoryPolicies,
       historicalPolicies: policyBoard.summary.historicalPolicies,
       policyControls: policyBoard.summary.controls,
-      policyControlBlockers: policyBoard.summary.blockingControls
+      policyControlBlockers: controlBoard.summary.blockingControls,
+      policyControlsVerified: controlBoard.summary.verifiedControls,
+      policyControlsWithEvidence: controlBoard.summary.evidenceRecordedControls,
+      policyControlsOverdue: controlBoard.summary.overdueControls,
+      selfAssessments: selfAssessmentBoard.summary.assessments,
+      selfAssessmentsSubmitted: selfAssessmentBoard.summary.submitted,
+      selfAssessmentsCorrectionRequired: selfAssessmentBoard.summary.correctionRequired,
+      selfAssessmentsAccepted: selfAssessmentBoard.summary.accepted
     },
     standards,
     policyRegister: policyBoard.policies,
     policySummary: policyBoard.summary,
     policyChecks: policyBoard.checks,
-    controlMatrix: policyBoard.controls,
-    policyControlBlockers: policyBoard.blockingControls,
+    controlMatrix: controlBoard.allControls,
+    controlMatrixSummary: controlBoard.summary,
+    controlMatrixChecks: controlBoard.checks,
+    policyControlBlockers: controlBoard.blockers,
+    selfAssessmentSummary: selfAssessmentBoard.summary,
+    selfAssessmentChecks: selfAssessmentBoard.checks,
     evaluationTasks,
     evidencePackets,
     reviewQueue,
@@ -7607,6 +7639,7 @@ function normalizeState(data) {
     digitalHospitalStandards: mergeByKey(seedDigitalHospitalStandards(), data.digitalHospitalStandards, "id"),
     digitalHospitalPolicyRegister: mergeByKey(seedDigitalHospitalPolicyRegister(), data.digitalHospitalPolicyRegister, "id"),
     digitalHospitalControlMatrix: mergeByKey(seedDigitalHospitalControlMatrix(), data.digitalHospitalControlMatrix, "id"),
+    digitalHospitalSelfAssessments: mergeByKey(seedDigitalHospitalSelfAssessments(), data.digitalHospitalSelfAssessments, "id"),
     digitalHospitalEvaluationTasks: mergeByKey(seedDigitalHospitalEvaluationTasks(), data.digitalHospitalEvaluationTasks, "id"),
     digitalHospitalEvidencePackets: mergeByKey(seedDigitalHospitalEvidencePackets(), data.digitalHospitalEvidencePackets, "id"),
     digitalHospitalRiskItems: mergeByKey(seedDigitalHospitalRiskItems(), data.digitalHospitalRiskItems, "id"),
@@ -7681,7 +7714,11 @@ function normalizeState(data) {
     platformProcessAudit: Array.isArray(data.platformProcessAudit) ? data.platformProcessAudit : seedPlatformProcessAudit(),
     personalRecords: PhysicalExaminationService.mergeSeedRecords(Array.isArray(data.personalRecords) ? data.personalRecords : seedPersonalRecords()).map(cleanPersonalRecordText),
     physicalExamAbnormalCases: mergeByKey(PhysicalExaminationService.seedAbnormalCases(), data.physicalExamAbnormalCases, "id"),
-    physicalExamJointTests: mergeByKey(PhysicalExaminationService.seedJointTests(), data.physicalExamJointTests, "id")
+    physicalExamJointTests: mergeByKey(PhysicalExaminationService.seedJointTests(), data.physicalExamJointTests, "id"),
+    physicalExamHealthPassports: Array.isArray(data.physicalExamHealthPassports) ? data.physicalExamHealthPassports.slice(0, 500) : [],
+    physicalExamReviewRequests: Array.isArray(data.physicalExamReviewRequests) ? data.physicalExamReviewRequests.slice(0, 1000) : [],
+    physicalExamFamilyRiskConsents: Array.isArray(data.physicalExamFamilyRiskConsents) ? data.physicalExamFamilyRiskConsents.slice(0, 500) : [],
+    physicalExamHighlightActions: Array.isArray(data.physicalExamHighlightActions) ? data.physicalExamHighlightActions.slice(0, 1000) : []
   };
   completeSystemTargets(state);
   PhysicalExaminationService.synchronizeCareLinks(state, { notify: false, actor: "state-normalizer" });
@@ -13358,6 +13395,126 @@ function buildChronicProductionSafetyReport(data) {
     checks,
     blockers,
     boundary: "This endpoint reports control presence and evidence status only. It does not certify a production launch, disclose secret values, or replace formal security assessment, commercial-crypto assessment, external joint testing, or signed go/no-go approval."
+  };
+}
+
+function buildChronicProductionSafetyEvidenceBridge(data) {
+  const templates = new Map(buildSiteLaunchEvidenceTemplates(data).map((item) => [item.id, item]));
+  const verifiedEvidence = (Array.isArray(data.siteLaunchEvidence) ? data.siteLaunchEvidence : [])
+    .filter((item) => String(item?.status || "").toLowerCase() === "verified");
+  const requirements = [
+    { id: "chronic-evidence:launch-core-signoff", controlId: "chronic:launch-core-signoff", templateId: "signoff-cutover-chronic-launch-core", name: "Chronic launch-core cutover signoff" },
+    { id: "chronic-evidence:audit-retention", controlId: "environment:audit-retention", templateId: "signoff-cutover-audit-retention", name: "Audit retention and SIEM signoff" },
+    { id: "chronic-evidence:site-interface", controlId: "environment:site-interface-signoff", templateId: "signoff-cutover-institution-interfaces", name: "Institution interface joint-test signoff" },
+    { id: "chronic-evidence:insurance-settlement", controlId: "environment:insurance-certificate-signoff", templateId: "signoff-cutover-insurance-certificate", name: "Insurance settlement acceptance" },
+    { id: "chronic-evidence:monitoring", controlId: "environment:monitoring-signoff", templateId: "signoff-cutover-monitoring", name: "Monitoring and on-call rehearsal" },
+    { id: "chronic-evidence:dr-rehearsal", controlId: "environment:dr-rehearsal-signoff", templateId: "signoff-cutover-dr-rehearsal", name: "Disaster recovery rehearsal" }
+  ];
+  const rows = requirements.map((requirement) => {
+    const evidence = verifiedEvidence.filter((item) => item.templateId === requirement.templateId).map((item) => ({
+      id: item.id,
+      artifactName: item.artifactName,
+      jointTestNo: item.jointTestNo,
+      verifiedAt: item.verifiedAt,
+      verifiedBy: item.verifiedBy
+    }));
+    const template = templates.get(requirement.templateId);
+    return {
+      ...requirement,
+      templateAvailable: Boolean(template),
+      owner: template?.owner || "site-launch-owner",
+      evidenceVerified: evidence.length > 0,
+      evidence,
+      nextAction: evidence.length > 0
+        ? "retain the verified evidence and complete the corresponding production control separately"
+        : "submit and verify the required site evidence in the commission workbench"
+    };
+  });
+  return {
+    ok: true,
+    summary: {
+      requirements: rows.length,
+      evidenceVerified: rows.filter((item) => item.evidenceVerified).length,
+      evidencePending: rows.filter((item) => !item.evidenceVerified).length
+    },
+    rows,
+    boundary: "This bridge only traces already verified site-launch evidence to chronic production-safety controls. It does not set environment variables, close pharmacy reconciliation exceptions, certify security or commercial-crypto assessments, or approve production go-live."
+  };
+}
+
+const CHRONIC_INTEROPERABILITY_PROFILES = [
+  {
+    id: "chronic-referral-return-v1",
+    name: "Referral return and primary-care continuity",
+    purpose: "Standardize referral return, discharge handoff, and primary-care follow-up continuity messages.",
+    standards: ["WS/T 303-2023", "WS/T 363.2/364.2-2023", "WS/T 363.10/364.10-2023", "WS/T 363.12/364.12-2023", "WS/T 363.17/364.17-2023", "WS/T 846.2/.6/.7/.11-2024", "WS/T 847-2024"],
+    requiredFields: ["externalId", "residentId", "personIndex", "referralId", "sourceSystem", "occurredAt", "returnStatus", "diagnosis", "nextFollowupAt"],
+    dateFields: ["occurredAt", "nextFollowupAt"],
+    sourceInterfaces: ["/api/chronic/referral-continuity", "/api/chronic/archive-standard"],
+    productionEvidence: ["signed referral-return document", "joint-test receipt", "primary-care acceptance", "digital-signature verification"]
+  },
+  {
+    id: "chronic-device-observation-v1",
+    name: "Device observation and electronic health-record writeback",
+    purpose: "Standardize patient-identified device observations before writeback to the chronic electronic health record.",
+    standards: ["WS/T 303-2023", "WS/T 363.2/364.2-2023", "WS/T 363.7/364.7-2023", "WS/T 363.9/364.9-2023", "WS/T 846.2/.6/.11-2024", "WS/T 847-2024"],
+    requiredFields: ["externalId", "residentId", "personIndex", "deviceId", "measurementType", "measurementValue", "reportedAt", "sourceSystem"],
+    dateFields: ["reportedAt"],
+    sourceInterfaces: ["/api/chronic/device-measurements", "/api/chronic/archive-standard"],
+    productionEvidence: ["device identity mapping", "measurement source record", "gateway replay receipt", "signed document verification"]
+  },
+  {
+    id: "chronic-pharmacy-insurance-status-v1",
+    name: "Long-prescription pharmacy and insurance status closure",
+    purpose: "Standardize medication, insurance settlement, pharmacy callback, and closure-status messages without treating the profile as a real settlement interface.",
+    standards: ["WS/T 303-2023", "WS/T 363.2/364.2-2023", "WS/T 363.13/364.13-2023", "WS/T 363.16/364.16-2023", "WS/T 846.2/.8/.11-2024", "WS/T 847-2024"],
+    requiredFields: ["externalId", "residentId", "personIndex", "medicationPickupId", "insuranceClaimId", "medication", "settlementStatus", "callbackStatus", "occurredAt", "sourceSystem"],
+    dateFields: ["occurredAt"],
+    sourceInterfaces: ["/api/chronic/pharmacy-callbacks", "/api/chronic/pharmacy-insurance-closure"],
+    productionEvidence: ["insurance settlement receipt", "pharmacy inventory receipt", "idempotent callback identifier", "joint-test and signature evidence"]
+  }
+];
+
+function buildChronicInteroperabilityProfiles() {
+  const profiles = CHRONIC_INTEROPERABILITY_PROFILES.map((item) => ({ ...item, requiredFields: [...item.requiredFields], dateFields: [...item.dateFields], standards: [...item.standards], sourceInterfaces: [...item.sourceInterfaces], productionEvidence: [...item.productionEvidence] }));
+  return {
+    ok: true,
+    summary: {
+      profiles: profiles.length,
+      dataElementProfiles: profiles.filter((item) => item.standards.some((standard) => standard.startsWith("WS/T 363"))).length,
+      interactionProfiles: profiles.filter((item) => item.standards.some((standard) => standard.startsWith("WS/T 846"))).length,
+      signatureProfiles: profiles.filter((item) => item.standards.includes("WS/T 847-2024")).length
+    },
+    profiles,
+    boundary: "These profiles provide platform-side field and message prevalidation. They do not replace local interface specifications, medical-document signature validation, insurance-core acceptance, or formal interoperability assessment."
+  };
+}
+
+function validateChronicInteroperabilityMessage(data, user, payload = {}) {
+  const profileId = String(payload.profileId || "").trim();
+  const profile = CHRONIC_INTEROPERABILITY_PROFILES.find((item) => item.id === profileId);
+  if (!profile) return { status: 400, body: { ok: false, error: "Bad Request", message: "profileId must identify a chronic interoperability profile" } };
+  const message = payload.message && typeof payload.message === "object" && !Array.isArray(payload.message) ? payload.message : payload;
+  const residentId = String(message.residentId || "").trim();
+  if (residentId && !canAccessResident(user, residentId, data)) {
+    return { status: 403, body: { ok: false, error: "Forbidden", message: "resident scope denied" } };
+  }
+  const fields = profile.requiredFields.map((field) => ({ field, present: Boolean(String(message[field] ?? "").trim()), standard: profile.standards.filter((standard) => /363|364|846|847/.test(standard)) }));
+  const formatChecks = profile.dateFields.map((field) => ({ field, valid: !message[field] || Number.isFinite(Date.parse(String(message[field]))) }));
+  const missingFields = fields.filter((item) => !item.present).map((item) => item.field);
+  const invalidDateFields = formatChecks.filter((item) => !item.valid).map((item) => item.field);
+  const valid = missingFields.length === 0 && invalidDateFields.length === 0;
+  return {
+    status: valid ? 200 : 422,
+    body: {
+      ok: valid,
+      profile: { id: profile.id, name: profile.name, standards: profile.standards, sourceInterfaces: profile.sourceInterfaces },
+      fields,
+      formatChecks,
+      missingFields,
+      invalidDateFields,
+      boundary: "Validation is non-persistent and does not authenticate an external sender, verify a production signature, submit a medical document, settle insurance, or approve an interface for production use."
+    }
   };
 }
 
@@ -19084,6 +19241,21 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/platform/standards-ledgers") {
+    const user = requireApiRole(req, res, ["commission"], "/api/platform/standards-ledgers");
+    if (!user) return;
+    const data = readDatabase();
+    const releaseReport = buildReleaseReport({ data, env: process.env, profile: "demo", skipPlatformStandardsLedgers: true });
+    const manifest = buildReleaseArtifactManifest({ releaseReport });
+    const standardsLedgers = buildPlatformStandardsLedgers(data, { manifest });
+    if (url.searchParams.get("format") === "markdown") {
+      sendText(res, 200, renderPlatformStandardsLedgersMarkdown(standardsLedgers), "text/markdown; charset=utf-8");
+      return;
+    }
+    sendJson(res, 200, standardsLedgers);
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/auth/identity/preview") {
     const user = requireApiRole(req, res, ["commission"], "/api/auth/identity/preview");
     if (!user) return;
@@ -19583,6 +19755,18 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/emergency/aed-map") {
+    const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/emergency/aed-map");
+    if (!user) return;
+    try {
+      const item = EmergencyService.buildAedMap(readDatabase(), user, { latitude:url.searchParams.get("latitude"), longitude:url.searchParams.get("longitude"), limit:url.searchParams.get("limit") });
+      sendJson(res, 200, redactSensitiveResponse(item, user));
+    } catch (error) {
+      sendJson(res, error.status || 400, { error:error.status === 403 ? "Forbidden" : "Bad Request", message:error.message });
+    }
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/emergency/calls") {
     const user = requireApiRole(req, res, ["citizen"], "/api/emergency/calls");
     if (!user) return;
@@ -19594,6 +19778,20 @@ async function handleApi(req, res) {
       sendJson(res, 201, { ok: true, event, warning: "辅助呼救信息已提交，正式派车必须由120坐席人工确认；危急情况请立即拨打120。" });
     } catch (error) {
       sendJson(res, error.status || 400, { error: error.status === 403 ? "Forbidden" : "Bad Request", message: error.message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/emergency/sos") {
+    const user = requireApiRole(req, res, ["citizen"], "/api/emergency/sos");
+    if (!user) return;
+    try {
+      const data = readDatabase();
+      const event = EmergencyService.createSosCall(data, user, await collectJson(req));
+      writeDatabase(data);
+      sendJson(res, 201, { ok:true, event, callInstruction:{ telUri:"tel:120", requiresDeviceConfirmation:true, message:"SOS information was submitted to the 120 acceptance queue. Confirm the mobile system call to reach 120." } });
+    } catch (error) {
+      sendJson(res, error.status || 400, { error:error.status === 403 ? "Forbidden" : "Bad Request", message:error.message });
     }
     return;
   }
@@ -20934,6 +21132,28 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/chronic/production-safety-evidence") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/chronic/production-safety-evidence");
+    if (!user) return;
+    sendJson(res, 200, buildChronicProductionSafetyEvidenceBridge(readDatabase()));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/chronic/interoperability-profiles") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/chronic/interoperability-profiles");
+    if (!user) return;
+    sendJson(res, 200, buildChronicInteroperabilityProfiles());
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/chronic/interoperability-validation") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/chronic/interoperability-validation");
+    if (!user) return;
+    const result = validateChronicInteroperabilityMessage(readDatabase(), user, await collectJson(req));
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/chronic/public-health-loop") {
     const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/chronic/public-health-loop");
     if (!user) return;
@@ -21589,6 +21809,197 @@ async function handleApi(req, res) {
     if (!user) return;
     const data = readDatabase();
     sendJson(res, 200, buildMasterDataDirectory(data));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/digital-hospital/self-assessments") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/digital-hospital/self-assessments");
+    if (!user) return;
+    const data = readDatabase();
+    const board = buildDigitalHospitalSelfAssessmentBoard(data, user, {
+      status: url.searchParams.get("status") || "",
+      institutionId: url.searchParams.get("institutionId") || "",
+      overdueOnly: url.searchParams.get("overdueOnly") || "",
+      query: url.searchParams.get("q") || ""
+    });
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "digital-hospital-self-assessment-read",
+      target: "/api/digital-hospital/self-assessments",
+      result: "allowed",
+      detail: `${board.summary.filteredAssessments}/${board.summary.assessments} role-scoped assessments returned`
+    });
+    sendJson(res, 200, board);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/digital-hospital/self-assessments/actions") {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/self-assessments/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    if (payload.action !== "assign-assessment") {
+      sendJson(res, 400, { error: "Bad Request", message: "Only assign-assessment is accepted on the collection action endpoint" });
+      return;
+    }
+    const data = readDatabase();
+    const assessments = Array.isArray(data.digitalHospitalSelfAssessments)
+      ? data.digitalHospitalSelfAssessments
+      : seedDigitalHospitalSelfAssessments();
+    if (assessments.some((item) => item.institutionId === String(payload.institutionId || "").trim() && item.cycle === String(payload.cycle || "").trim())) {
+      sendJson(res, 409, { error: "Conflict", message: "该机构在当前评价周期已有自评任务" });
+      return;
+    }
+    let assessment;
+    try {
+      assessment = createDigitalHospitalSelfAssessment(payload, user, { id: `dhsa-${randomUUID()}` });
+    } catch (error) {
+      sendJson(res, Number(error.status) || 400, { error: Number(error.status) === 403 ? "Forbidden" : "Bad Request", message: error.message });
+      return;
+    }
+    data.digitalHospitalSelfAssessments = [assessment, ...assessments];
+    data.securityEvents = sealAuditTrail([
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "digital-hospital-self-assessment-action",
+        target: assessment.id,
+        result: "allowed",
+        detail: `assign-assessment / ${assessment.institutionId} / ${assessment.cycle}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    const refreshed = readDatabase();
+    sendJson(res, 201, { ok: true, assessment, board: buildDigitalHospitalSelfAssessmentBoard(refreshed, user) });
+    return;
+  }
+
+  const digitalHospitalSelfAssessmentActionMatch = url.pathname.match(/^\/api\/digital-hospital\/self-assessments\/([^/]+)\/actions$/);
+  if (req.method === "POST" && digitalHospitalSelfAssessmentActionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/digital-hospital/self-assessments/:id/actions");
+    if (!user) return;
+    const assessmentId = decodeURIComponent(digitalHospitalSelfAssessmentActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const assessments = Array.isArray(data.digitalHospitalSelfAssessments)
+      ? data.digitalHospitalSelfAssessments
+      : seedDigitalHospitalSelfAssessments();
+    const index = assessments.findIndex((item) => item.id === assessmentId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Digital hospital self-assessment not found" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizeDigitalHospitalSelfAssessmentAction(assessments[index], payload, user);
+    } catch (error) {
+      const status = Number(error.status) || 400;
+      sendJson(res, status, { error: status === 403 ? "Forbidden" : status === 409 ? "Conflict" : "Bad Request", message: error.message });
+      return;
+    }
+    assessments[index] = normalized.assessment;
+    data.digitalHospitalSelfAssessments = assessments;
+    data.securityEvents = sealAuditTrail([
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "digital-hospital-self-assessment-action",
+        target: assessmentId,
+        result: "allowed",
+        detail: `${normalized.event.action} / ${normalized.assessment.status} / ${normalized.assessment.institutionId}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    const refreshed = readDatabase();
+    sendJson(res, 200, {
+      ok: true,
+      assessment: normalized.assessment,
+      event: normalized.event,
+      board: buildDigitalHospitalSelfAssessmentBoard(refreshed, user),
+      standards: user.role === "commission" ? buildDigitalHospitalStandardsOverview(refreshed) : undefined
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/digital-hospital/control-matrix") {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/control-matrix");
+    if (!user) return;
+    const data = readDatabase();
+    const board = buildDigitalHospitalControlMatrixBoard(data, {
+      domain: url.searchParams.get("domain") || "",
+      controlStatus: url.searchParams.get("controlStatus") || "",
+      blockingOnly: url.searchParams.get("blockingOnly") || "",
+      overdueOnly: url.searchParams.get("overdueOnly") || "",
+      query: url.searchParams.get("q") || ""
+    });
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "digital-hospital-control-matrix",
+      target: "/api/digital-hospital/control-matrix",
+      result: "allowed",
+      detail: `${board.summary.filteredControls}/${board.summary.controls} controls returned`
+    });
+    sendJson(res, 200, board);
+    return;
+  }
+
+  const digitalHospitalControlActionMatch = url.pathname.match(/^\/api\/digital-hospital\/control-matrix\/([^/]+)\/actions$/);
+  if (req.method === "POST" && digitalHospitalControlActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/control-matrix/:id/actions");
+    if (!user) return;
+    const controlId = decodeURIComponent(digitalHospitalControlActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const controls = Array.isArray(data.digitalHospitalControlMatrix)
+      ? data.digitalHospitalControlMatrix
+      : seedDigitalHospitalControlMatrix();
+    const index = controls.findIndex((item) => item.id === controlId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Digital hospital control not found" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizeDigitalHospitalControlAction(controls[index], payload, user);
+    } catch (error) {
+      sendJson(res, Number(error.status) || 400, {
+        error: Number(error.status) === 409 ? "Conflict" : "Bad Request",
+        message: error.message
+      });
+      return;
+    }
+    controls[index] = normalized.control;
+    data.digitalHospitalControlMatrix = controls;
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "digital-hospital-control-action",
+        target: controlId,
+        result: "allowed",
+        detail: `${normalized.action.action} / ${normalized.control.controlStatus}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    data.securityEvents = sealAuditTrail(data.securityEvents, { recompute: true });
+    writeDatabase(normalizeState(data));
+    const refreshed = readDatabase();
+    sendJson(res, 200, {
+      ok: true,
+      control: normalized.control,
+      action: normalized.action,
+      board: buildDigitalHospitalControlMatrixBoard(refreshed),
+      standards: buildDigitalHospitalStandardsOverview(refreshed)
+    });
     return;
   }
 
@@ -25458,6 +25869,32 @@ async function handleApi(req, res) {
       writeDatabase(data);
     }
     sendJson(res, 200, redactSensitiveResponse(overview, user));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/physical-exams/highlights/actions") {
+    const user = requireApiRole(req, res, ["citizen", "institution", "commission"], "/api/physical-exams/highlights/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const residentId = String(payload.residentId || "").trim();
+    try {
+      const result = PhysicalExaminationService.applyHighlightAction(data, payload, {
+        id: `pe-highlight-${randomUUID()}`,
+        actor: user.username || user.role,
+        now: new Date().toISOString(),
+        canAccessResident: (targetResidentId) => canAccessResident(user, targetResidentId, data)
+      });
+      appendDataAccessLog(data, user, residentId, "体检创新服务", `${payload.action} · ${result.type}`);
+      data.securityEvents = [{ id: randomUUID(), at: new Date().toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role, action: "体检创新服务", target: residentId, result: "允许", detail: `${payload.action} · ${result.type}` }, ...(data.securityEvents || [])].slice(0, 120);
+      writeDatabase(normalizeState(data));
+      const overview = PhysicalExaminationService.buildOverview(data, { residentId, residentIds: [...allowedResidentIdsForUser(data, user)] });
+      sendJson(res, 200, redactSensitiveResponse({ ok: true, result, highlights: overview.highlights }, user));
+    } catch (error) {
+      const status = Number(error?.statusCode || 400);
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "体检创新服务", target: residentId || "unknown", result: "拒绝", detail: error.message });
+      sendJson(res, status, { error: status === 403 ? "Forbidden" : "Bad Request", message: error.message });
+    }
     return;
   }
 

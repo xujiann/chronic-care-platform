@@ -1254,6 +1254,18 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.match(goLiveMarkdownText, /Platform go-live slices readiness/);
     assert.match(goLiveMarkdownText, /Unified Blocker Register/);
 
+    const standardsLedgers = await api(baseUrl, "/api/platform/standards-ledgers", authorized(accountLogin.body.token));
+    assert.equal(standardsLedgers.response.status, 200);
+    assert.equal(standardsLedgers.body.ok, true);
+    assert.equal(standardsLedgers.body.summary.ledgers, 6);
+    assert.equal(standardsLedgers.body.summary.acceptanceCriteria >= 24, true);
+    assert.equal(standardsLedgers.body.summary.formalGoLiveReady, 0);
+    assert.equal(standardsLedgers.body.ledgers.some((item) => item.id === "interface-exchange-register"), true);
+
+    const standardsLedgersMarkdown = await fetch(`${baseUrl}/api/platform/standards-ledgers?format=markdown`, authorized(accountLogin.body.token));
+    assert.equal(standardsLedgersMarkdown.status, 200);
+    assert.match(await standardsLedgersMarkdown.text(), /六类可验收台账/);
+
     const blockerRegister = await api(baseUrl, "/api/platform/blocker-register", authorized(accountLogin.body.token));
     assert.equal(blockerRegister.response.status, 200);
     assert.equal(blockerRegister.body.summary.open >= 1, true);
@@ -1508,6 +1520,231 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(digitalHospitalPolicyReview.body.policy.nextReviewAt, "2026-10-31");
     assert.equal(digitalHospitalPolicyReview.body.standards.ok, true);
 
+    const digitalHospitalControlMatrix = await api(baseUrl, "/api/digital-hospital/control-matrix?domain=%E4%BA%92%E8%81%94%E4%BA%92%E9%80%9A&blockingOnly=true", authorized(accountLogin.body.token));
+    assert.equal(digitalHospitalControlMatrix.response.status, 200);
+    assert.equal(digitalHospitalControlMatrix.body.ok, true);
+    assert.equal(digitalHospitalControlMatrix.body.summary.controls, 13);
+    assert.equal(digitalHospitalControlMatrix.body.controls.length >= 1, true);
+    assert.equal(digitalHospitalControlMatrix.body.controls.every((item) => item.domain === "互联互通" && item.blocking), true);
+    assert.equal(digitalHospitalControlMatrix.body.checks.every((item) => item.passed), true);
+
+    const deniedDigitalHospitalControlMatrix = await api(baseUrl, "/api/digital-hospital/control-matrix", authorized(residentPhoneLogin.body.token));
+    assert.equal(deniedDigitalHospitalControlMatrix.response.status, 403);
+
+    const invalidDigitalHospitalControlEvidence = await api(baseUrl, "/api/digital-hospital/control-matrix/dhc-interoperability-contract/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "record-evidence",
+        artifactName: "生产接口联调报告",
+        evidenceRef: "DH-INT-API-001",
+        evidenceLevel: "site",
+        noPatientPii: false,
+        note: "拒绝包含患者明细的证据"
+      })
+    }));
+    assert.equal(invalidDigitalHospitalControlEvidence.response.status, 400);
+
+    const digitalHospitalControlAssignment = await api(baseUrl, "/api/digital-hospital/control-matrix/dhc-interoperability-contract/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "assign-control",
+        assignedTo: "接口联调专班",
+        dueAt: "2026-08-15",
+        note: "分派生产接口联合验证"
+      })
+    }));
+    assert.equal(digitalHospitalControlAssignment.response.status, 200);
+    assert.equal(digitalHospitalControlAssignment.body.control.controlStatus, "in-progress");
+    assert.equal(digitalHospitalControlAssignment.body.control.assignedTo, "接口联调专班");
+
+    const digitalHospitalControlEvidence = await api(baseUrl, "/api/digital-hospital/control-matrix/dhc-interoperability-contract/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "record-evidence",
+        artifactName: "生产接口联调报告",
+        evidenceRef: "DH-INT-API-001",
+        evidenceLevel: "site",
+        noPatientPii: true,
+        note: "登记现场接口最小化证据"
+      })
+    }));
+    assert.equal(digitalHospitalControlEvidence.response.status, 200);
+    assert.equal(digitalHospitalControlEvidence.body.control.controlStatus, "evidence-recorded");
+    assert.equal(digitalHospitalControlEvidence.body.control.evidenceCount, 1);
+
+    const duplicateDigitalHospitalControlReviewer = await api(baseUrl, "/api/digital-hospital/control-matrix/dhc-interoperability-contract/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "verify-control",
+        decision: "accepted",
+        note: "提交人不能复核自己的证据"
+      })
+    }));
+    assert.equal(duplicateDigitalHospitalControlReviewer.response.status, 409);
+
+    const digitalHospitalControlReviewerLogin = await login(baseUrl, "city");
+    assert.equal(digitalHospitalControlReviewerLogin.response.status, 200);
+    const digitalHospitalControlVerification = await api(baseUrl, "/api/digital-hospital/control-matrix/dhc-interoperability-contract/actions", authorized(digitalHospitalControlReviewerLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "verify-control",
+        decision: "accepted",
+        note: "市级独立复核现场接口证据通过"
+      })
+    }));
+    assert.equal(digitalHospitalControlVerification.response.status, 200);
+    assert.equal(digitalHospitalControlVerification.body.control.controlStatus, "verified");
+    assert.equal(digitalHospitalControlVerification.body.control.blocking, false);
+    assert.equal(digitalHospitalControlVerification.body.control.verifiedEvidenceCount, 1);
+    assert.equal(digitalHospitalControlVerification.body.standards.summary.policyControlsWithEvidence >= 1, true);
+
+    const digitalHospitalSelfAssessmentBoard = await api(baseUrl, "/api/digital-hospital/self-assessments", authorized(accountLogin.body.token));
+    assert.equal(digitalHospitalSelfAssessmentBoard.response.status, 200);
+    assert.equal(digitalHospitalSelfAssessmentBoard.body.ok, true);
+    assert.equal(digitalHospitalSelfAssessmentBoard.body.indicators.length, 12);
+    assert.equal(digitalHospitalSelfAssessmentBoard.body.summary.assessments >= 2, true);
+    assert.equal(digitalHospitalSelfAssessmentBoard.body.checks.every((item) => item.passed), true);
+
+    const deniedDigitalHospitalSelfAssessment = await api(baseUrl, "/api/digital-hospital/self-assessments", authorized(residentPhoneLogin.body.token));
+    assert.equal(deniedDigitalHospitalSelfAssessment.response.status, 403);
+
+    const digitalHospitalSelfAssessmentHospitalLogin = await login(baseUrl, "hospital");
+    assert.equal(digitalHospitalSelfAssessmentHospitalLogin.response.status, 200);
+    const digitalHospitalSelfAssessmentHospitalBoard = await api(baseUrl, "/api/digital-hospital/self-assessments", authorized(digitalHospitalSelfAssessmentHospitalLogin.body.token));
+    assert.equal(digitalHospitalSelfAssessmentHospitalBoard.response.status, 200);
+    assert.equal(digitalHospitalSelfAssessmentHospitalBoard.body.summary.assessments, 1);
+    assert.equal(digitalHospitalSelfAssessmentHospitalBoard.body.assessments[0].institutionId, "MR1");
+
+    const digitalHospitalSelfAssessmentCommunityLogin = await login(baseUrl, "community");
+    assert.equal(digitalHospitalSelfAssessmentCommunityLogin.response.status, 200);
+    const deniedCrossInstitutionSelfAssessment = await api(baseUrl, "/api/digital-hospital/self-assessments/dhsa-mr1-2026-pilot/actions", authorized(digitalHospitalSelfAssessmentCommunityLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "save-draft",
+        indicatorId: "dhsi-standard-version",
+        answer: "compliant",
+        evidenceRefs: ["CROSS-ORG-EVIDENCE"],
+        note: "不得跨机构填报。",
+        noPatientPii: true
+      })
+    }));
+    assert.equal(deniedCrossInstitutionSelfAssessment.response.status, 403);
+
+    const invalidSelfAssessmentEvidence = await api(baseUrl, "/api/digital-hospital/self-assessments/dhsa-mr1-2026-pilot/actions", authorized(digitalHospitalSelfAssessmentHospitalLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "save-draft",
+        indicatorId: "dhsi-standard-version",
+        answer: "compliant",
+        evidenceRefs: ["SITE-MR1-11"],
+        note: "拒绝未确认最小化边界的证据。",
+        noPatientPii: false
+      })
+    }));
+    assert.equal(invalidSelfAssessmentEvidence.response.status, 400);
+
+    let hospitalSelfAssessment = digitalHospitalSelfAssessmentHospitalBoard.body.assessments[0];
+    const answeredSelfAssessmentIndicators = new Set((hospitalSelfAssessment.responses || []).map((item) => item.indicatorId));
+    for (const indicator of digitalHospitalSelfAssessmentHospitalBoard.body.indicators.filter((item) => !answeredSelfAssessmentIndicators.has(item.id))) {
+      const saved = await api(baseUrl, `/api/digital-hospital/self-assessments/${encodeURIComponent(hospitalSelfAssessment.id)}/actions`, authorized(digitalHospitalSelfAssessmentHospitalLogin.body.token, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save-draft",
+          indicatorId: indicator.id,
+          answer: "compliant",
+          evidenceRefs: [`SITE-MR1-${indicator.id}`],
+          note: "登记 API 回归受控证据引用。",
+          noPatientPii: true
+        })
+      }));
+      assert.equal(saved.response.status, 200);
+      hospitalSelfAssessment = saved.body.assessment;
+    }
+
+    const submittedSelfAssessment = await api(baseUrl, `/api/digital-hospital/self-assessments/${encodeURIComponent(hospitalSelfAssessment.id)}/actions`, authorized(digitalHospitalSelfAssessmentHospitalLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "submit-assessment",
+        declarationAccepted: true,
+        noPatientPii: true,
+        note: "医院确认十二项指标和最小化证据后提交。"
+      })
+    }));
+    assert.equal(submittedSelfAssessment.response.status, 200);
+    assert.equal(submittedSelfAssessment.body.assessment.status, "submitted");
+    assert.equal(submittedSelfAssessment.body.assessment.declaration.noPatientPii, true);
+
+    const correctionSelfAssessment = await api(baseUrl, `/api/digital-hospital/self-assessments/${encodeURIComponent(hospitalSelfAssessment.id)}/actions`, authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "request-correction",
+        indicatorIds: ["dhsi-resilience"],
+        dueAt: "2026-08-20",
+        note: "补充备份恢复演练回执。"
+      })
+    }));
+    assert.equal(correctionSelfAssessment.response.status, 200);
+    assert.equal(correctionSelfAssessment.body.assessment.status, "correction-required");
+
+    const correctedSelfAssessment = await api(baseUrl, `/api/digital-hospital/self-assessments/${encodeURIComponent(hospitalSelfAssessment.id)}/actions`, authorized(digitalHospitalSelfAssessmentHospitalLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "save-draft",
+        indicatorId: "dhsi-resilience",
+        answer: "compliant",
+        evidenceRefs: ["DR-REHEARSAL-MR1-2026-API"],
+        note: "已补充恢复演练受控回执。",
+        noPatientPii: true
+      })
+    }));
+    assert.equal(correctedSelfAssessment.response.status, 200);
+    assert.equal(correctedSelfAssessment.body.assessment.status, "correction-in-progress");
+
+    const resubmittedSelfAssessment = await api(baseUrl, `/api/digital-hospital/self-assessments/${encodeURIComponent(hospitalSelfAssessment.id)}/actions`, authorized(digitalHospitalSelfAssessmentHospitalLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "submit-assessment",
+        declarationAccepted: true,
+        noPatientPii: true,
+        note: "补正完成后重新提交。"
+      })
+    }));
+    assert.equal(resubmittedSelfAssessment.response.status, 200);
+    assert.equal(resubmittedSelfAssessment.body.assessment.status, "resubmitted");
+
+    const acceptedSelfAssessment = await api(baseUrl, `/api/digital-hospital/self-assessments/${encodeURIComponent(hospitalSelfAssessment.id)}/actions`, authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "accept-assessment",
+        note: "省级初审确认补正证据完整，接受本轮自评。"
+      })
+    }));
+    assert.equal(acceptedSelfAssessment.response.status, 200);
+    assert.equal(acceptedSelfAssessment.body.assessment.status, "accepted");
+    assert.equal(acceptedSelfAssessment.body.assessment.review.decision, "accepted");
+
+    const assignedSelfAssessment = await api(baseUrl, "/api/digital-hospital/self-assessments/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "assign-assessment",
+        institutionId: "MR5",
+        institutionName: "庄河市基层机构",
+        cycle: "2027-pilot",
+        targetLevel: "基层医疗机构轻量试点",
+        assignedTo: "机构信息管理员",
+        dueAt: "2027-03-31",
+        note: "分派下一评价周期自评任务。"
+      })
+    }));
+    assert.equal(assignedSelfAssessment.response.status, 201);
+    assert.equal(assignedSelfAssessment.body.assessment.status, "assigned");
+
+    const deniedInstitutionAssignment = await api(baseUrl, "/api/digital-hospital/self-assessments/actions", authorized(digitalHospitalSelfAssessmentHospitalLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "assign-assessment" })
+    }));
+    assert.equal(deniedInstitutionAssignment.response.status, 403);
+
     const deniedDigitalHospitalStandards = await api(baseUrl, "/api/digital-hospital/standards", authorized(residentPhoneLogin.body.token));
     assert.equal(deniedDigitalHospitalStandards.response.status, 403);
 
@@ -1716,6 +1953,10 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(digitalHospitalAudit.body.securityEvents.some((item) => item.action === "digital-hospital-launch-readiness" && item.target === "/api/digital-hospital/launch-readiness"), true);
     assert.equal(digitalHospitalAudit.body.securityEvents.some((item) => item.action === "digital-hospital-policy-register" && item.target === "/api/digital-hospital/policy-register"), true);
     assert.equal(digitalHospitalAudit.body.securityEvents.some((item) => item.action === "digital-hospital-policy-review" && item.target === "dhp-wst-846-847-2024"), true);
+    assert.equal(digitalHospitalAudit.body.securityEvents.some((item) => item.action === "digital-hospital-control-matrix" && item.target === "/api/digital-hospital/control-matrix"), true);
+    assert.equal(digitalHospitalAudit.body.securityEvents.some((item) => item.action === "digital-hospital-control-action" && item.target === "dhc-interoperability-contract"), true);
+    assert.equal(digitalHospitalAudit.body.securityEvents.some((item) => item.action === "digital-hospital-self-assessment-read" && item.target === "/api/digital-hospital/self-assessments"), true);
+    assert.equal(digitalHospitalAudit.body.securityEvents.some((item) => item.action === "digital-hospital-self-assessment-action" && item.target === "dhsa-mr1-2026-pilot"), true);
     assert.equal(digitalHospitalAudit.body.securityEvents.some((item) => item.action === "digital-hospital-launch-requirement-action" && item.target === "dhlr-site-interface-signoff"), true);
     assert.equal(digitalHospitalAudit.body.securityEvents.some((item) => item.action === "digital-hospital-production-evidence-packets" && item.target === "/api/digital-hospital/production-evidence-packets"), true);
     assert.equal(digitalHospitalAudit.body.securityEvents.some((item) => item.action === "digital-hospital-production-evidence-packet-action" && item.target === "dhpep-specialty-casebook"), true);
@@ -4712,8 +4953,47 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(chronicProductionSafety.body.functionalState, "ready-for-site-safety-evidence");
     assert.equal(chronicProductionSafety.body.formalGoLiveState, "site-evidence-pending");
     assert.equal(chronicProductionSafety.body.checks.some((item) => item.id === "environment:audit-retention"), true);
+    const chronicProductionSafetyEvidence = await api(baseUrl, "/api/chronic/production-safety-evidence", authorized(commissionToken));
+    assert.equal(chronicProductionSafetyEvidence.response.status, 200);
+    assert.equal(chronicProductionSafetyEvidence.body.summary.requirements, 6);
+    assert.equal(chronicProductionSafetyEvidence.body.rows.some((item) => item.controlId === "chronic:launch-core-signoff" && item.templateId === "signoff-cutover-chronic-launch-core"), true);
     const citizenProductionSafety = await api(baseUrl, "/api/chronic/production-safety", authorized(citizen.body.token));
     assert.equal(citizenProductionSafety.response.status, 403);
+    const citizenProductionSafetyEvidence = await api(baseUrl, "/api/chronic/production-safety-evidence", authorized(citizen.body.token));
+    assert.equal(citizenProductionSafetyEvidence.response.status, 403);
+
+    const chronicInteroperabilityProfiles = await api(baseUrl, "/api/chronic/interoperability-profiles", authorized(commissionToken));
+    assert.equal(chronicInteroperabilityProfiles.response.status, 200);
+    assert.equal(chronicInteroperabilityProfiles.body.summary.profiles, 3);
+    assert.equal(chronicInteroperabilityProfiles.body.profiles.some((item) => item.id === "chronic-referral-return-v1" && item.standards.includes("WS/T 847-2024")), true);
+    const interoperableReferral = await api(baseUrl, "/api/chronic/interoperability-validation", authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({
+        profileId: "chronic-referral-return-v1",
+        message: {
+          externalId: "referral-return-r1-20260717",
+          residentId: "r1",
+          personIndex: "person-index-r1",
+          referralId: "ref-001",
+          sourceSystem: "leading-hospital-emr",
+          occurredAt: "2026-07-17T08:00:00.000Z",
+          returnStatus: "returned-to-primary-care",
+          diagnosis: "hypertension",
+          nextFollowupAt: "2026-07-24T08:00:00.000Z"
+        }
+      })
+    }));
+    assert.equal(interoperableReferral.response.status, 200);
+    assert.equal(interoperableReferral.body.ok, true);
+    const invalidInteroperabilityMessage = await api(baseUrl, "/api/chronic/interoperability-validation", authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({ profileId: "chronic-device-observation-v1", message: { residentId: "r1", reportedAt: "not-a-date" } })
+    }));
+    assert.equal(invalidInteroperabilityMessage.response.status, 422);
+    assert.equal(invalidInteroperabilityMessage.body.missingFields.includes("externalId"), true);
+    assert.equal(invalidInteroperabilityMessage.body.invalidDateFields.includes("reportedAt"), true);
+    const citizenInteroperabilityProfiles = await api(baseUrl, "/api/chronic/interoperability-profiles", authorized(citizen.body.token));
+    assert.equal(citizenInteroperabilityProfiles.response.status, 403);
 
     const publicHealthLoop = await api(baseUrl, "/api/chronic/public-health-loop", authorized(commissionToken));
     assert.equal(publicHealthLoop.response.status, 200);
@@ -4756,7 +5036,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const chronicInstitutionInterfaces = await api(baseUrl, "/api/chronic/institution-interfaces", authorized(commissionToken));
     assert.equal(chronicInstitutionInterfaces.response.status, 200);
     assert.equal(chronicInstitutionInterfaces.body.ok, true);
-    assert.equal(chronicInstitutionInterfaces.body.summary.readyContracts, 14);
+    assert.equal(chronicInstitutionInterfaces.body.summary.readyContracts, 17);
     assert.equal(chronicInstitutionInterfaces.body.contracts.some((item) => item.path === "/api/chronic/pharmacy-callbacks" && item.ready), true);
 
     const chronicLaunchCore = await api(baseUrl, "/api/chronic/launch-core", authorized(commissionToken));

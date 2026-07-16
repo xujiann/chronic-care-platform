@@ -84,7 +84,7 @@ const CAPABILITY_TRACKS = [
     name: "Institution integration and launch core",
     sourceCategories: ["dalian-planning", "system-design", "repo-evidence"],
     dataCollections: ["chronicExternalIntegrations", "chronicLaunchCoreSignoffs", "chronicIdentityScopes", "personalRecords"],
-    apiMarkers: ["/api/chronic/institution-interfaces", "/api/chronic/launch-core", "/api/chronic/production-safety", "/api/chronic/archive-standard", "/api/chronic/referral-continuity"],
+    apiMarkers: ["/api/chronic/institution-interfaces", "/api/chronic/launch-core", "/api/chronic/production-safety", "/api/chronic/production-safety-evidence", "/api/chronic/interoperability-profiles", "/api/chronic/interoperability-validation", "/api/chronic/archive-standard", "/api/chronic/referral-continuity"],
     docMarkers: ["docs/chronic-institution-interfaces.md", "docs/chronic-launch-core.md"]
   },
   {

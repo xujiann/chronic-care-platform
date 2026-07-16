@@ -56,10 +56,36 @@ test("event evidence package shows completeness and WS/T 621 handover evidence",
 
 test("citizens can only read their own emergency evidence package", () => {
   const data = EmergencyService.seed();
+  assert.equal(EmergencyService.buildDashboard(data, { role:"citizen", name:"resident", residentId:"r-100" }).events.length, 0, "unlinked events must not appear in a citizen dashboard");
   const event = EmergencyService.createCall(data, { role:"citizen", name:"resident", residentId:"r-100" }, { address:"test address", chiefComplaint:"chest pain" });
   const ownPackage = EmergencyService.buildEvidencePackage(data, { role:"citizen", name:"resident", residentId:"r-100" }, event.id);
   assert.equal(ownPackage.eventId, event.id);
+  assert.deepEqual(EmergencyService.buildDashboard(data, { role:"citizen", name:"resident", residentId:"r-100" }).events.map((item) => item.id), [event.id]);
   assert.throws(() => EmergencyService.buildEvidencePackage(data, { role:"citizen", name:"other", residentId:"r-200" }, event.id), /cannot access/);
+});
+
+test("confirmed SOS enters the P1 acceptance queue and AED map favours a usable device", () => {
+  const data = EmergencyService.seed();
+  const citizen = { role:"citizen", name:"resident", residentId:"r-100" };
+  assert.throws(() => EmergencyService.createSosCall(data, citizen, { address:"test", confirmed:false }), /explicit confirmation/);
+  const event = EmergencyService.createSosCall(data, citizen, {
+    confirmed:true,
+    detectedSignal:"collapse",
+    address:"SOS test location",
+    latitude:38.92,
+    longitude:121.65
+  });
+  assert.equal(event.source, "device-sos");
+  assert.equal(event.triageLevel, "P1");
+  assert.equal(event.sos.status, "submitted-to-120-queue");
+  assert.equal(event.sos.autoDialUri, "tel:120");
+  assert.ok(data.emergencyAuditEvents.some((item) => item.action === "create-confirmed-sos"));
+
+  const map = EmergencyService.buildAedMap(data, citizen, { latitude:38.92, longitude:121.65, limit:4 });
+  assert.equal(map.nearestAvailable.status, "available");
+  assert.equal(map.sites.length, 4);
+  assert.ok(map.sites.every((site, index, rows) => index === 0 || site.distanceMeters >= rows[index - 1].distanceMeters));
+  assert.throws(() => EmergencyService.buildAedMap(data, citizen, { latitude:"invalid", longitude:121.65 }), /valid latitude/);
 });
 
 test("evidence exports bind the role-scoped package to a SHA-256 digest", () => {

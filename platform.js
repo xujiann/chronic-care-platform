@@ -78,6 +78,7 @@ let platformData = null;
 let activeEditSnapshot = null;
 let platformCapabilityMap = null;
 let platformGoLiveSlices = null;
+let platformStandardsLedgers = null;
 let platformCapabilityOperationsCenter = {
   productionReady: false,
   summary: { capabilityDomains: 0, repositoryEvidenceReady: 0, reviewedPreproduction: 0, improvementRequired: 0, pendingReview: 0, evidenceRecorded: 0, productionReady: 0, mvpRequiredModules: 0, productionBlockers: 0, blockersOpen: 0, blockersInProgress: 0, blockerEvidenceSubmitted: 0, blockerEvidenceReviewed: 0, blockerEvidenceRecorded: 0 },
@@ -425,6 +426,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   platformState = await loadPlatformState(fallbackPlatformState);
   await loadPlatformCapabilityMap();
   await loadPlatformGoLiveSlices();
+  await loadPlatformStandardsLedgers();
   await loadPlatformCapabilityOperationsCenter();
   await loadCommercialCryptoCenter();
   await loadPostgresReconciliationCenter();
@@ -441,6 +443,7 @@ function renderPlatform() {
   renderMetrics(platformState, platformData);
   renderPlatformCapabilityMap();
   renderPlatformGoLiveSlices();
+  renderPlatformStandardsLedgers();
   renderCapabilities(platformState, platformData.capabilities);
   renderIntegrationRegistry(platformData.integrations);
   renderInterfacePlan(platformData.interfaces);
@@ -703,6 +706,42 @@ function renderPlatformGoLiveSlices() {
       <h3>${platformEscapeHtml(item.name || item.domain)}</h3>
       <p>${platformEscapeHtml((item.standardItems || []).slice(0, 4).join(" / "))}</p>
       <small>${platformEscapeHtml(item.owner || "unassigned")} / ${platformEscapeHtml(item.signoffStatus || "pending")} / ${item.onsiteBlocked ? "onsite blocked" : "ready"}</small>
+    </article>
+  `).join("");
+}
+
+function renderPlatformStandardsLedgers() {
+  const statusTarget = document.querySelector("#platform-standards-ledgers-status");
+  const metricsTarget = document.querySelector("#platform-standards-ledgers-metrics");
+  const gridTarget = document.querySelector("#platform-standards-ledgers-grid");
+  if (!statusTarget || !metricsTarget || !gridTarget) return;
+  if (!platformStandardsLedgers) {
+    statusTarget.textContent = PLATFORM_API_BASE ? "等待台账 API" : "静态预览需连接动态后端";
+    statusTarget.className = "badge warn";
+    metricsTarget.innerHTML = `<article class="metric-card"><span>动态 API</span><strong>/api/platform/standards-ledgers</strong><small>连接 Node 后端后汇总六类台账和验收边界。</small></article>`;
+    gridTarget.innerHTML = `<article class="evidence-card"><h3>台账未加载</h3><p>静态预览不伪造标准符合性和现场签字状态。</p></article>`;
+    return;
+  }
+  const summary = platformStandardsLedgers.summary || {};
+  const functionStateLabels = { implemented: "功能已实现", partial: "部分实现" };
+  const goLiveStateLabels = { ready: "正式上线就绪", "blocked-until-onsite-evidence": "待现场证据" };
+  statusTarget.textContent = platformStandardsLedgers.ok ? "六类台账结构可验收" : "台账结构存在缺口";
+  statusTarget.className = platformStandardsLedgers.ok ? "badge success" : "badge warn";
+  const metricRows = [
+    ["台账", summary.ledgers || 0, `${summary.implemented || 0} 张功能结构已实现`],
+    ["归集记录", summary.records || 0, "仅展示治理摘要，不汇聚患者可识别明细"],
+    ["验收口径", summary.acceptanceCriteria || 0, `${summary.automatedChecks || 0} 项自动检查`],
+    ["正式上线", summary.formalGoLiveReady || 0, `${summary.onsiteBlockers || 0} 类现场阻断仍显式保留`]
+  ];
+  metricsTarget.innerHTML = metricRows.map(([label, value, hint]) => `
+    <article class="metric-card"><span>${platformEscapeHtml(label)}</span><strong>${platformEscapeHtml(value)}</strong><small>${platformEscapeHtml(hint)}</small></article>
+  `).join("");
+  gridTarget.innerHTML = (platformStandardsLedgers.ledgers || []).map((item) => `
+    <article class="evidence-card" data-platform-standards-ledger="${platformEscapeHtml(item.id)}">
+      <h3>${platformEscapeHtml(item.title)}</h3>
+      <p>${platformEscapeHtml(item.purpose)}</p>
+      <small>责任方：${platformEscapeHtml(item.owner)}；记录 ${platformEscapeHtml(item.summary?.records || 0)}；${platformEscapeHtml(functionStateLabels[item.functionalState] || item.functionalState)}；${platformEscapeHtml(goLiveStateLabels[item.formalGoLiveState] || item.formalGoLiveState)}</small>
+      <p>${platformEscapeHtml((item.onsiteBlockers || []).join("；"))}</p>
     </article>
   `).join("");
 }
@@ -2147,6 +2186,7 @@ function bindPlatformEditor() {
   document.querySelector("#export-platform-report")?.addEventListener("click", exportPlatformReport);
   document.querySelector("#export-platform-capability-map")?.addEventListener("click", exportPlatformCapabilityMap);
   document.querySelector("#export-platform-go-live-slices")?.addEventListener("click", exportPlatformGoLiveSlices);
+  document.querySelector("#export-platform-standards-ledgers")?.addEventListener("click", exportPlatformStandardsLedgers);
   const filters = document.querySelector("#platform-report-filters");
   filters?.addEventListener("input", refreshReportSummary);
   filters?.addEventListener("change", refreshReportSummary);
@@ -2179,6 +2219,18 @@ async function loadPlatformGoLiveSlices() {
     platformGoLiveSlices = await response.json();
   } catch (error) {
     platformGoLiveSlices = null;
+  }
+}
+
+async function loadPlatformStandardsLedgers() {
+  if (!PLATFORM_API_BASE) return;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  try {
+    const response = await request(`${PLATFORM_API_BASE}/platform/standards-ledgers`);
+    if (!response.ok) return;
+    platformStandardsLedgers = await response.json();
+  } catch (error) {
+    platformStandardsLedgers = null;
   }
 }
 
@@ -3137,6 +3189,28 @@ async function exportPlatformGoLiveSlices() {
       "",
       "请确认已使用卫生健康委管理端账号登录，并检查动态后端是否可访问。"
     ].join("\n"));
+  }
+}
+
+async function exportPlatformStandardsLedgers() {
+  if (!PLATFORM_API_BASE) {
+    downloadText(`卫生健康信息平台六类台账-${todayStamp()}.md`, [
+      "# 卫生健康信息平台六类可验收台账",
+      "",
+      "当前为静态预览模式，无法读取 `/api/platform/standards-ledgers`。",
+      "",
+      "请启动 Node 后端后重新导出，以保留实时数据、自动检查和正式上线边界。"
+    ].join("\n"));
+    return;
+  }
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  try {
+    const response = await request(`${PLATFORM_API_BASE}/platform/standards-ledgers?format=markdown`);
+    const text = await response.text();
+    if (!response.ok) throw new Error(text || `HTTP ${response.status}`);
+    downloadText(`卫生健康信息平台六类台账-${todayStamp()}.md`, text);
+  } catch (error) {
+    downloadText(`卫生健康信息平台六类台账导出失败-${todayStamp()}.md`, `# 导出失败\n\n${error.message || "unknown error"}\n`);
   }
 }
 

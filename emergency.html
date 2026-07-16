@@ -32,6 +32,28 @@
           <button type="submit">提交辅助信息并继续拨打120</button>
         </form>
       </article>
+      <article class="panel sos-panel" data-emergency-panel="sos">
+        <div class="panel-title"><h2>智能 SOS 自动呼救</h2><span>确认后提交 120 队列并打开系统拨号</span></div>
+        <form id="emergency-sos-form" class="filter-grid">
+          <label>突发信号<select name="detectedSignal"><option value="collapse">疑似晕厥/倒地</option><option value="chest-pain">突发胸痛</option><option value="breathing-difficulty">呼吸困难</option><option value="stroke-suspected">疑似卒中</option><option value="manual-sos">手动 SOS</option></select></label>
+          <label>现场地址<input name="address" required value="大连市中山区人民路示范点" /></label>
+          <label>简要症状<input name="chiefComplaint" required value="突发疾病，已触发 SOS" /></label>
+          <label>纬度<input name="latitude" type="number" step="0.000001" value="38.920000" required /></label>
+          <label>经度<input name="longitude" type="number" step="0.000001" value="121.650000" required /></label>
+          <label class="sos-confirm"><input name="confirmed" type="checkbox" value="true" required /> 我确认需要 120 急救，并同意提交位置和症状。</label>
+          <button type="submit" class="sos-button">触发 SOS 并拨打 120</button>
+        </form>
+        <p class="sos-boundary">网页不能绕过手机系统静默拨号；提交后仍需在设备上确认拨打 120。</p>
+      </article>
+      <article class="panel" data-emergency-panel="aed-map">
+        <div class="panel-title"><h2>AED 地图与取用指引</h2><span>就近 AED、距离、可用状态</span></div>
+        <form id="aed-map-form" class="filter-grid compact-form">
+          <label>纬度<input name="latitude" type="number" step="0.000001" value="38.920000" required /></label>
+          <label>经度<input name="longitude" type="number" step="0.000001" value="121.650000" required /></label>
+          <button type="submit" class="secondary">查询就近 AED</button>
+        </form>
+        <div id="emergency-aed-map" class="aed-map" aria-live="polite"><p>正在加载 AED 地图…</p></div>
+      </article>
       <article class="panel" data-emergency-panel="dispatch">
         <div class="panel-title"><h2>120调度</h2><span>统一受理派车</span></div>
         <form id="dispatch-form" class="filter-grid">

@@ -5,7 +5,7 @@ let institutionRegistrationDashboard = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
   platformState = await loadPlatformState(fallbackState);
-  const [followupSummary, launchCore, publicHealthLoop, referralContinuity, archiveStandardization, pathwayQuality, pharmacyInsuranceClosure, productionSafety, registrationDashboard] = await Promise.all([loadChronicFollowupSummary(), loadChronicLaunchCore(), loadChronicPublicHealthLoop(), loadChronicReferralContinuity(), loadChronicArchiveStandardization(), loadChronicPathwayQuality(), loadChronicPharmacyInsuranceClosure(), loadChronicProductionSafety(), loadRegistrationJourneyDashboard()]);
+  const [followupSummary, launchCore, publicHealthLoop, referralContinuity, archiveStandardization, pathwayQuality, pharmacyInsuranceClosure, productionSafety, productionSafetyEvidence, interoperabilityProfiles, registrationDashboard] = await Promise.all([loadChronicFollowupSummary(), loadChronicLaunchCore(), loadChronicPublicHealthLoop(), loadChronicReferralContinuity(), loadChronicArchiveStandardization(), loadChronicPathwayQuality(), loadChronicPharmacyInsuranceClosure(), loadChronicProductionSafety(), loadChronicProductionSafetyEvidence(), loadChronicInteroperabilityProfiles(), loadRegistrationJourneyDashboard()]);
   platformState.chronicFollowupSummary = followupSummary;
   platformState.chronicLaunchCore = launchCore;
   platformState.chronicPublicHealthLoop = publicHealthLoop;
@@ -14,6 +14,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   platformState.chronicPathwayQuality = pathwayQuality;
   platformState.chronicPharmacyInsuranceClosure = pharmacyInsuranceClosure;
   platformState.chronicProductionSafety = productionSafety;
+  platformState.chronicProductionSafetyEvidence = productionSafetyEvidence;
+  platformState.chronicInteroperabilityProfiles = interoperabilityProfiles;
   institutionRegistrationDashboard = registrationDashboard;
   bindInstitutionActions();
   renderAll(platformState);
@@ -115,6 +117,30 @@ async function loadChronicProductionSafety() {
   return null;
 }
 
+async function loadChronicProductionSafetyEvidence() {
+  if (!institutionApiBase) return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/chronic/production-safety-evidence`);
+    if (response.ok) return await response.json();
+  } catch (error) {
+    // Static preview remains explicit that verified site evidence is unavailable.
+  }
+  return null;
+}
+
+async function loadChronicInteroperabilityProfiles() {
+  if (!institutionApiBase) return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/chronic/interoperability-profiles`);
+    if (response.ok) return await response.json();
+  } catch (error) {
+    // Static preview shows the standard baseline but cannot validate live interface messages.
+  }
+  return null;
+}
+
 async function loadRegistrationJourneyDashboard() {
   if (institutionApiBase) {
     try {
@@ -134,7 +160,7 @@ async function loadRegistrationJourneyDashboard() {
 }
 
 async function refreshChronicRuntimeState() {
-  const [followupSummary, launchCore, publicHealthLoop, referralContinuity, archiveStandardization, pathwayQuality, pharmacyInsuranceClosure, productionSafety] = await Promise.all([loadChronicFollowupSummary(), loadChronicLaunchCore(), loadChronicPublicHealthLoop(), loadChronicReferralContinuity(), loadChronicArchiveStandardization(), loadChronicPathwayQuality(), loadChronicPharmacyInsuranceClosure(), loadChronicProductionSafety()]);
+  const [followupSummary, launchCore, publicHealthLoop, referralContinuity, archiveStandardization, pathwayQuality, pharmacyInsuranceClosure, productionSafety, productionSafetyEvidence, interoperabilityProfiles] = await Promise.all([loadChronicFollowupSummary(), loadChronicLaunchCore(), loadChronicPublicHealthLoop(), loadChronicReferralContinuity(), loadChronicArchiveStandardization(), loadChronicPathwayQuality(), loadChronicPharmacyInsuranceClosure(), loadChronicProductionSafety(), loadChronicProductionSafetyEvidence(), loadChronicInteroperabilityProfiles()]);
   if (followupSummary) platformState.chronicFollowupSummary = followupSummary;
   if (launchCore) platformState.chronicLaunchCore = launchCore;
   if (publicHealthLoop) platformState.chronicPublicHealthLoop = publicHealthLoop;
@@ -143,6 +169,8 @@ async function refreshChronicRuntimeState() {
   if (pathwayQuality) platformState.chronicPathwayQuality = pathwayQuality;
   if (pharmacyInsuranceClosure) platformState.chronicPharmacyInsuranceClosure = pharmacyInsuranceClosure;
   if (productionSafety) platformState.chronicProductionSafety = productionSafety;
+  if (productionSafetyEvidence) platformState.chronicProductionSafetyEvidence = productionSafetyEvidence;
+  if (interoperabilityProfiles) platformState.chronicInteroperabilityProfiles = interoperabilityProfiles;
 }
 
 function renderAll(state) {
@@ -154,6 +182,7 @@ function renderAll(state) {
   renderChronicPathwayQuality(state);
   renderChronicPharmacyInsuranceClosure(state);
   renderChronicProductionSafety(state);
+  renderChronicInteroperabilityProfiles(state);
   renderPhase2FamilyDoctorContracts(state);
   populateBirthCertificateForm(state);
   populateMultiPracticeForm(state);
@@ -683,7 +712,8 @@ function renderChronicProductionSafety(state) {
   const summaryEl = document.querySelector("#chronic-production-safety-summary");
   const checksEl = document.querySelector("#chronic-production-safety-checks");
   const blockersEl = document.querySelector("#chronic-production-safety-blockers");
-  if (!summaryEl || !checksEl || !blockersEl) return;
+  const evidenceEl = document.querySelector("#chronic-production-safety-evidence");
+  if (!summaryEl || !checksEl || !blockersEl || !evidenceEl) return;
   const report = state.chronicProductionSafety || fallbackChronicProductionSafety();
   const summary = report.summary || {};
   summaryEl.textContent = `${report.formalGoLiveState || "site-evidence-pending"} 路 ${summary.controlsPassed || 0}/${summary.controls || 0} controls`;
@@ -694,6 +724,25 @@ function renderChronicProductionSafety(state) {
     ["Open blockers", summary.blockers || 0]
   ].map(([label, value]) => `<article class="claim-card"><strong>${label}</strong><span>${value}<br>no secret values exposed</span></article>`).join("");
   blockersEl.innerHTML = (report.blockers || []).map((item) => `<section class="item"><div><h3>${item.name}</h3><p>${item.source || "production control"}</p><p>${item.nextAction || "complete and retain acceptance evidence"}</p></div><span class="badge warn">pending</span></section>`).join("") || `<p class="muted">No unresolved production-safety controls are reported. Formal approval remains a separate governance decision.</p>`;
+  const evidence = state.chronicProductionSafetyEvidence || { summary: { evidenceVerified: 0, requirements: 0 }, rows: [] };
+  const evidenceSummary = evidence.summary || {};
+  evidenceEl.innerHTML = `<section class="item"><div><h3>Verified site evidence bridge</h3><p>${evidenceSummary.evidenceVerified || 0}/${evidenceSummary.requirements || 0} chronic safety evidence requirements have verified site material.</p><p>${evidence.boundary || "Verified evidence supports traceability only; formal production approval remains separate."}</p></div><span class="badge ${(evidenceSummary.evidencePending || 0) ? "warn" : "info"}">${(evidenceSummary.evidencePending || 0) ? "evidence pending" : "evidence mapped"}</span></section>${(evidence.rows || []).filter((item) => !item.evidenceVerified).map((item) => `<section class="item"><div><h3>${item.name}</h3><p>${item.owner || "site-launch-owner"}</p><p>${item.nextAction}</p></div><span class="badge warn">pending</span></section>`).join("")}`;
+}
+
+function renderChronicInteroperabilityProfiles(state) {
+  const summaryEl = document.querySelector("#chronic-interoperability-summary");
+  const profilesEl = document.querySelector("#chronic-interoperability-profiles");
+  const evidenceEl = document.querySelector("#chronic-interoperability-evidence");
+  if (!summaryEl || !profilesEl || !evidenceEl) return;
+  const report = state.chronicInteroperabilityProfiles || { summary: { profiles: 0, dataElementProfiles: 0, interactionProfiles: 0, signatureProfiles: 0 }, profiles: [], boundary: "Open the authorized Node API to view the live interoperability standard baseline." };
+  const summary = report.summary || {};
+  summaryEl.textContent = `${summary.profiles || 0} profiles / WS/T 363/364 + 846 + 847`;
+  profilesEl.innerHTML = [
+    ["Data elements", summary.dataElementProfiles || 0, "WS/T 363/364"],
+    ["Interactions", summary.interactionProfiles || 0, "WS/T 846"],
+    ["Signatures", summary.signatureProfiles || 0, "WS/T 847"]
+  ].map(([label, value, standard]) => `<article class="claim-card"><strong>${label}</strong><span>${value}<br>${standard}</span></article>`).join("");
+  evidenceEl.innerHTML = (report.profiles || []).map((item) => `<section class="item"><div><h3>${item.name}</h3><p>${(item.standards || []).join(" / ")}</p><p>Required: ${(item.requiredFields || []).join(", ")}</p><p>Production evidence: ${(item.productionEvidence || []).join(", ")}</p></div><span class="badge warn">prevalidation</span></section>`).join("") || `<p class="muted">${report.boundary}</p>`;
 }
 
 async function recordChronicReferralContinuity(referralId) {

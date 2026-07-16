@@ -1517,6 +1517,15 @@ dialog::backdrop {
   font-weight: 800;
 }
 
+.filter-grid .digital-control-action-field[hidden] {
+  display: none;
+}
+
+.filter-grid .digital-self-assessment-action-field[hidden],
+[data-commission-only][hidden] {
+  display: none;
+}
+
 .filter-grid input,
 .filter-grid select,
 .filter-grid textarea {

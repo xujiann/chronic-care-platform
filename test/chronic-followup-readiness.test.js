@@ -62,6 +62,9 @@ test("chronic follow-up readiness covers all priority application boundaries", (
   assert.equal(report.apiSurface.includes("GET /api/chronic/pathway-quality"), true);
   assert.equal(report.apiSurface.includes("GET /api/chronic/pharmacy-insurance-closure"), true);
   assert.equal(report.apiSurface.includes("GET /api/chronic/production-safety"), true);
+  assert.equal(report.apiSurface.includes("GET /api/chronic/production-safety-evidence"), true);
+  assert.equal(report.apiSurface.includes("GET /api/chronic/interoperability-profiles"), true);
+  assert.equal(report.apiSurface.includes("POST /api/chronic/interoperability-validation"), true);
   assert.equal(report.apiSurface.includes("POST /api/chronic/referral-continuity"), true);
 });
 

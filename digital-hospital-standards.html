@@ -96,10 +96,109 @@
 
       <section class="panel" data-digital-hospital-section="control-matrix">
         <div class="panel-title">
-          <h2>六域控制矩阵</h2>
-          <span>规范要求到控制措施、证据、自动检查和上线阻断项</span>
+          <h2>六域控制整改工作台</h2>
+          <span>规范要求到责任分派、最小化证据、独立复核和上线阻断闭环</span>
         </div>
+        <div class="filter-grid">
+          <label>
+            标准域
+            <select id="control-domain-filter"><option value="">全部六域</option></select>
+          </label>
+          <label>
+            控制状态
+            <select id="control-status-filter">
+              <option value="">全部状态</option>
+              <option value="open">待处理</option>
+              <option value="in-progress">整改中</option>
+              <option value="evidence-recorded">待复核</option>
+              <option value="verified">已验证</option>
+              <option value="not-applicable">不适用</option>
+            </select>
+          </label>
+          <label>
+            关键词
+            <input id="control-search" type="search" placeholder="控制、责任人、证据或检查" />
+          </label>
+          <label class="checkbox-line">
+            <input id="control-blocking-filter" type="checkbox" />
+            只看上线阻断
+          </label>
+          <label class="checkbox-line">
+            <input id="control-overdue-filter" type="checkbox" />
+            只看逾期整改
+          </label>
+        </div>
+        <div id="digital-hospital-control-metrics" class="metric-grid"></div>
         <div id="digital-hospital-control-matrix" class="table-wrap"></div>
+        <form id="digital-hospital-control-action-form" class="filter-grid" autocomplete="off">
+          <label>
+            控制项
+            <select id="digital-hospital-control-id" required></select>
+          </label>
+          <label>
+            整改动作
+            <select id="digital-hospital-control-action" required>
+              <option value="assign-control">分派整改</option>
+              <option value="record-evidence">登记证据</option>
+              <option value="verify-control">独立复核</option>
+              <option value="reopen-control">重开控制</option>
+              <option value="mark-not-applicable">判定不适用</option>
+            </select>
+          </label>
+          <label class="digital-control-action-field" data-control-actions="assign-control">
+            整改责任人
+            <input id="digital-hospital-control-assignee" type="text" placeholder="责任部门或责任人" />
+          </label>
+          <label class="digital-control-action-field" data-control-actions="assign-control">
+            完成期限
+            <input id="digital-hospital-control-due-at" type="date" />
+          </label>
+          <label class="digital-control-action-field" data-control-actions="record-evidence">
+            证据名称
+            <input id="digital-hospital-control-artifact-name" type="text" placeholder="接口联调报告或现场签字包" />
+          </label>
+          <label class="digital-control-action-field" data-control-actions="record-evidence">
+            证据引用
+            <input id="digital-hospital-control-evidence-ref" type="text" placeholder="文档编号、受控路径或工单号" />
+          </label>
+          <label class="digital-control-action-field" data-control-actions="record-evidence">
+            证据级别
+            <select id="digital-hospital-control-evidence-level">
+              <option value="demo">演示证据</option>
+              <option value="site">现场证据</option>
+              <option value="production">生产证据</option>
+            </select>
+          </label>
+          <label class="digital-control-action-field" data-control-actions="record-evidence">
+            SHA-256（可选）
+            <input id="digital-hospital-control-checksum" type="text" maxlength="64" placeholder="64 位十六进制摘要" />
+          </label>
+          <label class="checkbox-line digital-control-action-field" data-control-actions="record-evidence">
+            <input id="digital-hospital-control-no-pii" type="checkbox" checked />
+            确认证据不含患者可识别信息
+          </label>
+          <label class="digital-control-action-field" data-control-actions="verify-control">
+            复核结论
+            <select id="digital-hospital-control-decision">
+              <option value="accepted">接受</option>
+              <option value="rejected">退回</option>
+            </select>
+          </label>
+          <label class="digital-control-action-field" data-control-actions="mark-not-applicable">
+            决策依据
+            <input id="digital-hospital-control-decision-ref" type="text" placeholder="停用范围、会议纪要或审批单" />
+          </label>
+          <label class="checkbox-line digital-control-action-field" data-control-actions="mark-not-applicable">
+            <input id="digital-hospital-control-feature-disabled" type="checkbox" />
+            确认相关功能未启用
+          </label>
+          <label class="full">
+            操作说明
+            <textarea id="digital-hospital-control-note" rows="2" required placeholder="记录整改依据、证据范围或复核结论"></textarea>
+          </label>
+          <button class="inline-action" type="submit">提交控制动作</button>
+          <span id="digital-hospital-control-feedback" class="badge info">所有动作将写入不可抵赖审计链</span>
+        </form>
       </section>
 
       <section class="panel" data-digital-hospital-section="standard-center">

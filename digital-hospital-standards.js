@@ -185,6 +185,7 @@ const DIGITAL_HOSPITAL_PILOT_PACKAGES = [
 
 const DIGITAL_HOSPITAL_API_ENDPOINT = "/api/digital-hospital/standards";
 const DIGITAL_HOSPITAL_POLICY_REGISTER_ENDPOINT = "/api/digital-hospital/policy-register";
+const DIGITAL_HOSPITAL_CONTROL_MATRIX_ENDPOINT = "/api/digital-hospital/control-matrix";
 const DIGITAL_HOSPITAL_LAUNCH_ENDPOINT = "/api/digital-hospital/launch-readiness";
 const DIGITAL_HOSPITAL_PRODUCTION_EVIDENCE_ENDPOINT = "/api/digital-hospital/production-evidence-packets";
 const DIGITAL_HOSPITAL_COMMAND_BRIEF_ENDPOINT = "/api/digital-hospital/launch-command-briefs";
@@ -194,6 +195,8 @@ const DIGITAL_HOSPITAL_FALLBACK_STATE = {
   policyRegister: DIGITAL_HOSPITAL_POLICY_REGISTER,
   policySummary: null,
   controlMatrix: DIGITAL_HOSPITAL_CONTROL_MATRIX,
+  controlMatrixSummary: null,
+  controlMatrixChecks: [],
   workflow: DIGITAL_HOSPITAL_WORKFLOW,
   evidencePacks: DIGITAL_HOSPITAL_EVIDENCE_PACKS,
   reviewQueue: DIGITAL_HOSPITAL_REVIEW_QUEUE,
@@ -217,6 +220,8 @@ function setDigitalHospitalRuntime(payload = {}) {
     policyRegister: Array.isArray(payload.policyRegister) && payload.policyRegister.length ? payload.policyRegister : DIGITAL_HOSPITAL_POLICY_REGISTER,
     policySummary: payload.policySummary || null,
     controlMatrix: Array.isArray(payload.controlMatrix) && payload.controlMatrix.length ? payload.controlMatrix : DIGITAL_HOSPITAL_CONTROL_MATRIX,
+    controlMatrixSummary: payload.controlMatrixSummary || null,
+    controlMatrixChecks: Array.isArray(payload.controlMatrixChecks) ? payload.controlMatrixChecks : [],
     evidencePacks: Array.isArray(payload.evidencePackets) && payload.evidencePackets.length ? payload.evidencePackets : DIGITAL_HOSPITAL_EVIDENCE_PACKS,
     reviewQueue: Array.isArray(payload.reviewQueue) && payload.reviewQueue.length ? payload.reviewQueue : DIGITAL_HOSPITAL_REVIEW_QUEUE,
     securityBoundary: Array.isArray(payload.securityBoundary) && payload.securityBoundary.length ? payload.securityBoundary : DIGITAL_HOSPITAL_SECURITY_BOUNDARY,
@@ -328,6 +333,22 @@ function digitalPolicyStatusClass(item = {}) {
   return "badge info";
 }
 
+function digitalControlStatusLabel(value) {
+  return ({
+    open: "待处理",
+    "in-progress": "整改中",
+    "evidence-recorded": "待复核",
+    verified: "已验证",
+    "not-applicable": "不适用"
+  })[value] || value || "待处理";
+}
+
+function digitalControlStatusClass(item = {}) {
+  if (item.overdue || item.blocking) return "badge danger";
+  if (["in-progress", "evidence-recorded"].includes(item.controlStatus)) return "badge warn";
+  return "badge info";
+}
+
 function renderPolicyFilters() {
   const domainSelect = document.getElementById("policy-domain-filter");
   if (domainSelect && domainSelect.options.length <= 1) {
@@ -393,28 +414,209 @@ function renderPolicyRegister() {
   `);
 }
 
+function digitalControlUiRow(item = {}) {
+  const evidenceRecords = Array.isArray(item.evidenceRecords) ? item.evidenceRecords : [];
+  const controlStatus = item.controlStatus || (item.implementationState === "implemented" ? "verified" : "open");
+  const terminal = ["verified", "not-applicable"].includes(controlStatus);
+  const dueAt = item.dueAt || "";
+  return {
+    ...item,
+    controlStatus,
+    assignedTo: item.assignedTo || item.controlOwner || "",
+    evidenceRecords,
+    evidenceCount: item.evidenceCount ?? evidenceRecords.length,
+    verifiedEvidenceCount: item.verifiedEvidenceCount ?? evidenceRecords.filter((record) => record.verificationStatus === "accepted").length,
+    latestEvidence: item.latestEvidence || evidenceRecords[0] || null,
+    overdue: item.overdue ?? Boolean(dueAt && dueAt < new Date().toISOString().slice(0, 10) && !terminal),
+    blocking: item.blocking ?? Boolean(item.goLiveCritical && !terminal)
+  };
+}
+
+function renderControlFilters() {
+  const controls = digitalHospitalControlMatrix().map(digitalControlUiRow);
+  const domainSelect = document.getElementById("control-domain-filter");
+  if (domainSelect && domainSelect.options.length <= 1) {
+    const domains = [...new Set(controls.map((item) => item.domain))];
+    domainSelect.innerHTML = `<option value="">全部六域</option>${domains.map((domain) => `<option value="${digitalEscape(domain)}">${digitalEscape(domain)}</option>`).join("")}`;
+  }
+  const controlSelect = document.getElementById("digital-hospital-control-id");
+  if (controlSelect) {
+    const current = controlSelect.value;
+    controlSelect.innerHTML = controls.map((item) => `<option value="${digitalEscape(item.id)}">${digitalEscape(item.domain)}：${digitalEscape(item.title)}</option>`).join("");
+    if ([...controlSelect.options].some((option) => option.value === current)) controlSelect.value = current;
+  }
+}
+
+function filteredControlRows() {
+  const domain = document.getElementById("control-domain-filter")?.value || "";
+  const status = document.getElementById("control-status-filter")?.value || "";
+  const query = (document.getElementById("control-search")?.value || "").trim().toLowerCase();
+  const blockingOnly = Boolean(document.getElementById("control-blocking-filter")?.checked);
+  const overdueOnly = Boolean(document.getElementById("control-overdue-filter")?.checked);
+  return digitalHospitalControlMatrix().map(digitalControlUiRow).filter((item) => {
+    const blob = [
+      item.domain,
+      item.title,
+      item.controlOwner,
+      item.assignedTo,
+      item.gap,
+      ...(item.evidenceCollections || []),
+      ...(item.automatedChecks || [])
+    ].join(" ").toLowerCase();
+    return (!domain || item.domain === domain)
+      && (!status || item.controlStatus === status)
+      && (!blockingOnly || item.blocking)
+      && (!overdueOnly || item.overdue)
+      && (!query || blob.includes(query));
+  });
+}
+
 function renderControlMatrix() {
+  renderControlFilters();
   const policies = new Map(digitalHospitalPolicyRegister().map((item) => [item.id, item]));
+  const allControls = digitalHospitalControlMatrix().map(digitalControlUiRow);
+  const rows = filteredControlRows();
+  const summary = digitalHospitalRuntime.controlMatrixSummary || {};
+  const metrics = [
+    ["核心控制", summary.controls ?? allControls.length, `${rows.length} 项符合当前筛选`],
+    ["上线阻断", summary.blockingControls ?? allControls.filter((item) => item.blocking).length, "未闭环不得进入正式割接"],
+    ["已验证", summary.verifiedControls ?? allControls.filter((item) => item.controlStatus === "verified").length, "已完成独立复核"],
+    ["已有证据", summary.evidenceRecordedControls ?? allControls.filter((item) => item.evidenceCount > 0).length, "仅接受最小化证据引用"],
+    ["逾期整改", summary.overdueControls ?? allControls.filter((item) => item.overdue).length, "需升级责任人和期限"]
+  ];
+  digitalSetHtml("digital-hospital-control-metrics", metrics.map(([label, value, hint]) => `
+    <article class="metric-card">
+      <span>${digitalEscape(label)}</span>
+      <strong>${digitalEscape(value)}</strong>
+      <small>${digitalEscape(hint)}</small>
+    </article>
+  `).join(""));
   digitalSetHtml("digital-hospital-control-matrix", `
     <table>
-      <thead><tr><th>标准域与控制</th><th>依据</th><th>实现状态</th><th>证据与自动检查</th><th>缺口</th></tr></thead>
+      <thead><tr><th>标准域与控制</th><th>整改状态</th><th>依据与检查</th><th>证据</th><th>缺口与操作</th></tr></thead>
       <tbody>
-        ${digitalHospitalControlMatrix().map((item) => {
+        ${rows.map((item) => {
           const requirements = (item.requirementIds || []).map((id) => policies.get(id)?.title || id);
-          const statusClass = item.implementationState === "implemented" ? "badge info" : item.goLiveCritical ? "badge danger" : "badge warn";
+          const latestEvidence = item.latestEvidence;
           return `
             <tr>
-              <td><strong>${digitalEscape(item.domain)}：${digitalEscape(item.title)}</strong><br /><small>${digitalEscape(item.controlOwner)}</small></td>
-              <td>${digitalEscape(requirements.join("；"))}</td>
-              <td><span class="${statusClass}">${digitalEscape(item.implementationState)}</span><br /><small>${item.goLiveCritical ? "上线关键控制" : "评价改进控制"}</small></td>
-              <td>${digitalEscape((item.evidenceCollections || []).join("、"))}<br /><small>${digitalEscape((item.automatedChecks || []).join("、"))}</small></td>
-              <td>${digitalEscape(item.gap)}</td>
+              <td><strong>${digitalEscape(item.domain)}：${digitalEscape(item.title)}</strong><br /><small>${item.goLiveCritical ? "上线关键控制" : "评价改进控制"}</small></td>
+              <td><span class="${digitalControlStatusClass(item)}">${digitalEscape(digitalControlStatusLabel(item.controlStatus))}</span>${item.overdue ? " <span class=\"badge danger\">已逾期</span>" : ""}<br /><small>责任：${digitalEscape(item.assignedTo || "未分派")}<br />期限：${digitalEscape(item.dueAt || "未设置")}</small></td>
+              <td>${digitalEscape(requirements.join("；"))}<br /><small>${digitalEscape((item.automatedChecks || []).join("、"))}</small></td>
+              <td>${digitalEscape(item.verifiedEvidenceCount || 0)}/${digitalEscape(item.evidenceCount || 0)} 已接受${latestEvidence ? `<br /><small>${digitalEscape(latestEvidence.artifactName)} / ${digitalEscape(latestEvidence.evidenceLevel)} / ${digitalEscape(latestEvidence.verificationStatus)}</small>` : "<br /><small>尚未登记证据</small>"}</td>
+              <td>${digitalEscape(item.gap)}<br /><button class="inline-action" data-digital-hospital-control-select="${digitalEscape(item.id)}" type="button">处理控制</button></td>
             </tr>
           `;
-        }).join("")}
+        }).join("") || `<tr><td colspan="5">没有符合筛选条件的控制项。</td></tr>`}
       </tbody>
     </table>
   `);
+  bindDigitalHospitalControlActions();
+}
+
+function updateDigitalHospitalControlActionFields() {
+  const action = document.getElementById("digital-hospital-control-action")?.value || "assign-control";
+  document.querySelectorAll(".digital-control-action-field").forEach((field) => {
+    const visible = String(field.dataset.controlActions || "").split(",").includes(action);
+    field.hidden = !visible;
+    field.querySelectorAll("input, select, textarea").forEach((input) => {
+      input.disabled = !visible;
+      input.required = visible && [
+        "digital-hospital-control-assignee",
+        "digital-hospital-control-due-at",
+        "digital-hospital-control-artifact-name",
+        "digital-hospital-control-evidence-ref",
+        "digital-hospital-control-evidence-level",
+        "digital-hospital-control-no-pii",
+        "digital-hospital-control-decision",
+        "digital-hospital-control-decision-ref",
+        "digital-hospital-control-feature-disabled"
+      ].includes(input.id);
+    });
+  });
+}
+
+async function recordDigitalHospitalControlAction(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector('button[type="submit"]');
+  const feedback = document.getElementById("digital-hospital-control-feedback");
+  const controlId = document.getElementById("digital-hospital-control-id")?.value || "";
+  const fetcher = window.HealthCityAuth?.authFetch || fetch;
+  if (button) {
+    button.disabled = true;
+    button.textContent = "提交中...";
+  }
+  try {
+    const response = await fetcher(`${DIGITAL_HOSPITAL_CONTROL_MATRIX_ENDPOINT}/${encodeURIComponent(controlId)}/actions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: document.getElementById("digital-hospital-control-action")?.value || "assign-control",
+        assignedTo: document.getElementById("digital-hospital-control-assignee")?.value || "",
+        dueAt: document.getElementById("digital-hospital-control-due-at")?.value || "",
+        artifactName: document.getElementById("digital-hospital-control-artifact-name")?.value || "",
+        evidenceRef: document.getElementById("digital-hospital-control-evidence-ref")?.value || "",
+        evidenceLevel: document.getElementById("digital-hospital-control-evidence-level")?.value || "demo",
+        checksumSha256: document.getElementById("digital-hospital-control-checksum")?.value || "",
+        noPatientPii: Boolean(document.getElementById("digital-hospital-control-no-pii")?.checked),
+        decision: document.getElementById("digital-hospital-control-decision")?.value || "accepted",
+        decisionRef: document.getElementById("digital-hospital-control-decision-ref")?.value || "",
+        featureDisabled: Boolean(document.getElementById("digital-hospital-control-feature-disabled")?.checked),
+        note: document.getElementById("digital-hospital-control-note")?.value || ""
+      })
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload?.message || `HTTP ${response.status}`);
+    if (payload?.standards?.ok) setDigitalHospitalRuntime(payload.standards);
+    renderDigitalHospitalStandards();
+    if (feedback) {
+      feedback.className = "badge info";
+      feedback.textContent = `${digitalControlStatusLabel(payload?.control?.controlStatus)}，控制动作已写入审计链`;
+    }
+    form.reset();
+    updateDigitalHospitalControlActionFields();
+  } catch (error) {
+    if (feedback) {
+      feedback.className = "badge danger";
+      feedback.textContent = error.message || "控制动作提交失败";
+    }
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "提交控制动作";
+    }
+  }
+}
+
+function bindDigitalHospitalControlActions() {
+  ["control-domain-filter", "control-status-filter", "control-search", "control-blocking-filter", "control-overdue-filter"].forEach((id) => {
+    const element = document.getElementById(id);
+    if (element && element.dataset.digitalHospitalControlBound !== "1") {
+      element.dataset.digitalHospitalControlBound = "1";
+      element.addEventListener("input", renderControlMatrix);
+    }
+  });
+  document.querySelectorAll("[data-digital-hospital-control-select]").forEach((button) => {
+    if (button.dataset.digitalHospitalControlBound === "1") return;
+    button.dataset.digitalHospitalControlBound = "1";
+    button.addEventListener("click", () => {
+      const select = document.getElementById("digital-hospital-control-id");
+      if (select) select.value = button.dataset.digitalHospitalControlSelect || "";
+      document.getElementById("digital-hospital-control-action")?.focus();
+    });
+  });
+  const actionSelect = document.getElementById("digital-hospital-control-action");
+  if (actionSelect && actionSelect.dataset.digitalHospitalControlBound !== "1") {
+    actionSelect.dataset.digitalHospitalControlBound = "1";
+    actionSelect.addEventListener("change", updateDigitalHospitalControlActionFields);
+  }
+  const form = document.getElementById("digital-hospital-control-action-form");
+  if (form && form.dataset.digitalHospitalControlBound !== "1") {
+    form.dataset.digitalHospitalControlBound = "1";
+    form.addEventListener("submit", recordDigitalHospitalControlAction);
+  }
+  updateDigitalHospitalControlActionFields();
 }
 
 async function recordDigitalHospitalPolicyReview(event) {
@@ -1090,9 +1292,29 @@ async function loadDigitalHospitalStandardsApi() {
   }
 }
 
+async function loadDigitalHospitalControlMatrixApi() {
+  const fetcher = window.HealthCityAuth?.authFetch || fetch;
+  try {
+    const response = await fetcher(DIGITAL_HOSPITAL_CONTROL_MATRIX_ENDPOINT);
+    if (!response.ok) return;
+    const payload = await response.json();
+    if (!payload?.ok) return;
+    digitalHospitalRuntime = {
+      ...digitalHospitalRuntime,
+      controlMatrix: Array.isArray(payload.allControls) ? payload.allControls : payload.controls,
+      controlMatrixSummary: payload.summary || null,
+      controlMatrixChecks: Array.isArray(payload.checks) ? payload.checks : []
+    };
+    renderControlMatrix();
+  } catch {
+    // Standards overview still carries a control matrix when the dedicated queue is unavailable.
+  }
+}
+
 function initDigitalHospitalStandards() {
   renderDigitalHospitalStandards();
   loadDigitalHospitalStandardsApi();
+  loadDigitalHospitalControlMatrixApi();
 }
 
 if (document.readyState === "loading") {

@@ -1139,14 +1139,24 @@ test("quality safety supervision app exposes runnable portal, API and release ev
 test("chronic pharmacy insurance closure is exposed through the institution workbench", () => {
   assert.match(read("server.js"), /\/api\/chronic\/pharmacy-insurance-closure/);
   assert.match(read("server.js"), /\/api\/chronic\/production-safety/);
+  assert.match(read("server.js"), /\/api\/chronic\/production-safety-evidence/);
+  assert.match(read("server.js"), /\/api\/chronic\/interoperability-profiles/);
+  assert.match(read("server.js"), /\/api\/chronic\/interoperability-validation/);
   assert.match(read("institution.html"), /chronic-pharmacy-insurance-summary/);
   assert.match(read("institution.html"), /chronic-production-safety-summary/);
+  assert.match(read("institution.html"), /chronic-production-safety-evidence/);
+  assert.match(read("institution.html"), /chronic-interoperability-summary/);
   assert.match(read("institution.js"), /loadChronicPharmacyInsuranceClosure/);
   assert.match(read("institution.js"), /renderChronicPharmacyInsuranceClosure/);
   assert.match(read("institution.js"), /loadChronicProductionSafety/);
   assert.match(read("institution.js"), /renderChronicProductionSafety/);
+  assert.match(read("institution.js"), /loadChronicProductionSafetyEvidence/);
+  assert.match(read("institution.js"), /loadChronicInteroperabilityProfiles/);
+  assert.match(read("institution.js"), /renderChronicInteroperabilityProfiles/);
   assert.match(read("scripts/chronic-institution-interfaces.js"), /chronic-pharmacy-insurance-closure-v1/);
   assert.match(read("scripts/chronic-institution-interfaces.js"), /chronic-production-safety-v1/);
+  assert.match(read("scripts/chronic-institution-interfaces.js"), /chronic-production-safety-evidence-v1/);
+  assert.match(read("scripts/chronic-institution-interfaces.js"), /chronic-interoperability-profiles-v1/);
 });
 
 test("data governance foundation exposes platform cards API and release evidence", () => {
@@ -1168,6 +1178,7 @@ test("data governance foundation exposes platform cards API and release evidence
 test("digital hospital standards platform exposes standards center workflow and release evidence", () => {
   const html = read("digital-hospital-standards.html");
   const js = read("digital-hospital-standards.js");
+  const portalCss = read("portal.css");
   const doc = read("docs/数智医院标准平台研发报告.md");
   const readiness = read("scripts/digital-hospital-standards-readiness.js");
   const server = read("server.js");
@@ -1183,10 +1194,15 @@ test("digital hospital standards platform exposes standards center workflow and 
   assert.match(html, /standard-domain-filter/);
   assert.match(html, /standard-blocker-filter/);
   assert.match(html, /digital-hospital-policy-review-form/);
+  assert.match(html, /digital-hospital-control-action-form/);
+  assert.match(html, /control-blocking-filter/);
+  assert.match(html, /digital-hospital-control-no-pii/);
+  assert.match(portalCss, /\.filter-grid \.digital-control-action-field\[hidden\]\s*\{\s*display:\s*none;/);
   assert.match(html, /digital-hospital-standards\.js/);
   assert.match(js, /DIGITAL_HOSPITAL_STANDARD_DOMAINS/);
   assert.match(js, /DIGITAL_HOSPITAL_API_ENDPOINT/);
   assert.match(js, /DIGITAL_HOSPITAL_POLICY_REGISTER_ENDPOINT/);
+  assert.match(js, /DIGITAL_HOSPITAL_CONTROL_MATRIX_ENDPOINT/);
   assert.match(js, /DIGITAL_HOSPITAL_POLICY_REGISTER/);
   assert.match(js, /DIGITAL_HOSPITAL_CONTROL_MATRIX/);
   assert.match(js, /DIGITAL_HOSPITAL_LAUNCH_ENDPOINT/);
@@ -1202,6 +1218,8 @@ test("digital hospital standards platform exposes standards center workflow and 
   assert.match(js, /renderPolicyRegister/);
   assert.match(js, /renderControlMatrix/);
   assert.match(js, /recordDigitalHospitalPolicyReview/);
+  assert.match(js, /recordDigitalHospitalControlAction/);
+  assert.match(js, /loadDigitalHospitalControlMatrixApi/);
   assert.match(js, /recordDigitalHospitalLaunchEvidence/);
   assert.match(js, /recordDigitalHospitalProductionEvidence/);
   assert.match(js, /recordDigitalHospitalLaunchCommandBrief/);
@@ -1222,12 +1240,17 @@ test("digital hospital standards platform exposes standards center workflow and 
   assert.match(doc, /digital-hospital:standards-readiness/);
   assert.match(readiness, /digitalHospital:standardDomains/);
   assert.match(readiness, /digitalHospital:apiContract/);
+  assert.match(readiness, /digitalHospital:controlRemediation/);
   assert.match(readiness, /digitalHospital:launchReadiness/);
   assert.match(readiness, /digitalHospital:releaseWiring/);
   assert.match(server, /\/api\/digital-hospital\/standards/);
   assert.match(server, /\/api\/digital-hospital\/policy-register/);
   assert.match(server, /\/api\/digital-hospital\/policy-register\/:id\/actions/);
+  assert.match(server, /\/api\/digital-hospital\/control-matrix/);
+  assert.match(server, /\/api\/digital-hospital\/control-matrix\/:id\/actions/);
   assert.match(server, /buildDigitalHospitalPolicyRegisterBoard/);
+  assert.match(server, /buildDigitalHospitalControlMatrixBoard/);
+  assert.match(server, /normalizeDigitalHospitalControlAction/);
   assert.match(server, /normalizeDigitalHospitalPolicyReview/);
   assert.match(server, /digitalHospitalPolicyRegister/);
   assert.match(server, /digitalHospitalControlMatrix/);
@@ -3124,6 +3147,40 @@ test("platform go-live slices expose APIs page card and release wiring", () => {
   assert.match(releaseReport, /platform-go-live-slices\.json/);
   assert.match(manifest, /platform-go-live-slices/);
   assert.match(deployCheck, /manifest:platformGoLiveSlices/);
+});
+
+test("six platform standards ledgers expose API page export and release gates", () => {
+  const server = read("server.js");
+  const html = read("platform.html");
+  const js = read("platform.js");
+  const builder = read("platform-standards-ledgers.js");
+  const releaseReport = read("scripts/release-report.js");
+  const manifest = read("scripts/release-artifact-manifest.js");
+  const deployCheck = read("scripts/deploy-check.js");
+  const pkg = JSON.parse(read("package.json"));
+
+  assert.match(server, /\/api\/platform\/standards-ledgers/);
+  assert.match(server, /renderPlatformStandardsLedgersMarkdown/);
+  assert.match(html, /id="platform-standards-ledgers-panel"/);
+  assert.match(html, /id="export-platform-standards-ledgers"/);
+  assert.match(js, /loadPlatformStandardsLedgers/);
+  assert.match(js, /renderPlatformStandardsLedgers/);
+  assert.match(js, /exportPlatformStandardsLedgers/);
+  assert.match(js, /data-platform-standards-ledger/);
+  assert.match(js, /待现场证据/);
+  assert.match(builder, /project-document-register/);
+  assert.match(builder, /policy-standard-register/);
+  assert.match(builder, /data-standard-master-register/);
+  assert.match(builder, /interface-exchange-register/);
+  assert.match(builder, /security-compliance-register/);
+  assert.match(builder, /acceptance-operations-register/);
+  assert.equal(Boolean(pkg.scripts["platform:standards-ledgers"]), true);
+  assert.match(releaseReport, /platformStandardsLedgers:readiness/);
+  assert.match(releaseReport, /platform-standards-ledgers\.json/);
+  assert.match(manifest, /platform-standards-ledgers/);
+  assert.match(deployCheck, /manifest:platformStandardsLedgers/);
+  assert.match(read(".github/workflows/ci.yml"), /platform:standards-ledgers/);
+  assert.match(read("docs/卫生健康信息平台六类可验收台账.md"), /blocked-until-onsite-evidence/);
 });
 
 test("health platform requirement research plan is documented", () => {

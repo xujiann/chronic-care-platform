@@ -35,6 +35,7 @@ const APP_SHELL = [
   "./auth.js?v=20260627",
   "./health-archive-standard.js",
   "./physical-examination-standards.js",
+  "./physical-examination-highlights.js",
   "./physical-examination-service.js",
   "./physical-examination.html",
   "./physical-examination.css",

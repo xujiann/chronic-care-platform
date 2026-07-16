@@ -525,13 +525,257 @@ function normalizePolicyList(value) {
   return [];
 }
 
+function digitalHospitalControlError(message, status = 400) {
+  const error = new Error(message);
+  error.status = status;
+  return error;
+}
+
+function normalizeDigitalHospitalControl(control = {}, asOf = new Date().toISOString()) {
+  const evidenceRecords = Array.isArray(control.evidenceRecords) ? control.evidenceRecords.slice(0, 30) : [];
+  const actionHistory = Array.isArray(control.actionHistory) ? control.actionHistory.slice(0, 50) : [];
+  const controlStatus = control.controlStatus
+    || (control.implementationState === "implemented" ? "verified" : "open");
+  const dueAt = String(control.dueAt || "").trim();
+  const terminal = ["verified", "not-applicable"].includes(controlStatus);
+  const overdue = Boolean(dueAt && /^\d{4}-\d{2}-\d{2}$/.test(dueAt) && dueAt < asOf.slice(0, 10) && !terminal);
+  return {
+    ...control,
+    controlStatus,
+    assignedTo: String(control.assignedTo || control.controlOwner || "").trim(),
+    dueAt,
+    evidenceRecords,
+    actionHistory,
+    evidenceCount: evidenceRecords.length,
+    verifiedEvidenceCount: evidenceRecords.filter((item) => item.verificationStatus === "accepted").length,
+    latestEvidence: evidenceRecords[0] || null,
+    overdue,
+    blocking: Boolean(control.goLiveCritical && !terminal)
+  };
+}
+
+function buildDigitalHospitalControlMatrixBoard(data = {}, filters = {}) {
+  const source = Array.isArray(data.digitalHospitalControlMatrix)
+    ? data.digitalHospitalControlMatrix
+    : seedDigitalHospitalControlMatrix();
+  const asOf = String(filters.asOf || new Date().toISOString()).trim();
+  const domain = String(filters.domain || "").trim();
+  const controlStatus = String(filters.controlStatus || filters.status || "").trim();
+  const query = String(filters.query || filters.q || "").trim().toLowerCase();
+  const blockingOnly = filters.blockingOnly === true || String(filters.blockingOnly || "").toLowerCase() === "true";
+  const overdueOnly = filters.overdueOnly === true || String(filters.overdueOnly || "").toLowerCase() === "true";
+  const controls = source.map((item) => normalizeDigitalHospitalControl(item, asOf));
+  const filteredControls = controls.filter((item) => {
+    const blob = [
+      item.domain,
+      item.title,
+      item.controlOwner,
+      item.assignedTo,
+      item.gap,
+      ...(item.requirementIds || []),
+      ...(item.evidenceCollections || []),
+      ...(item.automatedChecks || [])
+    ].join(" ").toLowerCase();
+    return (!domain || item.domain === domain)
+      && (!controlStatus || item.controlStatus === controlStatus)
+      && (!blockingOnly || item.blocking)
+      && (!overdueOnly || item.overdue)
+      && (!query || blob.includes(query));
+  });
+  const blockers = controls.filter((item) => item.blocking);
+  const domainSet = new Set(controls.map((item) => item.domain));
+  const checks = [
+    { id: "digitalHospitalControl:domains", passed: DIGITAL_HOSPITAL_SIX_DOMAINS.every((item) => domainSet.has(item)), detail: `${domainSet.size}/6 domains covered` },
+    { id: "digitalHospitalControl:ownership", passed: controls.every((item) => item.controlOwner && item.assignedTo), detail: `${controls.filter((item) => item.assignedTo).length}/${controls.length} controls assigned` },
+    { id: "digitalHospitalControl:evidenceBoundary", passed: controls.every((item) => item.evidenceRecords.every((record) => record.noPatientPii === true)), detail: `${controls.reduce((count, item) => count + item.evidenceCount, 0)} minimized evidence records` },
+    { id: "digitalHospitalControl:auditHistory", passed: controls.every((item) => Array.isArray(item.actionHistory)), detail: `${controls.reduce((count, item) => count + item.actionHistory.length, 0)} control actions retained` }
+  ];
+  return {
+    ok: checks.every((item) => item.passed),
+    generatedAt: new Date().toISOString(),
+    filters: { domain, controlStatus, query, blockingOnly, overdueOnly },
+    summary: {
+      controls: controls.length,
+      filteredControls: filteredControls.length,
+      goLiveCriticalControls: controls.filter((item) => item.goLiveCritical).length,
+      blockingControls: blockers.length,
+      verifiedControls: controls.filter((item) => item.controlStatus === "verified").length,
+      notApplicableControls: controls.filter((item) => item.controlStatus === "not-applicable").length,
+      evidenceRecordedControls: controls.filter((item) => item.evidenceCount > 0).length,
+      overdueControls: controls.filter((item) => item.overdue).length,
+      unassignedControls: controls.filter((item) => !item.assignedTo).length
+    },
+    controls: filteredControls,
+    allControls: controls,
+    blockers,
+    checks
+  };
+}
+
+function normalizeDigitalHospitalControlAction(control, payload = {}, user = {}, options = {}) {
+  if (!control?.id) throw digitalHospitalControlError("digital hospital control is required");
+  const allowedActions = new Set([
+    "assign-control",
+    "record-evidence",
+    "verify-control",
+    "reopen-control",
+    "mark-not-applicable"
+  ]);
+  const actionName = String(payload.action || "").trim();
+  if (!allowedActions.has(actionName)) throw digitalHospitalControlError("unsupported digital hospital control action");
+  const note = String(payload.note || payload.reviewNote || "").trim();
+  if (note.length < 4) throw digitalHospitalControlError("note must contain at least 4 characters");
+
+  const now = String(options.now || new Date().toISOString());
+  const actorId = String(user.username || user.id || user.name || "digital-hospital-control-operator").trim();
+  const actorName = String(user.name || user.username || "digital hospital control operator").trim();
+  const normalized = normalizeDigitalHospitalControl(control, now);
+  let next = { ...normalized };
+  const action = {
+    id: `dhca-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+    action: actionName,
+    note,
+    at: now,
+    by: actorName,
+    byId: actorId,
+    role: user.role || "commission"
+  };
+
+  if (actionName === "assign-control") {
+    if (["verified", "not-applicable"].includes(normalized.controlStatus)) {
+      throw digitalHospitalControlError("reopen the control before assigning new remediation", 409);
+    }
+    const assignedTo = String(payload.assignedTo || payload.assignee || "").trim();
+    const dueAt = String(payload.dueAt || "").trim();
+    if (assignedTo.length < 2) throw digitalHospitalControlError("assignedTo must contain at least 2 characters");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dueAt)) throw digitalHospitalControlError("dueAt must use YYYY-MM-DD");
+    next = { ...next, assignedTo, dueAt, controlStatus: "in-progress" };
+    Object.assign(action, { assignedTo, dueAt, controlStatus: "in-progress" });
+  }
+
+  if (actionName === "record-evidence") {
+    if (["verified", "not-applicable"].includes(normalized.controlStatus)) {
+      throw digitalHospitalControlError("reopen the control before recording new evidence", 409);
+    }
+    const evidenceLevel = String(payload.evidenceLevel || "demo").trim();
+    if (!new Set(["demo", "site", "production"]).has(evidenceLevel)) {
+      throw digitalHospitalControlError("evidenceLevel must be demo, site or production");
+    }
+    const artifactName = String(payload.artifactName || "").trim();
+    const evidenceRef = String(payload.evidenceRef || payload.reference || "").trim();
+    if (artifactName.length < 3) throw digitalHospitalControlError("artifactName must contain at least 3 characters");
+    if (evidenceRef.length < 4) throw digitalHospitalControlError("evidenceRef must contain at least 4 characters");
+    if (payload.noPatientPii !== true) throw digitalHospitalControlError("control evidence must confirm noPatientPii=true");
+    const checksumSha256 = String(payload.checksumSha256 || "").trim().toLowerCase();
+    if (checksumSha256 && !/^[a-f0-9]{64}$/.test(checksumSha256)) {
+      throw digitalHospitalControlError("checksumSha256 must be a 64-character hexadecimal digest");
+    }
+    const evidence = {
+      id: `dhce-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+      artifactName,
+      evidenceRef,
+      evidenceLevel,
+      checksumSha256,
+      noPatientPii: true,
+      submittedAt: now,
+      submittedBy: actorName,
+      submittedById: actorId,
+      note,
+      verificationStatus: "pending"
+    };
+    next = {
+      ...next,
+      controlStatus: "evidence-recorded",
+      evidenceRecords: [evidence, ...normalized.evidenceRecords].slice(0, 30),
+      latestEvidence: evidence,
+      evidenceCount: normalized.evidenceCount + 1
+    };
+    Object.assign(action, { evidenceId: evidence.id, artifactName, evidenceRef, evidenceLevel, controlStatus: "evidence-recorded" });
+  }
+
+  if (actionName === "verify-control") {
+    const decision = String(payload.decision || "accepted").trim();
+    if (!new Set(["accepted", "rejected"]).has(decision)) throw digitalHospitalControlError("decision must be accepted or rejected");
+    const evidence = normalized.evidenceRecords[0];
+    if (!evidence) throw digitalHospitalControlError("record evidence before control verification", 409);
+    if (evidence.submittedById === actorId) throw digitalHospitalControlError("control verification requires an independent reviewer", 409);
+    if (decision === "accepted" && normalized.goLiveCritical && !["site", "production"].includes(evidence.evidenceLevel)) {
+      throw digitalHospitalControlError("go-live critical controls require site or production evidence", 409);
+    }
+    const reviewedEvidence = {
+      ...evidence,
+      verificationStatus: decision,
+      verifiedAt: now,
+      verifiedBy: actorName,
+      verifiedById: actorId,
+      verificationNote: note
+    };
+    const accepted = decision === "accepted";
+    next = {
+      ...next,
+      baselineImplementationState: normalized.baselineImplementationState || normalized.implementationState,
+      implementationState: accepted ? "implemented" : (normalized.baselineImplementationState || normalized.implementationState),
+      controlStatus: accepted ? "verified" : "in-progress",
+      verifiedAt: accepted ? now : "",
+      verifiedBy: accepted ? actorName : "",
+      verifiedById: accepted ? actorId : "",
+      evidenceRecords: [reviewedEvidence, ...normalized.evidenceRecords.slice(1)]
+    };
+    Object.assign(action, { decision, evidenceId: evidence.id, controlStatus: next.controlStatus });
+  }
+
+  if (actionName === "reopen-control") {
+    if (!["verified", "not-applicable"].includes(normalized.controlStatus)) {
+      throw digitalHospitalControlError("only verified or not-applicable controls can be reopened", 409);
+    }
+    next = {
+      ...next,
+      implementationState: normalized.baselineImplementationState || (normalized.implementationState === "not-applicable" ? "partial" : normalized.implementationState),
+      controlStatus: "in-progress",
+      verifiedAt: "",
+      verifiedBy: "",
+      verifiedById: "",
+      reopenedAt: now,
+      reopenedBy: actorName
+    };
+    Object.assign(action, { controlStatus: "in-progress" });
+  }
+
+  if (actionName === "mark-not-applicable") {
+    if (normalized.applicability === "always") throw digitalHospitalControlError("always-applicable controls cannot be marked not applicable", 409);
+    if (payload.featureDisabled !== true) throw digitalHospitalControlError("featureDisabled=true is required for a not-applicable decision");
+    const decisionRef = String(payload.decisionRef || payload.evidenceRef || "").trim();
+    if (decisionRef.length < 4) throw digitalHospitalControlError("decisionRef must contain at least 4 characters");
+    next = {
+      ...next,
+      baselineImplementationState: normalized.baselineImplementationState || normalized.implementationState,
+      implementationState: "not-applicable",
+      controlStatus: "not-applicable",
+      applicabilityDecisionRef: decisionRef,
+      applicabilityDecidedAt: now,
+      applicabilityDecidedBy: actorName,
+      applicabilityDecidedById: actorId
+    };
+    Object.assign(action, { decisionRef, controlStatus: "not-applicable" });
+  }
+
+  next = {
+    ...next,
+    latestAction: action,
+    updatedAt: now,
+    updatedBy: actorId,
+    updatedByName: actorName,
+    actionHistory: [action, ...normalized.actionHistory].slice(0, 50)
+  };
+  return { action, control: normalizeDigitalHospitalControl(next, now) };
+}
+
 function buildDigitalHospitalPolicyRegisterBoard(data = {}, filters = {}) {
   const policies = Array.isArray(data.digitalHospitalPolicyRegister)
     ? data.digitalHospitalPolicyRegister
     : seedDigitalHospitalPolicyRegister();
-  const controls = Array.isArray(data.digitalHospitalControlMatrix)
-    ? data.digitalHospitalControlMatrix
-    : seedDigitalHospitalControlMatrix();
+  const controlBoard = buildDigitalHospitalControlMatrixBoard(data);
+  const controls = controlBoard.allControls;
   const domain = String(filters.domain || "").trim();
   const bindingLevel = String(filters.bindingLevel || filters.binding || "").trim();
   const lifecycleStatus = String(filters.lifecycleStatus || filters.lifecycle || "").trim();
@@ -547,7 +791,7 @@ function buildDigitalHospitalPolicyRegisterBoard(data = {}, filters = {}) {
   const domainSet = new Set(policies.flatMap((item) => normalizePolicyList(item.domains)));
   const activePolicies = policies.filter((item) => item.lifecycleStatus !== "historical-plan");
   const currentWithoutReview = activePolicies.filter((item) => !item.nextReviewAt || ["requires-update"].includes(item.reviewStatus));
-  const blockingControls = controls.filter((item) => item.goLiveCritical && item.implementationState !== "implemented");
+  const blockingControls = controlBoard.blockers;
   const checks = [
     { id: "digitalHospitalPolicy:domains", passed: DIGITAL_HOSPITAL_SIX_DOMAINS.every((item) => domainSet.has(item)), detail: `${domainSet.size}/6 domains covered` },
     { id: "digitalHospitalPolicy:activeRegister", passed: activePolicies.length >= 15, detail: `${activePolicies.length} active or conditional policies` },
@@ -573,7 +817,10 @@ function buildDigitalHospitalPolicyRegisterBoard(data = {}, filters = {}) {
       domains: domainSet.size,
       controls: controls.length,
       goLiveCriticalControls: controls.filter((item) => item.goLiveCritical).length,
-      blockingControls: blockingControls.length
+      blockingControls: blockingControls.length,
+      verifiedControls: controlBoard.summary.verifiedControls,
+      evidenceRecordedControls: controlBoard.summary.evidenceRecordedControls,
+      overdueControls: controlBoard.summary.overdueControls
     },
     policies: filteredPolicies,
     controls,
@@ -624,7 +871,9 @@ function normalizeDigitalHospitalPolicyReview(policy, payload = {}, user = {}) {
 
 module.exports = {
   DIGITAL_HOSPITAL_SIX_DOMAINS,
+  buildDigitalHospitalControlMatrixBoard,
   buildDigitalHospitalPolicyRegisterBoard,
+  normalizeDigitalHospitalControlAction,
   normalizeDigitalHospitalPolicyReview,
   seedDigitalHospitalControlMatrix,
   seedDigitalHospitalPolicyRegister

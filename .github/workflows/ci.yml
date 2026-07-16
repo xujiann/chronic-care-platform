@@ -31,6 +31,8 @@ jobs:
         run: npm run check
       - name: Run blood system readiness gate
         run: npm run blood-system:readiness
+      - name: Run emergency collaboration API gate
+        run: npm run emergency:test
       - name: Run commercial crypto adapter tests
         run: node --test test/commercial-crypto-readiness.test.js
       - name: Run API regression tests
@@ -57,6 +59,8 @@ jobs:
         run: npm run data-governance:readiness
       - name: Generate digital hospital standards readiness report
         run: npm run digital-hospital:standards-readiness
+      - name: Generate six platform standards ledgers
+        run: npm run platform:standards-ledgers
       - name: Generate phase 2 proposal readiness report
         run: npm run phase2:proposal-readiness
       - name: Generate phase 2 catalog readiness report

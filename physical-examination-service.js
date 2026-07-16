@@ -2,11 +2,15 @@
   const standards = typeof module === "object" && module.exports
     ? require("./physical-examination-standards")
     : root?.PhysicalExaminationStandards;
-  const api = factory(standards);
+  const highlights = typeof module === "object" && module.exports
+    ? require("./physical-examination-highlights")
+    : root?.PhysicalExaminationHighlights;
+  const api = factory(standards, highlights);
   if (typeof module === "object" && module.exports) module.exports = api;
   if (root) root.PhysicalExaminationService = api;
-})(typeof globalThis !== "undefined" ? globalThis : this, function (Standards) {
+})(typeof globalThis !== "undefined" ? globalThis : this, function (Standards, Highlights) {
   if (!Standards) throw new Error("PhysicalExaminationStandards is required");
+  if (!Highlights) throw new Error("PhysicalExaminationHighlights is required");
   const SOURCE_CONTRACTS = [
     {
       id: "exam-center-rest-v1",
@@ -80,6 +84,7 @@
           { code: "ECG", name: "心电图", value: "窦性心律", unit: "", reference: "", abnormal: false }
         ],
         recommendations: ["心内科或家庭医生复诊", "记录家庭血压"],
+        radiationExaminations: [{ modality: "DR", purpose: "胸部健康检查", justification: "体检方案经医师审核后实施", riskDisclosureRef: "DEMO-RAD-NOTICE-2025-R1", protectionOptimized: true, dose: 0.08, doseUnit: "mSv", pregnancyScreeningStatus: "not-applicable", operatorId: "DEMO-RAD-001", signedConclusionRef: "demo://radiology/TJ202505090119" }],
         signature: demoSignature("SIG-DLCENTRAL-2025-R1-009")
       }),
       physicalRecord({
@@ -508,6 +513,7 @@
       .filter((item) => !allowedIds || allowedIds.has(item.residentId))
       .filter((item) => !residentId || item.residentId === residentId);
     const qualityIndicators = buildQualityIndicators(reports, cases);
+    const highlights = Highlights.build(state, reports, cases, { minimumAggregate: 3 });
     return {
       summary: {
         reports: reports.length,
@@ -528,6 +534,7 @@
         deadLetters: gatewayEvents.filter((item) => item.deadLetter).length
       },
       qualityIndicators,
+      highlights,
       sourceContracts: SOURCE_CONTRACTS.map((item) => ({ ...item })),
       residents: [...residentIds].map((id) => ({ id, name: residentMap.get(id)?.name || id })),
       years,
@@ -817,6 +824,7 @@
     SOURCE_CONTRACTS,
     STANDARDS: Standards,
     applyAbnormalCaseAction,
+    applyHighlightAction: Highlights.applyAction,
     applyJointTestAction,
     buildOverview,
     buildQualityIndicators,
