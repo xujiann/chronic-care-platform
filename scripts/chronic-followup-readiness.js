@@ -386,6 +386,8 @@ function buildChronicFollowupReadinessReport(options = {}) {
       "GET /api/chronic/followup-summary",
       "GET /api/chronic/archive-standard",
       "GET /api/chronic/pathway-quality",
+      "GET /api/chronic/pharmacy-insurance-closure",
+      "GET /api/chronic/production-safety",
       "GET /api/chronic/referral-continuity",
       "GET /api/chronic/public-health-loop",
       "POST /api/chronic/followup-feedback",

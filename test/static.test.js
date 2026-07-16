@@ -1136,6 +1136,19 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(read("citizen.js"), /bindFollowupFeedback/);
 });
 
+test("chronic pharmacy insurance closure is exposed through the institution workbench", () => {
+  assert.match(read("server.js"), /\/api\/chronic\/pharmacy-insurance-closure/);
+  assert.match(read("server.js"), /\/api\/chronic\/production-safety/);
+  assert.match(read("institution.html"), /chronic-pharmacy-insurance-summary/);
+  assert.match(read("institution.html"), /chronic-production-safety-summary/);
+  assert.match(read("institution.js"), /loadChronicPharmacyInsuranceClosure/);
+  assert.match(read("institution.js"), /renderChronicPharmacyInsuranceClosure/);
+  assert.match(read("institution.js"), /loadChronicProductionSafety/);
+  assert.match(read("institution.js"), /renderChronicProductionSafety/);
+  assert.match(read("scripts/chronic-institution-interfaces.js"), /chronic-pharmacy-insurance-closure-v1/);
+  assert.match(read("scripts/chronic-institution-interfaces.js"), /chronic-production-safety-v1/);
+});
+
 test("data governance foundation exposes platform cards API and release evidence", () => {
   const server = read("server.js");
   assert.match(server, /seedDataGovernanceAssets/);
@@ -3076,6 +3089,41 @@ test("platform capability map exposes API page card and export wiring", () => {
   assert.match(builder, /dataCollections/);
   assert.match(builder, /riskRegister/);
   assert.match(builder, /renderCapabilityMapMarkdown/);
+});
+
+test("platform go-live slices expose APIs page card and release wiring", () => {
+  const server = read("server.js");
+  const html = read("platform.html");
+  const js = read("platform.js");
+  const builder = read("platform-go-live-slices.js");
+  const releaseReport = read("scripts/release-report.js");
+  const manifest = read("scripts/release-artifact-manifest.js");
+  const deployCheck = read("scripts/deploy-check.js");
+  const pkg = JSON.parse(read("package.json"));
+
+  assert.match(server, /\/api\/platform\/go-live-slices/);
+  assert.match(server, /\/api\/platform\/blocker-register/);
+  assert.match(server, /\/api\/platform\/service-order-center/);
+  assert.match(server, /\/api\/data-governance\/master-data/);
+  assert.match(server, /renderPlatformGoLiveSlicesMarkdown/);
+  assert.match(html, /id="platform-go-live-slices-panel"/);
+  assert.match(html, /id="export-platform-go-live-slices"/);
+  assert.match(html, /id="platform-go-live-blockers"/);
+  assert.match(html, /id="platform-service-order-center"/);
+  assert.match(html, /id="platform-master-data-directory"/);
+  assert.match(js, /loadPlatformGoLiveSlices/);
+  assert.match(js, /renderPlatformGoLiveSlices/);
+  assert.match(js, /exportPlatformGoLiveSlices/);
+  assert.match(js, /data-go-live-blocker/);
+  assert.match(builder, /buildPlatformBlockerRegister/);
+  assert.match(builder, /buildPlatformServiceOrderCenter/);
+  assert.match(builder, /buildMasterDataDirectory/);
+  assert.match(builder, /renderPlatformGoLiveSlicesMarkdown/);
+  assert.equal(Boolean(pkg.scripts["platform:go-live-slices"]), true);
+  assert.match(releaseReport, /platformGoLiveSlices:readiness/);
+  assert.match(releaseReport, /platform-go-live-slices\.json/);
+  assert.match(manifest, /platform-go-live-slices/);
+  assert.match(deployCheck, /manifest:platformGoLiveSlices/);
 });
 
 test("health platform requirement research plan is documented", () => {

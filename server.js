@@ -94,7 +94,8 @@ const {
   buildMasterDataDirectory,
   buildPlatformBlockerRegister,
   buildPlatformGoLiveSlices,
-  buildPlatformServiceOrderCenter
+  buildPlatformServiceOrderCenter,
+  renderPlatformGoLiveSlicesMarkdown
 } = require("./platform-go-live-slices");
 const {
   buildDigitalHospitalPolicyRegisterBoard,
@@ -7998,7 +7999,7 @@ function completeSystemTargets(state) {
 function ensureChronicFieldClosureEvidence(state) {
   const patchById = (collection, id, patch) => {
     const rows = Array.isArray(state[collection]) ? state[collection] : [];
-    state[collection] = rows.map((row) => row.id === id ? { ...patch, ...row } : row);
+    state[collection] = rows.map((row) => row.id === id ? { ...row, ...patch } : row);
   };
 
   patchById("chronicSelfManagement", "csm-001", {
@@ -8217,8 +8218,8 @@ function normalizeServiceOrderIndexRow(row = {}) {
     scheduledAt: String(row.scheduledAt || row.date || "").trim(),
     providerName: String(row.providerName || row.institution || "").trim(),
     entryPage: String(row.entryPage || row.page || "service-orders").trim(),
-    createdAt: String(row.createdAt || row.submittedAt || row.requestedAt || row.updatedAt || new Date().toISOString()).trim(),
-    updatedAt: String(row.updatedAt || row.createdAt || row.submittedAt || row.requestedAt || new Date().toISOString()).trim(),
+    createdAt: String(row.createdAt || row.submittedAt || row.requestedAt || row.updatedAt || row.scheduledAt || row.date || "").trim(),
+    updatedAt: String(row.updatedAt || row.createdAt || row.submittedAt || row.requestedAt || row.scheduledAt || row.date || "").trim(),
     sourceStatus: String(row.sourceStatus || status).trim()
   };
 }
@@ -13247,6 +13248,116 @@ function buildChronicPathwayQualityReport(data, user, residentId = "") {
     diseasePathways,
     indicators,
     sourceBoundary: "Calculated from authorized platform records. Formal regional quality assessment still requires approved indicator definitions, source-system reconciliation, sampling records, and expert signoff."
+  };
+}
+
+function buildChronicPharmacyInsuranceClosure(data, user, residentId = "") {
+  const residents = (data.residents || []).filter((item) => (!residentId || item.id === residentId) && canAccessResident(user, item.id, data));
+  const residentIds = new Set(residents.map((item) => item.id));
+  const residentById = new Map(residents.map((item) => [item.id, item]));
+  const pickups = (data.medicationPickups || []).filter((item) => residentIds.has(item.residentId));
+  const claims = (data.insuranceClaims || []).filter((item) => residentIds.has(item.residentId));
+  const linkByPickupId = new Map((data.chronicPharmacyInsuranceLinks || []).filter((item) => residentIds.has(item.residentId)).map((item) => [item.medicationPickupId, item]));
+  const claimById = new Map(claims.map((item) => [item.id, item]));
+  const approved = (value) => Boolean(value) && !/pending|await|待|退回|rejected|denied/i.test(String(value));
+  const rows = pickups.map((pickup) => {
+    const link = linkByPickupId.get(pickup.id) || null;
+    const claim = link?.insuranceClaimId ? claimById.get(link.insuranceClaimId) || null : claims.find((item) => item.residentId === pickup.residentId) || null;
+    const prescriptionConfirmed = approved(pickup.institutionReview);
+    const insuranceApproved = approved(pickup.insuranceReview) || approved(claim?.status);
+    const settlementReceipt = Boolean(link?.settlementReceiptStatus) && approved(link.settlementReceiptStatus);
+    const inventoryConfirmed = Boolean(pickup.inventoryStatus || link?.inventoryReceiptStatus || link?.pharmacyStock)
+      && approved(pickup.inventoryStatus || link?.inventoryReceiptStatus || link?.pharmacyStock);
+    const pharmacyCallback = Boolean(pickup.callbackExternalId || pickup.pickupConfirmedAt || (link?.callbackStatus && approved(link.callbackStatus)));
+    const closed = prescriptionConfirmed && insuranceApproved && settlementReceipt && inventoryConfirmed && pharmacyCallback && approved(link?.closureStatus);
+    const missing = [
+      !prescriptionConfirmed && "prescription confirmation",
+      !insuranceApproved && "insurance review",
+      !settlementReceipt && "settlement receipt",
+      !inventoryConfirmed && "pharmacy inventory receipt",
+      !pharmacyCallback && "pickup callback",
+      !approved(link?.closureStatus) && "closure acknowledgement"
+    ].filter(Boolean);
+    return {
+      medicationPickupId: pickup.id,
+      residentId: pickup.residentId,
+      residentName: residentById.get(pickup.residentId)?.name || "",
+      medication: pickup.medication,
+      pharmacy: pickup.pharmacy,
+      nextPickup: pickup.nextPickup,
+      longPrescription: link?.longPrescription || "",
+      catalogVersion: link?.catalogVersion || "",
+      prescriptionConfirmed,
+      insuranceApproved,
+      settlementReceipt,
+      inventoryConfirmed,
+      pharmacyCallback,
+      closureStatus: link?.closureStatus || "not-linked",
+      closed,
+      missing,
+      claimId: claim?.id || link?.insuranceClaimId || "",
+      callbackExternalId: pickup.callbackExternalId || "",
+      nextAction: closed ? "retain reconciliation evidence and monitor next refill" : `complete ${missing.join(", ")}`
+    };
+  });
+  return {
+    ok: true,
+    scope: residentId ? "resident" : "authorized-population",
+    summary: {
+      residents: residents.length,
+      pickups: rows.length,
+      prescriptionsConfirmed: rows.filter((item) => item.prescriptionConfirmed).length,
+      insuranceApproved: rows.filter((item) => item.insuranceApproved).length,
+      settlementReceipts: rows.filter((item) => item.settlementReceipt).length,
+      inventoryReceipts: rows.filter((item) => item.inventoryConfirmed).length,
+      pharmacyCallbacks: rows.filter((item) => item.pharmacyCallback).length,
+      closed: rows.filter((item) => item.closed).length,
+      exceptions: rows.filter((item) => !item.closed).length
+    },
+    rows,
+    sourceBoundary: "This report correlates authorized platform records only. Production closure requires the real insurance settlement receipt, pharmacy inventory ledger, signed callback, reconciliation ownership, and joint-test evidence."
+  };
+}
+
+function buildChronicProductionSafetyReport(data) {
+  const environment = buildProductionEnvironmentStatus();
+  const launchCore = buildChronicLaunchCoreReport({ data });
+  const pharmacyClosure = buildChronicPharmacyInsuranceClosure(data, { role: "commission" });
+  const environmentChecks = environment.checks.map(({ id, name, passed }) => ({ id: `environment:${id}`, name, passed, source: "production environment" }));
+  const chronicChecks = [
+    { id: "chronic:launch-core", name: "chronic launch-core evidence", passed: launchCore.ok, source: "chronic-launch-core" },
+    { id: "chronic:launch-core-signoff", name: "chronic launch-core cutover signoff", passed: cutoverSignoffReady("CUTOVER_CHRONIC_LAUNCH_CORE_SIGNOFF"), source: "cutover environment" },
+    { id: "chronic:pharmacy-callback", name: "pharmacy callback evidence", passed: pharmacyClosure.summary.pickups > 0 && pharmacyClosure.summary.pharmacyCallbacks > 0, source: "medicationPickup callbacks" },
+    { id: "chronic:pharmacy-settlement", name: "pharmacy and insurance settlement closure", passed: pharmacyClosure.summary.pickups > 0 && pharmacyClosure.summary.closed === pharmacyClosure.summary.pickups, source: "pharmacy-insurance closure" }
+  ];
+  const checks = [...environmentChecks, ...chronicChecks];
+  const blockers = checks.filter((item) => !item.passed).map((item) => ({
+    ...item,
+    nextAction: {
+      "environment:audit-retention": "configure audit retention and SIEM delivery without exposing endpoint credentials in the application",
+      "environment:site-interface-signoff": "archive the signed site interface joint-test record",
+      "environment:insurance-certificate-signoff": "archive the insurance settlement and certificate exchange acceptance",
+      "environment:monitoring-signoff": "complete the monitoring, on-call, and alert-routing rehearsal",
+      "environment:dr-rehearsal-signoff": "complete the disaster-recovery and rollback rehearsal",
+      "chronic:launch-core-signoff": "set the chronic launch-core signoff only after the pilot evidence pack is signed",
+      "chronic:pharmacy-callback": "record a signed pharmacy callback with an idempotent external identifier",
+      "chronic:pharmacy-settlement": "reconcile each long-prescription row with settlement, inventory, callback, and closure evidence"
+    }[item.id] || "complete the production control and retain the acceptance evidence"
+  }));
+  return {
+    ok: true,
+    functionalState: launchCore.ok ? "ready-for-site-safety-evidence" : "needs-functional-launch-evidence",
+    formalGoLiveState: blockers.length ? "site-evidence-pending" : "ready-for-production-approval",
+    summary: {
+      controls: checks.length,
+      controlsPassed: checks.filter((item) => item.passed).length,
+      blockers: blockers.length,
+      pharmacyRows: pharmacyClosure.summary.pickups,
+      pharmacyClosures: pharmacyClosure.summary.closed
+    },
+    checks,
+    blockers,
+    boundary: "This endpoint reports control presence and evidence status only. It does not certify a production launch, disclose secret values, or replace formal security assessment, commercial-crypto assessment, external joint testing, or signed go/no-go approval."
   };
 }
 
@@ -18964,7 +19075,12 @@ async function handleApi(req, res) {
     const releaseReport = buildReleaseReport({ data, env: process.env, profile: "demo" });
     const manifest = buildReleaseArtifactManifest({ releaseReport });
     const capabilityMap = buildCapabilityMap({ data, manifest });
-    sendJson(res, 200, buildPlatformGoLiveSlices(data, capabilityMap));
+    const goLiveSlices = buildPlatformGoLiveSlices(data, capabilityMap);
+    if (url.searchParams.get("format") === "markdown") {
+      sendText(res, 200, renderPlatformGoLiveSlicesMarkdown(goLiveSlices), "text/markdown; charset=utf-8");
+      return;
+    }
+    sendJson(res, 200, goLiveSlices);
     return;
   }
 
@@ -20794,6 +20910,27 @@ async function handleApi(req, res) {
       return;
     }
     sendJson(res, 200, redactSensitiveResponse(buildChronicPathwayQualityReport(data, user, residentId), user));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/chronic/pharmacy-insurance-closure") {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance", "citizen"], "/api/chronic/pharmacy-insurance-closure");
+    if (!user) return;
+    const data = readDatabase();
+    const residentId = url.searchParams.get("residentId") || "";
+    if (residentId && !canAccessResident(user, residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "read chronic pharmacy insurance closure", target: residentId, result: "denied", detail: "resident scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "resident scope denied" });
+      return;
+    }
+    sendJson(res, 200, redactSensitiveResponse(buildChronicPharmacyInsuranceClosure(data, user, residentId), user));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/chronic/production-safety") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/chronic/production-safety");
+    if (!user) return;
+    sendJson(res, 200, buildChronicProductionSafetyReport(readDatabase()));
     return;
   }
 

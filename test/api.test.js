@@ -1240,6 +1240,32 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.match(capabilityMapMarkdownText, /Release artifacts/);
     assert.match(capabilityMapMarkdownText, /Risk Register/);
 
+    const goLiveSlices = await api(baseUrl, "/api/platform/go-live-slices", authorized(accountLogin.body.token));
+    assert.equal(goLiveSlices.response.status, 200);
+    assert.equal(goLiveSlices.body.ok, true);
+    assert.equal(goLiveSlices.body.summary.openBlockers >= 1, true);
+    assert.equal(goLiveSlices.body.summary.serviceOrders >= 8, true);
+    assert.equal(goLiveSlices.body.summary.masterDataDomains >= 6, true);
+    assert.equal(goLiveSlices.body.blockerRegister.blockers.some((item) => item.severity === "P0"), true);
+
+    const goLiveMarkdown = await fetch(`${baseUrl}/api/platform/go-live-slices?format=markdown`, authorized(accountLogin.body.token));
+    assert.equal(goLiveMarkdown.status, 200);
+    const goLiveMarkdownText = await goLiveMarkdown.text();
+    assert.match(goLiveMarkdownText, /Platform go-live slices readiness/);
+    assert.match(goLiveMarkdownText, /Unified Blocker Register/);
+
+    const blockerRegister = await api(baseUrl, "/api/platform/blocker-register", authorized(accountLogin.body.token));
+    assert.equal(blockerRegister.response.status, 200);
+    assert.equal(blockerRegister.body.summary.open >= 1, true);
+
+    const serviceOrderCenter = await api(baseUrl, "/api/platform/service-order-center", authorized(accountLogin.body.token));
+    assert.equal(serviceOrderCenter.response.status, 200);
+    assert.equal(serviceOrderCenter.body.summary.serviceTypes >= 4, true);
+
+    const masterDataDirectory = await api(baseUrl, "/api/data-governance/master-data", authorized(accountLogin.body.token));
+    assert.equal(masterDataDirectory.response.status, 200);
+    assert.equal(masterDataDirectory.body.summary.domains >= 6, true);
+
     const managementFunctions = await api(baseUrl, "/api/interoperability/management-functions", authorized(accountLogin.body.token));
     assert.equal(managementFunctions.response.status, 200);
     assert.equal(managementFunctions.body.ok, true);
@@ -4671,6 +4697,24 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(residentPathwayQuality.body.summary.residents, 1);
     assert.equal(deniedResidentPathwayQuality.response.status, 403);
 
+    const chronicPharmacyClosure = await api(baseUrl, "/api/chronic/pharmacy-insurance-closure", authorized(commissionToken));
+    assert.equal(chronicPharmacyClosure.response.status, 200);
+    assert.equal(chronicPharmacyClosure.body.summary.pickups >= 4, true);
+    assert.equal(chronicPharmacyClosure.body.rows.some((item) => item.medicationPickupId === "mp1" && item.pharmacyCallback), true);
+    const residentPharmacyClosure = await api(baseUrl, "/api/chronic/pharmacy-insurance-closure?residentId=r1", authorized(citizen.body.token));
+    const deniedResidentPharmacyClosure = await api(baseUrl, "/api/chronic/pharmacy-insurance-closure?residentId=r2", authorized(citizen.body.token));
+    assert.equal(residentPharmacyClosure.response.status, 200);
+    assert.equal(residentPharmacyClosure.body.rows.every((item) => item.residentId === "r1"), true);
+    assert.equal(deniedResidentPharmacyClosure.response.status, 403);
+
+    const chronicProductionSafety = await api(baseUrl, "/api/chronic/production-safety", authorized(commissionToken));
+    assert.equal(chronicProductionSafety.response.status, 200);
+    assert.equal(chronicProductionSafety.body.functionalState, "ready-for-site-safety-evidence");
+    assert.equal(chronicProductionSafety.body.formalGoLiveState, "site-evidence-pending");
+    assert.equal(chronicProductionSafety.body.checks.some((item) => item.id === "environment:audit-retention"), true);
+    const citizenProductionSafety = await api(baseUrl, "/api/chronic/production-safety", authorized(citizen.body.token));
+    assert.equal(citizenProductionSafety.response.status, 403);
+
     const publicHealthLoop = await api(baseUrl, "/api/chronic/public-health-loop", authorized(commissionToken));
     assert.equal(publicHealthLoop.response.status, 200);
     assert.equal(publicHealthLoop.body.ok, true);
@@ -4712,7 +4756,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const chronicInstitutionInterfaces = await api(baseUrl, "/api/chronic/institution-interfaces", authorized(commissionToken));
     assert.equal(chronicInstitutionInterfaces.response.status, 200);
     assert.equal(chronicInstitutionInterfaces.body.ok, true);
-    assert.equal(chronicInstitutionInterfaces.body.summary.readyContracts, 12);
+    assert.equal(chronicInstitutionInterfaces.body.summary.readyContracts, 14);
     assert.equal(chronicInstitutionInterfaces.body.contracts.some((item) => item.path === "/api/chronic/pharmacy-callbacks" && item.ready), true);
 
     const chronicLaunchCore = await api(baseUrl, "/api/chronic/launch-core", authorized(commissionToken));

@@ -132,6 +132,27 @@ Runtime audit endpoint: `GET /api/chronic/institution-interfaces`.
 - Evidence basis: disease registry models, management plans, follow-ups, medication closure, referral return, archive field coverage, and sampling governance.
 - Launch check: calculated indicators are evidence coverage for the authorized platform scope; formal regional assessment still requires approved denominator definitions, source-system reconciliation, sampling records, and expert signoff.
 
+### chronic-pharmacy-insurance-closure-v1
+
+- Endpoint: `GET /api/chronic/pharmacy-insurance-closure`
+- Owner: pharmacy, insurance, and chronic-care coordination
+- Roles: `citizen`, `institution`, `insurance`, `commission`
+- Direction: authorized medication-closure evidence report
+- Required query fields: optional `residentId`
+- Response fields: `summary`, `rows`, `sourceBoundary`
+- Evidence basis: long-prescription confirmation, insurance review, settlement receipt, pharmacy inventory receipt, pickup callback, and closure acknowledgement.
+- Launch check: the report exposes each missing closure step. Production use still requires the real insurance settlement receipt, pharmacy inventory ledger, signed callback, reconciliation ownership, and joint-test evidence.
+
+### chronic-production-safety-v1
+
+- Endpoint: `GET /api/chronic/production-safety`
+- Owner: security operations and chronic-launch coordination
+- Roles: `institution`, `commission`
+- Direction: authorized preflight report; it is read-only and returns no secret values.
+- Response fields: `functionalState`, `formalGoLiveState`, `summary`, `checks`, `blockers`, `boundary`
+- Evidence basis: production environment control status, chronic launch-core evidence, pharmacy/insurance closure, audit retention, monitoring, disaster-recovery, and cutover signoffs.
+- Launch check: `ready-for-site-safety-evidence` only means the module can collect site evidence. `ready-for-production-approval` still requires all controls, formal assessment results, external joint-test receipts, and signed go/no-go approval.
+
 ### chronic-followup-escalation-v1
 
 - Endpoint: `POST /api/chronic/followup-escalations`

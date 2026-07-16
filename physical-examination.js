@@ -151,7 +151,7 @@ function renderStandards(standards) {
 function renderQualityIndicators(indicators) {
   const target = document.querySelector("#physical-exam-quality-indicators");
   if (!target) return;
-  target.innerHTML = indicators.map((item) => `<article class="readiness-card"><span>${escapeExamHtml(item.code)}</span><strong>${item.collectable ? `${escapeExamHtml(item.value)}${escapeExamHtml(item.unit)}` : "待采集"}</strong><small>${escapeExamHtml(item.name)} · ${escapeExamHtml(item.numerator || 0)}/${escapeExamHtml(item.denominator || 0)}</small></article>`).join("");
+  target.innerHTML = indicators.map((item) => `<article class="readiness-card"><span>${escapeExamHtml(item.code)}</span><strong>${!item.collectable ? "待采集" : item.value === null ? "暂无分母" : `${escapeExamHtml(item.value)}${escapeExamHtml(item.unit)}`}</strong><small>${escapeExamHtml(item.name)} · ${escapeExamHtml(item.numerator || 0)}/${escapeExamHtml(item.denominator || 0)}</small></article>`).join("");
 }
 
 function renderPhysicalExamFilters(overview) {

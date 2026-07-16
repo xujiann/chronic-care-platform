@@ -77,6 +77,7 @@ let platformState = structuredClone(fallbackPlatformState);
 let platformData = null;
 let activeEditSnapshot = null;
 let platformCapabilityMap = null;
+let platformGoLiveSlices = null;
 let platformCapabilityOperationsCenter = {
   productionReady: false,
   summary: { capabilityDomains: 0, repositoryEvidenceReady: 0, reviewedPreproduction: 0, improvementRequired: 0, pendingReview: 0, evidenceRecorded: 0, productionReady: 0, mvpRequiredModules: 0, productionBlockers: 0, blockersOpen: 0, blockersInProgress: 0, blockerEvidenceSubmitted: 0, blockerEvidenceReviewed: 0, blockerEvidenceRecorded: 0 },
@@ -423,6 +424,7 @@ const defaultCommercialCryptoCapabilities = [
 document.addEventListener("DOMContentLoaded", async () => {
   platformState = await loadPlatformState(fallbackPlatformState);
   await loadPlatformCapabilityMap();
+  await loadPlatformGoLiveSlices();
   await loadPlatformCapabilityOperationsCenter();
   await loadCommercialCryptoCenter();
   await loadPostgresReconciliationCenter();
@@ -438,6 +440,7 @@ function renderPlatform() {
   platformData = platformModel(platformState);
   renderMetrics(platformState, platformData);
   renderPlatformCapabilityMap();
+  renderPlatformGoLiveSlices();
   renderCapabilities(platformState, platformData.capabilities);
   renderIntegrationRegistry(platformData.integrations);
   renderInterfacePlan(platformData.interfaces);
@@ -640,6 +643,66 @@ function renderPlatformCapabilityMap() {
       <h3>${platformEscapeHtml(item.title)}</h3>
       <p>${platformEscapeHtml(item.artifacts)} 个发布工件 / ${platformEscapeHtml(item.evidencePresent)} 个证据文件 / ${platformEscapeHtml(item.scripts)} 个脚本</p>
       <small>数据集合 ${platformEscapeHtml(item.collections)} 个；关注项 ${platformEscapeHtml(item.attention || 0)} 个</small>
+    </article>
+  `).join("");
+}
+
+function renderPlatformGoLiveSlices() {
+  const statusTarget = document.querySelector("#platform-go-live-slices-status");
+  const metricsTarget = document.querySelector("#platform-go-live-slices-metrics");
+  const blockersTarget = document.querySelector("#platform-go-live-blockers");
+  const serviceTarget = document.querySelector("#platform-service-order-center");
+  const masterTarget = document.querySelector("#platform-master-data-directory");
+  if (!statusTarget || !metricsTarget || !blockersTarget || !serviceTarget || !masterTarget) return;
+  if (!platformGoLiveSlices) {
+    statusTarget.textContent = PLATFORM_API_BASE ? "等待上线切片 API" : "静态预览需连接动态后端";
+    statusTarget.className = "badge warn";
+    metricsTarget.innerHTML = `
+      <article class="metric-card">
+        <span>动态 API</span>
+        <strong>/api/platform/go-live-slices</strong>
+        <small>统一汇总阻塞项、服务订单和主数据目录。</small>
+      </article>
+    `;
+    blockersTarget.innerHTML = `<article class="evidence-card"><h3>未加载阻塞台账</h3><p>启动 Node 后端后可查看。</p></article>`;
+    serviceTarget.innerHTML = `<article class="evidence-card"><h3>未加载服务订单</h3><p>启动 Node 后端后可查看。</p></article>`;
+    masterTarget.innerHTML = `<article class="evidence-card"><h3>未加载主数据目录</h3><p>启动 Node 后端后可查看。</p></article>`;
+    return;
+  }
+  const summary = platformGoLiveSlices.summary || {};
+  statusTarget.textContent = platformGoLiveSlices.ok ? "上线切片已汇总" : "上线切片存在阻塞";
+  statusTarget.className = platformGoLiveSlices.ok ? "badge success" : "badge warn";
+  const metricRows = [
+    ["开放阻塞项", summary.openBlockers || 0, `${summary.p0Blockers || 0} 个 P0 仍需现场收口`],
+    ["服务订单", summary.serviceOrders || 0, `${summary.serviceTypes || 0} 类服务统一纳管`],
+    ["主数据域", summary.masterDataDomains || 0, `${summary.onsiteMasterDataGaps || 0} 个现场缺口显式保留`]
+  ];
+  metricsTarget.innerHTML = metricRows.map(([label, value, hint]) => `
+    <article class="metric-card">
+      <span>${platformEscapeHtml(label)}</span>
+      <strong>${platformEscapeHtml(value)}</strong>
+      <small>${platformEscapeHtml(hint)}</small>
+    </article>
+  `).join("");
+  blockersTarget.innerHTML = (platformGoLiveSlices.blockerRegister?.blockers || []).slice(0, 6).map((item) => `
+    <article class="evidence-card" data-go-live-blocker="${platformEscapeHtml(item.id)}">
+      <h3>${platformEscapeHtml(item.severity || "P2")} ${platformEscapeHtml(item.title || item.source)}</h3>
+      <p>${platformEscapeHtml(item.nextAction || "Awaiting action.")}</p>
+      <small>${platformEscapeHtml(item.source)} / ${platformEscapeHtml(item.owner || "unassigned")} / ${platformEscapeHtml(item.status || "open")}</small>
+    </article>
+  `).join("");
+  serviceTarget.innerHTML = (platformGoLiveSlices.serviceOrderCenter?.orders || []).slice(0, 6).map((item) => `
+    <article class="evidence-card" data-service-order="${platformEscapeHtml(item.id)}">
+      <h3>${platformEscapeHtml(item.serviceType)} / ${platformEscapeHtml(item.title)}</h3>
+      <p>${platformEscapeHtml(item.providerName || item.ownerRole || "provider pending")}</p>
+      <small>${platformEscapeHtml(item.residentId || "no resident")} / ${platformEscapeHtml(item.status || item.lifecycle)}</small>
+    </article>
+  `).join("");
+  masterTarget.innerHTML = (platformGoLiveSlices.masterDataDirectory?.domains || []).slice(0, 8).map((item) => `
+    <article class="evidence-card" data-master-data-domain="${platformEscapeHtml(item.id)}">
+      <h3>${platformEscapeHtml(item.name || item.domain)}</h3>
+      <p>${platformEscapeHtml((item.standardItems || []).slice(0, 4).join(" / "))}</p>
+      <small>${platformEscapeHtml(item.owner || "unassigned")} / ${platformEscapeHtml(item.signoffStatus || "pending")} / ${item.onsiteBlocked ? "onsite blocked" : "ready"}</small>
     </article>
   `).join("");
 }
@@ -2083,6 +2146,7 @@ function bindPlatformEditor() {
 
   document.querySelector("#export-platform-report")?.addEventListener("click", exportPlatformReport);
   document.querySelector("#export-platform-capability-map")?.addEventListener("click", exportPlatformCapabilityMap);
+  document.querySelector("#export-platform-go-live-slices")?.addEventListener("click", exportPlatformGoLiveSlices);
   const filters = document.querySelector("#platform-report-filters");
   filters?.addEventListener("input", refreshReportSummary);
   filters?.addEventListener("change", refreshReportSummary);
@@ -2103,6 +2167,18 @@ async function loadPlatformCapabilityMap() {
     platformCapabilityMap = await response.json();
   } catch (error) {
     platformCapabilityMap = null;
+  }
+}
+
+async function loadPlatformGoLiveSlices() {
+  if (!PLATFORM_API_BASE) return;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  try {
+    const response = await request(`${PLATFORM_API_BASE}/platform/go-live-slices`);
+    if (!response.ok) return;
+    platformGoLiveSlices = await response.json();
+  } catch (error) {
+    platformGoLiveSlices = null;
   }
 }
 
@@ -3032,6 +3108,34 @@ async function exportPlatformCapabilityMap() {
       `错误：${error.message || "unknown error"}`,
       "",
       "请确认登录角色为卫生健康委管理端，并检查动态后端是否可访问。"
+    ].join("\n"));
+  }
+}
+
+async function exportPlatformGoLiveSlices() {
+  if (!PLATFORM_API_BASE) {
+    downloadText(`上线三切片收口-${todayStamp()}.md`, [
+      "# 上线三切片收口",
+      "",
+      "当前为静态预览模式，无法读取 `/api/platform/go-live-slices`。",
+      "",
+      "请启动 Node 后端后重新导出，以汇总阻塞项、服务订单和主数据目录。"
+    ].join("\n"));
+    return;
+  }
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  try {
+    const response = await request(`${PLATFORM_API_BASE}/platform/go-live-slices?format=markdown`);
+    const text = await response.text();
+    if (!response.ok) throw new Error(text || `HTTP ${response.status}`);
+    downloadText(`上线三切片收口-${todayStamp()}.md`, text);
+  } catch (error) {
+    downloadText(`上线三切片收口导出失败-${todayStamp()}.md`, [
+      "# 上线三切片收口导出失败",
+      "",
+      `错误：${error.message || "unknown error"}`,
+      "",
+      "请确认已使用卫生健康委管理端账号登录，并检查动态后端是否可访问。"
     ].join("\n"));
   }
 }

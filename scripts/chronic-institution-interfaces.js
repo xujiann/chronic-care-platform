@@ -108,6 +108,28 @@ const CONTRACTS = [
     evidence: ["disease pathway coverage", "quality indicator calculation", "sampling governance", "source boundary"]
   },
   {
+    id: "chronic-pharmacy-insurance-closure-v1",
+    method: "GET",
+    path: "/api/chronic/pharmacy-insurance-closure",
+    owner: "pharmacy-insurance-and-chronic-care",
+    direction: "outbound",
+    roles: ["citizen", "institution", "insurance", "commission"],
+    requiredFields: ["residentId?", "summary", "rows", "sourceBoundary"],
+    targetCollections: ["medicationPickups", "insuranceClaims", "chronicPharmacyInsuranceLinks", "taskMessages", "securityEvents"],
+    evidence: ["prescription confirmation", "insurance and settlement receipt", "inventory and pickup callback", "closure exception"]
+  },
+  {
+    id: "chronic-production-safety-v1",
+    method: "GET",
+    path: "/api/chronic/production-safety",
+    owner: "security-operations-and-chronic-launch",
+    direction: "outbound",
+    roles: ["institution", "commission"],
+    requiredFields: ["functionalState", "formalGoLiveState", "summary", "checks", "blockers", "boundary"],
+    targetCollections: ["chronicLaunchCoreSignoffs", "chronicPharmacyInsuranceLinks", "securityEvents"],
+    evidence: ["safe environment control status", "cutover signoffs", "pharmacy settlement closure", "formal production boundary"]
+  },
+  {
     id: "chronic-archive-standard-v1",
     method: "GET",
     path: "/api/chronic/archive-standard",

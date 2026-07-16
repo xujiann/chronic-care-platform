@@ -179,6 +179,7 @@
         reportIssuedAt: String(input.reportIssuedAt || input.signature?.signedAt || "").trim(),
         stoolTestOrdered: input.stoolTestOrdered === true,
         stoolSampleCollected: input.stoolSampleCollected === true,
+        stoolCollectionCaptured: Object.prototype.hasOwnProperty.call(input, "stoolTestOrdered") || Object.prototype.hasOwnProperty.call(input, "stoolSampleCollected"),
         ultrasoundWorkload: normalizeUltrasoundWorkload(input.ultrasoundWorkload),
         processingBasis: Standards.normalizeProcessingBasis(input),
         retentionPolicy: String(input.retentionPolicy || Standards.RETENTION_POLICY),
@@ -299,7 +300,13 @@
     reports.forEach((report) => {
       const resident = residents.get(report.residentId) || {};
       const activeContract = contracts.find((item) => item.residentId === report.residentId && /active|renewal|family-confirmed/i.test(String(item.status || "")));
-      const linkage = buildCareLinkage(report, resident, activeContract, options);
+      const existingLinkage = report.meta?.careLinkage || {};
+      const stableNow = options.now
+        || existingLinkage.generatedAt
+        || existingLinkage.familyDoctorSuggestion?.generatedAt
+        || report.createdAt
+        || new Date().toISOString();
+      const linkage = buildCareLinkage(report, resident, activeContract, { ...options, now: stableNow });
       if (!linkage) return;
       report.meta = { ...(report.meta || {}), careLinkage: linkage };
       linkedReports.push(report);
@@ -554,6 +561,7 @@
     const questionnaires = reports.filter((item) => Standards.questionnaireComplete(item.meta?.healthQuestionnaire || {})).length;
     const stoolOrdered = reports.filter((item) => item.meta?.stoolTestOrdered === true).length;
     const stoolCollected = reports.filter((item) => item.meta?.stoolTestOrdered === true && item.meta?.stoolSampleCollected === true).length;
+    const stoolCollectionCaptured = reports.some((item) => item.meta?.stoolCollectionCaptured === true);
     const ultrasoundRows = reports.map((item) => item.meta?.ultrasoundWorkload).filter((item) => item?.physicianPosts > 0 && item?.workingDays > 0);
     const ultrasoundSites = ultrasoundRows.reduce((total, item) => total + item.examSites, 0);
     const ultrasoundCapacity = ultrasoundRows.reduce((total, item) => total + (item.physicianPosts * item.workingDays), 0);
@@ -563,17 +571,17 @@
     const notifiedHighRisk = highRiskCases.filter((item) => item.notificationStatus === "delivered").length;
     const followedImportant = importantCases.filter((item) => ["followup-completed", "closed", "resolved"].includes(item.status) || (item.actions || []).some((action) => action.action === "followup")).length;
     return [
-      qualityIndicator("HCHM-PR-01", "高级职称医师签署报告率", seniorSigned, reports.length, "ratio"),
-      qualityIndicator("HCHM-PR-02", "健康体检问卷完成率", questionnaires, reports.length, "ratio"),
-      qualityIndicator("HCHM-PR-03", "超声医师日均负担超声检查部位数", ultrasoundSites, ultrasoundCapacity, "average"),
-      qualityIndicator("HCHM-PR-04", "大便标本留取率", stoolCollected, stoolOrdered, "ratio"),
+      qualityIndicator("HCHM-PR-01", "高级职称医师签署报告率", seniorSigned, reports.length, "ratio", reports.length > 0),
+      qualityIndicator("HCHM-PR-02", "健康体检问卷完成率", questionnaires, reports.length, "ratio", reports.length > 0),
+      qualityIndicator("HCHM-PR-03", "超声医师日均负担超声检查部位数", ultrasoundSites, ultrasoundCapacity, "average", ultrasoundRows.length > 0),
+      qualityIndicator("HCHM-PR-04", "大便标本留取率", stoolCollected, stoolOrdered, "ratio", stoolCollectionCaptured),
       { code: "HCHM-PR-05", name: "健康体检报告平均完成时间", numerator: completionDays.reduce((sum, item) => sum + item, 0), denominator: completionDays.length, value: completionDays.length ? Math.round((completionDays.reduce((sum, item) => sum + item, 0) / completionDays.length) * 10) / 10 : null, unit: "天", collectable: completionDays.length > 0 },
-      qualityIndicator("HCHM-OU-01", "高危异常结果通知率", notifiedHighRisk, highRiskCases.length, "ratio"),
-      qualityIndicator("HCHM-OU-02", "重要异常结果随访率", followedImportant, importantCases.length, "ratio")
+      qualityIndicator("HCHM-OU-01", "高危异常结果通知率", notifiedHighRisk, highRiskCases.length, "ratio", true),
+      qualityIndicator("HCHM-OU-02", "重要异常结果随访率", followedImportant, importantCases.length, "ratio", true)
     ];
   }
 
-  function qualityIndicator(code, name, numerator, denominator, mode) {
+  function qualityIndicator(code, name, numerator, denominator, mode, collectable) {
     return {
       code,
       name,
@@ -581,7 +589,7 @@
       denominator,
       value: denominator > 0 ? Math.round((numerator / denominator) * (mode === "ratio" ? 1000 : 10)) / 10 : null,
       unit: mode === "ratio" ? "%" : "部位/医师工作日",
-      collectable: denominator > 0
+      collectable: collectable === true
     };
   }
 

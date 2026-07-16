@@ -5,13 +5,15 @@ let institutionRegistrationDashboard = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
   platformState = await loadPlatformState(fallbackState);
-  const [followupSummary, launchCore, publicHealthLoop, referralContinuity, archiveStandardization, pathwayQuality, registrationDashboard] = await Promise.all([loadChronicFollowupSummary(), loadChronicLaunchCore(), loadChronicPublicHealthLoop(), loadChronicReferralContinuity(), loadChronicArchiveStandardization(), loadChronicPathwayQuality(), loadRegistrationJourneyDashboard()]);
+  const [followupSummary, launchCore, publicHealthLoop, referralContinuity, archiveStandardization, pathwayQuality, pharmacyInsuranceClosure, productionSafety, registrationDashboard] = await Promise.all([loadChronicFollowupSummary(), loadChronicLaunchCore(), loadChronicPublicHealthLoop(), loadChronicReferralContinuity(), loadChronicArchiveStandardization(), loadChronicPathwayQuality(), loadChronicPharmacyInsuranceClosure(), loadChronicProductionSafety(), loadRegistrationJourneyDashboard()]);
   platformState.chronicFollowupSummary = followupSummary;
   platformState.chronicLaunchCore = launchCore;
   platformState.chronicPublicHealthLoop = publicHealthLoop;
   platformState.chronicReferralContinuity = referralContinuity;
   platformState.chronicArchiveStandardization = archiveStandardization;
   platformState.chronicPathwayQuality = pathwayQuality;
+  platformState.chronicPharmacyInsuranceClosure = pharmacyInsuranceClosure;
+  platformState.chronicProductionSafety = productionSafety;
   institutionRegistrationDashboard = registrationDashboard;
   bindInstitutionActions();
   renderAll(platformState);
@@ -89,6 +91,30 @@ async function loadChronicPathwayQuality() {
   return null;
 }
 
+async function loadChronicPharmacyInsuranceClosure() {
+  if (!institutionApiBase) return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/chronic/pharmacy-insurance-closure`);
+    if (response.ok) return await response.json();
+  } catch (error) {
+    // Static preview derives only local pickup evidence.
+  }
+  return null;
+}
+
+async function loadChronicProductionSafety() {
+  if (!institutionApiBase) return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/chronic/production-safety`);
+    if (response.ok) return await response.json();
+  } catch (error) {
+    // Static preview remains explicit that production evidence is unavailable.
+  }
+  return null;
+}
+
 async function loadRegistrationJourneyDashboard() {
   if (institutionApiBase) {
     try {
@@ -108,13 +134,15 @@ async function loadRegistrationJourneyDashboard() {
 }
 
 async function refreshChronicRuntimeState() {
-  const [followupSummary, launchCore, publicHealthLoop, referralContinuity, archiveStandardization, pathwayQuality] = await Promise.all([loadChronicFollowupSummary(), loadChronicLaunchCore(), loadChronicPublicHealthLoop(), loadChronicReferralContinuity(), loadChronicArchiveStandardization(), loadChronicPathwayQuality()]);
+  const [followupSummary, launchCore, publicHealthLoop, referralContinuity, archiveStandardization, pathwayQuality, pharmacyInsuranceClosure, productionSafety] = await Promise.all([loadChronicFollowupSummary(), loadChronicLaunchCore(), loadChronicPublicHealthLoop(), loadChronicReferralContinuity(), loadChronicArchiveStandardization(), loadChronicPathwayQuality(), loadChronicPharmacyInsuranceClosure(), loadChronicProductionSafety()]);
   if (followupSummary) platformState.chronicFollowupSummary = followupSummary;
   if (launchCore) platformState.chronicLaunchCore = launchCore;
   if (publicHealthLoop) platformState.chronicPublicHealthLoop = publicHealthLoop;
   if (referralContinuity) platformState.chronicReferralContinuity = referralContinuity;
   if (archiveStandardization) platformState.chronicArchiveStandardization = archiveStandardization;
   if (pathwayQuality) platformState.chronicPathwayQuality = pathwayQuality;
+  if (pharmacyInsuranceClosure) platformState.chronicPharmacyInsuranceClosure = pharmacyInsuranceClosure;
+  if (productionSafety) platformState.chronicProductionSafety = productionSafety;
 }
 
 function renderAll(state) {
@@ -124,6 +152,8 @@ function renderAll(state) {
   renderChronicReferralContinuity(state);
   renderChronicArchiveStandardization(state);
   renderChronicPathwayQuality(state);
+  renderChronicPharmacyInsuranceClosure(state);
+  renderChronicProductionSafety(state);
   renderPhase2FamilyDoctorContracts(state);
   populateBirthCertificateForm(state);
   populateMultiPracticeForm(state);
@@ -602,6 +632,68 @@ function renderChronicPathwayQuality(state) {
   summaryEl.textContent = `${summary.evidenceCompletePathways || 0}/${summary.activeDiseasePathways || 0} active pathways evidence complete`;
   indicatorsEl.innerHTML = (report.indicators || []).map((item) => `<article class="claim-card"><strong>${item.metric}</strong><span>${item.value === null ? "N/A" : `${item.value}%`}<br>${item.evidence}</span></article>`).join("") || `<p class="muted">Quality indicators require the runtime API.</p>`;
   pathwaysEl.innerHTML = (report.diseasePathways || []).map((item) => `<section class="item"><div><h3>${item.diseaseType} · ${item.version}</h3><p>registered ${item.registered} · plans ${item.managementPlans} · follow-ups ${item.followups} · medication closure ${item.medicationClosed}</p><p>threshold ${item.threshold || "pending"} · quality sampling ${item.qualitySampling || "pending"}</p></div><span class="badge ${item.status === "evidence-complete" ? "info" : "warn"}">${item.status}</span></section>`).join("") || `<p class="muted">No disease pathways are available in the current scope.</p>`;
+}
+
+function fallbackChronicPharmacyInsuranceClosure(state) {
+  const rows = (state.medicationPickups || []).map((item) => ({
+    medicationPickupId: item.id,
+    residentId: item.residentId,
+    medication: item.medication,
+    pharmacy: item.pharmacy,
+    prescriptionConfirmed: Boolean(item.institutionReview),
+    insuranceApproved: Boolean(item.insuranceReview),
+    settlementReceipt: false,
+    inventoryConfirmed: Boolean(item.inventoryStatus),
+    pharmacyCallback: Boolean(item.callbackExternalId || item.pickupConfirmedAt),
+    closed: false,
+    closureStatus: "static-preview",
+    missing: ["runtime reconciliation evidence"]
+  }));
+  return { summary: { pickups: rows.length, closed: 0, exceptions: rows.length }, rows };
+}
+
+function renderChronicPharmacyInsuranceClosure(state) {
+  const summaryEl = document.querySelector("#chronic-pharmacy-insurance-summary");
+  const metricsEl = document.querySelector("#chronic-pharmacy-insurance-metrics");
+  const rowsEl = document.querySelector("#chronic-pharmacy-insurance-rows");
+  if (!summaryEl || !metricsEl || !rowsEl) return;
+  const report = state.chronicPharmacyInsuranceClosure || fallbackChronicPharmacyInsuranceClosure(state);
+  const summary = report.summary || {};
+  summaryEl.textContent = `${summary.closed || 0}/${summary.pickups || 0} medication closures complete`;
+  metricsEl.innerHTML = [
+    ["Prescription", summary.prescriptionsConfirmed || 0],
+    ["Insurance", summary.insuranceApproved || 0],
+    ["Settlement", summary.settlementReceipts || 0],
+    ["Pharmacy callback", summary.pharmacyCallbacks || 0]
+  ].map(([label, value]) => `<article class="claim-card"><strong>${label}</strong><span>${value}<br>authorized evidence rows</span></article>`).join("");
+  rowsEl.innerHTML = (report.rows || []).map((item) => `<section class="item"><div><h3>${item.residentName || residentOf(state, item.residentId)?.name || item.residentId} 路 ${item.medication}</h3><p>${item.pharmacy || "pharmacy pending"} 路 long prescription ${item.longPrescription || "pending"} 路 claim ${item.claimId || "unlinked"}</p><p>Prescription ${item.prescriptionConfirmed ? "confirmed" : "pending"} 路 insurance ${item.insuranceApproved ? "approved" : "pending"} 路 settlement ${item.settlementReceipt ? "received" : "pending"} 路 callback ${item.pharmacyCallback ? "received" : "pending"}</p><p>${item.closed ? "Closure evidence retained" : `Next: ${(item.missing || []).join(", ")}`}</p></div><span class="badge ${item.closed ? "info" : "warn"}">${item.closed ? "closed" : item.closureStatus || "open"}</span></section>`).join("") || `<p class="muted">No medication closure records are available in the current scope.</p>`;
+}
+
+function fallbackChronicProductionSafety() {
+  return {
+    functionalState: "static-preview",
+    formalGoLiveState: "site-evidence-pending",
+    summary: { controls: 0, controlsPassed: 0, blockers: 1 },
+    checks: [],
+    blockers: [{ name: "Runtime production evidence", nextAction: "Open the Node API with an authorized institution or commission account to view environment and cutover controls." }]
+  };
+}
+
+function renderChronicProductionSafety(state) {
+  const summaryEl = document.querySelector("#chronic-production-safety-summary");
+  const checksEl = document.querySelector("#chronic-production-safety-checks");
+  const blockersEl = document.querySelector("#chronic-production-safety-blockers");
+  if (!summaryEl || !checksEl || !blockersEl) return;
+  const report = state.chronicProductionSafety || fallbackChronicProductionSafety();
+  const summary = report.summary || {};
+  summaryEl.textContent = `${report.formalGoLiveState || "site-evidence-pending"} 路 ${summary.controlsPassed || 0}/${summary.controls || 0} controls`;
+  checksEl.innerHTML = [
+    ["Functional state", report.functionalState || "pending"],
+    ["Formal go-live", report.formalGoLiveState || "pending"],
+    ["Controls passed", `${summary.controlsPassed || 0}/${summary.controls || 0}`],
+    ["Open blockers", summary.blockers || 0]
+  ].map(([label, value]) => `<article class="claim-card"><strong>${label}</strong><span>${value}<br>no secret values exposed</span></article>`).join("");
+  blockersEl.innerHTML = (report.blockers || []).map((item) => `<section class="item"><div><h3>${item.name}</h3><p>${item.source || "production control"}</p><p>${item.nextAction || "complete and retain acceptance evidence"}</p></div><span class="badge warn">pending</span></section>`).join("") || `<p class="muted">No unresolved production-safety controls are reported. Formal approval remains a separate governance decision.</p>`;
 }
 
 async function recordChronicReferralContinuity(referralId) {

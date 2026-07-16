@@ -76,15 +76,15 @@ const CAPABILITY_TRACKS = [
     name: "Medication support, long prescription and insurance closure",
     sourceCategories: ["policy-standards", "dalian-planning", "sanming-yuxi-case"],
     dataCollections: ["medicationPickups", "insuranceClaims", "chronicPharmacyInsuranceLinks"],
-    apiMarkers: ["/api/chronic/pharmacy-callbacks", "/api/chronic-medication-support"],
-    docMarkers: ["docs/chronic-launch-core.md", "docs/chronic-followup-readiness.md"]
+    apiMarkers: ["/api/chronic/pharmacy-callbacks", "/api/chronic-medication-support", "/api/chronic/pharmacy-insurance-closure"],
+    docMarkers: ["docs/chronic-launch-core.md", "docs/chronic-followup-readiness.md", "docs/chronic-institution-interfaces.md"]
   },
   {
     id: "institution-integration-launch",
     name: "Institution integration and launch core",
     sourceCategories: ["dalian-planning", "system-design", "repo-evidence"],
     dataCollections: ["chronicExternalIntegrations", "chronicLaunchCoreSignoffs", "chronicIdentityScopes", "personalRecords"],
-    apiMarkers: ["/api/chronic/institution-interfaces", "/api/chronic/launch-core", "/api/chronic/archive-standard", "/api/chronic/referral-continuity"],
+    apiMarkers: ["/api/chronic/institution-interfaces", "/api/chronic/launch-core", "/api/chronic/production-safety", "/api/chronic/archive-standard", "/api/chronic/referral-continuity"],
     docMarkers: ["docs/chronic-institution-interfaces.md", "docs/chronic-launch-core.md"]
   },
   {

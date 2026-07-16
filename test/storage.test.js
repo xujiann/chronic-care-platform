@@ -264,6 +264,8 @@ test("SQLite writes enqueue PostgreSQL changes in the same transactional outbox"
   const storage = require(serverPath);
   try {
     storage.ensureDatabase();
+    // Persist newly introduced seed and derived collections before isolating the resident-only change.
+    storage.writeDatabase(storage.readDatabase());
     withDatabase(storage, (db) => db.prepare("DELETE FROM postgres_sync_outbox").run());
     const state = storage.readDatabase();
     state.residents[0].address = "postgres-outbox-address";
