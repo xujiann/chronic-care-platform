@@ -733,6 +733,38 @@ body.service-paged-mode .citizen-shell {
   font-weight: 800;
 }
 
+.service-call-contract {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 10px;
+  margin-top: 10px;
+  border: 1px solid #d7e8ff;
+  border-radius: 8px;
+  padding: 10px;
+  background: #f3f8ff;
+}
+
+.service-call-contract span {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: #dbeafe;
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.service-call-contract strong {
+  margin: 0;
+  font-size: 13px;
+}
+
+.service-call-contract small {
+  grid-column: 1 / -1;
+  color: #375569;
+  font-size: 12px;
+}
+
 .service-summary span,
 .service-summary strong,
 .service-summary small {
@@ -2427,6 +2459,87 @@ body.service-paged-mode .citizen-shell {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
+.service-order-center-panel {
+  margin-bottom: 16px;
+}
+
+.service-order-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.service-order-metrics article,
+.service-order-card {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fbfd;
+}
+
+.service-order-metrics strong,
+.service-order-metrics span,
+.service-order-metrics small {
+  display: block;
+}
+
+.service-order-metrics strong {
+  color: var(--ink);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.service-order-metrics span {
+  margin-top: 6px;
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.service-order-metrics small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.service-order-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+}
+
+.service-order-card {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.service-order-card > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.service-order-card > div:first-child span {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: #e8f6ef;
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.service-order-card h3,
+.service-order-card p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .service-task-card {
   display: grid;
   gap: 8px;
@@ -2740,6 +2853,14 @@ dialog::backdrop {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .service-order-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .service-order-grid {
+    grid-template-columns: 1fr;
+  }
+
   .service-command-panel {
     gap: 8px;
     order: 4;
@@ -2795,6 +2916,10 @@ dialog::backdrop {
     width: 100%;
     min-height: 50px;
     font-size: 15px;
+  }
+
+  .service-call-contract {
+    grid-template-columns: 1fr;
   }
 
   .service-subnav {
@@ -3242,4 +3367,17 @@ dialog::backdrop {
   .dataset-row small {
     grid-column: 1 / -1;
   }
+}
+.physical-exam-meta {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-left: 3px solid #2a7f73;
+  border-radius: 8px;
+  background: #eef8f6;
+}
+
+.physical-exam-meta p {
+  margin: 4px 0;
+  color: #365b56;
+  font-size: 13px;
 }

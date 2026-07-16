@@ -512,6 +512,8 @@ function buildChronicRiskStratification(data) {
     const overdueFollowups = openFollowups.filter((item) => item.status === "已逾期" || String(item.plannedAt || "") < today);
     const planPending = residentPlans.filter((item) => item.status !== "已复核");
     const selfAlerts = residentSelf.filter((item) => /预警|复核|异常|偏高/.test(`${item.status || ""}${item.latestValue || ""}${item.nextAction || ""}`));
+    const physicalExamScreenings = openScreenings.filter((item) => item.sourceType === "physical-exam");
+    const physicalExamRiskContribution = Math.min(30, physicalExamScreenings.reduce((sum, item) => sum + Number(item.riskScoreContribution || 0), 0));
     const risk = assessRisk(resident);
     const highRisk = risk.level === "高危" || residentScreenings.some((item) => item.riskLevel === "高危") || residentPlans.some((item) => item.grade === "高危");
     const score = Math.min(100,
@@ -521,6 +523,7 @@ function buildChronicRiskStratification(data) {
       selfAlerts.length * 10 +
       planPending.length * 8 +
       residentComorbidity.length * 6 +
+      physicalExamRiskContribution +
       (highRisk ? 12 : 0)
     );
     const priority = score >= 80 ? "high" : score >= 55 ? "medium" : "routine";
@@ -528,6 +531,7 @@ function buildChronicRiskStratification(data) {
       highRisk ? `风险分层：${risk.level}` : "",
       overdueFollowups.length ? `逾期随访 ${overdueFollowups.length} 项` : "",
       openScreenings.length ? `筛查未闭环 ${openScreenings.length} 项` : "",
+      physicalExamScreenings.length ? `体检异常 ${physicalExamScreenings.length} 份` : "",
       selfAlerts.length ? `自测/家属预警 ${selfAlerts.length} 项` : "",
       planPending.length ? `管理方案待复核 ${planPending.length} 项` : "",
       residentComorbidity.length ? "多病共管" : ""
@@ -554,11 +558,12 @@ function buildChronicRiskStratification(data) {
       openCounts: {
         overdueFollowups: overdueFollowups.length,
         openScreeningTasks: openScreenings.length,
+        physicalExamAbnormal: physicalExamScreenings.length,
         selfAlerts: selfAlerts.length,
         planReviews: planPending.length,
         comorbidityPlans: residentComorbidity.length
       },
-      nextAction: chronicRiskNextAction({ priority, overdueFollowups, openScreenings, selfAlerts, planPending, residentComorbidity }),
+      nextAction: chronicRiskNextAction({ priority, overdueFollowups, openScreenings, physicalExamScreenings, selfAlerts, planPending, residentComorbidity }),
       dueAt
     };
   }).sort((left, right) => right.score - left.score || String(left.dueAt || "").localeCompare(String(right.dueAt || "")));
@@ -576,8 +581,9 @@ function buildChronicRiskStratification(data) {
   };
 }
 
-function chronicRiskNextAction({ priority, overdueFollowups, openScreenings, selfAlerts, planPending, residentComorbidity }) {
+function chronicRiskNextAction({ priority, overdueFollowups, openScreenings, physicalExamScreenings = [], selfAlerts, planPending, residentComorbidity }) {
   if (overdueFollowups.length) return "补齐随访记录，必要时由家庭医生电话复核并登记结果。";
+  if (physicalExamScreenings.length) return "复核体检异常证据，更新慢病风险分层，并确认家医服务包与复测/转诊安排。";
   if (openScreenings.length) return "完成筛查评估、检查申请或干预推送，并回写风险分级。";
   if (selfAlerts.length) return "复核居民端自测异常，判断是否升级重点随访或转诊。";
   if (planPending.length) return "复核分级管理方案，明确下次随访频次和指标目标。";

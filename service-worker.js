@@ -1,4 +1,4 @@
-const CACHE_NAME = "chronic-care-citizen-v45-registration-journey";
+const CACHE_NAME = "chronic-care-citizen-v47-physical-examination-standards";
 const APP_SHELL = [
   "./",
   "./citizen.html",
@@ -34,6 +34,11 @@ const APP_SHELL = [
   "./auth.js",
   "./auth.js?v=20260627",
   "./health-archive-standard.js",
+  "./physical-examination-standards.js",
+  "./physical-examination-service.js",
+  "./physical-examination.html",
+  "./physical-examination.css",
+  "./physical-examination.js",
   "./immunization-schedule.js",
   "./immunization.html",
   "./immunization.js",

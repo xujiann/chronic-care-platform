@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>体检系统 · 全民健康信息平台</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <link rel="stylesheet" href="./physical-examination.css" />
+    <script src="./auth.js"></script>
+    <script>window.HealthCityAuth.requireRole(["commission", "institution", "citizen"])</script>
+  </head>
+  <body>
+    <main class="portal-shell physical-exam-shell">
+      <header class="physical-exam-hero">
+        <div>
+          <span class="hero-kicker">居民主索引 · 历史报告归集</span>
+          <h1>体检系统</h1>
+          <p>接入体检中心和医院体检结果，完成标准化、幂等去重和健康档案同步，让居民按年度连续查看全部历史体检报告。</p>
+        </div>
+        <div class="hero-actions">
+          <a class="light-button" href="./citizen.html?client=app&page=health-record#service-health-record">居民健康档案</a>
+          <a class="light-button" href="./health-city.html">返回平台</a>
+        </div>
+      </header>
+
+      <section class="metric-grid physical-exam-metrics" id="physical-exam-summary" aria-label="体检系统运行指标"></section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h2>接入通道</h2>
+            <p>统一映射居民主索引、来源机构、报告号、异常项、健康建议和原报告索引。</p>
+          </div>
+          <span class="status-chip ok">接口契约 v1</span>
+        </div>
+        <div class="contract-grid" id="physical-exam-contracts"></div>
+      </section>
+
+      <section class="panel" id="physical-exam-standards-panel">
+        <div class="panel-header">
+          <div><h2>信息化规范基线</h2><p>区分法律强制要求、行业标准和测评依据；生产报告逐份执行规范门禁。</p></div>
+          <span class="status-chip warn">基线 2026-07-15</span>
+        </div>
+        <div class="contract-grid" id="physical-exam-standards"></div>
+      </section>
+
+      <section class="panel" id="physical-exam-quality-panel">
+        <div class="panel-header">
+          <div><h2>国家医疗质控指标</h2><p>按2023年版七项指标采集，并执行2026年度重要异常结果随访改进目标；缺少分母数据时明确显示待采集。</p></div>
+          <span class="status-chip warn">HCHM 2023 / PIT-2026-18</span>
+        </div>
+        <div class="readiness-grid" id="physical-exam-quality-indicators"></div>
+      </section>
+
+      <div class="physical-exam-layout">
+        <section class="panel">
+          <div class="panel-header report-toolbar">
+            <div>
+              <h2>历史体检报告</h2>
+              <p id="physical-exam-report-summary">正在同步健康档案...</p>
+            </div>
+            <label>居民
+              <select id="physical-exam-resident-filter"><option value="">全部可授权居民</option></select>
+            </label>
+            <label>年度
+              <select id="physical-exam-year-filter"><option value="">全部年度</option></select>
+            </label>
+            <button class="primary-action" id="physical-exam-refresh" type="button">刷新</button>
+          </div>
+          <div class="report-list" id="physical-exam-report-list"></div>
+        </section>
+
+        <aside class="panel import-panel" id="physical-exam-import-panel">
+          <div class="panel-header">
+            <div><h2>报告接入演示</h2><p>同一机构与外部报告号重复提交时自动去重；演示签名不计入生产合规。</p></div>
+          </div>
+          <form id="physical-exam-import-form" class="import-form">
+            <label>来源类型<select name="sourceType" required><option value="exam-center">体检中心</option><option value="hospital">医院</option></select></label>
+            <label>居民<select name="residentId" required></select></label>
+            <label>机构编码<input name="institutionId" value="exam-center-demo" required /></label>
+            <label>机构名称<input name="institutionName" value="大连健康体检中心" required /></label>
+            <label>外部数据标识<input name="externalId" required /></label>
+            <label>报告号<input name="reportNo" required /></label>
+            <label>体检日期<input name="examDate" type="date" required /></label>
+            <label class="full">体检结论<textarea name="summary" rows="3" required>年度体检完成，主要项目已同步至居民健康档案。</textarea></label>
+            <label class="full">异常项（每行：项目|结果|单位）<textarea name="abnormalFindings" rows="3" placeholder="血压|152/90|mmHg"></textarea></label>
+            <label class="full">健康建议（每行一项）<textarea name="recommendations" rows="3">按年度持续体检&#10;如有异常请联系家庭医生</textarea></label>
+            <button class="primary-action full" type="submit">接入并同步健康档案</button>
+          </form>
+          <div class="import-result" id="physical-exam-import-result" role="status"></div>
+        </aside>
+      </div>
+
+      <section class="panel operations-panel" id="physical-exam-readiness-panel">
+        <div class="panel-header">
+          <div><h2>上线门禁</h2><p>代码就绪与生产环境、真实机构验收分开判定，阻断项必须有证据才能关闭。</p></div>
+          <span class="status-chip warn" id="physical-exam-readiness-status">等待核验</span>
+        </div>
+        <div class="readiness-grid" id="physical-exam-readiness"></div>
+        <div class="blocker-list" id="physical-exam-blockers"></div>
+      </section>
+
+      <div class="operations-grid operations-panel" id="physical-exam-operations">
+        <section class="panel">
+          <div class="panel-header"><div><h2>异常结果闭环</h2><p>异常报告自动建单，按确认、通知、复查/专科、随访、关闭顺序留痕。</p></div></div>
+          <div class="workflow-list" id="physical-exam-abnormal-cases"></div>
+        </section>
+        <section class="panel">
+          <div class="panel-header"><div><h2>机构联调验收</h2><p>网络、映射、验签、幂等、存储和重试逐项留证后签署。</p></div></div>
+          <div class="workflow-list" id="physical-exam-joint-tests"></div>
+        </section>
+      </div>
+
+      <section class="panel operations-panel" id="physical-exam-gateway-panel">
+        <div class="panel-header"><div><h2>接入事件与死信</h2><p>展示签名接入、落库、幂等回放和失败补偿状态。</p></div></div>
+        <div class="gateway-list" id="physical-exam-gateway-events"></div>
+      </section>
+
+      <section class="panel archive-proof">
+        <div><span>健康档案落点</span><strong>personalRecords / physical-exam</strong><small>居民主索引、授权裁剪和访问审计沿用平台现有能力</small></div>
+        <div><span>签名接入 API</span><strong>POST /api/integration/events</strong><small>HMAC-SHA256 验签、幂等防重、失败死信与人工补偿</small></div>
+        <div><span>居民查询</span><strong>GET /api/physical-exams</strong><small>按授权居民和年度汇总历史体检报告</small></div>
+      </section>
+    </main>
+
+    <dialog id="physical-exam-detail-dialog" class="report-dialog">
+      <div class="dialog-head"><h2>体检报告详情</h2><button type="button" data-close-report>×</button></div>
+      <div id="physical-exam-detail"></div>
+    </dialog>
+    <div class="toast" id="physical-exam-toast" role="status"></div>
+    <script src="./physical-examination-standards.js"></script>
+    <script src="./physical-examination-service.js"></script>
+    <script src="./physical-examination.js"></script>
+  </body>
+</html>

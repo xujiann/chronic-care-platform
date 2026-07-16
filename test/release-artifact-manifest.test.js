@@ -20,6 +20,7 @@ test("release artifact manifest indexes reports templates commands and evidence"
   assert.equal(report.templateReadmes.length, 4);
   assert.equal(report.artifacts.some((item) => item.id === "release-report" && item.command === "release:report"), true);
   assert.equal(report.artifacts.some((item) => item.id === "release-artifact-manifest" && item.command === "release:manifest"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "platform-capability-map" && item.command === "platform:capability-map" && item.markdown === "release/platform-capability-map.md" && item.evidence === "/api/platform/capability-map"), true);
   assert.equal(report.artifacts.some((item) => item.id === "health-platform-system-atlas" && item.command === "release:manifest" && item.markdown === "docs/全系统图谱集.md" && item.evidence === "docs/全系统图谱集.md"), true);
   assert.equal(report.artifacts.some((item) => item.id === "platform-production-audit" && item.command === "platform:production-audit" && item.markdown === "docs/数智医院标准平台全程审计与生产前开发规划.md" && item.evidence === "release/production-cutover-checklist.md"), true);
   assert.equal(report.artifacts.some((item) => item.id === "platform-development-report-20260713" && item.command === "release:report" && item.markdown === "docs/数智医院标准平台开发报告与下一步计划-2026-07-13.md"), true);
@@ -45,6 +46,7 @@ test("release artifact manifest indexes reports templates commands and evidence"
   assert.equal(report.artifacts.some((item) => item.id === "production-deployment-package" && item.command === "deployment:package" && item.markdown === "release/production-deployment-package.md" && item.evidence === "npm run deployment:verify"), true);
   assert.equal(report.artifacts.some((item) => item.id === "multi-practice" && item.command === "multi-practice:readiness" && item.markdown === "release/multi-practice-readiness-report.md" && item.evidence === "/api/multi-practice-registry"), true);
   assert.equal(report.artifacts.some((item) => item.id === "chronic-followup" && item.command === "chronic:followup-readiness"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "chronic-informatization-sources" && item.command === "chronic:informatization-sources" && item.markdown === "release/chronic-informatization-sources.md"), true);
   assert.equal(report.artifacts.some((item) => item.id === "chronic-institution-interfaces" && item.command === "chronic:institution-interfaces"), true);
   assert.equal(report.artifacts.some((item) => item.id === "chronic-launch-core" && item.command === "chronic:launch-core" && item.evidence === "/api/chronic/launch-core"), true);
   assert.equal(report.artifacts.some((item) => item.id === "data-governance" && item.command === "data-governance:readiness" && item.markdown === "release/data-governance-readiness-report.md" && item.evidence === "/api/data-governance"), true);
@@ -88,6 +90,7 @@ test("release artifact manifest renders and writes artifacts", (t) => {
   assert.match(markdown, /Doctor multi-practice readiness report/);
   assert.match(markdown, /Template READMEs/);
   assert.match(markdown, /release-artifact-manifest\.md/);
+  assert.match(markdown, /platform-capability-map\.md/);
   assert.match(markdown, /全系统图谱集\.md/);
   assert.match(markdown, /Health information platform top-level system atlas and development rules/);
   assert.match(markdown, /数智医院标准平台全程审计与生产前开发规划\.md/);

@@ -122,6 +122,17 @@
         <div id="reminder-cards" class="cards"></div>
       </section>
 
+      <section class="panel service-order-center-panel" data-service-pane="health-record">
+        <div class="panel-title">
+          <div>
+            <h2>服务订单中心</h2>
+            <span id="service-order-summary">护理、陪诊、挂号、体检、家医统一查看</span>
+          </div>
+        </div>
+        <div class="service-order-metrics" id="service-order-metrics"></div>
+        <div id="service-order-cards" class="service-order-grid"></div>
+      </section>
+
       <section class="panel citizen-notification-panel" data-service-pane="health-record">
         <div class="panel-title">
           <h2>居民通知</h2>
@@ -221,6 +232,7 @@
           <div class="panel-actions">
             <em class="feature-state ready">已实现</em>
             <span id="vault-updated">持续更新</span>
+            <a class="small-button" href="./physical-examination.html">全部体检报告</a>
             <button class="small-button" id="upload-record">上传资料</button>
             <button class="small-button primary" id="grant-auth">新增授权</button>
           </div>
@@ -555,6 +567,7 @@
           <label>资料类型
             <select name="category" required>
               <option value="labs">检查检验</option>
+              <option value="physical-exam">体检报告</option>
               <option value="emr">电子病历</option>
               <option value="medications">用药处方</option>
               <option value="allergies">过敏史</option>
@@ -597,6 +610,8 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="./health-archive-standard.js"></script>
+    <script src="./physical-examination-standards.js"></script>
+    <script src="./physical-examination-service.js"></script>
     <script src="./immunization-schedule.js"></script>
     <script src="./citizen.js?v=20260710journey"></script>
     <script>

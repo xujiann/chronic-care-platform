@@ -20,7 +20,7 @@
           
           <a href="./public-health.html">公共卫生</a>
           <a href="./digital-hospital-standards.html">数智医院标准</a>
-          <a href="./quality-safety.html">Quality safety</a><a href="./escort.html">助医陪诊</a><a href="./health-city.html">系统总览</a>
+          <a href="./quality-safety.html">Quality safety</a><a href="./emergency.html">院前急救</a><a href="./escort.html">助医陪诊</a><a href="./health-city.html">系统总览</a>
           <a href="./about.html">关于</a>
           <a href="./regional-data-sharing.html">区域共享</a>
           <a href="./workbench.html">运营工作台</a>
@@ -31,6 +31,20 @@
       </header>
 
       <section class="metric-grid" id="platform-metrics"></section>
+
+      <section class="panel" id="platform-capability-map-panel">
+        <div class="panel-title">
+          <h2>平台功能总览</h2>
+          <span id="platform-capability-map-status" class="badge warn">等待汇总</span>
+        </div>
+        <div class="action-row">
+          <button class="primary-button" type="button" id="export-platform-capability-map">导出功能总览</button>
+          <span class="muted">汇总 release manifest、package scripts、readiness 报告和数据集合。</span>
+        </div>
+        <div id="platform-capability-map-metrics" class="metric-grid"></div>
+        <div id="platform-capability-map-risks" class="evidence-grid"></div>
+        <div id="platform-capability-map-domains" class="evidence-grid"></div>
+      </section>
 
       <section class="portal-grid">
         <article class="panel wide">

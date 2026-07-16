@@ -17,11 +17,14 @@ test("chronic institution interface report covers pre-launch contracts", () => {
   const report = buildChronicInstitutionInterfaceReport({ data });
 
   assert.equal(report.ok, true);
-  assert.equal(report.summary.contracts, 9);
-  assert.equal(report.summary.readyContracts, 9);
+  assert.equal(report.summary.contracts, 12);
+  assert.equal(report.summary.readyContracts, 12);
   assert.equal(report.contracts.every((item) => item.routeReady && item.docReady && item.testReady), true);
   assert.equal(report.contracts.some((item) => item.id === "chronic-device-measurement-v1" && item.requiredFields.includes("externalId?")), true);
   assert.equal(report.contracts.some((item) => item.id === "chronic-followup-escalation-v1" && item.path === "/api/chronic/followup-escalations"), true);
+  assert.equal(report.contracts.some((item) => item.id === "chronic-referral-continuity-v1" && item.path === "/api/chronic/referral-continuity"), true);
+  assert.equal(report.contracts.some((item) => item.id === "chronic-archive-standard-v1" && item.path === "/api/chronic/archive-standard"), true);
+  assert.equal(report.contracts.some((item) => item.id === "chronic-pathway-quality-v1" && item.path === "/api/chronic/pathway-quality"), true);
   assert.equal(report.launchEvidence.authorization, true);
   assert.equal(report.launchEvidence.seedEvidence, true);
 });
@@ -49,4 +52,7 @@ test("chronic institution interface report renders and writes release artifacts"
   assert.match(markdown, /chronic-pharmacy-callback-v1/);
   assert.equal(JSON.parse(fs.readFileSync(written.output, "utf8")).ok, true);
   assert.match(fs.readFileSync(written.markdown, "utf8"), /chronic-followup-escalation-v1/);
+  assert.match(fs.readFileSync(written.markdown, "utf8"), /chronic-referral-continuity-v1/);
+  assert.match(fs.readFileSync(written.markdown, "utf8"), /chronic-archive-standard-v1/);
+  assert.match(fs.readFileSync(written.markdown, "utf8"), /chronic-pathway-quality-v1/);
 });

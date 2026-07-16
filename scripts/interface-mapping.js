@@ -100,6 +100,20 @@ const FIELD_MAPPINGS = {
       institution: "institution",
       metrics: "metrics"
     }
+  },
+  "physical-exam-report-v1": {
+    targetCollection: "personalRecords",
+    owner: "physical-examination-integration",
+    fields: {
+      externalId: "source.externalId",
+      residentId: "residentId",
+      sourceType: "source.type",
+      institutionId: "source.institutionId",
+      institutionName: "sourceInstitution",
+      examDate: "recordDate",
+      summary: "summary",
+      "sourceType+institutionId+externalId": "source.idempotencyKey"
+    }
   }
 };
 

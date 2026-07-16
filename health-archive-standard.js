@@ -107,6 +107,7 @@
     const age = ageOf(resident.birthDate);
     const diseases = diseaseNames(state, residentId);
     const emrs = recordsOf(state, residentId, "emr");
+    const physicalExams = recordsOf(state, residentId, "physical-exam");
     const labs = recordsOf(state, residentId, "labs");
     const meds = recordsOf(state, residentId, "medications");
     const allergies = recordsOf(state, residentId, "allergies");
@@ -129,6 +130,7 @@
     if (hasDisease(state, residentId, ["精神", "分裂"])) addEvidence(evidence, "HRB04.04", "严重精神障碍管理记录");
     if (age >= 60 || seniorServices.length) addEvidence(evidence, "HRB04.05", `老年健康/适老服务 ${seniorServices.length} 项`);
     if (emrs.length) addEvidence(evidence, "HRC00.01", `门诊和诊疗摘要 ${emrs.length} 条`);
+    if (physicalExams.length) addEvidence(evidence, "HRC00.04", `成人健康体检报告 ${physicalExams.length} 份`);
     if (labs.length) addEvidence(evidence, "HRC00.04", `检查检验 ${labs.length} 条`);
     if (meds.length) addEvidence(evidence, "HRC00.01", `用药处方 ${meds.length} 条`);
     if (admissions.some((item) => /住院|入院/.test(`${item.name}${item.result}`))) {
@@ -158,7 +160,7 @@
       problems: diseases.length ? diseases : ["暂无慢病登记"],
       activities: [
         { title: "预防", detail: `接种 ${vaccines.length} 条，风险监测 ${resident.metrics ? "已记录" : "待补齐"}` },
-        { title: "医疗", detail: `电子病历 ${emrs.length} 条，检查检验 ${labs.length} 条，用药 ${meds.length} 条` },
+        { title: "医疗", detail: `电子病历 ${emrs.length} 条，体检报告 ${physicalExams.length} 份，检查检验 ${labs.length} 条，用药 ${meds.length} 条` },
         { title: "保健/康复", detail: `随访 ${followups.length} 项，适老服务 ${seniorServices.length} 项` },
         { title: "健康教育", detail: pickups.length ? `固定取药 ${pickups.length} 项，用药依从性提醒` : "待补充健康教育记录" }
       ],

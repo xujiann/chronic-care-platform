@@ -99,6 +99,39 @@ Runtime audit endpoint: `GET /api/chronic/institution-interfaces`.
 - Writes: `seniorServices`, `taskMessages`, `securityEvents`, `dataAccessLogs`
 - Launch check: SMS, phone, or in-app reminder evidence is visible in readiness reports.
 
+### chronic-referral-continuity-v1
+
+- Endpoint: `GET /api/chronic/referral-continuity` and `POST /api/chronic/referral-continuity`
+- Owner: county referral center and primary-care institution
+- Roles: `GET` supports `citizen`, `institution`, `commission`; `POST` supports `institution`, `commission`
+- Direction: referral handoff and primary-care return-management evidence
+- Required POST body fields: `referralId`
+- Optional POST fields: `externalId`, `primaryCareAccepted`, `archiveUpdated`, `familyRiskPrompted`, `nextFollowupAt`, `receivingFeedback`, `servicePack`, `result`
+- Writes: `referralSystem.referrals[].continuity`, `personalRecords`, `taskMessages`, `securityEvents`, `dataAccessLogs`
+- Launch check: specialist report return, primary-care acceptance, electronic health archive update, archive-standard mapping summary, family risk prompt, and next follow-up are visible as separate evidence fields. A complete field map is reported separately from the original handoff status.
+
+### chronic-archive-standard-v1
+
+- Endpoint: `GET /api/chronic/archive-standard`
+- Owner: health archive and chronic-care integration
+- Roles: `citizen`, `institution`, `commission`
+- Direction: platform field-coverage report to institution or resident portal
+- Required query fields: optional `residentId`
+- Response fields: `standardVersion`, `summary`, `dimensions`
+- Standard basis: `WS/T 363/364-2023`, including identification, health history, health risks, physical examination/laboratory evidence, diagnosis, assessment, intervention, and health management.
+- Launch check: the response separates fully mapped dimensions from `needs-source-mapping` gaps; live external-field mapping and source-system signatures remain on-site acceptance evidence.
+
+### chronic-pathway-quality-v1
+
+- Endpoint: `GET /api/chronic/pathway-quality`
+- Owner: chronic quality office
+- Roles: `citizen`, `institution`, `commission`
+- Direction: authorized disease-pathway and quality-evidence report
+- Required query fields: optional `residentId`
+- Response fields: `summary`, `diseasePathways`, `indicators`, `sourceBoundary`
+- Evidence basis: disease registry models, management plans, follow-ups, medication closure, referral return, archive field coverage, and sampling governance.
+- Launch check: calculated indicators are evidence coverage for the authorized platform scope; formal regional assessment still requires approved denominator definitions, source-system reconciliation, sampling records, and expert signoff.
+
 ### chronic-followup-escalation-v1
 
 - Endpoint: `POST /api/chronic/followup-escalations`
@@ -157,7 +190,7 @@ Runtime audit endpoint: `GET /api/chronic/institution-interfaces`.
 
 ## Pre-Launch Acceptance
 
-- Run `npm run chronic:institution-interfaces` and confirm all 8 contracts pass.
+- Run `npm run chronic:institution-interfaces` and confirm all active contracts pass.
 - Run `npm run chronic:followup-readiness` and confirm `field-integration-closure` passes.
 - Run `npm run release:report` and confirm `chronicFollowup:institutionInterfaces` and `chronicFollowup:fieldIntegration` pass.
 - Confirm site-specific interface signoff remains a production cutover item through `CUTOVER_SITE_INTERFACE_SIGNOFF`.

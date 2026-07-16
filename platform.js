@@ -76,6 +76,7 @@ const PLATFORM_STORAGE_KEY = "chronic-care-platform-state";
 let platformState = structuredClone(fallbackPlatformState);
 let platformData = null;
 let activeEditSnapshot = null;
+let platformCapabilityMap = null;
 let platformCapabilityOperationsCenter = {
   productionReady: false,
   summary: { capabilityDomains: 0, repositoryEvidenceReady: 0, reviewedPreproduction: 0, improvementRequired: 0, pendingReview: 0, evidenceRecorded: 0, productionReady: 0, mvpRequiredModules: 0, productionBlockers: 0, blockersOpen: 0, blockersInProgress: 0, blockerEvidenceSubmitted: 0, blockerEvidenceReviewed: 0, blockerEvidenceRecorded: 0 },
@@ -264,6 +265,7 @@ const defaultApplicationCatalog = [
   { id: "app-chronic", name: "慢病医防融合管理", sourceSystem: "慢病管理平台", interfaceMode: "模块纳管", owner: "基层卫生处/疾控", reuseMode: "业务与数据复用", batch: "第一批", evidence: "筛查随访闭环/接口清单", status: "已纳管", next: "挂接专病库版本和科研数据集目录。" },
   { id: "app-county", name: "县域医共体协同", sourceSystem: "医共体信息平台", interfaceMode: "API/能力复用", owner: "医政医管处", reuseMode: "协同中心复用", batch: "第二批", evidence: "16255 功能清单/工单样例", status: "已纳管", next: "补齐区级实施批次和培训证据。" },
   { id: "app-institution", name: "医疗机构业务协同", sourceSystem: "HIS/EMR/LIS/PACS", interfaceMode: "标准接口", owner: "医疗机构", reuseMode: "门户集成+数据回流", batch: "第二批", evidence: "字段映射/联调记录", status: "演示对接完成", next: "现场按机构登记真实接口环境、版本和联调责任人。" },
+  { id: "app-physical-exam", name: "区域体检系统", sourceSystem: "体检中心/HIS/EMR", interfaceMode: "标准接口+报告回流", owner: "医疗机构/体检中心", reuseMode: "居民主索引+健康档案复用", batch: "第二批", evidence: "physical-examination.html / /api/physical-exams", status: "演示对接完成", next: "按试点机构确认体检项目字典、报告签章和原报告存储地址。" },
   { id: "app-citizen", name: "健康大连居民服务", sourceSystem: "居民端/健康码", interfaceMode: "统一入口", owner: "基层卫生处", reuseMode: "入口整合", batch: "第三批", evidence: "居民旅程/授权记录", status: "已纳管", next: "接入政务身份源和正式消息服务。" },
   { id: "app-insurance", name: "医保结算监管协同", sourceSystem: "医保核心平台", interfaceMode: "接口接入", owner: "医保局/医保中心", reuseMode: "业务协同", batch: "第三批", evidence: "结算审核/凭证核验样例", status: "演示对接完成", next: "确认生产接口规范和联调窗口。" }
 ];
@@ -420,6 +422,7 @@ const defaultCommercialCryptoCapabilities = [
 
 document.addEventListener("DOMContentLoaded", async () => {
   platformState = await loadPlatformState(fallbackPlatformState);
+  await loadPlatformCapabilityMap();
   await loadPlatformCapabilityOperationsCenter();
   await loadCommercialCryptoCenter();
   await loadPostgresReconciliationCenter();
@@ -434,6 +437,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 function renderPlatform() {
   platformData = platformModel(platformState);
   renderMetrics(platformState, platformData);
+  renderPlatformCapabilityMap();
   renderCapabilities(platformState, platformData.capabilities);
   renderIntegrationRegistry(platformData.integrations);
   renderInterfacePlan(platformData.interfaces);
@@ -578,6 +582,64 @@ function renderMetrics(state, platform) {
       <span>${label}</span>
       <strong>${value}</strong>
       <small>${hint}</small>
+    </article>
+  `).join("");
+}
+
+function renderPlatformCapabilityMap() {
+  const statusTarget = document.querySelector("#platform-capability-map-status");
+  const metricsTarget = document.querySelector("#platform-capability-map-metrics");
+  const risksTarget = document.querySelector("#platform-capability-map-risks");
+  const domainsTarget = document.querySelector("#platform-capability-map-domains");
+  if (!statusTarget || !metricsTarget || !domainsTarget) return;
+  if (!platformCapabilityMap) {
+    statusTarget.textContent = PLATFORM_API_BASE ? "等待功能总览 API" : "静态预览需连接动态后端";
+    statusTarget.className = "badge warn";
+    metricsTarget.innerHTML = `
+      <article class="metric-card">
+        <span>动态 API</span>
+        <strong>/api/platform/capability-map</strong>
+        <small>连接 Node 后端后汇总 release、scripts、readiness 和数据集合</small>
+      </article>
+    `;
+    domainsTarget.innerHTML = `<article class="evidence-card"><h3>功能总览未加载</h3><p>静态预览不会伪造发布工件和 readiness 结果，请在动态服务下查看。</p></article>`;
+    return;
+  }
+  const summary = platformCapabilityMap.summary || {};
+  const riskRegister = platformCapabilityMap.riskRegister || {};
+  statusTarget.textContent = platformCapabilityMap.ok ? "功能总览已生成" : "存在需关注证据";
+  statusTarget.className = platformCapabilityMap.ok ? "badge success" : "badge warn";
+  const metricRows = [
+    ["发布工件", summary.releaseArtifacts || 0, `${summary.releaseEvidencePresent || 0} 个已有报告/文档证据`],
+    ["脚本", summary.packageScripts || 0, `${summary.readinessScripts || 0} 个 readiness/report 脚本`],
+    ["数据集合", summary.dataCollections || 0, `${summary.totalRecords || 0} 条快照记录`],
+    ["能力域", summary.capabilityDomains || 0, `${summary.releaseAttention || 0} 个需关注工件`],
+    ["生产脚本", summary.productionScripts || 0, "部署、数据库、审计、身份和上线检查"],
+    ["测试脚本", summary.testScripts || 0, "聚焦测试和全量测试入口"]
+  ];
+  metricsTarget.innerHTML = metricRows.map(([label, value, hint]) => `
+    <article class="metric-card">
+      <span>${platformEscapeHtml(label)}</span>
+      <strong>${platformEscapeHtml(value)}</strong>
+      <small>${platformEscapeHtml(hint)}</small>
+    </article>
+  `).join("");
+  if (risksTarget) {
+    const riskItems = (riskRegister.items || []).slice(0, 8);
+    risksTarget.innerHTML = riskItems.length ? riskItems.map((item) => `
+      <article class="evidence-card" data-capability-map-risk="${platformEscapeHtml(item.id)}">
+        <h3>${platformEscapeHtml(item.severity || "P2")} ${platformEscapeHtml(item.title || item.source || "Risk")}</h3>
+        <p>${platformEscapeHtml(item.nextAction || "Awaiting evidence closure.")}</p>
+        <small>${platformEscapeHtml(item.source || "source")} / ${platformEscapeHtml(item.owner || "unassigned")} / ${platformEscapeHtml(item.status || "open")}</small>
+      </article>
+    `).join("") : `<article class="evidence-card"><h3>No open risk register items</h3><p>Release artifacts and onsite blockers have no current attention rows.</p></article>`;
+  }
+  const domains = (platformCapabilityMap.domains || []).slice(0, 12);
+  domainsTarget.innerHTML = domains.map((item) => `
+    <article class="evidence-card" data-capability-map-domain="${platformEscapeHtml(item.id)}">
+      <h3>${platformEscapeHtml(item.title)}</h3>
+      <p>${platformEscapeHtml(item.artifacts)} 个发布工件 / ${platformEscapeHtml(item.evidencePresent)} 个证据文件 / ${platformEscapeHtml(item.scripts)} 个脚本</p>
+      <small>数据集合 ${platformEscapeHtml(item.collections)} 个；关注项 ${platformEscapeHtml(item.attention || 0)} 个</small>
     </article>
   `).join("");
 }
@@ -2020,6 +2082,7 @@ function bindPlatformEditor() {
   });
 
   document.querySelector("#export-platform-report")?.addEventListener("click", exportPlatformReport);
+  document.querySelector("#export-platform-capability-map")?.addEventListener("click", exportPlatformCapabilityMap);
   const filters = document.querySelector("#platform-report-filters");
   filters?.addEventListener("input", refreshReportSummary);
   filters?.addEventListener("change", refreshReportSummary);
@@ -2029,6 +2092,18 @@ function bindPlatformEditor() {
     });
     refreshReportSummary();
   });
+}
+
+async function loadPlatformCapabilityMap() {
+  if (!PLATFORM_API_BASE) return;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  try {
+    const response = await request(`${PLATFORM_API_BASE}/platform/capability-map`);
+    if (!response.ok) return;
+    platformCapabilityMap = await response.json();
+  } catch (error) {
+    platformCapabilityMap = null;
+  }
 }
 
 async function loadPlatformCapabilityOperationsCenter() {
@@ -2931,6 +3006,34 @@ function exportPlatformReport() {
     ""
   ];
   downloadText(`全民健康信息平台建设周报素材-${todayStamp()}.md`, lines.join("\n"));
+}
+
+async function exportPlatformCapabilityMap() {
+  if (!PLATFORM_API_BASE) {
+    downloadText(`平台功能总览-${todayStamp()}.md`, [
+      "# 平台功能总览",
+      "",
+      "当前为静态预览模式，无法读取 `/api/platform/capability-map`。",
+      "",
+      "请启动 Node 后端后重新导出，以汇总 release manifest、package scripts、readiness 报告和数据集合。"
+    ].join("\n"));
+    return;
+  }
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  try {
+    const response = await request(`${PLATFORM_API_BASE}/platform/capability-map?format=markdown`);
+    const text = await response.text();
+    if (!response.ok) throw new Error(text || `HTTP ${response.status}`);
+    downloadText(`平台功能总览-${todayStamp()}.md`, text);
+  } catch (error) {
+    downloadText(`平台功能总览导出失败-${todayStamp()}.md`, [
+      "# 平台功能总览导出失败",
+      "",
+      `错误：${error.message || "unknown error"}`,
+      "",
+      "请确认登录角色为卫生健康委管理端，并检查动态后端是否可访问。"
+    ].join("\n"));
+  }
 }
 
 function filterLabel(filters) {

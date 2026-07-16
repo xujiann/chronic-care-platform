@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const fs = require("node:fs");
 const path = require("node:path");
+const { buildChronicInformatizationSourceReport } = require("./chronic-informatization-sources");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "chronic-followup-readiness-report.json");
@@ -110,6 +111,11 @@ function buildPolicyAlignment(data, feedback, followupMessages) {
       id: "policy-feedback-dispatch",
       evidence: "taskMessages[chronicFollowup=true]",
       count: followupMessages.filter((item) => item.residentId && item.targetRole).length
+    },
+    {
+      id: "policy-referral-continuity",
+      evidence: "referralSystem/referralTeleconsultations/personalRecords[chronic-referral-continuity]",
+      count: buildReferralContinuityEvidence(data).readyRows.length
     }
   ].map((item) => ({
     ...item,
@@ -117,8 +123,34 @@ function buildPolicyAlignment(data, feedback, followupMessages) {
   }));
 }
 
+function buildReferralContinuityEvidence(data) {
+  const referrals = data.referralSystem?.referrals || [];
+  const consultations = data.referralTeleconsultations || [];
+  const records = data.personalRecords || [];
+  const plans = data.chronicManagementPlans || [];
+  const followups = data.followups || [];
+  const rows = referrals.map((referral) => {
+    const continuity = records.find((item) => item.residentId === referral.residentId && item.category === "chronic-referral-continuity" && item.meta?.referralId === referral.id);
+    const consultation = consultations.find((item) => item.referralId === referral.id);
+    const archiveEvidence = records.some((item) => item.residentId === referral.residentId && ["emr", "labs", "physical-exam"].includes(item.category));
+    const isDownReferral = /down|下转/.test(`${referral.type || ""}${consultation?.type || ""}`);
+    const reportReturned = /returned|回传/.test(`${consultation?.status || ""}${consultation?.reportStatus || ""}`);
+    const handoff = Boolean(continuity?.meta?.primaryCareAccepted || (isDownReferral && (/基层承接|承接/.test(String(referral.status || "")) || reportReturned)));
+    const followupPlanned = Boolean(continuity?.meta?.nextFollowupAt || plans.some((item) => item.residentId === referral.residentId) || followups.some((item) => item.residentId === referral.residentId));
+    const archiveUpdated = Boolean(continuity?.meta?.archiveUpdated);
+    const familyRiskPrompted = Boolean(continuity?.meta?.familyRiskPrompted);
+    return { referralId: referral.id, residentId: referral.residentId, isDownReferral, handoff, reportReturned, archiveEvidence, archiveUpdated, familyRiskPrompted, followupPlanned, ready: handoff && reportReturned && archiveEvidence && followupPlanned };
+  });
+  return {
+    rows,
+    readyRows: rows.filter((item) => item.ready),
+    downReferralRows: rows.filter((item) => item.isDownReferral)
+  };
+}
+
 function buildChronicFollowupReadinessReport(options = {}) {
   const data = options.data || readJson("data/db.json");
+  const sourceTraceability = options.sourceTraceability || buildChronicInformatizationSourceReport({ data, pkg: options.pkg });
   const feedback = (data.personalRecords || []).filter((item) => item.category === "chronic-feedback" || item.meta?.followupFeedback);
   const experienceRecords = (data.personalRecords || []).filter((item) => item.category === "chronic-self-checkin" || item.meta?.residentExperience);
   const followupMessages = (data.taskMessages || []).filter((item) => item.chronicFollowup);
@@ -129,6 +161,7 @@ function buildChronicFollowupReadinessReport(options = {}) {
   ].filter(Boolean));
   const feedbackHighRiskCovered = highRiskResidentIds.size > 0 && [...highRiskResidentIds].every((residentId) => feedbackResidentIds.has(residentId));
   const policyAlignment = buildPolicyAlignment(data, feedback, followupMessages);
+  const referralContinuity = buildReferralContinuityEvidence(data);
   const screeningResidents = recordsByResident(data, "chronicScreeningTasks");
   const planResidents = recordsByResident(data, "chronicManagementPlans");
   const followupResidents = recordsByResident(data, "followups");
@@ -252,8 +285,20 @@ function buildChronicFollowupReadinessReport(options = {}) {
     {
       id: "policy-alignment",
       name: "Policy-aligned chronic follow-up evidence",
-      passed: policyAlignment.length >= 7 && policyAlignment.every((item) => item.covered),
+      passed: policyAlignment.length >= 8 && policyAlignment.every((item) => item.covered),
       evidence: "policyAlignment[chronic-followup]"
+    },
+    {
+      id: "referral-continuity",
+      name: "Referral return and primary-care continuity",
+      passed: referralContinuity.downReferralRows.length >= 1 && referralContinuity.readyRows.length >= 1,
+      evidence: "referralSystem/referralTeleconsultations/personalRecords[chronic-referral-continuity]"
+    },
+    {
+      id: "informatization-source-traceability",
+      name: "Chronic informatization source traceability",
+      passed: Boolean(sourceTraceability.ok) && sourceTraceability.summary?.readyCapabilityTracks === sourceTraceability.summary?.capabilityTracks,
+      evidence: "chronic-informatization-sources"
     },
     {
       id: "status-policy",
@@ -297,9 +342,16 @@ function buildChronicFollowupReadinessReport(options = {}) {
       publicHealthLoopReadyStages: publicHealthLoopStages.filter((item) => item.passed).length,
       publicHealthIntegrationLinks: publicHealthIntegrationLinks.length,
       publicHealthReadyIntegrationLinks: publicHealthIntegrationLinks.filter((item) => item.passed).length,
+      informatizationSources: sourceTraceability.summary?.sources || 0,
+      informatizationCategoriesCovered: sourceTraceability.summary?.categoriesCovered || 0,
+      informatizationReadyCapabilityTracks: sourceTraceability.summary?.readyCapabilityTracks || 0,
+      informatizationCapabilityTracks: sourceTraceability.summary?.capabilityTracks || 0,
       immunizationTargets,
       infectiousSignals,
       cdcCommandRows,
+      referralContinuityRows: referralContinuity.rows.length,
+      referralContinuityReadyRows: referralContinuity.readyRows.length,
+      referralFamilyRiskPrompts: referralContinuity.rows.filter((item) => item.familyRiskPrompted).length,
       policyAligned: policyAlignment.filter((item) => item.covered).length,
       policyItems: policyAlignment.length,
       highRiskScreenings: count(data.chronicScreeningTasks, (item) => /\u9ad8\u5371|high/i.test(String(item.riskLevel || ""))),
@@ -310,8 +362,10 @@ function buildChronicFollowupReadinessReport(options = {}) {
     alertQueue,
     residentExperience,
     fieldIntegration,
+    referralContinuity,
     publicHealthLoopStages,
     publicHealthIntegrationLinks,
+    sourceTraceability,
     residentCoverage,
     reusePoints: [
       "chronicScreeningTasks",
@@ -322,11 +376,17 @@ function buildChronicFollowupReadinessReport(options = {}) {
       "birthCertificates",
       "deathCertificates",
       "hospitalOperationSnapshots",
+      "referralSystem",
+      "referralTeleconsultations",
+      "docs/chronic-informatization-source-inventory.md",
       "citizen.html",
       "institution.html"
     ],
     apiSurface: [
       "GET /api/chronic/followup-summary",
+      "GET /api/chronic/archive-standard",
+      "GET /api/chronic/pathway-quality",
+      "GET /api/chronic/referral-continuity",
       "GET /api/chronic/public-health-loop",
       "POST /api/chronic/followup-feedback",
       "POST /api/chronic/resident-checkins",
@@ -334,6 +394,7 @@ function buildChronicFollowupReadinessReport(options = {}) {
       "POST /api/chronic/pharmacy-callbacks",
       "POST /api/chronic/family-doctor-actions",
       "POST /api/chronic/reminder-outreach",
+      "POST /api/chronic/referral-continuity",
       "POST /api/chronic/followup-escalations",
       "POST /api/chronic/followup-dispatch"
     ]
@@ -346,6 +407,8 @@ function renderMarkdown(report) {
   const alertRows = (report.alertQueue || []).slice(0, 12).map((item) => `| ${item.id} | ${item.residentId} | ${item.priority} | ${item.dueBucket} | ${item.dueAt || ""} |`).join("\n");
   const publicHealthRows = (report.publicHealthLoopStages || []).map((item) => `| ${item.id} | ${item.passed ? "PASS" : "FAIL"} | ${item.count} | ${item.evidence} |`).join("\n");
   const publicHealthIntegrationRows = (report.publicHealthIntegrationLinks || []).map((item) => `| ${item.id} | ${item.passed ? "PASS" : "FAIL"} | ${item.count} | ${item.evidence} |`).join("\n");
+  const sourceRows = (report.sourceTraceability?.capabilityTracks || []).map((item) => `| ${item.ready ? "PASS" : "FAIL"} | ${item.id} | ${item.name} | ${item.dataCovered.length}/${item.dataCollections.length} | ${item.apiCovered.length}/${item.apiMarkers.length} | ${item.docsCovered.length}/${item.docMarkers.length} |`).join("\n");
+  const referralRows = (report.referralContinuity?.rows || []).map((item) => `| ${item.referralId} | ${item.handoff ? "Y" : "N"} | ${item.reportReturned ? "Y" : "N"} | ${item.archiveUpdated ? "Y" : "N"} | ${item.familyRiskPrompted ? "Y" : "N"} | ${item.followupPlanned ? "Y" : "N"} | ${item.ready ? "PASS" : "FAIL"} |`).join("\n");
   const residentRows = report.residentCoverage.map((item) => `| ${item.residentId} | ${item.screening ? "Y" : "N"} | ${item.plan ? "Y" : "N"} | ${item.followup ? "Y" : "N"} | ${item.medication ? "Y" : "N"} | ${item.feedback ? "Y" : "N"} |`).join("\n");
   return [
     "# Chronic follow-up readiness report",
@@ -383,6 +446,18 @@ function renderMarkdown(report) {
     "| Link | Status | Count | Evidence |",
     "| --- | --- | --- | --- |",
     publicHealthIntegrationRows,
+    "",
+    "## Informatization source traceability",
+    "",
+    "| Status | Track | Name | Data | API | Docs |",
+    "| --- | --- | --- | --- | --- | --- |",
+    sourceRows,
+    "",
+    "## Referral continuity",
+    "",
+    "| Referral | Primary care handoff | Report returned | Archive updated | Family risk prompt | Follow-up planned | Status |",
+    "| --- | --- | --- | --- | --- | --- |",
+    referralRows,
     "",
     "## Resident coverage",
     "",

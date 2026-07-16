@@ -1222,6 +1222,24 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(releaseManifest.body.artifacts.some((item) => item.id === "release-artifact-manifest"), true);
     assert.equal(releaseManifest.body.templateReadmes.some((item) => item.file === "release/templates/production-signoff/README.md"), true);
 
+    const capabilityMap = await api(baseUrl, "/api/platform/capability-map", authorized(accountLogin.body.token));
+    assert.equal(capabilityMap.response.status, 200);
+    assert.equal(capabilityMap.body.ok, true);
+    assert.equal(capabilityMap.body.summary.releaseArtifacts >= 68, true);
+    assert.equal(capabilityMap.body.summary.packageScripts >= 90, true);
+    assert.equal(capabilityMap.body.summary.dataCollections >= 200, true);
+    assert.equal(capabilityMap.body.summary.openRisks >= 1, true);
+    assert.equal(Array.isArray(capabilityMap.body.riskRegister.items), true);
+    assert.equal(capabilityMap.body.domains.some((item) => item.id === "emergency"), true);
+    assert.equal(capabilityMap.body.artifacts.some((item) => item.id === "release-artifact-manifest"), true);
+
+    const capabilityMapMarkdown = await fetch(`${baseUrl}/api/platform/capability-map?format=markdown`, authorized(accountLogin.body.token));
+    assert.equal(capabilityMapMarkdown.status, 200);
+    const capabilityMapMarkdownText = await capabilityMapMarkdown.text();
+    assert.match(capabilityMapMarkdownText, /Platform capability map/);
+    assert.match(capabilityMapMarkdownText, /Release artifacts/);
+    assert.match(capabilityMapMarkdownText, /Risk Register/);
+
     const managementFunctions = await api(baseUrl, "/api/interoperability/management-functions", authorized(accountLogin.body.token));
     assert.equal(managementFunctions.response.status, 200);
     assert.equal(managementFunctions.body.ok, true);
@@ -1430,6 +1448,39 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(digitalHospitalStandards.body.evidencePackets.every((item) => item.noPatientPii === true), true);
     assert.equal(digitalHospitalStandards.body.riskItems.some((item) => item.severity === "P0" && item.status === "open"), true);
     assert.equal(digitalHospitalStandards.body.checks.some((item) => item.id === "digitalHospitalApi:evidenceBoundary" && item.passed), true);
+    assert.equal(digitalHospitalStandards.body.summary.policies >= 18, true);
+    assert.equal(digitalHospitalStandards.body.summary.policyControls >= 12, true);
+    assert.equal(digitalHospitalStandards.body.policyRegister.some((item) => item.id === "dhp-health-information-plan-14fyp" && item.lifecycleStatus === "historical-plan"), true);
+    assert.equal(digitalHospitalStandards.body.controlMatrix.some((item) => item.domain === "安全合规" && item.goLiveCritical), true);
+
+    const digitalHospitalPolicyRegister = await api(baseUrl, "/api/digital-hospital/policy-register?domain=%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84&bindingLevel=mandatory", authorized(accountLogin.body.token));
+    assert.equal(digitalHospitalPolicyRegister.response.status, 200);
+    assert.equal(digitalHospitalPolicyRegister.body.ok, true);
+    assert.equal(digitalHospitalPolicyRegister.body.policies.length >= 4, true);
+    assert.equal(digitalHospitalPolicyRegister.body.policies.every((item) => item.domains.includes("安全合规") && item.bindingLevel === "mandatory"), true);
+
+    const deniedDigitalHospitalPolicyRegister = await api(baseUrl, "/api/digital-hospital/policy-register", authorized(residentPhoneLogin.body.token));
+    assert.equal(deniedDigitalHospitalPolicyRegister.response.status, 403);
+
+    const invalidDigitalHospitalPolicyReview = await api(baseUrl, "/api/digital-hospital/policy-register/dhp-wst-846-847-2024/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ reviewStatus: "verified-current", reviewNote: "ok", nextReviewAt: "2027-01-31" })
+    }));
+    assert.equal(invalidDigitalHospitalPolicyReview.response.status, 400);
+
+    const digitalHospitalPolicyReview = await api(baseUrl, "/api/digital-hospital/policy-register/dhp-wst-846-847-2024/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "review-policy",
+        reviewStatus: "local-supplement-required",
+        reviewNote: "国家标准已核验，等待属地接口补充要求",
+        nextReviewAt: "2026-10-31"
+      })
+    }));
+    assert.equal(digitalHospitalPolicyReview.response.status, 200);
+    assert.equal(digitalHospitalPolicyReview.body.policy.reviewStatus, "local-supplement-required");
+    assert.equal(digitalHospitalPolicyReview.body.policy.nextReviewAt, "2026-10-31");
+    assert.equal(digitalHospitalPolicyReview.body.standards.ok, true);
 
     const deniedDigitalHospitalStandards = await api(baseUrl, "/api/digital-hospital/standards", authorized(residentPhoneLogin.body.token));
     assert.equal(deniedDigitalHospitalStandards.response.status, 403);
@@ -1637,6 +1688,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
 
     const digitalHospitalAudit = await api(baseUrl, "/api/audit/export?trail=securityEvents", authorized(accountLogin.body.token));
     assert.equal(digitalHospitalAudit.body.securityEvents.some((item) => item.action === "digital-hospital-launch-readiness" && item.target === "/api/digital-hospital/launch-readiness"), true);
+    assert.equal(digitalHospitalAudit.body.securityEvents.some((item) => item.action === "digital-hospital-policy-register" && item.target === "/api/digital-hospital/policy-register"), true);
+    assert.equal(digitalHospitalAudit.body.securityEvents.some((item) => item.action === "digital-hospital-policy-review" && item.target === "dhp-wst-846-847-2024"), true);
     assert.equal(digitalHospitalAudit.body.securityEvents.some((item) => item.action === "digital-hospital-launch-requirement-action" && item.target === "dhlr-site-interface-signoff"), true);
     assert.equal(digitalHospitalAudit.body.securityEvents.some((item) => item.action === "digital-hospital-production-evidence-packets" && item.target === "/api/digital-hospital/production-evidence-packets"), true);
     assert.equal(digitalHospitalAudit.body.securityEvents.some((item) => item.action === "digital-hospital-production-evidence-packet-action" && item.target === "dhpep-specialty-casebook"), true);
@@ -1725,6 +1778,11 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(familyDoctorApplication.response.status, 201);
     assert.equal(familyDoctorApplication.body.application.reviewStatus, "pending");
     assert.equal(familyDoctorApplication.body.application.reviewInstitutionCode, "MR3");
+    const familyDoctorServiceOrders = await api(baseUrl, "/api/service-orders?residentId=r1&serviceType=family-doctor", authorized(citizenLogin.body.token));
+    assert.equal(familyDoctorServiceOrders.response.status, 200);
+    assert.equal(familyDoctorServiceOrders.body.collection, "serviceOrders");
+    assert.equal(familyDoctorServiceOrders.body.schema.sourceCollections.includes("phase2FamilyDoctorApplications"), true);
+    assert.equal(familyDoctorServiceOrders.body.orders.some((item) => item.sourceCollection === "phase2FamilyDoctorApplications" && item.sourceId === familyDoctorApplication.body.application.id), true);
 
     const communityLogin = await login(baseUrl, "community");
     const familyDoctorReview = await api(baseUrl, `/api/phase2/family-doctor-contracts/applications/${familyDoctorApplication.body.application.id}/review`, authorized(communityLogin.body.token, {
@@ -2552,6 +2610,9 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(handoff.body.outpatientQueueNo, "C08");
     assert.equal(handoff.body.departmentCode, "CARD");
     assert.equal(handoff.body.auditTrail[0].action, "hospital-confirmed");
+    const escortServiceOrders = await api(baseUrl, "/api/service-orders?residentId=r1&serviceType=escort", authorized(citizenToken));
+    assert.equal(escortServiceOrders.response.status, 200);
+    assert.equal(escortServiceOrders.body.orders.some((item) => item.sourceCollection === "escortServiceOrders" && item.sourceId === created.body.id && item.serviceType === "escort"), true);
 
     const returnEscortDate = new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const returnCandidate = await api(baseUrl, "/api/escort-services/orders", authorized(citizenToken, {
@@ -2730,6 +2791,9 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(refreshed.body.summary.hisConfirmed >= 1, true);
     assert.equal(refreshed.body.summary.insurancePrechecked >= 1, true);
     assert.equal(refreshed.body.orders.find((item) => item.id === created.body.id).allowedActions.includes("pay-demo"), true);
+    const registrationServiceOrders = await api(baseUrl, "/api/service-orders?residentId=r1&serviceType=registration", authorized(citizenToken));
+    assert.equal(registrationServiceOrders.response.status, 200);
+    assert.equal(registrationServiceOrders.body.orders.some((item) => item.sourceCollection === "registrationOrders" && item.sourceId === created.body.id && item.serviceType === "registration"), true);
 
     const paid = await api(baseUrl, `/api/registrations/orders/${created.body.id}/actions`, authorized(citizenToken, {
       method: "POST",
@@ -3210,6 +3274,9 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(created.body.locationTracePoints.length, 0);
     assert.equal(created.body.notificationDeliveries.some((item) => item.event === "appointment-submitted" && item.channel === "sms" && item.status === "queued"), true);
     assert.equal(created.body.notificationDeliveries.some((item) => item.event === "appointment-submitted" && item.channel === "hospital_message"), true);
+    const nursingServiceOrders = await api(baseUrl, "/api/service-orders?residentId=r1&serviceType=nursing", authorized(citizenToken));
+    assert.equal(nursingServiceOrders.response.status, 200);
+    assert.equal(nursingServiceOrders.body.orders.some((item) => item.sourceCollection === "internetNursingOrders" && item.sourceId === created.body.id && item.serviceType === "nursing"), true);
 
     const hospitalLogin = await login(baseUrl, "hospital");
     const hospitalToken = hospitalLogin.body.token;
@@ -4579,6 +4646,31 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(chronicFollowupSummary.body.policyAlignment.some((item) => item.id === "policy-feedback-dispatch" && item.covered), true);
     assert.equal(chronicFollowupSummary.body.residents.some((item) => item.residentId === "r1" && item.medicationAdherence.total >= 1), true);
 
+    const chronicArchiveStandard = await api(baseUrl, "/api/chronic/archive-standard", authorized(commissionToken));
+    assert.equal(chronicArchiveStandard.response.status, 200);
+    assert.equal(chronicArchiveStandard.body.ok, true);
+    assert.equal(chronicArchiveStandard.body.standardVersion, "WS/T 363/364-2023");
+    assert.equal(chronicArchiveStandard.body.summary.dimensions, 8);
+    assert.equal(chronicArchiveStandard.body.dimensions.some((item) => item.id === "risk-factors" && item.standard.includes("WS/T 363.5-2023")), true);
+
+    const residentArchiveStandard = await api(baseUrl, "/api/chronic/archive-standard?residentId=r1", authorized(citizen.body.token));
+    assert.equal(residentArchiveStandard.response.status, 200);
+    assert.equal(residentArchiveStandard.body.summary.residents, 1);
+
+    const deniedResidentArchiveStandard = await api(baseUrl, "/api/chronic/archive-standard?residentId=r2", authorized(citizen.body.token));
+    assert.equal(deniedResidentArchiveStandard.response.status, 403);
+
+    const chronicPathwayQuality = await api(baseUrl, "/api/chronic/pathway-quality", authorized(commissionToken));
+    assert.equal(chronicPathwayQuality.response.status, 200);
+    assert.equal(chronicPathwayQuality.body.diseasePathways.length >= 2, true);
+    assert.equal(chronicPathwayQuality.body.indicators.length, 5);
+    assert.equal(chronicPathwayQuality.body.diseasePathways.some((item) => item.diseaseType === "hypertension" && item.manualReview), true);
+    const residentPathwayQuality = await api(baseUrl, "/api/chronic/pathway-quality?residentId=r1", authorized(citizen.body.token));
+    const deniedResidentPathwayQuality = await api(baseUrl, "/api/chronic/pathway-quality?residentId=r2", authorized(citizen.body.token));
+    assert.equal(residentPathwayQuality.response.status, 200);
+    assert.equal(residentPathwayQuality.body.summary.residents, 1);
+    assert.equal(deniedResidentPathwayQuality.response.status, 403);
+
     const publicHealthLoop = await api(baseUrl, "/api/chronic/public-health-loop", authorized(commissionToken));
     assert.equal(publicHealthLoop.response.status, 200);
     assert.equal(publicHealthLoop.body.ok, true);
@@ -4620,7 +4712,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const chronicInstitutionInterfaces = await api(baseUrl, "/api/chronic/institution-interfaces", authorized(commissionToken));
     assert.equal(chronicInstitutionInterfaces.response.status, 200);
     assert.equal(chronicInstitutionInterfaces.body.ok, true);
-    assert.equal(chronicInstitutionInterfaces.body.summary.readyContracts, 9);
+    assert.equal(chronicInstitutionInterfaces.body.summary.readyContracts, 12);
     assert.equal(chronicInstitutionInterfaces.body.contracts.some((item) => item.path === "/api/chronic/pharmacy-callbacks" && item.ready), true);
 
     const chronicLaunchCore = await api(baseUrl, "/api/chronic/launch-core", authorized(commissionToken));
@@ -4734,6 +4826,36 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     }));
     assert.equal(reminderOutreach.response.status, 201);
     assert.equal(reminderOutreach.body.seniorService.outreachEvidence, true);
+
+    const referralContinuity = await api(baseUrl, "/api/chronic/referral-continuity", authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({
+        referralId: "rf3",
+        externalId: "referral-api-test-rf3",
+        primaryCareAccepted: true,
+        archiveUpdated: true,
+        familyRiskPrompted: true,
+        nextFollowupAt: "2026-06-28",
+        receivingFeedback: "primary care received the specialist return plan"
+      })
+    }));
+    assert.equal(referralContinuity.response.status, 201);
+    assert.equal(referralContinuity.body.record.category, "chronic-referral-continuity");
+    assert.equal(referralContinuity.body.referral.continuity.archiveUpdated, true);
+
+    const referralContinuityReplay = await api(baseUrl, "/api/chronic/referral-continuity", authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({ referralId: "rf3", externalId: "referral-api-test-rf3" })
+    }));
+    assert.equal(referralContinuityReplay.response.status, 200);
+    assert.equal(referralContinuityReplay.body.idempotent, true);
+
+    const referralContinuitySummary = await api(baseUrl, "/api/chronic/referral-continuity?residentId=r4", authorized(commissionToken));
+    assert.equal(referralContinuitySummary.response.status, 200);
+    assert.equal(referralContinuitySummary.body.rows.some((item) => item.referralId === "rf3" && item.ready), true);
+    const rf3Continuity = referralContinuitySummary.body.rows.find((item) => item.referralId === "rf3");
+    assert.equal(rf3Continuity.archiveMapping.standardVersion, "WS/T 363/364-2023");
+    assert.equal(rf3Continuity.archiveMapping.totalDimensions, 8);
 
     const pharmacyCallbackDenied = await api(baseUrl, "/api/chronic/pharmacy-callbacks", authorized(citizen.body.token, {
       method: "POST",

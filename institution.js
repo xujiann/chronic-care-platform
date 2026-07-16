@@ -1,14 +1,17 @@
-const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], referralTeleconsultations: [], registrationSchedules: [], registrationOrders: [], registrationWaitlistEntries: [], medicationPickups: [], chronicScreeningTasks: [], chronicManagementPlans: [], chronicFollowupStatusPolicy: {}, deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthCertificateDocuments: [], birthStatistics: {}, doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {}, taskMessages: [], phase2FamilyDoctorTemplates: [], phase2FamilyDoctorTeams: [], phase2FamilyDoctorServicePackages: [], phase2FamilyDoctorApplications: [], phase2FamilyDoctorContracts: [], phase2FamilyDoctorFulfillments: [] };
+const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], referralSystem: null, referralTeleconsultations: [], registrationSchedules: [], registrationOrders: [], registrationWaitlistEntries: [], medicationPickups: [], chronicScreeningTasks: [], chronicManagementPlans: [], chronicQualityMetrics: [], chronicComorbidityPlans: [], chronicSelfManagement: [], diseaseRegistryModels: [], chronicFollowupStatusPolicy: {}, deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthCertificateDocuments: [], birthStatistics: {}, doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {}, taskMessages: [], phase2FamilyDoctorTemplates: [], phase2FamilyDoctorTeams: [], phase2FamilyDoctorServicePackages: [], phase2FamilyDoctorApplications: [], phase2FamilyDoctorContracts: [], phase2FamilyDoctorFulfillments: [] };
 const institutionApiBase = location.protocol === "file:" || location.hostname.endsWith("github.io") ? "" : "/api";
 let platformState = fallbackState;
 let institutionRegistrationDashboard = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
   platformState = await loadPlatformState(fallbackState);
-  const [followupSummary, launchCore, publicHealthLoop, registrationDashboard] = await Promise.all([loadChronicFollowupSummary(), loadChronicLaunchCore(), loadChronicPublicHealthLoop(), loadRegistrationJourneyDashboard()]);
+  const [followupSummary, launchCore, publicHealthLoop, referralContinuity, archiveStandardization, pathwayQuality, registrationDashboard] = await Promise.all([loadChronicFollowupSummary(), loadChronicLaunchCore(), loadChronicPublicHealthLoop(), loadChronicReferralContinuity(), loadChronicArchiveStandardization(), loadChronicPathwayQuality(), loadRegistrationJourneyDashboard()]);
   platformState.chronicFollowupSummary = followupSummary;
   platformState.chronicLaunchCore = launchCore;
   platformState.chronicPublicHealthLoop = publicHealthLoop;
+  platformState.chronicReferralContinuity = referralContinuity;
+  platformState.chronicArchiveStandardization = archiveStandardization;
+  platformState.chronicPathwayQuality = pathwayQuality;
   institutionRegistrationDashboard = registrationDashboard;
   bindInstitutionActions();
   renderAll(platformState);
@@ -50,6 +53,42 @@ async function loadChronicPublicHealthLoop() {
   return null;
 }
 
+async function loadChronicReferralContinuity() {
+  if (!institutionApiBase) return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/chronic/referral-continuity`);
+    if (response.ok) return await response.json();
+  } catch (error) {
+    // Static preview uses the referral and archive snapshot.
+  }
+  return null;
+}
+
+async function loadChronicArchiveStandardization() {
+  if (!institutionApiBase) return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/chronic/archive-standard`);
+    if (response.ok) return await response.json();
+  } catch (error) {
+    // Static preview derives field coverage from the local snapshot.
+  }
+  return null;
+}
+
+async function loadChronicPathwayQuality() {
+  if (!institutionApiBase) return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/chronic/pathway-quality`);
+    if (response.ok) return await response.json();
+  } catch (error) {
+    // Static preview derives a minimal pathway inventory from the local snapshot.
+  }
+  return null;
+}
+
 async function loadRegistrationJourneyDashboard() {
   if (institutionApiBase) {
     try {
@@ -69,16 +108,22 @@ async function loadRegistrationJourneyDashboard() {
 }
 
 async function refreshChronicRuntimeState() {
-  const [followupSummary, launchCore, publicHealthLoop] = await Promise.all([loadChronicFollowupSummary(), loadChronicLaunchCore(), loadChronicPublicHealthLoop()]);
+  const [followupSummary, launchCore, publicHealthLoop, referralContinuity, archiveStandardization, pathwayQuality] = await Promise.all([loadChronicFollowupSummary(), loadChronicLaunchCore(), loadChronicPublicHealthLoop(), loadChronicReferralContinuity(), loadChronicArchiveStandardization(), loadChronicPathwayQuality()]);
   if (followupSummary) platformState.chronicFollowupSummary = followupSummary;
   if (launchCore) platformState.chronicLaunchCore = launchCore;
   if (publicHealthLoop) platformState.chronicPublicHealthLoop = publicHealthLoop;
+  if (referralContinuity) platformState.chronicReferralContinuity = referralContinuity;
+  if (archiveStandardization) platformState.chronicArchiveStandardization = archiveStandardization;
+  if (pathwayQuality) platformState.chronicPathwayQuality = pathwayQuality;
 }
 
 function renderAll(state) {
   renderChronicLaunchCore(state);
   renderChronicPublicHealthLoop(state);
   renderChronicFollowupWorkbench(state);
+  renderChronicReferralContinuity(state);
+  renderChronicArchiveStandardization(state);
+  renderChronicPathwayQuality(state);
   renderPhase2FamilyDoctorContracts(state);
   populateBirthCertificateForm(state);
   populateMultiPracticeForm(state);
@@ -106,6 +151,7 @@ function bindInstitutionActions() {
       const button = event.target.closest("[data-workflow-action]");
       const launchCoreButton = event.target.closest("[data-launch-core-action]");
       const integrationButton = event.target.closest("[data-chronic-integration]");
+      const referralContinuityButton = event.target.closest("[data-chronic-referral-continuity]");
       const familyDoctorReviewButton = event.target.closest("[data-family-doctor-review]");
       const familyDoctorFulfillmentButton = event.target.closest("[data-family-doctor-fulfillment]");
       const registrationJourneyButton = event.target.closest("[data-registration-institution-action]");
@@ -205,6 +251,13 @@ function bindInstitutionActions() {
         integrationButton.disabled = true;
         const result = await runChronicIntegrationDemo(integrationButton.dataset.chronicIntegration);
         integrationButton.disabled = false;
+        if (result.ok) renderAll(platformState);
+        return;
+      }
+      if (referralContinuityButton) {
+        referralContinuityButton.disabled = true;
+        const result = await recordChronicReferralContinuity(referralContinuityButton.dataset.chronicReferralContinuity);
+        referralContinuityButton.disabled = false;
         if (result.ok) renderAll(platformState);
         return;
       }
@@ -437,6 +490,152 @@ function renderChronicFollowupWorkbench(state) {
       <span class="badge ${String(item.status || "").includes("逾期") || String(item.status || "").includes("预警") ? "danger" : "warn"}">${item.status || "待处理"}</span>
     </section>`;
   }).join("") || `<p class="muted">暂无待处置慢病随访事项。</p>`;
+}
+
+function fallbackChronicReferralContinuity(state) {
+  const referrals = state.referralSystem?.referrals || [];
+  const records = state.personalRecords || [];
+  const consultations = state.referralTeleconsultations || [];
+  const rows = referrals.map((item) => {
+      const continuity = records.find((record) => record.category === "chronic-referral-continuity" && record.meta?.referralId === item.id);
+      const consultation = consultations.find((row) => row.referralId === item.id);
+      const primaryCareAccepted = Boolean(continuity?.meta?.primaryCareAccepted || /基层承接|承接/.test(String(item.status || "")));
+      const reportReturned = /returned|回传/.test(`${consultation?.status || ""}${consultation?.reportStatus || ""}`);
+      const archiveAvailable = records.some((record) => record.residentId === item.residentId && ["emr", "labs", "physical-exam"].includes(record.category));
+      const archiveUpdated = Boolean(continuity?.meta?.archiveUpdated);
+      const familyRiskPrompted = Boolean(continuity?.meta?.familyRiskPrompted);
+      const followupPlanned = Boolean(continuity?.meta?.nextFollowupAt || (state.followups || []).some((row) => row.residentId === item.residentId));
+      return { referralId: item.id, residentId: item.residentId, type: item.type, diseaseType: item.diseaseType, status: item.status, primaryCareAccepted, reportReturned, archiveAvailable, archiveUpdated, familyRiskPrompted, followupPlanned, nextFollowupAt: continuity?.meta?.nextFollowupAt || "", ready: primaryCareAccepted && reportReturned && archiveAvailable && followupPlanned };
+    });
+  return {
+    summary: {
+      referrals: rows.length,
+      ready: rows.filter((item) => item.ready).length,
+      archivedHandoffs: rows.filter((item) => item.archiveUpdated).length,
+      familyRiskPrompts: rows.filter((item) => item.familyRiskPrompted).length
+    },
+    rows
+  };
+}
+
+function renderChronicReferralContinuity(state) {
+  const summaryEl = document.querySelector("#chronic-referral-continuity-summary");
+  const listEl = document.querySelector("#chronic-referral-continuity");
+  if (!summaryEl || !listEl) return;
+  const report = state.chronicReferralContinuity || fallbackChronicReferralContinuity(state);
+  const rows = report.rows || [];
+  const ready = report.summary?.ready ?? rows.filter((item) => item.ready).length;
+  summaryEl.textContent = `${ready}/${rows.length} referral handoffs ready`;
+  listEl.innerHTML = rows.map((item) => `<section class="item">
+    <div>
+      <h3>${residentOf(state, item.residentId)?.name || item.residentId} · ${item.diseaseType || "chronic referral"}</h3>
+      <p>${item.type || "referral"} · ${item.status || "pending"} · report ${item.reportReturned ? "returned" : "pending"} · primary care ${item.primaryCareAccepted ? "accepted" : "pending"}</p>
+      <p>Archive ${item.archiveUpdated ? "updated" : "pending"} · standard map ${item.archiveMapping ? `${item.archiveMapping.mappedDimensions}/${item.archiveMapping.totalDimensions}` : "not calculated"} · family risk ${item.familyRiskPrompted ? "prompted" : "pending"} · next follow-up ${item.nextFollowupAt || "pending"}</p>
+      <div class="action-row">${item.ready ? "" : `<button class="inline-action" type="button" data-chronic-referral-continuity="${item.referralId}">Record handoff</button>`}</div>
+    </div>
+    <span class="badge ${item.ready ? "info" : "warn"}">${item.ready ? "ready" : "needs closure"}</span>
+  </section>`).join("") || `<p class="muted">No chronic referral handoffs in the current scope.</p>`;
+}
+
+function fallbackChronicArchiveStandardization(state) {
+  const residents = state.residents || [];
+  const hasRecord = (residentId, categories) => (state.personalRecords || []).some((item) => item.residentId === residentId && categories.includes(item.category));
+  const definitions = [
+    ["identity", "Resident identification", "WS/T 363.2-2023 / WS/T 364.2-2023", "residents", ["residentId", "personIndex"], (resident) => Boolean(resident.personIndex)],
+    ["health-history", "Health history and chronic problems", "WS/T 363.4-2023 / WS/T 364.4-2023", "diseases", ["diseaseType", "diagnosisDate"], (resident) => (state.diseases || []).some((item) => item.residentId === resident.id && (item.type || item.diagnosis))],
+    ["risk-factors", "Health risk factors", "WS/T 363.5-2023 / WS/T 364.5-2023", "chronicScreeningTasks", ["riskLevel", "screenedAt", "sourceIndicator"], (resident) => (state.chronicScreeningTasks || []).some((item) => item.residentId === resident.id && (item.riskLevel || item.risk))],
+    ["physical-lab", "Physical examination and laboratory evidence", "WS/T 363.7-2023 / WS/T 363.9-2023", "personalRecords", ["measurement", "result", "reportedAt"], (resident) => hasRecord(resident.id, ["physical-exam", "labs"])],
+    ["diagnosis", "Diagnosis", "WS/T 363.10-2023 / WS/T 364.10-2023", "diseases", ["diagnosis", "icdCode", "diagnosisDate"], (resident) => (state.diseases || []).some((item) => item.residentId === resident.id && (item.type || item.diagnosis))],
+    ["assessment", "Assessment and stratification", "WS/T 363.11-2023 / WS/T 364.11-2023", "chronicManagementPlans", ["grade", "assessment", "nextReview"], (resident) => (state.chronicManagementPlans || []).some((item) => item.residentId === resident.id && (item.grade || item.riskLevel || item.risk))],
+    ["intervention", "Plan and intervention", "WS/T 363.12-2023 / WS/T 364.12-2023", "chronicManagementPlans / followups", ["intervention", "plannedAt", "assignee"], (resident) => (state.chronicManagementPlans || []).some((item) => item.residentId === resident.id && item.intervention) || (state.followups || []).some((item) => item.residentId === resident.id && item.plannedAt)],
+    ["health-management", "Health management continuity", "WS/T 363.17-2023 / WS/T 364.17-2023", "personalRecords", ["followupFeedback", "referralId", "nextFollowupAt"], (resident) => hasRecord(resident.id, ["chronic-feedback", "chronic-referral-continuity"])]
+  ];
+  const dimensions = definitions.map(([id, title, standard, source, fields, covered]) => {
+    const missingResidentIds = residents.filter((resident) => !covered(resident)).map((resident) => resident.id);
+    return { id, title, standard, source, fields, coveredResidents: residents.length - missingResidentIds.length, totalResidents: residents.length, missingResidentIds, status: missingResidentIds.length ? "needs-source-mapping" : "mapped" };
+  });
+  return { ok: true, standardVersion: "WS/T 363/364-2023", summary: { residents: residents.length, dimensions: dimensions.length, mappedDimensions: dimensions.filter((item) => item.status === "mapped").length, dimensionsWithGaps: dimensions.filter((item) => item.status !== "mapped").length }, dimensions };
+}
+
+function renderChronicArchiveStandardization(state) {
+  const summaryEl = document.querySelector("#chronic-archive-standard-summary");
+  const listEl = document.querySelector("#chronic-archive-standard");
+  if (!summaryEl || !listEl) return;
+  const report = state.chronicArchiveStandardization || fallbackChronicArchiveStandardization(state);
+  const dimensions = report.dimensions || [];
+  const mapped = report.summary?.mappedDimensions ?? dimensions.filter((item) => item.status === "mapped").length;
+  summaryEl.textContent = `${mapped}/${dimensions.length} archive dimensions mapped`;
+  listEl.innerHTML = dimensions.map((item) => `<section class="item">
+    <div>
+      <h3>${item.title}</h3>
+      <p>${item.standard} · ${item.source}</p>
+      <p>${item.coveredResidents}/${item.totalResidents} residents · fields: ${(item.fields || []).join(", ")}</p>
+      ${item.missingResidentIds?.length ? `<p>Source mapping pending: ${item.missingResidentIds.join(", ")}</p>` : ""}
+    </div>
+    <span class="badge ${item.status === "mapped" ? "info" : "warn"}">${item.status}</span>
+  </section>`).join("") || `<p class="muted">No chronic archive data in the current scope.</p>`;
+}
+
+function fallbackChronicPathwayQuality(state) {
+  const diseasePathways = (state.diseaseRegistryModels || []).map((item) => ({
+    modelId: item.id,
+    diseaseType: item.diseaseType,
+    version: item.version,
+    threshold: item.threshold,
+    registered: 0,
+    managementPlans: 0,
+    followups: 0,
+    medicationClosed: 0,
+    qualitySampling: "static-preview",
+    status: "static-preview"
+  }));
+  return { summary: { activeDiseasePathways: 0, evidenceCompletePathways: 0 }, diseasePathways, indicators: [] };
+}
+
+function renderChronicPathwayQuality(state) {
+  const summaryEl = document.querySelector("#chronic-pathway-quality-summary");
+  const indicatorsEl = document.querySelector("#chronic-pathway-quality-indicators");
+  const pathwaysEl = document.querySelector("#chronic-pathway-quality-pathways");
+  if (!summaryEl || !indicatorsEl || !pathwaysEl) return;
+  const report = state.chronicPathwayQuality || fallbackChronicPathwayQuality(state);
+  const summary = report.summary || {};
+  summaryEl.textContent = `${summary.evidenceCompletePathways || 0}/${summary.activeDiseasePathways || 0} active pathways evidence complete`;
+  indicatorsEl.innerHTML = (report.indicators || []).map((item) => `<article class="claim-card"><strong>${item.metric}</strong><span>${item.value === null ? "N/A" : `${item.value}%`}<br>${item.evidence}</span></article>`).join("") || `<p class="muted">Quality indicators require the runtime API.</p>`;
+  pathwaysEl.innerHTML = (report.diseasePathways || []).map((item) => `<section class="item"><div><h3>${item.diseaseType} · ${item.version}</h3><p>registered ${item.registered} · plans ${item.managementPlans} · follow-ups ${item.followups} · medication closure ${item.medicationClosed}</p><p>threshold ${item.threshold || "pending"} · quality sampling ${item.qualitySampling || "pending"}</p></div><span class="badge ${item.status === "evidence-complete" ? "info" : "warn"}">${item.status}</span></section>`).join("") || `<p class="muted">No disease pathways are available in the current scope.</p>`;
+}
+
+async function recordChronicReferralContinuity(referralId) {
+  const referral = (platformState.referralSystem?.referrals || []).find((item) => item.id === referralId) || {};
+  const payload = {
+    referralId,
+    externalId: `institution-handoff-${referralId}-${new Date().toISOString().slice(0, 10)}`,
+    primaryCareAccepted: true,
+    archiveUpdated: true,
+    familyRiskPrompted: true,
+    nextFollowupAt: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+    receivingFeedback: "primary-care institution confirmed receipt of referral plan",
+    result: "institution workbench recorded chronic referral primary-care handoff"
+  };
+  if (!institutionApiBase) {
+    platformState.personalRecords = [{ id: `local-referral-${Date.now()}`, residentId: referral.residentId, category: "chronic-referral-continuity", meta: payload }, ...(platformState.personalRecords || [])];
+    platformState.chronicReferralContinuity = fallbackChronicReferralContinuity(platformState);
+    return { ok: true };
+  }
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/chronic/referral-continuity`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error(`referral continuity failed: ${response.status}`);
+    await response.json();
+    await refreshChronicRuntimeState();
+    return { ok: true };
+  } catch (error) {
+    alert(error.message || "Unable to record chronic referral handoff");
+    return { ok: false };
+  }
 }
 
 function familyDoctorPackageName(state, packageId) {

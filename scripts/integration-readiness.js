@@ -22,6 +22,10 @@ function readText(relativePath) {
   return fs.readFileSync(path.join(ROOT, relativePath), "utf8");
 }
 
+function contractReady(contract) {
+  return /(^ready$|-ready$)/i.test(String(contract.status || "")) && contract.idempotencyKey && contract.signature && contract.retryPolicy && contract.requiredFields?.length;
+}
+
 function buildIntegrationReadinessReport(options = {}) {
   const data = options.data || readJson("data/db.json");
   const connectorSource = options.connectorSource ?? readText("hospital-connectors.js");
@@ -42,7 +46,7 @@ function buildIntegrationReadinessReport(options = {}) {
     const domainCoverage = rule.requiredDomains.map((domain) => ({
       domain,
       contracts: contractsByDomain.get(domain) || [],
-      ready: (contractsByDomain.get(domain) || []).some((item) => item.status === "ready" && item.idempotencyKey && item.signature && item.retryPolicy && item.requiredFields?.length)
+      ready: (contractsByDomain.get(domain) || []).some(contractReady)
     }));
     return {
       ...rule,
@@ -61,7 +65,7 @@ function buildIntegrationReadinessReport(options = {}) {
   }));
   const checks = [
     { id: "integration:p0Interfaces", passed: p0Interfaces.length >= 5 && p0Interfaces.every((item) => item.id && item.owner && item.status && item.next), detail: `${p0Interfaces.length} P0 interfaces` },
-    { id: "integration:contractsReady", passed: contracts.length >= 7 && contracts.every((item) => item.id && item.version && item.status === "ready" && item.idempotencyKey && item.signature && item.retryPolicy), detail: `${contracts.length} contracts` },
+    { id: "integration:contractsReady", passed: contracts.length >= 7 && contracts.every((item) => item.id && item.version && contractReady(item)), detail: `${contracts.length} contracts` },
     { id: "integration:medicalCoverage", passed: ["HIS", "EMR", "LIS", "PACS"].every((domain) => contractsByDomain.has(domain)), detail: [...contractsByDomain.keys()].join(",") },
     { id: "integration:p0Coverage", passed: p0Coverage.every((item) => item.ready), detail: p0Coverage.map((item) => `${item.interfaceId}:${item.ready ? "ready" : "blocked"}`).join(";") },
     { id: "integration:runtimeAdapters", passed: runtimeAdapters.every((item) => item.sourceReady && item.environmentReady && item.runtimeReady && item.boundaryReady), detail: runtimeAdapters.map((item) => `${item.domain}:${item.sourceReady && item.environmentReady && item.runtimeReady && item.boundaryReady ? "foundation-ready" : "incomplete"}`).join(";") },
@@ -83,7 +87,7 @@ function buildIntegrationReadinessReport(options = {}) {
 function renderMarkdown(report) {
   const checkRows = report.checks.map((item) => `| ${item.passed ? "PASS" : "FAIL"} | ${item.id} | ${String(item.detail || "").replace(/\|/g, "/")} |`);
   const coverageRows = report.p0Coverage.map((item) => `| ${item.ready ? "PASS" : "FAIL"} | ${item.interfaceId} | ${item.interface?.domain || "missing"} | ${item.interface?.owner || ""} | ${item.evidence.join(", ")} | ${item.requiredDomains.join(", ") || "n/a"} |`);
-  const contractRows = report.contracts.map((item) => `| ${item.status === "ready" ? "PASS" : "FAIL"} | ${item.id} | ${item.domain} | ${item.direction} | ${item.resource} | ${item.requiredFields.join(", ")} |`);
+  const contractRows = report.contracts.map((item) => `| ${/(^ready$|-ready$)/i.test(String(item.status || "")) ? "PASS" : "FAIL"} | ${item.id} | ${item.domain} | ${item.direction} | ${item.resource} | ${item.requiredFields.join(", ")} |`);
   const adapterRows = report.runtimeAdapters.map((item) => `| ${item.sourceReady && item.environmentReady && item.runtimeReady && item.boundaryReady ? "foundation-ready" : "incomplete"} | ${item.domain} | ${item.endpointVariable} | ${item.runtimeReady ? "dispatch + receipt + retry" : "missing"} | site joint-test pending |`);
   return [
     "# Integration readiness report",
@@ -158,4 +162,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { buildIntegrationReadinessReport, parseArgs, renderMarkdown, writeOutput };
+module.exports = { buildIntegrationReadinessReport, contractReady, parseArgs, renderMarkdown, writeOutput };

@@ -49,6 +49,8 @@ jobs:
         run: npm run audit:retention
       - name: Generate chronic follow-up readiness report
         run: npm run chronic:followup-readiness
+      - name: Generate chronic informatization source report
+        run: npm run chronic:informatization-sources
       - name: Generate data quality report
         run: npm run data-quality:report
       - name: Generate data governance readiness report

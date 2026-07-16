@@ -27,6 +27,81 @@
 
       <section class="metric-grid" id="digital-hospital-metrics"></section>
 
+      <section class="panel" data-digital-hospital-section="policy-register">
+        <div class="panel-title">
+          <h2>规范政策台账</h2>
+          <span>区分法定强制、行业管理、评价参考、推荐标准和历史规划</span>
+        </div>
+        <div class="filter-grid">
+          <label>
+            适用域
+            <select id="policy-domain-filter"><option value="">全部六域</option></select>
+          </label>
+          <label>
+            效力层级
+            <select id="policy-binding-filter">
+              <option value="">全部层级</option>
+              <option value="mandatory">法定强制</option>
+              <option value="management-required">行业管理要求</option>
+              <option value="evaluation-reference">评价参考</option>
+              <option value="recommended-standard">推荐性标准</option>
+              <option value="policy-guidance">政策指导</option>
+              <option value="historical-planning">历史规划</option>
+            </select>
+          </label>
+          <label>
+            生命周期
+            <select id="policy-lifecycle-filter">
+              <option value="">全部状态</option>
+              <option value="effective">现行</option>
+              <option value="current-reference">现行参考</option>
+              <option value="conditional">条件适用</option>
+              <option value="historical-plan">历史规划</option>
+            </select>
+          </label>
+          <label>
+            关键词
+            <input id="policy-search" type="search" placeholder="文件、文号、适用条件" />
+          </label>
+        </div>
+        <div id="digital-hospital-policy-metrics" class="metric-grid"></div>
+        <div id="digital-hospital-policy-register" class="table-wrap"></div>
+        <form id="digital-hospital-policy-review-form" class="filter-grid" autocomplete="off">
+          <label>
+            规范文件
+            <select id="digital-hospital-policy-review-id" required></select>
+          </label>
+          <label>
+            复核结论
+            <select id="digital-hospital-policy-review-status" required>
+              <option value="verified-current">核验为现行</option>
+              <option value="verified-reference">核验为评价参考</option>
+              <option value="local-supplement-required">需补属地要求</option>
+              <option value="requires-update">发现更新待处理</option>
+              <option value="historical-only">仅保留历史依据</option>
+            </select>
+          </label>
+          <label>
+            下次复核
+            <input id="digital-hospital-policy-next-review" type="date" value="2027-01-31" />
+          </label>
+          <label>
+            复核说明
+            <input id="digital-hospital-policy-review-note" type="text" required placeholder="记录来源核验或属地补充要求" />
+          </label>
+          <button class="inline-action" type="submit">记录复核</button>
+          <span id="digital-hospital-policy-review-feedback" class="badge info">复核动作将写入审计链</span>
+        </form>
+      </section>
+
+      <section class="panel" data-digital-hospital-section="control-matrix">
+        <div class="panel-title">
+          <h2>六域控制矩阵</h2>
+          <span>规范要求到控制措施、证据、自动检查和上线阻断项</span>
+        </div>
+        <div id="digital-hospital-control-matrix" class="table-wrap"></div>
+      </section>
+
       <section class="panel" data-digital-hospital-section="standard-center">
         <div class="panel-title">
           <h2>标准与指标中枢</h2>

@@ -37,6 +37,8 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "file:docs/registration-journey-center.md",
     "file:docs/registration-integration-center.md",
     "file:scripts/onsite-launch-requirements.js",
+    "file:scripts/chronic-informatization-sources.js",
+    "file:docs/chronic-informatization-source-inventory.md",
     "file:scripts/digital-hospital-standards-readiness.js",
     "file:scripts/phase2-proposal-readiness.js",
     "file:scripts/phase2-catalog-readiness.js",
@@ -50,6 +52,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "file:scripts/registration-journey-readiness.js",
     "file:scripts/registration-integration-readiness.js",
     "file:scripts/platform-production-audit.js",
+    "file:scripts/platform-capability-map.js",
     "file:immunization.html",
     "file:immunization.js",
     "file:immunization-schedule.js",
@@ -76,6 +79,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "package:registrationJourneyReadiness",
     "package:registrationIntegrationReadiness",
     "package:platformProductionAudit",
+    "package:platformCapabilityMap",
     "package:objectStorageReadiness",
     "file:docs/公共卫生信息化下一步开发计划.md",
     "package:hybridDeploymentReadiness",
@@ -113,6 +117,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "snapshot:registrationIntegration",
     "snapshot:multiPractice",
     "docs:chronicLaunchCore",
+    "docs:chronicInformatizationSources",
     "docs:platformResearchReport",
     "docs:platformProductionAudit",
     "api:productionIdentityMessageAdapters",
@@ -190,6 +195,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "manifest:registrationJourneyReadiness",
     "manifest:registrationIntegrationReadiness",
     "manifest:platformProductionAudit",
+    "manifest:platformCapabilityMap",
     "manifest:objectStorageReadiness",
     "manifest:multiPracticeReadiness",
     "manifest:hybridDeploymentReadiness",
@@ -216,6 +222,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
   assert.match(report.checks.find((item) => item.name === "api:publicHealthLaunchApprovalPreflight").detail, /approval preflight blocks final approval/);
   assert.match(report.checks.find((item) => item.name === "api:digitalHospitalStandards").detail, /standards API, launch readiness gate, production evidence packets, command briefs, formal cutover approvals, seed data and frontend fetch fallback/);
   assert.match(report.checks.find((item) => item.name === "docs:chronicLaunchCore").detail, /closure, site signoff/);
+  assert.match(report.checks.find((item) => item.name === "docs:chronicInformatizationSources").detail, /source inventory maps source files/);
   assert.match(report.checks.find((item) => item.name === "docs:platformResearchReport").detail, /policy basis/);
   assert.match(report.checks.find((item) => item.name === "ui:immunizationLaunchBoard").detail, /evidence ledger/);
   assert.match(report.checks.find((item) => item.name === "docs:immunizationProductionGate").detail, /production launch gate/);

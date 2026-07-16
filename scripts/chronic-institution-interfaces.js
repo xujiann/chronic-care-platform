@@ -86,6 +86,39 @@ const CONTRACTS = [
     evidence: ["sms/phone/in-app evidence", "senior service", "receipt-ready task message"]
   },
   {
+    id: "chronic-referral-continuity-v1",
+    method: "POST",
+    path: "/api/chronic/referral-continuity",
+    owner: "county-referral-center",
+    direction: "inbound",
+    roles: ["institution", "commission"],
+    requiredFields: ["referralId", "externalId?", "primaryCareAccepted?", "archiveUpdated?", "familyRiskPrompted?", "nextFollowupAt?"],
+    targetCollections: ["referralSystem", "referralTeleconsultations", "personalRecords", "taskMessages", "securityEvents", "dataAccessLogs"],
+    evidence: ["receiving feedback", "archive update", "archive field-mapping summary", "family risk prompt", "primary-care follow-up"]
+  },
+  {
+    id: "chronic-pathway-quality-v1",
+    method: "GET",
+    path: "/api/chronic/pathway-quality",
+    owner: "chronic-quality-office",
+    direction: "outbound",
+    roles: ["citizen", "institution", "commission"],
+    requiredFields: ["residentId?", "summary", "diseasePathways", "indicators", "sourceBoundary"],
+    targetCollections: ["diseases", "diseaseRegistryModels", "chronicManagementPlans", "followups", "medicationPickups", "chronicQualityMetrics", "chronicModelGovernance"],
+    evidence: ["disease pathway coverage", "quality indicator calculation", "sampling governance", "source boundary"]
+  },
+  {
+    id: "chronic-archive-standard-v1",
+    method: "GET",
+    path: "/api/chronic/archive-standard",
+    owner: "health-archive-and-chronic-care-integration",
+    direction: "outbound",
+    roles: ["citizen", "institution", "commission"],
+    requiredFields: ["residentId?", "standardVersion", "summary", "dimensions"],
+    targetCollections: ["residents", "diseases", "chronicScreeningTasks", "chronicManagementPlans", "followups", "personalRecords", "diagnosticReports"],
+    evidence: ["WS/T 363/364-2023", "field coverage", "source mapping gaps"]
+  },
+  {
     id: "chronic-followup-escalation-v1",
     method: "POST",
     path: "/api/chronic/followup-escalations",

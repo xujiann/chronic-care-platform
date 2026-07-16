@@ -12,10 +12,13 @@ Field integration now covers device measurement ingestion, pharmacy pickup callb
 
 Institution interface details are maintained in `docs/chronic-institution-interfaces.md` and checked by `npm run chronic:institution-interfaces`.
 
+Source-file traceability is maintained in `docs/chronic-informatization-source-inventory.md` and checked by `npm run chronic:informatization-sources`. It maps the local chronic disease informatization files under `../慢病` plus repository evidence documents to implemented data collections, API routes, readiness scripts, and release artifacts.
+
 ## Policy Basis
 
 - 《关于加强基层慢性病健康管理服务的指导意见》（国卫基层发〔2025〕15号）要求强化基层慢病健康管理服务，覆盖家庭医生签约、分类分级管理、随访健康指导、自我健康管理、用药保障、医保协同和质量控制。
 - 《基层慢性病健康管理服务能力建设指引》明确基层慢病健康管理中心可承担咨询筛查、诊断治疗、随访与健康指导、转诊、信息汇总流转和数智化支撑等能力。
+- 能力建设指引还要求将电子健康档案、诊疗、体检和基本公共卫生数据汇聚流转；对下转居民维持动态随访，并在健康信息更新时开展家庭成员风险提示。
 - This application maps those policy requirements into runnable local evidence: `chronicScreeningTasks` for screening, `chronicManagementPlans` for tiered management, `followups` for post-discharge follow-up and return visits, `medicationPickups` for adherence and medication support, `taskMessages` for feedback handling, and audit logs for traceability.
 - `GET /api/chronic/followup-summary` now returns a `policyAlignment` matrix so the institution workbench can show policy coverage alongside operational workload.
 
@@ -64,6 +67,10 @@ The field integration APIs reuse the same resident authorization, institution sc
 
 `GET /api/chronic/public-health-loop` exposes the first CDC and public-health slice for chronic high-risk residents and primary-care follow-up. It reuses risk stratification, follow-up summary, task messages, family-doctor closure records, resident feedback, and policy alignment to present the minimum runnable `monitor -> alert -> dispatch -> intervention -> follow-up -> summary` loop. The first slice is intentionally limited to chronic high-risk and primary follow-up; immunization planning, infectious disease reporting, and regional public-health systems remain the next integration tracks.
 
+`GET /api/chronic/referral-continuity` exposes the chronic referral handoff queue. `POST /api/chronic/referral-continuity` records the receiving feedback, primary-care acceptance, electronic health archive update, family risk prompt, and next follow-up. The idempotency key is `externalId` when an external referral center sends the same handoff again.
+
+`GET /api/chronic/archive-standard` exposes a resident-scoped chronic electronic-health-record field coverage report. It maps the existing resident index, disease history, risk screening, physical examination and laboratory evidence, diagnosis, assessment, intervention, and continuity-management evidence to `WS/T 363/364-2023`. A `mapped` result means the required local source data is present for every resident in the current scope; `needs-source-mapping` remains visible when a source field is absent and must not be treated as production interoperability acceptance.
+
 The second public-health slice now links the chronic queue to three runnable public-health work packages:
 
 - Immunization planning: uses `personalRecords[category=vaccines]`, `birthCertificates`, and chronic high-risk residents to create vaccination review reminders.
@@ -76,6 +83,11 @@ Run `npm run chronic:followup-readiness` to generate:
 
 - `release/chronic-followup-readiness-report.json`
 - `release/chronic-followup-readiness-report.md`
+
+Run `npm run chronic:informatization-sources` to generate:
+
+- `release/chronic-informatization-sources.json`
+- `release/chronic-informatization-sources.md`
 
 `release:report`, `deploy:check`, CI, and regression tests include the same readiness domain.
 
@@ -90,6 +102,8 @@ Run `npm run chronic:followup-readiness` to generate:
 `release:report` gates `chronicFollowup:publicHealthLoop`, requiring all six public-health loop stages to have evidence before publication.
 
 `release:report` gates `chronicFollowup:publicHealthIntegrations`, requiring immunization planning, infectious disease reporting, and CDC command-summary evidence before publication.
+
+`release:report` gates `chronicFollowup:informatizationSources`, requiring the source-file inventory and all mapped chronic capability tracks to remain ready before publication.
 
 `release:report` gates `chronicFollowup:institutionInterfaces`, requiring the institution interface specification, runtime routes, API tests, and launch evidence to stay aligned.
 

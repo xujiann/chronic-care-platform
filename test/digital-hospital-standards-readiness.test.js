@@ -19,8 +19,10 @@ test("digital hospital standards readiness verifies runnable page docs and relea
   assert.equal(report.summary.launchMarkers, REQUIRED_LAUNCH_MARKERS.length);
   assert.equal(report.summary.evidenceModes >= 5, true);
   assert.equal(report.summary.pilotRows >= 5, true);
+  assert.equal(report.summary.policyRecords >= 18, true);
+  assert.equal(report.summary.policyControls >= 12, true);
   assert.equal(report.checks.every((item) => item.passed), true);
   assert.match(renderMarkdown(report), /Digital hospital standards readiness report/);
-  assert.match(renderMarkdown(report), /API markers: 5/);
+  assert.match(renderMarkdown(report), new RegExp(`API markers: ${REQUIRED_API_MARKERS.length}`));
   assert.match(renderMarkdown(report), new RegExp(`Launch markers: ${REQUIRED_LAUNCH_MARKERS.length}`));
 });

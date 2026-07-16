@@ -66,6 +66,9 @@ http://localhost:5173/login.html
 | `institution.html` | 医疗机构端：授权档案、转诊、固定取药、证照、多点执业 |
 | `insurance.html` | 医保局/医保中心/区市县医保局：审核、监管、凭证、取药 |
 | `citizen.html` | 居民端个人健康信息库、家庭成员、授权共享、适老化服务 |
+| `physical-examination.html` | 体检中心/医院结果接入、标准化归档、异常项与健康建议、居民历史体检报告 |
+| `docs/体检系统信息化规范基线-2026-07-15.md` | 体检业务、共享文档、数据元/值域、签名、隐私、安全和留存规范目录 |
+| `docs/体检系统规范需求追溯矩阵-2026-07-15.md` | 规范条款到代码、测试与上线证据的追溯矩阵 |
 | `mobile-preview.html` | 居民端手机预览 |
 | `county.html` | 县域医共体平台、16255 模型、协同工单、互认、基层 AI |
 
@@ -119,6 +122,11 @@ SQLite 结构化镜像已覆盖居民、账户、主索引、个人健康档案�
 | `GET /api/health` | 依赖就绪检查，返回服务、存储和会话存储状态；中央会话不可用时返回 503 |
 | `GET /api/metrics` | 管理端运行指标，返回请求数、状态码、慢请求、任务堆积、死信、质量问题；运营工作台会在服务模式下展示部分指标 |
 | `GET /api/system/readiness` | 管理端系统就绪报告，汇总 P2 集合、接口准备度、审计链、运行负载和现场外部依赖边界 |
+| `GET /api/physical-exams` | 按角色授权和居民主索引查询全部历史体检报告，返回年度、来源机构、异常项和健康建议 |
+| `POST /api/physical-exams/import` | 体检中心或医院单份/批量接入体检报告，按来源机构与外部标识幂等去重并同步个人健康档案 |
+| `POST /api/physical-exams/abnormal-cases/:id/actions` | 对体检异常结果执行通知居民、复查安排、专科分派、关闭或重开，并生成消息与审计证据 |
+| `POST /api/physical-exams/:id/link-attachment` | 将已完成校验和与恶意文件扫描的原始体检报告安全附件关联到健康档案 |
+| `POST /api/physical-exams/joint-tests/:id/actions` | 逐项登记机构现场联调证据，全部通过后签署上线确认 |
 | `GET /api/process-audit` | 管理端全流程审计报告，汇总居民、慢病、医共体、医保取药、统计证照、安全合规和生产切换证据域 |
 | `POST /api/auth/login` / `GET /api/auth/me` / `POST /api/auth/logout` | 登录、会话、退出 |
 | `GET /api/state` / `PUT /api/state` | 按角色裁剪读取和管理端持久化状态 |
@@ -246,6 +254,8 @@ npm.cmd run hybrid:deployment-readiness
 `process:audit` 会生成 `release/process-audit-report.json` 与 `release/process-audit-report.md`，把居民主索引、慢病验收、医共体验收、医保取药、统计证照、安全合规和生产切换汇总为全流程审计证据域；`release:report` 会同步归档该报告。
 
 `release:report` 会额外生成 `release/service-acceptance-summary.json` 与 `release/service-acceptance-summary.md`，把慢病和医共体服务域的建模情况、记录行数、开放事项数和 open actions 整理为单独验收摘要，便于从发布包直接核对 `/api/service-acceptance-summary` 的运行时结果。
+
+慢病信息化文件追溯由 `docs/chronic-informatization-source-inventory.md` 和 `npm.cmd run chronic:informatization-sources` 维护，生成 `release/chronic-informatization-sources.json` 与 `release/chronic-informatization-sources.md`，把 `../慢病` 下的政策规范、建设方案、可研规划、三明/尤溪案例、监测研究和系统设计文件映射到慢病筛查分层、随访反馈、多病共管、用药医保、机构联调和公卫质控能力轨道；该追溯项已进入 `chronic:followup-readiness`、`release:report` 和 `deploy:check`。
 
 `site:pack` 会生成 `release/site-readiness-pack.json` 与 `release/site-readiness-pack.md`，把政务身份源、HIS/EMR/LIS/PACS/医保/证照接口联调、监控值守和生产签字事项转换为现场可填写的字段映射、样例报文、告警、值班和签字模板；同时生成 `release/templates/*/README.md`，按身份源映射、接口联调、监控值守、生产签字四类模板说明当前系统可实现的能力、需收集的输入、产出物和 API 证据。`GET /api/site-template-readmes` 会把这 4 个模板 README 作为运行时审计数据返回，工作台会展示每个模板的状态、责任方、行数、附件类型和 live evidence；`release:report` 会同步归档该准备包与模板 README。
 
