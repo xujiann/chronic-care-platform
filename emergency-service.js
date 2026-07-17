@@ -216,6 +216,7 @@ function buildEvidencePackage(input, user = {}, eventId) {
   }
   const timeline = Array.isArray(event.timeline) ? event.timeline : [];
   const audit = data.emergencyAuditEvents.filter((item) => item.target === event.id).slice(0, 100);
+  const automaticSignal = (data.emergencySosSignalLog || []).find((item) => item.eventId === event.id && item.status === "accepted");
   const trackStatuses = new Set(timeline.map((item) => item.status));
   const hasVehicleTrack = Boolean(event.mission) && ["dispatched", "departed", "arrived-scene", "patient-contact", "transporting", "arrived-hospital"].some((status) => trackStatuses.has(status) || event.mission?.[{
     dispatched: "dispatchedAt",
@@ -234,6 +235,14 @@ function buildEvidencePackage(input, user = {}, eventId) {
       { label:"chiefComplaint", value:event.chiefComplaint },
       { label:"createdAt", value:event.createdAt }
     ]),
+    makeEvidenceSection("automatic-sos-control", "Automatic SOS consent and control", Boolean(automaticSignal && event.sos?.authorizationId && event.sos?.riskScore >= 60), [
+      { label:"authorizationId", value:event.sos?.authorizationId },
+      { label:"deviceRef", value:event.sos?.deviceRef },
+      { label:"detectedSignal", value:event.sos?.detectedSignal },
+      { label:"riskScore", value:event.sos?.riskScore },
+      { label:"sourceSignalId", value:automaticSignal?.sourceSignalId },
+      { label:"reviewStatus", value:event.sos?.reviewStatus || "not-requested" }
+    ], Boolean(event.sos?.autoAuthorized)),
     makeEvidenceSection("dispatch", "Dispatch mission", event.mission?.id && event.mission?.ambulanceId && event.mission?.dispatchedAt, [
       { label:"missionId", value:event.mission?.id },
       { label:"ambulanceId", value:event.mission?.ambulanceId },

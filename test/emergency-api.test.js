@@ -75,11 +75,24 @@ test("emergency HTTP API enforces citizen scope and produces verifiable exports"
 
   const deviceSos = await jsonRequest(baseUrl, "/api/emergency/life-chain/device-sos", citizenToken, {
     method:"POST",
-    body:JSON.stringify({ deviceId:"wearable-api-01", detectedSignal:"cardiac-risk", riskScore:86, address:"Device SOS test location", latitude:38.92, longitude:121.65, networkStatus:"weak" })
+    body:JSON.stringify({ deviceId:"wearable-api-01", detectedSignal:"cardiac-risk", riskScore:86, address:"Device SOS test location", latitude:38.92, longitude:121.65, networkStatus:"weak", sourceSignalId:"wearable-api-01-signal-01" })
   });
   assert.equal(deviceSos.response.status, 201, JSON.stringify(deviceSos.body));
   assert.equal(deviceSos.body.event.sos.autoAuthorized, true);
   assert.equal(deviceSos.body.event.lifeChain.firstAidTaskIds.length > 0, true);
+  const duplicateDeviceSos = await jsonRequest(baseUrl, "/api/emergency/life-chain/device-sos", citizenToken, {
+    method:"POST",
+    body:JSON.stringify({ deviceId:"wearable-api-01", detectedSignal:"cardiac-risk", riskScore:86, address:"Device SOS test location", sourceSignalId:"wearable-api-01-signal-01" })
+  });
+  assert.equal(duplicateDeviceSos.response.status, 200, JSON.stringify(duplicateDeviceSos.body));
+  assert.equal(duplicateDeviceSos.body.submission.deduplicated, true);
+  assert.equal(duplicateDeviceSos.body.event.id, deviceSos.body.event.id);
+  const cancellationRequested = await jsonRequest(baseUrl, `/api/emergency/events/${encodeURIComponent(deviceSos.body.event.id)}/automatic-sos-cancellation-request`, citizenToken, { method:"POST", body:JSON.stringify({ confirmed:true, reason:"API false-positive review" }) });
+  assert.equal(cancellationRequested.response.status, 200);
+  assert.equal(cancellationRequested.body.sos.reviewStatus, "cancellation-requested");
+  const cancellationResolved = await jsonRequest(baseUrl, `/api/emergency/events/${encodeURIComponent(deviceSos.body.event.id)}/automatic-sos-cancellation-resolve`, commissionToken, { method:"POST", body:JSON.stringify({ confirmed:true, decision:"keep-open", note:"API review retained queue" }) });
+  assert.equal(cancellationResolved.response.status, 200);
+  assert.equal(cancellationResolved.body.sos.reviewStatus, "kept-open");
   const lifeChain = await jsonRequest(baseUrl, `/api/emergency/life-chain/overview?eventId=${encodeURIComponent(deviceSos.body.event.id)}`, citizenToken);
   assert.equal(lifeChain.response.status, 200);
   assert.equal(lifeChain.body.familyNotifications.length, 1);
@@ -93,6 +106,10 @@ test("emergency HTTP API enforces citizen scope and produces verifiable exports"
   const lifeChainQuality = await jsonRequest(baseUrl, "/api/emergency/life-chain/quality", commissionToken);
   assert.equal(lifeChainQuality.response.status, 200);
   assert.equal(lifeChainQuality.body.summary.automaticSos, 1);
+  assert.equal(lifeChainQuality.body.summary.suppressedDuplicateSignals, 1);
+  const revokedAuthorization = await jsonRequest(baseUrl, `/api/emergency/life-chain/authorizations/${encodeURIComponent(authorization.body.item.id)}/revoke`, citizenToken, { method:"POST", body:JSON.stringify({ confirmed:true }) });
+  assert.equal(revokedAuthorization.response.status, 200);
+  assert.equal(revokedAuthorization.body.item.active, false);
 
   const rejectedSos = await jsonRequest(baseUrl, "/api/emergency/sos", citizenToken, {
     method:"POST",

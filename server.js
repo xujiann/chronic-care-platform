@@ -20156,6 +20156,15 @@ async function handleApi(req, res) {
     return;
   }
 
+  const lifeChainAuthorizationRevokeMatch = url.pathname.match(/^\/api\/emergency\/life-chain\/authorizations\/([^/]+)\/revoke$/);
+  if (req.method === "POST" && lifeChainAuthorizationRevokeMatch) {
+    const user = requireApiRole(req, res, ["citizen"], "/api/emergency/life-chain/authorizations/:id/revoke");
+    if (!user) return;
+    try { const data=readDatabase(); const item=EmergencyLifeChain.revokeAuthorization(data, user, decodeURIComponent(lifeChainAuthorizationRevokeMatch[1]), await collectJson(req)); writeDatabase(data); sendJson(res, 200, { ok:true, item }); }
+    catch (error) { sendJson(res, error.status || 400, { error:error.status === 404 ? "Not Found" : error.status === 403 ? "Forbidden" : "Bad Request", message:error.message }); }
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/emergency/life-chain/family-contacts") {
     const user = requireApiRole(req, res, ["citizen"], "/api/emergency/life-chain/family-contacts");
     if (!user) return;
@@ -20167,8 +20176,26 @@ async function handleApi(req, res) {
   if (req.method === "POST" && url.pathname === "/api/emergency/life-chain/device-sos") {
     const user = requireApiRole(req, res, ["citizen"], "/api/emergency/life-chain/device-sos");
     if (!user) return;
-    try { const data=readDatabase(); const event=EmergencyLifeChain.createAutomaticSos(data, user, await collectJson(req), EmergencyService); writeDatabase(data); sendJson(res, 201, { ok:true, event, callInstruction:{ telUri:"tel:120", requiresDeviceConfirmation:true, message:"A pre-authorized device SOS was submitted to the 120 information queue. The device must still obtain native call confirmation for 120." } }); }
+    try { const data=readDatabase(); const event=EmergencyLifeChain.createAutomaticSos(data, user, await collectJson(req), EmergencyService); const submission=event.automaticSosSubmission || { deduplicated:false, eventId:event.id }; writeDatabase(data); sendJson(res, submission.deduplicated ? 200 : 201, { ok:true, event, submission, callInstruction:submission.deduplicated ? null : { telUri:"tel:120", requiresDeviceConfirmation:true, message:"A pre-authorized device SOS was submitted to the 120 information queue. The device must still obtain native call confirmation for 120." } }); }
     catch (error) { sendJson(res, error.status || 400, { error:error.status === 403 ? "Forbidden" : "Bad Request", message:error.message }); }
+    return;
+  }
+
+  const automaticSosCancellationRequestMatch = url.pathname.match(/^\/api\/emergency\/events\/([^/]+)\/automatic-sos-cancellation-request$/);
+  if (req.method === "POST" && automaticSosCancellationRequestMatch) {
+    const user = requireApiRole(req, res, ["citizen"], "/api/emergency/events/:id/automatic-sos-cancellation-request");
+    if (!user) return;
+    try { const data=readDatabase(); const sos=EmergencyLifeChain.requestAutomaticSosCancellation(data, user, decodeURIComponent(automaticSosCancellationRequestMatch[1]), await collectJson(req)); writeDatabase(data); sendJson(res, 200, { ok:true, sos }); }
+    catch (error) { sendJson(res, error.status || 400, { error:error.status === 404 ? "Not Found" : error.status === 403 ? "Forbidden" : error.status === 409 ? "Conflict" : "Bad Request", message:error.message }); }
+    return;
+  }
+
+  const automaticSosCancellationResolveMatch = url.pathname.match(/^\/api\/emergency\/events\/([^/]+)\/automatic-sos-cancellation-resolve$/);
+  if (req.method === "POST" && automaticSosCancellationResolveMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/emergency/events/:id/automatic-sos-cancellation-resolve");
+    if (!user) return;
+    try { const data=readDatabase(); const sos=EmergencyLifeChain.resolveAutomaticSosCancellation(data, user, decodeURIComponent(automaticSosCancellationResolveMatch[1]), await collectJson(req)); writeDatabase(data); sendJson(res, 200, { ok:true, sos }); }
+    catch (error) { sendJson(res, error.status || 400, { error:error.status === 404 ? "Not Found" : error.status === 403 ? "Forbidden" : error.status === 409 ? "Conflict" : "Bad Request", message:error.message }); }
     return;
   }
 
