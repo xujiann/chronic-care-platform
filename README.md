@@ -368,6 +368,8 @@ The hospital interface development handoff is `docs/escort-hospital-interface.md
 
 `digital-hospital-evaluation.html` is the commission/institution workbench for P0-P1 pilot evaluation. `GET /api/digital-hospital/evaluation-catalog` exposes 4 rule packs, 70 clause-level projects and the tertiary-general-hospital pilot profile; `GET /api/digital-hospital/pilot-readiness` separates `pilot-launch-ready` from `blocked-until-site-evidence-signed`. Collection, evidence and pre-assessment actions are available under `/api/digital-hospital/collection-jobs/:id/actions`, `/api/digital-hospital/evaluation-evidence/:id/actions`, `/api/digital-hospital/pre-assessments/actions` and `/api/digital-hospital/pre-assessments/:id/actions`. `npm.cmd run digital-hospital:pilot-readiness` generates the release-visible pilot report.
 
+The same workbench now includes multi-hospital pilot operations. `/api/digital-hospital/pilot-institutions/actions` registers institutions, while `/api/digital-hospital/pilot-institutions/:id/actions` enforces six readiness checks, independent approval, whitelist activation, pause/resume, observation-stage advancement, daily-review evidence, institution scope, and the no-patient-PII boundary.
+
 ## Internet Nursing Pilot
 
 `internet-nursing.html` is the runnable three-role entry for Internet+ Nursing. Citizens can submit nursing appointments, hospital users can complete first-visit assessment, informed consent, and nurse dispatch, and the nurse workstation can accept orders, start tracked home service, complete nursing records, and leave quality-callback evidence.

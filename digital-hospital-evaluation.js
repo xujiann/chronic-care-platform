@@ -161,6 +161,156 @@ function seedDigitalHospitalEvaluationEvidence() {
   }));
 }
 
+const PILOT_READINESS_KEYS = ["organizationOwner", "scopedAccounts", "dataBoundary", "collectionPlan", "rollbackPlan", "supportRoster"];
+const PILOT_STAGES = ["onboarding", "evidence-preparation", "controlled-pilot", "observation", "completed"];
+
+function seedDigitalHospitalPilotInstitutions() {
+  return [
+    {
+      id: "dhpi-mr1",
+      institutionId: "MR1",
+      institutionName: "大连市中心医院",
+      institutionType: "tertiary-general",
+      owner: "医院信息中心",
+      stage: "controlled-pilot",
+      status: "active",
+      whitelistEnabled: true,
+      noPatientPii: true,
+      readiness: Object.fromEntries(PILOT_READINESS_KEYS.map((key) => [key, true])),
+      evidenceRefs: ["DH-PILOT-ORG-001", "DH-PILOT-ACCOUNT-001", "DH-PILOT-DATA-001", "DH-PILOT-COLLECT-001", "DH-PILOT-ROLLBACK-001", "DH-PILOT-ROSTER-001"],
+      submittedBy: "institution:MR1",
+      approvedBy: "commission:pilot-reviewer",
+      approvedAt: "2026-07-17T03:00:00.000Z",
+      launchWindow: "2026-07-18/2026-08-18",
+      history: []
+    },
+    {
+      id: "dhpi-pilot-02",
+      institutionId: "PILOT-02",
+      institutionName: "第二试点医院（待确认）",
+      institutionType: "tertiary-general",
+      owner: "待分派",
+      stage: "onboarding",
+      status: "onboarding",
+      whitelistEnabled: false,
+      noPatientPii: true,
+      readiness: Object.fromEntries(PILOT_READINESS_KEYS.map((key) => [key, false])),
+      evidenceRefs: [],
+      launchWindow: "待确认",
+      history: []
+    }
+  ];
+}
+
+function createDigitalHospitalPilotInstitution(payload = {}, user = {}, options = {}) {
+  if (user.role !== "commission") {
+    const error = new Error("only commission can register a pilot institution");
+    error.status = 403;
+    throw error;
+  }
+  const institutionId = String(payload.institutionId || "").trim();
+  const institutionName = String(payload.institutionName || "").trim();
+  const owner = String(payload.owner || "").trim();
+  if (!institutionId || !institutionName || !owner) throw new Error("institutionId, institutionName and owner are required");
+  const now = options.now || new Date().toISOString();
+  return {
+    id: options.id || `dhpi-${randomUUID()}`,
+    institutionId,
+    institutionName,
+    institutionType: String(payload.institutionType || "tertiary-general"),
+    owner,
+    stage: "onboarding",
+    status: "onboarding",
+    whitelistEnabled: false,
+    noPatientPii: true,
+    readiness: Object.fromEntries(PILOT_READINESS_KEYS.map((key) => [key, false])),
+    evidenceRefs: [],
+    launchWindow: String(payload.launchWindow || "待确认"),
+    createdAt: now,
+    createdBy: actorKey(user),
+    history: [{ action: "register", at: now, actor: actorKey(user), note: String(payload.note || "登记试点机构") }]
+  };
+}
+
+function normalizeDigitalHospitalPilotInstitutionAction(item = {}, payload = {}, user = {}, options = {}) {
+  const action = String(payload.action || "").trim();
+  const allowed = new Set(["submit-readiness", "approve-pilot", "pause-pilot", "resume-pilot", "advance-stage", "record-daily-review"]);
+  if (!allowed.has(action)) throw new Error("unsupported pilot institution action");
+  if (user.role === "institution" && user.orgCode !== item.institutionId) {
+    const error = new Error("institution account cannot update another pilot institution");
+    error.status = 403;
+    throw error;
+  }
+  const commissionOnly = new Set(["approve-pilot", "pause-pilot", "resume-pilot", "advance-stage"]);
+  if (commissionOnly.has(action) && user.role !== "commission") {
+    const error = new Error("only commission can change pilot operating state");
+    error.status = 403;
+    throw error;
+  }
+  const note = String(payload.note || "").trim();
+  if (note.length < 4) throw new Error("note must contain at least 4 characters");
+  const now = options.now || new Date().toISOString();
+  const next = { ...item, readiness: { ...(item.readiness || {}) }, evidenceRefs: [...(item.evidenceRefs || [])], history: [...(item.history || [])] };
+  if (action === "submit-readiness") {
+    if (payload.noPatientPii !== true) throw new Error("noPatientPii=true is required");
+    const readiness = payload.readiness && typeof payload.readiness === "object" ? payload.readiness : {};
+    const evidenceRefs = [...new Set((Array.isArray(payload.evidenceRefs) ? payload.evidenceRefs : []).map(String).filter(Boolean))];
+    if (!PILOT_READINESS_KEYS.every((key) => readiness[key] === true) || evidenceRefs.length < 3) throw new Error("all readiness checks and at least three evidence references are required");
+    next.readiness = Object.fromEntries(PILOT_READINESS_KEYS.map((key) => [key, true]));
+    next.evidenceRefs = [...new Set([...next.evidenceRefs, ...evidenceRefs])];
+    next.status = "ready-for-review";
+    next.stage = "evidence-preparation";
+    next.noPatientPii = true;
+    next.submittedBy = actorKey(user);
+    next.submittedAt = now;
+  } else if (action === "approve-pilot") {
+    if (next.status !== "ready-for-review") {
+      const error = new Error("pilot readiness must be submitted before approval");
+      error.status = 409;
+      throw error;
+    }
+    if (next.submittedBy === actorKey(user)) {
+      const error = new Error("independent pilot approver is required");
+      error.status = 409;
+      throw error;
+    }
+    next.status = "active";
+    next.stage = "controlled-pilot";
+    next.whitelistEnabled = true;
+    next.approvedBy = actorKey(user);
+    next.approvedAt = now;
+  } else if (action === "pause-pilot") {
+    if (next.status !== "active") throw Object.assign(new Error("only an active pilot can be paused"), { status: 409 });
+    next.status = "paused";
+    next.whitelistEnabled = false;
+  } else if (action === "resume-pilot") {
+    if (next.status !== "paused") throw Object.assign(new Error("only a paused pilot can be resumed"), { status: 409 });
+    next.status = "active";
+    next.whitelistEnabled = true;
+  } else if (action === "advance-stage") {
+    if (next.status !== "active") throw Object.assign(new Error("only an active pilot can advance"), { status: 409 });
+    const currentIndex = PILOT_STAGES.indexOf(next.stage);
+    if (currentIndex < 2 || currentIndex >= PILOT_STAGES.length - 1) throw Object.assign(new Error("pilot stage cannot advance"), { status: 409 });
+    const clearanceRef = String(payload.p0ClearanceRef || "").trim();
+    if (!clearanceRef) throw new Error("p0ClearanceRef is required");
+    next.evidenceRefs = [...new Set([...next.evidenceRefs, clearanceRef])];
+    next.stage = PILOT_STAGES[currentIndex + 1];
+    if (next.stage === "completed") {
+      next.status = "completed";
+      next.whitelistEnabled = false;
+    }
+  } else {
+    if (payload.noPatientPii !== true) throw new Error("noPatientPii=true is required");
+    const dailyReportRef = String(payload.dailyReportRef || "").trim();
+    if (!dailyReportRef) throw new Error("dailyReportRef is required");
+    next.evidenceRefs = [...new Set([...next.evidenceRefs, dailyReportRef])];
+    next.lastDailyReview = { at: now, actor: actorKey(user), dailyReportRef, note };
+  }
+  next.updatedAt = now;
+  next.history.unshift({ action, at: now, actor: actorKey(user), note, status: next.status, stage: next.stage });
+  return next;
+}
+
 function normalizeLevel(packId, level) {
   if (packId === "interoperability") return String(level || "1").toUpperCase();
   return Number(level) || 0;
@@ -480,6 +630,57 @@ function buildDigitalHospitalEvaluationCatalog() {
   };
 }
 
+function buildDigitalHospitalPilotOperations(data = {}, user = {}, filters = {}) {
+  const requestedInstitution = String(filters.institutionId || "").trim();
+  const scopedInstitution = user.role === "institution" ? String(user.orgCode || "") : requestedInstitution;
+  const institutions = (Array.isArray(data.digitalHospitalPilotInstitutions) ? data.digitalHospitalPilotInstitutions : seedDigitalHospitalPilotInstitutions())
+    .filter((item) => !scopedInstitution || item.institutionId === scopedInstitution);
+  const assessments = Array.isArray(data.digitalHospitalPreAssessments) ? data.digitalHospitalPreAssessments : seedDigitalHospitalPreAssessments();
+  const jobs = Array.isArray(data.digitalHospitalCollectionJobs) ? data.digitalHospitalCollectionJobs : seedDigitalHospitalCollectionJobs();
+  const evidence = Array.isArray(data.digitalHospitalEvaluationEvidence) ? data.digitalHospitalEvaluationEvidence : seedDigitalHospitalEvaluationEvidence();
+  const today = String(filters.today || new Date().toISOString().slice(0, 10));
+  const rows = institutions.map((institution) => {
+    const ownAssessments = assessments.filter((item) => item.institutionId === institution.institutionId);
+    const findings = ownAssessments.flatMap((item) => item.findings || []);
+    const openFindings = findings.filter((item) => item.status !== "resolved");
+    const overdue = openFindings.filter((item) => item.dueAt && item.dueAt < today);
+    const ownJobs = jobs.filter((item) => item.institutionId === institution.institutionId);
+    const ownEvidence = evidence.filter((item) => item.institutionId === institution.institutionId);
+    return {
+      ...institution,
+      operations: {
+        preAssessments: ownAssessments.length,
+        acceptedAssessments: ownAssessments.filter((item) => item.status === "accepted-for-pilot").length,
+        openP0: openFindings.filter((item) => item.severity === "P0").length,
+        openP1: openFindings.filter((item) => item.severity === "P1").length,
+        overdueP0: overdue.filter((item) => item.severity === "P0").length,
+        validatedJobs: ownJobs.filter((item) => item.status === "validated").length,
+        totalJobs: ownJobs.length,
+        verifiedEvidence: ownEvidence.filter((item) => item.status === "verified").length,
+        totalEvidence: ownEvidence.length
+      },
+      readinessComplete: PILOT_READINESS_KEYS.every((key) => institution.readiness?.[key] === true)
+    };
+  });
+  return {
+    ok: rows.some((item) => item.status === "active" && item.whitelistEnabled) && rows.every((item) => item.noPatientPii === true),
+    generatedAt: new Date().toISOString(),
+    summary: {
+      institutions: rows.length,
+      active: rows.filter((item) => item.status === "active").length,
+      paused: rows.filter((item) => item.status === "paused").length,
+      readyForReview: rows.filter((item) => item.status === "ready-for-review").length,
+      onboarding: rows.filter((item) => item.status === "onboarding").length,
+      overdueP0: rows.reduce((sum, item) => sum + item.operations.overdueP0, 0),
+      whitelistEnabled: rows.filter((item) => item.whitelistEnabled).length
+    },
+    institutions: rows,
+    readinessKeys: PILOT_READINESS_KEYS,
+    stages: PILOT_STAGES,
+    boundary: "试点白名单和阶段状态不等同于正式评价授权或生产上线签字"
+  };
+}
+
 function buildDigitalHospitalPilotBoard(data = {}, user = {}, filters = {}) {
   const requestedInstitution = String(filters.institutionId || "").trim();
   const scopedInstitution = user.role === "institution" ? String(user.orgCode || "") : requestedInstitution;
@@ -489,6 +690,7 @@ function buildDigitalHospitalPilotBoard(data = {}, user = {}, filters = {}) {
     .filter((item) => !scopedInstitution || item.institutionId === scopedInstitution);
   const preAssessments = (Array.isArray(data.digitalHospitalPreAssessments) ? data.digitalHospitalPreAssessments : seedDigitalHospitalPreAssessments())
     .filter((item) => !scopedInstitution || item.institutionId === scopedInstitution);
+  const operations = buildDigitalHospitalPilotOperations(data, user, filters);
   const checks = [
     { id: "pilot:catalog", passed: EVALUATION_PACKS.length === 4 && EVALUATION_PROJECTS.length === 70 && STANDARD_CLAUSES.length === 70, detail: `${EVALUATION_PACKS.length} packs / ${EVALUATION_PROJECTS.length} projects / ${STANDARD_CLAUSES.length} clauses` },
     { id: "pilot:emrProjects", passed: EVALUATION_PROJECTS.filter((item) => item.packId === "emr").length === 39, detail: "39 EMR evaluation projects" },
@@ -498,7 +700,8 @@ function buildDigitalHospitalPilotBoard(data = {}, user = {}, filters = {}) {
     { id: "pilot:collectionAdapters", passed: jobs.length >= 6 && jobs.every((item) => item.status === "validated" && item.noPatientPii === true && item.receiptRef), detail: `${jobs.filter((item) => item.status === "validated").length}/${jobs.length} controlled adapters validated` },
     { id: "pilot:evidenceBoundary", passed: evidence.length >= 6 && evidence.every((item) => item.noPatientPii === true), detail: `${evidence.length} evidence records with no-patient-PII boundary` },
     { id: "pilot:preAssessment", passed: preAssessments.length >= 1 && preAssessments.every((item) => item.results?.length === 4 && item.formalResult === false), detail: `${preAssessments.length} four-pack pilot simulations` },
-    { id: "pilot:rectification", passed: preAssessments.some((item) => item.findings?.length > 0 && item.findings.every((finding) => Array.isArray(finding.history))), detail: `${preAssessments.reduce((sum, item) => sum + (item.findings?.length || 0), 0)} traceable findings` }
+    { id: "pilot:rectification", passed: preAssessments.some((item) => item.findings?.length > 0 && item.findings.every((finding) => Array.isArray(finding.history))), detail: `${preAssessments.reduce((sum, item) => sum + (item.findings?.length || 0), 0)} traceable findings` },
+    { id: "pilot:operations", passed: operations.ok, detail: `${operations.summary.active} active / ${operations.summary.institutions} pilot institutions / ${operations.summary.overdueP0} overdue P0` }
   ];
   const sitePending = evidence.filter((item) => item.status === "site-pending");
   return {
@@ -514,12 +717,16 @@ function buildDigitalHospitalPilotBoard(data = {}, user = {}, filters = {}) {
       evidenceRecords: evidence.length,
       sitePendingEvidence: sitePending.length,
       preAssessments: preAssessments.length,
-      openFindings: preAssessments.reduce((sum, item) => sum + (item.findings || []).filter((finding) => finding.status !== "resolved").length, 0)
+      openFindings: preAssessments.reduce((sum, item) => sum + (item.findings || []).filter((finding) => finding.status !== "resolved").length, 0),
+      pilotInstitutions: operations.summary.institutions,
+      activePilotInstitutions: operations.summary.active,
+      overdueP0: operations.summary.overdueP0
     },
     checks,
     jobs,
     evidence,
     preAssessments,
+    operations,
     profiles: PILOT_PROFILES,
     siteBlockers: sitePending.map((item) => ({ id: item.id, title: item.title, nextAction: "接入真实医院系统后完成脱敏抽样、厂商确认和现场签字" }))
   };
@@ -532,13 +739,17 @@ module.exports = {
   STANDARD_CLAUSES,
   buildDigitalHospitalEvaluationCatalog,
   buildDigitalHospitalPilotBoard,
+  buildDigitalHospitalPilotOperations,
   calculatePackResult,
+  createDigitalHospitalPilotInstitution,
   normalizeDigitalHospitalCollectionJobAction,
   normalizeDigitalHospitalEvaluationEvidenceAction,
   normalizeDigitalHospitalPreAssessmentAction,
+  normalizeDigitalHospitalPilotInstitutionAction,
   runDigitalHospitalPreAssessment,
   seedDigitalHospitalCollectionJobs,
   seedDigitalHospitalEvaluationEvidence,
   seedDigitalHospitalPreAssessments,
+  seedDigitalHospitalPilotInstitutions,
   seedPilotResponses
 };

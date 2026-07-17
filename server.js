@@ -124,12 +124,15 @@ const {
 const {
   buildDigitalHospitalEvaluationCatalog,
   buildDigitalHospitalPilotBoard,
+  createDigitalHospitalPilotInstitution,
   normalizeDigitalHospitalCollectionJobAction,
   normalizeDigitalHospitalEvaluationEvidenceAction,
+  normalizeDigitalHospitalPilotInstitutionAction,
   normalizeDigitalHospitalPreAssessmentAction,
   runDigitalHospitalPreAssessment,
   seedDigitalHospitalCollectionJobs,
   seedDigitalHospitalEvaluationEvidence,
+  seedDigitalHospitalPilotInstitutions,
   seedDigitalHospitalPreAssessments
 } = require("./digital-hospital-evaluation");
 const {
@@ -1045,6 +1048,7 @@ function seedState() {
     digitalHospitalCollectionJobs: seedDigitalHospitalCollectionJobs(),
     digitalHospitalEvaluationEvidence: seedDigitalHospitalEvaluationEvidence(),
     digitalHospitalPreAssessments: seedDigitalHospitalPreAssessments(),
+    digitalHospitalPilotInstitutions: seedDigitalHospitalPilotInstitutions(),
     digitalHospitalEvaluationTasks: seedDigitalHospitalEvaluationTasks(),
     digitalHospitalEvidencePackets: seedDigitalHospitalEvidencePackets(),
     digitalHospitalRiskItems: seedDigitalHospitalRiskItems(),
@@ -7715,6 +7719,7 @@ function normalizeState(data) {
     digitalHospitalCollectionJobs: mergeByKey(seedDigitalHospitalCollectionJobs(), data.digitalHospitalCollectionJobs, "id"),
     digitalHospitalEvaluationEvidence: mergeByKey(seedDigitalHospitalEvaluationEvidence(), data.digitalHospitalEvaluationEvidence, "id"),
     digitalHospitalPreAssessments: mergeByKey(seedDigitalHospitalPreAssessments(), data.digitalHospitalPreAssessments, "id"),
+    digitalHospitalPilotInstitutions: mergeByKey(seedDigitalHospitalPilotInstitutions(), data.digitalHospitalPilotInstitutions, "id"),
     digitalHospitalEvaluationTasks: mergeByKey(seedDigitalHospitalEvaluationTasks(), data.digitalHospitalEvaluationTasks, "id"),
     digitalHospitalEvidencePackets: mergeByKey(seedDigitalHospitalEvidencePackets(), data.digitalHospitalEvidencePackets, "id"),
     digitalHospitalRiskItems: mergeByKey(seedDigitalHospitalRiskItems(), data.digitalHospitalRiskItems, "id"),
@@ -22340,6 +22345,70 @@ async function handleApi(req, res) {
       detail: `${board.functionalState} / ${board.formalGoLiveState} / ${board.summary.openFindings} open findings`
     });
     sendJson(res, 200, board);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/digital-hospital/pilot-institutions/actions") {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/pilot-institutions/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    if (payload.action !== "register") {
+      sendJson(res, 400, { error: "Bad Request", message: "Only register is accepted" });
+      return;
+    }
+    const data = readDatabase();
+    const institutions = Array.isArray(data.digitalHospitalPilotInstitutions) ? data.digitalHospitalPilotInstitutions : seedDigitalHospitalPilotInstitutions();
+    if (institutions.some((item) => item.institutionId === String(payload.institutionId || "").trim())) {
+      sendJson(res, 409, { error: "Conflict", message: "Pilot institution already exists" });
+      return;
+    }
+    let institution;
+    try {
+      institution = createDigitalHospitalPilotInstitution(payload, user);
+    } catch (error) {
+      const status = Number(error.status) || 400;
+      sendJson(res, status, { error: status === 403 ? "Forbidden" : "Bad Request", message: error.message });
+      return;
+    }
+    data.digitalHospitalPilotInstitutions = [institution, ...institutions].slice(0, 100);
+    data.securityEvents = sealAuditTrail([{
+      id: randomUUID(), at: new Date().toISOString(), actor: user.name, role: user.role,
+      action: "digital-hospital-pilot-institution-register", target: institution.id, result: "allowed",
+      detail: `${institution.institutionId} / onboarding / pilot only`
+    }, ...(data.securityEvents || [])].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    sendJson(res, 201, { ok: true, institution, board: buildDigitalHospitalPilotBoard(readDatabase(), user) });
+    return;
+  }
+
+  const digitalHospitalPilotInstitutionActionMatch = url.pathname.match(/^\/api\/digital-hospital\/pilot-institutions\/([^/]+)\/actions$/);
+  if (req.method === "POST" && digitalHospitalPilotInstitutionActionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/digital-hospital/pilot-institutions/:id/actions");
+    if (!user) return;
+    const institutionRecordId = decodeURIComponent(digitalHospitalPilotInstitutionActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const institutions = Array.isArray(data.digitalHospitalPilotInstitutions) ? data.digitalHospitalPilotInstitutions : seedDigitalHospitalPilotInstitutions();
+    const index = institutions.findIndex((item) => item.id === institutionRecordId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Digital hospital pilot institution not found" });
+      return;
+    }
+    try {
+      institutions[index] = normalizeDigitalHospitalPilotInstitutionAction(institutions[index], payload, user);
+    } catch (error) {
+      const status = Number(error.status) || 400;
+      sendJson(res, status, { error: status === 403 ? "Forbidden" : status === 409 ? "Conflict" : "Bad Request", message: error.message });
+      return;
+    }
+    data.digitalHospitalPilotInstitutions = institutions;
+    data.securityEvents = sealAuditTrail([{
+      id: randomUUID(), at: new Date().toISOString(), actor: user.name, role: user.role,
+      action: "digital-hospital-pilot-institution-action", target: institutionRecordId, result: "allowed",
+      detail: `${payload.action} / ${institutions[index].status} / ${institutions[index].stage}`
+    }, ...(data.securityEvents || [])].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    sendJson(res, 200, { ok: true, institution: institutions[index], board: buildDigitalHospitalPilotBoard(readDatabase(), user) });
     return;
   }
 

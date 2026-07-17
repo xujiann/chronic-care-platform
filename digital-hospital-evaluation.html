@@ -26,6 +26,37 @@
 
       <section class="metric-grid" id="digital-evaluation-metrics"></section>
 
+      <section class="panel" data-digital-evaluation-section="pilot-operations">
+        <div class="panel-title"><h2>多院试点运营</h2><span>机构准入、白名单、阶段门禁、整改 SLA 与日报</span></div>
+        <div class="table-wrap" id="digital-evaluation-pilot-institutions"></div>
+        <form id="digital-evaluation-pilot-register-form" class="filter-grid commission-only" autocomplete="off">
+          <label>机构编码<input id="digital-evaluation-pilot-register-id" required placeholder="PILOT-03" /></label>
+          <label>机构名称<input id="digital-evaluation-pilot-register-name" required /></label>
+          <label>试点负责人<input id="digital-evaluation-pilot-register-owner" required /></label>
+          <label>计划窗口<input id="digital-evaluation-pilot-register-window" placeholder="2026-08-01/2026-09-01" /></label>
+          <label class="full">登记说明<textarea id="digital-evaluation-pilot-register-note" rows="2" required>纳入数智医院建设预评受控试点</textarea></label>
+          <button class="inline-action" type="submit">登记试点机构</button>
+        </form>
+        <form id="digital-evaluation-pilot-action-form" class="filter-grid" autocomplete="off">
+          <label>试点机构<select id="digital-evaluation-pilot-institution-id" required></select></label>
+          <label>动作<select id="digital-evaluation-pilot-action"><option value="submit-readiness">提交准入材料</option><option value="approve-pilot">批准受控试点</option><option value="record-daily-review">登记试点日报</option><option value="pause-pilot">暂停试点</option><option value="resume-pilot">恢复试点</option><option value="advance-stage">推进至下一阶段</option></select></label>
+          <label>证据引用（逗号分隔）<input id="digital-evaluation-pilot-evidence-refs" placeholder="DH-ORG-001,DH-DATA-001,DH-ROLLBACK-001" /></label>
+          <label>P0 清零证据<input id="digital-evaluation-pilot-p0-clearance" placeholder="DH-P0-CLEAR-001" /></label>
+          <label>日报引用<input id="digital-evaluation-pilot-daily-report" placeholder="DH-DAILY-20260718" /></label>
+          <div class="full readiness-checks" id="digital-evaluation-pilot-readiness-checks">
+            <label><input type="checkbox" data-readiness-key="organizationOwner" /> 组织负责人</label>
+            <label><input type="checkbox" data-readiness-key="scopedAccounts" /> 受控账号</label>
+            <label><input type="checkbox" data-readiness-key="dataBoundary" /> 数据边界</label>
+            <label><input type="checkbox" data-readiness-key="collectionPlan" /> 采集计划</label>
+            <label><input type="checkbox" data-readiness-key="rollbackPlan" /> 回退方案</label>
+            <label><input type="checkbox" data-readiness-key="supportRoster" /> 支撑排班</label>
+          </div>
+          <label class="full">处理说明<textarea id="digital-evaluation-pilot-action-note" rows="2" required></textarea></label>
+          <label class="check-line"><input id="digital-evaluation-pilot-no-pii" type="checkbox" checked /> 确认证据不含患者可识别信息</label>
+          <button class="inline-action" type="submit">提交试点动作</button>
+        </form>
+      </section>
+
       <section class="panel" data-digital-evaluation-section="catalog">
         <div class="panel-title"><h2>四套评价规则包</h2><span>条款级建模与目标等级画像</span></div>
         <div class="filter-grid">

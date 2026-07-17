@@ -1601,6 +1601,34 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(digitalHospitalPilotReadiness.body.functionalState, "pilot-launch-ready");
     assert.equal(digitalHospitalPilotReadiness.body.formalGoLiveState, "blocked-until-site-evidence-signed");
     assert.equal(digitalHospitalPilotReadiness.body.summary.collectionJobs, 6);
+    assert.equal(digitalHospitalPilotReadiness.body.summary.pilotInstitutions, 2);
+    assert.equal(digitalHospitalPilotReadiness.body.operations.summary.active, 1);
+
+    const registeredPilotInstitution = await api(baseUrl, "/api/digital-hospital/pilot-institutions/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "register", institutionId: "API-PILOT-03", institutionName: "API第三试点医院", owner: "医院信息中心", launchWindow: "2026-08-01/2026-09-01", note: "登记API试点机构" })
+    }));
+    assert.equal(registeredPilotInstitution.response.status, 201);
+    assert.equal(registeredPilotInstitution.body.institution.status, "onboarding");
+
+    const pausedPilotInstitution = await api(baseUrl, "/api/digital-hospital/pilot-institutions/dhpi-mr1/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "pause-pilot", note: "API演练暂停受控试点" })
+    }));
+    assert.equal(pausedPilotInstitution.response.status, 200);
+    assert.equal(pausedPilotInstitution.body.institution.whitelistEnabled, false);
+    const resumedPilotInstitution = await api(baseUrl, "/api/digital-hospital/pilot-institutions/dhpi-mr1/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "resume-pilot", note: "API复核后恢复受控试点" })
+    }));
+    assert.equal(resumedPilotInstitution.response.status, 200);
+    assert.equal(resumedPilotInstitution.body.institution.status, "active");
+
+    const deniedPilotInstitutionRegister = await api(baseUrl, "/api/digital-hospital/pilot-institutions/actions", authorized(residentPhoneLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "register", institutionId: "DENIED", institutionName: "越权机构", owner: "居民" })
+    }));
+    assert.equal(deniedPilotInstitutionRegister.response.status, 403);
 
     const digitalHospitalPreAssessment = await api(baseUrl, "/api/digital-hospital/pre-assessments/actions", authorized(accountLogin.body.token, {
       method: "POST",

@@ -3263,17 +3263,18 @@ test("digital hospital P0-P1 pilot evaluation workbench is wired", () => {
   const model = read("digital-hospital-evaluation.js");
   const server = read("server.js");
   const readiness = read("scripts/digital-hospital-pilot-readiness.js");
-  ["catalog", "collection", "evidence", "preassessment", "rectification", "boundary"].forEach((section) => {
+  ["pilot-operations", "catalog", "collection", "evidence", "preassessment", "rectification", "boundary"].forEach((section) => {
     assert.match(html, new RegExp(`data-digital-evaluation-section="${section}"`));
   });
   assert.match(html, /requireRole\(\["commission", "institution"\]\)/);
   assert.match(ui, /run-preassessment/);
   assert.match(ui, /refreshBoard/);
+  assert.match(ui, /submit-readiness/);
   assert.match(model, /EVALUATION_PROJECTS/);
   assert.match(model, /STANDARD_CLAUSES/);
   assert.match(model, /pilot-launch-ready/);
   assert.match(model, /blocked-until-site-evidence-signed/);
-  ["evaluation-catalog", "pilot-readiness", "collection-jobs", "evaluation-evidence", "pre-assessments"].forEach((route) => assert.match(server, new RegExp(route)));
+  ["evaluation-catalog", "pilot-readiness", "pilot-institutions", "collection-jobs", "evaluation-evidence", "pre-assessments"].forEach((route) => assert.match(server, new RegExp(route)));
   assert.match(readiness, /39 EMR \/ 17 service \/ 10 management \/ 4 interoperability/);
   assert.match(read("auth.js"), /"digital-hospital-evaluation\.html": \["commission", "institution"\]/);
   assert.match(read("package.json"), /digital-hospital:pilot-readiness/);

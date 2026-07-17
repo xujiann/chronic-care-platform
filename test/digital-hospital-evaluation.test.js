@@ -4,13 +4,17 @@ const {
   EVALUATION_PROJECTS,
   buildDigitalHospitalEvaluationCatalog,
   buildDigitalHospitalPilotBoard,
+  buildDigitalHospitalPilotOperations,
   calculatePackResult,
+  createDigitalHospitalPilotInstitution,
   normalizeDigitalHospitalCollectionJobAction,
   normalizeDigitalHospitalEvaluationEvidenceAction,
+  normalizeDigitalHospitalPilotInstitutionAction,
   normalizeDigitalHospitalPreAssessmentAction,
   runDigitalHospitalPreAssessment,
   seedDigitalHospitalCollectionJobs,
   seedDigitalHospitalEvaluationEvidence,
+  seedDigitalHospitalPilotInstitutions,
   seedPilotResponses
 } = require("../digital-hospital-evaluation");
 
@@ -77,5 +81,37 @@ test("pilot readiness is ready for controlled pilot while formal site evidence r
   assert.equal(board.functionalState, "pilot-launch-ready");
   assert.equal(board.formalGoLiveState, "blocked-until-site-evidence-signed");
   assert.equal(board.summary.collectionJobs, 6);
+  assert.equal(board.summary.pilotInstitutions, 2);
+  assert.equal(board.summary.activePilotInstitutions, 1);
   assert.equal(board.checks.every((item) => item.passed), true);
+});
+
+test("multi-hospital pilot onboarding requires scoped submission and independent approval", () => {
+  let institution = createDigitalHospitalPilotInstitution({ institutionId: "PILOT-03", institutionName: "第三试点医院", owner: "信息中心", note: "登记第三试点医院" }, commission, { id: "dhpi-test", now: "2026-07-18T08:00:00.000Z" });
+  const pilotHospital = { ...hospital, id: "u-pilot-03", username: "pilot03", orgCode: "PILOT-03", orgName: "第三试点医院" };
+  const readiness = Object.fromEntries(["organizationOwner", "scopedAccounts", "dataBoundary", "collectionPlan", "rollbackPlan", "supportRoster"].map((key) => [key, true]));
+  assert.throws(() => normalizeDigitalHospitalPilotInstitutionAction(institution, { action: "submit-readiness", readiness, evidenceRefs: ["A", "B", "C"], noPatientPii: true, note: "越权提交准入材料" }, hospital), /another pilot institution/);
+  institution = normalizeDigitalHospitalPilotInstitutionAction(institution, { action: "submit-readiness", readiness, evidenceRefs: ["A", "B", "C"], noPatientPii: true, note: "提交六项准入材料" }, pilotHospital);
+  assert.equal(institution.status, "ready-for-review");
+  institution = normalizeDigitalHospitalPilotInstitutionAction(institution, { action: "approve-pilot", note: "独立审核批准受控试点" }, reviewer);
+  assert.equal(institution.status, "active");
+  assert.equal(institution.whitelistEnabled, true);
+  institution = normalizeDigitalHospitalPilotInstitutionAction(institution, { action: "pause-pilot", note: "演练暂停试点入口" }, commission);
+  assert.equal(institution.whitelistEnabled, false);
+  institution = normalizeDigitalHospitalPilotInstitutionAction(institution, { action: "resume-pilot", note: "复核后恢复试点入口" }, commission);
+  institution = normalizeDigitalHospitalPilotInstitutionAction(institution, { action: "advance-stage", p0ClearanceRef: "P0-CLEAR-001", note: "P0清零后进入观察期" }, commission);
+  assert.equal(institution.stage, "observation");
+});
+
+test("pilot operations aggregates institution scope and overdue P0 SLA", () => {
+  const assessment = runDigitalHospitalPreAssessment({ institutionId: "MR1", institutionName: "大连市中心医院" }, hospital, { id: "dhpa-overdue", now: "2026-07-17T08:00:00.000Z" });
+  const p0Finding = assessment.findings.find((item) => item.severity === "P0");
+  p0Finding.assignedTo = "医院信息中心";
+  p0Finding.dueAt = "2026-07-17";
+  p0Finding.status = "in-progress";
+  const data = { digitalHospitalPilotInstitutions: seedDigitalHospitalPilotInstitutions(), digitalHospitalPreAssessments: [assessment] };
+  const board = buildDigitalHospitalPilotOperations(data, hospital, { today: "2026-07-18" });
+  assert.equal(board.institutions.length, 1);
+  assert.equal(board.institutions[0].institutionId, "MR1");
+  assert.equal(board.summary.overdueP0, 1);
 });

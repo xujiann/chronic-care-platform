@@ -1,6 +1,7 @@
 const DIGITAL_EVALUATION_ENDPOINTS = {
   catalog: "/api/digital-hospital/evaluation-catalog",
   pilot: "/api/digital-hospital/pilot-readiness",
+  pilotInstitutions: "/api/digital-hospital/pilot-institutions",
   collection: "/api/digital-hospital/collection-jobs",
   evidence: "/api/digital-hospital/evaluation-evidence",
   preassessments: "/api/digital-hospital/pre-assessments"
@@ -25,10 +26,22 @@ function renderMetrics() {
     ["评价项目", summary.projects || 0, "条款级可计算项目"],
     ["采集适配器", summary.collectionJobs || 0, "六类医院系统受控采集"],
     ["预评批次", summary.preAssessments || 0, "建设预评与整改留痕"],
-    ["开放整改", summary.openFindings || 0, "P0/P1差距项"],
+    ["开放整改", summary.openFindings || 0, `P0/P1差距项 · ${summary.activePilotInstitutions || 0}/${summary.pilotInstitutions || 0} 家试点激活`],
     ["试点状态", digitalEvaluationState.board?.functionalState || "待加载", digitalEvaluationState.board?.formalGoLiveState || ""]
   ];
   setHtml("digital-evaluation-metrics", metrics.map(([label, value, hint]) => `<article class="metric-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(hint)}</small></article>`).join(""));
+}
+
+function renderPilotOperations() {
+  const operations = digitalEvaluationState.board?.operations || {};
+  const rows = operations.institutions || [];
+  setHtml("digital-evaluation-pilot-institutions", `<table><thead><tr><th>试点机构</th><th>阶段与白名单</th><th>预评/采集/证据</th><th>P0/P1 与 SLA</th><th>状态</th></tr></thead><tbody>${rows.map((item) => `<tr><td><strong>${escapeHtml(item.institutionName)}</strong><br><small>${escapeHtml(item.institutionId)} / ${escapeHtml(item.owner)}</small></td><td>${escapeHtml(item.stage)}<br><small>${item.whitelistEnabled ? "白名单已启用" : "白名单未启用"}</small></td><td>${item.operations.preAssessments} / ${item.operations.validatedJobs}/${item.operations.totalJobs} / ${item.operations.verifiedEvidence}/${item.operations.totalEvidence}</td><td><span class="${item.operations.overdueP0 ? "pilot-paused" : ""}">P0 ${item.operations.openP0}（逾期 ${item.operations.overdueP0}）</span><br><small>P1 ${item.operations.openP1}</small></td><td><span class="badge ${item.status === "active" ? "info" : item.status === "paused" ? "danger" : "warn"}">${escapeHtml(item.status)}</span></td></tr>`).join("")}</tbody></table>`);
+  const select = document.getElementById("digital-evaluation-pilot-institution-id");
+  const current = select?.value;
+  if (select) {
+    select.innerHTML = rows.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.institutionName)} / ${escapeHtml(item.status)}</option>`).join("");
+    if (current && rows.some((item) => item.id === current)) select.value = current;
+  }
 }
 
 function renderCatalog() {
@@ -90,7 +103,7 @@ function renderBoundary() {
   setHtml("digital-evaluation-site-blockers", `<p>平台功能达到受控试点上线要求；正式生产评价仍需真实系统联调和现场签字。</p>${(board.siteBlockers || []).map((item) => `<p><strong>${escapeHtml(item.title)}</strong>：${escapeHtml(item.nextAction)}</p>`).join("")}`);
 }
 
-function renderAll() { renderMetrics(); renderCatalog(); renderCollectionJobs(); renderEvidence(); renderPreAssessments(); renderBoundary(); }
+function renderAll() { renderMetrics(); renderPilotOperations(); renderCatalog(); renderCollectionJobs(); renderEvidence(); renderPreAssessments(); renderBoundary(); }
 
 async function refreshBoard() {
   const [catalog, board] = await Promise.all([jsonRequest(DIGITAL_EVALUATION_ENDPOINTS.catalog), jsonRequest(DIGITAL_EVALUATION_ENDPOINTS.pilot)]);
@@ -101,6 +114,9 @@ async function refreshBoard() {
     document.getElementById("digital-evaluation-institution-id").value = user.orgCode || "";
     document.getElementById("digital-evaluation-institution-name").value = user.orgName || "";
     document.getElementById("digital-evaluation-institution-id").readOnly = true;
+    document.querySelectorAll(".commission-only").forEach((item) => { item.hidden = true; });
+    const action = document.getElementById("digital-evaluation-pilot-action");
+    if (action) action.innerHTML = '<option value="submit-readiness">提交准入材料</option><option value="record-daily-review">登记试点日报</option>';
   }
   renderAll();
 }
@@ -108,6 +124,20 @@ async function refreshBoard() {
 function bindForms() {
   ["digital-evaluation-pack-filter", "digital-evaluation-project-search"].forEach((id) => document.getElementById(id)?.addEventListener("input", renderCatalog));
   document.getElementById("digital-evaluation-assessment-id")?.addEventListener("change", renderFindings);
+  document.getElementById("digital-evaluation-pilot-register-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const payload = { action: "register", institutionId: document.getElementById("digital-evaluation-pilot-register-id").value, institutionName: document.getElementById("digital-evaluation-pilot-register-name").value, owner: document.getElementById("digital-evaluation-pilot-register-owner").value, launchWindow: document.getElementById("digital-evaluation-pilot-register-window").value, note: document.getElementById("digital-evaluation-pilot-register-note").value };
+    const result = await jsonRequest(`${DIGITAL_EVALUATION_ENDPOINTS.pilotInstitutions}/actions`, { method: "POST", body: JSON.stringify(payload) });
+    digitalEvaluationState.board = result.board; renderAll();
+  });
+  document.getElementById("digital-evaluation-pilot-action-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const id = document.getElementById("digital-evaluation-pilot-institution-id").value;
+    const readiness = Object.fromEntries([...document.querySelectorAll("[data-readiness-key]")].map((item) => [item.dataset.readinessKey, item.checked]));
+    const payload = { action: document.getElementById("digital-evaluation-pilot-action").value, readiness, evidenceRefs: document.getElementById("digital-evaluation-pilot-evidence-refs").value.split(",").map((item) => item.trim()).filter(Boolean), p0ClearanceRef: document.getElementById("digital-evaluation-pilot-p0-clearance").value, dailyReportRef: document.getElementById("digital-evaluation-pilot-daily-report").value, note: document.getElementById("digital-evaluation-pilot-action-note").value, noPatientPii: document.getElementById("digital-evaluation-pilot-no-pii").checked };
+    const result = await jsonRequest(`${DIGITAL_EVALUATION_ENDPOINTS.pilotInstitutions}/${encodeURIComponent(id)}/actions`, { method: "POST", body: JSON.stringify(payload) });
+    digitalEvaluationState.board = result.board; renderAll();
+  });
   document.getElementById("digital-evaluation-collection-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const id = document.getElementById("digital-evaluation-job-id").value;
