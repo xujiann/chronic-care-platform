@@ -238,11 +238,12 @@ function buildOverview(data, user, eventId = "") {
   const events = scopedEvents(data, user);
   const event = eventId ? events.find((row) => row.id === eventId) : events[0];
   const eventIdSet = new Set(events.map((row) => row.id));
-  const taskRows = data.emergencyFirstAidTasks.filter((row) => !eventId || row.eventId === eventId);
-  const preparationRows = data.emergencyGreenChannelPreparations.filter((row) => !eventId || row.eventId === eventId);
-  const familyRows = data.emergencyFamilyNotifications.filter((row) => !eventId || row.eventId === eventId);
-  const fallbackRows = data.emergencyFallbackDeliveries.filter((row) => !eventId || row.eventId === eventId);
-  return { ok:true, generatedAt:now(), activeEvent:event || null, events:events.slice(0, 20), firstAidTasks:taskRows.filter((row) => eventIdSet.has(row.eventId)), greenChannelPreparations:preparationRows.filter((row) => eventIdSet.has(row.eventId)), familyNotifications:familyRows.filter((row) => eventIdSet.has(row.eventId)), fallbackDeliveries:fallbackRows.filter((row) => eventIdSet.has(row.eventId)), authorizations:user.role === "citizen" ? data.emergencySosAuthorizations.filter((row) => row.residentId === user.residentId) : [], summary:{ goldenFourMinuteTasks:taskRows.length, pendingHospitalConfirmation:preparationRows.filter((row) => row.status !== "hospital-confirmed").length, queuedFamilyNotifications:familyRows.filter((row) => row.status === "queued").length, weakNetworkFallbacks:fallbackRows.length } };
+  const inScope = (row) => eventIdSet.has(row.eventId) && (!eventId || row.eventId === eventId);
+  const taskRows = data.emergencyFirstAidTasks.filter(inScope);
+  const preparationRows = data.emergencyGreenChannelPreparations.filter(inScope);
+  const familyRows = data.emergencyFamilyNotifications.filter(inScope);
+  const fallbackRows = data.emergencyFallbackDeliveries.filter(inScope);
+  return { ok:true, generatedAt:now(), activeEvent:event || null, events:events.slice(0, 20), firstAidTasks:taskRows, greenChannelPreparations:preparationRows, familyNotifications:familyRows, fallbackDeliveries:fallbackRows, authorizations:user.role === "citizen" ? data.emergencySosAuthorizations.filter((row) => row.residentId === user.residentId) : [], summary:{ goldenFourMinuteTasks:taskRows.length, pendingHospitalConfirmation:preparationRows.filter((row) => row.status !== "hospital-confirmed").length, queuedFamilyNotifications:familyRows.filter((row) => row.status === "queued").length, weakNetworkFallbacks:fallbackRows.length } };
 }
 
 function buildCommandCenter(data, user) {
@@ -256,13 +257,15 @@ function buildCommandCenter(data, user) {
 
 function buildQualityDashboard(data, user) {
   ensureState(data); if (!["commission", "institution"].includes(user.role)) throw Object.assign(new Error("Only emergency-center or hospital roles can access quality analytics"), { status:403 });
-  const rows = data.emergencyEvents.filter((event) => event.sos || event.lifeChain).map((event) => {
+  const visibleEvents = scopedEvents(data, user);
+  const visibleEventIds = new Set(visibleEvents.map((event) => event.id));
+  const rows = visibleEvents.filter((event) => event.sos || event.lifeChain).map((event) => {
     const chain = event.lifeChain || {};
     const tasks = data.emergencyFirstAidTasks.filter((item) => item.eventId === event.id);
     const green = data.emergencyGreenChannelPreparations.find((item) => item.eventId === event.id);
     return { eventId:event.id, eventNo:event.eventNo, source:event.source, status:event.status, signal:event.sos?.detectedSignal || "manual", automatic:Boolean(event.sos?.autoAuthorized), firstAidTasks:tasks.length, greenChannelStatus:green?.status || "not-created", fallback:Boolean(chain.fallbackDeliveryId), evidenceReady:Boolean(event.handover), qualityState:event.handover ? "closed-loop-complete" : green?.status === "hospital-confirmed" ? "hospital-prealert-confirmed" : "in-progress" };
   });
-  return { ok:true, generatedAt:now(), summary:{ cases:rows.length, automaticSos:rows.filter((row) => row.automatic).length, firstAidTaskCoverage:rows.filter((row) => row.firstAidTasks > 0).length, hospitalPrealertsConfirmed:rows.filter((row) => row.greenChannelStatus === "hospital-confirmed").length, weakNetworkFallbacks:rows.filter((row) => row.fallback).length, cancellationReviews:data.emergencyQualityReviews.filter((item) => item.type === "automatic-sos-cancellation-review").length, suppressedDuplicateSignals:data.emergencySosSignalLog.filter((item) => item.status === "suppressed-duplicate").length, closedLoopEvidence:rows.filter((row) => row.evidenceReady).length }, rows, boundary:"Quality dashboard uses platform timestamps; statutory quality reporting and official emergency performance assessment require locally approved indicators and data signoff." };
+  return { ok:true, generatedAt:now(), summary:{ cases:rows.length, automaticSos:rows.filter((row) => row.automatic).length, firstAidTaskCoverage:rows.filter((row) => row.firstAidTasks > 0).length, hospitalPrealertsConfirmed:rows.filter((row) => row.greenChannelStatus === "hospital-confirmed").length, weakNetworkFallbacks:rows.filter((row) => row.fallback).length, cancellationReviews:data.emergencyQualityReviews.filter((item) => visibleEventIds.has(item.eventId) && item.type === "automatic-sos-cancellation-review").length, suppressedDuplicateSignals:data.emergencySosSignalLog.filter((item) => visibleEventIds.has(item.eventId) && item.status === "suppressed-duplicate").length, closedLoopEvidence:rows.filter((row) => row.evidenceReady).length }, rows, boundary:"Quality dashboard uses platform timestamps; statutory quality reporting and official emergency performance assessment require locally approved indicators and data signoff." };
 }
 
 module.exports = { addFamilyContact, buildCommandCenter, buildOverview, buildQualityDashboard, confirmGreenChannel, coordinateEvent, createAuthorization, createAutomaticSos, ensureState, requestAutomaticSosCancellation, resolveAutomaticSosCancellation, revokeAuthorization, seed };
