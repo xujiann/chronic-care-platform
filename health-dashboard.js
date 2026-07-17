@@ -228,6 +228,14 @@ function renderDashboard(summary) {
   renderDependencies(summary.siteDependencies || []);
   renderInterfaces(summary.interfaces || []);
   renderEvidence(summary.evidence || []);
+  renderBloodCoordination(summary.bloodCoordination || {});
+}
+
+function renderBloodCoordination(coordination) {
+  const target = document.querySelector("#dashboard-blood-coordination");
+  if (!target) return;
+  const rows = coordination.projections || [];
+  target.innerHTML = rows.length ? `<table><thead><tr><th>级别</th><th>治理事件</th><th>订阅模块</th><th>对象</th><th>发生时间</th></tr></thead><tbody>${rows.map((item) => `<tr><td>${escapeHtml(item.severity)}</td><td>${escapeHtml(item.eventType)}</td><td>${escapeHtml(item.consumer)}</td><td>${escapeHtml(item.subjectId)}</td><td>${escapeHtml(item.occurredAt)}</td></tr>`).join("")}</tbody></table>` : "<p>尚无区域血液事件投影。</p>";
 }
 
 function renderIndustryGovernanceIndicatorCenter(center) {

@@ -270,16 +270,16 @@ const citizenActionDockFallbacks = {
   "health-record": [
     { label: "看时间轴", target: "#citizen-highlight-center", tone: "primary" },
     { label: "查订单", target: ".service-order-center-panel" },
-    { label: "隐私授权", target: ".data-governance-panel" }
+    { label: "隐私授权", target: "#grant-auth" }
   ],
   emr: [
     { label: "看病历", target: "#service-emr", tone: "primary" },
     { label: "查检验", target: ".vault-panel" },
-    { label: "授权记录", target: ".data-governance-panel" }
+    { label: "授权记录", target: "#grant-auth" }
   ],
   nursing: [
     { label: "预约护理", target: "#service-nursing", tone: "primary" },
-    { label: "长期照护", target: "#long-term-care-assessment-panel" },
+    { label: "长期照护", target: ".longterm-care-panel" },
     { label: "查订单", target: ".service-order-center-panel" }
   ],
   escort: [
@@ -289,12 +289,12 @@ const citizenActionDockFallbacks = {
   ],
   "family-doctor": [
     { label: "签约家医", target: "#service-family-doctor", tone: "primary" },
-    { label: "履约进度", target: "#family-doctor-contract-panel" },
-    { label: "家庭成员", target: ".member-panel" }
+    { label: "履约进度", target: "#family-doctor-contract-cards" },
+    { label: "家庭成员", target: "#member-list" }
   ],
   registration: [
     { label: "预约挂号", target: "#service-registration", tone: "primary" },
-    { label: "候补号源", target: "#registration-waitlist-panel" },
+    { label: "候补号源", target: "#registration-waitlist-cards" },
     { label: "查订单", target: ".service-order-center-panel" }
   ]
 };

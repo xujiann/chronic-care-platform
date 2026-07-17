@@ -169,6 +169,14 @@ function renderDashboard() {
   fill("hospital-event", emergencyDashboard.events.filter((e)=>e.status==="transporting"), (e)=>e.eventNo);
   fill("hospital-select", emergencyDashboard.hospitals.filter((h)=>h.emergencyStatus==="available"), (h)=>`${h.name} · ETA ${h.etaMinutes}分钟`);
   fill("handover-event", emergencyDashboard.events.filter((e)=>e.status==="arrived-hospital"), (e)=>e.eventNo);
+  renderBloodCoordination(emergencyDashboard.bloodCoordination || {});
+}
+
+function renderBloodCoordination(coordination) {
+  const target = document.querySelector("#emergency-blood-coordination");
+  if (!target) return;
+  const rows = coordination.projections || [];
+  target.innerHTML = rows.length ? rows.map((item) => productionRow(`${item.eventType} / ${item.subjectId}`, item.severity, `${item.category} / ${item.workflow}`)).join("") : productionRow("区域血液保障", "pending", "尚无血液事件投影，请由血液中心发布当前态势");
 }
 
 function renderEvent(event) {

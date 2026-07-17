@@ -359,6 +359,7 @@ function renderPublicHealthSystem(system) {
   currentPublicHealthSystem = system;
   setPublicHealthMessage("");
   renderMetrics(system);
+  renderPublicHealthHighlights(system.highlights || {});
   renderSourceDocuments(system.sourceDocuments || []);
   renderStandardDomains(system);
   renderStandardImplementationLedger(system.standardImplementationBoard || buildStaticStandardImplementationBoard(system.standardImplementationLedger || [], system.standardDomains || []), system.standardImplementationEvidenceCandidates || []);
@@ -397,6 +398,39 @@ function renderPublicHealthSystem(system) {
   }));
   renderCutoverBlockers(system.cutoverBlockers || []);
   renderEvidence(system.readinessEvidence || []);
+}
+
+function renderPublicHealthHighlights(highlights) {
+  const target = document.querySelector("#public-health-highlight-center");
+  if (!target) return;
+  const capabilities = Array.isArray(highlights.capabilities) ? highlights.capabilities : [];
+  const summary = highlights.summary || {};
+  if (!capabilities.length) {
+    target.innerHTML = `<article class="priority-row">
+      <div class="priority-rank warn">PH</div>
+      <div>
+        <strong>亮点能力待同步</strong>
+        <p>请通过 /api/public-health/highlights 读取公共卫生监测预警、指挥调度和证据驾驶舱数据。</p>
+      </div>
+    </article>`;
+    return;
+  }
+  const header = `<article class="priority-row">
+    <div class="priority-rank ok">${escapeHtml(summary.capabilities || capabilities.length)}</div>
+    <div>
+      <strong>五套亮点能力已接入</strong>
+      <p>活跃预警 ${escapeHtml(summary.activeAlerts || 0)} 个，开放任务 ${escapeHtml(summary.openTasks || 0)} 个，可用资源 ${escapeHtml(summary.readyResources || 0)}/${escapeHtml(summary.resources || 0)}，证据得分 ${escapeHtml(summary.evidenceScore || 0)}%。</p>
+      <small>功能态：${escapeHtml(highlights.functionalState || "runnable")}；上线态：${escapeHtml(highlights.formalGoLiveState || "site-evidence-required")}</small>
+    </div>
+  </article>`;
+  target.innerHTML = header + capabilities.map((item, index) => `<article class="priority-row">
+    <div class="priority-rank ${index < 2 ? "danger" : "warn"}">${escapeHtml(index + 1)}</div>
+    <div>
+      <strong>${escapeHtml(item.name || item.id)}</strong>
+      <p>${escapeHtml(item.description || "")}</p>
+      <small>${escapeHtml(item.owner || "")} / ${escapeHtml((item.sources || []).join("、"))}</small>
+    </div>
+  </article>`).join("");
 }
 
 function renderMetrics(system) {

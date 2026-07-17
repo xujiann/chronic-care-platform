@@ -199,6 +199,21 @@ const {
   seedPublicHealthStandardImplementationLedger,
   seedPublicHealthStandards
 } = require("./scripts/public-health-readiness");
+const {
+  buildPublicHealthHighlights,
+  normalizePublicHealthAiReviewAction,
+  normalizePublicHealthCommandTaskAction,
+  normalizePublicHealthEvidenceAction,
+  normalizePublicHealthHighlightAlertAction,
+  normalizePublicHealthSignal,
+  seedPublicHealthAiReviews,
+  seedPublicHealthAlerts,
+  seedPublicHealthCommandTasks,
+  seedPublicHealthEvidenceRecords,
+  seedPublicHealthResources,
+  seedPublicHealthSignals,
+  seedPublicHealthTriggerRules
+} = require("./public-health-highlights-service");
 
 const PORT = Number(process.env.PORT || 5173);
 const ROOT = __dirname;
@@ -904,6 +919,13 @@ function seedState() {
     publicHealthStandardImplementationLedger: seedPublicHealthStandardImplementationLedger(),
     publicHealthInstitutionScopes: seedPublicHealthInstitutionScopes(),
     publicHealthEvents: seedPublicHealthEvents(),
+    publicHealthTriggerRules: seedPublicHealthTriggerRules(),
+    publicHealthSignals: seedPublicHealthSignals(),
+    publicHealthAlerts: seedPublicHealthAlerts(),
+    publicHealthCommandTasks: seedPublicHealthCommandTasks(),
+    publicHealthResources: seedPublicHealthResources(),
+    publicHealthAiReviews: seedPublicHealthAiReviews(),
+    publicHealthEvidenceRecords: seedPublicHealthEvidenceRecords(),
     publicHealthExchangeTasks: seedPublicHealthExchangeTasks(),
     publicHealthExchangeRuns: seedPublicHealthExchangeRuns(),
     publicHealthInstitutionTasks: seedPublicHealthInstitutionTasks(),
@@ -7499,6 +7521,13 @@ function normalizeState(data) {
     publicHealthStandardImplementationLedger: mergeByKey(seedPublicHealthStandardImplementationLedger(), data.publicHealthStandardImplementationLedger, "id"),
     publicHealthInstitutionScopes: mergeByKey(seedPublicHealthInstitutionScopes(), data.publicHealthInstitutionScopes, "id"),
     publicHealthEvents: mergeByKey(seedPublicHealthEvents(), data.publicHealthEvents, "id"),
+    publicHealthTriggerRules: mergeByKey(seedPublicHealthTriggerRules(), data.publicHealthTriggerRules, "id"),
+    publicHealthSignals: mergeByKey(seedPublicHealthSignals(), data.publicHealthSignals, "id"),
+    publicHealthAlerts: mergeByKey(seedPublicHealthAlerts(), data.publicHealthAlerts, "id"),
+    publicHealthCommandTasks: mergeByKey(seedPublicHealthCommandTasks(), data.publicHealthCommandTasks, "id"),
+    publicHealthResources: mergeByKey(seedPublicHealthResources(), data.publicHealthResources, "id"),
+    publicHealthAiReviews: mergeByKey(seedPublicHealthAiReviews(), data.publicHealthAiReviews, "id"),
+    publicHealthEvidenceRecords: mergeByKey(seedPublicHealthEvidenceRecords(), data.publicHealthEvidenceRecords, "id"),
     publicHealthExchangeTasks: mergeByKey(seedPublicHealthExchangeTasks(), data.publicHealthExchangeTasks, "id"),
     publicHealthExchangeRuns: mergeByKey(seedPublicHealthExchangeRuns(), data.publicHealthExchangeRuns, "id"),
     publicHealthInstitutionTasks: mergeByKey(seedPublicHealthInstitutionTasks(), data.publicHealthInstitutionTasks, "id"),
@@ -8032,6 +8061,13 @@ function completeSystemTargets(state) {
   state.publicHealthStandards = mergeByKey(seedPublicHealthStandards(), state.publicHealthStandards, "id");
   state.publicHealthInstitutionScopes = mergeByKey(seedPublicHealthInstitutionScopes(), state.publicHealthInstitutionScopes, "id");
   state.publicHealthEvents = mergeByKey(seedPublicHealthEvents(), state.publicHealthEvents, "id");
+  state.publicHealthTriggerRules = mergeByKey(seedPublicHealthTriggerRules(), state.publicHealthTriggerRules, "id");
+  state.publicHealthSignals = mergeByKey(seedPublicHealthSignals(), state.publicHealthSignals, "id");
+  state.publicHealthAlerts = mergeByKey(seedPublicHealthAlerts(), state.publicHealthAlerts, "id");
+  state.publicHealthCommandTasks = mergeByKey(seedPublicHealthCommandTasks(), state.publicHealthCommandTasks, "id");
+  state.publicHealthResources = mergeByKey(seedPublicHealthResources(), state.publicHealthResources, "id");
+  state.publicHealthAiReviews = mergeByKey(seedPublicHealthAiReviews(), state.publicHealthAiReviews, "id");
+  state.publicHealthEvidenceRecords = mergeByKey(seedPublicHealthEvidenceRecords(), state.publicHealthEvidenceRecords, "id");
   state.publicHealthExchangeTasks = mergeByKey(seedPublicHealthExchangeTasks(), state.publicHealthExchangeTasks, "id");
   state.publicHealthExchangeRuns = mergeByKey(seedPublicHealthExchangeRuns(), state.publicHealthExchangeRuns, "id");
   state.publicHealthInstitutionTasks = mergeByKey(seedPublicHealthInstitutionTasks(), state.publicHealthInstitutionTasks, "id");
@@ -17598,11 +17634,11 @@ async function handleApi(req, res) {
       result: "allowed",
       detail: "Commission dashboard aggregate summary read."
     });
-    sendJson(res, 200, buildHealthDashboardSummary({
+    sendJson(res, 200, { ...buildHealthDashboardSummary({
       data,
       runtime: buildRuntimeMetrics(data),
       readiness: buildSystemReadinessReport(data)
-    }));
+    }), bloodCoordination: BloodEventHub.dashboard(data, user) });
     return;
   }
 
@@ -17649,6 +17685,8 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/public-health/system");
     if (!user) return;
     const data = readDatabase();
+    const system = buildPublicHealthSystem({ data });
+    const highlights = buildPublicHealthHighlights({ data });
     appendSecurityEvent({
       actor: user.name,
       role: user.role,
@@ -17657,7 +17695,249 @@ async function handleApi(req, res) {
       result: "allowed",
       detail: "Public health standard matrix, institution scopes, events, and exchange tasks read."
     });
-    sendJson(res, 200, buildPublicHealthSystem({ data }));
+    sendJson(res, 200, {
+      ...system,
+      highlights,
+      summary: {
+        ...system.summary,
+        highlightCapabilities: highlights.summary.capabilities,
+        highlightActiveAlerts: highlights.summary.activeAlerts,
+        highlightOpenTasks: highlights.summary.openTasks,
+        highlightEvidenceScore: highlights.summary.evidenceScore
+      }
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/highlights") {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/highlights");
+    if (!user) return;
+    const data = readDatabase();
+    const highlights = buildPublicHealthHighlights({ data });
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "public-health-highlight-read",
+      target: "/api/public-health/highlights",
+      result: "allowed",
+      detail: `${highlights.summary.capabilities} capabilities / ${highlights.summary.activeAlerts} active alerts / ${highlights.summary.openTasks} open tasks`
+    });
+    sendJson(res, 200, highlights);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/public-health/highlights/signals") {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/highlights/signals");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    let signal;
+    try {
+      signal = normalizePublicHealthSignal(payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    data.publicHealthSignals = [signal, ...mergeByKey(seedPublicHealthSignals(), data.publicHealthSignals, "id")].slice(0, 200);
+    data.securityEvents = sealAuditTrail([
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "public-health-highlight-signal",
+        target: signal.id,
+        result: "allowed",
+        detail: `${signal.sourceType} / ${signal.metric} / ${signal.value}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120), { recompute: true });
+    writeDatabase(data);
+    sendJson(res, 201, {
+      ok: true,
+      signal,
+      highlights: buildPublicHealthHighlights({ data: readDatabase() })
+    });
+    return;
+  }
+
+  const publicHealthHighlightAlertActionMatch = url.pathname.match(/^\/api\/public-health\/highlights\/alerts\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthHighlightAlertActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/highlights/alerts/:id/actions");
+    if (!user) return;
+    const alertId = decodeURIComponent(publicHealthHighlightAlertActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const alerts = mergeByKey(seedPublicHealthAlerts(), data.publicHealthAlerts, "id");
+    const index = alerts.findIndex((item) => item.id === alertId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "public health highlight alert not found" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizePublicHealthHighlightAlertAction(alerts[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    alerts[index] = normalized.item;
+    data.publicHealthAlerts = alerts;
+    data.securityEvents = sealAuditTrail([
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "public-health-highlight-alert-action",
+        target: alertId,
+        result: "allowed",
+        detail: `${normalized.history.action} / ${normalized.item.status}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120), { recompute: true });
+    writeDatabase(data);
+    sendJson(res, 200, {
+      ok: true,
+      alert: normalized.item,
+      action: normalized.history,
+      highlights: buildPublicHealthHighlights({ data: readDatabase() })
+    });
+    return;
+  }
+
+  const publicHealthHighlightTaskActionMatch = url.pathname.match(/^\/api\/public-health\/highlights\/command-tasks\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthHighlightTaskActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/highlights/command-tasks/:id/actions");
+    if (!user) return;
+    const taskId = decodeURIComponent(publicHealthHighlightTaskActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const tasks = mergeByKey(seedPublicHealthCommandTasks(), data.publicHealthCommandTasks, "id");
+    const index = tasks.findIndex((item) => item.id === taskId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "public health highlight command task not found" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizePublicHealthCommandTaskAction(tasks[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    tasks[index] = normalized.item;
+    data.publicHealthCommandTasks = tasks;
+    data.securityEvents = sealAuditTrail([
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "public-health-highlight-command-task-action",
+        target: taskId,
+        result: "allowed",
+        detail: `${normalized.history.action} / ${normalized.item.status}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120), { recompute: true });
+    writeDatabase(data);
+    sendJson(res, 200, {
+      ok: true,
+      task: normalized.item,
+      action: normalized.history,
+      highlights: buildPublicHealthHighlights({ data: readDatabase() })
+    });
+    return;
+  }
+
+  const publicHealthHighlightAiActionMatch = url.pathname.match(/^\/api\/public-health\/highlights\/ai-reviews\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthHighlightAiActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/highlights/ai-reviews/:id/actions");
+    if (!user) return;
+    const reviewId = decodeURIComponent(publicHealthHighlightAiActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const reviews = mergeByKey(seedPublicHealthAiReviews(), data.publicHealthAiReviews, "id");
+    const index = reviews.findIndex((item) => item.id === reviewId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "public health highlight AI review not found" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizePublicHealthAiReviewAction(reviews[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    reviews[index] = normalized.item;
+    data.publicHealthAiReviews = reviews;
+    data.securityEvents = sealAuditTrail([
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "public-health-highlight-ai-review-action",
+        target: reviewId,
+        result: "allowed",
+        detail: `${normalized.history.action} / ${normalized.item.status}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120), { recompute: true });
+    writeDatabase(data);
+    sendJson(res, 200, {
+      ok: true,
+      review: normalized.item,
+      action: normalized.history,
+      highlights: buildPublicHealthHighlights({ data: readDatabase() })
+    });
+    return;
+  }
+
+  const publicHealthHighlightEvidenceActionMatch = url.pathname.match(/^\/api\/public-health\/highlights\/evidence\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthHighlightEvidenceActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/highlights/evidence/:id/actions");
+    if (!user) return;
+    const evidenceId = decodeURIComponent(publicHealthHighlightEvidenceActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const records = mergeByKey(seedPublicHealthEvidenceRecords(), data.publicHealthEvidenceRecords, "id");
+    const index = records.findIndex((item) => item.id === evidenceId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "public health highlight evidence record not found" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizePublicHealthEvidenceAction(records[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    records[index] = normalized.item;
+    data.publicHealthEvidenceRecords = records;
+    data.securityEvents = sealAuditTrail([
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "public-health-highlight-evidence-action",
+        target: evidenceId,
+        result: "allowed",
+        detail: `${normalized.history.action} / ${normalized.item.status}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120), { recompute: true });
+    writeDatabase(data);
+    sendJson(res, 200, {
+      ok: true,
+      evidence: normalized.item,
+      action: normalized.history,
+      highlights: buildPublicHealthHighlights({ data: readDatabase() })
+    });
     return;
   }
 
@@ -18832,6 +19112,7 @@ async function handleApi(req, res) {
     const dashboard = buildHospitalOperationsDashboard(data);
     dashboard.runCenter = buildProductionOperationsCenter(data, { runtimeMetrics: buildRuntimeMetrics(data) });
     dashboard.observability = buildObservabilityAlertCenter(data);
+    dashboard.bloodCoordination = { ...BloodEventHub.dashboard(data, user), projections: BloodEventHub.dashboard(data, user).projections.filter((item) => item.consumer === "operations") };
     sendJson(res, 200, dashboard);
     return;
   }
@@ -19837,7 +20118,9 @@ async function handleApi(req, res) {
   if (req.method === "GET" && url.pathname === "/api/emergency/dashboard") {
     const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/emergency/dashboard");
     if (!user) return;
-    sendJson(res, 200, redactSensitiveResponse(EmergencyService.buildDashboard(readDatabase(), user), user));
+    const data = readDatabase();
+    const bloodCoordination = BloodEventHub.dashboard(data, user);
+    sendJson(res, 200, redactSensitiveResponse({ ...EmergencyService.buildDashboard(data, user), bloodCoordination: { ...bloodCoordination, projections: bloodCoordination.projections.filter((item) => item.consumer === "emergency") } }, user));
     return;
   }
 
@@ -21043,7 +21326,9 @@ async function handleApi(req, res) {
   if (req.method === "GET" && url.pathname === "/api/quality-safety/dashboard") {
     const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/quality-safety/dashboard");
     if (!user) return;
-    sendJson(res, 200, buildQualitySafetyDashboard(readDatabase(), user));
+    const data = readDatabase();
+    const bloodCoordination = BloodEventHub.dashboard(data, user);
+    sendJson(res, 200, { ...buildQualitySafetyDashboard(data, user), bloodCoordination: { ...bloodCoordination, projections: bloodCoordination.projections.filter((item) => item.consumer === "quality-safety") } });
     return;
   }
 

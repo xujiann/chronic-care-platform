@@ -103,8 +103,16 @@ function renderOperationsDashboard(dashboard) {
   renderReconciliationReviews(dashboard.reconciliationReviews || []);
   renderProductionOperationsCenter(dashboard.runCenter || {});
   renderObservabilityAlertCenter(dashboard.observability || {});
+  renderBloodCoordination(dashboard.bloodCoordination || {});
   const boundary = document.querySelector("#operations-boundary");
   if (boundary) boundary.textContent = `${(dashboard.boundaries || []).join(" / ")} | reuse: ${(dashboard.reusedCollections || []).join(", ")}`;
+}
+
+function renderBloodCoordination(coordination) {
+  const target = document.querySelector("#operations-blood-coordination");
+  if (!target) return;
+  const rows = coordination.projections || [];
+  target.innerHTML = rows.length ? `<table><thead><tr><th>级别</th><th>血液事件</th><th>对象</th><th>运营流程</th><th>发生时间</th></tr></thead><tbody>${rows.map((item) => `<tr><td>${operationsEscapeHtml(item.severity)}</td><td>${operationsEscapeHtml(item.eventType)}</td><td>${operationsEscapeHtml(item.subjectId)}</td><td>${operationsEscapeHtml(item.workflow)}</td><td>${operationsEscapeHtml(item.occurredAt)}</td></tr>`).join("")}</tbody></table>` : "<p>尚无血液事件投影，请在血液创新中心发布当前态势。</p>";
 }
 
 function renderObservabilityAlertCenter(center) {

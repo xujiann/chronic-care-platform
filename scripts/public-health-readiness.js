@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const fs = require("node:fs");
 const path = require("node:path");
+const { buildPublicHealthHighlights } = require("../public-health-highlights-service");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "public-health-readiness-report.json");
@@ -2548,6 +2549,7 @@ function defaultSources() {
 function buildPublicHealthReadinessReport(options = {}) {
   const pkg = options.pkg || (options.packageSource ? JSON.parse(options.packageSource) : readJson("package.json"));
   const system = buildPublicHealthSystem(options);
+  const highlights = buildPublicHealthHighlights({ data: options.data || {} });
   const sources = options.sources || defaultSources();
   const standard = system.standardCoverage;
   const scopeText = system.institutionScopes.map((item) => `${item.name} ${item.institutionType}`).join("\n");
@@ -2616,6 +2618,9 @@ function buildPublicHealthReadinessReport(options = {}) {
     check("api:site-evidence-verification-tasks", sources.server.includes("/api/public-health/site-evidence-verification-tasks/:id/actions") && sources.server.includes("public-health-site-evidence-verification-action"), "site evidence verification task API is wired", "api"),
     check("api:standard-implementation-ledger", ["/api/public-health/standard-implementation-ledger/:id/actions", "public-health-standard-implementation-action", "assign-standard-gap-remediation", "verify-standard-gap-remediation", "remediationOwner and remediationDueAt"].every((token) => sources.server.includes(token)), "standard implementation ledger API is wired with remediation safeguards", "api"),
     check("api:launch-gate", sources.server.includes("/api/public-health/launch-gate") && sources.server.includes("public-health-launch-gate-action") && sources.server.includes("launch approval is blocked until all prerequisite launch requirements pass"), "public health production launch gate API is wired", "api"),
+    check("publicHealth:highlightCapabilities", highlights.summary.capabilities === 5 && highlights.capabilities.length === 5 && highlights.formalGoLiveState === "blocked-until-site-evidence-signed", `${highlights.summary.capabilities} highlight capabilities / ${highlights.summary.activeAlerts} active alerts / ${highlights.summary.openTasks} open tasks`, "public-health"),
+    check("api:highlight-actions", ["/api/public-health/highlights", "/api/public-health/highlights/signals", "/api/public-health/highlights/alerts/:id/actions", "/api/public-health/highlights/command-tasks/:id/actions", "/api/public-health/highlights/ai-reviews/:id/actions", "/api/public-health/highlights/evidence/:id/actions"].every((token) => sources.server.includes(token)), "five-suite public health highlight APIs are wired", "api"),
+    check("frontend:highlight-center", sources.html.includes("public-health-highlight-center") && sources.js.includes("renderPublicHealthHighlights"), "public health highlight center is visible", "frontend"),
     check("frontend:page", sources.html.includes("public-health-metrics") && sources.js.includes("renderPublicHealthSystem"), "public-health.html and public-health.js are wired", "frontend"),
     check("api:route", sources.server.includes("/api/public-health/system") && sources.server.includes("buildPublicHealthSystem"), "GET /api/public-health/system", "api"),
     check("package:script", Boolean(pkg.scripts?.["public-health:readiness"]) && sources.packageSource.includes("public-health-readiness.js"), pkg.scripts?.["public-health:readiness"] || "missing", "release"),
@@ -2663,6 +2668,7 @@ function buildPublicHealthReadinessReport(options = {}) {
     siteEvidenceVerificationBoard: system.siteEvidenceVerificationBoard,
     launchApprovals: system.launchApprovals,
     launchGate: system.launchGate,
+    highlights,
     openCutoverBlockers: system.openCutoverBlockers,
     cutoverReadiness: system.cutoverReadiness,
     riskQueue: system.riskQueue,

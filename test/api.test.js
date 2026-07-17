@@ -395,6 +395,85 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(publicHealth.body.summary.productionHandoffs >= 6, true);
     assert.equal(publicHealth.body.productionHandoffBoard.status, "blocked");
     assert.equal(publicHealth.body.productionHandoffBoard.summary.releaseArtifacts >= 8, true);
+    assert.equal(publicHealth.body.highlights.summary.capabilities, 5);
+    assert.equal(publicHealth.body.summary.highlightCapabilities, 5);
+
+    const publicHealthHighlights = await api(baseUrl, "/api/public-health/highlights", authorized(accountLogin.body.token));
+    assert.equal(publicHealthHighlights.response.status, 200);
+    assert.equal(publicHealthHighlights.body.ok, true);
+    assert.equal(publicHealthHighlights.body.summary.capabilities, 5);
+    assert.equal(publicHealthHighlights.body.triggerCenter.rules.length >= 5, true);
+    assert.equal(publicHealthHighlights.body.commandCenter.openTasks.length >= 1, true);
+    assert.equal(publicHealthHighlights.body.aiCenter.modelCard.humanApprovalRequired, true);
+
+    const publicHealthHighlightSignal = await api(baseUrl, "/api/public-health/highlights/signals", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        id: "phsig-api-regression",
+        ruleId: publicHealthHighlights.body.triggerCenter.rules[0].id,
+        sourceType: publicHealthHighlights.body.triggerCenter.rules[0].sourceType,
+        sourceSystem: "API regression signal source",
+        metric: publicHealthHighlights.body.triggerCenter.rules[0].metric,
+        value: 9,
+        baseline: 2,
+        unit: "cases",
+        region: "API regression region",
+        institution: "API regression institution",
+        evidenceRefs: ["PH-HIGHLIGHT-API-001"]
+      })
+    }));
+    assert.equal(publicHealthHighlightSignal.response.status, 201);
+    assert.equal(publicHealthHighlightSignal.body.ok, true);
+    assert.equal(publicHealthHighlightSignal.body.signal.id, "phsig-api-regression");
+    assert.equal(publicHealthHighlightSignal.body.highlights.summary.signals >= publicHealthHighlights.body.summary.signals, true);
+
+    const publicHealthHighlightAlertAction = await api(baseUrl, "/api/public-health/highlights/alerts/phalert-fever-zhongshan/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "dispatch",
+        note: "API regression dispatches the public health highlight alert",
+        evidenceRefs: ["PH-HIGHLIGHT-API-002"]
+      })
+    }));
+    assert.equal(publicHealthHighlightAlertAction.response.status, 200);
+    assert.equal(publicHealthHighlightAlertAction.body.alert.status, "dispatched");
+    assert.equal(publicHealthHighlightAlertAction.body.action.action, "dispatch");
+
+    const publicHealthHighlightTaskAction = await api(baseUrl, "/api/public-health/highlights/command-tasks/phcmd-task-fever-investigation/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "accept",
+        note: "API regression accepts command task",
+        evidenceRefs: ["PH-HIGHLIGHT-API-003"]
+      })
+    }));
+    assert.equal(publicHealthHighlightTaskAction.response.status, 200);
+    assert.equal(publicHealthHighlightTaskAction.body.task.status, "in-progress");
+    assert.equal(publicHealthHighlightTaskAction.body.action.action, "accept");
+
+    const publicHealthHighlightAiReviewAction = await api(baseUrl, "/api/public-health/highlights/ai-reviews/phai-review-fever-zhongshan/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "approve",
+        note: "API regression keeps AI suggestion behind human approval",
+        evidenceRefs: ["PH-HIGHLIGHT-API-004"]
+      })
+    }));
+    assert.equal(publicHealthHighlightAiReviewAction.response.status, 200);
+    assert.equal(publicHealthHighlightAiReviewAction.body.review.status, "approved");
+    assert.equal(publicHealthHighlightAiReviewAction.body.review.approvedBy, accountLogin.body.user.name);
+
+    const publicHealthHighlightEvidenceAction = await api(baseUrl, "/api/public-health/highlights/evidence/phec-audit-chain/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "verify",
+        artifactName: "API regression audit-chain evidence",
+        note: "API regression verifies the highlight audit chain"
+      })
+    }));
+    assert.equal(publicHealthHighlightEvidenceAction.response.status, 200);
+    assert.equal(publicHealthHighlightEvidenceAction.body.evidence.status, "verified");
+    assert.equal(publicHealthHighlightEvidenceAction.body.highlights.evidenceCenter.summary.recorded >= 1, true);
 
     const publicHealthAction = await api(baseUrl, "/api/public-health/events/phe-infectious-001/actions", authorized(accountLogin.body.token, {
       method: "POST",
@@ -1078,6 +1157,12 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(publicHealthAudit.body.securityEvents.some((item) => item.action === "public-health-cutover-readiness" && item.target === "/api/public-health/cutover-readiness"), true);
     assert.equal(publicHealthAudit.body.securityEvents.some((item) => item.action === "public-health-cutover-evidence-packets" && item.target === "/api/public-health/cutover-evidence-packets"), true);
     assert.equal(publicHealthAudit.body.securityEvents.some((item) => item.action === "public-health-cutover-evidence-packet-action" && item.target === "phcep-direct-report-endpoint"), true);
+    assert.equal(publicHealthAudit.body.securityEvents.some((item) => item.action === "public-health-highlight-read" && item.target === "/api/public-health/highlights"), true);
+    assert.equal(publicHealthAudit.body.securityEvents.some((item) => item.action === "public-health-highlight-signal" && item.target === "phsig-api-regression"), true);
+    assert.equal(publicHealthAudit.body.securityEvents.some((item) => item.action === "public-health-highlight-alert-action" && item.target === "phalert-fever-zhongshan"), true);
+    assert.equal(publicHealthAudit.body.securityEvents.some((item) => item.action === "public-health-highlight-command-task-action" && item.target === "phcmd-task-fever-investigation"), true);
+    assert.equal(publicHealthAudit.body.securityEvents.some((item) => item.action === "public-health-highlight-ai-review-action" && item.target === "phai-review-fever-zhongshan"), true);
+    assert.equal(publicHealthAudit.body.securityEvents.some((item) => item.action === "public-health-highlight-evidence-action" && item.target === "phec-audit-chain"), true);
     assert.equal(publicHealthAudit.body.securityEvents.some((item) => item.action === "public-health-cutover-drills" && item.target === "/api/public-health/cutover-drills"), true);
     assert.equal(publicHealthAudit.body.securityEvents.some((item) => item.action === "public-health-cutover-drill-action" && item.target === "phdr-backup-rollback"), true);
     assert.equal(publicHealthAudit.body.securityEvents.some((item) => item.action === "public-health-production-handoffs" && item.target === "/api/public-health/production-handoffs"), true);

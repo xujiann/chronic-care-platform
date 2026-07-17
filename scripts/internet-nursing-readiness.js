@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const fs = require("node:fs");
 const path = require("node:path");
+const { HIGHLIGHT_FEATURE_IDS, buildInternetNursingInnovationCenter } = require("../internet-nursing-highlights");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "internet-nursing-readiness-report.json");
@@ -402,6 +403,13 @@ function buildInternetNursingReadinessReport(options = {}) {
   const nurses = mergeById(fallbackNurses(), data.internetNursingNurses);
   const orders = mergeById(fallbackOrders(), data.internetNursingOrders);
   const cutoverPack = buildInternetNursingCutoverPack(policy, options.env || process.env);
+  const innovationCenter = buildInternetNursingInnovationCenter({
+    policy,
+    institutions,
+    nurses,
+    orders,
+    siteCutoverPack: cutoverPack
+  });
   const institutionIds = new Set(institutions.map((item) => item.id));
   const nurseIds = new Set(nurses.map((item) => item.id));
   const checks = [
@@ -421,6 +429,12 @@ function buildInternetNursingReadinessReport(options = {}) {
     { id: "nursing:deviceVerification", passed: hasDeviceVerificationEvidence(policy, orders, nurses, frontend, server, moduleDoc, launchPlan), detail: "mobile GPS, location device, recorder, one-click alert, photo attachment, and exception escalation evidence are implemented" },
     { id: "nursing:regulatorySubmission", passed: hasRegulatorySubmissionEvidence(policy, frontend, server, moduleDoc, launchPlan), detail: "field mapping, monthly and realtime submission, signoff, and pressure-test evidence are implemented" },
     { id: "nursing:siteCutoverPack", passed: hasCutoverPackEvidence(cutoverPack, `${moduleDoc}\n${cutoverDoc}`, launchPlan), detail: "site cutover signoff pack maps message, signature, connector, payment, device, regulatory, and audit-retention evidence" },
+    { id: "nursing:highlightFeatures", passed: innovationCenter.featureCount === 10 && HIGHLIGHT_FEATURE_IDS.every((id) => innovationCenter.features.some((item) => item.id === id)) && /internet-nursing-highlights\.js/.test(frontend) && /renderNursingInnovationCenter/.test(frontend) && /nursing-highlight-center/.test(frontend) && /buildInternetNursingInnovationCenter/.test(server), detail: `${innovationCenter.featureCount}/10 highlight features wired` },
+    { id: "nursing:highlightSmartDispatch", passed: innovationCenter.smartDispatch.recommendedCandidates >= 1 && innovationCenter.features.some((item) => item.id === "smart-dispatch"), detail: `${innovationCenter.smartDispatch.recommendedCandidates} dispatch candidates` },
+    { id: "nursing:highlightRiskScore", passed: innovationCenter.riskScores.length >= orders.length && innovationCenter.riskScores.some((item) => item.band === "high"), detail: `${innovationCenter.riskScores.length} risk scores` },
+    { id: "nursing:highlightLiveTrace", passed: innovationCenter.liveTrace.rows.length >= orders.length && innovationCenter.features.some((item) => item.id === "live-trace"), detail: `${innovationCenter.liveTrace.trackedOrders} traced orders` },
+    { id: "nursing:highlightQualityRegulatoryPayment", passed: innovationCenter.qualityControl.issueCount >= 1 && innovationCenter.regulatoryDashboard.serviceVolume >= orders.length && innovationCenter.paymentClosure.rows.length >= orders.length, detail: "quality control, regulatory dashboard, and payment closure are calculated" },
+    { id: "nursing:highlightEvidenceWorkbench", passed: innovationCenter.evidenceWorkbench.totalTracks >= 5 && innovationCenter.evidenceWorkbench.blockerCount >= 1, detail: `${innovationCenter.evidenceWorkbench.readyTracks}/${innovationCenter.evidenceWorkbench.totalTracks} tracks and ${innovationCenter.evidenceWorkbench.blockerCount} blockers` },
     { id: "nursing:api", passed: /\/api\/internet-nursing\/dashboard/.test(server) && /\/api\/internet-nursing\/orders/.test(server) && /canAccessInternetNursingOrder/.test(server), detail: "dashboard, order creation, action, and role guard present" },
     { id: "nursing:frontend", passed: /nursing-appointment-form/.test(frontend) && /nursing-nurse-queue/.test(frontend) && /nursing-risk-guidance/.test(frontend) && /fetchInternetNursingDashboard/.test(frontend), detail: "citizen, hospital, nurse, and risk guidance work areas present" },
     { id: "nursing:closedLoopSummary", passed: /buildNursingClosedLoopSummary/.test(frontend) && /renderNursingClosedLoopSummary/.test(frontend) && /nursing-loop-summary/.test(frontend) && /nursing-loop-risk-strip/.test(frontend) && /completionRate/.test(frontend) && /readyForDispatch/.test(frontend) && /waitingAssessment/.test(frontend) && /waitingAcceptance/.test(frontend) && /slaOverdue/.test(frontend) && /highRiskOpen/.test(frontend) && /nursing-loop-summary/.test(portalCss) && /nursing-loop-risk-strip/.test(portalCss), detail: "closed-loop summary exposes completion, dispatch, pending dispatch, assessment or signature gaps, high-risk open orders, and 24-hour SLA risk" },
@@ -447,11 +461,13 @@ function buildInternetNursingReadinessReport(options = {}) {
       orders: orders.length,
       highRiskOrders: orders.filter((item) => item.riskLevel === "high").length,
       trackingOrders: orders.filter((item) => item.locationTrace === "tracking").length,
+      highlightFeatures: innovationCenter.featureCount,
       cutoverTracks: cutoverPack.tracks.length,
       cutoverReadyTracks: cutoverPack.tracks.filter((item) => item.ready).length,
       productionBlockers: cutoverPack.productionBlockers.length
     },
     cutoverPack,
+    innovationCenter,
     checks
   };
 }
@@ -470,6 +486,7 @@ function renderMarkdown(report) {
     `- Orders: ${report.summary.orders}`,
     `- High-risk orders: ${report.summary.highRiskOrders}`,
     `- Tracking orders: ${report.summary.trackingOrders}`,
+    `- Highlight features: ${report.summary.highlightFeatures || report.innovationCenter?.featureCount || 0}`,
     `- Cutover tracks: ${report.summary.cutoverReadyTracks}/${report.summary.cutoverTracks}`,
     `- Production readiness: ${report.cutoverPack.productionReadiness}`,
     `- Production blockers: ${report.summary.productionBlockers}`,
@@ -487,6 +504,12 @@ function renderMarkdown(report) {
     "| Track | Owner | Ready | Blocking until |",
     "| --- | --- | --- | --- |",
     ...report.cutoverPack.tracks.map((item) => `| ${item.id} | ${item.owner} | ${item.ready ? "yes" : "no"} | ${item.blockingUntil.replace(/\|/g, "/")} |`),
+    "",
+    "## Highlight Features",
+    "",
+    "| Feature | Status | Detail |",
+    "| --- | --- | --- |",
+    ...(report.innovationCenter?.features || []).map((item) => `| ${item.title} | ${item.status} | ${String(item.detail || "").replace(/\|/g, "/")} |`),
     "",
     "## Production Blockers",
     "",

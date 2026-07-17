@@ -78,7 +78,9 @@ function buildBloodSystemReadinessReport(options = {}) {
     ["Innovation command center UI", html.includes("blood-innovation.html") && readText("blood-innovation.html").includes("13项亮点能力") && readText("blood-innovation.js").includes("/api/blood-system/innovation")],
     ["Cross-module blood event contracts", require(path.join(ROOT, "blood-event-hub.js")).contracts.length === 6 && readText("blood-event-hub.js").includes('"quality-safety"') && readText("blood-event-hub.js").includes('"health-dashboard"')],
     ["Event idempotency dead letter and retry", readText("blood-event-hub.js").includes("stableId") && readText("blood-event-hub.js").includes('status: options.failConsumer === consumer ? "dead_letter"') && server.includes("BloodEventHub.retry")],
-    ["Cross-module event operations UI", readText("blood-innovation.html").includes("跨模块事件枢纽") && readText("blood-innovation.js").includes("publish-events") && server.includes('url.pathname === "/api/blood-system/events/publish"')]
+    ["Cross-module event operations UI", readText("blood-innovation.html").includes("跨模块事件枢纽") && readText("blood-innovation.js").includes("publish-events") && server.includes('url.pathname === "/api/blood-system/events/publish"')],
+    ["Four consumer dashboards receive blood projections", ["emergency.html", "quality-safety.html", "operations.html", "health-dashboard.html"].every((file) => readText(file).includes("blood-coordination")) && ["emergency.js", "quality-safety.js", "operations.js", "health-dashboard.js"].every((file) => readText(file).includes("renderBloodCoordination"))],
+    ["Consumer APIs expose scoped blood coordination", server.includes("dashboard.bloodCoordination") && server.includes("bloodCoordination: { ...bloodCoordination") && server.includes("bloodCoordination: BloodEventHub.dashboard")]
   ];
   const normalizedChecks = checks.map((item) => ({ name: item?.[0] || "Unnamed check", ok: Boolean(item?.[1]) }));
   return {

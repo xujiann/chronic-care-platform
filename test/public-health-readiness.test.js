@@ -115,6 +115,8 @@ test("public health readiness exposes institution scopes, event loop, and exchan
   assert.equal(report.exchangeRuns.length >= 6, true);
   assert.equal(report.exchangeRuns.every((item) => item.receiptStatus && item.compensationStatus), true);
   assert.equal(report.exchangeRuns.some((item) => item.compensationStatus === "replayed" || item.compensationStatus === "manual-review"), true);
+  assert.equal(report.highlights.summary.capabilities, 5);
+  assert.equal(report.highlights.formalGoLiveState, "blocked-until-site-evidence-signed");
   assert.equal(report.exchangeExceptionBoard.summary.exceptions >= 2, true);
   assert.equal(report.exchangeExceptionBoard.summary.openExceptions >= 1, true);
   assert.equal(report.summary.exchangeExceptions, report.exchangeExceptionBoard.summary.exceptions);
@@ -218,6 +220,9 @@ test("public health readiness exposes institution scopes, event loop, and exchan
   assert.equal(report.launchGate.approvalPreflight.status, "blocked");
   assert.equal(report.launchGate.approvalPreflight.blockedPrerequisites >= 1, true);
   assert.equal(report.launchGate.approvalPreflight.blockedRequirementIds.includes("launch-site-evidence-verification"), true);
+  ["publicHealth:highlightCapabilities", "api:highlight-actions", "frontend:highlight-center"].forEach((id) => {
+    assert.equal(report.checks.some((item) => item.id === id && item.passed), true, `${id} check missing`);
+  });
   ["standard:implementation-ledger", "exchange:runs", "exchange:compensation", "institution:tasks", "onsite:acceptance", "cutover:blockers", "cutover:open-boundary", "cutover:evidence-packets", "cutover:readiness-board", "cutover:drill-board", "production:handoffs", "go-live:observation-plan", "go-live:incident-desk", "go-live:duty-handoffs", "go-live:command-briefs", "go-live:command-brief-delivery-receipts", "site-evidence:bridge", "site-evidence:verification-desk", "launch:gate", "launch:approval-preflight", "frontend:standard-implementation-panel", "frontend:standard-implementation-actions", "frontend:cutover-readiness-panel", "frontend:cutover-evidence-panel", "frontend:cutover-drill-panel", "frontend:production-handoff-panel", "frontend:go-live-observation-panel", "frontend:launch-incident-panel", "frontend:launch-duty-panel", "frontend:launch-command-brief-panel", "frontend:launch-command-brief-receipts", "frontend:site-evidence-bridge-panel", "frontend:site-evidence-verification-panel", "frontend:launch-gate-panel", "frontend:launch-approval-preflight", "api:standard-implementation-ledger", "api:cutover-readiness", "api:cutover-evidence-packets", "api:cutover-drills", "api:production-handoffs", "api:go-live-observations", "api:launch-incidents", "api:launch-duty-shifts", "api:launch-command-briefs", "api:site-evidence-bridge", "api:site-evidence-verification-tasks", "api:launch-gate", "docs:production-handoffs", "docs:go-live-observations", "docs:launch-incidents", "docs:launch-duty", "docs:launch-command-briefs"].forEach((id) => {
     assert.equal(report.checks.some((item) => item.id === id && item.passed), true, `${id} check missing`);
   });

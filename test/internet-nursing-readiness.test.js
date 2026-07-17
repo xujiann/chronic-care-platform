@@ -37,6 +37,14 @@ test("internet nursing readiness validates three-role workflow and policy eviden
   assert.equal(report.checks.some((item) => item.id === "nursing:deviceVerification" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "nursing:regulatorySubmission" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "nursing:siteCutoverPack" && item.passed), true);
+  assert.equal(report.summary.highlightFeatures, 10);
+  assert.equal(report.innovationCenter.featureCount, 10);
+  assert.equal(report.checks.some((item) => item.id === "nursing:highlightFeatures" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "nursing:highlightSmartDispatch" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "nursing:highlightRiskScore" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "nursing:highlightLiveTrace" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "nursing:highlightQualityRegulatoryPayment" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "nursing:highlightEvidenceWorkbench" && item.passed), true);
   assert.equal(report.summary.cutoverTracks, 5);
   assert.equal(report.summary.cutoverReadyTracks, 5);
   assert.equal(report.summary.productionBlockers >= 1, true);
@@ -48,6 +56,8 @@ test("internet nursing readiness validates three-role workflow and policy eviden
   assert.equal(report.checks.some((item) => item.id === "nursing:nextPlan" && item.passed), true);
   assert.match(renderMarkdown(report), /Internet nursing readiness report/);
   assert.match(renderMarkdown(report), /Site Cutover Pack/);
+  assert.match(renderMarkdown(report), /Highlight Features/);
+  assert.match(renderMarkdown(report), /AI 智能派单 2\.0/);
   assert.match(renderMarkdown(report), /Production Blockers/);
   assert.match(renderMarkdown(report), /closed-loop summary exposes completion/);
   assert.match(renderMarkdown(report), /audit-retention/);
@@ -88,6 +98,7 @@ test("internet nursing readiness writes release artifacts", (t) => {
   const md = fs.readFileSync(markdown, "utf8");
   assert.equal(json.ok, true);
   assert.equal(json.internetNursingReadiness.ok, true);
+  assert.equal(json.internetNursingReadiness.innovationCenter.featureCount, 10);
   assert.equal(json.internetNursingReadiness.cutoverPack.productionReadiness, "production-blocked");
   assert.equal(json.internetNursingReadiness.cutoverPack.tracks.length, 5);
   assert.match(md, /Qualified nurses/);

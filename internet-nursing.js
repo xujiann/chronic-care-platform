@@ -729,6 +729,32 @@ function renderSiteCutoverPack(pack) {
   `;
 }
 
+function renderNursingInnovationCenter(center) {
+  const target = document.querySelector("#nursing-highlight-center");
+  if (!target) return;
+  const features = Array.isArray(center.features) ? center.features : [];
+  const highRisk = (center.riskScores || []).filter((item) => item.band === "high").length;
+  const qualityIssues = center.qualityControl?.issueCount || 0;
+  const blockers = center.evidenceWorkbench?.blockerCount || 0;
+  target.innerHTML = features.length ? `
+    <div>
+      <strong>亮点上线概览</strong>
+      <span>${escapeHtml(features.length)} 项亮点已接入 dashboard：高风险评分 ${escapeHtml(highRisk)} 单，质控提示 ${escapeHtml(qualityIssues)} 条，生产阻断 ${escapeHtml(blockers)} 项。</span>
+      <small>覆盖 AI 智能派单、风险评分、实时轨迹、视频评估、语音记录、家属协同、质量质控、监管驾驶舱、支付闭环和上线证据工作台。</small>
+    </div>
+    ${features.map((item) => `<div>
+      <strong>${escapeHtml(displayText(item.title || item.id))}</strong>
+      <span>${escapeHtml(displayText(item.detail || item.status || "runnable"))}</span>
+      <small>${escapeHtml(displayText(item.gate || ""))}</small>
+    </div>`).join("")}
+  ` : `
+    <div>
+      <strong>亮点能力中心待生成</strong>
+      <span>请刷新 API 或使用静态预览数据生成 10 个亮点功能摘要。</span>
+    </div>
+  `;
+}
+
 function renderInstitutionSelect(institutions) {
   const select = document.querySelector("#nursing-institution-select");
   if (!select) return;
