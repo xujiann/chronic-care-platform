@@ -61,6 +61,8 @@ jobs:
         run: npm run data-governance:readiness
       - name: Generate digital hospital standards readiness report
         run: npm run digital-hospital:standards-readiness
+      - name: Generate digital hospital pilot readiness report
+        run: npm run digital-hospital:pilot-readiness
       - name: Generate six platform standards ledgers
         run: npm run platform:standards-ledgers
       - name: Generate phase 2 proposal readiness report

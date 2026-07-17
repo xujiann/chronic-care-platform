@@ -134,6 +134,9 @@
 .critical-steps .done { color: var(--exam-dark); background: var(--exam-soft); }
 .critical-steps .pending { color: #7a4300; background: #ffefcf; }
 .critical-path-card.overdue { border-left: 5px solid #b3261e; }
+.specialized-routing-empty { border-style: dashed; background: #f7fbff; }
+.specialized-routing-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+.specialized-routing-fields input { min-width: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
 @media (max-width: 980px) {
   .physical-exam-hero, .physical-exam-layout, .operations-grid, .highlight-feature-grid { grid-template-columns: 1fr; }
   .readiness-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -154,4 +157,5 @@
   .gateway-list small { grid-column: 1 / -1; }
   .attachment-link { align-items: stretch; flex-direction: column; }
   .highlight-summary-grid, .quality-review-grid { grid-template-columns: 1fr; }
+  .specialized-routing-fields { grid-template-columns: 1fr; }
 }

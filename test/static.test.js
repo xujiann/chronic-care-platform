@@ -33,7 +33,7 @@ test("role pages keep explicit page guards", () => {
 
 test("citizen pages do not expose cross-role module links or management collections", () => {
   const citizenHtml = `${read("citizen.html")}\n${read("mobile-preview.html")}`;
-  ["institution.html", "insurance.html", "county.html", "index.html", "platform.html", "digital-hospital-standards.html", "digital-hospital-self-assessment.html", "workbench.html", "quality-safety.html", "health-dashboard.html", "public-health.html"].forEach((target) => {
+  ["institution.html", "insurance.html", "county.html", "index.html", "platform.html", "digital-hospital-standards.html", "digital-hospital-evaluation.html", "digital-hospital-self-assessment.html", "workbench.html", "quality-safety.html", "health-dashboard.html", "public-health.html"].forEach((target) => {
     assert.doesNotMatch(citizenHtml, new RegExp(`href=[\\"']\\./${target}`), `居民页面不应链接到 ${target}`);
   });
 
@@ -44,7 +44,7 @@ test("citizen pages do not expose cross-role module links or management collecti
 });
 
 test("application pages avoid placeholder navigation", () => {
-  const pages = ["about.html", "citizen.html", "mobile-preview.html", "doctor.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "digital-hospital-standards.html", "digital-hospital-self-assessment.html", "workbench.html", "quality-safety.html", "health-dashboard.html", "public-health.html"];
+  const pages = ["about.html", "citizen.html", "mobile-preview.html", "doctor.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "digital-hospital-standards.html", "digital-hospital-evaluation.html", "digital-hospital-self-assessment.html", "workbench.html", "quality-safety.html", "health-dashboard.html", "public-health.html"];
   pages.forEach((file) => assert.doesNotMatch(read(file), /href=["']#["']/, `${file} 存在空链接占位`));
 });
 
@@ -3255,4 +3255,27 @@ test("health platform requirement research plan is documented", () => {
   assert.match(doc, /onsite blocked/);
   assert.match(doc, /platform:capability-map/);
   assert.match(doc, /release:report/);
+});
+
+test("digital hospital P0-P1 pilot evaluation workbench is wired", () => {
+  const html = read("digital-hospital-evaluation.html");
+  const ui = read("digital-hospital-evaluation-ui.js");
+  const model = read("digital-hospital-evaluation.js");
+  const server = read("server.js");
+  const readiness = read("scripts/digital-hospital-pilot-readiness.js");
+  ["catalog", "collection", "evidence", "preassessment", "rectification", "boundary"].forEach((section) => {
+    assert.match(html, new RegExp(`data-digital-evaluation-section="${section}"`));
+  });
+  assert.match(html, /requireRole\(\["commission", "institution"\]\)/);
+  assert.match(ui, /run-preassessment/);
+  assert.match(ui, /refreshBoard/);
+  assert.match(model, /EVALUATION_PROJECTS/);
+  assert.match(model, /STANDARD_CLAUSES/);
+  assert.match(model, /pilot-launch-ready/);
+  assert.match(model, /blocked-until-site-evidence-signed/);
+  ["evaluation-catalog", "pilot-readiness", "collection-jobs", "evaluation-evidence", "pre-assessments"].forEach((route) => assert.match(server, new RegExp(route)));
+  assert.match(readiness, /39 EMR \/ 17 service \/ 10 management \/ 4 interoperability/);
+  assert.match(read("auth.js"), /"digital-hospital-evaluation\.html": \["commission", "institution"\]/);
+  assert.match(read("package.json"), /digital-hospital:pilot-readiness/);
+  assert.match(read("scripts/release-artifact-manifest.js"), /digital-hospital-pilot-readiness-report\.md/);
 });

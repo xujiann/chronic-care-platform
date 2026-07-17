@@ -299,6 +299,12 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "digitalHospitalStandards:controlRemediation" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "digitalHospitalStandards:selfAssessment" && item.passed), true);
   assert.equal(report.digitalHospitalStandards.ok, true);
+  assert.equal(report.checks.some((item) => item.name === "digitalHospitalPilot:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "digitalHospitalPilot:functionalState" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "digitalHospitalPilot:formalBoundary" && item.passed && item.severity === "warn"), true);
+  assert.equal(report.digitalHospitalPilot.ok, true);
+  assert.equal(report.digitalHospitalPilot.functionalState, "pilot-launch-ready");
+  assert.equal(report.digitalHospitalPilot.formalGoLiveState, "blocked-until-site-evidence-signed");
   assert.equal(report.platformProductionAudit.ok, true);
   assert.equal(report.platformProductionAudit.productionReady, false);
   assert.equal(report.checks.some((item) => item.name === "platformProductionAudit:capabilities" && item.passed), true);
@@ -687,6 +693,8 @@ test("release report writes standalone production cutover and storage artifacts"
   const dataQualityMarkdown = fs.readFileSync(path.join(outputDir, "data-quality-report.md"), "utf8");
   const digitalHospitalStandardsJson = JSON.parse(fs.readFileSync(path.join(outputDir, "digital-hospital-standards-readiness-report.json"), "utf8"));
   const digitalHospitalStandardsMarkdown = fs.readFileSync(path.join(outputDir, "digital-hospital-standards-readiness-report.md"), "utf8");
+  const digitalHospitalPilotJson = JSON.parse(fs.readFileSync(path.join(outputDir, "digital-hospital-pilot-readiness-report.json"), "utf8"));
+  const digitalHospitalPilotMarkdown = fs.readFileSync(path.join(outputDir, "digital-hospital-pilot-readiness-report.md"), "utf8");
   const phase2ProposalJson = JSON.parse(fs.readFileSync(path.join(outputDir, "phase2-proposal-readiness-report.json"), "utf8"));
   const phase2ProposalMarkdown = fs.readFileSync(path.join(outputDir, "phase2-proposal-readiness-report.md"), "utf8");
   const phase2CatalogJson = JSON.parse(fs.readFileSync(path.join(outputDir, "phase2-catalog-readiness-report.json"), "utf8"));
@@ -795,6 +803,10 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(digitalHospitalStandardsMarkdown, /digitalHospital:apiContract/);
   assert.match(digitalHospitalStandardsMarkdown, /digitalHospital:launchReadiness/);
   assert.match(digitalHospitalStandardsMarkdown, /digitalHospital:officialSources/);
+  assert.equal(digitalHospitalPilotJson.ok, true);
+  assert.equal(digitalHospitalPilotJson.functionalState, "pilot-launch-ready");
+  assert.match(digitalHospitalPilotMarkdown, /Digital hospital pilot readiness report/);
+  assert.match(digitalHospitalPilotMarkdown, /blocked-until-site-evidence-signed/);
   assert.equal(phase2ProposalJson.phase2Proposal.ok, true);
   assert.match(phase2ProposalMarkdown, /Phase 2 proposal readiness report/);
   assert.match(phase2ProposalMarkdown, /commercial-crypto-devices/);

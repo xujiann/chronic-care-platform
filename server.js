@@ -122,6 +122,17 @@ const {
   seedDigitalHospitalSelfAssessments
 } = require("./digital-hospital-self-assessment");
 const {
+  buildDigitalHospitalEvaluationCatalog,
+  buildDigitalHospitalPilotBoard,
+  normalizeDigitalHospitalCollectionJobAction,
+  normalizeDigitalHospitalEvaluationEvidenceAction,
+  normalizeDigitalHospitalPreAssessmentAction,
+  runDigitalHospitalPreAssessment,
+  seedDigitalHospitalCollectionJobs,
+  seedDigitalHospitalEvaluationEvidence,
+  seedDigitalHospitalPreAssessments
+} = require("./digital-hospital-evaluation");
+const {
   applyRegistrationDisruptionAction,
   applyRegistrationJourneyAction,
   applyRegistrationWaitlistAction,
@@ -1031,6 +1042,9 @@ function seedState() {
     digitalHospitalPolicyRegister: seedDigitalHospitalPolicyRegister(),
     digitalHospitalControlMatrix: seedDigitalHospitalControlMatrix(),
     digitalHospitalSelfAssessments: seedDigitalHospitalSelfAssessments(),
+    digitalHospitalCollectionJobs: seedDigitalHospitalCollectionJobs(),
+    digitalHospitalEvaluationEvidence: seedDigitalHospitalEvaluationEvidence(),
+    digitalHospitalPreAssessments: seedDigitalHospitalPreAssessments(),
     digitalHospitalEvaluationTasks: seedDigitalHospitalEvaluationTasks(),
     digitalHospitalEvidencePackets: seedDigitalHospitalEvidencePackets(),
     digitalHospitalRiskItems: seedDigitalHospitalRiskItems(),
@@ -1107,6 +1121,7 @@ function seedState() {
     physicalExamReviewRequests: [],
     physicalExamFamilyRiskConsents: [],
     physicalExamHighlightActions: [],
+    physicalExamSpecializedIntakes: [],
     taskMessages: []
   };
 }
@@ -2186,7 +2201,7 @@ function seedIntegrationContracts() {
     { id: "emr-summary-v1", domain: "EMR", version: "1.0.0", direction: "inbound", resource: "MedicalSummary", requiredFields: ["externalId", "residentId", "diagnosis", "recordDate"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "3 次指数退避", status: "ready" },
     { id: "lis-report-v1", domain: "LIS", version: "1.0.0", direction: "inbound", resource: "LabReport", requiredFields: ["externalId", "residentId", "item", "result", "reportedAt"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "3 次指数退避", status: "ready" },
     { id: "pacs-report-v1", domain: "PACS", version: "1.0.0", direction: "inbound", resource: "ImagingReport", requiredFields: ["externalId", "residentId", "modality", "conclusion", "reportedAt"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "3 次指数退避", status: "ready" },
-    { id: "physical-exam-report-v1", domain: "体检", version: "3.0.0", direction: "inbound", resource: "AdultPhysicalExamDocument", profile: "WS/T 483.16-2016 JSON projection + 2025 adult exam guide", requiredFields: ["externalId", "residentId", "sourceType", "institutionId", "institutionName", "examDate", "summary"], productionRequiredFields: ["documentProfile", "institutionQualification", "sectionSignatures", "healthQuestionnaire", "processingBasis", "signature", "sourceDocumentHash", "radiationExaminations(if applicable)"], dataElementStandard: "WS/T 363-2023", valueDomainStandard: "WS/T 364-2023", idempotencyKey: "sourceType+institutionId+externalId", signature: "HMAC-SHA256 transport + WS/T 847-2024 medical document signature", retryPolicy: "3 次重试后进入死信与人工对账", derivedServices: ["health-timeline", "resident-translation", "action-cards", "personalized-plan", "repeat-avoidance", "radiation-ledger", "quality-review"], status: "standards-ready" },
+    { id: "physical-exam-report-v1", domain: "体检", version: "3.1.0", direction: "inbound", resource: "AdultPhysicalExamDocument", profile: "WS/T 483.16-2016 JSON projection + 2025 adult exam guide", requiredFields: ["externalId", "residentId", "sourceType", "institutionId", "institutionName", "examDate", "summary", "examProgramType(default adult-general)"], productionRequiredFields: ["documentProfile", "institutionQualification", "sectionSignatures", "healthQuestionnaire", "processingBasis", "signature", "sourceDocumentHash", "radiationExaminations(if applicable)"], dataElementStandard: "WS/T 363-2023", valueDomainStandard: "WS/T 364-2023", idempotencyKey: "sourceType+institutionId+externalId+examProgramType", signature: "HMAC-SHA256 transport + WS/T 847-2024 medical document signature", retryPolicy: "3 次重试后进入死信与人工对账", derivedServices: ["health-timeline", "resident-translation", "action-cards", "personalized-plan", "repeat-avoidance", "radiation-ledger", "quality-review", "specialized-exam-routing"], status: "standards-ready" },
     { id: "appointment-order-v1", domain: "Appointment", version: "1.0.0", direction: "inbound", resource: "AppointmentOrderStatus", requiredFields: ["externalId", "residentId", "orderNo", "slotId", "eventType", "orderStatus", "occurredAt"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "3 attempts then dead letter and reconciliation", status: "ready" },
     { id: "payment-transaction-v1", domain: "Payment", version: "1.0.0", direction: "bidirectional", resource: "PaymentTransaction", requiredFields: ["externalId", "orderNo", "amountFen", "currency"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "3 attempts then dead letter and reconciliation", status: "ready" },
     { id: "insurance-settlement-v1", domain: "医保", version: "1.0.0", direction: "bidirectional", resource: "SettlementStatus", requiredFields: ["externalId", "residentId", "claimStatus", "amount"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "失败进入补偿队列", status: "ready" },
@@ -2975,6 +2990,8 @@ function buildDigitalHospitalStandardsOverview(data) {
   const policyBoard = buildDigitalHospitalPolicyRegisterBoard(data);
   const controlBoard = buildDigitalHospitalControlMatrixBoard(data);
   const selfAssessmentBoard = buildDigitalHospitalSelfAssessmentBoard(data, { role: "commission" });
+  const evaluationCatalog = buildDigitalHospitalEvaluationCatalog();
+  const pilotBoard = buildDigitalHospitalPilotBoard(data, { role: "commission" });
   const domainSet = new Set(standards.map((item) => item.domain).filter(Boolean));
   const p0Standards = standards.filter((item) => item.level === "P0");
   const openTasks = evaluationTasks.filter((item) => !/closed|done|complete|ready$/i.test(String(item.status || "")));
@@ -2994,7 +3011,9 @@ function buildDigitalHospitalStandardsOverview(data) {
     { id: "digitalHospitalApi:blockers", passed: blockers.length >= 4, detail: `${blockers.length} open or tracking blockers` },
     { id: "digitalHospitalApi:policyRegister", passed: policyBoard.ok && policyBoard.summary.domains >= 6, detail: `${policyBoard.summary.policies} policies / ${policyBoard.summary.controls} controls / ${policyBoard.summary.domains} domains` },
     { id: "digitalHospitalApi:controlRemediation", passed: controlBoard.ok && controlBoard.summary.controls >= 12, detail: `${controlBoard.summary.verifiedControls} verified / ${controlBoard.summary.blockingControls} blocking / ${controlBoard.summary.evidenceRecordedControls} with evidence` },
-    { id: "digitalHospitalApi:selfAssessment", passed: selfAssessmentBoard.ok && selfAssessmentBoard.indicators.length >= 12, detail: `${selfAssessmentBoard.summary.assessments} assignments / ${selfAssessmentBoard.indicators.length} indicators / ${selfAssessmentBoard.summary.correctionRequired} corrections` }
+    { id: "digitalHospitalApi:selfAssessment", passed: selfAssessmentBoard.ok && selfAssessmentBoard.indicators.length >= 12, detail: `${selfAssessmentBoard.summary.assessments} assignments / ${selfAssessmentBoard.indicators.length} indicators / ${selfAssessmentBoard.summary.correctionRequired} corrections` },
+    { id: "digitalHospitalApi:evaluationCatalog", passed: evaluationCatalog.ok && evaluationCatalog.summary.projects === 70, detail: `${evaluationCatalog.summary.packs} packs / ${evaluationCatalog.summary.projects} projects / ${evaluationCatalog.summary.clauses} clauses` },
+    { id: "digitalHospitalApi:pilotReadiness", passed: pilotBoard.functionalState === "pilot-launch-ready", detail: `${pilotBoard.functionalState} / ${pilotBoard.formalGoLiveState}` }
   ];
   return {
     ok: checks.every((item) => item.passed),
@@ -3021,7 +3040,11 @@ function buildDigitalHospitalStandardsOverview(data) {
       selfAssessments: selfAssessmentBoard.summary.assessments,
       selfAssessmentsSubmitted: selfAssessmentBoard.summary.submitted,
       selfAssessmentsCorrectionRequired: selfAssessmentBoard.summary.correctionRequired,
-      selfAssessmentsAccepted: selfAssessmentBoard.summary.accepted
+      selfAssessmentsAccepted: selfAssessmentBoard.summary.accepted,
+      evaluationProjects: evaluationCatalog.summary.projects,
+      evaluationClauses: evaluationCatalog.summary.clauses,
+      pilotFunctionalState: pilotBoard.functionalState,
+      pilotFormalGoLiveState: pilotBoard.formalGoLiveState
     },
     standards,
     policyRegister: policyBoard.policies,
@@ -3032,6 +3055,9 @@ function buildDigitalHospitalStandardsOverview(data) {
     controlMatrixChecks: controlBoard.checks,
     policyControlBlockers: controlBoard.blockers,
     selfAssessmentSummary: selfAssessmentBoard.summary,
+    evaluationCatalog: evaluationCatalog.packs,
+    evaluationCatalogSummary: evaluationCatalog.summary,
+    pilotReadiness: pilotBoard,
     selfAssessmentChecks: selfAssessmentBoard.checks,
     evaluationTasks,
     evidencePackets,
@@ -7686,6 +7712,9 @@ function normalizeState(data) {
     digitalHospitalPolicyRegister: mergeByKey(seedDigitalHospitalPolicyRegister(), data.digitalHospitalPolicyRegister, "id"),
     digitalHospitalControlMatrix: mergeByKey(seedDigitalHospitalControlMatrix(), data.digitalHospitalControlMatrix, "id"),
     digitalHospitalSelfAssessments: mergeByKey(seedDigitalHospitalSelfAssessments(), data.digitalHospitalSelfAssessments, "id"),
+    digitalHospitalCollectionJobs: mergeByKey(seedDigitalHospitalCollectionJobs(), data.digitalHospitalCollectionJobs, "id"),
+    digitalHospitalEvaluationEvidence: mergeByKey(seedDigitalHospitalEvaluationEvidence(), data.digitalHospitalEvaluationEvidence, "id"),
+    digitalHospitalPreAssessments: mergeByKey(seedDigitalHospitalPreAssessments(), data.digitalHospitalPreAssessments, "id"),
     digitalHospitalEvaluationTasks: mergeByKey(seedDigitalHospitalEvaluationTasks(), data.digitalHospitalEvaluationTasks, "id"),
     digitalHospitalEvidencePackets: mergeByKey(seedDigitalHospitalEvidencePackets(), data.digitalHospitalEvidencePackets, "id"),
     digitalHospitalRiskItems: mergeByKey(seedDigitalHospitalRiskItems(), data.digitalHospitalRiskItems, "id"),
@@ -7764,7 +7793,8 @@ function normalizeState(data) {
     physicalExamHealthPassports: Array.isArray(data.physicalExamHealthPassports) ? data.physicalExamHealthPassports.slice(0, 500) : [],
     physicalExamReviewRequests: Array.isArray(data.physicalExamReviewRequests) ? data.physicalExamReviewRequests.slice(0, 1000) : [],
     physicalExamFamilyRiskConsents: Array.isArray(data.physicalExamFamilyRiskConsents) ? data.physicalExamFamilyRiskConsents.slice(0, 500) : [],
-    physicalExamHighlightActions: Array.isArray(data.physicalExamHighlightActions) ? data.physicalExamHighlightActions.slice(0, 1000) : []
+    physicalExamHighlightActions: Array.isArray(data.physicalExamHighlightActions) ? data.physicalExamHighlightActions.slice(0, 1000) : [],
+    physicalExamSpecializedIntakes: Array.isArray(data.physicalExamSpecializedIntakes) ? data.physicalExamSpecializedIntakes.slice(0, 1000) : []
   };
   completeSystemTargets(state);
   PhysicalExaminationService.synchronizeCareLinks(state, { notify: false, actor: "state-normalizer" });
@@ -9853,18 +9883,21 @@ function landPhysicalExamIntegrationEvent(data, payload, event, user) {
       canAccessResident: (residentId) => canAccessResident(user, residentId, data)
     });
     const report = result.created[0] || result.duplicates[0];
+    const specialized = result.routed?.[0] || result.routedDuplicates?.[0];
+    const newlyRouted = Boolean(result.routed?.length);
     Object.assign(event, {
-      status: result.created.length ? "landed" : "duplicate",
+      status: specialized ? (newlyRouted ? "specialized-routed" : "duplicate") : (result.created.length ? "landed" : "duplicate"),
       deadLetter: false,
       deadLetterReason: "",
       reconciliationStatus: "matched",
-      landedRecordId: report?.id || "",
-      residentId: report?.residentId || event.residentId,
-      landingStatus: result.created.length ? "created" : "idempotent-replay",
+      landedRecordId: report?.id || specialized?.id || "",
+      residentId: report?.residentId || specialized?.residentId || event.residentId,
+      landingStatus: specialized ? (newlyRouted ? "specialized-profile-required" : "specialized-idempotent-replay") : (result.created.length ? "created" : "idempotent-replay"),
       signatureVerified: true
     });
     if (report?.residentId) appendDataAccessLog(data, user, report.residentId, "体检报告集成网关", `${report.source} · ${report.meta?.externalId || ""}`);
-    return { applied: true, event, report };
+    if (specialized?.residentId) appendDataAccessLog(data, user, specialized.residentId, "专项体检分流", `${specialized.examProgramName} · ${specialized.externalId}`);
+    return { applied: true, event, report, specializedIntake: specialized };
   } catch (error) {
     Object.assign(event, {
       status: "failed",
@@ -22277,6 +22310,160 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/digital-hospital/evaluation-catalog") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/digital-hospital/evaluation-catalog");
+    if (!user) return;
+    const catalog = buildDigitalHospitalEvaluationCatalog();
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "digital-hospital-evaluation-catalog-read",
+      target: "/api/digital-hospital/evaluation-catalog",
+      result: "allowed",
+      detail: `${catalog.summary.packs} packs / ${catalog.summary.projects} projects / ${catalog.summary.clauses} clauses`
+    });
+    sendJson(res, 200, catalog);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/digital-hospital/pilot-readiness") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/digital-hospital/pilot-readiness");
+    if (!user) return;
+    const data = readDatabase();
+    const board = buildDigitalHospitalPilotBoard(data, user, { institutionId: url.searchParams.get("institutionId") || "" });
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "digital-hospital-pilot-readiness-read",
+      target: "/api/digital-hospital/pilot-readiness",
+      result: "allowed",
+      detail: `${board.functionalState} / ${board.formalGoLiveState} / ${board.summary.openFindings} open findings`
+    });
+    sendJson(res, 200, board);
+    return;
+  }
+
+  const digitalHospitalCollectionJobActionMatch = url.pathname.match(/^\/api\/digital-hospital\/collection-jobs\/([^/]+)\/actions$/);
+  if (req.method === "POST" && digitalHospitalCollectionJobActionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/digital-hospital/collection-jobs/:id/actions");
+    if (!user) return;
+    const jobId = decodeURIComponent(digitalHospitalCollectionJobActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const jobs = Array.isArray(data.digitalHospitalCollectionJobs) ? data.digitalHospitalCollectionJobs : seedDigitalHospitalCollectionJobs();
+    const index = jobs.findIndex((item) => item.id === jobId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Digital hospital collection job not found" });
+      return;
+    }
+    try {
+      jobs[index] = normalizeDigitalHospitalCollectionJobAction(jobs[index], payload, user);
+    } catch (error) {
+      const status = Number(error.status) || 400;
+      sendJson(res, status, { error: status === 403 ? "Forbidden" : "Bad Request", message: error.message });
+      return;
+    }
+    data.digitalHospitalCollectionJobs = jobs;
+    data.securityEvents = sealAuditTrail([{
+      id: randomUUID(), at: new Date().toISOString(), actor: user.name, role: user.role,
+      action: "digital-hospital-collection-validation", target: jobId, result: "allowed",
+      detail: `${jobs[index].system} / ${jobs[index].sampleSize} rows / ${jobs[index].receiptRef}`
+    }, ...(data.securityEvents || [])].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    sendJson(res, 200, { ok: true, job: jobs[index], board: buildDigitalHospitalPilotBoard(readDatabase(), user) });
+    return;
+  }
+
+  const digitalHospitalEvaluationEvidenceActionMatch = url.pathname.match(/^\/api\/digital-hospital\/evaluation-evidence\/([^/]+)\/actions$/);
+  if (req.method === "POST" && digitalHospitalEvaluationEvidenceActionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/digital-hospital/evaluation-evidence/:id/actions");
+    if (!user) return;
+    const evidenceId = decodeURIComponent(digitalHospitalEvaluationEvidenceActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const evidence = Array.isArray(data.digitalHospitalEvaluationEvidence) ? data.digitalHospitalEvaluationEvidence : seedDigitalHospitalEvaluationEvidence();
+    const index = evidence.findIndex((item) => item.id === evidenceId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Digital hospital evaluation evidence not found" });
+      return;
+    }
+    try {
+      evidence[index] = normalizeDigitalHospitalEvaluationEvidenceAction(evidence[index], payload, user);
+    } catch (error) {
+      const status = Number(error.status) || 400;
+      sendJson(res, status, { error: status === 403 ? "Forbidden" : status === 409 ? "Conflict" : "Bad Request", message: error.message });
+      return;
+    }
+    data.digitalHospitalEvaluationEvidence = evidence;
+    data.securityEvents = sealAuditTrail([{
+      id: randomUUID(), at: new Date().toISOString(), actor: user.name, role: user.role,
+      action: "digital-hospital-evaluation-evidence-action", target: evidenceId, result: "allowed",
+      detail: `${payload.action} / ${evidence[index].status} / ${evidence[index].evidenceLevel}`
+    }, ...(data.securityEvents || [])].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    sendJson(res, 200, { ok: true, evidence: evidence[index], board: buildDigitalHospitalPilotBoard(readDatabase(), user) });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/digital-hospital/pre-assessments/actions") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/digital-hospital/pre-assessments/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    if (payload.action !== "run-preassessment") {
+      sendJson(res, 400, { error: "Bad Request", message: "Only run-preassessment is accepted" });
+      return;
+    }
+    const data = readDatabase();
+    let assessment;
+    try {
+      assessment = runDigitalHospitalPreAssessment(payload, user);
+    } catch (error) {
+      const status = Number(error.status) || 400;
+      sendJson(res, status, { error: status === 403 ? "Forbidden" : "Bad Request", message: error.message });
+      return;
+    }
+    data.digitalHospitalPreAssessments = [assessment, ...(Array.isArray(data.digitalHospitalPreAssessments) ? data.digitalHospitalPreAssessments : seedDigitalHospitalPreAssessments())].slice(0, 50);
+    data.securityEvents = sealAuditTrail([{
+      id: randomUUID(), at: new Date().toISOString(), actor: user.name, role: user.role,
+      action: "digital-hospital-preassessment-run", target: assessment.id, result: "allowed",
+      detail: `${assessment.institutionId} / ${assessment.summary.gaps} gaps / pilot simulation only`
+    }, ...(data.securityEvents || [])].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    sendJson(res, 201, { ok: true, assessment, board: buildDigitalHospitalPilotBoard(readDatabase(), user) });
+    return;
+  }
+
+  const digitalHospitalPreAssessmentActionMatch = url.pathname.match(/^\/api\/digital-hospital\/pre-assessments\/([^/]+)\/actions$/);
+  if (req.method === "POST" && digitalHospitalPreAssessmentActionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/digital-hospital/pre-assessments/:id/actions");
+    if (!user) return;
+    const assessmentId = decodeURIComponent(digitalHospitalPreAssessmentActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const assessments = Array.isArray(data.digitalHospitalPreAssessments) ? data.digitalHospitalPreAssessments : seedDigitalHospitalPreAssessments();
+    const index = assessments.findIndex((item) => item.id === assessmentId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Digital hospital pre-assessment not found" });
+      return;
+    }
+    try {
+      assessments[index] = normalizeDigitalHospitalPreAssessmentAction(assessments[index], payload, user);
+    } catch (error) {
+      const status = Number(error.status) || 400;
+      sendJson(res, status, { error: status === 403 ? "Forbidden" : status === 409 ? "Conflict" : "Bad Request", message: error.message });
+      return;
+    }
+    data.digitalHospitalPreAssessments = assessments;
+    data.securityEvents = sealAuditTrail([{
+      id: randomUUID(), at: new Date().toISOString(), actor: user.name, role: user.role,
+      action: "digital-hospital-preassessment-action", target: assessmentId, result: "allowed",
+      detail: `${payload.action} / ${assessments[index].status}`
+    }, ...(data.securityEvents || [])].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    sendJson(res, 200, { ok: true, assessment: assessments[index], board: buildDigitalHospitalPilotBoard(readDatabase(), user) });
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/digital-hospital/self-assessments") {
     const user = requireApiRole(req, res, ["commission", "institution"], "/api/digital-hospital/self-assessments");
     if (!user) return;
@@ -26407,6 +26594,7 @@ async function handleApi(req, res) {
     if (!['commission', 'institution'].includes(user.role)) {
       delete overview.jointTests;
       delete overview.gatewayEvents;
+      delete overview.specializedIntakes;
       overview.readiness = {
         codeReady: overview.readiness.codeReady,
         quality: overview.readiness.quality,
@@ -26497,6 +26685,31 @@ async function handleApi(req, res) {
     return;
   }
 
+  const physicalExamSpecializedActionMatch = url.pathname.match(/^\/api\/physical-exams\/specialized-intakes\/([^/]+)\/actions$/);
+  if (req.method === "POST" && physicalExamSpecializedActionMatch) {
+    const user = requireApiRole(req, res, ["institution", "commission"], "/api/physical-exams/specialized-intakes/:id/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const intakeId = decodeURIComponent(physicalExamSpecializedActionMatch[1]);
+    const current = (data.physicalExamSpecializedIntakes || []).find((item) => item.id === intakeId);
+    if (current && !canAccessResident(user, current.residentId, data)) {
+      sendJson(res, 403, { error: "Forbidden", message: "无权处置该专项体检分流记录" });
+      return;
+    }
+    try {
+      const intake = PhysicalExaminationService.applySpecializedIntakeAction(data, intakeId, payload, { actor: user.username || user.role, now: new Date().toISOString() });
+      appendDataAccessLog(data, user, intake.residentId, "专项体检分流处置", `${intake.examProgramName} · ${payload.action}`);
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "专项体检分流处置", target: intake.id, result: "成功", detail: `${payload.action} · ${payload.evidenceRef}` });
+      writeDatabase(normalizeState(data));
+      sendJson(res, 200, { ok: true, intake });
+    } catch (error) {
+      const status = Number(error?.statusCode || 400);
+      sendJson(res, status, { error: status === 404 ? "Not Found" : status === 409 ? "Conflict" : "Bad Request", message: error.message });
+    }
+    return;
+  }
+
   const physicalExamJointTestActionMatch = url.pathname.match(/^\/api\/physical-exams\/joint-tests\/([^/]+)\/actions$/);
   if (req.method === "POST" && physicalExamJointTestActionMatch) {
     const user = requireApiRole(req, res, ["institution", "commission"], "/api/physical-exams/joint-tests/:id/actions");
@@ -26574,14 +26787,21 @@ async function handleApi(req, res) {
       result.created.forEach((record) => {
         appendDataAccessLog(data, user, record.residentId, "体检报告接入", `${record.source} · ${record.meta?.reportNo || record.meta?.externalId}`);
       });
+      result.routed.forEach((record) => {
+        appendDataAccessLog(data, user, record.residentId, "专项体检自动分流", `${record.examProgramName} · ${record.externalId}`);
+      });
       writeDatabase(normalizeState(data));
-      sendJson(res, result.created.length ? 201 : 200, redactSensitiveResponse({
+      sendJson(res, result.created.length || result.routed.length ? 201 : 200, redactSensitiveResponse({
         ok: true,
         imported: result.created.length,
         duplicates: result.duplicates.length,
+        routed: result.routed.length,
+        routedDuplicates: result.routedDuplicates.length,
         total: result.total,
         records: result.created,
-        duplicateRecords: result.duplicates
+        duplicateRecords: result.duplicates,
+        specializedIntakes: result.routed,
+        specializedDuplicateRecords: result.routedDuplicates
       }, user));
     } catch (error) {
       const status = Number(error?.statusCode || 400);

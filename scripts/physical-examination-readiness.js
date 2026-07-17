@@ -12,6 +12,7 @@ function buildReport(options = {}) {
   data.personalRecords = PhysicalExaminationService.mergeSeedRecords(data.personalRecords);
   data.physicalExamAbnormalCases = Array.isArray(data.physicalExamAbnormalCases) ? data.physicalExamAbnormalCases : PhysicalExaminationService.seedAbnormalCases();
   data.physicalExamJointTests = Array.isArray(data.physicalExamJointTests) ? data.physicalExamJointTests : PhysicalExaminationService.seedJointTests();
+  data.physicalExamSpecializedIntakes = Array.isArray(data.physicalExamSpecializedIntakes) ? data.physicalExamSpecializedIntakes : [];
   data.chronicScreeningTasks = Array.isArray(data.chronicScreeningTasks) ? data.chronicScreeningTasks : [];
   data.taskMessages = Array.isArray(data.taskMessages) ? data.taskMessages : [];
   PhysicalExaminationService.synchronizeCareLinks(data, { notify: false, actor: "readiness" });
@@ -53,6 +54,7 @@ function buildReport(options = {}) {
     check("care:family-doctor-suggestion", overview.summary.familyDoctorSuggestions === overview.summary.careLinkedReports && server.includes("familyDoctorSuggestion") && client.includes("慢病与家医联动"), `${overview.summary.familyDoctorSuggestions} 条可追溯家医签约/服务包建议`),
     check("care:resident-task", overview.summary.residentRiskTasks === overview.summary.careLinkedReports && citizen.includes('item.sourceType === "physical-exam" ? "体检异常"'), `${overview.summary.residentRiskTasks} 条居民待办复用 chronicScreeningTasks`),
     check("care:idempotency", service.includes("sourceReportId === report.id") && service.includes("physicalExamCareLink"), "报告、风险任务和居民消息按来源报告幂等"),
+    check("scope:specialized-routing", PhysicalExaminationService.EXAM_PROGRAMS.length >= 7 && service.includes("awaiting-specialized-profile") && server.includes("/api/physical-exams/specialized-intakes/:id/actions") && page.includes("专项体检隔离与分流"), "职业健康、学生、征兵、驾驶、公卫专项及从业人员体检进入受限分流队列，不混入一般成人体检档案"),
     check("highlights:engine", highlights.includes("buildTrajectories") && highlights.includes("translateReport") && highlights.includes("buildExamPlan") && highlights.includes("buildRepeatAvoidance"), "健康时光机、报告翻译、个性计划和重复检查共享引擎"),
     check("highlights:care-actions", highlights.includes("appointmentHref") && highlights.includes("request-review") && highlights.includes("acknowledge-action") && server.includes("/api/physical-exams/highlights/actions"), "异常行动卡接入复查申请、居民确认、家医和待办"),
     check("highlights:radiation", highlights.includes("buildRadiationLedger") && highlights.includes("governanceStatus"), "放射正当化、告知、防护和剂量台账"),
@@ -64,7 +66,7 @@ function buildReport(options = {}) {
     check("ui:launch-workbench", page.includes("上线门禁") && page.includes("异常结果闭环") && page.includes("机构联调验收") && client.includes("renderGatewayEvents"), "上线门禁、异常闭环、联调与死信工作台"),
     check("ui:resident-history", citizen.includes('{ key: "physical-exam", label: "体检报告" }') && citizen.includes("renderPhysicalExamMeta"), "居民健康档案体检分类与详情"),
     check("ui:highlight-experience", page.includes("健康时光机") && page.includes("报告质量啄木鸟") && citizenPage.includes("我的体检健康时光机") && citizen.includes("renderCitizenPhysicalExamHighlights"), "管理端和居民端完整亮点体验"),
-    check("ui:idempotency", client.includes("检测到 ${result.duplicates} 份重复报告"), "前端反馈幂等去重结果")
+    check("ui:idempotency", client.includes("result.routedDuplicates") && client.includes("未重复归档"), "前端反馈一般体检和专项分流幂等去重结果")
   ];
   const passed = checks.filter((item) => item.passed).length;
   return {
@@ -107,6 +109,7 @@ function buildReport(options = {}) {
       abnormalApi: "POST /api/physical-exams/abnormal-cases/:id/actions",
       jointTestApi: "POST /api/physical-exams/joint-tests/:id/actions",
       attachmentApi: "POST /api/physical-exams/:id/link-attachment",
+      specializedRoutingApi: "POST /api/physical-exams/specialized-intakes/:id/actions",
       collection: "personalRecords[category=physical-exam]",
       standardsBaseline: "docs/体检系统信息化规范基线-2026-07-15.md",
       traceability: "docs/体检系统规范需求追溯矩阵-2026-07-15.md"

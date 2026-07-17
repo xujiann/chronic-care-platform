@@ -126,6 +126,21 @@ test("体检 API 完成机构接入、幂等归档和居民历史报告授权查
   assert.equal(duplicate.body.imported, 0);
   assert.equal(duplicate.body.duplicates, 1);
 
+  const specializedPayload = { ...payload, examProgramType: "occupational-health", externalId: "OCC-PE-API-001", reportNo: "OCC-API-001", summary: "职业健康检查进入专项分流" };
+  const specialized = await request(baseUrl, "/api/physical-exams/import", institutionLogin.body.token, { method: "POST", body: JSON.stringify(specializedPayload) });
+  assert.equal(specialized.status, 201);
+  assert.equal(specialized.body.imported, 0);
+  assert.equal(specialized.body.routed, 1);
+  assert.equal(specialized.body.specializedIntakes[0].targetArchiveCategory, "occupational-health-exam");
+  const specializedId = specialized.body.specializedIntakes[0].id;
+  const routedOverview = await request(baseUrl, "/api/physical-exams?residentId=r1", institutionLogin.body.token);
+  assert.equal(routedOverview.body.specializedIntakes.some((item) => item.id === specializedId), true);
+  const citizenOverview = await request(baseUrl, "/api/physical-exams?residentId=r1", citizenLogin.body.token);
+  assert.equal(Object.prototype.hasOwnProperty.call(citizenOverview.body, "specializedIntakes"), false);
+  const assigned = await request(baseUrl, `/api/physical-exams/specialized-intakes/${specializedId}/actions`, institutionLogin.body.token, { method: "POST", body: JSON.stringify({ action: "assign-profile", targetSystem: "occupational-health-system", profileId: "occupation-v1", evidenceRef: "ROUTE-API-001" }) });
+  assert.equal(assigned.status, 200);
+  assert.equal(assigned.body.intake.status, "routed-to-specialized-system");
+
   const after = await request(baseUrl, "/api/physical-exams?residentId=r1", citizenLogin.body.token);
   assert.equal(after.status, 200);
   assert.equal(after.body.reports.some((item) => item.meta.externalId === payload.externalId), true);

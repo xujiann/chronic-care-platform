@@ -1590,6 +1590,33 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(digitalHospitalStandards.body.policyRegister.some((item) => item.id === "dhp-health-information-plan-14fyp" && item.lifecycleStatus === "historical-plan"), true);
     assert.equal(digitalHospitalStandards.body.controlMatrix.some((item) => item.domain === "安全合规" && item.goLiveCritical), true);
 
+    const digitalHospitalEvaluationCatalog = await api(baseUrl, "/api/digital-hospital/evaluation-catalog", authorized(accountLogin.body.token));
+    assert.equal(digitalHospitalEvaluationCatalog.response.status, 200);
+    assert.equal(digitalHospitalEvaluationCatalog.body.summary.packs, 4);
+    assert.equal(digitalHospitalEvaluationCatalog.body.summary.projects, 70);
+    assert.equal(digitalHospitalEvaluationCatalog.body.packs.find((item) => item.id === "emr").projects, 39);
+
+    const digitalHospitalPilotReadiness = await api(baseUrl, "/api/digital-hospital/pilot-readiness", authorized(accountLogin.body.token));
+    assert.equal(digitalHospitalPilotReadiness.response.status, 200);
+    assert.equal(digitalHospitalPilotReadiness.body.functionalState, "pilot-launch-ready");
+    assert.equal(digitalHospitalPilotReadiness.body.formalGoLiveState, "blocked-until-site-evidence-signed");
+    assert.equal(digitalHospitalPilotReadiness.body.summary.collectionJobs, 6);
+
+    const digitalHospitalPreAssessment = await api(baseUrl, "/api/digital-hospital/pre-assessments/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "run-preassessment", institutionId: "MR1", institutionName: "大连市中心医院", cycle: "2026-api-pilot", profileId: "profile-tertiary-general-pilot" })
+    }));
+    assert.equal(digitalHospitalPreAssessment.response.status, 201);
+    assert.equal(digitalHospitalPreAssessment.body.assessment.results.length, 4);
+    assert.equal(digitalHospitalPreAssessment.body.assessment.formalResult, false);
+
+    const digitalHospitalCollectionValidation = await api(baseUrl, "/api/digital-hospital/collection-jobs/dhcj-his/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "run-validation", sampleSize: 100, validRows: 99, receiptRef: "API-PILOT-HIS-001", note: "运行API受控采集校验", noPatientPii: true })
+    }));
+    assert.equal(digitalHospitalCollectionValidation.response.status, 200);
+    assert.equal(digitalHospitalCollectionValidation.body.job.dataQualityIndex, 0.99);
+
     const digitalHospitalPolicyRegister = await api(baseUrl, "/api/digital-hospital/policy-register?domain=%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84&bindingLevel=mandatory", authorized(accountLogin.body.token));
     assert.equal(digitalHospitalPolicyRegister.response.status, 200);
     assert.equal(digitalHospitalPolicyRegister.body.ok, true);

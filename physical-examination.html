@@ -63,6 +63,14 @@
         <div class="contract-grid" id="physical-exam-contracts"></div>
       </section>
 
+      <section class="panel operations-panel" id="physical-exam-specialized-routing-panel">
+        <div class="panel-header">
+          <div><h2>专项体检隔离与分流</h2><p>职业健康、学生、征兵、驾驶、公卫专项和从业人员体检不进入一般成人体检档案，也不触发慢病、家医或居民待办。</p></div>
+          <span class="status-chip ok">独立画像边界</span>
+        </div>
+        <div class="workflow-list" id="physical-exam-specialized-intakes"></div>
+      </section>
+
       <section class="panel" id="physical-exam-standards-panel">
         <div class="panel-header">
           <div><h2>信息化规范基线</h2><p>区分法律强制要求、行业标准和测评依据；生产报告逐份执行规范门禁。</p></div>
@@ -103,6 +111,7 @@
           </div>
           <form id="physical-exam-import-form" class="import-form">
             <label>来源类型<select name="sourceType" required><option value="exam-center">体检中心</option><option value="hospital">医院</option></select></label>
+            <label>体检类型<select name="examProgramType" required><option value="adult-general">一般成人健康体检</option><option value="occupational-health">职业健康检查</option><option value="public-health-special">公共卫生专项体检</option><option value="student-health">学生健康体检</option><option value="conscription">征兵体检</option><option value="driver-license">驾驶人体检</option><option value="food-service">从业人员预防性健康检查</option></select></label>
             <label>居民<select name="residentId" required></select></label>
             <label>机构编码<input name="institutionId" value="exam-center-demo" required /></label>
             <label>机构名称<input name="institutionName" value="大连健康体检中心" required /></label>

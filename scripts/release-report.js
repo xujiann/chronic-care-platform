@@ -18,6 +18,7 @@ const { buildCommercialCryptoReadiness, renderMarkdown: renderCommercialCryptoMa
 const { buildDataGovernanceReadiness, renderMarkdown: renderDataGovernanceMarkdown } = require("./data-governance-readiness");
 const { buildDataQualityReport, renderMarkdown: renderDataQualityMarkdown } = require("./data-quality-report");
 const { buildDigitalHospitalStandardsReadiness, renderMarkdown: renderDigitalHospitalStandardsMarkdown } = require("./digital-hospital-standards-readiness");
+const { buildDigitalHospitalPilotReadiness, renderMarkdown: renderDigitalHospitalPilotMarkdown } = require("./digital-hospital-pilot-readiness");
 const { buildPlatformProductionAudit, renderMarkdown: renderPlatformProductionAuditMarkdown } = require("./platform-production-audit");
 const { buildPhase2CatalogReadiness, renderMarkdown: renderPhase2CatalogMarkdown } = require("./phase2-catalog-readiness");
 const { buildPhase2JointTestReadiness, renderMarkdown: renderPhase2JointTestMarkdown } = require("./phase2-joint-test-readiness");
@@ -735,6 +736,16 @@ function digitalHospitalStandardsChecks(digitalHospitalStandards) {
   ];
 }
 
+function digitalHospitalPilotChecks(digitalHospitalPilot) {
+  return [
+    check("digitalHospitalPilot:readiness", digitalHospitalPilot.ok, digitalHospitalPilot.ok ? "digital hospital pilot checks passed" : "digital hospital pilot checks failed", "error", "digital-hospital-pilot"),
+    check("digitalHospitalPilot:catalog", digitalHospitalPilot.summary?.packs === 4 && digitalHospitalPilot.summary?.projects === 70 && digitalHospitalPilot.summary?.clauses === 70, `${digitalHospitalPilot.summary?.packs || 0} packs / ${digitalHospitalPilot.summary?.projects || 0} projects / ${digitalHospitalPilot.summary?.clauses || 0} clauses`, "error", "digital-hospital-pilot"),
+    check("digitalHospitalPilot:collection", (digitalHospitalPilot.summary?.collectionJobs || 0) >= 6 && (digitalHospitalPilot.summary?.evidenceRecords || 0) >= 6, `${digitalHospitalPilot.summary?.collectionJobs || 0} collection jobs / ${digitalHospitalPilot.summary?.evidenceRecords || 0} evidence records`, "error", "digital-hospital-pilot"),
+    check("digitalHospitalPilot:functionalState", digitalHospitalPilot.functionalState === "pilot-launch-ready", digitalHospitalPilot.functionalState || "missing", "error", "digital-hospital-pilot"),
+    check("digitalHospitalPilot:formalBoundary", digitalHospitalPilot.formalGoLiveState === "blocked-until-site-evidence-signed", digitalHospitalPilot.formalGoLiveState || "missing", "warn", "digital-hospital-pilot")
+  ];
+}
+
 function platformProductionAuditChecks(platformProductionAudit) {
   return [
     check("platformProductionAudit:readiness", platformProductionAudit.ok, platformProductionAudit.ok ? "platform production audit checks passed" : "platform production audit checks failed", "error", "platform-production-audit"),
@@ -987,6 +998,7 @@ function packageChecks(pkg) {
     "data-governance:readiness",
     "data-quality:report",
     "digital-hospital:standards-readiness",
+    "digital-hospital:pilot-readiness",
     "phase2:catalog-readiness",
     "phase2:joint-test-readiness",
     "phase2:mutual-recognition-readiness",
@@ -1121,6 +1133,7 @@ function buildReleaseReport(options = {}) {
   const interfaceMapping = buildInterfaceMappingReport({ data, pkg });
   const dataGovernance = buildDataGovernanceReadiness({ data, pkg, interfaceMapping, dataQuality });
   const digitalHospitalStandards = buildDigitalHospitalStandardsReadiness({ pkg });
+  const digitalHospitalPilot = buildDigitalHospitalPilotReadiness({ data, pkg });
   const platformProductionAudit = buildPlatformProductionAudit({ pkg });
   const phase2Catalog = buildPhase2CatalogReadiness({ data, pkg });
   const phase2JointTest = buildPhase2JointTestReadiness({ data, pkg });
@@ -1186,6 +1199,7 @@ function buildReleaseReport(options = {}) {
     ...dataQualityChecks(dataQuality),
     ...dataGovernanceChecks(dataGovernance),
     ...digitalHospitalStandardsChecks(digitalHospitalStandards),
+    ...digitalHospitalPilotChecks(digitalHospitalPilot),
     ...platformProductionAuditChecks(platformProductionAudit),
     ...phase2CatalogChecks(phase2Catalog),
     ...phase2JointTestChecks(phase2JointTest),
@@ -1264,6 +1278,7 @@ function buildReleaseReport(options = {}) {
     dataQuality,
     dataGovernance,
     digitalHospitalStandards,
+    digitalHospitalPilot,
     platformProductionAudit,
     phase2Catalog,
     phase2JointTest,
@@ -1485,6 +1500,10 @@ function renderMarkdown(report) {
     "## Digital hospital standards readiness report",
     "",
     "See `digital-hospital-standards-readiness-report.json` and `digital-hospital-standards-readiness-report.md` for the standards center, official policy mapping, evaluation workflow, evidence model, review queue, pilot boundary, and no-patient-PII collection guardrails.",
+    "",
+    "## Digital hospital pilot readiness report",
+    "",
+    "See `digital-hospital-pilot-readiness-report.json` and `digital-hospital-pilot-readiness-report.md` for the four evaluation rule packs, clause-level catalog, hospital collection adapters, evidence review, pre-assessment, rectification, and formal site-evidence boundary.",
     "",
     "## Phase 2 proposal readiness report",
     "",
@@ -1946,6 +1965,8 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       internetNursingReadiness: report.internetNursingReadiness
     }, null, 2), "utf8");
+    const digitalHospitalPilotJson = path.join(path.dirname(output), "digital-hospital-pilot-readiness-report.json");
+    fs.writeFileSync(digitalHospitalPilotJson, JSON.stringify(report.digitalHospitalPilot, null, 2), "utf8");
     const emergencyReadinessJson = path.join(path.dirname(output), "emergency-readiness-report.json");
     fs.writeFileSync(emergencyReadinessJson, JSON.stringify({
       project: report.project,
@@ -2094,6 +2115,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(dataGovernanceMarkdown, renderDataGovernanceMarkdown(report.dataGovernance), "utf8");
     const digitalHospitalStandardsMarkdown = path.join(path.dirname(markdown), "digital-hospital-standards-readiness-report.md");
     fs.writeFileSync(digitalHospitalStandardsMarkdown, renderDigitalHospitalStandardsMarkdown(report.digitalHospitalStandards), "utf8");
+    const digitalHospitalPilotMarkdown = path.join(path.dirname(markdown), "digital-hospital-pilot-readiness-report.md");
+    fs.writeFileSync(digitalHospitalPilotMarkdown, renderDigitalHospitalPilotMarkdown(report.digitalHospitalPilot), "utf8");
     const platformProductionAuditMarkdown = path.join(path.dirname(markdown), "platform-production-audit.md");
     fs.writeFileSync(platformProductionAuditMarkdown, renderPlatformProductionAuditMarkdown(report.platformProductionAudit), "utf8");
     const phase2ProposalMarkdown = path.join(path.dirname(markdown), "phase2-proposal-readiness-report.md");

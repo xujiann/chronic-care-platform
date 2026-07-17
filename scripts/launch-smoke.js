@@ -16,6 +16,8 @@ const REQUIRED_ROUTES = [
   "/api/digital-hospital/production-evidence-packets",
   "/api/digital-hospital/launch-command-briefs",
   "/api/digital-hospital/formal-cutover-approvals",
+  "/api/digital-hospital/evaluation-catalog",
+  "/api/digital-hospital/pilot-readiness",
   "/api/production-cutover-checklist",
   "/api/site-readiness-pack"
 ];
@@ -30,6 +32,7 @@ const REQUIRED_ARTIFACTS = [
   "release/citizen-launch-foundation-readiness.json",
   "release/citizen-launch-foundation-readiness.md",
   "release/digital-hospital-standards-readiness-report.md",
+  "release/digital-hospital-pilot-readiness-report.md",
   "release/monitoring-readiness-report.md",
   "release/operations-readiness-report.md"
 ];

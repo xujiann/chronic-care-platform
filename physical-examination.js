@@ -49,6 +49,7 @@ function renderPhysicalExamSystem() {
   renderPhysicalExamSummary(overview.summary || {});
   renderPhysicalExamHighlights(overview.highlights || {});
   renderSourceContracts(overview.sourceContracts || []);
+  renderSpecializedIntakes(overview.specializedIntakes || [], overview.examPrograms || []);
   renderStandards(overview.standards || window.PhysicalExaminationStandards?.STANDARD_CATALOG || []);
   renderQualityIndicators(overview.qualityIndicators || []);
   renderPhysicalExamFilters(overview);
@@ -229,6 +230,23 @@ function renderSourceContracts(contracts) {
   </article>`).join("");
 }
 
+function renderSpecializedIntakes(rows, programs) {
+  const target = document.querySelector("#physical-exam-specialized-intakes");
+  if (!target) return;
+  if (!rows.length) {
+    const labels = programs.filter((item) => item.route === "specialized-profile").map((item) => item.name).join("、");
+    target.innerHTML = `<article class="workflow-card specialized-routing-empty"><header><strong>当前无待分流专项体检</strong><span class="status-chip ok">一般档案零混入</span></header><p>已启用独立画像：${escapeExamHtml(labels || "职业健康、学生、征兵、驾驶及公共卫生专项体检")}。</p><small>专项载荷仅登记最小路由元数据和摘要，不进入 personalRecords[physical-exam]。</small></article>`;
+    return;
+  }
+  target.innerHTML = rows.map((item) => `<article class="workflow-card" data-specialized-intake="${escapeExamHtml(item.id)}">
+    <header><strong>${escapeExamHtml(item.examProgramName)}</strong><span class="status-chip ${item.status === "closed" ? "ok" : "warn"}">${escapeExamHtml(item.status)}</span></header>
+    <p>${escapeExamHtml(item.institutionName)} · ${escapeExamHtml(item.examDate)} · ${escapeExamHtml(item.externalId)}</p>
+    <small>${escapeExamHtml(item.routingReason)} · 目标分类 ${escapeExamHtml(item.targetArchiveCategory)}</small>
+    <div class="specialized-routing-fields"><input data-specialized-target placeholder="专项系统标识" value="${escapeExamHtml(item.targetSystem || "")}" /><input data-specialized-profile placeholder="专项画像 ID" value="${escapeExamHtml(item.profileId || "")}" /><input data-specialized-evidence placeholder="证据编号" /></div>
+    <div class="inline-actions"><button type="button" data-specialized-action="assign-profile">分配专项画像</button><button type="button" data-specialized-action="return-source">退回来源</button><button type="button" data-specialized-action="close">关闭分流</button></div>
+  </article>`).join("");
+}
+
 function renderStandards(standards) {
   const target = document.querySelector("#physical-exam-standards");
   if (!target) return;
@@ -298,8 +316,34 @@ function bindPhysicalExamControls() {
   });
   document.querySelector("#physical-exam-abnormal-cases")?.addEventListener("click", handleAbnormalCaseAction);
   document.querySelector("#physical-exam-joint-tests")?.addEventListener("click", handleJointTestAction);
+  document.querySelector("#physical-exam-specialized-intakes")?.addEventListener("click", handleSpecializedIntakeAction);
   document.querySelector("#physical-exam-detail")?.addEventListener("click", handleAttachmentLink);
   document.querySelector("[data-close-report]")?.addEventListener("click", () => document.querySelector("#physical-exam-detail-dialog")?.close());
+}
+
+async function handleSpecializedIntakeAction(event) {
+  const button = event.target.closest("[data-specialized-action]");
+  const card = event.target.closest("[data-specialized-intake]");
+  if (!button || !card) return;
+  const evidenceRef = card.querySelector("[data-specialized-evidence]")?.value.trim();
+  if (!evidenceRef) {
+    showPhysicalExamToast("专项体检分流必须填写证据编号");
+    return;
+  }
+  const payload = { action: button.dataset.specializedAction, evidenceRef, note: "专项体检隔离分流处置" };
+  if (payload.action === "assign-profile") {
+    payload.targetSystem = card.querySelector("[data-specialized-target]")?.value.trim();
+    payload.profileId = card.querySelector("[data-specialized-profile]")?.value.trim();
+  }
+  button.disabled = true;
+  try {
+    await postPhysicalExamAction(`/physical-exams/specialized-intakes/${encodeURIComponent(card.dataset.specializedIntake)}/actions`, payload);
+    await refreshPhysicalExamWorkbench("专项体检分流状态已更新");
+  } catch (error) {
+    showPhysicalExamToast(error.message);
+  } finally {
+    button.disabled = false;
+  }
 }
 
 async function handleAbnormalCaseAction(event) {
@@ -412,7 +456,11 @@ async function submitPhysicalExamImport(event) {
     const response = await request(`${PHYSICAL_EXAM_API}/physical-exams/import`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || `接入失败：${response.status}`);
-    resultTarget.textContent = result.imported ? `已接入 ${result.imported} 份报告并同步健康档案。` : `检测到 ${result.duplicates} 份重复报告，未重复归档。`;
+    resultTarget.textContent = result.imported
+      ? `已接入 ${result.imported} 份一般成人体检报告并同步健康档案。`
+      : result.routed
+        ? `已将 ${result.routed} 份专项体检分流至受限队列，未写入一般体检档案。`
+        : `检测到 ${result.duplicates + (result.routedDuplicates || 0)} 份重复报告，未重复归档。`;
     physicalExamState.residentId = values.residentId;
     await loadPhysicalExams();
     renderPhysicalExamSystem();

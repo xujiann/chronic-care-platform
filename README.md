@@ -66,7 +66,7 @@ http://localhost:5173/login.html
 | `institution.html` | 医疗机构端：授权档案、转诊、固定取药、证照、多点执业 |
 | `insurance.html` | 医保局/医保中心/区市县医保局：审核、监管、凭证、取药 |
 | `citizen.html` | 居民端个人健康信息库、家庭成员、授权共享、适老化服务 |
-| `physical-examination.html` | 体检中心/医院结果接入、健康时光机、报告翻译、异常行动、个性计划、辐射管家、质量啄木鸟和城市雷达 |
+| `physical-examination.html` | 体检中心/医院结果接入、专项体检隔离分流、健康时光机、报告翻译、异常行动、个性计划、辐射管家、质量啄木鸟和城市雷达 |
 | `physical-examination-highlights.js` | 居民端与管理端共享的体检创新亮点计算及可审计动作引擎 |
 | `docs/体检系统信息化规范基线-2026-07-15.md` | 体检业务、共享文档、数据元/值域、签名、隐私、安全和留存规范目录 |
 | `docs/体检系统规范需求追溯矩阵-2026-07-15.md` | 规范条款到代码、测试与上线证据的追溯矩阵 |
@@ -125,10 +125,11 @@ SQLite 结构化镜像已覆盖居民、账户、主索引、个人健康档案�
 | `GET /api/metrics` | 管理端运行指标，返回请求数、状态码、慢请求、任务堆积、死信、质量问题；运营工作台会在服务模式下展示部分指标 |
 | `GET /api/system/readiness` | 管理端系统就绪报告，汇总 P2 集合、接口准备度、审计链、运行负载和现场外部依赖边界 |
 | `GET /api/physical-exams` | 按角色授权和居民主索引查询全部历史体检报告，返回年度、来源机构、异常项和健康建议 |
-| `POST /api/physical-exams/import` | 体检中心或医院单份/批量接入体检报告，按来源机构与外部标识幂等去重并同步个人健康档案 |
+| `POST /api/physical-exams/import` | 体检中心或医院单份/批量接入；一般成人体检同步健康档案，职业/专项体检进入受限分流队列，二者均幂等去重 |
 | `POST /api/physical-exams/abnormal-cases/:id/actions` | 对体检异常结果执行通知居民、复查安排、专科分派、关闭或重开，并生成消息与审计证据 |
 | `POST /api/physical-exams/:id/link-attachment` | 将已完成校验和与恶意文件扫描的原始体检报告安全附件关联到健康档案 |
 | `POST /api/physical-exams/joint-tests/:id/actions` | 逐项登记机构现场联调证据，全部通过后签署上线确认 |
+| `POST /api/physical-exams/specialized-intakes/:id/actions` | 凭证据编号把专项体检分配到独立画像、退回来源或关闭分流，禁止混入一般体检档案 |
 | `GET /api/process-audit` | 管理端全流程审计报告，汇总居民、慢病、医共体、医保取药、统计证照、安全合规和生产切换证据域 |
 | `POST /api/auth/login` / `GET /api/auth/me` / `POST /api/auth/logout` | 登录、会话、退出 |
 | `GET /api/state` / `PUT /api/state` | 按角色裁剪读取和管理端持久化状态 |
@@ -364,6 +365,8 @@ The hospital interface development handoff is `docs/escort-hospital-interface.md
 `GET /api/digital-hospital/formal-cutover-approvals` exposes the independent formal production approval desk. `POST /api/digital-hospital/formal-cutover-approvals/:id/actions` remains blocked until every site signoff and production evidence item is complete, then requires a change ticket, cutover window, exact confirmation phrase, and a signer not reused by another approval role. Formal production readiness requires all four approvals.
 
 `npm.cmd run digital-hospital:standards-readiness` generates `release/digital-hospital-standards-readiness-report.json` and `release/digital-hospital-standards-readiness-report.md`. The release gate checks the commission-only page guard, standard domains, workflow loop, evidence modes, official source links, API contract, launch readiness gate, production evidence packet board, launch command brief desk, formal cutover approval desk, no patient-identifiable collection boundary, CI wiring, deploy check, release report, launch smoke, and release artifact manifest.
+
+`digital-hospital-evaluation.html` is the commission/institution workbench for P0-P1 pilot evaluation. `GET /api/digital-hospital/evaluation-catalog` exposes 4 rule packs, 70 clause-level projects and the tertiary-general-hospital pilot profile; `GET /api/digital-hospital/pilot-readiness` separates `pilot-launch-ready` from `blocked-until-site-evidence-signed`. Collection, evidence and pre-assessment actions are available under `/api/digital-hospital/collection-jobs/:id/actions`, `/api/digital-hospital/evaluation-evidence/:id/actions`, `/api/digital-hospital/pre-assessments/actions` and `/api/digital-hospital/pre-assessments/:id/actions`. `npm.cmd run digital-hospital:pilot-readiness` generates the release-visible pilot report.
 
 ## Internet Nursing Pilot
 

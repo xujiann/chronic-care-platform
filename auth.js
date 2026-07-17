@@ -38,6 +38,7 @@
     "platform.html": ["commission"],
     "digital-hospital-standards.html": ["commission"],
     "digital-hospital-self-assessment.html": ["commission", "institution"],
+    "digital-hospital-evaluation.html": ["commission", "institution"],
     "regional-data-sharing.html": ["commission", "institution"],
     "quality-safety.html": ["commission"],
     "operations.html": ["commission"],
@@ -71,6 +72,9 @@
   roleLinks.citizen.splice(2, 0, ["imaging-cloud.html", "影像云"]);
   roleLinks.county.splice(1, 0, ["internet-nursing.html", "互联网护理"]);
   roleLinks.county.splice(2, 0, ["imaging-cloud.html", "影像云"]);
+
+  roleLinks.commission.splice(2, 0, ["digital-hospital-evaluation.html", "评价预评"]);
+  roleLinks.institution.splice(1, 0, ["digital-hospital-evaluation.html", "评价预评"]);
 
   async function login(username, password) {
     if (API_BASE) {

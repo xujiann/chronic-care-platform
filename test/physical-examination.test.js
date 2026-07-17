@@ -15,6 +15,7 @@ function demoState() {
     personalRecords: PhysicalExaminationService.seedRecords(),
     physicalExamAbnormalCases: PhysicalExaminationService.seedAbnormalCases(),
     physicalExamJointTests: PhysicalExaminationService.seedJointTests(),
+    physicalExamSpecializedIntakes: [],
     secureAttachments: [],
     integrationGatewayEvents: []
   };
@@ -115,6 +116,27 @@ test("体检导入拒绝未知来源、缺失主索引和越权居民", () => {
   assert.throws(() => PhysicalExaminationService.ingest(demoState(), { ...base, sourceType: "hospital", residentId: "r1" }, { canAccessResident: () => false }), /无权/);
 });
 
+test("专项体检自动进入受限分流队列且不污染一般体检健康档案", () => {
+  const state = demoState();
+  state.chronicScreeningTasks = [];
+  state.taskMessages = [];
+  const beforeRecords = state.personalRecords.length;
+  const payload = { sourceType: "hospital", examProgramType: "occupational-health", residentId: "r1", externalId: "OCC-001", institutionId: "occ-hospital", institutionName: "职业健康检查机构", reportNo: "OCC-R-001", examDate: "2026-07-17", summary: "职业健康检查完成", findings: [{ code: "BP", name: "血压", value: "160/95", abnormal: true }] };
+  const first = PhysicalExaminationService.ingest(state, payload, { actor: "hospital", canAccessResident: () => true, now: "2026-07-17T01:00:00.000Z" });
+  const repeat = PhysicalExaminationService.ingest(state, payload, { actor: "hospital", canAccessResident: () => true, now: "2026-07-17T01:01:00.000Z" });
+  assert.equal(first.created.length, 0);
+  assert.equal(first.routed.length, 1);
+  assert.equal(first.routed[0].restrictedData, true);
+  assert.equal(state.personalRecords.length, beforeRecords);
+  assert.equal(state.chronicScreeningTasks.some((item) => item.sourceReportId === first.routed[0].id || item.sourceExternalId === payload.externalId), false);
+  assert.equal(state.taskMessages.some((item) => item.sourceId === first.routed[0].id), false);
+  assert.equal(repeat.routedDuplicates.length, 1);
+  assert.throws(() => PhysicalExaminationService.applySpecializedIntakeAction(state, first.routed[0].id, { action: "assign-profile", targetSystem: "occ-system", profileId: "occ-v1" }), /证据编号/);
+  const routed = PhysicalExaminationService.applySpecializedIntakeAction(state, first.routed[0].id, { action: "assign-profile", targetSystem: "occ-system", profileId: "occ-v1", evidenceRef: "ROUTE-OCC-001" }, { actor: "health", now: "2026-07-17T01:02:00.000Z" });
+  assert.equal(routed.status, "routed-to-specialized-system");
+  assert.equal(routed.targetArchiveCategory, "occupational-health-exam");
+});
+
 test("体检系统就绪报告核对 API、界面和居民健康档案证据", () => {
   const report = buildReport();
   assert.equal(report.ok, true);
@@ -132,6 +154,7 @@ test("体检系统静态入口包含角色守卫与健康档案同步提示", ()
   assert.match(html, /physical-exam-import-form/);
   assert.match(html, /physical-exam-readiness/);
   assert.match(html, /机构联调验收/);
+  assert.match(html, /专项体检隔离与分流/);
   assert.match(citizen, /physical-examination\.html/);
   assert.match(citizen, /option value="physical-exam"/);
 });

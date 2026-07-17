@@ -38,6 +38,16 @@
     }
   ];
 
+  const EXAM_PROGRAMS = Object.freeze([
+    { id: "adult-general", name: "一般成人健康体检", archiveCategory: "physical-exam", route: "general-archive", residentVisible: true },
+    { id: "occupational-health", name: "职业健康检查", archiveCategory: "occupational-health-exam", route: "specialized-profile", residentVisible: false },
+    { id: "public-health-special", name: "公共卫生专项体检", archiveCategory: "public-health-exam", route: "specialized-profile", residentVisible: false },
+    { id: "student-health", name: "学生健康体检", archiveCategory: "student-health-exam", route: "specialized-profile", residentVisible: false },
+    { id: "conscription", name: "征兵体检", archiveCategory: "conscription-exam", route: "specialized-profile", residentVisible: false },
+    { id: "driver-license", name: "驾驶人体检", archiveCategory: "driver-license-exam", route: "specialized-profile", residentVisible: false },
+    { id: "food-service", name: "从业人员预防性健康检查", archiveCategory: "food-service-exam", route: "specialized-profile", residentVisible: false }
+  ]);
+
   const ITEM_DICTIONARY = Object.freeze([
     { code: "BP", name: "血压", nationalCodes: ["DE04.10.174.00", "DE04.10.176.00"], standard: "WS/T 363.7-2023", secondaryCode: "LOINC 85354-9", valueType: "string", unit: "mmHg", abnormalRule: "systolic >= 140 or diastolic >= 90" },
     { code: "GLU", name: "空腹血糖", nationalCodes: ["DE04.50.038.00"], standard: "WS/T 363.9-2023", secondaryCode: "LOINC 1558-6", valueType: "number", unit: "mmol/L", abnormalRule: "value < 3.9 or value > 6.1" },
@@ -221,9 +231,13 @@
     if (!Array.isArray(state?.residents) || !Array.isArray(state?.personalRecords)) throw inputError("体检归档状态不可用");
     const created = [];
     const duplicates = [];
+    const routed = [];
+    const routedDuplicates = [];
+    if (!Array.isArray(state.physicalExamSpecializedIntakes)) state.physicalExamSpecializedIntakes = [];
     const residentMap = new Map(state.residents.map((item) => [item.id, item]));
     const personIndexMap = new Map(state.residents.map((item) => [personIndexOf(item), item]).filter(([key]) => key));
     const existingKeys = new Map(state.personalRecords.filter(isPhysicalExamRecord).map((item) => [idempotencyKey(item), item]));
+    const existingSpecializedKeys = new Map(state.physicalExamSpecializedIntakes.map((item) => [specializedIdempotencyKey(item), item]));
 
     rows.forEach((raw) => {
       const input = validateImport(raw);
@@ -233,6 +247,18 @@
         const error = new Error(`无权向居民 ${resident.id} 归档体检报告`);
         error.statusCode = 403;
         throw error;
+      }
+      if (input.examProgramType !== "adult-general") {
+        const specialized = buildSpecializedIntake(input, resident, context);
+        const specializedKey = specializedIdempotencyKey(specialized);
+        if (existingSpecializedKeys.has(specializedKey)) {
+          routedDuplicates.push(existingSpecializedKeys.get(specializedKey));
+          return;
+        }
+        state.physicalExamSpecializedIntakes.unshift(specialized);
+        existingSpecializedKeys.set(specializedKey, specialized);
+        routed.push(specialized);
+        return;
       }
       const normalized = physicalRecord({
         ...input,
@@ -285,7 +311,64 @@
       now: context.now || new Date().toISOString()
     });
 
-    return { created, duplicates, total: rows.length };
+    return { created, duplicates, routed, routedDuplicates, total: rows.length };
+  }
+
+  function buildSpecializedIntake(input, resident, context = {}) {
+    const program = EXAM_PROGRAMS.find((item) => item.id === input.examProgramType);
+    if (!program || program.id === "adult-general") throw inputError("专项体检类型无效");
+    const now = context.now || new Date().toISOString();
+    return {
+      id: `physical-exam-specialized-${stableHash(`${input.sourceType}|${input.institutionId}|${input.externalId}|${program.id}`)}`,
+      residentId: resident.id,
+      personIndex: personIndexOf(resident),
+      sourceType: input.sourceType,
+      externalId: input.externalId,
+      institutionId: input.institutionId,
+      institutionName: input.institutionName,
+      reportNo: String(input.reportNo || "").trim(),
+      examDate: input.examDate,
+      examProgramType: program.id,
+      examProgramName: program.name,
+      targetArchiveCategory: program.archiveCategory,
+      route: program.route,
+      status: "awaiting-specialized-profile",
+      restrictedData: true,
+      payloadDigest: stableHash(JSON.stringify({ sourceType: input.sourceType, externalId: input.externalId, institutionId: input.institutionId, examDate: input.examDate, examProgramType: program.id })),
+      routingReason: "专项体检不得混入一般成人健康体检档案，未生成慢病风险、家医建议或居民待办。",
+      evidenceRefs: [],
+      actionHistory: [{ action: "routed", at: now, actor: context.actor || "integration", note: "自动进入专项体检受限分流队列" }],
+      createdAt: now,
+      updatedAt: now
+    };
+  }
+
+  function applySpecializedIntakeAction(state, intakeId, payload = {}, context = {}) {
+    const intakes = Array.isArray(state?.physicalExamSpecializedIntakes) ? state.physicalExamSpecializedIntakes : [];
+    const intake = intakes.find((item) => item.id === intakeId);
+    if (!intake) throw notFoundError("专项体检分流记录不存在");
+    const action = String(payload.action || "").trim();
+    const evidenceRef = String(payload.evidenceRef || "").trim();
+    const note = String(payload.note || "").trim();
+    if (!["assign-profile", "return-source", "close"].includes(action)) throw inputError("专项体检操作仅支持 assign-profile、return-source 或 close");
+    if (!evidenceRef) throw inputError("专项体检分流操作必须提供证据编号");
+    if (action === "assign-profile") {
+      const targetSystem = String(payload.targetSystem || "").trim();
+      const profileId = String(payload.profileId || "").trim();
+      if (!targetSystem || !profileId) throw inputError("分配专项画像必须提供 targetSystem 和 profileId");
+      intake.targetSystem = targetSystem;
+      intake.profileId = profileId;
+      intake.status = "routed-to-specialized-system";
+    } else if (action === "return-source") {
+      intake.status = "returned-to-source";
+    } else {
+      if (!['routed-to-specialized-system', 'returned-to-source'].includes(intake.status)) throw conflictError("专项体检尚未完成分流或退回，不能关闭");
+      intake.status = "closed";
+    }
+    intake.evidenceRefs = [...new Set([...(intake.evidenceRefs || []), evidenceRef])];
+    intake.updatedAt = context.now || new Date().toISOString();
+    intake.actionHistory = [...(intake.actionHistory || []), { action, at: intake.updatedAt, actor: context.actor || "system", note: note || evidenceRef, evidenceRef }];
+    return intake;
   }
 
   function synchronizeCareLinks(state, options = {}) {
@@ -469,6 +552,7 @@
     if (!raw.residentId && !raw.personIndex) throw inputError("residentId 与 personIndex 至少提供一项");
     const examDate = normalizeDate(raw.examDate);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(examDate)) throw inputError("examDate 应为 YYYY-MM-DD");
+    const examProgramType = normalizeExamProgramType(raw.examProgramType || raw.examScope || "adult-general");
     return {
       ...raw,
       sourceType,
@@ -478,7 +562,8 @@
       institutionName: String(raw.institutionName).trim(),
       summary: String(raw.summary).trim(),
       residentId: String(raw.residentId || "").trim(),
-      personIndex: String(raw.personIndex || "").trim()
+      personIndex: String(raw.personIndex || "").trim(),
+      examProgramType
     };
   }
 
@@ -501,6 +586,10 @@
       .sort((a, b) => String(a.dueAt || "").localeCompare(String(b.dueAt || "")));
     const attachments = new Map((state?.secureAttachments || []).map((item) => [item.id, item]));
     const jointTests = (state?.physicalExamJointTests || seedJointTests()).map((item) => ({ ...item, checks: Array.isArray(item.checks) ? item.checks : [] }));
+    const specializedIntakes = (state?.physicalExamSpecializedIntakes || [])
+      .filter((item) => !allowedIds || allowedIds.has(item.residentId))
+      .filter((item) => !residentId || item.residentId === residentId)
+      .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")));
     const gatewayEvents = (state?.integrationGatewayEvents || []).filter((item) => item.contractId === "physical-exam-report-v1");
     const unresolvedCases = cases.filter((item) => !["closed", "resolved"].includes(item.status));
     const mappingTotal = reports.reduce((total, item) => total + (item.meta?.findings?.length || 0), 0);
@@ -531,11 +620,14 @@
         openAbnormalCases: unresolvedCases.length,
         mappingRate: mappingTotal ? Math.round((mappedTotal / mappingTotal) * 100) : 100,
         nationalMappingRate: mappingTotal ? Math.round((nationalMappedTotal / mappingTotal) * 100) : 100,
-        deadLetters: gatewayEvents.filter((item) => item.deadLetter).length
+        deadLetters: gatewayEvents.filter((item) => item.deadLetter).length,
+        specializedPending: specializedIntakes.filter((item) => !["closed", "returned-to-source"].includes(item.status)).length
       },
       qualityIndicators,
       highlights,
       sourceContracts: SOURCE_CONTRACTS.map((item) => ({ ...item })),
+      examPrograms: EXAM_PROGRAMS.map((item) => ({ ...item })),
+      specializedIntakes,
       residents: [...residentIds].map((id) => ({ id, name: residentMap.get(id)?.name || id })),
       years,
       reports: reports.map((item) => {
@@ -720,6 +812,18 @@
     return normalized;
   }
 
+  function normalizeExamProgramType(value) {
+    const raw = String(value || "adult-general").trim().toLowerCase();
+    const aliases = { general: "adult-general", adult: "adult-general", occupational: "occupational-health", public: "public-health-special", student: "student-health", military: "conscription", driver: "driver-license", food: "food-service" };
+    const normalized = aliases[raw] || raw;
+    if (!EXAM_PROGRAMS.some((item) => item.id === normalized)) throw inputError(`examProgramType 不支持：${raw}`);
+    return normalized;
+  }
+
+  function specializedIdempotencyKey(item) {
+    return [item.sourceType, item.institutionId, item.externalId, item.examProgramType].map((value) => String(value || "").trim().toLowerCase()).join("|");
+  }
+
   function normalizeFindings(findings) {
     return (Array.isArray(findings) ? findings : []).slice(0, 200).map((item, index) => {
       const dictionary = dictionaryItem(item?.code);
@@ -821,10 +925,12 @@
 
   return {
     ITEM_DICTIONARY,
+    EXAM_PROGRAMS,
     SOURCE_CONTRACTS,
     STANDARDS: Standards,
     applyAbnormalCaseAction,
     applyHighlightAction: Highlights.applyAction,
+    applySpecializedIntakeAction,
     applyJointTestAction,
     buildOverview,
     buildQualityIndicators,
