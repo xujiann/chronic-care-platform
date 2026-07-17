@@ -92,9 +92,9 @@ const CONTRACTS = [
     owner: "county-referral-center",
     direction: "inbound",
     roles: ["institution", "commission"],
-    requiredFields: ["referralId", "externalId?", "primaryCareAccepted?", "archiveUpdated?", "familyRiskPrompted?", "nextFollowupAt?"],
+    requiredFields: ["referralId", "externalId?", "primaryCareAccepted?", "archiveUpdated?", "familyRiskPrompted?", "nextFollowupAt?", "standardsProfile?", "personIndex?", "sourceSystem?", "occurredAt?", "returnStatus?", "diagnosis?"],
     targetCollections: ["referralSystem", "referralTeleconsultations", "personalRecords", "taskMessages", "securityEvents", "dataAccessLogs"],
-    evidence: ["receiving feedback", "archive update", "archive field-mapping summary", "family risk prompt", "primary-care follow-up"]
+    evidence: ["receiving feedback", "archive update", "archive field-mapping summary", "family risk prompt", "primary-care follow-up", "optional WS/T 846 referral-return prevalidation"]
   },
   {
     id: "chronic-pathway-quality-v1",

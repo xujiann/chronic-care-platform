@@ -14462,6 +14462,36 @@ function recordChronicReferralContinuity(data, user, payload) {
   const familyRiskPrompted = payload.familyRiskPrompted === true;
   const nextFollowupAt = String(payload.nextFollowupAt || "").trim();
   const residentMap = new Map((data.residents || []).map((item) => [item.id, item]));
+  const standardsProfile = String(payload.standardsProfile || "").trim();
+  let interoperability = { mode: "legacy-compatible", profileId: "", validated: false };
+  if (standardsProfile) {
+    if (standardsProfile !== "chronic-referral-return-v1") {
+      return { status: 400, body: { error: "Bad Request", message: "standardsProfile must be chronic-referral-return-v1 for referral continuity" } };
+    }
+    const validation = validateChronicInteroperabilityMessage(data, user, {
+      profileId: standardsProfile,
+      message: {
+        externalId,
+        residentId: referral.residentId,
+        personIndex: String(payload.personIndex || "").trim(),
+        referralId,
+        sourceSystem: String(payload.sourceSystem || "").trim(),
+        occurredAt: String(payload.occurredAt || "").trim(),
+        returnStatus: String(payload.returnStatus || "").trim(),
+        diagnosis: String(payload.diagnosis || "").trim(),
+        nextFollowupAt
+      }
+    });
+    if (validation.status !== 200) return validation;
+    interoperability = {
+      mode: "standards-prevalidated",
+      profileId: standardsProfile,
+      validated: true,
+      validatedAt: now,
+      sourceSystem: String(payload.sourceSystem).trim(),
+      returnStatus: String(payload.returnStatus).trim()
+    };
+  }
   const record = {
     id: `chronic-referral-${randomUUID()}`,
     residentId: referral.residentId,
@@ -14479,6 +14509,7 @@ function recordChronicReferralContinuity(data, user, payload) {
       nextFollowupAt,
       receivingFeedback: String(payload.receivingFeedback || "").trim(),
       servicePack: String(payload.servicePack || "").trim(),
+      interoperability,
       recordedBy: user.username || user.role,
       recordedAt: now
     },
@@ -14526,6 +14557,7 @@ function recordChronicReferralContinuity(data, user, payload) {
       record,
       referral,
       messageId: message.id,
+      interoperability,
       continuity: buildChronicReferralContinuity(normalized, user, referral.residentId),
       idempotent: false
     }

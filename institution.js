@@ -747,9 +747,17 @@ function renderChronicInteroperabilityProfiles(state) {
 
 async function recordChronicReferralContinuity(referralId) {
   const referral = (platformState.referralSystem?.referrals || []).find((item) => item.id === referralId) || {};
+  const resident = residentOf(platformState, referral.residentId) || {};
+  const occurredAt = new Date().toISOString();
   const payload = {
     referralId,
     externalId: `institution-handoff-${referralId}-${new Date().toISOString().slice(0, 10)}`,
+    standardsProfile: "chronic-referral-return-v1",
+    personIndex: resident.personIndex || "",
+    sourceSystem: "institution-workbench",
+    occurredAt,
+    returnStatus: "returned-to-primary-care",
+    diagnosis: referral.diseaseType || referral.reason || "chronic disease",
     primaryCareAccepted: true,
     archiveUpdated: true,
     familyRiskPrompted: true,

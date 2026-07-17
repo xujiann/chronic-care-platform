@@ -1132,6 +1132,7 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(read("institution.html"), /chronic-followup-workbench/);
   assert.match(read("institution.js"), /dispatchChronicFollowup/);
   assert.match(read("institution.js"), /escalateChronicFollowup/);
+  assert.match(read("institution.js"), /standardsProfile: "chronic-referral-return-v1"/);
   assert.match(read("institution.js"), /data-chronic-escalation/);
   assert.match(read("citizen.html"), /followup-feedback-form/);
   assert.match(read("citizen.js"), /bindFollowupFeedback/);

@@ -5170,6 +5170,12 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       body: JSON.stringify({
         referralId: "rf3",
         externalId: "referral-api-test-rf3",
+        standardsProfile: "chronic-referral-return-v1",
+        personIndex: "person-index-r4",
+        sourceSystem: "leading-hospital-emr",
+        occurredAt: "2026-06-21T09:00:00.000Z",
+        returnStatus: "returned-to-primary-care",
+        diagnosis: "hypertension",
         primaryCareAccepted: true,
         archiveUpdated: true,
         familyRiskPrompted: true,
@@ -5180,6 +5186,15 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(referralContinuity.response.status, 201);
     assert.equal(referralContinuity.body.record.category, "chronic-referral-continuity");
     assert.equal(referralContinuity.body.referral.continuity.archiveUpdated, true);
+    assert.equal(referralContinuity.body.interoperability.profileId, "chronic-referral-return-v1");
+    assert.equal(referralContinuity.body.record.meta.interoperability.validated, true);
+
+    const invalidStandardReferral = await api(baseUrl, "/api/chronic/referral-continuity", authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({ referralId: "rf1", standardsProfile: "chronic-referral-return-v1", externalId: "referral-invalid-standard-rf1" })
+    }));
+    assert.equal(invalidStandardReferral.response.status, 422);
+    assert.equal(invalidStandardReferral.body.missingFields.includes("personIndex"), true);
 
     const referralContinuityReplay = await api(baseUrl, "/api/chronic/referral-continuity", authorized(commissionToken, {
       method: "POST",

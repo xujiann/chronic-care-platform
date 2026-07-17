@@ -107,8 +107,9 @@ Runtime audit endpoint: `GET /api/chronic/institution-interfaces`.
 - Direction: referral handoff and primary-care return-management evidence
 - Required POST body fields: `referralId`
 - Optional POST fields: `externalId`, `primaryCareAccepted`, `archiveUpdated`, `familyRiskPrompted`, `nextFollowupAt`, `receivingFeedback`, `servicePack`, `result`
+- Standards mode: set `standardsProfile` to `chronic-referral-return-v1` and provide `personIndex`, `sourceSystem`, `occurredAt`, `returnStatus`, and `diagnosis`. The request is validated against the referral-return profile before any continuity record is written.
 - Writes: `referralSystem.referrals[].continuity`, `personalRecords`, `taskMessages`, `securityEvents`, `dataAccessLogs`
-- Launch check: specialist report return, primary-care acceptance, electronic health archive update, archive-standard mapping summary, family risk prompt, and next follow-up are visible as separate evidence fields. A complete field map is reported separately from the original handoff status.
+- Launch check: specialist report return, primary-care acceptance, electronic health archive update, archive-standard mapping summary, family risk prompt, and next follow-up are visible as separate evidence fields. A complete field map is reported separately from the original handoff status. Standards-mode validation is prevalidation only and does not replace a signed production referral document or bilateral interface acceptance.
 
 ### chronic-archive-standard-v1
 
