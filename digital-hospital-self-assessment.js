@@ -2,6 +2,9 @@ const DIGITAL_HOSPITAL_SELF_ASSESSMENT_ACTIONS = [
   "assign-assessment",
   "save-draft",
   "submit-assessment",
+  "start-preliminary-review",
+  "escalate-expert-review",
+  "record-expert-opinion",
   "request-correction",
   "accept-assessment"
 ];
@@ -154,6 +157,7 @@ function buildDigitalHospitalSelfAssessmentBoard(data = {}, user = {}, filters =
     if (filters.status && item.status !== filters.status) return false;
     if (filters.institutionId && item.institutionId !== filters.institutionId) return false;
     if (filters.overdueOnly && !item.summary.overdue) return false;
+    if (filters.reviewOnly && !["submitted", "resubmitted", "preliminary-review", "expert-review", "expert-reviewed"].includes(item.status)) return false;
     if (query && !`${item.institutionName} ${item.targetLevel} ${item.assignedTo} ${item.status}`.toLowerCase().includes(query)) return false;
     return true;
   });
@@ -162,6 +166,10 @@ function buildDigitalHospitalSelfAssessmentBoard(data = {}, user = {}, filters =
     filteredAssessments: assessments.length,
     draft: allAssessments.filter((item) => ["assigned", "draft", "correction-in-progress"].includes(item.status)).length,
     submitted: allAssessments.filter((item) => ["submitted", "resubmitted"].includes(item.status)).length,
+    preliminaryReview: allAssessments.filter((item) => item.status === "preliminary-review").length,
+    expertReview: allAssessments.filter((item) => item.status === "expert-review").length,
+    expertReviewed: allAssessments.filter((item) => item.status === "expert-reviewed").length,
+    disputedIndicators: allAssessments.reduce((sum, item) => sum + (item.reviewWorkflow?.dispute?.indicatorIds?.length || 0), 0),
     correctionRequired: allAssessments.filter((item) => item.status === "correction-required").length,
     accepted: allAssessments.filter((item) => item.status === "accepted").length,
     overdue: allAssessments.filter((item) => item.summary.overdue).length,
@@ -171,7 +179,8 @@ function buildDigitalHospitalSelfAssessmentBoard(data = {}, user = {}, filters =
     { id: "digitalHospitalSelfAssessment:indicators", passed: DIGITAL_HOSPITAL_SELF_ASSESSMENT_INDICATORS.length >= 12, detail: `${DIGITAL_HOSPITAL_SELF_ASSESSMENT_INDICATORS.length} structured indicators` },
     { id: "digitalHospitalSelfAssessment:sixDomains", passed: new Set(DIGITAL_HOSPITAL_SELF_ASSESSMENT_INDICATORS.map((item) => item.domain)).size === 6, detail: "six domains covered" },
     { id: "digitalHospitalSelfAssessment:scope", passed: user.role !== "institution" || allAssessments.every((item) => item.institutionId === user.orgCode), detail: `${allAssessments.length} role-scoped assessments` },
-    { id: "digitalHospitalSelfAssessment:evidenceBoundary", passed: allAssessments.every((item) => (item.responses || []).every((response) => response.noPatientPii === true)), detail: "responses keep controlled references and no-PII declaration" }
+    { id: "digitalHospitalSelfAssessment:evidenceBoundary", passed: allAssessments.every((item) => (item.responses || []).every((response) => response.noPatientPii === true)), detail: "responses keep controlled references and no-PII declaration" },
+    { id: "digitalHospitalSelfAssessment:tieredReview", passed: ["start-preliminary-review", "escalate-expert-review", "record-expert-opinion"].every((action) => DIGITAL_HOSPITAL_SELF_ASSESSMENT_ACTIONS.includes(action)), detail: "preliminary review, disputed-indicator escalation and independent expert opinion are supported" }
   ];
   return {
     ok: checks.every((item) => item.passed),
@@ -182,7 +191,7 @@ function buildDigitalHospitalSelfAssessmentBoard(data = {}, user = {}, filters =
     allAssessments,
     assessments,
     checks,
-    boundary: "自评工作台只登记指标结论、受控证据引用和最小化摘要，不保存患者身份、完整病历或影像原片；接受自评不替代现场评价和正式割接审批。"
+    boundary: "自评工作台只登记指标结论、受控证据引用和最小化摘要，不保存患者身份、完整病历或影像原片；初审和专家意见属于试点评价过程证据，接受自评不替代现场评价和正式割接审批。"
   };
 }
 
@@ -280,9 +289,76 @@ function normalizeDigitalHospitalSelfAssessmentAction(assessment = {}, payload =
     return { assessment: next, event: next.history[next.history.length - 1] };
   }
 
+  if (action === "start-preliminary-review") {
+    assertCommission(user);
+    if (!["submitted", "resubmitted"].includes(next.status)) throw selfAssessmentError("仅已提交自评可进入省级初审", 409);
+    if (next.declaration?.submittedByKey === actorKey(user)) throw selfAssessmentError("自评提交人与初审人必须独立", 409);
+    const note = compact(payload.note, 800);
+    const dueAt = compact(payload.dueAt, 10);
+    if (!note || !dueAt) throw selfAssessmentError("省级初审必须填写期限和受理说明");
+    next.status = "preliminary-review";
+    next.dueAt = dueAt;
+    next.reviewWorkflow = {
+      ...(next.reviewWorkflow || {}),
+      preliminary: { reviewer: user.name || user.username, reviewerKey: actorKey(user), startedAt: at, dueAt, note }
+    };
+    next.history.push(historyEvent(action, user, note, at));
+    return { assessment: next, event: next.history[next.history.length - 1] };
+  }
+
+  if (action === "escalate-expert-review") {
+    assertCommission(user);
+    if (next.status !== "preliminary-review") throw selfAssessmentError("仅省级初审中的任务可升级专家复核", 409);
+    const note = compact(payload.note, 800);
+    const expertGroup = compact(payload.expertGroup, 160);
+    const dueAt = compact(payload.dueAt, 10);
+    const indicatorIds = [...new Set((Array.isArray(payload.indicatorIds) ? payload.indicatorIds : String(payload.indicatorIds || "").split(/[\s,，]+/)).map((item) => compact(item, 100)).filter(Boolean))];
+    const validIds = indicatorMap();
+    if (!note || !expertGroup || !dueAt || indicatorIds.length === 0 || indicatorIds.some((id) => !validIds.has(id))) {
+      throw selfAssessmentError("专家复核升级必须填写专家组、期限、有效争议指标和升级理由");
+    }
+    next.status = "expert-review";
+    next.dueAt = dueAt;
+    next.reviewWorkflow = {
+      ...(next.reviewWorkflow || {}),
+      dispute: { indicatorIds, reason: note, expertGroup, assignedBy: user.name || user.username, assignedByKey: actorKey(user), assignedAt: at, dueAt }
+    };
+    next.history.push(historyEvent(action, user, note, at));
+    return { assessment: next, event: next.history[next.history.length - 1] };
+  }
+
+  if (action === "record-expert-opinion") {
+    assertCommission(user);
+    if (next.status !== "expert-review") throw selfAssessmentError("仅专家复核中的任务可登记专家意见", 409);
+    const actor = actorKey(user);
+    if ([next.declaration?.submittedByKey, next.reviewWorkflow?.preliminary?.reviewerKey].filter(Boolean).includes(actor)) {
+      throw selfAssessmentError("专家复核人与申报人、初审人必须独立", 409);
+    }
+    const decision = compact(payload.decision, 30);
+    const opinionRef = compact(payload.opinionRef, 180);
+    const note = compact(payload.note, 800);
+    const dueAt = compact(payload.dueAt, 10);
+    if (!['confirm', 'revise', 'return'].includes(decision) || !opinionRef || !note) throw selfAssessmentError("专家意见必须包含有效结论、意见引用和说明");
+    if (decision === "return" && !dueAt) throw selfAssessmentError("退回补正的专家意见必须填写补正期限");
+    next.reviewWorkflow = {
+      ...(next.reviewWorkflow || {}),
+      expert: { decision, opinionRef, note, reviewer: user.name || user.username, reviewerKey: actor, reviewedAt: at }
+    };
+    if (decision === "return") {
+      const indicatorIds = next.reviewWorkflow.dispute?.indicatorIds || [];
+      next.status = "correction-required";
+      next.dueAt = dueAt;
+      next.correction = { note, indicatorIds, requestedBy: user.name || user.username, requestedByKey: actor, requestedAt: at, dueAt, source: "expert-review" };
+    } else {
+      next.status = "expert-reviewed";
+    }
+    next.history.push(historyEvent(action, user, note, at));
+    return { assessment: next, event: next.history[next.history.length - 1] };
+  }
+
   if (action === "request-correction") {
     assertCommission(user);
-    if (!["submitted", "resubmitted"].includes(next.status)) throw selfAssessmentError("仅已提交自评可退回补正", 409);
+    if (!["submitted", "resubmitted", "preliminary-review"].includes(next.status)) throw selfAssessmentError("仅已提交或初审中的自评可退回补正", 409);
     const note = compact(payload.note, 800);
     const dueAt = compact(payload.dueAt, 10);
     const indicatorIds = [...new Set((Array.isArray(payload.indicatorIds) ? payload.indicatorIds : String(payload.indicatorIds || "").split(/[\s,，]+/)).map((item) => compact(item, 100)).filter(Boolean))];
@@ -296,8 +372,10 @@ function normalizeDigitalHospitalSelfAssessmentAction(assessment = {}, payload =
   }
 
   assertCommission(user);
-  if (!["submitted", "resubmitted"].includes(next.status)) throw selfAssessmentError("仅已提交自评可审核接受", 409);
+  if (!["submitted", "resubmitted", "preliminary-review", "expert-reviewed"].includes(next.status)) throw selfAssessmentError("仅已提交、初审中或专家复核完成的自评可审核接受", 409);
   if (next.declaration?.submittedByKey && next.declaration.submittedByKey === actorKey(user)) throw selfAssessmentError("自评提交人与审核人必须独立", 409);
+  if (next.reviewWorkflow?.preliminary?.reviewerKey === actorKey(user)) throw selfAssessmentError("省级初审人与最终接受审核人必须独立", 409);
+  if (next.reviewWorkflow?.expert?.reviewerKey === actorKey(user)) throw selfAssessmentError("专家复核人与最终接受审核人必须独立", 409);
   const reviewNote = compact(payload.note, 800);
   if (!reviewNote) throw selfAssessmentError("接受自评必须填写审核结论");
   next.status = "accepted";

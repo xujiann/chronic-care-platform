@@ -67,6 +67,26 @@ test("commission user reaches the governance dashboard and opens maintenance", a
   await expect(page.locator("#platform-edit-form [name='owner']")).toHaveValue("规划信息处");
 });
 
+test("digital hospital self-assessment exposes tiered expert review without mobile overflow", async ({ page }) => {
+  const consoleErrors = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
+  await login(page, "health", "index.html");
+  await page.goto("/digital-hospital-self-assessment.html");
+  await expect(page.getByRole("heading", { name: "医院自评申报工作台" })).toBeVisible();
+  await expect(page.locator("#digital-self-assessment-metrics .metric-card")).toHaveCount(6);
+  await expect(page.locator("#digital-self-assessment-review-filter")).toBeVisible();
+  await expect(page.locator("#digital-self-assessment-status-filter")).toContainText("省级初审中");
+  await expect(page.locator("#digital-self-assessment-status-filter")).toContainText("专家复核中");
+  await expect(page.locator("#digital-self-assessment-dispute-indicators")).toBeAttached();
+  await expect(page.locator("#digital-self-assessment-opinion-ref")).toBeAttached();
+  await page.setViewportSize({ width: 375, height: 812 });
+  const overflow = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
+  expect(overflow.scrollWidth).toBe(overflow.width);
+  expect(consoleErrors).toEqual([]);
+});
+
 test("commission workbench renders live release gates and site templates", async ({ page }) => {
   await login(page, "health", "index.html");
   await page.goto("/workbench.html");

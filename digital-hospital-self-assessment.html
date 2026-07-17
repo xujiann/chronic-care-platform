@@ -42,6 +42,9 @@
               <option value="correction-in-progress">补正中</option>
               <option value="submitted">待初审</option>
               <option value="resubmitted">补正待审</option>
+              <option value="preliminary-review">省级初审中</option>
+              <option value="expert-review">专家复核中</option>
+              <option value="expert-reviewed">专家意见已出具</option>
               <option value="correction-required">退回补正</option>
               <option value="accepted">已接受</option>
             </select>
@@ -53,6 +56,10 @@
           <label class="checkbox-line">
             <input id="digital-self-assessment-overdue-filter" type="checkbox" />
             只看逾期任务
+          </label>
+          <label class="checkbox-line">
+            <input id="digital-self-assessment-review-filter" type="checkbox" />
+            只看审核队列
           </label>
         </div>
         <div id="digital-self-assessment-queue" class="table-wrap"></div>
@@ -107,6 +114,30 @@
           <label class="digital-self-assessment-action-field" data-self-assessment-actions="request-correction" hidden>
             补正期限
             <input id="digital-self-assessment-correction-due-at" type="date" />
+          </label>
+          <label class="digital-self-assessment-action-field" data-self-assessment-actions="start-preliminary-review,escalate-expert-review,record-expert-opinion" hidden>
+            审核期限
+            <input id="digital-self-assessment-review-due-at" type="date" />
+          </label>
+          <label class="digital-self-assessment-action-field" data-self-assessment-actions="escalate-expert-review" hidden>
+            专家组
+            <input id="digital-self-assessment-expert-group" type="text" placeholder="医疗信息化评价专家组" />
+          </label>
+          <label class="full digital-self-assessment-action-field" data-self-assessment-actions="escalate-expert-review" hidden>
+            争议指标
+            <select id="digital-self-assessment-dispute-indicators" multiple size="6"></select>
+          </label>
+          <label class="digital-self-assessment-action-field" data-self-assessment-actions="record-expert-opinion" hidden>
+            专家结论
+            <select id="digital-self-assessment-expert-decision">
+              <option value="confirm">维持机构自评</option>
+              <option value="revise">调整评价结论</option>
+              <option value="return">退回机构补正</option>
+            </select>
+          </label>
+          <label class="digital-self-assessment-action-field" data-self-assessment-actions="record-expert-opinion" hidden>
+            意见引用
+            <input id="digital-self-assessment-opinion-ref" type="text" placeholder="专家意见单或会议纪要编号" />
           </label>
           <label class="full">
             操作说明
@@ -164,7 +195,7 @@
         <div class="evidence-grid">
           <article><strong>最小化证据</strong><p>只登记受控引用、结论和必要摘要，不上传患者身份、完整病历或影像原片。</p></article>
           <article><strong>机构隔离</strong><p>医疗机构账号只能查看和修改本机构自评任务，跨机构动作由 API 拒绝。</p></article>
-          <article><strong>独立审核</strong><p>申报人与接受审核人必须独立，退回补正、重新提交和接受结论全程留痕。</p></article>
+          <article><strong>分级独立审核</strong><p>申报人、初审人、专家复核人和最终接受人相互独立，争议指标、专家意见和补正结论全程留痕。</p></article>
           <article><strong>生产边界</strong><p>自评被接受仍需现场抽查、等保密评、接口联调、多方签字和正式割接审批。</p></article>
         </div>
       </section>

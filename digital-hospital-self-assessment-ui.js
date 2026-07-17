@@ -12,6 +12,9 @@ const DIGITAL_SELF_ASSESSMENT_STATUS_LABELS = {
   "correction-in-progress": "补正中",
   submitted: "待初审",
   resubmitted: "补正待审",
+  "preliminary-review": "省级初审中",
+  "expert-review": "专家复核中",
+  "expert-reviewed": "专家意见已出具",
   "correction-required": "退回补正",
   accepted: "已接受"
 };
@@ -19,6 +22,9 @@ const DIGITAL_SELF_ASSESSMENT_STATUS_LABELS = {
 const DIGITAL_SELF_ASSESSMENT_ACTION_LABELS = {
   "save-draft": "保存指标草稿",
   "submit-assessment": "提交机构自评",
+  "start-preliminary-review": "受理省级初审",
+  "escalate-expert-review": "升级专家复核",
+  "record-expert-opinion": "登记专家意见",
   "request-correction": "退回补正",
   "accept-assessment": "接受本轮自评"
 };
@@ -44,7 +50,7 @@ function digitalSelfStatusLabel(status) {
 function digitalSelfStatusClass(item) {
   if (item.status === "accepted") return "badge info";
   if (item.summary?.overdue || item.status === "correction-required") return "badge danger";
-  if (["submitted", "resubmitted"].includes(item.status)) return "badge warn";
+  if (["submitted", "resubmitted", "preliminary-review", "expert-review", "expert-reviewed"].includes(item.status)) return "badge warn";
   return "badge";
 }
 
@@ -68,9 +74,11 @@ function digitalSelfFilteredAssessments() {
   const status = document.getElementById("digital-self-assessment-status-filter")?.value || "";
   const query = String(document.getElementById("digital-self-assessment-search")?.value || "").trim().toLowerCase();
   const overdueOnly = Boolean(document.getElementById("digital-self-assessment-overdue-filter")?.checked);
+  const reviewOnly = Boolean(document.getElementById("digital-self-assessment-review-filter")?.checked);
   return digitalSelfAssessments().filter((item) => {
     if (status && item.status !== status) return false;
     if (overdueOnly && !item.summary?.overdue) return false;
+    if (reviewOnly && !["submitted", "resubmitted", "preliminary-review", "expert-review", "expert-reviewed"].includes(item.status)) return false;
     if (query && !`${item.institutionName} ${item.cycle} ${item.targetLevel} ${item.assignedTo}`.toLowerCase().includes(query)) return false;
     return true;
   });
@@ -81,7 +89,7 @@ function renderDigitalSelfAssessmentMetrics() {
   const metrics = [
     ["自评任务", summary.assessments || 0, "当前账号可见范围"],
     ["平均完成率", `${summary.averageCompletion || 0}%`, "十二项结构化指标"],
-    ["待审核", summary.submitted || 0, "已提交或补正重提"],
+    ["审核队列", (summary.submitted || 0) + (summary.preliminaryReview || 0) + (summary.expertReview || 0), `${summary.expertReview || 0} 项专家复核 / ${summary.disputedIndicators || 0} 项争议`],
     ["退回补正", summary.correctionRequired || 0, "按指标和期限闭环"],
     ["已接受", summary.accepted || 0, "不替代现场正式评价"],
     ["逾期任务", summary.overdue || 0, "需升级责任人与期限"]
@@ -105,7 +113,7 @@ function renderDigitalSelfAssessmentQueue() {
           <td><strong>${digitalSelfEscape(item.institutionName)}</strong><br /><small>${digitalSelfEscape(item.institutionId)} / ${digitalSelfEscape(item.cycle)}</small></td>
           <td>${digitalSelfEscape(item.targetLevel)}<br /><small>责任：${digitalSelfEscape(item.assignedTo)}</small></td>
           <td><strong>${digitalSelfEscape(item.summary.completionPercent)}%</strong><br /><small>${digitalSelfEscape(item.summary.answeredIndicators)}/${digitalSelfEscape(item.summary.requiredIndicators)} 指标 · ${digitalSelfEscape(item.summary.evidenceRefs)} 项引用</small></td>
-          <td><span class="${digitalSelfStatusClass(item)}">${digitalSelfEscape(digitalSelfStatusLabel(item.status))}</span>${item.summary.overdue ? " <span class=\"badge danger\">已逾期</span>" : ""}<br /><small>${digitalSelfEscape(item.dueAt || "未设置")}</small></td>
+          <td><span class="${digitalSelfStatusClass(item)}">${digitalSelfEscape(digitalSelfStatusLabel(item.status))}</span>${item.summary.overdue ? " <span class=\"badge danger\">已逾期</span>" : ""}<br /><small>${digitalSelfEscape(item.reviewWorkflow?.dispute?.expertGroup || item.dueAt || "未设置")}</small></td>
           <td><button class="inline-action" type="button" data-digital-self-assessment-select="${digitalSelfEscape(item.id)}">进入任务</button></td>
         </tr>
       `).join("") || "<tr><td colspan=\"5\">没有符合筛选条件的自评任务。</td></tr>"}</tbody>
@@ -134,8 +142,11 @@ function digitalSelfAvailableActions(item) {
     return ["save-draft", "submit-assessment"];
   }
   if (role === "commission" && ["submitted", "resubmitted"].includes(item.status)) {
-    return ["request-correction", "accept-assessment"];
+    return ["start-preliminary-review", "request-correction", "accept-assessment"];
   }
+  if (role === "commission" && item.status === "preliminary-review") return ["escalate-expert-review", "request-correction", "accept-assessment"];
+  if (role === "commission" && item.status === "expert-review") return ["record-expert-opinion"];
+  if (role === "commission" && item.status === "expert-reviewed") return ["accept-assessment"];
   return [];
 }
 
@@ -179,6 +190,7 @@ function renderDigitalSelfAssessmentDetail() {
     ["加权自评分", item.summary.weightedScore, "平台自动汇总"],
     ["证据引用", item.summary.evidenceRefs, "不保存患者明细"],
     ["补正指标", item.summary.correctionIndicators, item.correction?.dueAt || "无待补正"],
+    ["争议指标", item.reviewWorkflow?.dispute?.indicatorIds?.length || 0, item.reviewWorkflow?.dispute?.expertGroup || "未升级专家复核"],
     ["完成期限", item.dueAt || "未设置", item.summary.overdue ? "已逾期" : "按期推进"]
   ];
   digitalSelfSetHtml("digital-self-assessment-detail-metrics", metrics.map(([label, value, hint]) => `
@@ -221,8 +233,10 @@ function renderDigitalSelfAssessmentIndicatorOptions() {
   const options = digitalSelfIndicators().map((item) => `<option value="${digitalSelfEscape(item.id)}">${digitalSelfEscape(item.domain)}：${digitalSelfEscape(item.title)}</option>`).join("");
   const indicator = document.getElementById("digital-self-assessment-indicator-id");
   const corrections = document.getElementById("digital-self-assessment-correction-indicators");
+  const disputes = document.getElementById("digital-self-assessment-dispute-indicators");
   if (indicator) indicator.innerHTML = options;
   if (corrections) corrections.innerHTML = options;
+  if (disputes) disputes.innerHTML = options;
 }
 
 function renderDigitalSelfAssessmentBoard() {
@@ -265,6 +279,17 @@ function digitalSelfActionPayload() {
   if (action === "request-correction") {
     payload.indicatorIds = Array.from(document.getElementById("digital-self-assessment-correction-indicators")?.selectedOptions || []).map((item) => item.value);
     payload.dueAt = document.getElementById("digital-self-assessment-correction-due-at")?.value || "";
+  }
+  if (["start-preliminary-review", "escalate-expert-review", "record-expert-opinion"].includes(action)) {
+    payload.dueAt = document.getElementById("digital-self-assessment-review-due-at")?.value || "";
+  }
+  if (action === "escalate-expert-review") {
+    payload.indicatorIds = Array.from(document.getElementById("digital-self-assessment-dispute-indicators")?.selectedOptions || []).map((item) => item.value);
+    payload.expertGroup = document.getElementById("digital-self-assessment-expert-group")?.value.trim() || "";
+  }
+  if (action === "record-expert-opinion") {
+    payload.decision = document.getElementById("digital-self-assessment-expert-decision")?.value || "";
+    payload.opinionRef = document.getElementById("digital-self-assessment-opinion-ref")?.value.trim() || "";
   }
   return payload;
 }
@@ -345,7 +370,7 @@ async function assignDigitalSelfAssessment(event) {
 }
 
 function bindDigitalSelfAssessmentWorkbench() {
-  ["digital-self-assessment-status-filter", "digital-self-assessment-search", "digital-self-assessment-overdue-filter"].forEach((id) => {
+  ["digital-self-assessment-status-filter", "digital-self-assessment-search", "digital-self-assessment-overdue-filter", "digital-self-assessment-review-filter"].forEach((id) => {
     document.getElementById(id)?.addEventListener("input", renderDigitalSelfAssessmentQueue);
   });
   document.getElementById("digital-self-assessment-id")?.addEventListener("change", (event) => {

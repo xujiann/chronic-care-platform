@@ -79,6 +79,9 @@ const REQUIRED_SELF_ASSESSMENT_ACTION_MARKERS = [
   "assign-assessment",
   "save-draft",
   "submit-assessment",
+  "start-preliminary-review",
+  "escalate-expert-review",
+  "record-expert-opinion",
   "request-correction",
   "accept-assessment"
 ];

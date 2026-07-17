@@ -22541,6 +22541,7 @@ async function handleApi(req, res) {
       status: url.searchParams.get("status") || "",
       institutionId: url.searchParams.get("institutionId") || "",
       overdueOnly: url.searchParams.get("overdueOnly") || "",
+      reviewOnly: url.searchParams.get("reviewOnly") || "",
       query: url.searchParams.get("q") || ""
     });
     appendSecurityEvent({

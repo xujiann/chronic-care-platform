@@ -1899,6 +1899,58 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     }));
     assert.equal(deniedInstitutionAssignment.response.status, 403);
 
+    const expertReviewSubmission = await api(baseUrl, "/api/digital-hospital/self-assessments/dhsa-mr3-2026-pilot/actions", authorized(digitalHospitalSelfAssessmentCommunityLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "submit-assessment",
+        declarationAccepted: true,
+        noPatientPii: true,
+        note: "提交省级初审和争议指标专家复核。"
+      })
+    }));
+    assert.equal(expertReviewSubmission.response.status, 200);
+    assert.equal(expertReviewSubmission.body.assessment.status, "resubmitted");
+    const preliminaryReview = await api(baseUrl, "/api/digital-hospital/self-assessments/dhsa-mr3-2026-pilot/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "start-preliminary-review", dueAt: "2026-07-24", note: "省级初审受理。" })
+    }));
+    assert.equal(preliminaryReview.response.status, 200);
+    assert.equal(preliminaryReview.body.assessment.status, "preliminary-review");
+    const escalatedExpertReview = await api(baseUrl, "/api/digital-hospital/self-assessments/dhsa-mr3-2026-pilot/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "escalate-expert-review",
+        indicatorIds: ["dhsi-interface-contract", "dhsi-resilience"],
+        expertGroup: "医疗信息化评价专家组",
+        dueAt: "2026-07-27",
+        note: "接口契约和灾备演练口径需专家复核。"
+      })
+    }));
+    assert.equal(escalatedExpertReview.response.status, 200);
+    assert.equal(escalatedExpertReview.body.assessment.status, "expert-review");
+    const deniedSameReviewerExpertOpinion = await api(baseUrl, "/api/digital-hospital/self-assessments/dhsa-mr3-2026-pilot/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "record-expert-opinion", decision: "confirm", opinionRef: "EXPERT-API-001", note: "同一审核员不得登记专家意见。" })
+    }));
+    assert.equal(deniedSameReviewerExpertOpinion.response.status, 409);
+    const cityReviewLogin = await login(baseUrl, "city");
+    const districtReviewLogin = await login(baseUrl, "district");
+    assert.equal(cityReviewLogin.response.status, 200);
+    assert.equal(districtReviewLogin.response.status, 200);
+    const expertOpinion = await api(baseUrl, "/api/digital-hospital/self-assessments/dhsa-mr3-2026-pilot/actions", authorized(cityReviewLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "record-expert-opinion", decision: "revise", opinionRef: "EXPERT-API-001", note: "调整试点解释口径，不形成正式等级结论。" })
+    }));
+    assert.equal(expertOpinion.response.status, 200);
+    assert.equal(expertOpinion.body.assessment.status, "expert-reviewed");
+    const finalExpertAcceptance = await api(baseUrl, "/api/digital-hospital/self-assessments/dhsa-mr3-2026-pilot/actions", authorized(districtReviewLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "accept-assessment", note: "初审和专家意见完整，接受本轮自评。" })
+    }));
+    assert.equal(finalExpertAcceptance.response.status, 200);
+    assert.equal(finalExpertAcceptance.body.assessment.status, "accepted");
+    assert.equal(finalExpertAcceptance.body.assessment.reviewWorkflow.expert.opinionRef, "EXPERT-API-001");
+
     const deniedDigitalHospitalStandards = await api(baseUrl, "/api/digital-hospital/standards", authorized(residentPhoneLogin.body.token));
     assert.equal(deniedDigitalHospitalStandards.response.status, 403);
 

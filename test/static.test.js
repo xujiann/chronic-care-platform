@@ -1207,6 +1207,9 @@ test("digital hospital standards platform exposes standards center workflow and 
   assert.match(selfAssessmentHtml, /digital-self-assessment-action-form/);
   assert.match(selfAssessmentHtml, /digital-self-assessment-assignment-form/);
   assert.match(selfAssessmentHtml, /digital-self-assessment-no-pii/);
+  assert.match(selfAssessmentHtml, /digital-self-assessment-review-filter/);
+  assert.match(selfAssessmentHtml, /digital-self-assessment-dispute-indicators/);
+  assert.match(selfAssessmentHtml, /digital-self-assessment-opinion-ref/);
   assert.match(selfAssessmentHtml, /requireRole\(\["commission", "institution"\]\)/);
   assert.match(selfAssessmentUi, /DIGITAL_SELF_ASSESSMENT_ENDPOINT/);
   assert.match(selfAssessmentUi, /recordDigitalSelfAssessmentAction/);
@@ -1216,6 +1219,10 @@ test("digital hospital standards platform exposes standards center workflow and 
   assert.match(selfAssessmentModel, /DIGITAL_HOSPITAL_SELF_ASSESSMENT_INDICATORS/);
   assert.match(selfAssessmentModel, /normalizeDigitalHospitalSelfAssessmentAction/);
   assert.match(selfAssessmentModel, /自评提交人与审核人必须独立/);
+  assert.match(selfAssessmentModel, /start-preliminary-review/);
+  assert.match(selfAssessmentModel, /escalate-expert-review/);
+  assert.match(selfAssessmentModel, /record-expert-opinion/);
+  assert.match(selfAssessmentModel, /专家复核人与申报人、初审人必须独立/);
   assert.match(html, /digital-hospital-standards\.js/);
   assert.match(js, /DIGITAL_HOSPITAL_STANDARD_DOMAINS/);
   assert.match(js, /DIGITAL_HOSPITAL_API_ENDPOINT/);
