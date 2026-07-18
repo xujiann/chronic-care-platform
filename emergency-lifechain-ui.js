@@ -46,12 +46,13 @@ function renderLifeChainOverview(item) {
 function renderLifeChainCommandCenter(item) {
   const node = document.querySelector("#lifechain-command-center"); if (!node) return;
   const eventRows = item.activeEvents.map((row) => `${row.eventNo} (${row.status})`).join(" · ") || "no active event";
-  node.innerHTML = `<div class="lifechain-summary"><strong>Capacity</strong><span>active events ${item.coverage.activeEvents} · available vehicles ${item.coverage.availableVehicles} · available AED ${item.coverage.availableAed} · responder tasks ${item.coverage.responderTasks}</span></div><div class="lifechain-row"><strong>Operational gap</strong><span>${lifeChainEscape(item.coverage.gap)}</span></div><div class="lifechain-row"><strong>Active events</strong><span>${lifeChainEscape(eventRows)}</span></div><p class="lifechain-boundary">${lifeChainEscape(item.boundary)}</p>`;
+  const cancellationRows = (item.cancellationReviews || []).map((row) => `<div class="lifechain-row"><strong>Automatic SOS cancellation review</strong><span>${lifeChainEscape(row.eventId)} · ${lifeChainEscape(row.reason)} <button type="button" class="secondary" data-cancellation-review-event="${lifeChainEscape(row.eventId)}" data-cancellation-review-decision="keep-open">Keep queue open</button> <button type="button" class="secondary" data-cancellation-review-event="${lifeChainEscape(row.eventId)}" data-cancellation-review-decision="withdraw-before-dispatch">Withdraw before dispatch</button></span></div>`).join("") || "";
+  node.innerHTML = `<div class="lifechain-summary"><strong>Capacity</strong><span>active events ${item.coverage.activeEvents} · available vehicles ${item.coverage.availableVehicles} · available AED ${item.coverage.availableAed} · responder tasks ${item.coverage.responderTasks} · cancellation reviews ${item.coverage.pendingCancellationReviews || 0}</span></div><div class="lifechain-row"><strong>Operational gap</strong><span>${lifeChainEscape(item.coverage.gap)}</span></div><div class="lifechain-row"><strong>Active events</strong><span>${lifeChainEscape(eventRows)}</span></div>${cancellationRows}<p class="lifechain-boundary">${lifeChainEscape(item.boundary)}</p>`;
 }
 
 function renderLifeChainQuality(item) {
   const node = document.querySelector("#lifechain-quality"); if (!node) return;
-  node.innerHTML = `<div class="lifechain-summary"><strong>Cases ${item.summary.cases}</strong><span>Automatic SOS ${item.summary.automaticSos} · first-aid coverage ${item.summary.firstAidTaskCoverage} · hospital pre-alerts confirmed ${item.summary.hospitalPrealertsConfirmed}</span></div>${item.rows.map((row) => `<div class="lifechain-row"><strong>${lifeChainEscape(row.eventNo)}</strong><span>${lifeChainEscape(row.qualityState)} · ${lifeChainEscape(row.signal)} · fallback ${lifeChainEscape(row.fallback)}</span></div>`).join("") || "<p>No life-chain cases are available.</p>"}<p class="lifechain-boundary">${lifeChainEscape(item.boundary)}</p>`;
+  node.innerHTML = `<div class="lifechain-summary"><strong>Cases ${item.summary.cases}</strong><span>Automatic SOS ${item.summary.automaticSos} · first-aid coverage ${item.summary.firstAidTaskCoverage} · hospital pre-alerts confirmed ${item.summary.hospitalPrealertsConfirmed} · duplicate signals ${item.summary.suppressedDuplicateSignals} · cancellation reviews ${item.summary.cancellationReviews}</span></div>${item.rows.map((row) => `<div class="lifechain-row"><strong>${lifeChainEscape(row.eventNo)}</strong><span>${lifeChainEscape(row.qualityState)} · ${lifeChainEscape(row.signal)} · fallback ${lifeChainEscape(row.fallback)}</span></div>`).join("") || "<p>No life-chain cases are available.</p>"}<p class="lifechain-boundary">${lifeChainEscape(item.boundary)}</p>`;
 }
 
 async function submitLifeChainForm(event) {
@@ -87,6 +88,17 @@ document.addEventListener("DOMContentLoaded", () => {
       await loadLifeChain();
     }
     catch (error) { lifeChainMessage(error.message, true); }
+  });
+  document.querySelector("#lifechain-command-center")?.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-cancellation-review-event]");
+    if (!button) return;
+    const decision = button.dataset.cancellationReviewDecision;
+    if (!window.confirm(decision === "withdraw-before-dispatch" ? "Confirm that 120 has reviewed the request and withdraw this queue item before dispatch?" : "Confirm that 120 has reviewed the request and will keep this queue item open?")) return;
+    try {
+      await lifeChainRequest(`/events/${encodeURIComponent(button.dataset.cancellationReviewEvent)}/automatic-sos-cancellation-resolve`, { method:"POST", body:JSON.stringify({ confirmed:true, decision, note:"Resolved from emergency command workbench" }) });
+      lifeChainMessage(decision === "withdraw-before-dispatch" ? "120 cancellation review completed; the pre-dispatch queue item was withdrawn." : "120 cancellation review completed; the queue item remains open.");
+      await loadLifeChain();
+    } catch (error) { lifeChainMessage(error.message, true); }
   });
   loadLifeChain();
 });

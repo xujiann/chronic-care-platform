@@ -49,6 +49,7 @@ flowchart LR
 - The platform is supplementary to the official 120 path. Device SOS submits information to the 120 queue; a webpage cannot silently call 120 or bypass the mobile operating-system confirmation.
 - Automatic SOS requires resident authorization, a configured device, an allow-listed signal, and a risk score threshold. The platform now has consent withdrawal, duplicate/replay suppression, cancellation review, 120-only cancellation resolution, and audit/evidence controls. Hardware identity attestation remains a signed device-integration requirement before production.
 - A cancellation request does not cancel an ambulance. Before dispatch, only the 120 emergency-center role can keep the queue item open or withdraw it after a human review; a dispatched case cannot be withdrawn through this path.
+- Pending cancellation reviews are visible only in the 120 command workbench, where the reviewer records either `keep-open` or `withdraw-before-dispatch`; the quality view retains the aggregate workload without exposing the patient cancellation queue to other hospitals.
 - Responder, AED, vehicle, hospital-capacity, SMS, wearable, and emergency-center feeds in this release are platform workflow/reference data. Real dispatch, message transmission, and clinical acceptance require signed interfaces, current authoritative registries, privacy/security assessment, joint testing, and site evidence.
 
 ## Verification
