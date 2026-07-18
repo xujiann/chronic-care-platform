@@ -53,6 +53,7 @@ test("emergency HTTP API enforces citizen scope and produces verifiable exports"
 
   const citizenToken = await login(baseUrl, "citizen");
   const commissionToken = await login(baseUrl, "health");
+  const independentCommissionToken = await login(baseUrl, "city");
   const institutionToken = await login(baseUrl, "hospital");
 
   const citizenBefore = await jsonRequest(baseUrl, "/api/emergency/dashboard", citizenToken);
@@ -107,6 +108,16 @@ test("emergency HTTP API enforces citizen scope and produces verifiable exports"
   assert.equal(lifeChainQuality.response.status, 200);
   assert.equal(lifeChainQuality.body.summary.automaticSos, 1);
   assert.equal(lifeChainQuality.body.summary.suppressedDuplicateSignals, 1);
+  const endpointProbe = await jsonRequest(baseUrl, "/api/emergency/production/endpoints/emg-int-cti/probe", commissionToken, { method:"POST", body:JSON.stringify({ baseUrl:"https://cti.example", credentialRef:"secret/cti" }) });
+  assert.equal(endpointProbe.response.status, 200);
+  const siteEvidence = await jsonRequest(baseUrl, "/api/emergency/production/requirements/EMG-SITE-01/sign", commissionToken, { method:"POST", body:JSON.stringify({ action:"submit-evidence", confirmation:"CONFIRM EMERGENCY SITE EVIDENCE", evidenceRef:"evidence://cti/joint-test", evidenceDigest:"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", externalSigner:"120 duty commander", externalOrganization:"120 emergency center", note:"joint interface test evidence" }) });
+  assert.equal(siteEvidence.response.status, 200, JSON.stringify(siteEvidence.body));
+  assert.equal(siteEvidence.body.item.status, "evidence-submitted");
+  const selfVerification = await jsonRequest(baseUrl, "/api/emergency/production/requirements/EMG-SITE-01/sign", commissionToken, { method:"POST", body:JSON.stringify({ action:"verify-evidence", confirmation:"VERIFY EMERGENCY SITE EVIDENCE", evidenceDigest:siteEvidence.body.item.evidenceDigest, verificationRef:"evidence://cti/self-review" }) });
+  assert.equal(selfVerification.response.status, 400);
+  const independentVerification = await jsonRequest(baseUrl, "/api/emergency/production/requirements/EMG-SITE-01/sign", independentCommissionToken, { method:"POST", body:JSON.stringify({ action:"verify-evidence", confirmation:"VERIFY EMERGENCY SITE EVIDENCE", evidenceDigest:siteEvidence.body.item.evidenceDigest, verificationRef:"evidence://cti/independent-review" }) });
+  assert.equal(independentVerification.response.status, 200, JSON.stringify(independentVerification.body));
+  assert.equal(independentVerification.body.item.status, "signed");
   const revokedAuthorization = await jsonRequest(baseUrl, `/api/emergency/life-chain/authorizations/${encodeURIComponent(authorization.body.item.id)}/revoke`, citizenToken, { method:"POST", body:JSON.stringify({ confirmed:true }) });
   assert.equal(revokedAuthorization.response.status, 200);
   assert.equal(revokedAuthorization.body.item.active, false);
