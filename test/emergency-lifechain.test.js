@@ -20,6 +20,9 @@ test("pre-authorized device SOS coordinates the golden four minutes without repl
   assert.equal(event.lifeChain.firstAidTaskIds.length > 0, true);
   assert.equal(Boolean(event.lifeChain.greenChannelPreparationId), true);
   assert.equal(Boolean(event.lifeChain.fallbackDeliveryId), true);
+  const automaticEvidence = EmergencyService.buildEvidencePackage(data, { role:"commission", name:"evidence" }, event.id);
+  const automaticControl = automaticEvidence.sections.find((item) => item.id === "automatic-sos-control");
+  assert.equal(automaticControl.present, true);
   const overview = LifeChain.buildOverview(data, citizen, event.id);
   assert.equal(overview.firstAidTasks.length > 0, true);
   assert.equal(overview.familyNotifications.length, 1);
@@ -35,6 +38,9 @@ test("pre-authorized device SOS coordinates the golden four minutes without repl
   assert.equal(cancellationResolved.reviewStatus, "kept-open");
   const preparation = LifeChain.confirmGreenChannel(data, { role:"institution", name:"ER", orgCode:"MR1" }, event.id, { note:"ready" });
   assert.equal(preparation.status, "hospital-confirmed");
+  assert.throws(() => LifeChain.confirmGreenChannel(data, { role:"institution", name:"other hospital", orgCode:"MR3" }, event.id, { note:"not allowed" }), /not the target/);
+  const otherHospitalView = LifeChain.buildOverview(data, { role:"institution", name:"other hospital", orgCode:"MR3" });
+  assert.equal(otherHospitalView.events.length, 0);
   const command = LifeChain.buildCommandCenter(data, { role:"commission", name:"120" });
   assert.equal(command.coverage.availableAed >= 1, true);
   const quality = LifeChain.buildQualityDashboard(data, { role:"commission", name:"quality" });
