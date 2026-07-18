@@ -34,6 +34,7 @@ test("pre-authorized device SOS coordinates the golden four minutes without repl
   assert.equal(data.emergencySosSignalLog.filter((item) => item.status === "suppressed-duplicate").length, 1);
   const cancellationRequest = LifeChain.requestAutomaticSosCancellation(data, citizen, event.id, { confirmed:true, reason:"false alarm check" });
   assert.equal(cancellationRequest.reviewStatus, "cancellation-requested");
+  assert.equal(LifeChain.buildCommandCenter(data, { role:"commission", name:"120" }).cancellationReviews.length, 1);
   const cancellationResolved = LifeChain.resolveAutomaticSosCancellation(data, { role:"commission", name:"120" }, event.id, { confirmed:true, decision:"keep-open", note:"Caller rechecked" });
   assert.equal(cancellationResolved.reviewStatus, "kept-open");
   const preparation = LifeChain.confirmGreenChannel(data, { role:"institution", name:"ER", orgCode:"MR1" }, event.id, { note:"ready" });
@@ -43,6 +44,7 @@ test("pre-authorized device SOS coordinates the golden four minutes without repl
   assert.equal(otherHospitalView.events.length, 0);
   const command = LifeChain.buildCommandCenter(data, { role:"commission", name:"120" });
   assert.equal(command.coverage.availableAed >= 1, true);
+  assert.equal(command.cancellationReviews.length, 0, "resolved reviews leave the 120 work queue");
   const quality = LifeChain.buildQualityDashboard(data, { role:"commission", name:"quality" });
   assert.equal(quality.summary.automaticSos, 1);
   assert.equal(quality.summary.weakNetworkFallbacks, 1);
