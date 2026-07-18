@@ -27,3 +27,4 @@ Resident SOS and AED guidance, device auto-alert, 120 information queue, first-a
 2. Mobile location, certified SMS fallback, wearable attestation, AED registry, vehicle telemetry, and hospital capacity interfaces are verified against authoritative sources.
 3. Privacy/security assessment, availability/backup drill, and operational duty roster are accepted.
 4. Pilot hospital completes green-channel and electronic-handover joint drill.
+5. Regional health platform completes MPI, organization/provider, document and audit interface joint testing and independent evidence verification.

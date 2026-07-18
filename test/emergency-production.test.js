@@ -9,7 +9,7 @@ test("production center keeps functional readiness separate from site cutover", 
   const center = Production.buildCenter(data);
   assert.equal(center.functionalReady, true);
   assert.equal(center.productionReady, false);
-  assert.equal(center.summary.cutoverBlockers, 5);
+  assert.equal(center.summary.cutoverBlockers, 6);
   assert.equal(center.formalGoLiveState, "blocked-until-site-evidence-signed");
 });
 
@@ -26,6 +26,7 @@ test("endpoint probe never self-signs production readiness", () => {
   const signed = Production.signRequirement(data,{...commission,id:"u-security",name:"independent verifier"},"EMG-SITE-01",{ action:"verify-evidence", confirmation:"VERIFY EMERGENCY SITE EVIDENCE", evidenceDigest:submitted.evidenceDigest, verificationRef:"evidence://cti/verify" });
   assert.equal(signed.status,"signed");
   assert.equal(endpoint.productionReady,true);
+  assert.throws(()=>Production.signRequirement(data,commission,"EMG-SITE-06",{ action:"submit-evidence", confirmation:Production.REQUIREMENT_CONFIRMATION, evidenceRef:"evidence://regional/joint-test", evidenceDigest:"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", externalSigner:"regional platform owner", externalOrganization:"regional health information center", note:"regional joint test evidence" }),/related endpoint probe must pass/);
 });
 
 test("delivery queue is idempotent and moves failed messages to dead letter", () => {
