@@ -10,9 +10,10 @@ const ROOT = path.resolve(__dirname, "..");
 test("interface mapping validates every contract required field", () => {
   const report = buildInterfaceMappingReport();
   assert.equal(report.ok, true);
-  assert.equal(report.mappings.length >= 7, true);
+  assert.equal(report.mappings.length >= 9, true);
   assert.equal(report.mappings.every((item) => item.ready), true);
   assert.equal(report.mappings.every((item) => item.idempotencyMapped), true);
+  assert.equal(report.mappings.some((item) => item.contractId === "payment-transaction-v1" && item.targetCollection === "registrationOrders"), true);
 });
 
 test("interface mapping fails when a required target collection is absent", () => {

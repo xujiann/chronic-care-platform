@@ -18,7 +18,10 @@
         </div>
         <nav>
           
-          <a href="./quality-safety.html">Quality safety</a><a href="./health-city.html">系统总览</a>
+          <a href="./public-health.html">公共卫生</a>
+          <a href="./digital-hospital-standards.html">数智医院标准</a>
+          <a href="./digital-hospital-evaluation.html">评价预评</a>
+          <a href="./quality-safety.html">Quality safety</a><a href="./emergency.html">院前急救</a><a href="./escort.html">助医陪诊</a><a href="./health-city.html">系统总览</a>
           <a href="./about.html">关于</a>
           <a href="./regional-data-sharing.html">区域共享</a>
           <a href="./workbench.html">运营工作台</a>
@@ -29,6 +32,75 @@
       </header>
 
       <section class="metric-grid" id="platform-metrics"></section>
+
+      <section class="panel" id="platform-capability-map-panel">
+        <div class="panel-title">
+          <h2>平台功能总览</h2>
+          <span id="platform-capability-map-status" class="badge warn">等待汇总</span>
+        </div>
+        <div class="action-row">
+          <button class="primary-button" type="button" id="export-platform-capability-map">导出功能总览</button>
+          <span class="muted">汇总 release manifest、package scripts、readiness 报告和数据集合。</span>
+        </div>
+        <div id="platform-capability-map-metrics" class="metric-grid"></div>
+        <div id="platform-capability-map-risks" class="evidence-grid"></div>
+        <div id="platform-capability-map-domains" class="evidence-grid"></div>
+      </section>
+
+      <section class="panel" id="platform-go-live-slices-panel">
+        <div class="panel-title">
+          <h2>上线三切片收口</h2>
+          <span id="platform-go-live-slices-status" class="badge warn">等待汇总</span>
+        </div>
+        <div class="action-row">
+          <button class="primary-button" type="button" id="export-platform-go-live-slices">导出上线切片报告</button>
+          <span class="muted">统一阻塞项台账、服务订单中心、主数据目录二期。</span>
+        </div>
+        <div id="platform-go-live-slices-metrics" class="metric-grid"></div>
+        <div class="portal-grid">
+          <article>
+            <h3>统一阻塞项台账</h3>
+            <div id="platform-go-live-blockers" class="priority-list"></div>
+          </article>
+          <article>
+            <h3>统一服务订单与消息中心</h3>
+            <div id="platform-service-order-center" class="priority-list"></div>
+          </article>
+          <article>
+            <h3>主数据目录二期</h3>
+            <div id="platform-master-data-directory" class="priority-list"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" id="platform-standards-ledgers-panel">
+        <div class="panel-title">
+          <h2>六类可验收台账</h2>
+          <span id="platform-standards-ledgers-status" class="badge warn">等待汇总</span>
+        </div>
+        <div class="action-row">
+          <button class="primary-button" type="button" id="export-platform-standards-ledgers">导出台账报告</button>
+          <span class="muted">项目文件、政策标准、数据主数据、接口交换、安全合规、验收运维统一追溯。</span>
+        </div>
+        <div id="platform-standards-ledgers-metrics" class="metric-grid"></div>
+        <div id="platform-standards-ledgers-grid" class="evidence-grid"></div>
+        <div class="panel-title">
+          <h3>台账验收明细</h3>
+          <span id="platform-standards-ledger-detail-status" class="badge warn">等待选择</span>
+        </div>
+        <form id="platform-standards-ledger-filters" class="filter-grid">
+          <label>台账<select id="platform-standards-ledger-select"></select></label>
+          <label>状态<select id="platform-standards-ledger-row-status"><option value="">全部状态</option></select></label>
+          <label>来源<select id="platform-standards-ledger-collection"><option value="">全部来源</option></select></label>
+          <label>关键词<input id="platform-standards-ledger-query" type="search" placeholder="事项、责任方或证据" /></label>
+          <div class="action-row">
+            <button class="primary-button" type="submit">查询</button>
+            <button class="ghost-button" type="button" id="export-platform-standards-ledger-detail">导出当前台账</button>
+          </div>
+        </form>
+        <div id="platform-standards-ledger-acceptance" class="evidence-grid"></div>
+        <div id="platform-standards-ledger-detail" class="table-wrap"></div>
+      </section>
 
       <section class="portal-grid">
         <article class="panel wide">
@@ -72,6 +144,54 @@
           <span>将 HIS、EMR、LIS、PACS、医保、统计和公卫数据映射到可执行管理职能</span>
         </div>
         <div id="hospital-management-functions" class="table-wrap"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>数据治理底座</h2>
+          <span>数据资产、标准字典、血缘控制、质量信号和现场阻塞项</span>
+        </div>
+        <div id="data-governance-foundation" class="evidence-grid"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>二期数据与服务目录</h2>
+          <span>216 表映射、服务资源目录、字段血缘、质量规则和验收证据</span>
+        </div>
+        <div id="phase2-catalog"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>二期最小联调样板</h2>
+          <span>三级医院、区县平台、基层机构的样例报文、网关轨迹、问题复测和签字边界</span>
+        </div>
+        <div id="phase2-joint-test-pilot"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>二期慢病报病协同</h2>
+          <span>诊断触发、报卡队列、区县回执、患者中心和监管统计</span>
+        </div>
+        <div id="phase2-disease-reporting"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>二期临床治疗辅助</h2>
+          <span>医生工作站提醒、规则配置、消息回执、服务集成和监管统计</span>
+        </div>
+        <div id="phase2-clinical-assist"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>二期家庭医生签约监管</h2>
+          <span>签约模板、团队、服务包、居民申请、机构审核、履约、续约和满意度统计</span>
+        </div>
+        <div id="phase2-family-doctor-contracts"></div>
       </section>
 
       <section class="panel">
@@ -126,12 +246,161 @@
         <div id="delivery-roadmap" class="priority-list"></div>
       </section>
 
+      <section class="panel" id="platform-capability-operations-center">
+        <div class="panel-title">
+          <h2>平台能力运营中心</h2>
+          <span>统一管理主要能力域的责任分派、生产前复核、证据补录和整改闭环</span>
+        </div>
+        <div class="action-row">
+          <span id="platform-capability-operations-status" class="badge warn">等待能力审计</span>
+        </div>
+        <div id="platform-capability-operations-metrics" class="metric-grid"></div>
+        <div class="portal-grid">
+          <div>
+            <h3>能力域复核台账</h3>
+            <div id="platform-capability-review-ledger" class="priority-list"></div>
+          </div>
+          <div>
+            <h3>MVP 与生产阻断</h3>
+            <div id="platform-capability-production-blockers" class="priority-list"></div>
+          </div>
+        </div>
+        <p id="platform-capability-operations-boundary" class="implementation-boundary"></p>
+      </section>
+
       <section class="panel">
         <div class="panel-title">
           <h2>P0 production deployment path</h2>
           <span>Release gate, production storage, government identity, and audit retention tracks</span>
         </div>
         <div id="production-deployment-plan" class="priority-list"></div>
+      </section>
+
+      <section class="panel" id="identity-lifecycle-center">
+        <div class="panel-title">
+          <h2>统一身份生命周期中心</h2>
+          <span id="identity-lifecycle-status" class="badge warn">等待配置</span>
+        </div>
+        <div class="action-row">
+          <button class="primary-button" type="button" data-identity-directory-action="preview">预检目录同步</button>
+          <button class="inline-action" type="button" data-identity-directory-action="apply">执行停用同步</button>
+          <button class="inline-action" type="button" data-session-cleanup-action>清理保留会话</button>
+        </div>
+        <div id="identity-lifecycle-metrics" class="metric-grid"></div>
+        <div id="identity-directory-plan" class="priority-list"></div>
+        <div class="panel-title compact-title">
+          <h3>短信送达回执</h3>
+          <span id="sms-delivery-status" class="badge warn">回调待配置</span>
+        </div>
+        <div id="sms-delivery-metrics" class="metric-grid"></div>
+        <div id="sms-delivery-receipts" class="priority-list"></div>
+        <p id="identity-lifecycle-boundary" class="implementation-boundary"></p>
+      </section>
+
+      <section class="panel" id="financial-gateway-operations-center">
+        <div class="panel-title">
+          <h2>支付医保证照回调与对账中心</h2>
+          <span id="financial-gateway-operations-status" class="badge warn">回调待配置</span>
+        </div>
+        <div class="action-row">
+          <button class="primary-button" type="button" data-financial-reconciliation-open>登记日终对账</button>
+        </div>
+        <div id="financial-gateway-operations-metrics" class="metric-grid"></div>
+        <div class="portal-grid">
+          <div>
+            <h3>最近回调</h3>
+            <div id="financial-gateway-callback-events" class="priority-list"></div>
+          </div>
+          <div>
+            <h3>日终对账</h3>
+            <div id="financial-reconciliation-runs" class="priority-list"></div>
+          </div>
+        </div>
+        <p id="financial-gateway-operations-boundary" class="implementation-boundary"></p>
+      </section>
+
+      <section class="panel" id="production-database-cutover-center">
+        <div class="panel-title">
+          <h2>生产数据库割接演练中心</h2>
+          <span>迁移批次、四类样例校验、回滚检查点与生产阻断证据</span>
+        </div>
+        <div class="action-row">
+          <button class="primary-button" type="button" data-production-db-action="rehearse">运行迁移样例校验</button>
+          <span id="production-database-cutover-status" class="badge warn">等待演练</span>
+        </div>
+        <div id="production-database-cutover-metrics" class="metric-grid"></div>
+        <div id="production-database-cutover-runs" class="priority-list"></div>
+        <div id="production-database-migration-batches" class="priority-list"></div>
+        <div class="panel-title compact-title">
+          <h3>PostgreSQL 主读取与生产适配</h3>
+          <span id="postgres-adapter-status" class="badge warn">未配置</span>
+        </div>
+        <div class="action-row">
+          <button class="primary-button" type="button" data-postgres-primary-read-action="run">运行主读取演练</button>
+          <span id="postgres-primary-read-status" class="badge warn">等待演练</span>
+        </div>
+        <div id="postgres-adapter-metrics" class="metric-grid"></div>
+        <div class="panel-title compact-title">
+          <h3>影子核对差异处置</h3>
+          <span id="postgres-reconciliation-status" class="badge warn">等待核对数据</span>
+        </div>
+        <div id="postgres-reconciliation-metrics" class="metric-grid"></div>
+        <div class="portal-grid">
+          <div>
+            <h3>差异工单</h3>
+            <div id="postgres-reconciliation-cases" class="priority-list"></div>
+          </div>
+          <div>
+            <h3>最近核对</h3>
+            <div id="postgres-reconciliation-history" class="priority-list"></div>
+          </div>
+        </div>
+        <p id="production-database-cutover-boundary" class="implementation-boundary"></p>
+      </section>
+
+      <section class="panel" id="citizen-operations-center">
+        <div class="panel-title">
+          <h2>居民服务运营中心</h2>
+          <span>内容发布、协议版本、实名复核、订单汇总、黑名单和医院服务开通</span>
+        </div>
+        <div class="action-row">
+          <span id="citizen-operations-status" class="badge warn">运营 MVP，现场受阻</span>
+          <a class="inline-action" href="./citizen.html#citizen-service-public-feed">查看居民端公开信息</a>
+        </div>
+        <div id="citizen-operations-metrics" class="metric-grid"></div>
+        <div class="portal-grid">
+          <div>
+            <h3>实名人工复核</h3>
+            <div id="citizen-identity-review-queue" class="priority-list"></div>
+          </div>
+          <div>
+            <h3>医院服务开通</h3>
+            <div id="citizen-hospital-service-configs" class="priority-list"></div>
+          </div>
+        </div>
+        <h3>内容、协议与黑名单</h3>
+        <div id="citizen-operations-governance" class="table-wrap"></div>
+        <h3>跨服务订单查询</h3>
+        <div id="citizen-operations-orders" class="table-wrap"></div>
+        <p id="citizen-operations-boundary" class="implementation-boundary"></p>
+      </section>
+
+      <section class="panel" id="commercial-crypto-center">
+        <div class="panel-title">
+          <h2>商用密码能力适配中心</h2>
+          <span>算法运行时探测、适配合同、证据留痕和生产密评门禁</span>
+        </div>
+        <div class="action-row">
+          <span id="commercial-crypto-status" class="badge warn">适配合同就绪，采购与密评受阻</span>
+        </div>
+        <div id="commercial-crypto-metrics" class="metric-grid"></div>
+        <h3>运行时兼容性探测</h3>
+        <div id="commercial-crypto-runtime" class="table-wrap"></div>
+        <h3>适配能力合同</h3>
+        <div id="commercial-crypto-capabilities" class="priority-list"></div>
+        <h3>证据包与现场复核</h3>
+        <div id="commercial-crypto-evidence" class="table-wrap"></div>
+        <p id="commercial-crypto-boundary" class="implementation-boundary"></p>
       </section>
 
       <section class="panel">
@@ -246,6 +515,34 @@
         <footer>
           <button type="button" class="ghost-button" data-close>取消</button>
           <button class="primary-button" value="save">保存证据</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="financial-reconciliation-dialog">
+      <form method="dialog" class="dialog-form" id="financial-reconciliation-form">
+        <header>
+          <h2>登记日终对账摘要</h2>
+          <button type="button" class="icon-button" data-close>×</button>
+        </header>
+        <div class="form-grid">
+          <label>网关
+            <select name="gatewayType" required>
+              <option value="PAYMENT">支付</option>
+              <option value="INSURANCE">医保</option>
+              <option value="CERTIFICATE">电子证照</option>
+            </select>
+          </label>
+          <label>业务日期<input type="date" name="businessDate" required /></label>
+          <label>账单总数<input type="number" name="total" min="0" step="1" required /></label>
+          <label>成功数<input type="number" name="succeeded" min="0" step="1" required /></label>
+          <label>异常数<input type="number" name="exceptions" min="0" step="1" required /></label>
+          <label>总金额（分）<input type="number" name="grossAmountFen" min="0" step="1" required /></label>
+          <label class="full">账单 SHA-256 摘要<input name="statementDigest" pattern="(?:sha256:)?[A-Fa-f0-9]{64}" required /></label>
+        </div>
+        <footer>
+          <button type="button" class="ghost-button" data-close>取消</button>
+          <button class="primary-button" value="save">登记摘要</button>
         </footer>
       </form>
     </dialog>

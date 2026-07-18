@@ -49,6 +49,29 @@ const FIELD_MAPPINGS = {
       reportedAt: "reportedAt"
     }
   },
+  "appointment-order-v1": {
+    targetCollection: "registrationOrders",
+    owner: "citizen-service-integration",
+    fields: {
+      externalId: "auditTrail[].externalId",
+      residentId: "residentId",
+      orderNo: "registrationNo",
+      slotId: "scheduleId",
+      eventType: "auditTrail[].action",
+      orderStatus: "status",
+      occurredAt: "updatedAt"
+    }
+  },
+  "payment-transaction-v1": {
+    targetCollection: "registrationOrders",
+    owner: "citizen-service-integration",
+    fields: {
+      externalId: "auditTrail[].externalId",
+      orderNo: "registrationNo",
+      amountFen: "fee",
+      currency: "paymentCurrency"
+    }
+  },
   "insurance-settlement-v1": {
     targetCollection: "insuranceClaims",
     owner: "cross-agency-integration",
@@ -76,6 +99,20 @@ const FIELD_MAPPINGS = {
       period: "period",
       institution: "institution",
       metrics: "metrics"
+    }
+  },
+  "physical-exam-report-v1": {
+    targetCollection: "personalRecords",
+    owner: "physical-examination-integration",
+    fields: {
+      externalId: "source.externalId",
+      residentId: "residentId",
+      sourceType: "source.type",
+      institutionId: "source.institutionId",
+      institutionName: "sourceInstitution",
+      examDate: "recordDate",
+      summary: "summary",
+      "sourceType+institutionId+externalId": "source.idempotencyKey"
     }
   }
 };

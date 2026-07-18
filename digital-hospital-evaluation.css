@@ -1,0 +1,17 @@
+.portal-shell { max-width: 1500px; }
+.filter-grid .full { grid-column: 1 / -1; }
+.check-line { display: flex; align-items: center; gap: 8px; min-height: 42px; }
+.check-line input { width: auto; }
+.evaluation-pack-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 12px 0; }
+.evaluation-pack { border-left: 3px solid #147d64; padding: 8px 12px; background: #f5faf8; }
+.evaluation-pack strong, .evaluation-pack span { display: block; }
+.evaluation-pack small { color: #536762; }
+.boundary-band { border-top: 4px solid #9a6a10; }
+.result-ready { color: #12634f; font-weight: 700; }
+.result-blocked { color: #9b2c2c; font-weight: 700; }
+.readiness-checks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.readiness-checks label { display: flex; align-items: center; gap: 6px; min-height: 36px; }
+.readiness-checks input { width: auto; }
+.pilot-paused { color: #9b2c2c; font-weight: 700; }
+@media (max-width: 900px) { .evaluation-pack-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 560px) { .evaluation-pack-grid, .readiness-checks { grid-template-columns: 1fr; } }

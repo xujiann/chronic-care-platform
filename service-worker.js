@@ -1,12 +1,54 @@
-const CACHE_NAME = "chronic-care-citizen-v1";
+const CACHE_NAME = "chronic-care-citizen-v48-physical-examination-highlights";
 const APP_SHELL = [
   "./",
   "./citizen.html",
   "./citizen.css",
+  "./citizen.css?v=20260630lifecycle",
+  "./citizen.css?v=20260703escortprogress",
+  "./citizen.css?v=20260705p0copy",
+  "./citizen.css?v=20260710journey",
   "./citizen.js",
+  "./citizen.js?v=20260627",
+  "./citizen.js?v=20260627nav",
+  "./citizen.js?v=20260627preview",
+  "./citizen.js?v=20260627pages",
+  "./citizen.js?v=20260627pages2",
+  "./citizen.js?v=20260627actions",
+  "./citizen.js?v=20260627channels",
+  "./citizen.js?v=20260628launch",
+  "./citizen.js?v=20260628tasks",
+  "./citizen.js?v=20260629registration",
+  "./citizen.js?v=20260629multinav",
+  "./citizen.js?v=20260629care",
+  "./citizen.js?v=20260630layout",
+  "./citizen.js?v=20260630visible",
+  "./citizen.js?v=20260630touch",
+  "./citizen.js?v=20260630sync",
+  "./citizen.js?v=20260630lifecycle",
+  "./citizen.js?v=20260630escortlink",
+  "./citizen.js?v=20260701actions",
+  "./citizen.js?v=20260701provider",
+  "./citizen.js?v=20260703escortprogress",
+  "./citizen.js?v=20260705p0copy",
+  "./citizen.js?v=20260710journey",
   "./auth.js",
+  "./auth.js?v=20260627",
   "./health-archive-standard.js",
+  "./physical-examination-standards.js",
+  "./physical-examination-highlights.js",
+  "./physical-examination-service.js",
+  "./physical-examination.html",
+  "./physical-examination.css",
+  "./physical-examination.js",
+  "./immunization-schedule.js",
+  "./immunization.html",
+  "./immunization.js",
+  "./imaging-cloud.html",
+  "./imaging-cloud.js",
   "./mobile-preview.html",
+  "./mobile-preview.css",
+  "./internet-nursing.html",
+  "./internet-nursing.js?v=20260629prod",
   "./manifest.webmanifest",
   "./pwa-icon.svg",
   "./data/db.json"
@@ -34,7 +76,25 @@ self.addEventListener("fetch", (event) => {
 
   if (event.request.mode === "navigate") {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match("./citizen.html"))
+      fetch(event.request, { cache: "no-store" }).catch(() => {
+        const fallbackPage = requestUrl.pathname.endsWith("/mobile-preview.html")
+          ? "./mobile-preview.html"
+          : "./citizen.html";
+        return caches.match(fallbackPage);
+      })
+    );
+    return;
+  }
+
+  if (/\.(?:html|js|css)$/.test(requestUrl.pathname)) {
+    event.respondWith(
+      fetch(event.request, { cache: "no-store" })
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          return response;
+        })
+        .catch(() => caches.match(event.request))
     );
     return;
   }

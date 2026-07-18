@@ -13,6 +13,18 @@ test("environment matrix validates demo staging and production gates", () => {
   assert.deepEqual(report.profiles.map((item) => item.id), ["demo", "staging", "production"]);
   assert.equal(report.profiles.every((item) => item.missingScripts.length === 0), true);
   assert.equal(report.profiles.every((item) => item.missingTemplateVars.length === 0), true);
+  assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => item.requiredVars.includes("SMS_GATEWAY_URL")), true);
+  assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => item.requiredVars.includes("SMS_TEMPLATE_ID")), true);
+  assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => item.requiredVars.includes("SMS_DELIVERY_CALLBACK_SECRET")), true);
+  assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => ["IDENTITY_DIRECTORY_URL", "IDENTITY_DIRECTORY_TOKEN"].every((variable) => item.requiredVars.includes(variable))), true);
+  assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => item.requiredVars.includes("HOSPITAL_ADAPTER_SECRET")), true);
+  assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => ["HIS", "EMR", "LIS", "PACS", "APPOINTMENT"].every((domain) => item.requiredVars.includes(`${domain}_ADAPTER_URL`))), true);
+  assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => ["OBJECT_STORAGE_GATEWAY_URL", "OBJECT_STORAGE_BUCKET", "OBJECT_STORAGE_SIGNING_SECRET"].every((variable) => item.requiredVars.includes(variable))), true);
+  assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => ["FINANCIAL_GATEWAY_SECRET", "FINANCIAL_CALLBACK_SECRET", "PAYMENT_GATEWAY_URL", "INSURANCE_GATEWAY_URL", "CERTIFICATE_GATEWAY_URL"].every((variable) => item.requiredVars.includes(variable))), true);
+  assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => ["SIEM_ENDPOINT", "SIEM_SIGNING_SECRET"].every((variable) => item.requiredVars.includes(variable))), true);
+  assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => ["DEPLOYMENT_SECRET_PROVIDER", "DEPLOYMENT_RELEASE_ID", "DEPLOYMENT_ARTIFACT_DIGEST"].every((variable) => item.requiredVars.includes(variable))), true);
+  assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => ["POSTGRES_SYNC_MODE", "POSTGRES_SSL_MODE"].every((variable) => item.requiredVars.includes(variable))), true);
+  assert.equal(report.profiles.every((item) => ["SESSION_TOPOLOGY", "SESSION_EXPIRED_RETENTION_DAYS", "SESSION_REVOKED_RETENTION_DAYS", "SESSION_CLEANUP_INTERVAL_MS"].every((variable) => item.requiredVars.includes(variable))), true);
   assert.equal(report.profiles.some((item) => item.id === "production" && item.blockedVars.includes("STORAGE_ENGINE=postgres")), true);
   assert.equal(report.checks.some((item) => item.id === "environment:productionTracks" && item.passed), true);
 });

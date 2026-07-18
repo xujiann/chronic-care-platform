@@ -14,6 +14,11 @@ test("monitoring readiness validates routes metrics alerts and SLO evidence", ()
   assert.equal(report.metricSignals.every((item) => item.present), true);
   assert.equal(report.alertSignals.some((item) => item.signal === "CUTOVER_MONITORING_SIGNOFF" && item.present), true);
   assert.equal(report.sloTargets.every((item) => item.covered), true);
+  assert.equal(report.status, "adapter-foundation-ready-site-acceptance-pending");
+  assert.equal(report.productionReady, false);
+  assert.equal(report.checks.some((item) => item.id === "monitoring:alertAdapter" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "monitoring:alertRuntime" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "monitoring:productionBoundary" && item.passed), true);
 });
 
 test("monitoring readiness fails when metrics route documentation is missing", () => {
@@ -36,6 +41,15 @@ test("monitoring readiness fails when runtime alert signals are missing", () => 
   assert.equal(report.checks.some((item) => item.id === "monitoring:alertSignals" && !item.passed), true);
 });
 
+test("monitoring readiness fails when alert signing and PII controls are removed", () => {
+  const adapterSource = fs.readFileSync(path.join(ROOT, "observability-alerting.js"), "utf8")
+    .replace(/HMAC-SHA256/g, "signature-disabled")
+    .replace(/FORBIDDEN_ALERT_KEYS/g, "allowed-alert-keys");
+  const report = buildMonitoringReadinessReport({ adapterSource });
+  assert.equal(report.ok, false);
+  assert.equal(report.checks.some((item) => item.id === "monitoring:alertAdapter" && !item.passed), true);
+});
+
 test("monitoring readiness renders and writes release artifacts", (t) => {
   const outputDir = path.join(ROOT, "tmp", "monitoring-readiness-test");
   t.after(() => fs.rmSync(outputDir, { recursive: true, force: true }));
@@ -43,6 +57,7 @@ test("monitoring readiness renders and writes release artifacts", (t) => {
   const markdown = renderMarkdown(report);
   assert.match(markdown, /Monitoring readiness report/);
   assert.match(markdown, /SLO targets/);
+  assert.match(markdown, /Production alert routing/);
 
   writeOutput(report, {
     output: path.join("tmp", "monitoring-readiness-test", "monitoring-readiness-report.json"),

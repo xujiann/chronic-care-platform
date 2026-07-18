@@ -15,26 +15,48 @@ const fallbackState = {
   platformProcessAudit: []
 };
 
+let currentSiteReadinessPack = null;
+let currentSiteTemplateReadmes = null;
+
 document.addEventListener("DOMContentLoaded", async () => {
-  const state = await loadPlatformState(fallbackState);
-  const operations = await loadOperationalMetrics();
-  const readiness = await loadSystemReadiness();
-  const processAudit = await loadProcessAudit();
-  const serviceAcceptanceSummary = await loadServiceAcceptanceSummary();
-  const acceptanceLedgers = await loadAcceptanceLedgers();
-  const siteReadinessPack = await loadSiteReadinessPack();
-  const siteTemplateReadmes = await loadSiteTemplateReadmes();
-  const releaseReport = await loadReleaseReport();
-  const productionCutover = await loadProductionCutoverChecklist();
-  const releaseArtifactManifest = await loadReleaseArtifactManifest();
-  const unifiedTaskReport = await loadUnifiedTaskReport();
+  const [
+    state,
+    operations,
+    readiness,
+    processAudit,
+    serviceAcceptanceSummary,
+    acceptanceLedgers,
+    siteReadinessPack,
+    siteTemplateReadmes,
+    siteLaunchEvidence,
+    releaseReport,
+    productionCutover,
+    releaseArtifactManifest,
+    unifiedTaskReport
+  ] = await Promise.all([
+    loadPlatformState(fallbackState),
+    loadOperationalMetrics(),
+    loadSystemReadiness(),
+    loadProcessAudit(),
+    loadServiceAcceptanceSummary(),
+    loadAcceptanceLedgers(),
+    loadSiteReadinessPack(),
+    loadSiteTemplateReadmes(),
+    loadSiteLaunchEvidence(),
+    loadReleaseReport(),
+    loadProductionCutoverChecklist(),
+    loadReleaseArtifactManifest(),
+    loadUnifiedTaskReport()
+  ]);
   const tasks = unifiedTaskReport?.tasks?.length ? normalizeApiTasks(unifiedTaskReport.tasks) : collectUnifiedTasks(state);
   const roadmap = state.platformRoadmap?.length ? state.platformRoadmap : defaultRoadmap();
+  currentSiteReadinessPack = siteReadinessPack;
+  currentSiteTemplateReadmes = siteTemplateReadmes;
   renderMetrics(state, tasks, roadmap, operations);
   renderSystemReadiness(readiness);
   renderReleaseEvidenceGates(state, readiness, operations, processAudit, serviceAcceptanceSummary, siteReadinessPack, releaseReport, productionCutover, releaseArtifactManifest);
   renderAcceptanceLedgers(state, acceptanceLedgers, serviceAcceptanceSummary);
-  renderSiteReadinessPack(siteReadinessPack, siteTemplateReadmes);
+  renderSiteReadinessPack(siteReadinessPack, siteTemplateReadmes, siteLaunchEvidence);
   renderSourceAlignment(state);
   renderAudit(state, tasks);
   renderProcessAudit(state, processAudit);
@@ -127,6 +149,18 @@ async function loadSiteTemplateReadmes() {
   try {
     const request = window.HealthCityAuth?.authFetch || fetch;
     const response = await request("/api/site-template-readmes");
+    if (!response.ok) return null;
+    return response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
+async function loadSiteLaunchEvidence() {
+  if (location.protocol === "file:") return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request("/api/site-launch-evidence");
     if (!response.ok) return null;
     return response.json();
   } catch (error) {
@@ -494,11 +528,12 @@ function renderAcceptanceLedgers(state, acceptanceLedgers, serviceAcceptanceSumm
   }).join("");
 }
 
-function renderSiteReadinessPack(siteReadinessPack, siteTemplateReadmes) {
+function renderSiteReadinessPack(siteReadinessPack, siteTemplateReadmes, siteLaunchEvidence) {
   const container = document.querySelector("#site-readiness-pack");
   if (!container) return;
 
   if (!siteReadinessPack) {
+    renderSiteLaunchEvidenceForm(siteLaunchEvidence);
     container.innerHTML = `<article class="priority-row">
       <div class="priority-rank warn">API</div>
       <div>
@@ -520,6 +555,41 @@ function renderSiteReadinessPack(siteReadinessPack, siteTemplateReadmes) {
     "monitoring-operations-pack": "monitoring-on-call",
     "production-signoff-pack": "production-signoff"
   };
+  renderSiteLaunchEvidenceForm(siteLaunchEvidence);
+  const evidenceSummary = siteLaunchEvidence?.summary || {};
+  const evidenceState = siteLaunchEvidence?.state || "evidence-api-not-loaded";
+  const missingVerifiedTemplates = evidenceSummary.missingVerifiedTemplates ?? evidenceSummary.missingTemplates;
+  const evidenceSummaryRow = `<article class="priority-row" data-site-launch-evidence="summary">
+    <div class="priority-rank ${missingVerifiedTemplates === 0 ? "info" : "warn"}">${evidenceSummary.verifiedTemplates || 0}/${evidenceSummary.templates || 0}</div>
+    <div>
+      <h3>Site launch evidence ledger</h3>
+      <p>${evidenceSummary.evidence || 0} evidence rows; submitted=${evidenceSummary.submitted || 0}; verified=${evidenceSummary.verified || 0}; recorded templates=${evidenceSummary.recordedTemplates || 0}; missing verified templates=${missingVerifiedTemplates ?? "n/a"}.</p>
+      <div class="standard-tags">
+        <span class="badge ${missingVerifiedTemplates === 0 ? "info" : "warn"}">${evidenceState}</span>
+        <span class="badge info">/api/site-launch-evidence</span>
+      </div>
+    </div>
+    <div class="capability-side">
+      <small>runtime evidence registration</small>
+      <small>audit: siteLaunchEvidence</small>
+    </div>
+  </article>`;
+  const evidenceRows = (siteLaunchEvidence?.evidence || []).slice(0, 6).map((item) => `<article class="priority-row" data-site-launch-evidence="${item.id}">
+    <div class="priority-rank ${item.status === "verified" ? "info" : item.status === "rejected" ? "danger" : "warn"}">EV</div>
+    <div>
+      <h3>${item.artifactName}</h3>
+      <p>${item.templateId} · ${item.externalSystem || "external system pending"} · ${item.jointTestNo || "joint test no pending"}</p>
+      <div class="standard-tags">
+        <span class="badge ${item.status === "verified" ? "info" : item.status === "rejected" ? "danger" : "warn"}">${item.status}</span>
+        <span class="badge info">${item.domain || item.template?.domain || "site"}</span>
+        <span class="badge info">${item.owner || item.template?.owner || "owner-pending"}</span>
+      </div>
+    </div>
+    <div class="capability-side">
+      <small>${item.submittedAt || ""}</small>
+      <small>${(item.attachmentNames || []).join(", ") || "attachments pending"}</small>
+    </div>
+  </article>`).join("");
   const packRows = (siteReadinessPack.packs || []).map((pack, index) => {
     const ready = pack.status === "template-ready";
     const readme = readmeById[readmeIdByPack[pack.id]];
@@ -559,7 +629,7 @@ function renderSiteReadinessPack(siteReadinessPack, siteTemplateReadmes) {
     </div>
   </article>`).join("");
 
-  container.innerHTML = `${packRows}${readmeRows || `<article class="priority-row">
+  container.innerHTML = `${evidenceSummaryRow}${evidenceRows}${packRows}${readmeRows || `<article class="priority-row">
     <div class="priority-rank warn">MD</div>
     <div>
       <h3>Template README bundle</h3>
@@ -570,6 +640,45 @@ function renderSiteReadinessPack(siteReadinessPack, siteTemplateReadmes) {
       <small>/api/site-template-readmes</small>
     </div>
   </article>`}`;
+}
+
+function renderSiteLaunchEvidenceForm(siteLaunchEvidence) {
+  const form = document.querySelector("#site-launch-evidence-form");
+  if (!form) return;
+  const templates = siteLaunchEvidence?.templates || [];
+  const select = form.elements.templateId;
+  if (select) {
+    select.innerHTML = templates.length
+      ? templates.slice(0, 120).map((item) => `<option value="${item.id}">${item.domain} · ${item.title}</option>`).join("")
+      : `<option value="">Start Node API to load templates</option>`;
+    select.disabled = templates.length === 0;
+  }
+  form.onsubmit = submitSiteLaunchEvidence;
+}
+
+async function submitSiteLaunchEvidence(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const submitButton = form.querySelector("button[type='submit']");
+  if (submitButton) submitButton.disabled = true;
+  const payload = Object.fromEntries(new FormData(form).entries());
+  payload.attachmentNames = String(payload.attachmentNames || "").split(/[,\n;]+/).map((item) => item.trim()).filter(Boolean);
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request("/api/site-launch-evidence", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error((await response.json()).message || "site launch evidence submission failed");
+    form.reset();
+    const refreshed = await loadSiteLaunchEvidence();
+    renderSiteReadinessPack(currentSiteReadinessPack, currentSiteTemplateReadmes, refreshed);
+  } catch (error) {
+    alert(error.message || "site launch evidence submission failed");
+  } finally {
+    if (submitButton) submitButton.disabled = false;
+  }
 }
 
 function renderAudit(state, tasks) {

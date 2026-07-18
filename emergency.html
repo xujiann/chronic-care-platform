@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>院前急救协同中心</title>
+  <link rel="stylesheet" href="./portal.css" />
+  <link rel="stylesheet" href="./emergency.css" />
+  <script src="./auth.js"></script>
+  <script>window.HealthCityAuth.requireRole(["commission", "institution", "citizen"])</script>
+</head>
+<body>
+  <main class="portal-shell">
+    <header class="portal-header emergency-header">
+      <div><span>120统一调度 · 院前院内协同</span><h1>院前急救协同中心</h1><p>居民辅助呼救、急救中心派车、车载救治、医院预接诊和电子交接全程留痕。</p></div>
+      <nav><a href="tel:120" class="call-120">立即拨打120</a><a href="./citizen.html">居民端</a><a href="./institution.html">医院端</a><a href="./platform.html">平台端</a><a href="#emergency-topology">拓扑与流程</a></nav>
+    </header>
+    <div class="emergency-notice" role="alert">互联网入口不替代120电话。危及生命时请立即拨打120；辅助信息须经急救中心人工确认后派车。</div>
+    <section class="metric-grid" id="emergency-metrics"></section>
+    <div id="emergency-message" class="auth-bar" role="status" aria-live="polite" hidden></div>
+
+    <section class="portal-grid">
+      <article class="panel" data-emergency-panel="citizen-call">
+        <div class="panel-title"><h2>居民辅助呼救</h2><span>位置与症状补充</span></div>
+        <form id="emergency-call-form" class="filter-grid">
+          <label>现场地址<input name="address" required value="大连市中山区人民路示范点" /></label>
+          <label>主要症状<textarea name="chiefComplaint" required>胸痛、呼吸困难</textarea></label>
+          <label>患者姓名<input name="patientName" value="待核实患者" /></label>
+          <label>患者人数<input name="patientCount" type="number" min="1" max="99" value="1" /></label>
+          <label>纬度<input name="latitude" type="number" step="0.000001" value="38.920000" /></label>
+          <label>经度<input name="longitude" type="number" step="0.000001" value="121.650000" /></label>
+          <button type="submit">提交辅助信息并继续拨打120</button>
+        </form>
+      </article>
+      <article class="panel sos-panel" data-emergency-panel="sos">
+        <div class="panel-title"><h2>智能 SOS 自动呼救</h2><span>确认后提交 120 队列并打开系统拨号</span></div>
+        <form id="emergency-sos-form" class="filter-grid">
+          <label>突发信号<select name="detectedSignal"><option value="collapse">疑似晕厥/倒地</option><option value="chest-pain">突发胸痛</option><option value="breathing-difficulty">呼吸困难</option><option value="stroke-suspected">疑似卒中</option><option value="manual-sos">手动 SOS</option></select></label>
+          <label>现场地址<input name="address" required value="大连市中山区人民路示范点" /></label>
+          <label>简要症状<input name="chiefComplaint" required value="突发疾病，已触发 SOS" /></label>
+          <label>纬度<input name="latitude" type="number" step="0.000001" value="38.920000" required /></label>
+          <label>经度<input name="longitude" type="number" step="0.000001" value="121.650000" required /></label>
+          <label class="sos-confirm"><input name="confirmed" type="checkbox" value="true" required /> 我确认需要 120 急救，并同意提交位置和症状。</label>
+          <button type="submit" class="sos-button">触发 SOS 并拨打 120</button>
+        </form>
+        <p class="sos-boundary">网页不能绕过手机系统静默拨号；提交后仍需在设备上确认拨打 120。</p>
+      </article>
+      <article class="panel" data-emergency-panel="aed-map">
+        <div class="panel-title"><h2>AED 地图与取用指引</h2><span>就近 AED、距离、可用状态</span></div>
+        <form id="aed-map-form" class="filter-grid compact-form">
+          <label>纬度<input name="latitude" type="number" step="0.000001" value="38.920000" required /></label>
+          <label>经度<input name="longitude" type="number" step="0.000001" value="121.650000" required /></label>
+          <button type="submit" class="secondary">查询就近 AED</button>
+        </form>
+        <div id="emergency-aed-map" class="aed-map" aria-live="polite"><p>正在加载 AED 地图…</p></div>
+      </article>
+      <article class="panel" data-emergency-panel="dispatch">
+        <div class="panel-title"><h2>120调度</h2><span>统一受理派车</span></div>
+        <form id="dispatch-form" class="filter-grid">
+          <label>待派事件<select name="eventId" id="dispatch-event"></select></label>
+          <label>可用车辆<select name="ambulanceId" id="dispatch-ambulance"></select></label>
+          <label>预计到达（分钟）<input name="etaMinutes" type="number" min="1" value="10" /></label>
+          <button type="submit">确认派车</button>
+        </form>
+      </article>
+    </section>
+
+    <section class="panel wide lifechain-panel" id="emergency-life-chain" data-emergency-panel="golden-four-minutes">
+      <div class="panel-title"><h2>黄金 4 分钟生命链</h2><span>设备预警、急救员、家属、绿色通道、弱网和质控</span></div>
+      <div class="portal-grid lifechain-grid">
+        <article class="lifechain-card"><h3>2. 预授权设备自动 SOS</h3><p>仅已由患者明确授权的设备可基于高风险信号自动提交 120 信息队列。</p>
+          <form id="lifechain-authorization-form" class="filter-grid compact-form"><label>设备编号<input name="deviceId" required value="wearable-demo-01" /></label><label class="sos-confirm"><input name="confirmed" type="checkbox" value="true" required /> 我确认启用自动 SOS 预授权</label><button type="submit">保存预授权</button></form>
+          <form id="lifechain-device-sos-form" class="filter-grid compact-form"><label>风险信号<select name="detectedSignal"><option value="fall-detected">跌倒识别</option><option value="cardiac-risk">心脏风险</option><option value="hypoxia-risk">低氧风险</option><option value="no-motion">持续无活动</option></select></label><label>风险分<input name="riskScore" type="number" min="60" max="100" value="82" required /></label><label>设备编号<input name="deviceId" required value="wearable-demo-01" /></label><label>位置<input name="address" required value="大连市中山区人民路示范点" /></label><label>纬度<input name="latitude" type="number" step="0.000001" value="38.920000" required /></label><label>经度<input name="longitude" type="number" step="0.000001" value="121.650000" required /></label><label>网络<select name="networkStatus"><option value="online">正常网络</option><option value="weak">弱网</option><option value="offline">离线降级</option></select></label><button type="submit" class="sos-button">模拟设备自动 SOS</button></form>
+        </article>
+        <article class="lifechain-card"><h3>4. 家属急救协同</h3><p>只向患者授权的紧急联系人生成通知任务；真实短信/电话需接入签约通道。</p>
+          <form id="lifechain-family-form" class="filter-grid compact-form"><label>联系人<input name="contactName" required value="紧急联系人" /></label><label>关系<input name="relation" value="家属" /></label><label>脱敏电话<input name="phoneMasked" required value="138****8000" /></label><label class="sos-confirm"><input name="confirmed" type="checkbox" value="true" required /> 我确认授权紧急通知</label><button type="submit">保存联系人</button></form>
+        </article>
+        <article class="lifechain-card lifechain-wide"><h3>1 / 3 / 5 / 6. 生命链态势</h3><div id="lifechain-overview" class="production-list" aria-live="polite"><p>正在加载生命链态势…</p></div></article>
+        <article class="lifechain-card lifechain-wide"><h3>5. 急救指挥态势投影</h3><div id="lifechain-command-center" class="production-list" aria-live="polite"><p>正在加载指挥态势…</p></div></article>
+        <article class="lifechain-card lifechain-wide"><h3>7. 急救质量与复盘</h3><div id="lifechain-quality" class="production-list" aria-live="polite"><p>正在加载质控指标…</p></div></article>
+      </div>
+      <p class="lifechain-boundary">自动 SOS 仅在预授权、可信设备和风险阈值满足时提交信息队列；急救员、医院接诊、短信与车辆/AED实时数据均须由现场签约系统确认。</p>
+    </section>
+
+    <section class="panel wide" id="emergency-production-center" data-emergency-panel="production-center">
+      <div class="panel-title"><h2>生产前上线控制中心</h2><span id="production-state">加载中</span></div>
+      <div class="metric-grid" id="production-metrics"></div>
+      <div class="production-board">
+        <div><h3>外部接口探测</h3><div id="production-endpoints" class="production-list"></div></div>
+        <div><h3>可靠消息与死信</h3><div id="production-queue" class="production-list"></div></div>
+        <div><h3>故障与灾备演练</h3><div id="production-drills" class="production-list"></div></div>
+        <div><h3>现场证据与切换阻塞</h3><div id="production-requirements" class="production-list"></div></div>
+        <div><h3>数据质量与告警</h3><div id="production-quality" class="production-list"></div></div>
+        <div><h3>上线值班与双人审批</h3><div id="production-approvals" class="production-list"></div></div>
+        <div><h3>生产交接与指挥简报</h3><div id="production-handoffs" class="production-list"></div></div>
+        <div><h3>上线观察、事件与回滚</h3><div id="production-observations" class="production-list"></div></div>
+      </div>
+      <details class="production-actions">
+        <summary>生产前操作与证据登记</summary>
+        <div class="portal-grid">
+          <form id="quality-resolve-form" class="filter-grid"><h3>Quality issue closure</h3><label>Issue<select name="id" id="quality-issue-select"></select></label><label>Evidence<input name="evidenceRef" placeholder="evidence://emergency/quality/..." required /></label><label>Resolution note<input name="note" required /></label><button type="submit">Close quality issue</button></form>
+          <form id="alert-action-form" class="filter-grid"><h3>Operational alert action</h3><label>Alert<select name="id" id="alert-select"></select></label><label>Action<select name="action"><option value="acknowledge">Acknowledge</option><option value="resolve">Resolve</option></select></label><label>Owner<input name="owner" /></label><label>Resolution note<input name="note" /></label><button type="submit">Save alert action</button></form>
+          <form id="incident-resolve-form" class="filter-grid"><h3>Launch incident closure</h3><label>Incident<select name="id" id="incident-resolve-select"></select></label><label>Evidence<input name="evidenceRef" placeholder="evidence://emergency/incident/..." required /></label><label>Resolution note<input name="note" required /></label><button type="submit">Resolve launch incident</button></form>
+          <form id="endpoint-probe-form" class="filter-grid"><h3>接口探测</h3><label>接口<select name="id" id="endpoint-probe-select"></select></label><label>服务地址<input name="baseUrl" placeholder="https://gateway.example" required /></label><label>凭据引用<input name="credentialRef" placeholder="secret/emergency/cti" required /></label><label>证书指纹<input name="certificateFingerprint" /></label><button type="submit">执行探测</button></form>
+          <form id="drill-complete-form" class="filter-grid"><h3>演练证据</h3><label>演练<select name="id" id="drill-select"></select></label><label>结果<select name="result"><option value="passed">通过</option></select></label><label>证据引用<input name="evidenceRef" placeholder="evidence://emergency/drill/..." required /></label><button type="submit">登记演练通过</button></form>
+          <form id="requirement-sign-form" class="filter-grid"><h3>现场签署</h3><label>上线要求<select name="id" id="requirement-select"></select></label><label>证据引用<input name="evidenceRef" placeholder="evidence://emergency/site/..." required /></label><label>签署说明<input name="note" required /></label><label>精确确认<input name="confirmation" required value="CONFIRM EMERGENCY SITE EVIDENCE" /></label><button type="submit">签署并解除阻塞</button></form>
+          <form id="quality-validate-form" class="filter-grid"><h3>急救数据质量</h3><label>急救事件<select name="id" id="quality-event-select"></select></label><button type="submit">执行完整性与状态一致性校验</button></form>
+          <form id="cutover-approval-form" class="filter-grid"><h3>最终切换审批</h3><label>审批通道<select name="id" id="approval-select"></select></label><label>证据引用<input name="evidenceRef" required /></label><label>审批说明<input name="note" required /></label><label>精确确认<input name="confirmation" value="CONFIRM EMERGENCY CUTOVER APPROVAL" required /></label><button type="submit">签署切换审批</button></form>
+          <form id="handoff-accept-form" class="filter-grid"><h3>生产交接接收</h3><label>交接通道<select name="id" id="handoff-select"></select></label><label>证据引用<input name="evidenceRef" required /></label><label>精确确认<input name="confirmation" value="ACCEPT EMERGENCY PRODUCTION HANDOFF" required /></label><button type="submit">确认接收生产交接</button></form>
+          <form id="command-brief-form" class="filter-grid"><h3>切换指挥简报</h3><label>指挥简报<select name="id" id="command-brief-select"></select></label><label>操作<select name="action"><option value="issue">发布切换指令</option><option value="acknowledge">确认收到指令</option></select></label><label>生效时间<input name="effectiveAt" type="datetime-local" /></label><label>接收责任人<input name="recipient" placeholder="确认收到时填写精确责任人名称" /></label><label>证据引用<input name="evidenceRef" /></label><button type="submit">执行指挥简报操作</button></form>
+          <form id="observation-record-form" class="filter-grid"><h3>上线观察记录</h3><label>观察窗口<select name="id" id="observation-select"></select></label><label>结果<select name="result"><option value="passed">通过</option><option value="failed">异常</option></select></label><label>证据引用<input name="evidenceRef" required /></label><label>说明<input name="note" /></label><button type="submit">保存观察结果</button></form>
+          <form id="launch-incident-form" class="filter-grid"><h3>上线事件上报</h3><label>标题<input name="title" required /></label><label>等级<select name="severity"><option value="P0">P0</option><option value="P1">P1</option><option value="P2">P2</option><option value="P3">P3</option></select></label><label>责任人<input name="owner" /></label><label>情况说明<input name="note" required /></label><button type="submit">创建上线事件</button></form>
+        </div>
+      </details>
+    </section>
+
+    <section class="panel wide" data-emergency-panel="events">
+      <div class="panel-title"><h2>急救事件主链</h2><span id="event-count"></span></div>
+      <div id="emergency-events" class="emergency-event-list"></div>
+    </section>
+
+    <section class="panel wide" data-emergency-panel="evidence-package">
+      <div class="panel-title"><h2>Event evidence package</h2><span>call / dispatch / track / clinical / receiving / handover / audit</span></div>
+      <div id="emergency-evidence-package" class="production-list">
+        <p>Select an emergency event to inspect its evidence package.</p>
+      </div>
+    </section>
+
+    <section class="panel wide" id="emergency-topology" data-emergency-panel="topology">
+      <div class="panel-title"><h2>系统拓扑与流程图集</h2><span>13类架构、业务、安全和上线视图</span></div>
+      <div class="emergency-diagram-index">
+        <a href="./docs/院前急救系统拓扑与流程图集.md#1-业务全景拓扑">业务全景</a><a href="./docs/院前急救系统拓扑与流程图集.md#2-逻辑架构">逻辑架构</a><a href="./docs/院前急救系统拓扑与流程图集.md#3-生产部署拓扑">生产部署</a><a href="./docs/院前急救系统拓扑与流程图集.md#4-网络与安全域拓扑">安全域</a><a href="./docs/院前急救系统拓扑与流程图集.md#5-数据交换拓扑">数据交换</a><a href="./docs/院前急救系统拓扑与流程图集.md#6-呼救与调度泳道">调度泳道</a><a href="./docs/院前急救系统拓扑与流程图集.md#7-车载救治与医院预接诊">车载与医院</a><a href="./docs/院前急救系统拓扑与流程图集.md#8-急救事件状态机">状态机</a><a href="./docs/院前急救系统拓扑与流程图集.md#9-患者身份归并流程">身份归并</a><a href="./docs/院前急救系统拓扑与流程图集.md#10-弱网与故障降级流程">故障降级</a><a href="./docs/院前急救系统拓扑与流程图集.md#11-数据安全与紧急访问流程">紧急访问</a><a href="./docs/院前急救系统拓扑与流程图集.md#12-上线与切换流程">上线切换</a><a href="./docs/院前急救系统拓扑与流程图集.md#13-监控告警链路">监控告警</a>
+      </div>
+    </section>
+
+    <section class="portal-grid">
+      <article class="panel" data-emergency-panel="ambulance">
+        <div class="panel-title"><h2>车载移动急救</h2><span>节点与院前病历</span></div>
+        <form id="vehicle-form" class="filter-grid">
+          <label>事件<select name="eventId" id="vehicle-event"></select></label>
+          <label>下一节点<select name="status"><option value="departed">车辆出发</option><option value="arrived-scene">到达现场</option><option value="patient-contact">接触患者</option><option value="transporting">开始转运</option><option value="arrived-hospital">到达医院</option></select></label>
+          <button type="submit">上报节点</button>
+        </form>
+        <form id="clinical-form" class="filter-grid clinical-grid">
+          <label>事件<select name="eventId" id="clinical-event"></select></label><label>初步诊断<input name="preliminaryDiagnosis" value="急性冠脉综合征待查" /></label>
+          <label>收缩压<input name="systolic" type="number" value="150" /></label><label>舒张压<input name="diastolic" type="number" value="95" /></label>
+          <label>心率<input name="heartRate" type="number" value="105" /></label><label>SpO₂<input name="spo2" type="number" value="96" /></label>
+          <label>处置<input name="treatment" value="吸氧并建立静脉通路" /></label><button type="submit">保存院前记录</button>
+        </form>
+      </article>
+      <article class="panel" data-emergency-panel="hospital">
+        <div class="panel-title"><h2>医院预接诊与交接</h2><span>绿色通道</span></div>
+        <form id="hospital-form" class="filter-grid">
+          <label>转运中事件<select name="eventId" id="hospital-event"></select></label><label>接诊医院<select name="hospitalId" id="hospital-select"></select></label>
+          <label>绿色通道<select name="greenChannel"><option value="chest-pain">胸痛中心</option><option value="stroke">卒中中心</option><option value="trauma">创伤中心</option><option value="general-emergency">普通急诊</option></select></label>
+          <label>接诊意见<input name="note" value="急诊抢救室准备" /></label><button type="submit">确认接收</button>
+        </form>
+        <form id="handover-form" class="filter-grid">
+          <label>已到院事件<select name="eventId" id="handover-event"></select></label><label>院内就诊号<input name="hospitalVisitId" required value="ER-20260715-001" /></label>
+          <label>院方交接人<input name="hospitalSigner" required value="急诊科 王医生" /></label><label>交接备注<input name="note" value="病情及用药已核对" /></label>
+          <button type="submit">完成电子交接</button>
+        </form>
+      </article>
+    </section>
+    <section class="panel wide" data-emergency-panel="blood-coordination"><div class="panel-header"><div><h2>应急用血保障</h2><p>接收区域库存、短缺预警和应急用血调配事件。</p></div></div><div id="emergency-blood-coordination" class="production-list"></div></section>
+  </main>
+  <script src="./emergency.js"></script>
+  <script src="./emergency-lifechain-ui.js"></script>
+</body>
+</html>

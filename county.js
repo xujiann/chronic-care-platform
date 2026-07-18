@@ -1,4 +1,4 @@
-const fallbackState = { countyConsortium: null, countyProjectBlueprint: null, countyCollaborationOrders: [], countyAiDiagnosisCases: [], countyMutualRecognitionRecords: [], referralTeleconsultations: [], residents: [], medicalResources: [], personalRecords: [] };
+const fallbackState = { countyConsortium: null, countyProjectBlueprint: null, countyCollaborationOrders: [], countyAiDiagnosisCases: [], countyMutualRecognitionRecords: [], phase2MutualRecognitionCatalog: [], phase2MutualRecognitionCitations: [], diagnosticReports: [], referralTeleconsultations: [], residents: [], medicalResources: [], personalRecords: [] };
 let platformState = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -16,6 +16,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderCountyTasks(county);
   renderCountyWorkflows(county);
   renderCountyReferral(state);
+  renderPhase2MutualRecognition(state);
   renderCountyIndicators(county);
   renderCountyGovernance(county);
   bindCountyActions();
@@ -205,6 +206,59 @@ function renderCountyBusinessOperations(state) {
   }
 }
 
+function renderPhase2MutualRecognition(state) {
+  const summaryEl = document.querySelector("#phase2-mutual-recognition-summary");
+  const browserEl = document.querySelector("#phase2-mutual-recognition-browser");
+  const citationEl = document.querySelector("#phase2-mutual-recognition-citations");
+  if (!summaryEl && !browserEl && !citationEl) return;
+  const catalog = state.phase2MutualRecognitionCatalog || [];
+  const citations = state.phase2MutualRecognitionCitations || [];
+  const reports = state.diagnosticReports || [];
+  const records = state.countyMutualRecognitionRecords || [];
+  const recognized = records.filter((item) => /recognized|已互认|已/.test(String(item.status || "")));
+  const rejected = records.filter((item) => /reject|退回|不互认|not_recognized/i.test(`${item.status || ""} ${item.reviewStatus || ""}`));
+  const pending = records.filter((item) => /pending|待|复核/i.test(`${item.status || ""} ${item.reviewStatus || ""}`));
+  const savedCost = records.reduce((sum, item) => sum + Number(item.savedCost || 0), 0);
+  if (summaryEl) {
+    summaryEl.innerHTML = [
+      ["78 项目录", `${catalog.length}/78`, catalog.length >= 78 ? "互认目录映射已建模" : "目录仍需补齐"],
+      ["报告浏览", `${reports.length} 份`, "LIS/PACS 报告与互认记录关联"],
+      ["互认处理", `${recognized.length}/${records.length}`, `${rejected.length} 退回 · ${pending.length} 待复核`],
+      ["引用确权", `${citations.length} 条`, "报告哈希、链节点和审计证据"],
+      ["监管节省", money(savedCost), "按互认记录估算减少重复费用"]
+    ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><small>${hint}</small></article>`).join("");
+  }
+  if (browserEl) {
+    browserEl.innerHTML = `<table>
+      <thead><tr><th>报告</th><th>居民</th><th>来源/目标</th><th>互认状态</th><th>目录</th><th>确权</th></tr></thead>
+      <tbody>${reports.slice(0, 10).map((report) => {
+        const resident = residentOf(state, report.residentId);
+        const record = records.find((item) => item.id === report.recognitionRecordId);
+        const citation = citations.find((item) => item.reportId === report.id || item.recognitionRecordId === report.recognitionRecordId);
+        const catalogItem = catalog.find((item) => String(item.item || "").toLowerCase() === String(report.item || "").toLowerCase() || item.catalogCode === citation?.catalogCode);
+        return `<tr>
+          <td><strong>${report.item}</strong><br><small>${report.externalId || report.id}</small></td>
+          <td>${resident?.name || report.residentId}</td>
+          <td>${report.sourceInstitution || "-"}<br><small>${report.targetInstitution || ""}</small></td>
+          <td>${statusBadge(record?.status || report.status)}</td>
+          <td>${catalogItem?.catalogCode || citation?.catalogCode || "-"}<br><small>${catalogItem?.standardName || report.category || ""}</small></td>
+          <td>${citation?.evidenceHash ? `<span class="badge info">已确权</span><br><small>${citation.evidenceHash}</small>` : `<span class="badge warn">待确权</span>`}</td>
+        </tr>`;
+      }).join("")}</tbody>
+    </table>`;
+  }
+  if (citationEl) {
+    citationEl.innerHTML = citations.slice(0, 8).map((item) => `<section class="item">
+      <div>
+        <h3>${item.catalogCode} · ${item.decision}</h3>
+        <p>报告 ${item.reportId} · 互认 ${item.recognitionRecordId}</p>
+        <p>${item.chainNode} · ${item.evidenceHash}</p>
+      </div>
+      ${statusBadge(item.verificationStatus || item.status)}
+    </section>`).join("");
+  }
+}
+
 function renderCountyTeleconsultationLoop(state) {
   const rows = state.referralTeleconsultations || [];
   const countEl = document.querySelector("#county-teleconsultation-count");
@@ -238,12 +292,23 @@ function bindCountyActions() {
     const result = await updateWorkflowAction(platformState, button.dataset.collection, button.dataset.id, updates, button.dataset.note || "县域医共体更新业务状态");
     if (!result.ok) return;
     renderCountyBusinessOperations(platformState);
+    renderPhase2MutualRecognition(platformState);
     renderCountyTeleconsultationLoop(platformState);
   });
 }
 
 function countyActionButton(collection, id, label, updates) {
   return `<button class="inline-action" type="button" data-county-action data-collection="${collection}" data-id="${id}" data-updates='${JSON.stringify(updates)}' data-note="${label}">${label}</button>`;
+}
+
+function statusBadge(status) {
+  const value = String(status || "待确认");
+  const klass = /已|recognized|verified|active|passed/i.test(value) ? "info" : /退回|reject|blocked|failed/i.test(value) ? "danger" : "warn";
+  return `<span class="badge ${klass}">${value}</span>`;
+}
+
+function money(value) {
+  return `¥${Number(value || 0).toLocaleString("zh-CN")}`;
 }
 
 function residentOf(state, id) {

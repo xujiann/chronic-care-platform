@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>助医陪诊信息平台</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+    <script>window.HealthCityAuth.requireRole(["commission", "institution"])</script>
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>助医陪诊信息平台</span>
+          <h1>服务主体名录、陪诊师队伍、订单闭环和质量监管</h1>
+          <p>面向老年人就医陪同场景，串联养老服务机构、陪诊师、医疗机构导诊、补贴保障、合同保险、风险预案和服务质量监测。</p>
+        </div>
+        <nav>
+          <a href="./platform.html">平台驾驶舱</a>
+          <a href="./workbench.html">运营工作台</a>
+          <a href="./index.html">卫健委端</a>
+          <a href="./about.html">关于</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid" id="escort-metrics"></section>
+
+      <section class="panel" id="escort-responsibility-board" data-escort-responsibility-plan>
+        <div class="panel-title">
+          <h2>功能责任与下一步计划</h2>
+          <span>已上线能力、责任部门和计划开发事项</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>现有功能</th>
+                <th>责任部门</th>
+                <th>当前证据</th>
+                <th>下一步计划开发功能</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>居民端陪诊预约、家庭成员代办、提交前核对</td>
+                <td>老龄健康服务部门、社区卫生服务中心</td>
+                <td>居民端表单、字段必填校验、重复预约拦截</td>
+                <td>接入实名身份、短信网关、电子健康卡和真机消息模板</td>
+              </tr>
+              <tr>
+                <td>服务主体名录、发布状态、价格和应急预案</td>
+                <td>老龄/民政协同服务部门、服务机构管理科</td>
+                <td>服务主体清单、保险状态、发布状态和风险预案</td>
+                <td>补齐资质附件、年度复核、黑名单和服务能力星级评价</td>
+              </tr>
+              <tr>
+                <td>陪诊师队伍、培训学时、考核和保险</td>
+                <td>服务机构运营部、培训管理部门</td>
+                <td>陪诊师台账、培训小时、考核状态和保险覆盖</td>
+                <td>建设陪诊师移动端签到、轨迹留痕、排班和服务记录</td>
+              </tr>
+              <tr>
+                <td>医院接诊回执、导诊交接和 HIS 就诊号映射</td>
+                <td>医疗机构门诊部、信息科</td>
+                <td>hospital-handoff API、医院回执状态、队列号和导诊提示</td>
+                <td>开展真实 HIS/门诊导诊台联调、异常退回和补证闭环</td>
+              </tr>
+              <tr>
+                <td>合同、保险、补贴类型、费用估算和质量回访</td>
+                <td>老龄服务监管、医保/民政补贴经办、财务部门</td>
+                <td>合同状态、保险状态、补贴分类、质控回访和居民反馈</td>
+                <td>上线电子签章、合同/保险附件、补贴结算和对账报表</td>
+              </tr>
+              <tr>
+                <td>风险队列、投诉处理、审计留痕和发布证据</td>
+                <td>卫健质控部门、投诉受理中心、规划信息/运维安全部门</td>
+                <td>高风险订单、质量回访、任务消息、审计事件和 release 报告</td>
+                <td>增加投诉工单、运营日报、现场签字、告警值守和 SIEM 归档</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="claim-grid" data-escort-launch-owner-checklist>
+          <div class="claim-card">
+            <strong>老龄健康服务部门</strong>
+            <span>确认试点服务目录、补贴规则、服务主体准入和质量回访口径。</span>
+          </div>
+          <div class="claim-card">
+            <strong>医疗机构门诊部/信息科</strong>
+            <span>完成 HIS/导诊台联调、医院回执字段确认和异常退回流程演练。</span>
+          </div>
+          <div class="claim-card">
+            <strong>社区卫生服务中心</strong>
+            <span>组织居民试点、家属代办确认、现场宣教和线下帮办。</span>
+          </div>
+          <div class="claim-card">
+            <strong>服务机构运营部</strong>
+            <span>维护服务主体、陪诊师排班、培训保险和服务履约记录。</span>
+          </div>
+          <div class="claim-card">
+            <strong>医保/民政补贴经办</strong>
+            <span>确认补贴资格、费用结算、对账周期和材料留存。</span>
+          </div>
+          <div class="claim-card">
+            <strong>规划信息/运维安全部门</strong>
+            <span>落实生产域名、HTTPS、短信/消息通道、监控、日志和审计保全。</span>
+          </div>
+        </div>
+        <div class="table-wrap" data-escort-production-blockers>
+          <table>
+            <thead>
+              <tr>
+                <th>上线阻断项</th>
+                <th>现场需求</th>
+                <th>责任方</th>
+                <th>当前处理</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>统一身份与实名核验</td>
+                <td>生产身份接口、电子健康卡授权 scope、监护人关系核验样例</td>
+                <td>规划信息/运维安全部门、社区卫生服务中心</td>
+                <td>待现场联调</td>
+              </tr>
+              <tr>
+                <td>短信与订阅消息通道</td>
+                <td>短信签名、验证码模板、服务变更通知模板、失败重试策略</td>
+                <td>规划信息/运维安全部门、老龄健康服务部门</td>
+                <td>待生产开通</td>
+              </tr>
+              <tr>
+                <td>HIS/导诊台联调</td>
+                <td>医院代码、科室/医生字典、就诊号/队列号、退回补证规则</td>
+                <td>医疗机构门诊部/信息科</td>
+                <td>待院内联测</td>
+              </tr>
+              <tr>
+                <td>合同保险与补贴结算</td>
+                <td>电子签章、保险附件、补贴资格核验、费用明细和对账样表</td>
+                <td>老龄服务监管、医保/民政补贴经办、财务部门</td>
+                <td>待业务签字</td>
+              </tr>
+              <tr>
+                <td>监控审计与值守</td>
+                <td>告警联系人、审计归档路径、SIEM endpoint、应急预案演练</td>
+                <td>卫健质控部门、规划信息/运维安全部门</td>
+                <td>待上线前确认</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="muted">完整清单见 <a href="./docs/陪诊信息平台功能责任与下一步计划.md">陪诊信息平台功能责任与下一步计划</a>。</p>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>陪诊订单闭环</h2>
+            <span id="escort-boundary"></span>
+          </div>
+          <div id="escort-orders" class="table-wrap"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>新增陪诊申请</h2>
+            <span>生成订单、任务和审计记录</span>
+          </div>
+          <form id="escort-order-form" class="filter-grid">
+            <label>居民 ID<input name="residentId" value="r1" /></label>
+            <label>服务主体
+              <select name="providerId" id="escort-provider-select"></select>
+            </label>
+            <label>医院<input name="hospital" value="Dalian Central Hospital outpatient clinic demo" /></label>
+            <label>科室<input name="department" value="Cardiology" /></label>
+            <label>预约日期<input name="appointmentAt" type="date" /></label>
+            <label>补贴类型
+              <select name="subsidyType">
+                <option value="80plus-living-alone">80plus-living-alone</option>
+                <option value="low-income">low-income</option>
+                <option value="time-bank">time-bank</option>
+                <option value="self-pay">self-pay</option>
+              </select>
+            </label>
+            <label>优先级
+              <select name="priority">
+                <option value="high">high</option>
+                <option value="medium">medium</option>
+                <option value="normal">normal</option>
+              </select>
+            </label>
+            <label class="full">服务内容<input name="serviceItems" value="mobility assistance,registration,exam escort,family communication" /></label>
+            <button class="inline-action" type="submit">提交申请</button>
+          </form>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel">
+          <div class="panel-title">
+            <h2>服务主体名录</h2>
+            <span>机构能力、收费、保险和发布状态</span>
+          </div>
+          <div id="escort-providers" class="table-wrap"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>陪诊师队伍</h2>
+            <span>培训、考核、保险和技能</span>
+          </div>
+          <div id="escort-workers" class="table-wrap"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel">
+          <div class="panel-title">
+            <h2>风险队列</h2>
+            <span>高龄、合同、应急和质量回访</span>
+          </div>
+          <div id="escort-risks" class="rules"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>政策映射</h2>
+            <span>试点方案到系统能力</span>
+          </div>
+          <div id="escort-policy" class="rules"></div>
+        </article>
+      </section>
+    </main>
+
+    <script src="./shared.js"></script>
+    <script src="./escort.js"></script>
+  </body>
+</html>

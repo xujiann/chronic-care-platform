@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>免疫规划 · 大连市全民健康信息平台</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+    <script>window.HealthCityAuth.requireRole(["commission", "institution", "citizen"])</script>
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>免疫规划 2026</span>
+          <h1>国家免疫规划疫苗儿童接种计划</h1>
+          <p>基于《国家免疫规划疫苗儿童免疫程序及说明（2026年版）》生成出生个案的应种、到期、逾期和补种核验清单。</p>
+        </div>
+        <nav>
+          <a href="./maternal-child-about.html">妇幼 About</a>
+          <a href="./index.html">卫健管理</a>
+          <a href="./institution.html">医疗机构</a>
+          <a href="./citizen.html">个人用户端</a>
+        </nav>
+      </header>
+
+      <section class="panel wide immunization-selector">
+        <div class="panel-title">
+          <h2>儿童接种计划生成</h2>
+          <label>出生医学证明
+            <select id="certificate-select"></select>
+          </label>
+          <label>健康状态
+            <select id="health-profile-select"></select>
+          </label>
+        </div>
+        <div class="metric-grid" id="immunization-summary"></div>
+      </section>
+
+      <section class="panel wide">
+        <div class="panel-title">
+          <h2>月龄程序轴</h2>
+          <span>默认采用乙脑减毒活疫苗和甲肝减毒活疫苗程序；现场可按疫苗来源切换为灭活程序。</span>
+        </div>
+        <div class="immunization-timeline" id="immunization-timeline"></div>
+      </section>
+
+      <section class="panel wide">
+        <div class="panel-title">
+          <h2>应种明细</h2>
+          <span>用于居民提醒、门诊预约、疾控补种核验和妇幼接续闭环。</span>
+        </div>
+        <div class="table-wrap" id="immunization-table"></div>
+      </section>
+
+      <section class="panel wide">
+        <div class="panel-title">
+          <h2>接种原则与特殊健康状态</h2>
+          <span>页面提供系统提醒口径，临床执行以接种单位评估和现行规范为准。</span>
+        </div>
+        <div class="rules" id="immunization-rules"></div>
+        <div class="capability-grid" id="immunization-special-rules"></div>
+      </section>
+      <section class="panel wide" id="immunization-launch-readiness">
+        <div class="panel-title">
+          <h2>Launch readiness</h2>
+          <span>Registry, appointment, safety, consent, audit and signoff evidence before production go-live.</span>
+        </div>
+        <div class="metric-grid" id="immunization-launch-summary"></div>
+        <div class="immunization-launch-board" id="immunization-launch-board"></div>
+      </section>
+    </main>
+    <script src="./immunization-schedule.js"></script>
+    <script src="./immunization.js"></script>
+  </body>
+</html>

@@ -18,6 +18,7 @@
         </div>
         <nav>
           <a href="./platform.html">平台建设</a>
+          <a href="./public-health.html">公共卫生</a>
           <a href="./workbench.html">运营工作台</a>
           <a href="./index.html">卫健委端</a>
           <a href="./county.html">医共体</a>
@@ -26,6 +27,36 @@
       </header>
 
       <section class="metric-grid" id="dashboard-metrics"></section>
+
+      <section class="panel" id="industry-governance-indicator-center" data-dashboard-section="industry-governance-indicators">
+        <div class="panel-title">
+          <h2>二期行业治理指标中心</h2>
+          <span id="industry-indicator-summary">健康体检、发热门诊、疾病报卡、临床辅助、档案调阅、预约、家庭医生和区域绩效</span>
+        </div>
+        <div class="filter-grid indicator-governance-toolbar">
+          <label>
+            监管分类
+            <select id="industry-indicator-category"><option value="all">全部分类</option></select>
+          </label>
+          <label>
+            指标状态
+            <select id="industry-indicator-status">
+              <option value="all">全部状态</option>
+              <option value="ready">就绪</option>
+              <option value="watch">关注</option>
+              <option value="blocked">数据源阻断</option>
+            </select>
+          </label>
+          <label>
+            报告周期
+            <select id="industry-indicator-period"><option value="month">月报</option><option value="year">年报</option></select>
+          </label>
+          <button class="inline-action" id="industry-indicator-export" type="button">导出指标 JSON</button>
+        </div>
+        <div class="metric-grid indicator-governance-metrics" id="industry-indicator-metrics"></div>
+        <div class="indicator-governance-grid" id="industry-indicator-list"></div>
+        <p class="muted indicator-governance-boundary" id="industry-indicator-boundary"></p>
+      </section>
 
       <section class="portal-grid">
         <article class="panel wide">
@@ -90,6 +121,7 @@
           <div id="dashboard-evidence" class="rules"></div>
         </article>
       </section>
+      <section class="panel"><div class="panel-header"><div><h2>区域血液治理态势</h2><p>聚合血液库存、短缺、召回、输血反应和应急保障事件。</p></div></div><div id="dashboard-blood-coordination" class="table-wrap"></div></section>
     </main>
 
     <script src="./shared.js"></script>

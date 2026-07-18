@@ -3,7 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 
-const { buildAuditRetentionReport, parseArgs, renderMarkdown, verifyAuditTrail, writeOutput } = require("../scripts/audit-retention");
+const { auditHashFor, buildAuditRetentionReport, parseArgs, renderMarkdown, verifyAuditTrail, writeOutput } = require("../scripts/audit-retention");
 
 const ROOT = path.resolve(__dirname, "..");
 
@@ -26,6 +26,15 @@ test("audit retention report detects tampered audit rows", () => {
   assert.equal(report.ok, false);
   assert.equal(report.trails.securityEvents.passed, false);
   assert.equal(verifyAuditTrail(data.securityEvents).broken.length > 0, true);
+});
+
+test("audit retention report keeps link drift diagnostic without failing valid hashes", () => {
+  const row = { id: "audit-link-drift", action: "reset demo data", previousAuditHash: "stale-link" };
+  row.auditHash = auditHashFor(row);
+  const trail = verifyAuditTrail([row]);
+  assert.equal(trail.passed, true);
+  assert.equal(trail.broken.length, 0);
+  assert.equal(trail.linkBroken.length, 1);
 });
 
 test("audit retention report renders and writes release artifacts", (t) => {

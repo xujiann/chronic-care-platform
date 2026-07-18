@@ -9,8 +9,8 @@
 | 范围 | 已完成能力 |
 |---|---|
 | P0 测试与 CI | Node API、隔离测试数据、角色权限、居民数据裁剪、静态页面守卫、敏感信息扫描、API 契约、覆盖率门禁、Chromium 端到端角色旅程 |
-| P0 数据与恢复 | SQLite/JSON 双路径、schema v1-v7 幂等迁移、集合版本、乐观锁、409 冲突契约、业务级 PATCH、备份、恢复演练、脱敏快照、恢复指标验收 |
-| P0 认证与隐私 | PBKDF2 密码哈希兼容、签名会话、密钥轮换、token 篡改拒绝、字段脱敏、授权撤销、访问历史复核、审计哈希链 |
+| P0 数据与恢复 | SQLite/JSON 双路径、schema v1-v11 幂等迁移、集合版本、乐观锁、409 冲突契约、PostgreSQL 事务 outbox、基线入队与只读影子核对、备份、恢复演练、脱敏快照、恢复指标验收 |
+| P0 认证与隐私 | PBKDF2 密码哈希兼容、签名会话、SQLite 持久化会话与跨进程撤销、密钥轮换、token 篡改拒绝、字段脱敏、授权撤销、访问历史复核、审计哈希链 |
 | P0 接口网关 | HIS/EMR/LIS/PACS/医保/电子证照/卫生统计接口契约、HMAC 签名、幂等键、事件落库、失败重试、死信补偿、对账监控、模拟接入 |
 | P1 区域闭环 | 检查检验互认、诊断报告回传、危急值预警、统一任务中心、站内消息、送达回执、超时升级、数据质量问题与评分卡、安全合规证据 |
 | P1 慢病医防融合 | 对照 2025 年基层慢性病健康管理服务要求，已补齐基层慢病健康管理中心、村站、牵头医院、公卫机构职责，能力建设条件、防筛诊治管康路径、多病共管、中医药服务、居民自我管理、用药保障和质控指标 |
@@ -47,7 +47,7 @@ http://localhost:5173/login.html
 | `health` / `whjw` | `index.html` | 大连市卫生健康委 |
 | `hospital` | `institution.html` | 三级医疗机构 |
 | `community` | `institution.html` | 基层医疗机构 |
-| `doctor` / `doctor_wang` | `institution.html` | 医生账户 |
+| `doctor` / `doctor_wang` | `doctor.html` | 医生账户 |
 | `mi` | `insurance.html` | 大连市医保局管理端 |
 | `insurance` | `insurance.html` | 大连市医保中心经办端 |
 | `district_mi` | `insurance.html` | 区市县医保局管理端 |
@@ -66,10 +66,29 @@ http://localhost:5173/login.html
 | `institution.html` | 医疗机构端：授权档案、转诊、固定取药、证照、多点执业 |
 | `insurance.html` | 医保局/医保中心/区市县医保局：审核、监管、凭证、取药 |
 | `citizen.html` | 居民端个人健康信息库、家庭成员、授权共享、适老化服务 |
+| `physical-examination.html` | 体检中心/医院结果接入、专项体检隔离分流、健康时光机、报告翻译、异常行动、个性计划、辐射管家、质量啄木鸟和城市雷达 |
+| `physical-examination-highlights.js` | 居民端与管理端共享的体检创新亮点计算及可审计动作引擎 |
+| `docs/体检系统信息化规范基线-2026-07-15.md` | 体检业务、共享文档、数据元/值域、签名、隐私、安全和留存规范目录 |
+| `docs/体检系统规范需求追溯矩阵-2026-07-15.md` | 规范条款到代码、测试与上线证据的追溯矩阵 |
+| `docs/体检系统创新亮点设计与验收-2026-07-17.md` | 15类体检创新亮点、隐私边界、动作接口与验收依据 |
 | `mobile-preview.html` | 居民端手机预览 |
 | `county.html` | 县域医共体平台、16255 模型、协同工单、互认、基层 AI |
 
-居民端已提供 PWA 基础壳：`manifest.webmanifest`、`service-worker.js` 和 `pwa-icon.svg` 支持浏览器安装入口、静态资源缓存和弱网/离线回退到居民端健康档案页面；个人健康信息库已细分电子病历、检查检验、用药处方、影像资料和附件资料，正式上线时仍需结合生产域名、HTTPS、PACS/文档存储授权和现场移动端策略复核。
+居民端已提供可安装网页应用基础壳：`manifest.webmanifest`、`service-worker.js` 和 `pwa-icon.svg` 支持浏览器安装入口、静态资源缓存和弱网/离线回退到居民端健康档案页面；`citizen.html?client=mini-program|app&page=health-record|emr|nursing|escort|registration` 将健康档案、电子病历、护理、陪诊和挂号拆为可分享、可回退的二级页面，并区分小程序与手机应用两种上线运行形态；桌面服务导航、手机端压缩服务标签、手机顶部快速切换条与手机底部导航均按 URL 跳转并优先落到对应业务内容，摘要卡提供当前页面主操作入口，陪诊预约会在提交前汇总服务主体、费用、就诊安排、服务内容、医院交接和保障状态，服务待办中心会按居民汇总慢病随访、筛查宣教、固定取药、转诊号源、陪诊和互联网护理事项，并支持确认、取消、反馈、评价和满意度/投诉质控闭环；居民通知面板复用 `/api/messages` 和回执接口展示预约变更、护士接单、陪诊师匹配、授权到期等消息；运行形态面板展示入口、上线能力、发布条件、当前二级页入口、复制入口和发布检查清单，功能审计沉到页面后方作为状态证明；手机应用/可安装网页应用形态已补齐安卓/苹果添加到桌面的 meta、Manifest `id`、展示降级策略和健康档案/电子病历/陪诊快捷入口；`mobile-preview.html` 提供 390px 手机框、本机/真机访问地址、演示登录方式、服务切换控制、双端运行形态切换、底部服务导航和待办通知验收清单，并适配 `?client=app` 直接预览手机应用形态，便于发布前预览居民端手机操作；个人健康信息库已细分电子病历、检查检验、用药处方、影像资料和附件资料，正式上线时仍需结合生产域名、HTTPS、PACS/文档存储授权和现场移动端策略复核。
+
+居民端手机二级页摘要区新增当前页序号、已实现能力数和全宽主操作按钮，方便居民在小程序/手机应用预览里确认当前位置并直接进入业务内容。
+手机端底部二级导航同步展示每个服务的实现状态和可用能力数，居民在健康档案、电子病历、护理、陪诊和挂号之间切换时无需回到顶部即可判断功能是否可用。
+小程序/手机应用二级页支持在页面空白区域左右滑动切换服务，并避开按钮、表单和链接等交互控件，方便单手连续浏览。
+手机预览页现在兼容 `mobile-preview.html?client=app&page=nursing` 这类入口，发布前可直接打开指定手机应用形态和二级服务页。
+居民端运行形态面板同步展示小程序与手机应用的 P0 现场材料，包括生产短信网关、实名/家庭关系核验、HTTPS/隐私协议、应用签名、推送证书和崩溃监控，便于上线前把已就绪能力和现场补齐事项分开验收。
+P0 现场材料继续补充责任方、验收口径和摘要统计，居民端预览时可直接看到材料总数、现场补齐数和责任方数量，便于现场联调按责任闭环。
+运行形态面板提供“复制材料清单”，会按当前小程序/手机应用端型和二级页面生成入口、摘要、责任方、验收口径与材料说明，方便现场交接和微信群/工单同步。
+手机预览页会自动带上 `launch=1` 验收参数以显示内部上线材料；普通居民入口不携带该参数，保持居民端页面简洁。
+手机预览页新增“复制验收摘要”，会按当前小程序/手机应用端型、二级服务页、真实入口、演示登录和 `launch=1` 材料口径生成现场验收文本，便于直接粘贴到上线工单。
+若现场浏览器限制剪贴板，手机预览页会展开独立的验收摘要框并自动选中摘要文本，入口 URL 输入框仍保持真实居民端地址。
+手机预览页同步显示当前服务验收卡片，聚合端型、二级页序号、已实现状态、能力数、生产化提示和真实入口，便于现场不进入 iframe 也能核对发布口径。
+
+手机预览页工具栏同步提供“上一个/下一个”快捷切换、左右方向键和手机框左右滑动服务切换、“打开当前页面”“出生健康直达”“复制入口”“当前入口地址”“精简预览”和手机框验收状态，会随小程序/手机应用和健康档案、电子病历、护理、陪诊、挂号切换生成真实居民端 URL；精简预览会进入手机验收模式，隐藏说明区、放大手机框并自动对齐到预览区，手机框顶部保留滑动切换提示，验收状态区会标明滑动切换是否启用，并汇总端型、服务、序号、预览模式和验收方式；预览说明区同步展示 P0-P3 下一步开发优先级，便于现场验收和真机分发。
 
 ## 数据与存储
 
@@ -101,12 +120,20 @@ SQLite 结构化镜像已覆盖居民、账户、主索引、个人健康档案�
 
 | API | 说明 |
 |---|---|
-| `GET /api/health` | 健康检查，返回服务版本、环境、uptime 和存储元信息 |
+| `GET /api/live` | 无外部依赖的进程存活检查，供编排器判断是否需要重启实例 |
+| `GET /api/health` | 依赖就绪检查，返回服务、存储和会话存储状态；中央会话不可用时返回 503 |
 | `GET /api/metrics` | 管理端运行指标，返回请求数、状态码、慢请求、任务堆积、死信、质量问题；运营工作台会在服务模式下展示部分指标 |
 | `GET /api/system/readiness` | 管理端系统就绪报告，汇总 P2 集合、接口准备度、审计链、运行负载和现场外部依赖边界 |
+| `GET /api/physical-exams` | 按角色授权和居民主索引查询全部历史体检报告，返回年度、来源机构、异常项和健康建议 |
+| `POST /api/physical-exams/import` | 体检中心或医院单份/批量接入；一般成人体检同步健康档案，职业/专项体检进入受限分流队列，二者均幂等去重 |
+| `POST /api/physical-exams/abnormal-cases/:id/actions` | 对体检异常结果执行通知居民、复查安排、专科分派、关闭或重开，并生成消息与审计证据 |
+| `POST /api/physical-exams/:id/link-attachment` | 将已完成校验和与恶意文件扫描的原始体检报告安全附件关联到健康档案 |
+| `POST /api/physical-exams/joint-tests/:id/actions` | 逐项登记机构现场联调证据，全部通过后签署上线确认 |
+| `POST /api/physical-exams/specialized-intakes/:id/actions` | 凭证据编号把专项体检分配到独立画像、退回来源或关闭分流，禁止混入一般体检档案 |
 | `GET /api/process-audit` | 管理端全流程审计报告，汇总居民、慢病、医共体、医保取药、统计证照、安全合规和生产切换证据域 |
 | `POST /api/auth/login` / `GET /api/auth/me` / `POST /api/auth/logout` | 登录、会话、退出 |
 | `GET /api/state` / `PUT /api/state` | 按角色裁剪读取和管理端持久化状态 |
+| `GET /api/multi-practice-registry` | 医师多点执业监管台账，按角色返回公开备案、风险补正队列、材料核验和政策摘要 |
 | `GET/POST/PATCH /api/personal-records` | 个人健康档案读写 |
 | `POST /api/workflow-actions` | 通用工作流动作 |
 | `PATCH /api/chronic-management-plans/:id`、`/api/chronic-comorbidity-plans/:id`、`/api/chronic-tcm-services/:id`、`/api/chronic-self-management/:id`、`/api/chronic-medication-support/:id`、`/api/chronic-quality-metrics/:id` | 慢病管理计划、多病共管、中医药、自我管理、用药保障和质控记录的单条更新，支持机构/卫健委权限、居民授权范围和乐观锁 |
@@ -135,11 +162,18 @@ NODE_ENV=production
 STORAGE_ENGINE=auto
 DATA_DIR=/var/lib/chronic-care-platform
 SESSION_SECRETS=replace-with-long-random-secret
+SESSION_STORE=sqlite
+SESSION_TOPOLOGY=single-host
+SESSION_EXPIRED_RETENTION_DAYS=7
+SESSION_REVOKED_RETENTION_DAYS=30
+SESSION_CLEANUP_INTERVAL_MS=900000
 INTEGRATION_GATEWAY_SECRET=replace-with-integration-secret
 DATABASE_URL=postgres://health:replace-with-password@postgres.internal:5432/chronic_care
 OIDC_ISSUER_URL=https://identity.example.gov.cn/real-issuer
 OIDC_CLIENT_ID=replace-with-oidc-client-id
 OIDC_CLIENT_SECRET=replace-with-oidc-client-secret
+SMS_GATEWAY_URL=https://sms.example.gov.cn/real-gateway
+SMS_DELIVERY_CALLBACK_SECRET=replace-with-provider-callback-signing-secret
 AUDIT_EXPORT_PATH=/var/log/chronic-care-platform/audit
 SIEM_ENDPOINT=https://siem.example.gov.cn/ingest
 RETENTION_POLICY=10y-worm
@@ -149,17 +183,22 @@ RETENTION_POLICY=10y-worm
 
 - `STORAGE_ENGINE=auto` 会在 Node 支持 `node:sqlite` 时使用 SQLite，并继续维护 `data/db.json` 静态快照。
 - `SESSION_SECRETS` 支持逗号分隔多密钥，便于会话密钥轮换。
+- 单主机生产环境使用 `SESSION_STORE=sqlite` 时，会话可跨进程读取和撤销并保留撤销审计；多主机生产环境使用中央 PostgreSQL 会话。开发、测试可显式使用 `memory`。
+- 单主机可使用 `SESSION_STORE=sqlite`；多主机必须设置 `SESSION_TOPOLOGY=multi-host`、`SESSION_STORE=postgres`、`DATABASE_URL` 和 `POSTGRES_SSL_MODE=verify-full`。每次鉴权请求从中央表装载会话，跨节点签发、撤销和账号停用立即生效。
+- `SESSION_EXPIRED_RETENTION_DAYS`、`SESSION_REVOKED_RETENTION_DAYS` 和 `SESSION_CLEANUP_INTERVAL_MS` 控制过期/撤销会话保留期及自动清理周期；启动清理、周期清理和管理员手动清理均通过身份生命周期中心暴露结果。
 - `INTEGRATION_GATEWAY_SECRET` 用于接口网关 HMAC 签名模拟。
-- `DATABASE_URL`、`OIDC_*`、`AUDIT_EXPORT_PATH`/`SIEM_ENDPOINT` 和 `RETENTION_POLICY` 是生产部署路径的正式数据库、政务身份和审计保全配置项。
+- `DATABASE_URL`、`OIDC_*`、`SMS_GATEWAY_URL`、`SMS_DELIVERY_CALLBACK_SECRET`、`AUDIT_EXPORT_PATH`/`SIEM_ENDPOINT` 和 `RETENTION_POLICY` 是生产部署路径的正式数据库、政务身份、居民验证码短信网关、最终送达回调和审计保全配置项。
 
 ## 验证与质量门禁
+
+`launch:smoke` generates `release/launch-smoke-report.json` and `release/launch-smoke-report.md`. Run it before release packaging for offline source/artifact checks, or run `npm.cmd run launch:smoke -- --base-url=https://your-runtime-host` after deployment to verify both `/api/live` liveness and `/api/health` dependency readiness.
 
 ```powershell
 npm.cmd run check
 npm.cmd test
 npm.cmd run test:coverage
 npm.cmd run test:e2e
-npm.cmd audit --omit=dev
+npm.cmd audit --omit=dev --registry=https://registry.npmjs.org
 ```
 
 补充部署前检查：
@@ -171,17 +210,30 @@ npm.cmd run env:check
 npm.cmd run release:report
 npm.cmd run release:report:full
 npm.cmd run release:manifest
+npm.cmd run launch:smoke
+npm.cmd run priority-apps:templates
+npm.cmd run maternal-child:readiness
+npm.cmd run policy:coverage
+npm.cmd run hybrid:deployment-readiness
 ```
 
 `deploy:check` 会检查 README、部署文档、静态快照、P2 集合、P2 完成状态、P0 接口准备度、安全验收台账、环境脚本和关键 npm scripts；`deploy:check:full` 还会串行执行 `check`、`test`、`test:coverage`、`test:e2e` 和 `npm audit --omit=dev`。
 
-`env:check` 使用 `.env.example` 做演示/模板级校验，不要求真实密钥；`env:check:production` 会读取 `.env`，并按生产规则校验 `NODE_ENV=production`、非 JSON 存储、非占位且不少于 32 位的 `SESSION_SECRETS` 和 `INTEGRATION_GATEWAY_SECRET`。当前运行时正式支持 `STORAGE_ENGINE=auto` 或 `sqlite`；`postgres/postgresql` 仍在 `productionDeploymentPlan` 中作为后续适配项，配置后会被门禁拦截，避免静默回落。生产模式还要求政务身份 `OIDC_ISSUER_URL/OIDC_CLIENT_ID/OIDC_CLIENT_SECRET` 与审计保全 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT` 至少一项可用。`env:check:production` 与 `release:report` 会附带生产切换清单，按环境文件、生产密钥、统一身份、审计保全、存储适配、现场接口联调、医保/证照交换、监控值守和灾备演练列出责任方、阻断状态和下一步动作；外部系统项必须有 `CUTOVER_SITE_INTERFACE_SIGNOFF`、`CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF`、`CUTOVER_MONITORING_SIGNOFF`、`CUTOVER_DR_REHEARSAL_SIGNOFF` 等现场签字信号才会通过。`release:report` 会汇总代码文件、关键 npm scripts、静态快照、P2 完成状态、接口准备度、安全验收、生产部署计划、验收证据和环境配置，默认输出 `release/release-report.json`、`release/release-report.md`、`release/production-cutover-checklist.json` 与 `release/production-cutover-checklist.md`；`release:manifest` 会生成 `release/release-artifact-manifest.json` 与 `release/release-artifact-manifest.md`，把所有发布报告、模板 README、生成命令和 API 证据整理成发布包目录清单；`release:report:full` 额外执行 `check`、`test`、`test:coverage`、`test:e2e`、`deploy:check` 和 `npm audit --omit=dev`。CI 会在每次检查中生成并上传 `release-readiness-report` artifact，便于发布取证。
+`env:check` 使用 `.env.example` 做演示/模板级校验，不要求真实密钥；`env:check:production` 会读取 `.env`，并按生产规则校验 `NODE_ENV=production`、非 JSON 存储、非占位且不少于 32 位的 `SESSION_SECRETS` 和 `INTEGRATION_GATEWAY_SECRET`。当前运行时正式支持 `STORAGE_ENGINE=auto` 或 `sqlite`；`postgres/postgresql` 仍在 `productionDeploymentPlan` 中作为后续适配项，配置后会被门禁拦截，避免静默回落。生产模式还要求政务身份 `OIDC_ISSUER_URL/OIDC_CLIENT_ID/OIDC_CLIENT_SECRET`、居民验证码 `SMS_GATEWAY_URL` 与审计保全 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT` 至少一项可用。`env:check:production` 与 `release:report` 会附带生产切换清单，按环境文件、生产密钥、统一身份和短信网关、审计保全、存储适配、现场接口联调、医保/证照交换、监控值守和灾备演练列出责任方、阻断状态和下一步动作；外部系统项必须有 `CUTOVER_SITE_INTERFACE_SIGNOFF`、`CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF`、`CUTOVER_MONITORING_SIGNOFF`、`CUTOVER_DR_REHEARSAL_SIGNOFF` 等现场签字信号才会通过。`release:report` 会汇总代码文件、关键 npm scripts、静态快照、P2 完成状态、接口准备度、安全验收、生产部署计划、验收证据和环境配置，默认输出 `release/release-report.json`、`release/release-report.md`、`release/production-cutover-checklist.json` 与 `release/production-cutover-checklist.md`；`release:manifest` 会生成 `release/release-artifact-manifest.json` 与 `release/release-artifact-manifest.md`，把所有发布报告、模板 README、生成命令和 API 证据整理成发布包目录清单；`release:report:full` 额外执行 `check`、`test`、`test:coverage`、`test:e2e`、`deploy:check` 和 `npm audit --omit=dev`。CI 会在每次检查中生成并上传 `release-readiness-report` artifact，便于发布取证。
 
-`release:report` 同时输出 `release/storage-model-inspection.json` 与 `release/storage-model-inspection.md`，记录 JSON 快照集合数、记录量、最大集合，以及 SQLite 表、schema 版本和迁移元数据；SQLite 文件在干净 checkout 中不存在时只作为提示，不阻断 CI。`production-db:readiness` 会生成 `release/production-db-readiness-report.json` 与 `release/production-db-readiness-report.md`，把 PostgreSQL/正式数据库切换前的 `productionDeploymentPlan`、当前 SQLite/JSON 模型、备份恢复演练文档、RTO/RPO 说明和运行时 PostgreSQL 阻断汇总为专项证据包。
+短信生产回调额外要求 `SMS_DELIVERY_CALLBACK_SECRET`，且必须是非占位的 32 位以上密钥。`POST /api/auth/sms-delivery-callback` 完成 HMAC 验签、时钟偏差、nonce 重放、幂等和乱序保护，`GET /api/auth/sms-deliveries` 提供卫健委脱敏送达台账；真实供应商字段映射、密钥托管、网络白名单和联合测试回执仍是上线阻断项。
+
+`release:report` 同时输出 `release/storage-model-inspection.json` 与 `release/storage-model-inspection.md`，记录 JSON 快照集合数、记录量、最大集合，以及 SQLite 表、schema 版本和迁移元数据；SQLite 文件在干净 checkout 中不存在时只作为提示，不阻断 CI。`production-db:readiness` 会生成 `release/production-db-readiness-report.json` 与 `release/production-db-readiness-report.md`，把 PostgreSQL/正式数据库切换前的 `productionDeploymentPlan`、当前 SQLite/JSON 模型、备份恢复演练文档、RTO/RPO 说明和运行时 PostgreSQL 阻断汇总为专项证据包。平台页同时提供生产数据库割接演练中心，通过 `GET /api/production-database/cutover-center`、`POST /api/production-database/cutover-runs` 和 `POST /api/production-database/cutover-runs/:id/actions` 管理四个迁移批次、居民/就诊/报告/统计样例校验、回滚检查点、复核及复测证据；演练成功不会绕过真实数据库驱动、全量迁移、容量测试和签字 gate。
+
+`phase2:citizen-operations-readiness` 会生成居民服务运营专项报告。平台“居民服务运营中心”通过 `GET /api/citizen-operations/center` 和分资源操作 API 管理内容发布、协议版本、实名人工复核、跨服务订单、黑名单及医院服务演示开通；居民端只调用 `GET /api/citizen-operations/public`，不会暴露实名复核和黑名单明细。所有本地动作都保留 `productionReady=false`，正式启用仍需政务实名、法务协议、医院授权、支付退费/医保回调和运营制度签字。
+
+`security:commercial-crypto-readiness` 会生成商用密码能力适配专项报告。平台“商用密码能力适配中心”通过 `GET /api/commercial-crypto/center` 和能力动作 API 管理国密 HTTPS、签名验签、重要数据加密、审计完整性、CA/USBKey 与安全浏览器六类适配合同，执行 SM2/SM3/SM4 运行时兼容性探测并登记现场证据。算法可用不代表产品认证或密评通过，所有记录保持 `productionReady=false`，正式启用仍需合格产品、生产证书与密钥管理、现场验证和第三方密评报告。
+
+`launch:smoke` 会生成 `release/launch-smoke-report.json` 与 `release/launch-smoke-report.md`，离线核对上线前只读运行路由、发布报告、生产割接清单、站点准备包、监控和运维证据是否齐备；传入 `--base-url=http://localhost:5173` 时会额外执行在线健康检查，适合作为发布前最后一跳冒烟。
 
 `identity:contract` 会生成 `release/identity-contract.json` 与 `release/identity-contract.md`，固化政务统一身份接入所需 claims、角色到门户映射、机构覆盖度和样例 claim 映射；`release:report` 与 CI 会同步归档该契约，便于现场 OIDC/SAML 联调前逐项确认。
 
-`audit:retention` 会生成 `release/audit-retention-report.json` 与 `release/audit-retention-report.md`，离线验证安全事件和数据访问日志哈希链，记录导出摘要、保全目标和安全验收台账；未配置 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT` 时只作为演示环境提示，生产切换仍由 `env:check:production` 阻断。
+`audit:retention` 会生成 `release/audit-retention-report.json` 与 `release/audit-retention-report.md`，离线验证安全事件和数据访问日志哈希链，记录导出摘要、保全目标和安全验收台账；默认 `release:report` 在演示环境使用发布包内审计报告作为本地归档目标，生产切换仍必须通过 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT` 绑定真实保全路径。
 
 `integration:readiness` 会生成 `release/integration-readiness-report.json` 与 `release/integration-readiness-report.md`，检查 P0 接口台账、HIS/EMR/LIS/PACS/医保/证照/统计契约、幂等键、签名和重试策略，并把身份、主索引、安全审计等 P0 覆盖关系纳入发布取证。
 
@@ -190,16 +242,29 @@ npm.cmd run release:manifest
 `research:sandbox` generates `release/research-sandbox-readiness-report.json` and `release/research-sandbox-readiness-report.md`, covering research dataset applications, disease registry models, ethics approval, de-identification release, sandbox access, usage audit, and outcome return evidence.
 
 `data-quality:report` 会生成 `release/data-quality-report.json` 与 `release/data-quality-report.md`，检查居民主索引完整度、跨集合居民引用、personIndex 一致性、来源可追溯和整改闭环。
+`data-governance:readiness` 会生成 `release/data-governance-readiness-report.json` 与 `release/data-governance-readiness-report.md`，把 HIS、EMR、LIS、PACS、医保、公卫、随访/互联网护理等来源系统纳入数据资产台账，汇总 personIndex、机构/科室/人员、疾病/手术/药品/检查检验等标准字典，并把字段映射、必填项、幂等、签名、质量检查和外部/现场阻塞项整理为可审查证据。
 
 `environment:matrix` 会生成 `release/environment-matrix-report.json` 与 `release/environment-matrix-report.md`，把 demo、staging、production 三层环境的必填变量、阻断变量、责任人、门禁脚本和上线验收规则固化为可检查矩阵；`release:report` 会同步归档该矩阵，便于生产切换前逐项确认环境分层和签字证据。
 
-`operations:readiness` 会生成 `release/operations-readiness-report.json` 与 `release/operations-readiness-report.md`，检查 `/api/health`、`/api/metrics`、`/api/system/readiness`、生产部署轨道、外部依赖风险和发布运维脚本。
+`hybrid:deployment-readiness` 会生成 `release/hybrid-deployment-readiness-report.json` 与 `release/hybrid-deployment-readiness-report.md`，核对 GitHub Pages/静态 HTML 预览层、`data/db.json` 快照回退、`server.js` Node API 后端、存储引擎边界、环境变量模板、CI 和发布门禁接线。
+
+`operations:readiness` 会生成 `release/operations-readiness-report.json` 与 `release/operations-readiness-report.md`，检查 `/api/live`、`/api/health`、`/api/metrics`、`/api/system/readiness`、生产部署轨道、外部依赖风险和发布运维脚本。运行调度页同时提供“生产运维与灾备运行中心”，通过 `GET /api/production-operations/center` 和分资源动作 API 管理 4 类服务级别、3 个 24x365 值班模板、故障事件、恢复演练、RPO/RTO 样例记录及证据包；本地动作均保持 `productionReady=false`，正式运行仍需远端备份、真实监控呼叫/工单、实名排班、全量恢复实测和多方签字。
+
+`registration:journey-readiness` 会生成 `release/registration-journey-readiness-report.json` 与 `release/registration-journey-readiness-report.md`。居民端挂号服务和机构端预约协同工作台通过 `POST /api/registrations/orders/:id/actions` 串联演示支付、HIS 确认、医保预核验确认、到院报到、完诊和退号退款，并把每一步写入消息、访问日志和安全审计；所有演示交易保持 `productionReady=false`，正式上线仍需真实 HIS、支付退款、医保结算和现场验收。
+
+`registration:integration-readiness` 会生成 `release/registration-integration-readiness-report.json` 与 `release/registration-integration-readiness-report.md`。`appointment-order-v1` 通过现有 HMAC 集成网关接收支付、HIS、医保、报到、完诊和退款成功/失败回调，执行必填字段、角色范围、状态顺序、幂等、订单落库、死信、重试和对账校验；机构端预约工作台展示来源、签名、匹配和异常摘要。回调证据仍保持 `productionEvidence=false`，正式切换需真实端点、非占位密钥、机器身份、字段字典、全场景联调和多方签字。
 
 `process:audit` 会生成 `release/process-audit-report.json` 与 `release/process-audit-report.md`，把居民主索引、慢病验收、医共体验收、医保取药、统计证照、安全合规和生产切换汇总为全流程审计证据域；`release:report` 会同步归档该报告。
 
 `release:report` 会额外生成 `release/service-acceptance-summary.json` 与 `release/service-acceptance-summary.md`，把慢病和医共体服务域的建模情况、记录行数、开放事项数和 open actions 整理为单独验收摘要，便于从发布包直接核对 `/api/service-acceptance-summary` 的运行时结果。
 
+慢病信息化文件追溯由 `docs/chronic-informatization-source-inventory.md` 和 `npm.cmd run chronic:informatization-sources` 维护，生成 `release/chronic-informatization-sources.json` 与 `release/chronic-informatization-sources.md`，把 `../慢病` 下的政策规范、建设方案、可研规划、三明/尤溪案例、监测研究和系统设计文件映射到慢病筛查分层、随访反馈、多病共管、用药医保、机构联调和公卫质控能力轨道；该追溯项已进入 `chronic:followup-readiness`、`release:report` 和 `deploy:check`。
+
 `site:pack` 会生成 `release/site-readiness-pack.json` 与 `release/site-readiness-pack.md`，把政务身份源、HIS/EMR/LIS/PACS/医保/证照接口联调、监控值守和生产签字事项转换为现场可填写的字段映射、样例报文、告警、值班和签字模板；同时生成 `release/templates/*/README.md`，按身份源映射、接口联调、监控值守、生产签字四类模板说明当前系统可实现的能力、需收集的输入、产出物和 API 证据。`GET /api/site-template-readmes` 会把这 4 个模板 README 作为运行时审计数据返回，工作台会展示每个模板的状态、责任方、行数、附件类型和 live evidence；`release:report` 会同步归档该准备包与模板 README。
+
+`GET /api/site-launch-evidence` 与 `POST /api/site-launch-evidence` 已支持委端登记现场上线证据，把身份源、接口联调、监控值守和生产签字模板转成可审计的 `siteLaunchEvidence` 台账；统一工作台的 Site readiness pack 面板可以选择模板、填写外部系统、联调单号、附件摘要和验收状态，并在提交后刷新证据缺口。`verified` 状态必须带联调单号或附件摘要，台账会分别统计已登记模板和已验收模板，避免把仅提交材料误判为可上线签字证据。
+
+`onsite:launch-requirements` 会生成 `release/onsite-launch-requirements.json` 与 `release/onsite-launch-requirements.md`，把正式上线现场必须补齐的生产域名、密钥、统一身份、短信、HIS/EMR/LIS/PACS、陪诊/护理/挂号、医保/证照、生产数据库、安全、监控、灾备、居民移动端和灰度签字要求转成 P0/P1 阻断清单；`release:report` 和 `release:manifest` 会同步归档该产物。
 
 `monitoring:readiness` 会生成 `release/monitoring-readiness-report.json` 与 `release/monitoring-readiness-report.md`，专项检查健康检查、运行指标、慢请求、状态码、死信、数据质量、SLO 阈值、告警信号和 on-call escalation 证据；真实 Prometheus/OpenTelemetry 或平台日志绑定完成后，再用 `CUTOVER_MONITORING_SIGNOFF` 作为现场签字信号。
 
@@ -229,7 +294,7 @@ GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下
 - SQLite 主存储、集合版本和乐观锁
 - 工作流动作、任务消息、审计写入
 - 接口网关签名、幂等、重试、死信
-- `/api/health` 和 `/api/metrics`
+- `/api/live`、`/api/health` 和 `/api/metrics`
 
 在独立后端、身份源、专线网关、生产数据库和现场联调完成前，不应将当前演示站描述为生产系统。
 
@@ -239,7 +304,7 @@ GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下
 
 1. 生产部署基线：已完成环境模板、demo/staging/production 环境矩阵、健康检查、后端部署说明、发布/部署门禁、CI artifact 取证和静态快照回滚；后续按真实部署平台补密钥注入、现场签字和环境差异参数。
 2. 可观测性：已完成 `/api/metrics`、请求状态、慢请求、任务堆积、死信、数据质量和 `/api/system/readiness`；后续接入 Prometheus/OpenTelemetry 或平台日志服务。
-3. 数据模型深化：已完成 SQLite schema v7、集合版本、乐观锁、恢复演练和 P2 结构化镜像表；后续继续补生产数据库约束、索引、回滚脚本和原生备份证据。
+3. 数据模型深化：已完成 SQLite schema v11、集合版本、乐观锁、持久化认证会话、恢复演练、P2 结构化镜像表、PostgreSQL 迁移包、事务 outbox、基线入队、只读影子核对及差异处置闭环；后续继续补生产主存储读路径、领域表转换、容量切换和原生备份证据。
 4. 发布取证：已完成 release report、deploy check、外部依赖风险台账、安全验收台账、慢病/医共体验收台账、全流程审计报告、数据质量/主索引证据、运维就绪证据和 CI 报告归档；后续在真实环境挂接测评报告、联调记录和上线签字。
 5. 测试深化：已覆盖 API 回归、覆盖率、E2E、并发冲突、静态快照、备份恢复、接口网关和发布门禁；后续围绕真实接口字段差异、移动弱网和现场权限边界继续扩展。
 
@@ -272,6 +337,60 @@ Site joint-testing boundary: production HIS/EMR/LIS/PACS critical-value rules, r
 operations.html is the runnable management entry for hospital operation monitoring and resource dispatch. It uses GET /api/operations/dashboard, POST /api/operations/dispatch, and POST /api/operations/reconciliation/:id/review to cover bed, staff, equipment, outpatient, emergency, inpatient, dispatch, alert, and statistics direct-report reconciliation boundaries.
 
 hospital-operations:readiness generates release/hospital-operations-readiness-report.json and release/hospital-operations-readiness-report.md. The report reuses healthStatistics, healthStatisticsIngestion, medicalResources, operations-readiness, /api/metrics, and platformProcessAudit evidence, and is included by release:report and deploy:check.
+
+## Medical Escort Service Platform
+
+`escort.html` is the runnable commission entry for the older adult medical escort service pilot. It uses `GET /api/escort-services/dashboard`, `POST /api/escort-services/orders`, `POST /api/escort-services/orders/:id/actions`, and `POST /api/escort-services/orders/:id/hospital-handoff` to manage provider registry publication, trained escort workers, service requests, hospital handoff confirmation, contract and insurance evidence, subsidy categories, risk queue, quality callbacks, and task messages.
+
+`docs/陪诊信息平台研发报告.md` consolidates the policy basis, implemented escort capabilities, go-live boundary, responsible departments, and next development plan for R&D and pilot reporting. `docs/陪诊信息平台功能责任与下一步计划.md` lists the current escort functions, responsible departments, evidence, next planned development items, go-live responsibility split, on-site handoff evidence, and production blockers; the same responsibility board, owner handoff checklist, and external-dependency blocker table are visible in `escort.html` for on-site review. `docs/陪诊服务上线服务器采购与部署方案.md` explains why the escort module should normally share the platform Node backend during pilot launch, when to buy a separate server, and how to purchase and configure cloud server, domain, HTTPS, database, object storage, SMS, identity, hospital interface, monitoring, and live smoke-test evidence.
+
+`citizen.html` includes a resident-side medical escort appointment form. Citizen users can create an order for themselves or household members through `POST /api/escort-services/orders`; the same scoped dashboard returns only their household orders and published service providers. The resident form now shows a five-item submit-readiness checklist for provider, hospital, department, date, and service items, and blocks incomplete requests before POST. The order API rejects missing provider registry rows, unpublished providers, missing hospital, department, appointment date, or service items, past appointment dates, and duplicate active appointments for the same registration or visit slot before creating the resident appointment.
+
+The hospital interface development handoff is `docs/escort-hospital-interface.md`. It documents HIS/outpatient guidance boundaries, `hospitalCode` scoping, request/response fields, the `hospital-handoff` API, resident notification behavior, audit requirements, and joint-test acceptance steps.
+
+`npm.cmd run escort:readiness` generates `release/escort-service-readiness-report.json` and `release/escort-service-readiness-report.md`, proving the policy-to-system mapping, registry, workforce, order evidence, API guard, commission frontend entry, citizen appointment entry, and resident submit-readiness checklist.
+
+## Digital Hospital Standards Platform
+
+`digital-hospital-standards.html` is the runnable management entry for the digital hospital standards and evaluation platform. It models the standards center, official policy mapping, indicator inheritance, data/evidence collection, automatic validation, tiered review, pilot blockers, and security boundary for a national/provincial/hospital evaluation workflow.
+
+`GET /api/digital-hospital/standards` is the commission-only runtime summary for standards, evaluation tasks, evidence packets, review queues, risk blockers, and the no-patient-PII evidence boundary. The page uses `HealthCityAuth.authFetch` against this API and keeps a static fallback for offline preview.
+
+`GET /api/digital-hospital/launch-readiness` returns the pilot launch gate, formal production signoff blockers, owner approvals, P0 requirements, production evidence packet coverage, and action audit state. `POST /api/digital-hospital/launch-readiness/:id/actions` records site evidence or signoff actions into the digital hospital launch ledger and security event chain.
+
+`GET /api/digital-hospital/production-evidence-packets` exposes the formal cutover evidence packet board for HIS/EMR/LIS/PACS samples, security assessment material, rollback rehearsal receipts, and specialty casebook evidence. `POST /api/digital-hospital/production-evidence-packets/:id/actions` verifies one evidence item, writes a security event, and signs the linked launch requirement when the packet is complete.
+
+`GET /api/digital-hospital/launch-command-briefs` exposes the launch command desk for go/no-go, first interface receipt, security observation, rollback standby, and first-day closure briefs. `POST /api/digital-hospital/launch-command-briefs/:id/actions` publishes or archives one command brief and links it back to the affected launch requirements.
+
+`GET /api/digital-hospital/formal-cutover-approvals` exposes the independent formal production approval desk. `POST /api/digital-hospital/formal-cutover-approvals/:id/actions` remains blocked until every site signoff and production evidence item is complete, then requires a change ticket, cutover window, exact confirmation phrase, and a signer not reused by another approval role. Formal production readiness requires all four approvals.
+
+`npm.cmd run digital-hospital:standards-readiness` generates `release/digital-hospital-standards-readiness-report.json` and `release/digital-hospital-standards-readiness-report.md`. The release gate checks the commission-only page guard, standard domains, workflow loop, evidence modes, official source links, API contract, launch readiness gate, production evidence packet board, launch command brief desk, formal cutover approval desk, no patient-identifiable collection boundary, CI wiring, deploy check, release report, launch smoke, and release artifact manifest.
+
+`digital-hospital-evaluation.html` is the commission/institution workbench for P0-P1 pilot evaluation. `GET /api/digital-hospital/evaluation-catalog` exposes 4 rule packs, 70 clause-level projects and the tertiary-general-hospital pilot profile; `GET /api/digital-hospital/pilot-readiness` separates `pilot-launch-ready` from `blocked-until-site-evidence-signed`. Collection, evidence and pre-assessment actions are available under `/api/digital-hospital/collection-jobs/:id/actions`, `/api/digital-hospital/evaluation-evidence/:id/actions`, `/api/digital-hospital/pre-assessments/actions` and `/api/digital-hospital/pre-assessments/:id/actions`. `npm.cmd run digital-hospital:pilot-readiness` generates the release-visible pilot report.
+
+The same workbench now includes multi-hospital pilot operations. `/api/digital-hospital/pilot-institutions/actions` registers institutions, while `/api/digital-hospital/pilot-institutions/:id/actions` enforces six readiness checks, independent approval, whitelist activation, pause/resume, observation-stage advancement, daily-review evidence, institution scope, and the no-patient-PII boundary.
+
+`digital-hospital-self-assessment.html` now carries the tiered review queue from institution submission through provincial preliminary review and disputed-indicator expert review. Expert opinions can confirm, revise, or return an assessment for correction; submitter, preliminary reviewer, expert reviewer, and final acceptance reviewer are independently checked and every transition is audited.
+
+## Internet Nursing Pilot
+
+`internet-nursing.html` is the runnable three-role entry for Internet+ Nursing. Citizens can submit nursing appointments, hospital users can complete first-visit assessment, informed consent, and nurse dispatch, and the nurse workstation can accept orders, start tracked home service, complete nursing records, and leave quality-callback evidence.
+
+Demo login: use `nurse` / `123456` to open the nurse workstation directly; it is scoped as an institution user with `nurseId=inn-001`.
+
+The module uses `GET /api/internet-nursing/dashboard`, `POST /api/internet-nursing/orders`, and `POST /api/internet-nursing/orders/:id/actions`. It tracks pilot institutions, qualified nurses, resident appointments, consent, service traces, nursing records, risk level, and task messages.
+
+The handoff document is `docs/互联网护理服务模块说明.md`; it covers role entries, data objects, API permissions, risk controls, workflow diagram, and acceptance evidence.
+
+`npm.cmd run internet-nursing:readiness` generates `release/internet-nursing-readiness-report.json` and `release/internet-nursing-readiness-report.md`, checking the Liaoning pilot policy boundary, institution registry, nurse qualification, order evidence, API guard, three-role frontend, closed-loop summary, and release script.
+
+`npm.cmd run citizen:launch-foundation` generates `release/citizen-launch-foundation-readiness.json` and `release/citizen-launch-foundation-readiness.md`; `release:report` includes the same resident phone-code login, account provisioning boundary, PWA/mobile shell, mini-program/APP routing, and production dependency gates. `docs/citizen-production-launch-requirements.md` is the resident-side real production launch requirements document, covering account owner evidence, role permissions, external interfaces, non-functional requirements, security/privacy, acceptance gates, rollout, and rollback.
+
+`docs/居民端下一步开发优先级.md` lists the resident-side next development priorities from P0 production launch foundation through P1 medical data read-only integration, P2 nursing/escort/registration service closure, and P3 pilot operations and accessibility optimization.
+
+`docs/production-go-live-requirements.md` is the platform-level real production go-live requirements baseline. Use it with `release/production-cutover-checklist.md`, `release/site-readiness-pack.md`, `release/launch-smoke-report.md`, `release/release-report.md`, and `release/release-artifact-manifest.md` before deciding that a deployment is ready for real users.
+
+`docs/on-site-launch-materials.md` is the field-owned material checklist for real go-live. It names the production environment, secrets, identity, SMS, HIS/EMR/LIS/PACS, nursing/escort/registration, insurance/certificate, database, security, monitoring, disaster recovery, resident mobile acceptance, gray release, and signoff materials that must be attached before opening to real residents.
 ## Drug Consumable Supervision Evidence
 
 `drug-consumable:readiness` generates `release/drug-consumable-readiness-report.json` and `release/drug-consumable-readiness-report.md`, covering rational medication, prescription review, fixed pickup, high-value consumable clues, insurance settlement coordination, and remediation-loop evidence for the drug and consumable supervision app.
@@ -279,7 +398,20 @@ hospital-operations:readiness generates release/hospital-operations-readiness-re
 
 - `health-dashboard.html` is priority application 8: the aggregate entry for the first seven applications.
 - `GET /api/health-dashboard/summary` returns application metrics, risk counts, open actions, interface tracks, acceptance evidence, and site dependencies for commission users.
+- `GET /api/health-dashboard/industry-governance-indicators` returns the commission-only phase-2 indicator center covering physical examinations, fever clinics, disease reporting, clinical assistance, archive access, appointment reconciliation, family doctor fulfillment, and regional performance. The dashboard supports category/status/period filtering, monthly and yearly snapshot views, source drilldown, and JSON export while keeping missing production sources blocked.
+- `GET /api/priority-applications/templates` returns the eight independent conversation handoff templates, including the Chinese conversation titles and the required boundary, reuse, data, API, frontend, test, acceptance, About-page description, module documentation, and workflow-diagram fields.
 - Every application in the summary carries the unified development template: functional boundary, reuse points, data collections, API routes, frontend entry, test evidence, and acceptance artifacts.
+- Unified template rule: every platform template must include an About feature section, a module document under `docs/`, and a workflow diagram covering data source, business workflow, sharing/collaboration, citizen visibility, and management statistics or alerts. `docs/妇幼健康全模块说明.md` is the reference implementation for this rule.
+- Maternal-child policy About page: `maternal-child-about.html` documents the birth certificate policy basis, seventh-version certificate transition, three-role functional boundary, data workflow diagram, and acceptance rule. `docs/maternal-child-policy.md` keeps the policy-to-system mapping for release review.
+- `npm.cmd run maternal-child:readiness` writes `release/maternal-child-readiness-report.json` and `release/maternal-child-readiness-report.md`, forming the maternal-child main function report and checking policy basis, About page, module/function documents, birth certificate data, API routes, role boundaries, privacy audit, and release evidence.
+- `npm.cmd run policy:coverage` writes `release/policy-coverage-report.json` and `release/policy-coverage-report.md`, checking About-page policy IDs, policy documents, template rules, CI, deploy-check, release manifest, and operator documentation coverage.
 - `npm.cmd run health-dashboard:summary` writes `release/health-dashboard-summary.json` and `release/health-dashboard-summary.md`.
+- `docs/health-dashboard-indicator-center-report.md` documents the eight governance topics, source boundary, monthly/yearly views, export contract, API and release evidence.
+- `npm.cmd run priority-apps:templates` writes `release/priority-application-templates.json` and `release/priority-application-templates.md` for the eight independent application handoff templates.
+- Each priority application template now carries a copy-ready `conversationStarter`, an `implementationChecklist` with the Codex loop execution step, and an `acceptanceGate` so each independent conversation can start with the same release boundary and evidence requirements.
+- `release:report` fails the priority application template gate if any generated checklist drops the Codex loop execution step.
+- Development loop: plan first, make one small change, run the matching test or build, observe and fix failures, update docs and acceptance notes, then repeat until the module passes release gates.
+- Thread control: `docs/codex-loop-thread-control.md` records the active project thread groups and the small-batch loop for continuing all worktrees without mixing unrelated changes.
+- Function-thread responsibility map: `docs/卫生健康信息平台功能线程与部门责任梳理.md` consolidates implemented platform threads, responsible departments, resident-first launch scope, next development queue, and residual go-live risks for cross-department review.
 - `release:manifest` indexes `health-dashboard-summary.md` as the release artifact for the eight-application template and aggregate dashboard evidence.
 - Boundary: the dashboard does not replace source workflows; source applications remain the system of record for business operations and acceptance.

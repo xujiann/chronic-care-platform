@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>数智医院自评申报工作台</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+    <script>window.HealthCityAuth.requireRole(["commission", "institution"])</script>
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>数智医院建设与应用评价</span>
+          <h1>医院自评申报工作台</h1>
+          <p>围绕六域结构化指标完成任务分派、机构填报、最小化证据引用、自动完整性校验、省级补正和独立审核。</p>
+        </div>
+        <nav>
+          <a href="./digital-hospital-evaluation.html">评价预评</a>
+          <a href="./digital-hospital-standards.html">标准平台</a>
+          <a href="./platform.html">平台驾驶舱</a>
+          <a href="./institution.html">医疗机构</a>
+          <a href="./about.html">关于</a>
+        </nav>
+      </header>
+
+      <section id="digital-self-assessment-metrics" class="metric-grid"></section>
+
+      <section class="panel" data-digital-self-assessment-section="queue">
+        <div class="panel-title">
+          <h2>自评任务队列</h2>
+          <span>机构账号按组织范围隔离，管理账号可查看全部试点任务</span>
+        </div>
+        <div class="filter-grid">
+          <label>
+            任务状态
+            <select id="digital-self-assessment-status-filter">
+              <option value="">全部状态</option>
+              <option value="assigned">待填报</option>
+              <option value="draft">填报中</option>
+              <option value="correction-in-progress">补正中</option>
+              <option value="submitted">待初审</option>
+              <option value="resubmitted">补正待审</option>
+              <option value="preliminary-review">省级初审中</option>
+              <option value="expert-review">专家复核中</option>
+              <option value="expert-reviewed">专家意见已出具</option>
+              <option value="correction-required">退回补正</option>
+              <option value="accepted">已接受</option>
+            </select>
+          </label>
+          <label>
+            关键词
+            <input id="digital-self-assessment-search" type="search" placeholder="医院、周期、目标或责任人" />
+          </label>
+          <label class="checkbox-line">
+            <input id="digital-self-assessment-overdue-filter" type="checkbox" />
+            只看逾期任务
+          </label>
+          <label class="checkbox-line">
+            <input id="digital-self-assessment-review-filter" type="checkbox" />
+            只看审核队列
+          </label>
+        </div>
+        <div id="digital-self-assessment-queue" class="table-wrap"></div>
+      </section>
+
+      <section class="panel" data-digital-self-assessment-section="indicator-workbench">
+        <div class="panel-title">
+          <h2>指标填报与审核</h2>
+          <span id="digital-self-assessment-selected-title">选择一项自评任务</span>
+        </div>
+        <div id="digital-self-assessment-detail-metrics" class="metric-grid"></div>
+        <div id="digital-self-assessment-indicators" class="table-wrap"></div>
+
+        <form id="digital-self-assessment-action-form" class="filter-grid" autocomplete="off">
+          <label>
+            自评任务
+            <select id="digital-self-assessment-id" required></select>
+          </label>
+          <label>
+            业务动作
+            <select id="digital-self-assessment-action" required></select>
+          </label>
+          <label class="digital-self-assessment-action-field" data-self-assessment-actions="save-draft" hidden>
+            自评指标
+            <select id="digital-self-assessment-indicator-id"></select>
+          </label>
+          <label class="digital-self-assessment-action-field" data-self-assessment-actions="save-draft" hidden>
+            自评结论
+            <select id="digital-self-assessment-answer">
+              <option value="compliant">符合</option>
+              <option value="partial">部分符合</option>
+              <option value="not-compliant">不符合</option>
+              <option value="not-applicable">不适用</option>
+            </select>
+          </label>
+          <label class="full digital-self-assessment-action-field" data-self-assessment-actions="save-draft" hidden>
+            受控证据引用
+            <textarea id="digital-self-assessment-evidence-refs" rows="2" placeholder="文档编号、工单号、受控路径或脱敏报告编号，每行一项"></textarea>
+          </label>
+          <label class="checkbox-line digital-self-assessment-action-field" data-self-assessment-actions="save-draft,submit-assessment" hidden>
+            <input id="digital-self-assessment-no-pii" type="checkbox" checked />
+            确认证据不含患者可识别信息
+          </label>
+          <label class="checkbox-line digital-self-assessment-action-field" data-self-assessment-actions="submit-assessment" hidden>
+            <input id="digital-self-assessment-declaration" type="checkbox" />
+            确认机构申报内容真实、完整、可追溯
+          </label>
+          <label class="full digital-self-assessment-action-field" data-self-assessment-actions="request-correction" hidden>
+            补正指标
+            <select id="digital-self-assessment-correction-indicators" multiple size="6"></select>
+          </label>
+          <label class="digital-self-assessment-action-field" data-self-assessment-actions="request-correction" hidden>
+            补正期限
+            <input id="digital-self-assessment-correction-due-at" type="date" />
+          </label>
+          <label class="digital-self-assessment-action-field" data-self-assessment-actions="start-preliminary-review,escalate-expert-review,record-expert-opinion" hidden>
+            审核期限
+            <input id="digital-self-assessment-review-due-at" type="date" />
+          </label>
+          <label class="digital-self-assessment-action-field" data-self-assessment-actions="escalate-expert-review" hidden>
+            专家组
+            <input id="digital-self-assessment-expert-group" type="text" placeholder="医疗信息化评价专家组" />
+          </label>
+          <label class="full digital-self-assessment-action-field" data-self-assessment-actions="escalate-expert-review" hidden>
+            争议指标
+            <select id="digital-self-assessment-dispute-indicators" multiple size="6"></select>
+          </label>
+          <label class="digital-self-assessment-action-field" data-self-assessment-actions="record-expert-opinion" hidden>
+            专家结论
+            <select id="digital-self-assessment-expert-decision">
+              <option value="confirm">维持机构自评</option>
+              <option value="revise">调整评价结论</option>
+              <option value="return">退回机构补正</option>
+            </select>
+          </label>
+          <label class="digital-self-assessment-action-field" data-self-assessment-actions="record-expert-opinion" hidden>
+            意见引用
+            <input id="digital-self-assessment-opinion-ref" type="text" placeholder="专家意见单或会议纪要编号" />
+          </label>
+          <label class="full">
+            操作说明
+            <textarea id="digital-self-assessment-note" rows="3" required placeholder="记录填报依据、补正要求或审核结论"></textarea>
+          </label>
+          <button id="digital-self-assessment-submit" class="inline-action" type="submit">提交自评动作</button>
+          <span id="digital-self-assessment-feedback" class="badge info">所有动作将写入不可抵赖审计链</span>
+        </form>
+      </section>
+
+      <section class="panel" data-commission-only data-digital-self-assessment-section="assignment" hidden>
+        <div class="panel-title">
+          <h2>评价任务分派</h2>
+          <span>同一机构同一周期只能存在一项自评任务</span>
+        </div>
+        <form id="digital-self-assessment-assignment-form" class="filter-grid" autocomplete="off">
+          <label>
+            机构编码
+            <input id="digital-self-assessment-assignment-institution-id" type="text" required placeholder="统一机构编码" />
+          </label>
+          <label>
+            机构名称
+            <input id="digital-self-assessment-assignment-institution-name" type="text" required />
+          </label>
+          <label>
+            评价周期
+            <input id="digital-self-assessment-assignment-cycle" type="text" required placeholder="2027-pilot" />
+          </label>
+          <label>
+            申报目标
+            <input id="digital-self-assessment-assignment-target" type="text" required placeholder="三级综合医院试点" />
+          </label>
+          <label>
+            机构责任人
+            <input id="digital-self-assessment-assignment-owner" type="text" required />
+          </label>
+          <label>
+            完成期限
+            <input id="digital-self-assessment-assignment-due-at" type="date" required />
+          </label>
+          <label class="full">
+            分派说明
+            <textarea id="digital-self-assessment-assignment-note" rows="2" required></textarea>
+          </label>
+          <button class="inline-action" type="submit">分派自评任务</button>
+          <span id="digital-self-assessment-assignment-feedback" class="badge info">任务分派后立即进入机构待办</span>
+        </form>
+      </section>
+
+      <section class="panel" data-digital-self-assessment-section="boundary">
+        <div class="panel-title">
+          <h2>数据与审核边界</h2>
+          <span>平台接受不等于现场评价通过</span>
+        </div>
+        <div class="evidence-grid">
+          <article><strong>最小化证据</strong><p>只登记受控引用、结论和必要摘要，不上传患者身份、完整病历或影像原片。</p></article>
+          <article><strong>机构隔离</strong><p>医疗机构账号只能查看和修改本机构自评任务，跨机构动作由 API 拒绝。</p></article>
+          <article><strong>分级独立审核</strong><p>申报人、初审人、专家复核人和最终接受人相互独立，争议指标、专家意见和补正结论全程留痕。</p></article>
+          <article><strong>生产边界</strong><p>自评被接受仍需现场抽查、等保密评、接口联调、多方签字和正式割接审批。</p></article>
+        </div>
+      </section>
+    </main>
+
+    <script src="./digital-hospital-self-assessment-ui.js"></script>
+  </body>
+</html>

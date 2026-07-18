@@ -19,7 +19,17 @@ test("identity contract validates required claims, roles and sample mappings", (
   assert.equal(contract.roleCoverage.citizen.users >= 1, true);
   assert.equal(contract.roleCoverage.county.users >= 1, true);
   assert.equal(contract.sampleMappings.every((item) => item.passed), true);
-  assert.equal(contract.sampleMappings.find((item) => item.id === "identity-institution").mappedHome, "institution.html");
+  assert.equal(contract.sampleMappings.find((item) => item.id === "identity-institution").mappedHome, "doctor.html");
+  assert.equal(Object.values(contract.adapterContracts.oidc).every(Boolean), true);
+  assert.equal(Object.values(contract.adapterContracts.sms).every(Boolean), true);
+  assert.equal(contract.checks.some((item) => item.id === "identity:oidcRuntimeAdapter" && item.passed), true);
+  assert.equal(contract.checks.some((item) => item.id === "identity:oidcLifecycle" && item.passed), true);
+  assert.equal(contract.checks.some((item) => item.id === "identity:smsRuntimeAdapter" && item.passed), true);
+  assert.equal(Object.values(contract.adapterContracts.oidcLifecycle).every(Boolean), true);
+  assert.equal(Object.values(contract.adapterContracts.productionSecurity).every(Boolean), true);
+  assert.equal(contract.adapterContracts.productionSecurity.sessionRetention, true);
+  assert.equal(contract.adapterContracts.productionSecurity.centralizedSessionStore, true);
+  assert.equal(contract.checks.some((item) => item.id === "identity:productionSecurityBoundary" && item.passed), true);
 });
 
 test("identity contract renders and writes release artifacts", (t) => {
@@ -30,6 +40,8 @@ test("identity contract renders and writes release artifacts", (t) => {
   assert.match(markdown, /Identity integration contract/);
   assert.match(markdown, /Required external claims/);
   assert.match(markdown, /Sample mappings/);
+  assert.match(markdown, /Production runtime adapters/);
+  assert.match(markdown, /foundation-ready/);
 
   writeOutput(contract, {
     output: path.join("tmp", "identity-contract-test", "identity-contract.json"),

@@ -17,6 +17,10 @@ function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(ROOT, relativePath), "utf8"));
 }
 
+function contractReady(contract) {
+  return /(^ready$|-ready$)/i.test(String(contract.status || "")) && Array.isArray(contract.requiredFields) && contract.requiredFields.length > 0;
+}
+
 function buildEvaluationEvidenceReport(options = {}) {
   const data = options.data || readJson("data/db.json");
   const evidenceRows = Array.isArray(data.platformEvidence) ? data.platformEvidence : [];
@@ -36,7 +40,7 @@ function buildEvaluationEvidenceReport(options = {}) {
     { id: "evaluation:records", passed: records.length >= 2 && records.every((item) => item.owner && item.testRecord && item.status), detail: `${records.length} records` },
     { id: "evaluation:artifactCoverage", passed: artifactCoverage.every((item) => item.present), detail: artifactCoverage.map((item) => `${item.label}:${item.present ? "yes" : "no"}`).join(";") },
     { id: "evaluation:p1Requirements", passed: p1Requirements.length >= 5 && p1Requirements.every((item) => item.keepExisting && item.need && item.owner && item.status), detail: `${p1Requirements.length} P1 requirements` },
-    { id: "evaluation:integrationContracts", passed: contracts.length >= 7 && contracts.every((item) => item.status === "ready" && item.requiredFields?.length), detail: `${contracts.length} ready contracts` },
+    { id: "evaluation:integrationContracts", passed: contracts.length >= 7 && contracts.every(contractReady), detail: `${contracts.length} ready contracts` },
     { id: "evaluation:processAudit", passed: processAudit.length >= 10 && processAudit.every((item) => item.process && item.auditPoint && item.evidence), detail: `${processAudit.length} audit rows` }
   ];
   return {
@@ -126,4 +130,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { buildEvaluationEvidenceReport, parseArgs, renderMarkdown, writeOutput };
+module.exports = { buildEvaluationEvidenceReport, contractReady, parseArgs, renderMarkdown, writeOutput };

@@ -15,6 +15,10 @@ test("integration readiness validates P0 interface and external contract coverag
   assert.equal(report.p0Coverage.every((item) => item.ready), true);
   assert.equal(report.contracts.every((item) => item.idempotencyKey && item.signature && item.retryPolicy), true);
   assert.equal(report.p0Coverage.find((item) => item.interfaceId === "if-medical").domainCoverage.every((item) => item.ready), true);
+  assert.equal(report.runtimeAdapters.length, 5);
+  assert.equal(report.runtimeAdapters.every((item) => item.sourceReady && item.environmentReady && item.runtimeReady && item.boundaryReady), true);
+  assert.equal(report.checks.some((item) => item.id === "integration:runtimeAdapters" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "integration:runtimeControls" && item.passed), true);
 });
 
 test("integration readiness fails when a required medical contract is absent", () => {
@@ -32,6 +36,8 @@ test("integration readiness renders and writes release artifacts", (t) => {
   const markdown = renderMarkdown(report);
   assert.match(markdown, /Integration readiness report/);
   assert.match(markdown, /P0 coverage/);
+  assert.match(markdown, /Hospital runtime adapters/);
+  assert.match(markdown, /foundation-ready/);
 
   writeOutput(report, {
     output: path.join("tmp", "integration-readiness-test", "integration-readiness-report.json"),

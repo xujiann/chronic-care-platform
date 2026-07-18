@@ -1,9 +1,12 @@
 const DASHBOARD_API_BASE = location.protocol === "file:" ? "" : "/api";
 const DASHBOARD_SUMMARY_ROUTE = "/api/health-dashboard/summary";
 const DASHBOARD_SUMMARY_PATH = DASHBOARD_SUMMARY_ROUTE.replace(/^\/api/, "");
+let currentDashboardSummary = null;
+const industryIndicatorFilters = { category: "all", status: "all", period: "month" };
 
 document.addEventListener("DOMContentLoaded", async () => {
   const summary = await loadDashboardSummary();
+  currentDashboardSummary = summary;
   renderDashboard(summary);
 });
 
@@ -133,6 +136,7 @@ function buildStaticDashboardSummary(state) {
   const evidence = Array.isArray(state.platformEvidence) ? state.platformEvidence : [];
   const interfaces = Array.isArray(state.platformInterfaces) ? state.platformInterfaces : [];
   const dependencies = Array.isArray(state.productionDeploymentPlan) ? state.productionDeploymentPlan : [];
+  const indicatorCenter = buildStaticIndustryGovernanceIndicatorCenter(state);
   return {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -150,6 +154,7 @@ function buildStaticDashboardSummary(state) {
       evidenceRecords: evidence.reduce((sum, item) => sum + (Array.isArray(item.records) ? item.records.length : 0), 0),
       siteDependencies: dependencies.length
     },
+    indicatorCenter,
     applications,
     risks: [],
     openActions: [],
@@ -159,8 +164,62 @@ function buildStaticDashboardSummary(state) {
   };
 }
 
+function buildStaticIndustryGovernanceIndicatorCenter(state) {
+  const month = new Date().toISOString().slice(0, 7);
+  const year = new Date().toISOString().slice(0, 4);
+  const definitions = [
+    ["industry-physical-exam", "健康体检覆盖", "专项监管", "医政医管处/基层卫生处", ["physicalExaminationRecords", "healthExamRecords"], "./citizen.html"],
+    ["industry-fever-clinic", "发热门诊报告闭环", "专项监管", "医政医管处/疾控处", ["feverClinicVisits", "publicHealthEvents"], "./public-health.html"],
+    ["industry-disease-reporting", "疾病报卡回执率", "公卫监管", "疾控处/区县信息中心", ["phase2DiseaseReportQueue", "phase2DiseaseReportReceipts"], "./platform.html#phase2-disease-reporting"],
+    ["industry-clinical-assist", "临床辅助消息回执率", "医政质量", "医政医管处/质控中心", ["phase2ClinicalAssistAlerts", "phase2ClinicalAssistReceipts"], "./platform.html#phase2-clinical-assist"],
+    ["industry-archive-access", "健康档案调阅合规率", "便民服务", "规划信息处/数据安全岗", ["dataAccessLogs", "personalRecords"], "./regional-data-sharing.html"],
+    ["industry-appointment-reconciliation", "预约订单对账完成率", "便民服务", "医政医管处/便民服务运营", ["registrationOrders", "careOrders"], "./citizen.html"],
+    ["industry-family-doctor", "家庭医生履约覆盖率", "基层卫生", "基层卫生处/区县卫健局", ["phase2FamilyDoctorContracts", "phase2FamilyDoctorFulfillments"], "./platform.html#phase2-family-doctor-contracts"],
+    ["industry-regional-performance", "区域绩效证据就绪率", "区域绩效", "规划信息处/医政医管处", ["institutionCreditEvaluations", "countyAcceptanceLedger", "healthDashboardSnapshots"], "./county.html"]
+  ];
+  const indicators = definitions.map(([id, topic, category, owner, sourceCollections, href]) => {
+    const records = sourceCollections.reduce((sum, collection) => sum + countRows(state[collection]), 0);
+    const status = records > 0 ? "watch" : "blocked";
+    const currentValue = `${records} records`;
+    return {
+      id,
+      topic,
+      category,
+      definition: `${topic}的静态预览口径，正式统计需由源系统按周期回传。`,
+      currentValue,
+      status,
+      exceptionCount: records > 0 ? 0 : 1,
+      owner,
+      sourceCollections,
+      sourceSystems: sourceCollections,
+      dataQuality: records > 0 ? "medium" : "source-required",
+      reports: [
+        { id: "month", label: "月报", period: month, value: currentValue, status, basis: "static snapshot" },
+        { id: "year", label: "年报", period: year, value: currentValue, status, basis: "static snapshot" }
+      ],
+      drilldown: { label: "查看源业务", href },
+      nextAction: records > 0 ? "核对源数据版本和正式统计口径。" : "接入并核验正式源数据。"
+    };
+  });
+  const categories = [...new Set(indicators.map((item) => item.category))];
+  const periodViews = [
+    { id: "month", label: "月报", period: month, indicators: indicators.length },
+    { id: "year", label: "年报", period: year, indicators: indicators.length }
+  ];
+  return {
+    title: "二期行业治理指标中心",
+    summary: { indicators: indicators.length, categories: categories.length, ready: 0, watch: indicators.filter((item) => item.status === "watch").length, blocked: indicators.filter((item) => item.status === "blocked").length, exceptions: indicators.reduce((sum, item) => sum + item.exceptionCount, 0), reportViews: 2 },
+    categories,
+    periodViews,
+    indicators,
+    exportFields: ["topic", "category", "definition", "currentValue", "status", "exceptionCount", "owner", "sourceCollections", "sourceSystems", "nextAction"],
+    boundary: "指标中心仅用于监管口径、报告和下钻，不能替代源系统法定上报或现场签字统计。"
+  };
+}
+
 function renderDashboard(summary) {
   renderMetrics(summary);
+  renderIndustryGovernanceIndicatorCenter(summary.indicatorCenter || {});
   document.querySelector("#dashboard-scope").textContent = summary.scope?.rule || "";
   renderApplications(summary.applications || []);
   renderTemplates(summary.applications || []);
@@ -169,6 +228,96 @@ function renderDashboard(summary) {
   renderDependencies(summary.siteDependencies || []);
   renderInterfaces(summary.interfaces || []);
   renderEvidence(summary.evidence || []);
+  renderBloodCoordination(summary.bloodCoordination || {});
+}
+
+function renderBloodCoordination(coordination) {
+  const target = document.querySelector("#dashboard-blood-coordination");
+  if (!target) return;
+  const rows = coordination.projections || [];
+  target.innerHTML = rows.length ? `<table><thead><tr><th>级别</th><th>治理事件</th><th>订阅模块</th><th>对象</th><th>发生时间</th></tr></thead><tbody>${rows.map((item) => `<tr><td>${escapeHtml(item.severity)}</td><td>${escapeHtml(item.eventType)}</td><td>${escapeHtml(item.consumer)}</td><td>${escapeHtml(item.subjectId)}</td><td>${escapeHtml(item.occurredAt)}</td></tr>`).join("")}</tbody></table>` : "<p>尚无区域血液事件投影。</p>";
+}
+
+function renderIndustryGovernanceIndicatorCenter(center) {
+  const indicators = Array.isArray(center.indicators) ? center.indicators : [];
+  const categories = Array.isArray(center.categories) ? center.categories : [];
+  const periodViews = Array.isArray(center.periodViews) ? center.periodViews : [];
+  const categorySelect = document.querySelector("#industry-indicator-category");
+  const statusSelect = document.querySelector("#industry-indicator-status");
+  const periodSelect = document.querySelector("#industry-indicator-period");
+  if (!categorySelect || !statusSelect || !periodSelect) return;
+  categorySelect.innerHTML = `<option value="all">全部分类</option>${categories.map((category) => `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`).join("")}`;
+  periodSelect.innerHTML = periodViews.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.label)} · ${escapeHtml(item.period)}</option>`).join("") || `<option value="month">月报</option><option value="year">年报</option>`;
+  categorySelect.value = industryIndicatorFilters.category;
+  statusSelect.value = industryIndicatorFilters.status;
+  periodSelect.value = industryIndicatorFilters.period;
+  const visible = indicators.filter((item) =>
+    (industryIndicatorFilters.category === "all" || item.category === industryIndicatorFilters.category) &&
+    (industryIndicatorFilters.status === "all" || item.status === industryIndicatorFilters.status)
+  );
+  const selectedPeriod = periodViews.find((item) => item.id === industryIndicatorFilters.period) || periodViews[0] || {};
+  const selectedReports = visible.map((item) => ({ item, report: (item.reports || []).find((report) => report.id === industryIndicatorFilters.period) || item.reports?.[0] || {} }));
+  document.querySelector("#industry-indicator-summary").textContent = `${selectedPeriod.label || "报告"} ${selectedPeriod.period || ""} / ${visible.length}/${indicators.length} 项 / ${visible.filter((item) => item.status === "blocked").length} 项数据源阻断`;
+  document.querySelector("#industry-indicator-metrics").innerHTML = [
+    ["监管指标", indicators.length, `${categories.length} 个分类`],
+    ["当前显示", visible.length, `${selectedPeriod.label || "报告"} ${selectedPeriod.period || ""}`],
+    ["数据源阻断", visible.filter((item) => item.status === "blocked").length, "不得纳入正式报表"],
+    ["异常记录", visible.reduce((sum, item) => sum + Number(item.exceptionCount || 0), 0), "回到源业务闭环"]
+  ].map(([label, value, hint]) => `<article class="metric-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(hint)}</small></article>`).join("");
+  document.querySelector("#industry-indicator-list").innerHTML = selectedReports.map(({ item, report }) => `
+    <article class="governance-indicator-card ${escapeHtml(item.status)}" data-industry-indicator="${escapeHtml(item.id)}" data-industry-category="${escapeHtml(item.category)}" data-industry-status="${escapeHtml(item.status)}">
+      <div class="governance-indicator-heading">
+        <span>${escapeHtml(item.category)}</span>
+        <span class="badge ${item.status === "ready" ? "info" : item.status === "watch" ? "warn" : "danger"}">${escapeHtml(item.status)}</span>
+      </div>
+      <strong>${escapeHtml(item.topic)}</strong>
+      <div class="governance-indicator-value">${escapeHtml(report.value || item.currentValue)}</div>
+      <p>${escapeHtml(item.definition)}</p>
+      <small>${escapeHtml(report.label || "报告")} ${escapeHtml(report.period || "")} / 异常 ${escapeHtml(item.exceptionCount || 0)}</small>
+      <small>${escapeHtml(item.owner)} / ${escapeHtml((item.sourceCollections || []).join(", "))}</small>
+      <p>${escapeHtml(item.nextAction)}</p>
+      <a class="inline-action" href="${escapeHtml(item.drilldown?.href || "#")}">${escapeHtml(item.drilldown?.label || "查看源业务")}</a>
+    </article>
+  `).join("") || `<article class="governance-indicator-card empty"><strong>暂无匹配指标</strong><p>调整分类或状态筛选后查看。</p></article>`;
+  document.querySelector("#industry-indicator-boundary").textContent = center.boundary || "指标中心不替代源系统法定上报。";
+  bindIndustryGovernanceIndicatorControls(center);
+}
+
+function bindIndustryGovernanceIndicatorControls(center) {
+  ["industry-indicator-category", "industry-indicator-status", "industry-indicator-period"].forEach((id) => {
+    const control = document.getElementById(id);
+    if (!control || control.dataset.industryIndicatorBound === "1") return;
+    control.dataset.industryIndicatorBound = "1";
+    control.addEventListener("change", () => {
+      industryIndicatorFilters.category = document.querySelector("#industry-indicator-category")?.value || "all";
+      industryIndicatorFilters.status = document.querySelector("#industry-indicator-status")?.value || "all";
+      industryIndicatorFilters.period = document.querySelector("#industry-indicator-period")?.value || "month";
+      renderIndustryGovernanceIndicatorCenter(center);
+    });
+  });
+  const exportButton = document.querySelector("#industry-indicator-export");
+  if (!exportButton || exportButton.dataset.industryIndicatorBound === "1") return;
+  exportButton.dataset.industryIndicatorBound = "1";
+  exportButton.addEventListener("click", () => {
+    const indicators = (center.indicators || []).filter((item) =>
+      (industryIndicatorFilters.category === "all" || item.category === industryIndicatorFilters.category) &&
+      (industryIndicatorFilters.status === "all" || item.status === industryIndicatorFilters.status)
+    );
+    const payload = {
+      generatedAt: currentDashboardSummary?.generatedAt || new Date().toISOString(),
+      period: industryIndicatorFilters.period,
+      category: industryIndicatorFilters.category,
+      status: industryIndicatorFilters.status,
+      boundary: center.boundary,
+      indicators
+    };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `industry-governance-indicators-${industryIndicatorFilters.period}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  });
 }
 
 function renderTemplates(applications) {

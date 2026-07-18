@@ -34,13 +34,18 @@ test("SQLite migrations are idempotent and collection versions change only on wr
 
     withDatabase(storage, (db) => {
       const migrations = db.prepare("SELECT version, name, checksum FROM schema_migrations ORDER BY version").all();
-      assert.deepEqual(migrations.map((item) => Number(item.version)), [1, 2, 3, 4, 5, 6, 7]);
+      assert.deepEqual(migrations.map((item) => Number(item.version)), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
       assert.ok(migrations.every((item) => item.name && /^[a-f0-9]{64}$/.test(item.checksum)));
 
       const columns = db.prepare("PRAGMA table_info(state_collections)").all().map((item) => item.name);
       assert.ok(columns.includes("version"));
       const indexes = db.prepare("PRAGMA index_list(state_collections)").all().map((item) => item.name);
       assert.ok(indexes.includes("idx_state_collections_updated_at"));
+      assert.equal(db.prepare("PRAGMA journal_mode").get().journal_mode, "wal");
+      assert.equal(Number(db.prepare("PRAGMA synchronous").get().synchronous), 2);
+      assert.equal(Number(db.prepare("PRAGMA foreign_keys").get().foreign_keys), 1);
+      assert.equal(Number(db.prepare("PRAGMA busy_timeout").get().timeout) >= 5000, true);
+      assert.equal(db.prepare("PRAGMA quick_check").get().quick_check, "ok");
 
       const tableNames = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((item) => item.name);
       [
@@ -59,7 +64,12 @@ test("SQLite migrations are idempotent and collection versions change only on wr
         "institution_credit_evaluation_records",
         "research_dataset_records",
         "disease_registry_model_records",
-        "accessibility_checklist_records"
+        "accessibility_checklist_records",
+        "postgres_sync_outbox",
+        "postgres_sync_reconciliations",
+        "postgres_sync_reconciliation_cases",
+        "postgres_sync_reconciliation_case_actions",
+        "auth_sessions"
       ].forEach((tableName) => {
         assert.ok(tableNames.includes(tableName), `${tableName} mirror table should exist`);
       });
@@ -222,8 +232,62 @@ test("SQLite migrations are idempotent and collection versions change only on wr
       orphanServiceState.careOrders[0].residentId = "missing-resident";
       storage.writeDatabase(orphanServiceState);
     }, /FOREIGN KEY constraint failed/);
-    assert.equal(storage.storageMeta().schemaVersion, 7);
+    const meta = storage.storageMeta();
+    assert.equal(meta.schemaVersion, 11);
+    assert.equal(meta.postgresSync.reconciliation.status, "never");
+    assert.equal(meta.postgresSync.reconciliation.cases.unresolved, 0);
+    assert.deepEqual(meta.sqliteProfile, {
+      journalMode: "wal",
+      synchronous: "FULL",
+      foreignKeys: true,
+      busyTimeoutMs: 5000,
+      walAutocheckpointPages: 1000,
+      quickCheck: "ok",
+      productionProfile: true
+    });
   } finally {
+    fs.rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
+test("SQLite writes enqueue PostgreSQL changes in the same transactional outbox", { skip: !sqliteAvailable }, () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "health-platform-postgres-outbox-"));
+  fs.copyFileSync(path.join(ROOT, "data", "db.json"), path.join(dataDir, "db.json"));
+  const serverPath = path.join(ROOT, "server.js");
+  const previousDataDir = process.env.DATA_DIR;
+  const previousStorageEngine = process.env.STORAGE_ENGINE;
+  const previousSyncMode = process.env.POSTGRES_SYNC_MODE;
+  process.env.DATA_DIR = dataDir;
+  process.env.STORAGE_ENGINE = "sqlite";
+  process.env.POSTGRES_SYNC_MODE = "outbox";
+  delete require.cache[serverPath];
+  const storage = require(serverPath);
+  try {
+    storage.ensureDatabase();
+    // Persist newly introduced seed and derived collections before isolating the resident-only change.
+    storage.writeDatabase(storage.readDatabase());
+    withDatabase(storage, (db) => db.prepare("DELETE FROM postgres_sync_outbox").run());
+    const state = storage.readDatabase();
+    state.residents[0].address = "postgres-outbox-address";
+    storage.writeDatabase(state);
+    withDatabase(storage, (db) => {
+      const rows = db.prepare("SELECT payload, payload_sha256, chain_hash, status FROM postgres_sync_outbox ORDER BY sequence").all();
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0].status, "pending");
+      assert.match(rows[0].payload_sha256, /^[a-f0-9]{64}$/);
+      assert.match(rows[0].chain_hash, /^[a-f0-9]{64}$/);
+      const changes = JSON.parse(rows[0].payload).changes;
+      assert.deepEqual(changes.map((item) => item.collection), ["residents"]);
+    });
+    const meta = storage.storageMeta();
+    assert.equal(meta.postgresSync.enabled, true);
+    assert.equal(meta.postgresSync.pending, 1);
+    assert.equal(meta.postgresSync.productionPrimary, false);
+  } finally {
+    if (previousDataDir === undefined) delete process.env.DATA_DIR; else process.env.DATA_DIR = previousDataDir;
+    if (previousStorageEngine === undefined) delete process.env.STORAGE_ENGINE; else process.env.STORAGE_ENGINE = previousStorageEngine;
+    if (previousSyncMode === undefined) delete process.env.POSTGRES_SYNC_MODE; else process.env.POSTGRES_SYNC_MODE = previousSyncMode;
+    delete require.cache[serverPath];
     fs.rmSync(dataDir, { recursive: true, force: true });
   }
 });

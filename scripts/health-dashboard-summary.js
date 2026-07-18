@@ -10,6 +10,7 @@ const SOURCE_APPLICATIONS = [
   {
     id: "regional-data-sharing",
     name: "Regional diagnosis data sharing",
+    conversationTitle: "区域诊疗数据共享平台",
     entry: "regional-data-sharing.html",
     owner: "commission",
     collections: ["residents", "personalRecords", "diagnosticReports", "integrationContracts", "dataAccessLogs", "platformInterfaces"],
@@ -22,6 +23,7 @@ const SOURCE_APPLICATIONS = [
   {
     id: "referral-teleconsultation",
     name: "Referral and teleconsultation",
+    conversationTitle: "医联体转诊与远程会诊平台",
     entry: "county.html",
     owner: "medical-services",
     collections: ["referralSystem", "referrals", "referralTeleconsultations", "careOrders", "countyCollaborationOrders", "countyAcceptanceLedger"],
@@ -34,6 +36,7 @@ const SOURCE_APPLICATIONS = [
   {
     id: "quality-safety",
     name: "Medical quality and safety supervision",
+    conversationTitle: "医疗质量与安全监管平台",
     entry: "quality-safety.html",
     owner: "quality-office",
     collections: ["diagnosticReports", "countyMutualRecognitionRecords", "dataQualityIssues", "institutionCreditEvaluations", "securityEvents", "hospitalInteroperabilityFunctions"],
@@ -46,6 +49,7 @@ const SOURCE_APPLICATIONS = [
   {
     id: "operations-dispatch",
     name: "Hospital operations and resource dispatch",
+    conversationTitle: "医院运行监测与资源调度平台",
     entry: "operations.html",
     owner: "operations",
     collections: ["healthStatistics", "healthStatisticsIngestion", "medicalResources", "platformProcessAudit", "operationsReadiness"],
@@ -58,6 +62,7 @@ const SOURCE_APPLICATIONS = [
   {
     id: "drug-consumable-supervision",
     name: "Drug, consumable, and rational medication supervision",
+    conversationTitle: "药品耗材与合理用药监管平台",
     entry: "insurance.html",
     owner: "insurance-and-institution",
     collections: ["drugConsumableSupervisions", "medicationPickups", "insuranceClaims", "institutionSupervisions", "integrationContracts"],
@@ -70,6 +75,7 @@ const SOURCE_APPLICATIONS = [
   {
     id: "chronic-followup",
     name: "Chronic disease management and post-discharge follow-up",
+    conversationTitle: "慢病管理与院后随访平台",
     entry: "index.html",
     owner: "primary-care",
     collections: ["chronicScreeningTasks", "chronicManagementPlans", "followups", "personalRecords", "medicationPickups", "chronicAcceptanceLedger"],
@@ -82,6 +88,7 @@ const SOURCE_APPLICATIONS = [
   {
     id: "research-sandbox",
     name: "Research datasets and data sandbox",
+    conversationTitle: "科研数据集与数据沙箱平台",
     entry: "platform.html",
     owner: "research-governance",
     collections: ["researchDatasets", "diseaseRegistryModels", "dataAccessLogs", "securityAcceptanceLedger", "personalRecords", "diagnosticReports"],
@@ -96,6 +103,7 @@ const SOURCE_APPLICATIONS = [
 const DASHBOARD_APPLICATION = {
   id: "health-dashboard",
   name: "Health commission aggregate dashboard",
+  conversationTitle: "卫生健康综合驾驶舱",
   entry: "health-dashboard.html",
   owner: "commission",
   aggregate: true,
@@ -108,6 +116,14 @@ const DASHBOARD_APPLICATION = {
 };
 
 const APPLICATIONS = [...SOURCE_APPLICATIONS, DASHBOARD_APPLICATION];
+const DOCUMENTATION_RULE = {
+  aboutPage: "about.html",
+  requiredDocument: "docs/<module-name>.md",
+  flowDiagram: "Each template must include a flow diagram covering data source, business workflow, sharing/collaboration, citizen visibility, and management statistics or alerts.",
+  requiredSections: ["功能边界", "角色入口", "数据对象", "API 权限", "页面入口", "测试证据", "验收证据", "流程图"],
+  codexLoop: "Plan first, make one small change, run the matching test or build, observe and fix failures, update docs and acceptance notes, then repeat until accepted.",
+  maternalChildReference: "docs/妇幼健康全模块说明.md"
+};
 
 const CLOSED_STATUS_PATTERN = /closed|resolved|approved|recognized|completed|passed|ready|signed|done|宸插畬鎴|宸查€氳繃|宸插彇鑽|宸插洖浼|宸蹭簰璁|宸叉牳楠|宸查棴鐜|已完成|已通过|已闭环/;
 const HIGH_RISK_PATTERN = /high|urgent|critical|overdue|dead_letter|楂|绱|閫炬湡|critical|高|逾期|危急/;
@@ -159,6 +175,7 @@ function summarizeApplication(data, app) {
   return {
     id: app.id,
     name: app.name,
+    conversationTitle: app.conversationTitle || app.name,
     entry: app.entry,
     owner: app.owner,
     collections: collectionRows.map((item) => ({ collection: item.collection, records: item.rows.length })),
@@ -174,9 +191,111 @@ function summarizeApplication(data, app) {
     frontendEntry: app.entry,
     testEvidence: app.testEvidence,
     acceptanceEvidence: app.acceptanceEvidence,
+    documentationRule: DOCUMENTATION_RULE,
     boundary: app.aggregate
       ? "Aggregate dashboard only; the first seven source applications remain the system of record."
       : "Aggregated in the dashboard; detailed workflow remains in the source application."
+  };
+}
+
+function buildConversationStarter(template) {
+  return [
+    `Thread title: ${template.conversationTitle}`,
+    `Goal: implement and verify ${template.id} using the unified template.`,
+    `Start from ${template.frontendEntry}, reuse ${template.dataCollections.join(", ")}, and keep ${template.acceptanceEvidence.join(", ")} as release evidence.`,
+    "Required sections: functional boundary, reuse points, data collections, API, frontend entry, tests, acceptance evidence, About section, module document, workflow diagram."
+  ].join(" ");
+}
+
+function buildImplementationChecklist(template) {
+  const docRule = template.documentationRule || DOCUMENTATION_RULE;
+  return [
+    `Confirm boundary and owner: ${template.owner}.`,
+    `Reuse source collections: ${template.dataCollections.join(", ")}.`,
+    `Wire or verify API routes: ${template.apiRoutes.join(", ")}.`,
+    `Verify frontend entry: ${template.frontendEntry}.`,
+    `Run evidence tests: ${template.testEvidence.join(", ")}.`,
+    `Follow Codex loop: ${docRule.codexLoop}`,
+    `Archive release evidence: ${template.acceptanceEvidence.join(", ")}.`,
+    `Keep About page and module docs current: ${docRule.aboutPage}, ${docRule.requiredDocument}.`,
+    "Include a workflow diagram covering data source, business workflow, sharing/collaboration, citizen visibility, and management statistics or alerts."
+  ];
+}
+
+function buildAcceptanceGate(template) {
+  return {
+    readyWhen: [
+      "Functional boundary is explicit and does not replace the owning source workflow.",
+      "All listed data collections and API routes have runnable tests or release evidence.",
+      "Frontend entry, About section, module document, workflow diagram, and acceptance artifacts are cross-linked.",
+      "Release report, release manifest, deploy check, and CI all reference the module evidence."
+    ],
+    blockers: [
+      template.openActions > 0 ? `${template.openActions} open source actions remain visible in dashboard evidence.` : "No open source actions recorded in dashboard evidence.",
+      template.highRisks > 0 ? `${template.highRisks} high-risk source records require owner review.` : "No high-risk source records recorded in dashboard evidence."
+    ],
+    evidence: template.acceptanceEvidence
+  };
+}
+
+function buildPriorityApplicationTemplates(options = {}) {
+  const summary = buildHealthDashboardSummary(options);
+  const templates = summary.applications.map((item, index) => {
+    const template = {
+      sequence: index + 1,
+      id: item.id,
+      conversationTitle: item.conversationTitle,
+      name: item.name,
+      owner: item.owner,
+      functionalBoundary: item.functionalBoundary,
+      reusePoints: item.reusePoints,
+      dataCollections: item.dataCollections,
+      apiRoutes: item.apiRoutes,
+      frontendEntry: item.frontendEntry,
+      testEvidence: item.testEvidence,
+      acceptanceEvidence: item.acceptanceEvidence,
+      sourceApplication: item.id !== DASHBOARD_APPLICATION.id,
+      aggregateApplication: item.id === DASHBOARD_APPLICATION.id,
+      status: item.status,
+      records: item.records,
+      openActions: item.openActions,
+      highRisks: item.highRisks,
+      documentationRule: item.documentationRule
+    };
+    return {
+      ...template,
+      conversationStarter: buildConversationStarter(template),
+      implementationChecklist: buildImplementationChecklist(template),
+      acceptanceGate: buildAcceptanceGate(template)
+    };
+  });
+  const checks = [
+    { id: "templates:count", passed: templates.length === 8, detail: `${templates.length} templates` },
+    { id: "templates:titles", passed: templates.every((item) => item.conversationTitle), detail: "all templates expose conversation titles" },
+    { id: "templates:required-fields", passed: templates.every((item) => item.functionalBoundary && item.reusePoints.length && item.dataCollections.length && item.apiRoutes.length && item.frontendEntry && item.testEvidence.length && item.acceptanceEvidence.length), detail: "all template fields populated" },
+    { id: "templates:documentation-rule", passed: templates.every((item) => item.documentationRule?.aboutPage && item.documentationRule?.requiredDocument && item.documentationRule?.flowDiagram), detail: "all templates require About docs and flow diagrams" },
+    { id: "templates:conversation-starter", passed: templates.every((item) => item.conversationStarter && item.conversationStarter.includes(item.id) && item.conversationStarter.includes(item.frontendEntry)), detail: "all templates expose copy-ready conversation starters" },
+    { id: "templates:implementation-checklist", passed: templates.every((item) => Array.isArray(item.implementationChecklist) && item.implementationChecklist.length >= 8), detail: "all templates expose implementation checklists" },
+    { id: "templates:acceptance-gate", passed: templates.every((item) => item.acceptanceGate?.readyWhen?.length >= 4 && item.acceptanceGate?.evidence?.length), detail: "all templates expose acceptance gates" },
+    { id: "templates:source-boundary", passed: templates.filter((item) => item.sourceApplication).length === 7 && templates.filter((item) => item.aggregateApplication).length === 1, detail: "7 source applications and 1 aggregate dashboard" }
+  ];
+  return {
+    ok: summary.ok && checks.every((item) => item.passed),
+    generatedAt: summary.generatedAt,
+    scope: {
+      role: "priority-application-development-templates",
+      rule: "Each template is the handoff contract for one independent application conversation: boundary, reuse, data, API, frontend, tests, acceptance evidence, About-page feature description, module documentation, and a workflow diagram."
+    },
+    summary: {
+      applications: templates.length,
+      sourceApplications: templates.filter((item) => item.sourceApplication).length,
+      aggregateApplications: templates.filter((item) => item.aggregateApplication).length,
+      apiRoutes: templates.reduce((sum, item) => sum + item.apiRoutes.length, 0),
+      dataCollections: new Set(templates.flatMap((item) => item.dataCollections)).size,
+      acceptanceArtifacts: templates.reduce((sum, item) => sum + item.acceptanceEvidence.length, 0)
+    },
+    templates,
+    checks
   };
 }
 
@@ -211,6 +330,114 @@ function collectOpenActions(data, limit = 12) {
   ).slice(0, limit);
 }
 
+function buildIndustryGovernanceIndicatorCenter(data = {}, context = {}) {
+  const now = context.now instanceof Date ? context.now : new Date();
+  const month = now.toISOString().slice(0, 7);
+  const year = now.toISOString().slice(0, 4);
+  const residents = rows(data, "residents");
+  const physicalExamRows = [...rows(data, "physicalExaminationRecords"), ...rows(data, "healthExamRecords")];
+  const feverClinicRows = [
+    ...rows(data, "feverClinicVisits"),
+    ...rows(data, "publicHealthEvents").filter((item) => /发热|fever/i.test(JSON.stringify(item)))
+  ];
+  const diseaseQueue = [...rows(data, "phase2DiseaseReportQueue"), ...rows(data, "diseaseReportQueue")];
+  const diseaseReceipts = [...rows(data, "phase2DiseaseReportReceipts"), ...rows(data, "diseaseReportReceipts")];
+  const clinicalAlerts = rows(data, "phase2ClinicalAssistAlerts");
+  const clinicalReceipts = rows(data, "phase2ClinicalAssistReceipts");
+  const archiveAccess = rows(data, "dataAccessLogs");
+  const appointmentRows = [
+    ...rows(data, "registrationOrders"),
+    ...rows(data, "careOrders").filter((item) => /appointment|registration|挂号|预约/i.test(JSON.stringify(item)))
+  ];
+  const familyDoctorContracts = rows(data, "phase2FamilyDoctorContracts");
+  const familyDoctorFulfillments = rows(data, "phase2FamilyDoctorFulfillments");
+  const regionalPerformanceRows = [
+    ...rows(data, "institutionCreditEvaluations"),
+    ...rows(data, "countyAcceptanceLedger"),
+    ...rows(data, "healthDashboardSnapshots")
+  ];
+  const completedCount = (items) => items.filter((item) => !isOpen(item)).length;
+  const allowedAccess = archiveAccess.filter((item) => /allowed|approved|success|granted|已授权|通过/i.test(String(item.result || item.status || item.decision || ""))).length;
+  const confirmedAppointments = appointmentRows.filter((item) => /confirmed|paid|completed|registered|accepted|已确认|已支付|已完成/i.test(statusOf(item))).length;
+  const fulfilledContractIds = new Set(familyDoctorFulfillments.map((item) => item.contractId).filter(Boolean));
+  const fulfilledContracts = familyDoctorContracts.filter((item) => fulfilledContractIds.has(item.id) || /active|fulfilled|renewed|履约|已签约/i.test(statusOf(item))).length;
+  const metric = ({ id, topic, category, definition, numerator, denominator, unit = "%", owner, sourceCollections, sourceSystems, drilldown, missingSource }) => {
+    const safeNumerator = Number(numerator || 0);
+    const safeDenominator = Number(denominator || 0);
+    const rate = safeDenominator > 0 ? Math.min(100, Math.round((safeNumerator / safeDenominator) * 1000) / 10) : 0;
+    const status = missingSource || safeDenominator === 0 ? "blocked" : rate >= 90 ? "ready" : "watch";
+    const currentValue = unit === "%" ? `${rate}%` : `${safeNumerator} ${unit}`;
+    const exceptionCount = safeDenominator > 0 ? Math.max(0, safeDenominator - safeNumerator) : 1;
+    const reports = [
+      { id: "month", label: "月报", period: month, value: currentValue, numerator: safeNumerator, denominator: safeDenominator, status, basis: "current normalized snapshot" },
+      { id: "year", label: "年报", period: year, value: currentValue, numerator: safeNumerator, denominator: safeDenominator, status, basis: "current normalized snapshot" }
+    ];
+    return {
+      id,
+      topic,
+      category,
+      definition,
+      numerator: safeNumerator,
+      denominator: safeDenominator,
+      currentValue,
+      rate,
+      unit,
+      status,
+      exceptionCount,
+      owner,
+      sourceCollections,
+      sourceSystems,
+      dataQuality: status === "ready" ? "high" : status === "watch" ? "medium" : "source-required",
+      reports,
+      drilldown,
+      nextAction: status === "blocked"
+        ? `Connect and verify ${sourceSystems.join(" / ")} source data before production reporting.`
+        : exceptionCount > 0
+          ? `Review ${exceptionCount} exception records in the owning source workflow.`
+          : "Keep the metric definition, source version and report evidence current."
+    };
+  };
+  const indicators = [
+    metric({ id: "industry-physical-exam", topic: "健康体检覆盖", category: "专项监管", definition: "已形成可追溯体检记录的居民数 / 纳入监管居民数。", numerator: new Set(physicalExamRows.map((item) => item.residentId).filter(Boolean)).size, denominator: residents.length, owner: "医政医管处/基层卫生处", sourceCollections: ["physicalExaminationRecords", "healthExamRecords", "residents"], sourceSystems: ["体检系统", "居民主索引"], drilldown: { label: "居民健康档案", href: "./citizen.html" }, missingSource: physicalExamRows.length === 0 }),
+    metric({ id: "industry-fever-clinic", topic: "发热门诊报告闭环", category: "专项监管", definition: "已完成报告和处置回执的发热门诊事件 / 发热门诊事件总数。", numerator: completedCount(feverClinicRows), denominator: feverClinicRows.length, owner: "医政医管处/疾控处", sourceCollections: ["feverClinicVisits", "publicHealthEvents"], sourceSystems: ["发热门诊系统", "公共卫生平台"], drilldown: { label: "公共卫生", href: "./public-health.html" }, missingSource: feverClinicRows.length === 0 }),
+    metric({ id: "industry-disease-reporting", topic: "疾病报卡回执率", category: "公卫监管", definition: "已取得区县平台回执的报卡数 / 疾病报卡队列总数。", numerator: Math.min(diseaseQueue.length, diseaseReceipts.length), denominator: diseaseQueue.length, owner: "疾控处/区县信息中心", sourceCollections: ["phase2DiseaseReportQueue", "phase2DiseaseReportReceipts"], sourceSystems: ["HIS/EMR", "区县直报平台"], drilldown: { label: "二期报病协同", href: "./platform.html#phase2-disease-reporting" }, missingSource: diseaseQueue.length === 0 }),
+    metric({ id: "industry-clinical-assist", topic: "临床辅助消息回执率", category: "医政质量", definition: "医生已处理并回执的临床辅助提醒 / 已生成提醒总数。", numerator: clinicalReceipts.length, denominator: clinicalAlerts.length, owner: "医政医管处/质控中心", sourceCollections: ["phase2ClinicalAssistAlerts", "phase2ClinicalAssistReceipts"], sourceSystems: ["医生工作站", "临床辅助规则中心"], drilldown: { label: "临床治疗辅助", href: "./platform.html#phase2-clinical-assist" }, missingSource: clinicalAlerts.length === 0 }),
+    metric({ id: "industry-archive-access", topic: "健康档案调阅合规率", category: "便民服务", definition: "通过授权和审计校验的档案调阅次数 / 档案调阅审计总数。", numerator: allowedAccess, denominator: archiveAccess.length, owner: "规划信息处/数据安全岗", sourceCollections: ["dataAccessLogs", "personalRecords"], sourceSystems: ["全民健康信息平台", "统一授权服务"], drilldown: { label: "数据共享审计", href: "./regional-data-sharing.html" }, missingSource: archiveAccess.length === 0 }),
+    metric({ id: "industry-appointment-reconciliation", topic: "预约订单对账完成率", category: "便民服务", definition: "已确认、支付或完成的预约订单 / 预约与挂号订单总数。", numerator: confirmedAppointments, denominator: appointmentRows.length, owner: "医政医管处/便民服务运营", sourceCollections: ["registrationOrders", "careOrders"], sourceSystems: ["17 家医院号源", "支付/医保回调"], drilldown: { label: "居民预约", href: "./citizen.html" }, missingSource: appointmentRows.length === 0 }),
+    metric({ id: "industry-family-doctor", topic: "家庭医生履约覆盖率", category: "基层卫生", definition: "已有履约记录或处于有效履约状态的签约数 / 家庭医生签约总数。", numerator: fulfilledContracts, denominator: familyDoctorContracts.length, owner: "基层卫生处/区县卫健局", sourceCollections: ["phase2FamilyDoctorContracts", "phase2FamilyDoctorFulfillments"], sourceSystems: ["家庭医生签约系统", "基层公卫系统"], drilldown: { label: "家庭医生监管", href: "./platform.html#phase2-family-doctor-contracts" }, missingSource: familyDoctorContracts.length === 0 }),
+    metric({ id: "industry-regional-performance", topic: "区域绩效证据就绪率", category: "区域绩效", definition: "已闭环或通过的区域绩效与机构评价记录 / 区域绩效证据总数。", numerator: completedCount(regionalPerformanceRows), denominator: regionalPerformanceRows.length, owner: "规划信息处/医政医管处", sourceCollections: ["institutionCreditEvaluations", "countyAcceptanceLedger", "healthDashboardSnapshots"], sourceSystems: ["综合监管", "医共体绩效", "机构信用评价"], drilldown: { label: "医共体绩效", href: "./county.html" }, missingSource: regionalPerformanceRows.length === 0 })
+  ];
+  const categories = Array.from(new Set(indicators.map((item) => item.category)));
+  const periodViews = ["month", "year"].map((periodId) => ({
+    id: periodId,
+    label: periodId === "month" ? "月报" : "年报",
+    period: periodId === "month" ? month : year,
+    indicators: indicators.length,
+    readyIndicators: indicators.filter((item) => item.reports.find((report) => report.id === periodId)?.status === "ready").length,
+    blockedIndicators: indicators.filter((item) => item.reports.find((report) => report.id === periodId)?.status === "blocked").length,
+    exceptionCount: indicators.reduce((sum, item) => sum + item.exceptionCount, 0),
+    basis: "current normalized snapshot; production reports require event-date filtering and signed source versions"
+  }));
+  return {
+    title: "二期行业治理指标中心",
+    summary: {
+      indicators: indicators.length,
+      categories: categories.length,
+      ready: indicators.filter((item) => item.status === "ready").length,
+      watch: indicators.filter((item) => item.status === "watch").length,
+      blocked: indicators.filter((item) => item.status === "blocked").length,
+      exceptions: indicators.reduce((sum, item) => sum + item.exceptionCount, 0),
+      reportViews: periodViews.length
+    },
+    categories,
+    periodViews,
+    indicators,
+    exportFields: ["topic", "category", "definition", "currentValue", "status", "exceptionCount", "owner", "sourceCollections", "sourceSystems", "nextAction"],
+    releaseEvidence: ["/api/health-dashboard/industry-governance-indicators", "health-dashboard.html#industry-governance-indicator-center", "docs/health-dashboard-indicator-center-report.md"],
+    boundary: "The indicator center is a governance definition, reporting and drilldown surface. It does not replace source-system reporting, statutory submissions or signed production statistics."
+  };
+}
+
 function buildHealthDashboardSummary(options = {}) {
   const data = options.data || readJson("data/db.json");
   const runtime = options.runtime || null;
@@ -222,15 +449,19 @@ function buildHealthDashboardSummary(options = {}) {
   const interfaceRows = rows(data, "platformInterfaces");
   const evidenceRecords = rows(data, "platformEvidence").flatMap((item) => item.records || []);
   const siteDependencies = rows(data, "productionDeploymentPlan").filter((item) => isOpen(item) || /missing|待|寰|blocked/i.test(JSON.stringify(item)));
+  const indicatorCenter = buildIndustryGovernanceIndicatorCenter(data, { now: options.now });
   const checks = [
     { id: "dashboard:applications", passed: applications.length === 8 && sourceApplications.length === 7 && applications.every((item) => item.entry && item.collections.length), detail: `${applications.length} priority applications; ${sourceApplications.length} source applications` },
     { id: "dashboard:development-template", passed: applications.every((item) => item.functionalBoundary && item.reusePoints.length && item.dataCollections.length && item.apiRoutes.length && item.frontendEntry && item.testEvidence.length && item.acceptanceEvidence.length), detail: "all priority applications expose boundary, reuse, data, API, frontend, test, and acceptance fields" },
+    { id: "dashboard:documentation-rule", passed: applications.every((item) => item.documentationRule?.aboutPage && item.documentationRule?.requiredDocument && item.documentationRule?.flowDiagram), detail: "all priority applications expose About docs and flow diagram requirements" },
     { id: "dashboard:source-boundary", passed: sourceApplications.every((item) => /source application/.test(item.boundary)), detail: "source applications keep workflow ownership" },
     { id: "dashboard:aggregate-boundary", passed: /first seven source applications/.test(applications.find((item) => item.id === DASHBOARD_APPLICATION.id)?.boundary || ""), detail: "dashboard is aggregate-only" },
     { id: "dashboard:metrics", passed: applications.reduce((sum, item) => sum + item.records, 0) > 0, detail: `${applications.reduce((sum, item) => sum + item.records, 0)} source records` },
     { id: "dashboard:actions", passed: openActions.length > 0, detail: `${openActions.length} open actions previewed` },
     { id: "dashboard:interfaces", passed: interfaceRows.length >= 4, detail: `${interfaceRows.length} interface rows` },
-    { id: "dashboard:evidence", passed: evidenceRecords.length >= 1, detail: `${evidenceRecords.length} evidence records` }
+    { id: "dashboard:evidence", passed: evidenceRecords.length >= 1, detail: `${evidenceRecords.length} evidence records` },
+    { id: "dashboard:industry-governance-indicators", passed: indicatorCenter.indicators.length === 8 && indicatorCenter.indicators.every((item) => item.definition && item.owner && item.sourceCollections.length && item.sourceSystems.length && item.reports.length === 2 && item.drilldown?.href), detail: `${indicatorCenter.indicators.length} governance indicators across ${indicatorCenter.summary.categories} categories` },
+    { id: "dashboard:industry-governance-reports", passed: indicatorCenter.periodViews.length === 2 && indicatorCenter.periodViews.every((item) => item.period && item.indicators === indicatorCenter.indicators.length && item.basis), detail: `${indicatorCenter.periodViews.length} monthly/yearly report views` }
   ];
   return {
     ok: checks.every((item) => item.passed),
@@ -252,6 +483,7 @@ function buildHealthDashboardSummary(options = {}) {
       readinessPassed: readiness?.passed ?? null,
       releasePassed: releaseReport?.ok ?? null
     },
+    indicatorCenter,
     applications,
     risks: applications.filter((item) => item.highRisks > 0 || item.openActions > 0).map((item) => ({
       applicationId: item.id,
@@ -290,8 +522,15 @@ function buildHealthDashboardSummary(options = {}) {
 
 function renderMarkdown(report) {
   const appRows = report.applications.map((item) => `| ${item.id} | ${item.entry} | ${item.records} | ${item.openActions} | ${item.highRisks} | ${item.status} |`);
-  const templateRows = report.applications.map((item) => `| ${item.id} | ${String(item.functionalBoundary || "").replace(/\|/g, "/")} | ${item.reusePoints.join("<br>")} | ${item.dataCollections.join("<br>")} | ${item.apiRoutes.join("<br>")} | ${item.frontendEntry} | ${item.testEvidence.join("<br>")} | ${item.acceptanceEvidence.join("<br>")} |`);
+  const templateRows = report.applications.map((item) => {
+    const documentation = item.documentationRule
+      ? [`About: ${item.documentationRule.aboutPage}`, `Doc: ${item.documentationRule.requiredDocument}`, "Flow: required", `Reference: ${item.documentationRule.maternalChildReference}`].join("<br>")
+      : "";
+    return `| ${item.id} | ${String(item.functionalBoundary || "").replace(/\|/g, "/")} | ${item.reusePoints.join("<br>")} | ${item.dataCollections.join("<br>")} | ${item.apiRoutes.join("<br>")} | ${item.frontendEntry} | ${item.testEvidence.join("<br>")} | ${item.acceptanceEvidence.join("<br>")} | ${documentation} |`;
+  });
   const actionRows = report.openActions.map((item) => `| ${item.priority} | ${item.collection} | ${item.id} | ${String(item.title || "").replace(/\|/g, "/")} | ${item.status} | ${item.owner} |`);
+  const indicatorRows = (report.indicatorCenter?.indicators || []).map((item) => `| ${item.category} | ${item.topic} | ${item.currentValue} | ${item.status} | ${item.exceptionCount} | ${item.owner} | ${item.sourceCollections.join("<br>")} |`);
+  const periodRows = (report.indicatorCenter?.periodViews || []).map((item) => `| ${item.label} | ${item.period} | ${item.indicators} | ${item.readyIndicators} | ${item.blockedIndicators} | ${item.exceptionCount} | ${item.basis} |`);
   const checkRows = report.checks.map((item) => `| ${item.passed ? "PASS" : "FAIL"} | ${item.id} | ${String(item.detail || "").replace(/\|/g, "/")} |`);
   return [
     "# Health dashboard summary",
@@ -323,9 +562,23 @@ function renderMarkdown(report) {
     "",
     "## Development template",
     "",
-    "| Application | Boundary | Reuse points | Data collections | API | Frontend entry | Tests | Acceptance evidence |",
-    "|---|---|---|---|---|---|---|---|",
+    "| Application | Boundary | Reuse points | Data collections | API | Frontend entry | Tests | Acceptance evidence | Documentation rule |",
+    "|---|---|---|---|---|---|---|---|---|",
     ...templateRows,
+    "",
+    "## Industry governance indicator center",
+    "",
+    report.indicatorCenter?.boundary || "",
+    "",
+    "| Category | Indicator | Current value | Status | Exceptions | Owner | Sources |",
+    "|---|---|---|---|---:|---|---|",
+    ...indicatorRows,
+    "",
+    "### Monthly and yearly report views",
+    "",
+    "| View | Period | Indicators | Ready | Blocked | Exceptions | Basis |",
+    "|---|---|---:|---:|---:|---:|---|",
+    ...periodRows,
     "",
     "## Open action preview",
     "",
@@ -372,4 +625,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { APPLICATIONS, buildHealthDashboardSummary, parseArgs, renderMarkdown, writeOutput };
+module.exports = { APPLICATIONS, DOCUMENTATION_RULE, buildHealthDashboardSummary, buildIndustryGovernanceIndicatorCenter, buildPriorityApplicationTemplates, parseArgs, renderMarkdown, writeOutput };

@@ -512,6 +512,8 @@ function buildChronicRiskStratification(data) {
     const overdueFollowups = openFollowups.filter((item) => item.status === "已逾期" || String(item.plannedAt || "") < today);
     const planPending = residentPlans.filter((item) => item.status !== "已复核");
     const selfAlerts = residentSelf.filter((item) => /预警|复核|异常|偏高/.test(`${item.status || ""}${item.latestValue || ""}${item.nextAction || ""}`));
+    const physicalExamScreenings = openScreenings.filter((item) => item.sourceType === "physical-exam");
+    const physicalExamRiskContribution = Math.min(30, physicalExamScreenings.reduce((sum, item) => sum + Number(item.riskScoreContribution || 0), 0));
     const risk = assessRisk(resident);
     const highRisk = risk.level === "高危" || residentScreenings.some((item) => item.riskLevel === "高危") || residentPlans.some((item) => item.grade === "高危");
     const score = Math.min(100,
@@ -521,6 +523,7 @@ function buildChronicRiskStratification(data) {
       selfAlerts.length * 10 +
       planPending.length * 8 +
       residentComorbidity.length * 6 +
+      physicalExamRiskContribution +
       (highRisk ? 12 : 0)
     );
     const priority = score >= 80 ? "high" : score >= 55 ? "medium" : "routine";
@@ -528,6 +531,7 @@ function buildChronicRiskStratification(data) {
       highRisk ? `风险分层：${risk.level}` : "",
       overdueFollowups.length ? `逾期随访 ${overdueFollowups.length} 项` : "",
       openScreenings.length ? `筛查未闭环 ${openScreenings.length} 项` : "",
+      physicalExamScreenings.length ? `体检异常 ${physicalExamScreenings.length} 份` : "",
       selfAlerts.length ? `自测/家属预警 ${selfAlerts.length} 项` : "",
       planPending.length ? `管理方案待复核 ${planPending.length} 项` : "",
       residentComorbidity.length ? "多病共管" : ""
@@ -554,11 +558,12 @@ function buildChronicRiskStratification(data) {
       openCounts: {
         overdueFollowups: overdueFollowups.length,
         openScreeningTasks: openScreenings.length,
+        physicalExamAbnormal: physicalExamScreenings.length,
         selfAlerts: selfAlerts.length,
         planReviews: planPending.length,
         comorbidityPlans: residentComorbidity.length
       },
-      nextAction: chronicRiskNextAction({ priority, overdueFollowups, openScreenings, selfAlerts, planPending, residentComorbidity }),
+      nextAction: chronicRiskNextAction({ priority, overdueFollowups, openScreenings, physicalExamScreenings, selfAlerts, planPending, residentComorbidity }),
       dueAt
     };
   }).sort((left, right) => right.score - left.score || String(left.dueAt || "").localeCompare(String(right.dueAt || "")));
@@ -576,8 +581,9 @@ function buildChronicRiskStratification(data) {
   };
 }
 
-function chronicRiskNextAction({ priority, overdueFollowups, openScreenings, selfAlerts, planPending, residentComorbidity }) {
+function chronicRiskNextAction({ priority, overdueFollowups, openScreenings, physicalExamScreenings = [], selfAlerts, planPending, residentComorbidity }) {
   if (overdueFollowups.length) return "补齐随访记录，必要时由家庭医生电话复核并登记结果。";
+  if (physicalExamScreenings.length) return "复核体检异常证据，更新慢病风险分层，并确认家医服务包与复测/转诊安排。";
   if (openScreenings.length) return "完成筛查评估、检查申请或干预推送，并回写风险分级。";
   if (selfAlerts.length) return "复核居民端自测异常，判断是否升级重点随访或转诊。";
   if (planPending.length) return "复核分级管理方案，明确下次随访频次和指标目标。";
@@ -949,6 +955,7 @@ function renderAnalytics() {
   renderStatisticsAnalytics();
   renderDalianHealthStatistics2025();
   renderBirthHealthManagement();
+  renderMaternalChildCare();
   renderHealthStatisticsIngestion();
   renderHealthBulletin2024();
 }
@@ -1406,6 +1413,14 @@ function renderBirthStatistics() {
   const rules = document.querySelector("#birth-stat-rules");
   if (!summary || !cards || !sources || !regionTable || !rules) return;
   const certificates = state.birthCertificates || [];
+  const certificateDocuments = state.birthCertificateDocuments || [];
+  const metricValue = (key, fallback) => {
+    const value = Number(metrics[key]);
+    return Number.isFinite(value) ? value : fallback;
+  };
+  const pendingPublicSecuritySync = metricValue("pendingPublicSecuritySync", certificates.filter((item) => item.publicSecuritySync !== "已共享").length);
+  const pendingMaternalChildSync = metricValue("pendingMaternalChildSync", certificates.filter((item) => item.maternalChildSync !== "已入册").length);
+  const qualityPending = metricValue("qualityPending", certificates.filter((item) => ["待质控", "待复核", "待补正"].includes(item.qualityCheck)).length);
 
   summary.textContent = `${formatPeriod(birth.period)} · 出生医学证明系统 + 妇幼健康管理 + 公安户籍共享`;
   cards.innerHTML = [
@@ -1414,18 +1429,20 @@ function renderBirthStatistics() {
     ["换发补发", metrics.reissued || 0, "原因登记与原证归档"],
     ["电子证照", metrics.electronicLicenses || 0, "第七版证件同步"],
     ["公安共享", metrics.publicSecuritySynced || 0, "出生登记依据"],
+    ["公安待共享", pendingPublicSecuritySync, "出生登记依据待推送"],
     ["妇幼入册", metrics.maternalChildSynced || 0, "新生儿健康管理"],
+    ["妇幼待入册", pendingMaternalChildSync, "健康管理档案待接续"],
     ["低体重儿", metrics.lowBirthWeight || 0, "专案随访"],
-    ["待处理", metrics.pending || 0, "待签发或待上报"]
+    ["质控补正", qualityPending, "材料编号和共享结果待复核"]
   ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${formatNumber(value)}</strong><em>${hint}</em></article>`).join("");
 
   if (alerts) {
     const alertItems = [
       ["待签发", certificates.filter((item) => item.status === "待签发").length, "督促签发机构完成材料核验、签章和编号登记"],
-      ["待公安共享", certificates.filter((item) => item.publicSecuritySync !== "已共享").length, "影响户籍出生登记和跨部门人口库更新"],
-      ["待妇幼入册", certificates.filter((item) => item.maternalChildSync !== "已入册").length, "新生儿访视、筛查和接种提醒未闭环"],
+      ["待公安共享", pendingPublicSecuritySync, "影响户籍出生登记和跨部门人口库更新"],
+      ["待妇幼入册", pendingMaternalChildSync, "新生儿访视、筛查和接种提醒未闭环"],
       ["低体重儿", certificates.filter((item) => Number(item.birthWeight || 0) > 0 && Number(item.birthWeight || 0) < 2500).length, "需建立专案随访和喂养指导"],
-      ["质控补正", certificates.filter((item) => ["待质控", "待复核", "待补正"].includes(item.qualityCheck)).length, "证件编号、父母身份、签发材料或共享结果需复核"]
+      ["质控补正", qualityPending, "证件编号、父母身份、签发材料或共享结果需复核"]
     ];
     alerts.innerHTML = alertItems.map(([label, value, hint]) => `<article>
       <span>${label}</span>
@@ -1451,7 +1468,13 @@ function renderBirthStatistics() {
     </tr>`).join("")}</tbody>
   </table>`;
 
-  rules.innerHTML = (birth.workflowRules || []).map((item) => `<div><strong>${item.rule}</strong><span>${item.deadline || item.detail}<br>${item.owner || ""} · ${item.status || ""}</span></div>`).join("");
+  const documentRules = certificateDocuments.map((item) => ({
+    rule: item.name || item.category,
+    deadline: `${item.serialRange || ""} · ${(item.controlPoints || []).join("、")}`,
+    owner: item.owner,
+    status: item.status
+  }));
+  rules.innerHTML = [...(birth.workflowRules || []), ...documentRules].map((item) => `<div><strong>${item.rule}</strong><span>${item.deadline || item.detail}<br>${item.owner || ""} · ${item.status || ""}</span></div>`).join("");
 }
 
 function renderBirthHealthManagement() {
@@ -1474,6 +1497,93 @@ function renderBirthHealthManagement() {
     <span>${item.target}</span>
     <span class="badge info">${item.status}</span>
   </article>`).join("");
+}
+
+function computeImmunizationSummary(certificates = []) {
+  const toolkit = window.ImmunizationSchedule2026;
+  if (!toolkit?.buildPlansFromCertificates) return { plans: [], total: 0, overdue: 0, dueSoon: 0, nextDose: null };
+  const plans = toolkit.buildPlansFromCertificates(certificates, state.personalRecords || [], { referenceDate: toolkit.POLICY.referenceDate });
+  const totals = plans.reduce((acc, plan) => {
+    acc.total += plan.summary.total;
+    acc.overdue += plan.summary.overdue;
+    acc.dueSoon += plan.summary.dueSoon;
+    if (!acc.nextDose && plan.nextDose) acc.nextDose = plan.nextDose;
+    return acc;
+  }, { plans, total: 0, overdue: 0, dueSoon: 0, nextDose: null });
+  return totals;
+}
+
+function renderMaternalChildCare() {
+  const summary = document.querySelector("#mch-summary");
+  const cards = document.querySelector("#mch-cards");
+  const table = document.querySelector("#mch-service-table");
+  const risks = document.querySelector("#mch-risk-list");
+  if (!summary || !cards || !table || !risks) return;
+
+  const certificates = state.birthCertificates || [];
+  const birth = getBirthStatistics();
+  const healthTasks = birth.healthManagement || [];
+  const motherIds = new Set(certificates.map((item) => item.maternalResidentId).filter(Boolean));
+  const signed = certificates.filter((item) => ["已签发", "已上报"].includes(item.status)).length;
+  const pendingVisit = certificates.filter((item) => /待|复测|确认/.test(`${item.healthManagementStatus || ""}${item.nextService || ""}`)).length;
+  const pendingScreening = certificates.filter((item) => /筛查|黄疸|出生缺陷|听力|遗传/.test(item.nextService || "")).length;
+  const lowWeight = certificates.filter((item) => Number(item.birthWeight || 0) > 0 && Number(item.birthWeight || 0) < 2500).length;
+  const pendingSync = certificates.filter((item) => item.maternalChildSync !== "已入册" || item.publicSecuritySync !== "已共享").length;
+  const qualityPending = certificates.filter((item) => ["待质控", "待复核", "待补正"].includes(item.qualityCheck)).length;
+  const immunization = computeImmunizationSummary(certificates);
+
+  summary.textContent = `${formatPeriod(birth.period)} · 孕产妇、出生证明、新生儿访视、筛查、免疫规划和儿童保健连续管理`;
+  cards.innerHTML = [
+    ["孕产妇个案", motherIds.size, "按母亲居民主索引汇聚"],
+    ["出生证明", certificates.length, "分娩信息和法定证明"],
+    ["签发/上报", signed, "证照与妇幼入册前置"],
+    ["待访视", pendingVisit, "新生儿/产后访视待闭环"],
+    ["筛查待确认", pendingScreening, "出生缺陷和黄疸等结果归集"],
+    ["免疫逾期", immunization.overdue, "按 2026 版国家免疫规划生成"],
+    ["接种到期", immunization.dueSoon, "30 天内到期提醒"],
+    ["低体重儿", lowWeight, "专案随访和喂养指导"],
+    ["共享待办", pendingSync, "公安户籍和妇幼系统"],
+    ["质控待办", qualityPending, "材料、编号和签章复核"]
+  ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${formatNumber(value)}</strong><em>${hint}</em></article>`).join("");
+
+  const stages = [
+    ["孕产妇建册", motherIds.size, "孕产妇保健服务与高危管理", pendingSync ? "关注入册" : "已衔接"],
+    ["产前筛查诊断", pendingScreening, "出生缺陷筛查、听力和遗传代谢病结果归集", pendingScreening ? "待确认" : "持续监测"],
+    ["住院分娩登记", certificates.length, "分娩机构、出生时间、体重身长和父母身份核验", "已建模"],
+    ["出生医学证明", signed, "首次签发、换发补发、电子证照和公安共享", pendingSync ? "待共享" : "已闭环"],
+    ["产后/新生儿访视", pendingVisit, "出生后 7 天内或出院后一周内访视", pendingVisit ? "待随访" : "已安排"],
+    ["儿童保健接续", healthTasks.length, "预防接种、体弱儿童管理和儿童体检", "居民端可见"],
+    ["免疫规划接续", immunization.plans.length, immunization.nextDose ? `下一剂次：${immunization.nextDose.childName} ${immunization.nextDose.vaccine} ${immunization.nextDose.dueDate}` : "按 2026 版规则库持续生成", immunization.overdue ? "免疫逾期" : "持续提醒"]
+  ];
+  table.innerHTML = `<table>
+    <thead><tr><th>服务环节</th><th>数量</th><th>管理口径</th><th>状态</th></tr></thead>
+    <tbody>${stages.map(([stage, count, scope, status]) => `<tr>
+      <td>${stage}</td>
+      <td>${formatNumber(count)}</td>
+      <td>${scope}</td>
+      <td><span class="badge ${/待|关注/.test(status) ? "warn" : "info"}">${status}</span></td>
+    </tr>`).join("")}</tbody>
+  </table>`;
+
+  const riskItems = certificates
+    .map((item) => {
+      const signals = [
+        Number(item.birthWeight || 0) > 0 && Number(item.birthWeight || 0) < 2500 ? "低体重儿" : "",
+        item.maternalChildSync !== "已入册" ? "妇幼待入册" : "",
+        item.publicSecuritySync !== "已共享" ? "公安待共享" : "",
+        ["待质控", "待复核", "待补正"].includes(item.qualityCheck) ? `质控${item.qualityCheck}` : "",
+        /筛查|黄疸|出生缺陷/.test(item.nextService || "") ? "筛查结果待确认" : ""
+      ].filter(Boolean);
+      return { ...item, signals };
+    })
+    .filter((item) => item.signals.length)
+    .slice(0, 6);
+  risks.innerHTML = riskItems.map((item) => `<article>
+    <strong>${item.newbornName || "未命名新生儿"} · ${item.motherName || "母亲待核验"}</strong>
+    <span>${item.birthDateTime || "出生时间待确认"} · ${item.birthWeight || "-"}g · ${item.issuingInstitution || "机构待确认"}</span>
+    <span>${item.signals.join("、")}</span>
+    <span class="badge warn">${item.nextService || "妇幼健康随访待安排"}</span>
+  </article>`).join("") || `<article><strong>暂无高优先级妇幼风险</strong><span>出生证、访视、筛查和共享状态均未触发风险规则。</span><span class="badge info">持续监测</span></article>`;
 }
 
 function renderStatisticsAnalytics() {

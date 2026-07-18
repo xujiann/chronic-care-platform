@@ -1,0 +1,25 @@
+[Unit]
+Description=Chronic Care Platform API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__SERVICE_USER__
+Group=__SERVICE_GROUP__
+WorkingDirectory=__APP_DIR__
+EnvironmentFile=__SECRET_ENV_FILE__
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=__DATA_DIR__ __LOG_DIR__
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

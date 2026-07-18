@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>医学影像云 · 全民健康信息平台</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+    <script>window.HealthCityAuth.requireRole(["commission", "institution", "county", "citizen"])</script>
+    <style>
+      .imaging-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.75fr);
+        gap: 16px;
+        align-items: start;
+      }
+      .imaging-tools,
+      .viewer-toolbar {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: end;
+      }
+      .imaging-tools label,
+      .ingest-form label {
+        display: grid;
+        gap: 6px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .imaging-tools select,
+      .ingest-form input,
+      .ingest-form select,
+      .ingest-form textarea {
+        min-height: 38px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px 10px;
+        color: var(--ink);
+        background: #fff;
+        font: inherit;
+      }
+      .ingest-form {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .ingest-form .full {
+        grid-column: 1 / -1;
+      }
+      .phone-shell {
+        border: 1px solid #1f2937;
+        border-radius: 28px;
+        padding: 12px;
+        background: #111827;
+        box-shadow: 0 18px 38px rgba(17, 24, 39, 0.18);
+      }
+      .phone-screen {
+        min-height: 620px;
+        border-radius: 20px;
+        background: #f8fafc;
+        overflow: hidden;
+        color: #17202a;
+      }
+      .phone-header {
+        padding: 16px;
+        background: #102033;
+        color: #fff;
+      }
+      .phone-header span,
+      .phone-header small {
+        display: block;
+        color: #b8d8ef;
+      }
+      .study-viewer {
+        padding: 14px;
+      }
+      .dicom-stage {
+        aspect-ratio: 1 / 1;
+        border-radius: 8px;
+        background:
+          radial-gradient(circle at 50% 46%, rgba(255,255,255,0.82) 0 6%, rgba(166,178,195,0.72) 7% 16%, rgba(48,59,77,0.92) 17% 42%, rgba(12,17,28,1) 43%),
+          linear-gradient(135deg, #1f2937, #020617);
+        display: grid;
+        place-items: center;
+        color: #dbeafe;
+        text-align: center;
+        padding: 18px;
+        border: 1px solid #334155;
+      }
+      .dicom-stage strong {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 20px;
+      }
+      .viewer-meta,
+      .series-strip,
+      .share-box {
+        display: grid;
+        gap: 8px;
+        margin-top: 12px;
+      }
+      .viewer-meta div,
+      .series-strip button,
+      .share-box div {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        padding: 10px;
+      }
+      .series-strip {
+        grid-template-columns: repeat(4, 1fr);
+      }
+      .series-strip button {
+        min-height: 54px;
+        cursor: pointer;
+        font-weight: 800;
+      }
+      .inline-action {
+        min-height: 34px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 6px 10px;
+        background: #fff;
+        color: var(--ink);
+        font: inherit;
+        font-weight: 800;
+        cursor: pointer;
+      }
+      .inline-action.primary {
+        border-color: var(--blue);
+        background: var(--blue);
+        color: #fff;
+      }
+      .badge.ok {
+        background: rgba(22, 132, 91, 0.12);
+        color: var(--green);
+      }
+      @media (max-width: 920px) {
+        .imaging-layout,
+        .ingest-form {
+          grid-template-columns: 1fr;
+        }
+        .portal-header {
+          position: static;
+        }
+        .phone-screen {
+          min-height: 560px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>医学影像云</span>
+          <h1>区域医学影像云工作台</h1>
+          <p>按辽宁省影像云功能与技术规范，接入医院 DICOM/RIS/PACS 数据，形成患者手机调阅、授权分享、质控统计和电子病历兼容索引。</p>
+        </div>
+        <nav>
+          <a href="./citizen.html">个人端</a>
+          <a href="./institution.html">医疗机构</a>
+          <a href="./county.html">医共体</a>
+          <a href="./index.html">监管端</a>
+        </nav>
+      </header>
+
+      <section class="panel wide" data-imaging-section="solution-a-health">
+        <div class="panel-title">
+          <h2>方案A：FHIR与影像服务状态</h2>
+          <button class="inline-action" id="reload-solution-a" type="button">重新探测</button>
+        </div>
+        <div class="metric-grid" id="solution-a-health"><article class="metric-card"><span>正在探测</span><strong>...</strong><small>HAPI FHIR / Orthanc / OHIF</small></article></div>
+      </section>
+
+      <section class="panel wide" data-imaging-section="solution-a-studies">
+        <div class="panel-title">
+          <h2>Orthanc外部影像归档</h2>
+          <button class="inline-action" id="reload-solution-a-studies" type="button">刷新检查</button>
+        </div>
+        <div id="solution-a-studies"><p>正在读取DICOMweb检查清单...</p></div>
+      </section>
+
+      <section class="panel wide">
+        <div class="panel-title">
+          <h2>运行总览</h2>
+          <div class="imaging-tools">
+            <label>居民
+              <select id="resident-filter"></select>
+            </label>
+            <label>机构
+              <select id="institution-filter"></select>
+            </label>
+            <button class="inline-action primary" id="reload-imaging" type="button">刷新</button>
+          </div>
+        </div>
+        <div class="metric-grid" id="imaging-summary"></div>
+      </section>
+
+      <div class="imaging-layout">
+        <div>
+          <section class="panel wide" data-imaging-section="hospital-ingest">
+            <div class="panel-title">
+              <h2>医院影像数据接入</h2>
+              <span>DICOM TAG、RIS 检查信息、审核报告和云端对象存储索引同步入云。</span>
+            </div>
+            <form class="ingest-form" id="ingest-form">
+              <label>居民
+                <select name="residentId" required></select>
+              </label>
+              <label>医疗机构编码
+                <input name="institutionCode" value="MR1" required />
+              </label>
+              <label>检查号
+                <input name="accessionNumber" value="CT-DEMO-NEW" required />
+              </label>
+              <label>检查 UID
+                <input name="studyInstanceUID" value="1.2.156.112605.demo.new" required />
+              </label>
+              <label>检查类型
+                <select name="modality">
+                  <option>CT</option>
+                  <option>MR</option>
+                  <option>DR</option>
+                  <option>DX</option>
+                  <option>CR</option>
+                </select>
+              </label>
+              <label>检查部位
+                <input name="bodyPart" value="胸部" required />
+              </label>
+              <label class="full">报告结论
+                <textarea name="reportConclusion" rows="3">影像云演示检查已完成入云，报告结论同步写入电子病历索引。</textarea>
+              </label>
+              <button class="inline-action primary" type="submit">接入影像</button>
+              <span id="ingest-status"></span>
+            </form>
+          </section>
+
+          <section class="panel wide">
+            <div class="panel-title">
+              <h2>影像检查列表</h2>
+              <span>支持按医院、时间、类型、部位和主索引调阅。</span>
+            </div>
+            <div class="table-wrap" id="study-table"></div>
+          </section>
+
+          <section class="panel wide" data-imaging-section="development-plan">
+            <div class="panel-title">
+              <h2>已实现功能与下一步开发计划</h2>
+              <span>把规范要求拆成当前能力、现场联调、性能、安全和监管扩展任务。</span>
+            </div>
+            <div class="capability-grid" id="imaging-current-capabilities"></div>
+            <div class="table-wrap" id="imaging-development-plan"></div>
+          </section>
+
+          <section class="panel wide">
+            <div class="panel-title">
+              <h2>前置网关与电子病历兼容</h2>
+              <span>云端主索引同步到区域健康信息平台，EMR 通过授权主索引调阅。</span>
+            </div>
+            <div class="capability-grid" id="gateway-grid"></div>
+            <div class="rules" id="emr-compatibility"></div>
+          </section>
+        </div>
+
+        <aside class="phone-shell" aria-label="患者手机影像查看">
+          <div class="phone-screen">
+            <div class="phone-header">
+              <span>患者手机查看</span>
+              <h2 id="phone-title">影像调阅</h2>
+              <small id="phone-subtitle">实名身份认证后查看云端影像和报告</small>
+            </div>
+            <div class="study-viewer" id="mobile-viewer"></div>
+          </div>
+        </aside>
+      </div>
+    </main>
+    <script src="./imaging-cloud.js"></script>
+  </body>
+</html>

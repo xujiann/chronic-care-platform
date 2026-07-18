@@ -142,8 +142,14 @@ function renderQualitySafety(data) {
   renderRectifications(data.rectifications || []);
   renderCritical(data.criticalValueAlerts || []);
   renderBoundaries(data);
+  renderBloodCoordination(data.bloodCoordination || {});
   const updated = document.getElementById("quality-safety-updated");
   if (updated) updated.textContent = data.generatedAt ? new Date(data.generatedAt).toLocaleString() : "";
+}
+
+function renderBloodCoordination(coordination) {
+  const rows = coordination.projections || [];
+  setHtml("quality-blood-coordination", rows.length ? `<table><thead><tr><th>级别</th><th>质量事件</th><th>处置类别</th><th>对象</th><th>工作流</th></tr></thead><tbody>${rows.map((item) => `<tr><td>${escapeHtml(item.severity)}</td><td>${escapeHtml(item.eventType)}</td><td>${escapeHtml(item.category)}</td><td>${escapeHtml(item.subjectId)}</td><td>${escapeHtml(item.workflow)}</td></tr>`).join("")}</tbody></table>` : "<p>尚无血液质量事件投影。</p>");
 }
 
 async function loadQualitySafety() {

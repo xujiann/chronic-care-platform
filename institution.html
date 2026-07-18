@@ -17,7 +17,9 @@
           <p>接收基层转诊、查看授权健康档案、补充电子病历，并与医保结算审核贯通。</p>
         </div>
         <nav>
+          <a href="./digital-hospital-self-assessment.html">数智医院自评</a>
           <a href="./health-city.html">系统总览</a>
+          <a href="./about.html">关于</a>
         </nav>
       </header>
 
@@ -28,8 +30,122 @@
           <h2>慢病管理与院后随访闭环</h2>
           <span id="chronic-followup-summary"></span>
         </div>
+        <div class="panel-title">
+          <h2>慢病上线核心联调</h2>
+          <span id="chronic-launch-core-summary"></span>
+        </div>
+        <div id="chronic-launch-core" class="claim-grid"></div>
+        <div class="panel-title">
+          <h2>疾控和公卫闭环</h2>
+          <span id="public-health-loop-summary"></span>
+        </div>
+        <div id="public-health-loop-stages" class="claim-grid"></div>
+        <div id="public-health-loop-integrations" class="claim-grid"></div>
+        <div id="public-health-cdc-summary" class="list compact"></div>
+        <div id="public-health-loop-queue" class="list compact"></div>
         <div id="chronic-followup-metrics" class="claim-grid"></div>
+        <div class="chronic-workbench-controls" data-chronic-workbench-controls>
+          <label>优先级
+            <select id="chronic-priority-filter">
+              <option value="all">全部优先级</option>
+              <option value="critical">紧急</option>
+              <option value="high">高</option>
+              <option value="medium">中</option>
+              <option value="low">低</option>
+            </select>
+          </label>
+          <label>任务类型
+            <select id="chronic-type-filter">
+              <option value="all">全部任务类型</option>
+              <option value="chronicScreeningTasks">筛查分级</option>
+              <option value="chronicManagementPlans">管理计划</option>
+              <option value="followups">随访任务</option>
+              <option value="medicationPickups">用药取药</option>
+            </select>
+          </label>
+          <label>搜索
+            <input id="chronic-search" type="search" placeholder="居民、任务、状态" />
+          </label>
+          <label>排序
+            <select id="chronic-sort">
+              <option value="priority">优先级与到期时间</option>
+              <option value="due">到期时间</option>
+              <option value="resident">居民姓名</option>
+            </select>
+          </label>
+          <button class="inline-action" id="chronic-clear-filters" type="button">清空</button>
+        </div>
+        <div class="integration-actions" id="chronic-integration-actions">
+          <button class="inline-action" type="button" data-chronic-integration="device">设备上传</button>
+          <button class="inline-action" type="button" data-chronic-integration="pharmacy">药房回传</button>
+          <button class="inline-action" type="button" data-chronic-integration="familyDoctor">家庭医生闭环</button>
+          <button class="inline-action" type="button" data-chronic-integration="outreach">提醒触达</button>
+          <span id="chronic-integration-status" class="muted">现场联调已就绪</span>
+        </div>
         <div id="chronic-followup-workbench" class="list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>转诊接续与基层承接</h2>
+          <span id="chronic-referral-continuity-summary"></span>
+        </div>
+        <div id="chronic-referral-continuity" class="list compact"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>慢病电子健康档案字段标准化</h2>
+          <span id="chronic-archive-standard-summary"></span>
+        </div>
+        <div id="chronic-archive-standard" class="list compact"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>病种路径与质控指标</h2>
+          <span id="chronic-pathway-quality-summary"></span>
+        </div>
+        <div id="chronic-pathway-quality-indicators" class="claim-grid"></div>
+        <div id="chronic-pathway-quality-pathways" class="list compact"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>医保药房闭环</h2>
+          <span id="chronic-pharmacy-insurance-summary"></span>
+        </div>
+        <div id="chronic-pharmacy-insurance-metrics" class="claim-grid"></div>
+        <div id="chronic-pharmacy-insurance-rows" class="list compact"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>慢病生产安全预检</h2>
+          <span id="chronic-production-safety-summary"></span>
+        </div>
+        <div id="chronic-production-safety-checks" class="claim-grid"></div>
+        <div id="chronic-production-safety-blockers" class="list compact"></div>
+        <div id="chronic-production-safety-evidence" class="list compact"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>Chronic interoperability standard precheck</h2>
+          <span id="chronic-interoperability-summary"></span>
+        </div>
+        <div id="chronic-interoperability-profiles" class="claim-grid"></div>
+        <div id="chronic-interoperability-evidence" class="list compact"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>二期家庭医生签约管理</h2>
+          <span id="phase2-family-doctor-summary">签约申请、审核、合同履约、续约和满意度</span>
+        </div>
+        <div id="phase2-family-doctor-contracts" class="claim-grid"></div>
+        <div id="phase2-family-doctor-applications" class="list compact"></div>
+        <div id="phase2-family-doctor-fulfillments" class="list compact"></div>
       </section>
 
       <section class="portal-grid">
@@ -44,7 +160,7 @@
         <article class="panel">
           <div class="panel-title">
             <h2>多点执业政策校验</h2>
-            <span>国卫医发〔2014〕86号</span>
+            <span>国卫医发〔2014〕86号 · <a href="./about.html">政策说明</a></span>
           </div>
           <div id="multi-practice-policy" class="rules"></div>
         </article>
@@ -149,6 +265,31 @@
           <span id="referral-center-count"></span>
         </div>
         <div id="referral-center" class="list"></div>
+      </section>
+
+      <section class="panel" id="registration-journey-workbench">
+        <div class="panel-title">
+          <h2>预约就诊协同工作台</h2>
+          <span>本院 HIS 确认、报到、完诊和退款闭环</span>
+        </div>
+        <div id="registration-journey-metrics" class="metric-grid compact"></div>
+        <div id="registration-journey-orders" class="priority-list"></div>
+        <p id="registration-journey-boundary" class="muted"></p>
+        <div class="panel-title compact" id="registration-waitlist-workbench">
+          <h3>号源候补与自动补位</h3>
+          <span id="registration-waitlist-status">等待候补</span>
+        </div>
+        <div id="registration-waitlist-metrics" class="metric-grid compact"></div>
+        <div id="registration-waitlist-entries" class="list compact"></div>
+        <p id="registration-waitlist-boundary" class="muted"></p>
+        <div class="panel-title compact" id="registration-integration-center">
+          <h3>预约回调联调与对账</h3>
+          <span id="registration-integration-status">等待回调</span>
+        </div>
+        <div id="registration-integration-metrics" class="metric-grid compact"></div>
+        <div id="registration-integration-sources" class="list compact"></div>
+        <div id="registration-integration-events" class="list compact"></div>
+        <p id="registration-integration-boundary" class="muted"></p>
       </section>
 
       <section class="panel">
@@ -279,6 +420,7 @@
         </div>
         <div id="birth-certificate-alerts" class="claim-grid"></div>
         <div id="birth-certificate-metrics" class="claim-grid"></div>
+        <div id="birth-certificate-documents" class="claim-grid"></div>
         <div id="birth-certificate-list" class="list"></div>
       </section>
 

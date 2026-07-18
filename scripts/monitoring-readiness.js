@@ -7,9 +7,11 @@ const DEFAULT_OUTPUT = path.join(ROOT, "release", "monitoring-readiness-report.j
 const DEFAULT_MARKDOWN = path.join(ROOT, "release", "monitoring-readiness-report.md");
 
 const REQUIRED_ROUTES = [
+  "/api/live",
   "/api/health",
   "/api/metrics",
-  "/api/system/readiness"
+  "/api/system/readiness",
+  "/api/observability/alerts"
 ];
 
 const REQUIRED_METRIC_SIGNALS = [
@@ -26,6 +28,8 @@ const REQUIRED_ALERT_SIGNALS = [
   "deadLetters",
   "dataQualityIssues",
   "externalDependencySummary",
+  "observabilityAlertDeliveries",
+  "alert-delivery-recovered",
   "CUTOVER_MONITORING_SIGNOFF"
 ];
 
@@ -44,7 +48,12 @@ function readText(relativePath) {
   return fs.readFileSync(path.join(ROOT, relativePath), "utf8");
 }
 
-function buildEvidenceMap(serverSource, readme, deployment, pkg) {
+function hasAll(source, markers) {
+  return markers.every((marker) => source.includes(marker));
+}
+
+function buildEvidenceMap(sources) {
+  const { serverSource, readme, deployment, pkg, adapterSource, operationsHtml, operationsJs, alertingDocument, envExample, releaseSource, deploySource } = sources;
   return {
     routes: REQUIRED_ROUTES.map((route) => ({
       route,
@@ -73,7 +82,45 @@ function buildEvidenceMap(serverSource, readme, deployment, pkg) {
     sloTargets: SLO_TARGETS.map((target) => ({
       ...target,
       covered: target.evidence.every((marker) => serverSource.includes(marker) || readme.includes(marker) || deployment.includes(marker) || Boolean(pkg.scripts?.[marker]))
-    }))
+    })),
+    alertAdapter: {
+      hmacSigned: hasAll(adapterSource, ["HMAC-SHA256", "signAlertRequest", "X-Signature"]),
+      httpsEnforced: hasAll(adapterSource, ["must use HTTPS in production", "productionHttps"]),
+      idempotent: hasAll(adapterSource, ["X-Idempotency-Key", "idempotencyKey"]),
+      boundedRetry: hasAll(adapterSource, ["ALERTING_MAX_ATTEMPTS", "maxAttempts"]),
+      piiRejected: hasAll(adapterSource, ["FORBIDDEN_ALERT_KEYS", "sensitive field is not allowed in alert payload"]),
+      publicStatusSafe: hasAll(adapterSource, ["publicRouteStatus", "productionReady: false"])
+    },
+    alertRuntime: {
+      centerRoute: serverSource.includes('url.pathname === "/api/observability/alerts"'),
+      dispatchRoute: serverSource.includes('url.pathname === "/api/observability/alerts/dispatch"'),
+      retryRoute: serverSource.includes("/api/observability/alert-deliveries/"),
+      persistedReceipts: hasAll(serverSource, ["observabilityAlertDeliveries", "adapterReceipt"]),
+      incidentClosure: hasAll(serverSource, ["ops-alert-delivery-", "alert-delivery-failed", "alert-delivery-recovered"]),
+      commissionOnly: hasAll(serverSource, ['["commission"]', "/api/observability/alerts"])
+    },
+    alertUi: {
+      statusPanel: hasAll(operationsHtml, ["observability-alert-status", "observability-alert-deliveries"]),
+      signalActions: hasAll(operationsJs, ["renderObservabilityAlertCenter", "data-observability-alert-action"]),
+      retryAction: hasAll(operationsJs, ["retryObservabilityAlert", "/observability/alert-deliveries/"])
+    },
+    alertEnvironment: {
+      siemEndpoint: envExample.includes("SIEM_ENDPOINT="),
+      siemSecret: envExample.includes("SIEM_SIGNING_SECRET="),
+      webhookEndpoint: envExample.includes("ALERT_WEBHOOK_URL="),
+      retryLimit: envExample.includes("ALERTING_MAX_ATTEMPTS=")
+    },
+    productionBoundary: {
+      adapterNotAcceptance: alertingDocument.includes("告警适配器基础通过不等于生产监控已经正式验收"),
+      minimized: alertingDocument.includes("去标识化"),
+      failureIncident: alertingDocument.includes("失败进入运维事件"),
+      signoffRequired: alertingDocument.includes("CUTOVER_MONITORING_SIGNOFF"),
+      productionReady: false
+    },
+    releaseWiring: {
+      releaseReport: hasAll(releaseSource, ["monitoring:alertRouting", "env:ALERTING.routes"]),
+      deployCheck: hasAll(deploySource, ["observability-alerting.js", "monitoring:alertRouting"])
+    }
   };
 }
 
@@ -82,7 +129,20 @@ function buildMonitoringReadinessReport(options = {}) {
   const serverSource = options.serverSource ?? readText("server.js");
   const readme = options.readme ?? readText("README.md");
   const deployment = options.deployment ?? readText("DEPLOYMENT.md");
-  const evidence = buildEvidenceMap(serverSource, readme, deployment, pkg);
+  const sources = {
+    serverSource,
+    readme,
+    deployment,
+    pkg,
+    adapterSource: options.adapterSource ?? readText("observability-alerting.js"),
+    operationsHtml: options.operationsHtml ?? readText("operations.html"),
+    operationsJs: options.operationsJs ?? readText("operations.js"),
+    alertingDocument: options.alertingDocument ?? readText("docs/production-observability-alerting.md"),
+    envExample: options.envExample ?? readText(".env.example"),
+    releaseSource: options.releaseSource ?? readText("scripts/release-report.js"),
+    deploySource: options.deploySource ?? readText("scripts/deploy-check.js")
+  };
+  const evidence = buildEvidenceMap(sources);
   const docsMentionOnCall = /on-call|值守|告警|监控|escalation/i.test(readme) && /on-call|值守|告警|监控|escalation/i.test(deployment);
   const checks = [
     { id: "monitoring:routes", passed: evidence.routes.every((item) => item.present && item.documented), detail: evidence.routes.map((item) => `${item.route}:${item.present ? "code" : "missing"}/${item.documented ? "docs" : "undoc"}`).join(";") },
@@ -90,16 +150,37 @@ function buildMonitoringReadinessReport(options = {}) {
     { id: "monitoring:alertSignals", passed: evidence.alertSignals.every((item) => item.present), detail: evidence.alertSignals.map((item) => `${item.signal}:${item.present ? "yes" : "no"}`).join(";") },
     { id: "monitoring:sloTargets", passed: evidence.sloTargets.every((item) => item.covered), detail: evidence.sloTargets.map((item) => `${item.id}:${item.target}`).join(";") },
     { id: "monitoring:onCallDocs", passed: docsMentionOnCall, detail: docsMentionOnCall ? "monitoring, alerting, and on-call escalation documented" : "missing monitoring/on-call documentation" },
-    { id: "monitoring:releaseScripts", passed: evidence.releaseScripts.every((item) => item.present), detail: evidence.releaseScripts.filter((item) => !item.present).map((item) => item.script).join(",") || "all monitoring release scripts present" }
+    { id: "monitoring:releaseScripts", passed: evidence.releaseScripts.every((item) => item.present), detail: evidence.releaseScripts.filter((item) => !item.present).map((item) => item.script).join(",") || "all monitoring release scripts present" },
+    { id: "monitoring:alertAdapter", passed: Object.values(evidence.alertAdapter).every(Boolean), detail: Object.entries(evidence.alertAdapter).map(([key, value]) => `${key}:${value ? "yes" : "no"}`).join(";") },
+    { id: "monitoring:alertRuntime", passed: Object.values(evidence.alertRuntime).every(Boolean), detail: Object.entries(evidence.alertRuntime).map(([key, value]) => `${key}:${value ? "yes" : "no"}`).join(";") },
+    { id: "monitoring:alertUi", passed: Object.values(evidence.alertUi).every(Boolean), detail: Object.entries(evidence.alertUi).map(([key, value]) => `${key}:${value ? "yes" : "no"}`).join(";") },
+    { id: "monitoring:alertEnvironment", passed: Object.values(evidence.alertEnvironment).every(Boolean), detail: Object.entries(evidence.alertEnvironment).map(([key, value]) => `${key}:${value ? "yes" : "no"}`).join(";") },
+    { id: "monitoring:productionBoundary", passed: Object.entries(evidence.productionBoundary).filter(([key]) => key !== "productionReady").every(([, value]) => value) && evidence.productionBoundary.productionReady === false, detail: "adapter foundation ready; production receiver, on-call drill and signoff remain required" },
+    { id: "monitoring:releaseWiring", passed: Object.values(evidence.releaseWiring).every(Boolean), detail: Object.entries(evidence.releaseWiring).map(([key, value]) => `${key}:${value ? "yes" : "no"}`).join(";") }
   ];
   return {
     ok: checks.every((item) => item.passed),
     generatedAt: new Date().toISOString(),
+    status: "adapter-foundation-ready-site-acceptance-pending",
+    productionReady: false,
     routes: evidence.routes,
     metricSignals: evidence.metricSignals,
     alertSignals: evidence.alertSignals,
     sloTargets: evidence.sloTargets,
     releaseScripts: evidence.releaseScripts,
+    alertRouting: {
+      adapter: evidence.alertAdapter,
+      runtime: evidence.alertRuntime,
+      ui: evidence.alertUi,
+      environment: evidence.alertEnvironment,
+      releaseWiring: evidence.releaseWiring
+    },
+    productionBoundary: evidence.productionBoundary,
+    summary: {
+      routes: evidence.routes.length,
+      controls: Object.values(evidence.alertAdapter).filter(Boolean).length,
+      blockers: 6
+    },
     checks
   };
 }
@@ -145,6 +226,13 @@ function renderMarkdown(report) {
     "| Result | SLO | Target | Evidence |",
     "|---|---|---|---|",
     ...sloRows,
+    "",
+    "## Production alert routing",
+    "",
+    `- Status: ${report.status}`,
+    `- Production ready: ${report.productionReady ? "yes" : "no"}`,
+    `- Adapter controls: ${report.summary.controls}/6`,
+    `- Site acceptance blockers: ${report.summary.blockers}`,
     ""
   ].join("\n");
 }

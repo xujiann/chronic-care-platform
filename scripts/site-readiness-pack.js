@@ -9,6 +9,10 @@ const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "site-readiness-pack.json");
 const DEFAULT_MARKDOWN = path.join(ROOT, "release", "site-readiness-pack.md");
 
+function readText(relativePath) {
+  return fs.readFileSync(path.join(ROOT, relativePath), "utf8");
+}
+
 function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(ROOT, relativePath), "utf8"));
 }
@@ -35,10 +39,11 @@ function buildSignoffTemplates(env) {
   return [
     ["cutover-env-file", "environment", "platform-ops", "NODE_ENV/STORAGE_ENGINE/.env production review", "NODE_ENV=production and non-JSON production storage confirmed"],
     ["cutover-secrets", "security", "security-admin", "session and gateway secret review", "non-placeholder SESSION_SECRETS and INTEGRATION_GATEWAY_SECRET injected"],
-    ["cutover-identity", "identity", "identity-integration", "government identity source signoff", "OIDC/SAML metadata, client secret, callback URL, and organization mapping confirmed"],
+    ["cutover-identity", "identity", "identity-integration", "government identity and SMS gateway signoff", "OIDC/SAML metadata, client secret, callback URL, organization mapping, and SMS_GATEWAY_URL confirmed"],
     ["cutover-audit-retention", "audit", "security-admin", "audit retention signoff", "AUDIT_EXPORT_PATH or SIEM endpoint and retention permission confirmed"],
     ["cutover-storage-adapter", "storage", "data-platform", "production database and backup signoff", "database adapter, backup, rollback, and migration rehearsal confirmed"],
     ["cutover-institution-interfaces", "integration", "institution-integration", "HIS/EMR/LIS/PACS joint-test signoff", envSigned(env, "CUTOVER_SITE_INTERFACE_SIGNOFF") ? "signed" : "requires CUTOVER_SITE_INTERFACE_SIGNOFF"],
+    ["cutover-chronic-launch-core", "integration", "chronic-followup", "chronic launch core action closure signoff", envSigned(env, "CUTOVER_CHRONIC_LAUNCH_CORE_SIGNOFF") ? "signed" : "requires CUTOVER_CHRONIC_LAUNCH_CORE_SIGNOFF"],
     ["cutover-insurance-certificate", "integration", "cross-agency-integration", "insurance/certificate/statistics exchange signoff", envSigned(env, "CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF") ? "signed" : "requires CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF"],
     ["cutover-monitoring", "operations", "platform-ops", "monitoring and on-call signoff", envSigned(env, "CUTOVER_MONITORING_SIGNOFF") ? "signed" : "requires CUTOVER_MONITORING_SIGNOFF"],
     ["cutover-dr-rehearsal", "resilience", "data-platform", "disaster recovery rehearsal signoff", envSigned(env, "CUTOVER_DR_REHEARSAL_SIGNOFF") ? "signed" : "requires CUTOVER_DR_REHEARSAL_SIGNOFF"]
@@ -80,6 +85,7 @@ function buildSiteReadinessPack(options = {}) {
   const identity = options.identityContract || buildIdentityContract({ data });
   const interfaceMapping = options.interfaceMapping || buildInterfaceMappingReport({ data, pkg });
   const monitoring = options.monitoringReadiness || buildMonitoringReadinessReport({ data, pkg });
+  const onsiteMaterialsDoc = options.onsiteMaterialsDoc ?? readText("docs/on-site-launch-materials.md");
 
   const identityTemplates = toRows(identity.requiredClaims, (claim) => ({
     id: `identity-${claim.claim || claim.name}`,
@@ -90,7 +96,7 @@ function buildSiteReadinessPack(options = {}) {
     field: claim.claim || claim.name,
     expectedSource: claim.source || "OIDC/SAML claim",
     platformUsage: claim.description || claim.usage || claim.purpose || "",
-    evidenceToAttach: ["OIDC/SAML metadata", "sample signed token", "role and organization mapping screenshot"]
+    evidenceToAttach: ["OIDC/SAML metadata", "sample signed token", "role and organization mapping screenshot", "SMS gateway delivery receipt"]
   }));
 
   const interfaceTemplates = toRows(interfaceMapping.mappings, (mapping) => ({
@@ -167,7 +173,21 @@ function buildSiteReadinessPack(options = {}) {
     { id: "site-pack:interfaces", passed: interfaceTemplates.length >= 5 && interfaceTemplates.every((item) => item.targetCollection), detail: `${interfaceTemplates.length} interface mapping rows` },
     { id: "site-pack:monitoring", passed: monitoringTemplates.length >= 4, detail: `${monitoringTemplates.length} monitoring rows` },
     { id: "site-pack:signoff", passed: signoffTemplates.length >= 8, detail: `${signoffTemplates.length} signoff rows` },
-    { id: "site-pack:artifacts", passed: packs.every((item) => item.requiredArtifacts.length >= 4), detail: `${packs.length} packs with artifact lists` }
+    { id: "site-pack:artifacts", passed: packs.every((item) => item.requiredArtifacts.length >= 4), detail: `${packs.length} packs with artifact lists` },
+    {
+      id: "site-pack:onsite-materials",
+      passed: [
+        "GLM-01",
+        "GLM-04",
+        "GLM-05",
+        "GLM-08",
+        "GLM-10",
+        "CIT-01",
+        "CIT-06",
+        "launch:smoke -- --base-url"
+      ].every((marker) => onsiteMaterialsDoc.includes(marker)),
+      detail: "on-site launch material checklist covers platform and citizen cutover evidence"
+    }
   ];
 
   return {
@@ -185,6 +205,10 @@ function buildSiteReadinessPack(options = {}) {
       interfaces: interfaceTemplates,
       monitoring: monitoringTemplates,
       signoff: signoffTemplates
+    },
+    onsiteMaterials: {
+      document: "docs/on-site-launch-materials.md",
+      requiredDomains: ["environment", "identity", "sms", "medical-interfaces", "resident-mobile", "database", "security", "monitoring", "dr", "signoff"]
     },
     checks
   };
@@ -204,6 +228,7 @@ function renderMarkdown(report) {
     `- Result: ${report.ok ? "PASS" : "FAIL"}`,
     `- Template rows: ${report.summary.templateRows}`,
     `- Required artifact slots: ${report.summary.requiredArtifacts}`,
+    `- On-site materials: ${report.onsiteMaterials?.document || "missing"}`,
     "",
     "## Checks",
     "",
@@ -240,6 +265,10 @@ function renderMarkdown(report) {
     "| Phase | Owner | Item | Required signatures |",
     "|---|---|---|---|",
     ...signoffRows,
+    "",
+    "## On-site material checklist",
+    "",
+    `Use \`${report.onsiteMaterials?.document || "docs/on-site-launch-materials.md"}\` before production cutover. It lists the field-owned materials for identity, SMS, medical interfaces, resident mobile acceptance, database, security, monitoring, disaster recovery, and signoff.`,
     ""
   ].join("\n");
 }
@@ -254,7 +283,7 @@ function renderTemplateReadmes(report) {
       pack: packById["identity-source-pack"],
       rows: templates.identity || [],
       capability: "Maps government OIDC/SAML claims, role codes, organization scope, and resident identity signals into the platform login and authorization model.",
-      input: "OIDC/SAML metadata, sample signed token, role and organization directory, callback URL, and identity source owner confirmation.",
+      input: "OIDC/SAML metadata, sample signed token, role and organization directory, callback URL, SMS gateway delivery receipt, and identity source owner confirmation.",
       output: "Claim mapping table, role-to-portal mapping, organization scope evidence, and signoff-ready identity integration notes.",
       apiEvidence: "/api/auth/login, /api/auth/me, /api/system/readiness, /api/site-readiness-pack"
     },

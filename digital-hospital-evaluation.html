@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>数智医院评价与试点工作台</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <link rel="stylesheet" href="./digital-hospital-evaluation.css" />
+    <script src="./auth.js"></script>
+    <script>window.HealthCityAuth.requireRole(["commission", "institution"])</script>
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>条款库、规则引擎、采集证据、预评整改</span>
+          <h1>数智医院评价与试点工作台</h1>
+          <p>面向三级综合医院首批试点，统一承载电子病历、智慧服务、智慧管理和互联互通建设预评。平台结论用于差距分析，不替代国家或省级正式评价。</p>
+        </div>
+        <nav>
+          <a href="./digital-hospital-standards.html">标准治理</a>
+          <a href="./digital-hospital-self-assessment.html">医院自评</a>
+          <a href="./platform.html">平台驾驶舱</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid" id="digital-evaluation-metrics"></section>
+
+      <section class="panel" data-digital-evaluation-section="pilot-operations">
+        <div class="panel-title"><h2>多院试点运营</h2><span>机构准入、白名单、阶段门禁、整改 SLA 与日报</span></div>
+        <div class="table-wrap" id="digital-evaluation-pilot-institutions"></div>
+        <form id="digital-evaluation-pilot-register-form" class="filter-grid commission-only" autocomplete="off">
+          <label>机构编码<input id="digital-evaluation-pilot-register-id" required placeholder="PILOT-03" /></label>
+          <label>机构名称<input id="digital-evaluation-pilot-register-name" required /></label>
+          <label>试点负责人<input id="digital-evaluation-pilot-register-owner" required /></label>
+          <label>计划窗口<input id="digital-evaluation-pilot-register-window" placeholder="2026-08-01/2026-09-01" /></label>
+          <label class="full">登记说明<textarea id="digital-evaluation-pilot-register-note" rows="2" required>纳入数智医院建设预评受控试点</textarea></label>
+          <button class="inline-action" type="submit">登记试点机构</button>
+        </form>
+        <form id="digital-evaluation-pilot-action-form" class="filter-grid" autocomplete="off">
+          <label>试点机构<select id="digital-evaluation-pilot-institution-id" required></select></label>
+          <label>动作<select id="digital-evaluation-pilot-action"><option value="submit-readiness">提交准入材料</option><option value="approve-pilot">批准受控试点</option><option value="record-daily-review">登记试点日报</option><option value="pause-pilot">暂停试点</option><option value="resume-pilot">恢复试点</option><option value="advance-stage">推进至下一阶段</option></select></label>
+          <label>证据引用（逗号分隔）<input id="digital-evaluation-pilot-evidence-refs" placeholder="DH-ORG-001,DH-DATA-001,DH-ROLLBACK-001" /></label>
+          <label>P0 清零证据<input id="digital-evaluation-pilot-p0-clearance" placeholder="DH-P0-CLEAR-001" /></label>
+          <label>日报引用<input id="digital-evaluation-pilot-daily-report" placeholder="DH-DAILY-20260718" /></label>
+          <div class="full readiness-checks" id="digital-evaluation-pilot-readiness-checks">
+            <label><input type="checkbox" data-readiness-key="organizationOwner" /> 组织负责人</label>
+            <label><input type="checkbox" data-readiness-key="scopedAccounts" /> 受控账号</label>
+            <label><input type="checkbox" data-readiness-key="dataBoundary" /> 数据边界</label>
+            <label><input type="checkbox" data-readiness-key="collectionPlan" /> 采集计划</label>
+            <label><input type="checkbox" data-readiness-key="rollbackPlan" /> 回退方案</label>
+            <label><input type="checkbox" data-readiness-key="supportRoster" /> 支撑排班</label>
+          </div>
+          <label class="full">处理说明<textarea id="digital-evaluation-pilot-action-note" rows="2" required></textarea></label>
+          <label class="check-line"><input id="digital-evaluation-pilot-no-pii" type="checkbox" checked /> 确认证据不含患者可识别信息</label>
+          <button class="inline-action" type="submit">提交试点动作</button>
+        </form>
+      </section>
+
+      <section class="panel" data-digital-evaluation-section="catalog">
+        <div class="panel-title"><h2>四套评价规则包</h2><span>条款级建模与目标等级画像</span></div>
+        <div class="filter-grid">
+          <label>评价体系<select id="digital-evaluation-pack-filter"><option value="">全部评价体系</option></select></label>
+          <label>项目关键词<input id="digital-evaluation-project-search" type="search" placeholder="角色、维度或项目" /></label>
+        </div>
+        <div class="table-wrap" id="digital-evaluation-catalog"></div>
+      </section>
+
+      <section class="panel" data-digital-evaluation-section="collection">
+        <div class="panel-title"><h2>医院数据采集与质量校验</h2><span>HIS、EMR、LIS、PACS、HRP、支付平台</span></div>
+        <div class="table-wrap" id="digital-evaluation-collection-jobs"></div>
+        <form id="digital-evaluation-collection-form" class="filter-grid" autocomplete="off">
+          <label>采集作业<select id="digital-evaluation-job-id" required></select></label>
+          <label>样本数<input id="digital-evaluation-job-sample-size" type="number" min="1" value="120" required /></label>
+          <label>有效记录数<input id="digital-evaluation-job-valid-rows" type="number" min="0" value="118" required /></label>
+          <label>校验回执<input id="digital-evaluation-job-receipt" required placeholder="PILOT-HIS-RECEIPT-002" /></label>
+          <label class="full">说明<textarea id="digital-evaluation-job-note" rows="2" required>运行受控脱敏样本采集与质量校验</textarea></label>
+          <label class="check-line"><input id="digital-evaluation-job-no-pii" type="checkbox" checked /> 确认不采集患者可识别信息</label>
+          <button class="inline-action" type="submit">运行校验</button>
+        </form>
+      </section>
+
+      <section class="panel" data-digital-evaluation-section="evidence">
+        <div class="panel-title"><h2>评价证据中心</h2><span>受控引用、摘要哈希、独立复核</span></div>
+        <div class="table-wrap" id="digital-evaluation-evidence"></div>
+        <form id="digital-evaluation-evidence-form" class="filter-grid" autocomplete="off">
+          <label>证据项<select id="digital-evaluation-evidence-id" required></select></label>
+          <label>动作<select id="digital-evaluation-evidence-action"><option value="record-evidence">登记证据</option><option value="verify-evidence">独立复核</option></select></label>
+          <label>证据级别<select id="digital-evaluation-evidence-level"><option value="controlled-sample">受控样本</option><option value="platform">平台证据</option><option value="site">现场证据</option></select></label>
+          <label>证据引用<input id="digital-evaluation-evidence-ref" placeholder="DH-SITE-INT-001" /></label>
+          <label class="full">说明<textarea id="digital-evaluation-evidence-note" rows="2" required></textarea></label>
+          <label class="check-line"><input id="digital-evaluation-evidence-no-pii" type="checkbox" checked /> 确认证据引用不含患者可识别信息</label>
+          <button class="inline-action" type="submit">提交证据动作</button>
+        </form>
+      </section>
+
+      <section class="panel" data-digital-evaluation-section="preassessment">
+        <div class="panel-title"><h2>四体系建设预评</h2><span>自动生成等级模拟、差距与整改项</span></div>
+        <form id="digital-evaluation-run-form" class="filter-grid" autocomplete="off">
+          <label>机构编码<input id="digital-evaluation-institution-id" value="MR1" required /></label>
+          <label>机构名称<input id="digital-evaluation-institution-name" value="大连市中心医院" required /></label>
+          <label>评价周期<input id="digital-evaluation-cycle" value="2026-pilot" required /></label>
+          <label>目标画像<select id="digital-evaluation-profile-id" required></select></label>
+          <button class="inline-action" type="submit">运行建设预评</button>
+          <span id="digital-evaluation-feedback" class="badge info">预评结果不作为正式评价等级</span>
+        </form>
+        <div id="digital-evaluation-preassessments"></div>
+      </section>
+
+      <section class="panel" data-digital-evaluation-section="rectification">
+        <div class="panel-title"><h2>整改与复测闭环</h2><span>责任分派、证据补充、问题关闭、独立审核</span></div>
+        <div class="table-wrap" id="digital-evaluation-findings"></div>
+        <form id="digital-evaluation-finding-form" class="filter-grid" autocomplete="off">
+          <label>预评批次<select id="digital-evaluation-assessment-id" required></select></label>
+          <label>整改项<select id="digital-evaluation-finding-id"></select></label>
+          <label>动作<select id="digital-evaluation-finding-action"><option value="assign-finding">分派整改</option><option value="record-finding-evidence">登记整改证据</option><option value="resolve-finding">关闭整改项</option><option value="submit-review">提交复核</option><option value="accept-preassessment">接受试点预评</option></select></label>
+          <label>责任人<input id="digital-evaluation-finding-owner" placeholder="医院信息中心" /></label>
+          <label>期限<input id="digital-evaluation-finding-due-at" type="date" /></label>
+          <label>证据引用<input id="digital-evaluation-finding-evidence-ref" placeholder="DH-RECT-001" /></label>
+          <label class="full">处理说明<textarea id="digital-evaluation-finding-note" rows="2" required></textarea></label>
+          <label class="check-line"><input id="digital-evaluation-finding-no-pii" type="checkbox" checked /> 确认证据不含患者可识别信息</label>
+          <button class="inline-action" type="submit">提交整改动作</button>
+        </form>
+      </section>
+
+      <section class="panel boundary-band" data-digital-evaluation-section="boundary">
+        <div class="panel-title"><h2>试点上线边界</h2><span id="digital-evaluation-boundary-status"></span></div>
+        <div id="digital-evaluation-site-blockers"></div>
+      </section>
+    </main>
+    <script src="./digital-hospital-evaluation-ui.js"></script>
+  </body>
+</html>

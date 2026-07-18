@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>数智医院标准平台</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+    <script>window.HealthCityAuth.requireRole(["commission"])</script>
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>数智医院建设与应用评价</span>
+          <h1>数智医院标准平台</h1>
+          <p>面向国家级、省级、医院端三级协同，先把标准库、指标映射、数据采集、自动校验、分级审核、整改闭环和安全合规做成可运行的最小闭环。</p>
+        </div>
+        <nav>
+          <a href="./digital-hospital-evaluation.html">评价预评</a>
+          <a href="./digital-hospital-self-assessment.html">医院自评</a>
+          <a href="./platform.html">平台驾驶舱</a>
+          <a href="./workbench.html">运营工作台</a>
+          <a href="./public-health.html">公共卫生</a>
+          <a href="./quality-safety.html">质量安全</a>
+          <a href="./about.html">关于</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid" id="digital-hospital-metrics"></section>
+
+      <section class="panel" data-digital-hospital-section="policy-register">
+        <div class="panel-title">
+          <h2>规范政策台账</h2>
+          <span>区分法定强制、行业管理、评价参考、推荐标准和历史规划</span>
+        </div>
+        <div class="filter-grid">
+          <label>
+            适用域
+            <select id="policy-domain-filter"><option value="">全部六域</option></select>
+          </label>
+          <label>
+            效力层级
+            <select id="policy-binding-filter">
+              <option value="">全部层级</option>
+              <option value="mandatory">法定强制</option>
+              <option value="management-required">行业管理要求</option>
+              <option value="evaluation-reference">评价参考</option>
+              <option value="recommended-standard">推荐性标准</option>
+              <option value="policy-guidance">政策指导</option>
+              <option value="historical-planning">历史规划</option>
+            </select>
+          </label>
+          <label>
+            生命周期
+            <select id="policy-lifecycle-filter">
+              <option value="">全部状态</option>
+              <option value="effective">现行</option>
+              <option value="current-reference">现行参考</option>
+              <option value="conditional">条件适用</option>
+              <option value="historical-plan">历史规划</option>
+            </select>
+          </label>
+          <label>
+            关键词
+            <input id="policy-search" type="search" placeholder="文件、文号、适用条件" />
+          </label>
+        </div>
+        <div id="digital-hospital-policy-metrics" class="metric-grid"></div>
+        <div id="digital-hospital-policy-register" class="table-wrap"></div>
+        <form id="digital-hospital-policy-review-form" class="filter-grid" autocomplete="off">
+          <label>
+            规范文件
+            <select id="digital-hospital-policy-review-id" required></select>
+          </label>
+          <label>
+            复核结论
+            <select id="digital-hospital-policy-review-status" required>
+              <option value="verified-current">核验为现行</option>
+              <option value="verified-reference">核验为评价参考</option>
+              <option value="local-supplement-required">需补属地要求</option>
+              <option value="requires-update">发现更新待处理</option>
+              <option value="historical-only">仅保留历史依据</option>
+            </select>
+          </label>
+          <label>
+            下次复核
+            <input id="digital-hospital-policy-next-review" type="date" value="2027-01-31" />
+          </label>
+          <label>
+            复核说明
+            <input id="digital-hospital-policy-review-note" type="text" required placeholder="记录来源核验或属地补充要求" />
+          </label>
+          <button class="inline-action" type="submit">记录复核</button>
+          <span id="digital-hospital-policy-review-feedback" class="badge info">复核动作将写入审计链</span>
+        </form>
+      </section>
+
+      <section class="panel" data-digital-hospital-section="control-matrix">
+        <div class="panel-title">
+          <h2>六域控制整改工作台</h2>
+          <span>规范要求到责任分派、最小化证据、独立复核和上线阻断闭环</span>
+        </div>
+        <div class="filter-grid">
+          <label>
+            标准域
+            <select id="control-domain-filter"><option value="">全部六域</option></select>
+          </label>
+          <label>
+            控制状态
+            <select id="control-status-filter">
+              <option value="">全部状态</option>
+              <option value="open">待处理</option>
+              <option value="in-progress">整改中</option>
+              <option value="evidence-recorded">待复核</option>
+              <option value="verified">已验证</option>
+              <option value="not-applicable">不适用</option>
+            </select>
+          </label>
+          <label>
+            关键词
+            <input id="control-search" type="search" placeholder="控制、责任人、证据或检查" />
+          </label>
+          <label class="checkbox-line">
+            <input id="control-blocking-filter" type="checkbox" />
+            只看上线阻断
+          </label>
+          <label class="checkbox-line">
+            <input id="control-overdue-filter" type="checkbox" />
+            只看逾期整改
+          </label>
+        </div>
+        <div id="digital-hospital-control-metrics" class="metric-grid"></div>
+        <div id="digital-hospital-control-matrix" class="table-wrap"></div>
+        <form id="digital-hospital-control-action-form" class="filter-grid" autocomplete="off">
+          <label>
+            控制项
+            <select id="digital-hospital-control-id" required></select>
+          </label>
+          <label>
+            整改动作
+            <select id="digital-hospital-control-action" required>
+              <option value="assign-control">分派整改</option>
+              <option value="record-evidence">登记证据</option>
+              <option value="verify-control">独立复核</option>
+              <option value="reopen-control">重开控制</option>
+              <option value="mark-not-applicable">判定不适用</option>
+            </select>
+          </label>
+          <label class="digital-control-action-field" data-control-actions="assign-control">
+            整改责任人
+            <input id="digital-hospital-control-assignee" type="text" placeholder="责任部门或责任人" />
+          </label>
+          <label class="digital-control-action-field" data-control-actions="assign-control">
+            完成期限
+            <input id="digital-hospital-control-due-at" type="date" />
+          </label>
+          <label class="digital-control-action-field" data-control-actions="record-evidence">
+            证据名称
+            <input id="digital-hospital-control-artifact-name" type="text" placeholder="接口联调报告或现场签字包" />
+          </label>
+          <label class="digital-control-action-field" data-control-actions="record-evidence">
+            证据引用
+            <input id="digital-hospital-control-evidence-ref" type="text" placeholder="文档编号、受控路径或工单号" />
+          </label>
+          <label class="digital-control-action-field" data-control-actions="record-evidence">
+            证据级别
+            <select id="digital-hospital-control-evidence-level">
+              <option value="demo">演示证据</option>
+              <option value="site">现场证据</option>
+              <option value="production">生产证据</option>
+            </select>
+          </label>
+          <label class="digital-control-action-field" data-control-actions="record-evidence">
+            SHA-256（可选）
+            <input id="digital-hospital-control-checksum" type="text" maxlength="64" placeholder="64 位十六进制摘要" />
+          </label>
+          <label class="checkbox-line digital-control-action-field" data-control-actions="record-evidence">
+            <input id="digital-hospital-control-no-pii" type="checkbox" checked />
+            确认证据不含患者可识别信息
+          </label>
+          <label class="digital-control-action-field" data-control-actions="verify-control">
+            复核结论
+            <select id="digital-hospital-control-decision">
+              <option value="accepted">接受</option>
+              <option value="rejected">退回</option>
+            </select>
+          </label>
+          <label class="digital-control-action-field" data-control-actions="mark-not-applicable">
+            决策依据
+            <input id="digital-hospital-control-decision-ref" type="text" placeholder="停用范围、会议纪要或审批单" />
+          </label>
+          <label class="checkbox-line digital-control-action-field" data-control-actions="mark-not-applicable">
+            <input id="digital-hospital-control-feature-disabled" type="checkbox" />
+            确认相关功能未启用
+          </label>
+          <label class="full">
+            操作说明
+            <textarea id="digital-hospital-control-note" rows="2" required placeholder="记录整改依据、证据范围或复核结论"></textarea>
+          </label>
+          <button class="inline-action" type="submit">提交控制动作</button>
+          <span id="digital-hospital-control-feedback" class="badge info">所有动作将写入不可抵赖审计链</span>
+        </form>
+      </section>
+
+      <section class="panel" data-digital-hospital-section="standard-center">
+        <div class="panel-title">
+          <h2>标准与指标中枢</h2>
+          <span>从既有评价体系到可执行指标模型</span>
+        </div>
+        <div class="filter-grid">
+          <label>
+            标准域
+            <select id="standard-domain-filter">
+              <option value="">全部标准域</option>
+            </select>
+          </label>
+          <label>
+            关键词
+            <input id="standard-search" type="search" placeholder="检索指标、证据、来源" />
+          </label>
+          <label class="checkbox-line">
+            <input id="standard-blocker-filter" type="checkbox" />
+            只看现场阻断项
+          </label>
+        </div>
+        <div id="digital-hospital-standard-map" class="priority-list"></div>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide" data-digital-hospital-section="workflow-loop">
+          <div class="panel-title">
+            <h2>评价闭环</h2>
+            <span>医院自评、省级初审、专家复核、国家抽查、整改复核</span>
+          </div>
+          <div id="digital-hospital-workflow" class="table-wrap"></div>
+        </article>
+
+        <article class="panel" data-digital-hospital-section="security-boundary">
+          <div class="panel-title">
+            <h2>安全边界</h2>
+            <span>最小必要、脱敏汇总、全程审计</span>
+          </div>
+          <div id="digital-hospital-security" class="rules"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide" data-digital-hospital-section="evidence-model">
+          <div class="panel-title">
+            <h2>采集与证据模型</h2>
+            <span>接口、模板、材料、抽样核验并行</span>
+          </div>
+          <div id="digital-hospital-evidence" class="evidence-grid"></div>
+        </article>
+
+        <article class="panel" data-digital-hospital-section="review-queue">
+          <div class="panel-title">
+            <h2>审核任务</h2>
+            <span>分级审核留痕</span>
+          </div>
+          <div id="digital-hospital-review-queue" class="rules"></div>
+        </article>
+      </section>
+
+      <section class="panel" data-digital-hospital-section="pilot-readiness">
+        <div class="panel-title">
+          <h2>试点准备度</h2>
+          <span>以 2-3 个省份、不同类型医院形成最小联调样板</span>
+        </div>
+        <div id="digital-hospital-pilot-readiness" class="table-wrap"></div>
+      </section>
+
+      <section class="panel" data-digital-hospital-section="launch-readiness">
+        <div class="panel-title">
+          <h2>Launch Readiness</h2>
+          <span>Pilot launch gate, formal site signoff blockers and audit actions</span>
+        </div>
+        <div id="digital-hospital-launch-readiness" class="table-wrap"></div>
+      </section>
+
+      <section class="panel" data-digital-hospital-section="production-evidence-packets">
+        <div class="panel-title">
+          <h2>Production Evidence Packets</h2>
+          <span>Formal cutover evidence packets, item verification and linked requirement signoff</span>
+        </div>
+        <div id="digital-hospital-production-evidence" class="table-wrap"></div>
+      </section>
+
+      <section class="panel" data-digital-hospital-section="launch-command-briefs">
+        <div class="panel-title">
+          <h2>Launch Command Briefs</h2>
+          <span>Go/no-go, first receipt, security watch, rollback standby and first-day closure briefs</span>
+        </div>
+        <div id="digital-hospital-launch-command-briefs" class="table-wrap"></div>
+      </section>
+
+      <section class="panel" data-digital-hospital-section="formal-cutover-approvals">
+        <div class="panel-title">
+          <h2>Formal Cutover Approval Desk</h2>
+          <span>Independent authorization after site evidence, production packets and pilot checks are complete</span>
+        </div>
+        <div id="digital-hospital-formal-cutover-approvals" class="table-wrap"></div>
+      </section>
+
+      <section class="panel" data-digital-hospital-section="official-source-map">
+        <div class="panel-title">
+          <h2>依据映射</h2>
+          <span>官方政策与标准到平台能力的映射</span>
+        </div>
+        <div id="digital-hospital-source-map" class="table-wrap"></div>
+      </section>
+    </main>
+
+    <script src="./digital-hospital-standards.js"></script>
+  </body>
+</html>

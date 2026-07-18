@@ -7,8 +7,8 @@ const DEFAULT_OUTPUT = path.join(ROOT, "release", "identity-contract.json");
 const DEFAULT_MARKDOWN = path.join(ROOT, "release", "identity-contract.md");
 
 const ROLE_PORTALS = {
-  commission: ["index.html", "workbench.html"],
-  institution: ["institution.html"],
+  commission: ["index.html", "workbench.html", "blood.html"],
+  institution: ["institution.html", "internet-nursing.html", "doctor.html", "blood.html"],
   insurance: ["insurance.html"],
   citizen: ["citizen.html"],
   county: ["county.html"]
@@ -27,7 +27,7 @@ const REQUIRED_CLAIMS = [
 
 const SAMPLE_CLAIMS = [
   { id: "identity-commission", orgCode: "ORG-HEALTH-DL", roles: ["health_admin", "commission"], expectedRole: "commission", expectedHome: "index.html" },
-  { id: "identity-institution", orgCode: "MR3", roles: ["doctor"], expectedRole: "institution", expectedHome: "institution.html" },
+  { id: "identity-institution", orgCode: "MR3", roles: ["doctor"], expectedRole: "institution", expectedHome: "doctor.html" },
   { id: "identity-insurance", orgCode: "ORG-MI-CENTER-DL", roles: ["insurance"], expectedRole: "insurance", expectedHome: "insurance.html" },
   { id: "identity-county", orgCode: "ORG-CONSORTIUM-ZS", roles: ["county"], expectedRole: "county", expectedHome: "county.html" },
   { id: "identity-citizen", orgCode: "PERSON-R1", roles: ["citizen"], expectedRole: "citizen", expectedHome: "citizen.html" }
@@ -35,6 +35,10 @@ const SAMPLE_CLAIMS = [
 
 function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(ROOT, relativePath), "utf8"));
+}
+
+function readText(relativePath) {
+  return fs.readFileSync(path.join(ROOT, relativePath), "utf8");
 }
 
 function roleFromClaims(roles, organization) {
@@ -52,13 +56,25 @@ function roleFromClaims(roles, organization) {
   return "commission";
 }
 
-function homeForRole(role, organization) {
+function homeForRole(role, organization, roles = []) {
+  const rawRoles = [roles].flat().filter(Boolean).map((item) => String(item).toLowerCase());
+  if (role === "institution" && rawRoles.some((item) => /doctor|physician/.test(item))) return "doctor.html";
   if (organization?.portal) return organization.portal;
   return ROLE_PORTALS[role]?.[0] || "health-city.html";
 }
 
 function buildIdentityContract(options = {}) {
   const data = options.data || readJson("data/db.json");
+  const adapterSource = options.adapterSource ?? readText("production-adapters.js");
+  const serverSource = options.serverSource ?? readText("server.js");
+  const sessionStoreSource = options.sessionStoreSource ?? readText("session-store.js");
+  const authSource = options.authSource ?? readText("auth.js");
+  const bloodBusinessSource = options.bloodBusinessSource ?? readText("blood-business.js");
+  const bloodRecallSource = options.bloodRecallSource ?? readText("blood-recall.js");
+  const platformHtml = options.platformHtml ?? readText("platform.html");
+  const platformSource = options.platformSource ?? readText("platform.js");
+  const adapterDocument = options.adapterDocument ?? readText("docs/production-identity-message-adapters.md");
+  const envTemplate = options.envTemplate ?? readText(".env.example");
   const users = Array.isArray(data.authUsers) ? data.authUsers : [];
   const organizations = Array.isArray(data.authOrganizations) ? data.authOrganizations : [];
   const orgByCode = new Map(organizations.map((item) => [item.orgCode, item]));
@@ -77,7 +93,7 @@ function buildIdentityContract(options = {}) {
   const sampleMappings = SAMPLE_CLAIMS.map((sample) => {
     const organization = orgByCode.get(sample.orgCode);
     const role = roleFromClaims(sample.roles, organization);
-    const home = homeForRole(role, organization);
+    const home = homeForRole(role, organization, sample.roles);
     return {
       ...sample,
       mappedRole: role,
@@ -87,13 +103,54 @@ function buildIdentityContract(options = {}) {
     };
   });
 
+  const adapterContracts = {
+    oidc: {
+      runtime: adapterSource.includes("fetchOidcUserInfo") && serverSource.includes("/api/auth/oidc/exchange"),
+      configuration: ["OIDC_ISSUER_URL", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET"].every((marker) => envTemplate.includes(marker)),
+      boundary: adapterDocument.includes("受控本地账号绑定") && adapterDocument.includes("现场联合测试回执")
+    },
+    oidcLifecycle: {
+      refresh: adapterSource.includes("refreshOidcAccessToken") && serverSource.includes("/api/auth/oidc/refresh"),
+      revocation: adapterSource.includes("revokeOidcToken") && serverSource.includes("/api/auth/oidc/revoke"),
+      directory: adapterSource.includes("fetchIdentityDirectory") && ["/api/auth/identity-directory/preview", "/api/auth/identity-directory/bind", "/api/auth/identity-directory/apply"].every((marker) => serverSource.includes(marker)),
+      controlledBinding: ["BIND EXTERNAL IDENTITY", "IDENTITY_BINDING_SUBJECT_CONFLICT", "IDENTITY_BINDING_REASSIGNMENT_BLOCKED", "local username exists but external subject requires controlled binding"].every((marker) => serverSource.includes(marker)),
+      deactivationSafety: ["IDENTITY_DIRECTORY_SELF_DEACTIVATION_BLOCKED", "IDENTITY_DIRECTORY_LAST_COMMISSION_BLOCKED", "APPLY IDENTITY DIRECTORY DEACTIVATIONS"].every((marker) => serverSource.includes(marker)),
+      operationsUi: platformHtml.includes("identity-lifecycle-center") && ["renderIdentityLifecycleCenter", "runIdentityBindingAction", "runIdentityDirectoryAction"].every((marker) => platformSource.includes(marker)),
+      configuration: ["OIDC_TOKEN_URL", "OIDC_REVOCATION_URL", "IDENTITY_DIRECTORY_URL", "IDENTITY_DIRECTORY_TOKEN"].every((marker) => envTemplate.includes(marker)),
+      boundary: ["不自动开户", "不自动提权", "不自动复活", "真实机构目录"].every((marker) => adapterDocument.includes(marker))
+    },
+    sms: {
+      runtime: adapterSource.includes("sendSmsVerificationCode") && serverSource.includes("/api/auth/phone-code"),
+      protectedCode: adapterSource.includes("digestPhoneVerificationCode") && serverSource.includes("codeDigest"),
+      signedDeliveryCallback: ["verifySmsDeliveryCallback", "applySmsDeliveryCallback", "SMS_CALLBACK_REPLAY_DETECTED", "terminal-conflict"].every((marker) => adapterSource.includes(marker)) && ["/api/auth/sms-delivery-callback", "/api/auth/sms-deliveries", "smsDeliveryReceipts"].every((marker) => serverSource.includes(marker)),
+      operationsUi: ["sms-delivery-status", "sms-delivery-metrics", "sms-delivery-receipts"].every((marker) => platformHtml.includes(marker)) && platformSource.includes("smsDelivery"),
+      configuration: ["SMS_GATEWAY_URL", "SMS_TEMPLATE_ID", "SMS_GATEWAY_TOKEN", "SMS_DELIVERY_CALLBACK_SECRET"].every((marker) => envTemplate.includes(marker)),
+      boundary: ["最终送达回调", "供应商专有字段与签名差异", "回调验签", "重放", "乱序"].every((marker) => adapterDocument.includes(marker))
+    },
+    productionSecurity: {
+      localPasswordDisabled: ["LOCAL_PASSWORD_LOGIN_DISABLED", "local password login is disabled in production"].every((marker) => serverSource.includes(marker)),
+      weakSecretStartupBlocked: ["assertProductionRuntimeSecurity", "PRODUCTION_SESSION_SECRET_INVALID"].every((marker) => serverSource.includes(marker)),
+      persistentSessionStore: ["SqliteSessionStore", "PRODUCTION_SESSION_STORE_INVALID", "sessionStoreStatus"].every((marker) => serverSource.includes(marker)) && ["auth_sessions", "revokeByUserIds", "crossProcess: true"].every((marker) => sessionStoreSource.includes(marker)) && platformSource.includes("同一主机共享数据目录可跨进程撤销") && envTemplate.includes("SESSION_STORE=sqlite"),
+      centralizedSessionStore: ["PostgresSessionStore", "hydrateRequestSession", "startServerAsync", "SESSION_STORE_UNAVAILABLE", "SESSION_TOPOLOGY"].every((marker) => serverSource.includes(marker)) && ["class PostgresSessionStore", "async hydrate", "crossHost: true", "centralized: true"].every((marker) => sessionStoreSource.includes(marker)) && ["SESSION_TOPOLOGY=single-host", "SESSION_STORE=sqlite"].every((marker) => envTemplate.includes(marker)) && platformSource.includes("多主机中央会话可跨节点撤销") && adapterDocument.includes("PostgreSQL 中央会话表"),
+      sessionRetention: ["cleanupRuntimeSessions", "scheduleSessionCleanup", "/api/auth/sessions/cleanup", "SESSION_CLEANUP_CONFIRMATION_REQUIRED", "PRODUCTION_SESSION_RETENTION_INVALID"].every((marker) => serverSource.includes(marker)) && ["cleanup(options", "deletedExpired", "deletedRevoked"].every((marker) => sessionStoreSource.includes(marker)) && ["SESSION_EXPIRED_RETENTION_DAYS", "SESSION_REVOKED_RETENTION_DAYS", "SESSION_CLEANUP_INTERVAL_MS"].every((marker) => envTemplate.includes(marker)) && platformSource.includes("会话保留"),
+      browserFailClosed: authSource.includes("认证服务暂不可用，请稍后重试"),
+      residentScope: ["applyResidentScope", "canManageResidentProfile", "INSURANCE_RESIDENT_COLLECTIONS", "COUNTY_RESIDENT_COLLECTIONS"].every((marker) => serverSource.includes(marker)),
+      contentSecurity: serverSource.includes("script-src-attr 'none'") && [bloodBusinessSource, bloodRecallSource].every((source) => source.includes("escapeHtml")),
+      boundary: ["生产安全边界", "集中式会话", "不再回退到本地演示账号"].every((marker) => adapterDocument.includes(marker))
+    }
+  };
+
   const checks = [
     { id: "identity:p0Requirements", passed: p0IdentityRequirements.length >= 3, detail: `${p0IdentityRequirements.length} P0 identity/org requirements` },
     { id: "identity:requiredClaims", passed: REQUIRED_CLAIMS.filter((item) => item.required).length >= 5, detail: `${REQUIRED_CLAIMS.length} claims documented` },
     { id: "identity:roleCoverage", passed: Object.values(roleCoverage).every((item) => item.users >= 1), detail: Object.entries(roleCoverage).map(([role, item]) => `${role}:${item.users}`).join(";") },
     { id: "identity:organizationCoverage", passed: users.every((item) => item.role === "citizen" || orgByCode.has(item.orgCode)), detail: `${organizations.length} organizations, ${users.length} users` },
     { id: "identity:portalMapping", passed: users.every((item) => ROLE_PORTALS[item.role]?.includes(item.home)), detail: "role home pages match allowed portals" },
-    { id: "identity:sampleMappings", passed: sampleMappings.every((item) => item.passed), detail: sampleMappings.map((item) => `${item.id}:${item.mappedRole}/${item.mappedHome}`).join(";") }
+    { id: "identity:sampleMappings", passed: sampleMappings.every((item) => item.passed), detail: sampleMappings.map((item) => `${item.id}:${item.mappedRole}/${item.mappedHome}`).join(";") },
+    { id: "identity:oidcRuntimeAdapter", passed: Object.values(adapterContracts.oidc).every(Boolean), detail: "OIDC UserInfo runtime, configuration and controlled-binding boundary documented" },
+    { id: "identity:oidcLifecycle", passed: Object.values(adapterContracts.oidcLifecycle).every(Boolean), detail: "OIDC subject binding, refresh, revocation, safe directory deactivation, operations UI and production boundary documented" },
+    { id: "identity:smsRuntimeAdapter", passed: Object.values(adapterContracts.sms).every(Boolean), detail: "SMS runtime, keyed code digest, signed final-delivery callback, replay-safe ordered ledger, operations UI and provider boundary documented" },
+    { id: "identity:productionSecurityBoundary", passed: Object.values(adapterContracts.productionSecurity).every(Boolean), detail: "production local-password, signing-secret, durable session retention, browser fail-closed, resident scope and content-security controls are wired" }
   ];
 
   return {
@@ -106,6 +163,7 @@ function buildIdentityContract(options = {}) {
     userCount: users.length,
     p0IdentityRequirements,
     sampleMappings,
+    adapterContracts,
     checks
   };
 }
@@ -115,6 +173,7 @@ function renderMarkdown(contract) {
   const claimRows = contract.requiredClaims.map((item) => `| ${item.required ? "required" : "optional"} | ${item.claim} | ${item.purpose} |`);
   const roleRows = Object.entries(contract.roleCoverage).map(([role, item]) => `| ${role} | ${item.users} | ${item.homes.join(", ")} | ${item.orgCodes.join(", ")} |`);
   const sampleRows = contract.sampleMappings.map((item) => `| ${item.passed ? "PASS" : "FAIL"} | ${item.id} | ${item.orgCode} | ${item.roles.join(", ")} | ${item.mappedRole} | ${item.mappedHome} |`);
+  const adapterRows = Object.entries(contract.adapterContracts).map(([adapter, controls]) => `| ${adapter} | ${Object.values(controls).every(Boolean) ? "foundation-ready" : "incomplete"} | ${Object.entries(controls).map(([name, passed]) => `${name}:${passed ? "PASS" : "FAIL"}`).join("; ")} |`);
   return [
     "# Identity integration contract",
     "",
@@ -146,6 +205,14 @@ function renderMarkdown(contract) {
     "| Result | Sample | Org code | Roles | Mapped role | Mapped home |",
     "|---|---|---|---|---|---|",
     ...sampleRows,
+    "",
+    "## Production runtime adapters",
+    "",
+    "| Adapter | Status | Controls |",
+    "|---|---|---|",
+    ...adapterRows,
+    "",
+    "Runtime adapter readiness does not replace real provider joint-test receipts, directory ownership and mapping acceptance, delivery callbacks or site signoff.",
     ""
   ].join("\n");
 }

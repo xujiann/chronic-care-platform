@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Chronic Care Platform PostgreSQL Outbox Worker
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=15s
+AccuracySec=2s
+Persistent=true
+Unit=postgres-sync-worker.service
+
+[Install]
+WantedBy=timers.target

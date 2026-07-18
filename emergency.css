@@ -1,0 +1,46 @@
+.emergency-header { background: linear-gradient(135deg, #7f1d1d, #dc2626); }
+.emergency-header h1, .emergency-header p, .emergency-header span { color: #fff; }
+.call-120 { background: #fff; color: #b91c1c !important; font-weight: 800; }
+.emergency-notice { margin: 16px 0; padding: 14px 18px; border-left: 5px solid #dc2626; background: #fff1f2; color: #881337; border-radius: 10px; font-weight: 700; }
+.emergency-event-list { display: grid; gap: 14px; }
+.emergency-event { border: 1px solid #fecaca; border-radius: 14px; padding: 16px; background: #fff; }
+.emergency-event header { display:flex; justify-content:space-between; gap:12px; align-items:center; }
+.emergency-event h3 { margin:0; color:#991b1b; }
+.emergency-badge { padding:4px 9px; border-radius:999px; background:#fee2e2; color:#991b1b; font-weight:700; }
+.emergency-timeline { display:flex; gap:7px; overflow:auto; padding:10px 0; }
+.emergency-step { min-width:110px; padding:8px; border-radius:8px; background:#f8fafc; font-size:12px; }
+.clinical-grid { margin-top:18px; padding-top:18px; border-top:1px dashed #cbd5e1; }
+textarea { min-height:72px; resize:vertical; }
+.emergency-diagram-index { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+.emergency-diagram-index a { padding:12px; border:1px solid #fecaca; border-radius:10px; color:#991b1b; background:#fff7f7; text-decoration:none; font-weight:700; }
+.production-board { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+.production-list { display:grid; gap:8px; }
+.production-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; padding:10px; border:1px solid #e2e8f0; border-radius:9px; }
+.production-row strong,.production-row small { display:block; }
+.production-status { font-weight:700; color:#991b1b; }
+.production-status.ready,.production-status.signed,.production-status.delivered,.production-status.passed { color:#166534; }
+.production-actions { margin-top:18px; }
+.production-actions summary { cursor:pointer; font-weight:700; color:#991b1b; padding:10px 0; }
+.sos-panel { border:2px solid #dc2626; background:#fff7f7; }
+.sos-button { background:#b91c1c; }
+.sos-confirm { grid-column:1/-1; padding:10px; border-radius:8px; background:#fee2e2; color:#7f1d1d; font-weight:700; }
+.sos-boundary,.aed-safety { margin:12px 0 0; color:#7c2d12; font-size:13px; }
+.aed-map { display:grid; gap:12px; }
+.aed-map-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; }
+.aed-site-card { padding:12px; border:1px solid #bbf7d0; border-radius:10px; background:#f0fdf4; }
+.aed-site-card.unavailable { border-color:#fed7aa; background:#fff7ed; }
+.aed-site-card h3,.aed-site-card p { margin:0 0 7px; }
+.aed-site-card small { color:#475569; }
+.aed-highlight { margin:0; padding:10px; border-radius:8px; background:#dcfce7; color:#166534; }
+.aed-unavailable { background:#fff7ed; color:#9a3412; }
+.lifechain-panel { border:1px solid #93c5fd; background:linear-gradient(180deg,#f8fbff,#fff); }
+.lifechain-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.lifechain-card { padding:14px; border:1px solid #dbeafe; border-radius:12px; background:#fff; }
+.lifechain-card h3,.lifechain-card p { margin-top:0; }
+.lifechain-wide { grid-column:span 1; }
+.lifechain-row,.lifechain-summary { display:flex; justify-content:space-between; gap:12px; padding:9px 0; border-bottom:1px solid #e2e8f0; font-size:14px; }
+.lifechain-summary { border-radius:9px; padding:10px; background:#eff6ff; flex-wrap:wrap; }
+.lifechain-boundary { margin:14px 0 0; color:#1e3a8a; font-size:13px; }
+@media(max-width:800px){.lifechain-grid{grid-template-columns:1fr}.lifechain-wide{grid-column:auto}.lifechain-row{flex-direction:column}}
+@media(max-width:800px){.production-board{grid-template-columns:1fr}}
+@media(max-width:720px){.emergency-event header{align-items:flex-start;flex-direction:column}.emergency-header nav{display:grid;grid-template-columns:1fr 1fr}.call-120{grid-column:1/-1;text-align:center}}

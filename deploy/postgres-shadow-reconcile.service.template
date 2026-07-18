@@ -1,0 +1,18 @@
+[Unit]
+Description=Health platform PostgreSQL shadow reconciliation
+After=network-online.target chronic-care-platform.service postgres-sync-worker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=health-platform
+Group=health-platform
+WorkingDirectory=DEPLOYMENT_APP_DIR
+EnvironmentFile=DEPLOYMENT_SECRET_ENV_FILE
+Environment=POSTGRES_SYNC_MODE=outbox
+ExecStart=/usr/bin/node DEPLOYMENT_APP_DIR/scripts/postgres-shadow-reconcile.js reconcile --sqlite-file=DEPLOYMENT_DATA_DIR/health-city.sqlite --output=DEPLOYMENT_LOG_DIR/postgres-shadow-reconciliation.json --markdown=DEPLOYMENT_LOG_DIR/postgres-shadow-reconciliation.md
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=DEPLOYMENT_DATA_DIR DEPLOYMENT_LOG_DIR

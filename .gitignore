@@ -8,10 +8,15 @@ data/*.sqlite-wal
 data/backups/
 data/sanitized/
 tmp/
+.tmp/
+.tmp-preview-data/
+.tmp-preview-logs/
+.tmp-*/
 coverage/
 playwright-report/
 test-results/
 release/
+output/
 .DS_Store
 Thumbs.db
 

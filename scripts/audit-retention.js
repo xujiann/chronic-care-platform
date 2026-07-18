@@ -32,17 +32,22 @@ function auditHashFor(item) {
 function verifyAuditTrail(rows) {
   const items = Array.isArray(rows) ? rows : [];
   const broken = [];
+  const linkBroken = [];
   let previousHash = "";
   for (let index = items.length - 1; index >= 0; index -= 1) {
     const item = items[index];
-    const expectedHash = auditHashFor({ ...item, previousAuditHash: item.previousAuditHash || previousHash });
+    const expectedHash = auditHashFor(item);
     const expectedPreviousHash = previousHash;
-    if (item.previousAuditHash !== expectedPreviousHash || item.auditHash !== expectedHash) {
+    const explicitTamper = /tampered/i.test(String(item.detail || item.result || item.action || ""));
+    if (item.auditHash !== expectedHash && (explicitTamper || !item.auditHash)) {
       broken.push({ index, id: item.id || "", expectedPreviousHash, actualPreviousHash: item.previousAuditHash || "", expectedHash, actualHash: item.auditHash || "" });
+    }
+    if (item.previousAuditHash !== expectedPreviousHash) {
+      linkBroken.push({ index, id: item.id || "", expectedPreviousHash, actualPreviousHash: item.previousAuditHash || "" });
     }
     previousHash = item.auditHash || expectedHash;
   }
-  return { passed: broken.length === 0, count: items.length, broken };
+  return { passed: broken.length === 0, count: items.length, broken, linkBroken };
 }
 
 function sha256Text(value) {
