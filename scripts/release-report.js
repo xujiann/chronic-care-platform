@@ -53,6 +53,7 @@ const { buildPolicyCoverageReport, renderMarkdown: renderPolicyCoverageMarkdown 
 const { buildProcessAuditReport, renderMarkdown: renderProcessAuditMarkdown } = require("./process-audit");
 const { buildProductionDbReadinessReport, renderMarkdown: renderProductionDbReadinessMarkdown } = require("./production-db-readiness");
 const { buildPublicHealthReadinessReport, renderMarkdown: renderPublicHealthMarkdown } = require("./public-health-readiness");
+const { buildPublicHealthHighlightsReadiness, renderMarkdown: renderPublicHealthHighlightsMarkdown } = require("./public-health-highlights-readiness");
 const { buildBloodSystemReadinessReport, renderMarkdown: renderBloodSystemMarkdown } = require("./blood-system-readiness");
 const { buildDiseasePaymentReadiness, renderMarkdown: renderDiseasePaymentMarkdown } = require("./disease-payment-readiness");
 const { renderMarkdown: renderPriorityApplicationTemplatesMarkdown } = require("./priority-application-templates");
@@ -737,6 +738,14 @@ function digitalHospitalStandardsChecks(digitalHospitalStandards) {
   ];
 }
 
+function publicHealthHighlightsReadinessChecks(publicHealthHighlightsReadiness) {
+  return [
+    check("publicHealthHighlights:readiness", publicHealthHighlightsReadiness.ok, publicHealthHighlightsReadiness.ok ? "public health five-suite readiness checks passed" : "public health five-suite readiness failed", "error", "public-health"),
+    check("publicHealthHighlights:fiveSuites", publicHealthHighlightsReadiness.summary?.capabilities === 5 && publicHealthHighlightsReadiness.summary?.checksPassed === publicHealthHighlightsReadiness.summary?.checks, `${publicHealthHighlightsReadiness.summary?.capabilities || 0}/5 capabilities and ${publicHealthHighlightsReadiness.summary?.checksPassed || 0}/${publicHealthHighlightsReadiness.summary?.checks || 0} checks`, "error", "public-health"),
+    check("publicHealthHighlights:productionBoundary", publicHealthHighlightsReadiness.functionalState === "five-suite-runnable" && publicHealthHighlightsReadiness.formalGoLiveState === "blocked-until-site-evidence-signed", `${publicHealthHighlightsReadiness.functionalState || "unknown"} / ${publicHealthHighlightsReadiness.formalGoLiveState || "unknown"}`, "error", "public-health")
+  ];
+}
+
 function digitalHospitalPilotChecks(digitalHospitalPilot) {
   return [
     check("digitalHospitalPilot:readiness", digitalHospitalPilot.ok, digitalHospitalPilot.ok ? "digital hospital pilot checks passed" : "digital hospital pilot checks failed", "error", "digital-hospital-pilot"),
@@ -1021,6 +1030,7 @@ function packageChecks(pkg) {
     "maternal-child:readiness",
     "immunization:readiness",
     "public-health:readiness",
+    "public-health:highlights:readiness",
     "blood-system:readiness",
     "policy:coverage",
     "integration:readiness",
@@ -1107,6 +1117,7 @@ function commandChecks(runCommands) {
   return [
     run(npm, ["run", "check"]),
     run(npm, ["run", "blood-system:readiness"]),
+    run(npm, ["run", "public-health:highlights:readiness"]),
     run(npm, ["test"]),
     run(npm, ["run", "test:coverage"]),
     run(npm, ["run", "test:e2e"]),
@@ -1176,6 +1187,7 @@ function buildReleaseReport(options = {}) {
   const maternalChildReadiness = buildMaternalChildReadinessReport({ data, packageSource: JSON.stringify(pkg) });
   const immunizationReadiness = buildImmunizationReadinessReport({ data });
   const publicHealthReadiness = buildPublicHealthReadinessReport({ data, pkg });
+  const publicHealthHighlightsReadiness = buildPublicHealthHighlightsReadiness({ data, pkg });
   const bloodSystemReadiness = buildBloodSystemReadinessReport({ pkg });
   const diseasePaymentReadiness = buildDiseasePaymentReadiness();
   const policyCoverage = buildPolicyCoverageReport();
@@ -1245,6 +1257,7 @@ function buildReleaseReport(options = {}) {
     ...maternalChildReadinessChecks(maternalChildReadiness),
     ...immunizationReadinessChecks(immunizationReadiness),
     ...publicHealthReadinessChecks(publicHealthReadiness),
+    ...publicHealthHighlightsReadinessChecks(publicHealthHighlightsReadiness),
     check("bloodSystem:readiness", bloodSystemReadiness.ok, bloodSystemReadiness.ok ? "blood system readiness checks passed" : "blood system readiness failed", "error", "blood-system"),
     check("diseasePayment:readiness", diseasePaymentReadiness.ready, diseasePaymentReadiness.ready ? `${diseasePaymentReadiness.checks.length}/${diseasePaymentReadiness.checks.length} disease payment readiness checks passed` : "disease payment readiness failed", "error", "disease-payment"),
     ...policyCoverageChecks(policyCoverage),
@@ -1325,6 +1338,7 @@ function buildReleaseReport(options = {}) {
     maternalChildReadiness,
     immunizationReadiness,
     publicHealthReadiness,
+    publicHealthHighlightsReadiness,
     bloodSystemReadiness,
     diseasePaymentReadiness,
     policyCoverage,
@@ -2062,6 +2076,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       publicHealthReadiness: report.publicHealthReadiness
     }, null, 2), "utf8");
+    const publicHealthHighlightsReadinessJson = path.join(path.dirname(output), "public-health-highlights-readiness-report.json");
+    fs.writeFileSync(publicHealthHighlightsReadinessJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      publicHealthHighlightsReadiness: report.publicHealthHighlightsReadiness
+    }, null, 2), "utf8");
     const bloodSystemReadinessJson = path.join(path.dirname(output), "blood-system-readiness-report.json");
     fs.writeFileSync(bloodSystemReadinessJson, JSON.stringify({
       project: report.project,
@@ -2215,6 +2237,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(immunizationReadinessMarkdown, renderImmunizationReadinessMarkdown(report.immunizationReadiness), "utf8");
     const publicHealthReadinessMarkdown = path.join(path.dirname(markdown), "public-health-readiness-report.md");
     fs.writeFileSync(publicHealthReadinessMarkdown, renderPublicHealthMarkdown(report.publicHealthReadiness), "utf8");
+    const publicHealthHighlightsReadinessMarkdown = path.join(path.dirname(markdown), "public-health-highlights-readiness-report.md");
+    fs.writeFileSync(publicHealthHighlightsReadinessMarkdown, renderPublicHealthHighlightsMarkdown(report.publicHealthHighlightsReadiness), "utf8");
     const bloodSystemReadinessMarkdown = path.join(path.dirname(markdown), "blood-system-readiness-report.md");
     fs.writeFileSync(bloodSystemReadinessMarkdown, renderBloodSystemMarkdown(report.bloodSystemReadiness), "utf8");
     const diseasePaymentReadinessMarkdown = path.join(path.dirname(markdown), "disease-payment-readiness-report.md");

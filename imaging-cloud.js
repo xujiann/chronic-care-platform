@@ -63,6 +63,7 @@ function renderImagingCloud() {
   renderFilters(payload);
   renderSummary(payload.summary || {});
   renderStudyTable(studies);
+  renderMutualRecognition(payload.mutualRecognition || []);
   renderDevelopmentPlan(payload);
   renderGateways(payload);
   renderMobileViewer(studies.find((item) => item.id === imagingState.selectedStudyId) || studies[0], payload);
@@ -98,7 +99,8 @@ function renderSummary(summary) {
     ["浏览级可看", summary.browserLevel || 0, "手机端流畅调阅"],
     ["质控通过", summary.qcPassed || 0, "扫描评价与报告审核"],
     ["EMR 已同步", summary.emrSynced || 0, "电子病历索引兼容"],
-    ["有效分享", summary.activeShares || 0, "二维码/短信限时授权"]
+    ["有效分享", summary.activeShares || 0, "二维码/短信限时授权"],
+    ["跨机构互认", summary.mutualRecognition || 0, `${summary.recognized || 0} 已互认 / ${summary.pendingRecognition || 0} 待确认`]
   ].map(([label, value, hint]) => `<article class="metric-card">
     <span>${escapeHtml(label)}</span>
     <strong>${escapeHtml(value)}</strong>
@@ -110,20 +112,45 @@ function renderStudyTable(studies) {
   const target = document.querySelector("#study-table");
   if (!target) return;
   target.innerHTML = `<table>
-    <thead><tr><th>检查</th><th>医院</th><th>主索引</th><th>入云</th><th>质控/EMR</th><th>操作</th></tr></thead>
+    <thead><tr><th>检查</th><th>医院</th><th>主索引</th><th>入云</th><th>质控/EMR</th><th>跨机构互认</th><th>操作</th></tr></thead>
     <tbody>${studies.map((item) => `<tr>
       <td><strong>${escapeHtml(item.modality)} · ${escapeHtml(item.bodyPart)}</strong><br><small>${escapeHtml(item.studyDate)} · ${escapeHtml(item.accessionNumber)}</small></td>
       <td>${escapeHtml(item.institutionName)}<br><small>${escapeHtml(item.uploadMode)}</small></td>
       <td><small>${escapeHtml(item.mainIndex)}</small></td>
       <td><span class="badge ok">${escapeHtml(item.uploadStatus)}</span><br><small>${escapeHtml(item.integrityCheck)} · ${escapeHtml(item.imageCount)} 幅</small></td>
       <td><span class="badge ${/通过|已写入|passed/i.test(`${item.qcStatus} ${item.emrSyncStatus}`) ? "ok" : "warn"}">${escapeHtml(item.qcStatus)}</span><br><small>${escapeHtml(item.emrSyncStatus)}</small></td>
+      <td><span class="badge ${/已互认|recognized/i.test(item.mutualRecognitionStatus || "") ? "ok" : /不予|拒绝/i.test(item.mutualRecognitionStatus || "") ? "warn" : "info"}">${escapeHtml(item.mutualRecognitionStatus || "未发起")}</span><br><small>${escapeHtml(item.mutualRecognitionReason || "可发起区域互认")}</small></td>
       <td>
         <button class="inline-action" type="button" data-view-study="${escapeHtml(item.id)}">手机查看</button>
         <button class="inline-action primary" type="button" data-open-ohif="${escapeHtml(item.id)}">OHIF调阅</button>
         <button class="inline-action" type="button" data-share-study="${escapeHtml(item.id)}">分享</button>
+        ${canManageMutualRecognition() && !item.mutualRecognitionRecordId ? `<button class="inline-action" type="button" data-start-recognition="${escapeHtml(item.id)}">纳入互认</button>` : ""}
       </td>
-    </tr>`).join("") || `<tr><td colspan="6">暂无影像云检查。</td></tr>`}</tbody>
+    </tr>`).join("") || `<tr><td colspan="7">暂无影像云检查。</td></tr>`}</tbody>
   </table>`;
+}
+
+function renderMutualRecognition(records) {
+  const target = document.querySelector("#mutual-recognition-table");
+  if (!target) return;
+  target.innerHTML = `<table>
+    <thead><tr><th>检查/主索引</th><th>协同路径</th><th>互认状态</th><th>质控与理由</th><th>操作</th></tr></thead>
+    <tbody>${records.map((item) => `<tr>
+      <td><strong>${escapeHtml(item.item)}</strong><br><small>${escapeHtml(item.mainIndex)}</small></td>
+      <td>${escapeHtml(item.sourceInstitution)}<br><small>至 ${escapeHtml(item.targetInstitution)}</small></td>
+      <td><span class="badge ${/已互认|recognized/i.test(`${item.status} ${item.reviewStatus}`) ? "ok" : /不予|拒绝|rejected/i.test(`${item.status} ${item.reviewStatus}`) ? "warn" : "info"}">${escapeHtml(item.reviewStatus || item.status)}</span></td>
+      <td>${escapeHtml(item.qualityStatus || "待质控")}<br><small>${escapeHtml(item.reviewReasonCode || item.reason || "待目标机构确认")}</small></td>
+      <td>${canDecideMutualRecognition() && /待|pending/i.test(`${item.status} ${item.reviewStatus}`) ? `<button class="inline-action primary" type="button" data-approve-recognition="${escapeHtml(item.imageCloudStudyId)}">确认互认</button>` : "-"}</td>
+    </tr>`).join("") || `<tr><td colspan="5">暂未纳入跨机构互认；机构端可在影像检查列表发起。</td></tr>`}</tbody>
+  </table>`;
+}
+
+function canManageMutualRecognition() {
+  return ["commission", "institution", "county"].includes(window.HealthCityAuth?.getUser?.()?.role);
+}
+
+function canDecideMutualRecognition() {
+  return ["commission", "county"].includes(window.HealthCityAuth?.getUser?.()?.role);
 }
 
 function renderGateways(payload) {
@@ -269,6 +296,8 @@ async function handleImagingAction(event) {
   const ohifButton = event.target.closest("[data-open-ohif]");
   const viewButton = event.target.closest("[data-view-study]");
   const shareButton = event.target.closest("[data-share-study]");
+  const startRecognitionButton = event.target.closest("[data-start-recognition]");
+  const approveRecognitionButton = event.target.closest("[data-approve-recognition]");
   if (linkExternalButton) {
     await linkExternalStudy(linkExternalButton.dataset.linkExternalStudy);
     return;
@@ -288,6 +317,14 @@ async function handleImagingAction(event) {
   }
   if (shareButton) {
     await shareStudy(shareButton.dataset.shareStudy);
+    return;
+  }
+  if (startRecognitionButton) {
+    await startMutualRecognition(startRecognitionButton.dataset.startRecognition);
+    return;
+  }
+  if (approveRecognitionButton) {
+    await decideMutualRecognition(approveRecognitionButton.dataset.approveRecognition);
   }
 }
 
@@ -377,6 +414,41 @@ async function shareStudy(studyId) {
     await loadImagingCloud();
     renderImagingCloud();
   }
+}
+
+async function startMutualRecognition(studyId) {
+  if (!IMAGING_API_BASE) {
+    const study = (imagingState.payload.studies || []).find((item) => item.id === studyId);
+    if (!study) return;
+    const record = { id: `cmr-static-${studyId}`, imageCloudStudyId: studyId, residentId: study.residentId, item: `${study.bodyPart}${study.modality}`, mainIndex: study.mainIndex, sourceInstitution: study.institutionName, targetInstitution: "区域医学影像资源共享中心", status: "pending_review", reviewStatus: "pending", qualityStatus: study.qcStatus, reason: "影像云报告已回传，待目标机构确认。" };
+    study.mutualRecognitionStatus = "待中心确认";
+    study.mutualRecognitionRecordId = record.id;
+    imagingState.payload.mutualRecognition = [record, ...(imagingState.payload.mutualRecognition || [])];
+    renderImagingCloud();
+    return;
+  }
+  const response = await (window.HealthCityAuth?.authFetch || fetch)(`${IMAGING_API_BASE}/imaging-cloud/studies/${encodeURIComponent(studyId)}/mutual-recognition`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ targetInstitution: "区域医学影像资源共享中心", priority: "中" })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) { window.alert(payload.message || "发起跨机构互认失败"); return; }
+  await loadImagingCloud();
+  renderImagingCloud();
+}
+
+async function decideMutualRecognition(studyId) {
+  if (!IMAGING_API_BASE || !window.confirm("确认该影像检查满足互认条件？")) return;
+  const response = await (window.HealthCityAuth?.authFetch || fetch)(`${IMAGING_API_BASE}/imaging-cloud/studies/${encodeURIComponent(studyId)}/mutual-recognition/decision`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ decision: "recognize", reasonCode: "qc-passed", comment: "影像云检查、报告和主索引复核通过。" })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) { window.alert(payload.message || "确认互认失败"); return; }
+  await loadImagingCloud();
+  renderImagingCloud();
 }
 
 function buildFallbackImagingCloud() {

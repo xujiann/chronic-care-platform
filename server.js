@@ -4967,6 +4967,13 @@ function seedImageCloudImplementedFeatures() {
       status: "已实现",
       evidence: "share/qc APIs",
       detail: "支持二维码或短信链接限时分享，支持扫描评分、报告评分和质控结论回写。"
+    },
+    {
+      id: "imaging-feature-mutual-recognition",
+      name: "跨机构影像互认闭环",
+      status: "已实现",
+      evidence: "imaging-cloud mutual-recognition APIs",
+      detail: "影像云检查可生成医共体协同工单、互认记录和主索引引用；确认后同步报告、检查状态和审计证据。"
     }
   ];
 }
@@ -5023,10 +5030,10 @@ function seedImageCloudDevelopmentPlan() {
       phase: "跨机构互认扩展",
       owner: "county-consortium-office",
       target: "把影像云检查纳入县域检查互认、远程诊断和远程会诊闭环。",
-      nextAction: "将影像云检查与 countyCollaborationOrders、countyMutualRecognitionRecords、referralTeleconsultations 建立引用。",
+      nextAction: "已建立影像云检查与县域协同工单、互认记录和报告引用；下一步接入真实 PACS/RIS 回传和会诊系统联调。",
       acceptance: "基层申请、中心诊断、报告回传、结果互认和居民查询可串联到同一主索引。",
-      status: "待开发",
-      evidence: ["countyCollaborationOrders", "countyMutualRecognitionRecords"]
+      status: "演示闭环已实现",
+      evidence: ["countyCollaborationOrders", "countyMutualRecognitionRecords", "POST /api/imaging-cloud/studies/:id/mutual-recognition"]
     }
   ];
 }
@@ -8633,6 +8640,87 @@ function buildImageCloudDerivedRecords(study, user) {
   });
   personalRecord.personIndex = study.personIndex;
   return { report, personalRecord };
+}
+
+function createImageCloudMutualRecognitionChain(data, study, payload, user) {
+  const targetInstitution = String(payload.targetInstitution || "区域医学影像资源共享中心").trim();
+  const region = String(payload.region || "区域影像云").trim();
+  const priority = String(payload.priority || "中").trim();
+  const reportId = `dr-${study.id}`;
+  const recognitionId = `cmr-imaging-${study.id}`;
+  const orderId = `cco-imaging-${study.id}`;
+  const now = new Date().toISOString();
+  const reportIndex = (data.diagnosticReports || []).findIndex((item) => item.id === reportId || item.imageCloudStudyId === study.id);
+  const derived = buildImageCloudDerivedRecords(study, user);
+  const report = reportIndex >= 0
+    ? { ...data.diagnosticReports[reportIndex], imageCloudStudyId: study.id, mainIndex: study.mainIndex, studyInstanceUID: study.studyInstanceUID }
+    : derived.report;
+  report.id = report.id || reportId;
+  report.category = "imaging";
+  report.imageCloudStudyId = study.id;
+  report.mainIndex = study.mainIndex;
+  report.studyInstanceUID = study.studyInstanceUID;
+  report.targetInstitution = targetInstitution;
+  report.status = report.status === "recognized" ? "recognized" : "pending_review";
+  report.recognitionRecordId = recognitionId;
+
+  const existingRecognitionIndex = (data.countyMutualRecognitionRecords || []).findIndex((item) => item.id === recognitionId || item.imageCloudStudyId === study.id);
+  const recognition = existingRecognitionIndex >= 0
+    ? { ...data.countyMutualRecognitionRecords[existingRecognitionIndex] }
+    : {
+      id: recognitionId,
+      residentId: study.residentId,
+      item: `${study.bodyPart}${study.modality}`,
+      sourceInstitution: study.institutionName,
+      targetInstitution,
+      status: "pending_review",
+      reviewStatus: "pending",
+      reason: "影像云报告已回传，待目标机构按互认规则确认。",
+      reportId: report.id,
+      at: study.studyDate,
+      qualityStatus: study.qcStatus,
+      createdAt: now,
+      createdBy: user.username || user.role
+    };
+  recognition.imageCloudStudyId = study.id;
+  recognition.studyInstanceUID = study.studyInstanceUID;
+  recognition.mainIndex = study.mainIndex;
+  recognition.reportId = report.id;
+  recognition.targetInstitution = recognition.targetInstitution || targetInstitution;
+  recognition.sourceInstitution = recognition.sourceInstitution || study.institutionName;
+  recognition.qualityStatus = study.qcStatus;
+  recognition.reason = recognition.reason || "影像云报告已回传，待目标机构按互认规则确认。";
+
+  const existingOrderIndex = (data.countyCollaborationOrders || []).findIndex((item) => item.id === orderId || item.imageCloudStudyId === study.id);
+  const order = existingOrderIndex >= 0
+    ? { ...data.countyCollaborationOrders[existingOrderIndex] }
+    : {
+      id: orderId,
+      center: "医学影像资源共享中心",
+      region,
+      fromInstitution: study.institutionName,
+      toInstitution: targetInstitution,
+      residentId: study.residentId,
+      orderType: `${study.bodyPart}${study.modality}跨机构互认`,
+      status: "待中心确认",
+      priority,
+      requestedAt: now,
+      due: String(payload.due || "").trim(),
+      result: "影像报告已回传，待互认确认"
+    };
+  order.imageCloudStudyId = study.id;
+  order.diagnosticReportId = report.id;
+  order.recognitionRecordId = recognition.id;
+  order.mainIndex = study.mainIndex;
+  order.studyInstanceUID = study.studyInstanceUID;
+
+  if (reportIndex >= 0) data.diagnosticReports[reportIndex] = report;
+  else data.diagnosticReports = [report, ...(data.diagnosticReports || [])].slice(0, 300);
+  if (existingRecognitionIndex >= 0) data.countyMutualRecognitionRecords[existingRecognitionIndex] = recognition;
+  else data.countyMutualRecognitionRecords = [recognition, ...(data.countyMutualRecognitionRecords || [])].slice(0, 300);
+  if (existingOrderIndex >= 0) data.countyCollaborationOrders[existingOrderIndex] = order;
+  else data.countyCollaborationOrders = [order, ...(data.countyCollaborationOrders || [])].slice(0, 300);
+  return { report, recognition, order, created: existingRecognitionIndex < 0 };
 }
 
 function normalizeResearchDatasetApplication(payload, user, data) {
@@ -25732,6 +25820,110 @@ async function handleApi(req, res) {
     data.imageCloudQualityReviews = [review, ...(Array.isArray(data.imageCloudQualityReviews) ? data.imageCloudQualityReviews : [])].slice(0, 300);
     writeDatabase(data);
     sendJson(res, 200, { study: data.imageCloudStudies[index], review, fhirReportSync });
+    return;
+  }
+
+  const imagingRecognitionMatch = url.pathname.match(/^\/api\/imaging-cloud\/studies\/([^/]+)\/mutual-recognition$/);
+  if (req.method === "POST" && imagingRecognitionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/imaging-cloud/studies/:id/mutual-recognition");
+    if (!user) return;
+    const data = readDatabase();
+    const studyId = decodeURIComponent(imagingRecognitionMatch[1]);
+    const studyIndex = (data.imageCloudStudies || []).findIndex((item) => item.id === studyId);
+    if (studyIndex < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到影像云检查" });
+      return;
+    }
+    const study = data.imageCloudStudies[studyIndex];
+    if (!canAccessResident(user, study.residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "start imaging mutual recognition", target: studyId, result: "denied", detail: "resident scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "无权将该居民影像纳入跨机构互认" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const chain = createImageCloudMutualRecognitionChain(data, study, payload, user);
+    data.imageCloudStudies[studyIndex] = {
+      ...study,
+      mutualRecognitionStatus: chain.recognition.status,
+      mutualRecognitionRecordId: chain.recognition.id,
+      countyCollaborationOrderId: chain.order.id,
+      updatedAt: new Date().toISOString()
+    };
+    appendDataAccessLog(data, user, study.residentId, "医学影像云", `纳入跨机构互认 ${study.accessionNumber} · ${study.mainIndex}`);
+    data.securityEvents = [{
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "start imaging mutual recognition",
+      target: studyId,
+      result: "allowed",
+      detail: `${chain.order.id} · ${chain.recognition.id} · ${study.mainIndex}`
+    }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, chain.created ? 201 : 200, { ...chain, study: data.imageCloudStudies[studyIndex] });
+    return;
+  }
+
+  const imagingRecognitionDecisionMatch = url.pathname.match(/^\/api\/imaging-cloud\/studies\/([^/]+)\/mutual-recognition\/decision$/);
+  if (req.method === "POST" && imagingRecognitionDecisionMatch) {
+    const user = requireApiRole(req, res, ["commission", "county"], "/api/imaging-cloud/studies/:id/mutual-recognition/decision");
+    if (!user) return;
+    const data = readDatabase();
+    const studyId = decodeURIComponent(imagingRecognitionDecisionMatch[1]);
+    const studyIndex = (data.imageCloudStudies || []).findIndex((item) => item.id === studyId);
+    if (studyIndex < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到影像云检查" });
+      return;
+    }
+    const study = data.imageCloudStudies[studyIndex];
+    if (!canAccessResident(user, study.residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "decide imaging mutual recognition", target: studyId, result: "denied", detail: "resident scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "无权确认该居民影像互认结果" });
+      return;
+    }
+    const record = (data.countyMutualRecognitionRecords || []).find((item) => item.imageCloudStudyId === studyId);
+    if (!record) {
+      sendJson(res, 409, { error: "Conflict", message: "请先将影像检查纳入跨机构互认" });
+      return;
+    }
+    const payload = await collectJson(req);
+    let reviewed;
+    try {
+      reviewed = reviewMutualRecognitionRecord(data, record.id, payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    const recognized = reviewed.status === "recognized";
+    const citation = upsertPhase2MutualRecognitionCitation(data, reviewed, payload, user);
+    data.imageCloudStudies[studyIndex] = {
+      ...study,
+      mutualRecognitionStatus: recognized ? "已互认" : "不予互认",
+      mutualRecognitionRecordId: reviewed.id,
+      mutualRecognitionReason: reviewed.reviewReasonCode,
+      mutualRecognitionReviewedAt: reviewed.reviewedAt,
+      updatedAt: new Date().toISOString()
+    };
+    data.countyCollaborationOrders = (data.countyCollaborationOrders || []).map((item) => item.recognitionRecordId === reviewed.id ? {
+      ...item,
+      status: recognized ? "已完成互认" : "退回复核",
+      result: recognized ? "影像报告已互认，可按授权主索引调阅" : `不予互认：${reviewed.reviewReasonCode}`,
+      updatedAt: reviewed.reviewedAt
+    } : item);
+    appendDataAccessLog(data, user, study.residentId, "医学影像云", `${recognized ? "确认互认" : "拒绝互认"} ${study.accessionNumber} · ${study.mainIndex}`);
+    data.securityEvents = [{
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "decide imaging mutual recognition",
+      target: studyId,
+      result: "allowed",
+      detail: `${reviewed.status} · ${reviewed.reviewReasonCode} · ${citation?.evidenceHash || "no-citation"}`
+    }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, { study: data.imageCloudStudies[studyIndex], record: reviewed, citation });
     return;
   }
 

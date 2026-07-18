@@ -5669,6 +5669,30 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(share.body.status, "active");
     assert.match(share.body.token, /^IMG-/);
 
+    const recognition = await api(baseUrl, `/api/imaging-cloud/studies/${encodeURIComponent(ingest.body.study.id)}/mutual-recognition`, authorized(hospital.body.token, {
+      method: "POST",
+      body: JSON.stringify({ targetInstitution: "中山区医学影像资源共享中心", region: "中山区", priority: "高" })
+    }));
+    assert.equal(recognition.response.status, 201);
+    assert.equal(recognition.body.recognition.imageCloudStudyId, ingest.body.study.id);
+    assert.equal(recognition.body.recognition.mainIndex, ingest.body.study.mainIndex);
+    assert.equal(recognition.body.order.recognitionRecordId, recognition.body.recognition.id);
+    assert.equal(recognition.body.report.imageCloudStudyId, ingest.body.study.id);
+
+    const county = await login(baseUrl, "county");
+    const decision = await api(baseUrl, `/api/imaging-cloud/studies/${encodeURIComponent(ingest.body.study.id)}/mutual-recognition/decision`, authorized(county.body.token, {
+      method: "POST",
+      body: JSON.stringify({ decision: "recognize", reasonCode: "qc-passed", comment: "影像云主索引、报告和质控记录复核通过。" })
+    }));
+    assert.equal(decision.response.status, 200);
+    assert.equal(decision.body.study.mutualRecognitionStatus, "已互认");
+    assert.equal(decision.body.record.status, "recognized");
+    assert.equal(decision.body.citation.verificationStatus, "verified");
+
+    const recognitionDashboard = await api(baseUrl, "/api/imaging-cloud", authorized(hospital.body.token));
+    assert.equal(recognitionDashboard.body.summary.mutualRecognition >= 1, true);
+    assert.equal(recognitionDashboard.body.mutualRecognition.some((item) => item.id === decision.body.record.id && item.mainIndex === ingest.body.study.mainIndex), true);
+
     const r2Citizen = await login(baseUrl, "citizen_r2");
     const forbiddenDashboard = await api(baseUrl, "/api/imaging-cloud?residentId=r1", authorized(r2Citizen.body.token));
     assert.equal(forbiddenDashboard.response.status, 403);
