@@ -23,7 +23,7 @@ function ensureIntakeState(state) {
   if (!Array.isArray(state.importRetryQueue)) state.importRetryQueue = [];
   if (!Array.isArray(state.grouperAdapters)) state.grouperAdapters = [
     { id: "simulation-local-v1", environment: "simulation", name: "本地可解释模拟分组器", status: "ready", authority: "non-binding" },
-    { id: "official-adapter-v1", environment: "formal", name: "国家/地方正式分组器适配器", status: "external-blocked", authority: "official-receipt-required" }
+    { id: "official-adapter-v1", environment: "formal", name: "国家/地方正式分组器适配器", status: "external-blocked", authority: "official-receipt-required", acceptedSchemeVersions: ["DRG-2.0-DL", "drg-demo-2026", "DIP-2.0-DL", "dip-demo-2026"], verificationContract: "detached-signature-attestation-v1" }
   ];
   return state;
 }
@@ -152,6 +152,37 @@ function appendImmutable(collection, record) {
   return sealed;
 }
 
+function officialCaseDigest(item, mode = "DRG") {
+  return digest({
+    caseId: item.id,
+    settlementListNo: item.settlementListNo,
+    mode,
+    principalDiagnosis: String(item.principalDiagnosis || "").toUpperCase(),
+    otherDiagnoses: (item.otherDiagnoses || []).map((diagnosis) => typeof diagnosis === "string" ? diagnosis : diagnosis.code).filter(Boolean).map((diagnosis) => String(diagnosis).toUpperCase()).sort(),
+    procedures: (item.procedures || []).map((procedure) => typeof procedure === "string" ? procedure : procedure.code).filter(Boolean).map((procedure) => String(procedure).toUpperCase()).sort(),
+    totalAmount: Number(item.totalAmount || 0),
+    dischargeDate: item.dischargeDate
+  });
+}
+
+function validateOfficialReceipt(state, item, official, mode) {
+  const errors = [];
+  if (!official?.receiptId) errors.push("缺少回执编号");
+  if (!official?.groupCode) errors.push("缺少正式分组编码");
+  if (!official?.schemeVersion) errors.push("缺少正式方案版本");
+  if (!official?.signedAt || Number.isNaN(Date.parse(official.signedAt))) errors.push("缺少有效签发时间");
+  if (official?.signatureValid !== true) errors.push("正式回执签名未通过适配器验证");
+  const verification = official?.verification || {};
+  if (verification.verifiedBy !== "official-adapter-v1" || !verification.algorithm || !verification.keyId || !verification.verifiedAt || Number.isNaN(Date.parse(verification.verifiedAt))) errors.push("缺少适配器验签证明");
+  const adapter = (state.grouperAdapters || []).find((row) => row.id === "official-adapter-v1");
+  if (adapter?.acceptedSchemeVersions?.length && official?.schemeVersion && !adapter.acceptedSchemeVersions.includes(official.schemeVersion)) errors.push("正式回执方案版本未获适配器接受");
+  const expectedInputDigest = officialCaseDigest(item, mode);
+  if (official?.inputDigest !== expectedInputDigest) errors.push("正式回执未绑定当前病例输入摘要");
+  const usedReceipt = (state.groupingRuns || []).flatMap((run) => run.results || []).find((result) => result.environment === "formal" && result.ok && result.receiptId === official?.receiptId);
+  if (usedReceipt) errors.push(`正式回执已被病例${usedReceipt.caseId}使用`);
+  return { ok: errors.length === 0, errors, expectedInputDigest, verificationContract: adapter?.verificationContract || "detached-signature-attestation-v1" };
+}
+
 function runGrouping(stateInput, payload, actor, calculateCase) {
   const state = ensureIntakeState(stateInput);
   const environment = payload.environment === "formal" ? "formal" : "simulation";
@@ -164,8 +195,9 @@ function runGrouping(stateInput, payload, actor, calculateCase) {
     if (!item) return { caseId, ok: false, error: "病例不存在" };
     if (environment === "formal") {
       const official = officialResults.get(caseId);
-      if (!official?.receiptId || !official?.groupCode || !official?.schemeVersion || official.signatureValid !== true) return { caseId, ok: false, error: "缺少有效正式分组回执" };
-      const result = { caseId, ok: true, environment, authority: "official", groupCode: official.groupCode, groupName: official.groupName || "", schemeVersion: official.schemeVersion, receiptId: official.receiptId, receiptDigest: digest(official), groupedAt: new Date().toISOString() };
+      const receiptValidation = validateOfficialReceipt(state, item, official, mode);
+      if (!receiptValidation.ok) return { caseId, ok: false, error: "正式分组回执验证失败", receiptErrors: receiptValidation.errors, expectedInputDigest: receiptValidation.expectedInputDigest };
+      const result = { caseId, ok: true, environment, authority: "official", groupCode: official.groupCode, groupName: official.groupName || "", schemeVersion: official.schemeVersion, receiptId: official.receiptId, inputDigest: official.inputDigest, receiptDigest: digest(official), verification: { ...official.verification, contract: receiptValidation.verificationContract }, signedAt: official.signedAt, groupedAt: new Date().toISOString() };
       item.formalStatus = "grouped";
       item.formalGrouping = result;
       return result;
@@ -203,4 +235,4 @@ function buildIntakeSummary(stateInput) {
   };
 }
 
-module.exports = { QUALITY_CATEGORIES, buildIntakeSummary, digest, ensureIntakeState, importBatch, normalizeSettlementList, retryImport, runGrouping, stableStringify, validateSettlementList, verifyLedger };
+module.exports = { QUALITY_CATEGORIES, buildIntakeSummary, digest, ensureIntakeState, importBatch, normalizeSettlementList, officialCaseDigest, retryImport, runGrouping, stableStringify, validateOfficialReceipt, validateSettlementList, verifyLedger };

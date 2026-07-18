@@ -1624,6 +1624,45 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(resumedPilotInstitution.response.status, 200);
     assert.equal(resumedPilotInstitution.body.institution.status, "active");
 
+    const createdPilotIssue = await api(baseUrl, "/api/digital-hospital/pilot-issues/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "create", institutionId: "MR1", institutionName: "大连市中心医院", title: "API联调回执待复核", severity: "P0", category: "interface-evidence", owner: "医院信息中心", dueAt: "2026-08-01", note: "登记API试点问题", noPatientPii: true })
+    }));
+    assert.equal(createdPilotIssue.response.status, 201);
+    assert.equal(createdPilotIssue.body.issue.status, "open");
+    const pilotIssueEvidence = await api(baseUrl, `/api/digital-hospital/pilot-issues/${encodeURIComponent(createdPilotIssue.body.issue.id)}/actions`, authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "record-evidence", evidenceRef: "DH-API-ISSUE-001", note: "登记API脱敏整改证据", noPatientPii: true })
+    }));
+    assert.equal(pilotIssueEvidence.response.status, 200);
+    assert.equal(pilotIssueEvidence.body.issue.evidenceRefs.includes("DH-API-ISSUE-001"), true);
+    const pilotIssueReview = await api(baseUrl, `/api/digital-hospital/pilot-issues/${encodeURIComponent(createdPilotIssue.body.issue.id)}/actions`, authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "submit-review", note: "提交API监管复核" })
+    }));
+    assert.equal(pilotIssueReview.response.status, 200);
+    assert.equal(pilotIssueReview.body.issue.status, "pending-review");
+    assert.equal(pilotIssueReview.body.board.summary.pendingPilotIssueReviews >= 1, true);
+    const deniedPilotIssueSelfReview = await api(baseUrl, `/api/digital-hospital/pilot-issues/${encodeURIComponent(createdPilotIssue.body.issue.id)}/actions`, authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "verify-close", note: "整改提交人不得自行关闭" })
+    }));
+    assert.equal(deniedPilotIssueSelfReview.response.status, 409);
+    const pilotIssueReviewerLogin = await login(baseUrl, "city");
+    assert.equal(pilotIssueReviewerLogin.response.status, 200);
+    const closedPilotIssue = await api(baseUrl, `/api/digital-hospital/pilot-issues/${encodeURIComponent(createdPilotIssue.body.issue.id)}/actions`, authorized(pilotIssueReviewerLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "verify-close", note: "独立复核整改证据后关闭" })
+    }));
+    assert.equal(closedPilotIssue.response.status, 200);
+    assert.equal(closedPilotIssue.body.issue.status, "verified-closed");
+    const reopenedPilotIssue = await api(baseUrl, `/api/digital-hospital/pilot-issues/${encodeURIComponent(createdPilotIssue.body.issue.id)}/actions`, authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "reopen", note: "抽查发现证据过期，重新打开" })
+    }));
+    assert.equal(reopenedPilotIssue.response.status, 200);
+    assert.equal(reopenedPilotIssue.body.issue.status, "reopened");
+
     const deniedPilotInstitutionRegister = await api(baseUrl, "/api/digital-hospital/pilot-institutions/actions", authorized(residentPhoneLogin.body.token, {
       method: "POST",
       body: JSON.stringify({ action: "register", institutionId: "DENIED", institutionName: "越权机构", owner: "居民" })

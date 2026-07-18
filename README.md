@@ -370,6 +370,8 @@ The hospital interface development handoff is `docs/escort-hospital-interface.md
 
 The same workbench now includes multi-hospital pilot operations. `/api/digital-hospital/pilot-institutions/actions` registers institutions, while `/api/digital-hospital/pilot-institutions/:id/actions` enforces six readiness checks, independent approval, whitelist activation, pause/resume, observation-stage advancement, daily-review evidence, institution scope, and the no-patient-PII boundary.
 
+The pilot workbench also includes an institution-scoped issue desk. `/api/digital-hospital/pilot-issues/actions` registers P0/P1/P2 issues against the pilot roster, while `/api/digital-hospital/pilot-issues/:id/actions` controls assignment, remediation, minimized evidence, review submission, independent closure, and commission-only reopening with SLA and audit history.
+
 `digital-hospital-self-assessment.html` now carries the tiered review queue from institution submission through provincial preliminary review and disputed-indicator expert review. Expert opinions can confirm, revise, or return an assessment for correction; submitter, preliminary reviewer, expert reviewer, and final acceptance reviewer are independently checked and every transition is audited.
 
 ## Internet Nursing Pilot

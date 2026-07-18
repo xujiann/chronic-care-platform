@@ -125,14 +125,17 @@ const {
   buildDigitalHospitalEvaluationCatalog,
   buildDigitalHospitalPilotBoard,
   createDigitalHospitalPilotInstitution,
+  createDigitalHospitalPilotIssue,
   normalizeDigitalHospitalCollectionJobAction,
   normalizeDigitalHospitalEvaluationEvidenceAction,
   normalizeDigitalHospitalPilotInstitutionAction,
+  normalizeDigitalHospitalPilotIssueAction,
   normalizeDigitalHospitalPreAssessmentAction,
   runDigitalHospitalPreAssessment,
   seedDigitalHospitalCollectionJobs,
   seedDigitalHospitalEvaluationEvidence,
   seedDigitalHospitalPilotInstitutions,
+  seedDigitalHospitalPilotIssues,
   seedDigitalHospitalPreAssessments
 } = require("./digital-hospital-evaluation");
 const {
@@ -1049,6 +1052,7 @@ function seedState() {
     digitalHospitalEvaluationEvidence: seedDigitalHospitalEvaluationEvidence(),
     digitalHospitalPreAssessments: seedDigitalHospitalPreAssessments(),
     digitalHospitalPilotInstitutions: seedDigitalHospitalPilotInstitutions(),
+    digitalHospitalPilotIssues: seedDigitalHospitalPilotIssues(),
     digitalHospitalEvaluationTasks: seedDigitalHospitalEvaluationTasks(),
     digitalHospitalEvidencePackets: seedDigitalHospitalEvidencePackets(),
     digitalHospitalRiskItems: seedDigitalHospitalRiskItems(),
@@ -7720,6 +7724,7 @@ function normalizeState(data) {
     digitalHospitalEvaluationEvidence: mergeByKey(seedDigitalHospitalEvaluationEvidence(), data.digitalHospitalEvaluationEvidence, "id"),
     digitalHospitalPreAssessments: mergeByKey(seedDigitalHospitalPreAssessments(), data.digitalHospitalPreAssessments, "id"),
     digitalHospitalPilotInstitutions: mergeByKey(seedDigitalHospitalPilotInstitutions(), data.digitalHospitalPilotInstitutions, "id"),
+    digitalHospitalPilotIssues: mergeByKey(seedDigitalHospitalPilotIssues(), data.digitalHospitalPilotIssues, "id"),
     digitalHospitalEvaluationTasks: mergeByKey(seedDigitalHospitalEvaluationTasks(), data.digitalHospitalEvaluationTasks, "id"),
     digitalHospitalEvidencePackets: mergeByKey(seedDigitalHospitalEvidencePackets(), data.digitalHospitalEvidencePackets, "id"),
     digitalHospitalRiskItems: mergeByKey(seedDigitalHospitalRiskItems(), data.digitalHospitalRiskItems, "id"),
@@ -8488,6 +8493,8 @@ function buildImageCloudDashboard(data, user, filters = {}) {
   const reviews = (Array.isArray(data.imageCloudQualityReviews) ? data.imageCloudQualityReviews : []).filter((item) => studyIds.has(item.studyId));
   const diagnosticReports = (Array.isArray(data.diagnosticReports) ? data.diagnosticReports : []).filter((item) => studyIds.has(item.imageCloudStudyId));
   const personalRecords = (Array.isArray(data.personalRecords) ? data.personalRecords : []).filter((item) => item.category === "imaging" && studyIds.has(item.meta?.imageCloudStudyId));
+  const mutualRecognition = (Array.isArray(data.countyMutualRecognitionRecords) ? data.countyMutualRecognitionRecords : [])
+    .filter((item) => studyIds.has(item.imageCloudStudyId));
   const gateways = (Array.isArray(data.imageCloudGateways) ? data.imageCloudGateways : [])
     .filter((item) => !filters.institutionCode || item.institutionCode === filters.institutionCode);
   const activeShares = shares.filter((item) => item.status === "active" && new Date(item.expiresAt).getTime() > Date.now());
@@ -8499,12 +8506,16 @@ function buildImageCloudDashboard(data, user, filters = {}) {
       browserLevel: studies.filter((item) => item.browserLevel).length,
       qcPassed: studies.filter((item) => /通过|passed/i.test(item.qcStatus || "")).length,
       emrSynced: studies.filter((item) => /已写入|synced/i.test(item.emrSyncStatus || "")).length,
-      activeShares: activeShares.length
+      activeShares: activeShares.length,
+      mutualRecognition: mutualRecognition.length,
+      recognized: mutualRecognition.filter((item) => /已互认|recognized/i.test(`${item.status || ""} ${item.reviewStatus || ""}`)).length,
+      pendingRecognition: mutualRecognition.filter((item) => /待|pending/i.test(`${item.status || ""} ${item.reviewStatus || ""}`)).length
     },
     gateways,
     studies,
     shares,
     qualityReviews: reviews,
+    mutualRecognition,
     implementedFeatures: seedImageCloudImplementedFeatures(),
     developmentPlan: seedImageCloudDevelopmentPlan(),
     emrCompatibility: {
@@ -17799,11 +17810,11 @@ async function handleApi(req, res) {
     return;
   }
 
-  const publicHealthHighlightAlertActionMatch = url.pathname.match(/^\/api\/public-health\/highlights\/alerts\/([^/]+)\/actions$/);
-  if (req.method === "POST" && publicHealthHighlightAlertActionMatch) {
+  const publicHealthHighlightAlertActionMatchDuplicate = url.pathname.match(/^\/api\/public-health\/highlights\/alerts\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthHighlightAlertActionMatchDuplicate) {
     const user = requireApiRole(req, res, ["commission"], "/api/public-health/highlights/alerts/:id/actions");
     if (!user) return;
-    const alertId = decodeURIComponent(publicHealthHighlightAlertActionMatch[1]);
+    const alertId = decodeURIComponent(publicHealthHighlightAlertActionMatchDuplicate[1]);
     const payload = await collectJson(req);
     const data = readDatabase();
     const alerts = mergeByKey(seedPublicHealthAlerts(), data.publicHealthAlerts, "id");
@@ -17976,6 +17987,215 @@ async function handleApi(req, res) {
       action: normalized.history,
       highlights: buildPublicHealthHighlights({ data: readDatabase() })
     });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/highlights") {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/highlights");
+    if (!user) return;
+    const data = readDatabase();
+    const highlights = buildPublicHealthHighlights({ data });
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "public-health-highlight-read",
+      target: "/api/public-health/highlights",
+      result: "allowed",
+      detail: `${highlights.summary.activeAlerts} active alerts / ${highlights.summary.openTasks} open tasks / evidence ${highlights.summary.evidenceScore}%`
+    });
+    sendJson(res, 200, highlights);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/public-health/highlights/signals") {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/highlights/signals");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    let signal;
+    try {
+      signal = normalizePublicHealthSignal(payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    const signals = [signal, ...(Array.isArray(data.publicHealthSignals) ? data.publicHealthSignals : [])].slice(0, 500);
+    data.publicHealthSignals = signals;
+    data.publicHealthEvidenceRecords = mergeByKey(seedPublicHealthEvidenceRecords(), data.publicHealthEvidenceRecords, "id").map((item) => (
+      item.id === "phec-source-lineage"
+        ? { ...item, observed: Math.max(Number(item.observed || 0), signals.length), status: "recorded" }
+        : item
+    ));
+    data.securityEvents = sealAuditTrail([{
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "public-health-highlight-signal-intake",
+      target: signal.id,
+      result: "allowed",
+      detail: `${signal.sourceType}/${signal.region}/${signal.metric}/${signal.value}`
+    }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    sendJson(res, 201, { ok: true, signal, highlights: buildPublicHealthHighlights({ data: readDatabase() }) });
+    return;
+  }
+
+  const publicHealthHighlightAlertActionMatchV2 = url.pathname.match(/^\/api\/public-health\/highlights\/alerts\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthHighlightAlertActionMatchV2) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/highlights/alerts/:id/actions");
+    if (!user) return;
+    const alertId = decodeURIComponent(publicHealthHighlightAlertActionMatchV2[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const alerts = mergeByKey(seedPublicHealthAlerts(), data.publicHealthAlerts, "id");
+    const index = alerts.findIndex((item) => item.id === alertId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到监测预警" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizePublicHealthHighlightAlertAction(alerts[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    alerts[index] = normalized.item;
+    data.publicHealthAlerts = alerts;
+    data.securityEvents = sealAuditTrail([{
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "public-health-highlight-alert-action",
+      target: alertId,
+      result: "allowed",
+      detail: `${normalized.history.action}/${normalized.item.status}/${normalized.history.note}`
+    }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    sendJson(res, 200, { ok: true, alert: normalized.item, action: normalized.history, highlights: buildPublicHealthHighlights({ data: readDatabase() }) });
+    return;
+  }
+
+  const publicHealthCommandTaskActionMatch = url.pathname.match(/^\/api\/public-health\/highlights\/command-tasks\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthCommandTaskActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/highlights/command-tasks/:id/actions");
+    if (!user) return;
+    const taskId = decodeURIComponent(publicHealthCommandTaskActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const tasks = mergeByKey(seedPublicHealthCommandTasks(), data.publicHealthCommandTasks, "id");
+    const index = tasks.findIndex((item) => item.id === taskId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到应急处置任务" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizePublicHealthCommandTaskAction(tasks[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    tasks[index] = normalized.item;
+    data.publicHealthCommandTasks = tasks;
+    data.publicHealthEvidenceRecords = mergeByKey(seedPublicHealthEvidenceRecords(), data.publicHealthEvidenceRecords, "id").map((item) => (
+      item.id === "phec-command-dispatch"
+        ? { ...item, status: "recorded", observed: Math.max(Number(item.observed || 0), tasks.filter((task) => task.owner && task.dueAt).length) }
+        : item
+    ));
+    data.securityEvents = sealAuditTrail([{
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "public-health-highlight-command-task-action",
+      target: taskId,
+      result: "allowed",
+      detail: `${normalized.history.action}/${normalized.item.status}/${normalized.history.note}`
+    }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    sendJson(res, 200, { ok: true, task: normalized.item, action: normalized.history, highlights: buildPublicHealthHighlights({ data: readDatabase() }) });
+    return;
+  }
+
+  const publicHealthAiReviewActionMatch = url.pathname.match(/^\/api\/public-health\/highlights\/ai-reviews\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthAiReviewActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/highlights/ai-reviews/:id/actions");
+    if (!user) return;
+    const reviewId = decodeURIComponent(publicHealthAiReviewActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const reviews = mergeByKey(seedPublicHealthAiReviews(), data.publicHealthAiReviews, "id");
+    const index = reviews.findIndex((item) => item.id === reviewId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到AI研判建议" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizePublicHealthAiReviewAction(reviews[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    reviews[index] = normalized.item;
+    data.publicHealthAiReviews = reviews;
+    data.publicHealthEvidenceRecords = mergeByKey(seedPublicHealthEvidenceRecords(), data.publicHealthEvidenceRecords, "id").map((item) => (
+      item.id === "phec-ai-human-review"
+        ? { ...item, status: "verified", observed: Math.max(Number(item.observed || 0), reviews.filter((review) => review.humanApprovalRequired).length) }
+        : item
+    ));
+    data.securityEvents = sealAuditTrail([{
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "public-health-highlight-ai-review-action",
+      target: reviewId,
+      result: "allowed",
+      detail: `${normalized.history.action}/${normalized.item.status}/${normalized.history.note}`
+    }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    sendJson(res, 200, { ok: true, review: normalized.item, action: normalized.history, highlights: buildPublicHealthHighlights({ data: readDatabase() }) });
+    return;
+  }
+
+  const publicHealthEvidenceActionMatch = url.pathname.match(/^\/api\/public-health\/highlights\/evidence\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthEvidenceActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/highlights/evidence/:id/actions");
+    if (!user) return;
+    const evidenceId = decodeURIComponent(publicHealthEvidenceActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const records = mergeByKey(seedPublicHealthEvidenceRecords(), data.publicHealthEvidenceRecords, "id");
+    const index = records.findIndex((item) => item.id === evidenceId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到证据链记录" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizePublicHealthEvidenceAction(records[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    records[index] = normalized.item;
+    data.publicHealthEvidenceRecords = records;
+    data.securityEvents = sealAuditTrail([{
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "public-health-highlight-evidence-action",
+      target: evidenceId,
+      result: "allowed",
+      detail: `${normalized.history.action}/${normalized.item.status}/${normalized.history.artifactName || normalized.history.note}`
+    }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    sendJson(res, 200, { ok: true, evidence: normalized.item, action: normalized.history, highlights: buildPublicHealthHighlights({ data: readDatabase() }) });
     return;
   }
 
@@ -22412,6 +22632,77 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "POST" && url.pathname === "/api/digital-hospital/pilot-issues/actions") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/digital-hospital/pilot-issues/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    if (payload.action !== "create") {
+      sendJson(res, 400, { error: "Bad Request", message: "Only create is accepted" });
+      return;
+    }
+    const data = readDatabase();
+    const institutionId = String(payload.institutionId || (user.role === "institution" ? user.orgCode : "") || "").trim();
+    const pilotInstitutions = Array.isArray(data.digitalHospitalPilotInstitutions) ? data.digitalHospitalPilotInstitutions : seedDigitalHospitalPilotInstitutions();
+    const pilotInstitution = pilotInstitutions.find((item) => item.institutionId === institutionId);
+    if (!pilotInstitution) {
+      sendJson(res, 400, { error: "Bad Request", message: "Pilot issue institution must be registered in the pilot roster" });
+      return;
+    }
+    const existingIssues = Array.isArray(data.digitalHospitalPilotIssues) ? data.digitalHospitalPilotIssues : seedDigitalHospitalPilotIssues();
+    if (existingIssues.some((item) => item.institutionId === institutionId && item.title === String(payload.title || "").trim() && item.status !== "verified-closed")) {
+      sendJson(res, 409, { error: "Conflict", message: "An open pilot issue with the same institution and title already exists" });
+      return;
+    }
+    let issue;
+    try {
+      issue = createDigitalHospitalPilotIssue({ ...payload, institutionId, institutionName: pilotInstitution.institutionName }, user);
+    } catch (error) {
+      const status = Number(error.status) || 400;
+      sendJson(res, status, { error: status === 403 ? "Forbidden" : "Bad Request", message: error.message });
+      return;
+    }
+    data.digitalHospitalPilotIssues = [issue, ...existingIssues].slice(0, 1000);
+    data.securityEvents = sealAuditTrail([{
+      id: randomUUID(), at: new Date().toISOString(), actor: user.name, role: user.role,
+      action: "digital-hospital-pilot-issue-create", target: issue.id, result: "allowed",
+      detail: `${issue.institutionId} / ${issue.severity} / no patient PII`
+    }, ...(data.securityEvents || [])].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    sendJson(res, 201, { ok: true, issue, board: buildDigitalHospitalPilotBoard(readDatabase(), user) });
+    return;
+  }
+
+  const digitalHospitalPilotIssueActionMatch = url.pathname.match(/^\/api\/digital-hospital\/pilot-issues\/([^/]+)\/actions$/);
+  if (req.method === "POST" && digitalHospitalPilotIssueActionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/digital-hospital/pilot-issues/:id/actions");
+    if (!user) return;
+    const issueId = decodeURIComponent(digitalHospitalPilotIssueActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const issues = Array.isArray(data.digitalHospitalPilotIssues) ? data.digitalHospitalPilotIssues : seedDigitalHospitalPilotIssues();
+    const index = issues.findIndex((item) => item.id === issueId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Digital hospital pilot issue not found" });
+      return;
+    }
+    try {
+      issues[index] = normalizeDigitalHospitalPilotIssueAction(issues[index], payload, user);
+    } catch (error) {
+      const status = Number(error.status) || 400;
+      sendJson(res, status, { error: status === 403 ? "Forbidden" : status === 409 ? "Conflict" : "Bad Request", message: error.message });
+      return;
+    }
+    data.digitalHospitalPilotIssues = issues;
+    data.securityEvents = sealAuditTrail([{
+      id: randomUUID(), at: new Date().toISOString(), actor: user.name, role: user.role,
+      action: "digital-hospital-pilot-issue-action", target: issueId, result: "allowed",
+      detail: `${payload.action} / ${issues[index].status} / ${issues[index].institutionId}`
+    }, ...(data.securityEvents || [])].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    sendJson(res, 200, { ok: true, issue: issues[index], board: buildDigitalHospitalPilotBoard(readDatabase(), user) });
+    return;
+  }
+
   const digitalHospitalCollectionJobActionMatch = url.pathname.match(/^\/api\/digital-hospital\/collection-jobs\/([^/]+)\/actions$/);
   if (req.method === "POST" && digitalHospitalCollectionJobActionMatch) {
     const user = requireApiRole(req, res, ["commission", "institution"], "/api/digital-hospital/collection-jobs/:id/actions");
@@ -25793,6 +26084,45 @@ async function handleApi(req, res) {
     const data = readDatabase();
     const result = DiseasePaymentService.simulateDrgCase(data.diseasePayment, await collectJson(req));
     sendJson(res, 200, result);
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/parameters" && req.method === "GET") {
+    const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
+    if (!user) return;
+    sendJson(res, 200, DiseasePaymentService.buildParameterGovernanceView(readDatabase().diseasePayment));
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/parameters" && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    const result = DiseasePaymentService.createPaymentParameter(data.diseasePayment, await collectJson(req), user.name);
+    data.diseasePayment = result.state;
+    writeDatabase(data);
+    sendJson(res, 201, result.row);
+    return;
+  }
+
+  const diseasePaymentParameterActionMatch = url.pathname.match(/^\/api\/disease-payment\/parameters\/([^/]+)\/(simulate|submit|review|publish)$/);
+  if (diseasePaymentParameterActionMatch && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
+    if (!user) return;
+    const [, encodedId, action] = diseasePaymentParameterActionMatch;
+    const id = decodeURIComponent(encodedId);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const handlers = {
+      simulate: () => DiseasePaymentService.simulatePaymentParameter(data.diseasePayment, id, user.name),
+      submit: () => DiseasePaymentService.submitPaymentParameter(data.diseasePayment, id, user.name),
+      review: () => DiseasePaymentService.reviewPaymentParameter(data.diseasePayment, id, payload, user.name),
+      publish: () => DiseasePaymentService.publishPaymentParameter(data.diseasePayment, id, user.name)
+    };
+    const result = handlers[action]();
+    data.diseasePayment = result.state;
+    writeDatabase(data);
+    sendJson(res, 200, { parameter: result.row, impactReport: result.report, approval: result.approval });
     return;
   }
 

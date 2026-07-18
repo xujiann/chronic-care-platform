@@ -389,6 +389,10 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "escortService:citizenSubmitReadiness" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "escortService:appointmentFieldGuard" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "internetNursing:closedLoopSummary" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "internetNursing:highlightFeatures" && item.passed), true);
+  assert.equal(report.internetNursingReadiness.summary.highlightFeatures, 10);
+  assert.equal(report.checks.some((item) => item.name === "diseasePayment:readiness" && item.passed), true);
+  assert.equal(report.diseasePaymentReadiness.ready, true);
   assert.equal(report.checks.some((item) => item.name === "operations:readiness" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "operations:runCenter" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "operations:production-boundary" && item.passed), true);
@@ -689,6 +693,8 @@ test("release report writes standalone production cutover and storage artifacts"
   const chronicInstitutionInterfacesMarkdown = fs.readFileSync(path.join(outputDir, "chronic-institution-interfaces.md"), "utf8");
   const chronicLaunchCoreJson = JSON.parse(fs.readFileSync(path.join(outputDir, "chronic-launch-core.json"), "utf8"));
   const chronicLaunchCoreMarkdown = fs.readFileSync(path.join(outputDir, "chronic-launch-core.md"), "utf8");
+  const diseasePaymentJson = JSON.parse(fs.readFileSync(path.join(outputDir, "disease-payment-readiness-report.json"), "utf8"));
+  const diseasePaymentMarkdown = fs.readFileSync(path.join(outputDir, "disease-payment-readiness-report.md"), "utf8");
   const dataQualityJson = JSON.parse(fs.readFileSync(path.join(outputDir, "data-quality-report.json"), "utf8"));
   const dataQualityMarkdown = fs.readFileSync(path.join(outputDir, "data-quality-report.md"), "utf8");
   const digitalHospitalStandardsJson = JSON.parse(fs.readFileSync(path.join(outputDir, "digital-hospital-standards-readiness-report.json"), "utf8"));
@@ -796,6 +802,8 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.equal(chronicLaunchCoreJson.chronicLaunchCore.ok, true);
   assert.equal(chronicLaunchCoreJson.chronicLaunchCore.summary.signedSignoffs, 6);
   assert.match(chronicLaunchCoreMarkdown, /Site Signoffs/);
+  assert.equal(diseasePaymentJson.diseasePaymentReadiness.ready, true);
+  assert.match(diseasePaymentMarkdown, /按病种付费系统就绪报告/);
   assert.equal(dataQualityJson.dataQuality.ok, true);
   assert.match(dataQualityMarkdown, /Resident-linked collections/);
   assert.equal(digitalHospitalStandardsJson.digitalHospitalStandards.ok, true);

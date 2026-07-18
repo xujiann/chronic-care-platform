@@ -2178,6 +2178,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /citizenActionDockFallbacks/);
   assert.match(citizenJs, /renderCitizenActionDock/);
   assert.match(citizenJs, /data-action-dock-target/);
+  assert.match(citizenJs, /aria-label="\$\{active\.label\}：\$\{item\.label\}"/);
   assert.match(citizenJs, /常用操作/);
   assert.match(citizenJs, /registration:integration-readiness/);
   assert.match(citizenJs, /onsiteAcceptance/);
@@ -2512,6 +2513,8 @@ test("citizen portal exposes resident service tabs and implementation states", (
 test("internet nursing module exposes appointment, management and nurse workflows", () => {
   const html = read("internet-nursing.html");
   const js = read("internet-nursing.js");
+  const highlights = read("internet-nursing-highlights.js");
+  const highlightDoc = read("docs/internet-nursing-highlight-center.md");
   const css = read("portal.css");
   const mobilePreviewHtml = read("mobile-preview.html");
   const server = read("server.js");
@@ -2548,6 +2551,8 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(html, /nursing-device-verification/);
   assert.match(html, /nursing-regulatory-submission/);
   assert.match(html, /nursing-site-cutover-pack/);
+  assert.match(html, /internet-nursing-highlights\.js/);
+  assert.match(html, /nursing-highlight-center/);
   assert.match(html, /现场割接证据包/);
   assert.match(js, /fetchInternetNursingDashboard/);
   assert.match(js, /renderRiskGuidance/);
@@ -2581,6 +2586,8 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(js, /renderRegulatorySubmission/);
   assert.match(js, /buildStaticSiteCutoverPack/);
   assert.match(js, /renderSiteCutoverPack/);
+  assert.match(js, /buildInternetNursingInnovationCenter/);
+  assert.match(js, /renderNursingInnovationCenter/);
   assert.match(js, /productionBlockers/);
   assert.match(js, /production-blocked/);
   assert.match(js, /nursing-cutover-regulatory-pressure-test/);
@@ -2648,6 +2655,7 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(server, /buildInternetNursingDeviceVerification/);
   assert.match(server, /buildInternetNursingRegulatorySubmission/);
   assert.match(server, /buildInternetNursingCutoverPack/);
+  assert.match(server, /buildInternetNursingInnovationCenter/);
   assert.match(server, /siteCutoverPack/);
   assert.match(server, /productionBlockers/);
   assert.match(server, /buildProductionEnvironmentStatus/);
@@ -2680,14 +2688,24 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(read("scripts/internet-nursing-readiness.js"), /nursing:siteCutoverPack/);
   assert.match(read("scripts/internet-nursing-readiness.js"), /nursing:closedLoopSummary/);
   assert.match(read("scripts/internet-nursing-readiness.js"), /nursing:accountProvisioning/);
+  assert.match(read("scripts/internet-nursing-readiness.js"), /nursing:highlightFeatures/);
+  assert.match(read("scripts/internet-nursing-readiness.js"), /nursing:highlightEvidenceWorkbench/);
   assert.match(read("scripts/internet-nursing-readiness.js"), /nursing-cutover-payment-reconciliation/);
+  assert.match(highlights, /HIGHLIGHT_FEATURES/);
+  assert.match(highlights, /smart-dispatch/);
+  assert.match(highlights, /evidence-workbench/);
+  assert.match(highlights, /riskScore/);
+  assert.match(highlightDoc, /Ten Highlight Functions/);
+  assert.match(highlightDoc, /internet-nursing\.html#nursing-highlight-section/);
   assert.match(read("scripts/internet-nursing-readiness.js"), /release\/audit-retention-report\.md/);
   assert.match(read("scripts/internet-nursing-readiness.js"), /互联网护理现场割接证据包\.md/);
   assert.match(read("scripts/release-artifact-manifest.js"), /internet-nursing-readiness-report\.md/);
+  assert.match(read("scripts/release-artifact-manifest.js"), /internet-nursing-highlight-center\.md/);
   assert.match(read("scripts/release-report.js"), /buildInternetNursingReadinessReport/);
   assert.match(read("scripts/release-report.js"), /escortService:citizenSubmitReadiness/);
   assert.match(read("scripts/release-report.js"), /escortService:appointmentFieldGuard/);
   assert.match(read("scripts/release-report.js"), /internetNursing:closedLoopSummary/);
+  assert.match(read("scripts/release-report.js"), /internetNursing:highlightFeatures/);
   assert.match(read(".github/workflows/ci.yml"), /npm run internet-nursing:readiness/);
   assert.match(read("README.md"), /Internet Nursing Pilot/);
   assert.match(read("DEPLOYMENT.md"), /internet-nursing:readiness/);
@@ -3277,11 +3295,18 @@ test("digital hospital P0-P1 pilot evaluation workbench is wired", () => {
   assert.match(ui, /run-preassessment/);
   assert.match(ui, /refreshBoard/);
   assert.match(ui, /submit-readiness/);
+  assert.match(ui, /pilotIssues/);
+  assert.match(html, /digital-evaluation-pilot-issues/);
+  assert.match(html, /data-digital-evaluation-section="pilot-issues"/);
+  assert.match(html, /digital-evaluation-issue-create-no-pii/);
+  assert.match(html, /digital-evaluation-issue-action-no-pii/);
   assert.match(model, /EVALUATION_PROJECTS/);
   assert.match(model, /STANDARD_CLAUSES/);
   assert.match(model, /pilot-launch-ready/);
   assert.match(model, /blocked-until-site-evidence-signed/);
-  ["evaluation-catalog", "pilot-readiness", "pilot-institutions", "collection-jobs", "evaluation-evidence", "pre-assessments"].forEach((route) => assert.match(server, new RegExp(route)));
+  ["evaluation-catalog", "pilot-readiness", "pilot-institutions", "pilot-issues", "collection-jobs", "evaluation-evidence", "pre-assessments"].forEach((route) => assert.match(server, new RegExp(route)));
+  assert.match(model, /normalizeDigitalHospitalPilotIssueAction/);
+  assert.match(model, /independent issue reviewer/);
   assert.match(readiness, /39 EMR \/ 17 service \/ 10 management \/ 4 interoperability/);
   assert.match(read("auth.js"), /"digital-hospital-evaluation\.html": \["commission", "institution"\]/);
   assert.match(read("package.json"), /digital-hospital:pilot-readiness/);

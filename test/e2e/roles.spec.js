@@ -87,6 +87,24 @@ test("digital hospital self-assessment exposes tiered expert review without mobi
   expect(consoleErrors).toEqual([]);
 });
 
+test("digital hospital pilot issue desk is scoped, actionable and mobile safe", async ({ page }) => {
+  const consoleErrors = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
+  await login(page, "health", "index.html");
+  await page.goto("/digital-hospital-evaluation.html");
+  await expect(page.getByRole("heading", { name: "试点问题督办" })).toBeVisible();
+  await expect(page.locator("#digital-evaluation-pilot-issues tbody tr")).toHaveCount(2);
+  await expect(page.locator("#digital-evaluation-issue-summary")).toContainText("项开放");
+  await expect(page.locator("#digital-evaluation-issue-action")).toHaveValue("assign");
+  await expect(page.locator("#digital-evaluation-issue-action-no-pii")).toBeAttached();
+  await page.setViewportSize({ width: 375, height: 812 });
+  const overflow = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
+  expect(overflow.scrollWidth).toBe(overflow.width);
+  expect(consoleErrors).toEqual([]);
+});
+
 test("commission workbench renders live release gates and site templates", async ({ page }) => {
   await login(page, "health", "index.html");
   await page.goto("/workbench.html");

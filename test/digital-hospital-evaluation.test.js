@@ -6,15 +6,18 @@ const {
   buildDigitalHospitalPilotBoard,
   buildDigitalHospitalPilotOperations,
   calculatePackResult,
+  createDigitalHospitalPilotIssue,
   createDigitalHospitalPilotInstitution,
   normalizeDigitalHospitalCollectionJobAction,
   normalizeDigitalHospitalEvaluationEvidenceAction,
   normalizeDigitalHospitalPilotInstitutionAction,
+  normalizeDigitalHospitalPilotIssueAction,
   normalizeDigitalHospitalPreAssessmentAction,
   runDigitalHospitalPreAssessment,
   seedDigitalHospitalCollectionJobs,
   seedDigitalHospitalEvaluationEvidence,
   seedDigitalHospitalPilotInstitutions,
+  seedDigitalHospitalPilotIssues,
   seedPilotResponses
 } = require("../digital-hospital-evaluation");
 
@@ -114,4 +117,36 @@ test("pilot operations aggregates institution scope and overdue P0 SLA", () => {
   assert.equal(board.institutions.length, 1);
   assert.equal(board.institutions[0].institutionId, "MR1");
   assert.equal(board.summary.overdueP0, 1);
+});
+
+test("pilot issue closure enforces institution scope, evidence and independent review", () => {
+  let issue = createDigitalHospitalPilotIssue({ institutionId: "MR1", institutionName: "大连市中心医院", title: "联调回执缺失", severity: "P0", category: "interface", owner: "信息中心", dueAt: "2026-07-25", noPatientPii: true, note: "登记试点联调问题" }, hospital, { id: "dhissue-test", now: "2026-07-18T08:00:00.000Z" });
+  assert.equal(issue.status, "open");
+  assert.throws(() => normalizeDigitalHospitalPilotIssueAction(issue, { action: "start-remediation", note: "越权整改问题" }, { ...hospital, orgCode: "PILOT-02" }), /another institution/);
+  issue = normalizeDigitalHospitalPilotIssueAction(issue, { action: "assign", owner: "接口组", dueAt: "2026-07-24", note: "分派接口整改责任" }, hospital);
+  assert.throws(() => normalizeDigitalHospitalPilotIssueAction(issue, { action: "submit-review", note: "无证据提交复核" }, hospital), /evidence reference/);
+  issue = normalizeDigitalHospitalPilotIssueAction(issue, { action: "record-evidence", evidenceRef: "DH-ISSUE-001", noPatientPii: true, note: "登记脱敏联调回执" }, hospital);
+  issue = normalizeDigitalHospitalPilotIssueAction(issue, { action: "submit-review", note: "提交监管独立复核" }, hospital);
+  assert.equal(issue.status, "pending-review");
+  assert.throws(() => normalizeDigitalHospitalPilotIssueAction(issue, { action: "verify-close", note: "整改提交人自审关闭" }, { ...hospital, role: "commission" }), /independent issue reviewer/);
+  issue = normalizeDigitalHospitalPilotIssueAction(issue, { action: "verify-close", note: "监管独立复核后关闭" }, reviewer);
+  assert.equal(issue.status, "verified-closed");
+  assert.equal(issue.verifiedBy, "u-city");
+  assert.throws(() => normalizeDigitalHospitalPilotIssueAction(issue, { action: "record-evidence", evidenceRef: "LATE", noPatientPii: true, note: "关闭后追加证据" }, hospital), /current status/);
+  issue = normalizeDigitalHospitalPilotIssueAction(issue, { action: "reopen", note: "抽查发现证据失效，重新打开" }, commission);
+  assert.equal(issue.status, "reopened");
+});
+
+test("pilot operations exposes issue SLA and pending review summary", () => {
+  const issues = seedDigitalHospitalPilotIssues().map((item, index) => index === 0 ? { ...item, dueAt: "2026-07-17", status: "pending-review", evidenceRefs: ["DH-ISSUE-READY"] } : item);
+  const data = { digitalHospitalPilotInstitutions: seedDigitalHospitalPilotInstitutions(), digitalHospitalPilotIssues: issues };
+  const board = buildDigitalHospitalPilotOperations(data, commission, { today: "2026-07-18" });
+  assert.equal(board.summary.openIssues, 2);
+  assert.equal(board.summary.overdueIssues, 1);
+  assert.equal(board.summary.pendingIssueReviews, 1);
+  assert.equal(board.institutions.find((item) => item.institutionId === "MR1").operations.openIssueP0, 1);
+  const institutionBoard = buildDigitalHospitalPilotBoard(data, hospital, { today: "2026-07-18" });
+  assert.equal(institutionBoard.ok, true);
+  assert.equal(institutionBoard.operations.issues.length, 1);
+  assert.equal(institutionBoard.checks.find((item) => item.id === "pilot:issueClosure").passed, true);
 });

@@ -2,12 +2,21 @@ const DIGITAL_EVALUATION_ENDPOINTS = {
   catalog: "/api/digital-hospital/evaluation-catalog",
   pilot: "/api/digital-hospital/pilot-readiness",
   pilotInstitutions: "/api/digital-hospital/pilot-institutions",
+  pilotIssues: "/api/digital-hospital/pilot-issues",
   collection: "/api/digital-hospital/collection-jobs",
   evidence: "/api/digital-hospital/evaluation-evidence",
   preassessments: "/api/digital-hospital/pre-assessments"
 };
 
 const digitalEvaluationState = { catalog: null, board: null, user: window.HealthCityAuth?.getUser?.() || null };
+const DIGITAL_ISSUE_ACTION_LABELS = {
+  assign: "分派责任与期限",
+  "start-remediation": "开始整改",
+  "record-evidence": "登记整改证据",
+  "submit-review": "提交关闭复核",
+  "verify-close": "独立复核关闭",
+  reopen: "重开问题"
+};
 const escapeHtml = (value) => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 const setHtml = (id, html) => { const element = document.getElementById(id); if (element) element.innerHTML = html; };
 const authFetch = (...args) => (window.HealthCityAuth?.authFetch || fetch)(...args);
@@ -26,7 +35,7 @@ function renderMetrics() {
     ["评价项目", summary.projects || 0, "条款级可计算项目"],
     ["采集适配器", summary.collectionJobs || 0, "六类医院系统受控采集"],
     ["预评批次", summary.preAssessments || 0, "建设预评与整改留痕"],
-    ["开放整改", summary.openFindings || 0, `P0/P1差距项 · ${summary.activePilotInstitutions || 0}/${summary.pilotInstitutions || 0} 家试点激活`],
+    ["开放整改", summary.openFindings || 0, `预评差距 · ${summary.openPilotIssues || 0} 项试点督办`],
     ["试点状态", digitalEvaluationState.board?.functionalState || "待加载", digitalEvaluationState.board?.formalGoLiveState || ""]
   ];
   setHtml("digital-evaluation-metrics", metrics.map(([label, value, hint]) => `<article class="metric-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(hint)}</small></article>`).join(""));
@@ -42,6 +51,61 @@ function renderPilotOperations() {
     select.innerHTML = rows.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.institutionName)} / ${escapeHtml(item.status)}</option>`).join("");
     if (current && rows.some((item) => item.id === current)) select.value = current;
   }
+  const issues = operations.issues || [];
+  const today = new Date().toISOString().slice(0, 10);
+  const statusClass = (item) => item.status === "verified-closed" ? "info" : item.status === "pending-review" ? "warn" : "";
+  setHtml("digital-evaluation-pilot-issues", `<table><thead><tr><th>优先级</th><th>机构/问题</th><th>责任与期限</th><th>证据</th><th>状态</th></tr></thead><tbody>${issues.map((item) => {
+    const overdue = item.status !== "verified-closed" && item.dueAt && item.dueAt < today;
+    return `<tr><td><span class="badge ${item.severity === "P0" ? "danger" : "warn"}">${escapeHtml(item.severity)}</span></td><td><strong>${escapeHtml(item.institutionName)}</strong><br>${escapeHtml(item.title)}<br><small>${escapeHtml(item.category)}</small></td><td>${escapeHtml(item.owner)}<br><small class="${overdue ? "pilot-paused" : ""}">${escapeHtml(item.dueAt)}${overdue ? " · 已逾期" : ""}</small></td><td>${escapeHtml((item.evidenceRefs || []).join(", ") || "待补充")}</td><td><span class="badge ${statusClass(item)}">${escapeHtml(item.status)}</span><br><small>${escapeHtml(item.history?.[0]?.note || "暂无处理记录")}</small></td></tr>`;
+  }).join("") || '<tr><td colspan="5">当前范围没有试点督办问题。</td></tr>'}</tbody></table>`);
+  const issueSummary = document.getElementById("digital-evaluation-issue-summary");
+  if (issueSummary) issueSummary.textContent = `${operations.summary?.openIssues || 0} 项开放 / ${operations.summary?.overdueIssues || 0} 项逾期 / ${operations.summary?.pendingIssueReviews || 0} 项待独立复核`;
+  const issueSelect = document.getElementById("digital-evaluation-issue-id");
+  const currentIssue = issueSelect?.value;
+  if (issueSelect) {
+    issueSelect.innerHTML = issues.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.severity)} / ${escapeHtml(item.title)}</option>`).join("");
+    if (currentIssue && issues.some((item) => item.id === currentIssue)) issueSelect.value = currentIssue;
+  }
+  const issueInstitution = document.getElementById("digital-evaluation-issue-institution-id");
+  const currentInstitution = issueInstitution?.value;
+  if (issueInstitution) {
+    issueInstitution.innerHTML = rows.map((item) => `<option value="${escapeHtml(item.institutionId)}" data-name="${escapeHtml(item.institutionName)}">${escapeHtml(item.institutionName)}</option>`).join("");
+    if (currentInstitution && rows.some((item) => item.institutionId === currentInstitution)) issueInstitution.value = currentInstitution;
+  }
+  renderPilotIssueActions();
+}
+
+function selectedPilotIssue() {
+  const id = document.getElementById("digital-evaluation-issue-id")?.value;
+  const issues = digitalEvaluationState.board?.operations?.issues || [];
+  return issues.find((item) => item.id === id) || issues[0] || null;
+}
+
+function pilotIssueActions(item) {
+  if (!item) return [];
+  const commission = digitalEvaluationState.user?.role === "commission";
+  if (item.status === "verified-closed") return commission ? ["reopen"] : [];
+  if (item.status === "pending-review") return commission ? ["verify-close"] : [];
+  if (["open", "reopened"].includes(item.status)) return ["assign", "start-remediation", "record-evidence"];
+  if (item.status === "in-progress") return ["assign", "record-evidence", ...(item.evidenceRefs?.length ? ["submit-review"] : [])];
+  return [];
+}
+
+function updatePilotIssueActionFields() {
+  const action = document.getElementById("digital-evaluation-issue-action")?.value || "";
+  document.querySelectorAll(".issue-action-field").forEach((element) => {
+    element.hidden = !String(element.dataset.issueActions || "").split(",").includes(action);
+  });
+}
+
+function renderPilotIssueActions() {
+  const select = document.getElementById("digital-evaluation-issue-action");
+  const submit = document.querySelector("#digital-evaluation-issue-action-form button[type='submit']");
+  if (!select || !submit) return;
+  const actions = pilotIssueActions(selectedPilotIssue());
+  select.innerHTML = actions.length ? actions.map((action) => `<option value="${action}">${escapeHtml(DIGITAL_ISSUE_ACTION_LABELS[action])}</option>`).join("") : '<option value="">当前状态无可用动作</option>';
+  submit.disabled = actions.length === 0;
+  updatePilotIssueActionFields();
 }
 
 function renderCatalog() {
@@ -124,6 +188,8 @@ async function refreshBoard() {
 function bindForms() {
   ["digital-evaluation-pack-filter", "digital-evaluation-project-search"].forEach((id) => document.getElementById(id)?.addEventListener("input", renderCatalog));
   document.getElementById("digital-evaluation-assessment-id")?.addEventListener("change", renderFindings);
+  document.getElementById("digital-evaluation-issue-id")?.addEventListener("change", renderPilotIssueActions);
+  document.getElementById("digital-evaluation-issue-action")?.addEventListener("change", updatePilotIssueActionFields);
   document.getElementById("digital-evaluation-pilot-register-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const payload = { action: "register", institutionId: document.getElementById("digital-evaluation-pilot-register-id").value, institutionName: document.getElementById("digital-evaluation-pilot-register-name").value, owner: document.getElementById("digital-evaluation-pilot-register-owner").value, launchWindow: document.getElementById("digital-evaluation-pilot-register-window").value, note: document.getElementById("digital-evaluation-pilot-register-note").value };
@@ -136,6 +202,20 @@ function bindForms() {
     const readiness = Object.fromEntries([...document.querySelectorAll("[data-readiness-key]")].map((item) => [item.dataset.readinessKey, item.checked]));
     const payload = { action: document.getElementById("digital-evaluation-pilot-action").value, readiness, evidenceRefs: document.getElementById("digital-evaluation-pilot-evidence-refs").value.split(",").map((item) => item.trim()).filter(Boolean), p0ClearanceRef: document.getElementById("digital-evaluation-pilot-p0-clearance").value, dailyReportRef: document.getElementById("digital-evaluation-pilot-daily-report").value, note: document.getElementById("digital-evaluation-pilot-action-note").value, noPatientPii: document.getElementById("digital-evaluation-pilot-no-pii").checked };
     const result = await jsonRequest(`${DIGITAL_EVALUATION_ENDPOINTS.pilotInstitutions}/${encodeURIComponent(id)}/actions`, { method: "POST", body: JSON.stringify(payload) });
+    digitalEvaluationState.board = result.board; renderAll();
+  });
+  document.getElementById("digital-evaluation-issue-create-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const institution = document.getElementById("digital-evaluation-issue-institution-id");
+    const payload = { action: "create", institutionId: institution.value, institutionName: institution.selectedOptions[0]?.dataset.name || "", title: document.getElementById("digital-evaluation-issue-title").value, severity: document.getElementById("digital-evaluation-issue-severity").value, category: document.getElementById("digital-evaluation-issue-category").value, owner: document.getElementById("digital-evaluation-issue-owner").value, dueAt: document.getElementById("digital-evaluation-issue-due-at").value, note: document.getElementById("digital-evaluation-issue-create-note").value, noPatientPii: document.getElementById("digital-evaluation-issue-create-no-pii").checked };
+    const result = await jsonRequest(`${DIGITAL_EVALUATION_ENDPOINTS.pilotIssues}/actions`, { method: "POST", body: JSON.stringify(payload) });
+    digitalEvaluationState.board = result.board; renderAll();
+  });
+  document.getElementById("digital-evaluation-issue-action-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const id = document.getElementById("digital-evaluation-issue-id").value;
+    const payload = { action: document.getElementById("digital-evaluation-issue-action").value, owner: document.getElementById("digital-evaluation-issue-action-owner").value, dueAt: document.getElementById("digital-evaluation-issue-action-due-at").value, evidenceRef: document.getElementById("digital-evaluation-issue-evidence-ref").value, note: document.getElementById("digital-evaluation-issue-action-note").value, noPatientPii: document.getElementById("digital-evaluation-issue-action-no-pii").checked };
+    const result = await jsonRequest(`${DIGITAL_EVALUATION_ENDPOINTS.pilotIssues}/${encodeURIComponent(id)}/actions`, { method: "POST", body: JSON.stringify(payload) });
     digitalEvaluationState.board = result.board; renderAll();
   });
   document.getElementById("digital-evaluation-collection-form")?.addEventListener("submit", async (event) => {

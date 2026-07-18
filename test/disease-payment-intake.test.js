@@ -48,11 +48,17 @@ test("formal grouping requires signed official receipt and stays isolated from s
   assert.equal(simulation.state.cases[0].formalGrouping, undefined);
   const blocked = Intake.runGrouping(simulation.state, { environment: "formal", mode: "DRG", caseIds: ["dp-case-001"] }, "tester", Service.calculateCase);
   assert.equal(blocked.run.failed, 1);
-  assert.match(blocked.run.results[0].error, /正式分组回执/);
-  const formal = Intake.runGrouping(blocked.state, { environment: "formal", mode: "DRG", caseIds: ["dp-case-001"], officialResults: [{ caseId: "dp-case-001", receiptId: "OFF-001", groupCode: "BR23", groupName: "脑血管疾病", schemeVersion: "DRG-2.0-DL", signatureValid: true }] }, "tester", Service.calculateCase);
+  assert.match(blocked.run.results[0].error, /正式分组回执验证失败/);
+  const official = { caseId: "dp-case-001", receiptId: "OFF-001", groupCode: "BR23", groupName: "脑血管疾病", schemeVersion: "DRG-2.0-DL", inputDigest: Intake.officialCaseDigest(blocked.state.cases[0], "DRG"), signedAt: "2026-07-18T08:00:00.000Z", signatureValid: true, verification: { verifiedBy: "official-adapter-v1", algorithm: "SM2/SM3", keyId: "nhsa-joint-test-key-01", verifiedAt: "2026-07-18T08:00:01.000Z" } };
+  const formal = Intake.runGrouping(blocked.state, { environment: "formal", mode: "DRG", caseIds: ["dp-case-001"], officialResults: [official] }, "tester", Service.calculateCase);
   assert.equal(formal.run.succeeded, 1);
   assert.equal(formal.state.cases[0].formalGrouping.authority, "official");
+  assert.equal(formal.state.cases[0].formalGrouping.inputDigest, official.inputDigest);
+  assert.equal(formal.state.cases[0].formalGrouping.verification.contract, "detached-signature-attestation-v1");
   assert.equal(formal.state.cases[0].simulationCalculation.grouping.groupCode, "BR23");
+  const replay = Intake.runGrouping(formal.state, { environment: "formal", mode: "DRG", caseIds: ["dp-case-001"], officialResults: [official] }, "tester", Service.calculateCase);
+  assert.equal(replay.run.failed, 1);
+  assert.match(replay.run.results[0].receiptErrors.join("；"), /已被病例dp-case-001使用/);
 });
 
 test("grouping and calculation ledgers form verifiable immutable hash chains", () => {

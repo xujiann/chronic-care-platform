@@ -631,9 +631,9 @@ function renderCitizenActionDock() {
   <div class="citizen-action-dock-actions">
     ${items.map((item) => {
       if (item.href) {
-        return `<a class="citizen-action-chip ${item.primary ? "primary" : ""}" href="${item.href}" data-action-dock-service="${item.internal ? item.key : ""}">${item.label}</a>`;
+        return `<a class="citizen-action-chip ${item.primary ? "primary" : ""}" href="${item.href}" data-action-dock-service="${item.internal ? item.key : ""}" aria-label="${active.label}：${item.label}">${item.label}</a>`;
       }
-      return `<button type="button" class="citizen-action-chip ${item.tone === "primary" ? "primary" : ""}" data-action-dock-target="${item.target || ""}">${item.label}</button>`;
+      return `<button type="button" class="citizen-action-chip ${item.tone === "primary" ? "primary" : ""}" data-action-dock-target="${item.target || ""}" aria-label="${active.label}：${item.label}">${item.label}</button>`;
     }).join("")}
   </div>`;
   target.querySelectorAll("[data-action-dock-service]").forEach((link) => {
