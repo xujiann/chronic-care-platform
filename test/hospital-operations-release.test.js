@@ -80,6 +80,7 @@ test("hospital operations release renders and writes artifacts", (t) => {
   assert.match(writtenMarkdown, /release:postCutoverSignoffGate/);
   assert.match(writtenMarkdown, /release:launchReadiness/);
   assert.match(writtenMarkdown, /release:goLiveGates/);
+  assert.match(writtenMarkdown, /review action/);
   assert.match(writtenMarkdown, /release:resourcePool/);
   assert.match(writtenMarkdown, /release:emergencyDispatchLoop/);
   assert.match(writtenMarkdown, /release:mobileDuty/);

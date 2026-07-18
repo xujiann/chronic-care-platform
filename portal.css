@@ -1438,6 +1438,7 @@ dialog::backdrop {
 .operation-go-live-gate-summary span,
 .operation-go-live-gate-summary small,
 .operation-go-live-gate-card span,
+.operation-go-live-gate-card small,
 .operation-go-live-gate-card p,
 .operation-go-live-gate-card footer {
   color: var(--muted);

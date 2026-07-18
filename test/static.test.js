@@ -262,6 +262,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /hospital-operations-module-report\.md/);
   assert.match(read("README.md"), /hospital-operations-module-brief-report\.pdf/);
   assert.match(read("README.md"), /\/api\/operations\/go-live-gates/);
+  assert.match(read("README.md"), /\/api\/operations\/go-live-gates\/actions/);
   assert.match(read("README.md"), /hospital-operations-flow\.md/);
   assert.match(read("README.md"), /hospital-operations-development-report\.md/);
   assert.match(read("README.md"), /operations-about\.html/);
@@ -291,6 +292,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("DEPLOYMENT.md"), /hospital-operations-module-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /hospital-operations-module-brief-report\.pdf/);
   assert.match(read("DEPLOYMENT.md"), /\/api\/operations\/go-live-gates/);
+  assert.match(read("DEPLOYMENT.md"), /\/api\/operations\/go-live-gates\/actions/);
   assert.match(read("DEPLOYMENT.md"), /hospital-operations-flow\.md/);
   assert.match(read("DEPLOYMENT.md"), /hospital-operations-development-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /operations-about\.html/);
@@ -536,8 +538,11 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsJs, /operations-duty-detail/);
   assert.match(operationsJs, /operation-launch-readiness/);
   assert.match(operationsJs, /renderGoLiveGates/);
+  assert.match(operationsJs, /reviewGoLiveGate/);
   assert.match(operationsJs, /buildStaticGoLiveGates/);
   assert.match(operationsJs, /\/api\/operations\/go-live-gates/);
+  assert.match(operationsJs, /\/api\/operations\/go-live-gates\/actions/);
+  assert.match(operationsJs, /data-go-live-gate/);
   assert.match(operationsJs, /applySituationFilter/);
   assert.match(operationsJs, /selectSnapshotById/);
   assert.match(operationsJs, /renderInterfaceMapping/);
@@ -691,6 +696,8 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("server.js"), /\/api\/operations\/cutover-command/);
   assert.match(read("server.js"), /\/api\/operations\/post-cutover-observation/);
   assert.match(read("server.js"), /\/api\/operations\/go-live-gates/);
+  assert.match(read("server.js"), /\/api\/operations\/go-live-gates\/actions/);
+  assert.match(read("server.js"), /operations-go-live-gate-review/);
   assert.match(read("server.js"), /\/api\/operations\/intelligence/);
   assert.match(read("server.js"), /\/api\/operations\/resource-pool/);
   assert.match(read("server.js"), /\/api\/operations\/mobile-duty/);

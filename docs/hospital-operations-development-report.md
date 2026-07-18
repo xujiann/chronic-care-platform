@@ -51,7 +51,7 @@
 | 对账复核 | `POST /api/operations/reconciliation/:id/review` |
 | 联调巡检 | `GET /api/operations/site-joint-tests`、`GET/POST /api/operations/site-joint-patrol` |
 | 上线运行 | `GET /api/operations/production-hardening`、`GET/POST /api/operations/cutover-command`、`GET/POST /api/operations/post-cutover-observation` |
-| 上线前门禁 | `GET /api/operations/go-live-gates`，汇总真实报文、审计保全、监控值守和灾备演练签收状态 |
+| 上线前门禁 | `GET /api/operations/go-live-gates`、`POST /api/operations/go-live-gates/actions`，汇总并复核运行真实报文、审计保全、监控值守和灾备演练签收状态 |
 
 ## 5. 发布与验收证据
 

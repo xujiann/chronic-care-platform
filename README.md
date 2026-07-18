@@ -121,7 +121,7 @@ SQLite 结构化镜像已覆盖居民、账户、主索引、个人健康档案�
 | `GET /api/research/sandbox` / `POST /api/research/datasets` / `POST /api/research/datasets/:id/approval` / `POST /api/research/datasets/:id/sandbox-access` / `POST /api/research/datasets/:id/outcomes` | Research dataset application, ethics approval, de-identified sandbox access, audit trail, and outcome return |
 | `GET /api/research/disease-models` / `POST /api/research/disease-models/:id/review` | 专病库模型和人工复核 |
 | `GET /api/operations/dashboard` / `GET /api/operations/resource-pool` / `GET /api/operations/emergency-dispatch-loop` / `GET /api/operations/go-live-gates` | 医院运行监测、跨院资源池、急诊拥堵调度闭环和上线前门禁清单 |
-| `POST /api/operations/emergency-dispatch-loop/actions` / `POST /api/operations/dispatch` | 急诊拥堵复核留痕和资源调度工单管理 |
+| `POST /api/operations/emergency-dispatch-loop/actions` / `POST /api/operations/go-live-gates/actions` / `POST /api/operations/dispatch` | 急诊拥堵复核留痕、上线前门禁复核和资源调度工单管理 |
 | `POST /api/auth/identity/preview` | 政务身份 claims 到角色、机构和首页的接入预映射 |
 | `GET /api/mobile/experience` / `POST /api/mobile/experience` | 移动体验和居民偏好 |
 | `GET /api/mobile/accessibility-checklist` | 无障碍验收清单 |
@@ -272,7 +272,7 @@ Site joint-testing boundary: production HIS/EMR/LIS/PACS critical-value rules, r
 
 ## Hospital Operations Dispatch
 
-operations.html is the runnable management entry for hospital operation monitoring and resource dispatch. It uses GET /api/operations/dashboard, GET /api/operations/site-joint-tests, GET /api/operations/production-hardening, GET /api/operations/go-live-gates, GET /api/operations/intelligence, GET /api/operations/governance-report, GET /api/operations/handover, GET /api/operations/handover/owners, POST /api/operations/handover/signoff, POST /api/operations/dispatch, and POST /api/operations/reconciliation/:id/review to cover bed, staff, equipment, outpatient, emergency, inpatient, dispatch, alert, site joint-test closeout, production hardening, go-live gate evidence, intelligent dispatch recommendations, governance reporting, shift handover owner assignment, shift handover signoff, and statistics direct-report reconciliation boundaries.
+operations.html is the runnable management entry for hospital operation monitoring and resource dispatch. It uses GET /api/operations/dashboard, GET /api/operations/site-joint-tests, GET /api/operations/production-hardening, GET /api/operations/go-live-gates, GET /api/operations/intelligence, GET /api/operations/governance-report, GET /api/operations/handover, GET /api/operations/handover/owners, POST /api/operations/handover/signoff, POST /api/operations/go-live-gates/actions, POST /api/operations/dispatch, and POST /api/operations/reconciliation/:id/review to cover bed, staff, equipment, outpatient, emergency, inpatient, dispatch, alert, site joint-test closeout, production hardening, go-live gate evidence, go-live gate review audit, intelligent dispatch recommendations, governance reporting, shift handover owner assignment, shift handover signoff, and statistics direct-report reconciliation boundaries.
 
 上线运行判定由 `/api/operations/dashboard` 中的 `launchReadiness` 汇总生成，统一核对生产加固阻断项、割接签收阻断项、上线后观察异常、待补证据和观察窗口签收状态，并在 `operations.html` 生产加固面板顶部展示可上线运行或暂缓上线运行结论。
 

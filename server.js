@@ -4498,7 +4498,26 @@ function operationGateStatus(ready, blockedStatus = "现场待签收") {
   return ready ? "已签收" : blockedStatus;
 }
 
-function buildOperationsGoLiveGates({ productionHardening, siteJointPatrol, cutoverCommand, postCutoverObservation }) {
+function operationGateReview(processAudit, gateId) {
+  return (Array.isArray(processAudit) ? processAudit : []).find((item) =>
+    String(item.process || "").includes("上线前门禁复核") &&
+    String(item.evidence || "").includes(`goLiveGates/${gateId}/`)
+  );
+}
+
+function attachOperationGateReview(row, processAudit) {
+  const review = operationGateReview(processAudit, row.id);
+  return {
+    ...row,
+    reviewStatus: review ? review.status || "已复核" : "待复核",
+    reviewedBy: review?.owner || "",
+    reviewedAt: review?.evidence || "",
+    reviewNote: review?.nextAction || "",
+    reviewEvidence: review?.evidence || ""
+  };
+}
+
+function buildOperationsGoLiveGates({ productionHardening, siteJointPatrol, cutoverCommand, postCutoverObservation, processAudit }) {
   const checks = Array.isArray(productionHardening?.checks) ? productionHardening.checks : [];
   const check = (id) => checks.find((item) => item.id === id) || {};
   const patrolPending = Number(siteJointPatrol?.summary?.pending || 0);
@@ -4560,7 +4579,7 @@ function buildOperationsGoLiveGates({ productionHardening, siteJointPatrol, cuto
       nextAction: check("dr-rehearsal-signoff").passed ? "复核回退策略和 T+1 观察证据。" : "完成备份恢复演练、RTO/RPO 记录和回退策略签收。",
       evidence: ["/api/operations/cutover-command", "/api/operations/post-cutover-observation", "release/production-cutover-checklist.md"]
     }
-  ];
+  ].map((item) => attachOperationGateReview(item, processAudit));
   return {
     ok: rows.every((item) => item.ready),
     generatedAt: new Date().toISOString(),
@@ -4568,10 +4587,11 @@ function buildOperationsGoLiveGates({ productionHardening, siteJointPatrol, cuto
       total: rows.length,
       ready: rows.filter((item) => item.ready).length,
       blocked: rows.filter((item) => !item.ready).length,
-      highPriority: rows.filter((item) => !item.ready && item.severity === "高").length
+      highPriority: rows.filter((item) => !item.ready && item.severity === "高").length,
+      reviewed: rows.filter((item) => item.reviewStatus !== "待复核").length
     },
     rows,
-    evidence: ["/api/operations/go-live-gates", "/api/operations/production-hardening", "/api/operations/site-joint-patrol", "/api/operations/post-cutover-observation"]
+    evidence: ["/api/operations/go-live-gates", "/api/operations/go-live-gates/actions", "/api/operations/production-hardening", "/api/operations/site-joint-patrol", "/api/operations/post-cutover-observation"]
   };
 }
 
@@ -5291,7 +5311,8 @@ function buildHospitalOperationsDashboard(data) {
     productionHardening,
     siteJointPatrol,
     cutoverCommand: dashboard.cutoverCommand,
-    postCutoverObservation: dashboard.postCutoverObservation
+    postCutoverObservation: dashboard.postCutoverObservation,
+    processAudit: data.platformProcessAudit
   });
   dashboard.governanceReport = buildOperationsGovernanceReport({
     snapshots,
@@ -9172,6 +9193,49 @@ async function handleApi(req, res) {
     if (!user) return;
     const dashboard = buildHospitalOperationsDashboard(readDatabase());
     sendJson(res, 200, dashboard.goLiveGates);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/operations/go-live-gates/actions") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/go-live-gates/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const dashboard = buildHospitalOperationsDashboard(data);
+    const rows = Array.isArray(dashboard.goLiveGates?.rows) ? dashboard.goLiveGates.rows : [];
+    const gate = rows.find((item) => item.id === payload.gateId) || rows[0];
+    if (!gate) {
+      sendJson(res, 400, { error: "Bad Request", message: "上线前门禁项不存在" });
+      return;
+    }
+    const now = new Date().toISOString();
+    const status = String(payload.status || "已复核").trim();
+    const audit = {
+      process: "医院运行上线前门禁复核",
+      owner: gate.owner || user.name,
+      status,
+      risk: gate.ready ? "已签收门禁复核" : gate.severity === "高" ? "高优先级门禁待补证" : "常规门禁复核",
+      auditPoint: `${gate.name}：${gate.status}`,
+      evidence: `goLiveGates/${gate.id}/${now}`,
+      nextAction: String(payload.note || gate.nextAction || "继续补齐上线前门禁证据。").trim()
+    };
+    data.platformProcessAudit = [audit, ...(Array.isArray(data.platformProcessAudit) ? data.platformProcessAudit : [])].slice(0, 80);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "operations-go-live-gate-review",
+        target: gate.id,
+        result: "allowed",
+        detail: `${gate.name}:${status}:${gate.severity}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    const refreshed = buildHospitalOperationsDashboard(data);
+    sendJson(res, 201, { audit, goLiveGates: refreshed.goLiveGates });
     return;
   }
 

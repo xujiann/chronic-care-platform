@@ -257,6 +257,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(operationsDashboard.body.launchReadiness.evidence.includes("release:report:full"), true);
     assert.equal(operationsDashboard.body.goLiveGates.summary.total, 4);
     assert.equal(operationsDashboard.body.goLiveGates.rows.some((item) => item.id === "audit-retention-target" && item.requiredEvidence.includes("AUDIT_EXPORT_PATH 或 SIEM_ENDPOINT")), true);
+    assert.equal(Number.isInteger(operationsDashboard.body.goLiveGates.summary.reviewed), true);
     assert.equal(operationsDashboard.body.goLiveGates.evidence.includes("/api/operations/go-live-gates"), true);
     assert.equal(operationsDashboard.body.intelligence.recommendations.some((item) => item.recommendation && item.prediction), true);
     assert.equal(operationsDashboard.body.resourcePool.rows.some((item) => item.resourceSlots.length >= 5), true);
@@ -287,6 +288,19 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(goLiveGates.body.summary.total, 4);
     assert.equal(goLiveGates.body.rows.some((item) => item.id === "real-payload-signoff" && item.evidence.includes("/api/operations/integration/snapshots")), true);
     assert.equal(goLiveGates.body.rows.some((item) => item.id === "monitoring-on-call" && item.requiredEvidence.includes("/api/metrics")), true);
+
+    const goLiveGateReview = await api(baseUrl, "/api/operations/go-live-gates/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        gateId: "audit-retention-target",
+        status: "待补证据已提醒",
+        note: "API regression go-live gate review"
+      })
+    }));
+    assert.equal(goLiveGateReview.response.status, 201);
+    assert.equal(goLiveGateReview.body.audit.process, "医院运行上线前门禁复核");
+    assert.equal(goLiveGateReview.body.goLiveGates.summary.reviewed >= 1, true);
+    assert.equal(goLiveGateReview.body.goLiveGates.rows.some((item) => item.id === "audit-retention-target" && item.reviewStatus === "待补证据已提醒"), true);
 
     const commandChains = await api(baseUrl, "/api/operations/command-chains", authorized(accountLogin.body.token));
     assert.equal(commandChains.response.status, 200);

@@ -689,10 +689,11 @@ function buildStaticGoLiveGates(productionHardening, siteJointPatrol, cutoverCom
       total: rows.length,
       ready: rows.filter((item) => item.ready).length,
       blocked: rows.filter((item) => !item.ready).length,
-      highPriority: rows.filter((item) => !item.ready && item.severity === "高").length
+      highPriority: rows.filter((item) => !item.ready && item.severity === "高").length,
+      reviewed: rows.filter((item) => item.reviewStatus && item.reviewStatus !== "待复核").length
     },
     rows,
-    evidence: ["/api/operations/go-live-gates", "/api/operations/production-hardening", "/api/operations/site-joint-patrol", "/api/operations/post-cutover-observation"]
+    evidence: ["/api/operations/go-live-gates", "/api/operations/go-live-gates/actions", "/api/operations/production-hardening", "/api/operations/site-joint-patrol", "/api/operations/post-cutover-observation"]
   };
 }
 
@@ -2087,7 +2088,7 @@ function renderGoLiveGates(goLiveGates) {
   target.innerHTML = `
     <article class="operation-go-live-gate-summary ${goLiveGates.ok ? "ready" : "blocked"}">
       <strong>上线前门禁清单</strong>
-      <span>${goLiveGates.summary?.ready || 0}/${goLiveGates.summary?.total || 0} 项已签收，${goLiveGates.summary?.highPriority || 0} 项高优先级待处理</span>
+      <span>${goLiveGates.summary?.ready || 0}/${goLiveGates.summary?.total || 0} 项已签收，${goLiveGates.summary?.reviewed || 0} 项已复核，${goLiveGates.summary?.highPriority || 0} 项高优先级待处理</span>
       <small>${evidenceList(goLiveGates.evidence || [])}</small>
     </article>
     ${rows.map((item) => `
@@ -2097,14 +2098,44 @@ function renderGoLiveGates(goLiveGates) {
           ${statusBadge(item.ready ? "normal" : "critical")}
         </header>
         <span>${zhInline(item.status)} / ${zhInline(item.owner)}</span>
+        <small>复核：${zhInline(item.reviewStatus || "待复核")}${item.reviewedBy ? ` / ${zhInline(item.reviewedBy)}` : ""}</small>
         <p>${zhInline(item.nextAction)}</p>
         <div class="operation-go-live-gate-tags">
           ${(item.requiredEvidence || []).slice(0, 6).map((evidence) => `<small>${zhInline(evidence)}</small>`).join("")}
         </div>
         ${Array.isArray(item.blockers) && item.blockers.length ? `<footer>${item.blockers.map((blocker) => `<span>${zhInline(blocker)}</span>`).join("")}</footer>` : ""}
+        <button class="inline-action compact" type="button" data-go-live-gate="${htmlAttribute(item.id)}">记录复核</button>
       </article>
     `).join("")}
   `;
+  target.querySelectorAll("[data-go-live-gate]").forEach((button) => {
+    button.addEventListener("click", () => reviewGoLiveGate(button.dataset.goLiveGate));
+  });
+}
+
+async function reviewGoLiveGate(gateId) {
+  const row = (operationsDashboard?.goLiveGates?.rows || []).find((item) => item.id === gateId);
+  if (!row) return;
+  const payload = {
+    gateId,
+    status: row.ready ? "已复核" : "待补证据已提醒",
+    note: row.nextAction
+  };
+  try {
+    const response = await request(`${OPERATIONS_API_BASE}/operations/go-live-gates/actions`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error("go-live gate review failed");
+    const result = await response.json();
+    operationsDashboard.goLiveGates = result.goLiveGates || operationsDashboard.goLiveGates;
+  } catch (error) {
+    operationsDashboard.goLiveGates = {
+      ...(operationsDashboard.goLiveGates || {}),
+      rows: (operationsDashboard.goLiveGates?.rows || []).map((item) => item.id === gateId ? { ...item, reviewStatus: payload.status, reviewNote: payload.note } : item)
+    };
+  }
+  renderGoLiveGates(operationsDashboard.goLiveGates || {});
 }
 
 function renderProductionHardening(productionHardening) {

@@ -197,8 +197,8 @@ function buildCapabilities(data, serverSource, readiness, release) {
       id: "go-live-gates",
       name: "上线前门禁清单",
       status: release.checks.some((item) => item.id === "release:goLiveGates" && item.passed) ? "ready" : "needs-attention",
-      evidence: ["/api/operations/go-live-gates", "/api/operations/site-joint-patrol", "/api/operations/production-hardening", "/api/operations/post-cutover-observation"],
-      detail: "按真实报文联调、审计保全目标、监控值守联通和灾备演练签收生成上线前门禁清单，并在运行页直接提示补证动作。"
+      evidence: ["/api/operations/go-live-gates", "/api/operations/go-live-gates/actions", "/api/operations/site-joint-patrol", "/api/operations/production-hardening", "/api/operations/post-cutover-observation"],
+      detail: "按真实报文联调、审计保全目标、监控值守联通和灾备演练签收生成上线前门禁清单，支持运行页复核留痕，并直接提示补证动作。"
     },
     {
       id: "ops-intelligence",
