@@ -100,7 +100,7 @@ function renderSummary(summary) {
     ["质控通过", summary.qcPassed || 0, "扫描评价与报告审核"],
     ["EMR 已同步", summary.emrSynced || 0, "电子病历索引兼容"],
     ["有效分享", summary.activeShares || 0, "二维码/短信限时授权"],
-    ["跨机构互认", summary.mutualRecognition || 0, `${summary.recognized || 0} 已互认 / ${summary.pendingRecognition || 0} 待确认`]
+    ["跨机构互认", summary.mutualRecognition || 0, `${summary.recognized || 0} 已互认 / ${summary.pendingRecognition || 0} 待确认 / ${summary.pendingAppeals || 0} 待复核`]
   ].map(([label, value, hint]) => `<article class="metric-card">
     <span>${escapeHtml(label)}</span>
     <strong>${escapeHtml(value)}</strong>
@@ -130,6 +130,24 @@ function renderStudyTable(studies) {
   </table>`;
 }
 
+function renderRecognitionActions(item) {
+  const state = `${item.status || ""} ${item.reviewStatus || ""}`;
+  if (item.appeal?.status === "pending-review") {
+    return canDecideMutualRecognition()
+      ? `<button class="inline-action primary" type="button" data-review-recognition-appeal="${escapeHtml(item.imageCloudStudyId)}" data-appeal-decision="approve">通过申诉</button>
+         <button class="inline-action" type="button" data-review-recognition-appeal="${escapeHtml(item.imageCloudStudyId)}" data-appeal-decision="reject">驳回申诉</button>`
+      : "待独立复核";
+  }
+  if (/不予|拒绝|rejected/i.test(state) && canSubmitRecognitionAppeal()) {
+    return `<button class="inline-action" type="button" data-appeal-recognition="${escapeHtml(item.imageCloudStudyId)}">提交申诉</button>`;
+  }
+  if (canDecideMutualRecognition() && /待|pending/i.test(state)) {
+    return `<button class="inline-action primary" type="button" data-decide-recognition="${escapeHtml(item.imageCloudStudyId)}" data-recognition-decision="recognize">确认互认</button>
+      <button class="inline-action" type="button" data-decide-recognition="${escapeHtml(item.imageCloudStudyId)}" data-recognition-decision="reject">不予互认</button>`;
+  }
+  return "-";
+}
+
 function renderMutualRecognition(records) {
   const target = document.querySelector("#mutual-recognition-table");
   if (!target) return;
@@ -138,9 +156,9 @@ function renderMutualRecognition(records) {
     <tbody>${records.map((item) => `<tr>
       <td><strong>${escapeHtml(item.item)}</strong><br><small>${escapeHtml(item.mainIndex)}</small></td>
       <td>${escapeHtml(item.sourceInstitution)}<br><small>至 ${escapeHtml(item.targetInstitution)}</small></td>
-      <td><span class="badge ${/已互认|recognized/i.test(`${item.status} ${item.reviewStatus}`) ? "ok" : /不予|拒绝|rejected/i.test(`${item.status} ${item.reviewStatus}`) ? "warn" : "info"}">${escapeHtml(item.reviewStatus || item.status)}</span></td>
-      <td>${escapeHtml(item.qualityStatus || "待质控")}<br><small>${escapeHtml(item.reviewReasonCode || item.reason || "待目标机构确认")}</small></td>
-      <td>${canDecideMutualRecognition() && /待|pending/i.test(`${item.status} ${item.reviewStatus}`) ? `<button class="inline-action primary" type="button" data-approve-recognition="${escapeHtml(item.imageCloudStudyId)}">确认互认</button>` : "-"}</td>
+      <td><span class="badge ${/已互认|recognized/i.test(`${item.status} ${item.reviewStatus}`) ? "ok" : /不予|拒绝|rejected/i.test(`${item.status} ${item.reviewStatus}`) ? "warn" : "info"}">${escapeHtml(item.reviewStatus || item.status)}</span>${item.appeal?.status ? `<br><small>申诉：${escapeHtml(item.appeal.status)}</small>` : ""}</td>
+      <td>${escapeHtml(item.qualityStatus || "待质控")}<br><small>${escapeHtml(item.appeal?.reason || item.reviewReasonCode || item.reason || "待目标机构确认")}</small></td>
+      <td>${renderRecognitionActions(item)}</td>
     </tr>`).join("") || `<tr><td colspan="5">暂未纳入跨机构互认；机构端可在影像检查列表发起。</td></tr>`}</tbody>
   </table>`;
 }
@@ -151,6 +169,10 @@ function canManageMutualRecognition() {
 
 function canDecideMutualRecognition() {
   return ["commission", "county"].includes(window.HealthCityAuth?.getUser?.()?.role);
+}
+
+function canSubmitRecognitionAppeal() {
+  return window.HealthCityAuth?.getUser?.()?.role === "institution";
 }
 
 function renderGateways(payload) {
@@ -297,7 +319,9 @@ async function handleImagingAction(event) {
   const viewButton = event.target.closest("[data-view-study]");
   const shareButton = event.target.closest("[data-share-study]");
   const startRecognitionButton = event.target.closest("[data-start-recognition]");
-  const approveRecognitionButton = event.target.closest("[data-approve-recognition]");
+  const decideRecognitionButton = event.target.closest("[data-decide-recognition]");
+  const appealRecognitionButton = event.target.closest("[data-appeal-recognition]");
+  const reviewAppealButton = event.target.closest("[data-review-recognition-appeal]");
   if (linkExternalButton) {
     await linkExternalStudy(linkExternalButton.dataset.linkExternalStudy);
     return;
@@ -323,8 +347,16 @@ async function handleImagingAction(event) {
     await startMutualRecognition(startRecognitionButton.dataset.startRecognition);
     return;
   }
-  if (approveRecognitionButton) {
-    await decideMutualRecognition(approveRecognitionButton.dataset.approveRecognition);
+  if (decideRecognitionButton) {
+    await decideMutualRecognition(decideRecognitionButton.dataset.decideRecognition, decideRecognitionButton.dataset.recognitionDecision);
+    return;
+  }
+  if (appealRecognitionButton) {
+    await submitMutualRecognitionAppeal(appealRecognitionButton.dataset.appealRecognition);
+    return;
+  }
+  if (reviewAppealButton) {
+    await reviewMutualRecognitionAppeal(reviewAppealButton.dataset.reviewRecognitionAppeal, reviewAppealButton.dataset.appealDecision);
   }
 }
 
@@ -438,15 +470,50 @@ async function startMutualRecognition(studyId) {
   renderImagingCloud();
 }
 
-async function decideMutualRecognition(studyId) {
-  if (!IMAGING_API_BASE || !window.confirm("确认该影像检查满足互认条件？")) return;
+async function decideMutualRecognition(studyId, decision = "recognize") {
+  const approved = decision === "recognize";
+  if (!IMAGING_API_BASE || !window.confirm(approved ? "确认该影像检查满足互认条件？" : "确认不予互认并登记原因？")) return;
+  const reasonCode = approved ? "qc-passed" : (window.prompt("请输入不予互认原因编码", "quality-not-qualified") || "").trim();
+  if (!reasonCode) return;
   const response = await (window.HealthCityAuth?.authFetch || fetch)(`${IMAGING_API_BASE}/imaging-cloud/studies/${encodeURIComponent(studyId)}/mutual-recognition/decision`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ decision: "recognize", reasonCode: "qc-passed", comment: "影像云检查、报告和主索引复核通过。" })
+    body: JSON.stringify({ decision, reasonCode, comment: approved ? "影像云检查、报告和主索引复核通过。" : "未满足当前互认质量规则。" })
   });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) { window.alert(payload.message || "确认互认失败"); return; }
+  if (!response.ok) { window.alert(payload.message || "互认判定失败"); return; }
+  await loadImagingCloud();
+  renderImagingCloud();
+}
+
+async function submitMutualRecognitionAppeal(studyId) {
+  if (!IMAGING_API_BASE) return;
+  const reason = (window.prompt("请输入申诉理由（不填写患者身份信息）", "补充质控证据后申请复核") || "").trim();
+  if (!reason) return;
+  const evidenceRefs = (window.prompt("请输入证据引用，多个引用用逗号分隔", "IMG-QC-EVIDENCE-001") || "").split(",").map((item) => item.trim()).filter(Boolean);
+  if (!evidenceRefs.length) return;
+  const response = await (window.HealthCityAuth?.authFetch || fetch)(`${IMAGING_API_BASE}/imaging-cloud/studies/${encodeURIComponent(studyId)}/mutual-recognition/appeal`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason, evidenceRefs, noPatientPii: true })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) { window.alert(payload.message || "提交申诉失败"); return; }
+  await loadImagingCloud();
+  renderImagingCloud();
+}
+
+async function reviewMutualRecognitionAppeal(studyId, decision) {
+  if (!IMAGING_API_BASE || !window.confirm(decision === "approve" ? "确认通过申诉并恢复互认？" : "确认驳回申诉？")) return;
+  const comment = (window.prompt("请输入独立复核意见", decision === "approve" ? "补充证据有效，复核通过" : "补充证据仍不满足互认规则") || "").trim();
+  if (!comment) return;
+  const response = await (window.HealthCityAuth?.authFetch || fetch)(`${IMAGING_API_BASE}/imaging-cloud/studies/${encodeURIComponent(studyId)}/mutual-recognition/appeal/review`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ decision, reasonCode: decision === "approve" ? "appeal-approved" : "appeal-rejected", comment })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) { window.alert(payload.message || "复核申诉失败"); return; }
   await loadImagingCloud();
   renderImagingCloud();
 }

@@ -1495,6 +1495,7 @@ function platformCapabilityBlockerLabel(status) {
 }
 
 function platformProductionBlockerBadge(status) {
+  if (status === "site-accepted") return "ok";
   if (status === "evidence-reviewed-site-pending") return "info";
   if (status === "evidence-submitted") return "warn";
   if (status === "in-progress") return "warn";
@@ -1562,6 +1563,8 @@ function renderPlatformCapabilityOperationsCenter() {
         <small>责任人：${platformEscapeHtml(review.owner || item.owner)} · 证据 ${platformEscapeHtml(review.evidenceRefs?.length || 0)} 条</small>
         <small>${latest ? `${platformEscapeHtml(latest.action)} · ${platformEscapeHtml(latest.actor)} · ${platformEscapeHtml(latest.at)}` : platformEscapeHtml(item.doneWhen)}</small>
         <div class="action-row">
+          ${status === "evidence-reviewed-site-pending" ? `<button class="inline-action" type="button" data-platform-blocker-action="record-site-acceptance" data-id="${platformEscapeHtml(item.id)}">Record site acceptance</button>` : ""}
+          ${status === "site-accepted" ? `<button class="inline-action" type="button" data-platform-blocker-action="revoke-site-acceptance" data-id="${platformEscapeHtml(item.id)}">Revoke site acceptance</button>` : ""}
           <button class="inline-action" type="button" data-platform-blocker-action="assign" data-id="${platformEscapeHtml(item.id)}">分派</button>
           <button class="inline-action" type="button" data-platform-blocker-action="record-evidence" data-id="${platformEscapeHtml(item.id)}">补录证据</button>
           ${status === "open" ? `<button class="inline-action" type="button" data-platform-blocker-action="start-remediation" data-id="${platformEscapeHtml(item.id)}">启动整改</button>` : ""}
@@ -1573,6 +1576,7 @@ function renderPlatformCapabilityOperationsCenter() {
       </div>
       <div class="capability-side">
         <span class="badge ${platformProductionBlockerBadge(status)}">${platformEscapeHtml(status)}</span>
+        <small>Site acceptance: ${platformEscapeHtml(review.siteAcceptance?.status || "pending")}</small>
         <small title="${platformEscapeHtml(item.status)}">${platformEscapeHtml(platformCapabilityBlockerLabel(item.status))}</small>
         <small>现场验收：仍需完成</small>
       </div>
@@ -2437,6 +2441,17 @@ async function runPlatformProductionBlockerAction(action, id, button) {
     payload.note = `已提交 ${id} 当前证据，申请生产前证据复核。`;
   } else if (action === "review-evidence") {
     payload.note = `已复核 ${id} 当前证据；正式放行仍等待现场验收与签字。`;
+  } else if (action === "record-site-acceptance") {
+    payload.acceptanceId = window.prompt("Enter the signed site acceptance ID", `site-signoff-${id}`) || "";
+    if (!payload.acceptanceId.trim()) return;
+    const signerNames = (window.prompt("Enter business, information, operations, security signers separated by commas", "") || "")
+      .split(",").map((item) => item.trim()).filter(Boolean);
+    if (signerNames.length !== 4) return;
+    payload.signers = ["business", "information", "operations", "security"].map((role, index) => ({ role, name: signerNames[index] }));
+    payload.note = `Site acceptance ${payload.acceptanceId.trim()} recorded for ${id}.`;
+  } else if (action === "revoke-site-acceptance") {
+    payload.note = window.prompt("Enter the reason for revoking this site acceptance", "Site evidence changed and must be remediated.") || "";
+    if (!payload.note.trim()) return;
   } else if (action === "reopen") {
     payload.note = window.prompt("请输入重新整改原因", "现场条件或证据发生变化，需要重新整改。") || "";
     if (!payload.note.trim()) return;

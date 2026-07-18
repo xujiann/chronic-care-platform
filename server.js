@@ -34,6 +34,7 @@ const BloodIntegrationGateway = require("./blood-integration-gateway");
 const BloodBusinessService = require("./blood-business-service");
 const BloodInnovationService = require("./blood-innovation-service");
 const BloodEventHub = require("./blood-event-hub");
+const BloodGoLiveService = require("./blood-go-live-service");
 const DiseasePaymentService = require("./disease-payment-service");
 const DiseasePaymentIntake = require("./disease-payment-intake");
 const PhysicalExaminationService = require("./physical-examination-service");
@@ -164,6 +165,13 @@ const {
   seedOperationsIncidents,
   seedProductionServiceLevels
 } = require("./scripts/operations-readiness");
+const {
+  buildProductionSecurityAcceptanceCenter,
+  normalizeProductionSecurityFindingAction,
+  normalizeProductionSecurityReleaseApprovalAction,
+  seedProductionSecurityFindings,
+  seedProductionSecurityReleaseApprovals
+} = require("./production-security-acceptance");
 const {
   applyProductionDatabaseCutoverAction,
   buildProductionDatabaseCutoverCenter,
@@ -1117,6 +1125,8 @@ function seedState() {
     mobileExperienceSettings: seedMobileExperienceSettings(),
     accessibilityChecklist: seedAccessibilityChecklist(),
     securityAcceptanceLedger: seedSecurityAcceptanceLedger(),
+    productionSecurityFindings: seedProductionSecurityFindings(),
+    productionSecurityReleaseApprovals: seedProductionSecurityReleaseApprovals(),
     platformChangeLogs: seedPlatformChangeLogs(),
     healthDashboardSnapshots: seedHealthDashboardSnapshots(),
     platformRoadmap: seedPlatformRoadmap(),
@@ -7799,6 +7809,8 @@ function normalizeState(data) {
     mobileExperienceSettings: data.mobileExperienceSettings && typeof data.mobileExperienceSettings === "object" ? { ...seedMobileExperienceSettings(), ...data.mobileExperienceSettings } : seedMobileExperienceSettings(),
     accessibilityChecklist: mergeByKey(seedAccessibilityChecklist(), data.accessibilityChecklist, "id"),
     securityAcceptanceLedger: mergeByKey(seedSecurityAcceptanceLedger(), data.securityAcceptanceLedger, "id"),
+    productionSecurityFindings: mergeByKey(seedProductionSecurityFindings(), data.productionSecurityFindings, "id"),
+    productionSecurityReleaseApprovals: mergeByKey(seedProductionSecurityReleaseApprovals(), data.productionSecurityReleaseApprovals, "id"),
     platformChangeLogs: Array.isArray(data.platformChangeLogs) ? data.platformChangeLogs : seedPlatformChangeLogs(),
     healthDashboardSnapshots: mergeByKey(seedHealthDashboardSnapshots(), data.healthDashboardSnapshots, "id"),
     platformRoadmap: Array.isArray(data.platformRoadmap) ? data.platformRoadmap : seedPlatformRoadmap(),
@@ -8516,7 +8528,8 @@ function buildImageCloudDashboard(data, user, filters = {}) {
       activeShares: activeShares.length,
       mutualRecognition: mutualRecognition.length,
       recognized: mutualRecognition.filter((item) => /已互认|recognized/i.test(`${item.status || ""} ${item.reviewStatus || ""}`)).length,
-      pendingRecognition: mutualRecognition.filter((item) => /待|pending/i.test(`${item.status || ""} ${item.reviewStatus || ""}`)).length
+      pendingRecognition: mutualRecognition.filter((item) => /待|pending/i.test(`${item.status || ""} ${item.reviewStatus || ""}`)).length,
+      pendingAppeals: mutualRecognition.filter((item) => item.appeal?.status === "pending-review").length
     },
     gateways,
     studies,
@@ -8721,6 +8734,88 @@ function createImageCloudMutualRecognitionChain(data, study, payload, user) {
   if (existingOrderIndex >= 0) data.countyCollaborationOrders[existingOrderIndex] = order;
   else data.countyCollaborationOrders = [order, ...(data.countyCollaborationOrders || [])].slice(0, 300);
   return { report, recognition, order, created: existingRecognitionIndex < 0 };
+}
+
+function submitImageCloudRecognitionAppeal(data, study, record, payload, user) {
+  if (!/rejected|not_recognized/i.test(`${record.status || ""} ${record.reviewStatus || ""}`)) {
+    throw new Error("only rejected mutual-recognition records can be appealed");
+  }
+  if (user.role !== "institution" || study.institutionCode !== user.orgCode) {
+    throw new Error("only the source institution can submit this appeal");
+  }
+  if (record.appeal?.status === "pending-review") throw new Error("an appeal is already pending review");
+  const reason = String(payload.reason || payload.comment || "").trim();
+  const evidenceRefs = (Array.isArray(payload.evidenceRefs) ? payload.evidenceRefs : String(payload.evidenceRefs || "").split(","))
+    .map((item) => String(item).trim()).filter(Boolean).slice(0, 12);
+  if (!reason) throw new Error("appeal reason is required");
+  if (!evidenceRefs.length) throw new Error("at least one minimized evidence reference is required");
+  if (payload.noPatientPii !== true) throw new Error("noPatientPii confirmation is required");
+  const actor = user.username || user.role;
+  const now = new Date().toISOString();
+  const appeal = {
+    id: `icra-${record.id}-${Date.now()}`,
+    status: "pending-review",
+    reason,
+    evidenceRefs,
+    noPatientPii: true,
+    submittedBy: actor,
+    submittedByName: user.name,
+    submittedAt: now,
+    originalReviewer: record.reviewedBy || "",
+    originalDecisionAt: record.reviewedAt || "",
+    history: [{ action: "submit", actor, role: user.role, at: now, note: reason, evidenceRefs }]
+  };
+  record.appeal = appeal;
+  record.appealStatus = appeal.status;
+  record.appealUpdatedAt = now;
+  data.diagnosticReports = (data.diagnosticReports || []).map((item) => item.id === record.reportId ? {
+    ...item,
+    appealStatus: appeal.status,
+    appealId: appeal.id,
+    appealUpdatedAt: now
+  } : item);
+  return { record, appeal };
+}
+
+function reviewImageCloudRecognitionAppeal(data, record, payload, user) {
+  const appeal = record.appeal;
+  if (!appeal || appeal.status !== "pending-review") throw new Error("no pending appeal exists");
+  const actor = user.username || user.role;
+  if ([appeal.submittedBy, appeal.originalReviewer].filter(Boolean).includes(actor)) {
+    throw new Error("appeal review requires an independent reviewer");
+  }
+  const decision = String(payload.decision || "").trim();
+  if (!["approve", "reject"].includes(decision)) throw new Error("decision must be approve or reject");
+  const comment = String(payload.comment || "").trim();
+  if (!comment) throw new Error("review comment is required");
+  const now = new Date().toISOString();
+  let updated = record;
+  if (decision === "approve") {
+    updated = reviewMutualRecognitionRecord(data, record.id, {
+      decision: "recognize",
+      reasonCode: String(payload.reasonCode || "appeal-approved").trim(),
+      comment
+    }, user);
+  }
+  updated.appeal = {
+    ...appeal,
+    status: decision === "approve" ? "approved" : "rejected",
+    reviewedBy: actor,
+    reviewedByName: user.name,
+    reviewedAt: now,
+    reviewComment: comment,
+    history: [...(appeal.history || []), { action: decision, actor, role: user.role, at: now, note: comment }]
+  };
+  updated.appealStatus = updated.appeal.status;
+  updated.appealUpdatedAt = now;
+  data.diagnosticReports = (data.diagnosticReports || []).map((item) => item.id === updated.reportId ? {
+    ...item,
+    status: decision === "approve" ? "recognized" : item.status,
+    appealStatus: updated.appeal.status,
+    appealId: updated.appeal.id,
+    appealUpdatedAt: now
+  } : item);
+  return { record: updated, appeal: updated.appeal, approved: decision === "approve" };
 }
 
 function normalizeResearchDatasetApplication(payload, user, data) {
@@ -20079,6 +20174,92 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/production-security/center") {
+    const user = requireApiRole(req, res, ["commission"], "/api/production-security/center");
+    if (!user) return;
+    const data = normalizeState(readDatabase());
+    const center = buildProductionSecurityAcceptanceCenter(data.productionSecurityFindings, data.productionSecurityReleaseApprovals);
+    sendJson(res, 200, center);
+    return;
+  }
+
+  const productionSecurityFindingActionMatch = url.pathname.match(/^\/api\/production-security\/findings\/([^/]+)\/actions$/);
+  if (req.method === "POST" && productionSecurityFindingActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/production-security/findings/:id/actions");
+    if (!user) return;
+    const data = normalizeState(readDatabase());
+    const findingId = decodeURIComponent(productionSecurityFindingActionMatch[1]);
+    const index = data.productionSecurityFindings.findIndex((item) => item.id === findingId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "production security finding not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    try {
+      data.productionSecurityFindings[index] = normalizeProductionSecurityFindingAction(data.productionSecurityFindings[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    let center = buildProductionSecurityAcceptanceCenter(data.productionSecurityFindings, data.productionSecurityReleaseApprovals);
+    if (!center.summary.releaseEligible) {
+      data.productionSecurityReleaseApprovals = data.productionSecurityReleaseApprovals.map((item) => item.status === "approved"
+        ? { ...item, status: "pending", invalidatedAt: new Date().toISOString(), invalidatedByFindingId: findingId }
+        : item);
+      center = buildProductionSecurityAcceptanceCenter(data.productionSecurityFindings, data.productionSecurityReleaseApprovals);
+    }
+    data.securityEvents = [{
+      id: randomUUID(),
+      at: new Date().toISOString(),
+      actor: user.name,
+      role: user.role,
+      action: "production-security-finding-action",
+      target: findingId,
+      result: "allowed",
+      detail: `${payload.action || "unknown"}:${data.productionSecurityFindings[index].status}`
+    }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120);
+    writeDatabase(normalizeState(data));
+    sendJson(res, 200, { ok: true, finding: data.productionSecurityFindings[index], center });
+    return;
+  }
+
+  const productionSecurityApprovalActionMatch = url.pathname.match(/^\/api\/production-security\/release-approvals\/([^/]+)\/actions$/);
+  if (req.method === "POST" && productionSecurityApprovalActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/production-security/release-approvals/:id/actions");
+    if (!user) return;
+    const data = normalizeState(readDatabase());
+    const approvalId = decodeURIComponent(productionSecurityApprovalActionMatch[1]);
+    const index = data.productionSecurityReleaseApprovals.findIndex((item) => item.id === approvalId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "production security release approval not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const currentCenter = buildProductionSecurityAcceptanceCenter(data.productionSecurityFindings, data.productionSecurityReleaseApprovals);
+    try {
+      data.productionSecurityReleaseApprovals[index] = normalizeProductionSecurityReleaseApprovalAction(
+        data.productionSecurityReleaseApprovals[index], payload, user, currentCenter
+      );
+    } catch (error) {
+      sendJson(res, 409, { error: "Conflict", message: error.message });
+      return;
+    }
+    const center = buildProductionSecurityAcceptanceCenter(data.productionSecurityFindings, data.productionSecurityReleaseApprovals);
+    data.securityEvents = [{
+      id: randomUUID(),
+      at: new Date().toISOString(),
+      actor: user.name,
+      role: user.role,
+      action: "production-security-release-opinion",
+      target: approvalId,
+      result: "allowed",
+      detail: `${payload.action || "unknown"}:${data.productionSecurityReleaseApprovals[index].status}`
+    }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120);
+    writeDatabase(normalizeState(data));
+    sendJson(res, 200, { ok: true, approval: data.productionSecurityReleaseApprovals[index], center });
+    return;
+  }
+
   const securityControlActionMatch = url.pathname.match(/^\/api\/security\/controls\/([^/]+)\/actions$/);
   if (req.method === "POST" && securityControlActionMatch) {
     const user = requireApiRole(req, res, ["commission"], "/api/security/controls/:id/actions");
@@ -25927,6 +26108,90 @@ async function handleApi(req, res) {
     return;
   }
 
+  const imagingRecognitionAppealMatch = url.pathname.match(/^\/api\/imaging-cloud\/studies\/([^/]+)\/mutual-recognition\/appeal$/);
+  if (req.method === "POST" && imagingRecognitionAppealMatch) {
+    const user = requireApiRole(req, res, ["institution"], "/api/imaging-cloud/studies/:id/mutual-recognition/appeal");
+    if (!user) return;
+    const data = readDatabase();
+    const studyId = decodeURIComponent(imagingRecognitionAppealMatch[1]);
+    const studyIndex = (data.imageCloudStudies || []).findIndex((item) => item.id === studyId);
+    const record = (data.countyMutualRecognitionRecords || []).find((item) => item.imageCloudStudyId === studyId);
+    if (studyIndex < 0 || !record) {
+      sendJson(res, 404, { error: "Not Found", message: "影像检查或互认记录不存在" });
+      return;
+    }
+    let result;
+    try {
+      result = submitImageCloudRecognitionAppeal(data, data.imageCloudStudies[studyIndex], record, await collectJson(req), user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    data.imageCloudStudies[studyIndex] = {
+      ...data.imageCloudStudies[studyIndex],
+      mutualRecognitionStatus: "appeal-pending",
+      mutualRecognitionReason: result.appeal.reason,
+      updatedAt: result.appeal.submittedAt
+    };
+    data.countyCollaborationOrders = (data.countyCollaborationOrders || []).map((item) => item.recognitionRecordId === record.id ? {
+      ...item,
+      status: "appeal-pending",
+      result: `Appeal evidence pending independent review: ${result.appeal.evidenceRefs.join(", ")}`,
+      updatedAt: result.appeal.submittedAt
+    } : item);
+    data.securityEvents = [{
+      id: randomUUID(), at: new Date().toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role,
+      action: "submit imaging mutual recognition appeal", target: studyId, result: "allowed",
+      detail: `${result.appeal.id} / ${result.appeal.evidenceRefs.join(",")}`
+    }, ...(data.securityEvents || [])].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 201, { study: data.imageCloudStudies[studyIndex], ...result });
+    return;
+  }
+
+  const imagingRecognitionAppealReviewMatch = url.pathname.match(/^\/api\/imaging-cloud\/studies\/([^/]+)\/mutual-recognition\/appeal\/review$/);
+  if (req.method === "POST" && imagingRecognitionAppealReviewMatch) {
+    const user = requireApiRole(req, res, ["commission", "county"], "/api/imaging-cloud/studies/:id/mutual-recognition/appeal/review");
+    if (!user) return;
+    const data = readDatabase();
+    const studyId = decodeURIComponent(imagingRecognitionAppealReviewMatch[1]);
+    const studyIndex = (data.imageCloudStudies || []).findIndex((item) => item.id === studyId);
+    const record = (data.countyMutualRecognitionRecords || []).find((item) => item.imageCloudStudyId === studyId);
+    if (studyIndex < 0 || !record) {
+      sendJson(res, 404, { error: "Not Found", message: "影像检查或互认记录不存在" });
+      return;
+    }
+    let result;
+    try {
+      result = reviewImageCloudRecognitionAppeal(data, record, await collectJson(req), user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    const citation = upsertPhase2MutualRecognitionCitation(data, result.record, { reasonCode: result.record.reviewReasonCode }, user);
+    data.imageCloudStudies[studyIndex] = {
+      ...data.imageCloudStudies[studyIndex],
+      mutualRecognitionStatus: result.approved ? "recognized-after-appeal" : "rejected-after-appeal",
+      mutualRecognitionReason: result.record.reviewReasonCode || result.appeal.reviewComment,
+      mutualRecognitionReviewedAt: result.appeal.reviewedAt,
+      updatedAt: result.appeal.reviewedAt
+    };
+    data.countyCollaborationOrders = (data.countyCollaborationOrders || []).map((item) => item.recognitionRecordId === record.id ? {
+      ...item,
+      status: result.approved ? "recognized-after-appeal" : "appeal-rejected",
+      result: result.approved ? "Mutual recognition approved after independent appeal review" : "Appeal rejected after independent review",
+      updatedAt: result.appeal.reviewedAt
+    } : item);
+    data.securityEvents = [{
+      id: randomUUID(), at: new Date().toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role,
+      action: "review imaging mutual recognition appeal", target: studyId, result: "allowed",
+      detail: `${result.appeal.status} / ${result.appeal.id} / ${citation?.evidenceHash || "no-citation"}`
+    }, ...(data.securityEvents || [])].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, { study: data.imageCloudStudies[studyIndex], ...result, citation });
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/mutual-recognition/rules") {
     const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/mutual-recognition/rules");
     if (!user) return;
@@ -27123,7 +27388,7 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/innovation");
     if (!user) return;
     const data = readDatabase();
-    sendJson(res, 200, { ...BloodInnovationService.dashboard(data, user, url.searchParams.get("code") || ""), eventHub: BloodEventHub.dashboard(data, user) });
+    sendJson(res, 200, { ...BloodInnovationService.dashboard(data, user, url.searchParams.get("code") || ""), eventHub: BloodEventHub.dashboard(data, user), goLive: BloodGoLiveService.center(data) });
     return;
   }
 
@@ -27131,6 +27396,22 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/events");
     if (!user) return;
     sendJson(res, 200, BloodEventHub.dashboard(readDatabase(), user));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/blood-system/go-live") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/go-live"); if (!user) return;
+    sendJson(res, 200, BloodGoLiveService.center(readDatabase())); return;
+  }
+
+  const bloodGoLiveActionMatch = url.pathname.match(/^\/api\/blood-system\/go-live\/(endpoints|requirements|drills|migrations|approvals)\/([^/]+)\/(probe|actions|complete|reconcile|sign)$/);
+  if (req.method === "POST" && bloodGoLiveActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/blood-system/go-live/actions"); if (!user) return;
+    const data = readDatabase(), payload = await collectJson(req), [,resource,id] = bloodGoLiveActionMatch;
+    try {
+      const fn = { endpoints: BloodGoLiveService.probe, requirements: BloodGoLiveService.signRequirement, drills: BloodGoLiveService.completeDrill, migrations: BloodGoLiveService.reconcileMigration, approvals: BloodGoLiveService.signApproval }[resource];
+      const item = fn(data, user, decodeURIComponent(id), payload); writeDatabase(data); sendJson(res, 200, { ok:true, item, center:BloodGoLiveService.center(data) });
+    } catch (error) { sendJson(res, error.status || 400, { error:error.status===404?"Not Found":"Bad Request", message:error.message }); }
     return;
   }
 

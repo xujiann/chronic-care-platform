@@ -24,10 +24,12 @@ test("imaging cloud readiness validates province-spec capabilities", () => {
   assert.equal(report.checks.some((item) => item.id === "spec:hospital-ingest" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "spec:emr-compatibility" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "spec:mutual-recognition" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "spec:recognition-appeal" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "spec:security" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "ui:development-plan" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "docs:summary-plan" && item.passed), true);
   assert.equal(report.summary.requiredCapabilities.includes("development plan"), true);
+  assert.equal(report.summary.requiredCapabilities.includes("mutual-recognition appeal"), true);
   assert.match(markdown, /Imaging cloud readiness report/);
   assert.match(markdown, /imaging-cloud\.html/);
 });

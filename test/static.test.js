@@ -1885,13 +1885,18 @@ test("imaging cloud module exposes hospital ingest, mobile viewing and EMR compa
   assert.match(pageJs, /\/imaging-cloud\/ingest/);
   assert.match(pageJs, /renderDevelopmentPlan/);
   assert.match(pageJs, /startMutualRecognition/);
+  assert.match(pageJs, /submitMutualRecognitionAppeal/);
+  assert.match(pageJs, /reviewMutualRecognitionAppeal/);
   assert.match(pageJs, /终端不保存原始 DICOM/);
   assert.match(server, /\/api\/imaging-cloud/);
   assert.match(server, /buildImageCloudDerivedRecords/);
   assert.match(server, /seedImageCloudImplementedFeatures/);
   assert.match(server, /seedImageCloudDevelopmentPlan/);
   assert.match(server, /createImageCloudMutualRecognitionChain/);
+  assert.match(server, /submitImageCloudRecognitionAppeal/);
+  assert.match(server, /reviewImageCloudRecognitionAppeal/);
   assert.match(server, /imaging-cloud\/studies\/:id\/mutual-recognition/);
+  assert.match(server, /imaging-cloud\/studies\/:id\/mutual-recognition\/appeal/);
   assert.match(server, /diagnosticReports/);
   assert.match(server, /personalRecords/);
   assert.match(auth, /"imaging-cloud\.html": \["commission", "institution", "county", "citizen"\]/);
@@ -2901,6 +2906,7 @@ test("appointment callbacks land through signed gateway reconciliation", () => {
 test("platform production audit separates runnable capabilities from formal cutover", () => {
   const script = read("scripts/platform-production-audit.js");
   const documentation = read("docs/数智医院标准平台全程审计与生产前开发规划.md");
+  const siteAcceptance = read("docs/platform-site-acceptance-gate.md");
   const manifest = read("scripts/release-artifact-manifest.js");
   const releaseReport = read("scripts/release-report.js");
   const deployCheck = read("scripts/deploy-check.js");
@@ -2909,6 +2915,9 @@ test("platform production audit separates runnable capabilities from formal cuto
   assert.match(script, /MVP_REQUIRED_MODULES/);
   assert.match(script, /PRODUCTION_BLOCKERS/);
   assert.match(script, /pre-production-implemented-site-cutover-blocked/);
+  assert.match(script, /siteAcceptanceDocumentation/);
+  assert.match(siteAcceptance, /record-site-acceptance/);
+  assert.match(siteAcceptance, /blocked-until-global-go-no-go/);
   assert.match(script, /P0 \/ 0-30 天/);
   assert.match(documentation, /正式生产前已实现的主要功能/);
   assert.match(documentation, /MVP 剩余必开发模块/);

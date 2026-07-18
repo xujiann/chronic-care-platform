@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>血液系统上线控制中心</title>
+  <link rel="stylesheet" href="./portal.css">
+  <script src="./auth.js"></script>
+  <script>window.HealthCityAuth.requireRole(["commission", "institution"]);</script>
+  <style>
+    .gl { max-width: 1500px; margin: auto; padding: 22px; }
+    .gl-hero { background: #731423; color: #fff; padding: 26px; border-radius: 8px; }
+    .gl-hero a { color: #fff; }
+    .gl-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin: 16px 0; }
+    .gl-card, .gl-panel { min-width: 0; border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 15px; }
+    .gl-card strong { display: block; font-size: 24px; }
+    .gl-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+    .gl-panel > div { max-width: 100%; overflow-x: auto; }
+    .gl-table { width: 100%; min-width: 520px; table-layout: fixed; border-collapse: collapse; }
+    .gl-table th, .gl-table td { padding: 9px; border-bottom: 1px solid var(--line); text-align: left; overflow-wrap: anywhere; }
+    .ready { color: #087752; }
+    .blocked { color: #a61d30; }
+    @media (max-width: 900px) {
+      .gl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .gl-layout { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="gl">
+    <header class="gl-hero">
+      <h1>血液系统上线控制中心</h1>
+      <p>软件就绪不等于正式上线。真实接口、现场证据、迁移对账、演练和双签全部完成后，生产状态才会开放。</p>
+      <a href="./blood-innovation.html">返回创新指挥中心</a>
+    </header>
+    <section class="gl-grid" id="gl-summary"></section>
+    <div class="gl-layout">
+      <section class="gl-panel"><h2>生产接口与设备</h2><div id="gl-endpoints"></div></section>
+      <section class="gl-panel"><h2>现场上线要求</h2><div id="gl-requirements"></div></section>
+      <section class="gl-panel"><h2>生产演练</h2><div id="gl-drills"></div></section>
+      <section class="gl-panel"><h2>数据迁移批次</h2><div id="gl-migrations"></div></section>
+    </div>
+    <section class="gl-panel" style="margin-top: 14px">
+      <h2>上线审批与回滚边界</h2>
+      <div id="gl-approvals"></div>
+      <p id="gl-rollback"></p>
+    </section>
+  </main>
+  <script src="./blood-go-live.js"></script>
+</body>
+</html>

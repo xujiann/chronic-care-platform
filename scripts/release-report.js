@@ -15,6 +15,7 @@ const { buildChronicLaunchCoreReport, renderMarkdown: renderChronicLaunchCoreMar
 const { buildCitizenLaunchFoundationReadiness, renderMarkdown: renderCitizenLaunchFoundationMarkdown } = require("./citizen-launch-foundation-readiness");
 const { buildCitizenOperationsReadiness, renderMarkdown: renderCitizenOperationsMarkdown } = require("./citizen-operations-readiness");
 const { buildCommercialCryptoReadiness, renderMarkdown: renderCommercialCryptoMarkdown } = require("./commercial-crypto-readiness");
+const { buildProductionSecurityReadiness, renderMarkdown: renderProductionSecurityMarkdown } = require("./production-security-readiness");
 const { buildDataGovernanceReadiness, renderMarkdown: renderDataGovernanceMarkdown } = require("./data-governance-readiness");
 const { buildDataQualityReport, renderMarkdown: renderDataQualityMarkdown } = require("./data-quality-report");
 const { buildDigitalHospitalStandardsReadiness, renderMarkdown: renderDigitalHospitalStandardsMarkdown } = require("./digital-hospital-standards-readiness");
@@ -717,6 +718,15 @@ function commercialCryptoChecks(commercialCrypto) {
   ];
 }
 
+function productionSecurityChecks(productionSecurity) {
+  return [
+    check("productionSecurity:readiness", productionSecurity.ok, productionSecurity.ok ? "P0-07 software controls passed" : "P0-07 software controls failed", "error", "production-security"),
+    check("productionSecurity:findings", (productionSecurity.summary?.findings || 0) >= 4, `${productionSecurity.summary?.findings || 0} governed findings`, "error", "production-security"),
+    check("productionSecurity:independentControls", productionSecurity.checks?.some((item) => item.id === "productionSecurity:stateMachine" && item.passed), "independent retest, waiver and release opinions enforced", "error", "production-security"),
+    check("productionSecurity:formalBoundary", productionSecurity.center?.productionGate?.formalProductionReady === false, `${productionSecurity.center?.status || "unknown"}; formal readiness remains false`, "warn", "production-security")
+  ];
+}
+
 function qualitySafetyChecks(qualitySafety) {
   return [
     check("qualitySafety:report", qualitySafety.ok, qualitySafety.ok ? "quality and safety supervision checks passed" : "quality and safety supervision checks failed", "error", "quality-safety"),
@@ -1158,6 +1168,7 @@ function buildReleaseReport(options = {}) {
   const registrationJourney = buildRegistrationJourneyReadiness({ data, pkg });
   const registrationIntegration = buildRegistrationIntegrationReadiness({ data, pkg });
   const commercialCrypto = buildCommercialCryptoReadiness({ data, pkg });
+  const productionSecurity = buildProductionSecurityReadiness({ data, pkg });
   const phase2Proposal = buildPhase2ProposalReadiness({ pkg });
   const regionalDataSharing = buildRegionalDataSharingReport({ data, pkg });
   const hospitalOperationsReadiness = buildHospitalOperationsReadinessReport({ data, pkg });
@@ -1226,6 +1237,7 @@ function buildReleaseReport(options = {}) {
     ...registrationJourneyChecks(registrationJourney),
     ...registrationIntegrationChecks(registrationIntegration),
     ...commercialCryptoChecks(commercialCrypto),
+    ...productionSecurityChecks(productionSecurity),
     ...phase2ProposalChecks(phase2Proposal),
     ...qualitySafetyChecks(qualitySafety),
     ...drugConsumableChecks(drugConsumable),
@@ -1259,6 +1271,7 @@ function buildReleaseReport(options = {}) {
     ...publicHealthReadinessChecks(publicHealthReadiness),
     ...publicHealthHighlightsReadinessChecks(publicHealthHighlightsReadiness),
     check("bloodSystem:readiness", bloodSystemReadiness.ok, bloodSystemReadiness.ok ? "blood system readiness checks passed" : "blood system readiness failed", "error", "blood-system"),
+    check("bloodSystem:formalGoLiveBoundary", bloodSystemReadiness.functionalState === "software-release-ready" && bloodSystemReadiness.formalGoLiveState === "blocked-until-site-evidence-signed" && bloodSystemReadiness.productionReady === false && (bloodSystemReadiness.onsiteBlockers?.length || 0) >= 8, `${bloodSystemReadiness.functionalState} / ${bloodSystemReadiness.formalGoLiveState} / ${bloodSystemReadiness.onsiteBlockers?.length || 0} onsite blockers`, "error", "blood-system"),
     check("diseasePayment:readiness", diseasePaymentReadiness.ready, diseasePaymentReadiness.ready ? `${diseasePaymentReadiness.checks.length}/${diseasePaymentReadiness.checks.length} disease payment readiness checks passed` : "disease payment readiness failed", "error", "disease-payment"),
     ...policyCoverageChecks(policyCoverage),
     ...platformCapabilityMapChecks(platformCapabilityMap),
@@ -1307,6 +1320,7 @@ function buildReleaseReport(options = {}) {
     registrationJourney,
     registrationIntegration,
     commercialCrypto,
+    productionSecurity,
     phase2Proposal,
     qualitySafety,
     drugConsumable,
@@ -1840,6 +1854,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       commercialCrypto: report.commercialCrypto
     }, null, 2), "utf8");
+    const productionSecurityJson = path.join(path.dirname(output), "production-security-readiness-report.json");
+    fs.writeFileSync(productionSecurityJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      productionSecurity: report.productionSecurity
+    }, null, 2), "utf8");
     const qualitySafetyJson = path.join(path.dirname(output), "quality-safety-report.json");
     fs.writeFileSync(qualitySafetyJson, JSON.stringify({
       project: report.project,
@@ -2176,6 +2198,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(registrationIntegrationMarkdown, renderRegistrationIntegrationMarkdown(report.registrationIntegration), "utf8");
     const commercialCryptoMarkdown = path.join(path.dirname(markdown), "commercial-crypto-readiness-report.md");
     fs.writeFileSync(commercialCryptoMarkdown, renderCommercialCryptoMarkdown(report.commercialCrypto), "utf8");
+    const productionSecurityMarkdown = path.join(path.dirname(markdown), "production-security-readiness-report.md");
+    fs.writeFileSync(productionSecurityMarkdown, renderProductionSecurityMarkdown(report.productionSecurity), "utf8");
     const qualitySafetyMarkdown = path.join(path.dirname(markdown), "quality-safety-report.md");
     fs.writeFileSync(qualitySafetyMarkdown, renderQualitySafetyMarkdown(report.qualitySafety), "utf8");
     const integrationMarkdown = path.join(path.dirname(markdown), "integration-readiness-report.md");

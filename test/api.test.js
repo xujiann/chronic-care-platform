@@ -5682,16 +5682,42 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const county = await login(baseUrl, "county");
     const decision = await api(baseUrl, `/api/imaging-cloud/studies/${encodeURIComponent(ingest.body.study.id)}/mutual-recognition/decision`, authorized(county.body.token, {
       method: "POST",
-      body: JSON.stringify({ decision: "recognize", reasonCode: "qc-passed", comment: "影像云主索引、报告和质控记录复核通过。" })
+      body: JSON.stringify({ decision: "reject", reasonCode: "quality-evidence-incomplete", comment: "质控证据不足，暂不互认。" })
     }));
     assert.equal(decision.response.status, 200);
-    assert.equal(decision.body.study.mutualRecognitionStatus, "已互认");
-    assert.equal(decision.body.record.status, "recognized");
+    assert.equal(decision.body.study.mutualRecognitionStatus, "不予互认");
+    assert.equal(decision.body.record.status, "rejected");
     assert.equal(decision.body.citation.verificationStatus, "verified");
+
+    const appeal = await api(baseUrl, `/api/imaging-cloud/studies/${encodeURIComponent(ingest.body.study.id)}/mutual-recognition/appeal`, authorized(hospital.body.token, {
+      method: "POST",
+      body: JSON.stringify({ reason: "已补充影像质量抽检和报告审核证据", evidenceRefs: ["IMG-QC-API-001", "IMG-REPORT-API-001"], noPatientPii: true })
+    }));
+    assert.equal(appeal.response.status, 201);
+    assert.equal(appeal.body.appeal.status, "pending-review");
+    assert.equal(appeal.body.study.mutualRecognitionStatus, "appeal-pending");
+
+    const nonIndependentReview = await api(baseUrl, `/api/imaging-cloud/studies/${encodeURIComponent(ingest.body.study.id)}/mutual-recognition/appeal/review`, authorized(county.body.token, {
+      method: "POST",
+      body: JSON.stringify({ decision: "approve", comment: "原判定人尝试复核" })
+    }));
+    assert.equal(nonIndependentReview.response.status, 400);
+    assert.match(nonIndependentReview.body.message, /independent reviewer/);
+
+    const appealReview = await api(baseUrl, `/api/imaging-cloud/studies/${encodeURIComponent(ingest.body.study.id)}/mutual-recognition/appeal/review`, authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({ decision: "approve", reasonCode: "appeal-approved", comment: "补充证据完整，独立复核通过。" })
+    }));
+    assert.equal(appealReview.response.status, 200);
+    assert.equal(appealReview.body.appeal.status, "approved");
+    assert.equal(appealReview.body.record.status, "recognized");
+    assert.equal(appealReview.body.study.mutualRecognitionStatus, "recognized-after-appeal");
+    assert.equal(appealReview.body.citation.verificationStatus, "verified");
 
     const recognitionDashboard = await api(baseUrl, "/api/imaging-cloud", authorized(hospital.body.token));
     assert.equal(recognitionDashboard.body.summary.mutualRecognition >= 1, true);
-    assert.equal(recognitionDashboard.body.mutualRecognition.some((item) => item.id === decision.body.record.id && item.mainIndex === ingest.body.study.mainIndex), true);
+    assert.equal(recognitionDashboard.body.summary.pendingAppeals, 0);
+    assert.equal(recognitionDashboard.body.mutualRecognition.some((item) => item.id === appealReview.body.record.id && item.mainIndex === ingest.body.study.mainIndex && item.appeal.status === "approved"), true);
 
     const r2Citizen = await login(baseUrl, "citizen_r2");
     const forbiddenDashboard = await api(baseUrl, "/api/imaging-cloud?residentId=r1", authorized(r2Citizen.body.token));
@@ -5994,6 +6020,39 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(tamperedVerify.body.passed, false);
     assert.equal(tamperedVerify.body.trails.securityEvents.passed, false);
     assert.ok(tamperedVerify.body.trails.securityEvents.broken.length > 0);
+  });
+
+  await t.test("governs P0-07 remediation with independent security retest", async () => {
+    const center = await api(baseUrl, "/api/production-security/center", authorized(commissionToken));
+    assert.equal(center.response.status, 200);
+    assert.equal(center.body.productionGate.formalProductionReady, false);
+    assert.equal(center.body.summary.highOpen >= 1, true);
+
+    const findingId = "psf-dependency-high-001";
+    const remediation = await api(baseUrl, `/api/production-security/findings/${findingId}/actions`, authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "record-remediation", evidenceRef: "api-security/fix-001.json", note: "API records controlled remediation evidence." })
+    }));
+    assert.equal(remediation.response.status, 200);
+    const submitted = await api(baseUrl, `/api/production-security/findings/${findingId}/actions`, authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "submit-retest", note: "API submits remediation for independent retest." })
+    }));
+    assert.equal(submitted.body.finding.status, "pending-retest");
+    const selfReview = await api(baseUrl, `/api/production-security/findings/${findingId}/actions`, authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "verify-retest", result: "passed", evidenceRef: "api-security/retest-self.json", note: "API attempts a prohibited self review." })
+    }));
+    assert.equal(selfReview.response.status, 400);
+
+    const independent = await login(baseUrl, "city");
+    const reviewed = await api(baseUrl, `/api/production-security/findings/${findingId}/actions`, authorized(independent.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "verify-retest", result: "passed", evidenceRef: "api-security/retest-001.json", note: "Independent API retest closes the finding." })
+    }));
+    assert.equal(reviewed.response.status, 200);
+    assert.equal(reviewed.body.finding.status, "closed");
+    assert.equal(reviewed.body.center.productionGate.formalProductionReady, false);
   });
 
   await t.test("invalidates a session after logout", async () => {

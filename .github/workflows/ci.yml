@@ -87,6 +87,8 @@ jobs:
         run: npm run registration:integration-readiness
       - name: Generate commercial crypto adapter readiness report
         run: npm run security:commercial-crypto-readiness
+      - name: Generate production security acceptance readiness report
+        run: npm run security:production-readiness
       - name: Generate medical quality and safety report
         run: npm run quality-safety:report
       - name: Generate drug consumable readiness report
