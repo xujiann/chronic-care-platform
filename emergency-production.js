@@ -26,11 +26,11 @@ function seed() {
       { id:"emg-drill-security", title:"敏感数据泄露响应", owner:"安全责任部门", scenario:"模拟敏感位置和医疗数据泄露，验证阻断、取证、报告与通知", status:"planned", result:"", evidenceRef:"", executedAt:"", productionEvidence:false }
     ],
     emergencyLaunchRequirements: [
-      { id:"EMG-SITE-01", title:"CTI和录音系统双向接口联调签署", owner:"120急救中心", status:"site-pending", cutoverBlocker:true, evidenceRef:"", signedBy:"", signedAt:"", note:"" },
-      { id:"EMG-SITE-02", title:"手机定位、短信和弱网降级验收", owner:"通信运营商/地图服务方", status:"site-pending", cutoverBlocker:true, evidenceRef:"", signedBy:"", signedAt:"", note:"" },
-      { id:"EMG-SITE-03", title:"真实车辆终端、监护仪和心电设备接入", owner:"急救中心车管与设备厂商", status:"site-pending", cutoverBlocker:true, evidenceRef:"", signedBy:"", signedAt:"", note:"" },
-      { id:"EMG-SITE-04", title:"急诊预建档、绿色通道和电子病历归档联调", owner:"试点医院", status:"site-pending", cutoverBlocker:true, evidenceRef:"", signedBy:"", signedAt:"", note:"" },
-      { id:"EMG-SITE-05", title:"等保定级、个保影响评估、密码和灾备验收", owner:"网信与安全责任部门", status:"site-pending", cutoverBlocker:true, evidenceRef:"", signedBy:"", signedAt:"", note:"" }
+      { id:"EMG-SITE-01", title:"CTI和录音系统双向接口联调签署", owner:"120急救中心", status:"site-pending", cutoverBlocker:true, evidenceRef:"", evidenceDigest:"", externalSigner:"", externalOrganization:"", submittedBy:"", submittedAt:"", verifiedBy:"", verifiedAt:"", verificationRef:"", signedBy:"", signedAt:"", note:"" },
+      { id:"EMG-SITE-02", title:"手机定位、短信和弱网降级验收", owner:"通信运营商/地图服务方", status:"site-pending", cutoverBlocker:true, evidenceRef:"", evidenceDigest:"", externalSigner:"", externalOrganization:"", submittedBy:"", submittedAt:"", verifiedBy:"", verifiedAt:"", verificationRef:"", signedBy:"", signedAt:"", note:"" },
+      { id:"EMG-SITE-03", title:"真实车辆终端、监护仪和心电设备接入", owner:"急救中心车管与设备厂商", status:"site-pending", cutoverBlocker:true, evidenceRef:"", evidenceDigest:"", externalSigner:"", externalOrganization:"", submittedBy:"", submittedAt:"", verifiedBy:"", verifiedAt:"", verificationRef:"", signedBy:"", signedAt:"", note:"" },
+      { id:"EMG-SITE-04", title:"急诊预建档、绿色通道和电子病历归档联调", owner:"试点医院", status:"site-pending", cutoverBlocker:true, evidenceRef:"", evidenceDigest:"", externalSigner:"", externalOrganization:"", submittedBy:"", submittedAt:"", verifiedBy:"", verifiedAt:"", verificationRef:"", signedBy:"", signedAt:"", note:"" },
+      { id:"EMG-SITE-05", title:"等保定级、个保影响评估、密码和灾备验收", owner:"网信与安全责任部门", status:"site-pending", cutoverBlocker:true, evidenceRef:"", evidenceDigest:"", externalSigner:"", externalOrganization:"", submittedBy:"", submittedAt:"", verifiedBy:"", verifiedAt:"", verificationRef:"", signedBy:"", signedAt:"", note:"" }
     ],
     emergencyDataQualityRules: [
       { id:"emg-dq-required", name:"急救事件核心字段完整", severity:"P0", fields:["eventNo","source","location.address","chiefComplaint","status","createdAt"], enabled:true },
@@ -200,12 +200,25 @@ function signRequirement(data, user, id, payload = {}) {
   ensure(data);
   const requirement = data.emergencyLaunchRequirements.find((item)=>item.id === id);
   if (!requirement) throw Object.assign(new Error("launch requirement not found"), { status:404 });
-  if (text(payload.confirmation) !== REQUIREMENT_CONFIRMATION || !text(payload.evidenceRef) || !text(payload.note)) throw new Error("exact confirmation, evidenceRef and note are required");
   const relatedEndpoint = data.emergencyIntegrationEndpoints.find((item)=>({"EMG-SITE-01":"cti","EMG-SITE-02":"location","EMG-SITE-03":"device","EMG-SITE-04":"hospital"}[id] === item.category));
-  if (relatedEndpoint && relatedEndpoint.status !== "probe-passed-site-signoff-pending") throw new Error("related endpoint probe must pass before signoff");
-  requirement.status="signed"; requirement.evidenceRef=text(payload.evidenceRef,300); requirement.note=text(payload.note,500); requirement.signedBy=user.name; requirement.signedAt=timestamp();
-  if (relatedEndpoint) { relatedEndpoint.status="ready"; relatedEndpoint.productionReady=true; }
-  audit(data,user,"sign-launch-requirement",id,requirement.evidenceRef); return requirement;
+  const action = text(payload.action || "submit-evidence", 40);
+  const actor = user.id || user.username || user.name;
+  if (action === "submit-evidence") {
+    if (text(payload.confirmation) !== REQUIREMENT_CONFIRMATION || !text(payload.evidenceRef) || !text(payload.note) || !text(payload.externalSigner) || !text(payload.externalOrganization) || !/^sha256:[a-f0-9]{64}$/.test(text(payload.evidenceDigest,80))) throw new Error("exact confirmation, evidence reference, SHA-256 digest, external signer, organization and note are required");
+    if (relatedEndpoint && relatedEndpoint.status !== "probe-passed-site-signoff-pending") throw new Error("related endpoint probe must pass before evidence submission");
+    if (requirement.status === "signed") throw new Error("a signed launch requirement cannot be replaced without a formal change record");
+    Object.assign(requirement, { status:"evidence-submitted", evidenceRef:text(payload.evidenceRef,300), evidenceDigest:text(payload.evidenceDigest,80), externalSigner:text(payload.externalSigner,100), externalOrganization:text(payload.externalOrganization,160), note:text(payload.note,500), submittedBy:actor, submittedAt:timestamp(), verifiedBy:"", verifiedAt:"", verificationRef:"", signedBy:"", signedAt:"" });
+    audit(data,user,"submit-launch-requirement-evidence",id,`${requirement.evidenceRef}; ${requirement.evidenceDigest}`); return requirement;
+  }
+  if (action === "verify-evidence") {
+    if (requirement.status !== "evidence-submitted") throw new Error("external evidence must be submitted before independent verification");
+    if (text(payload.confirmation) !== "VERIFY EMERGENCY SITE EVIDENCE" || !text(payload.verificationRef) || text(payload.evidenceDigest,80) !== requirement.evidenceDigest) throw new Error("exact verification confirmation, matching SHA-256 digest and verification reference are required");
+    if (actor === requirement.submittedBy) throw new Error("the evidence submitter cannot independently verify the same launch requirement");
+    Object.assign(requirement, { status:"signed", verifiedBy:actor, verifiedAt:timestamp(), verificationRef:text(payload.verificationRef,300), signedBy:actor, signedAt:timestamp() });
+    if (relatedEndpoint) { relatedEndpoint.status="ready"; relatedEndpoint.productionReady=true; }
+    audit(data,user,"verify-launch-requirement-evidence",id,`${requirement.verificationRef}; ${requirement.evidenceDigest}`); return requirement;
+  }
+  throw new Error("unsupported launch requirement action");
 }
 
 module.exports = { REQUIREMENT_CONFIRMATION, acceptProductionHandoff, applyAlertAction, applyCommandBriefAction, buildCenter, completeDrill, createLaunchIncident, enqueue, ensure, probeEndpoint, recordObservation, resolveDataQualityIssue, resolveLaunchIncident, retryDelivery, seed, signCutoverApproval, signRequirement, validateEvent };
