@@ -30,7 +30,8 @@ function seed() {
       { id:"EMG-SITE-02", title:"手机定位、短信和弱网降级验收", owner:"通信运营商/地图服务方", status:"site-pending", cutoverBlocker:true, evidenceRef:"", evidenceDigest:"", externalSigner:"", externalOrganization:"", submittedBy:"", submittedAt:"", verifiedBy:"", verifiedAt:"", verificationRef:"", signedBy:"", signedAt:"", note:"" },
       { id:"EMG-SITE-03", title:"真实车辆终端、监护仪和心电设备接入", owner:"急救中心车管与设备厂商", status:"site-pending", cutoverBlocker:true, evidenceRef:"", evidenceDigest:"", externalSigner:"", externalOrganization:"", submittedBy:"", submittedAt:"", verifiedBy:"", verifiedAt:"", verificationRef:"", signedBy:"", signedAt:"", note:"" },
       { id:"EMG-SITE-04", title:"急诊预建档、绿色通道和电子病历归档联调", owner:"试点医院", status:"site-pending", cutoverBlocker:true, evidenceRef:"", evidenceDigest:"", externalSigner:"", externalOrganization:"", submittedBy:"", submittedAt:"", verifiedBy:"", verifiedAt:"", verificationRef:"", signedBy:"", signedAt:"", note:"" },
-      { id:"EMG-SITE-05", title:"等保定级、个保影响评估、密码和灾备验收", owner:"网信与安全责任部门", status:"site-pending", cutoverBlocker:true, evidenceRef:"", evidenceDigest:"", externalSigner:"", externalOrganization:"", submittedBy:"", submittedAt:"", verifiedBy:"", verifiedAt:"", verificationRef:"", signedBy:"", signedAt:"", note:"" }
+      { id:"EMG-SITE-05", title:"等保定级、个保影响评估、密码和灾备验收", owner:"网信与安全责任部门", status:"site-pending", cutoverBlocker:true, evidenceRef:"", evidenceDigest:"", externalSigner:"", externalOrganization:"", submittedBy:"", submittedAt:"", verifiedBy:"", verifiedAt:"", verificationRef:"", signedBy:"", signedAt:"", note:"" },
+      { id:"EMG-SITE-06", title:"区域全民健康信息平台主索引、机构人员、文档与审计联调签署", owner:"市卫生健康信息中心", status:"site-pending", cutoverBlocker:true, evidenceRef:"", evidenceDigest:"", externalSigner:"", externalOrganization:"", submittedBy:"", submittedAt:"", verifiedBy:"", verifiedAt:"", verificationRef:"", signedBy:"", signedAt:"", note:"" }
     ],
     emergencyDataQualityRules: [
       { id:"emg-dq-required", name:"急救事件核心字段完整", severity:"P0", fields:["eventNo","source","location.address","chiefComplaint","status","createdAt"], enabled:true },
@@ -200,7 +201,7 @@ function signRequirement(data, user, id, payload = {}) {
   ensure(data);
   const requirement = data.emergencyLaunchRequirements.find((item)=>item.id === id);
   if (!requirement) throw Object.assign(new Error("launch requirement not found"), { status:404 });
-  const relatedEndpoint = data.emergencyIntegrationEndpoints.find((item)=>({"EMG-SITE-01":"cti","EMG-SITE-02":"location","EMG-SITE-03":"device","EMG-SITE-04":"hospital"}[id] === item.category));
+  const relatedEndpoint = data.emergencyIntegrationEndpoints.find((item)=>({"EMG-SITE-01":"cti","EMG-SITE-02":"location","EMG-SITE-03":"device","EMG-SITE-04":"hospital","EMG-SITE-06":"regional-platform"}[id] === item.category));
   const action = text(payload.action || "submit-evidence", 40);
   const actor = user.id || user.username || user.name;
   if (action === "submit-evidence") {
