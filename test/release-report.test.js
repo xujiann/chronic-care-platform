@@ -393,6 +393,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.internetNursingReadiness.summary.highlightFeatures, 10);
   assert.equal(report.checks.some((item) => item.name === "productionGoNoGo:evidenceDrift" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "diseasePayment:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "diseasePayment:formalGroupingOperations" && item.passed), true);
   assert.equal(report.diseasePaymentReadiness.ready, true);
   assert.equal(report.checks.some((item) => item.name === "operations:readiness" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "operations:runCenter" && item.passed), true);

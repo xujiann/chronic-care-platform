@@ -181,6 +181,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "api:commercialCryptoCenter",
     "api:productionOperationsCenter",
     "api:productionGoNoGo",
+    "api:diseasePaymentFormalGroupingOperations",
     "api:registrationJourney",
     "api:registrationIntegration",
     "api:publicHealthLaunchGate",
@@ -252,6 +253,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
   assert.match(report.checks.find((item) => item.name === "security:productionRuntimeBoundary").detail, /retention cleanup/);
   assert.match(report.checks.find((item) => item.name === "security:productionRuntimeBoundary").detail, /centralized multi-host session/);
   assert.match(report.checks.find((item) => item.name === "api:productionHospitalConnectors").detail, /outbound connectors/);
+  assert.match(report.checks.find((item) => item.name === "api:diseasePaymentFormalGroupingOperations").detail, /async dispatch, receipt, retry and dead-letter/);
   assert.match(report.checks.find((item) => item.name === "manifest:citizenLaunchFoundation").detail, /resident pipeline acceptance panel/);
   assert.match(report.checks.find((item) => item.name === "api:secureObjectStorage").detail, /malware scan/);
   assert.match(report.checks.find((item) => item.name === "api:financialGateways").detail, /signed replay-safe amount-aware callbacks/);
