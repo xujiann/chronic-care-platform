@@ -63,7 +63,10 @@ const { buildBloodSystemReadinessReport, renderMarkdown: renderBloodSystemMarkdo
 const { buildDiseasePaymentReadiness, renderMarkdown: renderDiseasePaymentMarkdown } = require("./disease-payment-readiness");
 const { renderMarkdown: renderPriorityApplicationTemplatesMarkdown } = require("./priority-application-templates");
 const { buildRegionalDataSharingReport, renderMarkdown: renderRegionalDataSharingMarkdown } = require("./regional-data-sharing");
+const { buildRegionalReferralOverlapReport, renderMarkdown: renderRegionalReferralOverlapMarkdown } = require("./regional-referral-overlap");
 const { buildQualitySafetyReport, renderMarkdown: renderQualitySafetyMarkdown } = require("./quality-safety-report");
+const { buildQualitySafetyInterfaceStandard, renderMarkdown: renderQualitySafetyInterfaceStandardMarkdown } = require("./quality-safety-interface-standard");
+const { buildQualitySafetyInterfaceJointTestPack, renderMarkdown: renderQualitySafetyInterfaceJointTestMarkdown } = require("./quality-safety-interface-joint-test");
 const { buildReleaseArtifactManifest, renderMarkdown: renderReleaseArtifactManifestMarkdown } = require("./release-artifact-manifest");
 const { buildCapabilityMap, renderCapabilityMapMarkdown } = require("../platform-capability-map");
 const { buildPlatformGoLiveSlices, renderPlatformGoLiveSlicesMarkdown } = require("../platform-go-live-slices");
@@ -436,6 +439,11 @@ function chronicFollowupChecks(chronicFollowup, chronicInstitutionInterfaces, ch
     check("chronicFollowup:readiness", chronicFollowup.ok, chronicFollowup.ok ? "chronic follow-up readiness checks passed" : `chronic follow-up readiness checks failed: ${failedBoundaries.join(",") || "unknown"}`, "error", "chronic-followup"),
     check("chronicFollowup:boundaries", chronicFollowup.summary?.passed === chronicFollowup.summary?.boundaries, `${chronicFollowup.summary?.passed || 0}/${chronicFollowup.summary?.boundaries || 0} boundaries${failedBoundaries.length ? `: ${failedBoundaries.join(",")}` : ""}`, "error", "chronic-followup"),
     check("chronicFollowup:feedback", chronicFollowup.summary?.feedbackRecords >= 1, `${chronicFollowup.summary?.feedbackRecords || 0} feedback records`, "error", "chronic-followup"),
+    check("chronicFollowup:notifications", chronicFollowup.summary?.notificationMessages >= 1, `${chronicFollowup.summary?.notificationMessages || 0} notification messages`, "error", "chronic-followup"),
+    check("chronicFollowup:policyAlignment", chronicFollowup.summary?.policyAligned === chronicFollowup.summary?.policyItems, `${chronicFollowup.summary?.policyAligned || 0}/${chronicFollowup.summary?.policyItems || 0} policy items`, "error", "chronic-followup"),
+    check("chronicFollowup:alertQueue", chronicFollowup.summary?.alerts >= 1 && chronicFollowup.summary?.overdueAlerts >= 1 && chronicFollowup.summary?.highPriorityAlerts >= 1, `${chronicFollowup.summary?.alerts || 0} alerts / ${chronicFollowup.summary?.overdueAlerts || 0} overdue / ${chronicFollowup.summary?.highPriorityAlerts || 0} high priority`, "error", "chronic-followup"),
+    check("chronicFollowup:residentExperience", chronicFollowup.summary?.residentExperienceItems >= 5, `${chronicFollowup.summary?.residentExperienceItems || 0} resident experience records`, "error", "chronic-followup"),
+    check("chronicFollowup:fieldIntegration", chronicFollowup.summary?.fieldIntegrationItems >= 4, `${chronicFollowup.summary?.fieldIntegrationItems || 0} field integration records`, "error", "chronic-followup"),
     check("chronicFollowup:publicHealthLoop", chronicFollowup.summary?.publicHealthLoopReadyStages === 6, `${chronicFollowup.summary?.publicHealthLoopReadyStages || 0}/6 public health loop stages`, "error", "chronic-followup"),
     check("chronicFollowup:publicHealthIntegrations", chronicFollowup.summary?.publicHealthReadyIntegrationLinks === 3, `${chronicFollowup.summary?.publicHealthReadyIntegrationLinks || 0}/3 public health integrations`, "error", "chronic-followup"),
     check("chronicFollowup:informatizationSources", chronicInformatizationSources?.ok && chronicInformatizationSources.summary?.readyCapabilityTracks === chronicInformatizationSources.summary?.capabilityTracks, `${chronicInformatizationSources?.summary?.readyCapabilityTracks || 0}/${chronicInformatizationSources?.summary?.capabilityTracks || 0} source capability tracks`, "error", "chronic-followup"),
@@ -569,7 +577,7 @@ function healthDashboardChecks(healthDashboard) {
     check("healthDashboard:applications", healthDashboard.applications?.length === 8 && healthDashboard.totals?.sourceApplications === 7, `${healthDashboard.applications?.length || 0} applications; ${healthDashboard.totals?.sourceApplications || 0} source applications`, "error", "health-dashboard"),
     check("healthDashboard:developmentTemplate", healthDashboard.applications?.every((item) => item.functionalBoundary && item.reusePoints?.length && item.dataCollections?.length && item.apiRoutes?.length && item.frontendEntry && item.testEvidence?.length && item.acceptanceEvidence?.length), "boundary, reuse, data, API, frontend, test, and acceptance fields", "error", "health-dashboard"),
     check("healthDashboard:industryGovernanceIndicators", healthDashboard.indicatorCenter?.indicators?.length === 8 && healthDashboard.indicatorCenter?.periodViews?.length === 2 && healthDashboard.indicatorCenter?.indicators?.every((item) => item.definition && item.owner && item.sourceCollections?.length && item.reports?.length === 2 && item.drilldown?.href), `${healthDashboard.indicatorCenter?.indicators?.length || 0} indicators / ${healthDashboard.indicatorCenter?.periodViews?.length || 0} report views`, "error", "health-dashboard"),
-    check("healthDashboard:boundary", /source business applications|source applications/.test(healthDashboard.scope?.rule || ""), healthDashboard.scope?.rule || "missing", "error", "health-dashboard")
+    check("healthDashboard:boundary", /source business applications|source applications|不替代源业务应用/.test(healthDashboard.scope?.rule || ""), healthDashboard.scope?.rule || "missing", "error", "health-dashboard")
   ];
 }
 
@@ -1257,6 +1265,8 @@ function buildReleaseReport(options = {}) {
   const chronicLaunchCore = buildChronicLaunchCoreReport({ data, pkg });
   const dataQuality = buildDataQualityReport({ data });
   const qualitySafety = buildQualitySafetyReport({ data });
+  const qualitySafetyInterfaceStandard = buildQualitySafetyInterfaceStandard({ data });
+  const qualitySafetyInterfaceJointTest = buildQualitySafetyInterfaceJointTestPack({ data, standardReport: qualitySafetyInterfaceStandard });
   const drugConsumable = buildDrugConsumableReadinessReport({ data, pkg });
   const integrationReadiness = buildIntegrationReadinessReport({ data });
   const objectStorageReadiness = buildObjectStorageReadiness({ data, pkg });
@@ -1280,6 +1290,7 @@ function buildReleaseReport(options = {}) {
   const productionGoNoGo = buildProductionGoNoGoReadiness({ data, pkg, drRehearsalSigned: false });
   const phase2Proposal = buildPhase2ProposalReadiness({ pkg });
   const regionalDataSharing = buildRegionalDataSharingReport({ data, pkg });
+  const regionalReferralOverlap = buildRegionalReferralOverlapReport({ data, pkg });
   const hospitalOperationsReadiness = buildHospitalOperationsReadinessReport({ data, pkg });
   const hospitalOperationsRelease = buildHospitalOperationsReleaseReport({ data, pkg, readiness: hospitalOperationsReadiness });
   const hospitalOperationsModule = buildHospitalOperationsModuleReport({ data, pkg, readiness: hospitalOperationsReadiness, release: hospitalOperationsRelease });
@@ -1357,12 +1368,15 @@ function buildReleaseReport(options = {}) {
     ...productionGoNoGoChecks(productionGoNoGo),
     ...phase2ProposalChecks(phase2Proposal),
     ...qualitySafetyChecks(qualitySafety),
+    ...qualitySafetyInterfaceStandardChecks(qualitySafetyInterfaceStandard),
+    ...qualitySafetyInterfaceJointTestChecks(qualitySafetyInterfaceJointTest),
     ...drugConsumableChecks(drugConsumable),
     ...integrationReadinessChecks(integrationReadiness),
     ...objectStorageReadinessChecks(objectStorageReadiness),
     ...financialGatewayReadinessChecks(financialGatewayReadiness),
     ...interfaceMappingChecks(interfaceMapping),
     ...regionalDataSharingChecks(regionalDataSharing),
+    ...regionalReferralOverlapChecks(regionalReferralOverlap),
     ...hospitalOperationsReadinessChecks(hospitalOperationsReadiness),
     ...hospitalOperationsReleaseChecks(hospitalOperationsRelease),
     ...hospitalOperationsModuleChecks(hospitalOperationsModule),
@@ -1445,12 +1459,15 @@ function buildReleaseReport(options = {}) {
     productionGoNoGo,
     phase2Proposal,
     qualitySafety,
+    qualitySafetyInterfaceStandard,
+    qualitySafetyInterfaceJointTest,
     drugConsumable,
     integrationReadiness,
     objectStorageReadiness,
     financialGatewayReadiness,
     interfaceMapping,
     regionalDataSharing,
+    regionalReferralOverlap,
     hospitalOperationsReadiness,
     hospitalOperationsRelease,
     hospitalOperationsModule,
@@ -1757,6 +1774,10 @@ function renderMarkdown(report) {
     "## Referral teleconsultation readiness report",
     "",
     "See `referral-teleconsultation-readiness-report.json` and `referral-teleconsultation-readiness-report.md` for referral, teleconsultation, receiving feedback, report return, collaboration order, resident authorization, and performance evidence.",
+    "",
+    "## Regional data sharing and referral overlap report",
+    "",
+    "See `regional-data-sharing-report.json`, `regional-data-sharing-report.md`, `regional-referral-overlap-report.json`, and `regional-referral-overlap-report.md` for shared clinical evidence, referral handoff readiness, ownership boundaries, and the explicit no-runtime-merge decision.",
     "",
     "## Internet nursing readiness report",
     "",
@@ -2066,6 +2087,14 @@ function writeOutput(report, flags) {
       profile: report.profile,
       generatedAt: report.generatedAt,
       regionalDataSharing: report.regionalDataSharing
+    }, null, 2), "utf8");
+    const regionalReferralOverlapJson = path.join(path.dirname(output), "regional-referral-overlap-report.json");
+    fs.writeFileSync(regionalReferralOverlapJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      regionalReferralOverlap: report.regionalReferralOverlap
     }, null, 2), "utf8");
     const drugConsumableJson = path.join(path.dirname(output), "drug-consumable-readiness-report.json");
     fs.writeFileSync(drugConsumableJson, JSON.stringify({
@@ -2415,6 +2444,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(interfaceMappingMarkdown, renderInterfaceMappingMarkdown(report.interfaceMapping), "utf8");
     const regionalDataSharingMarkdown = path.join(path.dirname(markdown), "regional-data-sharing-report.md");
     fs.writeFileSync(regionalDataSharingMarkdown, renderRegionalDataSharingMarkdown(report.regionalDataSharing), "utf8");
+    const regionalReferralOverlapMarkdown = path.join(path.dirname(markdown), "regional-referral-overlap-report.md");
+    fs.writeFileSync(regionalReferralOverlapMarkdown, renderRegionalReferralOverlapMarkdown(report.regionalReferralOverlap), "utf8");
     const drugConsumableMarkdown = path.join(path.dirname(markdown), "drug-consumable-readiness-report.md");
     fs.writeFileSync(drugConsumableMarkdown, renderDrugConsumableMarkdown(report.drugConsumable), "utf8");
     const researchSandboxMarkdown = path.join(path.dirname(markdown), "research-sandbox-readiness-report.md");

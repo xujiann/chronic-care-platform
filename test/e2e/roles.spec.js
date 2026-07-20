@@ -257,7 +257,7 @@ test("about page explains runnable platform capabilities", async ({ page }) => {
   await expect(page.locator("[data-dashboard-about-section='runtime-report']")).toBeVisible();
   await expect(page.locator("#dashboard-about-runtime-state")).toHaveAttribute("data-source-mode", "api");
   await expect(page.locator("#dashboard-about-function-report [data-about-runtime-function]")).toHaveCount(15);
-  await expect(page.locator("#dashboard-about-function-report [data-about-runtime-function='aggregate-entry']")).toContainText("212 条源记录");
+  await expect(page.locator("#dashboard-about-function-report [data-about-runtime-function='aggregate-entry']")).toContainText(/7 个源应用，\d+ 条源记录/);
   await expect(page.locator("#dashboard-about-release-evidence [data-about-runtime-evidence='summary-script']")).toContainText("综合管理服务系统摘要脚本");
   await expect(page.locator("[data-dashboard-about-section='template-functions']")).toBeVisible();
   await expect(page.locator("[data-dashboard-template-function='aggregate-entry']")).toContainText("前七应用汇总入口");

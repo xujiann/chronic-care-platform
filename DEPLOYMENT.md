@@ -413,6 +413,8 @@ hospital-operations:module-report generates release/hospital-operations-module-r
 
 Before site joint testing for the drug and consumable supervision app, run `npm.cmd run drug-consumable:readiness` and archive `release/drug-consumable-readiness-report.json` plus `release/drug-consumable-readiness-report.md`. The report is the pre-field evidence bundle for rational medication, prescription review, fixed pickup, high-value consumable clues, insurance settlement coordination, and remediation-loop signoff.
 
+Use `drug-consumable-about.html` as the role-facing scope, policy-source, evidence, and acceptance boundary for this application during pilot training and go-live signoff.
+
 ## Health Dashboard Deployment Evidence
 
 - Open `health-dashboard.html` after commission login to review the aggregate health dashboard.

@@ -1,7 +1,8 @@
-const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], referralSystem: null, referralTeleconsultations: [], registrationSchedules: [], registrationOrders: [], registrationWaitlistEntries: [], medicationPickups: [], chronicScreeningTasks: [], chronicManagementPlans: [], chronicQualityMetrics: [], chronicComorbidityPlans: [], chronicSelfManagement: [], diseaseRegistryModels: [], chronicFollowupStatusPolicy: {}, deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthCertificateDocuments: [], birthStatistics: {}, doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {}, taskMessages: [], phase2FamilyDoctorTemplates: [], phase2FamilyDoctorTeams: [], phase2FamilyDoctorServicePackages: [], phase2FamilyDoctorApplications: [], phase2FamilyDoctorContracts: [], phase2FamilyDoctorFulfillments: [] };
+const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], drugConsumableSupervisions: [], referralSystem: null, referralTeleconsultations: [], registrationSchedules: [], registrationOrders: [], registrationWaitlistEntries: [], medicationPickups: [], chronicScreeningTasks: [], chronicManagementPlans: [], chronicQualityMetrics: [], chronicComorbidityPlans: [], chronicSelfManagement: [], diseaseRegistryModels: [], chronicFollowupStatusPolicy: {}, deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthCertificateDocuments: [], birthStatistics: {}, doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {}, taskMessages: [], phase2FamilyDoctorTemplates: [], phase2FamilyDoctorTeams: [], phase2FamilyDoctorServicePackages: [], phase2FamilyDoctorApplications: [], phase2FamilyDoctorContracts: [], phase2FamilyDoctorFulfillments: [] };
 const institutionApiBase = location.protocol === "file:" || location.hostname.endsWith("github.io") ? "" : "/api";
 let platformState = fallbackState;
 let institutionRegistrationDashboard = null;
+let institutionDrugConsumableState = { boundaries: [], rows: [], summary: {} };
 
 document.addEventListener("DOMContentLoaded", async () => {
   platformState = await loadPlatformState(fallbackState);
@@ -16,6 +17,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   platformState.chronicProductionSafety = productionSafety;
   platformState.chronicProductionSafetyEvidence = productionSafetyEvidence;
   platformState.chronicInteroperabilityProfiles = interoperabilityProfiles;
+  institutionDrugConsumableState = await loadInstitutionDrugConsumableSupervision(platformState);
   institutionRegistrationDashboard = registrationDashboard;
   bindInstitutionActions();
   renderAll(platformState);
@@ -208,7 +210,24 @@ function renderAll(state) {
 }
 
 function bindInstitutionActions() {
+  document.addEventListener("submit", async (event) => {
+    if (event.target.matches("#teleconsultation-form")) {
+      await submitTeleconsultation(event);
+      return;
+    }
+    if (event.target.closest(".teleconsultation-action-form")) {
+      await submitTeleconsultationAction(event);
+    }
+  });
   document.addEventListener("click", async (event) => {
+      const drugButton = event.target.closest("[data-institution-drug-action]");
+      if (drugButton) {
+        drugButton.disabled = true;
+        const payload = JSON.parse(drugButton.dataset.payload || "{}");
+        await postInstitutionDrugConsumableAction(drugButton.dataset.id, drugButton.dataset.institutionDrugAction || "remediation", payload);
+        drugButton.disabled = false;
+        return;
+      }
       const button = event.target.closest("[data-workflow-action]");
       const launchCoreButton = event.target.closest("[data-launch-core-action]");
       const integrationButton = event.target.closest("[data-chronic-integration]");
@@ -364,6 +383,43 @@ function bindInstitutionActions() {
   });
 }
 
+function renderInstitutionTraceabilityPolicySources(policySources = []) {
+  if (!policySources.length) {
+    return `<div data-institution-traceability-policy-sources><strong>Traceability policy sources</strong><span>No official policy sources returned.</span></div>`;
+  }
+  return `<div data-institution-traceability-policy-sources><strong>Traceability policy sources</strong><span>${policySources.length} official policy links; review <a href="./drug-consumable-about.html">the policy basis</a> before uploading evidence.</span></div>${policySources.slice(0, 5).map((item) => `<div data-institution-traceability-policy-source="${item.id || ""}"><strong>${item.documentNo || item.authority || "Policy source"}</strong><span><a href="${item.url || "./drug-consumable-about.html"}">${item.title || item.authority || "Official source"}</a></span></div>`).join("")}`;
+}
+
+function renderInstitutionTraceabilityEvidenceChecklist(evidenceChecklist = []) {
+  if (!evidenceChecklist.length) {
+    return `<div data-institution-traceability-evidence-checklist><strong>Traceability evidence checklist</strong><span>No evidence checklist returned.</span></div>`;
+  }
+  return `<div data-institution-traceability-evidence-checklist><strong>Traceability evidence checklist</strong><span>${evidenceChecklist.filter((item) => item.ready).length}/${evidenceChecklist.length} evidence groups ready.</span></div>${evidenceChecklist.filter((item) => item.owner !== "insurance-integration").slice(0, 5).map((item) => `<div data-institution-traceability-evidence="${item.id || ""}"><strong>${item.title || item.id}</strong><span>${(item.evidenceFields || []).join(", ")} | policies ${(item.policySourceIds || []).join(", ")} | rows ${item.rowCount || 0}</span></div>`).join("")}`;
+}
+
+function renderInstitutionDrugConsumableSupervision(report, state) {
+  const countEl = document.querySelector("#institution-drug-consumable-count");
+  const boundaryEl = document.querySelector("#institution-drug-consumable-boundaries");
+  const listEl = document.querySelector("#institution-drug-consumable-list");
+  if (!countEl || !boundaryEl || !listEl) return;
+  const fallbackRows = (state.drugConsumableSupervisions || []).map((item) => ({
+    ...item,
+    normalizedStatus: /closed|complete|done|passed/i.test(String(item.status || "")) ? "closed" : "open",
+    auditCount: Array.isArray(item.auditTrail) ? item.auditTrail.length : 0
+  }));
+  const items = report?.rows?.length ? report.rows : fallbackRows;
+  const openRows = items.filter((item) => item.normalizedStatus !== "closed");
+  const boundaries = report?.boundaries || [];
+  countEl.textContent = `${openRows.length}/${items.length} open`;
+  boundaryEl.innerHTML = boundaries.map((item) => `<div><strong>${item.name}</strong><span>${item.source} | ${item.count}</span></div>`).join("") || `<div><strong>Institution remediation</strong><span>Drug, consumable, fixed-pickup and catalog evidence</span></div>`;
+  boundaryEl.insertAdjacentHTML("beforeend", renderInstitutionTraceabilityPolicySources(report?.traceabilityPolicySources || []));
+  boundaryEl.insertAdjacentHTML("beforeend", renderInstitutionTraceabilityEvidenceChecklist(report?.traceabilityEvidenceChecklist || []));
+  listEl.innerHTML = openRows.map((item) => {
+    const resident = residentOf(state, item.residentId);
+    return `<section class="item" data-institution-drug-consumable="${item.id}"><div><h3>${resident?.name || item.residentId || "Unknown resident"} | ${item.category || item.boundary}</h3><p>${item.issue || item.nextAction || "Drug consumable supervision item"}</p><p>Traceability coverage ${item.traceabilityEvidenceCoverage?.complete || 0}/${item.traceabilityEvidenceCoverage?.required || 0}; status ${item.traceabilityEvidenceCoverage?.status || "pending"}; missing ${item.traceabilityEvidenceCoverage?.missing || 0}; partial ${item.traceabilityEvidenceCoverage?.partial || 0}</p><div class="action-row">${institutionDrugActionButton(item.id, "Submit remediation", { remediationStatus: "submitted", status: "remediation-submitted", evidence: "institution-remediation-evidence" })}${institutionDrugActionButton(item.id, "Trace scan uploaded", { requirementId: "trace-scan-capture", evidenceSource: "institution-scanner-joint-test", fields: { traceCode: "TRACE-DEMO-001", scanTime: new Date().toISOString(), packageLevel: "unit", operator: "institution-demo", sourceSystem: "pharmacy-scanner" } }, "traceability-evidence")}</div></div></section>`;
+  }).join("") || `<p class="muted">No open drug consumable remediation rows.</p>`;
+}
+
 async function loadInstitutionDrugConsumableSupervision(state = platformState) {
   if (!institutionApiBase) {
     const rows = (state.drugConsumableSupervisions || []).map((item) => ({
@@ -412,6 +468,10 @@ async function postInstitutionDrugConsumableRemediation(id, body) {
 
 function actionButton(collection, id, label, updates, note) {
   return `<button class="inline-action" type="button" data-workflow-action data-collection="${collection}" data-id="${id}" data-updates='${JSON.stringify(updates)}' data-note="${note || label}">${label}</button>`;
+}
+
+function institutionDrugActionButton(id, label, payload, action = "remediation") {
+  return `<button class="inline-action" type="button" data-institution-drug-action="${action}" data-id="${id}" data-payload='${JSON.stringify(payload)}'>${label}</button>`;
 }
 
 function chronicDispatchButton(collection, id, label, updates, note) {
@@ -808,7 +868,12 @@ function renderChronicFollowupWorkbench(state) {
   const openScreenings = (state.chronicScreeningTasks || []).filter((item) => !chronicClosed(state, item.status));
   const pendingMedication = (state.medicationPickups || []).filter((item) => !chronicClosed(state, item.status || item.pharmacyStatus));
   summaryEl.textContent = `${openFollowups.length + openPlans.length + openScreenings.length} 项待处置`;
-  const apiSummary = state.chronicFollowupSummary?.summary || {};
+  const followupMessages = (state.taskMessages || []).filter((item) => item.chronicFollowup && item.targetRole === "institution" && !["read", "handled"].includes(String(item.status || "").toLowerCase()));
+  const policyAlignment = buildChronicFollowupPolicyAlignment(state);
+  const policyCovered = policyAlignment.filter((item) => item.covered).length;
+  const alertQueue = state.chronicFollowupSummary?.alertQueue || buildChronicFollowupAlertQueue(state);
+  const alertSummary = state.chronicFollowupSummary?.summary || {};
+  const apiSummary = alertSummary;
   if (apiSummary.alerts !== undefined) {
     summaryEl.textContent = `${openFollowups.length + openPlans.length + openScreenings.length} 项待处置 · ${apiSummary.highPriorityAlerts || 0} 项高优先级 · ${apiSummary.policyAligned || 0}/${apiSummary.policyItems || 0} 政策覆盖`;
   }
@@ -2390,6 +2455,24 @@ function renderTeleconsultationLoop(state) {
         <p>${item.sourceInstitution || "-"} -> ${item.targetInstitution || "-"} · ${item.meetingWindow || item.due || "-"}</p>
         <p>${item.clinicalQuestion || item.receivingFeedback || item.reportSummary || "待补充临床说明"}</p>
         <p>授权：${item.authorizationStatus || "待确认"} · 报告：${item.reportStatus || "待回传"}</p>
+        <div class="status-ribbon">
+          <span>状态：${teleconsultationStatusLabel(item.status)}</span>
+          <span>授权：${item.authorizationStatus || "待确认"}</span>
+          <span>报告：${item.reportStatus || "待回传"}</span>
+        </div>
+        <form class="teleconsultation-action-form compact-form" data-id="${item.id}">
+          <select name="status" aria-label="会诊状态">
+            <option value="accepted">已接诊</option>
+            <option value="scheduled">已排期</option>
+            <option value="feedback-returned">已反馈</option>
+            <option value="report-returned">报告已回传</option>
+            <option value="closed">已闭环</option>
+          </select>
+          <input name="receivingFeedback" aria-label="接诊反馈" placeholder="接诊反馈">
+          <input name="reportSummary" aria-label="报告摘要" placeholder="报告摘要">
+          <input name="note" aria-label="操作说明" placeholder="操作说明">
+          <button class="inline-action compact" type="submit">保存反馈</button>
+        </form>
         <div class="action-row">
           ${item.status === "requested" ? actionButton("referralTeleconsultations", item.id, "接收会诊", { status: "accepted", receivingFeedback: "接收机构已确认远程会诊。" }, "接收转诊会诊") : ""}
           ${item.reportStatus !== "returned" ? actionButton("referralTeleconsultations", item.id, "回传报告", { status: "report-returned", reportStatus: "returned", reportSummary: "会诊报告已回传至发起机构。" }, "回传会诊报告") : ""}

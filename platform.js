@@ -78,6 +78,7 @@ const PLATFORM_API_BASE = location.protocol === "file:" ? "" : "/api";
 const PLATFORM_STORAGE_KEY = "chronic-care-platform-state";
 let platformState = structuredClone(fallbackPlatformState);
 let platformData = null;
+let researchSandboxSummary = null;
 let activeEditSnapshot = null;
 let platformCapabilityMap = null;
 let platformGoLiveSlices = null;
@@ -2002,8 +2003,21 @@ function renderCommercialCryptoCenter(platform) {
   if (boundaryTarget) boundaryTarget.textContent = "本页只证明适配合同、运行时兼容性探测和证据流程可执行。正式启用仍需通过检测的商用密码产品、生产证书与密钥管理、现场验证、第三方密评报告和整改签字。";
 }
 
-function renderResearchGovernance(platform) {
-  const datasetRows = platform.researchDatasets.map((item) => `
+function renderResearchGovernance(platform, sandboxSummary = researchSandboxSummary) {
+  const datasets = Array.isArray(platform?.researchDatasets) ? platform.researchDatasets : [];
+  const models = Array.isArray(platform?.diseaseRegistryModels) ? platform.diseaseRegistryModels : [];
+  const summary = sandboxSummary?.summary || {};
+  const compliantExports = Array.isArray(sandboxSummary?.recentExports) ? sandboxSummary.recentExports : [];
+  const activeSandboxCount = summary.activeDatasets ?? datasets.filter((item) => item.sandbox?.status === "active").length;
+  const pendingApplications = summary.pendingApplications ?? datasets.filter((item) => item.status === "requested" || item.authorizationStatus === "pending").length;
+  const exportCount = summary.compliantExports ?? compliantExports.length;
+  const usageAuditCount = summary.usageAudits ?? datasets.reduce((total, item) => total + (item.usageAudit || []).length, 0);
+  const outcomeCount = summary.outcomes ?? datasets.reduce((total, item) => total + (item.outcomes || []).length, 0);
+  const boundaries = Array.isArray(sandboxSummary?.boundaries) ? sandboxSummary.boundaries : ["research dataset", "disease registry", "ethics approval", "de-identification release", "policy controls", "sandbox access", "compliant data export", "usage audit", "outcome return"];
+  const reusableCollections = Array.isArray(sandboxSummary?.reusableCollections) ? sandboxSummary.reusableCollections : ["researchDatasets", "diseaseRegistryModels", "compliantDataExports", "dataAccessLogs", "securityAcceptanceLedger", "personalRecords", "diagnosticReports"];
+  const statusState = sandboxSummary?.ok ? "ok" : "warn";
+  const statusText = sandboxSummary ? (sandboxSummary.ok ? "Research governance evidence is ready." : "Research governance evidence needs review.") : "Loading research governance evidence.";
+  const datasetRows = datasets.map((item) => `
     <tr>
       <td><strong>${item.name}</strong></td>
       <td>${item.diseaseType}</td>

@@ -413,6 +413,8 @@ operations-about.html is the policy and scope page for the hospital operations p
 
 hospital-operations:readiness generates release/hospital-operations-readiness-report.json and release/hospital-operations-readiness-report.md. The report reuses healthStatistics, healthStatisticsIngestion, medicalResources, operations-readiness, /api/metrics, and platformProcessAudit evidence, and is included by release:report and deploy:check.
 
+`hospital-operations:release` generates `release/hospital-operations-release-report.json` and `release/hospital-operations-release-report.md`; `hospital-operations:module-report` generates `release/hospital-operations-module-report.json` and `release/hospital-operations-module-report.md`; `hospital-operations:brief-pdf` generates `release/hospital-operations-module-brief-report.pdf`. The runnable gate and review APIs are `GET /api/operations/go-live-gates` and `POST /api/operations/go-live-gates/actions`.
+
 ## Medical Escort Service Platform
 
 `escort.html` is the runnable commission entry for the older adult medical escort service pilot. It uses `GET /api/escort-services/dashboard`, `POST /api/escort-services/orders`, `POST /api/escort-services/orders/:id/actions`, and `POST /api/escort-services/orders/:id/hospital-handoff` to manage provider registry publication, trained escort workers, service requests, hospital handoff confirmation, contract and insurance evidence, subsidy categories, risk queue, quality callbacks, and task messages.
@@ -471,6 +473,10 @@ The handoff document is `docs/互联网护理服务模块说明.md`; it covers r
 ## Drug Consumable Supervision Evidence
 
 `drug-consumable:readiness` generates `release/drug-consumable-readiness-report.json` and `release/drug-consumable-readiness-report.md`, covering rational medication, prescription review, fixed pickup, high-value consumable clues, insurance settlement coordination, and remediation-loop evidence for the drug and consumable supervision app.
+
+Implemented drug-consumable capabilities include role-scoped supervision access, rational-medication and prescription-review rows, fixed-pickup and high-value consumable clues, insurance settlement coordination, institution remediation actions, traceability policy sources, traceability evidence requirements and submission, per-row evidence coverage, audit logging, runnable insurance/institution/commission panels, `drug-consumable-about.html`, and release artifacts through `drug-consumable:readiness`, `deploy:check`, `release:report`, and `release:manifest`.
+
+Before production launch, bind real scanner/HIS/pharmacy fields to `traceabilityEvidenceRequirements`, ingest real insurance-code/commodity-code/trace-code mapping versions, connect insurance settlement callbacks, attach high-value consumable catalog and charge-item cross-checks, configure production identity/secrets/audit-retention storage, and archive signed site evidence for interface joint tests, monitoring, and disaster-recovery rehearsal.
 
 ## Health Dashboard Aggregate Entry
 

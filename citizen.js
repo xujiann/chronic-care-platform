@@ -516,7 +516,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
   bindDialogs();
   bindFollowupFeedback();
-  bindResidentCheckin();
+  bindResidentExperienceCheckin();
   bindEscortAppointment();
   bindFamilyDoctorApplication();
   bindRegistrationAppointment();
@@ -2821,7 +2821,7 @@ function renderResidentCheckin(residentId) {
   status.textContent = records.length ? `${records.length} check-ins recorded` : "Ready";
 }
 
-function bindResidentCheckin() {
+function bindResidentExperienceCheckin() {
   const form = document.querySelector("#resident-checkin-form");
   if (!form) return;
   form.addEventListener("submit", async (event) => {

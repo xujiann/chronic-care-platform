@@ -734,6 +734,12 @@ th {
   color: var(--blue);
 }
 
+.inline-action.compact {
+  min-height: 30px;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
 .inline-action:disabled {
   cursor: wait;
   opacity: 0.55;
@@ -2560,6 +2566,16 @@ dialog::backdrop {
   font-weight: 800;
 }
 
+.dispatch-batch-toolbar,
+.dispatch-batch-note {
+  min-width: 0;
+}
+
+.dispatch-batch-note {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
 .operations-mobile-duty-panel {
   grid-column: 1 / -1;
 }
@@ -3733,6 +3749,13 @@ dialog::backdrop {
   justify-self: start;
 }
 
+.research-sandbox-summary,
+.research-application-form,
+.research-governance-board,
+.research-audit-feed {
+  min-width: 0;
+}
+
 .chronic-workbench-controls,
 .integration-actions {
   display: grid;
@@ -4636,4 +4659,7 @@ tbody tr:hover {
   table {
     min-width: 640px;
   }
+}
+#production-operations-run-center {
+  scroll-margin-top: 172px;
 }

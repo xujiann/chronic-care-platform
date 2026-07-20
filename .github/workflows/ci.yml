@@ -101,6 +101,8 @@ jobs:
         run: npm run interface:mapping
       - name: Generate regional data sharing report
         run: npm run regional-data-sharing:report
+      - name: Audit regional referral responsibility overlap
+        run: npm run regional-referral:overlap
       - name: Generate hybrid deployment readiness report
         run: npm run hybrid:deployment-readiness
       - name: Generate research sandbox readiness report

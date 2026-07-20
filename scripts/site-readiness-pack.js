@@ -96,6 +96,7 @@ function buildSiteReadinessPack(options = {}) {
   const identity = options.identityContract || buildIdentityContract({ data });
   const interfaceMapping = options.interfaceMapping || buildInterfaceMappingReport({ data, pkg });
   const monitoring = options.monitoringReadiness || buildMonitoringReadinessReport({ data, pkg });
+  const auditRetention = options.auditRetention || buildAuditRetentionReport({ data, env });
   const onsiteMaterialsDoc = options.onsiteMaterialsDoc ?? readText("docs/on-site-launch-materials.md");
 
   const identityTemplates = toRows(identity.requiredClaims, (claim) => ({

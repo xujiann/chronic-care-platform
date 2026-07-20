@@ -2381,6 +2381,27 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const productionOperationsAudit = await api(baseUrl, "/api/state", authorized(accountLogin.body.token));
     assert.equal(productionOperationsAudit.body.securityEvents.some((item) => item.action === "production-operations-action" && item.result === "allowed"), true);
 
+    const hospitalOperationsLogin = await login(baseUrl, "hospital");
+    const operationSnapshotPayload = {
+      snapshots: [{
+        id: "ops-mr1-live-api",
+        institutionId: "MR1",
+        institution: "Dalian Central Hospital",
+        snapshotAt: "2026-07-20T08:00:00.000Z",
+        beds: { total: 120, open: 100, occupied: 96, icuTotal: 12, icuOccupied: 10 },
+        staff: { doctorsOnDuty: 24, nursesOnDuty: 45, shortage: 0 },
+        outpatient: { visitsToday: 2600, emergencyVisits: 220, waitingOver30Min: 18 },
+        reporting: { source: "hospital-operations-api-test", varianceRate: 0.01, reconciled: true }
+      }]
+    };
+    const operationSnapshotIngest = await api(baseUrl, "/api/operations/integration/snapshots", authorized(hospitalOperationsLogin.body.token, {
+      method: "POST",
+      headers: { "x-integration-signature": integrationSignature(operationSnapshotPayload) },
+      body: JSON.stringify(operationSnapshotPayload)
+    }));
+    assert.equal(operationSnapshotIngest.response.status, 202);
+    assert.equal(operationSnapshotIngest.body.critical, 1);
+
     const dispatchAction = await api(baseUrl, "/api/operations/dispatch", authorized(accountLogin.body.token, {
       method: "POST",
       body: JSON.stringify({
@@ -2433,7 +2454,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       receiptNo: "RECEIPT-MR1-001",
       handledBy: "MR1 operations desk"
     };
-    const dispatchFeedback = await api(baseUrl, "/api/operations/integration/dispatch-feedback", authorized(hospitalLogin.body.token, {
+    const dispatchFeedback = await api(baseUrl, "/api/operations/integration/dispatch-feedback", authorized(hospitalOperationsLogin.body.token, {
       method: "POST",
       headers: { "x-integration-signature": integrationSignature(feedbackPayload) },
       body: JSON.stringify(feedbackPayload)
@@ -2478,7 +2499,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
         }
       ]
     };
-    const reconciliationIngest = await api(baseUrl, "/api/operations/integration/reconciliation", authorized(hospitalLogin.body.token, {
+    const reconciliationIngest = await api(baseUrl, "/api/operations/integration/reconciliation", authorized(hospitalOperationsLogin.body.token, {
       method: "POST",
       headers: { "x-integration-signature": integrationSignature(reconciliationPayload) },
       body: JSON.stringify(reconciliationPayload)
@@ -5198,7 +5219,11 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const slaInstitutionMessages = await api(baseUrl, "/api/messages", authorized(institution.body.token));
     assert.equal(slaInstitutionMessages.body.messages.some((item) => item.escalationKey === "referralTeleconsultations:rtc-001:sla:high"), true);
     const institutionState = await api(baseUrl, "/api/state", authorized(institution.body.token));
-    const authorization = institutionState.body.personalRecords.find((item) => item.category === "authorizations" && item.residentId === "r1" && item.status !== "revoked");
+    const authorization = institutionState.body.personalRecords.find((item) =>
+      item.category === "authorizations" &&
+      item.residentId === "r1" &&
+      [item.status, item.meta?.status].some((status) => ["authorized", "active"].includes(status))
+    );
     const createdTeleconsultation = await api(baseUrl, "/api/referral-teleconsultations", authorized(institution.body.token, {
       method: "POST",
       body: JSON.stringify({
@@ -5213,7 +5238,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
         clinicalQuestion: "Create a new specialist review from the institution workflow."
       })
     }));
-    assert.equal(createdTeleconsultation.response.status, 201);
+    assert.equal(createdTeleconsultation.response.status, 201, JSON.stringify(createdTeleconsultation.body));
     assert.equal(createdTeleconsultation.body.authorizationStatus, "authorized");
     assert.equal(createdTeleconsultation.body.status, "requested");
     const feedbackPayload = {
@@ -5423,7 +5448,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(drugTaskAction.body.auditTrail[0].action, "unified-task-action");
 
     const citizen = await login(baseUrl, "citizen");
-    const institution = await login(baseUrl, "hospital");
+    const hospitalInstitution = await login(baseUrl, "hospital");
     const citizenMessages = await api(baseUrl, "/api/messages", authorized(citizen.body.token));
     assert.equal(citizenMessages.response.status, 200);
     assert.equal(citizenMessages.body.messages.some((item) => item.id === taskMessage.body.id), true);
@@ -5731,7 +5756,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(deviceMeasurementReplay.response.status, 200);
     assert.equal(deviceMeasurementReplay.body.idempotent, true);
 
-    const pharmacyCallback = await api(baseUrl, "/api/chronic/pharmacy-callbacks", authorized(institution.body.token, {
+    const pharmacyCallback = await api(baseUrl, "/api/chronic/pharmacy-callbacks", authorized(hospitalInstitution.body.token, {
       method: "POST",
       body: JSON.stringify({
         medicationPickupId: "mp1",
@@ -5746,7 +5771,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(pharmacyCallback.body.medicationPickup.callbackExternalId, "api-pharmacy-mp1-001");
     assert.equal(typeof pharmacyCallback.body.messageId, "string");
 
-    const familyDoctorClosure = await api(baseUrl, "/api/chronic/family-doctor-actions", authorized(institution.body.token, {
+    const familyDoctorClosure = await api(baseUrl, "/api/chronic/family-doctor-actions", authorized(hospitalInstitution.body.token, {
       method: "POST",
       body: JSON.stringify({
         residentId: "r1",
@@ -5761,7 +5786,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(familyDoctorClosure.body.note.category, "chronic-family-doctor-note");
     assert.equal(familyDoctorClosure.body.closedMessages >= 1, true);
 
-    const reminderOutreach = await api(baseUrl, "/api/chronic/reminder-outreach", authorized(institution.body.token, {
+    const reminderOutreach = await api(baseUrl, "/api/chronic/reminder-outreach", authorized(hospitalInstitution.body.token, {
       method: "POST",
       body: JSON.stringify({
         residentId: "r1",
@@ -5795,7 +5820,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(feedback.body.meta.followupId, "f1");
     assert.equal(Boolean(feedback.body.messageId), true);
 
-    const residentCheckin = await api(baseUrl, "/api/chronic/resident-checkins", authorized(citizen.body.token, {
+    const residentCheckinIntegration = await api(baseUrl, "/api/chronic/resident-checkins", authorized(citizen.body.token, {
       method: "POST",
       body: JSON.stringify({
         residentId: "r1",
@@ -5807,17 +5832,17 @@ test("API authentication, scoping and governance regression suite", async (t) =>
         seniorReminder: true
       })
     }));
-    assert.equal(residentCheckin.response.status, 201);
-    assert.equal(residentCheckin.body.record.category, "chronic-self-checkin");
-    assert.equal(Boolean(residentCheckin.body.messageId), true);
+    assert.equal(residentCheckinIntegration.response.status, 201);
+    assert.equal(residentCheckinIntegration.body.record.category, "chronic-self-checkin");
+    assert.equal(Boolean(residentCheckinIntegration.body.messageId), true);
 
-    const residentCheckinDenied = await api(baseUrl, "/api/chronic/resident-checkins", authorized(citizen.body.token, {
+    const residentCheckinDeniedIntegration = await api(baseUrl, "/api/chronic/resident-checkins", authorized(citizen.body.token, {
       method: "POST",
       body: JSON.stringify({ residentId: "r2", measurementValue: "tampered" })
     }));
-    assert.equal(residentCheckinDenied.response.status, 403);
+    assert.equal(residentCheckinDeniedIntegration.response.status, 403);
 
-    const deviceMeasurement = await api(baseUrl, "/api/chronic/device-measurements", authorized(citizen.body.token, {
+    const deviceMeasurementIntegration = await api(baseUrl, "/api/chronic/device-measurements", authorized(citizen.body.token, {
       method: "POST",
       body: JSON.stringify({
         residentId: "r1",
@@ -5827,17 +5852,17 @@ test("API authentication, scoping and governance regression suite", async (t) =>
         measurementValue: "151/91 high"
       })
     }));
-    assert.equal(deviceMeasurement.response.status, 201);
-    assert.equal(deviceMeasurement.body.record.meta.deviceExternalId, "device-api-test-001");
+    assert.equal(deviceMeasurementIntegration.response.status, 201);
+    assert.equal(deviceMeasurementIntegration.body.record.meta.deviceExternalId, "device-api-test-001");
 
-    const deviceMeasurementReplay = await api(baseUrl, "/api/chronic/device-measurements", authorized(citizen.body.token, {
+    const deviceMeasurementReplayIntegration = await api(baseUrl, "/api/chronic/device-measurements", authorized(citizen.body.token, {
       method: "POST",
       body: JSON.stringify({ residentId: "r1", externalId: "device-api-test-001", measurementValue: "151/91 high" })
     }));
-    assert.equal(deviceMeasurementReplay.response.status, 200);
-    assert.equal(deviceMeasurementReplay.body.idempotent, true);
+    assert.equal(deviceMeasurementReplayIntegration.response.status, 200);
+    assert.equal(deviceMeasurementReplayIntegration.body.idempotent, true);
 
-    const pharmacyCallback = await api(baseUrl, "/api/chronic/pharmacy-callbacks", authorized(commissionToken, {
+    const pharmacyCallbackIntegration = await api(baseUrl, "/api/chronic/pharmacy-callbacks", authorized(commissionToken, {
       method: "POST",
       body: JSON.stringify({
         medicationPickupId: "mp1",
@@ -5847,27 +5872,27 @@ test("API authentication, scoping and governance regression suite", async (t) =>
         medicationTaken: true
       })
     }));
-    assert.equal(pharmacyCallback.response.status, 200);
-    assert.equal(pharmacyCallback.body.medicationPickup.callbackExternalId, "pharmacy-api-test-001");
+    assert.equal(pharmacyCallbackIntegration.response.status, 200);
+    assert.equal(pharmacyCallbackIntegration.body.medicationPickup.callbackExternalId, "pharmacy-api-test-001");
 
-    const familyDoctorClosure = await api(baseUrl, "/api/chronic/family-doctor-actions", authorized(commissionToken, {
+    const familyDoctorClosureIntegration = await api(baseUrl, "/api/chronic/family-doctor-actions", authorized(commissionToken, {
       method: "POST",
       body: JSON.stringify({
         residentId: "r1",
-        taskId: `chronicSelfManagement:${residentCheckin.body.selfManagement.id}`,
+        taskId: `chronicSelfManagement:${residentCheckinIntegration.body.selfManagement.id}`,
         action: "family doctor phone review",
         result: "reviewed resident self-monitoring and updated plan"
       })
     }));
-    assert.equal(familyDoctorClosure.response.status, 200);
-    assert.equal(familyDoctorClosure.body.note.category, "chronic-family-doctor-note");
+    assert.equal(familyDoctorClosureIntegration.response.status, 200);
+    assert.equal(familyDoctorClosureIntegration.body.note.category, "chronic-family-doctor-note");
 
-    const reminderOutreach = await api(baseUrl, "/api/chronic/reminder-outreach", authorized(commissionToken, {
+    const reminderOutreachIntegration = await api(baseUrl, "/api/chronic/reminder-outreach", authorized(commissionToken, {
       method: "POST",
       body: JSON.stringify({ residentId: "r1", channel: "sms", reminderType: "chronic follow-up reminder" })
     }));
-    assert.equal(reminderOutreach.response.status, 201);
-    assert.equal(reminderOutreach.body.seniorService.outreachEvidence, true);
+    assert.equal(reminderOutreachIntegration.response.status, 201);
+    assert.equal(reminderOutreachIntegration.body.seniorService.outreachEvidence, true);
 
     const referralContinuity = await api(baseUrl, "/api/chronic/referral-continuity", authorized(commissionToken, {
       method: "POST",
@@ -5914,11 +5939,11 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(rf3Continuity.archiveMapping.standardVersion, "WS/T 363/364-2023");
     assert.equal(rf3Continuity.archiveMapping.totalDimensions, 8);
 
-    const pharmacyCallbackDenied = await api(baseUrl, "/api/chronic/pharmacy-callbacks", authorized(citizen.body.token, {
+    const pharmacyCallbackDeniedIntegration = await api(baseUrl, "/api/chronic/pharmacy-callbacks", authorized(citizen.body.token, {
       method: "POST",
       body: JSON.stringify({ medicationPickupId: "mp1", status: "picked_up" })
     }));
-    assert.equal(pharmacyCallbackDenied.response.status, 403);
+    assert.equal(pharmacyCallbackDeniedIntegration.response.status, 403);
 
     const followupEscalationDenied = await api(baseUrl, "/api/chronic/followup-escalations", authorized(citizen.body.token, {
       method: "POST",

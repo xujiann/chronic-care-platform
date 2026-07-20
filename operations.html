@@ -52,7 +52,18 @@
           <h2>生产运维与灾备运行中心</h2>
           <span id="production-operations-status" class="badge warn">运行模板就绪，现场运行受阻</span>
         </div>
+        <p id="production-operations-boundary" class="implementation-boundary"></p>
         <div id="production-operations-metrics" class="metric-grid"></div>
+        <h3>服务级别与响应目标</h3>
+        <div id="production-service-levels" class="table-wrap"></div>
+        <div class="portal-grid">
+          <div><h3>24x365 值班交接</h3><div id="production-duty-shifts" class="priority-list"></div></div>
+          <div><h3>故障事件队列</h3><div id="production-incidents" class="priority-list"></div></div>
+        </div>
+        <h3>备份恢复与回滚演练</h3>
+        <div id="production-recovery-drills" class="priority-list"></div>
+        <h3>运行证据包</h3>
+        <div id="production-operations-evidence" class="table-wrap"></div>
         <div class="panel-title">
           <h3>告警路由与 SIEM 投递</h3>
           <span id="observability-alert-status" class="badge warn">生产路由待配置</span>
@@ -64,23 +75,259 @@
         <h3>投递与重放回执</h3>
         <div id="observability-alert-deliveries" class="table-wrap"></div>
         <p id="observability-alert-boundary" class="implementation-boundary"></p>
-        <h3>服务级别与响应目标</h3>
-        <div id="production-service-levels" class="table-wrap"></div>
-        <div class="portal-grid">
-          <div>
-            <h3>24x365 值班交接</h3>
-            <div id="production-duty-shifts" class="priority-list"></div>
-          </div>
-          <div>
-            <h3>故障事件队列</h3>
-            <div id="production-incidents" class="priority-list"></div>
-          </div>
+      </section>
+
+      <section class="panel operations-situation-panel" aria-label="运行态势速览">
+        <div class="panel-title">
+          <h2>运行态势速览</h2>
+          <span>按当前筛选汇总风险、调度、直报复核和下一步处置入口</span>
         </div>
-        <h3>备份恢复与回滚演练</h3>
-        <div id="production-recovery-drills" class="priority-list"></div>
-        <h3>运行证据包</h3>
-        <div id="production-operations-evidence" class="table-wrap"></div>
-        <p id="production-operations-boundary" class="implementation-boundary"></p>
+        <div id="operations-situation-strip" class="operations-situation-strip"></div>
+        <div id="operations-focus-links" class="operations-focus-links"></div>
+        <div id="operations-duty-priority" class="operations-duty-priority"></div>
+        <div id="operations-duty-queue" class="operations-duty-queue"></div>
+        <div id="operations-duty-actions" class="operations-duty-actions"></div>
+      </section>
+
+      <section class="panel performance-manual-panel" aria-label="公立医院绩效监测口径">
+        <div class="panel-title">
+          <h2>公立医院绩效监测口径</h2>
+          <span>依据二级、三级公立医院绩效监测操作手册（2025版）</span>
+        </div>
+        <div class="filter-grid">
+          <label>医院等级
+            <select id="performance-tier-filter">
+              <option value="secondary">二级公立医院</option>
+              <option value="tertiary">三级公立医院</option>
+            </select>
+          </label>
+          <label>指标域
+            <select id="performance-domain-filter">
+              <option value="all">全部指标域</option>
+              <option value="功能定位">功能定位</option>
+              <option value="医疗质量">医疗质量</option>
+              <option value="运营效率">运营效率</option>
+              <option value="持续发展">持续发展</option>
+              <option value="满意度评价">满意度评价</option>
+            </select>
+          </label>
+          <label>数据来源
+            <select id="performance-source-filter">
+              <option value="all">全部来源</option>
+              <option value="病案首页">病案首页</option>
+              <option value="医院填报">医院填报</option>
+              <option value="财务年报表">财务年报表</option>
+              <option value="满意度调查平台">满意度调查平台</option>
+              <option value="国家或省级平台">国家或省级平台</option>
+            </select>
+          </label>
+          <button id="performance-filter-reset" class="inline-action" type="button">重置口径</button>
+        </div>
+        <div id="performance-summary" class="performance-summary-grid"></div>
+        <div class="portal-grid compact-monitor-grid">
+          <div id="performance-domains" class="performance-domain-list"></div>
+          <div id="performance-indicators" class="performance-indicator-list"></div>
+        </div>
+        <div id="performance-actions" class="performance-action-grid"></div>
+        <div id="performance-readiness" class="performance-readiness-grid"></div>
+        <div id="performance-indicator-detail" class="performance-detail-panel"></div>
+      </section>
+
+      <section class="panel operations-monitor-controls" aria-label="运行监测筛选">
+        <div class="panel-title">
+          <h2>运行监测筛选</h2>
+          <span>按机构状态、预警域和资源压力定位异常</span>
+        </div>
+        <div class="filter-grid">
+          <label>状态
+            <select id="operation-status-filter">
+              <option value="all">全部状态</option>
+              <option value="critical">严重预警</option>
+              <option value="warning">一般预警</option>
+              <option value="normal">正常</option>
+            </select>
+          </label>
+          <label>预警域
+            <select id="operation-domain-filter">
+              <option value="all">全部预警域</option>
+              <option value="beds">床位</option>
+              <option value="staff">人员</option>
+              <option value="outpatient">门急诊</option>
+              <option value="statistics">统计直报</option>
+            </select>
+          </label>
+          <label>机构搜索
+            <input id="operation-search" type="search" placeholder="输入机构名称" />
+          </label>
+          <label>排序
+            <select id="operation-sort">
+              <option value="pressure">资源压力优先</option>
+              <option value="bed">床位占用优先</option>
+              <option value="emergency">急诊量优先</option>
+              <option value="variance">直报差异优先</option>
+            </select>
+          </label>
+          <button id="operation-filter-reset" class="inline-action" type="button">重置筛选</button>
+        </div>
+      </section>
+
+      <section class="panel interface-mapping-panel" aria-label="现场联调字段映射">
+        <div class="panel-title">
+          <h2>现场联调字段映射</h2>
+          <span>按来源系统核对字段、责任科室、更新周期和联调状态</span>
+        </div>
+        <div id="operations-interface-mapping" class="interface-mapping-grid"></div>
+      </section>
+
+      <section class="operations-command-board" aria-label="联调加固与治理指挥区">
+      <section class="panel operations-command-card" aria-label="现场联调闭环">
+        <div class="panel-title">
+          <h2>现场联调闭环</h2>
+          <span>样例报文、验签日志、回放记录、失败重试和接收端确认一屏复核</span>
+        </div>
+        <div id="operations-site-joint-tests" class="interface-mapping-grid"></div>
+        <div id="operations-site-joint-patrol" class="site-joint-patrol-grid"></div>
+      </section>
+
+      <section class="panel operations-command-card" aria-label="生产加固清单">
+        <div class="panel-title">
+          <h2>生产加固清单</h2>
+          <span>生产密钥、审计保全、监控告警、灾备演练和现场签字状态</span>
+        </div>
+        <div id="operation-launch-readiness" class="operation-launch-readiness-grid"></div>
+        <div id="operation-go-live-gates" class="operation-go-live-gate-grid"></div>
+        <div id="operation-production-hardening" class="performance-readiness-grid"></div>
+        <div id="operation-cutover-command" class="operation-cutover-grid"></div>
+        <div id="operation-post-cutover-observation" class="operation-observation-grid"></div>
+      </section>
+
+      <section class="panel operations-command-card" aria-label="智能调度建议">
+        <div class="panel-title">
+          <h2>智能调度建议</h2>
+          <span>床位缺口、人员缺口、急诊拥堵和直报风险的人工复核队列</span>
+        </div>
+        <div id="operation-intelligence" class="operation-playbook-grid"></div>
+      </section>
+
+      <section class="panel operations-command-card operations-resource-pool-panel" aria-label="跨院资源池">
+        <div class="panel-title">
+          <h2>跨院资源池</h2>
+          <span>汇总床位、ICU、呼吸机、救护车和值班医生可支援能力，并生成跨院调拨建议</span>
+        </div>
+        <div id="operation-resource-pool" class="operation-resource-pool-grid"></div>
+      </section>
+
+      <section class="panel operations-command-card operations-emergency-loop-panel" aria-label="急诊拥堵调度闭环">
+        <div class="panel-title">
+          <h2>急诊拥堵调度闭环</h2>
+          <span>把急诊候诊、留观、CT/救护车能力、资源池和调度单串成可复核闭环</span>
+        </div>
+        <div id="operation-emergency-dispatch-loop" class="operation-emergency-loop-grid"></div>
+      </section>
+
+      <section class="panel operations-command-card operations-mobile-duty-panel" aria-label="移动值守台">
+        <div class="panel-title">
+          <h2>移动值守台</h2>
+          <span>把预警确认、交接签收、调度备注和直报复核提醒压缩为值班可操作卡片，并写入消息与审计留痕</span>
+        </div>
+        <div id="operation-mobile-duty" class="operation-mobile-duty-grid"></div>
+      </section>
+
+      <section class="panel operations-command-card" aria-label="治理报表">
+        <div class="panel-title">
+          <h2>治理报表</h2>
+          <span>月度运行报告、直报差异清单、调度复盘和绩效异常说明</span>
+        </div>
+        <div id="operation-governance-report" class="performance-action-grid"></div>
+      </section>
+
+      <section class="panel operations-command-card operations-delivery-pack-panel" aria-label="上线报告与发布证据">
+        <div class="panel-title">
+          <h2>上线报告与发布证据</h2>
+          <span>汇总现场验收、发布归档和下一步联调所需资料</span>
+        </div>
+        <div class="operation-delivery-pack-guide" aria-label="交付包验收路线">
+          <article>
+            <strong>1. 先核流程</strong>
+            <span>用完整流程图确认数据接入、调度、对账、审计和上线观察责任链。</span>
+          </article>
+          <article>
+            <strong>2. 再核功能</strong>
+            <span>用开发报告和模块功能报告核对已实现能力、API、数据集合和验证结果。</span>
+          </article>
+          <article>
+            <strong>3. 最后归档</strong>
+            <span>将 PDF 简报、联通需求和 release 证据纳入现场签收材料。</span>
+          </article>
+        </div>
+        <div class="operation-delivery-pack-alert" aria-label="上线前补证提醒">
+          <strong>上线前补证提醒</strong>
+          <span>正式割接前需完成真实报文、验签日志、回放记录、接收端截图、监控值守和审计保全目标配置。</span>
+          <small>生产环境需配置 <code>AUDIT_EXPORT_PATH</code> 或 <code>SIEM_ENDPOINT</code> 后再签收上线。</small>
+        </div>
+        <div class="operation-delivery-pack-grid">
+          <a class="operation-delivery-pack-card primary" href="./output/pdf/hospital-operations-module-brief-report.pdf" target="_blank" rel="noreferrer">
+            <strong>2页开发简要报告</strong>
+            <span>已实现功能、验收证据、现场联通边界和下一步方向。</span>
+            <small>PDF：output/pdf/hospital-operations-module-brief-report.pdf</small>
+          </a>
+          <a class="operation-delivery-pack-card" href="./release/hospital-operations-module-report.md" target="_blank" rel="noreferrer">
+            <strong>模块功能报告</strong>
+            <span>能力清单、审计检查、发布证据和后续开发计划。</span>
+            <small>release/hospital-operations-module-report.md</small>
+          </a>
+          <a class="operation-delivery-pack-card" href="./docs/hospital-operations-flow.md" target="_blank" rel="noreferrer">
+            <strong>完整流程图</strong>
+            <span>数据接入、预警研判、资源调度、复核对账、审计归档和上线观察。</span>
+            <small>docs/hospital-operations-flow.md</small>
+          </a>
+          <a class="operation-delivery-pack-card" href="./docs/hospital-operations-development-report.md" target="_blank" rel="noreferrer">
+            <strong>开发报告</strong>
+            <span>模块定位、已实现功能、数据接口、验收证据和下一步开发计划。</span>
+            <small>docs/hospital-operations-development-report.md</small>
+          </a>
+          <a class="operation-delivery-pack-card" href="./docs/hospital-operations-integration-requirements.md" target="_blank" rel="noreferrer">
+            <strong>系统联通需求</strong>
+            <span>HIS、排班、设备、门急诊、统计直报、移动值守等现场接口边界。</span>
+            <small>docs/hospital-operations-integration-requirements.md</small>
+          </a>
+        </div>
+      </section>
+
+      <section class="panel operations-command-card operations-next-development-panel" aria-label="下一步功能研究">
+        <div class="panel-title">
+          <h2>下一步功能研究</h2>
+          <span>围绕现场联调、生产割接、智能调度、跨院资源、治理导出和移动值守拆分可开发能力</span>
+        </div>
+        <div id="operation-next-development" class="operation-next-development-grid"></div>
+      </section>
+      </section>
+
+      <section class="panel command-chain-panel" aria-label="运行处置链">
+        <div class="panel-title">
+          <h2>运行处置链</h2>
+          <span>按机构串联预警、调度、直报复核和绩效说明</span>
+        </div>
+        <div id="operation-command-chains" class="command-chain-grid"></div>
+      </section>
+
+      <section class="panel operation-playbook-panel" aria-label="预警处置预案">
+        <div class="panel-title">
+          <h2>预警处置预案</h2>
+          <span>按床位、人员、门急诊、设备和统计直报场景沉淀责任链、SLA、字段证据和处置动作</span>
+        </div>
+        <div id="operation-playbooks" class="operation-playbook-grid"></div>
+      </section>
+
+      <section class="panel operation-handover-panel" aria-label="运行交接清单">
+        <div class="panel-title">
+          <h2>运行交接清单</h2>
+          <span>汇总开放调度、活动预警、直报复核和SLA临期风险，支持值班交接</span>
+        </div>
+        <div id="operation-handover-summary" class="operation-handover-summary"></div>
+        <div id="operation-handover-owner-matrix" class="operation-handover-owner-matrix"></div>
+        <div id="operation-handover-signoffs" class="operation-handover-signoffs"></div>
+        <div id="operation-handover" class="operation-handover-grid"></div>
       </section>
 
       <section class="portal-grid">
@@ -158,6 +405,14 @@
         </article>
       </section>
 
+      <section class="panel" data-operations-panel="blood-coordination">
+        <div class="panel-title">
+          <h2>区域用血协同</h2>
+          <span>监测库存、短缺、冷链和应急调配事件</span>
+        </div>
+        <div id="operations-blood-coordination" class="rules"></div>
+      </section>
+
       <section class="panel">
         <div class="panel-title">
           <h2>统计直报对账复核</h2>
@@ -165,7 +420,6 @@
         </div>
         <div id="reconciliation-reviews" class="table-wrap"></div>
       </section>
-      <section class="panel"><div class="panel-header"><div><h2>血液资源协同</h2><p>来自区域血液事件枢纽的库存、短缺、冷链和应急调拨投影。</p></div></div><div id="operations-blood-coordination" class="table-wrap"></div></section>
     </main>
 
     <script src="./shared.js"></script>

@@ -1283,6 +1283,7 @@ function bindCountyActions() {
     }
     const button = event.target.closest("[data-county-action]");
     if (!button || !platformState) return;
+    if (button.dataset.confirm && !window.confirm(button.dataset.confirm)) return;
     const updates = JSON.parse(button.dataset.updates || "{}");
     const result = await updateWorkflowAction(platformState, button.dataset.collection, button.dataset.id, updates, button.dataset.note || "县域医共体更新业务状态");
     if (!result.ok) return;
@@ -1529,7 +1530,8 @@ async function completeReferralJointLedgerTask(state, role) {
 }
 
 function countyActionButton(collection, id, label, updates) {
-  return `<button class="inline-action" type="button" data-county-action data-collection="${collection}" data-id="${id}" data-updates='${JSON.stringify(updates)}' data-note="${label}">${label}</button>`;
+  const confirmMessage = label.includes("关闭") ? "确认关闭该业务闭环？关闭后仍保留完整审计记录。" : "";
+  return `<button class="inline-action" type="button" data-county-action data-collection="${collection}" data-id="${id}" data-updates='${JSON.stringify(updates)}' data-note="${label}" data-confirm="${confirmMessage}">${label}</button>`;
 }
 
 function statusBadge(status) {

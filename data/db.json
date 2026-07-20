@@ -8057,7 +8057,7 @@
       "uploadSource": "居民端自测",
       "deviceId": "bp-device-demo-001",
       "deviceExternalId": "device-bp-r1-20260622",
-      "integrationStatus": "device callback accepted",
+      "integrationStatus": "device gateway accepted",
       "id": "csm-001",
       "residentId": "r1",
       "device": "电子血压计",
@@ -8066,10 +8066,7 @@
       "incentive": "连续上传7天可兑换健康积分",
       "status": "需医生复核",
       "nextAction": "家庭医生电话随访并判断是否上转",
-      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
-      "deviceId": "bp-device-demo-001",
-      "deviceExternalId": "device-bp-r1-20260622",
-      "integrationStatus": "device gateway accepted"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "csm-002",
@@ -8536,7 +8533,7 @@
       "signoffStatus": "signed",
       "signedBy": "project-office",
       "evidence": "siteReadinessPack.templates.signoff",
-      "nextAction": "collect signed forms during site cutover"
+      "nextAction": "collect wet signatures during site cutover"
     }
   ],
   "chronicLaunchCoreActions": [],
@@ -9698,7 +9695,7 @@
       "department": "Cardiology",
       "applicantDoctor": "doc-liu",
       "receivingDoctor": "doc-wang",
-      "residentAuthorizationId": "pr-auth-r1",
+      "residentAuthorizationId": "auth-r1-referral-demo",
       "authorizationStatus": "authorized",
       "status": "scheduled",
       "priority": "high",
@@ -9715,7 +9712,7 @@
       "reportStatus": "pending-return",
       "reportReturnedAt": "",
       "reportSummary": "",
-      "collaborationOrderId": "cco-004",
+      "collaborationOrderId": "cco-001",
       "performance": {
         "responseHours": 4,
         "reportReturnHours": 0,
@@ -9764,7 +9761,7 @@
       "department": "Family doctor studio",
       "applicantDoctor": "doc-wang",
       "receivingDoctor": "doc-liu",
-      "residentAuthorizationId": "pr-auth-r4",
+      "residentAuthorizationId": "auth-r4-referral-demo",
       "authorizationStatus": "authorized",
       "status": "report-returned",
       "priority": "medium",
@@ -9780,7 +9777,7 @@
       "reportStatus": "returned",
       "reportReturnedAt": "2026-06-21",
       "reportSummary": "Continue eight-week long prescription follow-up and weekly blood pressure upload.",
-      "collaborationOrderId": "cco-005",
+      "collaborationOrderId": "cco-001",
       "performance": {
         "responseHours": 2,
         "reportReturnHours": 18,
@@ -9803,8 +9800,6 @@
         }
       ],
       "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4",
-      "sourceInstitutionCode": "MR3",
-      "targetInstitutionCode": "MR2",
       "slaDisposition": {
         "status": "closed",
         "owner": "Xinghaiwan Community Health Service Center",
@@ -9820,6 +9815,143 @@
     }
   ],
   "taskMessages": [
+    {
+      "id": "msg-chronic-feedback-r4",
+      "taskId": "followups:f3",
+      "collection": "followups",
+      "sourceId": "f3",
+      "residentId": "r4",
+      "targetRole": "institution",
+      "channel": "in_app",
+      "title": "High-risk chronic follow-up feedback received",
+      "body": "居民已补充高危高血压家庭血压记录，请家庭医生复核并确认下一次随访。",
+      "status": "sent",
+      "chronicFollowup": true,
+      "meta": {
+        "followupFeedback": true,
+        "highRiskCoverage": true,
+        "fieldIntegration": true
+      },
+      "receipts": [
+        {
+          "at": "2026-06-24T10:05:00.000Z",
+          "status": "delivered",
+          "channel": "in_app"
+        }
+      ],
+      "createdAt": "2026-06-24T10:05:00.000Z",
+      "createdBy": "citizen",
+      "createdByName": "演示居民D",
+      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
+    },
+    {
+      "id": "msg-chronic-feedback-r1",
+      "taskId": "chronicFollowup:r1-feedback",
+      "collection": "chronicFollowup",
+      "sourceId": "chronic-feedback-r1",
+      "residentId": "r1",
+      "targetRole": "institution",
+      "channel": "in_app",
+      "title": "Chronic follow-up feedback requires review",
+      "body": "Resident feedback and self-monitoring have been delivered to the family doctor team.",
+      "status": "sent",
+      "chronicFollowup": true,
+      "meta": {
+        "reminderOutreach": true,
+        "fieldIntegration": true
+      },
+      "receipts": [
+        {
+          "at": "2026-06-22T08:35:00.000Z",
+          "status": "delivered",
+          "channel": "in_app"
+        }
+      ],
+      "createdAt": "2026-06-22T08:35:00.000Z",
+      "createdBy": "system",
+      "createdByName": "system",
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
+    },
+    {
+      "id": "msg-95de26b5-a5b3-4e42-993e-701bcf2879db",
+      "taskId": "multiPracticeApplications:mp-4cb42cf8-a3a5-48ed-9033-b09e48110e55",
+      "collection": "multiPracticeApplications",
+      "sourceId": "mp-4cb42cf8-a3a5-48ed-9033-b09e48110e55",
+      "residentId": "",
+      "targetRole": "doctor",
+      "targetDoctorId": "doc-liu",
+      "targetOrgCode": "MR3",
+      "targetOrgName": "青泥洼桥社区卫生服务中心",
+      "channel": "in_app",
+      "title": "多点执业医院端已处理",
+      "body": "大连市中心医院 已处理 刘医生 的多点执业申请：待卫健审核。医院端确认接收多点执业申请",
+      "status": "sent",
+      "receipts": [],
+      "createdAt": "2026-06-29T08:40:11.836Z",
+      "createdBy": "hospital",
+      "createdByName": "医疗机构管理员",
+      "personIndex": ""
+    },
+    {
+      "id": "msg-d9c310eb-29d8-47cd-9fd0-f32d21620015",
+      "taskId": "multiPracticeApplications:mp-4cb42cf8-a3a5-48ed-9033-b09e48110e55",
+      "collection": "multiPracticeApplications",
+      "sourceId": "mp-4cb42cf8-a3a5-48ed-9033-b09e48110e55",
+      "residentId": "",
+      "targetRole": "institution",
+      "targetDoctorId": "",
+      "targetOrgCode": "MR1",
+      "targetOrgName": "大连市中心医院",
+      "channel": "in_app",
+      "title": "多点执业申请待医院端处理",
+      "body": "刘医生 申请到 大连市中心医院 开展多点执业，请医院端完成材料核验、第一执业地点确认和备案意见。",
+      "status": "sent",
+      "receipts": [],
+      "createdAt": "2026-06-29T08:40:11.622Z",
+      "createdBy": "doctor",
+      "createdByName": "刘医生",
+      "personIndex": ""
+    },
+    {
+      "id": "msg-a56d3a58-ba3c-4028-918b-08fac805878b",
+      "taskId": "multiPracticeApplications:mp-387e5ad0-f705-4c06-8c01-d28fed1b738d",
+      "collection": "multiPracticeApplications",
+      "sourceId": "mp-387e5ad0-f705-4c06-8c01-d28fed1b738d",
+      "residentId": "",
+      "targetRole": "institution",
+      "targetDoctorId": "doc-liu",
+      "targetOrgCode": "MR3",
+      "targetOrgName": "青泥洼桥社区卫生服务中心",
+      "channel": "in_app",
+      "title": "多点执业医院端已处理",
+      "body": "上线验收通知已送达",
+      "status": "sent",
+      "receipts": [],
+      "createdAt": "2026-06-29T08:35:11.686Z",
+      "createdBy": "hospital",
+      "createdByName": "医疗机构管理员",
+      "personIndex": ""
+    },
+    {
+      "id": "msg-af552725-01b3-456f-bce3-0b5d00aa074e",
+      "taskId": "multiPracticeApplications:mp-387e5ad0-f705-4c06-8c01-d28fed1b738d",
+      "collection": "multiPracticeApplications",
+      "sourceId": "mp-387e5ad0-f705-4c06-8c01-d28fed1b738d",
+      "residentId": "",
+      "targetRole": "institution",
+      "targetDoctorId": "",
+      "targetOrgCode": "MR1",
+      "targetOrgName": "大连市中心医院",
+      "channel": "in_app",
+      "title": "多点执业申请待医院端处理",
+      "body": "上线验收通知已送达",
+      "status": "sent",
+      "receipts": [],
+      "createdAt": "2026-06-29T08:35:11.412Z",
+      "createdBy": "doctor",
+      "createdByName": "刘医生",
+      "personIndex": ""
+    },
     {
       "id": "msg-rtc-001-feedback-citizen",
       "taskId": "referralTeleconsultations:rtc-001",
@@ -11657,145 +11789,6 @@
       "sourceStatus": "archived"
     }
   ],
-  "taskMessages": [
-    {
-      "id": "msg-chronic-feedback-r4",
-      "taskId": "followups:f3",
-      "collection": "followups",
-      "sourceId": "f3",
-      "residentId": "r4",
-      "targetRole": "institution",
-      "channel": "in_app",
-      "title": "High-risk chronic follow-up feedback received",
-      "body": "居民已补充高危高血压家庭血压记录，请家庭医生复核并确认下一次随访。",
-      "status": "sent",
-      "chronicFollowup": true,
-      "meta": {
-        "followupFeedback": true,
-        "highRiskCoverage": true,
-        "fieldIntegration": true
-      },
-      "receipts": [
-        {
-          "at": "2026-06-24T10:05:00.000Z",
-          "status": "delivered",
-          "channel": "in_app"
-        }
-      ],
-      "createdAt": "2026-06-24T10:05:00.000Z",
-      "createdBy": "citizen",
-      "createdByName": "演示居民D",
-      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
-    },
-    {
-      "id": "msg-chronic-feedback-r1",
-      "taskId": "chronicFollowup:r1-feedback",
-      "collection": "chronicFollowup",
-      "sourceId": "chronic-feedback-r1",
-      "residentId": "r1",
-      "targetRole": "institution",
-      "channel": "in_app",
-      "title": "Chronic follow-up feedback requires review",
-      "body": "Resident feedback and self-monitoring have been delivered to the family doctor team.",
-      "status": "sent",
-      "chronicFollowup": true,
-      "meta": {
-        "reminderOutreach": true,
-        "fieldIntegration": true
-      },
-      "receipts": [
-        {
-          "at": "2026-06-22T08:35:00.000Z",
-          "status": "delivered",
-          "channel": "in_app"
-        }
-      ],
-      "createdAt": "2026-06-22T08:35:00.000Z",
-      "createdBy": "system",
-      "createdByName": "system",
-      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
-    },
-    {
-      "id": "msg-95de26b5-a5b3-4e42-993e-701bcf2879db",
-      "taskId": "multiPracticeApplications:mp-4cb42cf8-a3a5-48ed-9033-b09e48110e55",
-      "collection": "multiPracticeApplications",
-      "sourceId": "mp-4cb42cf8-a3a5-48ed-9033-b09e48110e55",
-      "residentId": "",
-      "targetRole": "doctor",
-      "targetDoctorId": "doc-liu",
-      "targetOrgCode": "MR3",
-      "targetOrgName": "青泥洼桥社区卫生服务中心",
-      "channel": "in_app",
-      "title": "多点执业医院端已处理",
-      "body": "大连市中心医院 已处理 刘医生 的多点执业申请：待卫健审核。医院端确认接收多点执业申请",
-      "status": "sent",
-      "receipts": [],
-      "createdAt": "2026-06-29T08:40:11.836Z",
-      "createdBy": "hospital",
-      "createdByName": "医疗机构管理员",
-      "personIndex": ""
-    },
-    {
-      "id": "msg-d9c310eb-29d8-47cd-9fd0-f32d21620015",
-      "taskId": "multiPracticeApplications:mp-4cb42cf8-a3a5-48ed-9033-b09e48110e55",
-      "collection": "multiPracticeApplications",
-      "sourceId": "mp-4cb42cf8-a3a5-48ed-9033-b09e48110e55",
-      "residentId": "",
-      "targetRole": "institution",
-      "targetDoctorId": "",
-      "targetOrgCode": "MR1",
-      "targetOrgName": "大连市中心医院",
-      "channel": "in_app",
-      "title": "多点执业申请待医院端处理",
-      "body": "刘医生 申请到 大连市中心医院 开展多点执业，请医院端完成材料核验、第一执业地点确认和备案意见。",
-      "status": "sent",
-      "receipts": [],
-      "createdAt": "2026-06-29T08:40:11.622Z",
-      "createdBy": "doctor",
-      "createdByName": "刘医生",
-      "personIndex": ""
-    },
-    {
-      "id": "msg-a56d3a58-ba3c-4028-918b-08fac805878b",
-      "taskId": "multiPracticeApplications:mp-387e5ad0-f705-4c06-8c01-d28fed1b738d",
-      "collection": "multiPracticeApplications",
-      "sourceId": "mp-387e5ad0-f705-4c06-8c01-d28fed1b738d",
-      "residentId": "",
-      "targetRole": "institution",
-      "targetDoctorId": "doc-liu",
-      "targetOrgCode": "MR3",
-      "targetOrgName": "青泥洼桥社区卫生服务中心",
-      "channel": "in_app",
-      "title": "多点执业医院端已处理",
-      "body": "上线验收通知已送达",
-      "status": "sent",
-      "receipts": [],
-      "createdAt": "2026-06-29T08:35:11.686Z",
-      "createdBy": "hospital",
-      "createdByName": "医疗机构管理员",
-      "personIndex": ""
-    },
-    {
-      "id": "msg-af552725-01b3-456f-bce3-0b5d00aa074e",
-      "taskId": "multiPracticeApplications:mp-387e5ad0-f705-4c06-8c01-d28fed1b738d",
-      "collection": "multiPracticeApplications",
-      "sourceId": "mp-387e5ad0-f705-4c06-8c01-d28fed1b738d",
-      "residentId": "",
-      "targetRole": "institution",
-      "targetDoctorId": "",
-      "targetOrgCode": "MR1",
-      "targetOrgName": "大连市中心医院",
-      "channel": "in_app",
-      "title": "多点执业申请待医院端处理",
-      "body": "上线验收通知已送达",
-      "status": "sent",
-      "receipts": [],
-      "createdAt": "2026-06-29T08:35:11.412Z",
-      "createdBy": "doctor",
-      "createdByName": "刘医生",
-      "personIndex": ""
-    }
-  ],
   "dataQualityIssues": [],
   "careOrders": [
     {
@@ -11839,7 +11832,7 @@
     {
       "callbackExternalId": "pharmacy-mp1-20260622",
       "pickupConfirmedAt": "2026-06-22T09:30:00.000Z",
-      "inventoryStatus": "available",
+      "inventoryStatus": "dispensed",
       "adherenceStatus": "pharmacy callback confirmed",
       "integrationStatus": "pharmacy callback accepted",
       "id": "mp1",
@@ -11858,11 +11851,7 @@
       "pharmacyStatus": "待取药",
       "deliveryMode": "社区药房自取",
       "lastUpdated": "2026-06-15",
-      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
-      "callbackExternalId": "pharmacy-mp1-20260622",
-      "pickupConfirmedAt": "2026-06-22T09:30:00.000Z",
-      "inventoryStatus": "dispensed",
-      "adherenceStatus": "pharmacy callback confirmed"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "mp2",
@@ -26942,6 +26931,67 @@
         "consentNo": "AUTH-RTC-R4-20260619",
         "signedAt": "2026-06-19T09:00:00.000+08:00"
       }
+    },
+    {
+      "id": "pr-rtc-002-report",
+      "residentId": "r2",
+      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2",
+      "category": "teleconsultation-report",
+      "date": "2026-06-21",
+      "recordDate": "2026-06-21",
+      "name": "Endocrinology teleconsultation report",
+      "result": "Recheck HbA1c in three months; primary institution continues diet and exercise intervention and monitors hypoglycemia risk.",
+      "source": "Dalian Medical University Hospital",
+      "teleconsultationId": "rtc-002",
+      "referralId": "rf2",
+      "externalReportId": "EMR-RTC-002",
+      "idempotencyKey": "rtc-002-report-seed",
+      "reportReturnedAt": "2026-06-21T10:30:00.000Z",
+      "createdBy": "system",
+      "createdAt": "2026-06-21T10:30:00.000Z",
+      "meta": {
+        "sourceInstitution": "Xinghaiwan Community Health Service Center",
+        "targetInstitution": "Dalian Medical University Hospital",
+        "reportStatus": "returned"
+      }
+    },
+    {
+      "id": "auth-r4-referral-demo",
+      "residentId": "r4",
+      "category": "authorizations",
+      "type": "authorization",
+      "name": "Referral teleconsultation resident authorization",
+      "status": "active",
+      "recordDate": "2026-06-23",
+      "source": "citizen consent demo",
+      "result": "authorized referral and teleconsultation sharing",
+      "meta": {
+        "status": "active",
+        "scope": "referral-teleconsultation",
+        "authorizedTo": [
+          "MR1",
+          "MR3"
+        ]
+      }
+    },
+    {
+      "id": "auth-r1-referral-demo",
+      "residentId": "r1",
+      "category": "authorizations",
+      "type": "authorization",
+      "name": "Referral teleconsultation resident authorization",
+      "status": "active",
+      "recordDate": "2026-06-23",
+      "source": "citizen consent demo",
+      "result": "authorized referral and teleconsultation sharing",
+      "meta": {
+        "status": "active",
+        "scope": "referral-teleconsultation",
+        "authorizedTo": [
+          "MR1",
+          "MR3"
+        ]
+      }
     }
   ],
   "physicalExamAbnormalCases": [
@@ -28027,312 +28077,6 @@
         "functionalState",
         "formalGoLiveState"
       ]
-    }
-  ],
-  "chronicExternalIntegrations": [
-    {
-      "id": "cei-his-emr",
-      "system": "HIS/EMR",
-      "contractId": "chronic-followup-dispatch-v1",
-      "endpoint": "/api/chronic/followup-dispatch",
-      "signature": "HMAC-SHA256",
-      "idempotencyKey": "externalId",
-      "samplePayload": {
-        "collection": "followups",
-        "id": "f1",
-        "status": "completed"
-      },
-      "receiptStatus": "sample-accepted",
-      "owner": "institution-integration",
-      "scope": "post-discharge follow-up and EMR disposition",
-      "status": "ready",
-      "completionStatus": "completed",
-      "latestReceiptId": "his-emr-receipt-001",
-      "signedPayloadHash": "sample-hmac-his-emr",
-      "jointTestStatus": "passed"
-    },
-    {
-      "id": "cei-lis-pacs",
-      "system": "LIS/PACS",
-      "contractId": "chronic-device-measurement-v1",
-      "endpoint": "/api/chronic/device-measurements",
-      "signature": "HMAC-SHA256",
-      "idempotencyKey": "externalId",
-      "samplePayload": {
-        "residentId": "r1",
-        "measurementType": "HbA1c",
-        "measurementValue": "6.8%"
-      },
-      "receiptStatus": "sample-accepted",
-      "owner": "institution-integration",
-      "scope": "diagnostic and monitoring writeback",
-      "status": "ready",
-      "completionStatus": "completed",
-      "latestReceiptId": "lis-pacs-receipt-001",
-      "signedPayloadHash": "sample-hmac-lis-pacs",
-      "jointTestStatus": "passed"
-    },
-    {
-      "id": "cei-pharmacy",
-      "system": "pharmacy",
-      "contractId": "chronic-pharmacy-callback-v1",
-      "endpoint": "/api/chronic/pharmacy-callbacks",
-      "signature": "HMAC-SHA256",
-      "idempotencyKey": "externalId",
-      "samplePayload": {
-        "medicationPickupId": "mp1",
-        "status": "picked_up"
-      },
-      "receiptStatus": "sample-accepted",
-      "owner": "pharmacy-insurance",
-      "scope": "long prescription pickup callback",
-      "status": "ready",
-      "completionStatus": "completed",
-      "latestReceiptId": "pharmacy-receipt-001",
-      "signedPayloadHash": "sample-hmac-pharmacy",
-      "jointTestStatus": "passed"
-    }
-  ],
-  "chronicIdentityScopes": [
-    {
-      "id": "cis-doctor-org",
-      "claim": "org_code",
-      "source": "government OIDC/SAML",
-      "mappedField": "authUsers.orgCode",
-      "role": "institution",
-      "organizationScope": "institution residents and assigned follow-up tasks",
-      "sampleValue": "MR1",
-      "auditRule": "appendDataAccessLog on resident access",
-      "status": "ready",
-      "completionStatus": "completed",
-      "sampleTokenValidated": true,
-      "scopeReviewStatus": "approved",
-      "reviewer": "identity-integration"
-    },
-    {
-      "id": "cis-resident-person",
-      "claim": "person_index",
-      "source": "resident identity source",
-      "mappedField": "residents.personIndex",
-      "role": "citizen",
-      "organizationScope": "self and authorized family members",
-      "sampleValue": "derived-person-index",
-      "auditRule": "canAccessResident resident authorization",
-      "status": "ready",
-      "completionStatus": "completed",
-      "sampleTokenValidated": true,
-      "scopeReviewStatus": "approved",
-      "reviewer": "identity-integration"
-    },
-    {
-      "id": "cis-insurance-org",
-      "claim": "insurance_org_code",
-      "source": "insurance identity source",
-      "mappedField": "authUsers.orgCode",
-      "role": "insurance",
-      "organizationScope": "insurance claims and medication pickup review",
-      "sampleValue": "ORG-MI-CENTER-DL",
-      "auditRule": "scopeStateForUser insurance collections",
-      "status": "ready",
-      "completionStatus": "completed",
-      "sampleTokenValidated": true,
-      "scopeReviewStatus": "approved",
-      "reviewer": "identity-integration"
-    }
-  ],
-  "chronicMessageChannels": [
-    {
-      "id": "cmc-sms",
-      "channel": "sms",
-      "provider": "message-platform",
-      "receiptField": "providerMessageId/deliveryStatus",
-      "retryPolicy": "retry 3 times within 30 minutes",
-      "escalationAfter": "60 minutes without receipt",
-      "fallback": "family doctor phone call",
-      "templateId": "chronic-reminder-sms-v1",
-      "status": "receipt-ready",
-      "completionStatus": "completed",
-      "latestReceiptStatus": "delivered",
-      "latestReceiptId": "sms-receipt-001",
-      "escalationTested": true
-    },
-    {
-      "id": "cmc-phone",
-      "channel": "phone",
-      "provider": "family-doctor-call-center",
-      "receiptField": "callId/callResult",
-      "retryPolicy": "two manual attempts",
-      "escalationAfter": "same day no answer",
-      "fallback": "institution task escalation",
-      "templateId": "chronic-phone-followup-v1",
-      "status": "receipt-ready",
-      "completionStatus": "completed",
-      "latestReceiptStatus": "answered",
-      "latestReceiptId": "call-receipt-001",
-      "escalationTested": true
-    },
-    {
-      "id": "cmc-in-app",
-      "channel": "in_app",
-      "provider": "citizen portal",
-      "receiptField": "taskMessages.receipts",
-      "retryPolicy": "unread reminder next day",
-      "escalationAfter": "72 hours unread",
-      "fallback": "sms",
-      "templateId": "chronic-inapp-notice-v1",
-      "status": "receipt-ready",
-      "completionStatus": "completed",
-      "latestReceiptStatus": "read",
-      "latestReceiptId": "inapp-receipt-001",
-      "escalationTested": true
-    }
-  ],
-  "chronicModelGovernance": [
-    {
-      "id": "cmg-htn-v1",
-      "modelId": "dm-hypertension-risk-v1",
-      "diseaseType": "hypertension",
-      "version": "1.0.0",
-      "threshold": "systolic>=140 or riskLevel=high",
-      "reviewOwner": "chronic-quality-office",
-      "manualReview": true,
-      "sampleRule": "high risk or uncontrolled readings enter family doctor review",
-      "status": "active",
-      "registryEvidence": "diseaseRegistryModels",
-      "completionStatus": "completed",
-      "lastReviewStatus": "approved",
-      "qualitySampleStatus": "sample-passed",
-      "reviewerComment": "hypertension threshold accepted for pilot"
-    },
-    {
-      "id": "cmg-dm-v1",
-      "modelId": "dm-diabetes-risk-v1",
-      "diseaseType": "diabetes",
-      "version": "1.0.0",
-      "threshold": "glucose>=7.0 or HbA1c>=6.5",
-      "reviewOwner": "endocrinology-quality-team",
-      "manualReview": true,
-      "sampleRule": "abnormal lab result triggers diet and medication adherence review",
-      "status": "active",
-      "registryEvidence": "diseaseRegistryModels",
-      "completionStatus": "completed",
-      "lastReviewStatus": "approved",
-      "qualitySampleStatus": "sample-passed",
-      "reviewerComment": "diabetes threshold accepted for pilot"
-    },
-    {
-      "id": "cmg-quality-sampling",
-      "modelId": "chronic-quality-sampling-v1",
-      "diseaseType": "multi-disease",
-      "version": "1.0.0",
-      "threshold": "overdue follow-up or missing medication callback",
-      "reviewOwner": "leading-hospital-quality-team",
-      "manualReview": true,
-      "sampleRule": "monthly 5 percent sampling with expert comments",
-      "status": "active",
-      "registryEvidence": "chronicQualityMetrics",
-      "completionStatus": "completed",
-      "lastReviewStatus": "approved",
-      "qualitySampleStatus": "sample-passed",
-      "reviewerComment": "monthly sampling rule accepted"
-    }
-  ],
-  "chronicPharmacyInsuranceLinks": [
-    {
-      "id": "cpil-r1-htn",
-      "medicationPickupId": "mp1",
-      "insuranceClaimId": "ic1",
-      "residentId": "r1",
-      "longPrescription": "8 weeks",
-      "catalogVersion": "2026-demo-drug-catalog",
-      "settlementStatus": "pre-review-passed",
-      "callbackStatus": "pharmacy callback confirmed",
-      "pharmacyStock": "available",
-      "reimbursementPolicy": "chronic outpatient medication support",
-      "status": "ready",
-      "completionStatus": "completed",
-      "settlementReceiptStatus": "accepted",
-      "inventoryReceiptStatus": "available",
-      "closureStatus": "closed"
-    },
-    {
-      "id": "cpil-r2-dm",
-      "medicationPickupId": "mp2",
-      "insuranceClaimId": "ic2",
-      "residentId": "r2",
-      "longPrescription": "4 weeks renewable",
-      "catalogVersion": "2026-demo-drug-catalog",
-      "settlementStatus": "needs chronic special disease confirmation",
-      "callbackStatus": "pending callback",
-      "pharmacyStock": "low-stock warning",
-      "reimbursementPolicy": "diabetes outpatient chronic policy",
-      "status": "ready",
-      "completionStatus": "completed",
-      "settlementReceiptStatus": "accepted",
-      "inventoryReceiptStatus": "reserved",
-      "closureStatus": "closed"
-    }
-  ],
-  "chronicLaunchCoreSignoffs": [
-    {
-      "id": "clcs-institution-systems",
-      "itemId": "institution-systems",
-      "owner": "institution-integration",
-      "artifact": "HIS/EMR/LIS/PACS/pharmacy joint-test receipt pack",
-      "signoffStatus": "signed",
-      "signedBy": "institution-integration-lead",
-      "evidence": "chronicExternalIntegrations.latestReceiptId",
-      "nextAction": "replace sample payloads with each pilot institution signed record"
-    },
-    {
-      "id": "clcs-identity-scope",
-      "itemId": "identity-scope",
-      "owner": "identity-integration",
-      "artifact": "government identity source and organization-scope mapping",
-      "signoffStatus": "signed",
-      "signedBy": "identity-integration-lead",
-      "evidence": "chronicIdentityScopes.scopeReviewStatus",
-      "nextAction": "archive real OIDC/SAML metadata and role directory export"
-    },
-    {
-      "id": "clcs-message-channels",
-      "itemId": "message-channels",
-      "owner": "message-platform",
-      "artifact": "SMS phone and in-app receipt escalation rehearsal",
-      "signoffStatus": "signed",
-      "signedBy": "message-platform-lead",
-      "evidence": "chronicMessageChannels.latestReceiptStatus",
-      "nextAction": "bind production provider callback URLs"
-    },
-    {
-      "id": "clcs-quality-model",
-      "itemId": "quality-model",
-      "owner": "chronic-quality-office",
-      "artifact": "hypertension diabetes and sampling model review",
-      "signoffStatus": "signed",
-      "signedBy": "chronic-quality-lead",
-      "evidence": "chronicModelGovernance.lastReviewStatus",
-      "nextAction": "attach clinical expert approval record"
-    },
-    {
-      "id": "clcs-pharmacy-insurance",
-      "itemId": "pharmacy-insurance",
-      "owner": "pharmacy-insurance",
-      "artifact": "long prescription stock callback and insurance review closure",
-      "signoffStatus": "signed",
-      "signedBy": "pharmacy-insurance-lead",
-      "evidence": "chronicPharmacyInsuranceLinks.closureStatus",
-      "nextAction": "replace demo catalog version with production drug catalog"
-    },
-    {
-      "id": "clcs-site-pack",
-      "itemId": "site-readiness-pack",
-      "owner": "project-office",
-      "artifact": "production-signoff template extension for chronic launch core",
-      "signoffStatus": "signed",
-      "signedBy": "project-office",
-      "evidence": "siteReadinessPack.templates.signoff",
-      "nextAction": "collect wet signatures during site cutover"
     }
   ],
   "qualitySafetySiteSignoffs": [

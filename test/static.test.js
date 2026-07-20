@@ -12,20 +12,20 @@ function read(file) {
 
 test("role pages keep explicit page guards", () => {
   const guards = {
-    "citizen.html": "citizen",
-    "mobile-preview.html": "citizen",
-    "doctor.html": "institution",
-    "institution.html": "institution",
-    "insurance.html": "insurance",
-    "county.html": "county",
-    "index.html": "commission",
-    "health-dashboard.html": "commission",
-    "public-health.html": "commission",
-    "platform.html": "commission",
-    "digital-hospital-standards.html": "commission",
-    "workbench.html": "commission",
-    "operations-about.html": "commission",
-    "quality-safety.html": "commission"
+    "citizen.html": ["citizen"],
+    "mobile-preview.html": ["citizen"],
+    "doctor.html": ["institution"],
+    "institution.html": ["institution"],
+    "insurance.html": ["insurance"],
+    "county.html": ["county"],
+    "index.html": ["commission"],
+    "health-dashboard.html": ["commission"],
+    "public-health.html": ["commission"],
+    "platform.html": ["commission"],
+    "digital-hospital-standards.html": ["commission"],
+    "workbench.html": ["commission"],
+    "operations-about.html": ["commission"],
+    "quality-safety.html": ["commission"]
   };
   Object.entries(guards).forEach(([file, roles]) => {
     roles.forEach((role) => {

@@ -33,7 +33,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     releaseReport,
     productionCutover,
     releaseArtifactManifest,
-    unifiedTaskReport
+    unifiedTaskReport,
+    drugConsumableSupervision
   ] = await Promise.all([
     loadPlatformState(fallbackState),
     loadOperationalMetrics(),
@@ -47,7 +48,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     loadReleaseReport(),
     loadProductionCutoverChecklist(),
     loadReleaseArtifactManifest(),
-    loadUnifiedTaskReport()
+    loadUnifiedTaskReport(),
+    loadDrugConsumableSupervision()
   ]);
   const tasks = unifiedTaskReport?.tasks?.length ? normalizeApiTasks(unifiedTaskReport.tasks) : collectUnifiedTasks(state);
   const roadmap = state.platformRoadmap?.length ? state.platformRoadmap : defaultRoadmap();

@@ -38,6 +38,11 @@ const BloodGoLiveService = require("./blood-go-live-service");
 const DiseasePaymentService = require("./disease-payment-service");
 const DiseasePaymentIntake = require("./disease-payment-intake");
 const PhysicalExaminationService = require("./physical-examination-service");
+const { buildQualitySafetyInterfaceStandard } = require("./scripts/quality-safety-interface-standard");
+const {
+  buildQualitySafetyInterfaceJointTestPack,
+  validateQualitySafetyInterfaceMessage
+} = require("./scripts/quality-safety-interface-joint-test");
 const PHYSICAL_EXAM_CONTRACT_ID = "physical-exam-report-v1";
 const EmergencyService = require("./emergency-service");
 const EmergencyLifeChain = require("./emergency-lifechain");
@@ -1110,6 +1115,7 @@ function seedState() {
     countyProjectBlueprint: seedCountyProjectBlueprint(),
     countyConsortium: seedCountyConsortium(),
     referralSystem: seedReferralSystem(),
+    referralTeleconsultationSignoffs: [],
     platformCapabilities: seedPlatformCapabilities(),
     platformIntegrations: seedPlatformIntegrations(),
     platformInterfaces: seedPlatformInterfaces(),
@@ -10038,7 +10044,8 @@ function normalizeState(data) {
     regionalSharingPackages: normalizeRegionalSharingPackages(mergeByKey(seedRegionalSharingPackages(), data.regionalSharingPackages, "id")),
     regionalSharingSnapshots: data.regionalSharingSnapshots && typeof data.regionalSharingSnapshots === "object" ? { ...seedRegionalSharingSnapshots(), ...data.regionalSharingSnapshots } : seedRegionalSharingSnapshots(),
     regionalSharingAccessReviews: Array.isArray(data.regionalSharingAccessReviews) ? data.regionalSharingAccessReviews : seedRegionalSharingAccessReviews(),
-    referralTeleconsultations: mergeByKey(seedReferralTeleconsultations(), data.referralTeleconsultations, "id"),
+    referralTeleconsultations: mergeByKeyWithDefaultFields(seedReferralTeleconsultations(), data.referralTeleconsultations, "id"),
+    referralTeleconsultationSignoffs: Array.isArray(data.referralTeleconsultationSignoffs) ? data.referralTeleconsultationSignoffs.slice(0, 50) : [],
     escortServicePolicy: data.escortServicePolicy && typeof data.escortServicePolicy === "object" ? { ...seedEscortServicePolicy(), ...data.escortServicePolicy } : seedEscortServicePolicy(),
     escortServiceProviders: mergeByKey(seedEscortServiceProviders(), data.escortServiceProviders, "id"),
     escortWorkers: mergeByKey(seedEscortWorkers(), data.escortWorkers, "id"),
@@ -11828,6 +11835,14 @@ function prependAuditTrailEntry(rows, entry, limit = 120) {
   return sealAuditTrail(next);
 }
 
+function prependAuditEventPreservingTrail(entry, rows, limit = 120) {
+  const current = (Array.isArray(rows) ? rows : []).slice(0, Math.max(0, limit - 1));
+  const previousAuditHash = current[0]?.auditHash || "";
+  const nextEntry = { ...entry, previousAuditHash };
+  nextEntry.auditHash = auditHashFor(nextEntry);
+  return [nextEntry, ...current];
+}
+
 function resealAuditTrail(rows) {
   return sealAuditTrail((Array.isArray(rows) ? rows : []).map(({ auditHash, previousAuditHash, ...item }) => item));
 }
@@ -12846,6 +12861,11 @@ function personIndexForResident(residentMap, residentId) {
 
 function serveStatic(req, res) {
   const rawPath = decodeURIComponent(new URL(req.url, `http://${req.headers.host}`).pathname);
+  if (rawPath === "/favicon.ico") {
+    res.writeHead(204, securityResponseHeaders());
+    res.end();
+    return;
+  }
   const requested = rawPath === "/" ? "/index.html" : rawPath;
   const filePath = path.normalize(path.join(ROOT, requested));
   const relativePath = path.relative(ROOT, filePath);
@@ -13804,14 +13824,22 @@ function organizationAliasesForUser(data, user) {
   const candidates = Object.values(data || {}).flatMap((value) => Array.isArray(value) ? value : []);
   candidates.forEach((item) => {
     if (!item || typeof item !== "object") return;
-    const codeMatches = ORGANIZATION_CODE_FIELDS.some((field) => String(item[field] || "").trim() === user.orgCode);
-    if (!codeMatches) return;
-    ORGANIZATION_NAME_FIELDS.forEach((field) => {
-      const alias = normalizedScopeValue(item[field]);
-      if (alias) aliases.add(alias);
+    const scopedPairs = [
+      ["orgCode", ["organization", "organizationName"]],
+      ["createdByOrgCode", ["organization", "organizationName"]],
+      ["institutionCode", ["institution", "institutionName"]],
+      ["institutionId", ["institution", "institutionName"]],
+      ["hospitalCode", ["hospital"]],
+      ["sourceInstitutionCode", ["sourceInstitution", "fromInstitution"]],
+      ["targetInstitutionCode", ["targetInstitution", "toInstitution"]]
+    ];
+    scopedPairs.forEach(([codeField, nameFields]) => {
+      if (String(item[codeField] || "").trim() !== user.orgCode) return;
+      nameFields.forEach((field) => {
+        const alias = normalizedScopeValue(item[field]);
+        if (alias) aliases.add(alias);
+      });
     });
-    const name = normalizedScopeValue(item.name);
-    if (name) aliases.add(name);
   });
   const nextCache = dataCache || new Map();
   nextCache.set(cacheKey, aliases);
@@ -15997,7 +16025,7 @@ function scopeStateForUser(data, user) {
     const preferenceKey = user.residentId || user.accountId || user.username;
     scoped.mobileExperienceSettings = { ...scoped.mobileExperienceSettings, userPreferences: { [preferenceKey]: preferences[preferenceKey] || {} } };
   }
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "referralTeleconsultations", "escortServiceOrders", "registrationOrders", "registrationWaitlistEntries", "internetNursingOrders", "serviceOrders", "taskMessages"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "drugConsumableSupervisions", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "referralTeleconsultations", "escortServiceOrders", "registrationOrders", "registrationWaitlistEntries", "internetNursingOrders", "serviceOrders", "taskMessages"].forEach((key) => {
     scoped[key] = (data[key] || []).filter(hasAllowedResident);
   });
   ["phase2FamilyDoctorApplications", "phase2FamilyDoctorContracts", "phase2FamilyDoctorFulfillments"].forEach((key) => {
@@ -16034,7 +16062,8 @@ function allowedResidentIdsForUser(data, user) {
   }
   if (user.role === "institution") {
     addReferences(data.residents, (item) => rowMatchesOrganizationScope(data, user, item));
-    Object.values(data).forEach((value) => {
+    Object.entries(data).forEach(([collection, value]) => {
+      if (["phase2FamilyDoctorApplications", "phase2FamilyDoctorContracts", "phase2FamilyDoctorFulfillments"].includes(collection)) return;
       if (Array.isArray(value)) addReferences(value, (item) => rowMatchesOrganizationScope(data, user, item));
     });
     Object.values(data.referralSystem || {}).forEach((value) => {
@@ -16050,6 +16079,7 @@ function applyResidentScope(scoped, data, user) {
   scoped.residents = (data.residents || []).filter((item) => allowed.has(item.id));
   Object.entries(scoped).forEach(([collection, value]) => {
     if (!Array.isArray(value) || collection === "residents") return;
+    if (["phase2FamilyDoctorApplications", "phase2FamilyDoctorContracts", "phase2FamilyDoctorFulfillments"].includes(collection)) return;
     if (!value.some((item) => residentReferences(item).length)) return;
     if (user.role === "insurance" && !INSURANCE_RESIDENT_COLLECTIONS.has(collection)) {
       scoped[collection] = [];
@@ -16794,6 +16824,10 @@ function buildChronicReferralContinuity(data, user, residentId = "") {
   };
 }
 
+function buildChronicFollowupAlertQueue(data, readiness = buildChronicFollowupReadinessReport({ data })) {
+  return enrichChronicAlertQueue(data, readiness.alertQueue || []);
+}
+
 function buildChronicFollowupSummary(data, user, residentId = "") {
   const scoped = scopeStateForUser(data, user);
   const targetResidents = (scoped.residents || []).filter((resident) => !residentId || resident.id === residentId);
@@ -16801,12 +16835,13 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
   const readiness = buildChronicFollowupReadinessReport({ data: scoped });
   const archiveStandardization = buildChronicArchiveStandardization(data, user, residentId);
   const referralContinuity = buildChronicReferralContinuity(data, user, residentId);
-  const alertQueue = enrichChronicAlertQueue(scoped, readiness.alertQueue || []);
+  const targetResidentIds = new Set(targetResidents.map((resident) => resident.id));
+  const alertQueue = buildChronicFollowupAlertQueue(scoped, readiness)
+    .filter((item) => item.residentId && targetResidentIds.has(item.residentId));
   const escalationMessages = (scoped.taskMessages || []).filter((message) => message.chronicFollowup && message.meta?.escalation && isOpenChronicFollowupMessage(message));
   const feedbackRecords = (scoped.personalRecords || []).filter((item) => item.category === "chronic-feedback");
   const residentExperienceRecords = (scoped.personalRecords || []).filter((item) => item.category === "chronic-self-checkin" || item.meta?.residentExperience);
   const followupMessages = (scoped.taskMessages || []).filter((item) => item.chronicFollowup);
-  const alertQueue = buildChronicFollowupAlertQueue(scoped, targetResidents, policy);
   const residents = targetResidents.map((resident) => {
     const screenings = (scoped.chronicScreeningTasks || []).filter((item) => item.residentId === resident.id);
     const plans = (scoped.chronicManagementPlans || []).filter((item) => item.residentId === resident.id);
@@ -16878,9 +16913,13 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
       openFollowups: residents.reduce((sum, item) => sum + item.returnVisitReminders.length, 0),
       medicationPending: residents.reduce((sum, item) => sum + item.medicationAdherence.pending, 0),
       feedbackRecords: residents.reduce((sum, item) => sum + item.residentFeedback.count, 0),
-      alerts: readiness.summary?.alerts || 0,
-      overdueAlerts: readiness.summary?.overdueAlerts || 0,
-      highPriorityAlerts: readiness.summary?.highPriorityAlerts || 0,
+      residentExperienceRecords: residentExperienceRecords.filter((item) => targetResidentIds.has(item.residentId)).length,
+      healthPoints: residentExperienceRecords
+        .filter((item) => targetResidentIds.has(item.residentId))
+        .reduce((sum, item) => sum + Number(item.meta?.healthPoints || 0), 0),
+      alerts: alertQueue.length,
+      overdueAlerts: alertQueue.filter((item) => item.dueBucket === "overdue").length,
+      highPriorityAlerts: alertQueue.filter((item) => ["critical", "high"].includes(item.priority)).length,
       escalationAlerts: alertQueue.filter((item) => item.dueBucket === "overdue" || ["critical", "high"].includes(item.priority)).length,
       openEscalations: escalationMessages.length,
       referralContinuityReady: referralContinuity.summary.ready,
@@ -19426,6 +19465,7 @@ const SERVICE_DOMAIN_BY_COLLECTION = {
   referralTeleconsultations: "referralTeleconsultation",
   escortServiceOrders: "escortService",
   internetNursingOrders: "internetNursing",
+  drugConsumableSupervisions: "drugConsumable",
   citizenLifecycleActions: "citizenLifecycle"
 };
 
@@ -19960,6 +20000,48 @@ function buildReferralTeleconsultationPersonalRecord(data, item, callback, user)
   };
 }
 
+function createReferralTeleconsultationNotification({ item, callback, kind, targetRole, user }) {
+  const now = new Date().toISOString();
+  const idempotencyKey = callback.idempotencyKey || callback.externalId || item.id;
+  const titles = {
+    feedback: "Teleconsultation feedback returned",
+    schedule: "Teleconsultation scheduled",
+    report: "Teleconsultation report returned"
+  };
+  const bodies = {
+    feedback: `Receiving feedback: ${callback.receivingFeedback || item.receivingFeedback || "request accepted."}`,
+    schedule: `Teleconsultation scheduled for ${callback.meetingWindow || item.meetingWindow || "the confirmed appointment window"}.`,
+    report: `Report returned: ${callback.reportSummary || item.reportSummary || "specialist report is ready."}`
+  };
+  return {
+    id: `msg-${randomUUID()}`,
+    taskId: `referralTeleconsultations:${item.id}`,
+    collection: "referralTeleconsultations",
+    sourceId: item.id,
+    residentId: item.residentId || "",
+    targetRole,
+    channel: "in_app",
+    title: titles[kind] || "Teleconsultation update",
+    body: bodies[kind] || "Teleconsultation status updated.",
+    status: "sent",
+    notificationKey: `referralTeleconsultations:${item.id}:${kind}:${idempotencyKey}:${targetRole}`,
+    receipts: [],
+    createdAt: now,
+    createdBy: user.username || user.role,
+    createdByName: user.name
+  };
+}
+
+function appendReferralTeleconsultationNotifications(data, item, kind, callback, user) {
+  const existing = Array.isArray(data.taskMessages) ? data.taskMessages : [];
+  const existingKeys = new Set(existing.map((message) => message.notificationKey).filter(Boolean));
+  const messages = ["institution", "citizen"]
+    .map((targetRole) => createReferralTeleconsultationNotification({ item, callback, kind, targetRole, user }))
+    .filter((message) => !existingKeys.has(message.notificationKey));
+  data.taskMessages = [...messages, ...existing].slice(0, 300);
+  return messages;
+}
+
 function parseReferralDate(value) {
   if (!value) return null;
   const date = new Date(value);
@@ -20461,6 +20543,8 @@ function completeReferralTeleconsultationJointTestTask(data, user, role, payload
     }
   };
 }
+
+const REFERRAL_SIGNOFF_ROLES = new Set(["referral-center", "receiving-hospital", "hospital-it", "county-performance", "insurance"]);
 
 function buildReferralTeleconsultationSignoffSummary(data, options = {}) {
   const teleconsultations = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
@@ -27276,6 +27360,135 @@ async function handleApi(req, res) {
     return;
   }
 
+  const referralCallbackMatch = url.pathname.match(/^\/api\/referral-teleconsultations\/([^/]+)\/(feedback|schedule|report)-callback$/);
+  if (req.method === "POST" && referralCallbackMatch) {
+    const callbackType = referralCallbackMatch[2];
+    const route = `/api/referral-teleconsultations/:id/${callbackType}-callback`;
+    const user = requireApiRole(req, res, ["institution", "county", "commission"], route);
+    if (!user) return;
+    const payload = await collectJson(req);
+    const teleconsultationId = decodeURIComponent(referralCallbackMatch[1]);
+    if (!verifyIntegrationSignature(payload, req.headers["x-integration-signature"])) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: `referral teleconsultation ${callbackType} callback`, target: teleconsultationId, result: "denied", detail: "signature mismatch" });
+      sendJson(res, 401, { error: "Unauthorized", message: "integration signature verification failed" });
+      return;
+    }
+    const data = readDatabase();
+    const rows = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
+    const index = rows.findIndex((item) => item.id === teleconsultationId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "referral teleconsultation not found" });
+      return;
+    }
+    if (!canAccessReferralTeleconsultation(user, rows[index], data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: `referral teleconsultation ${callbackType} callback`, target: teleconsultationId, result: "denied", detail: "scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
+      return;
+    }
+    try {
+      const normalizers = {
+        feedback: normalizeReferralTeleconsultationFeedbackCallback,
+        schedule: normalizeReferralTeleconsultationScheduleCallback,
+        report: normalizeReferralTeleconsultationCallback
+      };
+      const callback = normalizers[callbackType](payload, rows[index]);
+      assertReferralCallbackResident(callback, rows[index]);
+      const duplicate = (Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])
+        .find((item) => item.contractId === callback.contractId && item.idempotencyKey === callback.idempotencyKey);
+      if (duplicate) {
+        sendJson(res, 200, { teleconsultation: rows[index], integrationEvent: { ...duplicate, idempotentReplay: true } });
+        return;
+      }
+
+      if (callbackType === "feedback") {
+        rows[index] = applyReferralTeleconsultationAction(rows[index], {
+          status: callback.feedbackStatus,
+          feedback: callback.receivingFeedback,
+          note: `${callback.sourceSystem} feedback callback`
+        }, user);
+        rows[index].feedbackAt = callback.feedbackAt;
+      } else if (callbackType === "schedule") {
+        const now = new Date().toISOString();
+        rows[index] = {
+          ...rows[index],
+          status: rows[index].reportStatus === "returned" ? rows[index].status : normalizeReferralTeleconsultationStatus(callback.scheduleStatus),
+          meetingWindow: callback.meetingWindow,
+          targetInstitution: callback.targetInstitution,
+          targetInstitutionCode: callback.targetInstitutionCode,
+          department: callback.department,
+          receivingDoctor: callback.receivingDoctor,
+          lastUpdated: now,
+          updatedBy: user.username || user.role,
+          updatedByName: user.name,
+          auditTrail: [
+            { at: now, actor: user.username || user.role, action: "schedule-callback", note: `${callback.sourceSystem} schedule callback` },
+            ...(Array.isArray(rows[index].auditTrail) ? rows[index].auditTrail : [])
+          ].slice(0, 40)
+        };
+      } else {
+        rows[index] = applyReferralTeleconsultationAction(rows[index], {
+          status: "report-returned",
+          feedback: callback.receivingFeedback,
+          reportSummary: callback.reportSummary,
+          note: `${callback.sourceSystem} report callback`
+        }, user);
+        rows[index].reportReturnedAt = callback.reportReturnedAt;
+      }
+      if (callback.performance && typeof callback.performance === "object") {
+        rows[index].performance = { ...(rows[index].performance || {}), ...callback.performance };
+      }
+      data.referralTeleconsultations = rows;
+      const event = {
+        id: `igw-${randomUUID()}`,
+        idempotencyKey: callback.idempotencyKey,
+        externalId: callback.externalId,
+        contractId: callback.contractId,
+        domain: "referral-teleconsultation",
+        resource: `${callbackType}-callback`,
+        residentId: callback.residentId,
+        status: "matched",
+        receivedAt: new Date().toISOString(),
+        receivedBy: user.username || user.role,
+        payload: callback.payload,
+        retryCount: 0,
+        deadLetter: false,
+        reconciliationStatus: "matched",
+        targetCollection: "referralTeleconsultations",
+        targetId: rows[index].id
+      };
+      data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
+      let personalRecord = null;
+      if (callbackType === "report") {
+        personalRecord = (Array.isArray(data.personalRecords) ? data.personalRecords : [])
+          .find((record) => record.category === "teleconsultation-report" && record.teleconsultationId === rows[index].id && record.idempotencyKey === callback.idempotencyKey) || null;
+        if (!personalRecord) {
+          personalRecord = buildReferralTeleconsultationPersonalRecord(data, rows[index], callback, user);
+          data.personalRecords = [personalRecord, ...(Array.isArray(data.personalRecords) ? data.personalRecords : [])].slice(0, 500);
+        }
+      }
+      const messages = appendReferralTeleconsultationNotifications(data, rows[index], callbackType, callback, user);
+      data.securityEvents = resealAuditTrail([
+        {
+          id: randomUUID(),
+          at: new Date().toLocaleString("zh-CN", { hour12: false }),
+          actor: user.name,
+          role: user.role,
+          action: `referral teleconsultation ${callbackType} callback`,
+          target: rows[index].id,
+          result: "allowed",
+          detail: `${callback.sourceSystem} / ${callback.idempotencyKey}`
+        },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120));
+      appendDataAccessLog(data, user, rows[index].residentId, "referral teleconsultation", `external ${callbackType} callback`, "allowed");
+      writeDatabase(data);
+      sendJson(res, 200, { teleconsultation: rows[index], integrationEvent: event, personalRecord, messages });
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+    }
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/escort-services/dashboard") {
     const user = requireApiRole(req, res, ["commission", "institution", "county", "citizen"], "/api/escort-services/dashboard");
     if (!user) return;
@@ -29319,6 +29532,9 @@ async function handleApi(req, res) {
     if (user.role === "citizen") {
       data.taskMessages = [buildCitizenTaskActionMessage(rows[index], collection, payload, user), ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])].slice(0, 300);
     }
+    if (collection === "drugConsumableSupervisions") {
+      appendDrugConsumableAuditTrail(rows[index], user, "unified-task-action", payload.comment || payload.action);
+    }
     data.securityEvents = [
       {
         id: randomUUID(),
@@ -29331,7 +29547,7 @@ async function handleApi(req, res) {
         detail: rows[index].status
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120));
+    ].slice(0, 120);
     writeDatabase(data);
     sendJson(res, 200, rows[index]);
     return;
@@ -32111,7 +32327,7 @@ async function handleApi(req, res) {
         detail: `${event.contractId} · ${event.idempotencyKey} · retry=${event.retryCount}${event.direction === "outbound" ? ` · ${event.lastRetryResult}` : ""}`
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120));
+    ].slice(0, 120);
     writeDatabase(data);
     sendJson(res, 200, event);
     return;
@@ -32490,7 +32706,7 @@ async function handleApi(req, res) {
         detail: `${study.uploadMode} / ${study.integrityCheck} / ${study.emrSyncStatus}`
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120));
+    ].slice(0, 120);
     writeDatabase(data);
     sendJson(res, existingStudyIndex >= 0 ? 200 : 201, { study, ...derived });
     return;
@@ -32852,7 +33068,7 @@ async function handleApi(req, res) {
         detail: `${reviewed.reviewStatus} · ${reviewed.reviewReasonCode} · ${citation?.evidenceHash || "no-citation"}`
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120));
+    ].slice(0, 120);
     writeDatabase(data);
     sendJson(res, 200, { record: reviewed, citation, overview: buildPhase2MutualRecognitionOverview(data) });
     return;
@@ -33004,7 +33220,7 @@ async function handleApi(req, res) {
         detail: `${application.doctorName} · ${application.primaryInstitution} -> ${application.targetInstitution} · ${application.status}`
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120));
+    ].slice(0, 120);
     writeDatabase(data);
     sendJson(res, 201, application);
     return;
@@ -33343,8 +33559,6 @@ async function handleApi(req, res) {
       auditTrailRowsMatchById(incomingSecurityEvents, currentData.securityEvents);
     const incomingAccessTrailOk = incomingAccessLogs.length === 0 || verifyAuditTrail(incomingAccessLogs).passed;
     const data = normalizeState(payload);
-    if (payloadSecurityEventsValid || securityEventsRepairable) data.securityEvents = resealAuditTrail(data.securityEvents);
-    if (payloadDataAccessLogsValid || dataAccessLogsRepairable) data.dataAccessLogs = resealAuditTrail(data.dataAccessLogs);
     data.storageMeta = payload.storageMeta;
     data.dataAccessLogs = incomingAccessTrailOk ? resealAuditTrail(data.dataAccessLogs) : sealAuditTrail(data.dataAccessLogs);
     const saveEvent = {
@@ -33362,6 +33576,7 @@ async function handleApi(req, res) {
       ? resealAuditTrail(nextSecurityEvents)
       : prependAuditEventPreservingTrail(saveEvent, data.securityEvents);
     writeDatabase(data);
+    const normalized = readDatabase();
     sendJson(res, 200, normalized);
     return;
   }

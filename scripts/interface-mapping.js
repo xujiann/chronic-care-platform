@@ -114,6 +114,42 @@ const FIELD_MAPPINGS = {
       summary: "summary",
       "sourceType+institutionId+externalId": "source.idempotencyKey"
     }
+  },
+  "referral-feedback-callback-v1": {
+    targetCollection: "referralTeleconsultations",
+    owner: "county-referral-integration",
+    fields: {
+      externalId: "feedbackCallback.externalId",
+      teleconsultationId: "id",
+      residentId: "residentId",
+      receivingFeedback: "receivingFeedback",
+      feedbackAt: "feedbackReturnedAt",
+      sourceSystem: "feedbackCallback.sourceSystem"
+    }
+  },
+  "referral-schedule-callback-v1": {
+    targetCollection: "referralTeleconsultations",
+    owner: "county-referral-integration",
+    fields: {
+      externalId: "scheduleCallback.externalId",
+      teleconsultationId: "id",
+      residentId: "residentId",
+      meetingWindow: "meetingWindow",
+      targetInstitution: "targetInstitution",
+      department: "department"
+    }
+  },
+  "referral-report-callback-v1": {
+    targetCollection: "referralTeleconsultations",
+    owner: "county-referral-integration",
+    fields: {
+      externalId: "reportCallback.externalId",
+      teleconsultationId: "id",
+      residentId: "residentId",
+      reportSummary: "reportSummary",
+      reportReturnedAt: "reportReturnedAt",
+      sourceSystem: "reportCallback.sourceSystem"
+    }
   }
 };
 

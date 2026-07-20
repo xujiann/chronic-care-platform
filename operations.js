@@ -222,12 +222,46 @@ function buildStaticOperationsDashboard(state) {
   const snapshots = (Array.isArray(state.hospitalOperationSnapshots) ? state.hospitalOperationSnapshots : []).map((snapshot) => enrichSnapshot(snapshot, alertRules));
   const dispatchRequests = Array.isArray(state.resourceDispatchRequests) ? state.resourceDispatchRequests : [];
   const reconciliationReviews = Array.isArray(state.statisticsReconciliationReviews) ? state.statisticsReconciliationReviews : [];
-  const alertRules = Array.isArray(state.operationAlertRules) ? state.operationAlertRules : [];
-  const serviceLevels = Array.isArray(state.productionServiceLevels) ? state.productionServiceLevels : [];
-  const dutyShifts = Array.isArray(state.operationsDutyShifts) ? state.operationsDutyShifts : [];
-  const incidents = Array.isArray(state.operationsIncidents) ? state.operationsIncidents : [];
-  const drills = Array.isArray(state.disasterRecoveryDrills) ? state.disasterRecoveryDrills : [];
-  const evidencePackets = Array.isArray(state.operationsEvidencePackets) ? state.operationsEvidencePackets : [];
+  const medicalResources = Array.isArray(state.medicalResources) ? state.medicalResources : [];
+  const openStatuses = new Set(["pending", "assigned", "in-progress"]);
+  const occupiedBeds = snapshots.reduce((sum, item) => sum + Number(item.beds?.occupied || 0), 0);
+  const totalOpenBeds = snapshots.reduce((sum, item) => sum + Number(item.beds?.open || 0), 0);
+  const commandChains = buildStaticCommandChains(snapshots, dispatchRequests, reconciliationReviews);
+  const interfaceMapping = buildStaticInterfaceMapping();
+  const playbooks = buildStaticOperationsPlaybooks(snapshots, alertRules, commandChains, interfaceMapping);
+  const handover = buildStaticOperationsHandover(snapshots, dispatchRequests, reconciliationReviews, commandChains, playbooks, state.operationHandoverSignoffs || []);
+  const siteJointTests = buildStaticSiteJointTests(interfaceMapping);
+  const siteJointPatrol = buildStaticSiteJointPatrol(siteJointTests, dispatchRequests, reconciliationReviews);
+  const productionHardening = buildStaticProductionHardening(state);
+  const intelligence = buildStaticOperationsIntelligence(snapshots, dispatchRequests, reconciliationReviews);
+  const performanceMonitoring = buildStaticPerformanceMonitoringEvidence(state, snapshots);
+  const resourcePool = buildStaticResourcePool(snapshots, medicalResources, dispatchRequests);
+  const emergencyDispatchLoop = buildStaticEmergencyDispatchLoop(snapshots, dispatchRequests, resourcePool, state.emergencyDispatchLoops || []);
+  const mobileDuty = buildStaticMobileDuty(snapshots, dispatchRequests, reconciliationReviews, handover, state.taskMessages || []);
+  const cutoverCommand = buildStaticCutoverCommand(productionHardening, siteJointPatrol, mobileDuty, state.platformProcessAudit || [], state.securityEvents || []);
+  const postCutoverObservation = buildStaticPostCutoverObservation(snapshots, dispatchRequests, reconciliationReviews, siteJointPatrol, cutoverCommand, mobileDuty, state.platformProcessAudit || [], state.securityEvents || []);
+  const launchReadiness = buildStaticLaunchReadiness(productionHardening, cutoverCommand, postCutoverObservation);
+  const governanceReport = buildStaticGovernanceReport(snapshots, dispatchRequests, reconciliationReviews, performanceMonitoring, handover);
+  const governanceExportPackage = buildStaticGovernanceExportPackage(
+    snapshots,
+    dispatchRequests,
+    reconciliationReviews,
+    performanceMonitoring,
+    governanceReport,
+    intelligence,
+    handover
+  );
+  const nextDevelopmentResearch = buildStaticNextDevelopmentResearch(
+    snapshots,
+    dispatchRequests,
+    reconciliationReviews,
+    performanceMonitoring,
+    siteJointTests,
+    productionHardening,
+    intelligence,
+    governanceReport,
+    handover
+  );
   return {
     ok: true,
     boundaries: ["hospital-operation-monitoring", "resource-dispatch", "statistics-reconciliation"],
@@ -248,48 +282,27 @@ function buildStaticOperationsDashboard(state) {
     snapshots,
     dispatchRequests,
     reconciliationReviews,
+    medicalResources,
     alertRules,
-    observability: {
-      ok: true,
-      status: "adapter-foundation-ready-configuration-pending",
-      productionReady: false,
-      routing: {
-        adapterReady: false,
-        productionReady: false,
-        summary: { total: 2, configured: 0 },
-        routes: [
-          { route: "SIEM", configured: false, productionHttps: true },
-          { route: "WEBHOOK", configured: false, productionHttps: true }
-        ]
-      },
-      summary: { activeSignals: 0, deliveries: 0, accepted: 0, failed: 0, configuredRoutes: 0, totalRoutes: 2 },
-      activeSignals: [],
-      deliveries: [],
-      boundary: "Static preview exposes the alert-routing contract only. Production requires a configured receiver and signed acceptance."
-    },
-    runCenter: {
-      ok: true,
-      status: "run-center-ready-onsite-blocked",
-      summary: {
-        serviceLevels: serviceLevels.length,
-        dutyShifts: dutyShifts.length,
-        handoffsRecorded: dutyShifts.filter((item) => item.handoffStatus === "recorded-demo").length,
-        incidents: incidents.length,
-        openIncidents: incidents.filter((item) => !/resolved|closed/i.test(item.status)).length,
-        drills: drills.length,
-        validatedDrills: drills.filter((item) => item.status === "validated-demo").length,
-        evidencePackets: evidencePackets.length,
-        productionReady: 0,
-        onsiteBlockers: 5
-      },
-      serviceLevels,
-      dutyShifts,
-      incidents,
-      drills,
-      evidencePackets,
-      blockers: ["signed duty roster", "remote backup", "full-volume recovery", "live paging and ticketing", "DR signoff"],
-      boundary: "Static preview shows the operating model only. Production operation requires live monitoring, remote backup, measured recovery, signed duty rosters and multi-party approval."
-    }
+    commandChains,
+    interfaceMapping,
+    siteJointTests,
+    siteJointPatrol,
+    productionHardening,
+    intelligence,
+    playbooks,
+    handover,
+    handoverOwnerMatrix: buildStaticHandoverOwnerMatrix(handover),
+    performanceMonitoring,
+    resourcePool,
+    emergencyDispatchLoop,
+    mobileDuty,
+    cutoverCommand,
+    postCutoverObservation,
+    launchReadiness,
+    governanceReport,
+    governanceExportPackage,
+    nextDevelopmentResearch
   };
 }
 
@@ -1418,6 +1431,9 @@ function renderOperationsDashboard() {
   if (!filteredSnapshots.some((item) => item.id === selectedSnapshotId)) selectedSnapshotId = filteredSnapshots[0]?.id || dashboard.snapshots?.[0]?.id || "";
   const selected = (dashboard.snapshots || []).find((item) => item.id === selectedSnapshotId) || filteredSnapshots[0] || null;
   renderOperationsMetrics(dashboard.summary || {}, filteredSnapshots, dashboard.launchReadiness || {});
+  renderProductionOperationsCenter(dashboard.runCenter || {});
+  renderObservabilityAlertCenter(dashboard.observability || {});
+  renderBloodCoordination(dashboard.bloodCoordination || {});
   renderOperationsSituation(dashboard, filteredSnapshots, selected);
   renderPerformanceManual(dashboard, filteredSnapshots);
   renderInterfaceMapping(dashboard.interfaceMapping || buildStaticInterfaceMapping());
@@ -1460,234 +1476,118 @@ function renderOperationsDashboard() {
   renderAlertRules(dashboard.alertRules || []);
   renderDispatchRequests(dashboard.dispatchRequests || []);
   renderReconciliationReviews(dashboard.reconciliationReviews || []);
-  renderProductionOperationsCenter(dashboard.runCenter || {});
-  renderObservabilityAlertCenter(dashboard.observability || {});
-  renderBloodCoordination(dashboard.bloodCoordination || {});
   const boundary = document.querySelector("#operations-boundary");
   if (boundary) boundary.textContent = `${zhList(dashboard.boundaries || [], " / ")} | 复用：${zhList(dashboard.reusedCollections || [])}`;
 }
 
-function renderBloodCoordination(coordination) {
-  const target = document.querySelector("#operations-blood-coordination");
-  if (!target) return;
-  const rows = coordination.projections || [];
-  target.innerHTML = rows.length ? `<table><thead><tr><th>级别</th><th>血液事件</th><th>对象</th><th>运营流程</th><th>发生时间</th></tr></thead><tbody>${rows.map((item) => `<tr><td>${operationsEscapeHtml(item.severity)}</td><td>${operationsEscapeHtml(item.eventType)}</td><td>${operationsEscapeHtml(item.subjectId)}</td><td>${operationsEscapeHtml(item.workflow)}</td><td>${operationsEscapeHtml(item.occurredAt)}</td></tr>`).join("")}</tbody></table>` : "<p>尚无血液事件投影，请在血液创新中心发布当前态势。</p>";
+function launchDutyDetail(launchReadiness) {
+  const blocker = Array.isArray(launchReadiness.blockers) ? launchReadiness.blockers[0] : null;
+  if (blocker) return `责任：${zhInline(blocker.owner || "值班长")}；下一步：${zhInline(blocker.nextAction || "补齐上线阻断证据。")}`;
+  const nextAction = Array.isArray(launchReadiness.nextActions) ? launchReadiness.nextActions[0] : "";
+  return `责任：值班长；下一步：${zhInline(nextAction || "保持观察记录并归档上线签收材料。")}`;
 }
 
-function renderObservabilityAlertCenter(center) {
-  const metricsTarget = document.querySelector("#observability-alert-metrics");
-  const routesTarget = document.querySelector("#observability-alert-routes");
-  const signalsTarget = document.querySelector("#observability-active-signals");
-  const deliveriesTarget = document.querySelector("#observability-alert-deliveries");
-  if (!metricsTarget || !routesTarget || !signalsTarget || !deliveriesTarget) return;
-  const summary = center.summary || {};
-  const routes = center.routing?.routes || [];
-  const configuredRoutes = routes.filter((item) => item.configured && item.productionHttps);
-  const signals = center.activeSignals || [];
-  const deliveries = center.deliveries || [];
-  const metrics = [
-    ["活动信号", summary.activeSignals || 0, "慢请求、死信、数据质量、医院运行与安全"],
-    ["已配置路由", summary.configuredRoutes || 0, `${summary.totalRoutes || 0} 条候选路由`],
-    ["接收回执", summary.accepted || 0, `${summary.deliveries || 0} 次投递`],
-    ["失败待重放", summary.failed || 0, "失败自动进入运维事件队列"]
-  ];
-  metricsTarget.innerHTML = metrics.map(([label, value, hint]) => `<article class="metric-card"><span>${operationsEscapeHtml(label)}</span><strong>${operationsEscapeHtml(value)}</strong><small>${operationsEscapeHtml(hint)}</small></article>`).join("");
-  routesTarget.innerHTML = `<table><thead><tr><th>路由</th><th>地址</th><th>签名</th><th>HTTPS</th><th>生产验收</th></tr></thead><tbody>${routes.map((item) => `<tr><td><strong>${operationsEscapeHtml(item.route)}</strong></td><td>${item.endpointConfigured ? "已配置" : "未配置"}</td><td>${item.signingSecretConfigured ? "已配置" : "未配置"}</td><td>${item.productionHttps ? "通过" : "阻断"}</td><td>未完成</td></tr>`).join("")}</tbody></table>`;
-  signalsTarget.innerHTML = signals.length ? `<table><thead><tr><th>级别</th><th>信号</th><th>摘要</th><th>指标</th><th>投递</th></tr></thead><tbody>${signals.map((item) => `<tr><td><span class="badge ${productionOperationsBadge(item.severity)}">${operationsEscapeHtml(item.severity)}</span></td><td><strong>${operationsEscapeHtml(item.title)}</strong><br><small>${operationsEscapeHtml(item.source)}</small></td><td>${operationsEscapeHtml(item.summary)}</td><td>${operationsEscapeHtml(Object.entries(item.metrics || {}).map(([key, value]) => `${key}=${value}`).join("；"))}</td><td>${configuredRoutes.length ? configuredRoutes.map((route) => `<button class="inline-action" type="button" data-observability-alert-action="dispatch" data-fingerprint="${operationsEscapeHtml(item.fingerprint)}" data-route="${operationsEscapeHtml(route.route)}">发送至 ${operationsEscapeHtml(route.route)}</button>`).join(" ") : "待配置生产路由"}</td></tr>`).join("")}</tbody></table>` : "<p>当前没有达到投递条件的运行信号。</p>";
-  deliveriesTarget.innerHTML = deliveries.length ? `<table><thead><tr><th>时间</th><th>路由</th><th>告警</th><th>状态</th><th>回执</th><th>操作</th></tr></thead><tbody>${deliveries.map((item) => `<tr><td>${operationsEscapeHtml(item.createdAt || "")}</td><td>${operationsEscapeHtml(item.route)}</td><td><strong>${operationsEscapeHtml(item.alert?.title || item.fingerprint)}</strong><br><small>${operationsEscapeHtml(item.idempotencyKey)}</small></td><td><span class="badge ${productionOperationsBadge(item.deadLetter ? "critical" : item.status)}">${operationsEscapeHtml(item.status)}</span></td><td>${operationsEscapeHtml(item.adapterReceipt?.receiptId || item.deadLetterReason || "-")}</td><td>${item.deadLetter ? `<button class="inline-action" type="button" data-observability-alert-action="retry" data-delivery-id="${operationsEscapeHtml(item.id)}">重试</button>` : "已接收"}</td></tr>`).join("")}</tbody></table>` : "<p>尚无告警投递记录。</p>";
-  const statusTarget = document.querySelector("#observability-alert-status");
-  if (statusTarget) {
-    statusTarget.textContent = center.routing?.adapterReady ? "路由已配置，现场验收待完成" : "生产路由待配置";
-    statusTarget.className = `badge ${center.routing?.adapterReady ? "info" : "warn"}`;
+function launchDutySla(launchReadiness) {
+  const blocker = Array.isArray(launchReadiness.blockers) ? launchReadiness.blockers[0] : null;
+  if (!blocker) return "时限：T+1观察归档";
+  if (String(blocker.id || "").includes("post-cutover")) return "时限：观察窗口内签收";
+  return "时限：上线前关闭";
+}
+
+function dispatchDutyDetail(openDispatches) {
+  const item = [...openDispatches].sort((a, b) => statusSeverity(b.priority) - statusSeverity(a.priority) || new Date(a.requiredBy || 0) - new Date(b.requiredBy || 0))[0];
+  if (!item) return "责任：运行调度席；下一步：保持调度池清零并巡检跨院资源池。";
+  return `责任：运行调度席；下一步：${zhInline(item.targetInstitution || item.sourceInstitution || "目标机构")} ${zhInline(item.resourceType || "资源")}×${item.quantity || 0} ${formatDateTime(item.requiredBy) || "尽快"}前确认。`;
+}
+
+function dispatchDutySla(openDispatches) {
+  const item = [...openDispatches].sort((a, b) => statusSeverity(b.priority) - statusSeverity(a.priority) || new Date(a.requiredBy || 0) - new Date(b.requiredBy || 0))[0];
+  return item?.requiredBy ? `时限：${formatDateTime(item.requiredBy)}前` : "时限：日内巡检";
+}
+
+function reconciliationDutyDetail(blockedReviews) {
+  const item = [...blockedReviews].sort((a, b) => statusSeverity(b.status) - statusSeverity(a.status) || Number(b.varianceRate || 0) - Number(a.varianceRate || 0))[0];
+  if (!item) return "责任：统计办公室；下一步：保持直报复核清零并归档对账凭证。";
+  return `责任：${zhInline(item.owner || "统计办公室")}；下一步：${zhInline(item.institution || "相关机构")} ${zhList(item.fields || []) || "直报字段"}差异${percent(item.varianceRate)}复核。`;
+}
+
+function reconciliationDutySla(blockedReviews) {
+  const item = [...blockedReviews].sort((a, b) => statusSeverity(b.status) - statusSeverity(a.status) || Number(b.varianceRate || 0) - Number(a.varianceRate || 0))[0];
+  if (!item) return "时限：日报前确认";
+  return String(item.status || "") === "blocked" ? "时限：2小时内阻断说明" : "时限：12小时内完成复核";
+}
+
+function activateDutyAction(action, target) {
+  if (action === "dispatch" || action === "reconciliation") {
+    applySituationFilter(action);
+    return;
   }
-  const boundaryTarget = document.querySelector("#observability-alert-boundary");
-  if (boundaryTarget) boundaryTarget.textContent = center.boundary || "告警适配器基础不等于生产监控验收完成。";
+  document.querySelector(target)?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function bindObservabilityAlertActions() {
-  document.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-observability-alert-action]");
-    if (!button) return;
-    if (button.dataset.observabilityAlertAction === "dispatch") {
-      dispatchObservabilityAlert(button.dataset.fingerprint, button.dataset.route, button);
-    } else if (button.dataset.observabilityAlertAction === "retry") {
-      retryObservabilityAlert(button.dataset.deliveryId, button);
-    }
-  });
-}
-
-async function dispatchObservabilityAlert(fingerprint, route, button) {
-  if (!OPERATIONS_API_BASE || !fingerprint || !route) return;
-  const alert = (operationsDashboard?.observability?.activeSignals || []).find((item) => item.fingerprint === fingerprint);
-  if (!alert) return;
-  const request = window.HealthCityAuth?.authFetch || fetch;
-  button.disabled = true;
-  try {
-    const response = await request(`${OPERATIONS_API_BASE}/observability/alerts/dispatch`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ route, idempotencyKey: `${route}:${fingerprint}`, alert })
-    });
-    const payload = await response.json().catch(() => ({}));
-    await loadOperationsDashboard();
-    const statusTarget = document.querySelector("#observability-alert-status");
-    if (statusTarget) {
-      statusTarget.textContent = response.ok ? `已投递：${payload.delivery?.adapterReceipt?.receiptId || route}` : `投递失败：${payload.delivery?.deadLetterReason || payload.message || response.status}`;
-      statusTarget.className = `badge ${response.ok ? "info" : "danger"}`;
-    }
-  } catch (error) {
-    const statusTarget = document.querySelector("#observability-alert-status");
-    if (statusTarget) {
-      statusTarget.textContent = `投递失败：${error.message}`;
-      statusTarget.className = "badge danger";
-    }
-  } finally {
-    button.disabled = false;
-  }
-}
-
-async function retryObservabilityAlert(deliveryId, button) {
-  if (!OPERATIONS_API_BASE || !deliveryId) return;
-  const request = window.HealthCityAuth?.authFetch || fetch;
-  button.disabled = true;
-  try {
-    const response = await request(`${OPERATIONS_API_BASE}/observability/alert-deliveries/${encodeURIComponent(deliveryId)}/retry`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reason: "operations console manual retry" })
-    });
-    const payload = await response.json().catch(() => ({}));
-    await loadOperationsDashboard();
-    const statusTarget = document.querySelector("#observability-alert-status");
-    if (statusTarget) {
-      statusTarget.textContent = payload.ok ? `重放成功：${payload.delivery?.adapterReceipt?.receiptId || deliveryId}` : `重放失败：${payload.delivery?.deadLetterReason || payload.message || response.status}`;
-      statusTarget.className = `badge ${payload.ok ? "info" : "danger"}`;
-    }
-  } catch (error) {
-    const statusTarget = document.querySelector("#observability-alert-status");
-    if (statusTarget) {
-      statusTarget.textContent = `重放失败：${error.message}`;
-      statusTarget.className = "badge danger";
-    }
-  } finally {
-    button.disabled = false;
-  }
-}
-
-function productionOperationsBadge(status) {
-  const text = String(status || "pending");
-  if (/validated-demo|recorded-demo|acknowledged-demo|resolved-demo|policy-defined/i.test(text)) return "info";
-  if (/P1|critical|escalated/i.test(text)) return "danger";
-  return "warn";
-}
-
-function renderProductionOperationsCenter(center) {
-  const metricsTarget = document.querySelector("#production-operations-metrics");
-  const serviceTarget = document.querySelector("#production-service-levels");
-  const dutyTarget = document.querySelector("#production-duty-shifts");
-  const incidentTarget = document.querySelector("#production-incidents");
-  const drillTarget = document.querySelector("#production-recovery-drills");
-  const evidenceTarget = document.querySelector("#production-operations-evidence");
-  if (!metricsTarget || !serviceTarget || !dutyTarget || !incidentTarget || !drillTarget || !evidenceTarget) return;
-  const summary = center.summary || {};
-  const serviceLevels = center.serviceLevels || [];
-  const dutyShifts = center.dutyShifts || [];
-  const incidents = center.incidents || [];
-  const drills = center.drills || [];
-  const evidencePackets = center.evidencePackets || [];
-  const metrics = [
-    ["服务级别", summary.serviceLevels || 0, "API、接口、数据与恢复"],
-    ["值班班次", summary.dutyShifts || 0, `${summary.handoffsRecorded || 0} 次演示交接`],
-    ["开放事件", summary.openIncidents || 0, `${summary.incidents || 0} 条事件`],
-    ["恢复演练", summary.validatedDrills || 0, `${summary.drills || 0} 个场景`],
-    ["运行证据", summary.evidencePackets || 0, "待现场复核"],
-    ["生产就绪", 0, `${summary.onsiteBlockers || 0} 项现场阻断`]
-  ];
-  metricsTarget.innerHTML = metrics.map(([label, value, hint]) => `<article class="metric-card"><span>${operationsEscapeHtml(label)}</span><strong>${operationsEscapeHtml(value)}</strong><small>${operationsEscapeHtml(hint)}</small></article>`).join("");
-  serviceTarget.innerHTML = `<table>
-    <thead><tr><th>服务</th><th>范围</th><th>目标</th><th>响应</th><th>责任方</th><th>生产</th></tr></thead>
-    <tbody>${serviceLevels.map((item) => `<tr><td><strong>${operationsEscapeHtml(item.name)}</strong></td><td>${operationsEscapeHtml(item.scope)}</td><td>${operationsEscapeHtml(item.target)}</td><td>${operationsEscapeHtml(item.responseTarget)}</td><td>${operationsEscapeHtml(item.owner)}</td><td>否</td></tr>`).join("")}</tbody>
-  </table>`;
-  dutyTarget.innerHTML = dutyShifts.map((item, index) => `<article class="priority-row" data-production-duty-shift="${operationsEscapeHtml(item.id)}">
-    <div class="priority-rank ${productionOperationsBadge(item.status)}">${index + 1}</div>
-    <div><h3>${operationsEscapeHtml(item.name)}</h3><p>${operationsEscapeHtml(item.window)} · ${operationsEscapeHtml(item.primaryRole)} / ${operationsEscapeHtml(item.backupRole)}</p><small>${operationsEscapeHtml((item.handoffChecklist || []).join("；"))}</small><div class="action-row"><button class="inline-action" type="button" data-production-operations-action="record-handoff" data-resource="duty-shifts" data-id="${operationsEscapeHtml(item.id)}">记录演示交接</button><button class="inline-action" type="button" data-production-operations-action="request-onsite" data-resource="duty-shifts" data-id="${operationsEscapeHtml(item.id)}">申请现场签班</button></div></div>
-    <div class="capability-side"><span class="badge ${productionOperationsBadge(item.handoffStatus)}">${operationsEscapeHtml(item.handoffStatus || "pending")}</span><small>生产：否</small></div>
-  </article>`).join("");
-  incidentTarget.innerHTML = incidents.map((item, index) => `<article class="priority-row" data-production-incident="${operationsEscapeHtml(item.id)}">
-    <div class="priority-rank ${productionOperationsBadge(item.severity)}">${index + 1}</div>
-    <div><h3>${operationsEscapeHtml(item.title)}</h3><p>${operationsEscapeHtml(item.source)} · ${operationsEscapeHtml(item.owner)}</p><small>响应 ${operationsEscapeHtml(item.acknowledgeWithinMinutes || "-")} 分钟 · 回滚责任 ${operationsEscapeHtml(item.rollbackDecisionOwner || "待确认")}</small><div class="action-row"><button class="inline-action" type="button" data-production-operations-action="acknowledge" data-resource="incidents" data-id="${operationsEscapeHtml(item.id)}">确认</button><button class="inline-action" type="button" data-production-operations-action="escalate" data-resource="incidents" data-id="${operationsEscapeHtml(item.id)}">升级</button><button class="inline-action" type="button" data-production-operations-action="resolve-demo" data-resource="incidents" data-id="${operationsEscapeHtml(item.id)}">演示关闭</button></div></div>
-    <div class="capability-side"><span class="badge ${productionOperationsBadge(item.status)}">${operationsEscapeHtml(item.status)}</span><small>${operationsEscapeHtml(item.severity)}</small></div>
-  </article>`).join("");
-  drillTarget.innerHTML = drills.map((item, index) => `<article class="priority-row" data-production-drill="${operationsEscapeHtml(item.id)}">
-    <div class="priority-rank ${productionOperationsBadge(item.status)}">${index + 1}</div>
-    <div><h3>${operationsEscapeHtml(item.name)}</h3><p>${operationsEscapeHtml(item.scenario)} · 目标 RPO ${operationsEscapeHtml(item.targetRpoMinutes)} 分钟 / RTO ${operationsEscapeHtml(item.targetRtoMinutes)} 分钟</p><small>实测 RPO ${operationsEscapeHtml(item.measuredRpoMinutes ?? "-")} / RTO ${operationsEscapeHtml(item.measuredRtoMinutes ?? "-")} · ${operationsEscapeHtml((item.requiredEvidence || []).join("；"))}</small><div class="action-row"><button class="inline-action" type="button" data-production-operations-action="rehearse-demo" data-resource="drills" data-id="${operationsEscapeHtml(item.id)}">运行样例演练</button><button class="inline-action" type="button" data-production-operations-action="record-evidence" data-resource="drills" data-id="${operationsEscapeHtml(item.id)}">登记证据</button><button class="inline-action" type="button" data-production-operations-action="request-onsite" data-resource="drills" data-id="${operationsEscapeHtml(item.id)}">申请现场演练</button></div></div>
-    <div class="capability-side"><span class="badge ${productionOperationsBadge(item.status)}">${operationsEscapeHtml(item.status)}</span><small>生产：否</small></div>
-  </article>`).join("");
-  evidenceTarget.innerHTML = `<table><thead><tr><th>资源</th><th>类型</th><th>引用</th><th>状态</th><th>生产证据</th></tr></thead><tbody>${evidencePackets.slice(0, 12).map((item) => `<tr><td>${operationsEscapeHtml(item.resource)}</td><td>${operationsEscapeHtml(item.type)}</td><td><strong>${operationsEscapeHtml(item.reference)}</strong><br><small>${operationsEscapeHtml(item.note || "")}</small></td><td>${operationsEscapeHtml(item.status)}</td><td>否</td></tr>`).join("")}</tbody></table>`;
-  const statusTarget = document.querySelector("#production-operations-status");
-  if (statusTarget) {
-    statusTarget.textContent = "运行中心已就绪，现场运维受阻";
-    statusTarget.className = "badge warn";
-  }
-  const boundaryTarget = document.querySelector("#production-operations-boundary");
-  if (boundaryTarget) boundaryTarget.textContent = "本页记录策略、交接、事件和本地恢复样例，不代表生产灾备通过。正式运行仍需真实监控与呼叫、远端备份、全量恢复实测、签字值班表和多方灾备验收。";
-}
-
-function bindProductionOperationsActions() {
-  document.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-production-operations-action]");
-    if (!button) return;
-    runProductionOperationsAction(button.dataset.resource, button.dataset.productionOperationsAction, button.dataset.id, button);
-  });
-}
-
-async function runProductionOperationsAction(resource, action, id, button) {
-  if (!OPERATIONS_API_BASE || !resource || !action || !id) return;
-  const request = window.HealthCityAuth?.authFetch || fetch;
-  const notes = {
-    "record-handoff": "Commission operations recorded a demo handoff checklist; named roster and duty phone remain onsite requirements.",
-    acknowledge: "Commission operations acknowledged the demo incident signal.",
-    escalate: "Commission operations escalated the demo incident to the configured owner.",
-    "resolve-demo": "Commission operations closed the demo incident after local verification.",
-    "rehearse-demo": "Commission operations ran an isolated sample recovery rehearsal; full-volume production recovery remains required.",
-    "record-evidence": "Commission operations registered a recovery evidence reference for onsite validation.",
-    "request-onsite": "Commission operations requested signed onsite duty or recovery verification."
-  };
-  if (button) button.disabled = true;
-  try {
-    const response = await request(`${OPERATIONS_API_BASE}/production-operations/${encodeURIComponent(resource)}/${encodeURIComponent(id)}/actions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, note: notes[action] || "Production operations action recorded.", evidenceRef: action === "record-evidence" ? `operations-console/${id}/${Date.now()}` : "" })
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.message || `HTTP ${response.status}`);
-    operationsDashboard.runCenter = payload.center;
-    renderProductionOperationsCenter(payload.center);
-  } catch (error) {
-    const statusTarget = document.querySelector("#production-operations-status");
-    if (statusTarget) {
-      statusTarget.textContent = error.message || "操作失败";
-      statusTarget.className = "badge danger";
-    }
-  } finally {
-    if (button) button.disabled = false;
-  }
-}
-
-function operationsEscapeHtml(value) {
-  return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
-}
-
-function renderOperationsMetrics(summary) {
-  const metrics = [
-    ["机构数", summary.institutions || 0, "纳入运行监测的机构"],
-    ["严重预警", summary.critical || 0, "critical operation status"],
-    ["一般预警", summary.warning || 0, "warning operation status"],
-    ["告警项", summary.alerts || 0, "规则触发总数"],
-    ["待调度", summary.openDispatchRequests || 0, "pending / assigned / in-progress"],
-    ["待对账", summary.pendingReconciliation || 0, "未关闭的直报复核"],
-    ["床位使用率", `${Math.round((summary.bedOccupancyRate || 0) * 1000) / 10}%`, "occupied/open beds"]
+function renderOperationsSituation(dashboard, filteredSnapshots, selected) {
+  const strip = document.querySelector("#operations-situation-strip");
+  const links = document.querySelector("#operations-focus-links");
+  const dutyPriority = document.querySelector("#operations-duty-priority");
+  const dutyQueue = document.querySelector("#operations-duty-queue");
+  const dutyActions = document.querySelector("#operations-duty-actions");
+  if (!strip || !links || !dutyPriority || !dutyQueue || !dutyActions) return;
+  const snapshots = Array.isArray(dashboard.snapshots) ? dashboard.snapshots : [];
+  const dispatchRequests = Array.isArray(dashboard.dispatchRequests) ? dashboard.dispatchRequests : [];
+  const reconciliationReviews = Array.isArray(dashboard.reconciliationReviews) ? dashboard.reconciliationReviews : [];
+  const launchReadiness = dashboard.launchReadiness || {};
+  const urgent = [...filteredSnapshots].sort((a, b) => Number(b.resourcePressure || 0) - Number(a.resourcePressure || 0))[0] || selected;
+  const openDispatches = dispatchRequests.filter((item) => ["pending", "assigned", "in-progress"].includes(item.status));
+  const blockedReviews = reconciliationReviews.filter((item) => ["blocked", "pending-review", "returned", "correcting"].includes(item.status));
+  const criticalCount = filteredSnapshots.filter((item) => item.normalizedStatus === "critical").length;
+  const warningCount = filteredSnapshots.filter((item) => item.normalizedStatus === "warning").length;
+  const selectedAlerts = selected?.activeAlerts?.length || 0;
+  const selectedPressure = Number(selected?.resourcePressure || 0);
+  strip.innerHTML = `
+    <article class="operations-situation-main ${urgent?.normalizedStatus || "normal"}">
+      <div>
+        <strong>${urgent ? zh(urgent.institution) : "暂无机构"}</strong>
+        <span>当前优先关注机构 / 资源压力 ${urgent?.resourcePressure || 0} / 预警 ${urgent?.activeAlerts?.length || 0}</span>
+      </div>
+      <button class="inline-action compact" type="button" data-situation-select="${urgent?.id || ""}" ${urgent ? "" : "disabled"}>查看详情</button>
+    </article>
+    <article>
+      <span>当前筛选</span>
+      <strong>${filteredSnapshots.length}/${snapshots.length}</strong>
+      <small>严重 ${criticalCount} / 一般 ${warningCount}</small>
+    </article>
+    <article>
+      <span>开放调度</span>
+      <strong>${openDispatches.length}</strong>
+      <small>${openDispatches.length ? "需跟踪分派与到位" : "暂无开放工单"}</small>
+    </article>
+    <article>
+      <span>直报复核</span>
+      <strong>${blockedReviews.length}</strong>
+      <small>${blockedReviews.length ? "需完成补正或阻断说明" : "暂无阻断复核"}</small>
+    </article>
+    <article>
+      <span>已选机构</span>
+      <strong>${selected ? zh(selected.institution) : "未选择"}</strong>
+      <small>压力 ${selectedPressure} / 预警 ${selectedAlerts}</small>
+    </article>
+  `;
+  links.innerHTML = [
+    ["all", "全部机构", "恢复全量监测"],
+    ["critical", "严重预警", "只看严重风险"],
+    ["warning", "一般预警", "只看一般预警"],
+    ["dispatch", "开放调度", "定位调度工单"],
+    ["reconciliation", "直报复核", "定位对账复核"]
+  ].map(([mode, title, hint]) => `
+    <button class="operations-focus-button" type="button" data-situation-filter="${mode}">
+      <strong>${title}</strong>
+      <span>${hint}</span>
+    </button>
+  `).join("");
+  const dutyRows = [
+    { action: "launch", title: "上线判定", count: launchReadiness.summary?.blockers || 0, status: zhInline(launchReadiness.decision || "待判定"), hint: "查看生产加固、割接签收和观察阻断项", detail: launchDutyDetail(launchReadiness), sla: launchDutySla(launchReadiness), target: "#operation-launch-readiness", priority: (launchReadiness.summary?.blockers || 0) ? 300 + (launchReadiness.summary?.blockers || 0) : 0 },
+    { action: "dispatch", title: "开放调度", count: openDispatches.length, status: openDispatches.length ? "需跟踪" : "已清零", hint: "定位资源调度工单与分派状态", detail: dispatchDutyDetail(openDispatches), sla: dispatchDutySla(openDispatches), priority: openDispatches.length ? 220 + openDispatches.length : 0 },
+    { action: "reconciliation", title: "直报复核", count: blockedReviews.length, status: blockedReviews.length ? "需复核" : "已闭环", hint: "定位统计直报差异和补正说明", detail: reconciliationDutyDetail(blockedReviews), sla: reconciliationDutySla(blockedReviews), priority: blockedReviews.length ? 240 + blockedReviews.length : 0 }
   ];
   const rankedDuties = [...dutyRows].sort((a, b) => b.priority - a.priority || b.count - a.count);
   const primaryDuty = rankedDuties[0];
@@ -1785,6 +1685,124 @@ function selectSnapshotById(id, scrollTarget = "#operation-detail") {
   selectedSnapshotId = snapshot.id;
   renderOperationsDashboard();
   document.querySelector(scrollTarget)?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function operationsEscapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+}
+
+function productionOperationsBadge(status) {
+  const value = String(status || "pending");
+  if (/validated|recorded|acknowledged|resolved|ready|accepted/i.test(value)) return "info";
+  if (/critical|failed|dead|blocked|escalated/i.test(value)) return "danger";
+  return "warn";
+}
+
+function renderProductionOperationsCenter(center = {}) {
+  const metricsTarget = document.querySelector("#production-operations-metrics");
+  if (!metricsTarget) return;
+  const summary = center.summary || {};
+  const serviceLevels = center.serviceLevels || [];
+  const dutyShifts = center.dutyShifts || [];
+  const incidents = center.incidents || [];
+  const drills = center.drills || [];
+  const evidencePackets = center.evidencePackets || [];
+  const metrics = [
+    ["服务级别", summary.serviceLevels || serviceLevels.length],
+    ["值班班次", summary.dutyShifts || dutyShifts.length],
+    ["开放事件", summary.openIncidents || 0],
+    ["恢复演练", summary.validatedDrills || 0],
+    ["运行证据", summary.evidencePackets || evidencePackets.length]
+  ];
+  metricsTarget.innerHTML = metrics.map(([label, value]) => `<article class="metric-card"><span>${operationsEscapeHtml(label)}</span><strong>${operationsEscapeHtml(value)}</strong></article>`).join("");
+  document.querySelector("#production-service-levels").innerHTML = `<table><thead><tr><th>服务</th><th>范围</th><th>目标</th><th>响应</th><th>责任方</th></tr></thead><tbody>${serviceLevels.map((item) => `<tr><td>${operationsEscapeHtml(item.name)}</td><td>${operationsEscapeHtml(item.scope)}</td><td>${operationsEscapeHtml(item.target)}</td><td>${operationsEscapeHtml(item.responseTarget)}</td><td>${operationsEscapeHtml(item.owner)}</td></tr>`).join("")}</tbody></table>`;
+  document.querySelector("#production-duty-shifts").innerHTML = dutyShifts.map((item) => `<article class="priority-row"><div><h3>${operationsEscapeHtml(item.name)}</h3><p>${operationsEscapeHtml(item.window)} | ${operationsEscapeHtml(item.primaryRole)}</p><button class="inline-action" type="button" data-production-operations-action="record-handoff" data-resource="duty-shifts" data-id="${operationsEscapeHtml(item.id)}">记录交接</button></div></article>`).join("");
+  document.querySelector("#production-incidents").innerHTML = incidents.map((item) => `<article class="priority-row"><div><h3>${operationsEscapeHtml(item.title)}</h3><p>${operationsEscapeHtml(item.source)} | ${operationsEscapeHtml(item.owner)}</p><button class="inline-action" type="button" data-production-operations-action="acknowledge" data-resource="incidents" data-id="${operationsEscapeHtml(item.id)}">确认</button></div><span class="badge ${productionOperationsBadge(item.status)}">${operationsEscapeHtml(item.status)}</span></article>`).join("");
+  document.querySelector("#production-recovery-drills").innerHTML = drills.map((item) => `<article class="priority-row"><div><h3>${operationsEscapeHtml(item.name)}</h3><p>RPO ${operationsEscapeHtml(item.targetRpoMinutes)} 分钟 | RTO ${operationsEscapeHtml(item.targetRtoMinutes)} 分钟</p><button class="inline-action" type="button" data-production-operations-action="rehearse-demo" data-resource="drills" data-id="${operationsEscapeHtml(item.id)}">运行样例演练</button></div></article>`).join("");
+  document.querySelector("#production-operations-evidence").innerHTML = `<table><thead><tr><th>资源</th><th>类型</th><th>引用</th><th>状态</th></tr></thead><tbody>${evidencePackets.map((item) => `<tr><td>${operationsEscapeHtml(item.resource)}</td><td>${operationsEscapeHtml(item.type)}</td><td>${operationsEscapeHtml(item.reference)}</td><td>${operationsEscapeHtml(item.status)}</td></tr>`).join("")}</tbody></table>`;
+  document.querySelector("#production-operations-boundary").textContent = center.boundary || "本页记录策略、交接、事件和本地恢复样例，不代表生产灾备通过。";
+}
+
+function bindProductionOperationsActions() {
+  document.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-production-operations-action]");
+    if (!button || !OPERATIONS_API_BASE) return;
+    const resource = button.dataset.resource;
+    const id = button.dataset.id;
+    button.disabled = true;
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${OPERATIONS_API_BASE}/production-operations/${encodeURIComponent(resource)}/${encodeURIComponent(id)}/actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: button.dataset.productionOperationsAction, note: "Operations console action" })
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      await loadOperationsDashboard();
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
+function renderObservabilityAlertCenter(center = {}) {
+  const metricsTarget = document.querySelector("#observability-alert-metrics");
+  if (!metricsTarget) return;
+  const summary = center.summary || {};
+  const routes = center.routing?.routes || [];
+  const signals = center.activeSignals || [];
+  const deliveries = center.deliveries || [];
+  metricsTarget.innerHTML = [["活动信号", summary.activeSignals || 0], ["已配置路由", summary.configuredRoutes || 0], ["接收回执", summary.accepted || 0], ["失败待重放", summary.failed || 0]].map(([label, value]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong></article>`).join("");
+  document.querySelector("#observability-alert-routes").innerHTML = `<table><thead><tr><th>路由</th><th>地址</th><th>签名</th><th>HTTPS</th></tr></thead><tbody>${routes.map((item) => `<tr><td>${operationsEscapeHtml(item.route)}</td><td>${item.endpointConfigured ? "已配置" : "未配置"}</td><td>${item.signingSecretConfigured ? "已配置" : "未配置"}</td><td>${item.productionHttps ? "通过" : "阻断"}</td></tr>`).join("")}</tbody></table>`;
+  document.querySelector("#observability-active-signals").innerHTML = signals.map((item) => `<article class="priority-row"><div><h3>${operationsEscapeHtml(item.title)}</h3><p>${operationsEscapeHtml(item.summary)}</p></div>${routes.filter((route) => route.configured && route.productionHttps).map((route) => `<button class="inline-action" type="button" data-observability-alert-action="dispatch" data-fingerprint="${operationsEscapeHtml(item.fingerprint)}" data-route="${operationsEscapeHtml(route.route)}">投递</button>`).join("")}</article>`).join("") || "<p>当前没有达到投递条件的运行信号。</p>";
+  document.querySelector("#observability-alert-deliveries").innerHTML = `<table><thead><tr><th>时间</th><th>路由</th><th>状态</th><th>回执</th><th>操作</th></tr></thead><tbody>${deliveries.map((item) => `<tr><td>${operationsEscapeHtml(item.createdAt)}</td><td>${operationsEscapeHtml(item.route)}</td><td>${operationsEscapeHtml(item.status)}</td><td>${operationsEscapeHtml(item.adapterReceipt?.receiptId || item.deadLetterReason || "-")}</td><td>${item.deadLetter ? `<button class="inline-action" type="button" data-observability-alert-action="retry" data-delivery-id="${operationsEscapeHtml(item.id)}">重试</button>` : "已接收"}</td></tr>`).join("")}</tbody></table>`;
+  document.querySelector("#observability-alert-boundary").textContent = center.boundary || "告警适配器基础通过不等于生产监控正式验收。";
+}
+
+function bindObservabilityAlertActions() {
+  document.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-observability-alert-action]");
+    if (!button || !OPERATIONS_API_BASE) return;
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    button.disabled = true;
+    try {
+      if (button.dataset.observabilityAlertAction === "dispatch") {
+        const alert = (operationsDashboard?.observability?.activeSignals || []).find((item) => item.fingerprint === button.dataset.fingerprint);
+        await request(`${OPERATIONS_API_BASE}/observability/alerts/dispatch`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ route: button.dataset.route, idempotencyKey: `${button.dataset.route}:${button.dataset.fingerprint}`, alert }) });
+      } else {
+        await retryObservabilityAlert(button.dataset.deliveryId);
+      }
+      await loadOperationsDashboard();
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
+async function retryObservabilityAlert(deliveryId) {
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  return request(`${OPERATIONS_API_BASE}/observability/alert-deliveries/${encodeURIComponent(deliveryId)}/retry`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason: "operations console manual retry" })
+  });
+}
+
+function renderBloodCoordination(coordination = {}) {
+  const target = document.querySelector("#operations-blood-coordination");
+  if (!target) return;
+  const summary = coordination.summary || {};
+  const projections = coordination.projections || [];
+  target.replaceChildren();
+  const lead = document.createElement("p");
+  lead.textContent = `事件 ${summary.events || 0}，协同投影 ${projections.length}，死信 ${summary.deadLetters || 0}`;
+  target.append(lead);
+  projections.slice(0, 6).forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "rule-item";
+    row.textContent = `${item.eventType || "blood.event"} / ${item.severity || "info"} / ${item.workflow || "monitor-dispatch-reconcile"}`;
+    target.append(row);
+  });
 }
 
 function renderOperationsMetrics(summary, filteredSnapshots, launchReadiness = {}) {

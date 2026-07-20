@@ -994,15 +994,27 @@ function renderQualitySafety(data) {
   renderIssues(filteredIssues);
   renderRectifications(filteredRectifications);
   renderCritical(data.criticalValueAlerts || []);
-  renderBoundaries(data);
   renderBloodCoordination(data.bloodCoordination || {});
+  renderBoundaries(data);
   const updated = document.getElementById("quality-safety-updated");
   if (updated) updated.textContent = data.generatedAt ? new Date(data.generatedAt).toLocaleString() : "";
 }
 
-function renderBloodCoordination(coordination) {
-  const rows = coordination.projections || [];
-  setHtml("quality-blood-coordination", rows.length ? `<table><thead><tr><th>级别</th><th>质量事件</th><th>处置类别</th><th>对象</th><th>工作流</th></tr></thead><tbody>${rows.map((item) => `<tr><td>${escapeHtml(item.severity)}</td><td>${escapeHtml(item.eventType)}</td><td>${escapeHtml(item.category)}</td><td>${escapeHtml(item.subjectId)}</td><td>${escapeHtml(item.workflow)}</td></tr>`).join("")}</tbody></table>` : "<p>尚无血液质量事件投影。</p>");
+function renderBloodCoordination(coordination = {}) {
+  const target = document.querySelector("#quality-safety-blood-coordination");
+  if (!target) return;
+  const summary = coordination.summary || {};
+  const projections = coordination.projections || [];
+  target.replaceChildren();
+  const lead = document.createElement("p");
+  lead.textContent = `事件 ${summary.events || 0}，质控投影 ${projections.length}，死信 ${summary.deadLetters || 0}`;
+  target.append(lead);
+  projections.slice(0, 6).forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "rule-item";
+    row.textContent = `${item.eventType || "blood.event"} / ${item.severity || "info"} / ${item.workflow || "dispatch-rectify-review"}`;
+    target.append(row);
+  });
 }
 
 async function loadQualitySafety() {
