@@ -117,6 +117,9 @@ function buildDeployCheckReport(options = {}) {
   ];
   const p0Interfaces = (Array.isArray(data.platformInterfaces) ? data.platformInterfaces : []).filter((item) => item.priority === "P0");
   const securityAcceptanceLedger = Array.isArray(data.securityAcceptanceLedger) ? data.securityAcceptanceLedger : [];
+  const traceabilityPolicySources = Array.isArray(data.drugTraceabilityPolicySources) ? data.drugTraceabilityPolicySources : [];
+  const traceabilityEvidenceRequirements = Array.isArray(data.drugTraceabilityEvidenceRequirements) ? data.drugTraceabilityEvidenceRequirements : [];
+  const drugConsumableSupervisions = Array.isArray(data.drugConsumableSupervisions) ? data.drugConsumableSupervisions : [];
   const serverSource = fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
   const sessionStoreSource = fs.readFileSync(path.join(ROOT, "session-store.js"), "utf8");
   const authSource = fs.readFileSync(path.join(ROOT, "auth.js"), "utf8");
@@ -241,6 +244,7 @@ function buildDeployCheckReport(options = {}) {
     assertFile("docs/卫生健康信息平台研发报告.md"),
     assertFile("docs/on-site-launch-materials.md"),
     assertFile("data/db.json"),
+    assertFile("drug-consumable-about.html"),
     assertFile("server.js"),
     assertFile("session-store.js"),
     assertFile("production-adapters.js"),
@@ -516,6 +520,9 @@ function buildDeployCheckReport(options = {}) {
     { name: "api:chronicPublicHealthLoop", ok: serverSource.includes("/api/chronic/public-health-loop") && serverSource.includes("immunizationPlanning") && serverSource.includes("infectiousDiseaseReporting") && serverSource.includes("cdcSummary") && institutionSource.includes("loadChronicPublicHealthLoop") && institutionSource.includes("renderChronicPublicHealthLoop") && institutionHtml.includes("public-health-loop-stages") && institutionHtml.includes("public-health-loop-integrations") && institutionHtml.includes("public-health-cdc-summary"), detail: "chronic public health monitor-alert-dispatch-intervention-followup-summary loop plus immunization infectious-reporting and CDC command summary is wired" },
     { name: "snapshot:researchSandbox", ok: (data.researchDatasets || []).some((item) => item.authorizationStatus === "approved" && (item.deidentificationStatus === "released" || item.anonymization) && (item.sandbox?.status === "active" || item.status === "published")) && (data.dataAccessLogs || []).some((item) => /research|科研|数据集|沙箱/i.test(`${item.scope || ""} ${item.purpose || ""}`)), detail: `${data.researchDatasets?.length || 0} datasets / ${data.dataAccessLogs?.length || 0} audit logs` },
     { name: "snapshot:externalDependencyRisks", ok: externalDependencyRiskIds.every((id) => serverSource.includes(id)), detail: `${externalDependencyRiskIds.length} external dependency risks` },
+    { name: "snapshot:drugTraceabilityPolicySources", ok: traceabilityPolicySources.length >= 5 && traceabilityPolicySources.every((item) => /^https:\/\/(www\.)?(nhsa|nmpa)\.gov\.cn\//.test(item.url || "")), detail: `${traceabilityPolicySources.length} official traceability policy sources` },
+    { name: "snapshot:drugTraceabilityEvidenceRequirements", ok: traceabilityEvidenceRequirements.length >= 5 && traceabilityEvidenceRequirements.every((item) => item.id && Array.isArray(item.policySourceIds) && item.policySourceIds.every((id) => traceabilityPolicySources.some((source) => source.id === id)) && Array.isArray(item.evidenceFields) && item.evidenceFields.length > 0), detail: `${traceabilityEvidenceRequirements.length} traceability evidence requirements` },
+    { name: "snapshot:drugConsumableSupplyAlerts", ok: drugConsumableSupervisions.some((item) => item.boundary === "supply-alert" && item.relatedPickupId && item.remediationStatus), detail: `${drugConsumableSupervisions.filter((item) => item.boundary === "supply-alert").length} supply alert rows` },
     { name: "snapshot:p2-complete", ok: (data.platformRoadmap || []).filter((item) => item.priority === "P2").every((item) => item.status === "已完成"), detail: (data.platformRoadmap || []).filter((item) => item.priority === "P2").map((item) => `${item.title}:${item.status}`).join(";") },
     { name: "snapshot:accessibility", ok: Array.isArray(data.accessibilityChecklist) && data.accessibilityChecklist.length >= 5, detail: `${data.accessibilityChecklist?.length || 0} checklist items` },
     { name: "snapshot:healthDashboard", ok: Array.isArray(data.healthDashboardSnapshots) && data.healthDashboardSnapshots.some((item) => Array.isArray(item.sourceApplications) && item.sourceApplications.length === 7), detail: `${data.healthDashboardSnapshots?.length || 0} dashboard snapshots` },

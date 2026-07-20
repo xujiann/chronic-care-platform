@@ -1042,6 +1042,8 @@ function seedState() {
     institutionSupervisions: seedInstitutionSupervisions(),
     insuranceClaims: seedInsuranceClaims(),
     policyAlignment: seedPolicyAlignment(),
+    drugTraceabilityPolicySources: seedDrugTraceabilityPolicySources(),
+    drugTraceabilityEvidenceRequirements: seedDrugTraceabilityEvidenceRequirements(),
     emergencySignals: seedEmergencySignals(),
     ...EmergencyService.seed(),
     ...EmergencyLifeChain.seed(),
@@ -5444,6 +5446,106 @@ function seedPolicyAlignment() {
   ];
 }
 
+function seedDrugTraceabilityPolicySources() {
+  return [
+    {
+      id: "nhsa-2025-7",
+      authority: "国家医保局等四部门",
+      title: "关于加强药品追溯码在医疗保障和工伤保险领域采集应用的通知",
+      documentNo: "医保发〔2025〕7号",
+      issuedAt: "2025-03-19",
+      url: "https://www.nhsa.gov.cn/art/2025/3/19/art_104_16045.html",
+      rule: "2025-07-01 起销售环节按要求扫码后方可进行医保基金结算；2026-01-01 起所有医药机构实现药品追溯码全量采集上传。",
+      platformImpact: "药耗监管、医保结算协同、机构整改和工作台模板必须记录追溯码采集、上传、无码库、异常重复销售和部门协同处置证据。"
+    },
+    {
+      id: "nhsa-2024-collection",
+      authority: "国家医疗保障局办公室",
+      title: "关于进一步做好医保药品耗材追溯码信息采集工作有关事项的公告",
+      documentNo: "2024-04-00056",
+      issuedAt: "2024-09-30",
+      url: "https://www.nhsa.gov.cn/art/2024/9/30/art_109_14042.html",
+      rule: "明确采集范围、生产流通企业上传接口、三码映射库、包装级联映射库和地方医保部门不得一刀切、不得指定设备服务商等注意事项。",
+      platformImpact: "模板需区分暂不采集场景、医保编码/商品码/追溯码映射、生产流通企业可选上传和现场设备服务边界。"
+    },
+    {
+      id: "nmpa-2018-guidance",
+      authority: "国家药监局",
+      title: "国家药监局关于药品信息化追溯体系建设的指导意见",
+      documentNo: "国药监药管〔2018〕35号",
+      issuedAt: "2018-11-01",
+      url: "https://www.nmpa.gov.cn/directory/web/nmpa/xxgk/fgwj/gzwj/gzwjyp/20181101100801272.html",
+      rule: "以保障公众用药安全为目标，以落实企业主体责任为基础，按一物一码、物码同追方向建设药品信息化追溯体系。",
+      platformImpact: "药品追溯线索、整改闭环和审计报告需以主体责任、全流程追溯和公众用药安全为基本监管口径。"
+    },
+    {
+      id: "nmpa-2019-32",
+      authority: "国家药监局",
+      title: "关于发布《药品信息化追溯体系建设导则》《药品追溯码编码要求》两项信息化标准的公告",
+      documentNo: "2019年第32号",
+      issuedAt: "2019-04-28",
+      url: "https://www.nmpa.gov.cn/directory/web/nmpa/////////zwgk/ghcw/ghjh/20190428164801603.html",
+      rule: "发布药品信息化追溯体系建设导则和药品追溯码编码要求，作为追溯体系与编码规范基础。",
+      platformImpact: "接口联调模板需留出追溯码编码规则、各级包装关联、发码机构和追溯系统地址解析字段。"
+    },
+    {
+      id: "nmpa-2022-label",
+      authority: "国家药监局",
+      title: "药品追溯码标识规范",
+      documentNo: "NMPAB/T 1011-2022",
+      issuedAt: "2022-06-23",
+      url: "https://www.nmpa.gov.cn/directory/web/nmpa/images/1656320881524098380.pdf",
+      rule: "药品追溯码用于唯一标识药品各级销售包装单元；标识应清晰、显著、可被设备和人眼识读，并包含文字、可识读字符和条码符号。",
+      platformImpact: "机构端和医保端模板需记录追溯码可识读性、包装级别、扫码失败原因、人工核验和整改证据。"
+    }
+  ];
+}
+
+function seedDrugTraceabilityEvidenceRequirements() {
+  return [
+    {
+      id: "trace-scan-capture",
+      title: "Traceability scan capture",
+      boundaries: ["rational-medication", "fixed-pharmacy", "insurance-settlement"],
+      owner: "institution-and-insurance",
+      policySourceIds: ["nhsa-2025-7", "nmpa-2022-label"],
+      evidenceFields: ["traceCode", "scanTime", "packageLevel", "operator", "sourceSystem"]
+    },
+    {
+      id: "trace-code-mapping",
+      title: "Insurance code and traceability-code mapping",
+      boundaries: ["insurance-settlement"],
+      owner: "insurance-integration",
+      policySourceIds: ["nhsa-2024-collection", "nmpa-2019-32"],
+      evidenceFields: ["medicalInsuranceCode", "commodityCode", "traceCode", "packageCascade", "mappingVersion"]
+    },
+    {
+      id: "trace-manual-exception",
+      title: "No-code or failed-scan manual verification",
+      boundaries: ["rational-medication", "fixed-pharmacy", "consumable-clue"],
+      owner: "institution-remediation",
+      policySourceIds: ["nhsa-2024-collection", "nmpa-2022-label"],
+      evidenceFields: ["noCodeReason", "manualVerification", "photoEvidence", "reviewer", "rectificationDeadline"]
+    },
+    {
+      id: "trace-consumable-catalog",
+      title: "High-value consumable catalog and settlement cross-check",
+      boundaries: ["consumable-clue", "insurance-settlement"],
+      owner: "institution-and-insurance",
+      policySourceIds: ["nhsa-2025-7", "nhsa-2024-collection"],
+      evidenceFields: ["catalogVersion", "batchNo", "useRecord", "chargeItem", "claimId"]
+    },
+    {
+      id: "trace-remediation-audit",
+      title: "Remediation audit trail and department coordination",
+      boundaries: ["rational-medication", "fixed-pharmacy", "consumable-clue", "insurance-settlement"],
+      owner: "commission-insurance-institution",
+      policySourceIds: ["nhsa-2025-7", "nmpa-2018-guidance"],
+      evidenceFields: ["auditTrail", "securityEvent", "remediationEvidence", "reviewDecision", "nextAction"]
+    }
+  ];
+}
+
 function seedMedicalResources() {
   return [
     { id: "mr1", institution: "大连市中心医院", type: "三级医院", beds: 1200, doctors: 860, nurses: 1240, chronicClinics: 8, devices: 46, region: "市级" },
@@ -6220,6 +6322,28 @@ function seedDrugConsumableSupervisions() {
       nextAction: "Insurance center confirms benefit scope and pickup cycle.",
       auditTrail: [{ at: "2026-06-20T09:05:00.000Z", actor: "system", role: "commission", action: "seed", result: "created" }],
       lastUpdated: "2026-06-20T09:05:00.000Z",
+      personIndex: "DEMO-ID-R2#DEMO-MOBILE-R2"
+    },
+    {
+      id: "dcs-supply-mp3",
+      residentId: "r2",
+      category: "supply-assurance",
+      boundary: "supply-alert",
+      institution: "Xinghaiwan Community Health Service Center",
+      sourceCollection: "medicationPickups",
+      sourceId: "mp3",
+      relatedPickupId: "mp3",
+      relatedClaimId: "ic2",
+      issue: "Metformin fixed-pickup supply is under low-stock warning and needs procurement or transfer confirmation.",
+      riskLevel: "warning",
+      reviewStatus: "supply-alert-registered",
+      insuranceStatus: "pending-audit",
+      remediationStatus: "open",
+      status: "open",
+      ownerRole: "institution",
+      nextAction: "Institution pharmacy confirms stock transfer plan and insurance center keeps the pickup cycle payable.",
+      auditTrail: [{ at: "2026-06-20T09:08:00.000Z", actor: "system", role: "commission", action: "seed", result: "created" }],
+      lastUpdated: "2026-06-20T09:08:00.000Z",
       personIndex: "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
@@ -9738,6 +9862,10 @@ function collectJson(req) {
 }
 
 function normalizeState(data) {
+  const auditTrailSource = {
+    dataAccessLogs: Array.isArray(data?.dataAccessLogs) ? data.dataAccessLogs : null,
+    securityEvents: Array.isArray(data?.securityEvents) ? data.securityEvents : null
+  };
   data = restoreCorruptedStrings(seedState(), data);
   const state = {
     accounts: Array.isArray(data.accounts) ? data.accounts : seedState().accounts,
@@ -9883,6 +10011,8 @@ function normalizeState(data) {
     insuranceClaims: Array.isArray(data.insuranceClaims) ? data.insuranceClaims : seedInsuranceClaims(),
     diseasePayment: DiseasePaymentService.normalizeState(data.diseasePayment),
     policyAlignment: Array.isArray(data.policyAlignment) ? data.policyAlignment : seedPolicyAlignment(),
+    drugTraceabilityPolicySources: mergeByKey(seedDrugTraceabilityPolicySources(), data.drugTraceabilityPolicySources, "id"),
+    drugTraceabilityEvidenceRequirements: mergeByKey(seedDrugTraceabilityEvidenceRequirements(), data.drugTraceabilityEvidenceRequirements, "id"),
     emergencySignals: Array.isArray(data.emergencySignals) ? data.emergencySignals : seedEmergencySignals(),
     emergencyResources: Array.isArray(data.emergencyResources) ? data.emergencyResources : EmergencyService.seed().emergencyResources,
     emergencyHospitals: Array.isArray(data.emergencyHospitals) ? data.emergencyHospitals : EmergencyService.seed().emergencyHospitals,
@@ -9914,8 +10044,8 @@ function normalizeState(data) {
     emergencyLaunchIncidents: Array.isArray(data.emergencyLaunchIncidents) ? data.emergencyLaunchIncidents.slice(0, 2000) : [],
     emergencyRollbackPlan: data.emergencyRollbackPlan && typeof data.emergencyRollbackPlan === "object" ? data.emergencyRollbackPlan : EmergencyProduction.seed().emergencyRollbackPlan,
     seniorServices: Array.isArray(data.seniorServices) ? data.seniorServices : seedSeniorServices(),
-    dataAccessLogs: sealAuditTrail(Array.isArray(data.dataAccessLogs) ? data.dataAccessLogs : seedDataAccessLogs()),
-    securityEvents: sealAuditTrail(Array.isArray(data.securityEvents) ? data.securityEvents : seedSecurityEvents()),
+    dataAccessLogs: sealAuditTrail(auditTrailSource.dataAccessLogs || seedDataAccessLogs()),
+    securityEvents: sealAuditTrail(auditTrailSource.securityEvents || seedSecurityEvents()),
     digitalCredentials: Array.isArray(data.digitalCredentials) ? data.digitalCredentials : seedDigitalCredentials(),
     healthArchiveStandard: data.healthArchiveStandard && typeof data.healthArchiveStandard === "object" ? data.healthArchiveStandard : seedHealthArchiveStandard(),
     authOrganizations: mergeByKey(seedAuthOrganizations(), data.authOrganizations, "orgCode"),
@@ -18642,6 +18772,21 @@ function cleanWorkflowUpdates(updates) {
   }, {});
 }
 
+function appendDrugConsumableAuditTrail(item, user, action, detail) {
+  if (!item || typeof item !== "object") return;
+  item.auditTrail = [
+    {
+      at: new Date().toISOString(),
+      actor: user?.username || user?.role || "system",
+      role: user?.role || "system",
+      action,
+      result: item.status || item.reviewStatus || item.remediationStatus || "updated",
+      detail: String(detail || item.nextAction || "").trim()
+    },
+    ...(Array.isArray(item.auditTrail) ? item.auditTrail : [])
+  ].slice(0, 20);
+}
+
 function cleanResidentPatch(patch) {
   return Object.entries(patch && typeof patch === "object" ? patch : {}).reduce((result, [key, value]) => {
     if (RESIDENT_PROTECTED_FIELDS.has(key) || key === "expectedVersion") return result;
@@ -19029,6 +19174,8 @@ const TASK_SOURCES = [
   ["diagnosticReports", "county", "报告回传", "reportedAt"]
 ];
 
+TASK_SOURCES.splice(13, 0, ["drugConsumableSupervisions", ["commission", "insurance", "institution"], "Drug consumable supervision", "lastUpdated"]);
+
 const SERVICE_DOMAIN_BY_COLLECTION = {
   chronicScreeningTasks: "screening",
   chronicEducationPushes: "education",
@@ -19056,7 +19203,7 @@ function taskPriorityLevel(item) {
 }
 
 function taskTitle(item, category) {
-  return item.taskName || item.topic || item.plan || item.orderType || item.claimType || item.medication || item.item || item.title || item.name || item.service || category;
+  return item.taskName || item.topic || item.plan || item.orderType || item.claimType || item.medication || item.issue || item.item || item.title || item.name || item.service || category;
 }
 
 function isClosedTaskStatus(status) {
@@ -21896,8 +22043,95 @@ function drugConsumableStatus(value) {
   return text || "tracking";
 }
 
+function buildDrugTraceabilityEvidenceChecklist(rows, policySources, requirements = seedDrugTraceabilityEvidenceRequirements()) {
+  const sourceIds = new Set((policySources || []).map((item) => item.id));
+  return requirements.map((requirement) => {
+    const linkedRows = rows.filter((row) =>
+      (requirement.boundaries || []).includes(row.boundary) ||
+      ((requirement.boundaries || []).includes("insurance-settlement") && row.relatedClaimId) ||
+      (requirement.id === "trace-remediation-audit" && row.remediationStatus)
+    );
+    const policySourceIds = (requirement.policySourceIds || []).filter((id) => sourceIds.has(id));
+    return {
+      ...requirement,
+      policySourceIds,
+      rowIds: linkedRows.map((row) => row.id),
+      rowCount: linkedRows.length,
+      ready: policySourceIds.length === (requirement.policySourceIds || []).length && linkedRows.length > 0
+    };
+  });
+}
+
+function buildDrugTraceabilityEvidenceSubmission(data, item, payload, user) {
+  const requirements = Array.isArray(data.drugTraceabilityEvidenceRequirements) ? data.drugTraceabilityEvidenceRequirements : seedDrugTraceabilityEvidenceRequirements();
+  const policySources = Array.isArray(data.drugTraceabilityPolicySources) ? data.drugTraceabilityPolicySources : seedDrugTraceabilityPolicySources();
+  const requirement = requirements.find((row) => row.id === payload.requirementId) ||
+    requirements.find((row) => (row.boundaries || []).includes(item.boundary)) ||
+    requirements[0];
+  const fields = payload.fields && typeof payload.fields === "object" ? payload.fields : {};
+  const expectedFields = Array.isArray(requirement?.evidenceFields) ? requirement.evidenceFields : [];
+  const completedFields = expectedFields.filter((field) => fields[field] !== undefined && fields[field] !== null && String(fields[field]).trim() !== "");
+  const missingFields = expectedFields.filter((field) => !completedFields.includes(field));
+  const policySourceIds = (requirement?.policySourceIds || []).filter((id) => policySources.some((source) => source.id === id));
+  const completeness = missingFields.length === 0 && expectedFields.length > 0 ? "complete" : "partial";
+  return {
+    id: `dte-${randomUUID()}`,
+    requirementId: requirement?.id || String(payload.requirementId || "traceability-evidence"),
+    title: requirement?.title || "Traceability evidence",
+    submittedAt: new Date().toISOString(),
+    submittedBy: user.username || user.role,
+    submittedByName: user.name,
+    submittedByRole: user.role,
+    evidenceSource: String(payload.evidenceSource || payload.source || "manual-entry"),
+    fields,
+    expectedFields,
+    completedFields,
+    missingFields,
+    policySourceIds,
+    completeness,
+    note: String(payload.note || payload.nextAction || "").trim()
+  };
+}
+
+function drugTraceabilityRequirementApplies(requirement, row) {
+  const boundaries = requirement.boundaries || [];
+  return boundaries.includes(row.boundary) ||
+    (boundaries.includes("insurance-settlement") && row.relatedClaimId) ||
+    (requirement.id === "trace-remediation-audit" && row.remediationStatus);
+}
+
+function buildDrugTraceabilityEvidenceCoverage(row, requirements = seedDrugTraceabilityEvidenceRequirements()) {
+  const applicable = requirements.filter((requirement) => drugTraceabilityRequirementApplies(requirement, row));
+  const submissions = Array.isArray(row.traceabilityEvidenceSubmissions) ? row.traceabilityEvidenceSubmissions : [];
+  const requirementStatus = applicable.map((requirement) => {
+    const submission = submissions.find((item) => item.requirementId === requirement.id);
+    const status = submission?.completeness === "complete" ? "complete" : submission ? "partial" : "missing";
+    return {
+      requirementId: requirement.id,
+      title: requirement.title,
+      status,
+      missingFields: submission?.missingFields || requirement.evidenceFields || [],
+      submittedAt: submission?.submittedAt || "",
+      evidenceSource: submission?.evidenceSource || ""
+    };
+  });
+  const complete = requirementStatus.filter((item) => item.status === "complete").length;
+  const partial = requirementStatus.filter((item) => item.status === "partial").length;
+  const missing = requirementStatus.filter((item) => item.status === "missing").length;
+  return {
+    required: applicable.length,
+    complete,
+    partial,
+    missing,
+    status: missing === 0 && partial === 0 && applicable.length > 0 ? "complete" : complete || partial ? "partial" : "pending",
+    requirementStatus
+  };
+}
+
 function buildDrugConsumableSupervision(data) {
   const supervisions = Array.isArray(data.drugConsumableSupervisions) ? data.drugConsumableSupervisions : seedDrugConsumableSupervisions();
+  const traceabilityPolicySources = Array.isArray(data.drugTraceabilityPolicySources) ? data.drugTraceabilityPolicySources : seedDrugTraceabilityPolicySources();
+  const traceabilityEvidenceRequirements = Array.isArray(data.drugTraceabilityEvidenceRequirements) ? data.drugTraceabilityEvidenceRequirements : seedDrugTraceabilityEvidenceRequirements();
   const pickups = Array.isArray(data.medicationPickups) ? data.medicationPickups : [];
   const claims = Array.isArray(data.insuranceClaims) ? data.insuranceClaims : [];
   const institutionSupervisions = Array.isArray(data.institutionSupervisions) ? data.institutionSupervisions : [];
@@ -21912,10 +22146,14 @@ function buildDrugConsumableSupervision(data) {
       pickup,
       claim,
       institutionIssue,
+      traceabilityEvidenceCoverage: buildDrugTraceabilityEvidenceCoverage(item, traceabilityEvidenceRequirements),
       auditCount: Array.isArray(item.auditTrail) ? item.auditTrail.length : 0
     };
   });
   const openRows = rows.filter((item) => item.normalizedStatus !== "closed");
+  const completeCoverageRows = rows.filter((item) => item.traceabilityEvidenceCoverage?.status === "complete");
+  const supplyAlerts = rows.filter((item) => item.boundary === "supply-alert" || item.category === "supply-assurance");
+  const traceabilityEvidenceChecklist = buildDrugTraceabilityEvidenceChecklist(rows, traceabilityPolicySources, traceabilityEvidenceRequirements);
   const insuranceContract = contracts.find((item) => item.id === "insurance-settlement-v1");
   return {
     generatedAt: new Date().toISOString(),
@@ -21923,6 +22161,7 @@ function buildDrugConsumableSupervision(data) {
       { id: "rational-medication", name: "Rational medication", source: "medicationPickups + personalRecords", count: rows.filter((item) => item.boundary === "rational-medication").length },
       { id: "prescription-review", name: "Prescription and pharmacist review", source: "drugConsumableSupervisions.reviewStatus", count: rows.filter((item) => /review|rational/.test(item.boundary)).length },
       { id: "fixed-pharmacy", name: "Fixed pickup", source: "medicationPickups", count: pickups.length },
+      { id: "supply-alert", name: "Supply assurance alerts", source: "medicationPickups + drugConsumableSupervisions", count: supplyAlerts.length },
       { id: "consumable-clue", name: "High-value consumable clues", source: "institutionSupervisions + drugConsumableSupervisions", count: rows.filter((item) => item.boundary === "consumable-clue").length },
       { id: "insurance-settlement", name: "Insurance settlement coordination", source: "insuranceClaims + integrationContracts", count: claims.length },
       { id: "remediation-loop", name: "Remediation loop", source: "workflow-actions + securityEvents", count: rows.filter((item) => item.remediationStatus && item.remediationStatus !== "closed").length }
@@ -21931,12 +22170,22 @@ function buildDrugConsumableSupervision(data) {
       total: rows.length,
       open: openRows.length,
       highRisk: rows.filter((item) => item.riskLevel === "high").length,
+      supplyAlerts: supplyAlerts.length,
       pendingInsurance: rows.filter((item) => drugConsumableStatus(item.insuranceStatus) === "pending").length,
       fixedPickup: pickups.length,
       claims: claims.length,
+      traceabilityPolicySources: traceabilityPolicySources.length,
+      traceabilityEvidenceRequirements: traceabilityEvidenceRequirements.length,
+      traceabilityEvidenceItems: traceabilityEvidenceChecklist.length,
+      traceabilityEvidenceReady: traceabilityEvidenceChecklist.filter((item) => item.ready).length,
+      traceabilityCoverageCompleteRows: completeCoverageRows.length,
       contractReady: Boolean(insuranceContract?.status === "ready" && insuranceContract.signature && insuranceContract.retryPolicy)
     },
     rows,
+    traceabilityPolicySources,
+    traceabilityEvidenceRequirements,
+    traceabilityEvidenceChecklist,
+    supplyAlerts,
     insuranceCoordination: {
       contractId: insuranceContract?.id || "",
       status: insuranceContract?.status || "missing",
@@ -25302,6 +25551,30 @@ async function handleApi(req, res) {
       status: String(payload.status || "insurance-synced"),
       nextAction: String(payload.nextAction || payload.note || "Archive settlement coordination evidence.")
     }, user, "drug-consumable-insurance-sync");
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname.startsWith("/api/drug-consumable-supervision/") && url.pathname.endsWith("/traceability-evidence")) {
+    const user = requireApiRole(req, res, ["commission", "insurance", "institution"], "/api/drug-consumable-supervision/:id/traceability-evidence");
+    if (!user) return;
+    const id = decodeURIComponent(url.pathname.replace("/api/drug-consumable-supervision/", "").replace("/traceability-evidence", ""));
+    const data = readDatabase();
+    const item = (Array.isArray(data.drugConsumableSupervisions) ? data.drugConsumableSupervisions : []).find((row) => row.id === id);
+    if (!item) {
+      sendJson(res, 404, { error: "Not Found", message: "drug consumable supervision not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const submission = buildDrugTraceabilityEvidenceSubmission(data, item, payload, user);
+    const submissions = [submission, ...(Array.isArray(item.traceabilityEvidenceSubmissions) ? item.traceabilityEvidenceSubmissions : [])].slice(0, 10);
+    const result = updateDrugConsumableSupervision(data, id, {
+      traceabilityEvidenceSubmissions: submissions,
+      traceabilityEvidenceStatus: submission.completeness,
+      status: submission.completeness === "complete" ? String(payload.status || "traceability-evidence-complete") : String(payload.status || "traceability-evidence-partial"),
+      remediationStatus: submission.completeness === "complete" ? String(payload.remediationStatus || "evidence-complete") : String(payload.remediationStatus || "evidence-partial"),
+      nextAction: String(payload.nextAction || (submission.completeness === "complete" ? "Review submitted traceability evidence and archive field joint-test proof." : `Complete missing traceability fields: ${submission.missingFields.join(", ")}`))
+    }, user, "drug-consumable-traceability-evidence");
     sendJson(res, result.status, result.body);
     return;
   }

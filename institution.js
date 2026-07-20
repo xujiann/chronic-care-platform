@@ -194,6 +194,7 @@ function renderAll(state) {
   renderCareOrders(state);
   renderAuthorizedRecords(state);
   renderClaimLinks(state);
+  renderInstitutionDrugConsumableSupervision(institutionDrugConsumableState, state);
   renderReferralCenter(state);
   renderRegistrationJourneyWorkbench(state);
   renderTeleconsultationLoop(state);
@@ -361,6 +362,52 @@ function bindInstitutionActions() {
     if (search) search.value = "";
     renderChronicFollowupWorkbench(platformState);
   });
+}
+
+async function loadInstitutionDrugConsumableSupervision(state = platformState) {
+  if (!institutionApiBase) {
+    const rows = (state.drugConsumableSupervisions || []).map((item) => ({
+      ...item,
+      normalizedStatus: /closed|complete|done|passed/i.test(String(item.status || "")) ? "closed" : "open",
+      auditCount: Array.isArray(item.auditTrail) ? item.auditTrail.length : 0
+    }));
+    return {
+      rows,
+      boundaries: [],
+      summary: {
+        total: rows.length,
+        open: rows.filter((item) => item.normalizedStatus !== "closed").length,
+        highRisk: rows.filter((item) => item.riskLevel === "high").length
+      }
+    };
+  }
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/drug-consumable-supervision`);
+    if (!response.ok) return { boundaries: [], rows: [], summary: {} };
+    return response.json();
+  } catch {
+    return { boundaries: [], rows: [], summary: {} };
+  }
+}
+
+async function postInstitutionDrugConsumableAction(id, action, body) {
+  if (!institutionApiBase) return false;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  const response = await request(`${institutionApiBase}/drug-consumable-supervision/${encodeURIComponent(id)}/${action}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  if (!response.ok) return false;
+  institutionDrugConsumableState = await loadInstitutionDrugConsumableSupervision(platformState);
+  platformState = await loadPlatformState(fallbackState);
+  renderAll(platformState);
+  return true;
+}
+
+async function postInstitutionDrugConsumableRemediation(id, body) {
+  return postInstitutionDrugConsumableAction(id, "remediation", body);
 }
 
 function actionButton(collection, id, label, updates, note) {

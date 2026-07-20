@@ -13,6 +13,7 @@ test("process audit validates full process evidence domains", () => {
   assert.equal(report.evidenceDomains.length >= 6, true);
   assert.equal(report.evidenceDomains.every((item) => item.passed), true);
   assert.equal(report.evidenceDomains.some((item) => item.id === "site-readiness" && item.passed), true);
+  assert.equal(report.evidenceDomains.some((item) => item.id === "insurance-and-pharmacy" && item.evidence.includes("drugConsumableSupervisions")), true);
   assert.equal(report.checks.some((item) => item.id === "process:siteReadinessPack" && item.passed), true);
   assert.equal(report.ledgers.chronic.total >= 5, true);
   assert.equal(report.ledgers.county.total >= 4, true);
@@ -51,6 +52,7 @@ test("process audit renders and writes release artifacts", (t) => {
   const markdown = renderMarkdown(report);
   assert.match(markdown, /Full process audit report/);
   assert.match(markdown, /Evidence domains/);
+  assert.match(markdown, /drugConsumableSupervisions/);
   assert.match(markdown, /Process matrix/);
 
   writeOutput(report, {

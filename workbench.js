@@ -10,6 +10,7 @@ const fallbackState = {
   chronicProjectBlueprint: null,
   countyProjectBlueprint: null,
   referralSystem: null,
+  drugConsumableSupervisions: [],
   platformRoadmap: [],
   platformAudit: [],
   platformProcessAudit: []
@@ -53,6 +54,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   currentSiteReadinessPack = siteReadinessPack;
   currentSiteTemplateReadmes = siteTemplateReadmes;
   renderMetrics(state, tasks, roadmap, operations);
+  renderDrugConsumableSupervision(drugConsumableSupervision, state);
   renderSystemReadiness(readiness);
   renderReleaseEvidenceGates(state, readiness, operations, processAudit, serviceAcceptanceSummary, siteReadinessPack, releaseReport, productionCutover, releaseArtifactManifest);
   renderAcceptanceLedgers(state, acceptanceLedgers, serviceAcceptanceSummary);
@@ -216,6 +218,18 @@ async function loadUnifiedTaskReport() {
   }
 }
 
+async function loadDrugConsumableSupervision() {
+  if (location.protocol === "file:") return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request("/api/drug-consumable-supervision");
+    if (!response.ok) return null;
+    return response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
 function normalizeApiTasks(tasks) {
   const priorityWeight = { high: 3, medium: 2, normal: 1 };
   return tasks.map((task) => ({
@@ -250,6 +264,94 @@ function renderMetrics(state, tasks, roadmap, operations) {
     ["P0 优先项", p0, "先补平台底座"],
     ["居民主索引", state.residents?.length || 0, "身份证号 + 手机号"]
   ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><small>${hint}</small></article>`).join("");
+}
+
+function renderDrugConsumableSupervision(report, state) {
+  const container = document.querySelector("#drug-consumable-supervision");
+  const countEl = document.querySelector("#drug-consumable-supervision-count");
+  if (!container || !countEl) return;
+
+  const fallbackRows = (state.drugConsumableSupervisions || []).map((item) => ({
+    ...item,
+    normalizedStatus: /closed|complete|通过|完成/i.test(String(item.status || "")) ? "closed" : "open",
+    auditCount: Array.isArray(item.auditTrail) ? item.auditTrail.length : 0
+  }));
+  const rows = report?.rows?.length ? report.rows : fallbackRows;
+  const boundaries = report?.boundaries || [];
+  const policySources = report?.traceabilityPolicySources || [];
+  const evidenceChecklist = report?.traceabilityEvidenceChecklist || [];
+  const summary = report?.summary || {
+    total: rows.length,
+    open: rows.filter((item) => item.normalizedStatus !== "closed").length,
+    highRisk: rows.filter((item) => item.riskLevel === "high").length
+  };
+
+  countEl.textContent = `${summary.open ?? rows.length}/${summary.total ?? rows.length} open`;
+  const boundaryRows = boundaries.length ? boundaries.map((item) => `<div><strong>${item.name}</strong><span>${item.source} · ${item.count}</span></div>`).join("") : "";
+  const policySourceRow = renderDrugTraceabilityPolicyRow(policySources);
+  const evidenceChecklistRow = renderDrugTraceabilityEvidenceChecklistRow(evidenceChecklist);
+  const supervisionRows = rows.slice(0, 6).map((item, index) => {
+    const resident = residentOf(state, item.residentId);
+    const badge = item.riskLevel === "high" ? "danger" : item.normalizedStatus === "pending" ? "warn" : "info";
+    return `<article class="priority-row" data-drug-consumable-supervision="${item.id}">
+      <div class="priority-rank ${badge}">${index + 1}</div>
+      <div>
+        <h3>${resident?.name || item.residentId || "Unknown resident"} · ${item.category || item.boundary}</h3>
+        <p>${item.institution || "institution pending"} · ${item.issue || item.nextAction || "Drug consumable supervision item"}</p>
+        <small>Trace evidence ${item.traceabilityEvidenceStatus || "pending"} · submissions ${(item.traceabilityEvidenceSubmissions || []).length} · coverage ${item.traceabilityEvidenceCoverage?.complete || 0}/${item.traceabilityEvidenceCoverage?.required || 0} · status ${item.traceabilityEvidenceCoverage?.status || "pending"} · missing ${item.traceabilityEvidenceCoverage?.missing || 0} · partial ${item.traceabilityEvidenceCoverage?.partial || 0}</small>
+        <small>${item.boundary || ""}</small>
+        <small>${item.nextAction || ""}</small>
+      </div>
+      <span class="badge ${badge}">${item.riskLevel || item.normalizedStatus || item.status}</span>
+    </article>`;
+  }).join("");
+
+  container.innerHTML = `
+    <article class="priority-row" data-drug-consumable-summary>
+      <div class="priority-rank ${summary.highRisk ? "danger" : "info"}">${summary.highRisk || 0}</div>
+      <div>
+        <h3>Drug, consumable and rational-use supervision</h3>
+        <p>${summary.total || rows.length} supervision rows · ${summary.open || 0} open · ${summary.pendingInsurance || 0} pending insurance coordination.</p>
+        <small>/api/drug-consumable-supervision</small>
+        <small>release/drug-consumable-readiness-report.md</small>
+      </div>
+      <span class="badge ${summary.highRisk ? "danger" : "info"}">${summary.contractReady === false ? "contract pending" : "demo-ready"}</span>
+    </article>
+    ${boundaryRows ? `<article class="priority-row"><div class="priority-rank info">B</div><div class="rules">${boundaryRows}</div><span class="badge info">boundaries</span></article>` : ""}
+    ${policySourceRow}
+    ${evidenceChecklistRow}
+    ${supervisionRows || `<article class="priority-row"><div class="priority-rank warn">0</div><div><h3>No drug consumable supervision rows</h3><p>Run the local API or seed data to review this app.</p></div><span class="badge warn">empty</span></article>`}
+  `;
+}
+
+function renderDrugTraceabilityPolicyRow(policySources = []) {
+  const sourceLinks = policySources.slice(0, 3).map((item) => `<a href="${item.url || "./drug-consumable-about.html"}">${item.documentNo || item.authority || "source"}</a>`).join(" · ");
+  return `<article class="priority-row" data-drug-traceability-policy-sources>
+    <div class="priority-rank info">${policySources.length || "P"}</div>
+    <div>
+      <h3>Drug traceability policy sources</h3>
+      <p>${policySources.length ? `${policySources.length} official policy sources linked to supervision, remediation and insurance settlement evidence.` : "No official policy sources returned by the drug consumable API."}</p>
+      <small>${sourceLinks || "drugTraceabilityPolicySources"}</small>
+      <small><a href="./drug-consumable-about.html">drug-consumable-about.html</a></small>
+    </div>
+    <span class="badge info">policy</span>
+  </article>`;
+}
+
+function renderDrugTraceabilityEvidenceChecklistRow(evidenceChecklist = []) {
+  const ready = evidenceChecklist.filter((item) => item.ready).length;
+  const allReady = evidenceChecklist.length > 0 && ready === evidenceChecklist.length;
+  const evidencePreview = evidenceChecklist.slice(0, 3).map((item) => `${item.title || item.id}: ${(item.evidenceFields || []).slice(0, 3).join("/")} [${(item.policySourceIds || []).join(", ")}]`).join(" · ");
+  return `<article class="priority-row" data-drug-traceability-evidence-checklist>
+    <div class="priority-rank ${allReady ? "info" : "warn"}">${ready}/${evidenceChecklist.length || 0}</div>
+    <div>
+      <h3>Traceability evidence checklist</h3>
+      <p>${evidenceChecklist.length ? "Evidence fields are mapped to supervision rows, remediation uploads and insurance settlement review." : "No evidence checklist returned by the drug consumable API."}</p>
+      <small>${evidencePreview || "traceabilityEvidenceChecklist"}</small>
+      <small>/api/drug-consumable-supervision</small>
+    </div>
+    <span class="badge ${allReady ? "info" : "warn"}">evidence</span>
+  </article>`;
 }
 
 function renderSystemReadiness(readiness) {
