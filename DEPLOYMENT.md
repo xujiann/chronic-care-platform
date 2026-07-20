@@ -379,7 +379,7 @@ Before onsite testing, compare `referral-feedback-callback-v1`, `referral-schedu
 
 ## Medical quality and safety supervision release boundary
 
-Run `npm.cmd run quality-safety:report` before release. The generated `release/quality-safety-report.md` and `release/quality-safety-report.json` prove the demo boundary for medical quality, safety events, critical values, clinical pathways, medical record QC, mutual-recognition QC, dispatch, feedback, review, permission trimming, and audit evidence.
+Run `npm.cmd run quality-safety:report` before release. The generated `release/quality-safety-report.md` and `release/quality-safety-report.json` prove the demo boundary for medical quality, safety events, critical value acknowledgement and disposition, clinical pathway variance review, medical record QC, mutual-recognition QC, dispatch, feedback, review, permission trimming, policy-basis references, prioritized action-plan evidence, go-live readiness, site joint-testing sign-off tracking, and audit evidence.
 
 Site joint testing still requires live HIS/EMR/LIS/PACS feeds, production critical-value acknowledgement routing, medical-record sampling signatures, clinical pathway rule dictionaries, mutual-recognition QC rules, and department rectification sign-off attachments.
 

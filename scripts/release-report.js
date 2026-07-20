@@ -753,7 +753,27 @@ function qualitySafetyChecks(qualitySafety) {
   return [
     check("qualitySafety:report", qualitySafety.ok, qualitySafety.ok ? "quality and safety supervision checks passed" : "quality and safety supervision checks failed", "error", "quality-safety"),
     check("qualitySafety:boundaries", qualitySafety.summary?.modeledBoundaries === qualitySafety.summary?.boundaries, `${qualitySafety.summary?.modeledBoundaries || 0}/${qualitySafety.summary?.boundaries || 0} boundaries modeled`, "error", "quality-safety"),
-    check("qualitySafety:reuse", qualitySafety.reusedCollections?.every((item) => item.present), `${qualitySafety.summary?.reusedCollections || 0} reused collections`, "error", "quality-safety")
+    check("qualitySafety:reuse", qualitySafety.reusedCollections?.every((item) => item.present), `${qualitySafety.summary?.reusedCollections || 0} reused collections`, "error", "quality-safety"),
+    check("qualitySafety:siteSignoffTracker", Array.isArray(qualitySafety.siteSignoffs) && qualitySafety.siteSignoffs.length >= 6, `${qualitySafety.summary?.siteSignoffs?.total || 0} site sign-off items`, "error", "quality-safety"),
+    check("qualitySafety:warningIndicators", Array.isArray(qualitySafety.warningIndicators) && qualitySafety.warningIndicators.length >= 6 && qualitySafety.warningIndicators.every((item) => item.closedLoopReady), `${qualitySafety.summary?.warningIndicators || 0} warning indicators; ${qualitySafety.summary?.warningIndicatorsAttention || 0} requiring attention`, "error", "quality-safety"),
+    check("qualitySafety:goLiveReadiness", qualitySafety.goLiveReadiness?.usable, `${qualitySafety.goLiveReadiness?.stage || "unknown"} score=${qualitySafety.goLiveReadiness?.score ?? 0}`, "error", "quality-safety")
+  ];
+}
+
+function qualitySafetyInterfaceStandardChecks(standard) {
+  return [
+    check("qualitySafetyInterface:standard", standard.ok, standard.ok ? "quality-safety institution interface standard checks passed" : "quality-safety institution interface standard checks failed", "error", "quality-safety"),
+    check("qualitySafetyInterface:interfaces", standard.summary?.interfaces >= 6, `${standard.summary?.interfaces || 0} interface documents`, "error", "quality-safety"),
+    check("qualitySafetyInterface:acceptanceChecklist", standard.summary?.acceptanceRows >= 6, `${standard.summary?.acceptanceRows || 0} acceptance rows`, "error", "quality-safety")
+  ];
+}
+
+function qualitySafetyInterfaceJointTestChecks(pack) {
+  return [
+    check("qualitySafetyInterfaceJointTest:pack", pack.ok, pack.ok ? "quality-safety joint-test pack checks passed" : "quality-safety joint-test pack checks failed", "error", "quality-safety"),
+    check("qualitySafetyInterfaceJointTest:samples", pack.summary?.sampleAccepted === pack.summary?.sampleRequests, `${pack.summary?.sampleAccepted || 0}/${pack.summary?.sampleRequests || 0} sample messages accepted`, "error", "quality-safety"),
+    check("qualitySafetyInterfaceJointTest:negativeCases", pack.negativeCases?.every((item) => !item.result.ok), `${pack.negativeCases?.length || 0} rejection cases`, "error", "quality-safety"),
+    check("qualitySafetyInterfaceJointTest:siteSampleAcceptance", pack.summary?.siteSampleReady === pack.summary?.siteSampleAcceptance && pack.summary?.siteSampleAcceptance === pack.summary?.sampleRequests, `${pack.summary?.siteSampleReady || 0}/${pack.summary?.siteSampleAcceptance || 0} site sample acceptance rows ready`, "error", "quality-safety")
   ];
 }
 
@@ -1054,6 +1074,8 @@ function packageChecks(pkg) {
     "phase2:citizen-operations-readiness",
     "security:commercial-crypto-readiness",
     "quality-safety:report",
+    "quality-safety:interface-standard",
+    "quality-safety:joint-test",
     "environment:matrix",
     "hybrid:deployment-readiness",
     "deployment:package",
@@ -1618,6 +1640,14 @@ function renderMarkdown(report) {
     "",
     "See `drug-consumable-readiness-report.json` and `drug-consumable-readiness-report.md` for rational medication, prescription review, fixed pickup, high-value consumable clues, insurance settlement coordination, and remediation-loop evidence.",
     "",
+    "## Quality-safety institution interface standard",
+    "",
+    "See `quality-safety-interface-standard.json` and `quality-safety-interface-standard.md` for hospital-facing document control, transport, security, message envelope, field dictionaries, sample payloads, status codes, and joint-test acceptance checklist.",
+    "",
+    "## Quality-safety institution joint-test pack",
+    "",
+    "See `quality-safety-interface-joint-test-pack.json` and `quality-safety-interface-joint-test-pack.md` for sample requests, HMAC-SHA256 signature fixtures, field dictionaries, site sample acceptance rows, idempotency replay checks, and negative validation cases.",
+    "",
     "## Operations readiness report",
     "",
     "See `operations-readiness-report.json` and `operations-readiness-report.md` for operation routes, production deployment tracks, external dependency risks, and release operation scripts.",
@@ -1914,6 +1944,22 @@ function writeOutput(report, flags) {
       profile: report.profile,
       generatedAt: report.generatedAt,
       qualitySafety: report.qualitySafety
+    }, null, 2), "utf8");
+    const qualitySafetyInterfaceJson = path.join(path.dirname(output), "quality-safety-interface-standard.json");
+    fs.writeFileSync(qualitySafetyInterfaceJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      qualitySafetyInterfaceStandard: report.qualitySafetyInterfaceStandard
+    }, null, 2), "utf8");
+    const qualitySafetyJointTestJson = path.join(path.dirname(output), "quality-safety-interface-joint-test-pack.json");
+    fs.writeFileSync(qualitySafetyJointTestJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      qualitySafetyInterfaceJointTest: report.qualitySafetyInterfaceJointTest
     }, null, 2), "utf8");
     const integrationJson = path.join(path.dirname(output), "integration-readiness-report.json");
     fs.writeFileSync(integrationJson, JSON.stringify({
@@ -2249,6 +2295,10 @@ function writeOutput(report, flags) {
     fs.writeFileSync(productionGoNoGoMarkdown, renderProductionGoNoGoMarkdown(report.productionGoNoGo), "utf8");
     const qualitySafetyMarkdown = path.join(path.dirname(markdown), "quality-safety-report.md");
     fs.writeFileSync(qualitySafetyMarkdown, renderQualitySafetyMarkdown(report.qualitySafety), "utf8");
+    const qualitySafetyInterfaceMarkdown = path.join(path.dirname(markdown), "quality-safety-interface-standard.md");
+    fs.writeFileSync(qualitySafetyInterfaceMarkdown, renderQualitySafetyInterfaceStandardMarkdown(report.qualitySafetyInterfaceStandard), "utf8");
+    const qualitySafetyJointTestMarkdown = path.join(path.dirname(markdown), "quality-safety-interface-joint-test-pack.md");
+    fs.writeFileSync(qualitySafetyJointTestMarkdown, renderQualitySafetyInterfaceJointTestMarkdown(report.qualitySafetyInterfaceJointTest), "utf8");
     const integrationMarkdown = path.join(path.dirname(markdown), "integration-readiness-report.md");
     fs.writeFileSync(integrationMarkdown, renderIntegrationReadinessMarkdown(report.integrationReadiness), "utf8");
     const objectStorageMarkdown = path.join(path.dirname(markdown), "object-storage-readiness-report.md");

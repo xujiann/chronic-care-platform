@@ -362,10 +362,32 @@ The "medical consortium closed loop" task from `chronic-care-platform/docs/æµªæ½
 ## Priority app 3: medical quality and safety supervision
 
 - Runnable portal: `quality-safety.html`
-- API evidence: `/api/quality-safety/dashboard`, `/api/quality-safety/issues/:id/dispatch`, `/api/quality-safety/rectifications/:id/feedback`, `/api/quality-safety/rectifications/:id/review`
-- Seed collections: `qualitySafetyEvents`, `criticalValueAlerts`, `clinicalPathwayCases`, `medicalRecordQualityReviews`, `mutualRecognitionQualityReviews`, `qualityRectificationOrders`
+- About and policy page: `quality-safety-about.html`
+- Role access: commission dispatches and reviews; institution/county users can open the same portal for scoped dashboard and rectification feedback.
+- API evidence: `/api/quality-safety/dashboard`, `/api/quality-safety/interface-standard`, `/api/quality-safety/interface-joint-test-pack`, `/api/quality-safety/interface-messages/validate`, `/api/quality-safety/issues/:id/dispatch`, `/api/quality-safety/rectifications/:id/feedback`, `/api/quality-safety/rectifications/:id/review`, `/api/quality-safety/critical-values/:id/acknowledge`, `/api/quality-safety/critical-values/:id/dispose`, `/api/quality-safety/clinical-pathways/:id/review`, `/api/quality-safety/core-systems/:id/evidence`, `/api/quality-safety/site-signoffs/:id/evidence`, `/api/quality-safety/site-signoffs/:id/review`
+- Seed collections: `qualitySafetyEvents`, `criticalValueAlerts`, `clinicalPathwayCases`, `medicalRecordQualityReviews`, `mutualRecognitionQualityReviews`, `qualityRectificationOrders`, `qualitySafetySiteSignoffs`
 - Reused collections: `diagnosticReports`, `countyMutualRecognitionRecords`, `dataQualityIssues`, `institutionCreditEvaluations`, `securityEvents`, `hospitalInteroperabilityFunctions`
-- Release artifact: `quality-safety-report.md` / `quality-safety-report.json` from `npm.cmd run quality-safety:report`
+- Release artifacts: `quality-safety-report.md` / `quality-safety-report.json` from `npm.cmd run quality-safety:report`, `quality-safety-interface-standard.md` / `quality-safety-interface-standard.json` from `npm.cmd run quality-safety:interface-standard`, and `quality-safety-interface-joint-test-pack.md` / `quality-safety-interface-joint-test-pack.json` from `npm.cmd run quality-safety:joint-test`
+- National quality goals: the dashboard and release report map all 10 2025 national medical quality and safety improvement goals to evidence collections, monitoring cadence, site input fields, and next collection boundaries; the module report now gates site input coverage as release evidence.
+- National goal cadence plan: the dashboard and module report group the 10 goals into monthly review, quarterly department feedback, and continuous monitoring plans with owners, review windows, evidence counts, and site input coverage.
+- Institution interface standard: the interface standard fixes document control, HTTPS/JSON transport, HMAC signature, idempotency key, message envelope, status codes, field dictionary requirements, sample payloads, retry/compensation, and joint-test acceptance checklist for HIS/EMR/LIS/PACS and mutual-recognition platform docking.
+- Institution joint-test pack: the portal and API expose sample requests, HMAC-SHA256 signature fixtures, body hash, idempotency replay checks, field dictionaries, site sample acceptance rows, and negative validation cases for missing fields, invalid signatures, and duplicate replay.
+- Go-live readiness: the dashboard, module report, and release report compute `controlled_pilot_ready` status with a score, evidence checks, blockers, and production sign-off items.
+- Pre-launch tracker: the runnable portal displays production sign-off gaps as owner, status, evidence, and next-action rows before the detailed site sign-off table.
+- Onsite requirements: the dashboard and release report list go-live functional requirements with onsite inputs, acceptance evidence, owner roles, status, and source collections.
+- Cutover sequence: the dashboard and release report group onsite requirements into before-cutover, cutover-day, and post-cutover stabilization phases.
+- Next development plan: the dashboard and module report convert live-interface docking, closed-loop drills, national-goal review, and production audit/operations gaps into prioritized development increments with owners, acceptance evidence, verification commands, and current status.
+- Department task queue: attention-required cutover phases are promoted to the top role queue and jump directly to the cutover sequence panel.
+- Operations runbook: the dashboard and release report derive module on-call watch items from critical values, rectification SLA, clinical pathways, mutual-recognition QC, site sign-offs, and audit-retention evidence.
+- Warning indicators: the dashboard, module report, and release report now expose a first runnable Inspur 4.1 quality-safety increment that normalizes critical-value, rectification SLA, pathway variance, mutual-recognition QC, live sign-off, and audit-retention signals into closed-loop warning rows with thresholds, owners, evidence, and UI targets.
+- Site sign-off tracker: production cutover items for live feeds, critical-value routing, pathway dictionaries, mutual-recognition rules, department attachments, and audit retention are tracked with owner, status, required evidence, and audit trail.
+- SLA evidence: rectification orders include due-date status, evidence completeness, and commission escalation records.
+- Risk ranking: the portal and release report derive institution priority from severity, open issues, SLA pressure, missing feedback, and escalations.
+- Regulatory action plan: the dashboard and release report turn risk, SLA, critical-value, pathway, and mutual-recognition signals into prioritized next actions with owner and evidence fields.
+- Critical-value loop: institution and commission users can acknowledge and dispose critical value alerts with audit records and linked event status updates.
+- Clinical-pathway loop: commission users can review pathway variance cases from the runnable portal, close or return the linked quality event, and preserve audit evidence.
+- Policy basis: the about page links the module to the Medical Quality Management Measures, 18 core safety systems, 2023-2025 quality action plan, inspection/test mutual-recognition rules, 2025 national improvement goals, and clinical pathway guidance.
+- Pre-launch development gaps: the about page now separates production interface joint-testing, local rule dictionaries, signed evidence attachments, notification/escalation receipts, audit/security hardening, and operations support as the remaining work before formal production launch.
 
 Site joint-testing boundary: production HIS/EMR/LIS/PACS critical-value rules, real clinical pathway dictionaries, signed medical-record sampling forms, mutual-recognition QC rules, department sign-off evidence, and notification channels remain site-owned inputs.
 

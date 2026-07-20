@@ -3,34 +3,221 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Medical Quality and Safety Supervision</title>
+    <title>医疗质量与安全监管平台</title>
     <link rel="stylesheet" href="./portal.css" />
     <script src="./auth.js"></script>
-    <script>window.HealthCityAuth.requireRole(["commission"])</script>
+    <script>window.HealthCityAuth.requireRole(["commission", "institution", "county"])</script>
   </head>
-  <body>
+  <body class="quality-safety-page">
     <main class="portal-shell">
       <header class="portal-header">
         <div>
-          <span>Priority application 3</span>
-          <h1>Medical quality and safety supervision</h1>
-          <p>Quality dashboard, issue dispatch, rectification feedback, and commission review for critical values, clinical pathways, record QC, mutual recognition QC, and safety events.</p>
+          <span>优先应用 3</span>
+          <h1>医疗质量与安全监管平台</h1>
+          <p>面向危急值、临床路径、病历质控、检查检验互认质控和安全事件，提供质控看板、问题派发、整改反馈与监管复核。</p>
         </div>
         <nav>
-          <a href="./workbench.html">Workbench</a>
-          <a href="./platform.html">Platform</a>
-          <a href="./index.html">Commission</a>
-          <a href="./institution.html">Institution</a>
-          <a href="./county.html">County</a>
+          <a href="./quality-safety-about.html">关于</a>
+          <a href="./workbench.html">工作台</a>
+          <a href="./platform.html">平台总览</a>
+          <a href="./index.html">卫健管理</a>
+          <a href="./institution.html">医疗机构</a>
+          <a href="./county.html">县域医共体</a>
         </nav>
       </header>
 
+      <section class="panel">
+        <div class="panel-title">
+          <h2>政策依据</h2>
+          <span>医疗质量管理、核心安全制度、检查检验互认和临床路径治理</span>
+        </div>
+        <div class="rules">
+          <div><strong>监管范围</strong><span>对应卫生健康行政部门和医疗机构的医疗质量管理职责。</span></div>
+          <div><strong>闭环重点</strong><span>危急值、病历可追溯、路径偏离、互认质控和整改证据均按可审计流程跟踪。</span></div>
+          <div><strong>详细说明</strong><span><a href="./quality-safety-about.html">查看政策和关于页</a></span></div>
+        </div>
+      </section>
+
+      <section class="panel quality-safety-toolbar" aria-label="质量安全监管工具条">
+        <div class="panel-title">
+          <h2>监管工作台</h2>
+          <span>筛选问题、整改、签收事项并聚焦今日重点</span>
+        </div>
+        <div class="quality-filter-grid">
+          <label>
+            状态
+            <select id="quality-safety-status-filter">
+              <option value="">全部状态</option>
+              <option value="待处理">待处理</option>
+              <option value="处理中">处理中</option>
+              <option value="复核中">复核中</option>
+              <option value="已逾期">已逾期</option>
+              <option value="待现场确认">待现场确认</option>
+              <option value="具备联调条件">具备联调条件</option>
+              <option value="已关闭">已关闭</option>
+            </select>
+          </label>
+          <label>
+            领域
+            <select id="quality-safety-domain-filter">
+              <option value="">全部领域</option>
+              <option value="医疗质量">医疗质量</option>
+              <option value="安全事件">安全事件</option>
+              <option value="危急值">危急值</option>
+              <option value="临床路径">临床路径</option>
+              <option value="病历质控">病历质控</option>
+              <option value="互认质控">互认质控</option>
+              <option value="整改闭环">整改闭环</option>
+              <option value="数据质量">数据质量</option>
+              <option value="机构信用">机构信用</option>
+            </select>
+          </label>
+          <label class="wide">
+            关键词
+            <input id="quality-safety-search" type="search" placeholder="搜索机构、问题、工单或证据" />
+          </label>
+          <div class="quality-toolbar-actions">
+            <button class="ghost-button" type="button" id="quality-safety-reset">重置</button>
+            <button class="primary-button" type="button" id="quality-safety-refresh">刷新</button>
+          </div>
+        </div>
+        <div id="quality-safety-brief" class="quality-brief" aria-live="polite"></div>
+      </section>
+
+      <section class="panel" data-quality-safety-department-panel>
+        <div class="panel-title">
+          <h2>当前部门任务视图</h2>
+          <span>按登录部门展示数据范围、可执行动作和重点待办</span>
+        </div>
+        <div id="quality-safety-department-view" class="quality-department-view" aria-live="polite"></div>
+      </section>
+
+      <section class="panel" data-quality-safety-task-queue-panel>
+        <div class="panel-title">
+          <h2>部门任务队列</h2>
+          <span>按登录部门裁剪后的优先任务、责任方、来源和下一步动作</span>
+        </div>
+        <div id="quality-safety-department-queue" class="table-wrap" aria-live="polite"></div>
+      </section>
+
       <section class="metric-grid" id="quality-safety-metrics"></section>
+
+      <section class="panel" data-quality-safety-national-goals-panel>
+        <div class="panel-title">
+          <h2>国家改进目标映射</h2>
+          <span>依据《2025年国家医疗质量安全改进目标》，映射平台证据源、监测周期和下一步采集边界</span>
+        </div>
+        <div id="quality-safety-national-goals" class="table-wrap" aria-live="polite"></div>
+      </section>
+
+      <section class="panel" data-quality-safety-national-goal-cadence-panel>
+        <div class="panel-title">
+          <h2>国家目标复盘节奏</h2>
+          <span>按月、按季度和持续监测要求组织质控反馈、科室复盘和现场数据准备</span>
+        </div>
+        <div id="quality-safety-national-goal-cadence" class="table-wrap" aria-live="polite"></div>
+      </section>
+
+      <section class="panel" data-quality-safety-core-systems-panel>
+        <div class="panel-title">
+          <h2>核心制度落实矩阵</h2>
+          <span>依据国卫医发〔2018〕8号，将18项医疗质量安全核心制度转为平台证据、状态和下一步动作</span>
+        </div>
+        <div id="quality-safety-core-systems" class="table-wrap" aria-live="polite"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>上线就绪</h2>
+          <span>受控试点状态和生产签收边界</span>
+        </div>
+        <div id="quality-safety-readiness" class="rules"></div>
+      </section>
+
+      <section class="panel" data-quality-safety-prelaunch-panel>
+        <div class="panel-title">
+          <h2>上线前缺口跟踪</h2>
+          <span>将生产签收事项转为责任方、证据状态和下一步动作</span>
+        </div>
+        <div id="quality-safety-prelaunch-gaps" class="table-wrap" aria-live="polite"></div>
+      </section>
+
+      <section class="panel" data-quality-safety-cutover-sequence-panel>
+        <div class="panel-title">
+          <h2>上线执行顺序</h2>
+          <span>按上线前、切换当天和上线后稳定期组织现场动作</span>
+        </div>
+        <div id="quality-safety-cutover-sequence" class="table-wrap" aria-live="polite"></div>
+      </section>
+
+      <section class="panel" data-quality-safety-next-development-panel>
+        <div class="panel-title">
+          <h2>下一步开发计划</h2>
+          <span>把上线缺口、现场联调、国家目标复盘和运维审计转成可验收开发增量</span>
+        </div>
+        <div id="quality-safety-next-development" class="table-wrap" aria-live="polite"></div>
+      </section>
+
+      <section class="panel" data-quality-safety-onsite-requirements-panel>
+        <div class="panel-title">
+          <h2>现场上线功能需求清单</h2>
+          <span>明确上线当天需要现场确认的输入、证据、责任角色和验收状态</span>
+        </div>
+        <div id="quality-safety-onsite-requirements" class="table-wrap" aria-live="polite"></div>
+      </section>
+
+      <section class="panel" data-quality-safety-operations-panel>
+        <div class="panel-title">
+          <h2>运行值守台账</h2>
+          <span>把危急值、整改 SLA、路径、互认、接口和审计信号转为上线后值守动作</span>
+        </div>
+        <div id="quality-safety-operations-runbook" class="table-wrap" aria-live="polite"></div>
+      </section>
+
+      <section class="panel" data-quality-safety-warning-indicators-panel>
+        <div class="panel-title">
+          <h2>预警指标闭环</h2>
+          <span>汇总危急值、整改 SLA、临床路径、互认质控、联调签收和审计留存信号，形成可定位、可派发、可复核的上线预警清单</span>
+        </div>
+        <div id="quality-safety-warning-indicators" class="table-wrap" aria-live="polite"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>现场联调签收</h2>
+          <span>生产切换证据跟踪</span>
+        </div>
+        <div id="quality-safety-signoffs" class="table-wrap"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>机构接口联调</h2>
+          <span>样例报文校验、HMAC 签名、幂等键和字段字典检查</span>
+        </div>
+        <div id="quality-safety-interface-pack" class="table-wrap"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>监管行动计划</h2>
+          <span>按风险、SLA、危急值、路径和互认信号生成优先处置事项</span>
+        </div>
+        <div id="quality-safety-actions" class="table-wrap"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>监管优先级</h2>
+          <span>医疗机构风险排序</span>
+        </div>
+        <div id="quality-safety-risks" class="table-wrap"></div>
+      </section>
 
       <section class="portal-grid">
         <article class="panel wide">
           <div class="panel-title">
-            <h2>Issue queue</h2>
+            <h2>问题队列</h2>
             <span id="quality-safety-updated"></span>
           </div>
           <div id="quality-safety-issues" class="table-wrap"></div>
@@ -38,8 +225,8 @@
 
         <article class="panel">
           <div class="panel-title">
-            <h2>Reuse map</h2>
-            <span>Existing platform collections</span>
+            <h2>复用关系</h2>
+            <span>既有平台数据集合</span>
           </div>
           <div id="quality-safety-reuse" class="rules"></div>
         </article>
@@ -48,16 +235,16 @@
       <section class="portal-grid">
         <article class="panel wide">
           <div class="panel-title">
-            <h2>Rectification loop</h2>
-            <span>Dispatch, feedback, and review</span>
+            <h2>整改闭环</h2>
+            <span>派发、反馈和复核</span>
           </div>
           <div id="quality-safety-rectifications" class="table-wrap"></div>
         </article>
 
         <article class="panel">
           <div class="panel-title">
-            <h2>Critical values</h2>
-            <span>LIS/PACS/HIS closed loop</span>
+            <h2>危急值</h2>
+            <span>LIS/PACS/HIS 闭环</span>
           </div>
           <div id="quality-safety-critical" class="rules"></div>
         </article>
@@ -65,8 +252,8 @@
 
       <section class="panel">
         <div class="panel-title">
-          <h2>Boundary evidence</h2>
-          <span>Pathway, medical record, and mutual recognition QC</span>
+          <h2>边界证据</h2>
+          <span>临床路径、病历质控和互认质控</span>
         </div>
         <div id="quality-safety-boundaries" class="table-wrap"></div>
       </section>

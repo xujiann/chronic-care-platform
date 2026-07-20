@@ -202,9 +202,13 @@
     }
   }
 
+  function getToken() {
+    return getUser()?.token || "";
+  }
+
   function authHeaders(extra = {}) {
-    const user = getUser();
-    return user?.token ? { ...extra, Authorization: `Bearer ${user.token}` } : extra;
+    const token = getToken();
+    return token ? { ...extra, Authorization: `Bearer ${token}` } : extra;
   }
 
   function authFetch(url, options = {}) {
@@ -231,6 +235,11 @@
     const user = getUser();
     if (!user) {
       window.location.replace(`./login.html?redirect=${encodeURIComponent(currentPage())}`);
+      return false;
+    }
+    if (API_BASE && !user.token) {
+      localStorage.removeItem(SESSION_KEY);
+      window.location.replace(`./login.html?redirect=${encodeURIComponent(currentPage())}&expired=1`);
       return false;
     }
     if (user.expiresAt && new Date(user.expiresAt).getTime() < Date.now()) {
@@ -364,6 +373,7 @@
     sendPhoneCode,
     logout,
     getUser,
+    getToken,
     authHeaders,
     authFetch,
     requireRole,

@@ -1034,6 +1034,8 @@ function seedState() {
     medicalRecordQualityReviews: seedMedicalRecordQualityReviews(),
     mutualRecognitionQualityReviews: seedMutualRecognitionQualityReviews(),
     qualityRectificationOrders: seedQualityRectificationOrders(),
+    qualitySafetySiteSignoffs: seedQualitySafetySiteSignoffs(),
+    qualitySafetyCoreSystemEvidence: [],
     careOrders: seedCareOrders(),
     medicationPickups: seedMedicationPickups(),
     institutionSupervisions: seedInstitutionSupervisions(),
@@ -3731,7 +3733,7 @@ function seedCriticalValueAlerts() {
 
 function seedClinicalPathwayCases() {
   return [
-    { id: "cpc-001", eventId: "qse-path-001", residentId: "r1", pathwayCode: "HTN-2026", pathwayName: "Hypertension standard pathway", institutionName: "Dalian Central Hospital", currentNode: "follow-up-after-medication", varianceType: "missing_evidence", varianceReason: "Follow-up result not written back to EMR.", status: "variance_open", owner: "Clinical pathway office", dueAt: "2026-06-28T10:00:00.000Z" }
+    { id: "cpc-001", eventId: "qse-path-001", residentId: "r1", pathwayCode: "HTN-2026", pathwayName: "Hypertension standard pathway", institutionName: "Dalian Central Hospital", currentNode: "follow-up-after-medication", varianceType: "missing_evidence", varianceReason: "Follow-up result not written back to EMR.", status: "variance_open", owner: "Clinical pathway office", dueAt: "2026-06-28T10:00:00.000Z", auditTrail: [{ at: "2026-06-21T10:00:00.000Z", by: "health", action: "seed-variance", note: "Clinical pathway variance captured from EMR summary." }] }
   ];
 }
 
@@ -3763,6 +3765,89 @@ function seedQualityRectificationOrders() {
       feedback: [{ at: "2026-06-22T16:00:00.000Z", by: "community", byName: "Community doctor", content: "Corrected assessment fields have been uploaded for review.", attachments: ["emr-correction-screenshot"] }],
       review: [],
       auditTrail: [{ at: "2026-06-20T15:00:00.000Z", by: "health", action: "dispatch", note: "Seed rectification order." }]
+    }
+  ];
+}
+
+function seedQualitySafetySiteSignoffs() {
+  return [
+    {
+      id: "qss-live-feeds",
+      domain: "live_interfaces",
+      item: "Live HIS/EMR/LIS/PACS feed binding",
+      ownerRole: "commission",
+      owner: "Institution integration group",
+      requiredEvidence: ["signed joint-test record", "sample inbound payload", "field mapping confirmation"],
+      sourceCollections: ["hospitalInteroperabilityFunctions", "integrationContracts"],
+      status: "pending_site_confirmation",
+      dueAt: "2026-07-05",
+      latestNote: "Confirm live feed scope and payload signatures before production cutover.",
+      auditTrail: [{ at: "2026-06-28T10:00:00.000Z", by: "health", action: "seed-site-signoff", note: "Initial site sign-off tracker." }]
+    },
+    {
+      id: "qss-critical-routing",
+      domain: "critical_value",
+      item: "Production critical-value routing and timeout escalation",
+      ownerRole: "institution",
+      owner: "Dalian Central Hospital",
+      requiredEvidence: ["routing rule screenshot", "acknowledgement receipt", "timeout escalation recipient list"],
+      sourceCollections: ["criticalValueAlerts", "diagnosticReports"],
+      status: "ready_for_joint_test",
+      dueAt: "2026-07-03",
+      latestNote: "Pilot route is ready; production notification receipt still needs site confirmation.",
+      auditTrail: [{ at: "2026-06-28T10:05:00.000Z", by: "health", action: "seed-site-signoff", note: "Critical value route prepared for joint test." }]
+    },
+    {
+      id: "qss-pathway-dictionary",
+      domain: "clinical_pathway",
+      item: "Local clinical pathway dictionaries and EMR variance evidence",
+      ownerRole: "institution",
+      owner: "Dalian Central Hospital",
+      requiredEvidence: ["local pathway dictionary", "variance rule mapping", "EMR screenshot sample"],
+      sourceCollections: ["clinicalPathwayCases", "qualitySafetyEvents"],
+      status: "pending_site_confirmation",
+      dueAt: "2026-07-08",
+      latestNote: "Attach local pathway dictionary version and variance examples.",
+      auditTrail: [{ at: "2026-06-28T10:10:00.000Z", by: "health", action: "seed-site-signoff", note: "Pathway dictionary sign-off item created." }]
+    },
+    {
+      id: "qss-mutual-recognition-rules",
+      domain: "mutual_recognition_qc",
+      item: "Regional mutual-recognition lists and negative-list rules",
+      ownerRole: "county",
+      owner: "Regional mutual recognition QC",
+      requiredEvidence: ["recognition catalog", "negative-list rule", "manual review exception sample"],
+      sourceCollections: ["countyMutualRecognitionRecords", "mutualRecognitionQualityReviews"],
+      status: "pending_site_confirmation",
+      dueAt: "2026-07-06",
+      latestNote: "County consortium must confirm catalog and exception handling.",
+      auditTrail: [{ at: "2026-06-28T10:15:00.000Z", by: "health", action: "seed-site-signoff", note: "Mutual-recognition sign-off item created." }]
+    },
+    {
+      id: "qss-department-attachments",
+      domain: "rectification",
+      item: "Department rectification sign-off attachments",
+      ownerRole: "institution",
+      owner: "Qingniwaqiao Community Health Service Center",
+      requiredEvidence: ["department head signature", "corrected EMR evidence", "commission review note"],
+      sourceCollections: ["qualityRectificationOrders", "medicalRecordQualityReviews"],
+      status: "ready_for_joint_test",
+      dueAt: "2026-07-04",
+      latestNote: "Demo attachment placeholder exists; production requires signed department evidence.",
+      auditTrail: [{ at: "2026-06-28T10:20:00.000Z", by: "health", action: "seed-site-signoff", note: "Rectification attachment sign-off prepared." }]
+    },
+    {
+      id: "qss-audit-retention",
+      domain: "audit_retention",
+      item: "Production audit retention target",
+      ownerRole: "commission",
+      owner: "Security administration",
+      requiredEvidence: ["AUDIT_EXPORT_PATH or SIEM_ENDPOINT", "retention period approval", "audit export permission"],
+      sourceCollections: ["securityEvents", "dataAccessLogs"],
+      status: "pending_site_confirmation",
+      dueAt: "2026-07-10",
+      latestNote: "Production retention target remains a cutover warning until environment evidence is configured.",
+      auditTrail: [{ at: "2026-06-28T10:25:00.000Z", by: "health", action: "seed-site-signoff", note: "Audit retention sign-off item created." }]
     }
   ];
 }
@@ -7784,6 +7869,8 @@ function normalizeState(data) {
     medicalRecordQualityReviews: mergeByKey(seedMedicalRecordQualityReviews(), data.medicalRecordQualityReviews, "id"),
     mutualRecognitionQualityReviews: mergeByKey(seedMutualRecognitionQualityReviews(), data.mutualRecognitionQualityReviews, "id"),
     qualityRectificationOrders: mergeByKey(seedQualityRectificationOrders(), data.qualityRectificationOrders, "id"),
+    qualitySafetySiteSignoffs: mergeByKey(seedQualitySafetySiteSignoffs(), data.qualitySafetySiteSignoffs, "id"),
+    qualitySafetyCoreSystemEvidence: Array.isArray(data.qualitySafetyCoreSystemEvidence) ? data.qualitySafetyCoreSystemEvidence : [],
     mutualRecognitionRules: mergeByKey(seedMutualRecognitionRules(), data.mutualRecognitionRules, "id"),
     diagnosticReports: mergeByKey(seedDiagnosticReports(), data.diagnosticReports, "id"),
     regionalDataSharingScope: data.regionalDataSharingScope && typeof data.regionalDataSharingScope === "object" ? { ...seedRegionalDataSharingScope(), ...data.regionalDataSharingScope } : seedRegionalDataSharingScope(),
@@ -18410,11 +18497,249 @@ function buildDataQualityScorecard(data) {
 
 function normalizeQualitySafetyStatus(status) {
   const text = String(status || "open").trim().toLowerCase();
-  if (/closed|resolved|approved|review_passed|completed|recognized/.test(text)) return "closed";
+  if (/closed|resolved|approved|accepted|review_passed|completed|recognized|disposed/.test(text)) return "closed";
   if (/feedback|submitted|review/.test(text)) return "reviewing";
-  if (/dispatch|in_progress|pending_disposition|variance_open/.test(text)) return "in_progress";
+  if (/dispatch|in_progress|pending_disposition|acknowledg|variance_open|escalat/.test(text)) return "in_progress";
   if (/reject|returned|overdue/.test(text)) return "returned";
   return "open";
+}
+
+function qualitySafetySlaState(item, now = new Date()) {
+  const normalizedStatus = normalizeQualitySafetyStatus(item.status);
+  const closed = normalizedStatus === "closed";
+  const dueAt = String(item.dueAt || "").trim();
+  const dueTime = dueAt ? new Date(dueAt).getTime() : NaN;
+  const nowTime = now.getTime();
+  const daysRemaining = Number.isFinite(dueTime) ? Math.ceil((dueTime - nowTime) / 86400000) : null;
+  const feedbackComplete = Array.isArray(item.feedback) && item.feedback.length > 0;
+  const reviewComplete = Array.isArray(item.review) && item.review.length > 0;
+  const auditReady = Array.isArray(item.auditTrail) && item.auditTrail.length > 0;
+  let slaStatus = "unscheduled";
+  if (closed) slaStatus = "closed";
+  else if (Number.isFinite(dueTime) && dueTime < nowTime) slaStatus = "overdue";
+  else if (Number.isFinite(dueTime) && daysRemaining <= 7) slaStatus = "due_soon";
+  else if (Number.isFinite(dueTime)) slaStatus = "on_track";
+  return {
+    slaStatus,
+    daysRemaining,
+    feedbackComplete,
+    reviewComplete,
+    evidenceComplete: feedbackComplete && auditReady && (closed ? reviewComplete : true)
+  };
+}
+
+function qualitySafetySeverityPoints(severity) {
+  const text = String(severity || "").trim().toLowerCase();
+  if (/critical|severe|重大|危急/.test(text)) return 6;
+  if (/high|高/.test(text)) return 4;
+  if (/medium|中/.test(text)) return 2;
+  if (/low|低/.test(text)) return 1;
+  return 2;
+}
+
+function buildQualitySafetyInstitutionRisks(issues, rectifications) {
+  const rows = new Map();
+  function ensure(name) {
+    const key = String(name || "Unknown institution").trim() || "Unknown institution";
+    if (!rows.has(key)) {
+      rows.set(key, {
+        institutionName: key,
+        score: 0,
+        issueCount: 0,
+        openIssues: 0,
+        highSeverity: 0,
+        overdue: 0,
+        dueSoon: 0,
+        missingFeedback: 0,
+        escalated: 0,
+        domains: new Set(),
+        drivers: new Set()
+      });
+    }
+    return rows.get(key);
+  }
+  issues.forEach((issue) => {
+    const row = ensure(issue.institutionName || issue.owner || issue.sourceCollection);
+    const severityPoints = qualitySafetySeverityPoints(issue.severity);
+    const normalizedStatus = normalizeQualitySafetyStatus(issue.status);
+    row.issueCount += 1;
+    row.score += severityPoints;
+    row.domains.add(issue.domain || issue.type || "quality");
+    if (severityPoints >= 4) {
+      row.highSeverity += 1;
+      row.drivers.add("high-severity issue");
+    }
+    if (normalizedStatus !== "closed") {
+      row.openIssues += 1;
+      row.score += 2;
+    }
+    if (/critical|medical_quality|safety_event/i.test(`${issue.domain || ""} ${issue.type || ""}`)) {
+      row.score += 2;
+      row.drivers.add("critical value or safety signal");
+    }
+  });
+  rectifications.forEach((order) => {
+    const row = ensure(order.institutionName || order.owner);
+    row.score += 1;
+    if (order.slaStatus === "overdue") {
+      row.overdue += 1;
+      row.score += 6;
+      row.drivers.add("overdue rectification");
+    } else if (order.slaStatus === "due_soon") {
+      row.dueSoon += 1;
+      row.score += 3;
+      row.drivers.add("SLA due soon");
+    }
+    if (!order.feedbackComplete && order.normalizedStatus !== "closed") {
+      row.missingFeedback += 1;
+      row.score += 2;
+      row.drivers.add("feedback missing");
+    }
+    if (/escalat/i.test(String(order.status || ""))) {
+      row.escalated += 1;
+      row.score += 4;
+      row.drivers.add("commission escalation");
+    }
+    if (!order.evidenceComplete && order.normalizedStatus !== "closed") {
+      row.score += 1;
+      row.drivers.add("evidence incomplete");
+    }
+  });
+  return Array.from(rows.values())
+    .map((row) => ({
+      ...row,
+      domains: Array.from(row.domains).slice(0, 5),
+      drivers: Array.from(row.drivers).slice(0, 4),
+      riskLevel: row.score >= 12 ? "high" : row.score >= 6 ? "medium" : "watch",
+      nextAction: row.overdue > 0 ? "Start overdue escalation and require leadership sign-off." : row.score >= 12 ? "Assign focused review and require a department correction plan." : row.dueSoon > 0 ? "Confirm evidence upload before SLA deadline." : "Keep routine QC tracking active."
+    }))
+    .sort((a, b) => b.score - a.score || b.openIssues - a.openIssues || a.institutionName.localeCompare(b.institutionName))
+    .slice(0, 10);
+}
+
+function buildQualitySafetyCriticalAlerts(data, user) {
+  const rows = (Array.isArray(data.criticalValueAlerts) ? data.criticalValueAlerts : []).map((item) => ({
+    ...item,
+    ownerRole: "institution",
+    institutionName: item.targetInstitution || item.sourceInstitution,
+    sourceCollection: "criticalValueAlerts",
+    sourceId: item.id,
+    normalizedStatus: normalizeQualitySafetyStatus(item.status),
+    acknowledgementComplete: Boolean(item.acknowledgedAt),
+    dispositionComplete: Boolean(item.disposedAt)
+  }));
+  return qualitySafetyVisibleRows(rows, user);
+}
+
+function buildQualitySafetyClinicalPathways(data, user) {
+  const rows = (Array.isArray(data.clinicalPathwayCases) ? data.clinicalPathwayCases : []).map((item) => ({
+    ...item,
+    ownerRole: item.ownerRole || "institution",
+    sourceCollection: "clinicalPathwayCases",
+    sourceId: item.id,
+    normalizedStatus: normalizeQualitySafetyStatus(item.status),
+    reviewComplete: normalizeQualitySafetyStatus(item.status) === "closed",
+    evidenceComplete: Boolean(item.eventId && item.dueAt && Array.isArray(item.auditTrail) && item.auditTrail.length > 0)
+  }));
+  return qualitySafetyVisibleRows(rows, user);
+}
+
+function buildQualitySafetyActionPlan({ issues, rectifications, criticalValueAlerts, clinicalPathwayCases, mutualRecognitionQualityReviews, institutionRisks }) {
+  const rows = [];
+  function push(item) {
+    rows.push({
+      id: item.id,
+      priority: item.priority,
+      owner: item.owner || "Site quality office",
+      domain: item.domain || "quality_safety",
+      action: item.action,
+      reason: item.reason,
+      source: item.source,
+      dueAt: item.dueAt || "",
+      evidence: item.evidence || ""
+    });
+  }
+  criticalValueAlerts
+    .filter((item) => item.normalizedStatus !== "closed" || !item.dispositionComplete)
+    .forEach((item) => push({
+      id: `action-${item.id}`,
+      priority: "critical",
+      owner: item.institutionName || item.targetInstitution || item.sourceInstitution,
+      domain: "critical_value",
+      action: "Complete acknowledgement, physician notification, disposition note, and linked event closure.",
+      reason: `${item.item || "critical item"} ${item.value || ""} meets ${item.threshold || "critical"} threshold.`,
+      source: item.id,
+      dueAt: item.reportedAt,
+      evidence: "acknowledgement, disposition, auditTrail"
+    }));
+  rectifications
+    .filter((item) => item.normalizedStatus !== "closed")
+    .filter((item) => ["overdue", "due_soon"].includes(item.slaStatus) || !item.evidenceComplete || !item.feedbackComplete)
+    .forEach((item) => push({
+      id: `action-${item.id}`,
+      priority: item.slaStatus === "overdue" ? "high" : "medium",
+      owner: item.institutionName || item.owner,
+      domain: "rectification",
+      action: item.slaStatus === "overdue" ? "Escalate overdue rectification and require leadership sign-off." : "Confirm feedback and evidence before the SLA deadline.",
+      reason: `${item.slaStatus || "open"}; feedback=${item.feedbackComplete ? "complete" : "missing"}; evidence=${item.evidenceComplete ? "complete" : "pending"}.`,
+      source: item.id,
+      dueAt: item.dueAt,
+      evidence: "feedback, review, auditTrail"
+    }));
+  clinicalPathwayCases
+    .filter((item) => item.normalizedStatus !== "closed")
+    .forEach((item) => push({
+      id: `action-${item.id}`,
+      priority: "medium",
+      owner: item.institutionName || item.owner,
+      domain: "clinical_pathway",
+      action: "Review pathway variance, attach EMR evidence, and close or return the linked quality event.",
+      reason: item.varianceReason || item.currentNode || "Open clinical pathway variance.",
+      source: item.id,
+      dueAt: item.dueAt,
+      evidence: "reviewTrail, EMR variance evidence, qualitySafetyEvents"
+    }));
+  mutualRecognitionQualityReviews
+    .filter((item) => normalizeQualitySafetyStatus(item.status || item.qcStatus) !== "closed")
+    .forEach((item) => push({
+      id: `action-${item.id}`,
+      priority: /manual|open|required/i.test(`${item.qcStatus || ""}${item.status || ""}`) ? "medium" : "watch",
+      owner: item.owner || item.institutionName || "Regional mutual recognition QC",
+      domain: "mutual_recognition_qc",
+      action: "Verify recognition quality-control evidence and document whether the result can be recognized.",
+      reason: item.issueType || item.qcStatus || item.nextAction || "Mutual recognition QC pending.",
+      source: item.id,
+      dueAt: item.dueAt,
+      evidence: "countyMutualRecognitionRecords, diagnosticReports"
+    }));
+  institutionRisks
+    .filter((item) => item.riskLevel === "high")
+    .forEach((item) => push({
+      id: `action-risk-${item.institutionName.replace(/\W+/g, "-").toLowerCase()}`,
+      priority: "high",
+      owner: item.institutionName,
+      domain: "institution_risk",
+      action: item.nextAction,
+      reason: `${item.score} risk points; ${(item.drivers || []).join(", ")}`,
+      source: "institutionRisks",
+      evidence: "issues, rectifications, SLA, escalation"
+    }));
+  if (!rows.length && issues.some((item) => item.normalizedStatus !== "closed")) {
+    push({
+      id: "action-routine-qc",
+      priority: "watch",
+      owner: "Site quality office",
+      domain: "routine_qc",
+      action: "Keep routine quality tracking active and review newly opened issues.",
+      reason: `${issues.filter((item) => item.normalizedStatus !== "closed").length} non-closed issues remain visible.`,
+      source: "qualitySafetyEvents",
+      evidence: "dashboard refresh"
+    });
+  }
+  const priorityRank = { critical: 0, high: 1, medium: 2, watch: 3 };
+  return rows
+    .sort((a, b) => (priorityRank[a.priority] ?? 9) - (priorityRank[b.priority] ?? 9) || String(a.dueAt || "9999").localeCompare(String(b.dueAt || "9999")) || a.id.localeCompare(b.id))
+    .slice(0, 8);
 }
 
 function qualitySafetyVisibleRows(rows, user) {
@@ -18426,6 +18751,817 @@ function qualitySafetyVisibleRows(rows, user) {
     return rows.filter((item) => ["institution", ""].includes(String(item.ownerRole || "")) || /hospital|community|institution/i.test(`${item.institutionName || ""}${item.owner || ""}`));
   }
   return [];
+}
+
+const QUALITY_SAFETY_NATIONAL_GOALS_2025 = [
+  {
+    code: "NIT-2025-I",
+    title: "提高急性脑梗死再灌注治疗率",
+    domain: "critical_value",
+    cadence: "按月分析反馈",
+    strategy: "急救转运、院内流程、再灌注团队和持续监测反馈",
+    evidenceCollections: ["criticalValueAlerts", "diagnosticReports", "hospitalInteroperabilityFunctions"],
+    nextAction: "接入卒中中心绿色通道、发病时间、到院时间和再灌注处置回写。"
+  },
+  {
+    code: "NIT-2025-II",
+    title: "提高肿瘤治疗前临床 TNM 分期评估率",
+    domain: "clinical_pathway",
+    cadence: "按季度分科室反馈",
+    strategy: "多学科协作、评估流程、病历书写和绩效约束",
+    evidenceCollections: ["clinicalPathwayCases", "medicalRecordQualityReviews"],
+    nextAction: "补齐肿瘤单病种字典、TNM 分期字段和治疗前评估证据。"
+  },
+  {
+    code: "NIT-2025-III",
+    title: "提高静脉血栓栓塞症规范预防率",
+    domain: "medical_record_qc",
+    cadence: "持续监测并纳入绩效",
+    strategy: "VTE 管理团队、风险评估、预防提醒和会诊转诊机制",
+    evidenceCollections: ["medicalRecordQualityReviews", "hospitalInteroperabilityFunctions"],
+    nextAction: "对接 VTE 风险评估、出血风险评估和预防措施执行记录。"
+  },
+  {
+    code: "NIT-2025-IV",
+    title: "提高感染性休克集束化治疗完成率",
+    domain: "safety_event",
+    cadence: "按季度分科室反馈",
+    strategy: "重症、急诊、感染、检验和医务多部门联合监测",
+    evidenceCollections: ["qualitySafetyEvents", "criticalValueAlerts", "diagnosticReports"],
+    nextAction: "增加 1 小时、3 小时、6 小时集束化治疗节点采集。"
+  },
+  {
+    code: "NIT-2025-V",
+    title: "提高住院患者静脉输液规范使用率",
+    domain: "medical_quality",
+    cadence: "按季度点评反馈",
+    strategy: "给药途径优化、无需输液病种清单、药物监测和预警",
+    evidenceCollections: ["qualitySafetyEvents", "medicalRecordQualityReviews"],
+    nextAction: "对接住院医嘱、输液频次、液体总量和药品品种监测。"
+  },
+  {
+    code: "NIT-2025-VI",
+    title: "提高医疗质量安全不良事件报告率",
+    domain: "safety_event",
+    cadence: "按季度分析反馈",
+    strategy: "不良事件分级分类、主动报告、国家平台利用和成因分析",
+    evidenceCollections: ["qualitySafetyEvents", "securityEvents"],
+    nextAction: "将隐患、未造成严重后果事件和严重事件统一纳入主动报告台账。"
+  },
+  {
+    code: "NIT-2025-VII",
+    title: "提高四级手术术前多学科讨论完成率",
+    domain: "clinical_pathway",
+    cadence: "按季度监测评价",
+    strategy: "四级手术目录、术前多学科讨论制度、时限和记录追溯",
+    evidenceCollections: ["clinicalPathwayCases", "medicalRecordQualityReviews", "qualitySafetySiteSignoffs"],
+    nextAction: "接入四级手术目录、MDT 邀请、讨论记录和术前时限校验。"
+  },
+  {
+    code: "NIT-2025-VIII",
+    title: "提高关键诊疗行为相关记录完整率",
+    domain: "medical_record_qc",
+    cadence: "按季度分科室反馈",
+    strategy: "运行病历、终末病历、核心制度和病历内涵质量常态化监测",
+    evidenceCollections: ["medicalRecordQualityReviews", "qualityRectificationOrders"],
+    nextAction: "把医嘱、病程、查房、讨论、知情同意和安全核查纳入抽检字段。"
+  },
+  {
+    code: "NIT-2025-IX",
+    title: "降低非计划重返手术室再手术率",
+    domain: "medical_quality",
+    cadence: "按季度分科室反馈",
+    strategy: "手术分级、医师授权、术前讨论、安全核查和术后管理联动",
+    evidenceCollections: ["qualitySafetyEvents", "medicalRecordQualityReviews", "qualityRectificationOrders"],
+    nextAction: "补齐非计划重返手术室事件、原因分析和再手术整改闭环。"
+  },
+  {
+    code: "NIT-2025-X",
+    title: "提高医疗机构检查检验结果互认率",
+    domain: "mutual_recognition_qc",
+    cadence: "按月分析反馈",
+    strategy: "互认目录、质控评价、互认标识、未互认原因和绩效考核",
+    evidenceCollections: ["mutualRecognitionQualityReviews", "countyMutualRecognitionRecords", "diagnosticReports"],
+    nextAction: "按地区互认目录监测互认率、未互认原因和偏离平均水平机构。"
+  }
+];
+
+const QUALITY_SAFETY_NATIONAL_GOAL_SITE_INPUTS = {
+  "NIT-2025-I": ["卒中发病时间", "到院时间", "再灌注方式", "处置完成时间"],
+  "NIT-2025-II": ["肿瘤病种", "治疗前 TNM 分期", "MDT 记录", "治疗启动时间"],
+  "NIT-2025-III": ["VTE 风险评估", "出血风险评估", "预防措施", "执行时间"],
+  "NIT-2025-IV": ["感染性休克识别时间", "1小时集束节点", "3小时集束节点", "6小时集束节点"],
+  "NIT-2025-V": ["住院医嘱", "输液频次", "液体总量", "药品品种"],
+  "NIT-2025-VI": ["事件分级", "事件分类", "主动报告时间", "成因分析"],
+  "NIT-2025-VII": ["四级手术目录", "术前 MDT 邀请", "讨论记录", "术前完成时限"],
+  "NIT-2025-VIII": ["医嘱记录", "病程记录", "查房记录", "知情同意", "安全核查"],
+  "NIT-2025-IX": ["重返手术室事件", "再手术原因", "术后管理记录", "整改闭环"],
+  "NIT-2025-X": ["互认目录", "互认标识", "未互认原因", "机构互认率"]
+};
+
+function buildQualitySafetyNationalGoals(data) {
+  return QUALITY_SAFETY_NATIONAL_GOALS_2025.map((goal) => {
+    const evidenceRows = goal.evidenceCollections.reduce((total, collection) => total + (Array.isArray(data[collection]) ? data[collection].length : 0), 0);
+    return {
+      ...goal,
+      siteInputs: QUALITY_SAFETY_NATIONAL_GOAL_SITE_INPUTS[goal.code] || [],
+      evidenceRows,
+      currentStatus: evidenceRows > 0 ? "tracked" : "pending_site_confirmation"
+    };
+  });
+}
+
+function qualitySafetyNationalGoalCadenceType(cadence) {
+  const value = String(cadence || "");
+  if (value.includes("月")) return "monthly";
+  if (value.includes("季度")) return "quarterly";
+  return "continuous";
+}
+
+function buildQualitySafetyNationalGoalCadencePlan(nationalQualityGoals) {
+  const meta = {
+    monthly: {
+      cadenceType: "monthly",
+      cadenceLabel: "按月复盘",
+      reviewWindow: "每月 5 日前完成上月数据分析和反馈",
+      owner: "医政医管与质控中心联合值守",
+      nextAction: "优先核对危急值、卒中再灌注和检查检验互认月度指标。"
+    },
+    quarterly: {
+      cadenceType: "quarterly",
+      cadenceLabel: "按季度分科室反馈",
+      reviewWindow: "每季度首月 10 日前形成上季度分科室反馈",
+      owner: "医务、病案、护理、药事和手术管理联合复盘",
+      nextAction: "按科室汇总 TNM、VTE、感染性休克、输液、事件报告、四级手术、病历完整性和再手术问题。"
+    },
+    continuous: {
+      cadenceType: "continuous",
+      cadenceLabel: "持续监测",
+      reviewWindow: "每周滚动监测，月度纳入绩效复盘",
+      owner: "质控办与信息化运维联合监测",
+      nextAction: "保持 VTE 风险评估、提醒、会诊转诊和绩效反馈常态化。"
+    }
+  };
+  const groups = new Map();
+  nationalQualityGoals.forEach((goal) => {
+    const cadenceType = qualitySafetyNationalGoalCadenceType(goal.cadence);
+    const group = groups.get(cadenceType) || {
+      ...meta[cadenceType],
+      goals: [],
+      goalCount: 0,
+      evidenceRows: 0,
+      siteInputFields: 0
+    };
+    group.goals.push({ code: goal.code, title: goal.title, cadence: goal.cadence });
+    group.goalCount += 1;
+    group.evidenceRows += Number(goal.evidenceRows || 0);
+    group.siteInputFields += Array.isArray(goal.siteInputs) ? goal.siteInputs.length : 0;
+    groups.set(cadenceType, group);
+  });
+  return ["monthly", "quarterly", "continuous"].map((key) => groups.get(key)).filter(Boolean);
+}
+
+function buildQualitySafetySiteSignoffs(data, user) {
+  const rows = (Array.isArray(data.qualitySafetySiteSignoffs) ? data.qualitySafetySiteSignoffs : []).map((item) => ({
+    ...item,
+    ownerRole: item.ownerRole || "commission",
+    normalizedStatus: normalizeQualitySafetyStatus(item.status),
+    evidenceCount: Array.isArray(item.evidence) ? item.evidence.length : 0,
+    auditCount: Array.isArray(item.auditTrail) ? item.auditTrail.length : 0,
+    evidenceReady: Array.isArray(item.evidence) && item.evidence.length > 0,
+    requiredEvidenceText: Array.isArray(item.requiredEvidence) ? item.requiredEvidence.join(", ") : String(item.requiredEvidence || ""),
+    sourceCollection: "qualitySafetySiteSignoffs",
+    sourceId: item.id
+  }));
+  return qualitySafetyVisibleRows(rows, user);
+}
+
+function buildQualitySafetyGoLiveReadiness({ summary, actionPlan, institutionRisks, rectifications, criticalValueAlerts, clinicalPathwayCases, mutualRecognitionQualityReviews, reusedCollections, role }) {
+  const checks = [
+    {
+      id: "dashboard-scope",
+      passed: summary.issues > 0 && summary.rectifications > 0,
+      evidence: `${summary.issues} issues and ${summary.rectifications} rectifications visible for ${role}`
+    },
+    {
+      id: "dispatch-review-loop",
+      passed: rectifications.some((item) => item.feedbackComplete && item.evidenceComplete),
+      evidence: `${rectifications.filter((item) => item.evidenceComplete).length} rectifications include feedback and audit evidence`
+    },
+    {
+      id: "critical-value-loop",
+      passed: criticalValueAlerts.length > 0 && criticalValueAlerts.every((item) => item.acknowledgementComplete || item.dispositionComplete || item.normalizedStatus !== "closed"),
+      evidence: `${summary.criticalValuesDisposed}/${summary.criticalValues} critical values disposed`
+    },
+    {
+      id: "pathway-qc-loop",
+      passed: clinicalPathwayCases.length > 0 && clinicalPathwayCases.every((item) => item.eventId && item.dueAt),
+      evidence: `${summary.clinicalPathwaysReviewed}/${summary.clinicalPathways} pathway variances reviewed`
+    },
+    {
+      id: "mutual-recognition-qc",
+      passed: mutualRecognitionQualityReviews.length > 0,
+      evidence: `${mutualRecognitionQualityReviews.length} mutual-recognition QC rows`
+    },
+    {
+      id: "risk-action-plan",
+      passed: institutionRisks.length > 0 && actionPlan.length > 0,
+      evidence: `${institutionRisks.length} ranked institutions and ${actionPlan.length} action items`
+    },
+    {
+      id: "reuse-map",
+      passed: reusedCollections.every((item) => item.present),
+      evidence: reusedCollections.map((item) => `${item.collection}:${item.rows}`).join(";")
+    }
+  ];
+  const passed = checks.filter((item) => item.passed).length;
+  const score = Math.round((passed / checks.length) * 100);
+  const blockers = checks.filter((item) => !item.passed).map((item) => item.id);
+  return {
+    stage: blockers.length ? "release_candidate" : "controlled_pilot_ready",
+    usable: blockers.length === 0,
+    score,
+    blockers,
+    checks,
+    productionSignoffPending: [
+      "live HIS/EMR/LIS/PACS feed binding",
+      "production critical-value routing and timeout escalation",
+      "local clinical pathway dictionaries and EMR variance evidence",
+      "regional mutual-recognition lists and negative-list rules",
+      "department rectification sign-off attachments",
+      "production audit retention target"
+    ],
+    nextAction: blockers.length
+      ? `Resolve ${blockers.join(", ")} before pilot go-live.`
+      : "Ready for controlled pilot release; complete site joint-testing sign-offs before production cutover."
+  };
+}
+
+function buildQualitySafetyOperationsRunbook({ summary, rectifications, criticalValueAlerts, clinicalPathwayCases, mutualRecognitionQualityReviews, siteSignoffs, actionPlan, user }) {
+  const pendingCritical = criticalValueAlerts.filter((item) => !item.acknowledgementComplete || !item.dispositionComplete).length;
+  const openPathways = clinicalPathwayCases.filter((item) => item.normalizedStatus !== "closed").length;
+  const openMutualRecognition = mutualRecognitionQualityReviews.filter((item) => normalizeQualitySafetyStatus(item.status || item.qcStatus) !== "closed").length;
+  const pendingSignoffs = siteSignoffs.filter((item) => !["accepted", "closed"].includes(String(item.status || item.normalizedStatus || ""))).length;
+  const auditRetention = siteSignoffs.find((item) => item.id === "qss-audit-retention") || {};
+  const rows = [
+    {
+      id: "critical-value-on-call",
+      domain: "critical_value",
+      ownerRole: "institution",
+      owner: "Medical institution duty desk",
+      watchItem: "Critical-value acknowledgement and disposition",
+      signal: `${pendingCritical}/${criticalValueAlerts.length} pending`,
+      threshold: "acknowledge and dispose before timeout escalation",
+      currentStatus: pendingCritical > 0 ? "attention_required" : "ready",
+      escalation: "notify department lead and commission duty officer",
+      evidence: "criticalValueAlerts, qualitySafetySiteSignoffs"
+    },
+    {
+      id: "rectification-sla-watch",
+      domain: "rectification",
+      ownerRole: "commission",
+      owner: "Quality supervision duty officer",
+      watchItem: "Rectification SLA and overdue escalation",
+      signal: `overdue ${summary.sla?.overdue || 0}, due soon ${summary.sla?.dueSoon || 0}`,
+      threshold: "overdue > 0 or missing feedback before due date",
+      currentStatus: (summary.sla?.overdue || 0) > 0 ? "attention_required" : "ready",
+      escalation: "issue leadership escalation and require signed correction evidence",
+      evidence: "qualityRectificationOrders, securityEvents"
+    },
+    {
+      id: "pathway-variance-watch",
+      domain: "clinical_pathway",
+      ownerRole: "commission",
+      owner: "Clinical pathway office",
+      watchItem: "Clinical pathway variance review",
+      signal: `${openPathways}/${clinicalPathwayCases.length} open`,
+      threshold: "variance case remains open after review window",
+      currentStatus: openPathways > 0 ? "attention_required" : "ready",
+      escalation: "assign pathway review and require EMR variance evidence",
+      evidence: "clinicalPathwayCases, qualitySafetyEvents"
+    },
+    {
+      id: "mutual-recognition-watch",
+      domain: "mutual_recognition_qc",
+      ownerRole: "county",
+      owner: "County consortium office",
+      watchItem: "Mutual-recognition QC exception handling",
+      signal: `${openMutualRecognition}/${mutualRecognitionQualityReviews.length} open`,
+      threshold: "negative-list or exception reason missing",
+      currentStatus: openMutualRecognition > 0 ? "attention_required" : "ready",
+      escalation: "coordinate member institutions and submit consortium evidence",
+      evidence: "mutualRecognitionQualityReviews, countyMutualRecognitionRecords"
+    },
+    {
+      id: "site-signoff-watch",
+      domain: "live_interfaces",
+      ownerRole: "commission",
+      owner: "Site integration lead",
+      watchItem: "HIS/EMR/LIS/PACS joint-test and sign-off",
+      signal: `${pendingSignoffs}/${siteSignoffs.length} pending`,
+      threshold: "any production cutover sign-off missing",
+      currentStatus: pendingSignoffs > 0 ? "attention_required" : "ready",
+      escalation: "freeze cutover, collect signed evidence, rerun joint-test pack",
+      evidence: "qualitySafetySiteSignoffs, hospitalInteroperabilityFunctions"
+    },
+    {
+      id: "audit-retention-watch",
+      domain: "audit_retention",
+      ownerRole: "commission",
+      owner: "Security and audit administrator",
+      watchItem: "Audit retention and SIEM export evidence",
+      signal: auditRetention.status || "pending_site_confirmation",
+      threshold: "production audit target not configured or unsigned",
+      currentStatus: ["accepted", "closed"].includes(String(auditRetention.status || "")) ? "ready" : "attention_required",
+      escalation: "bind audit export target and archive retention sign-off",
+      evidence: "securityEvents, dataAccessLogs, qualitySafetySiteSignoffs"
+    }
+  ];
+  const visibleRows = qualitySafetyVisibleRows(rows, user);
+  const rank = { attention_required: 0, ready: 1 };
+  return visibleRows
+    .sort((a, b) => (rank[a.currentStatus] ?? 9) - (rank[b.currentStatus] ?? 9) || a.id.localeCompare(b.id))
+    .map((item) => ({
+      ...item,
+      actionLink: actionPlan.find((action) => action.domain === item.domain)?.id || ""
+    }));
+}
+
+function buildQualitySafetyWarningIndicators({ summary, operationsRunbook, actionPlan }) {
+  const runbookById = new Map((operationsRunbook || []).map((item) => [item.id, item]));
+  const actionByDomain = new Map((actionPlan || []).map((item) => [item.domain, item]));
+  const indicators = [
+    {
+      id: "warning-critical-value-disposition",
+      domain: "critical_value",
+      name: "危急值处置超时预警",
+      runbookId: "critical-value-on-call",
+      targetSection: "quality-safety-critical",
+      threshold: "未确认或未处置危急值 > 0",
+      sourceCollection: "criticalValueAlerts"
+    },
+    {
+      id: "warning-rectification-sla",
+      domain: "rectification",
+      name: "整改 SLA 逾期预警",
+      runbookId: "rectification-sla-watch",
+      targetSection: "quality-safety-rectifications",
+      threshold: "逾期整改 > 0 或反馈证据缺失",
+      sourceCollection: "qualityRectificationOrders"
+    },
+    {
+      id: "warning-pathway-variance",
+      domain: "clinical_pathway",
+      name: "临床路径偏离复核预警",
+      runbookId: "pathway-variance-watch",
+      targetSection: "quality-safety-boundaries",
+      threshold: "路径偏离病例在复核窗口后仍未关闭",
+      sourceCollection: "clinicalPathwayCases"
+    },
+    {
+      id: "warning-mutual-recognition-qc",
+      domain: "mutual_recognition_qc",
+      name: "检查检验互认质控预警",
+      runbookId: "mutual-recognition-watch",
+      targetSection: "quality-safety-boundaries",
+      threshold: "互认例外未补齐负面清单或复核原因",
+      sourceCollection: "mutualRecognitionQualityReviews"
+    },
+    {
+      id: "warning-live-signoff",
+      domain: "live_interfaces",
+      name: "上线联调签收预警",
+      runbookId: "site-signoff-watch",
+      targetSection: "quality-safety-signoffs",
+      threshold: "生产切换前任一签收项未完成",
+      sourceCollection: "qualitySafetySiteSignoffs"
+    },
+    {
+      id: "warning-audit-retention",
+      domain: "audit_retention",
+      name: "审计留存对接预警",
+      runbookId: "audit-retention-watch",
+      targetSection: "quality-safety-prelaunch-gaps",
+      threshold: "审计导出或 SIEM 留存目标未签收",
+      sourceCollection: "securityEvents"
+    }
+  ];
+  return indicators.map((indicator) => {
+    const runbook = runbookById.get(indicator.runbookId) || {};
+    const action = actionByDomain.get(indicator.domain) || {};
+    const currentStatus = runbook.currentStatus || "attention_required";
+    const signal = runbook.signal || "";
+    return {
+      ...indicator,
+      level: currentStatus === "attention_required" ? "high" : "watch",
+      owner: runbook.owner || action.owner || "质控监管值守员",
+      ownerRole: runbook.ownerRole || action.ownerRole || "commission",
+      signal,
+      currentStatus,
+      nextAction: runbook.escalation || action.action || "定位闭环任务并补齐现场证据",
+      evidence: runbook.evidence || action.evidence || indicator.sourceCollection,
+      relatedActionId: runbook.actionLink || action.id || "",
+      closedLoopReady: Boolean(runbook.threshold && runbook.escalation && (runbook.evidence || action.evidence)),
+      summarySnapshot: {
+        criticalValuesPending: summary.criticalValuesPending || 0,
+        rectificationOverdue: summary.sla?.overdue || 0,
+        clinicalPathwaysOpen: summary.clinicalPathwaysOpen || 0,
+        siteSignoffsPending: summary.siteSignoffsPending || 0
+      }
+    };
+  }).sort((a, b) => {
+    const rank = { attention_required: 0, ready: 1 };
+    return (rank[a.currentStatus] ?? 9) - (rank[b.currentStatus] ?? 9) || a.id.localeCompare(b.id);
+  });
+}
+
+function buildQualitySafetySiteRequirementChecklist({ siteSignoffs, operationsRunbook, coreSystemMatrix, goLiveReadiness, user }) {
+  const signoffById = new Map(siteSignoffs.map((item) => [item.id, item]));
+  const runbookById = new Map(operationsRunbook.map((item) => [item.id, item]));
+  const coreSystemNames = new Set(coreSystemMatrix.map((item) => item.name));
+  const signoffStatus = (id) => {
+    const signoff = signoffById.get(id);
+    if (!signoff) return "pending_site_confirmation";
+    if (["accepted", "closed"].includes(String(signoff.status || signoff.normalizedStatus || ""))) return "accepted";
+    if (String(signoff.status || "") === "ready_for_joint_test") return "ready_for_joint_test";
+    return signoff.status || "pending_site_confirmation";
+  };
+  const runbookStatus = (id) => runbookById.get(id)?.currentStatus || "attention_required";
+  const rows = [
+    {
+      id: "onsite-login-roles",
+      domain: "identity",
+      ownerRole: "commission",
+      owner: "市卫健委监管管理员",
+      requirement: "确认卫健监管、医疗机构、县域医共体三类登录部门和最小权限",
+      onsiteInput: "政务统一身份、机构编码、角色清单、测试账号和停用账号",
+      acceptanceEvidence: "三类账号登录截图、越权拒绝记录和审计日志",
+      currentStatus: goLiveReadiness.usable ? "ready_for_joint_test" : "pending_site_confirmation",
+      source: "authUsers, requireApiRole, securityEvents"
+    },
+    {
+      id: "onsite-live-feeds",
+      domain: "live_interfaces",
+      ownerRole: "commission",
+      owner: "现场接口联调负责人",
+      requirement: "接入 HIS/EMR/LIS/PACS 生产或准生产实时数据源",
+      onsiteInput: "接口地址、机构编码、接口密钥、报文样例、失败重试窗口",
+      acceptanceEvidence: "联调签字单、样例报文校验结果和幂等重放记录",
+      currentStatus: signoffStatus("qss-live-feeds"),
+      source: "qualitySafetySiteSignoffs, hospitalInteroperabilityFunctions"
+    },
+    {
+      id: "onsite-critical-routing",
+      domain: "critical_value",
+      ownerRole: "institution",
+      owner: "医疗机构值班台",
+      requirement: "配置危急值接收人、超时升级链路和闭环处置回写",
+      onsiteInput: "危急值项目清单、值班电话、短信/站内信通道、科室升级表",
+      acceptanceEvidence: "危急值演练记录、确认处置截图和超时升级回执",
+      currentStatus: signoffStatus("qss-critical-routing") === "accepted" ? "accepted" : runbookStatus("critical-value-on-call"),
+      source: "criticalValueAlerts, qualitySafetySiteSignoffs"
+    },
+    {
+      id: "onsite-pathway-dictionaries",
+      domain: "clinical_pathway",
+      ownerRole: "commission",
+      owner: "临床路径办公室",
+      requirement: "确认本地临床路径字典、EMR 节点和偏差复核规则",
+      onsiteInput: "病种路径字典、节点编码、偏差原因、EMR 回写字段",
+      acceptanceEvidence: "路径偏差用例、EMR 证据截图和监管复核记录",
+      currentStatus: signoffStatus("qss-pathway-dictionaries"),
+      source: coreSystemNames.has("会诊制度") ? "clinicalPathwayCases, medicalRecordQualityReviews" : "clinicalPathwayCases"
+    },
+    {
+      id: "onsite-mutual-recognition",
+      domain: "mutual_recognition_qc",
+      ownerRole: "county",
+      owner: "县域医共体办公室",
+      requirement: "确认检验检查互认目录、负面清单和例外复核规则",
+      onsiteInput: "互认项目、机构范围、负面清单、不互认原因和复核责任人",
+      acceptanceEvidence: "互认质控样例、例外复核记录和医共体签收材料",
+      currentStatus: signoffStatus("qss-mutual-recognition-rules") === "accepted" ? "accepted" : runbookStatus("mutual-recognition-watch"),
+      source: "mutualRecognitionQualityReviews, countyMutualRecognitionRecords"
+    },
+    {
+      id: "onsite-rectification-attachments",
+      domain: "rectification",
+      ownerRole: "institution",
+      owner: "机构质控办公室",
+      requirement: "确认整改反馈附件、科室签收和监管复核证据归档规则",
+      onsiteInput: "整改模板、附件类型、科室负责人、复核时限和退回规则",
+      acceptanceEvidence: "整改反馈、科室签字附件、复核通过/退回审计轨迹",
+      currentStatus: signoffStatus("qss-rectification-attachments") === "accepted" ? "accepted" : runbookStatus("rectification-sla-watch"),
+      source: "qualityRectificationOrders, securityEvents"
+    },
+    {
+      id: "onsite-audit-retention",
+      domain: "audit_retention",
+      ownerRole: "commission",
+      owner: "安全审计管理员",
+      requirement: "确认审计日志留存、导出、哈希保全和 SIEM 对接边界",
+      onsiteInput: "AUDIT_EXPORT_PATH 或 SIEM_ENDPOINT、留存周期、审计账号、保全目录",
+      acceptanceEvidence: "审计导出文件、哈希校验记录和安全签收单",
+      currentStatus: signoffStatus("qss-audit-retention") === "accepted" ? "accepted" : runbookStatus("audit-retention-watch"),
+      source: "securityEvents, dataAccessLogs, qualitySafetySiteSignoffs"
+    },
+    {
+      id: "onsite-monitoring-oncall",
+      domain: "operations",
+      ownerRole: "commission",
+      owner: "平台运维值守组",
+      requirement: "绑定健康检查、指标监控、告警规则和值班升级表",
+      onsiteInput: "/api/health、/api/metrics、SLO 阈值、告警接收人、值班表",
+      acceptanceEvidence: "监控截图、告警演练记录、值班签收和升级回执",
+      currentStatus: operationsRunbook.every((item) => item.currentStatus === "ready") ? "accepted" : "attention_required",
+      source: "operationsRunbook, monitoring-readiness-report"
+    },
+    {
+      id: "onsite-training-cutover",
+      domain: "training",
+      ownerRole: "commission",
+      owner: "项目实施和质控联合组",
+      requirement: "完成上线培训、试运行问题清零和回退联系人确认",
+      onsiteInput: "培训签到、操作手册、问题清单、回退联系人和切换窗口",
+      acceptanceEvidence: "培训签到表、试运行问题清零表和上线确认单",
+      currentStatus: "pending_site_confirmation",
+      source: "site-readiness-pack, production-cutover-checklist"
+    }
+  ];
+  return qualitySafetyVisibleRows(rows, user);
+}
+
+function buildQualitySafetyCutoverSequence({ onsiteRequirements }) {
+  const requirementById = new Map(onsiteRequirements.map((item) => [item.id, item]));
+  const phases = [
+    {
+      id: "before-cutover",
+      phase: "上线前准备",
+      window: "T-5 至 T-1 工作日",
+      requirementIds: ["onsite-login-roles", "onsite-live-feeds", "onsite-pathway-dictionaries", "onsite-mutual-recognition"],
+      objective: "完成账号、接口、路径和互认规则确认，避免上线当天补基础资料。",
+      acceptanceGate: "账号可登录、接口样例通过、字典和互认目录完成现场确认。"
+    },
+    {
+      id: "cutover-day",
+      phase: "上线当天切换",
+      window: "T 日",
+      requirementIds: ["onsite-critical-routing", "onsite-rectification-attachments", "onsite-monitoring-oncall"],
+      objective: "完成危急值路由、整改附件、监控告警和现场值守联动。",
+      acceptanceGate: "危急值演练有回执，整改附件可上传复核，监控告警可触达值守人。"
+    },
+    {
+      id: "after-cutover",
+      phase: "上线后稳定",
+      window: "T+1 至 T+7 日",
+      requirementIds: ["onsite-audit-retention", "onsite-training-cutover"],
+      objective: "完成审计保全、培训记录、试运行问题清零和回退联系人确认。",
+      acceptanceGate: "审计导出和哈希保全可验证，培训签到和问题清零表归档。"
+    }
+  ];
+  const rank = { attention_required: 0, pending_site_confirmation: 1, ready_for_joint_test: 2, accepted: 3, closed: 3 };
+  return phases.map((item) => {
+    const requirements = item.requirementIds.map((id) => requirementById.get(id)).filter(Boolean);
+    const owners = [...new Set(requirements.map((requirement) => requirement.owner).filter(Boolean))];
+    const statuses = requirements.map((requirement) => String(requirement.currentStatus || "pending_site_confirmation"));
+    const currentStatus = statuses.length === 0
+      ? "pending_site_confirmation"
+      : statuses.some((status) => status === "attention_required")
+        ? "attention_required"
+        : statuses.every((status) => ["accepted", "closed", "ready_for_joint_test"].includes(status))
+          ? "ready_for_joint_test"
+          : statuses.sort((a, b) => (rank[a] ?? 9) - (rank[b] ?? 9))[0] || "pending_site_confirmation";
+    return {
+      ...item,
+      owners,
+      currentStatus,
+      readyCount: statuses.filter((status) => ["accepted", "closed", "ready_for_joint_test"].includes(status)).length,
+      totalCount: requirements.length,
+      requirements: requirements.map((requirement) => ({
+        id: requirement.id,
+        requirement: requirement.requirement,
+        currentStatus: requirement.currentStatus
+      }))
+    };
+  }).filter((item) => item.totalCount > 0);
+}
+
+function buildQualitySafetyNextDevelopmentPlan({ goLiveReadiness, operationsRunbook, onsiteRequirements, cutoverSequence, nationalGoalCadencePlan }) {
+  const requirementById = new Map((onsiteRequirements || []).map((item) => [item.id, item]));
+  const runbookById = new Map((operationsRunbook || []).map((item) => [item.id, item]));
+  const phaseById = new Map((cutoverSequence || []).map((item) => [item.id, item]));
+  const cadenceLabels = (nationalGoalCadencePlan || []).map((item) => item.cadenceLabel).filter(Boolean).join("、");
+  const plan = [
+    {
+      id: "plan-live-interface-joint-test",
+      phase: "上线前准备",
+      priority: "P0",
+      owner: "医疗机构接口联调组",
+      scope: "HIS、EMR、LIS、PACS 实时或准实时数据接入，完成字段映射、签名校验和幂等重放。",
+      currentGap: "仍需归档现场联合测试记录、样例报文和字段映射确认。",
+      developmentIncrement: "把真实机构样例接入现有接口标准和联调包，形成可重复回归的接口验收批次。",
+      acceptanceEvidence: "签字联调记录、样例入站报文、字段映射确认、失败重放记录。",
+      verificationCommand: "npm.cmd run quality-safety:joint-test; npm.cmd run integration:readiness",
+      status: requirementById.get("onsite-live-feeds")?.currentStatus || "pending_site_confirmation",
+      source: "qualitySafetySiteSignoffs, hospitalInteroperabilityFunctions, integrationContracts",
+      targetSurface: "quality-safety-interface-pack"
+    },
+    {
+      id: "plan-core-closure-drill",
+      phase: "上线当天切换",
+      priority: "P0",
+      owner: "医政医管、质控中心、医疗机构医务科",
+      scope: "危急值、整改工单、临床路径变异、互认异常和核心制度证据的闭环演练。",
+      currentGap: "危急值处置、整改附件、路径字典和互认规则仍需现场演练签收。",
+      developmentIncrement: "把现场演练结果写回现有闭环接口，形成监管复核和退回补正证据。",
+      acceptanceEvidence: "危急值回执、整改签字附件、路径变异复核、互认异常复核、监管审计日志。",
+      verificationCommand: "npm.cmd run quality-safety:report; npm.cmd test",
+      status: phaseById.get("cutover-day")?.currentStatus || "attention_required",
+      source: "criticalValueAlerts, qualityRectificationOrders, clinicalPathwayCases, mutualRecognitionQualityReviews",
+      targetSurface: "quality-safety-actions"
+    },
+    {
+      id: "plan-national-goal-review",
+      phase: "上线后稳定",
+      priority: "P1",
+      owner: "质控中心、病案室、护理部、药事和手术管理部门",
+      scope: "围绕 2025 年国家医疗质量安全改进目标形成按月、按季度和持续监测复盘。",
+      currentGap: `${cadenceLabels || "国家目标复盘"} 已建模，仍需现场确认科室口径、指标阈值和反馈模板。`,
+      developmentIncrement: "把月度/季度复盘口径转为机构科室分层看板和导出模板。",
+      acceptanceEvidence: "月度反馈表、季度分科室复盘记录、科室整改任务、绩效纳入确认。",
+      verificationCommand: "npm.cmd run quality-safety:report",
+      status: (nationalGoalCadencePlan || []).length >= 3 ? "ready_for_joint_test" : "pending_site_confirmation",
+      source: "nationalQualityGoals, nationalGoalCadencePlan, medicalRecordQualityReviews",
+      targetSurface: "quality-safety-national-goal-cadence"
+    },
+    {
+      id: "plan-production-audit-operations",
+      phase: "上线后稳定",
+      priority: "P0",
+      owner: "安全管理岗、平台运维和值班负责人",
+      scope: "生产审计留存、监控告警、值守升级、问题清零和回退联系人确认。",
+      currentGap: "生产审计留存目标和监控签收仍是正式切换前的现场配置项。",
+      developmentIncrement: "把审计留存、监控告警和上线培训签收纳入统一发布证据链。",
+      acceptanceEvidence: "AUDIT_EXPORT_PATH 或 SIEM_ENDPOINT、监控截图、告警演练记录、培训签到和上线确认单。",
+      verificationCommand: "npm.cmd run release:report; npm.cmd run deploy:check",
+      status: runbookById.get("audit-retention-watch")?.currentStatus || "attention_required",
+      source: "securityEvents, dataAccessLogs, monitoring-readiness-report, production-cutover-checklist",
+      targetSurface: "quality-safety-operations-runbook"
+    }
+  ];
+  return plan.map((item) => ({
+    ...item,
+    goLiveStage: goLiveReadiness?.stage || "unknown",
+    readyForPilot: Boolean(goLiveReadiness?.usable),
+    requiresAttention: !["accepted", "ready_for_joint_test", "closed", "ready"].includes(String(item.status || ""))
+  }));
+}
+
+function buildQualitySafetyDepartmentTaskView({ user, summary, actionPlan, issues, rectifications, criticalValueAlerts, siteSignoffs, mutualRecognitionQualityReviews, cutoverSequence = [] }) {
+  const profileByRole = {
+    commission: {
+      name: "卫健监管部门",
+      scope: "全域/辖区医疗质量、安全事件、整改闭环和现场签收监管",
+      focus: "优先处理高风险机构、逾期整改、危急行动事项和现场签收阻断项",
+      actions: ["派发问题", "复核整改", "升级逾期", "复核路径", "联调签收"],
+      permissions: ["dispatch_issue", "review_rectification", "escalate_overdue", "review_pathway", "review_site_signoff"]
+    },
+    institution: {
+      name: "医疗机构",
+      scope: "本机构医疗质量事件、危急值、整改反馈和现场证据",
+      focus: "优先完成危急值确认处置、整改反馈、病历补证和生产证据补交",
+      actions: ["提交整改反馈", "确认危急值", "处置危急值", "提交现场证据"],
+      permissions: ["submit_feedback", "acknowledge_critical_value", "dispose_critical_value", "submit_site_evidence"]
+    },
+    county: {
+      name: "县域医共体",
+      scope: "医共体成员机构、互认质控、区域协同事项和现场签收材料",
+      focus: "优先补齐互认清单、负面清单、例外复核证据和医共体签收材料",
+      actions: ["查看互认质控", "提交医共体证据", "补充签收材料", "协同成员机构"],
+      permissions: ["view_mutual_recognition_qc", "submit_consortium_evidence", "coordinate_member_institutions"]
+    }
+  };
+  const role = user.role || "commission";
+  const profile = profileByRole[role] || profileByRole.commission;
+  const openIssueCount = issues.filter((item) => normalizeQualitySafetyStatus(item.status || item.normalizedStatus) !== "closed").length;
+  const openSignoffs = siteSignoffs.filter((item) => !["accepted", "closed", "ready_for_joint_test"].includes(String(item.status || item.normalizedStatus || "")));
+  const roleSignoffs = openSignoffs.filter((item) => !item.ownerRole || item.ownerRole === role);
+  const metricRows = role === "institution" ? [
+    { label: "待处置危急值", value: criticalValueAlerts.filter((item) => !item.acknowledgementComplete || !item.dispositionComplete).length },
+    { label: "待反馈整改", value: rectifications.filter((item) => !item.feedbackComplete && item.normalizedStatus !== "closed").length },
+    { label: "本机构签收", value: roleSignoffs.length },
+    { label: "可见问题", value: openIssueCount }
+  ] : role === "county" ? [
+    { label: "互认待复核", value: mutualRecognitionQualityReviews.filter((item) => normalizeQualitySafetyStatus(item.status || item.qcStatus) !== "closed").length },
+    { label: "医共体签收", value: roleSignoffs.length },
+    { label: "区域整改", value: rectifications.filter((item) => item.normalizedStatus !== "closed").length },
+    { label: "可见问题", value: openIssueCount }
+  ] : [
+    { label: "逾期整改", value: summary.sla?.overdue || 0 },
+    { label: "高危行动", value: summary.criticalActionItems || 0 },
+    { label: "待复核整改", value: rectifications.filter((item) => item.normalizedStatus === "reviewing").length },
+    { label: "待签收项", value: openSignoffs.length }
+  ];
+  const queue = [
+    ...actionPlan.map((item) => ({
+      id: item.id,
+      kind: "action_plan",
+      priority: item.priority,
+      title: item.action,
+      owner: item.owner,
+      dueAt: item.dueAt || "",
+      source: item.source || item.id,
+      context: item.reason || item.evidence || "",
+      targetSection: "quality-safety-actions",
+      actionLabel: "查看行动计划"
+    })),
+    ...roleSignoffs.map((item) => ({
+      id: item.id,
+      kind: "site_signoff",
+      priority: item.status === "pending_site_confirmation" ? "high" : "medium",
+      title: item.item,
+      owner: item.owner,
+      dueAt: item.dueAt || "",
+      source: item.sourceCollection || "qualitySafetySiteSignoffs",
+      context: item.requiredEvidenceText || item.latestNote || "",
+      targetSection: "quality-safety-signoffs",
+      actionLabel: role === "commission" ? "记录联调" : "提交证据"
+    })),
+    ...cutoverSequence
+      .filter((item) => item.currentStatus === "attention_required")
+      .map((item) => ({
+        id: item.id,
+        kind: "cutover_sequence",
+        priority: item.id === "cutover-day" ? "critical" : "high",
+        title: `${item.phase}：${item.objective}`,
+        owner: (item.owners || []).join("、") || "现场上线联合组",
+        dueAt: item.window || "",
+        source: "cutoverSequence",
+        context: item.acceptanceGate || "",
+        targetSection: "quality-safety-cutover-sequence",
+        actionLabel: "查看执行顺序"
+    }))
+  ];
+  const priorityRank = { critical: 0, high: 1, medium: 2, watch: 3 };
+  return {
+    role,
+    roleName: user.roleName || profile.name,
+    orgCode: user.orgCode || "",
+    orgName: user.orgName || "",
+    dataScope: user.dataScope || profile.scope,
+    profile,
+    metrics: metricRows,
+    queue: queue
+      .sort((a, b) => (priorityRank[a.priority] ?? 9) - (priorityRank[b.priority] ?? 9) || String(a.dueAt || "9999").localeCompare(String(b.dueAt || "9999")) || a.id.localeCompare(b.id))
+      .slice(0, 8)
+  };
+}
+
+function buildQualitySafetyCoreSystemMatrix(data) {
+  const rows = [
+    ["first-visit-responsibility", "首诊负责制度", "明确诊疗责任主体、连续服务和诊疗记录可追溯", ["qualitySafetyEvents", "medicalRecordQualityReviews"], "首诊责任和转诊告知记录抽查"],
+    ["three-level-rounds", "三级查房制度", "明确各级医师决策权限、查房周期和术前术后查房要求", ["medicalRecordQualityReviews"], "病历质控抽样和查房记录缺陷反馈"],
+    ["consultation", "会诊制度", "统一会诊单、急会诊时限、会诊意见处置和病程记录", ["clinicalPathwayCases", "hospitalInteroperabilityFunctions"], "会诊记录和路径偏离证据联动"],
+    ["graded-nursing", "分级护理制度", "护理级别动态调整、明确标识和护理记录质控", ["medicalRecordQualityReviews"], "护理记录缺陷纳入病历质控反馈"],
+    ["duty-handover", "值班和交接班制度", "值班职责、通讯畅通、急危重床旁交班和专册签字", ["criticalValueAlerts", "qualitySafetySiteSignoffs"], "危急值路由、超时升级和现场签收"],
+    ["difficult-case-discussion", "疑难病例讨论制度", "疑难病例范围、科室组织、专册记录和病历写入", ["clinicalPathwayCases", "medicalRecordQualityReviews"], "路径偏离与疑难讨论证据抽查"],
+    ["critical-rescue", "急危重患者抢救制度", "绿色通道、抢救资源、6小时内抢救记录和签字审核", ["criticalValueAlerts", "qualitySafetyEvents"], "危急值处置和关联事件关闭"],
+    ["preoperative-discussion", "术前讨论制度", "手术指征、风险预案、多学科讨论和病历记录", ["clinicalPathwayCases", "medicalRecordQualityReviews"], "术前讨论证据纳入病历质控"],
+    ["death-case-discussion", "死亡病例讨论制度", "死亡病例1周内讨论、专册记录和持续改进", ["medicalRecordQualityReviews", "qualitySafetyEvents"], "死亡病例专项抽查待接入"],
+    ["checking-system", "查对制度", "患者身份、诊疗行为、设备药品和标本查对", ["diagnosticReports", "criticalValueAlerts"], "检查检验报告、危急值复核和双人核对"],
+    ["surgical-safety-check", "手术安全核查制度", "麻醉前、手术前、离室前多方核查并纳入病历", ["medicalRecordQualityReviews"], "手术安全核查表抽样质控"],
+    ["surgery-grade-management", "手术分级管理制度", "手术分级目录、医师授权档案和动态评估", ["hospitalInteroperabilityFunctions", "medicalRecordQualityReviews"], "手术权限和病案证据现场签收"],
+    ["new-technology-access", "新技术和新项目准入制度", "技术清单、审批流程、伦理审核、风险预案和动态评估", ["qualitySafetyEvents", "institutionCreditEvaluations"], "新技术准入风险和机构信用整改联动"],
+    ["critical-value-reporting", "危急值报告制度", "危急值清单、复核报告、接收确认和全流程登记追溯", ["criticalValueAlerts", "diagnosticReports"], "危急值提醒、确认、处置和审计轨迹"],
+    ["medical-record-management", "病历管理制度", "病历书写、质控、保存、修改和安全等级保护", ["medicalRecordQualityReviews", "qualityRectificationOrders"], "病历质控评分、整改反馈和复核证据"],
+    ["antimicrobial-grade-management", "抗菌药物分级管理制度", "药物分级目录、处方权限、会诊专家库和用药评价", ["qualitySafetyEvents", "dataQualityIssues"], "药事系统接口和处方权限待现场接入"],
+    ["clinical-blood-audit", "临床用血审核制度", "用血申请、配血、输血观察、不良反应和全程记录", ["qualitySafetyEvents", "medicalRecordQualityReviews"], "输血系统接口和合理用血评估待现场接入"],
+    ["information-security", "信息安全管理制度", "诊疗信息全流程安全、授权、风险评估、自查和事故追溯", ["securityEvents", "dataAccessLogs"], "安全事件、访问审计和追溯机制"]
+  ];
+  const siteSignoffs = Array.isArray(data.qualitySafetySiteSignoffs) ? data.qualitySafetySiteSignoffs : [];
+  const submittedEvidence = Array.isArray(data.qualitySafetyCoreSystemEvidence) ? data.qualitySafetyCoreSystemEvidence : [];
+  return rows.map(([id, name, requirement, evidenceCollections, platformControl]) => {
+    const submissions = submittedEvidence.filter((item) => item.coreSystemId === id);
+    const sourceEvidenceRows = evidenceCollections.reduce((total, collection) => total + (Array.isArray(data[collection]) ? data[collection].length : 0), 0);
+    const evidenceRows = sourceEvidenceRows + submissions.length;
+    const signoffMatched = siteSignoffs.some((item) => {
+      const sources = Array.isArray(item.sourceCollections) ? item.sourceCollections : [];
+      return evidenceCollections.some((collection) => sources.includes(collection)) || String(item.item || "").includes(name.slice(0, 2));
+    });
+    return {
+      id,
+      name,
+      requirement,
+      platformControl,
+      evidenceCollections,
+      evidenceRows,
+      submittedEvidenceCount: submissions.length,
+      latestSubmission: submissions[0] || null,
+      sourcePolicy: "国卫医发〔2018〕8号《医疗质量安全核心制度要点》",
+      status: signoffMatched ? "已纳入现场联调" : submissions.length > 0 ? "已提交制度证据" : sourceEvidenceRows > 0 ? "已纳入监管看板" : "需扩展接口",
+      nextAction: submissions.length > 0 ? "等待监管复核并补充现场抽查材料" : signoffMatched ? "完成现场签收并固化生产证据" : sourceEvidenceRows > 0 ? "补充现场模板和抽查规则" : "对接业务系统并建立质控样例"
+    };
+  });
 }
 
 function buildQualitySafetyIssues(data) {
@@ -18486,7 +19622,28 @@ function buildQualitySafetyIssues(data) {
 function buildQualitySafetyDashboard(data, user) {
   const issues = qualitySafetyVisibleRows(buildQualitySafetyIssues(data), user);
   const rectifications = qualitySafetyVisibleRows(Array.isArray(data.qualityRectificationOrders) ? data.qualityRectificationOrders : [], user)
-    .map((item) => ({ ...item, normalizedStatus: normalizeQualitySafetyStatus(item.status) }));
+    .map((item) => ({ ...item, normalizedStatus: normalizeQualitySafetyStatus(item.status), ...qualitySafetySlaState(item) }));
+  const criticalValueAlerts = buildQualitySafetyCriticalAlerts(data, user);
+  const clinicalPathwayCases = buildQualitySafetyClinicalPathways(data, user);
+  const siteSignoffs = buildQualitySafetySiteSignoffs(data, user);
+  const institutionRisks = buildQualitySafetyInstitutionRisks(issues, rectifications);
+  const mutualRecognitionQualityReviews = qualitySafetyVisibleRows((Array.isArray(data.mutualRecognitionQualityReviews) ? data.mutualRecognitionQualityReviews : []).map((item) => ({
+    ...item,
+    ownerRole: item.ownerRole || "county",
+    sourceCollection: "mutualRecognitionQualityReviews",
+    sourceId: item.id,
+    normalizedStatus: normalizeQualitySafetyStatus(item.status || item.qcStatus)
+  })), user);
+  const nationalQualityGoals = buildQualitySafetyNationalGoals(data);
+  const nationalGoalCadencePlan = buildQualitySafetyNationalGoalCadencePlan(nationalQualityGoals);
+  const actionPlan = buildQualitySafetyActionPlan({ issues, rectifications, criticalValueAlerts, clinicalPathwayCases, mutualRecognitionQualityReviews, institutionRisks });
+  const slaSummary = {
+    overdue: rectifications.filter((item) => item.slaStatus === "overdue").length,
+    dueSoon: rectifications.filter((item) => item.slaStatus === "due_soon").length,
+    onTrack: rectifications.filter((item) => item.slaStatus === "on_track").length,
+    missingFeedback: rectifications.filter((item) => !item.feedbackComplete && item.normalizedStatus !== "closed").length,
+    evidenceComplete: rectifications.filter((item) => item.evidenceComplete).length
+  };
   const summary = {
     issues: issues.length,
     open: issues.filter((item) => item.normalizedStatus === "open").length,
@@ -18494,11 +19651,30 @@ function buildQualitySafetyDashboard(data, user) {
     reviewing: issues.filter((item) => item.normalizedStatus === "reviewing").length,
     closed: issues.filter((item) => item.normalizedStatus === "closed").length,
     rectifications: rectifications.length,
-    criticalValues: Array.isArray(data.criticalValueAlerts) ? data.criticalValueAlerts.length : 0,
-    clinicalPathways: Array.isArray(data.clinicalPathwayCases) ? data.clinicalPathwayCases.length : 0,
+    sla: slaSummary,
+    criticalValues: criticalValueAlerts.length,
+    criticalValuesPending: criticalValueAlerts.filter((item) => item.normalizedStatus !== "closed").length,
+    criticalValuesDisposed: criticalValueAlerts.filter((item) => item.dispositionComplete).length,
+    clinicalPathways: clinicalPathwayCases.length,
+    clinicalPathwaysOpen: clinicalPathwayCases.filter((item) => item.normalizedStatus !== "closed").length,
+    clinicalPathwaysReviewed: clinicalPathwayCases.filter((item) => item.reviewComplete).length,
     medicalRecordReviews: Array.isArray(data.medicalRecordQualityReviews) ? data.medicalRecordQualityReviews.length : 0,
-    mutualRecognitionReviews: Array.isArray(data.mutualRecognitionQualityReviews) ? data.mutualRecognitionQualityReviews.length : 0
+    mutualRecognitionReviews: mutualRecognitionQualityReviews.length,
+    actionItems: actionPlan.length,
+    criticalActionItems: actionPlan.filter((item) => item.priority === "critical").length,
+    highActionItems: actionPlan.filter((item) => item.priority === "high").length
   };
+  summary.siteSignoffs = siteSignoffs.length;
+  summary.siteSignoffsAccepted = siteSignoffs.filter((item) => item.normalizedStatus === "closed").length;
+  summary.siteSignoffsReady = siteSignoffs.filter((item) => item.status === "ready_for_joint_test").length;
+  summary.siteSignoffsPending = siteSignoffs.filter((item) => !["accepted", "closed"].includes(String(item.status || ""))).length;
+  summary.nationalQualityGoals = nationalQualityGoals.length;
+  summary.nationalQualityGoalsTracked = nationalQualityGoals.filter((item) => item.currentStatus === "tracked").length;
+  summary.nationalGoalsWithSiteInputs = nationalQualityGoals.filter((item) => Array.isArray(item.siteInputs) && item.siteInputs.length > 0).length;
+  summary.nationalGoalSiteInputFields = nationalQualityGoals.reduce((total, item) => total + (Array.isArray(item.siteInputs) ? item.siteInputs.length : 0), 0);
+  summary.nationalGoalCadencePlans = nationalGoalCadencePlan.length;
+  summary.nationalGoalMonthlyPlans = nationalGoalCadencePlan.filter((item) => item.cadenceType === "monthly").length;
+  summary.nationalGoalQuarterlyPlans = nationalGoalCadencePlan.filter((item) => item.cadenceType === "quarterly").length;
   const reusableCollections = [
     "diagnosticReports",
     "countyMutualRecognitionRecords",
@@ -18509,6 +19685,7 @@ function buildQualitySafetyDashboard(data, user) {
   ].map((collection) => ({
     collection,
     rows: Array.isArray(data[collection]) ? data[collection].length : 0,
+    present: Array.isArray(data[collection]),
     reusedFor: {
       diagnosticReports: "critical value and report quality signals",
       countyMutualRecognitionRecords: "mutual recognition QC",
@@ -18518,18 +19695,96 @@ function buildQualitySafetyDashboard(data, user) {
       hospitalInteroperabilityFunctions: "HIS/EMR/LIS/PACS management boundary"
     }[collection]
   }));
+  const goLiveReadiness = buildQualitySafetyGoLiveReadiness({
+    summary,
+    actionPlan,
+    institutionRisks,
+    rectifications,
+    criticalValueAlerts,
+    clinicalPathwayCases,
+    mutualRecognitionQualityReviews,
+    reusedCollections: reusableCollections,
+    role: user.role
+  });
+  summary.readinessScore = goLiveReadiness.score;
+  summary.readinessStage = goLiveReadiness.stage;
+  const coreSystemMatrix = buildQualitySafetyCoreSystemMatrix(data);
+  summary.coreSystems = coreSystemMatrix.length;
+  summary.coreSystemsLinked = coreSystemMatrix.filter((item) => item.evidenceRows > 0).length;
+  summary.coreSystemsInJointTest = coreSystemMatrix.filter((item) => item.status === "已纳入现场联调").length;
+  const operationsRunbook = buildQualitySafetyOperationsRunbook({
+    summary,
+    rectifications,
+    criticalValueAlerts,
+    clinicalPathwayCases,
+    mutualRecognitionQualityReviews,
+    siteSignoffs,
+    actionPlan,
+    user
+  });
+  summary.operationsWatchItems = operationsRunbook.length;
+  summary.operationsAttentionRequired = operationsRunbook.filter((item) => item.currentStatus === "attention_required").length;
+  const warningIndicators = buildQualitySafetyWarningIndicators({ summary, operationsRunbook, actionPlan });
+  summary.warningIndicators = warningIndicators.length;
+  summary.warningIndicatorsAttention = warningIndicators.filter((item) => item.currentStatus === "attention_required").length;
+  summary.warningIndicatorsClosedLoop = warningIndicators.filter((item) => item.closedLoopReady).length;
+  const onsiteRequirements = buildQualitySafetySiteRequirementChecklist({
+    siteSignoffs,
+    operationsRunbook,
+    coreSystemMatrix,
+    goLiveReadiness,
+    user
+  });
+  summary.onsiteRequirementItems = onsiteRequirements.length;
+  summary.onsiteRequirementReady = onsiteRequirements.filter((item) => ["accepted", "ready_for_joint_test"].includes(String(item.currentStatus || ""))).length;
+  const cutoverSequence = buildQualitySafetyCutoverSequence({ onsiteRequirements });
+  summary.cutoverSequenceSteps = cutoverSequence.length;
+  summary.cutoverSequenceAttention = cutoverSequence.filter((item) => item.currentStatus === "attention_required").length;
+  const nextDevelopmentPlan = buildQualitySafetyNextDevelopmentPlan({
+    goLiveReadiness,
+    operationsRunbook,
+    onsiteRequirements,
+    cutoverSequence,
+    nationalGoalCadencePlan
+  });
+  summary.nextDevelopmentItems = nextDevelopmentPlan.length;
+  summary.nextDevelopmentAttention = nextDevelopmentPlan.filter((item) => item.requiresAttention).length;
+  const departmentTaskView = buildQualitySafetyDepartmentTaskView({
+    user,
+    summary,
+    actionPlan,
+    issues,
+    rectifications,
+    criticalValueAlerts,
+    siteSignoffs,
+    mutualRecognitionQualityReviews,
+    cutoverSequence
+  });
   return {
     ok: true,
     generatedAt: new Date().toISOString(),
     role: user.role,
     summary,
+    departmentTaskView,
+    coreSystemMatrix,
+    actionPlan,
+    institutionRisks,
     issues,
     rectifications,
-    criticalValueAlerts: Array.isArray(data.criticalValueAlerts) ? data.criticalValueAlerts : [],
-    clinicalPathwayCases: Array.isArray(data.clinicalPathwayCases) ? data.clinicalPathwayCases : [],
+    criticalValueAlerts,
+    clinicalPathwayCases,
+    nationalQualityGoals,
+    nationalGoalCadencePlan,
+    siteSignoffs,
+    operationsRunbook,
+    warningIndicators,
+    onsiteRequirements,
+    cutoverSequence,
+    nextDevelopmentPlan,
     medicalRecordQualityReviews: Array.isArray(data.medicalRecordQualityReviews) ? data.medicalRecordQualityReviews : [],
-    mutualRecognitionQualityReviews: Array.isArray(data.mutualRecognitionQualityReviews) ? data.mutualRecognitionQualityReviews : [],
-    reusedCollections: reusableCollections
+    mutualRecognitionQualityReviews,
+    reusedCollections: reusableCollections,
+    goLiveReadiness
   };
 }
 
@@ -23654,6 +24909,42 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/quality-safety/interface-standard") {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/quality-safety/interface-standard");
+    if (!user) return;
+    sendJson(res, 200, buildQualitySafetyInterfaceStandard({ data: readDatabase() }));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/quality-safety/interface-joint-test-pack") {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/quality-safety/interface-joint-test-pack");
+    if (!user) return;
+    sendJson(res, 200, buildQualitySafetyInterfaceJointTestPack({ data: readDatabase(), secret: integrationGatewaySecret() }));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/quality-safety/interface-messages/validate") {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/quality-safety/interface-messages/validate");
+    if (!user) return;
+    const data = readDatabase();
+    const payload = await collectJson(req);
+    const standard = buildQualitySafetyInterfaceStandard({ data }).standard;
+    const result = validateQualitySafetyInterfaceMessage({
+      standard,
+      interfaceId: payload.interfaceId,
+      method: payload.method || "POST",
+      path: payload.path,
+      headers: payload.headers || {},
+      message: payload.message || payload.payload || {},
+      previousIdempotencyKeys: Array.isArray(payload.previousIdempotencyKeys) ? payload.previousIdempotencyKeys : [],
+      secret: integrationGatewaySecret()
+    });
+    appendQualitySafetyAudit(data, user, "quality-safety interface message validation", result.interfaceId || String(payload.interfaceId || ""), `${result.status}: ${result.errors.map((item) => item.code).join(",") || "accepted"}`);
+    writeDatabase(data);
+    sendJson(res, 200, result);
+    return;
+  }
+
   const qualityDispatchMatch = url.pathname.match(/^\/api\/quality-safety\/issues\/([^/]+)\/dispatch$/);
   if (req.method === "POST" && qualityDispatchMatch) {
     const user = requireApiRole(req, res, ["commission"], "/api/quality-safety/issues/:id/dispatch");
@@ -23776,6 +25067,310 @@ async function handleApi(req, res) {
     appendQualitySafetyAudit(data, user, "quality-safety review", id, `${decision}: ${review.comment}`);
     writeDatabase(data);
     sendJson(res, 200, orders[index]);
+    return;
+  }
+
+  const qualityEscalationMatch = url.pathname.match(/^\/api\/quality-safety\/rectifications\/([^/]+)\/escalate$/);
+  if (req.method === "POST" && qualityEscalationMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/quality-safety/rectifications/:id/escalate");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(qualityEscalationMatch[1]);
+    const orders = Array.isArray(data.qualityRectificationOrders) ? data.qualityRectificationOrders : [];
+    const index = orders.findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Quality rectification order not found" });
+      return;
+    }
+    if (normalizeQualitySafetyStatus(orders[index].status) === "closed") {
+      sendJson(res, 400, { error: "Bad Request", message: "Closed rectification orders cannot be escalated" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const now = new Date().toISOString();
+    const sla = qualitySafetySlaState(orders[index], new Date(now));
+    const escalation = {
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      level: String(payload.level || (sla.slaStatus === "overdue" ? "overdue" : "watch")).trim(),
+      reason: String(payload.reason || payload.comment || "Manual quality-safety escalation.").trim(),
+      slaStatus: sla.slaStatus,
+      daysRemaining: sla.daysRemaining
+    };
+    orders[index] = {
+      ...orders[index],
+      status: "escalated",
+      escalationLevel: escalation.level,
+      escalations: [escalation, ...(orders[index].escalations || [])].slice(0, 50),
+      auditTrail: [{ at: now, by: user.username || user.role, action: "escalate", note: escalation.reason }, ...(orders[index].auditTrail || [])].slice(0, 50)
+    };
+    data.qualityRectificationOrders = orders;
+    appendQualitySafetyAudit(data, user, "quality-safety escalation", id, `${escalation.level}: ${escalation.reason}`);
+    writeDatabase(data);
+    sendJson(res, 200, { ...orders[index], ...qualitySafetySlaState(orders[index], new Date(now)) });
+    return;
+  }
+
+  const qualityCriticalAckMatch = url.pathname.match(/^\/api\/quality-safety\/critical-values\/([^/]+)\/acknowledge$/);
+  if (req.method === "POST" && qualityCriticalAckMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/quality-safety/critical-values/:id/acknowledge");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(qualityCriticalAckMatch[1]);
+    const alerts = Array.isArray(data.criticalValueAlerts) ? data.criticalValueAlerts : [];
+    const index = alerts.findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Critical value alert not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const now = new Date().toISOString();
+    const acknowledgement = {
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      note: String(payload.note || payload.comment || "Critical value acknowledged.").trim()
+    };
+    alerts[index] = {
+      ...alerts[index],
+      status: normalizeQualitySafetyStatus(alerts[index].status) === "closed" ? alerts[index].status : "acknowledged",
+      acknowledgedAt: alerts[index].acknowledgedAt || now,
+      acknowledgement,
+      auditTrail: [{ at: now, by: user.username || user.role, action: "acknowledge", note: acknowledgement.note }, ...(alerts[index].auditTrail || [])].slice(0, 50)
+    };
+    data.criticalValueAlerts = alerts;
+    appendQualitySafetyAudit(data, user, "quality-safety critical value acknowledgement", id, acknowledgement.note);
+    writeDatabase(data);
+    sendJson(res, 200, { ...alerts[index], normalizedStatus: normalizeQualitySafetyStatus(alerts[index].status), acknowledgementComplete: true, dispositionComplete: Boolean(alerts[index].disposedAt) });
+    return;
+  }
+
+  const qualityCriticalDisposeMatch = url.pathname.match(/^\/api\/quality-safety\/critical-values\/([^/]+)\/dispose$/);
+  if (req.method === "POST" && qualityCriticalDisposeMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/quality-safety/critical-values/:id/dispose");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(qualityCriticalDisposeMatch[1]);
+    const alerts = Array.isArray(data.criticalValueAlerts) ? data.criticalValueAlerts : [];
+    const index = alerts.findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Critical value alert not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const now = new Date().toISOString();
+    const disposition = {
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      action: String(payload.action || payload.disposition || "Responsible physician notified and disposition note completed.").trim(),
+      outcome: String(payload.outcome || "disposed").trim()
+    };
+    alerts[index] = {
+      ...alerts[index],
+      status: "disposed",
+      acknowledgedAt: alerts[index].acknowledgedAt || now,
+      disposedAt: now,
+      disposition,
+      action: disposition.action,
+      auditTrail: [{ at: now, by: user.username || user.role, action: "dispose", note: disposition.action }, ...(alerts[index].auditTrail || [])].slice(0, 50)
+    };
+    data.criticalValueAlerts = alerts;
+    data.qualitySafetyEvents = (Array.isArray(data.qualitySafetyEvents) ? data.qualitySafetyEvents : []).map((item) => item.id === alerts[index].eventId ? {
+      ...item,
+      status: "closed",
+      auditTrail: [{ at: now, by: user.username || user.role, action: "critical-value-disposition", note: disposition.action }, ...(item.auditTrail || [])].slice(0, 50)
+    } : item);
+    appendQualitySafetyAudit(data, user, "quality-safety critical value disposition", id, disposition.action);
+    writeDatabase(data);
+    sendJson(res, 200, { ...alerts[index], normalizedStatus: normalizeQualitySafetyStatus(alerts[index].status), acknowledgementComplete: true, dispositionComplete: true });
+    return;
+  }
+
+  const qualityPathwayReviewMatch = url.pathname.match(/^\/api\/quality-safety\/clinical-pathways\/([^/]+)\/review$/);
+  if (req.method === "POST" && qualityPathwayReviewMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/quality-safety/clinical-pathways/:id/review");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(qualityPathwayReviewMatch[1]);
+    const cases = Array.isArray(data.clinicalPathwayCases) ? data.clinicalPathwayCases : [];
+    const index = cases.findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Clinical pathway case not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const decision = String(payload.decision || "approved").trim();
+    if (!["approved", "returned"].includes(decision)) {
+      sendJson(res, 400, { error: "Bad Request", message: "decision must be approved or returned" });
+      return;
+    }
+    const now = new Date().toISOString();
+    const review = {
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      decision,
+      comment: String(payload.comment || "").trim(),
+      evidence: Array.isArray(payload.evidence) ? payload.evidence.map((item) => String(item).trim()).filter(Boolean) : []
+    };
+    const status = decision === "approved" ? "review_passed" : "returned";
+    cases[index] = {
+      ...cases[index],
+      status,
+      reviewedAt: now,
+      reviewedBy: user.username || user.role,
+      reviewTrail: [review, ...(cases[index].reviewTrail || [])].slice(0, 50),
+      auditTrail: [{ at: now, by: user.username || user.role, action: "clinical-pathway-review", note: `${decision}: ${review.comment}` }, ...(cases[index].auditTrail || [])].slice(0, 50)
+    };
+    data.clinicalPathwayCases = cases;
+    data.qualitySafetyEvents = (Array.isArray(data.qualitySafetyEvents) ? data.qualitySafetyEvents : []).map((item) => item.id === cases[index].eventId ? {
+      ...item,
+      status: decision === "approved" ? "closed" : "returned",
+      reviewedAt: now,
+      reviewedBy: user.username || user.role,
+      auditTrail: [{ at: now, by: user.username || user.role, action: "clinical-pathway-review", note: `${decision}: ${review.comment}` }, ...(item.auditTrail || [])].slice(0, 50)
+    } : item);
+    appendQualitySafetyAudit(data, user, "quality-safety clinical pathway review", id, `${decision}: ${review.comment}`);
+    writeDatabase(data);
+    sendJson(res, 200, { ...cases[index], normalizedStatus: normalizeQualitySafetyStatus(cases[index].status), reviewComplete: normalizeQualitySafetyStatus(cases[index].status) === "closed" });
+    return;
+  }
+
+  const qualitySiteSignoffEvidenceMatch = url.pathname.match(/^\/api\/quality-safety\/site-signoffs\/([^/]+)\/evidence$/);
+  if (req.method === "POST" && qualitySiteSignoffEvidenceMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/quality-safety/site-signoffs/:id/evidence");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(qualitySiteSignoffEvidenceMatch[1]);
+    const signoffs = Array.isArray(data.qualitySafetySiteSignoffs) ? data.qualitySafetySiteSignoffs : [];
+    const index = signoffs.findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Quality-safety site sign-off item not found" });
+      return;
+    }
+    const ownerRole = String(signoffs[index].ownerRole || "commission");
+    if (user.role !== "commission" && ownerRole !== user.role) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "访问接口", target: "/api/quality-safety/site-signoffs/:id/evidence", result: "拒绝", detail: `site sign-off ${id} belongs to ${ownerRole}` });
+      sendJson(res, 403, { error: "Forbidden", message: "Site sign-off evidence can only be submitted by the owner role or commission" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const evidence = Array.isArray(payload.evidence) ? payload.evidence.map((item) => String(item).trim()).filter(Boolean) : [];
+    const note = String(payload.note || payload.comment || "").trim();
+    if (evidence.length === 0 && !note) {
+      sendJson(res, 400, { error: "Bad Request", message: "evidence or note is required" });
+      return;
+    }
+    const now = new Date().toISOString();
+    const submission = {
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      ownerRole,
+      note,
+      evidence
+    };
+    signoffs[index] = {
+      ...signoffs[index],
+      status: "evidence_submitted",
+      latestNote: note || signoffs[index].latestNote,
+      submittedAt: now,
+      submittedBy: user.username || user.role,
+      evidence: [...evidence, ...(signoffs[index].evidence || [])].slice(0, 50),
+      submissionTrail: [submission, ...(signoffs[index].submissionTrail || [])].slice(0, 50),
+      auditTrail: [{ at: now, by: user.username || user.role, action: "site-signoff-evidence", note: note || evidence.join(", ") }, ...(signoffs[index].auditTrail || [])].slice(0, 50)
+    };
+    data.qualitySafetySiteSignoffs = signoffs;
+    appendQualitySafetyAudit(data, user, "quality-safety site signoff evidence", id, note || evidence.join(", "));
+    writeDatabase(data);
+    sendJson(res, 200, { ...signoffs[index], normalizedStatus: normalizeQualitySafetyStatus(signoffs[index].status), evidenceCount: (signoffs[index].evidence || []).length });
+    return;
+  }
+
+  const qualityCoreSystemEvidenceMatch = url.pathname.match(/^\/api\/quality-safety\/core-systems\/([^/]+)\/evidence$/);
+  if (req.method === "POST" && qualityCoreSystemEvidenceMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/quality-safety/core-systems/:id/evidence");
+    if (!user) return;
+    const data = readDatabase();
+    const coreSystemId = decodeURIComponent(qualityCoreSystemEvidenceMatch[1]);
+    const matrix = buildQualitySafetyCoreSystemMatrix(data);
+    const row = matrix.find((item) => item.id === coreSystemId);
+    if (!row) {
+      sendJson(res, 404, { error: "Not Found", message: "Core safety system item not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const evidence = Array.isArray(payload.evidence) ? payload.evidence.map((item) => String(item).trim()).filter(Boolean) : [];
+    const note = String(payload.note || payload.comment || "").trim();
+    if (!note && evidence.length === 0) {
+      sendJson(res, 400, { error: "Bad Request", message: "evidence or note is required" });
+      return;
+    }
+    const now = new Date().toISOString();
+    const submission = {
+      id: randomUUID(),
+      coreSystemId,
+      coreSystemName: row.name,
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      role: user.role,
+      orgCode: user.orgCode || "",
+      orgName: user.orgName || "",
+      note,
+      evidence
+    };
+    data.qualitySafetyCoreSystemEvidence = [submission, ...(Array.isArray(data.qualitySafetyCoreSystemEvidence) ? data.qualitySafetyCoreSystemEvidence : [])].slice(0, 300);
+    appendQualitySafetyAudit(data, user, "quality-safety core system evidence", coreSystemId, note || evidence.join(", "));
+    writeDatabase(data);
+    const updated = buildQualitySafetyCoreSystemMatrix(data).find((item) => item.id === coreSystemId);
+    sendJson(res, 200, updated);
+    return;
+  }
+
+  const qualitySiteSignoffMatch = url.pathname.match(/^\/api\/quality-safety\/site-signoffs\/([^/]+)\/review$/);
+  if (req.method === "POST" && qualitySiteSignoffMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/quality-safety/site-signoffs/:id/review");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(qualitySiteSignoffMatch[1]);
+    const signoffs = Array.isArray(data.qualitySafetySiteSignoffs) ? data.qualitySafetySiteSignoffs : [];
+    const index = signoffs.findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Quality-safety site sign-off item not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const decision = String(payload.decision || payload.status || "ready_for_joint_test").trim();
+    if (!["ready_for_joint_test", "accepted", "returned", "pending_site_confirmation"].includes(decision)) {
+      sendJson(res, 400, { error: "Bad Request", message: "decision must be ready_for_joint_test, accepted, returned, or pending_site_confirmation" });
+      return;
+    }
+    const now = new Date().toISOString();
+    const review = {
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      decision,
+      note: String(payload.note || payload.comment || "").trim(),
+      evidence: Array.isArray(payload.evidence) ? payload.evidence.map((item) => String(item).trim()).filter(Boolean) : []
+    };
+    signoffs[index] = {
+      ...signoffs[index],
+      status: decision,
+      latestNote: review.note || signoffs[index].latestNote,
+      reviewedAt: now,
+      reviewedBy: user.username || user.role,
+      evidence: [...review.evidence, ...(signoffs[index].evidence || [])].slice(0, 50),
+      reviewTrail: [review, ...(signoffs[index].reviewTrail || [])].slice(0, 50),
+      auditTrail: [{ at: now, by: user.username || user.role, action: "site-signoff-review", note: `${decision}: ${review.note}` }, ...(signoffs[index].auditTrail || [])].slice(0, 50)
+    };
+    data.qualitySafetySiteSignoffs = signoffs;
+    appendQualitySafetyAudit(data, user, "quality-safety site signoff review", id, `${decision}: ${review.note}`);
+    writeDatabase(data);
+    sendJson(res, 200, { ...signoffs[index], normalizedStatus: normalizeQualitySafetyStatus(signoffs[index].status), evidenceCount: (signoffs[index].evidence || []).length });
     return;
   }
 
@@ -29492,7 +31087,7 @@ async function handleApi(req, res) {
     const payload = await collectJson(req);
     const recordData = normalizePersonalRecord(payload);
     if (!canAccessResident(user, recordData.residentId, data)) {
-      appendSecurityEvent({ actor: user.name, role: user.role, action: "新增个人健康信息", target: recordData.residentId, result: "拒绝", detail: "超出居民授权范围" });
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "create personal health record", target: recordData.residentId, result: "拒绝", detail: "超出居民授权范围" });
       sendJson(res, 403, { error: "Forbidden", message: "无权新增该居民健康信息" });
       return;
     }

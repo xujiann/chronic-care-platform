@@ -44,8 +44,93 @@ test("quality safety report covers boundaries, reuse and routes", () => {
   assert.equal(report.reusedCollections.some((item) => item.collection === "countyMutualRecognitionRecords" && item.present), true);
   assert.equal(report.reusedCollections.some((item) => item.collection === "securityEvents" && item.present), true);
   assert.equal(report.routes.every((item) => item.present), true);
+  assert.equal(report.routes.some((item) => item.route.includes("escalate") && item.present), true);
+  assert.equal(report.routes.some((item) => item.route.includes("critical-values") && item.route.includes("acknowledge") && item.present), true);
+  assert.equal(report.routes.some((item) => item.route.includes("critical-values") && item.route.includes("dispose") && item.present), true);
+  assert.equal(report.routes.some((item) => item.route.includes("clinical-pathways") && item.route.includes("review") && item.present), true);
+  assert.equal(report.checks.some((item) => item.id === "quality-safety:sla" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "quality-safety:critical-value-loop" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "quality-safety:clinical-pathway-loop" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "quality-safety:policy-basis" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "quality-safety:action-plan" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "quality-safety:risk-ranking" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "quality-safety:site-signoff-tracker" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "quality-safety:operations-runbook" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "quality-safety:warning-indicators" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "quality-safety:onsite-requirements" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "quality-safety:cutover-sequence" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "quality-safety:national-goals-2025" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "quality-safety:national-goal-site-inputs" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "quality-safety:national-goal-cadence-plan" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "quality-safety:next-development-plan" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "quality-safety:go-live-readiness" && item.passed), true);
+  assert.equal(report.goLiveReadiness.usable, true);
+  assert.equal(report.goLiveReadiness.stage, "controlled_pilot_ready");
+  assert.equal(report.summary.readinessScore, 100);
+  assert.equal(report.summary.siteSignoffs.total >= 6, true);
+  assert.equal(report.summary.operationsWatchItems >= 6, true);
+  assert.equal(report.summary.warningIndicators >= 6, true);
+  assert.equal(report.summary.warningIndicatorsClosedLoop, report.summary.warningIndicators);
+  assert.equal(report.summary.onsiteRequirementItems >= 8, true);
+  assert.equal(report.summary.cutoverSequenceSteps, 3);
+  assert.equal(report.summary.nationalQualityGoals, 10);
+  assert.equal(report.summary.nationalQualityGoalsTracked, 10);
+  assert.equal(report.summary.nationalGoalsWithSiteInputs, 10);
+  assert.equal(report.summary.nationalGoalSiteInputFields >= 40, true);
+  assert.equal(report.summary.nationalGoalCadencePlans, 3);
+  assert.equal(report.summary.nextDevelopmentItems >= 4, true);
+  assert.equal(report.summary.nextDevelopmentAttention >= 1, true);
+  assert.equal(report.nextDevelopmentPlan.some((item) => item.id === "plan-live-interface-joint-test" && item.verificationCommand.includes("quality-safety:joint-test")), true);
+  assert.equal(report.nextDevelopmentPlan.some((item) => item.id === "plan-production-audit-operations" && item.acceptanceEvidence.includes("SIEM_ENDPOINT")), true);
+  assert.equal(report.nationalGoalCadencePlan.some((item) => item.cadenceType === "monthly" && item.goalCount >= 2), true);
+  assert.equal(report.nationalGoalCadencePlan.some((item) => item.cadenceType === "quarterly" && item.reviewWindow.includes("季度")), true);
+  assert.equal(report.nationalQualityGoals.some((item) => item.code === "NIT-2025-X" && item.evidenceCollections.includes("mutualRecognitionQualityReviews")), true);
+  assert.equal(report.nationalQualityGoals.every((item) => Array.isArray(item.siteInputs) && item.siteInputs.length >= 4), true);
+  assert.equal(report.nationalQualityGoals.some((item) => item.code === "NIT-2025-I" && item.siteInputs.includes("再灌注方式")), true);
+  assert.equal(report.cutoverSequence.some((item) => item.id === "cutover-day" && item.requirements.length > 0), true);
+  assert.equal(report.cutoverSequence.some((item) => item.id === "after-cutover" && item.acceptanceGate), true);
+  assert.equal(report.onsiteRequirements.some((item) => item.id === "onsite-live-feeds" && item.onsiteInput.includes("endpoint")), true);
+  assert.equal(report.onsiteRequirements.some((item) => item.id === "onsite-monitoring-oncall" && item.acceptanceEvidence.includes("alert")), true);
+  assert.equal(report.operationsRunbook.some((item) => item.id === "critical-value-on-call" && item.escalation), true);
+  assert.equal(report.operationsRunbook.some((item) => item.id === "audit-retention-watch" && item.evidence.includes("securityEvents")), true);
+  assert.equal(report.warningIndicators.some((item) => item.id === "warning-rectification-sla" && item.targetSection === "quality-safety-rectifications"), true);
+  assert.equal(report.warningIndicators.some((item) => item.id === "warning-live-signoff" && item.evidence.includes("qualitySafetySiteSignoffs")), true);
+  assert.equal(report.siteSignoffs.some((item) => item.id === "qss-audit-retention" && item.requiredEvidence.length > 0), true);
+  assert.equal(report.institutionRisks.length > 0, true);
+  assert.equal(report.institutionRisks[0].score > 0, true);
+  assert.equal(report.criticalValues.length > 0, true);
+  assert.equal(report.clinicalPathways.length > 0, true);
+  assert.equal(report.policyReferences.every((item) => item.present), true);
+  assert.equal(report.actionPlan.some((item) => item.priority === "critical" && item.evidence), true);
+  assert.equal(report.rectifications.some((item) => item.slaStatus && item.evidenceComplete), true);
   assert.match(renderMarkdown(report), /Medical quality and safety supervision report/);
   assert.match(renderMarkdown(report), /mutual-recognition-qc/);
+  assert.match(renderMarkdown(report), /Critical Value Loop/);
+  assert.match(renderMarkdown(report), /Clinical Pathway Loop/);
+  assert.match(renderMarkdown(report), /Policy Basis/);
+  assert.match(renderMarkdown(report), /Regulatory Action Plan/);
+  assert.match(renderMarkdown(report), /Go-live Readiness/);
+  assert.match(renderMarkdown(report), /Operations Runbook/);
+  assert.match(renderMarkdown(report), /Warning Indicators/);
+  assert.match(renderMarkdown(report), /warning-rectification-sla|Rectification SLA warning/);
+  assert.match(renderMarkdown(report), /Onsite Go-live Requirements/);
+  assert.match(renderMarkdown(report), /Cutover Sequence/);
+  assert.match(renderMarkdown(report), /2025 National Quality Goals/);
+  assert.match(renderMarkdown(report), /NIT-2025-I/);
+  assert.match(renderMarkdown(report), /Site inputs/);
+  assert.match(renderMarkdown(report), /National goal site inputs/);
+  assert.match(renderMarkdown(report), /National Goal Cadence Plan/);
+  assert.match(renderMarkdown(report), /Next Development Plan/);
+  assert.match(renderMarkdown(report), /quality-safety:joint-test/);
+  assert.match(renderMarkdown(report), /按季度分科室反馈/);
+  assert.match(renderMarkdown(report), /再灌注方式/);
+  assert.match(renderMarkdown(report), /Cutover day/);
+  assert.match(renderMarkdown(report), /onsite-live-feeds|Bind HIS\/EMR\/LIS\/PACS/);
+  assert.match(renderMarkdown(report), /critical-value-on-call|Critical-value acknowledgement/);
+  assert.match(renderMarkdown(report), /controlled_pilot_ready/);
+  assert.match(renderMarkdown(report), /Site Joint-testing Sign-offs/);
+  assert.match(renderMarkdown(report), /Institution risk ranking/);
+  assert.match(renderMarkdown(report), /Rectification SLA/);
 });
 
 test("quality safety API supports dashboard, dispatch, feedback and review", async (t) => {
@@ -71,7 +156,66 @@ test("quality safety API supports dashboard, dispatch, feedback and review", asy
   const dashboard = await api(baseUrl, "/api/quality-safety/dashboard", authorized(token));
   assert.equal(dashboard.response.status, 200);
   assert.equal(dashboard.body.summary.issues >= 3, true);
+  assert.equal(dashboard.body.summary.criticalValuesPending >= 1, true);
+  assert.equal(dashboard.body.summary.clinicalPathwaysOpen >= 1, true);
+  assert.equal(dashboard.body.summary.actionItems >= 1, true);
+  assert.equal(dashboard.body.goLiveReadiness.usable, true);
+  assert.equal(dashboard.body.goLiveReadiness.stage, "controlled_pilot_ready");
+  assert.equal(dashboard.body.summary.readinessScore, 100);
+  assert.equal(dashboard.body.summary.siteSignoffs >= 6, true);
+  assert.equal(dashboard.body.summary.operationsWatchItems >= 4, true);
+  assert.equal(dashboard.body.summary.warningIndicators >= 6, true);
+  assert.equal(dashboard.body.summary.warningIndicatorsClosedLoop, dashboard.body.summary.warningIndicators);
+  assert.equal(dashboard.body.summary.onsiteRequirementItems >= 6, true);
+  assert.equal(dashboard.body.summary.cutoverSequenceSteps >= 3, true);
+  assert.equal(dashboard.body.summary.nationalQualityGoals, 10);
+  assert.equal(dashboard.body.summary.nationalQualityGoalsTracked, 10);
+  assert.equal(dashboard.body.summary.nationalGoalsWithSiteInputs, 10);
+  assert.equal(dashboard.body.summary.nationalGoalSiteInputFields >= 40, true);
+  assert.equal(dashboard.body.summary.nationalGoalCadencePlans, 3);
+  assert.equal(dashboard.body.summary.nextDevelopmentItems >= 4, true);
+  assert.equal(dashboard.body.summary.nextDevelopmentAttention >= 1, true);
+  assert.equal(dashboard.body.nextDevelopmentPlan.some((item) => item.id === "plan-core-closure-drill" && item.targetSurface === "quality-safety-actions"), true);
+  assert.equal(dashboard.body.nextDevelopmentPlan.some((item) => item.id === "plan-national-goal-review" && item.status === "ready_for_joint_test"), true);
+  assert.equal(dashboard.body.nationalGoalCadencePlan.some((item) => item.cadenceType === "monthly" && item.reviewWindow.includes("每月")), true);
+  assert.equal(dashboard.body.nationalGoalCadencePlan.some((item) => item.cadenceType === "continuous" && item.siteInputFields >= 4), true);
+  assert.equal(dashboard.body.nationalQualityGoals.some((item) => item.code === "NIT-2025-VIII" && item.evidenceCollections.includes("medicalRecordQualityReviews")), true);
+  assert.equal(dashboard.body.nationalQualityGoals.every((item) => Array.isArray(item.siteInputs) && item.siteInputs.length >= 4), true);
+  assert.equal(dashboard.body.nationalQualityGoals.some((item) => item.code === "NIT-2025-X" && item.siteInputs.includes("未互认原因")), true);
+  assert.equal(dashboard.body.cutoverSequence.some((item) => item.id === "before-cutover" && item.totalCount >= 1), true);
+  assert.equal(dashboard.body.cutoverSequence.some((item) => item.id === "cutover-day" && item.acceptanceGate), true);
+  assert.equal(dashboard.body.departmentTaskView.queue.some((item) => item.kind === "cutover_sequence" && item.targetSection === "quality-safety-cutover-sequence"), true);
+  assert.equal(dashboard.body.onsiteRequirements.some((item) => item.id === "onsite-critical-routing" && item.acceptanceEvidence), true);
+  assert.equal(dashboard.body.onsiteRequirements.some((item) => item.id === "onsite-audit-retention" && item.onsiteInput.includes("SIEM_ENDPOINT")), true);
+  assert.equal(dashboard.body.operationsRunbook.some((item) => item.id === "rectification-sla-watch" && item.threshold), true);
+  assert.equal(dashboard.body.operationsRunbook.some((item) => item.evidence.includes("qualitySafetySiteSignoffs")), true);
+  assert.equal(dashboard.body.warningIndicators.some((item) => item.id === "warning-critical-value-disposition" && item.targetSection === "quality-safety-critical"), true);
+  assert.equal(dashboard.body.warningIndicators.some((item) => item.id === "warning-audit-retention" && item.closedLoopReady), true);
+  assert.equal(dashboard.body.summary.coreSystems, 18);
+  assert.equal(dashboard.body.summary.coreSystemsLinked >= 18, true);
+  assert.equal(dashboard.body.coreSystemMatrix.length, 18);
+  assert.equal(dashboard.body.coreSystemMatrix.some((item) => item.name === "危急值报告制度" && item.evidenceCollections.includes("criticalValueAlerts")), true);
+  assert.equal(dashboard.body.coreSystemMatrix.some((item) => item.name === "信息安全管理制度" && item.evidenceCollections.includes("securityEvents")), true);
+  const coreEvidence = await api(baseUrl, "/api/quality-safety/core-systems/critical-value-reporting/evidence", authorized(token, {
+    method: "POST",
+    body: JSON.stringify({ note: "Critical value registry template and drill record submitted.", evidence: ["critical-value-registry-template", "drill-record"] })
+  }));
+  assert.equal(coreEvidence.response.status, 200);
+  assert.equal(coreEvidence.body.id, "critical-value-reporting");
+  assert.equal(coreEvidence.body.submittedEvidenceCount >= 1, true);
+  assert.equal(dashboard.body.departmentTaskView.role, "commission");
+  assert.equal(dashboard.body.departmentTaskView.profile.permissions.includes("review_rectification"), true);
+  assert.equal(dashboard.body.departmentTaskView.metrics.some((item) => item.label === "逾期整改"), true);
+  assert.equal(dashboard.body.departmentTaskView.queue.some((item) => item.kind === "action_plan"), true);
+  assert.equal(dashboard.body.departmentTaskView.queue.some((item) => item.targetSection === "quality-safety-actions" && item.actionLabel === "查看行动计划"), true);
+  assert.equal(dashboard.body.departmentTaskView.queue.some((item) => item.targetSection === "quality-safety-signoffs"), true);
+  assert.equal(dashboard.body.siteSignoffs.some((item) => item.id === "qss-live-feeds"), true);
+  assert.equal(dashboard.body.actionPlan.some((item) => item.priority === "critical"), true);
+  assert.equal(dashboard.body.institutionRisks.length > 0, true);
+  assert.equal(dashboard.body.institutionRisks[0].score > 0, true);
   assert.equal(dashboard.body.reusedCollections.some((item) => item.collection === "hospitalInteroperabilityFunctions"), true);
+  const critical = dashboard.body.criticalValueAlerts[0];
+  const pathway = dashboard.body.clinicalPathwayCases[0];
 
   const issue = dashboard.body.issues.find((item) => item.id === "qse-path-001") || dashboard.body.issues[0];
   const dispatch = await api(baseUrl, `/api/quality-safety/issues/${encodeURIComponent(issue.id)}/dispatch`, authorized(token, {
@@ -87,6 +231,77 @@ test("quality safety API supports dashboard, dispatch, feedback and review", asy
 
   const institutionLogin = await login(baseUrl, "hospital");
   assert.equal(institutionLogin.response.status, 200);
+  const institutionDashboard = await api(baseUrl, "/api/quality-safety/dashboard", authorized(institutionLogin.body.token));
+  assert.equal(institutionDashboard.response.status, 200);
+  assert.equal(institutionDashboard.body.role, "institution");
+  assert.equal(institutionDashboard.body.departmentTaskView.role, "institution");
+  assert.equal(institutionDashboard.body.departmentTaskView.profile.permissions.includes("submit_feedback"), true);
+  assert.equal(institutionDashboard.body.departmentTaskView.metrics.some((item) => item.label === "待处置危急值"), true);
+  assert.equal(institutionDashboard.body.departmentTaskView.queue.some((item) => item.actionLabel === "提交证据"), true);
+  assert.equal(Array.isArray(institutionDashboard.body.institutionRisks), true);
+  assert.equal(institutionDashboard.body.siteSignoffs.some((item) => item.id === "qss-critical-routing"), true);
+  const siteEvidence = await api(baseUrl, "/api/quality-safety/site-signoffs/qss-critical-routing/evidence", authorized(institutionLogin.body.token, {
+    method: "POST",
+    body: JSON.stringify({ note: "Critical routing screenshot and receipt uploaded.", evidence: ["critical-routing-screenshot", "ack-receipt"] })
+  }));
+  assert.equal(siteEvidence.response.status, 200);
+  assert.equal(siteEvidence.body.status, "evidence_submitted");
+  assert.equal(siteEvidence.body.evidenceCount >= 2, true);
+  assert.equal(Array.isArray(siteEvidence.body.submissionTrail), true);
+  const acknowledgement = await api(baseUrl, `/api/quality-safety/critical-values/${encodeURIComponent(critical.id)}/acknowledge`, authorized(institutionLogin.body.token, {
+    method: "POST",
+    body: JSON.stringify({ note: "Duty physician confirmed receipt." })
+  }));
+  assert.equal(acknowledgement.response.status, 200);
+  assert.equal(acknowledgement.body.acknowledgementComplete, true);
+  const disposition = await api(baseUrl, `/api/quality-safety/critical-values/${encodeURIComponent(critical.id)}/dispose`, authorized(institutionLogin.body.token, {
+    method: "POST",
+    body: JSON.stringify({ action: "Disposition note completed and patient contacted.", outcome: "disposed" })
+  }));
+  assert.equal(disposition.response.status, 200);
+  assert.equal(disposition.body.status, "disposed");
+  assert.equal(disposition.body.dispositionComplete, true);
+  const forbiddenDispatch = await api(baseUrl, `/api/quality-safety/issues/${encodeURIComponent(issue.id)}/dispatch`, authorized(institutionLogin.body.token, {
+    method: "POST",
+    body: JSON.stringify({ ownerRole: "institution", requirement: "Should be forbidden." })
+  }));
+  assert.equal(forbiddenDispatch.response.status, 403);
+  const forbiddenPathwayReview = await api(baseUrl, `/api/quality-safety/clinical-pathways/${encodeURIComponent(pathway.id)}/review`, authorized(institutionLogin.body.token, {
+    method: "POST",
+    body: JSON.stringify({ decision: "approved", comment: "Should be forbidden." })
+  }));
+  assert.equal(forbiddenPathwayReview.response.status, 403);
+
+  const countyLogin = await login(baseUrl, "county");
+  assert.equal(countyLogin.response.status, 200);
+  const countyDashboard = await api(baseUrl, "/api/quality-safety/dashboard", authorized(countyLogin.body.token));
+  assert.equal(countyDashboard.response.status, 200);
+  assert.equal(countyDashboard.body.role, "county");
+  assert.equal(countyDashboard.body.departmentTaskView.role, "county");
+  assert.equal(countyDashboard.body.departmentTaskView.profile.permissions.includes("submit_consortium_evidence"), true);
+  assert.equal(countyDashboard.body.departmentTaskView.metrics.some((item) => item.label === "互认待复核"), true);
+  assert.equal(countyDashboard.body.departmentTaskView.queue.some((item) => item.targetSection === "quality-safety-signoffs"), true);
+  assert.equal(countyDashboard.body.siteSignoffs.some((item) => item.id === "qss-mutual-recognition-rules"), true);
+  const countyEvidence = await api(baseUrl, "/api/quality-safety/site-signoffs/qss-mutual-recognition-rules/evidence", authorized(countyLogin.body.token, {
+    method: "POST",
+    body: JSON.stringify({ note: "Recognition catalog and exception sample uploaded.", evidence: ["recognition-catalog", "exception-sample"] })
+  }));
+  assert.equal(countyEvidence.response.status, 200);
+  assert.equal(countyEvidence.body.status, "evidence_submitted");
+  const forbiddenSiteEvidence = await api(baseUrl, "/api/quality-safety/site-signoffs/qss-live-feeds/evidence", authorized(countyLogin.body.token, {
+    method: "POST",
+    body: JSON.stringify({ note: "Should be forbidden.", evidence: ["wrong-owner"] })
+  }));
+  assert.equal(forbiddenSiteEvidence.response.status, 403);
+
+  const escalation = await api(baseUrl, `/api/quality-safety/rectifications/${encodeURIComponent(dispatch.body.id)}/escalate`, authorized(token, {
+    method: "POST",
+    body: JSON.stringify({ reason: "Escalate before site feedback window closes." })
+  }));
+  assert.equal(escalation.response.status, 200);
+  assert.equal(escalation.body.status, "escalated");
+  assert.equal(typeof escalation.body.slaStatus, "string");
+
   const feedback = await api(baseUrl, `/api/quality-safety/rectifications/${encodeURIComponent(dispatch.body.id)}/feedback`, authorized(institutionLogin.body.token, {
     method: "POST",
     body: JSON.stringify({ content: "Evidence uploaded.", attachments: ["qc-evidence"] })
@@ -101,8 +316,39 @@ test("quality safety API supports dashboard, dispatch, feedback and review", asy
   }));
   assert.equal(review.response.status, 200);
   assert.equal(review.body.status, "closed");
+  const pathwayReview = await api(baseUrl, `/api/quality-safety/clinical-pathways/${encodeURIComponent(pathway.id)}/review`, authorized(token, {
+    method: "POST",
+    body: JSON.stringify({ decision: "approved", comment: "Pathway variance closed.", evidence: ["emr-follow-up-note"] })
+  }));
+  assert.equal(pathwayReview.response.status, 200);
+  assert.equal(pathwayReview.body.status, "review_passed");
+  assert.equal(pathwayReview.body.reviewComplete, true);
+  const signoffReview = await api(baseUrl, "/api/quality-safety/site-signoffs/qss-live-feeds/review", authorized(token, {
+    method: "POST",
+    body: JSON.stringify({ decision: "ready_for_joint_test", note: "Joint-test payload sample archived.", evidence: ["his-emr-lis-pacs-sample"] })
+  }));
+  assert.equal(signoffReview.response.status, 200);
+  assert.equal(signoffReview.body.status, "ready_for_joint_test");
+  assert.equal(signoffReview.body.evidenceCount >= 1, true);
+  const signoffAccepted = await api(baseUrl, "/api/quality-safety/site-signoffs/qss-critical-routing/review", authorized(token, {
+    method: "POST",
+    body: JSON.stringify({ decision: "accepted", note: "Institution evidence accepted for controlled pilot.", evidence: ["commission-acceptance-note"] })
+  }));
+  assert.equal(signoffAccepted.response.status, 200);
+  assert.equal(signoffAccepted.body.status, "accepted");
+  assert.equal(signoffAccepted.body.normalizedStatus, "closed");
+  const forbiddenSignoffReview = await api(baseUrl, "/api/quality-safety/site-signoffs/qss-live-feeds/review", authorized(institutionLogin.body.token, {
+    method: "POST",
+    body: JSON.stringify({ decision: "accepted", note: "Should be forbidden." })
+  }));
+  assert.equal(forbiddenSignoffReview.response.status, 403);
 
   const audit = await api(baseUrl, "/api/audit/export?trail=securityEvents", authorized(token));
   assert.equal(audit.response.status, 200);
   assert.equal(JSON.stringify(audit.body).includes("quality-safety review"), true);
+  assert.equal(JSON.stringify(audit.body).includes("quality-safety critical value disposition"), true);
+  assert.equal(JSON.stringify(audit.body).includes("quality-safety clinical pathway review"), true);
+  assert.equal(JSON.stringify(audit.body).includes("quality-safety site signoff evidence"), true);
+  assert.equal(JSON.stringify(audit.body).includes("quality-safety site signoff review"), true);
+  assert.equal(JSON.stringify(audit.body).includes("quality-safety core system evidence"), true);
 });
