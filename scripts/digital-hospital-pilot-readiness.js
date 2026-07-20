@@ -41,12 +41,14 @@ function buildDigitalHospitalPilotReadiness(options = {}) {
     "/api/digital-hospital/pilot-readiness",
     "/api/digital-hospital/pilot-institutions/actions",
     "/api/digital-hospital/pilot-institutions/:id/actions",
+    "/api/digital-hospital/pilot-issues/actions",
+    "/api/digital-hospital/pilot-issues/:id/actions",
     "/api/digital-hospital/collection-jobs/:id/actions",
     "/api/digital-hospital/evaluation-evidence/:id/actions",
     "/api/digital-hospital/pre-assessments/actions",
     "/api/digital-hospital/pre-assessments/:id/actions"
   ];
-  const requiredSections = ["pilot-operations", "catalog", "collection", "evidence", "preassessment", "rectification", "boundary"];
+  const requiredSections = ["pilot-operations", "pilot-issues", "catalog", "collection", "evidence", "preassessment", "rectification", "boundary"];
   const checks = [
     check("pilotReadiness:catalog", catalog.ok && catalog.summary.packs === 4 && catalog.summary.projects === 70 && catalog.summary.clauses === 70, `${catalog.summary.packs} packs / ${catalog.summary.projects} projects / ${catalog.summary.clauses} clauses`),
     check("pilotReadiness:officialStructure", catalog.packs.find((item) => item.id === "emr")?.projects === 39 && catalog.packs.find((item) => item.id === "smart-service")?.projects === 17 && catalog.packs.find((item) => item.id === "smart-management")?.projects === 10 && catalog.packs.find((item) => item.id === "interoperability")?.projects === 4, "39 EMR / 17 service / 10 management / 4 interoperability"),
@@ -55,8 +57,9 @@ function buildDigitalHospitalPilotReadiness(options = {}) {
     check("pilotReadiness:evidence", board.checks.find((item) => item.id === "pilot:evidenceBoundary")?.passed && model.includes("independent reviewer"), `${board.summary.evidenceRecords} minimized evidence records with independent review`),
     check("pilotReadiness:rectification", board.checks.find((item) => item.id === "pilot:rectification")?.passed && ["assign-finding", "record-finding-evidence", "resolve-finding", "submit-review", "accept-preassessment"].every((marker) => model.includes(marker)), `${board.summary.openFindings} traceable pilot findings`),
     check("pilotReadiness:operations", board.checks.find((item) => item.id === "pilot:operations")?.passed && ["submit-readiness", "approve-pilot", "pause-pilot", "resume-pilot", "record-daily-review"].every((marker) => model.includes(marker)), `${board.summary.activePilotInstitutions}/${board.summary.pilotInstitutions} pilot institutions active / ${board.summary.overdueP0} overdue P0`),
+    check("pilotReadiness:issueClosure", board.checks.find((item) => item.id === "pilot:issueClosure")?.passed && ["createDigitalHospitalPilotIssue", "normalizeDigitalHospitalPilotIssueAction", "independent issue reviewer"].every((marker) => model.includes(marker)), `${board.summary.openPilotIssues}/${board.summary.pilotIssues} pilot issues open / ${board.summary.pendingPilotIssueReviews} pending review`),
     check("pilotReadiness:api", requiredRoutes.every((marker) => server.includes(marker)), `${requiredRoutes.length}/${requiredRoutes.length} pilot API markers`),
-    check("pilotReadiness:ui", requiredSections.every((section) => html.includes(`data-digital-evaluation-section="${section}"`)) && ui.includes("refreshBoard") && ui.includes("run-preassessment"), `${requiredSections.length}/${requiredSections.length} workbench sections`),
+    check("pilotReadiness:ui", requiredSections.every((section) => html.includes(`data-digital-evaluation-section="${section}"`)) && ui.includes("refreshBoard") && ui.includes("run-preassessment") && html.includes("digital-evaluation-pilot-issues") && ui.includes("pilotIssues"), `${requiredSections.length}/${requiredSections.length} workbench sections with pilot issue closure`),
     check("pilotReadiness:roleScope", html.includes('requireRole(["commission", "institution"])') && auth.includes('"digital-hospital-evaluation.html": ["commission", "institution"]') && model.includes("institution account cannot"), "commission and institution role scope is enforced"),
     check("pilotReadiness:boundary", board.functionalState === "pilot-launch-ready" && board.formalGoLiveState === "blocked-until-site-evidence-signed" && doc.includes("不替代国家或省级正式评价"), `${board.functionalState} / ${board.formalGoLiveState}`),
     check("pilotReadiness:releaseWiring", Boolean(pkg.scripts?.["digital-hospital:pilot-readiness"]) && manifest.includes("digital-hospital-pilot-readiness-report.md") && deploy.includes("digitalHospitalPilotReadiness") && ci.includes("digital-hospital:pilot-readiness"), "package, manifest, deploy check and CI are wired")

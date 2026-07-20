@@ -192,6 +192,10 @@ const PRODUCTION_BLOCKERS = [
     ? "signed-delivery-callback-ready-site-joint-test-pending"
     : id === "P0-06"
     ? "signed-callback-reconciliation-ready-site-joint-test-pending"
+    : id === "P0-07"
+    ? "security-remediation-release-control-ready-site-assessment-pending"
+    : id === "P0-10"
+    ? "global-go-no-go-control-ready-site-evidence-pending"
     : (["P0-05", "P0-08", "P0-09"].includes(id) ? "adapter-foundation-ready-site-joint-test-pending" : "blocked-until-site-evidence"),
   progress: id === "P0-01"
     ? "已实现不可变部署包、运行文件摘要复核、密钥仅引用不落盘、最小权限进程模板、CI 验证和回滚契约；真实 Vault/KMS、TLS、制品仓库、服务账号和生产 smoke 签字未完成。"
@@ -205,9 +209,13 @@ const PRODUCTION_BLOCKERS = [
           ? "已实现 HIS/EMR/LIS/PACS/号源通用出站适配、签名、幂等、有限重试、受理回执和死信对账；厂商专有协议、字典、网络、性能和联合签字未完成。"
           : (id === "P0-06"
             ? "已实现支付、医保与电子证照通用生产网关、14 个受控操作、独立密钥 HMAC 回调、时间窗与 nonce 防重放、事件幂等、金额一致性、旧回执隔离、乱序终态保护、成功后冲正、摘要级日终对账、分域运维界面和异常指标；机构专有协议、来源白名单、账单传输、差错补偿和联合签字未完成。"
+            : (id === "P0-07"
+              ? "已实现安全发现分级、责任分派、整改证据、独立复测、严重问题禁止豁免、高危限期豁免、证据指纹和双人独立安全放行意见；等保、密评、渗透复测、生产密钥交接和正式安全放行材料仍需现场完成。"
+              : (id === "P0-10"
+                ? "已实现 10 项 P0 现场验收聚合、P0-07 安全意见、生产地址冒烟、10/10 割接清单、灾备签字五项前置门禁，四方独立审批、证据指纹失效、GO 精确确认和随时 NO-GO；真实灾备演练、生产环境证据和正式变更委员会批准仍需现场完成。"
             : (id === "P0-08"
               ? "已实现去标识化 SIEM/Webhook 投递、HMAC 签名、投递回执和审计链；目标 SIEM/WORM 留存策略、查询验证和防篡改签字未完成。"
-              : (id === "P0-09" ? "已实现告警信号、路由状态、幂等投递、有限重试、失败运维事件和恢复关闭；真实值班升级、生产演练和首日观察签字未完成。" : ""))))))
+              : (id === "P0-09" ? "已实现告警信号、路由状态、幂等投递、有限重试、失败运维事件和恢复关闭；真实值班升级、生产演练和首日观察签字未完成。" : ""))))))))
 }));
 
 const ROADMAP = [
@@ -278,6 +286,7 @@ function buildPlatformProductionAudit(options = {}) {
     html: read("platform.html"),
     client: read("platform.js"),
     documentation: read("docs/platform-capability-operations-center.md"),
+    siteAcceptanceDocumentation: read("docs/platform-site-acceptance-gate.md"),
     postgresRuntime: read("postgres-runtime-sync.js"),
     postgresAdapter: read("postgres-production-adapter.js"),
     postgresDocumentation: read("docs/postgresql-runtime-sync.md"),
@@ -306,7 +315,7 @@ function buildPlatformProductionAudit(options = {}) {
     check("platformAudit:boundaries", PRODUCTION_BLOCKERS.every((item) => item.owner && item.evidence && item.doneWhen), `${PRODUCTION_BLOCKERS.length} production blockers have owners, evidence and exit criteria`),
     check("platformAudit:mvpRequiredModules", MVP_REQUIRED_MODULES.length >= 8 && MVP_REQUIRED_MODULES.every((item) => item.priority === "P0" && item.remainingCode && item.siteDependency), `${MVP_REQUIRED_MODULES.length} mandatory MVP production modules have code scope and site dependencies`),
     check("platformAudit:roadmap", ROADMAP.length === 4 && ROADMAP.every((item) => item.deliverables.length >= 4 && item.exit), "30/60/90-day and continuous-improvement roadmap is complete"),
-    check("platformAudit:capabilityOperationsCenter", runtimeSources.domain.includes("applyPlatformCapabilityReviewAction") && runtimeSources.domain.includes("applyPlatformProductionBlockerAction") && runtimeSources.server.includes("/api/platform/capability-operations/blockers/") && runtimeSources.html.includes("platform-capability-operations-center") && runtimeSources.client.includes("renderPlatformCapabilityOperationsCenter") && runtimeSources.client.includes("runPlatformProductionBlockerAction") && runtimeSources.documentation.includes("reviewed-preproduction") && runtimeSources.documentation.includes("evidence-reviewed-site-pending"), "capability review and production-blocker evidence workflows are runnable, audited and documented"),
+    check("platformAudit:capabilityOperationsCenter", runtimeSources.domain.includes("applyPlatformCapabilityReviewAction") && runtimeSources.domain.includes("applyPlatformProductionBlockerAction") && runtimeSources.domain.includes("record-site-acceptance") && runtimeSources.server.includes("/api/platform/capability-operations/blockers/") && runtimeSources.html.includes("platform-capability-operations-center") && runtimeSources.client.includes("renderPlatformCapabilityOperationsCenter") && runtimeSources.client.includes("runPlatformProductionBlockerAction") && runtimeSources.client.includes("record-site-acceptance") && runtimeSources.documentation.includes("reviewed-preproduction") && runtimeSources.documentation.includes("evidence-reviewed-site-pending") && runtimeSources.siteAcceptanceDocumentation.includes("site-accepted") && runtimeSources.siteAcceptanceDocumentation.includes("blocked-until-global-go-no-go"), "capability review, site acceptance, and production-blocker evidence workflows are runnable, audited and documented"),
     check("platformAudit:productionDatabaseAdapter", ["runPostgresPrimaryReadRehearsal", "buildPostgresPrimaryReadSnapshot"].every((marker) => runtimeSources.postgresRuntime.includes(marker)) && ["readPostgresProductionState", "writePostgresProductionState", "runtime_primary_write_audit", "POSTGRES_PRIMARY_WRITE_BLOCKED"].every((marker) => runtimeSources.postgresAdapter.includes(marker)) && ["/api/production-database/adapter", "/api/production-database/primary-read-rehearsal"].every((marker) => runtimeSources.server.includes(marker)) && ["生产数据库适配器", "SERIALIZABLE", "productionPrimary"].every((marker) => runtimeSources.postgresDocumentation.includes(marker)), "P0-02 primary-read rehearsal and evidence-gated production adapter are runnable, audited and documented"),
     check("platformAudit:identityLifecycleAdapter", ["refreshOidcAccessToken", "revokeOidcToken", "fetchIdentityDirectory", "identityLifecycleReady"].every((marker) => runtimeSources.identityAdapter.includes(marker)) && ["/api/auth/identity-lifecycle", "/api/auth/oidc/refresh", "/api/auth/oidc/revoke", "/api/auth/identity-directory/preview", "/api/auth/identity-directory/bind", "/api/auth/identity-directory/apply", "BIND EXTERNAL IDENTITY", "IDENTITY_BINDING_REASSIGNMENT_BLOCKED", "IDENTITY_DIRECTORY_SELF_DEACTIVATION_BLOCKED", "IDENTITY_DIRECTORY_LAST_COMMISSION_BLOCKED"].every((marker) => runtimeSources.server.includes(marker)) && runtimeSources.html.includes("identity-lifecycle-center") && ["renderIdentityLifecycleCenter", "runIdentityBindingAction", "runIdentityDirectoryAction"].every((marker) => runtimeSources.client.includes(marker)) && ["不按同名用户名自动回退", "不自动开户", "不自动提权", "不自动复活", "现场联合测试回执"].every((marker) => runtimeSources.identityDocumentation.includes(marker)), "P0-03 OIDC subject binding, lifecycle, safe directory deactivation, operations UI and production boundary are runnable, audited and documented"),
     check("platformAudit:smsDeliveryCallback", ["verifySmsDeliveryCallback", "applySmsDeliveryCallback", "buildSmsDeliveryCenter", "SMS_CALLBACK_REPLAY_DETECTED", "terminal-conflict"].every((marker) => runtimeSources.identityAdapter.includes(marker)) && ["/api/auth/sms-delivery-callback", "/api/auth/sms-deliveries", "smsDeliveryReceipts", "recordSmsDeliveryAcceptance"].every((marker) => runtimeSources.server.includes(marker)) && ["sms-delivery-status", "sms-delivery-metrics", "sms-delivery-receipts"].every((marker) => runtimeSources.html.includes(marker)) && runtimeSources.client.includes("smsDelivery") && ["SMS_DELIVERY_CALLBACK_SECRET", "回调验签", "重放", "乱序"].every((marker) => runtimeSources.identityDocumentation.includes(marker)), "P0-04 signed SMS final-delivery callbacks, replay protection, ordered persistence, operations visibility and site boundary are runnable, audited and documented"),

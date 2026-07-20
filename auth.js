@@ -33,6 +33,7 @@
   const routeAccess = {
     "index.html": ["commission"],
     "health-dashboard.html": ["commission"],
+    "health-dashboard-about.html": ["commission"],
     "public-health.html": ["commission"],
     "workbench.html": ["commission"],
     "platform.html": ["commission"],
@@ -40,8 +41,10 @@
     "digital-hospital-self-assessment.html": ["commission", "institution"],
     "digital-hospital-evaluation.html": ["commission", "institution"],
     "regional-data-sharing.html": ["commission", "institution"],
+    "regional-data-sharing-about.html": ["commission", "institution"],
     "quality-safety.html": ["commission"],
     "operations.html": ["commission"],
+    "operations-about.html": ["commission"],
     "escort.html": ["commission"],
     "internet-nursing.html": ["commission", "institution", "citizen", "county"],
     "imaging-cloud.html": ["commission", "institution", "county", "citizen"],
@@ -57,11 +60,11 @@
   };
 
   const roleLinks = {
-    commission: [["platform.html", "全民健康平台"], ["digital-hospital-standards.html", "数智医院"], ["digital-hospital-self-assessment.html", "医院自评"], ["public-health.html", "公共卫生"], ["regional-data-sharing.html", "区域共享"], ["quality-safety.html", "质量安全"], ["operations.html", "运行调度"], ["escort.html", "助医陪诊"], ["blood.html", "血液管理"], ["health-city.html", "总览"], ["about.html", "关于"], ["workbench.html", "工作台"], ["index.html", "卫健管理"]],
+    commission: [["platform.html", "全民健康平台"], ["digital-hospital-standards.html", "数智医院"], ["digital-hospital-self-assessment.html", "医院自评"], ["public-health.html", "公共卫生"], ["regional-data-sharing.html", "区域共享"], ["quality-safety.html", "质量安全"], ["operations.html", "运行监测"], ["operations-about.html", "运行说明"], ["escort.html", "助医陪诊"], ["blood.html", "血液管理"], ["health-city.html", "总览"], ["about.html", "关于"], ["workbench.html", "工作台"], ["index.html", "卫健管理"]],
     institution: [["health-city.html", "总览"], ["digital-hospital-self-assessment.html", "医院自评"], ["doctor.html", "医生端"], ["regional-data-sharing.html", "区域共享"], ["blood.html", "血液管理"], ["about.html", "关于"], ["institution.html", "医疗机构"]],
     insurance: [["health-city.html", "总览"], ["about.html", "关于"], ["insurance.html", "医保"]],
     citizen: [["health-city.html", "总览"], ["about.html", "关于"], ["citizen.html", "个人端"], ["mobile-preview.html", "手机预览"]],
-    county: [["health-city.html", "总览"], ["about.html", "关于"], ["county.html", "医共体"]]
+    county: [["health-city.html", "总览"], ["about.html", "关于"], ["referral-teleconsultation-about.html", "转诊会诊"], ["county.html", "医共体"]]
   };
 
   roleLinks.commission.splice(5, 0, ["internet-nursing.html", "互联网护理"]);
@@ -75,6 +78,10 @@
 
   roleLinks.commission.splice(2, 0, ["digital-hospital-evaluation.html", "评价预评"]);
   roleLinks.institution.splice(1, 0, ["digital-hospital-evaluation.html", "评价预评"]);
+
+  roleLinks.commission.splice(6, 0, ["regional-data-sharing-about.html", "共享说明"]);
+  roleLinks.institution.splice(5, 0, ["regional-data-sharing-about.html", "共享说明"]);
+  roleLinks.insurance.splice(1, 0, ["drug-consumable-about.html", "药耗说明"]);
 
   async function login(username, password) {
     if (API_BASE) {
@@ -202,9 +209,13 @@
     }
   }
 
+  function getToken() {
+    return getUser()?.token || "";
+  }
+
   function authHeaders(extra = {}) {
-    const user = getUser();
-    return user?.token ? { ...extra, Authorization: `Bearer ${user.token}` } : extra;
+    const token = getToken();
+    return token ? { ...extra, Authorization: `Bearer ${token}` } : extra;
   }
 
   function authFetch(url, options = {}) {
@@ -231,6 +242,11 @@
     const user = getUser();
     if (!user) {
       window.location.replace(`./login.html?redirect=${encodeURIComponent(currentPage())}`);
+      return false;
+    }
+    if (API_BASE && !user.token) {
+      localStorage.removeItem(SESSION_KEY);
+      window.location.replace(`./login.html?redirect=${encodeURIComponent(currentPage())}&expired=1`);
       return false;
     }
     if (user.expiresAt && new Date(user.expiresAt).getTime() < Date.now()) {
@@ -284,7 +300,7 @@
 
   function canAccessPage(pageName, user) {
     if (!pageName || pageName.startsWith("#")) return true;
-    if (!user) return pageName === "login.html" || pageName === "health-city.html" || pageName === "about.html";
+    if (!user) return pageName === "login.html" || pageName === "health-city.html" || pageName === "about.html" || pageName === "referral-teleconsultation-about.html";
     if (pageName === "login.html") return false;
     if (pageName === "doctor.html") return user.accountType === "doctor";
     const allowed = routeAccess[pageName];
@@ -364,6 +380,7 @@
     sendPhoneCode,
     logout,
     getUser,
+    getToken,
     authHeaders,
     authFetch,
     requireRole,

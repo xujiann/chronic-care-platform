@@ -87,6 +87,10 @@ jobs:
         run: npm run registration:integration-readiness
       - name: Generate commercial crypto adapter readiness report
         run: npm run security:commercial-crypto-readiness
+      - name: Generate production security acceptance readiness report
+        run: npm run security:production-readiness
+      - name: Generate production global Go/No-Go readiness report
+        run: npm run production:go-no-go-readiness
       - name: Generate medical quality and safety report
         run: npm run quality-safety:report
       - name: Generate drug consumable readiness report
@@ -97,6 +101,8 @@ jobs:
         run: npm run interface:mapping
       - name: Generate regional data sharing report
         run: npm run regional-data-sharing:report
+      - name: Audit regional referral responsibility overlap
+        run: npm run regional-referral:overlap
       - name: Generate hybrid deployment readiness report
         run: npm run hybrid:deployment-readiness
       - name: Generate research sandbox readiness report
@@ -105,6 +111,14 @@ jobs:
         run: npm run monitoring:readiness
       - name: Generate operations readiness report
         run: npm run operations:readiness
+      - name: Generate hospital operations readiness report
+        run: npm run hospital-operations:readiness
+      - name: Generate hospital operations release report
+        run: npm run hospital-operations:release
+      - name: Generate hospital operations module report
+        run: npm run hospital-operations:module-report
+      - name: Verify hospital operations brief PDF
+        run: npm run hospital-operations:brief-pdf
       - name: Generate site readiness pack
         run: npm run site:pack
       - name: Generate priority application templates

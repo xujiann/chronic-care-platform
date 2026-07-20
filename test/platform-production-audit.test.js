@@ -147,6 +147,44 @@ test("platform production blocker workflow requires remediation, evidence submis
   assert.equal(center.summary.blockerEvidenceRecorded, 1);
   assert.equal(center.productionReady, false);
 
+  assert.throws(
+    () => applyPlatformProductionBlockerAction({ platformProductionBlockerReviews: reviewed.reviews }, "P0-02", {
+      action: "record-site-acceptance",
+      acceptanceId: "site-db-acceptance-001",
+      signers: [{ role: "business", name: "Business Owner" }],
+      note: "Incomplete signers must be rejected."
+    }, { name: "Release Reviewer", role: "commission" }),
+    (error) => error.code === "PLATFORM_SITE_ACCEPTANCE_SIGNERS_INCOMPLETE" && error.statusCode === 409
+  );
+
+  const accepted = applyPlatformProductionBlockerAction({ platformProductionBlockerReviews: reviewed.reviews }, "P0-02", {
+    action: "record-site-acceptance",
+    acceptanceId: "site-db-acceptance-001",
+    signers: [
+      { role: "business", name: "Business Owner" },
+      { role: "information", name: "Information Owner" },
+      { role: "operations", name: "Operations Owner" },
+      { role: "security", name: "Security Owner" }
+    ],
+    note: "Site acceptance is recorded but formal go-live remains blocked."
+  }, { name: "Release Reviewer", role: "commission" });
+  assert.equal(accepted.item.workflowStatus, "site-accepted");
+  assert.equal(accepted.item.siteAcceptanceRequired, false);
+  assert.equal(accepted.item.siteAcceptance.signers.length, 4);
+  assert.equal(accepted.item.productionReady, false);
+
+  const acceptedCenter = buildPlatformCapabilityOperationsCenter({ platformProductionBlockerReviews: accepted.reviews }, { evidenceExists: () => true });
+  assert.equal(acceptedCenter.summary.blockersSiteAccepted, 1);
+  assert.equal(acceptedCenter.formalGoLiveState, "blocked-until-site-acceptance");
+  assert.equal(acceptedCenter.productionReady, false);
+
+  const revoked = applyPlatformProductionBlockerAction({ platformProductionBlockerReviews: accepted.reviews }, "P0-02", {
+    action: "revoke-site-acceptance",
+    note: "Database capacity evidence changed."
+  }, { name: "Release Reviewer", role: "commission" });
+  assert.equal(revoked.item.workflowStatus, "in-progress");
+  assert.equal(revoked.item.siteAcceptance.status, "revoked");
+
   const reopened = applyPlatformProductionBlockerAction({ platformProductionBlockerReviews: reviewed.reviews }, "P0-02", {
     action: "reopen",
     note: "Capacity evidence changed and remediation must resume."

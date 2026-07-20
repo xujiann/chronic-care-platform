@@ -24,6 +24,7 @@ function buildBloodSystemReadinessReport(options = {}) {
   const releaseReport = options.releaseReport ?? readText("scripts/release-report.js");
   const artifactManifest = options.artifactManifest ?? readText("scripts/release-artifact-manifest.js");
   const deployCheck = options.deployCheck ?? readText("scripts/deploy-check.js");
+  const goLive = options.goLive ?? require(path.join(ROOT, "blood-go-live-service.js")).center({});
   const checks = [
     ["双角色工作台", /data-role="center"/.test(html) && /data-role="hospital"/.test(html)],
     ["血站六大业务域", ["献血者服务", "血液采集", "成分制备", "血液检测", "储存发放运输", "质量管理"].every((item) => js.includes(item))],
@@ -80,12 +81,20 @@ function buildBloodSystemReadinessReport(options = {}) {
     ["Event idempotency dead letter and retry", readText("blood-event-hub.js").includes("stableId") && readText("blood-event-hub.js").includes('status: options.failConsumer === consumer ? "dead_letter"') && server.includes("BloodEventHub.retry")],
     ["Cross-module event operations UI", readText("blood-innovation.html").includes("跨模块事件枢纽") && readText("blood-innovation.js").includes("publish-events") && server.includes('url.pathname === "/api/blood-system/events/publish"')],
     ["Four consumer dashboards receive blood projections", ["emergency.html", "quality-safety.html", "operations.html", "health-dashboard.html"].every((file) => readText(file).includes("blood-coordination")) && ["emergency.js", "quality-safety.js", "operations.js", "health-dashboard.js"].every((file) => readText(file).includes("renderBloodCoordination"))],
-    ["Consumer APIs expose scoped blood coordination", server.includes("dashboard.bloodCoordination") && server.includes("bloodCoordination: { ...bloodCoordination") && server.includes("bloodCoordination: BloodEventHub.dashboard")]
+    ["Consumer APIs expose scoped blood coordination", server.includes("dashboard.bloodCoordination") && server.includes("bloodCoordination: { ...bloodCoordination") && server.includes("bloodCoordination: BloodEventHub.dashboard")],
+    ["Blood production cutover center", server.includes("BloodGoLiveService.center") && readText("blood-go-live.html").includes("血液系统上线控制中心") && readText("blood-go-live.js").includes("/api/blood-system/go-live")],
+    ["Formal go-live boundary preserved", readText("blood-go-live-service.js").includes("blocked-until-site-evidence-signed") && readText("blood-go-live-service.js").includes("ready-for-production") && readText("blood-go-live-service.js").includes("independent verification")],
+    ["Interfaces drills migrations and dual approvals", ["bloodGoLiveEndpoints","bloodGoLiveDrills","bloodMigrationBatches","bloodCutoverApprovals"].every((token)=>readText("blood-go-live-service.js").includes(token)) && server.includes("BloodGoLiveService.signApproval")]
   ];
   const normalizedChecks = checks.map((item) => ({ name: item?.[0] || "Unnamed check", ok: Boolean(item?.[1]) }));
   return {
     system: "区域血液信息系统",
     generatedAt: new Date().toISOString(),
+    functionalState: goLive.functionalState,
+    formalGoLiveState: goLive.formalGoLiveState,
+    productionReady: goLive.productionReady,
+    goLiveSummary: goLive.summary,
+    onsiteBlockers: goLive.requirements.filter((item) => item.status !== "signed").map((item) => ({ id:item.id, title:item.title, owner:item.owner, status:item.status })),
     passed: normalizedChecks.filter((item) => item.ok).length,
     total: checks.length,
     ok: normalizedChecks.every((item) => item.ok),
@@ -102,6 +111,10 @@ function renderMarkdown(report) {
     `- Generated at: ${report.generatedAt}`,
     `- Result: ${report.ok ? "PASS" : "FAIL"}`,
     `- Checks: ${report.passed}/${report.total}`,
+    `- Functional state: ${report.functionalState}`,
+    `- Formal go-live state: ${report.formalGoLiveState}`,
+    `- Production ready: ${report.productionReady ? "yes" : "no"}`,
+    `- Onsite blockers: ${report.onsiteBlockers?.length || 0}`,
     "",
     "| Result | Check |",
     "|---|---|",

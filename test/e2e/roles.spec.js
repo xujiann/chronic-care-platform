@@ -42,6 +42,19 @@ test("commission user reaches the governance dashboard and opens maintenance", a
   await expect(page.locator("#institution-credit-evaluations tbody tr")).toHaveCount(3);
   await expect(page.locator("#research-governance table").first().locator("tbody tr")).toHaveCount(2);
   await expect(page.locator("#research-governance table").nth(1).locator("tbody tr")).toHaveCount(2);
+  await expect(page.locator(".research-sandbox-summary > div")).toHaveCount(6);
+  await expect(page.locator("#research-application-form")).toBeVisible();
+  await expect(page.locator("#research-application-form input[name='diseaseType']")).toHaveValue("copd");
+  await expect(page.locator("#research-application-form input[name='name']")).toHaveValue("COPD pulmonary rehabilitation cohort");
+  await expect(page.locator("#research-application-form input[name='dataUseAgreement']")).toHaveValue("DUA-DEMO-COPD-2026");
+  await expect(page.locator("#research-application-form input[name='minimumNecessary']")).toBeChecked();
+  await expect(page.locator("#research-application-form input[name='reidentificationProhibited']")).toBeChecked();
+  await expect(page.locator("#research-application-form button[type='submit']")).toHaveText("提交申请");
+  await expect(page.locator("#research-governance [data-research-action='sandbox-access']").first()).toHaveText("沙箱访问");
+  await expect(page.locator("#research-governance [data-research-action='compliant-export']").first()).toBeVisible();
+  await expect(page.locator(".research-governance-board > article")).toHaveCount(4);
+  await expect(page.locator(".research-boundary-list .badge")).toHaveCount(9);
+  await expect(page.locator(".research-reuse-list span")).toHaveCount(7);
   await expect(page.locator("#mobile-accessibility-governance > div")).toHaveCount(10);
   await expect(page.locator("#security-acceptance-ledger > div")).toHaveCount(4);
   await expect(page.locator("#production-deployment-plan .priority-row")).toHaveCount(4);
@@ -81,6 +94,24 @@ test("digital hospital self-assessment exposes tiered expert review without mobi
   await expect(page.locator("#digital-self-assessment-status-filter")).toContainText("专家复核中");
   await expect(page.locator("#digital-self-assessment-dispute-indicators")).toBeAttached();
   await expect(page.locator("#digital-self-assessment-opinion-ref")).toBeAttached();
+  await page.setViewportSize({ width: 375, height: 812 });
+  const overflow = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
+  expect(overflow.scrollWidth).toBe(overflow.width);
+  expect(consoleErrors).toEqual([]);
+});
+
+test("digital hospital pilot issue desk is scoped, actionable and mobile safe", async ({ page }) => {
+  const consoleErrors = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
+  await login(page, "health", "index.html");
+  await page.goto("/digital-hospital-evaluation.html");
+  await expect(page.getByRole("heading", { name: "试点问题督办" })).toBeVisible();
+  await expect(page.locator("#digital-evaluation-pilot-issues tbody tr")).toHaveCount(2);
+  await expect(page.locator("#digital-evaluation-issue-summary")).toContainText("项开放");
+  await expect(page.locator("#digital-evaluation-issue-action")).toHaveValue("assign");
+  await expect(page.locator("#digital-evaluation-issue-action-no-pii")).toBeAttached();
   await page.setViewportSize({ width: 375, height: 812 });
   const overflow = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
   expect(overflow.scrollWidth).toBe(overflow.width);
@@ -140,6 +171,64 @@ test("commission workbench renders live release gates and site templates", async
   expect(serviceAcceptance.serviceAcceptance.county.openActions.some((item) => item.id === "cco-001")).toBe(true);
 });
 
+test("operations metrics navigate to the matching work areas", async ({ page }) => {
+  await login(page, "health", "index.html");
+  await page.goto("/operations.html");
+
+  await expect(page.getByRole("heading", { name: "运行监测、资源调度、统计直报对账" })).toBeVisible();
+  await expect(page.locator("#operations-metrics [data-metric-action]")).toHaveCount(10);
+  await expect(page.locator("#operations-duty-priority")).toContainText("首要处置");
+  await expect(page.locator("#operations-duty-queue [data-duty-action]")).toHaveCount(3);
+  await expect(page.locator("#operations-duty-actions [data-duty-action]")).toHaveCount(3);
+  await expect(page.locator("#operations-duty-actions")).toContainText("上线判定");
+  await expect(page.locator("#operations-duty-actions")).toContainText("责任：");
+  await expect(page.locator("#operations-duty-actions")).toContainText("下一步：");
+  await expect(page.locator("#operations-duty-actions")).toContainText("时限：");
+
+  await page.locator("#operations-metrics [data-metric-action='critical']").click();
+  await expect(page.locator("#operation-status-filter")).toHaveValue("critical");
+  await expect(page.locator("#operations-snapshots")).toContainText("机构");
+
+  await page.locator("#operations-duty-actions [data-duty-action='dispatch']").click();
+  await expect(page.locator("#operation-status-filter")).toHaveValue("all");
+  await expect(page.locator("#dispatch-requests")).toContainText("调度单");
+  await expect(page.locator("#dispatch-batch-toolbar")).toContainText("批量处置");
+  await page.locator("#dispatch-batch-toolbar [data-dispatch-batch-note]").fill("到位凭证 TEST-001");
+  await expect(page.locator("#dispatch-batch-toolbar [data-dispatch-batch-note]")).toHaveValue("到位凭证 TEST-001");
+  await page.locator("#dispatch-requests [data-dispatch-select]:not([disabled])").first().check();
+  await expect(page.locator("#dispatch-batch-toolbar")).toContainText("已选择 1");
+  await expect(page.locator("#dispatch-batch-toolbar [data-dispatch-batch-note]")).toHaveValue("到位凭证 TEST-001");
+  await page.locator("#dispatch-batch-toolbar [data-dispatch-clear]").click();
+  await expect(page.locator("#dispatch-batch-toolbar")).toContainText("已选择 0");
+
+  await page.locator("#operations-duty-actions [data-duty-action='reconciliation']").click();
+  await expect(page.locator("#operation-sort")).toHaveValue("variance");
+  await expect(page.locator("#reconciliation-reviews")).toContainText("统计复核单");
+
+  await page.locator("#operations-duty-actions [data-duty-action='launch']").click();
+  await expect(page.locator("#operation-launch-readiness")).toContainText("上线运行判定");
+
+  const queueAction = await page.locator("#operations-duty-queue [data-duty-action]").first().getAttribute("data-duty-action");
+  await page.locator("#operations-duty-queue [data-duty-action]").first().click();
+  if (queueAction === "dispatch") {
+    await expect(page.locator("#dispatch-requests")).toContainText("调度单");
+  } else if (queueAction === "reconciliation") {
+    await expect(page.locator("#reconciliation-reviews")).toContainText("统计复核单");
+  } else {
+    await expect(page.locator("#operation-launch-readiness")).toContainText("上线运行判定");
+  }
+
+  const primaryAction = await page.locator("#operations-duty-priority [data-duty-action]").getAttribute("data-duty-action");
+  await page.locator("#operations-duty-priority [data-duty-action]").click();
+  if (primaryAction === "dispatch") {
+    await expect(page.locator("#dispatch-requests")).toContainText("调度单");
+  } else if (primaryAction === "reconciliation") {
+    await expect(page.locator("#reconciliation-reviews")).toContainText("统计复核单");
+  } else {
+    await expect(page.locator("#operation-launch-readiness")).toContainText("上线运行判定");
+  }
+});
+
 test("about page explains runnable platform capabilities", async ({ page }) => {
   await page.goto("/about.html");
 
@@ -149,11 +238,77 @@ test("about page explains runnable platform capabilities", async ({ page }) => {
   await expect(page.locator("[data-about-capability='site-template-readmes']")).toContainText("/api/site-template-readmes");
   await expect(page.locator("[data-about-capability='workflow-tasks']")).toContainText("/api/tasks");
   await expect(page.locator("[data-about-capability='release-gates']")).toContainText("npm run deploy:check");
+  await expect(page.locator("[data-about-section='referral-policy']")).toBeVisible();
   await expect(page.locator("[data-about-section='external-dependencies']")).toBeVisible();
+
+  await page.goto("/referral-teleconsultation-about.html");
+  await expect(page.locator("[data-referral-about-section='policy-basis']")).toBeVisible();
+  await expect(page.locator("[data-referral-policy='graded-diagnosis']")).toBeVisible();
+  await expect(page.locator("[data-referral-about-section='joint-signoff']")).toBeVisible();
+  await expect(page.locator("[data-referral-signoff='referral-center']")).toContainText("feedback-callback");
+  await expect(page.locator("[data-referral-signoff='hospital-it']")).toContainText("report-callback");
+  await expect(page.locator("[data-referral-about-section='developer']")).toContainText("Dr.Xu");
 
   await login(page, "health", "index.html");
   await page.goto("/about.html");
   await expect(page.locator(".auth-bar a[href='./about.html']")).toHaveCount(1);
+
+  await page.goto("/health-dashboard-about.html");
+  await expect(page.locator("[data-dashboard-about-section='runtime-report']")).toBeVisible();
+  await expect(page.locator("#dashboard-about-runtime-state")).toHaveAttribute("data-source-mode", "api");
+  await expect(page.locator("#dashboard-about-function-report [data-about-runtime-function]")).toHaveCount(15);
+  await expect(page.locator("#dashboard-about-function-report [data-about-runtime-function='aggregate-entry']")).toContainText(/7 个源应用，\d+ 条源记录/);
+  await expect(page.locator("#dashboard-about-release-evidence [data-about-runtime-evidence='summary-script']")).toContainText("综合管理服务系统摘要脚本");
+  await expect(page.locator("[data-dashboard-about-section='template-functions']")).toBeVisible();
+  await expect(page.locator("[data-dashboard-template-function='aggregate-entry']")).toContainText("前七应用汇总入口");
+  await expect(page.locator("[data-dashboard-template-function='population-service-board']")).toContainText("日");
+  await expect(page.locator("[data-dashboard-template-function='release-report']")).toContainText("主要功能报告");
+  await expect(page.locator("[data-dashboard-about-section='policy-basis']")).toBeVisible();
+  await expect(page.locator("[data-dashboard-policy='certificates']")).toContainText("出生");
+  await expect(page.locator("[data-dashboard-about-section='data-boundary']")).toContainText("卫生统计日报");
+  await expect(page.locator("[data-dashboard-about-section='api-evidence']")).toContainText("摘要接口");
+  await expect(page.locator("[data-dashboard-about-section='site-cutover']")).toBeVisible();
+  await expect(page.locator("[data-dashboard-about-section='production-launch-requirements']")).toContainText("productionReady");
+  await expect(page.locator("[data-dashboard-launch-requirements-link]")).toHaveAttribute("href", "./docs/health-dashboard-production-launch-requirements.md");
+  await expect(page.locator("[data-dashboard-about-section='implementation-plan']")).toContainText("已实现功能");
+  await expect(page.locator("[data-dashboard-about-section='implementation-plan'] [data-dashboard-implemented]")).toHaveCount(6);
+  await expect(page.locator("[data-dashboard-next-plan='prod-identity-audit']")).toContainText("真实身份");
+  await expect(page.locator("[data-dashboard-next-plan='prod-ops-drill']")).toContainText("灾备演练");
+  await expect(page.locator("[data-dashboard-about-section='next-plan']")).toBeVisible();
+  await expect(page.locator("[data-dashboard-next-plan='daily-interface-done']")).toContainText("日报");
+  await expect(page.locator("[data-dashboard-next-plan='site-evidence-done']")).toContainText("验收");
+});
+
+test("regional sharing page renders referral handoff boundary", async ({ page }) => {
+  await login(page, "health", "index.html");
+  await page.goto("/regional-data-sharing.html");
+
+  await expect(page.getByRole("heading", { name: "上线前缺口" })).toBeVisible();
+  await expect(page.locator("#regional-launch-readiness")).toContainText("已实现能力");
+  await expect(page.locator("#regional-launch-readiness")).toContainText("待开发项");
+  await expect(page.locator("#regional-launch-readiness")).toContainText("OIDC/SAML");
+  await expect(page.locator("[data-regional-section='site-integration']")).toBeVisible();
+  await expect(page.locator("#regional-site-integration .capability-card")).toHaveCount(8);
+  await expect(page.locator("#regional-site-integration")).toContainText("身份与权限");
+  await expect(page.locator("#regional-site-integration")).toContainText("监控灾备");
+  await expect(page.locator("#regional-site-integration")).toContainText("联调样例");
+  await expect(page.locator("#regional-site-integration")).toContainText("验收证据");
+  await expect(page.locator("#regional-site-integration")).toContainText("下一步");
+  await expect(page.locator("#regional-launch-readiness")).toContainText("现场签字");
+
+  await expect(page.getByRole("heading", { name: "转诊会诊交接" })).toBeVisible();
+  await expect(page.locator("#regional-referral-handoff-summary")).toContainText(/项证据可交接/);
+  await expect(page.locator("#regional-referral-handoff .handoff-grid article")).toHaveCount(6);
+  await expect(page.locator("#regional-referral-handoff")).toContainText("调阅审计");
+  await expect(page.locator("#regional-referral-boundary")).toContainText("可以合并");
+  await expect(page.locator("#regional-referral-boundary")).toContainText("不合并运行时");
+  await expect(page.locator("#regional-referral-boundary")).toContainText("不把区域共享包当作转诊单主表");
+
+  await page.getByRole("button", { name: "生成交接清单" }).click();
+  await expect(page.locator("#regional-handoff-report")).toContainText("区域共享-转诊会诊交接清单");
+  await expect(page.locator("#regional-handoff-report")).toContainText(/rshr-/);
+  await expect(page.locator("#regional-handoff-report")).toContainText("证据进度");
+  await expect(page.locator("#regional-handoff-report .handoff-report-list article")).toHaveCount(3);
 });
 
 test("citizen stays in the household experience and cannot open commission pages", async ({ page }) => {

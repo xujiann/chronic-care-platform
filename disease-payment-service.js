@@ -88,6 +88,7 @@ function seedDiseasePaymentState() {
       { id: "param-drg-2026", mode: "DRG", schemeId: "drg-demo-2026", name: "2026年度DRG支付参数", rateMethod: "固定费率法", rate: 10800, status: "已发布", effectiveFrom: "2026-01-01", approvedBy: "演示医保经办" },
       { id: "param-dip-2026", mode: "DIP", schemeId: "dip-demo-2026", name: "2026年度DIP支付参数", rateMethod: "浮动费率法", rate: 112.5, status: "草案", effectiveFrom: "2026-01-01", approvedBy: "待审批" }
     ],
+    parameterImpactReports: [],
     groupCatalog: [
       { code: "FZ11", mode: "DRG", name: "循环系统疾病伴严重并发症", mdcCode: "MDCF", mdcName: "循环系统疾病及功能障碍", adrgCode: "FZ1", adrgName: "循环系统内科诊疗组", groupType: "medical", complicationLevel: "MCC", diagnosisPrefixes: ["I10", "I11", "I12", "I13", "I15"], weight: 1.28, adjustment: 1, primaryCare: false },
       { code: "FZ13", mode: "DRG", name: "循环系统疾病伴一般并发症", mdcCode: "MDCF", mdcName: "循环系统疾病及功能障碍", adrgCode: "FZ1", adrgName: "循环系统内科诊疗组", groupType: "medical", complicationLevel: "CC", diagnosisPrefixes: ["I10", "I11", "I12", "I13", "I15"], weight: 0.98, adjustment: 1, primaryCare: true },
@@ -116,9 +117,11 @@ function seedDiseasePaymentState() {
     groupingRuns: [],
     paymentCalculationLedger: [],
     importRetryQueue: [],
+    formalGroupingJobs: [],
+    formalGroupingDeadLetters: [],
     grouperAdapters: [
       { id: "simulation-local-v1", environment: "simulation", name: "本地可解释模拟分组器", status: "ready", authority: "non-binding" },
-      { id: "official-adapter-v1", environment: "formal", name: "国家/地方正式分组器适配器", status: "external-blocked", authority: "official-receipt-required" }
+      { id: "official-adapter-v1", environment: "formal", name: "国家/地方正式分组器适配器", status: "external-blocked", authority: "official-receipt-required", acceptedSchemeVersions: ["DRG-2.0-DL", "drg-demo-2026", "DIP-2.0-DL", "dip-demo-2026"], verificationContract: "detached-signature-attestation-v1" }
     ],
     specialCases: [],
     settlementBatches: [],
@@ -172,6 +175,12 @@ function normalizeState(input) {
   normalized.groupCatalog = [
     ...seed.groupCatalog.map((item) => ({ ...item, ...(storedByCode.get(item.code) || {}) })),
     ...storedCatalog.filter((item) => !seed.groupCatalog.some((seedItem) => seedItem.code === item.code))
+  ];
+  const storedAdapters = Array.isArray(state.grouperAdapters) ? state.grouperAdapters : [];
+  const storedAdaptersById = new Map(storedAdapters.map((item) => [item.id, item]));
+  normalized.grouperAdapters = [
+    ...seed.grouperAdapters.map((item) => ({ ...item, ...(storedAdaptersById.get(item.id) || {}) })),
+    ...storedAdapters.filter((item) => !seed.grouperAdapters.some((seedItem) => seedItem.id === item.id))
   ];
   return normalized;
 }
@@ -410,6 +419,139 @@ function applyGovernanceAction(input, resource, id, payload, actor) {
   return { state, row };
 }
 
+function createPaymentParameter(input, payload, actor) {
+  const state = normalizeState(input);
+  const mode = payload.mode === "DIP" ? "DIP" : "DRG";
+  const rate = Number(payload.rate);
+  if (!Number.isFinite(rate) || rate <= 0) throw new Error("费率或点值必须大于0");
+  const schemeId = String(payload.schemeId || state.schemeVersions.find((item) => item.mode === mode && item.status === "已发布")?.id || "");
+  if (!state.schemeVersions.some((item) => item.id === schemeId && item.mode === mode)) throw new Error("参数未绑定有效分组方案版本");
+  const row = {
+    id: String(payload.id || `param-${mode.toLowerCase()}-${Date.now()}`),
+    mode,
+    schemeId,
+    name: String(payload.name || `${new Date().getFullYear()}年度${mode}支付参数草案`),
+    rateMethod: String(payload.rateMethod || (mode === "DRG" ? "固定费率法" : "浮动点值法")),
+    rate,
+    status: "草案",
+    effectiveFrom: String(payload.effectiveFrom || new Date().toISOString().slice(0, 10)),
+    approvals: [],
+    createdAt: new Date().toISOString(),
+    createdBy: actor
+  };
+  if (state.parameterVersions.some((item) => item.id === row.id)) throw new Error("参数版本编号已存在");
+  state.parameterVersions.unshift(row);
+  audit(state, "支付参数草案创建", row.id, actor, `${mode} ${row.rateMethod}=${row.rate}`);
+  return { state, row };
+}
+
+function simulatePaymentParameter(input, id, actor) {
+  const state = normalizeState(input);
+  const row = state.parameterVersions.find((item) => item.id === id);
+  if (!row) throw new Error("参数版本不存在");
+  if (!["草案", "已试算", "已驳回"].includes(row.status)) throw new Error("当前状态不允许重新试算");
+  const active = activeParameter({ ...state, parameterVersions: state.parameterVersions.filter((item) => item.id !== row.id) }, row.mode);
+  const details = state.cases.map((item) => {
+    const calculation = calculateCase(state, item, row.mode);
+    const unit = row.mode === "DRG" ? Number(calculation.grouping?.weight || 0) : Number(calculation.grouping?.score || 0);
+    const adjustment = Number(calculation.grouping?.adjustment || 1);
+    const candidateAmount = round(unit * row.rate * adjustment);
+    const currentAmount = active ? round(unit * Number(active.rate) * adjustment) : 0;
+    return { caseId: item.id, institution: item.institution, groupCode: calculation.grouping?.groupCode || "UNGROUPED", currentAmount, candidateAmount, delta: round(candidateAmount - currentAmount) };
+  });
+  const byInstitution = [...new Set(details.map((item) => item.institution))].map((institution) => {
+    const rows = details.filter((item) => item.institution === institution);
+    const currentAmount = round(rows.reduce((sum, item) => sum + item.currentAmount, 0));
+    const candidateAmount = round(rows.reduce((sum, item) => sum + item.candidateAmount, 0));
+    return { institution, caseCount: rows.length, currentAmount, candidateAmount, delta: round(candidateAmount - currentAmount), changeRate: currentAmount ? round((candidateAmount - currentAmount) / currentAmount, 4) : null };
+  });
+  const currentTotal = round(details.reduce((sum, item) => sum + item.currentAmount, 0));
+  const candidateTotal = round(details.reduce((sum, item) => sum + item.candidateAmount, 0));
+  const report = {
+    id: `param-impact-${Date.now()}-${randomUUID().slice(0, 8)}`,
+    parameterId: row.id,
+    mode: row.mode,
+    schemeId: row.schemeId,
+    baselineParameterId: active?.id || null,
+    caseCount: details.length,
+    currentTotal,
+    candidateTotal,
+    delta: round(candidateTotal - currentTotal),
+    changeRate: currentTotal ? round((candidateTotal - currentTotal) / currentTotal, 4) : null,
+    byInstitution,
+    details,
+    inputDigest: DiseasePaymentIntake.digest({ parameterId: row.id, rate: row.rate, schemeId: row.schemeId, cases: state.cases.map((item) => ({ id: item.id, totalAmount: item.totalAmount, principalDiagnosis: item.principalDiagnosis })) }),
+    generatedAt: new Date().toISOString(),
+    generatedBy: actor
+  };
+  state.parameterImpactReports.unshift(report);
+  row.status = "已试算";
+  row.latestImpactReportId = report.id;
+  row.simulatedAt = report.generatedAt;
+  audit(state, "支付参数影响试算", row.id, actor, `影响${report.delta}，病例${report.caseCount}例`);
+  return { state, row, report };
+}
+
+function submitPaymentParameter(input, id, actor) {
+  const state = normalizeState(input);
+  const row = state.parameterVersions.find((item) => item.id === id);
+  if (!row) throw new Error("参数版本不存在");
+  if (row.status !== "已试算" || !row.latestImpactReportId) throw new Error("参数必须先完成影响试算");
+  row.status = "待复核";
+  row.submittedAt = new Date().toISOString();
+  row.submittedBy = actor;
+  row.approvals = [];
+  audit(state, "支付参数提交复核", row.id, actor, row.latestImpactReportId);
+  return { state, row };
+}
+
+function reviewPaymentParameter(input, id, payload, actor) {
+  const state = normalizeState(input);
+  const row = state.parameterVersions.find((item) => item.id === id);
+  if (!row) throw new Error("参数版本不存在");
+  if (!["待复核", "复核中"].includes(row.status)) throw new Error("当前状态不允许复核");
+  row.approvals ||= [];
+  if (row.approvals.some((item) => item.reviewer === actor)) throw new Error("同一复核人不得重复签署");
+  const approval = { reviewer: actor, role: String(payload.role || "医保参数复核"), approved: payload.approved === true, opinion: String(payload.opinion || ""), reviewedAt: new Date().toISOString() };
+  row.approvals.push(approval);
+  if (!approval.approved) {
+    row.status = "已驳回";
+  } else {
+    row.status = row.approvals.filter((item) => item.approved).length >= 2 ? "已批准" : "复核中";
+  }
+  audit(state, "支付参数复核", row.id, actor, `${approval.approved ? "通过" : "驳回"}，已签署${row.approvals.length}人`);
+  return { state, row, approval };
+}
+
+function publishPaymentParameter(input, id, actor) {
+  const state = normalizeState(input);
+  const row = state.parameterVersions.find((item) => item.id === id);
+  if (!row) throw new Error("参数版本不存在");
+  if (row.status !== "已批准" || new Set((row.approvals || []).filter((item) => item.approved).map((item) => item.reviewer)).size < 2) throw new Error("参数发布需要两名不同复核人批准");
+  state.parameterVersions.filter((item) => item.id !== row.id && item.mode === row.mode && item.status === "已发布").forEach((item) => {
+    item.status = "已冻结";
+    item.frozenAt = new Date().toISOString();
+    item.frozenBy = actor;
+    item.replacedBy = row.id;
+  });
+  row.status = "已发布";
+  row.publishedAt = new Date().toISOString();
+  row.publishedBy = actor;
+  row.frozen = true;
+  audit(state, "支付参数发布", row.id, actor, `${row.mode} ${row.rateMethod}=${row.rate}`);
+  return { state, row };
+}
+
+function buildParameterGovernanceView(input) {
+  const state = normalizeState(input);
+  return {
+    versions: state.parameterVersions,
+    impactReports: state.parameterImpactReports,
+    active: ["DRG", "DIP"].map((mode) => ({ mode, parameter: activeParameter(state, mode) })),
+    workflow: ["草案", "已试算", "待复核", "复核中", "已批准", "已发布/已冻结"]
+  };
+}
+
 function buildDrgAnalytics(input) {
   const state = normalizeState(input);
   const rows = state.cases.map((item) => ({ item, calculation: item.calculation })).filter(({ calculation }) => calculation?.grouping?.mode === "DRG");
@@ -477,4 +619,4 @@ function buildOverview(input) {
   return { state, summary: { caseCount: state.cases.length, calculatedCount: calculated.length, ungroupedCount: state.cases.filter((item) => item.calculation?.grouping && !item.calculation.grouping.ok).length, totalCost, paymentStandard, projectedBalance: round(paymentStandard - totalCost), riskCount: risks.length, specialPending: state.specialCases.filter((item) => item.status === "待评审").length, specialCapRate, specialUsageRate: round(state.specialCases.filter((item) => !["不予通过", "已撤回"].includes(item.status)).length / Math.max(1, state.cases.length), 4), settlementPending: state.settlementBatches.filter((item) => item.status !== "已拨付").length, prepaymentPending: state.prepayments.filter((item) => item.status === "待审批").length, unpaidPending: state.unpaidItems.filter((item) => item.status !== "已支付").length, negotiationPending: state.negotiationRounds.filter((item) => item.status !== "已达成一致").length, trainingPending: state.trainings.filter((item) => item.status !== "已完成").length, intake: DiseasePaymentIntake.buildIntakeSummary(state), drg: buildDrgAnalytics(state) }, institutions };
 }
 
-module.exports = { POLICY, applyGovernanceAction, buildDrgAnalytics, buildDrgCatalogView, buildOverview, calculateAll, calculateCase, createSettlementBatch, createSpecialCase, drgCatalogMatch, inferDrgComplicationLevel, normalizeState, reconcileBatch, reviewSpecialCase, seedDiseasePaymentState, simulateDrgCase, validateCase };
+module.exports = { POLICY, applyGovernanceAction, buildDrgAnalytics, buildDrgCatalogView, buildOverview, buildParameterGovernanceView, calculateAll, calculateCase, createPaymentParameter, createSettlementBatch, createSpecialCase, drgCatalogMatch, inferDrgComplicationLevel, normalizeState, publishPaymentParameter, reconcileBatch, reviewPaymentParameter, reviewSpecialCase, seedDiseasePaymentState, simulateDrgCase, simulatePaymentParameter, submitPaymentParameter, validateCase };

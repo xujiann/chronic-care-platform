@@ -311,6 +311,128 @@ function normalizeDigitalHospitalPilotInstitutionAction(item = {}, payload = {},
   return next;
 }
 
+function seedDigitalHospitalPilotIssues() {
+  return [
+    {
+      id: "dhissue-mr1-interface-receipt",
+      institutionId: "MR1",
+      institutionName: "大连市中心医院",
+      title: "接口回执抽样证据待补齐",
+      severity: "P0",
+      category: "interface-evidence",
+      owner: "医院信息中心",
+      dueAt: "2026-07-25",
+      status: "in-progress",
+      noPatientPii: true,
+      evidenceRefs: [],
+      history: []
+    },
+    {
+      id: "dhissue-pilot02-owner",
+      institutionId: "PILOT-02",
+      institutionName: "第二试点医院（待确认）",
+      title: "试点责任人和支持排班待确认",
+      severity: "P1",
+      category: "pilot-governance",
+      owner: "待分派",
+      dueAt: "2026-07-30",
+      status: "open",
+      noPatientPii: true,
+      evidenceRefs: [],
+      history: []
+    }
+  ];
+}
+
+function assertPilotIssueScope(item, user) {
+  if (!["commission", "institution"].includes(user.role)) throw Object.assign(new Error("current role cannot operate pilot issues"), { status: 403 });
+  if (user.role === "institution" && String(user.orgCode || "") !== item.institutionId) throw Object.assign(new Error("institution account cannot operate another institution issue"), { status: 403 });
+}
+
+function createDigitalHospitalPilotIssue(payload = {}, user = {}, options = {}) {
+  if (!["commission", "institution"].includes(user.role)) throw Object.assign(new Error("current role cannot create pilot issues"), { status: 403 });
+  const institutionId = String(payload.institutionId || (user.role === "institution" ? user.orgCode : "") || "").trim();
+  if (user.role === "institution" && institutionId !== String(user.orgCode || "")) throw Object.assign(new Error("institution account cannot create another institution issue"), { status: 403 });
+  const institutionName = String(payload.institutionName || (user.role === "institution" ? user.orgName : "") || "").trim();
+  const title = String(payload.title || "").trim();
+  const owner = String(payload.owner || "").trim();
+  const dueAt = String(payload.dueAt || "").trim();
+  const severity = String(payload.severity || "P1").toUpperCase();
+  const note = String(payload.note || "").trim();
+  if (!institutionId || !institutionName || !title || !owner || !/^\d{4}-\d{2}-\d{2}$/.test(dueAt)) throw new Error("institutionId, institutionName, title, owner and YYYY-MM-DD dueAt are required");
+  if (!["P0", "P1", "P2"].includes(severity)) throw new Error("severity must be P0, P1 or P2");
+  if (payload.noPatientPii !== true) throw new Error("noPatientPii=true is required");
+  if (note.length < 4) throw new Error("note must contain at least 4 characters");
+  const at = options.now || new Date().toISOString();
+  return {
+    id: options.id || `dhissue-${randomUUID()}`,
+    institutionId,
+    institutionName,
+    title,
+    severity,
+    category: String(payload.category || "pilot-operations").trim(),
+    owner,
+    dueAt,
+    status: "open",
+    noPatientPii: true,
+    evidenceRefs: [],
+    createdAt: at,
+    createdBy: actorKey(user),
+    history: [{ action: "create", at, actor: actorKey(user), note, status: "open" }]
+  };
+}
+
+function normalizeDigitalHospitalPilotIssueAction(item = {}, payload = {}, user = {}, options = {}) {
+  assertPilotIssueScope(item, user);
+  const action = String(payload.action || "").trim();
+  if (!["assign", "start-remediation", "record-evidence", "submit-review", "verify-close", "reopen"].includes(action)) throw new Error("unsupported pilot issue action");
+  if (["verify-close", "reopen"].includes(action) && user.role !== "commission") throw Object.assign(new Error("only commission can verify or reopen a pilot issue"), { status: 403 });
+  const note = String(payload.note || "").trim();
+  if (note.length < 4) throw new Error("note must contain at least 4 characters");
+  const at = options.now || new Date().toISOString();
+  const next = { ...item, evidenceRefs: [...(item.evidenceRefs || [])], history: [...(item.history || [])] };
+  if (action === "assign") {
+    if (!["open", "reopened", "in-progress"].includes(next.status)) throw Object.assign(new Error("issue cannot be assigned from current status"), { status: 409 });
+    const owner = String(payload.owner || "").trim();
+    const dueAt = String(payload.dueAt || "").trim();
+    if (!owner || !/^\d{4}-\d{2}-\d{2}$/.test(dueAt)) throw new Error("owner and YYYY-MM-DD dueAt are required");
+    next.owner = owner;
+    next.dueAt = dueAt;
+    next.status = "in-progress";
+  } else if (action === "start-remediation") {
+    if (!["open", "reopened", "in-progress"].includes(next.status)) throw Object.assign(new Error("issue cannot start remediation from current status"), { status: 409 });
+    next.status = "in-progress";
+  } else if (action === "record-evidence") {
+    if (!["open", "reopened", "in-progress"].includes(next.status)) throw Object.assign(new Error("issue evidence cannot be changed from current status"), { status: 409 });
+    if (payload.noPatientPii !== true) throw new Error("noPatientPii=true is required");
+    const evidenceRef = String(payload.evidenceRef || "").trim();
+    if (!evidenceRef) throw new Error("evidenceRef is required");
+    next.evidenceRefs = [...new Set([...next.evidenceRefs, evidenceRef])];
+    next.status = "in-progress";
+  } else if (action === "submit-review") {
+    if (next.status !== "in-progress") throw Object.assign(new Error("only an in-progress issue can be submitted for review"), { status: 409 });
+    if (!next.evidenceRefs.length) throw Object.assign(new Error("at least one evidence reference is required before review"), { status: 409 });
+    next.status = "pending-review";
+    next.submittedBy = actorKey(user);
+    next.submittedAt = at;
+  } else if (action === "verify-close") {
+    if (next.status !== "pending-review") throw Object.assign(new Error("issue must be pending review before closure"), { status: 409 });
+    if (next.submittedBy === actorKey(user)) throw Object.assign(new Error("independent issue reviewer is required"), { status: 409 });
+    next.status = "verified-closed";
+    next.verifiedBy = actorKey(user);
+    next.verifiedAt = at;
+  } else {
+    if (next.status !== "verified-closed") throw Object.assign(new Error("only a verified closed issue can be reopened"), { status: 409 });
+    next.status = "reopened";
+    next.reopenedBy = actorKey(user);
+    next.reopenedAt = at;
+  }
+  next.updatedAt = at;
+  next.updatedBy = actorKey(user);
+  next.history.unshift({ action, at, actor: actorKey(user), note, status: next.status, evidenceRef: String(payload.evidenceRef || "").trim() });
+  return next;
+}
+
 function normalizeLevel(packId, level) {
   if (packId === "interoperability") return String(level || "1").toUpperCase();
   return Number(level) || 0;
@@ -638,6 +760,8 @@ function buildDigitalHospitalPilotOperations(data = {}, user = {}, filters = {})
   const assessments = Array.isArray(data.digitalHospitalPreAssessments) ? data.digitalHospitalPreAssessments : seedDigitalHospitalPreAssessments();
   const jobs = Array.isArray(data.digitalHospitalCollectionJobs) ? data.digitalHospitalCollectionJobs : seedDigitalHospitalCollectionJobs();
   const evidence = Array.isArray(data.digitalHospitalEvaluationEvidence) ? data.digitalHospitalEvaluationEvidence : seedDigitalHospitalEvaluationEvidence();
+  const issues = (Array.isArray(data.digitalHospitalPilotIssues) ? data.digitalHospitalPilotIssues : seedDigitalHospitalPilotIssues())
+    .filter((item) => !scopedInstitution || item.institutionId === scopedInstitution);
   const today = String(filters.today || new Date().toISOString().slice(0, 10));
   const rows = institutions.map((institution) => {
     const ownAssessments = assessments.filter((item) => item.institutionId === institution.institutionId);
@@ -646,6 +770,8 @@ function buildDigitalHospitalPilotOperations(data = {}, user = {}, filters = {})
     const overdue = openFindings.filter((item) => item.dueAt && item.dueAt < today);
     const ownJobs = jobs.filter((item) => item.institutionId === institution.institutionId);
     const ownEvidence = evidence.filter((item) => item.institutionId === institution.institutionId);
+    const ownIssues = issues.filter((item) => item.institutionId === institution.institutionId);
+    const openIssues = ownIssues.filter((item) => item.status !== "verified-closed");
     return {
       ...institution,
       operations: {
@@ -657,7 +783,11 @@ function buildDigitalHospitalPilotOperations(data = {}, user = {}, filters = {})
         validatedJobs: ownJobs.filter((item) => item.status === "validated").length,
         totalJobs: ownJobs.length,
         verifiedEvidence: ownEvidence.filter((item) => item.status === "verified").length,
-        totalEvidence: ownEvidence.length
+        totalEvidence: ownEvidence.length,
+        openIssues: openIssues.length,
+        openIssueP0: openIssues.filter((item) => item.severity === "P0").length,
+        overdueIssues: openIssues.filter((item) => item.dueAt && item.dueAt < today).length,
+        pendingIssueReviews: openIssues.filter((item) => item.status === "pending-review").length
       },
       readinessComplete: PILOT_READINESS_KEYS.every((key) => institution.readiness?.[key] === true)
     };
@@ -672,9 +802,13 @@ function buildDigitalHospitalPilotOperations(data = {}, user = {}, filters = {})
       readyForReview: rows.filter((item) => item.status === "ready-for-review").length,
       onboarding: rows.filter((item) => item.status === "onboarding").length,
       overdueP0: rows.reduce((sum, item) => sum + item.operations.overdueP0, 0),
-      whitelistEnabled: rows.filter((item) => item.whitelistEnabled).length
+      whitelistEnabled: rows.filter((item) => item.whitelistEnabled).length,
+      openIssues: issues.filter((item) => item.status !== "verified-closed").length,
+      overdueIssues: issues.filter((item) => item.status !== "verified-closed" && item.dueAt && item.dueAt < today).length,
+      pendingIssueReviews: issues.filter((item) => item.status === "pending-review").length
     },
     institutions: rows,
+    issues,
     readinessKeys: PILOT_READINESS_KEYS,
     stages: PILOT_STAGES,
     boundary: "试点白名单和阶段状态不等同于正式评价授权或生产上线签字"
@@ -701,7 +835,8 @@ function buildDigitalHospitalPilotBoard(data = {}, user = {}, filters = {}) {
     { id: "pilot:evidenceBoundary", passed: evidence.length >= 6 && evidence.every((item) => item.noPatientPii === true), detail: `${evidence.length} evidence records with no-patient-PII boundary` },
     { id: "pilot:preAssessment", passed: preAssessments.length >= 1 && preAssessments.every((item) => item.results?.length === 4 && item.formalResult === false), detail: `${preAssessments.length} four-pack pilot simulations` },
     { id: "pilot:rectification", passed: preAssessments.some((item) => item.findings?.length > 0 && item.findings.every((finding) => Array.isArray(finding.history))), detail: `${preAssessments.reduce((sum, item) => sum + (item.findings?.length || 0), 0)} traceable findings` },
-    { id: "pilot:operations", passed: operations.ok, detail: `${operations.summary.active} active / ${operations.summary.institutions} pilot institutions / ${operations.summary.overdueP0} overdue P0` }
+    { id: "pilot:operations", passed: operations.ok, detail: `${operations.summary.active} active / ${operations.summary.institutions} pilot institutions / ${operations.summary.overdueP0} overdue P0` },
+    { id: "pilot:issueClosure", passed: (user.role === "institution" || operations.issues.length >= 2) && operations.issues.every((item) => item.institutionId && item.owner && item.dueAt && item.noPatientPii === true && Array.isArray(item.history)), detail: `${operations.summary.openIssues} open / ${operations.summary.overdueIssues} overdue / ${operations.summary.pendingIssueReviews} pending review` }
   ];
   const sitePending = evidence.filter((item) => item.status === "site-pending");
   return {
@@ -720,7 +855,11 @@ function buildDigitalHospitalPilotBoard(data = {}, user = {}, filters = {}) {
       openFindings: preAssessments.reduce((sum, item) => sum + (item.findings || []).filter((finding) => finding.status !== "resolved").length, 0),
       pilotInstitutions: operations.summary.institutions,
       activePilotInstitutions: operations.summary.active,
-      overdueP0: operations.summary.overdueP0
+      overdueP0: operations.summary.overdueP0,
+      pilotIssues: operations.issues.length,
+      openPilotIssues: operations.summary.openIssues,
+      overduePilotIssues: operations.summary.overdueIssues,
+      pendingPilotIssueReviews: operations.summary.pendingIssueReviews
     },
     checks,
     jobs,
@@ -742,14 +881,17 @@ module.exports = {
   buildDigitalHospitalPilotOperations,
   calculatePackResult,
   createDigitalHospitalPilotInstitution,
+  createDigitalHospitalPilotIssue,
   normalizeDigitalHospitalCollectionJobAction,
   normalizeDigitalHospitalEvaluationEvidenceAction,
   normalizeDigitalHospitalPreAssessmentAction,
   normalizeDigitalHospitalPilotInstitutionAction,
+  normalizeDigitalHospitalPilotIssueAction,
   runDigitalHospitalPreAssessment,
   seedDigitalHospitalCollectionJobs,
   seedDigitalHospitalEvaluationEvidence,
   seedDigitalHospitalPreAssessments,
   seedDigitalHospitalPilotInstitutions,
+  seedDigitalHospitalPilotIssues,
   seedPilotResponses
 };

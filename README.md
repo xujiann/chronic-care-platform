@@ -62,6 +62,7 @@ http://localhost:5173/login.html
 | `health-city.html` | 健康城市系统总览 |
 | `workbench.html` | 统一运营工作台、全流程审计矩阵、路线图、系统就绪报告 |
 | `platform.html` | 平台建设驾驶舱、应用目录、信用评价、科研专病库治理、移动无障碍治理、安全信创台账 |
+| `research-sandbox-about.html` | 科研数据沙箱政策说明、运行边界、政策依据、现场验收证据和发布证据 |
 | `index.html` | 卫健委端：慢病、统计、应急、质量、审计、互认、绩效 |
 | `institution.html` | 医疗机构端：授权档案、转诊、固定取药、证照、多点执业 |
 | `insurance.html` | 医保局/医保中心/区市县医保局：审核、监管、凭证、取药 |
@@ -107,6 +108,7 @@ data/db.json
 - 协同业务：`careOrders`、`medicationPickups`、`insuranceClaims`、`referralSystem`、`referralTeleconsultations`
 - 县域医共体：`countyConsortium`、`countyCollaborationOrders`、`countyMutualRecognitionRecords`、`countyAiDiagnosisCases`
 - 证照统计：`deathCertificates`、`birthCertificates`、`healthStatistics`、`healthStatisticsIngestion`
+- 医院运行监测：`hospitalOperationSnapshots`、`resourceDispatchRequests`、`emergencyDispatchLoops`、`statisticsReconciliationReviews`、`operationAlertRules`
 - 治理审计：`securityEvents`、`dataAccessLogs`、`platformRoadmap`、`platformAudit`、`platformProcessAudit`
 - 生产部署：`productionDeploymentPlan` 记录发布门禁、正式数据库适配、政务身份适配和审计保全路径
 - P2 治理：`institutionCreditEvaluations`、`creditEvaluationRules`、`researchDatasets`、`diseaseRegistryModels`
@@ -128,7 +130,7 @@ SQLite 结构化镜像已覆盖居民、账户、主索引、个人健康档案�
 | `POST /api/physical-exams/import` | 体检中心或医院单份/批量接入；一般成人体检同步健康档案，职业/专项体检进入受限分流队列，二者均幂等去重 |
 | `POST /api/physical-exams/abnormal-cases/:id/actions` | 对体检异常结果执行通知居民、复查安排、专科分派、关闭或重开，并生成消息与审计证据 |
 | `POST /api/physical-exams/:id/link-attachment` | 将已完成校验和与恶意文件扫描的原始体检报告安全附件关联到健康档案 |
-| `POST /api/physical-exams/joint-tests/:id/actions` | 逐项登记机构现场联调证据，全部通过后签署上线确认 |
+| `POST /api/physical-exams/joint-tests/:id/actions` | 逐项登记机构现场联调证据；机构提交、不同卫生行政责任人按同一SHA-256摘要独立核验后才完成上线确认 |
 | `POST /api/physical-exams/specialized-intakes/:id/actions` | 凭证据编号把专项体检分配到独立画像、退回来源或关闭分流，禁止混入一般体检档案 |
 | `GET /api/process-audit` | 管理端全流程审计报告，汇总居民、慢病、医共体、医保取药、统计证照、安全合规和生产切换证据域 |
 | `POST /api/auth/login` / `GET /api/auth/me` / `POST /api/auth/logout` | 登录、会话、退出 |
@@ -136,6 +138,7 @@ SQLite 结构化镜像已覆盖居民、账户、主索引、个人健康档案�
 | `GET /api/multi-practice-registry` | 医师多点执业监管台账，按角色返回公开备案、风险补正队列、材料核验和政策摘要 |
 | `GET/POST/PATCH /api/personal-records` | 个人健康档案读写 |
 | `POST /api/workflow-actions` | 通用工作流动作 |
+| `GET /api/regional-data-sharing` / `GET /api/regional-data-sharing/handoff-report` / `POST /api/regional-data-sharing/access-reviews` | 区域诊疗数据共享包、转诊会诊交接清单和调阅审计留痕；管理端全域可见，机构端按来源/接收机构裁剪 |
 | `PATCH /api/chronic-management-plans/:id`、`/api/chronic-comorbidity-plans/:id`、`/api/chronic-tcm-services/:id`、`/api/chronic-self-management/:id`、`/api/chronic-medication-support/:id`、`/api/chronic-quality-metrics/:id` | 慢病管理计划、多病共管、中医药、自我管理、用药保障和质控记录的单条更新，支持机构/卫健委权限、居民授权范围和乐观锁 |
 | `GET /api/tasks` / `POST /api/tasks/:id/actions` | 统一任务中心 |
 | `GET /api/messages` / `POST /api/messages/:id/receipt` | 站内消息与送达回执 |
@@ -144,8 +147,10 @@ SQLite 结构化镜像已覆盖居民、账户、主索引、个人健康档案�
 | `GET /api/credit-evaluations/calculate` | 信用评价自动计算 |
 | `GET /api/performance/consortium-report` | 医共体绩效、人财物、药耗、基层履约报表 |
 | `GET /api/research/datasets` / `POST /api/research/datasets/:id/actions` | 科研数据集治理 |
-| `GET /api/research/sandbox` / `POST /api/research/datasets` / `POST /api/research/datasets/:id/approval` / `POST /api/research/datasets/:id/sandbox-access` / `POST /api/research/datasets/:id/outcomes` | Research dataset application, ethics approval, de-identified sandbox access, audit trail, and outcome return |
+| `GET /api/research/sandbox` / `POST /api/research/datasets` / `POST /api/research/datasets/:id/evidence` / `POST /api/research/datasets/:id/approval` / `POST /api/research/datasets/:id/sandbox-access` / `GET /api/research/compliant-exports` / `POST /api/research/datasets/:id/compliant-exports` / `POST /api/research/datasets/:id/outcomes` | Research dataset application, evidence-document registration, ethics approval, de-identified sandbox access, compliant data export, audit trail, and outcome return |
 | `GET /api/research/disease-models` / `POST /api/research/disease-models/:id/review` | 专病库模型和人工复核 |
+| `GET /api/operations/dashboard` / `GET /api/operations/resource-pool` / `GET /api/operations/emergency-dispatch-loop` / `GET /api/operations/go-live-gates` | 医院运行监测、跨院资源池、急诊拥堵调度闭环和上线前门禁清单 |
+| `POST /api/operations/emergency-dispatch-loop/actions` / `POST /api/operations/go-live-gates/actions` / `POST /api/operations/dispatch` | 急诊拥堵复核留痕、上线前门禁复核和资源调度工单管理 |
 | `POST /api/auth/identity/preview` | 政务身份 claims 到角色、机构和首页的接入预映射 |
 | `GET /api/mobile/experience` / `POST /api/mobile/experience` | 移动体验和居民偏好 |
 | `GET /api/mobile/accessibility-checklist` | 无障碍验收清单 |
@@ -217,6 +222,10 @@ npm.cmd run policy:coverage
 npm.cmd run hybrid:deployment-readiness
 ```
 
+`regional-referral:overlap` 会生成 `release/regional-referral-overlap-report.json` 和 `release/regional-referral-overlap-report.md`，用于检查区域诊疗数据共享平台与医联体转诊/远程会诊功能的重合度。当前结论是“部分合并”：合并交接证据、报告和现场验收边界；不合并运行时主模型和 API。
+
+区域诊疗数据共享页面提供“生成交接清单”动作，对应 `GET /api/regional-data-sharing/handoff-report`。该接口复用共享包权限裁剪，输出每个共享包的 6 项交接证据、待补项、Markdown 清单和运行边界，用于现场证明资料可调阅、可追溯、可交接，但不生成或改写医联体转诊单。
+
 `deploy:check` 会检查 README、部署文档、静态快照、P2 集合、P2 完成状态、P0 接口准备度、安全验收台账、环境脚本和关键 npm scripts；`deploy:check:full` 还会串行执行 `check`、`test`、`test:coverage`、`test:e2e` 和 `npm audit --omit=dev`。
 
 `env:check` 使用 `.env.example` 做演示/模板级校验，不要求真实密钥；`env:check:production` 会读取 `.env`，并按生产规则校验 `NODE_ENV=production`、非 JSON 存储、非占位且不少于 32 位的 `SESSION_SECRETS` 和 `INTEGRATION_GATEWAY_SECRET`。当前运行时正式支持 `STORAGE_ENGINE=auto` 或 `sqlite`；`postgres/postgresql` 仍在 `productionDeploymentPlan` 中作为后续适配项，配置后会被门禁拦截，避免静默回落。生产模式还要求政务身份 `OIDC_ISSUER_URL/OIDC_CLIENT_ID/OIDC_CLIENT_SECRET`、居民验证码 `SMS_GATEWAY_URL` 与审计保全 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT` 至少一项可用。`env:check:production` 与 `release:report` 会附带生产切换清单，按环境文件、生产密钥、统一身份和短信网关、审计保全、存储适配、现场接口联调、医保/证照交换、监控值守和灾备演练列出责任方、阻断状态和下一步动作；外部系统项必须有 `CUTOVER_SITE_INTERFACE_SIGNOFF`、`CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF`、`CUTOVER_MONITORING_SIGNOFF`、`CUTOVER_DR_REHEARSAL_SIGNOFF` 等现场签字信号才会通过。`release:report` 会汇总代码文件、关键 npm scripts、静态快照、P2 完成状态、接口准备度、安全验收、生产部署计划、验收证据和环境配置，默认输出 `release/release-report.json`、`release/release-report.md`、`release/production-cutover-checklist.json` 与 `release/production-cutover-checklist.md`；`release:manifest` 会生成 `release/release-artifact-manifest.json` 与 `release/release-artifact-manifest.md`，把所有发布报告、模板 README、生成命令和 API 证据整理成发布包目录清单；`release:report:full` 额外执行 `check`、`test`、`test:coverage`、`test:e2e`、`deploy:check` 和 `npm audit --omit=dev`。CI 会在每次检查中生成并上传 `release-readiness-report` artifact，便于发布取证。
@@ -239,7 +248,9 @@ npm.cmd run hybrid:deployment-readiness
 
 `interface:mapping` 会生成 `release/interface-mapping-report.json` 与 `release/interface-mapping-report.md`，逐项归档 HIS/EMR/LIS/PACS/医保/电子证照/统计契约字段到平台集合和字段的映射、必填字段覆盖、幂等字段落点、签名与重试证据，作为现场接口字段差异确认和联调整改的前置材料。
 
-`research:sandbox` generates `release/research-sandbox-readiness-report.json` and `release/research-sandbox-readiness-report.md`, covering research dataset applications, disease registry models, ethics approval, de-identification release, sandbox access, usage audit, and outcome return evidence.
+`research:sandbox` generates `release/research-sandbox-readiness-report.json` and `release/research-sandbox-readiness-report.md`, covering research dataset applications, disease registry models, ethics approval, data-use agreement evidence documents, de-identification release, sandbox access, compliant data export, usage audit, and outcome return evidence. The first Wave 4.1 smart-hospital research-platform slice is limited to research management and compliant data governance; it does not perform AI diagnosis.
+
+科研数据沙箱的政策说明页为 `research-sandbox-about.html`，基于《中华人民共和国个人信息保护法》《中华人民共和国数据安全法》《网络数据安全管理条例》《涉及人的生命科学和医学研究伦理审查办法》《国家健康医疗大数据标准、安全和服务管理办法（试行）》整理演示边界。当前系统只证明申请、材料登记、审批、脱敏状态、沙箱访问、审计和成果回流的本地闭环；真实科研共享仍需现场提供伦理批件、数据使用协议、字段最小化评审、脱敏/重识别风险评估、日志保全或 SIEM/WORM 留存配置，以及专病库模型复核意见。
 
 `data-quality:report` 会生成 `release/data-quality-report.json` 与 `release/data-quality-report.md`，检查居民主索引完整度、跨集合居民引用、personIndex 一致性、来源可追溯和整改闭环。
 `data-governance:readiness` 会生成 `release/data-governance-readiness-report.json` 与 `release/data-governance-readiness-report.md`，把 HIS、EMR、LIS、PACS、医保、公卫、随访/互联网护理等来源系统纳入数据资产台账，汇总 personIndex、机构/科室/人员、疾病/手术/药品/检查检验等标准字典，并把字段映射、必填项、幂等、签名、质量检查和外部/现场阻塞项整理为可审查证据。
@@ -268,7 +279,7 @@ npm.cmd run hybrid:deployment-readiness
 
 `monitoring:readiness` 会生成 `release/monitoring-readiness-report.json` 与 `release/monitoring-readiness-report.md`，专项检查健康检查、运行指标、慢请求、状态码、死信、数据质量、SLO 阈值、告警信号和 on-call escalation 证据；真实 Prometheus/OpenTelemetry 或平台日志绑定完成后，再用 `CUTOVER_MONITORING_SIGNOFF` 作为现场签字信号。
 
-`referral:readiness` 会生成 `release/referral-teleconsultation-readiness-report.json` 与 `release/referral-teleconsultation-readiness-report.md`，检查医联体转诊、远程会诊、接诊反馈、报告回传、协同工单、绩效评价、居民授权、审计留痕、专用 API 与机构端/县域端入口，作为 HIS/EMR、预约号源、远程视频、PACS/LIS 报告和医共体绩效公式现场联调前的闭环证据。
+`referral:readiness` 会生成 `release/referral-teleconsultation-readiness-report.json` 与 `release/referral-teleconsultation-readiness-report.md`，检查医联体转诊、远程会诊、接诊反馈、报告回传、协同工单、绩效评价、居民授权、审计留痕、专用 API 与机构端/县域端入口，作为 HIS/EMR、预约号源、远程视频、PACS/LIS 报告和医共体绩效公式现场联调前的闭环证据。县域端已把医共体协同闭环呈现为 `发起 -> 受理 -> 执行/会诊 -> 报告回传 -> 反馈/评价 -> 绩效归档` 六步状态链，并联动 action queue、taskReceipts、exportSummary 与角色跳转按钮；真实 HIS/EMR/LIS/PACS/医保回调、现场签字、生产身份、审计和监控仍保留为 external/onsite blockers。
 
 `evaluation:evidence` 会生成 `release/evaluation-evidence-report.json` 与 `release/evaluation-evidence-report.md`，汇总互联互通四甲/五乙测评所需接口清单、标准映射、交易样例、整改记录、P1 接口需求和流程审计证据。
 
@@ -322,21 +333,87 @@ GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下
 - [后续开发优先级](./docs/后续开发优先级.md)
 - [GitHub 拆分部署方案](./docs/GitHub拆分部署方案.md)
 
+## Referral Teleconsultation Callback
+
+The runnable policy and about page for this application is `referral-teleconsultation-about.html`; it maps graded diagnosis, county medical consortium informatization, telemedicine governance, and insurance-payment boundaries to the platform workflow.
+
+Receiving systems can use `POST /api/referral-teleconsultations/:id/feedback-callback` with `idempotencyKey` and `x-integration-signature`; accepted callbacks update `receivingFeedback`, status, performance evidence, institution/resident `taskMessages`, audit logs, and a matched integration gateway event.
+
+Scheduling systems can use `POST /api/referral-teleconsultations/:id/schedule-callback` with `idempotencyKey` and `x-integration-signature`; accepted callbacks update `meetingWindow`, receiving doctor, target institution fields, performance evidence, create institution/resident `taskMessages`, and write a matched integration gateway event.
+
+HIS/EMR report callback can use `POST /api/referral-teleconsultations/:id/report-callback` with `idempotencyKey` and `x-integration-signature`; accepted callbacks update report return status, append audit evidence, archive a `teleconsultation-report` personal record, create institution/resident `taskMessages`, and write a matched integration gateway event.
+
+The field contracts are tracked as `referral-feedback-callback-v1`, `referral-schedule-callback-v1`, and `referral-report-callback-v1` in the interface mapping report.
+
+`GET /api/referral-teleconsultations/joint-test-pack` returns the onsite joint-test pack for referral-center, receiving-hospital scheduling, hospital EMR report callback, county performance, and insurance signoff. It includes callback sample payloads, checklist rows, role responsibilities, joint-test task receipt summaries, an export summary showing whether each role is ready for final signoff, a cutover readiness blocker summary, and a structured next-development plan for field replay, onsite archive, insurance performance cutover, and production controls.
+
+`GET /api/referral-teleconsultations/joint-test-ledger` returns the joint-test reconciliation ledger across callback replay events, local demo evidence, onsite signoff status, SLA supervision, and insurance payment-policy rows.
+
+`POST /api/referral-teleconsultations/joint-test-ledger/tasks` lets county or commission users create idempotent `taskMessages` from unresolved ledger rows, so callback replay, onsite signoff, SLA supervision, and insurance-policy follow-up can be assigned before final acceptance.
+
+`POST /api/referral-teleconsultations/joint-test-ledger/tasks/:role/complete` records the owner receipt for a joint-test task. Commission and county coordinators can close any role row; institution and insurance users can close tasks targeted to their role, with receipt and audit evidence retained on the original `taskMessages` row.
+
+`GET /api/referral-teleconsultations/signoff-summary` returns the demo-ready/site-pending signoff summary for referral center, receiving hospital, hospital IT, county performance, and insurance review, so onsite teams can see which local evidence is ready before attaching real signed records.
+
+`POST /api/referral-teleconsultations/signoff-summary/:role/evidence` archives an onsite signoff record for an approved role. Commission/county users can archive any role, institution users can archive referral-center/receiving-hospital/hospital-it evidence, and insurance users can archive insurance evidence; every write records signer, organization, note, audit log, and security event.
+
+`POST /api/referral-teleconsultations/:id/escalations/ack` lets institution, county, or commission users acknowledge or close an SLA reminder. The action updates the teleconsultation `slaDisposition`, county supervision status, reminder message receipts, data-access logs, and security audit trail.
+
+`GET /api/referral-teleconsultations/performance-policy` exposes the referral teleconsultation payment and performance policy, including report-return rate, follow-up closure, repeat-exam control, and payment-path metrics for insurance review and medical consortium settlement.
+
+`GET /api/referral-teleconsultations/consortium-metrics` exposes the G-end collectible medical-consortium closed-loop metrics for commission/county users: loop completion, collaboration response hours, report-return rate, mutual-recognition evidence rows, grassroots follow-up return, quality feedback closure, and role todo backlog. The endpoint is release and indicator-center evidence; it still marks production HIS/EMR/LIS/PACS/insurance callbacks, onsite signatures, production identity, audit export, and monitoring as external or onsite blockers.
+
+The "medical consortium closed loop" task from `chronic-care-platform/docs/浪潮方案4.1立即采纳开发任务分派表.md` is tracked in this thread as a runnable county-portal slice: the six-step closed-loop chain, role-based todos, mutual-recognition light evidence, primary follow-up return, quality/SLA feedback closure, and G-end collectible metrics (`consortium-loop-completion-rate`, `collaboration-efficiency-hours`, `grassroots-followup-return`, `quality-feedback-closure`). These fields are release evidence only; real HIS/EMR/LIS/PACS/insurance callbacks, onsite signatures, production identity, audit export, and monitoring remain external or onsite blockers.
+
 ## Priority app 3: medical quality and safety supervision
 
 - Runnable portal: `quality-safety.html`
-- API evidence: `/api/quality-safety/dashboard`, `/api/quality-safety/issues/:id/dispatch`, `/api/quality-safety/rectifications/:id/feedback`, `/api/quality-safety/rectifications/:id/review`
-- Seed collections: `qualitySafetyEvents`, `criticalValueAlerts`, `clinicalPathwayCases`, `medicalRecordQualityReviews`, `mutualRecognitionQualityReviews`, `qualityRectificationOrders`
+- About and policy page: `quality-safety-about.html`
+- Role access: commission dispatches and reviews; institution/county users can open the same portal for scoped dashboard and rectification feedback.
+- API evidence: `/api/quality-safety/dashboard`, `/api/quality-safety/interface-standard`, `/api/quality-safety/interface-joint-test-pack`, `/api/quality-safety/interface-messages/validate`, `/api/quality-safety/issues/:id/dispatch`, `/api/quality-safety/rectifications/:id/feedback`, `/api/quality-safety/rectifications/:id/review`, `/api/quality-safety/critical-values/:id/acknowledge`, `/api/quality-safety/critical-values/:id/dispose`, `/api/quality-safety/clinical-pathways/:id/review`, `/api/quality-safety/core-systems/:id/evidence`, `/api/quality-safety/site-signoffs/:id/evidence`, `/api/quality-safety/site-signoffs/:id/review`
+- Seed collections: `qualitySafetyEvents`, `criticalValueAlerts`, `clinicalPathwayCases`, `medicalRecordQualityReviews`, `mutualRecognitionQualityReviews`, `qualityRectificationOrders`, `qualitySafetySiteSignoffs`
 - Reused collections: `diagnosticReports`, `countyMutualRecognitionRecords`, `dataQualityIssues`, `institutionCreditEvaluations`, `securityEvents`, `hospitalInteroperabilityFunctions`
-- Release artifact: `quality-safety-report.md` / `quality-safety-report.json` from `npm.cmd run quality-safety:report`
+- Release artifacts: `quality-safety-report.md` / `quality-safety-report.json` from `npm.cmd run quality-safety:report`, `quality-safety-interface-standard.md` / `quality-safety-interface-standard.json` from `npm.cmd run quality-safety:interface-standard`, and `quality-safety-interface-joint-test-pack.md` / `quality-safety-interface-joint-test-pack.json` from `npm.cmd run quality-safety:joint-test`
+- National quality goals: the dashboard and release report map all 10 2025 national medical quality and safety improvement goals to evidence collections, monitoring cadence, site input fields, and next collection boundaries; the module report now gates site input coverage as release evidence.
+- National goal cadence plan: the dashboard and module report group the 10 goals into monthly review, quarterly department feedback, and continuous monitoring plans with owners, review windows, evidence counts, and site input coverage.
+- Institution interface standard: the interface standard fixes document control, HTTPS/JSON transport, HMAC signature, idempotency key, message envelope, status codes, field dictionary requirements, sample payloads, retry/compensation, and joint-test acceptance checklist for HIS/EMR/LIS/PACS and mutual-recognition platform docking.
+- Institution joint-test pack: the portal and API expose sample requests, HMAC-SHA256 signature fixtures, body hash, idempotency replay checks, field dictionaries, site sample acceptance rows, and negative validation cases for missing fields, invalid signatures, and duplicate replay.
+- Go-live readiness: the dashboard, module report, and release report compute `controlled_pilot_ready` status with a score, evidence checks, blockers, and production sign-off items.
+- Pre-launch tracker: the runnable portal displays production sign-off gaps as owner, status, evidence, and next-action rows before the detailed site sign-off table.
+- Onsite requirements: the dashboard and release report list go-live functional requirements with onsite inputs, acceptance evidence, owner roles, status, and source collections.
+- Cutover sequence: the dashboard and release report group onsite requirements into before-cutover, cutover-day, and post-cutover stabilization phases.
+- Next development plan: the dashboard and module report convert live-interface docking, closed-loop drills, national-goal review, and production audit/operations gaps into prioritized development increments with owners, acceptance evidence, verification commands, and current status.
+- Department task queue: attention-required cutover phases are promoted to the top role queue and jump directly to the cutover sequence panel.
+- Operations runbook: the dashboard and release report derive module on-call watch items from critical values, rectification SLA, clinical pathways, mutual-recognition QC, site sign-offs, and audit-retention evidence.
+- Warning indicators: the dashboard, module report, and release report now expose a first runnable Inspur 4.1 quality-safety increment that normalizes critical-value, rectification SLA, pathway variance, mutual-recognition QC, live sign-off, and audit-retention signals into closed-loop warning rows with thresholds, owners, evidence, and UI targets.
+- Site sign-off tracker: production cutover items for live feeds, critical-value routing, pathway dictionaries, mutual-recognition rules, department attachments, and audit retention are tracked with owner, status, required evidence, and audit trail.
+- SLA evidence: rectification orders include due-date status, evidence completeness, and commission escalation records.
+- Risk ranking: the portal and release report derive institution priority from severity, open issues, SLA pressure, missing feedback, and escalations.
+- Regulatory action plan: the dashboard and release report turn risk, SLA, critical-value, pathway, and mutual-recognition signals into prioritized next actions with owner and evidence fields.
+- Critical-value loop: institution and commission users can acknowledge and dispose critical value alerts with audit records and linked event status updates.
+- Clinical-pathway loop: commission users can review pathway variance cases from the runnable portal, close or return the linked quality event, and preserve audit evidence.
+- Policy basis: the about page links the module to the Medical Quality Management Measures, 18 core safety systems, 2023-2025 quality action plan, inspection/test mutual-recognition rules, 2025 national improvement goals, and clinical pathway guidance.
+- Pre-launch development gaps: the about page now separates production interface joint-testing, local rule dictionaries, signed evidence attachments, notification/escalation receipts, audit/security hardening, and operations support as the remaining work before formal production launch.
 
 Site joint-testing boundary: production HIS/EMR/LIS/PACS critical-value rules, real clinical pathway dictionaries, signed medical-record sampling forms, mutual-recognition QC rules, department sign-off evidence, and notification channels remain site-owned inputs.
 
 ## Hospital Operations Dispatch
 
-operations.html is the runnable management entry for hospital operation monitoring and resource dispatch. It uses GET /api/operations/dashboard, POST /api/operations/dispatch, and POST /api/operations/reconciliation/:id/review to cover bed, staff, equipment, outpatient, emergency, inpatient, dispatch, alert, and statistics direct-report reconciliation boundaries.
+operations.html is the runnable management entry for hospital operation monitoring and resource dispatch. It uses GET /api/operations/dashboard, GET /api/operations/site-joint-tests, GET /api/operations/production-hardening, GET /api/operations/go-live-gates, GET /api/operations/intelligence, GET /api/operations/governance-report, GET /api/operations/handover, GET /api/operations/handover/owners, POST /api/operations/handover/signoff, POST /api/operations/go-live-gates/actions, POST /api/operations/dispatch, and POST /api/operations/reconciliation/:id/review to cover bed, staff, equipment, outpatient, emergency, inpatient, dispatch, alert, site joint-test closeout, production hardening, go-live gate evidence, go-live gate review audit, intelligent dispatch recommendations, governance reporting, shift handover owner assignment, shift handover signoff, and statistics direct-report reconciliation boundaries.
+
+上线运行判定由 `/api/operations/dashboard` 中的 `launchReadiness` 汇总生成，统一核对生产加固阻断项、割接签收阻断项、上线后观察异常、待补证据和观察窗口签收状态，并在 `operations.html` 生产加固面板顶部展示可上线运行或暂缓上线运行结论。
+
+`docs/hospital-operations-integration-requirements.md` 列出上线前与 HIS/住院、HR/排班、设备、门急诊、统计直报、绩效监测、120/转运、医保/证照、统一身份、监控/SIEM、移动消息和生产数据库联通的接口、数据、证据、责任方和阻断条件。
+
+`docs/hospital-operations-flow.md` 补充医院运行监测平台完整流程图，覆盖数据接入、状态规范化、运行监测、预警研判、资源调度、急诊拥堵闭环、统计直报对账、移动值守、审计归档和上线观察。
+
+`docs/hospital-operations-development-report.md` 是本模块开发报告，汇总模块定位、已实现功能、数据集合、API 入口、发布验收证据、当前上线边界和下一步开发计划。
+
+operations-about.html is the policy and scope page for the hospital operations platform. It summarizes the 2025 secondary and tertiary public hospital performance monitoring manuals, hospital operation monitoring boundaries, direct-report reconciliation requirements, data source ownership, and on-site joint-test handoff points.
 
 hospital-operations:readiness generates release/hospital-operations-readiness-report.json and release/hospital-operations-readiness-report.md. The report reuses healthStatistics, healthStatisticsIngestion, medicalResources, operations-readiness, /api/metrics, and platformProcessAudit evidence, and is included by release:report and deploy:check.
+
+`hospital-operations:release` generates `release/hospital-operations-release-report.json` and `release/hospital-operations-release-report.md`; `hospital-operations:module-report` generates `release/hospital-operations-module-report.json` and `release/hospital-operations-module-report.md`; `hospital-operations:brief-pdf` generates `release/hospital-operations-module-brief-report.pdf`. The runnable gate and review APIs are `GET /api/operations/go-live-gates` and `POST /api/operations/go-live-gates/actions`.
 
 ## Medical Escort Service Platform
 
@@ -370,6 +447,8 @@ The hospital interface development handoff is `docs/escort-hospital-interface.md
 
 The same workbench now includes multi-hospital pilot operations. `/api/digital-hospital/pilot-institutions/actions` registers institutions, while `/api/digital-hospital/pilot-institutions/:id/actions` enforces six readiness checks, independent approval, whitelist activation, pause/resume, observation-stage advancement, daily-review evidence, institution scope, and the no-patient-PII boundary.
 
+The pilot workbench also includes an institution-scoped issue desk. `/api/digital-hospital/pilot-issues/actions` registers P0/P1/P2 issues against the pilot roster, while `/api/digital-hospital/pilot-issues/:id/actions` controls assignment, remediation, minimized evidence, review submission, independent closure, and commission-only reopening with SLA and audit history.
+
 `digital-hospital-self-assessment.html` now carries the tiered review queue from institution submission through provincial preliminary review and disputed-indicator expert review. Expert opinions can confirm, revise, or return an assessment for correction; submitter, preliminary reviewer, expert reviewer, and final acceptance reviewer are independently checked and every transition is audited.
 
 ## Internet Nursing Pilot
@@ -394,6 +473,11 @@ The handoff document is `docs/互联网护理服务模块说明.md`; it covers r
 ## Drug Consumable Supervision Evidence
 
 `drug-consumable:readiness` generates `release/drug-consumable-readiness-report.json` and `release/drug-consumable-readiness-report.md`, covering rational medication, prescription review, fixed pickup, high-value consumable clues, insurance settlement coordination, and remediation-loop evidence for the drug and consumable supervision app.
+
+Implemented drug-consumable capabilities include role-scoped supervision access, rational-medication and prescription-review rows, fixed-pickup and high-value consumable clues, insurance settlement coordination, institution remediation actions, traceability policy sources, traceability evidence requirements and submission, per-row evidence coverage, audit logging, runnable insurance/institution/commission panels, `drug-consumable-about.html`, and release artifacts through `drug-consumable:readiness`, `deploy:check`, `release:report`, and `release:manifest`.
+
+Before production launch, bind real scanner/HIS/pharmacy fields to `traceabilityEvidenceRequirements`, ingest real insurance-code/commodity-code/trace-code mapping versions, connect insurance settlement callbacks, attach high-value consumable catalog and charge-item cross-checks, configure production identity/secrets/audit-retention storage, and archive signed site evidence for interface joint tests, monitoring, and disaster-recovery rehearsal.
+
 ## Health Dashboard Aggregate Entry
 
 - `health-dashboard.html` is priority application 8: the aggregate entry for the first seven applications.

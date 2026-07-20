@@ -10,8 +10,9 @@ const {
 
 const ROOT = __dirname;
 const ALLOWED_ACTIONS = ["assign", "record-evidence", "review", "request-improvement", "comment"];
-const BLOCKER_ALLOWED_ACTIONS = ["assign", "start-remediation", "record-evidence", "submit-evidence", "review-evidence", "reopen", "comment"];
-const BLOCKER_WORKFLOW_STATUSES = ["open", "in-progress", "evidence-submitted", "evidence-reviewed-site-pending"];
+const BLOCKER_ALLOWED_ACTIONS = ["assign", "start-remediation", "record-evidence", "submit-evidence", "review-evidence", "record-site-acceptance", "revoke-site-acceptance", "reopen", "comment"];
+const BLOCKER_WORKFLOW_STATUSES = ["open", "in-progress", "evidence-submitted", "evidence-reviewed-site-pending", "site-accepted"];
+const SITE_ACCEPTANCE_SIGNER_ROLES = ["business", "information", "operations", "security"];
 const DEFAULT_OWNERS = {
   "standards-governance": "standards-office",
   "data-governance": "data-platform",
@@ -81,9 +82,44 @@ function seedPlatformProductionBlockerReviews() {
     actionHistory: [],
     updatedAt: "",
     updatedBy: "",
+    siteAcceptance: null,
     siteAcceptanceRequired: true,
     productionReady: false
   }));
+}
+
+function normalizeSiteAcceptance(value) {
+  if (!value || typeof value !== "object" || value.status !== "accepted") return null;
+  const acceptanceId = String(value.acceptanceId || "").trim();
+  const signers = Array.isArray(value.signers) ? value.signers
+    .map((item) => ({ role: String(item?.role || "").trim(), name: String(item?.name || "").trim() }))
+    .filter((item) => SITE_ACCEPTANCE_SIGNER_ROLES.includes(item.role) && item.name.length >= 2 && item.name.length <= 120)
+    : [];
+  const signerRoles = new Set(signers.map((item) => item.role));
+  if (!acceptanceId || !SITE_ACCEPTANCE_SIGNER_ROLES.every((role) => signerRoles.has(role))) return null;
+  return {
+    status: "accepted",
+    acceptanceId,
+    signers: SITE_ACCEPTANCE_SIGNER_ROLES.map((role) => signers.find((item) => item.role === role)),
+    acceptedAt: String(value.acceptedAt || "").trim(),
+    acceptedBy: String(value.acceptedBy || "").trim(),
+    note: String(value.note || "").trim()
+  };
+}
+
+function requireSiteAcceptanceSigners(value) {
+  if (!Array.isArray(value)) {
+    throw new PlatformCapabilityOperationsError("site acceptance requires four signer records", "PLATFORM_SITE_ACCEPTANCE_SIGNERS_REQUIRED", 409);
+  }
+  const signers = value.map((item) => ({
+    role: cleanText(item?.role, "signer role", 2, 40),
+    name: cleanText(item?.name, "signer name", 2, 120)
+  }));
+  const signerRoles = new Set(signers.map((item) => item.role));
+  if (signers.length !== SITE_ACCEPTANCE_SIGNER_ROLES.length || !SITE_ACCEPTANCE_SIGNER_ROLES.every((role) => signerRoles.has(role))) {
+    throw new PlatformCapabilityOperationsError("site acceptance requires business, information, operations and security signers", "PLATFORM_SITE_ACCEPTANCE_SIGNERS_INCOMPLETE", 409);
+  }
+  return SITE_ACCEPTANCE_SIGNER_ROLES.map((role) => signers.find((item) => item.role === role));
 }
 
 function normalizePlatformProductionBlockerReviews(currentRows) {
@@ -94,16 +130,21 @@ function normalizePlatformProductionBlockerReviews(currentRows) {
   );
   return seedPlatformProductionBlockerReviews().map((seed) => {
     const item = current.get(seed.blockerId) || {};
+    const siteAcceptance = normalizeSiteAcceptance(item.siteAcceptance);
+    const workflowStatus = siteAcceptance?.status === "accepted"
+      ? "site-accepted"
+      : (BLOCKER_WORKFLOW_STATUSES.includes(item.workflowStatus) && item.workflowStatus !== "site-accepted" ? item.workflowStatus : seed.workflowStatus);
     return {
       ...seed,
       ...item,
       id: seed.id,
       blockerId: seed.blockerId,
       owner: String(item.owner || seed.owner).trim(),
-      workflowStatus: BLOCKER_WORKFLOW_STATUSES.includes(item.workflowStatus) ? item.workflowStatus : seed.workflowStatus,
+      workflowStatus,
       evidenceRefs: [...new Set(Array.isArray(item.evidenceRefs) ? item.evidenceRefs.map(String).filter(Boolean) : [])].slice(0, 30),
       actionHistory: Array.isArray(item.actionHistory) ? item.actionHistory.slice(0, 30) : [],
-      siteAcceptanceRequired: true,
+      siteAcceptance,
+      siteAcceptanceRequired: workflowStatus !== "site-accepted",
       productionReady: false
     };
   });
@@ -155,12 +196,15 @@ function buildPlatformCapabilityOperationsCenter(data = {}, options = {}) {
     blockersInProgress: productionBlockers.filter((item) => item.review.workflowStatus === "in-progress").length,
     blockerEvidenceSubmitted: productionBlockers.filter((item) => item.review.workflowStatus === "evidence-submitted").length,
     blockerEvidenceReviewed: productionBlockers.filter((item) => item.review.workflowStatus === "evidence-reviewed-site-pending").length,
-    blockerEvidenceRecorded: productionBlockers.filter((item) => item.review.evidenceRefs.length > 0).length
+    blockerEvidenceRecorded: productionBlockers.filter((item) => item.review.evidenceRefs.length > 0).length,
+    blockersSiteAccepted: productionBlockers.filter((item) => item.review.workflowStatus === "site-accepted").length
   };
+  const allBlockersSiteAccepted = productionBlockers.every((item) => item.review.workflowStatus === "site-accepted");
   return {
     ok: capabilities.every((item) => item.repositoryEvidenceReady),
     generatedAt: new Date().toISOString(),
     productionReady: false,
+    formalGoLiveState: allBlockersSiteAccepted ? "blocked-until-global-go-no-go" : "blocked-until-site-acceptance",
     boundary: "本中心用于仓库能力的责任分派、生产前复核、证据补录和整改闭环。正式生产就绪仍以真实环境联调、安全测评、灾备演练、现场验收和 go/no-go 签字为准。",
     summary,
     capabilities,
@@ -296,6 +340,34 @@ function applyPlatformProductionBlockerAction(data, blockerId, payload = {}, act
     }
     workflowStatus = "evidence-reviewed-site-pending";
   }
+  let siteAcceptance = previous.siteAcceptance || null;
+  if (action === "record-site-acceptance") {
+    if (workflowStatus !== "evidence-reviewed-site-pending") {
+      throw new PlatformCapabilityOperationsError("reviewed evidence is required before site acceptance", "PLATFORM_SITE_ACCEPTANCE_REVIEW_REQUIRED", 409);
+    }
+    siteAcceptance = {
+      status: "accepted",
+      acceptanceId: cleanText(payload.acceptanceId, "acceptanceId", 4, 160),
+      signers: requireSiteAcceptanceSigners(payload.signers),
+      acceptedAt: now,
+      acceptedBy: String(actor.name || actor.username || "commission-operator"),
+      note
+    };
+    workflowStatus = "site-accepted";
+  }
+  if (action === "revoke-site-acceptance") {
+    if (workflowStatus !== "site-accepted" || !siteAcceptance) {
+      throw new PlatformCapabilityOperationsError("only recorded site acceptance can be revoked", "PLATFORM_SITE_ACCEPTANCE_REVOKE_INVALID", 409);
+    }
+    siteAcceptance = {
+      ...siteAcceptance,
+      status: "revoked",
+      revokedAt: now,
+      revokedBy: String(actor.name || actor.username || "commission-operator"),
+      revokeNote: note
+    };
+    workflowStatus = "in-progress";
+  }
   if (action === "reopen") {
     if (workflowStatus !== "evidence-reviewed-site-pending") {
       throw new PlatformCapabilityOperationsError("only reviewed evidence can be reopened", "PLATFORM_PRODUCTION_BLOCKER_REOPEN_INVALID", 409);
@@ -325,7 +397,8 @@ function applyPlatformProductionBlockerAction(data, blockerId, payload = {}, act
     evidenceReviewedBy: action === "review-evidence" ? history.actor : previous.evidenceReviewedBy || "",
     updatedAt: now,
     updatedBy: history.actor,
-    siteAcceptanceRequired: true,
+    siteAcceptance,
+    siteAcceptanceRequired: workflowStatus !== "site-accepted",
     productionReady: false
   };
   reviews[index] = item;
@@ -335,6 +408,7 @@ function applyPlatformProductionBlockerAction(data, blockerId, payload = {}, act
 module.exports = {
   ALLOWED_ACTIONS,
   BLOCKER_ALLOWED_ACTIONS,
+  SITE_ACCEPTANCE_SIGNER_ROLES,
   PlatformCapabilityOperationsError,
   applyPlatformCapabilityReviewAction,
   applyPlatformProductionBlockerAction,

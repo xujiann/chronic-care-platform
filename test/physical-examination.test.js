@@ -109,6 +109,49 @@ test("体检项目字典、异常闭环、原件归档与联调证据形成上�
   assert.throws(() => PhysicalExaminationService.applyJointTestAction(state, jointTest.id, { action: "signoff", note: "签署确认", evidenceRef: "SIGN-001" }), /未完成现场验收/);
 });
 
+test("生产体检视图隔离演示报告、演示异常和模拟网关事件", () => {
+  const state = demoState();
+  const productionRecord = JSON.parse(JSON.stringify(state.personalRecords[0]));
+  productionRecord.id = "physical-exam-production-001";
+  productionRecord.meta.externalId = "PRODUCTION-001";
+  productionRecord.meta.signature.mode = "external-production";
+  productionRecord.meta.signature.certificateSerial = "CA-PRODUCTION-001";
+  state.personalRecords.push(productionRecord);
+  state.integrationGatewayEvents = [
+    { id: "event-demo", contractId: "physical-exam-report-v1", simulated: true },
+    { id: "event-production", contractId: "physical-exam-report-v1", simulated: false, productionEvidence: true }
+  ];
+  const overview = PhysicalExaminationService.buildOverview(state, { excludeDemoData: true });
+  assert.deepEqual(overview.reports.map((item) => item.id), ["physical-exam-production-001"]);
+  assert.equal(overview.summary.demoReportsExcluded, 4);
+  assert.equal(overview.abnormalCases.every((item) => item.reportId === productionRecord.id), true);
+  assert.deepEqual(overview.gatewayEvents.map((item) => item.id), ["event-production"]);
+  assert.equal(PhysicalExaminationService.isDemoPhysicalExamRecord(state.personalRecords[0]), true);
+  assert.equal(PhysicalExaminationService.isDemoPhysicalExamRecord(productionRecord), false);
+});
+
+test("机构上线证据必须由不同责任人按同一 SHA-256 摘要四眼核验", () => {
+  const state = demoState();
+  const jointTestId = "physical-exam-joint-test-hospital";
+  const row = state.physicalExamJointTests.find((item) => item.id === jointTestId);
+  row.checks = row.checks.map((item) => ({ ...item, status: "site-passed", evidenceRef: `UAT-${item.id}` }));
+  const digest = "a".repeat(64);
+  assert.throws(() => PhysicalExaminationService.applyJointTestAction(state, jointTestId, { action: "submit-signoff", note: "提交验收", evidenceRef: "SIGN-001", evidenceDigest: "bad", externalSigner: "王主任", signerOrganization: "测试医院" }, { actor: "hospital-a", role: "institution" }), /64 位 SHA-256/);
+  const submitted = PhysicalExaminationService.applyJointTestAction(state, jointTestId, { action: "submit-signoff", note: "提交验收", evidenceRef: "SIGN-001", evidenceDigest: digest, externalSigner: "王主任", signerOrganization: "测试医院" }, { actor: "hospital-a", role: "institution", now: "2026-07-18T08:00:00.000Z" });
+  assert.equal(submitted.signoffStatus, "submitted-awaiting-independent-verification");
+  assert.equal(submitted.siteSignoff, false);
+  assert.throws(() => PhysicalExaminationService.applyJointTestAction(state, jointTestId, { action: "verify-signoff", note: "复核通过", evidenceDigest: digest, verificationRef: "REVIEW-001" }, { actor: "hospital-a", role: "commission" }), /不得核验本人/);
+  assert.throws(() => PhysicalExaminationService.applyJointTestAction(state, jointTestId, { action: "verify-signoff", note: "复核通过", evidenceDigest: "b".repeat(64), verificationRef: "REVIEW-001" }, { actor: "health-b", role: "commission" }), /摘要与提交证据/);
+  assert.throws(() => PhysicalExaminationService.applyJointTestAction(state, jointTestId, { action: "verify-signoff", note: "复核通过", evidenceDigest: digest, verificationRef: "REVIEW-001" }, { actor: "hospital-b", role: "institution" }), /卫生行政角色/);
+  const verified = PhysicalExaminationService.applyJointTestAction(state, jointTestId, { action: "verify-signoff", note: "复核通过", evidenceDigest: digest, verificationRef: "REVIEW-001" }, { actor: "health-b", role: "commission", now: "2026-07-18T09:00:00.000Z" });
+  assert.equal(verified.siteSignoff, true);
+  assert.equal(verified.siteSignoffVerified, true);
+  assert.equal(verified.signoffVerification.reviewedBy, "health-b");
+  const invalidated = PhysicalExaminationService.applyJointTestAction(state, jointTestId, { action: "update-check", checkId: "network", status: "site-passed", note: "切换后重新验证", evidenceRef: "UAT-network-v2" }, { actor: "hospital-a" });
+  assert.equal(invalidated.siteSignoffVerified, false);
+  assert.equal(invalidated.signoffSubmission, null);
+});
+
 test("体检导入拒绝未知来源、缺失主索引和越权居民", () => {
   const base = { externalId: "x", institutionId: "i", institutionName: "机构", examDate: "2026-07-15", summary: "完成" };
   assert.throws(() => PhysicalExaminationService.ingest(demoState(), { ...base, sourceType: "unknown", residentId: "r1" }), /sourceType/);

@@ -44,8 +44,10 @@ test("release artifact manifest indexes reports templates commands and evidence"
   assert.equal(report.artifacts.some((item) => item.id === "citizen-launch-foundation" && item.command === "citizen:launch-foundation" && item.markdown === "release/citizen-launch-foundation-readiness.md" && item.evidence === "citizen.html?client=app&page=health-record&launch=1#citizen-pipeline-panel"), true);
   assert.equal(report.artifacts.some((item) => item.id === "maternal-child-readiness" && item.command === "maternal-child:readiness" && item.markdown === "release/maternal-child-readiness-report.md" && item.evidence === "maternal-child-about.html"), true);
   assert.equal(report.artifacts.some((item) => item.id === "public-health-readiness" && item.command === "public-health:readiness" && item.markdown === "release/public-health-readiness-report.md" && item.evidence === "/api/public-health/system"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "disease-payment-readiness" && item.command === "disease-payment:readiness" && item.markdown === "release/disease-payment-readiness-report.md" && item.evidence === "/api/disease-payment"), true);
   assert.equal(report.artifacts.some((item) => item.id === "hybrid-deployment" && item.command === "hybrid:deployment-readiness" && item.markdown === "release/hybrid-deployment-readiness-report.md"), true);
   assert.equal(report.artifacts.some((item) => item.id === "production-deployment-package" && item.command === "deployment:package" && item.markdown === "release/production-deployment-package.md" && item.evidence === "npm run deployment:verify"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "internet-nursing-highlight-center" && item.command === "internet-nursing:readiness" && item.markdown === "docs/internet-nursing-highlight-center.md" && item.evidence === "internet-nursing.html#nursing-highlight-section"), true);
   assert.equal(report.artifacts.some((item) => item.id === "multi-practice" && item.command === "multi-practice:readiness" && item.markdown === "release/multi-practice-readiness-report.md" && item.evidence === "/api/multi-practice-registry"), true);
   assert.equal(report.artifacts.some((item) => item.id === "chronic-followup" && item.command === "chronic:followup-readiness"), true);
   assert.equal(report.artifacts.some((item) => item.id === "chronic-informatization-sources" && item.command === "chronic:informatization-sources" && item.markdown === "release/chronic-informatization-sources.md"), true);
@@ -86,6 +88,8 @@ test("release artifact manifest renders and writes artifacts", (t) => {
   assert.match(markdown, /citizen\.html\?client=app&page=health-record&launch=1#citizen-pipeline-panel/);
   assert.match(markdown, /maternal-child-readiness-report\.md/);
   assert.match(markdown, /public-health-readiness-report\.md/);
+  assert.match(markdown, /disease-payment-readiness-report\.md/);
+  assert.match(markdown, /internet-nursing-highlight-center\.md/);
   assert.match(markdown, /Maternal-child main function and readiness report/);
   assert.match(markdown, /Public health informatization standard readiness report/);
   assert.match(markdown, /Hybrid static preview and dynamic backend readiness/);

@@ -1,7 +1,8 @@
-const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], referralSystem: null, referralTeleconsultations: [], registrationSchedules: [], registrationOrders: [], registrationWaitlistEntries: [], medicationPickups: [], chronicScreeningTasks: [], chronicManagementPlans: [], chronicQualityMetrics: [], chronicComorbidityPlans: [], chronicSelfManagement: [], diseaseRegistryModels: [], chronicFollowupStatusPolicy: {}, deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthCertificateDocuments: [], birthStatistics: {}, doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {}, taskMessages: [], phase2FamilyDoctorTemplates: [], phase2FamilyDoctorTeams: [], phase2FamilyDoctorServicePackages: [], phase2FamilyDoctorApplications: [], phase2FamilyDoctorContracts: [], phase2FamilyDoctorFulfillments: [] };
+const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], drugConsumableSupervisions: [], referralSystem: null, referralTeleconsultations: [], registrationSchedules: [], registrationOrders: [], registrationWaitlistEntries: [], medicationPickups: [], chronicScreeningTasks: [], chronicManagementPlans: [], chronicQualityMetrics: [], chronicComorbidityPlans: [], chronicSelfManagement: [], diseaseRegistryModels: [], chronicFollowupStatusPolicy: {}, deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthCertificateDocuments: [], birthStatistics: {}, doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {}, taskMessages: [], phase2FamilyDoctorTemplates: [], phase2FamilyDoctorTeams: [], phase2FamilyDoctorServicePackages: [], phase2FamilyDoctorApplications: [], phase2FamilyDoctorContracts: [], phase2FamilyDoctorFulfillments: [] };
 const institutionApiBase = location.protocol === "file:" || location.hostname.endsWith("github.io") ? "" : "/api";
 let platformState = fallbackState;
 let institutionRegistrationDashboard = null;
+let institutionDrugConsumableState = { boundaries: [], rows: [], summary: {} };
 
 document.addEventListener("DOMContentLoaded", async () => {
   platformState = await loadPlatformState(fallbackState);
@@ -16,6 +17,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   platformState.chronicProductionSafety = productionSafety;
   platformState.chronicProductionSafetyEvidence = productionSafetyEvidence;
   platformState.chronicInteroperabilityProfiles = interoperabilityProfiles;
+  institutionDrugConsumableState = await loadInstitutionDrugConsumableSupervision(platformState);
   institutionRegistrationDashboard = registrationDashboard;
   bindInstitutionActions();
   renderAll(platformState);
@@ -186,6 +188,7 @@ function renderAll(state) {
   renderPhase2FamilyDoctorContracts(state);
   populateBirthCertificateForm(state);
   populateMultiPracticeForm(state);
+  populateTeleconsultationForm(state);
   renderMetrics(state);
   renderDoctorAccounts(state);
   renderMultiPracticePolicy(state);
@@ -193,6 +196,7 @@ function renderAll(state) {
   renderCareOrders(state);
   renderAuthorizedRecords(state);
   renderClaimLinks(state);
+  renderInstitutionDrugConsumableSupervision(institutionDrugConsumableState, state);
   renderReferralCenter(state);
   renderRegistrationJourneyWorkbench(state);
   renderTeleconsultationLoop(state);
@@ -206,7 +210,24 @@ function renderAll(state) {
 }
 
 function bindInstitutionActions() {
+  document.addEventListener("submit", async (event) => {
+    if (event.target.matches("#teleconsultation-form")) {
+      await submitTeleconsultation(event);
+      return;
+    }
+    if (event.target.closest(".teleconsultation-action-form")) {
+      await submitTeleconsultationAction(event);
+    }
+  });
   document.addEventListener("click", async (event) => {
+      const drugButton = event.target.closest("[data-institution-drug-action]");
+      if (drugButton) {
+        drugButton.disabled = true;
+        const payload = JSON.parse(drugButton.dataset.payload || "{}");
+        await postInstitutionDrugConsumableAction(drugButton.dataset.id, drugButton.dataset.institutionDrugAction || "remediation", payload);
+        drugButton.disabled = false;
+        return;
+      }
       const button = event.target.closest("[data-workflow-action]");
       const launchCoreButton = event.target.closest("[data-launch-core-action]");
       const integrationButton = event.target.closest("[data-chronic-integration]");
@@ -362,8 +383,95 @@ function bindInstitutionActions() {
   });
 }
 
+function renderInstitutionTraceabilityPolicySources(policySources = []) {
+  if (!policySources.length) {
+    return `<div data-institution-traceability-policy-sources><strong>Traceability policy sources</strong><span>No official policy sources returned.</span></div>`;
+  }
+  return `<div data-institution-traceability-policy-sources><strong>Traceability policy sources</strong><span>${policySources.length} official policy links; review <a href="./drug-consumable-about.html">the policy basis</a> before uploading evidence.</span></div>${policySources.slice(0, 5).map((item) => `<div data-institution-traceability-policy-source="${item.id || ""}"><strong>${item.documentNo || item.authority || "Policy source"}</strong><span><a href="${item.url || "./drug-consumable-about.html"}">${item.title || item.authority || "Official source"}</a></span></div>`).join("")}`;
+}
+
+function renderInstitutionTraceabilityEvidenceChecklist(evidenceChecklist = []) {
+  if (!evidenceChecklist.length) {
+    return `<div data-institution-traceability-evidence-checklist><strong>Traceability evidence checklist</strong><span>No evidence checklist returned.</span></div>`;
+  }
+  return `<div data-institution-traceability-evidence-checklist><strong>Traceability evidence checklist</strong><span>${evidenceChecklist.filter((item) => item.ready).length}/${evidenceChecklist.length} evidence groups ready.</span></div>${evidenceChecklist.filter((item) => item.owner !== "insurance-integration").slice(0, 5).map((item) => `<div data-institution-traceability-evidence="${item.id || ""}"><strong>${item.title || item.id}</strong><span>${(item.evidenceFields || []).join(", ")} | policies ${(item.policySourceIds || []).join(", ")} | rows ${item.rowCount || 0}</span></div>`).join("")}`;
+}
+
+function renderInstitutionDrugConsumableSupervision(report, state) {
+  const countEl = document.querySelector("#institution-drug-consumable-count");
+  const boundaryEl = document.querySelector("#institution-drug-consumable-boundaries");
+  const listEl = document.querySelector("#institution-drug-consumable-list");
+  if (!countEl || !boundaryEl || !listEl) return;
+  const fallbackRows = (state.drugConsumableSupervisions || []).map((item) => ({
+    ...item,
+    normalizedStatus: /closed|complete|done|passed/i.test(String(item.status || "")) ? "closed" : "open",
+    auditCount: Array.isArray(item.auditTrail) ? item.auditTrail.length : 0
+  }));
+  const items = report?.rows?.length ? report.rows : fallbackRows;
+  const openRows = items.filter((item) => item.normalizedStatus !== "closed");
+  const boundaries = report?.boundaries || [];
+  countEl.textContent = `${openRows.length}/${items.length} open`;
+  boundaryEl.innerHTML = boundaries.map((item) => `<div><strong>${item.name}</strong><span>${item.source} | ${item.count}</span></div>`).join("") || `<div><strong>Institution remediation</strong><span>Drug, consumable, fixed-pickup and catalog evidence</span></div>`;
+  boundaryEl.insertAdjacentHTML("beforeend", renderInstitutionTraceabilityPolicySources(report?.traceabilityPolicySources || []));
+  boundaryEl.insertAdjacentHTML("beforeend", renderInstitutionTraceabilityEvidenceChecklist(report?.traceabilityEvidenceChecklist || []));
+  listEl.innerHTML = openRows.map((item) => {
+    const resident = residentOf(state, item.residentId);
+    return `<section class="item" data-institution-drug-consumable="${item.id}"><div><h3>${resident?.name || item.residentId || "Unknown resident"} | ${item.category || item.boundary}</h3><p>${item.issue || item.nextAction || "Drug consumable supervision item"}</p><p>Traceability coverage ${item.traceabilityEvidenceCoverage?.complete || 0}/${item.traceabilityEvidenceCoverage?.required || 0}; status ${item.traceabilityEvidenceCoverage?.status || "pending"}; missing ${item.traceabilityEvidenceCoverage?.missing || 0}; partial ${item.traceabilityEvidenceCoverage?.partial || 0}</p><div class="action-row">${institutionDrugActionButton(item.id, "Submit remediation", { remediationStatus: "submitted", status: "remediation-submitted", evidence: "institution-remediation-evidence" })}${institutionDrugActionButton(item.id, "Trace scan uploaded", { requirementId: "trace-scan-capture", evidenceSource: "institution-scanner-joint-test", fields: { traceCode: "TRACE-DEMO-001", scanTime: new Date().toISOString(), packageLevel: "unit", operator: "institution-demo", sourceSystem: "pharmacy-scanner" } }, "traceability-evidence")}</div></div></section>`;
+  }).join("") || `<p class="muted">No open drug consumable remediation rows.</p>`;
+}
+
+async function loadInstitutionDrugConsumableSupervision(state = platformState) {
+  if (!institutionApiBase) {
+    const rows = (state.drugConsumableSupervisions || []).map((item) => ({
+      ...item,
+      normalizedStatus: /closed|complete|done|passed/i.test(String(item.status || "")) ? "closed" : "open",
+      auditCount: Array.isArray(item.auditTrail) ? item.auditTrail.length : 0
+    }));
+    return {
+      rows,
+      boundaries: [],
+      summary: {
+        total: rows.length,
+        open: rows.filter((item) => item.normalizedStatus !== "closed").length,
+        highRisk: rows.filter((item) => item.riskLevel === "high").length
+      }
+    };
+  }
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/drug-consumable-supervision`);
+    if (!response.ok) return { boundaries: [], rows: [], summary: {} };
+    return response.json();
+  } catch {
+    return { boundaries: [], rows: [], summary: {} };
+  }
+}
+
+async function postInstitutionDrugConsumableAction(id, action, body) {
+  if (!institutionApiBase) return false;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  const response = await request(`${institutionApiBase}/drug-consumable-supervision/${encodeURIComponent(id)}/${action}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  if (!response.ok) return false;
+  institutionDrugConsumableState = await loadInstitutionDrugConsumableSupervision(platformState);
+  platformState = await loadPlatformState(fallbackState);
+  renderAll(platformState);
+  return true;
+}
+
+async function postInstitutionDrugConsumableRemediation(id, body) {
+  return postInstitutionDrugConsumableAction(id, "remediation", body);
+}
+
 function actionButton(collection, id, label, updates, note) {
   return `<button class="inline-action" type="button" data-workflow-action data-collection="${collection}" data-id="${id}" data-updates='${JSON.stringify(updates)}' data-note="${note || label}">${label}</button>`;
+}
+
+function institutionDrugActionButton(id, label, payload, action = "remediation") {
+  return `<button class="inline-action" type="button" data-institution-drug-action="${action}" data-id="${id}" data-payload='${JSON.stringify(payload)}'>${label}</button>`;
 }
 
 function chronicDispatchButton(collection, id, label, updates, note) {
@@ -464,7 +572,254 @@ async function recordLaunchCoreAction(itemId, rowId) {
 
 function chronicClosed(state, status) {
   const closed = state.chronicFollowupStatusPolicy?.statusGroups?.closed || [];
-  return closed.some((item) => String(status || "").includes(item) || String(item || "").includes(String(status || "")));
+  return closed.some((item) => String(status || "").includes(item) || String(item || "").includes(String(status || ""))) || /已完成|已取药|已评估|已复核|completed|picked|handled|closed|read/i.test(String(status || ""));
+}
+
+function chronicDaysUntil(dateText) {
+  if (!dateText) return 999;
+  const date = new Date(`${String(dateText).slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return 999;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((date.getTime() - today.getTime()) / 86400000);
+}
+
+function buildChronicFollowupAlertQueue(state) {
+  const normalize = (item) => {
+    const days = chronicDaysUntil(item.dueAt);
+    const riskText = `${item.status || ""} ${item.risk || ""}`;
+    const priority = String(riskText).includes("逾期") || days < 0 ? "critical" : /高危|预警|high|alert/i.test(riskText) || days <= 3 ? "high" : days <= 7 ? "medium" : "low";
+    return {
+      id: `${item.collection}:${item.sourceId}`,
+      ...item,
+      daysUntil: days,
+      dueBucket: String(riskText).includes("逾期") || days < 0 ? "overdue" : days === 0 ? "due-today" : days <= 7 ? "due-soon" : "scheduled",
+      priority
+    };
+  };
+  return [
+    ...(state.followups || []).filter((item) => !chronicClosed(state, item.status)).map((item) => normalize({ collection: "followups", sourceId: item.id, residentId: item.residentId, dueAt: item.plannedAt, status: item.status, risk: item.diseaseType })),
+    ...(state.medicationPickups || []).filter((item) => !chronicClosed(state, item.status || item.pharmacyStatus)).map((item) => normalize({ collection: "medicationPickups", sourceId: item.id, residentId: item.residentId, dueAt: item.nextPickup, status: item.status || item.pharmacyStatus, risk: item.medication })),
+    ...(state.chronicManagementPlans || []).filter((item) => !chronicClosed(state, item.status)).map((item) => normalize({ collection: "chronicManagementPlans", sourceId: item.id, residentId: item.residentId, dueAt: item.nextReview, status: item.status, risk: item.grade })),
+    ...(state.chronicScreeningTasks || []).filter((item) => !chronicClosed(state, item.status)).map((item) => normalize({ collection: "chronicScreeningTasks", sourceId: item.id, residentId: item.residentId, dueAt: item.due, status: item.status, risk: item.riskLevel })),
+    ...(state.taskMessages || []).filter((item) => item.chronicFollowup && item.targetRole === "institution" && !["read", "handled"].includes(String(item.status || "").toLowerCase())).map((item) => normalize({ collection: item.collection || "taskMessages", sourceId: item.sourceId || item.id, residentId: item.residentId, dueAt: String(item.createdAt || "").slice(0, 10), status: item.status || "sent", risk: "feedback" }))
+  ].sort((a, b) => ({ critical: 0, high: 1, medium: 2, low: 3 }[a.priority] ?? 9) - ({ critical: 0, high: 1, medium: 2, low: 3 }[b.priority] ?? 9) || a.daysUntil - b.daysUntil);
+}
+
+function buildChronicFollowupPolicyAlignment(state) {
+  const feedback = (state.personalRecords || []).filter((item) => item.category === "chronic-feedback" || item.meta?.followupFeedback);
+  return [
+    ["咨询筛查与风险发现", (state.chronicScreeningTasks || []).filter((item) => item.residentId && item.riskLevel && item.nextStep).length],
+    ["分类分级管理", (state.chronicManagementPlans || []).filter((item) => item.residentId && item.grade && item.nextReview).length],
+    ["院后随访与健康指导", (state.followups || []).filter((item) => item.residentId && item.plannedAt && item.assignee).length],
+    ["长期处方与用药保障", (state.medicationPickups || []).filter((item) => item.residentId && item.nextPickup && item.pharmacyStatus).length],
+    ["家庭医生协同", (state.residents || []).filter((resident) => resident.familyDoctor).length + (state.chronicManagementPlans || []).filter((item) => item.owner).length],
+    ["居民自我管理与反馈", feedback.length],
+    ["信息流转与处置闭环", (state.taskMessages || []).filter((item) => item.chronicFollowup && item.residentId && item.targetRole).length]
+  ].map(([policy, count]) => ({ policy, count, covered: count > 0 }));
+}
+
+function fallbackChronicLaunchCore(state) {
+  const items = [
+    ["institution-systems", "机构系统联调", "chronicExternalIntegrations", "institution-integration"],
+    ["identity-scope", "身份与机构范围", "chronicIdentityScopes", "identity-integration"],
+    ["message-channels", "消息回执升级", "chronicMessageChannels", "message-platform"],
+    ["quality-model", "质控模型版本", "chronicModelGovernance", "chronic-quality-office"],
+    ["pharmacy-insurance", "药房医保闭环", "chronicPharmacyInsuranceLinks", "pharmacy-insurance"]
+  ].map(([id, title, collection, owner]) => {
+    const rows = state[collection] || [];
+    return {
+      id,
+      title,
+      owner,
+      collection,
+      ready: rows.length > 0,
+      collectionEvidence: { rows: rows.length, readyRows: rows.length }
+    };
+  });
+  return {
+    ok: items.every((item) => item.ready),
+    summary: {
+      items: items.length,
+      readyItems: items.filter((item) => item.ready).length,
+      evidenceRows: items.reduce((sum, item) => sum + item.collectionEvidence.rows, 0)
+    },
+    items
+  };
+}
+
+function renderChronicLaunchCoreLegacy(state) {
+  const summaryEl = document.querySelector("#chronic-launch-core-summary");
+  const gridEl = document.querySelector("#chronic-launch-core");
+  if (!summaryEl || !gridEl) return;
+  const report = state.chronicLaunchCore || fallbackChronicLaunchCore(state);
+  summaryEl.textContent = `${report.summary.readyItems}/${report.summary.items} 项就绪 · ${report.summary.evidenceRows} 条证据`;
+  gridEl.innerHTML = (report.items || []).map((item) => {
+    const rows = item.collectionEvidence || {};
+    return `<article class="claim-card">
+      <strong>${item.title}</strong>
+      <span>${item.ready ? "PASS" : "PENDING"}<br>${item.collection} · ${rows.readyRows || 0}/${rows.rows || 0}<br>${item.owner}</span>
+    </article>`;
+  }).join("");
+}
+
+function renderChronicLaunchCore(state) {
+  const summaryEl = document.querySelector("#chronic-launch-core-summary");
+  const gridEl = document.querySelector("#chronic-launch-core");
+  if (!summaryEl || !gridEl) return;
+  const report = state.chronicLaunchCore || fallbackChronicLaunchCore(state);
+  const signoffs = report.summary.signoffs || 0;
+  const signedSignoffs = report.summary.signedSignoffs || 0;
+  summaryEl.textContent = `${report.summary.readyItems}/${report.summary.items} ready - ${report.summary.closureRows || 0} closure rows - ${signedSignoffs}/${signoffs} signoffs`;
+  gridEl.innerHTML = (report.items || []).map((item) => {
+    const rows = item.collectionEvidence || {};
+    const closure = item.closureEvidence || {};
+    return `<article class="claim-card">
+      <strong>${item.title}</strong>
+      <span>${item.ready ? "PASS" : "PENDING"}<br>${item.collection} - ${rows.readyRows || 0}/${rows.rows || 0}<br>closure - ${closure.readyRows || 0}/${closure.rows || 0}<br>${item.owner}</span>
+      <div class="action-row">${launchCoreActionButton(item)}</div>
+    </article>`;
+  }).join("");
+}
+
+async function recordLaunchCoreAction(itemId, rowId) {
+  const payload = {
+    itemId,
+    rowId,
+    action: "site closure confirmation",
+    completionStatus: "closed",
+    receiptStatus: "accepted",
+    reviewStatus: "approved",
+    signoffStatus: "signed",
+    note: "institution launch core closure recorded from portal"
+  };
+  if (!institutionApiBase) {
+    const report = platformState.chronicLaunchCore || fallbackChronicLaunchCore(platformState);
+    const item = (report.items || []).find((entry) => entry.id === itemId);
+    if (item) {
+      item.ready = true;
+      item.closureReady = true;
+      item.closureEvidence = {
+        ...(item.closureEvidence || {}),
+        rows: Math.max(item.closureEvidence?.rows || 0, 1),
+        readyRows: Math.max(item.closureEvidence?.readyRows || 0, 1)
+      };
+    }
+    platformState.chronicLaunchCore = report;
+    return { ok: true };
+  }
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/chronic/launch-core/actions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error(`launch core action failed: ${response.status}`);
+    const saved = await response.json();
+    platformState.chronicLaunchCore = saved.launchCore || await loadChronicLaunchCore();
+    return { ok: true, saved };
+  } catch (error) {
+    alert(error.message || "launch core action failed");
+    return { ok: false };
+  }
+}
+
+function chronicPriorityRank(priority) {
+  return { critical: 0, high: 1, medium: 2, low: 3 }[priority] ?? 9;
+}
+
+function chronicWorkbenchFilters() {
+  return {
+    priority: document.querySelector("#chronic-priority-filter")?.value || "all",
+    type: document.querySelector("#chronic-type-filter")?.value || "all",
+    search: String(document.querySelector("#chronic-search")?.value || "").trim().toLowerCase(),
+    sort: document.querySelector("#chronic-sort")?.value || "priority"
+  };
+}
+
+function decorateChronicWorkbenchRows(rows, alertQueue) {
+  const alerts = new Map((alertQueue || []).map((item) => [`${item.collection}:${item.sourceId}`, item]));
+  return rows.map((item) => {
+    const alert = alerts.get(`${item.collection}:${item.id}`) || alerts.get(`${item.collection}:${item.sourceId}`);
+    const resident = residentOf(platformState, item.residentId);
+    return {
+      ...item,
+      alert,
+      priority: alert?.priority || item.priority || "low",
+      dueBucket: alert?.dueBucket || "scheduled",
+      residentName: resident?.name || "",
+      searchText: [resident?.name, item.title, item.collection, item.status, item.due, item.assignee, item.owner, item.pharmacy, item.nextStep, item.intervention, item.advice, item.result].filter(Boolean).join(" ").toLowerCase()
+    };
+  });
+}
+
+function filterChronicWorkbenchRows(rows, filters) {
+  return rows.filter((item) => {
+    if (filters.priority !== "all" && item.priority !== filters.priority) return false;
+    if (filters.type !== "all" && item.collection !== filters.type) return false;
+    if (filters.search && !item.searchText.includes(filters.search)) return false;
+    return true;
+  }).sort((a, b) => {
+    if (filters.sort === "due") return chronicDaysUntil(a.due) - chronicDaysUntil(b.due) || chronicPriorityRank(a.priority) - chronicPriorityRank(b.priority);
+    if (filters.sort === "resident") return String(a.residentName || "").localeCompare(String(b.residentName || ""), "zh-CN") || chronicPriorityRank(a.priority) - chronicPriorityRank(b.priority);
+    return chronicPriorityRank(a.priority) - chronicPriorityRank(b.priority) || chronicDaysUntil(a.due) - chronicDaysUntil(b.due);
+  });
+}
+
+function renderChronicFollowupWorkbenchLegacy(state) {
+  const summaryEl = document.querySelector("#chronic-followup-summary");
+  const metricsEl = document.querySelector("#chronic-followup-metrics");
+  const listEl = document.querySelector("#chronic-followup-workbench");
+  if (!summaryEl || !metricsEl || !listEl) return;
+  const feedback = (state.personalRecords || []).filter((item) => item.category === "chronic-feedback" || item.meta?.followupFeedback);
+  const openFollowups = (state.followups || []).filter((item) => !chronicClosed(state, item.status));
+  const openPlans = (state.chronicManagementPlans || []).filter((item) => !chronicClosed(state, item.status));
+  const openScreenings = (state.chronicScreeningTasks || []).filter((item) => !chronicClosed(state, item.status));
+  const pendingMedication = (state.medicationPickups || []).filter((item) => !chronicClosed(state, item.status || item.pharmacyStatus));
+  const followupMessages = (state.taskMessages || []).filter((item) => item.chronicFollowup && item.targetRole === "institution" && !["read", "handled"].includes(String(item.status || "").toLowerCase()));
+  const policyAlignment = buildChronicFollowupPolicyAlignment(state);
+  const policyCovered = policyAlignment.filter((item) => item.covered).length;
+  const alertQueue = state.chronicFollowupSummary?.alertQueue || buildChronicFollowupAlertQueue(state);
+  const alertSummary = state.chronicFollowupSummary?.summary || {};
+  summaryEl.textContent = `${openFollowups.length + openPlans.length + openScreenings.length + followupMessages.length} 项待处置`;
+  summaryEl.textContent += ` · ${alertQueue.length} 项风险提醒`;
+  metricsEl.innerHTML = [
+    ["筛查分级", openScreenings.length, "高风险发现与分级评估"],
+    ["管理计划", openPlans.length, "复核、升级预警、下次随访"],
+    ["院后随访", openFollowups.length, "逾期、待随访、复诊提醒"],
+    ["用药依从", pendingMedication.length, "固定取药与长处方闭环"],
+    ["随访消息", followupMessages.length, "居民反馈到机构处置提醒"],
+    ["居民反馈", feedback.length, "居民端主动回填"],
+    ["提醒队列", alertQueue.length, `${alertSummary.highPriorityAlerts || alertQueue.filter((item) => ["critical", "high"].includes(item.priority)).length} 项高优先级`],
+    ["政策对照", `${policyCovered}/${policyAlignment.length}`, "国卫基层发〔2025〕15号"]
+  ].map(([label, value, hint]) => `<article class="claim-card"><strong>${label}</strong><span>${value}<br>${hint}</span></article>`).join("");
+
+  const rows = [
+    ...openScreenings.map((item) => ({ ...item, collection: "chronicScreeningTasks", title: item.taskName, due: item.due, primary: "完成评估", updates: { status: "已评估", result: "已生成风险分级和干预建议" } })),
+    ...openPlans.map((item) => ({ ...item, collection: "chronicManagementPlans", title: `${item.diseaseType}管理计划`, due: item.nextReview, primary: "复核完成", updates: { status: "已复核", intervention: "已完成阶段复核并更新管理方案" } })),
+    ...openFollowups.map((item) => ({ ...item, collection: "followups", title: `${item.diseaseType}随访`, due: item.plannedAt, primary: "完成随访", updates: { status: "已完成", result: "已完成院后随访并同步居民反馈" } })),
+    ...pendingMedication.map((item) => ({ ...item, collection: "medicationPickups", title: item.medication, due: item.nextPickup, primary: "确认依从", updates: { status: "已完成", pharmacyStatus: "已取药" } }))
+  ].slice(0, 12);
+  listEl.innerHTML = rows.map((item) => {
+    const resident = residentOf(state, item.residentId);
+    const latestFeedback = feedback.find((record) => record.residentId === item.residentId);
+    const latestMessage = followupMessages.find((message) => message.residentId === item.residentId);
+    return `<section class="item">
+      <div>
+        <h3>${resident?.name || "未知居民"} · ${item.title || item.id}</h3>
+        <p>${item.collection} · ${item.status || "待处理"} · ${item.due || "待排期"} · ${item.assignee || item.owner || item.pharmacy || "责任人待定"}</p>
+        <p>${item.nextStep || item.intervention || item.advice || item.result || "按慢病随访计划处置"}</p>
+        <p>居民反馈：${latestFeedback ? `${latestFeedback.result} · ${latestFeedback.meta?.nextRequest || ""}` : "暂无新增反馈"}</p>
+        <p>随访消息：${latestMessage ? `${latestMessage.title} · ${latestMessage.body || ""}` : "暂无待处理消息"}</p>
+        <div class="action-row">
+          ${chronicDispatchButton(item.collection, item.id, item.primary, item.updates, `慢病随访处置：${item.primary}`)}
+          ${item.collection === "chronicManagementPlans" ? chronicDispatchButton(item.collection, item.id, "升级预警", { status: "预警中", intervention: "已升级家庭医生重点管理" }, "慢病管理计划升级预警") : ""}
+        </div>
+      </div>
+      <span class="badge ${String(item.status || "").includes("逾期") || String(item.status || "").includes("预警") ? "danger" : "warn"}">${item.status || "待处理"}</span>
+    </section>`;
+  }).join("") || `<p class="muted">暂无待处置慢病随访事项。</p>`;
 }
 
 function chronicPriority(item) {
@@ -513,17 +868,25 @@ function renderChronicFollowupWorkbench(state) {
   const openScreenings = (state.chronicScreeningTasks || []).filter((item) => !chronicClosed(state, item.status));
   const pendingMedication = (state.medicationPickups || []).filter((item) => !chronicClosed(state, item.status || item.pharmacyStatus));
   summaryEl.textContent = `${openFollowups.length + openPlans.length + openScreenings.length} 项待处置`;
-  const apiSummary = state.chronicFollowupSummary?.summary || {};
+  const followupMessages = (state.taskMessages || []).filter((item) => item.chronicFollowup && item.targetRole === "institution" && !["read", "handled"].includes(String(item.status || "").toLowerCase()));
+  const policyAlignment = buildChronicFollowupPolicyAlignment(state);
+  const policyCovered = policyAlignment.filter((item) => item.covered).length;
+  const alertQueue = state.chronicFollowupSummary?.alertQueue || buildChronicFollowupAlertQueue(state);
+  const alertSummary = state.chronicFollowupSummary?.summary || {};
+  const apiSummary = alertSummary;
   if (apiSummary.alerts !== undefined) {
     summaryEl.textContent = `${openFollowups.length + openPlans.length + openScreenings.length} 项待处置 · ${apiSummary.highPriorityAlerts || 0} 项高优先级 · ${apiSummary.policyAligned || 0}/${apiSummary.policyItems || 0} 政策覆盖`;
   }
   metricsEl.innerHTML = [
-    ["筛查分级", openScreenings.length, "高风险发现与分级评估"],
-    ["管理计划", openPlans.length, "复核、升级预警、下次随访"],
-    ["院后随访", openFollowups.length, "逾期、待随访、复诊提醒"],
-    ["用药依从", pendingMedication.length, "固定取药与长处方闭环"],
-    ["居民反馈", feedback.length, "居民端主动回填"]
-  ].map(([label, value, hint]) => `<article class="claim-card"><strong>${label}</strong><span>${value}<br>${hint}</span></article>`).join("");
+    ["Screening", openScreenings.length, "risk discovery and grading"],
+    ["Plans", openPlans.length, "review and escalation"],
+    ["Follow-ups", openFollowups.length, "post-discharge queue"],
+    ["Medication", pendingMedication.length, "pickup and adherence"],
+    ["Messages", followupMessages.length, "resident feedback tasks"],
+    ["Feedback", feedback.length, "resident submitted records"],
+    ["Alert queue", alertQueue.length, `${alertSummary.highPriorityAlerts || alertQueue.filter((item) => ["critical", "high"].includes(item.priority)).length} high priority`],
+    ["Policy", `${policyCovered}/${policyAlignment.length}`, "service boundary coverage"]
+  ].map(([label, value, hint]) => `<article class="claim-card chronic-metric-card"><strong>${label}</strong><span>${value}<br>${hint}</span></article>`).join("");
 
   const rows = filterChronicWorkbenchRows([
     ...openScreenings.map((item) => ({ ...item, collection: "chronicScreeningTasks", title: item.taskName, due: item.due, primary: "完成评估", updates: { status: "已评估", result: "已生成风险分级和干预建议" } })),
@@ -534,21 +897,31 @@ function renderChronicFollowupWorkbench(state) {
   listEl.innerHTML = rows.map((item) => {
     const resident = residentOf(state, item.residentId);
     const latestFeedback = feedback.find((record) => record.residentId === item.residentId);
-    return `<section class="item">
+    const latestMessage = followupMessages.find((message) => message.residentId === item.residentId);
+    const statusText = item.status || item.pharmacyStatus || "pending";
+    const priorityClass = item.priority === "critical" ? "danger" : item.priority === "high" ? "warn" : "info";
+    return `<section class="item chronic-workbench-row priority-${item.priority}">
       <div>
-        <h3>${resident?.name || "未知居民"} · ${item.title || item.id}</h3>
-        <p>${item.collection} · ${item.status || "待处理"} · ${item.due || "待排期"} · ${item.assignee || item.owner || item.pharmacy || "责任人待定"}</p>
-        <p>${item.nextStep || item.intervention || item.advice || item.result || "按慢病随访计划处置"}</p>
-        <p>居民反馈：${latestFeedback ? `${latestFeedback.result} · ${latestFeedback.meta?.nextRequest || ""}` : "暂无新增反馈"}</p>
+        <h3>${resident?.name || "Unknown resident"} - ${item.title || item.id}</h3>
+        <div class="chronic-row-meta">
+          <span class="badge ${priorityClass}">${item.priority}</span>
+          <span>${item.dueBucket}</span>
+          <span>${item.collection}</span>
+          <span>${item.due || "no due date"}</span>
+        </div>
+        <p>${statusText} - ${item.assignee || item.owner || item.pharmacy || "owner pending"}</p>
+        <p>${item.nextStep || item.intervention || item.advice || item.result || "Follow the chronic care plan and close the loop after disposition."}</p>
+        <p>Feedback: ${latestFeedback ? `${latestFeedback.result} - ${latestFeedback.meta?.nextRequest || ""}` : "no new resident feedback"}</p>
+        <p>Message: ${latestMessage ? `${latestMessage.title} - ${latestMessage.body || ""}` : "no open institution message"}</p>
         <div class="action-row">
           ${chronicDispatchButton(item.collection, item.id, item.primary, item.updates, `慢病随访处置：${item.primary}`)}
           ${item.collection === "chronicManagementPlans" ? chronicDispatchButton(item.collection, item.id, "升级预警", { status: "预警中", intervention: "已升级家庭医生重点管理" }, "慢病管理计划升级预警") : ""}
           ${["critical", "high"].includes(item.itemPriority) ? chronicEscalationButton(item.collection, item.id, `priority ${item.itemPriority} chronic follow-up escalation`) : ""}
         </div>
       </div>
-      <span class="badge ${String(item.status || "").includes("逾期") || String(item.status || "").includes("预警") ? "danger" : "warn"}">${item.status || "待处理"}</span>
+      <span class="badge ${priorityClass}">${statusText}</span>
     </section>`;
-  }).join("") || `<p class="muted">暂无待处置慢病随访事项。</p>`;
+  }).join("") || `<p class="muted chronic-empty-state">No chronic follow-up items match the current filters.</p>`;
 }
 
 function fallbackChronicReferralContinuity(state) {
@@ -1083,6 +1456,115 @@ function populateMultiPracticeForm(state) {
   if (compensation && !compensation.value) compensation.value = "按实际工作时间、工作量和绩效协商结算";
   const insurance = form.querySelector("input[name='insurance']");
   if (insurance && !insurance.value) insurance.value = "已购买医师个人医疗执业保险";
+}
+
+function populateTeleconsultationForm(state) {
+  const form = document.querySelector("#teleconsultation-form");
+  if (!form) return;
+  const authSelect = form.querySelector("select[name='residentAuthorizationId']");
+  const referralSelect = form.querySelector("select[name='referralId']");
+  const authorizations = (state.personalRecords || [])
+    .filter((item) => item.category === "authorizations" && item.status !== "revoked" && item.meta?.status !== "revoked");
+  authSelect.innerHTML = authorizations.map((record) => {
+    const resident = residentOf(state, record.residentId);
+    return `<option value="${record.id}" data-resident-id="${record.residentId}">${resident?.name || record.residentId} · ${record.name || "authorization"}</option>`;
+  }).join("");
+  const referrals = state.referralSystem?.referrals || [];
+  referralSelect.innerHTML = [`<option value="">No linked referral</option>`, ...referrals.map((item) => {
+    const resident = residentOf(state, item.residentId);
+    return `<option value="${item.id}">${resident?.name || item.residentId} · ${item.type || "referral"} · ${item.status || ""}</option>`;
+  })].join("");
+  const target = form.querySelector("input[name='targetInstitution']");
+  const targetCode = form.querySelector("input[name='targetInstitutionCode']");
+  const department = form.querySelector("input[name='department']");
+  if (target && !target.value) target.value = "Dalian Central Hospital";
+  if (targetCode && !targetCode.value) targetCode.value = "MR1";
+  if (department && !department.value) department.value = "Cardiology";
+}
+
+async function submitTeleconsultation(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const selected = form.querySelector("select[name='residentAuthorizationId']")?.selectedOptions?.[0];
+  const formData = Object.fromEntries(new FormData(form));
+  const doctor = (platformState.doctorProfiles || [])[0] || {};
+  const payload = {
+    ...formData,
+    residentId: selected?.dataset.residentId || "",
+    sourceInstitution: doctor.primaryInstitution || "",
+    sourceInstitutionCode: doctor.primaryInstitutionId || "",
+    applicantDoctor: doctor.id || "",
+    type: "teleconsultation",
+    status: "requested",
+    materials: ["EMR summary", "resident authorization", "primary care note"],
+    note: "Created from institution teleconsultation form"
+  };
+  const submit = form.querySelector("button[type='submit']");
+  submit.disabled = true;
+  try {
+    let saved;
+    if (institutionApiBase) {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${institutionApiBase}/referral-teleconsultations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || `Teleconsultation creation failed: ${response.status}`);
+      }
+      saved = await response.json();
+    } else {
+      saved = {
+        ...payload,
+        id: `rtc-local-${Date.now()}`,
+        authorizationStatus: "authorized",
+        reportStatus: "pending-return",
+        receivingFeedback: "",
+        reportSummary: "",
+        auditTrail: [{ at: new Date().toISOString(), actor: "local-preview", action: "created", note: payload.note }],
+        performance: { responseHours: 0, reportReturnHours: 0, satisfaction: "pending" },
+        createdAt: new Date().toISOString(),
+        lastUpdated: new Date().toISOString()
+      };
+    }
+    platformState.referralTeleconsultations = [saved, ...(platformState.referralTeleconsultations || [])];
+    form.reset();
+    populateTeleconsultationForm(platformState);
+    renderTeleconsultationLoop(platformState);
+  } catch (error) {
+    alert(error.message || "Teleconsultation creation failed. Check resident authorization and role scope.");
+  } finally {
+    submit.disabled = false;
+  }
+}
+
+async function submitTeleconsultationAction(event) {
+  const form = event.target.closest(".teleconsultation-action-form");
+  if (!form) return;
+  event.preventDefault();
+  const formData = Object.fromEntries(new FormData(form));
+  const updates = {
+    status: formData.status,
+    receivingFeedback: formData.receivingFeedback,
+    reportSummary: formData.reportSummary
+  };
+  if (formData.status === "report-returned") updates.reportStatus = "returned";
+  Object.keys(updates).forEach((key) => {
+    if (!updates[key]) delete updates[key];
+  });
+  const submit = form.querySelector("button[type='submit']");
+  submit.disabled = true;
+  const result = await updateWorkflowAction(
+    platformState,
+    "referralTeleconsultations",
+    form.dataset.id,
+    updates,
+    formData.note || "Referral teleconsultation feedback updated"
+  );
+  submit.disabled = false;
+  if (result.ok) renderAll(platformState);
 }
 
 async function submitMultiPracticeApplication(event) {
@@ -1963,25 +2445,96 @@ function renderTeleconsultationLoop(state) {
   const countEl = document.querySelector("#teleconsultation-count");
   const listEl = document.querySelector("#teleconsultation-loop");
   if (!countEl || !listEl) return;
-  countEl.textContent = `${rows.length} items`;
+  countEl.textContent = `${rows.length} 项`;
   listEl.innerHTML = rows.map((item) => {
     const resident = residentOf(state, item.residentId);
     const badge = item.priority === "high" ? "danger" : item.reportStatus === "returned" ? "info" : "warn";
-    return `<section class="item">
+    return `<section class="item teleconsultation-card">
       <div>
-        <h3>${resident?.name || "Unknown resident"} · ${item.department || item.diseaseType || "Teleconsultation"}</h3>
+        <h3>${resident?.name || "未知居民"} · ${item.department || item.diseaseType || "远程会诊"}</h3>
         <p>${item.sourceInstitution || "-"} -> ${item.targetInstitution || "-"} · ${item.meetingWindow || item.due || "-"}</p>
         <p>${item.clinicalQuestion || item.receivingFeedback || item.reportSummary || "待补充临床说明"}</p>
         <p>授权：${item.authorizationStatus || "待确认"} · 报告：${item.reportStatus || "待回传"}</p>
+        <div class="status-ribbon">
+          <span>状态：${teleconsultationStatusLabel(item.status)}</span>
+          <span>授权：${item.authorizationStatus || "待确认"}</span>
+          <span>报告：${item.reportStatus || "待回传"}</span>
+        </div>
+        <form class="teleconsultation-action-form compact-form" data-id="${item.id}">
+          <select name="status" aria-label="会诊状态">
+            <option value="accepted">已接诊</option>
+            <option value="scheduled">已排期</option>
+            <option value="feedback-returned">已反馈</option>
+            <option value="report-returned">报告已回传</option>
+            <option value="closed">已闭环</option>
+          </select>
+          <input name="receivingFeedback" aria-label="接诊反馈" placeholder="接诊反馈">
+          <input name="reportSummary" aria-label="报告摘要" placeholder="报告摘要">
+          <input name="note" aria-label="操作说明" placeholder="操作说明">
+          <button class="inline-action compact" type="submit">保存反馈</button>
+        </form>
         <div class="action-row">
           ${item.status === "requested" ? actionButton("referralTeleconsultations", item.id, "接收会诊", { status: "accepted", receivingFeedback: "接收机构已确认远程会诊。" }, "接收转诊会诊") : ""}
           ${item.reportStatus !== "returned" ? actionButton("referralTeleconsultations", item.id, "回传报告", { status: "report-returned", reportStatus: "returned", reportSummary: "会诊报告已回传至发起机构。" }, "回传会诊报告") : ""}
           ${item.status !== "closed" ? actionButton("referralTeleconsultations", item.id, "关闭闭环", { status: "closed" }, "关闭转诊会诊闭环") : ""}
         </div>
       </div>
-      <span class="badge ${badge}">${item.status}</span>
+      <span class="badge ${badge}">${teleconsultationStatusLabel(item.status)}</span>
     </section>`;
-  }).join("") || `<p class="muted">No referral teleconsultation tasks.</p>`;
+  }).join("") || `<p class="muted">暂无转诊会诊任务。</p>`;
+}
+
+async function acknowledgeTeleconsultationSla(state, id) {
+  const action = "Institution acknowledged SLA reminder and started report callback reconciliation.";
+  if (institutionApiBase) {
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${institutionApiBase}/referral-teleconsultations/${encodeURIComponent(id)}/escalations/ack`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "acknowledged", action })
+      });
+      if (response.ok) {
+        const payload = await response.json();
+        state.referralTeleconsultations = (state.referralTeleconsultations || []).map((item) => item.id === id ? payload.teleconsultation : item);
+        state.taskMessages = [
+          ...(payload.messages || []),
+          ...(state.taskMessages || []).filter((message) => !(message.collection === "referralTeleconsultations" && message.sourceId === id))
+        ].slice(0, 300);
+        return { ok: true };
+      }
+    } catch (error) {
+      // Static preview falls back to local acknowledgement below.
+    }
+  }
+  const now = new Date().toISOString();
+  state.referralTeleconsultations = (state.referralTeleconsultations || []).map((item) => item.id === id
+    ? {
+        ...item,
+        slaDisposition: { status: "acknowledged", action, owner: "institution-preview", updatedAt: now },
+        countySupervision: { ...(item.countySupervision || {}), status: "已确认", action, updatedAt: now }
+      }
+    : item);
+  state.taskMessages = (state.taskMessages || []).map((message) => message.collection === "referralTeleconsultations" && message.sourceId === id && message.escalationKey
+    ? { ...message, status: "acknowledged", receipts: [{ at: now, by: "institution-preview", action }, ...(message.receipts || [])] }
+    : message);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  return { ok: true };
+}
+
+function teleconsultationAckButton(id) {
+  return `<button class="inline-action" type="button" data-teleconsultation-ack data-id="${id}">确认 SLA</button>`;
+}
+
+function teleconsultationStatusLabel(status) {
+  return {
+    requested: "已申请",
+    accepted: "已接诊",
+    scheduled: "已排期",
+    "feedback-returned": "已反馈",
+    "report-returned": "报告已回传",
+    closed: "已闭环"
+  }[status] || status || "待处理";
 }
 
 function renderReservedResources(state) {

@@ -1,12 +1,16 @@
 const fallbackState = {
   residents: [],
+  diseases: [],
+  followups: [],
   personalRecords: [],
   medicalResources: [],
+  careOrders: [],
   medicationPickups: [],
   insuranceClaims: [],
   institutionSupervisions: [],
   digitalCredentials: [],
   dataAccessLogs: [],
+  referralTeleconsultations: [],
   referralSystem: { insuranceGuidance: [], referrals: [] }
 };
 
@@ -27,6 +31,7 @@ function renderAll(state) {
   renderClaims(state);
   renderSupervisions(state);
   renderReferralPayments(state);
+  renderReferralPerformancePolicy(state);
   renderPickupAudits(state);
   renderCredentialChecks(state);
   renderInsuranceAudit(state);
@@ -128,10 +133,13 @@ function renderMetrics(state) {
 function renderDrugConsumableSupervision(report) {
   const rows = report.rows || [];
   const boundaries = report.boundaries || [];
+  const policySources = report.traceabilityPolicySources || [];
+  const evidenceChecklist = report.traceabilityEvidenceChecklist || [];
   document.querySelector("#drug-consumable-count").textContent = `${rows.length} 条`;
-  document.querySelector("#drug-consumable-boundaries").innerHTML = boundaries.map((item) => `
+  const boundaryRows = boundaries.map((item) => `
     <div><strong>${item.name}</strong><span>${item.source} · ${item.count} 条</span></div>
   `).join("");
+  document.querySelector("#drug-consumable-boundaries").innerHTML = `${boundaryRows}${renderTraceabilityPolicySources(policySources)}${renderTraceabilityEvidenceChecklist(evidenceChecklist)}`;
   document.querySelector("#drug-consumable-list").innerHTML = rows.map((item) => {
     const badge = item.riskLevel === "high" ? "danger" : item.normalizedStatus === "pending" ? "warn" : "info";
     const resident = residentOf(platformState, item.residentId);
@@ -140,16 +148,54 @@ function renderDrugConsumableSupervision(report) {
         <h3>${resident?.name || item.residentId || "未知居民"} · ${item.category}</h3>
         <p>${item.institution || "机构待补"} · ${item.boundary} · ${item.issue}</p>
         <p>审方：${item.reviewStatus || "pending"} · 医保：${item.insuranceStatus || "pending"} · 整改：${item.remediationStatus || "open"} · 审计 ${item.auditCount || 0} 条</p>
+        <p>Trace evidence ${item.traceabilityEvidenceStatus || "pending"} · submissions ${(item.traceabilityEvidenceSubmissions || []).length} · coverage ${item.traceabilityEvidenceCoverage?.complete || 0}/${item.traceabilityEvidenceCoverage?.required || 0} · status ${item.traceabilityEvidenceCoverage?.status || "pending"} · missing ${item.traceabilityEvidenceCoverage?.missing || 0} · partial ${item.traceabilityEvidenceCoverage?.partial || 0}</p>
         <p>${item.nextAction || "等待下一步处理"}</p>
         <div class="action-row">
           ${drugActionButton(item.id, "review", "审核通过", { reviewStatus: "review-passed", insuranceStatus: "coordinating", status: "in-review", nextAction: "Continue settlement coordination and archive prescription review evidence." })}
           ${drugActionButton(item.id, "insurance-sync", "医保同步", { insuranceStatus: "synced", status: "insurance-synced", settlementBatch: "demo-drug-consumable", nextAction: "Archive settlement coordination evidence." })}
+          ${drugActionButton(item.id, "traceability-evidence", "Trace evidence", { requirementId: "trace-code-mapping", evidenceSource: "insurance-settlement-joint-test", fields: { medicalInsuranceCode: "MI-DEMO-001", commodityCode: "COM-DEMO-001", traceCode: "TRACE-DEMO-001", packageCascade: "box-pack-unit", mappingVersion: "demo-2026.1" }, nextAction: "Institution and insurance center review traceability-code mapping evidence." })}
           ${drugActionButton(item.id, "remediation", "提交整改", { remediationStatus: "submitted", status: "remediation-submitted", evidence: "demo-remediation-evidence", nextAction: "Regulator reviews remediation evidence." })}
         </div>
       </div>
       <span class="badge ${badge}">${item.riskLevel || item.normalizedStatus}</span>
     </section>`;
   }).join("") || `<p class="muted">暂无药品耗材监管线索。</p>`;
+}
+
+function renderTraceabilityPolicySources(policySources = []) {
+  if (!policySources.length) {
+    return `<div data-drug-traceability-policy-sources><strong>Traceability policy sources</strong><span>No official policy sources returned by /api/drug-consumable-supervision.</span></div>`;
+  }
+  return `
+    <div data-drug-traceability-policy-sources>
+      <strong>Traceability policy sources</strong>
+      <span>${policySources.length} official policy links are available on <a href="./drug-consumable-about.html">drug consumable policy about</a>.</span>
+    </div>
+    ${policySources.slice(0, 5).map((item) => `
+      <div data-drug-traceability-policy-source="${item.id || ""}">
+        <strong>${item.documentNo || item.authority || "Policy source"}</strong>
+        <span><a href="${item.url || "./drug-consumable-about.html"}">${item.title || item.authority || "Official source"}</a></span>
+      </div>
+    `).join("")}
+  `;
+}
+
+function renderTraceabilityEvidenceChecklist(evidenceChecklist = []) {
+  if (!evidenceChecklist.length) {
+    return `<div data-drug-traceability-evidence-checklist><strong>Traceability evidence checklist</strong><span>No evidence checklist returned by /api/drug-consumable-supervision.</span></div>`;
+  }
+  return `
+    <div data-drug-traceability-evidence-checklist>
+      <strong>Traceability evidence checklist</strong>
+      <span>${evidenceChecklist.filter((item) => item.ready).length}/${evidenceChecklist.length} ready evidence groups for settlement, remediation and audit review.</span>
+    </div>
+    ${evidenceChecklist.slice(0, 5).map((item) => `
+      <div data-drug-traceability-evidence="${item.id || ""}">
+        <strong>${item.title || item.id}</strong>
+        <span>${(item.evidenceFields || []).join(", ")} · policies ${(item.policySourceIds || []).join(", ")} · rows ${item.rowCount || 0} · owner ${item.owner || "pending"}</span>
+      </div>
+    `).join("")}
+  `;
 }
 
 function renderClaims(state) {
@@ -208,6 +254,28 @@ function renderReferralPayments(state) {
       <span class="badge ${badge}">${item.status}</span>
     </section>`;
   }).join("") || `<p class="muted">暂无分级诊疗支付政策配置。</p>`;
+}
+
+function renderReferralPerformancePolicy(state) {
+  const rows = state.referralTeleconsultations || [];
+  const el = document.querySelector("#referral-performance-policy");
+  const countEl = document.querySelector("#referral-performance-policy-count");
+  if (!el || !countEl) return;
+  const returned = rows.filter((item) => item.reportStatus === "returned" || item.status === "report-returned");
+  const closed = rows.filter((item) => String(item.slaDisposition?.status || "").includes("closed") || String(item.countySupervision?.status || "").includes("闭环"));
+  const repeatControlled = rows.filter((item) => String(item.performance?.repeatExamControl || "").includes("recognized") || String(item.performance?.repeatExamControl || "").includes("reused"));
+  const rate = (count) => rows.length ? Math.round((count / rows.length) * 100) : 100;
+  const paymentPaths = [...new Set(rows.map((item) => item.performance?.insurancePaymentPath).filter(Boolean))];
+  countEl.textContent = `${rows.length} 项`;
+  el.innerHTML = [
+    ["报告回传率", `${rate(returned.length)}%`, `${returned.length}/${rows.length || 0} 用于医共体绩效`],
+    ["随访闭环率", `${rate(closed.length)}%`, `${closed.length}/${rows.length || 0} 支撑基层连续服务支付`],
+    ["重复检查控制", `${rate(repeatControlled.length)}%`, `${repeatControlled.length}/${rows.length || 0} 支撑互认和控费审核`],
+    ["支付路径", paymentPaths.length, paymentPaths.join("；") || "待现场医保口径确认"]
+  ].map(([label, value, hint]) => `<article class="claim-card">
+    <strong>${label}</strong>
+    <span>${value}<br>${hint}</span>
+  </article>`).join("");
 }
 
 function renderPickupAudits(state) {

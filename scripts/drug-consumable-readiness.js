@@ -9,9 +9,33 @@ const DEFAULT_MARKDOWN = path.join(ROOT, "release", "drug-consumable-readiness-r
 const REQUIRED_BOUNDARIES = [
   "rational-medication",
   "fixed-pharmacy",
+  "supply-alert",
   "consumable-clue",
   "insurance-settlement",
   "remediation-loop"
+];
+
+const IMPLEMENTED_CAPABILITIES = [
+  "role-scoped supervision access",
+  "rational medication and prescription review rows",
+  "fixed pickup and high-value consumable clues",
+  "supply assurance warning loop",
+  "insurance settlement coordination",
+  "institution remediation actions",
+  "traceability policy sources and evidence requirements",
+  "traceability evidence submission and coverage",
+  "audit trail and security-event logging",
+  "runnable insurance, institution, commission, and about pages",
+  "release/readiness artifacts"
+];
+
+const PRE_LAUNCH_GAPS = [
+  "real scanner, HIS, EMR, pharmacy, and consumable-system field binding",
+  "insurance-code, commodity-code, and trace-code mapping versions",
+  "upstream insurance settlement callbacks",
+  "high-value consumable catalog and charge-item cross-checks",
+  "production identity, secrets, and audit-retention storage",
+  "signed site evidence for interface, insurance/certificate, monitoring, and disaster-recovery signoff"
 ];
 
 function readJson(relativePath) {
@@ -30,19 +54,45 @@ function normalizeStatus(value) {
   return text || "tracking";
 }
 
+function buildTraceabilityEvidenceChecklist(rows, policySources, requirements) {
+  const sourceIds = new Set((policySources || []).map((item) => item.id));
+  return (requirements || []).map((requirement) => {
+    const linkedRows = rows.filter((row) =>
+      (requirement.boundaries || []).includes(row.boundary) ||
+      ((requirement.boundaries || []).includes("insurance-settlement") && row.relatedClaimId) ||
+      (requirement.id === "trace-remediation-audit" && row.remediationStatus)
+    );
+    const policySourceIds = (requirement.policySourceIds || []).filter((id) => sourceIds.has(id));
+    return {
+      ...requirement,
+      policySourceIds,
+      rowIds: linkedRows.map((row) => row.id),
+      rowCount: linkedRows.length,
+      ready: policySourceIds.length === (requirement.policySourceIds || []).length && linkedRows.length > 0
+    };
+  });
+}
+
 function buildDrugConsumableReadinessReport(options = {}) {
   const data = options.data ?? readJson("data/db.json");
   const pkg = options.pkg ?? readJson("package.json");
   const readme = options.readme ?? readText("README.md");
   const deployment = options.deployment ?? readText("DEPLOYMENT.md");
+  const aboutPage = options.aboutPage ?? readText("about.html");
   const server = options.server ?? readText("server.js");
   const insurancePage = options.insurancePage ?? readText("insurance.html");
   const insuranceJs = options.insuranceJs ?? readText("insurance.js");
+  const institutionPage = options.institutionPage ?? readText("institution.html");
+  const institutionJs = options.institutionJs ?? readText("institution.js");
+  const workbenchPage = options.workbenchPage ?? readText("workbench.html");
+  const workbenchJs = options.workbenchJs ?? readText("workbench.js");
   const rows = Array.isArray(data.drugConsumableSupervisions) ? data.drugConsumableSupervisions : [];
   const pickups = Array.isArray(data.medicationPickups) ? data.medicationPickups : [];
   const claims = Array.isArray(data.insuranceClaims) ? data.insuranceClaims : [];
   const institutionSupervisions = Array.isArray(data.institutionSupervisions) ? data.institutionSupervisions : [];
   const contracts = Array.isArray(data.integrationContracts) ? data.integrationContracts : [];
+  const policySources = Array.isArray(data.drugTraceabilityPolicySources) ? data.drugTraceabilityPolicySources : [];
+  const evidenceRequirements = Array.isArray(data.drugTraceabilityEvidenceRequirements) ? data.drugTraceabilityEvidenceRequirements : [];
   const insuranceContract = contracts.find((item) => item.id === "insurance-settlement-v1");
   const boundaries = new Set(rows.map((item) => item.boundary));
   if (pickups.length) boundaries.add("fixed-pharmacy");
@@ -58,14 +108,40 @@ function buildDrugConsumableReadinessReport(options = {}) {
     supervisionLinked: item.sourceCollection !== "institutionSupervisions" || institutionSupervisions.some((row) => row.id === item.sourceId),
     auditTrailPresent: Array.isArray(item.auditTrail) && item.auditTrail.length > 0
   }));
+  const supplyAlerts = rows.filter((item) => item.boundary === "supply-alert" || item.category === "supply-assurance");
+  const traceabilityEvidenceChecklist = buildTraceabilityEvidenceChecklist(rows, policySources, evidenceRequirements);
+  const evidenceRequirementsReady = evidenceRequirements.length >= 5 &&
+    evidenceRequirements.every((item) =>
+      item.id &&
+      Array.isArray(item.boundaries) &&
+      item.boundaries.length > 0 &&
+      Array.isArray(item.policySourceIds) &&
+      item.policySourceIds.length > 0 &&
+      Array.isArray(item.evidenceFields) &&
+      item.evidenceFields.length > 0 &&
+      item.policySourceIds.every((id) => policySources.some((source) => source.id === id))
+    );
   const docsMentionArtifacts = /drug-consumable-readiness-report\.md/.test(readme) && /drug-consumable-readiness-report\.md/.test(deployment);
+  const launchReadiness = {
+    demoReviewReady: true,
+    productionCutoverBlocked: true,
+    implementedCapabilities: IMPLEMENTED_CAPABILITIES,
+    preLaunchGaps: PRE_LAUNCH_GAPS
+  };
   const checks = [
     { id: "drug-consumable:data", passed: rows.length >= 3 && pickups.length > 0 && claims.length > 0 && institutionSupervisions.length > 0, detail: `${rows.length} supervision rows; ${pickups.length} pickups; ${claims.length} claims` },
     { id: "drug-consumable:boundaries", passed: REQUIRED_BOUNDARIES.every((item) => boundaries.has(item)), detail: REQUIRED_BOUNDARIES.map((item) => `${item}:${boundaries.has(item) ? "present" : "missing"}`).join(";") },
     { id: "drug-consumable:links", passed: linkedRows.every((item) => item.pickupLinked && item.claimLinked && item.supervisionLinked), detail: linkedRows.map((item) => `${item.id}:${item.pickupLinked && item.claimLinked && item.supervisionLinked ? "linked" : "missing-link"}`).join(";") },
+    { id: "drug-consumable:supply-alert", passed: supplyAlerts.length >= 1 && supplyAlerts.every((item) => item.relatedPickupId && item.remediationStatus && item.nextAction) && /supplyAlerts/.test(server), detail: `${supplyAlerts.length} supply assurance alert rows linked to fixed pickup remediation` },
     { id: "drug-consumable:audit", passed: linkedRows.every((item) => item.auditTrailPresent) && /drug-consumable-review/.test(server) && /drug-consumable-remediation/.test(server), detail: "business auditTrail and securityEvents actions are wired" },
     { id: "drug-consumable:insurance-contract", passed: Boolean(insuranceContract?.status === "ready" && insuranceContract.signature && insuranceContract.retryPolicy), detail: insuranceContract ? `${insuranceContract.id}:${insuranceContract.status}` : "missing insurance-settlement-v1" },
-    { id: "drug-consumable:frontend", passed: /drug-consumable-panel/.test(insurancePage) && /renderDrugConsumableSupervision/.test(insuranceJs), detail: "insurance portal renders actionable drug consumable supervision entry" },
+    { id: "drug-consumable:workflow-reuse", passed: /WORKFLOW_COLLECTIONS[\s\S]*drugConsumableSupervisions/.test(server) && /appendDrugConsumableAuditTrail/.test(server) && /unified-task-action/.test(server) && /workflow-action/.test(server), detail: "/api/workflow-actions and /api/tasks/:id/actions reuse drugConsumableSupervisions with audit trail" },
+    { id: "drug-consumable:traceability-policy", passed: policySources.length >= 5 && policySources.some((item) => item.id === "nhsa-2025-7") && policySources.some((item) => item.id === "nmpa-2022-label") && policySources.every((item) => /^https:\/\/(www\.)?(nhsa|nmpa)\.gov\.cn\//.test(item.url || "")) && /policy-source-rules/.test(aboutPage), detail: `${policySources.length} official traceability policy sources; about policy section ${/policy-source-rules/.test(aboutPage) ? "present" : "missing"}` },
+    { id: "drug-consumable:traceability-evidence", passed: evidenceRequirementsReady && traceabilityEvidenceChecklist.length >= 5 && traceabilityEvidenceChecklist.every((item) => item.ready) && /buildDrugTraceabilityEvidenceChecklist/.test(server) && /traceabilityEvidenceChecklist/.test(server) && /renderTraceabilityEvidenceChecklist/.test(insuranceJs) && /renderInstitutionTraceabilityEvidenceChecklist/.test(institutionJs) && /renderDrugTraceabilityEvidenceChecklistRow/.test(workbenchJs), detail: `${traceabilityEvidenceChecklist.filter((item) => item.ready).length}/${traceabilityEvidenceChecklist.length} evidence groups ready from drugTraceabilityEvidenceRequirements` },
+    { id: "drug-consumable:traceability-submission", passed: /buildDrugTraceabilityEvidenceSubmission/.test(server) && /\/traceability-evidence/.test(server) && /drug-consumable-traceability-evidence/.test(server) && /traceability-evidence/.test(insuranceJs) && /postInstitutionDrugConsumableAction/.test(institutionJs) && /Trace scan uploaded/.test(institutionJs), detail: "traceability evidence submission API and insurance/institution buttons are wired" },
+    { id: "drug-consumable:traceability-coverage", passed: /buildDrugTraceabilityEvidenceCoverage/.test(server) && /traceabilityEvidenceCoverage/.test(server) && /traceabilityCoverageCompleteRows/.test(server) && /traceabilityEvidenceCoverage/.test(insuranceJs) && /traceabilityEvidenceCoverage/.test(institutionJs) && /traceabilityEvidenceCoverage/.test(workbenchJs), detail: "traceability evidence coverage is derived by API and displayed across supervision pages" },
+    { id: "drug-consumable:frontend", passed: /drug-consumable-panel/.test(insurancePage) && /renderDrugConsumableSupervision/.test(insuranceJs) && /renderTraceabilityPolicySources/.test(insuranceJs) && /renderTraceabilityEvidenceChecklist/.test(insuranceJs) && /institution-drug-consumable-panel/.test(institutionPage) && /renderInstitutionDrugConsumableSupervision/.test(institutionJs) && /renderInstitutionTraceabilityPolicySources/.test(institutionJs) && /renderInstitutionTraceabilityEvidenceChecklist/.test(institutionJs) && /postInstitutionDrugConsumableRemediation/.test(institutionJs) && /drug-consumable-supervision-panel/.test(workbenchPage) && /loadDrugConsumableSupervision/.test(workbenchJs) && /renderDrugTraceabilityPolicyRow/.test(workbenchJs) && /renderDrugTraceabilityEvidenceChecklistRow/.test(workbenchJs), detail: "insurance portal, institution remediation panel, and commission workbench render actionable drug consumable supervision entries with traceability policy sources and evidence checklist" },
+    { id: "drug-consumable:launch-readiness", passed: /Implemented drug-consumable capabilities/.test(readme) && /Before production launch/.test(readme) && launchReadiness.implementedCapabilities.length >= 8 && launchReadiness.preLaunchGaps.length >= 6, detail: `${launchReadiness.implementedCapabilities.length} implemented capabilities; ${launchReadiness.preLaunchGaps.length} pre-launch gaps` },
     { id: "drug-consumable:release", passed: Boolean(pkg.scripts?.["drug-consumable:readiness"] && docsMentionArtifacts), detail: docsMentionArtifacts ? "script and docs present" : "missing script or docs" }
   ];
   return {
@@ -75,19 +151,42 @@ function buildDrugConsumableReadinessReport(options = {}) {
     summary: {
       supervisionRows: rows.length,
       openRows: linkedRows.filter((item) => item.normalizedStatus !== "closed").length,
+      supplyAlerts: supplyAlerts.length,
       medicationPickups: pickups.length,
       insuranceClaims: claims.length,
       institutionSupervisions: institutionSupervisions.length,
-      insuranceContractReady: Boolean(insuranceContract?.status === "ready")
+      traceabilityPolicySources: policySources.length,
+      traceabilityEvidenceRequirements: evidenceRequirements.length,
+      traceabilityEvidenceReady: traceabilityEvidenceChecklist.filter((item) => item.ready).length,
+      traceabilitySubmissionReady: checks.some((item) => item.id === "drug-consumable:traceability-submission" && item.passed),
+      traceabilityCoverageReady: checks.some((item) => item.id === "drug-consumable:traceability-coverage" && item.passed),
+      insuranceContractReady: Boolean(insuranceContract?.status === "ready"),
+      workflowReuseReady: checks.some((item) => item.id === "drug-consumable:workflow-reuse" && item.passed),
+      institutionRemediationReady: checks.some((item) => item.id === "drug-consumable:frontend" && item.passed)
     },
     linkedRows,
+    supplyAlerts,
+    policySources,
+    launchReadiness,
+    traceabilityEvidenceChecklist,
     checks
   };
 }
 
 function renderMarkdown(report) {
   const checkRows = report.checks.map((item) => `| ${item.passed ? "PASS" : "FAIL"} | ${item.id} | ${String(item.detail || "").replace(/\|/g, "/")} |`);
-  const rowLines = report.linkedRows.map((item) => `| ${item.id} | ${item.boundary} | ${item.normalizedStatus} | ${item.pickupLinked ? "yes" : "no"} | ${item.claimLinked ? "yes" : "no"} | ${item.auditTrailPresent ? "yes" : "no"} |`);
+  const rowLines = report.linkedRows.map((item) => `| ${item.id} | ${item.boundary} | ${item.normalizedStatus} | ${item.pickupLinked ? "yes" : "no"} | ${item.claimLinked ? "yes" : "no"} | ${item.supervisionLinked ? "yes" : "no"} | ${item.auditTrailPresent ? "yes" : "no"} |`);
+  const policyRows = (report.policySources || []).map((item) => `| ${String(item.documentNo || "").replace(/\|/g, "/")} | ${String(item.title || "").replace(/\|/g, "/")} | ${String(item.url || "").replace(/\|/g, "/")} |`);
+  const implementedRows = (report.launchReadiness?.implementedCapabilities || []).map((item) => `| implemented | ${String(item).replace(/\|/g, "/")} |`);
+  const gapRows = (report.launchReadiness?.preLaunchGaps || []).map((item) => `| pre-launch gap | ${String(item).replace(/\|/g, "/")} |`);
+  const policySourceById = new Map((report.policySources || []).map((item) => [item.id, item]));
+  const evidenceRows = (report.traceabilityEvidenceChecklist || []).map((item) => {
+    const policySourceLinks = (item.policySourceIds || []).map((id) => {
+      const source = policySourceById.get(id);
+      return source?.url ? `${id} ${source.url}` : id;
+    });
+    return `| ${item.ready ? "yes" : "no"} | ${String(item.id || "").replace(/\|/g, "/")} | ${String(item.owner || "").replace(/\|/g, "/")} | ${String((item.evidenceFields || []).join(", ")).replace(/\|/g, "/")} | ${String(policySourceLinks.join(", ")).replace(/\|/g, "/")} | ${item.rowCount || 0} |`;
+  });
   return [
     "# Drug consumable readiness report",
     "",
@@ -95,6 +194,10 @@ function renderMarkdown(report) {
     `- Result: ${report.ok ? "PASS" : "FAIL"}`,
     `- Supervision rows: ${report.summary.supervisionRows}`,
     `- Open rows: ${report.summary.openRows}`,
+    `- Supply assurance alerts: ${report.summary.supplyAlerts}`,
+    `- Traceability policy sources: ${report.summary.traceabilityPolicySources}`,
+    `- Traceability evidence requirements: ${report.summary.traceabilityEvidenceReady}/${report.summary.traceabilityEvidenceRequirements} ready`,
+    `- Traceability coverage: ${report.summary.traceabilityCoverageReady ? "ready" : "missing"}`,
     "",
     "## Checks",
     "",
@@ -102,11 +205,33 @@ function renderMarkdown(report) {
     "|---|---|---|",
     ...checkRows,
     "",
+    "## Launch readiness",
+    "",
+    `- Demo review ready: ${report.launchReadiness?.demoReviewReady ? "yes" : "no"}`,
+    `- Production cutover blocked: ${report.launchReadiness?.productionCutoverBlocked ? "yes" : "no"}`,
+    "",
+    "| Type | Item |",
+    "|---|---|",
+    ...implementedRows,
+    ...gapRows,
+    "",
     "## Supervision links",
     "",
-    "| Row | Boundary | Status | Pickup | Claim | Audit |",
-    "|---|---|---|---|---|---|",
+    "| Row | Boundary | Status | Pickup | Claim | Supervision | Audit |",
+    "|---|---|---|---|---|---|---|",
     ...rowLines,
+    "",
+    "## Traceability policy sources",
+    "",
+    "| Document | Title | Source link |",
+    "|---|---|---|",
+    ...policyRows,
+    "",
+    "## Traceability evidence requirements",
+    "",
+    "| Ready | Requirement | Owner | Evidence fields | Policy sources | Linked rows |",
+    "|---|---|---|---|---|---|",
+    ...evidenceRows,
     ""
   ].join("\n");
 }
@@ -146,4 +271,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { REQUIRED_BOUNDARIES, buildDrugConsumableReadinessReport, normalizeStatus, parseArgs, renderMarkdown, writeOutput };
+module.exports = { REQUIRED_BOUNDARIES, buildDrugConsumableReadinessReport, buildTraceabilityEvidenceChecklist, normalizeStatus, parseArgs, renderMarkdown, writeOutput };

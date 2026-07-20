@@ -449,6 +449,7 @@ function scoreEvidence(records) {
 
 function buildMapBoard(signals, alerts, tasks, resources) {
   const nodes = [];
+  const signalById = new Map((Array.isArray(signals) ? signals : []).map((item) => [item.id, item]));
   (Array.isArray(signals) ? signals : []).forEach((signal) => nodes.push({
     id: signal.id,
     type: "signal",
@@ -467,7 +468,7 @@ function buildMapBoard(signals, alerts, tasks, resources) {
     region: alert.region,
     status: alert.status,
     severity: alert.severity,
-    location: alert.location || { x: 50, y: 50 }
+    location: alert.location || signalById.get(alert.signalIds?.[0])?.location || { x: 50, y: 50 }
   }));
   const regionNames = [...new Set(nodes.map((item) => item.region).filter(Boolean))];
   return {

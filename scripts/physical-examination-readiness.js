@@ -62,6 +62,10 @@ function buildReport(options = {}) {
     check("highlights:privacy", highlights.includes("suppressed-small-cell") && highlights.includes("consentRequired") && highlights.includes("risk-signals-only"), "城市雷达小单元抑制及家庭成员逐人授权"),
     check("highlights:resident-wallet", highlights.includes("create-passport") && highlights.includes("revoke-passport") && highlights.includes("buildSimulation"), "居民健康护照可创建/撤销，趋势模拟保持健康教育边界"),
     check("site:evidence-required", service.includes("现场验收通过必须提供证据编号或附件引用") && service.includes("上线签署必须提供验收单编号或签字附件引用"), "现场联调和上线签署强制证据引用"),
+    check("production:demo-isolation", service.includes("excludeDemoData") && service.includes("isDemoPhysicalExamRecord") && server.includes("excludeDemoData: isProductionRuntime()"), "生产 API 自动排除演示签名报告、关联异常和模拟网关事件"),
+    check("production:gateway-freshness", server.includes("10 * 60 * 1000") && server.includes("productionEvidence: production") && server.includes("productionIntegrationSecretReady"), "生产体检事件强制 10 分钟时钟窗口、非占位长密钥和真实落库证据"),
+    check("production:original-storage", server.includes("allOriginalsStored") && service.includes("productionStoredReports") && server.includes("仍有体检报告未关联校验通过的生产原件"), "全部生产报告必须关联状态有效且恶意文件扫描通过的原件"),
+    check("site:four-eyes", service.includes("submit-signoff") && service.includes("verify-signoff") && service.includes("提交人不得核验本人提交的上线证据") && server.includes("siteSignoffVerified") && client.includes("data-joint-digest"), "机构提交人与卫生行政复核人按同一 SHA-256 摘要完成四眼签署"),
     check("ui:management", page.includes("历史体检报告") && page.includes("physical-exam-import-form"), "体检管理与报告接入界面"),
     check("ui:launch-workbench", page.includes("上线门禁") && page.includes("异常结果闭环") && page.includes("机构联调验收") && client.includes("renderGatewayEvents"), "上线门禁、异常闭环、联调与死信工作台"),
     check("ui:resident-history", citizen.includes('{ key: "physical-exam", label: "体检报告" }') && citizen.includes("renderPhysicalExamMeta"), "居民健康档案体检分类与详情"),
@@ -97,7 +101,7 @@ function buildReport(options = {}) {
       "由各机构与平台上线负责人完成验收单签署后，生产门禁才可转为可上线。"
     ],
     boundaries: [
-      "代码侧已实现标准化签名接入、幂等归档、死信补偿、授权查询、异常闭环、原报告安全关联、居民历史报告以及体检创新亮点工作台。",
+      "代码侧已实现生产/演示数据隔离、标准化签名接入、10分钟时钟窗口、幂等归档、死信补偿、授权查询、异常闭环、原报告安全关联、四眼验收签署、居民历史报告以及体检创新亮点工作台。",
       "真实密钥、生产对象存储与机构现场签字属于外部上线证据，未完成前系统会保持上线阻断。"
     ],
     evidence: {
