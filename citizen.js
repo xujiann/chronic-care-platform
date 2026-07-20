@@ -342,6 +342,13 @@ function citizenActionDockItems(tab) {
     .slice(0, 4);
 }
 
+function citizenActionDockHint(tab, items) {
+  const recent = items.find((item) => item.recent);
+  if (recent) return `最近使用：${recent.label}`;
+  const count = serviceNavigationMeta(tab).featureCount;
+  return `${count} 项可用能力`;
+}
+
 const registrationSchedules = [
   { id: "reg-sch-cardio-am", hospital: "大连市中心医院", department: "心内科", doctor: "王医生", date: todayOffset(2), period: "上午", remaining: 6, fee: 18, cancelBeforeHours: 24, source: "医院号源池", tags: ["高血压复诊", "支持陪诊"] },
   { id: "reg-sch-cardio-waitlist-am", hospital: "大连市中心医院", department: "心内科", doctor: "孙医生", date: todayOffset(1), period: "上午", remaining: 0, fee: 18, cancelBeforeHours: 12, source: "医院号源池", tags: ["号源已满", "支持候补"] },
@@ -647,12 +654,12 @@ function renderCitizenActionDock() {
   const target = document.querySelector("#citizen-action-dock");
   if (!target) return;
   const active = getActiveCitizenService();
-  const meta = serviceNavigationMeta(active);
   const items = citizenActionDockItems(active);
+  const hint = citizenActionDockHint(active, items);
   target.innerHTML = `<div class="citizen-action-dock-copy">
     <span>常用操作</span>
     <strong>${active.label}</strong>
-    <small>${meta.featureCount} 项可用能力</small>
+    <small>${hint}</small>
   </div>
   <div class="citizen-action-dock-actions">
     ${items.map((item) => {

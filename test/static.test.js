@@ -2188,6 +2188,8 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /CITIZEN_RECENT_ACTION_KEY/);
   assert.match(citizenJs, /rememberCitizenAction/);
   assert.match(citizenJs, /renderCitizenActionDock/);
+  assert.match(citizenJs, /citizenActionDockHint/);
+  assert.match(citizenJs, /最近使用：\$\{recent\.label\}/);
   assert.match(citizenJs, /data-action-dock-target/);
   assert.match(citizenJs, /data-action-dock-label/);
   assert.match(citizenJs, /aria-label="\$\{active\.label\}：\$\{item\.label\}"/);
