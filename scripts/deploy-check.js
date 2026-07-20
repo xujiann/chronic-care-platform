@@ -62,6 +62,7 @@ function buildDeployCheckReport(options = {}) {
     "commercialCryptoEvidencePackets",
     "hospitalOperationSnapshots",
     "resourceDispatchRequests",
+    "emergencyDispatchLoops",
     "statisticsReconciliationReviews",
     "operationAlertRules",
     "productionServiceLevels",

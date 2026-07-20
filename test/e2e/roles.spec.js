@@ -158,6 +158,64 @@ test("commission workbench renders live release gates and site templates", async
   expect(serviceAcceptance.serviceAcceptance.county.openActions.some((item) => item.id === "cco-001")).toBe(true);
 });
 
+test("operations metrics navigate to the matching work areas", async ({ page }) => {
+  await login(page, "health", "index.html");
+  await page.goto("/operations.html");
+
+  await expect(page.getByRole("heading", { name: "运行监测、资源调度、统计直报对账" })).toBeVisible();
+  await expect(page.locator("#operations-metrics [data-metric-action]")).toHaveCount(10);
+  await expect(page.locator("#operations-duty-priority")).toContainText("首要处置");
+  await expect(page.locator("#operations-duty-queue [data-duty-action]")).toHaveCount(3);
+  await expect(page.locator("#operations-duty-actions [data-duty-action]")).toHaveCount(3);
+  await expect(page.locator("#operations-duty-actions")).toContainText("上线判定");
+  await expect(page.locator("#operations-duty-actions")).toContainText("责任：");
+  await expect(page.locator("#operations-duty-actions")).toContainText("下一步：");
+  await expect(page.locator("#operations-duty-actions")).toContainText("时限：");
+
+  await page.locator("#operations-metrics [data-metric-action='critical']").click();
+  await expect(page.locator("#operation-status-filter")).toHaveValue("critical");
+  await expect(page.locator("#operations-snapshots")).toContainText("机构");
+
+  await page.locator("#operations-duty-actions [data-duty-action='dispatch']").click();
+  await expect(page.locator("#operation-status-filter")).toHaveValue("all");
+  await expect(page.locator("#dispatch-requests")).toContainText("调度单");
+  await expect(page.locator("#dispatch-batch-toolbar")).toContainText("批量处置");
+  await page.locator("#dispatch-batch-toolbar [data-dispatch-batch-note]").fill("到位凭证 TEST-001");
+  await expect(page.locator("#dispatch-batch-toolbar [data-dispatch-batch-note]")).toHaveValue("到位凭证 TEST-001");
+  await page.locator("#dispatch-requests [data-dispatch-select]:not([disabled])").first().check();
+  await expect(page.locator("#dispatch-batch-toolbar")).toContainText("已选择 1");
+  await expect(page.locator("#dispatch-batch-toolbar [data-dispatch-batch-note]")).toHaveValue("到位凭证 TEST-001");
+  await page.locator("#dispatch-batch-toolbar [data-dispatch-clear]").click();
+  await expect(page.locator("#dispatch-batch-toolbar")).toContainText("已选择 0");
+
+  await page.locator("#operations-duty-actions [data-duty-action='reconciliation']").click();
+  await expect(page.locator("#operation-sort")).toHaveValue("variance");
+  await expect(page.locator("#reconciliation-reviews")).toContainText("统计复核单");
+
+  await page.locator("#operations-duty-actions [data-duty-action='launch']").click();
+  await expect(page.locator("#operation-launch-readiness")).toContainText("上线运行判定");
+
+  const queueAction = await page.locator("#operations-duty-queue [data-duty-action]").first().getAttribute("data-duty-action");
+  await page.locator("#operations-duty-queue [data-duty-action]").first().click();
+  if (queueAction === "dispatch") {
+    await expect(page.locator("#dispatch-requests")).toContainText("调度单");
+  } else if (queueAction === "reconciliation") {
+    await expect(page.locator("#reconciliation-reviews")).toContainText("统计复核单");
+  } else {
+    await expect(page.locator("#operation-launch-readiness")).toContainText("上线运行判定");
+  }
+
+  const primaryAction = await page.locator("#operations-duty-priority [data-duty-action]").getAttribute("data-duty-action");
+  await page.locator("#operations-duty-priority [data-duty-action]").click();
+  if (primaryAction === "dispatch") {
+    await expect(page.locator("#dispatch-requests")).toContainText("调度单");
+  } else if (primaryAction === "reconciliation") {
+    await expect(page.locator("#reconciliation-reviews")).toContainText("统计复核单");
+  } else {
+    await expect(page.locator("#operation-launch-readiness")).toContainText("上线运行判定");
+  }
+});
+
 test("about page explains runnable platform capabilities", async ({ page }) => {
   await page.goto("/about.html");
 

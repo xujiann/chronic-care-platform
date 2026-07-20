@@ -2396,6 +2396,50 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(dispatchAction.body.id, "dispatch-api-test");
     assert.equal(dispatchAction.body.auditTrail.some((item) => item.action === "upsert"), true);
 
+    const dispatchStatus = await api(baseUrl, "/api/operations/dispatch/dispatch-api-test/status", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ status: "closed", note: "API regression closed" })
+    }));
+    assert.equal(dispatchStatus.response.status, 200);
+    assert.equal(dispatchStatus.body.status, "closed");
+    assert.equal(dispatchStatus.body.auditTrail.some((item) => item.action === "status-change"), true);
+
+    const integrationDispatch = await api(baseUrl, "/api/operations/dispatch", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        id: "dispatch-integration-feedback-test",
+        category: "bed",
+        priority: "high",
+        status: "assigned",
+        sourceInstitutionId: "MR3",
+        sourceInstitution: "Qingniwaqiao Community Health Service Center",
+        targetInstitutionId: "MR1",
+        targetInstitution: "Dalian Central Hospital",
+        resourceType: "step-down-bed",
+        quantity: 6,
+        reason: "API regression dispatch feedback"
+      })
+    }));
+    assert.equal(integrationDispatch.response.status, 201);
+
+    const feedbackPayload = {
+      dispatchId: "dispatch-integration-feedback-test",
+      status: "in-progress",
+      note: "Hospital accepted resource dispatch.",
+      sourceSystem: "hospital-dispatch-system",
+      receiptNo: "RECEIPT-MR1-001",
+      handledBy: "MR1 operations desk"
+    };
+    const dispatchFeedback = await api(baseUrl, "/api/operations/integration/dispatch-feedback", authorized(hospitalLogin.body.token, {
+      method: "POST",
+      headers: { "x-integration-signature": integrationSignature(feedbackPayload) },
+      body: JSON.stringify(feedbackPayload)
+    }));
+    assert.equal(dispatchFeedback.response.status, 200);
+    assert.equal(dispatchFeedback.body.status, "in-progress");
+    assert.equal(dispatchFeedback.body.externalReceipt.receiptNo, "RECEIPT-MR1-001");
+    assert.equal(dispatchFeedback.body.auditTrail.some((item) => item.action === "status-change"), true);
+
     const reconReview = await api(baseUrl, "/api/operations/reconciliation/recon-mr1-20260622-am/review", authorized(accountLogin.body.token, {
       method: "POST",
       body: JSON.stringify({ status: "approved", reviewNote: "API regression approved" })
@@ -2403,6 +2447,47 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(reconReview.response.status, 200);
     assert.equal(reconReview.body.status, "approved");
     assert.equal(reconReview.body.reviewedBy, "health");
+    assert.equal(reconReview.body.auditTrail.some((item) => item.action === "review-status-change"), true);
+
+    const reconCorrection = await api(baseUrl, "/api/operations/reconciliation/recon-mr3-20260622-am/review", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ status: "correcting", reviewNote: "API regression correction requested" })
+    }));
+    assert.equal(reconCorrection.response.status, 200);
+    assert.equal(reconCorrection.body.status, "correcting");
+    assert.equal(reconCorrection.body.auditTrail.some((item) => item.action === "review-status-change"), true);
+
+    const reconciliationPayload = {
+      idempotencyKey: "ops-recon-mr1-live-001",
+      reconciliations: [
+        {
+          id: "recon-mr1-live-api",
+          institutionId: "MR1",
+          institution: "Dalian Central Hospital",
+          period: "2026-06-23 AM",
+          sourceBatch: "stat-20260623-am",
+          status: "blocked",
+          varianceRate: 0.052,
+          fields: ["beds.occupied", "outpatient.visitsToday"],
+          platformValue: 5120,
+          directReportValue: 4860,
+          reviewNote: "Hospital direct-report staging value requires confirmation."
+        }
+      ]
+    };
+    const reconciliationIngest = await api(baseUrl, "/api/operations/integration/reconciliation", authorized(hospitalLogin.body.token, {
+      method: "POST",
+      headers: { "x-integration-signature": integrationSignature(reconciliationPayload) },
+      body: JSON.stringify(reconciliationPayload)
+    }));
+    assert.equal(reconciliationIngest.response.status, 202);
+    assert.equal(reconciliationIngest.body.accepted, 1);
+    assert.equal(reconciliationIngest.body.blocked, 1);
+
+    const operationsAfterIntegration = await api(baseUrl, "/api/operations/dashboard", authorized(accountLogin.body.token));
+    assert.equal(operationsAfterIntegration.body.snapshots.some((item) => item.id === "ops-mr1-live-api" && item.normalizedStatus === "critical"), true);
+    assert.equal(operationsAfterIntegration.body.dispatchRequests.some((item) => item.id === "dispatch-integration-feedback-test" && item.status === "in-progress"), true);
+    assert.equal(operationsAfterIntegration.body.reconciliationReviews.some((item) => item.id === "recon-mr1-live-api" && item.status === "blocked"), true);
 
     const identityPreview = await api(baseUrl, "/api/auth/identity/preview", authorized(accountLogin.body.token, {
       method: "POST",

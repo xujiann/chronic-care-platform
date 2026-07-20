@@ -19,9 +19,31 @@
         <nav>
           <a href="./platform.html">平台驾驶舱</a>
           <a href="./workbench.html">运营工作台</a>
+          <a href="./operations-about.html">政策说明</a>
           <a href="./index.html">卫健委端</a>
         </nav>
       </header>
+
+      <section class="panel operations-policy-panel" aria-label="政策依据与监测边界">
+        <div class="panel-title">
+          <h2>政策依据与监测边界</h2>
+          <span>对齐国家二级、三级公立医院绩效监测操作手册（2025版）和医院运行调度现场管理口径</span>
+        </div>
+        <div class="policy-note-grid">
+          <article>
+            <strong>绩效监测口径</strong>
+            <span>按二级公立医院 28 项、三级公立医院 56 项指标建立指标域、数据来源、责任科室、填报周期和异常说明，运行页只承载监测、预警、复核和取证，不替代国家平台正式上报。</span>
+          </article>
+          <article>
+            <strong>运行调度边界</strong>
+            <span>覆盖床位、人员、设备、门急诊、住院运行、直报对账和资源调度；跨院调拨、急诊分流、重症资源协调均保留指挥链 SLA 和审计轨迹。</span>
+          </article>
+          <article>
+            <strong>现场联调要求</strong>
+            <span>HIS、病案首页、人力资源、排班、设备、急诊、统计直报和满意度平台需逐字段核对来源、更新频率、责任科室和差异处理规则。</span>
+          </article>
+        </div>
+      </section>
 
       <section class="metric-grid" id="operations-metrics"></section>
 
@@ -72,6 +94,24 @@
 
         <article class="panel">
           <div class="panel-title">
+            <h2>单机构详情</h2>
+            <span id="operation-selected-hint">点击监测表行查看</span>
+          </div>
+          <div id="operation-detail" class="operation-detail"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>预警处置队列</h2>
+            <span>自动汇总床位、人员、门急诊和直报差异</span>
+          </div>
+          <div id="operation-alert-queue" class="operation-alert-queue"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
             <h2>预警规则</h2>
             <span>床位、人员、设备、门急诊、统计对账</span>
           </div>
@@ -94,25 +134,25 @@
             <span>写入审计留痕</span>
           </div>
           <form id="dispatch-form" class="filter-grid">
-            <label>来源机构<input name="sourceInstitution" value="Qingniwaqiao Community Health Service Center" /></label>
-            <label>目标机构<input name="targetInstitution" value="Dalian Central Hospital" /></label>
-            <label>资源类型<input name="resourceType" value="step-down-bed" /></label>
+            <label>来源机构<input name="sourceInstitution" value="青泥洼桥社区卫生服务中心" /></label>
+            <label>目标机构<input name="targetInstitution" value="大连市中心医院" /></label>
+            <label>资源类型<input name="resourceType" value="过渡病床" /></label>
             <label>数量<input name="quantity" type="number" min="1" value="6" /></label>
             <label>优先级
               <select name="priority">
-                <option value="high">high</option>
-                <option value="medium">medium</option>
-                <option value="low">low</option>
+                <option value="high">高</option>
+                <option value="medium">中</option>
+                <option value="low">低</option>
               </select>
             </label>
             <label>状态
               <select name="status">
-                <option value="pending">pending</option>
-                <option value="assigned">assigned</option>
-                <option value="closed">closed</option>
+                <option value="pending">待处理</option>
+                <option value="assigned">已分派</option>
+                <option value="closed">已关闭</option>
               </select>
             </label>
-            <label class="full">原因<textarea name="reason" rows="3">Bed occupancy alert triggered manual dispatch review.</textarea></label>
+            <label class="full">原因<textarea name="reason" rows="3">床位占用预警触发人工调度复核。</textarea></label>
             <button class="inline-action" type="submit">提交调度</button>
           </form>
         </article>
@@ -121,7 +161,7 @@
       <section class="panel">
         <div class="panel-title">
           <h2>统计直报对账复核</h2>
-          <span>关联 healthStatistics、healthStatisticsIngestion 与运行快照</span>
+          <span>关联卫生健康统计数据、统计直报采集数据与运行快照</span>
         </div>
         <div id="reconciliation-reviews" class="table-wrap"></div>
       </section>

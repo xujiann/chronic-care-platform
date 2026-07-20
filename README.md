@@ -107,6 +107,7 @@ data/db.json
 - 协同业务：`careOrders`、`medicationPickups`、`insuranceClaims`、`referralSystem`、`referralTeleconsultations`
 - 县域医共体：`countyConsortium`、`countyCollaborationOrders`、`countyMutualRecognitionRecords`、`countyAiDiagnosisCases`
 - 证照统计：`deathCertificates`、`birthCertificates`、`healthStatistics`、`healthStatisticsIngestion`
+- 医院运行监测：`hospitalOperationSnapshots`、`resourceDispatchRequests`、`emergencyDispatchLoops`、`statisticsReconciliationReviews`、`operationAlertRules`
 - 治理审计：`securityEvents`、`dataAccessLogs`、`platformRoadmap`、`platformAudit`、`platformProcessAudit`
 - 生产部署：`productionDeploymentPlan` 记录发布门禁、正式数据库适配、政务身份适配和审计保全路径
 - P2 治理：`institutionCreditEvaluations`、`creditEvaluationRules`、`researchDatasets`、`diseaseRegistryModels`
@@ -147,6 +148,8 @@ SQLite 结构化镜像已覆盖居民、账户、主索引、个人健康档案�
 | `GET /api/research/datasets` / `POST /api/research/datasets/:id/actions` | 科研数据集治理 |
 | `GET /api/research/sandbox` / `POST /api/research/datasets` / `POST /api/research/datasets/:id/approval` / `POST /api/research/datasets/:id/sandbox-access` / `POST /api/research/datasets/:id/outcomes` | Research dataset application, ethics approval, de-identified sandbox access, audit trail, and outcome return |
 | `GET /api/research/disease-models` / `POST /api/research/disease-models/:id/review` | 专病库模型和人工复核 |
+| `GET /api/operations/dashboard` / `GET /api/operations/resource-pool` / `GET /api/operations/emergency-dispatch-loop` / `GET /api/operations/go-live-gates` | 医院运行监测、跨院资源池、急诊拥堵调度闭环和上线前门禁清单 |
+| `POST /api/operations/emergency-dispatch-loop/actions` / `POST /api/operations/go-live-gates/actions` / `POST /api/operations/dispatch` | 急诊拥堵复核留痕、上线前门禁复核和资源调度工单管理 |
 | `POST /api/auth/identity/preview` | 政务身份 claims 到角色、机构和首页的接入预映射 |
 | `GET /api/mobile/experience` / `POST /api/mobile/experience` | 移动体验和居民偏好 |
 | `GET /api/mobile/accessibility-checklist` | 无障碍验收清单 |
@@ -393,7 +396,17 @@ Site joint-testing boundary: production HIS/EMR/LIS/PACS critical-value rules, r
 
 ## Hospital Operations Dispatch
 
-operations.html is the runnable management entry for hospital operation monitoring and resource dispatch. It uses GET /api/operations/dashboard, POST /api/operations/dispatch, and POST /api/operations/reconciliation/:id/review to cover bed, staff, equipment, outpatient, emergency, inpatient, dispatch, alert, and statistics direct-report reconciliation boundaries.
+operations.html is the runnable management entry for hospital operation monitoring and resource dispatch. It uses GET /api/operations/dashboard, GET /api/operations/site-joint-tests, GET /api/operations/production-hardening, GET /api/operations/go-live-gates, GET /api/operations/intelligence, GET /api/operations/governance-report, GET /api/operations/handover, GET /api/operations/handover/owners, POST /api/operations/handover/signoff, POST /api/operations/go-live-gates/actions, POST /api/operations/dispatch, and POST /api/operations/reconciliation/:id/review to cover bed, staff, equipment, outpatient, emergency, inpatient, dispatch, alert, site joint-test closeout, production hardening, go-live gate evidence, go-live gate review audit, intelligent dispatch recommendations, governance reporting, shift handover owner assignment, shift handover signoff, and statistics direct-report reconciliation boundaries.
+
+上线运行判定由 `/api/operations/dashboard` 中的 `launchReadiness` 汇总生成，统一核对生产加固阻断项、割接签收阻断项、上线后观察异常、待补证据和观察窗口签收状态，并在 `operations.html` 生产加固面板顶部展示可上线运行或暂缓上线运行结论。
+
+`docs/hospital-operations-integration-requirements.md` 列出上线前与 HIS/住院、HR/排班、设备、门急诊、统计直报、绩效监测、120/转运、医保/证照、统一身份、监控/SIEM、移动消息和生产数据库联通的接口、数据、证据、责任方和阻断条件。
+
+`docs/hospital-operations-flow.md` 补充医院运行监测平台完整流程图，覆盖数据接入、状态规范化、运行监测、预警研判、资源调度、急诊拥堵闭环、统计直报对账、移动值守、审计归档和上线观察。
+
+`docs/hospital-operations-development-report.md` 是本模块开发报告，汇总模块定位、已实现功能、数据集合、API 入口、发布验收证据、当前上线边界和下一步开发计划。
+
+operations-about.html is the policy and scope page for the hospital operations platform. It summarizes the 2025 secondary and tertiary public hospital performance monitoring manuals, hospital operation monitoring boundaries, direct-report reconciliation requirements, data source ownership, and on-site joint-test handoff points.
 
 hospital-operations:readiness generates release/hospital-operations-readiness-report.json and release/hospital-operations-readiness-report.md. The report reuses healthStatistics, healthStatisticsIngestion, medicalResources, operations-readiness, /api/metrics, and platformProcessAudit evidence, and is included by release:report and deploy:check.
 
@@ -455,6 +468,7 @@ The handoff document is `docs/互联网护理服务模块说明.md`; it covers r
 ## Drug Consumable Supervision Evidence
 
 `drug-consumable:readiness` generates `release/drug-consumable-readiness-report.json` and `release/drug-consumable-readiness-report.md`, covering rational medication, prescription review, fixed pickup, high-value consumable clues, insurance settlement coordination, and remediation-loop evidence for the drug and consumable supervision app.
+
 ## Health Dashboard Aggregate Entry
 
 - `health-dashboard.html` is priority application 8: the aggregate entry for the first seven applications.

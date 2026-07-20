@@ -449,6 +449,37 @@
       ]
     }
   ],
+  "emergencyDispatchLoops": [
+    {
+      "id": "ed-loop-mr1-20260622-am",
+      "snapshotId": "ops-mr1-2026-06-22-am",
+      "institutionId": "MR1",
+      "institution": "Dalian Central Hospital",
+      "status": "triage-confirmed",
+      "priority": "high",
+      "targetInstitutionId": "MR2",
+      "targetInstitution": "Dalian Women and Children Medical Center",
+      "resourceType": "ct-slot",
+      "quantity": 2,
+      "trigger": "waitingOver30Min=74, emergencyVisits=612",
+      "reviewNote": "急诊候诊超过30分钟人数较高，先确认CT优先时段和院内分诊分流。",
+      "owner": "急诊科/运行调度席",
+      "reviewedAt": "2026-06-22T09:20:00+08:00",
+      "evidence": [
+        "hospitalOperationSnapshots",
+        "resourceDispatchRequests",
+        "medicalResources"
+      ],
+      "auditTrail": [
+        {
+          "at": "2026-06-22T09:20:00+08:00",
+          "actor": "operations",
+          "action": "triage-confirmed",
+          "note": "急诊拥堵已纳入调度复核队列。"
+        }
+      ]
+    }
+  ],
   "statisticsReconciliationReviews": [
     {
       "id": "recon-mr1-20260622-am",
