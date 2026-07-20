@@ -17,6 +17,8 @@ const { buildCitizenOperationsReadiness, renderMarkdown: renderCitizenOperations
 const { buildCommercialCryptoReadiness, renderMarkdown: renderCommercialCryptoMarkdown } = require("./commercial-crypto-readiness");
 const { buildProductionSecurityReadiness, renderMarkdown: renderProductionSecurityMarkdown } = require("./production-security-readiness");
 const { buildProductionGoNoGoReadiness, renderMarkdown: renderProductionGoNoGoMarkdown } = require("./production-go-no-go-readiness");
+const { buildPilotAcceptanceCenter } = require("../pilot-acceptance");
+const { renderMarkdown: renderPilotAcceptanceMarkdown } = require("./pilot-acceptance-readiness");
 const { buildDataGovernanceReadiness, renderMarkdown: renderDataGovernanceMarkdown } = require("./data-governance-readiness");
 const { buildDataQualityReport, renderMarkdown: renderDataQualityMarkdown } = require("./data-quality-report");
 const { buildDigitalHospitalStandardsReadiness, renderMarkdown: renderDigitalHospitalStandardsMarkdown } = require("./digital-hospital-standards-readiness");
@@ -786,6 +788,17 @@ function productionGoNoGoChecks(productionGoNoGo) {
   ];
 }
 
+function pilotAcceptanceChecks(pilotAcceptance) {
+  return [
+    check("pilotAcceptance:readiness", pilotAcceptance.ok, pilotAcceptance.ok ? "pilot acceptance software controls passed" : "pilot acceptance software controls failed", "error", "pilot-acceptance"),
+    check("pilotAcceptance:applications", pilotAcceptance.summary?.regressionReady === 8 && pilotAcceptance.summary?.applications === 8, `${pilotAcceptance.summary?.regressionReady || 0}/${pilotAcceptance.summary?.applications || 0} applications regression-ready`, "error", "pilot-acceptance"),
+    check("pilotAcceptance:onsitePack", pilotAcceptance.summary?.onsiteTasks === 10, `${pilotAcceptance.summary?.onsiteTasks || 0}/10 P0 acceptance tasks`, "error", "pilot-acceptance"),
+    check("pilotAcceptance:interfaceSamples", pilotAcceptance.summary?.interfaceSamples === 4 && pilotAcceptance.interfaceSamples?.every((item) => item.containsPatientData === false), `${pilotAcceptance.summary?.interfaceSamples || 0} synthetic no-patient-data samples`, "error", "pilot-acceptance"),
+    check("pilotAcceptance:trialRun", pilotAcceptance.summary?.trialPassed === pilotAcceptance.summary?.trialScenarios && (pilotAcceptance.summary?.trialScenarios || 0) >= 7, `${pilotAcceptance.summary?.trialPassed || 0}/${pilotAcceptance.summary?.trialScenarios || 0} simulated scenarios`, "error", "pilot-acceptance"),
+    check("pilotAcceptance:formalBoundary", pilotAcceptance.formalGoLiveState === "blocked-until-site-evidence-signed", pilotAcceptance.formalGoLiveState || "missing", "warn", "pilot-acceptance")
+  ];
+}
+
 function qualitySafetyChecks(qualitySafety) {
   return [
     check("qualitySafety:report", qualitySafety.ok, qualitySafety.ok ? "quality and safety supervision checks passed" : "quality and safety supervision checks failed", "error", "quality-safety"),
@@ -1288,6 +1301,7 @@ function buildReleaseReport(options = {}) {
   const commercialCrypto = buildCommercialCryptoReadiness({ data, pkg });
   const productionSecurity = buildProductionSecurityReadiness({ data, pkg });
   const productionGoNoGo = buildProductionGoNoGoReadiness({ data, pkg, drRehearsalSigned: false });
+  const pilotAcceptance = buildPilotAcceptanceCenter({ data, pkg, env: { ...process.env, ...(options.env || {}) } });
   const phase2Proposal = buildPhase2ProposalReadiness({ pkg });
   const regionalDataSharing = buildRegionalDataSharingReport({ data, pkg });
   const regionalReferralOverlap = buildRegionalReferralOverlapReport({ data, pkg });
@@ -1366,6 +1380,7 @@ function buildReleaseReport(options = {}) {
     ...commercialCryptoChecks(commercialCrypto),
     ...productionSecurityChecks(productionSecurity),
     ...productionGoNoGoChecks(productionGoNoGo),
+    ...pilotAcceptanceChecks(pilotAcceptance),
     ...phase2ProposalChecks(phase2Proposal),
     ...qualitySafetyChecks(qualitySafety),
     ...qualitySafetyInterfaceStandardChecks(qualitySafetyInterfaceStandard),
@@ -1457,6 +1472,7 @@ function buildReleaseReport(options = {}) {
     commercialCrypto,
     productionSecurity,
     productionGoNoGo,
+    pilotAcceptance,
     phase2Proposal,
     qualitySafety,
     qualitySafetyInterfaceStandard,
@@ -1763,6 +1779,10 @@ function renderMarkdown(report) {
     "",
     "See `site-readiness-pack.json` and `site-readiness-pack.md` for identity source mapping, interface joint-test, monitoring/on-call, production signoff templates, and the platform policy source rule.",
     "",
+    "## Priority application pilot acceptance readiness",
+    "",
+    "See `pilot-acceptance-readiness-report.json` and `pilot-acceptance-readiness-report.md` for the eight-application regression matrix, production alerting preflight, P0-01 through P0-10 onsite task pack, four synthetic joint-test samples, end-to-end trial run and issue ledger.",
+    "",
     "## On-site launch requirements",
     "",
     "See `onsite-launch-requirements.json` and `onsite-launch-requirements.md` for field-owned production inputs, P0 blockers, resident mobile acceptance, gray release scope, and signoff evidence.",
@@ -2040,6 +2060,8 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       productionGoNoGo: report.productionGoNoGo
     }, null, 2), "utf8");
+    const pilotAcceptanceJson = path.join(path.dirname(output), "pilot-acceptance-readiness-report.json");
+    fs.writeFileSync(pilotAcceptanceJson, JSON.stringify(report.pilotAcceptance, null, 2), "utf8");
     const qualitySafetyJson = path.join(path.dirname(output), "quality-safety-report.json");
     fs.writeFileSync(qualitySafetyJson, JSON.stringify({
       project: report.project,
@@ -2428,6 +2450,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(productionSecurityMarkdown, renderProductionSecurityMarkdown(report.productionSecurity), "utf8");
     const productionGoNoGoMarkdown = path.join(path.dirname(markdown), "production-go-no-go-readiness-report.md");
     fs.writeFileSync(productionGoNoGoMarkdown, renderProductionGoNoGoMarkdown(report.productionGoNoGo), "utf8");
+    const pilotAcceptanceMarkdown = path.join(path.dirname(markdown), "pilot-acceptance-readiness-report.md");
+    fs.writeFileSync(pilotAcceptanceMarkdown, renderPilotAcceptanceMarkdown(report.pilotAcceptance), "utf8");
     const qualitySafetyMarkdown = path.join(path.dirname(markdown), "quality-safety-report.md");
     fs.writeFileSync(qualitySafetyMarkdown, renderQualitySafetyMarkdown(report.qualitySafety), "utf8");
     const qualitySafetyInterfaceMarkdown = path.join(path.dirname(markdown), "quality-safety-interface-standard.md");

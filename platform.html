@@ -436,6 +436,31 @@
         <p id="production-go-no-go-boundary" class="implementation-boundary"></p>
       </section>
 
+      <section class="panel" id="pilot-acceptance-center" data-platform-section="pilot-acceptance">
+        <div class="panel-title">
+          <h2>八应用试点验收控制中心</h2>
+          <span>统一回归、告警预检、P0任务包、接口样例、试运行和问题台账</span>
+        </div>
+        <div class="action-row">
+          <span id="pilot-acceptance-status" class="badge warn">正在核验试点验收状态</span>
+          <button type="button" class="inline-action" data-pilot-acceptance-refresh>刷新验收状态</button>
+        </div>
+        <div id="pilot-acceptance-metrics" class="metric-grid"></div>
+        <h3>八应用集成回归</h3>
+        <div id="pilot-acceptance-applications" class="table-wrap"></div>
+        <h3>生产告警配置预检</h3>
+        <div id="pilot-acceptance-alerting" class="table-wrap"></div>
+        <h3>P0现场验收任务包</h3>
+        <div id="pilot-acceptance-onsite" class="table-wrap"></div>
+        <h3>重点接口合成联调样例</h3>
+        <div id="pilot-acceptance-interfaces" class="table-wrap"></div>
+        <h3>端到端试运行</h3>
+        <div id="pilot-acceptance-trials" class="table-wrap"></div>
+        <h3>问题台账</h3>
+        <div id="pilot-acceptance-issues" class="table-wrap"></div>
+        <p id="pilot-acceptance-boundary" class="implementation-boundary"></p>
+      </section>
+
       <section class="panel">
         <div class="panel-title">
           <h2>验收证据库</h2>
@@ -619,5 +644,6 @@
     <script src="./platform.js"></script>
     <script src="./production-security.js"></script>
     <script src="./production-go-no-go-ui.js"></script>
+    <script src="./pilot-acceptance-ui.js"></script>
   </body>
 </html>
