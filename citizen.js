@@ -3,6 +3,8 @@ const CITIZEN_EXTRA_KEY = "chronic-care-citizen-extra";
 const LARGE_MODE_KEY = "chronic-care-large-mode";
 const CLIENT_CHANNEL_KEY = "chronic-care-client-channel";
 const CITIZEN_RECENT_ACTION_KEY = "chronic-care-citizen-recent-actions";
+let citizenRecentActionCache = null;
+const citizenRecentActionSession = {};
 const API_BASE = location.protocol === "file:" ? "" : "/api";
 const RESIDENT_TASK_CLOSED_STATUSES = new Set(["closed", "completed", "cancel-requested", "cancelled", "canceled"]);
 const CITIZEN_SERVICE_SWIPE_THRESHOLD = 54;
@@ -268,12 +270,14 @@ function mobileServiceBadgeLabel(tab, active) {
 }
 
 function readCitizenRecentActions() {
+  if (citizenRecentActionCache) return citizenRecentActionCache;
   try {
     const saved = JSON.parse(localStorage.getItem(CITIZEN_RECENT_ACTION_KEY) || "{}");
-    return saved && typeof saved === "object" ? saved : {};
+    citizenRecentActionCache = saved && typeof saved === "object" ? saved : {};
   } catch (error) {
-    return {};
+    citizenRecentActionCache = {};
   }
+  return citizenRecentActionCache;
 }
 
 function rememberCitizenAction(serviceKey, label) {
@@ -281,10 +285,30 @@ function rememberCitizenAction(serviceKey, label) {
   const saved = readCitizenRecentActions();
   const current = Array.isArray(saved[serviceKey]) ? saved[serviceKey] : [];
   saved[serviceKey] = [label, ...current.filter((item) => item !== label)].slice(0, 3);
+  citizenRecentActionSession[serviceKey] = [...saved[serviceKey]];
   try {
     localStorage.setItem(CITIZEN_RECENT_ACTION_KEY, JSON.stringify(saved));
   } catch (error) {
     // Ignore private browsing or storage quota failures.
+  }
+}
+
+function clearCitizenRecentActions(serviceKey) {
+  if (!serviceKey) return;
+  const saved = readCitizenRecentActions();
+  const hasSavedActions = Array.isArray(saved[serviceKey]) && saved[serviceKey].length > 0;
+  const hasSessionActions = Array.isArray(citizenRecentActionSession[serviceKey]) && citizenRecentActionSession[serviceKey].length > 0;
+  if (!hasSavedActions && !hasSessionActions) return;
+  delete saved[serviceKey];
+  delete citizenRecentActionSession[serviceKey];
+  try {
+    if (Object.keys(saved).length > 0) {
+      localStorage.setItem(CITIZEN_RECENT_ACTION_KEY, JSON.stringify(saved));
+    } else {
+      localStorage.removeItem(CITIZEN_RECENT_ACTION_KEY);
+    }
+  } catch (error) {
+    // Keep the default action order available when storage is restricted.
   }
 }
 
@@ -321,7 +345,7 @@ const citizenActionDockFallbacks = {
   ]
 };
 
-function citizenActionDockItems(tab) {
+function citizenActionDockItems(tab, immediateRecentLabel = "") {
   const items = [];
   if (tab) {
     items.push({
@@ -335,7 +359,11 @@ function citizenActionDockItems(tab) {
   (citizenActionDockFallbacks[tab?.key] || []).forEach((item) => {
     if (!items.some((existing) => existing.label === item.label)) items.push(item);
   });
-  const recentLabels = readCitizenRecentActions()[tab?.key] || [];
+  const savedRecentValue = citizenRecentActionSession[tab?.key] || readCitizenRecentActions()[tab?.key];
+  const savedRecentLabels = Array.isArray(savedRecentValue) ? savedRecentValue : [];
+  const recentLabels = immediateRecentLabel
+    ? [immediateRecentLabel, ...savedRecentLabels.filter((label) => label !== immediateRecentLabel)]
+    : savedRecentLabels;
   return items
     .map((item) => ({ ...item, recent: recentLabels.includes(item.label) }))
     .sort((a, b) => Number(Boolean(b.primary)) - Number(Boolean(a.primary)) || Number(Boolean(b.recent)) - Number(Boolean(a.recent)))
@@ -650,16 +678,20 @@ function renderMobileServicePagebar() {
   });
 }
 
-function renderCitizenActionDock() {
+function renderCitizenActionDock(immediateRecentLabel = "") {
   const target = document.querySelector("#citizen-action-dock");
   if (!target) return;
   const active = getActiveCitizenService();
-  const items = citizenActionDockItems(active);
+  const items = citizenActionDockItems(active, immediateRecentLabel);
   const hint = citizenActionDockHint(active, items);
+  const hasRecent = items.some((item) => item.recent);
   target.innerHTML = `<div class="citizen-action-dock-copy">
     <span>常用操作</span>
     <strong>${active.label}</strong>
-    <small>${hint}</small>
+    <div class="citizen-action-dock-meta">
+      <small>${hint}</small>
+      ${hasRecent ? `<button type="button" class="citizen-action-dock-reset" data-action-dock-reset aria-label="恢复${active.label}常用操作默认顺序">恢复默认</button>` : ""}
+    </div>
   </div>
   <div class="citizen-action-dock-actions">
     ${items.map((item) => {
@@ -679,7 +711,7 @@ function renderCitizenActionDock() {
       event.preventDefault();
       rememberCitizenAction(active.key, event.currentTarget.dataset.actionDockLabel);
       invokeInternalServiceAction(event.currentTarget.dataset.actionDockService);
-      renderCitizenActionDock();
+      renderCitizenActionDock(event.currentTarget.dataset.actionDockLabel);
     });
   });
   target.querySelectorAll("[data-action-dock-target]").forEach((button) => {
@@ -691,8 +723,12 @@ function renderCitizenActionDock() {
         setServiceTab(destination.closest("[data-service-pane]").dataset.servicePane, { pushState: true, scrollToPane: false });
       }
       (destination || getServicePageTarget(active.key))?.scrollIntoView({ block: "start", behavior: "smooth" });
-      renderCitizenActionDock();
+      renderCitizenActionDock(button.dataset.actionDockLabel);
     });
+  });
+  target.querySelector("[data-action-dock-reset]")?.addEventListener("click", () => {
+    clearCitizenRecentActions(active.key);
+    renderCitizenActionDock();
   });
 }
 
