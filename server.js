@@ -10085,10 +10085,17 @@ function landPhysicalExamIntegrationEvent(data, payload, event, user) {
     ? { ...payload.payload, externalId: payload.payload.externalId || payload.externalId, residentId: payload.payload.residentId || payload.residentId }
     : payload;
   try {
+    const production = isProductionRuntime();
+    if (production) {
+      if (event.simulated === true) throw new Error("生产环境禁止将模拟体检事件落库");
+      const occurredAt = new Date(payload.occurredAt || "");
+      const clockSkewMs = Math.abs(Date.now() - occurredAt.getTime());
+      if (Number.isNaN(occurredAt.getTime()) || clockSkewMs > 10 * 60 * 1000) throw new Error("生产体检事件 occurredAt 缺失或超出 10 分钟时钟窗口");
+    }
     const result = PhysicalExaminationService.ingest(data, reportPayload, {
       actor: user.username || user.role,
       actorName: user.name,
-      requireStandards: String(process.env.NODE_ENV || "").toLowerCase() === "production",
+      requireStandards: production,
       canAccessResident: (residentId) => canAccessResident(user, residentId, data)
     });
     const report = result.created[0] || result.duplicates[0];
@@ -10102,7 +10109,9 @@ function landPhysicalExamIntegrationEvent(data, payload, event, user) {
       landedRecordId: report?.id || specialized?.id || "",
       residentId: report?.residentId || specialized?.residentId || event.residentId,
       landingStatus: specialized ? (newlyRouted ? "specialized-profile-required" : "specialized-idempotent-replay") : (result.created.length ? "created" : "idempotent-replay"),
-      signatureVerified: true
+      signatureVerified: true,
+      productionEvidence: production,
+      runtimeEnvironment: production ? "production" : "non-production"
     });
     if (report?.residentId) appendDataAccessLog(data, user, report.residentId, "体检报告集成网关", `${report.source} · ${report.meta?.externalId || ""}`);
     if (specialized?.residentId) appendDataAccessLog(data, user, specialized.residentId, "专项体检分流", `${specialized.examProgramName} · ${specialized.externalId}`);
@@ -10122,25 +10131,33 @@ function landPhysicalExamIntegrationEvent(data, payload, event, user) {
 
 function buildPhysicalExamProductionReadiness(data, overview) {
   const storage = objectStorageCenter(process.env);
-  const production = String(process.env.NODE_ENV || "").toLowerCase() === "production";
-  const gatewaySecretConfigured = Boolean(String(process.env.INTEGRATION_GATEWAY_SECRET || "").trim());
+  const production = isProductionRuntime();
+  const gatewaySecretPresent = Boolean(String(process.env.INTEGRATION_GATEWAY_SECRET || "").trim());
+  const gatewaySecretConfigured = productionIntegrationSecretReady(process.env.INTEGRATION_GATEWAY_SECRET);
+  const productionReportsReady = overview.summary.reports > 0;
   const allReportsSigned = overview.summary.reports > 0 && overview.summary.signedReports === overview.summary.reports;
+  const allOriginalsStored = overview.summary.reports > 0 && overview.summary.productionStoredReports === overview.summary.reports;
   const dictionaryReady = overview.summary.mappingRate === 100;
   const nationalDictionaryReady = overview.summary.nationalMappingRate === 100;
   const standardsReady = overview.summary.reports > 0 && overview.summary.standardCompliantReports === overview.summary.reports;
   const qualityIndicatorsCollectable = (overview.qualityIndicators || []).every((item) => item.collectable === true);
   const importantFollowup = (overview.qualityIndicators || []).find((item) => item.code === "HCHM-OU-02");
-  const jointTestsSigned = overview.jointTests.length > 0 && overview.jointTests.every((item) => item.siteSignoff === true);
+  const jointTestsSigned = overview.jointTests.length > 0 && overview.jointTests.every((item) => item.siteSignoff === true && item.siteSignoffVerified === true);
+  const productionGatewayEvents = (overview.gatewayEvents || []).filter((item) => item.productionEvidence === true && item.signatureVerified === true && ["landed", "duplicate", "specialized-routed"].includes(item.status));
+  const gatewayEvidenceReady = productionGatewayEvents.length > 0;
   const blockers = [
+    ...(!productionReportsReady ? ["生产数据域尚无通过规范门禁的真实体检报告"] : []),
     ...(!gatewaySecretConfigured ? ["体检接入独立签名密钥未配置"] : []),
+    ...(!gatewayEvidenceReady ? ["尚无通过时钟窗口、验签和落库校验的生产体检接入事件"] : []),
     ...(!storage.adapterReady ? ["原报告对象存储网关未完成生产配置"] : []),
+    ...(!allOriginalsStored ? ["仍有体检报告未关联校验通过的生产原件"] : []),
     ...(!allReportsSigned ? ["仍有体检报告未通过电子签章核验"] : []),
     ...(!dictionaryReady ? ["仍有体检项目未映射标准字典"] : []),
     ...(!nationalDictionaryReady ? ["仍有体检项目未完成 WS/T 363-2023 国家数据元映射"] : []),
     ...(!standardsReady ? ["报告尚未全部通过 WS/T 483.16-2016 文档、机构资质、个人信息处理依据及 WS/T 847-2024 生产签名门禁"] : []),
     ...(!qualityIndicatorsCollectable ? ["2023版健康体检七项医疗质控指标仍有数据采集缺口"] : []),
     ...(importantFollowup?.denominator > 0 && importantFollowup.value < 100 ? ["重要异常结果尚未全部完成确认、通知和随访闭环"] : []),
-    ...(!jointTestsSigned ? ["体检中心/医院现场联调签字未齐"] : [])
+    ...(!jointTestsSigned ? ["体检中心/医院现场联调证据尚未完成四眼独立核验"] : [])
   ];
   return {
     codeReady: true,
@@ -10149,14 +10166,21 @@ function buildPhysicalExamProductionReadiness(data, overview) {
     gateway: {
       contractId: PHYSICAL_EXAM_CONTRACT_ID,
       signatureAlgorithm: "HMAC-SHA256",
-      replayProtection: "idempotencyKey + integration event ledger",
-      secretConfigured: gatewaySecretConfigured
+      replayProtection: "10-minute occurredAt window + idempotencyKey + integration event ledger",
+      secretPresent: gatewaySecretPresent,
+      secretConfigured: gatewaySecretConfigured,
+      productionEvidenceReady: gatewayEvidenceReady,
+      productionEvents: productionGatewayEvents.length,
+      lastProductionEventAt: productionGatewayEvents[0]?.receivedAt || ""
     },
     storage: {
       adapterReady: storage.adapterReady,
       checksumRequired: storage.controls.checksumRequired,
       malwareScanRequired: storage.controls.serverSideMalwareScanRequired,
-      retentionPolicy: "clinical-record / 15 years / immutable"
+      retentionPolicy: "clinical-record / 15 years / immutable",
+      allOriginalsStored,
+      storedReports: overview.summary.productionStoredReports,
+      reports: overview.summary.reports
     },
     quality: {
       dictionaryReady,
@@ -10171,15 +10195,23 @@ function buildPhysicalExamProductionReadiness(data, overview) {
       standardCompliantReports: overview.summary.standardCompliantReports,
       documentStandard: PhysicalExaminationService.STANDARDS.ADULT_EXAM_DOCUMENT_STANDARD,
       signatureStandard: PhysicalExaminationService.STANDARDS.DIGITAL_SIGNATURE_STANDARD,
-      reports: overview.summary.reports
+      reports: overview.summary.reports,
+      productionReportsReady,
+      demoReportsExcluded: overview.summary.demoReportsExcluded
     },
     siteAcceptance: {
       jointTests: overview.jointTests.length,
       signed: overview.jointTests.filter((item) => item.siteSignoff).length,
+      independentlyVerified: overview.jointTests.filter((item) => item.siteSignoff && item.siteSignoffVerified).length,
       ready: jointTestsSigned
     },
     blockers
   };
+}
+
+function productionIntegrationSecretReady(value) {
+  const secret = String(value || "").trim();
+  return secret.length >= 32 && !/(demo|example|test|change[-_ ]?me|placeholder)/i.test(secret);
 }
 
 function roleFromExternalClaims(claims, organization) {
@@ -27606,7 +27638,8 @@ async function handleApi(req, res) {
     }
     const overview = PhysicalExaminationService.buildOverview(data, {
       residentId,
-      residentIds: [...allowedResidentIds]
+      residentIds: [...allowedResidentIds],
+      excludeDemoData: isProductionRuntime()
     });
     overview.readiness = buildPhysicalExamProductionReadiness(data, overview);
     if (!['commission', 'institution'].includes(user.role)) {
@@ -27643,7 +27676,7 @@ async function handleApi(req, res) {
       appendDataAccessLog(data, user, residentId, "体检创新服务", `${payload.action} · ${result.type}`);
       data.securityEvents = [{ id: randomUUID(), at: new Date().toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role, action: "体检创新服务", target: residentId, result: "允许", detail: `${payload.action} · ${result.type}` }, ...(data.securityEvents || [])].slice(0, 120);
       writeDatabase(normalizeState(data));
-      const overview = PhysicalExaminationService.buildOverview(data, { residentId, residentIds: [...allowedResidentIdsForUser(data, user)] });
+      const overview = PhysicalExaminationService.buildOverview(data, { residentId, residentIds: [...allowedResidentIdsForUser(data, user)], excludeDemoData: isProductionRuntime() });
       sendJson(res, 200, redactSensitiveResponse({ ok: true, result, highlights: overview.highlights }, user));
     } catch (error) {
       const status = Number(error?.statusCode || 400);
@@ -27694,7 +27727,7 @@ async function handleApi(req, res) {
       appendDataAccessLog(data, user, abnormalCase.residentId, "体检异常闭环", `${payload.action} · ${abnormalCase.latestAction}`);
       data.securityEvents = [{ id: randomUUID(), at: new Date().toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role, action: "体检异常处置", target: caseId, result: "允许", detail: `${payload.action} · ${abnormalCase.status}` }, ...(data.securityEvents || [])].slice(0, 120);
       writeDatabase(normalizeState(data));
-      const overview = PhysicalExaminationService.buildOverview(data, { residentIds: [...allowedResidentIdsForUser(data, user)] });
+      const overview = PhysicalExaminationService.buildOverview(data, { residentIds: [...allowedResidentIdsForUser(data, user)], excludeDemoData: isProductionRuntime() });
       sendJson(res, 200, { abnormalCase, overview });
     } catch (error) {
       const status = Number(error?.statusCode || 400);
@@ -27745,10 +27778,10 @@ async function handleApi(req, res) {
       return;
     }
     try {
-      const jointTest = PhysicalExaminationService.applyJointTestAction(data, jointTestId, payload, { actor: user.username || user.role });
+      const jointTest = PhysicalExaminationService.applyJointTestAction(data, jointTestId, payload, { actor: user.username || user.role, role: user.role });
       data.securityEvents = [{ id: randomUUID(), at: new Date().toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role, action: "体检机构联调验收", target: jointTestId, result: "允许", detail: `${payload.action} · ${payload.evidenceRef || ""}` }, ...(data.securityEvents || [])].slice(0, 120);
       writeDatabase(normalizeState(data));
-      const overview = PhysicalExaminationService.buildOverview(data, { residentIds: [...allowedResidentIdsForUser(data, user)] });
+      const overview = PhysicalExaminationService.buildOverview(data, { residentIds: [...allowedResidentIdsForUser(data, user)], excludeDemoData: isProductionRuntime() });
       sendJson(res, 200, { jointTest, readiness: buildPhysicalExamProductionReadiness(data, overview) });
     } catch (error) {
       const status = Number(error?.statusCode || 400);

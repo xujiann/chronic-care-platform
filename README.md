@@ -128,7 +128,7 @@ SQLite 结构化镜像已覆盖居民、账户、主索引、个人健康档案�
 | `POST /api/physical-exams/import` | 体检中心或医院单份/批量接入；一般成人体检同步健康档案，职业/专项体检进入受限分流队列，二者均幂等去重 |
 | `POST /api/physical-exams/abnormal-cases/:id/actions` | 对体检异常结果执行通知居民、复查安排、专科分派、关闭或重开，并生成消息与审计证据 |
 | `POST /api/physical-exams/:id/link-attachment` | 将已完成校验和与恶意文件扫描的原始体检报告安全附件关联到健康档案 |
-| `POST /api/physical-exams/joint-tests/:id/actions` | 逐项登记机构现场联调证据，全部通过后签署上线确认 |
+| `POST /api/physical-exams/joint-tests/:id/actions` | 逐项登记机构现场联调证据；机构提交、不同卫生行政责任人按同一SHA-256摘要独立核验后才完成上线确认 |
 | `POST /api/physical-exams/specialized-intakes/:id/actions` | 凭证据编号把专项体检分配到独立画像、退回来源或关闭分流，禁止混入一般体检档案 |
 | `GET /api/process-audit` | 管理端全流程审计报告，汇总居民、慢病、医共体、医保取药、统计证照、安全合规和生产切换证据域 |
 | `POST /api/auth/login` / `GET /api/auth/me` / `POST /api/auth/logout` | 登录、会话、退出 |

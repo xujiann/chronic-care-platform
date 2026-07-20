@@ -185,7 +185,7 @@ function renderProductionReadiness(readiness) {
     ["签名网关", readiness.gateway?.secretConfigured ? "已配置" : "待配置", readiness.gateway?.signatureAlgorithm || "HMAC-SHA256"],
     ["原件存储", readiness.storage?.adapterReady ? "已配置" : "待配置", "校验和、扫描、15年留存"],
     ["报告质量", readiness.quality?.standardsReady ? "通过" : "待治理", `国标 ${readiness.quality?.nationalMappingRate ?? 0}% · 合规 ${readiness.quality?.standardCompliantReports || 0}/${readiness.quality?.reports || 0}`],
-    ["现场验收", readiness.siteAcceptance?.ready ? "已签署" : "待签署", `${readiness.siteAcceptance?.signed || 0}/${readiness.siteAcceptance?.jointTests || 0} 家机构`]
+    ["现场验收", readiness.siteAcceptance?.ready ? "四眼核验通过" : "待独立核验", `${readiness.siteAcceptance?.independentlyVerified || 0}/${readiness.siteAcceptance?.jointTests || 0} 家机构`]
   ];
   target.innerHTML = cards.map(([label, value, hint]) => `<article class="readiness-card"><span>${escapeExamHtml(label)}</span><strong>${escapeExamHtml(value)}</strong><small>${escapeExamHtml(hint)}</small></article>`).join("");
   const ready = readiness.goLiveReady === true;
@@ -209,10 +209,20 @@ function renderJointTests(rows) {
   const target = document.querySelector("#physical-exam-joint-tests");
   if (!target) return;
   target.innerHTML = rows.map((item) => `<article class="workflow-card" data-joint-test="${escapeExamHtml(item.id)}">
-    <header><strong>${escapeExamHtml(item.institutionName)}</strong><span class="status-chip ${item.siteSignoff ? "ok" : "warn"}">${item.siteSignoff ? "已签署" : "待现场验收"}</span></header>
+    <header><strong>${escapeExamHtml(item.institutionName)}</strong><span class="status-chip ${item.siteSignoffVerified ? "ok" : "warn"}">${item.siteSignoffVerified ? "四眼核验通过" : escapeExamHtml(item.signoffStatus || "待现场验收")}</span></header>
     <ul class="check-list">${(item.checks || []).map((check) => `<li><span>${escapeExamHtml(check.name)}</span><em>${escapeExamHtml(check.status)}</em>${check.status !== "site-passed" && check.status !== "not-applicable" ? `<button type="button" data-joint-check="${escapeExamHtml(check.id)}">现场通过</button>` : ""}</li>`).join("")}</ul>
-    <label class="evidence-field">验收证据编号或附件引用<input data-joint-evidence placeholder="例如 UAT-${escapeExamHtml(item.sourceType)}-001" /></label>
-    <button class="text-action" type="button" data-joint-signoff>签署上线确认</button>
+    ${item.signoffSubmission ? `<p class="signoff-proof">已提交：${escapeExamHtml(item.signoffSubmission.externalSigner)} · ${escapeExamHtml(item.signoffSubmission.signerOrganization)} · 摘要 ${escapeExamHtml(item.signoffSubmission.evidenceDigest.slice(0, 12))}…</p>` : ""}
+    <div class="evidence-grid">
+      <label class="evidence-field">验收证据编号或附件引用<input data-joint-evidence placeholder="例如 UAT-${escapeExamHtml(item.sourceType)}-001" /></label>
+      <label class="evidence-field">证据 SHA-256 摘要<input data-joint-digest maxlength="64" placeholder="64 位十六进制摘要" /></label>
+      <label class="evidence-field">外部签署人<input data-joint-external-signer placeholder="现场业务/信息负责人" /></label>
+      <label class="evidence-field">签署人所属机构<input data-joint-signer-org placeholder="体检中心或医院" /></label>
+      <label class="evidence-field">独立复核记录<input data-joint-verification placeholder="卫生行政复核单号或附件" /></label>
+    </div>
+    <div class="inline-actions">
+      <button type="button" data-joint-submit>提交上线证据</button>
+      ${item.signoffSubmission && !item.siteSignoffVerified ? `<button type="button" data-joint-verify>独立核验通过</button><button type="button" data-joint-reject>退回证据</button>` : ""}
+    </div>
   </article>`).join("") || `<p class="muted">暂无机构联调记录。</p>`;
 }
 
@@ -364,22 +374,42 @@ async function handleAbnormalCaseAction(event) {
 async function handleJointTestAction(event) {
   const card = event.target.closest("[data-joint-test]");
   if (!card) return;
+  const checkButton = event.target.closest("[data-joint-check]");
+  const submitButton = event.target.closest("[data-joint-submit]");
+  const verifyButton = event.target.closest("[data-joint-verify]");
+  const rejectButton = event.target.closest("[data-joint-reject]");
+  if (!checkButton && !submitButton && !verifyButton && !rejectButton) return;
   const evidenceRef = card.querySelector("[data-joint-evidence]")?.value.trim();
-  if (!evidenceRef) {
+  const evidenceDigest = card.querySelector("[data-joint-digest]")?.value.trim().toLowerCase();
+  const externalSigner = card.querySelector("[data-joint-external-signer]")?.value.trim();
+  const signerOrganization = card.querySelector("[data-joint-signer-org]")?.value.trim();
+  const verificationRef = card.querySelector("[data-joint-verification]")?.value.trim();
+  if ((checkButton || submitButton) && !evidenceRef) {
     showPhysicalExamToast("请先填写真实验收证据编号或附件引用");
     return;
   }
-  const checkButton = event.target.closest("[data-joint-check]");
-  const signoffButton = event.target.closest("[data-joint-signoff]");
-  if (!checkButton && !signoffButton) return;
+  if ((submitButton || verifyButton || rejectButton) && !/^[a-f0-9]{64}$/.test(evidenceDigest || "")) {
+    showPhysicalExamToast("请填写与验收附件一致的 64 位 SHA-256 摘要");
+    return;
+  }
+  if (submitButton && (!externalSigner || !signerOrganization)) {
+    showPhysicalExamToast("提交上线证据必须填写外部签署人及所属机构");
+    return;
+  }
+  if ((verifyButton || rejectButton) && !verificationRef) {
+    showPhysicalExamToast("独立复核必须填写复核记录编号或附件引用");
+    return;
+  }
   const payload = checkButton
     ? { action: "update-check", checkId: checkButton.dataset.jointCheck, status: "site-passed", note: "现场联调验证通过", evidenceRef }
-    : { action: "signoff", note: "机构现场验收完成并签署上线确认", evidenceRef };
-  const button = checkButton || signoffButton;
+    : submitButton
+      ? { action: "submit-signoff", note: "提交机构现场验收证据，等待独立复核", evidenceRef, evidenceDigest, externalSigner, signerOrganization }
+      : { action: verifyButton ? "verify-signoff" : "reject-signoff", note: verifyButton ? "卫生行政独立核验通过" : "证据核验不通过，退回补正", evidenceDigest, verificationRef };
+  const button = checkButton || submitButton || verifyButton || rejectButton;
   button.disabled = true;
   try {
     await postPhysicalExamAction(`/physical-exams/joint-tests/${encodeURIComponent(card.dataset.jointTest)}/actions`, payload);
-    await refreshPhysicalExamWorkbench(checkButton ? "联调检查项已留证" : "机构上线确认已签署");
+    await refreshPhysicalExamWorkbench(checkButton ? "联调检查项已留证" : submitButton ? "上线证据已提交，等待独立复核" : verifyButton ? "上线证据已完成四眼核验" : "上线证据已退回补正");
   } catch (error) {
     showPhysicalExamToast(error.message);
   } finally {
