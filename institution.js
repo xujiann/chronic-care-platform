@@ -464,7 +464,254 @@ async function recordLaunchCoreAction(itemId, rowId) {
 
 function chronicClosed(state, status) {
   const closed = state.chronicFollowupStatusPolicy?.statusGroups?.closed || [];
-  return closed.some((item) => String(status || "").includes(item) || String(item || "").includes(String(status || "")));
+  return closed.some((item) => String(status || "").includes(item) || String(item || "").includes(String(status || ""))) || /已完成|已取药|已评估|已复核|completed|picked|handled|closed|read/i.test(String(status || ""));
+}
+
+function chronicDaysUntil(dateText) {
+  if (!dateText) return 999;
+  const date = new Date(`${String(dateText).slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return 999;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((date.getTime() - today.getTime()) / 86400000);
+}
+
+function buildChronicFollowupAlertQueue(state) {
+  const normalize = (item) => {
+    const days = chronicDaysUntil(item.dueAt);
+    const riskText = `${item.status || ""} ${item.risk || ""}`;
+    const priority = String(riskText).includes("逾期") || days < 0 ? "critical" : /高危|预警|high|alert/i.test(riskText) || days <= 3 ? "high" : days <= 7 ? "medium" : "low";
+    return {
+      id: `${item.collection}:${item.sourceId}`,
+      ...item,
+      daysUntil: days,
+      dueBucket: String(riskText).includes("逾期") || days < 0 ? "overdue" : days === 0 ? "due-today" : days <= 7 ? "due-soon" : "scheduled",
+      priority
+    };
+  };
+  return [
+    ...(state.followups || []).filter((item) => !chronicClosed(state, item.status)).map((item) => normalize({ collection: "followups", sourceId: item.id, residentId: item.residentId, dueAt: item.plannedAt, status: item.status, risk: item.diseaseType })),
+    ...(state.medicationPickups || []).filter((item) => !chronicClosed(state, item.status || item.pharmacyStatus)).map((item) => normalize({ collection: "medicationPickups", sourceId: item.id, residentId: item.residentId, dueAt: item.nextPickup, status: item.status || item.pharmacyStatus, risk: item.medication })),
+    ...(state.chronicManagementPlans || []).filter((item) => !chronicClosed(state, item.status)).map((item) => normalize({ collection: "chronicManagementPlans", sourceId: item.id, residentId: item.residentId, dueAt: item.nextReview, status: item.status, risk: item.grade })),
+    ...(state.chronicScreeningTasks || []).filter((item) => !chronicClosed(state, item.status)).map((item) => normalize({ collection: "chronicScreeningTasks", sourceId: item.id, residentId: item.residentId, dueAt: item.due, status: item.status, risk: item.riskLevel })),
+    ...(state.taskMessages || []).filter((item) => item.chronicFollowup && item.targetRole === "institution" && !["read", "handled"].includes(String(item.status || "").toLowerCase())).map((item) => normalize({ collection: item.collection || "taskMessages", sourceId: item.sourceId || item.id, residentId: item.residentId, dueAt: String(item.createdAt || "").slice(0, 10), status: item.status || "sent", risk: "feedback" }))
+  ].sort((a, b) => ({ critical: 0, high: 1, medium: 2, low: 3 }[a.priority] ?? 9) - ({ critical: 0, high: 1, medium: 2, low: 3 }[b.priority] ?? 9) || a.daysUntil - b.daysUntil);
+}
+
+function buildChronicFollowupPolicyAlignment(state) {
+  const feedback = (state.personalRecords || []).filter((item) => item.category === "chronic-feedback" || item.meta?.followupFeedback);
+  return [
+    ["咨询筛查与风险发现", (state.chronicScreeningTasks || []).filter((item) => item.residentId && item.riskLevel && item.nextStep).length],
+    ["分类分级管理", (state.chronicManagementPlans || []).filter((item) => item.residentId && item.grade && item.nextReview).length],
+    ["院后随访与健康指导", (state.followups || []).filter((item) => item.residentId && item.plannedAt && item.assignee).length],
+    ["长期处方与用药保障", (state.medicationPickups || []).filter((item) => item.residentId && item.nextPickup && item.pharmacyStatus).length],
+    ["家庭医生协同", (state.residents || []).filter((resident) => resident.familyDoctor).length + (state.chronicManagementPlans || []).filter((item) => item.owner).length],
+    ["居民自我管理与反馈", feedback.length],
+    ["信息流转与处置闭环", (state.taskMessages || []).filter((item) => item.chronicFollowup && item.residentId && item.targetRole).length]
+  ].map(([policy, count]) => ({ policy, count, covered: count > 0 }));
+}
+
+function fallbackChronicLaunchCore(state) {
+  const items = [
+    ["institution-systems", "机构系统联调", "chronicExternalIntegrations", "institution-integration"],
+    ["identity-scope", "身份与机构范围", "chronicIdentityScopes", "identity-integration"],
+    ["message-channels", "消息回执升级", "chronicMessageChannels", "message-platform"],
+    ["quality-model", "质控模型版本", "chronicModelGovernance", "chronic-quality-office"],
+    ["pharmacy-insurance", "药房医保闭环", "chronicPharmacyInsuranceLinks", "pharmacy-insurance"]
+  ].map(([id, title, collection, owner]) => {
+    const rows = state[collection] || [];
+    return {
+      id,
+      title,
+      owner,
+      collection,
+      ready: rows.length > 0,
+      collectionEvidence: { rows: rows.length, readyRows: rows.length }
+    };
+  });
+  return {
+    ok: items.every((item) => item.ready),
+    summary: {
+      items: items.length,
+      readyItems: items.filter((item) => item.ready).length,
+      evidenceRows: items.reduce((sum, item) => sum + item.collectionEvidence.rows, 0)
+    },
+    items
+  };
+}
+
+function renderChronicLaunchCoreLegacy(state) {
+  const summaryEl = document.querySelector("#chronic-launch-core-summary");
+  const gridEl = document.querySelector("#chronic-launch-core");
+  if (!summaryEl || !gridEl) return;
+  const report = state.chronicLaunchCore || fallbackChronicLaunchCore(state);
+  summaryEl.textContent = `${report.summary.readyItems}/${report.summary.items} 项就绪 · ${report.summary.evidenceRows} 条证据`;
+  gridEl.innerHTML = (report.items || []).map((item) => {
+    const rows = item.collectionEvidence || {};
+    return `<article class="claim-card">
+      <strong>${item.title}</strong>
+      <span>${item.ready ? "PASS" : "PENDING"}<br>${item.collection} · ${rows.readyRows || 0}/${rows.rows || 0}<br>${item.owner}</span>
+    </article>`;
+  }).join("");
+}
+
+function renderChronicLaunchCore(state) {
+  const summaryEl = document.querySelector("#chronic-launch-core-summary");
+  const gridEl = document.querySelector("#chronic-launch-core");
+  if (!summaryEl || !gridEl) return;
+  const report = state.chronicLaunchCore || fallbackChronicLaunchCore(state);
+  const signoffs = report.summary.signoffs || 0;
+  const signedSignoffs = report.summary.signedSignoffs || 0;
+  summaryEl.textContent = `${report.summary.readyItems}/${report.summary.items} ready - ${report.summary.closureRows || 0} closure rows - ${signedSignoffs}/${signoffs} signoffs`;
+  gridEl.innerHTML = (report.items || []).map((item) => {
+    const rows = item.collectionEvidence || {};
+    const closure = item.closureEvidence || {};
+    return `<article class="claim-card">
+      <strong>${item.title}</strong>
+      <span>${item.ready ? "PASS" : "PENDING"}<br>${item.collection} - ${rows.readyRows || 0}/${rows.rows || 0}<br>closure - ${closure.readyRows || 0}/${closure.rows || 0}<br>${item.owner}</span>
+      <div class="action-row">${launchCoreActionButton(item)}</div>
+    </article>`;
+  }).join("");
+}
+
+async function recordLaunchCoreAction(itemId, rowId) {
+  const payload = {
+    itemId,
+    rowId,
+    action: "site closure confirmation",
+    completionStatus: "closed",
+    receiptStatus: "accepted",
+    reviewStatus: "approved",
+    signoffStatus: "signed",
+    note: "institution launch core closure recorded from portal"
+  };
+  if (!institutionApiBase) {
+    const report = platformState.chronicLaunchCore || fallbackChronicLaunchCore(platformState);
+    const item = (report.items || []).find((entry) => entry.id === itemId);
+    if (item) {
+      item.ready = true;
+      item.closureReady = true;
+      item.closureEvidence = {
+        ...(item.closureEvidence || {}),
+        rows: Math.max(item.closureEvidence?.rows || 0, 1),
+        readyRows: Math.max(item.closureEvidence?.readyRows || 0, 1)
+      };
+    }
+    platformState.chronicLaunchCore = report;
+    return { ok: true };
+  }
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/chronic/launch-core/actions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error(`launch core action failed: ${response.status}`);
+    const saved = await response.json();
+    platformState.chronicLaunchCore = saved.launchCore || await loadChronicLaunchCore();
+    return { ok: true, saved };
+  } catch (error) {
+    alert(error.message || "launch core action failed");
+    return { ok: false };
+  }
+}
+
+function chronicPriorityRank(priority) {
+  return { critical: 0, high: 1, medium: 2, low: 3 }[priority] ?? 9;
+}
+
+function chronicWorkbenchFilters() {
+  return {
+    priority: document.querySelector("#chronic-priority-filter")?.value || "all",
+    type: document.querySelector("#chronic-type-filter")?.value || "all",
+    search: String(document.querySelector("#chronic-search")?.value || "").trim().toLowerCase(),
+    sort: document.querySelector("#chronic-sort")?.value || "priority"
+  };
+}
+
+function decorateChronicWorkbenchRows(rows, alertQueue) {
+  const alerts = new Map((alertQueue || []).map((item) => [`${item.collection}:${item.sourceId}`, item]));
+  return rows.map((item) => {
+    const alert = alerts.get(`${item.collection}:${item.id}`) || alerts.get(`${item.collection}:${item.sourceId}`);
+    const resident = residentOf(platformState, item.residentId);
+    return {
+      ...item,
+      alert,
+      priority: alert?.priority || item.priority || "low",
+      dueBucket: alert?.dueBucket || "scheduled",
+      residentName: resident?.name || "",
+      searchText: [resident?.name, item.title, item.collection, item.status, item.due, item.assignee, item.owner, item.pharmacy, item.nextStep, item.intervention, item.advice, item.result].filter(Boolean).join(" ").toLowerCase()
+    };
+  });
+}
+
+function filterChronicWorkbenchRows(rows, filters) {
+  return rows.filter((item) => {
+    if (filters.priority !== "all" && item.priority !== filters.priority) return false;
+    if (filters.type !== "all" && item.collection !== filters.type) return false;
+    if (filters.search && !item.searchText.includes(filters.search)) return false;
+    return true;
+  }).sort((a, b) => {
+    if (filters.sort === "due") return chronicDaysUntil(a.due) - chronicDaysUntil(b.due) || chronicPriorityRank(a.priority) - chronicPriorityRank(b.priority);
+    if (filters.sort === "resident") return String(a.residentName || "").localeCompare(String(b.residentName || ""), "zh-CN") || chronicPriorityRank(a.priority) - chronicPriorityRank(b.priority);
+    return chronicPriorityRank(a.priority) - chronicPriorityRank(b.priority) || chronicDaysUntil(a.due) - chronicDaysUntil(b.due);
+  });
+}
+
+function renderChronicFollowupWorkbenchLegacy(state) {
+  const summaryEl = document.querySelector("#chronic-followup-summary");
+  const metricsEl = document.querySelector("#chronic-followup-metrics");
+  const listEl = document.querySelector("#chronic-followup-workbench");
+  if (!summaryEl || !metricsEl || !listEl) return;
+  const feedback = (state.personalRecords || []).filter((item) => item.category === "chronic-feedback" || item.meta?.followupFeedback);
+  const openFollowups = (state.followups || []).filter((item) => !chronicClosed(state, item.status));
+  const openPlans = (state.chronicManagementPlans || []).filter((item) => !chronicClosed(state, item.status));
+  const openScreenings = (state.chronicScreeningTasks || []).filter((item) => !chronicClosed(state, item.status));
+  const pendingMedication = (state.medicationPickups || []).filter((item) => !chronicClosed(state, item.status || item.pharmacyStatus));
+  const followupMessages = (state.taskMessages || []).filter((item) => item.chronicFollowup && item.targetRole === "institution" && !["read", "handled"].includes(String(item.status || "").toLowerCase()));
+  const policyAlignment = buildChronicFollowupPolicyAlignment(state);
+  const policyCovered = policyAlignment.filter((item) => item.covered).length;
+  const alertQueue = state.chronicFollowupSummary?.alertQueue || buildChronicFollowupAlertQueue(state);
+  const alertSummary = state.chronicFollowupSummary?.summary || {};
+  summaryEl.textContent = `${openFollowups.length + openPlans.length + openScreenings.length + followupMessages.length} 项待处置`;
+  summaryEl.textContent += ` · ${alertQueue.length} 项风险提醒`;
+  metricsEl.innerHTML = [
+    ["筛查分级", openScreenings.length, "高风险发现与分级评估"],
+    ["管理计划", openPlans.length, "复核、升级预警、下次随访"],
+    ["院后随访", openFollowups.length, "逾期、待随访、复诊提醒"],
+    ["用药依从", pendingMedication.length, "固定取药与长处方闭环"],
+    ["随访消息", followupMessages.length, "居民反馈到机构处置提醒"],
+    ["居民反馈", feedback.length, "居民端主动回填"],
+    ["提醒队列", alertQueue.length, `${alertSummary.highPriorityAlerts || alertQueue.filter((item) => ["critical", "high"].includes(item.priority)).length} 项高优先级`],
+    ["政策对照", `${policyCovered}/${policyAlignment.length}`, "国卫基层发〔2025〕15号"]
+  ].map(([label, value, hint]) => `<article class="claim-card"><strong>${label}</strong><span>${value}<br>${hint}</span></article>`).join("");
+
+  const rows = [
+    ...openScreenings.map((item) => ({ ...item, collection: "chronicScreeningTasks", title: item.taskName, due: item.due, primary: "完成评估", updates: { status: "已评估", result: "已生成风险分级和干预建议" } })),
+    ...openPlans.map((item) => ({ ...item, collection: "chronicManagementPlans", title: `${item.diseaseType}管理计划`, due: item.nextReview, primary: "复核完成", updates: { status: "已复核", intervention: "已完成阶段复核并更新管理方案" } })),
+    ...openFollowups.map((item) => ({ ...item, collection: "followups", title: `${item.diseaseType}随访`, due: item.plannedAt, primary: "完成随访", updates: { status: "已完成", result: "已完成院后随访并同步居民反馈" } })),
+    ...pendingMedication.map((item) => ({ ...item, collection: "medicationPickups", title: item.medication, due: item.nextPickup, primary: "确认依从", updates: { status: "已完成", pharmacyStatus: "已取药" } }))
+  ].slice(0, 12);
+  listEl.innerHTML = rows.map((item) => {
+    const resident = residentOf(state, item.residentId);
+    const latestFeedback = feedback.find((record) => record.residentId === item.residentId);
+    const latestMessage = followupMessages.find((message) => message.residentId === item.residentId);
+    return `<section class="item">
+      <div>
+        <h3>${resident?.name || "未知居民"} · ${item.title || item.id}</h3>
+        <p>${item.collection} · ${item.status || "待处理"} · ${item.due || "待排期"} · ${item.assignee || item.owner || item.pharmacy || "责任人待定"}</p>
+        <p>${item.nextStep || item.intervention || item.advice || item.result || "按慢病随访计划处置"}</p>
+        <p>居民反馈：${latestFeedback ? `${latestFeedback.result} · ${latestFeedback.meta?.nextRequest || ""}` : "暂无新增反馈"}</p>
+        <p>随访消息：${latestMessage ? `${latestMessage.title} · ${latestMessage.body || ""}` : "暂无待处理消息"}</p>
+        <div class="action-row">
+          ${chronicDispatchButton(item.collection, item.id, item.primary, item.updates, `慢病随访处置：${item.primary}`)}
+          ${item.collection === "chronicManagementPlans" ? chronicDispatchButton(item.collection, item.id, "升级预警", { status: "预警中", intervention: "已升级家庭医生重点管理" }, "慢病管理计划升级预警") : ""}
+        </div>
+      </div>
+      <span class="badge ${String(item.status || "").includes("逾期") || String(item.status || "").includes("预警") ? "danger" : "warn"}">${item.status || "待处理"}</span>
+    </section>`;
+  }).join("") || `<p class="muted">暂无待处置慢病随访事项。</p>`;
 }
 
 function chronicPriority(item) {
@@ -518,12 +765,15 @@ function renderChronicFollowupWorkbench(state) {
     summaryEl.textContent = `${openFollowups.length + openPlans.length + openScreenings.length} 项待处置 · ${apiSummary.highPriorityAlerts || 0} 项高优先级 · ${apiSummary.policyAligned || 0}/${apiSummary.policyItems || 0} 政策覆盖`;
   }
   metricsEl.innerHTML = [
-    ["筛查分级", openScreenings.length, "高风险发现与分级评估"],
-    ["管理计划", openPlans.length, "复核、升级预警、下次随访"],
-    ["院后随访", openFollowups.length, "逾期、待随访、复诊提醒"],
-    ["用药依从", pendingMedication.length, "固定取药与长处方闭环"],
-    ["居民反馈", feedback.length, "居民端主动回填"]
-  ].map(([label, value, hint]) => `<article class="claim-card"><strong>${label}</strong><span>${value}<br>${hint}</span></article>`).join("");
+    ["Screening", openScreenings.length, "risk discovery and grading"],
+    ["Plans", openPlans.length, "review and escalation"],
+    ["Follow-ups", openFollowups.length, "post-discharge queue"],
+    ["Medication", pendingMedication.length, "pickup and adherence"],
+    ["Messages", followupMessages.length, "resident feedback tasks"],
+    ["Feedback", feedback.length, "resident submitted records"],
+    ["Alert queue", alertQueue.length, `${alertSummary.highPriorityAlerts || alertQueue.filter((item) => ["critical", "high"].includes(item.priority)).length} high priority`],
+    ["Policy", `${policyCovered}/${policyAlignment.length}`, "service boundary coverage"]
+  ].map(([label, value, hint]) => `<article class="claim-card chronic-metric-card"><strong>${label}</strong><span>${value}<br>${hint}</span></article>`).join("");
 
   const rows = filterChronicWorkbenchRows([
     ...openScreenings.map((item) => ({ ...item, collection: "chronicScreeningTasks", title: item.taskName, due: item.due, primary: "完成评估", updates: { status: "已评估", result: "已生成风险分级和干预建议" } })),
@@ -534,21 +784,31 @@ function renderChronicFollowupWorkbench(state) {
   listEl.innerHTML = rows.map((item) => {
     const resident = residentOf(state, item.residentId);
     const latestFeedback = feedback.find((record) => record.residentId === item.residentId);
-    return `<section class="item">
+    const latestMessage = followupMessages.find((message) => message.residentId === item.residentId);
+    const statusText = item.status || item.pharmacyStatus || "pending";
+    const priorityClass = item.priority === "critical" ? "danger" : item.priority === "high" ? "warn" : "info";
+    return `<section class="item chronic-workbench-row priority-${item.priority}">
       <div>
-        <h3>${resident?.name || "未知居民"} · ${item.title || item.id}</h3>
-        <p>${item.collection} · ${item.status || "待处理"} · ${item.due || "待排期"} · ${item.assignee || item.owner || item.pharmacy || "责任人待定"}</p>
-        <p>${item.nextStep || item.intervention || item.advice || item.result || "按慢病随访计划处置"}</p>
-        <p>居民反馈：${latestFeedback ? `${latestFeedback.result} · ${latestFeedback.meta?.nextRequest || ""}` : "暂无新增反馈"}</p>
+        <h3>${resident?.name || "Unknown resident"} - ${item.title || item.id}</h3>
+        <div class="chronic-row-meta">
+          <span class="badge ${priorityClass}">${item.priority}</span>
+          <span>${item.dueBucket}</span>
+          <span>${item.collection}</span>
+          <span>${item.due || "no due date"}</span>
+        </div>
+        <p>${statusText} - ${item.assignee || item.owner || item.pharmacy || "owner pending"}</p>
+        <p>${item.nextStep || item.intervention || item.advice || item.result || "Follow the chronic care plan and close the loop after disposition."}</p>
+        <p>Feedback: ${latestFeedback ? `${latestFeedback.result} - ${latestFeedback.meta?.nextRequest || ""}` : "no new resident feedback"}</p>
+        <p>Message: ${latestMessage ? `${latestMessage.title} - ${latestMessage.body || ""}` : "no open institution message"}</p>
         <div class="action-row">
           ${chronicDispatchButton(item.collection, item.id, item.primary, item.updates, `慢病随访处置：${item.primary}`)}
           ${item.collection === "chronicManagementPlans" ? chronicDispatchButton(item.collection, item.id, "升级预警", { status: "预警中", intervention: "已升级家庭医生重点管理" }, "慢病管理计划升级预警") : ""}
           ${["critical", "high"].includes(item.itemPriority) ? chronicEscalationButton(item.collection, item.id, `priority ${item.itemPriority} chronic follow-up escalation`) : ""}
         </div>
       </div>
-      <span class="badge ${String(item.status || "").includes("逾期") || String(item.status || "").includes("预警") ? "danger" : "warn"}">${item.status || "待处理"}</span>
+      <span class="badge ${priorityClass}">${statusText}</span>
     </section>`;
-  }).join("") || `<p class="muted">暂无待处置慢病随访事项。</p>`;
+  }).join("") || `<p class="muted chronic-empty-state">No chronic follow-up items match the current filters.</p>`;
 }
 
 function fallbackChronicReferralContinuity(state) {

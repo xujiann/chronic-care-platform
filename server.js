@@ -13493,6 +13493,75 @@ function statusInPolicy(policy, group, status) {
   return (policy?.statusGroups?.[group] || []).some((item) => String(status || "").includes(item) || String(item || "").includes(String(status || "")));
 }
 
+function isClosedChronicStatus(policy, status) {
+  return statusInPolicy(policy, "closed", status) || /已完成|已取药|已评估|已复核|completed|picked|handled|closed|read/i.test(String(status || ""));
+}
+
+function buildChronicFollowupPolicyAlignment(data) {
+  const feedback = (data.personalRecords || []).filter((item) => item.category === "chronic-feedback" || item.meta?.followupFeedback);
+  return [
+    {
+      id: "policy-screening",
+      policy: "咨询筛查与风险发现",
+      basis: "基层慢性病健康管理服务能力建设指引",
+      evidence: "chronicScreeningTasks",
+      count: (data.chronicScreeningTasks || []).filter((item) => item.residentId && item.riskLevel && item.nextStep).length,
+      nextAction: "接入基层自测设备、健康体检和公卫筛查结果。"
+    },
+    {
+      id: "policy-tiered-management",
+      policy: "分类分级管理",
+      basis: "国卫基层发〔2025〕15号",
+      evidence: "chronicManagementPlans",
+      count: (data.chronicManagementPlans || []).filter((item) => item.residentId && item.grade && item.nextReview).length,
+      nextAction: "对接家庭医生签约分层规则和专病质控阈值。"
+    },
+    {
+      id: "policy-followup-guidance",
+      policy: "院后随访与健康指导",
+      basis: "国卫基层发〔2025〕15号",
+      evidence: "followups",
+      count: (data.followups || []).filter((item) => item.residentId && item.plannedAt && item.assignee).length,
+      nextAction: "对接 HIS/EMR 出院小结和真实复诊预约状态。"
+    },
+    {
+      id: "policy-medication-support",
+      policy: "长期处方与用药保障",
+      basis: "国卫基层发〔2025〕15号",
+      evidence: "medicationPickups",
+      count: (data.medicationPickups || []).filter((item) => item.residentId && item.nextPickup && item.pharmacyStatus).length,
+      nextAction: "对接处方、药房库存、医保慢病待遇和配送状态。"
+    },
+    {
+      id: "policy-family-doctor",
+      policy: "家庭医生协同",
+      basis: "国卫基层发〔2025〕15号",
+      evidence: "residents.familyDoctor/chronicManagementPlans.owner",
+      count: (data.residents || []).filter((resident) => resident.familyDoctor).length + (data.chronicManagementPlans || []).filter((item) => item.owner).length,
+      nextAction: "绑定真实家庭医生团队、签约居民和服务包。"
+    },
+    {
+      id: "policy-resident-feedback",
+      policy: "居民自我管理与反馈",
+      basis: "基层慢性病健康管理服务能力建设指引",
+      evidence: "personalRecords[category=chronic-feedback]",
+      count: feedback.length,
+      nextAction: "补充居民端量表、满意度和自测指标上传。"
+    },
+    {
+      id: "policy-feedback-dispatch",
+      policy: "信息流转与处置闭环",
+      basis: "基层慢性病健康管理服务能力建设指引",
+      evidence: "taskMessages[chronicFollowup=true]",
+      count: (data.taskMessages || []).filter((item) => item.chronicFollowup && item.residentId && item.targetRole).length,
+      nextAction: "对接短信、公众号和机构站内待办的真实触达回执。"
+    }
+  ].map((item) => ({
+    ...item,
+    covered: item.count > 0
+  }));
+}
+
 function latestRecord(records, residentId, category) {
   return (records || [])
     .filter((item) => item.residentId === residentId && (!category || item.category === category))
@@ -13939,6 +14008,9 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
   const alertQueue = enrichChronicAlertQueue(scoped, readiness.alertQueue || []);
   const escalationMessages = (scoped.taskMessages || []).filter((message) => message.chronicFollowup && message.meta?.escalation && isOpenChronicFollowupMessage(message));
   const feedbackRecords = (scoped.personalRecords || []).filter((item) => item.category === "chronic-feedback");
+  const residentExperienceRecords = (scoped.personalRecords || []).filter((item) => item.category === "chronic-self-checkin" || item.meta?.residentExperience);
+  const followupMessages = (scoped.taskMessages || []).filter((item) => item.chronicFollowup);
+  const alertQueue = buildChronicFollowupAlertQueue(scoped, targetResidents, policy);
   const residents = targetResidents.map((resident) => {
     const screenings = (scoped.chronicScreeningTasks || []).filter((item) => item.residentId === resident.id);
     const plans = (scoped.chronicManagementPlans || []).filter((item) => item.residentId === resident.id);
@@ -13947,10 +14019,10 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
     const adherence = medicationAdherenceForResident(scoped, resident.id);
     const latestFeedback = latestRecord(feedbackRecords, resident.id);
     const openItems = [
-      ...screenings.filter((item) => !statusInPolicy(policy, "closed", item.status)),
-      ...plans.filter((item) => !statusInPolicy(policy, "closed", item.status)),
-      ...followups.filter((item) => !statusInPolicy(policy, "closed", item.status)),
-      ...adherence.pickups.filter((item) => !statusInPolicy(policy, "closed", item.status || item.pharmacyStatus))
+      ...screenings.filter((item) => !isClosedChronicStatus(policy, item.status)),
+      ...plans.filter((item) => !isClosedChronicStatus(policy, item.status)),
+      ...followups.filter((item) => !isClosedChronicStatus(policy, item.status)),
+      ...adherence.pickups.filter((item) => !isClosedChronicStatus(policy, item.status || item.pharmacyStatus))
     ];
     const highPriority = [
       ...screenings,
@@ -13966,7 +14038,7 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
       screeningTasks: screenings,
       managementPlans: plans,
       followups,
-      returnVisitReminders: followups.filter((item) => !statusInPolicy(policy, "closed", item.status)).map((item) => ({
+      returnVisitReminders: followups.filter((item) => !isClosedChronicStatus(policy, item.status)).map((item) => ({
         id: item.id,
         plannedAt: item.plannedAt,
         assignee: item.assignee,
@@ -13983,6 +14055,16 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
         latest: latestFeedback || null,
         count: feedbackRecords.filter((item) => item.residentId === resident.id).length
       },
+      residentExperience: {
+        checkins: residentExperienceRecords.filter((item) => item.residentId === resident.id).length,
+        healthPoints: residentExperienceRecords.filter((item) => item.residentId === resident.id).reduce((sum, item) => sum + Number(item.meta?.healthPoints || 0), 0),
+        seniorReminder: (scoped.seniorServices || []).some((item) => item.residentId === resident.id)
+      },
+      notifications: {
+        count: followupMessages.filter((item) => item.residentId === resident.id).length,
+        unread: followupMessages.filter((item) => item.residentId === resident.id && isOpenChronicFollowupMessage(item)).length
+      },
+      alerts: alertQueue.filter((item) => item.residentId === resident.id),
       archiveEvidence: {
         authorizations: records.filter((item) => item.category === "authorizations").length,
         emr: records.filter((item) => item.category === "emr").length,
@@ -15128,6 +15210,119 @@ function dispatchChronicFollowupAction(data, user, payload) {
   });
   writeDatabase(normalizeState(data));
   return { status: 200, body: { ...item, closedMessages, closedEscalationMessages } };
+}
+
+function recordChronicLaunchCoreAction(data, user, payload) {
+  const itemId = String(payload.itemId || "").trim();
+  const rowId = String(payload.rowId || payload.id || "").trim();
+  const actionType = String(payload.action || "record-launch-core-action").trim();
+  const now = new Date().toISOString();
+  const collectionByItem = {
+    "institution-systems": "chronicExternalIntegrations",
+    "identity-scope": "chronicIdentityScopes",
+    "message-channels": "chronicMessageChannels",
+    "quality-model": "chronicModelGovernance",
+    "pharmacy-insurance": "chronicPharmacyInsuranceLinks",
+    "site-readiness-pack": "chronicLaunchCoreSignoffs"
+  };
+  const collection = collectionByItem[itemId];
+  if (!collection) return { status: 400, body: { error: "Bad Request", message: "unsupported launch core itemId" } };
+  const rows = Array.isArray(data[collection]) ? data[collection] : [];
+  const row = rows.find((item) => item.id === rowId) || rows.find((item) => item.itemId === itemId);
+  if (!row) return { status: 404, body: { error: "Not Found", message: "launch core row not found" } };
+
+  const commonPatch = {
+    completionStatus: String(payload.completionStatus || payload.status || row.completionStatus || "completed").trim(),
+    lastAction: actionType,
+    lastActionAt: now,
+    lastActionBy: user.username || user.role,
+    lastActionByName: user.name,
+    lastActionNote: String(payload.note || payload.comment || "").trim()
+  };
+  const itemPatches = {
+    "institution-systems": {
+      latestReceiptId: String(payload.receiptId || row.latestReceiptId || `receipt-${Date.now()}`).trim(),
+      receiptStatus: String(payload.receiptStatus || row.receiptStatus || "sample-accepted").trim(),
+      jointTestStatus: String(payload.jointTestStatus || "passed").trim(),
+      signedPayloadHash: String(payload.signedPayloadHash || row.signedPayloadHash || "runtime-sample-hash").trim()
+    },
+    "identity-scope": {
+      sampleTokenValidated: payload.sampleTokenValidated === undefined ? true : Boolean(payload.sampleTokenValidated),
+      scopeReviewStatus: String(payload.scopeReviewStatus || "approved").trim(),
+      reviewer: String(payload.reviewer || user.name || row.reviewer || "").trim()
+    },
+    "message-channels": {
+      latestReceiptId: String(payload.receiptId || row.latestReceiptId || `message-receipt-${Date.now()}`).trim(),
+      latestReceiptStatus: String(payload.receiptStatus || payload.deliveryStatus || "delivered").trim(),
+      escalationTested: payload.escalationTested === undefined ? true : Boolean(payload.escalationTested)
+    },
+    "quality-model": {
+      lastReviewStatus: String(payload.reviewStatus || "approved").trim(),
+      qualitySampleStatus: String(payload.qualitySampleStatus || "sample-passed").trim(),
+      reviewerComment: String(payload.reviewerComment || payload.note || row.reviewerComment || "").trim()
+    },
+    "pharmacy-insurance": {
+      settlementReceiptStatus: String(payload.settlementReceiptStatus || "accepted").trim(),
+      inventoryReceiptStatus: String(payload.inventoryReceiptStatus || row.inventoryReceiptStatus || "reserved").trim(),
+      closureStatus: String(payload.closureStatus || "closed").trim()
+    },
+    "site-readiness-pack": {
+      signoffStatus: String(payload.signoffStatus || "signed").trim(),
+      signedBy: String(payload.signedBy || user.name || row.signedBy || "").trim(),
+      signedAt: now
+    }
+  };
+  Object.assign(row, commonPatch, itemPatches[itemId] || {});
+  row.actions = [
+    {
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      action: actionType,
+      status: row.completionStatus || row.signoffStatus || "completed",
+      note: commonPatch.lastActionNote
+    },
+    ...(Array.isArray(row.actions) ? row.actions : [])
+  ].slice(0, 20);
+
+  data.chronicLaunchCoreActions = [
+    {
+      id: `clca-${randomUUID()}`,
+      itemId,
+      collection,
+      rowId: row.id,
+      action: actionType,
+      status: row.completionStatus || row.signoffStatus || "completed",
+      note: commonPatch.lastActionNote,
+      createdAt: now,
+      createdBy: user.username || user.role,
+      createdByName: user.name
+    },
+    ...(Array.isArray(data.chronicLaunchCoreActions) ? data.chronicLaunchCoreActions : [])
+  ].slice(0, 200);
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "record chronic launch core action",
+      target: `${collection}/${row.id}`,
+      result: "allowed",
+      detail: actionType
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
+  writeDatabase(normalizeState(data));
+  return {
+    status: 200,
+    body: {
+      itemId,
+      collection,
+      row,
+      launchCore: buildChronicLaunchCoreReport({ data: normalizeState(data) })
+    }
+  };
 }
 
 function appendSecurityEvent(event) {
@@ -26921,7 +27116,7 @@ async function handleApi(req, res) {
       ].slice(0, 120);
     }
     writeDatabase(data);
-    sendJson(res, 200, data);
+    sendJson(res, 200, normalized);
     return;
   }
 

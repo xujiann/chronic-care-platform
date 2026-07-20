@@ -5058,6 +5058,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(insuranceTasks.body.tasks.some((item) => item.collection === "chronicScreeningTasks"), false);
 
     const citizen = await login(baseUrl, "citizen");
+    const institution = await login(baseUrl, "hospital");
     const citizenMessages = await api(baseUrl, "/api/messages", authorized(citizen.body.token));
     assert.equal(citizenMessages.response.status, 200);
     assert.equal(citizenMessages.body.messages.some((item) => item.id === taskMessage.body.id), true);
@@ -5306,6 +5307,112 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const citizenFollowupSummary = await api(baseUrl, "/api/chronic/followup-summary?residentId=r1", authorized(citizen.body.token));
     assert.equal(citizenFollowupSummary.response.status, 200);
     assert.equal(citizenFollowupSummary.body.residents.every((item) => ["r1"].includes(item.residentId)), true);
+    assert.equal(citizenFollowupSummary.body.alertQueue.every((item) => item.residentId === "r1"), true);
+
+    const residentCheckin = await api(baseUrl, "/api/chronic/resident-checkins", authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        medicationPickupId: "mp1",
+        measurementType: "home blood pressure",
+        measurementValue: "158/92 mmHg high",
+        medicationTaken: true,
+        satisfaction: "needs phone review",
+        proxyName: "family member A",
+        proxyRelation: "daughter",
+        seniorReminder: true,
+        note: "please remind family before next pickup"
+      })
+    }));
+    assert.equal(residentCheckin.response.status, 201);
+    assert.equal(residentCheckin.body.record.category, "chronic-self-checkin");
+    assert.equal(residentCheckin.body.selfManagement.residentId, "r1");
+    assert.equal(residentCheckin.body.healthPoints >= 20, true);
+    assert.equal(typeof residentCheckin.body.messageId, "string");
+    assert.equal(residentCheckin.body.medicationPickup.id, "mp1");
+
+    const checkinSummary = await api(baseUrl, "/api/chronic/followup-summary?residentId=r1", authorized(citizen.body.token));
+    assert.equal(checkinSummary.body.summary.residentExperienceRecords >= 1, true);
+    assert.equal(checkinSummary.body.summary.healthPoints >= residentCheckin.body.healthPoints, true);
+    assert.equal(checkinSummary.body.residents[0].residentExperience.seniorReminder, true);
+
+    const residentCheckinDenied = await api(baseUrl, "/api/chronic/resident-checkins", authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({ residentId: "r2", measurementType: "blood glucose", measurementValue: "7.1" })
+    }));
+    assert.equal(residentCheckinDenied.response.status, 403);
+
+    const deviceMeasurement = await api(baseUrl, "/api/chronic/device-measurements", authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        externalId: "api-device-r1-001",
+        deviceId: "bp-device-api",
+        deviceType: "blood pressure monitor",
+        measurementType: "remote blood pressure",
+        measurementValue: "149/90 mmHg high",
+        medicationTaken: true
+      })
+    }));
+    assert.equal(deviceMeasurement.response.status, 201);
+    assert.equal(deviceMeasurement.body.record.meta.deviceExternalId, "api-device-r1-001");
+    assert.equal(deviceMeasurement.body.selfManagement.uploadSource, "device gateway");
+
+    const deviceMeasurementReplay = await api(baseUrl, "/api/chronic/device-measurements", authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({ residentId: "r1", externalId: "api-device-r1-001", measurementValue: "149/90 mmHg high" })
+    }));
+    assert.equal(deviceMeasurementReplay.response.status, 200);
+    assert.equal(deviceMeasurementReplay.body.idempotent, true);
+
+    const pharmacyCallback = await api(baseUrl, "/api/chronic/pharmacy-callbacks", authorized(institution.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        medicationPickupId: "mp1",
+        externalId: "api-pharmacy-mp1-001",
+        status: "picked_up",
+        pharmacyStatus: "picked_up",
+        medicationTaken: true,
+        note: "pharmacy callback confirmed pickup"
+      })
+    }));
+    assert.equal(pharmacyCallback.response.status, 200);
+    assert.equal(pharmacyCallback.body.medicationPickup.callbackExternalId, "api-pharmacy-mp1-001");
+    assert.equal(typeof pharmacyCallback.body.messageId, "string");
+
+    const familyDoctorClosure = await api(baseUrl, "/api/chronic/family-doctor-actions", authorized(institution.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        messageId: residentCheckin.body.messageId,
+        taskId: `chronicSelfManagement:${residentCheckin.body.selfManagement.id}`,
+        action: "family doctor phone review",
+        result: "family doctor reviewed self-monitoring and updated the service pack",
+        nextAction: "continue home monitoring for 7 days"
+      })
+    }));
+    assert.equal(familyDoctorClosure.response.status, 200);
+    assert.equal(familyDoctorClosure.body.note.category, "chronic-family-doctor-note");
+    assert.equal(familyDoctorClosure.body.closedMessages >= 1, true);
+
+    const reminderOutreach = await api(baseUrl, "/api/chronic/reminder-outreach", authorized(institution.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        channel: "sms",
+        reminderType: "chronic medication reminder",
+        reason: "remind resident and family before pharmacy pickup"
+      })
+    }));
+    assert.equal(reminderOutreach.response.status, 201);
+    assert.equal(reminderOutreach.body.seniorService.outreachEvidence, true);
+    assert.equal(typeof reminderOutreach.body.messageId, "string");
+
+    const pharmacyCallbackDenied = await api(baseUrl, "/api/chronic/pharmacy-callbacks", authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({ medicationPickupId: "mp1", status: "picked_up" })
+    }));
+    assert.equal(pharmacyCallbackDenied.response.status, 403);
 
     const feedback = await api(baseUrl, "/api/chronic/followup-feedback", authorized(citizen.body.token, {
       method: "POST",
@@ -5495,6 +5602,14 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(manualDispatch.response.status, 200);
     assert.equal(manualDispatch.body.escalationStatus, "escalated");
     assert.equal(manualDispatch.body.closedEscalationMessages, 0);
+
+    const closedInstitutionMessages = await api(baseUrl, "/api/messages", authorized(commissionToken));
+    const closedFeedbackMessage = closedInstitutionMessages.body.messages.find((item) => item.id === feedback.body.messageId);
+    assert.equal(closedFeedbackMessage.status, "handled");
+    assert.equal(closedFeedbackMessage.receipts[0].status, "handled");
+
+    const chronicCitizenMessages = await api(baseUrl, "/api/messages", authorized(citizen.body.token));
+    assert.equal(chronicCitizenMessages.body.messages.some((item) => item.taskId === "followups:f1" && item.targetRole === "citizen" && item.chronicFollowup), true);
 
     const dispatchDenied = await api(baseUrl, "/api/chronic/followup-dispatch", authorized(citizen.body.token, {
       method: "POST",
