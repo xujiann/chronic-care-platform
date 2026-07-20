@@ -20,3 +20,10 @@ test("payment parameter governance exposes simulation dual review and publish co
   ["data-payment-section=\"parameter-governance\"", "parameter-version-list", "parameter-impact-list", "创建下一版参数草案"].forEach((marker) => assert.ok(html.includes(marker), marker));
   ["renderParameterGovernance", "parameter-simulate", "parameter-review", "parameter-publish", "/parameters/"].forEach((marker) => assert.ok(script.includes(marker), marker));
 });
+
+test("formal grouper operations exposes asynchronous dispatch retry and dead-letter controls", () => {
+  const html = fs.readFileSync(path.join(ROOT, "disease-payment.html"), "utf8");
+  const script = fs.readFileSync(path.join(ROOT, "disease-payment.js"), "utf8");
+  ["data-payment-section=\"formal-grouping-operations\"", "formal-grouping-job-list", "formal-grouping-dead-letter-list", "创建正式分组作业"].forEach((marker) => assert.ok(html.includes(marker), marker));
+  ["renderFormalGroupingOperations", "formal-dispatch", "formal-fail", "formal-retry", "formal-reconcile", "/formal-grouping/jobs"].forEach((marker) => assert.ok(script.includes(marker), marker));
+});

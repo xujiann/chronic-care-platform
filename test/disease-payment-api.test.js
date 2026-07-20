@@ -6,6 +6,8 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
 const test = require("node:test");
+const Intake = require("../disease-payment-intake");
+const Service = require("../disease-payment-service");
 
 const ROOT = path.resolve(__dirname, "..");
 
@@ -86,6 +88,26 @@ test("disease payment API runs an authenticated end-to-end workflow", async (t) 
   assert.equal(grouping.response.status, 201);
   assert.equal(grouping.body.environment, "simulation");
   assert.ok(grouping.body.recordHash);
+  const formalJob = await json(baseUrl, "/api/disease-payment/formal-grouping/jobs", { method: "POST", headers, body: JSON.stringify({ id: "api-formal-job-success", idempotencyKey: "api-formal-idem-success", mode: "DRG", schemeVersion: "DRG-2.0-DL", caseIds: ["dp-case-003"] }) });
+  assert.equal(formalJob.response.status, 201);
+  assert.equal(formalJob.body.job.status, "queued");
+  const formalDispatch = await json(baseUrl, "/api/disease-payment/formal-grouping/jobs/api-formal-job-success/dispatch", { method: "POST", headers, body: JSON.stringify({ accepted: true, transportId: "api-transport-success" }) });
+  assert.equal(formalDispatch.body.job.status, "awaiting-receipt");
+  const formalCase = Service.seedDiseasePaymentState().cases.find((item) => item.id === "dp-case-003");
+  const formalReceipt = await json(baseUrl, "/api/disease-payment/formal-grouping/jobs/api-formal-job-success/receipts", { method: "POST", headers, body: JSON.stringify({ correlationId: formalDispatch.body.job.correlationId, officialResults: [{ caseId: formalCase.id, receiptId: "API-OFFICIAL-003", groupCode: "FZ15", groupName: "循环系统疾病不伴并发症", schemeVersion: "DRG-2.0-DL", inputDigest: Intake.officialCaseDigest(formalCase, "DRG"), signedAt: "2026-07-20T08:00:00.000Z", signatureValid: true, verification: { verifiedBy: "official-adapter-v1", algorithm: "SM2/SM3", keyId: "api-joint-test-key", verifiedAt: "2026-07-20T08:00:01.000Z" } }] }) });
+  assert.equal(formalReceipt.response.status, 200);
+  assert.equal(formalReceipt.body.job.status, "completed");
+  assert.equal(formalReceipt.body.groupingRun.environment, "formal");
+  const failedJob = await json(baseUrl, "/api/disease-payment/formal-grouping/jobs", { method: "POST", headers, body: JSON.stringify({ id: "api-formal-job-failure", mode: "DRG", schemeVersion: "DRG-2.0-DL", caseIds: ["dp-case-002"], maxAttempts: 1 }) });
+  await json(baseUrl, "/api/disease-payment/formal-grouping/jobs/api-formal-job-failure/dispatch", { method: "POST", headers, body: JSON.stringify({ accepted: true }) });
+  const formalFailure = await json(baseUrl, "/api/disease-payment/formal-grouping/jobs/api-formal-job-failure/fail", { method: "POST", headers, body: JSON.stringify({ errorCode: "RECEIPT_TIMEOUT", errorMessage: "回执超时" }) });
+  assert.equal(formalFailure.body.job.status, "dead-letter");
+  const formalReconciled = await json(baseUrl, "/api/disease-payment/formal-grouping/jobs/api-formal-job-failure/reconcile", { method: "POST", headers, body: JSON.stringify({ resolution: "链路恢复，完成手工对账" }) });
+  assert.equal(formalReconciled.body.job.status, "queued");
+  const formalOperations = await json(baseUrl, "/api/disease-payment/formal-grouping/operations", { headers });
+  assert.equal(formalOperations.response.status, 200);
+  assert.equal(formalOperations.body.summary.completed, 1);
+  assert.equal(formalOperations.body.deadLetters[0].status, "resolved");
   const errors = await json(baseUrl, "/api/disease-payment/intake/errors", { headers });
   assert.equal(errors.response.status, 200);
   assert.equal(errors.body.summary.ledgerValid, true);
