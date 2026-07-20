@@ -4532,3 +4532,22 @@ test("digital hospital P0-P1 pilot evaluation workbench is wired", () => {
   assert.match(read("package.json"), /digital-hospital:pilot-readiness/);
   assert.match(read("scripts/release-artifact-manifest.js"), /digital-hospital-pilot-readiness-report\.md/);
 });
+
+test("priority application pilot acceptance control center is release wired", () => {
+  const server = read("server.js");
+  const html = read("platform.html");
+  const ui = read("pilot-acceptance-ui.js");
+  const model = read("pilot-acceptance.js");
+  const readiness = read("scripts/pilot-acceptance-readiness.js");
+  const documentation = read("docs/pilot-acceptance-control-center.md");
+  assert.match(server, /\/api\/pilot-acceptance\/center/);
+  assert.match(html, /data-platform-section="pilot-acceptance"/);
+  ["pilot-acceptance-applications", "pilot-acceptance-alerting", "pilot-acceptance-onsite", "pilot-acceptance-interfaces", "pilot-acceptance-trials", "pilot-acceptance-issues"].forEach((marker) => assert.match(html, new RegExp(marker)));
+  assert.match(ui, /pilot-acceptance\/center/);
+  assert.match(ui, /data-pilot-acceptance-refresh/);
+  ["official-grouper", "insurance-core", "his-emr-feed", "physical-exam-feed", "pilot-acceptance-tooling-ready", "blocked-until-site-evidence-signed"].forEach((marker) => assert.match(model, new RegExp(marker)));
+  assert.match(readiness, /pilot-acceptance-readiness-report\.md/);
+  assert.match(documentation, /P0-01至P0-10/);
+  assert.match(read("deploy/pilot-alerting.env.template"), /CUTOVER_MONITORING_SIGNOFF=false/);
+  assert.match(read("package.json"), /pilot:acceptance-readiness/);
+});

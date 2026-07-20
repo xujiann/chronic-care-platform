@@ -1197,6 +1197,17 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(priorityTemplates.body.templates.some((item) => item.conversationTitle === "卫生健康综合驾驶舱" && item.aggregateApplication), true);
     assert.equal(priorityTemplates.body.checks.every((item) => item.passed), true);
 
+    const pilotAcceptance = await api(baseUrl, "/api/pilot-acceptance/center", authorized(accountLogin.body.token));
+    assert.equal(pilotAcceptance.response.status, 200);
+    assert.equal(pilotAcceptance.body.ok, true);
+    assert.equal(pilotAcceptance.body.functionalState, "pilot-acceptance-tooling-ready");
+    assert.equal(pilotAcceptance.body.formalGoLiveState, "blocked-until-site-evidence-signed");
+    assert.equal(pilotAcceptance.body.summary.applications, 8);
+    assert.equal(pilotAcceptance.body.summary.onsiteTasks, 10);
+    assert.equal(pilotAcceptance.body.summary.interfaceSamples, 4);
+    assert.equal(pilotAcceptance.body.trialRun.scenarios.length, 7);
+    assert.equal(pilotAcceptance.body.interfaceSamples.every((item) => item.containsPatientData === false), true);
+
     const processAudit = await api(baseUrl, "/api/process-audit", authorized(accountLogin.body.token));
     assert.equal(processAudit.response.status, 200);
     assert.equal(processAudit.body.ok, true);

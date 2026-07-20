@@ -420,6 +420,7 @@ Use `drug-consumable-about.html` as the role-facing scope, policy-source, eviden
 - Open `health-dashboard.html` after commission login to review the aggregate health dashboard.
 - Run `npm.cmd run health-dashboard:summary` to generate `release/health-dashboard-summary.json` and `release/health-dashboard-summary.md`.
 - Run `npm.cmd run priority-apps:templates` to generate `release/priority-application-templates.json` and `release/priority-application-templates.md`.
+- Run `npm.cmd run pilot:acceptance-readiness` to generate the eight-application regression matrix, production alerting preflight, P0 onsite acceptance task pack, synthetic joint-test samples, trial-run evidence and issue ledger. Use `deploy/pilot-alerting.env.template` only as a variable contract; inject real endpoint and secret values through the deployment secret provider.
 - Run `npm.cmd run maternal-child:readiness` to generate the maternal-child main function report: `release/maternal-child-readiness-report.json` and `release/maternal-child-readiness-report.md`.
 - Run `npm.cmd run policy:coverage` to generate `release/policy-coverage-report.json` and `release/policy-coverage-report.md`.
 - Use `GET /api/priority-applications/templates` as the live handoff API for the eight independent application conversations.

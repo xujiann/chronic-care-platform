@@ -97,6 +97,7 @@ const {
 const { buildProcessAuditReport } = require("./scripts/process-audit");
 const { buildSiteReadinessPack, renderTemplateReadmes } = require("./scripts/site-readiness-pack");
 const { buildHealthDashboardSummary, buildPriorityApplicationTemplates } = require("./scripts/health-dashboard-summary");
+const { buildPilotAcceptanceCenter } = require("./pilot-acceptance");
 const { buildReleaseReport, buildServiceAcceptanceSummary } = require("./scripts/release-report");
 const { buildReleaseArtifactManifest } = require("./scripts/release-artifact-manifest");
 const { buildCapabilityMap, renderCapabilityMapMarkdown } = require("./platform-capability-map");
@@ -24892,6 +24893,22 @@ async function handleApi(req, res) {
       detail: "Eight priority application development templates read."
     });
     sendJson(res, 200, buildPriorityApplicationTemplates({ data }));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/pilot-acceptance/center") {
+    const user = requireApiRole(req, res, ["commission"], "/api/pilot-acceptance/center");
+    if (!user) return;
+    const center = buildPilotAcceptanceCenter({ data: readDatabase(), env: process.env });
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "pilot-acceptance-center",
+      target: "/api/pilot-acceptance/center",
+      result: "allowed",
+      detail: `${center.summary.regressionReady}/8 applications regression-ready; ${center.summary.openIssues} pilot issues visible.`
+    });
+    sendJson(res, 200, center);
     return;
   }
 

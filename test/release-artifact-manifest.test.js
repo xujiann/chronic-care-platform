@@ -41,6 +41,7 @@ test("release artifact manifest indexes reports templates commands and evidence"
   assert.equal(report.artifacts.some((item) => item.id === "health-dashboard" && item.command === "health-dashboard:summary" && item.markdown === "release/health-dashboard-summary.md" && item.evidence === "/api/health-dashboard/summary"), true);
   assert.equal(report.artifacts.some((item) => item.id === "health-dashboard-indicator-center" && item.command === "health-dashboard:summary" && item.markdown === "docs/health-dashboard-indicator-center-report.md" && item.evidence === "/api/health-dashboard/industry-governance-indicators"), true);
   assert.equal(report.artifacts.some((item) => item.id === "priority-application-templates" && item.command === "priority-apps:templates" && item.markdown === "release/priority-application-templates.md" && item.evidence === "/api/priority-applications/templates"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "pilot-acceptance-readiness" && item.command === "pilot:acceptance-readiness" && item.markdown === "release/pilot-acceptance-readiness-report.md" && item.evidence === "/api/pilot-acceptance/center"), true);
   assert.equal(report.artifacts.some((item) => item.id === "citizen-launch-foundation" && item.command === "citizen:launch-foundation" && item.markdown === "release/citizen-launch-foundation-readiness.md" && item.evidence === "citizen.html?client=app&page=health-record&launch=1#citizen-pipeline-panel"), true);
   assert.equal(report.artifacts.some((item) => item.id === "maternal-child-readiness" && item.command === "maternal-child:readiness" && item.markdown === "release/maternal-child-readiness-report.md" && item.evidence === "maternal-child-about.html"), true);
   assert.equal(report.artifacts.some((item) => item.id === "public-health-readiness" && item.command === "public-health:readiness" && item.markdown === "release/public-health-readiness-report.md" && item.evidence === "/api/public-health/system"), true);
@@ -84,6 +85,7 @@ test("release artifact manifest renders and writes artifacts", (t) => {
   assert.match(markdown, /health-dashboard-summary\.md/);
   assert.match(markdown, /health-dashboard-indicator-center-report\.md/);
   assert.match(markdown, /priority-application-templates\.md/);
+  assert.match(markdown, /pilot-acceptance-readiness-report\.md/);
   assert.match(markdown, /citizen-launch-foundation-readiness\.md/);
   assert.match(markdown, /citizen\.html\?client=app&page=health-record&launch=1#citizen-pipeline-panel/);
   assert.match(markdown, /maternal-child-readiness-report\.md/);
