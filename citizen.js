@@ -637,8 +637,18 @@ function renderMobileServiceRail() {
       setServiceTab(link.dataset.mobileRailTab, { pushState: true, scrollToPane: false });
     });
   });
-  const activeLink = target.querySelector('[data-mobile-rail-tab][aria-current="page"]');
-  activeLink?.scrollIntoView?.({ block: "nearest", inline: "center" });
+  alignActiveMobileServiceRail(target);
+}
+
+function alignActiveMobileServiceRail(target) {
+  const scroller = target?.querySelector(".mobile-service-rail-scroll");
+  const activeLink = scroller?.querySelector('[data-mobile-rail-tab][aria-current="page"]');
+  if (!scroller || !activeLink) return;
+  requestAnimationFrame(() => {
+    const centeredLeft = activeLink.offsetLeft - (scroller.clientWidth - activeLink.offsetWidth) / 2;
+    const maximumLeft = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
+    scroller.scrollLeft = Math.min(maximumLeft, Math.max(0, centeredLeft));
+  });
 }
 
 function renderMobileServicePagebar() {
