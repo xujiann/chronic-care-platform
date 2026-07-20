@@ -47,6 +47,8 @@ test("interface mapping renders and writes release artifacts", (t) => {
   const writtenMarkdown = fs.readFileSync(path.join(outputDir, "interface-mapping-report.md"), "utf8");
   assert.equal(writtenJson.ok, true);
   assert.match(writtenMarkdown, /his-patient-v1/);
+  assert.match(writtenMarkdown, /referral-feedback-callback-v1/);
+  assert.match(writtenMarkdown, /referral-schedule-callback-v1/);
 });
 
 test("interface mapping CLI parser keeps output flags", () => {

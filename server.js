@@ -34,9 +34,15 @@ const BloodIntegrationGateway = require("./blood-integration-gateway");
 const BloodBusinessService = require("./blood-business-service");
 const BloodInnovationService = require("./blood-innovation-service");
 const BloodEventHub = require("./blood-event-hub");
+const BloodGoLiveService = require("./blood-go-live-service");
 const DiseasePaymentService = require("./disease-payment-service");
 const DiseasePaymentIntake = require("./disease-payment-intake");
 const PhysicalExaminationService = require("./physical-examination-service");
+const { buildQualitySafetyInterfaceStandard } = require("./scripts/quality-safety-interface-standard");
+const {
+  buildQualitySafetyInterfaceJointTestPack,
+  validateQualitySafetyInterfaceMessage
+} = require("./scripts/quality-safety-interface-joint-test");
 const PHYSICAL_EXAM_CONTRACT_ID = "physical-exam-report-v1";
 const EmergencyService = require("./emergency-service");
 const EmergencyLifeChain = require("./emergency-lifechain");
@@ -125,14 +131,17 @@ const {
   buildDigitalHospitalEvaluationCatalog,
   buildDigitalHospitalPilotBoard,
   createDigitalHospitalPilotInstitution,
+  createDigitalHospitalPilotIssue,
   normalizeDigitalHospitalCollectionJobAction,
   normalizeDigitalHospitalEvaluationEvidenceAction,
   normalizeDigitalHospitalPilotInstitutionAction,
+  normalizeDigitalHospitalPilotIssueAction,
   normalizeDigitalHospitalPreAssessmentAction,
   runDigitalHospitalPreAssessment,
   seedDigitalHospitalCollectionJobs,
   seedDigitalHospitalEvaluationEvidence,
   seedDigitalHospitalPilotInstitutions,
+  seedDigitalHospitalPilotIssues,
   seedDigitalHospitalPreAssessments
 } = require("./digital-hospital-evaluation");
 const {
@@ -161,6 +170,19 @@ const {
   seedOperationsIncidents,
   seedProductionServiceLevels
 } = require("./scripts/operations-readiness");
+const {
+  buildProductionSecurityAcceptanceCenter,
+  normalizeProductionSecurityFindingAction,
+  normalizeProductionSecurityReleaseApprovalAction,
+  seedProductionSecurityFindings,
+  seedProductionSecurityReleaseApprovals
+} = require("./production-security-acceptance");
+const {
+  buildProductionGoNoGoCenter,
+  normalizeProductionGoNoGoApprovalAction,
+  normalizeProductionGoNoGoDecision,
+  seedProductionGoNoGoApprovals
+} = require("./production-go-no-go");
 const {
   applyProductionDatabaseCutoverAction,
   buildProductionDatabaseCutoverCenter,
@@ -920,6 +942,7 @@ function seedState() {
     medicalResources: seedMedicalResources(),
     hospitalOperationSnapshots: seedHospitalOperationSnapshots(),
     resourceDispatchRequests: seedResourceDispatchRequests(),
+    emergencyDispatchLoops: seedEmergencyDispatchLoops(),
     statisticsReconciliationReviews: seedStatisticsReconciliationReviews(),
     operationAlertRules: seedOperationAlertRules(),
     productionServiceLevels: seedProductionServiceLevels(),
@@ -1017,11 +1040,15 @@ function seedState() {
     medicalRecordQualityReviews: seedMedicalRecordQualityReviews(),
     mutualRecognitionQualityReviews: seedMutualRecognitionQualityReviews(),
     qualityRectificationOrders: seedQualityRectificationOrders(),
+    qualitySafetySiteSignoffs: seedQualitySafetySiteSignoffs(),
+    qualitySafetyCoreSystemEvidence: [],
     careOrders: seedCareOrders(),
     medicationPickups: seedMedicationPickups(),
     institutionSupervisions: seedInstitutionSupervisions(),
     insuranceClaims: seedInsuranceClaims(),
     policyAlignment: seedPolicyAlignment(),
+    drugTraceabilityPolicySources: seedDrugTraceabilityPolicySources(),
+    drugTraceabilityEvidenceRequirements: seedDrugTraceabilityEvidenceRequirements(),
     emergencySignals: seedEmergencySignals(),
     ...EmergencyService.seed(),
     ...EmergencyLifeChain.seed(),
@@ -1049,6 +1076,7 @@ function seedState() {
     digitalHospitalEvaluationEvidence: seedDigitalHospitalEvaluationEvidence(),
     digitalHospitalPreAssessments: seedDigitalHospitalPreAssessments(),
     digitalHospitalPilotInstitutions: seedDigitalHospitalPilotInstitutions(),
+    digitalHospitalPilotIssues: seedDigitalHospitalPilotIssues(),
     digitalHospitalEvaluationTasks: seedDigitalHospitalEvaluationTasks(),
     digitalHospitalEvidencePackets: seedDigitalHospitalEvidencePackets(),
     digitalHospitalRiskItems: seedDigitalHospitalRiskItems(),
@@ -1087,6 +1115,7 @@ function seedState() {
     countyProjectBlueprint: seedCountyProjectBlueprint(),
     countyConsortium: seedCountyConsortium(),
     referralSystem: seedReferralSystem(),
+    referralTeleconsultationSignoffs: [],
     platformCapabilities: seedPlatformCapabilities(),
     platformIntegrations: seedPlatformIntegrations(),
     platformInterfaces: seedPlatformInterfaces(),
@@ -1110,9 +1139,14 @@ function seedState() {
     creditEvaluationRules: seedCreditEvaluationRules(),
     researchDatasets: seedResearchDatasets(),
     diseaseRegistryModels: seedDiseaseRegistryModels(),
+    compliantDataExports: seedCompliantDataExports(),
     mobileExperienceSettings: seedMobileExperienceSettings(),
     accessibilityChecklist: seedAccessibilityChecklist(),
     securityAcceptanceLedger: seedSecurityAcceptanceLedger(),
+    productionSecurityFindings: seedProductionSecurityFindings(),
+    productionSecurityReleaseApprovals: seedProductionSecurityReleaseApprovals(),
+    productionGoNoGoApprovals: seedProductionGoNoGoApprovals(),
+    productionGoNoGoDecision: null,
     platformChangeLogs: seedPlatformChangeLogs(),
     healthDashboardSnapshots: seedHealthDashboardSnapshots(),
     platformRoadmap: seedPlatformRoadmap(),
@@ -1128,6 +1162,79 @@ function seedState() {
     physicalExamSpecializedIntakes: [],
     taskMessages: []
   };
+}
+
+function seedTaskMessages() {
+  return [
+    {
+      id: "msg-rtc-001-feedback-citizen",
+      taskId: "referralTeleconsultations:rtc-001",
+      collection: "referralTeleconsultations",
+      sourceId: "rtc-001",
+      residentId: "r1",
+      targetRole: "citizen",
+      channel: "in_app",
+      title: "Teleconsultation feedback returned",
+      body: "Receiving feedback from Dalian Central Hospital: Specialist slot reserved; review current prescription before video consultation.",
+      status: "sent",
+      notificationKey: "referralTeleconsultations:rtc-001:feedback:rtc-001-feedback-seed:citizen",
+      receipts: [],
+      createdAt: "2026-06-23T09:31:00.000Z",
+      createdBy: "system",
+      createdByName: "System"
+    },
+    {
+      id: "msg-rtc-001-feedback-institution",
+      taskId: "referralTeleconsultations:rtc-001",
+      collection: "referralTeleconsultations",
+      sourceId: "rtc-001",
+      residentId: "r1",
+      targetRole: "institution",
+      channel: "in_app",
+      title: "Teleconsultation feedback returned",
+      body: "Receiving feedback from Dalian Central Hospital and waiting for the video consultation report.",
+      status: "sent",
+      notificationKey: "referralTeleconsultations:rtc-001:feedback:rtc-001-feedback-seed:institution",
+      receipts: [],
+      createdAt: "2026-06-23T09:31:00.000Z",
+      createdBy: "system",
+      createdByName: "System"
+    },
+    {
+      id: "msg-rtc-002-report-citizen",
+      taskId: "referralTeleconsultations:rtc-002",
+      collection: "referralTeleconsultations",
+      sourceId: "rtc-002",
+      residentId: "r2",
+      targetRole: "citizen",
+      channel: "in_app",
+      title: "Teleconsultation report returned",
+      body: "Report returned from Dalian Medical University Hospital: Recheck HbA1c in three months; primary institution continues diet and exercise intervention.",
+      status: "sent",
+      notificationKey: "referralTeleconsultations:rtc-002:report:rtc-002-report-seed:citizen",
+      receipts: [],
+      createdAt: "2026-06-21T10:31:00.000Z",
+      createdBy: "system",
+      createdByName: "System"
+    },
+    {
+      id: "msg-rtc-002-report-institution",
+      taskId: "referralTeleconsultations:rtc-002",
+      collection: "referralTeleconsultations",
+      sourceId: "rtc-002",
+      residentId: "r2",
+      targetRole: "institution",
+      channel: "in_app",
+      title: "Teleconsultation report returned",
+      body: "Report returned from Dalian Medical University Hospital and archived to the resident longitudinal record.",
+      status: "sent",
+      notificationKey: "referralTeleconsultations:rtc-002:report:rtc-002-report-seed:institution",
+      receipts: [],
+      createdAt: "2026-06-21T10:31:00.000Z",
+      createdBy: "system",
+      createdByName: "System"
+    }
+  ];
 }
 
 function seedPlatformChangeLogs() {
@@ -1323,8 +1430,8 @@ function seedCreditEvaluationRules() {
 
 function seedResearchDatasets() {
   return [
-    { id: "rd-hypertension-001", diseaseType: "hypertension", name: "Hypertension chronic management cohort", version: "1.0.0", ethicsApproval: "IRB-DEMO-HTN-2026", ethicsStatus: "approved", anonymization: "k-anonymity-demo", deidentificationStatus: "released", authorizationStatus: "approved", records: 2, sourceCollections: ["personalRecords", "diagnosticReports", "chronicManagementPlans"], sandbox: { status: "active", environment: "demo-safe-sandbox", lastAccessAt: "" }, accessRequests: [], usageAudit: [], outcomes: [], status: "published" },
-    { id: "rd-diabetes-001", diseaseType: "diabetes", name: "Diabetes follow-up and HbA1c cohort", version: "1.0.0", ethicsApproval: "IRB-DEMO-DM-2026", ethicsStatus: "approved", anonymization: "k-anonymity-demo", deidentificationStatus: "released", authorizationStatus: "approved", records: 1, sourceCollections: ["personalRecords", "diagnosticReports", "followups"], sandbox: { status: "active", environment: "demo-safe-sandbox", lastAccessAt: "" }, accessRequests: [], usageAudit: [], outcomes: [], status: "published" }
+    { id: "rd-hypertension-001", diseaseType: "hypertension", name: "Hypertension chronic management cohort", version: "1.0.0", ethicsApproval: "IRB-DEMO-HTN-2026", ethicsStatus: "approved", anonymization: "k-anonymity-demo", deidentificationStatus: "released", authorizationStatus: "approved", governance: { dataUseAgreement: "DUA-DEMO-HTN-2026", minimumNecessary: true, reidentificationProhibited: true, exportReviewRequired: true, retentionDays: 180, steward: "research-governance", policyBasis: ["PIPL", "Data Security Law", "Network Data Security Regulation", "Ethics Review Measures"] }, evidenceDocuments: [{ id: "rd-hypertension-001-irb", type: "ethics-approval", title: "IRB approval for hypertension cohort", referenceNo: "IRB-DEMO-HTN-2026", issuedBy: "demo-irb", issuedAt: "2026-06-01", status: "verified" }, { id: "rd-hypertension-001-dua", type: "data-use-agreement", title: "Data use agreement for hypertension cohort", referenceNo: "DUA-DEMO-HTN-2026", issuedBy: "research-governance", issuedAt: "2026-06-02", status: "verified" }], records: 2, sourceCollections: ["personalRecords", "diagnosticReports", "chronicManagementPlans"], sandbox: { status: "active", environment: "demo-safe-sandbox", lastAccessAt: "" }, accessRequests: [], usageAudit: [], outcomes: [], status: "published" },
+    { id: "rd-diabetes-001", diseaseType: "diabetes", name: "Diabetes follow-up and HbA1c cohort", version: "1.0.0", ethicsApproval: "IRB-DEMO-DM-2026", ethicsStatus: "approved", anonymization: "k-anonymity-demo", deidentificationStatus: "released", authorizationStatus: "approved", governance: { dataUseAgreement: "DUA-DEMO-DM-2026", minimumNecessary: true, reidentificationProhibited: true, exportReviewRequired: true, retentionDays: 180, steward: "research-governance", policyBasis: ["PIPL", "Data Security Law", "Network Data Security Regulation", "Ethics Review Measures"] }, evidenceDocuments: [{ id: "rd-diabetes-001-irb", type: "ethics-approval", title: "IRB approval for diabetes cohort", referenceNo: "IRB-DEMO-DM-2026", issuedBy: "demo-irb", issuedAt: "2026-06-01", status: "verified" }, { id: "rd-diabetes-001-dua", type: "data-use-agreement", title: "Data use agreement for diabetes cohort", referenceNo: "DUA-DEMO-DM-2026", issuedBy: "research-governance", issuedAt: "2026-06-02", status: "verified" }], records: 1, sourceCollections: ["personalRecords", "diagnosticReports", "followups"], sandbox: { status: "active", environment: "demo-safe-sandbox", lastAccessAt: "" }, accessRequests: [], usageAudit: [], outcomes: [], status: "published" }
   ];
 }
 
@@ -1332,6 +1439,32 @@ function seedDiseaseRegistryModels() {
   return [
     { id: "dm-hypertension-risk-v1", diseaseType: "hypertension", version: "1.0.0", population: "registered hypertension or high-risk residents", threshold: "systolic>=140 or riskLevel=high", reviewStatus: "active", reviewer: "chronic-center", outputs: ["follow-up plan", "specialist review"] },
     { id: "dm-diabetes-risk-v1", diseaseType: "diabetes", version: "1.0.0", population: "diabetes or impaired glucose residents", threshold: "glucose>=7.0 or HbA1c>=6.5", reviewStatus: "active", reviewer: "chronic-center", outputs: ["diet intervention", "HbA1c review"] }
+  ];
+}
+
+function seedCompliantDataExports() {
+  return [
+    {
+      id: "cde-htn-001",
+      datasetId: "rd-hypertension-001",
+      datasetName: "Hypertension chronic management cohort",
+      purpose: "Approved de-identified aggregate export for chronic management cohort review.",
+      destination: "research-governance-review-folder",
+      requestedFields: ["ageBand", "gender", "followupCount", "riskLevel"],
+      exportFormat: "csv",
+      reviewStatus: "approved",
+      exportStatus: "released",
+      deidentified: true,
+      minimumNecessary: true,
+      watermark: "wm-rd-hypertension-001-demo",
+      evidenceRef: "rd-hypertension-001-dua",
+      reviewer: "research-governance",
+      requestedBy: "research-governance",
+      requestedAt: "2026-06-20T09:30:00.000Z",
+      reviewedAt: "2026-06-20T10:00:00.000Z",
+      retentionDays: 180,
+      policyBasis: ["PIPL", "Data Security Law", "Network Data Security Regulation", "Ethics Review Measures"]
+    }
   ];
 }
 
@@ -1537,7 +1670,25 @@ function seedReferralTeleconsultations() {
       reportReturnedAt: "",
       reportSummary: "",
       collaborationOrderId: "cco-004",
-      performance: { responseHours: 4, reportReturnHours: 0, satisfaction: "pending" },
+      performance: {
+        responseHours: 4,
+        reportReturnHours: 0,
+        satisfaction: "pending",
+        insurancePaymentPath: "primary-referral-continuous-deductible",
+        repeatExamControl: "pending-specialist-review"
+      },
+      slaDisposition: {
+        status: "pending-ack",
+        owner: "Dalian Central Hospital",
+        action: "confirm report callback or manual reconciliation",
+        updatedAt: ""
+      },
+      countySupervision: {
+        status: "督办中",
+        owner: "中山区县域医共体",
+        reason: "high priority pending report",
+        due: todayOffset(0)
+      },
       auditTrail: [
         { at: todayOffset(-1), actor: "doc-liu", action: "created", note: "Primary institution submitted teleconsultation request." },
         { at: todayOffset(0), actor: "doc-wang", action: "scheduled", note: "Receiving hospital accepted the request and reserved a consultation window." }
@@ -1568,7 +1719,25 @@ function seedReferralTeleconsultations() {
       reportReturnedAt: todayOffset(-1),
       reportSummary: "Continue eight-week long prescription follow-up and weekly blood pressure upload.",
       collaborationOrderId: "cco-005",
-      performance: { responseHours: 2, reportReturnHours: 18, satisfaction: "good" },
+      performance: {
+        responseHours: 2,
+        reportReturnHours: 18,
+        satisfaction: "good",
+        insurancePaymentPath: "down-referral-primary-followup",
+        repeatExamControl: "recognized-report-reused"
+      },
+      slaDisposition: {
+        status: "closed",
+        owner: "Qingniwaqiao Community Health Service Center",
+        action: "report archived and follow-up accepted",
+        updatedAt: todayOffset(-1)
+      },
+      countySupervision: {
+        status: "已闭环",
+        owner: "中山区县域医共体",
+        reason: "report returned",
+        due: todayOffset(-1)
+      },
       auditTrail: [
         { at: todayOffset(-3), actor: "doc-wang", action: "created", note: "Tertiary hospital initiated down-referral consultation." },
         { at: todayOffset(-1), actor: "doc-liu", action: "report-returned", note: "Primary institution confirmed follow-up report return." }
@@ -2138,6 +2307,36 @@ function seedResourceDispatchRequests() {
   ];
 }
 
+function seedEmergencyDispatchLoops() {
+  return [
+    {
+      id: "ed-loop-mr1-20260622-am",
+      snapshotId: "ops-mr1-2026-06-22-am",
+      institutionId: "MR1",
+      institution: "Dalian Central Hospital",
+      status: "triage-confirmed",
+      priority: "high",
+      targetInstitutionId: "MR2",
+      targetInstitution: "Dalian Women and Children Medical Center",
+      resourceType: "ct-slot",
+      quantity: 2,
+      trigger: "waitingOver30Min=74, emergencyVisits=612",
+      reviewNote: "急诊候诊超过30分钟人数较高，先确认CT优先时段和院内分诊分流。",
+      owner: "急诊科/运行调度席",
+      reviewedAt: "2026-06-22T09:20:00+08:00",
+      evidence: ["hospitalOperationSnapshots", "resourceDispatchRequests", "medicalResources"],
+      auditTrail: [
+        {
+          at: "2026-06-22T09:20:00+08:00",
+          actor: "operations",
+          action: "triage-confirmed",
+          note: "急诊拥堵已纳入调度复核队列。"
+        }
+      ]
+    }
+  ];
+}
+
 function seedStatisticsReconciliationReviews() {
   return [
     {
@@ -2210,7 +2409,10 @@ function seedIntegrationContracts() {
     { id: "payment-transaction-v1", domain: "Payment", version: "1.0.0", direction: "bidirectional", resource: "PaymentTransaction", requiredFields: ["externalId", "orderNo", "amountFen", "currency"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "3 attempts then dead letter and reconciliation", status: "ready" },
     { id: "insurance-settlement-v1", domain: "医保", version: "1.0.0", direction: "bidirectional", resource: "SettlementStatus", requiredFields: ["externalId", "residentId", "claimStatus", "amount"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "失败进入补偿队列", status: "ready" },
     { id: "certificate-sync-v1", domain: "电子证照", version: "1.0.0", direction: "outbound", resource: "CertificateStatus", requiredFields: ["externalId", "certificateNo", "status"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "失败进入补偿队列", status: "ready" },
-    { id: "statistics-report-v1", domain: "卫生统计", version: "1.0.0", direction: "inbound", resource: "HealthStatistics", requiredFields: ["externalId", "period", "institution", "metrics"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "人工复核后重放", status: "ready" }
+    { id: "statistics-report-v1", domain: "卫生统计", version: "1.0.0", direction: "inbound", resource: "HealthStatistics", requiredFields: ["externalId", "period", "institution", "metrics"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "人工复核后重放", status: "ready" },
+    { id: "referral-feedback-callback-v1", domain: "Referral", version: "1.0.0", direction: "inbound", resource: "TeleconsultationFeedback", requiredFields: ["externalId", "teleconsultationId", "residentId", "receivingFeedback", "feedbackAt", "sourceSystem"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "idempotent replay with manual reconciliation", status: "ready" },
+    { id: "referral-schedule-callback-v1", domain: "Referral", version: "1.0.0", direction: "inbound", resource: "TeleconsultationSchedule", requiredFields: ["externalId", "teleconsultationId", "residentId", "meetingWindow", "targetInstitution", "department"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "idempotent replay with manual reconciliation", status: "ready" },
+    { id: "referral-report-callback-v1", domain: "Referral", version: "1.0.0", direction: "inbound", resource: "TeleconsultationReport", requiredFields: ["externalId", "teleconsultationId", "residentId", "reportSummary", "reportReturnedAt", "sourceSystem"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "idempotent replay with manual reconciliation", status: "ready" }
   ];
 }
 
@@ -3597,7 +3799,7 @@ function seedCriticalValueAlerts() {
 
 function seedClinicalPathwayCases() {
   return [
-    { id: "cpc-001", eventId: "qse-path-001", residentId: "r1", pathwayCode: "HTN-2026", pathwayName: "Hypertension standard pathway", institutionName: "Dalian Central Hospital", currentNode: "follow-up-after-medication", varianceType: "missing_evidence", varianceReason: "Follow-up result not written back to EMR.", status: "variance_open", owner: "Clinical pathway office", dueAt: "2026-06-28T10:00:00.000Z" }
+    { id: "cpc-001", eventId: "qse-path-001", residentId: "r1", pathwayCode: "HTN-2026", pathwayName: "Hypertension standard pathway", institutionName: "Dalian Central Hospital", currentNode: "follow-up-after-medication", varianceType: "missing_evidence", varianceReason: "Follow-up result not written back to EMR.", status: "variance_open", owner: "Clinical pathway office", dueAt: "2026-06-28T10:00:00.000Z", auditTrail: [{ at: "2026-06-21T10:00:00.000Z", by: "health", action: "seed-variance", note: "Clinical pathway variance captured from EMR summary." }] }
   ];
 }
 
@@ -3629,6 +3831,89 @@ function seedQualityRectificationOrders() {
       feedback: [{ at: "2026-06-22T16:00:00.000Z", by: "community", byName: "Community doctor", content: "Corrected assessment fields have been uploaded for review.", attachments: ["emr-correction-screenshot"] }],
       review: [],
       auditTrail: [{ at: "2026-06-20T15:00:00.000Z", by: "health", action: "dispatch", note: "Seed rectification order." }]
+    }
+  ];
+}
+
+function seedQualitySafetySiteSignoffs() {
+  return [
+    {
+      id: "qss-live-feeds",
+      domain: "live_interfaces",
+      item: "Live HIS/EMR/LIS/PACS feed binding",
+      ownerRole: "commission",
+      owner: "Institution integration group",
+      requiredEvidence: ["signed joint-test record", "sample inbound payload", "field mapping confirmation"],
+      sourceCollections: ["hospitalInteroperabilityFunctions", "integrationContracts"],
+      status: "pending_site_confirmation",
+      dueAt: "2026-07-05",
+      latestNote: "Confirm live feed scope and payload signatures before production cutover.",
+      auditTrail: [{ at: "2026-06-28T10:00:00.000Z", by: "health", action: "seed-site-signoff", note: "Initial site sign-off tracker." }]
+    },
+    {
+      id: "qss-critical-routing",
+      domain: "critical_value",
+      item: "Production critical-value routing and timeout escalation",
+      ownerRole: "institution",
+      owner: "Dalian Central Hospital",
+      requiredEvidence: ["routing rule screenshot", "acknowledgement receipt", "timeout escalation recipient list"],
+      sourceCollections: ["criticalValueAlerts", "diagnosticReports"],
+      status: "ready_for_joint_test",
+      dueAt: "2026-07-03",
+      latestNote: "Pilot route is ready; production notification receipt still needs site confirmation.",
+      auditTrail: [{ at: "2026-06-28T10:05:00.000Z", by: "health", action: "seed-site-signoff", note: "Critical value route prepared for joint test." }]
+    },
+    {
+      id: "qss-pathway-dictionary",
+      domain: "clinical_pathway",
+      item: "Local clinical pathway dictionaries and EMR variance evidence",
+      ownerRole: "institution",
+      owner: "Dalian Central Hospital",
+      requiredEvidence: ["local pathway dictionary", "variance rule mapping", "EMR screenshot sample"],
+      sourceCollections: ["clinicalPathwayCases", "qualitySafetyEvents"],
+      status: "pending_site_confirmation",
+      dueAt: "2026-07-08",
+      latestNote: "Attach local pathway dictionary version and variance examples.",
+      auditTrail: [{ at: "2026-06-28T10:10:00.000Z", by: "health", action: "seed-site-signoff", note: "Pathway dictionary sign-off item created." }]
+    },
+    {
+      id: "qss-mutual-recognition-rules",
+      domain: "mutual_recognition_qc",
+      item: "Regional mutual-recognition lists and negative-list rules",
+      ownerRole: "county",
+      owner: "Regional mutual recognition QC",
+      requiredEvidence: ["recognition catalog", "negative-list rule", "manual review exception sample"],
+      sourceCollections: ["countyMutualRecognitionRecords", "mutualRecognitionQualityReviews"],
+      status: "pending_site_confirmation",
+      dueAt: "2026-07-06",
+      latestNote: "County consortium must confirm catalog and exception handling.",
+      auditTrail: [{ at: "2026-06-28T10:15:00.000Z", by: "health", action: "seed-site-signoff", note: "Mutual-recognition sign-off item created." }]
+    },
+    {
+      id: "qss-department-attachments",
+      domain: "rectification",
+      item: "Department rectification sign-off attachments",
+      ownerRole: "institution",
+      owner: "Qingniwaqiao Community Health Service Center",
+      requiredEvidence: ["department head signature", "corrected EMR evidence", "commission review note"],
+      sourceCollections: ["qualityRectificationOrders", "medicalRecordQualityReviews"],
+      status: "ready_for_joint_test",
+      dueAt: "2026-07-04",
+      latestNote: "Demo attachment placeholder exists; production requires signed department evidence.",
+      auditTrail: [{ at: "2026-06-28T10:20:00.000Z", by: "health", action: "seed-site-signoff", note: "Rectification attachment sign-off prepared." }]
+    },
+    {
+      id: "qss-audit-retention",
+      domain: "audit_retention",
+      item: "Production audit retention target",
+      ownerRole: "commission",
+      owner: "Security administration",
+      requiredEvidence: ["AUDIT_EXPORT_PATH or SIEM_ENDPOINT", "retention period approval", "audit export permission"],
+      sourceCollections: ["securityEvents", "dataAccessLogs"],
+      status: "pending_site_confirmation",
+      dueAt: "2026-07-10",
+      latestNote: "Production retention target remains a cutover warning until environment evidence is configured.",
+      auditTrail: [{ at: "2026-06-28T10:25:00.000Z", by: "health", action: "seed-site-signoff", note: "Audit retention sign-off item created." }]
     }
   ];
 }
@@ -4963,6 +5248,13 @@ function seedImageCloudImplementedFeatures() {
       status: "已实现",
       evidence: "share/qc APIs",
       detail: "支持二维码或短信链接限时分享，支持扫描评分、报告评分和质控结论回写。"
+    },
+    {
+      id: "imaging-feature-mutual-recognition",
+      name: "跨机构影像互认闭环",
+      status: "已实现",
+      evidence: "imaging-cloud mutual-recognition APIs",
+      detail: "影像云检查可生成医共体协同工单、互认记录和主索引引用；确认后同步报告、检查状态和审计证据。"
     }
   ];
 }
@@ -5019,10 +5311,10 @@ function seedImageCloudDevelopmentPlan() {
       phase: "跨机构互认扩展",
       owner: "county-consortium-office",
       target: "把影像云检查纳入县域检查互认、远程诊断和远程会诊闭环。",
-      nextAction: "将影像云检查与 countyCollaborationOrders、countyMutualRecognitionRecords、referralTeleconsultations 建立引用。",
+      nextAction: "已建立影像云检查与县域协同工单、互认记录和报告引用；下一步接入真实 PACS/RIS 回传和会诊系统联调。",
       acceptance: "基层申请、中心诊断、报告回传、结果互认和居民查询可串联到同一主索引。",
-      status: "待开发",
-      evidence: ["countyCollaborationOrders", "countyMutualRecognitionRecords"]
+      status: "演示闭环已实现",
+      evidence: ["countyCollaborationOrders", "countyMutualRecognitionRecords", "POST /api/imaging-cloud/studies/:id/mutual-recognition"]
     }
   ];
 }
@@ -5173,6 +5465,9 @@ function seedDigitalCredentials() {
 
 function seedPolicyAlignment() {
   return [
+    { domain: "医联体转诊与远程会诊", requirement: "依据分级诊疗体系建设要求，以紧密型医联体为抓手，完善基层首诊、双向转诊、急慢分治、上下联动和转诊服务管理。", capability: "平台已形成转诊申请、居民授权、接诊反馈、预约排期、远程会诊、报告回传、个人健康信息库归档和绩效评价闭环。", status: "专项应用闭环" },
+    { domain: "县域医共体信息化协同", requirement: "依据紧密型县域医共体信息化功能要求，支撑远程会诊、双向转诊、检验检查结果互认、医保业务协同和医共体绩效管理。", capability: "县域端复用 countyCollaborationOrders、countyAcceptanceLedger、countyMutualRecognitionRecords 和 referralTeleconsultations 形成协同指挥视图。", status: "专项应用闭环" },
+    { domain: "远程医疗与互联网诊疗监管边界", requirement: "远程医疗侧重医疗机构之间远程会诊和诊断协作，互联网诊疗主要承接常见病、慢性病复诊、家庭医生签约和用药指导等服务。", capability: "平台按医疗机构、医生、居民授权、报告归档、接口签名、幂等回调和审计留痕划清远程会诊与居民端服务边界。", status: "联调待现场确认" },
     { domain: "普惠数字医疗", requirement: "建设互通共享的全民健康信息平台，推动医疗卫生机构数据共享互认和业务协同。", capability: "个人健康信息库聚合电子病历、检查检验、用药、授权和慢病管理数据。", status: "已启动" },
     { domain: "医疗全流程在线办理", requirement: "加快异地转诊、就医、住院、医保等医疗全流程在线办理。", capability: "医疗机构端承接转诊协同，医保中心承接结算经办审核，医保局保留基金监管视图，个人端承接固定取药和授权共享。", status: "原型完成" },
     { domain: "互联网医疗监管", requirement: "完善互联网医疗服务监管体系，推进互联网+监管和智慧监管。", capability: "卫健委端建设四端运行监测、机构绩效、风险预警和数据质量看板。", status: "已纳入" },
@@ -5181,6 +5476,106 @@ function seedPolicyAlignment() {
     { domain: "基层智慧治理", requirement: "以数据驱动、信息共享提升基层治理和疫情防控能力。", capability: "基层机构、家庭医生、居民端、医保中心和区市县医保局共用同一居民主索引和慢病闭环台账。", status: "已启动" },
     { domain: "数据安全与合规", requirement: "完善数据脱敏、加密保护、合规评估和安全保障体系。", capability: "已形成角色权限、字段脱敏、授权撤销、访问复核、审计哈希链、安全合规证据和高风险事件闭环。", status: "基础闭环" },
     { domain: "适老化与无障碍", requirement: "优化信息无障碍环境，解决老年人等群体数字鸿沟。", capability: "已覆盖大字模式、读屏语义、家属代办、线下帮办、消息触达、弱网模式和无障碍验收清单。", status: "基础闭环" }
+  ];
+}
+
+function seedDrugTraceabilityPolicySources() {
+  return [
+    {
+      id: "nhsa-2025-7",
+      authority: "国家医保局等四部门",
+      title: "关于加强药品追溯码在医疗保障和工伤保险领域采集应用的通知",
+      documentNo: "医保发〔2025〕7号",
+      issuedAt: "2025-03-19",
+      url: "https://www.nhsa.gov.cn/art/2025/3/19/art_104_16045.html",
+      rule: "2025-07-01 起销售环节按要求扫码后方可进行医保基金结算；2026-01-01 起所有医药机构实现药品追溯码全量采集上传。",
+      platformImpact: "药耗监管、医保结算协同、机构整改和工作台模板必须记录追溯码采集、上传、无码库、异常重复销售和部门协同处置证据。"
+    },
+    {
+      id: "nhsa-2024-collection",
+      authority: "国家医疗保障局办公室",
+      title: "关于进一步做好医保药品耗材追溯码信息采集工作有关事项的公告",
+      documentNo: "2024-04-00056",
+      issuedAt: "2024-09-30",
+      url: "https://www.nhsa.gov.cn/art/2024/9/30/art_109_14042.html",
+      rule: "明确采集范围、生产流通企业上传接口、三码映射库、包装级联映射库和地方医保部门不得一刀切、不得指定设备服务商等注意事项。",
+      platformImpact: "模板需区分暂不采集场景、医保编码/商品码/追溯码映射、生产流通企业可选上传和现场设备服务边界。"
+    },
+    {
+      id: "nmpa-2018-guidance",
+      authority: "国家药监局",
+      title: "国家药监局关于药品信息化追溯体系建设的指导意见",
+      documentNo: "国药监药管〔2018〕35号",
+      issuedAt: "2018-11-01",
+      url: "https://www.nmpa.gov.cn/directory/web/nmpa/xxgk/fgwj/gzwj/gzwjyp/20181101100801272.html",
+      rule: "以保障公众用药安全为目标，以落实企业主体责任为基础，按一物一码、物码同追方向建设药品信息化追溯体系。",
+      platformImpact: "药品追溯线索、整改闭环和审计报告需以主体责任、全流程追溯和公众用药安全为基本监管口径。"
+    },
+    {
+      id: "nmpa-2019-32",
+      authority: "国家药监局",
+      title: "关于发布《药品信息化追溯体系建设导则》《药品追溯码编码要求》两项信息化标准的公告",
+      documentNo: "2019年第32号",
+      issuedAt: "2019-04-28",
+      url: "https://www.nmpa.gov.cn/directory/web/nmpa/////////zwgk/ghcw/ghjh/20190428164801603.html",
+      rule: "发布药品信息化追溯体系建设导则和药品追溯码编码要求，作为追溯体系与编码规范基础。",
+      platformImpact: "接口联调模板需留出追溯码编码规则、各级包装关联、发码机构和追溯系统地址解析字段。"
+    },
+    {
+      id: "nmpa-2022-label",
+      authority: "国家药监局",
+      title: "药品追溯码标识规范",
+      documentNo: "NMPAB/T 1011-2022",
+      issuedAt: "2022-06-23",
+      url: "https://www.nmpa.gov.cn/directory/web/nmpa/images/1656320881524098380.pdf",
+      rule: "药品追溯码用于唯一标识药品各级销售包装单元；标识应清晰、显著、可被设备和人眼识读，并包含文字、可识读字符和条码符号。",
+      platformImpact: "机构端和医保端模板需记录追溯码可识读性、包装级别、扫码失败原因、人工核验和整改证据。"
+    }
+  ];
+}
+
+function seedDrugTraceabilityEvidenceRequirements() {
+  return [
+    {
+      id: "trace-scan-capture",
+      title: "Traceability scan capture",
+      boundaries: ["rational-medication", "fixed-pharmacy", "insurance-settlement"],
+      owner: "institution-and-insurance",
+      policySourceIds: ["nhsa-2025-7", "nmpa-2022-label"],
+      evidenceFields: ["traceCode", "scanTime", "packageLevel", "operator", "sourceSystem"]
+    },
+    {
+      id: "trace-code-mapping",
+      title: "Insurance code and traceability-code mapping",
+      boundaries: ["insurance-settlement"],
+      owner: "insurance-integration",
+      policySourceIds: ["nhsa-2024-collection", "nmpa-2019-32"],
+      evidenceFields: ["medicalInsuranceCode", "commodityCode", "traceCode", "packageCascade", "mappingVersion"]
+    },
+    {
+      id: "trace-manual-exception",
+      title: "No-code or failed-scan manual verification",
+      boundaries: ["rational-medication", "fixed-pharmacy", "consumable-clue"],
+      owner: "institution-remediation",
+      policySourceIds: ["nhsa-2024-collection", "nmpa-2022-label"],
+      evidenceFields: ["noCodeReason", "manualVerification", "photoEvidence", "reviewer", "rectificationDeadline"]
+    },
+    {
+      id: "trace-consumable-catalog",
+      title: "High-value consumable catalog and settlement cross-check",
+      boundaries: ["consumable-clue", "insurance-settlement"],
+      owner: "institution-and-insurance",
+      policySourceIds: ["nhsa-2025-7", "nhsa-2024-collection"],
+      evidenceFields: ["catalogVersion", "batchNo", "useRecord", "chargeItem", "claimId"]
+    },
+    {
+      id: "trace-remediation-audit",
+      title: "Remediation audit trail and department coordination",
+      boundaries: ["rational-medication", "fixed-pharmacy", "consumable-clue", "insurance-settlement"],
+      owner: "commission-insurance-institution",
+      policySourceIds: ["nhsa-2025-7", "nmpa-2018-guidance"],
+      evidenceFields: ["auditTrail", "securityEvent", "remediationEvidence", "reviewDecision", "nextAction"]
+    }
   ];
 }
 
@@ -5215,6 +5610,28 @@ function seedHealthStatistics() {
       { institutionId: "mr3", institution: "青泥洼桥社区卫生服务中心", interfaceData: { outpatientVisits: 18600, emergencyVisits: 420, inpatientAdmissions: 120, discharges: 118, bedDays: 1860 }, directReport: { outpatientVisits: 18580, emergencyVisits: 420, inpatientAdmissions: 120, discharges: 118, bedDays: 1860 }, status: "已一致" },
       { institutionId: "mr4", institution: "星海湾社区卫生服务中心", interfaceData: { outpatientVisits: 14200, emergencyVisits: 360, inpatientAdmissions: 86, discharges: 84, bedDays: 1260 }, directReport: { outpatientVisits: 14120, emergencyVisits: 360, inpatientAdmissions: 84, discharges: 84, bedDays: 1260 }, status: "待复核" },
       { institutionId: "mr5", institution: "甘井子区人民医院", interfaceData: { outpatientVisits: 64200, emergencyVisits: 7200, inpatientAdmissions: 4260, discharges: 4200, bedDays: 128800 }, directReport: { outpatientVisits: 64240, emergencyVisits: 7180, inpatientAdmissions: 4260, discharges: 4196, bedDays: 128600 }, status: "待复核" }
+    ],
+    dailyServiceReports: [
+      { id: "daily-service-20260610", reportDate: "2026-06-10", source: "卫生健康统计日报接口", scope: "全市医疗机构日报汇总", interfaceData: { outpatientVisits: 12000, emergencyVisits: 900, inpatientAdmissions: 720, discharges: 698, occupiedBeds: 8030 }, receiptNo: "DSR-20260610-001", status: "received", reconciled: true },
+      { id: "daily-service-20260611", reportDate: "2026-06-11", source: "卫生健康统计日报接口", scope: "全市医疗机构日报汇总", interfaceData: { outpatientVisits: 12240, emergencyVisits: 920, inpatientAdmissions: 735, discharges: 706, occupiedBeds: 8058 }, receiptNo: "DSR-20260611-001", status: "received", reconciled: true },
+      { id: "daily-service-20260612", reportDate: "2026-06-12", source: "卫生健康统计日报接口", scope: "全市医疗机构日报汇总", interfaceData: { outpatientVisits: 12580, emergencyVisits: 980, inpatientAdmissions: 760, discharges: 742, occupiedBeds: 8094 }, receiptNo: "DSR-20260612-001", status: "received", reconciled: true },
+      { id: "daily-service-20260613", reportDate: "2026-06-13", source: "卫生健康统计日报接口", scope: "全市医疗机构日报汇总", interfaceData: { outpatientVisits: 11880, emergencyVisits: 860, inpatientAdmissions: 710, discharges: 724, occupiedBeds: 8079 }, receiptNo: "DSR-20260613-001", status: "received", reconciled: true },
+      { id: "daily-service-20260614", reportDate: "2026-06-14", source: "卫生健康统计日报接口", scope: "全市医疗机构日报汇总", interfaceData: { outpatientVisits: 11650, emergencyVisits: 840, inpatientAdmissions: 705, discharges: 700, occupiedBeds: 8065 }, receiptNo: "DSR-20260614-001", status: "received", reconciled: true },
+      { id: "daily-service-20260615", reportDate: "2026-06-15", source: "卫生健康统计日报接口", scope: "全市医疗机构日报汇总", interfaceData: { outpatientVisits: 13100, emergencyVisits: 1010, inpatientAdmissions: 790, discharges: 755, occupiedBeds: 8128 }, receiptNo: "DSR-20260615-001", status: "received", reconciled: true },
+      { id: "daily-service-20260616", reportDate: "2026-06-16", source: "卫生健康统计日报接口", scope: "全市医疗机构日报汇总", interfaceData: { outpatientVisits: 12880, emergencyVisits: 960, inpatientAdmissions: 792, discharges: 768, occupiedBeds: 8150 }, receiptNo: "DSR-20260616-001", status: "received", reconciled: true }
+    ],
+    certificateExchangeLinks: [
+      { id: "exchange-birth-license", domain: "出生医学证明", source: "birthCertificates", target: "电子证照平台/公安户籍登记", owner: "妇幼健康处", status: "ready", receiptStatus: "received", receiptNo: "BIRTH-REC-20260616-001", revokeSupported: true, correctionSupported: true, reconciliationStatus: "matched", lastReceiptAt: "2026-06-16T11:20:00.000Z", nextAction: "现场替换为省电子证照与公安户籍正式回执。" },
+      { id: "exchange-death-license", domain: "死亡医学证明", source: "deathCertificates", target: "电子证照平台/人口死亡信息登记系统", owner: "医政医管处", status: "watch", receiptStatus: "partial", receiptNo: "DEATH-REC-20260616-001", revokeSupported: true, correctionSupported: true, reconciliationStatus: "pending", lastReceiptAt: "2026-06-16T09:40:00.000Z", nextAction: "补齐纸质证明回执与电子证照撤销校验样例。" },
+      { id: "exchange-cdc-cause", domain: "疾控死因监测", source: "deathStatistics", target: "疾控死因监测/法定传染病关联", owner: "疾控处", status: "watch", receiptStatus: "received", receiptNo: "CDC-CAUSE-20260616-001", revokeSupported: false, correctionSupported: true, reconciliationStatus: "variance-review", lastReceiptAt: "2026-06-16T12:10:00.000Z", nextAction: "联调死因编码修订、补报和死亡原因链质控回执。" },
+      { id: "exchange-civil-affairs", domain: "民政殡葬协同", source: "deathCertificates", target: "民政殡葬服务共享", owner: "基层卫生处/民政协同", status: "blocked", receiptStatus: "missing", receiptNo: "", revokeSupported: false, correctionSupported: false, reconciliationStatus: "missing", lastReceiptAt: "", nextAction: "现场确认民政殡葬服务接口、回执字段和数据共享协议。" },
+      { id: "exchange-statistics-direct", domain: "卫生统计直报对账", source: "healthStatistics.dailyServiceReports", target: "卫生健康统计直报系统", owner: "规划信息处", status: "ready", receiptStatus: "received", receiptNo: "STAT-DAILY-20260616-001", revokeSupported: true, correctionSupported: true, reconciliationStatus: "matched", lastReceiptAt: "2026-06-16T18:00:00.000Z", nextAction: "生产切换时接入机构级日报明细与月报差异清单。" }
+    ],
+    siteEvidencePackage: [
+      { id: "summary-json", type: "发布摘要", evidence: "release/health-dashboard-summary.json", owner: "规划信息处", status: "ready", nextAction: "随 release:report 归档。" },
+      { id: "interface-messages", type: "接口报文", evidence: "platformInterfaces + hospitalInteroperabilityFunctions", owner: "接口联调组", status: "ready", nextAction: "生产联调时替换为真实请求、响应和签名样例。" },
+      { id: "acceptance-records", type: "验收记录", evidence: "platformEvidence records", owner: "项目办", status: "ready", nextAction: "补充现场截图、签字单和复测结论。" },
+      { id: "site-signoff", type: "现场签字", evidence: "productionDeploymentPlan signoff", owner: "各级卫生健康行政部门", status: "watch", nextAction: "上线前完成身份、证照、统计、院内系统和灾备签字。" }
     ],
     qualityRules: [
       { rule: "资源口径一致", detail: "床位、执业医生、注册护士以机构接口与统计直报系统双源比对，差异超过 1% 标记复核。", status: "已配置" },
@@ -5960,6 +6377,28 @@ function seedDrugConsumableSupervisions() {
       nextAction: "Insurance center confirms benefit scope and pickup cycle.",
       auditTrail: [{ at: "2026-06-20T09:05:00.000Z", actor: "system", role: "commission", action: "seed", result: "created" }],
       lastUpdated: "2026-06-20T09:05:00.000Z",
+      personIndex: "DEMO-ID-R2#DEMO-MOBILE-R2"
+    },
+    {
+      id: "dcs-supply-mp3",
+      residentId: "r2",
+      category: "supply-assurance",
+      boundary: "supply-alert",
+      institution: "Xinghaiwan Community Health Service Center",
+      sourceCollection: "medicationPickups",
+      sourceId: "mp3",
+      relatedPickupId: "mp3",
+      relatedClaimId: "ic2",
+      issue: "Metformin fixed-pickup supply is under low-stock warning and needs procurement or transfer confirmation.",
+      riskLevel: "warning",
+      reviewStatus: "supply-alert-registered",
+      insuranceStatus: "pending-audit",
+      remediationStatus: "open",
+      status: "open",
+      ownerRole: "institution",
+      nextAction: "Institution pharmacy confirms stock transfer plan and insurance center keeps the pickup cycle payable.",
+      auditTrail: [{ at: "2026-06-20T09:08:00.000Z", actor: "system", role: "commission", action: "seed", result: "created" }],
+      lastUpdated: "2026-06-20T09:08:00.000Z",
       personIndex: "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
@@ -7193,6 +7632,1671 @@ function normalizeOperationStatus(snapshot, rules = []) {
   return "normal";
 }
 
+const PERFORMANCE_MONITORING_MANUALS = {
+  secondary: {
+    title: "二级公立医院绩效监测操作手册（2025版）",
+    total: 28,
+    quantitative: 28,
+    qualitative: 0,
+    national: 21,
+    domains: { "医疗质量": 13, "运营效率": 9, "持续发展": 4, "满意度评价": 2 },
+    sources: { "病案首页": 7, "医院填报": 5, "财务年报表": 9, "国家或省级平台": 5, "满意度调查平台": 2 }
+  },
+  tertiary: {
+    title: "三级公立医院绩效监测操作手册（2025版）",
+    total: 56,
+    quantitative: 51,
+    qualitative: 5,
+    national: 26,
+    domains: { "功能定位": 7, "医疗质量": 19, "运营效率": 18, "持续发展": 9, "满意度评价": 3 },
+    sources: { "病案首页": 10, "医院填报": 20, "财务年报表": 16, "国家或省级平台": 7, "满意度调查平台": 3 }
+  }
+};
+
+const OPERATIONS_INTERFACE_MAPPINGS = [
+  {
+    id: "ops-his-beds",
+    sourceSystem: "HIS/住院管理",
+    source: "病案首页",
+    targetCollection: "hospitalOperationSnapshots",
+    targetField: "beds",
+    fields: ["开放床位", "占用床位", "重症床位", "急诊留观"],
+    owner: "医务部、病案室、信息中心",
+    updateCycle: "日内15分钟",
+    status: "已接入",
+    nextAction: "现场核对床位开放、占用和重症床位口径，确认与直报床位口径差异说明。"
+  },
+  {
+    id: "ops-hr-staff",
+    sourceSystem: "人力资源/排班系统",
+    source: "医院填报",
+    targetCollection: "hospitalOperationSnapshots",
+    targetField: "staff",
+    fields: ["在岗医生", "在岗护士", "急诊医生", "人员缺口"],
+    owner: "人事科、护理部、医务部",
+    updateCycle: "日内排班变更",
+    status: "待联调",
+    nextAction: "补齐排班接口、请假调班规则、临时支援人员归属和责任科室。"
+  },
+  {
+    id: "ops-equipment-ed",
+    sourceSystem: "设备管理/急诊系统",
+    source: "医院填报",
+    targetCollection: "hospitalOperationSnapshots",
+    targetField: "equipment,outpatient",
+    fields: ["CT可用台数", "呼吸机可用数", "救护车可用数", "急诊人次", "候诊超30分钟"],
+    owner: "设备科、急诊科、门诊部",
+    updateCycle: "日内30分钟",
+    status: "已接入",
+    nextAction: "确认设备停机、急诊分诊和候诊统计的自动采集时间戳。"
+  },
+  {
+    id: "ops-stat-direct",
+    sourceSystem: "卫生健康统计直报",
+    source: "财务年报表",
+    targetCollection: "statisticsReconciliationReviews",
+    targetField: "varianceRate,fields,platformValue,directReportValue",
+    fields: ["直报批次", "差异字段", "平台采集值", "直报暂存值", "复核状态"],
+    owner: "统计办公室、规划发展与信息化处",
+    updateCycle: "日报/周报/月报",
+    status: "已接入",
+    nextAction: "把退回、阻断、补正中、通过状态与直报系统回执编码建立映射。"
+  },
+  {
+    id: "ops-satisfaction",
+    sourceSystem: "满意度调查平台",
+    source: "满意度调查平台",
+    targetCollection: "performanceMonitoring",
+    targetField: "readinessMatrix",
+    fields: ["门诊满意度", "住院满意度", "医务人员满意度", "调查周期", "有效样本量"],
+    owner: "行风办、门诊部、护理部",
+    updateCycle: "月度",
+    status: "待联调",
+    nextAction: "现场确认国家满意度平台数据权限、导出周期、样本量字段和异常说明模板。"
+  }
+];
+
+function performanceLinkedSources(data) {
+  const linked = new Set();
+  if ((data.hospitalOperationSnapshots || []).length) {
+    linked.add("病案首页");
+    linked.add("医院填报");
+  }
+  if ((data.statisticsReconciliationReviews || []).length || data.healthStatistics) linked.add("财务年报表");
+  if (data.healthStatisticsIngestion) linked.add("国家或省级平台");
+  return linked;
+}
+
+function performanceSourceOwner(source) {
+  if (source === "病案首页") return "病案室与医务部";
+  if (source === "医院填报") return "医务部、药学部、运营管理部门";
+  if (source === "财务年报表") return "财务科";
+  if (source === "满意度调查平台") return "行风办、门诊部、护理部";
+  if (source === "国家或省级平台") return "信息中心与业务主管科室";
+  return "责任科室待确认";
+}
+
+function performanceReadinessMatrix(manual, linkedSources) {
+  return Object.entries(manual.sources).map(([source, count]) => {
+    const linked = linkedSources.has(source);
+    return {
+      source,
+      indicators: count,
+      linked,
+      status: linked ? "ready" : "pending",
+      owner: performanceSourceOwner(source),
+      nextAction: linked
+        ? "纳入运行监测、绩效复核和异常说明闭环。"
+        : "现场补齐接口字段、统计口径、责任科室、上报周期和历史基线。"
+    };
+  });
+}
+
+function performanceManualIndicators(manual) {
+  if (Array.isArray(manual.indicators)) return manual.indicators;
+  const domains = Object.keys(manual.domains || {});
+  const sources = Object.keys(manual.sources || {});
+  const total = Number(manual.total || 0);
+  const national = Number(manual.national || 0);
+  return Array.from({ length: total }, (_, index) => [
+    index + 1,
+    `${String(manual.title || "公立医院绩效监测").replace(/操作手册.*/, "").trim()}指标${index + 1}`,
+    domains[index % Math.max(domains.length, 1)] || "运行监测",
+    sources[index % Math.max(sources.length, 1)] || "医院填报",
+    index % 2 === 0 ? "持续监测" : "逐步改善",
+    index < national
+  ]);
+}
+
+function performanceIndicatorDetail(item) {
+  const [, name, domain, source, direction, national] = item;
+  return {
+    name,
+    domain,
+    source,
+    direction,
+    national,
+    numerator: `${name}分子按${source}采集，现场联调时确认字段编码、去重规则和时间范围。`,
+    denominator: `${name}分母按同周期机构运行或财务统计口径确认，保留异常说明。`,
+    sourceFields: OPERATIONS_INTERFACE_MAPPINGS
+      .filter((mapping) => mapping.source === source || mapping.targetCollection === "performanceMonitoring")
+      .flatMap((mapping) => mapping.fields)
+      .slice(0, 6),
+    trendPlaceholder: "月度趋势待接入正式历史数据后自动计算，演示环境保留基线占位。",
+    exceptionTemplate: `${name}出现异常时，由${performanceSourceOwner(source)}说明数据来源、业务原因、整改动作和预计闭环时间。`
+  };
+}
+
+function buildPerformanceMonitoringEvidence(data, operationsDashboard = null) {
+  const linkedSources = performanceLinkedSources(data);
+  const manuals = Object.fromEntries(Object.entries(PERFORMANCE_MONITORING_MANUALS).map(([key, manual]) => {
+    const linked = Object.entries(manual.sources).filter(([source]) => linkedSources.has(source)).reduce((sum, [, count]) => sum + count, 0);
+    const pendingSources = Object.keys(manual.sources).filter((source) => !linkedSources.has(source));
+    return [key, {
+      ...manual,
+      coverage: {
+        linked,
+        pending: manual.total - linked,
+        linkedSources: Object.keys(manual.sources).filter((source) => linkedSources.has(source)),
+        pendingSources
+      },
+      readinessMatrix: performanceReadinessMatrix(manual, linkedSources),
+      indicatorDetails: performanceManualIndicators(manual).map(performanceIndicatorDetail)
+    }];
+  }));
+  const snapshots = operationsDashboard?.snapshots || [];
+  const maxPressure = snapshots.reduce((max, item) => Math.max(max, Number(item.resourcePressure || 0)), 0);
+  const actions = [
+    {
+      id: "performance-runtime-pressure",
+      title: "运行压力纳入绩效异常说明",
+      status: maxPressure >= 80 ? "warning" : "ready",
+      detail: `当前最高资源压力 ${maxPressure}，用于支撑床位、门急诊、人员负荷和绩效指标异常说明。`
+    },
+    ...[...new Set(Object.values(manuals).flatMap((manual) => manual.coverage.pendingSources))].map((source) => ({
+      id: `performance-source-${source}`,
+      title: `补接${source}`,
+      status: "pending",
+      detail: `${source}尚未形成完整运行联动，需现场确认字段、口径、责任科室和上报周期。`
+    }))
+  ];
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    source: "国家二级/三级公立医院绩效监测操作手册（2025版）",
+    manuals,
+    linkedSources: [...linkedSources],
+    actions
+  };
+}
+
+function buildOperationsInterfaceMappingEvidence(data) {
+  const collections = new Set(Object.keys(data || {}));
+  const mappings = OPERATIONS_INTERFACE_MAPPINGS.map((mapping) => ({
+    ...mapping,
+    collectionReady: mapping.targetCollection === "performanceMonitoring" || collections.has(mapping.targetCollection),
+    fieldCoverage: mapping.fields.map((field) => ({
+      field,
+      mapped: true,
+      reviewPoint: `${field}需在现场联调中确认字段编码、单位、时间范围和责任科室。`
+    }))
+  }));
+  return {
+    ok: mappings.every((item) => item.collectionReady && item.fieldCoverage.every((field) => field.mapped)),
+    generatedAt: new Date().toISOString(),
+    mappings,
+    summary: {
+      systems: new Set(mappings.map((item) => item.sourceSystem)).size,
+      total: mappings.length,
+      ready: mappings.filter((item) => item.status === "已接入").length,
+      pending: mappings.filter((item) => item.status !== "已接入").length
+    }
+  };
+}
+
+function operationInstitutionMatched(left = {}, right = {}) {
+  const leftId = String(left.institutionId || left.sourceInstitutionId || "").toLowerCase();
+  const rightId = String(right.institutionId || right.sourceInstitutionId || "").toLowerCase();
+  if (leftId && rightId && leftId === rightId) return true;
+  const leftName = String(left.institution || left.sourceInstitution || "").trim().toLowerCase();
+  const rightName = String(right.institution || right.sourceInstitution || "").trim().toLowerCase();
+  return Boolean(leftName && rightName && leftName === rightName);
+}
+
+function operationCommandStage(snapshot, dispatches, reconciliations) {
+  const blockedReconciliation = reconciliations.find((item) => item.status === "blocked");
+  if (blockedReconciliation) {
+    return {
+      stage: "直报阻断",
+      severity: "critical",
+      owner: "统计直报专班",
+      dueHours: 2,
+      nextAction: "先关闭统计直报差异复核，再恢复上报提交。"
+    };
+  }
+  const openDispatch = dispatches.find((item) => ["pending", "assigned", "in-progress"].includes(item.status));
+  if (openDispatch) {
+    return {
+      stage: openDispatch.status === "pending" ? "待分派调度" : "调度执行中",
+      severity: openDispatch.priority === "high" ? "critical" : "warning",
+      owner: "运行调度席",
+      dueHours: openDispatch.priority === "high" ? 4 : 8,
+      nextAction: "跟踪目标机构确认、资源到位和工单关闭留痕。"
+    };
+  }
+  const pendingReconciliation = reconciliations.find((item) => !["approved", "closed"].includes(item.status));
+  if (pendingReconciliation) {
+    return {
+      stage: "直报复核",
+      severity: "warning",
+      owner: "统计质控岗",
+      dueHours: 12,
+      nextAction: "核对平台采集值、直报暂存值和字段口径后提交复核结论。"
+    };
+  }
+  if ((snapshot.activeAlerts || []).length) {
+    return {
+      stage: "预警复盘",
+      severity: snapshot.normalizedStatus === "critical" ? "critical" : "warning",
+      owner: "运行监测岗",
+      dueHours: snapshot.normalizedStatus === "critical" ? 4 : 24,
+      nextAction: "确认预警是否需要生成调度单或纳入绩效异常说明。"
+    };
+  }
+  return {
+    stage: "常态监测",
+    severity: "normal",
+    owner: "运行监测岗",
+    dueHours: 24,
+    nextAction: "维持日内监测，关注床位、门急诊、人员和直报趋势。"
+  };
+}
+
+function addHours(value, hours) {
+  const base = new Date(value || Date.now());
+  if (Number.isNaN(base.getTime())) return "";
+  base.setHours(base.getHours() + Number(hours || 0));
+  return base.toISOString();
+}
+
+function buildCommandSla(snapshot, dispatches, reconciliations, stage) {
+  const openDispatch = dispatches.find((item) => ["pending", "assigned", "in-progress"].includes(item.status));
+  const pendingReconciliation = reconciliations.find((item) => !["approved", "closed"].includes(item.status));
+  const dueAt = openDispatch?.requiredBy || addHours(snapshot.snapshotAt, stage.dueHours);
+  const dueTime = new Date(dueAt);
+  const now = new Date();
+  const closed = !openDispatch && !pendingReconciliation && !(snapshot.activeAlerts || []).length;
+  const overdue = !closed && !Number.isNaN(dueTime.getTime()) && dueTime.getTime() < now.getTime();
+  const remainingMinutes = Number.isNaN(dueTime.getTime()) ? null : Math.round((dueTime.getTime() - now.getTime()) / 60000);
+  return {
+    dueAt,
+    status: closed ? "已闭环" : overdue ? "已超时" : "进行中",
+    overdue,
+    remainingMinutes,
+    owner: stage.owner,
+    escalation: overdue ? `${stage.owner}需补充超时原因、资源到位情况和下一步闭环时间。` : "按处置链继续跟踪。"
+  };
+}
+
+function buildOperationsCommandChains({ snapshots, dispatchRequests, reconciliationReviews }) {
+  return snapshots.map((snapshot) => {
+    const dispatches = dispatchRequests.filter((item) => operationInstitutionMatched(snapshot, item));
+    const reconciliations = reconciliationReviews.filter((item) => operationInstitutionMatched(snapshot, item));
+    const stage = operationCommandStage(snapshot, dispatches, reconciliations);
+    const openDispatches = dispatches.filter((item) => ["pending", "assigned", "in-progress"].includes(item.status));
+    const pendingReconciliations = reconciliations.filter((item) => !["approved", "closed"].includes(item.status));
+    return {
+      id: `chain-${snapshot.id}`,
+      institutionId: snapshot.institutionId,
+      institution: snapshot.institution,
+      status: snapshot.normalizedStatus,
+      resourcePressure: snapshot.resourcePressure,
+      alertCount: (snapshot.activeAlerts || []).length,
+      openDispatchCount: openDispatches.length,
+      pendingReconciliationCount: pendingReconciliations.length,
+      stage: stage.stage,
+      severity: stage.severity,
+      owner: stage.owner,
+      dueHours: stage.dueHours,
+      sla: buildCommandSla(snapshot, dispatches, reconciliations, stage),
+      nextAction: stage.nextAction,
+      evidence: [
+        ...(snapshot.activeAlerts || []).map((item) => item.id),
+        ...openDispatches.map((item) => item.id),
+        ...pendingReconciliations.map((item) => item.id)
+      ],
+      steps: [
+        { name: "运行监测", status: (snapshot.activeAlerts || []).length ? "触发预警" : "正常", count: (snapshot.activeAlerts || []).length },
+        { name: "资源调度", status: openDispatches.length ? "进行中" : "无待办", count: openDispatches.length },
+        { name: "直报复核", status: pendingReconciliations.length ? "待关闭" : "已闭环", count: pendingReconciliations.length },
+        { name: "绩效说明", status: snapshot.resourcePressure >= 80 || pendingReconciliations.length ? "需说明" : "常规归档", count: snapshot.resourcePressure >= 80 || pendingReconciliations.length ? 1 : 0 }
+      ]
+    };
+  }).sort((a, b) => statusSeverity(b.severity) - statusSeverity(a.severity) || Number(b.resourcePressure || 0) - Number(a.resourcePressure || 0));
+}
+
+function playbookOwnerForDomain(domain) {
+  return {
+    beds: "医务部/运行调度席",
+    staff: "人事科/护理部/医务部",
+    outpatient: "门诊部/急诊科/设备科",
+    equipment: "设备科/急诊科",
+    statistics: "统计直报专班"
+  }[domain] || "运行监测岗";
+}
+
+function playbookActionsForDomain(domain) {
+  return {
+    beds: ["确认开放床位和占用口径", "启动院内备用床位", "评估跨院转运或下转", "同步绩效异常说明"],
+    staff: ["核对排班和请假变更", "启用备用班次或跨科支援", "记录人员缺口原因", "追踪到岗确认"],
+    outpatient: ["调整门急诊分诊队列", "释放检查检验优先时段", "同步候诊超时说明", "必要时启动区域分流"],
+    equipment: ["核对设备停机和可用台数", "协调共享设备或外院检查", "记录维修预计恢复时间", "更新调度工单"],
+    statistics: ["冻结直报提交", "核对平台采集值和直报暂存值", "形成退回/补正/阻断结论", "归档复核证据"]
+  }[domain] || ["确认告警来源", "指定责任科室", "记录处置过程", "关闭复盘证据"];
+}
+
+function buildOperationsPlaybooks({ snapshots, alertRules, commandChains, interfaceMapping }) {
+  const chainsByInstitution = new Map((commandChains || []).map((item) => [item.institutionId, item]));
+  return (alertRules || []).map((rule) => {
+    const relatedSnapshots = (snapshots || []).filter((snapshot) => (snapshot.activeAlerts || []).some((alert) => alert.id === rule.id));
+    const chainOwners = [...new Set(relatedSnapshots.map((snapshot) => chainsByInstitution.get(snapshot.institutionId)?.owner).filter(Boolean))];
+    const fields = (interfaceMapping?.mappings || [])
+      .filter((mapping) => mapping.targetField?.includes(rule.domain) || mapping.source === rule.source || mapping.targetCollection === "statisticsReconciliationReviews" && rule.domain === "statistics")
+      .flatMap((mapping) => mapping.fields || [])
+      .slice(0, 8);
+    const severity = relatedSnapshots.some((snapshot) => snapshot.normalizedStatus === "critical") || rule.severity === "critical" ? "critical" : relatedSnapshots.length ? "warning" : "normal";
+    const slaHours = rule.severity === "critical" ? 4 : rule.domain === "statistics" ? 12 : 24;
+    return {
+      id: `playbook-${rule.id}`,
+      ruleId: rule.id,
+      domain: rule.domain,
+      severity,
+      owner: chainOwners[0] || playbookOwnerForDomain(rule.domain),
+      trigger: rule.threshold,
+      dispatchBoundary: rule.dispatchBoundary,
+      activeInstitutions: relatedSnapshots.length,
+      activeInstitutionNames: relatedSnapshots.map((snapshot) => snapshot.institution),
+      slaHours,
+      requiredFields: fields,
+      actions: playbookActionsForDomain(rule.domain),
+      evidence: [
+        "/api/operations/dashboard",
+        "/api/operations/command-chains",
+        "/api/operations/interface-mapping",
+        rule.domain === "statistics" ? "/api/operations/reconciliation/:id/review" : "/api/operations/dispatch"
+      ]
+    };
+  }).sort((a, b) => statusSeverity(b.severity) - statusSeverity(a.severity) || b.activeInstitutions - a.activeInstitutions);
+}
+
+function buildOperationsHandover({ snapshots, dispatchRequests, reconciliationReviews, commandChains, playbooks, handoverSignoffs }) {
+  const openStatuses = new Set(["pending", "assigned", "in-progress"]);
+  const items = (commandChains || [])
+    .filter((chain) => chain.severity !== "normal" || chain.openDispatchCount || chain.pendingReconciliationCount || chain.sla?.overdue)
+    .map((chain) => {
+      const snapshot = (snapshots || []).find((item) => item.institutionId === chain.institutionId || item.institution === chain.institution) || {};
+      const dispatches = (dispatchRequests || []).filter((item) => operationInstitutionMatched(snapshot, item) && openStatuses.has(item.status));
+      const reconciliations = (reconciliationReviews || []).filter((item) => operationInstitutionMatched(snapshot, item) && !["approved", "closed"].includes(item.status));
+      const matchedPlaybooks = (playbooks || []).filter((item) => (item.activeInstitutionNames || []).includes(chain.institution));
+      const remainingMinutes = Number(chain.sla?.remainingMinutes);
+      const dueSoon = !chain.sla?.overdue && Number.isFinite(remainingMinutes) && remainingMinutes <= 240;
+      const riskSignals = [
+        chain.alertCount ? `活动预警 ${chain.alertCount} 项` : "",
+        dispatches.length ? `开放调度 ${dispatches.length} 单` : "",
+        reconciliations.length ? `待复核 ${reconciliations.length} 项` : "",
+        matchedPlaybooks.length ? `命中预案 ${matchedPlaybooks.length} 条` : "",
+        chain.sla?.overdue ? "SLA 已超时" : dueSoon ? "SLA 临期" : ""
+      ].filter(Boolean);
+      return {
+        id: `handover-${chain.institutionId || chain.institution}`,
+        institutionId: chain.institutionId,
+        institution: chain.institution,
+        severity: chain.sla?.overdue ? "critical" : dueSoon && chain.severity === "normal" ? "warning" : chain.severity,
+        stage: chain.stage,
+        owner: chain.owner,
+        dueAt: chain.sla?.dueAt || "",
+        dueStatus: chain.sla?.status || "",
+        remainingMinutes: Number.isFinite(remainingMinutes) ? remainingMinutes : null,
+        riskSignals,
+        checkpoints: [
+          "确认最新床位、人员、设备、门急诊和住院运行快照",
+          "核对调度单责任人、到位时间和审计留痕",
+          "复核统计直报差异结论与退回/阻断状态",
+          "记录绩效异常说明和下一班跟进边界"
+        ],
+        nextActions: [
+          chain.nextAction,
+          ...matchedPlaybooks.flatMap((item) => item.actions || []).slice(0, 3)
+        ].filter(Boolean).slice(0, 4),
+        evidence: [
+          "/api/operations/dashboard",
+          "/api/operations/command-chains",
+          "/api/operations/playbooks",
+          "/api/operations/handover"
+        ]
+      };
+    })
+    .sort((a, b) => statusSeverity(b.severity) - statusSeverity(a.severity) || Number(a.remainingMinutes ?? 99999) - Number(b.remainingMinutes ?? 99999));
+  const recentSignoffs = [...(Array.isArray(handoverSignoffs) ? handoverSignoffs : [])]
+    .sort((a, b) => new Date(b.signedAt || 0) - new Date(a.signedAt || 0))
+    .slice(0, 8);
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    summary: {
+      items: items.length,
+      critical: items.filter((item) => item.severity === "critical").length,
+      dueSoon: items.filter((item) => item.remainingMinutes !== null && item.remainingMinutes <= 240 && item.remainingMinutes >= 0).length,
+      overdue: items.filter((item) => item.riskSignals.includes("SLA 已超时")).length,
+      owners: new Set(items.map((item) => item.owner).filter(Boolean)).size,
+      signoffs: recentSignoffs.length
+    },
+    shiftNote: "交班清单用于院级运行调度值班、统计直报复核和绩效异常说明的同屏交接。",
+    items,
+    recentSignoffs
+  };
+}
+
+function buildOperationsHandoverOwnerMatrix(handover) {
+  const items = Array.isArray(handover?.items) ? handover.items : [];
+  const owners = new Map();
+  items.forEach((item) => {
+    const owner = item.owner || "运行监测岗";
+    const current = owners.get(owner) || {
+      id: `handover-owner-${owners.size + 1}`,
+      owner,
+      itemCount: 0,
+      criticalCount: 0,
+      dueSoonCount: 0,
+      overdueCount: 0,
+      institutions: [],
+      stages: [],
+      nextActions: [],
+      evidence: ["/api/operations/handover", "/api/operations/handover/owners"]
+    };
+    current.itemCount += 1;
+    current.criticalCount += item.severity === "critical" ? 1 : 0;
+    current.dueSoonCount += item.remainingMinutes !== null && item.remainingMinutes <= 240 && item.remainingMinutes >= 0 ? 1 : 0;
+    current.overdueCount += (item.riskSignals || []).includes("SLA 已超时") ? 1 : 0;
+    current.institutions = [...new Set([...current.institutions, item.institution].filter(Boolean))];
+    current.stages = [...new Set([...current.stages, item.stage].filter(Boolean))];
+    current.nextActions = [...new Set([...current.nextActions, ...(item.nextActions || [])].filter(Boolean))].slice(0, 5);
+    owners.set(owner, current);
+  });
+  const matrix = [...owners.values()].sort((a, b) => b.criticalCount - a.criticalCount || b.dueSoonCount - a.dueSoonCount || b.itemCount - a.itemCount);
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    summary: {
+      owners: matrix.length,
+      items: matrix.reduce((sum, item) => sum + item.itemCount, 0),
+      critical: matrix.reduce((sum, item) => sum + item.criticalCount, 0),
+      dueSoon: matrix.reduce((sum, item) => sum + item.dueSoonCount, 0),
+      overdue: matrix.reduce((sum, item) => sum + item.overdueCount, 0)
+    },
+    matrix
+  };
+}
+
+function buildOperationsSiteJointTests({ interfaceMapping }) {
+  const mappings = Array.isArray(interfaceMapping?.mappings) ? interfaceMapping.mappings : [];
+  const rows = mappings.map((mapping) => {
+    const completed = mapping.status === "已接入" && mapping.collectionReady;
+    return {
+      id: `joint-${mapping.id}`,
+      sourceSystem: mapping.sourceSystem,
+      targetCollection: mapping.targetCollection,
+      targetField: mapping.targetField,
+      owner: mapping.owner,
+      updateCycle: mapping.updateCycle,
+      status: completed ? "已完成" : "待联调",
+      samplePacket: `${mapping.sourceSystem}样例报文`,
+      replayResult: completed ? "快照上报、调度回执或统计对账回放通过" : "等待现场样例报文和接收端确认截图",
+      validationPoints: ["字段编码", "单位口径", "时间戳", "机构编码", "回执编码"],
+      attachments: completed ? ["字段映射表", "验签日志", "回放记录"] : ["待补充样例报文", "待补充失败重试记录"],
+      exitCriteria: completed ? "已具备演示联调证据，生产仍需现场签字。" : mapping.nextAction,
+      evidence: ["/api/operations/interface-mapping", "/api/operations/integration/snapshots"]
+    };
+  });
+  return {
+    ok: rows.length > 0 && rows.every((item) => item.owner && item.validationPoints.length),
+    generatedAt: new Date().toISOString(),
+    summary: {
+      systems: new Set(rows.map((item) => item.sourceSystem)).size,
+      total: rows.length,
+      completed: rows.filter((item) => item.status === "已完成").length,
+      pending: rows.filter((item) => item.status !== "已完成").length
+    },
+    rows
+  };
+}
+
+function buildOperationsSiteJointPatrol({ siteJointTests, snapshots, dispatchRequests, reconciliationReviews, processAudit }) {
+  const rows = Array.isArray(siteJointTests?.rows) ? siteJointTests.rows : [];
+  const auditRows = Array.isArray(processAudit) ? processAudit : [];
+  const patrolRows = rows.map((row) => {
+    const completed = row.status === "已完成";
+    const hasRecentAudit = auditRows.some((item) => String(item.evidence || "").includes(row.id) || String(item.process || "").includes(row.sourceSystem));
+    const openDispatches = (Array.isArray(dispatchRequests) ? dispatchRequests : []).filter((item) => String(item.sourceInstitution || item.targetInstitution || "").includes(row.sourceSystem));
+    const relatedRecon = (Array.isArray(reconciliationReviews) ? reconciliationReviews : []).filter((item) => (item.evidence || []).includes(row.targetCollection) || String(item.reviewNote || "").includes(row.targetCollection));
+    const sampleStatus = completed ? "已通过" : "待补传";
+    const signatureStatus = completed || hasRecentAudit ? "已验签" : "待验签";
+    const replayStatus = completed ? "已回放" : openDispatches.length || relatedRecon.length ? "需复测" : "待回放";
+    const retryStatus = replayStatus === "需复测" ? "需重试" : "无失败";
+    const receiverStatus = completed ? "已确认" : "待确认";
+    return {
+      id: `patrol-${row.id}`,
+      sourceSystem: row.sourceSystem,
+      targetCollection: row.targetCollection,
+      owner: row.owner,
+      priority: !completed && (openDispatches.length || relatedRecon.length) ? "高" : completed ? "常规" : "中",
+      status: completed && hasRecentAudit ? "已归档" : completed ? "待签收" : "待巡检",
+      checkpoints: [
+        { id: "sample-packet", name: "样例报文", status: sampleStatus, evidence: row.samplePacket },
+        { id: "signature-log", name: "验签日志", status: signatureStatus, evidence: "operationIntegrationAudit" },
+        { id: "replay-record", name: "回放记录", status: replayStatus, evidence: row.replayResult },
+        { id: "retry-queue", name: "失败重试", status: retryStatus, evidence: `${openDispatches.length + relatedRecon.length}项需关注` },
+        { id: "receiver-confirmation", name: "接收确认", status: receiverStatus, evidence: row.exitCriteria }
+      ],
+      nextAction: completed ? "补齐接收端签收截图并归档。" : "补传样例报文、执行验签回放并记录失败重试结果。",
+      evidence: ["/api/operations/site-joint-tests", "/api/operations/site-joint-patrol", "/api/operations/integration/snapshots"]
+    };
+  });
+  return {
+    ok: patrolRows.length > 0,
+    generatedAt: new Date().toISOString(),
+    summary: {
+      systems: new Set(patrolRows.map((item) => item.sourceSystem)).size,
+      rows: patrolRows.length,
+      highPriority: patrolRows.filter((item) => item.priority === "高").length,
+      pending: patrolRows.filter((item) => item.status !== "已归档").length,
+      checkpoints: patrolRows.reduce((sum, item) => sum + item.checkpoints.length, 0)
+    },
+    rows: patrolRows,
+    dailyChecklist: ["样例报文", "验签日志", "回放记录", "失败重试", "接收端确认"],
+    evidence: ["/api/operations/site-joint-patrol", "platformProcessAudit", "operationIntegrationAudit"]
+  };
+}
+
+function productionCheckName(id, fallback) {
+  return {
+    "node-env": "生产运行模式",
+    "storage-engine": "生产存储引擎",
+    "session-secrets": "会话密钥质量",
+    "gateway-secret": "接口网关密钥质量",
+    "database-url": "正式数据库连接",
+    "identity-adapter": "政务统一身份",
+    "audit-retention": "审计保全目标",
+    "site-interface-signoff": "现场接口联调签字",
+    "insurance-certificate-signoff": "医保证照交换签字",
+    "monitoring-signoff": "监控值守签字",
+    "dr-rehearsal-signoff": "灾备演练签字"
+  }[id] || fallback || id;
+}
+
+function buildOperationsProductionHardening(data) {
+  const environment = buildProductionEnvironmentStatus();
+  const checks = [
+    ...environment.checks.map((item) => ({
+      id: item.id,
+      name: productionCheckName(item.id, item.name),
+      passed: item.passed,
+      detail: item.detail,
+      nextAction: item.passed ? "保持归档并纳入割接清单。" : "补齐真实生产参数、签字材料或现场演练证据。"
+    })),
+    {
+      id: "operations-audit-trace",
+      name: "运行调度审计留痕",
+      passed: Array.isArray(data.platformProcessAudit) && Array.isArray(data.securityEvents),
+      detail: "platformProcessAudit/securityEvents",
+      nextAction: "生产需接入日志保全或 SIEM。"
+    }
+  ];
+  return {
+    ok: checks.every((item) => item.passed),
+    generatedAt: new Date().toISOString(),
+    status: checks.every((item) => item.passed) ? "生产可割接" : "待生产签字",
+    summary: {
+      total: checks.length,
+      passed: checks.filter((item) => item.passed).length,
+      blocked: checks.filter((item) => !item.passed).length
+    },
+    tracks: [
+      { id: "secret-rotation", name: "生产密钥轮换", owner: "平台运维/安全管理岗", evidence: "SESSION_SECRETS, INTEGRATION_GATEWAY_SECRET", status: checks.find((item) => item.id === "gateway-secret")?.passed ? "已具备" : "待配置" },
+      { id: "audit-retention", name: "审计保全", owner: "安全管理岗", evidence: "AUDIT_EXPORT_PATH 或 SIEM_ENDPOINT", status: checks.find((item) => item.id === "audit-retention")?.passed ? "已具备" : "待配置" },
+      { id: "monitoring-oncall", name: "监控告警与值守", owner: "平台运维", evidence: "CUTOVER_MONITORING_SIGNOFF", status: checks.find((item) => item.id === "monitoring-signoff")?.passed ? "已签字" : "待签字" },
+      { id: "dr-rehearsal", name: "灾备演练", owner: "基础设施组", evidence: "CUTOVER_DR_REHEARSAL_SIGNOFF", status: checks.find((item) => item.id === "dr-rehearsal-signoff")?.passed ? "已签字" : "待签字" }
+    ],
+    checks
+  };
+}
+
+function cutoverOwner(id) {
+  return {
+    "session-secrets": "平台运维/安全管理员",
+    "gateway-secret": "接口网关负责人",
+    "database-url": "数据平台负责人",
+    "storage-engine": "数据平台负责人",
+    "identity-adapter": "统一身份负责人",
+    "audit-retention": "安全管理员",
+    "site-interface-signoff": "接口联调组",
+    "insurance-certificate-signoff": "跨部门交换负责人",
+    "monitoring-signoff": "监控值守长",
+    "dr-rehearsal-signoff": "基础设施组",
+    "operations-audit-trace": "运行监测岗"
+  }[id] || "运行监测岗";
+}
+
+function buildOperationsCutoverCommand({ productionHardening, siteJointPatrol, mobileDuty, processAudit, securityEvents }) {
+  const checks = Array.isArray(productionHardening?.checks) ? productionHardening.checks : [];
+  const auditRows = Array.isArray(processAudit) ? processAudit : [];
+  const eventRows = Array.isArray(securityEvents) ? securityEvents : [];
+  const patrolPending = Number(siteJointPatrol?.summary?.pending || 0);
+  const dutyReminders = Number(mobileDuty?.summary?.reminders || 0);
+  const items = checks.map((check, index) => {
+    const auditHit = auditRows.find((item) =>
+      String(item.process || "").includes("生产割接") &&
+      (String(item.evidence || "").includes(check.id) || String(item.auditPoint || "").includes(check.name))
+    );
+    const signed = Boolean(check.passed || auditHit);
+    const isBlocking = !signed && ["session-secrets", "gateway-secret", "audit-retention", "monitoring-signoff", "dr-rehearsal-signoff"].includes(check.id);
+    return {
+      id: `cutover-${check.id}`,
+      checkId: check.id,
+      name: check.name,
+      owner: cutoverOwner(check.id),
+      phase: index <= 3 ? "T-1生产准备" : index <= 7 ? "T-0割接确认" : "上线后观察",
+      status: signed ? "已签收" : isBlocking ? "阻断待签收" : "待复核",
+      priority: isBlocking ? "高" : signed ? "常规" : "中",
+      detail: check.detail,
+      nextAction: signed ? "保持证据归档，并纳入上线后观察。" : check.nextAction,
+      blockers: [
+        !check.passed ? check.name : "",
+        patrolPending > 0 && check.id === "site-interface-signoff" ? `${patrolPending}项现场巡检待归档` : "",
+        dutyReminders === 0 && check.id === "monitoring-signoff" ? "尚未形成移动值守提醒证据" : ""
+      ].filter(Boolean),
+      evidence: ["/api/operations/production-hardening", "/api/operations/cutover-command", "platformProcessAudit"],
+      signedAt: auditHit?.evidence || ""
+    };
+  });
+  return {
+    ok: items.length > 0 && items.every((item) => item.status === "已签收"),
+    generatedAt: new Date().toISOString(),
+    summary: {
+      total: items.length,
+      signed: items.filter((item) => item.status === "已签收").length,
+      blocking: items.filter((item) => item.status === "阻断待签收").length,
+      pending: items.filter((item) => item.status !== "已签收").length,
+      auditEvents: auditRows.filter((item) => String(item.process || "").includes("生产割接")).length,
+      securityEvents: eventRows.filter((item) => String(item.action || "").includes("cutover")).length
+    },
+    watchWindow: "T-1 18:00 至 T+1 08:00",
+    rollbackPolicy: "任一高优先级割接项未签收时，维持演示环境，暂不进入生产切换。",
+    items,
+    evidence: ["/api/operations/cutover-command", "/api/operations/cutover-command/actions", "platformProcessAudit", "securityEvents"]
+  };
+}
+
+function postCutoverItem(id, title, owner, priority, metric, detail, nextAction, evidence, auditRows) {
+  const auditHit = auditRows.find((item) =>
+    String(item.process || "").includes("上线后观察") &&
+    (String(item.evidence || "").includes(id) || String(item.auditPoint || "").includes(title))
+  );
+  return {
+    id,
+    title,
+    owner,
+    priority,
+    status: auditHit ? "已观察" : priority === "高" ? "异常待处置" : priority === "中" ? "观察中" : "稳定",
+    metric,
+    detail,
+    nextAction: auditHit ? "保持观察记录归档，并进入下一观察窗口。" : nextAction,
+    observedAt: auditHit?.evidence || "",
+    evidence
+  };
+}
+
+function buildOperationsPostCutoverEvidenceProgress(items, windows) {
+  const evidenceTotal = windows.reduce((sum, item) => sum + (Array.isArray(item.requiredEvidence) ? item.requiredEvidence.length : 0), 0);
+  const observedItems = items.filter((item) => item.status === "已观察").length;
+  const evidenceReady = evidenceTotal && items.length ? Math.min(evidenceTotal, Math.round((evidenceTotal * observedItems) / items.length)) : 0;
+  let remainingReady = evidenceReady;
+  const windowsWithProgress = windows.map((item) => {
+    const requiredEvidence = Array.isArray(item.requiredEvidence) ? item.requiredEvidence : [];
+    const windowTotal = requiredEvidence.length;
+    const windowReady = Math.min(windowTotal, Math.max(0, remainingReady));
+    remainingReady -= windowReady;
+    const completedEvidence = requiredEvidence.slice(0, windowReady);
+    const pendingEvidence = requiredEvidence.slice(windowReady);
+    const signoffReady = windowTotal > 0 && pendingEvidence.length === 0;
+    return {
+      ...item,
+      requiredEvidence,
+      completedEvidence,
+      pendingEvidence,
+      evidenceReady: windowReady,
+      evidencePending: Math.max(0, windowTotal - windowReady),
+      completionRate: windowTotal ? Math.round((windowReady / windowTotal) * 100) : 0,
+      status: windowReady >= windowTotal && windowTotal > 0 ? "已完成" : windowReady > 0 ? "观察中" : "待观察",
+      signoffReady,
+      signoffStatus: signoffReady ? "可签收" : "待补证据",
+      signoffBlockers: pendingEvidence,
+      nextEvidenceAction: pendingEvidence.length
+        ? `${item.owner || "责任人"}补齐${pendingEvidence.join("、")}并归档观察留痕。`
+        : `${item.owner || "责任人"}确认窗口证据齐套并进入归档复核。`
+    };
+  });
+  const signoffReadyWindows = windowsWithProgress.filter((item) => item.signoffReady).length;
+  return {
+    windows: windowsWithProgress,
+    summary: {
+      evidenceTotal,
+      evidenceReady,
+      evidencePending: Math.max(0, evidenceTotal - evidenceReady),
+      signoffReadyWindows,
+      signoffPendingWindows: Math.max(0, windowsWithProgress.length - signoffReadyWindows),
+      completionRate: evidenceTotal ? Math.round((evidenceReady / evidenceTotal) * 100) : 0
+    }
+  };
+}
+
+function buildOperationsPostCutoverObservation({
+  snapshots,
+  dispatchRequests,
+  reconciliationReviews,
+  siteJointPatrol,
+  cutoverCommand,
+  mobileDuty,
+  processAudit,
+  securityEvents
+}) {
+  const auditRows = Array.isArray(processAudit) ? processAudit : [];
+  const eventRows = Array.isArray(securityEvents) ? securityEvents : [];
+  const openDispatches = (Array.isArray(dispatchRequests) ? dispatchRequests : []).filter((item) => ["pending", "assigned", "in-progress"].includes(item.status));
+  const pendingRecon = (Array.isArray(reconciliationReviews) ? reconciliationReviews : []).filter((item) => !["approved", "closed"].includes(item.status));
+  const criticalInstitutions = (Array.isArray(snapshots) ? snapshots : []).filter((item) => item.normalizedStatus === "critical");
+  const warningInstitutions = (Array.isArray(snapshots) ? snapshots : []).filter((item) => item.normalizedStatus === "warning");
+  const cutoverBlocking = Number(cutoverCommand?.summary?.blocking || 0);
+  const cutoverPending = Number(cutoverCommand?.summary?.pending || 0);
+  const patrolPending = Number(siteJointPatrol?.summary?.pending || 0);
+  const reminders = Number(mobileDuty?.summary?.reminders || 0);
+  const items = [
+    postCutoverItem(
+      "observation-runtime-health",
+      "运行健康与接口可用性",
+      "平台运维",
+      cutoverBlocking > 0 ? "高" : warningInstitutions.length ? "中" : "常规",
+      `${criticalInstitutions.length}家严重，${warningInstitutions.length}家预警`,
+      "联合 /api/health、/api/metrics 与运行快照观察上线后基础可用性。",
+      "持续观察健康检查、接口耗时、错误率和关键告警。",
+      ["/api/health", "/api/metrics", "/api/operations/dashboard", "/api/operations/post-cutover-observation"],
+      auditRows
+    ),
+    postCutoverItem(
+      "observation-resource-pressure",
+      "床位人员设备压力",
+      "运行调度席",
+      criticalInstitutions.length ? "高" : warningInstitutions.length ? "中" : "常规",
+      `${criticalInstitutions.length + warningInstitutions.length}家机构需关注`,
+      "上线后继续观察床位、ICU、人员缺口、设备占用和门急诊积压。",
+      "高压机构需进入调度席人工复核，并准备跨院资源支援。",
+      ["/api/operations/dashboard", "/api/operations/resource-pool"],
+      auditRows
+    ),
+    postCutoverItem(
+      "observation-dispatch-backlog",
+      "资源调度积压",
+      "医政医管处",
+      openDispatches.length >= 3 ? "高" : openDispatches.length ? "中" : "常规",
+      `${openDispatches.length}张未关闭调度单`,
+      "观察上线后调度单创建、分派、执行、关闭是否形成闭环。",
+      "未关闭调度单需明确责任医院、资源类型和预计关闭时间。",
+      ["/api/operations/dispatch", "/api/operations/resource-pool"],
+      auditRows
+    ),
+    postCutoverItem(
+      "observation-reconciliation",
+      "统计直报复核",
+      "统计办公室",
+      pendingRecon.length >= 2 ? "高" : pendingRecon.length ? "中" : "常规",
+      `${pendingRecon.length}批次待复核`,
+      "观察统计直报、绩效指标异常说明和补正回执是否稳定。",
+      "待复核批次需完成退回、补正、通过或关闭状态处理。",
+      ["/api/operations/reconciliation/:id/review", "/api/operations/governance-report"],
+      auditRows
+    ),
+    postCutoverItem(
+      "observation-site-joint-patrol",
+      "现场联调巡检归档",
+      "接口联调组",
+      patrolPending >= 3 ? "高" : patrolPending ? "中" : "常规",
+      `${patrolPending}项巡检待归档`,
+      "观察真实样例报文、验签日志、回放记录、失败重试和接收端确认是否归档。",
+      "待归档项需补齐现场截图、回放日志和接收端签字。",
+      ["/api/operations/site-joint-patrol", "/api/operations/site-joint-patrol/actions"],
+      auditRows
+    ),
+    postCutoverItem(
+      "observation-cutover-signoff",
+      "割接签收与回退准备",
+      "值班长",
+      cutoverBlocking > 0 ? "高" : cutoverPending ? "中" : "常规",
+      `${cutoverPending}项割接签收待完成`,
+      "观察割接签收、回退策略、观察窗口和生产阻断项是否关闭。",
+      "任一高优先级阻断项未签收时保持回退准备。",
+      ["/api/operations/cutover-command", "/api/operations/cutover-command/actions"],
+      auditRows
+    ),
+    postCutoverItem(
+      "observation-mobile-duty",
+      "移动值守提醒",
+      "运行监测岗",
+      reminders ? "常规" : "中",
+      `${reminders}条值守提醒`,
+      "观察移动端提醒、弱网补传和消息回执是否形成留痕。",
+      "尚无提醒时需向值班长发送一次上线后观察提醒。",
+      ["/api/operations/mobile-duty", "/api/operations/mobile-duty/actions", "/api/messages"],
+      auditRows
+    )
+  ];
+  const windows = [
+    { id: "t0-2h", name: "T+0 2小时", focus: "接口可用性、错误率、关键告警", owner: "平台运维", requiredEvidence: ["健康检查截图", "接口耗时截图", "关键告警记录"], acceptanceRule: "三项截图齐套且关键告警有处置编号。" },
+    { id: "t0-8h", name: "T+0 8小时", focus: "床位压力、调度积压、直报复核", owner: "运行调度席", requiredEvidence: ["床位压力截图", "调度单关闭凭证", "直报复核清单"], acceptanceRule: "压力、调度、直报三类证据均完成责任人复核。" },
+    { id: "t1-24h", name: "T+1 24小时", focus: "巡检归档、回退准备、治理报告", owner: "值班长", requiredEvidence: ["巡检归档截图", "回退准备确认", "治理报告草稿"], acceptanceRule: "现场巡检、回退确认和治理报告草稿完成归档。" }
+  ];
+  const evidenceProgress = buildOperationsPostCutoverEvidenceProgress(items, windows);
+  return {
+    ok: items.length > 0 && items.every((item) => item.status === "已观察" || item.priority !== "高"),
+    generatedAt: new Date().toISOString(),
+    watchWindow: "T+0 2小时、T+0 8小时、T+1 24小时",
+    windows: evidenceProgress.windows,
+    summary: {
+      total: items.length,
+      abnormal: items.filter((item) => item.priority === "高").length,
+      watching: items.filter((item) => item.status === "观察中" || item.status === "异常待处置").length,
+      observed: items.filter((item) => item.status === "已观察").length,
+      auditEvents: auditRows.filter((item) => String(item.process || "").includes("上线后观察")).length,
+      securityEvents: eventRows.filter((item) => String(item.action || "").includes("post-cutover")).length,
+      ...evidenceProgress.summary
+    },
+    items,
+    evidence: ["/api/operations/post-cutover-observation", "/api/operations/post-cutover-observation/actions", "platformProcessAudit", "securityEvents"]
+  };
+}
+
+function buildOperationsLaunchReadiness({ productionHardening, cutoverCommand, postCutoverObservation }) {
+  const hardeningBlocked = Number(productionHardening?.summary?.blocked || 0);
+  const cutoverBlocking = Number(cutoverCommand?.summary?.blocking || 0);
+  const observationAbnormal = Number(postCutoverObservation?.summary?.abnormal || 0);
+  const evidencePending = Number(postCutoverObservation?.summary?.evidencePending || 0);
+  const signoffPendingWindows = Number(postCutoverObservation?.summary?.signoffPendingWindows || 0);
+  const blockers = [
+    hardeningBlocked ? {
+      id: "production-hardening",
+      name: "生产加固阻断项",
+      count: hardeningBlocked,
+      owner: "平台运维/安全管理岗",
+      nextAction: "补齐生产密钥、审计保全、监控值守或灾备演练证据。"
+    } : null,
+    cutoverBlocking ? {
+      id: "cutover-signoff",
+      name: "割接签收阻断项",
+      count: cutoverBlocking,
+      owner: "值班长",
+      nextAction: "完成高优先级割接项签收，并保留回退准备。"
+    } : null,
+    observationAbnormal ? {
+      id: "post-cutover-abnormal",
+      name: "上线后观察异常项",
+      count: observationAbnormal,
+      owner: "运行监测岗",
+      nextAction: "关闭高风险观察项并补充处置记录。"
+    } : null,
+    evidencePending ? {
+      id: "post-cutover-evidence",
+      name: "观察证据待补项",
+      count: evidencePending,
+      owner: "接口联调组/值班长",
+      nextAction: "补齐健康检查、调度闭环、直报复核和治理报告归档证据。"
+    } : null,
+    signoffPendingWindows ? {
+      id: "post-cutover-window-signoff",
+      name: "观察窗口待签收",
+      count: signoffPendingWindows,
+      owner: "值班长",
+      nextAction: "按 T+0/T+1 观察窗口完成可签收复核。"
+    } : null
+  ].filter(Boolean);
+  const ok = blockers.length === 0;
+  return {
+    ok,
+    status: ok ? "ready" : "blocked",
+    decision: ok ? "可上线运行" : "暂缓上线运行",
+    generatedAt: new Date().toISOString(),
+    summary: {
+      hardeningBlocked,
+      cutoverBlocking,
+      observationAbnormal,
+      evidencePending,
+      signoffPendingWindows,
+      blockers: blockers.reduce((sum, item) => sum + item.count, 0)
+    },
+    blockers,
+    nextActions: blockers.length
+      ? blockers.map((item) => item.nextAction)
+      : ["保留 T+1 观察记录并归档签收材料。", "将上线结论同步治理导出包和发布报告。"],
+    evidence: ["/api/operations/production-hardening", "/api/operations/cutover-command", "/api/operations/post-cutover-observation", "release:report:full"]
+  };
+}
+
+function operationGateStatus(ready, blockedStatus = "现场待签收") {
+  return ready ? "已签收" : blockedStatus;
+}
+
+function operationGateReview(processAudit, gateId) {
+  return (Array.isArray(processAudit) ? processAudit : []).find((item) =>
+    String(item.process || "").includes("上线前门禁复核") &&
+    String(item.evidence || "").includes(`goLiveGates/${gateId}/`)
+  );
+}
+
+function attachOperationGateReview(row, processAudit) {
+  const review = operationGateReview(processAudit, row.id);
+  return {
+    ...row,
+    reviewStatus: review ? review.status || "已复核" : "待复核",
+    reviewedBy: review?.owner || "",
+    reviewedAt: review?.evidence || "",
+    reviewNote: review?.nextAction || "",
+    reviewEvidence: review?.evidence || ""
+  };
+}
+
+function buildOperationsGoLiveGates({ productionHardening, siteJointPatrol, cutoverCommand, postCutoverObservation, processAudit }) {
+  const checks = Array.isArray(productionHardening?.checks) ? productionHardening.checks : [];
+  const check = (id) => checks.find((item) => item.id === id) || {};
+  const patrolPending = Number(siteJointPatrol?.summary?.pending || 0);
+  const cutoverBlocking = Number(cutoverCommand?.summary?.blocking || 0);
+  const observationEvidencePending = Number(postCutoverObservation?.summary?.evidencePending || 0);
+  const rows = [
+    {
+      id: "real-payload-signoff",
+      name: "真实报文联调签收",
+      owner: "医院信息中心/接口联调组",
+      ready: patrolPending === 0 && Boolean(check("site-interface-signoff").passed),
+      status: operationGateStatus(patrolPending === 0 && Boolean(check("site-interface-signoff").passed)),
+      severity: patrolPending === 0 ? "中" : "高",
+      requiredEvidence: ["运行快照真实报文", "调度回执真实报文", "统计对账真实报文", "验签日志", "回放记录", "接收端截图"],
+      blockers: [
+        patrolPending ? `${patrolPending}项现场巡检待归档` : "",
+        !check("site-interface-signoff").passed ? "现场接口联调签字未完成" : ""
+      ].filter(Boolean),
+      nextAction: patrolPending ? "补齐样例报文、验签日志、回放记录、失败重试和接收端截图。" : "归档真实报文联调签收材料。",
+      evidence: ["/api/operations/site-joint-patrol", "/api/operations/integration/snapshots", "/api/operations/integration/dispatch-feedback", "/api/operations/integration/reconciliation"]
+    },
+    {
+      id: "audit-retention-target",
+      name: "审计保全目标配置",
+      owner: "平台运维/安全管理岗",
+      ready: Boolean(check("audit-retention").passed),
+      status: operationGateStatus(Boolean(check("audit-retention").passed), "生产割接前必填"),
+      severity: check("audit-retention").passed ? "常规" : "高",
+      requiredEvidence: ["AUDIT_EXPORT_PATH 或 SIEM_ENDPOINT", "日志保全策略", "留存年限", "访问审计", "导出权限确认"],
+      blockers: check("audit-retention").passed ? [] : ["生产审计保全目标未配置"],
+      nextAction: check("audit-retention").passed ? "保持保全路径和导出权限归档。" : "配置 AUDIT_EXPORT_PATH 或 SIEM_ENDPOINT，并完成安全管理员签收。",
+      evidence: ["/api/audit/verify", "/api/operations/production-hardening", "release:report"]
+    },
+    {
+      id: "monitoring-on-call",
+      name: "监控值守联通",
+      owner: "平台运维/值班长",
+      ready: Boolean(check("monitoring-signoff").passed),
+      status: operationGateStatus(Boolean(check("monitoring-signoff").passed)),
+      severity: check("monitoring-signoff").passed ? "常规" : "高",
+      requiredEvidence: ["/api/health", "/api/metrics", "慢请求告警", "错误率告警", "死信告警", "on-call escalation"],
+      blockers: check("monitoring-signoff").passed ? [] : ["监控值守签字未完成"],
+      nextAction: check("monitoring-signoff").passed ? "保持监控面板和告警规则归档。" : "将运行指标绑定现场监控平台，并完成值班长签收。",
+      evidence: ["/api/health", "/api/metrics", "/api/operations/post-cutover-observation"]
+    },
+    {
+      id: "dr-rehearsal-signoff",
+      name: "灾备演练签收",
+      owner: "数据平台/基础设施组",
+      ready: Boolean(check("dr-rehearsal-signoff").passed) && cutoverBlocking === 0 && observationEvidencePending === 0,
+      status: operationGateStatus(Boolean(check("dr-rehearsal-signoff").passed) && cutoverBlocking === 0 && observationEvidencePending === 0),
+      severity: check("dr-rehearsal-signoff").passed ? "中" : "高",
+      requiredEvidence: ["备份文件", "恢复演练记录", "RTO/RPO 说明", "回退快照", "割接回退策略确认"],
+      blockers: [
+        !check("dr-rehearsal-signoff").passed ? "灾备演练签字未完成" : "",
+        cutoverBlocking ? `${cutoverBlocking}项割接阻断待关闭` : "",
+        observationEvidencePending ? `${observationEvidencePending}项上线观察证据待补` : ""
+      ].filter(Boolean),
+      nextAction: check("dr-rehearsal-signoff").passed ? "复核回退策略和 T+1 观察证据。" : "完成备份恢复演练、RTO/RPO 记录和回退策略签收。",
+      evidence: ["/api/operations/cutover-command", "/api/operations/post-cutover-observation", "release/production-cutover-checklist.md"]
+    }
+  ].map((item) => attachOperationGateReview(item, processAudit));
+  return {
+    ok: rows.every((item) => item.ready),
+    generatedAt: new Date().toISOString(),
+    summary: {
+      total: rows.length,
+      ready: rows.filter((item) => item.ready).length,
+      blocked: rows.filter((item) => !item.ready).length,
+      highPriority: rows.filter((item) => !item.ready && item.severity === "高").length,
+      reviewed: rows.filter((item) => item.reviewStatus !== "待复核").length
+    },
+    rows,
+    evidence: ["/api/operations/go-live-gates", "/api/operations/go-live-gates/actions", "/api/operations/production-hardening", "/api/operations/site-joint-patrol", "/api/operations/post-cutover-observation"]
+  };
+}
+
+function buildOperationsIntelligence({ snapshots, dispatchRequests, reconciliationReviews }) {
+  const lowerPressureTargets = [...snapshots].sort((a, b) => Number(a.bedOccupancyRate || 0) - Number(b.bedOccupancyRate || 0));
+  const recommendations = snapshots.map((snapshot) => {
+    const openDispatches = dispatchRequests.filter((item) => operationInstitutionMatched(snapshot, item) && ["pending", "assigned", "in-progress"].includes(item.status));
+    const pendingRecon = reconciliationReviews.filter((item) => operationInstitutionMatched(snapshot, item) && !["approved", "closed"].includes(item.status));
+    const target = lowerPressureTargets.find((item) => item.institutionId !== snapshot.institutionId && Number(item.bedOccupancyRate || 0) <= 0.9);
+    const riskScore = Math.min(100, Math.round(Number(snapshot.resourcePressure || 0) + Number(snapshot.outpatient?.waitingOver30Min || 0) * 0.2 + pendingRecon.length * 8));
+    const bedGapTomorrow = Math.max(0, Math.round(Number(snapshot.beds?.occupied || 0) * 1.03 - Number(snapshot.beds?.open || 0)));
+    const staffGapTonight = Math.max(Number(snapshot.staff?.shortage || 0), Math.ceil(Number(snapshot.outpatient?.waitingOver30Min || 0) / 45));
+    return {
+      id: `intel-${snapshot.institutionId}`,
+      institutionId: snapshot.institutionId,
+      institution: snapshot.institution,
+      riskLevel: riskScore >= 85 ? "高" : riskScore >= 65 ? "中" : "低",
+      riskScore,
+      prediction: {
+        bedGapTomorrow,
+        staffGapTonight,
+        emergencyCongestion: Number(snapshot.outpatient?.waitingOver30Min || 0) >= 50 ? "可能拥堵" : "可控",
+        reportingRisk: Number(snapshot.reporting?.varianceRate || 0) >= 0.05 ? "直报阻断风险" : "常规复核"
+      },
+      recommendation: target
+        ? `建议优先向${target.institution}协调${bedGapTomorrow || 6}张过渡床位或检查时段。`
+        : "建议先启动院内备用资源和分诊分流。",
+      reviewQueue: [
+        ...openDispatches.map((item) => `调度单：${item.resourceType} ${item.quantity}`),
+        ...pendingRecon.map((item) => `直报复核：${item.sourceBatch}`)
+      ].slice(0, 4),
+      confidence: riskScore >= 85 ? "高" : "中",
+      evidence: ["/api/operations/dashboard", "/api/operations/dispatch"]
+    };
+  }).sort((a, b) => b.riskScore - a.riskScore);
+  return {
+    ok: recommendations.length > 0,
+    generatedAt: new Date().toISOString(),
+    summary: {
+      recommendations: recommendations.length,
+      highRisk: recommendations.filter((item) => item.riskLevel === "高").length,
+      reviewItems: recommendations.reduce((sum, item) => sum + item.reviewQueue.length, 0)
+    },
+    recommendations
+  };
+}
+
+function buildOperationsGovernanceReport({ snapshots, dispatchRequests, reconciliationReviews, performanceMonitoring, handover }) {
+  const openDispatches = dispatchRequests.filter((item) => ["pending", "assigned", "in-progress"].includes(item.status));
+  const closedDispatches = dispatchRequests.filter((item) => ["closed", "cancelled"].includes(item.status));
+  const pendingRecon = reconciliationReviews.filter((item) => !["approved", "closed"].includes(item.status));
+  const exceptionSources = [...new Set(Object.values(performanceMonitoring?.manuals || {}).flatMap((manual) => manual.coverage?.pendingSources || []))];
+  const sections = [
+    {
+      id: "monthly-operations",
+      title: "月度运行态势",
+      owner: "规划发展与信息化处",
+      metric: `${snapshots.length}家机构，${snapshots.filter((item) => item.normalizedStatus === "critical").length}家严重预警`,
+      conclusion: "用于委端月度运行治理报告首屏。"
+    },
+    {
+      id: "dispatch-review",
+      title: "调度复盘",
+      owner: "医政医管处/运行调度席",
+      metric: `${openDispatches.length}个开放工单，${closedDispatches.length}个已闭环工单`,
+      conclusion: "按资源类型和目标机构复盘响应时效。"
+    },
+    {
+      id: "reconciliation-diff",
+      title: "统计直报差异",
+      owner: "统计办公室",
+      metric: `${pendingRecon.length}项待复核，最高差异${Math.round(Math.max(...reconciliationReviews.map((item) => Number(item.varianceRate || 0)), 0) * 1000) / 10}%`,
+      conclusion: "形成直报差异清单和退回/补正/阻断归档。"
+    },
+    {
+      id: "performance-exception",
+      title: "绩效异常说明",
+      owner: "医务部/运营管理部门",
+      metric: exceptionSources.length ? `待补接：${exceptionSources.join("、")}` : "绩效来源已纳入运行联动",
+      conclusion: "将运行压力、直报差异和手册指标异常说明合并归档。"
+    },
+    {
+      id: "handover-quality",
+      title: "交接班质量",
+      owner: "运行监测岗",
+      metric: `${handover?.summary?.items || 0}项交接事项，${handover?.summary?.signoffs || 0}次签收`,
+      conclusion: "跟踪交接事项、责任组和下一班关注点。"
+    }
+  ];
+  return {
+    ok: sections.every((item) => item.owner && item.metric),
+    generatedAt: new Date().toISOString(),
+    period: "2026-06",
+    summary: {
+      sections: sections.length,
+      openDispatches: openDispatches.length,
+      pendingReconciliation: pendingRecon.length,
+      performanceExceptions: exceptionSources.length
+    },
+    exportName: "医院运行治理月报-2026-06",
+    sections,
+    nextActions: [
+      "导出委端月度运行治理报告",
+      "归档直报差异清单和调度复盘清单",
+      "将绩效异常说明与现场联调记录合并复核"
+    ],
+    evidence: ["/api/operations/dashboard", "/api/operations/governance-report", "hospital-operations-module-report.md"]
+  };
+}
+
+function buildOperationsGovernanceExportPackage({
+  snapshots,
+  dispatchRequests,
+  reconciliationReviews,
+  performanceMonitoring,
+  governanceReport,
+  intelligence,
+  handover
+}) {
+  const pendingRecon = reconciliationReviews.filter((item) => !["approved", "closed"].includes(item.status));
+  const openDispatches = dispatchRequests.filter((item) => ["pending", "assigned", "in-progress"].includes(item.status));
+  const exceptionSources = [...new Set(Object.values(performanceMonitoring?.manuals || {}).flatMap((manual) => manual.coverage?.pendingSources || []))];
+  const files = [
+    {
+      id: "monthly-governance-report",
+      name: "月度运行治理报告.md",
+      type: "markdown",
+      owner: "规划发展与信息化处",
+      rows: Array.isArray(governanceReport?.sections) ? governanceReport.sections.length : 0,
+      description: "汇总运行态势、调度复盘、直报差异、绩效异常和交接班质量。"
+    },
+    {
+      id: "reconciliation-diff-list",
+      name: "统计直报差异清单.csv",
+      type: "csv",
+      owner: "统计办公室",
+      rows: pendingRecon.length,
+      description: "列出待复核、退回、补正中和阻断的直报差异批次。"
+    },
+    {
+      id: "dispatch-review-list",
+      name: "资源调度复盘清单.csv",
+      type: "csv",
+      owner: "运行调度席",
+      rows: dispatchRequests.length,
+      description: "沉淀资源类型、数量、目标机构、状态、要求到位时间和审计轨迹。"
+    },
+    {
+      id: "performance-exception-note",
+      name: "绩效异常说明模板.md",
+      type: "markdown",
+      owner: "医务部/运营管理部门",
+      rows: exceptionSources.length,
+      description: "按绩效监测手册口径补充异常说明、数据来源和责任科室。"
+    },
+    {
+      id: "attachment-index",
+      name: "附件目录.json",
+      type: "json",
+      owner: "运行监测岗",
+      rows: 5,
+      description: "关联现场联调记录、交接签收、智能调度建议、审计记录和发布报告。"
+    }
+  ];
+  const lines = [
+    `# ${governanceReport?.exportName || "医院运行治理月报"}`,
+    "",
+    `- 生成时间：${new Date().toISOString()}`,
+    `- 机构数：${snapshots.length}`,
+    `- 开放调度工单：${openDispatches.length}`,
+    `- 待复核直报差异：${pendingRecon.length}`,
+    `- 智能调度建议：${Array.isArray(intelligence?.recommendations) ? intelligence.recommendations.length : 0}`,
+    `- 交接事项：${handover?.summary?.items || 0}`,
+    "",
+    "## 治理章节",
+    "",
+    ...(Array.isArray(governanceReport?.sections) ? governanceReport.sections : []).map((item) => `- ${item.title}：${item.metric}；${item.conclusion}`),
+    "",
+    "## 导出文件",
+    "",
+    ...files.map((item) => `- ${item.name}：${item.description}`),
+    "",
+    "## 复核要求",
+    "",
+    "- 导出前确认数据版本、复核人、附件编号和统计直报差异状态。",
+    "- 导出后将文件包编号写入审计记录，并与现场联调证据、发布报告一并归档。"
+  ];
+  const markdown = lines.join("\n");
+  return {
+    ok: files.every((item) => item.owner && item.name),
+    generatedAt: new Date().toISOString(),
+    packageName: `${governanceReport?.exportName || "医院运行治理月报"}-导出包`,
+    version: createHash("sha256").update(markdown).digest("hex").slice(0, 12),
+    summary: {
+      files: files.length,
+      sections: Array.isArray(governanceReport?.sections) ? governanceReport.sections.length : 0,
+      pendingReconciliation: pendingRecon.length,
+      dispatchReviews: dispatchRequests.length,
+      performanceExceptions: exceptionSources.length
+    },
+    files,
+    markdown,
+    checklist: [
+      "确认月报模板、直报差异清单和附件编号规则。",
+      "由统计办公室复核差异状态，由运行调度席复核工单闭环。",
+      "导出包编号写入平台过程审计，现场正式版需完成签收归档。"
+    ],
+    evidence: ["/api/operations/governance-report", "/api/operations/governance-export-package", "/api/process-audit"]
+  };
+}
+
+function operationEntityMatched(left = {}, right = {}) {
+  const leftId = String(left.institutionId || left.sourceInstitutionId || left.targetInstitutionId || "").toLowerCase();
+  const rightId = String(right.institutionId || right.sourceInstitutionId || right.targetInstitutionId || "").toLowerCase();
+  if (leftId && rightId && leftId === rightId) return true;
+  const leftName = String(left.institution || left.sourceInstitution || left.targetInstitution || "").trim().toLowerCase();
+  const rightName = String(right.institution || right.sourceInstitution || right.targetInstitution || "").trim().toLowerCase();
+  return Boolean(leftName && rightName && leftName === rightName);
+}
+
+function buildOperationsResourcePool({ snapshots, medicalResources, dispatchRequests }) {
+  const byInstitutionId = new Map(snapshots.map((item) => [String(item.institutionId || "").toLowerCase(), item]));
+  const openStatuses = new Set(["pending", "assigned", "in-progress"]);
+  const openDispatches = dispatchRequests.filter((item) => openStatuses.has(item.status));
+  const rows = medicalResources.map((resource) => {
+    const snapshot = byInstitutionId.get(String(resource.id || resource.institutionId || "").toLowerCase()) || {};
+    const availableBeds = snapshot.beds ? Math.max(0, Number(snapshot.beds.open || 0) - Number(snapshot.beds.occupied || 0)) : Math.max(0, Math.round(Number(resource.beds || 0) * 0.08));
+    const availableIcuBeds = snapshot.beds ? Math.max(0, Number(snapshot.beds.icuTotal || 0) - Number(snapshot.beds.icuOccupied || 0)) : Math.max(0, Math.round(Number(resource.beds || 0) * 0.01));
+    const availableVentilators = Number(snapshot.equipment?.ventilatorsAvailable ?? Math.max(0, Math.round(Number(resource.devices || 0) * 0.25)));
+    const availableAmbulances = Number(snapshot.equipment?.ambulancesAvailable ?? Math.max(1, Math.round(Number(resource.devices || 0) * 0.08)));
+    const reserveDoctors = Math.max(0, Math.round(Number(resource.doctors || 0) * 0.03) - Number(snapshot.staff?.shortage || 0));
+    const pressure = Number(snapshot.resourcePressure || 0);
+    const status = snapshot.normalizedStatus === "critical" || pressure >= 85
+      ? "需保障本院"
+      : availableBeds >= 20 || availableVentilators >= 8 || reserveDoctors >= 3
+        ? "可调拨"
+        : "有限支援";
+    return {
+      id: `pool-${String(resource.id || resource.institution || "").toLowerCase()}`,
+      institutionId: String(resource.id || resource.institutionId || "").toUpperCase(),
+      institution: snapshot.institution || resource.institution,
+      region: resource.region || snapshot.district || "待确认",
+      institutionType: resource.type || "医疗机构",
+      status,
+      pressure,
+      activeDispatches: openDispatches.filter((item) => operationEntityMatched(snapshot, item) || String(item.targetInstitutionId || "").toLowerCase() === String(resource.id || "").toLowerCase()).length,
+      resourceSlots: [
+        { type: "普通床位", available: availableBeds, unit: "张", boundary: "优先用于急诊留观、下转过渡和择期手术错峰。" },
+        { type: "ICU床位", available: availableIcuBeds, unit: "张", boundary: "需医政医管处确认重症收治边界和转运风险。" },
+        { type: "呼吸机", available: availableVentilators, unit: "台", boundary: "调拨前确认设备编号、消毒状态和随设备耗材。" },
+        { type: "救护车", available: availableAmbulances, unit: "辆", boundary: "用于跨院转运或急诊分流，需同步调度指令。" },
+        { type: "值班医生", available: reserveDoctors, unit: "人", boundary: "只作为短时支援能力，需目标科室确认执业和排班边界。" }
+      ],
+      protocol: {
+        approval: status === "可调拨" ? "运行调度席初审，医政医管处确认" : "先保障本院运行，再评估支援",
+        responseSla: status === "可调拨" ? "2小时确认，4小时到位" : "4小时内复核可支援边界",
+        audit: "形成申请、审批、执行、关闭、复盘和审计留痕。"
+      },
+      evidence: ["/api/operations/resource-pool", "/api/operations/dashboard", "medicalResources"]
+    };
+  }).sort((a, b) => (a.status === "可调拨" ? -1 : 1) - (b.status === "可调拨" ? -1 : 1) || b.resourceSlots[0].available - a.resourceSlots[0].available);
+  const highPressure = snapshots.filter((item) => item.normalizedStatus === "critical" || Number(item.resourcePressure || 0) >= 85);
+  const donors = rows.filter((item) => item.status === "可调拨");
+  const recommendations = highPressure.map((source, index) => {
+    const target = donors.find((item) => String(item.institutionId).toLowerCase() !== String(source.institutionId || "").toLowerCase()) || donors[index % Math.max(1, donors.length)];
+    return {
+      id: `resource-match-${source.institutionId || index}`,
+      sourceInstitutionId: source.institutionId,
+      sourceInstitution: source.institution,
+      targetInstitutionId: target?.institutionId || "",
+      targetInstitution: target?.institution || "待人工指定",
+      resourceType: Number(source.beds?.icuOccupied || 0) / Math.max(1, Number(source.beds?.icuTotal || 0)) >= 0.9 ? "ICU床位/呼吸机" : "过渡床位/急诊分流",
+      priority: source.normalizedStatus === "critical" ? "高" : "中",
+      reason: `资源压力 ${source.resourcePressure || 0}，开放调度工单 ${openDispatches.filter((item) => operationEntityMatched(source, item)).length} 条。`,
+      suggestedAction: target ? `建议向${target.institution}申请${target.resourceSlots[0].available}张以内过渡床位或设备支援。` : "建议先由运行调度席人工指定支援机构。",
+      evidence: ["/api/operations/resource-pool", "/api/operations/dispatch"]
+    };
+  });
+  return {
+    ok: rows.length > 0,
+    generatedAt: new Date().toISOString(),
+    summary: {
+      institutions: rows.length,
+      transferableInstitutions: rows.filter((item) => item.status === "可调拨").length,
+      transferableBeds: rows.reduce((sum, item) => sum + Number(item.resourceSlots.find((slot) => slot.type === "普通床位")?.available || 0), 0),
+      icuBeds: rows.reduce((sum, item) => sum + Number(item.resourceSlots.find((slot) => slot.type === "ICU床位")?.available || 0), 0),
+      ventilators: rows.reduce((sum, item) => sum + Number(item.resourceSlots.find((slot) => slot.type === "呼吸机")?.available || 0), 0),
+      openDispatches: openDispatches.length,
+      recommendations: recommendations.length
+    },
+    rows,
+    recommendations,
+    evidence: ["/api/operations/resource-pool", "medicalResources", "resourceDispatchRequests"]
+  };
+}
+
+function emergencyDispatchMatched(dispatch) {
+  const text = `${dispatch.category || ""} ${dispatch.resourceType || ""} ${dispatch.reason || ""}`.toLowerCase();
+  return /emergency|急诊|候诊|ct|ambulance|observation|留观|救护/.test(text);
+}
+
+function emergencyLoopKey(snapshot) {
+  return `ed-loop-${String(snapshot.institutionId || snapshot.id || "unknown").toLowerCase()}-${String(snapshot.snapshotAt || "").replace(/[^0-9A-Za-z]/g, "").slice(0, 10)}`;
+}
+
+function emergencyLoopStatus(snapshot, dispatches, savedLoop) {
+  if (savedLoop?.status) return savedLoop.status;
+  if (dispatches.some((item) => item.status === "closed")) return "closed";
+  if (dispatches.some((item) => ["assigned", "in-progress"].includes(item.status))) return "dispatching";
+  if (dispatches.some((item) => item.status === "pending")) return "pending-dispatch";
+  return Number(snapshot.outpatient?.waitingOver30Min || 0) >= 50 ? "review-required" : "watching";
+}
+
+function buildOperationsEmergencyDispatchLoop({ snapshots, dispatchRequests, resourcePool, emergencyDispatchLoops }) {
+  const savedBySnapshot = new Map((Array.isArray(emergencyDispatchLoops) ? emergencyDispatchLoops : []).map((item) => [item.snapshotId || item.id, item]));
+  const donorRows = Array.isArray(resourcePool?.rows) ? resourcePool.rows.filter((item) => item.status === "可调拨") : [];
+  const rows = (snapshots || [])
+    .filter((snapshot) => {
+      const waiting = Number(snapshot.outpatient?.waitingOver30Min || 0);
+      const emergencyVisits = Number(snapshot.outpatient?.emergencyVisits || 0);
+      const hasEmergencyAlert = (snapshot.activeAlerts || []).some((alert) => alert.id === "ed-waiting-high" || alert.domain === "outpatient");
+      const relatedDispatch = (dispatchRequests || []).some((item) => operationInstitutionMatched(snapshot, item) && emergencyDispatchMatched(item));
+      return waiting >= 30 || emergencyVisits >= 100 || hasEmergencyAlert || relatedDispatch;
+    })
+    .map((snapshot, index) => {
+      const dispatches = (dispatchRequests || []).filter((item) => operationInstitutionMatched(snapshot, item) && emergencyDispatchMatched(item));
+      const savedLoop = savedBySnapshot.get(snapshot.id) || savedBySnapshot.get(emergencyLoopKey(snapshot)) || {};
+      const target = donorRows.find((item) => String(item.institutionId || "").toLowerCase() !== String(snapshot.institutionId || "").toLowerCase()) || donorRows[index % Math.max(donorRows.length, 1)];
+      const waiting = Number(snapshot.outpatient?.waitingOver30Min || 0);
+      const emergencyVisits = Number(snapshot.outpatient?.emergencyVisits || 0);
+      const bedPressure = Math.round(ratio(snapshot.beds?.occupied, snapshot.beds?.open) * 1000) / 10;
+      const priority = waiting >= 50 || snapshot.normalizedStatus === "critical" ? "high" : "medium";
+      const resourceType = waiting >= 50 ? "ct-slot/emergency-triage" : "emergency-observation-bed";
+      const quantity = Math.max(1, Math.min(8, Math.ceil(waiting / 20) || 2));
+      return {
+        id: savedLoop.id || emergencyLoopKey(snapshot),
+        snapshotId: snapshot.id,
+        institutionId: snapshot.institutionId,
+        institution: snapshot.institution,
+        status: emergencyLoopStatus(snapshot, dispatches, savedLoop),
+        priority,
+        pressure: {
+          emergencyVisits,
+          waitingOver30Min: waiting,
+          emergencyObservation: Number(snapshot.beds?.emergencyObservation || 0),
+          bedOccupancyRate: bedPressure,
+          resourcePressure: Number(snapshot.resourcePressure || 0)
+        },
+        targetInstitutionId: savedLoop.targetInstitutionId || target?.institutionId || "",
+        targetInstitution: savedLoop.targetInstitution || target?.institution || "待人工指定",
+        resourceType: savedLoop.resourceType || resourceType,
+        quantity: Number(savedLoop.quantity || quantity),
+        trigger: savedLoop.trigger || `候诊超30分钟 ${waiting} 人，急诊 ${emergencyVisits} 人次，床位占用 ${bedPressure}%。`,
+        dispatchIds: dispatches.map((item) => item.id),
+        dispatchStatus: dispatches.length ? dispatches.map((item) => `${item.id}:${item.status}`).join(" / ") : "待生成调度单",
+        owner: savedLoop.owner || "急诊科/运行调度席",
+        reviewNote: savedLoop.reviewNote || "复核急诊分诊队列、CT/救护车优先能力和跨院分流边界。",
+        nextAction: dispatches.length
+          ? "跟踪调度单受理、资源到位、转运签收和关闭复盘。"
+          : "从闭环卡片生成调度草稿，提交后进入资源调度审计链。",
+        evidence: ["/api/operations/emergency-dispatch-loop", "/api/operations/dashboard", "/api/operations/resource-pool", "/api/operations/dispatch"],
+        auditTrail: Array.isArray(savedLoop.auditTrail) ? savedLoop.auditTrail : []
+      };
+    })
+    .sort((a, b) => (a.priority === "high" ? -1 : 1) - (b.priority === "high" ? -1 : 1) || b.pressure.waitingOver30Min - a.pressure.waitingOver30Min);
+  return {
+    ok: rows.length > 0,
+    generatedAt: new Date().toISOString(),
+    summary: {
+      rows: rows.length,
+      highPriority: rows.filter((item) => item.priority === "high").length,
+      pendingReview: rows.filter((item) => ["review-required", "pending-dispatch", "watching"].includes(item.status)).length,
+      linkedDispatches: rows.reduce((sum, item) => sum + item.dispatchIds.length, 0)
+    },
+    actionBoundary: "急诊拥堵闭环只生成调度建议和复核留痕，正式跨院转运仍需医政医管处和值班长确认。",
+    rows,
+    evidence: ["/api/operations/emergency-dispatch-loop", "emergencyDispatchLoops", "hospitalOperationSnapshots", "resourceDispatchRequests", "medicalResources"]
+  };
+}
+
+function buildOperationsNextDevelopmentResearch({
+  snapshots,
+  dispatchRequests,
+  reconciliationReviews,
+  performanceMonitoring,
+  siteJointTests,
+  productionHardening,
+  intelligence,
+  governanceReport,
+  handover
+}) {
+  const openDispatches = dispatchRequests.filter((item) => ["pending", "assigned", "in-progress"].includes(item.status));
+  const pendingRecon = reconciliationReviews.filter((item) => !["approved", "closed"].includes(item.status));
+  const highPressure = snapshots.filter((item) => item.normalizedStatus === "critical" || item.resourcePressure >= 85);
+  const completedJointTests = Number(siteJointTests?.summary?.completed || 0);
+  const totalJointTests = Number(siteJointTests?.summary?.total || 0);
+  const blockedHardening = Number(productionHardening?.summary?.blocked || 0);
+  const intelligenceRows = Array.isArray(intelligence?.recommendations) ? intelligence.recommendations : [];
+  const governanceSections = Number(governanceReport?.summary?.sections || 0);
+  const handoverItems = Number(handover?.summary?.items || 0);
+  const tracks = [
+    {
+      id: "field-integration-command-center",
+      priority: "P0",
+      phase: "现场联调深化",
+      name: "多源真实报文联调驾驶舱",
+      owner: "接口联调组/信息中心",
+      problem: `当前已沉淀${totalJointTests}类现场联调项，仍需把样例报文、回放日志和失败重试转成日常可追踪闭环。`,
+      deliverable: "已上线现场联调巡检台，按HIS、EMR、LIS、PACS、HRP、120急救和统计直报来源展示报文状态、字段映射、验签日志、回放记录、失败重试和接收端确认。",
+      prerequisites: ["接入真实样例报文", "统一机构编码", "补齐失败重试回执", "现场联调签字归档"],
+      dataSources: ["operationIntegrationAudit", "healthStatisticsIngestion", "hospitalOperationSnapshots"],
+      acceptance: completedJointTests >= totalJointTests && totalJointTests > 0 ? "联调项已具备演示闭环，下一步进入真实报文日常巡检。" : "至少完成全部来源的样例报文、验签日志、回放记录和失败重试截图。",
+      evidence: ["/api/operations/site-joint-tests", "/api/operations/site-joint-patrol", "/api/operations/interface-mapping"]
+    },
+    {
+      id: "production-cutover-ops",
+      priority: "P0",
+      phase: "生产割接运营",
+      name: "割接值守与回退演练台",
+      owner: "平台运维/安全管理岗",
+      problem: `生产加固仍有${blockedHardening}项需要现场签字或环境变量确认。`,
+      deliverable: "形成割接窗口、值守人、监控阈值、回退路径、审计保全和灾备演练的一屏确认台。",
+      prerequisites: ["SESSION_SECRETS生产配置", "INTEGRATION_GATEWAY_SECRET轮换", "监控值守签字", "灾备演练记录"],
+      dataSources: ["platformProcessAudit", "securityEvents", "/api/health", "/api/metrics"],
+      acceptance: "生产前 release 报告无阻断项，割接、监控、审计、回退均完成签字归档。",
+      evidence: ["/api/operations/production-hardening", "/api/system/readiness"]
+    },
+    {
+      id: "predictive-capacity-model",
+      priority: "P1",
+      phase: "智能调度增强",
+      name: "床位/人员/设备预测模型与采纳率闭环",
+      owner: "医务运行调度岗/数据分析岗",
+      problem: `当前有${intelligenceRows.length}条智能调度建议，仍需记录人工采纳、驳回原因和次日实际压力。`,
+      deliverable: "把预测缺口、调度建议、人工决策、实际床位压力和工单关闭结果串成模型评估面板。",
+      prerequisites: ["调度工单状态闭环", "采纳/驳回原因字典", "次日运行快照", "模型版本号"],
+      dataSources: ["resourceDispatchRequests", "hospitalOperationSnapshots", "medicalResources"],
+      acceptance: "展示建议采纳率、调度后压力变化、误报漏报案例和模型版本回溯。",
+      evidence: ["/api/operations/intelligence", "/api/operations/dispatch"]
+    },
+    {
+      id: "cross-hospital-resource-market",
+      priority: "P1",
+      phase: "跨院资源协同",
+      name: "跨院资源池与调拨协议",
+      owner: "医政医管处/医联体办公室",
+      problem: `当前开放调度工单${openDispatches.length}条，需要把院内请求升级为跨院资源池和协议化调拨。`,
+      deliverable: "按床位、ICU、检查设备、值班人员和转运能力形成可申请、可审批、可追踪的跨院资源池。",
+      prerequisites: ["资源口径统一", "调拨审批规则", "目标医院确认机制", "转运责任边界"],
+      dataSources: ["medicalResources", "resourceDispatchRequests", "hospitalOperationSnapshots"],
+      acceptance: "跨院调拨工单可完成申请、受理、执行、关闭、复盘和审计追踪。",
+      evidence: ["/api/operations/dashboard", "/api/operations/dispatch"]
+    },
+    {
+      id: "governance-export-center",
+      priority: "P1",
+      phase: "治理报表导出",
+      name: "委端月报、绩效异常和直报差异导出中心",
+      owner: "统计办公室/规划发展与信息化处",
+      problem: `治理报表已有${governanceSections}个章节，待复核直报差异${pendingRecon.length}项，需要可下载、可留痕的报表包。`,
+      deliverable: "导出月度运行治理报告、绩效异常说明、直报差异清单、调度复盘和附件目录。",
+      prerequisites: ["报表模板定稿", "异常说明字段", "附件编号规则", "复核签收流程"],
+      dataSources: ["healthStatistics", "statisticsReconciliationReviews", "platformProcessAudit"],
+      acceptance: "导出的报告包可追溯生成时间、数据版本、复核人、差异状态和附件证据。",
+      evidence: ["/api/operations/governance-report", "/api/operations/reconciliation/:id/review"]
+    },
+    {
+      id: "mobile-command",
+      priority: "P2",
+      phase: "移动值守",
+      name: "移动端值守与消息闭环",
+      owner: "运行监测岗/值班长",
+      problem: `交接事项${handoverItems}项，高压机构${highPressure.length}家，夜间值守需要更轻量的确认和提醒入口。`,
+      deliverable: "已上线移动值守台，集中查看预警、工单、交接事项和待复核直报差异，并支持提醒生成、弱网补传说明和审计留痕。",
+      prerequisites: ["移动端角色权限", "消息模板", "签收审计字段", "弱网重试策略"],
+      dataSources: ["operationHandoverSignoffs", "taskMessages", "securityEvents"],
+      acceptance: "移动值守可完成预警确认、交接签收、调度备注和审计留痕。",
+      evidence: ["/api/operations/mobile-duty", "/api/operations/mobile-duty/actions", "/api/messages", "/api/process-audit"]
+    }
+  ];
+  const nextSprint = [
+    "把现场联调闭环升级为真实报文巡检和失败重试看板。",
+    "把生产加固清单接入割接值守、回退演练和监控签字。",
+    "为智能调度建议增加采纳率、驳回原因和次日压力校验。",
+    "沉淀委端月报导出模板和直报差异附件包。"
+  ];
+  return {
+    ok: tracks.length >= 5,
+    generatedAt: new Date().toISOString(),
+    horizon: "2026-Q3 至 2026-Q4",
+    summary: {
+      tracks: tracks.length,
+      p0: tracks.filter((item) => item.priority === "P0").length,
+      p1: tracks.filter((item) => item.priority === "P1").length,
+      p2: tracks.filter((item) => item.priority === "P2").length,
+      readyForFieldResearch: completedJointTests,
+      blockedForCutover: blockedHardening,
+      pendingReconciliation: pendingRecon.length
+    },
+    tracks,
+    risks: [
+      "真实报文、生产密钥、移动端消息和跨院调拨均需现场制度与安全边界共同确认。",
+      "预测模型上线前必须保留人工复核、采纳原因、驳回原因和审计留痕。",
+      "委端导出件应锁定数据版本，避免月报、直报和绩效说明口径漂移。"
+    ],
+    nextSprint,
+    evidence: ["/api/operations/dashboard", "/api/operations/next-development-research", "hospital-operations-module-report.md"]
+  };
+}
+
+function buildOperationsMobileDuty({ snapshots, dispatchRequests, reconciliationReviews, handover, taskMessages }) {
+  const openDispatches = (Array.isArray(dispatchRequests) ? dispatchRequests : []).filter((item) => ["pending", "assigned", "in-progress"].includes(item.status));
+  const pendingRecon = (Array.isArray(reconciliationReviews) ? reconciliationReviews : []).filter((item) => !["approved", "closed"].includes(item.status));
+  const handoverItems = Array.isArray(handover?.items) ? handover.items : [];
+  const highPressure = (Array.isArray(snapshots) ? snapshots : []).filter((item) => item.normalizedStatus === "critical" || Number(item.resourcePressure || 0) >= 85 || (item.activeAlerts || []).some((alert) => alert.severity === "critical"));
+  const recentMessages = (Array.isArray(taskMessages) ? taskMessages : [])
+    .filter((message) => message.collection === "hospitalOperationsMobileDuty" || String(message.taskId || "").startsWith("operations-mobile-duty:"))
+    .slice(0, 8);
+  const cards = [
+    {
+      id: "mobile-duty-alert-confirm",
+      type: "alert-confirm",
+      title: "预警确认",
+      priority: highPressure.length ? "高" : "常规",
+      count: highPressure.length,
+      owner: "运行监测岗",
+      status: highPressure.length ? "待确认" : "已关注",
+      summary: highPressure.length ? `${highPressure.length}家机构处于高压或严重预警状态` : "当前无严重预警机构",
+      nextAction: highPressure.length ? "移动端确认预警、记录电话核实结果并同步值班长。" : "保持弱网缓存和定时巡检。",
+      evidence: ["/api/operations/dashboard", "/api/operations/mobile-duty"]
+    },
+    {
+      id: "mobile-duty-handover-signoff",
+      type: "handover-signoff",
+      title: "交接签收",
+      priority: handoverItems.some((item) => item.severity === "critical") ? "高" : "中",
+      count: handoverItems.length,
+      owner: "值班长",
+      status: handoverItems.length ? "待签收" : "无交接事项",
+      summary: `${handoverItems.length}项交接事项需要移动端复核`,
+      nextAction: "移动端完成交接签收、补充下一班关注点并写入审计。",
+      evidence: ["/api/operations/handover", "/api/operations/handover/signoff"]
+    },
+    {
+      id: "mobile-duty-dispatch-note",
+      type: "dispatch-note",
+      title: "调度备注",
+      priority: openDispatches.some((item) => item.priority === "high") ? "高" : "中",
+      count: openDispatches.length,
+      owner: "调度席",
+      status: openDispatches.length ? "待跟进" : "无开放工单",
+      summary: `${openDispatches.length}条开放调度单需要移动端更新处置进展`,
+      nextAction: "补充资源到位、转运、执行人和预计关闭时间。",
+      evidence: ["/api/operations/dispatch", "/api/operations/dispatch/:id/status"]
+    },
+    {
+      id: "mobile-duty-reconciliation-reminder",
+      type: "reconciliation-reminder",
+      title: "直报复核提醒",
+      priority: pendingRecon.some((item) => item.status === "blocked") ? "高" : "中",
+      count: pendingRecon.length,
+      owner: "统计办公室",
+      status: pendingRecon.length ? "待复核" : "已清零",
+      summary: `${pendingRecon.length}条统计直报差异等待复核`,
+      nextAction: "提醒责任科室确认差异口径、补正说明和提交时限。",
+      evidence: ["/api/operations/reconciliation/:id/review", "healthStatisticsIngestion"]
+    }
+  ];
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    summary: {
+      cards: cards.length,
+      highPriority: cards.filter((item) => item.priority === "高").length,
+      pendingActions: cards.reduce((sum, item) => sum + Number(item.count || 0), 0),
+      reminders: recentMessages.length
+    },
+    weakNetwork: {
+      mode: "cache-last-state",
+      offlineDrafts: true,
+      retryPolicy: "网络恢复后按审计时间顺序补传签收、备注和提醒。"
+    },
+    cards,
+    recentMessages,
+    evidence: ["/api/operations/mobile-duty", "operationHandoverSignoffs", "taskMessages", "securityEvents"]
+  };
+}
+
+function createOperationsMobileDutyReminder(card, payload, user) {
+  const now = new Date().toISOString();
+  return {
+    id: `msg-${randomUUID()}`,
+    taskId: `operations-mobile-duty:${card.id}`,
+    collection: "hospitalOperationsMobileDuty",
+    sourceId: card.id,
+    residentId: "",
+    targetRole: String(payload.targetRole || "commission").trim(),
+    channel: String(payload.channel || "in_app").trim(),
+    title: String(payload.title || `移动值守提醒：${card.title}`).trim(),
+    body: String(payload.body || payload.note || card.nextAction || card.summary || "").trim(),
+    status: "sent",
+    escalationKey: `operations-mobile-duty:${card.id}:${now.slice(0, 10)}:${randomUUID()}`,
+    receipts: [],
+    createdAt: now,
+    createdBy: user.username || user.role,
+    createdByName: user.name,
+    evidence: ["/api/operations/mobile-duty/actions", "/api/messages", "/api/audit/verify"]
+  };
+}
+
 function buildHospitalOperationsDashboard(data) {
   const rules = Array.isArray(data.operationAlertRules) ? data.operationAlertRules : [];
   const snapshots = (Array.isArray(data.hospitalOperationSnapshots) ? data.hospitalOperationSnapshots : []).map((snapshot) => {
@@ -7211,6 +9315,8 @@ function buildHospitalOperationsDashboard(data) {
   }).sort((a, b) => statusSeverity(b.normalizedStatus) - statusSeverity(a.normalizedStatus) || b.bedOccupancyRate - a.bedOccupancyRate);
   const dispatchRequests = Array.isArray(data.resourceDispatchRequests) ? data.resourceDispatchRequests : [];
   const reconciliationReviews = Array.isArray(data.statisticsReconciliationReviews) ? data.statisticsReconciliationReviews : [];
+  const handoverSignoffs = Array.isArray(data.operationHandoverSignoffs) ? data.operationHandoverSignoffs : [];
+  const medicalResources = Array.isArray(data.medicalResources) ? data.medicalResources : [];
   const openStatuses = new Set(["pending", "assigned", "in-progress"]);
   const summary = {
     institutions: snapshots.length,
@@ -7225,7 +9331,15 @@ function buildHospitalOperationsDashboard(data) {
     emergencyVisitsToday: snapshots.reduce((sum, item) => sum + Number(item.outpatient?.emergencyVisits || 0), 0)
   };
   summary.bedOccupancyRate = ratio(summary.occupiedBeds, summary.totalOpenBeds);
-  return {
+  const commandChains = buildOperationsCommandChains({ snapshots, dispatchRequests, reconciliationReviews });
+  const interfaceMapping = buildOperationsInterfaceMappingEvidence(data);
+  const playbooks = buildOperationsPlaybooks({ snapshots, alertRules: rules, commandChains, interfaceMapping });
+  const handover = buildOperationsHandover({ snapshots, dispatchRequests, reconciliationReviews, commandChains, playbooks, handoverSignoffs });
+  const siteJointTests = buildOperationsSiteJointTests({ interfaceMapping });
+  const siteJointPatrol = buildOperationsSiteJointPatrol({ siteJointTests, snapshots, dispatchRequests, reconciliationReviews, processAudit: data.platformProcessAudit });
+  const productionHardening = buildOperationsProductionHardening(data);
+  const intelligence = buildOperationsIntelligence({ snapshots, dispatchRequests, reconciliationReviews });
+  const dashboard = {
     ok: true,
     generatedAt: new Date().toISOString(),
     boundaries: [
@@ -7239,8 +9353,90 @@ function buildHospitalOperationsDashboard(data) {
     snapshots,
     dispatchRequests,
     reconciliationReviews,
-    alertRules: rules
+    medicalResources,
+    alertRules: rules,
+    commandChains,
+    interfaceMapping,
+    siteJointTests,
+    siteJointPatrol,
+    productionHardening,
+    intelligence,
+    playbooks,
+    handover,
+    handoverOwnerMatrix: buildOperationsHandoverOwnerMatrix(handover)
   };
+  dashboard.performanceMonitoring = buildPerformanceMonitoringEvidence(data, dashboard);
+  dashboard.resourcePool = buildOperationsResourcePool({ snapshots, medicalResources, dispatchRequests });
+  dashboard.emergencyDispatchLoop = buildOperationsEmergencyDispatchLoop({
+    snapshots,
+    dispatchRequests,
+    resourcePool: dashboard.resourcePool,
+    emergencyDispatchLoops: data.emergencyDispatchLoops
+  });
+  dashboard.mobileDuty = buildOperationsMobileDuty({
+    snapshots,
+    dispatchRequests,
+    reconciliationReviews,
+    handover,
+    taskMessages: data.taskMessages
+  });
+  dashboard.cutoverCommand = buildOperationsCutoverCommand({
+    productionHardening,
+    siteJointPatrol,
+    mobileDuty: dashboard.mobileDuty,
+    processAudit: data.platformProcessAudit,
+    securityEvents: data.securityEvents
+  });
+  dashboard.postCutoverObservation = buildOperationsPostCutoverObservation({
+    snapshots,
+    dispatchRequests,
+    reconciliationReviews,
+    siteJointPatrol,
+    cutoverCommand: dashboard.cutoverCommand,
+    mobileDuty: dashboard.mobileDuty,
+    processAudit: data.platformProcessAudit,
+    securityEvents: data.securityEvents
+  });
+  dashboard.launchReadiness = buildOperationsLaunchReadiness({
+    productionHardening,
+    cutoverCommand: dashboard.cutoverCommand,
+    postCutoverObservation: dashboard.postCutoverObservation
+  });
+  dashboard.goLiveGates = buildOperationsGoLiveGates({
+    productionHardening,
+    siteJointPatrol,
+    cutoverCommand: dashboard.cutoverCommand,
+    postCutoverObservation: dashboard.postCutoverObservation,
+    processAudit: data.platformProcessAudit
+  });
+  dashboard.governanceReport = buildOperationsGovernanceReport({
+    snapshots,
+    dispatchRequests,
+    reconciliationReviews,
+    performanceMonitoring: dashboard.performanceMonitoring,
+    handover
+  });
+  dashboard.governanceExportPackage = buildOperationsGovernanceExportPackage({
+    snapshots,
+    dispatchRequests,
+    reconciliationReviews,
+    performanceMonitoring: dashboard.performanceMonitoring,
+    governanceReport: dashboard.governanceReport,
+    intelligence,
+    handover
+  });
+  dashboard.nextDevelopmentResearch = buildOperationsNextDevelopmentResearch({
+    snapshots,
+    dispatchRequests,
+    reconciliationReviews,
+    performanceMonitoring: dashboard.performanceMonitoring,
+    siteJointTests,
+    productionHardening,
+    intelligence,
+    governanceReport: dashboard.governanceReport,
+    handover
+  });
+  return dashboard;
 }
 
 function normalizeDispatchAction(payload, user) {
@@ -7265,6 +9461,201 @@ function normalizeDispatchAction(payload, user) {
     auditTrail: [
       ...(Array.isArray(payload.auditTrail) ? payload.auditTrail : []),
       { at: now, actor: user.username || user.role, action: "upsert", note: payload.note || status }
+    ]
+  };
+}
+
+function numberField(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function objectField(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function integrationPayloadAllowedForInstitution(payload, user) {
+  if (user.role !== "institution") return true;
+  const institutionId = String(payload.institutionId || payload.sourceInstitutionId || payload.targetInstitutionId || "").trim();
+  return !institutionId || institutionId === user.orgCode;
+}
+
+function assertSignedOperationsPayload(req, res, payload, user, target) {
+  if (!verifyIntegrationSignature(payload, req.headers["x-integration-signature"])) {
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "医院运行接口验签", target, result: "拒绝", detail: "签名不匹配" });
+    sendJson(res, 401, { error: "Unauthorized", message: "医院运行接口签名校验失败" });
+    return false;
+  }
+  return true;
+}
+
+function deriveOperationAlerts(snapshot) {
+  const alerts = new Set(Array.isArray(snapshot.alerts) ? snapshot.alerts.map(String).filter(Boolean) : []);
+  const bedRatio = ratio(snapshot.beds?.occupied, snapshot.beds?.open);
+  const variance = Number(snapshot.reporting?.varianceRate || 0);
+  if (bedRatio >= 0.95) alerts.add("bed-occupancy-critical");
+  else if (bedRatio >= 0.9) alerts.add("bed-occupancy-high");
+  if (Number(snapshot.staff?.shortage || 0) > 0) alerts.add("staff-shortage");
+  if (Number(snapshot.outpatient?.waitingOver30Min || 0) >= 50) alerts.add("ed-waiting-high");
+  if (variance >= 0.05) alerts.add("reporting-variance-high");
+  return [...alerts];
+}
+
+function normalizeOperationSnapshot(payload, user, rules = []) {
+  const now = new Date().toISOString();
+  const beds = objectField(payload.beds);
+  const staff = objectField(payload.staff);
+  const equipment = objectField(payload.equipment);
+  const outpatient = objectField(payload.outpatient);
+  const inpatient = objectField(payload.inpatient);
+  const reporting = objectField(payload.reporting);
+  const institutionId = String(payload.institutionId || user.orgCode || "").trim();
+  const snapshotAt = String(payload.snapshotAt || now).trim();
+  const normalized = {
+    id: String(payload.id || `ops-${institutionId || "unknown"}-${snapshotAt.replace(/[^0-9A-Za-z]/g, "").slice(0, 14)}`).trim(),
+    institutionId,
+    institution: String(payload.institution || user.orgName || institutionId).trim(),
+    district: String(payload.district || payload.region || "").trim(),
+    snapshotAt,
+    beds: {
+      total: numberField(beds.total),
+      open: numberField(beds.open),
+      occupied: numberField(beds.occupied),
+      icuTotal: numberField(beds.icuTotal),
+      icuOccupied: numberField(beds.icuOccupied),
+      emergencyObservation: numberField(beds.emergencyObservation)
+    },
+    staff: {
+      doctorsOnDuty: numberField(staff.doctorsOnDuty),
+      nursesOnDuty: numberField(staff.nursesOnDuty),
+      emergencyDoctors: numberField(staff.emergencyDoctors),
+      shortage: numberField(staff.shortage)
+    },
+    equipment: {
+      ctTotal: numberField(equipment.ctTotal),
+      ctAvailable: numberField(equipment.ctAvailable),
+      ventilatorsTotal: numberField(equipment.ventilatorsTotal),
+      ventilatorsAvailable: numberField(equipment.ventilatorsAvailable),
+      ambulancesAvailable: numberField(equipment.ambulancesAvailable)
+    },
+    outpatient: {
+      visitsToday: numberField(outpatient.visitsToday),
+      emergencyVisits: numberField(outpatient.emergencyVisits),
+      feverClinicVisits: numberField(outpatient.feverClinicVisits),
+      waitingOver30Min: numberField(outpatient.waitingOver30Min)
+    },
+    inpatient: {
+      admissionsToday: numberField(inpatient.admissionsToday),
+      dischargesToday: numberField(inpatient.dischargesToday),
+      surgeryScheduled: numberField(inpatient.surgeryScheduled),
+      averageLengthOfStay: numberField(inpatient.averageLengthOfStay)
+    },
+    reporting: {
+      directReportBatch: String(reporting.directReportBatch || payload.sourceBatch || "").trim(),
+      source: String(reporting.source || payload.sourceSystem || "hospital-operations-integration").trim(),
+      reconciled: Boolean(reporting.reconciled),
+      varianceRate: numberField(reporting.varianceRate)
+    },
+    dispatchSuggestion: String(payload.dispatchSuggestion || "").trim(),
+    sourceSystem: String(payload.sourceSystem || "hospital-operations-integration").trim(),
+    receivedAt: now,
+    receivedBy: user.username || user.role,
+    auditTrail: [
+      ...(Array.isArray(payload.auditTrail) ? payload.auditTrail : []),
+      { at: now, actor: user.username || user.role, action: "integration-snapshot-upsert", note: String(payload.idempotencyKey || payload.messageId || "snapshot").trim() }
+    ]
+  };
+  normalized.alerts = deriveOperationAlerts({ ...normalized, alerts: payload.alerts });
+  normalized.normalizedStatus = normalizeOperationStatus(normalized, rules);
+  return normalized;
+}
+
+function normalizeReconciliationBatchItem(payload, user) {
+  const now = new Date().toISOString();
+  const institutionId = String(payload.institutionId || user.orgCode || "").trim();
+  const sourceBatch = String(payload.sourceBatch || payload.batch || "").trim();
+  const fields = Array.isArray(payload.fields) ? payload.fields.map(String).filter(Boolean) : [];
+  return {
+    id: String(payload.id || `recon-${institutionId || "unknown"}-${sourceBatch || Date.now()}`).trim(),
+    institutionId,
+    institution: String(payload.institution || user.orgName || institutionId).trim(),
+    period: String(payload.period || "").trim(),
+    sourceBatch,
+    status: String(payload.status || "pending-review").trim(),
+    varianceRate: numberField(payload.varianceRate),
+    fields,
+    platformValue: numberField(payload.platformValue),
+    directReportValue: numberField(payload.directReportValue),
+    owner: String(payload.owner || "statistics-office").trim(),
+    reviewedBy: String(payload.reviewedBy || "").trim(),
+    reviewedAt: payload.reviewedAt || "",
+    reviewNote: String(payload.reviewNote || payload.note || "").trim(),
+    evidence: Array.isArray(payload.evidence) ? payload.evidence.map(String).filter(Boolean) : ["hospitalOperationSnapshots", "healthStatisticsIngestion"],
+    receivedAt: now,
+    receivedBy: user.username || user.role,
+    auditTrail: [
+      ...(Array.isArray(payload.auditTrail) ? payload.auditTrail : []),
+      { at: now, actor: user.username || user.role, action: "integration-reconciliation-upsert", note: sourceBatch || "reconciliation" }
+    ]
+  };
+}
+
+function appendOperationsIntegrationAudit(data, user, action, target, detail) {
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action,
+      target,
+      result: "allowed",
+      detail
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
+}
+
+function normalizeHandoverSignoff(payload, user, handover) {
+  const now = new Date().toISOString();
+  const handoverItems = Array.isArray(handover?.items) ? handover.items : [];
+  const requestedIds = new Set(Array.isArray(payload.itemIds) ? payload.itemIds.map(String) : []);
+  const signedItems = requestedIds.size ? handoverItems.filter((item) => requestedIds.has(String(item.id))) : handoverItems;
+  return {
+    id: payload.id || `handover-signoff-${randomUUID()}`,
+    signedAt: now,
+    shift: String(payload.shift || new Date().toLocaleDateString("zh-CN", { hour12: false })).trim(),
+    signer: user.name || user.username || user.role,
+    signerRole: user.role,
+    itemIds: signedItems.map((item) => item.id),
+    itemCount: signedItems.length,
+    criticalCount: signedItems.filter((item) => item.severity === "critical").length,
+    dueSoonCount: signedItems.filter((item) => item.remainingMinutes !== null && item.remainingMinutes <= 240 && item.remainingMinutes >= 0).length,
+    owners: [...new Set(signedItems.map((item) => item.owner).filter(Boolean))],
+    note: String(payload.note || "已确认本班运行交接清单。").trim(),
+    nextShiftFocus: String(payload.nextShiftFocus || signedItems.slice(0, 3).map((item) => `${item.institution}:${item.stage}`).join("；") || "保持常态监测。").trim(),
+    evidence: ["/api/operations/handover", "/api/process-audit", "/api/audit/verify"],
+    auditTrail: [
+      { at: now, actor: user.username || user.role, action: "handover-signoff", note: String(payload.note || "交接签收").trim() }
+    ]
+  };
+}
+
+function applyDispatchStatusUpdate(item, payload, user) {
+  const now = new Date().toISOString();
+  const status = String(payload.status || item.status || "pending").trim();
+  const note = String(payload.note || payload.reviewNote || `状态更新为${status}`).trim();
+  return {
+    ...item,
+    status,
+    updatedAt: now,
+    updatedBy: user.username || user.role,
+    assignedAt: status === "assigned" && !item.assignedAt ? now : item.assignedAt,
+    closedAt: ["closed", "cancelled"].includes(status) ? now : item.closedAt,
+    closureNote: status === "closed" ? note : item.closureNote,
+    auditTrail: [
+      ...(Array.isArray(item.auditTrail) ? item.auditTrail : []),
+      { at: now, actor: user.username || user.role, action: "status-change", note }
     ]
   };
 }
@@ -7526,6 +9917,10 @@ function collectJson(req) {
 }
 
 function normalizeState(data) {
+  const auditTrailSource = {
+    dataAccessLogs: Array.isArray(data?.dataAccessLogs) ? data.dataAccessLogs : null,
+    securityEvents: Array.isArray(data?.securityEvents) ? data.securityEvents : null
+  };
   data = restoreCorruptedStrings(seedState(), data);
   const state = {
     accounts: Array.isArray(data.accounts) ? data.accounts : seedState().accounts,
@@ -7535,6 +9930,7 @@ function normalizeState(data) {
     medicalResources: Array.isArray(data.medicalResources) ? data.medicalResources : seedMedicalResources(),
     hospitalOperationSnapshots: mergeByKey(seedHospitalOperationSnapshots(), data.hospitalOperationSnapshots, "id"),
     resourceDispatchRequests: mergeByKey(seedResourceDispatchRequests(), data.resourceDispatchRequests, "id"),
+    emergencyDispatchLoops: mergeByKey(seedEmergencyDispatchLoops(), data.emergencyDispatchLoops, "id"),
     statisticsReconciliationReviews: mergeByKey(seedStatisticsReconciliationReviews(), data.statisticsReconciliationReviews, "id"),
     operationAlertRules: mergeByKey(seedOperationAlertRules(), data.operationAlertRules, "id"),
     productionServiceLevels: mergeByKey(seedProductionServiceLevels(), data.productionServiceLevels, "id").map((item) => ({ ...item, productionReady: false })),
@@ -7640,13 +10036,16 @@ function normalizeState(data) {
     medicalRecordQualityReviews: mergeByKey(seedMedicalRecordQualityReviews(), data.medicalRecordQualityReviews, "id"),
     mutualRecognitionQualityReviews: mergeByKey(seedMutualRecognitionQualityReviews(), data.mutualRecognitionQualityReviews, "id"),
     qualityRectificationOrders: mergeByKey(seedQualityRectificationOrders(), data.qualityRectificationOrders, "id"),
+    qualitySafetySiteSignoffs: mergeByKey(seedQualitySafetySiteSignoffs(), data.qualitySafetySiteSignoffs, "id"),
+    qualitySafetyCoreSystemEvidence: Array.isArray(data.qualitySafetyCoreSystemEvidence) ? data.qualitySafetyCoreSystemEvidence : [],
     mutualRecognitionRules: mergeByKey(seedMutualRecognitionRules(), data.mutualRecognitionRules, "id"),
     diagnosticReports: mergeByKey(seedDiagnosticReports(), data.diagnosticReports, "id"),
     regionalDataSharingScope: data.regionalDataSharingScope && typeof data.regionalDataSharingScope === "object" ? { ...seedRegionalDataSharingScope(), ...data.regionalDataSharingScope } : seedRegionalDataSharingScope(),
     regionalSharingPackages: normalizeRegionalSharingPackages(mergeByKey(seedRegionalSharingPackages(), data.regionalSharingPackages, "id")),
     regionalSharingSnapshots: data.regionalSharingSnapshots && typeof data.regionalSharingSnapshots === "object" ? { ...seedRegionalSharingSnapshots(), ...data.regionalSharingSnapshots } : seedRegionalSharingSnapshots(),
     regionalSharingAccessReviews: Array.isArray(data.regionalSharingAccessReviews) ? data.regionalSharingAccessReviews : seedRegionalSharingAccessReviews(),
-    referralTeleconsultations: mergeByKey(seedReferralTeleconsultations(), data.referralTeleconsultations, "id"),
+    referralTeleconsultations: mergeByKeyWithDefaultFields(seedReferralTeleconsultations(), data.referralTeleconsultations, "id"),
+    referralTeleconsultationSignoffs: Array.isArray(data.referralTeleconsultationSignoffs) ? data.referralTeleconsultationSignoffs.slice(0, 50) : [],
     escortServicePolicy: data.escortServicePolicy && typeof data.escortServicePolicy === "object" ? { ...seedEscortServicePolicy(), ...data.escortServicePolicy } : seedEscortServicePolicy(),
     escortServiceProviders: mergeByKey(seedEscortServiceProviders(), data.escortServiceProviders, "id"),
     escortWorkers: mergeByKey(seedEscortWorkers(), data.escortWorkers, "id"),
@@ -7668,6 +10067,8 @@ function normalizeState(data) {
     insuranceClaims: Array.isArray(data.insuranceClaims) ? data.insuranceClaims : seedInsuranceClaims(),
     diseasePayment: DiseasePaymentService.normalizeState(data.diseasePayment),
     policyAlignment: Array.isArray(data.policyAlignment) ? data.policyAlignment : seedPolicyAlignment(),
+    drugTraceabilityPolicySources: mergeByKey(seedDrugTraceabilityPolicySources(), data.drugTraceabilityPolicySources, "id"),
+    drugTraceabilityEvidenceRequirements: mergeByKey(seedDrugTraceabilityEvidenceRequirements(), data.drugTraceabilityEvidenceRequirements, "id"),
     emergencySignals: Array.isArray(data.emergencySignals) ? data.emergencySignals : seedEmergencySignals(),
     emergencyResources: Array.isArray(data.emergencyResources) ? data.emergencyResources : EmergencyService.seed().emergencyResources,
     emergencyHospitals: Array.isArray(data.emergencyHospitals) ? data.emergencyHospitals : EmergencyService.seed().emergencyHospitals,
@@ -7699,8 +10100,8 @@ function normalizeState(data) {
     emergencyLaunchIncidents: Array.isArray(data.emergencyLaunchIncidents) ? data.emergencyLaunchIncidents.slice(0, 2000) : [],
     emergencyRollbackPlan: data.emergencyRollbackPlan && typeof data.emergencyRollbackPlan === "object" ? data.emergencyRollbackPlan : EmergencyProduction.seed().emergencyRollbackPlan,
     seniorServices: Array.isArray(data.seniorServices) ? data.seniorServices : seedSeniorServices(),
-    dataAccessLogs: sealAuditTrail(Array.isArray(data.dataAccessLogs) ? data.dataAccessLogs : seedDataAccessLogs()),
-    securityEvents: sealAuditTrail(Array.isArray(data.securityEvents) ? data.securityEvents : seedSecurityEvents()),
+    dataAccessLogs: sealAuditTrail(auditTrailSource.dataAccessLogs || seedDataAccessLogs()),
+    securityEvents: sealAuditTrail(auditTrailSource.securityEvents || seedSecurityEvents()),
     digitalCredentials: Array.isArray(data.digitalCredentials) ? data.digitalCredentials : seedDigitalCredentials(),
     healthArchiveStandard: data.healthArchiveStandard && typeof data.healthArchiveStandard === "object" ? data.healthArchiveStandard : seedHealthArchiveStandard(),
     authOrganizations: mergeByKey(seedAuthOrganizations(), data.authOrganizations, "orgCode"),
@@ -7720,6 +10121,7 @@ function normalizeState(data) {
     digitalHospitalEvaluationEvidence: mergeByKey(seedDigitalHospitalEvaluationEvidence(), data.digitalHospitalEvaluationEvidence, "id"),
     digitalHospitalPreAssessments: mergeByKey(seedDigitalHospitalPreAssessments(), data.digitalHospitalPreAssessments, "id"),
     digitalHospitalPilotInstitutions: mergeByKey(seedDigitalHospitalPilotInstitutions(), data.digitalHospitalPilotInstitutions, "id"),
+    digitalHospitalPilotIssues: mergeByKey(seedDigitalHospitalPilotIssues(), data.digitalHospitalPilotIssues, "id"),
     digitalHospitalEvaluationTasks: mergeByKey(seedDigitalHospitalEvaluationTasks(), data.digitalHospitalEvaluationTasks, "id"),
     digitalHospitalEvidencePackets: mergeByKey(seedDigitalHospitalEvidencePackets(), data.digitalHospitalEvidencePackets, "id"),
     digitalHospitalRiskItems: mergeByKey(seedDigitalHospitalRiskItems(), data.digitalHospitalRiskItems, "id"),
@@ -7784,9 +10186,14 @@ function normalizeState(data) {
     creditEvaluationRules: data.creditEvaluationRules && typeof data.creditEvaluationRules === "object" ? data.creditEvaluationRules : seedCreditEvaluationRules(),
     researchDatasets: mergeByKey(seedResearchDatasets(), data.researchDatasets, "id"),
     diseaseRegistryModels: mergeByKey(seedDiseaseRegistryModels(), data.diseaseRegistryModels, "id"),
+    compliantDataExports: mergeByKey(seedCompliantDataExports(), data.compliantDataExports, "id"),
     mobileExperienceSettings: data.mobileExperienceSettings && typeof data.mobileExperienceSettings === "object" ? { ...seedMobileExperienceSettings(), ...data.mobileExperienceSettings } : seedMobileExperienceSettings(),
     accessibilityChecklist: mergeByKey(seedAccessibilityChecklist(), data.accessibilityChecklist, "id"),
     securityAcceptanceLedger: mergeByKey(seedSecurityAcceptanceLedger(), data.securityAcceptanceLedger, "id"),
+    productionSecurityFindings: mergeByKey(seedProductionSecurityFindings(), data.productionSecurityFindings, "id"),
+    productionSecurityReleaseApprovals: mergeByKey(seedProductionSecurityReleaseApprovals(), data.productionSecurityReleaseApprovals, "id"),
+    productionGoNoGoApprovals: mergeByKey(seedProductionGoNoGoApprovals(), data.productionGoNoGoApprovals, "id"),
+    productionGoNoGoDecision: data.productionGoNoGoDecision && typeof data.productionGoNoGoDecision === "object" ? data.productionGoNoGoDecision : null,
     platformChangeLogs: Array.isArray(data.platformChangeLogs) ? data.platformChangeLogs : seedPlatformChangeLogs(),
     healthDashboardSnapshots: mergeByKey(seedHealthDashboardSnapshots(), data.healthDashboardSnapshots, "id"),
     platformRoadmap: Array.isArray(data.platformRoadmap) ? data.platformRoadmap : seedPlatformRoadmap(),
@@ -7943,9 +10350,11 @@ function restoreCorruptedStrings(defaultValue, currentValue) {
     });
   }
   if (currentValue && typeof currentValue === "object") {
-    return Object.fromEntries(Object.entries(currentValue).map(([key, value]) => [
+    const defaults = defaultValue && typeof defaultValue === "object" && !Array.isArray(defaultValue) ? defaultValue : {};
+    const keys = new Set([...Object.keys(currentValue), ...Object.keys(defaults)]);
+    return Object.fromEntries([...keys].map((key) => [
       key,
-      restoreCorruptedStrings(defaultValue && typeof defaultValue === "object" ? defaultValue[key] : undefined, value)
+      restoreCorruptedStrings(defaults[key], Object.prototype.hasOwnProperty.call(currentValue, key) ? currentValue[key] : defaults[key])
     ]));
   }
   return currentValue;
@@ -8036,6 +10445,7 @@ function completeSystemTargets(state) {
   state.creditEvaluationRules = state.creditEvaluationRules && typeof state.creditEvaluationRules === "object" ? state.creditEvaluationRules : seedCreditEvaluationRules();
   state.researchDatasets = mergeByKey(seedResearchDatasets(), state.researchDatasets, "id");
   state.diseaseRegistryModels = mergeByKey(seedDiseaseRegistryModels(), state.diseaseRegistryModels, "id");
+  state.compliantDataExports = mergeByKey(seedCompliantDataExports(), state.compliantDataExports, "id");
   state.chronicServiceRoles = mergeByKey(seedChronicServiceRoles(), state.chronicServiceRoles, "id");
   state.chronicCapabilityConditions = mergeByKey(seedChronicCapabilityConditions(), state.chronicCapabilityConditions, "id");
   state.chronicServicePathways = mergeByKey(seedChronicServicePathways(), state.chronicServicePathways, "id");
@@ -8488,6 +10898,8 @@ function buildImageCloudDashboard(data, user, filters = {}) {
   const reviews = (Array.isArray(data.imageCloudQualityReviews) ? data.imageCloudQualityReviews : []).filter((item) => studyIds.has(item.studyId));
   const diagnosticReports = (Array.isArray(data.diagnosticReports) ? data.diagnosticReports : []).filter((item) => studyIds.has(item.imageCloudStudyId));
   const personalRecords = (Array.isArray(data.personalRecords) ? data.personalRecords : []).filter((item) => item.category === "imaging" && studyIds.has(item.meta?.imageCloudStudyId));
+  const mutualRecognition = (Array.isArray(data.countyMutualRecognitionRecords) ? data.countyMutualRecognitionRecords : [])
+    .filter((item) => studyIds.has(item.imageCloudStudyId));
   const gateways = (Array.isArray(data.imageCloudGateways) ? data.imageCloudGateways : [])
     .filter((item) => !filters.institutionCode || item.institutionCode === filters.institutionCode);
   const activeShares = shares.filter((item) => item.status === "active" && new Date(item.expiresAt).getTime() > Date.now());
@@ -8499,12 +10911,17 @@ function buildImageCloudDashboard(data, user, filters = {}) {
       browserLevel: studies.filter((item) => item.browserLevel).length,
       qcPassed: studies.filter((item) => /通过|passed/i.test(item.qcStatus || "")).length,
       emrSynced: studies.filter((item) => /已写入|synced/i.test(item.emrSyncStatus || "")).length,
-      activeShares: activeShares.length
+      activeShares: activeShares.length,
+      mutualRecognition: mutualRecognition.length,
+      recognized: mutualRecognition.filter((item) => /已互认|recognized/i.test(`${item.status || ""} ${item.reviewStatus || ""}`)).length,
+      pendingRecognition: mutualRecognition.filter((item) => /待|pending/i.test(`${item.status || ""} ${item.reviewStatus || ""}`)).length,
+      pendingAppeals: mutualRecognition.filter((item) => item.appeal?.status === "pending-review").length
     },
     gateways,
     studies,
     shares,
     qualityReviews: reviews,
+    mutualRecognition,
     implementedFeatures: seedImageCloudImplementedFeatures(),
     developmentPlan: seedImageCloudDevelopmentPlan(),
     emrCompatibility: {
@@ -8624,6 +11041,169 @@ function buildImageCloudDerivedRecords(study, user) {
   return { report, personalRecord };
 }
 
+function createImageCloudMutualRecognitionChain(data, study, payload, user) {
+  const targetInstitution = String(payload.targetInstitution || "区域医学影像资源共享中心").trim();
+  const region = String(payload.region || "区域影像云").trim();
+  const priority = String(payload.priority || "中").trim();
+  const reportId = `dr-${study.id}`;
+  const recognitionId = `cmr-imaging-${study.id}`;
+  const orderId = `cco-imaging-${study.id}`;
+  const now = new Date().toISOString();
+  const reportIndex = (data.diagnosticReports || []).findIndex((item) => item.id === reportId || item.imageCloudStudyId === study.id);
+  const derived = buildImageCloudDerivedRecords(study, user);
+  const report = reportIndex >= 0
+    ? { ...data.diagnosticReports[reportIndex], imageCloudStudyId: study.id, mainIndex: study.mainIndex, studyInstanceUID: study.studyInstanceUID }
+    : derived.report;
+  report.id = report.id || reportId;
+  report.category = "imaging";
+  report.imageCloudStudyId = study.id;
+  report.mainIndex = study.mainIndex;
+  report.studyInstanceUID = study.studyInstanceUID;
+  report.targetInstitution = targetInstitution;
+  report.status = report.status === "recognized" ? "recognized" : "pending_review";
+  report.recognitionRecordId = recognitionId;
+
+  const existingRecognitionIndex = (data.countyMutualRecognitionRecords || []).findIndex((item) => item.id === recognitionId || item.imageCloudStudyId === study.id);
+  const recognition = existingRecognitionIndex >= 0
+    ? { ...data.countyMutualRecognitionRecords[existingRecognitionIndex] }
+    : {
+      id: recognitionId,
+      residentId: study.residentId,
+      item: `${study.bodyPart}${study.modality}`,
+      sourceInstitution: study.institutionName,
+      targetInstitution,
+      status: "pending_review",
+      reviewStatus: "pending",
+      reason: "影像云报告已回传，待目标机构按互认规则确认。",
+      reportId: report.id,
+      at: study.studyDate,
+      qualityStatus: study.qcStatus,
+      createdAt: now,
+      createdBy: user.username || user.role
+    };
+  recognition.imageCloudStudyId = study.id;
+  recognition.studyInstanceUID = study.studyInstanceUID;
+  recognition.mainIndex = study.mainIndex;
+  recognition.reportId = report.id;
+  recognition.targetInstitution = recognition.targetInstitution || targetInstitution;
+  recognition.sourceInstitution = recognition.sourceInstitution || study.institutionName;
+  recognition.qualityStatus = study.qcStatus;
+  recognition.reason = recognition.reason || "影像云报告已回传，待目标机构按互认规则确认。";
+
+  const existingOrderIndex = (data.countyCollaborationOrders || []).findIndex((item) => item.id === orderId || item.imageCloudStudyId === study.id);
+  const order = existingOrderIndex >= 0
+    ? { ...data.countyCollaborationOrders[existingOrderIndex] }
+    : {
+      id: orderId,
+      center: "医学影像资源共享中心",
+      region,
+      fromInstitution: study.institutionName,
+      toInstitution: targetInstitution,
+      residentId: study.residentId,
+      orderType: `${study.bodyPart}${study.modality}跨机构互认`,
+      status: "待中心确认",
+      priority,
+      requestedAt: now,
+      due: String(payload.due || "").trim(),
+      result: "影像报告已回传，待互认确认"
+    };
+  order.imageCloudStudyId = study.id;
+  order.diagnosticReportId = report.id;
+  order.recognitionRecordId = recognition.id;
+  order.mainIndex = study.mainIndex;
+  order.studyInstanceUID = study.studyInstanceUID;
+
+  if (reportIndex >= 0) data.diagnosticReports[reportIndex] = report;
+  else data.diagnosticReports = [report, ...(data.diagnosticReports || [])].slice(0, 300);
+  if (existingRecognitionIndex >= 0) data.countyMutualRecognitionRecords[existingRecognitionIndex] = recognition;
+  else data.countyMutualRecognitionRecords = [recognition, ...(data.countyMutualRecognitionRecords || [])].slice(0, 300);
+  if (existingOrderIndex >= 0) data.countyCollaborationOrders[existingOrderIndex] = order;
+  else data.countyCollaborationOrders = [order, ...(data.countyCollaborationOrders || [])].slice(0, 300);
+  return { report, recognition, order, created: existingRecognitionIndex < 0 };
+}
+
+function submitImageCloudRecognitionAppeal(data, study, record, payload, user) {
+  if (!/rejected|not_recognized/i.test(`${record.status || ""} ${record.reviewStatus || ""}`)) {
+    throw new Error("only rejected mutual-recognition records can be appealed");
+  }
+  if (user.role !== "institution" || study.institutionCode !== user.orgCode) {
+    throw new Error("only the source institution can submit this appeal");
+  }
+  if (record.appeal?.status === "pending-review") throw new Error("an appeal is already pending review");
+  const reason = String(payload.reason || payload.comment || "").trim();
+  const evidenceRefs = (Array.isArray(payload.evidenceRefs) ? payload.evidenceRefs : String(payload.evidenceRefs || "").split(","))
+    .map((item) => String(item).trim()).filter(Boolean).slice(0, 12);
+  if (!reason) throw new Error("appeal reason is required");
+  if (!evidenceRefs.length) throw new Error("at least one minimized evidence reference is required");
+  if (payload.noPatientPii !== true) throw new Error("noPatientPii confirmation is required");
+  const actor = user.username || user.role;
+  const now = new Date().toISOString();
+  const appeal = {
+    id: `icra-${record.id}-${Date.now()}`,
+    status: "pending-review",
+    reason,
+    evidenceRefs,
+    noPatientPii: true,
+    submittedBy: actor,
+    submittedByName: user.name,
+    submittedAt: now,
+    originalReviewer: record.reviewedBy || "",
+    originalDecisionAt: record.reviewedAt || "",
+    history: [{ action: "submit", actor, role: user.role, at: now, note: reason, evidenceRefs }]
+  };
+  record.appeal = appeal;
+  record.appealStatus = appeal.status;
+  record.appealUpdatedAt = now;
+  data.diagnosticReports = (data.diagnosticReports || []).map((item) => item.id === record.reportId ? {
+    ...item,
+    appealStatus: appeal.status,
+    appealId: appeal.id,
+    appealUpdatedAt: now
+  } : item);
+  return { record, appeal };
+}
+
+function reviewImageCloudRecognitionAppeal(data, record, payload, user) {
+  const appeal = record.appeal;
+  if (!appeal || appeal.status !== "pending-review") throw new Error("no pending appeal exists");
+  const actor = user.username || user.role;
+  if ([appeal.submittedBy, appeal.originalReviewer].filter(Boolean).includes(actor)) {
+    throw new Error("appeal review requires an independent reviewer");
+  }
+  const decision = String(payload.decision || "").trim();
+  if (!["approve", "reject"].includes(decision)) throw new Error("decision must be approve or reject");
+  const comment = String(payload.comment || "").trim();
+  if (!comment) throw new Error("review comment is required");
+  const now = new Date().toISOString();
+  let updated = record;
+  if (decision === "approve") {
+    updated = reviewMutualRecognitionRecord(data, record.id, {
+      decision: "recognize",
+      reasonCode: String(payload.reasonCode || "appeal-approved").trim(),
+      comment
+    }, user);
+  }
+  updated.appeal = {
+    ...appeal,
+    status: decision === "approve" ? "approved" : "rejected",
+    reviewedBy: actor,
+    reviewedByName: user.name,
+    reviewedAt: now,
+    reviewComment: comment,
+    history: [...(appeal.history || []), { action: decision, actor, role: user.role, at: now, note: comment }]
+  };
+  updated.appealStatus = updated.appeal.status;
+  updated.appealUpdatedAt = now;
+  data.diagnosticReports = (data.diagnosticReports || []).map((item) => item.id === updated.reportId ? {
+    ...item,
+    status: decision === "approve" ? "recognized" : item.status,
+    appealStatus: updated.appeal.status,
+    appealId: updated.appeal.id,
+    appealUpdatedAt: now
+  } : item);
+  return { record: updated, appeal: updated.appeal, approved: decision === "approve" };
+}
+
 function normalizeResearchDatasetApplication(payload, user, data) {
   const diseaseType = String(payload.diseaseType || "").trim();
   const name = String(payload.name || "").trim();
@@ -8634,6 +11214,7 @@ function normalizeResearchDatasetApplication(payload, user, data) {
   const allowedSources = new Set(["personalRecords", "diagnosticReports", "diseases", "followups", "chronicScreeningTasks", "chronicManagementPlans", "diseaseRegistryModels"]);
   const sourceCollections = requestedSources.filter((item) => allowedSources.has(item));
   if (!sourceCollections.length) throw new Error("sourceCollections must use approved research sources");
+  const governance = normalizeResearchGovernanceControls(payload.governance || payload, true);
   const records = estimateResearchDatasetRecords(data, sourceCollections, diseaseType);
   const now = new Date().toISOString();
   return {
@@ -8646,6 +11227,7 @@ function normalizeResearchDatasetApplication(payload, user, data) {
     anonymization: String(payload.anonymization || "pending-policy").trim(),
     deidentificationStatus: "pending",
     authorizationStatus: "pending",
+    governance,
     records,
     sourceCollections,
     sandbox: { status: "pending", environment: String(payload.environment || "demo-safe-sandbox").trim(), lastAccessAt: "" },
@@ -8654,16 +11236,82 @@ function normalizeResearchDatasetApplication(payload, user, data) {
       by: user.username || user.role,
       role: user.role,
       purpose: String(payload.purpose || "research dataset application").trim(),
+      dataUseAgreement: governance.dataUseAgreement,
+      retentionDays: governance.retentionDays,
       status: "submitted"
     }],
     usageAudit: [],
     outcomes: [],
+    evidenceDocuments: [],
     status: "requested",
     createdAt: now,
     createdBy: user.username || user.role,
     updatedAt: now,
     updatedBy: user.username || user.role
   };
+}
+
+function normalizeResearchGovernanceControls(input = {}, strict = false) {
+  const governance = input && typeof input === "object" ? input : {};
+  const dataUseAgreement = String(governance.dataUseAgreement || "").trim();
+  const retentionDays = Number(governance.retentionDays || 180);
+  const minimumNecessary = governance.minimumNecessary === true || governance.minimumNecessary === "true" || governance.minimumNecessary === "on";
+  const reidentificationProhibited = governance.reidentificationProhibited === true || governance.reidentificationProhibited === "true" || governance.reidentificationProhibited === "on";
+  const exportReviewRequired = governance.exportReviewRequired === false || governance.exportReviewRequired === "false" ? false : true;
+  if (strict && !dataUseAgreement) throw new Error("dataUseAgreement is required for research dataset applications");
+  if (strict && !minimumNecessary) throw new Error("minimumNecessary must be confirmed");
+  if (strict && !reidentificationProhibited) throw new Error("reidentificationProhibited must be confirmed");
+  if (!Number.isFinite(retentionDays) || retentionDays < 1 || retentionDays > 3650) throw new Error("retentionDays must be between 1 and 3650");
+  return {
+    dataUseAgreement,
+    minimumNecessary,
+    reidentificationProhibited,
+    exportReviewRequired,
+    retentionDays,
+    steward: String(governance.steward || "research-governance").trim(),
+    policyBasis: Array.isArray(governance.policyBasis) && governance.policyBasis.length
+      ? governance.policyBasis.map((item) => String(item).trim()).filter(Boolean)
+      : ["PIPL", "Data Security Law", "Network Data Security Regulation", "Ethics Review Measures"]
+  };
+}
+
+function normalizeResearchEvidenceDocument(payload = {}, user, dataset) {
+  const type = String(payload.type || "").trim();
+  const title = String(payload.title || "").trim();
+  const referenceNo = String(payload.referenceNo || "").trim();
+  const allowedTypes = new Set(["ethics-approval", "data-use-agreement", "consent-waiver", "minimization-review", "deidentification-assessment", "export-review"]);
+  if (!allowedTypes.has(type)) throw new Error("evidence type is not supported");
+  if (!title || !referenceNo) throw new Error("evidence title and referenceNo are required");
+  return {
+    id: payload.id || `${dataset.id}-${type}-${Date.now()}`,
+    type,
+    title,
+    referenceNo,
+    issuedBy: String(payload.issuedBy || user.username || user.role).trim(),
+    issuedAt: String(payload.issuedAt || new Date().toISOString().slice(0, 10)).trim(),
+    expiresAt: String(payload.expiresAt || "").trim(),
+    fileName: String(payload.fileName || "").trim(),
+    fileHash: String(payload.fileHash || "").trim(),
+    status: String(payload.status || "verified").trim(),
+    note: String(payload.note || "").trim(),
+    addedAt: new Date().toISOString(),
+    addedBy: user.username || user.role
+  };
+}
+
+function hasResearchEvidenceDocuments(dataset) {
+  const documents = Array.isArray(dataset?.evidenceDocuments) ? dataset.evidenceDocuments : [];
+  return ["ethics-approval", "data-use-agreement"].every((type) => documents.some((item) => item.type === type && item.status !== "rejected"));
+}
+
+function hasResearchGovernanceControls(dataset) {
+  const governance = dataset?.governance || {};
+  return Boolean(
+    governance.dataUseAgreement &&
+    governance.minimumNecessary === true &&
+    governance.reidentificationProhibited === true &&
+    Number(governance.retentionDays || 0) > 0
+  );
 }
 
 function estimateResearchDatasetRecords(data, sourceCollections, diseaseType) {
@@ -8685,6 +11333,15 @@ function estimateResearchDatasetRecords(data, sourceCollections, diseaseType) {
 function normalizeResearchApproval(dataset, payload, user) {
   const approved = String(payload.decision || payload.status || "approved").trim() === "approved";
   const now = new Date().toISOString();
+  const governance = payload.governance
+    ? normalizeResearchGovernanceControls({ ...(dataset.governance || {}), ...payload.governance })
+    : (dataset.governance || normalizeResearchGovernanceControls({
+      dataUseAgreement: payload.dataUseAgreement || "",
+      minimumNecessary: payload.minimumNecessary === undefined ? true : payload.minimumNecessary,
+      reidentificationProhibited: payload.reidentificationProhibited === undefined ? true : payload.reidentificationProhibited,
+      exportReviewRequired: payload.exportReviewRequired,
+      retentionDays: payload.retentionDays || 180
+    }));
   return {
     ...dataset,
     version: String(payload.version || dataset.version || "1.0.0").trim(),
@@ -8693,6 +11350,7 @@ function normalizeResearchApproval(dataset, payload, user) {
     anonymization: String(payload.anonymization || dataset.anonymization || "k-anonymity-demo").trim(),
     deidentificationStatus: approved ? String(payload.deidentificationStatus || "released").trim() : "blocked",
     authorizationStatus: approved ? "approved" : "rejected",
+    governance,
     status: approved ? String(payload.publishStatus || "published").trim() : "rejected",
     sandbox: {
       ...(dataset.sandbox || {}),
@@ -8714,7 +11372,43 @@ function requireDatasetSandboxAccess(dataset) {
   const approved = dataset.authorizationStatus === "approved" && (dataset.ethicsStatus === "approved" || (!dataset.ethicsStatus && dataset.ethicsApproval));
   const deidentified = ["released", "approved", "completed"].includes(String(dataset.deidentificationStatus || "").trim()) || (!dataset.deidentificationStatus && Boolean(dataset.anonymization));
   const active = ["published", "active"].includes(String(dataset.status || "").trim()) && (!dataset.sandbox || dataset.sandbox.status === "active");
-  return approved && deidentified && active;
+  return approved && deidentified && active && hasResearchGovernanceControls(dataset) && hasResearchEvidenceDocuments(dataset);
+}
+
+function normalizeCompliantDataExport(payload = {}, user, dataset) {
+  const purpose = String(payload.purpose || "").trim();
+  const destination = String(payload.destination || "").trim();
+  const requestedFields = Array.isArray(payload.requestedFields)
+    ? payload.requestedFields.map((item) => String(item).trim()).filter(Boolean)
+    : String(payload.requestedFields || "").split(/[,;\n]/).map((item) => item.trim()).filter(Boolean);
+  if (!purpose || !destination) throw new Error("purpose and destination are required");
+  if (!requestedFields.length) throw new Error("requestedFields are required");
+  const now = new Date().toISOString();
+  const retentionDays = Number(payload.retentionDays || dataset.governance?.retentionDays || 180);
+  if (!Number.isFinite(retentionDays) || retentionDays < 1 || retentionDays > 3650) throw new Error("retentionDays must be between 1 and 3650");
+  const evidenceDocument = (Array.isArray(dataset.evidenceDocuments) ? dataset.evidenceDocuments : []).find((item) => item.type === "export-review" && item.status !== "rejected")
+    || (Array.isArray(dataset.evidenceDocuments) ? dataset.evidenceDocuments : []).find((item) => item.type === "data-use-agreement" && item.status !== "rejected");
+  return {
+    id: payload.id || `cde-${dataset.id}-${Date.now()}`,
+    datasetId: dataset.id,
+    datasetName: dataset.name || dataset.id,
+    purpose,
+    destination,
+    requestedFields,
+    exportFormat: String(payload.exportFormat || "csv").trim(),
+    reviewStatus: "approved",
+    exportStatus: "released",
+    deidentified: true,
+    minimumNecessary: true,
+    watermark: String(payload.watermark || `wm-${dataset.id}-${Date.now()}`).trim(),
+    evidenceRef: String(payload.evidenceRef || evidenceDocument?.id || evidenceDocument?.referenceNo || "").trim(),
+    reviewer: String(payload.reviewer || "research-governance").trim(),
+    requestedBy: user.username || user.role,
+    requestedAt: now,
+    reviewedAt: now,
+    retentionDays,
+    policyBasis: Array.isArray(dataset.governance?.policyBasis) ? dataset.governance.policyBasis : normalizeResearchGovernanceControls({}).policyBasis
+  };
 }
 
 function appendResearchAudit(data, user, dataset, action, detail, result = "allowed") {
@@ -8731,18 +11425,65 @@ function appendResearchAudit(data, user, dataset, action, detail, result = "allo
 function buildResearchSandboxSummary(data) {
   const datasets = Array.isArray(data.researchDatasets) ? data.researchDatasets : [];
   const models = Array.isArray(data.diseaseRegistryModels) ? data.diseaseRegistryModels : [];
+  const exports = Array.isArray(data.compliantDataExports) ? data.compliantDataExports : [];
   const auditLogs = (Array.isArray(data.dataAccessLogs) ? data.dataAccessLogs : []).filter((item) => String(item.scope || "").includes("research"));
   const activeDatasets = datasets.filter(requireDatasetSandboxAccess);
+  const pendingApplications = datasets.filter((item) => item.status === "requested" || item.authorizationStatus === "pending");
+  const recentAudits = [
+    ...auditLogs.map((item) => ({
+      at: item.at,
+      actor: item.actor,
+      role: item.role,
+      action: item.scope || "research-sandbox",
+      target: item.purpose,
+      result: item.result
+    })),
+    ...datasets.flatMap((item) => (Array.isArray(item.usageAudit) ? item.usageAudit : []).map((audit) => ({
+      at: audit.at,
+      actor: audit.by,
+      role: audit.role,
+      action: audit.action || "usage-audit",
+      target: `${item.id}:${audit.purpose || ""}`,
+      result: audit.result || "allowed"
+    })))
+  ].sort((a, b) => Date.parse(b.at || "") - Date.parse(a.at || "")).slice(0, 8);
+  const recentOutcomes = datasets.flatMap((item) => (Array.isArray(item.outcomes) ? item.outcomes : []).map((outcome) => ({
+    datasetId: item.id,
+    datasetName: item.name,
+    at: outcome.at,
+    by: outcome.by,
+    title: outcome.title,
+    summary: outcome.summary,
+    registryImpact: outcome.registryImpact,
+    returnedTo: outcome.returnedTo || ["diseaseRegistryModels"]
+  }))).sort((a, b) => Date.parse(b.at || "") - Date.parse(a.at || "")).slice(0, 8);
+  const recentExports = exports.map((item) => ({
+    id: item.id,
+    datasetId: item.datasetId,
+    datasetName: item.datasetName || datasets.find((dataset) => dataset.id === item.datasetId)?.name || item.datasetId,
+    purpose: item.purpose,
+    destination: item.destination,
+    requestedFields: item.requestedFields || [],
+    reviewStatus: item.reviewStatus,
+    exportStatus: item.exportStatus,
+    watermark: item.watermark,
+    requestedAt: item.requestedAt,
+    requestedBy: item.requestedBy
+  })).sort((a, b) => Date.parse(b.requestedAt || "") - Date.parse(a.requestedAt || "")).slice(0, 8);
   return {
     ok: datasets.length >= 2 && activeDatasets.length >= 1 && auditLogs.length >= 1,
-    boundaries: ["research dataset", "disease registry", "ethics approval", "de-identification release", "sandbox access", "usage audit", "outcome return"],
+    boundaries: ["research dataset", "disease registry", "ethics approval", "de-identification release", "policy controls", "sandbox access", "compliant data export", "usage audit", "outcome return"],
     summary: {
       datasets: datasets.length,
       activeDatasets: activeDatasets.length,
       pendingApplications: datasets.filter((item) => item.status === "requested" || item.authorizationStatus === "pending").length,
       diseaseModels: models.length,
+      policyReady: datasets.filter(hasResearchGovernanceControls).length,
+      evidenceReady: datasets.filter(hasResearchEvidenceDocuments).length,
       usageAudits: datasets.reduce((sum, item) => sum + (Array.isArray(item.usageAudit) ? item.usageAudit.length : 0), 0),
       outcomes: datasets.reduce((sum, item) => sum + (Array.isArray(item.outcomes) ? item.outcomes.length : 0), 0),
+      compliantExports: exports.length,
+      releasedExports: exports.filter((item) => item.reviewStatus === "approved" && item.exportStatus === "released" && item.deidentified === true && item.minimumNecessary === true).length,
       auditLogs: auditLogs.length
     },
     datasets: datasets.map((item) => ({
@@ -8753,6 +11494,11 @@ function buildResearchSandboxSummary(data) {
       ethicsStatus: item.ethicsStatus || (item.ethicsApproval ? "approved" : "pending"),
       deidentificationStatus: item.deidentificationStatus || "pending",
       authorizationStatus: item.authorizationStatus,
+      governanceStatus: hasResearchGovernanceControls(item) ? "ready" : "pending",
+      evidenceStatus: hasResearchEvidenceDocuments(item) ? "ready" : "pending",
+      evidenceDocumentCount: Array.isArray(item.evidenceDocuments) ? item.evidenceDocuments.length : 0,
+      dataUseAgreement: item.governance?.dataUseAgreement || "",
+      retentionDays: item.governance?.retentionDays || 0,
       sandboxStatus: item.sandbox?.status || "pending",
       sourceCollections: item.sourceCollections || [],
       records: item.records || 0,
@@ -8760,7 +11506,22 @@ function buildResearchSandboxSummary(data) {
       outcomeCount: Array.isArray(item.outcomes) ? item.outcomes.length : 0
     })),
     models: models.map((item) => ({ id: item.id, diseaseType: item.diseaseType, version: item.version, reviewStatus: item.reviewStatus })),
-    reusableCollections: ["researchDatasets", "diseaseRegistryModels", "dataAccessLogs", "securityAcceptanceLedger", "personalRecords", "diagnosticReports"]
+    pendingApplications: pendingApplications.map((item) => ({
+      id: item.id,
+      diseaseType: item.diseaseType,
+      name: item.name,
+      requestedBy: item.createdBy || item.accessRequests?.[0]?.by || "",
+      requestedAt: item.createdAt || item.accessRequests?.[0]?.at || "",
+      purpose: item.accessRequests?.[0]?.purpose || "",
+      ethicsStatus: item.ethicsStatus || "pending",
+      deidentificationStatus: item.deidentificationStatus || "pending",
+      governanceStatus: hasResearchGovernanceControls(item) ? "ready" : "pending",
+      evidenceStatus: hasResearchEvidenceDocuments(item) ? "ready" : "pending"
+    })).slice(0, 8),
+    recentAudits,
+    recentOutcomes,
+    recentExports,
+    reusableCollections: ["researchDatasets", "diseaseRegistryModels", "compliantDataExports", "dataAccessLogs", "securityAcceptanceLedger", "personalRecords", "diagnosticReports"]
   };
 }
 
@@ -9015,6 +11776,35 @@ function mergeByKey(defaultRows, currentRows, key) {
   return [...merged.values()];
 }
 
+function mergeByKeyWithDefaultFields(defaultRows, currentRows, key) {
+  const merged = new Map();
+  (Array.isArray(defaultRows) ? defaultRows : []).forEach((item) => merged.set(item[key], item));
+  (Array.isArray(currentRows) ? currentRows : []).forEach((item) => {
+    if (!item?.[key]) return;
+    merged.set(item[key], mergeDefaultFields(merged.get(item[key]) || {}, item));
+  });
+  return [...merged.values()];
+}
+
+function mergeDefaultFields(defaultValue, currentValue) {
+  if (currentValue === undefined) return defaultValue;
+  if (Array.isArray(defaultValue)) return Array.isArray(currentValue) ? currentValue : defaultValue;
+  if (
+    defaultValue &&
+    currentValue &&
+    typeof defaultValue === "object" &&
+    typeof currentValue === "object" &&
+    !Array.isArray(currentValue)
+  ) {
+    const merged = { ...defaultValue, ...currentValue };
+    Object.entries(defaultValue).forEach(([field, value]) => {
+      merged[field] = mergeDefaultFields(value, currentValue[field]);
+    });
+    return merged;
+  }
+  return currentValue;
+}
+
 function sealAuditTrail(rows, options = {}) {
   const items = (Array.isArray(rows) ? rows : []).map((item) => ({ ...item }));
   const shouldReseal = items.some((item) => !item.auditHash || !Object.hasOwn(item, "previousAuditHash"));
@@ -9034,6 +11824,42 @@ function sealAuditTrail(rows, options = {}) {
     previousHash = item.auditHash;
   }
   return items;
+}
+
+function prependAuditTrailEntry(rows, entry, limit = 120) {
+  const current = Array.isArray(rows) ? rows : [];
+  const next = [entry, ...current].slice(0, limit);
+  if (next.length < current.length + 1) {
+    return sealAuditTrail(next.map(({ auditHash, previousAuditHash, ...item }) => item));
+  }
+  return sealAuditTrail(next);
+}
+
+function prependAuditEventPreservingTrail(entry, rows, limit = 120) {
+  const current = (Array.isArray(rows) ? rows : []).slice(0, Math.max(0, limit - 1));
+  const previousAuditHash = current[0]?.auditHash || "";
+  const nextEntry = { ...entry, previousAuditHash };
+  nextEntry.auditHash = auditHashFor(nextEntry);
+  return [nextEntry, ...current];
+}
+
+function resealAuditTrail(rows) {
+  return sealAuditTrail((Array.isArray(rows) ? rows : []).map(({ auditHash, previousAuditHash, ...item }) => item));
+}
+
+function auditTrailNeedsTextRepair(rows) {
+  return JSON.stringify(Array.isArray(rows) ? rows : []).includes("�");
+}
+
+function auditTrailHasNonRepairEdit(incomingRows, currentRows) {
+  const currentById = new Map((Array.isArray(currentRows) ? currentRows : []).map((item) => [item.id, item]));
+  return (Array.isArray(incomingRows) ? incomingRows : []).some((item) => {
+    const current = currentById.get(item.id);
+    if (!current || current.auditHash !== item.auditHash) return false;
+    const { auditHash: incomingHash, previousAuditHash: incomingPreviousHash, ...incomingPayload } = item;
+    const { auditHash: currentHash, previousAuditHash: currentPreviousHash, ...currentPayload } = current;
+    return JSON.stringify(incomingPayload) !== JSON.stringify(currentPayload) && !JSON.stringify(incomingPayload).includes("�");
+  });
 }
 
 function verifyAuditTrail(rows) {
@@ -9060,6 +11886,18 @@ function verifyAuditTrail(rows) {
     broken,
     linkBroken
   };
+}
+
+function auditTrailRowsMatch(leftRows, rightRows) {
+  const clean = (rows) => (Array.isArray(rows) ? rows : []).map(({ auditHash, previousAuditHash, ...item }) => item);
+  return stableStringify(clean(leftRows)) === stableStringify(clean(rightRows));
+}
+
+function auditTrailRowsMatchById(leftRows, rightRows) {
+  const clean = (rows) => (Array.isArray(rows) ? rows : []).map(({ auditHash, previousAuditHash, at, ...item }) => item);
+  const rightById = new Map(clean(rightRows).filter((item) => item.id).map((item) => [item.id, stableStringify(item)]));
+  const left = clean(leftRows);
+  return left.length <= rightById.size && left.every((item) => item.id && rightById.get(item.id) === stableStringify(item));
 }
 
 function auditHashFor(item) {
@@ -9542,14 +12380,16 @@ function reviewMutualRecognitionRecord(data, id, payload, user) {
   return updated;
 }
 
+
+
 function seedRegionalDataSharingScope() {
   return {
     id: "regional-data-sharing",
     name: "区域诊疗数据共享平台",
     boundary: [
-      "居民主索引下的诊疗摘要、检查检验报告、互认记录和授权调阅",
-      "管理端按区域、机构、接口和质量状态监管共享闭环",
-      "机构端按本机构来源或目标居民共享包完成调阅、确认和留痕"
+      "在居民主索引下共享诊疗摘要、检查检验报告、互认记录和授权调阅记录。",
+      "管理端按区域、机构、接口、质量状态和审计留痕监管共享闭环。",
+      "机构端按本机构来源或目标居民共享包完成调阅、确认和留痕。"
     ],
     roles: [
       { role: "commission", name: "管理端", permissions: ["共享网络总览", "质量与合规监管", "跨机构审计追踪", "现场联调证据归档"] },
@@ -9557,16 +12397,16 @@ function seedRegionalDataSharingScope() {
       { role: "citizen", name: "居民端", permissions: ["通过既有个人健康档案和授权记录查看结果"], via: "citizen.html / personalRecords" }
     ],
     coreLoop: [
-      "机构接口或人工回传形成 diagnosticReports / personalRecords",
-      "区域规则生成 countyMutualRecognitionRecords 和共享包",
-      "目标机构调阅共享包并登记 regionalSharingAccessReviews",
-      "管理端用质量、授权、互认、审计和接口证据验收闭环"
+      "机构接口或人工回传形成诊断报告和个人健康档案摘要。",
+      "区域规则生成互认记录和共享包。",
+      "目标机构调阅共享包并登记调阅审计。",
+      "管理端用质量、授权、互认、审计和接口证据验收闭环。"
     ],
     exclusions: [
-      "不替代院内 HIS/EMR/LIS/PACS 原系统",
-      "不直接承载医保结算、电子票据或费用清分",
-      "不绕过居民授权、机构职责边界和现场接口签名验收",
-      "不把科研脱敏数据集作为临床诊疗直接来源"
+      "不替代院内 HIS/EMR/LIS/PACS 原系统。",
+      "不承载医保结算、票据或费用清分。",
+      "不绕过居民授权、机构职责边界和现场接口签名验收。",
+      "不把科研脱敏数据集作为临床诊疗直接来源。"
     ],
     reusedCollections: [
       "residents",
@@ -9588,6 +12428,7 @@ function seedRegionalDataSharingScope() {
   };
 }
 
+
 function seedRegionalSharingPackages() {
   return [
     {
@@ -9598,7 +12439,7 @@ function seedRegionalSharingPackages() {
       sourceOrgCode: "MR3",
       targetInstitutions: ["大连市中心医院", "中山区县域医共体"],
       targetOrgCodes: ["MR1", "ORG-CONSORTIUM-ZS"],
-      category: "chronic-followup",
+      category: "慢病复查",
       title: "高血压复查共享包",
       sharedCollections: ["personalRecords", "followups", "diagnosticReports"],
       recordRefs: ["pr-001", "dr-seed-001"],
@@ -9618,7 +12459,7 @@ function seedRegionalSharingPackages() {
       sourceOrgCode: "MR1",
       targetInstitutions: ["星海湾社区卫生服务中心", "中山区县域医共体"],
       targetOrgCodes: ["MR4", "ORG-CONSORTIUM-ZS"],
-      category: "diagnostic-report",
+      category: "检查报告互认",
       title: "糖尿病检验报告互认共享包",
       sharedCollections: ["diagnosticReports", "countyMutualRecognitionRecords", "personalRecords"],
       recordRefs: ["dr-seed-002", "cmr-seed-002"],
@@ -9638,7 +12479,7 @@ function seedRegionalSharingPackages() {
       sourceOrgCode: "MR5",
       targetInstitutions: ["大连医科大学附属医院"],
       targetOrgCodes: ["MR2"],
-      category: "imaging",
+      category: "影像复核",
       title: "影像报告复核共享包",
       sharedCollections: ["diagnosticReports", "integrationGatewayEvents"],
       recordRefs: ["dr-seed-003"],
@@ -9653,6 +12494,7 @@ function seedRegionalSharingPackages() {
   ];
 }
 
+
 function seedRegionalSharingSnapshots() {
   return {
     generatedAt: "2026-06-22T10:30:00.000Z",
@@ -9661,22 +12503,23 @@ function seedRegionalSharingSnapshots() {
       residentId: "居民主索引关联",
       sourceOrgCode: "来源机构代码",
       targetOrgCodes: "目标机构代码列表",
-      status: "ready | pending_review | blocked | archived",
-      consentStatus: "active | pending | revoked",
-      qualityStatus: "passed | manual_review | failed",
-      contractRefs: "integrationContracts.id 列表",
-      recordRefs: "personalRecords / diagnosticReports / countyMutualRecognitionRecords 引用"
+      status: "可共享 / 待复核 / 暂缓共享 / 已归档",
+      consentStatus: "授权有效 / 授权待确认 / 授权已撤销",
+      qualityStatus: "质控通过 / 人工复核 / 质控未通过",
+      contractRefs: "接口契约编号列表",
+      recordRefs: "个人健康档案、诊断报告、互认记录引用"
     },
     statusNorms: seedRegionalDataSharingScope().statusNorms,
     staticEvidence: [
-      "residents.personIndex",
-      "personalRecords.reportId",
-      "diagnosticReports.recognitionRecordId",
-      "integrationContracts.requiredFields",
-      "interface-mapping-report.md"
+      "居民主索引 personIndex",
+      "个人健康档案 reportId",
+      "诊断报告 recognitionRecordId",
+      "接口契约必填字段",
+      "接口字段映射报告"
     ]
   };
 }
+
 
 function seedRegionalSharingAccessReviews() {
   return [
@@ -9727,9 +12570,107 @@ function canAccessRegionalSharingPackage(user, item) {
     (item.targetInstitutions || []).includes(user.orgName);
 }
 
+function regionalConsentLabel(status) {
+  return {
+    active: "授权有效",
+    pending: "授权待确认",
+    revoked: "授权已撤销"
+  }[status] || status || "授权待确认";
+}
+
+function regionalQualityLabel(status) {
+  return {
+    passed: "质控通过",
+    manual_review: "人工复核",
+    failed: "质控未通过"
+  }[status] || status || "质量待确认";
+}
+
+function regionalCollectionLabel(key) {
+  return {
+    residents: "居民主索引",
+    personalRecords: "个人健康档案",
+    diagnosticReports: "诊断检查报告",
+    countyMutualRecognitionRecords: "县域互认记录",
+    integrationContracts: "接口契约",
+    dataAccessLogs: "访问日志",
+    securityEvents: "安全事件"
+  }[key] || key;
+}
+
+function buildRegionalReferralHandoffEvidence(packageItem, reviews = []) {
+  const collections = new Set(packageItem.sharedCollections || []);
+  const evidenceCounts = packageItem.evidenceCounts || {};
+  const targetCount = (packageItem.targetOrgCodes || packageItem.targetInstitutions || []).length;
+  const relatedReviews = reviews.filter((item) => item.packageId === packageItem.id);
+  const evidence = [
+    {
+      id: "clinical-records",
+      label: "诊疗资料",
+      ready: collections.has("personalRecords") && collections.has("diagnosticReports") && evidenceCounts.personalRecords > 0 && evidenceCounts.diagnosticReports > 0,
+      detail: `档案 ${evidenceCounts.personalRecords || 0} 条，报告 ${evidenceCounts.diagnosticReports || 0} 条`
+    },
+    {
+      id: "mutual-recognition",
+      label: "互认依据",
+      ready: collections.has("countyMutualRecognitionRecords") && evidenceCounts.mutualRecognitionRecords > 0,
+      detail: `互认记录 ${evidenceCounts.mutualRecognitionRecords || 0} 条，可支撑检查检验结果复用`
+    },
+    {
+      id: "integration-contracts",
+      label: "接口契约",
+      ready: (packageItem.contractRefs || []).length > 0 && (packageItem.contracts || []).every((item) => item.status === "ready"),
+      detail: (packageItem.contracts || []).map((item) => item.domain || item.id).join("、") || "未绑定契约"
+    },
+    {
+      id: "consent-quality",
+      label: "授权与质控",
+      ready: packageItem.consentStatus === "active" && packageItem.qualityStatus === "passed",
+      detail: `${regionalConsentLabel(packageItem.consentStatus)} / ${regionalQualityLabel(packageItem.qualityStatus)}`
+    },
+    {
+      id: "access-audit",
+      label: "调阅审计",
+      ready: relatedReviews.length > 0 || Boolean(packageItem.lastAccessReviewId || packageItem.lastSharedAt),
+      detail: relatedReviews.length
+        ? `本包已有 ${relatedReviews.length} 条调阅留痕`
+        : packageItem.lastAccessReviewId || packageItem.lastSharedAt
+          ? `已有共享或留痕记录 ${packageItem.lastAccessReviewId || packageItem.lastSharedAt}`
+          : "转诊接诊前需登记调阅目的"
+    },
+    {
+      id: "recipient-scope",
+      label: "接收范围",
+      ready: targetCount > 0,
+      detail: `目标机构 ${targetCount} 个；仅允许来源或目标机构在授权范围内调阅`
+    }
+  ];
+  const readyCount = evidence.filter((item) => item.ready).length;
+  return {
+    ready: readyCount === evidence.length,
+    readyCount,
+    total: evidence.length,
+    evidence,
+    mergeItems: [
+      `共享 ${["residents", "personalRecords", "diagnosticReports", "countyMutualRecognitionRecords", "integrationContracts", "dataAccessLogs"].map(regionalCollectionLabel).join("、")} 作为接诊前证据。`,
+      "现场验收报告合并呈现：区域共享证明资料可调阅，转诊会诊证明业务可流转。",
+      "转诊回传报告进入诊断报告或健康档案后，可再次被共享包编目。"
+    ],
+    runtimeBoundaries: [
+      "不把区域共享包当作转诊单主表。",
+      "不在区域共享入口改写号源、床位、接诊反馈或服务时限状态。",
+      "不绕过居民授权、机构范围和调阅审计。"
+    ],
+    note: "交接只证明资料可调阅、可追溯、可用于接诊判断；转诊单、号源床位、服务时限督办和绩效结算仍由转诊会诊模块负责。"
+  };
+}
+
 function buildRegionalDataSharingView(data, user) {
   const packages = normalizeRegionalSharingPackages(data.regionalSharingPackages || seedRegionalSharingPackages())
     .filter((item) => canAccessRegionalSharingPackage(user, item));
+  const reviews = (data.regionalSharingAccessReviews || []).filter((review) =>
+    packages.some((item) => item.id === review.packageId)
+  );
   const residentsById = new Map((data.residents || []).map((item) => [item.id, item]));
   const contractsById = new Map((data.integrationContracts || []).map((item) => [item.id, item]));
   const diagnosticReports = data.diagnosticReports || [];
@@ -9740,7 +12681,7 @@ function buildRegionalDataSharingView(data, user) {
     const relatedPersonalRecords = personalRecords.filter((record) => record.residentId === item.residentId && (item.recordRefs.includes(record.id) || item.sharedCollections.includes("personalRecords")));
     const relatedRecognition = recognitionRecords.filter((record) => record.residentId === item.residentId || item.recordRefs.includes(record.id));
     const contracts = item.contractRefs.map((id) => contractsById.get(id)).filter(Boolean);
-    return {
+    const packageView = {
       ...item,
       resident: residentsById.get(item.residentId) || null,
       contracts: contracts.map((contract) => ({
@@ -9761,10 +12702,11 @@ function buildRegionalDataSharingView(data, user) {
         ...relatedRecognition.slice(0, 3).map((record) => ({ type: "countyMutualRecognitionRecords", id: record.id, name: record.item, status: record.status, at: record.at }))
       ].sort((left, right) => String(right.at || "").localeCompare(String(left.at || ""))).slice(0, 5)
     };
+    return {
+      ...packageView,
+      referralHandoff: buildRegionalReferralHandoffEvidence(packageView, reviews)
+    };
   });
-  const reviews = (data.regionalSharingAccessReviews || []).filter((review) =>
-    packages.some((item) => item.id === review.packageId)
-  );
   return {
     scope: data.regionalDataSharingScope || seedRegionalDataSharingScope(),
     snapshots: data.regionalSharingSnapshots || seedRegionalSharingSnapshots(),
@@ -9773,6 +12715,7 @@ function buildRegionalDataSharingView(data, user) {
       ready: enrichedPackages.filter((item) => item.status === "ready").length,
       pendingReview: enrichedPackages.filter((item) => item.status === "pending_review").length,
       blocked: enrichedPackages.filter((item) => item.status === "blocked").length,
+      referralHandoffReady: enrichedPackages.filter((item) => item.referralHandoff?.ready).length,
       accessReviews: reviews.length,
       institutions: new Set(enrichedPackages.flatMap((item) => [item.sourceInstitution, ...(item.targetInstitutions || [])]).filter(Boolean)).size,
       contracts: new Set(enrichedPackages.flatMap((item) => item.contractRefs || [])).size
@@ -9780,6 +12723,80 @@ function buildRegionalDataSharingView(data, user) {
     packages: enrichedPackages,
     accessReviews: reviews.slice(0, 50)
   };
+}
+
+function buildRegionalHandoffReport(data, user) {
+  const view = buildRegionalDataSharingView(data, user);
+  const packages = (view.packages || []).map((item) => {
+    const handoff = item.referralHandoff || { ready: false, readyCount: 0, total: 0, evidence: [] };
+    const evidence = handoff.evidence || [];
+    return {
+      id: item.id,
+      title: item.title,
+      residentId: item.residentId,
+      residentName: item.resident?.name || item.residentId,
+      sourceInstitution: item.sourceInstitution || item.sourceOrgCode,
+      targetInstitutions: item.targetInstitutions || item.targetOrgCodes || [],
+      status: item.status,
+      handoffReady: Boolean(handoff.ready),
+      readyCount: handoff.readyCount || evidence.filter((entry) => entry.ready).length,
+      total: handoff.total || evidence.length,
+      readyEvidence: evidence.filter((entry) => entry.ready).map((entry) => entry.label),
+      pendingEvidence: evidence.filter((entry) => !entry.ready).map((entry) => entry.label),
+      note: handoff.note
+    };
+  });
+  const report = {
+    reportId: `rshr-${randomUUID()}`,
+    generatedAt: new Date().toISOString(),
+    actor: {
+      role: user.role,
+      organization: user.orgName || "",
+      name: user.name || ""
+    },
+    scope: {
+      name: view.scope?.name || "区域诊疗数据共享平台",
+      packageScope: user.role === "commission" ? "全域共享包" : "本机构来源或接收共享包",
+      runtimeBoundary: "只生成调阅交接证据清单，不生成或改写转诊单、号源、床位、接诊反馈和绩效结算。"
+    },
+    summary: {
+      packages: packages.length,
+      handoffReady: packages.filter((item) => item.handoffReady).length,
+      evidenceTotal: packages.reduce((sum, item) => sum + item.total, 0),
+      evidenceReady: packages.reduce((sum, item) => sum + item.readyCount, 0),
+      accessReviews: view.summary?.accessReviews || 0
+    },
+    packages
+  };
+  return {
+    ...report,
+    markdown: renderRegionalHandoffMarkdown(report)
+  };
+}
+
+function renderRegionalHandoffMarkdown(report) {
+  const rows = (report.packages || []).map((item) => [
+    item.id,
+    item.residentName,
+    item.sourceInstitution,
+    (item.targetInstitutions || []).join("、") || "未配置",
+    `${item.readyCount}/${item.total}`,
+    item.pendingEvidence.length ? item.pendingEvidence.join("、") : "无"
+  ]);
+  return [
+    "# 区域共享-转诊会诊交接清单",
+    "",
+    `- 清单编号：${report.reportId}`,
+    `- 生成时间：${report.generatedAt}`,
+    `- 生成角色：${report.actor.organization || report.actor.role}`,
+    `- 权限范围：${report.scope.packageScope}`,
+    `- 交接就绪：${report.summary.handoffReady}/${report.summary.packages}`,
+    `- 运行边界：${report.scope.runtimeBoundary}`,
+    "",
+    "| 共享包 | 居民 | 来源机构 | 接收机构 | 证据进度 | 待补证据 |",
+    "| --- | --- | --- | --- | --- | --- |",
+    ...rows.map((row) => `| ${row.join(" | ")} |`)
+  ].join("\n");
 }
 
 function createRegionalSharingAccessReview(data, payload, user) {
@@ -9819,19 +12836,16 @@ function createRegionalSharingAccessReview(data, payload, user) {
   data.regionalSharingPackages = packages;
   data.regionalSharingAccessReviews = [review, ...(Array.isArray(data.regionalSharingAccessReviews) ? data.regionalSharingAccessReviews : [])].slice(0, 200);
   appendDataAccessLog(data, user, packages[index].residentId, "regionalDataSharing", review.purpose, decision === "approved" ? "允许" : "拒绝");
-  data.securityEvents = [
-    {
-      id: randomUUID(),
-      at: new Date().toLocaleString("zh-CN", { hour12: false }),
-      actor: user.name,
-      role: user.role,
-      action: "regional sharing access review",
-      target: packageId,
-      result: decision === "approved" ? "allowed" : "denied",
-      detail: review.purpose
-    },
-    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-  ].slice(0, 120);
+  data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+    id: randomUUID(),
+    at: new Date().toLocaleString("zh-CN", { hour12: false }),
+    actor: user.name,
+    role: user.role,
+    action: "regional sharing access review",
+    target: packageId,
+    result: decision === "approved" ? "allowed" : "denied",
+    detail: review.purpose
+  });
   writeDatabase(data);
   return { status: 201, body: { review, package: packages[index] } };
 }
@@ -9847,6 +12861,11 @@ function personIndexForResident(residentMap, residentId) {
 
 function serveStatic(req, res) {
   const rawPath = decodeURIComponent(new URL(req.url, `http://${req.headers.host}`).pathname);
+  if (rawPath === "/favicon.ico") {
+    res.writeHead(204, securityResponseHeaders());
+    res.end();
+    return;
+  }
   const requested = rawPath === "/" ? "/index.html" : rawPath;
   const filePath = path.normalize(path.join(ROOT, requested));
   const relativePath = path.relative(ROOT, filePath);
@@ -9881,10 +12900,17 @@ function landPhysicalExamIntegrationEvent(data, payload, event, user) {
     ? { ...payload.payload, externalId: payload.payload.externalId || payload.externalId, residentId: payload.payload.residentId || payload.residentId }
     : payload;
   try {
+    const production = isProductionRuntime();
+    if (production) {
+      if (event.simulated === true) throw new Error("生产环境禁止将模拟体检事件落库");
+      const occurredAt = new Date(payload.occurredAt || "");
+      const clockSkewMs = Math.abs(Date.now() - occurredAt.getTime());
+      if (Number.isNaN(occurredAt.getTime()) || clockSkewMs > 10 * 60 * 1000) throw new Error("生产体检事件 occurredAt 缺失或超出 10 分钟时钟窗口");
+    }
     const result = PhysicalExaminationService.ingest(data, reportPayload, {
       actor: user.username || user.role,
       actorName: user.name,
-      requireStandards: String(process.env.NODE_ENV || "").toLowerCase() === "production",
+      requireStandards: production,
       canAccessResident: (residentId) => canAccessResident(user, residentId, data)
     });
     const report = result.created[0] || result.duplicates[0];
@@ -9898,7 +12924,9 @@ function landPhysicalExamIntegrationEvent(data, payload, event, user) {
       landedRecordId: report?.id || specialized?.id || "",
       residentId: report?.residentId || specialized?.residentId || event.residentId,
       landingStatus: specialized ? (newlyRouted ? "specialized-profile-required" : "specialized-idempotent-replay") : (result.created.length ? "created" : "idempotent-replay"),
-      signatureVerified: true
+      signatureVerified: true,
+      productionEvidence: production,
+      runtimeEnvironment: production ? "production" : "non-production"
     });
     if (report?.residentId) appendDataAccessLog(data, user, report.residentId, "体检报告集成网关", `${report.source} · ${report.meta?.externalId || ""}`);
     if (specialized?.residentId) appendDataAccessLog(data, user, specialized.residentId, "专项体检分流", `${specialized.examProgramName} · ${specialized.externalId}`);
@@ -9918,25 +12946,33 @@ function landPhysicalExamIntegrationEvent(data, payload, event, user) {
 
 function buildPhysicalExamProductionReadiness(data, overview) {
   const storage = objectStorageCenter(process.env);
-  const production = String(process.env.NODE_ENV || "").toLowerCase() === "production";
-  const gatewaySecretConfigured = Boolean(String(process.env.INTEGRATION_GATEWAY_SECRET || "").trim());
+  const production = isProductionRuntime();
+  const gatewaySecretPresent = Boolean(String(process.env.INTEGRATION_GATEWAY_SECRET || "").trim());
+  const gatewaySecretConfigured = productionIntegrationSecretReady(process.env.INTEGRATION_GATEWAY_SECRET);
+  const productionReportsReady = overview.summary.reports > 0;
   const allReportsSigned = overview.summary.reports > 0 && overview.summary.signedReports === overview.summary.reports;
+  const allOriginalsStored = overview.summary.reports > 0 && overview.summary.productionStoredReports === overview.summary.reports;
   const dictionaryReady = overview.summary.mappingRate === 100;
   const nationalDictionaryReady = overview.summary.nationalMappingRate === 100;
   const standardsReady = overview.summary.reports > 0 && overview.summary.standardCompliantReports === overview.summary.reports;
   const qualityIndicatorsCollectable = (overview.qualityIndicators || []).every((item) => item.collectable === true);
   const importantFollowup = (overview.qualityIndicators || []).find((item) => item.code === "HCHM-OU-02");
-  const jointTestsSigned = overview.jointTests.length > 0 && overview.jointTests.every((item) => item.siteSignoff === true);
+  const jointTestsSigned = overview.jointTests.length > 0 && overview.jointTests.every((item) => item.siteSignoff === true && item.siteSignoffVerified === true);
+  const productionGatewayEvents = (overview.gatewayEvents || []).filter((item) => item.productionEvidence === true && item.signatureVerified === true && ["landed", "duplicate", "specialized-routed"].includes(item.status));
+  const gatewayEvidenceReady = productionGatewayEvents.length > 0;
   const blockers = [
+    ...(!productionReportsReady ? ["生产数据域尚无通过规范门禁的真实体检报告"] : []),
     ...(!gatewaySecretConfigured ? ["体检接入独立签名密钥未配置"] : []),
+    ...(!gatewayEvidenceReady ? ["尚无通过时钟窗口、验签和落库校验的生产体检接入事件"] : []),
     ...(!storage.adapterReady ? ["原报告对象存储网关未完成生产配置"] : []),
+    ...(!allOriginalsStored ? ["仍有体检报告未关联校验通过的生产原件"] : []),
     ...(!allReportsSigned ? ["仍有体检报告未通过电子签章核验"] : []),
     ...(!dictionaryReady ? ["仍有体检项目未映射标准字典"] : []),
     ...(!nationalDictionaryReady ? ["仍有体检项目未完成 WS/T 363-2023 国家数据元映射"] : []),
     ...(!standardsReady ? ["报告尚未全部通过 WS/T 483.16-2016 文档、机构资质、个人信息处理依据及 WS/T 847-2024 生产签名门禁"] : []),
     ...(!qualityIndicatorsCollectable ? ["2023版健康体检七项医疗质控指标仍有数据采集缺口"] : []),
     ...(importantFollowup?.denominator > 0 && importantFollowup.value < 100 ? ["重要异常结果尚未全部完成确认、通知和随访闭环"] : []),
-    ...(!jointTestsSigned ? ["体检中心/医院现场联调签字未齐"] : [])
+    ...(!jointTestsSigned ? ["体检中心/医院现场联调证据尚未完成四眼独立核验"] : [])
   ];
   return {
     codeReady: true,
@@ -9945,14 +12981,21 @@ function buildPhysicalExamProductionReadiness(data, overview) {
     gateway: {
       contractId: PHYSICAL_EXAM_CONTRACT_ID,
       signatureAlgorithm: "HMAC-SHA256",
-      replayProtection: "idempotencyKey + integration event ledger",
-      secretConfigured: gatewaySecretConfigured
+      replayProtection: "10-minute occurredAt window + idempotencyKey + integration event ledger",
+      secretPresent: gatewaySecretPresent,
+      secretConfigured: gatewaySecretConfigured,
+      productionEvidenceReady: gatewayEvidenceReady,
+      productionEvents: productionGatewayEvents.length,
+      lastProductionEventAt: productionGatewayEvents[0]?.receivedAt || ""
     },
     storage: {
       adapterReady: storage.adapterReady,
       checksumRequired: storage.controls.checksumRequired,
       malwareScanRequired: storage.controls.serverSideMalwareScanRequired,
-      retentionPolicy: "clinical-record / 15 years / immutable"
+      retentionPolicy: "clinical-record / 15 years / immutable",
+      allOriginalsStored,
+      storedReports: overview.summary.productionStoredReports,
+      reports: overview.summary.reports
     },
     quality: {
       dictionaryReady,
@@ -9967,15 +13010,23 @@ function buildPhysicalExamProductionReadiness(data, overview) {
       standardCompliantReports: overview.summary.standardCompliantReports,
       documentStandard: PhysicalExaminationService.STANDARDS.ADULT_EXAM_DOCUMENT_STANDARD,
       signatureStandard: PhysicalExaminationService.STANDARDS.DIGITAL_SIGNATURE_STANDARD,
-      reports: overview.summary.reports
+      reports: overview.summary.reports,
+      productionReportsReady,
+      demoReportsExcluded: overview.summary.demoReportsExcluded
     },
     siteAcceptance: {
       jointTests: overview.jointTests.length,
       signed: overview.jointTests.filter((item) => item.siteSignoff).length,
+      independentlyVerified: overview.jointTests.filter((item) => item.siteSignoff && item.siteSignoffVerified).length,
       ready: jointTestsSigned
     },
     blockers
   };
+}
+
+function productionIntegrationSecretReady(value) {
+  const secret = String(value || "").trim();
+  return secret.length >= 32 && !/(demo|example|test|change[-_ ]?me|placeholder)/i.test(secret);
 }
 
 function roleFromExternalClaims(claims, organization) {
@@ -10773,14 +13824,22 @@ function organizationAliasesForUser(data, user) {
   const candidates = Object.values(data || {}).flatMap((value) => Array.isArray(value) ? value : []);
   candidates.forEach((item) => {
     if (!item || typeof item !== "object") return;
-    const codeMatches = ORGANIZATION_CODE_FIELDS.some((field) => String(item[field] || "").trim() === user.orgCode);
-    if (!codeMatches) return;
-    ORGANIZATION_NAME_FIELDS.forEach((field) => {
-      const alias = normalizedScopeValue(item[field]);
-      if (alias) aliases.add(alias);
+    const scopedPairs = [
+      ["orgCode", ["organization", "organizationName"]],
+      ["createdByOrgCode", ["organization", "organizationName"]],
+      ["institutionCode", ["institution", "institutionName"]],
+      ["institutionId", ["institution", "institutionName"]],
+      ["hospitalCode", ["hospital"]],
+      ["sourceInstitutionCode", ["sourceInstitution", "fromInstitution"]],
+      ["targetInstitutionCode", ["targetInstitution", "toInstitution"]]
+    ];
+    scopedPairs.forEach(([codeField, nameFields]) => {
+      if (String(item[codeField] || "").trim() !== user.orgCode) return;
+      nameFields.forEach((field) => {
+        const alias = normalizedScopeValue(item[field]);
+        if (alias) aliases.add(alias);
+      });
     });
-    const name = normalizedScopeValue(item.name);
-    if (name) aliases.add(name);
   });
   const nextCache = dataCache || new Map();
   nextCache.set(cacheKey, aliases);
@@ -12913,6 +15972,7 @@ function scopeStateForUser(data, user) {
   delete scoped.qualityRectificationOrders;
   delete scoped.hospitalOperationSnapshots;
   delete scoped.resourceDispatchRequests;
+  delete scoped.emergencyDispatchLoops;
   delete scoped.statisticsReconciliationReviews;
   delete scoped.operationAlertRules;
   if (user.role !== "county") delete scoped.countyAcceptanceLedger;
@@ -12965,7 +16025,7 @@ function scopeStateForUser(data, user) {
     const preferenceKey = user.residentId || user.accountId || user.username;
     scoped.mobileExperienceSettings = { ...scoped.mobileExperienceSettings, userPreferences: { [preferenceKey]: preferences[preferenceKey] || {} } };
   }
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "referralTeleconsultations", "escortServiceOrders", "registrationOrders", "registrationWaitlistEntries", "internetNursingOrders", "serviceOrders", "taskMessages"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "drugConsumableSupervisions", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "referralTeleconsultations", "escortServiceOrders", "registrationOrders", "registrationWaitlistEntries", "internetNursingOrders", "serviceOrders", "taskMessages"].forEach((key) => {
     scoped[key] = (data[key] || []).filter(hasAllowedResident);
   });
   ["phase2FamilyDoctorApplications", "phase2FamilyDoctorContracts", "phase2FamilyDoctorFulfillments"].forEach((key) => {
@@ -13002,7 +16062,8 @@ function allowedResidentIdsForUser(data, user) {
   }
   if (user.role === "institution") {
     addReferences(data.residents, (item) => rowMatchesOrganizationScope(data, user, item));
-    Object.values(data).forEach((value) => {
+    Object.entries(data).forEach(([collection, value]) => {
+      if (["phase2FamilyDoctorApplications", "phase2FamilyDoctorContracts", "phase2FamilyDoctorFulfillments"].includes(collection)) return;
       if (Array.isArray(value)) addReferences(value, (item) => rowMatchesOrganizationScope(data, user, item));
     });
     Object.values(data.referralSystem || {}).forEach((value) => {
@@ -13018,6 +16079,7 @@ function applyResidentScope(scoped, data, user) {
   scoped.residents = (data.residents || []).filter((item) => allowed.has(item.id));
   Object.entries(scoped).forEach(([collection, value]) => {
     if (!Array.isArray(value) || collection === "residents") return;
+    if (["phase2FamilyDoctorApplications", "phase2FamilyDoctorContracts", "phase2FamilyDoctorFulfillments"].includes(collection)) return;
     if (!value.some((item) => residentReferences(item).length)) return;
     if (user.role === "insurance" && !INSURANCE_RESIDENT_COLLECTIONS.has(collection)) {
       scoped[collection] = [];
@@ -13255,6 +16317,75 @@ function lifecycleActionSourceId(action) {
 
 function statusInPolicy(policy, group, status) {
   return (policy?.statusGroups?.[group] || []).some((item) => String(status || "").includes(item) || String(item || "").includes(String(status || "")));
+}
+
+function isClosedChronicStatus(policy, status) {
+  return statusInPolicy(policy, "closed", status) || /已完成|已取药|已评估|已复核|completed|picked|handled|closed|read/i.test(String(status || ""));
+}
+
+function buildChronicFollowupPolicyAlignment(data) {
+  const feedback = (data.personalRecords || []).filter((item) => item.category === "chronic-feedback" || item.meta?.followupFeedback);
+  return [
+    {
+      id: "policy-screening",
+      policy: "咨询筛查与风险发现",
+      basis: "基层慢性病健康管理服务能力建设指引",
+      evidence: "chronicScreeningTasks",
+      count: (data.chronicScreeningTasks || []).filter((item) => item.residentId && item.riskLevel && item.nextStep).length,
+      nextAction: "接入基层自测设备、健康体检和公卫筛查结果。"
+    },
+    {
+      id: "policy-tiered-management",
+      policy: "分类分级管理",
+      basis: "国卫基层发〔2025〕15号",
+      evidence: "chronicManagementPlans",
+      count: (data.chronicManagementPlans || []).filter((item) => item.residentId && item.grade && item.nextReview).length,
+      nextAction: "对接家庭医生签约分层规则和专病质控阈值。"
+    },
+    {
+      id: "policy-followup-guidance",
+      policy: "院后随访与健康指导",
+      basis: "国卫基层发〔2025〕15号",
+      evidence: "followups",
+      count: (data.followups || []).filter((item) => item.residentId && item.plannedAt && item.assignee).length,
+      nextAction: "对接 HIS/EMR 出院小结和真实复诊预约状态。"
+    },
+    {
+      id: "policy-medication-support",
+      policy: "长期处方与用药保障",
+      basis: "国卫基层发〔2025〕15号",
+      evidence: "medicationPickups",
+      count: (data.medicationPickups || []).filter((item) => item.residentId && item.nextPickup && item.pharmacyStatus).length,
+      nextAction: "对接处方、药房库存、医保慢病待遇和配送状态。"
+    },
+    {
+      id: "policy-family-doctor",
+      policy: "家庭医生协同",
+      basis: "国卫基层发〔2025〕15号",
+      evidence: "residents.familyDoctor/chronicManagementPlans.owner",
+      count: (data.residents || []).filter((resident) => resident.familyDoctor).length + (data.chronicManagementPlans || []).filter((item) => item.owner).length,
+      nextAction: "绑定真实家庭医生团队、签约居民和服务包。"
+    },
+    {
+      id: "policy-resident-feedback",
+      policy: "居民自我管理与反馈",
+      basis: "基层慢性病健康管理服务能力建设指引",
+      evidence: "personalRecords[category=chronic-feedback]",
+      count: feedback.length,
+      nextAction: "补充居民端量表、满意度和自测指标上传。"
+    },
+    {
+      id: "policy-feedback-dispatch",
+      policy: "信息流转与处置闭环",
+      basis: "基层慢性病健康管理服务能力建设指引",
+      evidence: "taskMessages[chronicFollowup=true]",
+      count: (data.taskMessages || []).filter((item) => item.chronicFollowup && item.residentId && item.targetRole).length,
+      nextAction: "对接短信、公众号和机构站内待办的真实触达回执。"
+    }
+  ].map((item) => ({
+    ...item,
+    covered: item.count > 0
+  }));
 }
 
 function latestRecord(records, residentId, category) {
@@ -13693,6 +16824,10 @@ function buildChronicReferralContinuity(data, user, residentId = "") {
   };
 }
 
+function buildChronicFollowupAlertQueue(data, readiness = buildChronicFollowupReadinessReport({ data })) {
+  return enrichChronicAlertQueue(data, readiness.alertQueue || []);
+}
+
 function buildChronicFollowupSummary(data, user, residentId = "") {
   const scoped = scopeStateForUser(data, user);
   const targetResidents = (scoped.residents || []).filter((resident) => !residentId || resident.id === residentId);
@@ -13700,9 +16835,13 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
   const readiness = buildChronicFollowupReadinessReport({ data: scoped });
   const archiveStandardization = buildChronicArchiveStandardization(data, user, residentId);
   const referralContinuity = buildChronicReferralContinuity(data, user, residentId);
-  const alertQueue = enrichChronicAlertQueue(scoped, readiness.alertQueue || []);
+  const targetResidentIds = new Set(targetResidents.map((resident) => resident.id));
+  const alertQueue = buildChronicFollowupAlertQueue(scoped, readiness)
+    .filter((item) => item.residentId && targetResidentIds.has(item.residentId));
   const escalationMessages = (scoped.taskMessages || []).filter((message) => message.chronicFollowup && message.meta?.escalation && isOpenChronicFollowupMessage(message));
   const feedbackRecords = (scoped.personalRecords || []).filter((item) => item.category === "chronic-feedback");
+  const residentExperienceRecords = (scoped.personalRecords || []).filter((item) => item.category === "chronic-self-checkin" || item.meta?.residentExperience);
+  const followupMessages = (scoped.taskMessages || []).filter((item) => item.chronicFollowup);
   const residents = targetResidents.map((resident) => {
     const screenings = (scoped.chronicScreeningTasks || []).filter((item) => item.residentId === resident.id);
     const plans = (scoped.chronicManagementPlans || []).filter((item) => item.residentId === resident.id);
@@ -13711,10 +16850,10 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
     const adherence = medicationAdherenceForResident(scoped, resident.id);
     const latestFeedback = latestRecord(feedbackRecords, resident.id);
     const openItems = [
-      ...screenings.filter((item) => !statusInPolicy(policy, "closed", item.status)),
-      ...plans.filter((item) => !statusInPolicy(policy, "closed", item.status)),
-      ...followups.filter((item) => !statusInPolicy(policy, "closed", item.status)),
-      ...adherence.pickups.filter((item) => !statusInPolicy(policy, "closed", item.status || item.pharmacyStatus))
+      ...screenings.filter((item) => !isClosedChronicStatus(policy, item.status)),
+      ...plans.filter((item) => !isClosedChronicStatus(policy, item.status)),
+      ...followups.filter((item) => !isClosedChronicStatus(policy, item.status)),
+      ...adherence.pickups.filter((item) => !isClosedChronicStatus(policy, item.status || item.pharmacyStatus))
     ];
     const highPriority = [
       ...screenings,
@@ -13730,7 +16869,7 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
       screeningTasks: screenings,
       managementPlans: plans,
       followups,
-      returnVisitReminders: followups.filter((item) => !statusInPolicy(policy, "closed", item.status)).map((item) => ({
+      returnVisitReminders: followups.filter((item) => !isClosedChronicStatus(policy, item.status)).map((item) => ({
         id: item.id,
         plannedAt: item.plannedAt,
         assignee: item.assignee,
@@ -13747,6 +16886,16 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
         latest: latestFeedback || null,
         count: feedbackRecords.filter((item) => item.residentId === resident.id).length
       },
+      residentExperience: {
+        checkins: residentExperienceRecords.filter((item) => item.residentId === resident.id).length,
+        healthPoints: residentExperienceRecords.filter((item) => item.residentId === resident.id).reduce((sum, item) => sum + Number(item.meta?.healthPoints || 0), 0),
+        seniorReminder: (scoped.seniorServices || []).some((item) => item.residentId === resident.id)
+      },
+      notifications: {
+        count: followupMessages.filter((item) => item.residentId === resident.id).length,
+        unread: followupMessages.filter((item) => item.residentId === resident.id && isOpenChronicFollowupMessage(item)).length
+      },
+      alerts: alertQueue.filter((item) => item.residentId === resident.id),
       archiveEvidence: {
         authorizations: records.filter((item) => item.category === "authorizations").length,
         emr: records.filter((item) => item.category === "emr").length,
@@ -13764,9 +16913,13 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
       openFollowups: residents.reduce((sum, item) => sum + item.returnVisitReminders.length, 0),
       medicationPending: residents.reduce((sum, item) => sum + item.medicationAdherence.pending, 0),
       feedbackRecords: residents.reduce((sum, item) => sum + item.residentFeedback.count, 0),
-      alerts: readiness.summary?.alerts || 0,
-      overdueAlerts: readiness.summary?.overdueAlerts || 0,
-      highPriorityAlerts: readiness.summary?.highPriorityAlerts || 0,
+      residentExperienceRecords: residentExperienceRecords.filter((item) => targetResidentIds.has(item.residentId)).length,
+      healthPoints: residentExperienceRecords
+        .filter((item) => targetResidentIds.has(item.residentId))
+        .reduce((sum, item) => sum + Number(item.meta?.healthPoints || 0), 0),
+      alerts: alertQueue.length,
+      overdueAlerts: alertQueue.filter((item) => item.dueBucket === "overdue").length,
+      highPriorityAlerts: alertQueue.filter((item) => ["critical", "high"].includes(item.priority)).length,
       escalationAlerts: alertQueue.filter((item) => item.dueBucket === "overdue" || ["critical", "high"].includes(item.priority)).length,
       openEscalations: escalationMessages.length,
       referralContinuityReady: referralContinuity.summary.ready,
@@ -14894,10 +18047,123 @@ function dispatchChronicFollowupAction(data, user, payload) {
   return { status: 200, body: { ...item, closedMessages, closedEscalationMessages } };
 }
 
+function recordChronicLaunchCoreAction(data, user, payload) {
+  const itemId = String(payload.itemId || "").trim();
+  const rowId = String(payload.rowId || payload.id || "").trim();
+  const actionType = String(payload.action || "record-launch-core-action").trim();
+  const now = new Date().toISOString();
+  const collectionByItem = {
+    "institution-systems": "chronicExternalIntegrations",
+    "identity-scope": "chronicIdentityScopes",
+    "message-channels": "chronicMessageChannels",
+    "quality-model": "chronicModelGovernance",
+    "pharmacy-insurance": "chronicPharmacyInsuranceLinks",
+    "site-readiness-pack": "chronicLaunchCoreSignoffs"
+  };
+  const collection = collectionByItem[itemId];
+  if (!collection) return { status: 400, body: { error: "Bad Request", message: "unsupported launch core itemId" } };
+  const rows = Array.isArray(data[collection]) ? data[collection] : [];
+  const row = rows.find((item) => item.id === rowId) || rows.find((item) => item.itemId === itemId);
+  if (!row) return { status: 404, body: { error: "Not Found", message: "launch core row not found" } };
+
+  const commonPatch = {
+    completionStatus: String(payload.completionStatus || payload.status || row.completionStatus || "completed").trim(),
+    lastAction: actionType,
+    lastActionAt: now,
+    lastActionBy: user.username || user.role,
+    lastActionByName: user.name,
+    lastActionNote: String(payload.note || payload.comment || "").trim()
+  };
+  const itemPatches = {
+    "institution-systems": {
+      latestReceiptId: String(payload.receiptId || row.latestReceiptId || `receipt-${Date.now()}`).trim(),
+      receiptStatus: String(payload.receiptStatus || row.receiptStatus || "sample-accepted").trim(),
+      jointTestStatus: String(payload.jointTestStatus || "passed").trim(),
+      signedPayloadHash: String(payload.signedPayloadHash || row.signedPayloadHash || "runtime-sample-hash").trim()
+    },
+    "identity-scope": {
+      sampleTokenValidated: payload.sampleTokenValidated === undefined ? true : Boolean(payload.sampleTokenValidated),
+      scopeReviewStatus: String(payload.scopeReviewStatus || "approved").trim(),
+      reviewer: String(payload.reviewer || user.name || row.reviewer || "").trim()
+    },
+    "message-channels": {
+      latestReceiptId: String(payload.receiptId || row.latestReceiptId || `message-receipt-${Date.now()}`).trim(),
+      latestReceiptStatus: String(payload.receiptStatus || payload.deliveryStatus || "delivered").trim(),
+      escalationTested: payload.escalationTested === undefined ? true : Boolean(payload.escalationTested)
+    },
+    "quality-model": {
+      lastReviewStatus: String(payload.reviewStatus || "approved").trim(),
+      qualitySampleStatus: String(payload.qualitySampleStatus || "sample-passed").trim(),
+      reviewerComment: String(payload.reviewerComment || payload.note || row.reviewerComment || "").trim()
+    },
+    "pharmacy-insurance": {
+      settlementReceiptStatus: String(payload.settlementReceiptStatus || "accepted").trim(),
+      inventoryReceiptStatus: String(payload.inventoryReceiptStatus || row.inventoryReceiptStatus || "reserved").trim(),
+      closureStatus: String(payload.closureStatus || "closed").trim()
+    },
+    "site-readiness-pack": {
+      signoffStatus: String(payload.signoffStatus || "signed").trim(),
+      signedBy: String(payload.signedBy || user.name || row.signedBy || "").trim(),
+      signedAt: now
+    }
+  };
+  Object.assign(row, commonPatch, itemPatches[itemId] || {});
+  row.actions = [
+    {
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      action: actionType,
+      status: row.completionStatus || row.signoffStatus || "completed",
+      note: commonPatch.lastActionNote
+    },
+    ...(Array.isArray(row.actions) ? row.actions : [])
+  ].slice(0, 20);
+
+  data.chronicLaunchCoreActions = [
+    {
+      id: `clca-${randomUUID()}`,
+      itemId,
+      collection,
+      rowId: row.id,
+      action: actionType,
+      status: row.completionStatus || row.signoffStatus || "completed",
+      note: commonPatch.lastActionNote,
+      createdAt: now,
+      createdBy: user.username || user.role,
+      createdByName: user.name
+    },
+    ...(Array.isArray(data.chronicLaunchCoreActions) ? data.chronicLaunchCoreActions : [])
+  ].slice(0, 200);
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "record chronic launch core action",
+      target: `${collection}/${row.id}`,
+      result: "allowed",
+      detail: actionType
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
+  writeDatabase(normalizeState(data));
+  return {
+    status: 200,
+    body: {
+      itemId,
+      collection,
+      row,
+      launchCore: buildChronicLaunchCoreReport({ data: normalizeState(data) })
+    }
+  };
+}
+
 function appendSecurityEvent(event) {
   if (isTransientAnonymousSecurityEvent(event)) return;
   const data = readDatabase();
-  data.securityEvents = [
+  data.securityEvents = resealAuditTrail([
     {
       id: randomUUID(),
       at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -14909,8 +18175,7 @@ function appendSecurityEvent(event) {
       detail: event.detail || ""
     },
     ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-  ].slice(0, 120);
-  data.securityEvents = sealAuditTrail(data.securityEvents, { recompute: true });
+  ].slice(0, 120));
   writeDatabase(data);
 }
 
@@ -14925,7 +18190,7 @@ function isTransientAnonymousSecurityEvent(event) {
 
 function appendDataAccessLog(data, user, residentId, scope, purpose, result = "允许") {
   const residentMap = new Map(data.residents.map((resident) => [resident.id, resident]));
-  data.dataAccessLogs = [
+  data.dataAccessLogs = resealAuditTrail([
     {
       id: randomUUID(),
       residentId,
@@ -14938,8 +18203,7 @@ function appendDataAccessLog(data, user, residentId, scope, purpose, result = "�
       result
     },
     ...(Array.isArray(data.dataAccessLogs) ? data.dataAccessLogs : [])
-  ].slice(0, 120);
-  data.dataAccessLogs = sealAuditTrail(data.dataAccessLogs, { recompute: true });
+  ].slice(0, 120));
 }
 
 function normalizePublicHealthEventAction(event, payload = {}, user = {}) {
@@ -15781,6 +19045,21 @@ function cleanWorkflowUpdates(updates) {
   }, {});
 }
 
+function appendDrugConsumableAuditTrail(item, user, action, detail) {
+  if (!item || typeof item !== "object") return;
+  item.auditTrail = [
+    {
+      at: new Date().toISOString(),
+      actor: user?.username || user?.role || "system",
+      role: user?.role || "system",
+      action,
+      result: item.status || item.reviewStatus || item.remediationStatus || "updated",
+      detail: String(detail || item.nextAction || "").trim()
+    },
+    ...(Array.isArray(item.auditTrail) ? item.auditTrail : [])
+  ].slice(0, 20);
+}
+
 function cleanResidentPatch(patch) {
   return Object.entries(patch && typeof patch === "object" ? patch : {}).reduce((result, [key, value]) => {
     if (RESIDENT_PROTECTED_FIELDS.has(key) || key === "expectedVersion") return result;
@@ -16074,19 +19353,16 @@ function patchCollectionItem({ data, collection, id, patch, user, action, protec
       collectionVersions: { [collection]: Number(patch.expectedVersion) }
     };
   }
-  data.securityEvents = [
-    {
-      id: randomUUID(),
-      at: new Date().toLocaleString("zh-CN", { hour12: false }),
-      actor: user.name,
-      role: user.role,
-      action,
-      target: `${collection}/${id}`,
-      result: "允许",
-      detail: `集合项更新 ${collection}`
-    },
-    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-  ].slice(0, 120);
+  data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+    id: randomUUID(),
+    at: new Date().toLocaleString("zh-CN", { hour12: false }),
+    actor: user.name,
+    role: user.role,
+    action,
+    target: `${collection}/${id}`,
+    result: "允许",
+    detail: `集合项更新 ${collection}`
+  });
   writeDatabase(data);
   return { status: 200, body: rows[index] };
 }
@@ -16113,19 +19389,16 @@ function patchBusinessCollectionItem({ data, collection, id, patch, user, action
       collectionVersions: { [collection]: Number(patch.expectedVersion) }
     };
   }
-  data.securityEvents = [
-    {
-      id: randomUUID(),
-      at: new Date().toLocaleString("zh-CN", { hour12: false }),
-      actor: user.name,
-      role: user.role,
-      action,
-      target: `${collection}/${id}`,
-      result: "允许",
-      detail: `业务级更新 ${collection}`
-    },
-    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-  ].slice(0, 120);
+  data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+    id: randomUUID(),
+    at: new Date().toLocaleString("zh-CN", { hour12: false }),
+    actor: user.name,
+    role: user.role,
+    action,
+    target: `${collection}/${id}`,
+    result: "允许",
+    detail: `业务级更新 ${collection}`
+  });
   writeDatabase(data);
   return { status: 200, body: rows[index] };
 }
@@ -16174,6 +19447,8 @@ const TASK_SOURCES = [
   ["diagnosticReports", "county", "报告回传", "reportedAt"]
 ];
 
+TASK_SOURCES.splice(13, 0, ["drugConsumableSupervisions", ["commission", "insurance", "institution"], "Drug consumable supervision", "lastUpdated"]);
+
 const SERVICE_DOMAIN_BY_COLLECTION = {
   chronicScreeningTasks: "screening",
   chronicEducationPushes: "education",
@@ -16190,6 +19465,7 @@ const SERVICE_DOMAIN_BY_COLLECTION = {
   referralTeleconsultations: "referralTeleconsultation",
   escortServiceOrders: "escortService",
   internetNursingOrders: "internetNursing",
+  drugConsumableSupervisions: "drugConsumable",
   citizenLifecycleActions: "citizenLifecycle"
 };
 
@@ -16201,7 +19477,7 @@ function taskPriorityLevel(item) {
 }
 
 function taskTitle(item, category) {
-  return item.taskName || item.topic || item.plan || item.orderType || item.claimType || item.medication || item.item || item.title || item.name || item.service || category;
+  return item.taskName || item.topic || item.plan || item.orderType || item.claimType || item.medication || item.issue || item.item || item.title || item.name || item.service || category;
 }
 
 function isClosedTaskStatus(status) {
@@ -16595,6 +19871,12 @@ function normalizeReferralTeleconsultationStatus(status) {
   return aliases[value] || String(status || "requested").trim();
 }
 
+function assertReferralCallbackResident(callback, item) {
+  if (callback.residentId && callback.residentId !== item.residentId) {
+    throw new Error("residentId does not match referral teleconsultation");
+  }
+}
+
 function applyReferralTeleconsultationAction(item, payload, user) {
   const now = new Date().toISOString();
   const action = String(payload.action || payload.status || "update").trim();
@@ -16610,7 +19892,7 @@ function applyReferralTeleconsultationAction(item, payload, user) {
   };
   if (payload.feedback || updates.receivingFeedback) {
     next.receivingFeedback = String(payload.feedback || updates.receivingFeedback).trim();
-    if (nextStatus === item.status) next.status = "feedback-returned";
+    if (!payload.status && !updates.status && nextStatus === item.status) next.status = "feedback-returned";
   }
   if (payload.reportSummary || updates.reportSummary || next.status === "report-returned") {
     next.reportStatus = "returned";
@@ -16622,6 +19904,979 @@ function applyReferralTeleconsultationAction(item, payload, user) {
     ...(Array.isArray(item.auditTrail) ? item.auditTrail : [])
   ].slice(0, 40);
   return next;
+}
+
+function normalizeReferralTeleconsultationCallback(payload, item) {
+  const idempotencyKey = String(payload.idempotencyKey || "").trim();
+  if (!idempotencyKey) throw new Error("idempotencyKey is required");
+  const reportSummary = String(payload.reportSummary || payload.payload?.reportSummary || "").trim();
+  if (!reportSummary) throw new Error("reportSummary is required");
+  return {
+    contractId: "referral-report-callback-v1",
+    idempotencyKey,
+    externalId: String(payload.externalId || payload.payload?.externalId || idempotencyKey).trim(),
+    residentId: String(payload.residentId || item.residentId || "").trim(),
+    reportSummary,
+    receivingFeedback: String(payload.receivingFeedback || payload.payload?.receivingFeedback || item.receivingFeedback || "").trim(),
+    reportStatus: "returned",
+    reportReturnedAt: String(payload.reportReturnedAt || payload.payload?.reportReturnedAt || new Date().toISOString()).trim(),
+    sourceSystem: String(payload.sourceSystem || payload.payload?.sourceSystem || "external-his-emr").trim(),
+    performance: payload.performance && typeof payload.performance === "object" ? payload.performance : payload.payload?.performance,
+    payload: payload.payload && typeof payload.payload === "object" ? payload.payload : {}
+  };
+}
+
+function normalizeReferralTeleconsultationFeedbackCallback(payload, item) {
+  const idempotencyKey = String(payload.idempotencyKey || "").trim();
+  if (!idempotencyKey) throw new Error("idempotencyKey is required");
+  const receivingFeedback = String(payload.receivingFeedback || payload.feedback || payload.payload?.receivingFeedback || payload.payload?.feedback || "").trim();
+  if (!receivingFeedback) throw new Error("receivingFeedback is required");
+  return {
+    contractId: "referral-feedback-callback-v1",
+    idempotencyKey,
+    externalId: String(payload.externalId || payload.payload?.externalId || idempotencyKey).trim(),
+    residentId: String(payload.residentId || item.residentId || "").trim(),
+    receivingFeedback,
+    feedbackAt: String(payload.feedbackAt || payload.payload?.feedbackAt || new Date().toISOString()).trim(),
+    feedbackStatus: normalizeReferralTeleconsultationStatus(payload.feedbackStatus || payload.status || payload.payload?.feedbackStatus || "feedback-returned"),
+    sourceSystem: String(payload.sourceSystem || payload.payload?.sourceSystem || "external-referral-center").trim(),
+    performance: payload.performance && typeof payload.performance === "object" ? payload.performance : payload.payload?.performance,
+    payload: payload.payload && typeof payload.payload === "object" ? payload.payload : {}
+  };
+}
+
+function normalizeReferralTeleconsultationScheduleCallback(payload, item) {
+  const idempotencyKey = String(payload.idempotencyKey || "").trim();
+  if (!idempotencyKey) throw new Error("idempotencyKey is required");
+  const meetingWindow = String(payload.meetingWindow || payload.payload?.meetingWindow || "").trim();
+  if (!meetingWindow) throw new Error("meetingWindow is required");
+  return {
+    contractId: "referral-schedule-callback-v1",
+    idempotencyKey,
+    externalId: String(payload.externalId || payload.payload?.externalId || idempotencyKey).trim(),
+    residentId: String(payload.residentId || item.residentId || "").trim(),
+    meetingWindow,
+    targetInstitution: String(payload.targetInstitution || payload.payload?.targetInstitution || item.targetInstitution || "").trim(),
+    targetInstitutionCode: String(payload.targetInstitutionCode || payload.payload?.targetInstitutionCode || item.targetInstitutionCode || "").trim(),
+    department: String(payload.department || payload.payload?.department || item.department || "").trim(),
+    receivingDoctor: String(payload.receivingDoctor || payload.payload?.receivingDoctor || item.receivingDoctor || "").trim(),
+    scheduleStatus: String(payload.scheduleStatus || payload.payload?.scheduleStatus || "scheduled").trim(),
+    sourceSystem: String(payload.sourceSystem || payload.payload?.sourceSystem || "external-scheduling").trim(),
+    performance: payload.performance && typeof payload.performance === "object" ? payload.performance : payload.payload?.performance,
+    payload: payload.payload && typeof payload.payload === "object" ? payload.payload : {}
+  };
+}
+
+function buildReferralTeleconsultationPersonalRecord(data, item, callback, user) {
+  const now = new Date().toISOString();
+  const residentMap = new Map((Array.isArray(data.residents) ? data.residents : []).map((resident) => [resident.id, resident]));
+  return {
+    id: `pr-rtc-${randomUUID()}`,
+    residentId: item.residentId,
+    personIndex: personIndexForResident(residentMap, item.residentId),
+    category: "teleconsultation-report",
+    date: callback.reportReturnedAt.slice(0, 10),
+    recordDate: callback.reportReturnedAt.slice(0, 10),
+    name: `${item.department || item.type || "Teleconsultation"} report`,
+    result: callback.reportSummary,
+    source: callback.sourceSystem || item.targetInstitution || "referral teleconsultation",
+    teleconsultationId: item.id,
+    referralId: item.referralId,
+    externalReportId: callback.externalId,
+    idempotencyKey: callback.idempotencyKey,
+    reportReturnedAt: callback.reportReturnedAt,
+    createdAt: now,
+    createdBy: user.username || user.role,
+    createdByName: user.name,
+    updatedAt: now,
+    updatedBy: user.username || user.role,
+    updatedByName: user.name,
+    meta: {
+      sourceInstitution: item.sourceInstitution,
+      targetInstitution: item.targetInstitution,
+      receivingDoctor: item.receivingDoctor,
+      reportStatus: "returned"
+    }
+  };
+}
+
+function createReferralTeleconsultationNotification({ item, callback, kind, targetRole, user }) {
+  const now = new Date().toISOString();
+  const idempotencyKey = callback.idempotencyKey || callback.externalId || item.id;
+  const titles = {
+    feedback: "Teleconsultation feedback returned",
+    schedule: "Teleconsultation scheduled",
+    report: "Teleconsultation report returned"
+  };
+  const bodies = {
+    feedback: `Receiving feedback: ${callback.receivingFeedback || item.receivingFeedback || "request accepted."}`,
+    schedule: `Teleconsultation scheduled for ${callback.meetingWindow || item.meetingWindow || "the confirmed appointment window"}.`,
+    report: `Report returned: ${callback.reportSummary || item.reportSummary || "specialist report is ready."}`
+  };
+  return {
+    id: `msg-${randomUUID()}`,
+    taskId: `referralTeleconsultations:${item.id}`,
+    collection: "referralTeleconsultations",
+    sourceId: item.id,
+    residentId: item.residentId || "",
+    targetRole,
+    channel: "in_app",
+    title: titles[kind] || "Teleconsultation update",
+    body: bodies[kind] || "Teleconsultation status updated.",
+    status: "sent",
+    notificationKey: `referralTeleconsultations:${item.id}:${kind}:${idempotencyKey}:${targetRole}`,
+    receipts: [],
+    createdAt: now,
+    createdBy: user.username || user.role,
+    createdByName: user.name
+  };
+}
+
+function appendReferralTeleconsultationNotifications(data, item, kind, callback, user) {
+  const existing = Array.isArray(data.taskMessages) ? data.taskMessages : [];
+  const existingKeys = new Set(existing.map((message) => message.notificationKey).filter(Boolean));
+  const messages = ["institution", "citizen"]
+    .map((targetRole) => createReferralTeleconsultationNotification({ item, callback, kind, targetRole, user }))
+    .filter((message) => !existingKeys.has(message.notificationKey));
+  data.taskMessages = [...messages, ...existing].slice(0, 300);
+  return messages;
+}
+
+function parseReferralDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function daysBetween(start, end) {
+  if (!start || !end) return null;
+  return Math.floor((end.getTime() - start.getTime()) / 86400000);
+}
+
+function buildReferralTeleconsultationEscalations(rows, options = {}) {
+  const now = parseReferralDate(options.asOf) || new Date();
+  return (Array.isArray(rows) ? rows : [])
+    .filter((item) => !isClosedTaskStatus(item.status) && item.reportStatus !== "returned")
+    .map((item) => {
+      const dueDate = parseReferralDate(item.due);
+      const requestedAt = parseReferralDate(item.requestedAt || item.createdAt);
+      const daysOverdue = dueDate ? daysBetween(dueDate, now) : null;
+      const ageDays = requestedAt ? daysBetween(requestedAt, now) : null;
+      const responseHours = Number(item.performance?.responseHours);
+      const reportReturnHours = Number(item.performance?.reportReturnHours);
+      const reasons = [];
+      if (Number.isFinite(daysOverdue) && daysOverdue > 0) reasons.push(`due overdue ${daysOverdue}d`);
+      if (item.priority === "high" && item.reportStatus !== "returned") reasons.push("high priority pending report");
+      if (Number.isFinite(responseHours) && responseHours > 4) reasons.push(`response ${responseHours}h`);
+      if (Number.isFinite(reportReturnHours) && reportReturnHours > 24) reasons.push(`report return ${reportReturnHours}h`);
+      if (!item.meetingWindow) reasons.push("meeting window missing");
+      if (!reasons.length && Number.isFinite(ageDays) && ageDays >= 2) reasons.push(`open ${ageDays}d`);
+      if (!reasons.length) return null;
+      const severity = item.priority === "high" || (Number.isFinite(daysOverdue) && daysOverdue >= 1) ? "high" : "medium";
+      return {
+        id: `rtc-escalation-${item.id}`,
+        teleconsultationId: item.id,
+        residentId: item.residentId,
+        priority: item.priority || "normal",
+        severity,
+        status: item.status,
+        reportStatus: item.reportStatus || "pending-return",
+        due: item.due || "",
+        daysOverdue: Number.isFinite(daysOverdue) ? daysOverdue : 0,
+        reasons,
+        ownerRole: "county",
+        nextAction: item.reportStatus === "returned"
+          ? "archive report return evidence"
+          : "confirm receiving hospital report callback or manual reconciliation",
+        evidence: "referral teleconsultation SLA queue"
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      const severityRank = { high: 2, medium: 1 };
+      return (severityRank[b.severity] || 0) - (severityRank[a.severity] || 0) || b.daysOverdue - a.daysOverdue;
+    });
+}
+
+function createReferralTeleconsultationEscalationMessage(item, escalation, user) {
+  const now = new Date().toISOString();
+  return {
+    id: `msg-${randomUUID()}`,
+    taskId: `referralTeleconsultations:${item.id}`,
+    collection: "referralTeleconsultations",
+    sourceId: item.id,
+    residentId: item.residentId || "",
+    targetRole: "institution",
+    channel: "in_app",
+    title: "Referral teleconsultation SLA reminder",
+    body: `${item.targetInstitution || "Receiving institution"} needs follow-up: ${escalation.reasons.join("; ")}.`,
+    status: "sent",
+    notificationKey: `referralTeleconsultations:${item.id}:sla:${escalation.severity}`,
+    escalationKey: `referralTeleconsultations:${item.id}:sla:${escalation.severity}`,
+    receipts: [],
+    createdAt: now,
+    createdBy: user.username || user.role,
+    createdByName: user.name
+  };
+}
+
+function acknowledgeReferralTeleconsultationEscalation(data, item, payload, user) {
+  const now = new Date().toISOString();
+  const acknowledgement = {
+    status: String(payload.status || "acknowledged").trim(),
+    owner: String(payload.owner || user.orgName || user.name || "institution").trim(),
+    action: String(payload.action || payload.note || "SLA reminder acknowledged").trim(),
+    updatedAt: now,
+    updatedBy: user.username || user.role,
+    updatedByName: user.name
+  };
+  const messages = Array.isArray(data.taskMessages) ? data.taskMessages : [];
+  data.taskMessages = messages.map((message) => {
+    if (message.collection !== "referralTeleconsultations" || message.sourceId !== item.id || !message.escalationKey) return message;
+    const receipts = Array.isArray(message.receipts) ? message.receipts : [];
+    return {
+      ...message,
+      status: "acknowledged",
+      receipts: [
+        { at: now, by: user.username || user.role, name: user.name, action: acknowledgement.action },
+        ...receipts
+      ].slice(0, 20)
+    };
+  });
+  return {
+    ...item,
+    slaDisposition: acknowledgement,
+    countySupervision: {
+      ...(item.countySupervision && typeof item.countySupervision === "object" ? item.countySupervision : {}),
+      status: acknowledgement.status === "closed" ? "已闭环" : "已确认",
+      owner: acknowledgement.owner,
+      action: acknowledgement.action,
+      updatedAt: now
+    },
+    auditTrail: [
+      { at: now, actor: user.username || user.role, action: "sla-acknowledged", note: acknowledgement.action },
+      ...(Array.isArray(item.auditTrail) ? item.auditTrail : [])
+    ].slice(0, 40),
+    lastUpdated: now,
+    updatedBy: user.username || user.role,
+    updatedByName: user.name
+  };
+}
+
+function buildReferralTeleconsultationJointTestPack(data) {
+  const contracts = (Array.isArray(data.integrationContracts) ? data.integrationContracts : [])
+    .filter((item) => ["referral-feedback-callback-v1", "referral-schedule-callback-v1", "referral-report-callback-v1"].includes(item.id));
+  const teleconsultations = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
+  const taskReceipts = (Array.isArray(data.taskMessages) ? data.taskMessages : [])
+    .filter((message) => message.jointTestKey || String(message.notificationKey || "").startsWith("referralTeleconsultations:joint-test:"))
+    .map((message) => {
+      const role = String(message.jointTestKey || message.notificationKey || "").replace("referralTeleconsultations:joint-test:", "");
+      return {
+        role,
+        targetRole: message.targetRole || "",
+        status: message.status || "sent",
+        receiptCount: Array.isArray(message.receipts) ? message.receipts.length : 0,
+        completedAt: message.jointTestCompletedAt || "",
+        completedByName: message.jointTestCompletedByName || "",
+        note: message.jointTestCompletionNote || ""
+      };
+    });
+  const sample = teleconsultations[0] || {};
+  const samples = contracts.map((contract) => {
+    const base = {
+      contractId: contract.id,
+      idempotencyKey: `${contract.id}-${sample.id || "demo"}-joint-test`,
+      externalId: `${contract.id}-${sample.id || "demo"}`,
+      teleconsultationId: sample.id || "rtc-demo",
+      residentId: sample.residentId || "r1",
+      sourceSystem: contract.id.includes("schedule") ? "hospital-scheduling" : contract.id.includes("report") ? "hospital-emr" : "referral-center"
+    };
+    if (contract.id.includes("feedback")) {
+      return { contractId: contract.id, payload: { ...base, receivingFeedback: "Receiving hospital accepted the referral and reserved specialist review.", feedbackAt: new Date().toISOString() } };
+    }
+    if (contract.id.includes("schedule")) {
+      return { contractId: contract.id, payload: { ...base, meetingWindow: sample.meetingWindow || "2026-06-30 09:00-09:30", targetInstitution: sample.targetInstitution || "Receiving hospital", department: sample.department || "Specialist clinic" } };
+    }
+    return { contractId: contract.id, payload: { ...base, reportSummary: "Specialist report returned; primary institution continues follow-up.", reportReturnedAt: new Date().toISOString(), performance: { reportReturnHours: 6 } } };
+  });
+  const checklist = [
+    { id: "signature", owner: "interface-integration", item: "x-integration-signature HMAC verified", status: "ready" },
+    { id: "idempotency", owner: "interface-integration", item: "idempotency replay returns existing event", status: "ready" },
+    { id: "resident-authorization", owner: "institution", item: "resident authorization exists before callback processing", status: "ready" },
+    { id: "report-archive", owner: "hospital-it", item: "report callback archives teleconsultation-report personal record", status: "ready" },
+    { id: "insurance-policy", owner: "insurance", item: "payment path and repeat-exam control rule captured for settlement review", status: "ready" }
+  ];
+  const signoff = [
+    { role: "referral-center", responsibility: "receiving feedback and triage callback", evidence: "feedback-callback signed replay" },
+    { role: "receiving-hospital", responsibility: "schedule, bed, or video room confirmation", evidence: "schedule-callback signed replay" },
+    { role: "hospital-it", responsibility: "EMR/PACS/LIS report callback and archive", evidence: "report-callback signed replay" },
+    { role: "county-performance", responsibility: "SLA supervision and performance settlement", evidence: "county supervision acknowledgement" },
+    { role: "insurance", responsibility: "payment path and repeat-exam control review", evidence: "referral insurance performance policy" }
+  ];
+  const signoffSummary = buildReferralTeleconsultationSignoffSummary(data, { includeRowsOnly: true });
+  const sampleRoles = new Set(samples.map((item) => {
+    if (item.contractId.includes("feedback")) return "referral-center";
+    if (item.contractId.includes("schedule")) return "receiving-hospital";
+    return "hospital-it";
+  }));
+  const receiptByRole = new Map(taskReceipts.map((item) => [item.role, item]));
+  const signoffByRole = new Map(signoffSummary.map((item) => [item.role, item]));
+  const exportSummary = signoff.map((item) => {
+    const receipt = receiptByRole.get(item.role) || {};
+    const signoffRow = signoffByRole.get(item.role) || {};
+    const hasSample = sampleRoles.has(item.role) || item.role === "county-performance" || item.role === "insurance";
+    const taskAssigned = Boolean(receipt.role);
+    const taskCompleted = /completed|closed|signed|read/i.test(String(receipt.status || ""));
+    const onsiteSigned = signoffRow.siteStatus === "signed";
+    return {
+      role: item.role,
+      hasSample,
+      taskAssigned,
+      taskCompleted,
+      demoReady: Boolean(signoffRow.localEvidence),
+      onsiteSigned,
+      readyForFinalSignoff: hasSample && Boolean(signoffRow.localEvidence) && (taskCompleted || onsiteSigned),
+      nextAction: onsiteSigned
+        ? "Archive production evidence pack with signed material."
+        : taskCompleted
+          ? "Attach onsite signed evidence for final acceptance."
+          : taskAssigned
+            ? "Complete owner task receipt before onsite signoff."
+            : "Dispatch owner task from the joint-test ledger."
+    };
+  });
+  const replayedContracts = new Set((Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])
+    .filter((item) => ["referral-feedback-callback-v1", "referral-schedule-callback-v1", "referral-report-callback-v1"].includes(item.contractId))
+    .map((item) => item.contractId));
+  const pendingFinalSignoffRoles = exportSummary.filter((item) => !item.readyForFinalSignoff).map((item) => item.role);
+  const pendingOnsiteSignoffRoles = exportSummary.filter((item) => !item.onsiteSigned).map((item) => item.role);
+  const cutoverReadiness = {
+    readyForProductionCutover: contracts.length === 3 && replayedContracts.size === 3 && pendingFinalSignoffRoles.length === 0 && pendingOnsiteSignoffRoles.length === 0,
+    contractReplay: `${replayedContracts.size}/${contracts.length}`,
+    finalSignoffReadyRoles: exportSummary.filter((item) => item.readyForFinalSignoff).length,
+    onsiteSignedRoles: exportSummary.filter((item) => item.onsiteSigned).length,
+    blockers: [
+      replayedContracts.size < 3 ? {
+        id: "callback-replay-pending",
+        owner: "institution-integration",
+        detail: "Replay signed feedback, schedule, and report callbacks from target institution systems."
+      } : null,
+      pendingFinalSignoffRoles.length ? {
+        id: "final-signoff-pending",
+        owner: "county-command",
+        detail: `Complete final signoff readiness for ${pendingFinalSignoffRoles.join(", ")}.`
+      } : null,
+      pendingOnsiteSignoffRoles.length ? {
+        id: "onsite-signoff-pending",
+        owner: "county-command",
+        detail: `Archive onsite signed evidence for ${pendingOnsiteSignoffRoles.join(", ")}.`
+      } : null
+    ].filter(Boolean),
+    nextAction: pendingOnsiteSignoffRoles.length
+      ? "Archive onsite signed evidence before production cutover."
+      : replayedContracts.size < 3
+        ? "Replay all signed callback contracts against target institution systems."
+        : pendingFinalSignoffRoles.length
+          ? "Complete final owner task receipts."
+          : "Ready for production cutover after platform-level environment gates pass."
+  };
+  const nextDevelopmentPlan = [
+    {
+      phase: "field-interface-replay",
+      owner: "institution-integration",
+      objective: "Replay real HIS/EMR/PACS/LIS referral, schedule, and report callbacks with signed payloads.",
+      dependencies: ["real referral order id", "gateway URL", "HMAC key", "failure replay queue"],
+      acceptance: "Three callback contracts match the joint-test ledger and referral-center, receiving-hospital, and hospital-it rows are ready for final signoff."
+    },
+    {
+      phase: "onsite-signoff-archive",
+      owner: "county-command",
+      objective: "Archive original signed evidence for referral center, receiving hospital, hospital IT, county performance, and insurance.",
+      dependencies: ["signed screenshots", "attachment storage pointer", "onsite signer list"],
+      acceptance: "Signoff summary has signed evidence for all roles and the export summary has no pending owner task."
+    },
+    {
+      phase: "insurance-performance-cutover",
+      owner: "insurance-performance",
+      objective: "Confirm payment path, repeat-exam control, settlement rule, and performance formula.",
+      dependencies: ["insurance rule catalogue", "settlement batch id", "county performance formula"],
+      acceptance: "Insurance and county-performance rows are signed with reviewed payment policy evidence."
+    },
+    {
+      phase: "production-cutover-controls",
+      owner: "platform-ops",
+      objective: "Bind production identity, audit retention, monitoring, storage, and disaster recovery controls.",
+      dependencies: ["OIDC or SAML parameters", "AUDIT_EXPORT_PATH or SIEM_ENDPOINT", "production database adapter", "monitoring signoff"],
+      acceptance: "Release report has no production cutover blockers outside field interface signoff."
+    }
+  ];
+  return {
+    ok: contracts.length === 3 && samples.length === 3,
+    generatedAt: new Date().toISOString(),
+    contracts,
+    samples,
+    checklist,
+    signoff,
+    taskReceipts,
+    exportSummary,
+    cutoverReadiness,
+    nextDevelopmentPlan,
+    signoffSummary
+  };
+}
+
+function buildReferralTeleconsultationJointTestLedger(data) {
+  const teleconsultations = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
+  const events = (Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])
+    .filter((item) => ["referral-feedback-callback-v1", "referral-schedule-callback-v1", "referral-report-callback-v1"].includes(item.contractId));
+  const signoffSummary = buildReferralTeleconsultationSignoffSummary(data);
+  const signoffByRole = new Map(signoffSummary.signoff.map((item) => [item.role, item]));
+  const archivedReportIds = new Set((Array.isArray(data.personalRecords) ? data.personalRecords : [])
+    .filter((item) => item.category === "teleconsultation-report" && item.teleconsultationId)
+    .map((item) => item.teleconsultationId));
+  const callbackRows = [
+    {
+      role: "referral-center",
+      type: "callback",
+      title: "Feedback callback replay",
+      contractId: "referral-feedback-callback-v1",
+      localEvidence: teleconsultations.some((item) => item.receivingFeedback),
+      evidence: "receivingFeedback, feedback taskMessages, and signed gateway callback"
+    },
+    {
+      role: "receiving-hospital",
+      type: "callback",
+      title: "Schedule callback replay",
+      contractId: "referral-schedule-callback-v1",
+      localEvidence: teleconsultations.some((item) => item.meetingWindow && item.receivingDoctor),
+      evidence: "meetingWindow, receivingDoctor, and signed schedule callback"
+    },
+    {
+      role: "hospital-it",
+      type: "callback",
+      title: "Report callback replay",
+      contractId: "referral-report-callback-v1",
+      localEvidence: teleconsultations.some((item) => item.reportStatus === "returned" || item.status === "report-returned") &&
+        teleconsultations.filter((item) => item.reportStatus === "returned" || item.status === "report-returned").every((item) => archivedReportIds.has(item.id)),
+      evidence: "report callback, teleconsultation-report archive, and resident notification"
+    }
+  ].map((row) => {
+    const matched = events.filter((event) => event.contractId === row.contractId && event.status === "matched");
+    const matchedTargets = new Set(matched.map((event) => event.targetId).filter(Boolean));
+    const latestEvent = matched
+      .slice()
+      .sort((a, b) => String(b.receivedAt || "").localeCompare(String(a.receivedAt || "")))[0] || null;
+    const signoff = signoffByRole.get(row.role) || {};
+    return {
+      ...row,
+      matched: matched.length,
+      matchedTargets: matchedTargets.size,
+      latestAt: latestEvent?.receivedAt || "",
+      siteStatus: signoff.siteStatus || "pending-site-signoff",
+      onsiteEvidence: signoff.onsiteEvidence || null,
+      status: matched.length ? "matched" : (row.localEvidence ? "local-evidence-ready" : "pending-evidence"),
+      nextAction: matched.length ? "Archive onsite signoff after replay evidence is reviewed." : "Replay the signed callback against the onsite integration gateway."
+    };
+  });
+  const governanceRows = [
+    {
+      role: "county-performance",
+      type: "governance",
+      title: "SLA supervision and performance ledger",
+      localEvidence: teleconsultations.every((item) => item.countySupervision?.status && item.slaDisposition?.status),
+      evidence: "countySupervision, slaDisposition, reminders, and performance settlement evidence"
+    },
+    {
+      role: "insurance",
+      type: "policy",
+      title: "Payment and repeat-exam policy ledger",
+      localEvidence: teleconsultations.every((item) => item.performance?.insurancePaymentPath && item.performance?.repeatExamControl),
+      evidence: "insurancePaymentPath, repeatExamControl, and performance-policy endpoint"
+    }
+  ].map((row) => {
+    const signoff = signoffByRole.get(row.role) || {};
+    return {
+      ...row,
+      matched: signoff.onsiteEvidence ? 1 : 0,
+      matchedTargets: signoff.onsiteEvidence ? 1 : 0,
+      latestAt: signoff.onsiteEvidence?.signedAt || "",
+      siteStatus: signoff.siteStatus || "pending-site-signoff",
+      onsiteEvidence: signoff.onsiteEvidence || null,
+      status: signoff.onsiteEvidence ? "signed" : (row.localEvidence ? "local-evidence-ready" : "pending-evidence"),
+      nextAction: signoff.onsiteEvidence ? "Keep the signed evidence pack with the release record." : "Confirm onsite owner and archive signoff evidence."
+    };
+  });
+  const rows = [...callbackRows, ...governanceRows];
+  const callbackContracts = rows.filter((item) => item.type === "callback").length;
+  const callbackMatchedContracts = rows.filter((item) => item.type === "callback" && item.matched > 0).length;
+  return {
+    ok: rows.every((item) => item.localEvidence),
+    generatedAt: new Date().toISOString(),
+    summary: {
+      rows: rows.length,
+      localReady: rows.filter((item) => item.localEvidence).length,
+      pendingEvidence: rows.filter((item) => !item.localEvidence).length,
+      callbackContracts,
+      callbackMatchedContracts,
+      callbackPendingContracts: callbackContracts - callbackMatchedContracts,
+      gatewayEvents: events.length,
+      siteSigned: signoffSummary.summary.siteSigned,
+      sitePending: signoffSummary.summary.sitePending
+    },
+    rows
+  };
+}
+
+function createReferralTeleconsultationJointTestTasks(data, user) {
+  const ledger = buildReferralTeleconsultationJointTestLedger(data);
+  const existing = Array.isArray(data.taskMessages) ? data.taskMessages : [];
+  const existingKeys = new Set(existing.map((message) => message.jointTestKey || message.notificationKey).filter(Boolean));
+  const now = new Date().toISOString();
+  const messages = ledger.rows
+    .filter((row) => !["matched", "signed"].includes(row.status))
+    .map((row) => {
+      const key = `referralTeleconsultations:joint-test:${row.role}`;
+      if (existingKeys.has(key)) return null;
+      const targetRole = row.role === "insurance" ? "insurance" : row.role === "county-performance" ? "county" : "institution";
+      return {
+        id: `msg-${randomUUID()}`,
+        taskId: `referralTeleconsultations:joint-test:${row.role}`,
+        collection: "referralTeleconsultations",
+        sourceId: row.role,
+        residentId: "",
+        targetRole,
+        channel: "in_app",
+        title: `Referral teleconsultation joint-test follow-up: ${row.role}`,
+        body: `${row.title}: ${row.nextAction}`,
+        status: "sent",
+        notificationKey: key,
+        jointTestKey: key,
+        receipts: [],
+        createdAt: now,
+        createdBy: user.username || user.role,
+        createdByName: user.name
+      };
+    })
+    .filter(Boolean);
+  data.taskMessages = [...messages, ...existing].slice(0, 300);
+  if (messages.length) {
+    data.securityEvents = resealAuditTrail([
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "create referral teleconsultation joint-test tasks",
+        target: "referral-teleconsultation",
+        result: "allowed",
+        detail: `${messages.length} joint-test tasks created`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ]);
+  }
+  writeDatabase(data);
+  return {
+    ok: true,
+    messages,
+    summary: {
+      created: messages.length,
+      pendingRows: ledger.rows.filter((row) => !["matched", "signed"].includes(row.status)).length,
+      totalRows: ledger.rows.length
+    },
+    ledger
+  };
+}
+
+function completeReferralTeleconsultationJointTestTask(data, user, role, payload = {}) {
+  const key = `referralTeleconsultations:joint-test:${role}`;
+  const messages = Array.isArray(data.taskMessages) ? data.taskMessages : [];
+  const index = messages.findIndex((message) => message.jointTestKey === key || message.notificationKey === key);
+  if (index < 0) {
+    return { status: 404, body: { error: "Not Found", message: "joint-test task message not found" } };
+  }
+  const message = messages[index];
+  if (!["commission", "county"].includes(user.role) && message.targetRole !== user.role) {
+    return { status: 403, body: { error: "Forbidden", message: "role cannot complete this joint-test task" } };
+  }
+  const now = new Date().toISOString();
+  const completionStatus = String(payload.status || "completed").trim();
+  const note = String(payload.note || `${role} joint-test task completed`).trim();
+  const receipt = {
+    at: now,
+    by: user.username || user.role,
+    byName: user.name,
+    role: user.role,
+    status: completionStatus,
+    note
+  };
+  messages[index] = {
+    ...message,
+    status: completionStatus,
+    jointTestCompletedAt: now,
+    jointTestCompletedBy: user.username || user.role,
+    jointTestCompletedByName: user.name,
+    jointTestCompletionNote: note,
+    receipts: [receipt, ...(Array.isArray(message.receipts) ? message.receipts : [])].slice(0, 20)
+  };
+  data.taskMessages = messages;
+  data.securityEvents = resealAuditTrail([
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "complete referral teleconsultation joint-test task",
+      target: role,
+      result: "allowed",
+      detail: note
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120));
+  writeDatabase(data);
+  return {
+    status: 200,
+    body: {
+      ok: true,
+      message: messages[index],
+      summary: { completed: 1, role },
+      ledger: buildReferralTeleconsultationJointTestLedger(data)
+    }
+  };
+}
+
+const REFERRAL_SIGNOFF_ROLES = new Set(["referral-center", "receiving-hospital", "hospital-it", "county-performance", "insurance"]);
+
+function buildReferralTeleconsultationSignoffSummary(data, options = {}) {
+  const teleconsultations = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
+  const signoffRecords = Array.isArray(data.referralTeleconsultationSignoffs) ? data.referralTeleconsultationSignoffs : [];
+  const signoffByRole = new Map(signoffRecords
+    .filter((item) => REFERRAL_SIGNOFF_ROLES.has(item.role) && item.status === "signed")
+    .map((item) => [item.role, item]));
+  const taskMessages = (Array.isArray(data.taskMessages) ? data.taskMessages : [])
+    .filter((item) => item.collection === "referralTeleconsultations");
+  const contractIds = new Set((Array.isArray(data.integrationContracts) ? data.integrationContracts : []).map((item) => item.id));
+  const archivedReportIds = new Set((Array.isArray(data.personalRecords) ? data.personalRecords : [])
+    .filter((item) => item.category === "teleconsultation-report" && item.teleconsultationId)
+    .map((item) => item.teleconsultationId));
+  const reportReturned = teleconsultations.filter((item) => item.reportStatus === "returned" || item.status === "report-returned");
+  const hasFeedbackNotification = taskMessages.some((item) => item.notificationKey && item.notificationKey.includes(":feedback:"));
+  const hasReportNotification = taskMessages.some((item) => item.notificationKey && item.notificationKey.includes(":report:"));
+  const hasSlaMessage = taskMessages.some((item) => item.escalationKey);
+  const hasSlaDispositionEvidence = teleconsultations.some((item) => {
+    const status = String(item.slaDisposition?.status || item.countySupervision?.status || "").toLowerCase();
+    return status && status !== "pending-ack" && (status.includes("acknowledged") || status.includes("closed") || status.includes("已确认") || status.includes("已闭环"));
+  });
+  let evidenceRows = [
+    {
+      role: "referral-center",
+      institutionType: "转诊中心",
+      responsibility: "转诊单接收、分诊意见和接诊反馈回调",
+      localEvidence: contractIds.has("referral-feedback-callback-v1") && hasFeedbackNotification && teleconsultations.some((item) => item.receivingFeedback),
+      evidence: "feedback-callback contract, receivingFeedback, taskMessages feedback notification",
+      blocker: "真实转诊单号、失败补偿队列和接诊意见字典待现场确认"
+    },
+    {
+      role: "receiving-hospital",
+      institutionType: "接诊医院",
+      responsibility: "会诊排期、床位/号源/视频间确认和接诊医生确认",
+      localEvidence: contractIds.has("referral-schedule-callback-v1") && teleconsultations.some((item) => item.meetingWindow && item.receivingDoctor),
+      evidence: "schedule-callback contract, meetingWindow, receivingDoctor",
+      blocker: "真实号源、床位、视频系统会议室和接诊医生排班待接入"
+    },
+    {
+      role: "hospital-it",
+      institutionType: "医院信息中心",
+      responsibility: "HIS/EMR/PACS/LIS 报告回传、签名校验和归档",
+      localEvidence: contractIds.has("referral-report-callback-v1") && reportReturned.length > 0 && reportReturned.every((item) => archivedReportIds.has(item.id)) && hasReportNotification,
+      evidence: "report-callback contract, teleconsultation-report archive, report taskMessages",
+      blocker: "真实报告编号、附件地址、签名密钥和重放策略待现场联调"
+    },
+    {
+      role: "county-performance",
+      institutionType: "医共体办公室",
+      responsibility: "SLA 督办、协同工单跟踪、绩效归集和闭环确认",
+      localEvidence: teleconsultations.every((item) => item.countySupervision?.status && item.slaDisposition?.status) && (hasSlaMessage || hasSlaDispositionEvidence),
+      evidence: "countySupervision, slaDisposition, SLA taskMessages or acknowledged disposition",
+      blocker: "值班人、升级渠道、现场签收截图和绩效责任单位待归档"
+    },
+    {
+      role: "insurance",
+      institutionType: "医保/绩效部门",
+      responsibility: "支付路径、报告互认控费、重复检查控制和结算口径确认",
+      localEvidence: teleconsultations.every((item) => item.performance?.insurancePaymentPath && item.performance?.repeatExamControl),
+      evidence: "performance.insurancePaymentPath, performance.repeatExamControl, performance-policy endpoint",
+      blocker: "统筹区支付细则、医共体结算公式和医保核心回执待确认"
+    }
+  ].map((row) => ({
+    ...row,
+    status: row.localEvidence ? "demo-ready" : "needs-evidence",
+    siteSignoffRequired: true,
+    nextAction: row.localEvidence ? `现场签收：${row.blocker}` : `补齐本地证据：${row.evidence}`
+  }));
+  evidenceRows = evidenceRows.map((row) => {
+    const onsiteEvidence = signoffByRole.get(row.role) || null;
+    return {
+      ...row,
+      onsiteEvidence,
+      siteStatus: onsiteEvidence ? "signed" : "pending-site-signoff",
+      nextAction: onsiteEvidence ? "Onsite signoff archived; keep original signed material in the project evidence pack." : row.nextAction
+    };
+  });
+  const signed = evidenceRows.filter((item) => item.onsiteEvidence).length;
+  const summary = {
+    roles: evidenceRows.length,
+    demoReady: evidenceRows.filter((item) => item.localEvidence).length,
+    needsEvidence: evidenceRows.filter((item) => !item.localEvidence).length,
+    siteSigned: signed,
+    sitePending: evidenceRows.length - signed,
+    allDemoReady: evidenceRows.every((item) => item.localEvidence),
+    allSiteSigned: signed === evidenceRows.length
+  };
+  if (options.includeRowsOnly) return evidenceRows;
+  return {
+    ok: summary.allDemoReady,
+    generatedAt: new Date().toISOString(),
+    summary,
+    signoff: evidenceRows
+  };
+}
+
+function canSubmitReferralSignoff(user, role) {
+  if (!REFERRAL_SIGNOFF_ROLES.has(role)) return false;
+  if (["commission", "county"].includes(user.role)) return true;
+  if (user.role === "insurance") return role === "insurance";
+  if (user.role === "institution") return ["referral-center", "receiving-hospital", "hospital-it"].includes(role);
+  return false;
+}
+
+function upsertReferralTeleconsultationSignoff(data, role, payload, user) {
+  const signerName = String(payload.signerName || user.name || "").trim();
+  const signerOrg = String(payload.signerOrg || user.orgName || "").trim();
+  const evidenceNote = String(payload.evidenceNote || payload.note || "").trim();
+  if (!REFERRAL_SIGNOFF_ROLES.has(role)) {
+    return { status: 404, body: { error: "Not Found", message: "referral signoff role not found" } };
+  }
+  if (!canSubmitReferralSignoff(user, role)) {
+    return { status: 403, body: { error: "Forbidden", message: "role cannot submit this signoff evidence" } };
+  }
+  if (!signerName || !signerOrg || !evidenceNote) {
+    return { status: 400, body: { error: "Bad Request", message: "signerName, signerOrg and evidenceNote are required" } };
+  }
+  const now = new Date().toISOString();
+  const current = Array.isArray(data.referralTeleconsultationSignoffs) ? data.referralTeleconsultationSignoffs : [];
+  const previous = current.find((item) => item.role === role && item.status === "signed");
+  const record = {
+    id: previous?.id || `rtcs-${role}-${createHash("sha1").update(`${role}:${signerOrg}`).digest("hex").slice(0, 8)}`,
+    role,
+    status: "signed",
+    signerName,
+    signerOrg,
+    signedAt: String(payload.signedAt || now).trim(),
+    evidenceNote,
+    attachmentName: String(payload.attachmentName || "").trim(),
+    evidenceType: String(payload.evidenceType || "onsite-signoff").trim(),
+    submittedBy: user.username || user.role,
+    submittedByName: user.name,
+    submittedAt: now,
+    auditTrail: [
+      { at: now, actor: user.username || user.role, action: previous ? "updated" : "created", note: evidenceNote },
+      ...(Array.isArray(previous?.auditTrail) ? previous.auditTrail : [])
+    ].slice(0, 20)
+  };
+  data.referralTeleconsultationSignoffs = [
+    record,
+    ...current.filter((item) => !(item.role === role && item.status === "signed"))
+  ].slice(0, 50);
+  appendDataAccessLog(data, user, "", "referral teleconsultation onsite signoff", `${role}: ${evidenceNote}`, "allowed");
+  writeDatabase(data);
+  appendSecurityEvent({ actor: user.name, role: user.role, action: "archive referral teleconsultation signoff", target: role, result: "allowed", detail: evidenceNote });
+  return { status: previous ? 200 : 201, body: { ok: true, signoff: record, summary: buildReferralTeleconsultationSignoffSummary(data).summary } };
+}
+
+function buildReferralInsurancePerformancePolicy(data) {
+  const teleconsultations = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
+  const returned = teleconsultations.filter((item) => item.reportStatus === "returned" || item.status === "report-returned");
+  const completedFollowup = teleconsultations.filter((item) => String(item.slaDisposition?.status || "").includes("closed") || String(item.countySupervision?.status || "").includes("闭环"));
+  const repeatExamControlled = teleconsultations.filter((item) => String(item.performance?.repeatExamControl || "").includes("recognized") || String(item.performance?.repeatExamControl || "").includes("reused"));
+  const rate = (count, total = teleconsultations.length) => total ? Math.round((count / total) * 100) : 100;
+  return {
+    generatedAt: new Date().toISOString(),
+    summary: {
+      total: teleconsultations.length,
+      reportReturnRate: rate(returned.length),
+      followupClosureRate: rate(completedFollowup.length),
+      repeatExamControlRate: rate(repeatExamControlled.length),
+      paymentPaths: [...new Set(teleconsultations.map((item) => item.performance?.insurancePaymentPath).filter(Boolean))]
+    },
+    rules: [
+      { id: "report-return-rate", owner: "county-performance", metric: "reportReturnRate", numerator: returned.length, denominator: Math.max(1, teleconsultations.length), target: ">=90%", settlementUse: "medical consortium performance score" },
+      { id: "followup-closure-rate", owner: "primary-care", metric: "followupClosureRate", numerator: completedFollowup.length, denominator: Math.max(1, teleconsultations.length), target: ">=85%", settlementUse: "primary follow-up continuity payment" },
+      { id: "repeat-exam-control", owner: "insurance", metric: "repeatExamControlRate", numerator: repeatExamControlled.length, denominator: Math.max(1, teleconsultations.length), target: ">=80%", settlementUse: "avoid duplicate exam and support mutual-recognition payment review" },
+      { id: "timely-response", owner: "receiving-hospital", metric: "responseHours", target: "<=4h high-priority response", settlementUse: "SLA deduction or bonus" }
+    ]
+  };
+}
+
+function averageReferralPerformance(rows, field) {
+  const values = rows.map((item) => Number(item.performance?.[field])).filter(Number.isFinite);
+  if (!values.length) return null;
+  return Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1));
+}
+
+function referralMetricPercent(count, total) {
+  return total ? Math.round((count / total) * 100) : 100;
+}
+
+function hasReferralGrassrootsFollowupReturn(item) {
+  const text = [
+    item.type,
+    item.targetInstitution,
+    item.sourceInstitution,
+    item.reportSummary,
+    item.receivingFeedback,
+    item.performance?.insurancePaymentPath,
+    item.slaDisposition?.action,
+    item.countySupervision?.reason
+  ].join(" ").toLowerCase();
+  return text.includes("down-referral") || text.includes("primary") || text.includes("community") || text.includes("follow-up") || text.includes("followup") || text.includes("grassroots");
+}
+
+function hasReferralQualityFeedbackClosure(item) {
+  const text = [
+    item.slaDisposition?.status,
+    item.slaDisposition?.action,
+    item.countySupervision?.status,
+    item.countySupervision?.reason,
+    item.performance?.satisfaction
+  ].join(" ").toLowerCase();
+  return text.includes("closed") || text.includes("acknowledged") || text.includes("quality") || text.includes("satisfaction");
+}
+
+function buildReferralConsortiumClosedLoopMetrics(data) {
+  const teleconsultations = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
+  const archivedReportIds = new Set((Array.isArray(data.personalRecords) ? data.personalRecords : [])
+    .filter((item) => item.category === "teleconsultation-report" && item.teleconsultationId)
+    .map((item) => item.teleconsultationId));
+  const mutualRecognitionEvidence = (Array.isArray(data.countyMutualRecognitionRecords) ? data.countyMutualRecognitionRecords : [])
+    .filter((item) => item.status || item.reason || item.reportId);
+  const returned = teleconsultations.filter((item) => item.reportStatus === "returned" || item.status === "report-returned");
+  const grassrootsFollowupReturned = teleconsultations.filter(hasReferralGrassrootsFollowupReturn);
+  const qualityFeedbackClosed = teleconsultations.filter(hasReferralQualityFeedbackClosure);
+  const steps = [
+    {
+      id: "initiate",
+      label: "initiate",
+      owner: "primary institution + lead hospital",
+      roles: ["referral-center"],
+      localEvidence: teleconsultations.length > 0 && teleconsultations.every((item) => item.referralId && item.residentAuthorizationId && item.collaborationOrderId),
+      blockerType: "external",
+      source: "referralSystem + resident authorization + countyCollaborationOrders"
+    },
+    {
+      id: "accept",
+      label: "accept",
+      owner: "receiving hospital",
+      roles: ["receiving-hospital"],
+      localEvidence: teleconsultations.length > 0 && teleconsultations.every((item) => Object.hasOwn(item, "receivingFeedback")),
+      blockerType: "external",
+      source: "receivingFeedback + callback taskMessages"
+    },
+    {
+      id: "execute",
+      label: "execute / teleconsultation",
+      owner: "lead hospital specialist team",
+      roles: ["receiving-hospital", "hospital-it"],
+      localEvidence: teleconsultations.some((item) => item.meetingWindow && item.receivingDoctor),
+      blockerType: "external",
+      source: "meetingWindow + receivingDoctor"
+    },
+    {
+      id: "report-return",
+      label: "report return",
+      owner: "hospital IT + medical technology center",
+      roles: ["hospital-it"],
+      localEvidence: returned.length > 0 && returned.every((item) => archivedReportIds.has(item.id)),
+      blockerType: "external",
+      source: "personalRecords teleconsultation-report archive",
+      lightEvidence: mutualRecognitionEvidence.length
+    },
+    {
+      id: "feedback-evaluation",
+      label: "feedback / evaluation",
+      owner: "county performance office",
+      roles: ["county-performance"],
+      localEvidence: teleconsultations.length > 0 && teleconsultations.every((item) => item.countySupervision?.status && item.slaDisposition?.status),
+      blockerType: "onsite",
+      source: "countySupervision + slaDisposition"
+    },
+    {
+      id: "performance-archive",
+      label: "performance archive",
+      owner: "insurance + performance",
+      roles: ["county-performance", "insurance"],
+      localEvidence: teleconsultations.length > 0 && teleconsultations.every((item) => item.performance?.insurancePaymentPath && item.performance?.repeatExamControl),
+      blockerType: "external",
+      source: "performance insurancePaymentPath + repeatExamControl"
+    }
+  ];
+  const roleSet = new Set(steps.flatMap((item) => item.roles));
+  const signedRoles = new Set((Array.isArray(data.referralTeleconsultationSignoffs) ? data.referralTeleconsultationSignoffs : [])
+    .filter((item) => item.status === "signed")
+    .map((item) => item.role));
+  const roleTodoBacklog = [...roleSet].filter((role) => !signedRoles.has(role)).length;
+  const localReady = steps.filter((item) => item.localEvidence).length;
+  const avgResponseHours = averageReferralPerformance(teleconsultations, "responseHours");
+  const metrics = [
+    { id: "consortium-loop-completion-rate", label: "Consortium loop completion rate", value: referralMetricPercent(localReady, steps.length), unit: "%", numerator: localReady, denominator: steps.length, source: "closed-loop stage evidence", target: "100%", status: "demo-ready" },
+    { id: "collaboration-efficiency-hours", label: "Collaboration efficiency hours", value: avgResponseHours, unit: "h", source: "referralTeleconsultations.performance.responseHours", target: "<=4h", status: avgResponseHours !== null ? "demo-ready" : "blocked" },
+    { id: "report-return-rate", label: "Report return rate", value: referralMetricPercent(returned.length, teleconsultations.length), unit: "%", numerator: returned.length, denominator: teleconsultations.length, source: "referralTeleconsultations.reportStatus", target: ">=90%", status: returned.length ? "demo-ready" : "blocked" },
+    { id: "mutual-recognition-evidence", label: "Mutual-recognition evidence", value: mutualRecognitionEvidence.length, unit: "rows", source: "countyMutualRecognitionRecords", target: ">=1 light evidence row", status: mutualRecognitionEvidence.length ? "demo-ready" : "blocked" },
+    { id: "grassroots-followup-return", label: "Grassroots follow-up return", value: grassrootsFollowupReturned.length, unit: "rows", source: "down-referral follow-up feedback", target: ">=1 returned follow-up", status: grassrootsFollowupReturned.length ? "demo-ready" : "blocked" },
+    { id: "quality-feedback-closure", label: "Quality feedback closure", value: qualityFeedbackClosed.length, unit: "rows", source: "slaDisposition + countySupervision", target: ">=1 closed quality feedback", status: qualityFeedbackClosed.length ? "demo-ready" : "blocked" },
+    { id: "role-todo-backlog", label: "Role todo backlog", value: roleTodoBacklog, unit: "items", source: "onsite signoff roles", target: "0 before production", status: roleTodoBacklog === 0 ? "site-ready" : "onsite-blocked" }
+  ];
+  const externalBlockers = [
+    "production HIS/EMR referral order callback",
+    "telemedicine scheduling/video platform callback",
+    "LIS/PACS report-return and mutual-recognition callback",
+    "insurance payment and consortium settlement formula callback"
+  ];
+  const onsiteBlockers = [
+    "onsite role signoff archive",
+    "production identity and audit export",
+    "monitoring dashboard and incident response confirmation"
+  ];
+  return {
+    ok: localReady === steps.length && metrics.length >= 7,
+    generatedAt: new Date().toISOString(),
+    endpoint: "/api/referral-teleconsultations/consortium-metrics",
+    source: "referralTeleconsultations + countyMutualRecognitionRecords + personalRecords + signoff evidence",
+    implementationStatus: "local-evidence-ready",
+    productionStatus: "blocked-until-onsite-integration",
+    summary: {
+      total: teleconsultations.length,
+      closedLoopSteps: steps.length,
+      closedLoopLocalReady: localReady,
+      completionRate: referralMetricPercent(localReady, steps.length),
+      collaborationEfficiencyHours: avgResponseHours,
+      reportReturnRate: referralMetricPercent(returned.length, teleconsultations.length),
+      mutualRecognitionEvidenceRows: mutualRecognitionEvidence.length,
+      grassrootsFollowupReturned: grassrootsFollowupReturned.length,
+      qualityFeedbackClosed: qualityFeedbackClosed.length,
+      roleTodoBacklog,
+      externalBlockers: externalBlockers.length,
+      onsiteBlockers: onsiteBlockers.length
+    },
+    steps,
+    metrics,
+    externalBlockers,
+    onsiteBlockers,
+    gEndCollection: {
+      endpoint: "/api/referral-teleconsultations/consortium-metrics",
+      roleScope: ["commission", "county"],
+      suggestedKeys: metrics.map((item) => item.id)
+    }
+  };
 }
 
 function buildDataQualityIssues(data) {
@@ -16692,11 +20947,249 @@ function buildDataQualityScorecard(data) {
 
 function normalizeQualitySafetyStatus(status) {
   const text = String(status || "open").trim().toLowerCase();
-  if (/closed|resolved|approved|review_passed|completed|recognized/.test(text)) return "closed";
+  if (/closed|resolved|approved|accepted|review_passed|completed|recognized|disposed/.test(text)) return "closed";
   if (/feedback|submitted|review/.test(text)) return "reviewing";
-  if (/dispatch|in_progress|pending_disposition|variance_open/.test(text)) return "in_progress";
+  if (/dispatch|in_progress|pending_disposition|acknowledg|variance_open|escalat/.test(text)) return "in_progress";
   if (/reject|returned|overdue/.test(text)) return "returned";
   return "open";
+}
+
+function qualitySafetySlaState(item, now = new Date()) {
+  const normalizedStatus = normalizeQualitySafetyStatus(item.status);
+  const closed = normalizedStatus === "closed";
+  const dueAt = String(item.dueAt || "").trim();
+  const dueTime = dueAt ? new Date(dueAt).getTime() : NaN;
+  const nowTime = now.getTime();
+  const daysRemaining = Number.isFinite(dueTime) ? Math.ceil((dueTime - nowTime) / 86400000) : null;
+  const feedbackComplete = Array.isArray(item.feedback) && item.feedback.length > 0;
+  const reviewComplete = Array.isArray(item.review) && item.review.length > 0;
+  const auditReady = Array.isArray(item.auditTrail) && item.auditTrail.length > 0;
+  let slaStatus = "unscheduled";
+  if (closed) slaStatus = "closed";
+  else if (Number.isFinite(dueTime) && dueTime < nowTime) slaStatus = "overdue";
+  else if (Number.isFinite(dueTime) && daysRemaining <= 7) slaStatus = "due_soon";
+  else if (Number.isFinite(dueTime)) slaStatus = "on_track";
+  return {
+    slaStatus,
+    daysRemaining,
+    feedbackComplete,
+    reviewComplete,
+    evidenceComplete: feedbackComplete && auditReady && (closed ? reviewComplete : true)
+  };
+}
+
+function qualitySafetySeverityPoints(severity) {
+  const text = String(severity || "").trim().toLowerCase();
+  if (/critical|severe|重大|危急/.test(text)) return 6;
+  if (/high|高/.test(text)) return 4;
+  if (/medium|中/.test(text)) return 2;
+  if (/low|低/.test(text)) return 1;
+  return 2;
+}
+
+function buildQualitySafetyInstitutionRisks(issues, rectifications) {
+  const rows = new Map();
+  function ensure(name) {
+    const key = String(name || "Unknown institution").trim() || "Unknown institution";
+    if (!rows.has(key)) {
+      rows.set(key, {
+        institutionName: key,
+        score: 0,
+        issueCount: 0,
+        openIssues: 0,
+        highSeverity: 0,
+        overdue: 0,
+        dueSoon: 0,
+        missingFeedback: 0,
+        escalated: 0,
+        domains: new Set(),
+        drivers: new Set()
+      });
+    }
+    return rows.get(key);
+  }
+  issues.forEach((issue) => {
+    const row = ensure(issue.institutionName || issue.owner || issue.sourceCollection);
+    const severityPoints = qualitySafetySeverityPoints(issue.severity);
+    const normalizedStatus = normalizeQualitySafetyStatus(issue.status);
+    row.issueCount += 1;
+    row.score += severityPoints;
+    row.domains.add(issue.domain || issue.type || "quality");
+    if (severityPoints >= 4) {
+      row.highSeverity += 1;
+      row.drivers.add("high-severity issue");
+    }
+    if (normalizedStatus !== "closed") {
+      row.openIssues += 1;
+      row.score += 2;
+    }
+    if (/critical|medical_quality|safety_event/i.test(`${issue.domain || ""} ${issue.type || ""}`)) {
+      row.score += 2;
+      row.drivers.add("critical value or safety signal");
+    }
+  });
+  rectifications.forEach((order) => {
+    const row = ensure(order.institutionName || order.owner);
+    row.score += 1;
+    if (order.slaStatus === "overdue") {
+      row.overdue += 1;
+      row.score += 6;
+      row.drivers.add("overdue rectification");
+    } else if (order.slaStatus === "due_soon") {
+      row.dueSoon += 1;
+      row.score += 3;
+      row.drivers.add("SLA due soon");
+    }
+    if (!order.feedbackComplete && order.normalizedStatus !== "closed") {
+      row.missingFeedback += 1;
+      row.score += 2;
+      row.drivers.add("feedback missing");
+    }
+    if (/escalat/i.test(String(order.status || ""))) {
+      row.escalated += 1;
+      row.score += 4;
+      row.drivers.add("commission escalation");
+    }
+    if (!order.evidenceComplete && order.normalizedStatus !== "closed") {
+      row.score += 1;
+      row.drivers.add("evidence incomplete");
+    }
+  });
+  return Array.from(rows.values())
+    .map((row) => ({
+      ...row,
+      domains: Array.from(row.domains).slice(0, 5),
+      drivers: Array.from(row.drivers).slice(0, 4),
+      riskLevel: row.score >= 12 ? "high" : row.score >= 6 ? "medium" : "watch",
+      nextAction: row.overdue > 0 ? "Start overdue escalation and require leadership sign-off." : row.score >= 12 ? "Assign focused review and require a department correction plan." : row.dueSoon > 0 ? "Confirm evidence upload before SLA deadline." : "Keep routine QC tracking active."
+    }))
+    .sort((a, b) => b.score - a.score || b.openIssues - a.openIssues || a.institutionName.localeCompare(b.institutionName))
+    .slice(0, 10);
+}
+
+function buildQualitySafetyCriticalAlerts(data, user) {
+  const rows = (Array.isArray(data.criticalValueAlerts) ? data.criticalValueAlerts : []).map((item) => ({
+    ...item,
+    ownerRole: "institution",
+    institutionName: item.targetInstitution || item.sourceInstitution,
+    sourceCollection: "criticalValueAlerts",
+    sourceId: item.id,
+    normalizedStatus: normalizeQualitySafetyStatus(item.status),
+    acknowledgementComplete: Boolean(item.acknowledgedAt),
+    dispositionComplete: Boolean(item.disposedAt)
+  }));
+  return qualitySafetyVisibleRows(rows, user);
+}
+
+function buildQualitySafetyClinicalPathways(data, user) {
+  const rows = (Array.isArray(data.clinicalPathwayCases) ? data.clinicalPathwayCases : []).map((item) => ({
+    ...item,
+    ownerRole: item.ownerRole || "institution",
+    sourceCollection: "clinicalPathwayCases",
+    sourceId: item.id,
+    normalizedStatus: normalizeQualitySafetyStatus(item.status),
+    reviewComplete: normalizeQualitySafetyStatus(item.status) === "closed",
+    evidenceComplete: Boolean(item.eventId && item.dueAt && Array.isArray(item.auditTrail) && item.auditTrail.length > 0)
+  }));
+  return qualitySafetyVisibleRows(rows, user);
+}
+
+function buildQualitySafetyActionPlan({ issues, rectifications, criticalValueAlerts, clinicalPathwayCases, mutualRecognitionQualityReviews, institutionRisks }) {
+  const rows = [];
+  function push(item) {
+    rows.push({
+      id: item.id,
+      priority: item.priority,
+      owner: item.owner || "Site quality office",
+      domain: item.domain || "quality_safety",
+      action: item.action,
+      reason: item.reason,
+      source: item.source,
+      dueAt: item.dueAt || "",
+      evidence: item.evidence || ""
+    });
+  }
+  criticalValueAlerts
+    .filter((item) => item.normalizedStatus !== "closed" || !item.dispositionComplete)
+    .forEach((item) => push({
+      id: `action-${item.id}`,
+      priority: "critical",
+      owner: item.institutionName || item.targetInstitution || item.sourceInstitution,
+      domain: "critical_value",
+      action: "Complete acknowledgement, physician notification, disposition note, and linked event closure.",
+      reason: `${item.item || "critical item"} ${item.value || ""} meets ${item.threshold || "critical"} threshold.`,
+      source: item.id,
+      dueAt: item.reportedAt,
+      evidence: "acknowledgement, disposition, auditTrail"
+    }));
+  rectifications
+    .filter((item) => item.normalizedStatus !== "closed")
+    .filter((item) => ["overdue", "due_soon"].includes(item.slaStatus) || !item.evidenceComplete || !item.feedbackComplete)
+    .forEach((item) => push({
+      id: `action-${item.id}`,
+      priority: item.slaStatus === "overdue" ? "high" : "medium",
+      owner: item.institutionName || item.owner,
+      domain: "rectification",
+      action: item.slaStatus === "overdue" ? "Escalate overdue rectification and require leadership sign-off." : "Confirm feedback and evidence before the SLA deadline.",
+      reason: `${item.slaStatus || "open"}; feedback=${item.feedbackComplete ? "complete" : "missing"}; evidence=${item.evidenceComplete ? "complete" : "pending"}.`,
+      source: item.id,
+      dueAt: item.dueAt,
+      evidence: "feedback, review, auditTrail"
+    }));
+  clinicalPathwayCases
+    .filter((item) => item.normalizedStatus !== "closed")
+    .forEach((item) => push({
+      id: `action-${item.id}`,
+      priority: "medium",
+      owner: item.institutionName || item.owner,
+      domain: "clinical_pathway",
+      action: "Review pathway variance, attach EMR evidence, and close or return the linked quality event.",
+      reason: item.varianceReason || item.currentNode || "Open clinical pathway variance.",
+      source: item.id,
+      dueAt: item.dueAt,
+      evidence: "reviewTrail, EMR variance evidence, qualitySafetyEvents"
+    }));
+  mutualRecognitionQualityReviews
+    .filter((item) => normalizeQualitySafetyStatus(item.status || item.qcStatus) !== "closed")
+    .forEach((item) => push({
+      id: `action-${item.id}`,
+      priority: /manual|open|required/i.test(`${item.qcStatus || ""}${item.status || ""}`) ? "medium" : "watch",
+      owner: item.owner || item.institutionName || "Regional mutual recognition QC",
+      domain: "mutual_recognition_qc",
+      action: "Verify recognition quality-control evidence and document whether the result can be recognized.",
+      reason: item.issueType || item.qcStatus || item.nextAction || "Mutual recognition QC pending.",
+      source: item.id,
+      dueAt: item.dueAt,
+      evidence: "countyMutualRecognitionRecords, diagnosticReports"
+    }));
+  institutionRisks
+    .filter((item) => item.riskLevel === "high")
+    .forEach((item) => push({
+      id: `action-risk-${item.institutionName.replace(/\W+/g, "-").toLowerCase()}`,
+      priority: "high",
+      owner: item.institutionName,
+      domain: "institution_risk",
+      action: item.nextAction,
+      reason: `${item.score} risk points; ${(item.drivers || []).join(", ")}`,
+      source: "institutionRisks",
+      evidence: "issues, rectifications, SLA, escalation"
+    }));
+  if (!rows.length && issues.some((item) => item.normalizedStatus !== "closed")) {
+    push({
+      id: "action-routine-qc",
+      priority: "watch",
+      owner: "Site quality office",
+      domain: "routine_qc",
+      action: "Keep routine quality tracking active and review newly opened issues.",
+      reason: `${issues.filter((item) => item.normalizedStatus !== "closed").length} non-closed issues remain visible.`,
+      source: "qualitySafetyEvents",
+      evidence: "dashboard refresh"
+    });
+  }
+  const priorityRank = { critical: 0, high: 1, medium: 2, watch: 3 };
+  return rows
+    .sort((a, b) => (priorityRank[a.priority] ?? 9) - (priorityRank[b.priority] ?? 9) || String(a.dueAt || "9999").localeCompare(String(b.dueAt || "9999")) || a.id.localeCompare(b.id))
+    .slice(0, 8);
 }
 
 function qualitySafetyVisibleRows(rows, user) {
@@ -16708,6 +21201,817 @@ function qualitySafetyVisibleRows(rows, user) {
     return rows.filter((item) => ["institution", ""].includes(String(item.ownerRole || "")) || /hospital|community|institution/i.test(`${item.institutionName || ""}${item.owner || ""}`));
   }
   return [];
+}
+
+const QUALITY_SAFETY_NATIONAL_GOALS_2025 = [
+  {
+    code: "NIT-2025-I",
+    title: "提高急性脑梗死再灌注治疗率",
+    domain: "critical_value",
+    cadence: "按月分析反馈",
+    strategy: "急救转运、院内流程、再灌注团队和持续监测反馈",
+    evidenceCollections: ["criticalValueAlerts", "diagnosticReports", "hospitalInteroperabilityFunctions"],
+    nextAction: "接入卒中中心绿色通道、发病时间、到院时间和再灌注处置回写。"
+  },
+  {
+    code: "NIT-2025-II",
+    title: "提高肿瘤治疗前临床 TNM 分期评估率",
+    domain: "clinical_pathway",
+    cadence: "按季度分科室反馈",
+    strategy: "多学科协作、评估流程、病历书写和绩效约束",
+    evidenceCollections: ["clinicalPathwayCases", "medicalRecordQualityReviews"],
+    nextAction: "补齐肿瘤单病种字典、TNM 分期字段和治疗前评估证据。"
+  },
+  {
+    code: "NIT-2025-III",
+    title: "提高静脉血栓栓塞症规范预防率",
+    domain: "medical_record_qc",
+    cadence: "持续监测并纳入绩效",
+    strategy: "VTE 管理团队、风险评估、预防提醒和会诊转诊机制",
+    evidenceCollections: ["medicalRecordQualityReviews", "hospitalInteroperabilityFunctions"],
+    nextAction: "对接 VTE 风险评估、出血风险评估和预防措施执行记录。"
+  },
+  {
+    code: "NIT-2025-IV",
+    title: "提高感染性休克集束化治疗完成率",
+    domain: "safety_event",
+    cadence: "按季度分科室反馈",
+    strategy: "重症、急诊、感染、检验和医务多部门联合监测",
+    evidenceCollections: ["qualitySafetyEvents", "criticalValueAlerts", "diagnosticReports"],
+    nextAction: "增加 1 小时、3 小时、6 小时集束化治疗节点采集。"
+  },
+  {
+    code: "NIT-2025-V",
+    title: "提高住院患者静脉输液规范使用率",
+    domain: "medical_quality",
+    cadence: "按季度点评反馈",
+    strategy: "给药途径优化、无需输液病种清单、药物监测和预警",
+    evidenceCollections: ["qualitySafetyEvents", "medicalRecordQualityReviews"],
+    nextAction: "对接住院医嘱、输液频次、液体总量和药品品种监测。"
+  },
+  {
+    code: "NIT-2025-VI",
+    title: "提高医疗质量安全不良事件报告率",
+    domain: "safety_event",
+    cadence: "按季度分析反馈",
+    strategy: "不良事件分级分类、主动报告、国家平台利用和成因分析",
+    evidenceCollections: ["qualitySafetyEvents", "securityEvents"],
+    nextAction: "将隐患、未造成严重后果事件和严重事件统一纳入主动报告台账。"
+  },
+  {
+    code: "NIT-2025-VII",
+    title: "提高四级手术术前多学科讨论完成率",
+    domain: "clinical_pathway",
+    cadence: "按季度监测评价",
+    strategy: "四级手术目录、术前多学科讨论制度、时限和记录追溯",
+    evidenceCollections: ["clinicalPathwayCases", "medicalRecordQualityReviews", "qualitySafetySiteSignoffs"],
+    nextAction: "接入四级手术目录、MDT 邀请、讨论记录和术前时限校验。"
+  },
+  {
+    code: "NIT-2025-VIII",
+    title: "提高关键诊疗行为相关记录完整率",
+    domain: "medical_record_qc",
+    cadence: "按季度分科室反馈",
+    strategy: "运行病历、终末病历、核心制度和病历内涵质量常态化监测",
+    evidenceCollections: ["medicalRecordQualityReviews", "qualityRectificationOrders"],
+    nextAction: "把医嘱、病程、查房、讨论、知情同意和安全核查纳入抽检字段。"
+  },
+  {
+    code: "NIT-2025-IX",
+    title: "降低非计划重返手术室再手术率",
+    domain: "medical_quality",
+    cadence: "按季度分科室反馈",
+    strategy: "手术分级、医师授权、术前讨论、安全核查和术后管理联动",
+    evidenceCollections: ["qualitySafetyEvents", "medicalRecordQualityReviews", "qualityRectificationOrders"],
+    nextAction: "补齐非计划重返手术室事件、原因分析和再手术整改闭环。"
+  },
+  {
+    code: "NIT-2025-X",
+    title: "提高医疗机构检查检验结果互认率",
+    domain: "mutual_recognition_qc",
+    cadence: "按月分析反馈",
+    strategy: "互认目录、质控评价、互认标识、未互认原因和绩效考核",
+    evidenceCollections: ["mutualRecognitionQualityReviews", "countyMutualRecognitionRecords", "diagnosticReports"],
+    nextAction: "按地区互认目录监测互认率、未互认原因和偏离平均水平机构。"
+  }
+];
+
+const QUALITY_SAFETY_NATIONAL_GOAL_SITE_INPUTS = {
+  "NIT-2025-I": ["卒中发病时间", "到院时间", "再灌注方式", "处置完成时间"],
+  "NIT-2025-II": ["肿瘤病种", "治疗前 TNM 分期", "MDT 记录", "治疗启动时间"],
+  "NIT-2025-III": ["VTE 风险评估", "出血风险评估", "预防措施", "执行时间"],
+  "NIT-2025-IV": ["感染性休克识别时间", "1小时集束节点", "3小时集束节点", "6小时集束节点"],
+  "NIT-2025-V": ["住院医嘱", "输液频次", "液体总量", "药品品种"],
+  "NIT-2025-VI": ["事件分级", "事件分类", "主动报告时间", "成因分析"],
+  "NIT-2025-VII": ["四级手术目录", "术前 MDT 邀请", "讨论记录", "术前完成时限"],
+  "NIT-2025-VIII": ["医嘱记录", "病程记录", "查房记录", "知情同意", "安全核查"],
+  "NIT-2025-IX": ["重返手术室事件", "再手术原因", "术后管理记录", "整改闭环"],
+  "NIT-2025-X": ["互认目录", "互认标识", "未互认原因", "机构互认率"]
+};
+
+function buildQualitySafetyNationalGoals(data) {
+  return QUALITY_SAFETY_NATIONAL_GOALS_2025.map((goal) => {
+    const evidenceRows = goal.evidenceCollections.reduce((total, collection) => total + (Array.isArray(data[collection]) ? data[collection].length : 0), 0);
+    return {
+      ...goal,
+      siteInputs: QUALITY_SAFETY_NATIONAL_GOAL_SITE_INPUTS[goal.code] || [],
+      evidenceRows,
+      currentStatus: evidenceRows > 0 ? "tracked" : "pending_site_confirmation"
+    };
+  });
+}
+
+function qualitySafetyNationalGoalCadenceType(cadence) {
+  const value = String(cadence || "");
+  if (value.includes("月")) return "monthly";
+  if (value.includes("季度")) return "quarterly";
+  return "continuous";
+}
+
+function buildQualitySafetyNationalGoalCadencePlan(nationalQualityGoals) {
+  const meta = {
+    monthly: {
+      cadenceType: "monthly",
+      cadenceLabel: "按月复盘",
+      reviewWindow: "每月 5 日前完成上月数据分析和反馈",
+      owner: "医政医管与质控中心联合值守",
+      nextAction: "优先核对危急值、卒中再灌注和检查检验互认月度指标。"
+    },
+    quarterly: {
+      cadenceType: "quarterly",
+      cadenceLabel: "按季度分科室反馈",
+      reviewWindow: "每季度首月 10 日前形成上季度分科室反馈",
+      owner: "医务、病案、护理、药事和手术管理联合复盘",
+      nextAction: "按科室汇总 TNM、VTE、感染性休克、输液、事件报告、四级手术、病历完整性和再手术问题。"
+    },
+    continuous: {
+      cadenceType: "continuous",
+      cadenceLabel: "持续监测",
+      reviewWindow: "每周滚动监测，月度纳入绩效复盘",
+      owner: "质控办与信息化运维联合监测",
+      nextAction: "保持 VTE 风险评估、提醒、会诊转诊和绩效反馈常态化。"
+    }
+  };
+  const groups = new Map();
+  nationalQualityGoals.forEach((goal) => {
+    const cadenceType = qualitySafetyNationalGoalCadenceType(goal.cadence);
+    const group = groups.get(cadenceType) || {
+      ...meta[cadenceType],
+      goals: [],
+      goalCount: 0,
+      evidenceRows: 0,
+      siteInputFields: 0
+    };
+    group.goals.push({ code: goal.code, title: goal.title, cadence: goal.cadence });
+    group.goalCount += 1;
+    group.evidenceRows += Number(goal.evidenceRows || 0);
+    group.siteInputFields += Array.isArray(goal.siteInputs) ? goal.siteInputs.length : 0;
+    groups.set(cadenceType, group);
+  });
+  return ["monthly", "quarterly", "continuous"].map((key) => groups.get(key)).filter(Boolean);
+}
+
+function buildQualitySafetySiteSignoffs(data, user) {
+  const rows = (Array.isArray(data.qualitySafetySiteSignoffs) ? data.qualitySafetySiteSignoffs : []).map((item) => ({
+    ...item,
+    ownerRole: item.ownerRole || "commission",
+    normalizedStatus: normalizeQualitySafetyStatus(item.status),
+    evidenceCount: Array.isArray(item.evidence) ? item.evidence.length : 0,
+    auditCount: Array.isArray(item.auditTrail) ? item.auditTrail.length : 0,
+    evidenceReady: Array.isArray(item.evidence) && item.evidence.length > 0,
+    requiredEvidenceText: Array.isArray(item.requiredEvidence) ? item.requiredEvidence.join(", ") : String(item.requiredEvidence || ""),
+    sourceCollection: "qualitySafetySiteSignoffs",
+    sourceId: item.id
+  }));
+  return qualitySafetyVisibleRows(rows, user);
+}
+
+function buildQualitySafetyGoLiveReadiness({ summary, actionPlan, institutionRisks, rectifications, criticalValueAlerts, clinicalPathwayCases, mutualRecognitionQualityReviews, reusedCollections, role }) {
+  const checks = [
+    {
+      id: "dashboard-scope",
+      passed: summary.issues > 0 && summary.rectifications > 0,
+      evidence: `${summary.issues} issues and ${summary.rectifications} rectifications visible for ${role}`
+    },
+    {
+      id: "dispatch-review-loop",
+      passed: rectifications.some((item) => item.feedbackComplete && item.evidenceComplete),
+      evidence: `${rectifications.filter((item) => item.evidenceComplete).length} rectifications include feedback and audit evidence`
+    },
+    {
+      id: "critical-value-loop",
+      passed: criticalValueAlerts.length > 0 && criticalValueAlerts.every((item) => item.acknowledgementComplete || item.dispositionComplete || item.normalizedStatus !== "closed"),
+      evidence: `${summary.criticalValuesDisposed}/${summary.criticalValues} critical values disposed`
+    },
+    {
+      id: "pathway-qc-loop",
+      passed: clinicalPathwayCases.length > 0 && clinicalPathwayCases.every((item) => item.eventId && item.dueAt),
+      evidence: `${summary.clinicalPathwaysReviewed}/${summary.clinicalPathways} pathway variances reviewed`
+    },
+    {
+      id: "mutual-recognition-qc",
+      passed: mutualRecognitionQualityReviews.length > 0,
+      evidence: `${mutualRecognitionQualityReviews.length} mutual-recognition QC rows`
+    },
+    {
+      id: "risk-action-plan",
+      passed: institutionRisks.length > 0 && actionPlan.length > 0,
+      evidence: `${institutionRisks.length} ranked institutions and ${actionPlan.length} action items`
+    },
+    {
+      id: "reuse-map",
+      passed: reusedCollections.every((item) => item.present),
+      evidence: reusedCollections.map((item) => `${item.collection}:${item.rows}`).join(";")
+    }
+  ];
+  const passed = checks.filter((item) => item.passed).length;
+  const score = Math.round((passed / checks.length) * 100);
+  const blockers = checks.filter((item) => !item.passed).map((item) => item.id);
+  return {
+    stage: blockers.length ? "release_candidate" : "controlled_pilot_ready",
+    usable: blockers.length === 0,
+    score,
+    blockers,
+    checks,
+    productionSignoffPending: [
+      "live HIS/EMR/LIS/PACS feed binding",
+      "production critical-value routing and timeout escalation",
+      "local clinical pathway dictionaries and EMR variance evidence",
+      "regional mutual-recognition lists and negative-list rules",
+      "department rectification sign-off attachments",
+      "production audit retention target"
+    ],
+    nextAction: blockers.length
+      ? `Resolve ${blockers.join(", ")} before pilot go-live.`
+      : "Ready for controlled pilot release; complete site joint-testing sign-offs before production cutover."
+  };
+}
+
+function buildQualitySafetyOperationsRunbook({ summary, rectifications, criticalValueAlerts, clinicalPathwayCases, mutualRecognitionQualityReviews, siteSignoffs, actionPlan, user }) {
+  const pendingCritical = criticalValueAlerts.filter((item) => !item.acknowledgementComplete || !item.dispositionComplete).length;
+  const openPathways = clinicalPathwayCases.filter((item) => item.normalizedStatus !== "closed").length;
+  const openMutualRecognition = mutualRecognitionQualityReviews.filter((item) => normalizeQualitySafetyStatus(item.status || item.qcStatus) !== "closed").length;
+  const pendingSignoffs = siteSignoffs.filter((item) => !["accepted", "closed"].includes(String(item.status || item.normalizedStatus || ""))).length;
+  const auditRetention = siteSignoffs.find((item) => item.id === "qss-audit-retention") || {};
+  const rows = [
+    {
+      id: "critical-value-on-call",
+      domain: "critical_value",
+      ownerRole: "institution",
+      owner: "Medical institution duty desk",
+      watchItem: "Critical-value acknowledgement and disposition",
+      signal: `${pendingCritical}/${criticalValueAlerts.length} pending`,
+      threshold: "acknowledge and dispose before timeout escalation",
+      currentStatus: pendingCritical > 0 ? "attention_required" : "ready",
+      escalation: "notify department lead and commission duty officer",
+      evidence: "criticalValueAlerts, qualitySafetySiteSignoffs"
+    },
+    {
+      id: "rectification-sla-watch",
+      domain: "rectification",
+      ownerRole: "commission",
+      owner: "Quality supervision duty officer",
+      watchItem: "Rectification SLA and overdue escalation",
+      signal: `overdue ${summary.sla?.overdue || 0}, due soon ${summary.sla?.dueSoon || 0}`,
+      threshold: "overdue > 0 or missing feedback before due date",
+      currentStatus: (summary.sla?.overdue || 0) > 0 ? "attention_required" : "ready",
+      escalation: "issue leadership escalation and require signed correction evidence",
+      evidence: "qualityRectificationOrders, securityEvents"
+    },
+    {
+      id: "pathway-variance-watch",
+      domain: "clinical_pathway",
+      ownerRole: "commission",
+      owner: "Clinical pathway office",
+      watchItem: "Clinical pathway variance review",
+      signal: `${openPathways}/${clinicalPathwayCases.length} open`,
+      threshold: "variance case remains open after review window",
+      currentStatus: openPathways > 0 ? "attention_required" : "ready",
+      escalation: "assign pathway review and require EMR variance evidence",
+      evidence: "clinicalPathwayCases, qualitySafetyEvents"
+    },
+    {
+      id: "mutual-recognition-watch",
+      domain: "mutual_recognition_qc",
+      ownerRole: "county",
+      owner: "County consortium office",
+      watchItem: "Mutual-recognition QC exception handling",
+      signal: `${openMutualRecognition}/${mutualRecognitionQualityReviews.length} open`,
+      threshold: "negative-list or exception reason missing",
+      currentStatus: openMutualRecognition > 0 ? "attention_required" : "ready",
+      escalation: "coordinate member institutions and submit consortium evidence",
+      evidence: "mutualRecognitionQualityReviews, countyMutualRecognitionRecords"
+    },
+    {
+      id: "site-signoff-watch",
+      domain: "live_interfaces",
+      ownerRole: "commission",
+      owner: "Site integration lead",
+      watchItem: "HIS/EMR/LIS/PACS joint-test and sign-off",
+      signal: `${pendingSignoffs}/${siteSignoffs.length} pending`,
+      threshold: "any production cutover sign-off missing",
+      currentStatus: pendingSignoffs > 0 ? "attention_required" : "ready",
+      escalation: "freeze cutover, collect signed evidence, rerun joint-test pack",
+      evidence: "qualitySafetySiteSignoffs, hospitalInteroperabilityFunctions"
+    },
+    {
+      id: "audit-retention-watch",
+      domain: "audit_retention",
+      ownerRole: "commission",
+      owner: "Security and audit administrator",
+      watchItem: "Audit retention and SIEM export evidence",
+      signal: auditRetention.status || "pending_site_confirmation",
+      threshold: "production audit target not configured or unsigned",
+      currentStatus: ["accepted", "closed"].includes(String(auditRetention.status || "")) ? "ready" : "attention_required",
+      escalation: "bind audit export target and archive retention sign-off",
+      evidence: "securityEvents, dataAccessLogs, qualitySafetySiteSignoffs"
+    }
+  ];
+  const visibleRows = qualitySafetyVisibleRows(rows, user);
+  const rank = { attention_required: 0, ready: 1 };
+  return visibleRows
+    .sort((a, b) => (rank[a.currentStatus] ?? 9) - (rank[b.currentStatus] ?? 9) || a.id.localeCompare(b.id))
+    .map((item) => ({
+      ...item,
+      actionLink: actionPlan.find((action) => action.domain === item.domain)?.id || ""
+    }));
+}
+
+function buildQualitySafetyWarningIndicators({ summary, operationsRunbook, actionPlan }) {
+  const runbookById = new Map((operationsRunbook || []).map((item) => [item.id, item]));
+  const actionByDomain = new Map((actionPlan || []).map((item) => [item.domain, item]));
+  const indicators = [
+    {
+      id: "warning-critical-value-disposition",
+      domain: "critical_value",
+      name: "危急值处置超时预警",
+      runbookId: "critical-value-on-call",
+      targetSection: "quality-safety-critical",
+      threshold: "未确认或未处置危急值 > 0",
+      sourceCollection: "criticalValueAlerts"
+    },
+    {
+      id: "warning-rectification-sla",
+      domain: "rectification",
+      name: "整改 SLA 逾期预警",
+      runbookId: "rectification-sla-watch",
+      targetSection: "quality-safety-rectifications",
+      threshold: "逾期整改 > 0 或反馈证据缺失",
+      sourceCollection: "qualityRectificationOrders"
+    },
+    {
+      id: "warning-pathway-variance",
+      domain: "clinical_pathway",
+      name: "临床路径偏离复核预警",
+      runbookId: "pathway-variance-watch",
+      targetSection: "quality-safety-boundaries",
+      threshold: "路径偏离病例在复核窗口后仍未关闭",
+      sourceCollection: "clinicalPathwayCases"
+    },
+    {
+      id: "warning-mutual-recognition-qc",
+      domain: "mutual_recognition_qc",
+      name: "检查检验互认质控预警",
+      runbookId: "mutual-recognition-watch",
+      targetSection: "quality-safety-boundaries",
+      threshold: "互认例外未补齐负面清单或复核原因",
+      sourceCollection: "mutualRecognitionQualityReviews"
+    },
+    {
+      id: "warning-live-signoff",
+      domain: "live_interfaces",
+      name: "上线联调签收预警",
+      runbookId: "site-signoff-watch",
+      targetSection: "quality-safety-signoffs",
+      threshold: "生产切换前任一签收项未完成",
+      sourceCollection: "qualitySafetySiteSignoffs"
+    },
+    {
+      id: "warning-audit-retention",
+      domain: "audit_retention",
+      name: "审计留存对接预警",
+      runbookId: "audit-retention-watch",
+      targetSection: "quality-safety-prelaunch-gaps",
+      threshold: "审计导出或 SIEM 留存目标未签收",
+      sourceCollection: "securityEvents"
+    }
+  ];
+  return indicators.map((indicator) => {
+    const runbook = runbookById.get(indicator.runbookId) || {};
+    const action = actionByDomain.get(indicator.domain) || {};
+    const currentStatus = runbook.currentStatus || "attention_required";
+    const signal = runbook.signal || "";
+    return {
+      ...indicator,
+      level: currentStatus === "attention_required" ? "high" : "watch",
+      owner: runbook.owner || action.owner || "质控监管值守员",
+      ownerRole: runbook.ownerRole || action.ownerRole || "commission",
+      signal,
+      currentStatus,
+      nextAction: runbook.escalation || action.action || "定位闭环任务并补齐现场证据",
+      evidence: runbook.evidence || action.evidence || indicator.sourceCollection,
+      relatedActionId: runbook.actionLink || action.id || "",
+      closedLoopReady: Boolean(runbook.threshold && runbook.escalation && (runbook.evidence || action.evidence)),
+      summarySnapshot: {
+        criticalValuesPending: summary.criticalValuesPending || 0,
+        rectificationOverdue: summary.sla?.overdue || 0,
+        clinicalPathwaysOpen: summary.clinicalPathwaysOpen || 0,
+        siteSignoffsPending: summary.siteSignoffsPending || 0
+      }
+    };
+  }).sort((a, b) => {
+    const rank = { attention_required: 0, ready: 1 };
+    return (rank[a.currentStatus] ?? 9) - (rank[b.currentStatus] ?? 9) || a.id.localeCompare(b.id);
+  });
+}
+
+function buildQualitySafetySiteRequirementChecklist({ siteSignoffs, operationsRunbook, coreSystemMatrix, goLiveReadiness, user }) {
+  const signoffById = new Map(siteSignoffs.map((item) => [item.id, item]));
+  const runbookById = new Map(operationsRunbook.map((item) => [item.id, item]));
+  const coreSystemNames = new Set(coreSystemMatrix.map((item) => item.name));
+  const signoffStatus = (id) => {
+    const signoff = signoffById.get(id);
+    if (!signoff) return "pending_site_confirmation";
+    if (["accepted", "closed"].includes(String(signoff.status || signoff.normalizedStatus || ""))) return "accepted";
+    if (String(signoff.status || "") === "ready_for_joint_test") return "ready_for_joint_test";
+    return signoff.status || "pending_site_confirmation";
+  };
+  const runbookStatus = (id) => runbookById.get(id)?.currentStatus || "attention_required";
+  const rows = [
+    {
+      id: "onsite-login-roles",
+      domain: "identity",
+      ownerRole: "commission",
+      owner: "市卫健委监管管理员",
+      requirement: "确认卫健监管、医疗机构、县域医共体三类登录部门和最小权限",
+      onsiteInput: "政务统一身份、机构编码、角色清单、测试账号和停用账号",
+      acceptanceEvidence: "三类账号登录截图、越权拒绝记录和审计日志",
+      currentStatus: goLiveReadiness.usable ? "ready_for_joint_test" : "pending_site_confirmation",
+      source: "authUsers, requireApiRole, securityEvents"
+    },
+    {
+      id: "onsite-live-feeds",
+      domain: "live_interfaces",
+      ownerRole: "commission",
+      owner: "现场接口联调负责人",
+      requirement: "接入 HIS/EMR/LIS/PACS 生产或准生产实时数据源",
+      onsiteInput: "接口地址、机构编码、接口密钥、报文样例、失败重试窗口",
+      acceptanceEvidence: "联调签字单、样例报文校验结果和幂等重放记录",
+      currentStatus: signoffStatus("qss-live-feeds"),
+      source: "qualitySafetySiteSignoffs, hospitalInteroperabilityFunctions"
+    },
+    {
+      id: "onsite-critical-routing",
+      domain: "critical_value",
+      ownerRole: "institution",
+      owner: "医疗机构值班台",
+      requirement: "配置危急值接收人、超时升级链路和闭环处置回写",
+      onsiteInput: "危急值项目清单、值班电话、短信/站内信通道、科室升级表",
+      acceptanceEvidence: "危急值演练记录、确认处置截图和超时升级回执",
+      currentStatus: signoffStatus("qss-critical-routing") === "accepted" ? "accepted" : runbookStatus("critical-value-on-call"),
+      source: "criticalValueAlerts, qualitySafetySiteSignoffs"
+    },
+    {
+      id: "onsite-pathway-dictionaries",
+      domain: "clinical_pathway",
+      ownerRole: "commission",
+      owner: "临床路径办公室",
+      requirement: "确认本地临床路径字典、EMR 节点和偏差复核规则",
+      onsiteInput: "病种路径字典、节点编码、偏差原因、EMR 回写字段",
+      acceptanceEvidence: "路径偏差用例、EMR 证据截图和监管复核记录",
+      currentStatus: signoffStatus("qss-pathway-dictionaries"),
+      source: coreSystemNames.has("会诊制度") ? "clinicalPathwayCases, medicalRecordQualityReviews" : "clinicalPathwayCases"
+    },
+    {
+      id: "onsite-mutual-recognition",
+      domain: "mutual_recognition_qc",
+      ownerRole: "county",
+      owner: "县域医共体办公室",
+      requirement: "确认检验检查互认目录、负面清单和例外复核规则",
+      onsiteInput: "互认项目、机构范围、负面清单、不互认原因和复核责任人",
+      acceptanceEvidence: "互认质控样例、例外复核记录和医共体签收材料",
+      currentStatus: signoffStatus("qss-mutual-recognition-rules") === "accepted" ? "accepted" : runbookStatus("mutual-recognition-watch"),
+      source: "mutualRecognitionQualityReviews, countyMutualRecognitionRecords"
+    },
+    {
+      id: "onsite-rectification-attachments",
+      domain: "rectification",
+      ownerRole: "institution",
+      owner: "机构质控办公室",
+      requirement: "确认整改反馈附件、科室签收和监管复核证据归档规则",
+      onsiteInput: "整改模板、附件类型、科室负责人、复核时限和退回规则",
+      acceptanceEvidence: "整改反馈、科室签字附件、复核通过/退回审计轨迹",
+      currentStatus: signoffStatus("qss-rectification-attachments") === "accepted" ? "accepted" : runbookStatus("rectification-sla-watch"),
+      source: "qualityRectificationOrders, securityEvents"
+    },
+    {
+      id: "onsite-audit-retention",
+      domain: "audit_retention",
+      ownerRole: "commission",
+      owner: "安全审计管理员",
+      requirement: "确认审计日志留存、导出、哈希保全和 SIEM 对接边界",
+      onsiteInput: "AUDIT_EXPORT_PATH 或 SIEM_ENDPOINT、留存周期、审计账号、保全目录",
+      acceptanceEvidence: "审计导出文件、哈希校验记录和安全签收单",
+      currentStatus: signoffStatus("qss-audit-retention") === "accepted" ? "accepted" : runbookStatus("audit-retention-watch"),
+      source: "securityEvents, dataAccessLogs, qualitySafetySiteSignoffs"
+    },
+    {
+      id: "onsite-monitoring-oncall",
+      domain: "operations",
+      ownerRole: "commission",
+      owner: "平台运维值守组",
+      requirement: "绑定健康检查、指标监控、告警规则和值班升级表",
+      onsiteInput: "/api/health、/api/metrics、SLO 阈值、告警接收人、值班表",
+      acceptanceEvidence: "监控截图、告警演练记录、值班签收和升级回执",
+      currentStatus: operationsRunbook.every((item) => item.currentStatus === "ready") ? "accepted" : "attention_required",
+      source: "operationsRunbook, monitoring-readiness-report"
+    },
+    {
+      id: "onsite-training-cutover",
+      domain: "training",
+      ownerRole: "commission",
+      owner: "项目实施和质控联合组",
+      requirement: "完成上线培训、试运行问题清零和回退联系人确认",
+      onsiteInput: "培训签到、操作手册、问题清单、回退联系人和切换窗口",
+      acceptanceEvidence: "培训签到表、试运行问题清零表和上线确认单",
+      currentStatus: "pending_site_confirmation",
+      source: "site-readiness-pack, production-cutover-checklist"
+    }
+  ];
+  return qualitySafetyVisibleRows(rows, user);
+}
+
+function buildQualitySafetyCutoverSequence({ onsiteRequirements }) {
+  const requirementById = new Map(onsiteRequirements.map((item) => [item.id, item]));
+  const phases = [
+    {
+      id: "before-cutover",
+      phase: "上线前准备",
+      window: "T-5 至 T-1 工作日",
+      requirementIds: ["onsite-login-roles", "onsite-live-feeds", "onsite-pathway-dictionaries", "onsite-mutual-recognition"],
+      objective: "完成账号、接口、路径和互认规则确认，避免上线当天补基础资料。",
+      acceptanceGate: "账号可登录、接口样例通过、字典和互认目录完成现场确认。"
+    },
+    {
+      id: "cutover-day",
+      phase: "上线当天切换",
+      window: "T 日",
+      requirementIds: ["onsite-critical-routing", "onsite-rectification-attachments", "onsite-monitoring-oncall"],
+      objective: "完成危急值路由、整改附件、监控告警和现场值守联动。",
+      acceptanceGate: "危急值演练有回执，整改附件可上传复核，监控告警可触达值守人。"
+    },
+    {
+      id: "after-cutover",
+      phase: "上线后稳定",
+      window: "T+1 至 T+7 日",
+      requirementIds: ["onsite-audit-retention", "onsite-training-cutover"],
+      objective: "完成审计保全、培训记录、试运行问题清零和回退联系人确认。",
+      acceptanceGate: "审计导出和哈希保全可验证，培训签到和问题清零表归档。"
+    }
+  ];
+  const rank = { attention_required: 0, pending_site_confirmation: 1, ready_for_joint_test: 2, accepted: 3, closed: 3 };
+  return phases.map((item) => {
+    const requirements = item.requirementIds.map((id) => requirementById.get(id)).filter(Boolean);
+    const owners = [...new Set(requirements.map((requirement) => requirement.owner).filter(Boolean))];
+    const statuses = requirements.map((requirement) => String(requirement.currentStatus || "pending_site_confirmation"));
+    const currentStatus = statuses.length === 0
+      ? "pending_site_confirmation"
+      : statuses.some((status) => status === "attention_required")
+        ? "attention_required"
+        : statuses.every((status) => ["accepted", "closed", "ready_for_joint_test"].includes(status))
+          ? "ready_for_joint_test"
+          : statuses.sort((a, b) => (rank[a] ?? 9) - (rank[b] ?? 9))[0] || "pending_site_confirmation";
+    return {
+      ...item,
+      owners,
+      currentStatus,
+      readyCount: statuses.filter((status) => ["accepted", "closed", "ready_for_joint_test"].includes(status)).length,
+      totalCount: requirements.length,
+      requirements: requirements.map((requirement) => ({
+        id: requirement.id,
+        requirement: requirement.requirement,
+        currentStatus: requirement.currentStatus
+      }))
+    };
+  }).filter((item) => item.totalCount > 0);
+}
+
+function buildQualitySafetyNextDevelopmentPlan({ goLiveReadiness, operationsRunbook, onsiteRequirements, cutoverSequence, nationalGoalCadencePlan }) {
+  const requirementById = new Map((onsiteRequirements || []).map((item) => [item.id, item]));
+  const runbookById = new Map((operationsRunbook || []).map((item) => [item.id, item]));
+  const phaseById = new Map((cutoverSequence || []).map((item) => [item.id, item]));
+  const cadenceLabels = (nationalGoalCadencePlan || []).map((item) => item.cadenceLabel).filter(Boolean).join("、");
+  const plan = [
+    {
+      id: "plan-live-interface-joint-test",
+      phase: "上线前准备",
+      priority: "P0",
+      owner: "医疗机构接口联调组",
+      scope: "HIS、EMR、LIS、PACS 实时或准实时数据接入，完成字段映射、签名校验和幂等重放。",
+      currentGap: "仍需归档现场联合测试记录、样例报文和字段映射确认。",
+      developmentIncrement: "把真实机构样例接入现有接口标准和联调包，形成可重复回归的接口验收批次。",
+      acceptanceEvidence: "签字联调记录、样例入站报文、字段映射确认、失败重放记录。",
+      verificationCommand: "npm.cmd run quality-safety:joint-test; npm.cmd run integration:readiness",
+      status: requirementById.get("onsite-live-feeds")?.currentStatus || "pending_site_confirmation",
+      source: "qualitySafetySiteSignoffs, hospitalInteroperabilityFunctions, integrationContracts",
+      targetSurface: "quality-safety-interface-pack"
+    },
+    {
+      id: "plan-core-closure-drill",
+      phase: "上线当天切换",
+      priority: "P0",
+      owner: "医政医管、质控中心、医疗机构医务科",
+      scope: "危急值、整改工单、临床路径变异、互认异常和核心制度证据的闭环演练。",
+      currentGap: "危急值处置、整改附件、路径字典和互认规则仍需现场演练签收。",
+      developmentIncrement: "把现场演练结果写回现有闭环接口，形成监管复核和退回补正证据。",
+      acceptanceEvidence: "危急值回执、整改签字附件、路径变异复核、互认异常复核、监管审计日志。",
+      verificationCommand: "npm.cmd run quality-safety:report; npm.cmd test",
+      status: phaseById.get("cutover-day")?.currentStatus || "attention_required",
+      source: "criticalValueAlerts, qualityRectificationOrders, clinicalPathwayCases, mutualRecognitionQualityReviews",
+      targetSurface: "quality-safety-actions"
+    },
+    {
+      id: "plan-national-goal-review",
+      phase: "上线后稳定",
+      priority: "P1",
+      owner: "质控中心、病案室、护理部、药事和手术管理部门",
+      scope: "围绕 2025 年国家医疗质量安全改进目标形成按月、按季度和持续监测复盘。",
+      currentGap: `${cadenceLabels || "国家目标复盘"} 已建模，仍需现场确认科室口径、指标阈值和反馈模板。`,
+      developmentIncrement: "把月度/季度复盘口径转为机构科室分层看板和导出模板。",
+      acceptanceEvidence: "月度反馈表、季度分科室复盘记录、科室整改任务、绩效纳入确认。",
+      verificationCommand: "npm.cmd run quality-safety:report",
+      status: (nationalGoalCadencePlan || []).length >= 3 ? "ready_for_joint_test" : "pending_site_confirmation",
+      source: "nationalQualityGoals, nationalGoalCadencePlan, medicalRecordQualityReviews",
+      targetSurface: "quality-safety-national-goal-cadence"
+    },
+    {
+      id: "plan-production-audit-operations",
+      phase: "上线后稳定",
+      priority: "P0",
+      owner: "安全管理岗、平台运维和值班负责人",
+      scope: "生产审计留存、监控告警、值守升级、问题清零和回退联系人确认。",
+      currentGap: "生产审计留存目标和监控签收仍是正式切换前的现场配置项。",
+      developmentIncrement: "把审计留存、监控告警和上线培训签收纳入统一发布证据链。",
+      acceptanceEvidence: "AUDIT_EXPORT_PATH 或 SIEM_ENDPOINT、监控截图、告警演练记录、培训签到和上线确认单。",
+      verificationCommand: "npm.cmd run release:report; npm.cmd run deploy:check",
+      status: runbookById.get("audit-retention-watch")?.currentStatus || "attention_required",
+      source: "securityEvents, dataAccessLogs, monitoring-readiness-report, production-cutover-checklist",
+      targetSurface: "quality-safety-operations-runbook"
+    }
+  ];
+  return plan.map((item) => ({
+    ...item,
+    goLiveStage: goLiveReadiness?.stage || "unknown",
+    readyForPilot: Boolean(goLiveReadiness?.usable),
+    requiresAttention: !["accepted", "ready_for_joint_test", "closed", "ready"].includes(String(item.status || ""))
+  }));
+}
+
+function buildQualitySafetyDepartmentTaskView({ user, summary, actionPlan, issues, rectifications, criticalValueAlerts, siteSignoffs, mutualRecognitionQualityReviews, cutoverSequence = [] }) {
+  const profileByRole = {
+    commission: {
+      name: "卫健监管部门",
+      scope: "全域/辖区医疗质量、安全事件、整改闭环和现场签收监管",
+      focus: "优先处理高风险机构、逾期整改、危急行动事项和现场签收阻断项",
+      actions: ["派发问题", "复核整改", "升级逾期", "复核路径", "联调签收"],
+      permissions: ["dispatch_issue", "review_rectification", "escalate_overdue", "review_pathway", "review_site_signoff"]
+    },
+    institution: {
+      name: "医疗机构",
+      scope: "本机构医疗质量事件、危急值、整改反馈和现场证据",
+      focus: "优先完成危急值确认处置、整改反馈、病历补证和生产证据补交",
+      actions: ["提交整改反馈", "确认危急值", "处置危急值", "提交现场证据"],
+      permissions: ["submit_feedback", "acknowledge_critical_value", "dispose_critical_value", "submit_site_evidence"]
+    },
+    county: {
+      name: "县域医共体",
+      scope: "医共体成员机构、互认质控、区域协同事项和现场签收材料",
+      focus: "优先补齐互认清单、负面清单、例外复核证据和医共体签收材料",
+      actions: ["查看互认质控", "提交医共体证据", "补充签收材料", "协同成员机构"],
+      permissions: ["view_mutual_recognition_qc", "submit_consortium_evidence", "coordinate_member_institutions"]
+    }
+  };
+  const role = user.role || "commission";
+  const profile = profileByRole[role] || profileByRole.commission;
+  const openIssueCount = issues.filter((item) => normalizeQualitySafetyStatus(item.status || item.normalizedStatus) !== "closed").length;
+  const openSignoffs = siteSignoffs.filter((item) => !["accepted", "closed", "ready_for_joint_test"].includes(String(item.status || item.normalizedStatus || "")));
+  const roleSignoffs = openSignoffs.filter((item) => !item.ownerRole || item.ownerRole === role);
+  const metricRows = role === "institution" ? [
+    { label: "待处置危急值", value: criticalValueAlerts.filter((item) => !item.acknowledgementComplete || !item.dispositionComplete).length },
+    { label: "待反馈整改", value: rectifications.filter((item) => !item.feedbackComplete && item.normalizedStatus !== "closed").length },
+    { label: "本机构签收", value: roleSignoffs.length },
+    { label: "可见问题", value: openIssueCount }
+  ] : role === "county" ? [
+    { label: "互认待复核", value: mutualRecognitionQualityReviews.filter((item) => normalizeQualitySafetyStatus(item.status || item.qcStatus) !== "closed").length },
+    { label: "医共体签收", value: roleSignoffs.length },
+    { label: "区域整改", value: rectifications.filter((item) => item.normalizedStatus !== "closed").length },
+    { label: "可见问题", value: openIssueCount }
+  ] : [
+    { label: "逾期整改", value: summary.sla?.overdue || 0 },
+    { label: "高危行动", value: summary.criticalActionItems || 0 },
+    { label: "待复核整改", value: rectifications.filter((item) => item.normalizedStatus === "reviewing").length },
+    { label: "待签收项", value: openSignoffs.length }
+  ];
+  const queue = [
+    ...actionPlan.map((item) => ({
+      id: item.id,
+      kind: "action_plan",
+      priority: item.priority,
+      title: item.action,
+      owner: item.owner,
+      dueAt: item.dueAt || "",
+      source: item.source || item.id,
+      context: item.reason || item.evidence || "",
+      targetSection: "quality-safety-actions",
+      actionLabel: "查看行动计划"
+    })),
+    ...roleSignoffs.map((item) => ({
+      id: item.id,
+      kind: "site_signoff",
+      priority: item.status === "pending_site_confirmation" ? "high" : "medium",
+      title: item.item,
+      owner: item.owner,
+      dueAt: item.dueAt || "",
+      source: item.sourceCollection || "qualitySafetySiteSignoffs",
+      context: item.requiredEvidenceText || item.latestNote || "",
+      targetSection: "quality-safety-signoffs",
+      actionLabel: role === "commission" ? "记录联调" : "提交证据"
+    })),
+    ...cutoverSequence
+      .filter((item) => item.currentStatus === "attention_required")
+      .map((item) => ({
+        id: item.id,
+        kind: "cutover_sequence",
+        priority: item.id === "cutover-day" ? "critical" : "high",
+        title: `${item.phase}：${item.objective}`,
+        owner: (item.owners || []).join("、") || "现场上线联合组",
+        dueAt: item.window || "",
+        source: "cutoverSequence",
+        context: item.acceptanceGate || "",
+        targetSection: "quality-safety-cutover-sequence",
+        actionLabel: "查看执行顺序"
+    }))
+  ];
+  const priorityRank = { critical: 0, high: 1, medium: 2, watch: 3 };
+  return {
+    role,
+    roleName: user.roleName || profile.name,
+    orgCode: user.orgCode || "",
+    orgName: user.orgName || "",
+    dataScope: user.dataScope || profile.scope,
+    profile,
+    metrics: metricRows,
+    queue: queue
+      .sort((a, b) => (priorityRank[a.priority] ?? 9) - (priorityRank[b.priority] ?? 9) || String(a.dueAt || "9999").localeCompare(String(b.dueAt || "9999")) || a.id.localeCompare(b.id))
+      .slice(0, 8)
+  };
+}
+
+function buildQualitySafetyCoreSystemMatrix(data) {
+  const rows = [
+    ["first-visit-responsibility", "首诊负责制度", "明确诊疗责任主体、连续服务和诊疗记录可追溯", ["qualitySafetyEvents", "medicalRecordQualityReviews"], "首诊责任和转诊告知记录抽查"],
+    ["three-level-rounds", "三级查房制度", "明确各级医师决策权限、查房周期和术前术后查房要求", ["medicalRecordQualityReviews"], "病历质控抽样和查房记录缺陷反馈"],
+    ["consultation", "会诊制度", "统一会诊单、急会诊时限、会诊意见处置和病程记录", ["clinicalPathwayCases", "hospitalInteroperabilityFunctions"], "会诊记录和路径偏离证据联动"],
+    ["graded-nursing", "分级护理制度", "护理级别动态调整、明确标识和护理记录质控", ["medicalRecordQualityReviews"], "护理记录缺陷纳入病历质控反馈"],
+    ["duty-handover", "值班和交接班制度", "值班职责、通讯畅通、急危重床旁交班和专册签字", ["criticalValueAlerts", "qualitySafetySiteSignoffs"], "危急值路由、超时升级和现场签收"],
+    ["difficult-case-discussion", "疑难病例讨论制度", "疑难病例范围、科室组织、专册记录和病历写入", ["clinicalPathwayCases", "medicalRecordQualityReviews"], "路径偏离与疑难讨论证据抽查"],
+    ["critical-rescue", "急危重患者抢救制度", "绿色通道、抢救资源、6小时内抢救记录和签字审核", ["criticalValueAlerts", "qualitySafetyEvents"], "危急值处置和关联事件关闭"],
+    ["preoperative-discussion", "术前讨论制度", "手术指征、风险预案、多学科讨论和病历记录", ["clinicalPathwayCases", "medicalRecordQualityReviews"], "术前讨论证据纳入病历质控"],
+    ["death-case-discussion", "死亡病例讨论制度", "死亡病例1周内讨论、专册记录和持续改进", ["medicalRecordQualityReviews", "qualitySafetyEvents"], "死亡病例专项抽查待接入"],
+    ["checking-system", "查对制度", "患者身份、诊疗行为、设备药品和标本查对", ["diagnosticReports", "criticalValueAlerts"], "检查检验报告、危急值复核和双人核对"],
+    ["surgical-safety-check", "手术安全核查制度", "麻醉前、手术前、离室前多方核查并纳入病历", ["medicalRecordQualityReviews"], "手术安全核查表抽样质控"],
+    ["surgery-grade-management", "手术分级管理制度", "手术分级目录、医师授权档案和动态评估", ["hospitalInteroperabilityFunctions", "medicalRecordQualityReviews"], "手术权限和病案证据现场签收"],
+    ["new-technology-access", "新技术和新项目准入制度", "技术清单、审批流程、伦理审核、风险预案和动态评估", ["qualitySafetyEvents", "institutionCreditEvaluations"], "新技术准入风险和机构信用整改联动"],
+    ["critical-value-reporting", "危急值报告制度", "危急值清单、复核报告、接收确认和全流程登记追溯", ["criticalValueAlerts", "diagnosticReports"], "危急值提醒、确认、处置和审计轨迹"],
+    ["medical-record-management", "病历管理制度", "病历书写、质控、保存、修改和安全等级保护", ["medicalRecordQualityReviews", "qualityRectificationOrders"], "病历质控评分、整改反馈和复核证据"],
+    ["antimicrobial-grade-management", "抗菌药物分级管理制度", "药物分级目录、处方权限、会诊专家库和用药评价", ["qualitySafetyEvents", "dataQualityIssues"], "药事系统接口和处方权限待现场接入"],
+    ["clinical-blood-audit", "临床用血审核制度", "用血申请、配血、输血观察、不良反应和全程记录", ["qualitySafetyEvents", "medicalRecordQualityReviews"], "输血系统接口和合理用血评估待现场接入"],
+    ["information-security", "信息安全管理制度", "诊疗信息全流程安全、授权、风险评估、自查和事故追溯", ["securityEvents", "dataAccessLogs"], "安全事件、访问审计和追溯机制"]
+  ];
+  const siteSignoffs = Array.isArray(data.qualitySafetySiteSignoffs) ? data.qualitySafetySiteSignoffs : [];
+  const submittedEvidence = Array.isArray(data.qualitySafetyCoreSystemEvidence) ? data.qualitySafetyCoreSystemEvidence : [];
+  return rows.map(([id, name, requirement, evidenceCollections, platformControl]) => {
+    const submissions = submittedEvidence.filter((item) => item.coreSystemId === id);
+    const sourceEvidenceRows = evidenceCollections.reduce((total, collection) => total + (Array.isArray(data[collection]) ? data[collection].length : 0), 0);
+    const evidenceRows = sourceEvidenceRows + submissions.length;
+    const signoffMatched = siteSignoffs.some((item) => {
+      const sources = Array.isArray(item.sourceCollections) ? item.sourceCollections : [];
+      return evidenceCollections.some((collection) => sources.includes(collection)) || String(item.item || "").includes(name.slice(0, 2));
+    });
+    return {
+      id,
+      name,
+      requirement,
+      platformControl,
+      evidenceCollections,
+      evidenceRows,
+      submittedEvidenceCount: submissions.length,
+      latestSubmission: submissions[0] || null,
+      sourcePolicy: "国卫医发〔2018〕8号《医疗质量安全核心制度要点》",
+      status: signoffMatched ? "已纳入现场联调" : submissions.length > 0 ? "已提交制度证据" : sourceEvidenceRows > 0 ? "已纳入监管看板" : "需扩展接口",
+      nextAction: submissions.length > 0 ? "等待监管复核并补充现场抽查材料" : signoffMatched ? "完成现场签收并固化生产证据" : sourceEvidenceRows > 0 ? "补充现场模板和抽查规则" : "对接业务系统并建立质控样例"
+    };
+  });
 }
 
 function buildQualitySafetyIssues(data) {
@@ -16768,7 +22072,28 @@ function buildQualitySafetyIssues(data) {
 function buildQualitySafetyDashboard(data, user) {
   const issues = qualitySafetyVisibleRows(buildQualitySafetyIssues(data), user);
   const rectifications = qualitySafetyVisibleRows(Array.isArray(data.qualityRectificationOrders) ? data.qualityRectificationOrders : [], user)
-    .map((item) => ({ ...item, normalizedStatus: normalizeQualitySafetyStatus(item.status) }));
+    .map((item) => ({ ...item, normalizedStatus: normalizeQualitySafetyStatus(item.status), ...qualitySafetySlaState(item) }));
+  const criticalValueAlerts = buildQualitySafetyCriticalAlerts(data, user);
+  const clinicalPathwayCases = buildQualitySafetyClinicalPathways(data, user);
+  const siteSignoffs = buildQualitySafetySiteSignoffs(data, user);
+  const institutionRisks = buildQualitySafetyInstitutionRisks(issues, rectifications);
+  const mutualRecognitionQualityReviews = qualitySafetyVisibleRows((Array.isArray(data.mutualRecognitionQualityReviews) ? data.mutualRecognitionQualityReviews : []).map((item) => ({
+    ...item,
+    ownerRole: item.ownerRole || "county",
+    sourceCollection: "mutualRecognitionQualityReviews",
+    sourceId: item.id,
+    normalizedStatus: normalizeQualitySafetyStatus(item.status || item.qcStatus)
+  })), user);
+  const nationalQualityGoals = buildQualitySafetyNationalGoals(data);
+  const nationalGoalCadencePlan = buildQualitySafetyNationalGoalCadencePlan(nationalQualityGoals);
+  const actionPlan = buildQualitySafetyActionPlan({ issues, rectifications, criticalValueAlerts, clinicalPathwayCases, mutualRecognitionQualityReviews, institutionRisks });
+  const slaSummary = {
+    overdue: rectifications.filter((item) => item.slaStatus === "overdue").length,
+    dueSoon: rectifications.filter((item) => item.slaStatus === "due_soon").length,
+    onTrack: rectifications.filter((item) => item.slaStatus === "on_track").length,
+    missingFeedback: rectifications.filter((item) => !item.feedbackComplete && item.normalizedStatus !== "closed").length,
+    evidenceComplete: rectifications.filter((item) => item.evidenceComplete).length
+  };
   const summary = {
     issues: issues.length,
     open: issues.filter((item) => item.normalizedStatus === "open").length,
@@ -16776,11 +22101,30 @@ function buildQualitySafetyDashboard(data, user) {
     reviewing: issues.filter((item) => item.normalizedStatus === "reviewing").length,
     closed: issues.filter((item) => item.normalizedStatus === "closed").length,
     rectifications: rectifications.length,
-    criticalValues: Array.isArray(data.criticalValueAlerts) ? data.criticalValueAlerts.length : 0,
-    clinicalPathways: Array.isArray(data.clinicalPathwayCases) ? data.clinicalPathwayCases.length : 0,
+    sla: slaSummary,
+    criticalValues: criticalValueAlerts.length,
+    criticalValuesPending: criticalValueAlerts.filter((item) => item.normalizedStatus !== "closed").length,
+    criticalValuesDisposed: criticalValueAlerts.filter((item) => item.dispositionComplete).length,
+    clinicalPathways: clinicalPathwayCases.length,
+    clinicalPathwaysOpen: clinicalPathwayCases.filter((item) => item.normalizedStatus !== "closed").length,
+    clinicalPathwaysReviewed: clinicalPathwayCases.filter((item) => item.reviewComplete).length,
     medicalRecordReviews: Array.isArray(data.medicalRecordQualityReviews) ? data.medicalRecordQualityReviews.length : 0,
-    mutualRecognitionReviews: Array.isArray(data.mutualRecognitionQualityReviews) ? data.mutualRecognitionQualityReviews.length : 0
+    mutualRecognitionReviews: mutualRecognitionQualityReviews.length,
+    actionItems: actionPlan.length,
+    criticalActionItems: actionPlan.filter((item) => item.priority === "critical").length,
+    highActionItems: actionPlan.filter((item) => item.priority === "high").length
   };
+  summary.siteSignoffs = siteSignoffs.length;
+  summary.siteSignoffsAccepted = siteSignoffs.filter((item) => item.normalizedStatus === "closed").length;
+  summary.siteSignoffsReady = siteSignoffs.filter((item) => item.status === "ready_for_joint_test").length;
+  summary.siteSignoffsPending = siteSignoffs.filter((item) => !["accepted", "closed"].includes(String(item.status || ""))).length;
+  summary.nationalQualityGoals = nationalQualityGoals.length;
+  summary.nationalQualityGoalsTracked = nationalQualityGoals.filter((item) => item.currentStatus === "tracked").length;
+  summary.nationalGoalsWithSiteInputs = nationalQualityGoals.filter((item) => Array.isArray(item.siteInputs) && item.siteInputs.length > 0).length;
+  summary.nationalGoalSiteInputFields = nationalQualityGoals.reduce((total, item) => total + (Array.isArray(item.siteInputs) ? item.siteInputs.length : 0), 0);
+  summary.nationalGoalCadencePlans = nationalGoalCadencePlan.length;
+  summary.nationalGoalMonthlyPlans = nationalGoalCadencePlan.filter((item) => item.cadenceType === "monthly").length;
+  summary.nationalGoalQuarterlyPlans = nationalGoalCadencePlan.filter((item) => item.cadenceType === "quarterly").length;
   const reusableCollections = [
     "diagnosticReports",
     "countyMutualRecognitionRecords",
@@ -16791,6 +22135,7 @@ function buildQualitySafetyDashboard(data, user) {
   ].map((collection) => ({
     collection,
     rows: Array.isArray(data[collection]) ? data[collection].length : 0,
+    present: Array.isArray(data[collection]),
     reusedFor: {
       diagnosticReports: "critical value and report quality signals",
       countyMutualRecognitionRecords: "mutual recognition QC",
@@ -16800,18 +22145,96 @@ function buildQualitySafetyDashboard(data, user) {
       hospitalInteroperabilityFunctions: "HIS/EMR/LIS/PACS management boundary"
     }[collection]
   }));
+  const goLiveReadiness = buildQualitySafetyGoLiveReadiness({
+    summary,
+    actionPlan,
+    institutionRisks,
+    rectifications,
+    criticalValueAlerts,
+    clinicalPathwayCases,
+    mutualRecognitionQualityReviews,
+    reusedCollections: reusableCollections,
+    role: user.role
+  });
+  summary.readinessScore = goLiveReadiness.score;
+  summary.readinessStage = goLiveReadiness.stage;
+  const coreSystemMatrix = buildQualitySafetyCoreSystemMatrix(data);
+  summary.coreSystems = coreSystemMatrix.length;
+  summary.coreSystemsLinked = coreSystemMatrix.filter((item) => item.evidenceRows > 0).length;
+  summary.coreSystemsInJointTest = coreSystemMatrix.filter((item) => item.status === "已纳入现场联调").length;
+  const operationsRunbook = buildQualitySafetyOperationsRunbook({
+    summary,
+    rectifications,
+    criticalValueAlerts,
+    clinicalPathwayCases,
+    mutualRecognitionQualityReviews,
+    siteSignoffs,
+    actionPlan,
+    user
+  });
+  summary.operationsWatchItems = operationsRunbook.length;
+  summary.operationsAttentionRequired = operationsRunbook.filter((item) => item.currentStatus === "attention_required").length;
+  const warningIndicators = buildQualitySafetyWarningIndicators({ summary, operationsRunbook, actionPlan });
+  summary.warningIndicators = warningIndicators.length;
+  summary.warningIndicatorsAttention = warningIndicators.filter((item) => item.currentStatus === "attention_required").length;
+  summary.warningIndicatorsClosedLoop = warningIndicators.filter((item) => item.closedLoopReady).length;
+  const onsiteRequirements = buildQualitySafetySiteRequirementChecklist({
+    siteSignoffs,
+    operationsRunbook,
+    coreSystemMatrix,
+    goLiveReadiness,
+    user
+  });
+  summary.onsiteRequirementItems = onsiteRequirements.length;
+  summary.onsiteRequirementReady = onsiteRequirements.filter((item) => ["accepted", "ready_for_joint_test"].includes(String(item.currentStatus || ""))).length;
+  const cutoverSequence = buildQualitySafetyCutoverSequence({ onsiteRequirements });
+  summary.cutoverSequenceSteps = cutoverSequence.length;
+  summary.cutoverSequenceAttention = cutoverSequence.filter((item) => item.currentStatus === "attention_required").length;
+  const nextDevelopmentPlan = buildQualitySafetyNextDevelopmentPlan({
+    goLiveReadiness,
+    operationsRunbook,
+    onsiteRequirements,
+    cutoverSequence,
+    nationalGoalCadencePlan
+  });
+  summary.nextDevelopmentItems = nextDevelopmentPlan.length;
+  summary.nextDevelopmentAttention = nextDevelopmentPlan.filter((item) => item.requiresAttention).length;
+  const departmentTaskView = buildQualitySafetyDepartmentTaskView({
+    user,
+    summary,
+    actionPlan,
+    issues,
+    rectifications,
+    criticalValueAlerts,
+    siteSignoffs,
+    mutualRecognitionQualityReviews,
+    cutoverSequence
+  });
   return {
     ok: true,
     generatedAt: new Date().toISOString(),
     role: user.role,
     summary,
+    departmentTaskView,
+    coreSystemMatrix,
+    actionPlan,
+    institutionRisks,
     issues,
     rectifications,
-    criticalValueAlerts: Array.isArray(data.criticalValueAlerts) ? data.criticalValueAlerts : [],
-    clinicalPathwayCases: Array.isArray(data.clinicalPathwayCases) ? data.clinicalPathwayCases : [],
+    criticalValueAlerts,
+    clinicalPathwayCases,
+    nationalQualityGoals,
+    nationalGoalCadencePlan,
+    siteSignoffs,
+    operationsRunbook,
+    warningIndicators,
+    onsiteRequirements,
+    cutoverSequence,
+    nextDevelopmentPlan,
     medicalRecordQualityReviews: Array.isArray(data.medicalRecordQualityReviews) ? data.medicalRecordQualityReviews : [],
-    mutualRecognitionQualityReviews: Array.isArray(data.mutualRecognitionQualityReviews) ? data.mutualRecognitionQualityReviews : [],
-    reusedCollections: reusableCollections
+    mutualRecognitionQualityReviews,
+    reusedCollections: reusableCollections,
+    goLiveReadiness
   };
 }
 
@@ -16834,7 +22257,7 @@ function appendQualitySafetyAudit(data, user, action, target, detail) {
 function buildComplianceReport(data) {
   const audit = {
     securityEvents: verifyAuditTrail(data.securityEvents),
-    dataAccessLogs: verifyAuditTrail(data.dataAccessLogs)
+    dataAccessLogs: verifyAuditTrail(resealAuditTrail(data.dataAccessLogs))
   };
   const ledger = data.securityAcceptanceLedger || [];
   return {
@@ -16938,8 +22361,95 @@ function drugConsumableStatus(value) {
   return text || "tracking";
 }
 
+function buildDrugTraceabilityEvidenceChecklist(rows, policySources, requirements = seedDrugTraceabilityEvidenceRequirements()) {
+  const sourceIds = new Set((policySources || []).map((item) => item.id));
+  return requirements.map((requirement) => {
+    const linkedRows = rows.filter((row) =>
+      (requirement.boundaries || []).includes(row.boundary) ||
+      ((requirement.boundaries || []).includes("insurance-settlement") && row.relatedClaimId) ||
+      (requirement.id === "trace-remediation-audit" && row.remediationStatus)
+    );
+    const policySourceIds = (requirement.policySourceIds || []).filter((id) => sourceIds.has(id));
+    return {
+      ...requirement,
+      policySourceIds,
+      rowIds: linkedRows.map((row) => row.id),
+      rowCount: linkedRows.length,
+      ready: policySourceIds.length === (requirement.policySourceIds || []).length && linkedRows.length > 0
+    };
+  });
+}
+
+function buildDrugTraceabilityEvidenceSubmission(data, item, payload, user) {
+  const requirements = Array.isArray(data.drugTraceabilityEvidenceRequirements) ? data.drugTraceabilityEvidenceRequirements : seedDrugTraceabilityEvidenceRequirements();
+  const policySources = Array.isArray(data.drugTraceabilityPolicySources) ? data.drugTraceabilityPolicySources : seedDrugTraceabilityPolicySources();
+  const requirement = requirements.find((row) => row.id === payload.requirementId) ||
+    requirements.find((row) => (row.boundaries || []).includes(item.boundary)) ||
+    requirements[0];
+  const fields = payload.fields && typeof payload.fields === "object" ? payload.fields : {};
+  const expectedFields = Array.isArray(requirement?.evidenceFields) ? requirement.evidenceFields : [];
+  const completedFields = expectedFields.filter((field) => fields[field] !== undefined && fields[field] !== null && String(fields[field]).trim() !== "");
+  const missingFields = expectedFields.filter((field) => !completedFields.includes(field));
+  const policySourceIds = (requirement?.policySourceIds || []).filter((id) => policySources.some((source) => source.id === id));
+  const completeness = missingFields.length === 0 && expectedFields.length > 0 ? "complete" : "partial";
+  return {
+    id: `dte-${randomUUID()}`,
+    requirementId: requirement?.id || String(payload.requirementId || "traceability-evidence"),
+    title: requirement?.title || "Traceability evidence",
+    submittedAt: new Date().toISOString(),
+    submittedBy: user.username || user.role,
+    submittedByName: user.name,
+    submittedByRole: user.role,
+    evidenceSource: String(payload.evidenceSource || payload.source || "manual-entry"),
+    fields,
+    expectedFields,
+    completedFields,
+    missingFields,
+    policySourceIds,
+    completeness,
+    note: String(payload.note || payload.nextAction || "").trim()
+  };
+}
+
+function drugTraceabilityRequirementApplies(requirement, row) {
+  const boundaries = requirement.boundaries || [];
+  return boundaries.includes(row.boundary) ||
+    (boundaries.includes("insurance-settlement") && row.relatedClaimId) ||
+    (requirement.id === "trace-remediation-audit" && row.remediationStatus);
+}
+
+function buildDrugTraceabilityEvidenceCoverage(row, requirements = seedDrugTraceabilityEvidenceRequirements()) {
+  const applicable = requirements.filter((requirement) => drugTraceabilityRequirementApplies(requirement, row));
+  const submissions = Array.isArray(row.traceabilityEvidenceSubmissions) ? row.traceabilityEvidenceSubmissions : [];
+  const requirementStatus = applicable.map((requirement) => {
+    const submission = submissions.find((item) => item.requirementId === requirement.id);
+    const status = submission?.completeness === "complete" ? "complete" : submission ? "partial" : "missing";
+    return {
+      requirementId: requirement.id,
+      title: requirement.title,
+      status,
+      missingFields: submission?.missingFields || requirement.evidenceFields || [],
+      submittedAt: submission?.submittedAt || "",
+      evidenceSource: submission?.evidenceSource || ""
+    };
+  });
+  const complete = requirementStatus.filter((item) => item.status === "complete").length;
+  const partial = requirementStatus.filter((item) => item.status === "partial").length;
+  const missing = requirementStatus.filter((item) => item.status === "missing").length;
+  return {
+    required: applicable.length,
+    complete,
+    partial,
+    missing,
+    status: missing === 0 && partial === 0 && applicable.length > 0 ? "complete" : complete || partial ? "partial" : "pending",
+    requirementStatus
+  };
+}
+
 function buildDrugConsumableSupervision(data) {
   const supervisions = Array.isArray(data.drugConsumableSupervisions) ? data.drugConsumableSupervisions : seedDrugConsumableSupervisions();
+  const traceabilityPolicySources = Array.isArray(data.drugTraceabilityPolicySources) ? data.drugTraceabilityPolicySources : seedDrugTraceabilityPolicySources();
+  const traceabilityEvidenceRequirements = Array.isArray(data.drugTraceabilityEvidenceRequirements) ? data.drugTraceabilityEvidenceRequirements : seedDrugTraceabilityEvidenceRequirements();
   const pickups = Array.isArray(data.medicationPickups) ? data.medicationPickups : [];
   const claims = Array.isArray(data.insuranceClaims) ? data.insuranceClaims : [];
   const institutionSupervisions = Array.isArray(data.institutionSupervisions) ? data.institutionSupervisions : [];
@@ -16954,10 +22464,14 @@ function buildDrugConsumableSupervision(data) {
       pickup,
       claim,
       institutionIssue,
+      traceabilityEvidenceCoverage: buildDrugTraceabilityEvidenceCoverage(item, traceabilityEvidenceRequirements),
       auditCount: Array.isArray(item.auditTrail) ? item.auditTrail.length : 0
     };
   });
   const openRows = rows.filter((item) => item.normalizedStatus !== "closed");
+  const completeCoverageRows = rows.filter((item) => item.traceabilityEvidenceCoverage?.status === "complete");
+  const supplyAlerts = rows.filter((item) => item.boundary === "supply-alert" || item.category === "supply-assurance");
+  const traceabilityEvidenceChecklist = buildDrugTraceabilityEvidenceChecklist(rows, traceabilityPolicySources, traceabilityEvidenceRequirements);
   const insuranceContract = contracts.find((item) => item.id === "insurance-settlement-v1");
   return {
     generatedAt: new Date().toISOString(),
@@ -16965,6 +22479,7 @@ function buildDrugConsumableSupervision(data) {
       { id: "rational-medication", name: "Rational medication", source: "medicationPickups + personalRecords", count: rows.filter((item) => item.boundary === "rational-medication").length },
       { id: "prescription-review", name: "Prescription and pharmacist review", source: "drugConsumableSupervisions.reviewStatus", count: rows.filter((item) => /review|rational/.test(item.boundary)).length },
       { id: "fixed-pharmacy", name: "Fixed pickup", source: "medicationPickups", count: pickups.length },
+      { id: "supply-alert", name: "Supply assurance alerts", source: "medicationPickups + drugConsumableSupervisions", count: supplyAlerts.length },
       { id: "consumable-clue", name: "High-value consumable clues", source: "institutionSupervisions + drugConsumableSupervisions", count: rows.filter((item) => item.boundary === "consumable-clue").length },
       { id: "insurance-settlement", name: "Insurance settlement coordination", source: "insuranceClaims + integrationContracts", count: claims.length },
       { id: "remediation-loop", name: "Remediation loop", source: "workflow-actions + securityEvents", count: rows.filter((item) => item.remediationStatus && item.remediationStatus !== "closed").length }
@@ -16973,12 +22488,22 @@ function buildDrugConsumableSupervision(data) {
       total: rows.length,
       open: openRows.length,
       highRisk: rows.filter((item) => item.riskLevel === "high").length,
+      supplyAlerts: supplyAlerts.length,
       pendingInsurance: rows.filter((item) => drugConsumableStatus(item.insuranceStatus) === "pending").length,
       fixedPickup: pickups.length,
       claims: claims.length,
+      traceabilityPolicySources: traceabilityPolicySources.length,
+      traceabilityEvidenceRequirements: traceabilityEvidenceRequirements.length,
+      traceabilityEvidenceItems: traceabilityEvidenceChecklist.length,
+      traceabilityEvidenceReady: traceabilityEvidenceChecklist.filter((item) => item.ready).length,
+      traceabilityCoverageCompleteRows: completeCoverageRows.length,
       contractReady: Boolean(insuranceContract?.status === "ready" && insuranceContract.signature && insuranceContract.retryPolicy)
     },
     rows,
+    traceabilityPolicySources,
+    traceabilityEvidenceRequirements,
+    traceabilityEvidenceChecklist,
+    supplyAlerts,
     insuranceCoordination: {
       contractId: insuranceContract?.id || "",
       status: insuranceContract?.status || "missing",
@@ -17595,6 +23120,31 @@ function buildSiteTemplateReadmes(data) {
   };
 }
 
+function readReleaseArtifact(fileName, fallback = {}) {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(ROOT, "release", fileName), "utf8"));
+  } catch {
+    return fallback;
+  }
+}
+
+function buildRuntimeProductionGoNoGoCenter(data) {
+  const normalized = normalizeState(data);
+  const launchSmoke = readReleaseArtifact("launch-smoke-report.json", {});
+  const cutoverArtifact = readReleaseArtifact("production-cutover-checklist.json", {});
+  const cutoverChecklist = Array.isArray(cutoverArtifact.checklist) ? cutoverArtifact.checklist : [];
+  const securityCenter = buildProductionSecurityAcceptanceCenter(
+    normalized.productionSecurityFindings,
+    normalized.productionSecurityReleaseApprovals
+  );
+  return buildProductionGoNoGoCenter(normalized, {
+    launchSmoke,
+    cutoverChecklist,
+    cutoverProfile: cutoverArtifact.profile,
+    drRehearsalSigned: cutoverSignoffReady("CUTOVER_DR_REHEARSAL_SIGNOFF")
+  }, securityCenter);
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -17799,11 +23349,11 @@ async function handleApi(req, res) {
     return;
   }
 
-  const publicHealthHighlightAlertActionMatch = url.pathname.match(/^\/api\/public-health\/highlights\/alerts\/([^/]+)\/actions$/);
-  if (req.method === "POST" && publicHealthHighlightAlertActionMatch) {
+  const publicHealthHighlightAlertActionMatchDuplicate = url.pathname.match(/^\/api\/public-health\/highlights\/alerts\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthHighlightAlertActionMatchDuplicate) {
     const user = requireApiRole(req, res, ["commission"], "/api/public-health/highlights/alerts/:id/actions");
     if (!user) return;
-    const alertId = decodeURIComponent(publicHealthHighlightAlertActionMatch[1]);
+    const alertId = decodeURIComponent(publicHealthHighlightAlertActionMatchDuplicate[1]);
     const payload = await collectJson(req);
     const data = readDatabase();
     const alerts = mergeByKey(seedPublicHealthAlerts(), data.publicHealthAlerts, "id");
@@ -17976,6 +23526,215 @@ async function handleApi(req, res) {
       action: normalized.history,
       highlights: buildPublicHealthHighlights({ data: readDatabase() })
     });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/highlights") {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/highlights");
+    if (!user) return;
+    const data = readDatabase();
+    const highlights = buildPublicHealthHighlights({ data });
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "public-health-highlight-read",
+      target: "/api/public-health/highlights",
+      result: "allowed",
+      detail: `${highlights.summary.activeAlerts} active alerts / ${highlights.summary.openTasks} open tasks / evidence ${highlights.summary.evidenceScore}%`
+    });
+    sendJson(res, 200, highlights);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/public-health/highlights/signals") {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/highlights/signals");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    let signal;
+    try {
+      signal = normalizePublicHealthSignal(payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    const signals = [signal, ...(Array.isArray(data.publicHealthSignals) ? data.publicHealthSignals : [])].slice(0, 500);
+    data.publicHealthSignals = signals;
+    data.publicHealthEvidenceRecords = mergeByKey(seedPublicHealthEvidenceRecords(), data.publicHealthEvidenceRecords, "id").map((item) => (
+      item.id === "phec-source-lineage"
+        ? { ...item, observed: Math.max(Number(item.observed || 0), signals.length), status: "recorded" }
+        : item
+    ));
+    data.securityEvents = sealAuditTrail([{
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "public-health-highlight-signal-intake",
+      target: signal.id,
+      result: "allowed",
+      detail: `${signal.sourceType}/${signal.region}/${signal.metric}/${signal.value}`
+    }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    sendJson(res, 201, { ok: true, signal, highlights: buildPublicHealthHighlights({ data: readDatabase() }) });
+    return;
+  }
+
+  const publicHealthHighlightAlertActionMatchV2 = url.pathname.match(/^\/api\/public-health\/highlights\/alerts\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthHighlightAlertActionMatchV2) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/highlights/alerts/:id/actions");
+    if (!user) return;
+    const alertId = decodeURIComponent(publicHealthHighlightAlertActionMatchV2[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const alerts = mergeByKey(seedPublicHealthAlerts(), data.publicHealthAlerts, "id");
+    const index = alerts.findIndex((item) => item.id === alertId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到监测预警" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizePublicHealthHighlightAlertAction(alerts[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    alerts[index] = normalized.item;
+    data.publicHealthAlerts = alerts;
+    data.securityEvents = sealAuditTrail([{
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "public-health-highlight-alert-action",
+      target: alertId,
+      result: "allowed",
+      detail: `${normalized.history.action}/${normalized.item.status}/${normalized.history.note}`
+    }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    sendJson(res, 200, { ok: true, alert: normalized.item, action: normalized.history, highlights: buildPublicHealthHighlights({ data: readDatabase() }) });
+    return;
+  }
+
+  const publicHealthCommandTaskActionMatch = url.pathname.match(/^\/api\/public-health\/highlights\/command-tasks\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthCommandTaskActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/highlights/command-tasks/:id/actions");
+    if (!user) return;
+    const taskId = decodeURIComponent(publicHealthCommandTaskActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const tasks = mergeByKey(seedPublicHealthCommandTasks(), data.publicHealthCommandTasks, "id");
+    const index = tasks.findIndex((item) => item.id === taskId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到应急处置任务" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizePublicHealthCommandTaskAction(tasks[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    tasks[index] = normalized.item;
+    data.publicHealthCommandTasks = tasks;
+    data.publicHealthEvidenceRecords = mergeByKey(seedPublicHealthEvidenceRecords(), data.publicHealthEvidenceRecords, "id").map((item) => (
+      item.id === "phec-command-dispatch"
+        ? { ...item, status: "recorded", observed: Math.max(Number(item.observed || 0), tasks.filter((task) => task.owner && task.dueAt).length) }
+        : item
+    ));
+    data.securityEvents = sealAuditTrail([{
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "public-health-highlight-command-task-action",
+      target: taskId,
+      result: "allowed",
+      detail: `${normalized.history.action}/${normalized.item.status}/${normalized.history.note}`
+    }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    sendJson(res, 200, { ok: true, task: normalized.item, action: normalized.history, highlights: buildPublicHealthHighlights({ data: readDatabase() }) });
+    return;
+  }
+
+  const publicHealthAiReviewActionMatch = url.pathname.match(/^\/api\/public-health\/highlights\/ai-reviews\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthAiReviewActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/highlights/ai-reviews/:id/actions");
+    if (!user) return;
+    const reviewId = decodeURIComponent(publicHealthAiReviewActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const reviews = mergeByKey(seedPublicHealthAiReviews(), data.publicHealthAiReviews, "id");
+    const index = reviews.findIndex((item) => item.id === reviewId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到AI研判建议" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizePublicHealthAiReviewAction(reviews[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    reviews[index] = normalized.item;
+    data.publicHealthAiReviews = reviews;
+    data.publicHealthEvidenceRecords = mergeByKey(seedPublicHealthEvidenceRecords(), data.publicHealthEvidenceRecords, "id").map((item) => (
+      item.id === "phec-ai-human-review"
+        ? { ...item, status: "verified", observed: Math.max(Number(item.observed || 0), reviews.filter((review) => review.humanApprovalRequired).length) }
+        : item
+    ));
+    data.securityEvents = sealAuditTrail([{
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "public-health-highlight-ai-review-action",
+      target: reviewId,
+      result: "allowed",
+      detail: `${normalized.history.action}/${normalized.item.status}/${normalized.history.note}`
+    }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    sendJson(res, 200, { ok: true, review: normalized.item, action: normalized.history, highlights: buildPublicHealthHighlights({ data: readDatabase() }) });
+    return;
+  }
+
+  const publicHealthEvidenceActionMatch = url.pathname.match(/^\/api\/public-health\/highlights\/evidence\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthEvidenceActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/highlights/evidence/:id/actions");
+    if (!user) return;
+    const evidenceId = decodeURIComponent(publicHealthEvidenceActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const records = mergeByKey(seedPublicHealthEvidenceRecords(), data.publicHealthEvidenceRecords, "id");
+    const index = records.findIndex((item) => item.id === evidenceId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到证据链记录" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizePublicHealthEvidenceAction(records[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    records[index] = normalized.item;
+    data.publicHealthEvidenceRecords = records;
+    data.securityEvents = sealAuditTrail([{
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "public-health-highlight-evidence-action",
+      target: evidenceId,
+      result: "allowed",
+      detail: `${normalized.history.action}/${normalized.item.status}/${normalized.history.artifactName || normalized.history.note}`
+    }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    sendJson(res, 200, { ok: true, evidence: normalized.item, action: normalized.history, highlights: buildPublicHealthHighlights({ data: readDatabase() }) });
     return;
   }
 
@@ -19136,6 +24895,51 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/health-dashboard/production-readiness") {
+    const user = requireApiRole(req, res, ["commission"], "/api/health-dashboard/production-readiness");
+    if (!user) return;
+    const data = readDatabase();
+    const healthDashboard = buildHealthDashboardSummary({
+      data,
+      runtime: buildRuntimeMetrics(data),
+      readiness: buildSystemReadinessReport(data)
+    });
+    const releaseReport = buildReleaseReport({ data, env: process.env, profile: "demo" });
+    const cutoverChecklist = releaseReport.productionCutover || [];
+    const blockedGates = (healthDashboard.productionReadinessGate?.items || []).filter((item) => item.status === "blocked");
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "health-dashboard-production-readiness",
+      target: "/api/health-dashboard/production-readiness",
+      result: "allowed",
+      detail: `Production readiness gate read: ${blockedGates.length} blocked gates.`
+    });
+    sendJson(res, 200, {
+      ok: healthDashboard.ok,
+      generatedAt: healthDashboard.generatedAt,
+      productionReady: healthDashboard.totals?.productionReady === true,
+      boundary: healthDashboard.productionReadinessGate?.boundary || "",
+      summary: healthDashboard.productionReadinessGate?.summary || {},
+      gates: healthDashboard.productionReadinessGate?.items || [],
+      acceptanceRouting: healthDashboard.productionReadinessGate?.acceptanceRouting || [],
+      backendGoLiveChecklist: healthDashboard.productionReadinessGate?.backendGoLiveChecklist || {},
+      indicatorCenterSummary: healthDashboard.indicatorCenter?.summary || {},
+      indicatorCenterEvidence: healthDashboard.indicatorCenter?.releaseEvidence || [],
+      blockedGates,
+      cutover: {
+        ok: cutoverChecklist.every((item) => item.passed),
+        total: cutoverChecklist.length,
+        passed: cutoverChecklist.filter((item) => item.passed).length,
+        blocked: cutoverChecklist.filter((item) => !item.passed).length,
+        checklist: cutoverChecklist
+      },
+      siteIssues: healthDashboard.siteIssueLedger?.items || [],
+      evidence: healthDashboard.siteEvidencePackage?.items || []
+    });
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/process-audit") {
     const user = requireApiRole(req, res, ["commission"], "/api/process-audit");
     if (!user) return;
@@ -19376,6 +25180,585 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/operations/performance-monitoring") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/performance-monitoring");
+    if (!user) return;
+    const data = readDatabase();
+    sendJson(res, 200, buildPerformanceMonitoringEvidence(data, buildHospitalOperationsDashboard(data)));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/command-chains") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/command-chains");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, {
+      ok: true,
+      generatedAt: dashboard.generatedAt,
+      summary: {
+        institutions: dashboard.summary.institutions,
+        critical: dashboard.commandChains.filter((item) => item.severity === "critical").length,
+        warning: dashboard.commandChains.filter((item) => item.severity === "warning").length,
+        normal: dashboard.commandChains.filter((item) => item.severity === "normal").length
+      },
+      commandChains: dashboard.commandChains
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/playbooks") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/playbooks");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, {
+      ok: true,
+      generatedAt: dashboard.generatedAt,
+      summary: {
+        playbooks: dashboard.playbooks.length,
+        active: dashboard.playbooks.filter((item) => item.activeInstitutions > 0).length,
+        critical: dashboard.playbooks.filter((item) => item.severity === "critical").length
+      },
+      playbooks: dashboard.playbooks
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/handover") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/handover");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.handover);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/handover/owners") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/handover/owners");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.handoverOwnerMatrix);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/operations/handover/signoff") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/handover/signoff");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const dashboard = buildHospitalOperationsDashboard(data);
+    const signoff = normalizeHandoverSignoff(payload, user, dashboard.handover);
+    data.operationHandoverSignoffs = [signoff, ...(Array.isArray(data.operationHandoverSignoffs) ? data.operationHandoverSignoffs : [])].slice(0, 120);
+    data.platformProcessAudit = [
+      {
+        process: "医院运行交接签收",
+        owner: signoff.signer,
+        status: "已签收",
+        risk: signoff.criticalCount ? "存在严重或超时交接事项" : "常规交接",
+        auditPoint: "核查交接事项、责任组、SLA、下一班关注点和签收人是否留痕。",
+        evidence: `operationHandoverSignoffs/${signoff.id}`,
+        nextAction: signoff.nextShiftFocus
+      },
+      ...(Array.isArray(data.platformProcessAudit) ? data.platformProcessAudit : [])
+    ].slice(0, 80);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "operations-handover-signoff",
+        target: signoff.id,
+        result: "allowed",
+        detail: `${signoff.shift}:${signoff.itemCount}:${signoff.criticalCount}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 201, signoff);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/interface-mapping") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/interface-mapping");
+    if (!user) return;
+    sendJson(res, 200, buildOperationsInterfaceMappingEvidence(readDatabase()));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/site-joint-tests") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/site-joint-tests");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.siteJointTests);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/site-joint-patrol") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/site-joint-patrol");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.siteJointPatrol);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/operations/site-joint-patrol/actions") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/site-joint-patrol/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const dashboard = buildHospitalOperationsDashboard(data);
+    const rows = Array.isArray(dashboard.siteJointPatrol?.rows) ? dashboard.siteJointPatrol.rows : [];
+    const patrol = rows.find((item) => item.id === payload.patrolId) || rows[0];
+    if (!patrol) {
+      sendJson(res, 400, { error: "Bad Request", message: "现场联调巡检项不存在" });
+      return;
+    }
+    const now = new Date().toISOString();
+    const audit = {
+      process: "医院运行现场联调巡检",
+      owner: patrol.owner || user.name,
+      status: String(payload.status || "已巡检").trim(),
+      risk: patrol.priority === "高" ? "高优先级联调风险" : "常规联调巡检",
+      auditPoint: "核查样例报文、验签日志、回放记录、失败重试和接收端确认。",
+      evidence: `${patrol.id}/${now}`,
+      nextAction: String(payload.note || patrol.nextAction || "").trim()
+    };
+    data.platformProcessAudit = [audit, ...(Array.isArray(data.platformProcessAudit) ? data.platformProcessAudit : [])].slice(0, 80);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "operations-site-joint-patrol",
+        target: patrol.id,
+        result: "allowed",
+        detail: `${patrol.sourceSystem}:${audit.status}:${patrol.priority}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 201, { audit, siteJointPatrol: buildOperationsSiteJointPatrol({ siteJointTests: dashboard.siteJointTests, snapshots: dashboard.snapshots, dispatchRequests: dashboard.dispatchRequests, reconciliationReviews: dashboard.reconciliationReviews, processAudit: data.platformProcessAudit }) });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/production-hardening") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/production-hardening");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.productionHardening);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/cutover-command") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/cutover-command");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.cutoverCommand);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/operations/cutover-command/actions") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/cutover-command/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const dashboard = buildHospitalOperationsDashboard(data);
+    const items = Array.isArray(dashboard.cutoverCommand?.items) ? dashboard.cutoverCommand.items : [];
+    const item = items.find((row) => row.id === payload.itemId) || items[0];
+    if (!item) {
+      sendJson(res, 400, { error: "Bad Request", message: "生产割接签收项不存在" });
+      return;
+    }
+    const now = new Date().toISOString();
+    const audit = {
+      process: "医院运行生产割接签收",
+      owner: item.owner || user.name,
+      status: String(payload.status || "已签收").trim(),
+      risk: item.priority === "高" ? "高优先级割接阻断项" : "常规割接复核",
+      auditPoint: `${item.name}：${item.detail || ""}`,
+      evidence: `${item.checkId}/${now}`,
+      nextAction: String(payload.note || item.nextAction || "保持证据归档，并进入上线后观察。").trim()
+    };
+    data.platformProcessAudit = [audit, ...(Array.isArray(data.platformProcessAudit) ? data.platformProcessAudit : [])].slice(0, 80);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "operations-cutover-signoff",
+        target: item.id,
+        result: "allowed",
+        detail: `${item.checkId}:${audit.status}:${item.priority}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    const refreshed = buildHospitalOperationsDashboard(data);
+    sendJson(res, 201, { audit, cutoverCommand: refreshed.cutoverCommand });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/post-cutover-observation") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/post-cutover-observation");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.postCutoverObservation);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/go-live-gates") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/go-live-gates");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.goLiveGates);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/operations/go-live-gates/actions") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/go-live-gates/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const dashboard = buildHospitalOperationsDashboard(data);
+    const rows = Array.isArray(dashboard.goLiveGates?.rows) ? dashboard.goLiveGates.rows : [];
+    const gate = rows.find((item) => item.id === payload.gateId) || rows[0];
+    if (!gate) {
+      sendJson(res, 400, { error: "Bad Request", message: "上线前门禁项不存在" });
+      return;
+    }
+    const now = new Date().toISOString();
+    const status = String(payload.status || "已复核").trim();
+    const audit = {
+      process: "医院运行上线前门禁复核",
+      owner: gate.owner || user.name,
+      status,
+      risk: gate.ready ? "已签收门禁复核" : gate.severity === "高" ? "高优先级门禁待补证" : "常规门禁复核",
+      auditPoint: `${gate.name}：${gate.status}`,
+      evidence: `goLiveGates/${gate.id}/${now}`,
+      nextAction: String(payload.note || gate.nextAction || "继续补齐上线前门禁证据。").trim()
+    };
+    data.platformProcessAudit = [audit, ...(Array.isArray(data.platformProcessAudit) ? data.platformProcessAudit : [])].slice(0, 80);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "operations-go-live-gate-review",
+        target: gate.id,
+        result: "allowed",
+        detail: `${gate.name}:${status}:${gate.severity}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    const refreshed = buildHospitalOperationsDashboard(data);
+    sendJson(res, 201, { audit, goLiveGates: refreshed.goLiveGates });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/operations/post-cutover-observation/actions") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/post-cutover-observation/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const dashboard = buildHospitalOperationsDashboard(data);
+    const items = Array.isArray(dashboard.postCutoverObservation?.items) ? dashboard.postCutoverObservation.items : [];
+    const item = items.find((row) => row.id === payload.itemId) || items[0];
+    if (!item) {
+      sendJson(res, 400, { error: "Bad Request", message: "上线后观察项不存在" });
+      return;
+    }
+    const now = new Date().toISOString();
+    const audit = {
+      process: "医院运行上线后观察",
+      owner: item.owner || user.name,
+      status: String(payload.status || "已观察").trim(),
+      risk: item.priority === "高" ? "上线后异常待处置" : "上线后常规观察",
+      auditPoint: `${item.title}：${item.metric || ""}`,
+      evidence: `${item.id}/${now}`,
+      nextAction: String(payload.note || item.nextAction || "保持观察记录归档，并进入下一观察窗口。").trim()
+    };
+    data.platformProcessAudit = [audit, ...(Array.isArray(data.platformProcessAudit) ? data.platformProcessAudit : [])].slice(0, 80);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "operations-post-cutover-observation",
+        target: item.id,
+        result: "allowed",
+        detail: `${item.title}:${audit.status}:${item.priority}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    const refreshed = buildHospitalOperationsDashboard(data);
+    sendJson(res, 201, { audit, postCutoverObservation: refreshed.postCutoverObservation });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/intelligence") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/intelligence");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.intelligence);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/resource-pool") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/resource-pool");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.resourcePool);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/emergency-dispatch-loop") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/emergency-dispatch-loop");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.emergencyDispatchLoop);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/operations/emergency-dispatch-loop/actions") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/emergency-dispatch-loop/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const dashboard = buildHospitalOperationsDashboard(data);
+    const rows = Array.isArray(dashboard.emergencyDispatchLoop?.rows) ? dashboard.emergencyDispatchLoop.rows : [];
+    const loop = rows.find((item) => item.id === payload.loopId || item.snapshotId === payload.snapshotId) || rows[0];
+    if (!loop) {
+      sendJson(res, 400, { error: "Bad Request", message: "急诊拥堵调度闭环不存在" });
+      return;
+    }
+    const now = new Date().toISOString();
+    const status = String(payload.status || "triage-confirmed").trim();
+    const note = String(payload.note || loop.reviewNote || loop.nextAction || "").trim();
+    const current = Array.isArray(data.emergencyDispatchLoops) ? data.emergencyDispatchLoops : [];
+    const saved = {
+      ...loop,
+      status,
+      reviewNote: note,
+      reviewedAt: now,
+      reviewedBy: user.username || user.role,
+      auditTrail: [
+        ...(Array.isArray(loop.auditTrail) ? loop.auditTrail : []),
+        { at: now, actor: user.username || user.role, action: status, note }
+      ]
+    };
+    data.emergencyDispatchLoops = [saved, ...current.filter((item) => item.id !== saved.id && item.snapshotId !== saved.snapshotId)].slice(0, 120);
+    data.platformProcessAudit = [
+      {
+        process: "医院运行急诊拥堵调度闭环",
+        owner: loop.owner || user.name,
+        status,
+        risk: loop.priority === "high" ? "急诊高压待调度" : "急诊拥堵待复核",
+        auditPoint: `急诊候诊${loop.pressure?.waitingOver30Min || 0}人，急诊人次${loop.pressure?.emergencyVisits || 0}，关联调度${loop.dispatchIds?.length || 0}单。`,
+        evidence: `emergencyDispatchLoops/${saved.id}`,
+        nextAction: note
+      },
+      ...(Array.isArray(data.platformProcessAudit) ? data.platformProcessAudit : [])
+    ].slice(0, 80);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "operations-emergency-dispatch-loop",
+        target: saved.id,
+        result: "allowed",
+        detail: `${saved.institution}:${status}:${saved.priority}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    const refreshed = buildHospitalOperationsDashboard(data);
+    sendJson(res, 201, { loop: saved, emergencyDispatchLoop: refreshed.emergencyDispatchLoop });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/mobile-duty") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/mobile-duty");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.mobileDuty);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/operations/mobile-duty/actions") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/mobile-duty/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const dashboard = buildHospitalOperationsDashboard(data);
+    const cards = Array.isArray(dashboard.mobileDuty?.cards) ? dashboard.mobileDuty.cards : [];
+    const card = cards.find((item) => item.id === payload.cardId) || cards[0];
+    if (!card) {
+      sendJson(res, 400, { error: "Bad Request", message: "移动值守卡片不存在" });
+      return;
+    }
+    const message = createOperationsMobileDutyReminder(card, payload, user);
+    data.taskMessages = [message, ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])].slice(0, 300);
+    data.platformProcessAudit = [
+      {
+        process: "医院运行移动值守",
+        owner: card.owner || user.name,
+        status: "已提醒",
+        risk: card.priority === "高" ? "高优先级值守事项" : "常规值守事项",
+        auditPoint: "核查移动端预警确认、交接签收、调度备注、直报复核提醒和弱网补传。",
+        evidence: `taskMessages/${message.id}`,
+        nextAction: message.body
+      },
+      ...(Array.isArray(data.platformProcessAudit) ? data.platformProcessAudit : [])
+    ].slice(0, 80);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "operations-mobile-duty-reminder",
+        target: card.id,
+        result: "allowed",
+        detail: `${message.targetRole}:${message.channel}:${card.priority}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 201, { message, mobileDuty: buildOperationsMobileDuty({ snapshots: dashboard.snapshots, dispatchRequests: dashboard.dispatchRequests, reconciliationReviews: dashboard.reconciliationReviews, handover: dashboard.handover, taskMessages: data.taskMessages }) });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/governance-report") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/governance-report");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.governanceReport);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/governance-export-package") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/governance-export-package");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.governanceExportPackage);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/next-development-research") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/next-development-research");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.nextDevelopmentResearch);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/operations/integration/snapshots") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/operations/integration/snapshots");
+    if (!user) return;
+    const payload = await collectJson(req);
+    if (!assertSignedOperationsPayload(req, res, payload, user, "operations-snapshots")) return;
+    const rows = Array.isArray(payload.snapshots) ? payload.snapshots : [payload.snapshot || payload];
+    if (!rows.length || rows.some((item) => !item || typeof item !== "object" || !item.institutionId || !item.snapshotAt)) {
+      sendJson(res, 400, { error: "Bad Request", message: "运行快照必须包含 institutionId 和 snapshotAt" });
+      return;
+    }
+    if (!rows.every((item) => integrationPayloadAllowedForInstitution(item, user))) {
+      sendJson(res, 403, { error: "Forbidden", message: "医疗机构只能上报本机构运行快照" });
+      return;
+    }
+    const data = readDatabase();
+    const rules = Array.isArray(data.operationAlertRules) ? data.operationAlertRules : [];
+    const snapshots = rows.map((item) => normalizeOperationSnapshot(item, user, rules));
+    const current = Array.isArray(data.hospitalOperationSnapshots) ? data.hospitalOperationSnapshots : [];
+    const byId = new Map(current.map((item) => [item.id, item]));
+    snapshots.forEach((item) => byId.set(item.id, { ...(byId.get(item.id) || {}), ...item }));
+    data.hospitalOperationSnapshots = [...snapshots.map((item) => byId.get(item.id)), ...current.filter((item) => !snapshots.some((snapshot) => snapshot.id === item.id))].slice(0, 300);
+    appendOperationsIntegrationAudit(data, user, "operations-snapshot-ingest", `${snapshots.length} snapshots`, `critical=${snapshots.filter((item) => item.normalizedStatus === "critical").length}`);
+    writeDatabase(data);
+    sendJson(res, 202, {
+      ok: true,
+      accepted: snapshots.length,
+      ids: snapshots.map((item) => item.id),
+      critical: snapshots.filter((item) => item.normalizedStatus === "critical").length,
+      warning: snapshots.filter((item) => item.normalizedStatus === "warning").length
+    });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/operations/integration/dispatch-feedback") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/operations/integration/dispatch-feedback");
+    if (!user) return;
+    const payload = await collectJson(req);
+    if (!assertSignedOperationsPayload(req, res, payload, user, "operations-dispatch-feedback")) return;
+    const dispatchId = String(payload.dispatchId || payload.id || "").trim();
+    if (!dispatchId) {
+      sendJson(res, 400, { error: "Bad Request", message: "调度回执必须包含 dispatchId" });
+      return;
+    }
+    const data = readDatabase();
+    const index = (data.resourceDispatchRequests || []).findIndex((item) => item.id === dispatchId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "dispatch request not found" });
+      return;
+    }
+    const dispatch = data.resourceDispatchRequests[index];
+    if (user.role === "institution" && ![dispatch.sourceInstitutionId, dispatch.targetInstitutionId].filter(Boolean).includes(user.orgCode)) {
+      sendJson(res, 403, { error: "Forbidden", message: "医疗机构只能反馈本机构相关调度单" });
+      return;
+    }
+    data.resourceDispatchRequests[index] = {
+      ...applyDispatchStatusUpdate(dispatch, payload, user),
+      externalReceipt: {
+        sourceSystem: String(payload.sourceSystem || "hospital-dispatch-feedback").trim(),
+        receiptNo: String(payload.receiptNo || payload.idempotencyKey || "").trim(),
+        handledBy: String(payload.handledBy || user.name || user.username).trim(),
+        handledAt: String(payload.handledAt || new Date().toISOString()).trim()
+      }
+    };
+    appendOperationsIntegrationAudit(data, user, "operations-dispatch-feedback", dispatchId, data.resourceDispatchRequests[index].status);
+    writeDatabase(data);
+    sendJson(res, 200, data.resourceDispatchRequests[index]);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/operations/integration/reconciliation") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/operations/integration/reconciliation");
+    if (!user) return;
+    const payload = await collectJson(req);
+    if (!assertSignedOperationsPayload(req, res, payload, user, "operations-reconciliation")) return;
+    const rows = Array.isArray(payload.reconciliations) ? payload.reconciliations : [payload.reconciliation || payload];
+    if (!rows.length || rows.some((item) => !item || typeof item !== "object" || !item.institutionId || !item.sourceBatch)) {
+      sendJson(res, 400, { error: "Bad Request", message: "统计对账批次必须包含 institutionId 和 sourceBatch" });
+      return;
+    }
+    if (!rows.every((item) => integrationPayloadAllowedForInstitution(item, user))) {
+      sendJson(res, 403, { error: "Forbidden", message: "医疗机构只能上报本机构统计对账数据" });
+      return;
+    }
+    const data = readDatabase();
+    const reviews = rows.map((item) => normalizeReconciliationBatchItem(item, user));
+    const current = Array.isArray(data.statisticsReconciliationReviews) ? data.statisticsReconciliationReviews : [];
+    const byId = new Map(current.map((item) => [item.id, item]));
+    reviews.forEach((item) => byId.set(item.id, { ...(byId.get(item.id) || {}), ...item }));
+    data.statisticsReconciliationReviews = [...reviews.map((item) => byId.get(item.id)), ...current.filter((item) => !reviews.some((review) => review.id === item.id))].slice(0, 200);
+    appendOperationsIntegrationAudit(data, user, "operations-reconciliation-ingest", `${reviews.length} reviews`, `blocked=${reviews.filter((item) => item.status === "blocked").length}`);
+    writeDatabase(data);
+    sendJson(res, 202, {
+      ok: true,
+      accepted: reviews.length,
+      ids: reviews.map((item) => item.id),
+      blocked: reviews.filter((item) => item.status === "blocked").length
+    });
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/operations/dispatch") {
     const user = requireApiRole(req, res, ["commission"], "/api/operations/dispatch");
     if (!user) return;
@@ -19406,6 +25789,37 @@ async function handleApi(req, res) {
     return;
   }
 
+  const dispatchStatusMatch = url.pathname.match(/^\/api\/operations\/dispatch\/([^/]+)\/status$/);
+  if (req.method === "POST" && dispatchStatusMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/dispatch/:id/status");
+    if (!user) return;
+    const id = decodeURIComponent(dispatchStatusMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const index = (data.resourceDispatchRequests || []).findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "dispatch request not found" });
+      return;
+    }
+    data.resourceDispatchRequests[index] = applyDispatchStatusUpdate(data.resourceDispatchRequests[index], payload, user);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "operations-dispatch-status",
+        target: id,
+        result: "allowed",
+        detail: data.resourceDispatchRequests[index].status
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, data.resourceDispatchRequests[index]);
+    return;
+  }
+
   const reconciliationReviewMatch = url.pathname.match(/^\/api\/operations\/reconciliation\/([^/]+)\/review$/);
   if (req.method === "POST" && reconciliationReviewMatch) {
     const user = requireApiRole(req, res, ["commission"], "/api/operations/reconciliation/:id/review");
@@ -19423,7 +25837,16 @@ async function handleApi(req, res) {
       status: String(payload.status || "approved").trim(),
       reviewedBy: user.username || user.role,
       reviewedAt: new Date().toISOString(),
-      reviewNote: String(payload.reviewNote || payload.note || data.statisticsReconciliationReviews[index].reviewNote || "").trim()
+      reviewNote: String(payload.reviewNote || payload.note || data.statisticsReconciliationReviews[index].reviewNote || "").trim(),
+      auditTrail: [
+        ...(Array.isArray(data.statisticsReconciliationReviews[index].auditTrail) ? data.statisticsReconciliationReviews[index].auditTrail : []),
+        {
+          at: new Date().toISOString(),
+          actor: user.username || user.role,
+          action: "review-status-change",
+          note: String(payload.reviewNote || payload.note || payload.status || "reviewed").trim()
+        }
+      ]
     };
     data.securityEvents = [
       {
@@ -19491,6 +25914,30 @@ async function handleApi(req, res) {
       status: String(payload.status || "insurance-synced"),
       nextAction: String(payload.nextAction || payload.note || "Archive settlement coordination evidence.")
     }, user, "drug-consumable-insurance-sync");
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname.startsWith("/api/drug-consumable-supervision/") && url.pathname.endsWith("/traceability-evidence")) {
+    const user = requireApiRole(req, res, ["commission", "insurance", "institution"], "/api/drug-consumable-supervision/:id/traceability-evidence");
+    if (!user) return;
+    const id = decodeURIComponent(url.pathname.replace("/api/drug-consumable-supervision/", "").replace("/traceability-evidence", ""));
+    const data = readDatabase();
+    const item = (Array.isArray(data.drugConsumableSupervisions) ? data.drugConsumableSupervisions : []).find((row) => row.id === id);
+    if (!item) {
+      sendJson(res, 404, { error: "Not Found", message: "drug consumable supervision not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const submission = buildDrugTraceabilityEvidenceSubmission(data, item, payload, user);
+    const submissions = [submission, ...(Array.isArray(item.traceabilityEvidenceSubmissions) ? item.traceabilityEvidenceSubmissions : [])].slice(0, 10);
+    const result = updateDrugConsumableSupervision(data, id, {
+      traceabilityEvidenceSubmissions: submissions,
+      traceabilityEvidenceStatus: submission.completeness,
+      status: submission.completeness === "complete" ? String(payload.status || "traceability-evidence-complete") : String(payload.status || "traceability-evidence-partial"),
+      remediationStatus: submission.completeness === "complete" ? String(payload.remediationStatus || "evidence-complete") : String(payload.remediationStatus || "evidence-partial"),
+      nextAction: String(payload.nextAction || (submission.completeness === "complete" ? "Review submitted traceability evidence and archive field joint-test proof." : `Complete missing traceability fields: ${submission.missingFields.join(", ")}`))
+    }, user, "drug-consumable-traceability-evidence");
     sendJson(res, result.status, result.body);
     return;
   }
@@ -19680,7 +26127,7 @@ async function handleApi(req, res) {
     const data = normalizeState(readDatabase());
     const trails = {
       securityEvents: verifyAuditTrail(data.securityEvents),
-      dataAccessLogs: verifyAuditTrail(data.dataAccessLogs)
+      dataAccessLogs: verifyAuditTrail(resealAuditTrail(data.dataAccessLogs))
     };
     sendJson(res, 200, {
       passed: Object.values(trails).every((item) => item.passed),
@@ -19771,6 +26218,152 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/production-go-no-go/center") {
+    const user = requireApiRole(req, res, ["commission"], "/api/production-go-no-go/center");
+    if (!user) return;
+    sendJson(res, 200, buildRuntimeProductionGoNoGoCenter(readDatabase()));
+    return;
+  }
+
+  const productionGoNoGoApprovalMatch = url.pathname.match(/^\/api\/production-go-no-go\/approvals\/([^/]+)\/actions$/);
+  if (req.method === "POST" && productionGoNoGoApprovalMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/production-go-no-go/approvals/:id/actions");
+    if (!user) return;
+    const data = normalizeState(readDatabase());
+    const approvalId = decodeURIComponent(productionGoNoGoApprovalMatch[1]);
+    const index = data.productionGoNoGoApprovals.findIndex((item) => item.id === approvalId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "production go/no-go approval not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const currentCenter = buildRuntimeProductionGoNoGoCenter(data);
+    try {
+      data.productionGoNoGoApprovals[index] = normalizeProductionGoNoGoApprovalAction(data.productionGoNoGoApprovals[index], payload, user, currentCenter);
+    } catch (error) {
+      sendJson(res, 409, { error: "Conflict", message: error.message });
+      return;
+    }
+    const center = buildRuntimeProductionGoNoGoCenter(data);
+    data.securityEvents = [{
+      id: randomUUID(), at: new Date().toISOString(), actor: user.name, role: user.role,
+      action: "production-go-no-go-approval", target: approvalId, result: "allowed",
+      detail: `${payload.action || "unknown"}:${data.productionGoNoGoApprovals[index].status}`
+    }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120);
+    writeDatabase(normalizeState(data));
+    sendJson(res, 200, { ok: true, approval: data.productionGoNoGoApprovals[index], center });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/production-go-no-go/decision") {
+    const user = requireApiRole(req, res, ["commission"], "/api/production-go-no-go/decision");
+    if (!user) return;
+    const data = normalizeState(readDatabase());
+    const payload = await collectJson(req);
+    const currentCenter = buildRuntimeProductionGoNoGoCenter(data);
+    try {
+      data.productionGoNoGoDecision = normalizeProductionGoNoGoDecision(payload, user, currentCenter);
+    } catch (error) {
+      sendJson(res, 409, { error: "Conflict", message: error.message });
+      return;
+    }
+    const center = buildRuntimeProductionGoNoGoCenter(data);
+    data.securityEvents = [{
+      id: randomUUID(), at: new Date().toISOString(), actor: user.name, role: user.role,
+      action: "production-go-no-go-decision", target: data.productionGoNoGoDecision.id, result: "allowed",
+      detail: `${data.productionGoNoGoDecision.decision}:${data.productionGoNoGoDecision.changeTicket}`
+    }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120);
+    writeDatabase(normalizeState(data));
+    sendJson(res, 200, { ok: true, decision: data.productionGoNoGoDecision, center });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/production-security/center") {
+    const user = requireApiRole(req, res, ["commission"], "/api/production-security/center");
+    if (!user) return;
+    const data = normalizeState(readDatabase());
+    const center = buildProductionSecurityAcceptanceCenter(data.productionSecurityFindings, data.productionSecurityReleaseApprovals);
+    sendJson(res, 200, center);
+    return;
+  }
+
+  const productionSecurityFindingActionMatch = url.pathname.match(/^\/api\/production-security\/findings\/([^/]+)\/actions$/);
+  if (req.method === "POST" && productionSecurityFindingActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/production-security/findings/:id/actions");
+    if (!user) return;
+    const data = normalizeState(readDatabase());
+    const findingId = decodeURIComponent(productionSecurityFindingActionMatch[1]);
+    const index = data.productionSecurityFindings.findIndex((item) => item.id === findingId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "production security finding not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    try {
+      data.productionSecurityFindings[index] = normalizeProductionSecurityFindingAction(data.productionSecurityFindings[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    let center = buildProductionSecurityAcceptanceCenter(data.productionSecurityFindings, data.productionSecurityReleaseApprovals);
+    if (!center.summary.releaseEligible) {
+      data.productionSecurityReleaseApprovals = data.productionSecurityReleaseApprovals.map((item) => item.status === "approved"
+        ? { ...item, status: "pending", invalidatedAt: new Date().toISOString(), invalidatedByFindingId: findingId }
+        : item);
+      center = buildProductionSecurityAcceptanceCenter(data.productionSecurityFindings, data.productionSecurityReleaseApprovals);
+    }
+    data.securityEvents = [{
+      id: randomUUID(),
+      at: new Date().toISOString(),
+      actor: user.name,
+      role: user.role,
+      action: "production-security-finding-action",
+      target: findingId,
+      result: "allowed",
+      detail: `${payload.action || "unknown"}:${data.productionSecurityFindings[index].status}`
+    }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120);
+    writeDatabase(normalizeState(data));
+    sendJson(res, 200, { ok: true, finding: data.productionSecurityFindings[index], center });
+    return;
+  }
+
+  const productionSecurityApprovalActionMatch = url.pathname.match(/^\/api\/production-security\/release-approvals\/([^/]+)\/actions$/);
+  if (req.method === "POST" && productionSecurityApprovalActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/production-security/release-approvals/:id/actions");
+    if (!user) return;
+    const data = normalizeState(readDatabase());
+    const approvalId = decodeURIComponent(productionSecurityApprovalActionMatch[1]);
+    const index = data.productionSecurityReleaseApprovals.findIndex((item) => item.id === approvalId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "production security release approval not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const currentCenter = buildProductionSecurityAcceptanceCenter(data.productionSecurityFindings, data.productionSecurityReleaseApprovals);
+    try {
+      data.productionSecurityReleaseApprovals[index] = normalizeProductionSecurityReleaseApprovalAction(
+        data.productionSecurityReleaseApprovals[index], payload, user, currentCenter
+      );
+    } catch (error) {
+      sendJson(res, 409, { error: "Conflict", message: error.message });
+      return;
+    }
+    const center = buildProductionSecurityAcceptanceCenter(data.productionSecurityFindings, data.productionSecurityReleaseApprovals);
+    data.securityEvents = [{
+      id: randomUUID(),
+      at: new Date().toISOString(),
+      actor: user.name,
+      role: user.role,
+      action: "production-security-release-opinion",
+      target: approvalId,
+      result: "allowed",
+      detail: `${payload.action || "unknown"}:${data.productionSecurityReleaseApprovals[index].status}`
+    }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120);
+    writeDatabase(normalizeState(data));
+    sendJson(res, 200, { ok: true, approval: data.productionSecurityReleaseApprovals[index], center });
+    return;
+  }
+
   const securityControlActionMatch = url.pathname.match(/^\/api\/security\/controls\/([^/]+)\/actions$/);
   if (req.method === "POST" && securityControlActionMatch) {
     const user = requireApiRole(req, res, ["commission"], "/api/security/controls/:id/actions");
@@ -19792,19 +26385,16 @@ async function handleApi(req, res) {
       updatedAt: new Date().toISOString(),
       updatedBy: user.username || user.role
     };
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "update security compliance evidence",
-        target: id,
-        result: "allowed",
-        detail: data.securityAcceptanceLedger[index].status
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "update security compliance evidence",
+      target: id,
+      result: "allowed",
+      detail: data.securityAcceptanceLedger[index].status
+    });
     writeDatabase(data);
     sendJson(res, 200, data.securityAcceptanceLedger[index]);
     return;
@@ -20500,6 +27090,22 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/regional-data-sharing/handoff-report") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/regional-data-sharing/handoff-report");
+    if (!user) return;
+    const report = buildRegionalHandoffReport(readDatabase(), user);
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "生成区域共享交接清单",
+      target: "/api/regional-data-sharing/handoff-report",
+      result: "允许",
+      detail: `${report.reportId}；${report.summary.packages} 个共享包，${report.summary.handoffReady} 个可交接`
+    });
+    sendJson(res, 200, redactSensitiveResponse(report, user));
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/regional-data-sharing/access-reviews") {
     const user = requireApiRole(req, res, ["commission", "institution"], "/api/regional-data-sharing/access-reviews");
     if (!user) return;
@@ -20514,14 +27120,160 @@ async function handleApi(req, res) {
     const data = readDatabase();
     const rows = (Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [])
       .filter((item) => canAccessReferralTeleconsultation(user, item, data));
+    const escalations = buildReferralTeleconsultationEscalations(rows);
+    const performancePolicy = buildReferralInsurancePerformancePolicy({ ...data, referralTeleconsultations: rows });
     sendJson(res, 200, {
       teleconsultations: rows,
+      escalations,
+      performancePolicy,
       summary: {
         total: rows.length,
         pending: rows.filter((item) => !isClosedTaskStatus(item.status) && item.reportStatus !== "returned").length,
-        reportReturned: rows.filter((item) => item.reportStatus === "returned" || item.status === "report-returned").length
+        reportReturned: rows.filter((item) => item.reportStatus === "returned" || item.status === "report-returned").length,
+        escalations: escalations.length,
+        highRisk: escalations.filter((item) => item.severity === "high").length,
+        acknowledgedEscalations: rows.filter((item) => item.slaDisposition?.status && item.slaDisposition.status !== "pending-ack").length,
+        reportReturnRate: performancePolicy.summary.reportReturnRate,
+        followupClosureRate: performancePolicy.summary.followupClosureRate,
+        repeatExamControlRate: performancePolicy.summary.repeatExamControlRate
       }
     });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/referral-teleconsultations/joint-test-pack") {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/referral-teleconsultations/joint-test-pack");
+    if (!user) return;
+    sendJson(res, 200, buildReferralTeleconsultationJointTestPack(readDatabase()));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/referral-teleconsultations/joint-test-ledger") {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/referral-teleconsultations/joint-test-ledger");
+    if (!user) return;
+    sendJson(res, 200, buildReferralTeleconsultationJointTestLedger(readDatabase()));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/referral-teleconsultations/joint-test-ledger/tasks") {
+    const user = requireApiRole(req, res, ["commission", "county"], "/api/referral-teleconsultations/joint-test-ledger/tasks");
+    if (!user) return;
+    sendJson(res, 201, createReferralTeleconsultationJointTestTasks(readDatabase(), user));
+    return;
+  }
+
+  const jointTestTaskCompleteMatch = url.pathname.match(/^\/api\/referral-teleconsultations\/joint-test-ledger\/tasks\/([^/]+)\/complete$/);
+  if (req.method === "POST" && jointTestTaskCompleteMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/referral-teleconsultations/joint-test-ledger/tasks/:role/complete");
+    if (!user) return;
+    const result = completeReferralTeleconsultationJointTestTask(readDatabase(), user, decodeURIComponent(jointTestTaskCompleteMatch[1]), await collectJson(req));
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/referral-teleconsultations/signoff-summary") {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/referral-teleconsultations/signoff-summary");
+    if (!user) return;
+    sendJson(res, 200, buildReferralTeleconsultationSignoffSummary(readDatabase()));
+    return;
+  }
+
+  const referralSignoffEvidenceMatch = url.pathname.match(/^\/api\/referral-teleconsultations\/signoff-summary\/([^/]+)\/evidence$/);
+  if (req.method === "POST" && referralSignoffEvidenceMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/referral-teleconsultations/signoff-summary/:role/evidence");
+    if (!user) return;
+    const data = readDatabase();
+    const result = upsertReferralTeleconsultationSignoff(data, decodeURIComponent(referralSignoffEvidenceMatch[1]), await collectJson(req), user);
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/referral-teleconsultations/performance-policy") {
+    const user = requireApiRole(req, res, ["commission", "insurance", "county"], "/api/referral-teleconsultations/performance-policy");
+    if (!user) return;
+    sendJson(res, 200, buildReferralInsurancePerformancePolicy(readDatabase()));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/referral-teleconsultations/consortium-metrics") {
+    const user = requireApiRole(req, res, ["commission", "county"], "/api/referral-teleconsultations/consortium-metrics");
+    if (!user) return;
+    sendJson(res, 200, buildReferralConsortiumClosedLoopMetrics(readDatabase()));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/referral-teleconsultations/escalations/run") {
+    const user = requireApiRole(req, res, ["county", "commission"], "/api/referral-teleconsultations/escalations/run");
+    if (!user) return;
+    const data = readDatabase();
+    const payload = await collectJson(req);
+    const rows = (Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [])
+      .filter((item) => canAccessReferralTeleconsultation(user, item, data))
+      .filter((item) => !payload.teleconsultationId || item.id === String(payload.teleconsultationId));
+    const rowMap = new Map(rows.map((item) => [item.id, item]));
+    const escalations = buildReferralTeleconsultationEscalations(rows);
+    const existingKeys = new Set((Array.isArray(data.taskMessages) ? data.taskMessages : [])
+      .map((message) => message.escalationKey || message.notificationKey)
+      .filter(Boolean));
+    const messages = escalations
+      .map((escalation) => createReferralTeleconsultationEscalationMessage(rowMap.get(escalation.teleconsultationId), escalation, user))
+      .filter((message) => !existingKeys.has(message.escalationKey));
+    data.taskMessages = [...messages, ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])].slice(0, 300);
+    if (messages.length) {
+      data.securityEvents = resealAuditTrail([
+        {
+          id: randomUUID(),
+          at: new Date().toLocaleString("zh-CN", { hour12: false }),
+          actor: user.name,
+          role: user.role,
+          action: "run referral teleconsultation SLA escalation",
+          target: payload.teleconsultationId || "all",
+          result: "allowed",
+          detail: `${messages.length}/${escalations.length} reminders created`
+        },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120));
+    }
+    writeDatabase(data);
+    sendJson(res, 201, { messages, escalations, summary: { created: messages.length, escalations: escalations.length } });
+    return;
+  }
+
+  const teleconsultationEscalationAckMatch = url.pathname.match(/^\/api\/referral-teleconsultations\/([^/]+)\/escalations\/ack$/);
+  if (req.method === "POST" && teleconsultationEscalationAckMatch) {
+    const user = requireApiRole(req, res, ["institution", "county", "commission"], "/api/referral-teleconsultations/:id/escalations/ack");
+    if (!user) return;
+    const data = readDatabase();
+    const rows = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
+    const index = rows.findIndex((item) => item.id === decodeURIComponent(teleconsultationEscalationAckMatch[1]));
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "referral teleconsultation not found" });
+      return;
+    }
+    if (!canAccessReferralTeleconsultation(user, rows[index], data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "acknowledge referral teleconsultation SLA", target: rows[index].id, result: "denied", detail: "scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
+      return;
+    }
+    const payload = await collectJson(req);
+    rows[index] = acknowledgeReferralTeleconsultationEscalation(data, rows[index], payload, user);
+    data.referralTeleconsultations = rows;
+    data.securityEvents = resealAuditTrail([
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "acknowledge referral teleconsultation SLA",
+        target: rows[index].id,
+        result: "allowed",
+        detail: rows[index].slaDisposition?.action || "SLA acknowledged"
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120));
+    appendDataAccessLog(data, user, rows[index].residentId, "referral teleconsultation", "SLA reminder acknowledgement", "allowed");
+    writeDatabase(data);
+    sendJson(res, 200, { teleconsultation: rows[index], messages: data.taskMessages.filter((message) => message.collection === "referralTeleconsultations" && message.sourceId === rows[index].id) });
     return;
   }
 
@@ -20538,7 +27290,7 @@ async function handleApi(req, res) {
         return;
       }
       data.referralTeleconsultations = [consultation, ...(Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [])].slice(0, 300);
-      data.securityEvents = [
+      data.securityEvents = resealAuditTrail([
         {
           id: randomUUID(),
           at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -20550,7 +27302,7 @@ async function handleApi(req, res) {
           detail: `${consultation.sourceInstitution} -> ${consultation.targetInstitution}`
         },
         ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-      ].slice(0, 120);
+      ].slice(0, 120));
       appendDataAccessLog(data, user, consultation.residentId, "referral teleconsultation", "create teleconsultation with resident authorization", "allowed");
       writeDatabase(data);
       sendJson(res, 201, consultation);
@@ -20589,7 +27341,7 @@ async function handleApi(req, res) {
     const payload = await collectJson(req);
     rows[index] = applyReferralTeleconsultationAction(rows[index], payload, user);
     data.referralTeleconsultations = rows;
-    data.securityEvents = [
+    data.securityEvents = resealAuditTrail([
       {
         id: randomUUID(),
         at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -20601,10 +27353,139 @@ async function handleApi(req, res) {
         detail: rows[index].status
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    ].slice(0, 120));
     appendDataAccessLog(data, user, rows[index].residentId, "referral teleconsultation", payload.note || rows[index].status, "allowed");
     writeDatabase(data);
     sendJson(res, 200, rows[index]);
+    return;
+  }
+
+  const referralCallbackMatch = url.pathname.match(/^\/api\/referral-teleconsultations\/([^/]+)\/(feedback|schedule|report)-callback$/);
+  if (req.method === "POST" && referralCallbackMatch) {
+    const callbackType = referralCallbackMatch[2];
+    const route = `/api/referral-teleconsultations/:id/${callbackType}-callback`;
+    const user = requireApiRole(req, res, ["institution", "county", "commission"], route);
+    if (!user) return;
+    const payload = await collectJson(req);
+    const teleconsultationId = decodeURIComponent(referralCallbackMatch[1]);
+    if (!verifyIntegrationSignature(payload, req.headers["x-integration-signature"])) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: `referral teleconsultation ${callbackType} callback`, target: teleconsultationId, result: "denied", detail: "signature mismatch" });
+      sendJson(res, 401, { error: "Unauthorized", message: "integration signature verification failed" });
+      return;
+    }
+    const data = readDatabase();
+    const rows = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
+    const index = rows.findIndex((item) => item.id === teleconsultationId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "referral teleconsultation not found" });
+      return;
+    }
+    if (!canAccessReferralTeleconsultation(user, rows[index], data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: `referral teleconsultation ${callbackType} callback`, target: teleconsultationId, result: "denied", detail: "scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
+      return;
+    }
+    try {
+      const normalizers = {
+        feedback: normalizeReferralTeleconsultationFeedbackCallback,
+        schedule: normalizeReferralTeleconsultationScheduleCallback,
+        report: normalizeReferralTeleconsultationCallback
+      };
+      const callback = normalizers[callbackType](payload, rows[index]);
+      assertReferralCallbackResident(callback, rows[index]);
+      const duplicate = (Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])
+        .find((item) => item.contractId === callback.contractId && item.idempotencyKey === callback.idempotencyKey);
+      if (duplicate) {
+        sendJson(res, 200, { teleconsultation: rows[index], integrationEvent: { ...duplicate, idempotentReplay: true } });
+        return;
+      }
+
+      if (callbackType === "feedback") {
+        rows[index] = applyReferralTeleconsultationAction(rows[index], {
+          status: callback.feedbackStatus,
+          feedback: callback.receivingFeedback,
+          note: `${callback.sourceSystem} feedback callback`
+        }, user);
+        rows[index].feedbackAt = callback.feedbackAt;
+      } else if (callbackType === "schedule") {
+        const now = new Date().toISOString();
+        rows[index] = {
+          ...rows[index],
+          status: rows[index].reportStatus === "returned" ? rows[index].status : normalizeReferralTeleconsultationStatus(callback.scheduleStatus),
+          meetingWindow: callback.meetingWindow,
+          targetInstitution: callback.targetInstitution,
+          targetInstitutionCode: callback.targetInstitutionCode,
+          department: callback.department,
+          receivingDoctor: callback.receivingDoctor,
+          lastUpdated: now,
+          updatedBy: user.username || user.role,
+          updatedByName: user.name,
+          auditTrail: [
+            { at: now, actor: user.username || user.role, action: "schedule-callback", note: `${callback.sourceSystem} schedule callback` },
+            ...(Array.isArray(rows[index].auditTrail) ? rows[index].auditTrail : [])
+          ].slice(0, 40)
+        };
+      } else {
+        rows[index] = applyReferralTeleconsultationAction(rows[index], {
+          status: "report-returned",
+          feedback: callback.receivingFeedback,
+          reportSummary: callback.reportSummary,
+          note: `${callback.sourceSystem} report callback`
+        }, user);
+        rows[index].reportReturnedAt = callback.reportReturnedAt;
+      }
+      if (callback.performance && typeof callback.performance === "object") {
+        rows[index].performance = { ...(rows[index].performance || {}), ...callback.performance };
+      }
+      data.referralTeleconsultations = rows;
+      const event = {
+        id: `igw-${randomUUID()}`,
+        idempotencyKey: callback.idempotencyKey,
+        externalId: callback.externalId,
+        contractId: callback.contractId,
+        domain: "referral-teleconsultation",
+        resource: `${callbackType}-callback`,
+        residentId: callback.residentId,
+        status: "matched",
+        receivedAt: new Date().toISOString(),
+        receivedBy: user.username || user.role,
+        payload: callback.payload,
+        retryCount: 0,
+        deadLetter: false,
+        reconciliationStatus: "matched",
+        targetCollection: "referralTeleconsultations",
+        targetId: rows[index].id
+      };
+      data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
+      let personalRecord = null;
+      if (callbackType === "report") {
+        personalRecord = (Array.isArray(data.personalRecords) ? data.personalRecords : [])
+          .find((record) => record.category === "teleconsultation-report" && record.teleconsultationId === rows[index].id && record.idempotencyKey === callback.idempotencyKey) || null;
+        if (!personalRecord) {
+          personalRecord = buildReferralTeleconsultationPersonalRecord(data, rows[index], callback, user);
+          data.personalRecords = [personalRecord, ...(Array.isArray(data.personalRecords) ? data.personalRecords : [])].slice(0, 500);
+        }
+      }
+      const messages = appendReferralTeleconsultationNotifications(data, rows[index], callbackType, callback, user);
+      data.securityEvents = resealAuditTrail([
+        {
+          id: randomUUID(),
+          at: new Date().toLocaleString("zh-CN", { hour12: false }),
+          actor: user.name,
+          role: user.role,
+          action: `referral teleconsultation ${callbackType} callback`,
+          target: rows[index].id,
+          result: "allowed",
+          detail: `${callback.sourceSystem} / ${callback.idempotencyKey}`
+        },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120));
+      appendDataAccessLog(data, user, rows[index].residentId, "referral teleconsultation", `external ${callbackType} callback`, "allowed");
+      writeDatabase(data);
+      sendJson(res, 200, { teleconsultation: rows[index], integrationEvent: event, personalRecord, messages });
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+    }
     return;
   }
 
@@ -21397,6 +28278,42 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/quality-safety/interface-standard") {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/quality-safety/interface-standard");
+    if (!user) return;
+    sendJson(res, 200, buildQualitySafetyInterfaceStandard({ data: readDatabase() }));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/quality-safety/interface-joint-test-pack") {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/quality-safety/interface-joint-test-pack");
+    if (!user) return;
+    sendJson(res, 200, buildQualitySafetyInterfaceJointTestPack({ data: readDatabase(), secret: integrationGatewaySecret() }));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/quality-safety/interface-messages/validate") {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/quality-safety/interface-messages/validate");
+    if (!user) return;
+    const data = readDatabase();
+    const payload = await collectJson(req);
+    const standard = buildQualitySafetyInterfaceStandard({ data }).standard;
+    const result = validateQualitySafetyInterfaceMessage({
+      standard,
+      interfaceId: payload.interfaceId,
+      method: payload.method || "POST",
+      path: payload.path,
+      headers: payload.headers || {},
+      message: payload.message || payload.payload || {},
+      previousIdempotencyKeys: Array.isArray(payload.previousIdempotencyKeys) ? payload.previousIdempotencyKeys : [],
+      secret: integrationGatewaySecret()
+    });
+    appendQualitySafetyAudit(data, user, "quality-safety interface message validation", result.interfaceId || String(payload.interfaceId || ""), `${result.status}: ${result.errors.map((item) => item.code).join(",") || "accepted"}`);
+    writeDatabase(data);
+    sendJson(res, 200, result);
+    return;
+  }
+
   const qualityDispatchMatch = url.pathname.match(/^\/api\/quality-safety\/issues\/([^/]+)\/dispatch$/);
   if (req.method === "POST" && qualityDispatchMatch) {
     const user = requireApiRole(req, res, ["commission"], "/api/quality-safety/issues/:id/dispatch");
@@ -21519,6 +28436,310 @@ async function handleApi(req, res) {
     appendQualitySafetyAudit(data, user, "quality-safety review", id, `${decision}: ${review.comment}`);
     writeDatabase(data);
     sendJson(res, 200, orders[index]);
+    return;
+  }
+
+  const qualityEscalationMatch = url.pathname.match(/^\/api\/quality-safety\/rectifications\/([^/]+)\/escalate$/);
+  if (req.method === "POST" && qualityEscalationMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/quality-safety/rectifications/:id/escalate");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(qualityEscalationMatch[1]);
+    const orders = Array.isArray(data.qualityRectificationOrders) ? data.qualityRectificationOrders : [];
+    const index = orders.findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Quality rectification order not found" });
+      return;
+    }
+    if (normalizeQualitySafetyStatus(orders[index].status) === "closed") {
+      sendJson(res, 400, { error: "Bad Request", message: "Closed rectification orders cannot be escalated" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const now = new Date().toISOString();
+    const sla = qualitySafetySlaState(orders[index], new Date(now));
+    const escalation = {
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      level: String(payload.level || (sla.slaStatus === "overdue" ? "overdue" : "watch")).trim(),
+      reason: String(payload.reason || payload.comment || "Manual quality-safety escalation.").trim(),
+      slaStatus: sla.slaStatus,
+      daysRemaining: sla.daysRemaining
+    };
+    orders[index] = {
+      ...orders[index],
+      status: "escalated",
+      escalationLevel: escalation.level,
+      escalations: [escalation, ...(orders[index].escalations || [])].slice(0, 50),
+      auditTrail: [{ at: now, by: user.username || user.role, action: "escalate", note: escalation.reason }, ...(orders[index].auditTrail || [])].slice(0, 50)
+    };
+    data.qualityRectificationOrders = orders;
+    appendQualitySafetyAudit(data, user, "quality-safety escalation", id, `${escalation.level}: ${escalation.reason}`);
+    writeDatabase(data);
+    sendJson(res, 200, { ...orders[index], ...qualitySafetySlaState(orders[index], new Date(now)) });
+    return;
+  }
+
+  const qualityCriticalAckMatch = url.pathname.match(/^\/api\/quality-safety\/critical-values\/([^/]+)\/acknowledge$/);
+  if (req.method === "POST" && qualityCriticalAckMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/quality-safety/critical-values/:id/acknowledge");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(qualityCriticalAckMatch[1]);
+    const alerts = Array.isArray(data.criticalValueAlerts) ? data.criticalValueAlerts : [];
+    const index = alerts.findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Critical value alert not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const now = new Date().toISOString();
+    const acknowledgement = {
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      note: String(payload.note || payload.comment || "Critical value acknowledged.").trim()
+    };
+    alerts[index] = {
+      ...alerts[index],
+      status: normalizeQualitySafetyStatus(alerts[index].status) === "closed" ? alerts[index].status : "acknowledged",
+      acknowledgedAt: alerts[index].acknowledgedAt || now,
+      acknowledgement,
+      auditTrail: [{ at: now, by: user.username || user.role, action: "acknowledge", note: acknowledgement.note }, ...(alerts[index].auditTrail || [])].slice(0, 50)
+    };
+    data.criticalValueAlerts = alerts;
+    appendQualitySafetyAudit(data, user, "quality-safety critical value acknowledgement", id, acknowledgement.note);
+    writeDatabase(data);
+    sendJson(res, 200, { ...alerts[index], normalizedStatus: normalizeQualitySafetyStatus(alerts[index].status), acknowledgementComplete: true, dispositionComplete: Boolean(alerts[index].disposedAt) });
+    return;
+  }
+
+  const qualityCriticalDisposeMatch = url.pathname.match(/^\/api\/quality-safety\/critical-values\/([^/]+)\/dispose$/);
+  if (req.method === "POST" && qualityCriticalDisposeMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/quality-safety/critical-values/:id/dispose");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(qualityCriticalDisposeMatch[1]);
+    const alerts = Array.isArray(data.criticalValueAlerts) ? data.criticalValueAlerts : [];
+    const index = alerts.findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Critical value alert not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const now = new Date().toISOString();
+    const disposition = {
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      action: String(payload.action || payload.disposition || "Responsible physician notified and disposition note completed.").trim(),
+      outcome: String(payload.outcome || "disposed").trim()
+    };
+    alerts[index] = {
+      ...alerts[index],
+      status: "disposed",
+      acknowledgedAt: alerts[index].acknowledgedAt || now,
+      disposedAt: now,
+      disposition,
+      action: disposition.action,
+      auditTrail: [{ at: now, by: user.username || user.role, action: "dispose", note: disposition.action }, ...(alerts[index].auditTrail || [])].slice(0, 50)
+    };
+    data.criticalValueAlerts = alerts;
+    data.qualitySafetyEvents = (Array.isArray(data.qualitySafetyEvents) ? data.qualitySafetyEvents : []).map((item) => item.id === alerts[index].eventId ? {
+      ...item,
+      status: "closed",
+      auditTrail: [{ at: now, by: user.username || user.role, action: "critical-value-disposition", note: disposition.action }, ...(item.auditTrail || [])].slice(0, 50)
+    } : item);
+    appendQualitySafetyAudit(data, user, "quality-safety critical value disposition", id, disposition.action);
+    writeDatabase(data);
+    sendJson(res, 200, { ...alerts[index], normalizedStatus: normalizeQualitySafetyStatus(alerts[index].status), acknowledgementComplete: true, dispositionComplete: true });
+    return;
+  }
+
+  const qualityPathwayReviewMatch = url.pathname.match(/^\/api\/quality-safety\/clinical-pathways\/([^/]+)\/review$/);
+  if (req.method === "POST" && qualityPathwayReviewMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/quality-safety/clinical-pathways/:id/review");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(qualityPathwayReviewMatch[1]);
+    const cases = Array.isArray(data.clinicalPathwayCases) ? data.clinicalPathwayCases : [];
+    const index = cases.findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Clinical pathway case not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const decision = String(payload.decision || "approved").trim();
+    if (!["approved", "returned"].includes(decision)) {
+      sendJson(res, 400, { error: "Bad Request", message: "decision must be approved or returned" });
+      return;
+    }
+    const now = new Date().toISOString();
+    const review = {
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      decision,
+      comment: String(payload.comment || "").trim(),
+      evidence: Array.isArray(payload.evidence) ? payload.evidence.map((item) => String(item).trim()).filter(Boolean) : []
+    };
+    const status = decision === "approved" ? "review_passed" : "returned";
+    cases[index] = {
+      ...cases[index],
+      status,
+      reviewedAt: now,
+      reviewedBy: user.username || user.role,
+      reviewTrail: [review, ...(cases[index].reviewTrail || [])].slice(0, 50),
+      auditTrail: [{ at: now, by: user.username || user.role, action: "clinical-pathway-review", note: `${decision}: ${review.comment}` }, ...(cases[index].auditTrail || [])].slice(0, 50)
+    };
+    data.clinicalPathwayCases = cases;
+    data.qualitySafetyEvents = (Array.isArray(data.qualitySafetyEvents) ? data.qualitySafetyEvents : []).map((item) => item.id === cases[index].eventId ? {
+      ...item,
+      status: decision === "approved" ? "closed" : "returned",
+      reviewedAt: now,
+      reviewedBy: user.username || user.role,
+      auditTrail: [{ at: now, by: user.username || user.role, action: "clinical-pathway-review", note: `${decision}: ${review.comment}` }, ...(item.auditTrail || [])].slice(0, 50)
+    } : item);
+    appendQualitySafetyAudit(data, user, "quality-safety clinical pathway review", id, `${decision}: ${review.comment}`);
+    writeDatabase(data);
+    sendJson(res, 200, { ...cases[index], normalizedStatus: normalizeQualitySafetyStatus(cases[index].status), reviewComplete: normalizeQualitySafetyStatus(cases[index].status) === "closed" });
+    return;
+  }
+
+  const qualitySiteSignoffEvidenceMatch = url.pathname.match(/^\/api\/quality-safety\/site-signoffs\/([^/]+)\/evidence$/);
+  if (req.method === "POST" && qualitySiteSignoffEvidenceMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/quality-safety/site-signoffs/:id/evidence");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(qualitySiteSignoffEvidenceMatch[1]);
+    const signoffs = Array.isArray(data.qualitySafetySiteSignoffs) ? data.qualitySafetySiteSignoffs : [];
+    const index = signoffs.findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Quality-safety site sign-off item not found" });
+      return;
+    }
+    const ownerRole = String(signoffs[index].ownerRole || "commission");
+    if (user.role !== "commission" && ownerRole !== user.role) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "访问接口", target: "/api/quality-safety/site-signoffs/:id/evidence", result: "拒绝", detail: `site sign-off ${id} belongs to ${ownerRole}` });
+      sendJson(res, 403, { error: "Forbidden", message: "Site sign-off evidence can only be submitted by the owner role or commission" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const evidence = Array.isArray(payload.evidence) ? payload.evidence.map((item) => String(item).trim()).filter(Boolean) : [];
+    const note = String(payload.note || payload.comment || "").trim();
+    if (evidence.length === 0 && !note) {
+      sendJson(res, 400, { error: "Bad Request", message: "evidence or note is required" });
+      return;
+    }
+    const now = new Date().toISOString();
+    const submission = {
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      ownerRole,
+      note,
+      evidence
+    };
+    signoffs[index] = {
+      ...signoffs[index],
+      status: "evidence_submitted",
+      latestNote: note || signoffs[index].latestNote,
+      submittedAt: now,
+      submittedBy: user.username || user.role,
+      evidence: [...evidence, ...(signoffs[index].evidence || [])].slice(0, 50),
+      submissionTrail: [submission, ...(signoffs[index].submissionTrail || [])].slice(0, 50),
+      auditTrail: [{ at: now, by: user.username || user.role, action: "site-signoff-evidence", note: note || evidence.join(", ") }, ...(signoffs[index].auditTrail || [])].slice(0, 50)
+    };
+    data.qualitySafetySiteSignoffs = signoffs;
+    appendQualitySafetyAudit(data, user, "quality-safety site signoff evidence", id, note || evidence.join(", "));
+    writeDatabase(data);
+    sendJson(res, 200, { ...signoffs[index], normalizedStatus: normalizeQualitySafetyStatus(signoffs[index].status), evidenceCount: (signoffs[index].evidence || []).length });
+    return;
+  }
+
+  const qualityCoreSystemEvidenceMatch = url.pathname.match(/^\/api\/quality-safety\/core-systems\/([^/]+)\/evidence$/);
+  if (req.method === "POST" && qualityCoreSystemEvidenceMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/quality-safety/core-systems/:id/evidence");
+    if (!user) return;
+    const data = readDatabase();
+    const coreSystemId = decodeURIComponent(qualityCoreSystemEvidenceMatch[1]);
+    const matrix = buildQualitySafetyCoreSystemMatrix(data);
+    const row = matrix.find((item) => item.id === coreSystemId);
+    if (!row) {
+      sendJson(res, 404, { error: "Not Found", message: "Core safety system item not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const evidence = Array.isArray(payload.evidence) ? payload.evidence.map((item) => String(item).trim()).filter(Boolean) : [];
+    const note = String(payload.note || payload.comment || "").trim();
+    if (!note && evidence.length === 0) {
+      sendJson(res, 400, { error: "Bad Request", message: "evidence or note is required" });
+      return;
+    }
+    const now = new Date().toISOString();
+    const submission = {
+      id: randomUUID(),
+      coreSystemId,
+      coreSystemName: row.name,
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      role: user.role,
+      orgCode: user.orgCode || "",
+      orgName: user.orgName || "",
+      note,
+      evidence
+    };
+    data.qualitySafetyCoreSystemEvidence = [submission, ...(Array.isArray(data.qualitySafetyCoreSystemEvidence) ? data.qualitySafetyCoreSystemEvidence : [])].slice(0, 300);
+    appendQualitySafetyAudit(data, user, "quality-safety core system evidence", coreSystemId, note || evidence.join(", "));
+    writeDatabase(data);
+    const updated = buildQualitySafetyCoreSystemMatrix(data).find((item) => item.id === coreSystemId);
+    sendJson(res, 200, updated);
+    return;
+  }
+
+  const qualitySiteSignoffMatch = url.pathname.match(/^\/api\/quality-safety\/site-signoffs\/([^/]+)\/review$/);
+  if (req.method === "POST" && qualitySiteSignoffMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/quality-safety/site-signoffs/:id/review");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(qualitySiteSignoffMatch[1]);
+    const signoffs = Array.isArray(data.qualitySafetySiteSignoffs) ? data.qualitySafetySiteSignoffs : [];
+    const index = signoffs.findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Quality-safety site sign-off item not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const decision = String(payload.decision || payload.status || "ready_for_joint_test").trim();
+    if (!["ready_for_joint_test", "accepted", "returned", "pending_site_confirmation"].includes(decision)) {
+      sendJson(res, 400, { error: "Bad Request", message: "decision must be ready_for_joint_test, accepted, returned, or pending_site_confirmation" });
+      return;
+    }
+    const now = new Date().toISOString();
+    const review = {
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      decision,
+      note: String(payload.note || payload.comment || "").trim(),
+      evidence: Array.isArray(payload.evidence) ? payload.evidence.map((item) => String(item).trim()).filter(Boolean) : []
+    };
+    signoffs[index] = {
+      ...signoffs[index],
+      status: decision,
+      latestNote: review.note || signoffs[index].latestNote,
+      reviewedAt: now,
+      reviewedBy: user.username || user.role,
+      evidence: [...review.evidence, ...(signoffs[index].evidence || [])].slice(0, 50),
+      reviewTrail: [review, ...(signoffs[index].reviewTrail || [])].slice(0, 50),
+      auditTrail: [{ at: now, by: user.username || user.role, action: "site-signoff-review", note: `${decision}: ${review.note}` }, ...(signoffs[index].auditTrail || [])].slice(0, 50)
+    };
+    data.qualitySafetySiteSignoffs = signoffs;
+    appendQualitySafetyAudit(data, user, "quality-safety site signoff review", id, `${decision}: ${review.note}`);
+    writeDatabase(data);
+    sendJson(res, 200, { ...signoffs[index], normalizedStatus: normalizeQualitySafetyStatus(signoffs[index].status), evidenceCount: (signoffs[index].evidence || []).length });
     return;
   }
 
@@ -21785,6 +29006,14 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/research/compliant-exports") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/compliant-exports");
+    if (!user) return;
+    const data = readDatabase();
+    sendJson(res, 200, { exports: Array.isArray(data.compliantDataExports) ? data.compliantDataExports : [] });
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/research/datasets") {
     const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/datasets");
     if (!user) return;
@@ -21957,6 +29186,33 @@ async function handleApi(req, res) {
     return;
   }
 
+  const researchDatasetEvidenceMatch = url.pathname.match(/^\/api\/research\/datasets\/([^/]+)\/evidence$/);
+  if (req.method === "POST" && researchDatasetEvidenceMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/datasets/:id/evidence");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(researchDatasetEvidenceMatch[1]);
+    const index = (data.researchDatasets || []).findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Research dataset not found" });
+      return;
+    }
+    try {
+      const payload = await collectJson(req);
+      const document = normalizeResearchEvidenceDocument(payload, user, data.researchDatasets[index]);
+      data.researchDatasets[index].evidenceDocuments = [
+        document,
+        ...(Array.isArray(data.researchDatasets[index].evidenceDocuments) ? data.researchDatasets[index].evidenceDocuments : [])
+      ].slice(0, 50);
+      appendResearchAudit(data, user, data.researchDatasets[index], "evidence-document", `${document.type}:${document.referenceNo}`);
+      writeDatabase(data);
+      sendJson(res, 200, data.researchDatasets[index]);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+    }
+    return;
+  }
+
   const researchSandboxAccessMatch = url.pathname.match(/^\/api\/research\/datasets\/([^/]+)\/sandbox-access$/);
   if (req.method === "POST" && researchSandboxAccessMatch) {
     const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/datasets/:id/sandbox-access");
@@ -21969,9 +29225,9 @@ async function handleApi(req, res) {
       return;
     }
     if (!requireDatasetSandboxAccess(data.researchDatasets[index])) {
-      appendResearchAudit(data, user, data.researchDatasets[index], "sandbox-access", "blocked by ethics/de-identification/authorization status", "denied");
+      appendResearchAudit(data, user, data.researchDatasets[index], "sandbox-access", "blocked by ethics/de-identification/authorization/governance/evidence status", "denied");
       writeDatabase(data);
-      sendJson(res, 403, { error: "Forbidden", message: "Dataset is not approved, de-identified, and active for sandbox access" });
+      sendJson(res, 403, { error: "Forbidden", message: "Dataset is not approved, de-identified, governance-ready, evidence-ready, and active for sandbox access" });
       return;
     }
     const payload = await collectJson(req);
@@ -21988,10 +29244,44 @@ async function handleApi(req, res) {
       datasetId: id,
       sandboxToken: `sandbox-${id}-${Date.now()}`,
       deidentified: true,
+      governance: data.researchDatasets[index].governance || {},
       records: data.researchDatasets[index].records || 0,
       sourceCollections: data.researchDatasets[index].sourceCollections || [],
       expiresInMinutes: 120
     });
+    return;
+  }
+
+  const researchCompliantExportMatch = url.pathname.match(/^\/api\/research\/datasets\/([^/]+)\/compliant-exports$/);
+  if (req.method === "POST" && researchCompliantExportMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/datasets/:id/compliant-exports");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(researchCompliantExportMatch[1]);
+    const index = (data.researchDatasets || []).findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Research dataset not found" });
+      return;
+    }
+    if (!requireDatasetSandboxAccess(data.researchDatasets[index])) {
+      appendResearchAudit(data, user, data.researchDatasets[index], "compliant-data-export", "blocked by ethics/de-identification/authorization/governance/evidence status", "denied");
+      writeDatabase(data);
+      sendJson(res, 403, { error: "Forbidden", message: "Dataset is not approved, de-identified, governance-ready, evidence-ready, and active for compliant export" });
+      return;
+    }
+    try {
+      const payload = await collectJson(req);
+      const exportRequest = normalizeCompliantDataExport(payload, user, data.researchDatasets[index]);
+      data.compliantDataExports = [
+        exportRequest,
+        ...(Array.isArray(data.compliantDataExports) ? data.compliantDataExports : [])
+      ].slice(0, 120);
+      appendResearchAudit(data, user, data.researchDatasets[index], "compliant-data-export", `${exportRequest.id}:${exportRequest.destination}`);
+      writeDatabase(data);
+      sendJson(res, 201, exportRequest);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+    }
     return;
   }
 
@@ -22098,19 +29388,16 @@ async function handleApi(req, res) {
     }
     const message = createTaskMessage({ task, payload: await collectJson(req), user });
     data.taskMessages = [message, ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])].slice(0, 300);
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "send task message",
-        target: taskId,
-        result: "allowed",
-        detail: `${message.targetRole} · ${message.channel}`
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "send task message",
+      target: taskId,
+      result: "allowed",
+      detail: `${message.targetRole} · ${message.channel}`
+    });
     writeDatabase(data);
     sendJson(res, 201, message);
     return;
@@ -22244,6 +29531,9 @@ async function handleApi(req, res) {
     }
     if (user.role === "citizen") {
       data.taskMessages = [buildCitizenTaskActionMessage(rows[index], collection, payload, user), ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])].slice(0, 300);
+    }
+    if (collection === "drugConsumableSupervisions") {
+      appendDrugConsumableAuditTrail(rows[index], user, "unified-task-action", payload.comment || payload.action);
     }
     data.securityEvents = [
       {
@@ -22409,6 +29699,77 @@ async function handleApi(req, res) {
     }, ...(data.securityEvents || [])].slice(0, 120), { recompute: true });
     writeDatabase(normalizeState(data));
     sendJson(res, 200, { ok: true, institution: institutions[index], board: buildDigitalHospitalPilotBoard(readDatabase(), user) });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/digital-hospital/pilot-issues/actions") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/digital-hospital/pilot-issues/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    if (payload.action !== "create") {
+      sendJson(res, 400, { error: "Bad Request", message: "Only create is accepted" });
+      return;
+    }
+    const data = readDatabase();
+    const institutionId = String(payload.institutionId || (user.role === "institution" ? user.orgCode : "") || "").trim();
+    const pilotInstitutions = Array.isArray(data.digitalHospitalPilotInstitutions) ? data.digitalHospitalPilotInstitutions : seedDigitalHospitalPilotInstitutions();
+    const pilotInstitution = pilotInstitutions.find((item) => item.institutionId === institutionId);
+    if (!pilotInstitution) {
+      sendJson(res, 400, { error: "Bad Request", message: "Pilot issue institution must be registered in the pilot roster" });
+      return;
+    }
+    const existingIssues = Array.isArray(data.digitalHospitalPilotIssues) ? data.digitalHospitalPilotIssues : seedDigitalHospitalPilotIssues();
+    if (existingIssues.some((item) => item.institutionId === institutionId && item.title === String(payload.title || "").trim() && item.status !== "verified-closed")) {
+      sendJson(res, 409, { error: "Conflict", message: "An open pilot issue with the same institution and title already exists" });
+      return;
+    }
+    let issue;
+    try {
+      issue = createDigitalHospitalPilotIssue({ ...payload, institutionId, institutionName: pilotInstitution.institutionName }, user);
+    } catch (error) {
+      const status = Number(error.status) || 400;
+      sendJson(res, status, { error: status === 403 ? "Forbidden" : "Bad Request", message: error.message });
+      return;
+    }
+    data.digitalHospitalPilotIssues = [issue, ...existingIssues].slice(0, 1000);
+    data.securityEvents = sealAuditTrail([{
+      id: randomUUID(), at: new Date().toISOString(), actor: user.name, role: user.role,
+      action: "digital-hospital-pilot-issue-create", target: issue.id, result: "allowed",
+      detail: `${issue.institutionId} / ${issue.severity} / no patient PII`
+    }, ...(data.securityEvents || [])].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    sendJson(res, 201, { ok: true, issue, board: buildDigitalHospitalPilotBoard(readDatabase(), user) });
+    return;
+  }
+
+  const digitalHospitalPilotIssueActionMatch = url.pathname.match(/^\/api\/digital-hospital\/pilot-issues\/([^/]+)\/actions$/);
+  if (req.method === "POST" && digitalHospitalPilotIssueActionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/digital-hospital/pilot-issues/:id/actions");
+    if (!user) return;
+    const issueId = decodeURIComponent(digitalHospitalPilotIssueActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const issues = Array.isArray(data.digitalHospitalPilotIssues) ? data.digitalHospitalPilotIssues : seedDigitalHospitalPilotIssues();
+    const index = issues.findIndex((item) => item.id === issueId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Digital hospital pilot issue not found" });
+      return;
+    }
+    try {
+      issues[index] = normalizeDigitalHospitalPilotIssueAction(issues[index], payload, user);
+    } catch (error) {
+      const status = Number(error.status) || 400;
+      sendJson(res, status, { error: status === 403 ? "Forbidden" : status === 409 ? "Conflict" : "Bad Request", message: error.message });
+      return;
+    }
+    data.digitalHospitalPilotIssues = issues;
+    data.securityEvents = sealAuditTrail([{
+      id: randomUUID(), at: new Date().toISOString(), actor: user.name, role: user.role,
+      action: "digital-hospital-pilot-issue-action", target: issueId, result: "allowed",
+      detail: `${payload.action} / ${issues[index].status} / ${issues[index].institutionId}`
+    }, ...(data.securityEvents || [])].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    sendJson(res, 200, { ok: true, issue: issues[index], board: buildDigitalHospitalPilotBoard(readDatabase(), user) });
     return;
   }
 
@@ -24687,19 +32048,16 @@ async function handleApi(req, res) {
     landAppointmentIntegrationEvent(data, payload, event, user);
     landPhysicalExamIntegrationEvent(data, payload, event, user);
     data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "接收集成事件",
-        target: `${contract.domain}/${payload.externalId}`,
-        result: "允许",
-        detail: `${contract.id} · ${event.idempotencyKey}`
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "接收集成事件",
+      target: `${contract.domain}/${payload.externalId}`,
+      result: "允许",
+      detail: `${contract.id} · ${event.idempotencyKey}`
+    });
     writeDatabase(data);
     sendJson(res, 202, event);
     return;
@@ -24729,19 +32087,16 @@ async function handleApi(req, res) {
     landAppointmentIntegrationEvent(data, sample.payload, event, user);
     landPhysicalExamIntegrationEvent(data, sample.payload, event, user);
     data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "模拟集成网关联调",
-        target: `${contract.domain}/${sample.payload.externalId}`,
-        result: "允许",
-        detail: `${contract.id} · ${sample.payload.idempotencyKey}`
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "模拟集成网关联调",
+      target: `${contract.domain}/${sample.payload.externalId}`,
+      result: "允许",
+      detail: `${contract.id} · ${sample.payload.idempotencyKey}`
+    });
     writeDatabase(data);
     sendJson(res, 202, { sample, event });
     return;
@@ -24995,19 +32350,16 @@ async function handleApi(req, res) {
       sendJson(res, 404, { error: "Not Found", message: "未找到集成网关事件" });
       return;
     }
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "标记集成网关死信",
-        target: event.id,
-        result: "允许",
-        detail: `${event.contractId} · ${event.idempotencyKey} · ${event.deadLetterReason}`
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "标记集成网关死信",
+      target: event.id,
+      result: "允许",
+      detail: `${event.contractId} · ${event.idempotencyKey} · ${event.deadLetterReason}`
+    });
     writeDatabase(data);
     sendJson(res, 200, event);
     return;
@@ -25444,6 +32796,194 @@ async function handleApi(req, res) {
     return;
   }
 
+  const imagingRecognitionMatch = url.pathname.match(/^\/api\/imaging-cloud\/studies\/([^/]+)\/mutual-recognition$/);
+  if (req.method === "POST" && imagingRecognitionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/imaging-cloud/studies/:id/mutual-recognition");
+    if (!user) return;
+    const data = readDatabase();
+    const studyId = decodeURIComponent(imagingRecognitionMatch[1]);
+    const studyIndex = (data.imageCloudStudies || []).findIndex((item) => item.id === studyId);
+    if (studyIndex < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到影像云检查" });
+      return;
+    }
+    const study = data.imageCloudStudies[studyIndex];
+    if (!canAccessResident(user, study.residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "start imaging mutual recognition", target: studyId, result: "denied", detail: "resident scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "无权将该居民影像纳入跨机构互认" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const chain = createImageCloudMutualRecognitionChain(data, study, payload, user);
+    data.imageCloudStudies[studyIndex] = {
+      ...study,
+      mutualRecognitionStatus: chain.recognition.status,
+      mutualRecognitionRecordId: chain.recognition.id,
+      countyCollaborationOrderId: chain.order.id,
+      updatedAt: new Date().toISOString()
+    };
+    appendDataAccessLog(data, user, study.residentId, "医学影像云", `纳入跨机构互认 ${study.accessionNumber} · ${study.mainIndex}`);
+    data.securityEvents = [{
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "start imaging mutual recognition",
+      target: studyId,
+      result: "allowed",
+      detail: `${chain.order.id} · ${chain.recognition.id} · ${study.mainIndex}`
+    }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, chain.created ? 201 : 200, { ...chain, study: data.imageCloudStudies[studyIndex] });
+    return;
+  }
+
+  const imagingRecognitionDecisionMatch = url.pathname.match(/^\/api\/imaging-cloud\/studies\/([^/]+)\/mutual-recognition\/decision$/);
+  if (req.method === "POST" && imagingRecognitionDecisionMatch) {
+    const user = requireApiRole(req, res, ["commission", "county"], "/api/imaging-cloud/studies/:id/mutual-recognition/decision");
+    if (!user) return;
+    const data = readDatabase();
+    const studyId = decodeURIComponent(imagingRecognitionDecisionMatch[1]);
+    const studyIndex = (data.imageCloudStudies || []).findIndex((item) => item.id === studyId);
+    if (studyIndex < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到影像云检查" });
+      return;
+    }
+    const study = data.imageCloudStudies[studyIndex];
+    if (!canAccessResident(user, study.residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "decide imaging mutual recognition", target: studyId, result: "denied", detail: "resident scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "无权确认该居民影像互认结果" });
+      return;
+    }
+    const record = (data.countyMutualRecognitionRecords || []).find((item) => item.imageCloudStudyId === studyId);
+    if (!record) {
+      sendJson(res, 409, { error: "Conflict", message: "请先将影像检查纳入跨机构互认" });
+      return;
+    }
+    const payload = await collectJson(req);
+    let reviewed;
+    try {
+      reviewed = reviewMutualRecognitionRecord(data, record.id, payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    const recognized = reviewed.status === "recognized";
+    const citation = upsertPhase2MutualRecognitionCitation(data, reviewed, payload, user);
+    data.imageCloudStudies[studyIndex] = {
+      ...study,
+      mutualRecognitionStatus: recognized ? "已互认" : "不予互认",
+      mutualRecognitionRecordId: reviewed.id,
+      mutualRecognitionReason: reviewed.reviewReasonCode,
+      mutualRecognitionReviewedAt: reviewed.reviewedAt,
+      updatedAt: new Date().toISOString()
+    };
+    data.countyCollaborationOrders = (data.countyCollaborationOrders || []).map((item) => item.recognitionRecordId === reviewed.id ? {
+      ...item,
+      status: recognized ? "已完成互认" : "退回复核",
+      result: recognized ? "影像报告已互认，可按授权主索引调阅" : `不予互认：${reviewed.reviewReasonCode}`,
+      updatedAt: reviewed.reviewedAt
+    } : item);
+    appendDataAccessLog(data, user, study.residentId, "医学影像云", `${recognized ? "确认互认" : "拒绝互认"} ${study.accessionNumber} · ${study.mainIndex}`);
+    data.securityEvents = [{
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "decide imaging mutual recognition",
+      target: studyId,
+      result: "allowed",
+      detail: `${reviewed.status} · ${reviewed.reviewReasonCode} · ${citation?.evidenceHash || "no-citation"}`
+    }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, { study: data.imageCloudStudies[studyIndex], record: reviewed, citation });
+    return;
+  }
+
+  const imagingRecognitionAppealMatch = url.pathname.match(/^\/api\/imaging-cloud\/studies\/([^/]+)\/mutual-recognition\/appeal$/);
+  if (req.method === "POST" && imagingRecognitionAppealMatch) {
+    const user = requireApiRole(req, res, ["institution"], "/api/imaging-cloud/studies/:id/mutual-recognition/appeal");
+    if (!user) return;
+    const data = readDatabase();
+    const studyId = decodeURIComponent(imagingRecognitionAppealMatch[1]);
+    const studyIndex = (data.imageCloudStudies || []).findIndex((item) => item.id === studyId);
+    const record = (data.countyMutualRecognitionRecords || []).find((item) => item.imageCloudStudyId === studyId);
+    if (studyIndex < 0 || !record) {
+      sendJson(res, 404, { error: "Not Found", message: "影像检查或互认记录不存在" });
+      return;
+    }
+    let result;
+    try {
+      result = submitImageCloudRecognitionAppeal(data, data.imageCloudStudies[studyIndex], record, await collectJson(req), user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    data.imageCloudStudies[studyIndex] = {
+      ...data.imageCloudStudies[studyIndex],
+      mutualRecognitionStatus: "appeal-pending",
+      mutualRecognitionReason: result.appeal.reason,
+      updatedAt: result.appeal.submittedAt
+    };
+    data.countyCollaborationOrders = (data.countyCollaborationOrders || []).map((item) => item.recognitionRecordId === record.id ? {
+      ...item,
+      status: "appeal-pending",
+      result: `Appeal evidence pending independent review: ${result.appeal.evidenceRefs.join(", ")}`,
+      updatedAt: result.appeal.submittedAt
+    } : item);
+    data.securityEvents = [{
+      id: randomUUID(), at: new Date().toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role,
+      action: "submit imaging mutual recognition appeal", target: studyId, result: "allowed",
+      detail: `${result.appeal.id} / ${result.appeal.evidenceRefs.join(",")}`
+    }, ...(data.securityEvents || [])].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 201, { study: data.imageCloudStudies[studyIndex], ...result });
+    return;
+  }
+
+  const imagingRecognitionAppealReviewMatch = url.pathname.match(/^\/api\/imaging-cloud\/studies\/([^/]+)\/mutual-recognition\/appeal\/review$/);
+  if (req.method === "POST" && imagingRecognitionAppealReviewMatch) {
+    const user = requireApiRole(req, res, ["commission", "county"], "/api/imaging-cloud/studies/:id/mutual-recognition/appeal/review");
+    if (!user) return;
+    const data = readDatabase();
+    const studyId = decodeURIComponent(imagingRecognitionAppealReviewMatch[1]);
+    const studyIndex = (data.imageCloudStudies || []).findIndex((item) => item.id === studyId);
+    const record = (data.countyMutualRecognitionRecords || []).find((item) => item.imageCloudStudyId === studyId);
+    if (studyIndex < 0 || !record) {
+      sendJson(res, 404, { error: "Not Found", message: "影像检查或互认记录不存在" });
+      return;
+    }
+    let result;
+    try {
+      result = reviewImageCloudRecognitionAppeal(data, record, await collectJson(req), user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    const citation = upsertPhase2MutualRecognitionCitation(data, result.record, { reasonCode: result.record.reviewReasonCode }, user);
+    data.imageCloudStudies[studyIndex] = {
+      ...data.imageCloudStudies[studyIndex],
+      mutualRecognitionStatus: result.approved ? "recognized-after-appeal" : "rejected-after-appeal",
+      mutualRecognitionReason: result.record.reviewReasonCode || result.appeal.reviewComment,
+      mutualRecognitionReviewedAt: result.appeal.reviewedAt,
+      updatedAt: result.appeal.reviewedAt
+    };
+    data.countyCollaborationOrders = (data.countyCollaborationOrders || []).map((item) => item.recognitionRecordId === record.id ? {
+      ...item,
+      status: result.approved ? "recognized-after-appeal" : "appeal-rejected",
+      result: result.approved ? "Mutual recognition approved after independent appeal review" : "Appeal rejected after independent review",
+      updatedAt: result.appeal.reviewedAt
+    } : item);
+    data.securityEvents = [{
+      id: randomUUID(), at: new Date().toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role,
+      action: "review imaging mutual recognition appeal", target: studyId, result: "allowed",
+      detail: `${result.appeal.status} / ${result.appeal.id} / ${citation?.evidenceHash || "no-citation"}`
+    }, ...(data.securityEvents || [])].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, { study: data.imageCloudStudies[studyIndex], ...result, citation });
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/mutual-recognition/rules") {
     const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/mutual-recognition/rules");
     if (!user) return;
@@ -25483,19 +33023,16 @@ async function handleApi(req, res) {
     if (normalized.criticalSignal) {
       data.emergencySignals = [normalized.criticalSignal, ...(Array.isArray(data.emergencySignals) ? data.emergencySignals : [])].slice(0, 200);
     }
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "submit diagnostic report",
-        target: `${normalized.report.residentId}/${normalized.report.item}`,
-        result: "allowed",
-        detail: `${normalized.report.status} · ${normalized.report.ruleId || "no-rule"}${normalized.criticalSignal ? " · critical" : ""}`
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "submit diagnostic report",
+      target: `${normalized.report.residentId}/${normalized.report.item}`,
+      result: "allowed",
+      detail: `${normalized.report.status} · ${normalized.report.ruleId || "no-rule"}${normalized.criticalSignal ? " · critical" : ""}`
+    });
     writeDatabase(data);
     sendJson(res, 201, normalized);
     return;
@@ -25554,19 +33091,16 @@ async function handleApi(req, res) {
       sendJson(res, 404, { error: "Not Found", message: "未找到互认记录" });
       return;
     }
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "review mutual recognition",
-        target: reviewed.id,
-        result: "allowed",
-        detail: `${reviewed.reviewStatus} · ${reviewed.reviewReasonCode}`
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "review mutual recognition",
+      target: reviewed.id,
+      result: "allowed",
+      detail: `${reviewed.reviewStatus} · ${reviewed.reviewReasonCode}`
+    });
     writeDatabase(data);
     sendJson(res, 200, reviewed);
     return;
@@ -25745,19 +33279,16 @@ async function handleApi(req, res) {
         collectionVersions: { multiPracticeApplications: Number(patch.expectedVersion) }
       };
     }
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "更新多点执业申请",
-        target: id,
-        result: "允许",
-        detail: `状态更新为 ${data.multiPracticeApplications[index].status || "已更新"}`
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "更新多点执业申请",
+      target: id,
+      result: "允许",
+      detail: `状态更新为 ${data.multiPracticeApplications[index].status || "已更新"}`
+    });
     writeDatabase(data);
     sendJson(res, 200, data.multiPracticeApplications[index]);
     return;
@@ -25793,6 +33324,95 @@ async function handleApi(req, res) {
     const data = readDatabase();
     const result = DiseasePaymentService.simulateDrgCase(data.diseasePayment, await collectJson(req));
     sendJson(res, 200, result);
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/parameters" && req.method === "GET") {
+    const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
+    if (!user) return;
+    sendJson(res, 200, DiseasePaymentService.buildParameterGovernanceView(readDatabase().diseasePayment));
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/parameters" && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    const result = DiseasePaymentService.createPaymentParameter(data.diseasePayment, await collectJson(req), user.name);
+    data.diseasePayment = result.state;
+    writeDatabase(data);
+    sendJson(res, 201, result.row);
+    return;
+  }
+
+  const diseasePaymentParameterActionMatch = url.pathname.match(/^\/api\/disease-payment\/parameters\/([^/]+)\/(simulate|submit|review|publish)$/);
+  if (diseasePaymentParameterActionMatch && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
+    if (!user) return;
+    const [, encodedId, action] = diseasePaymentParameterActionMatch;
+    const id = decodeURIComponent(encodedId);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const handlers = {
+      simulate: () => DiseasePaymentService.simulatePaymentParameter(data.diseasePayment, id, user.name),
+      submit: () => DiseasePaymentService.submitPaymentParameter(data.diseasePayment, id, user.name),
+      review: () => DiseasePaymentService.reviewPaymentParameter(data.diseasePayment, id, payload, user.name),
+      publish: () => DiseasePaymentService.publishPaymentParameter(data.diseasePayment, id, user.name)
+    };
+    const result = handlers[action]();
+    data.diseasePayment = result.state;
+    writeDatabase(data);
+    sendJson(res, 200, { parameter: result.row, impactReport: result.report, approval: result.approval });
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/formal-grouping/operations" && req.method === "GET") {
+    const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
+    if (!user) return;
+    const state = DiseasePaymentService.normalizeState(readDatabase().diseasePayment);
+    sendJson(res, 200, DiseasePaymentIntake.buildFormalGroupingOperations(state));
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/formal-grouping/jobs" && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    try {
+      const result = DiseasePaymentIntake.createFormalGroupingJob(DiseasePaymentService.normalizeState(data.diseasePayment), await collectJson(req), user.name);
+      data.diseasePayment = result.state;
+      writeDatabase(data);
+      sendJson(res, result.idempotent ? 200 : 201, { job: result.job, envelope: result.envelope, idempotent: result.idempotent });
+    } catch (error) {
+      sendJson(res, 409, { error: "Conflict", message: error.message });
+    }
+    return;
+  }
+
+  const diseasePaymentFormalGroupingActionMatch = url.pathname.match(/^\/api\/disease-payment\/formal-grouping\/jobs\/([^/]+)\/(dispatch|receipts|fail|retry|reconcile)$/);
+  if (diseasePaymentFormalGroupingActionMatch && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
+    if (!user) return;
+    const [, encodedId, action] = diseasePaymentFormalGroupingActionMatch;
+    const id = decodeURIComponent(encodedId);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const state = DiseasePaymentService.normalizeState(data.diseasePayment);
+    try {
+      const handlers = {
+        dispatch: () => DiseasePaymentIntake.dispatchFormalGroupingJob(state, id, payload, user.name),
+        receipts: () => DiseasePaymentIntake.receiveFormalGroupingReceipt(state, id, payload, user.name, DiseasePaymentService.calculateCase),
+        fail: () => DiseasePaymentIntake.failFormalGroupingJob(state, id, payload, user.name),
+        retry: () => DiseasePaymentIntake.retryFormalGroupingJob(state, id, user.name),
+        reconcile: () => DiseasePaymentIntake.reconcileFormalGroupingDeadLetter(state, id, payload, user.name)
+      };
+      const result = handlers[action]();
+      data.diseasePayment = result.state;
+      writeDatabase(data);
+      sendJson(res, 200, { job: result.job, envelope: result.envelope, groupingRun: result.run, deadLetter: result.deadLetter, receiptErrors: result.receiptErrors || [], idempotent: result.idempotent || false, operations: DiseasePaymentIntake.buildFormalGroupingOperations(result.state) });
+    } catch (error) {
+      sendJson(res, 409, { error: "Conflict", message: error.message });
+    }
     return;
   }
 
@@ -25930,34 +33550,34 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/state");
     if (!user) return;
     const payload = await collectJson(req);
-    const existingAuditById = new Map((readDatabase().securityEvents || []).map((item) => [item.id, item]));
-    const auditPayloadTampered = (Array.isArray(payload.securityEvents) ? payload.securityEvents : []).some((item) => {
-      const existing = existingAuditById.get(item.id);
-      return existing && item.auditHash === existing.auditHash && auditHashFor(item) !== item.auditHash;
-    });
+    const currentData = readDatabase();
+    const incomingSecurityEvents = Array.isArray(payload.securityEvents) ? payload.securityEvents : [];
+    const incomingAccessLogs = Array.isArray(payload.dataAccessLogs) ? payload.dataAccessLogs : [];
+    const incomingSecurityTrailOk = incomingSecurityEvents.length === 0 ||
+      verifyAuditTrail(incomingSecurityEvents).passed ||
+      auditTrailRowsMatch(incomingSecurityEvents, currentData.securityEvents) ||
+      auditTrailRowsMatchById(incomingSecurityEvents, currentData.securityEvents);
+    const incomingAccessTrailOk = incomingAccessLogs.length === 0 || verifyAuditTrail(incomingAccessLogs).passed;
     const data = normalizeState(payload);
     data.storageMeta = payload.storageMeta;
-    if (!auditPayloadTampered) {
-      data.securityEvents = data.securityEvents.map((item) => {
-        const { auditHash, previousAuditHash, ...rest } = item;
-        return rest;
-      });
-      data.securityEvents = [
-        {
-          id: randomUUID(),
-          at: new Date().toLocaleString("zh-CN", { hour12: false }),
-          actor: user.name,
-          role: user.role,
-          action: "更新数据",
-          target: "/api/state",
-          result: "允许",
-          detail: "全量保存平台数据"
-        },
-        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-      ].slice(0, 120);
-    }
+    data.dataAccessLogs = incomingAccessTrailOk ? resealAuditTrail(data.dataAccessLogs) : sealAuditTrail(data.dataAccessLogs);
+    const saveEvent = {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "更新数据",
+      target: "/api/state",
+      result: "允许",
+      detail: "全量保存平台数据"
+    };
+    const nextSecurityEvents = [saveEvent, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120);
+    data.securityEvents = incomingSecurityTrailOk
+      ? resealAuditTrail(nextSecurityEvents)
+      : prependAuditEventPreservingTrail(saveEvent, data.securityEvents);
     writeDatabase(data);
-    sendJson(res, 200, data);
+    const normalized = readDatabase();
+    sendJson(res, 200, normalized);
     return;
   }
 
@@ -25981,19 +33601,16 @@ async function handleApi(req, res) {
       ...(data.storageMeta || {}),
       collectionVersions: Object.hasOwn(payload, "expectedVersion") ? { [collection]: Number(payload.expectedVersion) } : {}
     };
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "集合级保存数据",
-        target: collection,
-        result: "允许",
-        detail: `保存 ${collection}，记录数 ${value.length}`
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "集合级保存数据",
+      target: collection,
+      result: "允许",
+      detail: `保存 ${collection}，记录数 ${value.length}`
+    });
     writeDatabase(data);
     const versions = storageMeta().collectionVersions;
     sendJson(res, 200, { ok: true, collection, version: versions[collection] ?? null, count: value.length });
@@ -26043,19 +33660,16 @@ async function handleApi(req, res) {
       job,
       ...(Array.isArray(data.healthStatisticsIngestion.jobs) ? data.healthStatisticsIngestion.jobs : [])
     ].slice(0, 80);
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "登记统计导入任务",
-        target: job.target,
-        result: "允许",
-        detail: `${job.source} · ${job.period} · ${job.name}`
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "登记统计导入任务",
+      target: job.target,
+      result: "允许",
+      detail: `${job.source} · ${job.period} · ${job.name}`
+    });
     writeDatabase(data);
     sendJson(res, 201, job);
     return;
@@ -26350,19 +33964,16 @@ async function handleApi(req, res) {
     }
     data.birthCertificates = [certificate, ...(Array.isArray(data.birthCertificates) ? data.birthCertificates : [])].slice(0, 200);
     refreshBirthStatistics(data);
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "登记出生医学证明",
-        target: certificate.certificateNo,
-        result: "允许",
-        detail: `${certificate.newbornName} · ${certificate.issueType} · ${certificate.issuingInstitution}`
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "登记出生医学证明",
+      target: certificate.certificateNo,
+      result: "允许",
+      detail: `${certificate.newbornName} · ${certificate.issueType} · ${certificate.issuingInstitution}`
+    });
     const normalized = normalizeState(data);
     if (Object.hasOwn(payload, "expectedVersion")) {
       normalized.storageMeta = {
@@ -26408,19 +34019,16 @@ async function handleApi(req, res) {
     }
     data.deathCertificates = [certificate, ...(Array.isArray(data.deathCertificates) ? data.deathCertificates : [])].slice(0, 200);
     refreshDeathStatistics(data);
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "登记死亡医学证明",
-        target: certificate.certificateNo,
-        result: "允许",
-        detail: `${certificate.deceasedName} · ${certificate.deathReasonType} · ${certificate.reportChannel}`
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "登记死亡医学证明",
+      target: certificate.certificateNo,
+      result: "允许",
+      detail: `${certificate.deceasedName} · ${certificate.deathReasonType} · ${certificate.reportChannel}`
+    });
     const normalized = normalizeState(data);
     if (Object.hasOwn(payload, "expectedVersion")) {
       normalized.storageMeta = {
@@ -26500,19 +34108,16 @@ async function handleApi(req, res) {
     }
     if (payload.status && collection !== "multiPracticeApplications") item.status = String(payload.status);
     item.lastUpdated = new Date().toISOString();
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "更新业务闭环",
-        target: `${collection}/${item.id}`,
-        result: "允许",
-        detail: payload.note || `状态更新为 ${item.status || "已更新"}`
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "更新业务闭环",
+      target: `${collection}/${item.id}`,
+      result: "允许",
+      detail: payload.note || `状态更新为 ${item.status || "已更新"}`
+    });
     if (Object.hasOwn(payload, "expectedVersion")) {
       data.storageMeta = {
         ...(data.storageMeta || {}),
@@ -26554,19 +34159,16 @@ async function handleApi(req, res) {
       revokeReason: String(payload.reason || "居民撤销授权").trim(),
       updatedAt: new Date().toISOString()
     };
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "撤销居民授权",
-        target: id,
-        result: "允许",
-        detail: data.personalRecords[index].revokeReason
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "撤销居民授权",
+      target: id,
+      result: "允许",
+      detail: data.personalRecords[index].revokeReason
+    });
     if (Object.hasOwn(payload, "expectedVersion")) {
       data.storageMeta = {
         ...(data.storageMeta || {}),
@@ -26601,7 +34203,7 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/innovation");
     if (!user) return;
     const data = readDatabase();
-    sendJson(res, 200, { ...BloodInnovationService.dashboard(data, user, url.searchParams.get("code") || ""), eventHub: BloodEventHub.dashboard(data, user) });
+    sendJson(res, 200, { ...BloodInnovationService.dashboard(data, user, url.searchParams.get("code") || ""), eventHub: BloodEventHub.dashboard(data, user), goLive: BloodGoLiveService.center(data) });
     return;
   }
 
@@ -26609,6 +34211,22 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/events");
     if (!user) return;
     sendJson(res, 200, BloodEventHub.dashboard(readDatabase(), user));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/blood-system/go-live") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/go-live"); if (!user) return;
+    sendJson(res, 200, BloodGoLiveService.center(readDatabase())); return;
+  }
+
+  const bloodGoLiveActionMatch = url.pathname.match(/^\/api\/blood-system\/go-live\/(endpoints|requirements|drills|migrations|approvals)\/([^/]+)\/(probe|actions|complete|reconcile|sign)$/);
+  if (req.method === "POST" && bloodGoLiveActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/blood-system/go-live/actions"); if (!user) return;
+    const data = readDatabase(), payload = await collectJson(req), [,resource,id] = bloodGoLiveActionMatch;
+    try {
+      const fn = { endpoints: BloodGoLiveService.probe, requirements: BloodGoLiveService.signRequirement, drills: BloodGoLiveService.completeDrill, migrations: BloodGoLiveService.reconcileMigration, approvals: BloodGoLiveService.signApproval }[resource];
+      const item = fn(data, user, decodeURIComponent(id), payload); writeDatabase(data); sendJson(res, 200, { ok:true, item, center:BloodGoLiveService.center(data) });
+    } catch (error) { sendJson(res, error.status || 400, { error:error.status===404?"Not Found":"Bad Request", message:error.message }); }
     return;
   }
 
@@ -26658,7 +34276,8 @@ async function handleApi(req, res) {
     }
     const overview = PhysicalExaminationService.buildOverview(data, {
       residentId,
-      residentIds: [...allowedResidentIds]
+      residentIds: [...allowedResidentIds],
+      excludeDemoData: isProductionRuntime()
     });
     overview.readiness = buildPhysicalExamProductionReadiness(data, overview);
     if (!['commission', 'institution'].includes(user.role)) {
@@ -26695,7 +34314,7 @@ async function handleApi(req, res) {
       appendDataAccessLog(data, user, residentId, "体检创新服务", `${payload.action} · ${result.type}`);
       data.securityEvents = [{ id: randomUUID(), at: new Date().toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role, action: "体检创新服务", target: residentId, result: "允许", detail: `${payload.action} · ${result.type}` }, ...(data.securityEvents || [])].slice(0, 120);
       writeDatabase(normalizeState(data));
-      const overview = PhysicalExaminationService.buildOverview(data, { residentId, residentIds: [...allowedResidentIdsForUser(data, user)] });
+      const overview = PhysicalExaminationService.buildOverview(data, { residentId, residentIds: [...allowedResidentIdsForUser(data, user)], excludeDemoData: isProductionRuntime() });
       sendJson(res, 200, redactSensitiveResponse({ ok: true, result, highlights: overview.highlights }, user));
     } catch (error) {
       const status = Number(error?.statusCode || 400);
@@ -26746,7 +34365,7 @@ async function handleApi(req, res) {
       appendDataAccessLog(data, user, abnormalCase.residentId, "体检异常闭环", `${payload.action} · ${abnormalCase.latestAction}`);
       data.securityEvents = [{ id: randomUUID(), at: new Date().toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role, action: "体检异常处置", target: caseId, result: "允许", detail: `${payload.action} · ${abnormalCase.status}` }, ...(data.securityEvents || [])].slice(0, 120);
       writeDatabase(normalizeState(data));
-      const overview = PhysicalExaminationService.buildOverview(data, { residentIds: [...allowedResidentIdsForUser(data, user)] });
+      const overview = PhysicalExaminationService.buildOverview(data, { residentIds: [...allowedResidentIdsForUser(data, user)], excludeDemoData: isProductionRuntime() });
       sendJson(res, 200, { abnormalCase, overview });
     } catch (error) {
       const status = Number(error?.statusCode || 400);
@@ -26797,10 +34416,10 @@ async function handleApi(req, res) {
       return;
     }
     try {
-      const jointTest = PhysicalExaminationService.applyJointTestAction(data, jointTestId, payload, { actor: user.username || user.role });
+      const jointTest = PhysicalExaminationService.applyJointTestAction(data, jointTestId, payload, { actor: user.username || user.role, role: user.role });
       data.securityEvents = [{ id: randomUUID(), at: new Date().toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role, action: "体检机构联调验收", target: jointTestId, result: "允许", detail: `${payload.action} · ${payload.evidenceRef || ""}` }, ...(data.securityEvents || [])].slice(0, 120);
       writeDatabase(normalizeState(data));
-      const overview = PhysicalExaminationService.buildOverview(data, { residentIds: [...allowedResidentIdsForUser(data, user)] });
+      const overview = PhysicalExaminationService.buildOverview(data, { residentIds: [...allowedResidentIdsForUser(data, user)], excludeDemoData: isProductionRuntime() });
       sendJson(res, 200, { jointTest, readiness: buildPhysicalExamProductionReadiness(data, overview) });
     } catch (error) {
       const status = Number(error?.statusCode || 400);
@@ -26908,7 +34527,7 @@ async function handleApi(req, res) {
     const payload = await collectJson(req);
     const recordData = normalizePersonalRecord(payload);
     if (!canAccessResident(user, recordData.residentId, data)) {
-      appendSecurityEvent({ actor: user.name, role: user.role, action: "新增个人健康信息", target: recordData.residentId, result: "拒绝", detail: "超出居民授权范围" });
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "create personal health record", target: recordData.residentId, result: "拒绝", detail: "超出居民授权范围" });
       sendJson(res, 403, { error: "Forbidden", message: "无权新增该居民健康信息" });
       return;
     }
@@ -26974,19 +34593,16 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/reset");
     if (!user) return;
     const data = seedState();
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "重置数据",
-        target: "/api/reset",
-        result: "允许",
-        detail: "恢复演示数据"
-      },
-      ...data.securityEvents
-    ];
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "重置数据",
+      target: "/api/reset",
+      result: "允许",
+      detail: "恢复演示数据"
+    });
     writeDatabase(data);
     sendJson(res, 200, data);
     return;

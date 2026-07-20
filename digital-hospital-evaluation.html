@@ -57,6 +57,32 @@
         </form>
       </section>
 
+      <section class="panel" data-digital-evaluation-section="pilot-issues">
+        <div class="panel-title"><h2>试点问题督办</h2><span id="digital-evaluation-issue-summary">问题登记、整改证据、独立复核与关闭重开</span></div>
+        <div class="table-wrap" id="digital-evaluation-pilot-issues"></div>
+        <form id="digital-evaluation-issue-create-form" class="filter-grid" autocomplete="off">
+          <label>试点机构<select id="digital-evaluation-issue-institution-id" required></select></label>
+          <label>优先级<select id="digital-evaluation-issue-severity"><option value="P0">P0</option><option value="P1" selected>P1</option><option value="P2">P2</option></select></label>
+          <label>问题分类<input id="digital-evaluation-issue-category" value="pilot-operations" required /></label>
+          <label>责任人<input id="digital-evaluation-issue-owner" required placeholder="医院信息中心" /></label>
+          <label>完成期限<input id="digital-evaluation-issue-due-at" type="date" required /></label>
+          <label class="full">问题标题<input id="digital-evaluation-issue-title" required placeholder="描述可验证、可关闭的试点问题" /></label>
+          <label class="full">登记说明<textarea id="digital-evaluation-issue-create-note" rows="2" required></textarea></label>
+          <label class="check-line"><input id="digital-evaluation-issue-create-no-pii" type="checkbox" checked /> 确认不登记患者可识别信息</label>
+          <button class="inline-action" type="submit">登记试点问题</button>
+        </form>
+        <form id="digital-evaluation-issue-action-form" class="filter-grid" autocomplete="off">
+          <label>督办问题<select id="digital-evaluation-issue-id" required></select></label>
+          <label>处理动作<select id="digital-evaluation-issue-action" required></select></label>
+          <label class="issue-action-field" data-issue-actions="assign">责任人<input id="digital-evaluation-issue-action-owner" placeholder="整改责任人" /></label>
+          <label class="issue-action-field" data-issue-actions="assign">完成期限<input id="digital-evaluation-issue-action-due-at" type="date" /></label>
+          <label class="issue-action-field" data-issue-actions="record-evidence">证据引用<input id="digital-evaluation-issue-evidence-ref" placeholder="DH-ISSUE-EVIDENCE-001" /></label>
+          <label class="full">处理说明<textarea id="digital-evaluation-issue-action-note" rows="2" required></textarea></label>
+          <label class="check-line issue-action-field" data-issue-actions="record-evidence"><input id="digital-evaluation-issue-action-no-pii" type="checkbox" checked /> 确认证据引用不含患者可识别信息</label>
+          <button class="inline-action" type="submit">提交督办动作</button>
+        </form>
+      </section>
+
       <section class="panel" data-digital-evaluation-section="catalog">
         <div class="panel-title"><h2>四套评价规则包</h2><span>条款级建模与目标等级画像</span></div>
         <div class="filter-grid">

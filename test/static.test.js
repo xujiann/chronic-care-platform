@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const vm = require("node:vm");
 const test = require("node:test");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -11,24 +12,34 @@ function read(file) {
 
 test("role pages keep explicit page guards", () => {
   const guards = {
-    "citizen.html": "citizen",
-    "mobile-preview.html": "citizen",
-    "doctor.html": "institution",
-    "institution.html": "institution",
-    "insurance.html": "insurance",
-    "county.html": "county",
-    "index.html": "commission",
-    "health-dashboard.html": "commission",
-    "public-health.html": "commission",
-    "platform.html": "commission",
-    "digital-hospital-standards.html": "commission",
-    "workbench.html": "commission",
-    "quality-safety.html": "commission"
+    "citizen.html": ["citizen"],
+    "mobile-preview.html": ["citizen"],
+    "doctor.html": ["institution"],
+    "institution.html": ["institution"],
+    "insurance.html": ["insurance"],
+    "county.html": ["county"],
+    "index.html": ["commission"],
+    "health-dashboard.html": ["commission"],
+    "public-health.html": ["commission"],
+    "platform.html": ["commission"],
+    "digital-hospital-standards.html": ["commission"],
+    "workbench.html": ["commission"],
+    "operations-about.html": ["commission"],
+    "quality-safety.html": ["commission"]
   };
-  Object.entries(guards).forEach(([file, role]) => {
-    assert.match(read(file), new RegExp(`requireRole\\(\\[\\"${role}\\"\\]\\)`), `${file} 缺少 ${role} 页面守卫`);
+  Object.entries(guards).forEach(([file, roles]) => {
+    roles.forEach((role) => {
+      assert.match(read(file), new RegExp(`requireRole\\([^\\)]*\\"${role}\\"`), `${file} 缺少 ${role} 页面守卫`);
+    });
   });
   assert.match(read("digital-hospital-self-assessment.html"), /requireRole\(\["commission", "institution"\]\)/);
+});
+
+test("server-backed pages reject stale local demo sessions without bearer tokens", () => {
+  const auth = read("auth.js");
+  assert.match(auth, /API_BASE && !user\.token/);
+  assert.match(auth, /localStorage\.removeItem\(SESSION_KEY\)/);
+  assert.match(auth, /redirect=\$\{encodeURIComponent\(currentPage\(\)\)\}&expired=1/);
 });
 
 test("citizen pages do not expose cross-role module links or management collections", () => {
@@ -50,13 +61,19 @@ test("application pages avoid placeholder navigation", () => {
 
 test("about page documents runnable platform capabilities", () => {
   const about = read("about.html");
+  const referralAbout = read("referral-teleconsultation-about.html");
   const auth = read("auth.js");
   assert.match(about, /data-about-section="runtime-capabilities"/);
   assert.match(about, /data-about-section="role-portals"/);
+  assert.match(about, /data-about-section="chronic-followup-policy"/);
   assert.match(about, /data-about-capability="service-acceptance"/);
   assert.match(about, /data-about-capability="site-template-readmes"/);
   assert.match(about, /data-about-capability="workflow-tasks"/);
   assert.match(about, /data-about-capability="chronic-care"/);
+  assert.match(about, /data-about-capability="chronic-followup-loop"/);
+  assert.match(about, /国卫基层发〔2025〕15号/);
+  assert.match(about, /基层慢性病健康管理服务能力建设指引/);
+  assert.match(about, /\/api\/chronic\/followup-feedback/);
   assert.match(about, /data-about-capability="county-consortium"/);
   assert.match(about, /data-about-section="policy-basis"/);
   assert.match(about, /data-policy-id="chronic-care-2025"/);
@@ -78,8 +95,27 @@ test("about page documents runnable platform capabilities", () => {
   assert.match(read("platform.html"), /href="\.\/about\.html"/);
   assert.match(read("public-health.html"), /href="\.\/about\.html"/);
   assert.match(read("health-city.html"), /href="\.\/about\.html"/);
+  assert.match(read("citizen.html"), /href="\.\/about\.html"/);
+  assert.match(read("institution.html"), /href="\.\/about\.html"/);
   assert.match(auth, /\["about\.html", "关于"\]/);
+  assert.match(auth, /referral-teleconsultation-about\.html/);
+  assert.match(referralAbout, /data-referral-about-section="policy-basis"/);
+  assert.match(referralAbout, /data-referral-policy="graded-diagnosis"/);
+  assert.match(referralAbout, /data-referral-about-section="joint-signoff"/);
+  assert.match(referralAbout, /data-referral-signoff="referral-center"/);
+  assert.match(referralAbout, /data-referral-signoff="receiving-hospital"/);
+  assert.match(referralAbout, /data-referral-signoff="hospital-it"/);
+  assert.match(referralAbout, /data-referral-signoff="county-performance"/);
+  assert.match(referralAbout, /Developer: Dr\.Xu/);
+  assert.match(referralAbout, /referral-feedback-callback-v1/);
+  assert.match(referralAbout, /feedback-callback/);
+  assert.match(referralAbout, /schedule-callback/);
+  assert.match(referralAbout, /report-callback/);
+  assert.match(referralAbout, /signoff-summary/);
+  assert.match(referralAbout, /npm\.cmd run referral:readiness/);
+  assert.doesNotMatch(referralAbout, /requireRole/);
   assert.match(auth, /pageName === "about\.html"/);
+  assert.match(auth, /drug-consumable-about\.html/);
   assert.doesNotMatch(about, /requireRole/);
 });
 
@@ -231,13 +267,25 @@ test("static snapshot keeps completed P2 governance collections", () => {
   assert.equal(data.creditEvaluationRules.version, "credit-rules-2026.1");
   assert.equal(Array.isArray(data.researchDatasets), true);
   assert.equal(data.researchDatasets.some((item) => item.id === "rd-hypertension-001"), true);
+  assert.equal(data.researchDatasets.every((item) => item.governance?.dataUseAgreement && item.governance.minimumNecessary === true && item.governance.reidentificationProhibited === true && item.governance.retentionDays > 0), true);
+  assert.equal(data.researchDatasets.every((item) => ["ethics-approval", "data-use-agreement"].every((type) => item.evidenceDocuments?.some((doc) => doc.type === type && doc.status !== "rejected"))), true);
   assert.equal(data.researchDatasets.every((item) => item.ethicsStatus && item.deidentificationStatus && item.sandbox && Array.isArray(item.sourceCollections)), true);
+  assert.equal(Array.isArray(data.compliantDataExports), true);
+  assert.equal(data.compliantDataExports.some((item) => item.datasetId === "rd-hypertension-001" && item.reviewStatus === "approved" && item.exportStatus === "released" && item.deidentified === true && item.minimumNecessary === true), true);
   assert.equal(data.dataAccessLogs.some((item) => /research/i.test(`${item.scope || ""} ${item.purpose || ""}`)), true);
   assert.equal(Array.isArray(data.diseaseRegistryModels), true);
   assert.equal(data.diseaseRegistryModels.some((item) => item.id === "dm-hypertension-risk-v1"), true);
   assert.equal(Array.isArray(data.drugConsumableSupervisions), true);
   assert.equal(data.drugConsumableSupervisions.some((item) => item.id === "dcs-rational-r1" && item.boundary === "rational-medication"), true);
+  assert.equal(data.drugConsumableSupervisions.some((item) => item.id === "dcs-supply-mp3" && item.boundary === "supply-alert" && item.relatedPickupId === "mp3"), true);
   assert.equal(data.drugConsumableSupervisions.some((item) => item.id === "dcs-consumable-mr1" && item.boundary === "consumable-clue"), true);
+  assert.equal(Array.isArray(data.drugTraceabilityPolicySources), true);
+  assert.equal(data.drugTraceabilityPolicySources.some((item) => item.id === "nhsa-2025-7" && item.documentNo === "医保发〔2025〕7号"), true);
+  assert.equal(data.drugTraceabilityPolicySources.some((item) => item.id === "nmpa-2022-label" && item.documentNo === "NMPAB/T 1011-2022"), true);
+  assert.equal(data.drugTraceabilityPolicySources.every((item) => /^https:\/\/(www\.)?(nhsa|nmpa)\.gov\.cn\//.test(item.url)), true);
+  assert.equal(Array.isArray(data.drugTraceabilityEvidenceRequirements), true);
+  assert.equal(data.drugTraceabilityEvidenceRequirements.some((item) => item.id === "trace-code-mapping" && item.policySourceIds.includes("nmpa-2019-32")), true);
+  assert.equal(data.drugTraceabilityEvidenceRequirements.every((item) => Array.isArray(item.evidenceFields) && item.evidenceFields.length > 0), true);
   assert.equal(data.mobileExperienceSettings.weakNetworkMode, "cache-last-state");
   assert.equal(Array.isArray(data.accessibilityChecklist), true);
   assert.equal(data.accessibilityChecklist.some((item) => item.id === "a11y-large-font"), true);
@@ -522,10 +570,137 @@ test("health dashboard exposes the aggregate application entry and API contract"
   const release = read("scripts/release-report.js");
   const deploy = read("scripts/deploy-check.js");
 
-  assert.match(html, /卫生健康综合驾驶舱/);
+  assert.match(html, /卫生健康综合管理服务系统/);
   assert.match(html, /dashboard-applications/);
   assert.match(html, /dashboard-templates/);
   assert.match(html, /dashboard-actions/);
+  assert.match(html, /dashboard-command-center/);
+  assert.match(html, /dashboard-section-nav/);
+  assert.match(html, /href="#dashboard-review-quick-links">上线审查/);
+  assert.match(html, /dashboard-api-state/);
+  assert.match(html, /dashboard-data-boundary/);
+  assert.match(html, /dashboard-policy-notes/);
+  assert.match(html, /data-dashboard-policy="certificates"/);
+  assert.match(html, /health-dashboard-about\.html/);
+  assert.match(html, /dashboard-review-quick-links/);
+  assert.match(html, /data-dashboard-review-link="implemented-plan"/);
+  assert.match(html, /data-dashboard-review-summary/);
+  assert.match(html, /data-dashboard-review-summary-item="blocked"/);
+  assert.match(html, /data-dashboard-review-checklist/);
+  assert.match(html, /data-dashboard-review-check="production-gates"/);
+  assert.match(html, /data-dashboard-review-check="onsite-evidence"/);
+  assert.match(html, /data-dashboard-review-status="ready"/);
+  assert.match(html, /data-dashboard-review-status="blocked"/);
+  assert.match(html, /data-dashboard-review-rules/);
+  assert.match(html, /data-dashboard-review-rule="demo-release"/);
+  assert.match(html, /可发布不等于生产 ready/);
+  assert.match(html, /data-dashboard-next-feature-pool/);
+  assert.match(html, /data-dashboard-next-feature="jurisdiction-drilldown"/);
+  assert.match(html, /data-dashboard-next-feature="evidence-signoff"/);
+  assert.match(html, /市县辖区钻取与科室权限/);
+  assert.match(html, /上线证据签字闭环/);
+  assert.match(html, /运行交接与值守台账/);
+  assert.match(html, /data-dashboard-function-responsibility-summary/);
+  assert.match(html, /data-dashboard-function-responsibility-summary-item="implemented"/);
+  assert.match(html, /data-dashboard-function-responsibility-summary-item="p1-plan"/);
+  assert.match(html, /预警、督办、证据闭环/);
+  assert.match(html, /生产审计留存与灾备签字/);
+  assert.match(html, /data-dashboard-next-priority-roadmap/);
+  assert.match(html, /data-dashboard-next-priority="p0-production-gates"/);
+  assert.match(html, /data-dashboard-next-priority="p1-management-views"/);
+  assert.match(html, /data-dashboard-next-priority="p2-operation-quality"/);
+  assert.match(html, /生产上线硬门禁/);
+  assert.match(html, /行政监管业务增强/);
+  assert.match(html, /运行优化与数据质量追溯/);
+  assert.match(html, /data-dashboard-p0-gate-plan/);
+  assert.match(html, /data-dashboard-p0-gate="identity"/);
+  assert.match(html, /data-dashboard-p0-gate="audit-retention"/);
+  assert.match(html, /data-dashboard-p0-gate="interface-signoff"/);
+  assert.match(html, /统一身份接入签字/);
+  assert.match(html, /生产审计留存配置/);
+  assert.match(html, /演示 JSON 快照不得作为生产主库/);
+  assert.match(html, /data-dashboard-p0-status="blocked"/);
+  assert.match(html, /data-dashboard-p0-evidence-pack/);
+  assert.match(html, /data-dashboard-p0-evidence="identity"/);
+  assert.match(html, /data-dashboard-p0-evidence="audit-retention"/);
+  assert.match(html, /data-dashboard-p0-evidence="monitoring-dr"/);
+  assert.match(html, /统一身份验收材料/);
+  assert.match(html, /审计留存验收材料/);
+  assert.match(html, /接口联调验收材料/);
+  assert.match(html, /data-dashboard-p0-evidence-status="missing"/);
+  assert.match(html, /data-dashboard-p0-acceptance-routing/);
+  assert.match(html, /data-dashboard-p0-acceptance="identity"/);
+  assert.match(html, /data-dashboard-p0-acceptance="database"/);
+  assert.match(html, /data-dashboard-p0-acceptance="interface-signoff"/);
+  assert.match(html, /统一身份接收判定/);
+  assert.match(html, /生产数据库接收判定/);
+  assert.match(html, /接口联调接收判定/);
+  assert.match(html, /data-dashboard-p0-acceptance-status="pending"/);
+  assert.match(html, /data-dashboard-function-responsibility/);
+  assert.match(html, /data-dashboard-function-owner="aggregate-entry"/);
+  assert.match(html, /data-dashboard-function-owner="population-service-board"/);
+  assert.match(html, /data-dashboard-function-owner="interface-evidence"/);
+  assert.match(html, /责任部门：规划信息处\/信息中心/);
+  assert.match(html, /责任部门：统计信息、医政医管、妇幼健康、疾控公卫/);
+  assert.match(html, /下一步开发签字闭环、退回补证和真实报文归档/);
+  assert.match(html, /data-dashboard-review-action="production-requirements"/);
+  assert.match(html, /data-dashboard-review-action="function-roadmap-report"/);
+  assert.match(html, /data-dashboard-review-action="backend-go-live-checklist"/);
+  assert.match(html, /health-dashboard-function-roadmap-report\.md/);
+  assert.match(html, /health-dashboard-backend-go-live-checklist\.md/);
+  assert.match(html, /health-dashboard-about\.html#dashboard-implementation-plan/);
+  assert.match(html, /dashboard-jurisdiction-board/);
+  assert.match(html, /jurisdiction-level-controls/);
+  assert.match(html, /jurisdiction-matrix/);
+  assert.match(html, /jurisdiction-district-filter/);
+  assert.match(html, /jurisdiction-type-filter/);
+  assert.match(html, /jurisdiction-scope-grid/);
+  assert.match(html, /jurisdiction-detail-panel/);
+  assert.match(html, /action-closure-trend-board/);
+  assert.match(html, /action-trend-periods/);
+  assert.match(html, /action-trend-apps/);
+  assert.match(html, /dashboard-department-board/);
+  assert.match(html, /department-status-controls/);
+  assert.match(html, /department-function-matrix/);
+  assert.match(html, /population-service-board/);
+  assert.match(html, /population-period-controls/);
+  assert.match(html, /population-metric-cards/);
+  assert.match(html, /population-chart/);
+  assert.match(html, /population-source-details/);
+  assert.match(html, /population-insights/);
+  assert.match(html, /dashboard-export-json/);
+  assert.match(html, /dashboard-indicator-center/);
+  assert.match(html, /indicator-dimension-filter/);
+  assert.match(html, /indicator-status-filter/);
+  assert.match(html, /indicator-category-list/);
+  assert.match(html, /indicator-aggregation-entrypoints/);
+  assert.match(html, /indicator-center-list/);
+  assert.match(html, /指标中心/);
+  assert.match(html, /certificate-exchange-board/);
+  assert.match(html, /certificate-exchange-cards/);
+  assert.match(html, /risk-drilldown-board/);
+  assert.match(html, /risk-drilldown-list/);
+  assert.match(html, /site-evidence-package/);
+  assert.match(html, /site-evidence-list/);
+  assert.match(html, /production-readiness-board/);
+  assert.match(html, /production-readiness-list/);
+  assert.match(html, /production-acceptance-routing-summary/);
+  assert.match(html, /production-acceptance-routing-list/);
+  assert.match(html, /P0 接收判定/);
+  assert.match(html, /production-backend-go-live-summary/);
+  assert.match(html, /production-backend-go-live-status-controls/);
+  assert.match(html, /data-production-backend-status-filter="blocked"/);
+  assert.match(html, /production-backend-go-live-reset/);
+  assert.match(html, /production-backend-go-live-list/);
+  assert.match(html, /生产后端上线准备/);
+  assert.match(html, /data-production-requirements-link/);
+  assert.match(html, /health-dashboard-production-launch-requirements\.md/);
+  assert.match(html, /site-issue-ledger-board/);
+  assert.match(html, /site-issue-ledger-status-controls/);
+  assert.match(html, /site-issue-owner-filter/);
+  assert.match(html, /site-issue-reset-filters/);
+  assert.match(html, /site-issue-ledger-list/);
+  assert.match(html, /site-issue-ledger-boundary/);
   assert.match(html, /dashboard-interfaces/);
   assert.match(html, /dashboard-evidence/);
   assert.match(html, /dashboard-dependencies/);
@@ -547,6 +722,7 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(server, /\/api\/priority-applications\/templates/);
   assert.match(server, /buildPriorityApplicationTemplates/);
   assert.match(server, /buildHealthDashboardSummary/);
+  assert.match(read("package.json"), /health-dashboard-applications\.js/);
   assert.match(release, /health-dashboard-summary/);
   assert.match(release, /\/api\/priority-applications\/templates/);
   assert.match(deploy, /snapshot:healthDashboard/);
@@ -662,6 +838,63 @@ test("institution chronic follow-up workbench exposes escalation closure", () =>
   assert.match(serverJs, /idempotent: Boolean\(existingMessage\)/);
 });
 
+test("health dashboard about page documents policies data boundary and site cutover", () => {
+  const html = read("health-dashboard-about.html");
+  const js = read("health-dashboard-about.js");
+  const auth = read("auth.js");
+
+  assert.match(html, /requireRole\(\["commission"\]\)/);
+  assert.match(html, /health-dashboard-about\.js/);
+  assert.match(html, /data-dashboard-about-section="runtime-report"/);
+  assert.match(html, /dashboard-about-function-report/);
+  assert.match(html, /data-dashboard-about-section="department-functions"/);
+  assert.match(html, /dashboard-about-department-matrix/);
+  assert.match(html, /规划信息处\/信息中心/);
+  assert.match(html, /医政医管处/);
+  assert.match(html, /data-dashboard-about-section="city-county-functions"/);
+  assert.match(html, /dashboard-about-city-county-matrix/);
+  assert.match(html, /市卫生健康委/);
+  assert.match(html, /区县卫生健康局/);
+  assert.match(html, /非本机关单位不在本系统承接办理职责/);
+  assert.doesNotMatch(html, /源应用办理入口/);
+  assert.match(html, /data-dashboard-about-section="template-functions"/);
+  assert.match(html, /data-dashboard-about-section="policy-basis"/);
+  assert.match(html, /data-dashboard-about-section="data-boundary"/);
+  assert.match(html, /data-dashboard-about-section="api-evidence"/);
+  assert.match(html, /data-dashboard-about-section="site-cutover"/);
+  assert.match(html, /data-dashboard-about-section="production-launch-requirements"/);
+  assert.match(html, /data-dashboard-launch-requirements-link/);
+  assert.match(html, /health-dashboard-production-launch-requirements\.md/);
+  assert.match(html, /data-dashboard-about-section="implementation-plan"/);
+  assert.match(html, /data-dashboard-about-section="next-plan"/);
+  assert.match(html, /data-dashboard-template-function="aggregate-entry"/);
+  assert.match(html, /data-dashboard-template-function="population-service-board"/);
+  assert.match(html, /data-dashboard-template-function="release-report"/);
+  assert.match(html, /data-dashboard-implemented="aggregate-dashboard"/);
+  assert.match(html, /data-dashboard-implemented="production-gates"/);
+  assert.match(html, /data-dashboard-policy="certificates"/);
+  assert.match(html, /综合管理服务系统摘要接口/);
+  assert.match(html, /人口服务看板/);
+  assert.match(html, /模块摘要脚本/);
+  assert.match(html, /data-dashboard-next-plan="prod-identity-audit"/);
+  assert.match(html, /data-dashboard-next-plan="prod-interface-signoff"/);
+  assert.match(html, /data-dashboard-next-plan="daily-interface-done"/);
+  assert.match(html, /data-dashboard-next-plan="certificate-exchange-done"/);
+  assert.match(html, /data-dashboard-next-plan="risk-drilldown-done"/);
+  assert.match(html, /data-dashboard-next-plan="site-evidence-done"/);
+  assert.match(html, /出生医学证明日期/);
+  assert.match(html, /卫生统计日报/);
+  assert.match(js, /\/api\/health-dashboard\/summary/);
+  assert.match(js, /dashboard-about-runtime-state/);
+  assert.match(js, /aboutRuntimeFunction/);
+  assert.match(js, /renderAboutMatrix/);
+  assert.match(js, /aboutFunctionMatrix/);
+  assert.match(js, /aboutRuntimeEvidence/);
+  assert.match(js, /staticAboutRuntimeReport/);
+  assert.match(read("package.json"), /health-dashboard-about\.js/);
+  assert.match(auth, /"health-dashboard-about\.html": \["commission"\]/);
+});
+
 test("static snapshot keeps acceptance evidence clean and actionable", () => {
   const raw = read("data/db.json");
   const data = JSON.parse(raw);
@@ -722,13 +955,45 @@ test("chronic disease policy module exposes 2025 service capacity workflow", () 
 test("insurance portal exposes actionable drug consumable supervision workflow", () => {
   const html = read("insurance.html");
   const js = read("insurance.js");
+  const institutionHtml = read("institution.html");
+  const institutionJs = read("institution.js");
   const server = read("server.js");
   assert.match(html, /drug-consumable-panel/);
   assert.match(js, /renderDrugConsumableSupervision/);
+  assert.match(js, /renderTraceabilityPolicySources/);
+  assert.match(js, /renderTraceabilityEvidenceChecklist/);
+  assert.match(js, /data-drug-traceability-policy-sources/);
+  assert.match(js, /data-drug-traceability-evidence-checklist/);
+  assert.match(js, /traceability-evidence/);
+  assert.match(js, /traceabilityEvidenceCoverage/);
+  assert.match(js, /missing \$/);
   assert.match(js, /postDrugConsumableAction/);
   assert.match(js, /data-drug-action/);
+  assert.match(institutionHtml, /institution-drug-consumable-panel/);
+  assert.match(institutionJs, /loadInstitutionDrugConsumableSupervision/);
+  assert.match(institutionJs, /renderInstitutionDrugConsumableSupervision/);
+  assert.match(institutionJs, /renderInstitutionTraceabilityPolicySources/);
+  assert.match(institutionJs, /renderInstitutionTraceabilityEvidenceChecklist/);
+  assert.match(institutionJs, /data-institution-traceability-policy-sources/);
+  assert.match(institutionJs, /data-institution-traceability-evidence-checklist/);
+  assert.match(institutionJs, /postInstitutionDrugConsumableAction/);
+  assert.match(institutionJs, /traceability-evidence/);
+  assert.match(institutionJs, /traceabilityEvidenceCoverage/);
+  assert.match(institutionJs, /partial \$/);
+  assert.match(institutionJs, /postInstitutionDrugConsumableRemediation/);
+  assert.match(institutionJs, /data-institution-drug-action/);
+  assert.match(institutionJs, /\/drug-consumable-supervision\/\$\{encodeURIComponent\(id\)\}\/\$\{action\}/);
   assert.match(server, /buildDrugConsumableSupervision/);
   assert.match(server, /\/api\/drug-consumable-supervision/);
+  assert.match(server, /traceabilityPolicySources/);
+  assert.match(server, /buildDrugTraceabilityEvidenceChecklist/);
+  assert.match(server, /buildDrugTraceabilityEvidenceSubmission/);
+  assert.match(server, /buildDrugTraceabilityEvidenceCoverage/);
+  assert.match(server, /traceabilityEvidenceChecklist/);
+  assert.match(server, /traceabilityEvidenceCoverage/);
+  assert.match(server, /traceabilityCoverageCompleteRows/);
+  assert.match(server, /supplyAlerts/);
+  assert.match(server, /drug-consumable-traceability-evidence/);
   assert.match(server, /drug-consumable-review/);
   assert.match(server, /drug-consumable-remediation/);
   assert.match(server, /drug-consumable-insurance-sync/);
@@ -736,6 +1001,7 @@ test("insurance portal exposes actionable drug consumable supervision workflow",
 
 test("deployment baseline documents scripts and environment template", () => {
   const pkg = JSON.parse(read("package.json"));
+  const referralAbout = read("referral-teleconsultation-about.html");
   assert.equal(Boolean(pkg.scripts["deploy:check"]), true);
   assert.equal(Boolean(pkg.scripts["env:check"]), true);
   assert.equal(Boolean(pkg.scripts["release:report"]), true);
@@ -800,6 +1066,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read(".env.example"), /SESSION_SECRETS=/);
   assert.match(read(".env.example"), /INTEGRATION_GATEWAY_SECRET=/);
   assert.match(read(".env.example"), /CUTOVER_SITE_INTERFACE_SIGNOFF/);
+  assert.match(read(".env.example"), /CUTOVER_CHRONIC_LAUNCH_CORE_SIGNOFF/);
   assert.match(read(".env.example"), /CUTOVER_DR_REHEARSAL_SIGNOFF/);
   assert.match(read(".env.example"), /OIDC_ISSUER_URL=/);
   assert.match(read(".env.example"), /SMS_GATEWAY_URL=/);
@@ -846,11 +1113,17 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /identity-contract\.md/);
   assert.match(read("README.md"), /audit-retention-report\.md/);
   assert.match(read("docs/chronic-followup-readiness.md"), /chronic-followup-readiness-report\.md/);
+  assert.match(read("docs/chronic-followup-readiness.md"), /chronic-institution-interfaces\.md/);
+  assert.match(read("docs/chronic-launch-core.md"), /HIS\/EMR\/LIS\/PACS/);
+  assert.match(read("docs/chronic-launch-core.md"), /\/api\/chronic\/launch-core/);
+  assert.match(read("docs/chronic-institution-interfaces.md"), /chronic-device-measurement-v1/);
+  assert.match(read("docs/chronic-institution-interfaces.md"), /\/api\/chronic\/institution-interfaces/);
   assert.match(read("docs/chronic-followup-readiness.md"), /\/api\/chronic\/followup-feedback/);
   assert.match(read("docs/chronic-followup-readiness.md"), /high-risk resident feedback coverage/);
   assert.match(read("README.md"), /data-quality-report\.md/);
   assert.match(read("README.md"), /quality-safety-report\.md/);
   assert.match(read("README.md"), /drug-consumable-readiness-report\.md/);
+  assert.match(read("README.md"), /drug-consumable-about\.html/);
   assert.match(read("README.md"), /environment-matrix-report\.md/);
   assert.match(read("README.md"), /hybrid-deployment-readiness-report\.md/);
   assert.match(read("README.md"), /integration-readiness-report\.md/);
@@ -860,6 +1133,14 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /monitoring-readiness-report\.md/);
   assert.match(read("README.md"), /operations-readiness-report\.md/);
   assert.match(read("README.md"), /hospital-operations-readiness-report\.md/);
+  assert.match(read("README.md"), /hospital-operations-release-report\.md/);
+  assert.match(read("README.md"), /hospital-operations-module-report\.md/);
+  assert.match(read("README.md"), /hospital-operations-module-brief-report\.pdf/);
+  assert.match(read("README.md"), /\/api\/operations\/go-live-gates/);
+  assert.match(read("README.md"), /\/api\/operations\/go-live-gates\/actions/);
+  assert.match(read("README.md"), /hospital-operations-flow\.md/);
+  assert.match(read("README.md"), /hospital-operations-development-report\.md/);
+  assert.match(read("README.md"), /operations-about\.html/);
   assert.match(read("README.md"), /process-audit-report\.md/);
   assert.match(read("README.md"), /service-acceptance-summary\.md/);
   assert.match(read("README.md"), /\/api\/service-acceptance-summary/);
@@ -888,6 +1169,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("DEPLOYMENT.md"), /data-quality-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /quality-safety-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /drug-consumable-readiness-report\.md/);
+  assert.match(read("DEPLOYMENT.md"), /drug-consumable-about\.html/);
   assert.match(read("DEPLOYMENT.md"), /environment-matrix-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /hybrid-deployment-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /integration-readiness-report\.md/);
@@ -896,6 +1178,14 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("DEPLOYMENT.md"), /monitoring-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /operations-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /hospital-operations-readiness-report\.md/);
+  assert.match(read("DEPLOYMENT.md"), /hospital-operations-release-report\.md/);
+  assert.match(read("DEPLOYMENT.md"), /hospital-operations-module-report\.md/);
+  assert.match(read("DEPLOYMENT.md"), /hospital-operations-module-brief-report\.pdf/);
+  assert.match(read("DEPLOYMENT.md"), /\/api\/operations\/go-live-gates/);
+  assert.match(read("DEPLOYMENT.md"), /\/api\/operations\/go-live-gates\/actions/);
+  assert.match(read("DEPLOYMENT.md"), /hospital-operations-flow\.md/);
+  assert.match(read("DEPLOYMENT.md"), /hospital-operations-development-report\.md/);
+  assert.match(read("DEPLOYMENT.md"), /operations-about\.html/);
   assert.match(read("DEPLOYMENT.md"), /process-audit-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /site-readiness-pack\.md/);
   assert.match(read("DEPLOYMENT.md"), /release\/templates\/\*\/README\.md/);
@@ -929,15 +1219,21 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/deploy-check.js"), /manifest:phase2FamilyDoctorReadiness/);
   assert.match(read("scripts/deploy-check.js"), /quality-safety:report/);
   assert.match(read("scripts/deploy-check.js"), /drug-consumable:readiness/);
+  assert.match(read("scripts/deploy-check.js"), /drug-consumable-about\.html/);
   assert.match(read("scripts/deploy-check.js"), /environment:matrix/);
   assert.match(read("scripts/deploy-check.js"), /hybrid:deployment-readiness/);
   assert.match(read("scripts/deploy-check.js"), /integration:readiness/);
   assert.match(read("scripts/deploy-check.js"), /interface:mapping/);
   assert.match(read("scripts/deploy-check.js"), /regional-data-sharing:report/);
+  assert.match(read("scripts/deploy-check.js"), /regional-referral:overlap/);
+  assert.match(read("package.json"), /regional-referral:overlap/);
   assert.match(read("scripts/deploy-check.js"), /monitoring:readiness/);
   assert.match(read("scripts/deploy-check.js"), /referral:readiness/);
   assert.match(read("scripts/deploy-check.js"), /operations:readiness/);
   assert.match(read("scripts/deploy-check.js"), /hospital-operations:readiness/);
+  assert.match(read("scripts/deploy-check.js"), /hospital-operations:release/);
+  assert.match(read("scripts/deploy-check.js"), /hospital-operations:module-report/);
+  assert.match(read("scripts/deploy-check.js"), /hospital-operations:brief-pdf/);
   assert.match(read("scripts/deploy-check.js"), /process:audit/);
   assert.match(read("scripts/deploy-check.js"), /site:pack/);
   assert.match(read("scripts/deploy-check.js"), /release:manifest/);
@@ -970,11 +1266,149 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read(".github/workflows/ci.yml"), /npm run integration:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run interface:mapping/);
   assert.match(read(".github/workflows/ci.yml"), /npm run regional-data-sharing:report/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run regional-referral:overlap/);
   assert.match(read(".github/workflows/ci.yml"), /npm run monitoring:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run referral:readiness/);
+  assert.match(read("institution.html"), /teleconsultation-form/);
+  assert.match(read("institution.html"), /data-referral-layout="institution-flow"/);
+  assert.match(read("institution.js"), /teleconsultation-action-form/);
+  assert.match(read("institution.js"), /status-ribbon/);
+  assert.match(read("institution.js"), /保存反馈/);
+  assert.match(read("institution.js"), /data-teleconsultation-ack/);
   assert.match(read("institution.html"), /teleconsultation-loop/);
+  assert.match(read("county.html"), /data-referral-layout="county-command"/);
+  assert.match(read("county.html"), /county-teleconsultation-status-filter/);
+  assert.match(read("county.html"), /county-teleconsultation-priority-filter/);
+  assert.match(read("county.html"), /county-teleconsultation-performance/);
+  assert.match(read("county.html"), /county-teleconsultation-cutover/);
+  assert.match(read("county.html"), /county-teleconsultation-risk-board/);
+  assert.match(read("county.html"), /county-teleconsultation-signoff/);
+  assert.match(read("county.js"), /averagePerformance/);
+  assert.match(read("county.js"), /SLA risks/);
+  assert.equal((read("county.js").match(/function renderCountyTeleconsultationLoop/g) || []).length, 1);
+  assert.match(read("county.js"), /buildReferralTeleconsultationEscalations/);
+  assert.match(read("county.js"), /renderCountyTeleconsultationCutoverReadiness/);
+  assert.match(read("county.js"), /loadCountyTeleconsultationJointTestPack/);
+  assert.match(read("county.js"), /data-referral-cutover-readiness/);
+  assert.match(read("county.js"), /data-referral-cutover-blocker/);
+  assert.match(read("county.js"), /data-referral-cutover-plan/);
+  assert.match(read("county.js"), /data-referral-cutover-plan-summary/);
+  assert.match(read("county.js"), /data-referral-cutover-action-queue/);
+  assert.match(read("county.js"), /data-referral-cutover-action-item/);
+  assert.match(read("county.js"), /data-referral-action-role/);
+  assert.match(read("county.js"), /data-target-selector/);
+  assert.match(read("county.js"), /data-consortium-loop-summary/);
+  assert.match(read("county.js"), /data-consortium-loop-step/);
+  assert.match(read("county.js"), /data-referral-loop-target/);
+  assert.match(read("county.js"), /data-consortium-loop-metrics/);
+  assert.match(read("county.js"), /data-gov-consortium-metric/);
+  assert.match(read("county.js"), /data-consortium-role-todo/);
+  assert.match(read("county.js"), /consortium-loop-completion-rate/);
+  assert.match(read("county.js"), /collaboration-efficiency-hours/);
+  assert.match(read("county.js"), /grassroots-followup-return/);
+  assert.match(read("county.js"), /quality-feedback-closure/);
+  assert.match(read("county.js"), /data-referral-plan-action/);
+  assert.match(read("county.js"), /normalizeCountyTeleconsultationNextPlan/);
+  assert.match(read("county.js"), /buildCountyTeleconsultationPlanSummary/);
+  assert.match(read("county.js"), /buildCountyTeleconsultationActionQueue/);
+  assert.match(read("county.js"), /buildCountyConsortiumClosedLoopChain/);
+  assert.match(read("county.js"), /buildCountyTeleconsultationReceiptSummary/);
+  assert.match(read("county.js"), /buildCountyTeleconsultationPendingRoleActions/);
+  assert.match(read("county.js"), /buildCountyTeleconsultationRoleAction/);
+  assert.match(read("county.js"), /getCountyTeleconsultationRoleTarget/);
+  assert.match(read("county.js"), /getCountyTeleconsultationPlanRoles/);
+  assert.match(read("county.js"), /formatCountyTeleconsultationRoleList/);
+  assert.match(read("county.js"), /taskReceipts/);
+  assert.match(read("county.js"), /exportSummary/);
+  assert.match(read("county.js"), /final-ready/);
+  assert.match(read("county.js"), /buildCountyTeleconsultationPlanStatus/);
+  assert.match(read("county.js"), /buildCountyTeleconsultationPlanAction/);
+  assert.match(read("county.js"), /scrollIntoView/);
+  assert.match(read("county.js"), /parseCountyTeleconsultationProgress/);
+  assert.match(read("county.js"), /nextDevelopmentPlan/);
+  assert.match(read("county.js"), /referral-teleconsultations\/joint-test-pack/);
+  assert.match(read("county.js"), /Evidence source/);
+  assert.match(read("county.js"), /renderCountyTeleconsultationRiskBoard/);
+  assert.match(read("county.js"), /renderCountyTeleconsultationJointLedger/);
+  assert.match(read("county.js"), /data-referral-joint-ledger/);
+  assert.match(read("county.js"), /data-referral-joint-ledger-tasks/);
+  assert.match(read("county.js"), /data-referral-joint-ledger-complete/);
+  assert.match(read("county.js"), /createReferralJointLedgerTasks/);
+  assert.match(read("county.js"), /completeReferralJointLedgerTask/);
+  assert.match(read("county.js"), /buildCountyTeleconsultationSignoffRows/);
+  assert.match(read("county.js"), /data-referral-signoff-status/);
+  assert.match(read("county.js"), /data-referral-signoff-submit/);
+  assert.match(read("county.js"), /archiveReferralSignoff/);
+  assert.match(read("county.js"), /data-referral-escalation/);
+  assert.match(read("county.js"), /data-county-sla-ack/);
+  assert.match(read("county.js"), /label\.includes\("关闭"\)/);
+  assert.match(read("county.js"), /督办/);
+  assert.match(read("county.js"), /runReferralEscalation/);
+  assert.match(read("county.js"), /hasReferralEscalationReminder/);
+  assert.match(read("server.js"), /buildReferralTeleconsultationEscalations/);
+  assert.match(read("server.js"), /referral-teleconsultations\/escalations\/run/);
+  assert.match(read("server.js"), /referral-teleconsultations\/joint-test-pack/);
+  assert.match(read("server.js"), /taskReceipts/);
+  assert.match(read("server.js"), /exportSummary/);
+  assert.match(read("server.js"), /cutoverReadiness/);
+  assert.match(read("server.js"), /nextDevelopmentPlan/);
+  assert.match(read("server.js"), /referral-teleconsultations\/joint-test-ledger/);
+  assert.match(read("server.js"), /joint-test-ledger\/tasks/);
+  assert.match(read("server.js"), /joint-test-ledger\/tasks\/:role\/complete/);
+  assert.match(read("server.js"), /buildReferralTeleconsultationJointTestLedger/);
+  assert.match(read("server.js"), /createReferralTeleconsultationJointTestTasks/);
+  assert.match(read("server.js"), /completeReferralTeleconsultationJointTestTask/);
+  assert.match(read("server.js"), /referral-teleconsultations\/signoff-summary/);
+  assert.match(read("server.js"), /signoff-summary\/:role\/evidence/);
+  assert.match(read("server.js"), /upsertReferralTeleconsultationSignoff/);
+  assert.match(read("server.js"), /canSubmitReferralSignoff/);
+  assert.match(read("server.js"), /buildReferralTeleconsultationSignoffSummary/);
+  assert.match(read("server.js"), /mergeByKeyWithDefaultFields\(seedReferralTeleconsultations\(\), data\.referralTeleconsultations, "id"\)/);
+  assert.match(read("server.js"), /function mergeByKeyWithDefaultFields/);
+  assert.match(read("server.js"), /function mergeDefaultFields/);
+  assert.match(read("server.js"), /referral-teleconsultations\/performance-policy/);
+  assert.match(read("server.js"), /referral-teleconsultations\/consortium-metrics/);
+  assert.match(read("server.js"), /buildReferralConsortiumClosedLoopMetrics/);
+  assert.match(read("server.js"), /blocked-until-onsite-integration/);
+  assert.match(read("server.js"), /escalations\/ack/);
+  assert.match(read("server.js"), /createReferralTeleconsultationEscalationMessage/);
+  assert.match(read("server.js"), /highRisk/);
+  assert.match(read("scripts/referral-teleconsultation-readiness.js"), /buildReferralConsortiumClosedLoopEvidence/);
+  assert.match(read("scripts/referral-teleconsultation-readiness.js"), /referral:consortiumClosedLoop/);
+  assert.match(read("scripts/referral-teleconsultation-readiness.js"), /referral:consortiumMetrics/);
+  assert.match(read("scripts/referral-teleconsultation-readiness.js"), /referral:consortiumMetricsApi/);
+  assert.match(read("scripts/referral-teleconsultation-readiness.js"), /consortiumLoopCompletionRate/);
+  assert.match(read("scripts/referral-teleconsultation-readiness.js"), /consortiumLoopExternalBlockers/);
+  assert.match(read("scripts/release-report.js"), /referralTeleconsultation:closedLoop/);
+  assert.match(read("scripts/release-report.js"), /referralTeleconsultation:closedLoopMetrics/);
+  assert.match(read("scripts/release-report.js"), /referralTeleconsultation:closedLoopMetricsApi/);
+  assert.match(read("server.js"), /schedule-callback/);
+  assert.match(read("server.js"), /feedback-callback/);
+  assert.match(read("server.js"), /appendReferralTeleconsultationNotifications/);
+  assert.match(read("README.md"), /referral-teleconsultations\/:id\/report-callback/);
+  assert.match(read("README.md"), /referral-feedback-callback-v1/);
+  assert.match(read("README.md"), /referral-schedule-callback-v1/);
+  assert.match(read("README.md"), /referral-teleconsultations\/signoff-summary/);
+  assert.match(read("README.md"), /taskMessages/);
+  assert.match(read("DEPLOYMENT.md"), /x-integration-signature/);
+  assert.match(read("DEPLOYMENT.md"), /feedback-callback/);
+  assert.match(read("DEPLOYMENT.md"), /referral-report-callback-v1/);
+  assert.match(read("DEPLOYMENT.md"), /referral-teleconsultations\/signoff-summary/);
+  assert.match(read("DEPLOYMENT.md"), /institution\/resident `taskMessages`/);
   assert.match(read("county.html"), /county-teleconsultation-loop/);
+  assert.match(read("county.html"), /county-teleconsultation-joint-ledger/);
+  assert.match(read("insurance.html"), /referral-performance-policy/);
+  assert.match(read("insurance.html"), /data-referral-layout="insurance-policy"/);
+  assert.match(read("insurance.js"), /renderReferralPerformancePolicy/);
+  assert.match(referralAbout, /data-referral-about-section="participant-progress"/);
+  assert.match(referralAbout, /data-referral-role-progress="county-office"/);
+  assert.match(read("portal.css"), /grid-template-columns: repeat\(auto-fit, minmax\(220px, 1fr\)\)/);
+  assert.match(read("portal.css"), /\.table-wrap table/);
   assert.match(read(".github/workflows/ci.yml"), /npm run operations:readiness/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run hospital-operations:readiness/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run hospital-operations:release/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run hospital-operations:module-report/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run hospital-operations:brief-pdf/);
   assert.match(read(".github/workflows/ci.yml"), /npm run site:pack/);
   assert.match(read(".github/workflows/ci.yml"), /npm run production-db:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run evaluation:evidence/);
@@ -987,21 +1421,266 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read(".github/workflows/ci.yml"), /npm audit --omit=dev/);
 });
 
+test("county teleconsultation action queue summarizes receipt evidence", () => {
+  const sandbox = {
+    API_BASE: "",
+    document: { addEventListener() {}, querySelector() { return null; } },
+    window: {}
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(read("county.js"), sandbox);
+
+  const queue = sandbox.buildCountyTeleconsultationActionQueue([
+    {
+      phase: "field-interface-replay",
+      owner: "institution-integration",
+      status: "pending",
+      actionLabel: "Open joint ledger"
+    }
+  ], {
+    taskReceipts: [
+      { role: "referral-center", status: "completed" },
+      { role: "receiving-hospital", status: "closed" },
+      { role: "hospital-it", status: "read" }
+    ],
+    exportSummary: [
+      { role: "referral-center", readyForFinalSignoff: true, onsiteSigned: true },
+      { role: "receiving-hospital", readyForFinalSignoff: true, onsiteSigned: false },
+      { role: "hospital-it", readyForFinalSignoff: false, onsiteSigned: false }
+    ]
+  });
+
+  assert.equal(queue.items.length, 1);
+  assert.equal(queue.items[0].receiptSummary, "3/3 receipts, 2/3 final-ready, 1/3 signed; pending final-ready: hospital IT; signed: receiving hospital, hospital IT");
+  assert.deepEqual(JSON.parse(JSON.stringify(queue.items[0].pendingRoleActions)), [
+    {
+      role: "receiving-hospital",
+      kind: "signed",
+      label: "Open receiving hospital",
+      targetSelector: "[data-referral-signoff-status='receiving-hospital']"
+    },
+    {
+      role: "hospital-it",
+      kind: "final-ready",
+      label: "Open hospital IT",
+      targetSelector: "[data-referral-joint-ledger='hospital-it']"
+    }
+  ]);
+
+  const readyQueue = sandbox.buildCountyTeleconsultationActionQueue([
+    { phase: "insurance-performance-cutover", status: "ready" }
+  ], {
+    taskReceipts: [
+      { role: "county-performance", status: "completed" },
+      { role: "insurance", status: "signed" }
+    ],
+    exportSummary: [
+      { role: "county-performance", readyForFinalSignoff: true, onsiteSigned: true },
+      { role: "insurance", readyForFinalSignoff: true, onsiteSigned: true }
+    ]
+  });
+  assert.equal(readyQueue.items[0].receiptSummary, "2/2 receipts, 2/2 final-ready, 2/2 signed");
+  assert.deepEqual(JSON.parse(JSON.stringify(readyQueue.items[0].pendingRoleActions)), []);
+
+  const insuranceQueue = sandbox.buildCountyTeleconsultationActionQueue([
+    { phase: "insurance-performance-cutover", status: "pending" }
+  ], {
+    taskReceipts: [],
+    exportSummary: []
+  });
+  assert.equal(insuranceQueue.items[0].pendingRoleActions[0].targetSelector, "#county-teleconsultation-risk-board");
+});
+
+test("county consortium closed-loop chain maps stages to blockers and targets", () => {
+  const sandbox = {
+    API_BASE: "",
+    document: { addEventListener() {}, querySelector() { return null; } },
+    window: {}
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(read("county.js"), sandbox);
+
+  const state = JSON.parse(read("data/db.json"));
+  const actionQueue = {
+    items: [
+      {
+        pendingRoleActions: [
+          { role: "hospital-it", targetSelector: "[data-referral-joint-ledger='hospital-it']" },
+          { role: "insurance", targetSelector: "#county-teleconsultation-risk-board" }
+        ]
+      }
+    ]
+  };
+  const chain = sandbox.buildCountyConsortiumClosedLoopChain(state, state.referralTeleconsultations, actionQueue);
+  const plain = JSON.parse(JSON.stringify(chain));
+
+  assert.equal(plain.totalSteps, 6);
+  assert.equal(plain.readySteps, 6);
+  assert.equal(plain.steps.map((item) => item.id).join("->"), "initiate->accept->execute->report-return->feedback-evaluation->performance-archive");
+  assert.equal(plain.steps.some((item) => item.blockers.some((blocker) => blocker.startsWith("external:"))), true);
+  assert.equal(plain.steps.some((item) => item.blockers.some((blocker) => blocker.includes("onsite signoff pending"))), true);
+  assert.equal(plain.steps.find((item) => item.id === "report-return").targetSelector, "[data-referral-joint-ledger='hospital-it']");
+  assert.equal(plain.steps.find((item) => item.id === "performance-archive").targetSelector, "#county-teleconsultation-risk-board");
+  assert.equal(plain.metrics.length >= 7, true);
+  assert.equal(plain.metrics.some((item) => item.key === "consortium-loop-completion-rate" && item.numericValue === 100), true);
+  assert.equal(plain.metrics.some((item) => item.key === "collaboration-efficiency-hours" && Number.isFinite(item.numericValue)), true);
+  assert.equal(plain.metrics.some((item) => item.key === "mutual-recognition-evidence" && item.numericValue >= 1), true);
+  assert.equal(plain.metrics.some((item) => item.key === "grassroots-followup-return" && item.numericValue >= 1), true);
+  assert.equal(plain.metrics.some((item) => item.key === "quality-feedback-closure" && item.numericValue >= 1), true);
+  assert.equal(plain.roles.every((item) => Number.isInteger(item.todoCount) && Array.isArray(item.todoItems)), true);
+});
+
 test("regional data sharing application has runnable entry, API and evidence script", () => {
   const html = read("regional-data-sharing.html");
+  const about = read("regional-data-sharing-about.html");
   const client = read("regional-data-sharing.js");
   const server = read("server.js");
   const script = read("scripts/regional-data-sharing.js");
+  const auth = read("auth.js");
   const data = JSON.parse(read("data/db.json"));
 
   assert.match(html, /区域诊疗数据共享平台/);
   assert.match(html, /regional-data-sharing\.js/);
+  assert.match(html, /regional-data-sharing-about\.html/);
+  assert.match(html, /regional-sharing-loop/);
+  assert.match(html, /regional-selected-package/);
+  assert.match(html, /regional-readiness-checklist/);
+  assert.match(html, /data-regional-section="launch-readiness"/);
+  assert.match(html, /regional-launch-readiness/);
+  assert.match(html, /data-regional-section="site-integration"/);
+  assert.match(html, /regional-site-integration/);
+  assert.match(html, /data-regional-section="scope-self-test"/);
+  assert.match(html, /regional-scope-self-test/);
+  assert.match(html, /权限裁剪自测/);
+  assert.match(html, /data-regional-section="function-roadmap"/);
+  assert.match(html, /regional-function-roadmap/);
+  assert.match(html, /data-regional-section="referral-handoff"/);
+  assert.match(html, /regional-referral-handoff/);
+  assert.match(html, /regional-referral-boundary/);
+  assert.match(html, /regional-handoff-report-action/);
+  assert.match(html, /regional-handoff-report/);
+  assert.match(html, /regional-access-feedback/);
   assert.match(client, /\/api\/regional-data-sharing/);
+  assert.match(client, /\/api\/regional-data-sharing\/handoff-report/);
+  assert.match(client, /selectRegionalPackage/);
+  assert.match(client, /renderRegionalLoop/);
+  assert.match(client, /renderRegionalLaunchReadiness/);
+  assert.match(client, /renderRegionalSiteIntegration/);
+  assert.match(client, /buildRegionalInterfaceJointTests/);
+  assert.match(client, /renderRegionalScopeSelfTest/);
+  assert.match(client, /renderRegionalFunctionRoadmap/);
+  assert.match(client, /regionalFunctionRoadmap/);
+  assert.match(client, /优先级排序：P0 共享包编目、角色权限裁剪；P1 联调检查与交接清单；P2 调阅审计与发布证据/);
+  assert.match(client, /buildRegionalCatalogChecks/);
+  assert.match(client, /catalogSummaryHtml/);
+  assert.match(client, /编目完整度/);
+  assert.match(client, /catalog-checks/);
+  assert.match(client, /责任部门/);
+  assert.match(client, /下一步计划开发功能/);
+  assert.match(client, /P0 上线前必须/);
+  assert.match(client, /P1 试点联调/);
+  assert.match(client, /P2 生产加固/);
+  assert.match(client, /市级平台数据治理组/);
+  assert.match(client, /接口联调组/);
+  assert.match(client, /P0 验收口径/);
+  assert.match(client, /居民主索引、来源机构、目标机构、记录引用、互认依据和质控状态/);
+  assert.match(client, /拒绝访问必须进入审计日志/);
+  assert.match(client, /当前账号范围/);
+  assert.match(client, /共享包可见性/);
+  assert.match(client, /拒绝审计证据/);
+  assert.match(client, /越权拒绝由后端安全事件留痕/);
+  assert.match(client, /管理端、来源机构、目标机构和无关机构账号/);
+  assert.match(client, /现场证据清单/);
+  assert.match(client, /管理端全域复核/);
+  assert.match(client, /来源机构复核/);
+  assert.match(client, /目标机构复核/);
+  assert.match(client, /无关机构拒绝复核/);
+  assert.match(client, /organization scope denied/);
+  assert.match(client, /身份与权限/);
+  assert.match(client, /HIS 就诊信息联调样例/);
+  assert.match(client, /EMR 病历摘要联调样例/);
+  assert.match(client, /LIS 检验报告联调样例/);
+  assert.match(client, /PACS 影像报告联调样例/);
+  assert.match(client, /字段映射签字/);
+  assert.match(client, /幂等键/);
+  assert.match(client, /接收医师确认/);
+  assert.match(client, /监控灾备/);
+  assert.match(client, /联调样例/);
+  assert.match(client, /验收证据/);
+  assert.match(client, /下一步/);
+  assert.match(client, /renderRegionalReadinessChecklist/);
+  assert.match(client, /buildRegionalReadinessChecks/);
+  assert.match(client, /renderRegionalReferralHandoff/);
+  assert.match(client, /generateRegionalHandoffReport/);
+  assert.match(client, /renderRegionalHandoffReport/);
+  assert.match(client, /buildRegionalReferralHandoff/);
+  assert.match(client, /packageItem\.referralHandoff/);
+  assert.match(client, /不合并运行时/);
+  assert.match(client, /renderAccessFeedback/);
   assert.match(client, /调阅留痕/);
   assert.match(server, /seedRegionalDataSharingScope/);
+  assert.match(server, /buildRegionalReferralHandoffEvidence/);
+  assert.match(server, /buildRegionalHandoffReport/);
+  assert.match(server, /renderRegionalHandoffMarkdown/);
+  assert.match(server, /referralHandoffReady/);
   assert.match(server, /createRegionalSharingAccessReview/);
+  assert.match(server, /\/api\/regional-data-sharing\/handoff-report/);
   assert.match(server, /\/api\/regional-data-sharing\/access-reviews/);
   assert.match(script, /buildRegionalDataSharingReport/);
+  assert.match(script, /buildRegionalReportHandoff/);
+  assert.match(script, /referralHandoffReady/);
+  assert.match(script, /转诊会诊交接证据/);
+  assert.match(script, /regional:aboutPolicy/);
+  assert.match(script, /regional:aboutLaunchReadiness/);
+  assert.match(script, /regional:launchReadinessUi/);
+  assert.match(script, /regional:siteIntegrationUi/);
+  assert.match(script, /regional:scopeSelfTestUi/);
+  assert.match(script, /regional:aboutFunctionRoadmap/);
+  assert.match(script, /regional:aboutSiteEvidenceActions/);
+  assert.match(about, /data-regional-about-section="policy-basis"/);
+  assert.match(about, /data-regional-about-section="merge-boundary"/);
+  assert.match(about, /data-regional-about-section="launch-readiness"/);
+  assert.match(about, /data-regional-about-section="function-roadmap"/);
+  assert.match(about, /data-regional-about-section="site-evidence-actions"/);
+  assert.match(about, /已实现功能与上线前缺口/);
+  assert.match(about, /现有功能及责任部门/);
+  assert.match(about, /优先级排序：P0 共享包编目、角色权限裁剪；P1 联调检查与交接清单；P2 调阅审计与发布证据/);
+  assert.match(about, /展示编目完整度/);
+  assert.match(about, /责任部门：市级平台数据治理组/);
+  assert.match(about, /责任部门：市卫生健康委信息化处/);
+  assert.match(about, /责任部门：接口联调组/);
+  assert.match(about, /责任部门：安全管理岗/);
+  assert.match(about, /优先级：P0 上线前必须/);
+  assert.match(about, /P0 验收口径/);
+  assert.match(about, /居民主索引、来源机构、目标机构、记录引用、互认依据和质控状态/);
+  assert.match(about, /拒绝访问必须进入审计日志/);
+  assert.match(about, /优先级：P1 试点联调/);
+  assert.match(about, /优先级：P2 生产加固/);
+  assert.match(about, /下一步计划开发功能/);
+  assert.match(about, /接入统一认证、机构目录、医生身份源/);
+  assert.match(about, /上线前仍需开发/);
+  assert.match(about, /OIDC\/SAML/);
+  assert.match(about, /现场签字证据/);
+  assert.match(about, /现场交付物/);
+  assert.match(about, /联调样例/);
+  assert.match(about, /验收证据/);
+  assert.match(about, /审计导出路径/);
+  assert.match(about, /健康检查/);
+  assert.match(about, /RTO\/RPO/);
+  assert.doesNotMatch(about, /residents|personalRecords|diagnosticReports|referralId|teleconsultationId|regionalPackageId|reportId|AUDIT_EXPORT_PATH|SIEM_ENDPOINT|\/api\/health|\/api\/metrics/);
+  assert.match(about, /与医联体转诊功能的关系/);
+  assert.match(read("scripts/regional-referral-overlap.js"), /buildRegionalReferralOverlapReport/);
+  assert.match(read("scripts/regional-referral-overlap.js"), /runtimeMergeAllowed/);
+  assert.match(script, /regional:referralHandoff/);
+  assert.match(script, /regional:apiHandoff/);
+  assert.match(script, /regional:handoffReportApi/);
+  assert.match(script, /regional:handoffReportUi/);
+  assert.match(about, /“十四五”全民健康信息化规划/);
+  assert.match(about, /医疗卫生机构信息互通共享三年攻坚/);
+  assert.match(about, /医疗机构检查检验结果互认管理办法/);
+  assert.match(about, /医疗卫生机构网络安全管理办法/);
+  assert.match(auth, /"regional-data-sharing-about\.html": \["commission", "institution"\]/);
+  assert.match(auth, /\["regional-data-sharing-about\.html", "共享说明"\]/);
   assert.equal(data.regionalDataSharingScope.reusedCollections.includes("residents"), true);
   assert.equal(data.regionalDataSharingScope.exclusions.length >= 3, true);
   assert.equal(data.regionalSharingPackages.length >= 3, true);
@@ -1014,11 +1693,31 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   const workbenchHtml = read("workbench.html");
   const workbenchJs = read("workbench.js");
   const operationsHtml = read("operations.html");
+  const operationsAboutHtml = read("operations-about.html");
   const operationsJs = read("operations.js");
   assert.match(platformHtml, /research-governance/);
+  assert.match(platformJs, /research-application-form/);
+  assert.match(platformJs, /refreshResearchSandboxSummary/);
+  assert.match(platformJs, /research-governance-board/);
+  assert.match(platformJs, /researchPendingRows/);
+  assert.match(platformJs, /submitResearchDatasetApplication/);
   assert.match(platformJs, /runResearchDatasetAction/);
+  assert.match(platformJs, /openResearchEvidenceEditor/);
+  assert.match(platformJs, /submitResearchEvidenceDocument/);
+  assert.match(platformHtml, /research-evidence-form/);
+  assert.match(platformJs, /data-research-evidence/);
   assert.match(platformJs, /sandbox-access/);
+  assert.match(platformJs, /compliant-export/);
+  assert.match(platformJs, /researchCompliantExportRows/);
+  assert.match(platformJs, /合规数据出口/);
+  assert.match(platformJs, /成果回流/);
+  assert.match(read("portal.css"), /research-sandbox-summary/);
+  assert.match(read("portal.css"), /research-application-form/);
+  assert.match(read("portal.css"), /research-governance-board/);
+  assert.match(read("portal.css"), /research-audit-feed/);
   assert.match(platformJs, /outcome-return/);
+  assert.match(read("server.js"), /\/api\/research\/datasets\/:id\/compliant-exports/);
+  assert.match(read("server.js"), /\/api\/research\/compliant-exports/);
   assert.match(platformHtml, /mobile-accessibility-governance/);
   assert.match(platformHtml, /production-deployment-plan/);
   assert.match(platformJs, /renderResearchGovernance/);
@@ -1032,6 +1731,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.doesNotMatch(platformJs, /domain: "医疗机构业务系统"[^\n]*status: "待接口"/);
   assert.match(workbenchHtml, /system-readiness/);
   assert.match(workbenchHtml, /release-evidence-gates/);
+  assert.match(workbenchHtml, /drug-consumable-supervision-panel/);
   assert.match(workbenchHtml, /acceptance-ledgers/);
   assert.match(workbenchHtml, /site-readiness-pack/);
   assert.match(workbenchHtml, /site-launch-evidence-form/);
@@ -1050,6 +1750,12 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(workbenchJs, /loadProductionCutoverChecklist/);
   assert.match(workbenchJs, /loadReleaseArtifactManifest/);
   assert.match(workbenchJs, /loadUnifiedTaskReport/);
+  assert.match(workbenchJs, /loadDrugConsumableSupervision/);
+  assert.match(workbenchJs, /renderDrugConsumableSupervision/);
+  assert.match(workbenchJs, /renderDrugTraceabilityPolicyRow/);
+  assert.match(workbenchJs, /renderDrugTraceabilityEvidenceChecklistRow/);
+  assert.match(workbenchJs, /data-drug-traceability-policy-sources/);
+  assert.match(workbenchJs, /data-drug-traceability-evidence-checklist/);
   assert.match(workbenchJs, /data-unified-task/);
   assert.match(workbenchJs, /renderReleaseEvidenceGates/);
   assert.match(workbenchJs, /data-quality:report/);
@@ -1072,6 +1778,9 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(workbenchJs, /\/api\/production-cutover-checklist/);
   assert.match(workbenchJs, /\/api\/release-artifact-manifest/);
   assert.match(workbenchJs, /\/api\/tasks/);
+  assert.match(workbenchJs, /\/api\/drug-consumable-supervision/);
+  assert.match(workbenchJs, /traceabilityEvidenceCoverage/);
+  assert.match(workbenchJs, /status \$/);
   assert.match(workbenchJs, /\/api\/chronic\/acceptance-ledger/);
   assert.match(workbenchJs, /\/api\/county\/acceptance-ledger/);
   assert.match(read("server.js"), /\/api\/process-audit/);
@@ -1081,19 +1790,286 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("server.js"), /missingVerifiedTemplates/);
   assert.match(read("server.js"), /\/api\/site-readiness-pack/);
   assert.match(read("server.js"), /SERVICE_DOMAIN_BY_COLLECTION/);
+  assert.match(read("server.js"), /drugConsumableSupervisions: "drugConsumable"/);
   assert.match(read("server.js"), /priorityLevel/);
   assert.match(read("server.js"), /\/api\/site-template-readmes/);
   assert.match(read("server.js"), /\/api\/release-report/);
   assert.match(read("server.js"), /\/api\/production-cutover-checklist/);
   assert.match(read("server.js"), /\/api\/release-artifact-manifest/);
   assert.match(operationsHtml, /operations-snapshots/);
+  assert.match(operationsHtml, /operations-about\.html/);
+  assert.match(operationsHtml, /政策依据与监测边界/);
+  assert.match(operationsHtml, /国家二级、三级公立医院绩效监测操作手册/);
+  assert.match(operationsHtml, /performance-tier-filter/);
+  assert.match(operationsHtml, /performance-domain-filter/);
+  assert.match(operationsHtml, /performance-source-filter/);
+  assert.match(operationsHtml, /performance-summary/);
+  assert.match(operationsHtml, /performance-indicators/);
+  assert.match(operationsHtml, /performance-actions/);
+  assert.match(operationsHtml, /performance-readiness/);
+  assert.match(operationsHtml, /performance-indicator-detail/);
+  assert.match(operationsHtml, /operations-situation-strip/);
+  assert.match(operationsHtml, /operations-focus-links/);
+  assert.match(operationsHtml, /operations-duty-priority/);
+  assert.match(operationsHtml, /operations-duty-queue/);
+  assert.match(operationsHtml, /operations-duty-actions/);
+  assert.match(operationsHtml, /operations-interface-mapping/);
+  assert.match(operationsHtml, /operations-command-board/);
+  assert.match(operationsHtml, /operations-site-joint-tests/);
+  assert.match(operationsHtml, /operations-site-joint-patrol/);
+  assert.match(operationsHtml, /operation-launch-readiness/);
+  assert.match(operationsHtml, /operation-go-live-gates/);
+  assert.match(operationsHtml, /operation-production-hardening/);
+  assert.match(operationsHtml, /operation-cutover-command/);
+  assert.match(operationsHtml, /operation-post-cutover-observation/);
+  assert.match(operationsHtml, /operation-intelligence/);
+  assert.match(operationsHtml, /operation-resource-pool/);
+  assert.match(operationsHtml, /operation-emergency-dispatch-loop/);
+  assert.match(operationsHtml, /operation-mobile-duty/);
+  assert.match(operationsHtml, /operation-governance-report/);
+  assert.match(operationsHtml, /operations-delivery-pack-panel/);
+  assert.match(operationsHtml, /operation-delivery-pack-guide/);
+  assert.match(operationsHtml, /operation-delivery-pack-alert/);
+  assert.match(operationsHtml, /先核流程/);
+  assert.match(operationsHtml, /再核功能/);
+  assert.match(operationsHtml, /最后归档/);
+  assert.match(operationsHtml, /上线前补证提醒/);
+  assert.match(operationsHtml, /AUDIT_EXPORT_PATH/);
+  assert.match(operationsHtml, /SIEM_ENDPOINT/);
+  assert.match(operationsHtml, /hospital-operations-module-brief-report\.pdf/);
+  assert.match(operationsHtml, /hospital-operations-flow\.md/);
+  assert.match(operationsHtml, /hospital-operations-development-report\.md/);
+  assert.match(operationsHtml, /operation-next-development/);
+  assert.match(operationsHtml, /operation-command-chains/);
+  assert.match(operationsHtml, /operation-playbooks/);
+  assert.match(operationsHtml, /operation-handover/);
+  assert.match(operationsHtml, /operation-handover-owner-matrix/);
+  assert.match(operationsHtml, /operation-handover-signoffs/);
+  assert.match(operationsHtml, /预警处置预案/);
+  assert.match(operationsHtml, /operation-status-filter/);
+  assert.match(operationsHtml, /operation-domain-filter/);
+  assert.match(operationsHtml, /operation-filter-reset/);
+  assert.match(operationsHtml, /operation-detail/);
+  assert.match(operationsHtml, /operation-alert-queue/);
   assert.match(operationsHtml, /dispatch-form/);
   assert.match(operationsHtml, /reconciliation-reviews/);
+  assert.match(operationsAboutHtml, /requireRole\(\["commission"\]\)/);
+  assert.match(operationsAboutHtml, /政策依据、业务边界与发布说明/);
+  assert.match(operationsAboutHtml, /国家二级公立医院绩效监测操作手册/);
+  assert.match(operationsAboutHtml, /国家三级公立医院绩效监测操作手册/);
+  assert.match(operationsAboutHtml, /GET \/api\/operations\/interface-mapping/);
+  assert.match(operationsAboutHtml, /hospital-operations:release/);
+  assert.match(operationsAboutHtml, /现场联调边界/);
   assert.match(operationsJs, /fetchOperationsDashboard/);
+  assert.match(operationsJs, /PERFORMANCE_MANUALS/);
+  assert.match(operationsJs, /二级公立医院绩效监测/);
+  assert.match(operationsJs, /三级公立医院绩效监测/);
+  assert.match(operationsJs, /total: 28/);
+  assert.match(operationsJs, /total: 56/);
+  assert.match(operationsJs, /renderPerformanceManual/);
+  assert.match(operationsJs, /renderPerformanceActions/);
+  assert.match(operationsJs, /renderPerformanceReadiness/);
+  assert.match(operationsJs, /renderPerformanceIndicatorDetail/);
+  assert.match(operationsJs, /renderOperationsSituation/);
+  assert.match(operationsJs, /上线判定/);
+  assert.match(operationsJs, /data-metric-action/);
+  assert.match(operationsJs, /data-duty-action/);
+  assert.match(operationsJs, /launchDutyDetail/);
+  assert.match(operationsJs, /dispatchDutySla/);
+  assert.match(operationsJs, /activateDutyAction/);
+  assert.match(operationsJs, /rankedDuties/);
+  assert.match(operationsJs, /operations-duty-detail/);
+  assert.match(operationsJs, /operation-launch-readiness/);
+  assert.match(operationsJs, /renderGoLiveGates/);
+  assert.match(operationsJs, /reviewGoLiveGate/);
+  assert.match(operationsJs, /buildStaticGoLiveGates/);
+  assert.match(operationsJs, /\/api\/operations\/go-live-gates/);
+  assert.match(operationsJs, /\/api\/operations\/go-live-gates\/actions/);
+  assert.match(operationsJs, /data-go-live-gate/);
+  assert.match(operationsJs, /applySituationFilter/);
+  assert.match(operationsJs, /selectSnapshotById/);
+  assert.match(operationsJs, /renderInterfaceMapping/);
+  assert.match(operationsJs, /renderSiteJointTests/);
+  assert.match(operationsJs, /renderSiteJointPatrol/);
+  assert.match(operationsJs, /buildStaticSiteJointPatrol/);
+  assert.match(operationsJs, /submitSiteJointPatrol/);
+  assert.match(operationsJs, /renderProductionHardening/);
+  assert.match(operationsJs, /renderLaunchReadiness/);
+  assert.match(operationsJs, /buildStaticLaunchReadiness/);
+  assert.match(operationsJs, /上线运行判定/);
+  assert.match(operationsJs, /renderCutoverCommand/);
+  assert.match(operationsJs, /buildStaticCutoverCommand/);
+  assert.match(operationsJs, /signoffCutoverCommand/);
+  assert.match(operationsJs, /renderPostCutoverObservation/);
+  assert.match(operationsJs, /buildStaticPostCutoverObservation/);
+  assert.match(operationsJs, /submitPostCutoverObservation/);
+  assert.match(operationsJs, /operation-observation-windows/);
+  assert.match(operationsJs, /requiredEvidence/);
+  assert.match(operationsJs, /项证据/);
+  assert.match(operationsJs, /证据完成/);
+  assert.match(operationsJs, /evidencePending/);
+  assert.match(operationsJs, /逐窗口|待补/);
+  assert.match(operationsJs, /completionRate/);
+  assert.match(operationsJs, /pendingEvidence/);
+  assert.match(operationsJs, /completedEvidence/);
+  assert.match(operationsJs, /acceptanceRule/);
+  assert.match(operationsJs, /nextEvidenceAction/);
+  assert.match(operationsJs, /signoffStatus/);
+  assert.match(operationsJs, /可签收/);
+  assert.match(operationsJs, /renderOperationsIntelligence/);
+  assert.match(operationsJs, /renderResourcePool/);
+  assert.match(operationsJs, /buildStaticResourcePool/);
+  assert.match(operationsJs, /applyResourceDispatchDraft/);
+  assert.match(operationsJs, /renderMobileDuty/);
+  assert.match(operationsJs, /buildStaticMobileDuty/);
+  assert.match(operationsJs, /sendMobileDutyReminder/);
+  assert.match(operationsJs, /renderGovernanceReport/);
+  assert.match(operationsJs, /buildStaticGovernanceExportPackage/);
+  assert.match(operationsJs, /downloadGovernanceExportPackage/);
+  assert.match(operationsJs, /renderNextDevelopmentResearch/);
+  assert.match(operationsJs, /buildStaticNextDevelopmentResearch/);
+  assert.match(operationsJs, /renderCommandChains/);
+  assert.match(operationsJs, /renderOperationsPlaybooks/);
+  assert.match(operationsJs, /renderOperationsHandover/);
+  assert.match(operationsJs, /renderHandoverOwnerMatrix/);
+  assert.match(operationsJs, /signoffOperationsHandover/);
+  assert.match(operationsJs, /buildStaticCommandChains/);
+  assert.match(operationsJs, /buildStaticOperationsPlaybooks/);
+  assert.match(operationsJs, /buildStaticOperationsHandover/);
+  assert.match(operationsJs, /buildStaticHandoverOwnerMatrix/);
+  assert.match(operationsJs, /buildStaticInterfaceMapping/);
+  assert.match(operationsJs, /performanceMonitoring/);
+  assert.match(operationsJs, /performanceSourceCoverage/);
+  assert.match(operationsJs, /performanceSourceOwner/);
+  assert.match(operationsJs, /performanceFormula/);
+  assert.match(operationsJs, /performanceDataHook/);
+  assert.match(operationsJs, /performanceOwner/);
+  assert.match(operationsJs, /bindPerformanceControls/);
+  assert.match(operationsJs, /bindMonitorControls/);
+  assert.match(operationsJs, /filterSnapshots/);
+  assert.match(operationsJs, /renderOperationDetail/);
+  assert.match(operationsJs, /renderAlertQueue/);
+  assert.match(operationsJs, /pressureBar/);
+  assert.match(operationsJs, /operationLoadFactors/);
+  assert.match(operationsJs, /applyDispatchDraft/);
+  assert.match(operationsJs, /dispatchDraftForAlert/);
+  assert.match(operationsJs, /updateDispatchStatus/);
+  assert.match(operationsJs, /updateSelectedDispatchStatuses/);
+  assert.match(operationsJs, /dispatchNextStatus/);
+  assert.match(operationsJs, /dispatch-batch-toolbar/);
+  assert.match(operationsJs, /dispatchBatchNote/);
+  assert.match(operationsJs, /window\.confirm/);
+  assert.match(operationsJs, /dispatchStatusButtons/);
+  assert.match(operationsJs, /reconciliationActionButtons/);
   assert.match(operationsJs, /\/operations\/dashboard/);
+  assert.match(operationsJs, /\/api\/operations\/site-joint-tests/);
+  assert.match(operationsJs, /\/api\/operations\/site-joint-patrol/);
+  assert.match(operationsJs, /\/api\/operations\/production-hardening/);
+  assert.match(operationsJs, /\/api\/operations\/cutover-command/);
+  assert.match(operationsJs, /\/api\/operations\/post-cutover-observation/);
+  assert.match(operationsJs, /\/api\/operations\/intelligence/);
+  assert.match(operationsJs, /\/api\/operations\/resource-pool/);
+  assert.match(operationsJs, /\/api\/operations\/emergency-dispatch-loop/);
+  assert.match(operationsJs, /renderEmergencyDispatchLoop/);
+  assert.match(operationsJs, /\/api\/operations\/mobile-duty/);
+  assert.match(operationsJs, /\/api\/operations\/governance-report/);
+  assert.match(operationsJs, /\/api\/operations\/governance-export-package/);
+  assert.match(operationsJs, /\/api\/operations\/next-development-research/);
   assert.match(operationsJs, /\/operations\/dispatch/);
+  assert.match(operationsJs, /\/operations\/dispatch\/.*\/status/);
   assert.match(operationsJs, /\/operations\/reconciliation/);
+  assert.match(read("portal.css"), /operation-pressure/);
+  assert.match(read("portal.css"), /performance-manual-panel/);
+  assert.match(read("portal.css"), /performance-indicator-card/);
+  assert.match(read("portal.css"), /performance-action-card/);
+  assert.match(read("portal.css"), /performance-action-card\.export/);
+  assert.match(read("portal.css"), /performance-readiness-card/);
+  assert.match(read("portal.css"), /performance-detail-card/);
+  assert.match(read("portal.css"), /interface-mapping-card/);
+  assert.match(read("portal.css"), /site-joint-patrol-card/);
+  assert.match(read("portal.css"), /operation-launch-readiness-summary/);
+  assert.match(read("portal.css"), /operation-go-live-gate-card/);
+  assert.match(read("portal.css"), /operation-cutover-card/);
+  assert.match(read("portal.css"), /operation-observation-card/);
+  assert.match(read("portal.css"), /operation-observation-windows/);
+  assert.match(read("portal.css"), /command-chain-sla/);
+  assert.match(read("portal.css"), /operation-playbook-card/);
+  assert.match(read("portal.css"), /operation-resource-pool-card/);
+  assert.match(read("portal.css"), /operation-emergency-loop-card/);
+  assert.match(read("portal.css"), /dispatch-batch-toolbar/);
+  assert.match(read("portal.css"), /dispatch-batch-note/);
+  assert.match(read("portal.css"), /operation-mobile-duty-card/);
+  assert.match(read("portal.css"), /operation-delivery-pack-card/);
+  assert.match(read("portal.css"), /operation-delivery-pack-guide/);
+  assert.match(read("portal.css"), /operation-delivery-pack-alert/);
+  assert.match(read("portal.css"), /operation-next-development-card/);
+  assert.match(read("portal.css"), /operation-handover-card/);
+  assert.match(read("portal.css"), /operation-handover-owner-card/);
+  assert.match(read("portal.css"), /operation-handover-signoffs/);
+  assert.match(read("portal.css"), /policy-note-grid/);
+  assert.match(read("portal.css"), /command-chain-card/);
+  assert.match(read("portal.css"), /operation-alert-item/);
+  assert.match(read("portal.css"), /operation-factor/);
+  assert.match(read("portal.css"), /is-highlighted/);
+  assert.match(read("portal.css"), /inline-action\.compact/);
+  assert.match(read("shared.js"), /HealthCityLocale/);
+  assert.match(read("shared.js"), /必须先经过 HealthCityLocale\.text\/list 中文化后再渲染/);
+  assert.match(operationsJs, /HealthCityLocale/);
+  assert.match(operationsJs, /zhList\(dashboard\.boundaries/);
+  assert.match(operationsJs, /statusBadge\(item\.normalizedStatus\)/);
+  assert.match(operationsJs, /OPERATIONS_EVIDENCE_LABELS/);
+  assert.match(operationsJs, /运行监测总览接口/);
+  assert.match(operationsJs, /evidenceList\(item\.evidence\)/);
+  assert.doesNotMatch(operationsJs, /证据：\$\{zhList\(item\.evidence/);
+  assert.doesNotMatch(operationsHtml, />high</);
+  assert.doesNotMatch(operationsHtml, />pending</);
+  assert.doesNotMatch(operationsHtml, /Qingniwaqiao Community Health Service Center/);
+  assert.doesNotMatch(operationsHtml, /step-down-bed/);
   assert.match(read("server.js"), /\/api\/operations\/dashboard/);
+  assert.match(read("server.js"), /\/api\/operations\/performance-monitoring/);
+  assert.match(read("server.js"), /\/api\/operations\/command-chains/);
+  assert.match(read("server.js"), /\/api\/operations\/playbooks/);
+  assert.match(read("server.js"), /\/api\/operations\/handover/);
+  assert.match(read("server.js"), /\/api\/operations\/handover\/owners/);
+  assert.match(read("server.js"), /\/api\/operations\/handover\/signoff/);
+  assert.match(read("server.js"), /\/api\/operations\/interface-mapping/);
+  assert.match(read("server.js"), /\/api\/operations\/site-joint-tests/);
+  assert.match(read("server.js"), /\/api\/operations\/site-joint-patrol/);
+  assert.match(read("server.js"), /\/api\/operations\/production-hardening/);
+  assert.match(read("server.js"), /\/api\/operations\/cutover-command/);
+  assert.match(read("server.js"), /\/api\/operations\/post-cutover-observation/);
+  assert.match(read("server.js"), /\/api\/operations\/go-live-gates/);
+  assert.match(read("server.js"), /\/api\/operations\/go-live-gates\/actions/);
+  assert.match(read("server.js"), /operations-go-live-gate-review/);
+  assert.match(read("server.js"), /\/api\/operations\/intelligence/);
+  assert.match(read("server.js"), /\/api\/operations\/resource-pool/);
+  assert.match(read("server.js"), /\/api\/operations\/mobile-duty/);
+  assert.match(read("server.js"), /operations-mobile-duty-reminder/);
+  assert.match(read("server.js"), /\/api\/operations\/governance-report/);
+  assert.match(read("server.js"), /\/api\/operations\/governance-export-package/);
+  assert.match(read("server.js"), /\/api\/operations\/next-development-research/);
+  assert.match(read("server.js"), /\/api\/operations\/dispatch\/:id\/status/);
+  assert.match(read("server.js"), /buildPerformanceMonitoringEvidence/);
+  assert.match(read("server.js"), /buildOperationsInterfaceMappingEvidence/);
+  assert.match(read("server.js"), /buildOperationsSiteJointPatrol/);
+  assert.match(read("server.js"), /buildOperationsCutoverCommand/);
+  assert.match(read("server.js"), /buildOperationsPostCutoverObservation/);
+  assert.match(read("server.js"), /buildOperationsGoLiveGates/);
+  assert.match(read("server.js"), /buildCommandSla/);
+  assert.match(read("server.js"), /buildOperationsPlaybooks/);
+  assert.match(read("server.js"), /buildOperationsHandover/);
+  assert.match(read("server.js"), /buildOperationsHandoverOwnerMatrix/);
+  assert.match(read("server.js"), /buildOperationsMobileDuty/);
+  assert.match(read("server.js"), /normalizeHandoverSignoff/);
+  assert.match(read("server.js"), /operations-handover-signoff/);
+  assert.match(read("server.js"), /buildOperationsCommandChains/);
+  assert.match(read("server.js"), /indicatorDetails/);
+  assert.match(read("server.js"), /review-status-change/);
+  assert.match(read("auth.js"), /\["operations\.html", "运行监测"\]/);
+  assert.match(read("auth.js"), /\["operations-about\.html", "运行说明"\]/);
+  assert.match(read("server.js"), /applyDispatchStatusUpdate/);
+  assert.match(read("server.js"), /performanceReadinessMatrix/);
+  assert.match(read("server.js"), /PERFORMANCE_MONITORING_MANUALS/);
   assert.match(read("server.js"), /operations-dispatch/);
   assert.match(read("server.js"), /statistics-reconciliation-review/);
 });
@@ -1101,9 +2077,12 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
 test("quality safety supervision app exposes runnable portal, API and release evidence", () => {
   const data = JSON.parse(read("data/db.json"));
   const html = read("quality-safety.html");
+  const about = read("quality-safety-about.html");
+  const login = read("login.html");
   const js = read("quality-safety.js");
   const server = read("server.js");
-  ["qualitySafetyEvents", "criticalValueAlerts", "clinicalPathwayCases", "medicalRecordQualityReviews", "mutualRecognitionQualityReviews", "qualityRectificationOrders"].forEach((key) => {
+  const portalCss = read("portal.css");
+  ["qualitySafetyEvents", "criticalValueAlerts", "clinicalPathwayCases", "medicalRecordQualityReviews", "mutualRecognitionQualityReviews", "qualityRectificationOrders", "qualitySafetySiteSignoffs"].forEach((key) => {
     assert.equal(Array.isArray(data[key]), true, `${key} should be seeded`);
     assert.equal(data[key].length > 0, true, `${key} should not be empty`);
   });
@@ -1111,17 +2090,201 @@ test("quality safety supervision app exposes runnable portal, API and release ev
     assert.match(read("scripts/quality-safety-report.js"), new RegExp(key));
   });
   assert.match(html, /quality-safety-metrics/);
+  assert.match(html, /quality-safety-national-goals/);
+  assert.match(html, /data-quality-safety-national-goals-panel/);
+  assert.match(html, /quality-safety-national-goal-cadence/);
+  assert.match(html, /data-quality-safety-national-goal-cadence-panel/);
+  assert.match(html, /quality-safety-core-systems/);
+  assert.match(html, /data-quality-safety-core-systems-panel/);
+  assert.match(html, /quality-safety-risks/);
+  assert.match(html, /quality-safety-actions/);
+  assert.match(html, /quality-safety-readiness/);
+  assert.match(html, /quality-safety-prelaunch-gaps/);
+  assert.match(html, /data-quality-safety-prelaunch-panel/);
+  assert.match(html, /quality-safety-cutover-sequence/);
+  assert.match(html, /data-quality-safety-cutover-sequence-panel/);
+  assert.match(html, /quality-safety-next-development/);
+  assert.match(html, /data-quality-safety-next-development-panel/);
+  assert.match(html, /quality-safety-onsite-requirements/);
+  assert.match(html, /data-quality-safety-onsite-requirements-panel/);
+  assert.match(html, /quality-safety-operations-runbook/);
+  assert.match(html, /data-quality-safety-operations-panel/);
+  assert.match(html, /quality-safety-warning-indicators/);
+  assert.match(html, /data-quality-safety-warning-indicators-panel/);
+  assert.match(html, /quality-safety-signoffs/);
+  assert.match(html, /quality-safety-interface-pack/);
   assert.match(html, /quality-safety-issues/);
   assert.match(html, /quality-safety-rectifications/);
+  assert.match(html, /quality-safety-toolbar/);
+  assert.match(html, /quality-safety-status-filter/);
+  assert.match(html, /quality-safety-domain-filter/);
+  assert.match(html, /quality-safety-search/);
+  assert.match(html, /quality-safety-brief/);
+  assert.match(html, /quality-safety-department-view/);
+  assert.match(html, /quality-safety-department-queue/);
+  assert.match(html, /data-quality-safety-department-panel/);
+  assert.match(html, /data-quality-safety-task-queue-panel/);
+  assert.match(html, /quality-safety-about\.html/);
+  assert.match(html, /医疗质量与安全监管平台/);
+  assert.doesNotMatch(html, /Medical quality|Policy basis|Go-live readiness|Issue queue|Rectification loop/);
+  assert.match(about, /data-quality-safety-about="policy-basis"/);
+  assert.match(about, /data-quality-safety-about="core-systems-matrix"/);
+  assert.match(about, /data-quality-safety-about="joint-testing"/);
+  assert.match(about, /data-quality-safety-about="login-departments"/);
+  assert.match(about, /data-quality-safety-about="prelaunch-gaps"/);
+  assert.match(about, /生产接口联调/);
+  assert.match(about, /本地规则字典/);
+  assert.match(about, /通知与升级/);
+  assert.match(read("README.md"), /Pre-launch development gaps/);
+  assert.match(about, /18项核心制度建设要求/);
+  assert.match(about, /首诊负责、三级查房、会诊、分级护理、值班和交接班/);
+  assert.match(about, /c24f4ba21d02422f81afc59efdd380a8/);
+  assert.match(about, /卫健监管部门/);
+  assert.match(about, /医疗机构/);
+  assert.match(about, /县域医共体/);
+  assert.match(about, /data-policy-ref="medical-quality-management"/);
+  assert.match(about, /data-policy-ref="core-safety-systems"/);
+  assert.match(about, /data-policy-ref="mutual-recognition"/);
+  assert.match(about, /data-policy-ref="quality-goals-2025"/);
+  assert.match(about, /data-policy-ref="clinical-pathway"/);
   assert.match(js, /loadQualitySafety/);
+  assert.match(js, /renderCoreSystemMatrix/);
+  assert.match(js, /renderRisks/);
+  assert.match(js, /renderActionPlan/);
+  assert.match(js, /renderGoLiveReadiness/);
+  assert.match(js, /renderPrelaunchGaps/);
+  assert.match(js, /renderCutoverSequence/);
+  assert.match(js, /renderNextDevelopmentPlan/);
+  assert.match(js, /nextDevelopmentPlan/);
+  assert.match(js, /cutoverSequence/);
+  assert.match(js, /上线阶段/);
+  assert.match(js, /需关注阶段/);
+  assert.match(js, /renderOnsiteRequirements/);
+  assert.match(js, /onsiteRequirements/);
+  assert.match(js, /renderOperationsRunbook/);
+  assert.match(js, /operationsRunbook/);
+  assert.match(js, /renderWarningIndicators/);
+  assert.match(js, /warningIndicators/);
+  assert.match(js, /quality-safety-warning-indicators/);
+  assert.match(js, /productionSignoffPending/);
+  assert.match(js, /renderSiteSignoffs/);
+  assert.match(js, /renderInterfaceJointTestPack/);
+  assert.match(js, /siteSampleAcceptance/);
+  assert.match(js, /现场样例/);
+  assert.match(js, /renderOperationsBrief/);
+  assert.match(js, /renderDepartmentView/);
+  assert.match(js, /renderDepartmentTaskQueue/);
+  assert.match(js, /renderNationalQualityGoals/);
+  assert.match(js, /renderNationalGoalCadencePlan/);
+  assert.match(js, /nationalGoalCadencePlan/);
+  assert.match(js, /nationalQualityGoals/);
+  assert.match(js, /siteInputs/);
+  assert.match(js, /现场采集字段/);
+  assert.match(js, /采集字段/);
+  assert.match(js, /qualityDepartmentProfile/);
+  assert.match(js, /departmentTaskView/);
+  assert.match(js, /行动计划/);
+  assert.match(js, /上线执行/);
+  assert.match(js, /现场签收/);
+  assert.match(js, /quality-queue-list/);
+  assert.match(js, /data-scroll-target/);
+  assert.match(js, /scrollIntoView/);
+  assert.match(js, /window\.HealthCityAuth\?\.getUser/);
+  assert.match(js, /filterQualityRows/);
+  assert.match(js, /applyQualitySafetyFilters/);
+  assert.match(js, /validateInterfaceSample/);
+  assert.match(js, /submitSiteSignoffEvidence/);
+  assert.match(js, /submitCoreSystemEvidence/);
+  assert.match(js, /data-core-system-evidence/);
+  assert.match(js, /response\.status === 401/);
+  assert.match(js, /HealthCityAuth\?\.logout/);
+  assert.match(js, /提交证据/);
+  assert.match(js, /zhText\(item\.id\)/);
+  assert.match(js, /zhText\(pack\.securityFixture\.signatureBase\)/);
+  assert.doesNotMatch(js, />Submit evidence<|>Dispatch<|>Feedback<|>Review<|>Escalate<|Last validation|No manual validation yet/);
   assert.match(js, /dispatchIssue/);
   assert.match(js, /submitFeedback/);
   assert.match(js, /reviewOrder/);
+  assert.match(js, /escalateOrder/);
+  assert.match(js, /acknowledgeCritical/);
+  assert.match(js, /disposeCritical/);
+  assert.match(js, /reviewClinicalPathway/);
+  assert.match(js, /reviewSiteSignoff/);
+  assert.match(js, /canDispatch/);
+  assert.match(js, /canReview/);
+  assert.match(js, /canFeedback/);
+  assert.match(js, /canEscalate/);
+  assert.match(portalCss, /quality-filter-grid/);
+  assert.match(portalCss, /quality-brief/);
+  assert.match(portalCss, /quality-department-view/);
+  assert.match(portalCss, /quality-action-list/);
+  assert.match(portalCss, /quality-queue-list/);
+  assert.match(portalCss, /\.table-wrap/);
+  assert.match(portalCss, /position: sticky/);
+  assert.match(portalCss, /login-scope-note/);
+  assert.match(login, /moduleScopes/);
+  assert.match(login, /quality-safety\.html/);
+  assert.match(login, /医疗质量与安全监管平台准入部门/);
+  assert.match(login, /scope\.roles\.includes\(user\.role\)/);
   assert.match(server, /\/api\/quality-safety\/dashboard/);
+  assert.match(server, /buildQualitySafetyDepartmentTaskView/);
+  assert.match(server, /buildQualitySafetyCoreSystemMatrix/);
+  assert.match(server, /首诊负责制度/);
+  assert.match(server, /信息安全管理制度/);
+  assert.match(server, /\/api\/quality-safety\/interface-standard/);
+  assert.match(server, /\/api\/quality-safety\/interface-joint-test-pack/);
+  assert.match(server, /\/api\/quality-safety\/interface-messages\/validate/);
   assert.match(server, /\/api\/quality-safety\/issues\/:id\/dispatch/);
   assert.match(server, /\/api\/quality-safety\/rectifications\/:id\/feedback/);
   assert.match(server, /\/api\/quality-safety\/rectifications\/:id\/review/);
+  assert.match(server, /\/api\/quality-safety\/rectifications\/:id\/escalate/);
+  assert.match(server, /\/api\/quality-safety\/critical-values\/:id\/acknowledge/);
+  assert.match(server, /\/api\/quality-safety\/critical-values\/:id\/dispose/);
+  assert.match(server, /\/api\/quality-safety\/clinical-pathways\/:id\/review/);
+  assert.match(server, /\/api\/quality-safety\/core-systems\/:id\/evidence/);
+  assert.match(server, /\/api\/quality-safety\/site-signoffs\/:id\/evidence/);
+  assert.match(server, /\/api\/quality-safety\/site-signoffs\/:id\/review/);
+  assert.match(server, /qualitySafetySlaState/);
+  assert.match(server, /buildQualitySafetyActionPlan/);
+  assert.match(server, /buildQualitySafetyInstitutionRisks/);
+  assert.match(server, /buildQualitySafetyGoLiveReadiness/);
+  assert.match(read("scripts/quality-safety-report.js"), /quality-safety:risk-ranking/);
+  assert.match(read("scripts/quality-safety-report.js"), /quality-safety:clinical-pathway-loop/);
+  assert.match(read("scripts/quality-safety-report.js"), /quality-safety:policy-basis/);
+  assert.match(read("scripts/quality-safety-report.js"), /quality-safety:action-plan/);
+  assert.match(read("scripts/quality-safety-report.js"), /quality-safety:site-signoff-tracker/);
+  assert.match(read("scripts/quality-safety-report.js"), /quality-safety:site-evidence-submission/);
+  assert.match(read("scripts/quality-safety-report.js"), /\/api\/quality-safety\/core-systems\/:id\/evidence/);
+  assert.match(read("README.md"), /\/api\/quality-safety\/core-systems\/:id\/evidence/);
+  assert.match(read("README.md"), /Pre-launch tracker/);
+  assert.match(read("scripts/quality-safety-report.js"), /quality-safety:go-live-readiness/);
+  assert.match(read("scripts/quality-safety-report.js"), /quality-safety:operations-runbook/);
+  assert.match(read("scripts/quality-safety-report.js"), /quality-safety:warning-indicators/);
+  assert.match(read("scripts/quality-safety-report.js"), /Warning Indicators/);
+  assert.match(read("scripts/quality-safety-report.js"), /quality-safety:onsite-requirements/);
+  assert.match(read("scripts/quality-safety-report.js"), /quality-safety:cutover-sequence/);
+  assert.match(read("scripts/quality-safety-report.js"), /quality-safety:national-goals-2025/);
+  assert.match(read("scripts/quality-safety-report.js"), /quality-safety:national-goal-site-inputs/);
+  assert.match(read("scripts/quality-safety-report.js"), /quality-safety:national-goal-cadence-plan/);
+  assert.match(read("scripts/quality-safety-report.js"), /quality-safety:next-development-plan/);
+  assert.match(read("scripts/quality-safety-report.js"), /2025 National Quality Goals/);
+  assert.match(read("scripts/quality-safety-report.js"), /National Goal Cadence Plan/);
+  assert.match(read("scripts/quality-safety-report.js"), /Next Development Plan/);
+  assert.match(read("README.md"), /Cutover sequence/);
+  assert.match(read("README.md"), /Onsite requirements/);
+  assert.match(read("README.md"), /Operations runbook/);
+  assert.match(read("README.md"), /Warning indicators/);
+  assert.match(read("README.md"), /Next development plan/);
   assert.match(read("scripts/release-report.js"), /qualitySafety:report/);
+  assert.match(read("scripts/release-report.js"), /qualitySafety:warningIndicators/);
+  assert.match(read("scripts/release-report.js"), /qualitySafetyInterface:standard/);
+  assert.match(read("scripts/release-report.js"), /qualitySafetyInterfaceJointTest:pack/);
+  assert.match(read("scripts/release-report.js"), /qualitySafetyInterfaceJointTest:siteSampleAcceptance/);
+  assert.match(read("scripts/quality-safety-interface-joint-test.js"), /joint-test:site-sample-acceptance/);
+  assert.match(read("scripts/quality-safety-interface-joint-test.js"), /Site Sample Acceptance/);
+  assert.match(read("scripts/quality-safety-interface-joint-test.js"), /签字联调单/);
+  assert.match(read("scripts/release-report.js"), /qualitySafety:siteSignoffTracker/);
+  assert.match(read("scripts/release-report.js"), /qualitySafety:goLiveReadiness/);
   assert.match(read("platform.html"), /quality-safety\.html/);
   assert.match(read("workbench.html"), /quality-safety\.html/);
   assert.match(read("auth.js"), /quality-safety\.html/);
@@ -1129,13 +2292,50 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(read("server.js"), /\/api\/chronic\/followup-feedback/);
   assert.match(read("server.js"), /\/api\/chronic\/followup-escalations/);
   assert.match(read("server.js"), /\/api\/chronic\/followup-dispatch/);
+  assert.match(read("server.js"), /appendChronicFollowupMessage/);
+  assert.match(read("server.js"), /closeChronicFollowupMessages/);
+  assert.match(read("server.js"), /upsertResidentExperienceCheckin/);
+  assert.match(read("server.js"), /recordChronicPharmacyCallback/);
+  assert.match(read("server.js"), /closeFamilyDoctorChronicAction/);
+  assert.match(read("server.js"), /buildChronicFollowupAlertQueue/);
+  assert.match(read("server.js"), /recordChronicLaunchCoreAction/);
+  assert.match(read("data/db.json"), /"chronicFollowup": true/);
+  assert.match(read("data/db.json"), /"chronicLaunchCoreSignoffs"/);
+  assert.match(read("docs/chronic-followup-readiness.md"), /\/api\/messages/);
+  assert.match(read("scripts/chronic-followup-readiness.js"), /policy-alignment/);
+  assert.match(read("scripts/chronic-launch-core.js"), /launch-core:actionClosure/);
+  assert.match(read("scripts/chronic-launch-core.js"), /launch-core:siteSignoffs/);
+  assert.match(read("scripts/site-readiness-pack.js"), /cutover-chronic-launch-core/);
+  assert.match(read("scripts/release-report.js"), /chronicFollowup:policyAlignment/);
+  assert.match(read("scripts/release-report.js"), /chronicFollowup:alertQueue/);
+  assert.match(read("scripts/release-report.js"), /chronicFollowup:residentExperience/);
+  assert.match(read("scripts/release-report.js"), /chronicFollowup:fieldIntegration/);
+  assert.match(read("scripts/release-report.js"), /chronicFollowup:institutionInterfaces/);
+  assert.match(read("scripts/release-report.js"), /chronicFollowup:launchCore/);
+  assert.equal(Boolean(JSON.parse(read("package.json")).scripts["chronic:institution-interfaces"]), true);
+  assert.equal(Boolean(JSON.parse(read("package.json")).scripts["chronic:launch-core"]), true);
+  assert.match(read("data/db.json"), /"chronicExternalIntegrations"/);
+  assert.match(read("data/db.json"), /"chronicPharmacyInsuranceLinks"/);
   assert.match(read("institution.html"), /chronic-followup-workbench/);
+  assert.match(read("institution.html"), /chronic-workbench-controls/);
+  assert.match(read("institution.html"), /chronic-priority-filter/);
+  assert.match(read("institution.html"), /chronic-type-filter/);
+  assert.match(read("institution.html"), /chronic-search/);
+  assert.match(read("institution.html"), /chronic-launch-core/);
+  assert.match(read("institution.html"), /chronic-integration-actions/);
   assert.match(read("institution.js"), /dispatchChronicFollowup/);
   assert.match(read("institution.js"), /escalateChronicFollowup/);
   assert.match(read("institution.js"), /standardsProfile: "chronic-referral-return-v1"/);
   assert.match(read("institution.js"), /data-chronic-escalation/);
   assert.match(read("citizen.html"), /followup-feedback-form/);
+  assert.match(read("citizen.html"), /resident-checkin-form/);
+  assert.match(read("citizen.js"), /buildResidentChronicReminderQueue/);
+  assert.match(read("citizen.js"), /bindResidentExperienceCheckin/);
+  assert.match(read("citizen.js"), /\/chronic\/resident-checkins/);
+  assert.match(read("citizen.js"), /loadChronicFollowupSummary/);
+  assert.match(read("citizen.js"), /chronicFollowupSummary\?\.alertQueue/);
   assert.match(read("citizen.js"), /bindFollowupFeedback/);
+  assert.match(read("citizen.js"), /state\.taskMessages/);
 });
 
 test("chronic pharmacy insurance closure is exposed through the institution workbench", () => {
@@ -1879,15 +3079,24 @@ test("imaging cloud module exposes hospital ingest, mobile viewing and EMR compa
   assert.match(page, /data-imaging-section="development-plan"/);
   assert.match(page, /imaging-current-capabilities/);
   assert.match(page, /imaging-development-plan/);
+  assert.match(page, /mutual-recognition-table/);
   assert.match(page, /患者手机查看/);
   assert.match(page, /电子病历兼容/);
   assert.match(pageJs, /\/imaging-cloud\/ingest/);
   assert.match(pageJs, /renderDevelopmentPlan/);
+  assert.match(pageJs, /startMutualRecognition/);
+  assert.match(pageJs, /submitMutualRecognitionAppeal/);
+  assert.match(pageJs, /reviewMutualRecognitionAppeal/);
   assert.match(pageJs, /终端不保存原始 DICOM/);
   assert.match(server, /\/api\/imaging-cloud/);
   assert.match(server, /buildImageCloudDerivedRecords/);
   assert.match(server, /seedImageCloudImplementedFeatures/);
   assert.match(server, /seedImageCloudDevelopmentPlan/);
+  assert.match(server, /createImageCloudMutualRecognitionChain/);
+  assert.match(server, /submitImageCloudRecognitionAppeal/);
+  assert.match(server, /reviewImageCloudRecognitionAppeal/);
+  assert.match(server, /imaging-cloud\/studies\/:id\/mutual-recognition/);
+  assert.match(server, /imaging-cloud\/studies\/:id\/mutual-recognition\/appeal/);
   assert.match(server, /diagnosticReports/);
   assert.match(server, /personalRecords/);
   assert.match(auth, /"imaging-cloud\.html": \["commission", "institution", "county", "citizen"\]/);
@@ -2176,8 +3385,15 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /citizenPipelineAudit/);
   assert.match(citizenJs, /renderCitizenPipelineAudit/);
   assert.match(citizenJs, /citizenActionDockFallbacks/);
+  assert.match(citizenJs, /CITIZEN_RECENT_ACTION_KEY/);
+  assert.match(citizenJs, /rememberCitizenAction/);
   assert.match(citizenJs, /renderCitizenActionDock/);
+  assert.match(citizenJs, /citizenActionDockHint/);
+  assert.match(citizenJs, /最近使用：\$\{recent\.label\}/);
   assert.match(citizenJs, /data-action-dock-target/);
+  assert.match(citizenJs, /data-action-dock-label/);
+  assert.match(citizenJs, /aria-label="\$\{active\.label\}：\$\{item\.label\}"/);
+  assert.match(citizenJs, /<small>最近<\/small>/);
   assert.match(citizenJs, /常用操作/);
   assert.match(citizenJs, /registration:integration-readiness/);
   assert.match(citizenJs, /onsiteAcceptance/);
@@ -2311,6 +3527,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /service-mobile-action/);
   assert.match(citizenCss, /citizen-action-dock/);
   assert.match(citizenCss, /citizen-action-chip/);
+  assert.match(citizenCss, /citizen-action-chip\.recent/);
   assert.match(citizenJs, /data-service-state/);
   assert.match(citizenJs, /service-tab-boundary/);
   assert.match(citizenJs, /service-summary-meta/);
@@ -2512,6 +3729,8 @@ test("citizen portal exposes resident service tabs and implementation states", (
 test("internet nursing module exposes appointment, management and nurse workflows", () => {
   const html = read("internet-nursing.html");
   const js = read("internet-nursing.js");
+  const highlights = read("internet-nursing-highlights.js");
+  const highlightDoc = read("docs/internet-nursing-highlight-center.md");
   const css = read("portal.css");
   const mobilePreviewHtml = read("mobile-preview.html");
   const server = read("server.js");
@@ -2548,6 +3767,8 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(html, /nursing-device-verification/);
   assert.match(html, /nursing-regulatory-submission/);
   assert.match(html, /nursing-site-cutover-pack/);
+  assert.match(html, /internet-nursing-highlights\.js/);
+  assert.match(html, /nursing-highlight-center/);
   assert.match(html, /现场割接证据包/);
   assert.match(js, /fetchInternetNursingDashboard/);
   assert.match(js, /renderRiskGuidance/);
@@ -2581,6 +3802,8 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(js, /renderRegulatorySubmission/);
   assert.match(js, /buildStaticSiteCutoverPack/);
   assert.match(js, /renderSiteCutoverPack/);
+  assert.match(js, /buildInternetNursingInnovationCenter/);
+  assert.match(js, /renderNursingInnovationCenter/);
   assert.match(js, /productionBlockers/);
   assert.match(js, /production-blocked/);
   assert.match(js, /nursing-cutover-regulatory-pressure-test/);
@@ -2648,6 +3871,7 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(server, /buildInternetNursingDeviceVerification/);
   assert.match(server, /buildInternetNursingRegulatorySubmission/);
   assert.match(server, /buildInternetNursingCutoverPack/);
+  assert.match(server, /buildInternetNursingInnovationCenter/);
   assert.match(server, /siteCutoverPack/);
   assert.match(server, /productionBlockers/);
   assert.match(server, /buildProductionEnvironmentStatus/);
@@ -2680,14 +3904,24 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(read("scripts/internet-nursing-readiness.js"), /nursing:siteCutoverPack/);
   assert.match(read("scripts/internet-nursing-readiness.js"), /nursing:closedLoopSummary/);
   assert.match(read("scripts/internet-nursing-readiness.js"), /nursing:accountProvisioning/);
+  assert.match(read("scripts/internet-nursing-readiness.js"), /nursing:highlightFeatures/);
+  assert.match(read("scripts/internet-nursing-readiness.js"), /nursing:highlightEvidenceWorkbench/);
   assert.match(read("scripts/internet-nursing-readiness.js"), /nursing-cutover-payment-reconciliation/);
+  assert.match(highlights, /HIGHLIGHT_FEATURES/);
+  assert.match(highlights, /smart-dispatch/);
+  assert.match(highlights, /evidence-workbench/);
+  assert.match(highlights, /riskScore/);
+  assert.match(highlightDoc, /Ten Highlight Functions/);
+  assert.match(highlightDoc, /internet-nursing\.html#nursing-highlight-section/);
   assert.match(read("scripts/internet-nursing-readiness.js"), /release\/audit-retention-report\.md/);
   assert.match(read("scripts/internet-nursing-readiness.js"), /互联网护理现场割接证据包\.md/);
   assert.match(read("scripts/release-artifact-manifest.js"), /internet-nursing-readiness-report\.md/);
+  assert.match(read("scripts/release-artifact-manifest.js"), /internet-nursing-highlight-center\.md/);
   assert.match(read("scripts/release-report.js"), /buildInternetNursingReadinessReport/);
   assert.match(read("scripts/release-report.js"), /escortService:citizenSubmitReadiness/);
   assert.match(read("scripts/release-report.js"), /escortService:appointmentFieldGuard/);
   assert.match(read("scripts/release-report.js"), /internetNursing:closedLoopSummary/);
+  assert.match(read("scripts/release-report.js"), /internetNursing:highlightFeatures/);
   assert.match(read(".github/workflows/ci.yml"), /npm run internet-nursing:readiness/);
   assert.match(read("README.md"), /Internet Nursing Pilot/);
   assert.match(read("DEPLOYMENT.md"), /internet-nursing:readiness/);
@@ -2879,6 +4113,7 @@ test("appointment callbacks land through signed gateway reconciliation", () => {
 test("platform production audit separates runnable capabilities from formal cutover", () => {
   const script = read("scripts/platform-production-audit.js");
   const documentation = read("docs/数智医院标准平台全程审计与生产前开发规划.md");
+  const siteAcceptance = read("docs/platform-site-acceptance-gate.md");
   const manifest = read("scripts/release-artifact-manifest.js");
   const releaseReport = read("scripts/release-report.js");
   const deployCheck = read("scripts/deploy-check.js");
@@ -2887,6 +4122,9 @@ test("platform production audit separates runnable capabilities from formal cuto
   assert.match(script, /MVP_REQUIRED_MODULES/);
   assert.match(script, /PRODUCTION_BLOCKERS/);
   assert.match(script, /pre-production-implemented-site-cutover-blocked/);
+  assert.match(script, /siteAcceptanceDocumentation/);
+  assert.match(siteAcceptance, /record-site-acceptance/);
+  assert.match(siteAcceptance, /blocked-until-global-go-no-go/);
   assert.match(script, /P0 \/ 0-30 天/);
   assert.match(documentation, /正式生产前已实现的主要功能/);
   assert.match(documentation, /MVP 剩余必开发模块/);
@@ -3277,11 +4515,18 @@ test("digital hospital P0-P1 pilot evaluation workbench is wired", () => {
   assert.match(ui, /run-preassessment/);
   assert.match(ui, /refreshBoard/);
   assert.match(ui, /submit-readiness/);
+  assert.match(ui, /pilotIssues/);
+  assert.match(html, /digital-evaluation-pilot-issues/);
+  assert.match(html, /data-digital-evaluation-section="pilot-issues"/);
+  assert.match(html, /digital-evaluation-issue-create-no-pii/);
+  assert.match(html, /digital-evaluation-issue-action-no-pii/);
   assert.match(model, /EVALUATION_PROJECTS/);
   assert.match(model, /STANDARD_CLAUSES/);
   assert.match(model, /pilot-launch-ready/);
   assert.match(model, /blocked-until-site-evidence-signed/);
-  ["evaluation-catalog", "pilot-readiness", "pilot-institutions", "collection-jobs", "evaluation-evidence", "pre-assessments"].forEach((route) => assert.match(server, new RegExp(route)));
+  ["evaluation-catalog", "pilot-readiness", "pilot-institutions", "pilot-issues", "collection-jobs", "evaluation-evidence", "pre-assessments"].forEach((route) => assert.match(server, new RegExp(route)));
+  assert.match(model, /normalizeDigitalHospitalPilotIssueAction/);
+  assert.match(model, /independent issue reviewer/);
   assert.match(readiness, /39 EMR \/ 17 service \/ 10 management \/ 4 interoperability/);
   assert.match(read("auth.js"), /"digital-hospital-evaluation\.html": \["commission", "institution"\]/);
   assert.match(read("package.json"), /digital-hospital:pilot-readiness/);

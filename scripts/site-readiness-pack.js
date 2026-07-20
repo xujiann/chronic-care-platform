@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const fs = require("node:fs");
 const path = require("node:path");
+const { buildAuditRetentionReport } = require("./audit-retention");
 const { buildIdentityContract } = require("./identity-contract");
 const { buildInterfaceMappingReport } = require("./interface-mapping");
 const { buildMonitoringReadinessReport } = require("./monitoring-readiness");
@@ -77,6 +78,16 @@ function toRows(items, mapper) {
   return (Array.isArray(items) ? items : []).map(mapper);
 }
 
+function buildPolicySourceRules(data) {
+  const drugTraceability = Array.isArray(data.drugTraceabilityPolicySources) ? data.drugTraceabilityPolicySources : [];
+  return {
+    required: true,
+    rule: "If a platform page, template, joint-test table, remediation record, or generated artifact references a policy, standard, attachment, or source file, the related page and about.html must expose the policy basis, source link, applicability boundary, and verification evidence.",
+    aboutSection: "policy-source-rules",
+    sources: drugTraceability
+  };
+}
+
 function buildSiteReadinessPack(options = {}) {
   const data = options.data || readJson("data/db.json");
   const pkg = options.pkg || readJson("package.json");
@@ -85,6 +96,7 @@ function buildSiteReadinessPack(options = {}) {
   const identity = options.identityContract || buildIdentityContract({ data });
   const interfaceMapping = options.interfaceMapping || buildInterfaceMappingReport({ data, pkg });
   const monitoring = options.monitoringReadiness || buildMonitoringReadinessReport({ data, pkg });
+  const auditRetention = options.auditRetention || buildAuditRetentionReport({ data, env });
   const onsiteMaterialsDoc = options.onsiteMaterialsDoc ?? readText("docs/on-site-launch-materials.md");
 
   const identityTemplates = toRows(identity.requiredClaims, (claim) => ({
@@ -128,10 +140,30 @@ function buildSiteReadinessPack(options = {}) {
       template: "slo-threshold",
       signal: target.name || target.id,
       requiredEvidence: ["threshold definition", "dashboard panel", "alert history", "escalation receiver"]
+    })),
+    ...Object.entries(auditRetention.trails || {}).map(([trail, trailReport]) => ({
+      id: `monitoring-audit-chain-${trail}`,
+      domain: "audit-monitoring",
+      owner: "security-admin",
+      template: "audit-chain-watch",
+      signal: `审计链路:${trail}`,
+      auditRows: trailReport.count || 0,
+      brokenLinks: (trailReport.broken || []).length,
+      requiredEvidence: ["audit-retention-report.md", "hash chain verification", "broken link triage", "retention owner signoff"]
+    })),
+    ...toRows(auditRetention.retentionTargets, (target) => ({
+      id: `monitoring-audit-retention-${target.id}`,
+      domain: "audit-monitoring",
+      owner: "security-admin",
+      template: "audit-retention-target",
+      signal: target.env,
+      configured: Boolean(target.configured),
+      requiredEvidence: ["retention target configuration", "export permission proof", "SIEM or archive handoff", "cutover signoff"]
     }))
   ];
 
   const signoffTemplates = buildSignoffTemplates(env);
+  const policySourceRules = buildPolicySourceRules(data);
 
   const packs = [
     {
@@ -155,7 +187,7 @@ function buildSiteReadinessPack(options = {}) {
       name: "Monitoring and on-call pack",
       owner: "platform-ops",
       rows: monitoringTemplates.length,
-      requiredArtifacts: ["监控目标", "SLO 阈值", "告警规则", "值班升级表", "演练记录"],
+      requiredArtifacts: ["监控目标", "SLO 阈值", "告警规则", "值班升级表", "审计链路校验", "审计保全目标", "演练记录"],
       status: monitoringTemplates.length >= 4 ? "template-ready" : "needs-template-work"
     },
     {
@@ -197,9 +229,11 @@ function buildSiteReadinessPack(options = {}) {
     summary: {
       packs: packs.length,
       templateRows: identityTemplates.length + interfaceTemplates.length + monitoringTemplates.length + signoffTemplates.length,
-      requiredArtifacts: packs.reduce((sum, item) => sum + item.requiredArtifacts.length, 0)
+      requiredArtifacts: packs.reduce((sum, item) => sum + item.requiredArtifacts.length, 0),
+      policySources: policySourceRules.sources.length
     },
     packs,
+    policySourceRules,
     templates: {
       identity: identityTemplates,
       interfaces: interfaceTemplates,
@@ -221,6 +255,7 @@ function renderMarkdown(report) {
   const interfaceRows = report.templates.interfaces.map((item) => `| ${item.sourceSystem || item.id} | ${item.owner} | ${item.targetCollection || ""} | ${(item.requiredFields || []).join(", ")} |`);
   const monitoringRows = report.templates.monitoring.map((item) => `| ${item.signal || item.id} | ${item.owner} | ${item.template} | ${(item.requiredEvidence || []).join(", ")} |`);
   const signoffRows = report.templates.signoff.map((item) => `| ${item.phase || ""} | ${item.owner || ""} | ${item.id} | ${(item.requiredSignatures || []).join(", ")} |`);
+  const policyRows = (report.policySourceRules?.sources || []).map((item) => `| ${item.authority || ""} | ${item.documentNo || ""} | ${item.title || ""} | ${item.url || ""} |`);
   return [
     "# Site readiness pack",
     "",
@@ -241,6 +276,14 @@ function renderMarkdown(report) {
     "| Status | Pack | Owner | Rows | Required artifacts |",
     "|---|---|---|---:|---|",
     ...packRows,
+    "",
+    "## Platform policy source rule",
+    "",
+    report.policySourceRules?.rule || "",
+    "",
+    "| Authority | Document | Title | Source link |",
+    "|---|---|---|---|",
+    ...policyRows,
     "",
     "## Identity source mapping template",
     "",
@@ -276,6 +319,8 @@ function renderMarkdown(report) {
 function renderTemplateReadmes(report) {
   const templates = report.templates || {};
   const packById = Object.fromEntries((report.packs || []).map((pack) => [pack.id, pack]));
+  const policyRule = report.policySourceRules?.rule || "";
+  const policyRows = (report.policySourceRules?.sources || []).map((item) => `| ${String(item.documentNo || "").replace(/\|/g, "/")} | ${String(item.title || "").replace(/\|/g, "/")} | ${String(item.url || "").replace(/\|/g, "/")} |`);
   const sections = [
     {
       file: "identity-source-mapping/README.md",
@@ -302,10 +347,10 @@ function renderTemplateReadmes(report) {
       title: "Monitoring and on-call template",
       pack: packById["monitoring-operations-pack"],
       rows: templates.monitoring || [],
-      capability: "Converts runtime health, metrics, SLO, alert, dead-letter, and escalation signals into an operations readiness checklist.",
-      input: "Health route screenshot, metrics scrape target, dashboard panel, alert rule, duty roster, escalation receiver, and drill record.",
-      output: "Route watch list, SLO threshold table, alert ownership, on-call escalation evidence, and cutover monitoring signoff material.",
-      apiEvidence: "/api/health, /api/metrics, /api/system/readiness, /api/site-readiness-pack"
+      capability: "Converts runtime health, metrics, SLO, alert, dead-letter, escalation, audit hash-chain, and audit-retention signals into an audit monitoring readiness checklist.",
+      input: "Health route screenshot, metrics scrape target, dashboard panel, alert rule, duty roster, escalation receiver, audit chain verification, retention target proof, and drill record.",
+      output: "Route watch list, SLO threshold table, alert ownership, audit-chain watch list, retention target evidence, on-call escalation evidence, and cutover monitoring signoff material.",
+      apiEvidence: "/api/health, /api/metrics, /api/audit/verify, /api/system/readiness, /api/site-readiness-pack, release/audit-retention-report.md"
     },
     {
       file: "production-signoff/README.md",
@@ -354,6 +399,18 @@ function renderTemplateReadmes(report) {
       "## Required artifacts",
       "",
       ...(section.pack?.requiredArtifacts || []).map((item) => `- ${item}`),
+      "",
+      "## Platform policy source rule",
+      "",
+      policyRule,
+      "",
+      "Any related page should also point users to `about.html#policy-source-rules` or the `data-about-section=\"policy-source-rules\"` section.",
+      "",
+      "### Drug traceability policy sources",
+      "",
+      "| Document | Title | Source link |",
+      "|---|---|---|",
+      ...policyRows,
       "",
       "## Rows preview",
       "",

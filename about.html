@@ -19,12 +19,34 @@
           <a href="https://xujiann.github.io/healthpolicy/">主页</a>
           <a href="./health-city.html">系统总览</a>
           <a href="./platform.html">平台首页</a>
+          <a href="./research-sandbox-about.html">科研沙箱说明</a>
           <a href="./workbench.html">运营工作台</a>
           <a href="./index.html">卫健委端</a>
           <a href="./maternal-child-about.html">妇幼说明</a>
           <a href="./login.html">登录</a>
         </nav>
       </header>
+
+      <section class="panel" id="policy-source-rules" data-about-section="policy-source-rules">
+        <div class="panel-title">
+          <h2>药品耗材追溯政策来源规则</h2>
+          <span>所有监管口径、证据模板和整改任务必须关联正式政策来源及适用边界</span>
+        </div>
+        <div class="capability-grid">
+          <article class="capability-card">
+            <strong>来源可核验</strong>
+            <span>政策依据采用国家医保局、国家药监局等主管部门正式链接，并保留文件编号、发布日期和适用范围。</span>
+          </article>
+          <article class="capability-card">
+            <strong>证据可追溯</strong>
+            <span>扫码、目录版本、结算映射、采购入库和使用记录按证据要求关联监管记录、责任岗位与审计轨迹。</span>
+          </article>
+          <a class="capability-card" href="./drug-consumable-about.html">
+            <strong>专项说明</strong>
+            <span>查看功能边界、政策来源、现场联调要求和生产上线阻断条件。</span>
+          </a>
+        </div>
+      </section>
 
       <section class="metric-grid" data-about-section="runtime-metrics">
         <article class="metric-card">
@@ -47,6 +69,35 @@
           <strong>脚本化</strong>
           <small>check、test、e2e、deploy:check、release:report</small>
         </article>
+      </section>
+
+      <section class="panel" data-about-section="chronic-followup-policy">
+        <div class="panel-title">
+          <h2>慢病管理与院后随访平台说明</h2>
+          <span>优先应用 6：筛查、分级、随访、复诊、用药、协同、反馈闭环</span>
+        </div>
+        <div class="capability-grid">
+          <article class="capability-card" data-about-capability="chronic-followup-loop">
+            <strong>业务闭环</strong>
+            <span>平台复用慢病筛查任务、分级管理计划、院后随访、个人健康记录、固定取药和站内消息，形成居民反馈、机构处置、居民通知和审计留痕的闭环。</span>
+          </article>
+          <article class="capability-card" data-about-capability="chronic-followup-policy">
+            <strong>政策依据</strong>
+            <span>对照《关于加强基层慢性病健康管理服务的指导意见》（国卫基层发〔2025〕15号）和《基层慢性病健康管理服务能力建设指引》，突出基层慢病健康管理中心、家庭医生签约、分级分类管理、随访健康指导、用药保障、医保协同和质量控制。</span>
+          </article>
+          <article class="capability-card" data-about-capability="chronic-followup-api">
+            <strong>接口证据</strong>
+            <span><code>/api/chronic/followup-summary</code> 汇总居民随访与依从性，<code>/api/chronic/followup-feedback</code> 接收居民反馈，<code>/api/chronic/followup-dispatch</code> 支持机构处置并回写消息。</span>
+          </article>
+          <article class="capability-card" data-about-capability="chronic-followup-sites">
+            <strong>现场联调边界</strong>
+            <span>正式上线仍需对接家庭医生签约系统、HIS/EMR 院后随访结果、药品供应链、医保慢病待遇规则、短信/公众号触达和生产审计留存。</span>
+          </article>
+        </div>
+        <div class="rules">
+          <div><strong>国家卫健委政策文件</strong><span><a href="https://www.nhc.gov.cn/jws/c100073/202510/3974d142eb1c4dd385b6e880f8617dcc.shtml">关于加强基层慢性病健康管理服务的指导意见</a></span></div>
+          <div><strong>能力建设指引</strong><span><a href="https://www.nhc.gov.cn/jws/c100073/202511/d3b6755fe7004cdeac938bf77b6a4a80.shtml">基层慢性病健康管理服务能力建设指引</a></span></div>
+        </div>
       </section>
 
       <section class="portal-grid">
@@ -126,6 +177,10 @@
             <strong>模板 README</strong>
             <span>可调用 <code>/api/site-template-readmes</code> 查看已按当前功能重写的模板说明，并纳入站点就绪包。</span>
           </article>
+          <a class="capability-card" href="./research-sandbox-about.html" data-about-capability="research-sandbox-policy">
+            <strong>科研数据沙箱政策说明</strong>
+            <span>说明科研数据集、专病库、伦理审批、脱敏发布、沙箱访问、使用审计和成果回流的政策依据、运行边界和现场验收证据。</span>
+          </a>
           <article class="capability-card" data-about-capability="release-gates">
             <strong>发布与审计门禁</strong>
             <span>可运行 <code>npm run check</code>、<code>npm test</code>、<code>npm run test:e2e</code>、<code>npm run deploy:check</code>、<code>npm run release:report</code>。</span>
@@ -263,6 +318,19 @@
       </section>
 
       <section class="portal-grid">
+        <article class="panel wide" data-about-section="referral-policy">
+          <div class="panel-title">
+            <h2>医联体转诊与远程会诊政策说明</h2>
+            <span>对应应用 2 的专项关于页与现场联调边界</span>
+          </div>
+          <div class="rules">
+            <div><strong>分级诊疗</strong><span>以紧密型医联体为抓手，支撑基层首诊、双向转诊、急慢分治、上下联动，平台落到转诊申请、接诊反馈、排期和报告回传。</span></div>
+            <div><strong>县域医共体信息化</strong><span>围绕远程会诊、双向转诊、检验检查互认、绩效管理等协同功能，复用县域协同工单和绩效驾驶舱。</span></div>
+            <div><strong>远程医疗边界</strong><span>远程会诊保留机构、医生、居民授权、报告归档和审计留痕，正式上线时需对接真实 HIS/EMR/PACS/LIS 和视频系统。</span></div>
+            <div><strong>专项关于页</strong><span><a href="./referral-teleconsultation-about.html" data-about-capability="referral-teleconsultation">打开医联体转诊与远程会诊平台关于页</a></span></div>
+          </div>
+        </article>
+
         <article class="panel wide" data-about-section="audit-flow">
           <div class="panel-title">
             <h2>全流程审计路径</h2>

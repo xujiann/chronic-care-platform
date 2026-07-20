@@ -449,6 +449,37 @@
       ]
     }
   ],
+  "emergencyDispatchLoops": [
+    {
+      "id": "ed-loop-mr1-20260622-am",
+      "snapshotId": "ops-mr1-2026-06-22-am",
+      "institutionId": "MR1",
+      "institution": "Dalian Central Hospital",
+      "status": "triage-confirmed",
+      "priority": "high",
+      "targetInstitutionId": "MR2",
+      "targetInstitution": "Dalian Women and Children Medical Center",
+      "resourceType": "ct-slot",
+      "quantity": 2,
+      "trigger": "waitingOver30Min=74, emergencyVisits=612",
+      "reviewNote": "急诊候诊超过30分钟人数较高，先确认CT优先时段和院内分诊分流。",
+      "owner": "急诊科/运行调度席",
+      "reviewedAt": "2026-06-22T09:20:00+08:00",
+      "evidence": [
+        "hospitalOperationSnapshots",
+        "resourceDispatchRequests",
+        "medicalResources"
+      ],
+      "auditTrail": [
+        {
+          "at": "2026-06-22T09:20:00+08:00",
+          "actor": "operations",
+          "action": "triage-confirmed",
+          "note": "急诊拥堵已纳入调度复核队列。"
+        }
+      ]
+    }
+  ],
   "statisticsReconciliationReviews": [
     {
       "id": "recon-mr1-20260622-am",
@@ -1009,6 +1040,231 @@
         "rule": "报送责任留痕",
         "detail": "按机构、周期、来源记录采集状态和复核状态，支持卫健委端追踪。",
         "status": "已配置"
+      }
+    ],
+    "dailyServiceReports": [
+      {
+        "id": "daily-service-20260610",
+        "reportDate": "2026-06-10",
+        "source": "卫生健康统计日报接口",
+        "scope": "全市医疗机构日报汇总",
+        "interfaceData": {
+          "outpatientVisits": 12000,
+          "emergencyVisits": 900,
+          "inpatientAdmissions": 720,
+          "discharges": 698,
+          "occupiedBeds": 8030
+        },
+        "receiptNo": "DSR-20260610-001",
+        "status": "received",
+        "reconciled": true
+      },
+      {
+        "id": "daily-service-20260611",
+        "reportDate": "2026-06-11",
+        "source": "卫生健康统计日报接口",
+        "scope": "全市医疗机构日报汇总",
+        "interfaceData": {
+          "outpatientVisits": 12240,
+          "emergencyVisits": 920,
+          "inpatientAdmissions": 735,
+          "discharges": 706,
+          "occupiedBeds": 8058
+        },
+        "receiptNo": "DSR-20260611-001",
+        "status": "received",
+        "reconciled": true
+      },
+      {
+        "id": "daily-service-20260612",
+        "reportDate": "2026-06-12",
+        "source": "卫生健康统计日报接口",
+        "scope": "全市医疗机构日报汇总",
+        "interfaceData": {
+          "outpatientVisits": 12580,
+          "emergencyVisits": 980,
+          "inpatientAdmissions": 760,
+          "discharges": 742,
+          "occupiedBeds": 8094
+        },
+        "receiptNo": "DSR-20260612-001",
+        "status": "received",
+        "reconciled": true
+      },
+      {
+        "id": "daily-service-20260613",
+        "reportDate": "2026-06-13",
+        "source": "卫生健康统计日报接口",
+        "scope": "全市医疗机构日报汇总",
+        "interfaceData": {
+          "outpatientVisits": 11880,
+          "emergencyVisits": 860,
+          "inpatientAdmissions": 710,
+          "discharges": 724,
+          "occupiedBeds": 8079
+        },
+        "receiptNo": "DSR-20260613-001",
+        "status": "received",
+        "reconciled": true
+      },
+      {
+        "id": "daily-service-20260614",
+        "reportDate": "2026-06-14",
+        "source": "卫生健康统计日报接口",
+        "scope": "全市医疗机构日报汇总",
+        "interfaceData": {
+          "outpatientVisits": 11650,
+          "emergencyVisits": 840,
+          "inpatientAdmissions": 705,
+          "discharges": 700,
+          "occupiedBeds": 8065
+        },
+        "receiptNo": "DSR-20260614-001",
+        "status": "received",
+        "reconciled": true
+      },
+      {
+        "id": "daily-service-20260615",
+        "reportDate": "2026-06-15",
+        "source": "卫生健康统计日报接口",
+        "scope": "全市医疗机构日报汇总",
+        "interfaceData": {
+          "outpatientVisits": 13100,
+          "emergencyVisits": 1010,
+          "inpatientAdmissions": 790,
+          "discharges": 755,
+          "occupiedBeds": 8128
+        },
+        "receiptNo": "DSR-20260615-001",
+        "status": "received",
+        "reconciled": true
+      },
+      {
+        "id": "daily-service-20260616",
+        "reportDate": "2026-06-16",
+        "source": "卫生健康统计日报接口",
+        "scope": "全市医疗机构日报汇总",
+        "interfaceData": {
+          "outpatientVisits": 12880,
+          "emergencyVisits": 960,
+          "inpatientAdmissions": 792,
+          "discharges": 768,
+          "occupiedBeds": 8150
+        },
+        "receiptNo": "DSR-20260616-001",
+        "status": "received",
+        "reconciled": true
+      }
+    ],
+    "certificateExchangeLinks": [
+      {
+        "id": "exchange-birth-license",
+        "domain": "出生医学证明",
+        "source": "birthCertificates",
+        "target": "电子证照平台/公安户籍登记",
+        "owner": "妇幼健康处",
+        "status": "ready",
+        "receiptStatus": "received",
+        "receiptNo": "BIRTH-REC-20260616-001",
+        "revokeSupported": true,
+        "correctionSupported": true,
+        "reconciliationStatus": "matched",
+        "lastReceiptAt": "2026-06-16T11:20:00.000Z",
+        "nextAction": "现场替换为省电子证照与公安户籍正式回执。"
+      },
+      {
+        "id": "exchange-death-license",
+        "domain": "死亡医学证明",
+        "source": "deathCertificates",
+        "target": "电子证照平台/人口死亡信息登记系统",
+        "owner": "医政医管处",
+        "status": "watch",
+        "receiptStatus": "partial",
+        "receiptNo": "DEATH-REC-20260616-001",
+        "revokeSupported": true,
+        "correctionSupported": true,
+        "reconciliationStatus": "pending",
+        "lastReceiptAt": "2026-06-16T09:40:00.000Z",
+        "nextAction": "补齐纸质证明回执与电子证照撤销校验样例。"
+      },
+      {
+        "id": "exchange-cdc-cause",
+        "domain": "疾控死因监测",
+        "source": "deathStatistics",
+        "target": "疾控死因监测/法定传染病关联",
+        "owner": "疾控处",
+        "status": "watch",
+        "receiptStatus": "received",
+        "receiptNo": "CDC-CAUSE-20260616-001",
+        "revokeSupported": false,
+        "correctionSupported": true,
+        "reconciliationStatus": "variance-review",
+        "lastReceiptAt": "2026-06-16T12:10:00.000Z",
+        "nextAction": "联调死因编码修订、补报和死亡原因链质控回执。"
+      },
+      {
+        "id": "exchange-civil-affairs",
+        "domain": "民政殡葬协同",
+        "source": "deathCertificates",
+        "target": "民政殡葬服务共享",
+        "owner": "基层卫生处/民政协同",
+        "status": "blocked",
+        "receiptStatus": "missing",
+        "receiptNo": "",
+        "revokeSupported": false,
+        "correctionSupported": false,
+        "reconciliationStatus": "missing",
+        "lastReceiptAt": "",
+        "nextAction": "现场确认民政殡葬服务接口、回执字段和数据共享协议。"
+      },
+      {
+        "id": "exchange-statistics-direct",
+        "domain": "卫生统计直报对账",
+        "source": "healthStatistics.dailyServiceReports",
+        "target": "卫生健康统计直报系统",
+        "owner": "规划信息处",
+        "status": "ready",
+        "receiptStatus": "received",
+        "receiptNo": "STAT-DAILY-20260616-001",
+        "revokeSupported": true,
+        "correctionSupported": true,
+        "reconciliationStatus": "matched",
+        "lastReceiptAt": "2026-06-16T18:00:00.000Z",
+        "nextAction": "生产切换时接入机构级日报明细与月报差异清单。"
+      }
+    ],
+    "siteEvidencePackage": [
+      {
+        "id": "summary-json",
+        "type": "发布摘要",
+        "evidence": "release/health-dashboard-summary.json",
+        "owner": "规划信息处",
+        "status": "ready",
+        "nextAction": "随 release:report 归档。"
+      },
+      {
+        "id": "interface-messages",
+        "type": "接口报文",
+        "evidence": "platformInterfaces + hospitalInteroperabilityFunctions",
+        "owner": "接口联调组",
+        "status": "ready",
+        "nextAction": "生产联调时替换为真实请求、响应和签名样例。"
+      },
+      {
+        "id": "acceptance-records",
+        "type": "验收记录",
+        "evidence": "platformEvidence records",
+        "owner": "项目办",
+        "status": "ready",
+        "nextAction": "补充现场截图、签字单和复测结论。"
+      },
+      {
+        "id": "site-signoff",
+        "type": "现场签字",
+        "evidence": "productionDeploymentPlan signoff",
+        "owner": "各级卫生健康行政部门",
+        "status": "watch",
+        "nextAction": "上线前完成身份、证照、统计、院内系统和灾备签字。"
       }
     ]
   },
@@ -7801,7 +8057,7 @@
       "uploadSource": "居民端自测",
       "deviceId": "bp-device-demo-001",
       "deviceExternalId": "device-bp-r1-20260622",
-      "integrationStatus": "device callback accepted",
+      "integrationStatus": "device gateway accepted",
       "id": "csm-001",
       "residentId": "r1",
       "device": "电子血压计",
@@ -8277,7 +8533,7 @@
       "signoffStatus": "signed",
       "signedBy": "project-office",
       "evidence": "siteReadinessPack.templates.signoff",
-      "nextAction": "collect signed forms during site cutover"
+      "nextAction": "collect wet signatures during site cutover"
     }
   ],
   "chronicLaunchCoreActions": [],
@@ -9439,7 +9695,7 @@
       "department": "Cardiology",
       "applicantDoctor": "doc-liu",
       "receivingDoctor": "doc-wang",
-      "residentAuthorizationId": "pr-auth-r1",
+      "residentAuthorizationId": "auth-r1-referral-demo",
       "authorizationStatus": "authorized",
       "status": "scheduled",
       "priority": "high",
@@ -9456,11 +9712,13 @@
       "reportStatus": "pending-return",
       "reportReturnedAt": "",
       "reportSummary": "",
-      "collaborationOrderId": "cco-004",
+      "collaborationOrderId": "cco-001",
       "performance": {
         "responseHours": 4,
         "reportReturnHours": 0,
-        "satisfaction": "pending"
+        "satisfaction": "pending",
+        "insurancePaymentPath": "primary-referral-continuous-deductible",
+        "repeatExamControl": "pending-specialist-review"
       },
       "auditTrail": [
         {
@@ -9476,7 +9734,21 @@
           "note": "Receiving hospital accepted the request and reserved a consultation window."
         }
       ],
-      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
+      "sourceInstitutionCode": "MR3",
+      "targetInstitutionCode": "MR1",
+      "slaDisposition": {
+        "status": "pending-ack",
+        "owner": "Dalian Central Hospital",
+        "action": "confirm report callback or manual reconciliation",
+        "updatedAt": ""
+      },
+      "countySupervision": {
+        "status": "督办中",
+        "owner": "中山区县域医共体",
+        "reason": "high priority pending report",
+        "due": "2026-06-23"
+      }
     },
     {
       "id": "rtc-002",
@@ -9489,7 +9761,7 @@
       "department": "Family doctor studio",
       "applicantDoctor": "doc-wang",
       "receivingDoctor": "doc-liu",
-      "residentAuthorizationId": "pr-auth-r4",
+      "residentAuthorizationId": "auth-r4-referral-demo",
       "authorizationStatus": "authorized",
       "status": "report-returned",
       "priority": "medium",
@@ -9505,11 +9777,13 @@
       "reportStatus": "returned",
       "reportReturnedAt": "2026-06-21",
       "reportSummary": "Continue eight-week long prescription follow-up and weekly blood pressure upload.",
-      "collaborationOrderId": "cco-005",
+      "collaborationOrderId": "cco-001",
       "performance": {
         "responseHours": 2,
         "reportReturnHours": 18,
-        "satisfaction": "good"
+        "satisfaction": "good",
+        "insurancePaymentPath": "down-referral-primary-followup",
+        "repeatExamControl": "recognized-report-reused"
       },
       "auditTrail": [
         {
@@ -9525,7 +9799,244 @@
           "note": "Primary institution confirmed follow-up report return."
         }
       ],
+      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4",
+      "slaDisposition": {
+        "status": "closed",
+        "owner": "Xinghaiwan Community Health Service Center",
+        "action": "report archived and follow-up accepted",
+        "updatedAt": "2026-06-22T11:30:00.000Z"
+      },
+      "countySupervision": {
+        "status": "已闭环",
+        "owner": "中山区县域医共体",
+        "reason": "report returned",
+        "due": "2026-06-22"
+      }
+    }
+  ],
+  "taskMessages": [
+    {
+      "id": "msg-chronic-feedback-r4",
+      "taskId": "followups:f3",
+      "collection": "followups",
+      "sourceId": "f3",
+      "residentId": "r4",
+      "targetRole": "institution",
+      "channel": "in_app",
+      "title": "High-risk chronic follow-up feedback received",
+      "body": "居民已补充高危高血压家庭血压记录，请家庭医生复核并确认下一次随访。",
+      "status": "sent",
+      "chronicFollowup": true,
+      "meta": {
+        "followupFeedback": true,
+        "highRiskCoverage": true,
+        "fieldIntegration": true
+      },
+      "receipts": [
+        {
+          "at": "2026-06-24T10:05:00.000Z",
+          "status": "delivered",
+          "channel": "in_app"
+        }
+      ],
+      "createdAt": "2026-06-24T10:05:00.000Z",
+      "createdBy": "citizen",
+      "createdByName": "演示居民D",
       "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
+    },
+    {
+      "id": "msg-chronic-feedback-r1",
+      "taskId": "chronicFollowup:r1-feedback",
+      "collection": "chronicFollowup",
+      "sourceId": "chronic-feedback-r1",
+      "residentId": "r1",
+      "targetRole": "institution",
+      "channel": "in_app",
+      "title": "Chronic follow-up feedback requires review",
+      "body": "Resident feedback and self-monitoring have been delivered to the family doctor team.",
+      "status": "sent",
+      "chronicFollowup": true,
+      "meta": {
+        "reminderOutreach": true,
+        "fieldIntegration": true
+      },
+      "receipts": [
+        {
+          "at": "2026-06-22T08:35:00.000Z",
+          "status": "delivered",
+          "channel": "in_app"
+        }
+      ],
+      "createdAt": "2026-06-22T08:35:00.000Z",
+      "createdBy": "system",
+      "createdByName": "system",
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
+    },
+    {
+      "id": "msg-95de26b5-a5b3-4e42-993e-701bcf2879db",
+      "taskId": "multiPracticeApplications:mp-4cb42cf8-a3a5-48ed-9033-b09e48110e55",
+      "collection": "multiPracticeApplications",
+      "sourceId": "mp-4cb42cf8-a3a5-48ed-9033-b09e48110e55",
+      "residentId": "",
+      "targetRole": "doctor",
+      "targetDoctorId": "doc-liu",
+      "targetOrgCode": "MR3",
+      "targetOrgName": "青泥洼桥社区卫生服务中心",
+      "channel": "in_app",
+      "title": "多点执业医院端已处理",
+      "body": "大连市中心医院 已处理 刘医生 的多点执业申请：待卫健审核。医院端确认接收多点执业申请",
+      "status": "sent",
+      "receipts": [],
+      "createdAt": "2026-06-29T08:40:11.836Z",
+      "createdBy": "hospital",
+      "createdByName": "医疗机构管理员",
+      "personIndex": ""
+    },
+    {
+      "id": "msg-d9c310eb-29d8-47cd-9fd0-f32d21620015",
+      "taskId": "multiPracticeApplications:mp-4cb42cf8-a3a5-48ed-9033-b09e48110e55",
+      "collection": "multiPracticeApplications",
+      "sourceId": "mp-4cb42cf8-a3a5-48ed-9033-b09e48110e55",
+      "residentId": "",
+      "targetRole": "institution",
+      "targetDoctorId": "",
+      "targetOrgCode": "MR1",
+      "targetOrgName": "大连市中心医院",
+      "channel": "in_app",
+      "title": "多点执业申请待医院端处理",
+      "body": "刘医生 申请到 大连市中心医院 开展多点执业，请医院端完成材料核验、第一执业地点确认和备案意见。",
+      "status": "sent",
+      "receipts": [],
+      "createdAt": "2026-06-29T08:40:11.622Z",
+      "createdBy": "doctor",
+      "createdByName": "刘医生",
+      "personIndex": ""
+    },
+    {
+      "id": "msg-a56d3a58-ba3c-4028-918b-08fac805878b",
+      "taskId": "multiPracticeApplications:mp-387e5ad0-f705-4c06-8c01-d28fed1b738d",
+      "collection": "multiPracticeApplications",
+      "sourceId": "mp-387e5ad0-f705-4c06-8c01-d28fed1b738d",
+      "residentId": "",
+      "targetRole": "institution",
+      "targetDoctorId": "doc-liu",
+      "targetOrgCode": "MR3",
+      "targetOrgName": "青泥洼桥社区卫生服务中心",
+      "channel": "in_app",
+      "title": "多点执业医院端已处理",
+      "body": "上线验收通知已送达",
+      "status": "sent",
+      "receipts": [],
+      "createdAt": "2026-06-29T08:35:11.686Z",
+      "createdBy": "hospital",
+      "createdByName": "医疗机构管理员",
+      "personIndex": ""
+    },
+    {
+      "id": "msg-af552725-01b3-456f-bce3-0b5d00aa074e",
+      "taskId": "multiPracticeApplications:mp-387e5ad0-f705-4c06-8c01-d28fed1b738d",
+      "collection": "multiPracticeApplications",
+      "sourceId": "mp-387e5ad0-f705-4c06-8c01-d28fed1b738d",
+      "residentId": "",
+      "targetRole": "institution",
+      "targetDoctorId": "",
+      "targetOrgCode": "MR1",
+      "targetOrgName": "大连市中心医院",
+      "channel": "in_app",
+      "title": "多点执业申请待医院端处理",
+      "body": "上线验收通知已送达",
+      "status": "sent",
+      "receipts": [],
+      "createdAt": "2026-06-29T08:35:11.412Z",
+      "createdBy": "doctor",
+      "createdByName": "刘医生",
+      "personIndex": ""
+    },
+    {
+      "id": "msg-rtc-001-feedback-citizen",
+      "taskId": "referralTeleconsultations:rtc-001",
+      "collection": "referralTeleconsultations",
+      "sourceId": "rtc-001",
+      "residentId": "r1",
+      "targetRole": "citizen",
+      "channel": "in_app",
+      "title": "Teleconsultation feedback returned",
+      "body": "Receiving feedback from Dalian Central Hospital: Specialist slot reserved; review current prescription before video consultation.",
+      "status": "sent",
+      "notificationKey": "referralTeleconsultations:rtc-001:feedback:rtc-001-feedback-seed:citizen",
+      "receipts": [],
+      "createdAt": "2026-06-23T09:31:00.000Z",
+      "createdBy": "system",
+      "createdByName": "System"
+    },
+    {
+      "id": "msg-rtc-001-feedback-institution",
+      "taskId": "referralTeleconsultations:rtc-001",
+      "collection": "referralTeleconsultations",
+      "sourceId": "rtc-001",
+      "residentId": "r1",
+      "targetRole": "institution",
+      "channel": "in_app",
+      "title": "Teleconsultation feedback returned",
+      "body": "Receiving feedback from Dalian Central Hospital and waiting for the video consultation report.",
+      "status": "sent",
+      "notificationKey": "referralTeleconsultations:rtc-001:feedback:rtc-001-feedback-seed:institution",
+      "receipts": [],
+      "createdAt": "2026-06-23T09:31:00.000Z",
+      "createdBy": "system",
+      "createdByName": "System"
+    },
+    {
+      "id": "msg-rtc-001-sla-institution",
+      "taskId": "referralTeleconsultations:rtc-001:sla:high",
+      "collection": "referralTeleconsultations",
+      "sourceId": "rtc-001",
+      "residentId": "r1",
+      "targetRole": "institution",
+      "channel": "in_app",
+      "title": "Teleconsultation SLA reminder",
+      "body": "Dalian Central Hospital teleconsultation report is overdue; confirm report callback or manual reconciliation.",
+      "status": "sent",
+      "priority": "high",
+      "escalationKey": "referralTeleconsultations:rtc-001:sla:high",
+      "receipts": [],
+      "createdAt": "2026-06-24T08:00:00.000Z",
+      "createdBy": "system",
+      "createdByName": "System"
+    },
+    {
+      "id": "msg-rtc-002-report-citizen",
+      "taskId": "referralTeleconsultations:rtc-002",
+      "collection": "referralTeleconsultations",
+      "sourceId": "rtc-002",
+      "residentId": "r2",
+      "targetRole": "citizen",
+      "channel": "in_app",
+      "title": "Teleconsultation report returned",
+      "body": "Report returned from Dalian Medical University Hospital: Recheck HbA1c in three months; primary institution continues diet and exercise intervention.",
+      "status": "sent",
+      "notificationKey": "referralTeleconsultations:rtc-002:report:rtc-002-report-seed:citizen",
+      "receipts": [],
+      "createdAt": "2026-06-21T10:31:00.000Z",
+      "createdBy": "system",
+      "createdByName": "System"
+    },
+    {
+      "id": "msg-rtc-002-report-institution",
+      "taskId": "referralTeleconsultations:rtc-002",
+      "collection": "referralTeleconsultations",
+      "sourceId": "rtc-002",
+      "residentId": "r2",
+      "targetRole": "institution",
+      "channel": "in_app",
+      "title": "Teleconsultation report returned",
+      "body": "Report returned from Dalian Medical University Hospital and archived to the resident longitudinal record.",
+      "status": "sent",
+      "notificationKey": "referralTeleconsultations:rtc-002:report:rtc-002-report-seed:institution",
+      "receipts": [],
+      "createdAt": "2026-06-21T10:31:00.000Z",
+      "createdBy": "system",
+      "createdByName": "System"
     }
   ],
   "escortServicePolicy": {
@@ -11278,145 +11789,6 @@
       "sourceStatus": "archived"
     }
   ],
-  "taskMessages": [
-    {
-      "id": "msg-chronic-feedback-r4",
-      "taskId": "followups:f3",
-      "collection": "followups",
-      "sourceId": "f3",
-      "residentId": "r4",
-      "targetRole": "institution",
-      "channel": "in_app",
-      "title": "High-risk chronic follow-up feedback received",
-      "body": "居民已补充高危高血压家庭血压记录，请家庭医生复核并确认下一次随访。",
-      "status": "sent",
-      "chronicFollowup": true,
-      "meta": {
-        "followupFeedback": true,
-        "highRiskCoverage": true,
-        "fieldIntegration": true
-      },
-      "receipts": [
-        {
-          "at": "2026-06-24T10:05:00.000Z",
-          "status": "delivered",
-          "channel": "in_app"
-        }
-      ],
-      "createdAt": "2026-06-24T10:05:00.000Z",
-      "createdBy": "citizen",
-      "createdByName": "演示居民D",
-      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
-    },
-    {
-      "id": "msg-chronic-feedback-r1",
-      "taskId": "chronicFollowup:r1-feedback",
-      "collection": "chronicFollowup",
-      "sourceId": "chronic-feedback-r1",
-      "residentId": "r1",
-      "targetRole": "institution",
-      "channel": "in_app",
-      "title": "Chronic follow-up feedback requires review",
-      "body": "Resident feedback and self-monitoring have been delivered to the family doctor team.",
-      "status": "sent",
-      "chronicFollowup": true,
-      "meta": {
-        "reminderOutreach": true,
-        "fieldIntegration": true
-      },
-      "receipts": [
-        {
-          "at": "2026-06-22T08:35:00.000Z",
-          "status": "delivered",
-          "channel": "in_app"
-        }
-      ],
-      "createdAt": "2026-06-22T08:35:00.000Z",
-      "createdBy": "system",
-      "createdByName": "system",
-      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
-    },
-    {
-      "id": "msg-95de26b5-a5b3-4e42-993e-701bcf2879db",
-      "taskId": "multiPracticeApplications:mp-4cb42cf8-a3a5-48ed-9033-b09e48110e55",
-      "collection": "multiPracticeApplications",
-      "sourceId": "mp-4cb42cf8-a3a5-48ed-9033-b09e48110e55",
-      "residentId": "",
-      "targetRole": "doctor",
-      "targetDoctorId": "doc-liu",
-      "targetOrgCode": "MR3",
-      "targetOrgName": "青泥洼桥社区卫生服务中心",
-      "channel": "in_app",
-      "title": "多点执业医院端已处理",
-      "body": "大连市中心医院 已处理 刘医生 的多点执业申请：待卫健审核。医院端确认接收多点执业申请",
-      "status": "sent",
-      "receipts": [],
-      "createdAt": "2026-06-29T08:40:11.836Z",
-      "createdBy": "hospital",
-      "createdByName": "医疗机构管理员",
-      "personIndex": ""
-    },
-    {
-      "id": "msg-d9c310eb-29d8-47cd-9fd0-f32d21620015",
-      "taskId": "multiPracticeApplications:mp-4cb42cf8-a3a5-48ed-9033-b09e48110e55",
-      "collection": "multiPracticeApplications",
-      "sourceId": "mp-4cb42cf8-a3a5-48ed-9033-b09e48110e55",
-      "residentId": "",
-      "targetRole": "institution",
-      "targetDoctorId": "",
-      "targetOrgCode": "MR1",
-      "targetOrgName": "大连市中心医院",
-      "channel": "in_app",
-      "title": "多点执业申请待医院端处理",
-      "body": "刘医生 申请到 大连市中心医院 开展多点执业，请医院端完成材料核验、第一执业地点确认和备案意见。",
-      "status": "sent",
-      "receipts": [],
-      "createdAt": "2026-06-29T08:40:11.622Z",
-      "createdBy": "doctor",
-      "createdByName": "刘医生",
-      "personIndex": ""
-    },
-    {
-      "id": "msg-a56d3a58-ba3c-4028-918b-08fac805878b",
-      "taskId": "multiPracticeApplications:mp-387e5ad0-f705-4c06-8c01-d28fed1b738d",
-      "collection": "multiPracticeApplications",
-      "sourceId": "mp-387e5ad0-f705-4c06-8c01-d28fed1b738d",
-      "residentId": "",
-      "targetRole": "institution",
-      "targetDoctorId": "doc-liu",
-      "targetOrgCode": "MR3",
-      "targetOrgName": "青泥洼桥社区卫生服务中心",
-      "channel": "in_app",
-      "title": "多点执业医院端已处理",
-      "body": "上线验收通知已送达",
-      "status": "sent",
-      "receipts": [],
-      "createdAt": "2026-06-29T08:35:11.686Z",
-      "createdBy": "hospital",
-      "createdByName": "医疗机构管理员",
-      "personIndex": ""
-    },
-    {
-      "id": "msg-af552725-01b3-456f-bce3-0b5d00aa074e",
-      "taskId": "multiPracticeApplications:mp-387e5ad0-f705-4c06-8c01-d28fed1b738d",
-      "collection": "multiPracticeApplications",
-      "sourceId": "mp-387e5ad0-f705-4c06-8c01-d28fed1b738d",
-      "residentId": "",
-      "targetRole": "institution",
-      "targetDoctorId": "",
-      "targetOrgCode": "MR1",
-      "targetOrgName": "大连市中心医院",
-      "channel": "in_app",
-      "title": "多点执业申请待医院端处理",
-      "body": "上线验收通知已送达",
-      "status": "sent",
-      "receipts": [],
-      "createdAt": "2026-06-29T08:35:11.412Z",
-      "createdBy": "doctor",
-      "createdByName": "刘医生",
-      "personIndex": ""
-    }
-  ],
   "dataQualityIssues": [],
   "careOrders": [
     {
@@ -11460,7 +11832,7 @@
     {
       "callbackExternalId": "pharmacy-mp1-20260622",
       "pickupConfirmedAt": "2026-06-22T09:30:00.000Z",
-      "inventoryStatus": "available",
+      "inventoryStatus": "dispensed",
       "adherenceStatus": "pharmacy callback confirmed",
       "integrationStatus": "pharmacy callback accepted",
       "id": "mp1",
@@ -11624,6 +11996,36 @@
         }
       ],
       "lastUpdated": "2026-06-20T09:05:00.000Z",
+      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
+    },
+    {
+      "id": "dcs-supply-mp3",
+      "residentId": "r2",
+      "category": "supply-assurance",
+      "boundary": "supply-alert",
+      "institution": "Xinghaiwan Community Health Service Center",
+      "sourceCollection": "medicationPickups",
+      "sourceId": "mp3",
+      "relatedPickupId": "mp3",
+      "relatedClaimId": "ic2",
+      "issue": "Metformin fixed-pickup supply is under low-stock warning and needs procurement or transfer confirmation.",
+      "riskLevel": "warning",
+      "reviewStatus": "supply-alert-registered",
+      "insuranceStatus": "pending-audit",
+      "remediationStatus": "open",
+      "status": "open",
+      "ownerRole": "institution",
+      "nextAction": "Institution pharmacy confirms stock transfer plan and insurance center keeps the pickup cycle payable.",
+      "auditTrail": [
+        {
+          "at": "2026-06-20T09:08:00.000Z",
+          "actor": "system",
+          "role": "commission",
+          "action": "seed",
+          "result": "created"
+        }
+      ],
+      "lastUpdated": "2026-06-20T09:08:00.000Z",
       "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
@@ -12229,6 +12631,163 @@
       "requirement": "优化信息无障碍环境，解决老年人等群体数字鸿沟。",
       "capability": "个人端按手机视口设计，后续补充大字模式、家属代办、语音提示和线下帮办。",
       "status": "待扩展"
+    }
+  ],
+  "drugTraceabilityPolicySources": [
+    {
+      "id": "nhsa-2025-7",
+      "authority": "国家医保局等四部门",
+      "title": "关于加强药品追溯码在医疗保障和工伤保险领域采集应用的通知",
+      "documentNo": "医保发〔2025〕7号",
+      "issuedAt": "2025-03-19",
+      "url": "https://www.nhsa.gov.cn/art/2025/3/19/art_104_16045.html",
+      "rule": "2025-07-01 起销售环节按要求扫码后方可进行医保基金结算；2026-01-01 起所有医药机构实现药品追溯码全量采集上传。",
+      "platformImpact": "药耗监管、医保结算协同、机构整改和工作台模板必须记录追溯码采集、上传、无码库、异常重复销售和部门协同处置证据。"
+    },
+    {
+      "id": "nhsa-2024-collection",
+      "authority": "国家医疗保障局办公室",
+      "title": "关于进一步做好医保药品耗材追溯码信息采集工作有关事项的公告",
+      "documentNo": "2024-04-00056",
+      "issuedAt": "2024-09-30",
+      "url": "https://www.nhsa.gov.cn/art/2024/9/30/art_109_14042.html",
+      "rule": "明确采集范围、生产流通企业上传接口、三码映射库、包装级联映射库和地方医保部门不得一刀切、不得指定设备服务商等注意事项。",
+      "platformImpact": "模板需区分暂不采集场景、医保编码/商品码/追溯码映射、生产流通企业可选上传和现场设备服务边界。"
+    },
+    {
+      "id": "nmpa-2018-guidance",
+      "authority": "国家药监局",
+      "title": "国家药监局关于药品信息化追溯体系建设的指导意见",
+      "documentNo": "国药监药管〔2018〕35号",
+      "issuedAt": "2018-11-01",
+      "url": "https://www.nmpa.gov.cn/directory/web/nmpa/xxgk/fgwj/gzwj/gzwjyp/20181101100801272.html",
+      "rule": "以保障公众用药安全为目标，以落实企业主体责任为基础，按一物一码、物码同追方向建设药品信息化追溯体系。",
+      "platformImpact": "药品追溯线索、整改闭环和审计报告需以主体责任、全流程追溯和公众用药安全为基本监管口径。"
+    },
+    {
+      "id": "nmpa-2019-32",
+      "authority": "国家药监局",
+      "title": "关于发布《药品信息化追溯体系建设导则》《药品追溯码编码要求》两项信息化标准的公告",
+      "documentNo": "2019年第32号",
+      "issuedAt": "2019-04-28",
+      "url": "https://www.nmpa.gov.cn/directory/web/nmpa/////////zwgk/ghcw/ghjh/20190428164801603.html",
+      "rule": "发布药品信息化追溯体系建设导则和药品追溯码编码要求，作为追溯体系与编码规范基础。",
+      "platformImpact": "接口联调模板需留出追溯码编码规则、各级包装关联、发码机构和追溯系统地址解析字段。"
+    },
+    {
+      "id": "nmpa-2022-label",
+      "authority": "国家药监局",
+      "title": "药品追溯码标识规范",
+      "documentNo": "NMPAB/T 1011-2022",
+      "issuedAt": "2022-06-23",
+      "url": "https://www.nmpa.gov.cn/directory/web/nmpa/images/1656320881524098380.pdf",
+      "rule": "药品追溯码用于唯一标识药品各级销售包装单元；标识应清晰、显著、可被设备和人眼识读，并包含文字、可识读字符和条码符号。",
+      "platformImpact": "机构端和医保端模板需记录追溯码可识读性、包装级别、扫码失败原因、人工核验和整改证据。"
+    }
+  ],
+  "drugTraceabilityEvidenceRequirements": [
+    {
+      "id": "trace-scan-capture",
+      "title": "Traceability scan capture",
+      "boundaries": [
+        "rational-medication",
+        "fixed-pharmacy",
+        "insurance-settlement"
+      ],
+      "owner": "institution-and-insurance",
+      "policySourceIds": [
+        "nhsa-2025-7",
+        "nmpa-2022-label"
+      ],
+      "evidenceFields": [
+        "traceCode",
+        "scanTime",
+        "packageLevel",
+        "operator",
+        "sourceSystem"
+      ]
+    },
+    {
+      "id": "trace-code-mapping",
+      "title": "Insurance code and traceability-code mapping",
+      "boundaries": [
+        "insurance-settlement"
+      ],
+      "owner": "insurance-integration",
+      "policySourceIds": [
+        "nhsa-2024-collection",
+        "nmpa-2019-32"
+      ],
+      "evidenceFields": [
+        "medicalInsuranceCode",
+        "commodityCode",
+        "traceCode",
+        "packageCascade",
+        "mappingVersion"
+      ]
+    },
+    {
+      "id": "trace-manual-exception",
+      "title": "No-code or failed-scan manual verification",
+      "boundaries": [
+        "rational-medication",
+        "fixed-pharmacy",
+        "consumable-clue"
+      ],
+      "owner": "institution-remediation",
+      "policySourceIds": [
+        "nhsa-2024-collection",
+        "nmpa-2022-label"
+      ],
+      "evidenceFields": [
+        "noCodeReason",
+        "manualVerification",
+        "photoEvidence",
+        "reviewer",
+        "rectificationDeadline"
+      ]
+    },
+    {
+      "id": "trace-consumable-catalog",
+      "title": "High-value consumable catalog and settlement cross-check",
+      "boundaries": [
+        "consumable-clue",
+        "insurance-settlement"
+      ],
+      "owner": "institution-and-insurance",
+      "policySourceIds": [
+        "nhsa-2025-7",
+        "nhsa-2024-collection"
+      ],
+      "evidenceFields": [
+        "catalogVersion",
+        "batchNo",
+        "useRecord",
+        "chargeItem",
+        "claimId"
+      ]
+    },
+    {
+      "id": "trace-remediation-audit",
+      "title": "Remediation audit trail and department coordination",
+      "boundaries": [
+        "rational-medication",
+        "fixed-pharmacy",
+        "consumable-clue",
+        "insurance-settlement"
+      ],
+      "owner": "commission-insurance-institution",
+      "policySourceIds": [
+        "nhsa-2025-7",
+        "nmpa-2018-guidance"
+      ],
+      "evidenceFields": [
+        "auditTrail",
+        "securityEvent",
+        "remediationEvidence",
+        "reviewDecision",
+        "nextAction"
+      ]
     }
   ],
   "emergencySignals": [
@@ -12908,6 +13467,19 @@
     ]
   },
   "seniorServices": [
+    {
+      "id": "ss-outreach-r1-demo",
+      "residentId": "r1",
+      "service": "chronic reminder outreach",
+      "channel": "sms",
+      "status": "scheduled",
+      "contact": "resident and family proxy",
+      "nextAction": "send medication pickup and follow-up reminder, collect receipt before next visit",
+      "scheduledAt": "2026-06-22T09:30:00.000Z",
+      "outreachEvidence": true,
+      "createdAt": "2026-06-22T09:30:00.000Z",
+      "createdBy": "seed"
+    },
     {
       "id": "ss1",
       "residentId": "r4",
@@ -15717,6 +16289,63 @@
       "idempotencyKey": "externalId",
       "signature": "HMAC-SHA256",
       "retryPolicy": "人工复核后重放",
+      "status": "ready"
+    },
+    {
+      "id": "referral-feedback-callback-v1",
+      "domain": "Referral",
+      "version": "1.0.0",
+      "direction": "inbound",
+      "resource": "TeleconsultationFeedback",
+      "requiredFields": [
+        "externalId",
+        "teleconsultationId",
+        "residentId",
+        "receivingFeedback",
+        "feedbackAt",
+        "sourceSystem"
+      ],
+      "idempotencyKey": "externalId",
+      "signature": "HMAC-SHA256",
+      "retryPolicy": "idempotent replay with manual reconciliation",
+      "status": "ready"
+    },
+    {
+      "id": "referral-schedule-callback-v1",
+      "domain": "Referral",
+      "version": "1.0.0",
+      "direction": "inbound",
+      "resource": "TeleconsultationSchedule",
+      "requiredFields": [
+        "externalId",
+        "teleconsultationId",
+        "residentId",
+        "meetingWindow",
+        "targetInstitution",
+        "department"
+      ],
+      "idempotencyKey": "externalId",
+      "signature": "HMAC-SHA256",
+      "retryPolicy": "idempotent replay with manual reconciliation",
+      "status": "ready"
+    },
+    {
+      "id": "referral-report-callback-v1",
+      "domain": "Referral",
+      "version": "1.0.0",
+      "direction": "inbound",
+      "resource": "TeleconsultationReport",
+      "requiredFields": [
+        "externalId",
+        "teleconsultationId",
+        "residentId",
+        "reportSummary",
+        "reportReturnedAt",
+        "sourceSystem"
+      ],
+      "idempotencyKey": "externalId",
+      "signature": "HMAC-SHA256",
+      "retryPolicy": "idempotent replay with manual reconciliation",
       "status": "ready"
     }
   ],
@@ -24232,6 +24861,40 @@
       "anonymization": "k-anonymity-demo",
       "deidentificationStatus": "released",
       "authorizationStatus": "approved",
+      "governance": {
+        "dataUseAgreement": "DUA-DEMO-HTN-2026",
+        "minimumNecessary": true,
+        "reidentificationProhibited": true,
+        "exportReviewRequired": true,
+        "retentionDays": 180,
+        "steward": "research-governance",
+        "policyBasis": [
+          "PIPL",
+          "Data Security Law",
+          "Network Data Security Regulation",
+          "Ethics Review Measures"
+        ]
+      },
+      "evidenceDocuments": [
+        {
+          "id": "rd-hypertension-001-irb",
+          "type": "ethics-approval",
+          "title": "IRB approval for hypertension cohort",
+          "referenceNo": "IRB-DEMO-HTN-2026",
+          "issuedBy": "demo-irb",
+          "issuedAt": "2026-06-01",
+          "status": "verified"
+        },
+        {
+          "id": "rd-hypertension-001-dua",
+          "type": "data-use-agreement",
+          "title": "Data use agreement for hypertension cohort",
+          "referenceNo": "DUA-DEMO-HTN-2026",
+          "issuedBy": "research-governance",
+          "issuedAt": "2026-06-02",
+          "status": "verified"
+        }
+      ],
       "records": 2,
       "sourceCollections": [
         "personalRecords",
@@ -24258,6 +24921,40 @@
       "anonymization": "k-anonymity-demo",
       "deidentificationStatus": "released",
       "authorizationStatus": "approved",
+      "governance": {
+        "dataUseAgreement": "DUA-DEMO-DM-2026",
+        "minimumNecessary": true,
+        "reidentificationProhibited": true,
+        "exportReviewRequired": true,
+        "retentionDays": 180,
+        "steward": "research-governance",
+        "policyBasis": [
+          "PIPL",
+          "Data Security Law",
+          "Network Data Security Regulation",
+          "Ethics Review Measures"
+        ]
+      },
+      "evidenceDocuments": [
+        {
+          "id": "rd-diabetes-001-irb",
+          "type": "ethics-approval",
+          "title": "IRB approval for diabetes cohort",
+          "referenceNo": "IRB-DEMO-DM-2026",
+          "issuedBy": "demo-irb",
+          "issuedAt": "2026-06-01",
+          "status": "verified"
+        },
+        {
+          "id": "rd-diabetes-001-dua",
+          "type": "data-use-agreement",
+          "title": "Data use agreement for diabetes cohort",
+          "referenceNo": "DUA-DEMO-DM-2026",
+          "issuedBy": "research-governance",
+          "issuedAt": "2026-06-02",
+          "status": "verified"
+        }
+      ],
       "records": 1,
       "sourceCollections": [
         "personalRecords",
@@ -24273,6 +24970,39 @@
       "usageAudit": [],
       "outcomes": [],
       "status": "published"
+    }
+  ],
+  "compliantDataExports": [
+    {
+      "id": "cde-htn-001",
+      "datasetId": "rd-hypertension-001",
+      "datasetName": "Hypertension chronic management cohort",
+      "purpose": "Approved de-identified aggregate export for chronic management cohort review.",
+      "destination": "research-governance-review-folder",
+      "requestedFields": [
+        "ageBand",
+        "gender",
+        "followupCount",
+        "riskLevel"
+      ],
+      "exportFormat": "csv",
+      "reviewStatus": "approved",
+      "exportStatus": "released",
+      "deidentified": true,
+      "minimumNecessary": true,
+      "watermark": "wm-rd-hypertension-001-demo",
+      "evidenceRef": "rd-hypertension-001-dua",
+      "reviewer": "research-governance",
+      "requestedBy": "research-governance",
+      "requestedAt": "2026-06-20T09:30:00.000Z",
+      "reviewedAt": "2026-06-20T10:00:00.000Z",
+      "retentionDays": 180,
+      "policyBasis": [
+        "PIPL",
+        "Data Security Law",
+        "Network Data Security Regulation",
+        "Ethics Review Measures"
+      ]
     }
   ],
   "diseaseRegistryModels": [
@@ -26201,6 +26931,67 @@
         "consentNo": "AUTH-RTC-R4-20260619",
         "signedAt": "2026-06-19T09:00:00.000+08:00"
       }
+    },
+    {
+      "id": "pr-rtc-002-report",
+      "residentId": "r2",
+      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2",
+      "category": "teleconsultation-report",
+      "date": "2026-06-21",
+      "recordDate": "2026-06-21",
+      "name": "Endocrinology teleconsultation report",
+      "result": "Recheck HbA1c in three months; primary institution continues diet and exercise intervention and monitors hypoglycemia risk.",
+      "source": "Dalian Medical University Hospital",
+      "teleconsultationId": "rtc-002",
+      "referralId": "rf2",
+      "externalReportId": "EMR-RTC-002",
+      "idempotencyKey": "rtc-002-report-seed",
+      "reportReturnedAt": "2026-06-21T10:30:00.000Z",
+      "createdBy": "system",
+      "createdAt": "2026-06-21T10:30:00.000Z",
+      "meta": {
+        "sourceInstitution": "Xinghaiwan Community Health Service Center",
+        "targetInstitution": "Dalian Medical University Hospital",
+        "reportStatus": "returned"
+      }
+    },
+    {
+      "id": "auth-r4-referral-demo",
+      "residentId": "r4",
+      "category": "authorizations",
+      "type": "authorization",
+      "name": "Referral teleconsultation resident authorization",
+      "status": "active",
+      "recordDate": "2026-06-23",
+      "source": "citizen consent demo",
+      "result": "authorized referral and teleconsultation sharing",
+      "meta": {
+        "status": "active",
+        "scope": "referral-teleconsultation",
+        "authorizedTo": [
+          "MR1",
+          "MR3"
+        ]
+      }
+    },
+    {
+      "id": "auth-r1-referral-demo",
+      "residentId": "r1",
+      "category": "authorizations",
+      "type": "authorization",
+      "name": "Referral teleconsultation resident authorization",
+      "status": "active",
+      "recordDate": "2026-06-23",
+      "source": "citizen consent demo",
+      "result": "authorized referral and teleconsultation sharing",
+      "meta": {
+        "status": "active",
+        "scope": "referral-teleconsultation",
+        "authorizedTo": [
+          "MR1",
+          "MR3"
+        ]
+      }
     }
   ],
   "physicalExamAbnormalCases": [
@@ -26625,5 +27416,831 @@
         }
       }
     }
-  }
+  },
+  "publicHealthTriggerRules": [
+    {
+      "id": "phhr-rule-fever-cluster",
+      "name": "发热门诊呼吸道病例聚集",
+      "sourceType": "临床症候群",
+      "metric": "fever-respiratory-cases",
+      "threshold": 5,
+      "windowHours": 24,
+      "severity": "high",
+      "enabled": true,
+      "actionTemplate": "24小时内完成病例核实、采样和流调派单"
+    },
+    {
+      "id": "phhr-rule-lab-positive",
+      "name": "实验室阳性结果聚集",
+      "sourceType": "实验室",
+      "metric": "same-pathogen-positive",
+      "threshold": 3,
+      "windowHours": 48,
+      "severity": "critical",
+      "enabled": true,
+      "actionTemplate": "锁定阳性样本、复核检验质量并启动关联病例核查"
+    },
+    {
+      "id": "phhr-rule-pharmacy-surge",
+      "name": "药店对症药品异常增长",
+      "sourceType": "药店",
+      "metric": "antipyretic-sales-index",
+      "threshold": 130,
+      "windowHours": 24,
+      "severity": "medium",
+      "enabled": true,
+      "actionTemplate": "核验销售异常来源并与医疗机构症候群信号交叉分析"
+    },
+    {
+      "id": "phhr-rule-school-cluster",
+      "name": "学校/养老机构聚集性症状",
+      "sourceType": "学校/养老",
+      "metric": "clustered-symptoms",
+      "threshold": 4,
+      "windowHours": 24,
+      "severity": "high",
+      "enabled": true,
+      "actionTemplate": "派发机构核实任务并同步健康提示和重点人员名单"
+    },
+    {
+      "id": "phhr-rule-public-report",
+      "name": "公众异常健康事件上报",
+      "sourceType": "公众上报",
+      "metric": "verified-public-report",
+      "threshold": 2,
+      "windowHours": 72,
+      "severity": "medium",
+      "enabled": true,
+      "actionTemplate": "人工核验公众线索，必要时转入事件处置"
+    }
+  ],
+  "publicHealthSignals": [
+    {
+      "id": "phsig-fever-001",
+      "ruleId": "phhr-rule-fever-cluster",
+      "sourceType": "临床症候群",
+      "sourceSystem": "市级医院EMR/发热门诊",
+      "metric": "fever-respiratory-cases",
+      "value": 8,
+      "baseline": 3,
+      "unit": "例/24小时",
+      "region": "中山区",
+      "institution": "大连市中心医院",
+      "observedAt": "2026-07-17T07:40:00+08:00",
+      "location": {
+        "x": 48,
+        "y": 32
+      },
+      "qualityStatus": "verified",
+      "status": "evaluated",
+      "evidenceRefs": [
+        "EMR-FEVER-20260717-001",
+        "LIS-RESP-20260717-004"
+      ]
+    },
+    {
+      "id": "phsig-fever-002",
+      "ruleId": "phhr-rule-fever-cluster",
+      "sourceType": "临床症候群",
+      "sourceSystem": "社区门诊症候群上报",
+      "metric": "fever-respiratory-cases",
+      "value": 6,
+      "baseline": 2,
+      "unit": "例/24小时",
+      "region": "中山区",
+      "institution": "青泥洼桥社区卫生服务中心",
+      "observedAt": "2026-07-17T08:05:00+08:00",
+      "location": {
+        "x": 54,
+        "y": 38
+      },
+      "qualityStatus": "verified",
+      "status": "evaluated",
+      "evidenceRefs": [
+        "PRIMARY-RESP-20260717-012"
+      ]
+    },
+    {
+      "id": "phsig-lab-001",
+      "ruleId": "phhr-rule-lab-positive",
+      "sourceType": "实验室",
+      "sourceSystem": "区域LIS阳性结果回传",
+      "metric": "same-pathogen-positive",
+      "value": 4,
+      "baseline": 1,
+      "unit": "例/48小时",
+      "region": "甘井子区",
+      "institution": "甘井子区人民医院",
+      "observedAt": "2026-07-17T06:55:00+08:00",
+      "location": {
+        "x": 65,
+        "y": 53
+      },
+      "qualityStatus": "verified",
+      "status": "evaluated",
+      "evidenceRefs": [
+        "LIS-POS-20260717-008",
+        "LIS-POS-20260717-009"
+      ]
+    },
+    {
+      "id": "phsig-pharmacy-001",
+      "ruleId": "phhr-rule-pharmacy-surge",
+      "sourceType": "药店",
+      "sourceSystem": "零售药店销售监测",
+      "metric": "antipyretic-sales-index",
+      "value": 162,
+      "baseline": 100,
+      "unit": "指数",
+      "region": "西岗区",
+      "institution": "区域药店哨点集群",
+      "observedAt": "2026-07-17T08:10:00+08:00",
+      "location": {
+        "x": 37,
+        "y": 44
+      },
+      "qualityStatus": "received",
+      "status": "evaluated",
+      "evidenceRefs": [
+        "PHARMACY-DAILY-20260717-01"
+      ]
+    },
+    {
+      "id": "phsig-school-001",
+      "ruleId": "phhr-rule-school-cluster",
+      "sourceType": "学校/养老",
+      "sourceSystem": "学校晨检上报",
+      "metric": "clustered-symptoms",
+      "value": 7,
+      "baseline": 1,
+      "unit": "人/24小时",
+      "region": "沙河口区",
+      "institution": "沙河口区实验小学",
+      "observedAt": "2026-07-17T07:15:00+08:00",
+      "location": {
+        "x": 45,
+        "y": 58
+      },
+      "qualityStatus": "verified",
+      "status": "evaluated",
+      "evidenceRefs": [
+        "SCHOOL-MORNING-20260717-021"
+      ]
+    },
+    {
+      "id": "phsig-public-001",
+      "ruleId": "phhr-rule-public-report",
+      "sourceType": "公众上报",
+      "sourceSystem": "居民健康事件上报",
+      "metric": "verified-public-report",
+      "value": 2,
+      "baseline": 0,
+      "unit": "条/72小时",
+      "region": "旅顺口区",
+      "institution": "居民线索核验队列",
+      "observedAt": "2026-07-16T19:30:00+08:00",
+      "location": {
+        "x": 22,
+        "y": 72
+      },
+      "qualityStatus": "manual-review",
+      "status": "evaluated",
+      "evidenceRefs": [
+        "CITIZEN-REPORT-20260716-004",
+        "CITIZEN-REPORT-20260716-006"
+      ]
+    }
+  ],
+  "publicHealthAlerts": [
+    {
+      "id": "phalert-fever-zhongshan",
+      "ruleId": "phhr-rule-fever-cluster",
+      "title": "中山区呼吸道症候群聚集预警",
+      "severity": "high",
+      "status": "open",
+      "region": "中山区",
+      "sourceTypes": [
+        "临床症候群"
+      ],
+      "signalIds": [
+        "phsig-fever-001",
+        "phsig-fever-002"
+      ],
+      "triggerCount": 14,
+      "threshold": 5,
+      "confidence": 0.91,
+      "createdAt": "2026-07-17T08:12:00+08:00",
+      "evidenceRefs": [
+        "EMR-FEVER-20260717-001",
+        "PRIMARY-RESP-20260717-012"
+      ],
+      "recommendedAction": "24小时内完成病例核实、采样和流调派单",
+      "actionHistory": []
+    },
+    {
+      "id": "phalert-lab-ganjingzi",
+      "ruleId": "phhr-rule-lab-positive",
+      "title": "甘井子区实验室阳性结果聚集预警",
+      "severity": "critical",
+      "status": "acknowledged",
+      "region": "甘井子区",
+      "sourceTypes": [
+        "实验室"
+      ],
+      "signalIds": [
+        "phsig-lab-001"
+      ],
+      "triggerCount": 4,
+      "threshold": 3,
+      "confidence": 0.96,
+      "createdAt": "2026-07-17T07:10:00+08:00",
+      "evidenceRefs": [
+        "LIS-POS-20260717-008",
+        "LIS-POS-20260717-009"
+      ],
+      "recommendedAction": "锁定阳性样本、复核检验质量并启动关联病例核查",
+      "actionHistory": [
+        {
+          "action": "acknowledge",
+          "actor": "疾控值守员",
+          "at": "2026-07-17T07:22:00+08:00",
+          "note": "已接收并启动实验室复核"
+        }
+      ]
+    },
+    {
+      "id": "phalert-pharmacy-xigang",
+      "ruleId": "phhr-rule-pharmacy-surge",
+      "title": "西岗区对症药品销售异常增长",
+      "severity": "medium",
+      "status": "investigating",
+      "region": "西岗区",
+      "sourceTypes": [
+        "药店"
+      ],
+      "signalIds": [
+        "phsig-pharmacy-001"
+      ],
+      "triggerCount": 162,
+      "threshold": 130,
+      "confidence": 0.78,
+      "createdAt": "2026-07-17T08:14:00+08:00",
+      "evidenceRefs": [
+        "PHARMACY-DAILY-20260717-01"
+      ],
+      "recommendedAction": "核验销售异常来源并与医疗机构症候群信号交叉分析",
+      "actionHistory": []
+    },
+    {
+      "id": "phalert-school-shahekou",
+      "ruleId": "phhr-rule-school-cluster",
+      "title": "沙河口区学校聚集性症状预警",
+      "severity": "high",
+      "status": "dispatched",
+      "region": "沙河口区",
+      "sourceTypes": [
+        "学校/养老"
+      ],
+      "signalIds": [
+        "phsig-school-001"
+      ],
+      "triggerCount": 7,
+      "threshold": 4,
+      "confidence": 0.87,
+      "createdAt": "2026-07-17T07:28:00+08:00",
+      "evidenceRefs": [
+        "SCHOOL-MORNING-20260717-021"
+      ],
+      "recommendedAction": "派发机构核实任务并同步健康提示和重点人员名单",
+      "actionHistory": [
+        {
+          "action": "dispatch",
+          "actor": "应急值守员",
+          "at": "2026-07-17T07:45:00+08:00",
+          "note": "已派发学校核实与健康提示任务"
+        }
+      ]
+    }
+  ],
+  "publicHealthCommandTasks": [
+    {
+      "id": "phcmd-task-fever-investigation",
+      "alertId": "phalert-fever-zhongshan",
+      "title": "中山区呼吸道聚集事件核实与流调",
+      "stage": "investigation",
+      "status": "pending-acceptance",
+      "priority": "high",
+      "owner": "中山市疾控流调一组",
+      "institution": "大连市中心医院/青泥洼桥社区卫生服务中心",
+      "region": "中山区",
+      "dueAt": "2026-07-18T08:12:00+08:00",
+      "requiredActions": [
+        "病例清单核对",
+        "采样复核",
+        "密接线索登记"
+      ],
+      "resourceIds": [
+        "phres-team-cdc-1",
+        "phres-lab-rapid"
+      ],
+      "evidenceRefs": [
+        "phalert-fever-zhongshan"
+      ],
+      "actionHistory": []
+    },
+    {
+      "id": "phcmd-task-lab-review",
+      "alertId": "phalert-lab-ganjingzi",
+      "title": "甘井子区阳性样本实验室质量复核",
+      "stage": "laboratory-review",
+      "status": "in-progress",
+      "priority": "critical",
+      "owner": "市疾控实验室质量组",
+      "institution": "甘井子区人民医院",
+      "region": "甘井子区",
+      "dueAt": "2026-07-17T19:10:00+08:00",
+      "requiredActions": [
+        "样本链核对",
+        "复检",
+        "关联病例核查"
+      ],
+      "resourceIds": [
+        "phres-lab-rapid",
+        "phres-ppe-stock"
+      ],
+      "evidenceRefs": [
+        "phalert-lab-ganjingzi"
+      ],
+      "actionHistory": [
+        {
+          "action": "accept",
+          "actor": "实验室质量组",
+          "at": "2026-07-17T07:24:00+08:00",
+          "note": "已接单"
+        }
+      ]
+    },
+    {
+      "id": "phcmd-task-pharmacy-correlation",
+      "alertId": "phalert-pharmacy-xigang",
+      "title": "西岗区药店异常销售交叉分析",
+      "stage": "correlation",
+      "status": "pending-acceptance",
+      "priority": "medium",
+      "owner": "市疾控监测分析组",
+      "institution": "西岗区市场监测哨点",
+      "region": "西岗区",
+      "dueAt": "2026-07-18T08:14:00+08:00",
+      "requiredActions": [
+        "销售数据质量复核",
+        "医院症候群比对",
+        "形成研判意见"
+      ],
+      "resourceIds": [
+        "phres-analysis-1"
+      ],
+      "evidenceRefs": [
+        "phalert-pharmacy-xigang"
+      ],
+      "actionHistory": []
+    },
+    {
+      "id": "phcmd-task-school-health",
+      "alertId": "phalert-school-shahekou",
+      "title": "沙河口区学校健康提示和重点人员随访",
+      "stage": "institution-response",
+      "status": "in-progress",
+      "priority": "high",
+      "owner": "沙河口区卫健局联络员",
+      "institution": "沙河口区实验小学",
+      "region": "沙河口区",
+      "dueAt": "2026-07-17T18:00:00+08:00",
+      "requiredActions": [
+        "机构核实",
+        "家长健康提示",
+        "重点人员随访回执"
+      ],
+      "resourceIds": [
+        "phres-team-primary-2",
+        "phres-ppe-stock"
+      ],
+      "evidenceRefs": [
+        "phalert-school-shahekou"
+      ],
+      "actionHistory": [
+        {
+          "action": "dispatch",
+          "actor": "应急值守员",
+          "at": "2026-07-17T07:45:00+08:00",
+          "note": "已派发基层协同任务"
+        }
+      ]
+    }
+  ],
+  "publicHealthResources": [
+    {
+      "id": "phres-team-cdc-1",
+      "type": "流调队伍",
+      "name": "市疾控流调一组",
+      "region": "中山区",
+      "capacity": 8,
+      "available": 5,
+      "unit": "人",
+      "status": "available",
+      "lastUpdatedAt": "2026-07-17T08:00:00+08:00"
+    },
+    {
+      "id": "phres-team-primary-2",
+      "type": "基层协同队伍",
+      "name": "沙河口区基层公卫队",
+      "region": "沙河口区",
+      "capacity": 6,
+      "available": 4,
+      "unit": "人",
+      "status": "available",
+      "lastUpdatedAt": "2026-07-17T07:50:00+08:00"
+    },
+    {
+      "id": "phres-lab-rapid",
+      "type": "实验室能力",
+      "name": "区域快速复检能力",
+      "region": "甘井子区",
+      "capacity": 30,
+      "available": 18,
+      "unit": "样本/日",
+      "status": "available",
+      "lastUpdatedAt": "2026-07-17T07:35:00+08:00"
+    },
+    {
+      "id": "phres-ppe-stock",
+      "type": "防护物资",
+      "name": "应急防护物资储备",
+      "region": "市级储备库",
+      "capacity": 1000,
+      "available": 760,
+      "unit": "套",
+      "status": "available",
+      "lastUpdatedAt": "2026-07-17T06:30:00+08:00"
+    },
+    {
+      "id": "phres-analysis-1",
+      "type": "分析席位",
+      "name": "监测分析席位",
+      "region": "市疾控中心",
+      "capacity": 10,
+      "available": 7,
+      "unit": "席",
+      "status": "available",
+      "lastUpdatedAt": "2026-07-17T08:05:00+08:00"
+    }
+  ],
+  "publicHealthAiReviews": [
+    {
+      "id": "phai-review-fever-zhongshan",
+      "alertId": "phalert-fever-zhongshan",
+      "title": "建议优先核查中山区医疗机构间的共同暴露线索",
+      "status": "pending-review",
+      "confidence": 0.88,
+      "modelVersion": "ph-risk-assist-demo-1.0",
+      "generatedAt": "2026-07-17T08:18:00+08:00",
+      "summary": "两个机构在24小时窗口内同时超过症候群基线，建议先核对就诊时间、居住地和共同场所。",
+      "reasoning": [
+        "两个机构信号时间窗口重叠",
+        "触发值为规则阈值的2.8倍",
+        "两条信号均已通过来源校验"
+      ],
+      "recommendedActions": [
+        "生成病例核查表",
+        "按机构分派流调任务",
+        "保留人工复核意见"
+      ],
+      "evidenceRefs": [
+        "EMR-FEVER-20260717-001",
+        "PRIMARY-RESP-20260717-012"
+      ],
+      "humanApprovalRequired": true,
+      "reviewHistory": []
+    },
+    {
+      "id": "phai-review-lab-ganjingzi",
+      "alertId": "phalert-lab-ganjingzi",
+      "title": "建议对甘井子区阳性样本执行复检和样本链核验",
+      "status": "approved",
+      "confidence": 0.94,
+      "modelVersion": "ph-risk-assist-demo-1.0",
+      "generatedAt": "2026-07-17T07:16:00+08:00",
+      "summary": "同一时间窗出现4例阳性结果，超过3例阈值，优先确认样本链和实验室质量。",
+      "reasoning": [
+        "阳性结果数量超过阈值",
+        "样本证据引用完整",
+        "已有人工值守员接收预警"
+      ],
+      "recommendedActions": [
+        "锁定样本",
+        "复检",
+        "关联病例核查"
+      ],
+      "evidenceRefs": [
+        "LIS-POS-20260717-008",
+        "LIS-POS-20260717-009"
+      ],
+      "humanApprovalRequired": true,
+      "approvedBy": "市疾控实验室质量组",
+      "approvedAt": "2026-07-17T07:25:00+08:00",
+      "reviewHistory": [
+        {
+          "action": "approve",
+          "actor": "市疾控实验室质量组",
+          "at": "2026-07-17T07:25:00+08:00",
+          "note": "建议与样本复核任务一致"
+        }
+      ]
+    }
+  ],
+  "publicHealthEvidenceRecords": [
+    {
+      "id": "phec-source-lineage",
+      "domain": "source-lineage",
+      "name": "多源信号来源可追溯",
+      "sourceCollection": "publicHealthSignals",
+      "expected": 6,
+      "observed": 6,
+      "status": "verified",
+      "owner": "平台技术组",
+      "evidenceRefs": [
+        "source-system",
+        "observedAt",
+        "evidenceRefs"
+      ]
+    },
+    {
+      "id": "phec-rule-evaluation",
+      "domain": "rule-evaluation",
+      "name": "预警规则命中可解释",
+      "sourceCollection": "publicHealthTriggerRules",
+      "expected": 5,
+      "observed": 5,
+      "status": "verified",
+      "owner": "疾控监测组",
+      "evidenceRefs": [
+        "threshold",
+        "windowHours",
+        "signalIds"
+      ]
+    },
+    {
+      "id": "phec-alert-action",
+      "domain": "alert-action",
+      "name": "预警动作闭环可回放",
+      "sourceCollection": "publicHealthAlerts",
+      "expected": 4,
+      "observed": 4,
+      "status": "recorded",
+      "owner": "应急办",
+      "evidenceRefs": [
+        "actionHistory",
+        "status",
+        "recommendedAction"
+      ]
+    },
+    {
+      "id": "phec-command-dispatch",
+      "domain": "command-dispatch",
+      "name": "任务责任人与时限已配置",
+      "sourceCollection": "publicHealthCommandTasks",
+      "expected": 4,
+      "observed": 4,
+      "status": "recorded",
+      "owner": "项目办",
+      "evidenceRefs": [
+        "owner",
+        "dueAt",
+        "resourceIds"
+      ]
+    },
+    {
+      "id": "phec-resource-inventory",
+      "domain": "resource-inventory",
+      "name": "资源可用量可追踪",
+      "sourceCollection": "publicHealthResources",
+      "expected": 5,
+      "observed": 5,
+      "status": "verified",
+      "owner": "应急物资保障组",
+      "evidenceRefs": [
+        "capacity",
+        "available",
+        "lastUpdatedAt"
+      ]
+    },
+    {
+      "id": "phec-ai-human-review",
+      "domain": "ai-human-review",
+      "name": "AI建议具备人工确认边界",
+      "sourceCollection": "publicHealthAiReviews",
+      "expected": 2,
+      "observed": 2,
+      "status": "verified",
+      "owner": "疾控研判组",
+      "evidenceRefs": [
+        "modelVersion",
+        "evidenceRefs",
+        "humanApprovalRequired"
+      ]
+    },
+    {
+      "id": "phec-audit-chain",
+      "domain": "audit-chain",
+      "name": "五件套动作写入安全审计",
+      "sourceCollection": "securityEvents",
+      "expected": 1,
+      "observed": 1,
+      "status": "recorded",
+      "owner": "安全管理岗",
+      "evidenceRefs": [
+        "actor",
+        "target",
+        "action",
+        "detail"
+      ]
+    },
+    {
+      "id": "phec-site-boundary",
+      "domain": "site-boundary",
+      "name": "正式上线现场材料边界明确",
+      "sourceCollection": "publicHealthReadinessEvidence",
+      "expected": 1,
+      "observed": 1,
+      "status": "verified",
+      "owner": "项目办",
+      "evidenceRefs": [
+        "functionalState",
+        "formalGoLiveState"
+      ]
+    }
+  ],
+  "qualitySafetySiteSignoffs": [
+    {
+      "id": "qss-live-feeds",
+      "domain": "live_interfaces",
+      "item": "Live HIS/EMR/LIS/PACS feed binding",
+      "ownerRole": "commission",
+      "owner": "Institution integration group",
+      "requiredEvidence": [
+        "signed joint-test record",
+        "sample inbound payload",
+        "field mapping confirmation"
+      ],
+      "sourceCollections": [
+        "hospitalInteroperabilityFunctions",
+        "integrationContracts"
+      ],
+      "status": "pending_site_confirmation",
+      "dueAt": "2026-07-05",
+      "latestNote": "Confirm live feed scope and payload signatures before production cutover.",
+      "auditTrail": [
+        {
+          "at": "2026-06-28T10:00:00.000Z",
+          "by": "health",
+          "action": "seed-site-signoff",
+          "note": "Initial site sign-off tracker."
+        }
+      ]
+    },
+    {
+      "id": "qss-critical-routing",
+      "domain": "critical_value",
+      "item": "Production critical-value routing and timeout escalation",
+      "ownerRole": "institution",
+      "owner": "Dalian Central Hospital",
+      "requiredEvidence": [
+        "routing rule screenshot",
+        "acknowledgement receipt",
+        "timeout escalation recipient list"
+      ],
+      "sourceCollections": [
+        "criticalValueAlerts",
+        "diagnosticReports"
+      ],
+      "status": "ready_for_joint_test",
+      "dueAt": "2026-07-03",
+      "latestNote": "Pilot route is ready; production notification receipt still needs site confirmation.",
+      "auditTrail": [
+        {
+          "at": "2026-06-28T10:05:00.000Z",
+          "by": "health",
+          "action": "seed-site-signoff",
+          "note": "Critical value route prepared for joint test."
+        }
+      ]
+    },
+    {
+      "id": "qss-pathway-dictionary",
+      "domain": "clinical_pathway",
+      "item": "Local clinical pathway dictionaries and EMR variance evidence",
+      "ownerRole": "institution",
+      "owner": "Dalian Central Hospital",
+      "requiredEvidence": [
+        "local pathway dictionary",
+        "variance rule mapping",
+        "EMR screenshot sample"
+      ],
+      "sourceCollections": [
+        "clinicalPathwayCases",
+        "qualitySafetyEvents"
+      ],
+      "status": "pending_site_confirmation",
+      "dueAt": "2026-07-08",
+      "latestNote": "Attach local pathway dictionary version and variance examples.",
+      "auditTrail": [
+        {
+          "at": "2026-06-28T10:10:00.000Z",
+          "by": "health",
+          "action": "seed-site-signoff",
+          "note": "Pathway dictionary sign-off item created."
+        }
+      ]
+    },
+    {
+      "id": "qss-mutual-recognition-rules",
+      "domain": "mutual_recognition_qc",
+      "item": "Regional mutual-recognition lists and negative-list rules",
+      "ownerRole": "county",
+      "owner": "Regional mutual recognition QC",
+      "requiredEvidence": [
+        "recognition catalog",
+        "negative-list rule",
+        "manual review exception sample"
+      ],
+      "sourceCollections": [
+        "countyMutualRecognitionRecords",
+        "mutualRecognitionQualityReviews"
+      ],
+      "status": "pending_site_confirmation",
+      "dueAt": "2026-07-06",
+      "latestNote": "County consortium must confirm catalog and exception handling.",
+      "auditTrail": [
+        {
+          "at": "2026-06-28T10:15:00.000Z",
+          "by": "health",
+          "action": "seed-site-signoff",
+          "note": "Mutual-recognition sign-off item created."
+        }
+      ]
+    },
+    {
+      "id": "qss-department-attachments",
+      "domain": "rectification",
+      "item": "Department rectification sign-off attachments",
+      "ownerRole": "institution",
+      "owner": "Qingniwaqiao Community Health Service Center",
+      "requiredEvidence": [
+        "department head signature",
+        "corrected EMR evidence",
+        "commission review note"
+      ],
+      "sourceCollections": [
+        "qualityRectificationOrders",
+        "medicalRecordQualityReviews"
+      ],
+      "status": "ready_for_joint_test",
+      "dueAt": "2026-07-04",
+      "latestNote": "Demo attachment placeholder exists; production requires signed department evidence.",
+      "auditTrail": [
+        {
+          "at": "2026-06-28T10:20:00.000Z",
+          "by": "health",
+          "action": "seed-site-signoff",
+          "note": "Rectification attachment sign-off prepared."
+        }
+      ]
+    },
+    {
+      "id": "qss-audit-retention",
+      "domain": "audit_retention",
+      "item": "Production audit retention target",
+      "ownerRole": "commission",
+      "owner": "Security administration",
+      "requiredEvidence": [
+        "AUDIT_EXPORT_PATH or SIEM_ENDPOINT",
+        "retention period approval",
+        "audit export permission"
+      ],
+      "sourceCollections": [
+        "securityEvents",
+        "dataAccessLogs"
+      ],
+      "status": "pending_site_confirmation",
+      "dueAt": "2026-07-10",
+      "latestNote": "Production retention target remains a cutover warning until environment evidence is configured.",
+      "auditTrail": [
+        {
+          "at": "2026-06-28T10:25:00.000Z",
+          "by": "health",
+          "action": "seed-site-signoff",
+          "note": "Audit retention sign-off item created."
+        }
+      ]
+    }
+  ]
 }

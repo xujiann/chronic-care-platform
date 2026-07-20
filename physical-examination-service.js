@@ -152,6 +152,10 @@
       contractId: contract.id,
       status: "demo-passed",
       siteSignoff: false,
+      siteSignoffVerified: false,
+      signoffStatus: "not-submitted",
+      signoffSubmission: null,
+      signoffVerification: null,
       evidenceRefs: ["sample-request.json", "sample-response.json"],
       checks: [
         { id: "network", name: "HTTPS 专线/白名单", status: "site-pending" },
@@ -570,12 +574,16 @@
   function buildOverview(state, options = {}) {
     const allowedIds = options.residentIds ? new Set(options.residentIds) : null;
     const residentId = String(options.residentId || "").trim();
+    const excludeDemoData = options.excludeDemoData === true;
     const residentMap = new Map((state?.residents || []).map((item) => [item.id, item]));
-    const reports = (state?.personalRecords || [])
+    const allReports = (state?.personalRecords || [])
       .filter(isPhysicalExamRecord)
       .filter((item) => !allowedIds || allowedIds.has(item.residentId))
-      .filter((item) => !residentId || item.residentId === residentId)
+      .filter((item) => !residentId || item.residentId === residentId);
+    const reports = allReports
+      .filter((item) => !excludeDemoData || !isDemoPhysicalExamRecord(item))
       .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+    const reportIds = new Set(reports.map((item) => item.id));
     const institutions = new Set(reports.map((item) => item.meta?.institutionId || item.source).filter(Boolean));
     const residentIds = new Set(reports.map((item) => item.residentId));
     const abnormalReports = reports.filter((item) => Number(item.meta?.abnormalCount || 0) > 0);
@@ -583,6 +591,7 @@
     const cases = (state?.physicalExamAbnormalCases || seedAbnormalCases())
       .filter((item) => !allowedIds || allowedIds.has(item.residentId))
       .filter((item) => !residentId || item.residentId === residentId)
+      .filter((item) => !excludeDemoData || reportIds.has(item.reportId))
       .sort((a, b) => String(a.dueAt || "").localeCompare(String(b.dueAt || "")));
     const attachments = new Map((state?.secureAttachments || []).map((item) => [item.id, item]));
     const jointTests = (state?.physicalExamJointTests || seedJointTests()).map((item) => ({ ...item, checks: Array.isArray(item.checks) ? item.checks : [] }));
@@ -590,7 +599,9 @@
       .filter((item) => !allowedIds || allowedIds.has(item.residentId))
       .filter((item) => !residentId || item.residentId === residentId)
       .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")));
-    const gatewayEvents = (state?.integrationGatewayEvents || []).filter((item) => item.contractId === "physical-exam-report-v1");
+    const gatewayEvents = (state?.integrationGatewayEvents || [])
+      .filter((item) => item.contractId === "physical-exam-report-v1")
+      .filter((item) => !excludeDemoData || item.simulated !== true);
     const unresolvedCases = cases.filter((item) => !["closed", "resolved"].includes(item.status));
     const mappingTotal = reports.reduce((total, item) => total + (item.meta?.findings?.length || 0), 0);
     const mappedTotal = reports.reduce((total, item) => total + Number(item.meta?.mappedCount || 0), 0);
@@ -600,7 +611,8 @@
     const careTasks = (state?.chronicScreeningTasks || [])
       .filter((item) => item.sourceType === "physical-exam")
       .filter((item) => !allowedIds || allowedIds.has(item.residentId))
-      .filter((item) => !residentId || item.residentId === residentId);
+      .filter((item) => !residentId || item.residentId === residentId)
+      .filter((item) => !excludeDemoData || reportIds.has(item.sourceReportId));
     const qualityIndicators = buildQualityIndicators(reports, cases);
     const highlights = Highlights.build(state, reports, cases, { minimumAggregate: 3 });
     return {
@@ -617,6 +629,11 @@
         familyDoctorSuggestions: linkedReports.filter((item) => item.meta?.careLinkage?.familyDoctorSuggestion).length,
         residentRiskTasks: careTasks.length,
         storedReports: reports.filter((item) => item.meta?.secureAttachmentId && attachments.get(item.meta.secureAttachmentId)?.status === "active").length,
+        productionStoredReports: reports.filter((item) => {
+          const attachment = attachments.get(item.meta?.secureAttachmentId);
+          return attachment?.status === "active" && attachment?.scanStatus === "clean";
+        }).length,
+        demoReportsExcluded: excludeDemoData ? allReports.filter(isDemoPhysicalExamRecord).length : 0,
         openAbnormalCases: unresolvedCases.length,
         mappingRate: mappingTotal ? Math.round((mappedTotal / mappingTotal) * 100) : 100,
         nationalMappingRate: mappingTotal ? Math.round((nationalMappedTotal / mappingTotal) * 100) : 100,
@@ -754,24 +771,63 @@
       rows[index] = {
         ...rows[index],
         checks: rows[index].checks.map((item) => item.id === checkId ? { ...item, status, note, evidenceRef, updatedAt: at } : item),
-        evidenceRefs: evidenceRef ? [...new Set([evidenceRef, ...(rows[index].evidenceRefs || [])])].slice(0, 30) : (rows[index].evidenceRefs || [])
+        evidenceRefs: evidenceRef ? [...new Set([evidenceRef, ...(rows[index].evidenceRefs || [])])].slice(0, 30) : (rows[index].evidenceRefs || []),
+        status: "site-testing",
+        siteSignoff: false,
+        siteSignoffVerified: false,
+        signoffStatus: "checks-updated",
+        signoffSubmission: null,
+        signoffVerification: null
       };
-    } else if (action === "signoff") {
+    } else if (["signoff", "submit-signoff"].includes(action)) {
       const evidenceRef = String(payload.evidenceRef || "").trim();
+      const evidenceDigest = normalizeEvidenceDigest(payload.evidenceDigest);
+      const externalSigner = String(payload.externalSigner || "").trim();
+      const signerOrganization = String(payload.signerOrganization || "").trim();
       const allSitePassed = rows[index].checks.every((item) => ["site-passed", "not-applicable"].includes(item.status));
       if (!allSitePassed) throw conflictError("仍有联调检查项未完成现场验收，不能签署上线确认");
+      if (action === "signoff") throw conflictError("生产上线确认必须先提交证据，再由不同责任人独立核验");
       if (evidenceRef.length < 3) throw inputError("上线签署必须提供验收单编号或签字附件引用");
+      if (!evidenceDigest) throw inputError("上线签署必须提供 64 位 SHA-256 证据摘要");
+      if (externalSigner.length < 2 || signerOrganization.length < 2) throw inputError("上线签署必须登记外部签署人及所属机构");
+      const submittedBy = String(context.actor || "").trim();
+      if (!submittedBy) throw inputError("上线签署必须记录提交责任人");
       rows[index] = {
         ...rows[index],
-        siteSignoff: true,
-        status: "site-signed",
-        signedAt: at,
-        signedBy: context.actor || "operator",
-        signoffEvidenceRef: evidenceRef,
+        siteSignoff: false,
+        siteSignoffVerified: false,
+        status: "site-signoff-review",
+        signoffStatus: "submitted-awaiting-independent-verification",
+        signoffSubmission: { submittedAt: at, submittedBy, evidenceRef, evidenceDigest, externalSigner, signerOrganization },
+        signoffVerification: null,
         evidenceRefs: [...new Set([evidenceRef, ...(rows[index].evidenceRefs || [])])].slice(0, 30)
       };
+    } else if (["verify-signoff", "reject-signoff"].includes(action)) {
+      const submission = rows[index].signoffSubmission;
+      if (!submission) throw conflictError("尚未提交上线签署证据，不能执行独立核验");
+      const reviewedBy = String(context.actor || "").trim();
+      if (!reviewedBy) throw inputError("独立核验必须记录复核责任人");
+      if (reviewedBy.toLowerCase() === String(submission.submittedBy || "").trim().toLowerCase()) throw conflictError("提交人不得核验本人提交的上线证据");
+      if (context.role && context.role !== "commission") throw conflictError("上线证据独立核验仅允许卫生行政角色执行");
+      const verificationRef = String(payload.verificationRef || payload.evidenceRef || "").trim();
+      if (verificationRef.length < 3) throw inputError("独立核验必须提供复核记录编号或附件引用");
+      const evidenceDigest = normalizeEvidenceDigest(payload.evidenceDigest);
+      if (!evidenceDigest || evidenceDigest !== submission.evidenceDigest) throw conflictError("独立核验摘要与提交证据 SHA-256 不一致");
+      const verified = action === "verify-signoff";
+      rows[index] = {
+        ...rows[index],
+        siteSignoff: verified,
+        siteSignoffVerified: verified,
+        status: verified ? "site-verified" : "site-signoff-rejected",
+        signoffStatus: verified ? "independently-verified" : "rejected",
+        signedAt: verified ? at : "",
+        signedBy: verified ? reviewedBy : "",
+        signoffEvidenceRef: verified ? submission.evidenceRef : "",
+        signoffVerification: { reviewedAt: at, reviewedBy, verificationRef, evidenceDigest, outcome: verified ? "verified" : "rejected", note },
+        evidenceRefs: [...new Set([verificationRef, ...(rows[index].evidenceRefs || [])])].slice(0, 30)
+      };
     } else {
-      throw inputError("联调动作仅支持 update-check 或 signoff");
+      throw inputError("联调动作仅支持 update-check、submit-signoff、verify-signoff 或 reject-signoff");
     }
     rows[index] = { ...rows[index], actionHistory: [{ action, note, at, actor: context.actor || "operator" }, ...(rows[index].actionHistory || [])].slice(0, 30) };
     state.physicalExamJointTests = rows;
@@ -798,6 +854,19 @@
 
   function isPhysicalExamRecord(item) {
     return item?.category === "physical-exam" || item?.meta?.physicalExam === true;
+  }
+
+  function isDemoPhysicalExamRecord(item) {
+    if (!isPhysicalExamRecord(item)) return false;
+    const meta = item?.meta || {};
+    return meta.signature?.mode === "demo"
+      || String(meta.signature?.certificateSerial || "").toUpperCase().startsWith("DEMO-")
+      || String(item.id || "").startsWith("physical-exam-r");
+  }
+
+  function normalizeEvidenceDigest(value) {
+    const digest = String(value || "").trim().toLowerCase();
+    return /^[a-f0-9]{64}$/.test(digest) ? digest : "";
   }
 
   function idempotencyKey(item) {
@@ -935,6 +1004,7 @@
     buildOverview,
     buildQualityIndicators,
     ingest,
+    isDemoPhysicalExamRecord,
     isPhysicalExamRecord,
     linkSecureAttachment,
     mergeSeedRecords,

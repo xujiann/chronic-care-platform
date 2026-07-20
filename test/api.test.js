@@ -85,6 +85,9 @@ function integrationSignature(payload) {
 test("API authentication, scoping and governance regression suite", async (t) => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "health-platform-test-"));
   const fixture = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "db.json"), "utf8"));
+  delete fixture.healthStatistics.dailyServiceReports;
+  delete fixture.healthStatistics.certificateExchangeLinks;
+  delete fixture.healthStatistics.siteEvidencePackage;
   fixture.accounts[0].name = "Needs normalization?";
   fixture.authUsers.push({
     id: "u-hashed-test",
@@ -1624,6 +1627,45 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(resumedPilotInstitution.response.status, 200);
     assert.equal(resumedPilotInstitution.body.institution.status, "active");
 
+    const createdPilotIssue = await api(baseUrl, "/api/digital-hospital/pilot-issues/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "create", institutionId: "MR1", institutionName: "大连市中心医院", title: "API联调回执待复核", severity: "P0", category: "interface-evidence", owner: "医院信息中心", dueAt: "2026-08-01", note: "登记API试点问题", noPatientPii: true })
+    }));
+    assert.equal(createdPilotIssue.response.status, 201);
+    assert.equal(createdPilotIssue.body.issue.status, "open");
+    const pilotIssueEvidence = await api(baseUrl, `/api/digital-hospital/pilot-issues/${encodeURIComponent(createdPilotIssue.body.issue.id)}/actions`, authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "record-evidence", evidenceRef: "DH-API-ISSUE-001", note: "登记API脱敏整改证据", noPatientPii: true })
+    }));
+    assert.equal(pilotIssueEvidence.response.status, 200);
+    assert.equal(pilotIssueEvidence.body.issue.evidenceRefs.includes("DH-API-ISSUE-001"), true);
+    const pilotIssueReview = await api(baseUrl, `/api/digital-hospital/pilot-issues/${encodeURIComponent(createdPilotIssue.body.issue.id)}/actions`, authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "submit-review", note: "提交API监管复核" })
+    }));
+    assert.equal(pilotIssueReview.response.status, 200);
+    assert.equal(pilotIssueReview.body.issue.status, "pending-review");
+    assert.equal(pilotIssueReview.body.board.summary.pendingPilotIssueReviews >= 1, true);
+    const deniedPilotIssueSelfReview = await api(baseUrl, `/api/digital-hospital/pilot-issues/${encodeURIComponent(createdPilotIssue.body.issue.id)}/actions`, authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "verify-close", note: "整改提交人不得自行关闭" })
+    }));
+    assert.equal(deniedPilotIssueSelfReview.response.status, 409);
+    const pilotIssueReviewerLogin = await login(baseUrl, "city");
+    assert.equal(pilotIssueReviewerLogin.response.status, 200);
+    const closedPilotIssue = await api(baseUrl, `/api/digital-hospital/pilot-issues/${encodeURIComponent(createdPilotIssue.body.issue.id)}/actions`, authorized(pilotIssueReviewerLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "verify-close", note: "独立复核整改证据后关闭" })
+    }));
+    assert.equal(closedPilotIssue.response.status, 200);
+    assert.equal(closedPilotIssue.body.issue.status, "verified-closed");
+    const reopenedPilotIssue = await api(baseUrl, `/api/digital-hospital/pilot-issues/${encodeURIComponent(createdPilotIssue.body.issue.id)}/actions`, authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "reopen", note: "抽查发现证据过期，重新打开" })
+    }));
+    assert.equal(reopenedPilotIssue.response.status, 200);
+    assert.equal(reopenedPilotIssue.body.issue.status, "reopened");
+
     const deniedPilotInstitutionRegister = await api(baseUrl, "/api/digital-hospital/pilot-institutions/actions", authorized(residentPhoneLogin.body.token, {
       method: "POST",
       body: JSON.stringify({ action: "register", institutionId: "DENIED", institutionName: "越权机构", owner: "居民" })
@@ -2339,6 +2381,27 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const productionOperationsAudit = await api(baseUrl, "/api/state", authorized(accountLogin.body.token));
     assert.equal(productionOperationsAudit.body.securityEvents.some((item) => item.action === "production-operations-action" && item.result === "allowed"), true);
 
+    const hospitalOperationsLogin = await login(baseUrl, "hospital");
+    const operationSnapshotPayload = {
+      snapshots: [{
+        id: "ops-mr1-live-api",
+        institutionId: "MR1",
+        institution: "Dalian Central Hospital",
+        snapshotAt: "2026-07-20T08:00:00.000Z",
+        beds: { total: 120, open: 100, occupied: 96, icuTotal: 12, icuOccupied: 10 },
+        staff: { doctorsOnDuty: 24, nursesOnDuty: 45, shortage: 0 },
+        outpatient: { visitsToday: 2600, emergencyVisits: 220, waitingOver30Min: 18 },
+        reporting: { source: "hospital-operations-api-test", varianceRate: 0.01, reconciled: true }
+      }]
+    };
+    const operationSnapshotIngest = await api(baseUrl, "/api/operations/integration/snapshots", authorized(hospitalOperationsLogin.body.token, {
+      method: "POST",
+      headers: { "x-integration-signature": integrationSignature(operationSnapshotPayload) },
+      body: JSON.stringify(operationSnapshotPayload)
+    }));
+    assert.equal(operationSnapshotIngest.response.status, 202);
+    assert.equal(operationSnapshotIngest.body.critical, 1);
+
     const dispatchAction = await api(baseUrl, "/api/operations/dispatch", authorized(accountLogin.body.token, {
       method: "POST",
       body: JSON.stringify({
@@ -2357,6 +2420,50 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(dispatchAction.body.id, "dispatch-api-test");
     assert.equal(dispatchAction.body.auditTrail.some((item) => item.action === "upsert"), true);
 
+    const dispatchStatus = await api(baseUrl, "/api/operations/dispatch/dispatch-api-test/status", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ status: "closed", note: "API regression closed" })
+    }));
+    assert.equal(dispatchStatus.response.status, 200);
+    assert.equal(dispatchStatus.body.status, "closed");
+    assert.equal(dispatchStatus.body.auditTrail.some((item) => item.action === "status-change"), true);
+
+    const integrationDispatch = await api(baseUrl, "/api/operations/dispatch", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        id: "dispatch-integration-feedback-test",
+        category: "bed",
+        priority: "high",
+        status: "assigned",
+        sourceInstitutionId: "MR3",
+        sourceInstitution: "Qingniwaqiao Community Health Service Center",
+        targetInstitutionId: "MR1",
+        targetInstitution: "Dalian Central Hospital",
+        resourceType: "step-down-bed",
+        quantity: 6,
+        reason: "API regression dispatch feedback"
+      })
+    }));
+    assert.equal(integrationDispatch.response.status, 201);
+
+    const feedbackPayload = {
+      dispatchId: "dispatch-integration-feedback-test",
+      status: "in-progress",
+      note: "Hospital accepted resource dispatch.",
+      sourceSystem: "hospital-dispatch-system",
+      receiptNo: "RECEIPT-MR1-001",
+      handledBy: "MR1 operations desk"
+    };
+    const dispatchFeedback = await api(baseUrl, "/api/operations/integration/dispatch-feedback", authorized(hospitalOperationsLogin.body.token, {
+      method: "POST",
+      headers: { "x-integration-signature": integrationSignature(feedbackPayload) },
+      body: JSON.stringify(feedbackPayload)
+    }));
+    assert.equal(dispatchFeedback.response.status, 200);
+    assert.equal(dispatchFeedback.body.status, "in-progress");
+    assert.equal(dispatchFeedback.body.externalReceipt.receiptNo, "RECEIPT-MR1-001");
+    assert.equal(dispatchFeedback.body.auditTrail.some((item) => item.action === "status-change"), true);
+
     const reconReview = await api(baseUrl, "/api/operations/reconciliation/recon-mr1-20260622-am/review", authorized(accountLogin.body.token, {
       method: "POST",
       body: JSON.stringify({ status: "approved", reviewNote: "API regression approved" })
@@ -2364,6 +2471,47 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(reconReview.response.status, 200);
     assert.equal(reconReview.body.status, "approved");
     assert.equal(reconReview.body.reviewedBy, "health");
+    assert.equal(reconReview.body.auditTrail.some((item) => item.action === "review-status-change"), true);
+
+    const reconCorrection = await api(baseUrl, "/api/operations/reconciliation/recon-mr3-20260622-am/review", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ status: "correcting", reviewNote: "API regression correction requested" })
+    }));
+    assert.equal(reconCorrection.response.status, 200);
+    assert.equal(reconCorrection.body.status, "correcting");
+    assert.equal(reconCorrection.body.auditTrail.some((item) => item.action === "review-status-change"), true);
+
+    const reconciliationPayload = {
+      idempotencyKey: "ops-recon-mr1-live-001",
+      reconciliations: [
+        {
+          id: "recon-mr1-live-api",
+          institutionId: "MR1",
+          institution: "Dalian Central Hospital",
+          period: "2026-06-23 AM",
+          sourceBatch: "stat-20260623-am",
+          status: "blocked",
+          varianceRate: 0.052,
+          fields: ["beds.occupied", "outpatient.visitsToday"],
+          platformValue: 5120,
+          directReportValue: 4860,
+          reviewNote: "Hospital direct-report staging value requires confirmation."
+        }
+      ]
+    };
+    const reconciliationIngest = await api(baseUrl, "/api/operations/integration/reconciliation", authorized(hospitalOperationsLogin.body.token, {
+      method: "POST",
+      headers: { "x-integration-signature": integrationSignature(reconciliationPayload) },
+      body: JSON.stringify(reconciliationPayload)
+    }));
+    assert.equal(reconciliationIngest.response.status, 202);
+    assert.equal(reconciliationIngest.body.accepted, 1);
+    assert.equal(reconciliationIngest.body.blocked, 1);
+
+    const operationsAfterIntegration = await api(baseUrl, "/api/operations/dashboard", authorized(accountLogin.body.token));
+    assert.equal(operationsAfterIntegration.body.snapshots.some((item) => item.id === "ops-mr1-live-api" && item.normalizedStatus === "critical"), true);
+    assert.equal(operationsAfterIntegration.body.dispatchRequests.some((item) => item.id === "dispatch-integration-feedback-test" && item.status === "in-progress"), true);
+    assert.equal(operationsAfterIntegration.body.reconciliationReviews.some((item) => item.id === "recon-mr1-live-api" && item.status === "blocked"), true);
 
     const identityPreview = await api(baseUrl, "/api/auth/identity/preview", authorized(accountLogin.body.token, {
       method: "POST",
@@ -2814,6 +2962,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.match(body.residents[0].address, /^已脱敏-/);
     assert.match(body.residents[0].personIndex, /^已脱敏-/);
     assert.notEqual(body.digitalCredentials[0].credentialNo, "MI-DEMO-MOBILE-R1");
+    assert.equal(body.drugConsumableSupervisions.every((item) => ["r1", "r4"].includes(item.residentId)), true);
     [
       "authUsers",
       "authOrganizations",
@@ -4944,12 +5093,284 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(teleconsultations.response.status, 200);
     assert.equal(teleconsultations.body.summary.total >= 2, true);
     assert.equal(teleconsultations.body.summary.reportReturned >= 1, true);
+    assert.equal(teleconsultations.body.summary.escalations >= 1, true);
+    assert.equal(teleconsultations.body.summary.highRisk >= 1, true);
+    assert.equal(teleconsultations.body.summary.reportReturnRate >= 50, true);
+    assert.equal(teleconsultations.body.summary.repeatExamControlRate >= 50, true);
+    assert.equal(Array.isArray(teleconsultations.body.performancePolicy.rules), true);
+    assert.equal(teleconsultations.body.escalations.some((item) => item.teleconsultationId === "rtc-001" && item.severity === "high"), true);
+    assert.equal(teleconsultations.body.escalations.some((item) => item.reasons.some((reason) => reason.includes("pending report"))), true);
+    const jointTestPack = await api(baseUrl, "/api/referral-teleconsultations/joint-test-pack", authorized(county.body.token));
+    assert.equal(jointTestPack.response.status, 200);
+    assert.equal(jointTestPack.body.ok, true);
+    assert.equal(jointTestPack.body.contracts.length, 3);
+    assert.equal(jointTestPack.body.samples.some((item) => item.contractId === "referral-report-callback-v1"), true);
+    assert.equal(jointTestPack.body.signoff.some((item) => item.role === "insurance"), true);
+    assert.equal(jointTestPack.body.exportSummary.some((item) => item.role === "hospital-it" && item.hasSample && item.demoReady), true);
+    assert.equal(jointTestPack.body.cutoverReadiness.readyForProductionCutover, false);
+    assert.equal(jointTestPack.body.cutoverReadiness.blockers.some((item) => item.id === "onsite-signoff-pending"), true);
+    assert.equal(jointTestPack.body.nextDevelopmentPlan.some((item) => item.phase === "field-interface-replay" && item.acceptance), true);
+    assert.equal(jointTestPack.body.signoffSummary.some((item) => item.role === "county-performance" && item.localEvidence), true);
+    const jointTestLedger = await api(baseUrl, "/api/referral-teleconsultations/joint-test-ledger", authorized(county.body.token));
+    assert.equal(jointTestLedger.response.status, 200);
+    assert.equal(jointTestLedger.body.summary.rows, 5);
+    assert.equal(jointTestLedger.body.summary.callbackContracts, 3);
+    assert.equal(jointTestLedger.body.rows.some((item) => item.contractId === "referral-report-callback-v1" && item.status === "local-evidence-ready"), true);
+    const jointTaskDispatch = await api(baseUrl, "/api/referral-teleconsultations/joint-test-ledger/tasks", authorized(county.body.token, {
+      method: "POST",
+      body: JSON.stringify({})
+    }));
+    assert.equal(jointTaskDispatch.response.status, 201);
+    assert.equal(jointTaskDispatch.body.summary.created, 5);
+    assert.equal(jointTaskDispatch.body.messages.some((item) => item.jointTestKey === "referralTeleconsultations:joint-test:hospital-it"), true);
+    const jointTaskComplete = await api(baseUrl, "/api/referral-teleconsultations/joint-test-ledger/tasks/hospital-it/complete", authorized(county.body.token, {
+      method: "POST",
+      body: JSON.stringify({ status: "completed", note: "Hospital IT replay owner confirmed callback evidence." })
+    }));
+    assert.equal(jointTaskComplete.response.status, 200);
+    assert.equal(jointTaskComplete.body.message.status, "completed");
+    assert.equal(jointTaskComplete.body.message.jointTestKey, "referralTeleconsultations:joint-test:hospital-it");
+    assert.equal(jointTaskComplete.body.message.receipts[0].status, "completed");
+    const jointTestPackAfterTasks = await api(baseUrl, "/api/referral-teleconsultations/joint-test-pack", authorized(county.body.token));
+    assert.equal(jointTestPackAfterTasks.response.status, 200);
+    assert.equal(jointTestPackAfterTasks.body.taskReceipts.some((item) => item.role === "hospital-it" && item.status === "completed" && item.receiptCount >= 1), true);
+    assert.equal(jointTestPackAfterTasks.body.exportSummary.some((item) => item.role === "hospital-it" && item.taskCompleted && item.readyForFinalSignoff), true);
+    const jointTaskReplay = await api(baseUrl, "/api/referral-teleconsultations/joint-test-ledger/tasks", authorized(county.body.token, {
+      method: "POST",
+      body: JSON.stringify({})
+    }));
+    assert.equal(jointTaskReplay.response.status, 201);
+    assert.equal(jointTaskReplay.body.summary.created, 0);
+    const signoffSummary = await api(baseUrl, "/api/referral-teleconsultations/signoff-summary", authorized(county.body.token));
+    assert.equal(signoffSummary.response.status, 200);
+    assert.equal(signoffSummary.body.ok, true);
+    assert.equal(signoffSummary.body.summary.demoReady, signoffSummary.body.summary.roles);
+    assert.equal(signoffSummary.body.signoff.some((item) => item.role === "hospital-it" && item.status === "demo-ready"), true);
+    assert.equal(signoffSummary.body.signoff.every((item) => item.siteSignoffRequired), true);
+    const signoffEvidence = await api(baseUrl, "/api/referral-teleconsultations/signoff-summary/county-performance/evidence", authorized(county.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        signerName: "现场负责人",
+        signerOrg: "中山区县域医共体",
+        evidenceNote: "现场联调签收截图已归档",
+        attachmentName: "county-performance-signoff.png"
+      })
+    }));
+    assert.equal(signoffEvidence.response.status, 201);
+    assert.equal(signoffEvidence.body.signoff.role, "county-performance");
+    assert.equal(signoffEvidence.body.summary.siteSigned, 1);
+    const signoffAfterArchive = await api(baseUrl, "/api/referral-teleconsultations/signoff-summary", authorized(county.body.token));
+    assert.equal(signoffAfterArchive.response.status, 200);
+    assert.equal(signoffAfterArchive.body.summary.sitePending, signoffAfterArchive.body.summary.roles - 1);
+    assert.equal(signoffAfterArchive.body.signoff.some((item) => item.role === "county-performance" && item.siteStatus === "signed"), true);
+    const referralInsuranceUser = await login(baseUrl, "insurance");
+    const performancePolicy = await api(baseUrl, "/api/referral-teleconsultations/performance-policy", authorized(referralInsuranceUser.body.token));
+    assert.equal(performancePolicy.response.status, 200);
+    assert.equal(performancePolicy.body.rules.some((item) => item.id === "repeat-exam-control"), true);
+    const consortiumMetrics = await api(baseUrl, "/api/referral-teleconsultations/consortium-metrics", authorized(county.body.token));
+    assert.equal(consortiumMetrics.response.status, 200);
+    assert.equal(consortiumMetrics.body.ok, true);
+    assert.equal(consortiumMetrics.body.endpoint, "/api/referral-teleconsultations/consortium-metrics");
+    assert.equal(consortiumMetrics.body.summary.closedLoopSteps, 6);
+    assert.equal(consortiumMetrics.body.summary.completionRate, 100);
+    assert.equal(consortiumMetrics.body.summary.mutualRecognitionEvidenceRows >= 1, true);
+    assert.equal(consortiumMetrics.body.summary.grassrootsFollowupReturned >= 1, true);
+    assert.equal(consortiumMetrics.body.summary.qualityFeedbackClosed >= 1, true);
+    assert.equal(consortiumMetrics.body.metrics.length >= 7, true);
+    assert.equal(consortiumMetrics.body.metrics.some((item) => item.id === "consortium-loop-completion-rate" && item.value === 100), true);
+    assert.equal(consortiumMetrics.body.metrics.some((item) => item.id === "role-todo-backlog" && item.status === "onsite-blocked"), true);
+    assert.equal(consortiumMetrics.body.externalBlockers.some((item) => item.includes("HIS/EMR")), true);
+    assert.equal(consortiumMetrics.body.onsiteBlockers.some((item) => item.includes("onsite role signoff")), true);
+    assert.deepEqual(consortiumMetrics.body.gEndCollection.roleScope, ["commission", "county"]);
+    const consortiumMetricsDenied = await api(baseUrl, "/api/referral-teleconsultations/consortium-metrics", authorized(citizenToken));
+    assert.equal(consortiumMetricsDenied.response.status, 403);
+    const referralEscalationRun = await api(baseUrl, "/api/referral-teleconsultations/escalations/run", authorized(county.body.token, {
+      method: "POST",
+      body: JSON.stringify({ teleconsultationId: "rtc-001" })
+    }));
+    assert.equal(referralEscalationRun.response.status, 201);
+    assert.equal(referralEscalationRun.body.summary.escalations >= 1, true);
+    assert.equal(referralEscalationRun.body.summary.created >= 0, true);
+    if (referralEscalationRun.body.messages.length) {
+      assert.equal(referralEscalationRun.body.messages[0].targetRole, "institution");
+      assert.match(referralEscalationRun.body.messages[0].escalationKey, /referralTeleconsultations:rtc-001:sla:high/);
+    }
+    const referralEscalationReplay = await api(baseUrl, "/api/referral-teleconsultations/escalations/run", authorized(county.body.token, {
+      method: "POST",
+      body: JSON.stringify({ teleconsultationId: "rtc-001" })
+    }));
+    assert.equal(referralEscalationReplay.response.status, 201);
+    assert.equal(referralEscalationReplay.body.summary.created, 0);
+    const referralEscalationAck = await api(baseUrl, "/api/referral-teleconsultations/rtc-001/escalations/ack", authorized(county.body.token, {
+      method: "POST",
+      body: JSON.stringify({ status: "acknowledged", action: "County office assigned receiving hospital report callback follow-up." })
+    }));
+    assert.equal(referralEscalationAck.response.status, 200);
+    assert.equal(referralEscalationAck.body.teleconsultation.slaDisposition.status, "acknowledged");
+    assert.equal(referralEscalationAck.body.messages.some((item) => item.escalationKey === "referralTeleconsultations:rtc-001:sla:high" && item.status === "acknowledged"), true);
     const teleconsultationAction = await api(baseUrl, "/api/referral-teleconsultations/rtc-001/actions", authorized(county.body.token, {
       method: "POST",
       body: JSON.stringify({ status: "feedback-returned", feedback: "County office confirmed receiving feedback.", note: "county follow-up" })
     }));
     assert.equal(teleconsultationAction.response.status, 200);
     assert.equal(teleconsultationAction.body.status, "feedback-returned");
+
+    const institution = await login(baseUrl, "doctor");
+    const slaInstitutionMessages = await api(baseUrl, "/api/messages", authorized(institution.body.token));
+    assert.equal(slaInstitutionMessages.body.messages.some((item) => item.escalationKey === "referralTeleconsultations:rtc-001:sla:high"), true);
+    const institutionState = await api(baseUrl, "/api/state", authorized(institution.body.token));
+    const authorization = institutionState.body.personalRecords.find((item) =>
+      item.category === "authorizations" &&
+      item.residentId === "r1" &&
+      [item.status, item.meta?.status].some((status) => ["authorized", "active"].includes(status))
+    );
+    const createdTeleconsultation = await api(baseUrl, "/api/referral-teleconsultations", authorized(institution.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: authorization.residentId,
+        residentAuthorizationId: authorization.id,
+        referralId: "rf1",
+        targetInstitution: "Dalian Central Hospital",
+        targetInstitutionCode: "MR1",
+        department: "Cardiology",
+        priority: "high",
+        due: "2026-06-24",
+        clinicalQuestion: "Create a new specialist review from the institution workflow."
+      })
+    }));
+    assert.equal(createdTeleconsultation.response.status, 201, JSON.stringify(createdTeleconsultation.body));
+    assert.equal(createdTeleconsultation.body.authorizationStatus, "authorized");
+    assert.equal(createdTeleconsultation.body.status, "requested");
+    const feedbackPayload = {
+      idempotencyKey: "rtc-created-feedback-callback-001",
+      externalId: "FB-RTC-001",
+      residentId: authorization.residentId,
+      sourceSystem: "referral-center",
+      receivingFeedback: "Receiving specialist accepted the referral and requested updated blood pressure logs.",
+      feedbackAt: "2026-06-24T08:30:00.000Z",
+      feedbackStatus: "feedback-returned",
+      performance: { responseHours: 1 },
+      payload: { triageLevel: "priority-review" }
+    };
+    const feedbackTeleconsultation = await api(baseUrl, `/api/referral-teleconsultations/${createdTeleconsultation.body.id}/feedback-callback`, authorized(institution.body.token, {
+      method: "POST",
+      headers: { "x-integration-signature": integrationSignature(feedbackPayload) },
+      body: JSON.stringify(feedbackPayload)
+    }));
+    assert.equal(feedbackTeleconsultation.response.status, 200);
+    assert.equal(feedbackTeleconsultation.body.teleconsultation.status, "feedback-returned");
+    assert.match(feedbackTeleconsultation.body.teleconsultation.receivingFeedback, /accepted the referral/);
+    assert.equal(feedbackTeleconsultation.body.teleconsultation.performance.responseHours, 1);
+    assert.equal(feedbackTeleconsultation.body.integrationEvent.contractId, "referral-feedback-callback-v1");
+    assert.equal(feedbackTeleconsultation.body.messages.length, 2);
+    assert.equal(feedbackTeleconsultation.body.messages.some((item) => item.notificationKey.includes(":feedback:") && item.targetRole === "institution"), true);
+    const replayFeedback = await api(baseUrl, `/api/referral-teleconsultations/${createdTeleconsultation.body.id}/feedback-callback`, authorized(institution.body.token, {
+      method: "POST",
+      headers: { "x-integration-signature": integrationSignature(feedbackPayload) },
+      body: JSON.stringify(feedbackPayload)
+    }));
+    assert.equal(replayFeedback.response.status, 200);
+    assert.equal(replayFeedback.body.integrationEvent.id, feedbackTeleconsultation.body.integrationEvent.id);
+    assert.equal(replayFeedback.body.integrationEvent.idempotentReplay, true);
+    const returnedTeleconsultation = await api(baseUrl, `/api/referral-teleconsultations/${createdTeleconsultation.body.id}/actions`, authorized(institution.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        status: "report-returned",
+        receivingFeedback: "Receiving specialist accepted and completed the remote consultation.",
+        reportSummary: "Medication plan adjusted and report returned to the source institution.",
+        note: "institution report return"
+      })
+    }));
+    assert.equal(returnedTeleconsultation.response.status, 200);
+    assert.equal(returnedTeleconsultation.body.status, "report-returned");
+    assert.equal(returnedTeleconsultation.body.reportStatus, "returned");
+    assert.match(returnedTeleconsultation.body.reportSummary, /Medication plan adjusted/);
+    assert.equal(returnedTeleconsultation.body.auditTrail[0].note, "institution report return");
+    const schedulePayload = {
+      idempotencyKey: "rtc-created-schedule-callback-001",
+      externalId: "SCHED-RTC-001",
+      residentId: authorization.residentId,
+      sourceSystem: "hospital-scheduling",
+      meetingWindow: "2026-06-24 15:00-15:30",
+      targetInstitution: "Dalian Central Hospital",
+      targetInstitutionCode: "MR1",
+      department: "Cardiology",
+      receivingDoctor: "dr-specialist-chen",
+      scheduleStatus: "scheduled",
+      performance: { responseHours: 1.5 },
+      payload: { videoRoom: "tele-room-01" }
+    };
+    const scheduledTeleconsultation = await api(baseUrl, `/api/referral-teleconsultations/${createdTeleconsultation.body.id}/schedule-callback`, authorized(institution.body.token, {
+      method: "POST",
+      headers: { "x-integration-signature": integrationSignature(schedulePayload) },
+      body: JSON.stringify(schedulePayload)
+    }));
+    assert.equal(scheduledTeleconsultation.response.status, 200);
+    assert.equal(scheduledTeleconsultation.body.teleconsultation.status, "report-returned");
+    assert.equal(scheduledTeleconsultation.body.teleconsultation.meetingWindow, "2026-06-24 15:00-15:30");
+    assert.equal(scheduledTeleconsultation.body.teleconsultation.performance.responseHours, 1.5);
+    assert.equal(scheduledTeleconsultation.body.integrationEvent.contractId, "referral-schedule-callback-v1");
+    assert.equal(scheduledTeleconsultation.body.messages.length, 2);
+    assert.equal(scheduledTeleconsultation.body.messages.some((item) => item.notificationKey.includes(":schedule:") && item.targetRole === "citizen"), true);
+    const replaySchedule = await api(baseUrl, `/api/referral-teleconsultations/${createdTeleconsultation.body.id}/schedule-callback`, authorized(institution.body.token, {
+      method: "POST",
+      headers: { "x-integration-signature": integrationSignature(schedulePayload) },
+      body: JSON.stringify(schedulePayload)
+    }));
+    assert.equal(replaySchedule.response.status, 200);
+    assert.equal(replaySchedule.body.integrationEvent.id, scheduledTeleconsultation.body.integrationEvent.id);
+    assert.equal(replaySchedule.body.integrationEvent.idempotentReplay, true);
+    const callbackPayload = {
+      idempotencyKey: "rtc-created-report-callback-001",
+      externalId: "EMR-RTC-REPORT-001",
+      residentId: authorization.residentId,
+      sourceSystem: "hospital-emr",
+      receivingFeedback: "EMR callback confirms specialist report completion.",
+      reportSummary: "Signed external report returned through the HIS/EMR callback.",
+      reportReturnedAt: "2026-06-24T09:30:00.000Z",
+      performance: { responseHours: 2, reportReturnHours: 6, satisfaction: "good" },
+      payload: { reportNo: "RPT-RTC-001" }
+    };
+    const unsignedCallback = await api(baseUrl, `/api/referral-teleconsultations/${createdTeleconsultation.body.id}/report-callback`, authorized(institution.body.token, {
+      method: "POST",
+      body: JSON.stringify(callbackPayload)
+    }));
+    assert.equal(unsignedCallback.response.status, 401);
+    const signedCallback = await api(baseUrl, `/api/referral-teleconsultations/${createdTeleconsultation.body.id}/report-callback`, authorized(institution.body.token, {
+      method: "POST",
+      headers: { "x-integration-signature": integrationSignature(callbackPayload) },
+      body: JSON.stringify(callbackPayload)
+    }));
+    assert.equal(signedCallback.response.status, 200);
+    assert.equal(signedCallback.body.teleconsultation.status, "report-returned");
+    assert.equal(signedCallback.body.teleconsultation.reportStatus, "returned");
+    assert.equal(signedCallback.body.teleconsultation.performance.reportReturnHours, 6);
+    assert.equal(signedCallback.body.integrationEvent.contractId, "referral-report-callback-v1");
+    assert.equal(signedCallback.body.integrationEvent.reconciliationStatus, "matched");
+    assert.equal(signedCallback.body.personalRecord.category, "teleconsultation-report");
+    assert.equal(signedCallback.body.personalRecord.teleconsultationId, createdTeleconsultation.body.id);
+    assert.equal(signedCallback.body.personalRecord.externalReportId, "EMR-RTC-REPORT-001");
+    assert.equal(signedCallback.body.messages.length, 2);
+    assert.equal(signedCallback.body.messages.some((item) => item.notificationKey.includes(":report:") && item.targetRole === "institution"), true);
+    const citizenReportMessage = signedCallback.body.messages.find((item) => item.targetRole === "citizen");
+    assert.ok(citizenReportMessage);
+    const replayCallback = await api(baseUrl, `/api/referral-teleconsultations/${createdTeleconsultation.body.id}/report-callback`, authorized(institution.body.token, {
+      method: "POST",
+      headers: { "x-integration-signature": integrationSignature(callbackPayload) },
+      body: JSON.stringify(callbackPayload)
+    }));
+    assert.equal(replayCallback.response.status, 200);
+    assert.equal(replayCallback.body.integrationEvent.id, signedCallback.body.integrationEvent.id);
+    assert.equal(replayCallback.body.integrationEvent.idempotentReplay, true);
+    const jointLedgerAfterCallbacks = await api(baseUrl, "/api/referral-teleconsultations/joint-test-ledger", authorized(county.body.token));
+    assert.equal(jointLedgerAfterCallbacks.response.status, 200);
+    assert.equal(jointLedgerAfterCallbacks.body.summary.callbackMatchedContracts, 3);
+    assert.equal(jointLedgerAfterCallbacks.body.rows.some((item) => item.contractId === "referral-report-callback-v1" && item.status === "matched" && item.matchedTargets >= 1), true);
+    const callbackState = await api(baseUrl, "/api/state", authorized(institution.body.token));
+    assert.equal(callbackState.body.personalRecords.some((item) => item.category === "teleconsultation-report" && item.teleconsultationId === createdTeleconsultation.body.id), true);
+    const institutionMessages = await api(baseUrl, "/api/messages", authorized(institution.body.token));
+    assert.equal(institutionMessages.response.status, 200);
+    assert.equal(institutionMessages.body.messages.some((item) => item.sourceId === createdTeleconsultation.body.id && item.notificationKey?.includes(":report:")), true);
 
     const taskHandled = await api(baseUrl, `/api/tasks/${encodeURIComponent(`emergencySignals:${critical.body.criticalSignal.id}`)}/actions`, authorized(county.body.token, {
       method: "POST",
@@ -5016,12 +5437,22 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const insuranceTasks = await api(baseUrl, "/api/tasks", authorized(insurance.body.token));
     assert.equal(insuranceTasks.response.status, 200);
     assert.equal(insuranceTasks.body.tasks.some((item) => item.collection === "insuranceClaims"), true);
+    assert.equal(insuranceTasks.body.tasks.some((item) => item.collection === "drugConsumableSupervisions" && item.serviceDomain === "drugConsumable"), true);
     assert.equal(insuranceTasks.body.tasks.some((item) => item.collection === "chronicScreeningTasks"), false);
 
+    const drugTaskAction = await api(baseUrl, "/api/tasks/drugConsumableSupervisions:dcs-rational-r1/actions", authorized(insurance.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "review", status: "task-reviewed", comment: "Unified task review writes business audit trail." })
+    }));
+    assert.equal(drugTaskAction.response.status, 200);
+    assert.equal(drugTaskAction.body.auditTrail[0].action, "unified-task-action");
+
     const citizen = await login(baseUrl, "citizen");
+    const hospitalInstitution = await login(baseUrl, "hospital");
     const citizenMessages = await api(baseUrl, "/api/messages", authorized(citizen.body.token));
     assert.equal(citizenMessages.response.status, 200);
     assert.equal(citizenMessages.body.messages.some((item) => item.id === taskMessage.body.id), true);
+    assert.equal(citizenMessages.body.messages.some((item) => item.id === citizenReportMessage.id), true);
 
     const receipt = await api(baseUrl, `/api/messages/${taskMessage.body.id}/receipt`, authorized(citizen.body.token, {
       method: "POST",
@@ -5267,6 +5698,112 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const citizenFollowupSummary = await api(baseUrl, "/api/chronic/followup-summary?residentId=r1", authorized(citizen.body.token));
     assert.equal(citizenFollowupSummary.response.status, 200);
     assert.equal(citizenFollowupSummary.body.residents.every((item) => ["r1"].includes(item.residentId)), true);
+    assert.equal(citizenFollowupSummary.body.alertQueue.every((item) => item.residentId === "r1"), true);
+
+    const residentCheckin = await api(baseUrl, "/api/chronic/resident-checkins", authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        medicationPickupId: "mp1",
+        measurementType: "home blood pressure",
+        measurementValue: "158/92 mmHg high",
+        medicationTaken: true,
+        satisfaction: "needs phone review",
+        proxyName: "family member A",
+        proxyRelation: "daughter",
+        seniorReminder: true,
+        note: "please remind family before next pickup"
+      })
+    }));
+    assert.equal(residentCheckin.response.status, 201);
+    assert.equal(residentCheckin.body.record.category, "chronic-self-checkin");
+    assert.equal(residentCheckin.body.selfManagement.residentId, "r1");
+    assert.equal(residentCheckin.body.healthPoints >= 20, true);
+    assert.equal(typeof residentCheckin.body.messageId, "string");
+    assert.equal(residentCheckin.body.medicationPickup.id, "mp1");
+
+    const checkinSummary = await api(baseUrl, "/api/chronic/followup-summary?residentId=r1", authorized(citizen.body.token));
+    assert.equal(checkinSummary.body.summary.residentExperienceRecords >= 1, true);
+    assert.equal(checkinSummary.body.summary.healthPoints >= residentCheckin.body.healthPoints, true);
+    assert.equal(checkinSummary.body.residents[0].residentExperience.seniorReminder, true);
+
+    const residentCheckinDenied = await api(baseUrl, "/api/chronic/resident-checkins", authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({ residentId: "r2", measurementType: "blood glucose", measurementValue: "7.1" })
+    }));
+    assert.equal(residentCheckinDenied.response.status, 403);
+
+    const deviceMeasurement = await api(baseUrl, "/api/chronic/device-measurements", authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        externalId: "api-device-r1-001",
+        deviceId: "bp-device-api",
+        deviceType: "blood pressure monitor",
+        measurementType: "remote blood pressure",
+        measurementValue: "149/90 mmHg high",
+        medicationTaken: true
+      })
+    }));
+    assert.equal(deviceMeasurement.response.status, 201);
+    assert.equal(deviceMeasurement.body.record.meta.deviceExternalId, "api-device-r1-001");
+    assert.equal(deviceMeasurement.body.selfManagement.uploadSource, "device gateway");
+
+    const deviceMeasurementReplay = await api(baseUrl, "/api/chronic/device-measurements", authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({ residentId: "r1", externalId: "api-device-r1-001", measurementValue: "149/90 mmHg high" })
+    }));
+    assert.equal(deviceMeasurementReplay.response.status, 200);
+    assert.equal(deviceMeasurementReplay.body.idempotent, true);
+
+    const pharmacyCallback = await api(baseUrl, "/api/chronic/pharmacy-callbacks", authorized(hospitalInstitution.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        medicationPickupId: "mp1",
+        externalId: "api-pharmacy-mp1-001",
+        status: "picked_up",
+        pharmacyStatus: "picked_up",
+        medicationTaken: true,
+        note: "pharmacy callback confirmed pickup"
+      })
+    }));
+    assert.equal(pharmacyCallback.response.status, 200);
+    assert.equal(pharmacyCallback.body.medicationPickup.callbackExternalId, "api-pharmacy-mp1-001");
+    assert.equal(typeof pharmacyCallback.body.messageId, "string");
+
+    const familyDoctorClosure = await api(baseUrl, "/api/chronic/family-doctor-actions", authorized(hospitalInstitution.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        messageId: residentCheckin.body.messageId,
+        taskId: `chronicSelfManagement:${residentCheckin.body.selfManagement.id}`,
+        action: "family doctor phone review",
+        result: "family doctor reviewed self-monitoring and updated the service pack",
+        nextAction: "continue home monitoring for 7 days"
+      })
+    }));
+    assert.equal(familyDoctorClosure.response.status, 200);
+    assert.equal(familyDoctorClosure.body.note.category, "chronic-family-doctor-note");
+    assert.equal(familyDoctorClosure.body.closedMessages >= 1, true);
+
+    const reminderOutreach = await api(baseUrl, "/api/chronic/reminder-outreach", authorized(hospitalInstitution.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        channel: "sms",
+        reminderType: "chronic medication reminder",
+        reason: "remind resident and family before pharmacy pickup"
+      })
+    }));
+    assert.equal(reminderOutreach.response.status, 201);
+    assert.equal(reminderOutreach.body.seniorService.outreachEvidence, true);
+    assert.equal(typeof reminderOutreach.body.messageId, "string");
+
+    const pharmacyCallbackDenied = await api(baseUrl, "/api/chronic/pharmacy-callbacks", authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({ medicationPickupId: "mp1", status: "picked_up" })
+    }));
+    assert.equal(pharmacyCallbackDenied.response.status, 403);
 
     const feedback = await api(baseUrl, "/api/chronic/followup-feedback", authorized(citizen.body.token, {
       method: "POST",
@@ -5283,7 +5820,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(feedback.body.meta.followupId, "f1");
     assert.equal(Boolean(feedback.body.messageId), true);
 
-    const residentCheckin = await api(baseUrl, "/api/chronic/resident-checkins", authorized(citizen.body.token, {
+    const residentCheckinIntegration = await api(baseUrl, "/api/chronic/resident-checkins", authorized(citizen.body.token, {
       method: "POST",
       body: JSON.stringify({
         residentId: "r1",
@@ -5295,17 +5832,17 @@ test("API authentication, scoping and governance regression suite", async (t) =>
         seniorReminder: true
       })
     }));
-    assert.equal(residentCheckin.response.status, 201);
-    assert.equal(residentCheckin.body.record.category, "chronic-self-checkin");
-    assert.equal(Boolean(residentCheckin.body.messageId), true);
+    assert.equal(residentCheckinIntegration.response.status, 201);
+    assert.equal(residentCheckinIntegration.body.record.category, "chronic-self-checkin");
+    assert.equal(Boolean(residentCheckinIntegration.body.messageId), true);
 
-    const residentCheckinDenied = await api(baseUrl, "/api/chronic/resident-checkins", authorized(citizen.body.token, {
+    const residentCheckinDeniedIntegration = await api(baseUrl, "/api/chronic/resident-checkins", authorized(citizen.body.token, {
       method: "POST",
       body: JSON.stringify({ residentId: "r2", measurementValue: "tampered" })
     }));
-    assert.equal(residentCheckinDenied.response.status, 403);
+    assert.equal(residentCheckinDeniedIntegration.response.status, 403);
 
-    const deviceMeasurement = await api(baseUrl, "/api/chronic/device-measurements", authorized(citizen.body.token, {
+    const deviceMeasurementIntegration = await api(baseUrl, "/api/chronic/device-measurements", authorized(citizen.body.token, {
       method: "POST",
       body: JSON.stringify({
         residentId: "r1",
@@ -5315,17 +5852,17 @@ test("API authentication, scoping and governance regression suite", async (t) =>
         measurementValue: "151/91 high"
       })
     }));
-    assert.equal(deviceMeasurement.response.status, 201);
-    assert.equal(deviceMeasurement.body.record.meta.deviceExternalId, "device-api-test-001");
+    assert.equal(deviceMeasurementIntegration.response.status, 201);
+    assert.equal(deviceMeasurementIntegration.body.record.meta.deviceExternalId, "device-api-test-001");
 
-    const deviceMeasurementReplay = await api(baseUrl, "/api/chronic/device-measurements", authorized(citizen.body.token, {
+    const deviceMeasurementReplayIntegration = await api(baseUrl, "/api/chronic/device-measurements", authorized(citizen.body.token, {
       method: "POST",
       body: JSON.stringify({ residentId: "r1", externalId: "device-api-test-001", measurementValue: "151/91 high" })
     }));
-    assert.equal(deviceMeasurementReplay.response.status, 200);
-    assert.equal(deviceMeasurementReplay.body.idempotent, true);
+    assert.equal(deviceMeasurementReplayIntegration.response.status, 200);
+    assert.equal(deviceMeasurementReplayIntegration.body.idempotent, true);
 
-    const pharmacyCallback = await api(baseUrl, "/api/chronic/pharmacy-callbacks", authorized(commissionToken, {
+    const pharmacyCallbackIntegration = await api(baseUrl, "/api/chronic/pharmacy-callbacks", authorized(commissionToken, {
       method: "POST",
       body: JSON.stringify({
         medicationPickupId: "mp1",
@@ -5335,27 +5872,27 @@ test("API authentication, scoping and governance regression suite", async (t) =>
         medicationTaken: true
       })
     }));
-    assert.equal(pharmacyCallback.response.status, 200);
-    assert.equal(pharmacyCallback.body.medicationPickup.callbackExternalId, "pharmacy-api-test-001");
+    assert.equal(pharmacyCallbackIntegration.response.status, 200);
+    assert.equal(pharmacyCallbackIntegration.body.medicationPickup.callbackExternalId, "pharmacy-api-test-001");
 
-    const familyDoctorClosure = await api(baseUrl, "/api/chronic/family-doctor-actions", authorized(commissionToken, {
+    const familyDoctorClosureIntegration = await api(baseUrl, "/api/chronic/family-doctor-actions", authorized(commissionToken, {
       method: "POST",
       body: JSON.stringify({
         residentId: "r1",
-        taskId: `chronicSelfManagement:${residentCheckin.body.selfManagement.id}`,
+        taskId: `chronicSelfManagement:${residentCheckinIntegration.body.selfManagement.id}`,
         action: "family doctor phone review",
         result: "reviewed resident self-monitoring and updated plan"
       })
     }));
-    assert.equal(familyDoctorClosure.response.status, 200);
-    assert.equal(familyDoctorClosure.body.note.category, "chronic-family-doctor-note");
+    assert.equal(familyDoctorClosureIntegration.response.status, 200);
+    assert.equal(familyDoctorClosureIntegration.body.note.category, "chronic-family-doctor-note");
 
-    const reminderOutreach = await api(baseUrl, "/api/chronic/reminder-outreach", authorized(commissionToken, {
+    const reminderOutreachIntegration = await api(baseUrl, "/api/chronic/reminder-outreach", authorized(commissionToken, {
       method: "POST",
       body: JSON.stringify({ residentId: "r1", channel: "sms", reminderType: "chronic follow-up reminder" })
     }));
-    assert.equal(reminderOutreach.response.status, 201);
-    assert.equal(reminderOutreach.body.seniorService.outreachEvidence, true);
+    assert.equal(reminderOutreachIntegration.response.status, 201);
+    assert.equal(reminderOutreachIntegration.body.seniorService.outreachEvidence, true);
 
     const referralContinuity = await api(baseUrl, "/api/chronic/referral-continuity", authorized(commissionToken, {
       method: "POST",
@@ -5402,11 +5939,11 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(rf3Continuity.archiveMapping.standardVersion, "WS/T 363/364-2023");
     assert.equal(rf3Continuity.archiveMapping.totalDimensions, 8);
 
-    const pharmacyCallbackDenied = await api(baseUrl, "/api/chronic/pharmacy-callbacks", authorized(citizen.body.token, {
+    const pharmacyCallbackDeniedIntegration = await api(baseUrl, "/api/chronic/pharmacy-callbacks", authorized(citizen.body.token, {
       method: "POST",
       body: JSON.stringify({ medicationPickupId: "mp1", status: "picked_up" })
     }));
-    assert.equal(pharmacyCallbackDenied.response.status, 403);
+    assert.equal(pharmacyCallbackDeniedIntegration.response.status, 403);
 
     const followupEscalationDenied = await api(baseUrl, "/api/chronic/followup-escalations", authorized(citizen.body.token, {
       method: "POST",
@@ -5457,6 +5994,14 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(manualDispatch.body.escalationStatus, "escalated");
     assert.equal(manualDispatch.body.closedEscalationMessages, 0);
 
+    const closedInstitutionMessages = await api(baseUrl, "/api/messages", authorized(commissionToken));
+    const closedFeedbackMessage = closedInstitutionMessages.body.messages.find((item) => item.id === feedback.body.messageId);
+    assert.equal(closedFeedbackMessage.status, "handled");
+    assert.equal(closedFeedbackMessage.receipts[0].status, "handled");
+
+    const chronicCitizenMessages = await api(baseUrl, "/api/messages", authorized(citizen.body.token));
+    assert.equal(chronicCitizenMessages.body.messages.some((item) => item.taskId === "followups:f1" && item.targetRole === "citizen" && item.chronicFollowup), true);
+
     const dispatchDenied = await api(baseUrl, "/api/chronic/followup-dispatch", authorized(citizen.body.token, {
       method: "POST",
       body: JSON.stringify({ collection: "followups", id: "f2", status: "已完成" })
@@ -5477,24 +6022,78 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(sandboxSummary.response.status, 200);
     assert.equal(sandboxSummary.body.reusableCollections.includes("personalRecords"), true);
     assert.equal(sandboxSummary.body.boundaries.includes("sandbox access"), true);
+    assert.equal(sandboxSummary.body.boundaries.includes("policy controls"), true);
+    assert.equal(sandboxSummary.body.boundaries.includes("compliant data export"), true);
+    assert.equal(sandboxSummary.body.summary.activeDatasets >= 1, true);
+    assert.equal(sandboxSummary.body.summary.policyReady >= 2, true);
+    assert.equal(sandboxSummary.body.summary.evidenceReady >= 2, true);
+    assert.equal(sandboxSummary.body.summary.compliantExports >= 1, true);
+    assert.equal(Array.isArray(sandboxSummary.body.pendingApplications), true);
+    assert.equal(Array.isArray(sandboxSummary.body.recentAudits), true);
+    assert.equal(Array.isArray(sandboxSummary.body.recentOutcomes), true);
+    assert.equal(Array.isArray(sandboxSummary.body.recentExports), true);
+    const seededExports = await api(baseUrl, "/api/research/compliant-exports", authorized(commissionToken));
+    assert.equal(seededExports.response.status, 200);
+    assert.equal(seededExports.body.exports.some((item) => item.id === "cde-htn-001"), true);
     const researchInstitution = await login(baseUrl, "hospital");
+    const invalidApplication = await api(baseUrl, "/api/research/datasets", authorized(researchInstitution.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        diseaseType: "copd",
+        name: "COPD missing governance",
+        purpose: "sandbox feasibility assessment",
+        sourceCollections: ["personalRecords", "diagnosticReports"]
+      })
+    }));
+    assert.equal(invalidApplication.response.status, 400);
+    assert.match(invalidApplication.body.message, /dataUseAgreement/);
     const application = await api(baseUrl, "/api/research/datasets", authorized(researchInstitution.body.token, {
       method: "POST",
       body: JSON.stringify({
         diseaseType: "copd",
         name: "COPD pulmonary rehabilitation cohort",
         purpose: "sandbox feasibility assessment",
-        sourceCollections: ["personalRecords", "diagnosticReports"]
+        sourceCollections: ["personalRecords", "diagnosticReports"],
+        governance: {
+          dataUseAgreement: "DUA-DEMO-COPD-2026",
+          minimumNecessary: true,
+          reidentificationProhibited: true,
+          exportReviewRequired: true,
+          retentionDays: 180
+        }
       })
     }));
     assert.equal(application.response.status, 201);
     assert.equal(application.body.authorizationStatus, "pending");
+    assert.equal(application.body.governance.dataUseAgreement, "DUA-DEMO-COPD-2026");
     assert.equal(application.body.sourceCollections.includes("diagnosticReports"), true);
+    const evidenceRejected = await api(baseUrl, `/api/research/datasets/${application.body.id}/evidence`, authorized(researchInstitution.body.token, {
+      method: "POST",
+      body: JSON.stringify({ type: "spreadsheet", title: "Bad evidence", referenceNo: "BAD-1" })
+    }));
+    assert.equal(evidenceRejected.response.status, 400);
+    const ethicsEvidence = await api(baseUrl, `/api/research/datasets/${application.body.id}/evidence`, authorized(researchInstitution.body.token, {
+      method: "POST",
+      body: JSON.stringify({ type: "ethics-approval", title: "COPD IRB approval", referenceNo: "IRB-DEMO-COPD-2026", issuedBy: "demo-irb", issuedAt: "2026-06-03" })
+    }));
+    assert.equal(ethicsEvidence.response.status, 200);
+    assert.equal(ethicsEvidence.body.evidenceDocuments[0].type, "ethics-approval");
+    const duaEvidence = await api(baseUrl, `/api/research/datasets/${application.body.id}/evidence`, authorized(researchInstitution.body.token, {
+      method: "POST",
+      body: JSON.stringify({ type: "data-use-agreement", title: "COPD data use agreement", referenceNo: "DUA-DEMO-COPD-2026", issuedBy: "research-governance", issuedAt: "2026-06-03" })
+    }));
+    assert.equal(duaEvidence.response.status, 200);
+    assert.equal(duaEvidence.body.evidenceDocuments.some((item) => item.type === "data-use-agreement"), true);
     const blockedSandbox = await api(baseUrl, `/api/research/datasets/${application.body.id}/sandbox-access`, authorized(researchInstitution.body.token, {
       method: "POST",
       body: JSON.stringify({ purpose: "try before approval" })
     }));
     assert.equal(blockedSandbox.response.status, 403);
+    const blockedExport = await api(baseUrl, `/api/research/datasets/${application.body.id}/compliant-exports`, authorized(researchInstitution.body.token, {
+      method: "POST",
+      body: JSON.stringify({ purpose: "try export before approval", destination: "research-share", requestedFields: ["ageBand"] })
+    }));
+    assert.equal(blockedExport.response.status, 403);
     const approval = await api(baseUrl, `/api/research/datasets/${application.body.id}/approval`, authorized(commissionToken, {
       method: "POST",
       body: JSON.stringify({ ethicsApproval: "IRB-DEMO-COPD-2026", anonymization: "k-anonymity-demo", deidentificationStatus: "released" })
@@ -5508,13 +6107,36 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     }));
     assert.equal(sandboxAccess.response.status, 200);
     assert.equal(sandboxAccess.body.deidentified, true);
+    assert.equal(sandboxAccess.body.governance.reidentificationProhibited, true);
     assert.equal(sandboxAccess.body.sourceCollections.includes("personalRecords"), true);
+    const compliantExport = await api(baseUrl, `/api/research/datasets/${application.body.id}/compliant-exports`, authorized(researchInstitution.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        purpose: "approved de-identified export for cohort counts",
+        destination: "research-governance-reviewed-share",
+        requestedFields: ["ageBand", "gender", "riskLevel"],
+        exportFormat: "csv"
+      })
+    }));
+    assert.equal(compliantExport.response.status, 201);
+    assert.equal(compliantExport.body.datasetId, application.body.id);
+    assert.equal(compliantExport.body.deidentified, true);
+    assert.equal(compliantExport.body.minimumNecessary, true);
+    assert.equal(compliantExport.body.reviewStatus, "approved");
+    const exportsAfterCreate = await api(baseUrl, "/api/research/compliant-exports", authorized(commissionToken));
+    assert.equal(exportsAfterCreate.body.exports.some((item) => item.id === compliantExport.body.id), true);
     const returnedOutcome = await api(baseUrl, `/api/research/datasets/${application.body.id}/outcomes`, authorized(researchInstitution.body.token, {
       method: "POST",
       body: JSON.stringify({ title: "COPD rehab feature set", summary: "Returned candidate model variables.", registryImpact: "Add pulmonary rehabilitation flags." })
     }));
     assert.equal(returnedOutcome.response.status, 200);
     assert.equal(returnedOutcome.body.outcomes[0].registryImpact, "Add pulmonary rehabilitation flags.");
+    const sandboxSummaryAfterOutcome = await api(baseUrl, "/api/research/sandbox", authorized(commissionToken));
+    assert.equal(sandboxSummaryAfterOutcome.response.status, 200);
+    assert.equal(sandboxSummaryAfterOutcome.body.pendingApplications.some((item) => item.id === application.body.id), false);
+    assert.equal(sandboxSummaryAfterOutcome.body.recentAudits.some((item) => String(item.target || "").includes(application.body.id)), true);
+    assert.equal(sandboxSummaryAfterOutcome.body.recentOutcomes.some((item) => item.datasetId === application.body.id), true);
+    assert.equal(sandboxSummaryAfterOutcome.body.recentExports.some((item) => item.id === compliantExport.body.id), true);
     const usage = await api(baseUrl, "/api/research/datasets/rd-hypertension-001/actions", authorized(commissionToken, {
       method: "POST",
       body: JSON.stringify({ action: "usage-audit", purpose: "risk stratification model validation", result: "allowed" })
@@ -5630,6 +6252,56 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(share.body.status, "active");
     assert.match(share.body.token, /^IMG-/);
 
+    const recognition = await api(baseUrl, `/api/imaging-cloud/studies/${encodeURIComponent(ingest.body.study.id)}/mutual-recognition`, authorized(hospital.body.token, {
+      method: "POST",
+      body: JSON.stringify({ targetInstitution: "中山区医学影像资源共享中心", region: "中山区", priority: "高" })
+    }));
+    assert.equal(recognition.response.status, 201);
+    assert.equal(recognition.body.recognition.imageCloudStudyId, ingest.body.study.id);
+    assert.equal(recognition.body.recognition.mainIndex, ingest.body.study.mainIndex);
+    assert.equal(recognition.body.order.recognitionRecordId, recognition.body.recognition.id);
+    assert.equal(recognition.body.report.imageCloudStudyId, ingest.body.study.id);
+
+    const county = await login(baseUrl, "county");
+    const decision = await api(baseUrl, `/api/imaging-cloud/studies/${encodeURIComponent(ingest.body.study.id)}/mutual-recognition/decision`, authorized(county.body.token, {
+      method: "POST",
+      body: JSON.stringify({ decision: "reject", reasonCode: "quality-evidence-incomplete", comment: "质控证据不足，暂不互认。" })
+    }));
+    assert.equal(decision.response.status, 200);
+    assert.equal(decision.body.study.mutualRecognitionStatus, "不予互认");
+    assert.equal(decision.body.record.status, "rejected");
+    assert.equal(decision.body.citation.verificationStatus, "verified");
+
+    const appeal = await api(baseUrl, `/api/imaging-cloud/studies/${encodeURIComponent(ingest.body.study.id)}/mutual-recognition/appeal`, authorized(hospital.body.token, {
+      method: "POST",
+      body: JSON.stringify({ reason: "已补充影像质量抽检和报告审核证据", evidenceRefs: ["IMG-QC-API-001", "IMG-REPORT-API-001"], noPatientPii: true })
+    }));
+    assert.equal(appeal.response.status, 201);
+    assert.equal(appeal.body.appeal.status, "pending-review");
+    assert.equal(appeal.body.study.mutualRecognitionStatus, "appeal-pending");
+
+    const nonIndependentReview = await api(baseUrl, `/api/imaging-cloud/studies/${encodeURIComponent(ingest.body.study.id)}/mutual-recognition/appeal/review`, authorized(county.body.token, {
+      method: "POST",
+      body: JSON.stringify({ decision: "approve", comment: "原判定人尝试复核" })
+    }));
+    assert.equal(nonIndependentReview.response.status, 400);
+    assert.match(nonIndependentReview.body.message, /independent reviewer/);
+
+    const appealReview = await api(baseUrl, `/api/imaging-cloud/studies/${encodeURIComponent(ingest.body.study.id)}/mutual-recognition/appeal/review`, authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({ decision: "approve", reasonCode: "appeal-approved", comment: "补充证据完整，独立复核通过。" })
+    }));
+    assert.equal(appealReview.response.status, 200);
+    assert.equal(appealReview.body.appeal.status, "approved");
+    assert.equal(appealReview.body.record.status, "recognized");
+    assert.equal(appealReview.body.study.mutualRecognitionStatus, "recognized-after-appeal");
+    assert.equal(appealReview.body.citation.verificationStatus, "verified");
+
+    const recognitionDashboard = await api(baseUrl, "/api/imaging-cloud", authorized(hospital.body.token));
+    assert.equal(recognitionDashboard.body.summary.mutualRecognition >= 1, true);
+    assert.equal(recognitionDashboard.body.summary.pendingAppeals, 0);
+    assert.equal(recognitionDashboard.body.mutualRecognition.some((item) => item.id === appealReview.body.record.id && item.mainIndex === ingest.body.study.mainIndex && item.appeal.status === "approved"), true);
+
     const r2Citizen = await login(baseUrl, "citizen_r2");
     const forbiddenDashboard = await api(baseUrl, "/api/imaging-cloud?residentId=r1", authorized(r2Citizen.body.token));
     assert.equal(forbiddenDashboard.response.status, 403);
@@ -5650,8 +6322,23 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(commission.response.status, 200);
     assert.equal(commission.body.scope.name, "区域诊疗数据共享平台");
     assert.equal(commission.body.summary.totalPackages >= 3, true);
+    assert.equal(commission.body.summary.referralHandoffReady >= 1, true);
     assert.equal(commission.body.packages.some((item) => item.id === "rsp-r3-imaging"), true);
+    const commissionHandoff = commission.body.packages.find((item) => item.id === "rsp-r1-hypertension").referralHandoff;
+    assert.equal(commissionHandoff.total, 6);
+    assert.equal(commissionHandoff.evidence.some((item) => item.id === "access-audit" && item.ready), true);
+    assert.equal(commissionHandoff.runtimeBoundaries.some((item) => item.includes("不把区域共享包当作转诊单主表")), true);
     assert.equal(commission.body.scope.exclusions.some((item) => item.includes("HIS")), true);
+
+    const commissionReport = await api(baseUrl, "/api/regional-data-sharing/handoff-report", authorized(commissionToken));
+    assert.equal(commissionReport.response.status, 200);
+    assert.match(commissionReport.body.reportId, /^rshr-/);
+    assert.equal(commissionReport.body.summary.packages, commission.body.summary.totalPackages);
+    assert.equal(commissionReport.body.summary.evidenceTotal, commission.body.summary.totalPackages * 6);
+    assert.equal(commissionReport.body.markdown.includes("区域共享-转诊会诊交接清单"), true);
+    assert.equal(commissionReport.body.markdown.includes(`清单编号：${commissionReport.body.reportId}`), true);
+    assert.equal(commissionReport.body.packages.some((item) => item.id === "rsp-r3-imaging"), true);
+    assert.equal(commissionReport.body.scope.runtimeBoundary.includes("不生成或改写转诊单"), true);
 
     const hospital = await login(baseUrl, "hospital");
     const institutionView = await api(baseUrl, "/api/regional-data-sharing", authorized(hospital.body.token));
@@ -5659,7 +6346,15 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(institutionView.body.packages.some((item) => item.id === "rsp-r1-hypertension"), true);
     assert.equal(institutionView.body.packages.some((item) => item.id === "rsp-r2-diabetes"), true);
     assert.equal(institutionView.body.packages.some((item) => item.id === "rsp-r3-imaging"), false);
+    assert.equal(institutionView.body.packages.every((item) => item.referralHandoff?.total === 6), true);
     assert.equal(institutionView.body.packages.every((item) => !String(item.resident?.idCard || "").startsWith("DEMO-ID-")), true);
+
+    const institutionReport = await api(baseUrl, "/api/regional-data-sharing/handoff-report", authorized(hospital.body.token));
+    assert.equal(institutionReport.response.status, 200);
+    assert.equal(institutionReport.body.packages.some((item) => item.id === "rsp-r1-hypertension"), true);
+    assert.equal(institutionReport.body.packages.some((item) => item.id === "rsp-r3-imaging"), false);
+    assert.equal(institutionReport.body.packages.every((item) => item.total === 6), true);
+    assert.equal(institutionReport.body.scope.packageScope, "本机构来源或接收共享包");
 
     const accessReview = await api(baseUrl, "/api/regional-data-sharing/access-reviews", authorized(hospital.body.token, {
       method: "POST",
@@ -5676,8 +6371,11 @@ test("API authentication, scoping and governance regression suite", async (t) =>
 
     const refreshed = await api(baseUrl, "/api/regional-data-sharing", authorized(hospital.body.token));
     assert.equal(refreshed.body.accessReviews.some((item) => item.id === accessReview.body.review.id), true);
+    const refreshedDiabetes = refreshed.body.packages.find((item) => item.id === "rsp-r2-diabetes");
+    assert.equal(refreshedDiabetes.referralHandoff.evidence.some((item) => item.id === "access-audit" && item.ready), true);
     const commissionState = await api(baseUrl, "/api/state", authorized(commissionToken));
     assert.equal(commissionState.body.dataAccessLogs.some((item) => item.scope === "regionalDataSharing" && item.residentId === "r2"), true);
+    assert.equal(commissionState.body.securityEvents.some((item) => item.action === "生成区域共享交接清单" && item.detail.includes(commissionReport.body.reportId)), true);
 
     const community = await login(baseUrl, "community");
     const deniedPackage = await api(baseUrl, "/api/regional-data-sharing/access-reviews", authorized(community.body.token, {
@@ -5689,6 +6387,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const insurance = await login(baseUrl, "insurance");
     const insuranceView = await api(baseUrl, "/api/regional-data-sharing", authorized(insurance.body.token));
     assert.equal(insuranceView.response.status, 403);
+    const insuranceReport = await api(baseUrl, "/api/regional-data-sharing/handoff-report", authorized(insurance.body.token));
+    assert.equal(insuranceReport.response.status, 403);
   });
 
   await t.test("enforces workflow collection ownership and protects structural fields", async () => {
@@ -5791,8 +6491,44 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const supervision = await api(baseUrl, "/api/drug-consumable-supervision", authorized(insurance.body.token));
     assert.equal(supervision.response.status, 200);
     assert.equal(supervision.body.summary.total >= 3, true);
+    assert.equal(supervision.body.summary.supplyAlerts >= 1, true);
+    assert.equal(supervision.body.summary.traceabilityPolicySources >= 5, true);
+    assert.equal(supervision.body.summary.traceabilityEvidenceRequirements >= 5, true);
+    assert.equal(supervision.body.summary.traceabilityEvidenceItems >= 5, true);
+    assert.equal(supervision.body.summary.traceabilityEvidenceReady >= 5, true);
     assert.equal(supervision.body.boundaries.some((item) => item.id === "rational-medication"), true);
+    assert.equal(supervision.body.boundaries.some((item) => item.id === "supply-alert"), true);
+    assert.equal(supervision.body.supplyAlerts.some((item) => item.id === "dcs-supply-mp3" && item.relatedPickupId === "mp3"), true);
     assert.equal(supervision.body.insuranceCoordination.contractId, "insurance-settlement-v1");
+    assert.equal(supervision.body.traceabilityPolicySources.some((item) => item.id === "nhsa-2025-7"), true);
+    assert.equal(supervision.body.traceabilityEvidenceRequirements.some((item) => item.id === "trace-code-mapping"), true);
+    assert.equal(supervision.body.traceabilityEvidenceChecklist.some((item) => item.id === "trace-scan-capture" && item.ready), true);
+    assert.equal(supervision.body.traceabilityEvidenceChecklist.every((item) => Array.isArray(item.evidenceFields) && item.evidenceFields.length > 0), true);
+    assert.equal(supervision.body.rows.every((item) => item.traceabilityEvidenceCoverage && item.traceabilityEvidenceCoverage.required > 0), true);
+
+    const traceabilityEvidence = await api(baseUrl, "/api/drug-consumable-supervision/dcs-rational-r1/traceability-evidence", authorized(insurance.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        requirementId: "trace-code-mapping",
+        evidenceSource: "api-test",
+        fields: {
+          medicalInsuranceCode: "MI-TEST-001",
+          commodityCode: "COM-TEST-001",
+          traceCode: "TRACE-TEST-001",
+          packageCascade: "box-pack-unit",
+          mappingVersion: "test-2026.1"
+        }
+      })
+    }));
+    assert.equal(traceabilityEvidence.response.status, 200);
+    assert.equal(traceabilityEvidence.body.traceabilityEvidenceStatus, "complete");
+    assert.equal(traceabilityEvidence.body.traceabilityEvidenceSubmissions[0].requirementId, "trace-code-mapping");
+    assert.equal(traceabilityEvidence.body.traceabilityEvidenceSubmissions[0].missingFields.length, 0);
+    assert.equal(traceabilityEvidence.body.auditTrail[0].action, "drug-consumable-traceability-evidence");
+    const afterTraceabilityEvidence = await api(baseUrl, "/api/drug-consumable-supervision", authorized(insurance.body.token));
+    const evidenceRow = afterTraceabilityEvidence.body.rows.find((item) => item.id === "dcs-rational-r1");
+    assert.equal(evidenceRow.traceabilityEvidenceCoverage.complete >= 1, true);
+    assert.equal(evidenceRow.traceabilityEvidenceCoverage.requirementStatus.some((item) => item.requirementId === "trace-code-mapping" && item.status === "complete"), true);
 
     const review = await api(baseUrl, "/api/drug-consumable-supervision/dcs-rational-r1/review", authorized(insurance.body.token, {
       method: "POST",
@@ -5892,7 +6628,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
   await t.test("verifies audit hash chains and detects tampering", async () => {
     const verified = await api(baseUrl, "/api/audit/verify", authorized(commissionToken));
     assert.equal(verified.response.status, 200);
-    assert.equal(verified.body.passed, true);
+    assert.equal(verified.body.passed, true, JSON.stringify(verified.body.trails));
     assert.equal(verified.body.trails.securityEvents.passed, true);
     assert.equal(verified.body.trails.dataAccessLogs.passed, true);
 
@@ -5931,6 +6667,66 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(tamperedVerify.body.passed, false);
     assert.equal(tamperedVerify.body.trails.securityEvents.passed, false);
     assert.ok(tamperedVerify.body.trails.securityEvents.broken.length > 0);
+  });
+
+  await t.test("governs P0-07 remediation with independent security retest", async () => {
+    const center = await api(baseUrl, "/api/production-security/center", authorized(commissionToken));
+    assert.equal(center.response.status, 200);
+    assert.equal(center.body.productionGate.formalProductionReady, false);
+    assert.equal(center.body.summary.highOpen >= 1, true);
+
+    const findingId = "psf-dependency-high-001";
+    const remediation = await api(baseUrl, `/api/production-security/findings/${findingId}/actions`, authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "record-remediation", evidenceRef: "api-security/fix-001.json", note: "API records controlled remediation evidence." })
+    }));
+    assert.equal(remediation.response.status, 200);
+    const submitted = await api(baseUrl, `/api/production-security/findings/${findingId}/actions`, authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "submit-retest", note: "API submits remediation for independent retest." })
+    }));
+    assert.equal(submitted.body.finding.status, "pending-retest");
+    const selfReview = await api(baseUrl, `/api/production-security/findings/${findingId}/actions`, authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "verify-retest", result: "passed", evidenceRef: "api-security/retest-self.json", note: "API attempts a prohibited self review." })
+    }));
+    assert.equal(selfReview.response.status, 400);
+
+    const independent = await login(baseUrl, "city");
+    const reviewed = await api(baseUrl, `/api/production-security/findings/${findingId}/actions`, authorized(independent.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "verify-retest", result: "passed", evidenceRef: "api-security/retest-001.json", note: "Independent API retest closes the finding." })
+    }));
+    assert.equal(reviewed.response.status, 200);
+    assert.equal(reviewed.body.finding.status, "closed");
+    assert.equal(reviewed.body.center.productionGate.formalProductionReady, false);
+  });
+
+  await t.test("keeps global production GO blocked until real P0-10 evidence passes", async () => {
+    const center = await api(baseUrl, "/api/production-go-no-go/center", authorized(commissionToken));
+    assert.equal(center.response.status, 200);
+    assert.equal(center.body.status, "blocked-by-cutover-prerequisites");
+    assert.equal(center.body.gate.productionGoRecorded, false);
+
+    const deniedApproval = await api(baseUrl, "/api/production-go-no-go/approvals/pgng-approval-business/actions", authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "approve", note: "API attempts approval before production evidence passes." })
+    }));
+    assert.equal(deniedApproval.response.status, 409);
+
+    const noGo = await api(baseUrl, "/api/production-go-no-go/decision", authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({
+        decision: "NO-GO",
+        changeTicket: "CHG-API-BLOCKED",
+        cutoverWindow: "blocked test window",
+        rollbackOwner: "API operations owner",
+        note: "API records NO-GO while production prerequisites remain blocked."
+      })
+    }));
+    assert.equal(noGo.response.status, 200);
+    assert.equal(noGo.body.decision.decision, "NO-GO");
+    assert.equal(noGo.body.center.gate.productionGoRecorded, false);
   });
 
   await t.test("invalidates a session after logout", async () => {

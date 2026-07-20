@@ -82,6 +82,8 @@
 .check-list em { color: var(--muted); font-size: 12px; font-style: normal; }
 .evidence-field { display: grid; gap: 5px; margin: 12px 0; color: var(--muted); font-size: 12px; font-weight: 800; }
 .evidence-field input, .attachment-link input { min-height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font: inherit; }
+.evidence-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 10px; }
+.signoff-proof { padding: 9px 10px; border-radius: 8px; background: var(--exam-soft); color: var(--exam-dark); font-size: 12px; overflow-wrap: anywhere; }
 .gateway-list { display: grid; gap: 8px; }
 .gateway-list article { display: grid; grid-template-columns: minmax(160px, 1fr) auto minmax(280px, 2fr); gap: 12px; padding: 11px; border-radius: 9px; background: var(--exam-soft); }
 .gateway-list small { color: var(--muted); }
@@ -146,7 +148,7 @@
   .import-panel { position: static; }
 }
 @media (max-width: 700px) {
-  .contract-grid, .archive-proof, .import-form { grid-template-columns: 1fr; }
+  .contract-grid, .archive-proof, .import-form, .evidence-grid { grid-template-columns: 1fr; }
   .import-form .full { grid-column: auto; }
   .report-card { grid-template-columns: 76px minmax(0, 1fr); }
   .report-actions { grid-column: 1 / -1; justify-items: stretch; }

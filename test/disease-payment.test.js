@@ -123,3 +123,23 @@ test("DRG preview handles MCC, excluded principal diagnoses and performance anal
   assert.equal(analytics.mdcCount, 3);
   assert.equal(analytics.groupDistribution.length, 3);
 });
+
+test("payment parameter workflow requires impact simulation and two distinct reviewers", () => {
+  const created = Service.createPaymentParameter(Service.seedDiseasePaymentState(), { id: "param-drg-2027", mode: "DRG", schemeId: "drg-demo-2026", name: "2027年度DRG参数", rate: 11000, effectiveFrom: "2027-01-01" }, "drafter");
+  assert.equal(created.row.status, "草案");
+  assert.throws(() => Service.submitPaymentParameter(created.state, created.row.id, "drafter"), /必须先完成影响试算/);
+  const simulated = Service.simulatePaymentParameter(created.state, created.row.id, "analyst");
+  assert.equal(simulated.row.status, "已试算");
+  assert.equal(simulated.report.caseCount, 3);
+  assert.ok(simulated.report.inputDigest);
+  assert.equal(simulated.report.byInstitution.length, 2);
+  const submitted = Service.submitPaymentParameter(simulated.state, created.row.id, "drafter");
+  const first = Service.reviewPaymentParameter(submitted.state, created.row.id, { approved: true, role: "医保业务复核" }, "reviewer-a");
+  assert.equal(first.row.status, "复核中");
+  assert.throws(() => Service.reviewPaymentParameter(first.state, created.row.id, { approved: true }, "reviewer-a"), /不得重复签署/);
+  const second = Service.reviewPaymentParameter(first.state, created.row.id, { approved: true, role: "基金财务复核" }, "reviewer-b");
+  assert.equal(second.row.status, "已批准");
+  const published = Service.publishPaymentParameter(second.state, created.row.id, "publisher");
+  assert.equal(published.row.status, "已发布");
+  assert.equal(published.state.parameterVersions.find((item) => item.id === "param-drg-2026").status, "已冻结");
+});

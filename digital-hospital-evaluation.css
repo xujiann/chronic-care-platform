@@ -1,5 +1,6 @@
 .portal-shell { max-width: 1500px; }
 .filter-grid .full { grid-column: 1 / -1; }
+.filter-grid .issue-action-field[hidden] { display: none; }
 .check-line { display: flex; align-items: center; gap: 8px; min-height: 42px; }
 .check-line input { width: auto; }
 .evaluation-pack-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 12px 0; }

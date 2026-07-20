@@ -15,6 +15,23 @@ function buildDiseasePaymentReadiness() {
   const imported = Intake.importBatch(state, { sourceSystem: "readiness", rows: [sample] }, "readiness-check");
   const grouped = Intake.runGrouping(imported.state, { environment: "simulation", mode: "DRG", caseIds: [imported.state.cases.at(-1).id] }, "readiness-check", Service.calculateCase);
   const intakeSummary = Intake.buildIntakeSummary(grouped.state);
+  const officialCase = state.cases[0];
+  const officialReceipt = { caseId: officialCase.id, receiptId: "READINESS-OFFICIAL-001", groupCode: "BR23", schemeVersion: "DRG-2.0-DL", inputDigest: Intake.officialCaseDigest(officialCase, "DRG"), signedAt: "2026-07-18T08:00:00.000Z", signatureValid: true, verification: { verifiedBy: "official-adapter-v1", algorithm: "SM2/SM3", keyId: "readiness-key", verifiedAt: "2026-07-18T08:00:01.000Z" } };
+  const receiptValidation = Intake.validateOfficialReceipt(state, officialCase, officialReceipt, "DRG");
+  const formalJobCreated = Intake.createFormalGroupingJob(state, { id: "readiness-formal-job", idempotencyKey: "readiness-formal-job-v1", mode: "DRG", schemeVersion: "DRG-2.0-DL", caseIds: [officialCase.id] }, "readiness-operator");
+  const formalJobDuplicate = Intake.createFormalGroupingJob(formalJobCreated.state, { idempotencyKey: "readiness-formal-job-v1", mode: "DRG", schemeVersion: "DRG-2.0-DL", caseIds: [officialCase.id] }, "readiness-operator");
+  const formalJobDispatched = Intake.dispatchFormalGroupingJob(formalJobCreated.state, formalJobCreated.job.id, { accepted: true, transportId: "readiness-transport" }, "readiness-dispatcher");
+  const formalJobReceived = Intake.receiveFormalGroupingReceipt(formalJobDispatched.state, formalJobCreated.job.id, { correlationId: formalJobDispatched.job.correlationId, officialResults: [officialReceipt] }, "readiness-callback", Service.calculateCase);
+  const failureJobCreated = Intake.createFormalGroupingJob(formalJobReceived.state, { id: "readiness-formal-failure", mode: "DRG", schemeVersion: "DRG-2.0-DL", caseIds: [state.cases[1].id], maxAttempts: 1 }, "readiness-operator");
+  const failureJobDead = Intake.dispatchFormalGroupingJob(failureJobCreated.state, failureJobCreated.job.id, { accepted: false, errorCode: "ADAPTER_UNAVAILABLE", errorMessage: "readiness failure rehearsal" }, "readiness-dispatcher");
+  const failureJobReconciled = Intake.reconcileFormalGroupingDeadLetter(failureJobDead.state, failureJobCreated.job.id, { resolution: "readiness reconciliation completed" }, "readiness-reconciler");
+  const formalOperations = Intake.buildFormalGroupingOperations(failureJobReconciled.state);
+  const parameterDraft = Service.createPaymentParameter(state, { id: "readiness-param-drg", mode: "DRG", schemeId: "drg-demo-2026", rate: 11000, effectiveFrom: "2027-01-01" }, "readiness-drafter");
+  const parameterSimulation = Service.simulatePaymentParameter(parameterDraft.state, parameterDraft.row.id, "readiness-analyst");
+  const parameterSubmitted = Service.submitPaymentParameter(parameterSimulation.state, parameterDraft.row.id, "readiness-drafter");
+  const parameterFirstReview = Service.reviewPaymentParameter(parameterSubmitted.state, parameterDraft.row.id, { approved: true }, "readiness-reviewer-a");
+  const parameterSecondReview = Service.reviewPaymentParameter(parameterFirstReview.state, parameterDraft.row.id, { approved: true }, "readiness-reviewer-b");
+  const parameterPublished = Service.publishPaymentParameter(parameterSecondReview.state, parameterDraft.row.id, "readiness-publisher");
   const checks = [
     { id: "policy-baseline", label: "医保发〔2025〕18号政策基线", ok: state.policy?.id === "nhsa-2025-18" },
     { id: "dual-mode", label: "DRG/DIP双模式目录与参数", ok: state.groupCatalog.some((item) => item.mode === "DRG") && state.groupCatalog.some((item) => item.mode === "DIP") },
@@ -28,6 +45,11 @@ function buildDiseasePaymentReadiness() {
     { id: "drg-hierarchy", label: "DRG本地模拟MDC、ADRG和CC/MCC分层", ok: state.cases.slice(0, 3).every((item) => item.calculation?.grouping?.mdcCode && item.calculation?.grouping?.adrgCode && item.calculation?.grouping?.complicationLevel) },
     { id: "drg-analytics", label: "DRG入组率、CMI、权重与倍率病例指标", ok: overview.summary.drg.groupedCount >= 3 && overview.summary.drg.cmi > 0 && ["highOutliers", "lowOutliers", "totalWeight"].every((key) => Object.hasOwn(overview.summary.drg, key)) },
     { id: "drg-preview-boundary", label: "DRG试分组非结算效力与正式结果隔离", ok: state.drgPreviewRules?.authority === "non-binding" && Service.simulateDrgCase(state, { caseId: "dp-case-001" }).binding === false },
+    { id: "official-receipt-contract", label: "正式回执病例摘要、方案版本与适配器验签合同", ok: receiptValidation.ok && receiptValidation.verificationContract === "detached-signature-attestation-v1" },
+    { id: "formal-grouping-async", label: "正式分组异步作业、幂等派发与关联回执", ok: formalJobDuplicate.idempotent && formalJobReceived.job.status === "completed" && formalJobReceived.run.succeeded === 1 && formalJobReceived.job.receiptCount === 1 },
+    { id: "formal-grouping-compensation", label: "正式分组指数退避、死信与人工对账重开", ok: failureJobDead.state.formalGroupingDeadLetters.length === 1 && failureJobReconciled.deadLetter.status === "resolved" && failureJobReconciled.job.status === "queued" && formalOperations.retryPolicy.backoffSeconds.join(",") === "60,120,240" },
+    { id: "parameter-impact", label: "支付参数病例与机构影响试算", ok: parameterSimulation.report.caseCount === state.cases.length && parameterSimulation.report.byInstitution.length >= 2 && Boolean(parameterSimulation.report.inputDigest) },
+    { id: "parameter-dual-review", label: "支付参数双人复核、发布与旧版冻结", ok: parameterPublished.row.status === "已发布" && parameterPublished.row.approvals.length === 2 && parameterPublished.state.parameterVersions.some((item) => item.id === "param-drg-2026" && item.status === "已冻结") },
     { id: "dip2-library-profile", label: "DIP 2.0版9520组目录结构", ok: state.dip2LibraryProfile?.coreDiseaseGroups === 9520 && state.dip2LibraryProfile?.conservativeTreatmentGroups === 3209 && state.dip2LibraryProfile?.surgeryOperationGroups === 6311 },
     { id: "dip2-grouping-rule", label: "主要诊断、主要操作、相关操作与10%资源阈值", ok: state.dip2LibraryProfile?.groupingFormula.includes("相关手术操作") && state.dip2LibraryProfile?.relatedOperationCostThreshold === 0.1 },
     { id: "dip2-supplement", label: "肿瘤创新治疗缺失病种补充", ok: ["肿瘤基因治疗", "肿瘤分子治疗", "肿瘤免疫治疗", "放射治疗"].every((item) => state.dip2LibraryProfile?.supplementedTreatments.includes(item)) },
@@ -42,9 +64,41 @@ function buildDiseasePaymentReadiness() {
     { id: "runnable-ui", label: "可运行医保工作台", ok: requiredFiles.every((file) => fs.existsSync(path.join(ROOT, file))) },
     { id: "api-routes", label: "按病种付费API路由", ok: ["/api/disease-payment", "/api/disease-payment/calculate", "/api/disease-payment/special-cases", "/api/disease-payment/settlements"].every((marker) => fs.readFileSync(path.join(ROOT, "server.js"), "utf8").includes(marker)) },
     { id: "drg-api-routes", label: "DRG目录、试分组与分析API", ok: ["/api/disease-payment/drg/catalog", "/api/disease-payment/drg/simulate", "/api/disease-payment/drg/analytics"].every((marker) => fs.readFileSync(path.join(ROOT, "server.js"), "utf8").includes(marker)) },
-    { id: "drg-ui", label: "DRG 2.0分组与绩效工作台", ok: ["data-drg-section=\"workbench\"", "drg-profile", "drg-hierarchy", "drg-analytics"].every((marker) => fs.readFileSync(path.join(ROOT, "disease-payment.html"), "utf8").includes(marker)) }
+    { id: "parameter-api-routes", label: "支付参数草案、试算、复核与发布API", ok: ["/api/disease-payment/parameters", "simulate|submit|review|publish", "createPaymentParameter", "publishPaymentParameter"].every((marker) => fs.readFileSync(path.join(ROOT, "server.js"), "utf8").includes(marker)) },
+    { id: "formal-grouping-api-routes", label: "正式分组作业、派发、回执、重试与死信对账API", ok: ["/api/disease-payment/formal-grouping/operations", "/api/disease-payment/formal-grouping/jobs", "dispatch|receipts|fail|retry|reconcile", "buildFormalGroupingOperations"].every((marker) => fs.readFileSync(path.join(ROOT, "server.js"), "utf8").includes(marker)) },
+    { id: "drg-ui", label: "DRG 2.0分组与绩效工作台", ok: ["data-drg-section=\"workbench\"", "drg-profile", "drg-hierarchy", "drg-analytics"].every((marker) => fs.readFileSync(path.join(ROOT, "disease-payment.html"), "utf8").includes(marker)) },
+    { id: "parameter-ui", label: "支付参数版本治理工作台", ok: ["data-payment-section=\"parameter-governance\"", "parameter-version-list", "parameter-impact-list"].every((marker) => fs.readFileSync(path.join(ROOT, "disease-payment.html"), "utf8").includes(marker)) },
+    { id: "formal-grouping-ui", label: "正式分组异步联调与死信工作台", ok: ["data-payment-section=\"formal-grouping-operations\"", "formal-grouping-job-list", "formal-grouping-dead-letter-list"].every((marker) => fs.readFileSync(path.join(ROOT, "disease-payment.html"), "utf8").includes(marker)) }
   ];
-  return { generatedAt: new Date().toISOString(), policy: state.policy, policy2: state.policy2, summary: { ...overview.summary, intake: intakeSummary }, checks, ready: checks.every((item) => item.ok), externalBlockers: state.externalDependencies.filter((item) => item.requiredForProduction && item.status !== "已联调") };
+  return { generatedAt: new Date().toISOString(), policy: state.policy, policy2: state.policy2, summary: { ...overview.summary, intake: intakeSummary, formalGrouping: formalOperations.summary }, checks, ready: checks.every((item) => item.ok), externalBlockers: state.externalDependencies.filter((item) => item.requiredForProduction && item.status !== "已联调") };
+}
+
+function renderMarkdown(report) {
+  return [
+    "# 按病种付费系统就绪报告",
+    "",
+    `- 生成时间：${report.generatedAt}`,
+    `- 本地可开发能力：${report.ready ? "通过" : "未通过"}`,
+    `- 检查：${report.checks.filter((item) => item.ok).length}/${report.checks.length}`,
+    `- 外部生产依赖：${report.externalBlockers.length}项`,
+    "",
+    "## DRG运行摘要",
+    "",
+    `- 入组病例：${report.summary.drg.groupedCount}/${report.summary.drg.caseCount}`,
+    `- CMI：${report.summary.drg.cmi}`,
+    `- 总权重：${report.summary.drg.totalWeight}`,
+    `- MDC/ADRG/DRG覆盖：${report.summary.drg.mdcCount}/${report.summary.drg.adrgCount}/${report.summary.drg.drgCount}`,
+    `- 正式分组异步作业：${report.summary.formalGrouping.total}（完成${report.summary.formalGrouping.completed}，待对账死信${report.summary.formalGrouping.pendingDeadLetters}）`,
+    "",
+    "## 检查项",
+    "",
+    ...report.checks.map((item) => `- ${item.ok ? "[x]" : "[ ]"} ${item.label}`),
+    "",
+    "## 外部生产依赖",
+    "",
+    ...report.externalBlockers.map((item) => `- ${item.name}：${item.status}（${item.owner}）`),
+    ""
+  ].join("\n");
 }
 
 if (require.main === module) {
@@ -53,4 +107,4 @@ if (require.main === module) {
   if (!report.ready) process.exitCode = 1;
 }
 
-module.exports = { buildDiseasePaymentReadiness };
+module.exports = { buildDiseasePaymentReadiness, renderMarkdown };

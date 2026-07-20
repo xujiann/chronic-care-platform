@@ -21,9 +21,11 @@ function ensureIntakeState(state) {
   if (!Array.isArray(state.groupingRuns)) state.groupingRuns = [];
   if (!Array.isArray(state.paymentCalculationLedger)) state.paymentCalculationLedger = [];
   if (!Array.isArray(state.importRetryQueue)) state.importRetryQueue = [];
+  if (!Array.isArray(state.formalGroupingJobs)) state.formalGroupingJobs = [];
+  if (!Array.isArray(state.formalGroupingDeadLetters)) state.formalGroupingDeadLetters = [];
   if (!Array.isArray(state.grouperAdapters)) state.grouperAdapters = [
     { id: "simulation-local-v1", environment: "simulation", name: "本地可解释模拟分组器", status: "ready", authority: "non-binding" },
-    { id: "official-adapter-v1", environment: "formal", name: "国家/地方正式分组器适配器", status: "external-blocked", authority: "official-receipt-required" }
+    { id: "official-adapter-v1", environment: "formal", name: "国家/地方正式分组器适配器", status: "external-blocked", authority: "official-receipt-required", acceptedSchemeVersions: ["DRG-2.0-DL", "drg-demo-2026", "DIP-2.0-DL", "dip-demo-2026"], verificationContract: "detached-signature-attestation-v1" }
   ];
   return state;
 }
@@ -152,6 +154,37 @@ function appendImmutable(collection, record) {
   return sealed;
 }
 
+function officialCaseDigest(item, mode = "DRG") {
+  return digest({
+    caseId: item.id,
+    settlementListNo: item.settlementListNo,
+    mode,
+    principalDiagnosis: String(item.principalDiagnosis || "").toUpperCase(),
+    otherDiagnoses: (item.otherDiagnoses || []).map((diagnosis) => typeof diagnosis === "string" ? diagnosis : diagnosis.code).filter(Boolean).map((diagnosis) => String(diagnosis).toUpperCase()).sort(),
+    procedures: (item.procedures || []).map((procedure) => typeof procedure === "string" ? procedure : procedure.code).filter(Boolean).map((procedure) => String(procedure).toUpperCase()).sort(),
+    totalAmount: Number(item.totalAmount || 0),
+    dischargeDate: item.dischargeDate
+  });
+}
+
+function validateOfficialReceipt(state, item, official, mode) {
+  const errors = [];
+  if (!official?.receiptId) errors.push("缺少回执编号");
+  if (!official?.groupCode) errors.push("缺少正式分组编码");
+  if (!official?.schemeVersion) errors.push("缺少正式方案版本");
+  if (!official?.signedAt || Number.isNaN(Date.parse(official.signedAt))) errors.push("缺少有效签发时间");
+  if (official?.signatureValid !== true) errors.push("正式回执签名未通过适配器验证");
+  const verification = official?.verification || {};
+  if (verification.verifiedBy !== "official-adapter-v1" || !verification.algorithm || !verification.keyId || !verification.verifiedAt || Number.isNaN(Date.parse(verification.verifiedAt))) errors.push("缺少适配器验签证明");
+  const adapter = (state.grouperAdapters || []).find((row) => row.id === "official-adapter-v1");
+  if (adapter?.acceptedSchemeVersions?.length && official?.schemeVersion && !adapter.acceptedSchemeVersions.includes(official.schemeVersion)) errors.push("正式回执方案版本未获适配器接受");
+  const expectedInputDigest = officialCaseDigest(item, mode);
+  if (official?.inputDigest !== expectedInputDigest) errors.push("正式回执未绑定当前病例输入摘要");
+  const usedReceipt = (state.groupingRuns || []).flatMap((run) => run.results || []).find((result) => result.environment === "formal" && result.ok && result.receiptId === official?.receiptId);
+  if (usedReceipt) errors.push(`正式回执已被病例${usedReceipt.caseId}使用`);
+  return { ok: errors.length === 0, errors, expectedInputDigest, verificationContract: adapter?.verificationContract || "detached-signature-attestation-v1" };
+}
+
 function runGrouping(stateInput, payload, actor, calculateCase) {
   const state = ensureIntakeState(stateInput);
   const environment = payload.environment === "formal" ? "formal" : "simulation";
@@ -164,8 +197,9 @@ function runGrouping(stateInput, payload, actor, calculateCase) {
     if (!item) return { caseId, ok: false, error: "病例不存在" };
     if (environment === "formal") {
       const official = officialResults.get(caseId);
-      if (!official?.receiptId || !official?.groupCode || !official?.schemeVersion || official.signatureValid !== true) return { caseId, ok: false, error: "缺少有效正式分组回执" };
-      const result = { caseId, ok: true, environment, authority: "official", groupCode: official.groupCode, groupName: official.groupName || "", schemeVersion: official.schemeVersion, receiptId: official.receiptId, receiptDigest: digest(official), groupedAt: new Date().toISOString() };
+      const receiptValidation = validateOfficialReceipt(state, item, official, mode);
+      if (!receiptValidation.ok) return { caseId, ok: false, error: "正式分组回执验证失败", receiptErrors: receiptValidation.errors, expectedInputDigest: receiptValidation.expectedInputDigest };
+      const result = { caseId, ok: true, environment, authority: "official", groupCode: official.groupCode, groupName: official.groupName || "", schemeVersion: official.schemeVersion, receiptId: official.receiptId, inputDigest: official.inputDigest, receiptDigest: digest(official), verification: { ...official.verification, contract: receiptValidation.verificationContract }, signedAt: official.signedAt, groupedAt: new Date().toISOString() };
       item.formalStatus = "grouped";
       item.formalGrouping = result;
       return result;
@@ -179,6 +213,205 @@ function runGrouping(stateInput, payload, actor, calculateCase) {
   const run = appendImmutable(state.groupingRuns, { id: runId, environment, mode, adapterId: environment === "formal" ? "official-adapter-v1" : "simulation-local-v1", caseCount: results.length, succeeded: results.filter((item) => item.ok).length, failed: results.filter((item) => !item.ok).length, results, createdAt: new Date().toISOString(), createdBy: actor, inputDigest: digest({ caseIds, mode, environment }) });
   results.filter((item) => item.ok).forEach((result) => appendImmutable(state.paymentCalculationLedger, { id: `calc-ledger-${randomUUID()}`, groupingRunId: run.id, caseId: result.caseId, environment, mode, authority: result.authority, schemeVersion: result.schemeVersion || result.grouping?.schemeId || "simulation", groupCode: result.groupCode || result.grouping?.groupCode, paymentStandard: result.calculation?.paymentStandard ?? null, parameterId: result.calculation?.parameterId ?? null, createdAt: new Date().toISOString(), createdBy: actor }));
   return { state, run };
+}
+
+function addFormalJobEvent(job, type, actor, detail = "") {
+  job.events ||= [];
+  job.events.push({ id: `fg-event-${randomUUID()}`, type, actor, detail, at: new Date().toISOString() });
+}
+
+function formalGroupingEnvelope(job) {
+  return {
+    contractId: "disease-payment-formal-grouping-v1",
+    correlationId: job.correlationId,
+    idempotencyKey: job.idempotencyKey,
+    mode: job.mode,
+    schemeVersion: job.schemeVersion,
+    cases: job.caseSnapshots.map((item) => ({ caseId: item.caseId, inputDigest: item.inputDigest }))
+  };
+}
+
+function createFormalGroupingJob(stateInput, payload, actor = "system") {
+  const state = ensureIntakeState(stateInput);
+  const mode = payload.mode === "DIP" ? "DIP" : "DRG";
+  const adapter = state.grouperAdapters.find((item) => item.id === "official-adapter-v1");
+  const schemeVersion = String(payload.schemeVersion || adapter?.acceptedSchemeVersions?.find((item) => item.startsWith(mode)) || "").trim();
+  if (!schemeVersion || (adapter?.acceptedSchemeVersions?.length && !adapter.acceptedSchemeVersions.includes(schemeVersion))) throw new Error("正式分组作业必须绑定适配器接受的方案版本");
+  const caseIds = [...new Set((Array.isArray(payload.caseIds) && payload.caseIds.length ? payload.caseIds : state.cases.map((item) => item.id)).map(String))];
+  if (!caseIds.length) throw new Error("正式分组作业至少包含一个病例");
+  const caseSnapshots = caseIds.map((caseId) => {
+    const item = state.cases.find((row) => row.id === caseId);
+    if (!item) throw new Error(`病例不存在：${caseId}`);
+    return { caseId, settlementListNo: item.settlementListNo, inputDigest: officialCaseDigest(item, mode) };
+  });
+  const idempotencyKey = String(payload.idempotencyKey || digest({ mode, schemeVersion, caseSnapshots })).trim();
+  const existing = state.formalGroupingJobs.find((item) => item.idempotencyKey === idempotencyKey);
+  if (existing) return { state, job: existing, envelope: formalGroupingEnvelope(existing), idempotent: true };
+  const job = {
+    id: String(payload.id || `formal-job-${Date.now()}-${randomUUID().slice(0, 8)}`),
+    correlationId: String(payload.correlationId || `fg-${randomUUID()}`),
+    idempotencyKey,
+    adapterId: "official-adapter-v1",
+    mode,
+    schemeVersion,
+    caseIds,
+    caseSnapshots,
+    status: "queued",
+    attemptCount: 0,
+    maxAttempts: Math.min(5, Math.max(1, Number(payload.maxAttempts || 3))),
+    createdAt: new Date().toISOString(),
+    createdBy: actor,
+    events: []
+  };
+  job.requestDigest = digest(formalGroupingEnvelope(job));
+  addFormalJobEvent(job, "queued", actor, `${caseIds.length}个病例，方案${schemeVersion}`);
+  state.formalGroupingJobs.unshift(job);
+  return { state, job, envelope: formalGroupingEnvelope(job), idempotent: false };
+}
+
+function registerFormalJobFailure(state, job, payload, actor) {
+  const errorCode = String(payload.errorCode || "ADAPTER_DELIVERY_FAILED");
+  const errorMessage = String(payload.errorMessage || "正式分组适配器派发或回执处理失败").slice(0, 300);
+  if (job.attemptCount === 0) job.attemptCount = 1;
+  job.lastError = { code: errorCode, message: errorMessage, at: new Date().toISOString(), actor };
+  if (job.attemptCount >= job.maxAttempts) {
+    job.status = "dead-letter";
+    job.deadLetteredAt = new Date().toISOString();
+    const existing = state.formalGroupingDeadLetters.find((item) => item.jobId === job.id && item.status === "pending-reconciliation");
+    if (!existing) state.formalGroupingDeadLetters.unshift({ id: `fg-dead-${randomUUID()}`, jobId: job.id, correlationId: job.correlationId, errorCode, errorMessage, attempts: job.attemptCount, status: "pending-reconciliation", createdAt: job.deadLetteredAt, createdBy: actor });
+    addFormalJobEvent(job, "dead-letter", actor, `${errorCode}：${errorMessage}`);
+  } else {
+    const delaySeconds = 60 * (2 ** Math.max(0, job.attemptCount - 1));
+    job.status = "retry-scheduled";
+    job.nextRetryAt = new Date(Date.now() + delaySeconds * 1000).toISOString();
+    addFormalJobEvent(job, "retry-scheduled", actor, `${errorCode}，${delaySeconds}秒后可重试`);
+  }
+  return job;
+}
+
+function dispatchFormalGroupingJob(stateInput, id, payload = {}, actor = "system") {
+  const state = ensureIntakeState(stateInput);
+  const job = state.formalGroupingJobs.find((item) => item.id === id);
+  if (!job) throw new Error("正式分组作业不存在");
+  if (!['queued', 'retry-scheduled'].includes(job.status)) throw new Error("当前状态不允许派发正式分组作业");
+  job.attemptCount += 1;
+  job.dispatchedAt = new Date().toISOString();
+  job.transportReceipt = { accepted: payload.accepted !== false, transportId: String(payload.transportId || `transport-${randomUUID()}`), endpoint: String(payload.endpoint || "official-grouper-adapter"), at: job.dispatchedAt };
+  addFormalJobEvent(job, "dispatched", actor, `第${job.attemptCount}次，${job.transportReceipt.transportId}`);
+  if (!job.transportReceipt.accepted) registerFormalJobFailure(state, job, payload, actor);
+  else {
+    job.status = "awaiting-receipt";
+    job.nextRetryAt = undefined;
+  }
+  return { state, job, envelope: formalGroupingEnvelope(job) };
+}
+
+function receiveFormalGroupingReceipt(stateInput, id, payload, actor, calculateCase) {
+  const state = ensureIntakeState(stateInput);
+  const job = state.formalGroupingJobs.find((item) => item.id === id);
+  if (!job) throw new Error("正式分组作业不存在");
+  const callbackDigest = digest(payload);
+  if (job.status === "completed" && job.callbackDigest === callbackDigest) return { state, job, run: state.groupingRuns.find((item) => item.id === job.groupingRunId), idempotent: true };
+  if (job.status !== "awaiting-receipt") throw new Error("正式分组作业尚未处于回执等待状态");
+  if (payload.correlationId !== job.correlationId) throw new Error("正式分组回执关联号不匹配");
+  const officialResults = Array.isArray(payload.officialResults) ? payload.officialResults : [];
+  const resultByCase = new Map(officialResults.map((item) => [item.caseId, item]));
+  const receiptErrors = [];
+  if (officialResults.length !== job.caseSnapshots.length || resultByCase.size !== job.caseSnapshots.length) receiptErrors.push("正式分组回执病例数量或唯一性不匹配");
+  job.caseSnapshots.forEach((snapshot) => {
+    const item = state.cases.find((row) => row.id === snapshot.caseId);
+    const official = resultByCase.get(snapshot.caseId);
+    if (!item) receiptErrors.push(`病例不存在：${snapshot.caseId}`);
+    else if (officialCaseDigest(item, job.mode) !== snapshot.inputDigest) receiptErrors.push(`病例提交后发生变化：${snapshot.caseId}`);
+    if (!official) receiptErrors.push(`缺少病例回执：${snapshot.caseId}`);
+    else {
+      if (official.schemeVersion !== job.schemeVersion) receiptErrors.push(`方案版本不匹配：${snapshot.caseId}`);
+      if (official.inputDigest !== snapshot.inputDigest) receiptErrors.push(`病例摘要不匹配：${snapshot.caseId}`);
+      const validation = item ? validateOfficialReceipt(state, item, official, job.mode) : { ok: false, errors: [] };
+      if (!validation.ok) receiptErrors.push(...validation.errors.map((error) => `${snapshot.caseId}：${error}`));
+    }
+  });
+  if (receiptErrors.length) {
+    job.status = "receipt-rejected";
+    job.receiptErrors = [...new Set(receiptErrors)];
+    addFormalJobEvent(job, "receipt-rejected", actor, job.receiptErrors.join("；"));
+    return { state, job, receiptErrors: job.receiptErrors, idempotent: false };
+  }
+  const grouped = runGrouping(state, { environment: "formal", mode: job.mode, caseIds: job.caseIds, officialResults }, actor, calculateCase);
+  if (grouped.run.failed) {
+    job.status = "receipt-rejected";
+    job.receiptErrors = grouped.run.results.flatMap((item) => item.receiptErrors || [item.error]).filter(Boolean);
+    addFormalJobEvent(job, "receipt-rejected", actor, job.receiptErrors.join("；"));
+    return { state: grouped.state, job, run: grouped.run, receiptErrors: job.receiptErrors };
+  }
+  job.status = "completed";
+  job.callbackDigest = callbackDigest;
+  job.groupingRunId = grouped.run.id;
+  job.completedAt = new Date().toISOString();
+  job.receiptCount = officialResults.length;
+  job.receiptErrors = [];
+  addFormalJobEvent(job, "completed", actor, `${officialResults.length}个正式回执已入账`);
+  return { state: grouped.state, job, run: grouped.run, idempotent: false };
+}
+
+function failFormalGroupingJob(stateInput, id, payload = {}, actor = "system") {
+  const state = ensureIntakeState(stateInput);
+  const job = state.formalGroupingJobs.find((item) => item.id === id);
+  if (!job) throw new Error("正式分组作业不存在");
+  if (!['queued', 'awaiting-receipt', 'receipt-rejected'].includes(job.status)) throw new Error("当前状态不允许登记失败");
+  registerFormalJobFailure(state, job, payload, actor);
+  return { state, job };
+}
+
+function retryFormalGroupingJob(stateInput, id, actor = "system") {
+  const state = ensureIntakeState(stateInput);
+  const job = state.formalGroupingJobs.find((item) => item.id === id);
+  if (!job) throw new Error("正式分组作业不存在");
+  if (!['retry-scheduled', 'receipt-rejected'].includes(job.status)) throw new Error("当前状态不允许重试");
+  if (job.attemptCount >= job.maxAttempts) throw new Error("正式分组作业已达到最大尝试次数，需先完成死信对账");
+  job.status = "queued";
+  job.correlationId = `fg-${randomUUID()}`;
+  job.requestDigest = digest(formalGroupingEnvelope(job));
+  job.nextRetryAt = undefined;
+  job.receiptErrors = [];
+  addFormalJobEvent(job, "retry-queued", actor, `准备第${job.attemptCount + 1}次派发`);
+  return { state, job, envelope: formalGroupingEnvelope(job) };
+}
+
+function reconcileFormalGroupingDeadLetter(stateInput, id, payload = {}, actor = "system") {
+  const state = ensureIntakeState(stateInput);
+  const job = state.formalGroupingJobs.find((item) => item.id === id);
+  if (!job || job.status !== "dead-letter") throw new Error("待对账的正式分组死信不存在");
+  const deadLetter = state.formalGroupingDeadLetters.find((item) => item.jobId === id && item.status === "pending-reconciliation");
+  if (!deadLetter) throw new Error("正式分组死信记录不存在");
+  const resolution = String(payload.resolution || "").trim();
+  if (!resolution) throw new Error("死信对账必须填写处置结论");
+  deadLetter.status = "resolved";
+  deadLetter.resolution = resolution;
+  deadLetter.resolvedAt = new Date().toISOString();
+  deadLetter.resolvedBy = actor;
+  job.status = "queued";
+  job.attemptCount = 0;
+  job.correlationId = `fg-${randomUUID()}`;
+  job.requestDigest = digest(formalGroupingEnvelope(job));
+  job.reopenedAt = deadLetter.resolvedAt;
+  addFormalJobEvent(job, "dead-letter-reconciled", actor, resolution);
+  return { state, job, deadLetter, envelope: formalGroupingEnvelope(job) };
+}
+
+function buildFormalGroupingOperations(stateInput) {
+  const state = ensureIntakeState(stateInput);
+  const now = Date.now();
+  const statuses = Object.fromEntries(["queued", "awaiting-receipt", "retry-scheduled", "receipt-rejected", "dead-letter", "completed"].map((status) => [status, state.formalGroupingJobs.filter((item) => item.status === status).length]));
+  const overdue = state.formalGroupingJobs.filter((item) => item.status === "awaiting-receipt" && now - Date.parse(item.dispatchedAt || item.createdAt) > 30 * 60 * 1000).length;
+  return {
+    adapter: state.grouperAdapters.find((item) => item.id === "official-adapter-v1"),
+    summary: { total: state.formalGroupingJobs.length, ...statuses, overdue, pendingDeadLetters: state.formalGroupingDeadLetters.filter((item) => item.status === "pending-reconciliation").length },
+    jobs: state.formalGroupingJobs,
+    deadLetters: state.formalGroupingDeadLetters,
+    retryPolicy: { maxAttemptsDefault: 3, backoffSeconds: [60, 120, 240], receiptSlaMinutes: 30 },
+    productionBoundary: "正式分组外部传输、证书和回执真实性仍由国家/地方分组器适配器提供"
+  };
 }
 
 function verifyLedger(collection) {
@@ -195,6 +428,9 @@ function buildIntakeSummary(stateInput) {
     acceptedLists: state.settlementLists.length,
     costItems: state.medicalCostItems.length,
     pendingRetries: state.importRetryQueue.filter((item) => item.status !== "resolved").length,
+    formalGroupingJobs: state.formalGroupingJobs.length,
+    formalGroupingPending: state.formalGroupingJobs.filter((item) => item.status !== "completed").length,
+    formalGroupingDeadLetters: state.formalGroupingDeadLetters.filter((item) => item.status === "pending-reconciliation").length,
     groupingRuns: state.groupingRuns.length,
     formalRuns: state.groupingRuns.filter((item) => item.environment === "formal").length,
     simulationRuns: state.groupingRuns.filter((item) => item.environment === "simulation").length,
@@ -203,4 +439,4 @@ function buildIntakeSummary(stateInput) {
   };
 }
 
-module.exports = { QUALITY_CATEGORIES, buildIntakeSummary, digest, ensureIntakeState, importBatch, normalizeSettlementList, retryImport, runGrouping, stableStringify, validateSettlementList, verifyLedger };
+module.exports = { QUALITY_CATEGORIES, buildFormalGroupingOperations, buildIntakeSummary, createFormalGroupingJob, digest, dispatchFormalGroupingJob, ensureIntakeState, failFormalGroupingJob, formalGroupingEnvelope, importBatch, normalizeSettlementList, officialCaseDigest, receiveFormalGroupingReceipt, reconcileFormalGroupingDeadLetter, retryFormalGroupingJob, retryImport, runGrouping, stableStringify, validateOfficialReceipt, validateSettlementList, verifyLedger };

@@ -13,6 +13,7 @@ Resident SOS and AED guidance, device auto-alert, 120 information queue, first-a
 | False positives had no safe reversal path | Add patient request and 120-only human resolution | Queue is never automatically cancelled; withdrawal is allowed only before dispatch and only after an emergency-center decision |
 | A hospital account could confirm another hospital's pre-alert | Bind green-channel confirmation and hospital views to the target hospital `orgCode` | Institution APIs expose only target-hospital pre-alerts and reject mismatched confirmation |
 | Device safety controls were not visible in evidence | Add automatic-SOS consent/control evidence section | Evidence package includes authorization, signal, risk score, source signal reference, and review status when automatic SOS is used |
+| A single platform account could release a site blocker | Require external provenance and independent site-evidence verification | Evidence submission requires an external signer, organization and SHA-256 digest; a different responsible person must verify the same digest before an endpoint becomes production-ready |
 
 ## Release decision
 
@@ -26,3 +27,4 @@ Resident SOS and AED guidance, device auto-alert, 120 information queue, first-a
 2. Mobile location, certified SMS fallback, wearable attestation, AED registry, vehicle telemetry, and hospital capacity interfaces are verified against authoritative sources.
 3. Privacy/security assessment, availability/backup drill, and operational duty roster are accepted.
 4. Pilot hospital completes green-channel and electronic-handover joint drill.
+5. Regional health platform completes MPI, organization/provider, document and audit interface joint testing and independent evidence verification.

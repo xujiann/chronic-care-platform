@@ -2,6 +2,7 @@ const STORAGE_KEY = "chronic-care-platform-state";
 const CITIZEN_EXTRA_KEY = "chronic-care-citizen-extra";
 const LARGE_MODE_KEY = "chronic-care-large-mode";
 const CLIENT_CHANNEL_KEY = "chronic-care-client-channel";
+const CITIZEN_RECENT_ACTION_KEY = "chronic-care-citizen-recent-actions";
 const API_BASE = location.protocol === "file:" ? "" : "/api";
 const RESIDENT_TASK_CLOSED_STATUSES = new Set(["closed", "completed", "cancel-requested", "cancelled", "canceled"]);
 const CITIZEN_SERVICE_SWIPE_THRESHOLD = 54;
@@ -266,6 +267,27 @@ function mobileServiceBadgeLabel(tab, active) {
   return active ? "当前" : `${serviceNavigationMeta(tab).featureCount}项`;
 }
 
+function readCitizenRecentActions() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(CITIZEN_RECENT_ACTION_KEY) || "{}");
+    return saved && typeof saved === "object" ? saved : {};
+  } catch (error) {
+    return {};
+  }
+}
+
+function rememberCitizenAction(serviceKey, label) {
+  if (!serviceKey || !label) return;
+  const saved = readCitizenRecentActions();
+  const current = Array.isArray(saved[serviceKey]) ? saved[serviceKey] : [];
+  saved[serviceKey] = [label, ...current.filter((item) => item !== label)].slice(0, 3);
+  try {
+    localStorage.setItem(CITIZEN_RECENT_ACTION_KEY, JSON.stringify(saved));
+  } catch (error) {
+    // Ignore private browsing or storage quota failures.
+  }
+}
+
 const citizenActionDockFallbacks = {
   "health-record": [
     { label: "看时间轴", target: "#citizen-highlight-center", tone: "primary" },
@@ -313,7 +335,18 @@ function citizenActionDockItems(tab) {
   (citizenActionDockFallbacks[tab?.key] || []).forEach((item) => {
     if (!items.some((existing) => existing.label === item.label)) items.push(item);
   });
-  return items.slice(0, 4);
+  const recentLabels = readCitizenRecentActions()[tab?.key] || [];
+  return items
+    .map((item) => ({ ...item, recent: recentLabels.includes(item.label) }))
+    .sort((a, b) => Number(Boolean(b.primary)) - Number(Boolean(a.primary)) || Number(Boolean(b.recent)) - Number(Boolean(a.recent)))
+    .slice(0, 4);
+}
+
+function citizenActionDockHint(tab, items) {
+  const recent = items.find((item) => item.recent);
+  if (recent) return `最近使用：${recent.label}`;
+  const count = serviceNavigationMeta(tab).featureCount;
+  return `${count} 项可用能力`;
 }
 
 const registrationSchedules = [
@@ -483,7 +516,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
   bindDialogs();
   bindFollowupFeedback();
-  bindResidentCheckin();
+  bindResidentExperienceCheckin();
   bindEscortAppointment();
   bindFamilyDoctorApplication();
   bindRegistrationAppointment();
@@ -621,36 +654,44 @@ function renderCitizenActionDock() {
   const target = document.querySelector("#citizen-action-dock");
   if (!target) return;
   const active = getActiveCitizenService();
-  const meta = serviceNavigationMeta(active);
   const items = citizenActionDockItems(active);
+  const hint = citizenActionDockHint(active, items);
   target.innerHTML = `<div class="citizen-action-dock-copy">
     <span>常用操作</span>
     <strong>${active.label}</strong>
-    <small>${meta.featureCount} 项可用能力</small>
+    <small>${hint}</small>
   </div>
   <div class="citizen-action-dock-actions">
     ${items.map((item) => {
+      const recentBadge = item.recent ? `<small>最近</small>` : "";
       if (item.href) {
-        return `<a class="citizen-action-chip ${item.primary ? "primary" : ""}" href="${item.href}" data-action-dock-service="${item.internal ? item.key : ""}">${item.label}</a>`;
+        return `<a class="citizen-action-chip ${item.primary ? "primary" : ""} ${item.recent ? "recent" : ""}" href="${item.href}" data-action-dock-label="${item.label}" data-action-dock-service="${item.internal ? item.key : ""}" aria-label="${active.label}：${item.label}">${item.label}${recentBadge}</a>`;
       }
-      return `<button type="button" class="citizen-action-chip ${item.tone === "primary" ? "primary" : ""}" data-action-dock-target="${item.target || ""}">${item.label}</button>`;
+      return `<button type="button" class="citizen-action-chip ${item.tone === "primary" ? "primary" : ""} ${item.recent ? "recent" : ""}" data-action-dock-label="${item.label}" data-action-dock-target="${item.target || ""}" aria-label="${active.label}：${item.label}">${item.label}${recentBadge}</button>`;
     }).join("")}
   </div>`;
   target.querySelectorAll("[data-action-dock-service]").forEach((link) => {
-    if (!link.dataset.actionDockService) return;
+    if (!link.dataset.actionDockService) {
+      link.addEventListener("click", () => rememberCitizenAction(active.key, link.dataset.actionDockLabel));
+      return;
+    }
     link.addEventListener("click", (event) => {
       event.preventDefault();
+      rememberCitizenAction(active.key, event.currentTarget.dataset.actionDockLabel);
       invokeInternalServiceAction(event.currentTarget.dataset.actionDockService);
+      renderCitizenActionDock();
     });
   });
   target.querySelectorAll("[data-action-dock-target]").forEach((button) => {
     button.addEventListener("click", () => {
+      rememberCitizenAction(active.key, button.dataset.actionDockLabel);
       const selector = button.dataset.actionDockTarget;
       const destination = selector ? document.querySelector(selector) : null;
       if (destination?.closest("[data-service-pane]")?.hidden) {
         setServiceTab(destination.closest("[data-service-pane]").dataset.servicePane, { pushState: true, scrollToPane: false });
       }
       (destination || getServicePageTarget(active.key))?.scrollIntoView({ block: "start", behavior: "smooth" });
+      renderCitizenActionDock();
     });
   });
 }
@@ -1099,7 +1140,11 @@ async function loadState() {
     try {
       const request = window.HealthCityAuth?.authFetch || fetch;
       const response = await request(`${API_BASE}/state`);
-      if (response.ok) return await response.json();
+      if (response.ok) {
+        const data = await response.json();
+        data.chronicFollowupSummary = await loadChronicFollowupSummary();
+        return data;
+      }
     } catch (error) {
       // Fall back to browser data below.
     }
@@ -1336,6 +1381,57 @@ function bindLargeMode() {
     button.setAttribute("aria-pressed", String(next));
     localStorage.setItem(LARGE_MODE_KEY, next ? "1" : "0");
   });
+}
+
+function chronicReminderDaysUntil(dateText) {
+  if (!dateText) return 999;
+  const date = new Date(`${String(dateText).slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return 999;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((date.getTime() - today.getTime()) / 86400000);
+}
+
+function chronicReminderStatus(dateText, status = "", risk = "") {
+  const days = chronicReminderDaysUntil(dateText);
+  const text = `${status} ${risk}`;
+  if (String(text).includes("逾期") || days < 0) return "已逾期";
+  if (days === 0) return "今日到期";
+  if (/高危|预警|high|alert/i.test(text) || days <= 7) return "重点提醒";
+  return "计划内";
+}
+
+function buildResidentChronicReminderQueue(residentId) {
+  const apiAlerts = (state.chronicFollowupSummary?.alertQueue || []).filter((item) => item.residentId === residentId);
+  if (apiAlerts.length) {
+    return apiAlerts.map((item) => ({
+      title: item.title || `${item.type || "chronic"}提醒`,
+      detail: `${item.dueAt || ""} · ${item.owner || item.familyDoctor || ""} · ${item.nextAction || item.detail || ""}`,
+      status: item.dueBucket === "overdue" ? "已逾期" : item.dueBucket === "due-today" ? "今日到期" : ["critical", "high"].includes(item.priority) ? "重点提醒" : "计划内"
+    }));
+  }
+  return [
+    ...(state.followups || []).filter((item) => item.residentId === residentId && item.status !== "已完成").map((item) => ({
+      title: `${item.diseaseType}随访提醒`,
+      detail: `${item.plannedAt} · ${item.assignee} · ${item.advice || "按计划随访"}`,
+      status: chronicReminderStatus(item.plannedAt, item.status, item.diseaseType)
+    })),
+    ...(state.medicationPickups || []).filter((item) => item.residentId === residentId && !["已完成", "已取药"].includes(item.status)).map((item) => ({
+      title: `${item.medication}取药提醒`,
+      detail: `${item.nextPickup} · ${item.pharmacy} · ${item.insuranceReview || "待医保审核"}`,
+      status: chronicReminderStatus(item.nextPickup, item.status, item.medication)
+    })),
+    ...(state.chronicManagementPlans || []).filter((item) => item.residentId === residentId && !["已完成", "已复核"].includes(item.status)).map((item) => ({
+      title: `${item.diseaseType}管理复核`,
+      detail: `${item.nextReview} · ${item.owner} · ${item.intervention || item.plan || "按管理计划复核"}`,
+      status: chronicReminderStatus(item.nextReview, item.status, item.grade)
+    })),
+    ...(state.taskMessages || []).filter((item) => item.residentId === residentId && item.targetRole === "citizen" && item.chronicFollowup && !["read", "handled"].includes(String(item.status || "").toLowerCase())).map((item) => ({
+      title: item.title || "慢病随访处置",
+      detail: `${item.createdAt ? item.createdAt.slice(0, 10) : ""} · ${item.body || "请查看家庭医生处置意见"}`,
+      status: "机构回执"
+    }))
+  ].sort((a, b) => ({ "已逾期": 0, "今日到期": 1, "重点提醒": 2, "机构回执": 3, "计划内": 4 }[a.status] ?? 9) - ({ "已逾期": 0, "今日到期": 1, "重点提醒": 2, "机构回执": 3, "计划内": 4 }[b.status] ?? 9));
 }
 
 function renderReminderCenter(residentId) {
@@ -2706,6 +2802,7 @@ function bindFollowupFeedback() {
         followup.feedbackSummary = saved.result;
         followup.medicationTaken = payload.medicationTaken;
       }
+      if (API_BASE) state.chronicFollowupSummary = await loadChronicFollowupSummary();
       form.reset();
       renderCitizen(currentResidentId);
       showToast("院后随访反馈已提交，家庭医生可在机构端处置");
@@ -2724,7 +2821,7 @@ function renderResidentCheckin(residentId) {
   status.textContent = records.length ? `${records.length} check-ins recorded` : "Ready";
 }
 
-function bindResidentCheckin() {
+function bindResidentExperienceCheckin() {
   const form = document.querySelector("#resident-checkin-form");
   if (!form) return;
   form.addEventListener("submit", async (event) => {

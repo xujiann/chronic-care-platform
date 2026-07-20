@@ -10,6 +10,7 @@ const {
   buildPriorityApplicationTemplates,
   renderMarkdown
 } = require("../scripts/health-dashboard-summary");
+const healthDashboardApplications = require("../health-dashboard-applications");
 
 const ROOT = path.resolve(__dirname, "..");
 
@@ -23,6 +24,9 @@ test("health dashboard summary tracks the eight priority applications without re
   assert.equal(report.totals.sourceApplications, 7);
   assert.equal(report.applications.every((item) => item.entry.endsWith(".html")), true);
   assert.equal(report.applications.every((item) => item.functionalBoundary && item.reusePoints.length && item.dataCollections.length && item.apiRoutes.length && item.frontendEntry && item.testEvidence.length && item.acceptanceEvidence.length), true);
+  assert.equal(report.applications.find((item) => item.id === "research-sandbox").apiRoutes.includes("POST /api/research/datasets/:id/evidence"), true);
+  assert.equal(report.applications.find((item) => item.id === "research-sandbox").apiRoutes.includes("POST /api/research/datasets/:id/compliant-exports"), true);
+  assert.equal(report.applications.find((item) => item.id === "research-sandbox").dataCollections.includes("compliantDataExports"), true);
   assert.equal(report.applications.filter((item) => item.id !== "health-dashboard").every((item) => /source application/.test(item.boundary)), true);
   assert.match(report.applications.find((item) => item.id === "health-dashboard").boundary, /first seven source applications/);
   assert.equal(report.totals.sourceRecords > 0, true);
@@ -50,6 +54,8 @@ test("health dashboard summary tracks the eight priority applications without re
   assert.match(markdown, /docs\/妇幼健康全模块说明\.md/);
   assert.match(markdown, /regional-data-sharing/);
   assert.match(markdown, /health-dashboard/);
+  assert.match(markdown, /POST \/api\/research\/datasets\/:id\/evidence/);
+  assert.match(markdown, /POST \/api\/research\/datasets\/:id\/compliant-exports/);
   assert.match(markdown, /Open action preview/);
   assert.match(markdown, /Industry governance indicator center/);
   assert.match(markdown, /健康体检覆盖/);

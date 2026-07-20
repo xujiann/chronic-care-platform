@@ -31,11 +31,95 @@ function hasRequiredPackageFields(item) {
   ].every((key) => Object.prototype.hasOwnProperty.call(item, key));
 }
 
+function consentLabel(status) {
+  return {
+    active: "授权有效",
+    pending: "授权待确认",
+    revoked: "授权已撤销"
+  }[status] || status || "授权待确认";
+}
+
+function qualityLabel(status) {
+  return {
+    passed: "质控通过",
+    manual_review: "人工复核",
+    failed: "质控未通过"
+  }[status] || status || "质量待确认";
+}
+
+function buildRegionalReportHandoff(packageItem, data, reviews) {
+  const collections = new Set(packageItem.sharedCollections || []);
+  const contractsById = new Map((data.integrationContracts || []).map((item) => [item.id, item]));
+  const contracts = (packageItem.contractRefs || []).map((id) => contractsById.get(id)).filter(Boolean);
+  const diagnosticReports = data.diagnosticReports || [];
+  const personalRecords = data.personalRecords || [];
+  const recognitionRecords = data.countyMutualRecognitionRecords || [];
+  const recordRefs = packageItem.recordRefs || [];
+  const evidenceCounts = {
+    diagnosticReports: diagnosticReports.filter((item) => item.residentId === packageItem.residentId || recordRefs.includes(item.id)).length,
+    personalRecords: personalRecords.filter((item) => item.residentId === packageItem.residentId && (recordRefs.includes(item.id) || collections.has("personalRecords"))).length,
+    mutualRecognitionRecords: recognitionRecords.filter((item) => item.residentId === packageItem.residentId || recordRefs.includes(item.id)).length,
+    contracts: contracts.length
+  };
+  const targetCount = (packageItem.targetOrgCodes || packageItem.targetInstitutions || []).length;
+  const relatedReviews = reviews.filter((item) => item.packageId === packageItem.id);
+  const evidence = [
+    {
+      id: "clinical-records",
+      label: "诊疗资料",
+      ready: collections.has("personalRecords") && collections.has("diagnosticReports") && evidenceCounts.personalRecords > 0 && evidenceCounts.diagnosticReports > 0,
+      detail: `档案 ${evidenceCounts.personalRecords} 条，报告 ${evidenceCounts.diagnosticReports} 条`
+    },
+    {
+      id: "mutual-recognition",
+      label: "互认依据",
+      ready: collections.has("countyMutualRecognitionRecords") && evidenceCounts.mutualRecognitionRecords > 0,
+      detail: `互认记录 ${evidenceCounts.mutualRecognitionRecords} 条`
+    },
+    {
+      id: "integration-contracts",
+      label: "接口契约",
+      ready: (packageItem.contractRefs || []).length > 0 && contracts.every((item) => item.status === "ready"),
+      detail: contracts.map((item) => item.domain || item.id).join("、") || "未绑定契约"
+    },
+    {
+      id: "consent-quality",
+      label: "授权与质控",
+      ready: packageItem.consentStatus === "active" && packageItem.qualityStatus === "passed",
+      detail: `${consentLabel(packageItem.consentStatus)} / ${qualityLabel(packageItem.qualityStatus)}`
+    },
+    {
+      id: "access-audit",
+      label: "调阅审计",
+      ready: relatedReviews.length > 0 || Boolean(packageItem.lastAccessReviewId || packageItem.lastSharedAt),
+      detail: relatedReviews.length
+        ? `已有 ${relatedReviews.length} 条调阅留痕`
+        : packageItem.lastAccessReviewId || packageItem.lastSharedAt
+          ? `已有共享或留痕记录 ${packageItem.lastAccessReviewId || packageItem.lastSharedAt}`
+          : "接诊前需登记调阅目的"
+    },
+    {
+      id: "recipient-scope",
+      label: "接收范围",
+      ready: targetCount > 0,
+      detail: `目标机构 ${targetCount} 个`
+    }
+  ];
+  const readyCount = evidence.filter((item) => item.ready).length;
+  return {
+    ready: readyCount === evidence.length,
+    readyCount,
+    total: evidence.length,
+    evidence
+  };
+}
+
 function buildRegionalDataSharingReport(options = {}) {
   const data = options.data ?? readJson("data/db.json");
   const pkg = options.pkg ?? readJson("package.json");
   const server = options.server ?? readText("server.js");
   const html = options.html ?? readText("regional-data-sharing.html");
+  const about = options.about ?? readText("regional-data-sharing-about.html");
   const client = options.client ?? readText("regional-data-sharing.js");
   const scope = data.regionalDataSharingScope || {};
   const packages = Array.isArray(data.regionalSharingPackages) ? data.regionalSharingPackages : [];
@@ -46,6 +130,8 @@ function buildRegionalDataSharingReport(options = {}) {
   const statuses = new Set(["ready", "pending_review", "blocked", "archived"]);
   const packageStatuses = packages.map((item) => item.status);
   const contractRefs = packages.flatMap((item) => item.contractRefs || []);
+  const handoffByPackage = new Map(packages.map((item) => [item.id, buildRegionalReportHandoff(item, data, reviews)]));
+  const handoffReady = [...handoffByPackage.values()].filter((item) => item.ready).length;
   const checks = [
     { id: "regional:boundary", passed: (scope.boundary || []).length >= 3 && (scope.exclusions || []).length >= 3 && (scope.roles || []).length >= 3, detail: `${(scope.boundary || []).length} boundaries, ${(scope.exclusions || []).length} exclusions` },
     { id: "regional:reuseCollections", passed: ["residents", "personalRecords", "diagnosticReports", "integrationContracts", "platformEvidence"].every((key) => reused.has(key)), detail: [...reused].join(",") },
@@ -54,7 +140,23 @@ function buildRegionalDataSharingReport(options = {}) {
     { id: "regional:contractRefs", passed: contractRefs.length >= 4 && contractRefs.every((id) => contracts.has(id)), detail: [...new Set(contractRefs)].join(",") },
     { id: "regional:accessReviews", passed: reviews.length >= 1 && reviews.every((item) => item.packageId && item.residentId && item.purpose && item.decision), detail: `${reviews.length} reviews` },
     { id: "regional:apiRoutes", passed: /\/api\/regional-data-sharing/.test(server) && /createRegionalSharingAccessReview/.test(server), detail: "GET and POST regional routes present" },
-    { id: "regional:frontendEntry", passed: /regional-data-sharing\.js/.test(html) && /登记留痕/.test(html) && /authFetch/.test(client), detail: "page and client workflow present" },
+    { id: "regional:apiHandoff", passed: /buildRegionalReferralHandoffEvidence/.test(server) && /referralHandoffReady/.test(server) && /referralHandoff/.test(client), detail: "API returns referral handoff evidence per package" },
+    { id: "regional:handoffReportApi", passed: /\/api\/regional-data-sharing\/handoff-report/.test(server) && /buildRegionalHandoffReport/.test(server) && /renderRegionalHandoffMarkdown/.test(server), detail: "runtime referral handoff report route present" },
+    { id: "regional:handoffEvidence", passed: handoffReady >= 1 && packages.every((item) => handoffByPackage.get(item.id)?.total === 6), detail: `${handoffReady}/${packages.length} packages ready for referral handoff` },
+    { id: "regional:frontendEntry", passed: /regional-data-sharing\.js/.test(html) && /regional-access-form/.test(html) && /authFetch/.test(client), detail: "page and client workflow present" },
+    { id: "regional:frontendWorkflow", passed: /regional-sharing-loop/.test(html) && /regional-selected-package/.test(html) && /regional-access-feedback/.test(html) && /selectRegionalPackage/.test(client) && /renderRegionalLoop/.test(client), detail: "loop, selection and access feedback present" },
+    { id: "regional:catalogCompletenessUi", passed: /buildRegionalCatalogChecks/.test(client) && /catalogSummaryHtml/.test(client) && /编目完整度/.test(client) && /catalog-checks/.test(client), detail: "P0 package catalog completeness is visible" },
+    { id: "regional:readinessChecklist", passed: /regional-readiness-checklist/.test(html) && /renderRegionalReadinessChecklist/.test(client) && /buildRegionalReadinessChecks/.test(client), detail: "selected package readiness checks present" },
+    { id: "regional:launchReadinessUi", passed: /data-regional-section="launch-readiness"/.test(html) && /regional-launch-readiness/.test(html) && /renderRegionalLaunchReadiness/.test(client) && /OIDC\/SAML/.test(client) && /现场签字/.test(client), detail: "main page launch readiness dashboard present" },
+    { id: "regional:siteIntegrationUi", passed: /data-regional-section="site-integration"/.test(html) && /regional-site-integration/.test(html) && /renderRegionalSiteIntegration/.test(client) && /buildRegionalInterfaceJointTests/.test(client) && /HIS 就诊信息联调样例/.test(client) && /EMR 病历摘要联调样例/.test(client) && /LIS 检验报告联调样例/.test(client) && /PACS 影像报告联调样例/.test(client) && /字段映射签字/.test(client) && /幂等键/.test(client) && /接收医师确认/.test(client) && /身份与权限/.test(client) && /监控灾备/.test(client) && /联调样例/.test(client) && /验收证据/.test(client) && /下一步/.test(client), detail: "site integration checklist present" },
+    { id: "regional:scopeSelfTestUi", passed: /data-regional-section="scope-self-test"/.test(html) && /regional-scope-self-test/.test(html) && /renderRegionalScopeSelfTest/.test(client) && /权限裁剪自测/.test(html) && /当前账号范围/.test(client) && /共享包可见性/.test(client) && /拒绝审计证据/.test(client) && /现场证据清单/.test(client) && /管理端全域复核/.test(client) && /来源机构复核/.test(client) && /目标机构复核/.test(client) && /无关机构拒绝复核/.test(client) && /organization scope denied/.test(client), detail: "P0 role scope self-test evidence present" },
+    { id: "regional:functionRoadmapUi", passed: /data-regional-section="function-roadmap"/.test(html) && /regional-function-roadmap/.test(html) && /renderRegionalFunctionRoadmap/.test(client) && /优先级排序：P0 共享包编目、角色权限裁剪；P1 联调检查与交接清单；P2 调阅审计与发布证据/.test(client) && /责任部门/.test(client) && /P0 验收口径/.test(client) && /居民主索引、来源机构、目标机构、记录引用、互认依据和质控状态/.test(client) && /拒绝访问必须进入审计日志/.test(client) && /下一步计划开发功能/.test(client) && /P0 上线前必须/.test(client) && /P1 试点联调/.test(client) && /P2 生产加固/.test(client) && /市级平台数据治理组/.test(client) && /接口联调组/.test(client), detail: "main page function owners, priorities and planned features present" },
+    { id: "regional:referralHandoff", passed: /data-regional-section="referral-handoff"/.test(html) && /regional-referral-handoff/.test(html) && /renderRegionalReferralHandoff/.test(client) && /buildRegionalReferralHandoff/.test(client) && /不合并运行时/.test(client), detail: "referral handoff panel and runtime boundary present" },
+    { id: "regional:handoffReportUi", passed: /regional-handoff-report-action/.test(html) && /regional-handoff-report/.test(html) && /generateRegionalHandoffReport/.test(client) && /\/api\/regional-data-sharing\/handoff-report/.test(client), detail: "runtime handoff report button and renderer present" },
+    { id: "regional:aboutPolicy", passed: /regional-data-sharing-about\.html/.test(html) && /data-regional-about-section="policy-basis"/.test(about) && /医疗卫生机构信息互通共享三年攻坚/.test(about) && /医疗卫生机构网络安全管理办法/.test(about), detail: "policy explanation page linked" },
+    { id: "regional:aboutLaunchReadiness", passed: /data-regional-about-section="launch-readiness"/.test(about) && /已实现功能与上线前缺口/.test(about) && /上线前仍需开发/.test(about) && /OIDC\/SAML/.test(about) && /现场签字证据/.test(about), detail: "implemented features and launch gaps documented" },
+    { id: "regional:aboutFunctionRoadmap", passed: /data-regional-about-section="function-roadmap"/.test(about) && /现有功能及责任部门/.test(about) && /优先级排序：P0 共享包编目、角色权限裁剪；P1 联调检查与交接清单；P2 调阅审计与发布证据/.test(about) && /展示编目完整度/.test(about) && /P0 验收口径/.test(about) && /居民主索引、来源机构、目标机构、记录引用、互认依据和质控状态/.test(about) && /拒绝访问必须进入审计日志/.test(about) && /下一步计划开发功能/.test(about) && /优先级：P0 上线前必须/.test(about) && /优先级：P1 试点联调/.test(about) && /优先级：P2 生产加固/.test(about) && /市级平台数据治理组/.test(about) && /安全管理岗/.test(about), detail: "implemented functions, owners, priorities and planned features documented" },
+    { id: "regional:aboutSiteEvidenceActions", passed: /data-regional-about-section="site-evidence-actions"/.test(about) && /现场交付物/.test(about) && /联调样例/.test(about) && /验收证据/.test(about) && /审计导出路径/.test(about) && /RTO\/RPO/.test(about), detail: "site evidence actions documented" },
     { id: "regional:releaseScript", passed: Boolean(pkg.scripts?.["regional-data-sharing:report"]), detail: pkg.scripts?.["regional-data-sharing:report"] || "missing" }
   ];
   return {
@@ -71,7 +173,10 @@ function buildRegionalDataSharingReport(options = {}) {
       ready: packages.filter((item) => item.status === "ready").length,
       pendingReview: packages.filter((item) => item.status === "pending_review").length,
       accessReviews: reviews.length,
-      contractRefs: [...new Set(contractRefs)].length
+      contractRefs: [...new Set(contractRefs)].length,
+      readinessChecks: packages.length * 5,
+      referralHandoffReady: handoffReady,
+      referralHandoffChecks: packages.length * 6
     },
     packages: packages.map((item) => ({
       id: item.id,
@@ -82,7 +187,8 @@ function buildRegionalDataSharingReport(options = {}) {
       consentStatus: item.consentStatus,
       qualityStatus: item.qualityStatus,
       contractRefs: item.contractRefs,
-      sharedCollections: item.sharedCollections
+      sharedCollections: item.sharedCollections,
+      referralHandoff: handoffByPackage.get(item.id)
     })),
     checks
   };
@@ -90,31 +196,44 @@ function buildRegionalDataSharingReport(options = {}) {
 
 function renderMarkdown(report) {
   return [
-    "# Regional data sharing report",
+    "# 区域诊疗数据共享平台验收报告",
     "",
-    `- Generated at: ${report.generatedAt}`,
-    `- Result: ${report.ok ? "PASS" : "FAIL"}`,
-    `- Packages: ${report.summary.packages}`,
-    `- Ready packages: ${report.summary.ready}`,
-    `- Access reviews: ${report.summary.accessReviews}`,
+    `- 生成时间：${report.generatedAt}`,
+    `- 结果：${report.ok ? "通过" : "未通过"}`,
+    `- 共享包：${report.summary.packages}`,
+    `- 可共享包：${report.summary.ready}`,
+    `- 调阅留痕：${report.summary.accessReviews}`,
+    `- 联调检查项：${report.summary.readinessChecks}`,
+    `- 转诊会诊可交接包：${report.summary.referralHandoffReady}/${report.summary.packages}`,
     "",
-    "## Checks",
+    "## 检查项",
     "",
-    "| Result | Check | Detail |",
+    "| 结果 | 检查项 | 详情 |",
     "|---|---|---|",
-    ...report.checks.map((item) => `| ${item.passed ? "PASS" : "FAIL"} | ${item.id} | ${String(item.detail || "").replace(/\|/g, "/")} |`),
+    ...report.checks.map((item) => `| ${item.passed ? "通过" : "未通过"} | ${item.id} | ${String(item.detail || "").replace(/\|/g, "/")} |`),
     "",
-    "## Packages",
+    "## 共享包",
     "",
-    "| Package | Resident | Source | Targets | Status | Contracts |",
+    "| 共享包 | 居民 | 来源 | 目标机构 | 状态 | 契约 |",
     "|---|---|---|---|---|---|",
     ...report.packages.map((item) => `| ${item.id} | ${item.residentId} | ${item.sourceOrgCode} | ${(item.targetOrgCodes || []).join(", ")} | ${item.status} | ${(item.contractRefs || []).join(", ")} |`),
     "",
-    "## Site Joint-Test Boundary",
+    "## 转诊会诊交接证据",
     "",
-    "- Confirm production resident master index and authorization source before enabling real cross-institution access.",
-    "- Confirm HIS/EMR/LIS/PACS payload signatures, idempotency keys, report identifiers, and receiving physician acknowledgement screenshots.",
-    "- Keep insurance settlement, billing, research de-identification, and cross-agency certificates outside this application unless separate signoff is provided.",
+    "| 共享包 | 交接状态 | 已具备 | 待补齐 |",
+    "|---|---|---|---|",
+    ...report.packages.map((item) => {
+      const handoff = item.referralHandoff || { ready: false, readyCount: 0, total: 0, evidence: [] };
+      const ready = (handoff.evidence || []).filter((evidence) => evidence.ready).map((evidence) => evidence.label).join("、") || "无";
+      const pending = (handoff.evidence || []).filter((evidence) => !evidence.ready).map((evidence) => evidence.label).join("、") || "无";
+      return `| ${item.id} | ${handoff.ready ? "可交接" : "需补证"} (${handoff.readyCount}/${handoff.total}) | ${ready} | ${pending} |`;
+    }),
+    "",
+    "## 现场联调边界",
+    "",
+    "- 开启真实跨机构调阅前，先确认生产居民主索引和授权来源。",
+    "- 确认 HIS/EMR/LIS/PACS 报文签名、幂等键、报告标识和接收医师确认截图。",
+    "- 医保结算、票据清分、科研脱敏和跨部门证照不纳入本应用，除非另行签字确认。",
     ""
   ].join("\n");
 }
