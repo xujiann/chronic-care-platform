@@ -16,6 +16,7 @@ const { buildCitizenLaunchFoundationReadiness, renderMarkdown: renderCitizenLaun
 const { buildCitizenOperationsReadiness, renderMarkdown: renderCitizenOperationsMarkdown } = require("./citizen-operations-readiness");
 const { buildCommercialCryptoReadiness, renderMarkdown: renderCommercialCryptoMarkdown } = require("./commercial-crypto-readiness");
 const { buildProductionSecurityReadiness, renderMarkdown: renderProductionSecurityMarkdown } = require("./production-security-readiness");
+const { buildProductionGoNoGoReadiness, renderMarkdown: renderProductionGoNoGoMarkdown } = require("./production-go-no-go-readiness");
 const { buildDataGovernanceReadiness, renderMarkdown: renderDataGovernanceMarkdown } = require("./data-governance-readiness");
 const { buildDataQualityReport, renderMarkdown: renderDataQualityMarkdown } = require("./data-quality-report");
 const { buildDigitalHospitalStandardsReadiness, renderMarkdown: renderDigitalHospitalStandardsMarkdown } = require("./digital-hospital-standards-readiness");
@@ -727,6 +728,15 @@ function productionSecurityChecks(productionSecurity) {
   ];
 }
 
+function productionGoNoGoChecks(productionGoNoGo) {
+  return [
+    check("productionGoNoGo:readiness", productionGoNoGo.ok, productionGoNoGo.ok ? "P0-10 software controls passed" : "P0-10 software controls failed", "error", "production-go-no-go"),
+    check("productionGoNoGo:prerequisites", productionGoNoGo.checks?.some((item) => item.id === "goNoGoReadiness:prerequisites" && item.passed), "five global production prerequisites modeled", "error", "production-go-no-go"),
+    check("productionGoNoGo:evidenceDrift", productionGoNoGo.checks?.some((item) => item.id === "goNoGoReadiness:evidenceDrift" && item.passed), `${productionGoNoGo.center?.summary?.staleApprovals || 0} stale approvals visible`, "error", "production-go-no-go"),
+    check("productionGoNoGo:boundary", productionGoNoGo.center?.gate?.softwareControlReady === true && productionGoNoGo.center?.gate?.productionGoRecorded === false, `${productionGoNoGo.center?.status || "unknown"}; no GO fabricated`, "warn", "production-go-no-go")
+  ];
+}
+
 function qualitySafetyChecks(qualitySafety) {
   return [
     check("qualitySafety:report", qualitySafety.ok, qualitySafety.ok ? "quality and safety supervision checks passed" : "quality and safety supervision checks failed", "error", "quality-safety"),
@@ -1169,6 +1179,7 @@ function buildReleaseReport(options = {}) {
   const registrationIntegration = buildRegistrationIntegrationReadiness({ data, pkg });
   const commercialCrypto = buildCommercialCryptoReadiness({ data, pkg });
   const productionSecurity = buildProductionSecurityReadiness({ data, pkg });
+  const productionGoNoGo = buildProductionGoNoGoReadiness({ data, pkg, drRehearsalSigned: false });
   const phase2Proposal = buildPhase2ProposalReadiness({ pkg });
   const regionalDataSharing = buildRegionalDataSharingReport({ data, pkg });
   const hospitalOperationsReadiness = buildHospitalOperationsReadinessReport({ data, pkg });
@@ -1238,6 +1249,7 @@ function buildReleaseReport(options = {}) {
     ...registrationIntegrationChecks(registrationIntegration),
     ...commercialCryptoChecks(commercialCrypto),
     ...productionSecurityChecks(productionSecurity),
+    ...productionGoNoGoChecks(productionGoNoGo),
     ...phase2ProposalChecks(phase2Proposal),
     ...qualitySafetyChecks(qualitySafety),
     ...drugConsumableChecks(drugConsumable),
@@ -1321,6 +1333,7 @@ function buildReleaseReport(options = {}) {
     registrationIntegration,
     commercialCrypto,
     productionSecurity,
+    productionGoNoGo,
     phase2Proposal,
     qualitySafety,
     drugConsumable,
@@ -1862,6 +1875,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       productionSecurity: report.productionSecurity
     }, null, 2), "utf8");
+    const productionGoNoGoJson = path.join(path.dirname(output), "production-go-no-go-readiness-report.json");
+    fs.writeFileSync(productionGoNoGoJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      productionGoNoGo: report.productionGoNoGo
+    }, null, 2), "utf8");
     const qualitySafetyJson = path.join(path.dirname(output), "quality-safety-report.json");
     fs.writeFileSync(qualitySafetyJson, JSON.stringify({
       project: report.project,
@@ -2200,6 +2221,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(commercialCryptoMarkdown, renderCommercialCryptoMarkdown(report.commercialCrypto), "utf8");
     const productionSecurityMarkdown = path.join(path.dirname(markdown), "production-security-readiness-report.md");
     fs.writeFileSync(productionSecurityMarkdown, renderProductionSecurityMarkdown(report.productionSecurity), "utf8");
+    const productionGoNoGoMarkdown = path.join(path.dirname(markdown), "production-go-no-go-readiness-report.md");
+    fs.writeFileSync(productionGoNoGoMarkdown, renderProductionGoNoGoMarkdown(report.productionGoNoGo), "utf8");
     const qualitySafetyMarkdown = path.join(path.dirname(markdown), "quality-safety-report.md");
     fs.writeFileSync(qualitySafetyMarkdown, renderQualitySafetyMarkdown(report.qualitySafety), "utf8");
     const integrationMarkdown = path.join(path.dirname(markdown), "integration-readiness-report.md");

@@ -1,4 +1,4 @@
-const paymentFallback = { state: { policy: {}, cases: [], specialCases: [], settlementBatches: [], budgets: [], feedbacks: [], auditTrail: [], schemeVersions: [], parameterVersions: [], parameterImpactReports: [], externalDependencies: [], groupCatalog: [], drg2LibraryProfile: {}, drgPreviewRules: {} }, summary: {}, institutions: [] };
+const paymentFallback = { state: { policy: {}, cases: [], specialCases: [], settlementBatches: [], budgets: [], feedbacks: [], auditTrail: [], schemeVersions: [], parameterVersions: [], parameterImpactReports: [], formalGroupingJobs: [], formalGroupingDeadLetters: [], externalDependencies: [], groupCatalog: [], drg2LibraryProfile: {}, drgPreviewRules: {} }, summary: {}, institutions: [] };
 let paymentView = paymentFallback;
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -68,6 +68,15 @@ async function handleAction(event) {
       await requestPayment(`/parameters/${encodeURIComponent(button.dataset.id)}/${action}`, { method: "POST", body: JSON.stringify(body) });
     }
     if (button.dataset.paymentAction === "retry-import") await requestPayment(`/intake/retries/${encodeURIComponent(button.dataset.id)}`, { method: "POST", body: JSON.stringify({ institutionCode: "HOSP-DEMO", totalAmount: 1200, declaredFundAmount: 900, costItems: [{ itemCode: "TEST-001", itemName: "补正诊疗项目", amount: 1200, catalogVersion: "2026" }] }) });
+    if (button.dataset.paymentAction === "create-formal-job") {
+      const mode = document.querySelector("#payment-mode").value;
+      const adapter = (paymentView.state.grouperAdapters || []).find((item) => item.id === "official-adapter-v1");
+      await requestPayment("/formal-grouping/jobs", { method: "POST", body: JSON.stringify({ mode, schemeVersion: adapter?.acceptedSchemeVersions?.find((item) => item.startsWith(mode)), caseIds: paymentView.state.cases.slice(0, 2).map((item) => item.id) }) });
+    }
+    if (button.dataset.paymentAction === "formal-dispatch") await requestPayment(`/formal-grouping/jobs/${encodeURIComponent(button.dataset.id)}/dispatch`, { method: "POST", body: JSON.stringify({ accepted: true, endpoint: "official-grouper-adapter" }) });
+    if (button.dataset.paymentAction === "formal-fail") await requestPayment(`/formal-grouping/jobs/${encodeURIComponent(button.dataset.id)}/fail`, { method: "POST", body: JSON.stringify({ errorCode: "RECEIPT_TIMEOUT", errorMessage: "演示：30分钟内未收到正式回执" }) });
+    if (button.dataset.paymentAction === "formal-retry") await requestPayment(`/formal-grouping/jobs/${encodeURIComponent(button.dataset.id)}/retry`, { method: "POST", body: "{}" });
+    if (button.dataset.paymentAction === "formal-reconcile") await requestPayment(`/formal-grouping/jobs/${encodeURIComponent(button.dataset.id)}/reconcile`, { method: "POST", body: JSON.stringify({ resolution: "已与医保分组器运维核对传输链路，允许重新派发" }) });
     await refresh(); message("业务状态已更新并记录审计");
   } catch (error) { message(error.message, true); }
 }
@@ -76,7 +85,7 @@ function render() {
   const { state, summary, institutions } = paymentView;
   document.querySelector("#payment-mode").value = state.mode || "DRG";
   document.querySelector("#payment-metrics").innerHTML = [["住院病例", summary.caseCount, `已测算 ${summary.calculatedCount || 0}`],["支付标准", fmt(summary.paymentStandard), `总费用 ${fmt(summary.totalCost)}`],["预计结余", fmt(summary.projectedBalance), "负值表示费用超出标准"],["监管线索", summary.riskCount, `未入组 ${summary.ungroupedCount || 0}`],["特例待评", summary.specialPending, "支持复杂危重与新药新技术"],["待办批次", summary.settlementPending, "月结算与年度清算"]].map(([label,value,hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><small>${hint}</small></article>`).join("");
-  renderDrgWorkbench(state, summary.drg || {}); renderParameterGovernance(state); renderIntake(state, summary.intake || {}); renderCases(state); renderPolicy(state); renderVersions(state); renderSpecial(state); renderSettlements(state); renderMonitoring(state, institutions); renderGovernance(state); renderFeedback(state); renderAudit(state);
+  renderDrgWorkbench(state, summary.drg || {}); renderParameterGovernance(state); renderFormalGroupingOperations(state); renderIntake(state, summary.intake || {}); renderCases(state); renderPolicy(state); renderVersions(state); renderSpecial(state); renderSettlements(state); renderMonitoring(state, institutions); renderGovernance(state); renderFeedback(state); renderAudit(state);
 }
 
 function renderDrgWorkbench(state, analytics) {
@@ -92,6 +101,20 @@ function renderParameterGovernance(state) {
   const actionFor = { "草案": ["parameter-simulate", "影响试算"], "已试算": ["parameter-submit", "提交复核"], "待复核": ["parameter-review", "签署复核"], "复核中": ["parameter-review", "第二人复核"], "已批准": ["parameter-publish", "发布并冻结旧版"] };
   document.querySelector("#parameter-version-list").innerHTML = (state.parameterVersions || []).map((item) => { const action = actionFor[item.status]; return `<section class="item"><div><h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.mode)} · ${escapeHtml(item.rateMethod)} ${item.rate} · 方案${escapeHtml(item.schemeId)}</p><small>${(item.approvals || []).length}人签署 · 生效${escapeHtml(item.effectiveFrom)}</small>${action ? `<div class="case-actions"><button data-payment-action="${action[0]}" data-id="${item.id}">${action[1]}</button></div>` : ""}</div><span class="badge ${item.status === "已发布" ? "info" : item.status === "已驳回" ? "danger" : "warn"}">${escapeHtml(item.status)}</span></section>`; }).join("");
   document.querySelector("#parameter-impact-list").innerHTML = (state.parameterImpactReports || []).slice(0, 5).map((item) => `<section class="item"><div><h3>影响报告 · ${escapeHtml(item.parameterId)}</h3><p>${item.caseCount}例 · 当前${fmt(item.currentTotal)} · 候选${fmt(item.candidateTotal)}</p><small>变化${fmt(item.delta)}（${item.changeRate == null ? "无基线" : `${Math.round(item.changeRate * 10000) / 100}%`}） · ${item.byInstitution.length}家机构 · 摘要${item.inputDigest.slice(0, 12)}</small></div><span class="badge ${Math.abs(item.changeRate || 0) > 0.05 ? "warn" : "info"}">${item.delta >= 0 ? "+" : ""}${fmt(item.delta)}</span></section>`).join("") || `<p class="muted">创建草案并完成试算后生成机构影响报告。</p>`;
+}
+
+function renderFormalGroupingOperations(state) {
+  const jobs = state.formalGroupingJobs || [];
+  const deadLetters = state.formalGroupingDeadLetters || [];
+  const pending = jobs.filter((item) => item.status !== "completed").length;
+  document.querySelector("#formal-grouping-summary").textContent = `作业${jobs.length}个 · 待处理${pending}个 · 待对账死信${deadLetters.filter((item) => item.status === "pending-reconciliation").length}个`;
+  const actions = { queued: ["formal-dispatch", "派发适配器"], "awaiting-receipt": ["formal-fail", "登记回执超时"], "retry-scheduled": ["formal-retry", "重新入队"], "receipt-rejected": ["formal-retry", "修复后重试"], "dead-letter": ["formal-reconcile", "对账并重开"] };
+  document.querySelector("#formal-grouping-job-list").innerHTML = jobs.slice(0, 8).map((item) => {
+    const action = actions[item.status];
+    const latest = (item.events || []).at(-1);
+    return `<section class="item"><div><h3>${escapeHtml(item.mode)}正式作业 · ${item.caseIds.length}例</h3><p>${escapeHtml(item.schemeVersion)} · 尝试${item.attemptCount}/${item.maxAttempts} · 关联号${escapeHtml(item.correlationId)}</p><small>请求摘要${escapeHtml(item.requestDigest?.slice(0, 16))}${latest ? ` · ${escapeHtml(latest.type)}：${escapeHtml(latest.detail)}` : ""}</small>${action ? `<div class="case-actions"><button data-payment-action="${action[0]}" data-id="${item.id}">${action[1]}</button></div>` : ""}</div><span class="badge ${item.status === "completed" ? "info" : item.status === "dead-letter" ? "danger" : "warn"}">${escapeHtml(item.status)}</span></section>`;
+  }).join("") || `<p class="muted">创建作业后生成带病例摘要和幂等键的出站信封。</p>`;
+  document.querySelector("#formal-grouping-dead-letter-list").innerHTML = deadLetters.slice(0, 8).map((item) => `<section class="item"><div><h3>死信 · ${escapeHtml(item.errorCode)}</h3><p>${escapeHtml(item.errorMessage)} · ${item.attempts}次尝试</p><small>${item.status === "resolved" ? `处置：${escapeHtml(item.resolution)}` : "待医保经办与适配器运维共同对账"}</small></div><span class="badge ${item.status === "resolved" ? "info" : "danger"}">${escapeHtml(item.status)}</span></section>`).join("") || `<p class="muted">暂无正式分组死信。</p>`;
 }
 
 async function importSample(withError) {

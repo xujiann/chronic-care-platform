@@ -419,6 +419,22 @@
         <p id="production-security-boundary" class="implementation-boundary"></p>
       </section>
 
+      <section class="panel" id="production-go-no-go-center" data-platform-section="production-go-no-go">
+        <div class="panel-title">
+          <h2>生产割接全局 Go/No-Go 指挥台</h2>
+          <span>聚合现场验收、安全意见、灾备签字、生产冒烟和四方独立审批</span>
+        </div>
+        <div class="action-row"><span id="production-go-no-go-status" class="badge danger">正在核验全局割接条件</span></div>
+        <div id="production-go-no-go-metrics" class="metric-grid"></div>
+        <h3>前置条件</h3>
+        <div id="production-go-no-go-checks" class="table-wrap"></div>
+        <h3>四方独立审批</h3>
+        <div id="production-go-no-go-approvals" class="table-wrap"></div>
+        <h3>指挥决策</h3>
+        <div id="production-go-no-go-decision"></div>
+        <p id="production-go-no-go-boundary" class="implementation-boundary"></p>
+      </section>
+
       <section class="panel">
         <div class="panel-title">
           <h2>验收证据库</h2>
@@ -566,5 +582,6 @@
     <script src="./shared.js"></script>
     <script src="./platform.js"></script>
     <script src="./production-security.js"></script>
+    <script src="./production-go-no-go-ui.js"></script>
   </body>
 </html>

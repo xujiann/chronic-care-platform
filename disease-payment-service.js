@@ -117,6 +117,8 @@ function seedDiseasePaymentState() {
     groupingRuns: [],
     paymentCalculationLedger: [],
     importRetryQueue: [],
+    formalGroupingJobs: [],
+    formalGroupingDeadLetters: [],
     grouperAdapters: [
       { id: "simulation-local-v1", environment: "simulation", name: "本地可解释模拟分组器", status: "ready", authority: "non-binding" },
       { id: "official-adapter-v1", environment: "formal", name: "国家/地方正式分组器适配器", status: "external-blocked", authority: "official-receipt-required", acceptedSchemeVersions: ["DRG-2.0-DL", "drg-demo-2026", "DIP-2.0-DL", "dip-demo-2026"], verificationContract: "detached-signature-attestation-v1" }

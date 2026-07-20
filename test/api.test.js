@@ -6055,6 +6055,33 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(reviewed.body.center.productionGate.formalProductionReady, false);
   });
 
+  await t.test("keeps global production GO blocked until real P0-10 evidence passes", async () => {
+    const center = await api(baseUrl, "/api/production-go-no-go/center", authorized(commissionToken));
+    assert.equal(center.response.status, 200);
+    assert.equal(center.body.status, "blocked-by-cutover-prerequisites");
+    assert.equal(center.body.gate.productionGoRecorded, false);
+
+    const deniedApproval = await api(baseUrl, "/api/production-go-no-go/approvals/pgng-approval-business/actions", authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "approve", note: "API attempts approval before production evidence passes." })
+    }));
+    assert.equal(deniedApproval.response.status, 409);
+
+    const noGo = await api(baseUrl, "/api/production-go-no-go/decision", authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({
+        decision: "NO-GO",
+        changeTicket: "CHG-API-BLOCKED",
+        cutoverWindow: "blocked test window",
+        rollbackOwner: "API operations owner",
+        note: "API records NO-GO while production prerequisites remain blocked."
+      })
+    }));
+    assert.equal(noGo.response.status, 200);
+    assert.equal(noGo.body.decision.decision, "NO-GO");
+    assert.equal(noGo.body.center.gate.productionGoRecorded, false);
+  });
+
   await t.test("invalidates a session after logout", async () => {
     const session = await login(baseUrl, "county");
     const logout = await api(baseUrl, "/api/auth/logout", authorized(session.body.token, { method: "POST" }));

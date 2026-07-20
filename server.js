@@ -173,6 +173,12 @@ const {
   seedProductionSecurityReleaseApprovals
 } = require("./production-security-acceptance");
 const {
+  buildProductionGoNoGoCenter,
+  normalizeProductionGoNoGoApprovalAction,
+  normalizeProductionGoNoGoDecision,
+  seedProductionGoNoGoApprovals
+} = require("./production-go-no-go");
+const {
   applyProductionDatabaseCutoverAction,
   buildProductionDatabaseCutoverCenter,
   createProductionDatabaseCutoverRun,
@@ -1127,6 +1133,8 @@ function seedState() {
     securityAcceptanceLedger: seedSecurityAcceptanceLedger(),
     productionSecurityFindings: seedProductionSecurityFindings(),
     productionSecurityReleaseApprovals: seedProductionSecurityReleaseApprovals(),
+    productionGoNoGoApprovals: seedProductionGoNoGoApprovals(),
+    productionGoNoGoDecision: null,
     platformChangeLogs: seedPlatformChangeLogs(),
     healthDashboardSnapshots: seedHealthDashboardSnapshots(),
     platformRoadmap: seedPlatformRoadmap(),
@@ -7811,6 +7819,8 @@ function normalizeState(data) {
     securityAcceptanceLedger: mergeByKey(seedSecurityAcceptanceLedger(), data.securityAcceptanceLedger, "id"),
     productionSecurityFindings: mergeByKey(seedProductionSecurityFindings(), data.productionSecurityFindings, "id"),
     productionSecurityReleaseApprovals: mergeByKey(seedProductionSecurityReleaseApprovals(), data.productionSecurityReleaseApprovals, "id"),
+    productionGoNoGoApprovals: mergeByKey(seedProductionGoNoGoApprovals(), data.productionGoNoGoApprovals, "id"),
+    productionGoNoGoDecision: data.productionGoNoGoDecision && typeof data.productionGoNoGoDecision === "object" ? data.productionGoNoGoDecision : null,
     platformChangeLogs: Array.isArray(data.platformChangeLogs) ? data.platformChangeLogs : seedPlatformChangeLogs(),
     healthDashboardSnapshots: mergeByKey(seedHealthDashboardSnapshots(), data.healthDashboardSnapshots, "id"),
     platformRoadmap: Array.isArray(data.platformRoadmap) ? data.platformRoadmap : seedPlatformRoadmap(),
@@ -17789,6 +17799,31 @@ function buildSiteTemplateReadmes(data) {
   };
 }
 
+function readReleaseArtifact(fileName, fallback = {}) {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(ROOT, "release", fileName), "utf8"));
+  } catch {
+    return fallback;
+  }
+}
+
+function buildRuntimeProductionGoNoGoCenter(data) {
+  const normalized = normalizeState(data);
+  const launchSmoke = readReleaseArtifact("launch-smoke-report.json", {});
+  const cutoverArtifact = readReleaseArtifact("production-cutover-checklist.json", {});
+  const cutoverChecklist = Array.isArray(cutoverArtifact.checklist) ? cutoverArtifact.checklist : [];
+  const securityCenter = buildProductionSecurityAcceptanceCenter(
+    normalized.productionSecurityFindings,
+    normalized.productionSecurityReleaseApprovals
+  );
+  return buildProductionGoNoGoCenter(normalized, {
+    launchSmoke,
+    cutoverChecklist,
+    cutoverProfile: cutoverArtifact.profile,
+    drRehearsalSigned: cutoverSignoffReady("CUTOVER_DR_REHEARSAL_SIGNOFF")
+  }, securityCenter);
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -20171,6 +20206,66 @@ async function handleApi(req, res) {
       });
       sendJson(res, status, { ok: false, code, message: known ? error.message : "SMS delivery callback failed" });
     }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/production-go-no-go/center") {
+    const user = requireApiRole(req, res, ["commission"], "/api/production-go-no-go/center");
+    if (!user) return;
+    sendJson(res, 200, buildRuntimeProductionGoNoGoCenter(readDatabase()));
+    return;
+  }
+
+  const productionGoNoGoApprovalMatch = url.pathname.match(/^\/api\/production-go-no-go\/approvals\/([^/]+)\/actions$/);
+  if (req.method === "POST" && productionGoNoGoApprovalMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/production-go-no-go/approvals/:id/actions");
+    if (!user) return;
+    const data = normalizeState(readDatabase());
+    const approvalId = decodeURIComponent(productionGoNoGoApprovalMatch[1]);
+    const index = data.productionGoNoGoApprovals.findIndex((item) => item.id === approvalId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "production go/no-go approval not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const currentCenter = buildRuntimeProductionGoNoGoCenter(data);
+    try {
+      data.productionGoNoGoApprovals[index] = normalizeProductionGoNoGoApprovalAction(data.productionGoNoGoApprovals[index], payload, user, currentCenter);
+    } catch (error) {
+      sendJson(res, 409, { error: "Conflict", message: error.message });
+      return;
+    }
+    const center = buildRuntimeProductionGoNoGoCenter(data);
+    data.securityEvents = [{
+      id: randomUUID(), at: new Date().toISOString(), actor: user.name, role: user.role,
+      action: "production-go-no-go-approval", target: approvalId, result: "allowed",
+      detail: `${payload.action || "unknown"}:${data.productionGoNoGoApprovals[index].status}`
+    }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120);
+    writeDatabase(normalizeState(data));
+    sendJson(res, 200, { ok: true, approval: data.productionGoNoGoApprovals[index], center });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/production-go-no-go/decision") {
+    const user = requireApiRole(req, res, ["commission"], "/api/production-go-no-go/decision");
+    if (!user) return;
+    const data = normalizeState(readDatabase());
+    const payload = await collectJson(req);
+    const currentCenter = buildRuntimeProductionGoNoGoCenter(data);
+    try {
+      data.productionGoNoGoDecision = normalizeProductionGoNoGoDecision(payload, user, currentCenter);
+    } catch (error) {
+      sendJson(res, 409, { error: "Conflict", message: error.message });
+      return;
+    }
+    const center = buildRuntimeProductionGoNoGoCenter(data);
+    data.securityEvents = [{
+      id: randomUUID(), at: new Date().toISOString(), actor: user.name, role: user.role,
+      action: "production-go-no-go-decision", target: data.productionGoNoGoDecision.id, result: "allowed",
+      detail: `${data.productionGoNoGoDecision.decision}:${data.productionGoNoGoDecision.changeTicket}`
+    }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120);
+    writeDatabase(normalizeState(data));
+    sendJson(res, 200, { ok: true, decision: data.productionGoNoGoDecision, center });
     return;
   }
 
@@ -26580,6 +26675,56 @@ async function handleApi(req, res) {
     data.diseasePayment = result.state;
     writeDatabase(data);
     sendJson(res, 200, { parameter: result.row, impactReport: result.report, approval: result.approval });
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/formal-grouping/operations" && req.method === "GET") {
+    const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
+    if (!user) return;
+    const state = DiseasePaymentService.normalizeState(readDatabase().diseasePayment);
+    sendJson(res, 200, DiseasePaymentIntake.buildFormalGroupingOperations(state));
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/formal-grouping/jobs" && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    try {
+      const result = DiseasePaymentIntake.createFormalGroupingJob(DiseasePaymentService.normalizeState(data.diseasePayment), await collectJson(req), user.name);
+      data.diseasePayment = result.state;
+      writeDatabase(data);
+      sendJson(res, result.idempotent ? 200 : 201, { job: result.job, envelope: result.envelope, idempotent: result.idempotent });
+    } catch (error) {
+      sendJson(res, 409, { error: "Conflict", message: error.message });
+    }
+    return;
+  }
+
+  const diseasePaymentFormalGroupingActionMatch = url.pathname.match(/^\/api\/disease-payment\/formal-grouping\/jobs\/([^/]+)\/(dispatch|receipts|fail|retry|reconcile)$/);
+  if (diseasePaymentFormalGroupingActionMatch && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
+    if (!user) return;
+    const [, encodedId, action] = diseasePaymentFormalGroupingActionMatch;
+    const id = decodeURIComponent(encodedId);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const state = DiseasePaymentService.normalizeState(data.diseasePayment);
+    try {
+      const handlers = {
+        dispatch: () => DiseasePaymentIntake.dispatchFormalGroupingJob(state, id, payload, user.name),
+        receipts: () => DiseasePaymentIntake.receiveFormalGroupingReceipt(state, id, payload, user.name, DiseasePaymentService.calculateCase),
+        fail: () => DiseasePaymentIntake.failFormalGroupingJob(state, id, payload, user.name),
+        retry: () => DiseasePaymentIntake.retryFormalGroupingJob(state, id, user.name),
+        reconcile: () => DiseasePaymentIntake.reconcileFormalGroupingDeadLetter(state, id, payload, user.name)
+      };
+      const result = handlers[action]();
+      data.diseasePayment = result.state;
+      writeDatabase(data);
+      sendJson(res, 200, { job: result.job, envelope: result.envelope, groupingRun: result.run, deadLetter: result.deadLetter, receiptErrors: result.receiptErrors || [], idempotent: result.idempotent || false, operations: DiseasePaymentIntake.buildFormalGroupingOperations(result.state) });
+    } catch (error) {
+      sendJson(res, 409, { error: "Conflict", message: error.message });
+    }
     return;
   }
 

@@ -70,3 +70,44 @@ test("grouping and calculation ledgers form verifiable immutable hash chains", (
   tampered[0].groupCode = "TAMPERED";
   assert.equal(Intake.verifyLedger(tampered), false);
 });
+
+test("formal grouper asynchronous job accepts a correlated signed callback exactly once", () => {
+  const created = Intake.createFormalGroupingJob(Service.seedDiseasePaymentState(), { id: "formal-job-success", idempotencyKey: "formal-idem-success", mode: "DRG", schemeVersion: "DRG-2.0-DL", caseIds: ["dp-case-001"] }, "operator");
+  assert.equal(created.job.status, "queued");
+  assert.equal(created.envelope.contractId, "disease-payment-formal-grouping-v1");
+  const duplicate = Intake.createFormalGroupingJob(created.state, { idempotencyKey: "formal-idem-success", mode: "DRG", schemeVersion: "DRG-2.0-DL", caseIds: ["dp-case-001"] }, "operator");
+  assert.equal(duplicate.idempotent, true);
+  assert.equal(duplicate.job.id, "formal-job-success");
+
+  const dispatched = Intake.dispatchFormalGroupingJob(created.state, created.job.id, { accepted: true, transportId: "transport-success" }, "dispatcher");
+  assert.equal(dispatched.job.status, "awaiting-receipt");
+  const item = dispatched.state.cases.find((row) => row.id === "dp-case-001");
+  const callback = {
+    correlationId: dispatched.job.correlationId,
+    officialResults: [{ caseId: item.id, receiptId: "ASYNC-OFFICIAL-001", groupCode: "BR23", groupName: "脑血管疾病", schemeVersion: "DRG-2.0-DL", inputDigest: Intake.officialCaseDigest(item, "DRG"), signedAt: "2026-07-20T08:00:00.000Z", signatureValid: true, verification: { verifiedBy: "official-adapter-v1", algorithm: "SM2/SM3", keyId: "joint-test-key", verifiedAt: "2026-07-20T08:00:01.000Z" } }]
+  };
+  const received = Intake.receiveFormalGroupingReceipt(dispatched.state, created.job.id, callback, "callback-adapter", Service.calculateCase);
+  assert.equal(received.job.status, "completed");
+  assert.equal(received.run.succeeded, 1);
+  assert.equal(received.state.cases.find((row) => row.id === item.id).formalGrouping.receiptId, "ASYNC-OFFICIAL-001");
+  const replay = Intake.receiveFormalGroupingReceipt(received.state, created.job.id, callback, "callback-adapter", Service.calculateCase);
+  assert.equal(replay.idempotent, true);
+  assert.equal(Intake.buildFormalGroupingOperations(replay.state).summary.completed, 1);
+});
+
+test("formal grouper delivery uses exponential retry and dead-letter reconciliation", () => {
+  const created = Intake.createFormalGroupingJob(Service.seedDiseasePaymentState(), { id: "formal-job-failure", mode: "DRG", schemeVersion: "DRG-2.0-DL", caseIds: ["dp-case-002"], maxAttempts: 2 }, "operator");
+  const firstFailure = Intake.dispatchFormalGroupingJob(created.state, created.job.id, { accepted: false, errorCode: "CONNECT_TIMEOUT", errorMessage: "连接超时" }, "dispatcher");
+  assert.equal(firstFailure.job.status, "retry-scheduled");
+  assert.ok(firstFailure.job.nextRetryAt);
+  const retried = Intake.retryFormalGroupingJob(firstFailure.state, created.job.id, "operator");
+  assert.equal(retried.job.status, "queued");
+  assert.notEqual(retried.job.correlationId, created.envelope.correlationId);
+  const dead = Intake.dispatchFormalGroupingJob(retried.state, created.job.id, { accepted: false, errorCode: "REMOTE_UNAVAILABLE", errorMessage: "正式分组器不可用" }, "dispatcher");
+  assert.equal(dead.job.status, "dead-letter");
+  assert.equal(dead.state.formalGroupingDeadLetters[0].status, "pending-reconciliation");
+  const reconciled = Intake.reconcileFormalGroupingDeadLetter(dead.state, created.job.id, { resolution: "医保侧恢复服务并完成链路核对" }, "reconciler");
+  assert.equal(reconciled.job.status, "queued");
+  assert.equal(reconciled.job.attemptCount, 0);
+  assert.equal(reconciled.deadLetter.status, "resolved");
+});
