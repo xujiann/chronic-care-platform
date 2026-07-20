@@ -344,6 +344,7 @@ function snapshotChecks(data) {
     "diseaseRegistryModels",
     "qualitySafetyEvents",
     "qualityRectificationOrders",
+    "compliantDataExports",
     "dataAccessLogs",
     "accessibilityChecklist",
     "regionalDataSharingScope",
@@ -380,7 +381,7 @@ function snapshotChecks(data) {
     check("snapshot:securityAcceptance", securityAcceptanceLedger.length >= 4 && securityAcceptanceLedger.every((item) => item.id && item.category && item.owner && item.status && item.next), `${securityAcceptanceLedger.length} security acceptance items`, "error", "snapshot"),
     check("snapshot:productionDeploymentPlan", productionDeploymentPlan.length >= 4 && productionDeploymentPlan.every((item) => item.id && item.owner && item.nextAction), `${productionDeploymentPlan.length} deployment tracks`, "error", "snapshot"),
     check("snapshot:interfaceReadiness", p0Interfaces.length >= 4 && p0Interfaces.every((item) => item.id && item.owner && item.status && item.next), `${p0Interfaces.length} P0 interface tracks`, "error", "snapshot"),
-    check("snapshot:researchSandbox", (data.researchDatasets || []).some((item) => item.authorizationStatus === "approved" && (item.deidentificationStatus === "released" || item.anonymization) && (item.sandbox?.status === "active" || item.status === "published")) && (data.dataAccessLogs || []).some((item) => /research|科研|数据集|沙箱/i.test(`${item.scope || ""} ${item.purpose || ""}`)), `${data.researchDatasets?.length || 0} datasets / ${data.dataAccessLogs?.length || 0} audit logs`, "error", "snapshot"),
+    check("snapshot:researchSandbox", (data.researchDatasets || []).some((item) => item.authorizationStatus === "approved" && (item.deidentificationStatus === "released" || item.anonymization) && (item.sandbox?.status === "active" || item.status === "published") && ["ethics-approval", "data-use-agreement"].every((type) => (item.evidenceDocuments || []).some((doc) => doc.type === type && doc.status !== "rejected"))) && (data.dataAccessLogs || []).some((item) => /research|科研|数据集|沙箱|export/i.test(`${item.scope || ""} ${item.purpose || ""}`)) && (data.compliantDataExports || []).some((item) => item.reviewStatus === "approved" && item.exportStatus === "released" && item.deidentified === true && item.minimumNecessary === true), `${data.researchDatasets?.length || 0} datasets / ${data.compliantDataExports?.length || 0} exports / ${data.dataAccessLogs?.length || 0} audit logs`, "error", "snapshot"),
     check("snapshot:externalDependencyRisks", externalDependencyRiskIds.every((id) => serverSource.includes(id)), `${externalDependencyRiskIds.length} external dependency risks`, "error", "snapshot"),
     check("snapshot:drugTraceabilityPolicySources", traceabilityPolicySources.length >= 5 && traceabilityPolicySources.every((item) => /^https:\/\/(www\.)?(nhsa|nmpa)\.gov\.cn\//.test(item.url || "")), `${traceabilityPolicySources.length} official traceability policy sources`, "error", "snapshot"),
     check("snapshot:drugTraceabilityEvidenceRequirements", traceabilityEvidenceRequirements.length >= 5 && traceabilityEvidenceRequirements.every((item) => item.id && Array.isArray(item.policySourceIds) && item.policySourceIds.every((id) => traceabilityPolicySources.some((source) => source.id === id)) && Array.isArray(item.evidenceFields) && item.evidenceFields.length > 0), `${traceabilityEvidenceRequirements.length} traceability evidence requirements`, "error", "snapshot"),
@@ -484,7 +485,10 @@ function researchSandboxChecks(researchSandbox) {
   return [
     check("researchSandbox:readiness", researchSandbox.ok, researchSandbox.ok ? "research sandbox checks passed" : "research sandbox checks failed", "error", "research"),
     check("researchSandbox:boundaries", researchSandbox.boundaries?.length >= 7, `${researchSandbox.boundaries?.length || 0} research boundaries`, "error", "research"),
-    check("researchSandbox:reusedCollections", ["researchDatasets", "diseaseRegistryModels", "dataAccessLogs", "securityAcceptanceLedger", "personalRecords", "diagnosticReports"].every((key) => researchSandbox.reusableCollections?.includes(key)), "required reusable collections mapped", "error", "research"),
+    check("researchSandbox:reusedCollections", ["researchDatasets", "diseaseRegistryModels", "compliantDataExports", "dataAccessLogs", "securityAcceptanceLedger", "personalRecords", "diagnosticReports"].every((key) => researchSandbox.reusableCollections?.includes(key)), "required reusable collections mapped", "error", "research"),
+    check("researchSandbox:policyControls", researchSandbox.summary?.policyReady >= researchSandbox.summary?.datasets && researchSandbox.summary?.datasets >= 1, `${researchSandbox.summary?.policyReady || 0}/${researchSandbox.summary?.datasets || 0} datasets policy-ready`, "error", "research"),
+    check("researchSandbox:evidenceDocuments", researchSandbox.summary?.evidenceReady >= researchSandbox.summary?.datasets && researchSandbox.summary?.datasets >= 1, `${researchSandbox.summary?.evidenceReady || 0}/${researchSandbox.summary?.datasets || 0} datasets evidence-ready`, "error", "research"),
+    check("researchSandbox:compliantExports", researchSandbox.summary?.releasedExports >= 1, `${researchSandbox.summary?.releasedExports || 0} compliant exports released`, "error", "research"),
     check("researchSandbox:sandboxReady", researchSandbox.summary?.sandboxReady >= 1, `${researchSandbox.summary?.sandboxReady || 0} sandbox-ready datasets`, "error", "research")
   ];
 }
@@ -1631,7 +1635,7 @@ function renderMarkdown(report) {
     "",
     "## Research sandbox readiness report",
     "",
-    "See `research-sandbox-readiness-report.json` and `research-sandbox-readiness-report.md` for dataset applications, disease registries, ethics approval, de-identification release, sandbox access, usage audit, and outcome return evidence.",
+    "See `research-sandbox-readiness-report.json` and `research-sandbox-readiness-report.md` for dataset applications, disease registries, ethics approval, de-identification release, sandbox access, compliant data export, usage audit, and outcome return evidence.",
     "",
     "## Data quality and master index report",
     "",

@@ -24647,6 +24647,40 @@
       "anonymization": "k-anonymity-demo",
       "deidentificationStatus": "released",
       "authorizationStatus": "approved",
+      "governance": {
+        "dataUseAgreement": "DUA-DEMO-HTN-2026",
+        "minimumNecessary": true,
+        "reidentificationProhibited": true,
+        "exportReviewRequired": true,
+        "retentionDays": 180,
+        "steward": "research-governance",
+        "policyBasis": [
+          "PIPL",
+          "Data Security Law",
+          "Network Data Security Regulation",
+          "Ethics Review Measures"
+        ]
+      },
+      "evidenceDocuments": [
+        {
+          "id": "rd-hypertension-001-irb",
+          "type": "ethics-approval",
+          "title": "IRB approval for hypertension cohort",
+          "referenceNo": "IRB-DEMO-HTN-2026",
+          "issuedBy": "demo-irb",
+          "issuedAt": "2026-06-01",
+          "status": "verified"
+        },
+        {
+          "id": "rd-hypertension-001-dua",
+          "type": "data-use-agreement",
+          "title": "Data use agreement for hypertension cohort",
+          "referenceNo": "DUA-DEMO-HTN-2026",
+          "issuedBy": "research-governance",
+          "issuedAt": "2026-06-02",
+          "status": "verified"
+        }
+      ],
       "records": 2,
       "sourceCollections": [
         "personalRecords",
@@ -24673,6 +24707,40 @@
       "anonymization": "k-anonymity-demo",
       "deidentificationStatus": "released",
       "authorizationStatus": "approved",
+      "governance": {
+        "dataUseAgreement": "DUA-DEMO-DM-2026",
+        "minimumNecessary": true,
+        "reidentificationProhibited": true,
+        "exportReviewRequired": true,
+        "retentionDays": 180,
+        "steward": "research-governance",
+        "policyBasis": [
+          "PIPL",
+          "Data Security Law",
+          "Network Data Security Regulation",
+          "Ethics Review Measures"
+        ]
+      },
+      "evidenceDocuments": [
+        {
+          "id": "rd-diabetes-001-irb",
+          "type": "ethics-approval",
+          "title": "IRB approval for diabetes cohort",
+          "referenceNo": "IRB-DEMO-DM-2026",
+          "issuedBy": "demo-irb",
+          "issuedAt": "2026-06-01",
+          "status": "verified"
+        },
+        {
+          "id": "rd-diabetes-001-dua",
+          "type": "data-use-agreement",
+          "title": "Data use agreement for diabetes cohort",
+          "referenceNo": "DUA-DEMO-DM-2026",
+          "issuedBy": "research-governance",
+          "issuedAt": "2026-06-02",
+          "status": "verified"
+        }
+      ],
       "records": 1,
       "sourceCollections": [
         "personalRecords",
@@ -24688,6 +24756,39 @@
       "usageAudit": [],
       "outcomes": [],
       "status": "published"
+    }
+  ],
+  "compliantDataExports": [
+    {
+      "id": "cde-htn-001",
+      "datasetId": "rd-hypertension-001",
+      "datasetName": "Hypertension chronic management cohort",
+      "purpose": "Approved de-identified aggregate export for chronic management cohort review.",
+      "destination": "research-governance-review-folder",
+      "requestedFields": [
+        "ageBand",
+        "gender",
+        "followupCount",
+        "riskLevel"
+      ],
+      "exportFormat": "csv",
+      "reviewStatus": "approved",
+      "exportStatus": "released",
+      "deidentified": true,
+      "minimumNecessary": true,
+      "watermark": "wm-rd-hypertension-001-demo",
+      "evidenceRef": "rd-hypertension-001-dua",
+      "reviewer": "research-governance",
+      "requestedBy": "research-governance",
+      "requestedAt": "2026-06-20T09:30:00.000Z",
+      "reviewedAt": "2026-06-20T10:00:00.000Z",
+      "retentionDays": 180,
+      "policyBasis": [
+        "PIPL",
+        "Data Security Law",
+        "Network Data Security Regulation",
+        "Ethics Review Measures"
+      ]
     }
   ],
   "diseaseRegistryModels": [

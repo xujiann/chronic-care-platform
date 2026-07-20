@@ -1133,6 +1133,7 @@ function seedState() {
     creditEvaluationRules: seedCreditEvaluationRules(),
     researchDatasets: seedResearchDatasets(),
     diseaseRegistryModels: seedDiseaseRegistryModels(),
+    compliantDataExports: seedCompliantDataExports(),
     mobileExperienceSettings: seedMobileExperienceSettings(),
     accessibilityChecklist: seedAccessibilityChecklist(),
     securityAcceptanceLedger: seedSecurityAcceptanceLedger(),
@@ -1423,8 +1424,8 @@ function seedCreditEvaluationRules() {
 
 function seedResearchDatasets() {
   return [
-    { id: "rd-hypertension-001", diseaseType: "hypertension", name: "Hypertension chronic management cohort", version: "1.0.0", ethicsApproval: "IRB-DEMO-HTN-2026", ethicsStatus: "approved", anonymization: "k-anonymity-demo", deidentificationStatus: "released", authorizationStatus: "approved", records: 2, sourceCollections: ["personalRecords", "diagnosticReports", "chronicManagementPlans"], sandbox: { status: "active", environment: "demo-safe-sandbox", lastAccessAt: "" }, accessRequests: [], usageAudit: [], outcomes: [], status: "published" },
-    { id: "rd-diabetes-001", diseaseType: "diabetes", name: "Diabetes follow-up and HbA1c cohort", version: "1.0.0", ethicsApproval: "IRB-DEMO-DM-2026", ethicsStatus: "approved", anonymization: "k-anonymity-demo", deidentificationStatus: "released", authorizationStatus: "approved", records: 1, sourceCollections: ["personalRecords", "diagnosticReports", "followups"], sandbox: { status: "active", environment: "demo-safe-sandbox", lastAccessAt: "" }, accessRequests: [], usageAudit: [], outcomes: [], status: "published" }
+    { id: "rd-hypertension-001", diseaseType: "hypertension", name: "Hypertension chronic management cohort", version: "1.0.0", ethicsApproval: "IRB-DEMO-HTN-2026", ethicsStatus: "approved", anonymization: "k-anonymity-demo", deidentificationStatus: "released", authorizationStatus: "approved", governance: { dataUseAgreement: "DUA-DEMO-HTN-2026", minimumNecessary: true, reidentificationProhibited: true, exportReviewRequired: true, retentionDays: 180, steward: "research-governance", policyBasis: ["PIPL", "Data Security Law", "Network Data Security Regulation", "Ethics Review Measures"] }, evidenceDocuments: [{ id: "rd-hypertension-001-irb", type: "ethics-approval", title: "IRB approval for hypertension cohort", referenceNo: "IRB-DEMO-HTN-2026", issuedBy: "demo-irb", issuedAt: "2026-06-01", status: "verified" }, { id: "rd-hypertension-001-dua", type: "data-use-agreement", title: "Data use agreement for hypertension cohort", referenceNo: "DUA-DEMO-HTN-2026", issuedBy: "research-governance", issuedAt: "2026-06-02", status: "verified" }], records: 2, sourceCollections: ["personalRecords", "diagnosticReports", "chronicManagementPlans"], sandbox: { status: "active", environment: "demo-safe-sandbox", lastAccessAt: "" }, accessRequests: [], usageAudit: [], outcomes: [], status: "published" },
+    { id: "rd-diabetes-001", diseaseType: "diabetes", name: "Diabetes follow-up and HbA1c cohort", version: "1.0.0", ethicsApproval: "IRB-DEMO-DM-2026", ethicsStatus: "approved", anonymization: "k-anonymity-demo", deidentificationStatus: "released", authorizationStatus: "approved", governance: { dataUseAgreement: "DUA-DEMO-DM-2026", minimumNecessary: true, reidentificationProhibited: true, exportReviewRequired: true, retentionDays: 180, steward: "research-governance", policyBasis: ["PIPL", "Data Security Law", "Network Data Security Regulation", "Ethics Review Measures"] }, evidenceDocuments: [{ id: "rd-diabetes-001-irb", type: "ethics-approval", title: "IRB approval for diabetes cohort", referenceNo: "IRB-DEMO-DM-2026", issuedBy: "demo-irb", issuedAt: "2026-06-01", status: "verified" }, { id: "rd-diabetes-001-dua", type: "data-use-agreement", title: "Data use agreement for diabetes cohort", referenceNo: "DUA-DEMO-DM-2026", issuedBy: "research-governance", issuedAt: "2026-06-02", status: "verified" }], records: 1, sourceCollections: ["personalRecords", "diagnosticReports", "followups"], sandbox: { status: "active", environment: "demo-safe-sandbox", lastAccessAt: "" }, accessRequests: [], usageAudit: [], outcomes: [], status: "published" }
   ];
 }
 
@@ -1432,6 +1433,32 @@ function seedDiseaseRegistryModels() {
   return [
     { id: "dm-hypertension-risk-v1", diseaseType: "hypertension", version: "1.0.0", population: "registered hypertension or high-risk residents", threshold: "systolic>=140 or riskLevel=high", reviewStatus: "active", reviewer: "chronic-center", outputs: ["follow-up plan", "specialist review"] },
     { id: "dm-diabetes-risk-v1", diseaseType: "diabetes", version: "1.0.0", population: "diabetes or impaired glucose residents", threshold: "glucose>=7.0 or HbA1c>=6.5", reviewStatus: "active", reviewer: "chronic-center", outputs: ["diet intervention", "HbA1c review"] }
+  ];
+}
+
+function seedCompliantDataExports() {
+  return [
+    {
+      id: "cde-htn-001",
+      datasetId: "rd-hypertension-001",
+      datasetName: "Hypertension chronic management cohort",
+      purpose: "Approved de-identified aggregate export for chronic management cohort review.",
+      destination: "research-governance-review-folder",
+      requestedFields: ["ageBand", "gender", "followupCount", "riskLevel"],
+      exportFormat: "csv",
+      reviewStatus: "approved",
+      exportStatus: "released",
+      deidentified: true,
+      minimumNecessary: true,
+      watermark: "wm-rd-hypertension-001-demo",
+      evidenceRef: "rd-hypertension-001-dua",
+      reviewer: "research-governance",
+      requestedBy: "research-governance",
+      requestedAt: "2026-06-20T09:30:00.000Z",
+      reviewedAt: "2026-06-20T10:00:00.000Z",
+      retentionDays: 180,
+      policyBasis: ["PIPL", "Data Security Law", "Network Data Security Regulation", "Ethics Review Measures"]
+    }
   ];
 }
 
@@ -10130,6 +10157,7 @@ function normalizeState(data) {
     creditEvaluationRules: data.creditEvaluationRules && typeof data.creditEvaluationRules === "object" ? data.creditEvaluationRules : seedCreditEvaluationRules(),
     researchDatasets: mergeByKey(seedResearchDatasets(), data.researchDatasets, "id"),
     diseaseRegistryModels: mergeByKey(seedDiseaseRegistryModels(), data.diseaseRegistryModels, "id"),
+    compliantDataExports: mergeByKey(seedCompliantDataExports(), data.compliantDataExports, "id"),
     mobileExperienceSettings: data.mobileExperienceSettings && typeof data.mobileExperienceSettings === "object" ? { ...seedMobileExperienceSettings(), ...data.mobileExperienceSettings } : seedMobileExperienceSettings(),
     accessibilityChecklist: mergeByKey(seedAccessibilityChecklist(), data.accessibilityChecklist, "id"),
     securityAcceptanceLedger: mergeByKey(seedSecurityAcceptanceLedger(), data.securityAcceptanceLedger, "id"),
@@ -10386,6 +10414,7 @@ function completeSystemTargets(state) {
   state.creditEvaluationRules = state.creditEvaluationRules && typeof state.creditEvaluationRules === "object" ? state.creditEvaluationRules : seedCreditEvaluationRules();
   state.researchDatasets = mergeByKey(seedResearchDatasets(), state.researchDatasets, "id");
   state.diseaseRegistryModels = mergeByKey(seedDiseaseRegistryModels(), state.diseaseRegistryModels, "id");
+  state.compliantDataExports = mergeByKey(seedCompliantDataExports(), state.compliantDataExports, "id");
   state.chronicServiceRoles = mergeByKey(seedChronicServiceRoles(), state.chronicServiceRoles, "id");
   state.chronicCapabilityConditions = mergeByKey(seedChronicCapabilityConditions(), state.chronicCapabilityConditions, "id");
   state.chronicServicePathways = mergeByKey(seedChronicServicePathways(), state.chronicServicePathways, "id");
@@ -11154,6 +11183,7 @@ function normalizeResearchDatasetApplication(payload, user, data) {
   const allowedSources = new Set(["personalRecords", "diagnosticReports", "diseases", "followups", "chronicScreeningTasks", "chronicManagementPlans", "diseaseRegistryModels"]);
   const sourceCollections = requestedSources.filter((item) => allowedSources.has(item));
   if (!sourceCollections.length) throw new Error("sourceCollections must use approved research sources");
+  const governance = normalizeResearchGovernanceControls(payload.governance || payload, true);
   const records = estimateResearchDatasetRecords(data, sourceCollections, diseaseType);
   const now = new Date().toISOString();
   return {
@@ -11166,6 +11196,7 @@ function normalizeResearchDatasetApplication(payload, user, data) {
     anonymization: String(payload.anonymization || "pending-policy").trim(),
     deidentificationStatus: "pending",
     authorizationStatus: "pending",
+    governance,
     records,
     sourceCollections,
     sandbox: { status: "pending", environment: String(payload.environment || "demo-safe-sandbox").trim(), lastAccessAt: "" },
@@ -11174,16 +11205,82 @@ function normalizeResearchDatasetApplication(payload, user, data) {
       by: user.username || user.role,
       role: user.role,
       purpose: String(payload.purpose || "research dataset application").trim(),
+      dataUseAgreement: governance.dataUseAgreement,
+      retentionDays: governance.retentionDays,
       status: "submitted"
     }],
     usageAudit: [],
     outcomes: [],
+    evidenceDocuments: [],
     status: "requested",
     createdAt: now,
     createdBy: user.username || user.role,
     updatedAt: now,
     updatedBy: user.username || user.role
   };
+}
+
+function normalizeResearchGovernanceControls(input = {}, strict = false) {
+  const governance = input && typeof input === "object" ? input : {};
+  const dataUseAgreement = String(governance.dataUseAgreement || "").trim();
+  const retentionDays = Number(governance.retentionDays || 180);
+  const minimumNecessary = governance.minimumNecessary === true || governance.minimumNecessary === "true" || governance.minimumNecessary === "on";
+  const reidentificationProhibited = governance.reidentificationProhibited === true || governance.reidentificationProhibited === "true" || governance.reidentificationProhibited === "on";
+  const exportReviewRequired = governance.exportReviewRequired === false || governance.exportReviewRequired === "false" ? false : true;
+  if (strict && !dataUseAgreement) throw new Error("dataUseAgreement is required for research dataset applications");
+  if (strict && !minimumNecessary) throw new Error("minimumNecessary must be confirmed");
+  if (strict && !reidentificationProhibited) throw new Error("reidentificationProhibited must be confirmed");
+  if (!Number.isFinite(retentionDays) || retentionDays < 1 || retentionDays > 3650) throw new Error("retentionDays must be between 1 and 3650");
+  return {
+    dataUseAgreement,
+    minimumNecessary,
+    reidentificationProhibited,
+    exportReviewRequired,
+    retentionDays,
+    steward: String(governance.steward || "research-governance").trim(),
+    policyBasis: Array.isArray(governance.policyBasis) && governance.policyBasis.length
+      ? governance.policyBasis.map((item) => String(item).trim()).filter(Boolean)
+      : ["PIPL", "Data Security Law", "Network Data Security Regulation", "Ethics Review Measures"]
+  };
+}
+
+function normalizeResearchEvidenceDocument(payload = {}, user, dataset) {
+  const type = String(payload.type || "").trim();
+  const title = String(payload.title || "").trim();
+  const referenceNo = String(payload.referenceNo || "").trim();
+  const allowedTypes = new Set(["ethics-approval", "data-use-agreement", "consent-waiver", "minimization-review", "deidentification-assessment", "export-review"]);
+  if (!allowedTypes.has(type)) throw new Error("evidence type is not supported");
+  if (!title || !referenceNo) throw new Error("evidence title and referenceNo are required");
+  return {
+    id: payload.id || `${dataset.id}-${type}-${Date.now()}`,
+    type,
+    title,
+    referenceNo,
+    issuedBy: String(payload.issuedBy || user.username || user.role).trim(),
+    issuedAt: String(payload.issuedAt || new Date().toISOString().slice(0, 10)).trim(),
+    expiresAt: String(payload.expiresAt || "").trim(),
+    fileName: String(payload.fileName || "").trim(),
+    fileHash: String(payload.fileHash || "").trim(),
+    status: String(payload.status || "verified").trim(),
+    note: String(payload.note || "").trim(),
+    addedAt: new Date().toISOString(),
+    addedBy: user.username || user.role
+  };
+}
+
+function hasResearchEvidenceDocuments(dataset) {
+  const documents = Array.isArray(dataset?.evidenceDocuments) ? dataset.evidenceDocuments : [];
+  return ["ethics-approval", "data-use-agreement"].every((type) => documents.some((item) => item.type === type && item.status !== "rejected"));
+}
+
+function hasResearchGovernanceControls(dataset) {
+  const governance = dataset?.governance || {};
+  return Boolean(
+    governance.dataUseAgreement &&
+    governance.minimumNecessary === true &&
+    governance.reidentificationProhibited === true &&
+    Number(governance.retentionDays || 0) > 0
+  );
 }
 
 function estimateResearchDatasetRecords(data, sourceCollections, diseaseType) {
@@ -11205,6 +11302,15 @@ function estimateResearchDatasetRecords(data, sourceCollections, diseaseType) {
 function normalizeResearchApproval(dataset, payload, user) {
   const approved = String(payload.decision || payload.status || "approved").trim() === "approved";
   const now = new Date().toISOString();
+  const governance = payload.governance
+    ? normalizeResearchGovernanceControls({ ...(dataset.governance || {}), ...payload.governance })
+    : (dataset.governance || normalizeResearchGovernanceControls({
+      dataUseAgreement: payload.dataUseAgreement || "",
+      minimumNecessary: payload.minimumNecessary === undefined ? true : payload.minimumNecessary,
+      reidentificationProhibited: payload.reidentificationProhibited === undefined ? true : payload.reidentificationProhibited,
+      exportReviewRequired: payload.exportReviewRequired,
+      retentionDays: payload.retentionDays || 180
+    }));
   return {
     ...dataset,
     version: String(payload.version || dataset.version || "1.0.0").trim(),
@@ -11213,6 +11319,7 @@ function normalizeResearchApproval(dataset, payload, user) {
     anonymization: String(payload.anonymization || dataset.anonymization || "k-anonymity-demo").trim(),
     deidentificationStatus: approved ? String(payload.deidentificationStatus || "released").trim() : "blocked",
     authorizationStatus: approved ? "approved" : "rejected",
+    governance,
     status: approved ? String(payload.publishStatus || "published").trim() : "rejected",
     sandbox: {
       ...(dataset.sandbox || {}),
@@ -11234,7 +11341,43 @@ function requireDatasetSandboxAccess(dataset) {
   const approved = dataset.authorizationStatus === "approved" && (dataset.ethicsStatus === "approved" || (!dataset.ethicsStatus && dataset.ethicsApproval));
   const deidentified = ["released", "approved", "completed"].includes(String(dataset.deidentificationStatus || "").trim()) || (!dataset.deidentificationStatus && Boolean(dataset.anonymization));
   const active = ["published", "active"].includes(String(dataset.status || "").trim()) && (!dataset.sandbox || dataset.sandbox.status === "active");
-  return approved && deidentified && active;
+  return approved && deidentified && active && hasResearchGovernanceControls(dataset) && hasResearchEvidenceDocuments(dataset);
+}
+
+function normalizeCompliantDataExport(payload = {}, user, dataset) {
+  const purpose = String(payload.purpose || "").trim();
+  const destination = String(payload.destination || "").trim();
+  const requestedFields = Array.isArray(payload.requestedFields)
+    ? payload.requestedFields.map((item) => String(item).trim()).filter(Boolean)
+    : String(payload.requestedFields || "").split(/[,;\n]/).map((item) => item.trim()).filter(Boolean);
+  if (!purpose || !destination) throw new Error("purpose and destination are required");
+  if (!requestedFields.length) throw new Error("requestedFields are required");
+  const now = new Date().toISOString();
+  const retentionDays = Number(payload.retentionDays || dataset.governance?.retentionDays || 180);
+  if (!Number.isFinite(retentionDays) || retentionDays < 1 || retentionDays > 3650) throw new Error("retentionDays must be between 1 and 3650");
+  const evidenceDocument = (Array.isArray(dataset.evidenceDocuments) ? dataset.evidenceDocuments : []).find((item) => item.type === "export-review" && item.status !== "rejected")
+    || (Array.isArray(dataset.evidenceDocuments) ? dataset.evidenceDocuments : []).find((item) => item.type === "data-use-agreement" && item.status !== "rejected");
+  return {
+    id: payload.id || `cde-${dataset.id}-${Date.now()}`,
+    datasetId: dataset.id,
+    datasetName: dataset.name || dataset.id,
+    purpose,
+    destination,
+    requestedFields,
+    exportFormat: String(payload.exportFormat || "csv").trim(),
+    reviewStatus: "approved",
+    exportStatus: "released",
+    deidentified: true,
+    minimumNecessary: true,
+    watermark: String(payload.watermark || `wm-${dataset.id}-${Date.now()}`).trim(),
+    evidenceRef: String(payload.evidenceRef || evidenceDocument?.id || evidenceDocument?.referenceNo || "").trim(),
+    reviewer: String(payload.reviewer || "research-governance").trim(),
+    requestedBy: user.username || user.role,
+    requestedAt: now,
+    reviewedAt: now,
+    retentionDays,
+    policyBasis: Array.isArray(dataset.governance?.policyBasis) ? dataset.governance.policyBasis : normalizeResearchGovernanceControls({}).policyBasis
+  };
 }
 
 function appendResearchAudit(data, user, dataset, action, detail, result = "allowed") {
@@ -11251,18 +11394,65 @@ function appendResearchAudit(data, user, dataset, action, detail, result = "allo
 function buildResearchSandboxSummary(data) {
   const datasets = Array.isArray(data.researchDatasets) ? data.researchDatasets : [];
   const models = Array.isArray(data.diseaseRegistryModels) ? data.diseaseRegistryModels : [];
+  const exports = Array.isArray(data.compliantDataExports) ? data.compliantDataExports : [];
   const auditLogs = (Array.isArray(data.dataAccessLogs) ? data.dataAccessLogs : []).filter((item) => String(item.scope || "").includes("research"));
   const activeDatasets = datasets.filter(requireDatasetSandboxAccess);
+  const pendingApplications = datasets.filter((item) => item.status === "requested" || item.authorizationStatus === "pending");
+  const recentAudits = [
+    ...auditLogs.map((item) => ({
+      at: item.at,
+      actor: item.actor,
+      role: item.role,
+      action: item.scope || "research-sandbox",
+      target: item.purpose,
+      result: item.result
+    })),
+    ...datasets.flatMap((item) => (Array.isArray(item.usageAudit) ? item.usageAudit : []).map((audit) => ({
+      at: audit.at,
+      actor: audit.by,
+      role: audit.role,
+      action: audit.action || "usage-audit",
+      target: `${item.id}:${audit.purpose || ""}`,
+      result: audit.result || "allowed"
+    })))
+  ].sort((a, b) => Date.parse(b.at || "") - Date.parse(a.at || "")).slice(0, 8);
+  const recentOutcomes = datasets.flatMap((item) => (Array.isArray(item.outcomes) ? item.outcomes : []).map((outcome) => ({
+    datasetId: item.id,
+    datasetName: item.name,
+    at: outcome.at,
+    by: outcome.by,
+    title: outcome.title,
+    summary: outcome.summary,
+    registryImpact: outcome.registryImpact,
+    returnedTo: outcome.returnedTo || ["diseaseRegistryModels"]
+  }))).sort((a, b) => Date.parse(b.at || "") - Date.parse(a.at || "")).slice(0, 8);
+  const recentExports = exports.map((item) => ({
+    id: item.id,
+    datasetId: item.datasetId,
+    datasetName: item.datasetName || datasets.find((dataset) => dataset.id === item.datasetId)?.name || item.datasetId,
+    purpose: item.purpose,
+    destination: item.destination,
+    requestedFields: item.requestedFields || [],
+    reviewStatus: item.reviewStatus,
+    exportStatus: item.exportStatus,
+    watermark: item.watermark,
+    requestedAt: item.requestedAt,
+    requestedBy: item.requestedBy
+  })).sort((a, b) => Date.parse(b.requestedAt || "") - Date.parse(a.requestedAt || "")).slice(0, 8);
   return {
     ok: datasets.length >= 2 && activeDatasets.length >= 1 && auditLogs.length >= 1,
-    boundaries: ["research dataset", "disease registry", "ethics approval", "de-identification release", "sandbox access", "usage audit", "outcome return"],
+    boundaries: ["research dataset", "disease registry", "ethics approval", "de-identification release", "policy controls", "sandbox access", "compliant data export", "usage audit", "outcome return"],
     summary: {
       datasets: datasets.length,
       activeDatasets: activeDatasets.length,
       pendingApplications: datasets.filter((item) => item.status === "requested" || item.authorizationStatus === "pending").length,
       diseaseModels: models.length,
+      policyReady: datasets.filter(hasResearchGovernanceControls).length,
+      evidenceReady: datasets.filter(hasResearchEvidenceDocuments).length,
       usageAudits: datasets.reduce((sum, item) => sum + (Array.isArray(item.usageAudit) ? item.usageAudit.length : 0), 0),
       outcomes: datasets.reduce((sum, item) => sum + (Array.isArray(item.outcomes) ? item.outcomes.length : 0), 0),
+      compliantExports: exports.length,
+      releasedExports: exports.filter((item) => item.reviewStatus === "approved" && item.exportStatus === "released" && item.deidentified === true && item.minimumNecessary === true).length,
       auditLogs: auditLogs.length
     },
     datasets: datasets.map((item) => ({
@@ -11273,6 +11463,11 @@ function buildResearchSandboxSummary(data) {
       ethicsStatus: item.ethicsStatus || (item.ethicsApproval ? "approved" : "pending"),
       deidentificationStatus: item.deidentificationStatus || "pending",
       authorizationStatus: item.authorizationStatus,
+      governanceStatus: hasResearchGovernanceControls(item) ? "ready" : "pending",
+      evidenceStatus: hasResearchEvidenceDocuments(item) ? "ready" : "pending",
+      evidenceDocumentCount: Array.isArray(item.evidenceDocuments) ? item.evidenceDocuments.length : 0,
+      dataUseAgreement: item.governance?.dataUseAgreement || "",
+      retentionDays: item.governance?.retentionDays || 0,
       sandboxStatus: item.sandbox?.status || "pending",
       sourceCollections: item.sourceCollections || [],
       records: item.records || 0,
@@ -11280,7 +11475,22 @@ function buildResearchSandboxSummary(data) {
       outcomeCount: Array.isArray(item.outcomes) ? item.outcomes.length : 0
     })),
     models: models.map((item) => ({ id: item.id, diseaseType: item.diseaseType, version: item.version, reviewStatus: item.reviewStatus })),
-    reusableCollections: ["researchDatasets", "diseaseRegistryModels", "dataAccessLogs", "securityAcceptanceLedger", "personalRecords", "diagnosticReports"]
+    pendingApplications: pendingApplications.map((item) => ({
+      id: item.id,
+      diseaseType: item.diseaseType,
+      name: item.name,
+      requestedBy: item.createdBy || item.accessRequests?.[0]?.by || "",
+      requestedAt: item.createdAt || item.accessRequests?.[0]?.at || "",
+      purpose: item.accessRequests?.[0]?.purpose || "",
+      ethicsStatus: item.ethicsStatus || "pending",
+      deidentificationStatus: item.deidentificationStatus || "pending",
+      governanceStatus: hasResearchGovernanceControls(item) ? "ready" : "pending",
+      evidenceStatus: hasResearchEvidenceDocuments(item) ? "ready" : "pending"
+    })).slice(0, 8),
+    recentAudits,
+    recentOutcomes,
+    recentExports,
+    reusableCollections: ["researchDatasets", "diseaseRegistryModels", "compliantDataExports", "dataAccessLogs", "securityAcceptanceLedger", "personalRecords", "diagnosticReports"]
   };
 }
 
@@ -28514,6 +28724,14 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/research/compliant-exports") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/compliant-exports");
+    if (!user) return;
+    const data = readDatabase();
+    sendJson(res, 200, { exports: Array.isArray(data.compliantDataExports) ? data.compliantDataExports : [] });
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/research/datasets") {
     const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/datasets");
     if (!user) return;
@@ -28686,6 +28904,33 @@ async function handleApi(req, res) {
     return;
   }
 
+  const researchDatasetEvidenceMatch = url.pathname.match(/^\/api\/research\/datasets\/([^/]+)\/evidence$/);
+  if (req.method === "POST" && researchDatasetEvidenceMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/datasets/:id/evidence");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(researchDatasetEvidenceMatch[1]);
+    const index = (data.researchDatasets || []).findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Research dataset not found" });
+      return;
+    }
+    try {
+      const payload = await collectJson(req);
+      const document = normalizeResearchEvidenceDocument(payload, user, data.researchDatasets[index]);
+      data.researchDatasets[index].evidenceDocuments = [
+        document,
+        ...(Array.isArray(data.researchDatasets[index].evidenceDocuments) ? data.researchDatasets[index].evidenceDocuments : [])
+      ].slice(0, 50);
+      appendResearchAudit(data, user, data.researchDatasets[index], "evidence-document", `${document.type}:${document.referenceNo}`);
+      writeDatabase(data);
+      sendJson(res, 200, data.researchDatasets[index]);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+    }
+    return;
+  }
+
   const researchSandboxAccessMatch = url.pathname.match(/^\/api\/research\/datasets\/([^/]+)\/sandbox-access$/);
   if (req.method === "POST" && researchSandboxAccessMatch) {
     const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/datasets/:id/sandbox-access");
@@ -28698,9 +28943,9 @@ async function handleApi(req, res) {
       return;
     }
     if (!requireDatasetSandboxAccess(data.researchDatasets[index])) {
-      appendResearchAudit(data, user, data.researchDatasets[index], "sandbox-access", "blocked by ethics/de-identification/authorization status", "denied");
+      appendResearchAudit(data, user, data.researchDatasets[index], "sandbox-access", "blocked by ethics/de-identification/authorization/governance/evidence status", "denied");
       writeDatabase(data);
-      sendJson(res, 403, { error: "Forbidden", message: "Dataset is not approved, de-identified, and active for sandbox access" });
+      sendJson(res, 403, { error: "Forbidden", message: "Dataset is not approved, de-identified, governance-ready, evidence-ready, and active for sandbox access" });
       return;
     }
     const payload = await collectJson(req);
@@ -28717,10 +28962,44 @@ async function handleApi(req, res) {
       datasetId: id,
       sandboxToken: `sandbox-${id}-${Date.now()}`,
       deidentified: true,
+      governance: data.researchDatasets[index].governance || {},
       records: data.researchDatasets[index].records || 0,
       sourceCollections: data.researchDatasets[index].sourceCollections || [],
       expiresInMinutes: 120
     });
+    return;
+  }
+
+  const researchCompliantExportMatch = url.pathname.match(/^\/api\/research\/datasets\/([^/]+)\/compliant-exports$/);
+  if (req.method === "POST" && researchCompliantExportMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/datasets/:id/compliant-exports");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(researchCompliantExportMatch[1]);
+    const index = (data.researchDatasets || []).findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Research dataset not found" });
+      return;
+    }
+    if (!requireDatasetSandboxAccess(data.researchDatasets[index])) {
+      appendResearchAudit(data, user, data.researchDatasets[index], "compliant-data-export", "blocked by ethics/de-identification/authorization/governance/evidence status", "denied");
+      writeDatabase(data);
+      sendJson(res, 403, { error: "Forbidden", message: "Dataset is not approved, de-identified, governance-ready, evidence-ready, and active for compliant export" });
+      return;
+    }
+    try {
+      const payload = await collectJson(req);
+      const exportRequest = normalizeCompliantDataExport(payload, user, data.researchDatasets[index]);
+      data.compliantDataExports = [
+        exportRequest,
+        ...(Array.isArray(data.compliantDataExports) ? data.compliantDataExports : [])
+      ].slice(0, 120);
+      appendResearchAudit(data, user, data.researchDatasets[index], "compliant-data-export", `${exportRequest.id}:${exportRequest.destination}`);
+      writeDatabase(data);
+      sendJson(res, 201, exportRequest);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+    }
     return;
   }
 

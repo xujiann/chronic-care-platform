@@ -91,10 +91,10 @@ const SOURCE_APPLICATIONS = [
     conversationTitle: "科研数据集与数据沙箱平台",
     entry: "platform.html",
     owner: "research-governance",
-    collections: ["researchDatasets", "diseaseRegistryModels", "dataAccessLogs", "securityAcceptanceLedger", "personalRecords", "diagnosticReports"],
-    functionalBoundary: "Govern research dataset application, ethics approval, de-identification release, sandbox access, usage audit, and outcome return.",
-    reusePoints: ["research datasets", "disease registry models", "data access logs", "security acceptance ledger", "clinical source records"],
-    apiRoutes: ["GET /api/research/sandbox", "GET /api/research/datasets", "POST /api/research/datasets/:id/approval", "POST /api/research/datasets/:id/sandbox-access", "POST /api/research/datasets/:id/outcomes"],
+    collections: ["researchDatasets", "diseaseRegistryModels", "compliantDataExports", "dataAccessLogs", "securityAcceptanceLedger", "personalRecords", "diagnosticReports"],
+    functionalBoundary: "Govern research dataset application, ethics approval, de-identification release, sandbox access, compliant data export, usage audit, and outcome return without AI diagnosis.",
+    reusePoints: ["research datasets", "disease registry models", "compliant data exports", "data access logs", "security acceptance ledger", "clinical source records"],
+    apiRoutes: ["GET /api/research/sandbox", "GET /api/research/datasets", "GET /api/research/compliant-exports", "POST /api/research/datasets/:id/evidence", "POST /api/research/datasets/:id/approval", "POST /api/research/datasets/:id/sandbox-access", "POST /api/research/datasets/:id/compliant-exports", "POST /api/research/datasets/:id/outcomes"],
     testEvidence: ["test/research-sandbox-readiness.test.js", "research:sandbox"],
     acceptanceEvidence: ["research-sandbox-readiness-report.json", "research-sandbox-readiness-report.md"]
   }
