@@ -398,6 +398,12 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.interfaceMapping.ok, true);
   assert.equal(report.checks.some((item) => item.name === "regionalDataSharing:report" && item.passed), true);
   assert.equal(report.regionalDataSharing.ok, true);
+  assert.equal(report.checks.some((item) => item.name === "regionalDataSharing:handoffEvidence" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "regionalDataSharing:handoffRuntime" && item.passed), true);
+  assert.equal(report.regionalDataSharing.summary.referralHandoffReady >= 1, true);
+  assert.equal(report.regionalDataSharing.packages.every((item) => item.referralHandoff?.total === 6), true);
+  assert.equal(report.checks.some((item) => item.name === "regionalReferralOverlap:report" && item.passed), true);
+  assert.equal(report.regionalReferralOverlap.runtimeMergeAllowed, false);
   assert.equal(report.checks.some((item) => item.name === "monitoring:readiness" && item.passed), true);
   assert.equal(report.monitoringReadiness.ok, true);
   assert.equal(report.checks.some((item) => item.name === "referralTeleconsultation:readiness" && item.passed), true);
@@ -594,6 +600,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(markdown, /Chronic launch core readiness/);
   assert.match(markdown, /Integration readiness report/);
   assert.match(markdown, /Interface mapping report/);
+  assert.match(markdown, /Regional data sharing and referral overlap report/);
   assert.match(markdown, /Data quality and master index report/);
   assert.match(markdown, /Digital hospital standards readiness report/);
   assert.match(markdown, /digital-hospital-standards-readiness-report\.md/);
@@ -751,6 +758,10 @@ test("release report writes standalone production cutover and storage artifacts"
   const objectStorageMarkdown = fs.readFileSync(path.join(outputDir, "object-storage-readiness-report.md"), "utf8");
   const interfaceMappingJson = JSON.parse(fs.readFileSync(path.join(outputDir, "interface-mapping-report.json"), "utf8"));
   const interfaceMappingMarkdown = fs.readFileSync(path.join(outputDir, "interface-mapping-report.md"), "utf8");
+  const regionalDataSharingJson = JSON.parse(fs.readFileSync(path.join(outputDir, "regional-data-sharing-report.json"), "utf8"));
+  const regionalDataSharingMarkdown = fs.readFileSync(path.join(outputDir, "regional-data-sharing-report.md"), "utf8");
+  const regionalReferralOverlapJson = JSON.parse(fs.readFileSync(path.join(outputDir, "regional-referral-overlap-report.json"), "utf8"));
+  const regionalReferralOverlapMarkdown = fs.readFileSync(path.join(outputDir, "regional-referral-overlap-report.md"), "utf8");
   const monitoringJson = JSON.parse(fs.readFileSync(path.join(outputDir, "monitoring-readiness-report.json"), "utf8"));
   const monitoringMarkdown = fs.readFileSync(path.join(outputDir, "monitoring-readiness-report.md"), "utf8");
   const referralJson = JSON.parse(fs.readFileSync(path.join(outputDir, "referral-teleconsultation-readiness-report.json"), "utf8"));
@@ -889,6 +900,12 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(objectStorageMarkdown, /Object storage and attachment security readiness/);
   assert.equal(interfaceMappingJson.interfaceMapping.ok, true);
   assert.match(interfaceMappingMarkdown, /Contract field mappings/);
+  assert.equal(regionalDataSharingJson.regionalDataSharing.summary.referralHandoffReady >= 1, true);
+  assert.equal(regionalDataSharingJson.regionalDataSharing.packages.every((item) => item.referralHandoff?.total === 6), true);
+  assert.match(regionalDataSharingMarkdown, /转诊会诊交接证据/);
+  assert.equal(regionalReferralOverlapJson.regionalReferralOverlap.ok, true);
+  assert.equal(regionalReferralOverlapJson.regionalReferralOverlap.runtimeMergeAllowed, false);
+  assert.match(regionalReferralOverlapMarkdown, /区域诊疗数据共享与医联体转诊重合度检查报告/);
   assert.equal(monitoringJson.monitoringReadiness.ok, true);
   assert.match(monitoringMarkdown, /SLO targets/);
   assert.equal(referralJson.referralTeleconsultationReadiness.ok, true);
@@ -951,6 +968,7 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "phase2-family-doctor"), true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "onsite-launch-requirements"), true);
   assert.match(manifestMarkdown, /Release artifact manifest/);
+  assert.match(manifestMarkdown, /regional-referral-overlap-report\.md/);
   assert.match(manifestMarkdown, /service-acceptance-summary\.md/);
   assert.match(manifestMarkdown, /release\/templates\/identity-source-mapping\/README\.md/);
 });

@@ -136,6 +136,7 @@ SQLite 结构化镜像已覆盖居民、账户、主索引、个人健康档案�
 | `GET /api/multi-practice-registry` | 医师多点执业监管台账，按角色返回公开备案、风险补正队列、材料核验和政策摘要 |
 | `GET/POST/PATCH /api/personal-records` | 个人健康档案读写 |
 | `POST /api/workflow-actions` | 通用工作流动作 |
+| `GET /api/regional-data-sharing` / `GET /api/regional-data-sharing/handoff-report` / `POST /api/regional-data-sharing/access-reviews` | 区域诊疗数据共享包、转诊会诊交接清单和调阅审计留痕；管理端全域可见，机构端按来源/接收机构裁剪 |
 | `PATCH /api/chronic-management-plans/:id`、`/api/chronic-comorbidity-plans/:id`、`/api/chronic-tcm-services/:id`、`/api/chronic-self-management/:id`、`/api/chronic-medication-support/:id`、`/api/chronic-quality-metrics/:id` | 慢病管理计划、多病共管、中医药、自我管理、用药保障和质控记录的单条更新，支持机构/卫健委权限、居民授权范围和乐观锁 |
 | `GET /api/tasks` / `POST /api/tasks/:id/actions` | 统一任务中心 |
 | `GET /api/messages` / `POST /api/messages/:id/receipt` | 站内消息与送达回执 |
@@ -216,6 +217,10 @@ npm.cmd run maternal-child:readiness
 npm.cmd run policy:coverage
 npm.cmd run hybrid:deployment-readiness
 ```
+
+`regional-referral:overlap` 会生成 `release/regional-referral-overlap-report.json` 和 `release/regional-referral-overlap-report.md`，用于检查区域诊疗数据共享平台与医联体转诊/远程会诊功能的重合度。当前结论是“部分合并”：合并交接证据、报告和现场验收边界；不合并运行时主模型和 API。
+
+区域诊疗数据共享页面提供“生成交接清单”动作，对应 `GET /api/regional-data-sharing/handoff-report`。该接口复用共享包权限裁剪，输出每个共享包的 6 项交接证据、待补项、Markdown 清单和运行边界，用于现场证明资料可调阅、可追溯、可交接，但不生成或改写医联体转诊单。
 
 `deploy:check` 会检查 README、部署文档、静态快照、P2 集合、P2 完成状态、P0 接口准备度、安全验收台账、环境脚本和关键 npm scripts；`deploy:check:full` 还会串行执行 `check`、`test`、`test:coverage`、`test:e2e` 和 `npm audit --omit=dev`。
 

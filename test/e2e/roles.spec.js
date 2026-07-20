@@ -174,6 +174,38 @@ test("about page explains runnable platform capabilities", async ({ page }) => {
   await expect(page.locator(".auth-bar a[href='./about.html']")).toHaveCount(1);
 });
 
+test("regional sharing page renders referral handoff boundary", async ({ page }) => {
+  await login(page, "health", "index.html");
+  await page.goto("/regional-data-sharing.html");
+
+  await expect(page.getByRole("heading", { name: "上线前缺口" })).toBeVisible();
+  await expect(page.locator("#regional-launch-readiness")).toContainText("已实现能力");
+  await expect(page.locator("#regional-launch-readiness")).toContainText("待开发项");
+  await expect(page.locator("#regional-launch-readiness")).toContainText("OIDC/SAML");
+  await expect(page.locator("[data-regional-section='site-integration']")).toBeVisible();
+  await expect(page.locator("#regional-site-integration .capability-card")).toHaveCount(8);
+  await expect(page.locator("#regional-site-integration")).toContainText("身份与权限");
+  await expect(page.locator("#regional-site-integration")).toContainText("监控灾备");
+  await expect(page.locator("#regional-site-integration")).toContainText("联调样例");
+  await expect(page.locator("#regional-site-integration")).toContainText("验收证据");
+  await expect(page.locator("#regional-site-integration")).toContainText("下一步");
+  await expect(page.locator("#regional-launch-readiness")).toContainText("现场签字");
+
+  await expect(page.getByRole("heading", { name: "转诊会诊交接" })).toBeVisible();
+  await expect(page.locator("#regional-referral-handoff-summary")).toContainText(/项证据可交接/);
+  await expect(page.locator("#regional-referral-handoff .handoff-grid article")).toHaveCount(6);
+  await expect(page.locator("#regional-referral-handoff")).toContainText("调阅审计");
+  await expect(page.locator("#regional-referral-boundary")).toContainText("可以合并");
+  await expect(page.locator("#regional-referral-boundary")).toContainText("不合并运行时");
+  await expect(page.locator("#regional-referral-boundary")).toContainText("不把区域共享包当作转诊单主表");
+
+  await page.getByRole("button", { name: "生成交接清单" }).click();
+  await expect(page.locator("#regional-handoff-report")).toContainText("区域共享-转诊会诊交接清单");
+  await expect(page.locator("#regional-handoff-report")).toContainText(/rshr-/);
+  await expect(page.locator("#regional-handoff-report")).toContainText("证据进度");
+  await expect(page.locator("#regional-handoff-report .handoff-report-list article")).toHaveCount(3);
+});
+
 test("citizen stays in the household experience and cannot open commission pages", async ({ page }) => {
   await login(page, "citizen", "citizen.html");
   await expect(page.getByRole("heading", { name: "个人健康信息库" })).toBeVisible();

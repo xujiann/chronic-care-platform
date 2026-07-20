@@ -9240,6 +9240,34 @@ function sealAuditTrail(rows, options = {}) {
   return items;
 }
 
+function prependAuditTrailEntry(rows, entry, limit = 120) {
+  const current = Array.isArray(rows) ? rows : [];
+  const next = [entry, ...current].slice(0, limit);
+  if (next.length < current.length + 1) {
+    return sealAuditTrail(next.map(({ auditHash, previousAuditHash, ...item }) => item));
+  }
+  return sealAuditTrail(next);
+}
+
+function resealAuditTrail(rows) {
+  return sealAuditTrail((Array.isArray(rows) ? rows : []).map(({ auditHash, previousAuditHash, ...item }) => item));
+}
+
+function auditTrailNeedsTextRepair(rows) {
+  return JSON.stringify(Array.isArray(rows) ? rows : []).includes("�");
+}
+
+function auditTrailHasNonRepairEdit(incomingRows, currentRows) {
+  const currentById = new Map((Array.isArray(currentRows) ? currentRows : []).map((item) => [item.id, item]));
+  return (Array.isArray(incomingRows) ? incomingRows : []).some((item) => {
+    const current = currentById.get(item.id);
+    if (!current || current.auditHash !== item.auditHash) return false;
+    const { auditHash: incomingHash, previousAuditHash: incomingPreviousHash, ...incomingPayload } = item;
+    const { auditHash: currentHash, previousAuditHash: currentPreviousHash, ...currentPayload } = current;
+    return JSON.stringify(incomingPayload) !== JSON.stringify(currentPayload) && !JSON.stringify(incomingPayload).includes("�");
+  });
+}
+
 function verifyAuditTrail(rows) {
   const items = Array.isArray(rows) ? rows : [];
   const broken = [];
@@ -9746,14 +9774,16 @@ function reviewMutualRecognitionRecord(data, id, payload, user) {
   return updated;
 }
 
+
+
 function seedRegionalDataSharingScope() {
   return {
     id: "regional-data-sharing",
     name: "区域诊疗数据共享平台",
     boundary: [
-      "居民主索引下的诊疗摘要、检查检验报告、互认记录和授权调阅",
-      "管理端按区域、机构、接口和质量状态监管共享闭环",
-      "机构端按本机构来源或目标居民共享包完成调阅、确认和留痕"
+      "在居民主索引下共享诊疗摘要、检查检验报告、互认记录和授权调阅记录。",
+      "管理端按区域、机构、接口、质量状态和审计留痕监管共享闭环。",
+      "机构端按本机构来源或目标居民共享包完成调阅、确认和留痕。"
     ],
     roles: [
       { role: "commission", name: "管理端", permissions: ["共享网络总览", "质量与合规监管", "跨机构审计追踪", "现场联调证据归档"] },
@@ -9761,16 +9791,16 @@ function seedRegionalDataSharingScope() {
       { role: "citizen", name: "居民端", permissions: ["通过既有个人健康档案和授权记录查看结果"], via: "citizen.html / personalRecords" }
     ],
     coreLoop: [
-      "机构接口或人工回传形成 diagnosticReports / personalRecords",
-      "区域规则生成 countyMutualRecognitionRecords 和共享包",
-      "目标机构调阅共享包并登记 regionalSharingAccessReviews",
-      "管理端用质量、授权、互认、审计和接口证据验收闭环"
+      "机构接口或人工回传形成诊断报告和个人健康档案摘要。",
+      "区域规则生成互认记录和共享包。",
+      "目标机构调阅共享包并登记调阅审计。",
+      "管理端用质量、授权、互认、审计和接口证据验收闭环。"
     ],
     exclusions: [
-      "不替代院内 HIS/EMR/LIS/PACS 原系统",
-      "不直接承载医保结算、电子票据或费用清分",
-      "不绕过居民授权、机构职责边界和现场接口签名验收",
-      "不把科研脱敏数据集作为临床诊疗直接来源"
+      "不替代院内 HIS/EMR/LIS/PACS 原系统。",
+      "不承载医保结算、票据或费用清分。",
+      "不绕过居民授权、机构职责边界和现场接口签名验收。",
+      "不把科研脱敏数据集作为临床诊疗直接来源。"
     ],
     reusedCollections: [
       "residents",
@@ -9792,6 +9822,7 @@ function seedRegionalDataSharingScope() {
   };
 }
 
+
 function seedRegionalSharingPackages() {
   return [
     {
@@ -9802,7 +9833,7 @@ function seedRegionalSharingPackages() {
       sourceOrgCode: "MR3",
       targetInstitutions: ["大连市中心医院", "中山区县域医共体"],
       targetOrgCodes: ["MR1", "ORG-CONSORTIUM-ZS"],
-      category: "chronic-followup",
+      category: "慢病复查",
       title: "高血压复查共享包",
       sharedCollections: ["personalRecords", "followups", "diagnosticReports"],
       recordRefs: ["pr-001", "dr-seed-001"],
@@ -9822,7 +9853,7 @@ function seedRegionalSharingPackages() {
       sourceOrgCode: "MR1",
       targetInstitutions: ["星海湾社区卫生服务中心", "中山区县域医共体"],
       targetOrgCodes: ["MR4", "ORG-CONSORTIUM-ZS"],
-      category: "diagnostic-report",
+      category: "检查报告互认",
       title: "糖尿病检验报告互认共享包",
       sharedCollections: ["diagnosticReports", "countyMutualRecognitionRecords", "personalRecords"],
       recordRefs: ["dr-seed-002", "cmr-seed-002"],
@@ -9842,7 +9873,7 @@ function seedRegionalSharingPackages() {
       sourceOrgCode: "MR5",
       targetInstitutions: ["大连医科大学附属医院"],
       targetOrgCodes: ["MR2"],
-      category: "imaging",
+      category: "影像复核",
       title: "影像报告复核共享包",
       sharedCollections: ["diagnosticReports", "integrationGatewayEvents"],
       recordRefs: ["dr-seed-003"],
@@ -9857,6 +9888,7 @@ function seedRegionalSharingPackages() {
   ];
 }
 
+
 function seedRegionalSharingSnapshots() {
   return {
     generatedAt: "2026-06-22T10:30:00.000Z",
@@ -9865,22 +9897,23 @@ function seedRegionalSharingSnapshots() {
       residentId: "居民主索引关联",
       sourceOrgCode: "来源机构代码",
       targetOrgCodes: "目标机构代码列表",
-      status: "ready | pending_review | blocked | archived",
-      consentStatus: "active | pending | revoked",
-      qualityStatus: "passed | manual_review | failed",
-      contractRefs: "integrationContracts.id 列表",
-      recordRefs: "personalRecords / diagnosticReports / countyMutualRecognitionRecords 引用"
+      status: "可共享 / 待复核 / 暂缓共享 / 已归档",
+      consentStatus: "授权有效 / 授权待确认 / 授权已撤销",
+      qualityStatus: "质控通过 / 人工复核 / 质控未通过",
+      contractRefs: "接口契约编号列表",
+      recordRefs: "个人健康档案、诊断报告、互认记录引用"
     },
     statusNorms: seedRegionalDataSharingScope().statusNorms,
     staticEvidence: [
-      "residents.personIndex",
-      "personalRecords.reportId",
-      "diagnosticReports.recognitionRecordId",
-      "integrationContracts.requiredFields",
-      "interface-mapping-report.md"
+      "居民主索引 personIndex",
+      "个人健康档案 reportId",
+      "诊断报告 recognitionRecordId",
+      "接口契约必填字段",
+      "接口字段映射报告"
     ]
   };
 }
+
 
 function seedRegionalSharingAccessReviews() {
   return [
@@ -9931,9 +9964,107 @@ function canAccessRegionalSharingPackage(user, item) {
     (item.targetInstitutions || []).includes(user.orgName);
 }
 
+function regionalConsentLabel(status) {
+  return {
+    active: "授权有效",
+    pending: "授权待确认",
+    revoked: "授权已撤销"
+  }[status] || status || "授权待确认";
+}
+
+function regionalQualityLabel(status) {
+  return {
+    passed: "质控通过",
+    manual_review: "人工复核",
+    failed: "质控未通过"
+  }[status] || status || "质量待确认";
+}
+
+function regionalCollectionLabel(key) {
+  return {
+    residents: "居民主索引",
+    personalRecords: "个人健康档案",
+    diagnosticReports: "诊断检查报告",
+    countyMutualRecognitionRecords: "县域互认记录",
+    integrationContracts: "接口契约",
+    dataAccessLogs: "访问日志",
+    securityEvents: "安全事件"
+  }[key] || key;
+}
+
+function buildRegionalReferralHandoffEvidence(packageItem, reviews = []) {
+  const collections = new Set(packageItem.sharedCollections || []);
+  const evidenceCounts = packageItem.evidenceCounts || {};
+  const targetCount = (packageItem.targetOrgCodes || packageItem.targetInstitutions || []).length;
+  const relatedReviews = reviews.filter((item) => item.packageId === packageItem.id);
+  const evidence = [
+    {
+      id: "clinical-records",
+      label: "诊疗资料",
+      ready: collections.has("personalRecords") && collections.has("diagnosticReports") && evidenceCounts.personalRecords > 0 && evidenceCounts.diagnosticReports > 0,
+      detail: `档案 ${evidenceCounts.personalRecords || 0} 条，报告 ${evidenceCounts.diagnosticReports || 0} 条`
+    },
+    {
+      id: "mutual-recognition",
+      label: "互认依据",
+      ready: collections.has("countyMutualRecognitionRecords") && evidenceCounts.mutualRecognitionRecords > 0,
+      detail: `互认记录 ${evidenceCounts.mutualRecognitionRecords || 0} 条，可支撑检查检验结果复用`
+    },
+    {
+      id: "integration-contracts",
+      label: "接口契约",
+      ready: (packageItem.contractRefs || []).length > 0 && (packageItem.contracts || []).every((item) => item.status === "ready"),
+      detail: (packageItem.contracts || []).map((item) => item.domain || item.id).join("、") || "未绑定契约"
+    },
+    {
+      id: "consent-quality",
+      label: "授权与质控",
+      ready: packageItem.consentStatus === "active" && packageItem.qualityStatus === "passed",
+      detail: `${regionalConsentLabel(packageItem.consentStatus)} / ${regionalQualityLabel(packageItem.qualityStatus)}`
+    },
+    {
+      id: "access-audit",
+      label: "调阅审计",
+      ready: relatedReviews.length > 0 || Boolean(packageItem.lastAccessReviewId || packageItem.lastSharedAt),
+      detail: relatedReviews.length
+        ? `本包已有 ${relatedReviews.length} 条调阅留痕`
+        : packageItem.lastAccessReviewId || packageItem.lastSharedAt
+          ? `已有共享或留痕记录 ${packageItem.lastAccessReviewId || packageItem.lastSharedAt}`
+          : "转诊接诊前需登记调阅目的"
+    },
+    {
+      id: "recipient-scope",
+      label: "接收范围",
+      ready: targetCount > 0,
+      detail: `目标机构 ${targetCount} 个；仅允许来源或目标机构在授权范围内调阅`
+    }
+  ];
+  const readyCount = evidence.filter((item) => item.ready).length;
+  return {
+    ready: readyCount === evidence.length,
+    readyCount,
+    total: evidence.length,
+    evidence,
+    mergeItems: [
+      `共享 ${["residents", "personalRecords", "diagnosticReports", "countyMutualRecognitionRecords", "integrationContracts", "dataAccessLogs"].map(regionalCollectionLabel).join("、")} 作为接诊前证据。`,
+      "现场验收报告合并呈现：区域共享证明资料可调阅，转诊会诊证明业务可流转。",
+      "转诊回传报告进入诊断报告或健康档案后，可再次被共享包编目。"
+    ],
+    runtimeBoundaries: [
+      "不把区域共享包当作转诊单主表。",
+      "不在区域共享入口改写号源、床位、接诊反馈或服务时限状态。",
+      "不绕过居民授权、机构范围和调阅审计。"
+    ],
+    note: "交接只证明资料可调阅、可追溯、可用于接诊判断；转诊单、号源床位、服务时限督办和绩效结算仍由转诊会诊模块负责。"
+  };
+}
+
 function buildRegionalDataSharingView(data, user) {
   const packages = normalizeRegionalSharingPackages(data.regionalSharingPackages || seedRegionalSharingPackages())
     .filter((item) => canAccessRegionalSharingPackage(user, item));
+  const reviews = (data.regionalSharingAccessReviews || []).filter((review) =>
+    packages.some((item) => item.id === review.packageId)
+  );
   const residentsById = new Map((data.residents || []).map((item) => [item.id, item]));
   const contractsById = new Map((data.integrationContracts || []).map((item) => [item.id, item]));
   const diagnosticReports = data.diagnosticReports || [];
@@ -9944,7 +10075,7 @@ function buildRegionalDataSharingView(data, user) {
     const relatedPersonalRecords = personalRecords.filter((record) => record.residentId === item.residentId && (item.recordRefs.includes(record.id) || item.sharedCollections.includes("personalRecords")));
     const relatedRecognition = recognitionRecords.filter((record) => record.residentId === item.residentId || item.recordRefs.includes(record.id));
     const contracts = item.contractRefs.map((id) => contractsById.get(id)).filter(Boolean);
-    return {
+    const packageView = {
       ...item,
       resident: residentsById.get(item.residentId) || null,
       contracts: contracts.map((contract) => ({
@@ -9965,10 +10096,11 @@ function buildRegionalDataSharingView(data, user) {
         ...relatedRecognition.slice(0, 3).map((record) => ({ type: "countyMutualRecognitionRecords", id: record.id, name: record.item, status: record.status, at: record.at }))
       ].sort((left, right) => String(right.at || "").localeCompare(String(left.at || ""))).slice(0, 5)
     };
+    return {
+      ...packageView,
+      referralHandoff: buildRegionalReferralHandoffEvidence(packageView, reviews)
+    };
   });
-  const reviews = (data.regionalSharingAccessReviews || []).filter((review) =>
-    packages.some((item) => item.id === review.packageId)
-  );
   return {
     scope: data.regionalDataSharingScope || seedRegionalDataSharingScope(),
     snapshots: data.regionalSharingSnapshots || seedRegionalSharingSnapshots(),
@@ -9977,6 +10109,7 @@ function buildRegionalDataSharingView(data, user) {
       ready: enrichedPackages.filter((item) => item.status === "ready").length,
       pendingReview: enrichedPackages.filter((item) => item.status === "pending_review").length,
       blocked: enrichedPackages.filter((item) => item.status === "blocked").length,
+      referralHandoffReady: enrichedPackages.filter((item) => item.referralHandoff?.ready).length,
       accessReviews: reviews.length,
       institutions: new Set(enrichedPackages.flatMap((item) => [item.sourceInstitution, ...(item.targetInstitutions || [])]).filter(Boolean)).size,
       contracts: new Set(enrichedPackages.flatMap((item) => item.contractRefs || [])).size
@@ -9984,6 +10117,80 @@ function buildRegionalDataSharingView(data, user) {
     packages: enrichedPackages,
     accessReviews: reviews.slice(0, 50)
   };
+}
+
+function buildRegionalHandoffReport(data, user) {
+  const view = buildRegionalDataSharingView(data, user);
+  const packages = (view.packages || []).map((item) => {
+    const handoff = item.referralHandoff || { ready: false, readyCount: 0, total: 0, evidence: [] };
+    const evidence = handoff.evidence || [];
+    return {
+      id: item.id,
+      title: item.title,
+      residentId: item.residentId,
+      residentName: item.resident?.name || item.residentId,
+      sourceInstitution: item.sourceInstitution || item.sourceOrgCode,
+      targetInstitutions: item.targetInstitutions || item.targetOrgCodes || [],
+      status: item.status,
+      handoffReady: Boolean(handoff.ready),
+      readyCount: handoff.readyCount || evidence.filter((entry) => entry.ready).length,
+      total: handoff.total || evidence.length,
+      readyEvidence: evidence.filter((entry) => entry.ready).map((entry) => entry.label),
+      pendingEvidence: evidence.filter((entry) => !entry.ready).map((entry) => entry.label),
+      note: handoff.note
+    };
+  });
+  const report = {
+    reportId: `rshr-${randomUUID()}`,
+    generatedAt: new Date().toISOString(),
+    actor: {
+      role: user.role,
+      organization: user.orgName || "",
+      name: user.name || ""
+    },
+    scope: {
+      name: view.scope?.name || "区域诊疗数据共享平台",
+      packageScope: user.role === "commission" ? "全域共享包" : "本机构来源或接收共享包",
+      runtimeBoundary: "只生成调阅交接证据清单，不生成或改写转诊单、号源、床位、接诊反馈和绩效结算。"
+    },
+    summary: {
+      packages: packages.length,
+      handoffReady: packages.filter((item) => item.handoffReady).length,
+      evidenceTotal: packages.reduce((sum, item) => sum + item.total, 0),
+      evidenceReady: packages.reduce((sum, item) => sum + item.readyCount, 0),
+      accessReviews: view.summary?.accessReviews || 0
+    },
+    packages
+  };
+  return {
+    ...report,
+    markdown: renderRegionalHandoffMarkdown(report)
+  };
+}
+
+function renderRegionalHandoffMarkdown(report) {
+  const rows = (report.packages || []).map((item) => [
+    item.id,
+    item.residentName,
+    item.sourceInstitution,
+    (item.targetInstitutions || []).join("、") || "未配置",
+    `${item.readyCount}/${item.total}`,
+    item.pendingEvidence.length ? item.pendingEvidence.join("、") : "无"
+  ]);
+  return [
+    "# 区域共享-转诊会诊交接清单",
+    "",
+    `- 清单编号：${report.reportId}`,
+    `- 生成时间：${report.generatedAt}`,
+    `- 生成角色：${report.actor.organization || report.actor.role}`,
+    `- 权限范围：${report.scope.packageScope}`,
+    `- 交接就绪：${report.summary.handoffReady}/${report.summary.packages}`,
+    `- 运行边界：${report.scope.runtimeBoundary}`,
+    "",
+    "| 共享包 | 居民 | 来源机构 | 接收机构 | 证据进度 | 待补证据 |",
+    "| --- | --- | --- | --- | --- | --- |",
+    ...rows.map((row) => `| ${row.join(" | ")} |`)
+  ].join("\n");
 }
 
 function createRegionalSharingAccessReview(data, payload, user) {
@@ -10023,19 +10230,16 @@ function createRegionalSharingAccessReview(data, payload, user) {
   data.regionalSharingPackages = packages;
   data.regionalSharingAccessReviews = [review, ...(Array.isArray(data.regionalSharingAccessReviews) ? data.regionalSharingAccessReviews : [])].slice(0, 200);
   appendDataAccessLog(data, user, packages[index].residentId, "regionalDataSharing", review.purpose, decision === "approved" ? "允许" : "拒绝");
-  data.securityEvents = [
-    {
-      id: randomUUID(),
-      at: new Date().toLocaleString("zh-CN", { hour12: false }),
-      actor: user.name,
-      role: user.role,
-      action: "regional sharing access review",
-      target: packageId,
-      result: decision === "approved" ? "allowed" : "denied",
-      detail: review.purpose
-    },
-    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-  ].slice(0, 120);
+  data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+    id: randomUUID(),
+    at: new Date().toLocaleString("zh-CN", { hour12: false }),
+    actor: user.name,
+    role: user.role,
+    action: "regional sharing access review",
+    target: packageId,
+    result: decision === "approved" ? "allowed" : "denied",
+    detail: review.purpose
+  });
   writeDatabase(data);
   return { status: 201, body: { review, package: packages[index] } };
 }
@@ -16505,19 +16709,16 @@ function patchCollectionItem({ data, collection, id, patch, user, action, protec
       collectionVersions: { [collection]: Number(patch.expectedVersion) }
     };
   }
-  data.securityEvents = [
-    {
-      id: randomUUID(),
-      at: new Date().toLocaleString("zh-CN", { hour12: false }),
-      actor: user.name,
-      role: user.role,
-      action,
-      target: `${collection}/${id}`,
-      result: "允许",
-      detail: `集合项更新 ${collection}`
-    },
-    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-  ].slice(0, 120);
+  data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+    id: randomUUID(),
+    at: new Date().toLocaleString("zh-CN", { hour12: false }),
+    actor: user.name,
+    role: user.role,
+    action,
+    target: `${collection}/${id}`,
+    result: "允许",
+    detail: `集合项更新 ${collection}`
+  });
   writeDatabase(data);
   return { status: 200, body: rows[index] };
 }
@@ -16544,19 +16745,16 @@ function patchBusinessCollectionItem({ data, collection, id, patch, user, action
       collectionVersions: { [collection]: Number(patch.expectedVersion) }
     };
   }
-  data.securityEvents = [
-    {
-      id: randomUUID(),
-      at: new Date().toLocaleString("zh-CN", { hour12: false }),
-      actor: user.name,
-      role: user.role,
-      action,
-      target: `${collection}/${id}`,
-      result: "允许",
-      detail: `业务级更新 ${collection}`
-    },
-    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-  ].slice(0, 120);
+  data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+    id: randomUUID(),
+    at: new Date().toLocaleString("zh-CN", { hour12: false }),
+    actor: user.name,
+    role: user.role,
+    action,
+    target: `${collection}/${id}`,
+    result: "允许",
+    detail: `业务级更新 ${collection}`
+  });
   writeDatabase(data);
   return { status: 200, body: rows[index] };
 }
@@ -20603,19 +20801,16 @@ async function handleApi(req, res) {
       updatedAt: new Date().toISOString(),
       updatedBy: user.username || user.role
     };
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "update security compliance evidence",
-        target: id,
-        result: "allowed",
-        detail: data.securityAcceptanceLedger[index].status
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "update security compliance evidence",
+      target: id,
+      result: "allowed",
+      detail: data.securityAcceptanceLedger[index].status
+    });
     writeDatabase(data);
     sendJson(res, 200, data.securityAcceptanceLedger[index]);
     return;
@@ -21308,6 +21503,22 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission", "institution"], "/api/regional-data-sharing");
     if (!user) return;
     sendJson(res, 200, redactSensitiveResponse(buildRegionalDataSharingView(readDatabase(), user), user));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/regional-data-sharing/handoff-report") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/regional-data-sharing/handoff-report");
+    if (!user) return;
+    const report = buildRegionalHandoffReport(readDatabase(), user);
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "生成区域共享交接清单",
+      target: "/api/regional-data-sharing/handoff-report",
+      result: "允许",
+      detail: `${report.reportId}；${report.summary.packages} 个共享包，${report.summary.handoffReady} 个可交接`
+    });
+    sendJson(res, 200, redactSensitiveResponse(report, user));
     return;
   }
 
@@ -22909,19 +23120,16 @@ async function handleApi(req, res) {
     }
     const message = createTaskMessage({ task, payload: await collectJson(req), user });
     data.taskMessages = [message, ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])].slice(0, 300);
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "send task message",
-        target: taskId,
-        result: "allowed",
-        detail: `${message.targetRole} · ${message.channel}`
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "send task message",
+      target: taskId,
+      result: "allowed",
+      detail: `${message.targetRole} · ${message.channel}`
+    });
     writeDatabase(data);
     sendJson(res, 201, message);
     return;
@@ -25569,19 +25777,16 @@ async function handleApi(req, res) {
     landAppointmentIntegrationEvent(data, payload, event, user);
     landPhysicalExamIntegrationEvent(data, payload, event, user);
     data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "接收集成事件",
-        target: `${contract.domain}/${payload.externalId}`,
-        result: "允许",
-        detail: `${contract.id} · ${event.idempotencyKey}`
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "接收集成事件",
+      target: `${contract.domain}/${payload.externalId}`,
+      result: "允许",
+      detail: `${contract.id} · ${event.idempotencyKey}`
+    });
     writeDatabase(data);
     sendJson(res, 202, event);
     return;
@@ -25611,19 +25816,16 @@ async function handleApi(req, res) {
     landAppointmentIntegrationEvent(data, sample.payload, event, user);
     landPhysicalExamIntegrationEvent(data, sample.payload, event, user);
     data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "模拟集成网关联调",
-        target: `${contract.domain}/${sample.payload.externalId}`,
-        result: "允许",
-        detail: `${contract.id} · ${sample.payload.idempotencyKey}`
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "模拟集成网关联调",
+      target: `${contract.domain}/${sample.payload.externalId}`,
+      result: "允许",
+      detail: `${contract.id} · ${sample.payload.idempotencyKey}`
+    });
     writeDatabase(data);
     sendJson(res, 202, { sample, event });
     return;
@@ -25877,19 +26079,16 @@ async function handleApi(req, res) {
       sendJson(res, 404, { error: "Not Found", message: "未找到集成网关事件" });
       return;
     }
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "标记集成网关死信",
-        target: event.id,
-        result: "允许",
-        detail: `${event.contractId} · ${event.idempotencyKey} · ${event.deadLetterReason}`
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "标记集成网关死信",
+      target: event.id,
+      result: "允许",
+      detail: `${event.contractId} · ${event.idempotencyKey} · ${event.deadLetterReason}`
+    });
     writeDatabase(data);
     sendJson(res, 200, event);
     return;
@@ -26553,19 +26752,16 @@ async function handleApi(req, res) {
     if (normalized.criticalSignal) {
       data.emergencySignals = [normalized.criticalSignal, ...(Array.isArray(data.emergencySignals) ? data.emergencySignals : [])].slice(0, 200);
     }
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "submit diagnostic report",
-        target: `${normalized.report.residentId}/${normalized.report.item}`,
-        result: "allowed",
-        detail: `${normalized.report.status} · ${normalized.report.ruleId || "no-rule"}${normalized.criticalSignal ? " · critical" : ""}`
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "submit diagnostic report",
+      target: `${normalized.report.residentId}/${normalized.report.item}`,
+      result: "allowed",
+      detail: `${normalized.report.status} · ${normalized.report.ruleId || "no-rule"}${normalized.criticalSignal ? " · critical" : ""}`
+    });
     writeDatabase(data);
     sendJson(res, 201, normalized);
     return;
@@ -26624,19 +26820,16 @@ async function handleApi(req, res) {
       sendJson(res, 404, { error: "Not Found", message: "未找到互认记录" });
       return;
     }
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "review mutual recognition",
-        target: reviewed.id,
-        result: "allowed",
-        detail: `${reviewed.reviewStatus} · ${reviewed.reviewReasonCode}`
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "review mutual recognition",
+      target: reviewed.id,
+      result: "allowed",
+      detail: `${reviewed.reviewStatus} · ${reviewed.reviewReasonCode}`
+    });
     writeDatabase(data);
     sendJson(res, 200, reviewed);
     return;
@@ -26815,19 +27008,16 @@ async function handleApi(req, res) {
         collectionVersions: { multiPracticeApplications: Number(patch.expectedVersion) }
       };
     }
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "更新多点执业申请",
-        target: id,
-        result: "允许",
-        detail: `状态更新为 ${data.multiPracticeApplications[index].status || "已更新"}`
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "更新多点执业申请",
+      target: id,
+      result: "允许",
+      detail: `状态更新为 ${data.multiPracticeApplications[index].status || "已更新"}`
+    });
     writeDatabase(data);
     sendJson(res, 200, data.multiPracticeApplications[index]);
     return;
@@ -27095,6 +27285,8 @@ async function handleApi(req, res) {
       return existing && item.auditHash === existing.auditHash && auditHashFor(item) !== item.auditHash;
     });
     const data = normalizeState(payload);
+    if (payloadSecurityEventsValid || securityEventsRepairable) data.securityEvents = resealAuditTrail(data.securityEvents);
+    if (payloadDataAccessLogsValid || dataAccessLogsRepairable) data.dataAccessLogs = resealAuditTrail(data.dataAccessLogs);
     data.storageMeta = payload.storageMeta;
     if (!auditPayloadTampered) {
       data.securityEvents = data.securityEvents.map((item) => {
@@ -27140,19 +27332,16 @@ async function handleApi(req, res) {
       ...(data.storageMeta || {}),
       collectionVersions: Object.hasOwn(payload, "expectedVersion") ? { [collection]: Number(payload.expectedVersion) } : {}
     };
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "集合级保存数据",
-        target: collection,
-        result: "允许",
-        detail: `保存 ${collection}，记录数 ${value.length}`
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "集合级保存数据",
+      target: collection,
+      result: "允许",
+      detail: `保存 ${collection}，记录数 ${value.length}`
+    });
     writeDatabase(data);
     const versions = storageMeta().collectionVersions;
     sendJson(res, 200, { ok: true, collection, version: versions[collection] ?? null, count: value.length });
@@ -27202,19 +27391,16 @@ async function handleApi(req, res) {
       job,
       ...(Array.isArray(data.healthStatisticsIngestion.jobs) ? data.healthStatisticsIngestion.jobs : [])
     ].slice(0, 80);
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "登记统计导入任务",
-        target: job.target,
-        result: "允许",
-        detail: `${job.source} · ${job.period} · ${job.name}`
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "登记统计导入任务",
+      target: job.target,
+      result: "允许",
+      detail: `${job.source} · ${job.period} · ${job.name}`
+    });
     writeDatabase(data);
     sendJson(res, 201, job);
     return;
@@ -27509,19 +27695,16 @@ async function handleApi(req, res) {
     }
     data.birthCertificates = [certificate, ...(Array.isArray(data.birthCertificates) ? data.birthCertificates : [])].slice(0, 200);
     refreshBirthStatistics(data);
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "登记出生医学证明",
-        target: certificate.certificateNo,
-        result: "允许",
-        detail: `${certificate.newbornName} · ${certificate.issueType} · ${certificate.issuingInstitution}`
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "登记出生医学证明",
+      target: certificate.certificateNo,
+      result: "允许",
+      detail: `${certificate.newbornName} · ${certificate.issueType} · ${certificate.issuingInstitution}`
+    });
     const normalized = normalizeState(data);
     if (Object.hasOwn(payload, "expectedVersion")) {
       normalized.storageMeta = {
@@ -27567,19 +27750,16 @@ async function handleApi(req, res) {
     }
     data.deathCertificates = [certificate, ...(Array.isArray(data.deathCertificates) ? data.deathCertificates : [])].slice(0, 200);
     refreshDeathStatistics(data);
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "登记死亡医学证明",
-        target: certificate.certificateNo,
-        result: "允许",
-        detail: `${certificate.deceasedName} · ${certificate.deathReasonType} · ${certificate.reportChannel}`
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "登记死亡医学证明",
+      target: certificate.certificateNo,
+      result: "允许",
+      detail: `${certificate.deceasedName} · ${certificate.deathReasonType} · ${certificate.reportChannel}`
+    });
     const normalized = normalizeState(data);
     if (Object.hasOwn(payload, "expectedVersion")) {
       normalized.storageMeta = {
@@ -27659,19 +27839,16 @@ async function handleApi(req, res) {
     }
     if (payload.status && collection !== "multiPracticeApplications") item.status = String(payload.status);
     item.lastUpdated = new Date().toISOString();
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "更新业务闭环",
-        target: `${collection}/${item.id}`,
-        result: "允许",
-        detail: payload.note || `状态更新为 ${item.status || "已更新"}`
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "更新业务闭环",
+      target: `${collection}/${item.id}`,
+      result: "允许",
+      detail: payload.note || `状态更新为 ${item.status || "已更新"}`
+    });
     if (Object.hasOwn(payload, "expectedVersion")) {
       data.storageMeta = {
         ...(data.storageMeta || {}),
@@ -27713,19 +27890,16 @@ async function handleApi(req, res) {
       revokeReason: String(payload.reason || "居民撤销授权").trim(),
       updatedAt: new Date().toISOString()
     };
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "撤销居民授权",
-        target: id,
-        result: "允许",
-        detail: data.personalRecords[index].revokeReason
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "撤销居民授权",
+      target: id,
+      result: "允许",
+      detail: data.personalRecords[index].revokeReason
+    });
     if (Object.hasOwn(payload, "expectedVersion")) {
       data.storageMeta = {
         ...(data.storageMeta || {}),
@@ -28150,19 +28324,16 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/reset");
     if (!user) return;
     const data = seedState();
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "重置数据",
-        target: "/api/reset",
-        result: "允许",
-        detail: "恢复演示数据"
-      },
-      ...data.securityEvents
-    ];
+    data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "重置数据",
+      target: "/api/reset",
+      result: "允许",
+      detail: "恢复演示数据"
+    });
     writeDatabase(data);
     sendJson(res, 200, data);
     return;

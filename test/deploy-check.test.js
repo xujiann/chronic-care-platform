@@ -99,6 +99,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "package:postgresPrimaryReadAdapter",
     "snapshot:collections",
     "snapshot:regionalDataSharing",
+    "snapshot:regionalHandoffRuntime",
     "snapshot:interfaceReadiness",
     "snapshot:securityAcceptance",
     "ui:digitalHospitalStandards",
