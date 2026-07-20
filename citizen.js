@@ -2,6 +2,7 @@ const STORAGE_KEY = "chronic-care-platform-state";
 const CITIZEN_EXTRA_KEY = "chronic-care-citizen-extra";
 const LARGE_MODE_KEY = "chronic-care-large-mode";
 const CLIENT_CHANNEL_KEY = "chronic-care-client-channel";
+const CITIZEN_RECENT_ACTION_KEY = "chronic-care-citizen-recent-actions";
 const API_BASE = location.protocol === "file:" ? "" : "/api";
 const RESIDENT_TASK_CLOSED_STATUSES = new Set(["closed", "completed", "cancel-requested", "cancelled", "canceled"]);
 const CITIZEN_SERVICE_SWIPE_THRESHOLD = 54;
@@ -266,6 +267,27 @@ function mobileServiceBadgeLabel(tab, active) {
   return active ? "当前" : `${serviceNavigationMeta(tab).featureCount}项`;
 }
 
+function readCitizenRecentActions() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(CITIZEN_RECENT_ACTION_KEY) || "{}");
+    return saved && typeof saved === "object" ? saved : {};
+  } catch (error) {
+    return {};
+  }
+}
+
+function rememberCitizenAction(serviceKey, label) {
+  if (!serviceKey || !label) return;
+  const saved = readCitizenRecentActions();
+  const current = Array.isArray(saved[serviceKey]) ? saved[serviceKey] : [];
+  saved[serviceKey] = [label, ...current.filter((item) => item !== label)].slice(0, 3);
+  try {
+    localStorage.setItem(CITIZEN_RECENT_ACTION_KEY, JSON.stringify(saved));
+  } catch (error) {
+    // Ignore private browsing or storage quota failures.
+  }
+}
+
 const citizenActionDockFallbacks = {
   "health-record": [
     { label: "看时间轴", target: "#citizen-highlight-center", tone: "primary" },
@@ -313,7 +335,11 @@ function citizenActionDockItems(tab) {
   (citizenActionDockFallbacks[tab?.key] || []).forEach((item) => {
     if (!items.some((existing) => existing.label === item.label)) items.push(item);
   });
-  return items.slice(0, 4);
+  const recentLabels = readCitizenRecentActions()[tab?.key] || [];
+  return items
+    .map((item) => ({ ...item, recent: recentLabels.includes(item.label) }))
+    .sort((a, b) => Number(Boolean(b.primary)) - Number(Boolean(a.primary)) || Number(Boolean(b.recent)) - Number(Boolean(a.recent)))
+    .slice(0, 4);
 }
 
 const registrationSchedules = [
@@ -630,27 +656,35 @@ function renderCitizenActionDock() {
   </div>
   <div class="citizen-action-dock-actions">
     ${items.map((item) => {
+      const recentBadge = item.recent ? `<small>最近</small>` : "";
       if (item.href) {
-        return `<a class="citizen-action-chip ${item.primary ? "primary" : ""}" href="${item.href}" data-action-dock-service="${item.internal ? item.key : ""}" aria-label="${active.label}：${item.label}">${item.label}</a>`;
+        return `<a class="citizen-action-chip ${item.primary ? "primary" : ""} ${item.recent ? "recent" : ""}" href="${item.href}" data-action-dock-label="${item.label}" data-action-dock-service="${item.internal ? item.key : ""}" aria-label="${active.label}：${item.label}">${item.label}${recentBadge}</a>`;
       }
-      return `<button type="button" class="citizen-action-chip ${item.tone === "primary" ? "primary" : ""}" data-action-dock-target="${item.target || ""}" aria-label="${active.label}：${item.label}">${item.label}</button>`;
+      return `<button type="button" class="citizen-action-chip ${item.tone === "primary" ? "primary" : ""} ${item.recent ? "recent" : ""}" data-action-dock-label="${item.label}" data-action-dock-target="${item.target || ""}" aria-label="${active.label}：${item.label}">${item.label}${recentBadge}</button>`;
     }).join("")}
   </div>`;
   target.querySelectorAll("[data-action-dock-service]").forEach((link) => {
-    if (!link.dataset.actionDockService) return;
+    if (!link.dataset.actionDockService) {
+      link.addEventListener("click", () => rememberCitizenAction(active.key, link.dataset.actionDockLabel));
+      return;
+    }
     link.addEventListener("click", (event) => {
       event.preventDefault();
+      rememberCitizenAction(active.key, event.currentTarget.dataset.actionDockLabel);
       invokeInternalServiceAction(event.currentTarget.dataset.actionDockService);
+      renderCitizenActionDock();
     });
   });
   target.querySelectorAll("[data-action-dock-target]").forEach((button) => {
     button.addEventListener("click", () => {
+      rememberCitizenAction(active.key, button.dataset.actionDockLabel);
       const selector = button.dataset.actionDockTarget;
       const destination = selector ? document.querySelector(selector) : null;
       if (destination?.closest("[data-service-pane]")?.hidden) {
         setServiceTab(destination.closest("[data-service-pane]").dataset.servicePane, { pushState: true, scrollToPane: false });
       }
       (destination || getServicePageTarget(active.key))?.scrollIntoView({ block: "start", behavior: "smooth" });
+      renderCitizenActionDock();
     });
   });
 }

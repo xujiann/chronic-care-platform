@@ -2185,9 +2185,13 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /citizenPipelineAudit/);
   assert.match(citizenJs, /renderCitizenPipelineAudit/);
   assert.match(citizenJs, /citizenActionDockFallbacks/);
+  assert.match(citizenJs, /CITIZEN_RECENT_ACTION_KEY/);
+  assert.match(citizenJs, /rememberCitizenAction/);
   assert.match(citizenJs, /renderCitizenActionDock/);
   assert.match(citizenJs, /data-action-dock-target/);
+  assert.match(citizenJs, /data-action-dock-label/);
   assert.match(citizenJs, /aria-label="\$\{active\.label\}：\$\{item\.label\}"/);
+  assert.match(citizenJs, /<small>最近<\/small>/);
   assert.match(citizenJs, /常用操作/);
   assert.match(citizenJs, /registration:integration-readiness/);
   assert.match(citizenJs, /onsiteAcceptance/);
@@ -2321,6 +2325,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /service-mobile-action/);
   assert.match(citizenCss, /citizen-action-dock/);
   assert.match(citizenCss, /citizen-action-chip/);
+  assert.match(citizenCss, /citizen-action-chip\.recent/);
   assert.match(citizenJs, /data-service-state/);
   assert.match(citizenJs, /service-tab-boundary/);
   assert.match(citizenJs, /service-summary-meta/);
