@@ -128,6 +128,26 @@ const DOCUMENTATION_RULE = {
 const CLOSED_STATUS_PATTERN = /closed|resolved|approved|recognized|completed|passed|ready|signed|done|宸插畬鎴|宸查€氳繃|宸插彇鑽|宸插洖浼|宸蹭簰璁|宸叉牳楠|宸查棴鐜|已完成|已通过|已闭环/;
 const HIGH_RISK_PATTERN = /high|urgent|critical|overdue|dead_letter|楂|绱|閫炬湡|critical|高|逾期|危急/;
 
+const APPLICATION_BY_COLLECTION = Object.fromEntries(
+  APPLICATIONS.flatMap((app) => app.collections.map((collection) => [collection, app]))
+);
+const TASK_COLLECTIONS = [
+  "followups",
+  "careOrders",
+  "medicationPickups",
+  "insuranceClaims",
+  "emergencySignals",
+  "chronicScreeningTasks",
+  "chronicEducationPushes",
+  "chronicManagementPlans",
+  "countyCollaborationOrders",
+  "countyMutualRecognitionRecords",
+  "countyAiDiagnosisCases",
+  "multiPracticeApplications",
+  "dataQualityIssues",
+  "integrationGatewayEvents"
+];
+
 function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(ROOT, relativePath), "utf8"));
 }
@@ -300,31 +320,7 @@ function buildPriorityApplicationTemplates(options = {}) {
 }
 
 function collectOpenActions(data, limit = 12) {
-  const taskCollections = [
-    "followups",
-    "careOrders",
-    "medicationPickups",
-    "insuranceClaims",
-    "emergencySignals",
-    "chronicScreeningTasks",
-    "chronicEducationPushes",
-    "chronicManagementPlans",
-    "countyCollaborationOrders",
-    "countyMutualRecognitionRecords",
-    "countyAiDiagnosisCases",
-    "multiPracticeApplications",
-    "dataQualityIssues",
-    "integrationGatewayEvents"
-  ];
-  return taskCollections.flatMap((collection) => rows(data, collection).filter(isOpen).map((item) => ({
-    id: item.id || `${collection}-${item.residentId || item.status || "open"}`,
-    collection,
-    title: item.title || item.taskName || item.topic || item.orderType || item.item || item.claimType || item.medication || item.name || collection,
-    owner: item.owner || item.assignee || item.institution || item.center || item.sourceInstitution || item.targetInstitution || "owner-pending",
-    status: statusOf(item) || "open",
-    priority: riskLevel(item),
-    dueAt: item.dueAt || item.due || item.nextReview || item.plannedAt || item.requestedAt || item.lastUpdated || ""
-  }))).sort((left, right) =>
+  return collectTaskActionRows(data).filter((item) => !item.closed).sort((left, right) =>
     ({ high: 3, medium: 2, normal: 1 }[right.priority] || 0) - ({ high: 3, medium: 2, normal: 1 }[left.priority] || 0) ||
     String(left.dueAt || "").localeCompare(String(right.dueAt || ""))
   ).slice(0, limit);
@@ -446,6 +442,8 @@ function buildHealthDashboardSummary(options = {}) {
   const applications = APPLICATIONS.map((app) => summarizeApplication(data, app));
   const sourceApplications = applications.filter((item) => item.id !== DASHBOARD_APPLICATION.id);
   const openActions = collectOpenActions(data);
+  const sourceOpenActions = applications.reduce((sum, item) => sum + item.openActions, 0);
+  const previewOpenActions = openActions.length;
   const interfaceRows = rows(data, "platformInterfaces");
   const evidenceRecords = rows(data, "platformEvidence").flatMap((item) => item.records || []);
   const siteDependencies = rows(data, "productionDeploymentPlan").filter((item) => isOpen(item) || /missing|待|寰|blocked/i.test(JSON.stringify(item)));
@@ -457,7 +455,7 @@ function buildHealthDashboardSummary(options = {}) {
     { id: "dashboard:source-boundary", passed: sourceApplications.every((item) => /source application/.test(item.boundary)), detail: "source applications keep workflow ownership" },
     { id: "dashboard:aggregate-boundary", passed: /first seven source applications/.test(applications.find((item) => item.id === DASHBOARD_APPLICATION.id)?.boundary || ""), detail: "dashboard is aggregate-only" },
     { id: "dashboard:metrics", passed: applications.reduce((sum, item) => sum + item.records, 0) > 0, detail: `${applications.reduce((sum, item) => sum + item.records, 0)} source records` },
-    { id: "dashboard:actions", passed: openActions.length > 0, detail: `${openActions.length} open actions previewed` },
+    { id: "dashboard:actions", passed: previewOpenActions > 0 && sourceOpenActions >= previewOpenActions, detail: `${previewOpenActions} 条预览待办 / ${sourceOpenActions} 条源应用待办` },
     { id: "dashboard:interfaces", passed: interfaceRows.length >= 4, detail: `${interfaceRows.length} interface rows` },
     { id: "dashboard:evidence", passed: evidenceRecords.length >= 1, detail: `${evidenceRecords.length} evidence records` },
     { id: "dashboard:industry-governance-indicators", passed: indicatorCenter.indicators.length === 8 && indicatorCenter.indicators.every((item) => item.definition && item.owner && item.sourceCollections.length && item.sourceSystems.length && item.reports.length === 2 && item.drilldown?.href), detail: `${indicatorCenter.indicators.length} governance indicators across ${indicatorCenter.summary.categories} categories` },
@@ -474,11 +472,14 @@ function buildHealthDashboardSummary(options = {}) {
       applications: applications.length,
       sourceApplications: sourceApplications.length,
       sourceRecords: applications.reduce((sum, item) => sum + item.records, 0),
-      openActions: openActions.length,
+      openActions: previewOpenActions,
+      previewOpenActions,
+      sourceOpenActions,
       highRisks: applications.reduce((sum, item) => sum + item.highRisks, 0),
       interfaceTracks: interfaceRows.length,
       evidenceRecords: evidenceRecords.length,
       siteDependencies: siteDependencies.length,
+      productionReady: productionReadinessGate.overallStatus === "ready",
       runtimeRequests: runtime?.http?.apiRequests ?? null,
       readinessPassed: readiness?.passed ?? null,
       releasePassed: releaseReport?.ok ?? null
@@ -490,9 +491,19 @@ function buildHealthDashboardSummary(options = {}) {
       application: item.name,
       highRisks: item.highRisks,
       openActions: item.openActions,
-      nextAction: item.highRisks ? "Review high-risk source records in the owning application." : "Close source workflow actions in the owning application."
+      nextAction: item.highRisks ? "回到源应用复核高风险记录。" : "回到源应用闭环待办。"
     })),
     openActions,
+    populationServiceBoard,
+    certificateExchange,
+    riskDrilldowns,
+    siteEvidencePackage,
+    siteIssueLedger,
+    productionReadinessGate,
+    indicatorCenter,
+    jurisdictionScope,
+    actionClosureTrend,
+    functionalReport,
     interfaces: interfaceRows.map((item) => ({
       id: item.id || item.domain,
       domain: item.domain || item.name || item.id,
@@ -520,6 +531,128 @@ function buildHealthDashboardSummary(options = {}) {
   };
 }
 
+function dashboardReportStatusLabel(status) {
+  const key = String(status || "").toLowerCase();
+  const labels = {
+    ready: "已就绪",
+    watch: "需关注",
+    blocked: "受阻",
+    empty: "暂无数据",
+    "empty-ready": "待接入",
+    modeled: "已建模",
+    normal: "正常",
+    open: "待办",
+    pending: "待处理",
+    linked: "已关联",
+    received: "已回执",
+    partial: "部分回执",
+    missing: "缺少回执",
+    matched: "已对账",
+    "variance-review": "差异复核",
+    "owner-pending": "待明确责任人",
+    "due-pending": "待明确时限",
+    "daily-interface": "日报接口",
+    "monthly-snapshot": "月度快照"
+  };
+  return labels[key] || status || "未标注";
+}
+
+function dashboardReportPriorityLabel(priority) {
+  const key = String(priority || "").toLowerCase();
+  return { high: "高", medium: "中", normal: "一般", low: "低" }[key] || priority || "一般";
+}
+
+function dashboardReportOwnerLabel(owner) {
+  return dashboardReportStatusLabel(owner || "owner-pending");
+}
+
+function dashboardReportCollectionLabel(collection) {
+  const labels = {
+    followups: "随访任务",
+    careOrders: "照护服务工单",
+    medicationPickups: "取药预约",
+    insuranceClaims: "医保审核",
+    emergencySignals: "风险预警",
+    countyCollaborationOrders: "县域协同工单",
+    countyMutualRecognitionRecords: "检查检验互认",
+    countyAiDiagnosisCases: "人工智能辅助诊断",
+    chronicScreeningTasks: "慢病筛查任务",
+    chronicEducationPushes: "健康教育推送",
+    birthCertificates: "出生医学证明",
+    deathCertificates: "死亡医学证明",
+    platformInterfaces: "平台接口清单",
+    platformEvidence: "平台验收证据"
+  };
+  return labels[collection] || dashboardReportEvidenceLabel(collection);
+}
+
+function dashboardReportCheckLabel(checkId) {
+  const labels = {
+    "dashboard:source-boundary": "源应用边界",
+    "dashboard:summary": "综合管理服务系统摘要",
+    "dashboard:applications": "前七应用汇总",
+    "dashboard:metrics": "指标汇总",
+    "dashboard:actions": "跨应用待办",
+    "dashboard:interfaces": "接口轨道",
+    "dashboard:evidence": "验收证据",
+    "dashboard:population-service-board": "人口服务看板",
+    "dashboard:certificate-exchange": "证照交换链路",
+    "dashboard:risk-drilldown": "风险下钻",
+    "dashboard:risk-drilldowns": "风险下钻",
+    "dashboard:site-evidence-package": "现场验收证据包",
+    "dashboard:site-issue-ledger": "现场问题整改台账",
+    "dashboard:production-readiness-gate": "上线运行门禁",
+    "dashboard:production-acceptance-routing": "P0 接收判定",
+    "dashboard:backend-go-live-checklist": "生产后端上线清单",
+    "dashboard:indicator-center": "指标中心",
+    "dashboard:functional-report": "主要功能报告",
+    "dashboard:jurisdiction-scope": "辖区监管钻取",
+    "dashboard:jurisdiction-detail": "区县监管详情",
+    "dashboard:action-closure-trend": "任务闭环率与超期率趋势",
+    "dashboard:department-function-matrix": "内部机构功能矩阵",
+    "dashboard:department-functions": "内部机构功能矩阵",
+    "dashboard:city-county-function-matrix": "市县两级机构功能矩阵",
+    "dashboard:city-county-functions": "市县两级机构功能矩阵"
+  };
+  return labels[checkId] || checkId;
+}
+
+function dashboardReportEvidenceLabel(text) {
+  return String(text || "")
+    .replace(/\/api\/health-dashboard\/summary/g, "综合管理服务系统摘要接口")
+    .replace(/health-dashboard-about\.html/g, "系统说明页面")
+    .replace(/health-dashboard-applications\.js/g, "应用清单")
+    .replace(/health-dashboard:summary/g, "综合管理服务系统摘要脚本")
+    .replace(/healthDashboardSummary/g, "综合管理服务系统摘要")
+    .replace(/healthDashboard:populationServiceBoard/g, "人口服务看板检查")
+    .replace(/release:report/g, "发布聚合报告")
+    .replace(/deploy:check/g, "部署门禁")
+    .replace(/source applications?/g, "源应用")
+    .replace(/source records?/g, "源记录")
+    .replace(/source open actions?/g, "源应用待办")
+    .replace(/preview open actions?/g, "预览待办")
+    .replace(/openActions/g, "待办")
+    .replace(/open actions?/g, "待办")
+    .replace(/high risks?/g, "高风险")
+    .replace(/riskDrilldowns/g, "风险下钻")
+    .replace(/certificateExchange/g, "证照交换")
+    .replace(/siteEvidencePackage/g, "现场证据包")
+    .replace(/dailyServiceReports/g, "日报服务量")
+    .replace(/interface tracks?/g, "接口轨道")
+    .replace(/evidence records?/g, "验收证据")
+    .replace(/platformInterfaces/g, "平台接口清单")
+    .replace(/platformEvidence/g, "平台验收证据")
+    .replace(/site dependencies/g, "现场依赖")
+    .replace(/artifacts/g, "材料")
+    .replace(/records/g, "记录")
+    .replace(/module functions/g, "模块功能")
+    .replace(/functions/g, "项功能")
+    .replace(/ready/g, "已就绪")
+    .replace(/watch/g, "需关注")
+    .replace(/blocked/g, "受阻")
+    .replace(/pending/g, "待处理");
+}
+
 function renderMarkdown(report) {
   const appRows = report.applications.map((item) => `| ${item.id} | ${item.entry} | ${item.records} | ${item.openActions} | ${item.highRisks} | ${item.status} |`);
   const templateRows = report.applications.map((item) => {
@@ -533,30 +666,31 @@ function renderMarkdown(report) {
   const periodRows = (report.indicatorCenter?.periodViews || []).map((item) => `| ${item.label} | ${item.period} | ${item.indicators} | ${item.readyIndicators} | ${item.blockedIndicators} | ${item.exceptionCount} | ${item.basis} |`);
   const checkRows = report.checks.map((item) => `| ${item.passed ? "PASS" : "FAIL"} | ${item.id} | ${String(item.detail || "").replace(/\|/g, "/")} |`);
   return [
-    "# Health dashboard summary",
+    "# 卫生健康综合管理服务系统摘要",
     "",
-    `- Generated at: ${report.generatedAt}`,
-    `- Result: ${report.ok ? "PASS" : "FAIL"}`,
-    `- Applications: ${report.totals.applications}`,
-    `- Source records: ${report.totals.sourceRecords}`,
-    `- Open actions: ${report.totals.openActions}`,
-    `- High risks: ${report.totals.highRisks}`,
-    `- Interface tracks: ${report.totals.interfaceTracks}`,
-    `- Evidence records: ${report.totals.evidenceRecords}`,
+    `- 生成时间：${report.generatedAt}`,
+    `- 检查结果：${report.ok ? "通过" : "未通过"}`,
+    `- 应用入口：${report.totals.applications}`,
+    `- 源记录：${report.totals.sourceRecords}`,
+    `- 源应用待办：${report.totals.sourceOpenActions ?? report.totals.openActions}`,
+    `- 预览待办：${report.totals.previewOpenActions ?? report.totals.openActions}`,
+    `- 高风险：${report.totals.highRisks}`,
+    `- 接口轨道：${report.totals.interfaceTracks}`,
+    `- 验收证据：${report.totals.evidenceRecords}`,
     "",
-    "## Boundary",
+    "## 功能边界",
     "",
     report.scope.rule,
     "",
-    "## Checks",
+    "## 发布检查",
     "",
-    "| Result | Check | Detail |",
+    "| 结果 | 检查项 | 明细 |",
     "|---|---|---|",
     ...checkRows,
     "",
-    "## Applications",
+    "## 应用汇总",
     "",
-    "| Application | Entry | Records | Open actions | High risks | Status |",
+    "| 应用 | 入口 | 源记录 | 待办 | 高风险 | 状态 |",
     "|---|---|---:|---:|---:|---|",
     ...appRows,
     "",
@@ -582,8 +716,162 @@ function renderMarkdown(report) {
     "",
     "## Open action preview",
     "",
-    "| Priority | Collection | ID | Title | Status | Owner |",
+    report.populationServiceBoard?.sourceNote || "暂无看板来源说明。",
+    "",
+    "| 周期 | 范围 | 指标 | 数值 | 来源 |",
+    "|---|---|---|---:|---|",
+    ...boardRows,
+    "",
+    "### 人口与服务接口字段",
+    "",
+    "| 状态 | 指标 | 口径 | 字段 | 记录数 |",
+    "|---|---|---|---|---:|",
+    ...boardSourceRows,
+    "",
+    "### 人口与服务洞察",
+    "",
+    "| 状态 | 洞察 | 数值 | 明细 |",
+    "|---|---|---:|---|",
+    ...insightRows,
+    "",
+    "## 证照交换链路",
+    "",
+    `- 状态：${dashboardReportStatusLabel(report.certificateExchange?.status || "empty")}`,
+    `- 来源：${dashboardReportEvidenceLabel(report.certificateExchange?.source || "healthStatistics.certificateExchangeLinks")}`,
+    "",
+    "| 状态 | 领域 | 目标 | 回执 | 对账 | 下一步 |",
     "|---|---|---|---|---|---|",
+    ...certificateRows,
+    "",
+    "## 风险下钻",
+    "",
+    "| 优先级 | 应用 | 数据集 | 责任人 | 状态 | 阻塞点 |",
+    "|---|---|---|---|---|---|",
+    ...drilldownRows,
+    "",
+    "## 现场验收证据包",
+    "",
+    "| 状态 | 类型 | 证据 | 责任人 | 下一步 |",
+    "|---|---|---|---|---|",
+    ...siteEvidenceRows,
+    "",
+    "### 现场问题整改台账",
+    "",
+    "| 状态 | 类别 | 责任方 | 来源 | 下一步 | 边界 |",
+    "|---|---|---|---|---|---|",
+    ...siteIssueRows,
+    "",
+    "### 上线运行门禁",
+    "",
+    `- 总体状态：${dashboardReportStatusLabel(report.productionReadinessGate?.overallStatus || "blocked")}`,
+    report.productionReadinessGate?.boundary || "上线运行标准以正式环境、统一身份、审计留存、生产数据库、接口签字、监控告警和灾备演练全部闭环为准。",
+    "",
+    "| 状态 | 门禁 | 责任方 | 证据 | 下一步 | 边界 |",
+    "|---|---|---|---|---|---|",
+    ...productionGateRows,
+    "",
+    "#### P0 接收判定",
+    "",
+    "| 状态 | 判定项 | 接收岗位 | 上线前准备 | 通过条件 | 未通过处理 |",
+    "|---|---|---|---|---|---|",
+    ...acceptanceRoutingRows,
+    "",
+    "#### 生产后端上线清单",
+    "",
+    report.productionReadinessGate?.backendGoLiveChecklist?.boundary || "真实上线必须使用生产级后端。",
+    "",
+    "| 状态 | 后端能力 | 责任方 | 必须准备 | 验收证据 | 下一步 |",
+    "|---|---|---|---|---|---|",
+    ...backendGoLiveRows,
+    "",
+    "## 指标中心",
+    "",
+    report.indicatorCenter?.basis || "按标准指标集、绩效考核、等级评审、运营决策和指标下钻形成可审查指标目录。",
+    "",
+    `- 指标数：${report.indicatorCenter?.summary?.indicators || 0}`,
+    `- 维度数：${report.indicatorCenter?.summary?.dimensions || 0}`,
+    `- 平均可信度：${report.indicatorCenter?.summary?.averageConfidence || 0}%`,
+    report.indicatorCenter?.boundary || "指标中心只做行政管理、绩效评估和上线审查，不替代源系统上报。",
+    "",
+    "| 状态 | 维度 | 指标 | 口径/公式 | 数据来源 | 责任方 | 当前值 | 目标值 | 可信度 | 阻塞项 | 下钻 |",
+    "|---|---|---|---|---|---|---|---|---:|---|---|",
+    ...indicatorRows,
+    "",
+    "### 公立医院改革与高质量发展分类",
+    "",
+    "| 分类 | 责任方 | 指标数 | 目标 |",
+    "|---|---|---:|---|",
+    ...indicatorCategoryRows,
+    "",
+    "### 汇聚入口预留",
+    "",
+    "| 状态 | 入口 | 模块 | 下一步 |",
+    "|---|---|---|---|",
+    ...indicatorEntrypointRows,
+    "",
+    "## 主要功能报告",
+    "",
+    report.functionalReport?.title || "综合管理服务系统主要功能报告",
+    "",
+    `- 功能数：${report.functionalReport?.summary?.functions || 0}`,
+    `- 已就绪：${report.functionalReport?.summary?.ready || 0}`,
+    `- 需关注：${report.functionalReport?.summary?.watch || 0}`,
+    `- 受阻：${report.functionalReport?.summary?.blocked || 0}`,
+    "",
+    "| 状态 | 功能 | 证据 | 边界 |",
+    "|---|---|---|---|",
+    ...functionRows,
+    "",
+    "### 内部机构功能矩阵",
+    "",
+    "| 状态 | 机构 | 已实现功能 | 下一步 |",
+    "|---|---|---|---|",
+    ...departmentRows,
+    "",
+    "### 市县两级机构功能矩阵",
+    "",
+    "| 状态 | 层级 | 机构 | 已实现功能 | 下一步 |",
+    "|---|---|---|---|---|",
+    ...cityCountyRows,
+    "",
+    "### 辖区监管钻取",
+    "",
+    "| 状态 | 辖区 | 机构 | 床位 | 医师 | 待办 | 高风险 | 日报 |",
+    "|---|---|---:|---:|---:|---:|---:|---:|",
+    ...jurisdictionRows,
+    "",
+    "### 区县监管详情",
+    "",
+    "| 辖区 | 机构目录 | 日报服务量 | 源应用待办 |",
+    "|---|---|---|---|",
+    ...jurisdictionDetailRows,
+    "",
+    "### 任务闭环率与超期率趋势",
+    "",
+    report.actionClosureTrend?.boundary || "本趋势仅用于行政监管、督办和调度分析。",
+    "",
+    "| 周期 | 范围 | 任务 | 已闭环 | 待闭环 | 超期 | 闭环率 | 超期率 |",
+    "|---|---|---:|---:|---:|---:|---:|---:|",
+    ...actionTrendRows,
+    "",
+    "| 源应用 | 任务 | 待闭环 | 超期 | 高风险 | 闭环率 | 超期率 |",
+    "|---|---:|---:|---:|---:|---:|---:|",
+    ...actionTrendAppRows,
+    "",
+    "### 发布证据",
+    "",
+    "| 项目 | 证据 |",
+    "|---|---|",
+    ...reportEvidenceRows,
+    "",
+    "### 现场联调边界",
+    "",
+    ...onsiteBoundaryRows,
+    "",
+    "## 待办预览",
+    "",
+    "| 优先级 | 应用 | 数据集 | 编号 | 标题 | 状态 | 责任人 |",
+    "|---|---|---|---|---|---|---|",
     ...actionRows,
     ""
   ].join("\n");

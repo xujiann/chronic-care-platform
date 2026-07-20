@@ -252,6 +252,31 @@ test("about page explains runnable platform capabilities", async ({ page }) => {
   await login(page, "health", "index.html");
   await page.goto("/about.html");
   await expect(page.locator(".auth-bar a[href='./about.html']")).toHaveCount(1);
+
+  await page.goto("/health-dashboard-about.html");
+  await expect(page.locator("[data-dashboard-about-section='runtime-report']")).toBeVisible();
+  await expect(page.locator("#dashboard-about-runtime-state")).toHaveAttribute("data-source-mode", "api");
+  await expect(page.locator("#dashboard-about-function-report [data-about-runtime-function]")).toHaveCount(15);
+  await expect(page.locator("#dashboard-about-function-report [data-about-runtime-function='aggregate-entry']")).toContainText("212 条源记录");
+  await expect(page.locator("#dashboard-about-release-evidence [data-about-runtime-evidence='summary-script']")).toContainText("综合管理服务系统摘要脚本");
+  await expect(page.locator("[data-dashboard-about-section='template-functions']")).toBeVisible();
+  await expect(page.locator("[data-dashboard-template-function='aggregate-entry']")).toContainText("前七应用汇总入口");
+  await expect(page.locator("[data-dashboard-template-function='population-service-board']")).toContainText("日");
+  await expect(page.locator("[data-dashboard-template-function='release-report']")).toContainText("主要功能报告");
+  await expect(page.locator("[data-dashboard-about-section='policy-basis']")).toBeVisible();
+  await expect(page.locator("[data-dashboard-policy='certificates']")).toContainText("出生");
+  await expect(page.locator("[data-dashboard-about-section='data-boundary']")).toContainText("卫生统计日报");
+  await expect(page.locator("[data-dashboard-about-section='api-evidence']")).toContainText("摘要接口");
+  await expect(page.locator("[data-dashboard-about-section='site-cutover']")).toBeVisible();
+  await expect(page.locator("[data-dashboard-about-section='production-launch-requirements']")).toContainText("productionReady");
+  await expect(page.locator("[data-dashboard-launch-requirements-link]")).toHaveAttribute("href", "./docs/health-dashboard-production-launch-requirements.md");
+  await expect(page.locator("[data-dashboard-about-section='implementation-plan']")).toContainText("已实现功能");
+  await expect(page.locator("[data-dashboard-about-section='implementation-plan'] [data-dashboard-implemented]")).toHaveCount(6);
+  await expect(page.locator("[data-dashboard-next-plan='prod-identity-audit']")).toContainText("真实身份");
+  await expect(page.locator("[data-dashboard-next-plan='prod-ops-drill']")).toContainText("灾备演练");
+  await expect(page.locator("[data-dashboard-about-section='next-plan']")).toBeVisible();
+  await expect(page.locator("[data-dashboard-next-plan='daily-interface-done']")).toContainText("日报");
+  await expect(page.locator("[data-dashboard-next-plan='site-evidence-done']")).toContainText("验收");
 });
 
 test("regional sharing page renders referral handoff boundary", async ({ page }) => {

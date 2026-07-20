@@ -546,6 +546,24 @@ function productionDeploymentPackageChecks(deploymentPackage) {
 }
 
 function healthDashboardChecks(healthDashboard) {
+  const populationPeriods = healthDashboard.populationServiceBoard?.periods?.length || 0;
+  const populationInsights = healthDashboard.populationServiceBoard?.insights?.length || 0;
+  const populationSourceFields = healthDashboard.populationServiceBoard?.sourceDetails?.length || 0;
+  const functionalItems = healthDashboard.functionalReport?.functions?.length || 0;
+  const certificateTracks = healthDashboard.certificateExchange?.items?.length || 0;
+  const drilldowns = healthDashboard.riskDrilldowns?.items?.length || 0;
+  const evidenceArtifacts = healthDashboard.siteEvidencePackage?.items?.length || 0;
+  const siteIssueRows = healthDashboard.siteIssueLedger?.items?.length || 0;
+  const jurisdictionRows = healthDashboard.jurisdictionScope?.districts?.length || 0;
+  const jurisdictionDetailRows = (healthDashboard.jurisdictionScope?.districts || []).filter((item) => item.id !== "all" && (item.institutionsList?.length || item.serviceReportList?.length || item.actionList?.length)).length;
+  const actionTrendPeriods = healthDashboard.actionClosureTrend?.periods?.length || 0;
+  const departmentRows = healthDashboard.functionalReport?.departmentFunctionMatrix?.length || 0;
+  const cityCountyRows = healthDashboard.functionalReport?.cityCountyFunctionMatrix?.length || 0;
+  const productionGateRows = healthDashboard.productionReadinessGate?.items?.length || 0;
+  const indicatorRows = healthDashboard.indicatorCenter?.indicators?.length || 0;
+  const indicatorDimensions = healthDashboard.indicatorCenter?.dimensions?.length || 0;
+  const indicatorCategories = healthDashboard.indicatorCenter?.reformCategories?.length || 0;
+  const indicatorEntrypoints = healthDashboard.indicatorCenter?.aggregationEntrypoints?.length || 0;
   return [
     check("healthDashboard:summary", healthDashboard.ok, healthDashboard.ok ? "health dashboard summary checks passed" : "health dashboard summary failed", "error", "health-dashboard"),
     check("healthDashboard:applications", healthDashboard.applications?.length === 8 && healthDashboard.totals?.sourceApplications === 7, `${healthDashboard.applications?.length || 0} applications; ${healthDashboard.totals?.sourceApplications || 0} source applications`, "error", "health-dashboard"),

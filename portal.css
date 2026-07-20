@@ -500,6 +500,32 @@ h1 { margin-top: 4px; font-size: 28px; }
   margin-top: 8px;
 }
 
+.dashboard-section-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -2px 0 16px;
+}
+
+.dashboard-section-nav a {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: #fff;
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.dashboard-section-nav a:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
 .portal-grid {
   display: grid;
   grid-template-columns: 1.4fr 0.9fr;
@@ -4457,6 +4483,19 @@ tbody tr:hover {
     flex-direction: column;
   }
   .metric-grid,
+  .dashboard-control-grid,
+  .function-report-grid,
+  .population-metric-grid,
+  .population-source-grid,
+  .population-insights,
+  .jurisdiction-grid,
+  .jurisdiction-scope-grid,
+  .jurisdiction-detail-metrics,
+  .jurisdiction-detail-columns,
+  .action-trend-grid,
+  .action-trend-bars,
+  .action-trend-apps,
+  .department-grid,
   .portal-grid,
   .nursing-mobile-workbench,
   .nursing-role-nav,

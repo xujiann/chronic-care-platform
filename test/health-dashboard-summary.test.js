@@ -10,6 +10,7 @@ const {
   buildPriorityApplicationTemplates,
   renderMarkdown
 } = require("../scripts/health-dashboard-summary");
+const healthDashboardApplications = require("../health-dashboard-applications");
 
 const ROOT = path.resolve(__dirname, "..");
 

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>卫生健康综合驾驶舱</title>
+    <title>卫生健康综合管理服务系统</title>
     <link rel="stylesheet" href="./portal.css" />
     <script src="./auth.js"></script>
     <script>window.HealthCityAuth.requireRole(["commission"])</script>
@@ -13,13 +13,14 @@
       <header class="portal-header">
         <div>
           <span>优先应用 8</span>
-          <h1>卫生健康综合驾驶舱</h1>
-          <p>面向前 7 个应用的汇总入口，集中展示指标、风险、任务、接口、验收证据和现场依赖；业务办理仍回到各源应用完成。</p>
+          <h1>卫生健康综合管理服务系统</h1>
+          <p>面向各级卫生健康行政部门使用，作为前 7 个应用的汇总管理入口，集中展示指标、风险、任务、接口、验收证据和现场依赖；业务办理仍回到各源应用完成。</p>
         </div>
         <nav>
           <a href="./platform.html">平台建设</a>
           <a href="./public-health.html">公共卫生</a>
           <a href="./workbench.html">运营工作台</a>
+          <a href="./health-dashboard-about.html">系统说明</a>
           <a href="./index.html">卫健委端</a>
           <a href="./county.html">医共体</a>
           <a href="./health-city.html">总览</a>
@@ -59,7 +60,7 @@
       </section>
 
       <section class="portal-grid">
-        <article class="panel wide">
+        <article class="panel wide" id="dashboard-application-panel">
           <div class="panel-title">
             <h2>应用汇总</h2>
             <span id="dashboard-scope"></span>
@@ -87,10 +88,10 @@
       </section>
 
       <section class="portal-grid">
-        <article class="panel wide">
+        <article class="panel wide" id="dashboard-actions-panel">
           <div class="panel-title">
             <h2>任务闭环</h2>
-            <span>仅展示跨应用 open action，办理入口保留在源业务端</span>
+            <span>仅展示跨应用待办，办理入口保留在源业务端</span>
           </div>
           <div id="dashboard-actions" class="priority-list"></div>
         </article>
@@ -104,11 +105,93 @@
         </article>
       </section>
 
+      <section class="panel production-readiness-board" id="production-readiness-board">
+        <div class="panel-title">
+          <h2>上线运行门禁</h2>
+          <span id="production-readiness-summary">正在汇总正式环境、身份审计、接口签字、运维灾备和数据库切换条件</span>
+        </div>
+        <div class="production-readiness-grid" id="production-readiness-list"></div>
+        <div class="panel-title compact">
+          <h3>P0 接收判定</h3>
+          <span id="production-acceptance-routing-summary">正在汇总上线前接收岗位、准备材料和未通过处理</span>
+        </div>
+        <div class="production-readiness-grid" id="production-acceptance-routing-list" aria-label="P0 接收判定清单"></div>
+        <div class="panel-title compact">
+          <h3>生产后端上线准备</h3>
+          <span id="production-backend-go-live-summary">正在汇总生产数据库、统一身份、真实接口、审计留存、监控告警和灾备条件</span>
+        </div>
+        <div class="period-switch production-backend-go-live-switch" id="production-backend-go-live-status-controls" aria-label="生产后端上线准备状态筛选">
+          <button type="button" data-production-backend-status-filter="all" class="active">全部</button>
+          <button type="button" data-production-backend-status-filter="blocked">阻塞</button>
+          <button type="button" data-production-backend-status-filter="pending">待办</button>
+          <button type="button" data-production-backend-status-filter="watch">关注</button>
+        </div>
+        <div class="dashboard-filter-actions production-backend-go-live-actions">
+          <button type="button" id="production-backend-go-live-reset">重置筛选</button>
+        </div>
+        <div class="production-readiness-grid production-backend-go-live-grid" id="production-backend-go-live-list" aria-label="生产后端上线准备清单"></div>
+        <p class="muted production-readiness-requirements"><a href="./docs/health-dashboard-production-launch-requirements.md" data-production-requirements-link>查看真实上线需求文档</a>，按生产环境、统一身份、审计保全、生产数据库、接口签字、监控告警和灾备演练逐项确认。</p>
+        <p class="muted production-readiness-boundary" id="production-readiness-boundary">上线门禁只用于行政管理端发布审计和现场切换确认；未完成正式环境配置、签字证据和灾备演练前不得按生产上线运行。</p>
+      </section>
+
+      <section class="panel action-trend-board" id="action-closure-trend-board">
+        <div class="panel-title">
+          <h2>任务闭环率与超期率趋势</h2>
+          <span id="action-trend-summary">正在汇总跨应用任务闭环与超期情况</span>
+        </div>
+        <div class="action-trend-grid" id="action-trend-cards"></div>
+        <div class="action-trend-bars" id="action-trend-periods" aria-label="任务闭环率与超期率周期趋势"></div>
+        <div class="action-trend-apps" id="action-trend-apps" aria-label="源应用闭环分布"></div>
+        <p class="muted action-trend-boundary" id="action-trend-boundary">本趋势仅用于卫生健康行政部门监管、督办和调度分析，具体办理仍回到源应用。</p>
+      </section>
+
       <section class="portal-grid">
+        <article class="panel wide" id="risk-drilldown-board">
+          <div class="panel-title">
+            <h2>风险下钻与处置轨迹</h2>
+            <span id="risk-drilldown-summary">正在汇总责任人、时限、处置轨迹和阻塞原因</span>
+          </div>
+          <div class="drilldown-grid" id="risk-drilldown-list"></div>
+        </article>
+
+        <article class="panel" id="site-evidence-package">
+          <div class="panel-title">
+            <h2>现场验收证据包</h2>
+            <span id="site-evidence-summary">正在绑定接口报文、截图、签字单和复测结论</span>
+          </div>
+          <div class="site-evidence-grid" id="site-evidence-list"></div>
+        </article>
+      </section>
+
+      <section class="panel site-issue-ledger-board" id="site-issue-ledger-board">
+        <div class="panel-title">
+          <h2>现场问题整改台账</h2>
+          <span id="site-issue-ledger-summary">正在汇总现场验收、联调和上线依赖中的待整改事项</span>
+        </div>
+        <div class="period-switch site-issue-ledger-switch" id="site-issue-ledger-status-controls" aria-label="现场问题状态筛选">
+          <button type="button" data-site-issue-status="all" class="active">全部</button>
+          <button type="button" data-site-issue-status="watch">待整改</button>
+          <button type="button" data-site-issue-status="ready">已就绪</button>
+          <button type="button" data-site-issue-status="blocked">阻塞</button>
+        </div>
+        <div class="filter-grid site-issue-ledger-filter-grid">
+          <label>
+            责任方
+            <select id="site-issue-owner-filter">
+              <option value="">全部责任方</option>
+            </select>
+          </label>
+          <button type="button" id="site-issue-reset-filters">重置筛选</button>
+        </div>
+        <div class="site-issue-ledger-grid" id="site-issue-ledger-list"></div>
+        <p class="muted site-issue-ledger-boundary" id="site-issue-ledger-boundary">台账只用于行政管理、上线督办和验收留痕，不替代源业务系统、医疗机构或平台厂商的实际整改办理。</p>
+      </section>
+
+      <section class="portal-grid" id="dashboard-integration-panel">
         <article class="panel">
           <div class="panel-title">
             <h2>接口联调</h2>
-            <span>复用 platformInterfaces 和联调证据</span>
+            <span>复用平台接口清单和联调证据</span>
           </div>
           <div id="dashboard-interfaces" class="rules"></div>
         </article>
@@ -116,7 +199,7 @@
         <article class="panel">
           <div class="panel-title">
             <h2>验收证据</h2>
-            <span>复用 platformEvidence 与 release artifacts</span>
+            <span>复用平台验收证据与发布材料</span>
           </div>
           <div id="dashboard-evidence" class="rules"></div>
         </article>
@@ -125,6 +208,7 @@
     </main>
 
     <script src="./shared.js"></script>
+    <script src="./health-dashboard-applications.js"></script>
     <script src="./health-dashboard.js"></script>
   </body>
 </html>
