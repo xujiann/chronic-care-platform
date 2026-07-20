@@ -273,7 +273,7 @@ npm.cmd run hybrid:deployment-readiness
 
 `monitoring:readiness` 会生成 `release/monitoring-readiness-report.json` 与 `release/monitoring-readiness-report.md`，专项检查健康检查、运行指标、慢请求、状态码、死信、数据质量、SLO 阈值、告警信号和 on-call escalation 证据；真实 Prometheus/OpenTelemetry 或平台日志绑定完成后，再用 `CUTOVER_MONITORING_SIGNOFF` 作为现场签字信号。
 
-`referral:readiness` 会生成 `release/referral-teleconsultation-readiness-report.json` 与 `release/referral-teleconsultation-readiness-report.md`，检查医联体转诊、远程会诊、接诊反馈、报告回传、协同工单、绩效评价、居民授权、审计留痕、专用 API 与机构端/县域端入口，作为 HIS/EMR、预约号源、远程视频、PACS/LIS 报告和医共体绩效公式现场联调前的闭环证据。
+`referral:readiness` 会生成 `release/referral-teleconsultation-readiness-report.json` 与 `release/referral-teleconsultation-readiness-report.md`，检查医联体转诊、远程会诊、接诊反馈、报告回传、协同工单、绩效评价、居民授权、审计留痕、专用 API 与机构端/县域端入口，作为 HIS/EMR、预约号源、远程视频、PACS/LIS 报告和医共体绩效公式现场联调前的闭环证据。县域端已把医共体协同闭环呈现为 `发起 -> 受理 -> 执行/会诊 -> 报告回传 -> 反馈/评价 -> 绩效归档` 六步状态链，并联动 action queue、taskReceipts、exportSummary 与角色跳转按钮；真实 HIS/EMR/LIS/PACS/医保回调、现场签字、生产身份、审计和监控仍保留为 external/onsite blockers。
 
 `evaluation:evidence` 会生成 `release/evaluation-evidence-report.json` 与 `release/evaluation-evidence-report.md`，汇总互联互通四甲/五乙测评所需接口清单、标准映射、交易样例、整改记录、P1 接口需求和流程审计证据。
 
@@ -326,6 +326,38 @@ GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下
 - [部署说明](./DEPLOYMENT.md)
 - [后续开发优先级](./docs/后续开发优先级.md)
 - [GitHub 拆分部署方案](./docs/GitHub拆分部署方案.md)
+
+## Referral Teleconsultation Callback
+
+The runnable policy and about page for this application is `referral-teleconsultation-about.html`; it maps graded diagnosis, county medical consortium informatization, telemedicine governance, and insurance-payment boundaries to the platform workflow.
+
+Receiving systems can use `POST /api/referral-teleconsultations/:id/feedback-callback` with `idempotencyKey` and `x-integration-signature`; accepted callbacks update `receivingFeedback`, status, performance evidence, institution/resident `taskMessages`, audit logs, and a matched integration gateway event.
+
+Scheduling systems can use `POST /api/referral-teleconsultations/:id/schedule-callback` with `idempotencyKey` and `x-integration-signature`; accepted callbacks update `meetingWindow`, receiving doctor, target institution fields, performance evidence, create institution/resident `taskMessages`, and write a matched integration gateway event.
+
+HIS/EMR report callback can use `POST /api/referral-teleconsultations/:id/report-callback` with `idempotencyKey` and `x-integration-signature`; accepted callbacks update report return status, append audit evidence, archive a `teleconsultation-report` personal record, create institution/resident `taskMessages`, and write a matched integration gateway event.
+
+The field contracts are tracked as `referral-feedback-callback-v1`, `referral-schedule-callback-v1`, and `referral-report-callback-v1` in the interface mapping report.
+
+`GET /api/referral-teleconsultations/joint-test-pack` returns the onsite joint-test pack for referral-center, receiving-hospital scheduling, hospital EMR report callback, county performance, and insurance signoff. It includes callback sample payloads, checklist rows, role responsibilities, joint-test task receipt summaries, an export summary showing whether each role is ready for final signoff, a cutover readiness blocker summary, and a structured next-development plan for field replay, onsite archive, insurance performance cutover, and production controls.
+
+`GET /api/referral-teleconsultations/joint-test-ledger` returns the joint-test reconciliation ledger across callback replay events, local demo evidence, onsite signoff status, SLA supervision, and insurance payment-policy rows.
+
+`POST /api/referral-teleconsultations/joint-test-ledger/tasks` lets county or commission users create idempotent `taskMessages` from unresolved ledger rows, so callback replay, onsite signoff, SLA supervision, and insurance-policy follow-up can be assigned before final acceptance.
+
+`POST /api/referral-teleconsultations/joint-test-ledger/tasks/:role/complete` records the owner receipt for a joint-test task. Commission and county coordinators can close any role row; institution and insurance users can close tasks targeted to their role, with receipt and audit evidence retained on the original `taskMessages` row.
+
+`GET /api/referral-teleconsultations/signoff-summary` returns the demo-ready/site-pending signoff summary for referral center, receiving hospital, hospital IT, county performance, and insurance review, so onsite teams can see which local evidence is ready before attaching real signed records.
+
+`POST /api/referral-teleconsultations/signoff-summary/:role/evidence` archives an onsite signoff record for an approved role. Commission/county users can archive any role, institution users can archive referral-center/receiving-hospital/hospital-it evidence, and insurance users can archive insurance evidence; every write records signer, organization, note, audit log, and security event.
+
+`POST /api/referral-teleconsultations/:id/escalations/ack` lets institution, county, or commission users acknowledge or close an SLA reminder. The action updates the teleconsultation `slaDisposition`, county supervision status, reminder message receipts, data-access logs, and security audit trail.
+
+`GET /api/referral-teleconsultations/performance-policy` exposes the referral teleconsultation payment and performance policy, including report-return rate, follow-up closure, repeat-exam control, and payment-path metrics for insurance review and medical consortium settlement.
+
+`GET /api/referral-teleconsultations/consortium-metrics` exposes the G-end collectible medical-consortium closed-loop metrics for commission/county users: loop completion, collaboration response hours, report-return rate, mutual-recognition evidence rows, grassroots follow-up return, quality feedback closure, and role todo backlog. The endpoint is release and indicator-center evidence; it still marks production HIS/EMR/LIS/PACS/insurance callbacks, onsite signatures, production identity, audit export, and monitoring as external or onsite blockers.
+
+The "medical consortium closed loop" task from `chronic-care-platform/docs/浪潮方案4.1立即采纳开发任务分派表.md` is tracked in this thread as a runnable county-portal slice: the six-step closed-loop chain, role-based todos, mutual-recognition light evidence, primary follow-up return, quality/SLA feedback closure, and G-end collectible metrics (`consortium-loop-completion-rate`, `collaboration-efficiency-hours`, `grassroots-followup-return`, `quality-feedback-closure`). These fields are release evidence only; real HIS/EMR/LIS/PACS/insurance callbacks, onsite signatures, production identity, audit export, and monitoring remain external or onsite blockers.
 
 ## Priority app 3: medical quality and safety supervision
 

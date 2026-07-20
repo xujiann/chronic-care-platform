@@ -9463,7 +9463,9 @@
       "performance": {
         "responseHours": 4,
         "reportReturnHours": 0,
-        "satisfaction": "pending"
+        "satisfaction": "pending",
+        "insurancePaymentPath": "primary-referral-continuous-deductible",
+        "repeatExamControl": "pending-specialist-review"
       },
       "auditTrail": [
         {
@@ -9479,7 +9481,21 @@
           "note": "Receiving hospital accepted the request and reserved a consultation window."
         }
       ],
-      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
+      "sourceInstitutionCode": "MR3",
+      "targetInstitutionCode": "MR1",
+      "slaDisposition": {
+        "status": "pending-ack",
+        "owner": "Dalian Central Hospital",
+        "action": "confirm report callback or manual reconciliation",
+        "updatedAt": ""
+      },
+      "countySupervision": {
+        "status": "督办中",
+        "owner": "中山区县域医共体",
+        "reason": "high priority pending report",
+        "due": "2026-06-23"
+      }
     },
     {
       "id": "rtc-002",
@@ -9512,7 +9528,9 @@
       "performance": {
         "responseHours": 2,
         "reportReturnHours": 18,
-        "satisfaction": "good"
+        "satisfaction": "good",
+        "insurancePaymentPath": "down-referral-primary-followup",
+        "repeatExamControl": "recognized-report-reused"
       },
       "auditTrail": [
         {
@@ -9528,7 +9546,109 @@
           "note": "Primary institution confirmed follow-up report return."
         }
       ],
-      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
+      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4",
+      "sourceInstitutionCode": "MR3",
+      "targetInstitutionCode": "MR2",
+      "slaDisposition": {
+        "status": "closed",
+        "owner": "Xinghaiwan Community Health Service Center",
+        "action": "report archived and follow-up accepted",
+        "updatedAt": "2026-06-22T11:30:00.000Z"
+      },
+      "countySupervision": {
+        "status": "已闭环",
+        "owner": "中山区县域医共体",
+        "reason": "report returned",
+        "due": "2026-06-22"
+      }
+    }
+  ],
+  "taskMessages": [
+    {
+      "id": "msg-rtc-001-feedback-citizen",
+      "taskId": "referralTeleconsultations:rtc-001",
+      "collection": "referralTeleconsultations",
+      "sourceId": "rtc-001",
+      "residentId": "r1",
+      "targetRole": "citizen",
+      "channel": "in_app",
+      "title": "Teleconsultation feedback returned",
+      "body": "Receiving feedback from Dalian Central Hospital: Specialist slot reserved; review current prescription before video consultation.",
+      "status": "sent",
+      "notificationKey": "referralTeleconsultations:rtc-001:feedback:rtc-001-feedback-seed:citizen",
+      "receipts": [],
+      "createdAt": "2026-06-23T09:31:00.000Z",
+      "createdBy": "system",
+      "createdByName": "System"
+    },
+    {
+      "id": "msg-rtc-001-feedback-institution",
+      "taskId": "referralTeleconsultations:rtc-001",
+      "collection": "referralTeleconsultations",
+      "sourceId": "rtc-001",
+      "residentId": "r1",
+      "targetRole": "institution",
+      "channel": "in_app",
+      "title": "Teleconsultation feedback returned",
+      "body": "Receiving feedback from Dalian Central Hospital and waiting for the video consultation report.",
+      "status": "sent",
+      "notificationKey": "referralTeleconsultations:rtc-001:feedback:rtc-001-feedback-seed:institution",
+      "receipts": [],
+      "createdAt": "2026-06-23T09:31:00.000Z",
+      "createdBy": "system",
+      "createdByName": "System"
+    },
+    {
+      "id": "msg-rtc-001-sla-institution",
+      "taskId": "referralTeleconsultations:rtc-001:sla:high",
+      "collection": "referralTeleconsultations",
+      "sourceId": "rtc-001",
+      "residentId": "r1",
+      "targetRole": "institution",
+      "channel": "in_app",
+      "title": "Teleconsultation SLA reminder",
+      "body": "Dalian Central Hospital teleconsultation report is overdue; confirm report callback or manual reconciliation.",
+      "status": "sent",
+      "priority": "high",
+      "escalationKey": "referralTeleconsultations:rtc-001:sla:high",
+      "receipts": [],
+      "createdAt": "2026-06-24T08:00:00.000Z",
+      "createdBy": "system",
+      "createdByName": "System"
+    },
+    {
+      "id": "msg-rtc-002-report-citizen",
+      "taskId": "referralTeleconsultations:rtc-002",
+      "collection": "referralTeleconsultations",
+      "sourceId": "rtc-002",
+      "residentId": "r2",
+      "targetRole": "citizen",
+      "channel": "in_app",
+      "title": "Teleconsultation report returned",
+      "body": "Report returned from Dalian Medical University Hospital: Recheck HbA1c in three months; primary institution continues diet and exercise intervention.",
+      "status": "sent",
+      "notificationKey": "referralTeleconsultations:rtc-002:report:rtc-002-report-seed:citizen",
+      "receipts": [],
+      "createdAt": "2026-06-21T10:31:00.000Z",
+      "createdBy": "system",
+      "createdByName": "System"
+    },
+    {
+      "id": "msg-rtc-002-report-institution",
+      "taskId": "referralTeleconsultations:rtc-002",
+      "collection": "referralTeleconsultations",
+      "sourceId": "rtc-002",
+      "residentId": "r2",
+      "targetRole": "institution",
+      "channel": "in_app",
+      "title": "Teleconsultation report returned",
+      "body": "Report returned from Dalian Medical University Hospital and archived to the resident longitudinal record.",
+      "status": "sent",
+      "notificationKey": "referralTeleconsultations:rtc-002:report:rtc-002-report-seed:institution",
+      "receipts": [],
+      "createdAt": "2026-06-21T10:31:00.000Z",
+      "createdBy": "system",
+      "createdByName": "System"
     }
   ],
   "escortServicePolicy": {
@@ -15737,6 +15857,63 @@
       "idempotencyKey": "externalId",
       "signature": "HMAC-SHA256",
       "retryPolicy": "人工复核后重放",
+      "status": "ready"
+    },
+    {
+      "id": "referral-feedback-callback-v1",
+      "domain": "Referral",
+      "version": "1.0.0",
+      "direction": "inbound",
+      "resource": "TeleconsultationFeedback",
+      "requiredFields": [
+        "externalId",
+        "teleconsultationId",
+        "residentId",
+        "receivingFeedback",
+        "feedbackAt",
+        "sourceSystem"
+      ],
+      "idempotencyKey": "externalId",
+      "signature": "HMAC-SHA256",
+      "retryPolicy": "idempotent replay with manual reconciliation",
+      "status": "ready"
+    },
+    {
+      "id": "referral-schedule-callback-v1",
+      "domain": "Referral",
+      "version": "1.0.0",
+      "direction": "inbound",
+      "resource": "TeleconsultationSchedule",
+      "requiredFields": [
+        "externalId",
+        "teleconsultationId",
+        "residentId",
+        "meetingWindow",
+        "targetInstitution",
+        "department"
+      ],
+      "idempotencyKey": "externalId",
+      "signature": "HMAC-SHA256",
+      "retryPolicy": "idempotent replay with manual reconciliation",
+      "status": "ready"
+    },
+    {
+      "id": "referral-report-callback-v1",
+      "domain": "Referral",
+      "version": "1.0.0",
+      "direction": "inbound",
+      "resource": "TeleconsultationReport",
+      "requiredFields": [
+        "externalId",
+        "teleconsultationId",
+        "residentId",
+        "reportSummary",
+        "reportReturnedAt",
+        "sourceSystem"
+      ],
+      "idempotencyKey": "externalId",
+      "signature": "HMAC-SHA256",
+      "retryPolicy": "idempotent replay with manual reconciliation",
       "status": "ready"
     }
   ],

@@ -281,7 +281,7 @@ npm.cmd run postgres:migration-verify
 
 `monitoring:readiness` 会生成 `release/monitoring-readiness-report.json` 和 `release/monitoring-readiness-report.md`，把 `/api/live`、`/api/health`、`/api/metrics`、`/api/system/readiness`、请求状态码、慢请求、死信、数据质量、SLO 阈值、告警信号和 on-call escalation 归档为监控接入证据；生产切换前仍需将这些信号绑定到现场 Prometheus/OpenTelemetry 或平台日志服务，并取得 `CUTOVER_MONITORING_SIGNOFF`。
 
-`referral:readiness` 会生成 `release/referral-teleconsultation-readiness-report.json` 和 `release/referral-teleconsultation-readiness-report.md`，把双向转诊、远程会诊、接诊反馈、报告回传、协同工单、居民授权、审计留痕和绩效评价归档为专项证据；现场联调仍需接入 HIS/EMR 真实转诊单、预约号源/床位、远程视频系统、PACS/LIS 报告回传、医保支付路径和医共体绩效结算公式。
+`referral:readiness` 会生成 `release/referral-teleconsultation-readiness-report.json` 和 `release/referral-teleconsultation-readiness-report.md`，把双向转诊、远程会诊、接诊反馈、报告回传、协同工单、居民授权、审计留痕和绩效评价归档为专项证据；县域端同步展示医共体协同闭环六步状态链，并把牵头医院、基层机构、接诊医院、医院 IT、医保/绩效等角色的回执、终签、现场签字和阻塞项纳入可机检证据。现场联调仍需接入 HIS/EMR 真实转诊单、预约号源/床位、远程视频系统、PACS/LIS 报告回传、医保支付路径、医共体绩效结算公式、生产身份、审计保全和监控签字。
 
 `evaluation:evidence` 会生成 `release/evaluation-evidence-report.json` 和 `release/evaluation-evidence-report.md`，汇总互联互通四甲/五乙测评所需接口清单、标准映射、交易样例、整改记录、P1 接口需求和流程审计证据，作为现场截图、第三方测评结论和整改复测记录的前置材料。
 
@@ -344,6 +344,38 @@ npm.cmd run rollback:snapshot -- "data/backups/<备份目录>"
 - 出生/死亡电子证照。
 - 公安、民政共享。
 - 等保、密评、日志保全、脱敏和容灾。
+
+## Referral Teleconsultation Callback
+
+Open `referral-teleconsultation-about.html` during onsite review to align policy basis, workflow boundaries, callback contracts, and signoff responsibilities before testing real HIS/EMR/referral-center payloads.
+
+Use `POST /api/referral-teleconsultations/:id/feedback-callback` for receiving-hospital acceptance, triage note, or down-referral acceptance joint testing. Requests must include `idempotencyKey` and `x-integration-signature`; successful callbacks update `receivingFeedback`, feedback timestamp, performance evidence, audit/data-access logs, institution/resident `taskMessages`, and a matched `integrationGatewayEvents` record.
+
+Use `POST /api/referral-teleconsultations/:id/schedule-callback` for appointment-slot, bed-resource, or tele-video room callback joint testing. Requests must include `idempotencyKey` and `x-integration-signature`; successful callbacks update `meetingWindow`, target institution fields, receiving doctor, performance evidence, audit/data-access logs, institution/resident `taskMessages`, and a matched `integrationGatewayEvents` record.
+
+Use `POST /api/referral-teleconsultations/:id/report-callback` for HIS/EMR report return joint testing. Requests must include `idempotencyKey` and `x-integration-signature`; successful callbacks move the teleconsultation to `report-returned`, merge performance evidence, archive the `teleconsultation-report` personal record, append audit/data-access logs, create institution/resident `taskMessages`, and create a matched `integrationGatewayEvents` record.
+
+Use `GET /api/referral-teleconsultations/joint-test-pack` before field testing to export the callback sample payloads, checklist, task receipt summaries, final-signoff export summary, cutover readiness blockers, next-development plan, and signoff matrix for referral center, receiving hospital, hospital IT, county performance, and insurance review.
+
+Use `GET /api/referral-teleconsultations/joint-test-ledger` during field testing to reconcile signed callback replay events, local demo evidence, onsite signoff status, SLA supervision, and insurance payment-policy readiness before final acceptance.
+
+Use `POST /api/referral-teleconsultations/joint-test-ledger/tasks` from the county command board when the ledger still has pending replay or signoff rows. The endpoint creates idempotent `taskMessages` for institution, county, or insurance owners without duplicating existing joint-test tasks.
+
+Use `POST /api/referral-teleconsultations/joint-test-ledger/tasks/:role/complete` when a responsible owner confirms callback replay, SLA supervision, or insurance-policy follow-up. The route records a completion receipt on the original `taskMessages` row and keeps an audit event before final onsite signoff evidence is archived.
+
+Use `GET /api/referral-teleconsultations/signoff-summary` during field testing to review demo-ready evidence and site-pending signoff rows for referral center, receiving hospital, hospital IT, county performance, and insurance review before archiving real signatures.
+
+Use `POST /api/referral-teleconsultations/signoff-summary/:role/evidence` to archive onsite signoff evidence after each role validates its callback replay, report archive, SLA supervision, or payment-policy row. Keep the original signed file in the project evidence pack and store its attachment name or storage pointer in the request note.
+
+Use `POST /api/referral-teleconsultations/:id/escalations/ack` after an SLA reminder is sent. Institution and county users can acknowledge or close the supervision item; the platform updates `slaDisposition`, county supervision status, reminder receipts, and audit logs.
+
+Use `GET /api/referral-teleconsultations/performance-policy` to confirm insurance-payment and medical-consortium performance rules. The report includes report-return rate, follow-up closure, repeat-exam control, and configured payment paths before site settlement formulas are finalized.
+
+Use `GET /api/referral-teleconsultations/consortium-metrics` as the G-end indicator-center collection endpoint for the closed-loop slice. It reports loop completion, collaboration efficiency, report return, mutual-recognition light evidence, grassroots follow-up return, quality feedback closure, role backlog, and the remaining external/onsite blockers before production callbacks and signoffs are available.
+
+For the "medical consortium closed loop" task in `chronic-care-platform/docs/浪潮方案4.1立即采纳开发任务分派表.md`, release evidence must include the county portal DOM markers for six closed-loop stages, role-based todos, G-end collectible indicators, mutual-recognition light evidence, primary follow-up return, and quality/SLA feedback closure. These are pre-field acceptance signals; production HIS/EMR/LIS/PACS/insurance callbacks, onsite signatures, production identity, audit export, and monitoring remain required site inputs.
+
+Before onsite testing, compare `referral-feedback-callback-v1`, `referral-schedule-callback-v1`, and `referral-report-callback-v1` in `release/interface-mapping-report.md` with the real HIS/EMR scheduling, receiving feedback, and report payloads.
 
 ## Medical quality and safety supervision release boundary
 

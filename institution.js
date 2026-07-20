@@ -186,6 +186,7 @@ function renderAll(state) {
   renderPhase2FamilyDoctorContracts(state);
   populateBirthCertificateForm(state);
   populateMultiPracticeForm(state);
+  populateTeleconsultationForm(state);
   renderMetrics(state);
   renderDoctorAccounts(state);
   renderMultiPracticePolicy(state);
@@ -1345,6 +1346,115 @@ function populateMultiPracticeForm(state) {
   if (insurance && !insurance.value) insurance.value = "已购买医师个人医疗执业保险";
 }
 
+function populateTeleconsultationForm(state) {
+  const form = document.querySelector("#teleconsultation-form");
+  if (!form) return;
+  const authSelect = form.querySelector("select[name='residentAuthorizationId']");
+  const referralSelect = form.querySelector("select[name='referralId']");
+  const authorizations = (state.personalRecords || [])
+    .filter((item) => item.category === "authorizations" && item.status !== "revoked" && item.meta?.status !== "revoked");
+  authSelect.innerHTML = authorizations.map((record) => {
+    const resident = residentOf(state, record.residentId);
+    return `<option value="${record.id}" data-resident-id="${record.residentId}">${resident?.name || record.residentId} · ${record.name || "authorization"}</option>`;
+  }).join("");
+  const referrals = state.referralSystem?.referrals || [];
+  referralSelect.innerHTML = [`<option value="">No linked referral</option>`, ...referrals.map((item) => {
+    const resident = residentOf(state, item.residentId);
+    return `<option value="${item.id}">${resident?.name || item.residentId} · ${item.type || "referral"} · ${item.status || ""}</option>`;
+  })].join("");
+  const target = form.querySelector("input[name='targetInstitution']");
+  const targetCode = form.querySelector("input[name='targetInstitutionCode']");
+  const department = form.querySelector("input[name='department']");
+  if (target && !target.value) target.value = "Dalian Central Hospital";
+  if (targetCode && !targetCode.value) targetCode.value = "MR1";
+  if (department && !department.value) department.value = "Cardiology";
+}
+
+async function submitTeleconsultation(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const selected = form.querySelector("select[name='residentAuthorizationId']")?.selectedOptions?.[0];
+  const formData = Object.fromEntries(new FormData(form));
+  const doctor = (platformState.doctorProfiles || [])[0] || {};
+  const payload = {
+    ...formData,
+    residentId: selected?.dataset.residentId || "",
+    sourceInstitution: doctor.primaryInstitution || "",
+    sourceInstitutionCode: doctor.primaryInstitutionId || "",
+    applicantDoctor: doctor.id || "",
+    type: "teleconsultation",
+    status: "requested",
+    materials: ["EMR summary", "resident authorization", "primary care note"],
+    note: "Created from institution teleconsultation form"
+  };
+  const submit = form.querySelector("button[type='submit']");
+  submit.disabled = true;
+  try {
+    let saved;
+    if (institutionApiBase) {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${institutionApiBase}/referral-teleconsultations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || `Teleconsultation creation failed: ${response.status}`);
+      }
+      saved = await response.json();
+    } else {
+      saved = {
+        ...payload,
+        id: `rtc-local-${Date.now()}`,
+        authorizationStatus: "authorized",
+        reportStatus: "pending-return",
+        receivingFeedback: "",
+        reportSummary: "",
+        auditTrail: [{ at: new Date().toISOString(), actor: "local-preview", action: "created", note: payload.note }],
+        performance: { responseHours: 0, reportReturnHours: 0, satisfaction: "pending" },
+        createdAt: new Date().toISOString(),
+        lastUpdated: new Date().toISOString()
+      };
+    }
+    platformState.referralTeleconsultations = [saved, ...(platformState.referralTeleconsultations || [])];
+    form.reset();
+    populateTeleconsultationForm(platformState);
+    renderTeleconsultationLoop(platformState);
+  } catch (error) {
+    alert(error.message || "Teleconsultation creation failed. Check resident authorization and role scope.");
+  } finally {
+    submit.disabled = false;
+  }
+}
+
+async function submitTeleconsultationAction(event) {
+  const form = event.target.closest(".teleconsultation-action-form");
+  if (!form) return;
+  event.preventDefault();
+  const formData = Object.fromEntries(new FormData(form));
+  const updates = {
+    status: formData.status,
+    receivingFeedback: formData.receivingFeedback,
+    reportSummary: formData.reportSummary
+  };
+  if (formData.status === "report-returned") updates.reportStatus = "returned";
+  Object.keys(updates).forEach((key) => {
+    if (!updates[key]) delete updates[key];
+  });
+  const submit = form.querySelector("button[type='submit']");
+  submit.disabled = true;
+  const result = await updateWorkflowAction(
+    platformState,
+    "referralTeleconsultations",
+    form.dataset.id,
+    updates,
+    formData.note || "Referral teleconsultation feedback updated"
+  );
+  submit.disabled = false;
+  if (result.ok) renderAll(platformState);
+}
+
 async function submitMultiPracticeApplication(event) {
   event.preventDefault();
   const form = event.currentTarget;
@@ -2223,13 +2333,13 @@ function renderTeleconsultationLoop(state) {
   const countEl = document.querySelector("#teleconsultation-count");
   const listEl = document.querySelector("#teleconsultation-loop");
   if (!countEl || !listEl) return;
-  countEl.textContent = `${rows.length} items`;
+  countEl.textContent = `${rows.length} 项`;
   listEl.innerHTML = rows.map((item) => {
     const resident = residentOf(state, item.residentId);
     const badge = item.priority === "high" ? "danger" : item.reportStatus === "returned" ? "info" : "warn";
-    return `<section class="item">
+    return `<section class="item teleconsultation-card">
       <div>
-        <h3>${resident?.name || "Unknown resident"} · ${item.department || item.diseaseType || "Teleconsultation"}</h3>
+        <h3>${resident?.name || "未知居民"} · ${item.department || item.diseaseType || "远程会诊"}</h3>
         <p>${item.sourceInstitution || "-"} -> ${item.targetInstitution || "-"} · ${item.meetingWindow || item.due || "-"}</p>
         <p>${item.clinicalQuestion || item.receivingFeedback || item.reportSummary || "待补充临床说明"}</p>
         <p>授权：${item.authorizationStatus || "待确认"} · 报告：${item.reportStatus || "待回传"}</p>
@@ -2239,9 +2349,62 @@ function renderTeleconsultationLoop(state) {
           ${item.status !== "closed" ? actionButton("referralTeleconsultations", item.id, "关闭闭环", { status: "closed" }, "关闭转诊会诊闭环") : ""}
         </div>
       </div>
-      <span class="badge ${badge}">${item.status}</span>
+      <span class="badge ${badge}">${teleconsultationStatusLabel(item.status)}</span>
     </section>`;
-  }).join("") || `<p class="muted">No referral teleconsultation tasks.</p>`;
+  }).join("") || `<p class="muted">暂无转诊会诊任务。</p>`;
+}
+
+async function acknowledgeTeleconsultationSla(state, id) {
+  const action = "Institution acknowledged SLA reminder and started report callback reconciliation.";
+  if (institutionApiBase) {
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${institutionApiBase}/referral-teleconsultations/${encodeURIComponent(id)}/escalations/ack`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "acknowledged", action })
+      });
+      if (response.ok) {
+        const payload = await response.json();
+        state.referralTeleconsultations = (state.referralTeleconsultations || []).map((item) => item.id === id ? payload.teleconsultation : item);
+        state.taskMessages = [
+          ...(payload.messages || []),
+          ...(state.taskMessages || []).filter((message) => !(message.collection === "referralTeleconsultations" && message.sourceId === id))
+        ].slice(0, 300);
+        return { ok: true };
+      }
+    } catch (error) {
+      // Static preview falls back to local acknowledgement below.
+    }
+  }
+  const now = new Date().toISOString();
+  state.referralTeleconsultations = (state.referralTeleconsultations || []).map((item) => item.id === id
+    ? {
+        ...item,
+        slaDisposition: { status: "acknowledged", action, owner: "institution-preview", updatedAt: now },
+        countySupervision: { ...(item.countySupervision || {}), status: "已确认", action, updatedAt: now }
+      }
+    : item);
+  state.taskMessages = (state.taskMessages || []).map((message) => message.collection === "referralTeleconsultations" && message.sourceId === id && message.escalationKey
+    ? { ...message, status: "acknowledged", receipts: [{ at: now, by: "institution-preview", action }, ...(message.receipts || [])] }
+    : message);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  return { ok: true };
+}
+
+function teleconsultationAckButton(id) {
+  return `<button class="inline-action" type="button" data-teleconsultation-ack data-id="${id}">确认 SLA</button>`;
+}
+
+function teleconsultationStatusLabel(status) {
+  return {
+    requested: "已申请",
+    accepted: "已接诊",
+    scheduled: "已排期",
+    "feedback-returned": "已反馈",
+    "report-returned": "报告已回传",
+    closed: "已闭环"
+  }[status] || status || "待处理";
 }
 
 function renderReservedResources(state) {

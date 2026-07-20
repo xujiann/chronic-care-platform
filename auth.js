@@ -61,7 +61,7 @@
     institution: [["health-city.html", "总览"], ["digital-hospital-self-assessment.html", "医院自评"], ["doctor.html", "医生端"], ["regional-data-sharing.html", "区域共享"], ["blood.html", "血液管理"], ["about.html", "关于"], ["institution.html", "医疗机构"]],
     insurance: [["health-city.html", "总览"], ["about.html", "关于"], ["insurance.html", "医保"]],
     citizen: [["health-city.html", "总览"], ["about.html", "关于"], ["citizen.html", "个人端"], ["mobile-preview.html", "手机预览"]],
-    county: [["health-city.html", "总览"], ["about.html", "关于"], ["county.html", "医共体"]]
+    county: [["health-city.html", "总览"], ["about.html", "关于"], ["referral-teleconsultation-about.html", "转诊会诊"], ["county.html", "医共体"]]
   };
 
   roleLinks.commission.splice(5, 0, ["internet-nursing.html", "互联网护理"]);
@@ -284,7 +284,7 @@
 
   function canAccessPage(pageName, user) {
     if (!pageName || pageName.startsWith("#")) return true;
-    if (!user) return pageName === "login.html" || pageName === "health-city.html" || pageName === "about.html";
+    if (!user) return pageName === "login.html" || pageName === "health-city.html" || pageName === "about.html" || pageName === "referral-teleconsultation-about.html";
     if (pageName === "login.html") return false;
     if (pageName === "doctor.html") return user.accountType === "doctor";
     const allowed = routeAccess[pageName];
