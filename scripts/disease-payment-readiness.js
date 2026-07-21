@@ -2,12 +2,24 @@
 
 const fs = require("fs");
 const path = require("path");
+const { generateKeyPairSync } = require("crypto");
 const Service = require("../disease-payment-service");
 const Intake = require("../disease-payment-intake");
+const PackageSignature = require("../disease-payment-package-signature");
 
 const ROOT = path.resolve(__dirname, "..");
 
 function buildDiseasePaymentReadiness() {
+  const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+  const signatureOptions = { trustedSignerFingerprints: [PackageSignature.publicKeyFingerprint(publicKey.export({ type: "spki", format: "pem" }))] };
+  const signPackage = (payload) => ({
+    ...payload,
+    signatureEvidence: PackageSignature.createPackageSignature(payload, privateKey.export({ type: "pkcs8", format: "pem" }), {
+      signerId: "readiness-medical-insurance-signer",
+      signerOrganization: payload.sourceOrganization,
+      validUntil: "2036-12-31T23:59:59.000Z"
+    })
+  });
   const state = Service.calculateAll(Service.seedDiseasePaymentState(), "readiness-check");
   const overview = Service.buildOverview(state);
   const requiredFiles = ["disease-payment-service.js", "disease-payment-intake.js", "disease-payment-local-package.js", "disease-payment.html", "disease-payment.js", "disease-payment.css", "scripts/disease-payment-package-builder.js", "config/disease-payment/templates/local-drg-package.template.json", "config/disease-payment/templates/local-dip-package.template.json"];
@@ -32,32 +44,32 @@ function buildDiseasePaymentReadiness() {
   const parameterFirstReview = Service.reviewPaymentParameter(parameterSubmitted.state, parameterDraft.row.id, { approved: true }, "readiness-reviewer-a");
   const parameterSecondReview = Service.reviewPaymentParameter(parameterFirstReview.state, parameterDraft.row.id, { approved: true }, "readiness-reviewer-b");
   const parameterPublished = Service.publishPaymentParameter(parameterSecondReview.state, parameterDraft.row.id, "readiness-publisher");
-  const localPackagePayload = {
+  const localPackagePayload = signPackage({
     id: "readiness-local-drg", regionCode: "210200", regionName: "就绪检查统筹区", mode: "DRG", scope: "incremental", authority: "local-medical-insurance-approved",
     packageVersion: "READINESS-DRG-V1", nationalVersion: "CHS-DRG 2.0", documentNo: "READINESS-2027-1", sourceOrganization: "就绪检查医保部门", effectiveFrom: "2026-01-01", effectiveTo: "2026-12-31", catalogCount: 1,
     sourceFiles: [{ name: "readiness-drg.xlsx", sha256: "e".repeat(64), verificationStatus: "verified" }], approvalDocument: { documentNo: "READINESS-2027-1", issuedAt: "2026-12-20", fileDigest: "f".repeat(64) },
     payment: { rateMethod: "固定费率法", rate: 11900, budgetYear: 2027, institutionCoefficients: [{ institution: "大连市中心医院", coefficient: 1.05 }] },
     catalog: [{ code: "BR23", name: "就绪检查DRG", mdcCode: "MDCB", mdcName: "神经系统", adrgCode: "BR2", adrgName: "脑血管疾病", groupType: "medical", complicationLevel: "CC", diagnosisPrefixes: ["I63"], weight: 2.45, adjustment: 1 }]
-  };
-  const localPackageImported = Service.importLocalPaymentPackage(state, localPackagePayload, "readiness-importer");
+  });
+  const localPackageImported = Service.importLocalPaymentPackage(state, localPackagePayload, "readiness-importer", signatureOptions);
   const localPackageSimulated = Service.simulateLocalPaymentPackage(localPackageImported.state, localPackagePayload.id, "readiness-analyst");
   const localPackageSubmitted = Service.submitLocalPaymentPackage(localPackageSimulated.state, localPackagePayload.id, "readiness-importer");
   const localPackageFirstReview = Service.reviewLocalPaymentPackage(localPackageSubmitted.state, localPackagePayload.id, { approved: true }, "readiness-local-reviewer-a");
   const localPackageSecondReview = Service.reviewLocalPaymentPackage(localPackageFirstReview.state, localPackagePayload.id, { approved: true }, "readiness-local-reviewer-b");
-  const localPackagePublished = Service.publishLocalPaymentPackage(localPackageSecondReview.state, localPackagePayload.id, "readiness-local-publisher");
-  const scheduledPayload = { ...localPackagePayload, id: "readiness-local-drg-next", packageVersion: "READINESS-DRG-V2", effectiveFrom: "2027-01-01", effectiveTo: "2027-12-31", catalog: localPackagePayload.catalog.map((item) => ({ ...item, weight: 2.5 })) };
-  const scheduledImported = Service.importLocalPaymentPackage(localPackagePublished.state, scheduledPayload, "readiness-importer");
+  const localPackagePublished = Service.publishLocalPaymentPackage(localPackageSecondReview.state, localPackagePayload.id, "readiness-local-publisher", signatureOptions);
+  const scheduledPayload = signPackage({ ...localPackagePayload, signatureEvidence: undefined, id: "readiness-local-drg-next", packageVersion: "READINESS-DRG-V2", effectiveFrom: "2027-01-01", effectiveTo: "2027-12-31", catalog: localPackagePayload.catalog.map((item) => ({ ...item, weight: 2.5 })) });
+  const scheduledImported = Service.importLocalPaymentPackage(localPackagePublished.state, scheduledPayload, "readiness-importer", signatureOptions);
   const scheduledSimulated = Service.simulateLocalPaymentPackage(scheduledImported.state, scheduledPayload.id, "readiness-analyst");
   const scheduledSubmitted = Service.submitLocalPaymentPackage(scheduledSimulated.state, scheduledPayload.id, "readiness-importer");
   const scheduledFirstReview = Service.reviewLocalPaymentPackage(scheduledSubmitted.state, scheduledPayload.id, { approved: true }, "readiness-scheduled-reviewer-a");
   const scheduledSecondReview = Service.reviewLocalPaymentPackage(scheduledFirstReview.state, scheduledPayload.id, { approved: true }, "readiness-scheduled-reviewer-b");
-  const scheduledPublished = Service.publishLocalPaymentPackage(scheduledSecondReview.state, scheduledPayload.id, "readiness-scheduler", { at: "2026-07-21" });
-  const scheduledActivated = Service.activateDueLocalPaymentPackages(scheduledPublished.state, "readiness-activation-worker", { at: "2027-01-01" });
+  const scheduledPublished = Service.publishLocalPaymentPackage(scheduledSecondReview.state, scheduledPayload.id, "readiness-scheduler", { ...signatureOptions, at: "2026-07-21" });
+  const scheduledActivated = Service.activateDueLocalPaymentPackages(scheduledPublished.state, "readiness-activation-worker", { ...signatureOptions, at: "2027-01-01" });
   const scheduledRolledBack = Service.rollbackLocalPaymentPackage(scheduledActivated.state, scheduledPayload.id, { reason: "readiness rollback rehearsal" }, "readiness-rollback-operator");
   const localPackageView = Service.buildLocalPaymentPackageView(scheduledRolledBack.state);
   const localCatalogPage = Service.getLocalPaymentPackageCatalogPage(scheduledRolledBack.state, localPackagePayload.id, { page: 1, pageSize: 1, query: "BR23" });
-  const batchPayload = { ...localPackagePayload, id: "readiness-local-drg-batch", packageVersion: "READINESS-DRG-BATCH" };
-  const batchImported = Service.importLocalPaymentPackage(Service.seedDiseasePaymentState(), batchPayload, "readiness-batch-importer");
+  const batchPayload = signPackage({ ...localPackagePayload, signatureEvidence: undefined, id: "readiness-local-drg-batch", packageVersion: "READINESS-DRG-BATCH" });
+  const batchImported = Service.importLocalPaymentPackage(Service.seedDiseasePaymentState(), batchPayload, "readiness-batch-importer", signatureOptions);
   const batchJobCreated = Service.createLocalPaymentPackageSimulationJob(batchImported.state, batchPayload.id, { batchSize: 2, idempotencyKey: "readiness-local-batch-idem" }, "readiness-batch-analyst");
   const batchJobDuplicate = Service.createLocalPaymentPackageSimulationJob(batchJobCreated.state, batchPayload.id, { batchSize: 2, idempotencyKey: "readiness-local-batch-idem" }, "readiness-batch-analyst");
   const batchJobFirst = Service.processLocalPaymentPackageSimulationJob(batchJobCreated.state, batchJobCreated.job.id, {}, "readiness-batch-worker");
@@ -85,6 +97,7 @@ function buildDiseasePaymentReadiness() {
     { id: "parameter-impact", label: "支付参数病例与机构影响试算", ok: parameterSimulation.report.caseCount === state.cases.length && parameterSimulation.report.byInstitution.length >= 2 && Boolean(parameterSimulation.report.inputDigest) },
     { id: "parameter-dual-review", label: "支付参数双人复核、发布与旧版冻结", ok: parameterPublished.row.status === "已发布" && parameterPublished.row.approvals.length === 2 && parameterPublished.state.parameterVersions.some((item) => item.id === "param-drg-2026" && item.status === "已冻结") },
     { id: "local-package-validation", label: "当地医保目录、权重/分值、费率和来源文件整包校验", ok: localPackageImported.validation.ok && localPackageImported.validation.summary.catalogCount === 1 && Boolean(localPackageImported.validation.digest) },
+    { id: "local-package-signature", label: "当地医保规则包内容摘要、数字签名与可信公钥指纹", ok: localPackageImported.validation.signature?.ok && localPackageImported.validation.signature?.cryptographicallyValid && localPackageImported.validation.signature?.trusted },
     { id: "local-package-impact", label: "当地医保规则包病例与机构影响试算", ok: localPackageSimulated.report.caseCount === state.cases.length && localPackageSimulated.report.byInstitution.length >= 2 && Boolean(localPackageSimulated.report.inputDigest) },
     { id: "local-package-diff", label: "当地医保目录、参数和机构系数版本差异报告", ok: localPackageSimulated.diffReport.packageId === localPackagePayload.id && Array.isArray(localPackageSimulated.diffReport.catalog.changed) && Boolean(localPackageSimulated.row.latestDiffReportId) },
     { id: "local-package-release", label: "当地医保规则包双人复核、原子发布和版本冻结", ok: localPackagePublished.row.status === "已发布" && localPackagePublished.scheme.authority === "official-local" && localPackagePublished.parameter.rate === 11900 && localPackagePublished.state.groupCatalog.some((item) => item.localPackageId === localPackagePayload.id) },

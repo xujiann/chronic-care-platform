@@ -653,8 +653,8 @@ function buildParameterGovernanceView(input) {
   };
 }
 
-function importLocalPaymentPackage(input, payload, actor) {
-  return LocalPaymentPackage.importLocalPaymentPackage(normalizeState(input), payload, actor);
+function importLocalPaymentPackage(input, payload, actor, options) {
+  return LocalPaymentPackage.importLocalPaymentPackage(normalizeState(input), payload, actor, options);
 }
 
 function simulateLocalPaymentPackage(input, id, actor) {

@@ -1341,7 +1341,7 @@ function buildReleaseReport(options = {}) {
   const diseasePaymentFormalGroupingIds = ["formal-grouping-async", "formal-grouping-compensation", "formal-grouping-api-routes", "formal-grouping-ui"];
   const diseasePaymentFormalGroupingReady = diseasePaymentFormalGroupingIds
     .every((id) => diseasePaymentReadiness.checks?.some((item) => item.id === id && item.ok));
-  const diseasePaymentLocalPackageIds = ["local-package-validation", "local-package-impact", "local-package-diff", "local-package-release", "local-package-scheduling", "local-package-rollback", "local-package-pagination", "catalog-prefix-index", "local-package-batch-simulation", "local-package-builder", "local-package-api-routes", "local-package-ui"];
+  const diseasePaymentLocalPackageIds = ["local-package-validation", "local-package-signature", "local-package-impact", "local-package-diff", "local-package-release", "local-package-scheduling", "local-package-rollback", "local-package-pagination", "catalog-prefix-index", "local-package-batch-simulation", "local-package-builder", "local-package-api-routes", "local-package-ui"];
   const diseasePaymentLocalPackageReady = diseasePaymentLocalPackageIds
     .every((id) => diseasePaymentReadiness.checks?.some((item) => item.id === id && item.ok));
   const policyCoverage = buildPolicyCoverageReport();
