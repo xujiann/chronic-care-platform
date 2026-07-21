@@ -5,14 +5,23 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
+const { generateKeyPairSync } = require("node:crypto");
 const test = require("node:test");
 const Intake = require("../disease-payment-intake");
 const Service = require("../disease-payment-service");
+const PackageSignature = require("../disease-payment-package-signature");
 
 const ROOT = path.resolve(__dirname, "..");
+const apiPackageKeys = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+const apiPackageFingerprint = PackageSignature.publicKeyFingerprint(apiPackageKeys.publicKey.export({ type: "spki", format: "pem" }));
+
+function signApiPackage(payload) {
+  payload.signatureEvidence = PackageSignature.createPackageSignature(payload, apiPackageKeys.privateKey.export({ type: "pkcs8", format: "pem" }), { signerId: "api-insurance-signer", signerOrganization: payload.sourceOrganization, validUntil: "2036-12-31T23:59:59.000Z" });
+  return payload;
+}
 
 function apiLocalPackage() {
-  return {
+  return signApiPackage({
     id: "api-local-drg-2027", regionCode: "210200", regionName: "API测试统筹区", mode: "DRG", scope: "incremental", authority: "local-medical-insurance-approved",
     packageVersion: "API-DRG-2027-V1", nationalVersion: "CHS-DRG 2.0", documentNo: "API医保发〔2027〕1号", sourceOrganization: "API测试医疗保障局",
     effectiveFrom: "2026-01-01", effectiveTo: "2026-12-31", catalogCount: 1,
@@ -20,7 +29,7 @@ function apiLocalPackage() {
     approvalDocument: { documentNo: "API医保发〔2027〕1号", issuedAt: "2026-12-20", fileDigest: "d".repeat(64) },
     payment: { rateMethod: "固定费率法", rate: 11800, budgetYear: 2027, institutionCoefficients: [] },
     catalog: [{ code: "FZ15", name: "API正式测试病组", mdcCode: "MDCF", mdcName: "循环系统", adrgCode: "FZ1", adrgName: "循环系统内科组", groupType: "medical", complicationLevel: "NONE", diagnosisPrefixes: ["I10"], weight: 0.9, adjustment: 1 }]
-  };
+  });
 }
 
 async function waitForServer(baseUrl) {
@@ -40,7 +49,7 @@ test("disease payment API runs an authenticated end-to-end workflow", async (t) 
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "disease-payment-api-"));
   fs.copyFileSync(path.join(ROOT, "data", "db.json"), path.join(dataDir, "db.json"));
   const port = 19500 + Math.floor(Math.random() * 1000);
-  const server = spawn(process.execPath, ["server.js"], { cwd: ROOT, env: { ...process.env, PORT: String(port), DATA_DIR: dataDir }, stdio: "ignore" });
+  const server = spawn(process.execPath, ["server.js"], { cwd: ROOT, env: { ...process.env, PORT: String(port), DATA_DIR: dataDir, DISEASE_PAYMENT_TRUSTED_SIGNER_FINGERPRINTS: apiPackageFingerprint }, stdio: "ignore" });
   t.after(() => { server.kill(); fs.rmSync(dataDir, { recursive: true, force: true }); });
   const baseUrl = `http://127.0.0.1:${port}`;
   await waitForServer(baseUrl);
@@ -115,6 +124,7 @@ test("disease payment API runs an authenticated end-to-end workflow", async (t) 
   futurePayload.packageVersion = "API-DRG-2028-V1";
   futurePayload.effectiveFrom = "2027-01-01";
   futurePayload.effectiveTo = "2027-12-31";
+  signApiPackage(futurePayload);
   await json(baseUrl, "/api/disease-payment/local-packages", { method: "POST", headers, body: JSON.stringify(futurePayload) });
   const simulationJob = await json(baseUrl, "/api/disease-payment/local-packages/api-local-drg-2028/simulation-jobs", { method: "POST", headers, body: JSON.stringify({ jobId: "api-local-simulation-job", idempotencyKey: "api-local-simulation-job-idem", batchSize: 2 }) });
   assert.equal(simulationJob.response.status, 201);

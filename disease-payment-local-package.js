@@ -2,9 +2,10 @@
 
 const { randomUUID } = require("crypto");
 const { digest } = require("./disease-payment-intake");
+const PackageSignature = require("./disease-payment-package-signature");
 
 const OFFICIAL_AUTHORITY = "local-medical-insurance-approved";
-const WORKFLOW_FIELDS = new Set(["status", "approvals", "createdAt", "createdBy", "updatedAt", "updatedBy", "submittedAt", "submittedBy", "approvedAt", "scheduledAt", "scheduledBy", "publishedAt", "publishedBy", "activatedAt", "activatedBy", "rolledBackAt", "rolledBackBy", "rollbackReason", "latestImpactReportId", "latestDiffReportId", "validationReportId", "activationSnapshotId", "contentDigest", "schemeId", "parameterId", "frozen", "frozenAt", "replacedBy"]);
+const WORKFLOW_FIELDS = new Set(["status", "approvals", "createdAt", "createdBy", "updatedAt", "updatedBy", "submittedAt", "submittedBy", "approvedAt", "scheduledAt", "scheduledBy", "publishedAt", "publishedBy", "activatedAt", "activatedBy", "rolledBackAt", "rolledBackBy", "rollbackReason", "latestImpactReportId", "latestDiffReportId", "validationReportId", "activationSnapshotId", "contentDigest", "schemeId", "parameterId", "frozen", "frozenAt", "replacedBy", "signatureEvidence", "signatureVerification"]);
 const SENSITIVE_FIELDS = new Set(["patientName", "residentId", "idCard", "identityNumber", "phone", "mobile"]);
 
 function ensureState(state) {
@@ -53,7 +54,7 @@ function previousDate(value) {
   return date.toISOString().slice(0, 10);
 }
 
-function validateLocalPaymentPackage(input) {
+function validateLocalPaymentPackage(input, options = {}) {
   const item = packageContent(input);
   const errors = [];
   const warnings = [];
@@ -113,12 +114,17 @@ function validateLocalPaymentPackage(input) {
   if (!coefficients.length) warnings.push("未配置机构差异系数，系统将按1.0计算");
   if (item.authority !== OFFICIAL_AUTHORITY) warnings.push("当前为模板/联调规则包，不具备正式发布资格");
   if (item.scope === "full" && catalog.length < 2) warnings.push("全量规则包目录条数异常偏少，请复核是否误传样例文件");
+  const signature = item.authority === OFFICIAL_AUTHORITY
+    ? PackageSignature.verifyPackageSignature({ ...item, signatureEvidence: input?.signatureEvidence }, options)
+    : null;
+  if (signature && !signature.ok) errors.push(...signature.errors.map((error) => `signatureEvidence：${error}`));
 
   return {
     ok: errors.length === 0,
     errors,
     warnings,
     digest: digest(item),
+    signature,
     summary: { mode: mode || item.mode, catalogCount: catalog.length, coefficientCount: coefficients.length, sourceFileCount: files.length, authority: item.authority || "" },
     checkedAt: new Date().toISOString()
   };
@@ -129,15 +135,17 @@ function audit(state, action, target, actor, detail = "") {
   state.auditTrail = state.auditTrail.slice(0, 200);
 }
 
-function importLocalPaymentPackage(stateInput, payload, actor = "system") {
+function importLocalPaymentPackage(stateInput, payload, actor = "system", options = {}) {
   const state = ensureState(stateInput);
   const content = packageContent(payload);
-  const validation = validateLocalPaymentPackage(content);
+  const validation = validateLocalPaymentPackage(payload, options);
   const existing = state.localPaymentPackages.find((item) => item.id === content.id);
   if (existing && !["校验失败", "校验通过", "已驳回"].includes(existing.status)) throw new Error("当前规则包状态不允许覆盖导入");
   const now = new Date().toISOString();
   const row = {
     ...content,
+    signatureEvidence: payload?.signatureEvidence || null,
+    signatureVerification: validation.signature,
     status: validation.ok ? "校验通过" : "校验失败",
     approvals: [],
     validationReportId: `local-package-validation-${randomUUID()}`,
@@ -483,7 +491,7 @@ function publishLocalPaymentPackage(stateInput, id, actor = "system", options = 
   if (!row) throw new Error("当地医保规则包不存在");
   if (row.authority !== OFFICIAL_AUTHORITY) throw new Error("模板或联调规则包不得发布为正式参数");
   if (row.status !== "已批准" || new Set(row.approvals.filter((item) => item.approved).map((item) => item.reviewer)).size < 2) throw new Error("规则包发布需要两名不同复核人批准");
-  const validation = validateLocalPaymentPackage(row);
+  const validation = validateLocalPaymentPackage(row, options);
   if (!validation.ok || validation.digest !== row.contentDigest) throw new Error("规则包内容已变化或校验失效，请重新导入校验");
   const at = dateOnly(options.at || new Date());
   if (row.effectiveTo < at) throw new Error("规则包有效期已结束，不得发布");
@@ -508,6 +516,8 @@ function activateLocalPaymentPackage(stateInput, id, actor = "system", options =
   const row = state.localPaymentPackages.find((item) => item.id === id);
   if (!row) throw new Error("当地医保规则包不存在");
   if (row.status !== "待生效") throw new Error("只有已发布待生效的规则包可以激活");
+  const validation = validateLocalPaymentPackage(row, options);
+  if (!validation.ok || validation.digest !== row.contentDigest) throw new Error("规则包签名、内容或信任状态已失效，请停止激活并复核");
   const at = dateOnly(options.at || new Date());
   if (row.effectiveFrom > at) throw new Error(`尚未到生效日期${row.effectiveFrom}`);
   if (row.effectiveTo < at) throw new Error("规则包尚未激活即已过期，请重新履行发布流程");
@@ -518,7 +528,7 @@ function activateDueLocalPaymentPackages(stateInput, actor = "system", options =
   const state = ensureState(stateInput);
   const at = dateOnly(options.at || new Date());
   const due = state.localPaymentPackages.filter((item) => item.status === "待生效" && item.effectiveFrom <= at && item.effectiveTo >= at).sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
-  const activated = due.map((item) => activatePackage(state, item, actor, at).row);
+  const activated = due.map((item) => activateLocalPaymentPackage(state, item.id, actor, options).row);
   return { state, activated, at };
 }
 
@@ -553,7 +563,8 @@ function rollbackLocalPaymentPackage(stateInput, id, payload = {}, actor = "syst
 
 function packageSummary(item) {
   const { catalog = [], ...summary } = item;
-  return { ...summary, catalogCount: catalog.length, payment: { ...(summary.payment || {}), institutionCoefficients: undefined, coefficientCount: summary.payment?.institutionCoefficients?.length || 0 } };
+  const signatureEvidence = summary.signatureEvidence ? { ...summary.signatureEvidence, publicKeyPem: undefined, signature: undefined } : null;
+  return { ...summary, signatureEvidence, catalogCount: catalog.length, payment: { ...(summary.payment || {}), institutionCoefficients: undefined, coefficientCount: summary.payment?.institutionCoefficients?.length || 0 } };
 }
 
 function diffReportSummary(item) {
@@ -606,7 +617,7 @@ function buildLocalPaymentPackageView(stateInput) {
     scheduled: state.localPaymentPackages.filter((item) => item.status === "待生效").map(packageSummary),
     workflow: ["校验通过", "版本差异+影响试算", "待复核", "复核中", "已批准", "待生效/已发布", "已冻结/已回退"],
     officialAuthority: OFFICIAL_AUTHORITY,
-    checklist: ["当地医保正式目录（含编码、名称及匹配依据）", "DRG权重或DIP分值", "费率/点值及其测算年度", "医疗机构差异系数（如适用）", "正式发文或批复文件", "所有源文件SHA-256摘要与来源核验记录", "生效与失效日期", "业务和基金财务双人复核"]
+    checklist: ["当地医保正式目录（含编码、名称及匹配依据）", "DRG权重或DIP分值", "费率/点值及其测算年度", "医疗机构差异系数（如适用）", "正式发文或批复文件", "所有源文件SHA-256摘要与来源核验记录", "可信公钥指纹与规则包数字签名", "生效与失效日期", "业务和基金财务双人复核"]
   };
 }
 

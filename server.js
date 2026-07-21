@@ -256,6 +256,16 @@ const PORT = Number(process.env.PORT || 5173);
 const ROOT = __dirname;
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(ROOT, "data");
 const DB_FILE = path.join(DATA_DIR, "db.json");
+
+function diseasePaymentPackageSignatureOptions(extra = {}) {
+  return {
+    ...extra,
+    trustedSignerFingerprints: String(process.env.DISEASE_PAYMENT_TRUSTED_SIGNER_FINGERPRINTS || "")
+      .split(/[,;\n]/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+  };
+}
 const SQLITE_FILE = path.join(DATA_DIR, "health-city.sqlite");
 const STORAGE_ENGINE = String(process.env.STORAGE_ENGINE || "auto").toLowerCase();
 const RUNTIME_STORAGE_ENGINES = new Set(["auto", "json", "sqlite"]);
@@ -33439,7 +33449,7 @@ async function handleApi(req, res) {
     if (!user) return;
     const data = readDatabase();
     try {
-      const result = DiseasePaymentService.importLocalPaymentPackage(data.diseasePayment, await collectJson(req, 30_000_000), user.name);
+      const result = DiseasePaymentService.importLocalPaymentPackage(data.diseasePayment, await collectJson(req, 30_000_000), user.name, diseasePaymentPackageSignatureOptions());
       data.diseasePayment = result.state;
       writeDatabase(data);
       sendJson(res, result.replaced ? 200 : 201, { package: result.row, validation: result.validation, replaced: result.replaced });
@@ -33455,7 +33465,7 @@ async function handleApi(req, res) {
     const payload = await collectJson(req);
     const data = readDatabase();
     try {
-      const result = DiseasePaymentService.activateDueLocalPaymentPackages(data.diseasePayment, user.name, payload);
+      const result = DiseasePaymentService.activateDueLocalPaymentPackages(data.diseasePayment, user.name, diseasePaymentPackageSignatureOptions(payload));
       data.diseasePayment = result.state;
       writeDatabase(data);
       sendJson(res, 200, { activated: result.activated, at: result.at, governance: DiseasePaymentService.buildLocalPaymentPackageView(result.state) });
@@ -33479,8 +33489,8 @@ async function handleApi(req, res) {
         simulate: () => DiseasePaymentService.simulateLocalPaymentPackage(data.diseasePayment, id, user.name),
         submit: () => DiseasePaymentService.submitLocalPaymentPackage(data.diseasePayment, id, user.name),
         review: () => DiseasePaymentService.reviewLocalPaymentPackage(data.diseasePayment, id, payload, user.name),
-        publish: () => DiseasePaymentService.publishLocalPaymentPackage(data.diseasePayment, id, user.name, payload),
-        activate: () => DiseasePaymentService.activateLocalPaymentPackage(data.diseasePayment, id, user.name, payload),
+        publish: () => DiseasePaymentService.publishLocalPaymentPackage(data.diseasePayment, id, user.name, diseasePaymentPackageSignatureOptions(payload)),
+        activate: () => DiseasePaymentService.activateLocalPaymentPackage(data.diseasePayment, id, user.name, diseasePaymentPackageSignatureOptions(payload)),
         rollback: () => DiseasePaymentService.rollbackLocalPaymentPackage(data.diseasePayment, id, payload, user.name)
       };
       const result = handlers[action]();
