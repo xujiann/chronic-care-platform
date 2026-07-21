@@ -5,6 +5,31 @@ const test = require("node:test");
 const Service = require("../disease-payment-service");
 const { buildDiseasePaymentReadiness } = require("../scripts/disease-payment-readiness");
 
+function localDrgPackage(id = "local-drg-test-2027") {
+  return {
+    id, regionCode: "210200", regionName: "测试统筹区", mode: "DRG", scope: "incremental", authority: "local-medical-insurance-approved",
+    packageVersion: "TEST-DRG-2027-V1", nationalVersion: "CHS-DRG 2.0", documentNo: "测试医保发〔2027〕1号", sourceOrganization: "测试市医疗保障局",
+    effectiveFrom: "2026-01-01", effectiveTo: "2026-12-31", catalogCount: 1,
+    sourceFiles: [{ name: "正式DRG目录.xlsx", sha256: "a".repeat(64), verificationStatus: "verified" }],
+    approvalDocument: { documentNo: "测试医保发〔2027〕1号", issuedAt: "2026-12-20", fileDigest: "b".repeat(64) },
+    payment: { rateMethod: "固定费率法", rate: 12000, budgetYear: 2027, institutionCoefficients: [{ institution: "大连市中心医院", coefficient: 1.1 }] },
+    catalog: [{ code: "BR23", name: "脑血管疾病伴一般并发症（正式测试）", mdcCode: "MDCB", mdcName: "神经系统", adrgCode: "BR2", adrgName: "脑血管疾病", groupType: "medical", complicationLevel: "CC", diagnosisPrefixes: ["I63"], weight: 2.5, adjustment: 1 }]
+  };
+}
+
+function approveLocalPackage(payload, state = Service.seedDiseasePaymentState()) {
+  let result = Service.importLocalPaymentPackage(state, payload, "importer");
+  result = Service.simulateLocalPaymentPackage(result.state, payload.id, "analyst");
+  result = Service.submitLocalPaymentPackage(result.state, payload.id, "importer");
+  result = Service.reviewLocalPaymentPackage(result.state, payload.id, { approved: true }, "reviewer-a");
+  return Service.reviewLocalPaymentPackage(result.state, payload.id, { approved: true }, "reviewer-b");
+}
+
+function publishLocalPackage(payload, options) {
+  const approved = approveLocalPackage(payload);
+  return Service.publishLocalPaymentPackage(approved.state, payload.id, "publisher", options);
+}
+
 test("DRG cases pass quality control, grouping, calculation and risk screening", () => {
   const state = Service.calculateAll(Service.seedDiseasePaymentState(), "tester");
   assert.equal(state.cases.length, 3);
@@ -142,4 +167,184 @@ test("payment parameter workflow requires impact simulation and two distinct rev
   const published = Service.publishPaymentParameter(second.state, created.row.id, "publisher");
   assert.equal(published.row.status, "已发布");
   assert.equal(published.state.parameterVersions.find((item) => item.id === "param-drg-2026").status, "已冻结");
+});
+
+test("local official package rejects patient identifiers and incomplete source evidence", () => {
+  const invalid = localDrgPackage("invalid-local-package");
+  invalid.catalog[0].patientName = "不应出现的姓名";
+  invalid.sourceFiles[0].sha256 = "not-a-digest";
+  const result = Service.importLocalPaymentPackage(Service.seedDiseasePaymentState(), invalid, "importer");
+  assert.equal(result.row.status, "校验失败");
+  assert.ok(result.validation.errors.some((item) => item.includes("患者个人信息")));
+  assert.ok(result.validation.errors.some((item) => item.includes("64位文件摘要")));
+  assert.throws(() => Service.simulateLocalPaymentPackage(result.state, invalid.id, "analyst"), /通过完整性校验/);
+});
+
+test("local official package is simulated, dual-reviewed, atomically published and frozen", () => {
+  const payload = localDrgPackage();
+  const imported = Service.importLocalPaymentPackage(Service.seedDiseasePaymentState(), payload, "importer");
+  assert.equal(imported.row.status, "校验通过");
+  assert.equal(imported.validation.summary.catalogCount, 1);
+  const simulated = Service.simulateLocalPaymentPackage(imported.state, payload.id, "analyst");
+  assert.equal(simulated.row.status, "已试算");
+  assert.equal(simulated.report.caseCount, 3);
+  assert.equal(simulated.report.byInstitution.length, 2);
+  assert.equal(simulated.diffReport.packageId, payload.id);
+  assert.ok(simulated.diffReport.catalog.changed.some((item) => item.code === "BR23" && item.fields.includes("weight")));
+  const submitted = Service.submitLocalPaymentPackage(simulated.state, payload.id, "importer");
+  const first = Service.reviewLocalPaymentPackage(submitted.state, payload.id, { approved: true, role: "医保业务复核" }, "reviewer-a");
+  assert.throws(() => Service.reviewLocalPaymentPackage(first.state, payload.id, { approved: true }, "reviewer-a"), /不得重复签署/);
+  const second = Service.reviewLocalPaymentPackage(first.state, payload.id, { approved: true, role: "基金财务复核" }, "reviewer-b");
+  const published = Service.publishLocalPaymentPackage(second.state, payload.id, "publisher");
+  assert.equal(published.row.status, "已发布");
+  assert.equal(published.scheme.authority, "official-local");
+  assert.equal(published.parameter.rate, 12000);
+  assert.equal(published.state.parameterVersions.find((item) => item.id === "param-drg-2026").status, "已冻结");
+  assert.ok(published.state.groupCatalog.some((item) => item.code === "BR23" && item.localPackageId === payload.id && item.authority === "official-local"));
+  const calculation = Service.calculateCase(published.state, published.state.cases[0], "DRG");
+  assert.equal(calculation.institutionCoefficient, 1.1);
+  assert.equal(calculation.paymentStandard, 33000);
+  assert.ok(calculation.formula.includes("机构系数"));
+  const view = Service.buildLocalPaymentPackageView(published.state);
+  assert.equal(view.packages[0].catalog, undefined);
+  assert.equal(view.packages[0].catalogCount, 1);
+  assert.equal(view.diffReports[0].catalog.changedCount, 1);
+  const catalogPage = Service.getLocalPaymentPackageCatalogPage(published.state, payload.id, { page: 1, pageSize: 1, query: "BR23" });
+  assert.equal(catalogPage.total, 1);
+  assert.equal(catalogPage.items[0].code, "BR23");
+  const fullDiff = Service.getLocalPaymentPackageReport(published.state, payload.id, "diff");
+  assert.ok(fullDiff.catalog.changed.some((item) => item.code === "BR23"));
+  const overview = Service.buildOverview(published.state);
+  assert.equal(overview.state.localPaymentPackages[0].catalog, undefined);
+  assert.ok(overview.state.groupCatalog.every((item) => item.mode === "DRG"));
+});
+
+test("template-only package cannot be promoted to formal settlement parameters", () => {
+  const payload = localDrgPackage("template-package");
+  payload.authority = "template-only";
+  let result = Service.importLocalPaymentPackage(Service.seedDiseasePaymentState(), payload, "importer");
+  result = Service.simulateLocalPaymentPackage(result.state, payload.id, "analyst");
+  result = Service.submitLocalPaymentPackage(result.state, payload.id, "importer");
+  result = Service.reviewLocalPaymentPackage(result.state, payload.id, { approved: true }, "reviewer-a");
+  result = Service.reviewLocalPaymentPackage(result.state, payload.id, { approved: true }, "reviewer-b");
+  assert.throws(() => Service.publishLocalPaymentPackage(result.state, payload.id, "publisher"), /不得发布为正式参数/);
+});
+
+test("published official catalog remains authoritative after persisted state normalization", () => {
+  const incremental = localDrgPackage("incremental-official-priority");
+  incremental.catalog[0].code = "LOCAL-BR23";
+  incremental.catalog[0].weight = 2.6;
+  const incrementalPublished = publishLocalPackage(incremental);
+  const incrementalReloaded = Service.normalizeState(JSON.parse(JSON.stringify(incrementalPublished.state)));
+  assert.equal(Service.calculateCase(incrementalReloaded, incrementalReloaded.cases[0], "DRG").grouping.groupCode, "LOCAL-BR23");
+
+  const full = localDrgPackage("full-official-replacement");
+  full.scope = "full";
+  full.catalog[0].code = "LOCAL-FULL-BR23";
+  const fullPublished = publishLocalPackage(full);
+  const fullReloaded = Service.normalizeState(JSON.parse(JSON.stringify(fullPublished.state)));
+  assert.deepEqual(fullReloaded.groupCatalog.filter((item) => item.mode === "DRG").map((item) => item.code), ["LOCAL-FULL-BR23"]);
+  assert.ok(fullReloaded.groupCatalog.some((item) => item.mode === "DIP"));
+});
+
+test("future official package is scheduled, activates on its effective date and can safely roll back", () => {
+  const payload = localDrgPackage("scheduled-local-package");
+  payload.effectiveFrom = "2026-08-01";
+  payload.effectiveTo = "2026-12-31";
+  payload.catalog[0].code = "SCHEDULED-BR23";
+  const approved = approveLocalPackage(payload);
+  const scheduled = Service.publishLocalPaymentPackage(approved.state, payload.id, "publisher", { at: "2026-07-21" });
+  assert.equal(scheduled.row.status, "待生效");
+  assert.equal(scheduled.scheduled, true);
+  assert.equal(scheduled.state.parameterVersions.find((item) => item.mode === "DRG" && item.status === "已发布").id, "param-drg-2026");
+  assert.throws(() => Service.activateLocalPaymentPackage(scheduled.state, payload.id, "operator", { at: "2026-07-31" }), /尚未到生效日期/);
+  const activated = Service.activateDueLocalPaymentPackages(scheduled.state, "scheduler", { at: "2026-08-01" });
+  assert.equal(activated.activated.length, 1);
+  assert.equal(activated.activated[0].status, "已发布");
+  assert.equal(activated.state.localPaymentPackageActivationSnapshots.length, 1);
+  const augustCase = { ...activated.state.cases[0], dischargeDate: "2026-08-05" };
+  assert.equal(Service.calculateCase(activated.state, augustCase, "DRG").grouping.groupCode, "SCHEDULED-BR23");
+  assert.equal(Service.calculateCase(activated.state, augustCase, "DRG").paymentStandard, 33000);
+  const juneCase = activated.state.cases[0];
+  assert.equal(Service.calculateCase(activated.state, juneCase, "DRG").grouping.groupCode, "BR23");
+  assert.equal(Service.calculateCase(activated.state, juneCase, "DRG").parameterId, "param-drg-2026");
+  const expiredCase = { ...activated.state.cases[0], dischargeDate: "2027-01-05" };
+  assert.match(Service.calculateCase(activated.state, expiredCase, "DRG").error, /没有可用支付参数/);
+  const rolledBack = Service.rollbackLocalPaymentPackage(activated.state, payload.id, { reason: "正式文件勘误，恢复上一版本" }, "rollback-operator");
+  assert.equal(rolledBack.row.status, "已回退");
+  assert.equal(rolledBack.state.parameterVersions.find((item) => item.mode === "DRG" && item.status === "已发布").id, "param-drg-2026");
+  assert.equal(rolledBack.state.auditTrail[0].action, "当地医保规则包安全回退");
+});
+
+test("package activation blocks overlapping schedules, expired releases and rollback after financial posting", () => {
+  const firstPayload = localDrgPackage("schedule-conflict-a");
+  firstPayload.effectiveFrom = "2026-08-01";
+  const firstApproved = approveLocalPackage(firstPayload);
+  const firstScheduled = Service.publishLocalPaymentPackage(firstApproved.state, firstPayload.id, "publisher", { at: "2026-07-21" });
+  const secondPayload = localDrgPackage("schedule-conflict-b");
+  secondPayload.effectiveFrom = "2026-09-01";
+  const secondApproved = approveLocalPackage(secondPayload, firstScheduled.state);
+  assert.throws(() => Service.publishLocalPaymentPackage(secondApproved.state, secondPayload.id, "publisher", { at: "2026-07-21" }), /有效期与schedule-conflict-a重叠/);
+
+  const expiredPayload = localDrgPackage("expired-package");
+  expiredPayload.effectiveTo = "2026-07-01";
+  const expiredApproved = approveLocalPackage(expiredPayload);
+  assert.throws(() => Service.publishLocalPaymentPackage(expiredApproved.state, expiredPayload.id, "publisher", { at: "2026-07-21" }), /有效期已结束/);
+
+  const activePayload = localDrgPackage("financial-posting-block");
+  const active = publishLocalPackage(activePayload, { at: "2026-07-21" });
+  active.state.settlementBatches.push({ id: "post-activation-settlement", createdAt: "2099-01-01T00:00:00.000Z" });
+  assert.throws(() => Service.rollbackLocalPaymentPackage(active.state, activePayload.id, { reason: "尝试回退" }, "operator"), /必须走财务冲正流程/);
+});
+
+test("large catalog uses diagnosis prefix index without changing grouping semantics", () => {
+  const state = Service.seedDiseasePaymentState();
+  state.parameterVersions.find((item) => item.mode === "DIP").status = "已发布";
+  state.groupCatalog = state.groupCatalog.filter((item) => item.mode !== "DIP");
+  state.groupCatalog.push(...Array.from({ length: 9520 }, (_, index) => ({ code: `DIP-X-${index}`, mode: "DIP", name: `规模测试病种${index}`, diagnosisPrefixes: [`X${String(index).padStart(5, "0")}`], score: index + 1, adjustment: 1 })));
+  const stats = Service.buildCatalogIndexStats(state);
+  assert.ok(stats.DIP.groupCount >= 9520);
+  assert.equal(stats.DIP.strategy, "diagnosis-prefix-trie");
+  const item = { ...state.cases[0], id: "large-catalog-case", settlementListNo: "LARGE-CATALOG-001", principalDiagnosis: "X09519.1" };
+  const result = Service.calculateCase(state, item, "DIP");
+  assert.equal(result.grouping.groupCode, "DIP-X-9519");
+  assert.equal(result.paymentStandard, 9520 * 112.5);
+});
+
+test("package impact simulation job is idempotent and advances in resumable batches", () => {
+  const payload = localDrgPackage("batch-simulation-package");
+  const imported = Service.importLocalPaymentPackage(Service.seedDiseasePaymentState(), payload, "importer");
+  imported.state.cases.push({ ...imported.state.cases[0], id: "batch-case-4", settlementListNo: "BATCH-004" }, { ...imported.state.cases[1], id: "batch-case-5", settlementListNo: "BATCH-005" });
+  const created = Service.createLocalPaymentPackageSimulationJob(imported.state, payload.id, { batchSize: 2, idempotencyKey: "batch-simulation-idempotency" }, "analyst");
+  assert.equal(created.job.status, "queued");
+  assert.equal(created.job.total, 5);
+  const duplicate = Service.createLocalPaymentPackageSimulationJob(created.state, payload.id, { batchSize: 2, idempotencyKey: "batch-simulation-idempotency" }, "analyst");
+  assert.equal(duplicate.idempotent, true);
+  assert.equal(duplicate.job.id, created.job.id);
+  const firstBatch = Service.processLocalPaymentPackageSimulationJob(created.state, created.job.id, {}, "worker");
+  assert.equal(firstBatch.job.processed, 2);
+  assert.equal(firstBatch.job.status, "running");
+  const secondBatch = Service.processLocalPaymentPackageSimulationJob(firstBatch.state, created.job.id, {}, "worker");
+  assert.equal(secondBatch.job.processed, 4);
+  const completed = Service.processLocalPaymentPackageSimulationJob(secondBatch.state, created.job.id, {}, "worker");
+  assert.equal(completed.job.status, "completed");
+  assert.equal(completed.job.processed, 5);
+  assert.equal(completed.row.status, "已试算");
+  assert.equal(completed.report.caseCount, 5);
+  assert.equal(completed.report.processingErrorCount, 0);
+  const view = Service.buildLocalPaymentPackageView(completed.state);
+  assert.equal(view.simulationJobs[0].caseSnapshots, undefined);
+  assert.equal(view.simulationJobs[0].snapshotCount, 5);
+});
+
+test("batch simulation detects case changes and refuses to certify an incomplete impact report", () => {
+  const payload = localDrgPackage("batch-simulation-stale-case");
+  const imported = Service.importLocalPaymentPackage(Service.seedDiseasePaymentState(), payload, "importer");
+  const created = Service.createLocalPaymentPackageSimulationJob(imported.state, payload.id, { batchSize: 10 }, "analyst");
+  created.state.cases[0].totalAmount += 1;
+  const completed = Service.processLocalPaymentPackageSimulationJob(created.state, created.job.id, {}, "worker");
+  assert.equal(completed.job.status, "completed-with-errors");
+  assert.equal(completed.report.processingErrorCount, 1);
+  assert.equal(completed.row.status, "校验通过");
+  assert.equal(completed.row.latestImpactReportId, undefined);
 });

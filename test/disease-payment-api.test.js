@@ -11,6 +11,18 @@ const Service = require("../disease-payment-service");
 
 const ROOT = path.resolve(__dirname, "..");
 
+function apiLocalPackage() {
+  return {
+    id: "api-local-drg-2027", regionCode: "210200", regionName: "API测试统筹区", mode: "DRG", scope: "incremental", authority: "local-medical-insurance-approved",
+    packageVersion: "API-DRG-2027-V1", nationalVersion: "CHS-DRG 2.0", documentNo: "API医保发〔2027〕1号", sourceOrganization: "API测试医疗保障局",
+    effectiveFrom: "2026-01-01", effectiveTo: "2026-12-31", catalogCount: 1,
+    sourceFiles: [{ name: "api-drg.xlsx", sha256: "c".repeat(64), verificationStatus: "verified" }],
+    approvalDocument: { documentNo: "API医保发〔2027〕1号", issuedAt: "2026-12-20", fileDigest: "d".repeat(64) },
+    payment: { rateMethod: "固定费率法", rate: 11800, budgetYear: 2027, institutionCoefficients: [] },
+    catalog: [{ code: "FZ15", name: "API正式测试病组", mdcCode: "MDCF", mdcName: "循环系统", adrgCode: "FZ1", adrgName: "循环系统内科组", groupType: "medical", complicationLevel: "NONE", diagnosisPrefixes: ["I10"], weight: 0.9, adjustment: 1 }]
+  };
+}
+
 async function waitForServer(baseUrl) {
   for (let attempt = 0; attempt < 80; attempt += 1) {
     try { const response = await fetch(`${baseUrl}/api/health`); if (response.ok) return; } catch {}
@@ -71,6 +83,63 @@ test("disease payment API runs an authenticated end-to-end workflow", async (t) 
   assert.equal(publishedParameter.body.parameter.status, "已发布");
   const parameterView = await json(baseUrl, "/api/disease-payment/parameters", { headers });
   assert.ok(parameterView.body.versions.some((item) => item.id === "param-drg-2026" && item.status === "已冻结"));
+  const localPackage = await json(baseUrl, "/api/disease-payment/local-packages", { method: "POST", headers, body: JSON.stringify(apiLocalPackage()) });
+  assert.equal(localPackage.response.status, 201);
+  assert.equal(localPackage.body.validation.ok, true);
+  const localSimulation = await json(baseUrl, "/api/disease-payment/local-packages/api-local-drg-2027/simulate", { method: "POST", headers, body: "{}" });
+  assert.equal(localSimulation.body.package.status, "已试算");
+  assert.equal(localSimulation.body.impactReport.caseCount, 3);
+  assert.equal(localSimulation.body.diffReport.packageId, "api-local-drg-2027");
+  await json(baseUrl, "/api/disease-payment/local-packages/api-local-drg-2027/submit", { method: "POST", headers, body: "{}" });
+  const localFirstReview = await json(baseUrl, "/api/disease-payment/local-packages/api-local-drg-2027/review", { method: "POST", headers, body: JSON.stringify({ approved: true, role: "医保业务复核" }) });
+  assert.equal(localFirstReview.body.package.status, "复核中");
+  const localSecondReview = await json(baseUrl, "/api/disease-payment/local-packages/api-local-drg-2027/review", { method: "POST", headers: secondHeaders, body: JSON.stringify({ approved: true, role: "基金财务复核" }) });
+  assert.equal(localSecondReview.body.package.status, "已批准");
+  const localPublished = await json(baseUrl, "/api/disease-payment/local-packages/api-local-drg-2027/publish", { method: "POST", headers: secondHeaders, body: "{}" });
+  assert.equal(localPublished.body.package.status, "已发布");
+  assert.equal(localPublished.body.parameter.rate, 11800);
+  const localPackageView = await json(baseUrl, "/api/disease-payment/local-packages", { headers });
+  assert.equal(localPackageView.body.published.find((item) => item.mode === "DRG").package.id, "api-local-drg-2027");
+  assert.ok(localPackageView.body.checklist.some((item) => item.includes("费率/点值")));
+  assert.ok(localPackageView.body.activationSnapshots.length >= 1);
+  assert.equal(localPackageView.body.packages[0].catalog, undefined);
+  const catalogPage = await json(baseUrl, "/api/disease-payment/local-packages/api-local-drg-2027/catalog?page=1&pageSize=1&query=FZ15", { headers });
+  assert.equal(catalogPage.response.status, 200);
+  assert.equal(catalogPage.body.total, 1);
+  assert.equal(catalogPage.body.items[0].code, "FZ15");
+  const diffReport = await json(baseUrl, "/api/disease-payment/local-packages/api-local-drg-2027/diff-report", { headers });
+  assert.equal(diffReport.response.status, 200);
+  assert.equal(diffReport.body.packageId, "api-local-drg-2027");
+  const futurePayload = apiLocalPackage();
+  futurePayload.id = "api-local-drg-2028";
+  futurePayload.packageVersion = "API-DRG-2028-V1";
+  futurePayload.effectiveFrom = "2027-01-01";
+  futurePayload.effectiveTo = "2027-12-31";
+  await json(baseUrl, "/api/disease-payment/local-packages", { method: "POST", headers, body: JSON.stringify(futurePayload) });
+  const simulationJob = await json(baseUrl, "/api/disease-payment/local-packages/api-local-drg-2028/simulation-jobs", { method: "POST", headers, body: JSON.stringify({ jobId: "api-local-simulation-job", idempotencyKey: "api-local-simulation-job-idem", batchSize: 2 }) });
+  assert.equal(simulationJob.response.status, 201);
+  assert.equal(simulationJob.body.job.status, "queued");
+  const simulationJobs = await json(baseUrl, "/api/disease-payment/local-packages/simulation-jobs", { headers });
+  assert.equal(simulationJobs.response.status, 200);
+  assert.equal(simulationJobs.body[0].snapshotCount, 3);
+  const simulationBatch1 = await json(baseUrl, "/api/disease-payment/local-packages/simulation-jobs/api-local-simulation-job/process", { method: "POST", headers, body: "{}" });
+  assert.equal(simulationBatch1.body.job.processed, 2);
+  assert.equal(simulationBatch1.body.job.status, "running");
+  const simulationBatch2 = await json(baseUrl, "/api/disease-payment/local-packages/simulation-jobs/api-local-simulation-job/process", { method: "POST", headers, body: "{}" });
+  assert.equal(simulationBatch2.body.job.status, "completed");
+  assert.equal(simulationBatch2.body.impactReport.processingErrorCount, 0);
+  await json(baseUrl, "/api/disease-payment/local-packages/api-local-drg-2028/submit", { method: "POST", headers, body: "{}" });
+  await json(baseUrl, "/api/disease-payment/local-packages/api-local-drg-2028/review", { method: "POST", headers, body: JSON.stringify({ approved: true }) });
+  await json(baseUrl, "/api/disease-payment/local-packages/api-local-drg-2028/review", { method: "POST", headers: secondHeaders, body: JSON.stringify({ approved: true }) });
+  const futurePublished = await json(baseUrl, "/api/disease-payment/local-packages/api-local-drg-2028/publish", { method: "POST", headers: secondHeaders, body: JSON.stringify({ at: "2026-07-21" }) });
+  assert.equal(futurePublished.body.package.status, "待生效");
+  assert.equal(futurePublished.body.scheduled, true);
+  const dueActivation = await json(baseUrl, "/api/disease-payment/local-packages/activate-due", { method: "POST", headers: secondHeaders, body: JSON.stringify({ at: "2027-01-01" }) });
+  assert.equal(dueActivation.body.activated.length, 1);
+  assert.equal(dueActivation.body.activated[0].id, "api-local-drg-2028");
+  const rollback = await json(baseUrl, "/api/disease-payment/local-packages/api-local-drg-2028/rollback", { method: "POST", headers: secondHeaders, body: JSON.stringify({ reason: "API测试回退" }) });
+  assert.equal(rollback.body.package.status, "已回退");
+  assert.ok(rollback.body.snapshot.snapshotDigest);
   const special = await json(baseUrl, "/api/disease-payment/special-cases", { method: "POST", headers, body: JSON.stringify({ caseId: "dp-case-001", reason: "复杂危重症" }) });
   assert.equal(special.response.status, 201);
   const review = await json(baseUrl, `/api/disease-payment/special-cases/${special.body.id}/review`, { method: "POST", headers, body: JSON.stringify({ approved: true }) });
