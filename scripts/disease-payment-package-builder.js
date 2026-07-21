@@ -4,6 +4,7 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const Service = require("../disease-payment-service");
+const PackageSignature = require("../disease-payment-package-signature");
 
 function parseArgs(argv) {
   const [command = "help", ...rest] = argv;
@@ -66,6 +67,10 @@ function splitPaths(value) {
   return String(value || "").split(";").map((item) => item.trim()).filter(Boolean).map((item) => path.resolve(item));
 }
 
+function trustedFingerprints(value) {
+  return String(value || "").split(/[,;\n]/).map((item) => item.trim()).filter(Boolean);
+}
+
 function buildPackage(options) {
   if (!options.base || !options.catalog) throw new Error("build需要--base和--catalog参数");
   const basePath = path.resolve(options.base);
@@ -87,23 +92,34 @@ function buildPackage(options) {
     const approvalPath = path.resolve(options.approval);
     result.approvalDocument = { ...(result.approvalDocument || {}), fileDigest: sha256(approvalPath) };
   }
-  const validation = Service.validateLocalPaymentPackage(result);
+  const signingKeyPath = options["signing-key"] ? path.resolve(options["signing-key"]) : "";
+  if (signingKeyPath) {
+    result.signatureEvidence = PackageSignature.createPackageSignature(result, fs.readFileSync(signingKeyPath, "utf8"), {
+      signerId: options["signer-id"],
+      signerOrganization: options["signer-organization"] || result.sourceOrganization,
+      signedAt: options["signed-at"],
+      validUntil: options["valid-until"]
+    });
+  }
+  const trust = trustedFingerprints(options["trusted-fingerprints"]);
+  if (result.signatureEvidence?.keyFingerprint) trust.push(result.signatureEvidence.keyFingerprint);
+  const validation = Service.validateLocalPaymentPackage(result, { trustedSignerFingerprints: trust });
   return { package: result, validation };
 }
 
-function validateFile(file) {
+function validateFile(file, options = {}) {
   const payload = JSON.parse(fs.readFileSync(path.resolve(file), "utf8"));
-  return Service.validateLocalPaymentPackage(payload);
+  return Service.validateLocalPaymentPackage(payload, { trustedSignerFingerprints: trustedFingerprints(options["trusted-fingerprints"]) });
 }
 
 function usage() {
   return [
     "当地医保规则包构建工具",
     "",
-    "构建：node scripts/disease-payment-package-builder.js build --base=<基础JSON> --catalog=<目录CSV> [--coefficients=<机构系数CSV>] [--source=<原始文件1;原始文件2>] [--approval=<批复文件>] --output=<输出JSON> [--verified]",
-    "校验：node scripts/disease-payment-package-builder.js validate --file=<规则包JSON>",
+    "构建：node scripts/disease-payment-package-builder.js build --base=<基础JSON> --catalog=<目录CSV> [--coefficients=<机构系数CSV>] [--source=<原始文件1;原始文件2>] [--approval=<批复文件>] --signing-key=<私钥PEM> --signer-id=<签名人标识> --output=<输出JSON> [--verified]",
+    "校验：node scripts/disease-payment-package-builder.js validate --file=<规则包JSON> --trusted-fingerprints=<可信公钥SHA-256指纹>",
     "",
-    "注意：--verified仅在人工确认文件来自当地医保正式渠道后使用。Excel文件可先用LibreOffice另存为UTF-8 CSV。"
+    "注意：--verified仅在人工确认文件来自当地医保正式渠道后使用。私钥只用于本机签名且不会写入输出；正式校验必须提供可信公钥指纹。"
   ].join("\n");
 }
 
@@ -119,7 +135,7 @@ function main(argv = process.argv.slice(2)) {
   }
   if (command === "validate") {
     if (!options.file) throw new Error("validate需要--file参数");
-    const validation = validateFile(options.file);
+    const validation = validateFile(options.file, options);
     process.stdout.write(`${JSON.stringify(validation, null, 2)}\n`);
     if (!validation.ok) process.exitCode = 2;
     return validation;
@@ -132,4 +148,4 @@ if (require.main === module) {
   try { main(); } catch (error) { process.stderr.write(`${error.message}\n`); process.exitCode = 1; }
 }
 
-module.exports = { buildPackage, catalogRow, main, parseArgs, parseCsv, sha256, validateFile };
+module.exports = { buildPackage, catalogRow, main, parseArgs, parseCsv, sha256, trustedFingerprints, validateFile };
