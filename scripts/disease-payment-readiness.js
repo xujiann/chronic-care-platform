@@ -10,7 +10,7 @@ const ROOT = path.resolve(__dirname, "..");
 function buildDiseasePaymentReadiness() {
   const state = Service.calculateAll(Service.seedDiseasePaymentState(), "readiness-check");
   const overview = Service.buildOverview(state);
-  const requiredFiles = ["disease-payment-service.js", "disease-payment-intake.js", "disease-payment.html", "disease-payment.js", "disease-payment.css"];
+  const requiredFiles = ["disease-payment-service.js", "disease-payment-intake.js", "disease-payment-local-package.js", "disease-payment.html", "disease-payment.js", "disease-payment.css", "scripts/disease-payment-package-builder.js", "config/disease-payment/templates/local-drg-package.template.json", "config/disease-payment/templates/local-dip-package.template.json"];
   const sample = { settlementListNo: "READINESS-001", institutionCode: "HOSP-001", institution: "测试医院", admissionDate: "2026-07-01", dischargeDate: "2026-07-02", principalDiagnosis: "I10", totalAmount: 1000, declaredFundAmount: 800, costItems: [{ itemCode: "P001", itemName: "项目", amount: 1000 }] };
   const imported = Intake.importBatch(state, { sourceSystem: "readiness", rows: [sample] }, "readiness-check");
   const grouped = Intake.runGrouping(imported.state, { environment: "simulation", mode: "DRG", caseIds: [imported.state.cases.at(-1).id] }, "readiness-check", Service.calculateCase);
@@ -32,6 +32,40 @@ function buildDiseasePaymentReadiness() {
   const parameterFirstReview = Service.reviewPaymentParameter(parameterSubmitted.state, parameterDraft.row.id, { approved: true }, "readiness-reviewer-a");
   const parameterSecondReview = Service.reviewPaymentParameter(parameterFirstReview.state, parameterDraft.row.id, { approved: true }, "readiness-reviewer-b");
   const parameterPublished = Service.publishPaymentParameter(parameterSecondReview.state, parameterDraft.row.id, "readiness-publisher");
+  const localPackagePayload = {
+    id: "readiness-local-drg", regionCode: "210200", regionName: "就绪检查统筹区", mode: "DRG", scope: "incremental", authority: "local-medical-insurance-approved",
+    packageVersion: "READINESS-DRG-V1", nationalVersion: "CHS-DRG 2.0", documentNo: "READINESS-2027-1", sourceOrganization: "就绪检查医保部门", effectiveFrom: "2026-01-01", effectiveTo: "2026-12-31", catalogCount: 1,
+    sourceFiles: [{ name: "readiness-drg.xlsx", sha256: "e".repeat(64), verificationStatus: "verified" }], approvalDocument: { documentNo: "READINESS-2027-1", issuedAt: "2026-12-20", fileDigest: "f".repeat(64) },
+    payment: { rateMethod: "固定费率法", rate: 11900, budgetYear: 2027, institutionCoefficients: [{ institution: "大连市中心医院", coefficient: 1.05 }] },
+    catalog: [{ code: "BR23", name: "就绪检查DRG", mdcCode: "MDCB", mdcName: "神经系统", adrgCode: "BR2", adrgName: "脑血管疾病", groupType: "medical", complicationLevel: "CC", diagnosisPrefixes: ["I63"], weight: 2.45, adjustment: 1 }]
+  };
+  const localPackageImported = Service.importLocalPaymentPackage(state, localPackagePayload, "readiness-importer");
+  const localPackageSimulated = Service.simulateLocalPaymentPackage(localPackageImported.state, localPackagePayload.id, "readiness-analyst");
+  const localPackageSubmitted = Service.submitLocalPaymentPackage(localPackageSimulated.state, localPackagePayload.id, "readiness-importer");
+  const localPackageFirstReview = Service.reviewLocalPaymentPackage(localPackageSubmitted.state, localPackagePayload.id, { approved: true }, "readiness-local-reviewer-a");
+  const localPackageSecondReview = Service.reviewLocalPaymentPackage(localPackageFirstReview.state, localPackagePayload.id, { approved: true }, "readiness-local-reviewer-b");
+  const localPackagePublished = Service.publishLocalPaymentPackage(localPackageSecondReview.state, localPackagePayload.id, "readiness-local-publisher");
+  const scheduledPayload = { ...localPackagePayload, id: "readiness-local-drg-next", packageVersion: "READINESS-DRG-V2", effectiveFrom: "2027-01-01", effectiveTo: "2027-12-31", catalog: localPackagePayload.catalog.map((item) => ({ ...item, weight: 2.5 })) };
+  const scheduledImported = Service.importLocalPaymentPackage(localPackagePublished.state, scheduledPayload, "readiness-importer");
+  const scheduledSimulated = Service.simulateLocalPaymentPackage(scheduledImported.state, scheduledPayload.id, "readiness-analyst");
+  const scheduledSubmitted = Service.submitLocalPaymentPackage(scheduledSimulated.state, scheduledPayload.id, "readiness-importer");
+  const scheduledFirstReview = Service.reviewLocalPaymentPackage(scheduledSubmitted.state, scheduledPayload.id, { approved: true }, "readiness-scheduled-reviewer-a");
+  const scheduledSecondReview = Service.reviewLocalPaymentPackage(scheduledFirstReview.state, scheduledPayload.id, { approved: true }, "readiness-scheduled-reviewer-b");
+  const scheduledPublished = Service.publishLocalPaymentPackage(scheduledSecondReview.state, scheduledPayload.id, "readiness-scheduler", { at: "2026-07-21" });
+  const scheduledActivated = Service.activateDueLocalPaymentPackages(scheduledPublished.state, "readiness-activation-worker", { at: "2027-01-01" });
+  const scheduledRolledBack = Service.rollbackLocalPaymentPackage(scheduledActivated.state, scheduledPayload.id, { reason: "readiness rollback rehearsal" }, "readiness-rollback-operator");
+  const localPackageView = Service.buildLocalPaymentPackageView(scheduledRolledBack.state);
+  const localCatalogPage = Service.getLocalPaymentPackageCatalogPage(scheduledRolledBack.state, localPackagePayload.id, { page: 1, pageSize: 1, query: "BR23" });
+  const batchPayload = { ...localPackagePayload, id: "readiness-local-drg-batch", packageVersion: "READINESS-DRG-BATCH" };
+  const batchImported = Service.importLocalPaymentPackage(Service.seedDiseasePaymentState(), batchPayload, "readiness-batch-importer");
+  const batchJobCreated = Service.createLocalPaymentPackageSimulationJob(batchImported.state, batchPayload.id, { batchSize: 2, idempotencyKey: "readiness-local-batch-idem" }, "readiness-batch-analyst");
+  const batchJobDuplicate = Service.createLocalPaymentPackageSimulationJob(batchJobCreated.state, batchPayload.id, { batchSize: 2, idempotencyKey: "readiness-local-batch-idem" }, "readiness-batch-analyst");
+  const batchJobFirst = Service.processLocalPaymentPackageSimulationJob(batchJobCreated.state, batchJobCreated.job.id, {}, "readiness-batch-worker");
+  const batchJobFirstProcessed = batchJobFirst.job.processed;
+  const batchJobCompleted = Service.processLocalPaymentPackageSimulationJob(batchJobFirst.state, batchJobCreated.job.id, {}, "readiness-batch-worker");
+  const scaleState = Service.seedDiseasePaymentState();
+  scaleState.groupCatalog = scaleState.groupCatalog.filter((item) => item.mode !== "DIP").concat(Array.from({ length: 9520 }, (_, index) => ({ code: `READINESS-DIP-${index}`, mode: "DIP", name: `规模目录${index}`, diagnosisPrefixes: [`X${String(index).padStart(5, "0")}`], score: index + 1 })));
+  const catalogIndexStats = Service.buildCatalogIndexStats(scaleState);
   const checks = [
     { id: "policy-baseline", label: "医保发〔2025〕18号政策基线", ok: state.policy?.id === "nhsa-2025-18" },
     { id: "dual-mode", label: "DRG/DIP双模式目录与参数", ok: state.groupCatalog.some((item) => item.mode === "DRG") && state.groupCatalog.some((item) => item.mode === "DIP") },
@@ -50,6 +84,16 @@ function buildDiseasePaymentReadiness() {
     { id: "formal-grouping-compensation", label: "正式分组指数退避、死信与人工对账重开", ok: failureJobDead.state.formalGroupingDeadLetters.length === 1 && failureJobReconciled.deadLetter.status === "resolved" && failureJobReconciled.job.status === "queued" && formalOperations.retryPolicy.backoffSeconds.join(",") === "60,120,240" },
     { id: "parameter-impact", label: "支付参数病例与机构影响试算", ok: parameterSimulation.report.caseCount === state.cases.length && parameterSimulation.report.byInstitution.length >= 2 && Boolean(parameterSimulation.report.inputDigest) },
     { id: "parameter-dual-review", label: "支付参数双人复核、发布与旧版冻结", ok: parameterPublished.row.status === "已发布" && parameterPublished.row.approvals.length === 2 && parameterPublished.state.parameterVersions.some((item) => item.id === "param-drg-2026" && item.status === "已冻结") },
+    { id: "local-package-validation", label: "当地医保目录、权重/分值、费率和来源文件整包校验", ok: localPackageImported.validation.ok && localPackageImported.validation.summary.catalogCount === 1 && Boolean(localPackageImported.validation.digest) },
+    { id: "local-package-impact", label: "当地医保规则包病例与机构影响试算", ok: localPackageSimulated.report.caseCount === state.cases.length && localPackageSimulated.report.byInstitution.length >= 2 && Boolean(localPackageSimulated.report.inputDigest) },
+    { id: "local-package-diff", label: "当地医保目录、参数和机构系数版本差异报告", ok: localPackageSimulated.diffReport.packageId === localPackagePayload.id && Array.isArray(localPackageSimulated.diffReport.catalog.changed) && Boolean(localPackageSimulated.row.latestDiffReportId) },
+    { id: "local-package-release", label: "当地医保规则包双人复核、原子发布和版本冻结", ok: localPackagePublished.row.status === "已发布" && localPackagePublished.scheme.authority === "official-local" && localPackagePublished.parameter.rate === 11900 && localPackagePublished.state.groupCatalog.some((item) => item.localPackageId === localPackagePayload.id) },
+    { id: "local-package-scheduling", label: "未来规则包发布排期与生效日自动激活", ok: scheduledPublished.scheduled && scheduledActivated.activated.length === 1 && scheduledActivated.activated[0].id === scheduledPayload.id && scheduledActivated.state.localPaymentPackageActivationSnapshots.length >= 2 },
+    { id: "local-package-rollback", label: "生效前快照验真与无财务入账安全回退", ok: scheduledRolledBack.row.status === "已回退" && Boolean(scheduledRolledBack.snapshot.snapshotDigest) && scheduledRolledBack.state.parameterVersions.some((item) => item.id === localPackagePublished.parameter.id && item.status === "已发布") },
+    { id: "local-package-pagination", label: "大目录摘要响应、分页检索与30MB规则包导入", ok: localPackageView.packages.every((item) => item.catalog === undefined) && localCatalogPage.total === 1 && localCatalogPage.items[0].code === "BR23" && fs.readFileSync(path.join(ROOT, "server.js"), "utf8").includes("collectJson(req, 30_000_000)") },
+    { id: "catalog-prefix-index", label: "DRG/DIP诊断前缀索引支持9520组规模目录", ok: catalogIndexStats.DIP.groupCount >= 9520 && catalogIndexStats.DIP.strategy === "diagnosis-prefix-trie" && catalogIndexStats.DIP.nodeCount > 1 },
+    { id: "local-package-batch-simulation", label: "规则包影响试算幂等作业、分批推进与断点状态", ok: batchJobDuplicate.idempotent && batchJobFirstProcessed === 2 && batchJobCompleted.job.status === "completed" && batchJobCompleted.report.caseCount === 3 && batchJobCompleted.report.processingErrorCount === 0 },
+    { id: "local-package-builder", label: "当地医保CSV目录与来源文件摘要构建工具", ok: fs.readFileSync(path.join(ROOT, "scripts", "disease-payment-package-builder.js"), "utf8").includes("buildPackage") && fs.readFileSync(path.join(ROOT, "package.json"), "utf8").includes("disease-payment:package") },
     { id: "dip2-library-profile", label: "DIP 2.0版9520组目录结构", ok: state.dip2LibraryProfile?.coreDiseaseGroups === 9520 && state.dip2LibraryProfile?.conservativeTreatmentGroups === 3209 && state.dip2LibraryProfile?.surgeryOperationGroups === 6311 },
     { id: "dip2-grouping-rule", label: "主要诊断、主要操作、相关操作与10%资源阈值", ok: state.dip2LibraryProfile?.groupingFormula.includes("相关手术操作") && state.dip2LibraryProfile?.relatedOperationCostThreshold === 0.1 },
     { id: "dip2-supplement", label: "肿瘤创新治疗缺失病种补充", ok: ["肿瘤基因治疗", "肿瘤分子治疗", "肿瘤免疫治疗", "放射治疗"].every((item) => state.dip2LibraryProfile?.supplementedTreatments.includes(item)) },
@@ -66,9 +110,11 @@ function buildDiseasePaymentReadiness() {
     { id: "drg-api-routes", label: "DRG目录、试分组与分析API", ok: ["/api/disease-payment/drg/catalog", "/api/disease-payment/drg/simulate", "/api/disease-payment/drg/analytics"].every((marker) => fs.readFileSync(path.join(ROOT, "server.js"), "utf8").includes(marker)) },
     { id: "parameter-api-routes", label: "支付参数草案、试算、复核与发布API", ok: ["/api/disease-payment/parameters", "simulate|submit|review|publish", "createPaymentParameter", "publishPaymentParameter"].every((marker) => fs.readFileSync(path.join(ROOT, "server.js"), "utf8").includes(marker)) },
     { id: "formal-grouping-api-routes", label: "正式分组作业、派发、回执、重试与死信对账API", ok: ["/api/disease-payment/formal-grouping/operations", "/api/disease-payment/formal-grouping/jobs", "dispatch|receipts|fail|retry|reconcile", "buildFormalGroupingOperations"].every((marker) => fs.readFileSync(path.join(ROOT, "server.js"), "utf8").includes(marker)) },
+    { id: "local-package-api-routes", label: "当地医保规则包导入、分页、分批试算、排期、复核与发布API", ok: ["/api/disease-payment/local-packages", "/api/disease-payment/local-packages/simulation-jobs", "catalog|diff-report|impact-report", "compare|simulate|submit|review|publish|activate|rollback", "process|retry|cancel", "activate-due", "importLocalPaymentPackage", "publishLocalPaymentPackage"].every((marker) => fs.readFileSync(path.join(ROOT, "server.js"), "utf8").includes(marker)) },
     { id: "drg-ui", label: "DRG 2.0分组与绩效工作台", ok: ["data-drg-section=\"workbench\"", "drg-profile", "drg-hierarchy", "drg-analytics"].every((marker) => fs.readFileSync(path.join(ROOT, "disease-payment.html"), "utf8").includes(marker)) },
     { id: "parameter-ui", label: "支付参数版本治理工作台", ok: ["data-payment-section=\"parameter-governance\"", "parameter-version-list", "parameter-impact-list"].every((marker) => fs.readFileSync(path.join(ROOT, "disease-payment.html"), "utf8").includes(marker)) },
-    { id: "formal-grouping-ui", label: "正式分组异步联调与死信工作台", ok: ["data-payment-section=\"formal-grouping-operations\"", "formal-grouping-job-list", "formal-grouping-dead-letter-list"].every((marker) => fs.readFileSync(path.join(ROOT, "disease-payment.html"), "utf8").includes(marker)) }
+    { id: "formal-grouping-ui", label: "正式分组异步联调与死信工作台", ok: ["data-payment-section=\"formal-grouping-operations\"", "formal-grouping-job-list", "formal-grouping-dead-letter-list"].every((marker) => fs.readFileSync(path.join(ROOT, "disease-payment.html"), "utf8").includes(marker)) },
+    { id: "local-package-ui", label: "当地医保正式规则包导入治理工作台", ok: ["data-payment-section=\"local-package-governance\"", "local-package-file", "local-package-list", "local-package-report-list"].every((marker) => fs.readFileSync(path.join(ROOT, "disease-payment.html"), "utf8").includes(marker)) }
   ];
   return { generatedAt: new Date().toISOString(), policy: state.policy, policy2: state.policy2, summary: { ...overview.summary, intake: intakeSummary, formalGrouping: formalOperations.summary }, checks, ready: checks.every((item) => item.ok), externalBlockers: state.externalDependencies.filter((item) => item.requiredForProduction && item.status !== "已联调") };
 }

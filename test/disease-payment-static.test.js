@@ -27,3 +27,10 @@ test("formal grouper operations exposes asynchronous dispatch retry and dead-let
   ["data-payment-section=\"formal-grouping-operations\"", "formal-grouping-job-list", "formal-grouping-dead-letter-list", "创建正式分组作业"].forEach((marker) => assert.ok(html.includes(marker), marker));
   ["renderFormalGroupingOperations", "formal-dispatch", "formal-fail", "formal-retry", "formal-reconcile", "/formal-grouping/jobs"].forEach((marker) => assert.ok(script.includes(marker), marker));
 });
+
+test("local official package workbench exposes import validation simulation review and publish controls", () => {
+  const html = fs.readFileSync(path.join(ROOT, "disease-payment.html"), "utf8");
+  const script = fs.readFileSync(path.join(ROOT, "disease-payment.js"), "utf8");
+  ["data-payment-section=\"local-package-governance\"", "local-package-file", "local-package-list", "local-package-report-list", "local-package-job-list", "activate-due-local-packages", "DRG模板", "DIP模板"].forEach((marker) => assert.ok(html.includes(marker), marker));
+  ["renderLocalPackageGovernance", "local-package-job-create", "local-package-job-process", "local-package-review", "local-package-publish", "local-package-activate", "local-package-rollback", "/local-packages"].forEach((marker) => assert.ok(script.includes(marker), marker));
+});

@@ -43,6 +43,25 @@
       </div>
     </section>
 
+    <section class="panel local-package-governance" data-payment-section="local-package-governance">
+      <div class="panel-title"><h2>当地医保正式规则包</h2><span>目录 · 权重/分值 · 费率/点值 · 机构系数同版发布</span></div>
+      <div class="payment-toolbar">
+        <button type="button" data-payment-action="choose-local-package">导入规则包JSON</button>
+        <button type="button" class="secondary" data-payment-action="activate-due-local-packages">检查到期生效</button>
+        <input id="local-package-file" type="file" accept="application/json,.json" hidden>
+        <a href="./config/disease-payment/templates/local-drg-package.template.json" download>DRG模板</a>
+        <a href="./config/disease-payment/templates/local-dip-package.template.json" download>DIP模板</a>
+        <span>模板数据不具备结算效力；正式发布必须有来源摘要、影响试算和双人复核。</span>
+      </div>
+      <div id="local-package-checklist" class="rules"></div>
+      <div class="parameter-governance-grid">
+        <div id="local-package-list" class="list compact"></div>
+        <div id="local-package-report-list" class="list compact"></div>
+      </div>
+      <div class="panel-title"><h3>分批影响试算作业</h3><span>默认每批500例，可断点续跑</span></div>
+      <div id="local-package-job-list" class="list compact"></div>
+    </section>
+
     <section class="panel formal-grouping-operations" data-payment-section="formal-grouping-operations">
       <div class="panel-title"><h2>正式分组器异步联调中心</h2><span>幂等派发 · 回执验签 · 指数退避 · 死信对账</span></div>
       <div class="payment-toolbar"><button type="button" data-payment-action="create-formal-job">创建正式分组作业</button><span id="formal-grouping-summary">正式传输需配置国家/地方分组器适配器。</span></div>

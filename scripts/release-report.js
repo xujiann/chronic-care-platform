@@ -1341,6 +1341,9 @@ function buildReleaseReport(options = {}) {
   const diseasePaymentFormalGroupingIds = ["formal-grouping-async", "formal-grouping-compensation", "formal-grouping-api-routes", "formal-grouping-ui"];
   const diseasePaymentFormalGroupingReady = diseasePaymentFormalGroupingIds
     .every((id) => diseasePaymentReadiness.checks?.some((item) => item.id === id && item.ok));
+  const diseasePaymentLocalPackageIds = ["local-package-validation", "local-package-impact", "local-package-diff", "local-package-release", "local-package-scheduling", "local-package-rollback", "local-package-pagination", "catalog-prefix-index", "local-package-batch-simulation", "local-package-builder", "local-package-api-routes", "local-package-ui"];
+  const diseasePaymentLocalPackageReady = diseasePaymentLocalPackageIds
+    .every((id) => diseasePaymentReadiness.checks?.some((item) => item.id === id && item.ok));
   const policyCoverage = buildPolicyCoverageReport();
   const platformCapabilityManifest = buildReleaseArtifactManifest({ pkg, releaseReport: { summary: { total: 0 }, checks: [] } });
   const platformCapabilityMap = buildCapabilityMap({ data, pkg, manifest: platformCapabilityManifest });
@@ -1423,6 +1426,7 @@ function buildReleaseReport(options = {}) {
     check("bloodSystem:formalGoLiveBoundary", bloodSystemReadiness.functionalState === "software-release-ready" && bloodSystemReadiness.formalGoLiveState === "blocked-until-site-evidence-signed" && bloodSystemReadiness.productionReady === false && (bloodSystemReadiness.onsiteBlockers?.length || 0) >= 8, `${bloodSystemReadiness.functionalState} / ${bloodSystemReadiness.formalGoLiveState} / ${bloodSystemReadiness.onsiteBlockers?.length || 0} onsite blockers`, "error", "blood-system"),
     check("diseasePayment:readiness", diseasePaymentReadiness.ready, diseasePaymentReadiness.ready ? `${diseasePaymentReadiness.checks.length}/${diseasePaymentReadiness.checks.length} disease payment readiness checks passed` : "disease payment readiness failed", "error", "disease-payment"),
     check("diseasePayment:formalGroupingOperations", diseasePaymentFormalGroupingReady && (diseasePaymentReadiness.summary?.formalGrouping?.completed || 0) >= 1, `${diseasePaymentReadiness.summary?.formalGrouping?.total || 0} formal grouping jobs, ${diseasePaymentReadiness.summary?.formalGrouping?.pendingDeadLetters || 0} pending dead letters`, "error", "disease-payment"),
+    check("diseasePayment:localPackageGovernance", diseasePaymentLocalPackageReady, diseasePaymentLocalPackageReady ? "local official catalog and payment parameter package governance passed" : "local official package governance failed", "error", "disease-payment"),
     ...policyCoverageChecks(policyCoverage),
     ...platformCapabilityMapChecks(platformCapabilityMap),
     ...platformGoLiveSlicesChecks(platformGoLiveSlices),
