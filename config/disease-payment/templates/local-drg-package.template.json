@@ -1,0 +1,40 @@
+{
+  "id": "请填写唯一规则包编号",
+  "regionCode": "请填写行政区划代码",
+  "regionName": "请填写统筹区名称",
+  "mode": "DRG",
+  "scope": "full",
+  "authority": "template-only",
+  "packageVersion": "请填写当地版本号",
+  "nationalVersion": "CHS-DRG 2.0或当地文件载明版本",
+  "documentNo": "请填写正式文号",
+  "sourceOrganization": "请填写当地医保部门全称",
+  "effectiveFrom": "YYYY-MM-DD",
+  "effectiveTo": "YYYY-MM-DD",
+  "catalogCount": 1,
+  "sourceFiles": [
+    { "name": "正式目录文件名.xlsx", "sha256": "请填写64位SHA-256", "verificationStatus": "待核验" }
+  ],
+  "approvalDocument": { "documentNo": "请填写批复文号", "issuedAt": "YYYY-MM-DD", "fileDigest": "请填写64位SHA-256" },
+  "payment": {
+    "rateMethod": "固定费率法",
+    "rate": 0,
+    "budgetYear": 2026,
+    "institutionCoefficients": []
+  },
+  "catalog": [
+    {
+      "code": "DRG编码",
+      "name": "DRG名称",
+      "mdcCode": "MDC编码",
+      "mdcName": "MDC名称",
+      "adrgCode": "ADRG编码",
+      "adrgName": "ADRG名称",
+      "groupType": "medical/surgical/procedure",
+      "complicationLevel": "MCC/CC/NONE",
+      "diagnosisPrefixes": ["诊断编码前缀"],
+      "weight": 0,
+      "adjustment": 1
+    }
+  ]
+}

@@ -9897,12 +9897,12 @@ function sendStorageConflict(res, error) {
   });
 }
 
-function collectJson(req) {
+function collectJson(req, maxLength = 2_000_000) {
   return new Promise((resolve, reject) => {
     let body = "";
     req.on("data", (chunk) => {
       body += chunk;
-      if (body.length > 2_000_000) {
+      if (body.length > maxLength) {
         req.destroy();
         reject(new Error("请求体过大"));
       }
@@ -33359,6 +33359,137 @@ async function handleApi(req, res) {
     data.diseasePayment = result.state;
     writeDatabase(data);
     sendJson(res, 201, result.row);
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/local-packages" && req.method === "GET") {
+    const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
+    if (!user) return;
+    sendJson(res, 200, DiseasePaymentService.buildLocalPaymentPackageView(readDatabase().diseasePayment));
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/local-packages/simulation-jobs" && req.method === "GET") {
+    const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
+    if (!user) return;
+    sendJson(res, 200, DiseasePaymentService.buildLocalPaymentPackageView(readDatabase().diseasePayment).simulationJobs);
+    return;
+  }
+
+  const diseasePaymentLocalSimulationCreateMatch = url.pathname.match(/^\/api\/disease-payment\/local-packages\/([^/]+)\/simulation-jobs$/);
+  if (diseasePaymentLocalSimulationCreateMatch && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    try {
+      const result = DiseasePaymentService.createLocalPaymentPackageSimulationJob(data.diseasePayment, decodeURIComponent(diseasePaymentLocalSimulationCreateMatch[1]), await collectJson(req), user.name);
+      data.diseasePayment = result.state;
+      writeDatabase(data);
+      sendJson(res, result.idempotent ? 200 : 201, { job: result.job, diffReport: result.diffReport, idempotent: result.idempotent });
+    } catch (error) {
+      sendJson(res, 409, { error: "Conflict", message: error.message });
+    }
+    return;
+  }
+
+  const diseasePaymentLocalSimulationActionMatch = url.pathname.match(/^\/api\/disease-payment\/local-packages\/simulation-jobs\/([^/]+)\/(process|retry|cancel)$/);
+  if (diseasePaymentLocalSimulationActionMatch && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
+    if (!user) return;
+    const [, encodedJobId, action] = diseasePaymentLocalSimulationActionMatch;
+    const jobId = decodeURIComponent(encodedJobId);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      const handlers = {
+        process: () => DiseasePaymentService.processLocalPaymentPackageSimulationJob(data.diseasePayment, jobId, payload, user.name),
+        retry: () => DiseasePaymentService.retryLocalPaymentPackageSimulationJob(data.diseasePayment, jobId, user.name),
+        cancel: () => DiseasePaymentService.cancelLocalPaymentPackageSimulationJob(data.diseasePayment, jobId, payload, user.name)
+      };
+      const result = handlers[action]();
+      data.diseasePayment = result.state;
+      writeDatabase(data);
+      sendJson(res, 200, { job: result.job, impactReport: result.report, package: result.row });
+    } catch (error) {
+      sendJson(res, 409, { error: "Conflict", message: error.message });
+    }
+    return;
+  }
+
+  const diseasePaymentLocalPackageReadMatch = url.pathname.match(/^\/api\/disease-payment\/local-packages\/([^/]+)\/(catalog|diff-report|impact-report)$/);
+  if (diseasePaymentLocalPackageReadMatch && req.method === "GET") {
+    const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
+    if (!user) return;
+    const [, encodedId, resource] = diseasePaymentLocalPackageReadMatch;
+    const id = decodeURIComponent(encodedId);
+    try {
+      const state = readDatabase().diseasePayment;
+      const result = resource === "catalog"
+        ? DiseasePaymentService.getLocalPaymentPackageCatalogPage(state, id, { page: url.searchParams.get("page"), pageSize: url.searchParams.get("pageSize"), query: url.searchParams.get("query") })
+        : DiseasePaymentService.getLocalPaymentPackageReport(state, id, resource === "diff-report" ? "diff" : "impact");
+      sendJson(res, 200, result);
+    } catch (error) {
+      sendJson(res, 404, { error: "Not Found", message: error.message });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/local-packages" && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    try {
+      const result = DiseasePaymentService.importLocalPaymentPackage(data.diseasePayment, await collectJson(req, 30_000_000), user.name);
+      data.diseasePayment = result.state;
+      writeDatabase(data);
+      sendJson(res, result.replaced ? 200 : 201, { package: result.row, validation: result.validation, replaced: result.replaced });
+    } catch (error) {
+      sendJson(res, 409, { error: "Conflict", message: error.message });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/local-packages/activate-due" && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      const result = DiseasePaymentService.activateDueLocalPaymentPackages(data.diseasePayment, user.name, payload);
+      data.diseasePayment = result.state;
+      writeDatabase(data);
+      sendJson(res, 200, { activated: result.activated, at: result.at, governance: DiseasePaymentService.buildLocalPaymentPackageView(result.state) });
+    } catch (error) {
+      sendJson(res, 409, { error: "Conflict", message: error.message });
+    }
+    return;
+  }
+
+  const diseasePaymentLocalPackageActionMatch = url.pathname.match(/^\/api\/disease-payment\/local-packages\/([^/]+)\/(compare|simulate|submit|review|publish|activate|rollback)$/);
+  if (diseasePaymentLocalPackageActionMatch && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
+    if (!user) return;
+    const [, encodedId, action] = diseasePaymentLocalPackageActionMatch;
+    const id = decodeURIComponent(encodedId);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      const handlers = {
+        compare: () => DiseasePaymentService.compareLocalPaymentPackage(data.diseasePayment, id, user.name, payload.baselineId),
+        simulate: () => DiseasePaymentService.simulateLocalPaymentPackage(data.diseasePayment, id, user.name),
+        submit: () => DiseasePaymentService.submitLocalPaymentPackage(data.diseasePayment, id, user.name),
+        review: () => DiseasePaymentService.reviewLocalPaymentPackage(data.diseasePayment, id, payload, user.name),
+        publish: () => DiseasePaymentService.publishLocalPaymentPackage(data.diseasePayment, id, user.name, payload),
+        activate: () => DiseasePaymentService.activateLocalPaymentPackage(data.diseasePayment, id, user.name, payload),
+        rollback: () => DiseasePaymentService.rollbackLocalPaymentPackage(data.diseasePayment, id, payload, user.name)
+      };
+      const result = handlers[action]();
+      data.diseasePayment = result.state;
+      writeDatabase(data);
+      sendJson(res, 200, { package: result.row, validation: result.validation, impactReport: action === "simulate" ? result.report : undefined, diffReport: result.diffReport || (action === "compare" ? result.report : undefined), approval: result.approval, scheme: result.scheme, parameter: result.parameter, snapshot: result.snapshot, scheduled: result.scheduled });
+    } catch (error) {
+      sendJson(res, 409, { error: "Conflict", message: error.message });
+    }
     return;
   }
 
