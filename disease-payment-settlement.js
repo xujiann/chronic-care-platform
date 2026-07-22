@@ -3,6 +3,7 @@
 const { createHash, randomUUID } = require("node:crypto");
 
 const SETTLEMENT_CONTRACT_ID = "insurance-disease-settlement-v1";
+const ANNUAL_CLEARANCE_CONTRACT_ID = "insurance-annual-clearance-v1";
 const SETTLEMENT_LABELS = Object.freeze({
   BATCH_FROZEN: "待申报",
   CORE_SUBMITTED: "医保核心已申报",
@@ -75,6 +76,69 @@ function requireDigest(payload, field, label = field) {
   const value = requireText(payload, field, label);
   if (!/^(sha256:)?[a-f0-9]{64}$/i.test(value)) throw new Error(`${label}必须为SHA-256摘要`);
   return value.replace(/^sha256:/i, "").toLowerCase();
+}
+
+function dateOnly(value, label = "日期") {
+  const text = String(value || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) throw new Error(`${label}必须为YYYY-MM-DD`);
+  const parsed = new Date(`${text}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== text) throw new Error(`${label}无效`);
+  return text;
+}
+
+function normalizeWorkingCalendar(input = {}) {
+  const uniqueDates = (values, label) => [...new Set((Array.isArray(values) ? values : []).map((item) => dateOnly(item, label)))].sort();
+  const nonWorkingDates = uniqueDates(input.nonWorkingDates, "非工作日");
+  const workingWeekendDates = uniqueDates(input.workingWeekendDates, "调休工作日");
+  if (nonWorkingDates.some((item) => workingWeekendDates.includes(item))) throw new Error("同一日期不能同时标记为非工作日和调休工作日");
+  return { version: String(input.version || "weekday-only-demo-v1").trim(), nonWorkingDates, workingWeekendDates, productionEvidence: input.productionEvidence === true };
+}
+
+function isWorkingDay(value, calendar = {}) {
+  const day = dateOnly(value);
+  if ((calendar.workingWeekendDates || []).includes(day)) return true;
+  if ((calendar.nonWorkingDates || []).includes(day)) return false;
+  const weekday = new Date(`${day}T00:00:00.000Z`).getUTCDay();
+  return weekday !== 0 && weekday !== 6;
+}
+
+function addWorkingDays(value, count, calendar = {}) {
+  const days = Number(count);
+  if (!Number.isInteger(days) || days < 0 || days > 366) throw new Error("工作日数量无效");
+  const cursor = new Date(`${dateOnly(value)}T00:00:00.000Z`);
+  let added = 0;
+  while (added < days) {
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+    if (isWorkingDay(cursor.toISOString().slice(0, 10), calendar)) added += 1;
+  }
+  return cursor.toISOString().slice(0, 10);
+}
+
+function workingDaysBetween(start, end, calendar = {}) {
+  const startDate = new Date(`${dateOnly(start)}T00:00:00.000Z`);
+  const endDate = new Date(`${dateOnly(end)}T00:00:00.000Z`);
+  if (endDate < startDate) return 0;
+  let count = 0;
+  const cursor = new Date(startDate);
+  while (cursor < endDate) {
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+    if (isWorkingDay(cursor.toISOString().slice(0, 10), calendar)) count += 1;
+  }
+  return count;
+}
+
+function buildSettlementSla(batch = {}, at = new Date().toISOString()) {
+  const submissionDeadline = dateOnly(batch.submissionDeadline, "申报截止日");
+  const calendar = normalizeWorkingCalendar(batch.workingCalendar || {});
+  const policyWorkingDays = Number(batch.policyWorkingDays || 30);
+  if (!Number.isInteger(policyWorkingDays) || policyWorkingDays <= 0 || policyWorkingDays > 120) throw new Error("结算SLA工作日无效");
+  const dueDate = addWorkingDays(submissionDeadline, policyWorkingDays, calendar);
+  const completedDate = batch.paymentReceipt?.paidAt ? dateOnly(batch.paymentReceipt.paidAt, "拨付日期") : "";
+  const evaluatedDate = completedDate || dateOnly(at, "SLA评估日期");
+  const elapsedWorkingDays = workingDaysBetween(submissionDeadline, evaluatedDate, calendar);
+  const overdueWorkingDays = Math.max(0, elapsedWorkingDays - policyWorkingDays);
+  const status = completedDate ? (overdueWorkingDays ? "completed-overdue" : "completed-within-sla") : overdueWorkingDays ? "overdue" : "within-sla";
+  return { policyWorkingDays, submissionDeadline, dueDate, completedDate, evaluatedDate, elapsedWorkingDays, remainingWorkingDays: Math.max(0, policyWorkingDays - elapsedWorkingDays), overdueWorkingDays, status, calendar };
 }
 
 function eventIdentity(payload, action) {
@@ -203,6 +267,7 @@ function transitionSettlementBatch(batch, payload = {}, actor = "system", option
   batch.status = SETTLEMENT_LABELS[rule.to];
   batch.updatedAt = now;
   batch.updatedBy = actor;
+  if (batch.submissionDeadline) batch.sla = buildSettlementSla(batch, now);
   const event = appendEvent(batch, { id: `settlement-event-${randomUUID()}`, action, from: before, to: rule.to, actor, at: now, idempotencyKey: identity, detail });
   return { batch, event, idempotent: false };
 }
@@ -212,6 +277,13 @@ function createAnnualClearance(batches = [], payload = {}, actor = "system") {
   if (!Number.isInteger(year) || year < 2000 || year > 2100) throw new Error("年度清算年份无效");
   const eligible = batches.filter((batch) => batch.type === "月度结算" && String(batch.period || "").startsWith(`${year}-`) && ["PAID", "CLOSED"].includes(settlementState(batch)));
   if (!eligible.length) throw new Error("该年度没有已拨付或已结案的月度结算批次");
+  const adjustmentFundFen = Number(payload.adjustmentFundFen || 0);
+  const retainedBalanceFen = Number(payload.retainedBalanceFen || 0);
+  const riskReserveFen = Number(payload.riskReserveFen || 0);
+  if (![adjustmentFundFen, retainedBalanceFen, riskReserveFen].every(Number.isSafeInteger) || retainedBalanceFen < 0 || riskReserveFen < 0) throw new Error("调节金、结余留用和风险准备金必须为有效整数分");
+  const paidAmountFen = eligible.reduce((sum, item) => sum + Number(item.paymentReceipt?.paidAmountFen || item.adjustedAmountFen || item.standardAmountFen || 0), 0);
+  const finalClearanceAmountFen = paidAmountFen + adjustmentFundFen - retainedBalanceFen - riskReserveFen;
+  if (!Number.isSafeInteger(finalClearanceAmountFen) || finalClearanceAmountFen < 0) throw new Error("年度最终清算金额无效");
   const row = {
     id: String(payload.id || `annual-clearance-${year}-${Date.now()}`),
     year,
@@ -221,14 +293,29 @@ function createAnnualClearance(batches = [], payload = {}, actor = "system") {
     batchCount: eligible.length,
     institutionCount: new Set(eligible.map((item) => item.institution)).size,
     standardAmountFen: eligible.reduce((sum, item) => sum + Number(item.standardAmountFen || 0), 0),
-    paidAmountFen: eligible.reduce((sum, item) => sum + Number(item.paymentReceipt?.paidAmountFen || item.adjustedAmountFen || item.standardAmountFen || 0), 0),
+    paidAmountFen,
+    adjustmentFundFen,
+    retainedBalanceFen,
+    riskReserveFen,
+    finalClearanceAmountFen,
+    adjustmentReason: String(payload.adjustmentReason || "").trim(),
     createdAt: new Date().toISOString(),
     createdBy: actor,
     events: []
   };
-  row.clearanceDigest = digest({ year, batchIds: row.batchIds, standardAmountFen: row.standardAmountFen, paidAmountFen: row.paidAmountFen });
+  row.clearanceDigest = digest(annualClearanceDigestPayload(row));
   appendEvent(row, { id: `clearance-event-${randomUUID()}`, action: "prepare", from: "NONE", to: "PREPARED", actor, at: row.createdAt, idempotencyKey: row.id, detail: { clearanceDigest: row.clearanceDigest } });
   return row;
+}
+
+function annualClearanceDigestPayload(row = {}) {
+  return { year: Number(row.year), batchIds: row.batchIds || [], standardAmountFen: Number(row.standardAmountFen || 0), paidAmountFen: Number(row.paidAmountFen || 0), adjustmentFundFen: Number(row.adjustmentFundFen || 0), retainedBalanceFen: Number(row.retainedBalanceFen || 0), riskReserveFen: Number(row.riskReserveFen || 0), finalClearanceAmountFen: Number(row.finalClearanceAmountFen || 0), adjustmentReason: String(row.adjustmentReason || "") };
+}
+
+function buildAnnualClearanceEnvelope(row = {}) {
+  const expectedDigest = digest(annualClearanceDigestPayload(row));
+  if (!row.clearanceDigest || row.clearanceDigest !== expectedDigest) throw new Error("年度清算摘要校验失败");
+  return { contractId: ANNUAL_CLEARANCE_CONTRACT_ID, contractVersion: "1.0.0", clearanceId: row.id, clearanceDigest: row.clearanceDigest, ...annualClearanceDigestPayload(row) };
 }
 
 function transitionAnnualClearance(row, payload = {}, actor = "system") {
@@ -241,6 +328,7 @@ function transitionAnnualClearance(row, payload = {}, actor = "system") {
   const identity = eventIdentity(payload, action);
   const duplicate = (row.events || []).find((event) => event.idempotencyKey === identity && event.action === action);
   if (identity && duplicate) return { row, event: duplicate, idempotent: true };
+  buildAnnualClearanceEnvelope(row);
   const detail = {};
   if (action === "record-dispute") {
     detail.institution = requireText(payload, "institution", "争议医院");
@@ -261,10 +349,20 @@ function transitionAnnualClearance(row, payload = {}, actor = "system") {
     detail.confirmationDigest = requireDigest(payload, "confirmationDigest", "医院确认摘要");
     row.institutionConfirmation = { digest: detail.confirmationDigest, confirmedAt: now, confirmedBy: actor };
   }
-  if (action === "approve") row.approval = { approvalNo: requireText(payload, "approvalNo", "清算批准文号"), approvedAt: now, approvedBy: actor };
-  if (action === "post") row.posting = { voucherNo: requireText(payload, "voucherNo", "财务凭证号"), postedAt: now, postedBy: actor };
+  if (action === "approve") {
+    if ((row.adjustmentFundFen || row.retainedBalanceFen || row.riskReserveFen) && !row.adjustmentReason) throw new Error("存在年度资金调整时必须填写调整原因");
+    detail.adjustmentApprovalDigest = (row.adjustmentFundFen || row.retainedBalanceFen || row.riskReserveFen) ? requireDigest(payload, "adjustmentApprovalDigest", "资金调整批准摘要") : "";
+    row.approval = { approvalNo: requireText(payload, "approvalNo", "清算批准文号"), adjustmentApprovalDigest: detail.adjustmentApprovalDigest, approvedAt: now, approvedBy: actor };
+  }
+  if (action === "post") {
+    const postedAmountFen = Number(payload.postedAmountFen ?? row.finalClearanceAmountFen);
+    if (!Number.isSafeInteger(postedAmountFen) || postedAmountFen !== row.finalClearanceAmountFen) throw new Error("财务入账金额必须与最终清算金额一致");
+    detail.postedAmountFen = postedAmountFen;
+    row.posting = { voucherNo: requireText(payload, "voucherNo", "财务凭证号"), postedAmountFen, postedAt: now, postedBy: actor };
+  }
   if (action === "lock") {
     detail.lockReference = requireText(payload, "lockReference", "锁账凭证号");
+    if (!row.posting || row.posting.postedAmountFen !== row.finalClearanceAmountFen) throw new Error("年度清算财务入账金额未核准，禁止锁账");
     if (!verifyEventLedger(row.events)) throw new Error("年度清算事件账本校验失败，禁止锁账");
     row.lockedAt = now;
     row.lockedBy = actor;
@@ -278,4 +376,4 @@ function transitionAnnualClearance(row, payload = {}, actor = "system") {
   return { row, event, idempotent: false };
 }
 
-module.exports = { ACTION_TARGETS, CLEARANCE_ACTION_TARGETS, CLEARANCE_LABELS, SETTLEMENT_CONTRACT_ID, SETTLEMENT_LABELS, appendEvent, buildCoreSettlementCase, buildCoreSettlementEnvelope, createAnnualClearance, digest, settlementState, stableStringify, transitionAnnualClearance, transitionSettlementBatch, verifyEventLedger, yuanToFen };
+module.exports = { ACTION_TARGETS, ANNUAL_CLEARANCE_CONTRACT_ID, CLEARANCE_ACTION_TARGETS, CLEARANCE_LABELS, SETTLEMENT_CONTRACT_ID, SETTLEMENT_LABELS, addWorkingDays, annualClearanceDigestPayload, appendEvent, buildAnnualClearanceEnvelope, buildCoreSettlementCase, buildCoreSettlementEnvelope, buildSettlementSla, createAnnualClearance, dateOnly, digest, isWorkingDay, normalizeWorkingCalendar, settlementState, stableStringify, transitionAnnualClearance, transitionSettlementBatch, verifyEventLedger, workingDaysBetween, yuanToFen };
