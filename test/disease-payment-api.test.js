@@ -193,6 +193,11 @@ test("disease payment API runs an authenticated end-to-end workflow", async (t) 
   assert.equal(admittedBatch.response.status, 201);
   assert.equal(admittedBatch.body.caseCount, 3);
   assert.equal(admittedBatch.body.settlementState, "BATCH_FROZEN");
+  const settlementPath = `/api/disease-payment/settlements/${encodeURIComponent(admittedBatch.body.id)}/reconcile`;
+  const coreSubmitted = await json(baseUrl, settlementPath, { method: "POST", headers, body: JSON.stringify({ action: "submit-core", externalRequestId: "API-CORE-REQUEST", idempotencyKey: "API-CORE-IDEM" }) });
+  assert.equal(coreSubmitted.body.settlementState, "CORE_SUBMITTED");
+  const manualCoreAccepted = await json(baseUrl, settlementPath, { method: "POST", headers, body: JSON.stringify({ action: "core-accepted", receiptId: "API-MANUAL-CORE-ACCEPTED" }) });
+  assert.equal(manualCoreAccepted.response.status, 500);
   const failedJob = await json(baseUrl, "/api/disease-payment/formal-grouping/jobs", { method: "POST", headers, body: JSON.stringify({ id: "api-formal-job-failure", mode: "DRG", schemeVersion: "DRG-2.0-DL", caseIds: ["dp-case-002"], maxAttempts: 1 }) });
   await json(baseUrl, "/api/disease-payment/formal-grouping/jobs/api-formal-job-failure/dispatch", { method: "POST", headers, body: JSON.stringify({ accepted: true }) });
   const formalFailure = await json(baseUrl, "/api/disease-payment/formal-grouping/jobs/api-formal-job-failure/fail", { method: "POST", headers, body: JSON.stringify({ errorCode: "RECEIPT_TIMEOUT", errorMessage: "回执超时" }) });

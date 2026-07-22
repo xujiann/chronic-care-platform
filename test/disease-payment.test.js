@@ -6,6 +6,7 @@ const { generateKeyPairSync } = require("node:crypto");
 const Service = require("../disease-payment-service");
 const Intake = require("../disease-payment-intake");
 const GrouperContract = require("../disease-payment-grouper-contract");
+const Settlement = require("../disease-payment-settlement");
 const PackageSignature = require("../disease-payment-package-signature");
 const { buildDiseasePaymentReadiness } = require("../scripts/disease-payment-readiness");
 
@@ -91,18 +92,53 @@ test("monthly settlement supports reconciliation and payment", () => {
   assert.throws(() => Service.createSettlementBatch(Service.seedDiseasePaymentState(), { period: "2026-06" }, "insurance"), /结算准入失败.*缺少可信正式分组回执/);
   const created = Service.createSettlementBatch(formallyGroupAll(), { period: "2026-06" }, "insurance");
   assert.equal(created.batch.caseCount, 3);
-  assert.equal(created.batch.status, "待对账");
+  assert.equal(created.batch.status, "待申报");
   assert.equal(created.batch.settlementState, "BATCH_FROZEN");
+  assert.equal(Number.isSafeInteger(created.batch.standardAmountFen), true);
   assert.ok(created.batch.batchDigest);
   assert.ok(created.batch.calculationSnapshots.every((item) => item.formalReceiptId && item.parameterId));
-  assert.throws(() => Service.reconcileBatch(created.state, created.batch.id, { status: "已拨付" }, "insurance"), /结算状态不允许/);
-  const reconciled = Service.reconcileBatch(created.state, created.batch.id, { status: "已对账" }, "insurance");
+  assert.throws(() => Service.applyInsuranceCoreSettlementCallback(created.state, created.batch.id, { action: "confirm-payment", receiptId: "PAY-TOO-EARLY", paidAmountFen: created.batch.standardAmountFen }), /结算状态不允许/);
+  const submitted = Service.reconcileBatch(created.state, created.batch.id, { action: "submit-core", externalRequestId: "CORE-REQ-001", idempotencyKey: "CORE-IDEM-001" }, "insurance");
+  assert.equal(submitted.batch.settlementState, "CORE_SUBMITTED");
+  const duplicate = Service.reconcileBatch(submitted.state, created.batch.id, { action: "submit-core", externalRequestId: "CORE-REQ-001", idempotencyKey: "CORE-IDEM-001" }, "insurance");
+  assert.equal(duplicate.idempotent, true);
+  assert.throws(() => Service.reconcileBatch(duplicate.state, created.batch.id, { action: "core-accepted", receiptId: "MANUAL-FAKE-RECEIPT" }, "insurance"), /只能由医保核心可信回调驱动/);
+  const accepted = Service.applyInsuranceCoreSettlementCallback(duplicate.state, created.batch.id, { action: "core-accepted", receiptId: "CORE-ACCEPT-001" });
+  const reconciling = Service.reconcileBatch(accepted.state, created.batch.id, { action: "start-reconciliation", idempotencyKey: "RECON-001", providerSummaryDigest: "a".repeat(64) }, "finance");
+  const reconciled = Service.reconcileBatch(reconciling.state, created.batch.id, { action: "confirm-matched", idempotencyKey: "MATCH-001", providerAmountFen: created.batch.standardAmountFen }, "finance");
   assert.equal(reconciled.batch.status, "已对账");
   assert.equal(reconciled.batch.settlementState, "RECONCILED");
-  const paid = Service.reconcileBatch(reconciled.state, created.batch.id, { status: "已拨付" }, "insurance");
+  const requested = Service.reconcileBatch(reconciled.state, created.batch.id, { action: "request-payment", paymentRequestId: "PAY-REQ-001" }, "insurance");
+  const paid = Service.applyInsuranceCoreSettlementCallback(requested.state, created.batch.id, { action: "confirm-payment", receiptId: "PAY-RECEIPT-001", paidAmountFen: created.batch.standardAmountFen });
   assert.equal(paid.batch.settlementState, "PAID");
   assert.ok(paid.state.cases.every((item) => item.status === "已结算"));
   assert.ok(paid.state.cases.every((item) => item.fundPaid === item.formalCalculation.paymentStandard));
+  assert.equal(Settlement.verifyEventLedger(paid.batch.events), true);
+});
+
+test("settlement difference correction and annual clearance remain auditable until lock", () => {
+  const created = Service.createSettlementBatch(formallyGroupAll(), { period: "2026-06" }, "insurance");
+  let result = Service.reconcileBatch(created.state, created.batch.id, { action: "submit-core", externalRequestId: "CORE-REQ-DIFF", idempotencyKey: "CORE-IDEM-DIFF" }, "insurance");
+  result = Service.applyInsuranceCoreSettlementCallback(result.state, created.batch.id, { action: "core-accepted", receiptId: "CORE-ACCEPT-DIFF" });
+  result = Service.reconcileBatch(result.state, created.batch.id, { action: "start-reconciliation", idempotencyKey: "RECON-DIFF", providerSummaryDigest: "b".repeat(64) }, "finance");
+  result = Service.reconcileBatch(result.state, created.batch.id, { action: "record-difference", idempotencyKey: "DIFF-001", differenceAmountFen: -100, reasonCode: "ROUNDING" }, "finance");
+  assert.equal(result.batch.settlementState, "DIFFERENCE_PENDING");
+  result = Service.reconcileBatch(result.state, created.batch.id, { action: "resolve-difference", idempotencyKey: "DIFF-RESOLVE-001", resolution: "医保核心核减1元并由双方确认", adjustedAmountFen: created.batch.standardAmountFen - 100 }, "finance");
+  result = Service.reconcileBatch(result.state, created.batch.id, { action: "request-payment", paymentRequestId: "PAY-REQ-DIFF" }, "insurance");
+  result = Service.applyInsuranceCoreSettlementCallback(result.state, created.batch.id, { action: "confirm-payment", receiptId: "PAY-RECEIPT-DIFF", paidAmountFen: created.batch.standardAmountFen - 100 });
+  const annual = Service.createAnnualClearance(result.state, { id: "annual-2026", year: 2026 }, "insurance");
+  assert.equal(annual.row.state, "PREPARED");
+  let clearance = Service.applyAnnualClearanceAction(annual.state, annual.row.id, { action: "start-confirmation", idempotencyKey: "ANNUAL-CONFIRM-START" }, "insurance");
+  clearance = Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "record-dispute", idempotencyKey: "ANNUAL-DISPUTE", institution: "全部机构", reason: "调节金口径待确认", amountFen: 100 }, "hospital-finance");
+  assert.throws(() => Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "confirm-institutions", confirmationDigest: "c".repeat(64) }, "hospital-finance"), /状态不允许|未解决/);
+  clearance = Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "resolve-dispute", idempotencyKey: "ANNUAL-DISPUTE-RESOLVE", resolution: "按双方签署口径处理" }, "insurance");
+  clearance = Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "confirm-institutions", idempotencyKey: "ANNUAL-CONFIRMED", confirmationDigest: "c".repeat(64) }, "hospital-finance");
+  clearance = Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "approve", idempotencyKey: "ANNUAL-APPROVE", approvalNo: "医保清算〔2027〕1号" }, "insurance-bureau");
+  clearance = Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "post", idempotencyKey: "ANNUAL-POST", voucherNo: "VOUCHER-2026-001" }, "finance");
+  clearance = Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "lock", idempotencyKey: "ANNUAL-LOCK", lockReference: "LOCK-2026-001" }, "finance");
+  assert.equal(clearance.row.state, "LOCKED");
+  assert.equal(Settlement.verifyEventLedger(clearance.row.events), true);
+  assert.throws(() => Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "record-dispute", institution: "测试医院", reason: "锁账后争议", amountFen: 1 }, "hospital"), /状态不允许/);
 });
 
 test("readiness report distinguishes locally ready functions from external blockers", () => {
