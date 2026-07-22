@@ -193,6 +193,7 @@ function buildStaticPublicHealthSystem(state) {
     cutoverEvidenceBoard,
     launchGate
   });
+  const coordinationCenter = buildStaticCoordinationCenter(state);
   return {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -298,7 +299,11 @@ function buildStaticPublicHealthSystem(state) {
       redCutoverBlockers: cutoverReadiness.summary.red,
       amberCutoverBlockers: cutoverReadiness.summary.amber,
       cutoverReadinessLevel: cutoverReadiness.readinessLevel,
-      readinessEvidence: readinessEvidence.length
+      readinessEvidence: readinessEvidence.length,
+      coordinationLanes: coordinationCenter.summary.lanes,
+      coordinationHandoffs: coordinationCenter.summary.handoffs,
+      coordinationOpenHandoffs: coordinationCenter.summary.openHandoffs,
+      coordinationStructurallyReady: coordinationCenter.summary.structurallyReady
     },
     standardCoverage: {
       management: {
@@ -351,7 +356,71 @@ function buildStaticPublicHealthSystem(state) {
     launchCommandBriefBoard,
     openCutoverBlockers,
     cutoverReadiness,
-    readinessEvidence
+    readinessEvidence,
+    coordinationCenter
+  };
+}
+
+function buildStaticCoordinationCenter(state = {}) {
+  const definitions = [
+    { id: "infectious-reporting", name: "传染病发现与直报", owner: "疾控中心传染病监测部门", domains: ["ph-infectious"], collections: ["publicHealthEvents", "phase2DiseaseReportQueue", "phase2DiseaseReportReceipts"], dependencies: ["疾控直报回执", "VPN/专线"] },
+    { id: "immunization", name: "免疫规划", owner: "疾控免疫规划部门", domains: ["ph-immunization"], collections: ["birthCertificates", "publicHealthEvents"], dependencies: ["儿童接种档案", "冷链与 AEFI 回执"] },
+    { id: "maternal-child", name: "妇幼健康", owner: "妇幼保健机构/妇幼健康处", domains: ["ph-maternal-child"], collections: ["birthCertificates", "birthStatistics", "personalRecords"], dependencies: ["妇幼入册", "公安共享回执"] },
+    { id: "senior-health", name: "老年健康", owner: "基层医疗卫生机构", domains: ["ph-senior"], collections: ["seniorServices", "personalRecords", "followups"], dependencies: ["老年健康评估", "民政协同授权"] },
+    { id: "chronic-management", name: "慢性病防控", owner: "基层卫生部门/疾控慢病部门", domains: ["ph-chronic"], collections: ["chronicScreeningTasks", "chronicManagementPlans", "followups"], dependencies: ["慢病平台", "药房回调"] },
+    { id: "public-health-followup", name: "基本公卫随访", owner: "基层公卫专班", domains: ["ph-chronic", "ph-archive"], collections: ["followups", "taskMessages", "personalRecords"], dependencies: ["基层公卫绩效口径", "随访回写"] },
+    { id: "health-education", name: "健康教育", owner: "疾控健康教育部门/基层机构", domains: ["ph-health-education"], collections: ["chronicEducationPushes", "publicHealthEvents"], dependencies: ["居民端投递回执", "效果评价"] },
+    { id: "family-doctor", name: "家庭医生协同", owner: "基层卫生部门/家庭医生团队", domains: ["ph-chronic", "ph-archive"], collections: ["phase2FamilyDoctorApplications", "phase2FamilyDoctorContracts", "phase2FamilyDoctorFulfillments", "followups"], dependencies: ["正式签约服务", "履约回写"] }
+  ];
+  const lanes = definitions.map((item) => {
+    const missingCollections = item.collections.filter((collection) => countCollection(state, collection) === 0);
+    return {
+      id: item.id,
+      name: item.name,
+      owner: item.owner,
+      standardDomainIds: item.domains,
+      sourceCollections: item.collections,
+      externalDependencies: item.dependencies,
+      missingCollections,
+      structurallyReady: !missingCollections.length,
+      metrics: {
+        total: item.collections.reduce((sum, collection) => sum + countCollection(state, collection), 0),
+        open: item.collections.reduce((sum, collection) => sum + countCollection(state, collection), 0)
+      }
+    };
+  });
+  const handoffs = lanes.map((lane) => {
+    const sourceRefs = lane.sourceCollections.flatMap((collection) => {
+      const value = state?.[collection];
+      if (Array.isArray(value)) return value.slice(0, 1).map((item) => item?.id || collection);
+      return value && typeof value === "object" ? [value.id || collection] : [];
+    }).filter(Boolean);
+    return {
+      id: `phc-${lane.id}-static`,
+      laneId: lane.id,
+      state: "detected",
+      sourceRefs,
+      standardDomainIds: lane.standardDomainIds,
+      businessKey: sourceRefs[0] || lane.id,
+      productionReady: false
+    };
+  });
+  const structurallyReady = lanes.filter((item) => item.structurallyReady).length;
+  return {
+    ok: lanes.length === 8 && structurallyReady === 8,
+    functionalState: "eight-lane-static-coordination-runnable",
+    formalGoLiveState: "blocked-until-external-receipts-and-site-evidence-verified",
+    summary: {
+      lanes: lanes.length,
+      structurallyReady,
+      handoffs: handoffs.length,
+      openHandoffs: handoffs.length,
+      closedHandoffs: 0,
+      externalDependencies: new Set(lanes.flatMap((item) => item.externalDependencies)).size
+    },
+    lanes,
+    handoffs,
+    productionReady: false
   };
 }
 
@@ -360,6 +429,7 @@ function renderPublicHealthSystem(system) {
   setPublicHealthMessage("");
   renderMetrics(system);
   renderPublicHealthHighlights(system.highlights || {});
+  renderPublicHealthCoordinationCenter(system.coordinationCenter || {});
   renderSourceDocuments(system.sourceDocuments || []);
   renderStandardDomains(system);
   renderStandardImplementationLedger(system.standardImplementationBoard || buildStaticStandardImplementationBoard(system.standardImplementationLedger || [], system.standardDomains || []), system.standardImplementationEvidenceCandidates || []);
@@ -398,6 +468,43 @@ function renderPublicHealthSystem(system) {
   }));
   renderCutoverBlockers(system.cutoverBlockers || []);
   renderEvidence(system.readinessEvidence || []);
+}
+
+function renderPublicHealthCoordinationCenter(center) {
+  const target = document.querySelector("#public-health-coordination-center");
+  if (!target) return;
+  const lanes = Array.isArray(center.lanes) ? center.lanes : [];
+  const handoffs = Array.isArray(center.handoffs) ? center.handoffs : [];
+  const summary = center.summary || {};
+  if (!lanes.length) {
+    target.innerHTML = `<article class="priority-row"><div class="priority-rank warn">8</div><div><strong>八领域协同数据待同步</strong><p>等待 /api/public-health/system 返回 coordinationCenter，静态预览将从本地业务集合生成。</p></div></article>`;
+    return;
+  }
+  const handoffByLane = new Map(handoffs.map((item) => [item.laneId, item]));
+  const header = `<article class="priority-row">
+    <div class="priority-rank ${center.productionReady ? "ok" : "warn"}">${escapeHtml(summary.structurallyReady || 0)}/${escapeHtml(summary.lanes || lanes.length)}</div>
+    <div>
+      <strong>八领域统一协同</strong>
+      <p>交接 ${escapeHtml(summary.handoffs || handoffs.length)} 项；开放 ${escapeHtml(summary.openHandoffs || 0)} 项；外部依赖 ${escapeHtml(summary.externalDependencies || 0)} 项。</p>
+      <small>功能态：${escapeHtml(center.functionalState || "coordination-runnable")}；上线态：${escapeHtml(center.formalGoLiveState || "site-evidence-required")}</small>
+    </div>
+  </article>`;
+  const cards = lanes.map((lane, index) => {
+    const handoff = handoffByLane.get(lane.id) || {};
+    const metric = lane.metrics || {};
+    const state = handoff.state || "detected";
+    const stateClass = state === "closed" ? "ok" : state === "exception-open" ? "danger" : "warn";
+    return `<article class="priority-row" data-public-health-coordination-lane="${escapeHtml(lane.id)}">
+      <div class="priority-rank ${stateClass}">${escapeHtml(index + 1)}</div>
+      <div>
+        <strong>${escapeHtml(lane.name || lane.id)}</strong>
+        <p>${escapeHtml(lane.owner || "待确认责任部门")}；业务记录 ${escapeHtml(metric.total || 0)} 项，开放 ${escapeHtml(metric.open || 0)} 项。</p>
+        <small>交接 ${escapeHtml(handoff.id || "待生成")} / ${escapeHtml(state)}；标准域 ${escapeHtml((lane.standardDomainIds || []).join("、"))}；来源 ${escapeHtml((handoff.sourceRefs || []).join(" / ") || "待同步")}</small>
+        <small>外部依赖：${escapeHtml((lane.externalDependencies || []).join("；"))}</small>
+      </div>
+    </article>`;
+  }).join("");
+  target.innerHTML = header + cards;
 }
 
 function renderPublicHealthHighlights(highlights) {

@@ -2,6 +2,15 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { buildPublicHealthHighlights } = require("../public-health-highlights-service");
+const {
+  DEFAULT_INFECTIOUS_EVENT_LINK,
+  buildInfectiousReportingCaseFromSources
+} = require("../public-health-event-reporting-service");
+const {
+  PRIORITY_STANDARD_REVIEW_TRACKS,
+  buildPriorityStandardReviewPack
+} = require("../public-health-priority-standard-review-service");
+const { buildPublicHealthCoordinationCenter } = require("../public-health-coordination-service");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "public-health-readiness-report.json");
@@ -2250,6 +2259,29 @@ function buildPublicHealthSystem(options = {}) {
   const data = options.data || readJson("data/db.json");
   const standards = mergeById(seedPublicHealthStandards(), data.publicHealthStandards);
   const standardImplementationLedger = mergeById(seedPublicHealthStandardImplementationLedger(), data.publicHealthStandardImplementationLedger);
+  let infectiousEventReporting = null;
+  try {
+    infectiousEventReporting = buildInfectiousReportingCaseFromSources({
+      event: (data.publicHealthEvents || []).find((item) => item.id === DEFAULT_INFECTIOUS_EVENT_LINK.publicHealthEventId),
+      report: (data.phase2DiseaseReportQueue || []).find((item) => item.id === DEFAULT_INFECTIOUS_EVENT_LINK.reportId),
+      receipt: (data.phase2DiseaseReportReceipts || []).find((item) => item.reportId === DEFAULT_INFECTIOUS_EVENT_LINK.reportId)
+    });
+  } catch (error) {
+    infectiousEventReporting = { ok: false, error: error.message };
+  }
+  const priorityArtifactAvailability = Object.fromEntries(
+    PRIORITY_STANDARD_REVIEW_TRACKS.flatMap((track) => track.artifactEvidence).map((file) => [file, fs.existsSync(path.join(ROOT, file))])
+  );
+  const priorityStandardReview = buildPriorityStandardReviewPack({
+    ledger: standardImplementationLedger,
+    data,
+    artifactAvailability: priorityArtifactAvailability
+  });
+  const coordinationCenter = buildPublicHealthCoordinationCenter({
+    data,
+    eventReporting: infectiousEventReporting,
+    standardReview: priorityStandardReview
+  });
   const institutionScopes = mergeById(seedPublicHealthInstitutionScopes(), data.publicHealthInstitutionScopes);
   const events = mergeById(seedPublicHealthEvents(), data.publicHealthEvents);
   const exchangeTasks = mergeById(seedPublicHealthExchangeTasks(), data.publicHealthExchangeTasks);
@@ -2377,7 +2409,8 @@ function buildPublicHealthSystem(options = {}) {
       launchIncidents.length >= 6 &&
       launchDutyShifts.length >= 6 &&
       launchCommandBriefs.length >= 5 &&
-      siteEvidenceVerificationTasks.length >= 9,
+      siteEvidenceVerificationTasks.length >= 9 &&
+      coordinationCenter.ok,
     generatedAt: new Date().toISOString(),
     sourceDocuments: clone(SOURCE_DOCUMENTS),
     standardTotals: clone(STANDARD_TOTALS),
@@ -2482,7 +2515,11 @@ function buildPublicHealthSystem(options = {}) {
       redCutoverBlockers: cutoverReadiness.summary.red,
       amberCutoverBlockers: cutoverReadiness.summary.amber,
       cutoverReadinessLevel: cutoverReadiness.readinessLevel,
-      readinessEvidence: readinessEvidence.length
+      readinessEvidence: readinessEvidence.length,
+      coordinationLanes: coordinationCenter.summary.lanes,
+      coordinationHandoffs: coordinationCenter.summary.handoffs,
+      coordinationOpenHandoffs: coordinationCenter.summary.openHandoffs,
+      coordinationStructurallyReady: coordinationCenter.summary.structurallyReady
     },
     standardCoverage,
     standardDomains: domainCoverage,
@@ -2521,6 +2558,9 @@ function buildPublicHealthSystem(options = {}) {
     openCutoverBlockers,
     cutoverReadiness,
     readinessEvidence,
+    infectiousEventReporting,
+    priorityStandardReview,
+    coordinationCenter,
     implementationBoundary: {
       platformRole: "依托全民健康信息平台承载公共卫生信息化建设",
       normalMode: "支撑宏观管理、资源配置、绩效评价、日常监测和服务协同",
@@ -2565,6 +2605,11 @@ function buildPublicHealthReadinessReport(options = {}) {
     check("events:high-priority", system.summary.highPriorityEvents >= 3 && system.riskQueue.some((item) => item.domain === "突发公共卫生事件管理"), `${system.summary.highPriorityEvents} high priority events`, "event"),
     check("events:action-api", sources.server.includes("/api/public-health/events/:id/actions") && sources.server.includes("public-health-event-action"), "event action API with audit evidence", "event"),
     check("frontend:event-actions", sources.js.includes("data-public-health-action") && sources.html.includes("public-health-risk-queue"), "risk queue exposes command actions", "frontend"),
+    check("coordination:eight-lanes", system.coordinationCenter?.ok === true && system.coordinationCenter?.summary?.lanes === 8 && system.coordinationCenter?.summary?.structurallyReady === 8, `${system.coordinationCenter?.summary?.structurallyReady || 0}/8 coordination lanes structurally ready`, "coordination"),
+    check("coordination:handoff-links", system.coordinationCenter?.handoffs?.length === 8 && system.coordinationCenter.handoffs.every((item) => item.businessKey && item.sourceRefs?.length && item.standardDomainIds?.length), `${system.coordinationCenter?.handoffs?.length || 0}/8 cross-domain handoffs linked`, "coordination"),
+    check("coordination:event-report-link", system.coordinationCenter?.summary?.eventReportingLinked === true && system.infectiousEventReporting?.publicHealthEventId && system.infectiousEventReporting?.reportId, `${system.infectiousEventReporting?.publicHealthEventId || "missing"} -> ${system.infectiousEventReporting?.reportId || "missing"}`, "coordination"),
+    check("coordination:standard-review-link", system.coordinationCenter?.summary?.standardReviewTracks === 8 && system.priorityStandardReview?.summary?.standardDomains === 7, `${system.priorityStandardReview?.summary?.tracks || 0} tracks / ${system.priorityStandardReview?.summary?.standardDomains || 0} domains`, "coordination"),
+    check("coordination:production-boundary", system.coordinationCenter?.productionReady === false && /blocked/.test(system.coordinationCenter?.formalGoLiveState || ""), system.coordinationCenter?.formalGoLiveState || "missing", "coordination"),
     check("exchange:categories", ["direct-report", "laboratory", "immunization", "maternal-child", "emergency", "security"].every((category) => system.exchangeCategories.includes(category)), system.exchangeCategories.join(","), "exchange"),
     check("exchange:runs", system.exchangeTasks.every((item) => exchangeRunTaskIds.has(item.id)) && system.exchangeRuns.every((item) => item.receiptStatus && item.compensationStatus), `${system.exchangeRuns.length} exchange runs with receipts`, "exchange"),
     check("exchange:compensation", system.exchangeRuns.some((item) => /replay|compensat|manual|retry|重放|补偿|人工/i.test(`${item.compensationStatus || ""} ${item.status || ""}`)), "failed exchange compensation path is modeled", "exchange"),
@@ -2621,6 +2666,7 @@ function buildPublicHealthReadinessReport(options = {}) {
     check("publicHealth:highlightCapabilities", highlights.summary.capabilities === 5 && highlights.capabilities.length === 5 && highlights.formalGoLiveState === "blocked-until-site-evidence-signed", `${highlights.summary.capabilities} highlight capabilities / ${highlights.summary.activeAlerts} active alerts / ${highlights.summary.openTasks} open tasks`, "public-health"),
     check("api:highlight-actions", ["/api/public-health/highlights", "/api/public-health/highlights/signals", "/api/public-health/highlights/alerts/:id/actions", "/api/public-health/highlights/command-tasks/:id/actions", "/api/public-health/highlights/ai-reviews/:id/actions", "/api/public-health/highlights/evidence/:id/actions"].every((token) => sources.server.includes(token)), "five-suite public health highlight APIs are wired", "api"),
     check("frontend:highlight-center", sources.html.includes("public-health-highlight-center") && sources.js.includes("renderPublicHealthHighlights"), "public health highlight center is visible", "frontend"),
+    check("frontend:coordination-center", sources.html.includes("public-health-coordination-center") && sources.js.includes("renderPublicHealthCoordinationCenter"), "eight-lane coordination center is visible", "frontend"),
     check("frontend:page", sources.html.includes("public-health-metrics") && sources.js.includes("renderPublicHealthSystem"), "public-health.html and public-health.js are wired", "frontend"),
     check("api:route", sources.server.includes("/api/public-health/system") && sources.server.includes("buildPublicHealthSystem"), "GET /api/public-health/system", "api"),
     check("package:script", Boolean(pkg.scripts?.["public-health:readiness"]) && sources.packageSource.includes("public-health-readiness.js"), pkg.scripts?.["public-health:readiness"] || "missing", "release"),
@@ -2673,6 +2719,9 @@ function buildPublicHealthReadinessReport(options = {}) {
     cutoverReadiness: system.cutoverReadiness,
     riskQueue: system.riskQueue,
     readinessEvidence: system.readinessEvidence,
+    infectiousEventReporting: system.infectiousEventReporting,
+    priorityStandardReview: system.priorityStandardReview,
+    coordinationCenter: system.coordinationCenter,
     checks,
     system
   };
@@ -2728,6 +2777,9 @@ function renderMarkdown(report) {
   const approvalPreflight = launchGate.approvalPreflight || {};
   const launchRequirementRows = (launchGate.requirements || []).map((item) => `| ${item.passed ? "PASS" : "BLOCKED"} | ${item.id || ""} | ${item.name || ""} | ${(item.evidence || []).join(", ")} | ${String(item.nextAction || "").replace(/\|/g, "/")} |`);
   const launchApprovalRows = (launchGate.approvals || report.launchApprovals || []).map((item) => `| ${item.status || ""} | ${item.role || ""} | ${item.owner || ""} | ${item.approver || ""} | ${item.dueAt || ""} | ${String(item.nextAction || "").replace(/\|/g, "/")} |`);
+  const coordinationCenter = report.coordinationCenter || {};
+  const coordinationSummary = coordinationCenter.summary || {};
+  const coordinationRows = (coordinationCenter.lanes || []).map((item) => `| ${item.name || item.id || ""} | ${item.owner || ""} | ${item.metrics?.total || 0} | ${item.metrics?.open || 0} | ${(item.standardDomainIds || []).join(", ")} | ${item.structurallyReady ? "READY" : `MISSING: ${(item.missingCollections || []).join(", ")}`} |`);
   return [
     "# Public health informatization readiness report",
     "",
@@ -2755,6 +2807,7 @@ function renderMarkdown(report) {
     `- Site evidence bridge: ${siteEvidenceBridge.status || "unknown"}; links ${siteEvidenceSummary.verifiedLinks || 0}/${siteEvidenceSummary.links || 0}, mapped items ${siteEvidenceSummary.verifiedItems || 0}/${siteEvidenceSummary.linkedItems || 0}`,
     `- Site evidence verification desk: ${siteEvidenceVerificationBoard.status || "unknown"}; verified ${siteEvidenceVerificationSummary.verifiedTasks || 0}/${siteEvidenceVerificationSummary.tasks || 0}, evidence available ${siteEvidenceVerificationSummary.evidenceAvailableTasks || 0}, blocked ${siteEvidenceVerificationSummary.blockedTasks || 0}`,
     `- Production launch gate: ${launchGate.status || "unknown"} / ${launchGate.releaseGate || "unknown"}; requirements ${launchSummary.passedRequirements || 0}/${launchSummary.requirements || 0}, approvals ${launchSummary.signedApprovals || 0}/${launchSummary.approvals || 0}; approval preflight ${approvalPreflight.status || "unknown"} ${approvalPreflight.passedPrerequisites || 0}/${approvalPreflight.prerequisiteRequirements || 0}`,
+    `- Eight-domain coordination: ${coordinationCenter.functionalState || "unknown"}; lanes ${coordinationSummary.structurallyReady || 0}/${coordinationSummary.lanes || 0}, handoffs ${coordinationSummary.handoffs || 0}, event reporting linked ${coordinationSummary.eventReportingLinked ? "yes" : "no"}, standard review tracks ${coordinationSummary.standardReviewTracks || 0}`,
     "",
     "## Checks",
     "",
@@ -2910,6 +2963,14 @@ function renderMarkdown(report) {
     "| Status | Role | Owner | Approver | Due | Next action |",
     "|---|---|---|---|---|---|",
     ...launchApprovalRows,
+    "",
+    "## Eight-domain coordination center",
+    "",
+    `Functional state: ${coordinationCenter.functionalState || "unknown"}; formal go-live state: ${coordinationCenter.formalGoLiveState || "unknown"}; production ready: ${coordinationCenter.productionReady ? "yes" : "no"}.`,
+    "",
+    "| Lane | Owner | Source rows | Open rows | Standard domains | Structural gate |",
+    "|---|---|---:|---:|---|---|",
+    ...coordinationRows,
     "",
     "## Production cutover blockers",
     "",
