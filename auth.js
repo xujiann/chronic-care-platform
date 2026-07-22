@@ -248,7 +248,12 @@
 
   function validateDelegation(delegation, user, subjectResidentId, permission, options = {}) {
     const actorAccountId = String(user.accountId || user.id || "").trim();
-    if (delegation.actorAccountId && String(delegation.actorAccountId) !== actorAccountId) {
+    const requiredAuditFields = ["id", "actorAccountId", "relationship", "legalBasis"];
+    const missingAuditFields = requiredAuditFields.filter((field) => !String(delegation[field] || "").trim());
+    if (missingAuditFields.length) {
+      return delegationDenied("DELEGATION_AUDIT_FIELDS_REQUIRED", `missing auditable delegation fields: ${missingAuditFields.join(", ")}`);
+    }
+    if (String(delegation.actorAccountId).trim() !== actorAccountId) {
       return delegationDenied("DELEGATION_ACTOR_MISMATCH", "delegation belongs to another actor account");
     }
     if (String(delegation.status || "").toLowerCase() !== "active") {
@@ -277,6 +282,7 @@
       permission,
       delegationId: String(delegation.id || ""),
       relationship: String(delegation.relationship || ""),
+      legalBasis: String(delegation.legalBasis || ""),
       authorizedAt: new Date(nowMs).toISOString(),
       clientHintOnly: true
     };

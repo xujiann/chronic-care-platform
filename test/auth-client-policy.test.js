@@ -52,6 +52,7 @@ function guardian(overrides = {}) {
       actorAccountId: "guardian-account-1",
       subjectResidentId: "resident-minor-1",
       relationship: "legal-guardian",
+      legalBasis: "statutory-guardianship",
       status: "active",
       validFrom: "2026-07-01T00:00:00.000Z",
       validUntil: "2026-08-01T00:00:00.000Z",
@@ -90,7 +91,35 @@ test("active guardian delegation returns actor and subject context", () => {
   assert.equal(result.mode, "delegated");
   assert.equal(result.actorAccountId, "guardian-account-1");
   assert.equal(result.subjectResidentId, "resident-minor-1");
+  assert.equal(result.delegationId, "delegation-1");
+  assert.equal(result.relationship, "legal-guardian");
+  assert.equal(result.legalBasis, "statutory-guardianship");
   assert.equal(result.clientHintOnly, true);
+});
+
+test("delegated access requires complete auditable identity and legal-basis fields", () => {
+  const auth = loadAuth();
+  const now = "2026-07-22T10:00:00.000Z";
+  for (const field of ["id", "actorAccountId", "relationship", "legalBasis"]) {
+    const delegation = { ...guardian().delegations[0] };
+    delete delegation[field];
+    const result = auth.authorizeDelegatedResidentAccess("resident-minor-1", "resident.delegated.read", {
+      user: guardian({ delegations: [delegation] }),
+      now
+    });
+    assert.equal(result.ok, false, `${field} must fail closed`);
+    assert.equal(result.reason, "DELEGATION_AUDIT_FIELDS_REQUIRED");
+    assert.match(result.detail, new RegExp(field));
+  }
+
+  const mismatchedActor = guardian({ delegations: [{
+    ...guardian().delegations[0],
+    actorAccountId: "another-guardian-account"
+  }] });
+  assert.equal(
+    auth.authorizeDelegatedResidentAccess("resident-minor-1", "resident.delegated.read", { user: mismatchedActor, now }).reason,
+    "DELEGATION_ACTOR_MISMATCH"
+  );
 });
 
 test("delegated access fails closed for wrong actors, invalid periods and broad permissions", () => {

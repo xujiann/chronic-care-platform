@@ -330,6 +330,7 @@ function buildIdentityContract(options = {}) {
     browserIdentityContext: {
       issuerScopedSubject: ["buildExternalIdentityKey", "externalIssuer", "encodeURIComponent(issuer)"].every((marker) => authSource.includes(marker)),
       guardianAccount: ["authorizeDelegatedResidentAccess", "GUARDIAN_ACCOUNT_REQUIRED"].every((marker) => authSource.includes(marker)),
+      auditableDelegation: ["DELEGATION_AUDIT_FIELDS_REQUIRED", '"id", "actorAccountId", "relationship", "legalBasis"'].every((marker) => authSource.includes(marker)),
       explicitPermission: ["DELEGATION_WILDCARD_FORBIDDEN", "DELEGATION_PERMISSION_DENIED"].every((marker) => authSource.includes(marker)),
       validityWindow: ["DELEGATION_NOT_STARTED", "DELEGATION_EXPIRED", "DELEGATION_VALIDITY_INVALID"].every((marker) => authSource.includes(marker)),
       sensitiveStepUp: ["DELEGATION_STEP_UP_REQUIRED", "DEFAULT_STEP_UP_MAX_AGE_MS"].every((marker) => authSource.includes(marker)),
