@@ -215,6 +215,8 @@ npm.cmd run env:check
 npm.cmd run release:report
 npm.cmd run release:report:full
 npm.cmd run release:manifest
+npm.cmd run integration:control
+npm.cmd run integration:control:gate
 npm.cmd run launch:smoke
 npm.cmd run priority-apps:templates
 npm.cmd run maternal-child:readiness
@@ -245,6 +247,8 @@ npm.cmd run hybrid:deployment-readiness
 `audit:retention` 会生成 `release/audit-retention-report.json` 与 `release/audit-retention-report.md`，离线验证安全事件和数据访问日志哈希链，记录导出摘要、保全目标和安全验收台账；默认 `release:report` 在演示环境使用发布包内审计报告作为本地归档目标，生产切换仍必须通过 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT` 绑定真实保全路径。
 
 `integration:readiness` 会生成 `release/integration-readiness-report.json` 与 `release/integration-readiness-report.md`，检查 P0 接口台账、HIS/EMR/LIS/PACS/医保/证照/统计契约、幂等键、签名和重试策略，并把身份、主索引、安全审计等 P0 覆盖关系纳入发布取证。
+
+`integration:control` 会只读检查 T01-T11 的登记 worktree、统一基线、分支提交、未提交文件和对 `server.js`、`portal.css`、`package.json`、`README.md`、`scripts/release-report.js` 的公共文件占用，并读取 `integration/intake-decisions.json` 中与候选 commit 精确绑定的 T00 审查决定，生成 `release/integration-control-ledger.json` 与 `release/integration-control-ledger.md`。分支新增提交后，旧决定自动转为 `review-stale`，必须重新完成代码审查和定向回归；只有结构检查、commit 绑定接收决定及声明依赖全部通过才进入 `merge-ready`。默认模式用于持续生成台账；`integration:control:gate` 在任一专业线缺失、基线漂移、工作树未清理、触碰 T00 公共文件、审查未接收或专业线尚未全部集成时返回失败。
 
 `interface:mapping` 会生成 `release/interface-mapping-report.json` 与 `release/interface-mapping-report.md`，逐项归档 HIS/EMR/LIS/PACS/医保/电子证照/统计契约字段到平台集合和字段的映射、必填字段覆盖、幂等字段落点、签名与重试证据，作为现场接口字段差异确认和联调整改的前置材料。
 

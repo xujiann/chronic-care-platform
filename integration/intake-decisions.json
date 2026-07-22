@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-07-22T10:20:00.000Z",
+  "decisions": [
+    {
+      "lineId": "T01",
+      "candidateHead": "c672959c9aa307b9a6bc3f6da1cceb65a668c390",
+      "decision": "accepted",
+      "reviewedAt": "2026-07-22T10:42:00.000Z",
+      "reviewer": "T00",
+      "checks": [
+        "git diff --check",
+        "16 targeted identity and security tests passed",
+        "17 identity and provisioning readiness tests passed",
+        "36 API authentication scoping and governance tests passed"
+      ],
+      "blockers": []
+    },
+    {
+      "lineId": "T08",
+      "candidateHead": "126948fda29472468f7fd028e5e722ae09cda823",
+      "decision": "accepted",
+      "reviewedAt": "2026-07-22T10:37:00.000Z",
+      "reviewer": "T00",
+      "checks": [
+        "git diff --check",
+        "74 targeted public-health tests passed",
+        "17 priority standard review readiness checks passed"
+      ],
+      "blockers": []
+    }
+  ]
+}
