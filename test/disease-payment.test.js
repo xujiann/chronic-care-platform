@@ -4,12 +4,16 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const { generateKeyPairSync } = require("node:crypto");
 const Service = require("../disease-payment-service");
+const Intake = require("../disease-payment-intake");
+const GrouperContract = require("../disease-payment-grouper-contract");
 const PackageSignature = require("../disease-payment-package-signature");
 const { buildDiseasePaymentReadiness } = require("../scripts/disease-payment-readiness");
 
 const packageSigningKeys = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
 const packageSignerFingerprint = PackageSignature.publicKeyFingerprint(packageSigningKeys.publicKey.export({ type: "spki", format: "pem" }));
 const packageSignatureOptions = { trustedSignerFingerprints: [packageSignerFingerprint] };
+const grouperSigningKeys = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+const grouperSignerFingerprint = GrouperContract.publicKeyFingerprint(grouperSigningKeys.publicKey.export({ type: "spki", format: "pem" }));
 const signedOptions = (options = {}) => ({ ...options, ...packageSignatureOptions });
 
 function signLocalPackage(payload) {
@@ -44,6 +48,16 @@ function publishLocalPackage(payload, options) {
   return Service.publishLocalPaymentPackage(approved.state, payload.id, "publisher", signedOptions(options));
 }
 
+function formallyGroupAll(state = Service.seedDiseasePaymentState(), caseIds = state.cases.map((item) => item.id)) {
+  state.grouperAdapters.find((item) => item.id === "official-adapter-v1").trustedSignerFingerprints = [grouperSignerFingerprint];
+  const officialResults = caseIds.map((caseId, index) => {
+    const item = state.cases.find((row) => row.id === caseId);
+    const local = Service.calculateCase(state, item, state.mode).grouping;
+    return GrouperContract.createSignedReceipt({ caseId, receiptId: `TEST-OFFICIAL-${index + 1}`, groupCode: local.groupCode, groupName: local.groupName, mdcCode: local.mdcCode, adrgCode: local.adrgCode, schemeVersion: "DRG-2.0-DL", inputDigest: Intake.officialCaseDigest(item, "DRG"), signedAt: "2026-07-20T08:00:00.000Z" }, grouperSigningKeys.privateKey.export({ type: "pkcs8", format: "pem" }), { keyId: "test-settlement-grouper", validUntil: "2036-12-31T23:59:59.000Z" });
+  });
+  return Intake.runGrouping(state, { environment: "formal", mode: "DRG", caseIds, officialResults }, "formal-adapter", Service.calculateCase).state;
+}
+
 test("DRG cases pass quality control, grouping, calculation and risk screening", () => {
   const state = Service.calculateAll(Service.seedDiseasePaymentState(), "tester");
   assert.equal(state.cases.length, 3);
@@ -74,13 +88,21 @@ test("special case workflow supports application and review", () => {
 });
 
 test("monthly settlement supports reconciliation and payment", () => {
-  const created = Service.createSettlementBatch(Service.seedDiseasePaymentState(), { period: "2026-06" }, "insurance");
+  assert.throws(() => Service.createSettlementBatch(Service.seedDiseasePaymentState(), { period: "2026-06" }, "insurance"), /结算准入失败.*缺少可信正式分组回执/);
+  const created = Service.createSettlementBatch(formallyGroupAll(), { period: "2026-06" }, "insurance");
   assert.equal(created.batch.caseCount, 3);
   assert.equal(created.batch.status, "待对账");
+  assert.equal(created.batch.settlementState, "BATCH_FROZEN");
+  assert.ok(created.batch.batchDigest);
+  assert.ok(created.batch.calculationSnapshots.every((item) => item.formalReceiptId && item.parameterId));
+  assert.throws(() => Service.reconcileBatch(created.state, created.batch.id, { status: "已拨付" }, "insurance"), /结算状态不允许/);
   const reconciled = Service.reconcileBatch(created.state, created.batch.id, { status: "已对账" }, "insurance");
   assert.equal(reconciled.batch.status, "已对账");
+  assert.equal(reconciled.batch.settlementState, "RECONCILED");
   const paid = Service.reconcileBatch(reconciled.state, created.batch.id, { status: "已拨付" }, "insurance");
+  assert.equal(paid.batch.settlementState, "PAID");
   assert.ok(paid.state.cases.every((item) => item.status === "已结算"));
+  assert.ok(paid.state.cases.every((item) => item.fundPaid === item.formalCalculation.paymentStandard));
 });
 
 test("readiness report distinguishes locally ready functions from external blockers", () => {

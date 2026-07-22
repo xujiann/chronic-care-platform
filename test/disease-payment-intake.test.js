@@ -1,9 +1,23 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const { generateKeyPairSync } = require("node:crypto");
 const test = require("node:test");
 const Intake = require("../disease-payment-intake");
+const GrouperContract = require("../disease-payment-grouper-contract");
 const Service = require("../disease-payment-service");
+
+const grouperKeys = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+const grouperFingerprint = GrouperContract.publicKeyFingerprint(grouperKeys.publicKey.export({ type: "spki", format: "pem" }));
+
+function trustedState(state = Service.seedDiseasePaymentState()) {
+  state.grouperAdapters.find((item) => item.id === "official-adapter-v1").trustedSignerFingerprints = [grouperFingerprint];
+  return state;
+}
+
+function signedReceipt(receipt) {
+  return GrouperContract.createSignedReceipt(receipt, grouperKeys.privateKey.export({ type: "pkcs8", format: "pem" }), { keyId: "test-grouper-key", signerOrganization: "测试医保正式分组器", validUntil: "2036-12-31T23:59:59.000Z" });
+}
 
 function validRow(suffix = "001") {
   return { settlementListNo: `DL-TEST-${suffix}`, institutionCode: "HOSP-001", institution: "测试医院", residentId: "r1", admissionDate: "2026-07-01", dischargeDate: "2026-07-05", principalDiagnosis: "I10", principalDiagnosisName: "原发性高血压", totalAmount: 1200, declaredFundAmount: 900, costItems: [{ itemCode: "P001", itemName: "诊疗项目", amount: 1000, catalogVersion: "2026" }, { itemCode: "M001", itemName: "药品", category: "药品", amount: 200, catalogVersion: "2026" }] };
@@ -41,7 +55,7 @@ test("invalid rows enter correction queue and can be retried", () => {
 });
 
 test("formal grouping requires signed official receipt and stays isolated from simulation", () => {
-  let state = Service.seedDiseasePaymentState();
+  let state = trustedState();
   const simulation = Intake.runGrouping(state, { environment: "simulation", mode: "DRG", caseIds: ["dp-case-001"] }, "tester", Service.calculateCase);
   assert.equal(simulation.run.succeeded, 1);
   assert.equal(simulation.run.environment, "simulation");
@@ -49,12 +63,13 @@ test("formal grouping requires signed official receipt and stays isolated from s
   const blocked = Intake.runGrouping(simulation.state, { environment: "formal", mode: "DRG", caseIds: ["dp-case-001"] }, "tester", Service.calculateCase);
   assert.equal(blocked.run.failed, 1);
   assert.match(blocked.run.results[0].error, /正式分组回执验证失败/);
-  const official = { caseId: "dp-case-001", receiptId: "OFF-001", groupCode: "BR23", groupName: "脑血管疾病", schemeVersion: "DRG-2.0-DL", inputDigest: Intake.officialCaseDigest(blocked.state.cases[0], "DRG"), signedAt: "2026-07-18T08:00:00.000Z", signatureValid: true, verification: { verifiedBy: "official-adapter-v1", algorithm: "SM2/SM3", keyId: "nhsa-joint-test-key-01", verifiedAt: "2026-07-18T08:00:01.000Z" } };
+  const official = signedReceipt({ caseId: "dp-case-001", receiptId: "OFF-001", groupCode: "BR23", groupName: "脑血管疾病", schemeVersion: "DRG-2.0-DL", inputDigest: Intake.officialCaseDigest(blocked.state.cases[0], "DRG"), signedAt: "2026-07-18T08:00:00.000Z" });
   const formal = Intake.runGrouping(blocked.state, { environment: "formal", mode: "DRG", caseIds: ["dp-case-001"], officialResults: [official] }, "tester", Service.calculateCase);
   assert.equal(formal.run.succeeded, 1);
   assert.equal(formal.state.cases[0].formalGrouping.authority, "official");
   assert.equal(formal.state.cases[0].formalGrouping.inputDigest, official.inputDigest);
-  assert.equal(formal.state.cases[0].formalGrouping.verification.contract, "detached-signature-attestation-v1");
+  assert.equal(formal.state.cases[0].formalGrouping.verification.contract, GrouperContract.SIGNATURE_SCHEMA_VERSION);
+  assert.equal(formal.state.cases[0].formalGrouping.verification.keyFingerprint, grouperFingerprint);
   assert.equal(formal.state.cases[0].simulationCalculation.grouping.groupCode, "BR23");
   const replay = Intake.runGrouping(formal.state, { environment: "formal", mode: "DRG", caseIds: ["dp-case-001"], officialResults: [official] }, "tester", Service.calculateCase);
   assert.equal(replay.run.failed, 1);
@@ -72,9 +87,12 @@ test("grouping and calculation ledgers form verifiable immutable hash chains", (
 });
 
 test("formal grouper asynchronous job accepts a correlated signed callback exactly once", () => {
-  const created = Intake.createFormalGroupingJob(Service.seedDiseasePaymentState(), { id: "formal-job-success", idempotencyKey: "formal-idem-success", mode: "DRG", schemeVersion: "DRG-2.0-DL", caseIds: ["dp-case-001"] }, "operator");
+  const created = Intake.createFormalGroupingJob(trustedState(), { id: "formal-job-success", idempotencyKey: "formal-idem-success", mode: "DRG", schemeVersion: "DRG-2.0-DL", caseIds: ["dp-case-001"] }, "operator");
   assert.equal(created.job.status, "queued");
-  assert.equal(created.envelope.contractId, "disease-payment-formal-grouping-v1");
+  assert.equal(created.envelope.contractId, GrouperContract.CONTRACT_ID);
+  assert.equal(created.envelope.contractVersion, "1.0.0");
+  assert.equal(created.envelope.cases[0].normalizedCase.patientName, undefined);
+  assert.equal(created.envelope.cases[0].normalizedCase.residentId, undefined);
   const duplicate = Intake.createFormalGroupingJob(created.state, { idempotencyKey: "formal-idem-success", mode: "DRG", schemeVersion: "DRG-2.0-DL", caseIds: ["dp-case-001"] }, "operator");
   assert.equal(duplicate.idempotent, true);
   assert.equal(duplicate.job.id, "formal-job-success");
@@ -84,7 +102,7 @@ test("formal grouper asynchronous job accepts a correlated signed callback exact
   const item = dispatched.state.cases.find((row) => row.id === "dp-case-001");
   const callback = {
     correlationId: dispatched.job.correlationId,
-    officialResults: [{ caseId: item.id, receiptId: "ASYNC-OFFICIAL-001", groupCode: "BR23", groupName: "脑血管疾病", schemeVersion: "DRG-2.0-DL", inputDigest: Intake.officialCaseDigest(item, "DRG"), signedAt: "2026-07-20T08:00:00.000Z", signatureValid: true, verification: { verifiedBy: "official-adapter-v1", algorithm: "SM2/SM3", keyId: "joint-test-key", verifiedAt: "2026-07-20T08:00:01.000Z" } }]
+    officialResults: [signedReceipt({ caseId: item.id, receiptId: "ASYNC-OFFICIAL-001", groupCode: "BR23", groupName: "脑血管疾病", schemeVersion: "DRG-2.0-DL", inputDigest: Intake.officialCaseDigest(item, "DRG"), signedAt: "2026-07-20T08:00:00.000Z" })]
   };
   const received = Intake.receiveFormalGroupingReceipt(dispatched.state, created.job.id, callback, "callback-adapter", Service.calculateCase);
   assert.equal(received.job.status, "completed");
@@ -93,6 +111,19 @@ test("formal grouper asynchronous job accepts a correlated signed callback exact
   const replay = Intake.receiveFormalGroupingReceipt(received.state, created.job.id, callback, "callback-adapter", Service.calculateCase);
   assert.equal(replay.idempotent, true);
   assert.equal(Intake.buildFormalGroupingOperations(replay.state).summary.completed, 1);
+});
+
+test("formal grouper contract rejects untrusted signatures and signed content drift", () => {
+  const state = trustedState();
+  const item = state.cases[0];
+  const receipt = signedReceipt({ caseId: item.id, receiptId: "SIGNED-001", groupCode: "BR23", schemeVersion: "DRG-2.0-DL", inputDigest: Intake.officialCaseDigest(item, "DRG"), signedAt: "2026-07-20T08:00:00.000Z" });
+  assert.equal(Intake.validateOfficialReceipt(state, item, receipt, "DRG").ok, true);
+  const drifted = { ...receipt, groupCode: "FZ15" };
+  assert.equal(Intake.validateOfficialReceipt(state, item, drifted, "DRG").ok, false);
+  assert.match(Intake.validateOfficialReceipt(state, item, drifted, "DRG").errors.join("；"), /数字签名验证失败|正文摘要不匹配/);
+  const untrusted = trustedState();
+  untrusted.grouperAdapters.find((row) => row.id === "official-adapter-v1").trustedSignerFingerprints = ["f".repeat(64)];
+  assert.match(Intake.validateOfficialReceipt(untrusted, item, receipt, "DRG").errors.join("；"), /不在可信指纹清单/);
 });
 
 test("formal grouper delivery uses exponential retry and dead-letter reconciliation", () => {

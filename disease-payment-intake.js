@@ -1,6 +1,7 @@
 "use strict";
 
 const { createHash, randomUUID } = require("crypto");
+const GrouperContract = require("./disease-payment-grouper-contract");
 
 const QUALITY_CATEGORIES = ["format", "coding", "business", "cost", "timeline", "linkage", "completeness"];
 
@@ -155,16 +156,7 @@ function appendImmutable(collection, record) {
 }
 
 function officialCaseDigest(item, mode = "DRG") {
-  return digest({
-    caseId: item.id,
-    settlementListNo: item.settlementListNo,
-    mode,
-    principalDiagnosis: String(item.principalDiagnosis || "").toUpperCase(),
-    otherDiagnoses: (item.otherDiagnoses || []).map((diagnosis) => typeof diagnosis === "string" ? diagnosis : diagnosis.code).filter(Boolean).map((diagnosis) => String(diagnosis).toUpperCase()).sort(),
-    procedures: (item.procedures || []).map((procedure) => typeof procedure === "string" ? procedure : procedure.code).filter(Boolean).map((procedure) => String(procedure).toUpperCase()).sort(),
-    totalAmount: Number(item.totalAmount || 0),
-    dischargeDate: item.dischargeDate
-  });
+  return GrouperContract.caseInputDigest(item, mode);
 }
 
 function validateOfficialReceipt(state, item, official, mode) {
@@ -173,16 +165,15 @@ function validateOfficialReceipt(state, item, official, mode) {
   if (!official?.groupCode) errors.push("缺少正式分组编码");
   if (!official?.schemeVersion) errors.push("缺少正式方案版本");
   if (!official?.signedAt || Number.isNaN(Date.parse(official.signedAt))) errors.push("缺少有效签发时间");
-  if (official?.signatureValid !== true) errors.push("正式回执签名未通过适配器验证");
-  const verification = official?.verification || {};
-  if (verification.verifiedBy !== "official-adapter-v1" || !verification.algorithm || !verification.keyId || !verification.verifiedAt || Number.isNaN(Date.parse(verification.verifiedAt))) errors.push("缺少适配器验签证明");
   const adapter = (state.grouperAdapters || []).find((row) => row.id === "official-adapter-v1");
+  const signatureVerification = GrouperContract.verifyReceiptSignature(official, { trustedSignerFingerprints: adapter?.trustedSignerFingerprints || [] });
+  if (!signatureVerification.ok) errors.push(...signatureVerification.errors);
   if (adapter?.acceptedSchemeVersions?.length && official?.schemeVersion && !adapter.acceptedSchemeVersions.includes(official.schemeVersion)) errors.push("正式回执方案版本未获适配器接受");
   const expectedInputDigest = officialCaseDigest(item, mode);
   if (official?.inputDigest !== expectedInputDigest) errors.push("正式回执未绑定当前病例输入摘要");
   const usedReceipt = (state.groupingRuns || []).flatMap((run) => run.results || []).find((result) => result.environment === "formal" && result.ok && result.receiptId === official?.receiptId);
   if (usedReceipt) errors.push(`正式回执已被病例${usedReceipt.caseId}使用`);
-  return { ok: errors.length === 0, errors, expectedInputDigest, verificationContract: adapter?.verificationContract || "detached-signature-attestation-v1" };
+  return { ok: errors.length === 0, errors: [...new Set(errors)], expectedInputDigest, signatureVerification, verificationContract: adapter?.verificationContract || GrouperContract.SIGNATURE_SCHEMA_VERSION };
 }
 
 function runGrouping(stateInput, payload, actor, calculateCase) {
@@ -199,7 +190,7 @@ function runGrouping(stateInput, payload, actor, calculateCase) {
       const official = officialResults.get(caseId);
       const receiptValidation = validateOfficialReceipt(state, item, official, mode);
       if (!receiptValidation.ok) return { caseId, ok: false, error: "正式分组回执验证失败", receiptErrors: receiptValidation.errors, expectedInputDigest: receiptValidation.expectedInputDigest };
-      const result = { caseId, ok: true, environment, authority: "official", groupCode: official.groupCode, groupName: official.groupName || "", schemeVersion: official.schemeVersion, receiptId: official.receiptId, inputDigest: official.inputDigest, receiptDigest: digest(official), verification: { ...official.verification, contract: receiptValidation.verificationContract }, signedAt: official.signedAt, groupedAt: new Date().toISOString() };
+      const result = { caseId, ok: true, environment, authority: "official", mode, groupCode: official.groupCode, groupName: official.groupName || "", mdcCode: official.mdcCode || "", adrgCode: official.adrgCode || "", schemeVersion: official.schemeVersion, receiptId: official.receiptId, inputDigest: official.inputDigest, receiptDigest: digest(official), verification: { ...receiptValidation.signatureVerification.verification, contract: receiptValidation.verificationContract }, signedAt: official.signedAt, groupedAt: new Date().toISOString() };
       item.formalStatus = "grouped";
       item.formalGrouping = result;
       return result;
@@ -221,14 +212,7 @@ function addFormalJobEvent(job, type, actor, detail = "") {
 }
 
 function formalGroupingEnvelope(job) {
-  return {
-    contractId: "disease-payment-formal-grouping-v1",
-    correlationId: job.correlationId,
-    idempotencyKey: job.idempotencyKey,
-    mode: job.mode,
-    schemeVersion: job.schemeVersion,
-    cases: job.caseSnapshots.map((item) => ({ caseId: item.caseId, inputDigest: item.inputDigest }))
-  };
+  return GrouperContract.buildRequestEnvelope(job);
 }
 
 function createFormalGroupingJob(stateInput, payload, actor = "system") {
@@ -242,7 +226,8 @@ function createFormalGroupingJob(stateInput, payload, actor = "system") {
   const caseSnapshots = caseIds.map((caseId) => {
     const item = state.cases.find((row) => row.id === caseId);
     if (!item) throw new Error(`病例不存在：${caseId}`);
-    return { caseId, settlementListNo: item.settlementListNo, inputDigest: officialCaseDigest(item, mode) };
+    const normalizedCase = GrouperContract.normalizedCaseSnapshot(item, mode);
+    return { caseId, settlementListNo: item.settlementListNo, normalizedCase, inputDigest: GrouperContract.sha256(normalizedCase) };
   });
   const idempotencyKey = String(payload.idempotencyKey || digest({ mode, schemeVersion, caseSnapshots })).trim();
   const existing = state.formalGroupingJobs.find((item) => item.idempotencyKey === idempotencyKey);
@@ -263,10 +248,13 @@ function createFormalGroupingJob(stateInput, payload, actor = "system") {
     createdBy: actor,
     events: []
   };
-  job.requestDigest = digest(formalGroupingEnvelope(job));
+  const envelope = formalGroupingEnvelope(job);
+  const contractValidation = GrouperContract.validateRequestEnvelope(envelope);
+  if (!contractValidation.ok) throw new Error(`正式分组契约校验失败：${contractValidation.errors.join("；")}`);
+  job.requestDigest = contractValidation.digest;
   addFormalJobEvent(job, "queued", actor, `${caseIds.length}个病例，方案${schemeVersion}`);
   state.formalGroupingJobs.unshift(job);
-  return { state, job, envelope: formalGroupingEnvelope(job), idempotent: false };
+  return { state, job, envelope, idempotent: false };
 }
 
 function registerFormalJobFailure(state, job, payload, actor) {
@@ -371,7 +359,7 @@ function retryFormalGroupingJob(stateInput, id, actor = "system") {
   if (job.attemptCount >= job.maxAttempts) throw new Error("正式分组作业已达到最大尝试次数，需先完成死信对账");
   job.status = "queued";
   job.correlationId = `fg-${randomUUID()}`;
-  job.requestDigest = digest(formalGroupingEnvelope(job));
+  job.requestDigest = GrouperContract.validateRequestEnvelope(formalGroupingEnvelope(job)).digest;
   job.nextRetryAt = undefined;
   job.receiptErrors = [];
   addFormalJobEvent(job, "retry-queued", actor, `准备第${job.attemptCount + 1}次派发`);
@@ -393,7 +381,7 @@ function reconcileFormalGroupingDeadLetter(stateInput, id, payload = {}, actor =
   job.status = "queued";
   job.attemptCount = 0;
   job.correlationId = `fg-${randomUUID()}`;
-  job.requestDigest = digest(formalGroupingEnvelope(job));
+  job.requestDigest = GrouperContract.validateRequestEnvelope(formalGroupingEnvelope(job)).digest;
   job.reopenedAt = deadLetter.resolvedAt;
   addFormalJobEvent(job, "dead-letter-reconciled", actor, resolution);
   return { state, job, deadLetter, envelope: formalGroupingEnvelope(job) };
