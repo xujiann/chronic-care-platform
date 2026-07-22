@@ -92,8 +92,10 @@ const PRIORITY_STANDARD_REVIEW_TRACKS = [
 const REVIEW_ACTIONS = {
   "confirm-responsibility": { from: ["draft"], to: "owner-confirmed", roles: ["commission", "cdc", "institution", "primary-care", "maternal-child"] },
   "review-standard-mapping": { from: ["owner-confirmed"], to: null, roles: ["commission", "cdc"] },
-  "link-site-evidence": { from: ["mapping-reviewed"], to: "site-evidence-linked", roles: ["commission", "cdc"] }
+  "link-site-evidence": { from: ["mapping-reviewed", "site-evidence-linked"], to: "site-evidence-linked", roles: ["commission", "cdc"] }
 };
+
+const TRUSTED_SITE_EVIDENCE_SOURCES = new Set(["server-evidence-store", "trusted-signature-service"]);
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -129,6 +131,56 @@ function hasRows(data, key) {
   return Boolean(value && typeof value === "object" && Object.keys(value).length > 0);
 }
 
+function findTrustedSiteEvidence(registry, evidenceId) {
+  if (!registry || !evidenceId) return null;
+  if (registry instanceof Map) return registry.get(evidenceId) || null;
+  if (Array.isArray(registry)) return registry.find((item) => clean(item?.id) === evidenceId) || null;
+  if (typeof registry === "object") return registry[evidenceId] || null;
+  return null;
+}
+
+function verifyTrustedSiteEvidence(claimedEvidence, context = {}) {
+  const evidenceId = clean(claimedEvidence?.id);
+  const trusted = findTrustedSiteEvidence(context.trustedSiteEvidenceRegistry, evidenceId);
+  if (!trusted) return { verified: false, blockerReason: "服务端可信证据仓尚无对应核验记录。" };
+  const verificationSource = clean(trusted.verificationSource).toLowerCase();
+  const artifactDigest = clean(trusted.artifactDigest).toLowerCase();
+  const matched = clean(trusted.id) === evidenceId
+    && clean(trusted.status).toLowerCase() === "verified"
+    && clean(trusted.artifactName) === clean(claimedEvidence.artifactName)
+    && clean(trusted.signedBy) === clean(claimedEvidence.signedBy)
+    && trusted.signatureVerified === true
+    && TRUSTED_SITE_EVIDENCE_SOURCES.has(verificationSource)
+    && /^[a-f0-9]{64}$/.test(artifactDigest)
+    && Boolean(clean(trusted.verifiedBy))
+    && Boolean(clean(trusted.verifiedAt));
+  if (!matched) return { verified: false, blockerReason: "服务端证据仓记录未通过来源、签名、摘要或字段一致性校验。" };
+  return {
+    verified: true,
+    verification: {
+      source: verificationSource,
+      signatureVerified: true,
+      artifactDigest,
+      verifiedBy: clean(trusted.verifiedBy),
+      verifiedAt: clean(trusted.verifiedAt)
+    }
+  };
+}
+
+function trustedSiteEvidenceForTrack(track, context = {}) {
+  const evidence = track?.siteEvidence || {};
+  if (!clean(evidence.id)) return { verified: false, blockerReason: "尚未登记现场材料。" };
+  return verifyTrustedSiteEvidence({
+    id: evidence.id,
+    artifactName: evidence.artifactName,
+    signedBy: evidence.claimedSignedBy
+  }, context);
+}
+
+function hasTrustedSiteEvidenceAttestation(track, context = {}) {
+  return trustedSiteEvidenceForTrack(track, context).verified;
+}
+
 function buildPriorityStandardReviewPack({ ledger = [], data = {}, artifactAvailability = {} } = {}) {
   const ledgerByDomain = new Map(ledger.map((item) => [item.standardDomainId, item]));
   const tracks = PRIORITY_STANDARD_REVIEW_TRACKS.map((definition) => {
@@ -154,6 +206,7 @@ function buildPriorityStandardReviewPack({ ledger = [], data = {}, artifactAvail
       ownerConfirmation: null,
       mappingReview: null,
       siteEvidence: null,
+      siteEvidenceTrustStatus: "not-registered",
       formallyAccepted: false,
       timeline: [],
       nextAction: mappingReady ? "确认责任部门并执行标准映射复核。" : "补齐缺失标准域、数据集合或制品证据后再复核。"
@@ -162,11 +215,35 @@ function buildPriorityStandardReviewPack({ ledger = [], data = {}, artifactAvail
   return summarizePack(tracks);
 }
 
-function summarizePack(tracks) {
-  const rows = clone(tracks);
+function summarizePack(tracks, context = {}) {
+  const rows = clone(tracks).map((item) => {
+    const trustResult = trustedSiteEvidenceForTrack(item, context);
+    const siteEvidence = item.siteEvidence?.id ? {
+      ...item.siteEvidence,
+      trustStatus: trustResult.verified ? "trusted-verified" : "pending-server-verification",
+      trustBlocker: trustResult.blockerReason || "",
+      verification: trustResult.verification || null
+    } : null;
+    return {
+      ...item,
+      siteEvidence,
+      siteEvidenceTrustStatus: siteEvidence?.trustStatus || "not-registered",
+      formallyAccepted: trustResult.verified
+    };
+  });
   const mappingReady = rows.filter((item) => item.mappingReady).length;
   const mappingReviewed = rows.filter((item) => item.state === "mapping-reviewed" || item.state === "site-evidence-linked").length;
+  const siteEvidenceRegistered = rows.filter((item) => item.siteEvidence?.id).length;
   const formallyAccepted = rows.filter((item) => item.formallyAccepted).length;
+  const allTrustedEvidenceVerified = rows.length > 0 && formallyAccepted === rows.length;
+  const productionBlockers = rows.filter((item) => !item.formallyAccepted).map((item) => ({
+    id: `trusted-site-evidence:${item.id}`,
+    trackId: item.id,
+    trackName: item.name,
+    status: item.siteEvidence?.id ? "evidence-registered-trust-pending" : "evidence-not-registered",
+    reason: item.siteEvidence?.trustBlocker || "尚未登记现场材料并取得服务端可信证据仓核验结果。",
+    requiredVerification: ["trusted source", "verified signature", "SHA-256 artifact digest", "server verifier", "verification timestamp"]
+  }));
   return {
     tracks: rows,
     summary: {
@@ -174,17 +251,23 @@ function summarizePack(tracks) {
       standardDomains: new Set(rows.flatMap((item) => item.domainIds)).size,
       mappingReady,
       mappingReviewed,
+      siteEvidenceRegistered,
       siteEvidencePending: rows.length - formallyAccepted,
-      formallyAccepted
+      trustedEvidenceVerified: formallyAccepted,
+      formallyAccepted,
+      productionBlockers: productionBlockers.length
     },
-    status: formallyAccepted === rows.length
-      ? "formally-accepted"
+    status: allTrustedEvidenceVerified
+      ? "trusted-site-evidence-verified"
+      : siteEvidenceRegistered === rows.length
+        ? "site-evidence-registered-trust-pending"
       : mappingReviewed === rows.length
         ? "mapping-reviewed-site-evidence-pending"
         : mappingReady === rows.length
           ? "ready-for-owner-review"
           : "mapping-input-incomplete",
-    productionReady: rows.length > 0 && formallyAccepted === rows.length
+    productionBlockers,
+    productionReady: allTrustedEvidenceVerified && productionBlockers.length === 0
   };
 }
 
@@ -200,7 +283,7 @@ function existingIdempotentAction(track, action, idempotencyKey) {
   return (track.timeline || []).find((item) => item.action === action && item.idempotencyKey === idempotencyKey) || null;
 }
 
-function applyPriorityStandardReviewAction(current, payload = {}, user = {}) {
+function applyPriorityStandardReviewAction(current, payload = {}, user = {}, context = {}) {
   const track = clone(current);
   const action = clean(payload.action);
   const { definition, role } = authorize(action, user);
@@ -258,11 +341,26 @@ function applyPriorityStandardReviewAction(current, payload = {}, user = {}) {
 
   if (action === "link-site-evidence") {
     const evidence = payload.siteEvidence || {};
-    if (clean(evidence.status).toLowerCase() !== "verified" || !clean(evidence.id) || !clean(evidence.artifactName) || !clean(evidence.signedBy)) {
-      throw new Error("verified site evidence with id, artifactName and signedBy is required");
+    if (!clean(evidence.status) || !clean(evidence.id) || !clean(evidence.artifactName) || !clean(evidence.signedBy)) {
+      throw new Error("site evidence material with status, id, artifactName and signedBy is required");
     }
-    track.siteEvidence = clone(evidence);
-    track.formallyAccepted = true;
+    const trustResult = verifyTrustedSiteEvidence(evidence, context);
+    track.siteEvidence = {
+      id: clean(evidence.id),
+      artifactName: clean(evidence.artifactName),
+      claimedStatus: clean(evidence.status).toLowerCase(),
+      claimedSignedBy: clean(evidence.signedBy),
+      registeredBy: actorName(user),
+      registeredAt: clean(payload.at || new Date().toISOString()),
+      trustStatus: trustResult.verified ? "trusted-verified" : "pending-server-verification",
+      trustBlocker: trustResult.blockerReason || "",
+      verification: trustResult.verification || null
+    };
+    track.siteEvidenceTrustStatus = track.siteEvidence.trustStatus;
+    track.formallyAccepted = trustResult.verified;
+    track.nextAction = trustResult.verified
+      ? "可信现场证据已核验，可进入后续全局上线审批。"
+      : "等待服务端可信证据仓完成签名、摘要和核验人验证。";
   }
 
   const sequence = (track.timeline || []).length + 1;
@@ -317,5 +415,7 @@ module.exports = {
   applyPriorityStandardReviewAction,
   buildPriorityStandardReviewPack,
   runPriorityStandardReviewAcceptanceScenario,
-  summarizePack
+  summarizePack,
+  hasTrustedSiteEvidenceAttestation,
+  verifyTrustedSiteEvidence
 };

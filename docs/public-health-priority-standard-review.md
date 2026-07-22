@@ -54,14 +54,16 @@
 
 ## 现场证据门禁
 
-`link-site-evidence` 只接受：
+`link-site-evidence` 首先只登记现场材料声明，要求：
 
-- `status: verified`
+- 非空材料状态 `status`（即使客户端填写 `verified`，也只视为声明）
 - 非空证据编号 `id`
 - 非空制品名称 `artifactName`
 - 非空签字责任方 `signedBy`
 
-代码测试报告、演示数据和映射记录不能替代现场证据。当前源台账七个目标标准域的持久化复核数仍为 0，现场证据也尚未签署，因此正式上线必须继续阻断。
+材料登记与生产可信核验严格拆分。客户端提交的 `status`、`signedBy`、`signatureVerified`、`verificationSource` 或摘要字段都不能直接形成正式接受。只有服务端通过第四个 `context.trustedSiteEvidenceRegistry` 参数注入可信证据仓记录，并同时满足可信来源、签名验证、SHA-256 制品摘要、服务端核验人、核验时间以及材料字段一致性，轨道才可 `formallyAccepted`。`summarizePack(tracks, context)` 还会在每次汇总时重新查询该可信上下文；仅有持久化投影而未传入服务端 registry 时仍会重新降级为阻断。
+
+未取得服务端可信结果时，汇总会返回逐轨 `productionBlockers`，状态为 `evidence-not-registered` 或 `evidence-registered-trust-pending`，`productionReady` 必须保持 `false`。代码测试报告、演示数据和映射记录不能替代现场证据。当前源台账七个目标标准域的持久化复核数仍为 0，现场证据也尚未签署，因此正式上线必须继续阻断。
 
 ## 八轨道主要证据
 
@@ -132,5 +134,7 @@ node --test test/public-health-priority-standard-review-service.test.js test/pub
 - 数据集合、接口和制品证据完整；
 - 复核动作具备角色、幂等和版本控制；
 - 少报任何复核项时动作失败；
-- 未验证、无制品名称或无签字人的现场证据不能关联；
+- 缺少状态、编号、制品名称或签字声明的现场材料不能登记；
+- 伪造 `verified`、`signedBy` 或客户端自报签名验证结果不能清除生产 blocker；
+- 正式接受必须来自服务端可信证据仓，并核验可信来源、签名、摘要、核验人和时间；
 - 演示复核完成后状态为 `mapping-reviewed-site-evidence-pending`，`productionReady` 保持 `false`。

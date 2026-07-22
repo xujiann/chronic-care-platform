@@ -7,7 +7,8 @@ const {
   PRIORITY_STANDARD_REVIEW_TRACKS,
   applyPriorityStandardReviewAction,
   buildPriorityStandardReviewPack,
-  runPriorityStandardReviewAcceptanceScenario
+  runPriorityStandardReviewAcceptanceScenario,
+  summarizePack
 } = require("../public-health-priority-standard-review-service");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -113,7 +114,7 @@ test("standard mapping review rejects incomplete domain, data, interface or evid
   );
 });
 
-test("verified signed site evidence is required for formal track acceptance", () => {
+test("trusted server evidence registry is required for formal track acceptance", () => {
   const reviewed = confirmAndReview(buildPack().tracks[0]);
   assert.throws(
     () => applyPriorityStandardReviewAction(reviewed, {
@@ -121,17 +122,114 @@ test("verified signed site evidence is required for formal track acceptance", ()
       idempotencyKey: "site-invalid",
       siteEvidence: { id: "site-1", status: "recorded", artifactName: "联调记录.pdf" }
     }, { name: "疾控复核员", role: "cdc" }),
-    /verified site evidence/
+    /site evidence material/
   );
 
-  const accepted = applyPriorityStandardReviewAction(reviewed, {
+  const claimed = applyPriorityStandardReviewAction(reviewed, {
     action: "link-site-evidence",
-    idempotencyKey: "site-valid",
-    siteEvidence: { id: "site-1", status: "verified", artifactName: "传染病直报联调签字记录.pdf", signedBy: "疾控中心/医院信息科" },
-    note: "现场证据核验通过"
+    idempotencyKey: "site-claimed",
+    siteEvidence: {
+      id: "site-1",
+      status: "verified",
+      artifactName: "传染病直报联调签字记录.pdf",
+      signedBy: "疾控中心/医院信息科",
+      signatureVerified: true,
+      verificationSource: "server-evidence-store",
+      artifactDigest: "f".repeat(64)
+    },
+    note: "客户端声明现场材料已核验"
   }, { name: "疾控复核员", role: "cdc" }).track;
-  assert.equal(accepted.state, "site-evidence-linked");
+  assert.equal(claimed.state, "site-evidence-linked");
+  assert.equal(claimed.siteEvidence.claimedStatus, "verified");
+  assert.equal(claimed.siteEvidence.trustStatus, "pending-server-verification");
+  assert.equal(claimed.formallyAccepted, false);
+
+  const accepted = applyPriorityStandardReviewAction(claimed, {
+    action: "link-site-evidence",
+    idempotencyKey: "site-server-verified",
+    siteEvidence: { id: "site-1", status: "verified", artifactName: "传染病直报联调签字记录.pdf", signedBy: "疾控中心/医院信息科" },
+    note: "使用服务端可信证据仓结果复核"
+  }, { name: "疾控复核员", role: "cdc" }, {
+    trustedSiteEvidenceRegistry: [{
+      id: "site-1",
+      status: "verified",
+      artifactName: "传染病直报联调签字记录.pdf",
+      signedBy: "疾控中心/医院信息科",
+      signatureVerified: true,
+      verificationSource: "server-evidence-store",
+      artifactDigest: "a".repeat(64),
+      verifiedBy: "现场证据服务",
+      verifiedAt: "2026-07-22T08:00:00.000Z"
+    }]
+  }).track;
   assert.equal(accepted.formallyAccepted, true);
+  assert.equal(accepted.siteEvidence.trustStatus, "trusted-verified");
+  assert.equal(accepted.siteEvidence.verification.artifactDigest, "a".repeat(64));
+});
+
+test("forged verified and signedBy evidence cannot make the review pack production ready", () => {
+  const reviewed = runPriorityStandardReviewAcceptanceScenario(buildPack());
+  const forgedTracks = reviewed.tracks.map((track) => applyPriorityStandardReviewAction(track, {
+    action: "link-site-evidence",
+    idempotencyKey: `${track.id}:forged-site-evidence`,
+    siteEvidence: {
+      id: `${track.id}-site-evidence`,
+      status: "verified",
+      artifactName: `${track.name}签字记录.pdf`,
+      signedBy: "客户端自报签字人",
+      signatureVerified: true,
+      verificationSource: "server-evidence-store",
+      artifactDigest: "b".repeat(64),
+      verifiedBy: "伪造核验服务"
+    },
+    note: "伪造 verified 和 signedBy 字段"
+  }, { name: "客户端复核员", role: "cdc" }).track);
+  const forgedPack = summarizePack(forgedTracks.map((track) => ({ ...track, formallyAccepted: true })));
+
+  assert.equal(forgedPack.summary.siteEvidenceRegistered, 8);
+  assert.equal(forgedPack.summary.trustedEvidenceVerified, 0);
+  assert.equal(forgedPack.summary.formallyAccepted, 0);
+  assert.equal(forgedPack.summary.productionBlockers, 8);
+  assert.equal(forgedPack.status, "site-evidence-registered-trust-pending");
+  assert.equal(forgedPack.productionReady, false);
+  assert.equal(forgedPack.productionBlockers.every((item) => item.status === "evidence-registered-trust-pending"), true);
+});
+
+test("all eight server-verified evidence records are required to clear the scoped production gate", () => {
+  const reviewed = runPriorityStandardReviewAcceptanceScenario(buildPack());
+  const trustedSiteEvidenceRegistry = reviewed.tracks.map((track, index) => ({
+    id: `${track.id}-trusted-evidence`,
+    status: "verified",
+    artifactName: `${track.name}现场签字记录.pdf`,
+    signedBy: track.leadOwner,
+    signatureVerified: true,
+    verificationSource: index % 2 ? "trusted-signature-service" : "server-evidence-store",
+    artifactDigest: String(index + 1).repeat(64),
+    verifiedBy: "公共卫生现场证据核验服务",
+    verifiedAt: "2026-07-22T09:00:00.000Z"
+  }));
+  const acceptedTracks = reviewed.tracks.map((track) => applyPriorityStandardReviewAction(track, {
+    action: "link-site-evidence",
+    idempotencyKey: `${track.id}:trusted-site-evidence`,
+    siteEvidence: {
+      id: `${track.id}-trusted-evidence`,
+      status: "verified",
+      artifactName: `${track.name}现场签字记录.pdf`,
+      signedBy: track.leadOwner
+    },
+    note: "关联服务端可信现场证据"
+  }, { name: "标准复核员", role: "commission" }, { trustedSiteEvidenceRegistry }).track);
+  const persistedOnlyPack = summarizePack(acceptedTracks);
+  assert.equal(persistedOnlyPack.productionReady, false);
+  assert.equal(persistedOnlyPack.summary.trustedEvidenceVerified, 0);
+
+  const trustedPack = summarizePack(acceptedTracks, { trustedSiteEvidenceRegistry });
+
+  assert.equal(trustedPack.summary.trustedEvidenceVerified, 8);
+  assert.equal(trustedPack.summary.productionBlockers, 0);
+  assert.deepEqual(trustedPack.productionBlockers, []);
+  assert.equal(trustedPack.status, "trusted-site-evidence-verified");
+  assert.equal(trustedPack.productionReady, true);
 });
 
 test("priority standard review enforces role, idempotency and version boundaries", () => {
