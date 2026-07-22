@@ -6,12 +6,16 @@ const { generateKeyPairSync } = require("crypto");
 const Service = require("../disease-payment-service");
 const Intake = require("../disease-payment-intake");
 const PackageSignature = require("../disease-payment-package-signature");
+const GrouperContract = require("../disease-payment-grouper-contract");
 
 const ROOT = path.resolve(__dirname, "..");
 
 function buildDiseasePaymentReadiness() {
   const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
   const signatureOptions = { trustedSignerFingerprints: [PackageSignature.publicKeyFingerprint(publicKey.export({ type: "spki", format: "pem" }))] };
+  const grouperKeys = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+  const grouperFingerprint = GrouperContract.publicKeyFingerprint(grouperKeys.publicKey.export({ type: "spki", format: "pem" }));
+  const signOfficialReceipt = (payload) => GrouperContract.createSignedReceipt(payload, grouperKeys.privateKey.export({ type: "pkcs8", format: "pem" }), { keyId: "readiness-official-grouper", signerOrganization: "就绪检查医保正式分组器", validUntil: "2036-12-31T23:59:59.000Z" });
   const signPackage = (payload) => ({
     ...payload,
     signatureEvidence: PackageSignature.createPackageSignature(payload, privateKey.export({ type: "pkcs8", format: "pem" }), {
@@ -21,14 +25,15 @@ function buildDiseasePaymentReadiness() {
     })
   });
   const state = Service.calculateAll(Service.seedDiseasePaymentState(), "readiness-check");
+  state.grouperAdapters.find((item) => item.id === "official-adapter-v1").trustedSignerFingerprints = [grouperFingerprint];
   const overview = Service.buildOverview(state);
-  const requiredFiles = ["disease-payment-service.js", "disease-payment-intake.js", "disease-payment-local-package.js", "disease-payment.html", "disease-payment.js", "disease-payment.css", "scripts/disease-payment-package-builder.js", "config/disease-payment/templates/local-drg-package.template.json", "config/disease-payment/templates/local-dip-package.template.json"];
+  const requiredFiles = ["disease-payment-service.js", "disease-payment-intake.js", "disease-payment-grouper-contract.js", "disease-payment-local-package.js", "disease-payment.html", "disease-payment.js", "disease-payment.css", "scripts/disease-payment-package-builder.js", "config/disease-payment/templates/local-drg-package.template.json", "config/disease-payment/templates/local-dip-package.template.json"];
   const sample = { settlementListNo: "READINESS-001", institutionCode: "HOSP-001", institution: "测试医院", admissionDate: "2026-07-01", dischargeDate: "2026-07-02", principalDiagnosis: "I10", totalAmount: 1000, declaredFundAmount: 800, costItems: [{ itemCode: "P001", itemName: "项目", amount: 1000 }] };
   const imported = Intake.importBatch(state, { sourceSystem: "readiness", rows: [sample] }, "readiness-check");
   const grouped = Intake.runGrouping(imported.state, { environment: "simulation", mode: "DRG", caseIds: [imported.state.cases.at(-1).id] }, "readiness-check", Service.calculateCase);
   const intakeSummary = Intake.buildIntakeSummary(grouped.state);
   const officialCase = state.cases[0];
-  const officialReceipt = { caseId: officialCase.id, receiptId: "READINESS-OFFICIAL-001", groupCode: "BR23", schemeVersion: "DRG-2.0-DL", inputDigest: Intake.officialCaseDigest(officialCase, "DRG"), signedAt: "2026-07-18T08:00:00.000Z", signatureValid: true, verification: { verifiedBy: "official-adapter-v1", algorithm: "SM2/SM3", keyId: "readiness-key", verifiedAt: "2026-07-18T08:00:01.000Z" } };
+  const officialReceipt = signOfficialReceipt({ caseId: officialCase.id, receiptId: "READINESS-OFFICIAL-001", groupCode: "BR23", schemeVersion: "DRG-2.0-DL", inputDigest: Intake.officialCaseDigest(officialCase, "DRG"), signedAt: "2026-07-18T08:00:00.000Z" });
   const receiptValidation = Intake.validateOfficialReceipt(state, officialCase, officialReceipt, "DRG");
   const formalJobCreated = Intake.createFormalGroupingJob(state, { id: "readiness-formal-job", idempotencyKey: "readiness-formal-job-v1", mode: "DRG", schemeVersion: "DRG-2.0-DL", caseIds: [officialCase.id] }, "readiness-operator");
   const formalJobDuplicate = Intake.createFormalGroupingJob(formalJobCreated.state, { idempotencyKey: "readiness-formal-job-v1", mode: "DRG", schemeVersion: "DRG-2.0-DL", caseIds: [officialCase.id] }, "readiness-operator");
@@ -38,6 +43,16 @@ function buildDiseasePaymentReadiness() {
   const failureJobDead = Intake.dispatchFormalGroupingJob(failureJobCreated.state, failureJobCreated.job.id, { accepted: false, errorCode: "ADAPTER_UNAVAILABLE", errorMessage: "readiness failure rehearsal" }, "readiness-dispatcher");
   const failureJobReconciled = Intake.reconcileFormalGroupingDeadLetter(failureJobDead.state, failureJobCreated.job.id, { resolution: "readiness reconciliation completed" }, "readiness-reconciler");
   const formalOperations = Intake.buildFormalGroupingOperations(failureJobReconciled.state);
+  const settlementState = Service.seedDiseasePaymentState();
+  settlementState.grouperAdapters.find((item) => item.id === "official-adapter-v1").trustedSignerFingerprints = [grouperFingerprint];
+  const settlementReceipts = settlementState.cases.map((item, index) => {
+    const preview = Service.calculateCase(settlementState, item, "DRG").grouping;
+    return signOfficialReceipt({ caseId: item.id, receiptId: `READINESS-SETTLEMENT-${index + 1}`, groupCode: preview.groupCode, groupName: preview.groupName, mdcCode: preview.mdcCode, adrgCode: preview.adrgCode, schemeVersion: "DRG-2.0-DL", inputDigest: Intake.officialCaseDigest(item, "DRG"), signedAt: "2026-07-18T08:00:00.000Z" });
+  });
+  const settlementGrouped = Intake.runGrouping(settlementState, { environment: "formal", mode: "DRG", caseIds: settlementState.cases.map((item) => item.id), officialResults: settlementReceipts }, "readiness-grouper", Service.calculateCase);
+  const settlementCreated = Service.createSettlementBatch(settlementGrouped.state, { period: "2026-06" }, "readiness-settlement");
+  const settlementFrozen = settlementCreated.batch.settlementState === "BATCH_FROZEN" && settlementCreated.batch.calculationSnapshots.every((item) => item.formalReceiptId);
+  const settlementReconciled = Service.reconcileBatch(settlementCreated.state, settlementCreated.batch.id, { status: "已对账" }, "readiness-reconciler");
   const parameterDraft = Service.createPaymentParameter(state, { id: "readiness-param-drg", mode: "DRG", schemeId: "drg-demo-2026", rate: 11000, effectiveFrom: "2027-01-01" }, "readiness-drafter");
   const parameterSimulation = Service.simulatePaymentParameter(parameterDraft.state, parameterDraft.row.id, "readiness-analyst");
   const parameterSubmitted = Service.submitPaymentParameter(parameterSimulation.state, parameterDraft.row.id, "readiness-drafter");
@@ -83,7 +98,7 @@ function buildDiseasePaymentReadiness() {
     { id: "dual-mode", label: "DRG/DIP双模式目录与参数", ok: state.groupCatalog.some((item) => item.mode === "DRG") && state.groupCatalog.some((item) => item.mode === "DIP") },
     { id: "case-loop", label: "清单质控、分组、测算与监管", ok: overview.summary.calculatedCount >= 3 && state.cases.slice(0, 3).every((item) => item.calculation?.quality?.ok) },
     { id: "special-case", label: "特例单议状态机", ok: Array.isArray(state.specialCases) },
-    { id: "settlement", label: "月结算与年度清算批次模型", ok: Array.isArray(state.settlementBatches) && Array.isArray(state.budgets) },
+    { id: "settlement", label: "正式分组结算准入与受控状态转换", ok: settlementFrozen && settlementReconciled.batch.settlementState === "RECONCILED" },
     { id: "external-boundary", label: "正式分组和医保核心外部边界", ok: state.externalDependencies.filter((item) => item.requiredForProduction).length >= 3 },
     { id: "grouping-2.0", label: "DRG/DIP 2.0版切换与期限", ok: state.policy2?.switchDeadline === "2024-12-31" && state.policy2?.settlementSlaWorkingDays === 30 },
     { id: "drg2-library-profile", label: "DRG 2.0版MDC/ADRG/DRG目录结构", ok: state.drg2LibraryProfile?.mdcCount === 26 && state.drg2LibraryProfile?.adrgCount === 409 && state.drg2LibraryProfile?.drgCount === 634 },
@@ -91,7 +106,7 @@ function buildDiseasePaymentReadiness() {
     { id: "drg-hierarchy", label: "DRG本地模拟MDC、ADRG和CC/MCC分层", ok: state.cases.slice(0, 3).every((item) => item.calculation?.grouping?.mdcCode && item.calculation?.grouping?.adrgCode && item.calculation?.grouping?.complicationLevel) },
     { id: "drg-analytics", label: "DRG入组率、CMI、权重与倍率病例指标", ok: overview.summary.drg.groupedCount >= 3 && overview.summary.drg.cmi > 0 && ["highOutliers", "lowOutliers", "totalWeight"].every((key) => Object.hasOwn(overview.summary.drg, key)) },
     { id: "drg-preview-boundary", label: "DRG试分组非结算效力与正式结果隔离", ok: state.drgPreviewRules?.authority === "non-binding" && Service.simulateDrgCase(state, { caseId: "dp-case-001" }).binding === false },
-    { id: "official-receipt-contract", label: "正式回执病例摘要、方案版本与适配器验签合同", ok: receiptValidation.ok && receiptValidation.verificationContract === "detached-signature-attestation-v1" },
+    { id: "official-receipt-contract", label: "正式回执病例摘要、方案版本与可信数字签名合同", ok: receiptValidation.ok && receiptValidation.signatureVerification?.cryptographicallyValid && receiptValidation.signatureVerification?.trusted && receiptValidation.verificationContract === GrouperContract.SIGNATURE_SCHEMA_VERSION },
     { id: "formal-grouping-async", label: "正式分组异步作业、幂等派发与关联回执", ok: formalJobDuplicate.idempotent && formalJobReceived.job.status === "completed" && formalJobReceived.run.succeeded === 1 && formalJobReceived.job.receiptCount === 1 },
     { id: "formal-grouping-compensation", label: "正式分组指数退避、死信与人工对账重开", ok: failureJobDead.state.formalGroupingDeadLetters.length === 1 && failureJobReconciled.deadLetter.status === "resolved" && failureJobReconciled.job.status === "queued" && formalOperations.retryPolicy.backoffSeconds.join(",") === "60,120,240" },
     { id: "parameter-impact", label: "支付参数病例与机构影响试算", ok: parameterSimulation.report.caseCount === state.cases.length && parameterSimulation.report.byInstitution.length >= 2 && Boolean(parameterSimulation.report.inputDigest) },
