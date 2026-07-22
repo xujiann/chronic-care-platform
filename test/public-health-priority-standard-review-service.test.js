@@ -376,6 +376,72 @@ test("trusted registry rejects missing secrets invalid receipts and tampered art
   assert.equal(tamperedResult.rejected[0].reasons.includes("valid server verification receipt signature is required"), true);
 });
 
+test("signed receipt rejects post-signing promotion of status origin source and signature verification", () => {
+  const verificationSecret = "public-health-test-verification-secret-2026";
+  const cases = [
+    {
+      name: "status",
+      mutateBeforeSigning: (evidence) => { evidence.status = "submitted"; },
+      promoteAfterSigning: (evidence) => { evidence.status = "verified"; }
+    },
+    {
+      name: "attestation origin",
+      mutateBeforeSigning: (evidence) => { evidence.trustedVerification.attestationOrigin = "client-generated"; },
+      promoteAfterSigning: (evidence) => { evidence.trustedVerification.attestationOrigin = "server-generated"; }
+    },
+    {
+      name: "verification source",
+      mutateBeforeSigning: (evidence) => { evidence.trustedVerification.verificationSource = "untrusted-client"; },
+      promoteAfterSigning: (evidence) => { evidence.trustedVerification.verificationSource = "server-evidence-store"; }
+    },
+    {
+      name: "signature verification boolean",
+      mutateBeforeSigning: (evidence) => { evidence.trustedVerification.signatureVerified = false; },
+      promoteAfterSigning: (evidence) => { evidence.trustedVerification.signatureVerified = true; }
+    }
+  ];
+
+  cases.forEach((scenario, index) => {
+    const evidenceId = `sle-trust-field-${index + 1}`;
+    const receiptId = `PH-SITE-TRUST-FIELD-${index + 1}`;
+    const evidence = {
+      id: evidenceId,
+      templateId: "interface-statistics-report-v1",
+      status: "verified",
+      artifactName: `${scenario.name}签名绑定测试.pdf`,
+      trustedVerification: {
+        attestationOrigin: "server-generated",
+        verificationSource: "server-evidence-store",
+        signatureVerified: true,
+        algorithm: "SM2/SM3",
+        keyId: "site-key-trust-fields",
+        artifactDigest: String(index + 1).repeat(64),
+        receiptId,
+        signedBy: "现场责任方",
+        verifiedBy: "服务端证据仓",
+        verifiedAt: "2026-07-22T11:00:00.000Z"
+      }
+    };
+    scenario.mutateBeforeSigning(evidence);
+    evidence.trustedVerification.receiptSignature = signTrustedSiteEvidenceReceipt(evidence, verificationSecret);
+    scenario.promoteAfterSigning(evidence);
+    const result = buildTrustedSiteEvidenceRegistry({
+      siteLaunchEvidence: [evidence],
+      verificationTasks: [{
+        id: `phsevt-trust-field-${index + 1}`,
+        evidenceId,
+        templateId: "interface-statistics-report-v1",
+        status: "verified",
+        verificationReceiptId: receiptId
+      }],
+      verificationSecret
+    });
+
+    assert.equal(result.registry.length, 0, `${scenario.name} promotion must not enter the trusted registry`);
+    assert.equal(result.rejected[0].reasons.includes("valid server verification receipt signature is required"), true, `${scenario.name} promotion must invalidate the signed receipt`);
+  });
+});
+
 test("priority standard review enforces role, idempotency and version boundaries", () => {
   const initial = buildPack().tracks[0];
   const payload = {
