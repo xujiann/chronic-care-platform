@@ -28,7 +28,7 @@ function buildDiseasePaymentReadiness() {
   const state = Service.calculateAll(Service.seedDiseasePaymentState(), "readiness-check");
   state.grouperAdapters.find((item) => item.id === "official-adapter-v1").trustedSignerFingerprints = [grouperFingerprint];
   const overview = Service.buildOverview(state);
-  const requiredFiles = ["disease-payment-service.js", "disease-payment-intake.js", "disease-payment-grouper-contract.js", "disease-payment-settlement.js", "disease-payment-local-package.js", "disease-payment.html", "disease-payment.js", "disease-payment.css", "scripts/disease-payment-package-builder.js", "config/disease-payment/templates/local-drg-package.template.json", "config/disease-payment/templates/local-dip-package.template.json"];
+  const requiredFiles = ["disease-payment-service.js", "disease-payment-intake.js", "disease-payment-grouper-contract.js", "disease-payment-special-case.js", "disease-payment-settlement.js", "disease-payment-local-package.js", "disease-payment.html", "disease-payment.js", "disease-payment.css", "scripts/disease-payment-package-builder.js", "config/disease-payment/templates/local-drg-package.template.json", "config/disease-payment/templates/local-dip-package.template.json"];
   const sample = { settlementListNo: "READINESS-001", institutionCode: "HOSP-001", institution: "测试医院", admissionDate: "2026-07-01", dischargeDate: "2026-07-02", principalDiagnosis: "I10", totalAmount: 1000, declaredFundAmount: 800, costItems: [{ itemCode: "P001", itemName: "项目", amount: 1000 }] };
   const imported = Intake.importBatch(state, { sourceSystem: "readiness", rows: [sample] }, "readiness-check");
   const grouped = Intake.runGrouping(imported.state, { environment: "simulation", mode: "DRG", caseIds: [imported.state.cases.at(-1).id] }, "readiness-check", Service.calculateCase);
@@ -51,8 +51,12 @@ function buildDiseasePaymentReadiness() {
     return signOfficialReceipt({ caseId: item.id, receiptId: `READINESS-SETTLEMENT-${index + 1}`, groupCode: preview.groupCode, groupName: preview.groupName, mdcCode: preview.mdcCode, adrgCode: preview.adrgCode, schemeVersion: "DRG-2.0-DL", inputDigest: Intake.officialCaseDigest(item, "DRG"), signedAt: "2026-07-18T08:00:00.000Z" });
   });
   const settlementGrouped = Intake.runGrouping(settlementState, { environment: "formal", mode: "DRG", caseIds: settlementState.cases.map((item) => item.id), officialResults: settlementReceipts }, "readiness-grouper", Service.calculateCase);
-  const settlementCreated = Service.createSettlementBatch(settlementGrouped.state, { period: "2026-06" }, "readiness-settlement");
-  const settlementFrozen = settlementCreated.batch.settlementState === "BATCH_FROZEN" && settlementCreated.batch.calculationSnapshots.every((item) => item.formalReceiptId);
+  const specialCreated = Service.createSpecialCase(settlementGrouped.state, { caseId: officialCase.id, reason: "readiness complex critical case", requestedPaymentFen: 3200000, evidence: [{ type: "medical-record-summary", digest: `sha256:${"9".repeat(64)}`, issuedBy: "readiness-hospital" }] }, "readiness-hospital");
+  const specialFirstReview = Service.reviewSpecialCase(specialCreated.state, specialCreated.row.id, { approved: true, adjustedPaymentFen: 3200000, role: "medical-insurance-review" }, "readiness-reviewer-a");
+  const specialApproved = Service.reviewSpecialCase(specialFirstReview.state, specialCreated.row.id, { approved: true, adjustedPaymentFen: 3200000, role: "fund-finance-review" }, "readiness-reviewer-b");
+  const settlementCreated = Service.createSettlementBatch(specialApproved.state, { period: "2026-06" }, "readiness-settlement");
+  const specialSnapshot = settlementCreated.batch.calculationSnapshots.find((item) => item.caseId === officialCase.id);
+  const settlementFrozen = settlementCreated.batch.settlementState === "BATCH_FROZEN" && settlementCreated.batch.calculationSnapshots.every((item) => item.formalReceiptId) && specialSnapshot.specialCaseId === specialCreated.row.id && specialSnapshot.paymentStandardFen === 3200000;
   const settlementSubmitted = Service.reconcileBatch(settlementCreated.state, settlementCreated.batch.id, { action: "submit-core", externalRequestId: "READINESS-CORE-REQUEST", idempotencyKey: "READINESS-CORE-IDEM" }, "readiness-settlement");
   const settlementAccepted = Service.applyInsuranceCoreSettlementCallback(settlementSubmitted.state, settlementCreated.batch.id, { action: "core-accepted", receiptId: "READINESS-CORE-ACCEPTED" }, "readiness-insurance-core");
   const settlementReconciling = Service.reconcileBatch(settlementAccepted.state, settlementCreated.batch.id, { action: "start-reconciliation", idempotencyKey: "READINESS-RECON", providerSummaryDigest: "c".repeat(64) }, "readiness-finance");
@@ -109,7 +113,7 @@ function buildDiseasePaymentReadiness() {
     { id: "policy-baseline", label: "医保发〔2025〕18号政策基线", ok: state.policy?.id === "nhsa-2025-18" },
     { id: "dual-mode", label: "DRG/DIP双模式目录与参数", ok: state.groupCatalog.some((item) => item.mode === "DRG") && state.groupCatalog.some((item) => item.mode === "DIP") },
     { id: "case-loop", label: "清单质控、分组、测算与监管", ok: overview.summary.calculatedCount >= 3 && state.cases.slice(0, 3).every((item) => item.calculation?.quality?.ok) },
-    { id: "special-case", label: "特例单议状态机", ok: Array.isArray(state.specialCases) },
+    { id: "special-case", label: "特例单议双人复核、证据账本与正式结算绑定", ok: specialApproved.row.state === "INCLUDED" && Service.verifySpecialCaseLedger(specialApproved.row.events) && specialSnapshot.specialCaseDecisionDigest === specialApproved.row.decisionDigest },
     { id: "settlement", label: "正式分组结算准入、医保核心回执与整数分状态机", ok: settlementFrozen && settlementPaid.batch.settlementState === "PAID" && Number.isSafeInteger(settlementPaid.batch.standardAmountFen) && Settlement.verifyEventLedger(settlementPaid.batch.events) },
     { id: "annual-clearance", label: "年度清算确认、批准、入账与锁账状态机", ok: annualProgress.row.state === "LOCKED" && Settlement.verifyEventLedger(annualProgress.row.events) },
     { id: "external-boundary", label: "正式分组和医保核心外部边界", ok: state.externalDependencies.filter((item) => item.requiredForProduction).length >= 3 },
