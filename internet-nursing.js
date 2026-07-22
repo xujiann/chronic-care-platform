@@ -1253,6 +1253,8 @@ function defaultNursingOrders() {
 }
 
 function isQualifiedNurse(item) {
+  const domain = window.NursingEscortDomain;
+  if (domain) return domain.validateNurseQualification(item, {}, { now: new Date() }).ok;
   return Number(item.yearsClinical || 0) >= 5 && item.registrationStatus === "verified" && item.badPracticeRecord === "none" && item.trainingStatus === "passed" && item.insuranceStatus === "covered";
 }
 

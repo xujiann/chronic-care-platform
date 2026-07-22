@@ -154,11 +154,25 @@ function renderEscortWorkers(items) {
           <td>${escapeHtml(item.providerId || "")}</td>
           <td>${escapeHtml(item.trainingHours || 0)}h / ${statusBadge(item.examStatus)}</td>
           <td>${escapeHtml((item.skills || []).join(", "))}</td>
-          <td>${statusBadge(item.status)}<br><small>${escapeHtml(item.insuranceStatus || "")}</small></td>
+          <td>${statusBadge(item.status)} ${statusBadge(escortWorkerQualification(item).ok ? "qualified" : "blocked")}<br><small>${escapeHtml(escortWorkerQualificationText(item))}</small></td>
         </tr>
       `).join("")}</tbody>
     </table>
   `;
+}
+
+function escortWorkerQualification(item, order = {}) {
+  const domain = window.NursingEscortDomain;
+  if (!domain) {
+    const ok = Number(item.trainingHours || 0) >= 32 && item.examStatus === "passed" && item.insuranceStatus === "covered" && !["training", "suspended", "disabled"].includes(item.status);
+    return { ok, reasons: ok ? [] : ["qualification-incomplete"], missingSkills: [] };
+  }
+  return domain.validateEscortWorkerQualification(item, order, { now: new Date(), requireAllSkills: false });
+}
+
+function escortWorkerQualificationText(item) {
+  const result = escortWorkerQualification(item);
+  return result.ok ? `qualified / ${item.insuranceStatus || "insurance pending"}` : `blocked: ${result.reasons.join(", ")}`;
 }
 
 function renderEscortRisks(items) {
