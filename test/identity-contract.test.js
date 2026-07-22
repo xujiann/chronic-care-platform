@@ -72,6 +72,18 @@ test("identity v2 documents organization hierarchy, least privilege and delegate
   assert.equal(contract.identityReviewCoverage.guardianCases >= 1, true);
 });
 
+test("login provisioning owner markers preserve readiness compatibility", () => {
+  const login = fs.readFileSync(path.join(ROOT, "login.html"), "utf8");
+  [
+    "居民主索引管理员",
+    "试点机构护理部",
+    "平台账号管理员",
+    "医政部门",
+    "平台身份管理员",
+    "居民服务窗口"
+  ].forEach((marker) => assert.match(login, new RegExp(marker)));
+});
+
 test("organization hierarchy validation rejects missing parents and cycles", () => {
   const valid = validateOrganizationHierarchy([
     { orgCode: "CITY", orgLevel: "市级", orgType: "city", parentCode: "" },
