@@ -13,7 +13,7 @@ test("priority standard review readiness covers eight tracks, seven domains and 
   assert.equal(report.ok, true);
   assert.equal(report.functionalState, "priority-standard-review-pack-runnable");
   assert.equal(report.formalGoLiveState, "blocked-until-owner-review-persisted-and-site-evidence-verified");
-  assert.equal(report.summary.checks, 17);
+  assert.equal(report.summary.checks, 18);
   assert.equal(report.summary.passed, report.summary.checks);
   assert.equal(report.summary.tracks, 8);
   assert.equal(report.summary.standardDomains, 7);
@@ -21,6 +21,7 @@ test("priority standard review readiness covers eight tracks, seven domains and 
   assert.equal(report.summary.acceptanceReviewed, 8);
   assert.equal(report.summary.sourceLedgerReviewed, 0);
   assert.equal(report.summary.siteEvidencePending, 8);
+  assert.equal(report.summary.trustedEvidenceRecords, 0);
   assert.equal(report.acceptanceScenario.productionReady, false);
   assert.equal(report.acceptanceScenario.productionBlockers.length, 8);
   assert.equal(report.checks.every((item) => item.passed), true);
@@ -51,5 +52,6 @@ test("priority standard review readiness renders scope and parses report destina
   assert.match(markdown, /blocked-until-owner-review-persisted-and-site-evidence-verified/);
   assert.match(markdown, /Business tracks: 8/);
   assert.match(markdown, /Standard domains: 7/);
+  assert.match(markdown, /Trusted evidence registry: 0 trusted/);
   assert.match(markdown, /T00 integration boundary/);
 });

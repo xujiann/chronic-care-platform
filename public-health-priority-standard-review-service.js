@@ -96,6 +96,7 @@ const REVIEW_ACTIONS = {
 };
 
 const TRUSTED_SITE_EVIDENCE_SOURCES = new Set(["server-evidence-store", "trusted-signature-service"]);
+const TRUSTED_SIGNATURE_ALGORITHMS = new Set(["SM2/SM3", "RSA-SHA256", "ECDSA-SHA256"]);
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -137,6 +138,76 @@ function findTrustedSiteEvidence(registry, evidenceId) {
   if (Array.isArray(registry)) return registry.find((item) => clean(item?.id) === evidenceId) || null;
   if (typeof registry === "object") return registry[evidenceId] || null;
   return null;
+}
+
+function normalizeArtifactDigest(value) {
+  return clean(value).toLowerCase().replace(/^sha256:/, "");
+}
+
+function buildTrustedSiteEvidenceRegistry({ siteLaunchEvidence = [], verificationTasks = [] } = {}) {
+  const evidenceRows = Array.isArray(siteLaunchEvidence) ? siteLaunchEvidence : [];
+  const tasks = Array.isArray(verificationTasks) ? verificationTasks : [];
+  const verifiedTaskByEvidenceId = new Map(
+    tasks.filter((item) => clean(item.status).toLowerCase() === "verified" && clean(item.evidenceId)).map((item) => [clean(item.evidenceId), item])
+  );
+  const registry = [];
+  const rejected = [];
+  evidenceRows.forEach((evidence) => {
+    const evidenceId = clean(evidence?.id);
+    const task = verifiedTaskByEvidenceId.get(evidenceId) || null;
+    const attestation = evidence?.trustedVerification || {};
+    const verificationSource = clean(attestation.verificationSource).toLowerCase();
+    const algorithm = clean(attestation.algorithm).toUpperCase();
+    const artifactDigest = normalizeArtifactDigest(attestation.artifactDigest);
+    const receiptId = clean(attestation.receiptId);
+    const reasons = [];
+    if (!evidenceId || clean(evidence.status).toLowerCase() !== "verified" || !clean(evidence.artifactName)) reasons.push("verified evidence identity and artifact are required");
+    if (!task) reasons.push("matching verified public health evidence task is required");
+    if (task && clean(task.templateId) !== clean(evidence.templateId)) reasons.push("verification task template does not match evidence template");
+    if (task && clean(task.verificationReceiptId) !== receiptId) reasons.push("server verification receipt does not match task receipt");
+    if (clean(attestation.attestationOrigin).toLowerCase() !== "server-generated") reasons.push("attestation must be server-generated");
+    if (!TRUSTED_SITE_EVIDENCE_SOURCES.has(verificationSource)) reasons.push("trusted verification source is required");
+    if (attestation.signatureVerified !== true) reasons.push("server signature verification is required");
+    if (!TRUSTED_SIGNATURE_ALGORITHMS.has(algorithm)) reasons.push("approved signature algorithm is required");
+    if (!clean(attestation.keyId)) reasons.push("signature keyId is required");
+    if (!/^[a-f0-9]{64}$/.test(artifactDigest)) reasons.push("SHA-256 artifact digest is required");
+    if (!receiptId || !clean(attestation.verifiedBy) || !clean(attestation.verifiedAt) || !clean(attestation.signedBy)) reasons.push("server receipt, verifier, timestamp and signer are required");
+    if (reasons.length) {
+      rejected.push({ id: evidenceId || "missing-evidence-id", templateId: clean(evidence?.templateId), reasons });
+      return;
+    }
+    registry.push({
+      id: evidenceId,
+      status: "verified",
+      artifactName: clean(evidence.artifactName),
+      signedBy: clean(attestation.signedBy),
+      signatureVerified: true,
+      verificationSource,
+      artifactDigest,
+      verifiedBy: clean(attestation.verifiedBy),
+      verifiedAt: clean(attestation.verifiedAt),
+      algorithm,
+      keyId: clean(attestation.keyId),
+      receiptId,
+      templateId: clean(evidence.templateId),
+      verificationTaskId: clean(task.id)
+    });
+  });
+  return {
+    ok: rejected.length === 0,
+    functionalState: registry.length ? "trusted-evidence-registry-built" : "trusted-evidence-pending",
+    summary: {
+      evidenceRows: evidenceRows.length,
+      verifiedEvidenceRows: evidenceRows.filter((item) => clean(item?.status).toLowerCase() === "verified").length,
+      verificationTasks: tasks.length,
+      verifiedTasks: verifiedTaskByEvidenceId.size,
+      trustedRecords: registry.length,
+      rejectedRecords: rejected.length
+    },
+    registry,
+    rejected,
+    productionReady: false
+  };
 }
 
 function verifyTrustedSiteEvidence(claimedEvidence, context = {}) {
@@ -413,6 +484,7 @@ module.exports = {
   PRIORITY_STANDARD_REVIEW_TRACKS,
   REVIEW_ACTIONS,
   applyPriorityStandardReviewAction,
+  buildTrustedSiteEvidenceRegistry,
   buildPriorityStandardReviewPack,
   runPriorityStandardReviewAcceptanceScenario,
   summarizePack,

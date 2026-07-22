@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const {
   PRIORITY_STANDARD_REVIEW_TRACKS,
+  buildTrustedSiteEvidenceRegistry,
   buildPriorityStandardReviewPack,
   runPriorityStandardReviewAcceptanceScenario
 } = require("../public-health-priority-standard-review-service");
@@ -37,6 +38,10 @@ function buildPublicHealthPriorityStandardReviewReadiness(options = {}) {
   const testSource = options.testSource ?? readText("test/public-health-priority-standard-review-service.test.js");
   const doc = options.doc ?? readText("docs/public-health-priority-standard-review.md");
   const sourcePack = buildPriorityStandardReviewPack({ ledger, data, artifactAvailability: availability });
+  const trustedRegistry = buildTrustedSiteEvidenceRegistry({
+    siteLaunchEvidence: data.siteLaunchEvidence,
+    verificationTasks: data.publicHealthSiteEvidenceVerificationTasks
+  });
   let reviewedPack = null;
   let scenarioError = "";
   try {
@@ -66,6 +71,7 @@ function buildPublicHealthPriorityStandardReviewReadiness(options = {}) {
     check("source:persistent-review-boundary", targetLedgerReviewed === 0 && persistentReviewed === 0, `${targetLedgerReviewed} target / ${persistentReviewed} total source ledger rows persisted as reviewed`, "source"),
     check("safety:negative-tests", ["incomplete domain", "trusted server evidence registry", "forged verified and signedBy evidence", "role, idempotency and version"].every((token) => testSource.includes(token)), "review completeness, forged evidence, trusted registry and concurrency safeguards are tested", "safety"),
     check("safety:trusted-evidence-gate", ["trustedSiteEvidenceRegistry", "signatureVerified", "verificationSource", "artifactDigest", "productionBlockers"].every((token) => serviceSource.includes(token)), "production readiness requires a server-controlled evidence registry result", "safety"),
+    check("safety:trusted-registry-adapter", ["buildTrustedSiteEvidenceRegistry", "attestationOrigin", "verificationReceiptId", "TRUSTED_SIGNATURE_ALGORITHMS"].every((token) => serviceSource.includes(token)) && testSource.includes("rejects legacy verified rows"), `${trustedRegistry.summary.trustedRecords} trusted / ${trustedRegistry.summary.rejectedRecords} rejected current evidence rows`, "safety"),
     check("implementation:domain-service", ["buildPriorityStandardReviewPack", "applyPriorityStandardReviewAction", "confirm-responsibility", "review-standard-mapping", "link-site-evidence"].every((token) => serviceSource.includes(token)), "review pack and controlled actions are implemented", "implementation"),
     check("docs:t00-handoff", ["T00", "server.js", "package.json", "八个业务轨道", "七个标准域", "现场证据"].every((token) => doc.includes(token)), "scope, evidence boundary and T00 handoff are documented", "docs")
   ];
@@ -83,8 +89,11 @@ function buildPublicHealthPriorityStandardReviewReadiness(options = {}) {
       mappingReady: sourcePack.summary.mappingReady,
       acceptanceReviewed: reviewedPack?.summary?.mappingReviewed || 0,
       sourceLedgerReviewed: targetLedgerReviewed,
-      siteEvidencePending: reviewedPack?.summary?.siteEvidencePending ?? 8
+      siteEvidencePending: reviewedPack?.summary?.siteEvidencePending ?? 8,
+      trustedEvidenceRecords: trustedRegistry.summary.trustedRecords,
+      rejectedEvidenceRecords: trustedRegistry.summary.rejectedRecords
     },
+    trustedEvidenceRegistry: trustedRegistry,
     sourcePack,
     acceptanceScenario: reviewedPack,
     checks,
@@ -96,6 +105,7 @@ function buildPublicHealthPriorityStandardReviewReadiness(options = {}) {
     },
     t00Integration: [
       "Persist owner confirmation and mapping review actions through the existing standard implementation API.",
+      "Generate trustedVerification and matching verificationReceiptId only after server-side signature and digest verification, then call buildTrustedSiteEvidenceRegistry.",
       "Add package.json check/test/readiness wiring and aggregate release evidence.",
       "Keep site evidence verification and production approval blocked until signed artifacts are verified."
     ]
@@ -118,6 +128,7 @@ function renderMarkdown(report) {
     `- Standard domains: ${report.summary.standardDomains}`,
     `- Source ledger reviewed: ${report.summary.sourceLedgerReviewed}`,
     `- Site evidence pending: ${report.summary.siteEvidencePending}`,
+    `- Trusted evidence registry: ${report.summary.trustedEvidenceRecords} trusted / ${report.summary.rejectedEvidenceRecords} rejected`,
     "",
     "## Checks",
     "",

@@ -6,6 +6,7 @@ const data = require("../data/db.json");
 const {
   PRIORITY_STANDARD_REVIEW_TRACKS,
   applyPriorityStandardReviewAction,
+  buildTrustedSiteEvidenceRegistry,
   buildPriorityStandardReviewPack,
   runPriorityStandardReviewAcceptanceScenario,
   summarizePack
@@ -230,6 +231,99 @@ test("all eight server-verified evidence records are required to clear the scope
   assert.deepEqual(trustedPack.productionBlockers, []);
   assert.equal(trustedPack.status, "trusted-site-evidence-verified");
   assert.equal(trustedPack.productionReady, true);
+});
+
+test("trusted registry adapter rejects legacy verified rows and accepts matched server attestations", () => {
+  const legacy = buildTrustedSiteEvidenceRegistry({
+    siteLaunchEvidence: [{
+      id: "sle-legacy",
+      templateId: "interface-statistics-report-v1",
+      status: "verified",
+      artifactName: "旧式人工核验记录.pdf",
+      verifiedBy: "commission reviewer",
+      verifiedAt: "2026-07-22T09:00:00.000Z"
+    }],
+    verificationTasks: [{
+      id: "phsevt-legacy",
+      evidenceId: "sle-legacy",
+      templateId: "interface-statistics-report-v1",
+      status: "verified"
+    }]
+  });
+  assert.equal(legacy.summary.trustedRecords, 0);
+  assert.equal(legacy.summary.rejectedRecords, 1);
+  assert.equal(legacy.productionReady, false);
+  assert.equal(legacy.rejected[0].reasons.includes("attestation must be server-generated"), true);
+
+  const trustedVerification = {
+    attestationOrigin: "server-generated",
+    verificationSource: "trusted-signature-service",
+    signatureVerified: true,
+    algorithm: "SM2/SM3",
+    keyId: "public-health-site-key-01",
+    artifactDigest: `sha256:${"c".repeat(64)}`,
+    receiptId: "PH-SITE-VERIFY-001",
+    signedBy: "疾控中心/医院信息科",
+    verifiedBy: "公共卫生现场证据核验服务",
+    verifiedAt: "2026-07-22T09:30:00.000Z"
+  };
+  const built = buildTrustedSiteEvidenceRegistry({
+    siteLaunchEvidence: [{
+      id: "sle-trusted",
+      templateId: "interface-statistics-report-v1",
+      status: "verified",
+      artifactName: "传染病直报联调签字记录.pdf",
+      trustedVerification
+    }],
+    verificationTasks: [{
+      id: "phsevt-trusted",
+      evidenceId: "sle-trusted",
+      templateId: "interface-statistics-report-v1",
+      status: "verified",
+      verificationReceiptId: "PH-SITE-VERIFY-001"
+    }]
+  });
+  assert.equal(built.ok, true);
+  assert.equal(built.summary.trustedRecords, 1);
+  assert.equal(built.summary.rejectedRecords, 0);
+  assert.equal(built.registry[0].artifactDigest, "c".repeat(64));
+  assert.equal(built.registry[0].algorithm, "SM2/SM3");
+  assert.equal(built.productionReady, false);
+});
+
+test("trusted registry adapter rejects mismatched task templates and receipts", () => {
+  const result = buildTrustedSiteEvidenceRegistry({
+    siteLaunchEvidence: [{
+      id: "sle-mismatch",
+      templateId: "interface-statistics-report-v1",
+      status: "verified",
+      artifactName: "签字记录.pdf",
+      trustedVerification: {
+        attestationOrigin: "server-generated",
+        verificationSource: "server-evidence-store",
+        signatureVerified: true,
+        algorithm: "RSA-SHA256",
+        keyId: "site-key-02",
+        artifactDigest: "d".repeat(64),
+        receiptId: "PH-SITE-VERIFY-002",
+        signedBy: "现场责任方",
+        verifiedBy: "服务端证据仓",
+        verifiedAt: "2026-07-22T10:00:00.000Z"
+      }
+    }],
+    verificationTasks: [{
+      id: "phsevt-mismatch",
+      evidenceId: "sle-mismatch",
+      templateId: "interface-his-patient-v1",
+      status: "verified",
+      verificationReceiptId: "WRONG-RECEIPT"
+    }]
+  });
+
+  assert.equal(result.registry.length, 0);
+  assert.equal(result.rejected.length, 1);
+  assert.equal(result.rejected[0].reasons.includes("verification task template does not match evidence template"), true);
+  assert.equal(result.rejected[0].reasons.includes("server verification receipt does not match task receipt"), true);
 });
 
 test("priority standard review enforces role, idempotency and version boundaries", () => {
