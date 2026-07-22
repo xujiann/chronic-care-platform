@@ -105,13 +105,73 @@ function createSpecialCaseApplication(item, payload = {}, actor = "operator") {
   return row;
 }
 
+function eligibleExperts(experts = [], row = {}, role, excludedIds = new Set()) {
+  return experts.filter((expert) => expert.active !== false && expert.role === role && !excludedIds.has(expert.id) && expert.institution !== row.institution && !(expert.conflictInstitutions || []).includes(row.institution) && safeText(expert.reviewerAccount || expert.name, 120));
+}
+
+function chooseExpert(candidates, seed) {
+  return [...candidates].sort((left, right) => digest(`${seed}:${left.id}`).localeCompare(digest(`${seed}:${right.id}`)))[0];
+}
+
+function selectSpecialCaseExperts(row, experts = [], payload = {}, actor = "expert-panel-service") {
+  if (specialCaseState(row) !== "APPLIED" || (row.reviews || []).length) throw new SpecialCaseWorkflowError("特例单议已开始评审，不能重新抽取专家", "SPECIAL_CASE_PANEL_STATE_INVALID");
+  const roles = Array.isArray(payload.roles) && payload.roles.length ? payload.roles.map((item) => safeText(item, 80)) : ["medical-insurance-review", "fund-finance-review"];
+  const excludedIds = new Set((payload.excludedExpertIds || []).map(String));
+  const selectedAccounts = new Set();
+  const seed = digest({ caseId: row.caseId, evidenceDigest: row.evidenceDigest, selectionNonce: safeText(payload.selectionNonce || row.id, 120) });
+  const members = roles.map((role) => {
+    const selected = chooseExpert(eligibleExperts(experts, row, role, excludedIds).filter((item) => !selectedAccounts.has(safeText(item.reviewerAccount || item.name, 120))), `${seed}:${role}`);
+    if (!selected) throw new SpecialCaseWorkflowError(`没有可用的${role}评审专家`, "SPECIAL_CASE_EXPERT_UNAVAILABLE");
+    excludedIds.add(selected.id);
+    selectedAccounts.add(safeText(selected.reviewerAccount || selected.name, 120));
+    return { expertId: selected.id, reviewerAccount: safeText(selected.reviewerAccount || selected.name, 120), displayName: safeText(selected.displayName || selected.name, 120), role, organization: safeText(selected.institution, 120), expertise: (selected.expertise || []).map((item) => safeText(item, 80)).filter(Boolean), status: "selected" };
+  });
+  const now = new Date().toISOString();
+  row.expertPanel = { seedDigest: seed, members, selectedAt: now, selectedBy: safeText(actor, 120), selectionDigest: digest(members), avoidanceBasisDigest: digest({ institution: row.institution, excludedExpertIds: [...excludedIds].sort() }) };
+  appendEvent(row, { id: `special-event-${randomUUID()}`, action: "select-experts", from: "APPLIED", to: "APPLIED", actor: row.expertPanel.selectedBy, at: now, idempotencyKey: row.expertPanel.selectionDigest, detail: { selectionDigest: row.expertPanel.selectionDigest, avoidanceBasisDigest: row.expertPanel.avoidanceBasisDigest, roles } });
+  return row.expertPanel;
+}
+
+function verifySpecialCaseExpertPanel(row = {}) {
+  const panel = row.expertPanel;
+  if (!panel || !Array.isArray(panel.members) || !panel.members.length || panel.selectionDigest !== digest(panel.members)) return false;
+  const selected = panel.members.filter((item) => item.status === "selected");
+  if (selected.length < 2 || new Set(selected.map((item) => item.expertId)).size !== selected.length || new Set(selected.map((item) => item.reviewerAccount)).size !== selected.length) return false;
+  const lastPanelEvent = [...(row.events || [])].reverse().find((item) => ["select-experts", "replace-expert"].includes(item.action));
+  return lastPanelEvent?.detail?.selectionDigest === panel.selectionDigest;
+}
+
+function reselectSpecialCaseExpert(row, experts = [], payload = {}, actor = "expert-panel-service") {
+  if (specialCaseState(row) !== "APPLIED" || (row.reviews || []).length) throw new SpecialCaseWorkflowError("特例单议已开始评审，不能更换专家", "SPECIAL_CASE_PANEL_STATE_INVALID");
+  const expertId = safeText(payload.expertId, 120);
+  const reason = safeText(payload.reason);
+  if (!expertId || !reason) throw new SpecialCaseWorkflowError("专家回避必须提供专家编号和原因", "SPECIAL_CASE_RECUSAL_REQUIRED", 400);
+  const member = row.expertPanel?.members?.find((item) => item.expertId === expertId && item.status === "selected");
+  if (!member) throw new SpecialCaseWorkflowError("待回避专家不在当前评审组", "SPECIAL_CASE_EXPERT_NOT_ASSIGNED", 404);
+  const excludedIds = new Set(row.expertPanel.members.map((item) => item.expertId));
+  const replacement = chooseExpert(eligibleExperts(experts, row, member.role, excludedIds), `${row.expertPanel.seedDigest}:${member.role}:replacement:${expertId}`);
+  if (!replacement) throw new SpecialCaseWorkflowError("没有可用的回避替补专家", "SPECIAL_CASE_REPLACEMENT_UNAVAILABLE");
+  member.status = "recused";
+  member.recusalReason = reason;
+  member.recusedAt = new Date().toISOString();
+  member.recusedBy = safeText(actor, 120);
+  const next = { expertId: replacement.id, reviewerAccount: safeText(replacement.reviewerAccount || replacement.name, 120), displayName: safeText(replacement.displayName || replacement.name, 120), role: member.role, organization: safeText(replacement.institution, 120), expertise: (replacement.expertise || []).map((item) => safeText(item, 80)).filter(Boolean), status: "selected", replacesExpertId: expertId };
+  row.expertPanel.members.push(next);
+  row.expertPanel.selectionDigest = digest(row.expertPanel.members);
+  appendEvent(row, { id: `special-event-${randomUUID()}`, action: "replace-expert", from: "APPLIED", to: "APPLIED", actor: member.recusedBy, at: member.recusedAt, idempotencyKey: `${expertId}:${replacement.id}`, detail: { expertId, replacementExpertId: replacement.id, role: member.role, reason, selectionDigest: row.expertPanel.selectionDigest } });
+  return { recused: member, replacement: next };
+}
+
 function reviewSpecialCaseApplication(row, payload = {}, actor = "reviewer") {
   const before = specialCaseState(row);
   if (!["APPLIED", "UNDER_REVIEW"].includes(before)) throw new SpecialCaseWorkflowError("当前状态不允许评审特例单议", "SPECIAL_CASE_REVIEW_STATE_INVALID");
+  if (row.expertPanel && !verifySpecialCaseExpertPanel(row)) throw new SpecialCaseWorkflowError("特例单议专家抽取记录校验失败", "SPECIAL_CASE_PANEL_INVALID");
   const reviewer = safeText(actor, 120);
   if (!reviewer || reviewer === row.submittedBy) throw new SpecialCaseWorkflowError("特例单议申请人与评审人必须分离", "SPECIAL_CASE_REVIEWER_SEPARATION_REQUIRED", 403);
   row.reviews ||= [];
   if (row.reviews.some((item) => item.reviewer === reviewer)) throw new SpecialCaseWorkflowError("同一评审人不得重复签署", "SPECIAL_CASE_DUPLICATE_REVIEWER");
+  const assigned = row.expertPanel?.members?.find((item) => item.status === "selected" && item.reviewerAccount === reviewer && (!payload.expertId || item.expertId === payload.expertId));
+  if (row.expertPanel && !assigned) throw new SpecialCaseWorkflowError("评审人未被抽取进入当前特例评审组", "SPECIAL_CASE_REVIEWER_NOT_ASSIGNED", 403);
   const approved = payload.approved === true;
   const adjustedPaymentFen = approved ? toFen(payload.adjustedPaymentFen ?? Math.round(Number(payload.adjustedPayment ?? row.requestedPaymentFen / 100) * 100), "评审支付金额") : 0;
   const caseTotalAmountFen = Number(row.caseTotalAmountFen || row.requestedPaymentFen);
@@ -119,7 +179,7 @@ function reviewSpecialCaseApplication(row, payload = {}, actor = "reviewer") {
   const priorApproved = row.reviews.find((item) => item.approved);
   if (approved && priorApproved && priorApproved.adjustedPaymentFen !== adjustedPaymentFen) throw new SpecialCaseWorkflowError("两名评审人的支付金额意见必须一致", "SPECIAL_CASE_REVIEW_AMOUNT_CONFLICT");
   const now = new Date().toISOString();
-  const review = { id: `special-review-${randomUUID()}`, reviewer, role: safeText(payload.role || "医保评审", 80), approved, adjustedPaymentFen, opinion: safeText(payload.opinion || (approved ? "符合特例单议范围" : "仍按病种标准付费")), reviewedAt: now };
+  const review = { id: `special-review-${randomUUID()}`, reviewer, expertId: assigned?.expertId || safeText(payload.expertId, 120), role: assigned?.role || safeText(payload.role || "医保评审", 80), approved, adjustedPaymentFen, opinion: safeText(payload.opinion || (approved ? "符合特例单议范围" : "仍按病种标准付费")), reviewedAt: now };
   row.reviews.push(review);
   row.state = !approved ? "REJECTED" : row.reviews.filter((item) => item.approved).length >= 2 ? "APPROVED" : "UNDER_REVIEW";
   row.status = SPECIAL_CASE_LABELS[row.state];
@@ -139,7 +199,7 @@ function reviewSpecialCaseApplication(row, payload = {}, actor = "reviewer") {
 function settlementAdjustment(specialCases = [], item = {}) {
   const row = specialCases.find((candidate) => candidate.caseId === item.id && specialCaseState(candidate) === "APPROVED");
   if (!row) return null;
-  if (!verifySpecialCaseLedger(row.events) || !/^[a-f0-9]{64}$/.test(String(row.decisionDigest || ""))) throw new SpecialCaseWorkflowError("特例单议决议或事件账本校验失败", "SPECIAL_CASE_LEDGER_INVALID");
+  if (!verifySpecialCaseLedger(row.events) || !verifySpecialCaseExpertPanel(row) || !/^[a-f0-9]{64}$/.test(String(row.decisionDigest || ""))) throw new SpecialCaseWorkflowError("特例单议决议、专家抽取或事件账本校验失败", "SPECIAL_CASE_LEDGER_INVALID");
   return { row, adjustedPaymentFen: toFen(row.adjustedPaymentFen, "特例单议支付金额"), decisionDigest: row.decisionDigest };
 }
 
@@ -155,4 +215,15 @@ function includeSpecialCaseInSettlement(row, batchId, actor = "settlement-servic
   return row;
 }
 
-module.exports = { ACTIVE_STATES, SPECIAL_CASE_LABELS, SpecialCaseWorkflowError, appendEvent, createSpecialCaseApplication, digest, includeSpecialCaseInSettlement, reviewSpecialCaseApplication, settlementAdjustment, specialCaseState, stableStringify, verifySpecialCaseLedger };
+function buildSpecialCaseDisclosure(specialCases = [], caseCountByInstitution = {}) {
+  const institutions = [...new Set(specialCases.map((item) => item.institution).filter(Boolean))];
+  const rows = institutions.map((institution) => {
+    const items = specialCases.filter((item) => item.institution === institution);
+    const approved = items.filter((item) => ["APPROVED", "INCLUDED"].includes(specialCaseState(item)));
+    const dischargedCases = Math.max(0, Number(caseCountByInstitution[institution] || 0));
+    return { institution, applications: items.length, approved: approved.length, included: items.filter((item) => specialCaseState(item) === "INCLUDED").length, applicationRate: dischargedCases ? Number((items.length / dischargedCases).toFixed(4)) : 0, adjustedPaymentFen: approved.reduce((sum, item) => sum + Number(item.adjustedPaymentFen || 0), 0) };
+  });
+  return { generatedAt: new Date().toISOString(), institutions: rows, totals: { applications: rows.reduce((sum, item) => sum + item.applications, 0), approved: rows.reduce((sum, item) => sum + item.approved, 0), included: rows.reduce((sum, item) => sum + item.included, 0), adjustedPaymentFen: rows.reduce((sum, item) => sum + item.adjustedPaymentFen, 0) }, privacyBoundary: "仅公开机构汇总，不返回病例、患者、证据或专家身份。" };
+}
+
+module.exports = { ACTIVE_STATES, SPECIAL_CASE_LABELS, SpecialCaseWorkflowError, appendEvent, buildSpecialCaseDisclosure, createSpecialCaseApplication, digest, eligibleExperts, includeSpecialCaseInSettlement, reselectSpecialCaseExpert, reviewSpecialCaseApplication, selectSpecialCaseExperts, settlementAdjustment, specialCaseState, stableStringify, verifySpecialCaseExpertPanel, verifySpecialCaseLedger };

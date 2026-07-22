@@ -8,6 +8,7 @@ const Intake = require("../disease-payment-intake");
 const PackageSignature = require("../disease-payment-package-signature");
 const GrouperContract = require("../disease-payment-grouper-contract");
 const Settlement = require("../disease-payment-settlement");
+const OperatingModel = require("../insurance-payment-operating-model");
 
 const ROOT = path.resolve(__dirname, "..");
 
@@ -28,7 +29,10 @@ function buildDiseasePaymentReadiness() {
   const state = Service.calculateAll(Service.seedDiseasePaymentState(), "readiness-check");
   state.grouperAdapters.find((item) => item.id === "official-adapter-v1").trustedSignerFingerprints = [grouperFingerprint];
   const overview = Service.buildOverview(state);
-  const requiredFiles = ["disease-payment-service.js", "disease-payment-intake.js", "disease-payment-grouper-contract.js", "disease-payment-special-case.js", "disease-payment-settlement.js", "disease-payment-local-package.js", "disease-payment.html", "disease-payment.js", "disease-payment.css", "scripts/disease-payment-package-builder.js", "config/disease-payment/templates/local-drg-package.template.json", "config/disease-payment/templates/local-dip-package.template.json"];
+  const requiredFiles = ["disease-payment-service.js", "disease-payment-intake.js", "disease-payment-grouper-contract.js", "disease-payment-special-case.js", "disease-payment-settlement.js", "insurance-payment-operating-model.js", "disease-payment-local-package.js", "disease-payment.html", "disease-payment.js", "disease-payment.css", "scripts/disease-payment-package-builder.js", "config/disease-payment/templates/local-drg-package.template.json", "config/disease-payment/templates/local-dip-package.template.json"];
+  const serverSource = fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
+  const operatingModel = OperatingModel.validateOperatingModel();
+  const integrationHandoff = OperatingModel.buildT00IntegrationHandoff(serverSource);
   const sample = { settlementListNo: "READINESS-001", institutionCode: "HOSP-001", institution: "测试医院", admissionDate: "2026-07-01", dischargeDate: "2026-07-02", principalDiagnosis: "I10", totalAmount: 1000, declaredFundAmount: 800, costItems: [{ itemCode: "P001", itemName: "项目", amount: 1000 }] };
   const imported = Intake.importBatch(state, { sourceSystem: "readiness", rows: [sample] }, "readiness-check");
   const grouped = Intake.runGrouping(imported.state, { environment: "simulation", mode: "DRG", caseIds: [imported.state.cases.at(-1).id] }, "readiness-check", Service.calculateCase);
@@ -52,8 +56,8 @@ function buildDiseasePaymentReadiness() {
   });
   const settlementGrouped = Intake.runGrouping(settlementState, { environment: "formal", mode: "DRG", caseIds: settlementState.cases.map((item) => item.id), officialResults: settlementReceipts }, "readiness-grouper", Service.calculateCase);
   const specialCreated = Service.createSpecialCase(settlementGrouped.state, { caseId: officialCase.id, reason: "readiness complex critical case", requestedPaymentFen: 3200000, evidence: [{ type: "medical-record-summary", digest: `sha256:${"9".repeat(64)}`, issuedBy: "readiness-hospital" }] }, "readiness-hospital");
-  const specialFirstReview = Service.reviewSpecialCase(specialCreated.state, specialCreated.row.id, { approved: true, adjustedPaymentFen: 3200000, role: "medical-insurance-review" }, "readiness-reviewer-a");
-  const specialApproved = Service.reviewSpecialCase(specialFirstReview.state, specialCreated.row.id, { approved: true, adjustedPaymentFen: 3200000, role: "fund-finance-review" }, "readiness-reviewer-b");
+  const specialFirstReview = Service.reviewSpecialCase(specialCreated.state, specialCreated.row.id, { approved: true, adjustedPaymentFen: 3200000 }, "大连市医保中心审核员");
+  const specialApproved = Service.reviewSpecialCase(specialFirstReview.state, specialCreated.row.id, { approved: true, adjustedPaymentFen: 3200000 }, "大连市医保局管理员");
   const settlementCreated = Service.createSettlementBatch(specialApproved.state, { period: "2026-06" }, "readiness-settlement");
   const specialSnapshot = settlementCreated.batch.calculationSnapshots.find((item) => item.caseId === officialCase.id);
   const settlementFrozen = settlementCreated.batch.settlementState === "BATCH_FROZEN" && settlementCreated.batch.calculationSnapshots.every((item) => item.formalReceiptId) && specialSnapshot.specialCaseId === specialCreated.row.id && specialSnapshot.paymentStandardFen === 3200000;
@@ -113,9 +117,11 @@ function buildDiseasePaymentReadiness() {
     { id: "policy-baseline", label: "医保发〔2025〕18号政策基线", ok: state.policy?.id === "nhsa-2025-18" },
     { id: "dual-mode", label: "DRG/DIP双模式目录与参数", ok: state.groupCatalog.some((item) => item.mode === "DRG") && state.groupCatalog.some((item) => item.mode === "DIP") },
     { id: "case-loop", label: "清单质控、分组、测算与监管", ok: overview.summary.calculatedCount >= 3 && state.cases.slice(0, 3).every((item) => item.calculation?.quality?.ok) },
-    { id: "special-case", label: "特例单议双人复核、证据账本与正式结算绑定", ok: specialApproved.row.state === "INCLUDED" && Service.verifySpecialCaseLedger(specialApproved.row.events) && specialSnapshot.specialCaseDecisionDigest === specialApproved.row.decisionDigest },
+    { id: "special-case", label: "特例单议专家抽取、利益回避、双人复核、证据账本与正式结算绑定", ok: specialApproved.row.state === "INCLUDED" && specialApproved.row.expertPanel?.members.filter((item) => item.status === "selected").length === 2 && Service.verifySpecialCaseLedger(specialApproved.row.events) && specialSnapshot.specialCaseDecisionDigest === specialApproved.row.decisionDigest },
     { id: "settlement", label: "正式分组结算准入、医保核心回执与整数分状态机", ok: settlementFrozen && settlementPaid.batch.settlementState === "PAID" && Number.isSafeInteger(settlementPaid.batch.standardAmountFen) && Settlement.verifyEventLedger(settlementPaid.batch.events) },
-    { id: "annual-clearance", label: "年度清算确认、批准、入账与锁账状态机", ok: annualProgress.row.state === "LOCKED" && Settlement.verifyEventLedger(annualProgress.row.events) },
+    { id: "settlement-sla", label: "申报截止次日起30工作日结算SLA与工作日历", ok: settlementCreated.batch.policyWorkingDays === 30 && Boolean(settlementCreated.batch.sla?.dueDate) && settlementPaid.batch.sla?.status === "completed-within-sla" },
+    { id: "annual-clearance", label: "年度清算确认、资金调整、入账与锁账状态机", ok: annualProgress.row.state === "LOCKED" && annualProgress.row.posting?.postedAmountFen === annualProgress.row.finalClearanceAmountFen && Settlement.buildAnnualClearanceEnvelope(annualProgress.row).contractId === Settlement.ANNUAL_CLEARANCE_CONTRACT_ID && Settlement.verifyEventLedger(annualProgress.row.events) },
+    { id: "responsibility-operating-model", label: "医保、医院、财务、适配器职责与证据矩阵", ok: operatingModel.ok && operatingModel.responsibilityCapabilities === 7 && integrationHandoff.readyForIntegration },
     { id: "external-boundary", label: "正式分组和医保核心外部边界", ok: state.externalDependencies.filter((item) => item.requiredForProduction).length >= 3 },
     { id: "grouping-2.0", label: "DRG/DIP 2.0版切换与期限", ok: state.policy2?.switchDeadline === "2024-12-31" && state.policy2?.settlementSlaWorkingDays === 30 },
     { id: "drg2-library-profile", label: "DRG 2.0版MDC/ADRG/DRG目录结构", ok: state.drg2LibraryProfile?.mdcCount === 26 && state.drg2LibraryProfile?.adrgCount === 409 && state.drg2LibraryProfile?.drgCount === 634 },
@@ -161,7 +167,7 @@ function buildDiseasePaymentReadiness() {
     { id: "formal-grouping-ui", label: "正式分组异步联调与死信工作台", ok: ["data-payment-section=\"formal-grouping-operations\"", "formal-grouping-job-list", "formal-grouping-dead-letter-list"].every((marker) => fs.readFileSync(path.join(ROOT, "disease-payment.html"), "utf8").includes(marker)) },
     { id: "local-package-ui", label: "当地医保正式规则包导入治理工作台", ok: ["data-payment-section=\"local-package-governance\"", "local-package-file", "local-package-list", "local-package-report-list"].every((marker) => fs.readFileSync(path.join(ROOT, "disease-payment.html"), "utf8").includes(marker)) }
   ];
-  return { generatedAt: new Date().toISOString(), policy: state.policy, policy2: state.policy2, summary: { ...overview.summary, intake: intakeSummary, formalGrouping: formalOperations.summary }, checks, ready: checks.every((item) => item.ok), externalBlockers: state.externalDependencies.filter((item) => item.requiredForProduction && item.status !== "已联调") };
+  return { generatedAt: new Date().toISOString(), policy: state.policy, policy2: state.policy2, summary: { ...overview.summary, intake: intakeSummary, formalGrouping: formalOperations.summary }, checks, ready: checks.every((item) => item.ok), operatingModel, integrationHandoff, externalBlockers: state.externalDependencies.filter((item) => item.requiredForProduction && item.status !== "已联调") };
 }
 
 function renderMarkdown(report) {
@@ -172,6 +178,7 @@ function renderMarkdown(report) {
     `- 本地可开发能力：${report.ready ? "通过" : "未通过"}`,
     `- 检查：${report.checks.filter((item) => item.ok).length}/${report.checks.length}`,
     `- 外部生产依赖：${report.externalBlockers.length}项`,
+    `- T00待接公共端点：${report.integrationHandoff?.pending || 0}项`,
     "",
     "## DRG运行摘要",
     "",

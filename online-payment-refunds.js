@@ -16,6 +16,7 @@ const REFUND_STATES = Object.freeze({
   CLOSED: "已结案"
 });
 const RESERVED_STATES = new Set(["REQUESTED", "UNDER_REVIEW", "APPROVED", "DISPATCHED", "PROCESSING", "SUCCEEDED", "FAILED", "RECONCILED", "CLOSED"]);
+const REQUIRED_REFUND_REVIEW_DOMAINS = Object.freeze(["business-review", "finance-review"]);
 
 class RefundWorkflowError extends Error {
   constructor(message, code, statusCode = 409) {
@@ -148,16 +149,20 @@ function reviewRefundRequest(data, id, input = {}, actor = {}) {
   const reviewer = safeText(actor.username || actor.name || actor.role, 120);
   if (!reviewer || reviewer === row.requestedBy) throw new RefundWorkflowError("退款申请人与复核人必须分离", "REFUND_REVIEWER_SEPARATION_REQUIRED", 403);
   if (row.reviews.some((item) => item.reviewer === reviewer)) throw new RefundWorkflowError("同一复核人不得重复签署", "REFUND_DUPLICATE_REVIEWER");
+  const reviewDomain = safeText(input.reviewDomain, 40);
+  if (!REQUIRED_REFUND_REVIEW_DOMAINS.includes(reviewDomain)) throw new RefundWorkflowError("退款复核必须明确为业务复核或财务复核", "REFUND_REVIEW_DOMAIN_REQUIRED", 400);
+  if (row.reviews.some((item) => item.approved && item.reviewDomain === reviewDomain)) throw new RefundWorkflowError("同一退款复核领域只能有一份有效意见", "REFUND_DUPLICATE_REVIEW_DOMAIN");
   const approved = input.approved === true;
   const reviewedAt = new Date().toISOString();
-  const review = { id: `refund-review-${randomUUID()}`, reviewer, role: safeText(input.role || actor.role || "refund-reviewer", 80), approved, opinion: safeText(input.opinion, 240), reviewedAt };
+  const review = { id: `refund-review-${randomUUID()}`, reviewer, reviewDomain, role: safeText(input.role || actor.role || reviewDomain, 80), approved, opinion: safeText(input.opinion, 240), reviewedAt };
   row.reviews.push(review);
   const before = row.state;
-  row.state = !approved ? "REJECTED" : row.reviews.filter((item) => item.approved).length >= 2 ? "APPROVED" : "UNDER_REVIEW";
+  const approvedDomains = new Set(row.reviews.filter((item) => item.approved).map((item) => item.reviewDomain));
+  row.state = !approved ? "REJECTED" : REQUIRED_REFUND_REVIEW_DOMAINS.every((item) => approvedDomains.has(item)) ? "APPROVED" : "UNDER_REVIEW";
   row.status = REFUND_STATES[row.state];
   row.updatedAt = reviewedAt;
   row.updatedBy = reviewer;
-  appendEvent(row, { id: `refund-event-${randomUUID()}`, action: approved ? "approve-review" : "reject-review", from: before, to: row.state, actor: reviewer, at: reviewedAt, idempotencyKey: review.id, detail: { role: review.role, opinion: review.opinion } });
+  appendEvent(row, { id: `refund-event-${randomUUID()}`, action: approved ? "approve-review" : "reject-review", from: before, to: row.state, actor: reviewer, at: reviewedAt, idempotencyKey: review.id, detail: { reviewDomain, role: review.role, opinion: review.opinion } });
   return { row, review };
 }
 
@@ -206,7 +211,8 @@ function syncRefundFromFinancialCallback(data, appliedCallback = {}, actor = "fi
   const stateByStatus = { accepted: "DISPATCHED", processing: "PROCESSING", succeeded: "SUCCEEDED", failed: "FAILED", cancelled: "FAILED", reversed: "FAILED" };
   const next = stateByStatus[callbackEvent.status];
   if (!next) throw new RefundWorkflowError("退款回调状态不受支持", "REFUND_CALLBACK_STATUS_INVALID", 400);
-  if (!["DISPATCHED", "PROCESSING"].includes(row.state) && row.state !== next) throw new RefundWorkflowError("退款回调与当前退款状态冲突", "REFUND_CALLBACK_STATE_CONFLICT");
+  const providerReversal = callbackEvent.status === "reversed" && row.state === "SUCCEEDED" && next === "FAILED";
+  if (!["DISPATCHED", "PROCESSING"].includes(row.state) && row.state !== next && !providerReversal) throw new RefundWorkflowError("退款回调与当前退款状态冲突", "REFUND_CALLBACK_STATE_CONFLICT");
   const before = row.state;
   row.state = next;
   row.status = REFUND_STATES[next];
@@ -216,7 +222,10 @@ function syncRefundFromFinancialCallback(data, appliedCallback = {}, actor = "fi
   row.failureReason = callbackEvent.failureReason;
   row.updatedAt = callbackEvent.receivedAt;
   if (next === "SUCCEEDED") row.succeededAt = callbackEvent.occurredAt;
-  if (next === "FAILED") row.failedAt = callbackEvent.occurredAt;
+  if (next === "FAILED") {
+    row.failedAt = callbackEvent.occurredAt;
+    row.reversalPending = providerReversal;
+  }
   const event = appendEvent(row, { id: `refund-event-${randomUUID()}`, action: "provider-callback", from: before, to: next, actor: safeText(actor, 120), at: callbackEvent.receivedAt, idempotencyKey: callbackEvent.eventId, detail: { providerStatus: callbackEvent.status, providerCode: callbackEvent.providerCode } });
   return { row, event, idempotent: false };
 }
@@ -233,6 +242,10 @@ function retryRefund(data, id, input = {}, actor = {}) {
   row.refundReceiptId = "";
   row.gatewayEventId = "";
   const at = new Date().toISOString();
+  if (row.reversalPending) {
+    row.reversalPending = false;
+    row.reversalResolvedAt = at;
+  }
   appendEvent(row, { id: `refund-event-${randomUUID()}`, action: "retry", from: before, to: "APPROVED", actor: safeText(actor.username || actor.name || actor.role || "operator", 120), at, idempotencyKey: safeText(input.idempotencyKey || `retry-${row.attempts.length + 1}`), detail: { resolution } });
   return { row };
 }
@@ -302,4 +315,4 @@ function buildRefundOperations(data = {}) {
   };
 }
 
-module.exports = { REFUND_STATES, RESERVED_STATES, RefundWorkflowError, buildRefundOperations, cancelRefund, closeRefund, createRefundRequest, digest, prepareRefundDispatch, reconcileRefund, recordRefundDispatch, reservedRefundAmount, retryRefund, reviewRefundRequest, stableStringify, syncRefundFromFinancialCallback, verifyRefundLedger };
+module.exports = { REFUND_STATES, REQUIRED_REFUND_REVIEW_DOMAINS, RESERVED_STATES, RefundWorkflowError, buildRefundOperations, cancelRefund, closeRefund, createRefundRequest, digest, prepareRefundDispatch, reconcileRefund, recordRefundDispatch, reservedRefundAmount, retryRefund, reviewRefundRequest, stableStringify, syncRefundFromFinancialCallback, verifyRefundLedger };
