@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-22T12:30:00.000Z",
+  "updatedAt": "2026-07-22T13:18:00.000Z",
   "decisions": [
     {
       "lineId": "T01",
@@ -13,6 +13,20 @@
         "16 targeted identity and security tests passed",
         "17 identity and provisioning readiness tests passed",
         "36 API authentication scoping and governance tests passed"
+      ],
+      "blockers": []
+    },
+    {
+      "lineId": "T02",
+      "candidateHead": "983d019551ae936d1e785a95943ebaf1040a3137",
+      "decision": "accepted",
+      "reviewedAt": "2026-07-22T13:18:00.000Z",
+      "reviewer": "T00",
+      "checks": [
+        "git diff --check",
+        "58 PostgreSQL migration, runtime, MPI, governance, storage and readiness tests passed",
+        "full exports require explicit acknowledgement, versioned HMAC keys and an external directory",
+        "RPO/RTO and production cutover remain explicitly unmeasured and blocked"
       ],
       "blockers": []
     },
