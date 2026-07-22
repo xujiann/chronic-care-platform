@@ -101,6 +101,16 @@ function settlementState(batch = {}) {
   return batch.settlementState || Object.entries(SETTLEMENT_LABELS).find(([, label]) => label === batch.status)?.[0] || "BATCH_FROZEN";
 }
 
+function buildCoreSettlementCase(item = {}) {
+  const basePaymentStandardFen = Number(item.basePaymentStandardFen ?? item.paymentStandardFen ?? yuanToFen(item.paymentStandard || 0, "病例基础支付标准"));
+  const paymentStandardFen = Number(item.paymentStandardFen ?? yuanToFen(item.paymentStandard || 0, "病例支付标准"));
+  if (!Number.isSafeInteger(basePaymentStandardFen) || basePaymentStandardFen < 0 || !Number.isSafeInteger(paymentStandardFen) || paymentStandardFen < 0) throw new Error("医保核心病例支付金额必须为非负整数分");
+  const specialCaseId = String(item.specialCaseId || "").trim();
+  const specialCaseDecisionDigest = String(item.specialCaseDecisionDigest || "").trim().toLowerCase();
+  if (Boolean(specialCaseId) !== Boolean(specialCaseDecisionDigest) || (specialCaseDecisionDigest && !/^[a-f0-9]{64}$/.test(specialCaseDecisionDigest))) throw new Error("特例单议编号与有效决议摘要必须成对提供");
+  return { caseId: item.caseId, settlementListNo: item.settlementListNo, formalReceiptId: item.formalReceiptId, formalReceiptDigest: item.formalReceiptDigest, schemeVersion: item.schemeVersion, groupCode: item.groupCode, parameterId: item.parameterId, basePaymentStandardFen, paymentStandardFen, specialCaseId, specialCaseDecisionDigest };
+}
+
 function buildCoreSettlementEnvelope(batch = {}) {
   return {
     contractId: SETTLEMENT_CONTRACT_ID,
@@ -113,7 +123,7 @@ function buildCoreSettlementEnvelope(batch = {}) {
     caseCount: Number(batch.caseCount || 0),
     declaredAmountFen: Number(batch.declaredAmountFen ?? yuanToFen(batch.declaredAmount || 0, "申报金额")),
     standardAmountFen: Number(batch.standardAmountFen ?? yuanToFen(batch.standardAmount || 0, "标准金额")),
-    cases: (batch.calculationSnapshots || []).map((item) => ({ caseId: item.caseId, settlementListNo: item.settlementListNo, formalReceiptId: item.formalReceiptId, formalReceiptDigest: item.formalReceiptDigest, schemeVersion: item.schemeVersion, groupCode: item.groupCode, parameterId: item.parameterId, paymentStandardFen: Number(item.paymentStandardFen ?? yuanToFen(item.paymentStandard || 0, "病例支付标准")) }))
+    cases: (batch.calculationSnapshots || []).map(buildCoreSettlementCase)
   };
 }
 
@@ -268,4 +278,4 @@ function transitionAnnualClearance(row, payload = {}, actor = "system") {
   return { row, event, idempotent: false };
 }
 
-module.exports = { ACTION_TARGETS, CLEARANCE_ACTION_TARGETS, CLEARANCE_LABELS, SETTLEMENT_CONTRACT_ID, SETTLEMENT_LABELS, appendEvent, buildCoreSettlementEnvelope, createAnnualClearance, digest, settlementState, stableStringify, transitionAnnualClearance, transitionSettlementBatch, verifyEventLedger, yuanToFen };
+module.exports = { ACTION_TARGETS, CLEARANCE_ACTION_TARGETS, CLEARANCE_LABELS, SETTLEMENT_CONTRACT_ID, SETTLEMENT_LABELS, appendEvent, buildCoreSettlementCase, buildCoreSettlementEnvelope, createAnnualClearance, digest, settlementState, stableStringify, transitionAnnualClearance, transitionSettlementBatch, verifyEventLedger, yuanToFen };

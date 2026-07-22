@@ -157,9 +157,14 @@ test("disease payment API runs an authenticated end-to-end workflow", async (t) 
   const rollback = await json(baseUrl, "/api/disease-payment/local-packages/api-local-drg-2028/rollback", { method: "POST", headers: secondHeaders, body: JSON.stringify({ reason: "API测试回退" }) });
   assert.equal(rollback.body.package.status, "已回退");
   assert.ok(rollback.body.snapshot.snapshotDigest);
-  const special = await json(baseUrl, "/api/disease-payment/special-cases", { method: "POST", headers, body: JSON.stringify({ caseId: "dp-case-001", reason: "复杂危重症" }) });
+  const hospitalLogin = await json(baseUrl, "/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: "hospital", password: "123456" }) });
+  assert.equal(hospitalLogin.response.status, 200);
+  const hospitalHeaders = { Authorization: `Bearer ${hospitalLogin.body.token}`, "Content-Type": "application/json" };
+  const special = await json(baseUrl, "/api/disease-payment/special-cases", { method: "POST", headers: hospitalHeaders, body: JSON.stringify({ caseId: "dp-case-001", reason: "复杂危重症", requestedPaymentFen: 3200000, evidence: [{ type: "medical-record-summary", digest: `sha256:${"e".repeat(64)}`, issuedBy: "hospital-medical-records" }] }) });
   assert.equal(special.response.status, 201);
-  const review = await json(baseUrl, `/api/disease-payment/special-cases/${special.body.id}/review`, { method: "POST", headers, body: JSON.stringify({ approved: true }) });
+  const firstSpecialReview = await json(baseUrl, `/api/disease-payment/special-cases/${special.body.id}/review`, { method: "POST", headers, body: JSON.stringify({ approved: true, adjustedPaymentFen: 3200000, role: "医保业务复核" }) });
+  assert.equal(firstSpecialReview.body.status, "复核中");
+  const review = await json(baseUrl, `/api/disease-payment/special-cases/${special.body.id}/review`, { method: "POST", headers: secondHeaders, body: JSON.stringify({ approved: true, adjustedPaymentFen: 3200000, role: "基金财务复核" }) });
   assert.equal(review.body.status, "评审通过");
   const batch = await json(baseUrl, "/api/disease-payment/settlements", { method: "POST", headers, body: JSON.stringify({ period: "2026-06" }) });
   assert.equal(batch.response.status, 500);
