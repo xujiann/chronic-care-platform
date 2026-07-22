@@ -39,6 +39,8 @@ test("identity contract validates required claims, roles and sample mappings", (
   assert.equal(contract.adapterContracts.productionSecurity.sessionRetention, true);
   assert.equal(contract.adapterContracts.productionSecurity.centralizedSessionStore, true);
   assert.equal(contract.checks.some((item) => item.id === "identity:productionSecurityBoundary" && item.passed), true);
+  assert.equal(contract.checks.some((item) => item.id === "identity:browserIdentityContext" && item.passed), true);
+  assert.equal(Object.values(contract.adapterContracts.browserIdentityContext).every(Boolean), true);
   assert.equal(contract.productionReady, false);
   assert.equal(contract.productionBlockers.some((item) => /SAML runtime/.test(item)), true);
 });

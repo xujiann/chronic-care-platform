@@ -327,6 +327,14 @@ function buildIdentityContract(options = {}) {
       metadataAndCertificates: false,
       signedAssertionValidation: false
     },
+    browserIdentityContext: {
+      issuerScopedSubject: ["buildExternalIdentityKey", "externalIssuer", "encodeURIComponent(issuer)"].every((marker) => authSource.includes(marker)),
+      guardianAccount: ["authorizeDelegatedResidentAccess", "GUARDIAN_ACCOUNT_REQUIRED"].every((marker) => authSource.includes(marker)),
+      explicitPermission: ["DELEGATION_WILDCARD_FORBIDDEN", "DELEGATION_PERMISSION_DENIED"].every((marker) => authSource.includes(marker)),
+      validityWindow: ["DELEGATION_NOT_STARTED", "DELEGATION_EXPIRED", "DELEGATION_VALIDITY_INVALID"].every((marker) => authSource.includes(marker)),
+      sensitiveStepUp: ["DELEGATION_STEP_UP_REQUIRED", "DEFAULT_STEP_UP_MAX_AGE_MS"].every((marker) => authSource.includes(marker)),
+      clientBoundary: authSource.includes("clientHintOnly: true")
+    },
     sms: {
       runtime: adapterSource.includes("sendSmsVerificationCode") && serverSource.includes("/api/auth/phone-code"),
       protectedCode: adapterSource.includes("digestPhoneVerificationCode") && serverSource.includes("codeDigest"),
@@ -363,6 +371,7 @@ function buildIdentityContract(options = {}) {
     { id: "identity:realNameWorkflow", passed: REAL_NAME_WORKFLOW.states.includes("manual-review") && REAL_NAME_WORKFLOW.controls.includes("master-index-match"), detail: `${REAL_NAME_WORKFLOW.states.length} states and ${REAL_NAME_WORKFLOW.controls.length} controls` },
     { id: "identity:guardianDelegationWorkflow", passed: GUARDIAN_DELEGATION_WORKFLOW.states.includes("active") && GUARDIAN_DELEGATION_WORKFLOW.controls.includes("actor-subject-audit"), detail: `${GUARDIAN_DELEGATION_WORKFLOW.states.length} states and ${GUARDIAN_DELEGATION_WORKFLOW.controls.length} controls` },
     { id: "identity:loginProvisioningBoundary", passed: ["data-provisioning-step=\"external-identity\"", "data-provisioning-step=\"guardian\"", "不自动开户", "监护关系"].every((marker) => loginSource.includes(marker)), detail: "login page documents controlled external binding and guardian review" },
+    { id: "identity:browserIdentityContext", passed: Object.values(adapterContracts.browserIdentityContext).every(Boolean), detail: "browser external-subject namespace and guardian delegation checks fail closed and remain client hints" },
     { id: "identity:oidcRuntimeAdapter", passed: Object.values(adapterContracts.oidc).every(Boolean), detail: "OIDC UserInfo runtime, configuration and controlled-binding boundary documented" },
     { id: "identity:oidcLifecycle", passed: Object.values(adapterContracts.oidcLifecycle).every(Boolean), detail: "OIDC subject binding, refresh, revocation, safe directory deactivation, operations UI and production boundary documented" },
     { id: "identity:smsRuntimeAdapter", passed: Object.values(adapterContracts.sms).every(Boolean), detail: "SMS runtime, keyed code digest, signed final-delivery callback, replay-safe ordered ledger, operations UI and provider boundary documented" },
