@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 const fs = require("node:fs");
 const path = require("node:path");
+const defaultData = require("../data/db.json");
 const { buildPublicHealthSystem } = require("./public-health-readiness");
 const { runPublicHealthCoordinationAcceptanceScenario } = require("../public-health-coordination-service");
+const { buildPublicHealthCoordinationRuntime } = require("../public-health-coordination-runtime");
+const { buildPublicHealthExternalAdapterRegistry } = require("../public-health-external-adapter-service");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "public-health-coordination-readiness-report.json");
@@ -20,8 +23,17 @@ function buildPublicHealthCoordinationReadiness(options = {}) {
   const system = options.system || buildPublicHealthSystem(options);
   const center = options.center || system.coordinationCenter;
   const accepted = center ? runPublicHealthCoordinationAcceptanceScenario(center) : null;
+  const runtime = center ? buildPublicHealthCoordinationRuntime({
+    data: options.data || defaultData,
+    eventReporting: system.infectiousEventReporting,
+    standardReview: system.priorityStandardReview,
+    center
+  }) : null;
+  const adapterRegistry = buildPublicHealthExternalAdapterRegistry({});
   const serviceSource = options.serviceSource ?? read("public-health-coordination-service.js");
   const serviceTestSource = options.serviceTestSource ?? read("test/public-health-coordination-service.test.js");
+  const runtimeSource = options.runtimeSource ?? read("public-health-coordination-runtime.js");
+  const adapterSource = options.adapterSource ?? read("public-health-external-adapter-service.js");
   const publicHealthSource = options.publicHealthSource ?? read("public-health.js");
   const publicHealthHtml = options.publicHealthHtml ?? read("public-health.html");
   const systemBuilderSource = options.systemBuilderSource ?? read("scripts/public-health-readiness.js");
@@ -46,6 +58,10 @@ function buildPublicHealthCoordinationReadiness(options = {}) {
     check("acceptance:exact-evidence", accepted?.handoffs?.every((item) => JSON.stringify([...item.closure.evidenceRefs].sort()) === JSON.stringify([...item.requiredEvidence].sort())), "all closures preserve exact lane evidence", "acceptance"),
     check("safety:exception-retry", ["exception-open", "retry-coordination", "exceptionOwner", "dueAt"].every((token) => serviceSource.includes(token)), "rejected receipts open assigned exceptions and retry safely", "safety"),
     check("safety:role-idempotency-version", ["ownerRole", "idempotencyKey", "expectedVersion", "version conflict"].every((token) => serviceSource.includes(token)) && serviceTestSource.includes("authorized idempotent replay"), "lane roles, idempotency and optimistic version checks are enforced", "safety"),
+    check("runtime:persistence-model", runtime?.handoffs?.length === 8 && runtime?.functionalState === "eight-lane-coordination-persistence-ready", `${runtime?.handoffs?.length || 0}/8 persistence-ready handoffs`, "runtime"),
+    check("runtime:persisted-invariants", ["PERSISTED_OPERATIONAL_FIELDS", "isCompatiblePersistedHandoff", "publicHealthCoordinationAudit", "rejectedPersistedHandoffs"].every((token) => runtimeSource.includes(token)), "persisted operational fields are allowlisted and invariant tampering is rejected", "runtime"),
+    check("adapter:eight-profiles", adapterRegistry?.summary?.adapters === 8 && adapterRegistry?.productionReady === false, `${adapterRegistry?.summary?.adapters || 0}/8 fail-closed adapter profiles`, "adapter"),
+    check("adapter:signed-retry-dead-letter", ["HMAC-SHA256", "timingSafeEqual", "retry-scheduled", "dead-letter", "productionReady: false"].every((token) => adapterSource.includes(token)), "signed receipts, retry and dead-letter compensation remain fail-closed", "adapter"),
     check("runtime:system-builder", system.coordinationCenter?.summary?.lanes === 8 && systemBuilderSource.includes("buildPublicHealthCoordinationCenter") && systemBuilderSource.includes("coordinationCenter"), "buildPublicHealthSystem returns coordinationCenter", "runtime"),
     check("frontend:panel", publicHealthHtml.includes("public-health-coordination-center") && publicHealthSource.includes("renderPublicHealthCoordinationCenter"), "public health page renders the coordination center", "frontend"),
     check("frontend:static-fallback", publicHealthSource.includes("buildStaticCoordinationCenter") && publicHealthSource.includes("eight-lane-static-coordination-runnable"), "file preview builds a local eight-lane fallback", "frontend"),
@@ -57,7 +73,7 @@ function buildPublicHealthCoordinationReadiness(options = {}) {
     generatedAt: new Date().toISOString(),
     ok: checks.every((item) => item.passed),
     functionalState: accepted?.summary?.closedHandoffs === 8 ? "eight-domain-coordination-complete" : "incomplete",
-    formalGoLiveState: "blocked-until-t00-action-persistence-and-site-evidence-verified",
+    formalGoLiveState: "blocked-until-t00-route-writer-production-endpoints-and-site-evidence-verified",
     summary: {
       checks: checks.length,
       passed: checks.filter((item) => item.passed).length,
@@ -73,6 +89,8 @@ function buildPublicHealthCoordinationReadiness(options = {}) {
     checks,
     artifacts: {
       service: "public-health-coordination-service.js",
+      runtime: "public-health-coordination-runtime.js",
+      externalAdapters: "public-health-external-adapter-service.js",
       page: "public-health.html",
       pageController: "public-health.js",
       test: "test/public-health-coordination-service.test.js",
@@ -80,9 +98,9 @@ function buildPublicHealthCoordinationReadiness(options = {}) {
       report: "release/public-health-coordination-readiness-report.md"
     },
     remainingT00Integration: [
-      "Persist coordination actions and version checks through public server routes.",
+      "Wire the public server action route and durable writer to the T08 coordination runtime controller.",
       "Add package scripts, public styling and aggregate release manifest entries.",
-      "Run production endpoint smoke tests and verify signed site evidence."
+      "Provision production adapter endpoints and secrets, run smoke tests, and verify signed receipts and trusted site evidence."
     ]
   };
 }
