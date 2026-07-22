@@ -11,6 +11,10 @@ test("insurance payment evidence packet is complete digest-bound and privacy-saf
   assert.equal(packet.productionReady, false);
   assert.equal(packet.workflows.length, 6);
   assert.equal(packet.artifacts.length, Evidence.EVIDENCE_FILES.length);
+  assert.equal(packet.productionHandoff.summary.required, packet.t00PendingRoutes.length + packet.externalBlockers.length);
+  assert.equal(packet.productionHandoff.ledgerValid, true);
+  assert.equal(packet.productionHandoff.evidenceComplete, false);
+  assert.equal(packet.productionHandoff.productionReady, false);
   assert.equal(Evidence.verifyInsurancePaymentEvidencePacket(packet), true);
   assert.doesNotMatch(JSON.stringify(packet), /residentId|patientName|FINANCIAL_GATEWAY_SECRET|PRIVATE KEY/);
   assert.match(Evidence.renderMarkdown(packet), /医保支付与按病种付费验收证据包/);

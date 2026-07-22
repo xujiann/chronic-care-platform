@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { createHash } = require("node:crypto");
 const { buildInsurancePaymentAcceptance } = require("./insurance-payment-acceptance");
+const Handoff = require("../insurance-payment-production-handoff");
 
 const ROOT = path.resolve(__dirname, "..");
 const EVIDENCE_FILES = Object.freeze([
@@ -13,6 +14,7 @@ const EVIDENCE_FILES = Object.freeze([
   "disease-payment-special-case.js",
   "online-payment-refunds.js",
   "insurance-payment-operating-model.js",
+  "insurance-payment-production-handoff.js",
   "scripts/insurance-payment-acceptance.js"
 ]);
 
@@ -34,6 +36,7 @@ function packetPayload(packet = {}) {
 function buildInsurancePaymentEvidencePacket(options = {}) {
   const acceptance = options.acceptance || buildInsurancePaymentAcceptance();
   const generatedAt = options.generatedAt || new Date().toISOString();
+  const productionHandoff = Handoff.buildProductionHandoffStatus(options.handoffData || {}, acceptance);
   const artifacts = EVIDENCE_FILES.map((relativePath) => {
     const source = fs.readFileSync(path.join(ROOT, relativePath));
     return { path: relativePath, sha256: sha256(source), bytes: source.length };
@@ -49,6 +52,7 @@ function buildInsurancePaymentEvidencePacket(options = {}) {
     summary: acceptance.summary,
     workflows: acceptance.workflows.map((item) => ({ id: item.id, label: item.label, ready: item.ready, evidence: item.evidence })),
     responsibilityChecks: acceptance.operatingModel.checks,
+    productionHandoff,
     t00PendingRoutes: acceptance.integrationHandoff.routes.filter((item) => !item.wired).map((item) => ({ id: item.id, method: item.method, path: item.path, handler: item.handler || item.handlers })),
     externalBlockers: acceptance.externalBlockers,
     artifacts,
