@@ -72,6 +72,7 @@ function buildPublicHealthPriorityStandardReviewReadiness(options = {}) {
     check("safety:negative-tests", ["incomplete domain", "trusted server evidence registry", "forged verified and signedBy evidence", "role, idempotency and version"].every((token) => testSource.includes(token)), "review completeness, forged evidence, trusted registry and concurrency safeguards are tested", "safety"),
     check("safety:trusted-evidence-gate", ["trustedSiteEvidenceRegistry", "signatureVerified", "verificationSource", "artifactDigest", "productionBlockers"].every((token) => serviceSource.includes(token)), "production readiness requires a server-controlled evidence registry result", "safety"),
     check("safety:trusted-registry-adapter", ["buildTrustedSiteEvidenceRegistry", "attestationOrigin", "verificationReceiptId", "TRUSTED_SIGNATURE_ALGORITHMS"].every((token) => serviceSource.includes(token)) && testSource.includes("rejects legacy verified rows"), `${trustedRegistry.summary.trustedRecords} trusted / ${trustedRegistry.summary.rejectedRecords} rejected current evidence rows`, "safety"),
+    check("safety:signed-server-receipt", ["createHmac", "timingSafeEqual", "signTrustedSiteEvidenceReceipt", "verifyTrustedSiteEvidenceReceipt", "receiptSignature"].every((token) => serviceSource.includes(token)) && testSource.includes("tampered artifacts"), "trusted registry requires a signed server receipt and rejects tampering", "safety"),
     check("implementation:domain-service", ["buildPriorityStandardReviewPack", "applyPriorityStandardReviewAction", "confirm-responsibility", "review-standard-mapping", "link-site-evidence"].every((token) => serviceSource.includes(token)), "review pack and controlled actions are implemented", "implementation"),
     check("docs:t00-handoff", ["T00", "server.js", "package.json", "八个业务轨道", "七个标准域", "现场证据"].every((token) => doc.includes(token)), "scope, evidence boundary and T00 handoff are documented", "docs")
   ];
@@ -105,7 +106,7 @@ function buildPublicHealthPriorityStandardReviewReadiness(options = {}) {
     },
     t00Integration: [
       "Persist owner confirmation and mapping review actions through the existing standard implementation API.",
-      "Generate trustedVerification and matching verificationReceiptId only after server-side signature and digest verification, then call buildTrustedSiteEvidenceRegistry.",
+      "Generate trustedVerification and matching verificationReceiptId only after server-side signature and digest verification; sign the receipt with an external secret, then call buildTrustedSiteEvidenceRegistry with that secret.",
       "Add package.json check/test/readiness wiring and aggregate release evidence.",
       "Keep site evidence verification and production approval blocked until signed artifacts are verified."
     ]

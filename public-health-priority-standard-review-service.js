@@ -1,3 +1,5 @@
+const { createHmac, timingSafeEqual } = require("node:crypto");
+
 const PRIORITY_STANDARD_REVIEW_TRACKS = [
   {
     id: "phpsr-infectious",
@@ -97,6 +99,7 @@ const REVIEW_ACTIONS = {
 
 const TRUSTED_SITE_EVIDENCE_SOURCES = new Set(["server-evidence-store", "trusted-signature-service"]);
 const TRUSTED_SIGNATURE_ALGORITHMS = new Set(["SM2/SM3", "RSA-SHA256", "ECDSA-SHA256"]);
+const TRUSTED_EVIDENCE_RECEIPT_VERSION = "ph-site-evidence-v1";
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -144,7 +147,37 @@ function normalizeArtifactDigest(value) {
   return clean(value).toLowerCase().replace(/^sha256:/, "");
 }
 
-function buildTrustedSiteEvidenceRegistry({ siteLaunchEvidence = [], verificationTasks = [] } = {}) {
+function trustedEvidenceReceiptPayload(evidence = {}) {
+  const attestation = evidence.trustedVerification || {};
+  return [
+    TRUSTED_EVIDENCE_RECEIPT_VERSION,
+    clean(evidence.id),
+    clean(evidence.templateId),
+    clean(evidence.artifactName),
+    normalizeArtifactDigest(attestation.artifactDigest),
+    clean(attestation.signedBy),
+    clean(attestation.algorithm).toUpperCase(),
+    clean(attestation.keyId),
+    clean(attestation.receiptId),
+    clean(attestation.verifiedBy),
+    clean(attestation.verifiedAt)
+  ].join("\n");
+}
+
+function signTrustedSiteEvidenceReceipt(evidence, verificationSecret) {
+  const secret = clean(verificationSecret);
+  if (secret.length < 32) throw new Error("trusted evidence verification secret must be at least 32 characters");
+  return createHmac("sha256", secret).update(trustedEvidenceReceiptPayload(evidence)).digest("hex");
+}
+
+function verifyTrustedSiteEvidenceReceipt(evidence, verificationSecret) {
+  const signature = clean(evidence?.trustedVerification?.receiptSignature).toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(signature) || clean(verificationSecret).length < 32) return false;
+  const expected = signTrustedSiteEvidenceReceipt(evidence, verificationSecret);
+  return timingSafeEqual(Buffer.from(signature, "hex"), Buffer.from(expected, "hex"));
+}
+
+function buildTrustedSiteEvidenceRegistry({ siteLaunchEvidence = [], verificationTasks = [], verificationSecret = "" } = {}) {
   const evidenceRows = Array.isArray(siteLaunchEvidence) ? siteLaunchEvidence : [];
   const tasks = Array.isArray(verificationTasks) ? verificationTasks : [];
   const verifiedTaskByEvidenceId = new Map(
@@ -172,6 +205,7 @@ function buildTrustedSiteEvidenceRegistry({ siteLaunchEvidence = [], verificatio
     if (!clean(attestation.keyId)) reasons.push("signature keyId is required");
     if (!/^[a-f0-9]{64}$/.test(artifactDigest)) reasons.push("SHA-256 artifact digest is required");
     if (!receiptId || !clean(attestation.verifiedBy) || !clean(attestation.verifiedAt) || !clean(attestation.signedBy)) reasons.push("server receipt, verifier, timestamp and signer are required");
+    if (!verifyTrustedSiteEvidenceReceipt(evidence, verificationSecret)) reasons.push("valid server verification receipt signature is required");
     if (reasons.length) {
       rejected.push({ id: evidenceId || "missing-evidence-id", templateId: clean(evidence?.templateId), reasons });
       return;
@@ -189,6 +223,7 @@ function buildTrustedSiteEvidenceRegistry({ siteLaunchEvidence = [], verificatio
       algorithm,
       keyId: clean(attestation.keyId),
       receiptId,
+      receiptSignatureVerified: true,
       templateId: clean(evidence.templateId),
       verificationTaskId: clean(task.id)
     });
@@ -489,5 +524,8 @@ module.exports = {
   runPriorityStandardReviewAcceptanceScenario,
   summarizePack,
   hasTrustedSiteEvidenceAttestation,
+  signTrustedSiteEvidenceReceipt,
+  trustedEvidenceReceiptPayload,
+  verifyTrustedSiteEvidenceReceipt,
   verifyTrustedSiteEvidence
 };

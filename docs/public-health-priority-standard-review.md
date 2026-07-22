@@ -65,7 +65,9 @@
 
 未取得服务端可信结果时，汇总会返回逐轨 `productionBlockers`，状态为 `evidence-not-registered` 或 `evidence-registered-trust-pending`，`productionReady` 必须保持 `false`。代码测试报告、演示数据和映射记录不能替代现场证据。当前源台账七个目标标准域的持久化复核数仍为 0，现场证据也尚未签署，因此正式上线必须继续阻断。
 
-`buildTrustedSiteEvidenceRegistry()` 是供 T00 公共路由调用的服务端适配边界。它会把 `siteLaunchEvidence` 与 `publicHealthSiteEvidenceVerificationTasks` 按证据编号、模板和服务端回执关联。旧式 `status: verified`、人工 `verifiedBy` 或单独的核验任务均不会进入 registry；证据还必须包含仅由服务器生成的 `trustedVerification`，其中具备可信来源、已验证签名、允许的签名算法、密钥编号、SHA-256 摘要、签字方、服务端核验人、时间和匹配回执。registry 构建本身始终 `productionReady: false`，最终仍由八轨汇总和全局上线审批共同决定。
+`buildTrustedSiteEvidenceRegistry()` 是供 T00 公共路由调用的服务端适配边界。它会把 `siteLaunchEvidence` 与 `publicHealthSiteEvidenceVerificationTasks` 按证据编号、模板和服务端回执关联。旧式 `status: verified`、人工 `verifiedBy` 或单独的核验任务均不会进入 registry；证据还必须包含仅由服务器生成的 `trustedVerification`，其中具备可信来源、已验证签名、允许的签名算法、密钥编号、SHA-256 摘要、签字方、服务端核验人、时间和匹配回执。
+
+服务端还须使用至少 32 字符的独立密钥调用 `signTrustedSiteEvidenceReceipt()` 生成 HMAC-SHA256 回执签名。registry 构建时通过恒定时间比较重新验签，密钥缺失、签名无效或证据编号、模板、制品名称、摘要、签字方、算法、密钥编号、回执、核验人、核验时间任一字段被修改都会拒绝该证据。密钥不进入 registry、报告或持久化对象。registry 构建本身始终 `productionReady: false`，最终仍由八轨汇总和全局上线审批共同决定。
 
 ## 八轨道主要证据
 

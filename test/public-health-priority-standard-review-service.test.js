@@ -9,6 +9,7 @@ const {
   buildTrustedSiteEvidenceRegistry,
   buildPriorityStandardReviewPack,
   runPriorityStandardReviewAcceptanceScenario,
+  signTrustedSiteEvidenceReceipt,
   summarizePack
 } = require("../public-health-priority-standard-review-service");
 
@@ -234,6 +235,7 @@ test("all eight server-verified evidence records are required to clear the scope
 });
 
 test("trusted registry adapter rejects legacy verified rows and accepts matched server attestations", () => {
+  const verificationSecret = "public-health-test-verification-secret-2026";
   const legacy = buildTrustedSiteEvidenceRegistry({
     siteLaunchEvidence: [{
       id: "sle-legacy",
@@ -267,63 +269,111 @@ test("trusted registry adapter rejects legacy verified rows and accepts matched 
     verifiedBy: "公共卫生现场证据核验服务",
     verifiedAt: "2026-07-22T09:30:00.000Z"
   };
+  const trustedEvidence = {
+    id: "sle-trusted",
+    templateId: "interface-statistics-report-v1",
+    status: "verified",
+    artifactName: "传染病直报联调签字记录.pdf",
+    trustedVerification
+  };
+  trustedVerification.receiptSignature = signTrustedSiteEvidenceReceipt(trustedEvidence, verificationSecret);
   const built = buildTrustedSiteEvidenceRegistry({
-    siteLaunchEvidence: [{
-      id: "sle-trusted",
-      templateId: "interface-statistics-report-v1",
-      status: "verified",
-      artifactName: "传染病直报联调签字记录.pdf",
-      trustedVerification
-    }],
+    siteLaunchEvidence: [trustedEvidence],
     verificationTasks: [{
       id: "phsevt-trusted",
       evidenceId: "sle-trusted",
       templateId: "interface-statistics-report-v1",
       status: "verified",
       verificationReceiptId: "PH-SITE-VERIFY-001"
-    }]
+    }],
+    verificationSecret
   });
   assert.equal(built.ok, true);
   assert.equal(built.summary.trustedRecords, 1);
   assert.equal(built.summary.rejectedRecords, 0);
   assert.equal(built.registry[0].artifactDigest, "c".repeat(64));
   assert.equal(built.registry[0].algorithm, "SM2/SM3");
+  assert.equal(built.registry[0].receiptSignatureVerified, true);
   assert.equal(built.productionReady, false);
 });
 
 test("trusted registry adapter rejects mismatched task templates and receipts", () => {
+  const verificationSecret = "public-health-test-verification-secret-2026";
+  const evidence = {
+    id: "sle-mismatch",
+    templateId: "interface-statistics-report-v1",
+    status: "verified",
+    artifactName: "签字记录.pdf",
+    trustedVerification: {
+      attestationOrigin: "server-generated",
+      verificationSource: "server-evidence-store",
+      signatureVerified: true,
+      algorithm: "RSA-SHA256",
+      keyId: "site-key-02",
+      artifactDigest: "d".repeat(64),
+      receiptId: "PH-SITE-VERIFY-002",
+      signedBy: "现场责任方",
+      verifiedBy: "服务端证据仓",
+      verifiedAt: "2026-07-22T10:00:00.000Z"
+    }
+  };
+  evidence.trustedVerification.receiptSignature = signTrustedSiteEvidenceReceipt(evidence, verificationSecret);
   const result = buildTrustedSiteEvidenceRegistry({
-    siteLaunchEvidence: [{
-      id: "sle-mismatch",
-      templateId: "interface-statistics-report-v1",
-      status: "verified",
-      artifactName: "签字记录.pdf",
-      trustedVerification: {
-        attestationOrigin: "server-generated",
-        verificationSource: "server-evidence-store",
-        signatureVerified: true,
-        algorithm: "RSA-SHA256",
-        keyId: "site-key-02",
-        artifactDigest: "d".repeat(64),
-        receiptId: "PH-SITE-VERIFY-002",
-        signedBy: "现场责任方",
-        verifiedBy: "服务端证据仓",
-        verifiedAt: "2026-07-22T10:00:00.000Z"
-      }
-    }],
+    siteLaunchEvidence: [evidence],
     verificationTasks: [{
       id: "phsevt-mismatch",
       evidenceId: "sle-mismatch",
       templateId: "interface-his-patient-v1",
       status: "verified",
       verificationReceiptId: "WRONG-RECEIPT"
-    }]
+    }],
+    verificationSecret
   });
 
   assert.equal(result.registry.length, 0);
   assert.equal(result.rejected.length, 1);
   assert.equal(result.rejected[0].reasons.includes("verification task template does not match evidence template"), true);
   assert.equal(result.rejected[0].reasons.includes("server verification receipt does not match task receipt"), true);
+});
+
+test("trusted registry rejects missing secrets invalid receipts and tampered artifacts", () => {
+  const verificationSecret = "public-health-test-verification-secret-2026";
+  const evidence = {
+    id: "sle-signed",
+    templateId: "interface-statistics-report-v1",
+    status: "verified",
+    artifactName: "原始签字记录.pdf",
+    trustedVerification: {
+      attestationOrigin: "server-generated",
+      verificationSource: "server-evidence-store",
+      signatureVerified: true,
+      algorithm: "ECDSA-SHA256",
+      keyId: "site-key-03",
+      artifactDigest: "e".repeat(64),
+      receiptId: "PH-SITE-VERIFY-003",
+      signedBy: "现场责任方",
+      verifiedBy: "服务端证据仓",
+      verifiedAt: "2026-07-22T10:30:00.000Z"
+    }
+  };
+  evidence.trustedVerification.receiptSignature = signTrustedSiteEvidenceReceipt(evidence, verificationSecret);
+  const verificationTasks = [{
+    id: "phsevt-signed",
+    evidenceId: "sle-signed",
+    templateId: "interface-statistics-report-v1",
+    status: "verified",
+    verificationReceiptId: "PH-SITE-VERIFY-003"
+  }];
+
+  const withoutSecret = buildTrustedSiteEvidenceRegistry({ siteLaunchEvidence: [evidence], verificationTasks });
+  assert.equal(withoutSecret.registry.length, 0);
+  assert.equal(withoutSecret.rejected[0].reasons.includes("valid server verification receipt signature is required"), true);
+
+  const tampered = JSON.parse(JSON.stringify(evidence));
+  tampered.artifactName = "篡改后的签字记录.pdf";
+  const tamperedResult = buildTrustedSiteEvidenceRegistry({ siteLaunchEvidence: [tampered], verificationTasks, verificationSecret });
+  assert.equal(tamperedResult.registry.length, 0);
+  assert.equal(tamperedResult.rejected[0].reasons.includes("valid server verification receipt signature is required"), true);
 });
 
 test("priority standard review enforces role, idempotency and version boundaries", () => {
