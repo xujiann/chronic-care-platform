@@ -39,7 +39,7 @@ T08 自有实现边界：
 - `public-health-coordination-service.js`：八领域责任、来源、依赖、状态机与验收场景。
 - `scripts/public-health-coordination-readiness.js`：功能完成度与上线边界门禁。
 - `scripts/public-health-readiness.js`：将事件直报、标准复核和协同中心聚合到公共卫生系统视图。
-- `public-health.html`、`public-health.js`：协同中心页面容器、接口渲染与静态回退。
+- `public-health.html`、`public-health.js`：协同中心页面容器、接口渲染、静态回退，以及分派、接单、成功/拒收回执、重试、证据关闭和重开动作载荷。
 - `test/public-health-coordination-*.test.js`：服务、验收和页面契约测试。
 
 T00 继续负责公共 `server.js` 动作持久化路由、`portal.css` 公共样式、`package.json` 脚本、`README` 和发布总表。本线程不修改这些公共文件。
@@ -52,6 +52,7 @@ T00 继续负责公共 `server.js` 动作持久化路由、`portal.css` 公共�
 - 妇幼连续服务、老年服务、慢病计划、公卫随访、健康教育和家庭医生履约均使用真实集合生成来源引用。
 - 关闭操作要求精确证据集合；越权、版本冲突和重复请求均被控制。
 - `/api/public-health/system` 的现有构建链能够返回 `coordinationCenter`，页面缺少接口时仍可构造八领域静态视图。
+- 页面动作统一携带幂等键和 `expectedVersion`，并调用 `/api/public-health/coordination/:id/actions` 公共路由边界；T00 只需完成路由接线和落库。
 - 缺少任何必需业务集合时，结构就绪门禁失败。
 - 功能验收通过仍保持 `productionReady=false`，不替代生产现场证据。
 

@@ -15,6 +15,24 @@ test("public health page exposes the eight-domain coordination center", () => {
   assert.match(source, /function buildStaticCoordinationCenter/);
 });
 
+test("coordination UI exposes the complete versioned action contract", () => {
+  [
+    "assign-coordination",
+    "start-coordination",
+    "record-coordination-receipt",
+    "retry-coordination",
+    "close-coordination",
+    "reopen-coordination"
+  ].forEach((action) => assert.ok(source.includes(action), `${action} should be available to the coordination UI`));
+
+  assert.match(source, /function handlePublicHealthCoordinationAction/);
+  assert.match(source, /\/api\/public-health\/coordination\/\$\{encodeURIComponent\(handoff\.id\)\}\/actions/);
+  assert.match(source, /expectedVersion: version/);
+  assert.match(source, /idempotencyKey: `\$\{handoff\.id\}:\$\{action\}:v\$\{version\}`/);
+  assert.match(source, /receiptStatus === "rejected"/);
+  assert.match(source, /evidenceRefs: handoff\.requiredEvidence \|\| lane\.requiredEvidence/);
+});
+
 test("static fallback contains every coordination lane and preserves launch boundary", () => {
   [
     "infectious-reporting",
