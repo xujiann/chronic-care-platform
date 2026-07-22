@@ -36,15 +36,17 @@
           </div>
           <div class="account-provisioning-note" data-account-provisioning>
             <strong>账号开通边界</strong>
-            <span>居民端暂不开放自助注册，需由平台完成实名建档和手机号绑定后登录；医生和护理端账号需由机构开通，并绑定执业资质、第一执业机构、doctorId 或 nurseId。</span>
+            <span>居民端暂不开放自助注册，需由平台完成实名建档和手机号绑定后登录；医生和护理端账号需由机构开通，并绑定执业资质、第一执业机构、doctorId 或 nurseId。外部身份不自动开户、不自动提权，OIDC/SAML 身份必须经过本地账号和机构目录受控绑定。</span>
             <ul>
               <li data-provisioning-step="resident">居民账号：后台受理、实名建档、手机号绑定。</li>
               <li data-provisioning-step="doctor">医生账号：第一执业机构确认、电子化注册核验、doctorId 绑定。</li>
               <li data-provisioning-step="nurse">护士账号：机构审核、资质核验、nurseId 绑定。</li>
+              <li data-provisioning-step="external-identity">外部身份：核验身份源、稳定主体、机构编码和角色白名单后受控绑定。</li>
+              <li data-provisioning-step="guardian">监护代办：监护人先完成本人实名，再核验监护关系、代办对象、权限范围和有效期。</li>
               <li data-provisioning-step="audit">开通动作：启用、变更、停用均进入账号审计留痕。</li>
             </ul>
             <div class="account-provisioning-owners" data-provisioning-owner>
-              <span data-owner-role="resident-master-index">责任方：居民主索引管理员、试点机构护理部、平台账号管理员。</span>
+              <span data-owner-role="resident-master-index">责任方：居民主索引管理员、试点机构医政护理部门、平台身份管理员、居民服务窗口。</span>
               <span data-owner-role="audit-evidence">证据表：authUsers、securityEvents、dataAccessLogs。</span>
             </div>
           </div>
