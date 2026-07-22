@@ -1,0 +1,29 @@
+"use strict";
+
+const assert = require("node:assert/strict");
+const test = require("node:test");
+const { buildInsurancePaymentAcceptance, renderMarkdown } = require("../scripts/insurance-payment-acceptance");
+
+test("T07 unified acceptance covers all six workflows without claiming production readiness", () => {
+  const report = buildInsurancePaymentAcceptance();
+  assert.equal(report.localReady, true);
+  assert.equal(report.productionReady, false);
+  assert.equal(report.summary.workflows, 6);
+  assert.equal(report.summary.workflowsReady, 6);
+  assert.ok(report.summary.t00RoutesPending > 0);
+  assert.ok(report.externalBlockers.length > 0);
+  assert.match(renderMarkdown(report), /在线支付退费 \| PASS/);
+  assert.match(renderMarkdown(report), /年度清算 \| PASS/);
+});
+
+test("T07 unified acceptance fails when one workflow evidence is missing", () => {
+  const report = buildInsurancePaymentAcceptance({
+    diseasePayment: { ready: true, checks: [
+      { id: "settlement", ok: true }, { id: "settlement-sla", ok: true }, { id: "dual-mode", ok: true }, { id: "official-receipt-contract", ok: true }, { id: "formal-grouping-async", ok: true }, { id: "parameter-dual-review", ok: true }, { id: "special-case", ok: false }, { id: "annual-clearance", ok: true }
+    ], externalBlockers: [] },
+    financialGateway: { ok: true, capabilities: [{ id: "online-refund-closed-loop", passed: true }], blockers: [] },
+    serverSource: ""
+  });
+  assert.equal(report.localReady, false);
+  assert.equal(report.workflows.find((item) => item.id === "special-case").ready, false);
+});
