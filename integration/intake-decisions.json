@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-23T06:52:07.738Z",
+  "updatedAt": "2026-07-23T06:58:33.573Z",
   "decisions": [
     {
       "lineId": "T01",
@@ -127,6 +127,20 @@
         "78 disease-payment, financial gateway and insurance-payment tests passed independently",
         "signed callbacks, replay protection, dual-review refunds, difference reconciliation and per-institution annual clearance validated",
         "evidence packets remain digest-bound, privacy-minimized and productionReady false"
+      ],
+      "blockers": []
+    },
+    {
+      "lineId": "T10",
+      "candidateHead": "64d2b04c091b1de0026fb31f3f8f589f24c3bc90",
+      "decision": "accepted",
+      "reviewedAt": "2026-07-23T06:58:33.573Z",
+      "reviewer": "T00",
+      "checks": [
+        "git diff --check",
+        "40 emergency device, life-chain, imaging, blood and physical-examination tests passed independently",
+        "device identities retain references only; signed signals enforce HMAC, clock and monotonic replay controls",
+        "synthetic and local evidence remains pre-production and cannot replace trusted endpoints or signed site acceptance"
       ],
       "blockers": []
     }
