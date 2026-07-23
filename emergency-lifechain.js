@@ -168,6 +168,37 @@ function createAutomaticSos(data, user, payload, EmergencyService) {
   return attachSubmissionResult(event, { deduplicated:false, eventId:event.id });
 }
 
+function createAutomaticSosFromTrustedSignal(data, user, signalId, EmergencyService, payload = {}) {
+  ensureState(data); assertCitizen(user);
+  const signal = (data.emergencyDeviceSignals || []).find((item) => item.id === signalId || item.sourceSignalId === signalId);
+  if (!signal) throw Object.assign(new Error("Trusted emergency device signal not found"), { status:404 });
+  if (!signal.signatureVerified) throw Object.assign(new Error("Trusted device signal must be signature verified before automatic SOS"), { status:409 });
+  if (signal.residentId && signal.residentId !== user.residentId) throw Object.assign(new Error("Current citizen cannot use this trusted device signal"), { status:403 });
+  const device = (data.emergencyTrustedDevices || []).find((item) => item.id === signal.trustedDeviceId || item.deviceId === signal.deviceId);
+  if (!device || device.status !== "active") throw Object.assign(new Error("Trusted device is not active for automatic SOS"), { status:409 });
+  if (signal.lifeChainEventId) {
+    const existing = data.emergencyEvents.find((item) => item.id === signal.lifeChainEventId);
+    if (existing) return attachSubmissionResult(existing, { deduplicated:true, eventId:existing.id, reason:"trusted-signal-already-linked" });
+  }
+  const event = createAutomaticSos(data, user, {
+    ...payload,
+    deviceId:signal.deviceId,
+    detectedSignal:signal.signal,
+    riskScore:signal.riskScore,
+    sourceSignalId:signal.sourceSignalId,
+    detectedAt:signal.occurredAt,
+    trustedDeviceSignalId:signal.id,
+    trustedDeviceId:signal.trustedDeviceId
+  }, EmergencyService);
+  signal.lifeChainEventId = event.id;
+  signal.lifeChainLinkedAt = now();
+  signal.lifeChainStatus = event.automaticSosSubmission?.deduplicated ? "deduplicated" : "linked";
+  event.sos.trustedDeviceSignalId = signal.id;
+  event.sos.trustedDeviceId = signal.trustedDeviceId;
+  appendAudit(data, user, "link-trusted-device-signal-to-life-chain", event.id, `${signal.deviceId}; ${signal.sourceSignalId}`);
+  return event;
+}
+
 function requestAutomaticSosCancellation(data, user, eventId, payload = {}) {
   ensureState(data); assertCitizen(user);
   if (![true, "true", "REQUEST REVIEW"].includes(payload.confirmed)) throw Object.assign(new Error("Cancellation review requires explicit confirmation"), { status:400 });
@@ -269,4 +300,4 @@ function buildQualityDashboard(data, user) {
   return { ok:true, generatedAt:now(), summary:{ cases:rows.length, automaticSos:rows.filter((row) => row.automatic).length, firstAidTaskCoverage:rows.filter((row) => row.firstAidTasks > 0).length, hospitalPrealertsConfirmed:rows.filter((row) => row.greenChannelStatus === "hospital-confirmed").length, weakNetworkFallbacks:rows.filter((row) => row.fallback).length, cancellationReviews:data.emergencyQualityReviews.filter((item) => visibleEventIds.has(item.eventId) && item.type === "automatic-sos-cancellation-review").length, suppressedDuplicateSignals:data.emergencySosSignalLog.filter((item) => visibleEventIds.has(item.eventId) && item.status === "suppressed-duplicate").length, closedLoopEvidence:rows.filter((row) => row.evidenceReady).length }, rows, boundary:"Quality dashboard uses platform timestamps; statutory quality reporting and official emergency performance assessment require locally approved indicators and data signoff." };
 }
 
-module.exports = { addFamilyContact, buildCommandCenter, buildOverview, buildQualityDashboard, confirmGreenChannel, coordinateEvent, createAuthorization, createAutomaticSos, ensureState, requestAutomaticSosCancellation, resolveAutomaticSosCancellation, revokeAuthorization, seed };
+module.exports = { addFamilyContact, buildCommandCenter, buildOverview, buildQualityDashboard, confirmGreenChannel, coordinateEvent, createAuthorization, createAutomaticSos, createAutomaticSosFromTrustedSignal, ensureState, requestAutomaticSosCancellation, resolveAutomaticSosCancellation, revokeAuthorization, seed };

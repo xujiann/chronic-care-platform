@@ -75,3 +75,14 @@ test("complete production evidence can open formal gate only after dual approval
 test("migration count mismatch is blocked", () => {
   assert.throws(() => service.reconcileMigration({}, businessOwner, "blood-migration-1", { sourceCount: 10, targetCount: 9, evidenceRef: "x" }), /matching/);
 });
+
+test("go-live audit entries form a tamper-evident digest chain", () => {
+  const data = {};
+  service.probe(data, businessOwner, "blood-his", { baseUrl: "https://prod/blood-his", credentialRef: "vault/blood-his" });
+  const first = data.bloodGoLiveAudit[0];
+  assert.equal(first.previousDigest, "GENESIS");
+  service.probe(data, businessOwner, "blood-lis", { baseUrl: "https://prod/blood-lis", credentialRef: "vault/blood-lis" });
+  const [latest, previous] = data.bloodGoLiveAudit;
+  assert.match(latest.digest, /^sha256:[a-f0-9]{64}$/);
+  assert.equal(latest.previousDigest, previous.digest);
+});
