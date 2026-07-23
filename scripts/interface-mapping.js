@@ -11,9 +11,9 @@ const FIELD_MAPPINGS = {
     targetCollection: "personalRecords",
     owner: "institution-integration",
     fields: {
-      externalId: "source.externalId",
+      externalId: "meta.source.externalId",
       residentId: "residentId",
-      institution: "sourceInstitution",
+      institution: "source",
       visitedAt: "recordDate"
     }
   },
@@ -21,7 +21,7 @@ const FIELD_MAPPINGS = {
     targetCollection: "personalRecords",
     owner: "institution-integration",
     fields: {
-      externalId: "source.externalId",
+      externalId: "meta.source.externalId",
       residentId: "residentId",
       diagnosis: "diagnosis",
       recordDate: "recordDate"
@@ -31,10 +31,25 @@ const FIELD_MAPPINGS = {
     targetCollection: "diagnosticReports",
     owner: "medical-resource-center",
     fields: {
-      externalId: "source.externalId",
+      externalId: "externalId",
       residentId: "residentId",
       item: "item",
       result: "result",
+      reportedAt: "reportedAt"
+    }
+  },
+  "public-health-direct-report-v1": {
+    targetCollection: "publicHealthEvents",
+    owner: "public-health-integration",
+    fields: {
+      externalId: "externalId",
+      subjectReference: "subjectReference",
+      institutionCode: "reportingInstitutionCode",
+      reportType: "reportType",
+      diseaseCode: "diseaseCode",
+      testCode: "testCode",
+      resultFlag: "resultFlag",
+      occurredAt: "occurredAt",
       reportedAt: "reportedAt"
     }
   },
@@ -42,7 +57,7 @@ const FIELD_MAPPINGS = {
     targetCollection: "diagnosticReports",
     owner: "medical-resource-center",
     fields: {
-      externalId: "source.externalId",
+      externalId: "externalId",
       residentId: "residentId",
       modality: "modality",
       conclusion: "conclusion",
@@ -76,17 +91,17 @@ const FIELD_MAPPINGS = {
     targetCollection: "insuranceClaims",
     owner: "cross-agency-integration",
     fields: {
-      externalId: "source.externalId",
+      externalId: "externalId",
       residentId: "residentId",
       claimStatus: "status",
-      amount: "amount"
+      amount: "totalAmount"
     }
   },
   "certificate-sync-v1": {
     targetCollection: "digitalCredentials",
     owner: "cross-agency-integration",
     fields: {
-      externalId: "source.externalId",
+      externalId: "externalId",
       certificateNo: "credentialNo",
       status: "status"
     }
