@@ -76,6 +76,7 @@ const {
   loadPublicHealthLaneCredentials
 } = require("./public-health-external-key-provider");
 const {
+  assertPublicHealthContractAttestationChain,
   assertUniquePublicHealthContractAttestations,
   contractAttestationUniqueKey,
   signTrustedPublicHealthContractAttestation
@@ -6587,13 +6588,16 @@ function assertPublicHealthExternalCas(data = {}, cas = {}) {
   return current;
 }
 
-function assertPublicHealthContractAttestationInsert(data = {}, constraint = {}) {
-  const key = contractAttestationUniqueKey(constraint);
-  const existing = (Array.isArray(data.publicHealthExternalContractAttestations)
-    ? data.publicHealthExternalContractAttestations
-    : []).find((item) => contractAttestationUniqueKey(item) === key);
-  if (existing) throw new Error(`public health contract attestation unique conflict: ${key}`);
-  return key;
+function assertPublicHealthContractAttestationInsert(data = {}, constraint = {}, incomingAttestations = []) {
+  return assertPublicHealthContractAttestationChain({
+    persistedAttestations: Array.isArray(data.publicHealthExternalContractAttestations)
+      ? data.publicHealthExternalContractAttestations
+      : [],
+    incomingAttestations,
+    attestation: constraint.attestation || constraint,
+    signingMaterial: constraint.signingMaterial,
+    at: constraint.at
+  });
 }
 
 function writeDatabase(data, options = {}) {
@@ -6601,14 +6605,18 @@ function writeDatabase(data, options = {}) {
   const publicHealthExternalCas = options.publicHealthExternalCas || null;
   const publicHealthExternalContractInsert = options.publicHealthExternalContractInsert || null;
   const sqlite = shouldUseSqlite();
+  const normalized = normalizeState(data);
   if ((publicHealthExternalCas || publicHealthExternalContractInsert) && !sqlite) {
     const persisted = fs.existsSync(DB_FILE) ? JSON.parse(fs.readFileSync(DB_FILE, "utf8")) : {};
     if (publicHealthExternalCas) assertPublicHealthExternalCas(persisted, publicHealthExternalCas);
     if (publicHealthExternalContractInsert) {
-      assertPublicHealthContractAttestationInsert(persisted, publicHealthExternalContractInsert);
+      assertPublicHealthContractAttestationInsert(
+        persisted,
+        publicHealthExternalContractInsert,
+        normalized.publicHealthExternalContractAttestations
+      );
     }
   }
-  const normalized = normalizeState(data);
   assertUniquePublicHealthContractAttestations(normalized.publicHealthExternalContractAttestations);
   normalized.storageMeta = data.storageMeta || storageMeta();
   if (sqlite) {
@@ -6824,7 +6832,7 @@ function writeSqliteState(
         .get("publicHealthExternalContractAttestations");
       assertPublicHealthContractAttestationInsert({
         publicHealthExternalContractAttestations: row ? JSON.parse(row.payload) : []
-      }, publicHealthExternalContractInsert);
+      }, publicHealthExternalContractInsert, data.publicHealthExternalContractAttestations);
     }
     const normalized = normalizeState(data);
     const entries = Object.entries(normalized).filter(([key]) => key !== "storageMeta");
@@ -23629,6 +23637,7 @@ async function handleApi(req, res) {
     const idempotencyKey = String(req.headers["idempotency-key"] || "").trim();
     let payload = {};
     let requestDigest = "";
+    let signedAttestation = null;
     try {
       payload = await collectJson(req);
       if (!idempotencyKey) throw new Error("public health contract attestation idempotency key is required");
@@ -23644,6 +23653,7 @@ async function handleApi(req, res) {
         user,
         at
       });
+      signedAttestation = signed.attestation;
       requestDigest = publicHealthContractAttestationRequestDigest(signed.attestation, payload.evidenceId);
       const key = contractAttestationUniqueKey(signed.attestation);
       const replayAudit = (data.publicHealthExternalContractGovernanceAudit || [])
@@ -23694,7 +23704,10 @@ async function handleApi(req, res) {
         event: "public-health-external-contract-attestation",
         publicHealthExternalContractInsert: {
           laneId: signed.attestation.laneId,
-          fromContract: signed.attestation.fromContract
+          fromContract: signed.attestation.fromContract,
+          attestation: signed.attestation,
+          signingMaterial: context.signingMaterial,
+          at
         }
       });
       sendJson(res, 201, publicHealthExternalPublicView({
@@ -23716,8 +23729,8 @@ async function handleApi(req, res) {
             idempotencyKey,
             requestDigest,
             evidenceId: payload.evidenceId,
-            laneId: payload.laneId,
-            fromContract: payload.fromContract,
+            laneId: signedAttestation?.laneId || payload.laneId,
+            fromContract: signedAttestation?.fromContract || payload.fromContract,
             detail: error.message
           })
         ];

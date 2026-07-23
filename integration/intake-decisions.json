@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-23T14:44:45.018Z",
+  "updatedAt": "2026-07-23T14:59:30.244Z",
   "decisions": [
     {
       "lineId": "T01",
@@ -47,24 +47,26 @@
     },
     {
       "lineId": "T08",
-      "candidateHead": "85608d8aa587d5860f4752ca0747b47e6f8a8628",
+      "candidateHead": "771c727b8abe7c722248d40656d6b91dfb67f3cf",
       "decision": "accepted",
-      "reviewedAt": "2026-07-23T14:44:45.018Z",
+      "reviewedAt": "2026-07-23T14:59:30.244Z",
       "reviewer": "T00",
       "checks": [
         "git diff --check",
-        "T08 reported 133 of 133 contract-governance and cutover targeted tests passed",
-        "T00 independently merged exact candidate 85608d8 and passed the focused public-health contract/resilience regression",
+        "T08 reported 136 of 136 chained contract-governance and cutover targeted tests passed",
+        "T00 independently merged exact candidate 771c727 and passed the focused public-health contract/resilience regression",
         "managed active and grace key verification, callback replay rejection and audit-chain tamper rejection validated",
         "server-only policies cover eight lanes and cannot be overridden by enqueue, claim or attempt payloads",
         "contract governance keyring is independent and non-enumerable; client-reported approval status and contractBinding are ignored",
         "deployed T08/T00 artifacts, field dictionary, bidirectional samples, joint test and rollback evidence are digest-bound before server signing",
-        "laneId plus fromContract is unique and accepted/rejected governance attempts persist without last-write-wins",
+        "laneId plus fromContract remains unique while one lane can append a signed v1 to v2 to v3 transition chain",
+        "the transaction locks and validates the complete predecessor chain; branch, gap, approval-order and window-overlap risks fail closed",
         "dispatch and lane-control versions are CAS-checked while outbox, resilience, contract credentials and audit persist in one SQLite transaction",
         "backpressure, rate limiting, concurrent claim, open rejection, single-probe recovery and probe-failure reopen are covered",
-        "active v2 enqueue/receipt binding, deprecated v1 claim, sunset rejection, active-contract dead-letter successor and cutover alerts are covered",
+        "active v3 enqueue/receipt binding, retired v1, deprecated v2, later-chain recovery successors and per-transition cutover tracks are covered",
+        "historical attestations rebuild at sunsetAt and production keyrings must retain their verification material",
         "legacy-static remains compatibility-only and all external runtime projections remain productionReady false",
-        "T00 aggregate final readiness passes 45 of 45 checks"
+        "T00 aggregate final readiness passes 47 of 47 checks"
       ],
       "blockers": []
     },

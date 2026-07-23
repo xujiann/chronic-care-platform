@@ -3,14 +3,60 @@ const crypto = require("node:crypto");
 const test = require("node:test");
 
 const {
+  assertPublicHealthContractAttestationChain,
   assertUniquePublicHealthContractAttestations,
   publicHealthContractRuntimeReleaseDigest,
   signTrustedPublicHealthContractAttestation
 } = require("../public-health-external-contract-integration");
+const {
+  signPublicHealthExternalContractAttestation
+} = require("../public-health-external-contract-governance-service");
 
 const AT = "2026-07-23T08:00:00.000Z";
 const SECRET = "contract-integration-secret-1234567890-123";
 const hex = (value) => crypto.createHash("sha256").update(value).digest("hex");
+
+function signedTransition({
+  fromContract,
+  toContract,
+  issuedAt,
+  effectiveAt,
+  sunsetAt,
+  producerApprovedAt,
+  consumerApprovedAt
+}) {
+  const version = Number(toContract.match(/-v(\d+)$/)?.[1]);
+  return signPublicHealthExternalContractAttestation({
+    laneId: "immunization",
+    fromContract,
+    toContract,
+    requestSchemaVersion: `public-health-external-dispatch/v${version}`,
+    receiptSchemaVersion: `public-health-external-receipt/v${version}`,
+    changeType: "additive",
+    fieldDictionaryDigest: hex(`fields:${toContract}`),
+    sampleRequestDigest: hex(`request:${toContract}`),
+    sampleReceiptDigest: hex(`receipt:${toContract}`),
+    runtimeReleaseDigest: hex(`runtime:${toContract}`),
+    producerApproval: {
+      organizationId: "producer-org",
+      role: "producer-contract-owner",
+      approverIdHash: hex(`producer:${toContract}`),
+      approvedAt: producerApprovedAt
+    },
+    consumerApproval: {
+      organizationId: "consumer-org",
+      role: "consumer-contract-owner",
+      approverIdHash: hex(`consumer:${toContract}`),
+      approvedAt: consumerApprovedAt
+    },
+    evidenceRefs: [`fields:${toContract}`, `joint-test:${toContract}`, `rollback:${toContract}`],
+    effectiveAt,
+    sunsetAt,
+    status: "approved",
+    issuedAt,
+    expiresAt: new Date(new Date(sunsetAt).getTime() + 86_400_000).toISOString()
+  }, SECRET);
+}
 
 function trustedEvidence() {
   const t08ReleaseDigest = hex("T08-904e2e0");
@@ -121,4 +167,83 @@ test("lane and from-contract uniqueness prevents last-write-wins", () => {
     first,
     { ...first, toContract: "immunization-registry-v2-forged" }
   ]), /unique conflict/);
+});
+
+test("transaction chain validation allows sequential upgrades and rejects every P0 topology", () => {
+  const first = signedTransition({
+    fromContract: "immunization-registry-v1",
+    toContract: "immunization-registry-v2",
+    producerApprovedAt: "2026-07-23T06:00:00.000Z",
+    consumerApprovedAt: "2026-07-23T07:00:00.000Z",
+    issuedAt: "2026-07-23T08:00:00.000Z",
+    effectiveAt: "2026-07-24T00:00:00.000Z",
+    sunsetAt: "2026-08-24T00:00:00.000Z"
+  });
+  const second = signedTransition({
+    fromContract: "immunization-registry-v2",
+    toContract: "immunization-registry-v3",
+    producerApprovedAt: "2026-08-25T06:00:00.000Z",
+    consumerApprovedAt: "2026-08-25T07:00:00.000Z",
+    issuedAt: "2026-08-25T08:00:00.000Z",
+    effectiveAt: "2026-08-26T00:00:00.000Z",
+    sunsetAt: "2026-09-26T00:00:00.000Z"
+  });
+  const accepted = assertPublicHealthContractAttestationChain({
+    persistedAttestations: [first],
+    incomingAttestations: [first, second],
+    attestation: second,
+    signingMaterial: SECRET,
+    at: second.issuedAt
+  });
+  assert.equal(accepted.transitions, 2);
+
+  assert.throws(() => assertPublicHealthContractAttestationChain({
+    persistedAttestations: [first],
+    incomingAttestations: [first, { ...first, toContract: "immunization-registry-v2-forged" }],
+    attestation: { ...first, toContract: "immunization-registry-v2-forged" },
+    signingMaterial: SECRET,
+    at: second.issuedAt
+  }), /contract-transition-conflict/);
+
+  assert.throws(() => assertPublicHealthContractAttestationChain({
+    persistedAttestations: [],
+    incomingAttestations: [second],
+    attestation: second,
+    signingMaterial: SECRET,
+    at: second.issuedAt
+  }), /contract-transition-disconnected/);
+
+  const invalidOrder = signedTransition({
+    fromContract: "immunization-registry-v2",
+    toContract: "immunization-registry-v3",
+    producerApprovedAt: "2026-07-23T07:30:00.000Z",
+    consumerApprovedAt: "2026-07-23T07:45:00.000Z",
+    issuedAt: "2026-08-25T08:00:00.000Z",
+    effectiveAt: "2026-08-26T00:00:00.000Z",
+    sunsetAt: "2026-09-26T00:00:00.000Z"
+  });
+  assert.throws(() => assertPublicHealthContractAttestationChain({
+    persistedAttestations: [first],
+    incomingAttestations: [first, invalidOrder],
+    attestation: invalidOrder,
+    signingMaterial: SECRET,
+    at: invalidOrder.issuedAt
+  }), /contract-transition-approval-order-invalid/);
+
+  const overlap = signedTransition({
+    fromContract: "immunization-registry-v2",
+    toContract: "immunization-registry-v3",
+    producerApprovedAt: "2026-08-19T06:00:00.000Z",
+    consumerApprovedAt: "2026-08-19T07:00:00.000Z",
+    issuedAt: "2026-08-19T08:00:00.000Z",
+    effectiveAt: "2026-08-20T00:00:00.000Z",
+    sunsetAt: "2026-09-20T00:00:00.000Z"
+  });
+  assert.throws(() => assertPublicHealthContractAttestationChain({
+    persistedAttestations: [first],
+    incomingAttestations: [first, overlap],
+    attestation: overlap,
+    signingMaterial: SECRET,
+    at: overlap.issuedAt
+  }), /contract-transition-window-overlap/);
 });

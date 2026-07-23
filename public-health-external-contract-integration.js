@@ -1,5 +1,6 @@
 const crypto = require("node:crypto");
 const {
+  buildPublicHealthExternalContractGovernance,
   signPublicHealthExternalContractAttestation
 } = require("./public-health-external-contract-governance-service");
 
@@ -156,13 +157,75 @@ function assertUniquePublicHealthContractAttestations(attestations = []) {
   const seen = new Set();
   (Array.isArray(attestations) ? attestations : []).forEach((item) => {
     const key = contractAttestationUniqueKey(item);
-    if (seen.has(key)) throw new Error(`public health contract attestation unique conflict: ${key}`);
+    if (seen.has(key)) {
+      throw new Error(`public health contract attestation unique conflict: contract-transition-conflict:${key}`);
+    }
     seen.add(key);
   });
 }
 
+function stableValue(value) {
+  if (Array.isArray(value)) return value.map(stableValue);
+  if (value && typeof value === "object") {
+    return Object.keys(value).sort().reduce((result, key) => {
+      result[key] = stableValue(value[key]);
+      return result;
+    }, {});
+  }
+  return value;
+}
+
+function stableStringify(value) {
+  return JSON.stringify(stableValue(value));
+}
+
+function assertPublicHealthContractAttestationChain({
+  persistedAttestations = [],
+  incomingAttestations = [],
+  attestation,
+  signingMaterial,
+  at
+} = {}) {
+  const persisted = Array.isArray(persistedAttestations) ? persistedAttestations : [];
+  const incoming = Array.isArray(incomingAttestations) ? incomingAttestations : [];
+  const key = contractAttestationUniqueKey(attestation);
+  if (persisted.some((item) => contractAttestationUniqueKey(item) === key)) {
+    throw new Error(`public health contract attestation unique conflict: contract-transition-conflict:${key}`);
+  }
+  if (incoming.length !== persisted.length + 1) {
+    throw new Error("public health contract attestation insert must append exactly one signed transition");
+  }
+  persisted.forEach((item) => {
+    const persistedKey = contractAttestationUniqueKey(item);
+    const unchanged = incoming.find((candidate) => contractAttestationUniqueKey(candidate) === persistedKey);
+    if (!unchanged || stableStringify(unchanged) !== stableStringify(item)) {
+      throw new Error(`public health contract attestation history mutation rejected: ${persistedKey}`);
+    }
+  });
+  const inserted = incoming.find((item) => contractAttestationUniqueKey(item) === key);
+  if (!inserted || stableStringify(inserted) !== stableStringify(attestation)) {
+    throw new Error(`public health contract attestation insert mismatch: ${key}`);
+  }
+  const laneId = clean(attestation.laneId);
+  const governance = buildPublicHealthExternalContractGovernance({
+    attestations: incoming.filter((item) => clean(item.laneId) === laneId),
+    signingMaterial,
+    at
+  });
+  const issue = governance.issues.find((item) => item.severity === "P0" && item.laneId === laneId);
+  if (issue) {
+    throw new Error(`public health contract attestation chain rejected: ${issue.code}:${laneId}`);
+  }
+  return {
+    key,
+    laneId,
+    transitions: governance.entries.find((item) => item.laneId === laneId)?.transitions.length || 0
+  };
+}
+
 module.exports = {
   assertPublicHealthContractGovernanceActor,
+  assertPublicHealthContractAttestationChain,
   assertUniquePublicHealthContractAttestations,
   contractAttestationUniqueKey,
   parsePublicHealthContractReleaseEvidence,
