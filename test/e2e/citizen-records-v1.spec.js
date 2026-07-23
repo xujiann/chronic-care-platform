@@ -160,6 +160,10 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
           date: authorizationExpiry.slice(0, 10),
           name: "家庭医生续约团队",
           status: "active",
+          receiptId: "receipt-auth-renew-e2e",
+          auditRef: "audit-auth-renew-e2e",
+          creationReceiptId: "receipt-auth-renew-e2e",
+          creationAuditRef: "audit-auth-renew-e2e",
           meta: {
             status: "active",
             granteeId: "team-renew-e2e",
@@ -231,6 +235,9 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
   await expect(page.locator("#citizen-current-subject")).toContainText("当前查看");
   await expect(page.locator("#citizen-care-sync-status")).toContainText("已安全同步");
   await page.evaluate(() => document.querySelector("#refresh-access-review").click());
+  await expect(page.locator("#citizen-authorization-receipt-summary")).toContainText("1/4 条操作证据完整");
+  await expect(page.locator("#citizen-authorization-receipt-summary")).toContainText("3 条待补回执");
+  await expect(page.locator("#citizen-authorization-receipt-list")).toContainText("receipt-auth-renew-e2e");
   await expect(page.locator("#citizen-access-review-v2-list")).toContainText("陌生机构A");
   await expect(page.locator("#citizen-access-review-v2-list")).toContainText("未匹配当前有效授权");
   await expect(page.locator("#citizen-access-review-v2-list")).toContainText("已拦截，未披露");

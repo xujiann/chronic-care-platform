@@ -638,9 +638,13 @@
       }
     });
     if (!CitizenRecordsV1.authorizationState(merged).active) throw new Error("授权创建响应未确认有效状态");
+    const receipt = projectActionReceipt(payload, { residentId: expected.residentId, resourceId: projected.id });
     return {
       ...merged,
-      ...projectActionReceipt(payload, { residentId: expected.residentId, resourceId: projected.id })
+      ...receipt,
+      creationReceiptId: receipt.receiptId,
+      creationAuditRef: receipt.auditRef,
+      creationAcceptedAt: receipt.acceptedAt
     };
   }
 
@@ -672,9 +676,21 @@
         revokedAt
       }
     });
+    const receipt = projectActionReceipt(payload, { residentId: expected.residentId, resourceId: expected.id });
+    const creationReceiptId = cleanText(record.creationReceiptId || record.receiptId, 160);
+    const creationAuditRef = cleanText(record.creationAuditRef || record.auditRef, 160);
+    if ((creationReceiptId && receipt.receiptId === creationReceiptId) || (creationAuditRef && receipt.auditRef === creationAuditRef)) {
+      throw new Error("授权撤销回执不得复用创建受理编号或审计关联号");
+    }
     return {
       ...revoked,
-      ...projectActionReceipt(payload, { residentId: expected.residentId, resourceId: expected.id })
+      ...receipt,
+      creationReceiptId,
+      creationAuditRef,
+      creationAcceptedAt: cleanText(record.creationAcceptedAt || record.acceptedAt, 60),
+      revocationReceiptId: receipt.receiptId,
+      revocationAuditRef: receipt.auditRef,
+      revocationAcceptedAt: receipt.acceptedAt
     };
   }
 
@@ -1116,6 +1132,56 @@
     };
   }
 
+  function buildAuthorizationReceiptLedger(records = [], residentId = "") {
+    const expectedResidentId = cleanText(residentId, 120);
+    const items = (Array.isArray(records) ? records : [])
+      .map((record) => CitizenRecordsV1?.projectRecord({ ...record, category: record?.category || "authorizations" }))
+      .filter((record) => record?.category === "authorizations" && (!expectedResidentId || record.residentId === expectedResidentId))
+      .map((record) => {
+        const lifecycle = CitizenRecordsV1.authorizationState(record);
+        const revoked = lifecycle.key === "revoked";
+        const creationReceiptId = cleanText(record.creationReceiptId || (!revoked ? record.receiptId : ""), 160);
+        const creationAuditRef = cleanText(record.creationAuditRef || (!revoked ? record.auditRef : ""), 160);
+        const revocationReceiptId = cleanText(record.revocationReceiptId || (revoked ? record.receiptId : ""), 160);
+        const revocationAuditRef = cleanText(record.revocationAuditRef || (revoked ? record.auditRef : ""), 160);
+        const creationVerified = Boolean(creationReceiptId && creationAuditRef);
+        const revocationVerified = !revoked || Boolean(revocationReceiptId && revocationAuditRef);
+        const issues = [];
+        if (!creationVerified) issues.push("创建回执缺少受理编号或审计关联号");
+        if (!revocationVerified) issues.push("撤销回执缺少受理编号或审计关联号");
+        return {
+          id: cleanText(record.id, 160),
+          residentId: cleanText(record.residentId, 120),
+          granteeName: cleanText(record.name, 200),
+          lifecycleKey: lifecycle.key,
+          lifecycleLabel: lifecycle.label,
+          creation: {
+            receiptId: creationReceiptId,
+            auditRef: creationAuditRef,
+            acceptedAt: cleanText(record.creationAcceptedAt || (!revoked ? record.acceptedAt : ""), 60),
+            verified: creationVerified
+          },
+          revocation: {
+            required: revoked,
+            receiptId: revocationReceiptId,
+            auditRef: revocationAuditRef,
+            acceptedAt: cleanText(record.revocationAcceptedAt || (revoked ? record.acceptedAt : ""), 60),
+            verified: revocationVerified
+          },
+          verified: creationVerified && revocationVerified,
+          issues
+        };
+      });
+    items.sort((left, right) => Number(left.verified) - Number(right.verified) || left.granteeName.localeCompare(right.granteeName));
+    return {
+      items,
+      total: items.length,
+      verified: items.filter((item) => item.verified).length,
+      incomplete: items.filter((item) => !item.verified).length,
+      revoked: items.filter((item) => item.lifecycleKey === "revoked").length
+    };
+  }
+
   function buildAuthorizationLifecycle(records = [], now = new Date(), warningDays = 30) {
     const reference = toDate(now) || new Date();
     const warningWindowDays = Math.max(1, Math.min(Number(warningDays) || 30, 90));
@@ -1245,6 +1311,7 @@
     projectAccessReviewActionReceipt,
     buildAccessExportRows,
     filterResidentRecords,
+    buildAuthorizationReceiptLedger,
     buildAuthorizationLifecycle,
     buildAuthorizationRenewalDraft,
     summarizeCareWorkspace

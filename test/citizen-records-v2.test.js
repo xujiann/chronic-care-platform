@@ -613,6 +613,8 @@ test("authorization create response preserves the resident request and strips se
   assert.equal(projected.meta.granteeId, "team-r1");
   assert.equal(projected.receiptId, "receipt-auth-create-1");
   assert.equal(projected.auditRef, "audit-auth-create-1");
+  assert.equal(projected.creationReceiptId, "receipt-auth-create-1");
+  assert.equal(projected.creationAuditRef, "audit-auth-create-1");
   assert.doesNotMatch(JSON.stringify(projected), /personIndex|objectKey|must-not-pass/);
   assert.throws(() => V2.projectAuthorizationCreateResponse({
     ...request,
@@ -646,7 +648,11 @@ test("authorization revoke response cannot alter immutable authorization fields"
       expiresAt: "2027-12-31",
       grantedAt: "2026-07-23T08:00:00.000Z"
     }),
-    id: "auth-revoke-1"
+    id: "auth-revoke-1",
+    receiptId: "receipt-auth-create-original",
+    auditRef: "audit-auth-create-original",
+    creationReceiptId: "receipt-auth-create-original",
+    creationAuditRef: "audit-auth-create-original"
   };
   const revoked = V2.projectAuthorizationRevocationResponse({
     ...record,
@@ -662,6 +668,10 @@ test("authorization revoke response cannot alter immutable authorization fields"
   assert.equal(revoked.meta.granteeId, "hospital-a");
   assert.equal(revoked.receiptId, "receipt-auth-revoke-1");
   assert.equal(revoked.auditRef, "audit-auth-revoke-1");
+  assert.equal(revoked.creationReceiptId, "receipt-auth-create-original");
+  assert.equal(revoked.creationAuditRef, "audit-auth-create-original");
+  assert.equal(revoked.revocationReceiptId, "receipt-auth-revoke-1");
+  assert.equal(revoked.revocationAuditRef, "audit-auth-revoke-1");
   assert.equal(V1.authorizationState(revoked).key, "revoked");
   assert.doesNotMatch(JSON.stringify(revoked), /恶意覆盖对象|objectKey|must-not-pass/);
   assert.throws(() => V2.projectAuthorizationRevocationResponse({
@@ -677,6 +687,42 @@ test("authorization revoke response cannot alter immutable authorization fields"
     revokedAt: "2026-07-24T01:00:00.000Z",
     revokeReason: "resident-requested"
   }, record, "resident-requested"));
+});
+
+test("authorization receipt ledger is resident scoped and flags incomplete operation evidence", () => {
+  const complete = {
+    ...V1.buildAuthorizationRecord({
+      residentId: "r1",
+      granteeName: "医院A",
+      granteeId: "hospital-a",
+      granteeType: "institution",
+      purpose: "复诊",
+      scopes: ["emr-summary"],
+      expiresAt: "2027-12-31",
+      grantedAt: "2026-07-23T08:00:00.000Z"
+    }),
+    id: "auth-ledger-complete",
+    creationReceiptId: "receipt-create-complete",
+    creationAuditRef: "audit-create-complete"
+  };
+  const revokedMissingReceipt = {
+    ...complete,
+    id: "auth-ledger-revoked",
+    status: "revoked",
+    revokedAt: "2026-07-24T01:00:00.000Z",
+    meta: { ...complete.meta, status: "revoked", revokedAt: "2026-07-24T01:00:00.000Z" }
+  };
+  const otherResident = { ...complete, id: "auth-ledger-r2", residentId: "r2" };
+  const ledger = V2.buildAuthorizationReceiptLedger([complete, revokedMissingReceipt, otherResident], "r1");
+  assert.equal(ledger.total, 2);
+  assert.equal(ledger.verified, 1);
+  assert.equal(ledger.incomplete, 1);
+  assert.equal(ledger.revoked, 1);
+  assert.equal(ledger.items.some((item) => item.residentId === "r2"), false);
+  const revoked = ledger.items.find((item) => item.id === "auth-ledger-revoked");
+  assert.equal(revoked.creation.verified, true);
+  assert.equal(revoked.revocation.verified, false);
+  assert.deepEqual(revoked.issues, ["撤销回执缺少受理编号或审计关联号"]);
 });
 
 test("authorization lifecycle highlights expiring and incomplete records", () => {
