@@ -490,6 +490,16 @@ Writes use `POST /api/quality-operations-governance/items/:id/actions`. The serv
 
 Run `npm.cmd run quality-operations:governance-readiness` to generate `release/quality-operations-governance-readiness-report.json` and `release/quality-operations-governance-readiness-report.md`. Local routing readiness does not mean production readiness: `productionReady` remains `false` until trusted identity and institution directories, HIS/EMR/LIS/PACS, bed/roster/equipment/transfer sources, scanner and insurance callbacks, production database, SIEM, alert duty coverage, and disaster-recovery evidence are connected and accepted.
 
+## Public Health External Coordination and Key Rotation
+
+T00 registers the eight-lane coordination runtime and external outbox through `GET /api/public-health/coordination-runtime`, versioned coordination actions, external enqueue, due-worker claim and attempt, signed public callback, governed dead-letter recovery, operations-board, and key-rotation routes under `/api/public-health/external/`. Every write uses the server receive time; client-supplied validation time is ignored.
+
+`public-health-external-key-provider.js` loads separate request and receipt keyrings by lane through an injectable managed-key-service contract. Keyring values are non-enumerable and are never merged into shared state, logs, responses, or release reports. Non-production static secrets remain compatibility-only, while production fails closed without keyring references and a managed loader. Claim, attempt, recovery, audit reconciliation, and operations-board verification receive the complete request keyring so records signed by a grace key remain verifiable.
+
+`public-health-external-worker.js` is the transport-injected worker boundary. It obtains lane credentials at execution time, persists the signed claim lease before calling transport, assigns server time to the attempt, and persists the signed result afterward. It does not contain a real network connector or trusted credential implementation; those remain production-owned dependencies.
+
+The enforced rotation sequence is new active key, old grace key, cross-key audit smoke, cross-key callback smoke, then old-key expiry or revocation. An emergency revocation creates a P0 security-quarantine disposition; automatic resign and automatic recovery remain disabled. Run `npm.cmd run public-health:final-readiness` for the aggregate 35-check report. `productionReady` remains `false` until real managed keys, HTTPS endpoints, service identity, trusted site evidence, external joint tests, monitoring duty, SIEM, database and disaster-recovery evidence are accepted.
+
 ## Health Dashboard Aggregate Entry
 
 - `health-dashboard.html` is priority application 8: the aggregate entry for the first seven applications.

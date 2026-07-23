@@ -314,8 +314,12 @@ function buildPublicHealthFinalReadiness(options = {}) {
   const runtimeSource = options.runtimeSource ?? fs.readFileSync(path.join(ROOT, "public-health-coordination-runtime.js"), "utf8");
   const adapterSource = options.adapterSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-adapter-service.js"), "utf8");
   const adapterRuntimeSource = options.adapterRuntimeSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-adapter-runtime.js"), "utf8");
+  const workerSource = options.workerSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-worker.js"), "utf8");
   const operationsSource = options.operationsSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-operations-service.js"), "utf8");
   const keyringSource = options.keyringSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-keyring-service.js"), "utf8");
+  const keyProviderSource = options.keyProviderSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-key-provider.js"), "utf8");
+  const serverSource = options.serverSource ?? fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
+  const packageSource = options.packageSource ?? fs.readFileSync(path.join(ROOT, "package.json"), "utf8");
   const pageSource = options.pageSource ?? fs.readFileSync(path.join(ROOT, "public-health.js"), "utf8");
   const doc = options.doc ?? fs.readFileSync(path.join(ROOT, "docs", "public-health-eight-domain-coordination.md"), "utf8");
   const keyringDoc = options.keyringDoc ?? fs.readFileSync(path.join(ROOT, "docs", "public-health-external-key-rotation.md"), "utf8");
@@ -361,14 +365,29 @@ function buildPublicHealthFinalReadiness(options = {}) {
     check("operations:risk-queue-contract", ["audit-dispatch-missing", "coordination-handoff-missing", "coordination-state-mismatch", "worker-lease-expired", "retry-due-unclaimed", "pending-dispatch-overdue", "dead-letter-unrecovered"].every((token) => operationsSource.includes(token)), "integrity, orphan audit/task, mismatch, lease, retry, SLA and dead-letter risks have explicit codes", "operations"),
     check("frontend:action-route-contract", pageSource.includes("/api/public-health/coordination/") && pageSource.includes("idempotencyKey") && pageSource.includes("expectedVersion"), "T00 route boundary has a stable client contract", "integration"),
     check("integration:documented-boundary", ["public-health-coordination-runtime.js", "public-health-external-adapter-service.js", "T00", "server.js", "productionReady"].every((token) => doc.includes(token)) && ["requestKeyring", "receiptKeyring", "receiptReplayKeyHash", "legacy-static"].every((token) => keyringDoc.includes(token)), "runtime, adapter, key lifecycle and T00 boundaries are documented", "integration"),
+    check("integration:t00-public-routes", [
+      "/api/public-health/coordination-runtime",
+      "publicHealthExternalEnqueueMatch",
+      "/api/public-health/external/outbox/due",
+      "publicHealthExternalClaimMatch",
+      "publicHealthExternalAttemptMatch",
+      "publicHealthExternalCallbackMatch",
+      "publicHealthExternalRecoveryMatch",
+      "/api/public-health/external/operations-board",
+      "/api/public-health/external/key-rotation"
+    ].every((token) => serverSource.includes(token)), "coordination, enqueue, worker, callback, recovery, operations and rotation routes are registered", "integration"),
+    check("integration:t00-managed-key-provider", ["loadPublicHealthLaneCredentials", "managed-key-service", "REQUEST_KEYRING_REF", "RECEIPT_KEYRING_REF", "privateCredentials"].every((token) => keyProviderSource.includes(token)), "lane keyrings load through a non-enumerable managed-key provider contract", "integration"),
+    check("integration:t00-server-time", serverSource.includes("publicHealthExternalCallbackMatch") && serverSource.includes("const at = new Date().toISOString()") && serverSource.includes("requestKeyring: credentials.requestKeyring") && serverSource.includes("receiptKeyring: credentials.receiptKeyring") && ["serverTime", "requestKeyring: credentials.requestKeyring", "receiptKeyring: credentials.receiptKeyring", "writeState(claimed.nextData"].every((token) => workerSource.includes(token)), "enqueue, worker and callback controllers inject server time and complete keyrings; worker persists its lease before transport", "integration"),
+    check("integration:t00-release-script", packageSource.includes("\"public-health:final-readiness\"") && packageSource.includes("test/public-health-external-api.test.js"), "package scripts register final readiness and public API regression", "integration"),
     check("safety:functional-not-production", runtime.productionReady === false && registry.productionReady === false && deliveries.every((item) => item.productionReady === false), "functional acceptance cannot self-assert production readiness", "safety"),
-    check("safety:trusted-site-evidence-blocker", deliveries.every((item) => /site evidence/i.test(item.blocker)), "every accepted delivery retains the trusted site-evidence blocker", "safety")
+    check("safety:trusted-site-evidence-blocker", deliveries.every((item) => /site evidence/i.test(item.blocker)), "every accepted delivery retains the trusted site-evidence blocker", "safety"),
+    check("safety:emergency-revocation-quarantine", ["security-quarantine", "automaticResignAllowed", "automaticRecoveryAllowed", "key-revoked"].every((token) => keyProviderSource.includes(token)), "emergency revocation is quarantined without automatic resign or recovery", "safety")
   ];
   return {
     generatedAt: new Date().toISOString(),
     ok: checks.every((item) => item.passed),
     functionalState: "t08-public-health-planned-functions-complete",
-    formalGoLiveState: "blocked-until-t00-integration-production-endpoints-and-trusted-site-evidence-verified",
+    formalGoLiveState: "blocked-until-production-key-service-endpoints-and-trusted-site-evidence-verified",
     summary: {
       checks: checks.length,
       passed: checks.filter((item) => item.passed).length,
@@ -414,14 +433,14 @@ function buildPublicHealthFinalReadiness(options = {}) {
       externalAdapters: "public-health-external-adapter-service.js",
       externalAdapterRuntime: "public-health-external-adapter-runtime.js",
       externalKeyring: "public-health-external-keyring-service.js",
+      externalKeyProvider: "public-health-external-key-provider.js",
+      externalWorker: "public-health-external-worker.js",
       externalOperations: "public-health-external-operations-service.js",
       documentation: "docs/public-health-eight-domain-coordination.md",
       keyRotationDocumentation: "docs/public-health-external-key-rotation.md"
     },
     remainingT00Integration: [
-      "Wire coordination actions plus external enqueue, due-worker claim/attempt, signed callback, governed dead-letter recovery and operations-board routes to the T08 controllers and durable data writer.",
-      "Register shared server, package, style, README and aggregate release entries owned by T00.",
-      "Provision production HTTPS endpoints and managed request/receipt keyrings, then verify rotation, revocation, signed external receipts and trusted site evidence."
+      "Production remains blocked until the real managed key service, HTTPS endpoints, worker identity, cross-key audit/callback smoke, trusted site evidence and formal operations acceptance are available."
     ]
   };
 }
@@ -443,7 +462,7 @@ function renderMarkdown(report) {
     "|---|---|---|---|",
     ...report.checks.map((item) => `| ${item.passed ? "PASS" : "FAIL"} | ${item.category} | ${item.id} | ${String(item.detail).replace(/\|/g, "/")} |`),
     "",
-    "## Remaining T00 and site integration",
+    "## Remaining production integration",
     "",
     ...report.remainingT00Integration.map((item) => `- ${item}`),
     ""

@@ -584,6 +584,10 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.publicHealthReadiness.cutoverDrillBoard.summary.openFindings >= 4, true);
   assert.equal(report.publicHealthReadiness.launchGate.summary.requirements >= 8, true);
   assert.equal(report.publicHealthReadiness.launchGate.releaseGate, "site-evidence-required");
+  assert.equal(report.publicHealthFinalReadiness.ok, true);
+  assert.equal(report.publicHealthFinalReadiness.summary.passed, 35);
+  assert.equal(report.publicHealthFinalReadiness.productionReady, false);
+  assert.equal(report.checks.some((item) => item.name === "publicHealthFinal:keyProvider" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "citizenLaunch:readiness" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "citizenLaunch:phoneCodeDelivery" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "citizenLaunch:accountProvisioning" && item.passed), true);
@@ -674,6 +678,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(markdown, /Environment matrix report/);
   assert.match(markdown, /Hybrid deployment readiness report/);
   assert.match(markdown, /public-health-readiness-report\.md/);
+  assert.match(markdown, /public-health-final-readiness-report\.md/);
   assert.match(markdown, /Release artifact manifest/);
   assert.match(markdown, /Quality-safety institution interface standard/);
   assert.match(markdown, /Quality-safety institution joint-test pack/);

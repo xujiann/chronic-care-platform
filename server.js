@@ -52,6 +52,28 @@ const {
   listGovernanceRecords,
   publicGovernanceRecord
 } = require("./quality-operations-governance-adapter");
+const {
+  applyPublicHealthCoordinationActionToState,
+  buildPublicHealthCoordinationRuntime
+} = require("./public-health-coordination-runtime");
+const {
+  claimPublicHealthExternalDispatchToState,
+  enqueuePublicHealthExternalDispatchToState,
+  listDuePublicHealthExternalDispatches,
+  recordClaimedPublicHealthExternalAttemptToState,
+  recordPublicHealthExternalAttemptToState,
+  requeuePublicHealthExternalDeadLetterToState
+} = require("./public-health-external-adapter-runtime");
+const {
+  EXTERNAL_ADAPTER_PROFILES
+} = require("./public-health-external-adapter-service");
+const {
+  buildPublicHealthExternalOperationsBoard
+} = require("./public-health-external-operations-service");
+const {
+  buildPublicHealthKeySafetyBoard,
+  loadPublicHealthLaneCredentials
+} = require("./public-health-external-key-provider");
 const PHYSICAL_EXAM_CONTRACT_ID = "physical-exam-report-v1";
 const EmergencyService = require("./emergency-service");
 const EmergencyLifeChain = require("./emergency-lifechain");
@@ -9968,6 +9990,21 @@ function normalizeState(data) {
     publicHealthInstitutionScopes: mergeByKey(seedPublicHealthInstitutionScopes(), data.publicHealthInstitutionScopes, "id"),
     publicHealthEvents: mergeByKey(seedPublicHealthEvents(), data.publicHealthEvents, "id"),
     publicHealthTriggerRules: mergeByKey(seedPublicHealthTriggerRules(), data.publicHealthTriggerRules, "id"),
+    publicHealthCoordinationHandoffs: Array.isArray(data.publicHealthCoordinationHandoffs)
+      ? data.publicHealthCoordinationHandoffs.slice(0, 100)
+      : [],
+    publicHealthCoordinationAudit: Array.isArray(data.publicHealthCoordinationAudit)
+      ? data.publicHealthCoordinationAudit.slice(-2000)
+      : [],
+    publicHealthExternalDispatches: Array.isArray(data.publicHealthExternalDispatches)
+      ? data.publicHealthExternalDispatches.slice(-2000)
+      : [],
+    publicHealthExternalDispatchAudit: Array.isArray(data.publicHealthExternalDispatchAudit)
+      ? data.publicHealthExternalDispatchAudit.slice(-5000)
+      : [],
+    publicHealthExternalKeyRotationEvidence: Array.isArray(data.publicHealthExternalKeyRotationEvidence)
+      ? data.publicHealthExternalKeyRotationEvidence.slice(-100)
+      : [],
     publicHealthSignals: mergeByKey(seedPublicHealthSignals(), data.publicHealthSignals, "id"),
     publicHealthAlerts: mergeByKey(seedPublicHealthAlerts(), data.publicHealthAlerts, "id"),
     publicHealthCommandTasks: mergeByKey(seedPublicHealthCommandTasks(), data.publicHealthCommandTasks, "id"),
@@ -23189,6 +23226,78 @@ function governanceHttpStatus(code) {
   return 400;
 }
 
+function publicHealthExternalHttpStatus(error) {
+  const message = String(error?.message || "");
+  if (/unknown public health/i.test(message)) return 404;
+  if (/role .* not allowed|scope denied|forbidden/i.test(message)) return 403;
+  if (/version conflict|idempotency|already claimed|already been requeued|not due/i.test(message)) return 409;
+  if (/key service is unavailable|KEYRING_REF is required|SECRET must contain|endpoint must use HTTPS/i.test(message)) return 503;
+  return 400;
+}
+
+function publicHealthExternalWorkerId(user = {}) {
+  return `public-health-worker:${String(user.id || user.username || "unknown").trim()}`;
+}
+
+function publicHealthExternalAttemptOptions(credentials, input, user, at) {
+  return {
+    requestKeyring: credentials.requestKeyring,
+    receiptKeyring: credentials.receiptKeyring,
+    attemptIdempotencyKey: String(input.idempotencyKey || "").trim(),
+    expectedVersion: input.expectedVersion,
+    workerId: publicHealthExternalWorkerId(user),
+    leaseToken: String(input.leaseToken || "").trim(),
+    at
+  };
+}
+
+async function publicHealthCredentialsForDispatch(data, dispatchId, at) {
+  const dispatch = (data.publicHealthExternalDispatches || []).find((item) => item.id === dispatchId);
+  if (!dispatch) throw new Error(`unknown public health external dispatch: ${dispatchId || "missing"}`);
+  return loadPublicHealthLaneCredentials(dispatch.laneId, { at });
+}
+
+async function loadAvailablePublicHealthCredentialMap(at) {
+  const entries = await Promise.all(EXTERNAL_ADAPTER_PROFILES.map(async (profile) => {
+    try {
+      return [profile.laneId, await loadPublicHealthLaneCredentials(profile.laneId, { at }), null];
+    } catch (error) {
+      return [profile.laneId, null, String(error.message || "credential unavailable")];
+    }
+  }));
+  return {
+    credentials: Object.fromEntries(entries.filter(([, value]) => value).map(([laneId, value]) => [laneId, value])),
+    summaries: entries.map(([laneId, value, error]) => value?.summary || {
+      laneId,
+      productionReady: false,
+      available: false,
+      blockers: [error]
+    })
+  };
+}
+
+function publicHealthExternalResult(result) {
+  return {
+    ok: result.ok,
+    idempotent: Boolean(result.idempotent),
+    dispatch: result.dispatch,
+    originalDispatch: result.originalDispatch,
+    successorDispatch: result.successorDispatch,
+    coordinationAction: result.coordinationAction,
+    productionReady: false
+  };
+}
+
+function publicHealthExternalPublicView(value) {
+  if (Array.isArray(value)) return value.map(publicHealthExternalPublicView);
+  if (!value || typeof value !== "object") return value;
+  return Object.entries(value).reduce((output, [key, item]) => {
+    if (key === "residentId" || key === "requestKeyring" || key === "receiptKeyring" || /secret/i.test(key)) return output;
+    output[key] = publicHealthExternalPublicView(item);
+    return output;
+  }, {});
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -23317,6 +23426,240 @@ async function handleApi(req, res) {
       auditEvent: result.auditEvent,
       error: result.error
     });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/coordination-runtime") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    sendJson(res, 200, publicHealthExternalPublicView(buildPublicHealthCoordinationRuntime({ data: readDatabase() })));
+    return;
+  }
+
+  const publicHealthCoordinationActionMatch = url.pathname.match(/^\/api\/public-health\/coordination\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthCoordinationActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/coordination/:id/actions");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req);
+      const data = readDatabase();
+      const result = applyPublicHealthCoordinationActionToState(
+        data,
+        decodeURIComponent(publicHealthCoordinationActionMatch[1]),
+        {
+          ...payload,
+          idempotencyKey: String(req.headers["idempotency-key"] || "").trim(),
+          at: new Date().toISOString()
+        },
+        user
+      );
+      writeDatabase(result.nextData);
+      sendJson(res, 200, publicHealthExternalPublicView({
+        ok: true,
+        idempotent: result.idempotent,
+        handoff: result.handoff,
+        action: result.action,
+        productionReady: false
+      }));
+    } catch (error) {
+      sendJson(res, publicHealthExternalHttpStatus(error), { error: "Public health coordination rejected", message: error.message, productionReady: false });
+    }
+    return;
+  }
+
+  const publicHealthExternalEnqueueMatch = url.pathname.match(/^\/api\/public-health\/external\/handoffs\/([^/]+)\/enqueue$/);
+  if (req.method === "POST" && publicHealthExternalEnqueueMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/external/handoffs/:id/enqueue");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req);
+      const data = readDatabase();
+      const handoffId = decodeURIComponent(publicHealthExternalEnqueueMatch[1]);
+      const runtime = buildPublicHealthCoordinationRuntime({ data });
+      const handoff = runtime.handoffs.find((item) => item.id === handoffId);
+      if (!handoff) throw new Error(`unknown public health coordination handoff: ${handoffId || "missing"}`);
+      const at = new Date().toISOString();
+      const credentials = await loadPublicHealthLaneCredentials(handoff.laneId, { at });
+      const result = enqueuePublicHealthExternalDispatchToState(data, handoffId, {
+        ...payload,
+        idempotencyKey: String(req.headers["idempotency-key"] || "").trim(),
+        at
+      }, credentials);
+      writeDatabase(result.nextData);
+      sendJson(res, 200, publicHealthExternalPublicView(publicHealthExternalResult(result)));
+    } catch (error) {
+      sendJson(res, publicHealthExternalHttpStatus(error), { error: "Public health external enqueue rejected", message: error.message, productionReady: false });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/external/outbox/due") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    try {
+      const at = new Date().toISOString();
+      const due = listDuePublicHealthExternalDispatches(readDatabase(), {
+        now: at,
+        limit: Number(url.searchParams.get("limit") || 20)
+      });
+      sendJson(res, 200, { generatedAt: at, due, productionReady: false });
+    } catch (error) {
+      sendJson(res, publicHealthExternalHttpStatus(error), { error: "Public health external due queue rejected", message: error.message, productionReady: false });
+    }
+    return;
+  }
+
+  const publicHealthExternalClaimMatch = url.pathname.match(/^\/api\/public-health\/external\/dispatches\/([^/]+)\/claim$/);
+  if (req.method === "POST" && publicHealthExternalClaimMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/external/dispatches/:id/claim");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req);
+      const data = readDatabase();
+      const dispatchId = decodeURIComponent(publicHealthExternalClaimMatch[1]);
+      const at = new Date().toISOString();
+      const credentials = await publicHealthCredentialsForDispatch(data, dispatchId, at);
+      const result = claimPublicHealthExternalDispatchToState(data, dispatchId, {
+        workerId: publicHealthExternalWorkerId(user),
+        idempotencyKey: String(req.headers["idempotency-key"] || "").trim(),
+        expectedVersion: payload.expectedVersion,
+        leaseSeconds: payload.leaseSeconds,
+        now: at
+      }, credentials);
+      writeDatabase(result.nextData);
+      sendJson(res, 200, publicHealthExternalPublicView({
+        ...publicHealthExternalResult(result),
+        leaseToken: result.leaseToken
+      }));
+    } catch (error) {
+      sendJson(res, publicHealthExternalHttpStatus(error), { error: "Public health external claim rejected", message: error.message, productionReady: false });
+    }
+    return;
+  }
+
+  const publicHealthExternalAttemptMatch = url.pathname.match(/^\/api\/public-health\/external\/dispatches\/([^/]+)\/attempt$/);
+  if (req.method === "POST" && publicHealthExternalAttemptMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/external/dispatches/:id/attempt");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req);
+      const data = readDatabase();
+      const dispatchId = decodeURIComponent(publicHealthExternalAttemptMatch[1]);
+      const at = new Date().toISOString();
+      const credentials = await publicHealthCredentialsForDispatch(data, dispatchId, at);
+      const result = recordClaimedPublicHealthExternalAttemptToState(
+        data,
+        dispatchId,
+        {
+          transportStatus: payload.transportStatus,
+          receipt: payload.receipt,
+          networkError: payload.networkError
+        },
+        publicHealthExternalAttemptOptions(credentials, {
+          ...payload,
+          idempotencyKey: String(req.headers["idempotency-key"] || "").trim(),
+          leaseToken: String(req.headers["x-public-health-lease-token"] || "").trim()
+        }, user, at)
+      );
+      writeDatabase(result.nextData);
+      sendJson(res, 200, publicHealthExternalPublicView(publicHealthExternalResult(result)));
+    } catch (error) {
+      sendJson(res, publicHealthExternalHttpStatus(error), { error: "Public health external attempt rejected", message: error.message, productionReady: false });
+    }
+    return;
+  }
+
+  const publicHealthExternalCallbackMatch = url.pathname.match(/^\/api\/public-health\/external\/callbacks\/([^/]+)$/);
+  if (req.method === "POST" && publicHealthExternalCallbackMatch) {
+    try {
+      const payload = await collectJson(req);
+      const data = readDatabase();
+      const dispatchId = decodeURIComponent(publicHealthExternalCallbackMatch[1]);
+      const at = new Date().toISOString();
+      const credentials = await publicHealthCredentialsForDispatch(data, dispatchId, at);
+      const result = recordPublicHealthExternalAttemptToState(
+        data,
+        dispatchId,
+        { transportStatus: 200, receipt: payload.receipt },
+        {
+          requestKeyring: credentials.requestKeyring,
+          receiptKeyring: credentials.receiptKeyring,
+          attemptIdempotencyKey: String(req.headers["idempotency-key"] || "").trim(),
+          expectedVersion: payload.expectedVersion,
+          at
+        }
+      );
+      writeDatabase(result.nextData);
+      sendJson(res, 200, {
+        ok: result.ok,
+        idempotent: Boolean(result.idempotent),
+        dispatchId: result.dispatch.id,
+        deliveryState: result.dispatch.deliveryState,
+        productionReady: false
+      });
+    } catch (error) {
+      sendJson(res, publicHealthExternalHttpStatus(error), { error: "Public health external callback rejected", message: error.message, productionReady: false });
+    }
+    return;
+  }
+
+  const publicHealthExternalRecoveryMatch = url.pathname.match(/^\/api\/public-health\/external\/dispatches\/([^/]+)\/recover$/);
+  if (req.method === "POST" && publicHealthExternalRecoveryMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/external/dispatches/:id/recover");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req);
+      const data = readDatabase();
+      const dispatchId = decodeURIComponent(publicHealthExternalRecoveryMatch[1]);
+      const at = new Date().toISOString();
+      const credentials = await publicHealthCredentialsForDispatch(data, dispatchId, at);
+      const result = requeuePublicHealthExternalDeadLetterToState(data, dispatchId, {
+        ...payload,
+        idempotencyKey: String(req.headers["idempotency-key"] || "").trim(),
+        at
+      }, credentials, user);
+      writeDatabase(result.nextData);
+      sendJson(res, 200, publicHealthExternalPublicView(publicHealthExternalResult(result)));
+    } catch (error) {
+      sendJson(res, publicHealthExternalHttpStatus(error), { error: "Public health external recovery rejected", message: error.message, productionReady: false });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/external/operations-board") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    const at = new Date().toISOString();
+    const data = readDatabase();
+    const loaded = await loadAvailablePublicHealthCredentialMap(at);
+    const coordinationCenter = buildPublicHealthCoordinationRuntime({ data });
+    const operations = buildPublicHealthExternalOperationsBoard({
+      data,
+      coordinationCenter,
+      secretResolver: (laneId) => loaded.credentials[laneId]?.requestKeyring,
+      now: at
+    });
+    const keySafety = buildPublicHealthKeySafetyBoard(data, loaded.credentials);
+    sendJson(res, 200, publicHealthExternalPublicView({
+      ...operations,
+      keySafety,
+      productionReady: false
+    }));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/external/key-rotation") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    const at = new Date().toISOString();
+    const data = readDatabase();
+    const loaded = await loadAvailablePublicHealthCredentialMap(at);
+    sendJson(res, 200, publicHealthExternalPublicView({
+      generatedAt: at,
+      lanes: loaded.summaries,
+      keySafety: buildPublicHealthKeySafetyBoard(data, loaded.credentials),
+      productionReady: false
+    }));
     return;
   }
 
