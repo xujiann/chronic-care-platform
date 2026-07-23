@@ -93,6 +93,8 @@ function buildEscortDispatchControl(order, workers, domain) {
     personId: ranked.candidates[0]?.personId || "",
     personName: ranked.candidates[0]?.personName || "",
     score: ranked.candidates[0]?.score || 0,
+    remainingCapacity: ranked.candidates[0]?.capacity?.remaining ?? 0,
+    serviceDate: ranked.candidates[0]?.capacity?.serviceDate || "",
     blockers: ranked.blockers
   };
 }
@@ -101,7 +103,7 @@ function escortDispatchControlText(item) {
   const control = item.dispatchControl;
   if (!control) return "";
   if (control.assigned && control.eligible) return `assigned qualification passed: ${control.personName || control.personId}`;
-  if (control.eligible) return `dispatch ready: ${control.personName || control.personId} / score ${Math.round(control.score * 10) / 10}`;
+  if (control.eligible) return `dispatch ready: ${control.personName || control.personId} / ${control.serviceDate || "service date"} remaining capacity ${control.remainingCapacity} / score ${Math.round(control.score * 10) / 10}`;
   return `dispatch blocked: ${(control.blockers || []).slice(0, 4).join(", ") || "no eligible worker"}`;
 }
 

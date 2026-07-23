@@ -13,6 +13,8 @@
   const DISPATCH_EVIDENCE_FUTURE_SKEW_MS = 5 * 60 * 1000;
   const ISSUED_DISPATCH_DECISIONS = new Map();
   const ISSUED_DISPATCH_DECISION_LIMIT = 1000;
+  const ISSUED_CAPACITY_RESERVATIONS = new Map();
+  const ISSUED_CAPACITY_RESERVATION_LIMIT = 2000;
 
   const WORKFLOWS = Object.freeze({
     nursing: Object.freeze({
@@ -86,7 +88,7 @@
   const EVIDENCE_GATES = Object.freeze({
     nursing: Object.freeze({
       assessed: ["identity-verification", "first-visit-assessment", "signed-consent"],
-      dispatched: ["qualification-snapshot", "dispatch-decision"],
+      dispatched: ["qualification-snapshot", "capacity-reservation", "dispatch-decision"],
       accepted: ["worker-acceptance"],
       "in-service": ["identity-verification", "location-start", "service-check-in"],
       completed: ["service-record", "location-end", "resident-confirmation", "exception-declaration"],
@@ -107,7 +109,7 @@
     escort: Object.freeze({
       "eligibility-checked": ["identity-verification", "eligibility-result"],
       "provider-matched": ["provider-admission-snapshot"],
-      "worker-dispatched": ["qualification-snapshot", "dispatch-decision"],
+      "worker-dispatched": ["qualification-snapshot", "capacity-reservation", "dispatch-decision"],
       accepted: ["worker-acceptance"],
       "hospital-confirmed": ["hospital-handoff"],
       "in-service": ["identity-verification", "location-start", "service-check-in"],
@@ -199,7 +201,9 @@
     else if (order.institutionCode && nurse.institutionCode !== order.institutionCode) reasons.push("institution-mismatch");
     if (order.serviceItem && !Array.isArray(nurse.specialties)) reasons.push("specialties-missing");
     else if (order.serviceItem && !nurse.specialties.includes(order.serviceItem)) reasons.push("specialty-mismatch");
-    if (Number(nurse.dailyCapacity || 0) > 0 && Number(nurse.assignedToday || 0) >= Number(nurse.dailyCapacity || 0)) reasons.push("daily-capacity-exhausted");
+    if (!Number.isInteger(Number(nurse.dailyCapacity)) || Number(nurse.dailyCapacity) <= 0) reasons.push("daily-capacity-invalid");
+    if (!Number.isInteger(Number(nurse.assignedToday)) || Number(nurse.assignedToday) < 0) reasons.push("assigned-count-invalid");
+    if (Number(nurse.dailyCapacity) > 0 && Number(nurse.assignedToday) >= Number(nurse.dailyCapacity)) reasons.push("daily-capacity-exhausted");
     return qualificationResult([...new Set(reasons)], {
       subjectId: String(nurse.id || ""),
       subjectType: "nurse",
@@ -300,24 +304,121 @@
       score: decision.score,
       riskBand: decision.riskBand,
       qualificationDigest: decision.qualificationDigest,
+      capacityReservationId: decision.capacityReservationId,
+      capacityDigest: decision.capacityDigest,
       checkedAt: decision.checkedAt,
       validUntil: decision.validUntil,
       policyVersion: decision.policyVersion
     };
   }
 
-  function dispatchEvidenceFingerprint(qualification = {}, decision = {}) {
+  function capacityReservationDigestPayload(reservation = {}) {
+    return {
+      status: reservation.status,
+      orderId: reservation.orderId,
+      domain: reservation.domain,
+      subjectId: reservation.subjectId,
+      subjectType: reservation.subjectType,
+      serviceDate: reservation.serviceDate,
+      capacityLimit: reservation.capacityLimit,
+      assignedCount: reservation.assignedCount,
+      reservedOrdinal: reservation.reservedOrdinal,
+      checkedAt: reservation.checkedAt,
+      validUntil: reservation.validUntil,
+      policyVersion: reservation.policyVersion
+    };
+  }
+
+  function dispatchEvidenceFingerprint(qualification = {}, reservation = {}, decision = {}) {
     return JSON.stringify({
       qualification: { ...qualificationDigestPayload(qualification), digest: qualification.digest },
+      reservation: { ...capacityReservationDigestPayload(reservation), digest: reservation.digest, id: reservation.id },
       decision: { ...dispatchDecisionDigestPayload(decision), digest: decision.digest, id: decision.id }
     });
   }
 
-  function registerDispatchEvidence(qualification, decision) {
+  function registerDispatchEvidence(qualification, reservation, decision) {
     if (ISSUED_DISPATCH_DECISIONS.size >= ISSUED_DISPATCH_DECISION_LIMIT) {
       ISSUED_DISPATCH_DECISIONS.delete(ISSUED_DISPATCH_DECISIONS.keys().next().value);
     }
-    ISSUED_DISPATCH_DECISIONS.set(decision.id, dispatchEvidenceFingerprint(qualification, decision));
+    if (ISSUED_CAPACITY_RESERVATIONS.size >= ISSUED_CAPACITY_RESERVATION_LIMIT) {
+      const disposable = [...ISSUED_CAPACITY_RESERVATIONS.entries()].find(([, entry]) => entry.state === "issued");
+      if (disposable) ISSUED_CAPACITY_RESERVATIONS.delete(disposable[0]);
+    }
+    const fingerprint = dispatchEvidenceFingerprint(qualification, reservation, decision);
+    ISSUED_DISPATCH_DECISIONS.set(decision.id, fingerprint);
+    ISSUED_CAPACITY_RESERVATIONS.set(reservation.id, {
+      state: "issued",
+      fingerprint,
+      orderId: reservation.orderId,
+      domain: reservation.domain,
+      subjectId: reservation.subjectId,
+      serviceDate: reservation.serviceDate
+    });
+  }
+
+  function serviceDateForCapacity(domain, order = {}, fallback) {
+    const normalizedDomain = normalizeDomain(domain);
+    const candidate = normalizedDomain === "nursing"
+      ? order.scheduledAt || order.preferredAt || fallback
+      : order.scheduledAt || order.appointmentAt || order.due || fallback;
+    const match = String(candidate || "").trim().match(/^(\d{4}-\d{2}-\d{2})/);
+    if (!match || parseTime(`${match[1]}T00:00:00Z`) === null) return "";
+    return match[1];
+  }
+
+  function capacityProfile(domain, person = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const configuredLimit = Number(person.dailyCapacity);
+    const configuredAssigned = Number(person.assignedToday);
+    return {
+      capacityLimit: Number.isInteger(configuredLimit) && configuredLimit > 0
+        ? configuredLimit
+        : normalizedDomain === "escort" ? 1 : 0,
+      assignedCount: Number.isInteger(configuredAssigned) && configuredAssigned >= 0 ? configuredAssigned : 0,
+      conservativeDefault: normalizedDomain === "escort" && (!Number.isInteger(configuredLimit) || configuredLimit <= 0)
+    };
+  }
+
+  function committedCapacityCount(domain, subjectId, serviceDate, excludeOrderId = "") {
+    let count = 0;
+    for (const entry of ISSUED_CAPACITY_RESERVATIONS.values()) {
+      if (entry.state !== "committed") continue;
+      if (entry.domain !== domain || entry.subjectId !== subjectId || entry.serviceDate !== serviceDate) continue;
+      if (excludeOrderId && entry.orderId === excludeOrderId) continue;
+      count += 1;
+    }
+    return count;
+  }
+
+  function capacityAvailability(domain, order = {}, person = {}, checkedAt) {
+    const normalizedDomain = normalizeDomain(domain);
+    const subjectId = String(person.id || "").trim();
+    const serviceDate = serviceDateForCapacity(normalizedDomain, order, checkedAt);
+    const profile = capacityProfile(normalizedDomain, person);
+    const committedCount = committedCapacityCount(normalizedDomain, subjectId, serviceDate, String(order.id || ""));
+    const used = profile.assignedCount + committedCount;
+    const reasons = [];
+    if (!serviceDate) reasons.push("service-date-invalid");
+    if (!subjectId) reasons.push("subject-missing");
+    if (!Number.isInteger(profile.capacityLimit) || profile.capacityLimit <= 0) reasons.push("capacity-limit-invalid");
+    if (used >= profile.capacityLimit) reasons.push("no-slot-available");
+    return {
+      ...profile,
+      serviceDate,
+      committedCount,
+      used,
+      remaining: Math.max(0, profile.capacityLimit - used),
+      reservedOrdinal: used + 1,
+      reasons
+    };
+  }
+
+  function commitCapacityReservation(reservation = {}) {
+    const entry = ISSUED_CAPACITY_RESERVATIONS.get(reservation.id);
+    if (!entry) return false;
+    entry.state = "committed";
+    return true;
   }
 
   function evidenceTimeReasons(prefix, evidence = {}, at) {
@@ -345,8 +446,10 @@
     const orderId = String(order.id || "").trim();
     const at = new Date(options.at || Date.now()).getTime();
     const qualification = order.qualificationSnapshot;
+    const reservation = order.capacityReservation;
     const decision = order.dispatchDecision;
     const qualificationReasons = [];
+    const capacityReasons = [];
     const decisionReasons = [];
 
     if (!orderId) qualificationReasons.push("order-id-missing");
@@ -364,6 +467,30 @@
       if (qualification.digest !== stableDigest(qualificationDigestPayload(qualification))) qualificationReasons.push("qualification-digest-mismatch");
     }
 
+    if (!reservation || typeof reservation !== "object" || Array.isArray(reservation)) {
+      capacityReasons.push("capacity-reservation-missing");
+    } else {
+      if (reservation.status !== "reserved") capacityReasons.push("capacity-status-not-reserved");
+      if (reservation.policyVersion !== WORKFLOW_POLICY_VERSION) capacityReasons.push("capacity-policy-version-invalid");
+      if (reservation.orderId !== orderId) capacityReasons.push("capacity-order-mismatch");
+      if (reservation.domain !== normalizedDomain) capacityReasons.push("capacity-domain-mismatch");
+      if (reservation.subjectId !== assignedId) capacityReasons.push("capacity-subject-mismatch");
+      if (reservation.subjectType !== expectedSubjectType) capacityReasons.push("capacity-subject-type-mismatch");
+      if (reservation.serviceDate !== serviceDateForCapacity(normalizedDomain, order, reservation.checkedAt)) capacityReasons.push("capacity-service-date-mismatch");
+      if (!Number.isInteger(reservation.capacityLimit) || reservation.capacityLimit <= 0) capacityReasons.push("capacity-limit-invalid");
+      if (!Number.isInteger(reservation.assignedCount) || reservation.assignedCount < 0) capacityReasons.push("capacity-assigned-count-invalid");
+      if (!Number.isInteger(reservation.reservedOrdinal) || reservation.reservedOrdinal <= reservation.assignedCount) capacityReasons.push("capacity-ordinal-invalid");
+      if (Number.isInteger(reservation.capacityLimit) && reservation.reservedOrdinal > reservation.capacityLimit) capacityReasons.push("capacity-limit-exceeded");
+      const committedCount = committedCapacityCount(normalizedDomain, assignedId, reservation.serviceDate, orderId);
+      if (Number.isInteger(reservation.assignedCount) && reservation.reservedOrdinal !== reservation.assignedCount + committedCount + 1) {
+        capacityReasons.push("capacity-slot-conflict");
+      }
+      capacityReasons.push(...evidenceTimeReasons("capacity", reservation, at));
+      const expectedCapacityDigest = stableDigest(capacityReservationDigestPayload(reservation));
+      if (reservation.digest !== expectedCapacityDigest) capacityReasons.push("capacity-digest-mismatch");
+      if (reservation.id !== `capacity:${expectedCapacityDigest}`) capacityReasons.push("capacity-id-mismatch");
+    }
+
     if (!decision || typeof decision !== "object" || Array.isArray(decision)) {
       decisionReasons.push("dispatch-decision-missing");
     } else {
@@ -376,16 +503,21 @@
       if (!Number.isFinite(decision.score)) decisionReasons.push("dispatch-score-invalid");
       if (!["low", "medium", "high"].includes(decision.riskBand)) decisionReasons.push("dispatch-risk-band-invalid");
       if (!qualification || decision.qualificationDigest !== qualification.digest) decisionReasons.push("dispatch-qualification-mismatch");
+      if (!reservation || decision.capacityReservationId !== reservation.id) decisionReasons.push("dispatch-capacity-id-mismatch");
+      if (!reservation || decision.capacityDigest !== reservation.digest) decisionReasons.push("dispatch-capacity-digest-mismatch");
       decisionReasons.push(...evidenceTimeReasons("dispatch", decision, at));
       const expectedDigest = stableDigest(dispatchDecisionDigestPayload(decision));
       if (decision.digest !== expectedDigest) decisionReasons.push("dispatch-digest-mismatch");
       if (decision.id !== `dispatch:${expectedDigest}`) decisionReasons.push("dispatch-id-mismatch");
       const issuedFingerprint = ISSUED_DISPATCH_DECISIONS.get(decision.id);
       if (!issuedFingerprint) decisionReasons.push("dispatch-decision-not-issued");
-      else if (issuedFingerprint !== dispatchEvidenceFingerprint(qualification, decision)) decisionReasons.push("dispatch-issuance-mismatch");
+      else if (issuedFingerprint !== dispatchEvidenceFingerprint(qualification, reservation, decision)) decisionReasons.push("dispatch-issuance-mismatch");
+      const issuedReservation = reservation && ISSUED_CAPACITY_RESERVATIONS.get(reservation.id);
+      if (!issuedReservation) capacityReasons.push("capacity-reservation-not-issued");
+      else if (issuedReservation.fingerprint !== dispatchEvidenceFingerprint(qualification, reservation, decision)) capacityReasons.push("capacity-issuance-mismatch");
     }
 
-    const reasons = [...new Set([...qualificationReasons, ...decisionReasons])];
+    const reasons = [...new Set([...qualificationReasons, ...capacityReasons, ...decisionReasons])];
     return {
       ok: reasons.length === 0,
       domain: normalizedDomain,
@@ -393,6 +525,7 @@
       targetStatus,
       assignedId,
       qualificationOk: qualificationReasons.length === 0,
+      capacityOk: capacityReasons.length === 0,
       decisionOk: decisionReasons.length === 0,
       reasons
     };
@@ -407,14 +540,16 @@
       : validateEscortWorkerQualification(person, order, options);
     const risk = assessOrderRisk(normalizedDomain, order);
     const prerequisites = dispatchPrerequisites(normalizedDomain, order);
+    const checkedAt = new Date(options.now || Date.now()).toISOString();
+    const capacity = capacityAvailability(normalizedDomain, order, person, checkedAt);
     const blockers = [];
     if (!transition.ok) blockers.push(`transition:${transition.current}->${target}`);
     blockers.push(...prerequisites.map((item) => `evidence:${item}`));
     blockers.push(...qualification.reasons.map((item) => `qualification:${item}`));
+    blockers.push(...capacity.reasons.map((item) => `capacity:${item}`));
     if (risk.band === "critical") blockers.push("risk:critical");
     if (risk.band === "high" && order.riskReview?.status !== "approved") blockers.push("risk:review-required");
     const score = dispatchCandidateScore(normalizedDomain, person, order);
-    const checkedAt = new Date(options.now || Date.now()).toISOString();
     const personId = String(person.id || "");
     const personName = String(person.name || personId);
     const uniqueBlockers = [...new Set(blockers)];
@@ -432,6 +567,22 @@
       policyVersion: WORKFLOW_POLICY_VERSION
     };
     qualificationSnapshot.digest = stableDigest(qualificationDigestPayload(qualificationSnapshot));
+    const capacityReservation = {
+      status: "reserved",
+      orderId,
+      domain: normalizedDomain,
+      subjectId: personId,
+      subjectType: qualification.subjectType,
+      serviceDate: capacity.serviceDate,
+      capacityLimit: capacity.capacityLimit,
+      assignedCount: capacity.assignedCount,
+      reservedOrdinal: capacity.reservedOrdinal,
+      checkedAt,
+      validUntil,
+      policyVersion: WORKFLOW_POLICY_VERSION
+    };
+    capacityReservation.digest = stableDigest(capacityReservationDigestPayload(capacityReservation));
+    capacityReservation.id = `capacity:${capacityReservation.digest}`;
     const dispatchDecision = {
       status: "approved",
       score,
@@ -443,11 +594,13 @@
       domain: normalizedDomain,
       targetStatus: target,
       qualificationDigest: qualificationSnapshot.digest,
+      capacityReservationId: capacityReservation.id,
+      capacityDigest: capacityReservation.digest,
       policyVersion: WORKFLOW_POLICY_VERSION
     };
     dispatchDecision.digest = stableDigest(dispatchDecisionDigestPayload(dispatchDecision));
     dispatchDecision.id = `dispatch:${dispatchDecision.digest}`;
-    if (eligible) registerDispatchEvidence(qualificationSnapshot, dispatchDecision);
+    if (eligible && options.issueEvidence !== false) registerDispatchEvidence(qualificationSnapshot, capacityReservation, dispatchDecision);
     return {
       eligible,
       domain: normalizedDomain,
@@ -459,11 +612,13 @@
       blockers: uniqueBlockers,
       transition,
       qualification,
+      capacity,
       risk,
       prerequisites,
       updates: eligible ? {
         ...(normalizedDomain === "nursing" ? { nurseId: personId, nurseName: personName } : { workerId: personId, workerName: personName }),
         qualificationSnapshot,
+        capacityReservation,
         dispatchDecision
       } : {}
     };
@@ -471,7 +626,7 @@
 
   function rankDispatchCandidates(domain, order = {}, roster = [], options = {}) {
     const decisions = (Array.isArray(roster) ? roster : [])
-      .map((person) => evaluateDispatchCandidate(domain, order, person, options))
+      .map((person) => evaluateDispatchCandidate(domain, order, person, { ...options, issueEvidence: false }))
       .sort((left, right) => Number(right.eligible) - Number(left.eligible) || right.score - left.score || left.personId.localeCompare(right.personId));
     const limit = Math.max(1, Math.min(20, Number(options.limit || 3)));
     return {
@@ -2047,7 +2202,8 @@
     if (next === dispatchTargetState(normalizedDomain)) {
       dispatchIntegrity = validateDispatchEvidence(normalizedDomain, order, options);
       if (dispatchIntegrity.qualificationOk) present.add("qualification-snapshot");
-      if (dispatchIntegrity.qualificationOk && dispatchIntegrity.decisionOk) present.add("dispatch-decision");
+      if (dispatchIntegrity.capacityOk) present.add("capacity-reservation");
+      if (dispatchIntegrity.qualificationOk && dispatchIntegrity.capacityOk && dispatchIntegrity.decisionOk) present.add("dispatch-decision");
     }
     if (["settlement-pending", "settled"].includes(next)) {
       financialIntegrity = validateFinancialEvidence(normalizedDomain, order, next);
@@ -2413,13 +2569,14 @@
       throw error;
     }
     const candidate = { ...order, ...(options.updates || {}), status: transition.next };
+    let dispatchIntegrity = null;
     if (transition.next === dispatchTargetState(domain)) {
-      const integrity = validateDispatchEvidence(domain, candidate, { at: options.at });
-      if (!integrity.ok) {
-        const error = new Error(`invalid dispatch evidence for ${transition.next}: ${integrity.reasons.join(", ")}`);
+      dispatchIntegrity = validateDispatchEvidence(domain, candidate, { at: options.at });
+      if (!dispatchIntegrity.ok) {
+        const error = new Error(`invalid dispatch evidence for ${transition.next}: ${dispatchIntegrity.reasons.join(", ")}`);
         error.code = "ORDER_DISPATCH_INTEGRITY_INVALID";
         error.statusCode = 409;
-        error.details = integrity;
+        error.details = dispatchIntegrity;
         throw error;
       }
     }
@@ -2503,6 +2660,12 @@
       error.code = "ORDER_NOTIFICATION_PLAN_INVALID";
       error.statusCode = 409;
       error.details = notificationPlanIntegrity;
+      throw error;
+    }
+    if (dispatchIntegrity && !commitCapacityReservation(candidate.capacityReservation)) {
+      const error = new Error("capacity reservation could not be committed");
+      error.code = "ORDER_CAPACITY_COMMIT_FAILED";
+      error.statusCode = 409;
       throw error;
     }
     return {

@@ -134,7 +134,8 @@ function buildStaticDispatchRecommendations(orders, nurses) {
             return {
               nurseId: item.personId,
               nurseName: item.personName,
-              remainingCapacity: Math.max(0, Number(nurse.dailyCapacity || 0) - Number(nurse.assignedToday || 0)),
+              remainingCapacity: item.capacity.remaining,
+              serviceDate: item.capacity.serviceDate,
               score: item.score,
               reason: `资质、机构、专科、容量、风险和证据门禁均通过；风险等级 ${item.risk.band}`
             };
