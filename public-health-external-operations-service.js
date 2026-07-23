@@ -6,6 +6,10 @@ const {
   verifyRuntimeStateSignature
 } = require("./public-health-external-adapter-runtime");
 const { summarizeKeyring } = require("./public-health-external-keyring-service");
+const {
+  buildPublicHealthExternalResilienceRuntime,
+  verifyPublicHealthExternalLaneControlAuditChain
+} = require("./public-health-external-resilience-service");
 
 function clean(value) {
   return String(value ?? "").trim();
@@ -141,6 +145,7 @@ function buildPublicHealthExternalOperationsBoard({
   const sla = Number(pendingSlaMinutes);
   if (!Number.isFinite(sla) || sla < 1 || sla > 1440) throw new Error("pendingSlaMinutes must be from 1 to 1440");
   const dispatches = rows(data, "publicHealthExternalDispatches");
+  const resilienceRuntime = buildPublicHealthExternalResilienceRuntime(data);
   const dispatchIds = new Set(dispatches.map((item) => item.id));
   const handoffs = new Map((coordinationCenter.handoffs || []).map((item) => [item.id, item]));
   const issues = [];
@@ -153,6 +158,16 @@ function buildPublicHealthExternalOperationsBoard({
       { id: item.dispatchId, laneId: item.laneId },
       `Audit entry ${clean(item.id) || "unknown"} references a missing dispatch.`,
       "Quarantine the orphan audit entry and restore its signed dispatch."
+    )));
+  const laneControlIds = new Set(rows(data, "publicHealthExternalLaneControls").map((item) => item.laneId));
+  rows(data, "publicHealthExternalLaneControlAudit")
+    .filter((item) => !laneControlIds.has(item.laneId))
+    .forEach((item) => issues.push(issue(
+      "P0",
+      "lane-control-audit-orphan",
+      { id: "", laneId: item.laneId },
+      `Lane-control audit entry ${clean(item.id) || "unknown"} has no signed control state.`,
+      "Quarantine the orphan resilience audit and restore its signed lane control."
     )));
 
   dispatches.forEach((dispatch) => {
@@ -284,6 +299,63 @@ function buildPublicHealthExternalOperationsBoard({
     }
   });
 
+  rows(data, "publicHealthExternalLaneControls").forEach((control) => {
+    const lane = laneSummary.get(control.laneId) || {
+      laneId: control.laneId,
+      dispatches: 0,
+      delivered: 0,
+      deadLetter: 0,
+      pending: 0,
+      retryScheduled: 0,
+      issues: 0
+    };
+    lane.circuitState = control.circuitState;
+    lane.controlVersion = control.version;
+    laneSummary.set(control.laneId, lane);
+    const signingMaterial = signingMaterialForLane(secretResolver, control.laneId);
+    if (!signingMaterialAvailable(signingMaterial, now)) {
+      issues.push(issue(
+        "P0",
+        "lane-control-signature-secret-unavailable",
+        { id: "", laneId: control.laneId },
+        "The lane signing material is unavailable for resilience-control verification.",
+        "Provision the full lane request keyring before claiming more work."
+      ));
+    } else {
+      const verification = verifyPublicHealthExternalLaneControlAuditChain(
+        data,
+        control.laneId,
+        signingMaterial
+      );
+      if (!verification.ok) {
+        issues.push(issue(
+          "P0",
+          "lane-control-integrity-invalid",
+          { id: "", laneId: control.laneId },
+          verification.reason,
+          "Stop lane delivery and restore the last trusted signed resilience state."
+        ));
+      }
+    }
+    if (control.circuitState === "open") {
+      issues.push(issue(
+        "P1",
+        "lane-circuit-open",
+        { id: "", laneId: control.laneId },
+        `Lane circuit is open until ${clean(control.openUntil) || "manual review"}.`,
+        "Investigate the external dependency and wait for the governed half-open probe."
+      ));
+    } else if (control.circuitState === "half-open") {
+      issues.push(issue(
+        "P1",
+        "lane-circuit-half-open",
+        { id: "", laneId: control.laneId },
+        `Lane has ${Number(control.halfOpenProbesInFlight || 0)} half-open probes in flight.`,
+        "Allow only the configured probe count and observe its signed outcome."
+      ));
+    }
+  });
+
   issues.push(...relationshipIssues(dispatches));
   issues.forEach((item) => {
     const lane = laneSummary.get(item.laneId);
@@ -295,7 +367,10 @@ function buildPublicHealthExternalOperationsBoard({
     "signature-secret-unavailable",
     "request-signature-invalid",
     "runtime-state-signature-invalid",
-    "audit-chain-invalid"
+    "audit-chain-invalid",
+    "lane-control-audit-orphan",
+    "lane-control-signature-secret-unavailable",
+    "lane-control-integrity-invalid"
   ].includes(item.code)).map((item) => item.dispatchId));
   return {
     generatedAt: new Date(nowValue).toISOString(),
@@ -312,11 +387,15 @@ function buildPublicHealthExternalOperationsBoard({
       signatureVerified: dispatches.length - integrityFailureIds.size,
       orphanDispatches: issues.filter((item) => item.code === "coordination-handoff-missing").length,
       orphanAuditEntries: issues.filter((item) => item.code === "audit-dispatch-missing").length,
+      orphanLaneControlAuditEntries: issues.filter((item) => item.code === "lane-control-audit-orphan").length,
       stateMismatches: issues.filter((item) => item.code === "coordination-state-mismatch").length,
       expiredLeases: issues.filter((item) => item.code === "worker-lease-expired").length,
       overduePending: issues.filter((item) => item.code === "pending-dispatch-overdue").length,
       dueRetries: issues.filter((item) => item.code === "retry-due-unclaimed").length,
-      unrecoveredDeadLetters: issues.filter((item) => item.code === "dead-letter-unrecovered").length
+      unrecoveredDeadLetters: issues.filter((item) => item.code === "dead-letter-unrecovered").length,
+      resilienceLanes: resilienceRuntime.summary.lanes,
+      openCircuits: issues.filter((item) => item.code === "lane-circuit-open").length,
+      halfOpenCircuits: issues.filter((item) => item.code === "lane-circuit-half-open").length
     },
     lanes: [...laneSummary.values()].sort((left, right) => left.laneId.localeCompare(right.laneId)),
     issues,

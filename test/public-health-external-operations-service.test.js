@@ -9,6 +9,10 @@ const {
 const {
   buildPublicHealthExternalOperationsBoard
 } = require("../public-health-external-operations-service");
+const {
+  recordPublicHealthExternalLaneOutcomeToState,
+  reservePublicHealthExternalLaneCapacityToState
+} = require("../public-health-external-resilience-service");
 const { buildPublicHealthSystem } = require("../scripts/public-health-readiness");
 const {
   runDeadLetterRecoveryAcceptance,
@@ -221,4 +225,56 @@ test("external operations board verifies historical records through a managed gr
   assert.equal(managedBoard.ok, true);
   assert.equal(managedBoard.summary.signatureVerified, 1);
   assert.equal(JSON.stringify(managedBoard).includes(REQUEST_SECRET), false);
+});
+
+test("external operations board exposes open circuits and blocks resilience tampering", () => {
+  const scenario = buildScenario();
+  const accepted = runExternalOutboxAcceptance(scenario.data, scenario.system);
+  const policy = {
+    failureThreshold: 1,
+    openSeconds: 30,
+    halfOpenMaxProbes: 1,
+    rateLimitPerMinute: 10,
+    maxPending: 10
+  };
+  const reserved = reservePublicHealthExternalLaneCapacityToState(
+    accepted.delivered.nextData,
+    "family-doctor",
+    { at: "2026-07-23T08:02:00.000Z", expectedVersion: 0 },
+    REQUEST_SECRET,
+    policy
+  );
+  const failed = recordPublicHealthExternalLaneOutcomeToState(
+    reserved.nextData,
+    "family-doctor",
+    { type: "failure", reason: "network-error" },
+    { at: "2026-07-23T08:02:10.000Z", expectedVersion: 1 },
+    REQUEST_SECRET,
+    policy
+  );
+  const openBoard = board(failed.nextData, scenario.dependencies, {
+    now: "2026-07-23T08:02:20.000Z"
+  });
+  assert.equal(openBoard.ok, true);
+  assert.equal(openBoard.operationallyHealthy, false);
+  assert.equal(openBoard.summary.resilienceLanes, 1);
+  assert.equal(openBoard.summary.openCircuits, 1);
+  assert.equal(openBoard.issues.some((item) => item.code === "lane-circuit-open"), true);
+
+  const tampered = structuredClone(failed.nextData);
+  tampered.publicHealthExternalLaneControls[0].circuitState = "closed";
+  const tamperedBoard = board(tampered, scenario.dependencies, {
+    now: "2026-07-23T08:02:20.000Z"
+  });
+  assert.equal(tamperedBoard.ok, false);
+  assert.equal(tamperedBoard.issues.some((item) => item.code === "lane-control-integrity-invalid"), true);
+
+  const orphanAudit = structuredClone(failed.nextData);
+  orphanAudit.publicHealthExternalLaneControls = [];
+  const orphanBoard = board(orphanAudit, scenario.dependencies, {
+    now: "2026-07-23T08:02:20.000Z"
+  });
+  assert.equal(orphanBoard.ok, false);
+  assert.equal(orphanBoard.summary.orphanLaneControlAuditEntries, 2);
+  assert.equal(orphanBoard.issues.some((item) => item.code === "lane-control-audit-orphan"), true);
 });

@@ -30,6 +30,9 @@ const {
   signPublicHealthExternalReceipt,
   verifyPublicHealthExternalReceipt
 } = require("../public-health-external-adapter-service");
+const {
+  verifyPublicHealthExternalLaneControlAuditChain
+} = require("../public-health-external-resilience-service");
 
 const ROOT = path.resolve(__dirname, "..");
 const REQUEST_SECRET = "runtime-request-secret-1234567890-123456";
@@ -726,4 +729,148 @@ test("external audit chain remains verifiable across an authorized request-key r
     claimed.dispatch.id,
     rotatedRequestKeyring
   ).ok, true);
+});
+
+test("configured backpressure rejects a second queued dispatch before persistence", () => {
+  const prepared = enqueueLane("maternal-child");
+  assert.throws(() => enqueuePublicHealthExternalDispatchToState(
+    prepared.enqueued.nextData,
+    prepared.handoffId,
+    {
+      idempotencyKey: "maternal-child:external:backpressure-second",
+      operation: "coordination-handoff",
+      evidenceRefs: ["maternal-child-second-request"],
+      exceptionOwner: "maternal-child-interface-owner",
+      exceptionDueAt: "2026-07-31",
+      at: "2026-07-23T08:00:10.000Z"
+    },
+    credentials({
+      resiliencePolicy: {
+        failureThreshold: 1,
+        openSeconds: 30,
+        rateLimitPerMinute: 10,
+        halfOpenMaxProbes: 1,
+        maxPending: 1
+      }
+    }),
+    prepared.dependencies
+  ), /backpressure limit reached/);
+  assert.equal(prepared.enqueued.nextData.publicHealthExternalDispatches.length, 1);
+});
+
+test("claimed delivery opens the signed circuit and a half-open probe closes it", () => {
+  const policy = {
+    failureThreshold: 1,
+    openSeconds: 30,
+    rateLimitPerMinute: 10,
+    halfOpenMaxProbes: 1,
+    maxPending: 10
+  };
+  const prepared = enqueueLane("health-education");
+  const firstClaim = claimPublicHealthExternalDispatchToState(
+    prepared.enqueued.nextData,
+    prepared.enqueued.dispatch.id,
+    {
+      workerId: "health-education-resilience-worker-1",
+      idempotencyKey: "health-education:resilience:claim-1",
+      expectedVersion: 1,
+      expectedLaneControlVersion: 0,
+      now: "2026-07-23T08:00:10.000Z",
+      leaseSeconds: 60
+    },
+    credentials({ resiliencePolicy: policy })
+  );
+  assert.equal(firstClaim.laneControl.version, 1);
+  assert.equal(firstClaim.laneControl.circuitState, "closed");
+
+  const failed = recordClaimedPublicHealthExternalAttemptToState(
+    firstClaim.nextData,
+    firstClaim.dispatch.id,
+    { transportStatus: 503 },
+    {
+      ...attemptOptions("health-education:resilience:attempt-1", "2026-07-23T08:00:20.000Z", 2),
+      workerId: "health-education-resilience-worker-1",
+      leaseToken: firstClaim.leaseToken,
+      expectedLaneControlVersion: 1,
+      resiliencePolicy: policy
+    },
+    prepared.dependencies
+  );
+  assert.equal(failed.dispatch.deliveryState, "retry-scheduled");
+  assert.equal(failed.laneControl.version, 2);
+  assert.equal(failed.laneControl.circuitState, "open");
+  assert.equal(failed.laneControl.openUntil, "2026-07-23T08:00:50.000Z");
+
+  const secondEnqueue = enqueuePublicHealthExternalDispatchToState(
+    failed.nextData,
+    prepared.handoffId,
+    {
+      idempotencyKey: "health-education:resilience:enqueue-2",
+      operation: "coordination-handoff",
+      evidenceRefs: ["health-education-probe-request"],
+      exceptionOwner: "health-education-interface-owner",
+      exceptionDueAt: "2026-07-31",
+      at: "2026-07-23T08:00:25.000Z"
+    },
+    credentials({ resiliencePolicy: policy }),
+    prepared.dependencies
+  );
+  assert.throws(() => claimPublicHealthExternalDispatchToState(
+    secondEnqueue.nextData,
+    secondEnqueue.dispatch.id,
+    {
+      workerId: "health-education-resilience-worker-2",
+      idempotencyKey: "health-education:resilience:blocked-claim",
+      expectedVersion: 1,
+      expectedLaneControlVersion: 2,
+      now: "2026-07-23T08:00:30.000Z",
+      leaseSeconds: 60
+    },
+    credentials({ resiliencePolicy: policy })
+  ), /circuit is open/);
+
+  const probe = claimPublicHealthExternalDispatchToState(
+    secondEnqueue.nextData,
+    secondEnqueue.dispatch.id,
+    {
+      workerId: "health-education-resilience-worker-2",
+      idempotencyKey: "health-education:resilience:probe-claim",
+      expectedVersion: 1,
+      expectedLaneControlVersion: 2,
+      now: "2026-07-23T08:00:50.000Z",
+      leaseSeconds: 60
+    },
+    credentials({ resiliencePolicy: policy })
+  );
+  assert.equal(probe.laneControl.version, 3);
+  assert.equal(probe.laneControl.circuitState, "half-open");
+
+  const receipt = signedReceipt(probe.dispatch, {
+    receiptCode: "HEALTH-EDUCATION-PROBE-ACCEPT",
+    receivedAt: "2026-07-23T08:01:00.000Z",
+    nonce: "health-education-probe-nonce"
+  });
+  const recovered = recordClaimedPublicHealthExternalAttemptToState(
+    probe.nextData,
+    probe.dispatch.id,
+    { transportStatus: 200, receipt },
+    {
+      ...attemptOptions("health-education:resilience:probe-success", "2026-07-23T08:01:00.000Z", 2),
+      workerId: "health-education-resilience-worker-2",
+      leaseToken: probe.leaseToken,
+      expectedLaneControlVersion: 3,
+      resiliencePolicy: policy
+    },
+    prepared.dependencies
+  );
+  assert.equal(recovered.dispatch.deliveryState, "delivered");
+  assert.equal(recovered.laneControl.version, 4);
+  assert.equal(recovered.laneControl.circuitState, "closed");
+  assert.equal(recovered.externalRuntime.summary.openCircuits, 0);
+  assert.equal(recovered.externalRuntime.summary.resilienceLanes, 1);
+  assert.equal(verifyPublicHealthExternalLaneControlAuditChain(
+    recovered.nextData,
+    "health-education",
+    REQUEST_SECRET
+  ).entries, 4);
 });

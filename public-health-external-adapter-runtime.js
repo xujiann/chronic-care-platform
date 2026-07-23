@@ -14,6 +14,13 @@ const {
   resolveVerificationKey,
   selectSigningKey
 } = require("./public-health-external-keyring-service");
+const {
+  assertPublicHealthExternalBackpressure,
+  buildPublicHealthExternalResilienceRuntime,
+  recordPublicHealthExternalLaneOutcomeToState,
+  reservePublicHealthExternalLaneCapacityToState,
+  verifyPublicHealthExternalLaneControlAuditChain
+} = require("./public-health-external-resilience-service");
 
 const EXTERNAL_AUDIT_SCHEMA_VERSION = "public-health-external-audit/v1";
 
@@ -77,6 +84,16 @@ function requestSigningMaterial(credentials = {}) {
 
 function receiptSigningMaterial(credentials = {}) {
   return credentials.receiptKeyring || credentials.receiptSecret;
+}
+
+function resiliencePolicyFor(credentials = {}, laneId) {
+  if (typeof credentials.resiliencePolicy === "function") {
+    return credentials.resiliencePolicy(laneId) || null;
+  }
+  if (credentials.resiliencePolicies && typeof credentials.resiliencePolicies === "object") {
+    return credentials.resiliencePolicies[laneId] || null;
+  }
+  return credentials.resiliencePolicy || null;
 }
 
 function signRuntimeState(dispatch, key) {
@@ -207,6 +224,7 @@ function isDispatchDue(dispatch, now) {
 function buildPublicHealthExternalAdapterRuntime(data = {}) {
   const dispatches = clone(rows(data, "publicHealthExternalDispatches"));
   const audit = clone(rows(data, "publicHealthExternalDispatchAudit"));
+  const resilience = buildPublicHealthExternalResilienceRuntime(data);
   return {
     ok: true,
     functionalState: "eight-domain-external-outbox-persistence-ready",
@@ -221,12 +239,16 @@ function buildPublicHealthExternalAdapterRuntime(data = {}) {
       deadLetter: dispatches.filter((item) => item.deliveryState === "dead-letter").length,
       recoveredDeadLetters: dispatches.filter((item) => item.recovery?.state === "requeued").length,
       recoverySuccessors: dispatches.filter((item) => item.predecessorDispatchId).length,
-      auditEntries: audit.length
+      auditEntries: audit.length,
+      resilienceLanes: resilience.summary.lanes,
+      openCircuits: resilience.summary.open,
+      halfOpenCircuits: resilience.summary.halfOpen
     },
+    resilience,
     productionReady: false,
     blockers: [
       "T00 must persist the returned immutable state through the shared writer.",
-      "Production endpoints, secrets, signed receipts and trusted site evidence remain required."
+      "Production endpoints, secrets, resilience policies, signed receipts and trusted site evidence remain required."
     ]
   };
 }
@@ -294,6 +316,13 @@ function claimPublicHealthExternalDispatchToState(data = {}, dispatchId, input =
     throw new Error(`persisted public health external dispatch rejected: ${requestVerification.ok ? "runtime-state-signature-invalid" : requestVerification.reason}`);
   }
   assertExternalAuditChain(data, current, signingMaterial);
+  const resiliencePolicy = resiliencePolicyFor(credentials, current.laneId);
+  if (resiliencePolicy && rows(data, "publicHealthExternalLaneControls").some((item) => item.laneId === current.laneId)) {
+    const laneControlVerification = verifyPublicHealthExternalLaneControlAuditChain(data, current.laneId, signingMaterial);
+    if (!laneControlVerification.ok) {
+      throw new Error(`public health external lane control rejected: ${laneControlVerification.reason}`);
+    }
+  }
   const workerIdHash = sha256(workerId);
   const idempotencyKeyHash = sha256(idempotencyKey);
   const auditRows = clone(rows(data, "publicHealthExternalDispatchAudit"));
@@ -325,6 +354,15 @@ function claimPublicHealthExternalDispatchToState(data = {}, dispatchId, input =
   }
   if (isLeaseActive(current, now)) throw new Error("external dispatch is already claimed by an active worker lease");
   if (!isDispatchDue(current, now)) throw new Error("external dispatch is not due for delivery");
+  const laneReservation = resiliencePolicy
+    ? reservePublicHealthExternalLaneCapacityToState(
+      data,
+      current.laneId,
+      { at: now, expectedVersion: input.expectedLaneControlVersion },
+      signingMaterial,
+      resiliencePolicy
+    )
+    : null;
   const expiresAt = new Date(nowValue + leaseSeconds * 1000).toISOString();
   const leaseSigningKey = selectSigningKey(signingMaterial, now);
   const lease = {
@@ -361,7 +399,7 @@ function claimPublicHealthExternalDispatchToState(data = {}, dispatchId, input =
   const updated = appended.dispatch;
   dispatches[index] = updated;
   const nextData = {
-    ...data,
+    ...(laneReservation?.nextData || data),
     publicHealthExternalDispatches: dispatches,
     publicHealthExternalDispatchAudit: appended.auditRows
   };
@@ -369,6 +407,7 @@ function claimPublicHealthExternalDispatchToState(data = {}, dispatchId, input =
     ok: true,
     idempotent: false,
     leaseToken,
+    laneControl: laneReservation?.control || null,
     dispatch: clone(updated),
     nextData,
     externalRuntime: buildPublicHealthExternalAdapterRuntime(nextData),
@@ -430,6 +469,8 @@ function enqueuePublicHealthExternalDispatchToState(
   const coordination = buildPublicHealthCoordinationRuntime({ data, ...dependencies });
   const handoff = coordination.handoffs.find((item) => item.id === clean(handoffId));
   if (!handoff) throw new Error(`unknown public health coordination handoff: ${clean(handoffId) || "missing"}`);
+  const resiliencePolicy = resiliencePolicyFor(credentials, handoff.laneId);
+  if (resiliencePolicy) assertPublicHealthExternalBackpressure(data, handoff.laneId, resiliencePolicy);
   const compensation = requireCompensation(input);
   const signingMaterial = requestSigningMaterial(credentials);
   const dispatchAt = clean(input.at || new Date().toISOString());
@@ -492,6 +533,19 @@ function externalAttemptAudit(dispatch, updated, result, options) {
     resultDigest: sha256(JSON.stringify(stableValue(result))),
     receiptReplayKeyHash,
     idempotencyKeyHash: sha256(options.attemptIdempotencyKey)
+  };
+}
+
+function resilienceOutcomeForAttempt(updated, result) {
+  const attempt = updated.attempts[updated.attempts.length - 1];
+  const transportStatus = Number(result.transportStatus || 0);
+  const infrastructureFailure = Boolean(clean(result.networkError))
+    || transportStatus === 429
+    || transportStatus >= 500
+    || (transportStatus >= 200 && transportStatus < 300 && attempt.reason !== "verified-signed-receipt");
+  return {
+    type: infrastructureFailure ? "failure" : "success",
+    reason: attempt.reason
   };
 }
 
@@ -568,6 +622,13 @@ function recordPublicHealthExternalAttemptToState(
     throw new Error("persisted public health external dispatch rejected: runtime-state-signature-invalid");
   }
   assertExternalAuditChain(data, current, signingMaterial);
+  const resiliencePolicy = options.requireLease ? resiliencePolicyFor(options, current.laneId) : null;
+  if (resiliencePolicy) {
+    const laneControlVerification = verifyPublicHealthExternalLaneControlAuditChain(data, current.laneId, signingMaterial);
+    if (!laneControlVerification.ok) {
+      throw new Error(`public health external lane control rejected: ${laneControlVerification.reason}`);
+    }
+  }
   const idempotencyKeyHash = sha256(attemptIdempotencyKey);
   const auditRows = clone(rows(data, "publicHealthExternalDispatchAudit"));
   const duplicate = auditRows.find((item) => (
@@ -651,10 +712,27 @@ function recordPublicHealthExternalAttemptToState(
     finalData = coordinated.nextData;
     coordinationAction = coordinated.action;
   }
+  let laneControl = null;
+  if (resiliencePolicy) {
+    const laneOutcome = recordPublicHealthExternalLaneOutcomeToState(
+      finalData,
+      updated.laneId,
+      resilienceOutcomeForAttempt(updated, result),
+      {
+        at: updated.attempts[updated.attempts.length - 1].at,
+        expectedVersion: options.expectedLaneControlVersion
+      },
+      signingMaterial,
+      resiliencePolicy
+    );
+    finalData = laneOutcome.nextData;
+    laneControl = laneOutcome.control;
+  }
   return {
     ok: true,
     idempotent: false,
     dispatch: clone(updated),
+    laneControl,
     coordinationAction,
     nextData: finalData,
     externalRuntime: buildPublicHealthExternalAdapterRuntime(finalData),
