@@ -51,6 +51,18 @@ function buildFinancialGatewayReadiness(options = {}) {
         "reconcileRefund",
         "refundOperations"
       ]
+    },
+    {
+      id: "online-refund-sla-operations",
+      source: refundSource,
+      markers: [
+        "REFUND_SLA_POLICY",
+        "buildRefundSla",
+        "buildRefundExceptionQueue",
+        "provider-callback-overdue",
+        "retry-exhausted",
+        "ledger-invalid"
+      ]
     }
   ].map((item) => {
     const source = item.source || adapterSource;

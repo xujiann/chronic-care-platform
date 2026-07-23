@@ -21,7 +21,7 @@ test("T07 unified acceptance fails when one workflow evidence is missing", () =>
     diseasePayment: { ready: true, checks: [
       { id: "settlement", ok: true }, { id: "settlement-sla", ok: true }, { id: "settlement-difference-governance", ok: true }, { id: "dual-mode", ok: true }, { id: "official-receipt-contract", ok: true }, { id: "formal-grouping-async", ok: true }, { id: "parameter-dual-review", ok: true }, { id: "special-case", ok: false }, { id: "annual-clearance", ok: true }, { id: "annual-clearance-institution-confirmation", ok: true }
     ], externalBlockers: [] },
-    financialGateway: { ok: true, capabilities: [{ id: "online-refund-closed-loop", passed: true }], blockers: [] },
+    financialGateway: { ok: true, capabilities: [{ id: "online-refund-closed-loop", passed: true }, { id: "online-refund-sla-operations", passed: true }], blockers: [] },
     serverSource: ""
   });
   assert.equal(report.localReady, false);

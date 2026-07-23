@@ -24,7 +24,7 @@ function buildInsurancePaymentAcceptance(options = {}) {
   const operatingModel = OperatingModel.validateOperatingModel();
   const integrationHandoff = OperatingModel.buildT00IntegrationHandoff(serverSource);
   const workflows = [
-    { id: "online-payment-refund", label: "在线支付退费", ready: capabilityById(financialGateway, "online-refund-closed-loop"), evidence: ["dual-domain-review", "trusted-callback", "provider-reversal", "daily-reconciliation", "voucher-close"] },
+    { id: "online-payment-refund", label: "在线支付退费", ready: capabilityById(financialGateway, "online-refund-closed-loop") && capabilityById(financialGateway, "online-refund-sla-operations"), evidence: ["dual-domain-review", "trusted-callback", "provider-reversal", "phase-sla", "redacted-exception-queue", "daily-reconciliation", "voucher-close"] },
     { id: "insurance-settlement", label: "医保核心结算", ready: checkById(diseasePayment, "settlement"), evidence: ["formal-grouping-gate", "integer-fen-contract", "trusted-core-callback", "hash-ledger"] },
     { id: "drg-dip", label: "DRG/DIP分组测算", ready: ["dual-mode", "official-receipt-contract", "formal-grouping-async", "parameter-dual-review"].every((id) => checkById(diseasePayment, id)), evidence: ["signed-grouper-contract", "simulation-isolation", "versioned-parameters", "impact-analysis"] },
     { id: "special-case", label: "特例单议", ready: checkById(diseasePayment, "special-case"), evidence: ["digest-only-evidence", "expert-avoidance", "dual-review", "settlement-binding", "privacy-disclosure"] },

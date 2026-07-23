@@ -17,6 +17,14 @@ const REFUND_STATES = Object.freeze({
 });
 const RESERVED_STATES = new Set(["REQUESTED", "UNDER_REVIEW", "APPROVED", "DISPATCHED", "PROCESSING", "SUCCEEDED", "FAILED", "RECONCILED", "CLOSED"]);
 const REQUIRED_REFUND_REVIEW_DOMAINS = Object.freeze(["business-review", "finance-review"]);
+const REFUND_SLA_POLICY = Object.freeze({
+  reviewMinutes: 120,
+  dispatchMinutes: 30,
+  callbackMinutes: 30,
+  failureDecisionMinutes: 240,
+  reconciliationMinutes: 2160,
+  voucherCloseMinutes: 1440
+});
 
 class RefundWorkflowError extends Error {
   constructor(message, code, statusCode = 409) {
@@ -61,6 +69,72 @@ function verifyRefundLedger(events = []) {
     const { eventHash, ...base } = event;
     return base.sequence === index + 1 && base.previousHash === (index ? events[index - 1].eventHash : "GENESIS") && eventHash === digest(base);
   });
+}
+
+function timestamp(value) {
+  const parsed = Date.parse(String(value || ""));
+  return Number.isFinite(parsed) ? parsed : NaN;
+}
+
+function refundSlaPhase(row = {}) {
+  const lastAttempt = (row.attempts || []).at(-1);
+  const phases = {
+    REQUESTED: { phase: "review", anchor: row.requestedAt, minutes: "reviewMinutes" },
+    UNDER_REVIEW: { phase: "review", anchor: row.requestedAt, minutes: "reviewMinutes" },
+    APPROVED: { phase: "dispatch", anchor: row.approvedAt || row.updatedAt || row.requestedAt, minutes: "dispatchMinutes" },
+    DISPATCHED: { phase: "provider-callback", anchor: lastAttempt?.dispatchedAt, minutes: "callbackMinutes" },
+    PROCESSING: { phase: "provider-callback", anchor: lastAttempt?.dispatchedAt, minutes: "callbackMinutes" },
+    FAILED: { phase: "failure-decision", anchor: row.failedAt || row.updatedAt, minutes: "failureDecisionMinutes" },
+    SUCCEEDED: { phase: "daily-reconciliation", anchor: row.succeededAt || row.updatedAt, minutes: "reconciliationMinutes" },
+    RECONCILED: { phase: "voucher-close", anchor: row.reconciledAt || row.updatedAt, minutes: "voucherCloseMinutes" }
+  };
+  return phases[row.state] || null;
+}
+
+function normalizeRefundSlaPolicy(input = {}) {
+  const policy = {};
+  for (const [key, fallback] of Object.entries(REFUND_SLA_POLICY)) {
+    const value = Number(input[key] ?? fallback);
+    if (!Number.isInteger(value) || value <= 0 || value > 43_200) throw new RefundWorkflowError("退款SLA配置必须为有效正整数分钟", "REFUND_SLA_POLICY_INVALID", 400);
+    policy[key] = value;
+  }
+  return policy;
+}
+
+function buildRefundSla(row = {}, at = new Date().toISOString(), policyInput = {}) {
+  const policy = normalizeRefundSlaPolicy(policyInput);
+  const evaluatedTimestamp = timestamp(at);
+  if (!Number.isFinite(evaluatedTimestamp)) throw new RefundWorkflowError("退款SLA评估时间无效", "REFUND_SLA_EVALUATION_TIME_INVALID", 400);
+  const evaluatedAt = new Date(evaluatedTimestamp).toISOString();
+  if (["REJECTED", "CANCELLED", "CLOSED"].includes(row.state)) return { phase: "terminal", status: "completed", evaluatedAt, dueAt: "", overdueMinutes: 0, remainingMinutes: 0, policy };
+  const phase = refundSlaPhase(row);
+  if (!phase) return { phase: "unknown", status: "missing-milestone", evaluatedAt, dueAt: "", overdueMinutes: 0, remainingMinutes: 0, policy };
+  const anchor = timestamp(phase.anchor);
+  if (!Number.isFinite(anchor)) return { phase: phase.phase, status: "missing-milestone", evaluatedAt, dueAt: "", overdueMinutes: 0, remainingMinutes: 0, policy };
+  const due = anchor + policy[phase.minutes] * 60_000;
+  const evaluated = timestamp(evaluatedAt);
+  const remainingMinutes = Math.max(0, Math.ceil((due - evaluated) / 60_000));
+  const overdueMinutes = Math.max(0, Math.floor((evaluated - due) / 60_000));
+  return { phase: phase.phase, status: evaluated > due ? "overdue" : "within-sla", evaluatedAt, anchorAt: new Date(anchor).toISOString(), dueAt: new Date(due).toISOString(), overdueMinutes, remainingMinutes, policy };
+}
+
+function buildRefundExceptionQueue(data = {}, options = {}) {
+  const at = options.at || new Date().toISOString();
+  const policy = options.policy || {};
+  const priorityRank = { critical: 0, high: 1, medium: 2 };
+  return refundCollection(data).flatMap((row) => {
+    const sla = buildRefundSla(row, at, policy);
+    const issueCodes = [];
+    if (!verifyRefundLedger(row.events)) issueCodes.push("ledger-invalid");
+    if (row.reversalPending) issueCodes.push("provider-reversal-pending");
+    if (row.state === "FAILED") issueCodes.push("provider-failed");
+    if (row.attempts?.length >= 3 && row.state === "FAILED") issueCodes.push("retry-exhausted");
+    if (sla.status === "overdue") issueCodes.push(`${sla.phase}-overdue`);
+    if (sla.status === "missing-milestone") issueCodes.push("milestone-missing");
+    if (!issueCodes.length) return [];
+    const priority = issueCodes.some((code) => ["ledger-invalid", "provider-reversal-pending", "retry-exhausted", "provider-callback-overdue"].includes(code)) ? "critical" : issueCodes.includes("provider-failed") || sla.status === "overdue" ? "high" : "medium";
+    return [{ id: row.id, orderReference: row.orderReference, refundAmountFen: row.refundAmountFen, reasonCode: row.reasonCode, state: row.state, priority, issueCodes, sla: { phase: sla.phase, status: sla.status, dueAt: sla.dueAt, overdueMinutes: sla.overdueMinutes }, attemptCount: row.attempts?.length || 0, ledgerValid: !issueCodes.includes("ledger-invalid"), productionReady: false }];
+  }).sort((left, right) => priorityRank[left.priority] - priorityRank[right.priority] || right.sla.overdueMinutes - left.sla.overdueMinutes || left.id.localeCompare(right.id));
 }
 
 function paymentEventStatus(event = {}) {
@@ -162,6 +236,8 @@ function reviewRefundRequest(data, id, input = {}, actor = {}) {
   row.status = REFUND_STATES[row.state];
   row.updatedAt = reviewedAt;
   row.updatedBy = reviewer;
+  if (row.state === "APPROVED") row.approvedAt = reviewedAt;
+  if (row.state === "REJECTED") row.rejectedAt = reviewedAt;
   appendEvent(row, { id: `refund-event-${randomUUID()}`, action: approved ? "approve-review" : "reject-review", from: before, to: row.state, actor: reviewer, at: reviewedAt, idempotencyKey: review.id, detail: { reviewDomain, role: review.role, opinion: review.opinion } });
   return { row, review };
 }
@@ -242,6 +318,7 @@ function retryRefund(data, id, input = {}, actor = {}) {
   row.refundReceiptId = "";
   row.gatewayEventId = "";
   const at = new Date().toISOString();
+  row.approvedAt = at;
   if (row.reversalPending) {
     row.reversalPending = false;
     row.reversalResolvedAt = at;
@@ -298,8 +375,11 @@ function closeRefund(data, id, input = {}, actor = {}) {
   return { row };
 }
 
-function buildRefundOperations(data = {}) {
+function buildRefundOperations(data = {}, options = {}) {
   const rows = refundCollection(data);
+  const at = options.at || new Date().toISOString();
+  const exceptionQueue = buildRefundExceptionQueue(data, { at, policy: options.policy });
+  const slaRows = rows.map((item) => buildRefundSla(item, at, options.policy));
   return {
     productionReady: false,
     summary: {
@@ -307,12 +387,16 @@ function buildRefundOperations(data = {}) {
       pendingReview: rows.filter((item) => ["REQUESTED", "UNDER_REVIEW"].includes(item.state)).length,
       processing: rows.filter((item) => ["APPROVED", "DISPATCHED", "PROCESSING"].includes(item.state)).length,
       failed: rows.filter((item) => item.state === "FAILED").length,
+      exceptions: exceptionQueue.length,
+      overdue: slaRows.filter((item) => item.status === "overdue").length,
+      critical: exceptionQueue.filter((item) => item.priority === "critical").length,
       succeeded: rows.filter((item) => ["SUCCEEDED", "RECONCILED", "CLOSED"].includes(item.state)).length,
       refundAmountFen: rows.filter((item) => ["SUCCEEDED", "RECONCILED", "CLOSED"].includes(item.state)).reduce((sum, item) => sum + Number(item.refundAmountFen || 0), 0)
     },
-    refunds: rows.slice(0, 100).map((item) => ({ id: item.id, orderReference: item.orderReference, refundAmountFen: item.refundAmountFen, reasonCode: item.reasonCode, state: item.state, status: item.status, reviewCount: item.reviews.length, attemptCount: item.attempts.length, providerBusinessDate: item.providerBusinessDate || "", ledgerValid: verifyRefundLedger(item.events), productionReady: false })),
+    exceptionQueue: exceptionQueue.slice(0, Number(options.limit || 100)),
+    refunds: rows.slice(0, 100).map((item) => ({ id: item.id, orderReference: item.orderReference, refundAmountFen: item.refundAmountFen, reasonCode: item.reasonCode, state: item.state, status: item.status, reviewCount: item.reviews.length, attemptCount: item.attempts.length, providerBusinessDate: item.providerBusinessDate || "", sla: buildRefundSla(item, at, options.policy), ledgerValid: verifyRefundLedger(item.events), productionReady: false })),
     boundary: "退款申请、复核、额度、可信回调和日终对账账本可运行；真实商户、支付机构回调、账单和财务凭证仍需现场验收。"
   };
 }
 
-module.exports = { REFUND_STATES, REQUIRED_REFUND_REVIEW_DOMAINS, RESERVED_STATES, RefundWorkflowError, buildRefundOperations, cancelRefund, closeRefund, createRefundRequest, digest, prepareRefundDispatch, reconcileRefund, recordRefundDispatch, reservedRefundAmount, retryRefund, reviewRefundRequest, stableStringify, syncRefundFromFinancialCallback, verifyRefundLedger };
+module.exports = { REFUND_SLA_POLICY, REFUND_STATES, REQUIRED_REFUND_REVIEW_DOMAINS, RESERVED_STATES, RefundWorkflowError, buildRefundExceptionQueue, buildRefundOperations, buildRefundSla, cancelRefund, closeRefund, createRefundRequest, digest, normalizeRefundSlaPolicy, prepareRefundDispatch, reconcileRefund, recordRefundDispatch, reservedRefundAmount, retryRefund, reviewRefundRequest, stableStringify, syncRefundFromFinancialCallback, verifyRefundLedger };
