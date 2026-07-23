@@ -40,14 +40,14 @@ T08 自有实现边界：
 - `public-health-coordination-service.js`：八领域责任、来源、依赖、状态机与验收场景。
 - `public-health-coordination-runtime.js`：从业务集合重建八领域任务，安全恢复持久化操作字段，并输出不可变的数据补丁和最小化追加审计；拒绝领域、业务键和来源引用篡改。
 - `public-health-external-adapter-service.js`：八领域适配器注册表、最小化签名请求、可信回执验签、瞬时故障重试、永久故障/重试耗尽死信和补偿责任。
-- `public-health-external-adapter-runtime.js`：持久化出站箱、可变投递状态签名、回调幂等、成功/拒绝回执自动推进和无回执死信补偿异常联动。
+- `public-health-external-adapter-runtime.js`：持久化出站箱、可变投递状态签名、到期扫描、worker 租约与过期接管、回调幂等、成功/拒绝回执自动推进和无回执死信补偿异常联动。
 - `scripts/public-health-coordination-readiness.js`：功能完成度与上线边界门禁。
 - `scripts/public-health-final-readiness.js`：持久化写模型、八领域签名回执和失败关闭边界的最终端到端验收。
 - `scripts/public-health-readiness.js`：将事件直报、标准复核和协同中心聚合到公共卫生系统视图。
 - `public-health.html`、`public-health.js`：协同中心页面容器、接口渲染、静态回退，以及分派、接单、成功/拒收回执、重试、证据关闭和重开动作载荷。
 - `test/public-health-coordination-*.test.js`：服务、验收和页面契约测试。
 
-T00 继续负责公共 `server.js` 动作路由及持久化写入器接线、`portal.css` 公共样式、`package.json` 脚本、`README` 和发布总表。本线程不修改这些公共文件。协调路由应调用 `applyPublicHealthCoordinationActionToState()`；外部投递和回调路由应分别调用 `enqueuePublicHealthExternalDispatchToState()`、`recordPublicHealthExternalAttemptToState()`。所有路由只把返回的 `nextData` 交给统一持久化写入器，不应复制状态转换、授权、幂等、版本、签名或补偿判断。
+T00 继续负责公共 `server.js` 动作路由及持久化写入器接线、`portal.css` 公共样式、`package.json` 脚本、`README` 和发布总表。本线程不修改这些公共文件。协调路由应调用 `applyPublicHealthCoordinationActionToState()`；外部入队调用 `enqueuePublicHealthExternalDispatchToState()`；worker 依次调用 `listDuePublicHealthExternalDispatches()`、`claimPublicHealthExternalDispatchToState()` 和 `recordClaimedPublicHealthExternalAttemptToState()`；外部系统主动回调调用 `recordPublicHealthExternalAttemptToState()`。所有路由只把返回的 `nextData` 交给统一持久化写入器，不应复制状态转换、授权、幂等、版本、签名、租约或补偿判断。
 
 ## 持久化与外部适配实施契约
 
@@ -57,7 +57,9 @@ T00 继续负责公共 `server.js` 动作路由及持久化写入器接线、`po
 
 瞬时网络错误、HTTP 429 和 5xx 使用同一请求摘要和幂等键重试；达到最大次数进入死信。无回执、绑定不一致、签名无效或永久 HTTP 故障直接进入死信并要求安全复核与人工补偿。外部回执验证成功只表示业务材料已登记，仍须可信现场证据，因而所有适配器结果继续保持 `productionReady=false`。
 
-出站箱持久化 `publicHealthExternalDispatches` 和最小化追加审计 `publicHealthExternalDispatchAudit`。初始请求签名保护固定契约；运行时状态签名额外绑定投递状态、尝试次数、最大重试次数、下次重试时间、回执、阻断原因和补偿责任，防止持久化后篡改状态影响信任判定。可信回执连同原签名持久化，可再次独立验签；每次响应还保留内容摘要用于无敏感正文的取证。每个回调必须携带独立幂等键：相同回调不重复增加尝试、审计或协调版本。可信接受回执自动把任务推进到 `receipt-confirmed`；可信拒绝回执打开签名所绑定的异常；无可信回执的永久失败或重试耗尽通过 `open-coordination-exception` 打开预先指定的补偿异常。
+出站箱持久化 `publicHealthExternalDispatches` 和最小化追加审计 `publicHealthExternalDispatchAudit`。初始请求签名保护固定契约；运行时状态签名额外绑定投递状态、尝试次数、最大重试次数、下次重试时间、回执、阻断原因、补偿责任和 worker 租约，防止持久化后篡改状态影响信任判定。可信回执连同原签名持久化，可再次独立验签；每次响应还保留内容摘要用于无敏感正文的取证。每个回调必须携带独立幂等键：相同回调不重复增加尝试、审计或协调版本。可信接受回执自动把任务推进到 `receipt-confirmed`；可信拒绝回执打开签名所绑定的异常；无可信回执的永久失败或重试耗尽通过 `open-coordination-exception` 打开预先指定的补偿异常。
+
+worker 只能领取状态为 `pending` 或已经到达 `nextRetryAt` 的任务。到期列表返回签名保护的 `outboxVersion`；领取和投递尝试均须提交 `expectedVersion`，每次成功写动作版本加一，供 T00 持久化写入器执行原子 CAS。领取时生成 15—900 秒签名租约，持久化 worker 标识哈希、租约令牌哈希和到期时间，原始租约令牌只返回给领取者而不落库。活动租约阻止其他 worker 并发投递；租约过期后任务重新进入到期队列并可由新 worker 接管。认领后的投递必须同时匹配版本、worker 和租约令牌且发生在有效期内，尝试完成后自动释放租约。外部系统主动回调不需要 worker 租约，但必须先通过独立回执验签并使用服务端当前版本；伪造回调直接拒绝且不进入死信，避免攻击者借无效回调改变任务状态。
 
 ## 测试清单
 
@@ -69,6 +71,7 @@ T00 继续负责公共 `server.js` 动作路由及持久化写入器接线、`po
 - `/api/public-health/system` 的现有构建链能够返回 `coordinationCenter`，页面缺少接口时仍可构造八领域静态视图。
 - 页面动作统一携带幂等键和 `expectedVersion`，并调用 `/api/public-health/coordination/:id/actions` 公共路由边界；T00 只需完成路由接线和落库。
 - 出站入队、成功/拒绝回调、瞬时重试、重试耗尽和回调重放均通过不可变状态补丁持久化；篡改请求或运行时状态签名必须在处理前拒绝。
+- 到期排序、乐观版本冲突、活动租约并发互斥、租约令牌不落库、过期接管、旧 worker 拒绝和投递后释放均须通过；公网主动回调必须先验签再改变状态。
 - 缺少任何必需业务集合时，结构就绪门禁失败。
 - 功能验收通过仍保持 `productionReady=false`，不替代生产现场证据。
 

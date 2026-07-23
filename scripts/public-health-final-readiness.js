@@ -17,8 +17,10 @@ const {
   signPublicHealthExternalReceipt
 } = require("../public-health-external-adapter-service");
 const {
+  claimPublicHealthExternalDispatchToState,
   enqueuePublicHealthExternalDispatchToState,
-  recordPublicHealthExternalAttemptToState,
+  listDuePublicHealthExternalDispatches,
+  recordClaimedPublicHealthExternalAttemptToState,
   verifyRuntimeStateSignature
 } = require("../public-health-external-adapter-runtime");
 const { buildPublicHealthSystem } = require("./public-health-readiness");
@@ -151,6 +153,16 @@ function runExternalOutboxAcceptance(sourceData, system) {
     exceptionDueAt: "2026-07-31",
     at: "2026-07-23T08:00:00.000Z"
   }, credentials, dependencies);
+  const dueBeforeClaim = listDuePublicHealthExternalDispatches(enqueued.nextData, {
+    now: "2026-07-23T08:00:30.000Z"
+  });
+  const claimed = claimPublicHealthExternalDispatchToState(enqueued.nextData, enqueued.dispatch.id, {
+    workerId: "final-readiness-family-doctor-worker",
+    idempotencyKey: "final:outbox:family-doctor:claim",
+    expectedVersion: 1,
+    now: "2026-07-23T08:00:30.000Z",
+    leaseSeconds: 60
+  }, credentials);
   const receipt = signPublicHealthExternalReceipt({
     dispatchId: enqueued.dispatch.id,
     requestDigest: enqueued.dispatch.requestDigest,
@@ -161,18 +173,21 @@ function runExternalOutboxAcceptance(sourceData, system) {
     evidenceRefs: ["family-doctor-signed-receipt"],
     receivedAt: "2026-07-23T08:01:00.000Z"
   }, ACCEPTANCE_RECEIPT_SECRET);
-  const delivered = recordPublicHealthExternalAttemptToState(enqueued.nextData, enqueued.dispatch.id, {
+  const delivered = recordClaimedPublicHealthExternalAttemptToState(claimed.nextData, enqueued.dispatch.id, {
     transportStatus: 200,
     receipt
   }, {
     requestSecret: ACCEPTANCE_REQUEST_SECRET,
     receiptSecret: ACCEPTANCE_RECEIPT_SECRET,
     attemptIdempotencyKey: "final:outbox:family-doctor:attempt",
-    at: "2026-07-23T08:01:30.000Z"
+    expectedVersion: 2,
+    at: "2026-07-23T08:01:00.000Z",
+    workerId: "final-readiness-family-doctor-worker",
+    leaseToken: claimed.leaseToken
   }, dependencies);
   const handoff = buildPublicHealthCoordinationRuntime({ data: delivered.nextData, ...dependencies })
     .handoffs.find((item) => item.id === initial.id);
-  return { enqueued, delivered, handoff };
+  return { enqueued, dueBeforeClaim, claimed, delivered, handoff };
 }
 
 function buildPublicHealthFinalReadiness(options = {}) {
@@ -205,10 +220,13 @@ function buildPublicHealthFinalReadiness(options = {}) {
     check("adapter:eight-signed-deliveries", deliveries.length === 8 && deliveries.every((item) => item.deliveryState === "delivered"), `${deliveries.filter((item) => item.deliveryState === "delivered").length}/8 signed receipts verified`, "adapter"),
     check("adapter:privacy-minimized", !serializedDeliveries.includes("residentId") && !serializedDeliveries.includes(ACCEPTANCE_REQUEST_SECRET) && !serializedDeliveries.includes(ACCEPTANCE_RECEIPT_SECRET), "dispatch artifacts exclude resident identifiers and secrets", "adapter"),
     check("adapter:retry-dead-letter", ["retry-scheduled", "dead-letter", "timingSafeEqual"].every((token) => adapterSource.includes(token)), "transient retry, terminal dead letter and timing-safe verification are implemented", "adapter"),
-    check("outbox:persisted-enqueue-attempt", outboxAcceptance.delivered.externalRuntime.summary.dispatches === 1 && outboxAcceptance.delivered.externalRuntime.summary.auditEntries === 2, "one signed dispatch and two append-only outbox audit entries", "outbox"),
+    check("outbox:persisted-enqueue-attempt", outboxAcceptance.delivered.externalRuntime.summary.dispatches === 1 && outboxAcceptance.delivered.externalRuntime.summary.auditEntries === 3, "one signed dispatch and three append-only enqueue/claim/attempt audit entries", "outbox"),
     check("outbox:coordination-advance", outboxAcceptance.delivered.dispatch.deliveryState === "delivered" && outboxAcceptance.handoff.state === "receipt-confirmed", "verified callback advances the linked coordination handoff", "outbox"),
     check("outbox:runtime-state-signature", verifyRuntimeStateSignature(outboxAcceptance.delivered.dispatch, ACCEPTANCE_REQUEST_SECRET), "mutable outbox state retains a trusted runtime signature", "outbox"),
     check("outbox:dead-letter-exception-contract", ["open-coordination-exception", "runtime-state-signature-invalid", "attemptIdempotencyKey"].every((token) => adapterRuntimeSource.includes(token)), "dead letters open compensation exceptions and callback replays are idempotent", "outbox"),
+    check("worker:due-claim-lease", outboxAcceptance.dueBeforeClaim.length === 1 && outboxAcceptance.claimed.dispatch.lease && outboxAcceptance.delivered.dispatch.lease === null, "due dispatch is leased once and released after the claimed attempt", "worker"),
+    check("worker:lease-token-private", !JSON.stringify(outboxAcceptance.claimed.nextData).includes(outboxAcceptance.claimed.leaseToken) && ["expiredLeaseReclaimable", "lease token is invalid", "unclaimed external callback rejected"].every((token) => adapterRuntimeSource.includes(token)), "lease token is not persisted; stale workers and forged callbacks fail closed", "worker"),
+    check("worker:optimistic-outbox-version", outboxAcceptance.dueBeforeClaim[0]?.outboxVersion === 1 && outboxAcceptance.claimed.dispatch.outboxVersion === 2 && outboxAcceptance.delivered.dispatch.outboxVersion === 3 && adapterRuntimeSource.includes("external dispatch version conflict"), "due, claim and attempt expose a CAS-ready signed outbox version", "worker"),
     check("frontend:action-route-contract", pageSource.includes("/api/public-health/coordination/") && pageSource.includes("idempotencyKey") && pageSource.includes("expectedVersion"), "T00 route boundary has a stable client contract", "integration"),
     check("integration:documented-boundary", ["public-health-coordination-runtime.js", "public-health-external-adapter-service.js", "T00", "server.js", "productionReady"].every((token) => doc.includes(token)), "runtime, adapter and T00 boundaries are documented", "integration"),
     check("safety:functional-not-production", runtime.productionReady === false && registry.productionReady === false && deliveries.every((item) => item.productionReady === false), "functional acceptance cannot self-assert production readiness", "safety"),
@@ -254,7 +272,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
       documentation: "docs/public-health-eight-domain-coordination.md"
     },
     remainingT00Integration: [
-      "Wire coordination actions plus external enqueue/callback routes to the T08 runtime controllers and durable data writer.",
+      "Wire coordination actions plus external enqueue, due-worker claim/attempt and signed callback routes to the T08 runtime controllers and durable data writer.",
       "Register shared server, package, style, README and aggregate release entries owned by T00.",
       "Provision production HTTPS endpoints and secrets, then verify signed external receipts and trusted site evidence."
     ]

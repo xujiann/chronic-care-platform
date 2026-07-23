@@ -6,7 +6,8 @@ const {
 const {
   createPublicHealthExternalDispatch,
   recordPublicHealthExternalDeliveryAttempt,
-  verifyPublicHealthExternalDispatch
+  verifyPublicHealthExternalDispatch,
+  verifyPublicHealthExternalReceipt
 } = require("./public-health-external-adapter-service");
 
 function clone(value) {
@@ -19,6 +20,11 @@ function clean(value) {
 
 function sha256(value) {
   return crypto.createHash("sha256").update(String(value)).digest("hex");
+}
+
+function timingSafeHexEqual(left, right) {
+  if (!/^[a-f0-9]{64}$/i.test(clean(left)) || !/^[a-f0-9]{64}$/i.test(clean(right))) return false;
+  return crypto.timingSafeEqual(Buffer.from(left, "hex"), Buffer.from(right, "hex"));
 }
 
 function stableValue(value) {
@@ -36,6 +42,7 @@ function runtimeStatePayload(dispatch) {
   return {
     id: dispatch.id,
     requestDigest: dispatch.requestDigest,
+    outboxVersion: dispatch.outboxVersion,
     deliveryState: dispatch.deliveryState,
     attempts: dispatch.attempts,
     maxAttempts: dispatch.maxAttempts,
@@ -43,6 +50,7 @@ function runtimeStatePayload(dispatch) {
     receipt: dispatch.receipt,
     blocker: dispatch.blocker,
     compensation: dispatch.compensation,
+    lease: dispatch.lease || null,
     productionReady: false
   };
 }
@@ -79,6 +87,23 @@ function rows(data, key) {
   return Array.isArray(data?.[key]) ? data[key] : [];
 }
 
+function timeValue(value, label) {
+  const parsed = new Date(value).getTime();
+  if (!Number.isFinite(parsed)) throw new Error(`${label} must be a valid date-time`);
+  return parsed;
+}
+
+function isLeaseActive(dispatch, now) {
+  return Boolean(dispatch.lease?.expiresAt && timeValue(dispatch.lease.expiresAt, "lease expiresAt") > timeValue(now, "now"));
+}
+
+function isDispatchDue(dispatch, now) {
+  if (!["pending", "retry-scheduled"].includes(dispatch.deliveryState)) return false;
+  if (isLeaseActive(dispatch, now)) return false;
+  if (dispatch.deliveryState === "pending") return true;
+  return Boolean(dispatch.nextRetryAt && timeValue(dispatch.nextRetryAt, "nextRetryAt") <= timeValue(now, "now"));
+}
+
 function buildPublicHealthExternalAdapterRuntime(data = {}) {
   const dispatches = clone(rows(data, "publicHealthExternalDispatches"));
   const audit = clone(rows(data, "publicHealthExternalDispatchAudit"));
@@ -91,6 +116,7 @@ function buildPublicHealthExternalAdapterRuntime(data = {}) {
       dispatches: dispatches.length,
       pending: dispatches.filter((item) => item.deliveryState === "pending").length,
       retryScheduled: dispatches.filter((item) => item.deliveryState === "retry-scheduled").length,
+      leased: dispatches.filter((item) => item.lease).length,
       delivered: dispatches.filter((item) => item.deliveryState === "delivered").length,
       deadLetter: dispatches.filter((item) => item.deliveryState === "dead-letter").length,
       auditEntries: audit.length
@@ -100,6 +126,134 @@ function buildPublicHealthExternalAdapterRuntime(data = {}) {
       "T00 must persist the returned immutable state through the shared writer.",
       "Production endpoints, secrets, signed receipts and trusted site evidence remain required."
     ]
+  };
+}
+
+function listDuePublicHealthExternalDispatches(data = {}, options = {}) {
+  const now = clean(options.now || new Date().toISOString());
+  timeValue(now, "now");
+  const limit = Number(options.limit || 20);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error("outbox due limit must be an integer from 1 to 100");
+  return rows(data, "publicHealthExternalDispatches")
+    .filter((item) => isDispatchDue(item, now))
+    .sort((left, right) => {
+      const leftDue = left.nextRetryAt ? timeValue(left.nextRetryAt, "nextRetryAt") : 0;
+      const rightDue = right.nextRetryAt ? timeValue(right.nextRetryAt, "nextRetryAt") : 0;
+      return leftDue - rightDue || clean(left.id).localeCompare(clean(right.id));
+    })
+    .slice(0, limit)
+    .map((item) => ({
+      id: item.id,
+      laneId: item.laneId,
+      handoffId: item.handoffId,
+      deliveryState: item.deliveryState,
+      attempts: Array.isArray(item.attempts) ? item.attempts.length : 0,
+      nextRetryAt: item.nextRetryAt,
+      outboxVersion: item.outboxVersion,
+      expiredLeaseReclaimable: Boolean(item.lease)
+    }));
+}
+
+function leaseTokenFor(dispatchId, lease, requestSecret) {
+  return crypto.createHmac("sha256", requestSecret)
+    .update(JSON.stringify(stableValue({
+      dispatchId,
+      workerIdHash: lease.workerIdHash,
+      idempotencyKeyHash: lease.idempotencyKeyHash,
+      claimedAt: lease.claimedAt,
+      expiresAt: lease.expiresAt
+    })))
+    .digest("hex");
+}
+
+function claimPublicHealthExternalDispatchToState(data = {}, dispatchId, input = {}, credentials = {}) {
+  const workerId = clean(input.workerId);
+  const idempotencyKey = clean(input.idempotencyKey);
+  const now = clean(input.now || new Date().toISOString());
+  const leaseSeconds = Number(input.leaseSeconds || 60);
+  if (!workerId || !idempotencyKey) throw new Error("workerId and idempotencyKey are required to claim external dispatch");
+  if (!Number.isInteger(leaseSeconds) || leaseSeconds < 15 || leaseSeconds > 900) {
+    throw new Error("leaseSeconds must be an integer from 15 to 900");
+  }
+  const nowValue = timeValue(now, "now");
+  const dispatches = clone(rows(data, "publicHealthExternalDispatches"));
+  const index = dispatches.findIndex((item) => item.id === clean(dispatchId));
+  if (index < 0) throw new Error(`unknown public health external dispatch: ${clean(dispatchId) || "missing"}`);
+  const current = dispatches[index];
+  const requestVerification = verifyPublicHealthExternalDispatch(current, credentials.requestSecret);
+  if (!requestVerification.ok || !verifyRuntimeStateSignature(current, credentials.requestSecret)) {
+    throw new Error(`persisted public health external dispatch rejected: ${requestVerification.ok ? "runtime-state-signature-invalid" : requestVerification.reason}`);
+  }
+  const workerIdHash = sha256(workerId);
+  const idempotencyKeyHash = sha256(idempotencyKey);
+  const auditRows = clone(rows(data, "publicHealthExternalDispatchAudit"));
+  const duplicate = auditRows.find((item) => (
+    item.dispatchId === current.id
+    && item.action === "claim-external-dispatch"
+    && item.idempotencyKeyHash === idempotencyKeyHash
+  ));
+  if (duplicate) {
+    if (duplicate.workerIdHash !== workerIdHash) throw new Error("claim idempotency key was reused by a different worker");
+    const leaseToken = current.lease?.idempotencyKeyHash === idempotencyKeyHash
+      ? leaseTokenFor(current.id, current.lease, credentials.requestSecret)
+      : "";
+    return {
+      ok: true,
+      idempotent: true,
+      leaseToken,
+      dispatch: current,
+      nextData: {
+        ...data,
+        publicHealthExternalDispatches: dispatches,
+        publicHealthExternalDispatchAudit: auditRows
+      },
+      productionReady: false
+    };
+  }
+  if (input.expectedVersion === undefined || Number(input.expectedVersion) !== Number(current.outboxVersion)) {
+    throw new Error(`external dispatch version conflict: expected ${input.expectedVersion ?? "missing"}, current ${current.outboxVersion}`);
+  }
+  if (isLeaseActive(current, now)) throw new Error("external dispatch is already claimed by an active worker lease");
+  if (!isDispatchDue(current, now)) throw new Error("external dispatch is not due for delivery");
+  const expiresAt = new Date(nowValue + leaseSeconds * 1000).toISOString();
+  const lease = { workerIdHash, idempotencyKeyHash, claimedAt: new Date(nowValue).toISOString(), expiresAt };
+  const leaseToken = leaseTokenFor(current.id, lease, credentials.requestSecret);
+  lease.tokenHash = sha256(leaseToken);
+  const updated = withRuntimeStateSignature({
+    ...current,
+    lease,
+    outboxVersion: Number(current.outboxVersion) + 1
+  }, credentials.requestSecret);
+  dispatches[index] = updated;
+  const audit = {
+    id: `${current.id}:audit:lease:${idempotencyKeyHash.slice(0, 16)}`,
+    dispatchId: current.id,
+    handoffId: current.handoffId,
+    laneId: current.laneId,
+    action: "claim-external-dispatch",
+    from: current.deliveryState,
+    to: current.deliveryState,
+    fromVersion: current.outboxVersion,
+    toVersion: updated.outboxVersion,
+    at: lease.claimedAt,
+    leaseExpiresAt: expiresAt,
+    workerIdHash,
+    idempotencyKeyHash,
+    reclaimedExpiredLease: Boolean(current.lease)
+  };
+  const nextData = {
+    ...data,
+    publicHealthExternalDispatches: dispatches,
+    publicHealthExternalDispatchAudit: [...auditRows, audit]
+  };
+  return {
+    ok: true,
+    idempotent: false,
+    leaseToken,
+    dispatch: clone(updated),
+    nextData,
+    externalRuntime: buildPublicHealthExternalAdapterRuntime(nextData),
+    productionReady: false
   };
 }
 
@@ -158,7 +312,8 @@ function enqueuePublicHealthExternalDispatchToState(
   const compensation = requireCompensation(input);
   const dispatch = withRuntimeStateSignature({
     ...createPublicHealthExternalDispatch(handoff, input, credentials),
-    compensation
+    compensation,
+    outboxVersion: 1
   }, credentials.requestSecret);
   const audit = [
     ...clone(rows(data, "publicHealthExternalDispatchAudit")),
@@ -170,6 +325,8 @@ function enqueuePublicHealthExternalDispatchToState(
       action: "enqueue-external-dispatch",
       from: "not-enqueued",
       to: "pending",
+      fromVersion: 0,
+      toVersion: dispatch.outboxVersion,
       at: clean(input.at || new Date().toISOString()),
       idempotencyKeyHash: dispatch.request.idempotencyKeyHash
     }
@@ -199,13 +356,32 @@ function externalAttemptAudit(dispatch, updated, result, options) {
     action: "record-external-delivery-attempt",
     from: dispatch.deliveryState,
     to: updated.deliveryState,
+    fromVersion: dispatch.outboxVersion,
+    toVersion: updated.outboxVersion,
     at: attempt.at,
     attempt: attempt.attempt,
     transportStatus: Number(result.transportStatus || 0),
     outcome: attempt.outcome,
     reason: attempt.reason,
+    resultDigest: sha256(JSON.stringify(stableValue(result))),
     idempotencyKeyHash: sha256(options.attemptIdempotencyKey)
   };
+}
+
+function verifyClaimedLease(dispatch, options) {
+  const workerIdHash = sha256(clean(options.workerId));
+  const leaseTokenHash = sha256(clean(options.leaseToken));
+  const at = clean(options.at || new Date().toISOString());
+  if (!clean(options.workerId) || !clean(options.leaseToken) || !dispatch.lease) {
+    throw new Error("an active worker lease is required for claimed external delivery attempt");
+  }
+  if (!timingSafeHexEqual(dispatch.lease.workerIdHash, workerIdHash)
+    || !timingSafeHexEqual(dispatch.lease.tokenHash, leaseTokenHash)) {
+    throw new Error("external dispatch worker lease token is invalid");
+  }
+  if (timeValue(dispatch.lease.expiresAt, "lease expiresAt") <= timeValue(at, "attempt at")) {
+    throw new Error("external dispatch worker lease has expired");
+  }
 }
 
 function coordinationPayloadForTerminalDispatch(dispatch, handoff) {
@@ -265,8 +441,16 @@ function recordPublicHealthExternalAttemptToState(
   }
   const idempotencyKeyHash = sha256(attemptIdempotencyKey);
   const auditRows = clone(rows(data, "publicHealthExternalDispatchAudit"));
-  const duplicate = auditRows.find((item) => item.dispatchId === current.id && item.idempotencyKeyHash === idempotencyKeyHash);
+  const duplicate = auditRows.find((item) => (
+    item.dispatchId === current.id
+    && item.action === "record-external-delivery-attempt"
+    && item.idempotencyKeyHash === idempotencyKeyHash
+  ));
   if (duplicate) {
+    const resultDigest = sha256(JSON.stringify(stableValue(result)));
+    if (duplicate.resultDigest && duplicate.resultDigest !== resultDigest) {
+      throw new Error("external attempt idempotency key was reused with a different result");
+    }
     return {
       ok: true,
       idempotent: true,
@@ -281,8 +465,24 @@ function recordPublicHealthExternalAttemptToState(
       productionReady: false
     };
   }
+  if (options.expectedVersion === undefined || Number(options.expectedVersion) !== Number(current.outboxVersion)) {
+    throw new Error(`external dispatch version conflict: expected ${options.expectedVersion ?? "missing"}, current ${current.outboxVersion}`);
+  }
+  if (options.requireLease) {
+    verifyClaimedLease(current, options);
+  } else {
+    const callbackVerification = result.receipt
+      ? verifyPublicHealthExternalReceipt(current, result.receipt, options.receiptSecret)
+      : { ok: false, reason: "receipt-missing" };
+    if (!callbackVerification.ok) {
+      throw new Error(`unclaimed external callback rejected: ${callbackVerification.reason}`);
+    }
+  }
+  const attempted = recordPublicHealthExternalDeliveryAttempt(current, result, options);
+  if (options.requireLease || ["delivered", "dead-letter"].includes(attempted.deliveryState)) attempted.lease = null;
+  attempted.outboxVersion = Number(current.outboxVersion) + 1;
   const updated = withRuntimeStateSignature(
-    recordPublicHealthExternalDeliveryAttempt(current, result, options),
+    attempted,
     options.requestSecret
   );
   dispatches[index] = updated;
@@ -318,9 +518,28 @@ function recordPublicHealthExternalAttemptToState(
   };
 }
 
+function recordClaimedPublicHealthExternalAttemptToState(
+  data = {},
+  dispatchId,
+  result = {},
+  options = {},
+  dependencies = {}
+) {
+  return recordPublicHealthExternalAttemptToState(
+    data,
+    dispatchId,
+    result,
+    { ...options, requireLease: true },
+    dependencies
+  );
+}
+
 module.exports = {
   buildPublicHealthExternalAdapterRuntime,
+  claimPublicHealthExternalDispatchToState,
   enqueuePublicHealthExternalDispatchToState,
+  listDuePublicHealthExternalDispatches,
+  recordClaimedPublicHealthExternalAttemptToState,
   recordPublicHealthExternalAttemptToState,
   runtimeStatePayload,
   verifyRuntimeStateSignature

@@ -17,7 +17,10 @@ const {
   buildPublicHealthCoordinationRuntime
 } = require("../public-health-coordination-runtime");
 const {
+  claimPublicHealthExternalDispatchToState,
   enqueuePublicHealthExternalDispatchToState,
+  listDuePublicHealthExternalDispatches,
+  recordClaimedPublicHealthExternalAttemptToState,
   recordPublicHealthExternalAttemptToState,
   verifyRuntimeStateSignature
 } = require("../public-health-external-adapter-runtime");
@@ -114,11 +117,12 @@ function signedReceipt(dispatch, overrides = {}) {
   }, RECEIPT_SECRET);
 }
 
-function attemptOptions(idempotencyKey, at = "2026-07-23T08:01:30.000Z") {
+function attemptOptions(idempotencyKey, at = "2026-07-23T08:01:30.000Z", expectedVersion = 1) {
   return {
     requestSecret: REQUEST_SECRET,
     receiptSecret: RECEIPT_SECRET,
     attemptIdempotencyKey: idempotencyKey,
+    expectedVersion,
     at
   };
 }
@@ -249,20 +253,54 @@ test("verified rejection opens the signed compensation exception", () => {
 test("retry exhaustion opens a receipt-free compensation exception", () => {
   const prepared = enqueueLane("health-education");
   const dispatch = prepared.enqueued.dispatch;
-  const retry = recordPublicHealthExternalAttemptToState(
+  const firstClaim = claimPublicHealthExternalDispatchToState(
     prepared.enqueued.nextData,
     dispatch.id,
+    {
+      workerId: "education-worker-1",
+      idempotencyKey: "education:claim:one",
+      expectedVersion: 1,
+      now: "2026-07-23T08:00:30.000Z",
+      leaseSeconds: 60
+    },
+    credentials()
+  );
+  const retry = recordClaimedPublicHealthExternalAttemptToState(
+    firstClaim.nextData,
+    dispatch.id,
     { transportStatus: 503 },
-    attemptOptions("education:attempt:one", "2026-07-23T08:01:00.000Z"),
+    {
+      ...attemptOptions("education:attempt:one", "2026-07-23T08:01:00.000Z", 2),
+      workerId: "education-worker-1",
+      leaseToken: firstClaim.leaseToken
+    },
     prepared.dependencies
   );
   assert.equal(retry.dispatch.deliveryState, "retry-scheduled");
   assert.equal(retry.coordinationAction, null);
-  const deadLetter = recordPublicHealthExternalAttemptToState(
+  assert.equal(retry.dispatch.lease, null);
+  assert.equal(listDuePublicHealthExternalDispatches(retry.nextData, { now: "2026-07-23T08:02:00.000Z" }).length, 0);
+  const secondClaim = claimPublicHealthExternalDispatchToState(
     retry.nextData,
     dispatch.id,
+    {
+      workerId: "education-worker-2",
+      idempotencyKey: "education:claim:two",
+      expectedVersion: 3,
+      now: "2026-07-23T08:03:01.000Z",
+      leaseSeconds: 60
+    },
+    credentials()
+  );
+  const deadLetter = recordClaimedPublicHealthExternalAttemptToState(
+    secondClaim.nextData,
+    dispatch.id,
     { networkError: "connection reset" },
-    attemptOptions("education:attempt:two", "2026-07-23T08:03:00.000Z"),
+    {
+      ...attemptOptions("education:attempt:two", "2026-07-23T08:03:30.000Z", 4),
+      workerId: "education-worker-2",
+      leaseToken: secondClaim.leaseToken
+    },
     prepared.dependencies
   );
   const handoff = buildPublicHealthCoordinationRuntime({ data: deadLetter.nextData, ...prepared.dependencies })
@@ -273,6 +311,108 @@ test("retry exhaustion opens a receipt-free compensation exception", () => {
   assert.equal(handoff.receipt, null);
   assert.equal(handoff.exception.owner, "health-education接口补偿专班");
   assert.deepEqual(handoff.exception.evidenceRefs, [dispatch.id]);
+});
+
+test("worker leases prevent concurrent delivery and allow expired lease takeover", () => {
+  const prepared = enqueueLane("senior-health");
+  const dispatchId = prepared.enqueued.dispatch.id;
+  assert.equal(listDuePublicHealthExternalDispatches(prepared.enqueued.nextData, {
+    now: "2026-07-23T08:00:00.000Z"
+  })[0].outboxVersion, 1);
+  assert.throws(() => claimPublicHealthExternalDispatchToState(
+    prepared.enqueued.nextData,
+    dispatchId,
+    {
+      workerId: "senior-worker-one",
+      idempotencyKey: "senior:claim:stale-version",
+      expectedVersion: 0,
+      now: "2026-07-23T08:00:00.000Z",
+      leaseSeconds: 15
+    },
+    credentials()
+  ), /external dispatch version conflict/);
+  const first = claimPublicHealthExternalDispatchToState(
+    prepared.enqueued.nextData,
+    dispatchId,
+    {
+      workerId: "senior-worker-one",
+      idempotencyKey: "senior:claim:one",
+      expectedVersion: 1,
+      now: "2026-07-23T08:00:00.000Z",
+      leaseSeconds: 15
+    },
+    credentials()
+  );
+  assert.match(first.leaseToken, /^[a-f0-9]{64}$/);
+  assert.equal(JSON.stringify(first.nextData).includes(first.leaseToken), false);
+  assert.equal(first.externalRuntime.summary.leased, 1);
+  assert.equal(listDuePublicHealthExternalDispatches(first.nextData, {
+    now: "2026-07-23T08:00:10.000Z"
+  }).length, 0);
+  assert.throws(() => claimPublicHealthExternalDispatchToState(
+    first.nextData,
+    dispatchId,
+    {
+      workerId: "senior-worker-two",
+      idempotencyKey: "senior:claim:two-early",
+      expectedVersion: 2,
+      now: "2026-07-23T08:00:10.000Z",
+      leaseSeconds: 30
+    },
+    credentials()
+  ), /already claimed/);
+
+  const dueAfterExpiry = listDuePublicHealthExternalDispatches(first.nextData, {
+    now: "2026-07-23T08:00:16.000Z"
+  });
+  assert.equal(dueAfterExpiry.length, 1);
+  assert.equal(dueAfterExpiry[0].expiredLeaseReclaimable, true);
+  const reclaimed = claimPublicHealthExternalDispatchToState(
+    first.nextData,
+    dispatchId,
+    {
+      workerId: "senior-worker-two",
+      idempotencyKey: "senior:claim:two",
+      expectedVersion: 2,
+      now: "2026-07-23T08:00:16.000Z",
+      leaseSeconds: 30
+    },
+    credentials()
+  );
+  assert.equal(reclaimed.nextData.publicHealthExternalDispatchAudit.at(-1).reclaimedExpiredLease, true);
+  assert.throws(() => recordClaimedPublicHealthExternalAttemptToState(
+    reclaimed.nextData,
+    dispatchId,
+    { transportStatus: 503 },
+    {
+      ...attemptOptions("senior:attempt:stale-worker", "2026-07-23T08:00:20.000Z", 3),
+      workerId: "senior-worker-one",
+      leaseToken: first.leaseToken
+    },
+    prepared.dependencies
+  ), /lease token is invalid/);
+});
+
+test("unclaimed callbacks require a valid signed receipt and cannot force dead letter", () => {
+  const prepared = enqueueLane("public-health-followup");
+  const dispatch = prepared.enqueued.dispatch;
+  assert.throws(() => recordPublicHealthExternalAttemptToState(
+    prepared.enqueued.nextData,
+    dispatch.id,
+    { transportStatus: 200, receipt: signedReceipt(dispatch) },
+    attemptOptions("followup:callback:stale-version", "2026-07-23T08:01:30.000Z", 0),
+    prepared.dependencies
+  ), /external dispatch version conflict/);
+  const forged = { ...signedReceipt(dispatch), receiptCode: "FORGED-CALLBACK" };
+  assert.throws(() => recordPublicHealthExternalAttemptToState(
+    prepared.enqueued.nextData,
+    dispatch.id,
+    { transportStatus: 200, receipt: forged },
+    attemptOptions("followup:callback:forged"),
+    prepared.dependencies
+  ), /unclaimed external callback rejected: receipt-signature-invalid/);
+  assert.equal(prepared.enqueued.nextData.publicHealthExternalDispatches[0].deliveryState, "pending");
+  assert.equal(prepared.enqueued.nextData.publicHealthExternalDispatchAudit.length, 1);
 });
 
 test("persisted outbox state tampering is rejected before callback processing", () => {
