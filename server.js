@@ -118,6 +118,7 @@ const {
   buildDigitalHospitalControlMatrixBoard,
   buildDigitalHospitalPolicyRegisterBoard,
   normalizeDigitalHospitalControlAction,
+  normalizeDigitalHospitalPolicyChangeAction,
   normalizeDigitalHospitalPolicyReview,
   seedDigitalHospitalControlMatrix,
   seedDigitalHospitalPolicyRegister
@@ -30193,7 +30194,10 @@ async function handleApi(req, res) {
     try {
       normalized = normalizeDigitalHospitalPolicyReview(policies[index], payload, user);
     } catch (error) {
-      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      sendJson(res, Number(error.status) || 400, {
+        error: Number(error.status) === 409 ? "Conflict" : "Bad Request",
+        message: error.message
+      });
       return;
     }
     policies[index] = normalized.policy;
@@ -30218,6 +30222,61 @@ async function handleApi(req, res) {
       ok: true,
       policy: normalized.policy,
       action: normalized.action,
+      board: buildDigitalHospitalPolicyRegisterBoard(refreshed),
+      standards: buildDigitalHospitalStandardsOverview(refreshed)
+    });
+    return;
+  }
+
+  const digitalHospitalPolicyChangeMatch = url.pathname.match(/^\/api\/digital-hospital\/policy-register\/([^/]+)\/change-actions$/);
+  if (req.method === "POST" && digitalHospitalPolicyChangeMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/policy-register/:id/change-actions");
+    if (!user) return;
+    const policyId = decodeURIComponent(digitalHospitalPolicyChangeMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const policies = Array.isArray(data.digitalHospitalPolicyRegister) ? data.digitalHospitalPolicyRegister : seedDigitalHospitalPolicyRegister();
+    const controls = Array.isArray(data.digitalHospitalControlMatrix) ? data.digitalHospitalControlMatrix : seedDigitalHospitalControlMatrix();
+    const index = policies.findIndex((item) => item.id === policyId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Digital hospital policy record not found" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizeDigitalHospitalPolicyChangeAction(policies[index], controls, payload, user);
+    } catch (error) {
+      sendJson(res, Number(error.status) || 400, {
+        error: Number(error.status) === 409 ? "Conflict" : "Bad Request",
+        message: error.message
+      });
+      return;
+    }
+    policies[index] = normalized.policy;
+    data.digitalHospitalPolicyRegister = policies;
+    data.digitalHospitalControlMatrix = normalized.controls;
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "digital-hospital-policy-change-action",
+        target: policyId,
+        result: "allowed",
+        detail: `${normalized.action.action} / ${normalized.change.id} / ${normalized.change.affectedControlIds.length} controls`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    data.securityEvents = sealAuditTrail(data.securityEvents, { recompute: true });
+    writeDatabase(normalizeState(data));
+    const refreshed = readDatabase();
+    sendJson(res, 200, {
+      ok: true,
+      policy: normalized.policy,
+      controls: normalized.controls,
+      action: normalized.action,
+      change: normalized.change,
       board: buildDigitalHospitalPolicyRegisterBoard(refreshed),
       standards: buildDigitalHospitalStandardsOverview(refreshed)
     });

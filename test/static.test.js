@@ -4574,6 +4574,8 @@ test("priority application pilot acceptance control center is release wired", ()
 test("2026-07-23 delivery report and onsite work pack preserve release evidence boundaries", () => {
   const report = read("docs/平台开发今日进展报告-2026-07-23.md");
   const workPack = read("docs/试点现场验收与接口联调工作包-2026-07-23.md");
-  ["515/515", "8/8", "0/10", "0/4", "blocked-until-site-evidence-signed"].forEach((marker) => assert.ok(report.includes(marker), marker));
+  const roadmap = read("docs/数智医院标准平台下一步开发规划-2026-07-23.md");
+  ["517/517", "8/8", "0/10", "0/4", "blocked-until-site-evidence-signed"].forEach((marker) => assert.ok(report.includes(marker), marker));
   ["P0-01", "P0-10", "生产告警演练单", "official-grouper", "四方签字页", "不代替医院或主管部门签字"].forEach((marker) => assert.ok(workPack.includes(marker), marker));
+  ["属地标准增补", "标准原文与条款解析", "证据治理", "专家评审治理", "规模化运营"].forEach((marker) => assert.ok(roadmap.includes(marker), marker));
 });

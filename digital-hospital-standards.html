@@ -94,6 +94,74 @@
           <button class="inline-action" type="submit">记录复核</button>
           <span id="digital-hospital-policy-review-feedback" class="badge info">复核动作将写入审计链</span>
         </form>
+        <div class="panel-title">
+          <h3>标准版本变更</h3>
+          <span>影响评估、控制重验和新版本启用</span>
+        </div>
+        <div id="digital-hospital-policy-change-list" class="table-wrap"></div>
+        <form id="digital-hospital-policy-change-form" class="filter-grid" autocomplete="off">
+          <label>
+            规范文件
+            <select id="digital-hospital-policy-change-id" required></select>
+          </label>
+          <label>
+            处理动作
+            <select id="digital-hospital-policy-change-action" required>
+              <option value="assess-change">登记影响评估</option>
+              <option value="activate-successor">启用后继版本</option>
+            </select>
+          </label>
+          <label class="digital-policy-change-field" data-policy-change-actions="assess-change">
+            后继文件名称
+            <input id="digital-hospital-policy-successor-title" type="text" placeholder="新版本规范文件名称" />
+          </label>
+          <label class="digital-policy-change-field" data-policy-change-actions="assess-change">
+            后继文号
+            <input id="digital-hospital-policy-successor-document-no" type="text" placeholder="标准号或正式文号" />
+          </label>
+          <label class="digital-policy-change-field" data-policy-change-actions="assess-change">
+            官方来源
+            <input id="digital-hospital-policy-successor-source-url" type="url" placeholder="https://" />
+          </label>
+          <label class="digital-policy-change-field" data-policy-change-actions="assess-change">
+            发布日期
+            <input id="digital-hospital-policy-successor-published-at" type="date" />
+          </label>
+          <label class="digital-policy-change-field" data-policy-change-actions="assess-change">
+            生效日期
+            <input id="digital-hospital-policy-successor-effective-at" type="date" />
+          </label>
+          <label class="digital-policy-change-field" data-policy-change-actions="assess-change">
+            迁移截止
+            <input id="digital-hospital-policy-migration-due-at" type="date" />
+          </label>
+          <label class="digital-policy-change-field" data-policy-change-actions="assess-change">
+            影响等级
+            <select id="digital-hospital-policy-impact-level">
+              <option value="high">高</option>
+              <option value="medium">中</option>
+              <option value="low">低</option>
+            </select>
+          </label>
+          <label class="digital-policy-change-field" data-policy-change-actions="assess-change">
+            受影响控制
+            <select id="digital-hospital-policy-change-controls" multiple size="4"></select>
+          </label>
+          <label class="digital-policy-change-field" data-policy-change-actions="assess-change">
+            变更摘要
+            <textarea id="digital-hospital-policy-change-summary" rows="3" placeholder="记录条款、接口、指标或证据要求变化"></textarea>
+          </label>
+          <label class="digital-policy-change-field" data-policy-change-actions="activate-successor">
+            下次复核
+            <input id="digital-hospital-policy-change-next-review" type="date" />
+          </label>
+          <label>
+            处理说明
+            <input id="digital-hospital-policy-change-note" type="text" required placeholder="记录评估或启用依据" />
+          </label>
+          <button class="inline-action" type="submit">提交变更动作</button>
+          <span id="digital-hospital-policy-change-feedback" class="badge info">新版本启用须由独立人员复核</span>
+        </form>
       </section>
 
       <section class="panel" data-digital-hospital-section="control-matrix">

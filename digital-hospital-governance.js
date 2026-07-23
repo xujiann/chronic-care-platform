@@ -845,6 +845,8 @@ function buildDigitalHospitalPolicyRegisterBoard(data = {}, filters = {}) {
   const domainSet = new Set(policies.flatMap((item) => normalizePolicyList(item.domains)));
   const activePolicies = policies.filter((item) => item.lifecycleStatus !== "historical-plan");
   const currentWithoutReview = activePolicies.filter((item) => !item.nextReviewAt || ["requires-update"].includes(item.reviewStatus));
+  const pendingPolicyChanges = policies.filter((item) => item.pendingChange?.status === "impact-assessed");
+  const impactedControlIds = new Set(pendingPolicyChanges.flatMap((item) => item.pendingChange?.affectedControlIds || []));
   const blockingControls = controlBoard.blockers;
   const checks = [
     { id: "digitalHospitalPolicy:domains", passed: DIGITAL_HOSPITAL_SIX_DOMAINS.every((item) => domainSet.has(item)), detail: `${domainSet.size}/6 domains covered` },
@@ -868,6 +870,8 @@ function buildDigitalHospitalPolicyRegisterBoard(data = {}, filters = {}) {
       recommendedStandards: policies.filter((item) => item.bindingLevel === "recommended-standard").length,
       historicalPolicies: policies.filter((item) => item.lifecycleStatus === "historical-plan").length,
       localSupplementRequired: policies.filter((item) => item.reviewStatus === "local-supplement-required").length,
+      pendingPolicyChanges: pendingPolicyChanges.length,
+      impactedControls: controls.filter((item) => impactedControlIds.has(item.id)).length,
       domains: domainSet.size,
       controls: controls.length,
       goLiveCriticalControls: controls.filter((item) => item.goLiveCritical).length,
@@ -893,6 +897,9 @@ function normalizeDigitalHospitalPolicyReview(policy, payload = {}, user = {}) {
   ]);
   const reviewStatus = String(payload.reviewStatus || payload.status || "verified-current").trim();
   if (!allowedStatuses.has(reviewStatus)) throw new Error("unsupported policy review status");
+  if (policy.pendingChange?.status === "impact-assessed" && reviewStatus !== "requires-update") {
+    throw digitalHospitalControlError("complete the pending policy change before changing review status", 409);
+  }
   const reviewNote = String(payload.reviewNote || payload.note || "").trim();
   if (reviewNote.length < 4) throw new Error("reviewNote must contain at least 4 characters");
   const nextReviewAt = String(payload.nextReviewAt || "").trim();
@@ -923,11 +930,254 @@ function normalizeDigitalHospitalPolicyReview(policy, payload = {}, user = {}) {
   };
 }
 
+function normalizeDigitalHospitalPolicyChangeAction(policy, controls = [], payload = {}, user = {}, options = {}) {
+  if (!policy?.id) throw digitalHospitalControlError("digital hospital policy is required");
+  const actionName = String(payload.action || "").trim();
+  if (!new Set(["assess-change", "activate-successor"]).has(actionName)) {
+    throw digitalHospitalControlError("unsupported digital hospital policy change action");
+  }
+  const now = String(options.now || new Date().toISOString());
+  const actorId = String(user.username || user.id || user.name || "digital-hospital-policy-operator").trim();
+  const actorName = String(user.name || user.username || "digital hospital policy operator").trim();
+  const note = String(payload.note || payload.changeSummary || "").trim();
+  if (note.length < 4) throw digitalHospitalControlError("note must contain at least 4 characters");
+  const sourceControls = Array.isArray(controls) ? controls : [];
+
+  if (actionName === "assess-change") {
+    if (policy.reviewStatus !== "requires-update") {
+      throw digitalHospitalControlError("policy must be marked requires-update before change assessment", 409);
+    }
+    if (policy.pendingChange?.status === "impact-assessed") {
+      throw digitalHospitalControlError("complete the pending policy change before starting another assessment", 409);
+    }
+    const successorTitle = String(payload.successorTitle || "").trim();
+    const successorDocumentNo = String(payload.successorDocumentNo || "").trim();
+    const successorSourceUrl = String(payload.successorSourceUrl || "").trim();
+    const successorPublishedAt = String(payload.successorPublishedAt || "").trim();
+    const successorEffectiveAt = String(payload.successorEffectiveAt || "").trim();
+    const migrationDueAt = String(payload.migrationDueAt || "").trim();
+    const changeSummary = String(payload.changeSummary || "").trim();
+    const impactLevel = String(payload.impactLevel || "").trim();
+    const affectedControlIds = [...new Set(normalizePolicyList(payload.affectedControlIds))];
+    if (successorTitle.length < 4) throw digitalHospitalControlError("successorTitle must contain at least 4 characters");
+    if (successorDocumentNo.length < 3) throw digitalHospitalControlError("successorDocumentNo must contain at least 3 characters");
+    if (successorDocumentNo === String(policy.documentNo || "").trim()) {
+      throw digitalHospitalControlError("successorDocumentNo must differ from the current document number");
+    }
+    if (!/^https:\/\//.test(successorSourceUrl)) throw digitalHospitalControlError("successorSourceUrl must use HTTPS");
+    [
+      ["successorPublishedAt", successorPublishedAt],
+      ["successorEffectiveAt", successorEffectiveAt],
+      ["migrationDueAt", migrationDueAt]
+    ].forEach(([name, value]) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw digitalHospitalControlError(`${name} must use YYYY-MM-DD`);
+    });
+    if (successorEffectiveAt < successorPublishedAt) {
+      throw digitalHospitalControlError("successorEffectiveAt cannot be earlier than successorPublishedAt");
+    }
+    if (migrationDueAt > successorEffectiveAt) {
+      throw digitalHospitalControlError("migrationDueAt cannot be later than successorEffectiveAt");
+    }
+    if (!new Set(["high", "medium", "low"]).has(impactLevel)) {
+      throw digitalHospitalControlError("impactLevel must be high, medium or low");
+    }
+    if (changeSummary.length < 8) throw digitalHospitalControlError("changeSummary must contain at least 8 characters");
+    if (!affectedControlIds.length) throw digitalHospitalControlError("at least one affected control is required");
+    const affectedControls = affectedControlIds.map((controlId) => {
+      const control = sourceControls.find((item) => item.id === controlId);
+      if (!control) throw digitalHospitalControlError(`affected control not found: ${controlId}`);
+      if (!normalizePolicyList(control.requirementIds).includes(policy.id)) {
+        throw digitalHospitalControlError(`control is not linked to policy: ${controlId}`);
+      }
+      return normalizeDigitalHospitalControl(control, now);
+    });
+    const changeId = `dhpc-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+    const change = {
+      id: changeId,
+      status: "impact-assessed",
+      priorVersion: {
+        title: policy.title,
+        documentNo: policy.documentNo,
+        sourceUrl: policy.sourceUrl,
+        publishedAt: policy.publishedAt,
+        effectiveAt: policy.effectiveAt
+      },
+      successor: {
+        title: successorTitle,
+        documentNo: successorDocumentNo,
+        sourceUrl: successorSourceUrl,
+        publishedAt: successorPublishedAt,
+        effectiveAt: successorEffectiveAt
+      },
+      impactLevel,
+      changeSummary,
+      migrationDueAt,
+      affectedControlIds,
+      controlBaselines: affectedControls.map((control) => ({
+        id: control.id,
+        controlStatus: control.controlStatus,
+        implementationState: control.implementationState,
+        verifiedAt: control.verifiedAt || "",
+        acceptedEvidence: control.verifiedEvidenceCount
+      })),
+      assessedAt: now,
+      assessedBy: actorName,
+      assessedById: actorId,
+      note
+    };
+    const nextControls = sourceControls.map((control) => {
+      if (!affectedControlIds.includes(control.id)) return control;
+      const normalized = normalizeDigitalHospitalControl(control, now);
+      const supersededEvidence = normalized.evidenceRecords.map((evidence) => evidence.verificationStatus === "accepted"
+        ? { ...evidence, verificationStatus: "superseded", supersededAt: now, supersededByChangeId: changeId }
+        : evidence);
+      const action = {
+        id: `dhca-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+        action: "policy-change-impact",
+        policyId: policy.id,
+        changeId,
+        impactLevel,
+        note: changeSummary,
+        at: now,
+        by: actorName,
+        byId: actorId,
+        role: user.role || "commission",
+        controlStatus: "in-progress"
+      };
+      return normalizeDigitalHospitalControl({
+        ...normalized,
+        baselineImplementationState: normalized.baselineImplementationState || normalized.implementationState,
+        implementationState: "partial",
+        controlStatus: "in-progress",
+        dueAt: migrationDueAt,
+        verifiedAt: "",
+        verifiedBy: "",
+        verifiedById: "",
+        evidenceRecords: supersededEvidence,
+        changeImpact: {
+          changeId,
+          policyId: policy.id,
+          priorDocumentNo: policy.documentNo,
+          successorDocumentNo,
+          impactLevel,
+          changeSummary,
+          status: "revalidation-required",
+          assessedAt: now
+        },
+        latestAction: action,
+        actionHistory: [action, ...normalized.actionHistory].slice(0, 50),
+        updatedAt: now,
+        updatedBy: actorId,
+        updatedByName: actorName
+      }, now);
+    });
+    const action = { ...change, action: actionName };
+    return {
+      action,
+      change,
+      controls: nextControls,
+      policy: {
+        ...policy,
+        pendingChange: change,
+        latestChangeAction: action,
+        changeHistory: [action, ...(Array.isArray(policy.changeHistory) ? policy.changeHistory : [])].slice(0, 30)
+      }
+    };
+  }
+
+  const pendingChange = policy.pendingChange;
+  if (!pendingChange || pendingChange.status !== "impact-assessed") {
+    throw digitalHospitalControlError("no assessed policy change is pending activation", 409);
+  }
+  if (pendingChange.assessedById === actorId) {
+    throw digitalHospitalControlError("policy successor activation requires an independent reviewer", 409);
+  }
+  const nextReviewAt = String(payload.nextReviewAt || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(nextReviewAt)) {
+    throw digitalHospitalControlError("nextReviewAt must use YYYY-MM-DD");
+  }
+  if (nextReviewAt < String(pendingChange.successor?.effectiveAt || "")) {
+    throw digitalHospitalControlError("nextReviewAt cannot be earlier than successorEffectiveAt");
+  }
+  const affectedControls = pendingChange.affectedControlIds.map((controlId) => {
+    const control = sourceControls.find((item) => item.id === controlId);
+    if (!control) throw digitalHospitalControlError(`affected control not found: ${controlId}`);
+    return normalizeDigitalHospitalControl(control, now);
+  });
+  const incomplete = affectedControls.filter((control) => {
+    const acceptedEvidence = control.evidenceRecords.find((evidence) => evidence.verificationStatus === "accepted");
+    return control.controlStatus !== "verified"
+      || !acceptedEvidence
+      || String(acceptedEvidence.submittedAt || "") < String(pendingChange.assessedAt || "");
+  });
+  if (incomplete.length) {
+    throw digitalHospitalControlError(`affected controls require fresh accepted evidence: ${incomplete.map((item) => item.id).join(", ")}`, 409);
+  }
+  const successor = pendingChange.successor;
+  const activation = {
+    id: `dhpc-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+    action: actionName,
+    changeId: pendingChange.id,
+    note,
+    nextReviewAt,
+    activatedAt: now,
+    activatedBy: actorName,
+    activatedById: actorId,
+    role: user.role || "commission"
+  };
+  const activatedChange = { ...pendingChange, status: "activated", ...activation };
+  const nextControls = sourceControls.map((control) => {
+    if (!pendingChange.affectedControlIds.includes(control.id)) return control;
+    const normalized = normalizeDigitalHospitalControl(control, now);
+    const action = {
+      id: `dhca-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+      action: "policy-successor-activated",
+      policyId: policy.id,
+      changeId: pendingChange.id,
+      note,
+      at: now,
+      by: actorName,
+      byId: actorId,
+      role: user.role || "commission",
+      controlStatus: normalized.controlStatus
+    };
+    return normalizeDigitalHospitalControl({
+      ...normalized,
+      changeImpact: { ...normalized.changeImpact, status: "revalidated", activatedAt: now },
+      latestAction: action,
+      actionHistory: [action, ...normalized.actionHistory].slice(0, 50),
+      updatedAt: now,
+      updatedBy: actorId,
+      updatedByName: actorName
+    }, now);
+  });
+  return {
+    action: activation,
+    change: activatedChange,
+    controls: nextControls,
+    policy: {
+      ...policy,
+      ...successor,
+      reviewStatus: policy.bindingLevel === "evaluation-reference" ? "verified-reference" : "verified-current",
+      lastReviewedAt: now.slice(0, 10),
+      nextReviewAt,
+      pendingChange: activatedChange,
+      latestChangeAction: activation,
+      versionHistory: [
+        { ...pendingChange.priorVersion, supersededAt: now, successorDocumentNo: successor.documentNo, changeId: pendingChange.id },
+        ...(Array.isArray(policy.versionHistory) ? policy.versionHistory : [])
+      ].slice(0, 30),
+      changeHistory: [activation, ...(Array.isArray(policy.changeHistory) ? policy.changeHistory : [])].slice(0, 30)
+    }
+  };
+}
+
 module.exports = {
   DIGITAL_HOSPITAL_SIX_DOMAINS,
   buildDigitalHospitalControlMatrixBoard,
   buildDigitalHospitalPolicyRegisterBoard,
   normalizeDigitalHospitalControlAction,
+  normalizeDigitalHospitalPolicyChangeAction,
   normalizeDigitalHospitalPolicyReview,
   seedDigitalHospitalControlMatrix,
   seedDigitalHospitalPolicyRegister

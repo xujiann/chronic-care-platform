@@ -235,7 +235,7 @@ function setDigitalHospitalRuntime(payload = {}) {
     productionEvidenceBoard: payload.productionEvidenceBoard || payload.launchReadiness?.productionEvidenceBoard || null,
     launchCommandBriefBoard: payload.launchCommandBriefBoard || payload.launchReadiness?.launchCommandBriefBoard || null,
     formalCutoverApprovalBoard: payload.formalCutoverApprovalBoard || payload.launchReadiness?.formalCutoverApprovalBoard || null,
-    source: payload.ok ? "api" : "static"
+    source: Array.isArray(payload.policyRegister) || Array.isArray(payload.standards) ? "api" : "static"
   };
 }
 
@@ -389,7 +389,7 @@ function renderPolicyRegister() {
     ["规范文件", summary.policies || allPolicies.length, `${rows.length} 项符合当前筛选`],
     ["法定强制", summary.mandatoryPolicies ?? allPolicies.filter((item) => item.bindingLevel === "mandatory").length, "法律与行政法规"],
     ["评价参考", summary.evaluationReferences ?? allPolicies.filter((item) => item.bindingLevel === "evaluation-reference").length, "不等同法定强制"],
-    ["历史规划", summary.historicalPolicies ?? allPolicies.filter((item) => item.lifecycleStatus === "historical-plan").length, "不得直接作为2026硬任务"],
+    ["变更处理中", summary.pendingPolicyChanges ?? allPolicies.filter((item) => item.pendingChange?.status === "impact-assessed").length, "受影响控制须重新验证"],
     ["控制阻断", summary.blockingControls ?? digitalHospitalControlMatrix().filter((item) => item.goLiveCritical && item.implementationState !== "implemented").length, "仍需实施或现场证据"]
   ];
   digitalSetHtml("digital-hospital-policy-metrics", metrics.map(([label, value, hint]) => `
@@ -409,12 +409,124 @@ function renderPolicyRegister() {
             <td><span class="${digitalPolicyStatusClass(item)}">${digitalEscape(digitalPolicyBindingLabel(item.bindingLevel))}</span><br /><small>${digitalEscape(digitalPolicyLifecycleLabel(item.lifecycleStatus))} / ${digitalEscape(item.reviewStatus)}</small></td>
             <td>${digitalEscape(item.applicability)}</td>
             <td>${digitalEscape((item.domains || []).join("、"))}<br /><small>${digitalEscape((item.controlTopics || []).join("、"))}</small></td>
-            <td>${digitalEscape(item.lastReviewedAt || "未复核")}<br /><small>下次：${digitalEscape(item.nextReviewAt || "历史归档")}</small></td>
+            <td>${digitalEscape(item.lastReviewedAt || "未复核")}<br /><small>下次：${digitalEscape(item.nextReviewAt || "历史归档")}</small>${item.pendingChange?.status === "impact-assessed" ? `<br /><span class="badge danger">待重验 ${digitalEscape(item.pendingChange.affectedControlIds?.length || 0)} 项</span>` : ""}</td>
           </tr>
         `).join("") || `<tr><td colspan="5">没有符合筛选条件的规范。</td></tr>`}
       </tbody>
     </table>
   `);
+  renderDigitalHospitalPolicyChangeBoard();
+}
+
+function digitalPolicyChangeRows() {
+  return digitalHospitalPolicyRegister().filter((item) => item.pendingChange || (item.versionHistory || []).length);
+}
+
+function updateDigitalHospitalPolicyChangeControls() {
+  const policyId = document.getElementById("digital-hospital-policy-change-id")?.value || "";
+  const select = document.getElementById("digital-hospital-policy-change-controls");
+  if (!select) return;
+  const current = [...select.selectedOptions].map((option) => option.value);
+  const controls = digitalHospitalControlMatrix().filter((item) => (item.requirementIds || []).includes(policyId));
+  select.innerHTML = controls.map((item) => `<option value="${digitalEscape(item.id)}">${digitalEscape(item.domain)}：${digitalEscape(item.title)}</option>`).join("");
+  [...select.options].forEach((option) => { option.selected = current.includes(option.value); });
+}
+
+function updateDigitalHospitalPolicyChangeFields() {
+  const action = document.getElementById("digital-hospital-policy-change-action")?.value || "assess-change";
+  const policySelect = document.getElementById("digital-hospital-policy-change-id");
+  if (policySelect) {
+    const current = policySelect.value;
+    const eligible = digitalHospitalPolicyRegister().filter((item) => action === "activate-successor"
+      ? item.pendingChange?.status === "impact-assessed"
+      : item.reviewStatus === "requires-update" && item.pendingChange?.status !== "impact-assessed");
+    policySelect.innerHTML = eligible.map((item) => `<option value="${digitalEscape(item.id)}">${digitalEscape(item.title)} / ${digitalEscape(item.documentNo)}</option>`).join("");
+    if ([...policySelect.options].some((option) => option.value === current)) policySelect.value = current;
+  }
+  document.querySelectorAll(".digital-policy-change-field").forEach((field) => {
+    const visible = String(field.dataset.policyChangeActions || "").split(",").includes(action);
+    field.hidden = !visible;
+    field.querySelectorAll("input, select, textarea").forEach((input) => {
+      input.disabled = !visible;
+      input.required = visible;
+    });
+  });
+  updateDigitalHospitalPolicyChangeControls();
+}
+
+function renderDigitalHospitalPolicyChangeBoard() {
+  const rows = digitalPolicyChangeRows();
+  digitalSetHtml("digital-hospital-policy-change-list", `
+    <table>
+      <thead><tr><th>原规范</th><th>后继版本</th><th>影响</th><th>状态</th></tr></thead>
+      <tbody>
+        ${rows.map((item) => {
+          const change = item.pendingChange || {};
+          return `<tr>
+            <td><strong>${digitalEscape(change.priorVersion?.documentNo || item.versionHistory?.[0]?.documentNo || item.documentNo)}</strong><br /><small>${digitalEscape(change.priorVersion?.title || item.title)}</small></td>
+            <td>${digitalEscape(change.successor?.documentNo || item.documentNo)}<br /><small>${digitalEscape(change.successor?.effectiveAt || item.effectiveAt)}</small></td>
+            <td>${digitalEscape(change.impactLevel || "-")} / ${digitalEscape(change.affectedControlIds?.length || 0)} 项<br /><small>${digitalEscape(change.changeSummary || "已完成版本切换")}</small></td>
+            <td><span class="${change.status === "impact-assessed" ? "badge danger" : "badge info"}">${digitalEscape(change.status === "impact-assessed" ? "待控制重验" : "已启用")}</span></td>
+          </tr>`;
+        }).join("") || `<tr><td colspan="4">暂无标准版本变更记录。</td></tr>`}
+      </tbody>
+    </table>
+  `);
+  updateDigitalHospitalPolicyChangeFields();
+}
+
+async function recordDigitalHospitalPolicyChange(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector('button[type="submit"]');
+  const feedback = document.getElementById("digital-hospital-policy-change-feedback");
+  const policyId = document.getElementById("digital-hospital-policy-change-id")?.value || "";
+  const controlSelect = document.getElementById("digital-hospital-policy-change-controls");
+  const action = document.getElementById("digital-hospital-policy-change-action")?.value || "assess-change";
+  const fetcher = window.HealthCityAuth?.authFetch || fetch;
+  if (button) {
+    button.disabled = true;
+    button.textContent = "提交中...";
+  }
+  try {
+    const response = await fetcher(`${DIGITAL_HOSPITAL_POLICY_REGISTER_ENDPOINT}/${encodeURIComponent(policyId)}/change-actions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action,
+        successorTitle: document.getElementById("digital-hospital-policy-successor-title")?.value || "",
+        successorDocumentNo: document.getElementById("digital-hospital-policy-successor-document-no")?.value || "",
+        successorSourceUrl: document.getElementById("digital-hospital-policy-successor-source-url")?.value || "",
+        successorPublishedAt: document.getElementById("digital-hospital-policy-successor-published-at")?.value || "",
+        successorEffectiveAt: document.getElementById("digital-hospital-policy-successor-effective-at")?.value || "",
+        migrationDueAt: document.getElementById("digital-hospital-policy-migration-due-at")?.value || "",
+        impactLevel: document.getElementById("digital-hospital-policy-impact-level")?.value || "",
+        affectedControlIds: controlSelect ? [...controlSelect.selectedOptions].map((option) => option.value) : [],
+        changeSummary: document.getElementById("digital-hospital-policy-change-summary")?.value || "",
+        nextReviewAt: document.getElementById("digital-hospital-policy-change-next-review")?.value || "",
+        note: document.getElementById("digital-hospital-policy-change-note")?.value || ""
+      })
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload?.message || `HTTP ${response.status}`);
+    if (payload?.standards) setDigitalHospitalRuntime(payload.standards);
+    form.reset();
+    renderDigitalHospitalStandards();
+    if (feedback) {
+      feedback.className = "badge info";
+      feedback.textContent = action === "assess-change" ? "影响评估已登记，相关控制已重开" : "后继版本已启用并保留版本链";
+    }
+  } catch (error) {
+    if (feedback) {
+      feedback.className = "badge danger";
+      feedback.textContent = error.message || "标准变更动作提交失败";
+    }
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "提交变更动作";
+    }
+  }
 }
 
 function digitalControlUiRow(item = {}) {
@@ -571,7 +683,7 @@ async function recordDigitalHospitalControlAction(event) {
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload?.message || `HTTP ${response.status}`);
-    if (payload?.standards?.ok) setDigitalHospitalRuntime(payload.standards);
+    if (payload?.standards) setDigitalHospitalRuntime(payload.standards);
     renderDigitalHospitalStandards();
     if (feedback) {
       feedback.className = "badge info";
@@ -646,7 +758,7 @@ async function recordDigitalHospitalPolicyReview(event) {
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload?.message || `HTTP ${response.status}`);
-    if (payload?.standards?.ok) setDigitalHospitalRuntime(payload.standards);
+    if (payload?.standards) setDigitalHospitalRuntime(payload.standards);
     renderDigitalHospitalStandards();
     if (feedback) {
       feedback.className = "badge info";
@@ -678,6 +790,21 @@ function bindDigitalHospitalPolicyActions() {
   if (form && form.dataset.digitalHospitalPolicyBound !== "1") {
     form.dataset.digitalHospitalPolicyBound = "1";
     form.addEventListener("submit", recordDigitalHospitalPolicyReview);
+  }
+  const changeForm = document.getElementById("digital-hospital-policy-change-form");
+  if (changeForm && changeForm.dataset.digitalHospitalPolicyBound !== "1") {
+    changeForm.dataset.digitalHospitalPolicyBound = "1";
+    changeForm.addEventListener("submit", recordDigitalHospitalPolicyChange);
+  }
+  const changeAction = document.getElementById("digital-hospital-policy-change-action");
+  if (changeAction && changeAction.dataset.digitalHospitalPolicyBound !== "1") {
+    changeAction.dataset.digitalHospitalPolicyBound = "1";
+    changeAction.addEventListener("change", updateDigitalHospitalPolicyChangeFields);
+  }
+  const changePolicy = document.getElementById("digital-hospital-policy-change-id");
+  if (changePolicy && changePolicy.dataset.digitalHospitalPolicyBound !== "1") {
+    changePolicy.dataset.digitalHospitalPolicyBound = "1";
+    changePolicy.addEventListener("change", updateDigitalHospitalPolicyChangeControls);
   }
 }
 
@@ -1287,7 +1414,7 @@ async function loadDigitalHospitalStandardsApi() {
     const response = await fetcher(DIGITAL_HOSPITAL_API_ENDPOINT);
     if (!response.ok) return;
     const payload = await response.json();
-    if (!payload?.ok) return;
+    if (!payload || !Array.isArray(payload.policyRegister) || !Array.isArray(payload.controlMatrix)) return;
     setDigitalHospitalRuntime(payload);
     renderDigitalHospitalStandards();
   } catch {

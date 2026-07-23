@@ -6,6 +6,7 @@ const {
   buildDigitalHospitalControlMatrixBoard,
   buildDigitalHospitalPolicyRegisterBoard,
   normalizeDigitalHospitalControlAction,
+  normalizeDigitalHospitalPolicyChangeAction,
   normalizeDigitalHospitalPolicyReview,
   seedDigitalHospitalControlMatrix,
   seedDigitalHospitalPolicyRegister
@@ -204,4 +205,99 @@ test("digital hospital conditional controls can be marked not applicable only wh
   assert.equal(result.control.controlStatus, "not-applicable");
   assert.equal(result.control.blocking, false);
   assert.equal(result.control.applicabilityDecisionRef, "DH-NA-003");
+});
+
+test("digital hospital policy change reopens affected controls and requires fresh evidence before activation", () => {
+  const policy = {
+    ...seedDigitalHospitalPolicyRegister().find((item) => item.id === "dhp-wst-846-847-2024"),
+    reviewStatus: "requires-update"
+  };
+  const originalControls = seedDigitalHospitalControlMatrix();
+  const controls = originalControls.map((item) => item.id === "dhc-interoperability-contract" ? {
+    ...item,
+    implementationState: "implemented",
+    controlStatus: "verified",
+    verifiedAt: "2026-07-01T08:00:00.000Z",
+    evidenceRecords: [{
+      id: "dhce-old-interface",
+      artifactName: "旧版接口联调报告",
+      evidenceRef: "DH-INT-OLD-001",
+      evidenceLevel: "site",
+      noPatientPii: true,
+      submittedAt: "2026-07-01T07:00:00.000Z",
+      submittedBy: "旧版实施人员",
+      submittedById: "old-operator",
+      verificationStatus: "accepted",
+      verifiedAt: "2026-07-01T08:00:00.000Z",
+      verifiedBy: "旧版复核人员",
+      verifiedById: "old-reviewer"
+    }]
+  } : item);
+  const assessor = { username: "health", name: "标准变更评估员", role: "commission" };
+  const operator = { username: "hospital", name: "接口整改人员", role: "institution" };
+  const reviewer = { username: "city", name: "市级独立复核员", role: "commission" };
+
+  const assessed = normalizeDigitalHospitalPolicyChangeAction(policy, controls, {
+    action: "assess-change",
+    successorTitle: "医院信息平台交互标准（2026年版）",
+    successorDocumentNo: "WS/T 846—2026",
+    successorSourceUrl: "https://www.nhc.gov.cn/wjw/s9497/202608/interoperability-2026.shtml",
+    successorPublishedAt: "2026-08-01",
+    successorEffectiveAt: "2027-01-01",
+    migrationDueAt: "2026-12-15",
+    impactLevel: "high",
+    affectedControlIds: ["dhc-interoperability-contract"],
+    changeSummary: "接口契约、签名算法和验收证据要求发生变化",
+    note: "完成新旧版本条款差异与控制影响评估"
+  }, assessor, { now: "2026-08-02T08:00:00.000Z" });
+  const impacted = assessed.controls.find((item) => item.id === "dhc-interoperability-contract");
+  assert.equal(assessed.policy.pendingChange.status, "impact-assessed");
+  assert.equal(impacted.controlStatus, "in-progress");
+  assert.equal(impacted.blocking, true);
+  assert.equal(impacted.evidenceRecords[0].verificationStatus, "superseded");
+  assert.equal(impacted.changeImpact.status, "revalidation-required");
+  assert.equal(buildDigitalHospitalPolicyRegisterBoard({
+    digitalHospitalPolicyRegister: [assessed.policy],
+    digitalHospitalControlMatrix: assessed.controls
+  }).summary.pendingPolicyChanges, 1);
+
+  assert.throws(() => normalizeDigitalHospitalPolicyChangeAction(assessed.policy, assessed.controls, {
+    action: "activate-successor",
+    nextReviewAt: "2027-07-31",
+    note: "尝试在控制重验前启用后继版本"
+  }, reviewer, { now: "2026-08-02T09:00:00.000Z" }), /fresh accepted evidence/);
+
+  const recorded = normalizeDigitalHospitalControlAction(impacted, {
+    action: "record-evidence",
+    artifactName: "新版接口生产联调报告",
+    evidenceRef: "DH-INT-NEW-001",
+    evidenceLevel: "site",
+    noPatientPii: true,
+    note: "登记新版接口现场重验证据"
+  }, operator, { now: "2026-08-03T08:00:00.000Z" });
+  const verified = normalizeDigitalHospitalControlAction(recorded.control, {
+    action: "verify-control",
+    decision: "accepted",
+    note: "新版接口现场证据独立复核通过"
+  }, reviewer, { now: "2026-08-03T09:00:00.000Z" });
+  const revalidatedControls = assessed.controls.map((item) => item.id === verified.control.id ? verified.control : item);
+
+  assert.throws(() => normalizeDigitalHospitalPolicyChangeAction(assessed.policy, revalidatedControls, {
+    action: "activate-successor",
+    nextReviewAt: "2027-07-31",
+    note: "评估人员不得自行启用后继版本"
+  }, assessor, { now: "2026-08-03T10:00:00.000Z" }), /independent reviewer/);
+
+  const activated = normalizeDigitalHospitalPolicyChangeAction(assessed.policy, revalidatedControls, {
+    action: "activate-successor",
+    nextReviewAt: "2027-07-31",
+    note: "控制重验完成，同意启用后继版本"
+  }, reviewer, { now: "2026-08-03T10:00:00.000Z" });
+  const activatedControl = activated.controls.find((item) => item.id === "dhc-interoperability-contract");
+  assert.equal(activated.policy.documentNo, "WS/T 846—2026");
+  assert.equal(activated.policy.pendingChange.status, "activated");
+  assert.equal(activated.policy.versionHistory[0].documentNo, policy.documentNo);
+  assert.equal(activated.policy.nextReviewAt, "2027-07-31");
+  assert.equal(activatedControl.controlStatus, "verified");
+  assert.equal(activatedControl.changeImpact.status, "revalidated");
 });

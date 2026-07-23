@@ -1836,6 +1836,85 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(digitalHospitalControlVerification.body.control.verifiedEvidenceCount, 1);
     assert.equal(digitalHospitalControlVerification.body.standards.summary.policyControlsWithEvidence >= 1, true);
 
+    const digitalHospitalPolicyRequiresUpdate = await api(baseUrl, "/api/digital-hospital/policy-register/dhp-wst-846-847-2024/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "review-policy",
+        reviewStatus: "requires-update",
+        reviewNote: "发现后继版本，进入标准变更影响评估",
+        nextReviewAt: "2026-08-31"
+      })
+    }));
+    assert.equal(digitalHospitalPolicyRequiresUpdate.response.status, 200);
+
+    const digitalHospitalPolicyChangeAssessment = await api(baseUrl, "/api/digital-hospital/policy-register/dhp-wst-846-847-2024/change-actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "assess-change",
+        successorTitle: "医院信息平台交互标准（2026年版）",
+        successorDocumentNo: "WS/T 846—2026",
+        successorSourceUrl: "https://www.nhc.gov.cn/wjw/s9497/202608/interoperability-2026.shtml",
+        successorPublishedAt: "2026-08-01",
+        successorEffectiveAt: "2027-01-01",
+        migrationDueAt: "2026-12-15",
+        impactLevel: "high",
+        affectedControlIds: ["dhc-interoperability-contract"],
+        changeSummary: "接口契约、签名算法和现场验收证据要求发生变化",
+        note: "完成新旧版本条款差异与控制影响评估"
+      })
+    }));
+    assert.equal(digitalHospitalPolicyChangeAssessment.response.status, 200);
+    assert.equal(digitalHospitalPolicyChangeAssessment.body.policy.pendingChange.status, "impact-assessed");
+    assert.equal(digitalHospitalPolicyChangeAssessment.body.controls.find((item) => item.id === "dhc-interoperability-contract").controlStatus, "in-progress");
+    assert.equal(digitalHospitalPolicyChangeAssessment.body.controls.find((item) => item.id === "dhc-interoperability-contract").evidenceRecords[0].verificationStatus, "superseded");
+
+    const prematureDigitalHospitalPolicyActivation = await api(baseUrl, "/api/digital-hospital/policy-register/dhp-wst-846-847-2024/change-actions", authorized(digitalHospitalControlReviewerLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "activate-successor",
+        nextReviewAt: "2027-07-31",
+        note: "控制重验前不得启用后继版本"
+      })
+    }));
+    assert.equal(prematureDigitalHospitalPolicyActivation.response.status, 409);
+
+    const digitalHospitalChangedControlEvidence = await api(baseUrl, "/api/digital-hospital/control-matrix/dhc-interoperability-contract/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "record-evidence",
+        artifactName: "新版接口生产联调报告",
+        evidenceRef: "DH-INT-API-002",
+        evidenceLevel: "site",
+        noPatientPii: true,
+        note: "登记新版接口现场重验证据"
+      })
+    }));
+    assert.equal(digitalHospitalChangedControlEvidence.response.status, 200);
+
+    const digitalHospitalChangedControlVerification = await api(baseUrl, "/api/digital-hospital/control-matrix/dhc-interoperability-contract/actions", authorized(digitalHospitalControlReviewerLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "verify-control",
+        decision: "accepted",
+        note: "新版接口现场证据独立复核通过"
+      })
+    }));
+    assert.equal(digitalHospitalChangedControlVerification.response.status, 200);
+
+    const digitalHospitalPolicyActivation = await api(baseUrl, "/api/digital-hospital/policy-register/dhp-wst-846-847-2024/change-actions", authorized(digitalHospitalControlReviewerLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "activate-successor",
+        nextReviewAt: "2027-07-31",
+        note: "控制重验完成，同意启用后继版本"
+      })
+    }));
+    assert.equal(digitalHospitalPolicyActivation.response.status, 200);
+    assert.equal(digitalHospitalPolicyActivation.body.policy.documentNo, "WS/T 846—2026");
+    assert.equal(digitalHospitalPolicyActivation.body.policy.pendingChange.status, "activated");
+    assert.equal(digitalHospitalPolicyActivation.body.policy.versionHistory[0].documentNo, "国卫通告（2024年10月28日）");
+    assert.equal(digitalHospitalPolicyActivation.body.controls.find((item) => item.id === "dhc-interoperability-contract").changeImpact.status, "revalidated");
+
     const digitalHospitalSelfAssessmentBoard = await api(baseUrl, "/api/digital-hospital/self-assessments", authorized(accountLogin.body.token));
     assert.equal(digitalHospitalSelfAssessmentBoard.response.status, 200);
     assert.equal(digitalHospitalSelfAssessmentBoard.body.ok, true);
@@ -2243,6 +2322,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(digitalHospitalAudit.body.securityEvents.some((item) => item.action === "digital-hospital-launch-readiness" && item.target === "/api/digital-hospital/launch-readiness"), true);
     assert.equal(digitalHospitalAudit.body.securityEvents.some((item) => item.action === "digital-hospital-policy-register" && item.target === "/api/digital-hospital/policy-register"), true);
     assert.equal(digitalHospitalAudit.body.securityEvents.some((item) => item.action === "digital-hospital-policy-review" && item.target === "dhp-wst-846-847-2024"), true);
+    assert.equal(digitalHospitalAudit.body.securityEvents.some((item) => item.action === "digital-hospital-policy-change-action" && item.target === "dhp-wst-846-847-2024"), true);
     assert.equal(digitalHospitalAudit.body.securityEvents.some((item) => item.action === "digital-hospital-control-matrix" && item.target === "/api/digital-hospital/control-matrix"), true);
     assert.equal(digitalHospitalAudit.body.securityEvents.some((item) => item.action === "digital-hospital-control-action" && item.target === "dhc-interoperability-contract"), true);
     assert.equal(digitalHospitalAudit.body.securityEvents.some((item) => item.action === "digital-hospital-self-assessment-read" && item.target === "/api/digital-hospital/self-assessments"), true);
