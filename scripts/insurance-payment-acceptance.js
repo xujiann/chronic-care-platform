@@ -29,7 +29,7 @@ function buildInsurancePaymentAcceptance(options = {}) {
     { id: "drg-dip", label: "DRG/DIP分组测算", ready: ["dual-mode", "official-receipt-contract", "formal-grouping-async", "parameter-dual-review"].every((id) => checkById(diseasePayment, id)), evidence: ["signed-grouper-contract", "simulation-isolation", "versioned-parameters", "impact-analysis"] },
     { id: "special-case", label: "特例单议", ready: checkById(diseasePayment, "special-case"), evidence: ["digest-only-evidence", "expert-avoidance", "dual-review", "settlement-binding", "privacy-disclosure"] },
     { id: "monthly-settlement", label: "月度结算", ready: checkById(diseasePayment, "settlement") && checkById(diseasePayment, "settlement-sla") && checkById(diseasePayment, "settlement-difference-governance"), evidence: ["frozen-batch", "30-working-day-sla", "digest-bound-difference-evidence", "dual-domain-difference-resolution", "payment-receipt"] },
-    { id: "annual-clearance", label: "年度清算", ready: checkById(diseasePayment, "annual-clearance"), evidence: ["institution-confirmation", "adjustment-fund", "retained-balance", "risk-reserve", "finance-posting", "locked-ledger"] }
+    { id: "annual-clearance", label: "年度清算", ready: checkById(diseasePayment, "annual-clearance") && checkById(diseasePayment, "annual-clearance-institution-confirmation"), evidence: ["per-institution-confirmation", "institution-bound-dispute", "aggregate-confirmation-digest", "adjustment-fund", "retained-balance", "risk-reserve", "finance-posting", "locked-ledger"] }
   ];
   const localReady = diseasePayment.ready && financialGateway.ok && operatingModel.ok && workflows.every((item) => item.ready);
   return {

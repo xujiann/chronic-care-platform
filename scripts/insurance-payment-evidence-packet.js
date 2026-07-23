@@ -10,6 +10,7 @@ const Handoff = require("../insurance-payment-production-handoff");
 const ROOT = path.resolve(__dirname, "..");
 const EVIDENCE_FILES = Object.freeze([
   "disease-payment-grouper-contract.js",
+  "disease-payment-service.js",
   "disease-payment-settlement.js",
   "disease-payment-special-case.js",
   "online-payment-refunds.js",

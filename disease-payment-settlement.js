@@ -4,6 +4,7 @@ const { createHash, randomUUID } = require("node:crypto");
 
 const SETTLEMENT_CONTRACT_ID = "insurance-disease-settlement-v1";
 const ANNUAL_CLEARANCE_CONTRACT_ID = "insurance-annual-clearance-v1";
+const ANNUAL_CLEARANCE_CONTRACT_VERSION = "2.0.0";
 const SETTLEMENT_LABELS = Object.freeze({
   BATCH_FROZEN: "待申报",
   CORE_SUBMITTED: "医保核心已申报",
@@ -45,6 +46,7 @@ const CLEARANCE_ACTION_TARGETS = Object.freeze({
   "start-confirmation": Object.freeze({ from: ["PREPARED"], to: "INSTITUTION_CONFIRMING" }),
   "record-dispute": Object.freeze({ from: ["INSTITUTION_CONFIRMING"], to: "DISPUTE_PENDING" }),
   "resolve-dispute": Object.freeze({ from: ["DISPUTE_PENDING"], to: "INSTITUTION_CONFIRMING" }),
+  "confirm-institution": Object.freeze({ from: ["INSTITUTION_CONFIRMING"], to: "INSTITUTION_CONFIRMING" }),
   "confirm-institutions": Object.freeze({ from: ["INSTITUTION_CONFIRMING"], to: "INSTITUTION_CONFIRMED" }),
   approve: Object.freeze({ from: ["INSTITUTION_CONFIRMED"], to: "CLEARANCE_APPROVED" }),
   post: Object.freeze({ from: ["CLEARANCE_APPROVED"], to: "POSTED" }),
@@ -380,15 +382,34 @@ function createAnnualClearance(batches = [], payload = {}, actor = "system") {
   const paidAmountFen = eligible.reduce((sum, item) => sum + Number(item.paymentReceipt?.paidAmountFen || item.adjustedAmountFen || item.standardAmountFen || 0), 0);
   const finalClearanceAmountFen = paidAmountFen + adjustmentFundFen - retainedBalanceFen - riskReserveFen;
   if (!Number.isSafeInteger(finalClearanceAmountFen) || finalClearanceAmountFen < 0) throw new Error("年度最终清算金额无效");
+  const institutionMap = new Map();
+  for (const batch of eligible) {
+    const snapshots = Array.isArray(batch.calculationSnapshots) && batch.calculationSnapshots.length ? batch.calculationSnapshots : [{ institution: batch.institution || "全部机构", institutionCode: batch.institutionCode || "ALL_INSTITUTIONS", paymentStandardFen: batch.standardAmountFen, caseId: "" }];
+    for (const snapshot of snapshots) {
+      const institutionId = String(snapshot.institutionCode || snapshot.institution || batch.institutionCode || batch.institution || "ALL_INSTITUTIONS").trim();
+      const institutionName = String(snapshot.institution || batch.institution || institutionId).trim();
+      const current = institutionMap.get(institutionId) || { institutionId, institutionName, batchIds: new Set(), caseCount: 0, standardAmountFen: 0 };
+      current.batchIds.add(batch.id);
+      current.caseCount += snapshot.caseId ? 1 : Number(batch.caseCount || 0);
+      current.standardAmountFen += Number(snapshot.paymentStandardFen || 0);
+      institutionMap.set(institutionId, current);
+    }
+  }
+  const institutionConfirmations = [...institutionMap.values()].map((item) => ({ institutionId: item.institutionId, institutionName: item.institutionName, batchIds: [...item.batchIds].sort(), caseCount: item.caseCount, standardAmountFen: item.standardAmountFen, state: "PENDING", confirmation: null }));
+  const institutionStandardAmountFen = institutionConfirmations.reduce((sum, item) => sum + item.standardAmountFen, 0);
+  const standardAmountFen = eligible.reduce((sum, item) => sum + Number(item.standardAmountFen || 0), 0);
+  if (institutionStandardAmountFen !== standardAmountFen) throw new Error("逐机构清算金额与年度标准金额不一致");
   const row = {
     id: String(payload.id || `annual-clearance-${year}-${Date.now()}`),
+    contractVersion: ANNUAL_CLEARANCE_CONTRACT_VERSION,
     year,
     state: "PREPARED",
     status: CLEARANCE_LABELS.PREPARED,
     batchIds: eligible.map((item) => item.id),
     batchCount: eligible.length,
-    institutionCount: new Set(eligible.map((item) => item.institution)).size,
-    standardAmountFen: eligible.reduce((sum, item) => sum + Number(item.standardAmountFen || 0), 0),
+    institutionCount: institutionConfirmations.length,
+    institutionConfirmations,
+    standardAmountFen,
     paidAmountFen,
     adjustmentFundFen,
     retainedBalanceFen,
@@ -405,13 +426,25 @@ function createAnnualClearance(batches = [], payload = {}, actor = "system") {
 }
 
 function annualClearanceDigestPayload(row = {}) {
-  return { year: Number(row.year), batchIds: row.batchIds || [], standardAmountFen: Number(row.standardAmountFen || 0), paidAmountFen: Number(row.paidAmountFen || 0), adjustmentFundFen: Number(row.adjustmentFundFen || 0), retainedBalanceFen: Number(row.retainedBalanceFen || 0), riskReserveFen: Number(row.riskReserveFen || 0), finalClearanceAmountFen: Number(row.finalClearanceAmountFen || 0), adjustmentReason: String(row.adjustmentReason || "") };
+  if (row.contractVersion !== ANNUAL_CLEARANCE_CONTRACT_VERSION) {
+    return { year: Number(row.year), batchIds: row.batchIds || [], standardAmountFen: Number(row.standardAmountFen || 0), paidAmountFen: Number(row.paidAmountFen || 0), adjustmentFundFen: Number(row.adjustmentFundFen || 0), retainedBalanceFen: Number(row.retainedBalanceFen || 0), riskReserveFen: Number(row.riskReserveFen || 0), finalClearanceAmountFen: Number(row.finalClearanceAmountFen || 0), adjustmentReason: String(row.adjustmentReason || "") };
+  }
+  const institutions = (row.institutionConfirmations || []).map((item) => ({ institutionId: item.institutionId, institutionName: item.institutionName, batchIds: item.batchIds || [], caseCount: Number(item.caseCount || 0), standardAmountFen: Number(item.standardAmountFen || 0) })).sort((left, right) => left.institutionId.localeCompare(right.institutionId));
+  return { contractVersion: row.contractVersion, year: Number(row.year), batchIds: row.batchIds || [], institutionCount: Number(row.institutionCount || institutions.length), institutions, standardAmountFen: Number(row.standardAmountFen || 0), paidAmountFen: Number(row.paidAmountFen || 0), adjustmentFundFen: Number(row.adjustmentFundFen || 0), retainedBalanceFen: Number(row.retainedBalanceFen || 0), riskReserveFen: Number(row.riskReserveFen || 0), finalClearanceAmountFen: Number(row.finalClearanceAmountFen || 0), adjustmentReason: String(row.adjustmentReason || "") };
+}
+
+function institutionConfirmationDigest(row = {}) {
+  const confirmations = (row.institutionConfirmations || []).map((item) => ({ institutionId: item.institutionId, confirmationDigest: item.confirmation?.digest || "" })).sort((left, right) => left.institutionId.localeCompare(right.institutionId));
+  if (!confirmations.length || confirmations.some((item) => !/^[a-f0-9]{64}$/.test(item.confirmationDigest))) throw new Error("机构确认尚未完整");
+  if (!verifyEventLedger(row.events)) throw new Error("年度清算事件账本校验失败");
+  if (confirmations.some((item) => !(row.events || []).some((event) => event.action === "confirm-institution" && event.detail?.institutionId === item.institutionId && event.detail?.confirmationDigest === item.confirmationDigest))) throw new Error("机构确认缺少匹配的账本事件");
+  return digest({ clearanceId: row.id, clearanceDigest: row.clearanceDigest, confirmations });
 }
 
 function buildAnnualClearanceEnvelope(row = {}) {
   const expectedDigest = digest(annualClearanceDigestPayload(row));
   if (!row.clearanceDigest || row.clearanceDigest !== expectedDigest) throw new Error("年度清算摘要校验失败");
-  return { contractId: ANNUAL_CLEARANCE_CONTRACT_ID, contractVersion: "1.0.0", clearanceId: row.id, clearanceDigest: row.clearanceDigest, ...annualClearanceDigestPayload(row) };
+  return { contractId: ANNUAL_CLEARANCE_CONTRACT_ID, contractVersion: row.contractVersion || "1.0.0", clearanceId: row.id, clearanceDigest: row.clearanceDigest, ...annualClearanceDigestPayload(row) };
 }
 
 function transitionAnnualClearance(row, payload = {}, actor = "system") {
@@ -422,28 +455,60 @@ function transitionAnnualClearance(row, payload = {}, actor = "system") {
   if (!rule.from.includes(before)) throw new Error(`年度清算状态不允许从${CLEARANCE_LABELS[before] || before}执行${action}`);
   const now = String(payload.at || new Date().toISOString());
   const identity = eventIdentity(payload, action);
+  if (!verifyEventLedger(row.events)) throw new Error("年度清算事件账本校验失败");
   const duplicate = (row.events || []).find((event) => event.idempotencyKey === identity && event.action === action);
   if (identity && duplicate) return { row, event: duplicate, idempotent: true };
   buildAnnualClearanceEnvelope(row);
   const detail = {};
   if (action === "record-dispute") {
-    detail.institution = requireText(payload, "institution", "争议医院");
+    detail.institutionId = String(payload.institutionId || payload.institution || "").trim();
+    if (!detail.institutionId) throw new Error("争议医院标识不能为空");
+    const institution = (row.institutionConfirmations || []).find((item) => item.institutionId === detail.institutionId || item.institutionName === detail.institutionId);
+    if (!institution) throw new Error("争议医院不在年度清算确认清单");
     detail.reason = requireText(payload, "reason", "争议原因");
+    detail.reasonCode = requireText(payload, "reasonCode", "争议原因码");
+    detail.evidenceDigest = requireDigest(payload, "evidenceDigest", "争议证据摘要");
     detail.amountFen = Number(payload.amountFen);
-    if (!Number.isSafeInteger(detail.amountFen)) throw new Error("争议金额必须为整数分");
+    if (!Number.isSafeInteger(detail.amountFen) || detail.amountFen === 0) throw new Error("争议金额必须为非零整数分");
     row.disputes ||= [];
-    row.disputes.push({ id: `clearance-dispute-${randomUUID()}`, ...detail, status: "open", createdAt: now, createdBy: actor });
+    const disputeId = String(payload.disputeId || `clearance-dispute-${randomUUID()}`);
+    if (row.disputes.some((item) => item.id === disputeId)) throw new Error("年度清算争议编号已存在");
+    institution.state = "DISPUTED";
+    institution.confirmation = null;
+    row.disputes.push({ id: disputeId, ...detail, institutionId: institution.institutionId, status: "open", createdAt: now, createdBy: actor });
+    detail.disputeId = disputeId;
   }
   if (action === "resolve-dispute") {
+    detail.disputeId = requireText(payload, "disputeId", "争议编号");
     detail.resolution = requireText(payload, "resolution", "争议处理结论");
-    const open = (row.disputes || []).find((item) => item.status === "open");
+    detail.resolutionDigest = requireDigest(payload, "resolutionDigest", "争议处理摘要");
+    detail.resolvedAmountFen = Number(payload.resolvedAmountFen);
+    if (!Number.isSafeInteger(detail.resolvedAmountFen)) throw new Error("争议解决金额必须为整数分");
+    const open = (row.disputes || []).find((item) => item.id === detail.disputeId && item.status === "open");
     if (!open) throw new Error("没有待处理的年度清算争议");
-    Object.assign(open, { status: "resolved", resolution: detail.resolution, resolvedAt: now, resolvedBy: actor });
+    const institution = (row.institutionConfirmations || []).find((item) => item.institutionId === open.institutionId);
+    if (!institution) throw new Error("争议医院不在年度清算确认清单");
+    Object.assign(open, { status: "resolved", resolution: detail.resolution, resolutionDigest: detail.resolutionDigest, resolvedAmountFen: detail.resolvedAmountFen, resolvedAt: now, resolvedBy: actor });
+    institution.state = "PENDING";
+    institution.confirmation = null;
+  }
+  if (action === "confirm-institution") {
+    detail.institutionId = requireText(payload, "institutionId", "确认医院标识");
+    const institution = (row.institutionConfirmations || []).find((item) => item.institutionId === detail.institutionId);
+    if (!institution) throw new Error("确认医院不在年度清算确认清单");
+    if ((row.disputes || []).some((item) => item.institutionId === institution.institutionId && item.status === "open")) throw new Error("该医院仍有未解决的年度清算争议");
+    if (institution.state === "CONFIRMED") throw new Error("该医院已完成年度清算确认");
+    detail.confirmationDigest = requireDigest(payload, "confirmationDigest", "医院确认摘要");
+    institution.state = "CONFIRMED";
+    institution.confirmation = { digest: detail.confirmationDigest, confirmedAt: now, confirmedBy: actor };
   }
   if (action === "confirm-institutions") {
     if ((row.disputes || []).some((item) => item.status === "open")) throw new Error("仍有未解决的年度清算争议");
-    detail.confirmationDigest = requireDigest(payload, "confirmationDigest", "医院确认摘要");
-    row.institutionConfirmation = { digest: detail.confirmationDigest, confirmedAt: now, confirmedBy: actor };
+    if (!(row.institutionConfirmations || []).length || row.institutionConfirmations.some((item) => item.state !== "CONFIRMED")) throw new Error("仍有医院未完成年度清算确认");
+    const expectedDigest = institutionConfirmationDigest(row);
+    detail.confirmationDigest = requireDigest(payload, "confirmationDigest", "医院汇总确认摘要");
+    if (detail.confirmationDigest !== expectedDigest) throw new Error("医院汇总确认摘要与逐机构确认不一致");
+    row.institutionConfirmation = { digest: detail.confirmationDigest, institutionCount: row.institutionConfirmations.length, confirmedAt: now, confirmedBy: actor };
   }
   if (action === "approve") {
     if ((row.adjustmentFundFen || row.retainedBalanceFen || row.riskReserveFen) && !row.adjustmentReason) throw new Error("存在年度资金调整时必须填写调整原因");
@@ -472,4 +537,4 @@ function transitionAnnualClearance(row, payload = {}, actor = "system") {
   return { row, event, idempotent: false };
 }
 
-module.exports = { ACTION_TARGETS, ANNUAL_CLEARANCE_CONTRACT_ID, CLEARANCE_ACTION_TARGETS, CLEARANCE_LABELS, DIFFERENCE_REVIEW_DOMAINS, SETTLEMENT_CONTRACT_ID, SETTLEMENT_LABELS, addWorkingDays, annualClearanceDigestPayload, appendEvent, buildAnnualClearanceEnvelope, buildCoreSettlementCase, buildCoreSettlementEnvelope, buildDifferenceCaseSla, buildSettlementSla, createAnnualClearance, dateOnly, digest, isWorkingDay, normalizeWorkingCalendar, settlementState, stableStringify, transitionAnnualClearance, transitionSettlementBatch, verifyEventLedger, workingDaysBetween, yuanToFen };
+module.exports = { ACTION_TARGETS, ANNUAL_CLEARANCE_CONTRACT_ID, ANNUAL_CLEARANCE_CONTRACT_VERSION, CLEARANCE_ACTION_TARGETS, CLEARANCE_LABELS, DIFFERENCE_REVIEW_DOMAINS, SETTLEMENT_CONTRACT_ID, SETTLEMENT_LABELS, addWorkingDays, annualClearanceDigestPayload, appendEvent, buildAnnualClearanceEnvelope, buildCoreSettlementCase, buildCoreSettlementEnvelope, buildDifferenceCaseSla, buildSettlementSla, createAnnualClearance, dateOnly, digest, institutionConfirmationDigest, isWorkingDay, normalizeWorkingCalendar, settlementState, stableStringify, transitionAnnualClearance, transitionSettlementBatch, verifyEventLedger, workingDaysBetween, yuanToFen };

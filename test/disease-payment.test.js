@@ -186,10 +186,14 @@ test("settlement difference correction and annual clearance remain auditable unt
   clearanceTampered.adjustmentFundFen += 1;
   assert.throws(() => Settlement.transitionAnnualClearance(clearanceTampered, { action: "start-confirmation", idempotencyKey: "TAMPERED" }, "insurance"), /摘要校验失败/);
   let clearance = Service.applyAnnualClearanceAction(annual.state, annual.row.id, { action: "start-confirmation", idempotencyKey: "ANNUAL-CONFIRM-START" }, "insurance");
-  clearance = Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "record-dispute", idempotencyKey: "ANNUAL-DISPUTE", institution: "全部机构", reason: "调节金口径待确认", amountFen: 100 }, "hospital-finance");
+  const disputedInstitutionId = clearance.row.institutionConfirmations[0].institutionId;
+  clearance = Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "record-dispute", idempotencyKey: "ANNUAL-DISPUTE", disputeId: "ANNUAL-DISPUTE-001", institutionId: disputedInstitutionId, reasonCode: "ADJUSTMENT_SCOPE", reason: "调节金口径待确认", amountFen: 100, evidenceDigest: "9".repeat(64) }, "hospital-finance");
   assert.throws(() => Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "confirm-institutions", confirmationDigest: "c".repeat(64) }, "hospital-finance"), /状态不允许|未解决/);
-  clearance = Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "resolve-dispute", idempotencyKey: "ANNUAL-DISPUTE-RESOLVE", resolution: "按双方签署口径处理" }, "insurance");
-  clearance = Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "confirm-institutions", idempotencyKey: "ANNUAL-CONFIRMED", confirmationDigest: "c".repeat(64) }, "hospital-finance");
+  clearance = Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "resolve-dispute", idempotencyKey: "ANNUAL-DISPUTE-RESOLVE", disputeId: "ANNUAL-DISPUTE-001", resolution: "按双方签署口径处理", resolutionDigest: "8".repeat(64), resolvedAmountFen: 0 }, "insurance");
+  for (const target of clearance.row.institutionConfirmations) {
+    clearance = Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "confirm-institution", idempotencyKey: `ANNUAL-CONFIRM-${target.institutionId}`, institutionId: target.institutionId, confirmationDigest: "c".repeat(64) }, `hospital-finance-${target.institutionId}`);
+  }
+  clearance = Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "confirm-institutions", idempotencyKey: "ANNUAL-CONFIRMED", confirmationDigest: Settlement.institutionConfirmationDigest(clearance.row) }, "hospital-finance");
   clearance = Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "approve", idempotencyKey: "ANNUAL-APPROVE", approvalNo: "医保清算〔2027〕1号", adjustmentApprovalDigest: "f".repeat(64) }, "insurance-bureau");
   assert.throws(() => Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "post", idempotencyKey: "ANNUAL-POST-BAD", voucherNo: "VOUCHER-BAD", postedAmountFen: clearance.row.finalClearanceAmountFen - 1 }, "finance"), /最终清算金额一致/);
   clearance = Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "post", idempotencyKey: "ANNUAL-POST", voucherNo: "VOUCHER-2026-001", postedAmountFen: clearance.row.finalClearanceAmountFen }, "finance");
