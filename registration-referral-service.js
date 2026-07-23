@@ -1,6 +1,6 @@
 "use strict";
 
-const { randomUUID } = require("node:crypto");
+const { createHash, randomUUID } = require("node:crypto");
 
 const {
   classifyMessageReceipt,
@@ -60,6 +60,15 @@ function text(value) {
 function clone(value) {
   if (typeof structuredClone === "function") return structuredClone(value);
   return JSON.parse(JSON.stringify(value));
+}
+
+function canonicalize(value) {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (!value || typeof value !== "object") return value;
+  return Object.keys(value).sort().reduce((result, key) => {
+    if (value[key] !== undefined) result[key] = canonicalize(value[key]);
+    return result;
+  }, {});
 }
 
 function requireText(value, field) {
@@ -669,23 +678,49 @@ function applyRegistrationCallback(data, command, actor) {
 }
 
 function normalizeCommand(input = {}) {
+  const suppliedAt = text(input.at);
   const command = {
     commandId: requireText(input.commandId, "commandId"),
     action: requireText(input.action, "action"),
     caseType: text(input.caseType),
     caseId: text(input.caseId),
     residentId: text(input.residentId),
-    at: text(input.at || new Date().toISOString()),
+    at: suppliedAt || new Date().toISOString(),
+    suppliedAt,
     payload: input.payload && typeof input.payload === "object" ? clone(input.payload) : {}
   };
   if (!Number.isFinite(Date.parse(command.at))) throw new Error("at must be an ISO-compatible timestamp");
   return command;
 }
 
-function appendClosureEvent(data, command, actor, result) {
+function commandFingerprint(command, actor = {}, options = {}) {
+  const actorSubject = text(actor.id || actor.subject || actor.sub || actor.username || actorName(actor));
+  const executionPolicy = command.action === "run-notification-fallback"
+    ? options.notificationPolicy || DEFAULT_NOTIFICATION_POLICY
+    : null;
+  const material = canonicalize({
+    action: command.action,
+    actor: {
+      orgCode: text(actor.orgCode),
+      residentIds: [...actorResidentIds(actor)].sort(),
+      role: text(actor.role),
+      subject: actorSubject
+    },
+    at: command.suppliedAt,
+    caseId: command.caseId,
+    caseType: command.caseType,
+    executionPolicy,
+    payload: command.payload,
+    residentId: command.residentId
+  });
+  return createHash("sha256").update(JSON.stringify(material)).digest("hex");
+}
+
+function appendClosureEvent(data, command, actor, result, fingerprint) {
   const event = {
     id: `rrce-${randomUUID()}`,
     commandId: command.commandId,
+    commandFingerprint: fingerprint,
     action: command.action,
     caseType: command.caseType,
     caseId: command.caseId || result?.assessment?.id || result?.order?.id || result?.teleconsultation?.id || result?.followup?.id || "",
@@ -705,8 +740,12 @@ function applyClosureCommand(sourceData = {}, input = {}, actor = {}, options = 
   const command = normalizeCommand(input);
   requireCommandRole(command.action, actor);
   const data = clone(sourceData);
+  const fingerprint = commandFingerprint(command, actor, options);
   const prior = rows(data.registrationReferralClosureEvents).find((item) => item.commandId === command.commandId);
-  if (prior) return { data, event: prior, result: null, idempotent: true, consistency: validateClosureReferences(data) };
+  if (prior) {
+    if (!prior.commandFingerprint || prior.commandFingerprint !== fingerprint) throw new Error("idempotency key conflict");
+    return { data, event: prior, result: null, idempotent: true, consistency: validateClosureReferences(data) };
+  }
   const handlers = {
     "advance-registration": () => advanceRegistration(data, command, actor),
     "apply-registration-callback": () => applyRegistrationCallback(data, command, actor),
@@ -721,7 +760,7 @@ function applyClosureCommand(sourceData = {}, input = {}, actor = {}, options = 
     "escalate-case": () => escalateCase(data, command, actor)
   };
   const result = handlers[command.action]();
-  const event = appendClosureEvent(data, command, actor, result);
+  const event = appendClosureEvent(data, command, actor, result, fingerprint);
   return {
     data,
     event,

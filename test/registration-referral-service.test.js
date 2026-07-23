@@ -68,6 +68,74 @@ test("primary care assessment creates a local follow-up and is idempotent", () =
   assert.equal(repeated.data.primaryCareAssessments.filter((item) => item.id === first.result.assessment.id).length, 1);
 });
 
+test("idempotency keys bind request content, actor scope and execution policy", () => {
+  const command = {
+    commandId: "cmd-fingerprint-primary-care",
+    action: "record-primary-care-assessment",
+    residentId: "r1",
+    at: "2026-07-22T09:05:00.000Z",
+    payload: {
+      institutionCode: "MR3",
+      doctorId: "doc-liu",
+      diagnosis: "hypertension",
+      assessment: "Fingerprint baseline.",
+      disposition: "refer-up"
+    }
+  };
+  const first = applyClosureCommand(data(), command, institution);
+  assert.match(first.event.commandFingerprint, /^[a-f0-9]{64}$/);
+  assert.equal(applyClosureCommand(first.data, command, institution).idempotent, true);
+
+  assert.throws(() => applyClosureCommand(first.data, {
+    ...command,
+    payload: { ...command.payload, assessment: "Altered payload." }
+  }, institution), /idempotency key conflict/);
+  assert.throws(() => applyClosureCommand(first.data, command, {
+    ...institution,
+    username: "different-doctor",
+    name: "Different Doctor"
+  }), /idempotency key conflict/);
+  assert.throws(() => applyClosureCommand(first.data, {
+    commandId: command.commandId,
+    action: "escalate-case",
+    caseType: "chronic-followup",
+    caseId: "f1",
+    payload: { note: "Conflicting action." }
+  }, institution), /idempotency key conflict/);
+
+  const legacy = data();
+  legacy.registrationReferralClosureEvents = [{ id: "legacy-event", commandId: command.commandId, action: command.action }];
+  assert.throws(() => applyClosureCommand(legacy, command, institution), /idempotency key conflict/);
+
+  const withoutSuppliedTime = {
+    commandId: "cmd-fingerprint-generated-time",
+    action: "record-primary-care-assessment",
+    residentId: "r1",
+    payload: {
+      institutionCode: "MR3",
+      doctorId: "doc-liu",
+      diagnosis: "hypertension",
+      assessment: "Generated timestamp replay.",
+      disposition: "refer-up"
+    }
+  };
+  const generatedTimeFirst = applyClosureCommand(data(), withoutSuppliedTime, institution);
+  assert.equal(applyClosureCommand(generatedTimeFirst.data, withoutSuppliedTime, institution).idempotent, true);
+
+  const fallbackCommand = {
+    commandId: "cmd-fingerprint-policy",
+    action: "run-notification-fallback",
+    payload: { messageId: "msg-rtc-001-feedback-institution", note: "Policy-bound retry." }
+  };
+  const policyA = { channels: [{ channel: "in_app", maxAttempts: 1 }, { channel: "manual-task", maxAttempts: 1 }] };
+  const policyB = { channels: [{ channel: "sms", maxAttempts: 1 }, { channel: "manual-task", maxAttempts: 1 }] };
+  const fallbackFirst = applyClosureCommand(data(), fallbackCommand, commission, { notificationPolicy: policyA });
+  assert.throws(
+    () => applyClosureCommand(fallbackFirst.data, fallbackCommand, commission, { notificationPolicy: policyB }),
+    /idempotency key conflict/
+  );
+});
+
 test("primary care teleconsultation creates a resident-consistent referral chain", () => {
   const assessed = applyClosureCommand(data(), {
     commandId: "cmd-primary-tele-1",

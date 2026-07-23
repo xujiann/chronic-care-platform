@@ -4,7 +4,9 @@
 
 `registration-referral-service.js` is the API-independent command layer for the T05 workflow. It composes the existing registration journey and callback functions with new primary-care, referral continuity, notification, chronic follow-up and family doctor closure commands.
 
-Every command requires a unique `commandId`. The service clones the supplied database, applies one authorized command, appends a non-production `registrationReferralClosureEvents` audit row, validates cross-record consistency and returns the changed copy. It never writes a file or claims production evidence.
+Every command requires a unique `commandId`. The service binds that key to a SHA-256 fingerprint covering the normalized action, case, resident, payload, supplied timestamp, actor identity and scope, plus the notification fallback policy when relevant. Only an exact replay is idempotent; altered requests, actors and legacy audit rows without a fingerprint fail with `idempotency key conflict`.
+
+The service clones the supplied database, applies one authorized command, appends a non-production `registrationReferralClosureEvents` audit row, validates cross-record consistency and returns the changed copy. It never writes a file or claims production evidence.
 
 ## Supported commands
 
