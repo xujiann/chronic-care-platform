@@ -2,9 +2,11 @@
 
 ## Scope
 
-`registration-referral-service.js` is the API-independent command layer for the T05 workflow. It composes the existing registration journey and callback functions with new primary-care, referral continuity, notification, chronic follow-up and family doctor closure commands.
+`registration-referral-service.js` is the API-independent command layer for the T05 workflow. It composes the existing registration journey and callback functions with primary-care, referral continuity, exception handling, notification reliability, chronic follow-up and family doctor lifecycle commands. Independently deployable T05 operations are isolated in `registration-referral-standalone.js` and still execute through the same authorization, idempotency and audit wrapper.
 
 Every command requires a unique `commandId`. The service binds that key to a SHA-256 fingerprint covering the normalized action, case, resident, payload, supplied timestamp, actor identity and scope, plus the notification fallback policy when relevant. Only an exact replay is idempotent; altered requests, actors and legacy audit rows without a fingerprint fail with `idempotency key conflict`.
+
+Commands may include `expectedVersion`. When the persistence adapter selects `requireExpectedVersion=true`, every update to an existing aggregate must match its current `workflowVersion`; stale commands fail before mutation. Successful commands increment the aggregate version and record it in the closure event. `replayClosureCommands` replays an ordered journal, preserves exact idempotent duplicates and stops with the failed journal index when recovery cannot continue safely.
 
 The service clones the supplied database, applies one authorized command, appends a non-production `registrationReferralClosureEvents` audit row, validates cross-record consistency and returns the changed copy. It never writes a file or claims production evidence.
 
@@ -29,6 +31,19 @@ Business terminal states are also enforced independently of `commandId`: one pri
 | `run-notification-fallback` | Apply bounded in-app, SMS, phone and manual-task fallback. |
 | `escalate-case` | Create an idempotent responsibility escalation for a non-terminal unified case. |
 
+## Standalone T05 operations
+
+The complete catalog contains 35 commands. In addition to the 14 closure commands above, T05 implements these operations without changing a public route or shared page:
+
+- Referral exceptions: `reject-referral-request`, `withdraw-referral`, `reassign-referral`, `reschedule-teleconsultation`, `cancel-teleconsultation` and `record-teleconsultation-no-show`.
+- Clinical package and consent: `attach-referral-materials`, `grant-referral-authorization`, `revoke-referral-authorization` and `resume-referral-authorization`. Resident or guardian grants must specify covered institutions, expiry and the minimum permitted data scopes.
+- SLA and messaging reliability: `run-closure-sla`, `acknowledge-escalation`, `record-notification-provider-result` and `resolve-notification-dead-letter`.
+- Family doctor lifecycle: `submit-family-doctor-application`, `review-family-doctor-application`, `activate-family-doctor-contract`, `record-family-doctor-fulfillment`, `request-family-doctor-renewal`, `review-family-doctor-renewal` and `terminate-family-doctor-contract`.
+
+`buildClosureWorkQueue` produces a role-scoped queue with overdue hours and priority. `buildClosureQualityMetrics` reports referral return, continuity, rejection, reassignment, repeat-exam reuse, material-manifest and family-doctor indicators. `buildNotificationReliability` reports provider receipts and dead-letter closure. All three are read-only and retain `productionReady=false`.
+
+Clinical material commands store only metadata, record identifiers, versions and SHA-256 digests. Binary files and signed document storage remain an object-storage integration responsibility.
+
 ## Authorization
 
 - Commission users can operate across organizations for supervision and reconciliation.
@@ -36,6 +51,8 @@ Business terminal states are also enforced independently of `commandId`: one pri
 - Citizen acknowledgements require the message, fulfillment or follow-up resident to be in the actor's resident scope.
 - Notification access additionally checks `targetRole` and `targetOrgCode`.
 - Referral creation requires an active resident authorization and a resident-consistent target chain.
+- Referral reassignment requires a new active authorization that explicitly covers the new target institution.
+- Authorization revocation is resident scoped and places every linked non-terminal referral on hold.
 
 ## Notification fallback
 
@@ -55,7 +72,7 @@ T00 should expose one command endpoint and persist the returned copy inside the 
 1. Authenticate the request with the current session and role guard.
 2. Collect a JSON command and require a client-generated `commandId`.
 3. Load the latest database snapshot.
-4. Call `applyClosureCommand(data, command, user)`.
+4. Call `applyClosureCommand(data, command, user, { requireExpectedVersion: true })` for version-protected production writes.
 5. If the result is not idempotent, persist `result.data` atomically once.
 6. Return the command event, business result, idempotency flag and consistency summary.
 7. Append the existing security and data-access audit records around the transaction.
@@ -70,7 +87,7 @@ Public integration remains responsible for:
 - Adding `POST /api/registration-referral/commands` or the suggested per-command endpoints from `CLOSURE_COMMAND_CONTRACTS`.
 - Preserving the already-correct `seedReferralTeleconsultations` parity: `rtc-001 -> cco-004`, `rtc-002 -> cco-005`.
 - Synchronizing `seedTaskMessages`: both `rtc-002` messages must use resident `r4` and the down-referral report text.
-- Initializing `primaryCareAssessments`, `registrationReferralClosureEvents` and `registrationReferralEscalations` as empty collections for a fresh database.
+- Initializing `primaryCareAssessments`, `registrationReferralClosureEvents`, `registrationReferralEscalations` and `registrationReferralNotificationDeadLetters` as empty collections for a fresh database.
 - Adding the package acceptance script and public release/deploy/report gates.
 - Wiring the institution, citizen and county interfaces to the command endpoint without duplicating state logic in UI code.
 

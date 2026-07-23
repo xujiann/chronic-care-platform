@@ -1,5 +1,7 @@
 "use strict";
 
+const { createHash } = require("node:crypto");
+
 const UNIFIED_PHASES = Object.freeze([
   "requested",
   "accepted",
@@ -251,7 +253,19 @@ function normalizeReferralCase(item = {}, context = {}) {
     Object.assign(envelope, responsibility(item.targetInstitutionCode || item.toInstitutionCode || item.targetInstitution || item.to, "receiving-hospital", item.due, "reserve specialist resource and schedule consultation"));
     return envelope;
   }
-  if (status === "cancelled") {
+  if (status === "no-show") {
+    envelope.unifiedPhase = "exception";
+    envelope.exceptionState = `teleconsultation-no-show-${text(item.noShow?.party || "unknown")}`;
+    Object.assign(envelope, responsibility(item.targetInstitutionCode || item.toInstitutionCode || item.targetInstitution || item.to, "receiving-hospital", item.due, "reschedule or cancel teleconsultation"));
+    return envelope;
+  }
+  if (status === "authorization-on-hold") {
+    envelope.unifiedPhase = "exception";
+    envelope.exceptionState = "resident-authorization-revoked";
+    Object.assign(envelope, responsibility(item.sourceInstitutionCode || item.fromInstitutionCode || item.sourceInstitution || item.from, "primary-care-institution", item.due, "obtain new resident authorization, reassign, or withdraw referral"));
+    return envelope;
+  }
+  if (["cancelled", "rejected", "withdrawn"].includes(status)) {
     envelope.unifiedPhase = "cancelled";
     Object.assign(envelope, responsibility("", "", "", "none"));
     return envelope;
@@ -366,6 +380,9 @@ function validateClosureReferences(data = {}) {
   const authorizations = index(rows(data.personalRecords).filter((item) => item.category === "authorizations"));
   const applications = rows(data.phase2FamilyDoctorApplications);
   const contracts = index(data.phase2FamilyDoctorContracts);
+  const familyTeams = index(data.phase2FamilyDoctorTeams);
+  const familyPackages = index(data.phase2FamilyDoctorServicePackages);
+  const taskMessages = index(data.taskMessages);
   const messageSourceIndexes = {
     referralTeleconsultations: index(data.referralTeleconsultations),
     registrationOrders: index(data.registrationOrders),
@@ -382,6 +399,18 @@ function validateClosureReferences(data = {}) {
     if (schedule && order.departmentCode && schedule.departmentCode && order.departmentCode !== schedule.departmentCode) addIssue("P0", "registration-department-mismatch", "registrationOrder", order.id, "order and schedule department codes differ", { orderDepartmentCode: order.departmentCode, scheduleDepartmentCode: schedule.departmentCode });
   });
 
+  authorizations.forEach((authorization) => {
+    const dataScopes = rows(authorization.dataScopes || authorization.meta?.dataScopes).map((item) => lower(item));
+    if (dataScopes.length && (!dataScopes.includes("clinical-summary") || !dataScopes.includes("referral-report"))) {
+      addIssue("P0", "referral-authorization-data-scope-incomplete", "authorization", authorization.id, "versioned referral authorization must include clinical-summary and referral-report scopes", { dataScopes });
+    }
+    const consentActor = lower(authorization.consentActor || authorization.meta?.consentActor);
+    const guardianProofId = text(authorization.guardianProofId || authorization.meta?.guardianProofId);
+    if (consentActor === "guardian" && !guardianProofId) {
+      addIssue("P0", "referral-authorization-guardian-proof-missing", "authorization", authorization.id, "guardian authorization requires a proof reference", {});
+    }
+  });
+
   rows(data.referralTeleconsultations).forEach((teleconsultation) => {
     const referral = referrals.get(teleconsultation.referralId);
     const collaborationOrder = collaborationOrders.get(teleconsultation.collaborationOrderId);
@@ -393,6 +422,43 @@ function validateClosureReferences(data = {}) {
     if (collaborationOrder && collaborationOrder.residentId !== teleconsultation.residentId) addIssue("P0", "teleconsult-collaboration-resident-mismatch", "referralTeleconsultation", teleconsultation.id, "teleconsultation and collaboration order residents differ", { teleconsultationResidentId: teleconsultation.residentId, collaborationOrderResidentId: collaborationOrder.residentId });
     if (!authorization) addIssue("P0", "teleconsult-authorization-missing", "referralTeleconsultation", teleconsultation.id, "teleconsultation references a missing resident authorization", { residentAuthorizationId: teleconsultation.residentAuthorizationId });
     if (authorization && authorization.residentId !== teleconsultation.residentId) addIssue("P0", "teleconsult-authorization-resident-mismatch", "referralTeleconsultation", teleconsultation.id, "teleconsultation and authorization residents differ", { teleconsultationResidentId: teleconsultation.residentId, authorizationResidentId: authorization.residentId });
+    const versionedMaterials = rows(teleconsultation.materials).filter((item) => item && typeof item === "object");
+    const materialIds = new Set();
+    versionedMaterials.forEach((material) => {
+      if (!material.id || materialIds.has(material.id)) addIssue("P0", "teleconsult-material-id-invalid", "referralTeleconsultation", teleconsultation.id, "versioned material ids must be present and unique", { materialId: material.id || "" });
+      materialIds.add(material.id);
+      if (!/^[a-f0-9]{64}$/i.test(text(material.digest))) addIssue("P0", "teleconsult-material-digest-invalid", "referralTeleconsultation", teleconsultation.id, "versioned material digest must be SHA-256", { materialId: material.id || "", digest: material.digest || "" });
+      if (!Number.isInteger(Number(material.version)) || Number(material.version) < 1) addIssue("P0", "teleconsult-material-version-invalid", "referralTeleconsultation", teleconsultation.id, "versioned material version must be a positive integer", { materialId: material.id || "", version: material.version });
+    });
+    if (versionedMaterials.length && !/^[a-f0-9]{64}$/i.test(text(teleconsultation.materialManifestDigest))) {
+      addIssue("P0", "teleconsult-material-manifest-missing", "referralTeleconsultation", teleconsultation.id, "versioned materials require a SHA-256 manifest digest", { materialCount: versionedMaterials.length });
+    } else if (versionedMaterials.length) {
+      const expectedManifestDigest = createHash("sha256")
+        .update(JSON.stringify([...versionedMaterials].sort((a, b) => text(a.id).localeCompare(text(b.id))).map((item) => ({ id: item.id, version: item.version, digest: item.digest }))))
+        .digest("hex");
+      if (expectedManifestDigest !== text(teleconsultation.materialManifestDigest).toLowerCase()) {
+        addIssue("P0", "teleconsult-material-manifest-mismatch", "referralTeleconsultation", teleconsultation.id, "clinical material manifest digest does not match its versioned entries", { expectedManifestDigest, actualManifestDigest: teleconsultation.materialManifestDigest });
+      }
+    }
+  });
+
+  rows(data.referralSystem?.referrals).forEach((referral) => {
+    const versionedMaterials = rows(referral.materials).filter((item) => item && typeof item === "object");
+    if (!versionedMaterials.length) return;
+    const expectedManifestDigest = createHash("sha256")
+      .update(JSON.stringify([...versionedMaterials].sort((a, b) => text(a.id).localeCompare(text(b.id))).map((item) => ({ id: item.id, version: item.version, digest: item.digest }))))
+      .digest("hex");
+    if (!/^[a-f0-9]{64}$/i.test(text(referral.materialManifestDigest)) || expectedManifestDigest !== text(referral.materialManifestDigest).toLowerCase()) {
+      addIssue("P0", "referral-material-manifest-invalid", "referral", referral.id, "referral clinical material manifest is missing or does not match its versioned entries", { expectedManifestDigest, actualManifestDigest: referral.materialManifestDigest || "" });
+    }
+  });
+
+  applications.forEach((application) => {
+    const team = familyTeams.get(application.teamId);
+    const servicePackage = familyPackages.get(application.packageId);
+    if (familyTeams.size && !team) addIssue("P0", "family-application-team-missing", "familyDoctorApplication", application.id, "application references a missing family doctor team", { teamId: application.teamId });
+    if (familyPackages.size && !servicePackage) addIssue("P0", "family-application-package-missing", "familyDoctorApplication", application.id, "application references a missing family doctor package", { packageId: application.packageId });
+    if (team && application.reviewInstitutionCode && team.institutionCode !== application.reviewInstitutionCode) addIssue("P0", "family-application-review-org-mismatch", "familyDoctorApplication", application.id, "application review institution differs from its team institution", { reviewInstitutionCode: application.reviewInstitutionCode, teamInstitutionCode: team.institutionCode });
   });
 
   rows(data.phase2FamilyDoctorContracts).forEach((contract) => {
@@ -405,6 +471,8 @@ function validateClosureReferences(data = {}) {
     if (contract.applicationId && !linkedApplication) addIssue("P1", "family-contract-application-missing", "familyDoctorContract", contract.id, "contract references a missing application", { applicationId: contract.applicationId });
     if (linkedApplication && linkedApplication.reviewStatus !== "approved" && !pendingRenewalForExistingContract) addIssue("P0", "family-contract-application-not-approved", "familyDoctorContract", contract.id, "contract was created from an application that is not approved", { applicationId: linkedApplication.id, reviewStatus: linkedApplication.reviewStatus });
     if (!contract.applicationId && !approvedCandidates.length) addIssue("P1", "family-contract-approved-application-unlinked", "familyDoctorContract", contract.id, "contract cannot be traced to an approved application", { residentId: contract.residentId, packageId: contract.packageId, teamId: contract.teamId });
+    if (familyTeams.size && !familyTeams.has(contract.teamId)) addIssue("P0", "family-contract-team-missing", "familyDoctorContract", contract.id, "contract references a missing family doctor team", { teamId: contract.teamId });
+    if (familyPackages.size && !familyPackages.has(contract.packageId)) addIssue("P0", "family-contract-package-missing", "familyDoctorContract", contract.id, "contract references a missing family doctor package", { packageId: contract.packageId });
   });
 
   rows(data.phase2FamilyDoctorFulfillments).forEach((fulfillment) => {
@@ -419,6 +487,13 @@ function validateClosureReferences(data = {}) {
     const source = sourceIndex.get(message.sourceId);
     if (!source) addIssue("P0", "notification-source-missing", "taskMessage", message.id, "notification references a missing business source", { collection: message.collection, sourceId: message.sourceId });
     if (source && source.residentId && message.residentId !== source.residentId) addIssue("P0", "notification-source-resident-mismatch", "taskMessage", message.id, "notification and source record residents differ", { collection: message.collection, sourceId: message.sourceId, messageResidentId: message.residentId, sourceResidentId: source.residentId });
+  });
+
+  rows(data.registrationReferralNotificationDeadLetters).forEach((deadLetter) => {
+    const message = taskMessages.get(deadLetter.messageId);
+    if (!message) addIssue("P0", "notification-dead-letter-message-missing", "notificationDeadLetter", deadLetter.id, "dead letter references a missing task message", { messageId: deadLetter.messageId });
+    if (message && deadLetter.residentId && deadLetter.residentId !== message.residentId) addIssue("P0", "notification-dead-letter-resident-mismatch", "notificationDeadLetter", deadLetter.id, "dead letter and task message residents differ", { messageId: deadLetter.messageId });
+    if (message && deadLetter.targetOrgCode && deadLetter.targetOrgCode !== message.targetOrgCode) addIssue("P0", "notification-dead-letter-org-mismatch", "notificationDeadLetter", deadLetter.id, "dead letter and task message target organizations differ", { messageId: deadLetter.messageId });
   });
 
   const summary = issues.reduce((result, issue) => {

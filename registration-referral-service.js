@@ -18,6 +18,13 @@ const {
 const {
   applyRegistrationJourneyAction
 } = require("./scripts/registration-journey-readiness");
+const {
+  STANDALONE_COMMAND_CONTRACTS,
+  applyStandaloneCommand,
+  buildClosureQualityMetrics,
+  buildClosureWorkQueue,
+  buildNotificationReliability
+} = require("./registration-referral-standalone");
 
 const DEFAULT_NOTIFICATION_POLICY = Object.freeze({
   channels: Object.freeze([
@@ -28,7 +35,7 @@ const DEFAULT_NOTIFICATION_POLICY = Object.freeze({
   ])
 });
 
-const CLOSURE_COMMAND_CONTRACTS = Object.freeze([
+const BASE_CLOSURE_COMMAND_CONTRACTS = Object.freeze([
   { action: "advance-registration", roles: ["citizen", "institution", "insurance", "commission"], requiredFields: ["caseId", "payload.action", "payload.note"], suggestedEndpoint: "POST /api/registration-referral/commands/advance-registration" },
   { action: "apply-registration-callback", roles: ["institution", "insurance", "commission"], requiredFields: ["caseId", "payload.callback.eventType", "payload.callback.orderNo"], suggestedEndpoint: "POST /api/registration-referral/commands/apply-registration-callback" },
   { action: "record-primary-care-assessment", roles: ["institution", "commission"], requiredFields: ["residentId", "payload.institutionCode", "payload.doctorId", "payload.diagnosis", "payload.disposition"], suggestedEndpoint: "POST /api/registration-referral/commands/record-primary-care-assessment" },
@@ -44,6 +51,7 @@ const CLOSURE_COMMAND_CONTRACTS = Object.freeze([
   { action: "run-notification-fallback", roles: ["institution", "county", "commission"], requiredFields: ["payload.messageId", "payload.note"], suggestedEndpoint: "POST /api/registration-referral/commands/run-notification-fallback" },
   { action: "escalate-case", roles: ["institution", "county", "commission"], requiredFields: ["caseType", "caseId", "payload.note"], suggestedEndpoint: "POST /api/registration-referral/commands/escalate-case" }
 ]);
+const CLOSURE_COMMAND_CONTRACTS = Object.freeze([...BASE_CLOSURE_COMMAND_CONTRACTS, ...STANDALONE_COMMAND_CONTRACTS]);
 
 const RECEIPT_STATUSES = new Set(["acknowledged", "bounced", "confirmed", "delivered", "failed", "handled", "read", "received"]);
 const BUSINESS_ACKNOWLEDGEMENT_STATUSES = new Set(["acknowledged", "confirmed", "handled", "read"]);
@@ -925,12 +933,18 @@ function applyRegistrationCallback(data, command, actor) {
 
 function normalizeCommand(input = {}) {
   const suppliedAt = text(input.at);
+  const hasExpectedVersion = input.expectedVersion !== undefined && input.expectedVersion !== null && input.expectedVersion !== "";
+  const expectedVersion = hasExpectedVersion ? Number(input.expectedVersion) : null;
+  if (hasExpectedVersion && (!Number.isInteger(expectedVersion) || expectedVersion < 0)) {
+    throw new Error("expectedVersion must be a non-negative integer");
+  }
   const command = {
     commandId: requireText(input.commandId, "commandId"),
     action: requireText(input.action, "action"),
     caseType: text(input.caseType),
     caseId: text(input.caseId),
     residentId: text(input.residentId),
+    expectedVersion,
     at: suppliedAt || new Date().toISOString(),
     suppliedAt,
     payload: input.payload && typeof input.payload === "object" ? clone(input.payload) : {}
@@ -942,8 +956,10 @@ function normalizeCommand(input = {}) {
 function commandFingerprint(command, actor = {}, options = {}) {
   const actorSubject = text(actor.id || actor.subject || actor.sub || actor.username || actorName(actor));
   const executionPolicy = command.action === "run-notification-fallback"
-    ? options.notificationPolicy || DEFAULT_NOTIFICATION_POLICY
-    : null;
+    ? options.requireExpectedVersion === true
+      ? { notificationPolicy: options.notificationPolicy || DEFAULT_NOTIFICATION_POLICY, requireExpectedVersion: true }
+      : options.notificationPolicy || DEFAULT_NOTIFICATION_POLICY
+    : options.requireExpectedVersion === true ? { requireExpectedVersion: true } : null;
   const material = canonicalize({
     action: command.action,
     actor: {
@@ -955,6 +971,7 @@ function commandFingerprint(command, actor = {}, options = {}) {
     at: command.suppliedAt,
     caseId: command.caseId,
     caseType: command.caseType,
+    expectedVersion: command.expectedVersion === null ? undefined : command.expectedVersion,
     executionPolicy,
     payload: command.payload,
     residentId: command.residentId
@@ -962,19 +979,77 @@ function commandFingerprint(command, actor = {}, options = {}) {
   return createHash("sha256").update(JSON.stringify(material)).digest("hex");
 }
 
-function appendClosureEvent(data, command, actor, result, fingerprint) {
+function findVersionedAggregate(data, command) {
+  if (["record-notification-receipt", "run-notification-fallback", "record-notification-provider-result"].includes(command.action)) {
+    return rows(data.taskMessages).find((item) => item.id === command.payload.messageId) || null;
+  }
+  if (command.action === "revoke-referral-authorization") {
+    return rows(data.personalRecords).find((item) => item.id === command.payload.authorizationId && item.category === "authorizations") || null;
+  }
+  if (command.action === "resolve-notification-dead-letter") {
+    return rows(data.registrationReferralNotificationDeadLetters).find((item) => item.id === command.caseId) || null;
+  }
+  if (command.action === "acknowledge-escalation") {
+    return rows(data.registrationReferralEscalations).find((item) => item.id === command.caseId) || null;
+  }
+  if (!command.caseId) return null;
+  const referral = findReferralRecord(data, command.caseId);
+  if (referral) return referral.item;
+  return [
+    ...rows(data.registrationOrders),
+    ...rows(data.primaryCareAssessments),
+    ...rows(data.followups),
+    ...rows(data.phase2FamilyDoctorApplications),
+    ...rows(data.phase2FamilyDoctorContracts),
+    ...rows(data.phase2FamilyDoctorFulfillments),
+    ...rows(data.registrationReferralEscalations)
+  ].find((item) => item.id === command.caseId) || null;
+}
+
+function assertAggregateVersion(aggregate, command, options = {}) {
+  if (!aggregate) return null;
+  const currentVersion = Number.isInteger(Number(aggregate.workflowVersion)) ? Number(aggregate.workflowVersion) : 0;
+  if (options.requireExpectedVersion === true && command.expectedVersion === null) {
+    throw new Error("expectedVersion is required for an existing aggregate");
+  }
+  if (command.expectedVersion !== null && command.expectedVersion !== currentVersion) {
+    throw new Error(`workflow version conflict: expected ${command.expectedVersion}, current ${currentVersion}`);
+  }
+  return currentVersion;
+}
+
+function advanceAggregateVersion(data, command, priorVersion, result) {
+  if (priorVersion !== null) {
+    const aggregate = findVersionedAggregate(data, command);
+    if (aggregate) {
+      aggregate.workflowVersion = priorVersion + 1;
+      aggregate.workflowUpdatedAt = command.at;
+      return aggregate.workflowVersion;
+    }
+  }
+  const created = result?.assessment || result?.application || result?.contract || result?.teleconsultation || result?.referral || result?.followup || result?.authorization || null;
+  if (created && created.workflowVersion === undefined) {
+    created.workflowVersion = 1;
+    created.workflowUpdatedAt = command.at;
+    return 1;
+  }
+  return created?.workflowVersion ?? null;
+}
+
+function appendClosureEvent(data, command, actor, result, fingerprint, aggregateVersion) {
   const event = {
     id: `rrce-${randomUUID()}`,
     commandId: command.commandId,
     commandFingerprint: fingerprint,
     action: command.action,
     caseType: command.caseType,
-    caseId: command.caseId || result?.assessment?.id || result?.order?.id || result?.teleconsultation?.id || result?.referral?.id || result?.followup?.id || "",
-    residentId: command.residentId || result?.assessment?.residentId || result?.teleconsultation?.residentId || result?.referral?.residentId || result?.followup?.residentId || "",
+    caseId: command.caseId || result?.assessment?.id || result?.order?.id || result?.teleconsultation?.id || result?.referral?.id || result?.followup?.id || result?.application?.id || result?.contract?.id || result?.fulfillment?.id || result?.authorization?.id || result?.escalation?.id || result?.deadLetter?.id || result?.message?.id || "",
+    residentId: command.residentId || result?.assessment?.residentId || result?.order?.residentId || result?.teleconsultation?.residentId || result?.referral?.residentId || result?.followup?.residentId || result?.application?.residentId || result?.contract?.residentId || result?.fulfillment?.residentId || result?.authorization?.residentId || result?.escalation?.residentId || result?.deadLetter?.residentId || result?.message?.residentId || "",
     at: command.at,
     actor: actorName(actor),
     actorRole: actor.role,
     actorOrgCode: text(actor.orgCode),
+    aggregateVersion,
     result: "allowed",
     productionEvidence: false
   };
@@ -992,6 +1067,7 @@ function applyClosureCommand(sourceData = {}, input = {}, actor = {}, options = 
     if (!prior.commandFingerprint || prior.commandFingerprint !== fingerprint) throw new Error("idempotency key conflict");
     return { data, event: prior, result: null, idempotent: true, consistency: validateClosureReferences(data) };
   }
+  const priorAggregateVersion = assertAggregateVersion(findVersionedAggregate(data, command), command, options);
   const handlers = {
     "advance-registration": () => advanceRegistration(data, command, actor),
     "apply-registration-callback": () => applyRegistrationCallback(data, command, actor),
@@ -1008,8 +1084,11 @@ function applyClosureCommand(sourceData = {}, input = {}, actor = {}, options = 
     "acknowledge-family-doctor-fulfillment": () => acknowledgeFamilyDoctorFulfillment(data, command, actor),
     "escalate-case": () => escalateCase(data, command, actor)
   };
-  const result = handlers[command.action]();
-  const event = appendClosureEvent(data, command, actor, result, fingerprint);
+  const handler = handlers[command.action];
+  const result = handler ? handler() : applyStandaloneCommand(data, command, actor);
+  if (!result) throw new Error(`unsupported closure command ${command.action}`);
+  const aggregateVersion = advanceAggregateVersion(data, command, priorAggregateVersion, result);
+  const event = appendClosureEvent(data, command, actor, result, fingerprint, aggregateVersion);
   return {
     data,
     event,
@@ -1020,11 +1099,49 @@ function applyClosureCommand(sourceData = {}, input = {}, actor = {}, options = 
   };
 }
 
+function replayClosureCommands(sourceData = {}, entries = [], actorOrResolver = {}, options = {}) {
+  let data = clone(sourceData);
+  const results = [];
+  rows(entries).forEach((entry, index) => {
+    const command = entry?.command || entry;
+    const actor = entry?.actor || (typeof actorOrResolver === "function" ? actorOrResolver(command, index) : actorOrResolver);
+    try {
+      const applied = applyClosureCommand(data, command, actor, options);
+      data = applied.data;
+      results.push({
+        index,
+        commandId: command.commandId,
+        action: command.action,
+        idempotent: applied.idempotent,
+        eventId: applied.event.id,
+        aggregateVersion: applied.event.aggregateVersion
+      });
+    } catch (error) {
+      const replayError = new Error(`closure replay failed at index ${index} (${text(command?.commandId || command?.action)}): ${error.message}`);
+      replayError.cause = error;
+      replayError.index = index;
+      replayError.command = command;
+      throw replayError;
+    }
+  });
+  return {
+    data,
+    results,
+    replayed: results.length,
+    idempotent: results.filter((item) => item.idempotent).length,
+    productionEvidence: false
+  };
+}
+
 module.exports = {
   CLOSURE_COMMAND_CONTRACTS,
   DEFAULT_NOTIFICATION_POLICY,
   applyClosureCommand,
+  buildClosureQualityMetrics,
+  buildClosureWorkQueue,
+  buildNotificationReliability,
   canAccessMessage,
   findCaseEnvelope,
-  normalizeCommand
+  normalizeCommand,
+  replayClosureCommands
 };

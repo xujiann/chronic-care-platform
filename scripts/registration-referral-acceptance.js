@@ -48,6 +48,7 @@ function buildRegistrationReferralAcceptance(options = {}) {
   const serviceSource = options.serviceSource ?? readText("registration-referral-service.js");
   const domainTestSource = options.domainTestSource ?? readText(path.join("test", "registration-referral-domain.test.js"));
   const serviceTestSource = options.serviceTestSource ?? readText(path.join("test", "registration-referral-service.test.js"));
+  const standaloneTestSource = options.standaloneTestSource ?? readText(path.join("test", "registration-referral-standalone.test.js"));
   const readinessTestSource = options.readinessTestSource ?? readText(path.join("test", "registration-referral-closure-readiness.test.js"));
   const domainDoc = options.domainDoc ?? readText(path.join("docs", "registration-referral-domain.md"));
   const serviceDoc = options.serviceDoc ?? readText(path.join("docs", "registration-referral-service.md"));
@@ -68,7 +69,28 @@ function buildRegistrationReferralAcceptance(options = {}) {
     "acknowledge-family-doctor-fulfillment",
     "record-notification-receipt",
     "run-notification-fallback",
-    "escalate-case"
+    "escalate-case",
+    "reject-referral-request",
+    "withdraw-referral",
+    "reassign-referral",
+    "reschedule-teleconsultation",
+    "cancel-teleconsultation",
+    "record-teleconsultation-no-show",
+    "attach-referral-materials",
+    "grant-referral-authorization",
+    "revoke-referral-authorization",
+    "resume-referral-authorization",
+    "run-closure-sla",
+    "acknowledge-escalation",
+    "record-notification-provider-result",
+    "resolve-notification-dead-letter",
+    "submit-family-doctor-application",
+    "review-family-doctor-application",
+    "activate-family-doctor-contract",
+    "record-family-doctor-fulfillment",
+    "request-family-doctor-renewal",
+    "review-family-doctor-renewal",
+    "terminate-family-doctor-contract"
   ];
   const referralSeed = extractFunction(serverSource, "seedReferralTeleconsultations");
   const taskSeed = extractFunction(serverSource, "seedTaskMessages");
@@ -83,8 +105,10 @@ function buildRegistrationReferralAcceptance(options = {}) {
     check("registrationReferralAcceptance:commandContracts", "thread", CLOSURE_COMMAND_CONTRACTS.every((item) => item.roles.length && item.requiredFields.length && item.suggestedEndpoint), `${CLOSURE_COMMAND_CONTRACTS.length} command contracts`),
     check("registrationReferralAcceptance:notificationFallback", "thread", DEFAULT_NOTIFICATION_POLICY.channels.map((item) => item.channel).join(",") === "in_app,sms,phone,manual-task", DEFAULT_NOTIFICATION_POLICY.channels.map((item) => `${item.channel}:${item.maxAttempts}`).join(";")),
     check("registrationReferralAcceptance:idempotencyAudit", "thread", serviceSource.includes("registrationReferralClosureEvents") && serviceSource.includes("commandId") && serviceSource.includes("idempotent: true"), "command idempotency and non-production audit event are implemented"),
-    check("registrationReferralAcceptance:tests", "thread", ["terminal registration rejects late insurance callbacks", "notification resident mismatch", "primary care teleconsultation creates a resident-consistent referral chain", "teleconsultation command path completes acceptance scheduling report and continuity", "notification fallback advances to a manual task", "closure readiness reports repaired current data"].every((marker) => `${domainTestSource}\n${serviceTestSource}\n${readinessTestSource}`.includes(marker)), "domain, service and readiness regression markers present"),
-    check("registrationReferralAcceptance:docs", "thread", domainDoc.includes("Safe repair planning") && serviceDoc.includes("T00 integration contract") && serviceDoc.includes("Persistence transaction"), "domain, service and integration boundaries documented")
+    check("registrationReferralAcceptance:concurrencyRecovery", "thread", serviceSource.includes("expectedVersion") && serviceSource.includes("replayClosureCommands") && standaloneTestSource.includes("optimistic concurrency and recovery evidence"), "optimistic version checks and idempotent journal replay are covered"),
+    check("registrationReferralAcceptance:operationalProjections", "thread", ["buildClosureWorkQueue", "buildClosureQualityMetrics", "buildNotificationReliability"].every((marker) => serviceSource.includes(marker)) && standaloneTestSource.includes("work queue and quality projections remain read-only"), "work queue, quality and notification reliability projections are covered"),
+    check("registrationReferralAcceptance:tests", "thread", ["terminal registration rejects late insurance callbacks", "notification resident mismatch", "primary care teleconsultation creates a resident-consistent referral chain", "teleconsultation command path completes acceptance scheduling report and continuity", "notification fallback advances to a manual task", "closure readiness reports repaired current data", "referral exception path rejects reassigns packages reschedules no-show and cancels", "family doctor commands cover application contract fulfillment renewal and termination"].every((marker) => `${domainTestSource}\n${serviceTestSource}\n${standaloneTestSource}\n${readinessTestSource}`.includes(marker)), "domain, service, standalone and readiness regression markers present"),
+    check("registrationReferralAcceptance:docs", "thread", domainDoc.includes("Safe repair planning") && serviceDoc.includes("T00 integration contract") && serviceDoc.includes("Persistence transaction") && serviceDoc.includes("Standalone T05 operations"), "domain, service and integration boundaries documented")
   ];
   const integrationChecks = [
     check("registrationReferralAcceptance:serverReferralSeed", "T00", rtc001.includes('collaborationOrderId: "cco-004"') && rtc002.includes('collaborationOrderId: "cco-005"'), "shared server referral seed matches repaired data"),

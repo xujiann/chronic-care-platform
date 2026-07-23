@@ -37,6 +37,9 @@ The unified phases are:
 
 - Requested referrals belong to the referral center or receiving institution.
 - Scheduled consultations remain with the receiving hospital until a signed report is returned.
+- Rejected, withdrawn and cancelled referrals are terminal cancellation paths; a no-show is an exception owned by the receiving hospital until it is rescheduled or cancelled.
+- Revoked resident authorization places every non-terminal linked referral in `authorization-on-hold`; the primary institution must obtain new consent, reassign or withdraw it.
+- Replacement resident or guardian authorization records the permitted institutions, expiry, consent proof and minimum clinical data scopes before a held referral can resume.
 - Report return is not closure. It becomes `primary-care-followup-pending` until the primary institution or family doctor accepts the report and follow-up responsibility.
 - A technical delivery receipt does not substitute for business acknowledgement.
 
@@ -61,8 +64,11 @@ Failures produce `attention-required`. Receipt statuses such as `handled`, `read
 
 - Registration order to schedule hospital and department consistency.
 - Teleconsultation to referral, collaboration order, resident and authorization consistency.
+- Versioned clinical material identifiers, positive versions, SHA-256 digests and manifest presence.
 - Family doctor contract traceability to an approved new-contract application, while allowing a pending renewal to point back to its existing active or renewal-pending contract.
+- Family doctor application and contract references to configured teams, service packages and review institutions when those catalogs are present.
 - Family doctor fulfillment resident, team and package consistency with its contract.
+- Notification dead-letter references and resident/organization scope against the source task message.
 
 The report intentionally separates:
 
