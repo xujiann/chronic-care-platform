@@ -23,12 +23,15 @@ const ACTION_TARGETS = Object.freeze({
   "resubmit-core": Object.freeze({ from: ["RETURNED"], to: "CORE_SUBMITTED" }),
   "start-reconciliation": Object.freeze({ from: ["CORE_ACCEPTED"], to: "RECONCILING" }),
   "record-difference": Object.freeze({ from: ["RECONCILING"], to: "DIFFERENCE_PENDING" }),
+  "submit-difference-evidence": Object.freeze({ from: ["DIFFERENCE_PENDING"], to: "DIFFERENCE_PENDING" }),
+  "review-difference": Object.freeze({ from: ["DIFFERENCE_PENDING"], to: "DIFFERENCE_PENDING" }),
   "confirm-matched": Object.freeze({ from: ["RECONCILING"], to: "RECONCILED" }),
   "resolve-difference": Object.freeze({ from: ["DIFFERENCE_PENDING"], to: "RECONCILED" }),
   "request-payment": Object.freeze({ from: ["RECONCILED"], to: "PAYMENT_REQUESTED" }),
   "confirm-payment": Object.freeze({ from: ["PAYMENT_REQUESTED"], to: "PAID" }),
   close: Object.freeze({ from: ["PAID"], to: "CLOSED" })
 });
+const DIFFERENCE_REVIEW_DOMAINS = Object.freeze(["hospital-finance", "insurance-settlement"]);
 const CLEARANCE_LABELS = Object.freeze({
   PREPARED: "清算准备",
   INSTITUTION_CONFIRMING: "医院确认中",
@@ -141,6 +144,20 @@ function buildSettlementSla(batch = {}, at = new Date().toISOString()) {
   return { policyWorkingDays, submissionDeadline, dueDate, completedDate, evaluatedDate, elapsedWorkingDays, remainingWorkingDays: Math.max(0, policyWorkingDays - elapsedWorkingDays), overdueWorkingDays, status, calendar };
 }
 
+function buildDifferenceCaseSla(differenceCase = {}, calendarInput = {}, at = new Date().toISOString()) {
+  const calendar = normalizeWorkingCalendar(calendarInput);
+  const reviewWorkingDays = Number(differenceCase.reviewWorkingDays || 5);
+  if (!Number.isInteger(reviewWorkingDays) || reviewWorkingDays <= 0 || reviewWorkingDays > 30) throw new Error("差额处理工作日必须为1至30");
+  const openedDate = dateOnly(differenceCase.currentReviewOpenedAt || differenceCase.createdAt, "差额处理开始日期");
+  const dueDate = addWorkingDays(openedDate, reviewWorkingDays, calendar);
+  const completedDate = differenceCase.resolvedAt ? dateOnly(differenceCase.resolvedAt, "差额解决日期") : "";
+  const evaluatedDate = completedDate || dateOnly(at, "差额SLA评估日期");
+  const elapsedWorkingDays = workingDaysBetween(openedDate, evaluatedDate, calendar);
+  const overdueWorkingDays = Math.max(0, elapsedWorkingDays - reviewWorkingDays);
+  const status = completedDate ? (overdueWorkingDays ? "completed-overdue" : "completed-within-sla") : overdueWorkingDays ? "overdue" : "within-sla";
+  return { reviewWorkingDays, openedDate, dueDate, completedDate, evaluatedDate, elapsedWorkingDays, remainingWorkingDays: Math.max(0, reviewWorkingDays - elapsedWorkingDays), overdueWorkingDays, status, calendar };
+}
+
 function eventIdentity(payload, action) {
   return String(payload.idempotencyKey || payload.receiptId || payload.externalRequestId || payload.paymentRequestId || `${action}:${payload.at || ""}`).trim();
 }
@@ -229,7 +246,73 @@ function transitionSettlementBatch(batch, payload = {}, actor = "system", option
     if (!Number.isSafeInteger(differenceAmountFen) || differenceAmountFen === 0) throw new Error("对账差额必须为非零整数分");
     detail.differenceAmountFen = differenceAmountFen;
     detail.reasonCode = requireText(payload, "reasonCode", "差额原因码");
-    batch.reconciliation = { ...(batch.reconciliation || {}), differenceAmountFen, reasonCode: detail.reasonCode, differenceRecordedAt: now };
+    detail.evidenceDigest = requireDigest(payload, "evidenceDigest", "差额证据摘要");
+    const reviewWorkingDays = Number(payload.reviewWorkingDays || 5);
+    if (!Number.isInteger(reviewWorkingDays) || reviewWorkingDays <= 0 || reviewWorkingDays > 30) throw new Error("差额处理工作日必须为1至30");
+    const differenceCase = {
+      id: String(payload.differenceCaseId || `settlement-difference-${randomUUID()}`),
+      batchId: batch.id,
+      state: "OPEN",
+      differenceAmountFen,
+      reasonCode: detail.reasonCode,
+      evidence: { digest: detail.evidenceDigest, revision: 1, submittedAt: now, submittedBy: actor },
+      reviewWorkingDays,
+      currentReviewOpenedAt: now,
+      createdAt: now,
+      createdBy: actor,
+      reviews: [],
+      events: []
+    };
+    differenceCase.sla = buildDifferenceCaseSla(differenceCase, batch.workingCalendar || {}, now);
+    appendEvent(differenceCase, { id: `difference-event-${randomUUID()}`, action: "record", from: "NONE", to: "OPEN", actor, at: now, idempotencyKey: identity, detail: { differenceAmountFen, reasonCode: detail.reasonCode, evidenceDigest: detail.evidenceDigest, dueDate: differenceCase.sla.dueDate } });
+    detail.differenceCaseId = differenceCase.id;
+    batch.reconciliation = { ...(batch.reconciliation || {}), differenceAmountFen, reasonCode: detail.reasonCode, differenceRecordedAt: now, differenceCaseId: differenceCase.id, differenceCase };
+  }
+  if (action === "submit-difference-evidence") {
+    const differenceCase = batch.reconciliation?.differenceCase;
+    if (!differenceCase || !["OPEN", "REJECTED"].includes(differenceCase.state)) throw new Error("当前差额状态不允许补充证据");
+    if (!verifyEventLedger(differenceCase.events)) throw new Error("差额事件账本校验失败");
+    if (differenceCase.state === "OPEN" && differenceCase.reviews.length) throw new Error("已有复核意见时只能在驳回后补充证据");
+    detail.evidenceDigest = requireDigest(payload, "evidenceDigest", "差额补充证据摘要");
+    detail.correctionReason = requireText(payload, "correctionReason", "差额补证原因");
+    const beforeCase = differenceCase.state;
+    differenceCase.evidence = { digest: detail.evidenceDigest, revision: Number(differenceCase.evidence?.revision || 0) + 1, submittedAt: now, submittedBy: actor, correctionReason: detail.correctionReason };
+    differenceCase.state = "OPEN";
+    differenceCase.reviews = [];
+    differenceCase.currentReviewOpenedAt = now;
+    differenceCase.sla = buildDifferenceCaseSla(differenceCase, batch.workingCalendar || {}, now);
+    appendEvent(differenceCase, { id: `difference-event-${randomUUID()}`, action: "submit-evidence", from: beforeCase, to: "OPEN", actor, at: now, idempotencyKey: identity, detail: { evidenceDigest: detail.evidenceDigest, revision: differenceCase.evidence.revision, correctionReason: detail.correctionReason, dueDate: differenceCase.sla.dueDate } });
+  }
+  if (action === "review-difference") {
+    const differenceCase = batch.reconciliation?.differenceCase;
+    if (!differenceCase || !["OPEN", "UNDER_REVIEW"].includes(differenceCase.state)) throw new Error("当前差额状态不允许复核");
+    if (!verifyEventLedger(differenceCase.events)) throw new Error("差额事件账本校验失败");
+    const reviewDomain = requireText(payload, "reviewDomain", "差额复核领域");
+    if (!DIFFERENCE_REVIEW_DOMAINS.includes(reviewDomain)) throw new Error("差额复核领域无效");
+    if (differenceCase.reviews.some((item) => item.reviewDomain === reviewDomain)) throw new Error("同一差额复核领域不得重复签署");
+    if (differenceCase.reviews.some((item) => item.reviewer === actor)) throw new Error("同一复核人不得跨领域重复签署");
+    if (typeof payload.approved !== "boolean") throw new Error("差额复核结论不能为空");
+    const review = { id: `difference-review-${randomUUID()}`, reviewDomain, approved: payload.approved, reviewer: actor, reviewedAt: now };
+    if (payload.approved) {
+      review.adjustedAmountFen = Number(payload.adjustedAmountFen);
+      if (!Number.isSafeInteger(review.adjustedAmountFen) || review.adjustedAmountFen < 0) throw new Error("差额复核金额必须为非负整数分");
+      review.resolutionDigest = requireDigest(payload, "resolutionDigest", "差额处置摘要");
+      const priorApproval = differenceCase.reviews.find((item) => item.approved);
+      if (priorApproval && (priorApproval.adjustedAmountFen !== review.adjustedAmountFen || priorApproval.resolutionDigest !== review.resolutionDigest)) throw new Error("医院与医保差额复核金额及处置摘要必须一致");
+    } else {
+      review.reasonCode = requireText(payload, "reasonCode", "差额驳回原因码");
+      review.opinion = requireText(payload, "opinion", "差额驳回意见");
+    }
+    const beforeCase = differenceCase.state;
+    differenceCase.reviews.push(review);
+    if (!review.approved) differenceCase.state = "REJECTED";
+    else if (DIFFERENCE_REVIEW_DOMAINS.every((domain) => differenceCase.reviews.some((item) => item.reviewDomain === domain && item.approved))) differenceCase.state = "RESOLUTION_READY";
+    else differenceCase.state = "UNDER_REVIEW";
+    differenceCase.sla = buildDifferenceCaseSla(differenceCase, batch.workingCalendar || {}, now);
+    appendEvent(differenceCase, { id: `difference-event-${randomUUID()}`, action: review.approved ? "approve" : "reject", from: beforeCase, to: differenceCase.state, actor, at: now, idempotencyKey: identity, detail: { reviewDomain, approved: review.approved, adjustedAmountFen: review.adjustedAmountFen, resolutionDigest: review.resolutionDigest, reasonCode: review.reasonCode } });
+    detail.differenceCaseId = differenceCase.id;
+    detail.reviewDomain = reviewDomain;
+    detail.approved = review.approved;
   }
   if (action === "confirm-matched") {
     const providerAmountFen = Number(payload.providerAmountFen);
@@ -242,9 +325,22 @@ function transitionSettlementBatch(batch, payload = {}, actor = "system", option
     detail.resolution = requireText(payload, "resolution", "差额处置结论");
     const adjustedAmountFen = Number(payload.adjustedAmountFen);
     if (!Number.isSafeInteger(adjustedAmountFen) || adjustedAmountFen < 0) throw new Error("调整后金额必须为非负整数分");
+    const differenceCase = batch.reconciliation?.differenceCase;
+    if (!differenceCase || differenceCase.state !== "RESOLUTION_READY") throw new Error("差额必须经医院财务与医保经办双域复核后才能解决");
+    if (!verifyEventLedger(differenceCase.events)) throw new Error("差额事件账本校验失败");
+    const approvals = differenceCase.reviews.filter((item) => item.approved);
+    const resolutionDigest = requireDigest(payload, "resolutionDigest", "差额处置摘要");
+    if (approvals.length !== DIFFERENCE_REVIEW_DOMAINS.length || approvals.some((item) => item.adjustedAmountFen !== adjustedAmountFen || item.resolutionDigest !== resolutionDigest)) throw new Error("差额解决金额或处置摘要与双域复核意见不一致");
+    const beforeCase = differenceCase.state;
+    differenceCase.state = "RESOLVED";
+    differenceCase.resolvedAt = now;
+    differenceCase.resolvedBy = actor;
+    differenceCase.resolution = { text: detail.resolution, digest: resolutionDigest, adjustedAmountFen };
+    differenceCase.sla = buildDifferenceCaseSla(differenceCase, batch.workingCalendar || {}, now);
+    appendEvent(differenceCase, { id: `difference-event-${randomUUID()}`, action: "resolve", from: beforeCase, to: "RESOLVED", actor, at: now, idempotencyKey: identity, detail: { adjustedAmountFen, resolutionDigest } });
     batch.adjustedAmountFen = adjustedAmountFen;
     batch.adjustedAmount = adjustedAmountFen / 100;
-    batch.reconciliation = { ...(batch.reconciliation || {}), resolution: detail.resolution, adjustedAmountFen, reconciledAt: now, reconciledBy: actor };
+    batch.reconciliation = { ...(batch.reconciliation || {}), resolution: detail.resolution, resolutionDigest, adjustedAmountFen, differenceAmountFen: 0, reconciledAt: now, reconciledBy: actor };
   }
   if (action === "request-payment") {
     detail.paymentRequestId = requireText(payload, "paymentRequestId", "拨付申请号");
@@ -376,4 +472,4 @@ function transitionAnnualClearance(row, payload = {}, actor = "system") {
   return { row, event, idempotent: false };
 }
 
-module.exports = { ACTION_TARGETS, ANNUAL_CLEARANCE_CONTRACT_ID, CLEARANCE_ACTION_TARGETS, CLEARANCE_LABELS, SETTLEMENT_CONTRACT_ID, SETTLEMENT_LABELS, addWorkingDays, annualClearanceDigestPayload, appendEvent, buildAnnualClearanceEnvelope, buildCoreSettlementCase, buildCoreSettlementEnvelope, buildSettlementSla, createAnnualClearance, dateOnly, digest, isWorkingDay, normalizeWorkingCalendar, settlementState, stableStringify, transitionAnnualClearance, transitionSettlementBatch, verifyEventLedger, workingDaysBetween, yuanToFen };
+module.exports = { ACTION_TARGETS, ANNUAL_CLEARANCE_CONTRACT_ID, CLEARANCE_ACTION_TARGETS, CLEARANCE_LABELS, DIFFERENCE_REVIEW_DOMAINS, SETTLEMENT_CONTRACT_ID, SETTLEMENT_LABELS, addWorkingDays, annualClearanceDigestPayload, appendEvent, buildAnnualClearanceEnvelope, buildCoreSettlementCase, buildCoreSettlementEnvelope, buildDifferenceCaseSla, buildSettlementSla, createAnnualClearance, dateOnly, digest, isWorkingDay, normalizeWorkingCalendar, settlementState, stableStringify, transitionAnnualClearance, transitionSettlementBatch, verifyEventLedger, workingDaysBetween, yuanToFen };

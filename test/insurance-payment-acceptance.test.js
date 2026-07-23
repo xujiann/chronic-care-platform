@@ -19,7 +19,7 @@ test("T07 unified acceptance covers all six workflows without claiming productio
 test("T07 unified acceptance fails when one workflow evidence is missing", () => {
   const report = buildInsurancePaymentAcceptance({
     diseasePayment: { ready: true, checks: [
-      { id: "settlement", ok: true }, { id: "settlement-sla", ok: true }, { id: "dual-mode", ok: true }, { id: "official-receipt-contract", ok: true }, { id: "formal-grouping-async", ok: true }, { id: "parameter-dual-review", ok: true }, { id: "special-case", ok: false }, { id: "annual-clearance", ok: true }
+      { id: "settlement", ok: true }, { id: "settlement-sla", ok: true }, { id: "settlement-difference-governance", ok: true }, { id: "dual-mode", ok: true }, { id: "official-receipt-contract", ok: true }, { id: "formal-grouping-async", ok: true }, { id: "parameter-dual-review", ok: true }, { id: "special-case", ok: false }, { id: "annual-clearance", ok: true }
     ], externalBlockers: [] },
     financialGateway: { ok: true, capabilities: [{ id: "online-refund-closed-loop", passed: true }], blockers: [] },
     serverSource: ""

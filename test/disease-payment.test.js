@@ -169,9 +169,13 @@ test("settlement difference correction and annual clearance remain auditable unt
   let result = Service.reconcileBatch(created.state, created.batch.id, { action: "submit-core", externalRequestId: "CORE-REQ-DIFF", idempotencyKey: "CORE-IDEM-DIFF" }, "insurance");
   result = Service.applyInsuranceCoreSettlementCallback(result.state, created.batch.id, { action: "core-accepted", receiptId: "CORE-ACCEPT-DIFF" });
   result = Service.reconcileBatch(result.state, created.batch.id, { action: "start-reconciliation", idempotencyKey: "RECON-DIFF", providerSummaryDigest: "b".repeat(64) }, "finance");
-  result = Service.reconcileBatch(result.state, created.batch.id, { action: "record-difference", idempotencyKey: "DIFF-001", differenceAmountFen: -100, reasonCode: "ROUNDING" }, "finance");
+  result = Service.reconcileBatch(result.state, created.batch.id, { action: "record-difference", idempotencyKey: "DIFF-001", differenceAmountFen: -100, reasonCode: "ROUNDING", evidenceDigest: "d".repeat(64) }, "finance");
   assert.equal(result.batch.settlementState, "DIFFERENCE_PENDING");
-  result = Service.reconcileBatch(result.state, created.batch.id, { action: "resolve-difference", idempotencyKey: "DIFF-RESOLVE-001", resolution: "医保核心核减1元并由双方确认", adjustedAmountFen: created.batch.standardAmountFen - 100 }, "finance");
+  result = Service.reconcileBatch(result.state, created.batch.id, { action: "review-difference", idempotencyKey: "DIFF-HOSPITAL-REVIEW", reviewDomain: "hospital-finance", approved: true, adjustedAmountFen: created.batch.standardAmountFen - 100, resolutionDigest: "e".repeat(64) }, "hospital-finance");
+  result = Service.reconcileBatch(result.state, created.batch.id, { action: "review-difference", idempotencyKey: "DIFF-INSURANCE-REVIEW", reviewDomain: "insurance-settlement", approved: true, adjustedAmountFen: created.batch.standardAmountFen - 100, resolutionDigest: "e".repeat(64) }, "insurance");
+  result = Service.reconcileBatch(result.state, created.batch.id, { action: "resolve-difference", idempotencyKey: "DIFF-RESOLVE-001", resolution: "医保核心核减1元并由双方确认", resolutionDigest: "e".repeat(64), adjustedAmountFen: created.batch.standardAmountFen - 100 }, "finance");
+  assert.equal(result.batch.reconciliation.differenceCase.state, "RESOLVED");
+  assert.equal(Settlement.verifyEventLedger(result.batch.reconciliation.differenceCase.events), true);
   result = Service.reconcileBatch(result.state, created.batch.id, { action: "request-payment", paymentRequestId: "PAY-REQ-DIFF" }, "insurance");
   result = Service.applyInsuranceCoreSettlementCallback(result.state, created.batch.id, { action: "confirm-payment", receiptId: "PAY-RECEIPT-DIFF", paidAmountFen: created.batch.standardAmountFen - 100 });
   const annual = Service.createAnnualClearance(result.state, { id: "annual-2026", year: 2026, adjustmentFundFen: 500, retainedBalanceFen: 200, riskReserveFen: 100, adjustmentReason: "年度基金预算与质量考核调节" }, "insurance");
