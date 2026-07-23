@@ -178,11 +178,13 @@ function buildSpecialtyCutoverPack(options = {}) {
     crossTrackControls: buildCrossTrackControls(tracks),
     acceptanceChecklist: buildAcceptanceChecklist(tracks),
     rehearsalPlan: buildRehearsalPlan(tracks, firstIncrement),
-    goNoGoDecision: buildGoNoGoDecision(tracks, firstIncrement)
+    goNoGoDecision: buildGoNoGoDecision(tracks, firstIncrement),
+    evidenceDossier: buildEvidenceDossier(tracks, firstIncrement),
+    pilotBatchPlan: buildPilotBatchPlan(tracks, firstIncrement)
   };
   pack.integrity = {
     algorithm: "sha256",
-    digest: `sha256:${sha256({ summary, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision })}`
+    digest: `sha256:${sha256({ summary, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision, evidenceDossier: pack.evidenceDossier, pilotBatchPlan: pack.pilotBatchPlan })}`
   };
   return pack;
 }
@@ -377,9 +379,134 @@ function buildGoNoGoDecision(tracks, firstIncrement) {
   };
 }
 
+function evidenceSeverity(blocker, index) {
+  const raw = `${blocker.id || ""} ${blocker.title || ""}`.toLowerCase();
+  if (/safety|patient|privacy|scope|signature|receipt|tls|cold|dose|越权|患者|安全|隐私|签名|回执|冷链/.test(raw)) return "P0";
+  if (index < 2) return "P0";
+  if (index < 5) return "P1";
+  return "P2";
+}
+
+function evidenceVerificationChecks(track, blocker) {
+  const checks = [
+    "evidence-id-present",
+    "business-and-technical-dual-signoff",
+    "sha256-digest-recorded",
+    "original-record-replayable",
+    "audit-chain-linked"
+  ];
+  const raw = `${track.id} ${blocker.id || ""} ${blocker.title || ""}`.toLowerCase();
+  if (/interface|receipt|pacs|ris|dicom|fhir|bis|btis|gateway|api|接口|回执|网关/.test(raw)) {
+    checks.push("external-interface-receipt-matched");
+    checks.push("idempotency-key-or-nonce-verified");
+  }
+  if (/signature|tls|certificate|secret|key|sm2|sm3|签名|证书|密钥|密码/.test(raw)) {
+    checks.push("certificate-fingerprint-or-key-custody-verified");
+  }
+  if (/patient|dispatch|handover|transfusion|report|abnormal|dose|患者|派车|交接|输血|报告|异常|剂量/.test(raw)) {
+    checks.push("patient-safety-downgrade-path-verified");
+  }
+  return [...new Set(checks)];
+}
+
+function buildEvidenceDossier(tracks, firstIncrement) {
+  const primaryTrackId = firstIncrement.trackId;
+  const entries = tracks.flatMap((track) => (track.blockers || []).map((blocker, index) => {
+    const severity = evidenceSeverity(blocker, index);
+    const evidenceId = `${track.id}:${blocker.id}`;
+    return {
+      evidenceId,
+      trackId: track.id,
+      trackName: track.name,
+      blockerId: blocker.id,
+      title: blocker.title,
+      owner: blocker.owner,
+      status: blocker.status || "site-pending",
+      severity,
+      requiredForFirstIncrement: track.id === primaryTrackId && index < 4,
+      hardStopIfMissing: severity === "P0",
+      requiredArtifacts: [
+        "site-signoff-form",
+        "external-system-receipt-or-original-record",
+        "operator-and-reviewer-identities",
+        "sha256-digest-and-timestamp",
+        "rollback-or-downgrade-evidence"
+      ],
+      verificationChecks: evidenceVerificationChecks(track, blocker)
+    };
+  }));
+  const firstIncrementRequired = entries.filter((item) => item.requiredForFirstIncrement);
+  return {
+    status: entries.every((item) => item.status === "accepted") ? "accepted" : "site-evidence-pending",
+    totalEntries: entries.length,
+    hardStopOpen: entries.filter((item) => item.hardStopIfMissing && item.status !== "accepted").length,
+    firstIncrementRequired: firstIncrementRequired.map((item) => item.evidenceId),
+    reviewPolicy: {
+      submitterMustDifferFromReviewer: true,
+      digestAlgorithm: "sha256",
+      retention: "archive with cutover packet and keep original evidence replayable",
+      closeRule: "only accepted evidence can close site-pending blockers; demo data cannot close site evidence"
+    },
+    entries
+  };
+}
+
+function buildPilotBatchPlan(tracks, firstIncrement) {
+  const primaryTrack = tracks.find((track) => track.id === firstIncrement.trackId) || tracks[0];
+  const watchOnlyTracks = tracks.filter((track) => track.id !== primaryTrack.id);
+  return {
+    status: "ready-to-plan-controlled-rehearsal",
+    batches: [
+      {
+        id: "batch-0-preflight",
+        name: "Evidence preflight",
+        scope: "no live traffic; validate accounts, endpoints, evidence templates and rollback contacts",
+        entryCriteria: [
+          "all first-increment evidence IDs assigned",
+          "commission reviewer and site submitter are different people",
+          "rollback contact and manual process are reachable"
+        ],
+        exitCriteria: [
+          "no P0 evidence gap remains unexplained",
+          "all required artifacts have a storage location and digest owner"
+        ],
+        promotionDecision: "allow batch-1 rehearsal only"
+      },
+      {
+        id: "batch-1-single-chain",
+        name: primaryTrack.name,
+        scope: primaryTrack.acceptanceIncrement,
+        entryCriteria: firstIncrement.requiredBeforeStart || [],
+        exitCriteria: [
+          "end-to-end chain replay succeeds",
+          "audit, receipt, retry and manual-review evidence are exported",
+          "no patient-safety or privacy hard stop is triggered"
+        ],
+        promotionDecision: "T+1 observation before any expansion"
+      },
+      {
+        id: "batch-2-watch-only",
+        name: "Watch-only specialty expansion",
+        scope: watchOnlyTracks.map((track) => track.name).join(" / "),
+        entryCriteria: [
+          "batch-1 T+1 observation has no open P0/P1 issue",
+          "next specialty evidence dossier has no unassigned owner"
+        ],
+        exitCriteria: [
+          "read-only or synthetic flow is observed without production write impact",
+          "next go/no-go scorecard is updated"
+        ],
+        promotionDecision: "select next specialty by risk and evidence completeness"
+      }
+    ]
+  };
+}
+
 function renderMarkdown(pack) {
   const rows = pack.tracks.map((item) => `| ${item.name} | ${item.department} | ${item.codeReady ? "是" : "否"} | ${item.productionReady ? "是" : "否"} | ${item.blockers.length} | ${item.page} |`);
   const blockers = pack.tracks.flatMap((track) => track.blockers.map((item) => `| ${track.name} | ${item.id} | ${item.title} | ${item.owner} | ${item.status} |`));
+  const evidenceRows = (pack.evidenceDossier?.entries || []).map((item) => `| ${item.trackName} | ${item.evidenceId} | ${item.severity} | ${item.requiredForFirstIncrement ? "yes" : "no"} | ${item.hardStopIfMissing ? "yes" : "no"} | ${item.status} |`);
+  const batchRows = (pack.pilotBatchPlan?.batches || []).map((item) => `| ${item.id} | ${item.name} | ${item.scope} | ${item.promotionDecision} |`);
   return [
     "# T10 急救、用血、影像与体检专项上线割接包",
     "",
@@ -435,6 +562,22 @@ function renderMarkdown(pack) {
     "### Hard stops",
     "",
     ...pack.goNoGoDecision.hardStops.map((item) => `- ${item.name}: ${item.noGo}`),
+    "",
+    "## Site evidence dossier",
+    "",
+    `- Status: ${pack.evidenceDossier?.status || "site-evidence-pending"}`,
+    `- Entries: ${pack.evidenceDossier?.totalEntries || 0}`,
+    `- Open hard stops: ${pack.evidenceDossier?.hardStopOpen || 0}`,
+    "",
+    "| Track | Evidence ID | Severity | First increment | Hard stop | Status |",
+    "|---|---|---:|---:|---:|---|",
+    ...evidenceRows,
+    "",
+    "## Controlled pilot batch plan",
+    "",
+    "| Batch | Name | Scope | Promotion decision |",
+    "|---|---|---|---|",
+    ...batchRows,
     ""
   ].join("\n");
 }
@@ -467,5 +610,7 @@ module.exports = {
   normalizeTrack,
   selectFirstIncrement,
   buildRehearsalPlan,
-  buildGoNoGoDecision
+  buildGoNoGoDecision,
+  buildEvidenceDossier,
+  buildPilotBatchPlan
 };

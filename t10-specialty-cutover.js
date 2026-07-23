@@ -35,6 +35,8 @@ function withCutoverDefaults(pack) {
     crossTrackControls: pack.crossTrackControls || fallback.crossTrackControls,
     rehearsalPlan: pack.rehearsalPlan || fallback.rehearsalPlan,
     goNoGoDecision: pack.goNoGoDecision || fallback.goNoGoDecision,
+    evidenceDossier: pack.evidenceDossier || fallback.evidenceDossier,
+    pilotBatchPlan: pack.pilotBatchPlan || fallback.pilotBatchPlan,
     integrity: pack.integrity || fallback.integrity
   };
 }
@@ -46,6 +48,8 @@ function renderCutoverPack(pack) {
   renderControls(pack.crossTrackControls || []);
   renderRehearsalPlan(pack.rehearsalPlan || {});
   renderDecisionMatrix(pack.goNoGoDecision || {});
+  renderEvidenceDossier(pack.evidenceDossier || {});
+  renderPilotBatchPlan(pack.pilotBatchPlan || {});
   renderBlockers(pack.tracks || []);
 }
 
@@ -197,6 +201,73 @@ function renderDecisionMatrix(decision) {
   `;
 }
 
+function renderEvidenceDossier(dossier) {
+  const entries = dossier.entries || [];
+  const firstIncrementRequired = new Set(dossier.firstIncrementRequired || []);
+  document.querySelector("#evidence-dossier").innerHTML = `
+    <div class="cutover-kpis">
+      ${kpi("证据条目", dossier.totalEntries || entries.length, "ok")}
+      ${kpi("硬阻断未关", dossier.hardStopOpen || 0, "warn")}
+      ${kpi("首增量必备", firstIncrementRequired.size, "warn")}
+      ${kpi("证据状态", dossier.status || "site-evidence-pending", "warn")}
+    </div>
+    <div class="cutover-card">
+      <h3>复核策略</h3>
+      <p class="muted">提交人与复核人必须不同：${dossier.reviewPolicy?.submitterMustDifferFromReviewer ? "是" : "否"}；摘要算法：${escapeHtml(dossier.reviewPolicy?.digestAlgorithm || "sha256")}</p>
+      <p>${escapeHtml(dossier.reviewPolicy?.closeRule || "only accepted evidence can close site-pending blockers")}</p>
+    </div>
+    <div class="table-wrap">
+      <table class="cutover-table">
+        <thead>
+          <tr>
+            <th>专项</th>
+            <th>证据编号</th>
+            <th>等级</th>
+            <th>首增量</th>
+            <th>验收检查</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${entries.map((item) => `
+            <tr>
+              <td>${escapeHtml(item.trackName)}</td>
+              <td><strong>${escapeHtml(item.evidenceId)}</strong><br>${escapeHtml(item.title)}</td>
+              <td><span class="badge ${item.severity === "P0" ? "warn" : ""}">${escapeHtml(item.severity)}</span></td>
+              <td>${item.requiredForFirstIncrement ? '<span class="badge warn">必备</span>' : '<span class="badge">旁路</span>'}</td>
+              <td>${(item.verificationChecks || []).slice(0, 4).map((check) => `<span class="badge">${escapeHtml(check)}</span>`).join(" ")}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderPilotBatchPlan(plan) {
+  const batches = plan.batches || [];
+  document.querySelector("#pilot-batch-plan").innerHTML = `
+    <div class="cutover-card">
+      <div class="badge-row">
+        <span class="badge warn">${escapeHtml(plan.status || "ready-to-plan-controlled-rehearsal")}</span>
+      </div>
+      <p class="muted">每一批只允许在上一批退出标准满足后推进；任何 hard stop 命中均回退到证据补齐和复盘。</p>
+    </div>
+    <div class="track-grid">
+      ${batches.map((batch) => `
+        <article class="cutover-card">
+          <h3>${escapeHtml(batch.id)} · ${escapeHtml(batch.name)}</h3>
+          <p>${escapeHtml(batch.scope)}</p>
+          <h4>进入标准</h4>
+          <ul class="evidence-list">${(batch.entryCriteria || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+          <h4>退出标准</h4>
+          <ul class="evidence-list">${(batch.exitCriteria || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+          <p class="muted">推进结论：${escapeHtml(batch.promotionDecision)}</p>
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+
 function renderBlockers(tracks) {
   const rows = tracks.flatMap((track) => (track.blockers || []).map((blocker) => `
     <tr>
@@ -314,7 +385,61 @@ function fallbackCutoverPack() {
       decisionRules: ["任何 hard stop 命中均直接 No-Go。", "所有必选项通过且总分达到 100 才允许进入正式 go/no-go 会。", "ready-to-rehearse 只允许开展受控演练。"],
       nextActions: ["补齐 external-evidence-1：120调度系统联调回执", "补齐 external-evidence-2：车载设备/穿戴设备证书指纹与密钥托管记录"]
     },
+    evidenceDossier: {
+      status: "site-evidence-pending",
+      totalEntries: 4,
+      hardStopOpen: 2,
+      firstIncrementRequired: ["emergency-life-chain:external-evidence-1", "emergency-life-chain:external-evidence-2"],
+      reviewPolicy: {
+        submitterMustDifferFromReviewer: true,
+        digestAlgorithm: "sha256",
+        closeRule: "only accepted evidence can close site-pending blockers; demo data cannot close site evidence"
+      },
+      entries: [
+        evidenceEntry("emergency-life-chain", "120急救生命链", "external-evidence-1", "120调度系统联调回执", "P0", true),
+        evidenceEntry("emergency-life-chain", "120急救生命链", "external-evidence-2", "车载设备/穿戴设备证书指纹与密钥托管记录", "P0", true),
+        evidenceEntry("clinical-blood", "临床用血", "BLOOD-SITE-01", "真实接口全场景联调", "P1", false),
+        evidenceEntry("regional-imaging-cloud", "区域影像云", "IMG-SITE-01", "PACS/RIS/DICOM TLS全链路联调", "P1", false)
+      ]
+    },
+    pilotBatchPlan: {
+      status: "ready-to-plan-controlled-rehearsal",
+      batches: [
+        {
+          id: "batch-0-preflight",
+          name: "Evidence preflight",
+          scope: "no live traffic; validate accounts, endpoints, evidence templates and rollback contacts",
+          entryCriteria: ["all first-increment evidence IDs assigned"],
+          exitCriteria: ["no P0 evidence gap remains unexplained"],
+          promotionDecision: "allow batch-1 rehearsal only"
+        },
+        {
+          id: "batch-1-single-chain",
+          name: "120急救生命链",
+          scope: "单链路灰度演练",
+          entryCriteria: ["120调度系统联调回执", "车载设备证书指纹"],
+          exitCriteria: ["end-to-end chain replay succeeds", "no patient-safety or privacy hard stop is triggered"],
+          promotionDecision: "T+1 observation before any expansion"
+        }
+      ]
+    },
     integrity: { algorithm: "sha256", digest: "sha256:static-preview-fallback" }
+  };
+}
+
+function evidenceEntry(trackId, trackName, blockerId, title, severity, requiredForFirstIncrement) {
+  return {
+    evidenceId: `${trackId}:${blockerId}`,
+    trackId,
+    trackName,
+    blockerId,
+    title,
+    owner: "现场责任部门",
+    status: "site-pending",
+    severity,
+    requiredForFirstIncrement,
+    hardStopIfMissing: severity === "P0",
+    verificationChecks: ["evidence-id-present", "business-and-technical-dual-signoff", "sha256-digest-recorded", "audit-chain-linked"]
   };
 }
 

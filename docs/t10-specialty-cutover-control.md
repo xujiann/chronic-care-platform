@@ -79,6 +79,28 @@ The cutover pack also emits a `goNoGoDecision` section. It is intentionally cons
 
 The current default decision remains `no-go-site-evidence-pending` because the four specialties have code evidence but still lack signed site receipts and observation evidence.
 
+## Site evidence dossier
+
+The cutover pack now emits an `evidenceDossier` section. It converts every site blocker into a reviewable evidence entry with:
+
+- a stable evidence ID in the form `trackId:blockerId`;
+- P0/P1/P2 severity and `hardStopIfMissing`;
+- whether the entry is required for the first grey increment;
+- required artifacts such as site signoff form, original external receipt, operator/reviewer identities, SHA-256 digest and rollback evidence;
+- verification checks for dual signoff, audit-chain linkage, external receipt matching, idempotency/nonce and certificate/key custody where applicable.
+
+The review policy keeps a strict production boundary: the submitter and reviewer must differ, evidence must be digest-addressed, and only accepted site evidence can close a site-pending blocker. Demo data cannot close production evidence.
+
+## Controlled pilot batches
+
+The pack also emits a `pilotBatchPlan`:
+
+1. `batch-0-preflight`: no live traffic; verify accounts, endpoints, evidence templates, rollback contacts and owner assignment.
+2. `batch-1-single-chain`: run only the selected first increment and export replayable audit, receipt, retry and manual-review evidence.
+3. `batch-2-watch-only`: observe the next specialty with read-only or synthetic impact after T+1 observation is clean.
+
+Each batch has entry criteria, exit criteria and a promotion decision. Expansion is blocked until the previous batch has no unexplained P0/P1 issue.
+
 ## Verification
 
 Run the focused test directly:
