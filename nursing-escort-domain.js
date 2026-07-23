@@ -706,6 +706,180 @@
     };
   }
 
+  function financialAmountFen(order = {}) {
+    if (!Object.hasOwn(order, "feeEstimate") || order.feeEstimate === null || String(order.feeEstimate).trim() === "") return null;
+    const amount = Number(order.feeEstimate);
+    const scaled = amount * 100;
+    const amountFen = Math.round(scaled);
+    return Number.isFinite(amount) && Math.abs(scaled - amountFen) < 1e-8 && Number.isSafeInteger(amountFen) && amountFen >= 0
+      ? amountFen
+      : null;
+  }
+
+  function validateFinancialEvidence(domain, order = {}, nextStatus) {
+    const normalizedDomain = normalizeDomain(domain);
+    const next = canonicalStatus(nextStatus, normalizedDomain);
+    const orderId = String(order.id || "").trim();
+    const amountFen = financialAmountFen(order);
+    const expectedKey = orderId && amountFen !== null ? `${normalizedDomain}:${orderId}:settlement:v1` : "";
+    const pricing = order.pricingConfirmation;
+    const dispatch = order.financialDispatch;
+    const callback = order.financialCallback;
+    const reconciliation = order.reconciliationResult;
+    const pricingReasons = [];
+    const dispatchReasons = [];
+    const callbackReasons = [];
+    const reconciliationReasons = [];
+
+    if (!orderId) pricingReasons.push("financial-order-id-missing");
+    if (amountFen === null) pricingReasons.push("financial-amount-invalid");
+    if (!pricing || typeof pricing !== "object" || Array.isArray(pricing)) {
+      pricingReasons.push("pricing-confirmation-missing");
+    } else {
+      if (pricing.status !== "confirmed") pricingReasons.push("pricing-not-confirmed");
+      if (pricing.orderId !== orderId) pricingReasons.push("pricing-order-mismatch");
+      if (pricing.domain !== normalizedDomain) pricingReasons.push("pricing-domain-mismatch");
+      if (pricing.amountFen !== amountFen) pricingReasons.push("pricing-amount-mismatch");
+      if (pricing.currency !== "CNY") pricingReasons.push("pricing-currency-invalid");
+      if (pricing.policyVersion !== WORKFLOW_POLICY_VERSION) pricingReasons.push("pricing-policy-version-invalid");
+      if (parseTime(pricing.confirmedAt) === null) pricingReasons.push("pricing-time-invalid");
+    }
+
+    if (!dispatch || typeof dispatch !== "object" || Array.isArray(dispatch)) {
+      dispatchReasons.push("financial-dispatch-missing");
+    } else {
+      if (dispatch.status !== "accepted") dispatchReasons.push("financial-dispatch-not-accepted");
+      if (dispatch.orderId !== orderId) dispatchReasons.push("financial-dispatch-order-mismatch");
+      if (dispatch.domain !== normalizedDomain) dispatchReasons.push("financial-dispatch-domain-mismatch");
+      if (dispatch.operation !== "settlement") dispatchReasons.push("financial-dispatch-operation-invalid");
+      if (dispatch.commandType !== "INSURANCE") dispatchReasons.push("financial-dispatch-command-type-invalid");
+      if (dispatch.amountFen !== amountFen) dispatchReasons.push("financial-dispatch-amount-mismatch");
+      if (dispatch.idempotencyKey !== expectedKey) dispatchReasons.push("financial-dispatch-idempotency-mismatch");
+      if (dispatch.policyVersion !== WORKFLOW_POLICY_VERSION) dispatchReasons.push("financial-dispatch-policy-version-invalid");
+      const dispatchedAt = parseTime(dispatch.dispatchedAt);
+      if (dispatchedAt === null) dispatchReasons.push("financial-dispatch-time-invalid");
+      const confirmedAt = parseTime(pricing?.confirmedAt);
+      if (dispatchedAt !== null && confirmedAt !== null && dispatchedAt < confirmedAt) dispatchReasons.push("financial-dispatch-before-pricing");
+    }
+
+    if (next === "settled") {
+      if (!callback || typeof callback !== "object" || Array.isArray(callback)) {
+        callbackReasons.push("financial-callback-missing");
+      } else {
+        if (callback.status !== "succeeded") callbackReasons.push("financial-callback-not-succeeded");
+        if (callback.signatureStatus !== "verified") callbackReasons.push("financial-callback-signature-invalid");
+        if (!callback.id) callbackReasons.push("financial-callback-id-missing");
+        if (!callback.providerTransactionId) callbackReasons.push("financial-provider-transaction-missing");
+        if (callback.orderId !== orderId) callbackReasons.push("financial-callback-order-mismatch");
+        if (callback.domain !== normalizedDomain) callbackReasons.push("financial-callback-domain-mismatch");
+        if (callback.amountFen !== amountFen) callbackReasons.push("financial-callback-amount-mismatch");
+        if (callback.idempotencyKey !== expectedKey) callbackReasons.push("financial-callback-idempotency-mismatch");
+        const verifiedAt = parseTime(callback.verifiedAt);
+        if (verifiedAt === null) callbackReasons.push("financial-callback-time-invalid");
+        const dispatchedAt = parseTime(dispatch?.dispatchedAt);
+        if (verifiedAt !== null && dispatchedAt !== null && verifiedAt < dispatchedAt) callbackReasons.push("financial-callback-before-dispatch");
+      }
+
+      if (!reconciliation || typeof reconciliation !== "object" || Array.isArray(reconciliation)) {
+        reconciliationReasons.push("reconciliation-result-missing");
+      } else {
+        if (reconciliation.status !== "matched") reconciliationReasons.push("reconciliation-not-matched");
+        if (reconciliation.digestVerified !== true) reconciliationReasons.push("reconciliation-digest-invalid");
+        if (reconciliation.orderId !== orderId) reconciliationReasons.push("reconciliation-order-mismatch");
+        if (reconciliation.domain !== normalizedDomain) reconciliationReasons.push("reconciliation-domain-mismatch");
+        if (reconciliation.amountFen !== amountFen) reconciliationReasons.push("reconciliation-amount-mismatch");
+        if (reconciliation.callbackId !== callback?.id) reconciliationReasons.push("reconciliation-callback-mismatch");
+        const reconciledAt = parseTime(reconciliation.reconciledAt);
+        if (reconciledAt === null) reconciliationReasons.push("reconciliation-time-invalid");
+        const verifiedAt = parseTime(callback?.verifiedAt);
+        if (reconciledAt !== null && verifiedAt !== null && reconciledAt < verifiedAt) reconciliationReasons.push("reconciliation-before-callback");
+      }
+    }
+
+    const reasons = [...new Set([...pricingReasons, ...dispatchReasons, ...callbackReasons, ...reconciliationReasons])];
+    return {
+      ok: reasons.length === 0,
+      domain: normalizedDomain,
+      next,
+      orderId,
+      amountFen,
+      expectedIdempotencyKey: expectedKey,
+      pricingOk: pricingReasons.length === 0,
+      dispatchOk: dispatchReasons.length === 0,
+      callbackOk: next !== "settled" || callbackReasons.length === 0,
+      reconciliationOk: next !== "settled" || reconciliationReasons.length === 0,
+      reasons
+    };
+  }
+
+  function buildSettlementDispatchEvidence(domain, order = {}, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const at = new Date(options.at || Date.now()).toISOString();
+    const orderId = String(order.id || "").trim();
+    const amountFen = financialAmountFen(order);
+    if (amountFen === null) {
+      const error = new Error("order amount is invalid for settlement dispatch");
+      error.code = "FINANCIAL_AMOUNT_INVALID";
+      throw error;
+    }
+    const command = buildFinancialCommand(normalizedDomain, order, "settlement");
+    return {
+      pricingConfirmedAt: at,
+      pricingConfirmation: {
+        status: "confirmed",
+        orderId,
+        domain: normalizedDomain,
+        amountFen,
+        currency: "CNY",
+        confirmedAt: at,
+        policyVersion: WORKFLOW_POLICY_VERSION
+      },
+      financialDispatch: {
+        status: "accepted",
+        orderId,
+        domain: normalizedDomain,
+        operation: "settlement",
+        commandType: command.type,
+        amountFen,
+        idempotencyKey: command.idempotencyKey,
+        dispatchedAt: at,
+        policyVersion: WORKFLOW_POLICY_VERSION
+      }
+    };
+  }
+
+  function buildSettlementCompletionEvidence(domain, order = {}, details = {}, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const at = new Date(options.at || Date.now()).toISOString();
+    const orderId = String(order.id || "").trim();
+    const amountFen = financialAmountFen(order);
+    const idempotencyKey = String(order.financialDispatch?.idempotencyKey || "");
+    const providerTransactionId = String(details.providerTransactionId || "");
+    const callbackId = String(details.callbackId || `${normalizedDomain}:${orderId}:callback:${providerTransactionId}`);
+    return {
+      financialCallback: {
+        id: callbackId,
+        status: details.status || "succeeded",
+        signatureStatus: details.signatureVerified === true ? "verified" : "rejected",
+        providerTransactionId,
+        orderId,
+        domain: normalizedDomain,
+        amountFen,
+        idempotencyKey,
+        verifiedAt: at
+      },
+      reconciliationResult: {
+        status: details.reconciliationStatus || "matched",
+        digestVerified: details.digestVerified === true,
+        orderId,
+        domain: normalizedDomain,
+        amountFen,
+        callbackId,
+        reconciledAt: at
+      }
+    };
+  }
+
   function evidenceTypes(order = {}) {
     const types = new Set((Array.isArray(order.evidence) ? order.evidence : []).map((item) => typeof item === "string" ? item : item?.type).filter(Boolean));
     if (order.identityVerified) types.add("identity-verification");
@@ -722,10 +896,6 @@
     if (order.serviceRecord?.status === "completed" || order.serviceRecordStatus === "completed") types.add("service-record");
     if (order.residentConfirmation?.status === "confirmed" || order.residentConfirmation === "confirmed" || order.residentServiceConfirmation === "confirmed" || (order.serviceAttachments || []).some((item) => item.type === "resident-signature")) types.add("resident-confirmation");
     if (["none", "resolved"].includes(order.serviceRecord?.exceptionReport?.status) || ["none", "closed", "resolved"].includes(order.adverseEvent?.status)) types.add("exception-declaration");
-    if (Number(order.feeEstimate || 0) >= 0 && order.pricingConfirmedAt) types.add("pricing-confirmation");
-    if (order.financialDispatch?.idempotencyKey) types.add("financial-dispatch");
-    if (order.financialCallback?.status === "succeeded") types.add("financial-callback");
-    if (order.reconciliationResult?.status === "matched") types.add("reconciliation-result");
     if (order.qualityCallback === "closed" || order.qualityReview === "closed" || order.satisfaction?.status === "submitted") types.add("quality-callback");
     if (order.qualityDecision?.status === "passed" || order.qualityInspection?.status === "closed") types.add("quality-decision");
     return types;
@@ -737,13 +907,21 @@
     const required = [...(EVIDENCE_GATES[normalizedDomain][next] || [])];
     const present = evidenceTypes(order);
     let dispatchIntegrity = null;
+    let financialIntegrity = null;
     if (next === dispatchTargetState(normalizedDomain)) {
       dispatchIntegrity = validateDispatchEvidence(normalizedDomain, order, options);
       if (dispatchIntegrity.qualificationOk) present.add("qualification-snapshot");
       if (dispatchIntegrity.qualificationOk && dispatchIntegrity.decisionOk) present.add("dispatch-decision");
     }
+    if (["settlement-pending", "settled"].includes(next)) {
+      financialIntegrity = validateFinancialEvidence(normalizedDomain, order, next);
+      if (financialIntegrity.pricingOk) present.add("pricing-confirmation");
+      if (financialIntegrity.dispatchOk) present.add("financial-dispatch");
+      if (financialIntegrity.callbackOk && next === "settled") present.add("financial-callback");
+      if (financialIntegrity.reconciliationOk && next === "settled") present.add("reconciliation-result");
+    }
     const missing = required.filter((item) => !present.has(item));
-    return { ok: missing.length === 0, domain: normalizedDomain, next, required, missing, present: [...present], dispatchIntegrity };
+    return { ok: missing.length === 0, domain: normalizedDomain, next, required, missing, present: [...present], dispatchIntegrity, financialIntegrity };
   }
 
   function buildTimelineEvent(domain, order, transition, options = {}) {
@@ -797,6 +975,16 @@
         error.code = "ORDER_SERVICE_EVIDENCE_INVALID";
         error.statusCode = 409;
         error.details = serviceEvidence;
+        throw error;
+      }
+    }
+    if (["settlement-pending", "settled"].includes(transition.next)) {
+      const financialEvidence = validateFinancialEvidence(domain, candidate, transition.next);
+      if (!financialEvidence.ok) {
+        const error = new Error(`invalid financial evidence for ${transition.next}: ${financialEvidence.reasons.join(", ")}`);
+        error.code = "ORDER_FINANCIAL_EVIDENCE_INVALID";
+        error.statusCode = 409;
+        error.details = financialEvidence;
         throw error;
       }
     }
@@ -871,6 +1059,9 @@
     validateServiceEvidence,
     buildServiceStartEvidence,
     buildServiceCompletionEvidence,
+    validateFinancialEvidence,
+    buildSettlementDispatchEvidence,
+    buildSettlementCompletionEvidence,
     evidenceTypes,
     validateEvidenceForTransition,
     buildTimelineEvent,
