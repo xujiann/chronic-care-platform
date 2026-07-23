@@ -14,8 +14,8 @@ test("final readiness accepts every planned T08 functional increment", () => {
   const report = buildPublicHealthFinalReadiness();
   assert.equal(report.ok, true);
   assert.equal(report.functionalState, "t08-public-health-planned-functions-complete");
-  assert.equal(report.summary.checks, 35);
-  assert.equal(report.summary.passed, 35);
+  assert.equal(report.summary.checks, 36);
+  assert.equal(report.summary.passed, 36);
   assert.equal(report.summary.lanes, 8);
   assert.equal(report.summary.handoffs, 8);
   assert.equal(report.summary.adapterProfiles, 8);

@@ -126,10 +126,10 @@ function normalizedContractAttestation(value = {}) {
 function validateContractAttestationPayload(payload, options = {}) {
   const profile = profileForLane(payload.laneId);
   if (!profile) throw new Error("contract attestation lane is invalid");
-  if (payload.fromContract !== profile.contract) throw new Error("contract attestation fromContract does not match the registered lane contract");
+  const baseline = contractVersion(profile.contract, "registered lane contract");
   const from = contractVersion(payload.fromContract, "fromContract");
   const to = contractVersion(payload.toContract, "toContract");
-  if (from.family !== to.family || to.version !== from.version + 1) {
+  if (from.family !== baseline.family || from.family !== to.family || to.version !== from.version + 1) {
     throw new Error("contract attestation must advance exactly one version in the same contract family");
   }
   const requestVersion = schemaVersion(payload.requestSchemaVersion, "dispatch", "requestSchemaVersion");
@@ -247,7 +247,21 @@ function baseContractEntry(profile) {
       sunsetAt: ""
     }],
     transition: null,
+    transitions: [],
     blockers: []
+  };
+}
+
+function transitionView(transition) {
+  return {
+    fromContract: transition.fromContract,
+    toContract: transition.toContract,
+    changeType: transition.changeType,
+    effectiveAt: transition.effectiveAt,
+    sunsetAt: transition.sunsetAt,
+    fieldDictionaryDigest: transition.fieldDictionaryDigest,
+    runtimeReleaseDigest: transition.runtimeReleaseDigest,
+    evidenceRefs: transition.evidenceRefs
   };
 }
 
@@ -260,11 +274,16 @@ function buildPublicHealthExternalContractGovernance({
   const entries = EXTERNAL_ADAPTER_PROFILES.map(baseContractEntry);
   const issues = [];
   const valid = [];
+  const uniquePayloads = new Set();
   (Array.isArray(attestations) ? attestations : []).forEach((attestation, index) => {
+    const sunsetAtValue = new Date(attestation?.sunsetAt).getTime();
+    const verificationAt = Number.isFinite(sunsetAtValue) && atValue > sunsetAtValue
+      ? new Date(sunsetAtValue).toISOString()
+      : at;
     const verification = verifyPublicHealthExternalContractAttestation(
       attestation,
       signingMaterial,
-      { at }
+      { at: verificationAt }
     );
     if (!verification.ok) {
       issues.push({
@@ -275,63 +294,113 @@ function buildPublicHealthExternalContractGovernance({
         detail: verification.reason
       });
     } else {
-      valid.push(verification.payload);
+      const payloadKey = stableStringify(verification.payload);
+      if (!uniquePayloads.has(payloadKey)) {
+        uniquePayloads.add(payloadKey);
+        valid.push(verification.payload);
+      }
     }
   });
   entries.forEach((entry) => {
     const transitions = valid.filter((item) => item.laneId === entry.laneId);
-    if (transitions.length > 1) {
+    if (!transitions.length) return;
+    const byFromContract = new Map();
+    transitions.forEach((transition) => {
+      const list = byFromContract.get(transition.fromContract) || [];
+      list.push(transition);
+      byFromContract.set(transition.fromContract, list);
+    });
+    const branches = [...byFromContract.entries()].filter(([, items]) => items.length > 1);
+    if (branches.length) {
       issues.push({
         severity: "P0",
         code: "contract-transition-conflict",
         laneId: entry.laneId,
-        detail: `${transitions.length} approved transitions target the same lane`
+        detail: `${branches.length} contract version nodes have multiple approved successors`
       });
       entry.blockers.push("Conflicting approved contract transitions require governance review.");
       return;
     }
-    const transition = transitions[0];
-    if (!transition) return;
-    const effectiveAt = timeValue(transition.effectiveAt, "transition effectiveAt");
-    const sunsetAt = timeValue(transition.sunsetAt, "transition sunsetAt");
-    entry.transition = {
-      fromContract: transition.fromContract,
-      toContract: transition.toContract,
-      changeType: transition.changeType,
-      effectiveAt: transition.effectiveAt,
-      sunsetAt: transition.sunsetAt,
-      fieldDictionaryDigest: transition.fieldDictionaryDigest,
-      runtimeReleaseDigest: transition.runtimeReleaseDigest,
-      evidenceRefs: transition.evidenceRefs
-    };
-    if (atValue < effectiveAt) {
-      entry.contracts.push({
-        contract: transition.toContract,
-        requestSchemaVersion: transition.requestSchemaVersion,
-        receiptSchemaVersion: transition.receiptSchemaVersion,
-        state: "scheduled",
-        effectiveAt: transition.effectiveAt,
-        sunsetAt: transition.sunsetAt
+    const chain = [];
+    let fromContract = entry.currentContract;
+    while (byFromContract.has(fromContract)) {
+      const transition = byFromContract.get(fromContract)[0];
+      chain.push(transition);
+      fromContract = transition.toContract;
+    }
+    const disconnected = transitions.filter((item) => !chain.includes(item));
+    if (disconnected.length) {
+      issues.push({
+        severity: "P0",
+        code: "contract-transition-disconnected",
+        laneId: entry.laneId,
+        detail: `${disconnected.length} approved transitions are not connected to ${entry.currentContract}`
       });
-    } else {
-      entry.currentContract = transition.toContract;
-      entry.contracts[0].state = atValue < sunsetAt ? "deprecated" : "retired";
-      entry.contracts[0].sunsetAt = transition.sunsetAt;
-      entry.contracts.push({
-        contract: transition.toContract,
-        requestSchemaVersion: transition.requestSchemaVersion,
-        receiptSchemaVersion: transition.receiptSchemaVersion,
-        state: "active",
-        effectiveAt: transition.effectiveAt,
-        sunsetAt: ""
-      });
-      entry.acceptedContracts = atValue < sunsetAt
-        ? [transition.toContract, transition.fromContract]
-        : [transition.toContract];
-      if (atValue < sunsetAt) {
-        entry.blockers.push(`Deprecated contract ${transition.fromContract} remains accepted until ${transition.sunsetAt}.`);
+      entry.blockers.push("Disconnected contract transitions require the missing signed predecessor.");
+      return;
+    }
+    for (let index = 1; index < chain.length; index += 1) {
+      if (timeValue(chain[index].producerApproval.approvedAt, "producer approvedAt")
+          < timeValue(chain[index - 1].issuedAt, "previous transition issuedAt")
+        || timeValue(chain[index].consumerApproval.approvedAt, "consumer approvedAt")
+          < timeValue(chain[index - 1].issuedAt, "previous transition issuedAt")
+        || timeValue(chain[index].issuedAt, "transition issuedAt")
+          <= timeValue(chain[index - 1].issuedAt, "previous transition issuedAt")) {
+        issues.push({
+          severity: "P0",
+          code: "contract-transition-approval-order-invalid",
+          laneId: entry.laneId,
+          detail: `${chain[index].fromContract} approval does not follow its signed predecessor`
+        });
+        entry.blockers.push("Sequential contract approvals must occur after the signed predecessor.");
+        return;
+      }
+      if (timeValue(chain[index].effectiveAt, "transition effectiveAt")
+        < timeValue(chain[index - 1].sunsetAt, "previous transition sunsetAt")) {
+        issues.push({
+          severity: "P0",
+          code: "contract-transition-window-overlap",
+          laneId: entry.laneId,
+          detail: `${chain[index].fromContract} advances before the previous compatibility window ends`
+        });
+        entry.blockers.push("Sequential contract compatibility windows must not overlap.");
+        return;
       }
     }
+    entry.transitions = chain.map(transitionView);
+    entry.transition = entry.transitions.find((item) => (
+      timeValue(item.effectiveAt, "transition effectiveAt") <= atValue
+      && atValue < timeValue(item.sunsetAt, "transition sunsetAt")
+    )) || entry.transitions.find((item) => timeValue(item.effectiveAt, "transition effectiveAt") > atValue)
+      || entry.transitions[entry.transitions.length - 1];
+    const contractById = new Map(entry.contracts.map((item) => [item.contract, item]));
+    chain.forEach((transition) => {
+      const effectiveAt = timeValue(transition.effectiveAt, "transition effectiveAt");
+      const sunsetAt = timeValue(transition.sunsetAt, "transition sunsetAt");
+      const source = contractById.get(transition.fromContract);
+      const target = {
+        contract: transition.toContract,
+        requestSchemaVersion: transition.requestSchemaVersion,
+        receiptSchemaVersion: transition.receiptSchemaVersion,
+        state: atValue < effectiveAt ? "scheduled" : "active",
+        effectiveAt: transition.effectiveAt,
+        sunsetAt: ""
+      };
+      entry.contracts.push(target);
+      contractById.set(target.contract, target);
+      if (atValue >= effectiveAt) {
+        source.state = atValue < sunsetAt ? "deprecated" : "retired";
+        source.sunsetAt = transition.sunsetAt;
+        entry.currentContract = transition.toContract;
+      }
+    });
+    entry.acceptedContracts = entry.contracts
+      .filter((item) => ["active", "deprecated"].includes(item.state))
+      .map((item) => item.contract)
+      .reverse();
+    entry.contracts.filter((item) => item.state === "deprecated").forEach((item) => {
+      entry.blockers.push(`Deprecated contract ${item.contract} remains accepted until ${item.sunsetAt}.`);
+    });
   });
   const contracts = entries.flatMap((entry) => entry.contracts);
   return {
@@ -346,6 +415,10 @@ function buildPublicHealthExternalContractGovernance({
       verifiedAttestations: valid.length,
       invalidAttestations: issues.filter((item) => item.code === "contract-attestation-invalid").length,
       conflicts: issues.filter((item) => item.code === "contract-transition-conflict").length,
+      disconnected: issues.filter((item) => item.code === "contract-transition-disconnected").length,
+      invalidApprovalOrder: issues.filter((item) => item.code === "contract-transition-approval-order-invalid").length,
+      overlappingWindows: issues.filter((item) => item.code === "contract-transition-window-overlap").length,
+      transitions: entries.reduce((sum, item) => sum + item.transitions.length, 0),
       active: contracts.filter((item) => item.state === "active").length,
       scheduled: contracts.filter((item) => item.state === "scheduled").length,
       deprecated: contracts.filter((item) => item.state === "deprecated").length,

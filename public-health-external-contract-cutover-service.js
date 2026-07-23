@@ -57,6 +57,7 @@ function buildPublicHealthExternalContractCutoverBoard({
       }],
       summary: {
         transitionLanes: 0,
+        transitionTracks: 0,
         scheduled: 0,
         draining: 0,
         readyForSunset: 0,
@@ -69,7 +70,17 @@ function buildPublicHealthExternalContractCutoverBoard({
     };
   }
 
-  contractGovernance.entries.filter((entry) => entry.transition).forEach((entry) => {
+  contractGovernance.entries.flatMap((entry) => {
+    const transitions = entry.transitions?.length
+      ? entry.transitions
+      : [entry.transition].filter(Boolean);
+    return transitions.map((transition, transitionIndex) => ({
+      ...entry,
+      transitions,
+      transition,
+      transitionIndex
+    }));
+  }).forEach((entry) => {
     const effectiveAt = timeValue(entry.transition.effectiveAt, "contract cutover effectiveAt");
     const sunsetAt = timeValue(entry.transition.sunsetAt, "contract cutover sunsetAt");
     const oldDispatches = dispatches.filter((item) => (
@@ -77,9 +88,14 @@ function buildPublicHealthExternalContractCutoverBoard({
     ));
     const outstanding = oldDispatches.filter(isOutstanding);
     const staleSuccessors = [];
+    const allowedSuccessorContracts = new Set(
+      entry.transitions.slice(entry.transitionIndex).map((item) => item.toContract)
+    );
     oldDispatches.filter((item) => item.recovery?.state === "requeued").forEach((item) => {
       const successor = dispatches.find((candidate) => candidate.id === item.recovery.successorDispatchId);
-      if (!successor || successor.predecessorDispatchId !== item.id || successor.contract !== entry.currentContract) {
+      if (!successor
+        || successor.predecessorDispatchId !== item.id
+        || !allowedSuccessorContracts.has(successor.contract)) {
         staleSuccessors.push({ predecessor: item, successor });
       }
     });
@@ -102,7 +118,7 @@ function buildPublicHealthExternalContractCutoverBoard({
         entry,
         predecessor,
         successor
-          ? `Recovery successor ${successor.id} does not use ${entry.currentContract}.`
+          ? `Recovery successor ${successor.id} does not use a later governed contract.`
           : `Recovery successor ${predecessor.recovery.successorDispatchId} is missing.`,
         "Repair the signed recovery relationship and create exactly one successor on the active contract."
       )));
@@ -114,6 +130,7 @@ function buildPublicHealthExternalContractCutoverBoard({
         : (outstanding.length || staleSuccessors.length ? "draining" : "ready-for-sunset");
     lanes.push({
       laneId: entry.laneId,
+      transitionIndex: entry.transitionIndex,
       fromContract: entry.transition.fromContract,
       toContract: entry.transition.toContract,
       effectiveAt: entry.transition.effectiveAt,
@@ -130,7 +147,8 @@ function buildPublicHealthExternalContractCutoverBoard({
   });
 
   const summary = {
-    transitionLanes: lanes.length,
+    transitionLanes: new Set(lanes.map((item) => item.laneId)).size,
+    transitionTracks: lanes.length,
     scheduled: lanes.filter((item) => item.status === "scheduled").length,
     draining: lanes.filter((item) => item.status === "draining").length,
     readyForSunset: lanes.filter((item) => item.status === "ready-for-sunset").length,

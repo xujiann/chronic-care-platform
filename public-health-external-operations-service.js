@@ -162,7 +162,7 @@ function buildPublicHealthExternalOperationsBoard({
     : {
       lanes: [],
       issues: [],
-      summary: { transitionLanes: 0, outstanding: 0, staleSuccessors: 0 }
+      summary: { transitionLanes: 0, transitionTracks: 0, outstanding: 0, staleSuccessors: 0 }
     };
   issues.push(...contractCutover.issues);
   rows(data, "publicHealthExternalDispatchAudit")
@@ -279,8 +279,11 @@ function buildPublicHealthExternalOperationsBoard({
         dispatch.receipt?.schemaVersion || governedContract?.receiptSchemaVersion || ""
       );
       if (!authorization.ok) {
+        const governedTransitions = governedLane?.transitions?.length
+          ? governedLane.transitions
+          : [governedLane?.transition];
         const cutoverRetirement = authorization.reason === "contract-version-retired"
-          && governedLane?.transition?.fromContract === dispatch.contract;
+          && governedTransitions.some((item) => item?.fromContract === dispatch.contract);
         if (!cutoverRetirement) {
           issues.push(issue(
             "P0",
@@ -452,6 +455,7 @@ function buildPublicHealthExternalOperationsBoard({
       contractMismatches: issues.filter((item) => item.code === "contract-governance-mismatch").length,
       deprecatedContracts: issues.filter((item) => item.code === "contract-version-deprecated").length,
       contractCutoverLanes: contractCutover.summary.transitionLanes,
+      contractCutoverTracks: contractCutover.summary.transitionTracks,
       contractCutoverBacklog: contractCutover.summary.outstanding,
       contractCutoverStaleSuccessors: contractCutover.summary.staleSuccessors
     },
