@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-23T07:04:45.981Z",
+  "updatedAt": "2026-07-23T07:09:39.254Z",
   "decisions": [
     {
       "lineId": "T01",
@@ -90,16 +90,18 @@
     },
     {
       "lineId": "T04",
-      "candidateHead": "83a363d3188dde9eaf8d70bc59bc5f8ceab35c35",
+      "candidateHead": "f9a8d70b08db796beb1a1031b352837a6223c3f6",
       "decision": "accepted",
-      "reviewedAt": "2026-07-23T06:59:43.077Z",
+      "reviewedAt": "2026-07-23T07:09:39.254Z",
       "reviewer": "T00",
       "checks": [
         "git diff --check",
-        "113 citizen record projection, policy, storage-minimization, static and security tests passed independently",
+        "116 citizen record projection, policy, privacy review, static and security tests passed independently",
+        "2 resident care workspace end-to-end tests passed independently",
         "controlled credentials require one-time HTTPS, five-minute expiry, matching resource and audit evidence",
         "server responses cannot widen authorization scope, extend expiry or overwrite resident correction security fields",
-        "production care workspace state stays out of localStorage and restores through resident-scoped secret-free synchronization"
+        "production care workspace state stays out of localStorage and restores through resident-scoped secret-free synchronization",
+        "resident privacy review exports minimized fields and keeps trusted authorization and directory evidence production-blocked"
       ],
       "blockers": []
     },
