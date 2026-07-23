@@ -28,6 +28,8 @@ T00 负责公共路由、统一认证鉴权、请求体与错误响应映射、�
 | refund-callback-hook | INTERNAL | PAYMENT 回调完成可信校验并入账后 | `applyFinancialCallback` → `syncRefundFromFinancialCallback` | system |
 | special-case-reselect | POST | `/api/disease-payment/special-cases/:id/expert-reselection` | `reselectSpecialCaseExpert` | insurance |
 | special-case-disclosure | GET | `/api/disease-payment/special-cases/disclosure` | `buildSpecialCaseDisclosure` | insurance, commission, institution |
+| special-case-appeal-create | POST | `/api/disease-payment/special-cases/:id/appeals` | `createSpecialCaseAppeal` | institution |
+| special-case-appeal-review | POST | `/api/disease-payment/special-cases/:id/appeals/review` | `reviewSpecialCaseAppeal` | insurance |
 | settlement-core-callback | INTERNAL | INSURANCE 回调完成可信校验并入账后 | `applyInsuranceCoreSettlementCallback` | system |
 | annual-clearance-create | POST | `/api/disease-payment/annual-clearances` | `createAnnualClearance` | insurance |
 | annual-clearance-action | POST | `/api/disease-payment/annual-clearances/:id/actions` | `applyAnnualClearanceAction` | insurance, institution, commission |
@@ -42,6 +44,7 @@ T00 负责公共路由、统一认证鉴权、请求体与错误响应映射、�
 6. 年度清算必须按领域状态机完成逐机构确认、机构争议定位与解决、汇总摘要、医保批准、基金财务入账和锁账；`confirm-institutions` 只能使用 `institutionConfirmationDigest` 生成的摘要，不得由公共层直接写确认或清算终态。
 7. 月度结算出现差额时，必须登记摘要证据，由医院财务和医保经办使用不同身份签署相同的调整金额与处置摘要；驳回后须补充新摘要证据，公共层不得直接调用 `resolve-difference` 跳过复核。
 8. 退款运营视图通过 `buildRefundOperations` 返回阶段 SLA 和脱敏异常队列。超时只用于告警和人工处置，不得由公共层据此伪造服务商失败回调、释放退款占用额度或绕过可信回调状态机。
+9. 特例复议申请必须由医疗机构角色提交并携带原决定摘要及至少一项新证据摘要；复议评审仅允许医保角色调用。公共层不得替换原决定摘要、改写账本封存的驳回时间、放宽申请窗口，或以新专家编号复用原审评审账号。
 
 ## 生产证据交接
 

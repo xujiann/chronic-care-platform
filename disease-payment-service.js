@@ -138,7 +138,9 @@ function seedDiseasePaymentState() {
       { id: "special-expert-medical-primary", name: "医保医学评审专家", displayName: "医保医学评审专家", reviewerAccount: "大连市医保中心审核员", role: "medical-insurance-review", institution: "大连市医保中心", expertise: ["复杂危重症", "DRG/DIP支付"], conflictInstitutions: [], active: true },
       { id: "special-expert-fund-primary", name: "基金财务评审专家", displayName: "基金财务评审专家", reviewerAccount: "大连市医保局管理员", role: "fund-finance-review", institution: "大连市医保局", expertise: ["基金预算", "支付标准"], conflictInstitutions: [], active: true },
       { id: "special-expert-medical-backup", name: "医学评审备选专家", displayName: "医学评审备选专家", reviewerAccount: "district-medical-reviewer", role: "medical-insurance-review", institution: "区县医保经办机构", expertise: ["复杂病例", "病案编码"], conflictInstitutions: [], active: false },
-      { id: "special-expert-fund-backup", name: "基金评审备选专家", displayName: "基金评审备选专家", reviewerAccount: "fund-reviewer-backup", role: "fund-finance-review", institution: "区县医保局", expertise: ["基金财务", "年度预算"], conflictInstitutions: [], active: false }
+      { id: "special-expert-fund-backup", name: "基金评审备选专家", displayName: "基金评审备选专家", reviewerAccount: "fund-reviewer-backup", role: "fund-finance-review", institution: "区县医保局", expertise: ["基金财务", "年度预算"], conflictInstitutions: [], active: false },
+      { id: "special-expert-medical-appeal", name: "医学复议专家", displayName: "医学复议专家", reviewerAccount: "medical-appeal-reviewer", role: "medical-insurance-review", institution: "省级医保复议专家库", expertise: ["疑难重症", "复议审查"], conflictInstitutions: [], active: true, appealOnly: true },
+      { id: "special-expert-fund-appeal", name: "基金复议专家", displayName: "基金复议专家", reviewerAccount: "fund-appeal-reviewer", role: "fund-finance-review", institution: "省级医保复议专家库", expertise: ["基金监管", "复议审查"], conflictInstitutions: [], active: true, appealOnly: true }
     ],
     settlementBatches: [],
     annualClearances: [],
@@ -549,6 +551,31 @@ function reviewSpecialCase(input, id, payload, actor) {
   return { state, row, review: reviewed.review };
 }
 
+function createSpecialCaseAppeal(input, id, payload, actor) {
+  const state = normalizeState(input);
+  const rowIndex = state.specialCases.findIndex((item) => item.id === id);
+  if (rowIndex < 0) throw new Error("特例单议不存在");
+  const row = structuredClone(state.specialCases[rowIndex]);
+  const appeal = SpecialCase.createSpecialCaseAppeal(row, payload, actor);
+  const panel = SpecialCase.selectSpecialCaseAppealExperts(row, state.specialCaseExperts, { excludedExpertIds: payload.excludedExpertIds, selectionNonce: payload.selectionNonce, at: payload.at }, "special-case-appeal-panel-service");
+  state.specialCases[rowIndex] = row;
+  const target = state.cases.find((item) => item.id === row.caseId);
+  if (target) target.specialCaseStatus = row.status;
+  audit(state, "特例单议复议申请", row.id, actor, `复议=${appeal.id}，原决定=${appeal.originalDecisionDigest}`);
+  return { state, row, appeal, panel };
+}
+
+function reviewSpecialCaseAppeal(input, id, payload, actor) {
+  const state = normalizeState(input);
+  const row = state.specialCases.find((item) => item.id === id);
+  if (!row) throw new Error("特例单议不存在");
+  const reviewed = SpecialCase.reviewSpecialCaseAppeal(row, payload, actor);
+  const target = state.cases.find((item) => item.id === row.caseId);
+  if (target) target.specialCaseStatus = row.status;
+  audit(state, "特例单议复议评审", row.id, actor, row.status);
+  return { state, row, appeal: reviewed.appeal, review: reviewed.review };
+}
+
 function createSettlementBatch(input, payload, actor) {
   const state = normalizeState(input);
   if (payload.type === "annual") throw new Error("年度清算必须基于已拨付月度批次单独创建");
@@ -933,4 +960,4 @@ function buildOverview(input) {
   return { state: clientState, summary: { caseCount: state.cases.length, calculatedCount: calculated.length, ungroupedCount: state.cases.filter((item) => item.calculation?.grouping && !item.calculation.grouping.ok).length, totalCost, paymentStandard, projectedBalance: round(paymentStandard - totalCost), riskCount: risks.length, specialPending: state.specialCases.filter((item) => ["APPLIED", "UNDER_REVIEW"].includes(SpecialCase.specialCaseState(item))).length, specialCapRate, specialUsageRate: round(state.specialCases.filter((item) => SpecialCase.ACTIVE_STATES.has(SpecialCase.specialCaseState(item))).length / Math.max(1, state.cases.length), 4), settlementPending: state.settlementBatches.filter((item) => !["PAID", "CLOSED"].includes(Settlement.settlementState(item))).length, annualClearancePending: state.annualClearances.filter((item) => item.state !== "LOCKED").length, prepaymentPending: state.prepayments.filter((item) => item.status === "待审批").length, unpaidPending: state.unpaidItems.filter((item) => item.status !== "已支付").length, negotiationPending: state.negotiationRounds.filter((item) => item.status !== "已达成一致").length, trainingPending: state.trainings.filter((item) => item.status !== "已完成").length, intake: DiseasePaymentIntake.buildIntakeSummary(state), drg: buildDrgAnalytics(state) }, institutions };
 }
 
-module.exports = { POLICY, SETTLEMENT_ACTIONS: Settlement.ACTION_TARGETS, SETTLEMENT_LABELS: Settlement.SETTLEMENT_LABELS, SPECIAL_CASE_LABELS: SpecialCase.SPECIAL_CASE_LABELS, activateDueLocalPaymentPackages, activateLocalPaymentPackage, applyAnnualClearanceAction, applyGovernanceAction, applyInsuranceCoreSettlementCallback, buildCatalogIndexStats, buildDrgAnalytics, buildDrgCatalogView, buildLocalPaymentPackageView, buildOverview, buildParameterGovernanceView, buildSpecialCaseDisclosure, calculateAll, calculateCase, calculateFormalCase, cancelLocalPaymentPackageSimulationJob, compareLocalPaymentPackage, createAnnualClearance, createLocalPaymentPackageSimulationJob, createPaymentParameter, createSettlementBatch, createSpecialCase, drgCatalogMatch, getLocalPaymentPackageCatalogPage, getLocalPaymentPackageReport, importLocalPaymentPackage, inferDrgComplicationLevel, normalizeState, processLocalPaymentPackageSimulationJob, publishLocalPaymentPackage, publishPaymentParameter, reconcileBatch, reselectSpecialCaseExpert, retryLocalPaymentPackageSimulationJob, reviewLocalPaymentPackage, reviewPaymentParameter, reviewSpecialCase, rollbackLocalPaymentPackage, seedDiseasePaymentState, simulateDrgCase, simulateLocalPaymentPackage, simulatePaymentParameter, submitLocalPaymentPackage, submitPaymentParameter, validateCase, validateLocalPaymentPackage: LocalPaymentPackage.validateLocalPaymentPackage, verifySpecialCaseLedger: SpecialCase.verifySpecialCaseLedger };
+module.exports = { POLICY, SETTLEMENT_ACTIONS: Settlement.ACTION_TARGETS, SETTLEMENT_LABELS: Settlement.SETTLEMENT_LABELS, SPECIAL_CASE_LABELS: SpecialCase.SPECIAL_CASE_LABELS, activateDueLocalPaymentPackages, activateLocalPaymentPackage, applyAnnualClearanceAction, applyGovernanceAction, applyInsuranceCoreSettlementCallback, buildCatalogIndexStats, buildDrgAnalytics, buildDrgCatalogView, buildLocalPaymentPackageView, buildOverview, buildParameterGovernanceView, buildSpecialCaseDisclosure, calculateAll, calculateCase, calculateFormalCase, cancelLocalPaymentPackageSimulationJob, compareLocalPaymentPackage, createAnnualClearance, createLocalPaymentPackageSimulationJob, createPaymentParameter, createSettlementBatch, createSpecialCase, createSpecialCaseAppeal, drgCatalogMatch, getLocalPaymentPackageCatalogPage, getLocalPaymentPackageReport, importLocalPaymentPackage, inferDrgComplicationLevel, normalizeState, processLocalPaymentPackageSimulationJob, publishLocalPaymentPackage, publishPaymentParameter, reconcileBatch, reselectSpecialCaseExpert, retryLocalPaymentPackageSimulationJob, reviewLocalPaymentPackage, reviewPaymentParameter, reviewSpecialCase, reviewSpecialCaseAppeal, rollbackLocalPaymentPackage, seedDiseasePaymentState, simulateDrgCase, simulateLocalPaymentPackage, simulatePaymentParameter, submitLocalPaymentPackage, submitPaymentParameter, validateCase, validateLocalPaymentPackage: LocalPaymentPackage.validateLocalPaymentPackage, verifySpecialCaseLedger: SpecialCase.verifySpecialCaseLedger };

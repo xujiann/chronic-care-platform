@@ -7,10 +7,14 @@ const SPECIAL_CASE_LABELS = Object.freeze({
   UNDER_REVIEW: "复核中",
   APPROVED: "评审通过",
   REJECTED: "不予通过",
+  APPEALED: "复议待评审",
+  APPEAL_UNDER_REVIEW: "复议评审中",
+  APPEAL_REJECTED: "复议不予通过",
   WITHDRAWN: "已撤回",
   INCLUDED: "已纳入结算"
 });
-const ACTIVE_STATES = new Set(["APPLIED", "UNDER_REVIEW", "APPROVED", "INCLUDED"]);
+const ACTIVE_STATES = new Set(["APPLIED", "UNDER_REVIEW", "APPROVED", "APPEALED", "APPEAL_UNDER_REVIEW", "INCLUDED"]);
+const SPECIAL_CASE_APPEAL_POLICY = Object.freeze({ appealWindowDays: 10, reviewSlaDays: 15 });
 
 class SpecialCaseWorkflowError extends Error {
   constructor(message, code, statusCode = 409) {
@@ -33,6 +37,13 @@ function digest(value) {
 
 function safeText(value, maximum = 240) {
   return String(value || "").replace(/[\r\n\0]/g, " ").trim().slice(0, maximum);
+}
+
+function addCalendarDays(value, days, label = "日期") {
+  const parsed = new Date(String(value || ""));
+  if (Number.isNaN(parsed.getTime())) throw new SpecialCaseWorkflowError(`${label}无效`, "SPECIAL_CASE_DATE_INVALID", 400);
+  parsed.setUTCDate(parsed.getUTCDate() + days);
+  return parsed.toISOString();
 }
 
 function toFen(value, label, allowZero = false) {
@@ -120,7 +131,7 @@ function selectSpecialCaseExperts(row, experts = [], payload = {}, actor = "expe
   const selectedAccounts = new Set();
   const seed = digest({ caseId: row.caseId, evidenceDigest: row.evidenceDigest, selectionNonce: safeText(payload.selectionNonce || row.id, 120) });
   const members = roles.map((role) => {
-    const selected = chooseExpert(eligibleExperts(experts, row, role, excludedIds).filter((item) => !selectedAccounts.has(safeText(item.reviewerAccount || item.name, 120))), `${seed}:${role}`);
+    const selected = chooseExpert(eligibleExperts(experts, row, role, excludedIds).filter((item) => item.appealOnly !== true && !selectedAccounts.has(safeText(item.reviewerAccount || item.name, 120))), `${seed}:${role}`);
     if (!selected) throw new SpecialCaseWorkflowError(`没有可用的${role}评审专家`, "SPECIAL_CASE_EXPERT_UNAVAILABLE");
     excludedIds.add(selected.id);
     selectedAccounts.add(safeText(selected.reviewerAccount || selected.name, 120));
@@ -149,7 +160,7 @@ function reselectSpecialCaseExpert(row, experts = [], payload = {}, actor = "exp
   const member = row.expertPanel?.members?.find((item) => item.expertId === expertId && item.status === "selected");
   if (!member) throw new SpecialCaseWorkflowError("待回避专家不在当前评审组", "SPECIAL_CASE_EXPERT_NOT_ASSIGNED", 404);
   const excludedIds = new Set(row.expertPanel.members.map((item) => item.expertId));
-  const replacement = chooseExpert(eligibleExperts(experts, row, member.role, excludedIds), `${row.expertPanel.seedDigest}:${member.role}:replacement:${expertId}`);
+  const replacement = chooseExpert(eligibleExperts(experts, row, member.role, excludedIds).filter((item) => item.appealOnly !== true), `${row.expertPanel.seedDigest}:${member.role}:replacement:${expertId}`);
   if (!replacement) throw new SpecialCaseWorkflowError("没有可用的回避替补专家", "SPECIAL_CASE_REPLACEMENT_UNAVAILABLE");
   member.status = "recused";
   member.recusalReason = reason;
@@ -191,15 +202,162 @@ function reviewSpecialCaseApplication(row, payload = {}, actor = "reviewer") {
     row.reviewedAt = now;
     row.reviewedBy = row.reviews.map((item) => item.reviewer);
     row.decisionDigest = digest({ caseId: row.caseId, requestedPaymentFen: row.requestedPaymentFen, adjustedPaymentFen, evidenceDigest: row.evidenceDigest, approvals: row.reviews.filter((item) => item.approved).map((item) => ({ reviewer: item.reviewer, role: item.role, reviewedAt: item.reviewedAt })) });
+  } else if (row.state === "REJECTED") {
+    row.rejectedAt = now;
+    row.decisionDigest = digest({ caseId: row.caseId, outcome: "REJECTED", requestedPaymentFen: row.requestedPaymentFen, evidenceDigest: row.evidenceDigest, rejection: { reviewer: review.reviewer, role: review.role, opinion: review.opinion, reviewedAt: review.reviewedAt } });
   }
   appendEvent(row, { id: `special-event-${randomUUID()}`, action: approved ? "approve-review" : "reject-review", from: before, to: row.state, actor: reviewer, at: now, idempotencyKey: review.id, detail: { role: review.role, adjustedPaymentFen, opinion: review.opinion, decisionDigest: row.decisionDigest || "" } });
   return { row, review };
 }
 
+function currentAppeal(row = {}) {
+  return (row.appeals || []).at(-1);
+}
+
+function buildSpecialCaseAppealSla(row = {}, at = new Date().toISOString()) {
+  const appeal = currentAppeal(row);
+  if (!appeal) return { status: "not-applicable", dueAt: "", overdueDays: 0 };
+  const evaluated = new Date(String(at));
+  const due = new Date(String(appeal.reviewDueAt));
+  if (Number.isNaN(evaluated.getTime()) || Number.isNaN(due.getTime())) throw new SpecialCaseWorkflowError("复议SLA时间无效", "SPECIAL_CASE_DATE_INVALID", 400);
+  if (appeal.decidedAt) return { status: new Date(appeal.decidedAt) > due ? "completed-overdue" : "completed-within-sla", dueAt: due.toISOString(), decidedAt: appeal.decidedAt, overdueDays: Math.max(0, Math.ceil((new Date(appeal.decidedAt) - due) / 86_400_000)) };
+  return { status: evaluated > due ? "overdue" : "within-sla", dueAt: due.toISOString(), evaluatedAt: evaluated.toISOString(), overdueDays: Math.max(0, Math.ceil((evaluated - due) / 86_400_000)) };
+}
+
+function createSpecialCaseAppeal(row, payload = {}, actor = "institution") {
+  if (!verifySpecialCaseLedger(row.events)) throw new SpecialCaseWorkflowError("特例单议事件账本校验失败", "SPECIAL_CASE_LEDGER_INVALID");
+  if ((row.appeals || []).length) throw new SpecialCaseWorkflowError("同一特例单议只能申请一次复议", "SPECIAL_CASE_APPEAL_DUPLICATE");
+  if (specialCaseState(row) !== "REJECTED") throw new SpecialCaseWorkflowError("只有原评审驳回的特例单议可以申请复议", "SPECIAL_CASE_APPEAL_STATE_INVALID");
+  const appellant = safeText(actor, 120);
+  if (!appellant) throw new SpecialCaseWorkflowError("复议申请人不能为空", "SPECIAL_CASE_APPELLANT_REQUIRED", 400);
+  const originalDecisionDigest = safeText(payload.originalDecisionDigest, 80).toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(originalDecisionDigest) || originalDecisionDigest !== row.decisionDigest) throw new SpecialCaseWorkflowError("复议绑定的原决定摘要无效", "SPECIAL_CASE_APPEAL_DECISION_DIGEST_INVALID", 400);
+  const at = safeText(payload.at || new Date().toISOString(), 40);
+  const rejectionEvent = [...row.events].reverse().find((item) => item.action === "reject-review" && item.to === "REJECTED" && item.detail?.decisionDigest === originalDecisionDigest);
+  if (!rejectionEvent || rejectionEvent.at !== row.rejectedAt) throw new SpecialCaseWorkflowError("原驳回时间与事件账本不一致", "SPECIAL_CASE_LEDGER_INVALID");
+  const submittedAt = new Date(at);
+  const rejectedAt = new Date(rejectionEvent.at);
+  if (Number.isNaN(submittedAt.getTime()) || submittedAt < rejectedAt) throw new SpecialCaseWorkflowError("复议申请时间不得早于原驳回时间", "SPECIAL_CASE_APPEAL_TIME_INVALID", 400);
+  const appealDeadline = addCalendarDays(rejectionEvent.at, SPECIAL_CASE_APPEAL_POLICY.appealWindowDays, "原驳回时间");
+  if (submittedAt > new Date(appealDeadline)) throw new SpecialCaseWorkflowError("特例单议复议已超过申请期限", "SPECIAL_CASE_APPEAL_WINDOW_EXPIRED");
+  const reason = safeText(payload.reason);
+  if (!reason) throw new SpecialCaseWorkflowError("复议原因不能为空", "SPECIAL_CASE_APPEAL_REASON_REQUIRED", 400);
+  const evidence = normalizeEvidence(payload.evidence);
+  const originalEvidenceDigests = new Set((row.evidence || []).map((item) => item.digest));
+  if (!evidence.some((item) => !originalEvidenceDigests.has(item.digest))) throw new SpecialCaseWorkflowError("复议必须提交至少一项新的摘要证据", "SPECIAL_CASE_APPEAL_NEW_EVIDENCE_REQUIRED", 400);
+  const appeal = {
+    id: safeText(payload.id || `special-appeal-${randomUUID()}`, 120),
+    originalDecisionDigest,
+    reason,
+    reasonCode: safeText(payload.reasonCode || "NEW_EVIDENCE", 60),
+    evidence,
+    evidenceDigest: digest(evidence),
+    state: "APPEALED",
+    submittedAt: at,
+    submittedBy: appellant,
+    appealDeadline,
+    reviewDueAt: addCalendarDays(at, SPECIAL_CASE_APPEAL_POLICY.reviewSlaDays, "复议申请时间"),
+    reviews: []
+  };
+  row.appeals = [appeal];
+  row.state = "APPEALED";
+  row.status = SPECIAL_CASE_LABELS.APPEALED;
+  row.updatedAt = at;
+  row.updatedBy = appellant;
+  appendEvent(row, { id: `special-event-${randomUUID()}`, action: "appeal", from: "REJECTED", to: "APPEALED", actor: appellant, at, idempotencyKey: safeText(payload.idempotencyKey || appeal.id, 160), detail: { appealId: appeal.id, originalDecisionDigest, evidenceDigest: appeal.evidenceDigest, reviewDueAt: appeal.reviewDueAt } });
+  return appeal;
+}
+
+function selectSpecialCaseAppealExperts(row, experts = [], payload = {}, actor = "appeal-panel-service") {
+  if (specialCaseState(row) !== "APPEALED") throw new SpecialCaseWorkflowError("当前状态不允许抽取复议专家", "SPECIAL_CASE_APPEAL_PANEL_STATE_INVALID");
+  const appeal = currentAppeal(row);
+  if (!appeal || appeal.expertPanel) throw new SpecialCaseWorkflowError("复议专家组不存在或已完成抽取", "SPECIAL_CASE_APPEAL_PANEL_STATE_INVALID");
+  if (!verifySpecialCaseLedger(row.events)) throw new SpecialCaseWorkflowError("特例单议事件账本校验失败", "SPECIAL_CASE_LEDGER_INVALID");
+  const roles = ["medical-insurance-review", "fund-finance-review"];
+  const excludedIds = new Set([...(row.expertPanel?.members || []).map((item) => item.expertId), ...(payload.excludedExpertIds || []).map(String)]);
+  const originalReviewerAccounts = new Set((row.expertPanel?.members || []).map((item) => item.reviewerAccount));
+  const selectedAccounts = new Set(originalReviewerAccounts);
+  const seed = digest({ appealId: appeal.id, originalDecisionDigest: appeal.originalDecisionDigest, evidenceDigest: appeal.evidenceDigest, selectionNonce: safeText(payload.selectionNonce || appeal.id, 120) });
+  const members = roles.map((role) => {
+    const selected = chooseExpert(eligibleExperts(experts, row, role, excludedIds).filter((item) => !selectedAccounts.has(safeText(item.reviewerAccount || item.name, 120))), `${seed}:${role}`);
+    if (!selected) throw new SpecialCaseWorkflowError(`没有可用的${role}复议专家`, "SPECIAL_CASE_APPEAL_EXPERT_UNAVAILABLE");
+    excludedIds.add(selected.id);
+    selectedAccounts.add(safeText(selected.reviewerAccount || selected.name, 120));
+    return { expertId: selected.id, reviewerAccount: safeText(selected.reviewerAccount || selected.name, 120), role, organization: safeText(selected.institution, 120), status: "selected" };
+  });
+  const at = safeText(payload.at || new Date().toISOString(), 40);
+  const selectedAt = new Date(at);
+  if (Number.isNaN(selectedAt.getTime()) || selectedAt < new Date(appeal.submittedAt)) throw new SpecialCaseWorkflowError("复议专家抽取时间不得早于复议申请时间", "SPECIAL_CASE_APPEAL_TIME_INVALID", 400);
+  appeal.expertPanel = { seedDigest: seed, members, selectionDigest: digest(members), selectedAt: at, selectedBy: safeText(actor, 120) };
+  appendEvent(row, { id: `special-event-${randomUUID()}`, action: "select-appeal-experts", from: "APPEALED", to: "APPEALED", actor: appeal.expertPanel.selectedBy, at, idempotencyKey: appeal.expertPanel.selectionDigest, detail: { appealId: appeal.id, selectionDigest: appeal.expertPanel.selectionDigest, roles } });
+  return appeal.expertPanel;
+}
+
+function verifySpecialCaseAppealPanel(row = {}) {
+  const appeal = currentAppeal(row);
+  const panel = appeal?.expertPanel;
+  if (!panel || panel.selectionDigest !== digest(panel.members || []) || panel.members?.length !== 2) return false;
+  if (new Set(panel.members.map((item) => item.expertId)).size !== 2 || new Set(panel.members.map((item) => item.reviewerAccount)).size !== 2) return false;
+  const originalExpertIds = new Set((row.expertPanel?.members || []).map((item) => item.expertId));
+  const originalReviewerAccounts = new Set((row.expertPanel?.members || []).map((item) => item.reviewerAccount));
+  if (panel.members.some((item) => originalExpertIds.has(item.expertId) || originalReviewerAccounts.has(item.reviewerAccount))) return false;
+  const event = [...(row.events || [])].reverse().find((item) => item.action === "select-appeal-experts" && item.detail?.appealId === appeal.id);
+  return event?.detail?.selectionDigest === panel.selectionDigest;
+}
+
+function reviewSpecialCaseAppeal(row, payload = {}, actor = "appeal-reviewer") {
+  const before = specialCaseState(row);
+  if (!["APPEALED", "APPEAL_UNDER_REVIEW"].includes(before)) throw new SpecialCaseWorkflowError("当前状态不允许评审复议", "SPECIAL_CASE_APPEAL_REVIEW_STATE_INVALID");
+  if (!verifySpecialCaseLedger(row.events) || !verifySpecialCaseAppealPanel(row)) throw new SpecialCaseWorkflowError("复议专家组或事件账本校验失败", "SPECIAL_CASE_APPEAL_PANEL_INVALID");
+  const appeal = currentAppeal(row);
+  const reviewer = safeText(actor, 120);
+  const assigned = appeal.expertPanel.members.find((item) => item.reviewerAccount === reviewer);
+  if (!assigned) throw new SpecialCaseWorkflowError("评审人未进入复议专家组", "SPECIAL_CASE_APPEAL_REVIEWER_NOT_ASSIGNED", 403);
+  if ((row.reviews || []).some((item) => item.reviewer === reviewer)) throw new SpecialCaseWorkflowError("原评审人不得参与同案复议", "SPECIAL_CASE_APPEAL_REVIEWER_CONFLICT", 403);
+  if (appeal.reviews.some((item) => item.reviewer === reviewer)) throw new SpecialCaseWorkflowError("同一复议专家不得重复签署", "SPECIAL_CASE_APPEAL_DUPLICATE_REVIEWER");
+  const approved = payload.approved === true;
+  const adjustedPaymentFen = approved ? toFen(payload.adjustedPaymentFen, "复议支付金额") : 0;
+  if (approved && adjustedPaymentFen > row.caseTotalAmountFen) throw new SpecialCaseWorkflowError("复议支付金额不得超过病例总费用", "SPECIAL_CASE_AMOUNT_EXCEEDS_COST", 400);
+  const prior = appeal.reviews.find((item) => item.approved);
+  if (approved && prior && prior.adjustedPaymentFen !== adjustedPaymentFen) throw new SpecialCaseWorkflowError("两名复议专家的支付金额意见必须一致", "SPECIAL_CASE_APPEAL_AMOUNT_CONFLICT");
+  const at = safeText(payload.at || new Date().toISOString(), 40);
+  const reviewedAt = new Date(at);
+  const previousReviewAt = appeal.reviews.at(-1)?.reviewedAt || appeal.expertPanel.selectedAt;
+  if (Number.isNaN(reviewedAt.getTime()) || reviewedAt < new Date(previousReviewAt)) throw new SpecialCaseWorkflowError("复议评审时间不得早于专家抽取或上一评审时间", "SPECIAL_CASE_APPEAL_TIME_INVALID", 400);
+  const review = { id: `special-appeal-review-${randomUUID()}`, reviewer, expertId: assigned.expertId, role: assigned.role, approved, adjustedPaymentFen, opinion: safeText(payload.opinion || (approved ? "复议通过" : "维持原决定")), reviewedAt: at };
+  appeal.reviews.push(review);
+  if (!approved) {
+    appeal.state = "APPEAL_REJECTED";
+    row.state = "APPEAL_REJECTED";
+  } else if (appeal.reviews.filter((item) => item.approved).length === 2) {
+    appeal.state = "APPROVED";
+    row.state = "APPROVED";
+    row.adjustedPaymentFen = adjustedPaymentFen;
+    row.adjustedPayment = adjustedPaymentFen / 100;
+  } else {
+    appeal.state = "APPEAL_UNDER_REVIEW";
+    row.state = "APPEAL_UNDER_REVIEW";
+  }
+  row.status = SPECIAL_CASE_LABELS[row.state];
+  row.updatedAt = at;
+  row.updatedBy = reviewer;
+  if (["APPROVED", "APPEAL_REJECTED"].includes(row.state)) {
+    appeal.decidedAt = at;
+    appeal.outcome = row.state;
+    appeal.decisionDigest = digest({ appealId: appeal.id, originalDecisionDigest: appeal.originalDecisionDigest, evidenceDigest: appeal.evidenceDigest, outcome: appeal.outcome, reviews: appeal.reviews.map((item) => ({ reviewer: item.reviewer, role: item.role, approved: item.approved, adjustedPaymentFen: item.adjustedPaymentFen, reviewedAt: item.reviewedAt })) });
+    row.decisionDigest = appeal.decisionDigest;
+    row.reviewedAt = at;
+    row.reviewedBy = appeal.reviews.map((item) => item.reviewer);
+  }
+  appendEvent(row, { id: `special-event-${randomUUID()}`, action: approved ? "approve-appeal" : "reject-appeal", from: before, to: row.state, actor: reviewer, at, idempotencyKey: review.id, detail: { appealId: appeal.id, role: review.role, adjustedPaymentFen, decisionDigest: appeal.decisionDigest || "" } });
+  return { row, appeal, review };
+}
+
 function settlementAdjustment(specialCases = [], item = {}) {
   const row = specialCases.find((candidate) => candidate.caseId === item.id && specialCaseState(candidate) === "APPROVED");
   if (!row) return null;
-  if (!verifySpecialCaseLedger(row.events) || !verifySpecialCaseExpertPanel(row) || !/^[a-f0-9]{64}$/.test(String(row.decisionDigest || ""))) throw new SpecialCaseWorkflowError("特例单议决议、专家抽取或事件账本校验失败", "SPECIAL_CASE_LEDGER_INVALID");
+  const appeal = currentAppeal(row);
+  if (!verifySpecialCaseLedger(row.events) || !verifySpecialCaseExpertPanel(row) || (appeal?.outcome === "APPROVED" && !verifySpecialCaseAppealPanel(row)) || !/^[a-f0-9]{64}$/.test(String(row.decisionDigest || ""))) throw new SpecialCaseWorkflowError("特例单议决议、专家抽取或事件账本校验失败", "SPECIAL_CASE_LEDGER_INVALID");
   return { row, adjustedPaymentFen: toFen(row.adjustedPaymentFen, "特例单议支付金额"), decisionDigest: row.decisionDigest };
 }
 
@@ -221,9 +379,9 @@ function buildSpecialCaseDisclosure(specialCases = [], caseCountByInstitution = 
     const items = specialCases.filter((item) => item.institution === institution);
     const approved = items.filter((item) => ["APPROVED", "INCLUDED"].includes(specialCaseState(item)));
     const dischargedCases = Math.max(0, Number(caseCountByInstitution[institution] || 0));
-    return { institution, applications: items.length, approved: approved.length, included: items.filter((item) => specialCaseState(item) === "INCLUDED").length, applicationRate: dischargedCases ? Number((items.length / dischargedCases).toFixed(4)) : 0, adjustedPaymentFen: approved.reduce((sum, item) => sum + Number(item.adjustedPaymentFen || 0), 0) };
+    return { institution, applications: items.length, appeals: items.filter((item) => (item.appeals || []).length).length, approved: approved.length, included: items.filter((item) => specialCaseState(item) === "INCLUDED").length, applicationRate: dischargedCases ? Number((items.length / dischargedCases).toFixed(4)) : 0, adjustedPaymentFen: approved.reduce((sum, item) => sum + Number(item.adjustedPaymentFen || 0), 0) };
   });
   return { generatedAt: new Date().toISOString(), institutions: rows, totals: { applications: rows.reduce((sum, item) => sum + item.applications, 0), approved: rows.reduce((sum, item) => sum + item.approved, 0), included: rows.reduce((sum, item) => sum + item.included, 0), adjustedPaymentFen: rows.reduce((sum, item) => sum + item.adjustedPaymentFen, 0) }, privacyBoundary: "仅公开机构汇总，不返回病例、患者、证据或专家身份。" };
 }
 
-module.exports = { ACTIVE_STATES, SPECIAL_CASE_LABELS, SpecialCaseWorkflowError, appendEvent, buildSpecialCaseDisclosure, createSpecialCaseApplication, digest, eligibleExperts, includeSpecialCaseInSettlement, reselectSpecialCaseExpert, reviewSpecialCaseApplication, selectSpecialCaseExperts, settlementAdjustment, specialCaseState, stableStringify, verifySpecialCaseExpertPanel, verifySpecialCaseLedger };
+module.exports = { ACTIVE_STATES, SPECIAL_CASE_APPEAL_POLICY, SPECIAL_CASE_LABELS, SpecialCaseWorkflowError, addCalendarDays, appendEvent, buildSpecialCaseAppealSla, buildSpecialCaseDisclosure, createSpecialCaseAppeal, createSpecialCaseApplication, currentAppeal, digest, eligibleExperts, includeSpecialCaseInSettlement, reselectSpecialCaseExpert, reviewSpecialCaseAppeal, reviewSpecialCaseApplication, selectSpecialCaseAppealExperts, selectSpecialCaseExperts, settlementAdjustment, specialCaseState, stableStringify, verifySpecialCaseAppealPanel, verifySpecialCaseExpertPanel, verifySpecialCaseLedger };
