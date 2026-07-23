@@ -34,3 +34,10 @@ test("local official package workbench exposes import validation simulation revi
   ["data-payment-section=\"local-package-governance\"", "local-package-file", "local-package-list", "local-package-report-list", "local-package-job-list", "activate-due-local-packages", "DRG模板", "DIP模板"].forEach((marker) => assert.ok(html.includes(marker), marker));
   ["renderLocalPackageGovernance", "local-package-job-create", "local-package-job-process", "local-package-review", "local-package-publish", "local-package-activate", "local-package-rollback", "签名可信", "完整性与签名校验", "/local-packages"].forEach((marker) => assert.ok(script.includes(marker), marker));
 });
+
+test("settlement workbench exposes core submission and callback waiting states without manual terminal receipts", () => {
+  const script = fs.readFileSync(path.join(ROOT, "disease-payment.js"), "utf8");
+  ["submit-core", "data-payment-action=\"settlement-${action[0]}", "开始对账", "发起拨付申请", "等待医保核心受理/退回回调", "等待医保核心拨付回调", "standardAmountFen"].forEach((marker) => assert.ok(script.includes(marker), marker));
+  assert.equal(script.includes('"core-accepted": { action'), false);
+  assert.equal(script.includes('"confirm-payment": { action'), false);
+});

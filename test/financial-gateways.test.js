@@ -3,16 +3,27 @@ const test = require("node:test");
 
 const {
   applyFinancialCallback,
+  buildRefundOperations,
+  cancelRefund,
+  closeRefund,
+  createRefundRequest,
   createFinancialReconciliationRun,
   dispatchFinancialRequest,
   financialGatewayCenter,
   financialGatewayOperationsCenter,
   normalizeFinancialReconciliationRun,
+  prepareRefundDispatch,
+  reconcileRefund,
+  recordRefundDispatch,
+  retryRefund,
+  reviewRefundRequest,
   signFinancialCallback,
   signFinancialRequest,
   stableStringify,
+  syncRefundFromFinancialCallback,
   validateFinancialRequest,
-  verifyFinancialCallback
+  verifyFinancialCallback,
+  verifyRefundLedger
 } = require("../financial-gateways");
 
 function jsonResponse(body, status = 200) {
@@ -306,4 +317,112 @@ test("financial reconciliation compares digest-only provider summaries", () => {
   assert.equal(center.summary.reconciliationRuns, 2);
   assert.equal(center.summary.reconciliationDifferences, 1);
   assert.doesNotMatch(JSON.stringify(center), /nonceDigest|CLAIM-001/);
+});
+
+test("online refund workflow enforces dual review available balance trusted callback and reconciliation", () => {
+  const data = {
+    integrationGatewayEvents: [{
+      id: "igw-original-payment",
+      adapterType: "financial",
+      gatewayType: "PAYMENT",
+      operation: "create-payment",
+      externalId: "ORDER-001",
+      adapterReceipt: { receiptId: "PAY-ORIGINAL-001", status: "succeeded" },
+      requestPayload: { payload: { orderNo: "ORDER-001", amountFen: 10000, currency: "CNY" } },
+      providerStatus: "succeeded",
+      reconciliationStatus: "provider-final",
+      businessDate: "2026-07-22",
+      callbackEvents: []
+    }],
+    financialReconciliationRuns: [],
+    onlinePaymentRefunds: []
+  };
+  const requested = createRefundRequest(data, { id: "refund-001", paymentEventId: "igw-original-payment", paymentTradeNo: "PAY-ORIGINAL-001", orderReference: "ORDER-001", refundAmountFen: 4000, refundReason: "取消医疗服务", reasonCode: "SERVICE_CANCELLED", idempotencyKey: "refund-idem-001" }, { username: "cashier-a" });
+  assert.equal(requested.row.state, "REQUESTED");
+  assert.equal(createRefundRequest(data, { paymentEventId: "igw-original-payment", paymentTradeNo: "PAY-ORIGINAL-001", refundAmountFen: 4000, refundReason: "取消医疗服务", idempotencyKey: "refund-idem-001" }).idempotent, true);
+  assert.throws(() => reviewRefundRequest(data, requested.row.id, { approved: true }, { username: "cashier-a" }), /申请人与复核人必须分离/);
+  reviewRefundRequest(data, requested.row.id, { approved: true, reviewDomain: "business-review", role: "业务复核" }, { username: "reviewer-b" });
+  assert.throws(() => reviewRefundRequest(data, requested.row.id, { approved: true, reviewDomain: "business-review", role: "业务复核" }, { username: "reviewer-b2" }), (error) => error.code === "REFUND_DUPLICATE_REVIEW_DOMAIN");
+  const approved = reviewRefundRequest(data, requested.row.id, { approved: true, reviewDomain: "finance-review", role: "财务复核" }, { username: "reviewer-c" });
+  assert.equal(approved.row.state, "APPROVED");
+  const dispatch = prepareRefundDispatch(data, requested.row.id);
+  assert.deepEqual(dispatch.payload, { externalId: "refund-001", paymentTradeNo: "PAY-ORIGINAL-001", refundAmountFen: 4000, refundReason: "取消医疗服务" });
+  const gatewayEvent = {
+    id: "igw-refund-001",
+    adapterType: "financial",
+    gatewayType: "PAYMENT",
+    operation: "refund",
+    externalId: requested.row.id,
+    adapterReceipt: { receiptId: "REFUND-RECEIPT-001", status: "accepted" },
+    requestPayload: { payload: dispatch.payload },
+    providerStatus: "accepted",
+    reconciliationStatus: "provider-processing",
+    businessDate: "2026-07-22",
+    callbackEvents: []
+  };
+  data.integrationGatewayEvents.push(gatewayEvent);
+  recordRefundDispatch(data, requested.row.id, { type: "PAYMENT", operation: "refund", receiptId: "REFUND-RECEIPT-001", status: "accepted", requestId: "REFUND-REQUEST-001", acceptedAt: "2026-07-22T08:00:00.000Z" }, gatewayEvent.id, { username: "refund-worker" });
+  const applied = applyFinancialCallback(data, { gatewayType: "PAYMENT", eventId: "refund-callback-001", receiptId: "REFUND-RECEIPT-001", status: "succeeded", occurredAt: "2026-07-22T08:01:00.000Z", receivedAt: "2026-07-22T08:01:01.000Z", businessDate: "2026-07-22", amountFen: 4000, providerCode: "SUCCESS", failureReason: "", settlementReferenceDigest: "a".repeat(64), nonceDigest: "b".repeat(64), signatureVerified: true });
+  assert.throws(() => syncRefundFromFinancialCallback(data, applied), /已验签金融回调/);
+  const synced = syncRefundFromFinancialCallback(data, applied, "financial-callback-adapter", { trustedFinancialCallback: true });
+  assert.equal(synced.row.state, "SUCCEEDED");
+  const run = createFinancialReconciliationRun(data, { gatewayType: "PAYMENT", businessDate: "2026-07-22", providerSummary: { total: 2, succeeded: 2, exceptions: 0, grossAmountFen: 14000, statementDigest: "c".repeat(64) } }, { username: "finance" });
+  assert.equal(run.run.status, "matched");
+  reconcileRefund(data, requested.row.id, { reconciliationRunId: run.run.id }, { username: "finance" });
+  const closed = closeRefund(data, requested.row.id, { voucherNo: "REFUND-VOUCHER-001" }, { username: "finance" });
+  assert.equal(closed.row.state, "CLOSED");
+  assert.equal(verifyRefundLedger(closed.row.events), true);
+  assert.throws(() => createRefundRequest(data, { paymentEventId: "igw-original-payment", paymentTradeNo: "PAY-ORIGINAL-001", refundAmountFen: 6001, refundReason: "超额退款", idempotencyKey: "refund-over" }), /超过原支付交易可退余额/);
+  const remaining = createRefundRequest(data, { id: "refund-remaining", paymentEventId: "igw-original-payment", paymentTradeNo: "PAY-ORIGINAL-001", refundAmountFen: 6000, refundReason: "退回剩余金额", idempotencyKey: "refund-remaining-idem" }, { username: "cashier-a" });
+  cancelRefund(data, remaining.row.id, { reason: "居民撤销退款申请", idempotencyKey: "refund-cancel" }, { username: "cashier-a" });
+  assert.equal(buildRefundOperations(data).summary.refundAmountFen, 4000);
+  const center = financialGatewayOperationsCenter(data, {}, "PAYMENT");
+  assert.equal(center.summary.refundRequests, 2);
+  assert.equal(center.refundOperations.refunds.every((item) => item.ledgerValid), true);
+  assert.doesNotMatch(JSON.stringify(center.refundOperations), /PAY-ORIGINAL-001/);
+});
+
+test("failed online refund remains reserved and can retry without creating a second refund request", () => {
+  const data = {
+    integrationGatewayEvents: [{ id: "igw-payment-retry", adapterType: "financial", gatewayType: "PAYMENT", operation: "create-payment", adapterReceipt: { receiptId: "PAY-RETRY", status: "succeeded" }, requestPayload: { payload: { orderNo: "ORDER-RETRY", amountFen: 5000 } }, providerStatus: "succeeded", reconciliationStatus: "provider-final", businessDate: "2026-07-22", callbackEvents: [] }],
+    onlinePaymentRefunds: []
+  };
+  const created = createRefundRequest(data, { id: "refund-retry", paymentEventId: "igw-payment-retry", paymentTradeNo: "PAY-RETRY", refundAmountFen: 1000, refundReason: "重复收费", idempotencyKey: "refund-retry-idem" }, { username: "cashier" });
+  reviewRefundRequest(data, created.row.id, { approved: true, reviewDomain: "business-review" }, { username: "reviewer-1" });
+  reviewRefundRequest(data, created.row.id, { approved: true, reviewDomain: "finance-review" }, { username: "reviewer-2" });
+  const dispatch = prepareRefundDispatch(data, created.row.id);
+  const gatewayEvent = { id: "igw-refund-retry-1", adapterType: "financial", gatewayType: "PAYMENT", operation: "refund", adapterReceipt: { receiptId: "REFUND-RETRY-1", status: "accepted" }, requestPayload: { payload: dispatch.payload }, providerStatus: "accepted", reconciliationStatus: "provider-processing", businessDate: "2026-07-22", callbackEvents: [] };
+  data.integrationGatewayEvents.push(gatewayEvent);
+  recordRefundDispatch(data, created.row.id, { type: "PAYMENT", operation: "refund", receiptId: "REFUND-RETRY-1", status: "accepted", requestId: "REFUND-RETRY-REQUEST-1", acceptedAt: "2026-07-22T09:00:00.000Z" }, gatewayEvent.id);
+  const failed = applyFinancialCallback(data, { gatewayType: "PAYMENT", eventId: "refund-retry-failed", receiptId: "REFUND-RETRY-1", status: "failed", occurredAt: "2026-07-22T09:01:00.000Z", receivedAt: "2026-07-22T09:01:01.000Z", businessDate: "2026-07-22", amountFen: 1000, providerCode: "TIMEOUT", failureReason: "upstream timeout", settlementReferenceDigest: "d".repeat(64), nonceDigest: "e".repeat(64), signatureVerified: true });
+  syncRefundFromFinancialCallback(data, failed, "financial-callback-adapter", { trustedFinancialCallback: true });
+  assert.equal(created.row.state, "FAILED");
+  assert.throws(() => createRefundRequest(data, { paymentEventId: "igw-payment-retry", paymentTradeNo: "PAY-RETRY", refundAmountFen: 4500, refundReason: "并发超额退款", idempotencyKey: "refund-concurrent" }), /可退余额/);
+  retryRefund(data, created.row.id, { resolution: "支付机构链路恢复", idempotencyKey: "refund-retry-action" }, { username: "finance" });
+  assert.equal(created.row.state, "APPROVED");
+  assert.match(prepareRefundDispatch(data, created.row.id).idempotencyKey, /attempt:2$/);
+});
+
+test("successful online refund can enter controlled retry after a trusted provider reversal", () => {
+  const data = {
+    integrationGatewayEvents: [{ id: "igw-payment-reversal", adapterType: "financial", gatewayType: "PAYMENT", operation: "create-payment", adapterReceipt: { receiptId: "PAY-REVERSAL", status: "succeeded" }, requestPayload: { payload: { orderNo: "ORDER-REVERSAL", amountFen: 3000 } }, providerStatus: "succeeded", reconciliationStatus: "provider-final", businessDate: "2026-07-22", callbackEvents: [] }],
+    onlinePaymentRefunds: []
+  };
+  const created = createRefundRequest(data, { id: "refund-reversal", paymentEventId: "igw-payment-reversal", paymentTradeNo: "PAY-REVERSAL", refundAmountFen: 1000, refundReason: "重复支付", idempotencyKey: "refund-reversal-idem" }, { username: "cashier" });
+  reviewRefundRequest(data, created.row.id, { approved: true, reviewDomain: "business-review" }, { username: "business-reviewer" });
+  reviewRefundRequest(data, created.row.id, { approved: true, reviewDomain: "finance-review" }, { username: "finance-reviewer" });
+  const dispatch = prepareRefundDispatch(data, created.row.id);
+  const gatewayEvent = { id: "igw-refund-reversal", adapterType: "financial", gatewayType: "PAYMENT", operation: "refund", adapterReceipt: { receiptId: "REFUND-REVERSAL", status: "accepted" }, requestPayload: { payload: dispatch.payload }, providerStatus: "accepted", reconciliationStatus: "provider-processing", businessDate: "2026-07-22", callbackEvents: [] };
+  data.integrationGatewayEvents.push(gatewayEvent);
+  recordRefundDispatch(data, created.row.id, { type: "PAYMENT", operation: "refund", receiptId: "REFUND-REVERSAL", status: "accepted", requestId: "REFUND-REVERSAL-REQUEST", acceptedAt: "2026-07-22T10:00:00.000Z" }, gatewayEvent.id);
+  const succeeded = applyFinancialCallback(data, { gatewayType: "PAYMENT", eventId: "refund-reversal-success", receiptId: "REFUND-REVERSAL", status: "succeeded", occurredAt: "2026-07-22T10:01:00.000Z", receivedAt: "2026-07-22T10:01:01.000Z", businessDate: "2026-07-22", amountFen: 1000, providerCode: "SUCCESS", failureReason: "", settlementReferenceDigest: "1".repeat(64), nonceDigest: "2".repeat(64), signatureVerified: true });
+  syncRefundFromFinancialCallback(data, succeeded, "financial-callback-adapter", { trustedFinancialCallback: true });
+  const reversed = applyFinancialCallback(data, { gatewayType: "PAYMENT", eventId: "refund-reversal-provider", receiptId: "REFUND-REVERSAL", status: "reversed", occurredAt: "2026-07-22T10:05:00.000Z", receivedAt: "2026-07-22T10:05:01.000Z", businessDate: "2026-07-22", amountFen: 1000, providerCode: "PROVIDER_REVERSAL", failureReason: "provider reversal", settlementReferenceDigest: "3".repeat(64), nonceDigest: "4".repeat(64), signatureVerified: true });
+  const synced = syncRefundFromFinancialCallback(data, reversed, "financial-callback-adapter", { trustedFinancialCallback: true });
+  assert.equal(synced.row.state, "FAILED");
+  assert.equal(synced.row.reversalPending, true);
+  retryRefund(data, synced.row.id, { resolution: "支付机构确认冲正后重新发起", idempotencyKey: "refund-reversal-retry" }, { username: "finance" });
+  assert.equal(synced.row.state, "APPROVED");
+  assert.equal(synced.row.reversalPending, false);
+  assert.equal(verifyRefundLedger(synced.row.events), true);
 });

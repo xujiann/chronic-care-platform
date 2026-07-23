@@ -17,6 +17,7 @@ function readJson(relativePath) {
 function buildFinancialGatewayReadiness(options = {}) {
   const pkg = options.pkg || readJson("package.json");
   const adapterSource = options.adapterSource ?? read("financial-gateways.js");
+  const refundSource = options.refundSource ?? read("online-payment-refunds.js");
   const serverSource = options.serverSource ?? read("server.js");
   const platformHtml = options.platformHtml ?? read("platform.html");
   const platformSource = options.platformSource ?? read("platform.js");
@@ -34,8 +35,40 @@ function buildFinancialGatewayReadiness(options = {}) {
     { id: "receipt", markers: ["receiptId", "providerCode", "financial-http-json-hmac"] },
     { id: "callback-security", markers: ["verifyFinancialCallback", "timingSafeEqual", "FINANCIAL_CALLBACK_REPLAY_DETECTED", "FINANCIAL_CALLBACK_MAX_SKEW_SECONDS"] },
     { id: "callback-state", markers: ["applyFinancialCallback", "superseded-receipt", "amount-mismatch", "terminal-conflict", "reversed"] },
-    { id: "daily-reconciliation", markers: ["createFinancialReconciliationRun", "statementDigest", "grossAmountFen", "provider-summary-digest"] }
-  ].map((item) => ({ ...item, passed: item.markers.every((marker) => adapterSource.includes(marker)) }));
+    { id: "daily-reconciliation", markers: ["createFinancialReconciliationRun", "statementDigest", "grossAmountFen", "provider-summary-digest"] },
+    {
+      id: "online-refund-closed-loop",
+      source: `${adapterSource}\n${refundSource}`,
+      markers: [
+        "createRefundRequest",
+        "reviewRefundRequest",
+        "REQUIRED_REFUND_REVIEW_DOMAINS",
+        "prepareRefundDispatch",
+        "syncRefundFromFinancialCallback",
+        "providerReversal",
+        "REFUND_AMOUNT_EXCEEDS_AVAILABLE",
+        "REFUND_LEDGER_INVALID",
+        "reconcileRefund",
+        "refundOperations"
+      ]
+    },
+    {
+      id: "online-refund-sla-operations",
+      source: refundSource,
+      markers: [
+        "REFUND_SLA_POLICY",
+        "buildRefundSla",
+        "buildRefundExceptionQueue",
+        "provider-callback-overdue",
+        "retry-exhausted",
+        "ledger-invalid"
+      ]
+    }
+  ].map((item) => {
+    const source = item.source || adapterSource;
+    const { source: _source, ...capability } = item;
+    return { ...capability, passed: item.markers.every((marker) => source.includes(marker)) };
+  });
   const apiMarkers = [
     "/api/financial-gateways",
     "/api/financial-gateways/dispatch",

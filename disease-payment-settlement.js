@@ -1,0 +1,540 @@
+"use strict";
+
+const { createHash, randomUUID } = require("node:crypto");
+
+const SETTLEMENT_CONTRACT_ID = "insurance-disease-settlement-v1";
+const ANNUAL_CLEARANCE_CONTRACT_ID = "insurance-annual-clearance-v1";
+const ANNUAL_CLEARANCE_CONTRACT_VERSION = "2.0.0";
+const SETTLEMENT_LABELS = Object.freeze({
+  BATCH_FROZEN: "待申报",
+  CORE_SUBMITTED: "医保核心已申报",
+  CORE_ACCEPTED: "已受理",
+  RETURNED: "退回补正",
+  RECONCILING: "对账中",
+  DIFFERENCE_PENDING: "差异待处理",
+  RECONCILED: "已对账",
+  PAYMENT_REQUESTED: "拨付申请",
+  PAID: "已拨付",
+  CLOSED: "已结案"
+});
+const ACTION_TARGETS = Object.freeze({
+  "submit-core": Object.freeze({ from: ["BATCH_FROZEN"], to: "CORE_SUBMITTED" }),
+  "core-accepted": Object.freeze({ from: ["CORE_SUBMITTED"], to: "CORE_ACCEPTED" }),
+  "core-returned": Object.freeze({ from: ["CORE_SUBMITTED", "CORE_ACCEPTED"], to: "RETURNED" }),
+  "resubmit-core": Object.freeze({ from: ["RETURNED"], to: "CORE_SUBMITTED" }),
+  "start-reconciliation": Object.freeze({ from: ["CORE_ACCEPTED"], to: "RECONCILING" }),
+  "record-difference": Object.freeze({ from: ["RECONCILING"], to: "DIFFERENCE_PENDING" }),
+  "submit-difference-evidence": Object.freeze({ from: ["DIFFERENCE_PENDING"], to: "DIFFERENCE_PENDING" }),
+  "review-difference": Object.freeze({ from: ["DIFFERENCE_PENDING"], to: "DIFFERENCE_PENDING" }),
+  "confirm-matched": Object.freeze({ from: ["RECONCILING"], to: "RECONCILED" }),
+  "resolve-difference": Object.freeze({ from: ["DIFFERENCE_PENDING"], to: "RECONCILED" }),
+  "request-payment": Object.freeze({ from: ["RECONCILED"], to: "PAYMENT_REQUESTED" }),
+  "confirm-payment": Object.freeze({ from: ["PAYMENT_REQUESTED"], to: "PAID" }),
+  close: Object.freeze({ from: ["PAID"], to: "CLOSED" })
+});
+const DIFFERENCE_REVIEW_DOMAINS = Object.freeze(["hospital-finance", "insurance-settlement"]);
+const CLEARANCE_LABELS = Object.freeze({
+  PREPARED: "清算准备",
+  INSTITUTION_CONFIRMING: "医院确认中",
+  DISPUTE_PENDING: "争议处理中",
+  INSTITUTION_CONFIRMED: "医院已确认",
+  CLEARANCE_APPROVED: "清算已批准",
+  POSTED: "财务已入账",
+  LOCKED: "已锁账"
+});
+const CLEARANCE_ACTION_TARGETS = Object.freeze({
+  "start-confirmation": Object.freeze({ from: ["PREPARED"], to: "INSTITUTION_CONFIRMING" }),
+  "record-dispute": Object.freeze({ from: ["INSTITUTION_CONFIRMING"], to: "DISPUTE_PENDING" }),
+  "resolve-dispute": Object.freeze({ from: ["DISPUTE_PENDING"], to: "INSTITUTION_CONFIRMING" }),
+  "confirm-institution": Object.freeze({ from: ["INSTITUTION_CONFIRMING"], to: "INSTITUTION_CONFIRMING" }),
+  "confirm-institutions": Object.freeze({ from: ["INSTITUTION_CONFIRMING"], to: "INSTITUTION_CONFIRMED" }),
+  approve: Object.freeze({ from: ["INSTITUTION_CONFIRMED"], to: "CLEARANCE_APPROVED" }),
+  post: Object.freeze({ from: ["CLEARANCE_APPROVED"], to: "POSTED" }),
+  lock: Object.freeze({ from: ["POSTED"], to: "LOCKED" })
+});
+
+function stableStringify(value) {
+  if (Array.isArray(value)) return `[${value.map((item) => stableStringify(item)).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(",")}}`;
+  return JSON.stringify(value);
+}
+
+function digest(value) {
+  return createHash("sha256").update(typeof value === "string" ? value : stableStringify(value)).digest("hex");
+}
+
+function yuanToFen(value, label = "金额") {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0) throw new Error(`${label}必须为非负金额`);
+  const fen = Math.round(number * 100);
+  if (!Number.isSafeInteger(fen)) throw new Error(`${label}超出安全金额范围`);
+  return fen;
+}
+
+function requireText(payload, field, label = field) {
+  const value = String(payload[field] || "").trim();
+  if (!value) throw new Error(`${label}不能为空`);
+  return value;
+}
+
+function requireDigest(payload, field, label = field) {
+  const value = requireText(payload, field, label);
+  if (!/^(sha256:)?[a-f0-9]{64}$/i.test(value)) throw new Error(`${label}必须为SHA-256摘要`);
+  return value.replace(/^sha256:/i, "").toLowerCase();
+}
+
+function dateOnly(value, label = "日期") {
+  const text = String(value || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) throw new Error(`${label}必须为YYYY-MM-DD`);
+  const parsed = new Date(`${text}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== text) throw new Error(`${label}无效`);
+  return text;
+}
+
+function normalizeWorkingCalendar(input = {}) {
+  const uniqueDates = (values, label) => [...new Set((Array.isArray(values) ? values : []).map((item) => dateOnly(item, label)))].sort();
+  const nonWorkingDates = uniqueDates(input.nonWorkingDates, "非工作日");
+  const workingWeekendDates = uniqueDates(input.workingWeekendDates, "调休工作日");
+  if (nonWorkingDates.some((item) => workingWeekendDates.includes(item))) throw new Error("同一日期不能同时标记为非工作日和调休工作日");
+  return { version: String(input.version || "weekday-only-demo-v1").trim(), nonWorkingDates, workingWeekendDates, productionEvidence: input.productionEvidence === true };
+}
+
+function isWorkingDay(value, calendar = {}) {
+  const day = dateOnly(value);
+  if ((calendar.workingWeekendDates || []).includes(day)) return true;
+  if ((calendar.nonWorkingDates || []).includes(day)) return false;
+  const weekday = new Date(`${day}T00:00:00.000Z`).getUTCDay();
+  return weekday !== 0 && weekday !== 6;
+}
+
+function addWorkingDays(value, count, calendar = {}) {
+  const days = Number(count);
+  if (!Number.isInteger(days) || days < 0 || days > 366) throw new Error("工作日数量无效");
+  const cursor = new Date(`${dateOnly(value)}T00:00:00.000Z`);
+  let added = 0;
+  while (added < days) {
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+    if (isWorkingDay(cursor.toISOString().slice(0, 10), calendar)) added += 1;
+  }
+  return cursor.toISOString().slice(0, 10);
+}
+
+function workingDaysBetween(start, end, calendar = {}) {
+  const startDate = new Date(`${dateOnly(start)}T00:00:00.000Z`);
+  const endDate = new Date(`${dateOnly(end)}T00:00:00.000Z`);
+  if (endDate < startDate) return 0;
+  let count = 0;
+  const cursor = new Date(startDate);
+  while (cursor < endDate) {
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+    if (isWorkingDay(cursor.toISOString().slice(0, 10), calendar)) count += 1;
+  }
+  return count;
+}
+
+function buildSettlementSla(batch = {}, at = new Date().toISOString()) {
+  const submissionDeadline = dateOnly(batch.submissionDeadline, "申报截止日");
+  const calendar = normalizeWorkingCalendar(batch.workingCalendar || {});
+  const policyWorkingDays = Number(batch.policyWorkingDays || 30);
+  if (!Number.isInteger(policyWorkingDays) || policyWorkingDays <= 0 || policyWorkingDays > 120) throw new Error("结算SLA工作日无效");
+  const dueDate = addWorkingDays(submissionDeadline, policyWorkingDays, calendar);
+  const completedDate = batch.paymentReceipt?.paidAt ? dateOnly(batch.paymentReceipt.paidAt, "拨付日期") : "";
+  const evaluatedDate = completedDate || dateOnly(at, "SLA评估日期");
+  const elapsedWorkingDays = workingDaysBetween(submissionDeadline, evaluatedDate, calendar);
+  const overdueWorkingDays = Math.max(0, elapsedWorkingDays - policyWorkingDays);
+  const status = completedDate ? (overdueWorkingDays ? "completed-overdue" : "completed-within-sla") : overdueWorkingDays ? "overdue" : "within-sla";
+  return { policyWorkingDays, submissionDeadline, dueDate, completedDate, evaluatedDate, elapsedWorkingDays, remainingWorkingDays: Math.max(0, policyWorkingDays - elapsedWorkingDays), overdueWorkingDays, status, calendar };
+}
+
+function buildDifferenceCaseSla(differenceCase = {}, calendarInput = {}, at = new Date().toISOString()) {
+  const calendar = normalizeWorkingCalendar(calendarInput);
+  const reviewWorkingDays = Number(differenceCase.reviewWorkingDays || 5);
+  if (!Number.isInteger(reviewWorkingDays) || reviewWorkingDays <= 0 || reviewWorkingDays > 30) throw new Error("差额处理工作日必须为1至30");
+  const openedDate = dateOnly(differenceCase.currentReviewOpenedAt || differenceCase.createdAt, "差额处理开始日期");
+  const dueDate = addWorkingDays(openedDate, reviewWorkingDays, calendar);
+  const completedDate = differenceCase.resolvedAt ? dateOnly(differenceCase.resolvedAt, "差额解决日期") : "";
+  const evaluatedDate = completedDate || dateOnly(at, "差额SLA评估日期");
+  const elapsedWorkingDays = workingDaysBetween(openedDate, evaluatedDate, calendar);
+  const overdueWorkingDays = Math.max(0, elapsedWorkingDays - reviewWorkingDays);
+  const status = completedDate ? (overdueWorkingDays ? "completed-overdue" : "completed-within-sla") : overdueWorkingDays ? "overdue" : "within-sla";
+  return { reviewWorkingDays, openedDate, dueDate, completedDate, evaluatedDate, elapsedWorkingDays, remainingWorkingDays: Math.max(0, reviewWorkingDays - elapsedWorkingDays), overdueWorkingDays, status, calendar };
+}
+
+function eventIdentity(payload, action) {
+  return String(payload.idempotencyKey || payload.receiptId || payload.externalRequestId || payload.paymentRequestId || `${action}:${payload.at || ""}`).trim();
+}
+
+function appendEvent(target, event) {
+  target.events ||= [];
+  const previousHash = target.events.length ? target.events[target.events.length - 1].eventHash : "GENESIS";
+  const base = { ...event, sequence: target.events.length + 1, previousHash };
+  const sealed = Object.freeze({ ...base, eventHash: digest(base) });
+  target.events.push(sealed);
+  return sealed;
+}
+
+function verifyEventLedger(events = []) {
+  return events.every((event, index) => {
+    const { eventHash, ...base } = event;
+    return base.sequence === index + 1 && base.previousHash === (index ? events[index - 1].eventHash : "GENESIS") && eventHash === digest(base);
+  });
+}
+
+function settlementState(batch = {}) {
+  return batch.settlementState || Object.entries(SETTLEMENT_LABELS).find(([, label]) => label === batch.status)?.[0] || "BATCH_FROZEN";
+}
+
+function buildCoreSettlementCase(item = {}) {
+  const basePaymentStandardFen = Number(item.basePaymentStandardFen ?? item.paymentStandardFen ?? yuanToFen(item.paymentStandard || 0, "病例基础支付标准"));
+  const paymentStandardFen = Number(item.paymentStandardFen ?? yuanToFen(item.paymentStandard || 0, "病例支付标准"));
+  if (!Number.isSafeInteger(basePaymentStandardFen) || basePaymentStandardFen < 0 || !Number.isSafeInteger(paymentStandardFen) || paymentStandardFen < 0) throw new Error("医保核心病例支付金额必须为非负整数分");
+  const specialCaseId = String(item.specialCaseId || "").trim();
+  const specialCaseDecisionDigest = String(item.specialCaseDecisionDigest || "").trim().toLowerCase();
+  if (Boolean(specialCaseId) !== Boolean(specialCaseDecisionDigest) || (specialCaseDecisionDigest && !/^[a-f0-9]{64}$/.test(specialCaseDecisionDigest))) throw new Error("特例单议编号与有效决议摘要必须成对提供");
+  return { caseId: item.caseId, settlementListNo: item.settlementListNo, formalReceiptId: item.formalReceiptId, formalReceiptDigest: item.formalReceiptDigest, schemeVersion: item.schemeVersion, groupCode: item.groupCode, parameterId: item.parameterId, basePaymentStandardFen, paymentStandardFen, specialCaseId, specialCaseDecisionDigest };
+}
+
+function buildCoreSettlementEnvelope(batch = {}) {
+  return {
+    contractId: SETTLEMENT_CONTRACT_ID,
+    contractVersion: "1.0.0",
+    batchId: batch.id,
+    batchDigest: batch.batchDigest,
+    period: batch.period,
+    settlementType: batch.type === "年度清算" ? "annual" : "monthly",
+    institutionReference: batch.institution,
+    caseCount: Number(batch.caseCount || 0),
+    declaredAmountFen: Number(batch.declaredAmountFen ?? yuanToFen(batch.declaredAmount || 0, "申报金额")),
+    standardAmountFen: Number(batch.standardAmountFen ?? yuanToFen(batch.standardAmount || 0, "标准金额")),
+    cases: (batch.calculationSnapshots || []).map(buildCoreSettlementCase)
+  };
+}
+
+function transitionSettlementBatch(batch, payload = {}, actor = "system", options = {}) {
+  const action = String(payload.action || "").trim();
+  const rule = ACTION_TARGETS[action];
+  if (!rule) throw new Error(`不支持的结算动作：${action || "空动作"}`);
+  if (["core-accepted", "core-returned", "confirm-payment"].includes(action) && options.trustedInsuranceCoreCallback !== true) throw new Error(`${action}只能由医保核心可信回调驱动`);
+  const before = settlementState(batch);
+  const identity = eventIdentity(payload, action);
+  const duplicate = (batch.events || []).find((event) => event.idempotencyKey === identity && event.action === action);
+  if (identity && duplicate) return { batch, event: duplicate, idempotent: true };
+  if (!rule.from.includes(before)) throw new Error(`结算状态不允许从${SETTLEMENT_LABELS[before] || before}执行${action}`);
+  const now = String(payload.at || new Date().toISOString());
+  const detail = {};
+  if (["submit-core", "resubmit-core"].includes(action)) {
+    detail.externalRequestId = requireText(payload, "externalRequestId", "医保核心请求号");
+    detail.idempotencyKey = requireText(payload, "idempotencyKey", "医保核心幂等键");
+    detail.requestDigest = requireDigest({ requestDigest: payload.requestDigest || digest(buildCoreSettlementEnvelope(batch)) }, "requestDigest", "医保核心请求摘要");
+    batch.coreSubmission = { ...detail, submittedAt: now, submittedBy: actor, revision: action === "resubmit-core" ? Number(batch.coreSubmission?.revision || 1) + 1 : 1 };
+    if (action === "resubmit-core") batch.correctionDigest = requireDigest(payload, "correctionDigest", "补正摘要");
+  }
+  if (action === "core-accepted") {
+    detail.receiptId = requireText(payload, "receiptId", "医保核心受理回执号");
+    batch.coreAcceptance = { receiptId: detail.receiptId, acceptedAt: now, acceptedBy: actor };
+  }
+  if (action === "core-returned") {
+    detail.receiptId = requireText(payload, "receiptId", "医保核心退回回执号");
+    detail.reasonCode = requireText(payload, "reasonCode", "退回原因码");
+    detail.reason = requireText(payload, "reason", "退回原因");
+    batch.returned = { ...detail, returnedAt: now, returnedBy: actor };
+  }
+  if (action === "start-reconciliation") {
+    detail.providerSummaryDigest = requireDigest(payload, "providerSummaryDigest", "医保核心对账摘要");
+    batch.reconciliation = { providerSummaryDigest: detail.providerSummaryDigest, startedAt: now, startedBy: actor };
+  }
+  if (action === "record-difference") {
+    const differenceAmountFen = Number(payload.differenceAmountFen);
+    if (!Number.isSafeInteger(differenceAmountFen) || differenceAmountFen === 0) throw new Error("对账差额必须为非零整数分");
+    detail.differenceAmountFen = differenceAmountFen;
+    detail.reasonCode = requireText(payload, "reasonCode", "差额原因码");
+    detail.evidenceDigest = requireDigest(payload, "evidenceDigest", "差额证据摘要");
+    const reviewWorkingDays = Number(payload.reviewWorkingDays || 5);
+    if (!Number.isInteger(reviewWorkingDays) || reviewWorkingDays <= 0 || reviewWorkingDays > 30) throw new Error("差额处理工作日必须为1至30");
+    const differenceCase = {
+      id: String(payload.differenceCaseId || `settlement-difference-${randomUUID()}`),
+      batchId: batch.id,
+      state: "OPEN",
+      differenceAmountFen,
+      reasonCode: detail.reasonCode,
+      evidence: { digest: detail.evidenceDigest, revision: 1, submittedAt: now, submittedBy: actor },
+      reviewWorkingDays,
+      currentReviewOpenedAt: now,
+      createdAt: now,
+      createdBy: actor,
+      reviews: [],
+      events: []
+    };
+    differenceCase.sla = buildDifferenceCaseSla(differenceCase, batch.workingCalendar || {}, now);
+    appendEvent(differenceCase, { id: `difference-event-${randomUUID()}`, action: "record", from: "NONE", to: "OPEN", actor, at: now, idempotencyKey: identity, detail: { differenceAmountFen, reasonCode: detail.reasonCode, evidenceDigest: detail.evidenceDigest, dueDate: differenceCase.sla.dueDate } });
+    detail.differenceCaseId = differenceCase.id;
+    batch.reconciliation = { ...(batch.reconciliation || {}), differenceAmountFen, reasonCode: detail.reasonCode, differenceRecordedAt: now, differenceCaseId: differenceCase.id, differenceCase };
+  }
+  if (action === "submit-difference-evidence") {
+    const differenceCase = batch.reconciliation?.differenceCase;
+    if (!differenceCase || !["OPEN", "REJECTED"].includes(differenceCase.state)) throw new Error("当前差额状态不允许补充证据");
+    if (!verifyEventLedger(differenceCase.events)) throw new Error("差额事件账本校验失败");
+    if (differenceCase.state === "OPEN" && differenceCase.reviews.length) throw new Error("已有复核意见时只能在驳回后补充证据");
+    detail.evidenceDigest = requireDigest(payload, "evidenceDigest", "差额补充证据摘要");
+    detail.correctionReason = requireText(payload, "correctionReason", "差额补证原因");
+    const beforeCase = differenceCase.state;
+    differenceCase.evidence = { digest: detail.evidenceDigest, revision: Number(differenceCase.evidence?.revision || 0) + 1, submittedAt: now, submittedBy: actor, correctionReason: detail.correctionReason };
+    differenceCase.state = "OPEN";
+    differenceCase.reviews = [];
+    differenceCase.currentReviewOpenedAt = now;
+    differenceCase.sla = buildDifferenceCaseSla(differenceCase, batch.workingCalendar || {}, now);
+    appendEvent(differenceCase, { id: `difference-event-${randomUUID()}`, action: "submit-evidence", from: beforeCase, to: "OPEN", actor, at: now, idempotencyKey: identity, detail: { evidenceDigest: detail.evidenceDigest, revision: differenceCase.evidence.revision, correctionReason: detail.correctionReason, dueDate: differenceCase.sla.dueDate } });
+  }
+  if (action === "review-difference") {
+    const differenceCase = batch.reconciliation?.differenceCase;
+    if (!differenceCase || !["OPEN", "UNDER_REVIEW"].includes(differenceCase.state)) throw new Error("当前差额状态不允许复核");
+    if (!verifyEventLedger(differenceCase.events)) throw new Error("差额事件账本校验失败");
+    const reviewDomain = requireText(payload, "reviewDomain", "差额复核领域");
+    if (!DIFFERENCE_REVIEW_DOMAINS.includes(reviewDomain)) throw new Error("差额复核领域无效");
+    if (differenceCase.reviews.some((item) => item.reviewDomain === reviewDomain)) throw new Error("同一差额复核领域不得重复签署");
+    if (differenceCase.reviews.some((item) => item.reviewer === actor)) throw new Error("同一复核人不得跨领域重复签署");
+    if (typeof payload.approved !== "boolean") throw new Error("差额复核结论不能为空");
+    const review = { id: `difference-review-${randomUUID()}`, reviewDomain, approved: payload.approved, reviewer: actor, reviewedAt: now };
+    if (payload.approved) {
+      review.adjustedAmountFen = Number(payload.adjustedAmountFen);
+      if (!Number.isSafeInteger(review.adjustedAmountFen) || review.adjustedAmountFen < 0) throw new Error("差额复核金额必须为非负整数分");
+      review.resolutionDigest = requireDigest(payload, "resolutionDigest", "差额处置摘要");
+      const priorApproval = differenceCase.reviews.find((item) => item.approved);
+      if (priorApproval && (priorApproval.adjustedAmountFen !== review.adjustedAmountFen || priorApproval.resolutionDigest !== review.resolutionDigest)) throw new Error("医院与医保差额复核金额及处置摘要必须一致");
+    } else {
+      review.reasonCode = requireText(payload, "reasonCode", "差额驳回原因码");
+      review.opinion = requireText(payload, "opinion", "差额驳回意见");
+    }
+    const beforeCase = differenceCase.state;
+    differenceCase.reviews.push(review);
+    if (!review.approved) differenceCase.state = "REJECTED";
+    else if (DIFFERENCE_REVIEW_DOMAINS.every((domain) => differenceCase.reviews.some((item) => item.reviewDomain === domain && item.approved))) differenceCase.state = "RESOLUTION_READY";
+    else differenceCase.state = "UNDER_REVIEW";
+    differenceCase.sla = buildDifferenceCaseSla(differenceCase, batch.workingCalendar || {}, now);
+    appendEvent(differenceCase, { id: `difference-event-${randomUUID()}`, action: review.approved ? "approve" : "reject", from: beforeCase, to: differenceCase.state, actor, at: now, idempotencyKey: identity, detail: { reviewDomain, approved: review.approved, adjustedAmountFen: review.adjustedAmountFen, resolutionDigest: review.resolutionDigest, reasonCode: review.reasonCode } });
+    detail.differenceCaseId = differenceCase.id;
+    detail.reviewDomain = reviewDomain;
+    detail.approved = review.approved;
+  }
+  if (action === "confirm-matched") {
+    const providerAmountFen = Number(payload.providerAmountFen);
+    const expected = Number(batch.adjustedAmountFen ?? batch.standardAmountFen);
+    if (!Number.isSafeInteger(providerAmountFen) || providerAmountFen !== expected) throw new Error("医保核心金额与冻结批次金额不一致");
+    detail.providerAmountFen = providerAmountFen;
+    batch.reconciliation = { ...(batch.reconciliation || {}), providerAmountFen, differenceAmountFen: 0, reconciledAt: now, reconciledBy: actor };
+  }
+  if (action === "resolve-difference") {
+    detail.resolution = requireText(payload, "resolution", "差额处置结论");
+    const adjustedAmountFen = Number(payload.adjustedAmountFen);
+    if (!Number.isSafeInteger(adjustedAmountFen) || adjustedAmountFen < 0) throw new Error("调整后金额必须为非负整数分");
+    const differenceCase = batch.reconciliation?.differenceCase;
+    if (!differenceCase || differenceCase.state !== "RESOLUTION_READY") throw new Error("差额必须经医院财务与医保经办双域复核后才能解决");
+    if (!verifyEventLedger(differenceCase.events)) throw new Error("差额事件账本校验失败");
+    const approvals = differenceCase.reviews.filter((item) => item.approved);
+    const resolutionDigest = requireDigest(payload, "resolutionDigest", "差额处置摘要");
+    if (approvals.length !== DIFFERENCE_REVIEW_DOMAINS.length || approvals.some((item) => item.adjustedAmountFen !== adjustedAmountFen || item.resolutionDigest !== resolutionDigest)) throw new Error("差额解决金额或处置摘要与双域复核意见不一致");
+    const beforeCase = differenceCase.state;
+    differenceCase.state = "RESOLVED";
+    differenceCase.resolvedAt = now;
+    differenceCase.resolvedBy = actor;
+    differenceCase.resolution = { text: detail.resolution, digest: resolutionDigest, adjustedAmountFen };
+    differenceCase.sla = buildDifferenceCaseSla(differenceCase, batch.workingCalendar || {}, now);
+    appendEvent(differenceCase, { id: `difference-event-${randomUUID()}`, action: "resolve", from: beforeCase, to: "RESOLVED", actor, at: now, idempotencyKey: identity, detail: { adjustedAmountFen, resolutionDigest } });
+    batch.adjustedAmountFen = adjustedAmountFen;
+    batch.adjustedAmount = adjustedAmountFen / 100;
+    batch.reconciliation = { ...(batch.reconciliation || {}), resolution: detail.resolution, resolutionDigest, adjustedAmountFen, differenceAmountFen: 0, reconciledAt: now, reconciledBy: actor };
+  }
+  if (action === "request-payment") {
+    detail.paymentRequestId = requireText(payload, "paymentRequestId", "拨付申请号");
+    batch.paymentRequest = { paymentRequestId: detail.paymentRequestId, amountFen: Number(batch.adjustedAmountFen ?? batch.standardAmountFen), requestedAt: now, requestedBy: actor };
+  }
+  if (action === "confirm-payment") {
+    detail.receiptId = requireText(payload, "receiptId", "拨付回执号");
+    const paidAmountFen = Number(payload.paidAmountFen);
+    const expected = Number(batch.adjustedAmountFen ?? batch.standardAmountFen);
+    if (!Number.isSafeInteger(paidAmountFen) || paidAmountFen !== expected) throw new Error("拨付金额必须与已对账金额一致");
+    batch.paymentReceipt = { receiptId: detail.receiptId, paidAmountFen, paidAt: now, confirmedBy: actor };
+  }
+  if (action === "close") {
+    detail.closeReference = requireText(payload, "closeReference", "结案凭证号");
+    batch.closedAt = now;
+    batch.closedBy = actor;
+    batch.closeReference = detail.closeReference;
+  }
+  batch.settlementState = rule.to;
+  batch.status = SETTLEMENT_LABELS[rule.to];
+  batch.updatedAt = now;
+  batch.updatedBy = actor;
+  if (batch.submissionDeadline) batch.sla = buildSettlementSla(batch, now);
+  const event = appendEvent(batch, { id: `settlement-event-${randomUUID()}`, action, from: before, to: rule.to, actor, at: now, idempotencyKey: identity, detail });
+  return { batch, event, idempotent: false };
+}
+
+function createAnnualClearance(batches = [], payload = {}, actor = "system") {
+  const year = Number(payload.year);
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) throw new Error("年度清算年份无效");
+  const eligible = batches.filter((batch) => batch.type === "月度结算" && String(batch.period || "").startsWith(`${year}-`) && ["PAID", "CLOSED"].includes(settlementState(batch)));
+  if (!eligible.length) throw new Error("该年度没有已拨付或已结案的月度结算批次");
+  const adjustmentFundFen = Number(payload.adjustmentFundFen || 0);
+  const retainedBalanceFen = Number(payload.retainedBalanceFen || 0);
+  const riskReserveFen = Number(payload.riskReserveFen || 0);
+  if (![adjustmentFundFen, retainedBalanceFen, riskReserveFen].every(Number.isSafeInteger) || retainedBalanceFen < 0 || riskReserveFen < 0) throw new Error("调节金、结余留用和风险准备金必须为有效整数分");
+  const paidAmountFen = eligible.reduce((sum, item) => sum + Number(item.paymentReceipt?.paidAmountFen || item.adjustedAmountFen || item.standardAmountFen || 0), 0);
+  const finalClearanceAmountFen = paidAmountFen + adjustmentFundFen - retainedBalanceFen - riskReserveFen;
+  if (!Number.isSafeInteger(finalClearanceAmountFen) || finalClearanceAmountFen < 0) throw new Error("年度最终清算金额无效");
+  const institutionMap = new Map();
+  for (const batch of eligible) {
+    const snapshots = Array.isArray(batch.calculationSnapshots) && batch.calculationSnapshots.length ? batch.calculationSnapshots : [{ institution: batch.institution || "全部机构", institutionCode: batch.institutionCode || "ALL_INSTITUTIONS", paymentStandardFen: batch.standardAmountFen, caseId: "" }];
+    for (const snapshot of snapshots) {
+      const institutionId = String(snapshot.institutionCode || snapshot.institution || batch.institutionCode || batch.institution || "ALL_INSTITUTIONS").trim();
+      const institutionName = String(snapshot.institution || batch.institution || institutionId).trim();
+      const current = institutionMap.get(institutionId) || { institutionId, institutionName, batchIds: new Set(), caseCount: 0, standardAmountFen: 0 };
+      current.batchIds.add(batch.id);
+      current.caseCount += snapshot.caseId ? 1 : Number(batch.caseCount || 0);
+      current.standardAmountFen += Number(snapshot.paymentStandardFen || 0);
+      institutionMap.set(institutionId, current);
+    }
+  }
+  const institutionConfirmations = [...institutionMap.values()].map((item) => ({ institutionId: item.institutionId, institutionName: item.institutionName, batchIds: [...item.batchIds].sort(), caseCount: item.caseCount, standardAmountFen: item.standardAmountFen, state: "PENDING", confirmation: null }));
+  const institutionStandardAmountFen = institutionConfirmations.reduce((sum, item) => sum + item.standardAmountFen, 0);
+  const standardAmountFen = eligible.reduce((sum, item) => sum + Number(item.standardAmountFen || 0), 0);
+  if (institutionStandardAmountFen !== standardAmountFen) throw new Error("逐机构清算金额与年度标准金额不一致");
+  const row = {
+    id: String(payload.id || `annual-clearance-${year}-${Date.now()}`),
+    contractVersion: ANNUAL_CLEARANCE_CONTRACT_VERSION,
+    year,
+    state: "PREPARED",
+    status: CLEARANCE_LABELS.PREPARED,
+    batchIds: eligible.map((item) => item.id),
+    batchCount: eligible.length,
+    institutionCount: institutionConfirmations.length,
+    institutionConfirmations,
+    standardAmountFen,
+    paidAmountFen,
+    adjustmentFundFen,
+    retainedBalanceFen,
+    riskReserveFen,
+    finalClearanceAmountFen,
+    adjustmentReason: String(payload.adjustmentReason || "").trim(),
+    createdAt: new Date().toISOString(),
+    createdBy: actor,
+    events: []
+  };
+  row.clearanceDigest = digest(annualClearanceDigestPayload(row));
+  appendEvent(row, { id: `clearance-event-${randomUUID()}`, action: "prepare", from: "NONE", to: "PREPARED", actor, at: row.createdAt, idempotencyKey: row.id, detail: { clearanceDigest: row.clearanceDigest } });
+  return row;
+}
+
+function annualClearanceDigestPayload(row = {}) {
+  if (row.contractVersion !== ANNUAL_CLEARANCE_CONTRACT_VERSION) {
+    return { year: Number(row.year), batchIds: row.batchIds || [], standardAmountFen: Number(row.standardAmountFen || 0), paidAmountFen: Number(row.paidAmountFen || 0), adjustmentFundFen: Number(row.adjustmentFundFen || 0), retainedBalanceFen: Number(row.retainedBalanceFen || 0), riskReserveFen: Number(row.riskReserveFen || 0), finalClearanceAmountFen: Number(row.finalClearanceAmountFen || 0), adjustmentReason: String(row.adjustmentReason || "") };
+  }
+  const institutions = (row.institutionConfirmations || []).map((item) => ({ institutionId: item.institutionId, institutionName: item.institutionName, batchIds: item.batchIds || [], caseCount: Number(item.caseCount || 0), standardAmountFen: Number(item.standardAmountFen || 0) })).sort((left, right) => left.institutionId.localeCompare(right.institutionId));
+  return { contractVersion: row.contractVersion, year: Number(row.year), batchIds: row.batchIds || [], institutionCount: Number(row.institutionCount || institutions.length), institutions, standardAmountFen: Number(row.standardAmountFen || 0), paidAmountFen: Number(row.paidAmountFen || 0), adjustmentFundFen: Number(row.adjustmentFundFen || 0), retainedBalanceFen: Number(row.retainedBalanceFen || 0), riskReserveFen: Number(row.riskReserveFen || 0), finalClearanceAmountFen: Number(row.finalClearanceAmountFen || 0), adjustmentReason: String(row.adjustmentReason || "") };
+}
+
+function institutionConfirmationDigest(row = {}) {
+  const confirmations = (row.institutionConfirmations || []).map((item) => ({ institutionId: item.institutionId, confirmationDigest: item.confirmation?.digest || "" })).sort((left, right) => left.institutionId.localeCompare(right.institutionId));
+  if (!confirmations.length || confirmations.some((item) => !/^[a-f0-9]{64}$/.test(item.confirmationDigest))) throw new Error("机构确认尚未完整");
+  if (!verifyEventLedger(row.events)) throw new Error("年度清算事件账本校验失败");
+  if (confirmations.some((item) => !(row.events || []).some((event) => event.action === "confirm-institution" && event.detail?.institutionId === item.institutionId && event.detail?.confirmationDigest === item.confirmationDigest))) throw new Error("机构确认缺少匹配的账本事件");
+  return digest({ clearanceId: row.id, clearanceDigest: row.clearanceDigest, confirmations });
+}
+
+function buildAnnualClearanceEnvelope(row = {}) {
+  const expectedDigest = digest(annualClearanceDigestPayload(row));
+  if (!row.clearanceDigest || row.clearanceDigest !== expectedDigest) throw new Error("年度清算摘要校验失败");
+  return { contractId: ANNUAL_CLEARANCE_CONTRACT_ID, contractVersion: row.contractVersion || "1.0.0", clearanceId: row.id, clearanceDigest: row.clearanceDigest, ...annualClearanceDigestPayload(row) };
+}
+
+function transitionAnnualClearance(row, payload = {}, actor = "system") {
+  const action = String(payload.action || "").trim();
+  const rule = CLEARANCE_ACTION_TARGETS[action];
+  if (!rule) throw new Error(`不支持的年度清算动作：${action || "空动作"}`);
+  const before = row.state || "PREPARED";
+  if (!rule.from.includes(before)) throw new Error(`年度清算状态不允许从${CLEARANCE_LABELS[before] || before}执行${action}`);
+  const now = String(payload.at || new Date().toISOString());
+  const identity = eventIdentity(payload, action);
+  if (!verifyEventLedger(row.events)) throw new Error("年度清算事件账本校验失败");
+  const duplicate = (row.events || []).find((event) => event.idempotencyKey === identity && event.action === action);
+  if (identity && duplicate) return { row, event: duplicate, idempotent: true };
+  buildAnnualClearanceEnvelope(row);
+  const detail = {};
+  if (action === "record-dispute") {
+    detail.institutionId = String(payload.institutionId || payload.institution || "").trim();
+    if (!detail.institutionId) throw new Error("争议医院标识不能为空");
+    const institution = (row.institutionConfirmations || []).find((item) => item.institutionId === detail.institutionId || item.institutionName === detail.institutionId);
+    if (!institution) throw new Error("争议医院不在年度清算确认清单");
+    detail.reason = requireText(payload, "reason", "争议原因");
+    detail.reasonCode = requireText(payload, "reasonCode", "争议原因码");
+    detail.evidenceDigest = requireDigest(payload, "evidenceDigest", "争议证据摘要");
+    detail.amountFen = Number(payload.amountFen);
+    if (!Number.isSafeInteger(detail.amountFen) || detail.amountFen === 0) throw new Error("争议金额必须为非零整数分");
+    row.disputes ||= [];
+    const disputeId = String(payload.disputeId || `clearance-dispute-${randomUUID()}`);
+    if (row.disputes.some((item) => item.id === disputeId)) throw new Error("年度清算争议编号已存在");
+    institution.state = "DISPUTED";
+    institution.confirmation = null;
+    row.disputes.push({ id: disputeId, ...detail, institutionId: institution.institutionId, status: "open", createdAt: now, createdBy: actor });
+    detail.disputeId = disputeId;
+  }
+  if (action === "resolve-dispute") {
+    detail.disputeId = requireText(payload, "disputeId", "争议编号");
+    detail.resolution = requireText(payload, "resolution", "争议处理结论");
+    detail.resolutionDigest = requireDigest(payload, "resolutionDigest", "争议处理摘要");
+    detail.resolvedAmountFen = Number(payload.resolvedAmountFen);
+    if (!Number.isSafeInteger(detail.resolvedAmountFen)) throw new Error("争议解决金额必须为整数分");
+    const open = (row.disputes || []).find((item) => item.id === detail.disputeId && item.status === "open");
+    if (!open) throw new Error("没有待处理的年度清算争议");
+    const institution = (row.institutionConfirmations || []).find((item) => item.institutionId === open.institutionId);
+    if (!institution) throw new Error("争议医院不在年度清算确认清单");
+    Object.assign(open, { status: "resolved", resolution: detail.resolution, resolutionDigest: detail.resolutionDigest, resolvedAmountFen: detail.resolvedAmountFen, resolvedAt: now, resolvedBy: actor });
+    institution.state = "PENDING";
+    institution.confirmation = null;
+  }
+  if (action === "confirm-institution") {
+    detail.institutionId = requireText(payload, "institutionId", "确认医院标识");
+    const institution = (row.institutionConfirmations || []).find((item) => item.institutionId === detail.institutionId);
+    if (!institution) throw new Error("确认医院不在年度清算确认清单");
+    if ((row.disputes || []).some((item) => item.institutionId === institution.institutionId && item.status === "open")) throw new Error("该医院仍有未解决的年度清算争议");
+    if (institution.state === "CONFIRMED") throw new Error("该医院已完成年度清算确认");
+    detail.confirmationDigest = requireDigest(payload, "confirmationDigest", "医院确认摘要");
+    institution.state = "CONFIRMED";
+    institution.confirmation = { digest: detail.confirmationDigest, confirmedAt: now, confirmedBy: actor };
+  }
+  if (action === "confirm-institutions") {
+    if ((row.disputes || []).some((item) => item.status === "open")) throw new Error("仍有未解决的年度清算争议");
+    if (!(row.institutionConfirmations || []).length || row.institutionConfirmations.some((item) => item.state !== "CONFIRMED")) throw new Error("仍有医院未完成年度清算确认");
+    const expectedDigest = institutionConfirmationDigest(row);
+    detail.confirmationDigest = requireDigest(payload, "confirmationDigest", "医院汇总确认摘要");
+    if (detail.confirmationDigest !== expectedDigest) throw new Error("医院汇总确认摘要与逐机构确认不一致");
+    row.institutionConfirmation = { digest: detail.confirmationDigest, institutionCount: row.institutionConfirmations.length, confirmedAt: now, confirmedBy: actor };
+  }
+  if (action === "approve") {
+    if ((row.adjustmentFundFen || row.retainedBalanceFen || row.riskReserveFen) && !row.adjustmentReason) throw new Error("存在年度资金调整时必须填写调整原因");
+    detail.adjustmentApprovalDigest = (row.adjustmentFundFen || row.retainedBalanceFen || row.riskReserveFen) ? requireDigest(payload, "adjustmentApprovalDigest", "资金调整批准摘要") : "";
+    row.approval = { approvalNo: requireText(payload, "approvalNo", "清算批准文号"), adjustmentApprovalDigest: detail.adjustmentApprovalDigest, approvedAt: now, approvedBy: actor };
+  }
+  if (action === "post") {
+    const postedAmountFen = Number(payload.postedAmountFen ?? row.finalClearanceAmountFen);
+    if (!Number.isSafeInteger(postedAmountFen) || postedAmountFen !== row.finalClearanceAmountFen) throw new Error("财务入账金额必须与最终清算金额一致");
+    detail.postedAmountFen = postedAmountFen;
+    row.posting = { voucherNo: requireText(payload, "voucherNo", "财务凭证号"), postedAmountFen, postedAt: now, postedBy: actor };
+  }
+  if (action === "lock") {
+    detail.lockReference = requireText(payload, "lockReference", "锁账凭证号");
+    if (!row.posting || row.posting.postedAmountFen !== row.finalClearanceAmountFen) throw new Error("年度清算财务入账金额未核准，禁止锁账");
+    if (!verifyEventLedger(row.events)) throw new Error("年度清算事件账本校验失败，禁止锁账");
+    row.lockedAt = now;
+    row.lockedBy = actor;
+    row.lockReference = detail.lockReference;
+  }
+  row.state = rule.to;
+  row.status = CLEARANCE_LABELS[rule.to];
+  row.updatedAt = now;
+  row.updatedBy = actor;
+  const event = appendEvent(row, { id: `clearance-event-${randomUUID()}`, action, from: before, to: rule.to, actor, at: now, idempotencyKey: identity, detail });
+  return { row, event, idempotent: false };
+}
+
+module.exports = { ACTION_TARGETS, ANNUAL_CLEARANCE_CONTRACT_ID, ANNUAL_CLEARANCE_CONTRACT_VERSION, CLEARANCE_ACTION_TARGETS, CLEARANCE_LABELS, DIFFERENCE_REVIEW_DOMAINS, SETTLEMENT_CONTRACT_ID, SETTLEMENT_LABELS, addWorkingDays, annualClearanceDigestPayload, appendEvent, buildAnnualClearanceEnvelope, buildCoreSettlementCase, buildCoreSettlementEnvelope, buildDifferenceCaseSla, buildSettlementSla, createAnnualClearance, dateOnly, digest, institutionConfirmationDigest, isWorkingDay, normalizeWorkingCalendar, settlementState, stableStringify, transitionAnnualClearance, transitionSettlementBatch, verifyEventLedger, workingDaysBetween, yuanToFen };
