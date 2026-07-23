@@ -172,3 +172,24 @@ test("coordination center exposes missing source collections instead of claiming
   assert.equal(education.structurallyReady, false);
   assert.deepEqual(education.missingCollections, ["chronicEducationPushes"]);
 });
+
+test("system adapter can open an auditable coordination exception without a forged receipt", () => {
+  const initial = buildCenter().handoffs.find((item) => item.laneId === "health-education");
+  const handoff = advanceToInProgress(initial);
+  const failed = applyPublicHealthCoordinationAction(handoff, {
+    action: "open-coordination-exception",
+    idempotencyKey: "education:adapter-dead-letter",
+    expectedVersion: handoff.version,
+    reason: "外部投递重试耗尽，未取得可信回执",
+    exceptionOwner: "健康教育接口专班",
+    dueAt: "2026-07-31",
+    evidenceRefs: ["ph-dispatch-education-dead-letter"]
+  }, { name: "健康教育外部适配器", role: "system" }).handoff;
+
+  assert.equal(failed.state, "exception-open");
+  assert.equal(failed.receipt, null);
+  assert.equal(failed.exception.owner, "健康教育接口专班");
+  assert.deepEqual(failed.exception.evidenceRefs, ["ph-dispatch-education-dead-letter"]);
+  assert.equal(failed.lastAction.action, "open-coordination-exception");
+  assert.equal(failed.productionReady, false);
+});

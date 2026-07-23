@@ -26,9 +26,10 @@
 1. `assign-coordination`：责任角色确认承办人、完成时限和说明。
 2. `start-coordination`：承办人接单，进入跨域核对和接口处置。
 3. `record-coordination-receipt`：适配器或责任部门记录接受/拒绝回执；拒绝回执必须同时指定异常原因、责任人和期限。
-4. `retry-coordination`：责任部门修复后重试，保留原异常和审计轨迹。
-5. `close-coordination`：仅在接受回执后关闭，关闭证据必须与该领域要求完全一致。
-6. `reopen-coordination`：已关闭任务可因复核问题重新打开。
+4. `open-coordination-exception`：系统适配器在无可信回执且重试耗尽时打开补偿异常，必须指定原因、责任人、期限和死信证据；不得伪造拒绝回执。
+5. `retry-coordination`：责任部门修复后重试，保留原异常和审计轨迹。
+6. `close-coordination`：仅在接受回执后关闭，关闭证据必须与该领域要求完全一致。
+7. `reopen-coordination`：已关闭任务可因复核问题重新打开。
 
 所有写动作要求责任角色授权、幂等键和可选的乐观版本校验。八领域验收场景各执行四步，形成 8 个业务闭环和 32 条审计记录。免疫规划额外覆盖拒绝回执、异常责任分派与重试；妇幼、老年、慢病、公卫随访、健康教育和家庭医生分别验证其专属源数据及回执证据。
 
@@ -39,13 +40,14 @@ T08 自有实现边界：
 - `public-health-coordination-service.js`：八领域责任、来源、依赖、状态机与验收场景。
 - `public-health-coordination-runtime.js`：从业务集合重建八领域任务，安全恢复持久化操作字段，并输出不可变的数据补丁和最小化追加审计；拒绝领域、业务键和来源引用篡改。
 - `public-health-external-adapter-service.js`：八领域适配器注册表、最小化签名请求、可信回执验签、瞬时故障重试、永久故障/重试耗尽死信和补偿责任。
+- `public-health-external-adapter-runtime.js`：持久化出站箱、可变投递状态签名、回调幂等、成功/拒绝回执自动推进和无回执死信补偿异常联动。
 - `scripts/public-health-coordination-readiness.js`：功能完成度与上线边界门禁。
 - `scripts/public-health-final-readiness.js`：持久化写模型、八领域签名回执和失败关闭边界的最终端到端验收。
 - `scripts/public-health-readiness.js`：将事件直报、标准复核和协同中心聚合到公共卫生系统视图。
 - `public-health.html`、`public-health.js`：协同中心页面容器、接口渲染、静态回退，以及分派、接单、成功/拒收回执、重试、证据关闭和重开动作载荷。
 - `test/public-health-coordination-*.test.js`：服务、验收和页面契约测试。
 
-T00 继续负责公共 `server.js` 动作路由及持久化写入器接线、`portal.css` 公共样式、`package.json` 脚本、`README` 和发布总表。本线程不修改这些公共文件。路由应调用 `applyPublicHealthCoordinationActionToState()`，把返回的 `nextData` 交给统一持久化写入器；T00 不应在路由内复制状态转换、授权、幂等或版本判断。
+T00 继续负责公共 `server.js` 动作路由及持久化写入器接线、`portal.css` 公共样式、`package.json` 脚本、`README` 和发布总表。本线程不修改这些公共文件。协调路由应调用 `applyPublicHealthCoordinationActionToState()`；外部投递和回调路由应分别调用 `enqueuePublicHealthExternalDispatchToState()`、`recordPublicHealthExternalAttemptToState()`。所有路由只把返回的 `nextData` 交给统一持久化写入器，不应复制状态转换、授权、幂等、版本、签名或补偿判断。
 
 ## 持久化与外部适配实施契约
 
@@ -54,6 +56,8 @@ T00 继续负责公共 `server.js` 动作路由及持久化写入器接线、`po
 八个适配器分别对应传染病直报、免疫规划、妇幼连续服务、老年健康、慢病管理、基本公卫随访、健康教育和家庭医生履约。生产配置必须使用 HTTPS，并为请求签名和回执验签分别配置不少于 32 字符的密钥。请求只发送任务标识、业务键哈希、幂等键哈希、操作、版本和证据引用，不发送 `residentId` 或原始幂等键。回执签名同时绑定任务、领域、请求摘要、状态、回执号、证据、时间和拒绝补偿字段；签名后篡改任一字段均拒绝。
 
 瞬时网络错误、HTTP 429 和 5xx 使用同一请求摘要和幂等键重试；达到最大次数进入死信。无回执、绑定不一致、签名无效或永久 HTTP 故障直接进入死信并要求安全复核与人工补偿。外部回执验证成功只表示业务材料已登记，仍须可信现场证据，因而所有适配器结果继续保持 `productionReady=false`。
+
+出站箱持久化 `publicHealthExternalDispatches` 和最小化追加审计 `publicHealthExternalDispatchAudit`。初始请求签名保护固定契约；运行时状态签名额外绑定投递状态、尝试次数、最大重试次数、下次重试时间、回执、阻断原因和补偿责任，防止持久化后篡改状态影响信任判定。可信回执连同原签名持久化，可再次独立验签；每次响应还保留内容摘要用于无敏感正文的取证。每个回调必须携带独立幂等键：相同回调不重复增加尝试、审计或协调版本。可信接受回执自动把任务推进到 `receipt-confirmed`；可信拒绝回执打开签名所绑定的异常；无可信回执的永久失败或重试耗尽通过 `open-coordination-exception` 打开预先指定的补偿异常。
 
 ## 测试清单
 
@@ -64,11 +68,12 @@ T00 继续负责公共 `server.js` 动作路由及持久化写入器接线、`po
 - 关闭操作要求精确证据集合；越权、版本冲突和重复请求均被控制。
 - `/api/public-health/system` 的现有构建链能够返回 `coordinationCenter`，页面缺少接口时仍可构造八领域静态视图。
 - 页面动作统一携带幂等键和 `expectedVersion`，并调用 `/api/public-health/coordination/:id/actions` 公共路由边界；T00 只需完成路由接线和落库。
+- 出站入队、成功/拒绝回调、瞬时重试、重试耗尽和回调重放均通过不可变状态补丁持久化；篡改请求或运行时状态签名必须在处理前拒绝。
 - 缺少任何必需业务集合时，结构就绪门禁失败。
 - 功能验收通过仍保持 `productionReady=false`，不替代生产现场证据。
 
 ## 验收标准
 
-功能完成须同时满足：八领域全部结构就绪、八个任务拥有稳定业务键和源引用、传染病直报链及八轨标准复核已关联、验收场景关闭 8/8、审计记录为 32 条、页面及静态回退契约存在、专项就绪报告全部通过。
+功能完成须同时满足：八领域全部结构就绪、八个任务拥有稳定业务键和源引用、传染病直报链及八轨标准复核已关联、验收场景关闭 8/8、审计记录为 32 条、出站箱回执能自动联动协调状态且篡改失败关闭、页面及静态回退契约存在、专项就绪报告全部通过。
 
 正式上线还须由 T00 把动作路由和统一持久化写入器接到 T08 运行时控制器、完成公共脚本接线和发布总表更新，并配置生产 HTTPS 端点与密钥，在生产端点冒烟后核验签名回执和可信现场证据。未完成这些事项时，正式状态保持阻断。

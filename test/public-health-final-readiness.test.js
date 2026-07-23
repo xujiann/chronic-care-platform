@@ -14,12 +14,15 @@ test("final readiness accepts every planned T08 functional increment", () => {
   const report = buildPublicHealthFinalReadiness();
   assert.equal(report.ok, true);
   assert.equal(report.functionalState, "t08-public-health-planned-functions-complete");
-  assert.equal(report.summary.checks, 14);
-  assert.equal(report.summary.passed, 14);
+  assert.equal(report.summary.checks, 18);
+  assert.equal(report.summary.passed, 18);
   assert.equal(report.summary.lanes, 8);
   assert.equal(report.summary.handoffs, 8);
   assert.equal(report.summary.adapterProfiles, 8);
   assert.equal(report.summary.verifiedAcceptanceDeliveries, 8);
+  assert.equal(report.summary.persistedOutboxDispatches, 1);
+  assert.equal(report.summary.persistedOutboxAuditEntries, 2);
+  assert.equal(report.outboxAcceptance.coordinationState, "receipt-confirmed");
   assert.equal(report.productionReady, false);
   assert.equal(report.remainingT00Integration.length, 3);
 });

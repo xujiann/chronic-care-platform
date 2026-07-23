@@ -93,6 +93,7 @@ const COORDINATION_ACTIONS = {
   "assign-coordination": { from: ["detected", "reopened"], to: "assigned" },
   "start-coordination": { from: ["assigned"], to: "in-progress" },
   "record-coordination-receipt": { from: ["in-progress"], to: null },
+  "open-coordination-exception": { from: ["in-progress"], to: "exception-open" },
   "retry-coordination": { from: ["exception-open"], to: "in-progress" },
   "close-coordination": { from: ["receipt-confirmed"], to: "closed" },
   "reopen-coordination": { from: ["closed"], to: "reopened" }
@@ -271,7 +272,7 @@ function actionDefinition(action) {
 
 function authorize(handoff, action, user) {
   const role = actorRole(user);
-  const allowed = action === "record-coordination-receipt"
+  const allowed = ["record-coordination-receipt", "open-coordination-exception"].includes(action)
     ? [handoff.ownerRole, "system", "commission"]
     : [handoff.ownerRole, "commission"];
   if (!allowed.includes(role)) throw new Error(`role ${role} is not allowed to ${action} for lane ${handoff.laneId}`);
@@ -318,6 +319,19 @@ function applyPublicHealthCoordinationAction(current, payload = {}, user = {}) {
       nextState = "exception-open";
       handoff.exception = { status: "open", reason: clean(payload.reason), owner: clean(payload.exceptionOwner), dueAt: clean(payload.dueAt) };
     }
+  }
+  if (action === "open-coordination-exception") {
+    const evidenceRefs = Array.isArray(payload.evidenceRefs) ? payload.evidenceRefs.map(clean).filter(Boolean) : [];
+    if (!clean(payload.reason) || !clean(payload.exceptionOwner) || !/^\d{4}-\d{2}-\d{2}/.test(clean(payload.dueAt)) || !evidenceRefs.length) {
+      throw new Error("reason, exceptionOwner, dueAt and evidenceRefs are required to open coordination exception");
+    }
+    handoff.exception = {
+      status: "open",
+      reason: clean(payload.reason),
+      owner: clean(payload.exceptionOwner),
+      dueAt: clean(payload.dueAt),
+      evidenceRefs
+    };
   }
   if (action === "retry-coordination") {
     if (!clean(payload.note)) throw new Error("note is required to retry coordination");

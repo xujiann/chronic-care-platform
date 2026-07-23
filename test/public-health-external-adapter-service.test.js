@@ -6,6 +6,7 @@ const {
   createPublicHealthExternalDispatch,
   recordPublicHealthExternalDeliveryAttempt,
   signPublicHealthExternalReceipt,
+  verifyPublicHealthExternalDispatch,
   verifyPublicHealthExternalReceipt
 } = require("../public-health-external-adapter-service");
 
@@ -73,7 +74,28 @@ test("external dispatch is deterministic, signed and excludes resident identifie
   assert.equal(JSON.stringify(first).includes(handoff.residentId), false);
   assert.equal(JSON.stringify(first).includes(input.idempotencyKey), false);
   assert.equal(JSON.stringify(first).includes(REQUEST_SECRET), false);
+  assert.deepEqual(verifyPublicHealthExternalDispatch(first, REQUEST_SECRET), { ok: true, reason: "verified" });
   assert.equal(first.productionReady, false);
+});
+
+test("persisted dispatch tampering invalidates its request signature and bindings", () => {
+  const dispatch = createPublicHealthExternalDispatch(
+    inProgressHandoff("public-health-followup"),
+    { idempotencyKey: "followup:dispatch:tamper" },
+    credentials()
+  );
+  assert.equal(verifyPublicHealthExternalDispatch({
+    ...dispatch,
+    request: { ...dispatch.request, operation: "forged-operation" }
+  }, REQUEST_SECRET).ok, false);
+  assert.equal(verifyPublicHealthExternalDispatch({
+    ...dispatch,
+    handoffId: "phc-forged-001"
+  }, REQUEST_SECRET).ok, false);
+  assert.equal(verifyPublicHealthExternalDispatch({
+    ...dispatch,
+    requestSignature: "0".repeat(64)
+  }, REQUEST_SECRET).ok, false);
 });
 
 test("verified accepted receipt completes delivery but not production readiness", () => {
@@ -88,7 +110,9 @@ test("verified accepted receipt completes delivery but not production readiness"
   }, { receiptSecret: RECEIPT_SECRET, at: "2026-07-22T08:01:00.000Z" });
   assert.equal(delivered.deliveryState, "delivered");
   assert.equal(delivered.receipt.status, "accepted");
+  assert.equal(verifyPublicHealthExternalReceipt(delivered, delivered.receipt, RECEIPT_SECRET).ok, true);
   assert.equal(delivered.attempts[0].outcome, "accepted");
+  assert.match(delivered.attempts[0].receiptDigest, /^[a-f0-9]{64}$/);
   assert.equal(delivered.productionReady, false);
   assert.match(delivered.blocker, /Trusted site evidence/);
 });

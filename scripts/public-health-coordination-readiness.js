@@ -34,6 +34,7 @@ function buildPublicHealthCoordinationReadiness(options = {}) {
   const serviceTestSource = options.serviceTestSource ?? read("test/public-health-coordination-service.test.js");
   const runtimeSource = options.runtimeSource ?? read("public-health-coordination-runtime.js");
   const adapterSource = options.adapterSource ?? read("public-health-external-adapter-service.js");
+  const adapterRuntimeSource = options.adapterRuntimeSource ?? read("public-health-external-adapter-runtime.js");
   const publicHealthSource = options.publicHealthSource ?? read("public-health.js");
   const publicHealthHtml = options.publicHealthHtml ?? read("public-health.html");
   const systemBuilderSource = options.systemBuilderSource ?? read("scripts/public-health-readiness.js");
@@ -62,6 +63,7 @@ function buildPublicHealthCoordinationReadiness(options = {}) {
     check("runtime:persisted-invariants", ["PERSISTED_OPERATIONAL_FIELDS", "isCompatiblePersistedHandoff", "publicHealthCoordinationAudit", "rejectedPersistedHandoffs"].every((token) => runtimeSource.includes(token)), "persisted operational fields are allowlisted and invariant tampering is rejected", "runtime"),
     check("adapter:eight-profiles", adapterRegistry?.summary?.adapters === 8 && adapterRegistry?.productionReady === false, `${adapterRegistry?.summary?.adapters || 0}/8 fail-closed adapter profiles`, "adapter"),
     check("adapter:signed-retry-dead-letter", ["HMAC-SHA256", "timingSafeEqual", "retry-scheduled", "dead-letter", "productionReady: false"].every((token) => adapterSource.includes(token)), "signed receipts, retry and dead-letter compensation remain fail-closed", "adapter"),
+    check("adapter:persistent-outbox-link", ["publicHealthExternalDispatches", "runtimeStateSignature", "recordPublicHealthExternalAttemptToState", "open-coordination-exception"].every((token) => adapterRuntimeSource.includes(token)), "signed persistent outbox links verified callbacks and dead letters to coordination state", "adapter"),
     check("runtime:system-builder", system.coordinationCenter?.summary?.lanes === 8 && systemBuilderSource.includes("buildPublicHealthCoordinationCenter") && systemBuilderSource.includes("coordinationCenter"), "buildPublicHealthSystem returns coordinationCenter", "runtime"),
     check("frontend:panel", publicHealthHtml.includes("public-health-coordination-center") && publicHealthSource.includes("renderPublicHealthCoordinationCenter"), "public health page renders the coordination center", "frontend"),
     check("frontend:static-fallback", publicHealthSource.includes("buildStaticCoordinationCenter") && publicHealthSource.includes("eight-lane-static-coordination-runnable"), "file preview builds a local eight-lane fallback", "frontend"),
@@ -91,6 +93,7 @@ function buildPublicHealthCoordinationReadiness(options = {}) {
       service: "public-health-coordination-service.js",
       runtime: "public-health-coordination-runtime.js",
       externalAdapters: "public-health-external-adapter-service.js",
+      externalAdapterRuntime: "public-health-external-adapter-runtime.js",
       page: "public-health.html",
       pageController: "public-health.js",
       test: "test/public-health-coordination-service.test.js",

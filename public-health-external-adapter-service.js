@@ -162,6 +162,39 @@ function createPublicHealthExternalDispatch(handoff = {}, input = {}, credential
   };
 }
 
+function verifyPublicHealthExternalDispatch(dispatch, requestSecret) {
+  let profile;
+  try {
+    profile = profileForLane(dispatch?.laneId);
+  } catch {
+    return { ok: false, reason: "dispatch-lane-invalid" };
+  }
+  const request = dispatch?.request || {};
+  const expectedId = `ph-dispatch-${sha256(`${request.laneId}:${request.handoffId}:${request.idempotencyKeyHash}`).slice(0, 24)}`;
+  const expectedDigest = sha256(stableStringify(request));
+  let expectedSignature = "";
+  try {
+    expectedSignature = signPayload(request, requestSecret);
+  } catch {
+    return { ok: false, reason: "dispatch-verification-secret-invalid" };
+  }
+  const bindingsValid = request.schemaVersion === REQUEST_SCHEMA_VERSION
+    && request.dispatchId === dispatch.id
+    && request.laneId === dispatch.laneId
+    && request.handoffId === dispatch.handoffId
+    && request.adapterId === dispatch.adapterId
+    && request.contract === dispatch.contract
+    && dispatch.adapterId === profile.adapterId
+    && dispatch.contract === profile.contract
+    && dispatch.id === expectedId
+    && dispatch.requestDigest === expectedDigest;
+  if (!bindingsValid) return { ok: false, reason: "dispatch-binding-mismatch" };
+  if (clean(dispatch.signatureAlgorithm) !== "HMAC-SHA256" || !timingSafeHexEqual(dispatch.requestSignature, expectedSignature)) {
+    return { ok: false, reason: "dispatch-signature-invalid" };
+  }
+  return { ok: true, reason: "verified" };
+}
+
 function normalizedReceiptPayload(receipt = {}) {
   const evidenceRefs = Array.isArray(receipt.evidenceRefs)
     ? [...new Set(receipt.evidenceRefs.map(clean).filter(Boolean))].sort()
@@ -240,11 +273,16 @@ function recordPublicHealthExternalDeliveryAttempt(dispatch, result = {}, option
     at,
     transportStatus,
     outcome: "failed",
-    reason: clean(result.networkError) ? "network-error" : verification.reason
+    reason: clean(result.networkError) ? "network-error" : verification.reason,
+    receiptDigest: result.receipt ? sha256(stableStringify(result.receipt)) : ""
   };
 
   if (transportStatus >= 200 && transportStatus < 300 && verification.ok) {
-    next.receipt = verification.payload;
+    next.receipt = {
+      ...verification.payload,
+      signatureAlgorithm: clean(result.receipt.signatureAlgorithm),
+      signature: clean(result.receipt.signature)
+    };
     attempt.outcome = verification.payload.status;
     attempt.reason = "verified-signed-receipt";
     if (verification.payload.status === "accepted") {
@@ -279,5 +317,6 @@ module.exports = {
   normalizedReceiptPayload,
   recordPublicHealthExternalDeliveryAttempt,
   signPublicHealthExternalReceipt,
+  verifyPublicHealthExternalDispatch,
   verifyPublicHealthExternalReceipt
 };
