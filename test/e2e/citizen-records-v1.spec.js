@@ -2,6 +2,12 @@ const { expect, test } = require("@playwright/test");
 const fs = require("node:fs");
 
 test("resident creates a scoped consent and revokes it through the dedicated audit route", async ({ page }) => {
+  const authorizationWrites = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && (/\/api\/personal-records$/.test(request.url()) || /\/api\/authorizations\/.*\/revoke$/.test(request.url()))) {
+      authorizationWrites.push({ url: request.url(), headers: request.headers(), body: JSON.parse(request.postData() || "{}") });
+    }
+  });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/login.html");
   await page.locator("#login-user").selectOption("citizen");
@@ -29,6 +35,17 @@ test("resident creates a scoped consent and revokes it through the dedicated aud
   await expect(diagnosticReport).toContainText("ECG检查报告");
   await expect(diagnosticReport).toContainText("已互认");
   await expect(diagnosticReport).toContainText("报告原文仍按授权和访问审计规则调阅");
+  const recordSearch = page.locator("#vault-search-keyword");
+  await recordSearch.fill("ECG-DEMO-001");
+  await expect(page.locator("#vault-search-status")).toContainText("显示 1 /");
+  await expect(diagnosticReport).toBeVisible();
+  await recordSearch.fill("不存在的报告");
+  await expect(page.locator("#vault-content")).toContainText("没有符合当前筛选条件的记录");
+  await page.locator("#vault-search-clear").click();
+  await expect(page.locator("#vault-search-status")).toContainText("检查检验：共");
+  await expect(diagnosticReport).toBeVisible();
+  const searchTouchHeight = await recordSearch.evaluate((element) => element.getBoundingClientRect().height);
+  expect(searchTouchHeight).toBeGreaterThanOrEqual(44);
 
   await page.locator('[data-vault="medications"]').click();
   const medicationService = page.locator(".vault-item").filter({ hasText: "下次取药 2026-07-05" }).first();
@@ -44,6 +61,10 @@ test("resident creates a scoped consent and revokes it through the dedicated aud
   await form.locator("input[name='purpose']").fill("高血压复诊资料核对");
   await form.locator("input[value='health-record-summary']").check();
   await form.locator("input[value='emr-summary']").check();
+  await expect(page.locator("#auth-scope-preview")).toContainText("已选择 2 项授权范围");
+  await expect(page.locator("#auth-scope-preview")).toContainText("健康档案摘要");
+  await expect(page.locator("#auth-scope-preview")).toContainText("电子病历摘要");
+  await expect(page.locator("#auth-scope-preview")).toContainText("不包含");
   await form.locator("input[name='consentConfirmed']").check();
   await form.getByRole("button", { name: "保存" }).click();
 
@@ -51,11 +72,19 @@ test("resident creates a scoped consent and revokes it through the dedicated aud
   await expect(authorization).toContainText("高血压复诊资料核对");
   await expect(authorization).toContainText("有效期至");
   await expect(authorization).toContainText("resident-record-consent-v1");
+  const createWrite = authorizationWrites.find((item) => /\/api\/personal-records$/.test(item.url));
+  expect(createWrite.headers["idempotency-key"]).toBeTruthy();
+  expect(createWrite.body.idempotencyKey).toBe(createWrite.headers["idempotency-key"]);
+  expect(createWrite.body.requestedAt).toBeTruthy();
 
   page.once("dialog", (dialog) => dialog.accept());
   await authorization.getByRole("button", { name: "撤销对专项复诊团队的授权" }).click();
   await expect(authorization).toContainText("已撤销");
   await expect(authorization.getByRole("button", { name: "撤销对专项复诊团队的授权" })).toHaveCount(0);
+  const revokeWrite = authorizationWrites.find((item) => /\/api\/authorizations\/.*\/revoke$/.test(item.url));
+  expect(revokeWrite.headers["idempotency-key"]).toBeTruthy();
+  expect(revokeWrite.body.idempotencyKey).toBe(revokeWrite.headers["idempotency-key"]);
+  expect(revokeWrite.body.resourceId).toBeTruthy();
 
   await page.locator('[data-highlight-command="toggle-large-mode"]').click();
   await expect(page.locator("body")).toHaveClass(/large-mode/);
@@ -175,6 +204,8 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
   await expect(renewalForm.locator("input[name='previousAuthorizationId']")).toHaveValue("auth-renew-e2e");
   await expect(renewalForm.locator("input[name='expiresAt']")).toHaveValue("");
   await expect(renewalForm.locator("input[name='consentConfirmed']")).not.toBeChecked();
+  await expect(page.locator("#auth-scope-preview")).toContainText("已选择 2 项授权范围");
+  await expect(page.locator("#auth-scope-preview")).toContainText("检验检查");
   await renewalForm.getByRole("button", { name: "取消" }).click();
 
   await page.locator("[data-acknowledge-access='access-review-1']").click();

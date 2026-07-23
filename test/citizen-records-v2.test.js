@@ -511,6 +511,150 @@ test("access export contains only minimized resident-readable columns", () => {
   assert.equal("auditHash" in rows[0], false);
 });
 
+test("record search stays resident scoped and filters only minimized display fields", () => {
+  const records = [
+    {
+      id: "lab-r1",
+      residentId: "r1",
+      category: "labs",
+      date: "2026-07-20",
+      name: "心电图检查",
+      result: "窦性心律",
+      source: "大连市中心医院 LIS",
+      meta: { reportNo: "ECG-001", objectKey: "secret-object-key" }
+    },
+    {
+      id: "self-r1",
+      residentId: "r1",
+      category: "labs",
+      date: "2026-07-21",
+      name: "家庭血糖",
+      result: "6.2 mmol/L",
+      source: "居民个人提供（待核验）",
+      meta: {}
+    },
+    {
+      id: "lab-r2",
+      residentId: "r2",
+      category: "labs",
+      date: "2026-07-20",
+      name: "心电图检查",
+      result: "其他居民记录",
+      source: "大连市中心医院 LIS",
+      meta: { reportNo: "ECG-OTHER" }
+    }
+  ];
+
+  const filtered = V2.filterResidentRecords(records, {
+    residentId: "r1",
+    keyword: "ecg-001",
+    trust: "authoritative",
+    dateFrom: "2026-07-01",
+    dateTo: "2026-07-31"
+  });
+  assert.equal(filtered.total, 2);
+  assert.equal(filtered.matched, 1);
+  assert.equal(filtered.items[0].id, "lab-r1");
+  assert.equal(filtered.applied, true);
+  assert.equal(V2.filterResidentRecords(records, { residentId: "r1", keyword: "secret-object-key" }).matched, 0);
+  assert.equal(V2.filterResidentRecords(records, { residentId: "r1", trust: "self-reported" }).items[0].id, "self-r1");
+});
+
+test("record search rejects inverted date ranges without leaking results", () => {
+  const result = V2.filterResidentRecords([
+    { id: "lab-r1", residentId: "r1", category: "labs", date: "2026-07-20", name: "检验", source: "医院 LIS" }
+  ], {
+    residentId: "r1",
+    dateFrom: "2026-07-31",
+    dateTo: "2026-07-01"
+  });
+  assert.equal(result.invalidRange, true);
+  assert.equal(result.matched, 0);
+  assert.deepEqual(result.items, []);
+});
+
+test("authorization scope disclosure explains inclusions and exclusions without broadening scopes", () => {
+  const disclosure = V2.buildAuthorizationScopeDisclosure([
+    "health-record-summary",
+    "attachments",
+    "attachments"
+  ]);
+  assert.equal(disclosure.selectedCount, 2);
+  assert.deepEqual(disclosure.items.map((item) => item.scope), ["health-record-summary", "attachments"]);
+  assert.match(disclosure.items[0].allows, /健康指标/);
+  assert.match(disclosure.items[0].excludes, /不包含医院原始病历/);
+  assert.match(disclosure.items[1].excludes, /不自动包含影像原图/);
+  assert.match(disclosure.boundary, /服务端再次校验/);
+  assert.equal(V2.buildAuthorizationScopeDisclosure([]).selectedCount, 0);
+  assert.throws(() => V2.buildAuthorizationScopeDisclosure(["labs", "internal-all-records"]), /未知范围/);
+});
+
+test("authorization create response preserves the resident request and strips server internals", () => {
+  const request = V1.buildAuthorizationRecord({
+    residentId: "r1",
+    granteeName: "家庭医生团队",
+    granteeId: "team-r1",
+    granteeType: "care-team",
+    purpose: "慢病复诊",
+    scopes: ["health-record-summary", "labs"],
+    expiresAt: "2027-12-31",
+    grantedAt: "2026-07-23T08:00:00.000Z"
+  });
+  const projected = V2.projectAuthorizationCreateResponse({
+    ...request,
+    id: "auth-created-1",
+    personIndex: "must-not-pass",
+    meta: { ...request.meta, objectKey: "must-not-pass" }
+  }, request);
+  assert.equal(projected.id, "auth-created-1");
+  assert.equal(projected.residentId, "r1");
+  assert.equal(projected.meta.granteeId, "team-r1");
+  assert.doesNotMatch(JSON.stringify(projected), /personIndex|objectKey|must-not-pass/);
+  assert.throws(() => V2.projectAuthorizationCreateResponse({
+    ...request,
+    id: "auth-created-2",
+    meta: { ...request.meta, granteeId: "attacker-team" }
+  }, request), /granteeId不匹配/);
+  assert.throws(() => V2.projectAuthorizationCreateResponse({
+    ...request,
+    id: "auth-created-3",
+    residentId: "r2"
+  }, request), /居民或分类不匹配/);
+});
+
+test("authorization revoke response cannot alter immutable authorization fields", () => {
+  const record = {
+    ...V1.buildAuthorizationRecord({
+      residentId: "r1",
+      granteeName: "医院A",
+      granteeId: "hospital-a",
+      granteeType: "institution",
+      purpose: "复诊资料核对",
+      scopes: ["emr-summary"],
+      expiresAt: "2027-12-31",
+      grantedAt: "2026-07-23T08:00:00.000Z"
+    }),
+    id: "auth-revoke-1"
+  };
+  const revoked = V2.projectAuthorizationRevocationResponse({
+    ...record,
+    name: "恶意覆盖对象",
+    status: "已撤销",
+    revokedAt: "2026-07-24T01:00:00.000Z",
+    revokeReason: "居民主动撤销",
+    meta: { ...record.meta, status: "active", objectKey: "must-not-pass" }
+  }, record, "居民主动撤销");
+  assert.equal(revoked.name, "医院A");
+  assert.equal(revoked.meta.granteeId, "hospital-a");
+  assert.equal(V1.authorizationState(revoked).key, "revoked");
+  assert.doesNotMatch(JSON.stringify(revoked), /恶意覆盖对象|objectKey|must-not-pass/);
+  assert.throws(() => V2.projectAuthorizationRevocationResponse({
+    ...record,
+    status: "active",
+    revokedAt: ""
+  }, record, "居民主动撤销"), /未确认撤销状态/);
+});
+
 test("authorization lifecycle highlights expiring and incomplete records", () => {
   const expiring = activeAuthorization({
     id: "auth-expiring",

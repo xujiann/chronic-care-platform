@@ -60,6 +60,57 @@
     return scopes[cleanText(category, 60)] || "health-record-summary";
   }
 
+  const AUTHORIZATION_SCOPE_DISCLOSURES = Object.freeze({
+    "health-record-summary": Object.freeze({
+      label: "健康档案摘要",
+      allows: "基础健康指标、体检摘要、过敏和免疫等居民可读摘要",
+      excludes: "不包含医院原始病历、检查原文、影像原图或附件"
+    }),
+    "emr-summary": Object.freeze({
+      label: "电子病历摘要",
+      allows: "就诊、诊断、处置、医嘱和复诊计划等居民可读摘要",
+      excludes: "不包含医院内部工作记录、审计字段或病历原文"
+    }),
+    labs: Object.freeze({
+      label: "检验检查",
+      allows: "检验项目、结果、结论、报告时间和来源机构",
+      excludes: "不包含报告原文、内部互认证据或居民主索引"
+    }),
+    medications: Object.freeze({
+      label: "用药记录",
+      allows: "药品、用法、取药服务状态和机构审核摘要",
+      excludes: "不授权受权人停药、换药或调整剂量"
+    }),
+    "imaging-report": Object.freeze({
+      label: "影像报告",
+      allows: "检查部位、模态、报告结论和质控状态",
+      excludes: "不包含原始 DICOM；影像原图仍需短时受控调阅"
+    }),
+    attachments: Object.freeze({
+      label: "附件资料",
+      allows: "已通过安全扫描的附件状态和短时下载申请",
+      excludes: "不自动包含影像原图，也不签发永久下载地址"
+    })
+  });
+
+  function buildAuthorizationScopeDisclosure(scopes = []) {
+    const normalized = [...new Set((Array.isArray(scopes) ? scopes : [])
+      .map((scope) => cleanText(scope, 100))
+      .filter(Boolean))];
+    const unknown = normalized.filter((scope) => !ACCESS_SCOPES.has(scope) || !AUTHORIZATION_SCOPE_DISCLOSURES[scope]);
+    if (unknown.length) throw new Error("授权范围说明不支持未知范围");
+    const items = normalized.map((scope) => ({
+      scope,
+      ...AUTHORIZATION_SCOPE_DISCLOSURES[scope]
+    }));
+    return {
+      items,
+      selectedCount: items.length,
+      summary: items.length ? `已选择 ${items.length} 项授权范围` : "尚未选择授权范围",
+      boundary: "授权仅限所选居民可读摘要；原文、影像原图和附件下载仍需服务端再次校验并记录审计。"
+    };
+  }
+
   function authorizationTargetsActor(authorization = {}, actor = {}) {
     const meta = authorization.meta || {};
     const targets = new Set([
@@ -535,6 +586,75 @@
     };
   }
 
+  function sameScopeSet(left = [], right = []) {
+    const normalize = (value) => [...new Set((Array.isArray(value) ? value : [])
+      .map((item) => cleanText(item, 100))
+      .filter(Boolean))].sort();
+    return JSON.stringify(normalize(left)) === JSON.stringify(normalize(right));
+  }
+
+  function projectAuthorizationCreateResponse(payload = {}, request = {}) {
+    const candidate = payload.authorization || payload.record || payload.item || payload;
+    const expected = CitizenRecordsV1?.projectRecord({ ...request, category: "authorizations" });
+    const projected = CitizenRecordsV1?.projectRecord({ ...candidate, category: candidate.category || "authorizations" });
+    if (!expected || !projected?.id) throw new Error("授权创建响应缺少授权标识");
+    if (projected.residentId !== expected.residentId || projected.category !== "authorizations") {
+      throw new Error("授权创建响应居民或分类不匹配");
+    }
+    const scalarFields = ["granteeId", "granteeType", "purpose", "expiresAt", "previousAuthorizationId"];
+    scalarFields.forEach((field) => {
+      const responseValue = cleanText(projected.meta?.[field], 500);
+      const expectedValue = cleanText(expected.meta?.[field], 500);
+      if (responseValue && responseValue !== expectedValue) throw new Error(`授权创建响应${field}不匹配`);
+    });
+    if (Array.isArray(projected.meta?.scopes) && !sameScopeSet(projected.meta.scopes, expected.meta?.scopes)) {
+      throw new Error("授权创建响应范围不匹配");
+    }
+    const merged = CitizenRecordsV1.projectRecord({
+      ...expected,
+      id: projected.id,
+      createdAt: projected.createdAt,
+      updatedAt: projected.updatedAt,
+      status: projected.status || expected.status,
+      meta: {
+        ...expected.meta,
+        status: projected.meta?.status || expected.meta?.status
+      }
+    });
+    if (!CitizenRecordsV1.authorizationState(merged).active) throw new Error("授权创建响应未确认有效状态");
+    return merged;
+  }
+
+  function projectAuthorizationRevocationResponse(payload = {}, record = {}, reason = "") {
+    const candidate = payload.authorization || payload.record || payload.item || payload;
+    const expected = CitizenRecordsV1?.projectRecord({ ...record, category: "authorizations" });
+    const projected = CitizenRecordsV1?.projectRecord({ ...candidate, category: candidate.category || "authorizations" });
+    if (!expected?.id || !projected?.id || projected.id !== expected.id) throw new Error("授权撤销响应标识不匹配");
+    if (projected.residentId !== expected.residentId || projected.category !== "authorizations") {
+      throw new Error("授权撤销响应居民或分类不匹配");
+    }
+    const revokedAt = cleanText(projected.revokedAt || projected.meta?.revokedAt, 60);
+    if (!revokedAt || CitizenRecordsV1.authorizationState(projected).key !== "revoked") {
+      throw new Error("授权撤销响应未确认撤销状态");
+    }
+    const expectedReason = cleanText(reason, 300);
+    if (projected.revokeReason && expectedReason && projected.revokeReason !== expectedReason) {
+      throw new Error("授权撤销响应原因不匹配");
+    }
+    return CitizenRecordsV1.projectRecord({
+      ...expected,
+      status: "已撤销",
+      revokedAt,
+      revokeReason: expectedReason || projected.revokeReason,
+      updatedAt: projected.updatedAt,
+      meta: {
+        ...expected.meta,
+        status: "revoked",
+        revokedAt
+      }
+    });
+  }
+
   function validateControlledCredential(payload = {}, intent = {}, options = {}) {
     const nested = payload.credential || payload.downloadIntent || payload.viewerIntent || {};
     const candidate = { ...payload, ...nested };
@@ -931,6 +1051,48 @@
     }));
   }
 
+  function filterResidentRecords(records = [], filters = {}) {
+    const residentId = cleanText(filters.residentId, 120);
+    const keyword = cleanText(filters.keyword, 100).toLocaleLowerCase("zh-CN");
+    const allowedTrust = new Set(["all", "authoritative", "self-reported", "pending-verification"]);
+    const trust = allowedTrust.has(filters.trust) ? filters.trust : "all";
+    const dateFrom = /^\d{4}-\d{2}-\d{2}$/.test(filters.dateFrom || "") ? filters.dateFrom : "";
+    const dateTo = /^\d{4}-\d{2}-\d{2}$/.test(filters.dateTo || "") ? filters.dateTo : "";
+    const invalidRange = Boolean(dateFrom && dateTo && dateFrom > dateTo);
+    const scoped = (Array.isArray(records) ? records : []).filter((record) => {
+      if (!record || (residentId && cleanText(record.residentId, 120) !== residentId)) return false;
+      return true;
+    });
+    const items = invalidRange ? [] : scoped.filter((record) => {
+      const recordDate = cleanText(record.date, 40).slice(0, 10);
+      if (dateFrom && (!recordDate || recordDate < dateFrom)) return false;
+      if (dateTo && (!recordDate || recordDate > dateTo)) return false;
+      const recordTrust = CitizenRecordsV1?.sourceTrust(record) || "pending-verification";
+      if (trust !== "all" && recordTrust !== trust) return false;
+      if (!keyword) return true;
+      const searchable = [
+        record.name,
+        record.result,
+        record.source,
+        record.categoryLabel,
+        record.related,
+        record.meta?.reportNo,
+        record.meta?.department,
+        record.meta?.modality,
+        record.meta?.bodyPart,
+        record.meta?.pharmacy
+      ].map((value) => cleanText(value, 1200).toLocaleLowerCase("zh-CN")).join("\n");
+      return searchable.includes(keyword);
+    });
+    return {
+      items,
+      total: scoped.length,
+      matched: items.length,
+      invalidRange,
+      applied: Boolean(keyword || trust !== "all" || dateFrom || dateTo)
+    };
+  }
+
   function buildAuthorizationLifecycle(records = [], now = new Date(), warningDays = 30) {
     const reference = toDate(now) || new Date();
     const warningWindow = Math.max(1, Math.min(Number(warningDays) || 30, 90)) * 86400000;
@@ -1015,11 +1177,13 @@
 
   return {
     ACCESS_SCOPES,
+    AUTHORIZATION_SCOPE_DISCLOSURES,
     ACTIVE_RELATIONSHIP_STATUSES,
     CORRECTION_STATUSES,
     SHARE_PACKAGE_STATUSES,
     DEFAULT_COMPLETENESS_ITEMS,
     scopeForCategory,
+    buildAuthorizationScopeDisclosure,
     authorizationTargetsActor,
     authorizationAllowsScope,
     relationshipAccessState,
@@ -1042,6 +1206,8 @@
     projectActionReceipt,
     projectCorrectionReceipt,
     projectSharePackageReceipt,
+    projectAuthorizationCreateResponse,
+    projectAuthorizationRevocationResponse,
     validateControlledCredential,
     normalizeAccessibilityPreferences,
     projectCareWorkspacePayload,
@@ -1055,6 +1221,7 @@
     buildAccessDispute,
     projectAccessReviewActionReceipt,
     buildAccessExportRows,
+    filterResidentRecords,
     buildAuthorizationLifecycle,
     buildAuthorizationRenewalDraft,
     summarizeCareWorkspace

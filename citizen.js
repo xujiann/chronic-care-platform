@@ -197,6 +197,13 @@ const vaultSections = [
 ];
 
 let activeVaultSection = "timeline";
+let vaultSearchResidentId = "";
+const vaultSearchState = {
+  keyword: "",
+  trust: "all",
+  dateFrom: "",
+  dateTo: ""
+};
 const citizenServiceTabs = [
   { key: "health-record", label: "健康档案", status: "已实现", detail: "健康指标、标准档案、授权共享", title: "健康档案二级页面", actionLabel: "查看健康档案" },
   { key: "emr", label: "电子病历", status: "已实现", detail: "诊疗时间线、慢病和访问记录", title: "电子病历二级页面", actionLabel: "查看电子病历" },
@@ -465,9 +472,11 @@ const residentFunctionAudit = [
   { service: "health-record", name: "健康指标与风险等级", status: "已实现", evidence: "展示血压、血糖、BMI、家庭医生和风险分层", mobile: "摘要卡片单列堆叠" },
   { service: "health-record", name: "全生命周期健康管理", status: "已实现", evidence: "出生、儿童、成人慢病、老年服务和死亡证明线索归集", mobile: "阶段卡片单列显示" },
   { service: "health-record", name: "健康档案归集", status: "已实现", evidence: "标准档案、历年体检报告、检查检验、用药、过敏、疫苗、影像和附件统一索引", mobile: "档案标签横向滑动" },
+  { service: "health-record", name: "档案检索与快速定位", status: "已实现", evidence: "按关键词、可信来源和日期范围检索当前居民最小化摘要", mobile: "筛选字段单列且触控高度不低于44像素" },
   { service: "health-record", name: "历史体检报告", status: "已实现", evidence: "体检中心和医院结果按居民主索引同步，保留异常项、建议、来源机构和外部报告号", mobile: "可按年度查看全部历史报告" },
   { service: "health-record", name: "上传资料", status: "已实现", evidence: "居民可补充报告、图片或自测记录", mobile: "弹窗在窄屏占满可用宽度" },
   { service: "health-record", name: "授权共享与撤销", status: "已实现", evidence: "可新增授权并记录授权对象、范围和来源", mobile: "表单字段单列录入" },
+  { service: "health-record", name: "授权范围影响预览", status: "已实现", evidence: "每项范围实时说明允许查看内容和明确排除项，未知范围拒绝", mobile: "说明卡片单列展示" },
   { service: "health-record", name: "服务端授权强制契约", status: "已实现", evidence: "本人、家庭关系、受权人、范围、状态和有效期统一 fail-closed 判定", mobile: "拒绝原因以居民可理解状态显示" },
   { service: "health-record", name: "跨院来源归集与去重", status: "已实现", evidence: "按来源系统和来源记录保留最新版本与可信等级", mobile: "来源和版本信息紧凑展示" },
   { service: "health-record", name: "短时原文与影像调阅", status: "已实现", evidence: "单次使用、最长五分钟、按用途和范围申请服务端凭据", mobile: "受控入口满足触控尺寸" },
@@ -2341,9 +2350,48 @@ function formatNursingStage(item) {
   return "等待上门服务";
 }
 
+function resetVaultSearchState() {
+  vaultSearchState.keyword = "";
+  vaultSearchState.trust = "all";
+  vaultSearchState.dateFrom = "";
+  vaultSearchState.dateTo = "";
+}
+
+function bindVaultSearch(resident, diseases, followups, records) {
+  if (vaultSearchResidentId !== resident.id) {
+    vaultSearchResidentId = resident.id;
+    resetVaultSearchState();
+  }
+  const fields = {
+    keyword: document.querySelector("#vault-search-keyword"),
+    trust: document.querySelector("#vault-search-trust"),
+    dateFrom: document.querySelector("#vault-search-from"),
+    dateTo: document.querySelector("#vault-search-to")
+  };
+  Object.entries(fields).forEach(([key, field]) => {
+    if (!field) return;
+    field.value = vaultSearchState[key];
+    const update = () => {
+      vaultSearchState[key] = field.value;
+      renderVault(resident, diseases, followups, records);
+    };
+    field.oninput = key === "keyword" ? update : null;
+    field.onchange = key === "keyword" ? null : update;
+  });
+  const clearButton = document.querySelector("#vault-search-clear");
+  if (clearButton) {
+    clearButton.onclick = () => {
+      resetVaultSearchState();
+      renderVault(resident, diseases, followups, records);
+      document.querySelector("#vault-search-keyword")?.focus();
+    };
+  }
+}
+
 function renderVault(resident, diseases, followups, records) {
   const grouped = collectVaultData(resident, diseases, followups, records);
   renderResidentRecordsV1Summary(resident.id);
+  bindVaultSearch(resident, diseases, followups, records);
   const completeCount = vaultSections.filter((section) => section.key === "standard" || grouped[section.key]?.length).length;
   const score = Math.round((completeCount / vaultSections.length) * 100);
   document.querySelector("#completeness-score").textContent = `${score}%`;
@@ -2366,12 +2414,23 @@ function renderVault(resident, diseases, followups, records) {
   });
 
   if (activeVaultSection === "standard") {
+    document.querySelector("#vault-search-status").textContent = "居民健康档案标准视图不使用记录筛选";
     document.querySelector("#vault-content").innerHTML = renderStandardArchive(resident.id);
     return;
   }
 
   const activeItems = grouped[activeVaultSection] || [];
-  document.querySelector("#vault-content").innerHTML = activeItems
+  const filtered = window.CitizenRecordsV2?.filterResidentRecords(activeItems, {
+    residentId: resident.id,
+    ...vaultSearchState
+  }) || { items: activeItems, total: activeItems.length, matched: activeItems.length, invalidRange: false, applied: false };
+  const activeLabel = vaultSections.find((section) => section.key === activeVaultSection)?.label || "当前分类";
+  document.querySelector("#vault-search-status").textContent = filtered.invalidRange
+    ? "开始日期不能晚于结束日期"
+    : filtered.applied
+      ? `${activeLabel}：显示 ${filtered.matched} / ${filtered.total} 条`
+      : `${activeLabel}：共 ${filtered.total} 条`;
+  document.querySelector("#vault-content").innerHTML = filtered.items
     .map((item) => `<article class="vault-item">
       <div>
         <strong>${escapeHtml(item.name)}</strong>
@@ -2386,7 +2445,7 @@ function renderVault(resident, diseases, followups, records) {
       <span>${escapeHtml(item.date)}<br>${escapeHtml(item.source)}</span>
       ${activeVaultSection === "authorizations" && isAuthorizationActive(item) ? `<button type="button" class="revoke-button" data-revoke-auth="${escapeHtml(item.id)}" aria-label="撤销对${escapeHtml(item.name)}的授权">撤销授权</button>` : ""}
     </article>`)
-    .join("") || `<p class="muted">当前分类暂无数据，可通过区域平台、医院电子病历或个人上传更新。</p>`;
+    .join("") || `<p class="muted">${filtered.invalidRange ? "请调整日期范围后重试。" : filtered.total && filtered.applied ? "没有符合当前筛选条件的记录。" : "当前分类暂无数据，可通过区域平台、医院电子病历或个人上传更新。"}</p>`;
   document.querySelectorAll("[data-revoke-auth]").forEach((button) => {
     button.addEventListener("click", () => revokeAuthorization(button.dataset.revokeAuth));
   });
@@ -2816,6 +2875,24 @@ function applyCitizenRecordAccessibility() {
   if (scaleOutput) scaleOutput.value = `${Math.round((preferences.textScale || 1) * 100)}%`;
 }
 
+function renderAuthorizationScopePreview(form = document.querySelector("#auth-form")) {
+  const target = document.querySelector("#auth-scope-preview");
+  if (!target || !form || !window.CitizenRecordsV2?.buildAuthorizationScopeDisclosure) return;
+  const scopes = [...form.querySelectorAll("input[name='scopes']:checked")].map((input) => input.value);
+  try {
+    const disclosure = window.CitizenRecordsV2.buildAuthorizationScopeDisclosure(scopes);
+    target.innerHTML = `<strong>${escapeHtml(disclosure.summary)}</strong>
+      ${disclosure.items.length ? `<div class="authorization-scope-preview-list">${disclosure.items.map((item) => `<article>
+        <b>${escapeHtml(item.label)}</b>
+        <p><span>允许</span>${escapeHtml(item.allows)}</p>
+        <small><span>不包含</span>${escapeHtml(item.excludes)}</small>
+      </article>`).join("")}</div>` : "<p>勾选范围后，这里会说明允许查看的内容和明确排除项。</p>"}
+      <em>${escapeHtml(disclosure.boundary)}</em>`;
+  } catch (error) {
+    target.innerHTML = `<strong>授权范围待核验</strong><p>${escapeHtml(error.message || "存在不受支持的授权范围")}</p>`;
+  }
+}
+
 function openAuthorizationRenewal(recordId) {
   const record = getPersonalRecords(currentResidentId, "authorizations").find((item) => item.id === recordId);
   if (!record) {
@@ -2839,6 +2916,7 @@ function openAuthorizationRenewal(recordId) {
       input.checked = draft.scopes.includes(input.value);
     });
     form.elements.consentConfirmed.checked = false;
+    renderAuthorizationScopePreview(form);
     document.querySelector("#auth-dialog").showModal();
   } catch (error) {
     showToast(error.message || "该授权暂不能续签");
@@ -5201,7 +5279,11 @@ function bindDialogs() {
     form.elements.expiresAt.min = todayOffset(1);
     form.elements.expiresAt.value = todayOffset(365);
     form.elements.source.value = "居民主动授权";
+    renderAuthorizationScopePreview(form);
     document.querySelector("#auth-dialog").showModal();
+  });
+  document.querySelectorAll("#auth-form input[name='scopes']").forEach((input) => {
+    input.addEventListener("change", () => renderAuthorizationScopePreview(input.form));
   });
   document.querySelectorAll("[data-close]").forEach((button) => {
     button.addEventListener("click", () => button.closest("dialog").close());
@@ -5265,13 +5347,31 @@ async function addPersonalRecord(record) {
   if (API_BASE) {
     try {
       const request = window.HealthCityAuth?.authFetch || fetch;
+      const authorizationAction = record.category === "authorizations" && window.CitizenRecordsV2
+        ? window.CitizenRecordsV2.buildIdempotentAction({
+          operation: "authorization-create",
+          residentId: record.residentId,
+          nonce: citizenCareRequestNonce(),
+          payload: {}
+        })
+        : null;
       const response = await request(`${API_BASE}/personal-records`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(record)
+        headers: {
+          "Content-Type": "application/json",
+          ...(authorizationAction ? { "Idempotency-Key": authorizationAction.idempotencyKey } : {})
+        },
+        body: JSON.stringify(authorizationAction ? {
+          ...record,
+          idempotencyKey: authorizationAction.idempotencyKey,
+          requestedAt: authorizationAction.requestedAt
+        } : record)
       });
       if (response.ok) {
-        const saved = await response.json();
+        const payload = await response.json();
+        const saved = authorizationAction
+          ? window.CitizenRecordsV2.projectAuthorizationCreateResponse(payload, record)
+          : payload;
         if (!Array.isArray(state.personalRecords)) state.personalRecords = [];
         state.personalRecords.push(saved);
         return saved;
@@ -5548,21 +5648,32 @@ function isAuthorizationActive(item) {
 }
 
 async function revokeAuthorization(id) {
-  const record = state.personalRecords?.find((item) => item.id === id);
+  const recordIndex = state.personalRecords?.findIndex((item) => item.id === id) ?? -1;
+  const record = recordIndex >= 0 ? state.personalRecords[recordIndex] : null;
   if (!record) return;
   if (!window.confirm(`确认撤销对“${record.name || "该对象"}”的授权？撤销后相关调阅应立即停止。`)) return;
   const reason = "居民通过居民端主动撤销";
   if (API_BASE) {
     try {
       const request = window.HealthCityAuth?.authFetch || fetch;
+      const action = window.CitizenRecordsV2.buildIdempotentAction({
+        operation: "authorization-revoke",
+        residentId: record.residentId,
+        nonce: citizenCareRequestNonce(),
+        payload: { resourceId: id, reason }
+      });
       const response = await request(`${API_BASE}/authorizations/${encodeURIComponent(id)}/revoke`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason })
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": action.idempotencyKey
+        },
+        body: JSON.stringify(action)
       });
       if (response.ok) {
-        const updated = await response.json();
-        Object.assign(record, updated);
+        const payload = await response.json();
+        const updated = window.CitizenRecordsV2.projectAuthorizationRevocationResponse(payload, record, reason);
+        state.personalRecords[recordIndex] = updated;
         renderCitizen(currentResidentId);
         showToast("授权已撤销，后续调阅将重新校验");
         return;

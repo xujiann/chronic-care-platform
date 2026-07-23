@@ -2155,6 +2155,66 @@ body.service-paged-mode .citizen-shell {
   transition: width 0.2s ease;
 }
 
+.vault-search {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #f8fbfd;
+}
+
+.vault-search-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.vault-search-heading h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.vault-search-heading small,
+.vault-search output {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.vault-search-fields {
+  display: grid;
+  grid-template-columns: minmax(220px, 2fr) minmax(170px, 1fr) repeat(2, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.vault-search-fields label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.vault-search-fields input,
+.vault-search-fields select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 8px 10px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
+
+.vault-search output {
+  min-height: 22px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .vault-tabs {
   display: flex;
   gap: 8px;
@@ -2657,6 +2717,66 @@ body.service-paged-mode .citizen-shell {
 .authorization-confirm input {
   width: 20px;
   height: 20px;
+}
+
+.authorization-scope-preview {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #b8ddd2;
+  border-radius: 12px;
+  padding: 12px;
+  background: #f0faf7;
+}
+
+.authorization-scope-preview > strong {
+  color: #176b5b;
+  font-size: 15px;
+}
+
+.authorization-scope-preview > p,
+.authorization-scope-preview > em {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.55;
+}
+
+.authorization-scope-preview-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.authorization-scope-preview-list article {
+  display: grid;
+  gap: 5px;
+  border-radius: 9px;
+  padding: 10px;
+  background: #fff;
+}
+
+.authorization-scope-preview-list b {
+  color: var(--ink);
+}
+
+.authorization-scope-preview-list p,
+.authorization-scope-preview-list small {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 6px;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.authorization-scope-preview-list span {
+  color: #176b5b;
+  font-weight: 900;
+}
+
+.authorization-scope-preview-list small span {
+  color: #9a5b00;
 }
 
 .record-detail {
@@ -3889,6 +4009,23 @@ dialog::backdrop {
 @media (max-width: 760px) {
   .resident-records-v1 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .vault-search-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .vault-search-heading .small-button {
+    width: 100%;
+  }
+
+  .vault-search-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .authorization-scope-preview-list {
+    grid-template-columns: 1fr;
   }
 
   .citizen-exam-highlight-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
