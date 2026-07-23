@@ -8,6 +8,8 @@ Every command requires a unique `commandId`. The service binds that key to a SHA
 
 Commands may include `expectedVersion`. When the persistence adapter selects `requireExpectedVersion=true`, every update to an existing aggregate must match its current `workflowVersion`; stale commands fail before mutation. Successful commands increment the aggregate version and record it in the closure event. `replayClosureCommands` replays an ordered journal, preserves exact idempotent duplicates and stops with the failed journal index when recovery cannot continue safely.
 
+Each new closure event contains `previousEventHash` and a canonical SHA-256 `eventHash`. `validateClosureEventChain` detects payload changes, broken links and duplicate command identifiers. The oldest retained event may carry an external anchor because the in-memory collection is bounded.
+
 The service clones the supplied database, applies one authorized command, appends a non-production `registrationReferralClosureEvents` audit row, validates cross-record consistency and returns the changed copy. It never writes a file or claims production evidence.
 
 Business terminal states are also enforced independently of `commandId`: one primary-care assessment cannot create a second referral chain, accepted continuity cannot be accepted again, completed or resident-acknowledged follow-ups cannot be rewritten, family-doctor acknowledgements are final, acknowledged notification receipts cannot regress, and notification fallback stops when the final channel exhausts its configured attempts.
@@ -33,12 +35,14 @@ Business terminal states are also enforced independently of `commandId`: one pri
 
 ## Standalone T05 operations
 
-The complete catalog contains 35 commands. In addition to the 14 closure commands above, T05 implements these operations without changing a public route or shared page:
+The complete catalog contains 40 commands. In addition to the 14 closure commands above, T05 implements these operations without changing a public route or shared page:
 
 - Referral exceptions: `reject-referral-request`, `withdraw-referral`, `reassign-referral`, `reschedule-teleconsultation`, `cancel-teleconsultation` and `record-teleconsultation-no-show`.
 - Clinical package and consent: `attach-referral-materials`, `grant-referral-authorization`, `revoke-referral-authorization` and `resume-referral-authorization`. Resident or guardian grants must specify covered institutions, expiry and the minimum permitted data scopes.
 - SLA and messaging reliability: `run-closure-sla`, `acknowledge-escalation`, `record-notification-provider-result` and `resolve-notification-dead-letter`.
 - Family doctor lifecycle: `submit-family-doctor-application`, `review-family-doctor-application`, `activate-family-doctor-contract`, `record-family-doctor-fulfillment`, `request-family-doctor-renewal`, `review-family-doctor-renewal` and `terminate-family-doctor-contract`.
+- Advanced continuity: `create-down-referral` creates a hospital-to-primary-care handoff, while `request-referral-supplement`, `submit-referral-supplement` and `review-referral-supplement` provide a versioned two-party material correction loop.
+- Family doctor operations: `run-family-doctor-scheduler` creates scoped service, renewal and expiry tasks. A later `record-family-doctor-fulfillment` may reference `serviceTaskId` and closes the task atomically with the fulfillment record.
 
 `buildClosureWorkQueue` produces a role-scoped queue with overdue hours and priority. `buildClosureQualityMetrics` reports referral return, continuity, rejection, reassignment, repeat-exam reuse, material-manifest and family-doctor indicators. `buildNotificationReliability` reports provider receipts and dead-letter closure. All three are read-only and retain `productionReady=false`.
 
@@ -87,7 +91,7 @@ Public integration remains responsible for:
 - Adding `POST /api/registration-referral/commands` or the suggested per-command endpoints from `CLOSURE_COMMAND_CONTRACTS`.
 - Preserving the already-correct `seedReferralTeleconsultations` parity: `rtc-001 -> cco-004`, `rtc-002 -> cco-005`.
 - Synchronizing `seedTaskMessages`: both `rtc-002` messages must use resident `r4` and the down-referral report text.
-- Initializing `primaryCareAssessments`, `registrationReferralClosureEvents`, `registrationReferralEscalations` and `registrationReferralNotificationDeadLetters` as empty collections for a fresh database.
+- Initializing `primaryCareAssessments`, `registrationReferralClosureEvents`, `registrationReferralEscalations`, `registrationReferralNotificationDeadLetters` and `phase2FamilyDoctorServiceTasks` as empty collections for a fresh database.
 - Adding the package acceptance script and public release/deploy/report gates.
 - Wiring the institution, citizen and county interfaces to the command endpoint without duplicating state logic in UI code.
 

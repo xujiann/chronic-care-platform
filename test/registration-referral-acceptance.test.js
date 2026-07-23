@@ -20,7 +20,7 @@ test("T05 acceptance passes while reporting T00 public integration blockers", ()
   assert.equal(report.status, "thread-ready-t00-integration-pending");
   assert.equal(report.summary.threadPassed, report.summary.threadChecks);
   assert.equal(report.summary.p0ConsistencyIssues, 0);
-  assert.equal(report.summary.commands, 35);
+  assert.equal(report.summary.commands, 40);
   assert.ok(report.integrationChecks.some((item) => item.id.endsWith("serverReferralSeed") && item.passed));
   assert.ok(report.integrationChecks.some((item) => item.id.endsWith("serverMessageSeed") && !item.passed));
 });
@@ -62,6 +62,7 @@ test("acceptance renders and writes T00 handoff evidence", (t) => {
   assert.match(markdown, /serverReferralSeed/);
   assert.match(markdown, /record-primary-care-assessment/);
   assert.match(markdown, /terminate-family-doctor-contract/);
+  assert.match(markdown, /create-down-referral/);
 
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "registration-referral-acceptance-"));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));

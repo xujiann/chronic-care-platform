@@ -51,6 +51,15 @@ function lower(value) {
   return text(value).toLowerCase();
 }
 
+function canonicalize(value) {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (!value || typeof value !== "object") return value;
+  return Object.keys(value).sort().reduce((result, key) => {
+    if (value[key] !== undefined) result[key] = canonicalize(value[key]);
+    return result;
+  }, {});
+}
+
 function isPaymentReady(order = {}) {
   return ["paid", "paid-demo", "waived"].includes(order.paymentStatus);
 }
@@ -243,6 +252,18 @@ function normalizeReferralCase(item = {}, context = {}) {
     }
     return envelope;
   }
+  if (status === "supplement-required") {
+    envelope.unifiedPhase = "exception";
+    envelope.exceptionState = "referral-material-supplement-required";
+    Object.assign(envelope, responsibility(item.sourceInstitutionCode || item.fromInstitutionCode || item.sourceInstitution || item.from, "referring-institution", item.supplementRequest?.dueAt || item.due, "submit all requested referral materials"));
+    return envelope;
+  }
+  if (status === "supplement-submitted") {
+    envelope.unifiedPhase = "requested";
+    envelope.exceptionState = "supplement-review-pending";
+    Object.assign(envelope, responsibility(item.targetInstitutionCode || item.toInstitutionCode || item.targetInstitution || item.to, "referral-center", item.supplementRequest?.dueAt || item.due, "review submitted referral supplement"));
+    return envelope;
+  }
   if (status === "scheduled") {
     envelope.unifiedPhase = "scheduled";
     Object.assign(envelope, responsibility(item.targetInstitutionCode || item.toInstitutionCode || item.targetInstitution || item.to, "receiving-hospital", item.due, "perform consultation and return signed report"));
@@ -370,6 +391,52 @@ function validateRegistrationCallbackTransition(order = {}, eventType = "") {
   return { allowed: true, reason: "allowed" };
 }
 
+function validateClosureEventChain(events = []) {
+  const hashed = rows(events).filter((event) => event?.eventHash);
+  const issues = [];
+  const commandIds = new Set();
+  rows(events).forEach((event) => {
+    if (!event?.commandId) return;
+    if (commandIds.has(event.commandId)) issues.push({
+      severity: "P0",
+      code: "closure-event-command-duplicate",
+      entityType: "registrationReferralClosureEvent",
+      entityId: event.id || event.commandId,
+      detail: "closure event commandId must be unique",
+      references: { commandId: event.commandId }
+    });
+    commandIds.add(event.commandId);
+  });
+  hashed.forEach((event, index) => {
+    const material = { ...event };
+    delete material.eventHash;
+    const expectedEventHash = createHash("sha256").update(JSON.stringify(canonicalize(material))).digest("hex");
+    if (expectedEventHash !== event.eventHash) issues.push({
+      severity: "P0",
+      code: "closure-event-hash-mismatch",
+      entityType: "registrationReferralClosureEvent",
+      entityId: event.id || event.commandId,
+      detail: "closure event hash does not match its canonical payload",
+      references: { expectedEventHash, actualEventHash: event.eventHash }
+    });
+    const expectedPreviousEventHash = text(hashed[index + 1]?.eventHash);
+    if (index < hashed.length - 1 && text(event.previousEventHash) !== expectedPreviousEventHash) issues.push({
+      severity: "P0",
+      code: "closure-event-chain-broken",
+      entityType: "registrationReferralClosureEvent",
+      entityId: event.id || event.commandId,
+      detail: "closure event previous hash does not link to the next older hashed event",
+      references: { expectedPreviousEventHash, actualPreviousEventHash: event.previousEventHash || "" }
+    });
+  });
+  return {
+    ok: issues.length === 0,
+    summary: { events: rows(events).length, hashed: hashed.length, issues: issues.length },
+    issues,
+    productionReady: false
+  };
+}
+
 function validateClosureReferences(data = {}) {
   const issues = [];
   const addIssue = (severity, code, entityType, entityId, detail, references = {}) => issues.push({ severity, code, entityType, entityId, detail, references });
@@ -380,16 +447,20 @@ function validateClosureReferences(data = {}) {
   const authorizations = index(rows(data.personalRecords).filter((item) => item.category === "authorizations"));
   const applications = rows(data.phase2FamilyDoctorApplications);
   const contracts = index(data.phase2FamilyDoctorContracts);
+  const serviceTasks = index(data.phase2FamilyDoctorServiceTasks);
   const familyTeams = index(data.phase2FamilyDoctorTeams);
   const familyPackages = index(data.phase2FamilyDoctorServicePackages);
   const taskMessages = index(data.taskMessages);
+  const externalReferralIds = new Set();
+  issues.push(...validateClosureEventChain(data.registrationReferralClosureEvents).issues);
   const messageSourceIndexes = {
     referralTeleconsultations: index(data.referralTeleconsultations),
     registrationOrders: index(data.registrationOrders),
     followups: index(data.followups),
     phase2FamilyDoctorApplications: index(data.phase2FamilyDoctorApplications),
     phase2FamilyDoctorContracts: index(data.phase2FamilyDoctorContracts),
-    phase2FamilyDoctorFulfillments: index(data.phase2FamilyDoctorFulfillments)
+    phase2FamilyDoctorFulfillments: index(data.phase2FamilyDoctorFulfillments),
+    phase2FamilyDoctorServiceTasks: serviceTasks
   };
 
   rows(data.registrationOrders).forEach((order) => {
@@ -443,6 +514,15 @@ function validateClosureReferences(data = {}) {
   });
 
   rows(data.referralSystem?.referrals).forEach((referral) => {
+    if (referral.externalReferralId) {
+      if (externalReferralIds.has(referral.externalReferralId)) addIssue("P0", "referral-external-id-duplicate", "referral", referral.id, "external referral identifiers must be unique", { externalReferralId: referral.externalReferralId });
+      externalReferralIds.add(referral.externalReferralId);
+    }
+    if (referral.residentAuthorizationId) {
+      const authorization = authorizations.get(referral.residentAuthorizationId);
+      if (!authorization) addIssue("P0", "referral-authorization-missing", "referral", referral.id, "referral references a missing resident authorization", { residentAuthorizationId: referral.residentAuthorizationId });
+      if (authorization && authorization.residentId !== referral.residentId) addIssue("P0", "referral-authorization-resident-mismatch", "referral", referral.id, "referral and authorization residents differ", { referralResidentId: referral.residentId, authorizationResidentId: authorization.residentId });
+    }
     const versionedMaterials = rows(referral.materials).filter((item) => item && typeof item === "object");
     if (!versionedMaterials.length) return;
     const expectedManifestDigest = createHash("sha256")
@@ -479,6 +559,21 @@ function validateClosureReferences(data = {}) {
     const contract = contracts.get(fulfillment.contractId);
     if (!contract) addIssue("P0", "family-fulfillment-contract-missing", "familyDoctorFulfillment", fulfillment.id, "fulfillment references a missing contract", { contractId: fulfillment.contractId });
     if (contract && (contract.residentId !== fulfillment.residentId || contract.teamId !== fulfillment.teamId || (fulfillment.packageId && contract.packageId !== fulfillment.packageId))) addIssue("P0", "family-fulfillment-contract-scope-mismatch", "familyDoctorFulfillment", fulfillment.id, "fulfillment resident, team, or package differs from its contract", { contractId: fulfillment.contractId });
+    if (fulfillment.serviceTaskId) {
+      const task = serviceTasks.get(fulfillment.serviceTaskId);
+      if (!task) addIssue("P0", "family-fulfillment-service-task-missing", "familyDoctorFulfillment", fulfillment.id, "fulfillment references a missing family doctor service task", { serviceTaskId: fulfillment.serviceTaskId });
+      if (task && (task.contractId !== fulfillment.contractId || task.residentId !== fulfillment.residentId)) addIssue("P0", "family-fulfillment-service-task-mismatch", "familyDoctorFulfillment", fulfillment.id, "fulfillment and service task contract or resident differ", { serviceTaskId: fulfillment.serviceTaskId });
+    }
+  });
+
+  rows(data.phase2FamilyDoctorServiceTasks).forEach((task) => {
+    const contract = contracts.get(task.contractId);
+    if (!contract) addIssue("P0", "family-service-task-contract-missing", "familyDoctorServiceTask", task.id, "service task references a missing family doctor contract", { contractId: task.contractId });
+    if (contract && contract.residentId !== task.residentId) addIssue("P0", "family-service-task-resident-mismatch", "familyDoctorServiceTask", task.id, "service task and contract residents differ", { contractId: task.contractId });
+    if (task.fulfillmentId) {
+      const fulfillment = rows(data.phase2FamilyDoctorFulfillments).find((item) => item.id === task.fulfillmentId);
+      if (!fulfillment || fulfillment.serviceTaskId !== task.id) addIssue("P0", "family-service-task-fulfillment-mismatch", "familyDoctorServiceTask", task.id, "completed service task must be linked back from its fulfillment", { fulfillmentId: task.fulfillmentId });
+    }
   });
 
   rows(data.taskMessages).forEach((message) => {
@@ -700,6 +795,7 @@ module.exports = {
   applyClosureReferenceRepairs,
   planClosureReferenceRepairs,
   summarizeNotificationReceipts,
+  validateClosureEventChain,
   validateClosureReferences,
   validateRegistrationCallbackTransition
 };

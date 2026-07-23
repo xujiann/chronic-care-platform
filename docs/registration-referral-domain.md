@@ -36,6 +36,8 @@ The unified phases are:
 ### Referral and teleconsultation
 
 - Requested referrals belong to the referral center or receiving institution.
+- Hospital-initiated down-referrals use the same resident authorization, collaboration-order and report-continuity references as upward referrals, but hand ongoing responsibility to the target primary-care institution.
+- `supplement-required` returns responsibility to the referring institution; `supplement-submitted` returns it to the receiving referral center for explicit approval or another correction round.
 - Scheduled consultations remain with the receiving hospital until a signed report is returned.
 - Rejected, withdrawn and cancelled referrals are terminal cancellation paths; a no-show is an exception owned by the receiving hospital until it is rescheduled or cancelled.
 - Revoked resident authorization places every non-terminal linked referral in `authorization-on-hold`; the primary institution must obtain new consent, reassign or withdraw it.
@@ -48,6 +50,7 @@ The unified phases are:
 - Pending applications belong to institution review.
 - Approved applications require contract activation and resident notification.
 - Active contracts remain with the family doctor team until the contracted services are fulfilled.
+- The family doctor scheduler creates institution-scoped service, renewal and expiry tasks; a service fulfillment must link back to the task before the task can close.
 - Completed follow-up remains `result-returned` until the resident acknowledges it or an auditable manual-contact result is recorded.
 
 ## Notification evidence
@@ -69,6 +72,8 @@ Failures produce `attention-required`. Receipt statuses such as `handled`, `read
 - Family doctor application and contract references to configured teams, service packages and review institutions when those catalogs are present.
 - Family doctor fulfillment resident, team and package consistency with its contract.
 - Notification dead-letter references and resident/organization scope against the source task message.
+- Family doctor service-task references and bidirectional links to their fulfillment records.
+- Closure-event canonical hashes, predecessor links and unique command identifiers.
 
 The report intentionally separates:
 

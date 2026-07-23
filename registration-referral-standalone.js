@@ -532,6 +532,29 @@ function resumeReferralAuthorization(data, command, actor) {
   return { ...linked, teleconsultation: record.kind === "teleconsultation" ? item : null, messages };
 }
 
+function normalizeFamilyServiceTask(item) {
+  const status = text(item.status).toLowerCase();
+  const terminal = ["completed", "cancelled"].includes(status);
+  return {
+    caseType: "family-doctor-service-task",
+    caseId: item.id,
+    residentId: item.residentId,
+    businessStatus: item.status,
+    unifiedPhase: terminal ? "closed" : status === "overdue" ? "exception" : status === "scheduled" ? "scheduled" : "requested",
+    sourceOrg: item.institutionCode,
+    responsibleOrg: terminal ? "" : item.institutionCode,
+    responsibleRole: terminal ? "" : item.kind === "renewal-reminder" ? "institution-review" : "family-doctor-team",
+    dueAt: item.dueAt || item.plannedAt,
+    nextAction: terminal ? "none" : item.kind === "renewal-reminder" ? "review contract renewal" : "complete contracted family doctor service",
+    notificationState: "",
+    receiptState: "",
+    exceptionState: status === "overdue" ? "family-doctor-service-overdue" : "none",
+    upstreamRefs: [item.contractId].filter(Boolean),
+    downstreamRefs: [item.fulfillmentId].filter(Boolean),
+    productionEvidence: false
+  };
+}
+
 function allCaseEnvelopes(data) {
   const messages = data.taskMessages || [];
   return [
@@ -543,7 +566,8 @@ function allCaseEnvelopes(data) {
       .map((item) => normalizeReferralCase(item, { messages })),
     ...rows(data.phase2FamilyDoctorApplications).map((item) => normalizeFamilyDoctorCase(item, { messages, fulfillments: data.phase2FamilyDoctorFulfillments })),
     ...rows(data.phase2FamilyDoctorContracts).map((item) => normalizeFamilyDoctorCase(item, { messages, fulfillments: data.phase2FamilyDoctorFulfillments })),
-    ...rows(data.followups).map((item) => normalizeChronicFollowupCase(item, { messages }))
+    ...rows(data.followups).map((item) => normalizeChronicFollowupCase(item, { messages })),
+    ...rows(data.phase2FamilyDoctorServiceTasks).map(normalizeFamilyServiceTask)
   ];
 }
 
@@ -889,6 +913,12 @@ function recordFamilyFulfillment(data, command, actor) {
   }
   const evidenceCollection = requireText(command.payload.evidenceCollection, "payload.evidenceCollection");
   const evidenceId = requireText(command.payload.evidenceId, "payload.evidenceId");
+  const serviceTaskId = text(command.payload.serviceTaskId);
+  const serviceTask = serviceTaskId ? rows(data.phase2FamilyDoctorServiceTasks).find((item) => item.id === serviceTaskId) : null;
+  if (serviceTaskId && (!serviceTask || serviceTask.contractId !== contract.id || serviceTask.residentId !== contract.residentId)) {
+    throw new Error("family doctor service task does not match contract");
+  }
+  if (serviceTask && ["completed", "cancelled"].includes(serviceTask.status)) throw new Error("family doctor service task is already terminal");
   const fulfillment = {
     id: text(command.payload.fulfillmentId || `p2fdf-${command.commandId}`),
     contractId: contract.id,
@@ -901,6 +931,7 @@ function recordFamilyFulfillment(data, command, actor) {
     status: "completed",
     evidenceCollection,
     evidenceId,
+    serviceTaskId,
     fulfillmentValue: value,
     satisfaction: "pending",
     completedAt: command.at,
@@ -911,6 +942,12 @@ function recordFamilyFulfillment(data, command, actor) {
     productionEvidence: false
   };
   data.phase2FamilyDoctorFulfillments = appendById(data.phase2FamilyDoctorFulfillments, fulfillment);
+  if (serviceTask) {
+    serviceTask.status = "completed";
+    serviceTask.completedAt = command.at;
+    serviceTask.completedBy = actorName(actor);
+    serviceTask.fulfillmentId = fulfillment.id;
+  }
   contract.fulfillmentPercent = Math.min(100, Number(contract.fulfillmentPercent || 0) + value);
   contract.lastServiceAt = serviceDate;
   contract.nextServiceAt = text(command.payload.nextServiceAt || contract.nextServiceAt);
@@ -992,6 +1029,14 @@ function reviewFamilyRenewal(data, command, actor) {
     contract.renewalStatus = "rejected";
     contract.renewalRejectionReason = text(command.payload.reason || note);
   }
+  rows(data.phase2FamilyDoctorServiceTasks)
+    .filter((task) => task.contractId === contract.id && task.kind === "renewal-reminder" && !["completed", "cancelled"].includes(task.status))
+    .forEach((task) => {
+      task.status = "completed";
+      task.completedAt = command.at;
+      task.completedBy = actorName(actor);
+      task.resolution = `renewal-${decision}`;
+    });
   const message = familyMessage(data, command, actor, application, "citizen", "", `Family doctor renewal ${decision}`, note, `renewal-${decision}`);
   return { contract, application, message };
 }
@@ -1011,6 +1056,14 @@ function terminateFamilyContract(data, command, actor) {
   contract.terminationReason = reason;
   contract.terminationNote = note;
   if (team && Number(team.signedResidents || 0) > 0) team.signedResidents = Number(team.signedResidents) - 1;
+  rows(data.phase2FamilyDoctorServiceTasks)
+    .filter((task) => task.contractId === contract.id && !["completed", "cancelled"].includes(task.status))
+    .forEach((task) => {
+      task.status = "cancelled";
+      task.cancelledAt = command.at;
+      task.cancelledBy = actorName(actor);
+      task.cancellationReason = reason;
+    });
   const targetRole = actor.role === "citizen" ? "institution" : "citizen";
   const message = familyMessage(data, command, actor, contract, targetRole, targetRole === "institution" ? contract.institutionCode || team?.institutionCode : "", "Family doctor contract terminated", `${reason}: ${note}`, "terminated");
   return { contract, message };
