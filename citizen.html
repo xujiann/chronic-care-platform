@@ -12,7 +12,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="format-detection" content="telephone=no" />
     <link rel="apple-touch-icon" href="./pwa-icon.svg" />
-    <link rel="stylesheet" href="./citizen.css?v=20260723care3" />
+    <link rel="stylesheet" href="./citizen.css?v=20260723care4" />
     <script src="./auth.js?v=20260627"></script>
     <script>window.HealthCityAuth.requireRole(["citizen"])</script>
   </head>
@@ -383,6 +383,36 @@
               <button type="submit" class="small-button primary">创建一次性资料包</button>
             </form>
             <div id="citizen-share-package-list" class="citizen-care-list"></div>
+          </article>
+
+          <article class="citizen-care-card wide">
+            <header>
+              <div><h3>隐私审计与访问异议</h3><small>复核谁在何时、因何用途访问了哪些范围；已拦截不等于数据已披露</small></div>
+              <button type="button" class="small-button" data-export-access-review>导出最小化访问清单</button>
+            </header>
+            <div id="citizen-access-review-v2-summary" class="citizen-care-list"></div>
+            <div id="citizen-access-review-v2-list" class="citizen-care-list"></div>
+            <form id="citizen-access-dispute-form" class="citizen-inline-form">
+              <label>访问事件<select name="accessLogId" required></select></label>
+              <label>异议类型
+                <select name="category" required>
+                  <option value="unknown-actor">不认识访问主体</option>
+                  <option value="purpose-mismatch">访问用途不符</option>
+                  <option value="scope-mismatch">访问范围不符</option>
+                  <option value="revoked-access">疑似撤权后访问</option>
+                  <option value="other">其他</option>
+                </select>
+              </label>
+              <label>联系偏好
+                <select name="contactPreference">
+                  <option value="in-app">站内反馈</option>
+                  <option value="phone">电话联系</option>
+                </select>
+              </label>
+              <label>异议说明<textarea name="reason" maxlength="800" required placeholder="说明为什么无法确认该次访问"></textarea></label>
+              <button type="submit" class="small-button primary">提交访问异议</button>
+            </form>
+            <div id="citizen-access-dispute-list" class="citizen-care-list"></div>
           </article>
         </div>
         <p class="resident-records-boundary">生产启用仍需 T00 将服务端强制授权、真实主索引/家庭关系、HIS/EMR/LIS/PACS、对象存储/KMS/扫描引擎和统一审计接入公共接口。</p>
@@ -776,8 +806,8 @@
     <script src="./physical-examination-service.js"></script>
     <script src="./immunization-schedule.js"></script>
     <script src="./citizen-records-v1.js?v=20260723auth2"></script>
-    <script src="./citizen-records-v2.js?v=20260723care3"></script>
-    <script src="./citizen.js?v=20260723care3"></script>
+    <script src="./citizen-records-v2.js?v=20260723care4"></script>
+    <script src="./citizen.js?v=20260723care4"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));

@@ -1,4 +1,5 @@
 const { expect, test } = require("@playwright/test");
+const fs = require("node:fs");
 
 test("resident creates a scoped consent and revokes it through the dedicated audit route", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -95,6 +96,27 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
     const body = JSON.parse(route.request().postData() || "{}");
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ status: "revoked", ...body, receiptId: "receipt-revoke-1", auditRef: "audit-revoke-1" }) });
   });
+  await page.route(/\/api\/access-reviews\?residentId=/, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        authorizations: [],
+        accessLogs: [
+          { id: "access-review-1", residentId: "r1", at: new Date().toISOString(), actor: "陌生机构A", role: "医疗机构", scope: "检验检查", purpose: "复诊资料核对", result: "允许", auditHash: "must-not-export" },
+          { id: "access-review-2", residentId: "r1", at: new Date(Date.now() - 60000).toISOString(), actor: "未知主体", role: "未知", scope: "电子病历摘要", purpose: "查询", result: "拒绝" }
+        ]
+      })
+    });
+  });
+  await page.route("**/api/access-reviews/*/acknowledge", async (route) => {
+    const body = JSON.parse(route.request().postData() || "{}");
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ...body, receiptId: "receipt-access-ack", auditRef: "audit-access-ack" }) });
+  });
+  await page.route("**/api/access-reviews/*/disputes", async (route) => {
+    const body = JSON.parse(route.request().postData() || "{}");
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ...body, receiptId: "receipt-access-dispute", auditRef: "audit-access-dispute" }) });
+  });
   await page.route("**/api/imaging-cloud/studies/*/viewer*", async (route) => {
     await route.fulfill({
       status: 200,
@@ -123,6 +145,28 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
   await expect(workspace).toContainText("档案完整度与更新提醒");
   await expect(page.locator("#citizen-current-subject")).toContainText("当前查看");
   await expect(page.locator("#citizen-care-sync-status")).toContainText("已安全同步");
+  await page.evaluate(() => document.querySelector("#refresh-access-review").click());
+  await expect(page.locator("#citizen-access-review-v2-list")).toContainText("陌生机构A");
+  await expect(page.locator("#citizen-access-review-v2-list")).toContainText("未匹配当前有效授权");
+  await expect(page.locator("#citizen-access-review-v2-list")).toContainText("已拦截，未披露");
+
+  await page.locator("[data-acknowledge-access='access-review-1']").click();
+  await expect(page.locator("#citizen-access-review-v2-list")).toContainText("居民已确认");
+  await page.locator("[data-fill-access-dispute='access-review-1']").click();
+  const accessDisputeForm = page.locator("#citizen-access-dispute-form");
+  await accessDisputeForm.locator("select[name='category']").selectOption("unknown-actor");
+  await accessDisputeForm.locator("textarea[name='reason']").fill("本人不认识该访问机构，请平台复核");
+  await accessDisputeForm.getByRole("button", { name: "提交访问异议" }).click();
+  await expect(page.locator("#citizen-access-dispute-list")).toContainText("audit-access-dispute");
+
+  const [accessDownload] = await Promise.all([
+    page.waitForEvent("download"),
+    page.locator("[data-export-access-review]").click()
+  ]);
+  const accessExport = fs.readFileSync(await accessDownload.path(), "utf8");
+  expect(accessExport).toContain("陌生机构A");
+  expect(accessExport).not.toContain("auditHash");
+  expect(accessExport).not.toContain("must-not-export");
   await page.locator('[data-vault="imaging"]').click();
   await page.getByRole("button", { name: /受控调阅胸部 CT 影像报告/ }).click();
   await expect(page.locator("#toast")).toContainText("HTTPS");
@@ -158,7 +202,7 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
   await expect(page.locator("#citizen-share-package-list")).toContainText("已撤销");
   const storedCareData = await page.evaluate(() => {
     const saved = JSON.parse(localStorage.getItem("chronic-care-citizen-extra") || "{}");
-    return Object.values(saved).some((item) => item?.recordCorrections || item?.recordSharePackages || item?.careTaskUpdates);
+    return Object.values(saved).some((item) => item?.recordCorrections || item?.recordSharePackages || item?.careTaskUpdates || item?.accessAcknowledgements || item?.accessDisputes);
   });
   expect(storedCareData).toBe(false);
 

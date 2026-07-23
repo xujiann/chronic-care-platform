@@ -367,6 +367,13 @@ test("care workspace sync projection is resident scoped and strips secrets", () 
       "care-task-1": { residentId: "r1", status: "completed", completedAt: "2026-07-23T09:00:00Z", auditRef: "audit-task" },
       "care-task-2": { residentId: "r2", status: "completed" }
     },
+    accessAcknowledgements: [
+      { id: "ack-1", residentId: "r1", accessLogId: "access-1", decision: "recognized", status: "accepted", auditRef: "audit-ack", internalNote: "secret" },
+      { id: "ack-2", residentId: "r2", accessLogId: "access-2", status: "accepted" }
+    ],
+    accessDisputes: [
+      { id: "dispute-1", residentId: "r1", accessLogId: "access-3", category: "unknown-actor", reason: "无法确认", status: "processing", auditRef: "audit-dispute", investigator: "secret" }
+    ],
     syncedAt: "2026-07-23T09:05:00Z",
     cursor: "cursor-1",
     databaseToken: "SECRET"
@@ -377,6 +384,10 @@ test("care workspace sync projection is resident scoped and strips secrets", () 
   assert.equal("oneTimeCode" in projected.recordSharePackages[0], false);
   assert.equal("downloadUrl" in projected.recordSharePackages[0], false);
   assert.deepEqual(Object.keys(projected.careTaskUpdates), ["care-task-1"]);
+  assert.deepEqual(projected.accessAcknowledgements.map((item) => item.id), ["ack-1"]);
+  assert.equal("internalNote" in projected.accessAcknowledgements[0], false);
+  assert.deepEqual(projected.accessDisputes.map((item) => item.id), ["dispute-1"]);
+  assert.equal("investigator" in projected.accessDisputes[0], false);
   assert.equal("databaseToken" in projected, false);
   assert.equal(projected.sync.cursor, "cursor-1");
 });
@@ -407,6 +418,97 @@ test("static care preview metadata expires within 24 hours", () => {
   assert.equal(V2.isCarePreviewExpired(metadata, "2026-07-24T07:59:59Z"), false);
   assert.equal(V2.isCarePreviewExpired(metadata, "2026-07-24T08:00:00Z"), true);
   assert.equal(V2.isCarePreviewExpired({}, now), true);
+});
+
+test("access review queue distinguishes blocked, recognized and unverified access", () => {
+  const authorization = activeAuthorization({
+    residentId: "r1",
+    name: "hospital-a",
+    meta: {
+      status: "active",
+      granteeId: "hospital-a",
+      scopes: ["labs"],
+      expiresAt: "2026-07-30"
+    }
+  });
+  const queue = V2.buildAccessReviewQueue([
+    { id: "access-1", residentId: "r1", at: "2026-07-23T08:00:00Z", actor: "hospital-a", role: "医疗机构", scope: "检验检查", purpose: "复诊", result: "允许" },
+    { id: "access-2", residentId: "r1", at: "2026-07-23T09:00:00Z", actor: "unknown", role: "机构", scope: "内部全量", purpose: "查询", result: "允许" },
+    { id: "access-3", residentId: "r1", at: "2026-07-23T10:00:00Z", actor: "unknown", role: "机构", scope: "电子病历摘要", purpose: "查询", result: "拒绝" }
+  ], "r1", [authorization], now);
+  assert.equal(queue[0].reviewState, "blocked");
+  assert.equal(queue[0].disclosed, false);
+  assert.equal(queue[1].reason, "unknown-scope");
+  assert.equal(queue[2].reviewState, "recognized");
+  assert.equal(queue[2].scope, "labs");
+  const pending = V2.classifyAccessEvent({
+    id: "access-pending",
+    residentId: "r1",
+    actor: "hospital-a",
+    scope: "检验检查",
+    purpose: "复诊",
+    result: "待核验"
+  }, [authorization], now);
+  assert.equal(pending.reason, "result-unverified");
+  assert.equal(pending.disclosed, null);
+});
+
+test("resident can acknowledge or dispute access with immutable receipt fields", () => {
+  const acknowledgement = V2.buildAccessAcknowledgement({
+    residentId: "r1",
+    accessLogId: "access-1",
+    acknowledgedAt: now
+  });
+  assert.equal(acknowledgement.decision, "recognized");
+  const dispute = V2.buildAccessDispute({
+    residentId: "r1",
+    accessLogId: "access-2",
+    category: "unknown-actor",
+    reason: "本人不认识该访问主体",
+    contactPreference: "phone",
+    submittedAt: now
+  });
+  const receipt = V2.projectAccessReviewActionReceipt({
+    status: "accepted",
+    residentId: "r1",
+    resourceId: "access-2",
+    receiptId: "receipt-dispute",
+    auditRef: "audit-dispute",
+    reason: "恶意覆盖"
+  }, dispute);
+  assert.equal(receipt.reason, "本人不认识该访问主体");
+  assert.equal(receipt.auditRef, "audit-dispute");
+  assert.throws(() => V2.buildAccessDispute({
+    residentId: "r1",
+    accessLogId: "access-2",
+    category: "unsupported",
+    reason: "test"
+  }), /异议类型/);
+  assert.throws(() => V2.projectAccessReviewActionReceipt({
+    status: "accepted",
+    residentId: "r2",
+    resourceId: "access-2",
+    receiptId: "receipt",
+    auditRef: "audit"
+  }, dispute), /居民不匹配/);
+});
+
+test("access export contains only minimized resident-readable columns", () => {
+  const rows = V2.buildAccessExportRows([{
+    eventId: "secret-event-id",
+    residentId: "r1",
+    at: "2026-07-23T08:00:00Z",
+    actor: "医院A",
+    role: "医疗机构",
+    scope: "labs",
+    purpose: "复诊",
+    result: "允许",
+    label: "授权匹配",
+    auditHash: "secret"
+  }]);
+  assert.deepEqual(Object.keys(rows[0]), ["time", "actor", "role", "scope", "purpose", "result", "review"]);
+  assert.equal("eventId" in rows[0], false);
+  assert.equal("auditHash" in rows[0], false);
 });
 
 test("workspace summary composes deduplication, care tasks, EMR and completeness", () => {
