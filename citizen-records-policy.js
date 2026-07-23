@@ -40,8 +40,13 @@ function authorizationTargetsUser(record = {}, user = {}) {
 }
 
 function authorizationHasScope(record = {}, scope = "health-record-summary") {
-  const scopes = Array.isArray(record.meta?.scopes) ? record.meta.scopes : [];
-  return scopes.includes("*") || scopes.includes(scope);
+  const requestedScope = cleanText(scope, 100);
+  if (!CitizenRecordsV1.RESIDENT_AUTHORIZATION_SCOPES.has(requestedScope)) return false;
+  const scopes = (Array.isArray(record.meta?.scopes) ? record.meta.scopes : [])
+    .map((item) => cleanText(item, 100))
+    .filter(Boolean);
+  if (!scopes.length || scopes.some((item) => !CitizenRecordsV1.RESIDENT_AUTHORIZATION_SCOPES.has(item))) return false;
+  return scopes.includes(requestedScope);
 }
 
 function hasActiveResidentAuthorization(data = {}, ownerResidentId, user = {}, options = {}) {
@@ -78,7 +83,8 @@ function scopeForRecordCategory(category) {
     emr: "emr-summary",
     labs: "labs",
     medications: "medications",
-    imaging: "imaging-report"
+    imaging: "imaging-report",
+    attachments: "attachments"
   };
   return scopes[cleanText(category, 60)] || "health-record-summary";
 }

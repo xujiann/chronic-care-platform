@@ -2768,7 +2768,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   const serviceWorker = read("service-worker.js");
   assert.match(citizenHtml, /rel="manifest"/);
   assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
-  assert.match(citizenHtml, /citizen-records-v1\.js\?v=20260722records4/);
+  assert.match(citizenHtml, /citizen-records-v1\.js\?v=20260723auth1/);
   assert.match(citizenHtml, /citizen\.js\?v=20260722records4/);
   assert.match(citizenHtml, /mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-capable/);

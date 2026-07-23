@@ -16,6 +16,14 @@
     "authorizations"
   ]);
   const ACTIVE_AUTHORIZATION_STATUSES = new Set(["active", "authorized", "有效", "已授权"]);
+  const RESIDENT_AUTHORIZATION_SCOPES = new Set([
+    "health-record-summary",
+    "emr-summary",
+    "labs",
+    "medications",
+    "imaging-report",
+    "attachments"
+  ]);
 
   const SAFE_META_FIELDS = new Set([
     "visitType",
@@ -167,6 +175,9 @@
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(expiresAt) || Number.isNaN(new Date(`${expiresAt}T23:59:59`).getTime())) {
       throw new Error("授权有效期格式不正确");
+    }
+    if (scopes.some((scope) => !RESIDENT_AUTHORIZATION_SCOPES.has(scope))) {
+      throw new Error("授权范围不受支持");
     }
     return {
       residentId: cleanText(input.residentId, 120),
@@ -475,6 +486,7 @@
   return {
     RESIDENT_RECORD_CATEGORIES,
     ACTIVE_AUTHORIZATION_STATUSES,
+    RESIDENT_AUTHORIZATION_SCOPES,
     SAFE_META_FIELDS,
     projectRecord,
     projectResidentRecords,

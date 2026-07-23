@@ -254,6 +254,8 @@ test("authorization model requires purpose scope expiry and evaluates active exp
   assert.equal(authorizationState({ ...record, status: "active", meta: { ...record.meta, status: "pending" } }, new Date("2026-07-22T09:00:00+08:00")).active, false);
   assert.throws(() => buildAuthorizationRecord({ residentId: "r1", granteeName: "团队", purpose: "复诊", expiresAt: "2026-12-31" }), /范围/);
   assert.throws(() => buildAuthorizationRecord({ residentId: "r1", granteeName: "团队", purpose: "复诊", scopes: ["emr-summary"], expiresAt: "not-a-date" }), /格式/);
+  assert.throws(() => buildAuthorizationRecord({ residentId: "r1", granteeName: "团队", purpose: "复诊", scopes: ["*"], expiresAt: "2026-12-31" }), /范围不受支持/);
+  assert.throws(() => buildAuthorizationRecord({ residentId: "r1", granteeName: "团队", purpose: "复诊", scopes: ["labs", "internal-all-records"], expiresAt: "2026-12-31" }), /范围不受支持/);
 });
 
 test("resident summary separates authoritative and self-reported records", () => {
@@ -287,6 +289,7 @@ test("resident UI uses the dedicated revoke route and exposes the V1 consent and
   assert.match(html, /id="resident-records-v1"/);
   assert.match(html, /name="purpose"/);
   assert.match(html, /name="scopes"/);
+  assert.match(html, /value="attachments"/);
   assert.match(html, /name="consentConfirmed"/);
   assert.match(html, /居民个人提供（待核验）/);
   assert.match(html, /citizen-records-v1\.js/);

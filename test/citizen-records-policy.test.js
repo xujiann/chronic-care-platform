@@ -98,6 +98,36 @@ test("future expiry never activates pending rejected or suspended family authori
   }), true);
 });
 
+test("family authorization scopes are exact allowlisted and never wildcard-expanded", () => {
+  const verifiedMember = {
+    residentId: "r4",
+    relation: "母亲",
+    relationshipStatus: "verified",
+    verifiedAt: "2026-07-20T09:00:00.000Z",
+    evidenceSource: "公安亲属关系核验回执"
+  };
+  const wildcard = authorization({ meta: { scopes: ["*"] } });
+  assert.equal(canCitizenReadRecord(
+    dataWith(verifiedMember, [wildcard]),
+    citizen,
+    { residentId: "r4", category: "labs" },
+    { now: NOW }
+  ), false);
+
+  const mixedUnknown = authorization({ meta: { scopes: ["labs", "internal-all-records"] } });
+  assert.equal(canCitizenReadRecord(
+    dataWith(verifiedMember, [mixedUnknown]),
+    citizen,
+    { residentId: "r4", category: "labs" },
+    { now: NOW }
+  ), false);
+
+  const attachments = authorization({ meta: { scopes: ["attachments"] } });
+  const scopedData = dataWith(verifiedMember, [attachments]);
+  assert.equal(canCitizenReadRecord(scopedData, citizen, { residentId: "r4", category: "attachments" }, { now: NOW }), true);
+  assert.equal(canCitizenReadRecord(scopedData, citizen, { residentId: "r4", category: "imaging" }, { now: NOW }), false);
+});
+
 test("resident supplement normalization prevents authority impersonation and cross-resident writes", () => {
   const normalized = normalizeCitizenSupplement({
     residentId: "r1",

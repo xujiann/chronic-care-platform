@@ -79,6 +79,8 @@
 
 V1 授权元数据包括 `granteeType`、`purpose`、`scopes`、`expiresAt`、`consentVersion`、`grantedAt`、`version` 和 `status`。前后端均应以撤销状态和到期时间计算有效性。家庭/监护关系只决定是否具备申请授权的前提，有效授权凭证才决定是否可以读取相应数据。
 
+居民授权范围采用显式最小白名单：`health-record-summary`、`emr-summary`、`labs`、`medications`、`imaging-report` 和 `attachments`。通配符、未知范围以及“合法范围 + 未知范围”的混合记录均 fail-closed；附件不会继承影像或健康档案摘要权限。未来有效期只能作为必要条件，授权状态还必须全部属于 `active / authorized / 有效 / 已授权` 最小白名单。
+
 当前公共后端仍需由 T00 在集成时进一步收紧：
 
 - 家庭成员读取必须同时满足权威关系核验和有效授权；
