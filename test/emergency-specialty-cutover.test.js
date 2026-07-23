@@ -11,6 +11,7 @@ const {
   buildSiteEvidenceWorkflow,
   buildAcceptanceScenarioSuite,
   buildScenarioEvidenceMatrix,
+  buildCutoverCommandCenter,
   normalizeTrack,
   renderMarkdown,
   selectFirstIncrement,
@@ -115,6 +116,11 @@ test("buildSpecialtyCutoverPack aggregates site blockers and cross-track control
   assert.equal(pack.scenarioEvidenceMatrix.summary.scenarios, 5);
   assert.equal(pack.scenarioEvidenceMatrix.summary.evidenceLinks, 10);
   assert.ok(pack.scenarioEvidenceMatrix.rows.some((item) => item.scenarioId === "scenario-5-evidence-replay" && item.goNoGoImpact === "review-scorecard-after-replay"));
+  assert.equal(pack.cutoverCommandCenter.status, "command-center-ready-for-rehearsal");
+  assert.equal(pack.cutoverCommandCenter.summary.windows, 3);
+  assert.equal(pack.cutoverCommandCenter.summary.rosterSeats, 5);
+  assert.ok(pack.cutoverCommandCenter.windows.some((item) => item.id === "window-t0-controlled-rehearsal"));
+  assert.ok(pack.cutoverCommandCenter.roster.some((item) => item.seat === "release-commander"));
   assert.match(pack.integrity.digest, /^sha256:[a-f0-9]{64}$/);
 });
 
@@ -166,6 +172,9 @@ test("renderMarkdown exposes the digest, departments, blockers and first grey in
   assert.match(markdown, /Scenario evidence matrix/);
   assert.match(markdown, /keep-no-go-on-failure/);
   assert.match(markdown, /review-scorecard-after-replay/);
+  assert.match(markdown, /Cutover command center/);
+  assert.match(markdown, /window-t0-controlled-rehearsal/);
+  assert.match(markdown, /release-commander/);
 });
 
 test("buildEvidenceDossier maps blockers to reviewable evidence and hard-stop policy", () => {
@@ -257,6 +266,28 @@ test("buildScenarioEvidenceMatrix links scenarios to evidence, workflow events a
   assert.ok(matrix.decisionRules.some((item) => /Go\/No-Go/.test(item)));
 });
 
+test("buildCutoverCommandCenter binds windows, duty seats and escalation to batch-1 gates", () => {
+  const normalized = tracks.map((track) => normalizeTrack(track, report()));
+  const firstIncrement = {
+    trackId: "emergency-life-chain",
+    requiredBeforeStart: ["SITE-01", "SITE-02"]
+  };
+  const dossier = buildEvidenceDossier(normalized, firstIncrement);
+  const plan = buildPilotBatchPlan(normalized, firstIncrement);
+  const workflow = buildSiteEvidenceWorkflow(dossier, plan);
+  const suite = buildAcceptanceScenarioSuite(normalized, firstIncrement, dossier, workflow);
+  const matrix = buildScenarioEvidenceMatrix(suite, dossier, workflow);
+  const commandCenter = buildCutoverCommandCenter(normalized, firstIncrement, plan, workflow, matrix);
+
+  assert.equal(commandCenter.status, "command-center-ready-for-rehearsal");
+  assert.equal(commandCenter.summary.windows, 3);
+  assert.equal(commandCenter.summary.watchOnlyTracks, 1);
+  assert.ok(commandCenter.windows.some((item) => item.id === "window-t-1-freeze" && item.requiredInputs.includes("emergency-life-chain:SITE-01")));
+  assert.ok(commandCenter.windows.some((item) => item.id === "window-t0-controlled-rehearsal" && item.requiredInputs.includes("scenario-3-signature-rejection")));
+  assert.ok(commandCenter.escalationRules.some((item) => /manual downgrade/.test(item)));
+  assert.ok(commandCenter.decisionArtifacts.includes("t-plus-1-observation-memo"));
+});
+
 test("writeCutoverPack writes JSON and Markdown artifacts without touching runtime data", () => {
   const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "t10-cutover-"));
   const pack = buildSpecialtyCutoverPack({
@@ -285,7 +316,8 @@ test("static cutover preview page exposes T10 tracks and release-artifact fallba
   assert.match(html, /现场证据闭环状态机/);
   assert.match(html, /首增量验收场景脚本/);
   assert.match(html, /场景-证据判定矩阵/);
-  assert.match(html, /t10-specialty-cutover\.js\?v=scenario-evidence-matrix/);
+  assert.match(html, /切换指挥台与值守责任/);
+  assert.match(html, /t10-specialty-cutover\.js\?v=cutover-command-center/);
   assert.match(html, /emergency\.html/);
   assert.match(html, /blood\.html/);
   assert.match(html, /imaging-cloud\.html/);
@@ -300,6 +332,7 @@ test("static cutover preview page exposes T10 tracks and release-artifact fallba
   assert.match(client, /renderSiteEvidenceWorkflow/);
   assert.match(client, /renderAcceptanceScenarioSuite/);
   assert.match(client, /renderScenarioEvidenceMatrix/);
+  assert.match(client, /renderCutoverCommandCenter/);
   assert.match(client, /evidence-id-present/);
   assert.match(client, /batch-1-single-chain/);
   assert.match(client, /submit-evidence/);
@@ -308,6 +341,9 @@ test("static cutover preview page exposes T10 tracks and release-artifact fallba
   assert.match(client, /ready-for-controlled-rehearsal-only/);
   assert.match(client, /keep-no-go-on-failure/);
   assert.match(client, /review-scorecard-after-replay/);
+  assert.match(client, /command-center-ready-for-rehearsal/);
+  assert.match(client, /window-t0-controlled-rehearsal/);
+  assert.match(client, /release-commander/);
   assert.match(client, /120急救生命链/);
   assert.match(client, /四眼现场证据签收/);
   assert.match(client, /T\+1 observation/);

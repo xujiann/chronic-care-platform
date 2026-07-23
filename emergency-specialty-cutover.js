@@ -164,6 +164,7 @@ function buildSpecialtyCutoverPack(options = {}) {
   const siteEvidenceWorkflow = buildSiteEvidenceWorkflow(evidenceDossier, pilotBatchPlan);
   const acceptanceScenarioSuite = buildAcceptanceScenarioSuite(tracks, firstIncrement, evidenceDossier, siteEvidenceWorkflow);
   const scenarioEvidenceMatrix = buildScenarioEvidenceMatrix(acceptanceScenarioSuite, evidenceDossier, siteEvidenceWorkflow);
+  const cutoverCommandCenter = buildCutoverCommandCenter(tracks, firstIncrement, pilotBatchPlan, siteEvidenceWorkflow, scenarioEvidenceMatrix);
   const summary = {
     tracks: tracks.length,
     codeReady: tracks.filter((item) => item.codeReady).length,
@@ -188,11 +189,12 @@ function buildSpecialtyCutoverPack(options = {}) {
     pilotBatchPlan,
     siteEvidenceWorkflow,
     acceptanceScenarioSuite,
-    scenarioEvidenceMatrix
+    scenarioEvidenceMatrix,
+    cutoverCommandCenter
   };
   pack.integrity = {
     algorithm: "sha256",
-    digest: `sha256:${sha256({ summary, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision, evidenceDossier, pilotBatchPlan, siteEvidenceWorkflow, acceptanceScenarioSuite, scenarioEvidenceMatrix })}`
+    digest: `sha256:${sha256({ summary, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision, evidenceDossier, pilotBatchPlan, siteEvidenceWorkflow, acceptanceScenarioSuite, scenarioEvidenceMatrix, cutoverCommandCenter })}`
   };
   return pack;
 }
@@ -767,6 +769,86 @@ function buildScenarioEvidenceMatrix(acceptanceScenarioSuite, evidenceDossier, s
   };
 }
 
+function buildCutoverCommandCenter(tracks, firstIncrement, pilotBatchPlan, siteEvidenceWorkflow, scenarioEvidenceMatrix) {
+  const primaryTrack = tracks.find((track) => track.id === firstIncrement.trackId) || tracks[0];
+  const firstBatch = (pilotBatchPlan.batches || []).find((batch) => batch.id === "batch-1-single-chain") || {};
+  const evidenceIds = siteEvidenceWorkflow.batchOneEntryRequires?.evidenceIds || [];
+  const hardStopRows = (scenarioEvidenceMatrix.rows || []).filter((row) => row.hardStopOnFail);
+  const watchOnlyTracks = tracks.filter((track) => track.id !== primaryTrack.id);
+  const windows = [
+    {
+      id: "window-t-1-freeze",
+      name: "T-1 scope freeze and evidence preflight",
+      stage: "T-1",
+      ownerRole: "release commander",
+      ownerDepartment: "commission release office + platform operations",
+      entryGate: "all pilot scope, endpoint, account, evidence and rollback owners are assigned",
+      exitGate: "first-increment evidence reaches submitted state and batch-1 scope is frozen",
+      requiredInputs: evidenceIds,
+      produces: ["frozen pilot roster", "signed evidence preflight checklist", "rollback contact sheet"],
+      noGoIfMissing: ["required evidence owner", "external endpoint receipt", "rollback contact"]
+    },
+    {
+      id: "window-t0-controlled-rehearsal",
+      name: "T0 controlled batch-1 rehearsal",
+      stage: "T0",
+      ownerRole: "business commander",
+      ownerDepartment: primaryTrack.department,
+      entryGate: firstBatch.promotionDecision || "allow batch-1 rehearsal only",
+      exitGate: "all hard-stop scenarios pass or remain No-Go with recorded reason",
+      requiredInputs: hardStopRows.map((row) => row.scenarioId),
+      produces: ["scenario run sheet", "interface receipt ledger", "manual downgrade proof", "audit export digest"],
+      noGoIfMissing: ["patient safety proof", "signature/idempotency proof", "append-only audit digest"]
+    },
+    {
+      id: "window-t-plus-1-observation",
+      name: "T+1 observation and promotion decision",
+      stage: "T+1",
+      ownerRole: "quality reviewer",
+      ownerDepartment: "operations duty + quality control + business owner",
+      entryGate: "batch-1 rehearsal has no unexplained P0/P1 issue",
+      exitGate: "decide stay No-Go, repeat batch-1, or open watch-only batch-2",
+      requiredInputs: ["alert review", "audit replay", "data-quality sample", "manual-handling review"],
+      produces: ["T+1 observation memo", "go/no-go scorecard update", "next specialty watch-only recommendation"],
+      noGoIfMissing: ["unexplained P0/P1 event", "missing audit replay", "unreviewed manual handling"]
+    }
+  ];
+  return {
+    status: "command-center-ready-for-rehearsal",
+    primaryTrackId: primaryTrack.id,
+    primaryTrackName: primaryTrack.name,
+    watchOnlyTrackIds: watchOnlyTracks.map((track) => track.id),
+    windows,
+    roster: [
+      { seat: "release-commander", owner: "commission release office", decisionRight: "freeze scope, pause rehearsal, call No-Go" },
+      { seat: "business-commander", owner: primaryTrack.department, decisionRight: "confirm patient-safety continuity and manual downgrade" },
+      { seat: "operations-duty", owner: "platform operations", decisionRight: "observe service, logs, alerts, rollback window and deployment health" },
+      { seat: "security-audit", owner: "security office", decisionRight: "reject unsigned, over-scoped or unreplayable evidence" },
+      { seat: "site-liaison", owner: "pilot institution information office", decisionRight: "coordinate external system, device and clinical department availability" }
+    ],
+    escalationRules: [
+      "any P0 patient-safety, privacy or security event pages release-commander and business-commander immediately",
+      "two consecutive unexplained interface failures pause batch-1 and switch to manual downgrade",
+      "missing append-only audit evidence keeps the decision No-Go even when the business flow appears successful",
+      "watch-only specialty expansion can start only after the T+1 observation memo is accepted"
+    ],
+    decisionArtifacts: [
+      "frozen-scope-sheet",
+      "command-roster-and-contact-sheet",
+      "scenario-run-sheet",
+      "interface-and-idempotency-ledger",
+      "manual-downgrade-or-rollback-proof",
+      "t-plus-1-observation-memo"
+    ],
+    summary: {
+      windows: windows.length,
+      rosterSeats: 5,
+      watchOnlyTracks: watchOnlyTracks.length,
+      noGoRules: windows.reduce((sum, window) => sum + window.noGoIfMissing.length, 0)
+    }
+  };
+}
+
 function renderMarkdown(pack) {
   const rows = pack.tracks.map((item) => `| ${item.name} | ${item.department} | ${item.codeReady ? "是" : "否"} | ${item.productionReady ? "是" : "否"} | ${item.blockers.length} | ${item.page} |`);
   const blockers = pack.tracks.flatMap((track) => track.blockers.map((item) => `| ${track.name} | ${item.id} | ${item.title} | ${item.owner} | ${item.status} |`));
@@ -775,6 +857,8 @@ function renderMarkdown(pack) {
   const workflowRows = (pack.siteEvidenceWorkflow?.transitions || []).map((item) => `| ${item.from} | ${item.action} | ${item.to} | ${item.requiredChecks.join(", ")} |`);
   const scenarioRows = (pack.acceptanceScenarioSuite?.scenarios || []).map((item) => `| ${item.id} | ${item.type} | ${item.batchId} | ${item.hardStopOnFail ? "yes" : "no"} | ${item.passCriteria} |`);
   const scenarioEvidenceRows = (pack.scenarioEvidenceMatrix?.rows || []).map((item) => `| ${item.scenarioId} | ${item.evidence.length} | ${item.requiredWorkflowEvents.join(", ")} | ${item.goNoGoImpact} | ${item.acceptanceResult} |`);
+  const commandWindowRows = (pack.cutoverCommandCenter?.windows || []).map((item) => `| ${item.stage} | ${item.id} | ${item.name} | ${item.ownerRole} | ${item.entryGate} | ${item.exitGate} |`);
+  const commandRosterRows = (pack.cutoverCommandCenter?.roster || []).map((item) => `| ${item.seat} | ${item.owner} | ${item.decisionRight} |`);
   return [
     "# T10 急救、用血、影像与体检专项上线割接包",
     "",
@@ -886,6 +970,24 @@ function renderMarkdown(pack) {
     "### Matrix decision rules",
     "",
     ...(pack.scenarioEvidenceMatrix?.decisionRules || []).map((item) => `- ${item}`),
+    "",
+    "## Cutover command center",
+    "",
+    `- Status: ${pack.cutoverCommandCenter?.status || "command-center-ready-for-rehearsal"}`,
+    `- Primary track: ${pack.cutoverCommandCenter?.primaryTrackName || pack.firstIncrement.trackName}`,
+    `- Watch-only tracks: ${(pack.cutoverCommandCenter?.watchOnlyTrackIds || []).join(", ")}`,
+    "",
+    "| Stage | Window ID | Window | Owner role | Entry gate | Exit gate |",
+    "|---|---|---|---|---|---|",
+    ...commandWindowRows,
+    "",
+    "| Seat | Owner | Decision right |",
+    "|---|---|---|",
+    ...commandRosterRows,
+    "",
+    "### Command escalation rules",
+    "",
+    ...(pack.cutoverCommandCenter?.escalationRules || []).map((item) => `- ${item}`),
     ""
   ].join("\n");
 }
@@ -923,5 +1025,6 @@ module.exports = {
   buildPilotBatchPlan,
   buildSiteEvidenceWorkflow,
   buildAcceptanceScenarioSuite,
-  buildScenarioEvidenceMatrix
+  buildScenarioEvidenceMatrix,
+  buildCutoverCommandCenter
 };
