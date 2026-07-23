@@ -8,6 +8,11 @@
   const TERMINAL_STATES = new Set(["closed", "cancelled", "rejected", "refunded"]);
   const NURSE_AVAILABLE_STATUSES = new Set(["available"]);
   const ESCORT_WORKER_AVAILABLE_STATUSES = new Set(["available"]);
+  const WORKFLOW_POLICY_VERSION = "nursing-escort-workflow-v1";
+  const DISPATCH_EVIDENCE_TTL_MS = 30 * 60 * 1000;
+  const DISPATCH_EVIDENCE_FUTURE_SKEW_MS = 5 * 60 * 1000;
+  const ISSUED_DISPATCH_DECISIONS = new Map();
+  const ISSUED_DISPATCH_DECISION_LIMIT = 1000;
 
   const WORKFLOWS = Object.freeze({
     nursing: Object.freeze({
@@ -238,6 +243,137 @@
     return Math.min(20, Number(person.trainingHours || 0) / 2) + skillCoverage * 8;
   }
 
+  function stableDigest(value) {
+    const text = JSON.stringify(value);
+    let hash = 2166136261;
+    for (let index = 0; index < text.length; index += 1) {
+      hash ^= text.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return `fnv1a32:${(hash >>> 0).toString(16).padStart(8, "0")}`;
+  }
+
+  function qualificationDigestPayload(snapshot = {}) {
+    return {
+      status: snapshot.status,
+      orderId: snapshot.orderId,
+      domain: snapshot.domain,
+      subjectId: snapshot.subjectId,
+      subjectType: snapshot.subjectType,
+      checkedAt: snapshot.checkedAt,
+      validUntil: snapshot.validUntil,
+      policyVersion: snapshot.policyVersion
+    };
+  }
+
+  function dispatchDecisionDigestPayload(decision = {}) {
+    return {
+      status: decision.status,
+      orderId: decision.orderId,
+      domain: decision.domain,
+      targetStatus: decision.targetStatus,
+      subjectId: decision.subjectId,
+      score: decision.score,
+      riskBand: decision.riskBand,
+      qualificationDigest: decision.qualificationDigest,
+      checkedAt: decision.checkedAt,
+      validUntil: decision.validUntil,
+      policyVersion: decision.policyVersion
+    };
+  }
+
+  function dispatchEvidenceFingerprint(qualification = {}, decision = {}) {
+    return JSON.stringify({
+      qualification: { ...qualificationDigestPayload(qualification), digest: qualification.digest },
+      decision: { ...dispatchDecisionDigestPayload(decision), digest: decision.digest, id: decision.id }
+    });
+  }
+
+  function registerDispatchEvidence(qualification, decision) {
+    if (ISSUED_DISPATCH_DECISIONS.size >= ISSUED_DISPATCH_DECISION_LIMIT) {
+      ISSUED_DISPATCH_DECISIONS.delete(ISSUED_DISPATCH_DECISIONS.keys().next().value);
+    }
+    ISSUED_DISPATCH_DECISIONS.set(decision.id, dispatchEvidenceFingerprint(qualification, decision));
+  }
+
+  function evidenceTimeReasons(prefix, evidence = {}, at) {
+    const reasons = [];
+    const checkedAt = parseTime(evidence.checkedAt);
+    const validUntil = parseTime(evidence.validUntil);
+    if (!Number.isFinite(at)) reasons.push(`${prefix}-validation-time-invalid`);
+    if (checkedAt === null) reasons.push(`${prefix}-checked-at-invalid`);
+    if (validUntil === null) reasons.push(`${prefix}-valid-until-invalid`);
+    if (Number.isFinite(at) && checkedAt !== null && checkedAt > at + DISPATCH_EVIDENCE_FUTURE_SKEW_MS) reasons.push(`${prefix}-checked-at-future`);
+    if (Number.isFinite(at) && checkedAt !== null && at - checkedAt > DISPATCH_EVIDENCE_TTL_MS) reasons.push(`${prefix}-stale`);
+    if (Number.isFinite(at) && validUntil !== null && validUntil < at) reasons.push(`${prefix}-expired`);
+    if (checkedAt !== null && validUntil !== null && (validUntil <= checkedAt || validUntil - checkedAt > DISPATCH_EVIDENCE_TTL_MS)) {
+      reasons.push(`${prefix}-validity-window-invalid`);
+    }
+    return reasons;
+  }
+
+  function validateDispatchEvidence(domain, order = {}, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const targetStatus = dispatchTargetState(normalizedDomain);
+    const assignedField = normalizedDomain === "nursing" ? "nurseId" : "workerId";
+    const expectedSubjectType = normalizedDomain === "nursing" ? "nurse" : "escort-worker";
+    const assignedId = String(order[assignedField] || "").trim();
+    const orderId = String(order.id || "").trim();
+    const at = new Date(options.at || Date.now()).getTime();
+    const qualification = order.qualificationSnapshot;
+    const decision = order.dispatchDecision;
+    const qualificationReasons = [];
+    const decisionReasons = [];
+
+    if (!orderId) qualificationReasons.push("order-id-missing");
+    if (!assignedId) qualificationReasons.push("assigned-subject-missing");
+    if (!qualification || typeof qualification !== "object" || Array.isArray(qualification)) {
+      qualificationReasons.push("qualification-snapshot-missing");
+    } else {
+      if (qualification.status !== "passed") qualificationReasons.push("qualification-status-not-passed");
+      if (qualification.policyVersion !== WORKFLOW_POLICY_VERSION) qualificationReasons.push("qualification-policy-version-invalid");
+      if (qualification.orderId !== orderId) qualificationReasons.push("qualification-order-mismatch");
+      if (qualification.domain !== normalizedDomain) qualificationReasons.push("qualification-domain-mismatch");
+      if (qualification.subjectId !== assignedId) qualificationReasons.push("qualification-subject-mismatch");
+      if (qualification.subjectType !== expectedSubjectType) qualificationReasons.push("qualification-subject-type-mismatch");
+      qualificationReasons.push(...evidenceTimeReasons("qualification", qualification, at));
+      if (qualification.digest !== stableDigest(qualificationDigestPayload(qualification))) qualificationReasons.push("qualification-digest-mismatch");
+    }
+
+    if (!decision || typeof decision !== "object" || Array.isArray(decision)) {
+      decisionReasons.push("dispatch-decision-missing");
+    } else {
+      if (decision.status !== "approved") decisionReasons.push("dispatch-decision-not-approved");
+      if (decision.policyVersion !== WORKFLOW_POLICY_VERSION) decisionReasons.push("dispatch-policy-version-invalid");
+      if (decision.orderId !== orderId) decisionReasons.push("dispatch-order-mismatch");
+      if (decision.domain !== normalizedDomain) decisionReasons.push("dispatch-domain-mismatch");
+      if (decision.targetStatus !== targetStatus) decisionReasons.push("dispatch-target-mismatch");
+      if (decision.subjectId !== assignedId) decisionReasons.push("dispatch-subject-mismatch");
+      if (!Number.isFinite(decision.score)) decisionReasons.push("dispatch-score-invalid");
+      if (!["low", "medium", "high"].includes(decision.riskBand)) decisionReasons.push("dispatch-risk-band-invalid");
+      if (!qualification || decision.qualificationDigest !== qualification.digest) decisionReasons.push("dispatch-qualification-mismatch");
+      decisionReasons.push(...evidenceTimeReasons("dispatch", decision, at));
+      const expectedDigest = stableDigest(dispatchDecisionDigestPayload(decision));
+      if (decision.digest !== expectedDigest) decisionReasons.push("dispatch-digest-mismatch");
+      if (decision.id !== `dispatch:${expectedDigest}`) decisionReasons.push("dispatch-id-mismatch");
+      const issuedFingerprint = ISSUED_DISPATCH_DECISIONS.get(decision.id);
+      if (!issuedFingerprint) decisionReasons.push("dispatch-decision-not-issued");
+      else if (issuedFingerprint !== dispatchEvidenceFingerprint(qualification, decision)) decisionReasons.push("dispatch-issuance-mismatch");
+    }
+
+    const reasons = [...new Set([...qualificationReasons, ...decisionReasons])];
+    return {
+      ok: reasons.length === 0,
+      domain: normalizedDomain,
+      orderId,
+      targetStatus,
+      assignedId,
+      qualificationOk: qualificationReasons.length === 0,
+      decisionOk: decisionReasons.length === 0,
+      reasons
+    };
+  }
+
   function evaluateDispatchCandidate(domain, order = {}, person = {}, options = {}) {
     const normalizedDomain = normalizeDomain(domain);
     const target = dispatchTargetState(normalizedDomain);
@@ -259,10 +395,39 @@
     const personName = String(person.name || personId);
     const uniqueBlockers = [...new Set(blockers)];
     const eligible = uniqueBlockers.length === 0;
+    const orderId = String(order.id || "");
+    const validUntil = new Date(new Date(checkedAt).getTime() + DISPATCH_EVIDENCE_TTL_MS).toISOString();
+    const qualificationSnapshot = {
+      subjectId: personId,
+      subjectType: qualification.subjectType,
+      status: "passed",
+      orderId,
+      domain: normalizedDomain,
+      checkedAt,
+      validUntil,
+      policyVersion: WORKFLOW_POLICY_VERSION
+    };
+    qualificationSnapshot.digest = stableDigest(qualificationDigestPayload(qualificationSnapshot));
+    const dispatchDecision = {
+      status: "approved",
+      score,
+      riskBand: risk.band,
+      checkedAt,
+      validUntil,
+      subjectId: personId,
+      orderId,
+      domain: normalizedDomain,
+      targetStatus: target,
+      qualificationDigest: qualificationSnapshot.digest,
+      policyVersion: WORKFLOW_POLICY_VERSION
+    };
+    dispatchDecision.digest = stableDigest(dispatchDecisionDigestPayload(dispatchDecision));
+    dispatchDecision.id = `dispatch:${dispatchDecision.digest}`;
+    if (eligible) registerDispatchEvidence(qualificationSnapshot, dispatchDecision);
     return {
       eligible,
       domain: normalizedDomain,
-      orderId: String(order.id || ""),
+      orderId,
       targetStatus: target,
       personId,
       personName,
@@ -274,20 +439,8 @@
       prerequisites,
       updates: eligible ? {
         ...(normalizedDomain === "nursing" ? { nurseId: personId, nurseName: personName } : { workerId: personId, workerName: personName }),
-        qualificationSnapshot: {
-          subjectId: personId,
-          subjectType: qualification.subjectType,
-          status: "passed",
-          checkedAt,
-          policyVersion: "nursing-escort-workflow-v1"
-        },
-        dispatchDecision: {
-          status: "approved",
-          score,
-          riskBand: risk.band,
-          checkedAt,
-          subjectId: personId
-        }
+        qualificationSnapshot,
+        dispatchDecision
       } : {}
     };
   }
@@ -341,8 +494,6 @@
     if (order.identityVerified) types.add("identity-verification");
     if (order.firstVisitAssessment === "passed") types.add("first-visit-assessment");
     if (order.informedConsent === "signed" && order.consentAttachment?.status === "signed") types.add("signed-consent");
-    if (order.qualificationSnapshot || order.qualificationEvidence) types.add("qualification-snapshot");
-    if (order.dispatchDecision || order.nurseId || order.workerId) types.add("dispatch-decision");
     if (order.workerAcceptedAt || order.nurseAcceptedAt || order.status === "accepted") types.add("worker-acceptance");
     if (order.providerAdmissionSnapshot || order.provider?.published) types.add("provider-admission-snapshot");
     if (order.eligibilityResult) types.add("eligibility-result");
@@ -363,13 +514,19 @@
     return types;
   }
 
-  function validateEvidenceForTransition(domain, order = {}, nextStatus) {
+  function validateEvidenceForTransition(domain, order = {}, nextStatus, options = {}) {
     const normalizedDomain = normalizeDomain(domain);
     const next = canonicalStatus(nextStatus, normalizedDomain);
     const required = [...(EVIDENCE_GATES[normalizedDomain][next] || [])];
     const present = evidenceTypes(order);
+    let dispatchIntegrity = null;
+    if (next === dispatchTargetState(normalizedDomain)) {
+      dispatchIntegrity = validateDispatchEvidence(normalizedDomain, order, options);
+      if (dispatchIntegrity.qualificationOk) present.add("qualification-snapshot");
+      if (dispatchIntegrity.qualificationOk && dispatchIntegrity.decisionOk) present.add("dispatch-decision");
+    }
     const missing = required.filter((item) => !present.has(item));
-    return { ok: missing.length === 0, domain: normalizedDomain, next, required, missing, present: [...present] };
+    return { ok: missing.length === 0, domain: normalizedDomain, next, required, missing, present: [...present], dispatchIntegrity };
   }
 
   function buildTimelineEvent(domain, order, transition, options = {}) {
@@ -385,7 +542,7 @@
       occurredAt: at,
       actorId: String(options.actorId || options.actor || "system"),
       actorRole: String(options.actorRole || "system"),
-      evidenceTypes: validateEvidenceForTransition(domain, order, transition.next).present,
+      evidenceTypes: validateEvidenceForTransition(domain, order, transition.next, { at }).present,
       note: String(options.note || "")
     };
   }
@@ -406,7 +563,17 @@
       throw error;
     }
     const candidate = { ...order, ...(options.updates || {}), status: transition.next };
-    const evidence = validateEvidenceForTransition(domain, candidate, transition.next);
+    if (transition.next === dispatchTargetState(domain)) {
+      const integrity = validateDispatchEvidence(domain, candidate, { at: options.at });
+      if (!integrity.ok) {
+        const error = new Error(`invalid dispatch evidence for ${transition.next}: ${integrity.reasons.join(", ")}`);
+        error.code = "ORDER_DISPATCH_INTEGRITY_INVALID";
+        error.statusCode = 409;
+        error.details = integrity;
+        throw error;
+      }
+    }
+    const evidence = validateEvidenceForTransition(domain, candidate, transition.next, { at: options.at });
     if (!evidence.ok) {
       const error = new Error(`missing evidence for ${transition.next}: ${evidence.missing.join(", ")}`);
       error.code = "ORDER_EVIDENCE_INCOMPLETE";
@@ -417,7 +584,7 @@
     const event = buildTimelineEvent(domain, candidate, transition, options);
     return {
       ...candidate,
-      workflowVersion: "nursing-escort-workflow-v1",
+      workflowVersion: WORKFLOW_POLICY_VERSION,
       updatedAt: event.occurredAt,
       timelineEvents: [event, ...(Array.isArray(order.timelineEvents) ? order.timelineEvents : [])].slice(0, 100),
       auditTrail: [
@@ -472,6 +639,7 @@
     dispatchPrerequisites,
     evaluateDispatchCandidate,
     rankDispatchCandidates,
+    validateDispatchEvidence,
     assessOrderRisk,
     evidenceTypes,
     validateEvidenceForTransition,

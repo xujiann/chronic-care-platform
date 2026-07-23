@@ -162,7 +162,14 @@ test("dispatch evaluation produces evidence-backed nursing updates for an eligib
   assert.equal(decision.eligible, true);
   assert.equal(decision.targetStatus, "dispatched");
   assert.equal(decision.updates.qualificationSnapshot.status, "passed");
+  assert.equal(decision.updates.qualificationSnapshot.orderId, order.id);
+  assert.equal(decision.updates.qualificationSnapshot.domain, "nursing");
+  assert.match(decision.updates.qualificationSnapshot.digest, /^fnv1a32:/);
   assert.equal(decision.updates.dispatchDecision.status, "approved");
+  assert.equal(decision.updates.dispatchDecision.orderId, order.id);
+  assert.equal(decision.updates.dispatchDecision.domain, "nursing");
+  assert.equal(decision.updates.dispatchDecision.subjectId, "inn-001");
+  assert.match(decision.updates.dispatchDecision.id, /^dispatch:fnv1a32:/);
 
   const dispatched = Domain.transitionOrder("nursing", order, "dispatched", {
     at: NOW,
@@ -172,6 +179,82 @@ test("dispatch evaluation produces evidence-backed nursing updates for an eligib
   });
   assert.equal(dispatched.status, "dispatched");
   assert.equal(dispatched.nurseId, "inn-001");
+});
+
+test("nursing dispatch rejects failed denied missing mismatched and stale evidence without mutation", () => {
+  const order = {
+    id: "ino-integrity-001",
+    residentId: "r1",
+    status: "assessed",
+    institutionId: "inh-mr1",
+    institutionCode: "MR1",
+    serviceItem: "wound care",
+    riskLevel: "medium",
+    identityVerified: true,
+    firstVisitAssessment: "passed",
+    informedConsent: "signed",
+    consentAttachment: { status: "signed" }
+  };
+  const updates = Domain.evaluateDispatchCandidate("nursing", order, qualifiedNurse(), { now: NOW }).updates;
+  assert.throws(
+    () => Domain.transitionOrder("nursing", order, "dispatched", {
+      at: NOW,
+      updates: {
+        nurseId: "missing-nurse",
+        qualificationSnapshot: { status: "failed" },
+        dispatchDecision: { status: "denied" }
+      }
+    }),
+    (error) => error.code === "ORDER_DISPATCH_INTEGRITY_INVALID"
+      && error.details.reasons.includes("qualification-status-not-passed")
+      && error.details.reasons.includes("dispatch-decision-not-approved")
+      && error.details.reasons.includes("dispatch-decision-not-issued")
+  );
+  const cases = [
+    {
+      name: "failed qualification",
+      updates: { ...updates, qualificationSnapshot: { ...updates.qualificationSnapshot, status: "failed" } },
+      reason: "qualification-status-not-passed"
+    },
+    {
+      name: "denied decision",
+      updates: { ...updates, dispatchDecision: { ...updates.dispatchDecision, status: "denied" } },
+      reason: "dispatch-decision-not-approved"
+    },
+    {
+      name: "missing decision",
+      updates: { ...updates, dispatchDecision: undefined },
+      reason: "dispatch-decision-missing"
+    },
+    {
+      name: "mismatched subject",
+      updates: { ...updates, nurseId: "missing-nurse" },
+      reason: "qualification-subject-mismatch"
+    },
+    {
+      name: "mismatched order binding",
+      updates: { ...updates, dispatchDecision: { ...updates.dispatchDecision, orderId: "ino-other" } },
+      reason: "dispatch-order-mismatch"
+    }
+  ];
+
+  for (const item of cases) {
+    assert.throws(
+      () => Domain.transitionOrder("nursing", order, "dispatched", { at: NOW, updates: item.updates }),
+      (error) => error.code === "ORDER_DISPATCH_INTEGRITY_INVALID" && error.details.reasons.includes(item.reason),
+      item.name
+    );
+    assert.equal(order.status, "assessed");
+    assert.equal(order.timelineEvents, undefined);
+  }
+
+  assert.throws(
+    () => Domain.transitionOrder("nursing", order, "dispatched", { at: "2026-07-22T10:00:01+08:00", updates }),
+    (error) => error.code === "ORDER_DISPATCH_INTEGRITY_INVALID"
+      && error.details.reasons.includes("qualification-stale")
+      && error.details.reasons.includes("dispatch-stale")
+  );
+  assert.equal(order.status, "assessed");
 });
 
 test("dispatch ranking excludes fail-closed candidates and reports order blockers", () => {
@@ -242,6 +325,48 @@ test("dispatch evaluation requires escort prerequisites and blocks critical nurs
   assert.equal(criticalDecision.blockers.includes("risk:critical"), true);
 });
 
+test("escort dispatch accepts evaluator evidence and rejects forged subject domain and stale bindings", () => {
+  const order = {
+    id: "eso-integrity-001",
+    residentId: "r1",
+    status: "provider-matched",
+    providerId: "esp-001",
+    serviceItems: ["registration", "exam escort"],
+    riskLevel: "low",
+    identityVerified: true,
+    eligibilityResult: { status: "eligible" },
+    providerAdmissionSnapshot: { status: "approved" },
+    contractStatus: "signed",
+    insuranceStatus: "covered"
+  };
+  const updates = Domain.evaluateDispatchCandidate("escort", order, qualifiedEscortWorker(), { now: NOW }).updates;
+  const dispatched = Domain.transitionOrder("escort", order, "worker-dispatched", { at: NOW, updates });
+  assert.equal(dispatched.status, "worker-dispatched");
+  assert.equal(dispatched.workerId, "ew-001");
+  assert.equal(dispatched.dispatchDecision.orderId, order.id);
+  assert.equal(dispatched.dispatchDecision.domain, "escort");
+
+  assert.throws(
+    () => Domain.transitionOrder("escort", order, "worker-dispatched", { at: NOW, updates: { ...updates, workerId: "ew-forged" } }),
+    (error) => error.code === "ORDER_DISPATCH_INTEGRITY_INVALID"
+      && error.details.reasons.includes("qualification-subject-mismatch")
+      && error.details.reasons.includes("dispatch-subject-mismatch")
+  );
+  assert.throws(
+    () => Domain.transitionOrder("escort", order, "worker-dispatched", {
+      at: NOW,
+      updates: { ...updates, dispatchDecision: { ...updates.dispatchDecision, domain: "nursing" } }
+    }),
+    (error) => error.code === "ORDER_DISPATCH_INTEGRITY_INVALID" && error.details.reasons.includes("dispatch-domain-mismatch")
+  );
+  assert.throws(
+    () => Domain.transitionOrder("escort", order, "worker-dispatched", { at: "2026-07-22T10:00:01+08:00", updates }),
+    (error) => error.code === "ORDER_DISPATCH_INTEGRITY_INVALID" && error.details.reasons.includes("dispatch-stale")
+  );
+  assert.equal(order.status, "provider-matched");
+  assert.equal(order.timelineEvents, undefined);
+});
+
 test("transition order blocks missing evidence and emits resident timeline evidence", () => {
   const requested = {
     id: "ino-test-001",
@@ -260,13 +385,16 @@ test("transition order blocks missing evidence and emits resident timeline evide
 
   assert.throws(
     () => Domain.transitionOrder("nursing", assessed, "dispatched", { actorId: "hospital", at: NOW }),
-    (error) => error.code === "ORDER_EVIDENCE_INCOMPLETE" && error.details.missing.includes("qualification-snapshot")
+    (error) => error.code === "ORDER_DISPATCH_INTEGRITY_INVALID"
+      && error.details.reasons.includes("qualification-snapshot-missing")
+      && error.details.reasons.includes("dispatch-decision-missing")
   );
 
+  const decision = Domain.evaluateDispatchCandidate("nursing", assessed, qualifiedNurse(), { now: NOW });
   const dispatched = Domain.transitionOrder("nursing", assessed, "dispatched", {
     actorId: "hospital",
     at: NOW,
-    updates: { nurseId: "inn-001", qualificationSnapshot: { status: "passed" }, dispatchDecision: { score: 12 } }
+    updates: decision.updates
   });
   assert.equal(dispatched.status, "dispatched");
 });
