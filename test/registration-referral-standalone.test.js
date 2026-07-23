@@ -113,7 +113,7 @@ test("standalone command catalog covers all locally implementable increments", (
     "review-family-doctor-renewal",
     "terminate-family-doctor-contract"
   ].forEach((action) => assert.ok(actions.has(action), action));
-  assert.equal(CLOSURE_COMMAND_CONTRACTS.length, 35);
+  assert.equal(CLOSURE_COMMAND_CONTRACTS.length, 40);
 });
 
 test("referral exception path rejects reassigns packages reschedules no-show and cancels", () => {

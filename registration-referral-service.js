@@ -25,6 +25,10 @@ const {
   buildClosureWorkQueue,
   buildNotificationReliability
 } = require("./registration-referral-standalone");
+const {
+  ADVANCED_COMMAND_CONTRACTS,
+  applyAdvancedCommand
+} = require("./registration-referral-advanced");
 
 const DEFAULT_NOTIFICATION_POLICY = Object.freeze({
   channels: Object.freeze([
@@ -51,7 +55,7 @@ const BASE_CLOSURE_COMMAND_CONTRACTS = Object.freeze([
   { action: "run-notification-fallback", roles: ["institution", "county", "commission"], requiredFields: ["payload.messageId", "payload.note"], suggestedEndpoint: "POST /api/registration-referral/commands/run-notification-fallback" },
   { action: "escalate-case", roles: ["institution", "county", "commission"], requiredFields: ["caseType", "caseId", "payload.note"], suggestedEndpoint: "POST /api/registration-referral/commands/escalate-case" }
 ]);
-const CLOSURE_COMMAND_CONTRACTS = Object.freeze([...BASE_CLOSURE_COMMAND_CONTRACTS, ...STANDALONE_COMMAND_CONTRACTS]);
+const CLOSURE_COMMAND_CONTRACTS = Object.freeze([...BASE_CLOSURE_COMMAND_CONTRACTS, ...STANDALONE_COMMAND_CONTRACTS, ...ADVANCED_COMMAND_CONTRACTS]);
 
 const RECEIPT_STATUSES = new Set(["acknowledged", "bounced", "confirmed", "delivered", "failed", "handled", "read", "received"]);
 const BUSINESS_ACKNOWLEDGEMENT_STATUSES = new Set(["acknowledged", "confirmed", "handled", "read"]);
@@ -1037,6 +1041,7 @@ function advanceAggregateVersion(data, command, priorVersion, result) {
 }
 
 function appendClosureEvent(data, command, actor, result, fingerprint, aggregateVersion) {
+  const previousEventHash = text(rows(data.registrationReferralClosureEvents)[0]?.eventHash);
   const event = {
     id: `rrce-${randomUUID()}`,
     commandId: command.commandId,
@@ -1050,9 +1055,11 @@ function appendClosureEvent(data, command, actor, result, fingerprint, aggregate
     actorRole: actor.role,
     actorOrgCode: text(actor.orgCode),
     aggregateVersion,
+    previousEventHash,
     result: "allowed",
     productionEvidence: false
   };
+  event.eventHash = createHash("sha256").update(JSON.stringify(canonicalize(event))).digest("hex");
   data.registrationReferralClosureEvents = appendById(data.registrationReferralClosureEvents, event);
   return event;
 }
@@ -1085,7 +1092,7 @@ function applyClosureCommand(sourceData = {}, input = {}, actor = {}, options = 
     "escalate-case": () => escalateCase(data, command, actor)
   };
   const handler = handlers[command.action];
-  const result = handler ? handler() : applyStandaloneCommand(data, command, actor);
+  const result = handler ? handler() : applyStandaloneCommand(data, command, actor) || applyAdvancedCommand(data, command, actor);
   if (!result) throw new Error(`unsupported closure command ${command.action}`);
   const aggregateVersion = advanceAggregateVersion(data, command, priorAggregateVersion, result);
   const event = appendClosureEvent(data, command, actor, result, fingerprint, aggregateVersion);
