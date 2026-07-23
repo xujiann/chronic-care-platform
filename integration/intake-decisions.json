@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-23T06:11:34.000Z",
+  "updatedAt": "2026-07-23T06:52:07.738Z",
   "decisions": [
     {
       "lineId": "T01",
@@ -99,6 +99,34 @@
         "109 citizen record projection, policy, continuous-care, static and security tests passed independently",
         "controlled credentials require one-time HTTPS, five-minute expiry, matching resource and audit evidence",
         "server responses cannot widen authorization scope, extend expiry or overwrite resident correction security fields"
+      ],
+      "blockers": []
+    },
+    {
+      "lineId": "T06",
+      "candidateHead": "bceee20bca687210fb0fea09e5a0705b170147dd",
+      "decision": "accepted",
+      "reviewedAt": "2026-07-23T06:52:07.738Z",
+      "reviewer": "T00",
+      "checks": [
+        "git diff --check",
+        "24 nursing and escort domain workflow tests passed independently",
+        "75 nursing, escort and static portal regressions passed independently",
+        "qualification, institution scope, high-risk, service evidence, complaint, settlement, cancellation and refund paths fail closed"
+      ],
+      "blockers": []
+    },
+    {
+      "lineId": "T07",
+      "candidateHead": "65b87d38fec0b48b3aadcd1680859ddfebde96b8",
+      "decision": "accepted",
+      "reviewedAt": "2026-07-23T06:52:07.738Z",
+      "reviewer": "T00",
+      "checks": [
+        "git diff --check",
+        "78 disease-payment, financial gateway and insurance-payment tests passed independently",
+        "signed callbacks, replay protection, dual-review refunds, difference reconciliation and per-institution annual clearance validated",
+        "evidence packets remain digest-bound, privacy-minimized and productionReady false"
       ],
       "blockers": []
     }
