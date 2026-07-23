@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-23T07:09:39.254Z",
+  "updatedAt": "2026-07-23T07:37:13.083Z",
   "decisions": [
     {
       "lineId": "T01",
@@ -107,30 +107,32 @@
     },
     {
       "lineId": "T06",
-      "candidateHead": "7cc9a09b9b4aa1af375e829107ad1e4fb3c8096f",
+      "candidateHead": "ff0a618f7bb2331aae9b89d0e8775f2fed110dc8",
       "decision": "accepted",
-      "reviewedAt": "2026-07-23T07:04:45.981Z",
+      "reviewedAt": "2026-07-23T07:37:13.083Z",
       "reviewer": "T00",
       "checks": [
         "git diff --check",
-        "102 nursing, escort domain, readiness and static portal tests passed independently",
+        "104 nursing, escort domain, readiness and static portal tests passed independently",
         "rescheduling releases original resources and requires an approved replacement assignment",
         "no-show handling requires grace-period attendance evidence and a bound human decision",
+        "resident timeline chronology, notification plans and provider receipts are order-, resident-, status- and idempotency-bound",
         "qualification, institution scope, high-risk, service evidence, complaint, settlement, cancellation and refund paths fail closed"
       ],
       "blockers": []
     },
     {
       "lineId": "T07",
-      "candidateHead": "bf0e78d7af8990bac476e54d14bb85fe89d24524",
+      "candidateHead": "76dcf77fa189864b66ba62f6cf0727ec224b5415",
       "decision": "accepted",
-      "reviewedAt": "2026-07-23T07:04:45.981Z",
+      "reviewedAt": "2026-07-23T07:37:13.083Z",
       "reviewer": "T00",
       "checks": [
         "git diff --check",
-        "83 disease-payment, financial gateway and insurance-payment tests passed independently",
+        "87 disease-payment, financial gateway and insurance-payment tests passed independently",
         "signed callbacks, replay protection, dual-review refunds, difference reconciliation and per-institution annual clearance validated",
         "special-case appeals bind the original decision and require a fresh two-person panel disjoint from original reviewers",
+        "insurance-core return correction cycles bind trusted receipts, requirements, SLA, resubmission identity and tamper-evident ledgers",
         "evidence packets remain digest-bound, privacy-minimized and productionReady false"
       ],
       "blockers": []
