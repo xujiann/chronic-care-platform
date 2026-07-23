@@ -637,6 +637,7 @@
         </header>
         <div class="form-grid">
           <label>授权对象<input name="granteeName" placeholder="例如：家庭医生团队" required /></label>
+          <label>对象标识<input name="granteeId" placeholder="团队、机构、账户或居民唯一标识" required /></label>
           <label>对象类型
             <select name="granteeType" required>
               <option value="care-team">家庭医生/医疗团队</option>
@@ -672,8 +673,8 @@
     <script src="./physical-examination-highlights.js"></script>
     <script src="./physical-examination-service.js"></script>
     <script src="./immunization-schedule.js"></script>
-    <script src="./citizen-records-v1.js?v=20260723auth1"></script>
-    <script src="./citizen.js?v=20260722records4"></script>
+    <script src="./citizen-records-v1.js?v=20260723auth2"></script>
+    <script src="./citizen.js?v=20260723auth2"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));

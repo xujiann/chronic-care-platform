@@ -38,6 +38,7 @@ test("resident creates a scoped consent and revokes it through the dedicated aud
   await page.locator("#grant-auth").click();
   const form = page.locator("#auth-form");
   await form.locator("input[name='granteeName']").fill("专项复诊团队");
+  await form.locator("input[name='granteeId']").fill("team-special-review");
   await form.locator("select[name='granteeType']").selectOption("care-team");
   await form.locator("input[name='purpose']").fill("高血压复诊资料核对");
   await form.locator("input[value='health-record-summary']").check();

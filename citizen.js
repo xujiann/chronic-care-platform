@@ -4580,6 +4580,7 @@ function bindDialogs() {
       const authorization = window.CitizenRecordsV1.buildAuthorizationRecord({
         residentId: currentResidentId,
         granteeName: formData.get("granteeName"),
+        granteeId: formData.get("granteeId"),
         granteeType: formData.get("granteeType"),
         purpose: formData.get("purpose"),
         scopes: formData.getAll("scopes"),
@@ -4811,6 +4812,7 @@ function renderAuthorizationState(item) {
     <div class="auth-state ${escapeHtml(status.className)}">${escapeHtml(status.label)}</div>
     <dl>
       <div><dt>用途</dt><dd>${escapeHtml(item.meta?.purpose || "历史授权，目的待补录")}</dd></div>
+      <div><dt>对象标识</dt><dd>${escapeHtml(item.meta?.granteeId || item.meta?.granteeAccountId || item.meta?.granteeResidentId || "历史授权待补录")}</dd></div>
       <div><dt>范围</dt><dd>${escapeHtml(scopes || "范围待补录")}</dd></div>
       <div><dt>凭证版本</dt><dd>${escapeHtml(item.meta?.consentVersion || "legacy-record")}</dd></div>
     </dl>

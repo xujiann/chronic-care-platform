@@ -77,9 +77,11 @@
 
 ## 授权模型
 
-V1 授权元数据包括 `granteeType`、`purpose`、`scopes`、`expiresAt`、`consentVersion`、`grantedAt`、`version` 和 `status`。前后端均应以撤销状态和到期时间计算有效性。家庭/监护关系只决定是否具备申请授权的前提，有效授权凭证才决定是否可以读取相应数据。
+V1 授权元数据包括 `granteeType`、`granteeId`、`purpose`、`scopes`、`expiresAt`、`consentVersion`、`grantedAt`、`version` 和 `status`。新授权必须绑定稳定的团队、机构、账户或居民标识，不能仅凭显示名称授权；家庭读取时该标识必须精确匹配当前账户或居民。前后端均应以主体匹配、撤销状态和到期时间计算有效性。家庭/监护关系只决定是否具备申请授权的前提，有效授权凭证才决定是否可以读取相应数据。
 
 居民授权范围采用显式最小白名单：`health-record-summary`、`emr-summary`、`labs`、`medications`、`imaging-report` 和 `attachments`。通配符、未知范围以及“合法范围 + 未知范围”的混合记录均 fail-closed；附件不会继承影像或健康档案摘要权限。未来有效期只能作为必要条件，授权状态还必须全部属于 `active / authorized / 有效 / 已授权` 最小白名单。
+
+授权构建器拒绝有效期早于授权时间的记录。历史授权若缺少 `granteeId`，可以只读展示，但不能用于家庭成员权限判定，需重新核验主体后再签发。
 
 当前公共后端仍需由 T00 在集成时进一步收紧：
 

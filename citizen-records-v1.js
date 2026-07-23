@@ -169,13 +169,19 @@
     const scopes = [...new Set((Array.isArray(input.scopes) ? input.scopes : []).map((item) => cleanText(item, 80)).filter(Boolean))];
     const expiresAt = cleanText(input.expiresAt, 20);
     const granteeName = cleanText(input.granteeName, 200);
+    const granteeId = cleanText(input.granteeId, 160);
     const purpose = cleanText(input.purpose, 300);
-    if (!input.residentId || !granteeName || !purpose || !scopes.length || !expiresAt) {
-      throw new Error("授权对象、用途、范围和有效期均不能为空");
+    const grantedAt = cleanText(input.grantedAt || new Date().toISOString(), 60);
+    if (!input.residentId || !granteeName || !granteeId || !purpose || !scopes.length || !expiresAt) {
+      throw new Error("授权对象名称、标识、用途、范围和有效期均不能为空");
     }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(expiresAt) || Number.isNaN(new Date(`${expiresAt}T23:59:59`).getTime())) {
+    const expiry = new Date(`${expiresAt}T23:59:59`);
+    const grantTime = new Date(grantedAt);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(expiresAt) || Number.isNaN(expiry.getTime())) {
       throw new Error("授权有效期格式不正确");
     }
+    if (Number.isNaN(grantTime.getTime())) throw new Error("授权时间格式不正确");
+    if (expiry.getTime() < grantTime.getTime()) throw new Error("授权有效期不能早于授权时间");
     if (scopes.some((scope) => !RESIDENT_AUTHORIZATION_SCOPES.has(scope))) {
       throw new Error("授权范围不受支持");
     }
@@ -189,11 +195,12 @@
       meta: {
         status: "active",
         granteeType: cleanText(input.granteeType || "care-team", 80),
+        granteeId,
         purpose,
         scopes,
         expiresAt,
         consentVersion: cleanText(input.consentVersion || "resident-record-consent-v1", 100),
-        grantedAt: cleanText(input.grantedAt || new Date().toISOString(), 60),
+        grantedAt,
         version: 1,
         sourceTrust: "resident-consent"
       }

@@ -18,6 +18,7 @@ function authorization(overrides = {}) {
   const record = buildAuthorizationRecord({
     residentId: "r4",
     granteeName: "演示居民A账户",
+    granteeId: "a1",
     granteeType: "family-member",
     purpose: "协助查看健康档案",
     scopes: ["health-record-summary"],
@@ -62,6 +63,11 @@ test("family access requires both verified relationship evidence and active matc
   assert.equal(canCitizenReadResident(dataWith(verifiedMember, [authorization()]), citizen, "r4", {
     now: NOW,
     scope: "imaging-report"
+  }), false);
+  const wrongGrantee = authorization({ meta: { granteeId: "a2", granteeAccountId: "a2" } });
+  assert.equal(canCitizenReadResident(dataWith(verifiedMember, [wrongGrantee]), citizen, "r4", {
+    now: NOW,
+    scope: "health-record-summary"
   }), false);
   const labAuthorization = authorization({ meta: { scopes: ["labs"] } });
   assert.equal(canCitizenReadRecord(dataWith(verifiedMember, [labAuthorization]), citizen, { residentId: "r4", category: "labs" }, { now: NOW }), true);
