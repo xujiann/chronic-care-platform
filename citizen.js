@@ -197,6 +197,13 @@ const vaultSections = [
 ];
 
 let activeVaultSection = "timeline";
+let vaultSearchResidentId = "";
+const vaultSearchState = {
+  keyword: "",
+  trust: "all",
+  dateFrom: "",
+  dateTo: ""
+};
 const citizenServiceTabs = [
   { key: "health-record", label: "健康档案", status: "已实现", detail: "健康指标、标准档案、授权共享", title: "健康档案二级页面", actionLabel: "查看健康档案" },
   { key: "emr", label: "电子病历", status: "已实现", detail: "诊疗时间线、慢病和访问记录", title: "电子病历二级页面", actionLabel: "查看电子病历" },
@@ -465,6 +472,7 @@ const residentFunctionAudit = [
   { service: "health-record", name: "健康指标与风险等级", status: "已实现", evidence: "展示血压、血糖、BMI、家庭医生和风险分层", mobile: "摘要卡片单列堆叠" },
   { service: "health-record", name: "全生命周期健康管理", status: "已实现", evidence: "出生、儿童、成人慢病、老年服务和死亡证明线索归集", mobile: "阶段卡片单列显示" },
   { service: "health-record", name: "健康档案归集", status: "已实现", evidence: "标准档案、历年体检报告、检查检验、用药、过敏、疫苗、影像和附件统一索引", mobile: "档案标签横向滑动" },
+  { service: "health-record", name: "档案检索与快速定位", status: "已实现", evidence: "按关键词、可信来源和日期范围检索当前居民最小化摘要", mobile: "筛选字段单列且触控高度不低于44像素" },
   { service: "health-record", name: "历史体检报告", status: "已实现", evidence: "体检中心和医院结果按居民主索引同步，保留异常项、建议、来源机构和外部报告号", mobile: "可按年度查看全部历史报告" },
   { service: "health-record", name: "上传资料", status: "已实现", evidence: "居民可补充报告、图片或自测记录", mobile: "弹窗在窄屏占满可用宽度" },
   { service: "health-record", name: "授权共享与撤销", status: "已实现", evidence: "可新增授权并记录授权对象、范围和来源", mobile: "表单字段单列录入" },
@@ -2341,9 +2349,48 @@ function formatNursingStage(item) {
   return "等待上门服务";
 }
 
+function resetVaultSearchState() {
+  vaultSearchState.keyword = "";
+  vaultSearchState.trust = "all";
+  vaultSearchState.dateFrom = "";
+  vaultSearchState.dateTo = "";
+}
+
+function bindVaultSearch(resident, diseases, followups, records) {
+  if (vaultSearchResidentId !== resident.id) {
+    vaultSearchResidentId = resident.id;
+    resetVaultSearchState();
+  }
+  const fields = {
+    keyword: document.querySelector("#vault-search-keyword"),
+    trust: document.querySelector("#vault-search-trust"),
+    dateFrom: document.querySelector("#vault-search-from"),
+    dateTo: document.querySelector("#vault-search-to")
+  };
+  Object.entries(fields).forEach(([key, field]) => {
+    if (!field) return;
+    field.value = vaultSearchState[key];
+    const update = () => {
+      vaultSearchState[key] = field.value;
+      renderVault(resident, diseases, followups, records);
+    };
+    field.oninput = key === "keyword" ? update : null;
+    field.onchange = key === "keyword" ? null : update;
+  });
+  const clearButton = document.querySelector("#vault-search-clear");
+  if (clearButton) {
+    clearButton.onclick = () => {
+      resetVaultSearchState();
+      renderVault(resident, diseases, followups, records);
+      document.querySelector("#vault-search-keyword")?.focus();
+    };
+  }
+}
+
 function renderVault(resident, diseases, followups, records) {
   const grouped = collectVaultData(resident, diseases, followups, records);
   renderResidentRecordsV1Summary(resident.id);
+  bindVaultSearch(resident, diseases, followups, records);
   const completeCount = vaultSections.filter((section) => section.key === "standard" || grouped[section.key]?.length).length;
   const score = Math.round((completeCount / vaultSections.length) * 100);
   document.querySelector("#completeness-score").textContent = `${score}%`;
@@ -2366,12 +2413,23 @@ function renderVault(resident, diseases, followups, records) {
   });
 
   if (activeVaultSection === "standard") {
+    document.querySelector("#vault-search-status").textContent = "居民健康档案标准视图不使用记录筛选";
     document.querySelector("#vault-content").innerHTML = renderStandardArchive(resident.id);
     return;
   }
 
   const activeItems = grouped[activeVaultSection] || [];
-  document.querySelector("#vault-content").innerHTML = activeItems
+  const filtered = window.CitizenRecordsV2?.filterResidentRecords(activeItems, {
+    residentId: resident.id,
+    ...vaultSearchState
+  }) || { items: activeItems, total: activeItems.length, matched: activeItems.length, invalidRange: false, applied: false };
+  const activeLabel = vaultSections.find((section) => section.key === activeVaultSection)?.label || "当前分类";
+  document.querySelector("#vault-search-status").textContent = filtered.invalidRange
+    ? "开始日期不能晚于结束日期"
+    : filtered.applied
+      ? `${activeLabel}：显示 ${filtered.matched} / ${filtered.total} 条`
+      : `${activeLabel}：共 ${filtered.total} 条`;
+  document.querySelector("#vault-content").innerHTML = filtered.items
     .map((item) => `<article class="vault-item">
       <div>
         <strong>${escapeHtml(item.name)}</strong>
@@ -2386,7 +2444,7 @@ function renderVault(resident, diseases, followups, records) {
       <span>${escapeHtml(item.date)}<br>${escapeHtml(item.source)}</span>
       ${activeVaultSection === "authorizations" && isAuthorizationActive(item) ? `<button type="button" class="revoke-button" data-revoke-auth="${escapeHtml(item.id)}" aria-label="撤销对${escapeHtml(item.name)}的授权">撤销授权</button>` : ""}
     </article>`)
-    .join("") || `<p class="muted">当前分类暂无数据，可通过区域平台、医院电子病历或个人上传更新。</p>`;
+    .join("") || `<p class="muted">${filtered.invalidRange ? "请调整日期范围后重试。" : filtered.total && filtered.applied ? "没有符合当前筛选条件的记录。" : "当前分类暂无数据，可通过区域平台、医院电子病历或个人上传更新。"}</p>`;
   document.querySelectorAll("[data-revoke-auth]").forEach((button) => {
     button.addEventListener("click", () => revokeAuthorization(button.dataset.revokeAuth));
   });

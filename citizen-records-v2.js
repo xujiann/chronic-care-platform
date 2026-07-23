@@ -931,6 +931,48 @@
     }));
   }
 
+  function filterResidentRecords(records = [], filters = {}) {
+    const residentId = cleanText(filters.residentId, 120);
+    const keyword = cleanText(filters.keyword, 100).toLocaleLowerCase("zh-CN");
+    const allowedTrust = new Set(["all", "authoritative", "self-reported", "pending-verification"]);
+    const trust = allowedTrust.has(filters.trust) ? filters.trust : "all";
+    const dateFrom = /^\d{4}-\d{2}-\d{2}$/.test(filters.dateFrom || "") ? filters.dateFrom : "";
+    const dateTo = /^\d{4}-\d{2}-\d{2}$/.test(filters.dateTo || "") ? filters.dateTo : "";
+    const invalidRange = Boolean(dateFrom && dateTo && dateFrom > dateTo);
+    const scoped = (Array.isArray(records) ? records : []).filter((record) => {
+      if (!record || (residentId && cleanText(record.residentId, 120) !== residentId)) return false;
+      return true;
+    });
+    const items = invalidRange ? [] : scoped.filter((record) => {
+      const recordDate = cleanText(record.date, 40).slice(0, 10);
+      if (dateFrom && (!recordDate || recordDate < dateFrom)) return false;
+      if (dateTo && (!recordDate || recordDate > dateTo)) return false;
+      const recordTrust = CitizenRecordsV1?.sourceTrust(record) || "pending-verification";
+      if (trust !== "all" && recordTrust !== trust) return false;
+      if (!keyword) return true;
+      const searchable = [
+        record.name,
+        record.result,
+        record.source,
+        record.categoryLabel,
+        record.related,
+        record.meta?.reportNo,
+        record.meta?.department,
+        record.meta?.modality,
+        record.meta?.bodyPart,
+        record.meta?.pharmacy
+      ].map((value) => cleanText(value, 1200).toLocaleLowerCase("zh-CN")).join("\n");
+      return searchable.includes(keyword);
+    });
+    return {
+      items,
+      total: scoped.length,
+      matched: items.length,
+      invalidRange,
+      applied: Boolean(keyword || trust !== "all" || dateFrom || dateTo)
+    };
+  }
+
   function buildAuthorizationLifecycle(records = [], now = new Date(), warningDays = 30) {
     const reference = toDate(now) || new Date();
     const warningWindow = Math.max(1, Math.min(Number(warningDays) || 30, 90)) * 86400000;
@@ -1055,6 +1097,7 @@
     buildAccessDispute,
     projectAccessReviewActionReceipt,
     buildAccessExportRows,
+    filterResidentRecords,
     buildAuthorizationLifecycle,
     buildAuthorizationRenewalDraft,
     summarizeCareWorkspace

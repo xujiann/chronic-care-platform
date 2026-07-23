@@ -511,6 +511,68 @@ test("access export contains only minimized resident-readable columns", () => {
   assert.equal("auditHash" in rows[0], false);
 });
 
+test("record search stays resident scoped and filters only minimized display fields", () => {
+  const records = [
+    {
+      id: "lab-r1",
+      residentId: "r1",
+      category: "labs",
+      date: "2026-07-20",
+      name: "心电图检查",
+      result: "窦性心律",
+      source: "大连市中心医院 LIS",
+      meta: { reportNo: "ECG-001", objectKey: "secret-object-key" }
+    },
+    {
+      id: "self-r1",
+      residentId: "r1",
+      category: "labs",
+      date: "2026-07-21",
+      name: "家庭血糖",
+      result: "6.2 mmol/L",
+      source: "居民个人提供（待核验）",
+      meta: {}
+    },
+    {
+      id: "lab-r2",
+      residentId: "r2",
+      category: "labs",
+      date: "2026-07-20",
+      name: "心电图检查",
+      result: "其他居民记录",
+      source: "大连市中心医院 LIS",
+      meta: { reportNo: "ECG-OTHER" }
+    }
+  ];
+
+  const filtered = V2.filterResidentRecords(records, {
+    residentId: "r1",
+    keyword: "ecg-001",
+    trust: "authoritative",
+    dateFrom: "2026-07-01",
+    dateTo: "2026-07-31"
+  });
+  assert.equal(filtered.total, 2);
+  assert.equal(filtered.matched, 1);
+  assert.equal(filtered.items[0].id, "lab-r1");
+  assert.equal(filtered.applied, true);
+  assert.equal(V2.filterResidentRecords(records, { residentId: "r1", keyword: "secret-object-key" }).matched, 0);
+  assert.equal(V2.filterResidentRecords(records, { residentId: "r1", trust: "self-reported" }).items[0].id, "self-r1");
+});
+
+test("record search rejects inverted date ranges without leaking results", () => {
+  const result = V2.filterResidentRecords([
+    { id: "lab-r1", residentId: "r1", category: "labs", date: "2026-07-20", name: "检验", source: "医院 LIS" }
+  ], {
+    residentId: "r1",
+    dateFrom: "2026-07-31",
+    dateTo: "2026-07-01"
+  });
+  assert.equal(result.invalidRange, true);
+  assert.equal(result.matched, 0);
+  assert.deepEqual(result.items, []);
+});
+
 test("authorization lifecycle highlights expiring and incomplete records", () => {
   const expiring = activeAuthorization({
     id: "auth-expiring",

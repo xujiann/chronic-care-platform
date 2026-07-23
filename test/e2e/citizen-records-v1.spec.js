@@ -29,6 +29,17 @@ test("resident creates a scoped consent and revokes it through the dedicated aud
   await expect(diagnosticReport).toContainText("ECG检查报告");
   await expect(diagnosticReport).toContainText("已互认");
   await expect(diagnosticReport).toContainText("报告原文仍按授权和访问审计规则调阅");
+  const recordSearch = page.locator("#vault-search-keyword");
+  await recordSearch.fill("ECG-DEMO-001");
+  await expect(page.locator("#vault-search-status")).toContainText("显示 1 /");
+  await expect(diagnosticReport).toBeVisible();
+  await recordSearch.fill("不存在的报告");
+  await expect(page.locator("#vault-content")).toContainText("没有符合当前筛选条件的记录");
+  await page.locator("#vault-search-clear").click();
+  await expect(page.locator("#vault-search-status")).toContainText("检查检验：共");
+  await expect(diagnosticReport).toBeVisible();
+  const searchTouchHeight = await recordSearch.evaluate((element) => element.getBoundingClientRect().height);
+  expect(searchTouchHeight).toBeGreaterThanOrEqual(44);
 
   await page.locator('[data-vault="medications"]').click();
   const medicationService = page.locator(".vault-item").filter({ hasText: "下次取药 2026-07-05" }).first();
