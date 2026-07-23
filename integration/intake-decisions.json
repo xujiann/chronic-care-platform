@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-22T13:32:00.000Z",
+  "updatedAt": "2026-07-23T03:35:58.000Z",
   "decisions": [
     {
       "lineId": "T01",
@@ -42,6 +42,20 @@
         "20 priority standard review readiness checks passed",
         "signed-receipt trust-field promotion exploit independently rejected",
         "T08 full targeted regression reported 78 of 78 passed"
+      ],
+      "blockers": []
+    },
+    {
+      "lineId": "T04",
+      "candidateHead": "52311603e1c8b49ebd69e6bdeb0e24d5a4c9ac10",
+      "decision": "accepted",
+      "reviewedAt": "2026-07-23T03:35:58.000Z",
+      "reviewer": "T00",
+      "checks": [
+        "git diff --check",
+        "18 citizen record projection and policy tests passed independently",
+        "pending, rejected, suspended and unknown future-dated authorizations independently rejected",
+        "only explicitly active authorization states with valid expiry can grant family access"
       ],
       "blockers": []
     }
