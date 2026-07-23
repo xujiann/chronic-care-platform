@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-23T06:09:40.000Z",
+  "updatedAt": "2026-07-23T06:10:35.000Z",
   "decisions": [
     {
       "lineId": "T01",
@@ -71,6 +71,20 @@
         "13 quality, operations and drug-consumable governance tests passed independently",
         "cross-institution, invalid transition, idempotency conflict and version conflict paths remain audited",
         "metric catalog ownership, sources and thresholds validate"
+      ],
+      "blockers": []
+    },
+    {
+      "lineId": "T05",
+      "candidateHead": "c237d584e59c05cc6070a0b5802632295a4b1b57",
+      "decision": "accepted",
+      "reviewedAt": "2026-07-23T06:10:35.000Z",
+      "reviewer": "T00",
+      "checks": [
+        "git diff --check",
+        "83 registration, referral, continuity, family-doctor and readiness tests passed independently",
+        "institution commands and callbacks fail closed without authenticated orgCode",
+        "expectedVersion, content-bound idempotency and resident authorization enforcement validated"
       ],
       "blockers": []
     },
