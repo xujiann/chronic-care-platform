@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-23T06:10:35.000Z",
+  "updatedAt": "2026-07-23T06:11:34.000Z",
   "decisions": [
     {
       "lineId": "T01",
@@ -47,16 +47,16 @@
     },
     {
       "lineId": "T08",
-      "candidateHead": "6662a11d5918fb527452b380afa1723b52cd859c",
+      "candidateHead": "a7e163dbdadd657de7c3d74d8ac15606820d22b2",
       "decision": "accepted",
-      "reviewedAt": "2026-07-22T13:32:00.000Z",
+      "reviewedAt": "2026-07-23T06:11:34.000Z",
       "reviewer": "T00",
       "checks": [
         "git diff --check",
-        "35 independent T08 coordination, event reporting and standard-review tests passed",
-        "20 priority standard review readiness checks passed",
-        "signed-receipt trust-field promotion exploit independently rejected",
-        "T08 full targeted regression reported 78 of 78 passed"
+        "85 public-health coordination, event, external adapter, keyring, operations and readiness tests passed independently",
+        "managed active and grace key verification, callback replay rejection and audit-chain tamper rejection validated",
+        "legacy-static remains compatibility-only and all external runtime projections remain productionReady false",
+        "T08 reported 111 of 111 targeted, 33 of 33 coordination and 30 of 30 final readiness checks passed"
       ],
       "blockers": []
     },
