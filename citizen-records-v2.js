@@ -586,6 +586,75 @@
     };
   }
 
+  function sameScopeSet(left = [], right = []) {
+    const normalize = (value) => [...new Set((Array.isArray(value) ? value : [])
+      .map((item) => cleanText(item, 100))
+      .filter(Boolean))].sort();
+    return JSON.stringify(normalize(left)) === JSON.stringify(normalize(right));
+  }
+
+  function projectAuthorizationCreateResponse(payload = {}, request = {}) {
+    const candidate = payload.authorization || payload.record || payload.item || payload;
+    const expected = CitizenRecordsV1?.projectRecord({ ...request, category: "authorizations" });
+    const projected = CitizenRecordsV1?.projectRecord({ ...candidate, category: candidate.category || "authorizations" });
+    if (!expected || !projected?.id) throw new Error("授权创建响应缺少授权标识");
+    if (projected.residentId !== expected.residentId || projected.category !== "authorizations") {
+      throw new Error("授权创建响应居民或分类不匹配");
+    }
+    const scalarFields = ["granteeId", "granteeType", "purpose", "expiresAt", "previousAuthorizationId"];
+    scalarFields.forEach((field) => {
+      const responseValue = cleanText(projected.meta?.[field], 500);
+      const expectedValue = cleanText(expected.meta?.[field], 500);
+      if (responseValue && responseValue !== expectedValue) throw new Error(`授权创建响应${field}不匹配`);
+    });
+    if (Array.isArray(projected.meta?.scopes) && !sameScopeSet(projected.meta.scopes, expected.meta?.scopes)) {
+      throw new Error("授权创建响应范围不匹配");
+    }
+    const merged = CitizenRecordsV1.projectRecord({
+      ...expected,
+      id: projected.id,
+      createdAt: projected.createdAt,
+      updatedAt: projected.updatedAt,
+      status: projected.status || expected.status,
+      meta: {
+        ...expected.meta,
+        status: projected.meta?.status || expected.meta?.status
+      }
+    });
+    if (!CitizenRecordsV1.authorizationState(merged).active) throw new Error("授权创建响应未确认有效状态");
+    return merged;
+  }
+
+  function projectAuthorizationRevocationResponse(payload = {}, record = {}, reason = "") {
+    const candidate = payload.authorization || payload.record || payload.item || payload;
+    const expected = CitizenRecordsV1?.projectRecord({ ...record, category: "authorizations" });
+    const projected = CitizenRecordsV1?.projectRecord({ ...candidate, category: candidate.category || "authorizations" });
+    if (!expected?.id || !projected?.id || projected.id !== expected.id) throw new Error("授权撤销响应标识不匹配");
+    if (projected.residentId !== expected.residentId || projected.category !== "authorizations") {
+      throw new Error("授权撤销响应居民或分类不匹配");
+    }
+    const revokedAt = cleanText(projected.revokedAt || projected.meta?.revokedAt, 60);
+    if (!revokedAt || CitizenRecordsV1.authorizationState(projected).key !== "revoked") {
+      throw new Error("授权撤销响应未确认撤销状态");
+    }
+    const expectedReason = cleanText(reason, 300);
+    if (projected.revokeReason && expectedReason && projected.revokeReason !== expectedReason) {
+      throw new Error("授权撤销响应原因不匹配");
+    }
+    return CitizenRecordsV1.projectRecord({
+      ...expected,
+      status: "已撤销",
+      revokedAt,
+      revokeReason: expectedReason || projected.revokeReason,
+      updatedAt: projected.updatedAt,
+      meta: {
+        ...expected.meta,
+        status: "revoked",
+        revokedAt
+      }
+    });
+  }
+
   function validateControlledCredential(payload = {}, intent = {}, options = {}) {
     const nested = payload.credential || payload.downloadIntent || payload.viewerIntent || {};
     const candidate = { ...payload, ...nested };
@@ -1137,6 +1206,8 @@
     projectActionReceipt,
     projectCorrectionReceipt,
     projectSharePackageReceipt,
+    projectAuthorizationCreateResponse,
+    projectAuthorizationRevocationResponse,
     validateControlledCredential,
     normalizeAccessibilityPreferences,
     projectCareWorkspacePayload,

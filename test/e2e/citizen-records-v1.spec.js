@@ -2,6 +2,12 @@ const { expect, test } = require("@playwright/test");
 const fs = require("node:fs");
 
 test("resident creates a scoped consent and revokes it through the dedicated audit route", async ({ page }) => {
+  const authorizationWrites = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && (/\/api\/personal-records$/.test(request.url()) || /\/api\/authorizations\/.*\/revoke$/.test(request.url()))) {
+      authorizationWrites.push({ url: request.url(), headers: request.headers(), body: JSON.parse(request.postData() || "{}") });
+    }
+  });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/login.html");
   await page.locator("#login-user").selectOption("citizen");
@@ -66,11 +72,19 @@ test("resident creates a scoped consent and revokes it through the dedicated aud
   await expect(authorization).toContainText("高血压复诊资料核对");
   await expect(authorization).toContainText("有效期至");
   await expect(authorization).toContainText("resident-record-consent-v1");
+  const createWrite = authorizationWrites.find((item) => /\/api\/personal-records$/.test(item.url));
+  expect(createWrite.headers["idempotency-key"]).toBeTruthy();
+  expect(createWrite.body.idempotencyKey).toBe(createWrite.headers["idempotency-key"]);
+  expect(createWrite.body.requestedAt).toBeTruthy();
 
   page.once("dialog", (dialog) => dialog.accept());
   await authorization.getByRole("button", { name: "撤销对专项复诊团队的授权" }).click();
   await expect(authorization).toContainText("已撤销");
   await expect(authorization.getByRole("button", { name: "撤销对专项复诊团队的授权" })).toHaveCount(0);
+  const revokeWrite = authorizationWrites.find((item) => /\/api\/authorizations\/.*\/revoke$/.test(item.url));
+  expect(revokeWrite.headers["idempotency-key"]).toBeTruthy();
+  expect(revokeWrite.body.idempotencyKey).toBe(revokeWrite.headers["idempotency-key"]);
+  expect(revokeWrite.body.resourceId).toBeTruthy();
 
   await page.locator('[data-highlight-command="toggle-large-mode"]').click();
   await expect(page.locator("body")).toHaveClass(/large-mode/);

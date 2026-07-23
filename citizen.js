@@ -5347,13 +5347,31 @@ async function addPersonalRecord(record) {
   if (API_BASE) {
     try {
       const request = window.HealthCityAuth?.authFetch || fetch;
+      const authorizationAction = record.category === "authorizations" && window.CitizenRecordsV2
+        ? window.CitizenRecordsV2.buildIdempotentAction({
+          operation: "authorization-create",
+          residentId: record.residentId,
+          nonce: citizenCareRequestNonce(),
+          payload: {}
+        })
+        : null;
       const response = await request(`${API_BASE}/personal-records`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(record)
+        headers: {
+          "Content-Type": "application/json",
+          ...(authorizationAction ? { "Idempotency-Key": authorizationAction.idempotencyKey } : {})
+        },
+        body: JSON.stringify(authorizationAction ? {
+          ...record,
+          idempotencyKey: authorizationAction.idempotencyKey,
+          requestedAt: authorizationAction.requestedAt
+        } : record)
       });
       if (response.ok) {
-        const saved = await response.json();
+        const payload = await response.json();
+        const saved = authorizationAction
+          ? window.CitizenRecordsV2.projectAuthorizationCreateResponse(payload, record)
+          : payload;
         if (!Array.isArray(state.personalRecords)) state.personalRecords = [];
         state.personalRecords.push(saved);
         return saved;
@@ -5630,21 +5648,32 @@ function isAuthorizationActive(item) {
 }
 
 async function revokeAuthorization(id) {
-  const record = state.personalRecords?.find((item) => item.id === id);
+  const recordIndex = state.personalRecords?.findIndex((item) => item.id === id) ?? -1;
+  const record = recordIndex >= 0 ? state.personalRecords[recordIndex] : null;
   if (!record) return;
   if (!window.confirm(`确认撤销对“${record.name || "该对象"}”的授权？撤销后相关调阅应立即停止。`)) return;
   const reason = "居民通过居民端主动撤销";
   if (API_BASE) {
     try {
       const request = window.HealthCityAuth?.authFetch || fetch;
+      const action = window.CitizenRecordsV2.buildIdempotentAction({
+        operation: "authorization-revoke",
+        residentId: record.residentId,
+        nonce: citizenCareRequestNonce(),
+        payload: { resourceId: id, reason }
+      });
       const response = await request(`${API_BASE}/authorizations/${encodeURIComponent(id)}/revoke`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason })
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": action.idempotencyKey
+        },
+        body: JSON.stringify(action)
       });
       if (response.ok) {
-        const updated = await response.json();
-        Object.assign(record, updated);
+        const payload = await response.json();
+        const updated = window.CitizenRecordsV2.projectAuthorizationRevocationResponse(payload, record, reason);
+        state.personalRecords[recordIndex] = updated;
         renderCitizen(currentResidentId);
         showToast("授权已撤销，后续调阅将重新校验");
         return;

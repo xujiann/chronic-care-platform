@@ -589,6 +589,72 @@ test("authorization scope disclosure explains inclusions and exclusions without 
   assert.throws(() => V2.buildAuthorizationScopeDisclosure(["labs", "internal-all-records"]), /未知范围/);
 });
 
+test("authorization create response preserves the resident request and strips server internals", () => {
+  const request = V1.buildAuthorizationRecord({
+    residentId: "r1",
+    granteeName: "家庭医生团队",
+    granteeId: "team-r1",
+    granteeType: "care-team",
+    purpose: "慢病复诊",
+    scopes: ["health-record-summary", "labs"],
+    expiresAt: "2027-12-31",
+    grantedAt: "2026-07-23T08:00:00.000Z"
+  });
+  const projected = V2.projectAuthorizationCreateResponse({
+    ...request,
+    id: "auth-created-1",
+    personIndex: "must-not-pass",
+    meta: { ...request.meta, objectKey: "must-not-pass" }
+  }, request);
+  assert.equal(projected.id, "auth-created-1");
+  assert.equal(projected.residentId, "r1");
+  assert.equal(projected.meta.granteeId, "team-r1");
+  assert.doesNotMatch(JSON.stringify(projected), /personIndex|objectKey|must-not-pass/);
+  assert.throws(() => V2.projectAuthorizationCreateResponse({
+    ...request,
+    id: "auth-created-2",
+    meta: { ...request.meta, granteeId: "attacker-team" }
+  }, request), /granteeId不匹配/);
+  assert.throws(() => V2.projectAuthorizationCreateResponse({
+    ...request,
+    id: "auth-created-3",
+    residentId: "r2"
+  }, request), /居民或分类不匹配/);
+});
+
+test("authorization revoke response cannot alter immutable authorization fields", () => {
+  const record = {
+    ...V1.buildAuthorizationRecord({
+      residentId: "r1",
+      granteeName: "医院A",
+      granteeId: "hospital-a",
+      granteeType: "institution",
+      purpose: "复诊资料核对",
+      scopes: ["emr-summary"],
+      expiresAt: "2027-12-31",
+      grantedAt: "2026-07-23T08:00:00.000Z"
+    }),
+    id: "auth-revoke-1"
+  };
+  const revoked = V2.projectAuthorizationRevocationResponse({
+    ...record,
+    name: "恶意覆盖对象",
+    status: "已撤销",
+    revokedAt: "2026-07-24T01:00:00.000Z",
+    revokeReason: "居民主动撤销",
+    meta: { ...record.meta, status: "active", objectKey: "must-not-pass" }
+  }, record, "居民主动撤销");
+  assert.equal(revoked.name, "医院A");
+  assert.equal(revoked.meta.granteeId, "hospital-a");
+  assert.equal(V1.authorizationState(revoked).key, "revoked");
+  assert.doesNotMatch(JSON.stringify(revoked), /恶意覆盖对象|objectKey|must-not-pass/);
+  assert.throws(() => V2.projectAuthorizationRevocationResponse({
+    ...record,
+    status: "active",
+    revokedAt: ""
+  }, record, "居民主动撤销"), /未确认撤销状态/);
+});
+
 test("authorization lifecycle highlights expiring and incomplete records", () => {
   const expiring = activeAuthorization({
     id: "auth-expiring",
