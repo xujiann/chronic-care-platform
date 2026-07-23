@@ -144,6 +144,104 @@ test("risk assessment turns missing assessment consent and assignment into contr
   assert.equal(escort.reasons.includes("hospital-returned"), true);
 });
 
+test("dispatch evaluation produces evidence-backed nursing updates for an eligible candidate", () => {
+  const order = {
+    id: "ino-dispatch-001",
+    residentId: "r1",
+    status: "assessed",
+    institutionId: "inh-mr1",
+    institutionCode: "MR1",
+    serviceItem: "wound care",
+    riskLevel: "medium",
+    identityVerified: true,
+    firstVisitAssessment: "passed",
+    informedConsent: "signed",
+    consentAttachment: { status: "signed" }
+  };
+  const decision = Domain.evaluateDispatchCandidate("nursing", order, qualifiedNurse(), { now: NOW });
+  assert.equal(decision.eligible, true);
+  assert.equal(decision.targetStatus, "dispatched");
+  assert.equal(decision.updates.qualificationSnapshot.status, "passed");
+  assert.equal(decision.updates.dispatchDecision.status, "approved");
+
+  const dispatched = Domain.transitionOrder("nursing", order, "dispatched", {
+    at: NOW,
+    actorId: "hospital",
+    actorRole: "institution",
+    updates: decision.updates
+  });
+  assert.equal(dispatched.status, "dispatched");
+  assert.equal(dispatched.nurseId, "inn-001");
+});
+
+test("dispatch ranking excludes fail-closed candidates and reports order blockers", () => {
+  const order = {
+    id: "ino-dispatch-002",
+    status: "assessed",
+    institutionId: "inh-mr1",
+    institutionCode: "MR1",
+    serviceItem: "wound care",
+    riskLevel: "medium",
+    identityVerified: true,
+    firstVisitAssessment: "passed",
+    informedConsent: "signed",
+    consentAttachment: { status: "signed" }
+  };
+  const missingFields = qualifiedNurse({ id: "inn-missing" });
+  delete missingFields.institutionCode;
+  delete missingFields.specialties;
+  delete missingFields.status;
+  const ranked = Domain.rankDispatchCandidates("nursing", order, [
+    qualifiedNurse({ id: "inn-expired", qualificationExpiresAt: "2026-07-20" }),
+    missingFields,
+    qualifiedNurse({ id: "inn-qualified", assignedToday: 1 })
+  ], { now: NOW });
+  assert.deepEqual(ranked.candidates.map((item) => item.personId), ["inn-qualified"]);
+  assert.equal(ranked.blockedCandidates.length, 2);
+  assert.equal(ranked.blockers.includes("qualification:qualification-expired"), true);
+  assert.equal(ranked.blockers.includes("qualification:institution-code-missing"), true);
+  assert.equal(ranked.blockers.includes("qualification:specialties-missing"), true);
+  assert.equal(ranked.blockers.includes("qualification:nurse-status-missing"), true);
+});
+
+test("dispatch evaluation requires escort prerequisites and blocks critical nursing risk", () => {
+  const escortOrder = {
+    id: "eso-dispatch-001",
+    status: "provider-matched",
+    providerId: "esp-001",
+    serviceItems: ["registration", "exam escort"],
+    riskLevel: "low",
+    identityVerified: true,
+    eligibilityResult: { status: "eligible" },
+    providerAdmissionSnapshot: { status: "approved" },
+    contractStatus: "signed",
+    insuranceStatus: "covered"
+  };
+  assert.equal(Domain.evaluateDispatchCandidate("escort", escortOrder, qualifiedEscortWorker(), { now: NOW }).eligible, true);
+
+  const missingEligibility = Domain.evaluateDispatchCandidate("escort", { ...escortOrder, eligibilityResult: undefined }, qualifiedEscortWorker(), { now: NOW });
+  assert.equal(missingEligibility.eligible, false);
+  assert.equal(missingEligibility.blockers.includes("evidence:eligibility-result"), true);
+
+  const criticalNursing = {
+    id: "ino-critical",
+    status: "assessed",
+    institutionId: "inh-mr1",
+    institutionCode: "MR1",
+    serviceItem: "wound care",
+    riskLevel: "high",
+    identityVerified: true,
+    firstVisitAssessment: "passed",
+    informedConsent: "signed",
+    consentAttachment: { status: "signed" },
+    adverseEvent: { status: "open" },
+    riskReview: { status: "approved" }
+  };
+  const criticalDecision = Domain.evaluateDispatchCandidate("nursing", criticalNursing, qualifiedNurse(), { now: NOW });
+  assert.equal(criticalDecision.eligible, false);
+  assert.equal(criticalDecision.blockers.includes("risk:critical"), true);
+});
+
 test("transition order blocks missing evidence and emits resident timeline evidence", () => {
   const requested = {
     id: "ino-test-001",
