@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-23T03:35:58.000Z",
+  "updatedAt": "2026-07-23T05:49:51.000Z",
   "decisions": [
     {
       "lineId": "T01",
@@ -27,6 +27,21 @@
         "58 PostgreSQL migration, runtime, MPI, governance, storage and readiness tests passed",
         "full exports require explicit acknowledgement, versioned HMAC keys and an external directory",
         "RPO/RTO and production cutover remain explicitly unmeasured and blocked"
+      ],
+      "blockers": []
+    },
+    {
+      "lineId": "T03",
+      "candidateHead": "26a42dcba1efabae9641cd0ef335bfbee9c6fc43",
+      "decision": "accepted",
+      "reviewedAt": "2026-07-23T05:49:51.000Z",
+      "reviewer": "T00",
+      "checks": [
+        "git diff --check",
+        "45 interface, financial projection, LIS direct-report and readiness tests passed independently",
+        "institution actors without authenticated orgCode are rejected before persistence",
+        "versioned keyed-HMAC subject and specimen references resist raw SHA-256 enumeration",
+        "T03 full targeted regression reported 75 of 75 passed"
       ],
       "blockers": []
     },
