@@ -39,7 +39,7 @@ function qualifiedEscortWorker(overrides = {}) {
 }
 
 test("workflow exposes guarded nursing and escort state transitions", () => {
-  assert.deepEqual(Domain.allowedNextStates("nursing", "requested"), ["assessed", "risk-hold", "cancel-requested", "rejected"]);
+  assert.deepEqual(Domain.allowedNextStates("nursing", "requested"), ["assessed", "risk-hold", "reschedule-requested", "cancel-requested", "rejected"]);
   assert.equal(Domain.validateTransition("nursing", "accepted", "in-service").ok, true);
   assert.equal(Domain.validateTransition("nursing", "requested", "completed").ok, false);
   assert.equal(Domain.validateTransition("escort", "matched", "accepted").ok, true);
@@ -1029,6 +1029,230 @@ test("escort paid cancellation requires refund intent decision and verified paym
     (error) => error.code === "ORDER_CANCELLATION_REFUND_EVIDENCE_INVALID"
       && error.details.reasons.includes("cancellation-refund-not-requested")
   );
+});
+
+test("nursing reschedule releases the original slot and binds an approved replacement reservation", () => {
+  const dispatchedBase = {
+    id: "ino-reschedule-001",
+    residentId: "r1",
+    nurseId: "inn-001",
+    status: "dispatched"
+  };
+  const reservation = Domain.buildResourceReservationEvidence("nursing", dispatchedBase, {
+    resourceId: "nursing-slot-mr1-0900",
+    slotAt: "2026-07-23T09:00:00+08:00",
+    reservedBy: "dispatch-001"
+  }, { at: "2026-07-21T09:00:00+08:00" });
+  const dispatched = { ...dispatchedBase, ...reservation };
+  const requestEvidence = Domain.buildRescheduleRequestEvidence("nursing", dispatched, {
+    proposedSlotAt: "2026-07-24T14:00:00+08:00",
+    requesterId: "r1",
+    requesterRole: "resident",
+    reason: "Resident has a conflicting outpatient appointment."
+  }, { at: NOW });
+  const forgedReservation = {
+    ...reservation.resourceReservation,
+    id: "forged-reservation",
+    resourceId: "forged-slot"
+  };
+  const forgedRequest = Domain.buildRescheduleRequestEvidence("nursing", {
+    ...dispatched,
+    resourceReservation: forgedReservation
+  }, {
+    proposedSlotAt: "2026-07-24T14:00:00+08:00",
+    requesterId: "r1",
+    requesterRole: "resident",
+    reason: "Attempt to replace the original reservation during request."
+  }, { at: NOW });
+  assert.throws(
+    () => Domain.transitionOrder("nursing", dispatched, "reschedule-requested", {
+      updates: { ...forgedRequest, resourceReservation: forgedReservation }
+    }),
+    (error) => error.code === "ORDER_SCHEDULING_EVIDENCE_INVALID"
+      && error.details.reasons.includes("reschedule-original-reservation-mismatch")
+  );
+  const rescheduleRequested = Domain.transitionOrder("nursing", dispatched, "reschedule-requested", {
+    at: NOW,
+    updates: requestEvidence
+  });
+  assert.equal(rescheduleRequested.status, "reschedule-requested");
+  assert.equal(rescheduleRequested.rescheduleRequest.originalReservationId, reservation.resourceReservation.id);
+
+  const completion = Domain.buildRescheduleCompletionEvidence("nursing", rescheduleRequested, {
+    decidedBy: "dispatch-reviewer-001",
+    reason: "Replacement nurse slot is available.",
+    resourceId: "nursing-slot-mr1-1400",
+    reservedBy: "dispatch-reviewer-001"
+  }, { at: "2026-07-22T09:10:00+08:00" });
+  assert.throws(
+    () => Domain.transitionOrder("nursing", rescheduleRequested, "requested", {
+      updates: {
+        ...completion,
+        resourceReservation: { ...completion.resourceReservation, orderId: "other-order" }
+      }
+    }),
+    (error) => error.code === "ORDER_SCHEDULING_EVIDENCE_INVALID"
+      && error.details.reasons.includes("replacement-reservation-order-mismatch")
+  );
+  const rescheduled = Domain.transitionOrder("nursing", rescheduleRequested, "requested", {
+    at: "2026-07-22T09:10:00+08:00",
+    updates: completion
+  });
+  assert.equal(rescheduled.status, "requested");
+  assert.equal(rescheduled.resourceRelease.reservationId, reservation.resourceReservation.id);
+  assert.equal(rescheduled.resourceReservation.previousReservationId, reservation.resourceReservation.id);
+  assert.equal(rescheduled.preferredAt, "2026-07-24T14:00:00+08:00");
+  assert.equal(dispatched.status, "dispatched");
+
+  const noReservation = {
+    id: "ino-reschedule-missing-001",
+    residentId: "r1",
+    status: "requested"
+  };
+  const invalidRequest = Domain.buildRescheduleRequestEvidence("nursing", noReservation, {
+    proposedSlotAt: "2026-07-24T14:00:00+08:00",
+    requesterId: "r1",
+    reason: "Missing original reservation."
+  }, { at: NOW });
+  assert.throws(
+    () => Domain.transitionOrder("nursing", noReservation, "reschedule-requested", { updates: invalidRequest }),
+    (error) => error.code === "ORDER_SCHEDULING_EVIDENCE_INVALID"
+      && error.details.reasons.includes("resource-reservation-missing")
+  );
+});
+
+test("escort no-show review requires grace-period attendance evidence and a bound human decision", () => {
+  const confirmedBase = {
+    id: "eso-no-show-001",
+    residentId: "r2",
+    workerId: "ew-001",
+    status: "hospital-confirmed"
+  };
+  const reservation = Domain.buildResourceReservationEvidence("escort", confirmedBase, {
+    resourceId: "hospital-mr1-checkin-0800",
+    slotAt: "2026-07-22T08:00:00+08:00",
+    reservedBy: "escort-dispatch-001"
+  }, { at: "2026-07-21T08:00:00+08:00" });
+  const confirmed = { ...confirmedBase, ...reservation };
+  const premature = Domain.buildNoShowEvidence("escort", confirmed, {
+    absentPartyRole: "resident",
+    reporterId: "ew-001",
+    presentPartyId: "ew-001",
+    evidenceType: "hospital-check-in",
+    verifierId: "hospital-desk-001",
+    verified: true,
+    graceMinutes: 30,
+    capturedAt: "2026-07-22T08:15:00+08:00"
+  }, { at: "2026-07-22T08:20:00+08:00" });
+  assert.throws(
+    () => Domain.transitionOrder("escort", confirmed, "no-show-review", { updates: premature }),
+    (error) => error.code === "ORDER_SCHEDULING_EVIDENCE_INVALID"
+      && error.details.reasons.includes("no-show-detected-before-grace-period")
+  );
+
+  const evidence = Domain.buildNoShowEvidence("escort", confirmed, {
+    absentPartyRole: "resident",
+    reporterId: "ew-001",
+    presentPartyId: "ew-001",
+    evidenceType: "hospital-check-in",
+    verifierId: "hospital-desk-001",
+    verified: true,
+    graceMinutes: 30,
+    capturedAt: "2026-07-22T08:35:00+08:00"
+  }, { at: NOW });
+  const review = Domain.transitionOrder("escort", confirmed, "no-show-review", {
+    at: NOW,
+    updates: evidence
+  });
+  assert.equal(review.status, "no-show-review");
+  assert.equal(review.attendanceEvidence.reportId, review.noShowReport.id);
+
+  const resumeDecision = Domain.buildNoShowDecisionEvidence("escort", review, {
+    outcome: "resume",
+    decidedBy: "escort-duty-001",
+    reason: "Hospital confirmed the resident was delayed in another queue."
+  }, { at: "2026-07-22T09:05:00+08:00" });
+  assert.throws(
+    () => Domain.transitionOrder("escort", review, "accepted", {
+      updates: {
+        ...resumeDecision,
+        noShowDecision: { ...resumeDecision.noShowDecision, outcome: "cancel", status: "confirmed" }
+      }
+    }),
+    (error) => error.code === "ORDER_SCHEDULING_EVIDENCE_INVALID"
+      && error.details.reasons.includes("no-show-decision-outcome-invalid")
+  );
+  const resumed = Domain.transitionOrder("escort", review, "accepted", {
+    at: "2026-07-22T09:05:00+08:00",
+    updates: resumeDecision
+  });
+  assert.equal(resumed.status, "accepted");
+  assert.equal(resumed.noShowDecision.status, "overturned");
+});
+
+test("confirmed no-show can enter reschedule and cancellation releases reserved resources", () => {
+  const acceptedBase = {
+    id: "ino-no-show-cancel-001",
+    residentId: "r1",
+    nurseId: "inn-001",
+    status: "accepted"
+  };
+  const reservation = Domain.buildResourceReservationEvidence("nursing", acceptedBase, {
+    resourceId: "nursing-slot-mr1-0800",
+    slotAt: "2026-07-22T08:00:00+08:00",
+    reservedBy: "dispatch-001"
+  }, { at: "2026-07-21T08:00:00+08:00" });
+  const accepted = { ...acceptedBase, ...reservation };
+  const noShowEvidence = Domain.buildNoShowEvidence("nursing", accepted, {
+    absentPartyRole: "resident",
+    reporterId: "inn-001",
+    presentPartyId: "inn-001",
+    evidenceType: "geo-check-in",
+    verifierId: "nursing-duty-001",
+    verified: true,
+    graceMinutes: 30,
+    capturedAt: "2026-07-22T08:35:00+08:00"
+  }, { at: NOW });
+  const review = Domain.transitionOrder("nursing", accepted, "no-show-review", {
+    at: NOW,
+    updates: noShowEvidence
+  });
+  const noShowDecision = Domain.buildNoShowDecisionEvidence("nursing", review, {
+    outcome: "cancel",
+    decidedBy: "nursing-duty-001",
+    reason: "Resident confirmed the service is no longer required."
+  }, { at: "2026-07-22T09:05:00+08:00" });
+  const cancelRequest = Domain.buildCancellationRequestEvidence("nursing", review, {
+    requesterId: "r1",
+    requesterRole: "resident",
+    reasonCode: "resident-no-show",
+    reason: "Resident confirmed cancellation after no-show review.",
+    refundRequested: false
+  }, { at: "2026-07-22T09:05:00+08:00" });
+  const cancelRequested = Domain.transitionOrder("nursing", review, "cancel-requested", {
+    at: "2026-07-22T09:05:00+08:00",
+    updates: { ...noShowDecision, ...cancelRequest }
+  });
+  const cancellationDecision = Domain.buildCancellationDecisionEvidence("nursing", cancelRequested, {
+    outcome: "cancel",
+    decidedBy: "nursing-duty-001",
+    reason: "No-show cancellation approved."
+  }, { at: "2026-07-22T09:10:00+08:00" });
+  assert.throws(
+    () => Domain.transitionOrder("nursing", cancelRequested, "cancelled", { updates: cancellationDecision }),
+    (error) => error.code === "ORDER_CANCELLATION_REFUND_EVIDENCE_INVALID"
+      && error.details.reasons.includes("resource-release-missing")
+  );
+  const release = Domain.buildResourceReleaseEvidence("nursing", cancelRequested, {
+    releasedBy: "dispatch-001",
+    reason: "Release reserved nurse slot after approved cancellation."
+  }, { at: "2026-07-22T09:11:00+08:00" });
+  const cancelled = Domain.transitionOrder("nursing", cancelRequested, "cancelled", {
+    at: "2026-07-22T09:11:00+08:00",
+    updates: { ...cancellationDecision, ...release }
+  });
+  assert.equal(cancelled.status, "cancelled");
+  assert.equal(cancelled.resourceRelease.reservationId, reservation.resourceReservation.id);
 });
 
 test("financial command correlates an order using integer cents and a stable idempotency key", () => {

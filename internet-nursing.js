@@ -16,6 +16,7 @@ async function loadInternetNursingDashboard() {
   nursingDashboard.dispatchRecommendations = buildStaticDispatchRecommendations(nursingDashboard.orders || [], nursingDashboard.nurses || []);
   nursingDashboard.orders = withNursingServiceControls(nursingDashboard.orders || []);
   nursingDashboard.orders = withNursingRiskQualityControls(nursingDashboard.orders);
+  nursingDashboard.orders = withNursingSchedulingControls(nursingDashboard.orders);
   nursingDashboard.orders = withNursingCancellationRefundControls(nursingDashboard.orders);
   nursingDashboard.paymentReadiness = buildStaticPaymentReadiness(nursingDashboard.policy || {}, nursingDashboard.orders);
   renderInternetNursingDashboard(nursingDashboard);
@@ -232,6 +233,47 @@ function nursingRiskQualityControlText(item) {
   if (!control) return "";
   if (control.ok) return control.target === "closed" ? "风险与质控关闭证据通过" : "风险与质控流转证据通过";
   return `风险质控阻断：${control.blockers.slice(0, 5).join("；")}`;
+}
+
+function withNursingSchedulingControls(orders) {
+  const domain = window.NursingEscortDomain;
+  if (!domain) return orders;
+  return orders.map((order) => {
+    const current = domain.canonicalStatus(order.status, "nursing");
+    if (!order.resourceReservation && !["reschedule-requested", "no-show-review"].includes(current)) {
+      return { ...order, schedulingControl: null };
+    }
+    let target = "reschedule-requested";
+    if (current === "reschedule-requested") target = "requested";
+    else if (current === "no-show-review") {
+      target = order.noShowDecision?.outcome === "cancel"
+        ? "cancel-requested"
+        : order.noShowDecision?.outcome === "reschedule" ? "reschedule-requested" : "accepted";
+    } else {
+      const slotAt = Date.parse(order.resourceReservation?.slotAt || "");
+      if (current === "accepted" && Number.isFinite(slotAt) && slotAt < Date.now()) target = "no-show-review";
+    }
+    const transition = domain.validateTransition("nursing", current, target);
+    const evidence = domain.validateSchedulingEvidence("nursing", order, target, { currentStatus: current });
+    return {
+      ...order,
+      schedulingControl: {
+        ok: transition.ok && evidence.ok,
+        target,
+        blockers: [
+          ...(transition.ok ? [] : [`transition:${current}->${target}`]),
+          ...evidence.reasons
+        ]
+      }
+    };
+  });
+}
+
+function nursingSchedulingControlText(item) {
+  const control = item?.schedulingControl;
+  if (!control) return "";
+  if (control.ok) return `改约爽约证据通过：${control.target}`;
+  return `改约爽约阻断：${control.blockers.slice(0, 5).join("，")}`;
 }
 
 function withNursingCancellationRefundControls(orders) {
@@ -972,7 +1014,7 @@ function renderHospitalOrders(items) {
           <td>${escapeHtml(displayText(item.institution?.name || item.institutionName || ""))}<br><small>${escapeHtml(item.institutionCode || "")}</small></td>
           <td>${escapeHtml(displayText(item.nurse?.name || item.nurseName || "pending"))}<br><small>${escapeHtml(displayText(item.nurse?.registrationStatus || ""))}</small></td>
           <td>${statusBadge(item.firstVisitAssessment)} ${statusBadge(item.informedConsent)} ${statusBadge(item.locationTrace)}<br><small>${escapeHtml(consentAttachmentText(item))}</small><br><small>${escapeHtml(locationTraceSummary(item))}</small><br><small>${escapeHtml(notificationSummary(item))}</small><br><small>${escapeHtml(nursingServiceControlText(item))}</small></td>
-          <td>${statusBadge(item.status)} ${statusBadge(item.riskLevel)}<br><small>${escapeHtml(displayText(item.qualityCallback || ""))}</small><br><small>${escapeHtml(nursingRiskQualityControlText(item))}</small><br><small>${escapeHtml(nursingCancellationRefundControlText(item))}</small></td>
+          <td>${statusBadge(item.status)} ${statusBadge(item.riskLevel)}<br><small>${escapeHtml(displayText(item.qualityCallback || ""))}</small><br><small>${escapeHtml(nursingRiskQualityControlText(item))}</small><br><small>${escapeHtml(nursingSchedulingControlText(item))}</small><br><small>${escapeHtml(nursingCancellationRefundControlText(item))}</small></td>
           <td>
             ${canManage ? `
             <button class="inline-action" type="button" data-nursing-action="${escapeHtml(item.id)}" data-action-kind="assessment">评估</button>
@@ -1149,7 +1191,7 @@ function nurseAcceptBlockReason(item) {
 function nursingEvidenceBadge(label, status, pendingLabel) {
   const text = String(status ?? "pending");
   const danger = ["high", "blocked", "overdue"].includes(text);
-  const warn = ["medium", "pending", "requested", "assessed", "dispatched", "accepted", "in-service", "tracking"].includes(text);
+  const warn = ["medium", "pending", "requested", "assessed", "dispatched", "accepted", "in-service", "tracking", "reschedule-requested", "no-show-review"].includes(text);
   const type = danger ? "danger" : warn ? "warn" : "info";
   const content = text === "pending" ? pendingLabel : `${label}${displayText(text)}`;
   return `<span class="badge ${type}">${escapeHtml(content)}</span>`;
@@ -1426,7 +1468,7 @@ function isQualifiedNurse(item) {
 function statusBadge(status) {
   const text = String(status ?? "unknown");
   const danger = ["high", "blocked", "overdue"].includes(text);
-  const warn = ["medium", "pending", "requested", "assessed", "dispatched", "accepted", "in-service", "tracking"].includes(text);
+  const warn = ["medium", "pending", "requested", "assessed", "dispatched", "accepted", "in-service", "tracking", "reschedule-requested", "no-show-review"].includes(text);
   const type = danger ? "danger" : warn ? "warn" : "info";
   return `<span class="badge ${type}">${escapeHtml(displayText(text))}</span>`;
 }
@@ -1587,6 +1629,8 @@ function displayText(value) {
     "low": "低风险",
     "unknown": "未知"
   };
+  labels["reschedule-requested"] = "改约待审核";
+  labels["no-show-review"] = "爽约待复核";
   return labels[text] || text;
 }
 

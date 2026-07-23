@@ -66,6 +66,7 @@ function withEscortDispatchControls(dashboard = {}) {
       serviceEvidenceControl: buildEscortServiceEvidenceControl(order, domain),
       financialEvidenceControl: buildEscortFinancialEvidenceControl(order, domain),
       riskQualityControl: buildEscortRiskQualityControl(order, domain),
+      schedulingControl: buildEscortSchedulingControl(order, domain),
       cancellationRefundControl: buildEscortCancellationRefundControl(order, domain)
     }))
   };
@@ -177,6 +178,38 @@ function escortRiskQualityActionAttributes(item, target) {
   return `disabled aria-disabled="true" title="${escapeHtml(escortRiskQualityText(item) || `transition to ${target} blocked`)}"`;
 }
 
+function buildEscortSchedulingControl(order, domain) {
+  const current = domain.canonicalStatus(order.status, "escort");
+  if (!order.resourceReservation && !["reschedule-requested", "no-show-review"].includes(current)) return null;
+  let target = "reschedule-requested";
+  if (current === "reschedule-requested") target = "requested";
+  else if (current === "no-show-review") {
+    target = order.noShowDecision?.outcome === "cancel"
+      ? "cancel-requested"
+      : order.noShowDecision?.outcome === "reschedule" ? "reschedule-requested" : "accepted";
+  } else {
+    const slotAt = Date.parse(order.resourceReservation?.slotAt || "");
+    if (["accepted", "hospital-confirmed"].includes(current) && Number.isFinite(slotAt) && slotAt < Date.now()) target = "no-show-review";
+  }
+  const transition = domain.validateTransition("escort", current, target);
+  const evidence = domain.validateSchedulingEvidence("escort", order, target, { currentStatus: current });
+  return {
+    ok: transition.ok && evidence.ok,
+    target,
+    blockers: [
+      ...(transition.ok ? [] : [`transition:${current}->${target}`]),
+      ...evidence.reasons
+    ]
+  };
+}
+
+function escortSchedulingText(item) {
+  const control = item.schedulingControl;
+  if (!control) return "";
+  if (control.ok) return `reschedule/no-show evidence passed: ${control.target}`;
+  return `reschedule/no-show blocked: ${control.blockers.slice(0, 5).join(", ")}`;
+}
+
 function buildEscortCancellationRefundControl(order, domain) {
   const current = domain.canonicalStatus(order.status, "escort");
   let target = "";
@@ -254,7 +287,7 @@ function renderEscortOrders(items) {
           <td>${escapeHtml(item.worker?.name || item.workerId || "pending")}<br><small>${escapeHtml((item.serviceItems || []).join(", "))}</small><br><small>${escapeHtml(escortDispatchControlText(item))}</small></td>
           <td>${escapeHtml(item.hospital || "")}<br><small>${escapeHtml(item.department || "")} / ${escapeHtml(item.appointmentAt || item.due || "")}</small><br><small>${statusBadge(item.hospitalInterfaceStatus || "pending")} ${escapeHtml(item.hospitalCheckInNo || item.outpatientQueueNo || item.hospitalNotice || "")}</small><br><small>${escapeHtml(item.hisVisitId || item.appointmentSource || "")} ${escapeHtml(item.departmentCode || "")} ${escapeHtml(item.doctorCode || "")}</small></td>
           <td>${statusBadge(item.subsidyType)} ${statusBadge(item.contractStatus)} ${statusBadge(item.insuranceStatus)}</td>
-          <td>${statusBadge(item.status)} ${statusBadge(item.priority)}<br><small>${escapeHtml(item.qualityReview || "")}</small><br><small>${escapeHtml(escortServiceEvidenceText(item))}</small><br><small>${escapeHtml(escortFinancialEvidenceText(item))}</small><br><small>${escapeHtml(escortRiskQualityText(item))}</small><br><small>${escapeHtml(escortCancellationRefundText(item))}</small></td>
+          <td>${statusBadge(item.status)} ${statusBadge(item.priority)}<br><small>${escapeHtml(item.qualityReview || "")}</small><br><small>${escapeHtml(escortServiceEvidenceText(item))}</small><br><small>${escapeHtml(escortFinancialEvidenceText(item))}</small><br><small>${escapeHtml(escortRiskQualityText(item))}</small><br><small>${escapeHtml(escortSchedulingText(item))}</small><br><small>${escapeHtml(escortCancellationRefundText(item))}</small></td>
           <td>
             <button class="inline-action" type="button" data-escort-action="${escapeHtml(item.id)}" data-status="in-service" ${item.serviceEvidenceControl?.ok ? "" : `disabled aria-disabled="true" title="${escapeHtml(escortServiceEvidenceText(item))}"`}>开始</button>
             <button class="inline-action" type="button" data-escort-action="${escapeHtml(item.id)}" data-status="quality-review" ${escortRiskQualityActionAttributes(item, "quality-review")}>回访</button>
@@ -419,9 +452,13 @@ async function updateEscortHospitalHandoff(id, decision) {
 function statusBadge(status) {
   const text = String(status ?? "unknown");
   const danger = ["high", "blocked", "training-gap", "overdue", "returned", "hospital-returned"].includes(text);
-  const warn = ["medium", "pending", "contract-pending", "requested", "quality-review", "follow-up-call-required", "training"].includes(text);
+  const warn = ["medium", "pending", "contract-pending", "requested", "quality-review", "follow-up-call-required", "training", "reschedule-requested", "no-show-review"].includes(text);
   const type = danger ? "danger" : warn ? "warn" : "info";
-  return `<span class="badge ${type}">${escapeHtml(text)}</span>`;
+  const label = {
+    "reschedule-requested": "改约待审核",
+    "no-show-review": "爽约待复核"
+  }[text] || text;
+  return `<span class="badge ${type}">${escapeHtml(label)}</span>`;
 }
 
 function escapeHtml(value) {
