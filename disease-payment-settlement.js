@@ -186,7 +186,7 @@ function verifyCoreReturnCycle(cycle = {}) {
 }
 
 function verifyCoreReturnCycleEvidence(batch = {}, cycle = {}) {
-  if (!verifyEventLedger(batch.events || []) || !verifyCoreReturnCycle(cycle)) return false;
+  if (!verifySettlementBatchProjection(batch) || !verifyCoreReturnCycle(cycle)) return false;
   const events = batch.events || [];
   const returned = events.some((event) => event.action === "core-returned"
     && event.detail?.returnCycleId === cycle.id
@@ -285,7 +285,7 @@ function verifyPaymentFailureCycle(cycle = {}) {
 }
 
 function verifyPaymentFailureCycleEvidence(batch = {}, cycle = {}) {
-  if (!verifyEventLedger(batch.events || []) || !verifyPaymentFailureCycle(cycle)) return false;
+  if (!verifySettlementBatchProjection(batch) || !verifyPaymentFailureCycle(cycle)) return false;
   const events = batch.events || [];
   const failed = events.some((event) => event.action === "payment-failed"
     && event.detail?.failureCycleId === cycle.id
@@ -378,12 +378,158 @@ function appendEvent(target, event) {
 function verifyEventLedger(events = []) {
   return events.every((event, index) => {
     const { eventHash, ...base } = event;
-    return base.sequence === index + 1 && base.previousHash === (index ? events[index - 1].eventHash : "GENESIS") && eventHash === digest(base);
+    return base.sequence === index + 1
+      && base.previousHash === (index ? events[index - 1].eventHash : "GENESIS")
+      && (index === 0 || base.from === events[index - 1].to)
+      && eventHash === digest(base);
   });
 }
 
 function settlementState(batch = {}) {
   return batch.settlementState || Object.entries(SETTLEMENT_LABELS).find(([, label]) => label === batch.status)?.[0] || "BATCH_FROZEN";
+}
+
+function verifySettlementBatchProjection(batch = {}) {
+  const events = Array.isArray(batch.events) ? batch.events : [];
+  if (!events.length || !verifyEventLedger(events)) return false;
+  const state = settlementState(batch);
+  return events.at(-1).to === state && batch.status === SETTLEMENT_LABELS[state];
+}
+
+function differenceReviewProjection(review = {}) {
+  return {
+    id: review.id,
+    reviewDomain: review.reviewDomain,
+    approved: review.approved === true,
+    reviewer: review.reviewer,
+    reviewedAt: review.reviewedAt,
+    adjustedAmountFen: review.adjustedAmountFen,
+    resolutionDigest: review.resolutionDigest,
+    reasonCode: review.reasonCode,
+    opinion: review.opinion
+  };
+}
+
+function verifyDifferenceCaseProjection(differenceCase = {}) {
+  const events = Array.isArray(differenceCase.events) ? differenceCase.events : [];
+  if (!events.length || !verifyEventLedger(events) || events[0].action !== "record" || events[0].from !== "NONE") return false;
+  if (differenceCase.state !== events.at(-1).to) return false;
+  const record = events[0];
+  if (differenceCase.createdAt !== record.at
+    || differenceCase.createdBy !== record.actor
+    || differenceCase.differenceAmountFen !== record.detail?.differenceAmountFen
+    || differenceCase.reasonCode !== record.detail?.reasonCode) return false;
+
+  let evidence = { digest: record.detail?.evidenceDigest, revision: 1, submittedAt: record.at, submittedBy: record.actor };
+  let reviews = [];
+  let resolution = null;
+  for (const event of events.slice(1)) {
+    if (event.action === "submit-evidence") {
+      evidence = { digest: event.detail?.evidenceDigest, revision: event.detail?.revision, submittedAt: event.at, submittedBy: event.actor, correctionReason: event.detail?.correctionReason };
+      reviews = [];
+    }
+    if (["approve", "reject"].includes(event.action)) {
+      reviews.push({
+        id: event.detail?.reviewId,
+        reviewDomain: event.detail?.reviewDomain,
+        approved: event.action === "approve",
+        reviewer: event.actor,
+        reviewedAt: event.at,
+        adjustedAmountFen: event.detail?.adjustedAmountFen,
+        resolutionDigest: event.detail?.resolutionDigest,
+        reasonCode: event.detail?.reasonCode,
+        opinion: event.detail?.opinion
+      });
+    }
+    if (event.action === "resolve") resolution = { text: event.detail?.resolution, digest: event.detail?.resolutionDigest, adjustedAmountFen: event.detail?.adjustedAmountFen };
+  }
+  if (stableStringify(differenceCase.evidence || {}) !== stableStringify(evidence)) return false;
+  if (stableStringify((differenceCase.reviews || []).map(differenceReviewProjection)) !== stableStringify(reviews)) return false;
+  if (resolution) {
+    const event = events.at(-1);
+    if (differenceCase.resolvedAt !== event.at || differenceCase.resolvedBy !== event.actor || stableStringify(differenceCase.resolution || {}) !== stableStringify(resolution)) return false;
+  } else if (differenceCase.resolution || differenceCase.resolvedAt || differenceCase.resolvedBy) return false;
+  return true;
+}
+
+function annualConfirmationProjection(item = {}) {
+  return { state: item.state, confirmation: item.confirmation || null };
+}
+
+function annualDisputeProjection(item = {}) {
+  return {
+    id: item.id,
+    institutionId: item.institutionId,
+    reason: item.reason,
+    reasonCode: item.reasonCode,
+    evidenceDigest: item.evidenceDigest,
+    amountFen: item.amountFen,
+    status: item.status,
+    createdAt: item.createdAt,
+    createdBy: item.createdBy,
+    resolution: item.resolution,
+    resolutionDigest: item.resolutionDigest,
+    resolvedAmountFen: item.resolvedAmountFen,
+    resolvedAt: item.resolvedAt,
+    resolvedBy: item.resolvedBy
+  };
+}
+
+function verifyAnnualClearanceProjection(row = {}) {
+  const events = Array.isArray(row.events) ? row.events : [];
+  if (!events.length || !verifyEventLedger(events) || events[0].action !== "prepare" || events[0].from !== "NONE") return false;
+  if (row.state !== events.at(-1).to || row.status !== CLEARANCE_LABELS[row.state]) return false;
+  if (events[0].detail?.clearanceDigest !== row.clearanceDigest || row.createdAt !== events[0].at || row.createdBy !== events[0].actor) return false;
+  const confirmations = new Map((row.institutionConfirmations || []).map((item) => [item.institutionId, { state: "PENDING", confirmation: null }]));
+  const disputes = [];
+  let institutionConfirmation = null;
+  let approval = null;
+  let posting = null;
+  let lock = null;
+  for (const event of events.slice(1)) {
+    if (event.action === "record-dispute") {
+      const institution = confirmations.get(event.detail?.institutionId);
+      if (!institution) return false;
+      institution.state = "DISPUTED";
+      institution.confirmation = null;
+      disputes.push({
+        id: event.detail?.disputeId,
+        institutionId: event.detail?.institutionId,
+        reason: event.detail?.reason,
+        reasonCode: event.detail?.reasonCode,
+        evidenceDigest: event.detail?.evidenceDigest,
+        amountFen: event.detail?.amountFen,
+        status: "open",
+        createdAt: event.at,
+        createdBy: event.actor
+      });
+    }
+    if (event.action === "resolve-dispute") {
+      const dispute = disputes.find((item) => item.id === event.detail?.disputeId && item.status === "open");
+      if (!dispute) return false;
+      Object.assign(dispute, { status: "resolved", resolution: event.detail?.resolution, resolutionDigest: event.detail?.resolutionDigest, resolvedAmountFen: event.detail?.resolvedAmountFen, resolvedAt: event.at, resolvedBy: event.actor });
+      const institution = confirmations.get(dispute.institutionId);
+      institution.state = "PENDING";
+      institution.confirmation = null;
+    }
+    if (event.action === "confirm-institution") {
+      const institution = confirmations.get(event.detail?.institutionId);
+      if (!institution) return false;
+      institution.state = "CONFIRMED";
+      institution.confirmation = { digest: event.detail?.confirmationDigest, confirmedAt: event.at, confirmedBy: event.actor };
+    }
+    if (event.action === "confirm-institutions") institutionConfirmation = { digest: event.detail?.confirmationDigest, institutionCount: confirmations.size, confirmedAt: event.at, confirmedBy: event.actor };
+    if (event.action === "approve") approval = { approvalNo: event.detail?.approvalNo, adjustmentApprovalDigest: event.detail?.adjustmentApprovalDigest, approvedAt: event.at, approvedBy: event.actor };
+    if (event.action === "post") posting = { voucherNo: event.detail?.voucherNo, postedAmountFen: event.detail?.postedAmountFen, postedAt: event.at, postedBy: event.actor };
+    if (event.action === "lock") lock = { lockedAt: event.at, lockedBy: event.actor, lockReference: event.detail?.lockReference };
+  }
+  if ((row.institutionConfirmations || []).some((item) => stableStringify(annualConfirmationProjection(item)) !== stableStringify(confirmations.get(item.institutionId)))) return false;
+  if (stableStringify((row.disputes || []).map(annualDisputeProjection)) !== stableStringify(disputes.map(annualDisputeProjection))) return false;
+  if (stableStringify(row.institutionConfirmation || null) !== stableStringify(institutionConfirmation)) return false;
+  if (stableStringify(row.approval || null) !== stableStringify(approval)) return false;
+  if (stableStringify(row.posting || null) !== stableStringify(posting)) return false;
+  if (stableStringify({ lockedAt: row.lockedAt, lockedBy: row.lockedBy, lockReference: row.lockReference }) !== stableStringify(lock || { lockedAt: undefined, lockedBy: undefined, lockReference: undefined })) return false;
+  return true;
 }
 
 function buildCoreSettlementCase(item = {}) {
@@ -417,7 +563,8 @@ function transitionSettlementBatch(batch, payload = {}, actor = "system", option
   const rule = ACTION_TARGETS[action];
   if (!rule) throw new Error(`不支持的结算动作：${action || "空动作"}`);
   if (["core-accepted", "core-returned", "payment-failed", "confirm-payment"].includes(action) && options.trustedInsuranceCoreCallback !== true) throw new Error(`${action}只能由医保核心可信回调驱动`);
-  if (!verifyEventLedger(batch.events || [])) throw new Error("结算批次事件账本校验失败");
+  if (!verifySettlementBatchProjection(batch)) throw new Error("结算批次状态投影或事件账本校验失败");
+  if (batch.reconciliation?.differenceCase && !verifyDifferenceCaseProjection(batch.reconciliation.differenceCase)) throw new Error("差额状态投影或事件账本校验失败");
   const before = settlementState(batch);
   const identity = eventIdentity(payload, action);
   const duplicate = (batch.events || []).find((event) => event.idempotencyKey === identity && event.action === action);
@@ -532,7 +679,7 @@ function transitionSettlementBatch(batch, payload = {}, actor = "system", option
   if (action === "submit-difference-evidence") {
     const differenceCase = batch.reconciliation?.differenceCase;
     if (!differenceCase || !["OPEN", "REJECTED"].includes(differenceCase.state)) throw new Error("当前差额状态不允许补充证据");
-    if (!verifyEventLedger(differenceCase.events)) throw new Error("差额事件账本校验失败");
+    if (!verifyDifferenceCaseProjection(differenceCase)) throw new Error("差额状态投影或事件账本校验失败");
     if (differenceCase.state === "OPEN" && differenceCase.reviews.length) throw new Error("已有复核意见时只能在驳回后补充证据");
     detail.evidenceDigest = requireDigest(payload, "evidenceDigest", "差额补充证据摘要");
     detail.correctionReason = requireText(payload, "correctionReason", "差额补证原因");
@@ -547,7 +694,7 @@ function transitionSettlementBatch(batch, payload = {}, actor = "system", option
   if (action === "review-difference") {
     const differenceCase = batch.reconciliation?.differenceCase;
     if (!differenceCase || !["OPEN", "UNDER_REVIEW"].includes(differenceCase.state)) throw new Error("当前差额状态不允许复核");
-    if (!verifyEventLedger(differenceCase.events)) throw new Error("差额事件账本校验失败");
+    if (!verifyDifferenceCaseProjection(differenceCase)) throw new Error("差额状态投影或事件账本校验失败");
     const reviewDomain = requireText(payload, "reviewDomain", "差额复核领域");
     if (!DIFFERENCE_REVIEW_DOMAINS.includes(reviewDomain)) throw new Error("差额复核领域无效");
     if (differenceCase.reviews.some((item) => item.reviewDomain === reviewDomain)) throw new Error("同一差额复核领域不得重复签署");
@@ -570,7 +717,7 @@ function transitionSettlementBatch(batch, payload = {}, actor = "system", option
     else if (DIFFERENCE_REVIEW_DOMAINS.every((domain) => differenceCase.reviews.some((item) => item.reviewDomain === domain && item.approved))) differenceCase.state = "RESOLUTION_READY";
     else differenceCase.state = "UNDER_REVIEW";
     differenceCase.sla = buildDifferenceCaseSla(differenceCase, batch.workingCalendar || {}, now);
-    appendEvent(differenceCase, { id: `difference-event-${randomUUID()}`, action: review.approved ? "approve" : "reject", from: beforeCase, to: differenceCase.state, actor, at: now, idempotencyKey: identity, detail: { reviewDomain, approved: review.approved, adjustedAmountFen: review.adjustedAmountFen, resolutionDigest: review.resolutionDigest, reasonCode: review.reasonCode } });
+    appendEvent(differenceCase, { id: `difference-event-${randomUUID()}`, action: review.approved ? "approve" : "reject", from: beforeCase, to: differenceCase.state, actor, at: now, idempotencyKey: identity, detail: { reviewId: review.id, reviewDomain, approved: review.approved, adjustedAmountFen: review.adjustedAmountFen, resolutionDigest: review.resolutionDigest, reasonCode: review.reasonCode, opinion: review.opinion } });
     detail.differenceCaseId = differenceCase.id;
     detail.reviewDomain = reviewDomain;
     detail.approved = review.approved;
@@ -588,7 +735,7 @@ function transitionSettlementBatch(batch, payload = {}, actor = "system", option
     if (!Number.isSafeInteger(adjustedAmountFen) || adjustedAmountFen < 0) throw new Error("调整后金额必须为非负整数分");
     const differenceCase = batch.reconciliation?.differenceCase;
     if (!differenceCase || differenceCase.state !== "RESOLUTION_READY") throw new Error("差额必须经医院财务与医保经办双域复核后才能解决");
-    if (!verifyEventLedger(differenceCase.events)) throw new Error("差额事件账本校验失败");
+    if (!verifyDifferenceCaseProjection(differenceCase)) throw new Error("差额状态投影或事件账本校验失败");
     const approvals = differenceCase.reviews.filter((item) => item.approved);
     const resolutionDigest = requireDigest(payload, "resolutionDigest", "差额处置摘要");
     if (approvals.length !== DIFFERENCE_REVIEW_DOMAINS.length || approvals.some((item) => item.adjustedAmountFen !== adjustedAmountFen || item.resolutionDigest !== resolutionDigest)) throw new Error("差额解决金额或处置摘要与双域复核意见不一致");
@@ -598,7 +745,7 @@ function transitionSettlementBatch(batch, payload = {}, actor = "system", option
     differenceCase.resolvedBy = actor;
     differenceCase.resolution = { text: detail.resolution, digest: resolutionDigest, adjustedAmountFen };
     differenceCase.sla = buildDifferenceCaseSla(differenceCase, batch.workingCalendar || {}, now);
-    appendEvent(differenceCase, { id: `difference-event-${randomUUID()}`, action: "resolve", from: beforeCase, to: "RESOLVED", actor, at: now, idempotencyKey: identity, detail: { adjustedAmountFen, resolutionDigest } });
+    appendEvent(differenceCase, { id: `difference-event-${randomUUID()}`, action: "resolve", from: beforeCase, to: "RESOLVED", actor, at: now, idempotencyKey: identity, detail: { resolution: detail.resolution, adjustedAmountFen, resolutionDigest } });
     batch.adjustedAmountFen = adjustedAmountFen;
     batch.adjustedAmount = adjustedAmountFen / 100;
     batch.reconciliation = { ...(batch.reconciliation || {}), resolution: detail.resolution, resolutionDigest, adjustedAmountFen, differenceAmountFen: 0, reconciledAt: now, reconciledBy: actor };
@@ -762,7 +909,7 @@ function annualClearanceDigestPayload(row = {}) {
 function institutionConfirmationDigest(row = {}) {
   const confirmations = (row.institutionConfirmations || []).map((item) => ({ institutionId: item.institutionId, confirmationDigest: item.confirmation?.digest || "" })).sort((left, right) => left.institutionId.localeCompare(right.institutionId));
   if (!confirmations.length || confirmations.some((item) => !/^[a-f0-9]{64}$/.test(item.confirmationDigest))) throw new Error("机构确认尚未完整");
-  if (!verifyEventLedger(row.events)) throw new Error("年度清算事件账本校验失败");
+  if (!verifyAnnualClearanceProjection(row)) throw new Error("年度清算状态投影或事件账本校验失败");
   if (confirmations.some((item) => !(row.events || []).some((event) => event.action === "confirm-institution" && event.detail?.institutionId === item.institutionId && event.detail?.confirmationDigest === item.confirmationDigest))) throw new Error("机构确认缺少匹配的账本事件");
   return digest({ clearanceId: row.id, clearanceDigest: row.clearanceDigest, confirmations });
 }
@@ -777,11 +924,11 @@ function transitionAnnualClearance(row, payload = {}, actor = "system") {
   const action = String(payload.action || "").trim();
   const rule = CLEARANCE_ACTION_TARGETS[action];
   if (!rule) throw new Error(`不支持的年度清算动作：${action || "空动作"}`);
+  if (!verifyAnnualClearanceProjection(row)) throw new Error("年度清算状态投影或事件账本校验失败");
   const before = row.state || "PREPARED";
   if (!rule.from.includes(before)) throw new Error(`年度清算状态不允许从${CLEARANCE_LABELS[before] || before}执行${action}`);
   const now = String(payload.at || new Date().toISOString());
   const identity = eventIdentity(payload, action);
-  if (!verifyEventLedger(row.events)) throw new Error("年度清算事件账本校验失败");
   const duplicate = (row.events || []).find((event) => event.idempotencyKey === identity && event.action === action);
   if (identity && duplicate) return { row, event: duplicate, idempotent: true };
   buildAnnualClearanceEnvelope(row);
@@ -839,13 +986,15 @@ function transitionAnnualClearance(row, payload = {}, actor = "system") {
   if (action === "approve") {
     if ((row.adjustmentFundFen || row.retainedBalanceFen || row.riskReserveFen) && !row.adjustmentReason) throw new Error("存在年度资金调整时必须填写调整原因");
     detail.adjustmentApprovalDigest = (row.adjustmentFundFen || row.retainedBalanceFen || row.riskReserveFen) ? requireDigest(payload, "adjustmentApprovalDigest", "资金调整批准摘要") : "";
-    row.approval = { approvalNo: requireText(payload, "approvalNo", "清算批准文号"), adjustmentApprovalDigest: detail.adjustmentApprovalDigest, approvedAt: now, approvedBy: actor };
+    detail.approvalNo = requireText(payload, "approvalNo", "清算批准文号");
+    row.approval = { approvalNo: detail.approvalNo, adjustmentApprovalDigest: detail.adjustmentApprovalDigest, approvedAt: now, approvedBy: actor };
   }
   if (action === "post") {
     const postedAmountFen = Number(payload.postedAmountFen ?? row.finalClearanceAmountFen);
     if (!Number.isSafeInteger(postedAmountFen) || postedAmountFen !== row.finalClearanceAmountFen) throw new Error("财务入账金额必须与最终清算金额一致");
     detail.postedAmountFen = postedAmountFen;
-    row.posting = { voucherNo: requireText(payload, "voucherNo", "财务凭证号"), postedAmountFen, postedAt: now, postedBy: actor };
+    detail.voucherNo = requireText(payload, "voucherNo", "财务凭证号");
+    row.posting = { voucherNo: detail.voucherNo, postedAmountFen, postedAt: now, postedBy: actor };
   }
   if (action === "lock") {
     detail.lockReference = requireText(payload, "lockReference", "锁账凭证号");
@@ -863,4 +1012,4 @@ function transitionAnnualClearance(row, payload = {}, actor = "system") {
   return { row, event, idempotent: false };
 }
 
-module.exports = { ACTION_TARGETS, ANNUAL_CLEARANCE_CONTRACT_ID, ANNUAL_CLEARANCE_CONTRACT_VERSION, CLEARANCE_ACTION_TARGETS, CLEARANCE_LABELS, CORE_CORRECTION_POLICY, DIFFERENCE_REVIEW_DOMAINS, PAYMENT_FAILURE_POLICY, SETTLEMENT_CONTRACT_ID, SETTLEMENT_LABELS, addWorkingDays, annualClearanceDigestPayload, appendEvent, buildAnnualClearanceEnvelope, buildCoreCorrectionSla, buildCoreSettlementCase, buildCoreSettlementEnvelope, buildDifferenceCaseSla, buildPaymentFailureSla, buildSettlementCoreCorrectionOperations, buildSettlementPaymentFailureOperations, buildSettlementSla, coreReturnDigestPayload, createAnnualClearance, dateOnly, digest, institutionConfirmationDigest, isWorkingDay, normalizeWorkingCalendar, paymentFailureDigestPayload, settlementState, stableStringify, transitionAnnualClearance, transitionSettlementBatch, verifyCoreReturnCycle, verifyCoreReturnCycleEvidence, verifyEventLedger, verifyPaymentFailureCycle, verifyPaymentFailureCycleEvidence, workingDaysBetween, yuanToFen };
+module.exports = { ACTION_TARGETS, ANNUAL_CLEARANCE_CONTRACT_ID, ANNUAL_CLEARANCE_CONTRACT_VERSION, CLEARANCE_ACTION_TARGETS, CLEARANCE_LABELS, CORE_CORRECTION_POLICY, DIFFERENCE_REVIEW_DOMAINS, PAYMENT_FAILURE_POLICY, SETTLEMENT_CONTRACT_ID, SETTLEMENT_LABELS, addWorkingDays, annualClearanceDigestPayload, appendEvent, buildAnnualClearanceEnvelope, buildCoreCorrectionSla, buildCoreSettlementCase, buildCoreSettlementEnvelope, buildDifferenceCaseSla, buildPaymentFailureSla, buildSettlementCoreCorrectionOperations, buildSettlementPaymentFailureOperations, buildSettlementSla, coreReturnDigestPayload, createAnnualClearance, dateOnly, digest, institutionConfirmationDigest, isWorkingDay, normalizeWorkingCalendar, paymentFailureDigestPayload, settlementState, stableStringify, transitionAnnualClearance, transitionSettlementBatch, verifyAnnualClearanceProjection, verifyCoreReturnCycle, verifyCoreReturnCycleEvidence, verifyDifferenceCaseProjection, verifyEventLedger, verifyPaymentFailureCycle, verifyPaymentFailureCycleEvidence, verifySettlementBatchProjection, workingDaysBetween, yuanToFen };

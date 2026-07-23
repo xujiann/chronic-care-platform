@@ -8,7 +8,7 @@ const Settlement = require("../disease-payment-settlement");
 const hash = (character) => character.repeat(64);
 
 function frozenBatch(id = "settlement-core-correction") {
-  return {
+  const batch = {
     id,
     period: "2026-06",
     type: "月度结算",
@@ -25,6 +25,8 @@ function frozenBatch(id = "settlement-core-correction") {
     workingCalendar: { version: "test-calendar", nonWorkingDates: [], workingWeekendDates: [] },
     events: []
   };
+  Settlement.appendEvent(batch, { id: `freeze-${id}`, action: "freeze", from: "NONE", to: "BATCH_FROZEN", actor: "fixture", at: "2026-07-10T08:00:00.000Z", idempotencyKey: id, detail: { batchDigest: batch.batchDigest } });
+  return batch;
 }
 
 function submit(batch, suffix = "1", at = "2026-07-11T08:00:00.000Z") {
@@ -142,7 +144,7 @@ test("tampered return requirements or batch ledger block correction", () => {
     externalRequestId: "CORE-REQUEST-2",
     idempotencyKey: "CORE-IDEM-2",
     correctionDigest: hash("f")
-  }, "insurance-settlement"), /结算批次事件账本校验失败/);
+  }, "insurance-settlement"), /状态投影|事件账本校验失败/);
 });
 
 test("service keeps settlement state unchanged when correction transition fails", () => {
