@@ -70,6 +70,19 @@ test("resident creates a scoped consent and revokes it through the dedicated aud
 });
 
 test("resident uses the V2 care workspace for correction, one-time sharing and accessibility", async ({ page }) => {
+  await page.route("**/api/record-care-workspace**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        corrections: [],
+        sharePackages: [],
+        taskUpdates: {},
+        syncedAt: new Date().toISOString(),
+        cursor: "e2e-cursor-1"
+      })
+    });
+  });
   await page.route("**/api/record-corrections", async (route) => {
     const body = JSON.parse(route.request().postData() || "{}");
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ...body, receiptId: "receipt-correction-1", auditRef: "audit-correction-1" }) });
@@ -109,6 +122,7 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
   await expect(workspace).toContainText("用药核对");
   await expect(workspace).toContainText("档案完整度与更新提醒");
   await expect(page.locator("#citizen-current-subject")).toContainText("当前查看");
+  await expect(page.locator("#citizen-care-sync-status")).toContainText("已安全同步");
   await page.locator('[data-vault="imaging"]').click();
   await page.getByRole("button", { name: /受控调阅胸部 CT 影像报告/ }).click();
   await expect(page.locator("#toast")).toContainText("HTTPS");
@@ -142,6 +156,11 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
   page.once("dialog", (dialog) => dialog.accept());
   await sharePackage.getByRole("button", { name: "立即撤销" }).click();
   await expect(page.locator("#citizen-share-package-list")).toContainText("已撤销");
+  const storedCareData = await page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem("chronic-care-citizen-extra") || "{}");
+    return Object.values(saved).some((item) => item?.recordCorrections || item?.recordSharePackages || item?.careTaskUpdates);
+  });
+  expect(storedCareData).toBe(false);
 
   await page.getByRole("button", { name: "简洁模式" }).click();
   await expect(page.locator("body")).toHaveClass(/record-simple-mode/);
@@ -151,4 +170,9 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
   await expect(page.locator("#citizen-record-text-scale")).toHaveText("110%");
   const minimumTouchHeight = await page.getByRole("button", { name: "简洁模式" }).evaluate((element) => element.getBoundingClientRect().height);
   expect(minimumTouchHeight).toBeGreaterThanOrEqual(44);
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.locator("[data-clear-care-workspace]").click();
+  await expect(page.locator("#citizen-care-sync-status")).toContainText("会话缓存已清理");
+  await expect(page.locator("#citizen-correction-list")).toContainText("尚未提交");
 });

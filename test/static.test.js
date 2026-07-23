@@ -2769,8 +2769,8 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(citizenHtml, /rel="manifest"/);
   assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
   assert.match(citizenHtml, /citizen-records-v1\.js\?v=20260723auth2/);
-  assert.match(citizenHtml, /citizen-records-v2\.js\?v=20260723care2/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260723care2/);
+  assert.match(citizenHtml, /citizen-records-v2\.js\?v=20260723care3/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260723care3/);
   assert.match(citizenHtml, /mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-title/);
@@ -3126,7 +3126,7 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   assert.match(citizenJs, /setEscortAppointmentAvailability/);
   assert.match(citizenJs, /escortProviderReady/);
   assert.match(citizenJs, /暂无可预约服务主体/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260723care2/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260723care3/);
   assert.match(citizenJs, /\/escort-services\/orders/);
   assert.match(citizenJs, /getEscortRegistrationOptions/);
   assert.match(citizenJs, /applyLinkedRegistrationToEscortForm/);
@@ -3342,8 +3342,8 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenHtml, /service-summary/);
   assert.match(citizenHtml, /service-mobile-pagebar/);
   assert.match(citizenHtml, /citizen-action-dock/);
-  assert.match(citizenHtml, /citizen\.css\?v=20260723care2/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260723care2/);
+  assert.match(citizenHtml, /citizen\.css\?v=20260723care3/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260723care3/);
   assert.match(citizenHtml, /当前服务常用操作/);
   assert.match(citizenHtml, /service-health-record/);
   assert.match(citizenHtml, /service-emr/);
@@ -3629,7 +3629,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /longterm-care-form/);
   assert.match(citizenCss, /registration-form/);
   assert.match(citizenHtml, /registration-summary/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260723care2/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260723care3/);
   assert.match(citizenJs, /registration-summary/);
   assert.match(citizenJs, /hisOrders/);
   assert.match(citizenJs, /insuranceReady/);
@@ -4606,7 +4606,11 @@ test("citizen record V2 exposes twelve governed care capabilities", () => {
     "buildIdempotentAction",
     "projectCorrectionReceipt",
     "projectSharePackageReceipt",
-    "validateControlledCredential"
+    "validateControlledCredential",
+    "projectCareWorkspacePayload",
+    "mergeCareWorkspaceState",
+    "buildCarePreviewMetadata",
+    "isCarePreviewExpired"
   ].forEach((contract) => assert.match(model, new RegExp(contract)));
   assert.match(policy, /evaluateCitizenRecordAccess/);
   assert.match(policy, /buildCitizenControlledAccessIntent/);
@@ -4615,12 +4619,18 @@ test("citizen record V2 exposes twelve governed care capabilities", () => {
   assert.match(ui, /\/care-tasks\//);
   assert.match(ui, /Idempotency-Key/);
   assert.match(ui, /CITIZEN_CONTROLLED_ACCESS_ORIGINS/);
+  assert.match(ui, /\/record-care-workspace\?residentId=/);
+  assert.match(ui, /citizenCareSession/);
+  assert.match(ui, /data-clear-care-workspace/);
   assert.match(css, /record-high-contrast/);
   assert.match(css, /min-height: 44px/);
   assert.match(documentation, /持续照护中心 V2/);
   assert.match(documentation, /生产响应信任边界收口/);
+  assert.match(documentation, /安全同步与本地最小留存/);
   assert.match(html, /data-record-accessibility="text-down"/);
   assert.match(html, /data-record-accessibility="text-up"/);
   assert.match(html, /citizen-record-text-scale/);
-  assert.match(html, /citizen-records-v2\.js\?v=20260723care2/);
+  assert.match(html, /data-refresh-care-workspace/);
+  assert.match(html, /data-clear-care-workspace/);
+  assert.match(html, /citizen-records-v2\.js\?v=20260723care3/);
 });

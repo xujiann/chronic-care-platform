@@ -501,6 +501,9 @@ let activeServiceTab = serviceTabFromRoute() || "health-record";
 let activeClientChannel = clientChannelFromRoute() || localStorage.getItem(CLIENT_CHANNEL_KEY) || "mini-program";
 let state = fallbackState;
 let citizenExtra = loadCitizenExtra();
+const citizenCareSession = new Map();
+const citizenCareSyncStatus = new Map();
+const citizenCareSyncRequested = new Set();
 let citizenImagingDashboard = null;
 let citizenSecureAttachments = [];
 let escortDashboard = null;
@@ -2432,19 +2435,122 @@ function residentCareRecords(residentId) {
   });
 }
 
-function ensureCitizenCareCollections(residentId) {
-  if (!citizenExtra[residentId]) citizenExtra[residentId] = {};
-  ["recordCorrections", "recordSharePackages"].forEach((key) => {
-    if (!Array.isArray(citizenExtra[residentId][key])) citizenExtra[residentId][key] = [];
-  });
-  if (!citizenExtra[residentId].careTaskUpdates || typeof citizenExtra[residentId].careTaskUpdates !== "object") {
-    citizenExtra[residentId].careTaskUpdates = {};
-  }
-  return citizenExtra[residentId];
+function clearCitizenCareLocalPreview(residentId) {
+  const preview = citizenExtra[residentId];
+  if (!preview || typeof preview !== "object") return false;
+  const keys = ["recordCorrections", "recordSharePackages", "careTaskUpdates", "careWorkspaceMeta"];
+  const changed = keys.some((key) => Object.hasOwn(preview, key));
+  keys.forEach((key) => delete preview[key]);
+  if (changed) localStorage.setItem(CITIZEN_EXTRA_KEY, JSON.stringify(citizenExtra));
+  return changed;
 }
 
-function saveCitizenCareCollections() {
+function ensureCitizenCareCollections(residentId) {
+  if (API_BASE) {
+    clearCitizenCareLocalPreview(residentId);
+    if (!citizenCareSession.has(residentId)) {
+      citizenCareSession.set(residentId, {
+        recordCorrections: [],
+        recordSharePackages: [],
+        careTaskUpdates: {},
+        sync: {}
+      });
+    }
+    return citizenCareSession.get(residentId);
+  }
+  if (!citizenExtra[residentId]) citizenExtra[residentId] = {};
+  const preview = citizenExtra[residentId];
+  const hasPreviewData = ["recordCorrections", "recordSharePackages"].some((key) => Array.isArray(preview[key]) && preview[key].length)
+    || Object.keys(preview.careTaskUpdates || {}).length > 0;
+  if (hasPreviewData && window.CitizenRecordsV2?.isCarePreviewExpired(preview.careWorkspaceMeta || {})) {
+    clearCitizenCareLocalPreview(residentId);
+  }
+  ["recordCorrections", "recordSharePackages"].forEach((key) => {
+    if (!Array.isArray(preview[key])) preview[key] = [];
+  });
+  if (!preview.careTaskUpdates || typeof preview.careTaskUpdates !== "object") {
+    preview.careTaskUpdates = {};
+  }
+  return preview;
+}
+
+function saveCitizenCareCollections(residentId) {
+  if (API_BASE) return;
+  const preview = ensureCitizenCareCollections(residentId);
+  preview.careWorkspaceMeta = window.CitizenRecordsV2.buildCarePreviewMetadata();
   localStorage.setItem(CITIZEN_EXTRA_KEY, JSON.stringify(citizenExtra));
+}
+
+function renderCitizenCareSyncStatus(residentId) {
+  const target = document.querySelector("#citizen-care-sync-status");
+  const clearButton = document.querySelector("[data-clear-care-workspace]");
+  if (!target) return;
+  if (!API_BASE) {
+    const metadata = ensureCitizenCareCollections(residentId).careWorkspaceMeta;
+    target.textContent = metadata?.expiresAt
+      ? `本机演示 · ${metadata.expiresAt.slice(0, 16).replace("T", " ")} 前自动清理`
+      : "本机演示 · 尚无敏感操作留存";
+    if (clearButton) clearButton.textContent = "清理本机演示数据";
+    return;
+  }
+  const status = citizenCareSyncStatus.get(residentId) || { key: "idle", label: "等待同步" };
+  target.textContent = status.label;
+  target.dataset.syncState = status.key;
+  if (clearButton) clearButton.textContent = "清除本次会话缓存";
+}
+
+async function refreshCitizenCareWorkspace(residentId, options = {}) {
+  if (!residentId) return;
+  if (!API_BASE) {
+    renderCitizenCareSyncStatus(residentId);
+    if (!options.silent) showToast("静态预览使用本机演示数据，不连接生产工作台");
+    return;
+  }
+  citizenCareSyncStatus.set(residentId, { key: "loading", label: "正在安全同步…" });
+  renderCitizenCareSyncStatus(residentId);
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${API_BASE}/record-care-workspace?residentId=${encodeURIComponent(residentId)}`, {
+      headers: { Accept: "application/json" }
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.message || "工作台同步失败");
+    const projected = window.CitizenRecordsV2.projectCareWorkspacePayload(payload, residentId);
+    const merged = window.CitizenRecordsV2.mergeCareWorkspaceState(ensureCitizenCareCollections(residentId), projected);
+    citizenCareSession.set(residentId, merged);
+    const syncedAt = projected.sync.syncedAt || new Date().toISOString();
+    citizenCareSyncStatus.set(residentId, {
+      key: "synced",
+      label: `已安全同步 · ${syncedAt.slice(0, 16).replace("T", " ")}`
+    });
+    if (currentResidentId === residentId) {
+      const resident = state.residents.find((item) => item.id === residentId);
+      const diseases = state.diseases.filter((item) => item.residentId === residentId);
+      renderCitizenCareWorkspace(resident, diseases);
+    }
+    if (!options.silent) showToast("居民工作台已从服务端安全同步");
+  } catch (error) {
+    citizenCareSyncStatus.set(residentId, {
+      key: "error",
+      label: "同步失败 · 本次会话数据未写入本机"
+    });
+    renderCitizenCareSyncStatus(residentId);
+    if (!options.silent) showToast(error.message || "工作台同步失败");
+  }
+}
+
+function scheduleCitizenCareWorkspaceSync(residentId) {
+  if (!API_BASE || citizenCareSyncRequested.has(residentId)) return;
+  citizenCareSyncRequested.add(residentId);
+  void refreshCitizenCareWorkspace(residentId, { silent: true });
+}
+
+function markCitizenCareActionSynced(residentId, receipt = {}) {
+  if (!API_BASE) return;
+  citizenCareSyncStatus.set(residentId, {
+    key: "synced",
+    label: `在线已确认 · ${receipt.auditRef || receipt.receiptId || "审计回执已生成"}`
+  });
 }
 
 function citizenCareEmpty(message) {
@@ -2572,7 +2678,9 @@ function renderCitizenCareWorkspace(resident, diseases = []) {
     const tomorrow = new Date(Date.now() + 24 * 3600000);
     shareExpiry.value = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}T${String(tomorrow.getHours()).padStart(2, "0")}:${String(tomorrow.getMinutes()).padStart(2, "0")}`;
   }
+  renderCitizenCareSyncStatus(resident.id);
   applyCitizenRecordAccessibility();
+  scheduleCitizenCareWorkspaceSync(resident.id);
 }
 
 function citizenCareRequestNonce() {
@@ -2673,7 +2781,8 @@ function bindCitizenCareWorkspace() {
       const saved = api.projectCorrectionReceipt(response, request);
       const careState = ensureCitizenCareCollections(currentResidentId);
       careState.recordCorrections.unshift(saved);
-      saveCitizenCareCollections();
+      saveCitizenCareCollections(currentResidentId);
+      markCitizenCareActionSynced(currentResidentId, saved);
       form.reset();
       renderCitizen(currentResidentId);
       showToast("纠错申请已提交，原始记录保持不变");
@@ -2698,13 +2807,32 @@ function bindCitizenCareWorkspace() {
       const saved = api.projectSharePackageReceipt(response, packageRecord);
       const careState = ensureCitizenCareCollections(currentResidentId);
       careState.recordSharePackages.unshift(saved);
-      saveCitizenCareCollections();
+      saveCitizenCareCollections(currentResidentId);
+      markCitizenCareActionSynced(currentResidentId, saved);
       form.reset();
       renderCitizen(currentResidentId);
       showToast("一次性健康资料包已创建");
     } catch (error) {
       showToast(error.message || "资料包创建失败");
     }
+  });
+
+  document.querySelector("[data-refresh-care-workspace]")?.addEventListener("click", () => {
+    void refreshCitizenCareWorkspace(currentResidentId);
+  });
+
+  document.querySelector("[data-clear-care-workspace]")?.addEventListener("click", () => {
+    const label = API_BASE ? "本次会话中的工作台缓存" : "本机保存的纠错、资料包和异常处置演示数据";
+    if (!window.confirm(`确认清理${label}？居民主动补充的其他健康资料不会被删除。`)) return;
+    if (API_BASE) {
+      citizenCareSession.delete(currentResidentId);
+      citizenCareSyncStatus.set(currentResidentId, { key: "cleared", label: "本次会话缓存已清理" });
+      citizenCareSyncRequested.add(currentResidentId);
+    } else {
+      clearCitizenCareLocalPreview(currentResidentId);
+    }
+    renderCitizen(currentResidentId);
+    showToast(`${label}已清理`);
   });
 
   section.addEventListener("click", async (event) => {
@@ -2723,7 +2851,8 @@ function bindCitizenCareWorkspace() {
         }, "share-revoke");
         const receipt = api.projectActionReceipt(response, { residentId: currentResidentId, resourceId: item.id });
         Object.assign(item, revoked, receipt);
-        saveCitizenCareCollections();
+        saveCitizenCareCollections(currentResidentId);
+        markCitizenCareActionSynced(currentResidentId, receipt);
         renderCitizen(currentResidentId);
         showToast("一次性资料包已撤销");
       } catch (error) {
@@ -2744,7 +2873,8 @@ function bindCitizenCareWorkspace() {
           resourceId: taskButton.dataset.careTaskComplete
         });
         careState.careTaskUpdates[taskButton.dataset.careTaskComplete] = { ...update, ...receipt };
-        saveCitizenCareCollections();
+        saveCitizenCareCollections(currentResidentId);
+        markCitizenCareActionSynced(currentResidentId, receipt);
         renderCitizen(currentResidentId);
         showToast("异常结果处置进度已记录");
       } catch (error) {
@@ -4989,7 +5119,14 @@ function addExtraRecord(residentId, category, record) {
 
 function loadCitizenExtra() {
   const saved = localStorage.getItem(CITIZEN_EXTRA_KEY);
-  return saved ? JSON.parse(saved) : {};
+  if (!saved) return {};
+  try {
+    const parsed = JSON.parse(saved);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    localStorage.removeItem(CITIZEN_EXTRA_KEY);
+    return {};
+  }
 }
 
 function sortByDateDesc(a, b) {
