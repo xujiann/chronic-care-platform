@@ -406,27 +406,129 @@ test("transition order rejects attempts to disable evidence enforcement", () => 
   );
 });
 
-test("completion requires service record trace confirmation and exception declaration", () => {
-  const order = {
-    id: "ino-test-002",
+test("nursing service start and completion require bound trace record confirmation and closed exceptions", () => {
+  const accepted = {
+    id: "ino-service-001",
     residentId: "r1",
-    status: "in-service",
-    serviceRecordStatus: "completed",
-    serviceRecord: { status: "completed", exceptionReport: { status: "none" } },
-    serviceAttachments: [{ type: "resident-signature", name: "resident.png" }],
-    locationTracePoints: [
-      { stage: "service-start", verified: true },
-      { stage: "service-complete", verified: true }
-    ],
+    status: "accepted",
+    nurseId: "inn-001",
+    identityVerified: true,
     adverseEvent: { status: "none" }
   };
-  const completed = Domain.transitionOrder("nursing", order, "completed", { actorId: "inn-001", actorRole: "nurse", at: NOW });
+  const startEvidence = Domain.buildServiceStartEvidence("nursing", accepted, {
+    lat: 38.915,
+    lng: 121.616,
+    source: "nurse-mobile",
+    verified: true,
+    identityMatched: true
+  }, { at: NOW });
+  assert.throws(
+    () => Domain.transitionOrder("nursing", accepted, "in-service", {
+      at: NOW,
+      updates: {
+        ...startEvidence,
+        serviceCheckIn: { ...startEvidence.serviceCheckIn, checkedInAt: "2026-07-22T09:05:00+08:00" },
+        locationTracePoints: startEvidence.locationTracePoints.map((item) => item.stage === "service-start" ? { ...item, lat: null } : item)
+      }
+    }),
+    (error) => error.code === "ORDER_SERVICE_EVIDENCE_INVALID"
+      && error.details.reasons.includes("service-start-trace-location-invalid")
+      && error.details.reasons.includes("service-check-in-time-mismatch")
+  );
+  assert.equal(accepted.status, "accepted");
+  const inService = Domain.transitionOrder("nursing", accepted, "in-service", {
+    actorId: "inn-001",
+    actorRole: "nurse",
+    at: NOW,
+    updates: startEvidence
+  });
+  assert.equal(inService.status, "in-service");
+  assert.equal(inService.serviceCheckIn.subjectId, "inn-001");
+
+  const completionAt = "2026-07-22T10:00:00+08:00";
+  const completionEvidence = Domain.buildServiceCompletionEvidence("nursing", inService, {
+    lat: 38.916,
+    lng: 121.617,
+    source: "nurse-mobile",
+    verified: true,
+    actions: ["identity check", "wound care", "health education"],
+    residentConfirmed: true,
+    signerName: "Resident A",
+    exceptionReport: { status: "none" }
+  }, { at: completionAt });
+  const completed = Domain.transitionOrder("nursing", inService, "completed", {
+    actorId: "inn-001",
+    actorRole: "nurse",
+    at: completionAt,
+    updates: completionEvidence
+  });
   assert.equal(completed.status, "completed");
+  assert.equal(completed.serviceRecord.subjectId, "inn-001");
+  assert.equal(completed.residentConfirmation.status, "confirmed");
 
   assert.throws(
-    () => Domain.transitionOrder("nursing", { ...order, serviceAttachments: [], residentConfirmation: "pending" }, "completed", { at: NOW }),
-    (error) => error.code === "ORDER_EVIDENCE_INCOMPLETE" && error.details.missing.includes("resident-confirmation")
+    () => Domain.transitionOrder("nursing", inService, "completed", {
+      at: completionAt,
+      updates: { ...completionEvidence, residentConfirmation: { ...completionEvidence.residentConfirmation, status: "rejected" } }
+    }),
+    (error) => error.code === "ORDER_SERVICE_EVIDENCE_INVALID" && error.details.reasons.includes("resident-confirmation-not-confirmed")
   );
+  assert.throws(
+    () => Domain.transitionOrder("nursing", inService, "completed", {
+      at: completionAt,
+      updates: { ...completionEvidence, adverseEvent: { status: "open" } }
+    }),
+    (error) => error.code === "ORDER_SERVICE_EVIDENCE_INVALID" && error.details.reasons.includes("adverse-event-open")
+  );
+  assert.equal(inService.status, "in-service");
+});
+
+test("escort service evidence rejects cross-order and cross-worker records without mutation", () => {
+  const confirmed = {
+    id: "eso-service-001",
+    residentId: "r1",
+    status: "hospital-confirmed",
+    workerId: "ew-001",
+    identityVerified: true,
+    adverseEvent: { status: "none" }
+  };
+  const startEvidence = Domain.buildServiceStartEvidence("escort", confirmed, {
+    lat: 38.92,
+    lng: 121.62,
+    source: "escort-mobile",
+    verified: true,
+    identityMatched: true
+  }, { at: NOW });
+  const inService = Domain.transitionOrder("escort", confirmed, "in-service", { at: NOW, updates: startEvidence });
+  const completionAt = "2026-07-22T10:00:00+08:00";
+  const completionEvidence = Domain.buildServiceCompletionEvidence("escort", inService, {
+    lat: 38.921,
+    lng: 121.621,
+    source: "escort-mobile",
+    verified: true,
+    actions: ["registration", "exam escort"],
+    residentConfirmed: true,
+    signerName: "Resident A",
+    exceptionReport: { status: "none" }
+  }, { at: completionAt });
+  const completed = Domain.transitionOrder("escort", inService, "completed", { at: completionAt, updates: completionEvidence });
+  assert.equal(completed.status, "completed");
+  assert.deepEqual(completed.serviceRecord.serviceActions, ["registration", "exam escort"]);
+
+  assert.throws(
+    () => Domain.transitionOrder("escort", inService, "completed", {
+      at: completionAt,
+      updates: {
+        ...completionEvidence,
+        serviceRecord: { ...completionEvidence.serviceRecord, subjectId: "ew-forged" },
+        locationTracePoints: completionEvidence.locationTracePoints.map((item) => item.stage === "service-complete" ? { ...item, orderId: "eso-other" } : item)
+      }
+    }),
+    (error) => error.code === "ORDER_SERVICE_EVIDENCE_INVALID"
+      && error.details.reasons.includes("service-record-subject-mismatch")
+      && error.details.reasons.includes("service-complete-trace-order-mismatch")
+  );
+  assert.equal(inService.status, "in-service");
 });
 
 test("financial command correlates an order using integer cents and a stable idempotency key", () => {

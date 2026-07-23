@@ -489,6 +489,223 @@
     return { domain: normalizedDomain, score: finalScore, band, reasons, controls };
   }
 
+  function serviceAssignedSubject(domain, order = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    return String(normalizedDomain === "nursing" ? order.nurseId || "" : order.workerId || "").trim();
+  }
+
+  function serviceTracePoint(order = {}, stage) {
+    const points = Array.isArray(order.locationTracePoints) ? order.locationTracePoints : [];
+    return [...points].reverse().find((item) => item?.stage === stage) || null;
+  }
+
+  function validateBoundServiceTrace(domain, order = {}, stage) {
+    const normalizedDomain = normalizeDomain(domain);
+    const orderId = String(order.id || "").trim();
+    const subjectId = serviceAssignedSubject(normalizedDomain, order);
+    const trace = serviceTracePoint(order, stage);
+    const reasons = [];
+    if (!trace) return { ok: false, trace: null, reasons: [`${stage}-trace-missing`] };
+    if (!trace.id) reasons.push(`${stage}-trace-id-missing`);
+    if (trace.orderId !== orderId) reasons.push(`${stage}-trace-order-mismatch`);
+    if (trace.domain !== normalizedDomain) reasons.push(`${stage}-trace-domain-mismatch`);
+    if (trace.subjectId !== subjectId) reasons.push(`${stage}-trace-subject-mismatch`);
+    if (trace.verified !== true) reasons.push(`${stage}-trace-not-verified`);
+    if (typeof trace.lat !== "number" || typeof trace.lng !== "number"
+      || !Number.isFinite(trace.lat) || !Number.isFinite(trace.lng)
+      || trace.lat < -90 || trace.lat > 90 || trace.lng < -180 || trace.lng > 180) {
+      reasons.push(`${stage}-trace-location-invalid`);
+    }
+    if (parseTime(trace.capturedAt) === null) reasons.push(`${stage}-trace-time-invalid`);
+    if (!String(trace.source || "").trim()) reasons.push(`${stage}-trace-source-missing`);
+    return { ok: reasons.length === 0, trace, reasons };
+  }
+
+  function validateServiceEvidence(domain, order = {}, nextStatus) {
+    const normalizedDomain = normalizeDomain(domain);
+    const next = canonicalStatus(nextStatus, normalizedDomain);
+    const orderId = String(order.id || "").trim();
+    const residentId = String(order.residentId || "").trim();
+    const subjectId = serviceAssignedSubject(normalizedDomain, order);
+    const reasons = [];
+    if (!orderId) reasons.push("service-order-id-missing");
+    if (!residentId) reasons.push("service-resident-id-missing");
+    if (!subjectId) reasons.push("service-subject-missing");
+
+    if (next === "in-service") {
+      const startTrace = validateBoundServiceTrace(normalizedDomain, order, "service-start");
+      reasons.push(...startTrace.reasons);
+      const checkIn = order.serviceCheckIn;
+      if (!checkIn || typeof checkIn !== "object" || Array.isArray(checkIn)) {
+        reasons.push("service-check-in-missing");
+      } else {
+        if (checkIn.status !== "verified") reasons.push("service-check-in-not-verified");
+        if (checkIn.orderId !== orderId) reasons.push("service-check-in-order-mismatch");
+        if (checkIn.domain !== normalizedDomain) reasons.push("service-check-in-domain-mismatch");
+        if (checkIn.subjectId !== subjectId) reasons.push("service-check-in-subject-mismatch");
+        if (checkIn.residentId !== residentId) reasons.push("service-check-in-resident-mismatch");
+        if (checkIn.tracePointId !== startTrace.trace?.id) reasons.push("service-check-in-trace-mismatch");
+        const checkedInAt = parseTime(checkIn.checkedInAt);
+        if (checkedInAt === null) reasons.push("service-check-in-time-invalid");
+        if (checkedInAt !== null && checkedInAt !== parseTime(startTrace.trace?.capturedAt)) reasons.push("service-check-in-time-mismatch");
+      }
+    }
+
+    if (next === "completed") {
+      const startTrace = validateBoundServiceTrace(normalizedDomain, order, "service-start");
+      const endTrace = validateBoundServiceTrace(normalizedDomain, order, "service-complete");
+      reasons.push(...startTrace.reasons, ...endTrace.reasons);
+      const record = order.serviceRecord;
+      if (!record || typeof record !== "object" || Array.isArray(record)) {
+        reasons.push("service-record-missing");
+      } else {
+        if (record.status !== "completed") reasons.push("service-record-not-completed");
+        if (!record.id) reasons.push("service-record-id-missing");
+        if (!record.version) reasons.push("service-record-version-missing");
+        if (record.orderId !== orderId) reasons.push("service-record-order-mismatch");
+        if (record.domain !== normalizedDomain) reasons.push("service-record-domain-mismatch");
+        if (record.subjectId !== subjectId) reasons.push("service-record-subject-mismatch");
+        if (record.residentId !== residentId) reasons.push("service-record-resident-mismatch");
+        const startedAt = parseTime(record.startedAt);
+        const completedAt = parseTime(record.completedAt);
+        if (startedAt === null) reasons.push("service-record-start-time-invalid");
+        if (completedAt === null) reasons.push("service-record-complete-time-invalid");
+        if (startedAt !== null && completedAt !== null && completedAt <= startedAt) reasons.push("service-record-time-order-invalid");
+        if (startedAt !== null && parseTime(startTrace.trace?.capturedAt) !== startedAt) reasons.push("service-record-start-trace-mismatch");
+        if (completedAt !== null && parseTime(endTrace.trace?.capturedAt) !== completedAt) reasons.push("service-record-complete-trace-mismatch");
+        const actions = normalizedDomain === "nursing"
+          ? record.careActions
+          : record.serviceActions || record.serviceItemsCompleted;
+        if (!Array.isArray(actions) || actions.filter(Boolean).length === 0) reasons.push("service-record-actions-missing");
+        const exception = record.exceptionReport;
+        if (!exception || !["none", "resolved"].includes(exception.status)) reasons.push("exception-declaration-invalid");
+        if (exception?.status === "resolved" && (!exception.resolution || parseTime(exception.resolvedAt) === null)) reasons.push("exception-resolution-incomplete");
+      }
+      const confirmation = order.residentConfirmation;
+      if (!confirmation || typeof confirmation !== "object" || Array.isArray(confirmation)) {
+        reasons.push("resident-confirmation-missing");
+      } else {
+        if (confirmation.status !== "confirmed") reasons.push("resident-confirmation-not-confirmed");
+        if (confirmation.orderId !== orderId) reasons.push("resident-confirmation-order-mismatch");
+        if (confirmation.residentId !== residentId) reasons.push("resident-confirmation-resident-mismatch");
+        if (!confirmation.signerName) reasons.push("resident-confirmation-signer-missing");
+        const confirmedAt = parseTime(confirmation.confirmedAt);
+        if (confirmedAt === null) reasons.push("resident-confirmation-time-invalid");
+        const completedAt = parseTime(order.serviceRecord?.completedAt);
+        if (confirmedAt !== null && completedAt !== null && confirmedAt < completedAt) reasons.push("resident-confirmation-before-completion");
+      }
+      if (order.adverseEvent?.status && !["none", "closed", "resolved"].includes(order.adverseEvent.status)) reasons.push("adverse-event-open");
+    }
+
+    return {
+      ok: reasons.length === 0,
+      domain: normalizedDomain,
+      next,
+      orderId,
+      residentId,
+      subjectId,
+      reasons: [...new Set(reasons)]
+    };
+  }
+
+  function buildServiceStartEvidence(domain, order = {}, details = {}, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const at = new Date(options.at || Date.now()).toISOString();
+    const orderId = String(order.id || "").trim();
+    const residentId = String(order.residentId || "").trim();
+    const subjectId = serviceAssignedSubject(normalizedDomain, order);
+    const traceId = `${normalizedDomain}:${orderId}:service-start:${at}`;
+    const tracePoint = {
+      id: traceId,
+      stage: "service-start",
+      orderId,
+      domain: normalizedDomain,
+      subjectId,
+      capturedAt: at,
+      lat: Number(details.lat),
+      lng: Number(details.lng),
+      source: String(details.source || "worker-mobile"),
+      verified: details.verified === true
+    };
+    return {
+      locationTrace: "tracking",
+      locationTracePoints: [...(Array.isArray(order.locationTracePoints) ? order.locationTracePoints : []), tracePoint].slice(-30),
+      serviceCheckInAt: at,
+      serviceCheckIn: {
+        status: details.identityMatched === true ? "verified" : "rejected",
+        orderId,
+        domain: normalizedDomain,
+        subjectId,
+        residentId,
+        tracePointId: traceId,
+        checkedInAt: at
+      },
+      serviceRecordStatus: "in-progress",
+      serviceRecord: {
+        ...(order.serviceRecord || {}),
+        status: "in-progress",
+        orderId,
+        domain: normalizedDomain,
+        subjectId,
+        residentId,
+        startedAt: at,
+        version: WORKFLOW_POLICY_VERSION
+      }
+    };
+  }
+
+  function buildServiceCompletionEvidence(domain, order = {}, details = {}, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const at = new Date(options.at || Date.now()).toISOString();
+    const orderId = String(order.id || "").trim();
+    const residentId = String(order.residentId || "").trim();
+    const subjectId = serviceAssignedSubject(normalizedDomain, order);
+    const traceId = `${normalizedDomain}:${orderId}:service-complete:${at}`;
+    const tracePoint = {
+      id: traceId,
+      stage: "service-complete",
+      orderId,
+      domain: normalizedDomain,
+      subjectId,
+      capturedAt: at,
+      lat: Number(details.lat),
+      lng: Number(details.lng),
+      source: String(details.source || "worker-mobile"),
+      verified: details.verified === true
+    };
+    const actions = Array.isArray(details.actions) ? details.actions.filter(Boolean) : [];
+    const exceptionReport = details.exceptionReport && typeof details.exceptionReport === "object"
+      ? { ...details.exceptionReport }
+      : { status: "none" };
+    return {
+      locationTrace: "completed",
+      locationTracePoints: [...(Array.isArray(order.locationTracePoints) ? order.locationTracePoints : []), tracePoint].slice(-30),
+      serviceRecordStatus: "completed",
+      serviceRecord: {
+        ...(order.serviceRecord || {}),
+        id: String(order.serviceRecord?.id || `${normalizedDomain}:${orderId}:service-record`),
+        status: "completed",
+        version: WORKFLOW_POLICY_VERSION,
+        orderId,
+        domain: normalizedDomain,
+        subjectId,
+        residentId,
+        startedAt: order.serviceRecord?.startedAt,
+        completedAt: at,
+        ...(normalizedDomain === "nursing" ? { careActions: actions } : { serviceActions: actions }),
+        exceptionReport
+      },
+      residentConfirmation: {
+        status: details.residentConfirmed === true ? "confirmed" : "rejected",
+        orderId,
+        residentId,
+        signerName: String(details.signerName || ""),
+        confirmedAt: at
+      },
+      adverseEvent: details.adverseEvent || order.adverseEvent || { status: "none" }
+    };
+  }
+
   function evidenceTypes(order = {}) {
     const types = new Set((Array.isArray(order.evidence) ? order.evidence : []).map((item) => typeof item === "string" ? item : item?.type).filter(Boolean));
     if (order.identityVerified) types.add("identity-verification");
@@ -503,8 +720,8 @@
     if (tracePoints.some((item) => item.stage === "service-complete" && item.verified !== false)) types.add("location-end");
     if (order.serviceCheckInAt || tracePoints.some((item) => item.stage === "service-start")) types.add("service-check-in");
     if (order.serviceRecord?.status === "completed" || order.serviceRecordStatus === "completed") types.add("service-record");
-    if (order.residentConfirmation === "confirmed" || order.residentServiceConfirmation === "confirmed" || (order.serviceAttachments || []).some((item) => item.type === "resident-signature")) types.add("resident-confirmation");
-    if (order.serviceRecord?.exceptionReport || order.adverseEvent) types.add("exception-declaration");
+    if (order.residentConfirmation?.status === "confirmed" || order.residentConfirmation === "confirmed" || order.residentServiceConfirmation === "confirmed" || (order.serviceAttachments || []).some((item) => item.type === "resident-signature")) types.add("resident-confirmation");
+    if (["none", "resolved"].includes(order.serviceRecord?.exceptionReport?.status) || ["none", "closed", "resolved"].includes(order.adverseEvent?.status)) types.add("exception-declaration");
     if (Number(order.feeEstimate || 0) >= 0 && order.pricingConfirmedAt) types.add("pricing-confirmation");
     if (order.financialDispatch?.idempotencyKey) types.add("financial-dispatch");
     if (order.financialCallback?.status === "succeeded") types.add("financial-callback");
@@ -570,6 +787,16 @@
         error.code = "ORDER_DISPATCH_INTEGRITY_INVALID";
         error.statusCode = 409;
         error.details = integrity;
+        throw error;
+      }
+    }
+    if (["in-service", "completed"].includes(transition.next)) {
+      const serviceEvidence = validateServiceEvidence(domain, candidate, transition.next);
+      if (!serviceEvidence.ok) {
+        const error = new Error(`invalid service evidence for ${transition.next}: ${serviceEvidence.reasons.join(", ")}`);
+        error.code = "ORDER_SERVICE_EVIDENCE_INVALID";
+        error.statusCode = 409;
+        error.details = serviceEvidence;
         throw error;
       }
     }
@@ -641,6 +868,9 @@
     rankDispatchCandidates,
     validateDispatchEvidence,
     assessOrderRisk,
+    validateServiceEvidence,
+    buildServiceStartEvidence,
+    buildServiceCompletionEvidence,
     evidenceTypes,
     validateEvidenceForTransition,
     buildTimelineEvent,

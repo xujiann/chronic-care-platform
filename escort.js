@@ -62,7 +62,8 @@ function withEscortDispatchControls(dashboard = {}) {
     ...dashboard,
     orders: (Array.isArray(dashboard.orders) ? dashboard.orders : []).map((order) => ({
       ...order,
-      dispatchControl: buildEscortDispatchControl(order, workers, domain)
+      dispatchControl: buildEscortDispatchControl(order, workers, domain),
+      serviceEvidenceControl: buildEscortServiceEvidenceControl(order, domain)
     }))
   };
 }
@@ -97,6 +98,28 @@ function escortDispatchControlText(item) {
   if (control.assigned && control.eligible) return `assigned qualification passed: ${control.personName || control.personId}`;
   if (control.eligible) return `dispatch ready: ${control.personName || control.personId} / score ${Math.round(control.score * 10) / 10}`;
   return `dispatch blocked: ${(control.blockers || []).slice(0, 4).join(", ") || "no eligible worker"}`;
+}
+
+function buildEscortServiceEvidenceControl(order, domain) {
+  const current = domain.canonicalStatus(order.status, "escort");
+  const target = current === "in-service" ? "completed" : "in-service";
+  const transition = domain.validateTransition("escort", current, target);
+  const evidence = domain.validateServiceEvidence("escort", order, target);
+  return {
+    ok: transition.ok && evidence.ok,
+    target,
+    blockers: [
+      ...(transition.ok ? [] : [`transition:${current}->${target}`]),
+      ...evidence.reasons
+    ]
+  };
+}
+
+function escortServiceEvidenceText(item) {
+  const control = item.serviceEvidenceControl;
+  if (!control) return "";
+  if (control.ok) return control.target === "completed" ? "completion evidence passed" : "service-start evidence passed";
+  return `service blocked: ${control.blockers.slice(0, 5).join(", ")}`;
 }
 
 function renderEscortDashboard(dashboard) {
@@ -147,9 +170,9 @@ function renderEscortOrders(items) {
           <td>${escapeHtml(item.worker?.name || item.workerId || "pending")}<br><small>${escapeHtml((item.serviceItems || []).join(", "))}</small><br><small>${escapeHtml(escortDispatchControlText(item))}</small></td>
           <td>${escapeHtml(item.hospital || "")}<br><small>${escapeHtml(item.department || "")} / ${escapeHtml(item.appointmentAt || item.due || "")}</small><br><small>${statusBadge(item.hospitalInterfaceStatus || "pending")} ${escapeHtml(item.hospitalCheckInNo || item.outpatientQueueNo || item.hospitalNotice || "")}</small><br><small>${escapeHtml(item.hisVisitId || item.appointmentSource || "")} ${escapeHtml(item.departmentCode || "")} ${escapeHtml(item.doctorCode || "")}</small></td>
           <td>${statusBadge(item.subsidyType)} ${statusBadge(item.contractStatus)} ${statusBadge(item.insuranceStatus)}</td>
-          <td>${statusBadge(item.status)} ${statusBadge(item.priority)}<br><small>${escapeHtml(item.qualityReview || "")}</small></td>
+          <td>${statusBadge(item.status)} ${statusBadge(item.priority)}<br><small>${escapeHtml(item.qualityReview || "")}</small><br><small>${escapeHtml(escortServiceEvidenceText(item))}</small></td>
           <td>
-            <button class="inline-action" type="button" data-escort-action="${escapeHtml(item.id)}" data-status="in-service">开始</button>
+            <button class="inline-action" type="button" data-escort-action="${escapeHtml(item.id)}" data-status="in-service" ${item.serviceEvidenceControl?.ok ? "" : `disabled aria-disabled="true" title="${escapeHtml(escortServiceEvidenceText(item))}"`}>开始</button>
             <button class="inline-action" type="button" data-escort-action="${escapeHtml(item.id)}" data-status="quality-review">回访</button>
             <button class="inline-action" type="button" data-escort-action="${escapeHtml(item.id)}" data-status="closed">关闭</button>
           </td>
