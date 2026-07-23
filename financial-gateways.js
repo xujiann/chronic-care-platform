@@ -764,6 +764,7 @@ module.exports = {
   prepareRefundDispatch: OnlinePaymentRefunds.prepareRefundDispatch,
   reconcileRefund: OnlinePaymentRefunds.reconcileRefund,
   recordRefundDispatch: OnlinePaymentRefunds.recordRefundDispatch,
+  resubmitRejectedRefund: OnlinePaymentRefunds.resubmitRejectedRefund,
   retryRefund: OnlinePaymentRefunds.retryRefund,
   reviewRefundRequest: OnlinePaymentRefunds.reviewRefundRequest,
   signFinancialCallback,

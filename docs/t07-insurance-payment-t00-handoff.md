@@ -19,6 +19,7 @@ T00 负责公共路由、统一认证鉴权、请求体与错误响应映射、�
 | ID | 方法 | 路径或挂钩点 | T07 领域函数 | 允许角色 |
 |---|---|---|---|---|
 | refund-create | POST | `/api/online-payments/refunds` | `createRefundRequest` | institution, commission |
+| refund-resubmit | POST | `/api/online-payments/refunds/:id/resubmit` | `resubmitRejectedRefund` | institution, commission |
 | refund-review | POST | `/api/online-payments/refunds/:id/reviews` | `reviewRefundRequest` | institution, commission |
 | refund-dispatch | POST | `/api/online-payments/refunds/:id/dispatch` | `prepareRefundDispatch` → `dispatchFinancialRequest` → `recordRefundDispatch` | commission |
 | refund-retry | POST | `/api/online-payments/refunds/:id/retry` | `retryRefund` | commission |
@@ -47,10 +48,12 @@ T00 负责公共路由、统一认证鉴权、请求体与错误响应映射、�
 9. 特例复议申请必须由医疗机构角色提交并携带原决定摘要及至少一项新证据摘要；复议评审仅允许医保角色调用。公共层不得替换原决定摘要、改写账本封存的驳回时间、放宽申请窗口，或以新专家编号复用原审评审账号。
 10. 医保核心退回回调必须携带退回回执号、原因码、原因和补正要求摘要；补正重报必须引用当前退回周期并更换外部请求号和幂等键。公共层不得覆盖历史退回周期或直接把退回批次改为受理。
 11. 拨付失败必须由可信医保核心回调触发，并携带失败回执、原因码、原因和失败证据摘要；重试必须引用当前失败周期并使用新的拨付申请号。三次失败后只能进入人工处置，不得由公共层继续自动重试或伪造拨付成功。
+12. 已驳回退款补证重提必须提交当前驳回决定摘要、新的补证材料摘要、整改说明和新幂等键。领域层会保留原复核快照、重新检查当前可退余额并重置双领域复核；公共层不得覆盖原驳回历史、复用旧补证摘要或直接恢复批准状态。
+13. 所有既有退款状态迁移，包括复核、补证重提、派发、可信回调同步、失败重试、取消、对账和结案，均须先通过退款事件哈希账本校验。收到 `REFUND_LEDGER_INVALID` 后只能进入人工审计，不得重算或跳过历史事件。
 
 ## 生产证据交接
 
-`insurance-payment-production-handoff.js` 将 15 个待接项和外部阻断项转换为摘要绑定、职责分离、可验真的证据台账。T00 接线完成后，应由 `integration-owner` 提交路由测试证据，再由不同主体的 `acceptance-reviewer`、`security-reviewer` 或 `finance-auditor` 核验。
+`insurance-payment-production-handoff.js` 将 16 个待接项和外部阻断项转换为摘要绑定、职责分离、可验真的证据台账。T00 接线完成后，应由 `integration-owner` 提交路由测试证据，再由不同主体的 `acceptance-reviewer`、`security-reviewer` 或 `finance-auditor` 核验。
 
 当前仍有 9 项外部生产条件：
 

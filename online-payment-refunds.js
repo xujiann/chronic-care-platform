@@ -55,6 +55,12 @@ function positiveFen(value, label) {
   return number;
 }
 
+function normalizeSha256Digest(value, label, code) {
+  const normalized = safeText(value, 80).replace(/^sha256:/i, "").toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(normalized)) throw new RefundWorkflowError(`${label}必须为 SHA-256 摘要`, code, 400);
+  return normalized;
+}
+
 function appendEvent(row, event) {
   row.events ||= [];
   const previousHash = row.events.length ? row.events[row.events.length - 1].eventHash : "GENESIS";
@@ -69,6 +75,11 @@ function verifyRefundLedger(events = []) {
     const { eventHash, ...base } = event;
     return base.sequence === index + 1 && base.previousHash === (index ? events[index - 1].eventHash : "GENESIS") && eventHash === digest(base);
   });
+}
+
+function requireValidRefundLedger(row) {
+  if (!Array.isArray(row.events) || row.events.length === 0 || !verifyRefundLedger(row.events)) throw new RefundWorkflowError("退款事件账本校验失败", "REFUND_LEDGER_INVALID");
+  return row;
 }
 
 function timestamp(value) {
@@ -201,7 +212,10 @@ function createRefundRequest(data, input = {}, actor = {}) {
     status: REFUND_STATES.REQUESTED,
     requestedAt,
     requestedBy,
+    reviewRevision: 1,
     reviews: [],
+    reviewHistory: [],
+    resubmissions: [],
     attempts: [],
     events: [],
     productionReady: false
@@ -219,6 +233,7 @@ function findRefund(data, id) {
 
 function reviewRefundRequest(data, id, input = {}, actor = {}) {
   const row = findRefund(data, id);
+  requireValidRefundLedger(row);
   if (!["REQUESTED", "UNDER_REVIEW"].includes(row.state)) throw new RefundWorkflowError("当前状态不允许复核退款", "REFUND_REVIEW_STATE_INVALID");
   const reviewer = safeText(actor.username || actor.name || actor.role, 120);
   if (!reviewer || reviewer === row.requestedBy) throw new RefundWorkflowError("退款申请人与复核人必须分离", "REFUND_REVIEWER_SEPARATION_REQUIRED", 403);
@@ -237,13 +252,97 @@ function reviewRefundRequest(data, id, input = {}, actor = {}) {
   row.updatedAt = reviewedAt;
   row.updatedBy = reviewer;
   if (row.state === "APPROVED") row.approvedAt = reviewedAt;
-  if (row.state === "REJECTED") row.rejectedAt = reviewedAt;
-  appendEvent(row, { id: `refund-event-${randomUUID()}`, action: approved ? "approve-review" : "reject-review", from: before, to: row.state, actor: reviewer, at: reviewedAt, idempotencyKey: review.id, detail: { reviewDomain, role: review.role, opinion: review.opinion } });
+  if (row.state === "REJECTED") {
+    row.rejectedAt = reviewedAt;
+    row.rejectionDecisionDigest = digest({
+      refundId: row.id,
+      paymentEventId: row.paymentEventId,
+      refundAmountFen: row.refundAmountFen,
+      reviewRevision: row.reviewRevision || 1,
+      review: { id: review.id, reviewer: review.reviewer, reviewDomain: review.reviewDomain, approved: review.approved, opinion: review.opinion },
+      rejectedAt: reviewedAt
+    });
+  }
+  appendEvent(row, { id: `refund-event-${randomUUID()}`, action: approved ? "approve-review" : "reject-review", from: before, to: row.state, actor: reviewer, at: reviewedAt, idempotencyKey: review.id, detail: { reviewDomain, role: review.role, opinion: review.opinion, rejectionDecisionDigest: row.state === "REJECTED" ? row.rejectionDecisionDigest : "" } });
   return { row, review };
+}
+
+function resubmitRejectedRefund(data, id, input = {}, actor = {}) {
+  const row = findRefund(data, id);
+  requireValidRefundLedger(row);
+  const originalDecisionDigest = normalizeSha256Digest(input.originalDecisionDigest, "原驳回决定摘要", "REFUND_RESUBMISSION_DECISION_DIGEST_INVALID");
+  const evidenceDigest = normalizeSha256Digest(input.evidenceDigest, "补证材料摘要", "REFUND_RESUBMISSION_EVIDENCE_DIGEST_INVALID");
+  const correctionReason = safeText(input.correctionReason, 240);
+  if (!correctionReason) throw new RefundWorkflowError("退款补证重提必须填写整改说明", "REFUND_RESUBMISSION_REASON_REQUIRED", 400);
+  const idempotencyKey = safeText(input.idempotencyKey, 120);
+  if (!idempotencyKey) throw new RefundWorkflowError("退款补证重提幂等键不能为空", "REFUND_RESUBMISSION_IDEMPOTENCY_REQUIRED", 400);
+  const refundReason = safeText(input.refundReason ?? row.refundReason, 240);
+  if (!refundReason) throw new RefundWorkflowError("退款原因不能为空", "REFUND_REASON_REQUIRED", 400);
+  const reasonCode = safeText(input.reasonCode ?? row.reasonCode, 40) || "OTHER";
+  const resubmissions = Array.isArray(row.resubmissions) ? row.resubmissions : [];
+  const existing = resubmissions.find((item) => item.idempotencyKey === idempotencyKey);
+  if (existing) {
+    const same = existing.originalDecisionDigest === originalDecisionDigest
+      && existing.evidenceDigest === evidenceDigest
+      && existing.correctionReason === correctionReason
+      && existing.refundReason === refundReason
+      && existing.reasonCode === reasonCode;
+    if (!same) throw new RefundWorkflowError("退款补证重提幂等键与既有内容冲突", "REFUND_RESUBMISSION_IDEMPOTENCY_CONFLICT");
+    return { row, resubmission: existing, idempotent: true };
+  }
+  if (row.state !== "REJECTED") throw new RefundWorkflowError("只有已驳回退款可以补证重提", "REFUND_RESUBMISSION_STATE_INVALID");
+  if (originalDecisionDigest !== row.rejectionDecisionDigest) throw new RefundWorkflowError("原驳回决定摘要与当前有效决定不匹配", "REFUND_RESUBMISSION_DECISION_DIGEST_MISMATCH");
+  if (resubmissions.some((item) => item.evidenceDigest === evidenceDigest)) throw new RefundWorkflowError("退款补证重提必须使用新的材料摘要", "REFUND_RESUBMISSION_NEW_EVIDENCE_REQUIRED");
+  const payment = findOriginalPayment(data, row);
+  const reservedAmountFen = reservedRefundAmount(data, payment.id, row.id);
+  if (row.refundAmountFen > paymentEventAmountFen(payment) - reservedAmountFen) throw new RefundWorkflowError("补证重提时退款金额超过原支付交易当前可退余额", "REFUND_RESUBMISSION_AMOUNT_EXCEEDS_AVAILABLE");
+  const resubmittedBy = safeText(actor.username || actor.name || actor.role || "operator", 120);
+  const resubmittedAt = new Date().toISOString();
+  const reviewRevision = row.reviewRevision || 1;
+  const reviewSnapshot = Object.freeze({
+    reviewRevision,
+    rejectionDecisionDigest: row.rejectionDecisionDigest,
+    rejectedAt: row.rejectedAt,
+    reviews: Object.freeze(row.reviews.map((item) => Object.freeze({ ...item })))
+  });
+  const resubmission = Object.freeze({
+    id: `refund-resubmission-${randomUUID()}`,
+    fromReviewRevision: reviewRevision,
+    toReviewRevision: reviewRevision + 1,
+    originalDecisionDigest,
+    evidenceDigest,
+    correctionReason,
+    refundReason,
+    reasonCode,
+    idempotencyKey,
+    resubmittedAt,
+    resubmittedBy
+  });
+  row.reviewHistory = Array.isArray(row.reviewHistory) ? row.reviewHistory : [];
+  row.resubmissions = resubmissions;
+  row.reviewHistory.push(reviewSnapshot);
+  row.resubmissions.push(resubmission);
+  row.reviewRevision = reviewRevision + 1;
+  row.reviews = [];
+  row.refundReason = refundReason;
+  row.reasonCode = reasonCode;
+  row.availableBeforeFen = paymentEventAmountFen(payment) - reservedAmountFen;
+  row.state = "REQUESTED";
+  row.status = REFUND_STATES.REQUESTED;
+  row.requestedAt = resubmittedAt;
+  row.requestedBy = resubmittedBy;
+  row.updatedAt = resubmittedAt;
+  row.updatedBy = resubmittedBy;
+  delete row.approvedAt;
+  delete row.rejectedAt;
+  delete row.rejectionDecisionDigest;
+  appendEvent(row, { id: `refund-event-${randomUUID()}`, action: "resubmit-after-rejection", from: "REJECTED", to: "REQUESTED", actor: resubmittedBy, at: resubmittedAt, idempotencyKey, detail: { fromReviewRevision: reviewRevision, toReviewRevision: reviewRevision + 1, originalDecisionDigest, evidenceDigest, correctionReason, reasonCode } });
+  return { row, resubmission, idempotent: false };
 }
 
 function prepareRefundDispatch(data, id) {
   const row = findRefund(data, id);
+  requireValidRefundLedger(row);
   if (row.state !== "APPROVED") throw new RefundWorkflowError("退款必须完成双人复核后才能派发", "REFUND_DISPATCH_STATE_INVALID");
   const attempt = row.attempts.length + 1;
   if (attempt > 3) throw new RefundWorkflowError("退款派发已达到最大尝试次数", "REFUND_MAX_ATTEMPTS_REACHED");
@@ -258,6 +357,7 @@ function prepareRefundDispatch(data, id) {
 
 function recordRefundDispatch(data, id, receipt = {}, gatewayEventId, actor = {}) {
   const row = findRefund(data, id);
+  requireValidRefundLedger(row);
   if (row.state !== "APPROVED") throw new RefundWorkflowError("当前状态不允许登记退款派发", "REFUND_DISPATCH_STATE_INVALID");
   const receiptId = safeText(receipt.receiptId);
   if (receipt.type !== "PAYMENT" || receipt.operation !== "refund" || !receiptId) throw new RefundWorkflowError("退款网关回执无效", "REFUND_DISPATCH_RECEIPT_INVALID", 400);
@@ -281,6 +381,7 @@ function syncRefundFromFinancialCallback(data, appliedCallback = {}, actor = "fi
   if (!gatewayEvent || gatewayEvent.gatewayType !== "PAYMENT" || gatewayEvent.operation !== "refund" || callbackEvent?.signatureVerified !== true) throw new RefundWorkflowError("退款金融回调上下文无效", "REFUND_CALLBACK_CONTEXT_INVALID", 400);
   const row = refundCollection(data).find((item) => item.gatewayEventId === gatewayEvent.id && item.refundReceiptId === callbackEvent.receiptId);
   if (!row) throw new RefundWorkflowError("退款回调未匹配退款申请", "REFUND_CALLBACK_NOT_MATCHED", 404);
+  requireValidRefundLedger(row);
   const duplicate = row.events.find((item) => item.idempotencyKey === callbackEvent.eventId && item.action === "provider-callback");
   if (duplicate) return { row, event: duplicate, idempotent: true };
   if (callbackEvent.stateApplied !== true) throw new RefundWorkflowError(`退款回调未生效：${callbackEvent.ignoredReason || "unknown"}`, "REFUND_CALLBACK_NOT_APPLIED");
@@ -308,6 +409,7 @@ function syncRefundFromFinancialCallback(data, appliedCallback = {}, actor = "fi
 
 function retryRefund(data, id, input = {}, actor = {}) {
   const row = findRefund(data, id);
+  requireValidRefundLedger(row);
   if (row.state !== "FAILED") throw new RefundWorkflowError("只有失败退款可以重试", "REFUND_RETRY_STATE_INVALID");
   if (row.attempts.length >= 3) throw new RefundWorkflowError("退款派发已达到最大尝试次数", "REFUND_MAX_ATTEMPTS_REACHED");
   const resolution = safeText(input.resolution, 240);
@@ -329,6 +431,7 @@ function retryRefund(data, id, input = {}, actor = {}) {
 
 function cancelRefund(data, id, input = {}, actor = {}) {
   const row = findRefund(data, id);
+  requireValidRefundLedger(row);
   if (!new Set(["REQUESTED", "UNDER_REVIEW", "APPROVED", "FAILED"]).has(row.state)) throw new RefundWorkflowError("当前状态不允许取消退款", "REFUND_CANCEL_STATE_INVALID");
   const reason = safeText(input.reason, 240);
   if (!reason) throw new RefundWorkflowError("取消退款必须填写原因", "REFUND_CANCEL_REASON_REQUIRED", 400);
@@ -343,6 +446,7 @@ function cancelRefund(data, id, input = {}, actor = {}) {
 
 function reconcileRefund(data, id, input = {}, actor = {}) {
   const row = findRefund(data, id);
+  requireValidRefundLedger(row);
   if (row.state !== "SUCCEEDED") throw new RefundWorkflowError("只有成功退款可以完成日终对账", "REFUND_RECONCILIATION_STATE_INVALID");
   const run = (data.financialReconciliationRuns || []).find((item) => item.id === input.reconciliationRunId && item.gatewayType === "PAYMENT" && item.businessDate === row.providerBusinessDate && item.status === "matched");
   if (!run) throw new RefundWorkflowError("未找到匹配的支付日终对账批次", "REFUND_RECONCILIATION_RUN_NOT_MATCHED");
@@ -361,10 +465,10 @@ function reconcileRefund(data, id, input = {}, actor = {}) {
 
 function closeRefund(data, id, input = {}, actor = {}) {
   const row = findRefund(data, id);
+  requireValidRefundLedger(row);
   if (row.state !== "RECONCILED") throw new RefundWorkflowError("退款必须完成日终对账后才能结案", "REFUND_CLOSE_STATE_INVALID");
   const voucherNo = safeText(input.voucherNo, 120);
   if (!voucherNo) throw new RefundWorkflowError("退款结案必须关联财务凭证号", "REFUND_VOUCHER_REQUIRED", 400);
-  if (!verifyRefundLedger(row.events)) throw new RefundWorkflowError("退款事件账本校验失败", "REFUND_LEDGER_INVALID");
   const before = row.state;
   row.state = "CLOSED";
   row.status = REFUND_STATES.CLOSED;
@@ -394,9 +498,9 @@ function buildRefundOperations(data = {}, options = {}) {
       refundAmountFen: rows.filter((item) => ["SUCCEEDED", "RECONCILED", "CLOSED"].includes(item.state)).reduce((sum, item) => sum + Number(item.refundAmountFen || 0), 0)
     },
     exceptionQueue: exceptionQueue.slice(0, Number(options.limit || 100)),
-    refunds: rows.slice(0, 100).map((item) => ({ id: item.id, orderReference: item.orderReference, refundAmountFen: item.refundAmountFen, reasonCode: item.reasonCode, state: item.state, status: item.status, reviewCount: item.reviews.length, attemptCount: item.attempts.length, providerBusinessDate: item.providerBusinessDate || "", sla: buildRefundSla(item, at, options.policy), ledgerValid: verifyRefundLedger(item.events), productionReady: false })),
+    refunds: rows.slice(0, 100).map((item) => ({ id: item.id, orderReference: item.orderReference, refundAmountFen: item.refundAmountFen, reasonCode: item.reasonCode, state: item.state, status: item.status, reviewRevision: item.reviewRevision || 1, resubmissionCount: item.resubmissions?.length || 0, reviewCount: item.reviews.length, attemptCount: item.attempts.length, providerBusinessDate: item.providerBusinessDate || "", sla: buildRefundSla(item, at, options.policy), ledgerValid: verifyRefundLedger(item.events), productionReady: false })),
     boundary: "退款申请、复核、额度、可信回调和日终对账账本可运行；真实商户、支付机构回调、账单和财务凭证仍需现场验收。"
   };
 }
 
-module.exports = { REFUND_SLA_POLICY, REFUND_STATES, REQUIRED_REFUND_REVIEW_DOMAINS, RESERVED_STATES, RefundWorkflowError, buildRefundExceptionQueue, buildRefundOperations, buildRefundSla, cancelRefund, closeRefund, createRefundRequest, digest, normalizeRefundSlaPolicy, prepareRefundDispatch, reconcileRefund, recordRefundDispatch, reservedRefundAmount, retryRefund, reviewRefundRequest, stableStringify, syncRefundFromFinancialCallback, verifyRefundLedger };
+module.exports = { REFUND_SLA_POLICY, REFUND_STATES, REQUIRED_REFUND_REVIEW_DOMAINS, RESERVED_STATES, RefundWorkflowError, buildRefundExceptionQueue, buildRefundOperations, buildRefundSla, cancelRefund, closeRefund, createRefundRequest, digest, normalizeRefundSlaPolicy, prepareRefundDispatch, reconcileRefund, recordRefundDispatch, requireValidRefundLedger, reservedRefundAmount, resubmitRejectedRefund, retryRefund, reviewRefundRequest, stableStringify, syncRefundFromFinancialCallback, verifyRefundLedger };

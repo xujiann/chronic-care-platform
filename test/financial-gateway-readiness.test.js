@@ -29,6 +29,15 @@ test("financial gateway readiness detects an incomplete online refund closed loo
   assert.equal(report.capabilities.find((item) => item.id === "online-refund-closed-loop").passed, false);
 });
 
+test("financial gateway readiness requires governed rejected-refund resubmission", () => {
+  const source = fs
+    .readFileSync(path.join(ROOT, "online-payment-refunds.js"), "utf8")
+    .replaceAll("REFUND_RESUBMISSION_NEW_EVIDENCE_REQUIRED", "REMOVED_REFUND_RESUBMISSION");
+  const report = buildFinancialGatewayReadiness({ refundSource: source });
+  assert.equal(report.ok, false);
+  assert.equal(report.capabilities.find((item) => item.id === "online-refund-closed-loop").passed, false);
+});
+
 test("financial gateway readiness fails when sensitive payload protection is removed", () => {
   const source = fs.readFileSync(path.join(ROOT, "financial-gateways.js"), "utf8").replaceAll("FORBIDDEN_PAYLOAD_KEYS", "REMOVED_PAYLOAD_GUARD");
   const report = buildFinancialGatewayReadiness({ adapterSource: source });

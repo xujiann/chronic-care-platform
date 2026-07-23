@@ -7,7 +7,7 @@ const RESPONSIBILITY_MATRIX = Object.freeze([
   Object.freeze({ capability: "special-case-negotiation", accountable: "insurance-bureau", responsible: ["hospital-medical-insurance-office", "medical-insurance-review", "fund-finance-review"], consulted: ["clinical-expert-pool"], evidence: ["evidence-digests", "avoidance-record", "dual-review", "decision-digest", "appeal-original-decision-digest", "fresh-appeal-panel", "appeal-sla"] }),
   Object.freeze({ capability: "monthly-settlement", accountable: "insurance-settlement-center", responsible: ["insurance-settlement-operator", "hospital-finance"], consulted: ["fund-finance"], evidence: ["frozen-batch-digest", "core-receipt", "core-return-requirement-digest", "correction-sla", "resubmission-identity", "reconciliation-digest", "difference-evidence-digest", "dual-domain-review", "payment-failure-evidence-digest", "payment-retry-identity", "payment-receipt", "sla-status"] }),
   Object.freeze({ capability: "annual-clearance", accountable: "insurance-bureau", responsible: ["insurance-settlement-center", "hospital-finance", "fund-finance"], consulted: ["insurance-payment-policy"], evidence: ["clearance-digest", "per-institution-confirmation", "institution-dispute-digest", "aggregate-confirmation-digest", "adjustment-approval", "finance-voucher", "lock-reference"] }),
-  Object.freeze({ capability: "online-payment-refund", accountable: "hospital-finance", responsible: ["cashier", "business-reviewer", "finance-reviewer", "payment-gateway-adapter"], consulted: ["payment-provider"], evidence: ["original-payment-receipt", "dual-review", "signed-provider-callback", "phase-sla", "redacted-exception-queue", "daily-reconciliation", "finance-voucher"] })
+  Object.freeze({ capability: "online-payment-refund", accountable: "hospital-finance", responsible: ["cashier", "business-reviewer", "finance-reviewer", "payment-gateway-adapter"], consulted: ["payment-provider"], evidence: ["original-payment-receipt", "dual-review", "rejection-decision-digest", "fresh-correction-evidence-digest", "immutable-review-history", "signed-provider-callback", "phase-sla", "redacted-exception-queue", "daily-reconciliation", "finance-voucher"] })
 ]);
 
 const ACTION_RULES = Object.freeze({
@@ -23,6 +23,7 @@ const ACTION_RULES = Object.freeze({
   "annual-clearance.approve": Object.freeze({ roles: ["insurance"], organizations: ["insurance_bureau"] }),
   "annual-clearance.post": Object.freeze({ roles: ["finance"], organizations: ["fund_finance"] }),
   "refund.request": Object.freeze({ roles: ["institution", "commission"], organizations: ["medical_institution", "platform"] }),
+  "refund.resubmit": Object.freeze({ roles: ["institution", "commission"], organizations: ["medical_institution", "platform"] }),
   "refund.review": Object.freeze({ roles: ["institution", "finance"], organizations: ["medical_institution", "hospital_finance"] }),
   "refund.provider-callback": Object.freeze({ roles: ["system"], organizations: ["payment_gateway_adapter"] }),
   "refund.reconcile-close": Object.freeze({ roles: ["finance"], organizations: ["hospital_finance"] })
@@ -30,6 +31,7 @@ const ACTION_RULES = Object.freeze({
 
 const T00_ROUTE_CONTRACTS = Object.freeze([
   Object.freeze({ id: "refund-create", method: "POST", path: "/api/online-payments/refunds", handler: "createRefundRequest", roles: ["institution", "commission"] }),
+  Object.freeze({ id: "refund-resubmit", method: "POST", path: "/api/online-payments/refunds/:id/resubmit", handler: "resubmitRejectedRefund", roles: ["institution", "commission"] }),
   Object.freeze({ id: "refund-review", method: "POST", path: "/api/online-payments/refunds/:id/reviews", handler: "reviewRefundRequest", roles: ["institution", "commission"] }),
   Object.freeze({ id: "refund-dispatch", method: "POST", path: "/api/online-payments/refunds/:id/dispatch", handlers: ["prepareRefundDispatch", "dispatchFinancialRequest", "recordRefundDispatch"], roles: ["commission"] }),
   Object.freeze({ id: "refund-retry", method: "POST", path: "/api/online-payments/refunds/:id/retry", handler: "retryRefund", roles: ["commission"] }),
