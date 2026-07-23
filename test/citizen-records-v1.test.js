@@ -67,6 +67,28 @@ test("resident record projection is resident-scoped", () => {
   assert.deepEqual(projectResidentRecords(records, "r1").map((item) => item.id), ["r1-emr"]);
 });
 
+test("authorization projection keeps resident-readable receipts and strips audit internals", () => {
+  const projected = projectRecord({
+    id: "auth-receipt-r1",
+    residentId: "r1",
+    category: "authorizations",
+    name: "医院A",
+    receiptId: "receipt-current",
+    auditRef: "audit-current",
+    creationReceiptId: "receipt-create",
+    creationAuditRef: "audit-create",
+    revocationReceiptId: "receipt-revoke",
+    revocationAuditRef: "audit-revoke",
+    auditHash: "must-not-leave",
+    auditPayload: { actor: "must-not-leave" }
+  });
+  assert.equal(projected.receiptId, "receipt-current");
+  assert.equal(projected.auditRef, "audit-current");
+  assert.equal(projected.creationReceiptId, "receipt-create");
+  assert.equal(projected.revocationAuditRef, "audit-revoke");
+  assert.doesNotMatch(JSON.stringify(projected), /auditHash|auditPayload|must-not-leave/);
+});
+
 test("image cloud studies become minimized resident report records without storage internals", () => {
   const mapped = imagingStudyToRecord({
     id: "study-r1-ct",

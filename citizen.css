@@ -4111,6 +4111,24 @@ dialog::backdrop {
   margin: 0 0 4px;
 }
 
+.citizen-authorization-receipts {
+  display: grid;
+  gap: 9px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.citizen-authorization-receipts h4 {
+  margin: 0;
+  color: #145b4f;
+}
+
+.citizen-authorization-receipts > small {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
 .citizen-care-card header small,
 .citizen-care-row small {
   color: var(--muted);
@@ -4124,10 +4142,13 @@ dialog::backdrop {
 .citizen-care-row {
   display: grid;
   gap: 5px;
+  min-width: 0;
+  max-width: 100%;
   padding: 10px 11px;
   border-left: 4px solid #2a7f73;
   border-radius: 9px;
   background: #f4f9f7;
+  overflow-wrap: anywhere;
 }
 
 .citizen-care-row.warning {
@@ -4152,6 +4173,7 @@ dialog::backdrop {
   flex-wrap: wrap;
   align-items: center;
   gap: 7px;
+  min-width: 0;
 }
 
 .citizen-care-row p {

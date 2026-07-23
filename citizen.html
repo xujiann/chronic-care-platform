@@ -12,7 +12,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="format-detection" content="telephone=no" />
     <link rel="apple-touch-icon" href="./pwa-icon.svg" />
-    <link rel="stylesheet" href="./citizen.css?v=20260723care7" />
+    <link rel="stylesheet" href="./citizen.css?v=20260724care8" />
     <script src="./auth.js?v=20260627"></script>
     <script>window.HealthCityAuth.requireRole(["citizen"])</script>
   </head>
@@ -412,6 +412,12 @@
             <header><div><h3>授权生命周期与到期提醒</h3><small>续授权必须重新选择有效期并再次确认，不会静默延长原授权</small></div></header>
             <div id="citizen-authorization-lifecycle-summary" class="citizen-care-list"></div>
             <div id="citizen-authorization-lifecycle-list" class="citizen-care-list"></div>
+            <section class="citizen-authorization-receipts" aria-labelledby="citizen-authorization-receipts-title">
+              <h4 id="citizen-authorization-receipts-title">授权操作回执核验</h4>
+              <small>创建和撤销均须同时具备受理编号与审计关联号；缺失证据的历史记录不得视为已完成在线闭环。</small>
+              <div id="citizen-authorization-receipt-summary" class="citizen-care-list" aria-live="polite"></div>
+              <div id="citizen-authorization-receipt-list" class="citizen-care-list"></div>
+            </section>
           </article>
 
           <article class="citizen-care-card wide">
@@ -839,9 +845,9 @@
     <script src="./physical-examination-highlights.js"></script>
     <script src="./physical-examination-service.js"></script>
     <script src="./immunization-schedule.js"></script>
-    <script src="./citizen-records-v1.js?v=20260723auth2"></script>
-    <script src="./citizen-records-v2.js?v=20260723care10"></script>
-    <script src="./citizen.js?v=20260723care10"></script>
+    <script src="./citizen-records-v1.js?v=20260724auth3"></script>
+    <script src="./citizen-records-v2.js?v=20260724care11"></script>
+    <script src="./citizen.js?v=20260724care11"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));

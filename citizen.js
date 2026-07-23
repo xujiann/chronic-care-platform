@@ -2780,6 +2780,18 @@ function renderCitizenCareWorkspace(resident, diseases = []) {
     ${item.renewEligible ? `<footer><button type="button" class="small-button" data-renew-authorization="${escapeHtml(item.id)}">准备续授权</button></footer>` : ""}
   </div>`).join("") || citizenCareEmpty("暂无授权记录。");
 
+  const authorizationReceipts = api.buildAuthorizationReceiptLedger(records, resident.id);
+  document.querySelector("#citizen-authorization-receipt-summary").innerHTML = `<div class="citizen-care-row ${authorizationReceipts.incomplete ? "warning" : ""}">
+    <div><strong>${authorizationReceipts.verified}/${authorizationReceipts.total} 条操作证据完整</strong><span>${authorizationReceipts.incomplete} 条待补回执</span><em>${authorizationReceipts.revoked} 条已撤销</em></div>
+    <p>只有受理编号和审计关联号同时存在，居民端才将本次授权写操作标记为已核验。</p>
+  </div>`;
+  document.querySelector("#citizen-authorization-receipt-list").innerHTML = authorizationReceipts.items.slice(0, 12).map((item) => `<div class="citizen-care-row ${item.verified ? "" : "warning"}">
+    <div><strong>${escapeHtml(item.granteeName || "授权对象待核验")}</strong><span>${item.verified ? "回执已核验" : "回执待补录"}</span><em>${escapeHtml(item.lifecycleLabel)}</em></div>
+    <p>创建：${item.creation.verified ? `受理 ${escapeHtml(item.creation.receiptId)} · 审计 ${escapeHtml(item.creation.auditRef)}` : "缺少受理编号或审计关联号"}</p>
+    ${item.revocation.required ? `<p>撤销：${item.revocation.verified ? `受理 ${escapeHtml(item.revocation.receiptId)} · 审计 ${escapeHtml(item.revocation.auditRef)}` : "缺少受理编号或审计关联号"}</p>` : ""}
+    <small>${item.issues.length ? escapeHtml(item.issues.join("；")) : "授权操作证据链完整，可供居民复核。"}</small>
+  </div>`).join("") || citizenCareEmpty("暂无可核验的授权操作回执。");
+
   const accessQueue = citizenAccessReviewQueue(resident.id);
   const acknowledged = new Set(careState.accessAcknowledgements.map((item) => item.accessLogId));
   const disputed = new Set(careState.accessDisputes.filter((item) => !["resolved", "rejected", "withdrawn"].includes(item.status)).map((item) => item.accessLogId));

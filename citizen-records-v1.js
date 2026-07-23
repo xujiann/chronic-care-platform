@@ -135,6 +135,16 @@
       createdAt: cleanText(record.createdAt, 60),
       updatedAt: cleanText(record.updatedAt || record.createdAt, 60),
       createdBy: cleanText(record.createdBy, 120),
+      receiptId: cleanText(record.receiptId || record.requestId, 160),
+      auditRef: cleanText(record.auditRef || record.auditReference || record.auditId, 160),
+      acceptedAt: cleanText(record.acceptedAt, 60),
+      syncStatus: cleanText(record.syncStatus, 40),
+      creationReceiptId: cleanText(record.creationReceiptId, 160),
+      creationAuditRef: cleanText(record.creationAuditRef, 160),
+      creationAcceptedAt: cleanText(record.creationAcceptedAt, 60),
+      revocationReceiptId: cleanText(record.revocationReceiptId, 160),
+      revocationAuditRef: cleanText(record.revocationAuditRef, 160),
+      revocationAcceptedAt: cleanText(record.revocationAcceptedAt, 60),
       meta: safeMeta(record.meta)
     };
   }
