@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-23T06:58:33.573Z",
+  "updatedAt": "2026-07-23T06:59:43.077Z",
   "decisions": [
     {
       "lineId": "T01",
@@ -90,15 +90,16 @@
     },
     {
       "lineId": "T04",
-      "candidateHead": "8dec0b977449a18dd373ce26e4e841e9a5b9460b",
+      "candidateHead": "83a363d3188dde9eaf8d70bc59bc5f8ceab35c35",
       "decision": "accepted",
-      "reviewedAt": "2026-07-23T06:09:40.000Z",
+      "reviewedAt": "2026-07-23T06:59:43.077Z",
       "reviewer": "T00",
       "checks": [
         "git diff --check",
-        "109 citizen record projection, policy, continuous-care, static and security tests passed independently",
+        "113 citizen record projection, policy, storage-minimization, static and security tests passed independently",
         "controlled credentials require one-time HTTPS, five-minute expiry, matching resource and audit evidence",
-        "server responses cannot widen authorization scope, extend expiry or overwrite resident correction security fields"
+        "server responses cannot widen authorization scope, extend expiry or overwrite resident correction security fields",
+        "production care workspace state stays out of localStorage and restores through resident-scoped secret-free synchronization"
       ],
       "blockers": []
     },
