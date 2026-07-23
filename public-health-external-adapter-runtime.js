@@ -21,6 +21,9 @@ const {
   reservePublicHealthExternalLaneCapacityToState,
   verifyPublicHealthExternalLaneControlAuditChain
 } = require("./public-health-external-resilience-service");
+const {
+  authorizePublicHealthExternalContract
+} = require("./public-health-external-contract-governance-service");
 
 const EXTERNAL_AUDIT_SCHEMA_VERSION = "public-health-external-audit/v1";
 
@@ -94,6 +97,23 @@ function resiliencePolicyFor(credentials = {}, laneId) {
     return credentials.resiliencePolicies[laneId] || null;
   }
   return credentials.resiliencePolicy || null;
+}
+
+function assertDispatchContractGovernance(dispatch, governance) {
+  if (!governance) return { ok: true, reason: "governance-not-configured" };
+  const lane = governance.entries?.find((item) => item.laneId === dispatch.laneId);
+  const contract = lane?.contracts?.find((item) => item.contract === dispatch.contract);
+  const authorization = authorizePublicHealthExternalContract(
+    governance,
+    dispatch.laneId,
+    dispatch.contract,
+    dispatch.request?.schemaVersion,
+    dispatch.receipt?.schemaVersion || contract?.receiptSchemaVersion || ""
+  );
+  if (!authorization.ok) {
+    throw new Error(`public health external contract rejected: ${authorization.reason}`);
+  }
+  return authorization;
 }
 
 function signRuntimeState(dispatch, key) {
@@ -349,6 +369,7 @@ function claimPublicHealthExternalDispatchToState(data = {}, dispatchId, input =
       productionReady: false
     };
   }
+  const contractAuthorization = assertDispatchContractGovernance(current, credentials.contractGovernance);
   if (input.expectedVersion === undefined || Number(input.expectedVersion) !== Number(current.outboxVersion)) {
     throw new Error(`external dispatch version conflict: expected ${input.expectedVersion ?? "missing"}, current ${current.outboxVersion}`);
   }
@@ -408,6 +429,7 @@ function claimPublicHealthExternalDispatchToState(data = {}, dispatchId, input =
     idempotent: false,
     leaseToken,
     laneControl: laneReservation?.control || null,
+    contractAuthorization,
     dispatch: clone(updated),
     nextData,
     externalRuntime: buildPublicHealthExternalAdapterRuntime(nextData),
@@ -474,8 +496,13 @@ function enqueuePublicHealthExternalDispatchToState(
   const compensation = requireCompensation(input);
   const signingMaterial = requestSigningMaterial(credentials);
   const dispatchAt = clean(input.at || new Date().toISOString());
+  const createdDispatch = createPublicHealthExternalDispatch(handoff, input, credentials);
+  const contractAuthorization = assertDispatchContractGovernance(
+    createdDispatch,
+    credentials.contractGovernance
+  );
   const initialDispatch = withRuntimeStateSignature({
-    ...createPublicHealthExternalDispatch(handoff, input, credentials),
+    ...createdDispatch,
     compensation,
     outboxVersion: 1,
     auditHead: ""
@@ -503,6 +530,7 @@ function enqueuePublicHealthExternalDispatchToState(
   return {
     ok: true,
     idempotent: false,
+    contractAuthorization,
     dispatch: clone(dispatch),
     nextData,
     externalRuntime: buildPublicHealthExternalAdapterRuntime(nextData),

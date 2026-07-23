@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const data = require("../data/db.json");
@@ -35,6 +36,11 @@ const {
   reservePublicHealthExternalLaneCapacityToState,
   verifyPublicHealthExternalLaneControlAuditChain
 } = require("../public-health-external-resilience-service");
+const {
+  authorizePublicHealthExternalContract,
+  buildPublicHealthExternalContractGovernance,
+  signPublicHealthExternalContractAttestation
+} = require("../public-health-external-contract-governance-service");
 const { buildPublicHealthSystem } = require("./public-health-readiness");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -323,6 +329,57 @@ function runExternalResilienceAcceptance() {
   return { policy, reserved, failed, probe, recovered };
 }
 
+function runExternalContractGovernanceAcceptance() {
+  const digest = (value) => crypto.createHash("sha256").update(value).digest("hex");
+  const attestation = signPublicHealthExternalContractAttestation({
+    laneId: "family-doctor",
+    fromContract: "family-doctor-fulfillment-v1",
+    toContract: "family-doctor-fulfillment-v2",
+    requestSchemaVersion: "public-health-external-dispatch/v2",
+    receiptSchemaVersion: "public-health-external-receipt/v2",
+    changeType: "additive",
+    fieldDictionaryDigest: digest("final-family-doctor-fields-v2"),
+    sampleRequestDigest: digest("final-family-doctor-request-v2"),
+    sampleReceiptDigest: digest("final-family-doctor-receipt-v2"),
+    runtimeReleaseDigest: digest("final-family-doctor-runtime-v2"),
+    producerApproval: {
+      organizationId: "family-doctor-platform",
+      role: "producer-contract-owner",
+      approverIdHash: digest("final-family-doctor-producer"),
+      approvedAt: "2026-07-22T08:00:00.000Z"
+    },
+    consumerApproval: {
+      organizationId: "district-health-platform",
+      role: "consumer-contract-owner",
+      approverIdHash: digest("final-family-doctor-consumer"),
+      approvedAt: "2026-07-22T09:00:00.000Z"
+    },
+    evidenceRefs: ["field-dictionary-v2", "producer-approval", "consumer-approval"],
+    effectiveAt: "2026-07-25T00:00:00.000Z",
+    sunsetAt: "2026-08-15T00:00:00.000Z",
+    status: "approved",
+    issuedAt: "2026-07-23T08:00:00.000Z",
+    expiresAt: "2026-09-01T00:00:00.000Z",
+    nonce: "final-family-doctor-contract-v2"
+  }, ACCEPTANCE_REQUEST_SECRET);
+  const scheduled = buildPublicHealthExternalContractGovernance({
+    attestations: [attestation],
+    signingMaterial: ACCEPTANCE_REQUEST_SECRET,
+    at: "2026-07-24T00:00:00.000Z"
+  });
+  const active = buildPublicHealthExternalContractGovernance({
+    attestations: [attestation],
+    signingMaterial: ACCEPTANCE_REQUEST_SECRET,
+    at: "2026-07-25T00:00:00.000Z"
+  });
+  const retired = buildPublicHealthExternalContractGovernance({
+    attestations: [attestation],
+    signingMaterial: ACCEPTANCE_REQUEST_SECRET,
+    at: "2026-08-15T00:00:00.000Z"
+  });
+  return { attestation, scheduled, active, retired };
+}
+
 function buildPublicHealthFinalReadiness(options = {}) {
   const sourceData = options.data || data;
   const system = options.system || buildPublicHealthSystem({ ...options, data: sourceData });
@@ -338,6 +395,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
   const outboxAcceptance = runExternalOutboxAcceptance(sourceData, system);
   const recoveryAcceptance = runDeadLetterRecoveryAcceptance(sourceData, system);
   const resilienceAcceptance = runExternalResilienceAcceptance();
+  const contractAcceptance = runExternalContractGovernanceAcceptance();
   const recoveryCoordination = buildPublicHealthCoordinationRuntime({
     data: recoveryAcceptance.recovered.nextData,
     eventReporting: system.infectiousEventReporting,
@@ -368,10 +426,12 @@ function buildPublicHealthFinalReadiness(options = {}) {
   const serverSource = options.serverSource ?? fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
   const packageSource = options.packageSource ?? fs.readFileSync(path.join(ROOT, "package.json"), "utf8");
   const resilienceSource = options.resilienceSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-resilience-service.js"), "utf8");
+  const contractSource = options.contractSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-contract-governance-service.js"), "utf8");
   const pageSource = options.pageSource ?? fs.readFileSync(path.join(ROOT, "public-health.js"), "utf8");
   const doc = options.doc ?? fs.readFileSync(path.join(ROOT, "docs", "public-health-eight-domain-coordination.md"), "utf8");
   const keyringDoc = options.keyringDoc ?? fs.readFileSync(path.join(ROOT, "docs", "public-health-external-key-rotation.md"), "utf8");
   const resilienceDoc = options.resilienceDoc ?? fs.readFileSync(path.join(ROOT, "docs", "public-health-external-resilience.md"), "utf8");
+  const contractDoc = options.contractDoc ?? fs.readFileSync(path.join(ROOT, "docs", "public-health-external-contract-governance.md"), "utf8");
   const serializedDeliveries = JSON.stringify(deliveries);
   const managedKeyringSummary = summarizeKeyring({
     purpose: "t08-readiness-request",
@@ -400,6 +460,8 @@ function buildPublicHealthFinalReadiness(options = {}) {
     check("adapter:callback-anti-replay", ["receipt-issued-in-future", "receipt-expired", "receiptReplayKeyHash", "receipt replay detected"].every((token) => `${adapterSource}\n${adapterRuntimeSource}`.includes(token)), "signed callbacks bind key, issue/expiry time and nonce; stale, future and replayed callbacks fail closed", "adapter"),
     check("resilience:signed-circuit-recovery", resilienceAcceptance.failed.control.circuitState === "open" && resilienceAcceptance.probe.control.circuitState === "half-open" && resilienceAcceptance.recovered.control.circuitState === "closed" && verifyPublicHealthExternalLaneControlAuditChain(resilienceAcceptance.recovered.nextData, "family-doctor", ACCEPTANCE_REQUEST_SECRET).entries === 4, "signed failure, open gate, half-open probe and recovery form a four-entry lane-control audit chain", "resilience"),
     check("resilience:runtime-enforcement", ["assertPublicHealthExternalBackpressure", "reservePublicHealthExternalLaneCapacityToState", "recordPublicHealthExternalLaneOutcomeToState", "expectedLaneControlVersion"].every((token) => adapterRuntimeSource.includes(token)) && ["rateLimitPerMinute", "maxPending", "halfOpenMaxProbes", "lane-control-signature-invalid"].every((token) => resilienceSource.includes(token)), "enqueue backpressure, claim rate/circuit admission and claimed-attempt outcomes use signed CAS controls", "resilience"),
+    check("contract:signed-version-lifecycle", contractAcceptance.scheduled.summary.scheduled === 1 && contractAcceptance.active.summary.deprecated === 1 && contractAcceptance.retired.summary.retired === 1 && authorizePublicHealthExternalContract(contractAcceptance.retired, "family-doctor", "family-doctor-fulfillment-v1", "public-health-external-dispatch/v1", "public-health-external-receipt/v1").reason === "contract-version-retired", "signed dual approval advances scheduled, active/deprecated and retired contract states", "contract"),
+    check("contract:trust-and-drift-boundary", ["producer-contract-owner", "consumer-contract-owner", "runtimeReleaseDigest", "contract-transition-conflict", "contract-attestation-signature-invalid"].every((token) => contractSource.includes(token)) && ["assertDispatchContractGovernance", "contractGovernance"].every((token) => adapterRuntimeSource.includes(token)) && ["contract-governance-mismatch", "contract-version-deprecated"].every((token) => operationsSource.includes(token)), "dual approvals, release/sample digests, conflicts, runtime admission, tampering and operations drift fail closed", "contract"),
     check("outbox:persisted-enqueue-attempt", outboxAcceptance.delivered.externalRuntime.summary.dispatches === 1 && outboxAcceptance.delivered.externalRuntime.summary.auditEntries === 3, "one signed dispatch and three append-only enqueue/claim/attempt audit entries", "outbox"),
     check("outbox:coordination-advance", outboxAcceptance.delivered.dispatch.deliveryState === "delivered" && outboxAcceptance.handoff.state === "receipt-confirmed", "verified callback advances the linked coordination handoff", "outbox"),
     check("outbox:runtime-state-signature", verifyRuntimeStateSignature(outboxAcceptance.delivered.dispatch, ACCEPTANCE_REQUEST_SECRET), "mutable outbox state retains a trusted runtime signature", "outbox"),
@@ -415,7 +477,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
     check("operations:healthy-reconciliation", operationsBoard.ok === true && operationsBoard.operationallyHealthy === true && operationsBoard.summary.signatureVerified === 2 && operationsBoard.summary.issues === 0, "recovered predecessor, successor, signatures, audit and coordination states reconcile", "operations"),
     check("operations:risk-queue-contract", ["audit-dispatch-missing", "coordination-handoff-missing", "coordination-state-mismatch", "worker-lease-expired", "retry-due-unclaimed", "pending-dispatch-overdue", "dead-letter-unrecovered", "lane-control-audit-orphan", "lane-control-integrity-invalid", "lane-circuit-open"].every((token) => operationsSource.includes(token)), "integrity, orphan audit/task/control, mismatch, lease, retry, SLA, dead-letter and lane resilience risks have explicit codes", "operations"),
     check("frontend:action-route-contract", pageSource.includes("/api/public-health/coordination/") && pageSource.includes("idempotencyKey") && pageSource.includes("expectedVersion"), "T00 route boundary has a stable client contract", "integration"),
-    check("integration:documented-boundary", ["public-health-coordination-runtime.js", "public-health-external-adapter-service.js", "T00", "server.js", "productionReady"].every((token) => doc.includes(token)) && ["requestKeyring", "receiptKeyring", "receiptReplayKeyHash", "legacy-static"].every((token) => keyringDoc.includes(token)) && ["expectedLaneControlVersion", "maxPending", "lane-circuit-open"].every((token) => resilienceDoc.includes(token)), "runtime, adapter, key lifecycle, resilience and T00 boundaries are documented", "integration"),
+    check("integration:documented-boundary", ["public-health-coordination-runtime.js", "public-health-external-adapter-service.js", "T00", "server.js", "productionReady"].every((token) => doc.includes(token)) && ["requestKeyring", "receiptKeyring", "receiptReplayKeyHash", "legacy-static"].every((token) => keyringDoc.includes(token)) && ["expectedLaneControlVersion", "maxPending", "lane-circuit-open"].every((token) => resilienceDoc.includes(token)) && ["runtimeReleaseDigest", "contract-transition-conflict", "contract-governance-mismatch"].every((token) => contractDoc.includes(token)), "runtime, adapter, key lifecycle, resilience, contract governance and T00 boundaries are documented", "integration"),
     check("integration:t00-public-routes", [
       "/api/public-health/coordination-runtime",
       "publicHealthExternalEnqueueMatch",
@@ -456,7 +518,8 @@ function buildPublicHealthFinalReadiness(options = {}) {
       recoverySuccessors: recoveryAcceptance.recovered.externalRuntime.summary.recoverySuccessors,
       operationsIssues: operationsBoard.summary.issues,
       operationsSignatureVerified: operationsBoard.summary.signatureVerified,
-      resilienceAuditEntries: resilienceAcceptance.recovered.nextData.publicHealthExternalLaneControlAudit.length
+      resilienceAuditEntries: resilienceAcceptance.recovered.nextData.publicHealthExternalLaneControlAudit.length,
+      verifiedContractAttestations: contractAcceptance.active.summary.verifiedAttestations
     },
     checks,
     runtime: {
@@ -487,6 +550,12 @@ function buildPublicHealthFinalReadiness(options = {}) {
       recovered: resilienceAcceptance.recovered.control,
       productionReady: false
     },
+    contractGovernanceAcceptance: {
+      scheduled: contractAcceptance.scheduled.summary,
+      active: contractAcceptance.active.summary,
+      retired: contractAcceptance.retired.summary,
+      productionReady: false
+    },
     productionReady: false,
     artifacts: {
       coordinationService: "public-health-coordination-service.js",
@@ -497,13 +566,16 @@ function buildPublicHealthFinalReadiness(options = {}) {
       externalKeyProvider: "public-health-external-key-provider.js",
       externalWorker: "public-health-external-worker.js",
       externalResilience: "public-health-external-resilience-service.js",
+      externalContractGovernance: "public-health-external-contract-governance-service.js",
       externalOperations: "public-health-external-operations-service.js",
       documentation: "docs/public-health-eight-domain-coordination.md",
       keyRotationDocumentation: "docs/public-health-external-key-rotation.md",
-      resilienceDocumentation: "docs/public-health-external-resilience.md"
+      resilienceDocumentation: "docs/public-health-external-resilience.md",
+      contractGovernanceDocumentation: "docs/public-health-external-contract-governance.md"
     },
     remainingT00Integration: [
-      "Production remains blocked until the real managed key service, HTTPS endpoints, worker identity, externally approved per-lane resilience policies, load evidence, cross-key audit/callback smoke, trusted site evidence and formal operations acceptance are available."
+      "Wire signed contract governance and release-evidence validation into the existing T00 public routes and durable data writer.",
+      "Production remains blocked until the real managed key service, HTTPS endpoints, worker identity, externally approved per-lane resilience policies, contract migration evidence, load evidence, cross-key audit/callback smoke, trusted site evidence and formal operations acceptance are available."
     ]
   };
 }
@@ -568,6 +640,7 @@ module.exports = {
   runExternalAdapterAcceptance,
   runExternalOutboxAcceptance,
   runExternalResilienceAcceptance,
+  runExternalContractGovernanceAcceptance,
   runDeadLetterRecoveryAcceptance,
   runRuntimeAcceptance,
   writeOutput

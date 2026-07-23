@@ -1,5 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
 const sourceData = require("../data/db.json");
 const { buildPublicHealthCoordinationRuntime } = require("../public-health-coordination-runtime");
 const {
@@ -13,6 +14,10 @@ const {
   recordPublicHealthExternalLaneOutcomeToState,
   reservePublicHealthExternalLaneCapacityToState
 } = require("../public-health-external-resilience-service");
+const {
+  buildPublicHealthExternalContractGovernance,
+  signPublicHealthExternalContractAttestation
+} = require("../public-health-external-contract-governance-service");
 const { buildPublicHealthSystem } = require("../scripts/public-health-readiness");
 const {
   runDeadLetterRecoveryAcceptance,
@@ -45,6 +50,44 @@ function board(data, dependencies, options = {}) {
     now: "2026-07-23T09:31:00.000Z",
     ...options
   });
+}
+
+function contractDigest(value) {
+  return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+function familyDoctorContractAttestation() {
+  return signPublicHealthExternalContractAttestation({
+    laneId: "family-doctor",
+    fromContract: "family-doctor-fulfillment-v1",
+    toContract: "family-doctor-fulfillment-v2",
+    requestSchemaVersion: "public-health-external-dispatch/v2",
+    receiptSchemaVersion: "public-health-external-receipt/v2",
+    changeType: "additive",
+    fieldDictionaryDigest: contractDigest("family-doctor-fields-v2"),
+    sampleRequestDigest: contractDigest("family-doctor-request-v2"),
+    sampleReceiptDigest: contractDigest("family-doctor-receipt-v2"),
+    runtimeReleaseDigest: contractDigest("family-doctor-runtime-v2"),
+    producerApproval: {
+      organizationId: "family-doctor-platform",
+      role: "producer-contract-owner",
+      approverIdHash: contractDigest("family-doctor-producer"),
+      approvedAt: "2026-07-22T08:00:00.000Z"
+    },
+    consumerApproval: {
+      organizationId: "district-health-platform",
+      role: "consumer-contract-owner",
+      approverIdHash: contractDigest("district-consumer"),
+      approvedAt: "2026-07-22T09:00:00.000Z"
+    },
+    evidenceRefs: ["field-dictionary-v2", "producer-approval", "consumer-approval"],
+    effectiveAt: "2026-07-25T00:00:00.000Z",
+    sunsetAt: "2026-08-15T00:00:00.000Z",
+    status: "approved",
+    issuedAt: "2026-07-23T08:00:00.000Z",
+    expiresAt: "2026-09-01T00:00:00.000Z",
+    nonce: "family-doctor-contract-operations-v2"
+  }, REQUEST_SECRET);
 }
 
 test("external operations board verifies delivered and recovered outbox chains", () => {
@@ -277,4 +320,48 @@ test("external operations board exposes open circuits and blocks resilience tamp
   assert.equal(orphanBoard.ok, false);
   assert.equal(orphanBoard.summary.orphanLaneControlAuditEntries, 2);
   assert.equal(orphanBoard.issues.some((item) => item.code === "lane-control-audit-orphan"), true);
+});
+
+test("external operations board warns during contract deprecation and blocks retired versions", () => {
+  const scenario = buildScenario();
+  const accepted = runExternalOutboxAcceptance(scenario.data, scenario.system);
+  const attestation = familyDoctorContractAttestation();
+  const scheduledGovernance = buildPublicHealthExternalContractGovernance({
+    attestations: [attestation],
+    signingMaterial: REQUEST_SECRET,
+    at: "2026-07-24T00:00:00.000Z"
+  });
+  const scheduledBoard = board(accepted.delivered.nextData, scenario.dependencies, {
+    now: "2026-07-24T00:00:00.000Z",
+    contractGovernance: scheduledGovernance
+  });
+  assert.equal(scheduledBoard.ok, true);
+  assert.equal(scheduledBoard.summary.deprecatedContracts, 0);
+
+  const activeGovernance = buildPublicHealthExternalContractGovernance({
+    attestations: [attestation],
+    signingMaterial: REQUEST_SECRET,
+    at: "2026-07-25T00:00:00.000Z"
+  });
+  const deprecatedBoard = board(accepted.delivered.nextData, scenario.dependencies, {
+    now: "2026-07-25T00:00:00.000Z",
+    contractGovernance: activeGovernance
+  });
+  assert.equal(deprecatedBoard.ok, true);
+  assert.equal(deprecatedBoard.operationallyHealthy, false);
+  assert.equal(deprecatedBoard.summary.deprecatedContracts, 1);
+  assert.equal(deprecatedBoard.issues.some((item) => item.code === "contract-version-deprecated"), true);
+
+  const retiredGovernance = buildPublicHealthExternalContractGovernance({
+    attestations: [attestation],
+    signingMaterial: REQUEST_SECRET,
+    at: "2026-08-15T00:00:00.000Z"
+  });
+  const retiredBoard = board(accepted.delivered.nextData, scenario.dependencies, {
+    now: "2026-08-15T00:00:00.000Z",
+    contractGovernance: retiredGovernance
+  });
+  assert.equal(retiredBoard.ok, false);
+  assert.equal(retiredBoard.summary.contractMismatches, 1);
+  assert.equal(retiredBoard.issues.some((item) => item.code === "contract-governance-mismatch"), true);
 });
