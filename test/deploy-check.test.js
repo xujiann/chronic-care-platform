@@ -218,6 +218,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "manifest:registrationIntegrationReadiness",
     "manifest:internetNursingReadiness",
     "manifest:internetNursingHighlightCenter",
+    "manifest:t10SpecialtyCutover",
     "manifest:platformProductionAudit",
     "manifest:platformCapabilityMap",
     "manifest:platformGoLiveSlices",

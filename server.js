@@ -23664,7 +23664,7 @@ async function handleApi(req, res) {
     return;
   }
 
-  if (req.method === "GET" && url.pathname === "/api/t10-specialty-cutover") {
+  if (req.method === "GET" && (url.pathname === "/api/t10-specialty/cutover-pack" || url.pathname === "/api/t10-specialty-cutover")) {
     const user = requireApiRole(req, res, ["commission"], url.pathname);
     if (!user) return;
     const pack = buildSpecialtyCutoverPack();

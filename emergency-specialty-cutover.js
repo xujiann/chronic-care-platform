@@ -176,11 +176,13 @@ function buildSpecialtyCutoverPack(options = {}) {
     tracks,
     firstIncrement,
     crossTrackControls: buildCrossTrackControls(tracks),
-    acceptanceChecklist: buildAcceptanceChecklist(tracks)
+    acceptanceChecklist: buildAcceptanceChecklist(tracks),
+    rehearsalPlan: buildRehearsalPlan(tracks, firstIncrement),
+    goNoGoDecision: buildGoNoGoDecision(tracks, firstIncrement)
   };
   pack.integrity = {
     algorithm: "sha256",
-    digest: `sha256:${sha256({ summary, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist })}`
+    digest: `sha256:${sha256({ summary, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision })}`
   };
   return pack;
 }
@@ -254,6 +256,127 @@ function buildAcceptanceChecklist(tracks) {
   ]);
 }
 
+function buildRehearsalPlan(tracks, firstIncrement) {
+  const primaryTrack = tracks.find((track) => track.id === firstIncrement.trackId) || tracks[0];
+  const allTrackIds = tracks.map((track) => track.id);
+  return {
+    scope: {
+      primaryTrackId: primaryTrack.id,
+      primaryTrackName: primaryTrack.name,
+      pilotSize: "单机构/单链路/合成或脱敏样例优先，禁止直接扩大到全量居民或真实生产调度。",
+      includedTracks: [primaryTrack.id],
+      watchOnlyTracks: allTrackIds.filter((id) => id !== primaryTrack.id)
+    },
+    timeline: [
+      {
+        stage: "T-1 preflight",
+        owner: "项目办/平台运维/业务责任部门",
+        actions: [
+          "冻结灰度范围、账号白名单、外部接口地址和回退联系人。",
+          "复核 readiness 摘要、现场阻断项和四眼签收材料是否与本次灰度范围一致。",
+          "准备停机/弱网/人工流程演练记录模板。"
+        ],
+        exitCriteria: "所有本次范围内阻断项具备证据编号、责任人和可复核摘要。"
+      },
+      {
+        stage: "T0 rehearsal",
+        owner: primaryTrack.department,
+        actions: [
+          primaryTrack.acceptanceIncrement,
+          "记录每个外部接口请求、回执、失败重试、死信补偿和人工复核动作。",
+          "验证审计链、证据导出、角色范围和患者安全降级提示。"
+        ],
+        exitCriteria: "端到端链路闭环成功，且未出现未解释的 P0/P1 安全、隐私或临床风险。"
+      },
+      {
+        stage: "T+1 observation",
+        owner: "运维值守/质控复盘/业务负责人",
+        actions: [
+          "复核告警、审计、接口回执、数据质量和人工处置记录。",
+          "完成问题清零、风险豁免或退回整改结论。",
+          "归档灰度验收记录，决定是否进入下一专项或下一机构。"
+        ],
+        exitCriteria: "观察窗口无未关闭 P0/P1 问题，业务和技术双负责人签字。"
+      }
+    ],
+    rollbackTriggers: [
+      "外部接口签名、时钟窗口或幂等校验连续失败且无法在灰度窗口内解释。",
+      "出现跨居民、跨机构或越权可见的数据范围问题。",
+      "急救、输血、影像诊断或体检异常通知出现可能影响患者安全的漏派、误派、漏告或误告。",
+      "审计证据、原始记录或回执摘要缺失，导致无法复盘。"
+    ],
+    dutyRoster: [
+      { role: "业务指挥", owner: primaryTrack.department, responsibility: "确认灰度范围、患者安全和业务回退。"},
+      { role: "平台运维", owner: "平台运维团队", responsibility: "监控服务、接口、日志、告警和回滚窗口。"},
+      { role: "安全审计", owner: "安全管理岗", responsibility: "复核账号、签名、审计链、证据摘要和隐私范围。"},
+      { role: "现场联络", owner: "试点机构信息科/科室负责人", responsibility: "协调外部系统、设备、临床科室和纸质降级流程。"}
+    ],
+    evidenceToArchive: [
+      "灰度范围确认单",
+      "接口请求/回执样例和签名校验日志",
+      "四眼签收记录和 SHA-256 摘要",
+      "告警、死信、补偿和人工复核台账",
+      "T+1 观察窗口结论和下一步 go/no-go 决策"
+    ]
+  };
+}
+
+function buildGoNoGoDecision(tracks, firstIncrement) {
+  const primaryTrack = tracks.find((track) => track.id === firstIncrement.trackId) || tracks[0];
+  const hardStops = [
+    {
+      id: "patient-safety",
+      name: "患者安全",
+      go: "急救、用血、影像诊断、体检异常通知均无漏派、误派、漏告、误告。",
+      noGo: "任一链路出现可能影响患者安全的未解释 P0/P1 事件。"
+    },
+    {
+      id: "scope-and-privacy",
+      name: "数据范围与隐私",
+      go: "居民、机构、角色和授权范围与灰度名单一致，审计可追溯。",
+      noGo: "出现越权可见、跨居民串档、跨机构数据外溢或无法解释的敏感字段暴露。"
+    },
+    {
+      id: "interface-receipt",
+      name: "外部接口回执",
+      go: "签名、时间窗、幂等、回执、死信补偿均可复核。",
+      noGo: "接口连续失败、回执缺失或签名/幂等异常无法在观察窗口内解释。"
+    },
+    {
+      id: "evidence-replay",
+      name: "证据复盘",
+      go: "事件证据、操作审计、SHA-256 摘要和四眼签收可完整复盘。",
+      noGo: "关键证据、原始记录或摘要缺失，导致无法重放业务链路。"
+    }
+  ];
+  const scorecard = [
+    { id: "readiness", name: "代码门禁", weight: 20, required: true, current: primaryTrack.codeReady ? "pass" : "fail" },
+    { id: "site-evidence", name: "现场证据", weight: 25, required: true, current: primaryTrack.blockers.length === 0 ? "pass" : "pending" },
+    { id: "dual-approval", name: "业务/技术双签", weight: 20, required: true, current: primaryTrack.productionReady ? "pass" : "pending" },
+    { id: "rollback-ready", name: "回退路径", weight: 15, required: true, current: "ready-to-rehearse" },
+    { id: "observation-window", name: "T+1观察", weight: 20, required: true, current: "pending" }
+  ];
+  const score = scorecard.reduce((sum, item) => sum + (item.current === "pass" ? item.weight : 0), 0);
+  return {
+    currentDecision: primaryTrack.productionReady ? "go-ready-for-formal-approval" : "no-go-site-evidence-pending",
+    primaryTrackId: primaryTrack.id,
+    primaryTrackName: primaryTrack.name,
+    score,
+    threshold: 100,
+    scorecard,
+    hardStops,
+    decisionRules: [
+      "任何 hard stop 命中均直接 No-Go，不允许用分数抵消。",
+      "所有 required scorecard 项必须通过且总分达到 100，才允许进入正式 go/no-go 会。",
+      "ready-to-rehearse 只允许开展受控演练，不代表可扩大灰度或真实上线。",
+      "site-pending 状态只能由现场证据和独立复核关闭，不能由本地演示数据关闭。"
+    ],
+    nextActions: primaryTrack.productionReady
+      ? ["准备正式 go/no-go 会签材料。", "安排 T+1 观察窗口和扩大范围审批。"]
+      : primaryTrack.blockers.slice(0, 5).map((item) => `补齐 ${item.id}：${item.title}`)
+  };
+}
+
 function renderMarkdown(pack) {
   const rows = pack.tracks.map((item) => `| ${item.name} | ${item.department} | ${item.codeReady ? "是" : "否"} | ${item.productionReady ? "是" : "否"} | ${item.blockers.length} | ${item.page} |`);
   const blockers = pack.tracks.flatMap((track) => track.blockers.map((item) => `| ${track.name} | ${item.id} | ${item.title} | ${item.owner} | ${item.status} |`));
@@ -288,6 +411,30 @@ function renderMarkdown(pack) {
     "## 跨专项控制",
     "",
     ...pack.crossTrackControls.map((item) => `- ${item.name}（${item.owner}）：${item.acceptance}`),
+    "",
+    "## 灰度演练计划",
+    "",
+    `- Primary track: ${pack.rehearsalPlan.scope.primaryTrackName}`,
+    `- Pilot size: ${pack.rehearsalPlan.scope.pilotSize}`,
+    "",
+    ...pack.rehearsalPlan.timeline.map((item) => `### ${item.stage}\n\n- Owner: ${item.owner}\n- Exit criteria: ${item.exitCriteria}\n${item.actions.map((action) => `- ${action}`).join("\n")}`),
+    "",
+    "## 回退触发",
+    "",
+    ...pack.rehearsalPlan.rollbackTriggers.map((item) => `- ${item}`),
+    "",
+    "## Go/No-Go 决策矩阵",
+    "",
+    `- Current decision: ${pack.goNoGoDecision.currentDecision}`,
+    `- Score: ${pack.goNoGoDecision.score}/${pack.goNoGoDecision.threshold}`,
+    "",
+    "| 项 | 权重 | 必须 | 当前 |",
+    "|---|---:|---:|---|",
+    ...pack.goNoGoDecision.scorecard.map((item) => `| ${item.name} | ${item.weight} | ${item.required ? "yes" : "no"} | ${item.current} |`),
+    "",
+    "### Hard stops",
+    "",
+    ...pack.goNoGoDecision.hardStops.map((item) => `- ${item.name}: ${item.noGo}`),
     ""
   ].join("\n");
 }
@@ -318,5 +465,7 @@ module.exports = {
   renderMarkdown,
   writeCutoverPack,
   normalizeTrack,
-  selectFirstIncrement
+  selectFirstIncrement,
+  buildRehearsalPlan,
+  buildGoNoGoDecision
 };

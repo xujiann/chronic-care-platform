@@ -56,6 +56,29 @@ The current default recommendation is to pilot the 120 emergency life-chain firs
 
 This increment is small enough to validate the end-to-end safety model and broad enough to exercise identity, signed interface, audit, evidence export, downgrade and clinical handover controls.
 
+## Rehearsal and rollback
+
+The cutover pack now includes a `rehearsalPlan` section for the selected first increment:
+
+- `T-1 preflight`: freeze pilot scope, accounts, endpoints and rollback contacts before touching the grey-release path.
+- `T0 rehearsal`: execute the selected end-to-end chain and record requests, receipts, retries, dead letters, manual review and evidence export.
+- `T+1 observation`: review alerts, audit, interface receipts, data quality and manual handling before the next go/no-go decision.
+
+Rollback is triggered when signature/idempotency checks repeatedly fail without explanation, resident or institution scope leaks, patient-safety actions are missed or misrouted, or audit/evidence records cannot support replay.
+
+The duty roster covers business command, platform operations, security audit and site liaison. This is a rehearsal control only; it does not start a live launch or broaden the authorized production scope.
+
+## Go/No-Go decision matrix
+
+The cutover pack also emits a `goNoGoDecision` section. It is intentionally conservative:
+
+- Hard stops override the score. Any patient-safety, scope/privacy, external-receipt or evidence-replay hard stop is an immediate No-Go.
+- Code readiness, site evidence, dual approval, rollback readiness and T+1 observation are scored separately.
+- A track cannot reach formal Go unless every required item passes and the score reaches 100/100.
+- `ready-to-rehearse` means the team may run a controlled rehearsal only; it is not production authorization.
+
+The current default decision remains `no-go-site-evidence-pending` because the four specialties have code evidence but still lack signed site receipts and observation evidence.
+
 ## Verification
 
 Run the focused test directly:

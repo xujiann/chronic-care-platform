@@ -127,7 +127,7 @@ SQLite 结构化镜像已覆盖居民、账户、主索引、个人健康档案�
 | `GET /api/health` | 依赖就绪检查，返回服务、存储和会话存储状态；中央会话不可用时返回 503 |
 | `GET /api/metrics` | 管理端运行指标，返回请求数、状态码、慢请求、任务堆积、死信、质量问题；运营工作台会在服务模式下展示部分指标 |
 | `GET /api/system/readiness` | 管理端系统就绪报告，汇总 P2 集合、接口准备度、审计链、运行负载和现场外部依赖边界 |
-| `GET /api/t10-specialty-cutover` | 卫健委只读查询四条专科切换轨道、现场阻断、首个灰度增量、四眼签收和患者安全降级控制 |
+| `GET /api/t10-specialty/cutover-pack` | 卫健委只读查询四条专科切换轨道、现场阻断、首个灰度增量、演练计划、Go/No-Go 决策矩阵、四眼签收和患者安全降级控制；`/api/t10-specialty-cutover` 保留为兼容路径 |
 | `GET /api/physical-exams` | 按角色授权和居民主索引查询全部历史体检报告，返回年度、来源机构、异常项和健康建议 |
 | `POST /api/physical-exams/import` | 体检中心或医院单份/批量接入；一般成人体检同步健康档案，职业/专项体检进入受限分流队列，二者均幂等去重 |
 | `POST /api/physical-exams/abnormal-cases/:id/actions` | 对体检异常结果执行通知居民、复查安排、专科分派、关闭或重开，并生成消息与审计证据 |
@@ -475,7 +475,7 @@ The handoff document is `docs/互联网护理服务模块说明.md`; it covers r
 
 `docs/production-go-live-requirements.md` is the platform-level real production go-live requirements baseline. Use it with `release/production-cutover-checklist.md`, `release/site-readiness-pack.md`, `release/launch-smoke-report.md`, `release/release-report.md`, and `release/release-artifact-manifest.md` before deciding that a deployment is ready for real users.
 
-T10 specialty cutover control is available at `t10-specialty-cutover.html`, through the commission-scoped `GET /api/t10-specialty-cutover`, and as `npm.cmd run t10:specialty-cutover`. Its generated `release/t10-specialty-cutover-pack.json` and `.md` artifacts keep all four tracks `productionReady=false` until real external receipts, independent site verification, four-eyes signoff, duty arrangements and downgrade evidence are accepted.
+T10 specialty cutover control is available at `t10-specialty-cutover.html`, through the commission-scoped `GET /api/t10-specialty/cutover-pack` endpoint, and as `npm.cmd run t10:specialty-cutover`. The legacy `GET /api/t10-specialty-cutover` path remains available for older previews. Its generated `release/t10-specialty-cutover-pack.json` and `.md` artifacts keep all four tracks `productionReady=false` until real external receipts, independent site verification, four-eyes signoff, duty arrangements, Go/No-Go hard-stop review and downgrade evidence are accepted.
 
 `docs/on-site-launch-materials.md` is the field-owned material checklist for real go-live. It names the production environment, secrets, identity, SMS, HIS/EMR/LIS/PACS, nursing/escort/registration, insurance/certificate, database, security, monitoring, disaster recovery, resident mobile acceptance, gray release, and signoff materials that must be attached before opening to real residents.
 ## Drug Consumable Supervision Evidence

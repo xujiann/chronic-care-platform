@@ -77,6 +77,15 @@ test("buildSpecialtyCutoverPack aggregates site blockers and cross-track control
   assert.equal(pack.summary.formalGoLiveState, "blocked-until-site-evidence-signed");
   assert.equal(pack.crossTrackControls.length, 4);
   assert.ok(pack.crossTrackControls.some((item) => item.id === "four-eyes-site-evidence"));
+  assert.equal(pack.rehearsalPlan.scope.primaryTrackId, "emergency-life-chain");
+  assert.equal(pack.rehearsalPlan.timeline.length, 3);
+  assert.ok(pack.rehearsalPlan.rollbackTriggers.length >= 4);
+  assert.ok(pack.rehearsalPlan.dutyRoster.some((item) => item.role === "安全审计"));
+  assert.equal(pack.goNoGoDecision.currentDecision, "no-go-site-evidence-pending");
+  assert.equal(pack.goNoGoDecision.score, 20);
+  assert.equal(pack.goNoGoDecision.threshold, 100);
+  assert.equal(pack.goNoGoDecision.scorecard.length, 5);
+  assert.ok(pack.goNoGoDecision.hardStops.some((item) => item.id === "patient-safety"));
   assert.match(pack.integrity.digest, /^sha256:[a-f0-9]{64}$/);
 });
 
@@ -109,6 +118,12 @@ test("renderMarkdown exposes the digest, departments, blockers and first grey in
   assert.match(markdown, /Site blockers: 4/);
   assert.match(markdown, /sha256:[a-f0-9]{64}/);
   assert.match(markdown, /首个可验收灰度增量/);
+  assert.match(markdown, /灰度演练计划/);
+  assert.match(markdown, /T-1 preflight/);
+  assert.match(markdown, /回退触发/);
+  assert.match(markdown, /Go\/No-Go 决策矩阵/);
+  assert.match(markdown, /no-go-site-evidence-pending/);
+  assert.match(markdown, /Hard stops/);
 });
 
 test("writeCutoverPack writes JSON and Markdown artifacts without touching runtime data", () => {
@@ -132,14 +147,22 @@ test("static cutover preview page exposes T10 tracks and release-artifact fallba
   const client = fs.readFileSync(path.join(root, "t10-specialty-cutover.js"), "utf8");
 
   assert.match(html, /T10专项上线割接总控/);
-  assert.match(html, /t10-specialty-cutover\.js/);
+  assert.match(html, /t10-specialty-cutover\.js\?v=go-nogo-decision/);
+  assert.match(html, /灰度演练、回退与值守计划/);
+  assert.match(html, /Go\/No-Go 决策矩阵/);
   assert.match(html, /emergency\.html/);
   assert.match(html, /blood\.html/);
   assert.match(html, /imaging-cloud\.html/);
   assert.match(html, /physical-examination\.html/);
   assert.match(client, /release\/t10-specialty-cutover-pack\.json/);
   assert.match(client, /fallbackCutoverPack/);
+  assert.match(client, /withCutoverDefaults/);
+  assert.match(client, /renderRehearsalPlan/);
+  assert.match(client, /renderDecisionMatrix/);
   assert.match(client, /120急救生命链/);
   assert.match(client, /四眼现场证据签收/);
+  assert.match(client, /T\+1 observation/);
+  assert.match(client, /no-go-site-evidence-pending/);
+  assert.match(client, /患者安全/);
   assert.match(client, /blocked-until-site-evidence-signed/);
 });
