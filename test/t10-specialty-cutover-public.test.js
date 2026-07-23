@@ -31,8 +31,10 @@ test("T00 exposes the T10 specialty cutover pack through public integration cont
   assert.match(client, /withCutoverDefaults/);
   assert.match(client, /renderEvidenceDossier/);
   assert.match(client, /renderPilotBatchPlan/);
+  assert.match(client, /renderSiteEvidenceWorkflow/);
   assert.match(client, /evidence-id-present/);
   assert.match(client, /batch-1-single-chain/);
+  assert.match(client, /submit-evidence/);
   assert.match(readme, /t10-specialty-cutover\.html/);
   assert.match(readme, /GET \/api\/t10-specialty\/cutover-pack/);
   assert.match(workbench, /t10-specialty-cutover\.html/);
@@ -43,6 +45,7 @@ test("T00 exposes the T10 specialty cutover pack through public integration cont
   assert.match(releaseReport, /specialtyCutover:goNoGoDecision/);
   assert.match(releaseReport, /specialtyCutover:evidenceDossier/);
   assert.match(releaseReport, /specialtyCutover:pilotBatchPlan/);
+  assert.match(releaseReport, /specialtyCutover:siteEvidenceWorkflow/);
   assert.match(releaseReport, /t10-specialty-cutover-pack\.json/);
   assert.match(releaseReport, /t10-specialty-cutover-pack\.md/);
 });
@@ -76,4 +79,8 @@ test("T10 public projection keeps all real production gates closed with rehearsa
   assert.ok(pack.evidenceDossier.firstIncrementRequired.every((id) => id.startsWith("emergency-life-chain:")));
   assert.equal(pack.pilotBatchPlan.status, "ready-to-plan-controlled-rehearsal");
   assert.equal(pack.pilotBatchPlan.batches.length, 3);
+  assert.equal(pack.siteEvidenceWorkflow.currentGate, "submitted-or-accepted-site-evidence-required-before-batch-1");
+  assert.equal(pack.siteEvidenceWorkflow.states.length, 6);
+  assert.ok(pack.siteEvidenceWorkflow.transitions.some((item) => item.action === "accept-evidence"));
+  assert.equal(pack.siteEvidenceWorkflow.batchOneEntryRequires.minimumStatus, "submitted");
 });

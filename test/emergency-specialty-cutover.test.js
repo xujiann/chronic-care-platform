@@ -8,6 +8,7 @@ const {
   buildSpecialtyCutoverPack,
   buildEvidenceDossier,
   buildPilotBatchPlan,
+  buildSiteEvidenceWorkflow,
   normalizeTrack,
   renderMarkdown,
   selectFirstIncrement,
@@ -98,6 +99,11 @@ test("buildSpecialtyCutoverPack aggregates site blockers and cross-track control
   assert.equal(pack.pilotBatchPlan.batches.length, 3);
   assert.equal(pack.pilotBatchPlan.batches[0].id, "batch-0-preflight");
   assert.equal(pack.pilotBatchPlan.batches[1].id, "batch-1-single-chain");
+  assert.equal(pack.siteEvidenceWorkflow.currentGate, "submitted-or-accepted-site-evidence-required-before-batch-1");
+  assert.equal(pack.siteEvidenceWorkflow.states.length, 6);
+  assert.ok(pack.siteEvidenceWorkflow.transitions.some((item) => item.action === "accept-evidence"));
+  assert.ok(pack.siteEvidenceWorkflow.batchOneEntryRequires.evidenceIds.includes("emergency-life-chain:SITE-01"));
+  assert.ok(pack.siteEvidenceWorkflow.auditEvents.every((item) => item.appendOnly));
   assert.match(pack.integrity.digest, /^sha256:[a-f0-9]{64}$/);
 });
 
@@ -140,6 +146,9 @@ test("renderMarkdown exposes the digest, departments, blockers and first grey in
   assert.match(markdown, /Controlled pilot batch plan/);
   assert.match(markdown, /batch-1-single-chain/);
   assert.match(markdown, /external-interface-receipt-matched|SITE-01/);
+  assert.match(markdown, /Site evidence workflow/);
+  assert.match(markdown, /submit-evidence/);
+  assert.match(markdown, /accept-evidence/);
 });
 
 test("buildEvidenceDossier maps blockers to reviewable evidence and hard-stop policy", () => {
@@ -170,6 +179,25 @@ test("buildPilotBatchPlan keeps production expansion behind preflight and T+1 ob
   assert.match(plan.batches[2].promotionDecision, /risk and evidence completeness/);
 });
 
+test("buildSiteEvidenceWorkflow defines evidence closure states, transitions and batch-1 gate", () => {
+  const normalized = tracks.map((track) => normalizeTrack(track, report()));
+  const firstIncrement = {
+    trackId: "emergency-life-chain",
+    requiredBeforeStart: ["SITE-01", "SITE-02"]
+  };
+  const dossier = buildEvidenceDossier(normalized, firstIncrement);
+  const plan = buildPilotBatchPlan(normalized, firstIncrement);
+  const workflow = buildSiteEvidenceWorkflow(dossier, plan);
+
+  assert.equal(workflow.states.length, 6);
+  assert.ok(workflow.states.some((item) => item.id === "expired" && item.terminal));
+  assert.ok(workflow.transitions.some((item) => item.from === "under-review" && item.to === "accepted"));
+  assert.ok(workflow.transitions.some((item) => item.requiredChecks.includes("submitter-reviewer-separation")));
+  assert.equal(workflow.batchOneEntryRequires.minimumStatus, "submitted");
+  assert.ok(workflow.batchOneEntryRequires.evidenceIds.every((id) => id.startsWith("emergency-life-chain:")));
+  assert.ok(workflow.gateRules.some((item) => /No-Go/.test(item)));
+});
+
 test("writeCutoverPack writes JSON and Markdown artifacts without touching runtime data", () => {
   const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "t10-cutover-"));
   const pack = buildSpecialtyCutoverPack({
@@ -195,7 +223,8 @@ test("static cutover preview page exposes T10 tracks and release-artifact fallba
   assert.match(html, /Go\/No-Go 决策矩阵/);
   assert.match(html, /现场证据包与硬阻断收口/);
   assert.match(html, /受控灰度批次推进计划/);
-  assert.match(html, /t10-specialty-cutover\.js\?v=evidence-dossier/);
+  assert.match(html, /现场证据闭环状态机/);
+  assert.match(html, /t10-specialty-cutover\.js\?v=evidence-workflow/);
   assert.match(html, /emergency\.html/);
   assert.match(html, /blood\.html/);
   assert.match(html, /imaging-cloud\.html/);
@@ -207,8 +236,11 @@ test("static cutover preview page exposes T10 tracks and release-artifact fallba
   assert.match(client, /renderDecisionMatrix/);
   assert.match(client, /renderEvidenceDossier/);
   assert.match(client, /renderPilotBatchPlan/);
+  assert.match(client, /renderSiteEvidenceWorkflow/);
   assert.match(client, /evidence-id-present/);
   assert.match(client, /batch-1-single-chain/);
+  assert.match(client, /submit-evidence/);
+  assert.match(client, /Accepted and digest-locked/);
   assert.match(client, /120急救生命链/);
   assert.match(client, /四眼现场证据签收/);
   assert.match(client, /T\+1 observation/);
