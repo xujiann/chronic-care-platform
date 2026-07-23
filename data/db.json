@@ -10740,6 +10740,7 @@
       ],
       "intakePolicyVersion": "internet-nursing-intake-v1",
       "writePathVersion": "internet-nursing-write-path-v1",
+      "eventOutboxVersion": "internet-nursing-event-outbox-v1",
       "requesterAuthorization": {
         "selfSource": "authenticated-session",
         "delegatedSource": "resident-authorization-registry",

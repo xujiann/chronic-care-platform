@@ -4,6 +4,7 @@ const { createHash, randomUUID } = require("node:crypto");
 const Domain = require("./nursing-escort-domain");
 
 const WRITE_PATH_POLICY_VERSION = "internet-nursing-write-path-v1";
+const EVENT_OUTBOX_POLICY_VERSION = "internet-nursing-event-outbox-v1";
 const ALLOWED_CREATE_ROLES = new Set(["citizen", "institution", "commission"]);
 const ALLOWED_RISK_LEVELS = new Set(["low", "medium", "high"]);
 const SERVICE_OBJECT_ALIASES = Object.freeze({
@@ -35,6 +36,20 @@ function normalizedSet(values = []) {
   return new Set((Array.isArray(values) ? values : []).map((item) => String(item || "").trim().toLowerCase()).filter(Boolean));
 }
 
+function stableValue(value) {
+  if (Array.isArray(value)) return value.map(stableValue);
+  if (!value || typeof value !== "object") return value;
+  return Object.keys(value).sort().reduce((result, key) => {
+    result[key] = stableValue(value[key]);
+    return result;
+  }, {});
+}
+
+function sha256Digest(value) {
+  const serialized = JSON.stringify(stableValue(value));
+  return `sha256:${createHash("sha256").update(serialized === undefined ? "null" : serialized).digest("hex")}`;
+}
+
 function canonicalIntakePayload(order = {}) {
   return {
     residentId: String(order.residentId || "").trim(),
@@ -57,7 +72,77 @@ function canonicalIntakePayload(order = {}) {
 
 function intakeFingerprint(order = {}) {
   const canonical = canonicalIntakePayload(order);
-  return `sha256:${createHash("sha256").update(JSON.stringify(canonical)).digest("hex")}`;
+  return sha256Digest(canonical);
+}
+
+function buildOutboxEvent({ aggregateId, eventType, occurredAt, idempotencyKey, payload }) {
+  const payloadDigest = sha256Digest(payload);
+  const digest = sha256Digest({ aggregateId, eventType, idempotencyKey, payloadDigest });
+  return {
+    id: `nursing-outbox:${digest.slice("sha256:".length)}`,
+    aggregateType: "internet-nursing-order",
+    aggregateId: String(aggregateId || ""),
+    eventType: String(eventType || ""),
+    status: "pending",
+    occurredAt: String(occurredAt || ""),
+    idempotencyKey: String(idempotencyKey || ""),
+    payloadDigest,
+    payload: clone(payload),
+    attempts: 0,
+    policyVersion: EVENT_OUTBOX_POLICY_VERSION
+  };
+}
+
+function validateOutboxEvent(event = {}) {
+  const reasons = [];
+  const expectedPayloadDigest = sha256Digest(event.payload);
+  const expectedDigest = sha256Digest({
+    aggregateId: event.aggregateId,
+    eventType: event.eventType,
+    idempotencyKey: event.idempotencyKey,
+    payloadDigest: expectedPayloadDigest
+  });
+  if (!event.id || event.id !== `nursing-outbox:${expectedDigest.slice("sha256:".length)}`) reasons.push("outbox-id-invalid");
+  if (event.aggregateType !== "internet-nursing-order") reasons.push("outbox-aggregate-type-invalid");
+  if (!event.aggregateId) reasons.push("outbox-aggregate-id-missing");
+  if (!event.eventType) reasons.push("outbox-event-type-missing");
+  if (!event.payload || typeof event.payload !== "object" || Array.isArray(event.payload)) reasons.push("outbox-payload-invalid");
+  if (!["pending", "processing", "delivered", "failed"].includes(event.status)) reasons.push("outbox-status-invalid");
+  if (!Number.isFinite(Date.parse(String(event.occurredAt || "")))) reasons.push("outbox-time-invalid");
+  if (!event.idempotencyKey) reasons.push("outbox-idempotency-key-missing");
+  if (event.payloadDigest !== expectedPayloadDigest) reasons.push("outbox-payload-digest-invalid");
+  if (!Number.isInteger(event.attempts) || event.attempts < 0) reasons.push("outbox-attempts-invalid");
+  if (event.policyVersion !== EVENT_OUTBOX_POLICY_VERSION) reasons.push("outbox-policy-version-invalid");
+  return { ok: reasons.length === 0, reasons, expectedPayloadDigest };
+}
+
+function assertOutboxEvent(event) {
+  const integrity = validateOutboxEvent(event);
+  if (!integrity.ok) {
+    throw new InternetNursingServiceError(
+      "NURSING_OUTBOX_INTEGRITY_INVALID",
+      `internet nursing outbox event is invalid: ${integrity.reasons.join(", ")}`,
+      integrity
+    );
+  }
+}
+
+function appendOutboxEvent(data, event) {
+  assertOutboxEvent(event);
+  const outbox = Array.isArray(data.internetNursingOutbox) ? data.internetNursingOutbox : [];
+  const existing = outbox.find((item) => item.idempotencyKey === event.idempotencyKey);
+  if (existing) {
+    if (existing.payloadDigest !== event.payloadDigest) {
+      throw new InternetNursingServiceError(
+        "NURSING_OUTBOX_IDEMPOTENCY_CONFLICT",
+        "outbox idempotency key was already used with a different payload",
+        { idempotencyKey: event.idempotencyKey, existingEventId: existing.id }
+      );
+    }
+    return { event: existing, replayed: true };
+  }
+  data.internetNursingOutbox = [event, ...outbox].slice(0, 1000);
+  return { event, replayed: false };
 }
 
 function authorizationReceiptFor(options = {}, residentId) {
@@ -222,7 +307,18 @@ function createInternetNursingOrder(state = {}, payload = {}, actor = {}, option
         { idempotencyKey: intake.idempotencyKey, existingOrderId: existing.id }
       );
     }
-    return { created: false, replayed: true, state: data, order: clone(existing) };
+    const createEventKey = `nursing:${existing.id}:create:${existing.idempotencyKey}`;
+    const outboxEvent = (Array.isArray(data.internetNursingOutbox) ? data.internetNursingOutbox : [])
+      .find((item) => item.idempotencyKey === createEventKey);
+    if (!outboxEvent) {
+      throw new InternetNursingServiceError(
+        "NURSING_OUTBOX_EVENT_MISSING",
+        "idempotent order replay is missing its atomic outbox event",
+        { idempotencyKey: intake.idempotencyKey, existingOrderId: existing.id }
+      );
+    }
+    assertOutboxEvent(outboxEvent);
+    return { created: false, replayed: true, state: data, order: clone(existing), outboxEvent: clone(outboxEvent) };
   }
   const validation = Domain.validateNursingOrderIntake(intake, {
     now: at,
@@ -269,7 +365,32 @@ function createInternetNursingOrder(state = {}, payload = {}, actor = {}, option
     writePathPolicyVersion: WRITE_PATH_POLICY_VERSION
   };
   data.internetNursingOrders = [order, ...orders];
-  return { created: true, replayed: false, state: data, order: clone(order) };
+  const outbox = appendOutboxEvent(data, buildOutboxEvent({
+    aggregateId: order.id,
+    eventType: "internet-nursing-order-created",
+    occurredAt: at,
+    idempotencyKey: `nursing:${order.id}:create:${order.idempotencyKey}`,
+    payload: {
+      orderId: order.id,
+      residentId: order.residentId,
+      institutionId: order.institutionId,
+      serviceItem: order.serviceItem,
+      status: order.status,
+      requesterRole: order.requesterAuthorization.requesterRole,
+      intakeFingerprint: order.intakeFingerprint,
+      task: {
+        targetRole: "institution",
+        templateKey: "internet-nursing-appointment-submitted",
+        requiredChannels: ["in_app"]
+      },
+      audit: {
+        action: "order-created",
+        actorId: order.requesterAuthorization.requesterId,
+        actorRole: order.requesterAuthorization.requesterRole
+      }
+    }
+  }));
+  return { created: true, replayed: false, state: data, order: clone(order), outboxEvent: clone(outbox.event) };
 }
 
 function transitionInternetNursingOrder(state = {}, orderId, nextStatus, actor = {}, options = {}) {
@@ -290,23 +411,158 @@ function transitionInternetNursingOrder(state = {}, orderId, nextStatus, actor =
   if (typeof options.canAccessOrder !== "function" || options.canAccessOrder(orders[index], actor) !== true) {
     throw new InternetNursingServiceError("NURSING_ORDER_SCOPE_DENIED", "order access decision is missing or denied", { orderId }, 403);
   }
+  const commandId = String(options.commandId || "").trim();
+  if (!commandId) {
+    throw new InternetNursingServiceError(
+      "NURSING_TRANSITION_IDEMPOTENCY_REQUIRED",
+      "transition command id is required",
+      { orderId },
+      400
+    );
+  }
+  const actorId = String(actor.id || actor.username || actor.accountId || actor.residentId || "").trim();
+  const normalizedNext = Domain.canonicalStatus(nextStatus, "nursing");
+  const commandFingerprint = sha256Digest({
+    orderId,
+    nextStatus: normalizedNext,
+    actorId,
+    actorRole: String(actor.role || "").trim(),
+    updates: options.updates || {}
+  });
+  const outboxIdempotencyKey = `nursing:${orderId}:transition:${normalizedNext}:${commandId}`;
+  const existingEvent = (Array.isArray(data.internetNursingOutbox) ? data.internetNursingOutbox : [])
+    .find((item) => item.idempotencyKey === outboxIdempotencyKey);
+  if (existingEvent) {
+    assertOutboxEvent(existingEvent);
+    if (existingEvent.payload?.commandFingerprint !== commandFingerprint) {
+      throw new InternetNursingServiceError(
+        "NURSING_TRANSITION_IDEMPOTENCY_CONFLICT",
+        "transition command id was already used with different content",
+        { commandId, existingEventId: existingEvent.id }
+      );
+    }
+    return { state: data, order: clone(orders[index]), outboxEvent: clone(existingEvent), replayed: true };
+  }
+  const fromStatus = orders[index].status;
   const transitioned = Domain.transitionOrder("nursing", orders[index], nextStatus, {
     at: options.at,
-    actorId: String(actor.id || actor.username || actor.accountId || actor.residentId || "").trim(),
+    actorId,
     actorRole: String(actor.role || "").trim(),
     updates: clone(options.updates || {})
   });
   orders[index] = transitioned;
   data.internetNursingOrders = orders;
-  return { state: data, order: clone(transitioned) };
+  const timelineEvent = transitioned.timelineEvents?.[0] || {};
+  const notificationPlan = transitioned.notificationPlans?.[0] || {};
+  const outbox = appendOutboxEvent(data, buildOutboxEvent({
+    aggregateId: orderId,
+    eventType: "internet-nursing-order-transitioned",
+    occurredAt: transitioned.updatedAt,
+    idempotencyKey: outboxIdempotencyKey,
+    payload: {
+      orderId,
+      residentId: transitioned.residentId,
+      fromStatus,
+      toStatus: transitioned.status,
+      commandId,
+      commandFingerprint,
+      timelineEvent,
+      notificationPlan,
+      audit: {
+        action: `transition:${fromStatus}->${transitioned.status}`,
+        actorId,
+        actorRole: String(actor.role || "").trim()
+      }
+    }
+  }));
+  return { state: data, order: clone(transitioned), outboxEvent: clone(outbox.event), replayed: false };
+}
+
+function recordInternetNursingNotificationReceipt(state = {}, orderId, messageId, details = {}, actor = {}, options = {}) {
+  const data = clone(state);
+  const orders = Array.isArray(data.internetNursingOrders) ? data.internetNursingOrders : [];
+  const index = orders.findIndex((item) => item.id === orderId);
+  if (index < 0) {
+    throw new InternetNursingServiceError("NURSING_ORDER_NOT_FOUND", "internet nursing order not found", { orderId }, 404);
+  }
+  if (typeof options.canAccessOrder !== "function" || options.canAccessOrder(orders[index], actor) !== true) {
+    throw new InternetNursingServiceError("NURSING_ORDER_SCOPE_DENIED", "order access decision is missing or denied", { orderId }, 403);
+  }
+  const message = (Array.isArray(orders[index].notificationPlans) ? orders[index].notificationPlans : [])
+    .flatMap((plan) => Array.isArray(plan.messages) ? plan.messages : [])
+    .find((item) => item.id === messageId);
+  if (!message) {
+    throw new InternetNursingServiceError(
+      "NURSING_NOTIFICATION_MESSAGE_NOT_FOUND",
+      "notification message is not bound to the order",
+      { orderId, messageId },
+      404
+    );
+  }
+  const receipt = Domain.buildNotificationReceiptEvidence("nursing", orders[index], message, details, { at: options.at });
+  const recorded = Domain.recordNotificationReceipt("nursing", orders[index], receipt, { at: options.at });
+  orders[index] = recorded.order;
+  data.internetNursingOrders = orders;
+  const outboxKey = `nursing:${orderId}:notification-receipt:${receipt.idempotencyKey}`;
+  const existingEvent = (Array.isArray(data.internetNursingOutbox) ? data.internetNursingOutbox : [])
+    .find((item) => item.idempotencyKey === outboxKey);
+  if (recorded.duplicate) {
+    if (!existingEvent) {
+      throw new InternetNursingServiceError(
+        "NURSING_OUTBOX_EVENT_MISSING",
+        "idempotent notification receipt replay is missing its atomic outbox event",
+        { orderId, messageId, idempotencyKey: receipt.idempotencyKey }
+      );
+    }
+    assertOutboxEvent(existingEvent);
+    return {
+      state: data,
+      order: clone(recorded.order),
+      receipt: clone(receipt),
+      outboxEvent: clone(existingEvent),
+      replayed: true
+    };
+  }
+  const actorId = String(actor.id || actor.username || actor.accountId || "").trim();
+  const outbox = appendOutboxEvent(data, buildOutboxEvent({
+    aggregateId: orderId,
+    eventType: "internet-nursing-notification-receipt-recorded",
+    occurredAt: receipt.occurredAt,
+    idempotencyKey: outboxKey,
+    payload: {
+      orderId,
+      residentId: recorded.order.residentId,
+      messageId: receipt.messageId,
+      planId: receipt.planId,
+      channel: receipt.channel,
+      status: receipt.status,
+      providerMessageId: receipt.providerMessageId,
+      audit: {
+        action: "notification-receipt-recorded",
+        actorId,
+        actorRole: String(actor.role || "gateway").trim()
+      }
+    }
+  }));
+  return {
+    state: data,
+    order: clone(recorded.order),
+    receipt: clone(receipt),
+    outboxEvent: clone(outbox.event),
+    replayed: false
+  };
 }
 
 module.exports = {
   WRITE_PATH_POLICY_VERSION,
+  EVENT_OUTBOX_POLICY_VERSION,
   InternetNursingServiceError,
   canonicalServiceObject,
   intakeFingerprint,
+  buildOutboxEvent,
+  validateOutboxEvent,
   validateCatalogAndInstitution,
   createInternetNursingOrder,
-  transitionInternetNursingOrder
+  transitionInternetNursingOrder,
+  recordInternetNursingNotificationReceipt
 };

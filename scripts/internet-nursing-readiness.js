@@ -305,10 +305,19 @@ function hasP1LifecycleEvidence(policy, domainSource, frontend) {
 function hasWritePathAdapterEvidence(policy, source) {
   const lifecycle = policy.p1Lifecycle || {};
   return lifecycle.writePathVersion === "internet-nursing-write-path-v1" &&
+    lifecycle.eventOutboxVersion === "internet-nursing-event-outbox-v1" &&
     /createInternetNursingOrder/.test(source) &&
     /transitionInternetNursingOrder/.test(source) &&
+    /recordInternetNursingNotificationReceipt/.test(source) &&
+    /validateOutboxEvent/.test(source) &&
+    /EVENT_OUTBOX_POLICY_VERSION/.test(source) &&
+    /internetNursingOutbox/.test(source) &&
     /NURSING_DELEGATION_EVIDENCE_REQUIRED/.test(source) &&
     /NURSING_IDEMPOTENCY_CONFLICT/.test(source) &&
+    /NURSING_TRANSITION_IDEMPOTENCY_REQUIRED/.test(source) &&
+    /NURSING_TRANSITION_IDEMPOTENCY_CONFLICT/.test(source) &&
+    /NURSING_OUTBOX_EVENT_MISSING/.test(source) &&
+    /NURSING_OUTBOX_INTEGRITY_INVALID/.test(source) &&
     /NURSING_EVIDENCE_BYPASS_FORBIDDEN/.test(source) &&
     /validateCatalogAndInstitution/.test(source) &&
     /intakeFingerprint/.test(source) &&
@@ -547,6 +556,7 @@ function buildInternetNursingReadinessReport(options = {}) {
       specialistHomeCareServices: SPECIALIST_HOME_CARE_SERVICES.filter((item) => (policy.serviceCatalog || []).includes(item)).length,
       p1LifecycleTracks: Array.isArray(policy.p1Lifecycle?.tracks) ? policy.p1Lifecycle.tracks.length : 0,
       writePathAdapter: policy.p1Lifecycle?.writePathVersion === "internet-nursing-write-path-v1",
+      eventOutbox: policy.p1Lifecycle?.eventOutboxVersion === "internet-nursing-event-outbox-v1",
       highlightFeatures: innovationCenter.featureCount,
       cutoverTracks: cutoverPack.tracks.length,
       cutoverReadyTracks: cutoverPack.tracks.filter((item) => item.ready).length,

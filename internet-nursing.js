@@ -588,9 +588,10 @@ function buildNursingP1Tracks(dashboard = {}) {
       label: "区域时段、授权与幂等调度",
       ready: typeof domain.validateNursingOrderIntake === "function" &&
         typeof domain.validateSchedulingEvidence === "function" &&
-        lifecycle.writePathVersion === "internet-nursing-write-path-v1",
-      evidence: "本人/家庭代约授权、目录准入、字段白名单、幂等重放与冲突检测",
-      boundary: "T00 仅需接入事务适配器及现有居民授权查询"
+        lifecycle.writePathVersion === "internet-nursing-write-path-v1" &&
+        lifecycle.eventOutboxVersion === "internet-nursing-event-outbox-v1",
+      evidence: "授权、目录、字段白名单、命令幂等、事务外盒及提供方回执",
+      boundary: "T00 注入授权查询并原子持久化订单与外盒事件"
     },
     {
       id: "specialist-protocols",
@@ -1528,6 +1529,7 @@ function defaultNursingPolicy() {
       ],
       intakePolicyVersion: "internet-nursing-intake-v1",
       writePathVersion: "internet-nursing-write-path-v1",
+      eventOutboxVersion: "internet-nursing-event-outbox-v1",
       assessmentPolicyVersion: "internet-nursing-assessment-v1",
       priceCatalogVersion: "internet-nursing-price-2026-v1",
       specialistProtocols: [
