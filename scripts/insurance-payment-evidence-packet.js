@@ -15,6 +15,7 @@ const EVIDENCE_FILES = Object.freeze([
   "online-payment-refunds.js",
   "insurance-payment-operating-model.js",
   "insurance-payment-production-handoff.js",
+  "docs/t07-insurance-payment-t00-handoff.md",
   "scripts/insurance-payment-acceptance.js"
 ]);
 
