@@ -731,11 +731,25 @@
       reopen: "reopened"
     };
     if (!transitions[action]) throw inputError("异常处置动作仅支持 confirm、notify、schedule、assign、followup、close、reopen");
+    const allowedActions = {
+      "pending-contact": ["confirm", "notify"],
+      confirmed: ["notify"],
+      "resident-notified": ["schedule", "assign", "followup"],
+      "followup-scheduled": ["notify", "assign", "followup"],
+      "specialist-review": ["followup"],
+      "followup-completed": ["close"],
+      closed: ["reopen"],
+      reopened: ["confirm", "notify"]
+    };
     const note = String(payload.note || "").trim();
     if (note.length < 2) throw inputError("异常处置备注至少 2 个字符");
     const at = context.now || new Date().toISOString();
     if (action === "close" && (cases[index].notificationStatus !== "delivered" || !(cases[index].actions || []).some((item) => item.action === "followup"))) {
       throw conflictError("重要异常结果必须完成通知和随访记录后才能关闭");
+    }
+    const currentStatus = String(cases[index].status || "pending-contact");
+    if (!(allowedActions[currentStatus] || []).includes(action)) {
+      throw conflictError(`异常处置不允许从 ${currentStatus} 执行 ${action}`);
     }
     cases[index] = {
       ...cases[index],

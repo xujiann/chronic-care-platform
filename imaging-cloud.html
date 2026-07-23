@@ -133,6 +133,25 @@
         background: var(--blue);
         color: #fff;
       }
+      .production-operations {
+        margin-top: 16px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.7);
+      }
+      .production-operations summary {
+        cursor: pointer;
+        font-weight: 900;
+      }
+      .production-operations .ingest-form {
+        align-content: start;
+        margin-top: 12px;
+      }
+      .production-operations .ingest-form h3 {
+        grid-column: 1 / -1;
+        margin: 0;
+      }
       .badge.ok {
         background: rgba(22, 132, 91, 0.12);
         color: var(--green);
@@ -181,6 +200,14 @@
           <button class="inline-action" id="reload-solution-a-studies" type="button">刷新检查</button>
         </div>
         <div id="solution-a-studies"><p>正在读取DICOMweb检查清单...</p></div>
+      </section>
+
+      <section class="panel wide" data-imaging-section="production-gate">
+        <div class="panel-title">
+          <h2>正式生产门禁</h2>
+          <span>合成数据验收、生产端点、现场证据、故障演练和双人审批全部完成前，不得标记正式上线。</span>
+        </div>
+        <div id="production-gate"><p>正在读取影像云生产门禁...</p></div>
       </section>
 
       <section class="panel wide">

@@ -1,6 +1,8 @@
 const imagingState = {
   payload: null,
   fallbackData: null,
+  productionCenter: null,
+  productionApiReady: false,
   selectedResidentId: "",
   selectedInstitutionCode: "",
   selectedStudyId: ""
@@ -9,7 +11,7 @@ const imagingState = {
 const IMAGING_API_BASE = location.protocol === "file:" ? "" : `${location.origin}/api`;
 
 document.addEventListener("DOMContentLoaded", async () => {
-  await Promise.all([loadImagingCloud(), loadSolutionAHealth(), loadSolutionAStudies()]);
+  await Promise.all([loadImagingCloud(), loadProductionCenter(), loadSolutionAHealth(), loadSolutionAStudies()]);
   bindImagingControls();
   renderImagingCloud();
 });
@@ -33,6 +35,24 @@ async function loadImagingCloud() {
   imagingState.payload = buildFallbackImagingCloud();
 }
 
+async function loadProductionCenter() {
+  if (IMAGING_API_BASE) {
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${IMAGING_API_BASE}/imaging-cloud/production-center`);
+      if (response.ok) {
+        imagingState.productionCenter = await response.json();
+        imagingState.productionApiReady = true;
+        return;
+      }
+    } catch (error) {
+      // T00 may not have integrated the production route yet.
+    }
+  }
+  imagingState.productionApiReady = false;
+  imagingState.productionCenter = imagingState.payload?.productionCenter || fallbackProductionCenter();
+}
+
 function bindImagingControls() {
   document.querySelector("#resident-filter")?.addEventListener("change", async (event) => {
     imagingState.selectedResidentId = event.target.value;
@@ -45,12 +65,13 @@ function bindImagingControls() {
     renderImagingCloud();
   });
   document.querySelector("#reload-imaging")?.addEventListener("click", async () => {
-    await loadImagingCloud();
+    await Promise.all([loadImagingCloud(), loadProductionCenter()]);
     renderImagingCloud();
   });
   document.querySelector("#reload-solution-a")?.addEventListener("click", loadSolutionAHealth);
   document.querySelector("#reload-solution-a-studies")?.addEventListener("click", loadSolutionAStudies);
   document.querySelector("#ingest-form")?.addEventListener("submit", submitImagingIngest);
+  document.addEventListener("submit", handleProductionSubmit);
   document.addEventListener("click", handleImagingAction);
 }
 
@@ -62,11 +83,135 @@ function renderImagingCloud() {
   }
   renderFilters(payload);
   renderSummary(payload.summary || {});
+  renderProductionGate(imagingState.productionCenter || payload.productionCenter || fallbackProductionCenter());
   renderStudyTable(studies);
   renderMutualRecognition(payload.mutualRecognition || []);
   renderDevelopmentPlan(payload);
   renderGateways(payload);
   renderMobileViewer(studies.find((item) => item.id === imagingState.selectedStudyId) || studies[0], payload);
+}
+
+function renderProductionGate(center = {}) {
+  const target = document.querySelector("#production-gate");
+  if (!target) return;
+  const summary = center.summary || {};
+  const formalReady = center.productionReady === true;
+  const metrics = [
+    ["合成验收", summary.syntheticChecksPassed || 0, summary.syntheticChecks || 10],
+    ["生产端点", summary.endpointsReady || 0, summary.endpoints || 5],
+    ["现场签署", summary.requirementsSigned || 0, summary.requirements || 7],
+    ["故障演练", summary.drillsPassed || 0, summary.drills || 4],
+    ["上线审批", summary.approvalsSigned || 0, summary.approvals || 2]
+  ];
+  const blockers = (center.requirements || []).filter((item) => item.status !== "signed").slice(0, 7);
+  target.innerHTML = `
+    <div class="metric-grid">
+      <article class="metric-card"><span>功能状态</span><strong>${escapeHtml(center.functionalState || "ready-for-synthetic-acceptance")}</strong><small>合成闭环通过后才进入现场联调</small></article>
+      <article class="metric-card"><span>正式上线</span><strong>${formalReady ? "可上线" : "阻断"}</strong><small>${escapeHtml(center.formalGoLiveState || "blocked-until-site-evidence-signed")}</small></article>
+      ${metrics.map(([label, passed, total]) => `<article class="metric-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(passed)}/${escapeHtml(total)}</strong><small>${Number(passed) === Number(total) ? "已完成" : "仍需生产证据"}</small></article>`).join("")}
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>现场要求</th><th>责任方</th><th>关联端点</th><th>状态</th><th>证据</th></tr></thead>
+      <tbody>${blockers.map((item) => `<tr>
+        <td><strong>${escapeHtml(item.id)}</strong><br><small>${escapeHtml(item.title)}</small></td>
+        <td>${escapeHtml(item.owner)}</td>
+        <td>${escapeHtml((item.endpointIds || []).join("、") || "综合验收")}</td>
+        <td><span class="badge warn">${escapeHtml(item.status)}</span></td>
+        <td>${escapeHtml(item.evidenceRef || "待现场提交")}</td>
+      </tr>`).join("") || `<tr><td colspan="5">全部现场证据已签署；仍需确认故障演练和双人审批。</td></tr>`}</tbody>
+    </table></div>
+    <p><small>生产控制接口由 <code>imaging-cloud-production.js</code> 提供领域契约，公共路由由T00集成。</small></p>
+    ${renderProductionOperations(center)}`;
+}
+
+function renderProductionOperations(center = {}) {
+  const role = window.HealthCityAuth?.getUser?.()?.role;
+  if (!IMAGING_API_BASE) return `<p class="status-message">静态预览不写入生产证据；请在T00完成公共路由集成后登录操作。</p>`;
+  if (!imagingState.productionApiReady) return `<p class="status-message">生产领域服务已就绪，T00公共路由尚未接通；当前保持只读，避免把演示数据写成生产证据。</p>`;
+  if (!["commission", "institution"].includes(role)) return `<p class="status-message">当前角色仅可查看生产门禁。</p>`;
+  const options = (rows, label) => (rows || []).map((item)=>`<option value="${escapeHtml(item.id)}">${escapeHtml(item.id)} · ${escapeHtml(item[label] || item.name || item.title)}</option>`).join("");
+  return `<details class="production-operations">
+    <summary>生产操作工作台</summary>
+    <p id="production-action-status" class="status-message">所有动作均写入领域审计；现场证据不会由页面自动生成。</p>
+    <div class="imaging-layout">
+      <form class="ingest-form" data-production-action="endpoint">
+        <h3>生产端点探测</h3>
+        <label>端点<select name="id">${options(center.endpoints, "name")}</select></label>
+        <label>HTTPS / DICOM TLS 地址<input name="endpoint" required placeholder="https://production.example/fhir"></label>
+        <label>凭据引用<input name="credentialRef" required placeholder="vault://imaging/fhir"></label>
+        <label>证书 SHA-256<input name="certificateFingerprint" required placeholder="sha256:64位摘要"></label>
+        <label>时延(ms)<input name="latencyMs" type="number" min="0"></label>
+        <button class="inline-action primary" type="submit">记录探测通过</button>
+      </form>
+      <form class="ingest-form" data-production-action="synthetic">
+        <h3>合成数据验收</h3>
+        <label>检查项<select name="id">${options(center.syntheticChecks, "title")}</select></label>
+        <label>精确确认语<input name="confirmation" required placeholder="CONFIRM SYNTHETIC IMAGING CHECK"></label>
+        <label>证据引用<input name="evidenceRef" required></label>
+        <label>说明<input name="detail"></label>
+        <button class="inline-action primary" type="submit">记录合成验收通过</button>
+      </form>
+      <form class="ingest-form" data-production-action="requirement">
+        <h3>现场证据四眼流转</h3>
+        <label>要求<select name="id">${options(center.requirements, "title")}</select></label>
+        <label>动作<select name="action"><option value="submit-evidence">提交证据</option><option value="verify-evidence">独立核验</option><option value="reject-evidence">驳回证据</option></select></label>
+        <label>精确确认语<input name="confirmation" placeholder="SUBMIT/VERIFY IMAGING SITE EVIDENCE"></label>
+        <label>证据引用<input name="evidenceRef"></label>
+        <label>证据摘要<input name="evidenceDigest" placeholder="sha256:64位摘要"></label>
+        <label>外部签署人<input name="externalSigner"></label>
+        <label>外部机构<input name="externalOrganization"></label>
+        <label>核验引用<input name="verificationRef"></label>
+        <button class="inline-action primary" type="submit">执行证据动作</button>
+      </form>
+      <form class="ingest-form" data-production-action="drill">
+        <h3>生产故障演练</h3>
+        <label>演练<select name="id">${options(center.drills, "title")}</select></label>
+        <label>证据引用<input name="evidenceRef" required></label>
+        <button class="inline-action primary" type="submit">记录演练通过</button>
+      </form>
+      <form class="ingest-form" data-production-action="approval">
+        <h3>上线双人审批</h3>
+        <label>审批<select name="id">${options(center.approvals, "title")}</select></label>
+        <label>精确确认语<input name="confirmation" required placeholder="CONFIRM IMAGING PRODUCTION CUTOVER"></label>
+        <label>证据引用<input name="evidenceRef" required></label>
+        <button class="inline-action primary" type="submit">签署上线审批</button>
+      </form>
+    </div>
+  </details>`;
+}
+
+async function handleProductionSubmit(event) {
+  const form = event.target.closest?.("form[data-production-action]");
+  if (!form) return;
+  event.preventDefault();
+  const kind = form.dataset.productionAction;
+  const values = Object.fromEntries([...new FormData(form).entries()].filter(([, value])=>String(value).trim() !== ""));
+  const id = encodeURIComponent(values.id || "");
+  delete values.id;
+  const contracts = {
+    endpoint:{ path:`/imaging-cloud/production/endpoints/${id}/probe`, defaults:{ environment:"production", result:"passed" } },
+    synthetic:{ path:`/imaging-cloud/production/synthetic-checks/${id}/actions`, defaults:{ result:"passed", dataClass:"synthetic-test-data" } },
+    requirement:{ path:`/imaging-cloud/production/requirements/${id}/actions`, defaults:{} },
+    drill:{ path:`/imaging-cloud/production/drills/${id}/complete`, defaults:{ result:"passed" } },
+    approval:{ path:`/imaging-cloud/production/approvals/${id}/sign`, defaults:{} }
+  };
+  const contract = contracts[kind];
+  if (!contract || !id) return;
+  const status = document.querySelector("#production-action-status");
+  if (status) status.textContent = "正在提交生产控制动作...";
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${IMAGING_API_BASE}${contract.path}`, {
+      method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ ...values, ...contract.defaults })
+    });
+    const result = await response.json().catch(()=>({}));
+    if (!response.ok) throw new Error(result.message || result.error || `HTTP ${response.status}`);
+    await loadProductionCenter();
+    renderProductionGate(imagingState.productionCenter);
+  } catch (error) {
+    const nextStatus = document.querySelector("#production-action-status");
+    if (nextStatus) nextStatus.textContent = `提交失败：${error.message}`;
+  }
 }
 
 function renderFilters(payload) {
@@ -534,6 +679,7 @@ function buildFallbackImagingCloud() {
     qualityReviews: [],
     implementedFeatures: fallbackImplementedFeatures(),
     developmentPlan: fallbackDevelopmentPlan(),
+    productionCenter: fallbackProductionCenter(),
     emrCompatibility: {
       mainIndexRule: "医疗机构编码 + 身份证号 + 检查号",
       sourceSystems: ["PACS", "RIS", "EMR"],
@@ -543,6 +689,24 @@ function buildFallbackImagingCloud() {
     }
   };
   return imagingState.fallbackData;
+}
+
+function fallbackProductionCenter() {
+  return {
+    functionalState: "ready-for-synthetic-acceptance",
+    formalGoLiveState: "blocked-until-site-evidence-signed",
+    productionReady: false,
+    summary: { syntheticChecksPassed: 0, syntheticChecks: 10, endpointsReady: 0, endpoints: 5, requirementsSigned: 0, requirements: 7, drillsPassed: 0, drills: 4, approvalsSigned: 0, approvals: 2 },
+    requirements: [
+      { id: "IMG-SITE-01", title: "试点医院PACS/RIS/DICOM TLS全链路联调", owner: "试点医院信息科/放射科", endpointIds: ["imaging-pacs-ris", "imaging-orthanc"], status: "site-pending" },
+      { id: "IMG-SITE-02", title: "FHIR资源引用与EMR报告回写验收", owner: "平台互联互通组/医院病案部门", endpointIds: ["imaging-fhir"], status: "site-pending" },
+      { id: "IMG-SITE-03", title: "居民主索引、机构人员和授权范围核验", owner: "市卫生健康信息中心", endpointIds: ["imaging-mpi-audit"], status: "site-pending" },
+      { id: "IMG-SITE-04", title: "OHIF实名授权调阅、越权拒绝和访问留痕", owner: "影像产品与安全组", endpointIds: ["imaging-ohif", "imaging-mpi-audit"], status: "site-pending" },
+      { id: "IMG-SITE-05", title: "省内本地存储、等保三级、密码和隐私评估", owner: "网信与安全责任部门", endpointIds: [], status: "site-pending" },
+      { id: "IMG-SITE-06", title: "性能容量、备份恢复和灾备切换验收", owner: "平台运维组", endpointIds: ["imaging-fhir", "imaging-orthanc", "imaging-ohif"], status: "site-pending" },
+      { id: "IMG-SITE-07", title: "业务、技术和管理多方现场验收", owner: "项目办", endpointIds: [], status: "site-pending" }
+    ]
+  };
 }
 
 function fallbackImplementedFeatures() {

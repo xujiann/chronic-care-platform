@@ -97,6 +97,11 @@ test("体检项目字典、异常闭环、原件归档与联调证据形成上�
   assert.equal(followed.status, "followup-completed");
   const closed = PhysicalExaminationService.applyAbnormalCaseAction(state, abnormalCase.id, { action: "close", note: "证据完整，完成关闭" }, { actor: "hospital" });
   assert.equal(closed.status, "closed");
+  assert.throws(() => PhysicalExaminationService.applyAbnormalCaseAction(state, abnormalCase.id, { action: "notify", note: "非法重复通知" }, { actor: "hospital" }), /不允许从 closed/);
+  const reopened = PhysicalExaminationService.applyAbnormalCaseAction(state, abnormalCase.id, { action: "reopen", note: "复发后重新建单" }, { actor: "hospital" });
+  assert.equal(reopened.status, "reopened");
+  assert.throws(() => PhysicalExaminationService.applyAbnormalCaseAction(state, abnormalCase.id, { action: "close", note: "禁止重开后直接关闭" }, { actor: "hospital" }), /不允许从 reopened/);
+  assert.equal(closed.status, "closed");
 
   const report = state.personalRecords.find((item) => item.id === "physical-exam-r1-2026-center");
   const attachment = { id: "att-report", residentId: "r1", status: "active", scanStatus: "clean" };
