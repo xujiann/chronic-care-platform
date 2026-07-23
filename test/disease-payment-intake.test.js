@@ -111,6 +111,38 @@ test("formal grouper asynchronous job accepts a correlated signed callback exact
   const replay = Intake.receiveFormalGroupingReceipt(received.state, created.job.id, callback, "callback-adapter", Service.calculateCase);
   assert.equal(replay.idempotent, true);
   assert.equal(Intake.buildFormalGroupingOperations(replay.state).summary.completed, 1);
+  assert.equal(Intake.verifyFormalGroupingResultProjection(replay.state, replay.job), true);
+  assert.equal(replay.run.formalJobId, replay.job.id);
+  assert.equal(replay.run.correlationId, replay.job.correlationId);
+  assert.ok(replay.state.paymentCalculationLedger.every((row) => row.groupingRunId !== replay.run.id || row.formalJobId === replay.job.id));
+
+  const missingRunState = structuredClone(replay.state);
+  missingRunState.groupingRuns = missingRunState.groupingRuns.filter((run) => run.id !== replay.job.groupingRunId);
+  const missingRunJob = missingRunState.formalGroupingJobs.find((job) => job.id === replay.job.id);
+  assert.equal(Intake.verifyFormalGroupingJobLedger(missingRunJob), true);
+  assert.equal(Intake.verifyFormalGroupingResultProjection(missingRunState, missingRunJob), false);
+  assert.throws(
+    () => Intake.receiveFormalGroupingReceipt(missingRunState, missingRunJob.id, callback, "callback-adapter", Service.calculateCase),
+    /结果运行或支付测算账本交叉校验失败/
+  );
+
+  const missingCalculationState = structuredClone(replay.state);
+  missingCalculationState.paymentCalculationLedger = missingCalculationState.paymentCalculationLedger.filter((row) => row.groupingRunId !== replay.run.id);
+  const missingCalculationJob = missingCalculationState.formalGroupingJobs.find((job) => job.id === replay.job.id);
+  assert.equal(Intake.verifyFormalGroupingResultProjection(missingCalculationState, missingCalculationJob), false);
+  assert.throws(
+    () => Intake.createFormalGroupingJob(missingCalculationState, { idempotencyKey: "formal-idem-success", mode: "DRG", schemeVersion: "DRG-2.0-DL", caseIds: ["dp-case-001"] }, "operator"),
+    /结果运行或支付测算账本交叉校验失败/
+  );
+
+  const driftedResultState = structuredClone(replay.state);
+  driftedResultState.groupingRuns.find((run) => run.id === replay.run.id).results[0].groupCode = "FORGED-GROUP";
+  const driftedResultJob = driftedResultState.formalGroupingJobs.find((job) => job.id === replay.job.id);
+  const operations = Intake.buildFormalGroupingOperations(driftedResultState);
+  assert.equal(Intake.verifyFormalGroupingResultProjection(driftedResultState, driftedResultJob), false);
+  assert.equal(operations.summary.invalidJobs, 1);
+  assert.equal(operations.jobs[0].jobLedgerIntegrity, true);
+  assert.equal(operations.jobs[0].resultIntegrity, false);
 });
 
 test("formal grouper contract rejects untrusted signatures and signed content drift", () => {
