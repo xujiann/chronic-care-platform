@@ -108,17 +108,21 @@
     },
     {
       "lineId": "T06",
-      "candidateHead": "a5cfe07812e93b428baa007aaf644b608bba7ce8",
+      "candidateHead": "8a161560f69016ec8372cfd89dfbf24afb047a80",
       "decision": "accepted",
-      "reviewedAt": "2026-07-23T07:57:57.048Z",
+      "reviewedAt": "2026-07-23T08:35:28.807Z",
       "reviewer": "T00",
       "checks": [
         "git diff --check",
-        "105 nursing, escort domain, readiness and static portal tests passed independently",
+        "117 of 117 release prerequisite tests passed with the locked dependency set",
+        "32 nursing and escort domain tests passed independently",
+        "139 main integration API, static portal and nursing-escort domain tests passed",
         "rescheduling releases original resources and requires an approved replacement assignment",
         "no-show handling requires grace-period attendance evidence and a bound human decision",
         "resident timeline chronology, notification plans and provider receipts are order-, resident-, status- and idempotency-bound",
         "issued capacity reservations bind worker, service date, ordinal and digest and reject concurrent overbooking",
+        "cancellation, completed rescheduling and dispatch rejection release only a digest-bound committed capacity reservation",
+        "dispatch assignment and evidence bindings are immutable after issuance",
         "qualification, institution scope, high-risk, service evidence, complaint, settlement, cancellation and refund paths fail closed"
       ],
       "blockers": []
