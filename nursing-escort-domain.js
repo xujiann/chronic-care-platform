@@ -15,6 +15,37 @@
   const ISSUED_DISPATCH_DECISION_LIMIT = 1000;
   const ISSUED_CAPACITY_RESERVATIONS = new Map();
   const ISSUED_CAPACITY_RESERVATION_LIMIT = 2000;
+  const INVASIVE_NURSING_SERVICES = new Set([
+    "intravenous catheter maintenance",
+    "picc maintenance",
+    "wound care",
+    "wound and ostomy care",
+    "tube care",
+    "peritoneal dialysis care"
+  ]);
+  const NURSING_INTAKE_POLICY_VERSION = "internet-nursing-intake-v1";
+  const NURSING_ASSESSMENT_POLICY_VERSION = "internet-nursing-assessment-v1";
+  const NURSING_PRICE_CATALOG_VERSION = "internet-nursing-price-2026-v1";
+  const SPECIALIST_NURSING_PROTOCOLS = Object.freeze({
+    "intravenous catheter maintenance": Object.freeze({
+      version: "intravenous-catheter-maintenance-v1",
+      requiredEquipment: Object.freeze(["sterile dressing kit", "disinfection kit", "medical waste container"]),
+      requiredRiskChecks: Object.freeze(["catheter-site-infection", "catheter-patency", "bleeding"]),
+      requiredRecordFields: Object.freeze(["catheterType", "catheterSite", "siteCondition", "patencyResult"])
+    }),
+    "wound and ostomy care": Object.freeze({
+      version: "wound-ostomy-care-v1",
+      requiredEquipment: Object.freeze(["sterile dressing kit", "wound measuring tool", "medical waste container"]),
+      requiredRiskChecks: Object.freeze(["infection", "bleeding", "skin-integrity"]),
+      requiredRecordFields: Object.freeze(["woundGrade", "woundSize", "exudate", "stomaCondition"])
+    }),
+    "peritoneal dialysis care": Object.freeze({
+      version: "peritoneal-dialysis-care-v1",
+      requiredEquipment: Object.freeze(["dialysis exchange kit", "sterile mask", "effluent inspection kit", "medical waste container"]),
+      requiredRiskChecks: Object.freeze(["peritonitis", "catheter-site-infection", "effluent-abnormality"]),
+      requiredRecordFields: Object.freeze(["effluentAppearance", "catheterSite", "exchangeVolumeMl", "dwellTimeMinutes"])
+    })
+  });
 
   const WORKFLOWS = Object.freeze({
     nursing: Object.freeze({
@@ -87,11 +118,11 @@
 
   const EVIDENCE_GATES = Object.freeze({
     nursing: Object.freeze({
-      assessed: ["identity-verification", "first-visit-assessment", "signed-consent"],
+      assessed: ["identity-verification", "first-visit-assessment", "clinical-assessment", "signed-consent", "consent-storage-receipt"],
       dispatched: ["qualification-snapshot", "capacity-reservation", "dispatch-decision"],
       accepted: ["worker-acceptance"],
-      "in-service": ["identity-verification", "location-start", "service-check-in"],
-      completed: ["service-record", "location-end", "resident-confirmation", "exception-declaration"],
+      "in-service": ["identity-verification", "service-readiness", "location-start", "service-check-in"],
+      completed: ["service-record", "service-archive", "location-end", "resident-confirmation", "exception-declaration"],
       "settlement-pending": ["pricing-confirmation", "financial-dispatch"],
       settled: ["financial-callback", "reconciliation-result"],
       "cancel-requested": ["cancellation-request"],
@@ -112,8 +143,8 @@
       "worker-dispatched": ["qualification-snapshot", "capacity-reservation", "dispatch-decision"],
       accepted: ["worker-acceptance"],
       "hospital-confirmed": ["hospital-handoff"],
-      "in-service": ["identity-verification", "location-start", "service-check-in"],
-      completed: ["service-record", "location-end", "resident-confirmation", "exception-declaration"],
+      "in-service": ["identity-verification", "service-readiness", "location-start", "service-check-in"],
+      completed: ["service-record", "service-archive", "location-end", "resident-confirmation", "exception-declaration"],
       "settlement-pending": ["pricing-confirmation", "financial-dispatch"],
       settled: ["financial-callback", "reconciliation-result"],
       "cancel-requested": ["cancellation-request"],
@@ -168,6 +199,169 @@
   function parseTime(value) {
     const time = Date.parse(String(value || ""));
     return Number.isFinite(time) ? time : null;
+  }
+
+  function nursingIntakeIdempotencyKey(order = {}) {
+    const preferredAt = parseTime(order.preferredAt);
+    const slot = preferredAt === null ? "" : new Date(preferredAt).toISOString();
+    return [
+      "nursing",
+      String(order.residentId || "").trim(),
+      String(order.institutionId || "").trim(),
+      String(order.serviceItem || "").trim().toLowerCase(),
+      slot
+    ].join(":");
+  }
+
+  function validateNursingOrderIntake(order = {}, context = {}) {
+    const reasons = [];
+    const now = parseTime(context.now || new Date().toISOString());
+    const preferredAt = parseTime(order.preferredAt);
+    const durationMinutes = Number(order.durationMinutes);
+    const institution = context.institution || {};
+    const activeOrders = Array.isArray(context.orders) ? context.orders : [];
+    const district = String(order.district || "").trim();
+    const serviceArea = new Set(Array.isArray(institution.serviceArea) ? institution.serviceArea : []);
+    const expectedKey = nursingIntakeIdempotencyKey(order);
+    if (!String(order.residentId || "").trim()) reasons.push("intake-resident-missing");
+    if (!String(order.institutionId || "").trim()) reasons.push("intake-institution-missing");
+    if (!String(order.serviceItem || "").trim()) reasons.push("intake-service-item-missing");
+    if (!String(order.serviceObject || "").trim()) reasons.push("intake-service-object-missing");
+    if (!String(order.address || "").trim()) reasons.push("intake-address-missing");
+    if (preferredAt === null) reasons.push("intake-preferred-time-invalid");
+    if (preferredAt !== null && now !== null && preferredAt <= now) reasons.push("intake-preferred-time-not-future");
+    if (preferredAt !== null && now !== null && preferredAt > now + Number(context.maxAdvanceDays ?? 90) * 86400000) {
+      reasons.push("intake-preferred-time-too-far");
+    }
+    if (!Number.isInteger(durationMinutes) || durationMinutes < 30 || durationMinutes > 480) reasons.push("intake-duration-invalid");
+    if (!district) reasons.push("intake-district-missing");
+    if (serviceArea.size && district && !serviceArea.has(district)) reasons.push("intake-outside-service-area");
+    const latitude = Number(order.location?.lat);
+    const longitude = Number(order.location?.lng);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) reasons.push("intake-location-invalid");
+    if (!String(order.idempotencyKey || "").trim()) reasons.push("intake-idempotency-key-missing");
+    else if (order.idempotencyKey !== expectedKey) reasons.push("intake-idempotency-key-mismatch");
+    const duplicate = activeOrders.find((item) =>
+      item.id !== order.id &&
+      !TERMINAL_STATES.has(canonicalStatus(item.status, "nursing")) &&
+      nursingIntakeIdempotencyKey(item) === expectedKey
+    );
+    if (duplicate) reasons.push("intake-duplicate-active-order");
+    return {
+      ok: reasons.length === 0,
+      reasons: [...new Set(reasons)],
+      expectedIdempotencyKey: expectedKey,
+      duplicateOrderId: String(duplicate?.id || ""),
+      policyVersion: NURSING_INTAKE_POLICY_VERSION
+    };
+  }
+
+  function buildNursingOrderIntakeEvidence(order = {}, details = {}, options = {}) {
+    const preferredAt = new Date(details.preferredAt || order.preferredAt || options.at || Date.now()).toISOString();
+    const candidate = {
+      ...order,
+      preferredAt,
+      durationMinutes: Number(details.durationMinutes ?? order.durationMinutes ?? 60),
+      district: String(details.district || order.district || ""),
+      address: String(details.address || order.address || ""),
+      location: {
+        lat: Number(details.lat ?? order.location?.lat),
+        lng: Number(details.lng ?? order.location?.lng),
+        source: String(details.locationSource || order.location?.source || "resident-map")
+      }
+    };
+    return {
+      ...candidate,
+      idempotencyKey: nursingIntakeIdempotencyKey(candidate),
+      intakePolicyVersion: NURSING_INTAKE_POLICY_VERSION
+    };
+  }
+
+  function buildNursingAssessmentEvidence(order = {}, details = {}, options = {}) {
+    const assessedAt = new Date(options.at || Date.now()).toISOString();
+    const validUntil = new Date(details.validUntil || new Date(assessedAt).getTime() + Number(details.validHours ?? 72) * 3600000).toISOString();
+    const passed = details.eligible === true;
+    const consentSigned = details.consentSigned === true;
+    const assessmentId = String(details.assessmentId || `nursing:${order.id || "order"}:assessment:${assessedAt}`);
+    return {
+      identityVerified: details.identityVerified === true,
+      firstVisitAssessment: passed ? "passed" : "failed",
+      informedConsent: consentSigned ? "signed" : "pending",
+      clinicalAssessment: {
+        id: assessmentId,
+        status: passed ? "passed" : "failed",
+        orderId: String(order.id || ""),
+        residentId: String(order.residentId || ""),
+        institutionId: String(order.institutionId || ""),
+        clinicianId: String(details.clinicianId || ""),
+        clinicianRole: String(details.clinicianRole || "registered-clinician"),
+        sourceEncounterId: String(details.sourceEncounterId || ""),
+        conditions: Array.isArray(details.conditions) ? details.conditions.filter(Boolean) : [],
+        contraindicationChecks: Array.isArray(details.contraindicationChecks) ? details.contraindicationChecks.filter(Boolean) : [],
+        riskLevel: String(details.riskLevel || order.riskLevel || "medium"),
+        assessedAt,
+        validUntil,
+        policyVersion: NURSING_ASSESSMENT_POLICY_VERSION
+      },
+      consentAttachment: {
+        id: String(details.consentId || `nursing:${order.id || "order"}:consent:${assessedAt}`),
+        status: consentSigned ? "signed" : "pending",
+        orderId: String(order.id || ""),
+        residentId: String(order.residentId || ""),
+        signerId: String(details.signerId || ""),
+        signerRole: String(details.signerRole || "resident"),
+        signerName: String(details.signerName || ""),
+        signedAt: consentSigned ? assessedAt : "",
+        version: String(details.consentVersion || "internet-nursing-consent-v1"),
+        objectKey: String(details.objectKey || ""),
+        contentHash: String(details.contentHash || ""),
+        storageReceiptId: String(details.storageReceiptId || ""),
+        policyVersion: NURSING_ASSESSMENT_POLICY_VERSION
+      }
+    };
+  }
+
+  function validateNursingAssessmentEvidence(order = {}, options = {}) {
+    const reasons = [];
+    const assessment = order.clinicalAssessment;
+    const consent = order.consentAttachment;
+    const at = parseTime(options.at || new Date().toISOString());
+    if (!order.identityVerified) reasons.push("assessment-identity-not-verified");
+    if (!assessment || typeof assessment !== "object" || Array.isArray(assessment)) {
+      reasons.push("clinical-assessment-missing");
+    } else {
+      if (assessment.status !== "passed" || order.firstVisitAssessment !== "passed") reasons.push("clinical-assessment-not-passed");
+      if (assessment.orderId !== String(order.id || "")) reasons.push("clinical-assessment-order-mismatch");
+      if (assessment.residentId !== String(order.residentId || "")) reasons.push("clinical-assessment-resident-mismatch");
+      if (assessment.institutionId !== String(order.institutionId || "")) reasons.push("clinical-assessment-institution-mismatch");
+      if (!assessment.clinicianId) reasons.push("clinical-assessment-clinician-missing");
+      if (!assessment.sourceEncounterId) reasons.push("clinical-assessment-encounter-missing");
+      if (!Array.isArray(assessment.conditions) || !assessment.conditions.filter(Boolean).length) reasons.push("clinical-assessment-condition-missing");
+      const checks = Array.isArray(assessment.contraindicationChecks) ? assessment.contraindicationChecks : [];
+      if (!checks.length) reasons.push("clinical-assessment-contraindication-checks-missing");
+      if (checks.some((item) => !item?.code || item.status !== "cleared")) reasons.push("clinical-assessment-contraindication-not-cleared");
+      if (assessment.policyVersion !== NURSING_ASSESSMENT_POLICY_VERSION) reasons.push("clinical-assessment-policy-version-invalid");
+      const assessedAt = parseTime(assessment.assessedAt);
+      const validUntil = parseTime(assessment.validUntil);
+      if (assessedAt === null) reasons.push("clinical-assessment-time-invalid");
+      if (validUntil === null || (at !== null && validUntil <= at)) reasons.push("clinical-assessment-expired");
+      if (assessedAt !== null && validUntil !== null && validUntil <= assessedAt) reasons.push("clinical-assessment-validity-invalid");
+      if (assessment.riskLevel === "high" && order.riskReview?.status !== "approved") reasons.push("clinical-assessment-high-risk-review-missing");
+    }
+    if (!consent || typeof consent !== "object" || Array.isArray(consent)) {
+      reasons.push("consent-storage-receipt-missing");
+    } else {
+      if (order.informedConsent !== "signed" || consent.status !== "signed") reasons.push("consent-not-signed");
+      if (consent.orderId !== String(order.id || "")) reasons.push("consent-order-mismatch");
+      if (consent.residentId !== String(order.residentId || "")) reasons.push("consent-resident-mismatch");
+      if (!consent.signerId || !consent.signerName) reasons.push("consent-signer-missing");
+      if (!consent.objectKey) reasons.push("consent-object-key-missing");
+      if (!/^sha256:[a-f0-9]{64}$/i.test(String(consent.contentHash || ""))) reasons.push("consent-content-hash-invalid");
+      if (!consent.storageReceiptId) reasons.push("consent-storage-receipt-id-missing");
+      if (parseTime(consent.signedAt) === null) reasons.push("consent-signed-time-invalid");
+      if (consent.policyVersion !== NURSING_ASSESSMENT_POLICY_VERSION) reasons.push("consent-policy-version-invalid");
+    }
+    return { ok: reasons.length === 0, reasons: [...new Set(reasons)], assessment, consent };
   }
 
   function isExpired(value, now = new Date()) {
@@ -250,6 +444,11 @@
     if (normalizedDomain === "nursing") {
       if (order.firstVisitAssessment !== "passed") missing.push("first-visit-assessment");
       if (order.informedConsent !== "signed" || order.consentAttachment?.status !== "signed") missing.push("signed-consent");
+      const assessment = validateNursingAssessmentEvidence(order);
+      if (!assessment.ok) {
+        missing.push("clinical-assessment");
+        if (assessment.reasons.some((item) => item.startsWith("consent-"))) missing.push("consent-storage-receipt");
+      }
     } else {
       if (!["eligible", "passed", "approved"].includes(String(order.eligibilityResult?.status || order.eligibilityResult || "").toLowerCase())) missing.push("eligibility-result");
       if (!order.providerAdmissionSnapshot && order.provider?.published !== true) missing.push("provider-admission-snapshot");
@@ -772,6 +971,197 @@
     return { ok: reasons.length === 0, trace, reasons };
   }
 
+  function serviceItemsForEvidence(domain, order = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const items = normalizedDomain === "nursing"
+      ? [order.serviceItem]
+      : Array.isArray(order.serviceItems) ? order.serviceItems : [];
+    return [...new Set(items.map((item) => String(item || "").trim()).filter(Boolean))].sort();
+  }
+
+  function specialistNursingProtocol(serviceItem) {
+    return SPECIALIST_NURSING_PROTOCOLS[String(serviceItem || "").trim().toLowerCase()] || null;
+  }
+
+  function buildNursingSpecialistProtocolEvidence(order = {}, details = {}, options = {}) {
+    const at = new Date(options.at || Date.now()).toISOString();
+    const protocol = specialistNursingProtocol(order.serviceItem);
+    if (!protocol) return {};
+    const phase = String(details.phase || "start");
+    const riskChecks = (Array.isArray(details.riskChecks) ? details.riskChecks : []).map((item) =>
+      typeof item === "string" ? { code: item, status: "cleared" } : { ...item }
+    );
+    const equipment = (Array.isArray(details.equipment) ? details.equipment : []).map((item) =>
+      typeof item === "string" ? { name: item, status: "verified" } : { ...item }
+    );
+    return {
+      specialistProtocolEvidence: {
+        id: String(details.id || `nursing:${order.id || "order"}:${protocol.version}:${phase}:${at}`),
+        status: phase === "complete" ? "completed" : "verified",
+        phase,
+        orderId: String(order.id || ""),
+        residentId: String(order.residentId || ""),
+        nurseId: String(order.nurseId || ""),
+        serviceItem: String(order.serviceItem || ""),
+        protocolVersion: protocol.version,
+        riskChecks,
+        equipment,
+        procedureRecord: details.procedureRecord && typeof details.procedureRecord === "object" ? { ...details.procedureRecord } : {},
+        outcome: String(details.outcome || ""),
+        patientEducation: String(details.patientEducation || ""),
+        exceptionDeclared: details.exceptionDeclared === true,
+        verifiedAt: at,
+        policyVersion: WORKFLOW_POLICY_VERSION
+      }
+    };
+  }
+
+  function validateNursingSpecialistProtocolEvidence(order = {}, phase = "start") {
+    const protocol = specialistNursingProtocol(order.serviceItem);
+    if (!protocol) return { ok: true, required: false, reasons: [], protocol: null, evidence: order.specialistProtocolEvidence };
+    const evidence = order.specialistProtocolEvidence;
+    const reasons = [];
+    if (!evidence || typeof evidence !== "object" || Array.isArray(evidence)) {
+      reasons.push("specialist-protocol-evidence-missing");
+    } else {
+      if (evidence.phase !== phase) reasons.push("specialist-protocol-phase-mismatch");
+      if (phase === "start" && evidence.status !== "verified") reasons.push("specialist-protocol-not-verified");
+      if (phase === "complete" && evidence.status !== "completed") reasons.push("specialist-protocol-not-completed");
+      if (evidence.orderId !== String(order.id || "")) reasons.push("specialist-protocol-order-mismatch");
+      if (evidence.residentId !== String(order.residentId || "")) reasons.push("specialist-protocol-resident-mismatch");
+      if (evidence.nurseId !== String(order.nurseId || "")) reasons.push("specialist-protocol-nurse-mismatch");
+      if (evidence.serviceItem !== String(order.serviceItem || "")) reasons.push("specialist-protocol-service-mismatch");
+      if (evidence.protocolVersion !== protocol.version) reasons.push("specialist-protocol-version-invalid");
+      if (evidence.policyVersion !== WORKFLOW_POLICY_VERSION) reasons.push("specialist-protocol-policy-version-invalid");
+      if (parseTime(evidence.verifiedAt) === null) reasons.push("specialist-protocol-time-invalid");
+      const riskByCode = new Map((Array.isArray(evidence.riskChecks) ? evidence.riskChecks : []).map((item) => [item?.code, item]));
+      protocol.requiredRiskChecks.forEach((code) => {
+        if (riskByCode.get(code)?.status !== "cleared") reasons.push(`specialist-risk-check-not-cleared:${code}`);
+      });
+      const equipmentByName = new Map((Array.isArray(evidence.equipment) ? evidence.equipment : []).map((item) => [item?.name, item]));
+      protocol.requiredEquipment.forEach((name) => {
+        if (equipmentByName.get(name)?.status !== "verified") reasons.push(`specialist-equipment-not-verified:${name}`);
+      });
+      if (phase === "complete") {
+        const record = evidence.procedureRecord && typeof evidence.procedureRecord === "object" ? evidence.procedureRecord : {};
+        protocol.requiredRecordFields.forEach((field) => {
+          if (record[field] === undefined || record[field] === null || String(record[field]).trim() === "") {
+            reasons.push(`specialist-record-field-missing:${field}`);
+          }
+        });
+        if (!evidence.outcome) reasons.push("specialist-outcome-missing");
+        if (!evidence.patientEducation) reasons.push("specialist-patient-education-missing");
+        if (evidence.exceptionDeclared !== true) reasons.push("specialist-exception-declaration-missing");
+      }
+    }
+    return { ok: reasons.length === 0, required: true, reasons: [...new Set(reasons)], protocol, evidence };
+  }
+
+  function validateServiceReadiness(domain, order = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const orderId = String(order.id || "").trim();
+    const residentId = String(order.residentId || "").trim();
+    const subjectId = serviceAssignedSubject(normalizedDomain, order);
+    const expectedItems = serviceItemsForEvidence(normalizedDomain, order);
+    const readiness = order.serviceReadiness;
+    const reasons = [];
+    if (!readiness || typeof readiness !== "object" || Array.isArray(readiness)) {
+      reasons.push("service-readiness-missing");
+    } else {
+      if (readiness.status !== "verified") reasons.push("service-readiness-not-verified");
+      if (readiness.orderId !== orderId) reasons.push("service-readiness-order-mismatch");
+      if (readiness.domain !== normalizedDomain) reasons.push("service-readiness-domain-mismatch");
+      if (readiness.subjectId !== subjectId) reasons.push("service-readiness-subject-mismatch");
+      if (readiness.residentId !== residentId) reasons.push("service-readiness-resident-mismatch");
+      const actualItems = Array.isArray(readiness.serviceItems)
+        ? [...new Set(readiness.serviceItems.map((item) => String(item || "").trim()).filter(Boolean))].sort()
+        : [];
+      if (!expectedItems.length) reasons.push("service-readiness-scope-missing");
+      if (JSON.stringify(actualItems) !== JSON.stringify(expectedItems)) reasons.push("service-readiness-scope-mismatch");
+      if (parseTime(readiness.checkedAt) === null) reasons.push("service-readiness-time-invalid");
+      const equipment = Array.isArray(readiness.equipmentChecklist) ? readiness.equipmentChecklist : [];
+      if (!equipment.length) reasons.push("service-equipment-checklist-missing");
+      if (equipment.some((item) => !String(item?.name || "").trim() || item?.status !== "verified")) {
+        reasons.push("service-equipment-not-verified");
+      }
+      const emergency = readiness.emergencyReadiness;
+      if (!emergency || emergency.status !== "verified") reasons.push("service-emergency-readiness-invalid");
+      if (!String(emergency?.contactId || "").trim()) reasons.push("service-emergency-contact-missing");
+      if (normalizedDomain === "nursing" && emergency?.oneClickAlertTested !== true) reasons.push("one-click-alert-not-tested");
+      if (normalizedDomain === "escort" && emergency?.hospitalRouteConfirmed !== true) reasons.push("escort-hospital-route-not-confirmed");
+      const coordination = readiness.coordinationPlan;
+      if (!coordination || coordination.status !== "confirmed") reasons.push("service-coordination-not-confirmed");
+      if (!String(coordination?.hospitalContactId || "").trim()) reasons.push("service-hospital-contact-missing");
+      if (!String(coordination?.supportContactId || "").trim()) reasons.push("service-support-contact-missing");
+    }
+    return { ok: reasons.length === 0, readiness, reasons };
+  }
+
+  function nursingServiceRequiresWasteHandover(order = {}) {
+    return serviceItemsForEvidence("nursing", order)
+      .some((item) => INVASIVE_NURSING_SERVICES.has(item.toLowerCase()));
+  }
+
+  function validateServiceArchive(domain, order = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const orderId = String(order.id || "").trim();
+    const residentId = String(order.residentId || "").trim();
+    const subjectId = serviceAssignedSubject(normalizedDomain, order);
+    const record = order.serviceRecord;
+    const receipt = order.serviceArchiveReceipt;
+    const reasons = [];
+    if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)) {
+      reasons.push("service-archive-receipt-missing");
+    } else {
+      if (receipt.status !== "accepted") reasons.push("service-archive-not-accepted");
+      if (!receipt.id) reasons.push("service-archive-receipt-id-missing");
+      if (receipt.orderId !== orderId) reasons.push("service-archive-order-mismatch");
+      if (receipt.domain !== normalizedDomain) reasons.push("service-archive-domain-mismatch");
+      if (receipt.subjectId !== subjectId) reasons.push("service-archive-subject-mismatch");
+      if (receipt.residentId !== residentId) reasons.push("service-archive-resident-mismatch");
+      if (receipt.serviceRecordId !== record?.id) reasons.push("service-archive-record-mismatch");
+      const acceptedTargets = normalizedDomain === "nursing"
+        ? new Set(["EMR"])
+        : new Set(["HIS", "outpatient-guidance-platform"]);
+      if (!acceptedTargets.has(receipt.targetSystem)) reasons.push("service-archive-target-invalid");
+      const archivedAt = parseTime(receipt.archivedAt);
+      const completedAt = parseTime(record?.completedAt);
+      if (archivedAt === null) reasons.push("service-archive-time-invalid");
+      if (archivedAt !== null && completedAt !== null && archivedAt < completedAt) reasons.push("service-archive-before-completion");
+    }
+    return { ok: reasons.length === 0, receipt, reasons };
+  }
+
+  function validateMedicalWasteHandover(domain, order = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    if (normalizedDomain !== "nursing" || !nursingServiceRequiresWasteHandover(order)) {
+      return { ok: true, required: false, handover: order.medicalWasteHandover, reasons: [] };
+    }
+    const orderId = String(order.id || "").trim();
+    const subjectId = serviceAssignedSubject(normalizedDomain, order);
+    const record = order.serviceRecord;
+    const handover = order.medicalWasteHandover;
+    const reasons = [];
+    if (!handover || typeof handover !== "object" || Array.isArray(handover)) {
+      reasons.push("medical-waste-handover-missing");
+    } else {
+      if (handover.status !== "received") reasons.push("medical-waste-handover-not-received");
+      if (!handover.id) reasons.push("medical-waste-handover-id-missing");
+      if (handover.orderId !== orderId) reasons.push("medical-waste-order-mismatch");
+      if (handover.domain !== normalizedDomain) reasons.push("medical-waste-domain-mismatch");
+      if (handover.subjectId !== subjectId) reasons.push("medical-waste-subject-mismatch");
+      if (handover.serviceRecordId !== record?.id) reasons.push("medical-waste-record-mismatch");
+      if (!Array.isArray(handover.wasteTypes) || !handover.wasteTypes.filter(Boolean).length) reasons.push("medical-waste-types-missing");
+      if (!String(handover.containerSealId || "").trim()) reasons.push("medical-waste-container-seal-missing");
+      if (!String(handover.receiverId || "").trim()) reasons.push("medical-waste-receiver-missing");
+      const handedOverAt = parseTime(handover.handedOverAt);
+      const completedAt = parseTime(record?.completedAt);
+      if (handedOverAt === null) reasons.push("medical-waste-handover-time-invalid");
+      if (handedOverAt !== null && completedAt !== null && handedOverAt < completedAt) reasons.push("medical-waste-handover-before-completion");
+    }
+    return { ok: reasons.length === 0, required: true, handover, reasons };
+  }
+
   function validateServiceEvidence(domain, order = {}, nextStatus) {
     const normalizedDomain = normalizeDomain(domain);
     const next = canonicalStatus(nextStatus, normalizedDomain);
@@ -784,6 +1174,12 @@
     if (!subjectId) reasons.push("service-subject-missing");
 
     if (next === "in-service") {
+      if (normalizedDomain === "nursing") {
+        const specialistProtocol = validateNursingSpecialistProtocolEvidence(order, "start");
+        reasons.push(...specialistProtocol.reasons);
+      }
+      const readiness = validateServiceReadiness(normalizedDomain, order);
+      reasons.push(...readiness.reasons);
       const startTrace = validateBoundServiceTrace(normalizedDomain, order, "service-start");
       reasons.push(...startTrace.reasons);
       const checkIn = order.serviceCheckIn;
@@ -803,6 +1199,10 @@
     }
 
     if (next === "completed") {
+      if (normalizedDomain === "nursing") {
+        const specialistProtocol = validateNursingSpecialistProtocolEvidence(order, "complete");
+        reasons.push(...specialistProtocol.reasons);
+      }
       const startTrace = validateBoundServiceTrace(normalizedDomain, order, "service-start");
       const endTrace = validateBoundServiceTrace(normalizedDomain, order, "service-complete");
       reasons.push(...startTrace.reasons, ...endTrace.reasons);
@@ -845,6 +1245,9 @@
         const completedAt = parseTime(order.serviceRecord?.completedAt);
         if (confirmedAt !== null && completedAt !== null && confirmedAt < completedAt) reasons.push("resident-confirmation-before-completion");
       }
+      const archive = validateServiceArchive(normalizedDomain, order);
+      const wasteHandover = validateMedicalWasteHandover(normalizedDomain, order);
+      reasons.push(...archive.reasons, ...wasteHandover.reasons);
       if (order.adverseEvent?.status && !["none", "closed", "resolved"].includes(order.adverseEvent.status)) reasons.push("adverse-event-open");
     }
 
@@ -866,6 +1269,21 @@
     const residentId = String(order.residentId || "").trim();
     const subjectId = serviceAssignedSubject(normalizedDomain, order);
     const traceId = `${normalizedDomain}:${orderId}:service-start:${at}`;
+    const equipmentChecklist = (Array.isArray(details.equipmentItems) ? details.equipmentItems : [])
+      .map((item) => ({
+        name: String(typeof item === "string" ? item : item?.name || ""),
+        status: details.equipmentVerified === true ? "verified" : "pending"
+      }))
+      .filter((item) => item.name);
+    const emergencyVerified = details.emergencyReady === true
+      && Boolean(String(details.emergencyContactId || "").trim())
+      && (normalizedDomain === "nursing" ? details.oneClickAlertTested === true : details.hospitalRouteConfirmed === true);
+    const coordinationConfirmed = details.coordinationConfirmed === true
+      && Boolean(String(details.hospitalContactId || "").trim())
+      && Boolean(String(details.supportContactId || "").trim());
+    const specialistEvidence = normalizedDomain === "nursing"
+      ? buildNursingSpecialistProtocolEvidence(order, { ...(details.specialistProtocol || {}), phase: "start" }, { at })
+      : {};
     const tracePoint = {
       id: traceId,
       stage: "service-start",
@@ -891,6 +1309,34 @@
         tracePointId: traceId,
         checkedInAt: at
       },
+      serviceReadiness: {
+        status: details.readinessVerified === true
+          && equipmentChecklist.length > 0
+          && equipmentChecklist.every((item) => item.status === "verified")
+          && emergencyVerified
+          && coordinationConfirmed ? "verified" : "rejected",
+        orderId,
+        domain: normalizedDomain,
+        subjectId,
+        residentId,
+        serviceItems: serviceItemsForEvidence(normalizedDomain, order),
+        equipmentChecklist,
+        emergencyReadiness: {
+          status: emergencyVerified ? "verified" : "pending",
+          contactId: String(details.emergencyContactId || ""),
+          oneClickAlertTested: normalizedDomain === "nursing" && details.oneClickAlertTested === true,
+          hospitalRouteConfirmed: normalizedDomain === "escort" && details.hospitalRouteConfirmed === true
+        },
+        coordinationPlan: {
+          status: coordinationConfirmed ? "confirmed" : "pending",
+          hospitalContactId: String(details.hospitalContactId || ""),
+          supportContactId: String(details.supportContactId || ""),
+          communityContactId: String(details.communityContactId || "")
+        },
+        checkedAt: at,
+        policyVersion: WORKFLOW_POLICY_VERSION
+      },
+      ...specialistEvidence,
       serviceRecordStatus: "in-progress",
       serviceRecord: {
         ...(order.serviceRecord || {}),
@@ -925,16 +1371,37 @@
       verified: details.verified === true
     };
     const actions = Array.isArray(details.actions) ? details.actions.filter(Boolean) : [];
+    const serviceRecordId = String(order.serviceRecord?.id || `${normalizedDomain}:${orderId}:service-record`);
     const exceptionReport = details.exceptionReport && typeof details.exceptionReport === "object"
       ? { ...details.exceptionReport }
       : { status: "none" };
+    const medicalWaste = details.medicalWaste && typeof details.medicalWaste === "object"
+      ? {
+        medicalWasteHandover: {
+          id: String(details.medicalWaste.id || `${normalizedDomain}:${orderId}:medical-waste:${at}`),
+          status: details.medicalWaste.received === true ? "received" : "pending",
+          orderId,
+          domain: normalizedDomain,
+          subjectId,
+          serviceRecordId,
+          wasteTypes: Array.isArray(details.medicalWaste.wasteTypes) ? details.medicalWaste.wasteTypes.filter(Boolean) : [],
+          containerSealId: String(details.medicalWaste.containerSealId || ""),
+          receiverId: String(details.medicalWaste.receiverId || ""),
+          handedOverAt: String(details.medicalWaste.handedOverAt || at),
+          policyVersion: WORKFLOW_POLICY_VERSION
+        }
+      }
+      : {};
+    const specialistEvidence = normalizedDomain === "nursing"
+      ? buildNursingSpecialistProtocolEvidence(order, { ...(details.specialistProtocol || {}), phase: "complete" }, { at })
+      : {};
     return {
       locationTrace: "completed",
       locationTracePoints: [...(Array.isArray(order.locationTracePoints) ? order.locationTracePoints : []), tracePoint].slice(-30),
       serviceRecordStatus: "completed",
       serviceRecord: {
         ...(order.serviceRecord || {}),
-        id: String(order.serviceRecord?.id || `${normalizedDomain}:${orderId}:service-record`),
+        id: serviceRecordId,
         status: "completed",
         version: WORKFLOW_POLICY_VERSION,
         orderId,
@@ -946,6 +1413,20 @@
         ...(normalizedDomain === "nursing" ? { careActions: actions } : { serviceActions: actions }),
         exceptionReport
       },
+      serviceArchiveReceipt: {
+        id: String(details.archiveReceiptId || `${normalizedDomain}:${orderId}:archive:${at}`),
+        status: details.archiveAccepted === true ? "accepted" : "rejected",
+        orderId,
+        domain: normalizedDomain,
+        subjectId,
+        residentId,
+        serviceRecordId,
+        targetSystem: String(details.archiveTarget || (normalizedDomain === "nursing" ? "EMR" : "HIS")),
+        archivedAt: String(details.archivedAt || at),
+        policyVersion: WORKFLOW_POLICY_VERSION
+      },
+      ...specialistEvidence,
+      ...medicalWaste,
       residentConfirmation: {
         status: details.residentConfirmed === true ? "confirmed" : "rejected",
         orderId,
@@ -955,6 +1436,79 @@
       },
       adverseEvent: details.adverseEvent || order.adverseEvent || { status: "none" }
     };
+  }
+
+  function priceSnapshotDigestPayload(snapshot = {}) {
+    return {
+      status: snapshot.status,
+      orderId: snapshot.orderId,
+      domain: snapshot.domain,
+      serviceItem: snapshot.serviceItem,
+      catalogVersion: snapshot.catalogVersion,
+      baseAmountFen: snapshot.baseAmountFen,
+      insuranceAmountFen: snapshot.insuranceAmountFen,
+      selfPayAmountFen: snapshot.selfPayAmountFen,
+      currency: snapshot.currency,
+      lockedAt: snapshot.lockedAt,
+      policyVersion: snapshot.policyVersion
+    };
+  }
+
+  function buildOrderPriceSnapshot(domain, order = {}, details = {}, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const lockedAt = new Date(options.at || Date.now()).toISOString();
+    const feeAmountFen = financialAmountFen(order);
+    const baseAmountFen = Number.isSafeInteger(details.baseAmountFen) ? details.baseAmountFen : feeAmountFen;
+    const insuranceAmountFen = Number.isSafeInteger(details.insuranceAmountFen)
+      ? details.insuranceAmountFen
+      : Math.round(Number(order.settlement?.insuranceEstimate || 0) * 100);
+    const selfPayAmountFen = Number.isSafeInteger(details.selfPayAmountFen)
+      ? details.selfPayAmountFen
+      : Number.isSafeInteger(baseAmountFen) ? baseAmountFen - insuranceAmountFen : null;
+    const snapshot = {
+      status: "locked",
+      orderId: String(order.id || ""),
+      domain: normalizedDomain,
+      serviceItem: normalizedDomain === "nursing" ? String(order.serviceItem || "") : (order.serviceItems || []).join("|"),
+      catalogVersion: String(details.catalogVersion || (normalizedDomain === "nursing" ? NURSING_PRICE_CATALOG_VERSION : "escort-price-v1")),
+      baseAmountFen,
+      insuranceAmountFen,
+      selfPayAmountFen,
+      currency: "CNY",
+      lockedAt,
+      policyVersion: WORKFLOW_POLICY_VERSION
+    };
+    snapshot.digest = stableDigest(priceSnapshotDigestPayload(snapshot));
+    snapshot.id = String(details.id || `price:${snapshot.digest}`);
+    return { priceSnapshot: snapshot };
+  }
+
+  function validateOrderPriceSnapshot(domain, order = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const snapshot = order.priceSnapshot;
+    const reasons = [];
+    const amountFen = financialAmountFen(order);
+    if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) {
+      reasons.push("price-snapshot-missing");
+    } else {
+      if (snapshot.status !== "locked") reasons.push("price-snapshot-not-locked");
+      if (!snapshot.id) reasons.push("price-snapshot-id-missing");
+      if (snapshot.orderId !== String(order.id || "")) reasons.push("price-snapshot-order-mismatch");
+      if (snapshot.domain !== normalizedDomain) reasons.push("price-snapshot-domain-mismatch");
+      const expectedServiceItem = normalizedDomain === "nursing" ? String(order.serviceItem || "") : (order.serviceItems || []).join("|");
+      if (snapshot.serviceItem !== expectedServiceItem) reasons.push("price-snapshot-service-mismatch");
+      if (!snapshot.catalogVersion) reasons.push("price-snapshot-catalog-version-missing");
+      if (snapshot.currency !== "CNY") reasons.push("price-snapshot-currency-invalid");
+      if (!Number.isSafeInteger(snapshot.baseAmountFen) || snapshot.baseAmountFen < 0) reasons.push("price-snapshot-base-amount-invalid");
+      if (!Number.isSafeInteger(snapshot.insuranceAmountFen) || snapshot.insuranceAmountFen < 0) reasons.push("price-snapshot-insurance-amount-invalid");
+      if (!Number.isSafeInteger(snapshot.selfPayAmountFen) || snapshot.selfPayAmountFen < 0) reasons.push("price-snapshot-self-pay-amount-invalid");
+      if (snapshot.baseAmountFen !== snapshot.insuranceAmountFen + snapshot.selfPayAmountFen) reasons.push("price-snapshot-split-mismatch");
+      if (amountFen !== null && snapshot.baseAmountFen !== amountFen) reasons.push("price-snapshot-order-amount-mismatch");
+      if (snapshot.policyVersion !== WORKFLOW_POLICY_VERSION) reasons.push("price-snapshot-policy-version-invalid");
+      if (parseTime(snapshot.lockedAt) === null) reasons.push("price-snapshot-time-invalid");
+      if (snapshot.digest !== stableDigest(priceSnapshotDigestPayload(snapshot))) reasons.push("price-snapshot-digest-mismatch");
+    }
+    return { ok: reasons.length === 0, reasons: [...new Set(reasons)], snapshot, amountFen };
   }
 
   function financialAmountFen(order = {}) {
@@ -981,6 +1535,8 @@
     const dispatchReasons = [];
     const callbackReasons = [];
     const reconciliationReasons = [];
+    const priceSnapshot = validateOrderPriceSnapshot(normalizedDomain, order);
+    const priceSnapshotReasons = [...priceSnapshot.reasons];
 
     if (!orderId) pricingReasons.push("financial-order-id-missing");
     if (amountFen === null) pricingReasons.push("financial-amount-invalid");
@@ -992,6 +1548,8 @@
       if (pricing.domain !== normalizedDomain) pricingReasons.push("pricing-domain-mismatch");
       if (pricing.amountFen !== amountFen) pricingReasons.push("pricing-amount-mismatch");
       if (pricing.currency !== "CNY") pricingReasons.push("pricing-currency-invalid");
+      if (pricing.priceSnapshotId !== priceSnapshot.snapshot?.id) pricingReasons.push("pricing-snapshot-id-mismatch");
+      if (pricing.priceSnapshotDigest !== priceSnapshot.snapshot?.digest) pricingReasons.push("pricing-snapshot-digest-mismatch");
       if (pricing.policyVersion !== WORKFLOW_POLICY_VERSION) pricingReasons.push("pricing-policy-version-invalid");
       if (parseTime(pricing.confirmedAt) === null) pricingReasons.push("pricing-time-invalid");
     }
@@ -1047,7 +1605,7 @@
       }
     }
 
-    const reasons = [...new Set([...pricingReasons, ...dispatchReasons, ...callbackReasons, ...reconciliationReasons])];
+    const reasons = [...new Set([...priceSnapshotReasons, ...pricingReasons, ...dispatchReasons, ...callbackReasons, ...reconciliationReasons])];
     return {
       ok: reasons.length === 0,
       domain: normalizedDomain,
@@ -1055,6 +1613,7 @@
       orderId,
       amountFen,
       expectedIdempotencyKey: expectedKey,
+      priceSnapshotOk: priceSnapshotReasons.length === 0,
       pricingOk: pricingReasons.length === 0,
       dispatchOk: dispatchReasons.length === 0,
       callbackOk: next !== "settled" || callbackReasons.length === 0,
@@ -1074,7 +1633,14 @@
       throw error;
     }
     const command = buildFinancialCommand(normalizedDomain, order, "settlement");
+    const priceSnapshot = order.priceSnapshot || buildOrderPriceSnapshot(normalizedDomain, order, {
+      catalogVersion: options.catalogVersion,
+      insuranceAmountFen: Number.isSafeInteger(options.insuranceAmountFen)
+        ? options.insuranceAmountFen
+        : Math.round(Number(order.settlement?.insuranceEstimate || 0) * 100)
+    }, { at }).priceSnapshot;
     return {
+      priceSnapshot,
       pricingConfirmedAt: at,
       pricingConfirmation: {
         status: "confirmed",
@@ -1082,6 +1648,8 @@
         domain: normalizedDomain,
         amountFen,
         currency: "CNY",
+        priceSnapshotId: priceSnapshot.id,
+        priceSnapshotDigest: priceSnapshot.digest,
         confirmedAt: at,
         policyVersion: WORKFLOW_POLICY_VERSION
       },
@@ -2245,7 +2813,11 @@
     const types = new Set((Array.isArray(order.evidence) ? order.evidence : []).map((item) => typeof item === "string" ? item : item?.type).filter(Boolean));
     if (order.identityVerified) types.add("identity-verification");
     if (order.firstVisitAssessment === "passed") types.add("first-visit-assessment");
+    if (order.clinicalAssessment?.status === "passed") types.add("clinical-assessment");
     if (order.informedConsent === "signed" && order.consentAttachment?.status === "signed") types.add("signed-consent");
+    if (order.consentAttachment?.storageReceiptId && /^sha256:[a-f0-9]{64}$/i.test(String(order.consentAttachment?.contentHash || ""))) {
+      types.add("consent-storage-receipt");
+    }
     if (order.workerAcceptedAt || order.nurseAcceptedAt || order.status === "accepted") types.add("worker-acceptance");
     if (order.providerAdmissionSnapshot || order.provider?.published) types.add("provider-admission-snapshot");
     if (order.eligibilityResult) types.add("eligibility-result");
@@ -2254,7 +2826,10 @@
     if (tracePoints.some((item) => item.stage === "service-start" && item.verified !== false)) types.add("location-start");
     if (tracePoints.some((item) => item.stage === "service-complete" && item.verified !== false)) types.add("location-end");
     if (order.serviceCheckInAt || tracePoints.some((item) => item.stage === "service-start")) types.add("service-check-in");
+    if (order.serviceReadiness?.status === "verified") types.add("service-readiness");
     if (order.serviceRecord?.status === "completed" || order.serviceRecordStatus === "completed") types.add("service-record");
+    if (order.serviceArchiveReceipt?.status === "accepted") types.add("service-archive");
+    if (order.medicalWasteHandover?.status === "received") types.add("medical-waste-handover");
     if (order.residentConfirmation?.status === "confirmed" || order.residentConfirmation === "confirmed" || order.residentServiceConfirmation === "confirmed" || (order.serviceAttachments || []).some((item) => item.type === "resident-signature")) types.add("resident-confirmation");
     if (["none", "resolved"].includes(order.serviceRecord?.exceptionReport?.status) || ["none", "closed", "resolved"].includes(order.adverseEvent?.status)) types.add("exception-declaration");
     return types;
@@ -2650,6 +3225,16 @@
       throw error;
     }
     const candidate = { ...order, ...updates, status: transition.next };
+    if (normalizeDomain(domain) === "nursing" && transition.next === "assessed") {
+      const assessmentEvidence = validateNursingAssessmentEvidence(candidate, { at: options.at });
+      if (!assessmentEvidence.ok) {
+        const error = new Error(`invalid nursing assessment evidence: ${assessmentEvidence.reasons.join(", ")}`);
+        error.code = "ORDER_ASSESSMENT_EVIDENCE_INVALID";
+        error.statusCode = 409;
+        error.details = assessmentEvidence;
+        throw error;
+      }
+    }
     let dispatchIntegrity = null;
     if (transition.next === dispatchTargetState(domain)) {
       dispatchIntegrity = validateDispatchEvidence(domain, candidate, { at: options.at });
@@ -2815,10 +3400,19 @@
     WORKFLOWS,
     EVIDENCE_GATES,
     TERMINAL_STATES,
+    SPECIALIST_NURSING_PROTOCOLS,
+    NURSING_INTAKE_POLICY_VERSION,
+    NURSING_ASSESSMENT_POLICY_VERSION,
+    NURSING_PRICE_CATALOG_VERSION,
     normalizeDomain,
     canonicalStatus,
     allowedNextStates,
     validateTransition,
+    nursingIntakeIdempotencyKey,
+    validateNursingOrderIntake,
+    buildNursingOrderIntakeEvidence,
+    validateNursingAssessmentEvidence,
+    buildNursingAssessmentEvidence,
     validateNurseQualification,
     validateEscortWorkerQualification,
     dispatchTargetState,
@@ -2828,9 +3422,14 @@
     validateDispatchEvidence,
     assessOrderRisk,
     validateServiceEvidence,
+    specialistNursingProtocol,
+    validateNursingSpecialistProtocolEvidence,
+    buildNursingSpecialistProtocolEvidence,
     buildServiceStartEvidence,
     buildServiceCompletionEvidence,
     validateFinancialEvidence,
+    validateOrderPriceSnapshot,
+    buildOrderPriceSnapshot,
     buildSettlementDispatchEvidence,
     buildSettlementCompletionEvidence,
     validateRiskQualityEvidence,

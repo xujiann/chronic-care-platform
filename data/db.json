@@ -10111,7 +10111,12 @@
       "hospital outpatient guidance",
       "non-emergency transfer",
       "volunteer time bank"
-    ]
+    ],
+    "writePathPolicyVersion": "escort-write-path-v1",
+    "eventOutboxPolicyVersion": "escort-event-outbox-v1",
+    "careServiceRuntimeVersion": "care-service-runtime-v1",
+    "providerAdmissionPolicyVersion": "escort-provider-admission-v1",
+    "eligibilityPolicyVersion": "escort-eligibility-v1"
   },
   "escortServiceProviders": [
     {
@@ -10123,6 +10128,21 @@
       "serviceCapacity": "regular",
       "trainedWorkers": 128,
       "published": true,
+      "serviceItems": [
+        "mobility assistance",
+        "registration",
+        "exam escort",
+        "payment and medication pickup",
+        "family communication",
+        "psychological comfort"
+      ],
+      "admissionReview": {
+        "status": "approved",
+        "policyVersion": "escort-provider-admission-v1",
+        "approvedAt": "2026-01-05T09:00:00+08:00",
+        "validUntil": "2027-01-05T23:59:59+08:00",
+        "reviewReceiptId": "escort-admission-esp-pudong-carehub-2026"
+      },
       "pricing": {
         "baseFee": 160,
         "halfDayFee": 260,
@@ -10144,6 +10164,21 @@
       "serviceCapacity": "regular",
       "trainedWorkers": 104,
       "published": true,
+      "serviceItems": [
+        "mobility assistance",
+        "registration",
+        "exam escort",
+        "payment and medication pickup",
+        "family communication",
+        "psychological comfort"
+      ],
+      "admissionReview": {
+        "status": "approved",
+        "policyVersion": "escort-provider-admission-v1",
+        "approvedAt": "2026-01-08T09:00:00+08:00",
+        "validUntil": "2027-01-08T23:59:59+08:00",
+        "reviewReceiptId": "escort-admission-esp-xuhui-daycare-2026"
+      },
       "pricing": {
         "baseFee": 120,
         "halfDayFee": 220,
@@ -10165,6 +10200,17 @@
       "serviceCapacity": "pilot",
       "trainedWorkers": 96,
       "published": false,
+      "serviceItems": [
+        "registration",
+        "family communication"
+      ],
+      "admissionReview": {
+        "status": "pending",
+        "policyVersion": "escort-provider-admission-v1",
+        "approvedAt": "",
+        "validUntil": "",
+        "reviewReceiptId": ""
+      },
       "pricing": {
         "baseFee": 0,
         "halfDayFee": 80,
@@ -10690,7 +10736,10 @@
       "vital signs measurement",
       "blood glucose measurement",
       "wound care",
+      "wound and ostomy care",
       "tube care",
+      "intravenous catheter maintenance",
+      "peritoneal dialysis care",
       "postpartum care",
       "infant care",
       "PICC maintenance"
@@ -10698,10 +10747,18 @@
     "requiredEvidence": [
       "identity authentication",
       "first diagnosis assessment",
+      "clinical assessment",
       "signed informed consent",
+      "consent storage receipt",
       "nurse practice certificate",
+      "service equipment readiness",
+      "emergency and coordination readiness",
+      "specialist protocol evidence",
       "service location trace",
       "nursing record",
+      "medical waste handover",
+      "EMR archive receipt",
+      "price snapshot",
       "quality callback"
     ],
     "platformRequirements": [
@@ -10714,10 +10771,55 @@
     "riskControls": [
       "emergency plan",
       "one-click alert",
+      "medical waste recovery",
       "liability insurance",
       "medical accident insurance",
       "service recorder"
     ],
+    "p1Lifecycle": {
+      "version": "internet-nursing-p1-v1",
+      "tracks": [
+        "structured clinical assessment and consent storage",
+        "service area slot duration and idempotency",
+        "specialist nursing protocols",
+        "order price snapshot and financial reconciliation",
+        "complaint and incident SLA",
+        "resident timeline and notification receipts"
+      ],
+      "intakePolicyVersion": "internet-nursing-intake-v1",
+      "writePathVersion": "internet-nursing-write-path-v1",
+      "eventOutboxVersion": "internet-nursing-event-outbox-v1",
+      "careServiceRuntimeVersion": "care-service-runtime-v1",
+      "requesterAuthorization": {
+        "selfSource": "authenticated-session",
+        "delegatedSource": "resident-authorization-registry",
+        "delegatedReceiptRequired": true,
+        "allowedCreateRoles": [
+          "citizen",
+          "institution",
+          "commission"
+        ]
+      },
+      "assessmentPolicyVersion": "internet-nursing-assessment-v1",
+      "priceCatalogVersion": "internet-nursing-price-2026-v1",
+      "specialistProtocols": [
+        "intravenous-catheter-maintenance-v1",
+        "wound-ostomy-care-v1",
+        "peritoneal-dialysis-care-v1"
+      ],
+      "complaintSlaHours": {
+        "critical": 4,
+        "high": 4,
+        "medium": 24,
+        "low": 24
+      },
+      "incidentSlaHours": {
+        "critical": 2,
+        "high": 2,
+        "medium": 24,
+        "low": 24
+      }
+    },
     "notificationGateway": {
       "mode": "simulation",
       "enabled": true,
@@ -10759,8 +10861,20 @@
           "basePrice": 168,
           "insuranceEligible": true
         },
+        "wound and ostomy care": {
+          "basePrice": 198,
+          "insuranceEligible": true
+        },
         "tube care": {
           "basePrice": 198,
+          "insuranceEligible": true
+        },
+        "intravenous catheter maintenance": {
+          "basePrice": 260,
+          "insuranceEligible": true
+        },
+        "peritoneal dialysis care": {
+          "basePrice": 298,
           "insuranceEligible": true
         },
         "postpartum care": {
@@ -10891,7 +11005,29 @@
         "health commission supervision",
         "platform operations"
       ]
-    }
+    },
+    "practiceReferences": [
+      {
+        "title": "Internet plus home nursing service officially launched",
+        "publisher": "The Second Affiliated Hospital of Dalian Medical University",
+        "publishedAt": "2026-07-23",
+        "url": "https://www.shdmu.com/web/details/index?coid=23&cnId=18406",
+        "serviceItems": [
+          "intravenous catheter maintenance",
+          "wound and ostomy care",
+          "peritoneal dialysis care"
+        ],
+        "controls": [
+          "system review",
+          "specialist nurse dispatch",
+          "professional equipment checklist",
+          "one-click alert and location",
+          "medical waste recovery",
+          "EMR realtime archive",
+          "hospital-community-family coordination"
+        ]
+      }
+    ]
   },
   "internetNursingInstitutions": [
     {
@@ -10913,6 +11049,9 @@
       ],
       "serviceItems": [
         "wound care",
+        "wound and ostomy care",
+        "intravenous catheter maintenance",
+        "peritoneal dialysis care",
         "PICC maintenance",
         "blood glucose measurement",
         "postpartum care"
@@ -11048,6 +11187,9 @@
       "badPracticeRecord": "none",
       "specialties": [
         "wound care",
+        "wound and ostomy care",
+        "intravenous catheter maintenance",
+        "peritoneal dialysis care",
         "PICC maintenance",
         "blood glucose measurement"
       ],

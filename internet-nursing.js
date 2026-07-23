@@ -7,7 +7,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderNurseQueue(nursingDashboard?.orders || []);
     renderMobileNurseCards(nursingDashboard?.orders || []);
   });
-  document.querySelector("#nursing-institution-select")?.addEventListener("change", () => renderServiceItemSelect(nursingDashboard?.institutions || []));
+  document.querySelector("#nursing-institution-select")?.addEventListener("change", () => {
+    renderServiceItemSelect(nursingDashboard?.institutions || []);
+    renderNursingDistrictSelect(nursingDashboard?.institutions || []);
+  });
   await loadInternetNursingDashboard();
 });
 
@@ -539,9 +542,11 @@ function buildStaticSiteCutoverPack(policy) {
 
 function renderInternetNursingDashboard(dashboard) {
   renderNursingMetrics(dashboard.summary || {});
+  renderNursingP1Center(dashboard);
   renderRiskGuidance(dashboard.orders || [], dashboard.riskQueue || []);
   renderInstitutionSelect(dashboard.institutions || []);
   renderServiceItemSelect(dashboard.institutions || []);
+  renderNursingDistrictSelect(dashboard.institutions || []);
   renderNurseSelect(dashboard.nurses || []);
   renderMobileAppointmentStatus(dashboard.orders || []);
   renderMobileNurseCards(dashboard.orders || []);
@@ -563,6 +568,73 @@ function renderInternetNursingDashboard(dashboard) {
   if (citizenSummary) citizenSummary.textContent = `${dashboard.summary?.publishedInstitutions || 0} 家已发布机构`;
   const nurseSummary = document.querySelector("#nursing-nurse-summary");
   if (nurseSummary) nurseSummary.textContent = `${dashboard.summary?.qualifiedNurses || 0}/${dashboard.summary?.nurses || 0} 名护士合格`;
+}
+
+function buildNursingP1Tracks(dashboard = {}) {
+  const domain = window.NursingEscortDomain || {};
+  const orders = Array.isArray(dashboard.orders) ? dashboard.orders : [];
+  const protocols = domain.SPECIALIST_NURSING_PROTOCOLS || {};
+  const lifecycle = dashboard.policy?.p1Lifecycle || {};
+  const tracks = [
+    {
+      id: "assessment-signature",
+      label: "结构化评估与签名",
+      ready: typeof domain.validateNursingAssessmentEvidence === "function",
+      evidence: `${orders.filter((item) => domain.validateNursingAssessmentEvidence?.(item, { at: new Date() })?.ok).length} 单证据有效`,
+      boundary: "真实签名对象存储由现场适配器回传"
+    },
+    {
+      id: "intake-scheduling",
+      label: "区域时段、授权与幂等调度",
+      ready: typeof domain.validateNursingOrderIntake === "function" &&
+        typeof domain.validateSchedulingEvidence === "function" &&
+        lifecycle.writePathVersion === "internet-nursing-write-path-v1" &&
+        lifecycle.eventOutboxVersion === "internet-nursing-event-outbox-v1",
+      evidence: "授权、目录、字段白名单、命令幂等、事务外盒及提供方回执",
+      boundary: "T00 注入授权查询并原子持久化订单与外盒事件"
+    },
+    {
+      id: "specialist-protocols",
+      label: "三项专科护理协议",
+      ready: Object.keys(protocols).length === 3 && typeof domain.validateNursingSpecialistProtocolEvidence === "function",
+      evidence: `${Object.keys(protocols).length}/3 项协议：导管、伤口造口、腹膜透析`,
+      boundary: "设备、医废和 EMR 使用现场回执"
+    },
+    {
+      id: "pricing-settlement",
+      label: "订单锁价与结算",
+      ready: typeof domain.buildOrderPriceSnapshot === "function" && typeof domain.validateFinancialEvidence === "function",
+      evidence: `${orders.filter((item) => item.priceSnapshot?.status === "locked").length} 单已锁价`,
+      boundary: "支付、医保、发票和退款使用金融网关"
+    },
+    {
+      id: "risk-quality",
+      label: "投诉与不良事件 SLA",
+      ready: typeof domain.buildComplaintEvidence === "function" && typeof domain.buildRiskIncidentEvidence === "function",
+      evidence: "责任人、时限、升级、居民通知和最终质控决定",
+      boundary: "值守组和报警渠道需现场配置"
+    },
+    {
+      id: "timeline-notification",
+      label: "居民时间轴与消息回执",
+      ready: typeof domain.validateTimelineIntegrity === "function" && typeof domain.recordNotificationReceipt === "function",
+      evidence: `${orders.filter((item) => Array.isArray(item.timelineEvents) && item.timelineEvents.length).length} 单已形成事件链`,
+      boundary: "短信和院内消息提供方回执需联调"
+    }
+  ];
+  return tracks.map((item) => ({ ...item, status: item.ready ? "已开发" : "阻断" }));
+}
+
+function renderNursingP1Center(dashboard = {}) {
+  const target = document.querySelector("#nursing-p1-center");
+  if (!target) return;
+  target.innerHTML = buildNursingP1Tracks(dashboard).map((item) => `
+    <div data-nursing-p1-track="${escapeHtml(item.id)}">
+      <strong>${escapeHtml(item.label)} ${statusBadge(item.status)}</strong>
+      <span>${escapeHtml(item.evidence)}</span>
+      <small>${escapeHtml(item.boundary)}</small>
+    </div>
+  `).join("");
 }
 
 function renderNursingClosedLoop(items) {
@@ -1024,6 +1096,21 @@ function renderServiceItemSelect(institutions) {
   if (items.includes(current)) select.value = current;
 }
 
+function renderNursingDistrictSelect(institutions) {
+  const select = document.querySelector("#nursing-district-select");
+  const institutionId = document.querySelector("#nursing-institution-select")?.value || "";
+  if (!select) return;
+  const current = select.value;
+  const institution = institutions.find((item) => item.id === institutionId) || institutions.find((item) => item.published !== false) || {};
+  const serviceArea = Array.isArray(institution.serviceArea) && institution.serviceArea.length
+    ? institution.serviceArea
+    : ["Zhongshan", "Xigang", "Shahekou", "Ganjingzi"];
+  select.innerHTML = serviceArea
+    .map((item) => `<option value="${escapeHtml(item)}">${escapeHtml(displayText(item))}</option>`)
+    .join("");
+  if (serviceArea.includes(current)) select.value = current;
+}
+
 function renderNurseSelect(nurses) {
   const select = document.querySelector("#nursing-nurse-select");
   if (!select) return;
@@ -1268,7 +1355,30 @@ function bindNursingAppointmentForm() {
     event.preventDefault();
     const submit = form.querySelector("button[type='submit']");
     if (submit?.disabled) return;
-    const values = Object.fromEntries(new FormData(form).entries());
+    let values = Object.fromEntries(new FormData(form).entries());
+    const domain = window.NursingEscortDomain;
+    if (domain) {
+      const preferredDate = String(values.preferredAt || "");
+      const preferredTime = String(values.serviceTime || "09:30");
+      const institution = (nursingDashboard?.institutions || []).find((item) => item.id === values.institutionId) || {};
+      values = domain.buildNursingOrderIntakeEvidence(values, {
+        preferredAt: `${preferredDate}T${preferredTime}:00+08:00`,
+        durationMinutes: Number(values.durationMinutes),
+        district: values.district,
+        address: values.address,
+        lat: Number(values.lat),
+        lng: Number(values.lng)
+      });
+      const intake = domain.validateNursingOrderIntake(values, {
+        now: new Date(),
+        institution,
+        orders: nursingDashboard?.orders || []
+      });
+      if (!intake.ok) {
+        showNursingMessage(`预约门禁未通过：${intake.reasons.join("；")}`, "danger");
+        return;
+      }
+    }
     values.sourceChannel = "internet-nursing-mobile";
     if (submit) submit.disabled = true;
     try {
@@ -1403,10 +1513,31 @@ function defaultNursingPolicy() {
   return {
     source: "辽宁省互联网+护理服务试点实施方案",
     serviceObjects: ["elderly or disabled people", "rehabilitation patients", "terminal-stage patients", "maternal and infant people"],
-    serviceCatalog: ["daily living ability assessment", "vital signs measurement", "blood glucose measurement", "wound care", "tube care", "postpartum care", "infant care", "PICC maintenance"],
-    requiredEvidence: ["identity authentication", "first diagnosis assessment", "signed informed consent", "nurse practice certificate", "service location trace", "nursing record", "quality callback"],
+    serviceCatalog: ["daily living ability assessment", "vital signs measurement", "blood glucose measurement", "wound care", "wound and ostomy care", "tube care", "intravenous catheter maintenance", "peritoneal dialysis care", "postpartum care", "infant care", "PICC maintenance"],
+    requiredEvidence: ["identity authentication", "first diagnosis assessment", "clinical assessment", "signed informed consent", "consent storage receipt", "nurse practice certificate", "service equipment readiness", "specialist protocol evidence", "service location trace", "nursing record", "medical waste handover", "EMR archive receipt", "price snapshot", "quality callback"],
     riskControls: ["emergency plan", "one-click alert", "liability insurance", "medical accident insurance", "service recorder"],
     platformRequirements: ["grade-3 security protection", "privacy protection", "medical record storage", "traceable service behavior", "workload statistics"],
+    p1Lifecycle: {
+      version: "internet-nursing-p1-v1",
+      tracks: [
+        "structured clinical assessment and consent storage",
+        "service area slot duration and idempotency",
+        "specialist nursing protocols",
+        "order price snapshot and financial reconciliation",
+        "complaint and incident SLA",
+        "resident timeline and notification receipts"
+      ],
+      intakePolicyVersion: "internet-nursing-intake-v1",
+      writePathVersion: "internet-nursing-write-path-v1",
+      eventOutboxVersion: "internet-nursing-event-outbox-v1",
+      assessmentPolicyVersion: "internet-nursing-assessment-v1",
+      priceCatalogVersion: "internet-nursing-price-2026-v1",
+      specialistProtocols: [
+        "intravenous-catheter-maintenance-v1",
+        "wound-ostomy-care-v1",
+        "peritoneal-dialysis-care-v1"
+      ]
+    },
     pricingRules: {
       items: {
         "blood glucose measurement": { basePrice: 86, insuranceEligible: true },
@@ -1474,14 +1605,14 @@ function defaultRegulatorySubmission() {
 
 function defaultNursingInstitutions() {
   return [
-    { id: "inh-mr1", institutionCode: "MR1", name: "大连市中心医院", district: "中山区", published: true, serviceItems: ["wound care", "PICC maintenance", "blood glucose measurement"], dailyCapacity: 18, admissionReview: { status: "approved" }, catalogChangeRequests: [] },
-    { id: "inh-mr3", institutionCode: "MR3", name: "青泥洼桥社区卫生服务中心", district: "中山区", published: true, serviceItems: ["vital signs measurement", "tube care"], dailyCapacity: 10, admissionReview: { status: "approved" }, catalogChangeRequests: [] }
+    { id: "inh-mr1", institutionCode: "MR1", name: "大连市中心医院", district: "中山区", published: true, serviceArea: ["Zhongshan", "Xigang", "Shahekou"], serviceItems: ["wound care", "wound and ostomy care", "intravenous catheter maintenance", "peritoneal dialysis care", "PICC maintenance", "blood glucose measurement"], dailyCapacity: 18, admissionReview: { status: "approved" }, catalogChangeRequests: [] },
+    { id: "inh-mr3", institutionCode: "MR3", name: "青泥洼桥社区卫生服务中心", district: "中山区", published: true, serviceArea: ["Qingniwaqiao", "Renmin Road"], serviceItems: ["vital signs measurement", "tube care"], dailyCapacity: 10, admissionReview: { status: "approved" }, catalogChangeRequests: [] }
   ];
 }
 
 function defaultNursingNurses() {
   return [
-    { id: "inn-001", name: "孙护士", institutionId: "inh-mr1", institutionCode: "MR1", title: "主管护师", yearsClinical: 9, registrationStatus: "verified", badPracticeRecord: "none", trainingStatus: "passed", insuranceStatus: "covered", specialties: ["wound care", "PICC maintenance", "blood glucose measurement"], dailyCapacity: 6, assignedToday: 2, qualificationExpiresAt: "2026-12-31", status: "available" },
+    { id: "inn-001", name: "孙护士", institutionId: "inh-mr1", institutionCode: "MR1", title: "主管护师", yearsClinical: 9, registrationStatus: "verified", badPracticeRecord: "none", trainingStatus: "passed", insuranceStatus: "covered", specialties: ["wound care", "wound and ostomy care", "intravenous catheter maintenance", "peritoneal dialysis care", "PICC maintenance", "blood glucose measurement"], dailyCapacity: 6, assignedToday: 2, qualificationExpiresAt: "2026-12-31", status: "available" },
     { id: "inn-002", name: "赵护士", institutionId: "inh-mr3", institutionCode: "MR3", title: "专科护士", yearsClinical: 6, registrationStatus: "verified", badPracticeRecord: "none", trainingStatus: "passed", insuranceStatus: "covered", specialties: ["vital signs measurement", "tube care"], dailyCapacity: 5, assignedToday: 1, qualificationExpiresAt: "2026-09-30", status: "available" }
   ];
 }
@@ -1530,7 +1661,10 @@ function displayText(value) {
     "vital signs measurement": "生命体征测量",
     "blood glucose measurement": "血糖测量",
     "wound care": "伤口护理",
+    "wound and ostomy care": "伤口造口护理",
     "tube care": "管路护理",
+    "intravenous catheter maintenance": "静脉导管维护",
+    "peritoneal dialysis care": "腹膜透析护理",
     "postpartum care": "产后护理",
     "infant care": "婴幼儿护理",
     "PICC maintenance": "PICC 维护",
