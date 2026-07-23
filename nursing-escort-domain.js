@@ -16,11 +16,13 @@
 
   const WORKFLOWS = Object.freeze({
     nursing: Object.freeze({
-      requested: ["assessed", "risk-hold", "cancel-requested", "rejected"],
-      assessed: ["dispatched", "risk-hold", "cancel-requested", "rejected"],
+      requested: ["assessed", "risk-hold", "reschedule-requested", "cancel-requested", "rejected"],
+      assessed: ["dispatched", "risk-hold", "reschedule-requested", "cancel-requested", "rejected"],
       "risk-hold": ["assessed", "rejected", "cancel-requested"],
-      dispatched: ["accepted", "cancel-requested", "rejected"],
-      accepted: ["in-service", "cancel-requested"],
+      dispatched: ["accepted", "reschedule-requested", "cancel-requested", "rejected"],
+      accepted: ["in-service", "no-show-review", "reschedule-requested", "cancel-requested"],
+      "reschedule-requested": ["requested", "cancel-requested"],
+      "no-show-review": ["accepted", "reschedule-requested", "cancel-requested"],
       "in-service": ["completed", "adverse-event"],
       "adverse-event": ["in-service", "completed", "closed"],
       completed: ["settlement-pending", "quality-review"],
@@ -36,15 +38,17 @@
       closed: []
     }),
     escort: Object.freeze({
-      requested: ["eligibility-checked", "risk-hold", "cancel-requested", "rejected"],
-      "eligibility-checked": ["provider-matched", "risk-hold", "cancel-requested", "rejected"],
-      "provider-matched": ["worker-dispatched", "cancel-requested", "rejected"],
-      "worker-dispatched": ["accepted", "cancel-requested", "rejected"],
-      accepted: ["hospital-confirmed", "hospital-returned", "cancel-requested"],
+      requested: ["eligibility-checked", "risk-hold", "reschedule-requested", "cancel-requested", "rejected"],
+      "eligibility-checked": ["provider-matched", "risk-hold", "reschedule-requested", "cancel-requested", "rejected"],
+      "provider-matched": ["worker-dispatched", "reschedule-requested", "cancel-requested", "rejected"],
+      "worker-dispatched": ["accepted", "reschedule-requested", "cancel-requested", "rejected"],
+      accepted: ["hospital-confirmed", "hospital-returned", "no-show-review", "reschedule-requested", "cancel-requested"],
       "hospital-returned": ["evidence-pending", "cancel-requested", "rejected"],
       "evidence-pending": ["accepted", "hospital-confirmed", "cancel-requested"],
-      "hospital-confirmed": ["in-service", "cancel-requested"],
+      "hospital-confirmed": ["in-service", "no-show-review", "reschedule-requested", "cancel-requested"],
       "risk-hold": ["eligibility-checked", "rejected", "cancel-requested"],
+      "reschedule-requested": ["requested", "cancel-requested"],
+      "no-show-review": ["accepted", "reschedule-requested", "cancel-requested"],
       "in-service": ["completed", "adverse-event"],
       "adverse-event": ["in-service", "completed", "closed"],
       completed: ["settlement-pending", "quality-review"],
@@ -72,6 +76,8 @@
     "in-service": "in-service",
     completed: "completed",
     "quality-review": "quality-review",
+    "reschedule-requested": "reschedule-requested",
+    "no-show-review": "no-show-review",
     "cancel-requested": "cancel-requested",
     cancelled: "cancelled",
     canceled: "cancelled"
@@ -88,7 +94,9 @@
       settled: ["financial-callback", "reconciliation-result"],
       "cancel-requested": ["cancellation-request"],
       cancelled: ["cancellation-decision"],
-      requested: ["cancellation-decision"],
+      requested: ["workflow-return-decision"],
+      "reschedule-requested": ["reschedule-request"],
+      "no-show-review": ["no-show-report", "attendance-evidence"],
       "refund-pending": ["refund-request", "refund-approval", "refund-dispatch"],
       refunded: ["refund-callback", "refund-reconciliation"],
       "quality-review": ["quality-callback"],
@@ -108,7 +116,9 @@
       settled: ["financial-callback", "reconciliation-result"],
       "cancel-requested": ["cancellation-request"],
       cancelled: ["cancellation-decision"],
-      requested: ["cancellation-decision"],
+      requested: ["workflow-return-decision"],
+      "reschedule-requested": ["reschedule-request"],
+      "no-show-review": ["no-show-report", "attendance-evidence"],
       "refund-pending": ["refund-request", "refund-approval", "refund-dispatch"],
       refunded: ["refund-callback", "refund-reconciliation"],
       "quality-review": ["quality-callback"],
@@ -1203,6 +1213,421 @@
     };
   }
 
+  function originalResourceReservation(order = {}) {
+    return order.previousResourceReservation || order.resourceReservation;
+  }
+
+  function validateResourceReservation(domain, order = {}, reservation = originalResourceReservation(order)) {
+    const normalizedDomain = normalizeDomain(domain);
+    const orderId = String(order.id || "").trim();
+    const reasons = [];
+    if (!reservation || typeof reservation !== "object" || Array.isArray(reservation)) {
+      reasons.push("resource-reservation-missing");
+    } else {
+      if (!reservation.id) reasons.push("resource-reservation-id-missing");
+      if (reservation.status !== "reserved") reasons.push("resource-reservation-status-invalid");
+      if (reservation.orderId !== orderId) reasons.push("resource-reservation-order-mismatch");
+      if (reservation.domain !== normalizedDomain) reasons.push("resource-reservation-domain-mismatch");
+      if (!reservation.resourceId) reasons.push("resource-id-missing");
+      if (!reservation.reservedBy) reasons.push("resource-reservation-actor-missing");
+      const slotAt = parseTime(reservation.slotAt);
+      const reservedAt = parseTime(reservation.reservedAt);
+      if (slotAt === null) reasons.push("resource-slot-time-invalid");
+      if (reservedAt === null) reasons.push("resource-reservation-time-invalid");
+      if (slotAt !== null && reservedAt !== null && slotAt <= reservedAt) reasons.push("resource-slot-not-future");
+      if (reservation.policyVersion !== WORKFLOW_POLICY_VERSION) reasons.push("resource-reservation-policy-version-invalid");
+    }
+    return { ok: reasons.length === 0, reservation, reasons };
+  }
+
+  function validateResourceRelease(domain, order = {}, release = order.resourceRelease, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const orderId = String(order.id || "").trim();
+    const reservation = options.reservation || originalResourceReservation(order);
+    const reasons = [];
+    if (!release || typeof release !== "object" || Array.isArray(release)) {
+      reasons.push("resource-release-missing");
+    } else {
+      if (!release.id) reasons.push("resource-release-id-missing");
+      if (release.status !== "released") reasons.push("resource-release-status-invalid");
+      if (release.reservationId !== reservation?.id) reasons.push("resource-release-reservation-mismatch");
+      if (release.orderId !== orderId) reasons.push("resource-release-order-mismatch");
+      if (release.domain !== normalizedDomain) reasons.push("resource-release-domain-mismatch");
+      if (!release.releasedBy) reasons.push("resource-release-actor-missing");
+      if (!release.reason) reasons.push("resource-release-reason-missing");
+      if (release.policyVersion !== WORKFLOW_POLICY_VERSION) reasons.push("resource-release-policy-version-invalid");
+      const releasedAt = parseTime(release.releasedAt);
+      const afterTime = parseTime(options.afterTime);
+      if (releasedAt === null) reasons.push("resource-release-time-invalid");
+      if (releasedAt !== null && afterTime !== null && releasedAt < afterTime) reasons.push("resource-release-before-decision");
+    }
+    return { ok: reasons.length === 0, reasons };
+  }
+
+  function validateSchedulingEvidence(domain, order = {}, nextStatus, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const next = canonicalStatus(nextStatus, normalizedDomain);
+    const current = canonicalStatus(options.currentStatus || order.status, normalizedDomain);
+    const sourceOrder = options.sourceOrder || order;
+    const orderId = String(sourceOrder.id || "").trim();
+    const residentId = String(sourceOrder.residentId || "").trim();
+    const subjectId = serviceAssignedSubject(normalizedDomain, sourceOrder);
+    const request = order.rescheduleRequest;
+    const decision = order.rescheduleDecision;
+    const report = order.noShowReport;
+    const attendance = order.attendanceEvidence;
+    const noShowDecision = order.noShowDecision;
+    const requestReasons = [];
+    const decisionReasons = [];
+    const releaseReasons = [];
+    const replacementReasons = [];
+    const reportReasons = [];
+    const attendanceReasons = [];
+    const noShowDecisionReasons = [];
+    const needsRescheduleRequest = next === "reschedule-requested"
+      || (next === "requested" && current === "reschedule-requested");
+    const needsRescheduleCompletion = next === "requested" && current === "reschedule-requested";
+    const enteringNoShowReview = next === "no-show-review";
+    const resolvingNoShow = current === "no-show-review"
+      && ["accepted", "reschedule-requested", "cancel-requested"].includes(next);
+    const sourceReservation = options.sourceReservation || originalResourceReservation(order);
+    const reservationResult = (needsRescheduleRequest || enteringNoShowReview || resolvingNoShow)
+      ? validateResourceReservation(normalizedDomain, order, sourceReservation)
+      : { ok: true, reservation: sourceReservation, reasons: [] };
+    const reservation = reservationResult.reservation;
+
+    if (needsRescheduleRequest) {
+      requestReasons.push(...reservationResult.reasons);
+      if (!orderId) requestReasons.push("reschedule-order-id-missing");
+      if (!residentId) requestReasons.push("reschedule-resident-id-missing");
+      if (String(order.id || "").trim() !== orderId) requestReasons.push("reschedule-order-identity-mutated");
+      if (String(order.residentId || "").trim() !== residentId) requestReasons.push("reschedule-resident-identity-mutated");
+      if (!request || typeof request !== "object" || Array.isArray(request)) {
+        requestReasons.push("reschedule-request-missing");
+      } else {
+        if (!request.id) requestReasons.push("reschedule-request-id-missing");
+        if (request.status !== "open") requestReasons.push("reschedule-request-status-invalid");
+        if (request.orderId !== orderId) requestReasons.push("reschedule-request-order-mismatch");
+        if (request.domain !== normalizedDomain) requestReasons.push("reschedule-request-domain-mismatch");
+        if (request.residentId !== residentId) requestReasons.push("reschedule-request-resident-mismatch");
+        if (request.originalReservationId !== reservation?.id) requestReasons.push("reschedule-original-reservation-mismatch");
+        if (parseTime(request.originalSlotAt) !== parseTime(reservation?.slotAt)) requestReasons.push("reschedule-original-slot-mismatch");
+        if (!request.requesterId) requestReasons.push("reschedule-requester-missing");
+        if (!["resident", "family", "authorized-agent", "institution", "worker"].includes(request.requesterRole)) requestReasons.push("reschedule-requester-role-invalid");
+        if (!request.reason) requestReasons.push("reschedule-reason-missing");
+        if (request.policyVersion !== WORKFLOW_POLICY_VERSION) requestReasons.push("reschedule-policy-version-invalid");
+        const requestedAt = parseTime(request.requestedAt);
+        const proposedSlotAt = parseTime(request.proposedSlotAt);
+        if (requestedAt === null) requestReasons.push("reschedule-request-time-invalid");
+        if (proposedSlotAt === null) requestReasons.push("reschedule-proposed-slot-invalid");
+        if (proposedSlotAt !== null && proposedSlotAt === parseTime(request.originalSlotAt)) requestReasons.push("reschedule-slot-unchanged");
+        if (requestedAt !== null && proposedSlotAt !== null && proposedSlotAt <= requestedAt) requestReasons.push("reschedule-slot-not-future");
+      }
+    }
+
+    if (needsRescheduleCompletion) {
+      if (!decision || typeof decision !== "object" || Array.isArray(decision)) {
+        decisionReasons.push("reschedule-decision-missing");
+      } else {
+        if (!decision.id) decisionReasons.push("reschedule-decision-id-missing");
+        if (decision.status !== "approved") decisionReasons.push("reschedule-decision-not-approved");
+        if (decision.requestId !== request?.id) decisionReasons.push("reschedule-decision-request-mismatch");
+        if (decision.orderId !== orderId) decisionReasons.push("reschedule-decision-order-mismatch");
+        if (decision.domain !== normalizedDomain) decisionReasons.push("reschedule-decision-domain-mismatch");
+        if (parseTime(decision.approvedSlotAt) !== parseTime(request?.proposedSlotAt)) decisionReasons.push("reschedule-approved-slot-mismatch");
+        if (!decision.decidedBy) decisionReasons.push("reschedule-decision-actor-missing");
+        if (!decision.reason) decisionReasons.push("reschedule-decision-reason-missing");
+        if (decision.policyVersion !== WORKFLOW_POLICY_VERSION) decisionReasons.push("reschedule-decision-policy-version-invalid");
+        const decidedAt = parseTime(decision.decidedAt);
+        const requestedAt = parseTime(request?.requestedAt);
+        if (decidedAt === null) decisionReasons.push("reschedule-decision-time-invalid");
+        if (decidedAt !== null && requestedAt !== null && decidedAt < requestedAt) decisionReasons.push("reschedule-decision-before-request");
+      }
+      const release = validateResourceRelease(normalizedDomain, order, order.resourceRelease, {
+        afterTime: decision?.decidedAt,
+        reservation
+      });
+      releaseReasons.push(...release.reasons);
+      const replacement = order.resourceReservation;
+      if (!replacement || typeof replacement !== "object" || Array.isArray(replacement)) {
+        replacementReasons.push("replacement-reservation-missing");
+      } else {
+        if (!replacement.id) replacementReasons.push("replacement-reservation-id-missing");
+        if (replacement.status !== "reserved") replacementReasons.push("replacement-reservation-status-invalid");
+        if (replacement.previousReservationId !== reservation?.id) replacementReasons.push("replacement-previous-reservation-mismatch");
+        if (replacement.orderId !== orderId) replacementReasons.push("replacement-reservation-order-mismatch");
+        if (replacement.domain !== normalizedDomain) replacementReasons.push("replacement-reservation-domain-mismatch");
+        if (!replacement.resourceId) replacementReasons.push("replacement-resource-id-missing");
+        if (parseTime(replacement.slotAt) !== parseTime(decision?.approvedSlotAt)) replacementReasons.push("replacement-slot-mismatch");
+        if (!replacement.reservedBy) replacementReasons.push("replacement-reservation-actor-missing");
+        if (replacement.policyVersion !== WORKFLOW_POLICY_VERSION) replacementReasons.push("replacement-reservation-policy-version-invalid");
+        const reservedAt = parseTime(replacement.reservedAt);
+        const releasedAt = parseTime(order.resourceRelease?.releasedAt);
+        if (reservedAt === null) replacementReasons.push("replacement-reservation-time-invalid");
+        if (reservedAt !== null && releasedAt !== null && reservedAt < releasedAt) replacementReasons.push("replacement-reserved-before-release");
+      }
+    }
+
+    if (enteringNoShowReview || resolvingNoShow) {
+      reportReasons.push(...reservationResult.reasons);
+      if (!orderId) reportReasons.push("no-show-order-id-missing");
+      if (!residentId) reportReasons.push("no-show-resident-id-missing");
+      if (!subjectId) reportReasons.push("no-show-subject-missing");
+      if (String(order.id || "").trim() !== orderId) reportReasons.push("no-show-order-identity-mutated");
+      if (String(order.residentId || "").trim() !== residentId) reportReasons.push("no-show-resident-identity-mutated");
+      if (serviceAssignedSubject(normalizedDomain, order) !== subjectId) reportReasons.push("no-show-subject-identity-mutated");
+      if (!report || typeof report !== "object" || Array.isArray(report)) {
+        reportReasons.push("no-show-report-missing");
+      } else {
+        if (!report.id) reportReasons.push("no-show-report-id-missing");
+        if (report.status !== "open") reportReasons.push("no-show-report-status-invalid");
+        if (report.orderId !== orderId) reportReasons.push("no-show-report-order-mismatch");
+        if (report.domain !== normalizedDomain) reportReasons.push("no-show-report-domain-mismatch");
+        if (report.residentId !== residentId) reportReasons.push("no-show-report-resident-mismatch");
+        if (report.subjectId !== subjectId) reportReasons.push("no-show-report-subject-mismatch");
+        if (report.reservationId !== reservation?.id) reportReasons.push("no-show-report-reservation-mismatch");
+        if (!["resident", "worker"].includes(report.absentPartyRole)) reportReasons.push("no-show-absent-party-invalid");
+        if (!report.reporterId) reportReasons.push("no-show-reporter-missing");
+        if (!Number.isInteger(report.graceMinutes) || report.graceMinutes < 5 || report.graceMinutes > 120) reportReasons.push("no-show-grace-period-invalid");
+        if (report.policyVersion !== WORKFLOW_POLICY_VERSION) reportReasons.push("no-show-policy-version-invalid");
+        const scheduledAt = parseTime(report.scheduledAt);
+        const detectedAt = parseTime(report.detectedAt);
+        if (scheduledAt === null || scheduledAt !== parseTime(reservation?.slotAt)) reportReasons.push("no-show-scheduled-time-mismatch");
+        if (detectedAt === null) reportReasons.push("no-show-detected-time-invalid");
+        if (scheduledAt !== null && detectedAt !== null && Number.isInteger(report.graceMinutes)
+          && detectedAt < scheduledAt + report.graceMinutes * 60 * 1000) reportReasons.push("no-show-detected-before-grace-period");
+      }
+      if (!attendance || typeof attendance !== "object" || Array.isArray(attendance)) {
+        attendanceReasons.push("attendance-evidence-missing");
+      } else {
+        if (!attendance.id) attendanceReasons.push("attendance-evidence-id-missing");
+        if (attendance.status !== "verified") attendanceReasons.push("attendance-evidence-not-verified");
+        if (attendance.reportId !== report?.id) attendanceReasons.push("attendance-evidence-report-mismatch");
+        if (attendance.orderId !== orderId) attendanceReasons.push("attendance-evidence-order-mismatch");
+        if (attendance.domain !== normalizedDomain) attendanceReasons.push("attendance-evidence-domain-mismatch");
+        if (attendance.reservationId !== reservation?.id) attendanceReasons.push("attendance-evidence-reservation-mismatch");
+        if (attendance.absentPartyRole !== report?.absentPartyRole) attendanceReasons.push("attendance-evidence-absent-party-mismatch");
+        if (!attendance.presentPartyId) attendanceReasons.push("attendance-present-party-missing");
+        if (!["geo-check-in", "hospital-check-in", "verified-call"].includes(attendance.evidenceType)) attendanceReasons.push("attendance-evidence-type-invalid");
+        if (!attendance.verifierId) attendanceReasons.push("attendance-verifier-missing");
+        const capturedAt = parseTime(attendance.capturedAt);
+        const scheduledAt = parseTime(report?.scheduledAt);
+        const detectedAt = parseTime(report?.detectedAt);
+        if (capturedAt === null) attendanceReasons.push("attendance-evidence-time-invalid");
+        if (capturedAt !== null && scheduledAt !== null && capturedAt < scheduledAt) attendanceReasons.push("attendance-evidence-before-slot");
+        if (capturedAt !== null && detectedAt !== null && capturedAt > detectedAt) attendanceReasons.push("attendance-evidence-after-report");
+      }
+    }
+
+    if (resolvingNoShow) {
+      if (!noShowDecision || typeof noShowDecision !== "object" || Array.isArray(noShowDecision)) {
+        noShowDecisionReasons.push("no-show-decision-missing");
+      } else {
+        const expectedOutcome = next === "accepted" ? "resume" : next === "reschedule-requested" ? "reschedule" : "cancel";
+        const expectedStatus = expectedOutcome === "resume" ? "overturned" : "confirmed";
+        if (!noShowDecision.id) noShowDecisionReasons.push("no-show-decision-id-missing");
+        if (noShowDecision.status !== expectedStatus || noShowDecision.outcome !== expectedOutcome) noShowDecisionReasons.push("no-show-decision-outcome-invalid");
+        if (noShowDecision.reportId !== report?.id) noShowDecisionReasons.push("no-show-decision-report-mismatch");
+        if (noShowDecision.orderId !== orderId) noShowDecisionReasons.push("no-show-decision-order-mismatch");
+        if (noShowDecision.domain !== normalizedDomain) noShowDecisionReasons.push("no-show-decision-domain-mismatch");
+        if (!noShowDecision.decidedBy) noShowDecisionReasons.push("no-show-decision-actor-missing");
+        if (!noShowDecision.reason) noShowDecisionReasons.push("no-show-decision-reason-missing");
+        if (noShowDecision.policyVersion !== WORKFLOW_POLICY_VERSION) noShowDecisionReasons.push("no-show-decision-policy-version-invalid");
+        const decidedAt = parseTime(noShowDecision.decidedAt);
+        const detectedAt = parseTime(report?.detectedAt);
+        if (decidedAt === null) noShowDecisionReasons.push("no-show-decision-time-invalid");
+        if (decidedAt !== null && detectedAt !== null && decidedAt < detectedAt) noShowDecisionReasons.push("no-show-decision-before-report");
+      }
+    }
+
+    const reasons = [...new Set([
+      ...requestReasons,
+      ...decisionReasons,
+      ...releaseReasons,
+      ...replacementReasons,
+      ...reportReasons,
+      ...attendanceReasons,
+      ...noShowDecisionReasons
+    ])];
+    return {
+      ok: reasons.length === 0,
+      domain: normalizedDomain,
+      current,
+      next,
+      requestOk: !needsRescheduleRequest || requestReasons.length === 0,
+      completionOk: !needsRescheduleCompletion || decisionReasons.length === 0 && releaseReasons.length === 0 && replacementReasons.length === 0,
+      reportOk: !enteringNoShowReview && !resolvingNoShow || reportReasons.length === 0,
+      attendanceOk: !enteringNoShowReview && !resolvingNoShow || attendanceReasons.length === 0,
+      noShowDecisionOk: !resolvingNoShow || noShowDecisionReasons.length === 0,
+      reasons
+    };
+  }
+
+  function buildResourceReservationEvidence(domain, order = {}, details = {}, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const at = new Date(options.at || Date.now()).toISOString();
+    return {
+      resourceReservation: {
+        id: String(details.id || `${normalizedDomain}:${order.id || "order"}:reservation:${details.slotAt || at}`),
+        status: "reserved",
+        orderId: String(order.id || ""),
+        domain: normalizedDomain,
+        resourceId: String(details.resourceId || ""),
+        slotAt: String(details.slotAt || ""),
+        reservedBy: String(details.reservedBy || ""),
+        reservedAt: at,
+        policyVersion: WORKFLOW_POLICY_VERSION
+      }
+    };
+  }
+
+  function buildRescheduleRequestEvidence(domain, order = {}, details = {}, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const at = new Date(options.at || Date.now()).toISOString();
+    const reservation = originalResourceReservation(order);
+    return {
+      rescheduleRequest: {
+        id: String(details.id || `${normalizedDomain}:${order.id || "order"}:reschedule:${at}`),
+        status: "open",
+        orderId: String(order.id || ""),
+        domain: normalizedDomain,
+        residentId: String(order.residentId || ""),
+        originalReservationId: String(reservation?.id || ""),
+        originalSlotAt: String(reservation?.slotAt || ""),
+        proposedSlotAt: String(details.proposedSlotAt || ""),
+        requesterId: String(details.requesterId || ""),
+        requesterRole: String(details.requesterRole || "resident"),
+        reason: String(details.reason || ""),
+        requestedAt: at,
+        policyVersion: WORKFLOW_POLICY_VERSION
+      }
+    };
+  }
+
+  function buildRescheduleCompletionEvidence(domain, order = {}, details = {}, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const at = new Date(options.at || Date.now()).toISOString();
+    const previous = originalResourceReservation(order);
+    const approvedSlotAt = String(details.approvedSlotAt || order.rescheduleRequest?.proposedSlotAt || "");
+    const replacementId = String(details.reservationId || `${normalizedDomain}:${order.id || "order"}:reservation:${approvedSlotAt}`);
+    return {
+      previousResourceReservation: previous,
+      rescheduleDecision: {
+        id: String(details.decisionId || `${normalizedDomain}:${order.id || "order"}:reschedule-decision:${at}`),
+        status: "approved",
+        requestId: String(order.rescheduleRequest?.id || ""),
+        orderId: String(order.id || ""),
+        domain: normalizedDomain,
+        approvedSlotAt,
+        decidedBy: String(details.decidedBy || ""),
+        reason: String(details.reason || ""),
+        decidedAt: at,
+        policyVersion: WORKFLOW_POLICY_VERSION
+      },
+      resourceRelease: {
+        id: String(details.releaseId || `${previous?.id || "reservation"}:release:${at}`),
+        status: "released",
+        reservationId: String(previous?.id || ""),
+        orderId: String(order.id || ""),
+        domain: normalizedDomain,
+        releasedBy: String(details.releasedBy || details.decidedBy || ""),
+        reason: String(details.releaseReason || details.reason || ""),
+        releasedAt: at,
+        policyVersion: WORKFLOW_POLICY_VERSION
+      },
+      resourceReservation: {
+        id: replacementId,
+        status: "reserved",
+        previousReservationId: String(previous?.id || ""),
+        orderId: String(order.id || ""),
+        domain: normalizedDomain,
+        resourceId: String(details.resourceId || previous?.resourceId || ""),
+        slotAt: approvedSlotAt,
+        reservedBy: String(details.reservedBy || details.decidedBy || ""),
+        reservedAt: at,
+        policyVersion: WORKFLOW_POLICY_VERSION
+      },
+      scheduledAt: approvedSlotAt,
+      ...(normalizedDomain === "nursing" ? { preferredAt: approvedSlotAt } : { appointmentAt: approvedSlotAt, due: approvedSlotAt })
+    };
+  }
+
+  function buildNoShowEvidence(domain, order = {}, details = {}, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const at = new Date(options.at || Date.now()).toISOString();
+    const reservation = originalResourceReservation(order);
+    const reportId = String(details.reportId || `${normalizedDomain}:${order.id || "order"}:no-show:${at}`);
+    return {
+      noShowReport: {
+        id: reportId,
+        status: "open",
+        orderId: String(order.id || ""),
+        domain: normalizedDomain,
+        residentId: String(order.residentId || ""),
+        subjectId: serviceAssignedSubject(normalizedDomain, order),
+        reservationId: String(reservation?.id || ""),
+        absentPartyRole: String(details.absentPartyRole || ""),
+        reporterId: String(details.reporterId || ""),
+        scheduledAt: String(reservation?.slotAt || ""),
+        detectedAt: at,
+        graceMinutes: Number(details.graceMinutes ?? 30),
+        policyVersion: WORKFLOW_POLICY_VERSION
+      },
+      attendanceEvidence: {
+        id: String(details.evidenceId || `${reportId}:attendance`),
+        status: details.verified === true ? "verified" : "rejected",
+        reportId,
+        orderId: String(order.id || ""),
+        domain: normalizedDomain,
+        reservationId: String(reservation?.id || ""),
+        absentPartyRole: String(details.absentPartyRole || ""),
+        presentPartyId: String(details.presentPartyId || ""),
+        evidenceType: String(details.evidenceType || ""),
+        verifierId: String(details.verifierId || ""),
+        capturedAt: String(details.capturedAt || at)
+      }
+    };
+  }
+
+  function buildNoShowDecisionEvidence(domain, order = {}, details = {}, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const at = new Date(options.at || Date.now()).toISOString();
+    const outcome = String(details.outcome || "resume");
+    return {
+      noShowDecision: {
+        id: String(details.id || `${normalizedDomain}:${order.id || "order"}:no-show-decision:${at}`),
+        status: outcome === "resume" ? "overturned" : "confirmed",
+        outcome,
+        reportId: String(order.noShowReport?.id || ""),
+        orderId: String(order.id || ""),
+        domain: normalizedDomain,
+        decidedBy: String(details.decidedBy || ""),
+        reason: String(details.reason || ""),
+        decidedAt: at,
+        policyVersion: WORKFLOW_POLICY_VERSION
+      }
+    };
+  }
+
+  function buildResourceReleaseEvidence(domain, order = {}, details = {}, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const at = new Date(options.at || Date.now()).toISOString();
+    const reservation = originalResourceReservation(order);
+    return {
+      resourceRelease: {
+        id: String(details.id || `${reservation?.id || "reservation"}:release:${at}`),
+        status: "released",
+        reservationId: String(reservation?.id || ""),
+        orderId: String(order.id || ""),
+        domain: normalizedDomain,
+        releasedBy: String(details.releasedBy || ""),
+        reason: String(details.reason || ""),
+        releasedAt: at,
+        policyVersion: WORKFLOW_POLICY_VERSION
+      }
+    };
+  }
+
   function verifiedRefundPaymentSource(domain, order = {}) {
     const normalizedDomain = normalizeDomain(domain);
     const orderId = String(order.id || "").trim();
@@ -1257,6 +1682,7 @@
     const dispatchReasons = [];
     const callbackReasons = [];
     const reconciliationReasons = [];
+    const resourceReleaseReasons = [];
     const needsCancellationRequest = ["cancel-requested", "cancelled", "requested"].includes(next)
       || (next === "refund-pending" && current === "cancel-requested");
     const needsCancellationDecision = ["cancelled", "requested"].includes(next)
@@ -1311,6 +1737,17 @@
           if (request?.refundRequested !== true) decisionReasons.push("cancellation-refund-not-requested");
         }
       }
+    }
+
+    const reservedResource = options.sourceReservation || originalResourceReservation(order);
+    const needsResourceRelease = reservedResource?.status === "reserved"
+      && (next === "cancelled" || ["refund-pending", "refunded"].includes(next));
+    if (needsResourceRelease) {
+      const release = validateResourceRelease(normalizedDomain, order, order.resourceRelease, {
+        afterTime: decision?.decidedAt,
+        reservation: reservedResource
+      });
+      resourceReleaseReasons.push(...release.reasons);
     }
 
     const needsRefund = ["refund-pending", "refunded"].includes(next);
@@ -1418,7 +1855,8 @@
       ...approvalReasons,
       ...dispatchReasons,
       ...callbackReasons,
-      ...reconciliationReasons
+      ...reconciliationReasons,
+      ...resourceReleaseReasons
     ])];
     return {
       ok: reasons.length === 0,
@@ -1432,6 +1870,7 @@
       dispatchOk: !needsRefund || paymentSource.ok && dispatchReasons.length === 0,
       callbackOk: next !== "refunded" || callbackReasons.length === 0,
       reconciliationOk: next !== "refunded" || reconciliationReasons.length === 0,
+      resourceReleaseOk: !needsResourceRelease || resourceReleaseReasons.length === 0,
       reasons
     };
   }
@@ -1603,6 +2042,8 @@
     let financialIntegrity = null;
     let riskQualityIntegrity = null;
     let cancellationRefundIntegrity = null;
+    let schedulingIntegrity = null;
+    const current = canonicalStatus(options.currentStatus || order.status, normalizedDomain);
     if (next === dispatchTargetState(normalizedDomain)) {
       dispatchIntegrity = validateDispatchEvidence(normalizedDomain, order, options);
       if (dispatchIntegrity.qualificationOk) present.add("qualification-snapshot");
@@ -1623,15 +2064,32 @@
       if (["quality-review", "closed"].includes(next) && riskQualityIntegrity.callbackOk) present.add("quality-callback");
       if (next === "closed" && riskQualityIntegrity.decisionOk) present.add("quality-decision");
     }
-    if (["cancel-requested", "cancelled", "requested", "refund-pending", "refunded"].includes(next)) {
+    const cancellationRefundTransition = ["cancel-requested", "cancelled", "refund-pending", "refunded"].includes(next)
+      || (next === "requested" && current === "cancel-requested");
+    if (cancellationRefundTransition) {
       cancellationRefundIntegrity = validateCancellationRefundEvidence(normalizedDomain, order, next, options);
       if (next === "cancel-requested" && cancellationRefundIntegrity.requestOk) present.add("cancellation-request");
-      if (["cancelled", "requested"].includes(next) && cancellationRefundIntegrity.decisionOk) present.add("cancellation-decision");
+      if (next === "cancelled" && cancellationRefundIntegrity.decisionOk) present.add("cancellation-decision");
+      if (next === "requested" && cancellationRefundIntegrity.decisionOk) {
+        present.add("cancellation-decision");
+        present.add("workflow-return-decision");
+      }
       if (next === "refund-pending" && cancellationRefundIntegrity.refundRequestOk) present.add("refund-request");
       if (next === "refund-pending" && cancellationRefundIntegrity.approvalOk) present.add("refund-approval");
       if (next === "refund-pending" && cancellationRefundIntegrity.dispatchOk) present.add("refund-dispatch");
       if (next === "refunded" && cancellationRefundIntegrity.callbackOk) present.add("refund-callback");
       if (next === "refunded" && cancellationRefundIntegrity.reconciliationOk) present.add("refund-reconciliation");
+    }
+    const schedulingTransition = ["reschedule-requested", "no-show-review"].includes(next)
+      || (next === "requested" && current === "reschedule-requested")
+      || (current === "no-show-review" && ["accepted", "cancel-requested"].includes(next));
+    if (schedulingTransition) {
+      schedulingIntegrity = validateSchedulingEvidence(normalizedDomain, order, next, options);
+      if (next === "reschedule-requested" && schedulingIntegrity.requestOk) present.add("reschedule-request");
+      if (next === "requested" && schedulingIntegrity.completionOk) present.add("workflow-return-decision");
+      if (next === "no-show-review" && schedulingIntegrity.reportOk) present.add("no-show-report");
+      if (next === "no-show-review" && schedulingIntegrity.attendanceOk) present.add("attendance-evidence");
+      if (current === "no-show-review" && schedulingIntegrity.noShowDecisionOk) present.add("no-show-decision");
     }
     const missing = required.filter((item) => !present.has(item));
     return {
@@ -1644,7 +2102,8 @@
       dispatchIntegrity,
       financialIntegrity,
       riskQualityIntegrity,
-      cancellationRefundIntegrity
+      cancellationRefundIntegrity,
+      schedulingIntegrity
     };
   }
 
@@ -1722,13 +2181,35 @@
         throw error;
       }
     }
-    if (["cancel-requested", "cancelled", "requested", "refund-pending", "refunded"].includes(transition.next)) {
-      const cancellationRefundEvidence = validateCancellationRefundEvidence(domain, candidate, transition.next, { currentStatus: transition.current });
+    const cancellationRefundTransition = ["cancel-requested", "cancelled", "refund-pending", "refunded"].includes(transition.next)
+      || (transition.next === "requested" && transition.current === "cancel-requested");
+    if (cancellationRefundTransition) {
+      const cancellationRefundEvidence = validateCancellationRefundEvidence(domain, candidate, transition.next, {
+        currentStatus: transition.current,
+        sourceReservation: originalResourceReservation(order)
+      });
       if (!cancellationRefundEvidence.ok) {
         const error = new Error(`invalid cancellation or refund evidence for ${transition.next}: ${cancellationRefundEvidence.reasons.join(", ")}`);
         error.code = "ORDER_CANCELLATION_REFUND_EVIDENCE_INVALID";
         error.statusCode = 409;
         error.details = cancellationRefundEvidence;
+        throw error;
+      }
+    }
+    const schedulingTransition = ["reschedule-requested", "no-show-review"].includes(transition.next)
+      || (transition.next === "requested" && transition.current === "reschedule-requested")
+      || (transition.current === "no-show-review" && ["accepted", "cancel-requested"].includes(transition.next));
+    if (schedulingTransition) {
+      const schedulingEvidence = validateSchedulingEvidence(domain, candidate, transition.next, {
+        currentStatus: transition.current,
+        sourceReservation: originalResourceReservation(order),
+        sourceOrder: order
+      });
+      if (!schedulingEvidence.ok) {
+        const error = new Error(`invalid scheduling evidence for ${transition.next}: ${schedulingEvidence.reasons.join(", ")}`);
+        error.code = "ORDER_SCHEDULING_EVIDENCE_INVALID";
+        error.statusCode = 409;
+        error.details = schedulingEvidence;
         throw error;
       }
     }
@@ -1813,6 +2294,15 @@
     buildComplaintResolutionEvidence,
     buildQualityReviewEvidence,
     buildQualityClosureEvidence,
+    validateResourceReservation,
+    validateResourceRelease,
+    validateSchedulingEvidence,
+    buildResourceReservationEvidence,
+    buildRescheduleRequestEvidence,
+    buildRescheduleCompletionEvidence,
+    buildNoShowEvidence,
+    buildNoShowDecisionEvidence,
+    buildResourceReleaseEvidence,
     validateCancellationRefundEvidence,
     buildCancellationRequestEvidence,
     buildCancellationDecisionEvidence,
