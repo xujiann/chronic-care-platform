@@ -101,3 +101,46 @@ test("service leaves the rejected case unchanged when no fresh appeal panel is a
   assert.throws(() => Service.createSpecialCaseAppeal(rejected.state, rejected.row.id, { originalDecisionDigest: rejected.row.decisionDigest, reason: "补充新证据", evidence: evidence("2"), at: rejected.row.rejectedAt }, "hospital-applicant"), (error) => error.code === "SPECIAL_CASE_APPEAL_EXPERT_UNAVAILABLE");
   assert.deepEqual(rejected.state.specialCases.find((item) => item.id === rejected.row.id), before);
 });
+
+test("special case state and original reviews cannot be promoted outside the event projection", () => {
+  const row = SpecialCase.createSpecialCaseApplication({ id: "case-projection", institution: "test-hospital", totalAmount: 1000 }, {
+    id: "special-projection",
+    reason: "复杂危重症",
+    requestedPaymentFen: 90000,
+    evidence: evidence("3")
+  }, "hospital-applicant");
+  SpecialCase.selectSpecialCaseExperts(row, experts(), { selectionNonce: "projection-original" });
+  row.state = "APPROVED";
+  row.status = SpecialCase.SPECIAL_CASE_LABELS.APPROVED;
+  row.adjustedPaymentFen = 90000;
+  row.decisionDigest = "4".repeat(64);
+  assert.equal(SpecialCase.verifySpecialCaseLedger(row.events), true);
+  assert.equal(SpecialCase.verifySpecialCaseStateProjection(row), false);
+  assert.throws(() => SpecialCase.settlementAdjustment([row], { id: row.caseId }), (error) => error.code === "SPECIAL_CASE_LEDGER_INVALID");
+
+  const rejected = rejectedApplication("special-review-projection");
+  const persisted = structuredClone(rejected);
+  persisted.reviews[0].opinion = "被篡改的原审意见";
+  assert.throws(() => SpecialCase.createSpecialCaseAppeal(persisted, {
+    originalDecisionDigest: persisted.decisionDigest,
+    reason: "补充证据",
+    evidence: evidence("5"),
+    at: persisted.rejectedAt
+  }, "hospital-applicant"), (error) => error.code === "SPECIAL_CASE_STATE_PROJECTION_INVALID");
+});
+
+test("fabricated appeal reviews cannot produce a special case decision", () => {
+  const row = rejectedApplication("special-appeal-projection");
+  const appeal = SpecialCase.createSpecialCaseAppeal(row, { id: "appeal-projection", originalDecisionDigest: row.decisionDigest, reason: "补充证据", evidence: evidence("6"), at: row.rejectedAt }, "hospital-applicant");
+  const panel = SpecialCase.selectSpecialCaseAppealExperts(row, experts(), { selectionNonce: "appeal-projection-panel", at: row.rejectedAt });
+  SpecialCase.reviewSpecialCaseAppeal(row, { approved: true, adjustedPaymentFen: 85000, at: appeal.submittedAt }, panel.members[0].reviewerAccount);
+  const persisted = structuredClone(row);
+  persisted.appeals[0].reviews[0].adjustedPaymentFen = 1;
+  assert.equal(SpecialCase.verifySpecialCaseLedger(persisted.events), true);
+  assert.equal(SpecialCase.verifySpecialCaseStateProjection(persisted), false);
+  assert.throws(() => SpecialCase.reviewSpecialCaseAppeal(persisted, {
+    approved: true,
+    adjustedPaymentFen: 85000,
+    at: appeal.submittedAt
+  }, panel.members[1].reviewerAccount), (error) => error.code === "SPECIAL_CASE_APPEAL_PANEL_INVALID");
+});
