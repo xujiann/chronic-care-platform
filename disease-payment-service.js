@@ -2,6 +2,8 @@
 
 const { randomUUID } = require("crypto");
 const DiseasePaymentIntake = require("./disease-payment-intake");
+const LocalPaymentPackage = require("./disease-payment-local-package");
+const catalogIndexCache = new WeakMap();
 
 const POLICY = {
   id: "nhsa-2025-18",
@@ -89,6 +91,12 @@ function seedDiseasePaymentState() {
       { id: "param-dip-2026", mode: "DIP", schemeId: "dip-demo-2026", name: "2026年度DIP支付参数", rateMethod: "浮动费率法", rate: 112.5, status: "草案", effectiveFrom: "2026-01-01", approvedBy: "待审批" }
     ],
     parameterImpactReports: [],
+    localPaymentPackages: [],
+    localPaymentPackageValidationReports: [],
+    localPaymentPackageImpactReports: [],
+    localPaymentPackageDiffReports: [],
+    localPaymentPackageActivationSnapshots: [],
+    localPaymentPackageSimulationJobs: [],
     groupCatalog: [
       { code: "FZ11", mode: "DRG", name: "循环系统疾病伴严重并发症", mdcCode: "MDCF", mdcName: "循环系统疾病及功能障碍", adrgCode: "FZ1", adrgName: "循环系统内科诊疗组", groupType: "medical", complicationLevel: "MCC", diagnosisPrefixes: ["I10", "I11", "I12", "I13", "I15"], weight: 1.28, adjustment: 1, primaryCare: false },
       { code: "FZ13", mode: "DRG", name: "循环系统疾病伴一般并发症", mdcCode: "MDCF", mdcName: "循环系统疾病及功能障碍", adrgCode: "FZ1", adrgName: "循环系统内科诊疗组", groupType: "medical", complicationLevel: "CC", diagnosisPrefixes: ["I10", "I11", "I12", "I13", "I15"], weight: 0.98, adjustment: 1, primaryCare: true },
@@ -171,10 +179,15 @@ function normalizeState(input) {
     complicationCatalog: { ...seed.drgPreviewRules.complicationCatalog, ...(state.drgPreviewRules?.complicationCatalog || {}) }
   };
   const storedCatalog = Array.isArray(state.groupCatalog) ? state.groupCatalog : [];
-  const storedByCode = new Map(storedCatalog.map((item) => [item.code, item]));
+  const fullPublishedModes = new Set((state.localPaymentPackages || []).filter((item) => item.status === "已发布" && item.scope === "full").map((item) => item.mode));
+  const officialStoredCatalog = storedCatalog.filter((item) => item.authority === "official-local");
+  const officialCodes = new Set(officialStoredCatalog.map((item) => `${item.mode}:${item.code}`));
+  const seedCatalog = seed.groupCatalog.filter((item) => !fullPublishedModes.has(item.mode));
+  const storedByCode = new Map(storedCatalog.map((item) => [`${item.mode}:${item.code}`, item]));
   normalized.groupCatalog = [
-    ...seed.groupCatalog.map((item) => ({ ...item, ...(storedByCode.get(item.code) || {}) })),
-    ...storedCatalog.filter((item) => !seed.groupCatalog.some((seedItem) => seedItem.code === item.code))
+    ...officialStoredCatalog,
+    ...seedCatalog.filter((item) => !officialCodes.has(`${item.mode}:${item.code}`)).map((item) => ({ ...item, ...(storedByCode.get(`${item.mode}:${item.code}`) || {}) })),
+    ...storedCatalog.filter((item) => item.authority !== "official-local" && !fullPublishedModes.has(item.mode) && !seedCatalog.some((seedItem) => seedItem.code === item.code))
   ];
   const storedAdapters = Array.isArray(state.grouperAdapters) ? state.grouperAdapters : [];
   const storedAdaptersById = new Map(storedAdapters.map((item) => [item.id, item]));
@@ -195,8 +208,93 @@ function validateCase(item) {
   return { ok: errors.length === 0, errors, checkedAt: new Date().toISOString() };
 }
 
-function activeParameter(state, mode) {
+function effectiveOn(item, effectiveDate) {
+  const date = String(effectiveDate || "").slice(0, 10);
+  if (!date) return true;
+  return (!item.effectiveFrom || item.effectiveFrom <= date) && (!item.effectiveTo || item.effectiveTo >= date);
+}
+
+function activeParameter(state, mode, effectiveDate = "") {
+  const candidate = state.parameterVersions.find((item) => item.mode === mode && item.simulationCandidate);
+  if (candidate) return candidate;
+  const versions = state.parameterVersions.filter((item) => item.mode === mode && ["已发布", "已冻结"].includes(item.status) && effectiveOn(item, effectiveDate)).sort((a, b) => String(b.effectiveFrom || "").localeCompare(String(a.effectiveFrom || "")) || (a.status === "已发布" ? -1 : 1));
+  if (versions[0] || effectiveDate) return versions[0];
   return state.parameterVersions.find((item) => item.mode === mode && item.status === "已发布") || state.parameterVersions.find((item) => item.mode === mode);
+}
+
+function activeScheme(state, mode, effectiveDate = "") {
+  const candidate = state.schemeVersions.find((item) => item.mode === mode && item.simulationCandidate);
+  if (candidate) return candidate;
+  const version = state.schemeVersions.filter((item) => item.mode === mode && ["已发布", "已冻结"].includes(item.status) && effectiveOn(item, effectiveDate)).sort((a, b) => String(b.effectiveFrom || "").localeCompare(String(a.effectiveFrom || "")) || (a.status === "已发布" ? -1 : 1))[0];
+  return version || (effectiveDate ? undefined : state.schemeVersions.find((item) => item.mode === mode && item.status === "已发布"));
+}
+
+function buildCatalogPrefixIndex(state, mode) {
+  const cached = catalogIndexCache.get(state);
+  if (cached?.catalog === state.groupCatalog && cached.byMode.has(mode)) return cached.byMode.get(mode);
+  const byMode = cached?.catalog === state.groupCatalog ? cached.byMode : new Map();
+  const root = { children: new Map(), groups: [] };
+  let prefixCount = 0;
+  let nodeCount = 1;
+  state.groupCatalog.filter((group) => group.mode === mode).forEach((group, catalogOrder) => {
+    (group.diagnosisPrefixes || []).forEach((rawPrefix) => {
+      const prefix = String(rawPrefix || "").toUpperCase();
+      if (!prefix) return;
+      prefixCount += 1;
+      let node = root;
+      for (const char of prefix) {
+        if (!node.children.has(char)) { node.children.set(char, { children: new Map(), groups: [] }); nodeCount += 1; }
+        node = node.children.get(char);
+      }
+      node.groups.push({ group, catalogOrder });
+    });
+  });
+  const index = { root, mode, groupCount: state.groupCatalog.filter((group) => group.mode === mode).length, prefixCount, nodeCount };
+  byMode.set(mode, index);
+  catalogIndexCache.set(state, { catalog: state.groupCatalog, byMode });
+  return index;
+}
+
+function indexedCatalogMatches(state, mode, diagnosis) {
+  const index = buildCatalogPrefixIndex(state, mode);
+  const matches = [];
+  let node = index.root;
+  for (const char of String(diagnosis || "").toUpperCase()) {
+    node = node.children.get(char);
+    if (!node) break;
+    matches.push(...node.groups);
+  }
+  const seen = new Set();
+  return matches.sort((a, b) => a.catalogOrder - b.catalogOrder).map((item) => item.group).filter((group) => { if (seen.has(group)) return false; seen.add(group); return true; });
+}
+
+function applicableCatalogMatches(state, mode, item, diagnosis) {
+  const date = item.dischargeDate || item.admissionDate || "";
+  const matches = indexedCatalogMatches(state, mode, diagnosis);
+  const candidateRows = matches.filter((group) => group.simulationCandidate);
+  if (candidateRows.length) {
+    if (candidateRows.some((group) => group.packageScope === "full")) return candidateRows;
+    const candidateCodes = new Set(candidateRows.map((group) => group.code));
+    return [...candidateRows, ...matches.filter((group) => !group.simulationCandidate && !candidateCodes.has(group.code))];
+  }
+  const officialRows = matches.filter((group) => group.authority === "official-local" && effectiveOn(group, date));
+  const fallbackRows = matches.filter((group) => group.authority !== "official-local");
+  if (!officialRows.length) {
+    const fullPackages = (state.localPaymentPackages || []).filter((group) => group.mode === mode && group.authority === "local-medical-insurance-approved" && group.scope === "full" && ["已发布", "已冻结"].includes(group.status));
+    if (date && fullPackages.length && date > fullPackages.map((group) => group.effectiveTo).sort().at(-1)) return [];
+    return fallbackRows;
+  }
+  if (officialRows.some((group) => group.packageScope === "full")) return officialRows;
+  const officialCodes = new Set(officialRows.map((group) => group.code));
+  return [...officialRows, ...fallbackRows.filter((group) => !officialCodes.has(group.code))];
+}
+
+function buildCatalogIndexStats(input) {
+  const state = normalizeState(input);
+  return Object.fromEntries(["DRG", "DIP"].map((mode) => {
+    const index = buildCatalogPrefixIndex(state, mode);
+    return [mode, { groupCount: index.groupCount, prefixCount: index.prefixCount, nodeCount: index.nodeCount, strategy: "diagnosis-prefix-trie" }];
+  }));
 }
 
 function operationRows(item) {
@@ -212,7 +310,7 @@ function dipCatalogMatch(state, item) {
   const threshold = Number(state.dip2LibraryProfile?.relatedOperationCostThreshold || 0.1);
   const eligibleRelated = operations.filter((row) => row !== main && row.cost / Math.max(1, Number(item.totalAmount)) >= threshold);
   const treatmentText = operations.map((row) => `${row.code} ${row.name}`).join(" ");
-  const candidates = state.groupCatalog.filter((group) => group.mode === "DIP" && group.diagnosisPrefixes.some((prefix) => diagnosis.startsWith(prefix)));
+  const candidates = applicableCatalogMatches(state, "DIP", item, diagnosis);
   return candidates.find((group) => group.mainOperationPrefixes?.some((prefix) => main?.code.startsWith(prefix)) && group.relatedOperationPrefixes?.some((prefix) => eligibleRelated.some((row) => row.code.startsWith(prefix))))
     || candidates.find((group) => group.mainOperationPrefixes?.some((prefix) => main?.code.startsWith(prefix)) && !group.relatedOperationPrefixes)
     || candidates.find((group) => group.treatmentTags?.some((tag) => treatmentText.includes(tag)))
@@ -242,7 +340,7 @@ function drgCatalogMatch(state, item) {
   if (diagnosisExclusion) {
     return { catalog: null, stage: "MDC", reasonCode: "EXCLUDED_PRINCIPAL_DIAGNOSIS", reason: diagnosisExclusion.reason, diagnosis };
   }
-  const candidates = state.groupCatalog.filter((group) => group.mode === "DRG" && (group.diagnosisPrefixes || []).some((prefix) => diagnosis.startsWith(prefix)));
+  const candidates = applicableCatalogMatches(state, "DRG", item, diagnosis);
   if (!candidates.length) return { catalog: null, stage: "MDC", reasonCode: "MDC_NOT_FOUND", reason: "本地模拟目录未覆盖该主要诊断，需调用正式分组器", diagnosis };
   const complication = inferDrgComplicationLevel(state, item);
   const catalog = candidates.find((group) => group.complicationLevel === complication.level)
@@ -275,7 +373,7 @@ function groupCase(state, item, mode = state.mode || "DRG") {
     score: catalog.score,
     adjustment: catalog.adjustment || 1,
     primaryCare: catalog.primaryCare,
-    schemeId: state.schemeVersions.find((scheme) => scheme.mode === mode && scheme.status === "已发布")?.id,
+    schemeId: activeScheme(state, mode, item.dischargeDate)?.id,
     groupedAt: new Date().toISOString(),
     grouper: "本地可解释联调适配器",
     authority: "non-binding",
@@ -303,10 +401,12 @@ function calculateCase(state, item, mode = state.mode || "DRG") {
   const quality = validateCase(item);
   if (!quality.ok) return { ok: false, quality, error: "结算清单质控未通过" };
   const grouping = groupCase(state, item, mode);
-  const parameter = activeParameter(state, mode);
+  const parameter = activeParameter(state, mode, item.dischargeDate);
   if (!parameter) return { ok: false, quality, grouping, error: "没有可用支付参数" };
   const unit = mode === "DRG" ? Number(grouping.weight || 0) : Number(grouping.score || 0);
-  const standard = round(unit * Number(parameter.rate) * Number(grouping.adjustment || 1));
+  const institutionCoefficientRow = (parameter.institutionCoefficients || []).find((row) => (row.institutionCode && row.institutionCode === item.institutionCode) || (row.institution && row.institution === item.institution));
+  const institutionCoefficient = Number(institutionCoefficientRow?.coefficient || 1);
+  const standard = round(unit * Number(parameter.rate) * Number(grouping.adjustment || 1) * institutionCoefficient);
   const risks = detectRisks(state, item, grouping, standard, mode);
   const costRatio = standard > 0 ? round(Number(item.totalAmount) / standard, 4) : 0;
   const outlierType = risks.some((risk) => risk.code === "HIGH_OUTLIER") ? "HIGH" : risks.some((risk) => risk.code === "LOW_OUTLIER") ? "LOW" : grouping.ok ? "NORMAL" : "UNGROUPED";
@@ -317,7 +417,8 @@ function calculateCase(state, item, mode = state.mode || "DRG") {
     parameterId: parameter.id,
     rateMethod: parameter.rateMethod,
     rate: parameter.rate,
-    formula: mode === "DRG" ? "权重 × 费率 × 调整系数" : "分值 × 点值 × 调整系数",
+    institutionCoefficient,
+    formula: `${mode === "DRG" ? "权重 × 费率 × 调整系数" : "分值 × 点值 × 调整系数"}${institutionCoefficient !== 1 ? " × 机构系数" : ""}`,
     paymentStandard: standard,
     variance: round(Number(item.totalAmount) - standard),
     projectedBalance: round(standard - Number(item.totalAmount)),
@@ -341,6 +442,140 @@ function calculateAll(input, actor) {
   });
   audit(state, "批量分组测算", `${state.cases.length}个病例`, actor, `模式=${state.mode}`);
   return state;
+}
+
+function diseaseCategory(code) {
+  const normalized = String(code || "").trim().toUpperCase();
+  const match = normalized.match(/^[A-Z][0-9]{2}/);
+  return match ? match[0] : normalized || "UNKNOWN";
+}
+
+function dateGapDays(from, to) {
+  const start = Date.parse(String(from || ""));
+  const end = Date.parse(String(to || ""));
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+  return Math.floor((end - start) / 86400000);
+}
+
+function estimatedClaimAmount(item) {
+  const declared = Number(item.declaredFundAmount || 0);
+  const standard = Number(item.calculation?.paymentStandard || 0);
+  const total = Number(item.totalAmount || 0);
+  if (declared > 0 && standard > 0) return round(Math.min(declared, standard));
+  return round(Math.max(0, declared || standard || total));
+}
+
+function complicationRank(value) {
+  return { NONE: 0, CC: 1, MCC: 2 }[String(value || "").toUpperCase()] ?? 0;
+}
+
+function buildDiseaseSupervisionProfiles(input, options = {}) {
+  const state = normalizeState(input);
+  const repeatWindowDays = Math.max(1, Math.min(180, Number(options.repeatWindowDays) || 30));
+  const institution = String(options.institution || "").trim();
+  const residentId = String(options.residentId || "").trim();
+  const requestedDisease = String(options.diseaseCode || "").trim().toUpperCase();
+  const requestedRisk = String(options.riskCode || "").trim().toUpperCase();
+  const limit = Math.max(1, Math.min(500, Number(options.limit) || 100));
+  const calculatedCases = state.cases.map((item) => item.calculation ? item : { ...item, calculation: calculateCase(state, item, state.mode) });
+  const grouped = new Map();
+
+  calculatedCases.forEach((item) => {
+    if (institution && item.institution !== institution && item.institutionCode !== institution) return;
+    if (residentId && item.residentId !== residentId) return;
+    const category = diseaseCategory(item.principalDiagnosis);
+    if (requestedDisease && category !== requestedDisease && String(item.principalDiagnosis || "").toUpperCase() !== requestedDisease) return;
+    const key = `${item.residentId || "NO_RESIDENT"}:${category}`;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(item);
+  });
+
+  const profiles = [...grouped.entries()].map(([key, rows]) => {
+    const admissions = rows.slice().sort((a, b) => String(a.admissionDate || "").localeCompare(String(b.admissionDate || "")) || String(a.id || "").localeCompare(String(b.id || "")));
+    const signals = [];
+    admissions.forEach((item, index) => {
+      const previous = index > 0 ? admissions[index - 1] : null;
+      const base = { caseId: item.id, settlementListNo: item.settlementListNo, institution: item.institution, occurredAt: item.admissionDate };
+      (item.calculation?.risks || []).forEach((risk) => {
+        const amount = risk.code === "HIGH_OUTLIER" ? Math.max(0, Number(item.declaredFundAmount || 0) - Number(item.calculation?.paymentStandard || 0)) : 0;
+        signals.push({ ...base, code: risk.code, name: risk.name, level: risk.level, estimatedFundImpact: round(amount), basis: risk.value ? `倍率${risk.value}，阈值${risk.threshold}` : "单病例规则命中" });
+      });
+      if (!previous) return;
+      const gapDays = dateGapDays(previous.dischargeDate, item.admissionDate);
+      if (gapDays == null || gapDays < 0 || gapDays > repeatWindowDays) return;
+      const crossInstitution = previous.institution !== item.institution;
+      signals.push({
+        ...base,
+        code: crossInstitution ? "CROSS_INSTITUTION_REPEAT_ADMISSION" : "REPEAT_ADMISSION",
+        name: crossInstitution ? "短期跨机构重复住院线索" : "短期重复住院线索",
+        level: gapDays <= 7 ? "高" : "中",
+        estimatedFundImpact: estimatedClaimAmount(item),
+        basis: `同一居民同一病种前次出院后${gapDays}天再次入院`,
+        linkedCaseIds: [previous.id, item.id],
+        previousInstitution: previous.institution,
+        gapDays
+      });
+      const previousDiagnoses = (previous.otherDiagnoses || []).length;
+      const currentDiagnoses = (item.otherDiagnoses || []).length;
+      const previousRank = complicationRank(previous.calculation?.grouping?.complicationLevel);
+      const currentRank = complicationRank(item.calculation?.grouping?.complicationLevel);
+      if (currentDiagnoses - previousDiagnoses >= 3 || currentRank > previousRank) {
+        signals.push({
+          ...base,
+          code: "CODING_COMPLEXITY_ESCALATION",
+          name: "诊断复杂度短期跃升线索",
+          level: currentRank - previousRank >= 2 ? "高" : "中",
+          estimatedFundImpact: round(Math.max(0, Number(item.calculation?.paymentStandard || 0) - Number(previous.calculation?.paymentStandard || 0))),
+          basis: `其他诊断${previousDiagnoses}→${currentDiagnoses}，并发症层级${previous.calculation?.grouping?.complicationLevel || "NONE"}→${item.calculation?.grouping?.complicationLevel || "NONE"}`,
+          linkedCaseIds: [previous.id, item.id],
+          gapDays
+        });
+      }
+    });
+    const uniqueSignals = [...new Map(signals.map((item) => [`${item.code}:${item.caseId}:${(item.linkedCaseIds || []).join("-")}`, item])).values()];
+    const visibleSignals = requestedRisk ? uniqueSignals.filter((item) => item.code === requestedRisk) : uniqueSignals;
+    const institutions = [...new Set(admissions.map((item) => item.institution).filter(Boolean))];
+    const latest = admissions.at(-1);
+    return {
+      id: key,
+      residentId: latest.residentId || "",
+      patientName: latest.patientName || "",
+      diseaseCode: diseaseCategory(latest.principalDiagnosis),
+      diseaseName: latest.principalDiagnosisName || latest.principalDiagnosis || "未命名病种",
+      admissionCount: admissions.length,
+      institutionCount: institutions.length,
+      institutions,
+      firstAdmissionDate: admissions[0]?.admissionDate || "",
+      lastDischargeDate: latest.dischargeDate || "",
+      totalAmount: round(admissions.reduce((sum, item) => sum + Number(item.totalAmount || 0), 0)),
+      declaredFundAmount: round(admissions.reduce((sum, item) => sum + Number(item.declaredFundAmount || 0), 0)),
+      paymentStandard: round(admissions.reduce((sum, item) => sum + Number(item.calculation?.paymentStandard || 0), 0)),
+      estimatedFundImpact: round(visibleSignals.reduce((sum, item) => sum + Number(item.estimatedFundImpact || 0), 0)),
+      riskLevel: visibleSignals.some((item) => item.level === "高") ? "高" : visibleSignals.length ? "中" : "低",
+      signals: visibleSignals,
+      admissions: admissions.map((item) => ({ id: item.id, settlementListNo: item.settlementListNo, institution: item.institution, admissionDate: item.admissionDate, dischargeDate: item.dischargeDate, principalDiagnosis: item.principalDiagnosis, groupCode: item.calculation?.grouping?.groupCode || "UNGROUPED", complicationLevel: item.calculation?.grouping?.complicationLevel || "", declaredFundAmount: Number(item.declaredFundAmount || 0), paymentStandard: Number(item.calculation?.paymentStandard || 0) }))
+    };
+  }).filter((item) => !requestedRisk || item.signals.length > 0)
+    .sort((a, b) => (({ "高": 2, "中": 1, "低": 0 }[b.riskLevel] || 0) - ({ "高": 2, "中": 1, "低": 0 }[a.riskLevel] || 0)) || b.estimatedFundImpact - a.estimatedFundImpact || String(b.lastDischargeDate).localeCompare(String(a.lastDischargeDate)))
+    .slice(0, limit);
+  const allSignals = profiles.flatMap((item) => item.signals);
+  return {
+    policyBoundary: "风险线索用于智能审核和人工复核，不直接认定违规或作为扣款依据",
+    ruleVersion: "disease-supervision-profile-v1",
+    repeatWindowDays,
+    generatedAt: new Date().toISOString(),
+    summary: {
+      profiles: profiles.length,
+      monitoredCases: profiles.reduce((sum, item) => sum + item.admissionCount, 0),
+      riskProfiles: profiles.filter((item) => item.signals.length).length,
+      signals: allSignals.length,
+      estimatedFundImpact: round(allSignals.reduce((sum, item) => sum + Number(item.estimatedFundImpact || 0), 0)),
+      repeatAdmissions: allSignals.filter((item) => item.code === "REPEAT_ADMISSION").length,
+      crossInstitutionAdmissions: allSignals.filter((item) => item.code === "CROSS_INSTITUTION_REPEAT_ADMISSION").length,
+      codingEscalations: allSignals.filter((item) => item.code === "CODING_COMPLEXITY_ESCALATION").length
+    },
+    profiles
+  };
 }
 
 function createSpecialCase(input, payload, actor) {
@@ -552,6 +787,70 @@ function buildParameterGovernanceView(input) {
   };
 }
 
+function importLocalPaymentPackage(input, payload, actor, options) {
+  return LocalPaymentPackage.importLocalPaymentPackage(normalizeState(input), payload, actor, options);
+}
+
+function simulateLocalPaymentPackage(input, id, actor) {
+  return LocalPaymentPackage.simulateLocalPaymentPackage(normalizeState(input), id, actor, calculateCase);
+}
+
+function compareLocalPaymentPackage(input, id, actor, baselineId) {
+  return LocalPaymentPackage.compareLocalPaymentPackage(normalizeState(input), id, actor, baselineId);
+}
+
+function createLocalPaymentPackageSimulationJob(input, id, payload, actor) {
+  return LocalPaymentPackage.createLocalPaymentPackageSimulationJob(normalizeState(input), id, payload, actor);
+}
+
+function processLocalPaymentPackageSimulationJob(input, jobId, payload, actor) {
+  return LocalPaymentPackage.processLocalPaymentPackageSimulationJob(normalizeState(input), jobId, payload, actor, calculateCase);
+}
+
+function retryLocalPaymentPackageSimulationJob(input, jobId, actor) {
+  return LocalPaymentPackage.retryLocalPaymentPackageSimulationJob(normalizeState(input), jobId, actor);
+}
+
+function cancelLocalPaymentPackageSimulationJob(input, jobId, payload, actor) {
+  return LocalPaymentPackage.cancelLocalPaymentPackageSimulationJob(normalizeState(input), jobId, payload, actor);
+}
+
+function submitLocalPaymentPackage(input, id, actor) {
+  return LocalPaymentPackage.submitLocalPaymentPackage(normalizeState(input), id, actor);
+}
+
+function reviewLocalPaymentPackage(input, id, payload, actor) {
+  return LocalPaymentPackage.reviewLocalPaymentPackage(normalizeState(input), id, payload, actor);
+}
+
+function publishLocalPaymentPackage(input, id, actor, options) {
+  return LocalPaymentPackage.publishLocalPaymentPackage(normalizeState(input), id, actor, options);
+}
+
+function activateLocalPaymentPackage(input, id, actor, options) {
+  return LocalPaymentPackage.activateLocalPaymentPackage(normalizeState(input), id, actor, options);
+}
+
+function activateDueLocalPaymentPackages(input, actor, options) {
+  return LocalPaymentPackage.activateDueLocalPaymentPackages(normalizeState(input), actor, options);
+}
+
+function rollbackLocalPaymentPackage(input, id, payload, actor) {
+  return LocalPaymentPackage.rollbackLocalPaymentPackage(normalizeState(input), id, payload, actor);
+}
+
+function buildLocalPaymentPackageView(input) {
+  return LocalPaymentPackage.buildLocalPaymentPackageView(normalizeState(input));
+}
+
+function getLocalPaymentPackageCatalogPage(input, id, options) {
+  return LocalPaymentPackage.getLocalPaymentPackageCatalogPage(normalizeState(input), id, options);
+}
+
+function getLocalPaymentPackageReport(input, id, type) {
+  return LocalPaymentPackage.getLocalPaymentPackageReport(normalizeState(input), id, type);
+}
+
 function buildDrgAnalytics(input) {
   const state = normalizeState(input);
   const rows = state.cases.map((item) => ({ item, calculation: item.calculation })).filter(({ calculation }) => calculation?.grouping?.mode === "DRG");
@@ -607,6 +906,16 @@ function simulateDrgCase(input, payload = {}) {
 
 function buildOverview(input) {
   const state = DiseasePaymentIntake.ensureIntakeState(normalizeState(input));
+  const localPackageView = LocalPaymentPackage.buildLocalPaymentPackageView(state);
+  const clientState = {
+    ...state,
+    groupCatalog: state.groupCatalog.filter((item) => item.mode === "DRG"),
+    localPaymentPackages: localPackageView.packages,
+    localPaymentPackageImpactReports: localPackageView.impactReports,
+    localPaymentPackageDiffReports: localPackageView.diffReports,
+    localPaymentPackageActivationSnapshots: localPackageView.activationSnapshots,
+    localPaymentPackageSimulationJobs: localPackageView.simulationJobs
+  };
   const calculated = state.cases.filter((item) => item.calculation?.ok);
   const risks = state.cases.flatMap((item) => item.calculation?.risks || []);
   const totalCost = round(state.cases.reduce((sum, item) => sum + Number(item.totalAmount || 0), 0));
@@ -616,7 +925,8 @@ function buildOverview(input) {
     return { institution, caseCount: cases.length, totalCost: round(cases.reduce((sum, item) => sum + Number(item.totalAmount || 0), 0)), standardAmount: round(cases.reduce((sum, item) => sum + Number(item.calculation?.paymentStandard || 0), 0)), riskCount: cases.reduce((sum, item) => sum + (item.calculation?.risks?.length || 0), 0) };
   });
   const specialCapRate = state.mode === "DRG" ? 0.05 : 0.005;
-  return { state, summary: { caseCount: state.cases.length, calculatedCount: calculated.length, ungroupedCount: state.cases.filter((item) => item.calculation?.grouping && !item.calculation.grouping.ok).length, totalCost, paymentStandard, projectedBalance: round(paymentStandard - totalCost), riskCount: risks.length, specialPending: state.specialCases.filter((item) => item.status === "待评审").length, specialCapRate, specialUsageRate: round(state.specialCases.filter((item) => !["不予通过", "已撤回"].includes(item.status)).length / Math.max(1, state.cases.length), 4), settlementPending: state.settlementBatches.filter((item) => item.status !== "已拨付").length, prepaymentPending: state.prepayments.filter((item) => item.status === "待审批").length, unpaidPending: state.unpaidItems.filter((item) => item.status !== "已支付").length, negotiationPending: state.negotiationRounds.filter((item) => item.status !== "已达成一致").length, trainingPending: state.trainings.filter((item) => item.status !== "已完成").length, intake: DiseasePaymentIntake.buildIntakeSummary(state), drg: buildDrgAnalytics(state) }, institutions };
+  const supervision = buildDiseaseSupervisionProfiles(state);
+  return { state: clientState, summary: { caseCount: state.cases.length, calculatedCount: calculated.length, ungroupedCount: state.cases.filter((item) => item.calculation?.grouping && !item.calculation.grouping.ok).length, totalCost, paymentStandard, projectedBalance: round(paymentStandard - totalCost), riskCount: risks.length, specialPending: state.specialCases.filter((item) => item.status === "待评审").length, specialCapRate, specialUsageRate: round(state.specialCases.filter((item) => !["不予通过", "已撤回"].includes(item.status)).length / Math.max(1, state.cases.length), 4), settlementPending: state.settlementBatches.filter((item) => item.status !== "已拨付").length, prepaymentPending: state.prepayments.filter((item) => item.status === "待审批").length, unpaidPending: state.unpaidItems.filter((item) => item.status !== "已支付").length, negotiationPending: state.negotiationRounds.filter((item) => item.status !== "已达成一致").length, trainingPending: state.trainings.filter((item) => item.status !== "已完成").length, intake: DiseasePaymentIntake.buildIntakeSummary(state), drg: buildDrgAnalytics(state), supervision: supervision.summary }, institutions, supervision };
 }
 
-module.exports = { POLICY, applyGovernanceAction, buildDrgAnalytics, buildDrgCatalogView, buildOverview, buildParameterGovernanceView, calculateAll, calculateCase, createPaymentParameter, createSettlementBatch, createSpecialCase, drgCatalogMatch, inferDrgComplicationLevel, normalizeState, publishPaymentParameter, reconcileBatch, reviewPaymentParameter, reviewSpecialCase, seedDiseasePaymentState, simulateDrgCase, simulatePaymentParameter, submitPaymentParameter, validateCase };
+module.exports = { POLICY, activateDueLocalPaymentPackages, activateLocalPaymentPackage, applyGovernanceAction, buildCatalogIndexStats, buildDiseaseSupervisionProfiles, buildDrgAnalytics, buildDrgCatalogView, buildLocalPaymentPackageView, buildOverview, buildParameterGovernanceView, calculateAll, calculateCase, cancelLocalPaymentPackageSimulationJob, compareLocalPaymentPackage, createLocalPaymentPackageSimulationJob, createPaymentParameter, createSettlementBatch, createSpecialCase, drgCatalogMatch, getLocalPaymentPackageCatalogPage, getLocalPaymentPackageReport, importLocalPaymentPackage, inferDrgComplicationLevel, normalizeState, processLocalPaymentPackageSimulationJob, publishLocalPaymentPackage, publishPaymentParameter, reconcileBatch, retryLocalPaymentPackageSimulationJob, reviewLocalPaymentPackage, reviewPaymentParameter, reviewSpecialCase, rollbackLocalPaymentPackage, seedDiseasePaymentState, simulateDrgCase, simulateLocalPaymentPackage, simulatePaymentParameter, submitLocalPaymentPackage, submitPaymentParameter, validateCase, validateLocalPaymentPackage: LocalPaymentPackage.validateLocalPaymentPackage };

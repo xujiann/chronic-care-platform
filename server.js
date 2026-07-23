@@ -97,7 +97,7 @@ const {
 const { buildProcessAuditReport } = require("./scripts/process-audit");
 const { buildSiteReadinessPack, renderTemplateReadmes } = require("./scripts/site-readiness-pack");
 const { buildHealthDashboardSummary, buildPriorityApplicationTemplates } = require("./scripts/health-dashboard-summary");
-const { buildPilotAcceptanceCenter } = require("./pilot-acceptance");
+const { applyPilotInterfaceReviewAction, buildInterfaceReviews, buildPilotAcceptanceCenter } = require("./pilot-acceptance");
 const { buildReleaseReport, buildServiceAcceptanceSummary } = require("./scripts/release-report");
 const { buildReleaseArtifactManifest } = require("./scripts/release-artifact-manifest");
 const { buildCapabilityMap, renderCapabilityMapMarkdown } = require("./platform-capability-map");
@@ -256,6 +256,16 @@ const PORT = Number(process.env.PORT || 5173);
 const ROOT = __dirname;
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(ROOT, "data");
 const DB_FILE = path.join(DATA_DIR, "db.json");
+
+function diseasePaymentPackageSignatureOptions(extra = {}) {
+  return {
+    ...extra,
+    trustedSignerFingerprints: String(process.env.DISEASE_PAYMENT_TRUSTED_SIGNER_FINGERPRINTS || "")
+      .split(/[,;\n]/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+  };
+}
 const SQLITE_FILE = path.join(DATA_DIR, "health-city.sqlite");
 const STORAGE_ENGINE = String(process.env.STORAGE_ENGINE || "auto").toLowerCase();
 const RUNTIME_STORAGE_ENGINES = new Set(["auto", "json", "sqlite"]);
@@ -1124,6 +1134,7 @@ function seedState() {
     platformEvidence: seedPlatformEvidence(),
     platformCapabilityReviews: seedPlatformCapabilityReviews(),
     platformProductionBlockerReviews: seedPlatformProductionBlockerReviews(),
+    pilotAcceptanceInterfaceReviews: [],
     productionDeploymentPlan: seedProductionDeploymentPlan(),
     productionDatabaseMigrationBatches: seedProductionDatabaseMigrationBatches(),
     productionDatabaseCutoverRuns: seedProductionDatabaseCutoverRuns(),
@@ -9897,12 +9908,12 @@ function sendStorageConflict(res, error) {
   });
 }
 
-function collectJson(req) {
+function collectJson(req, maxLength = 2_000_000) {
   return new Promise((resolve, reject) => {
     let body = "";
     req.on("data", (chunk) => {
       body += chunk;
-      if (body.length > 2_000_000) {
+      if (body.length > maxLength) {
         req.destroy();
         reject(new Error("请求体过大"));
       }
@@ -10170,6 +10181,7 @@ function normalizeState(data) {
     platformEvidence: cleanPlatformEvidenceText(mergeByKey(seedPlatformEvidence(), data.platformEvidence, "id")),
     platformCapabilityReviews: normalizePlatformCapabilityReviews(data.platformCapabilityReviews),
     platformProductionBlockerReviews: normalizePlatformProductionBlockerReviews(data.platformProductionBlockerReviews),
+    pilotAcceptanceInterfaceReviews: buildInterfaceReviews(data),
     productionDeploymentPlan: mergeByKey(seedProductionDeploymentPlan(), data.productionDeploymentPlan, "id"),
     productionDatabaseMigrationBatches: mergeByKey(seedProductionDatabaseMigrationBatches(), data.productionDatabaseMigrationBatches, "id"),
     productionDatabaseCutoverRuns: mergeByKey(seedProductionDatabaseCutoverRuns(), data.productionDatabaseCutoverRuns, "id"),
@@ -10381,6 +10393,7 @@ function completeSystemTargets(state) {
   }));
   state.platformCapabilityReviews = normalizePlatformCapabilityReviews(state.platformCapabilityReviews);
   state.platformProductionBlockerReviews = normalizePlatformProductionBlockerReviews(state.platformProductionBlockerReviews);
+  state.pilotAcceptanceInterfaceReviews = buildInterfaceReviews(state);
   state.productionDeploymentPlan = mergeByKey(seedProductionDeploymentPlan(), state.productionDeploymentPlan, "id").map((item) => ({
     ...item,
     requiredConfig: Array.isArray(item.requiredConfig) ? item.requiredConfig : [],
@@ -15930,6 +15943,7 @@ function scopeStateForUser(data, user) {
   delete scoped.platformEvidence;
   delete scoped.platformCapabilityReviews;
   delete scoped.platformProductionBlockerReviews;
+  delete scoped.pilotAcceptanceInterfaceReviews;
   delete scoped.productionDeploymentPlan;
   delete scoped.productionDatabaseMigrationBatches;
   delete scoped.productionDatabaseCutoverRuns;
@@ -24912,6 +24926,43 @@ async function handleApi(req, res) {
     return;
   }
 
+  const pilotAcceptanceInterfaceActionMatch = url.pathname.match(/^\/api\/pilot-acceptance\/interfaces\/([^/]+)\/actions$/);
+  if (req.method === "POST" && pilotAcceptanceInterfaceActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/pilot-acceptance/interfaces/:id/actions");
+    if (!user) return;
+    const interfaceId = decodeURIComponent(pilotAcceptanceInterfaceActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    let result;
+    try {
+      result = applyPilotInterfaceReviewAction(data, interfaceId, payload, user);
+    } catch (error) {
+      sendJson(res, /not found/.test(error.message) ? 404 : 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    data.pilotAcceptanceInterfaceReviews = result.reviews;
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "pilot-interface-joint-test-action",
+        target: interfaceId,
+        result: "allowed",
+        detail: `${payload.action} / ${result.item.workflowStatus} / ${result.item.evidenceRef || "no-evidence"}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, {
+      ok: true,
+      interfaceReview: result.item,
+      center: buildPilotAcceptanceCenter({ data, env: process.env })
+    });
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/health-dashboard/production-readiness") {
     const user = requireApiRole(req, res, ["commission"], "/api/health-dashboard/production-readiness");
     if (!user) return;
@@ -33315,7 +33366,27 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
     if (!user) return;
     const data = readDatabase();
-    sendJson(res, 200, DiseasePaymentService.buildOverview(data.diseasePayment));
+    const overview = DiseasePaymentService.buildOverview(data.diseasePayment);
+    if (user.role === "institution") {
+      overview.supervision = DiseasePaymentService.buildDiseaseSupervisionProfiles(data.diseasePayment, { institution: user.orgName });
+      overview.summary.supervision = overview.supervision.summary;
+    }
+    sendJson(res, 200, overview);
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/supervision/profiles" && req.method === "GET") {
+    const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    sendJson(res, 200, DiseasePaymentService.buildDiseaseSupervisionProfiles(data.diseasePayment, {
+      institution: user.role === "institution" ? user.orgName : url.searchParams.get("institution"),
+      residentId: url.searchParams.get("residentId"),
+      diseaseCode: url.searchParams.get("diseaseCode"),
+      riskCode: url.searchParams.get("riskCode"),
+      repeatWindowDays: url.searchParams.get("repeatWindowDays"),
+      limit: url.searchParams.get("limit")
+    }));
     return;
   }
 
@@ -33359,6 +33430,137 @@ async function handleApi(req, res) {
     data.diseasePayment = result.state;
     writeDatabase(data);
     sendJson(res, 201, result.row);
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/local-packages" && req.method === "GET") {
+    const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
+    if (!user) return;
+    sendJson(res, 200, DiseasePaymentService.buildLocalPaymentPackageView(readDatabase().diseasePayment));
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/local-packages/simulation-jobs" && req.method === "GET") {
+    const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
+    if (!user) return;
+    sendJson(res, 200, DiseasePaymentService.buildLocalPaymentPackageView(readDatabase().diseasePayment).simulationJobs);
+    return;
+  }
+
+  const diseasePaymentLocalSimulationCreateMatch = url.pathname.match(/^\/api\/disease-payment\/local-packages\/([^/]+)\/simulation-jobs$/);
+  if (diseasePaymentLocalSimulationCreateMatch && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    try {
+      const result = DiseasePaymentService.createLocalPaymentPackageSimulationJob(data.diseasePayment, decodeURIComponent(diseasePaymentLocalSimulationCreateMatch[1]), await collectJson(req), user.name);
+      data.diseasePayment = result.state;
+      writeDatabase(data);
+      sendJson(res, result.idempotent ? 200 : 201, { job: result.job, diffReport: result.diffReport, idempotent: result.idempotent });
+    } catch (error) {
+      sendJson(res, 409, { error: "Conflict", message: error.message });
+    }
+    return;
+  }
+
+  const diseasePaymentLocalSimulationActionMatch = url.pathname.match(/^\/api\/disease-payment\/local-packages\/simulation-jobs\/([^/]+)\/(process|retry|cancel)$/);
+  if (diseasePaymentLocalSimulationActionMatch && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
+    if (!user) return;
+    const [, encodedJobId, action] = diseasePaymentLocalSimulationActionMatch;
+    const jobId = decodeURIComponent(encodedJobId);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      const handlers = {
+        process: () => DiseasePaymentService.processLocalPaymentPackageSimulationJob(data.diseasePayment, jobId, payload, user.name),
+        retry: () => DiseasePaymentService.retryLocalPaymentPackageSimulationJob(data.diseasePayment, jobId, user.name),
+        cancel: () => DiseasePaymentService.cancelLocalPaymentPackageSimulationJob(data.diseasePayment, jobId, payload, user.name)
+      };
+      const result = handlers[action]();
+      data.diseasePayment = result.state;
+      writeDatabase(data);
+      sendJson(res, 200, { job: result.job, impactReport: result.report, package: result.row });
+    } catch (error) {
+      sendJson(res, 409, { error: "Conflict", message: error.message });
+    }
+    return;
+  }
+
+  const diseasePaymentLocalPackageReadMatch = url.pathname.match(/^\/api\/disease-payment\/local-packages\/([^/]+)\/(catalog|diff-report|impact-report)$/);
+  if (diseasePaymentLocalPackageReadMatch && req.method === "GET") {
+    const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
+    if (!user) return;
+    const [, encodedId, resource] = diseasePaymentLocalPackageReadMatch;
+    const id = decodeURIComponent(encodedId);
+    try {
+      const state = readDatabase().diseasePayment;
+      const result = resource === "catalog"
+        ? DiseasePaymentService.getLocalPaymentPackageCatalogPage(state, id, { page: url.searchParams.get("page"), pageSize: url.searchParams.get("pageSize"), query: url.searchParams.get("query") })
+        : DiseasePaymentService.getLocalPaymentPackageReport(state, id, resource === "diff-report" ? "diff" : "impact");
+      sendJson(res, 200, result);
+    } catch (error) {
+      sendJson(res, 404, { error: "Not Found", message: error.message });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/local-packages" && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    try {
+      const result = DiseasePaymentService.importLocalPaymentPackage(data.diseasePayment, await collectJson(req, 30_000_000), user.name, diseasePaymentPackageSignatureOptions());
+      data.diseasePayment = result.state;
+      writeDatabase(data);
+      sendJson(res, result.replaced ? 200 : 201, { package: result.row, validation: result.validation, replaced: result.replaced });
+    } catch (error) {
+      sendJson(res, 409, { error: "Conflict", message: error.message });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/local-packages/activate-due" && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      const result = DiseasePaymentService.activateDueLocalPaymentPackages(data.diseasePayment, user.name, diseasePaymentPackageSignatureOptions(payload));
+      data.diseasePayment = result.state;
+      writeDatabase(data);
+      sendJson(res, 200, { activated: result.activated, at: result.at, governance: DiseasePaymentService.buildLocalPaymentPackageView(result.state) });
+    } catch (error) {
+      sendJson(res, 409, { error: "Conflict", message: error.message });
+    }
+    return;
+  }
+
+  const diseasePaymentLocalPackageActionMatch = url.pathname.match(/^\/api\/disease-payment\/local-packages\/([^/]+)\/(compare|simulate|submit|review|publish|activate|rollback)$/);
+  if (diseasePaymentLocalPackageActionMatch && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
+    if (!user) return;
+    const [, encodedId, action] = diseasePaymentLocalPackageActionMatch;
+    const id = decodeURIComponent(encodedId);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      const handlers = {
+        compare: () => DiseasePaymentService.compareLocalPaymentPackage(data.diseasePayment, id, user.name, payload.baselineId),
+        simulate: () => DiseasePaymentService.simulateLocalPaymentPackage(data.diseasePayment, id, user.name),
+        submit: () => DiseasePaymentService.submitLocalPaymentPackage(data.diseasePayment, id, user.name),
+        review: () => DiseasePaymentService.reviewLocalPaymentPackage(data.diseasePayment, id, payload, user.name),
+        publish: () => DiseasePaymentService.publishLocalPaymentPackage(data.diseasePayment, id, user.name, diseasePaymentPackageSignatureOptions(payload)),
+        activate: () => DiseasePaymentService.activateLocalPaymentPackage(data.diseasePayment, id, user.name, diseasePaymentPackageSignatureOptions(payload)),
+        rollback: () => DiseasePaymentService.rollbackLocalPaymentPackage(data.diseasePayment, id, payload, user.name)
+      };
+      const result = handlers[action]();
+      data.diseasePayment = result.state;
+      writeDatabase(data);
+      sendJson(res, 200, { package: result.row, validation: result.validation, impactReport: action === "simulate" ? result.report : undefined, diffReport: result.diffReport || (action === "compare" ? result.report : undefined), approval: result.approval, scheme: result.scheme, parameter: result.parameter, snapshot: result.snapshot, scheduled: result.scheduled });
+    } catch (error) {
+      sendJson(res, 409, { error: "Conflict", message: error.message });
+    }
     return;
   }
 
@@ -33442,7 +33644,12 @@ async function handleApi(req, res) {
     if (["DRG", "DIP"].includes(payload.mode)) current.mode = payload.mode;
     data.diseasePayment = DiseasePaymentService.calculateAll(current, user.name);
     writeDatabase(data);
-    sendJson(res, 200, DiseasePaymentService.buildOverview(data.diseasePayment));
+    const overview = DiseasePaymentService.buildOverview(data.diseasePayment);
+    if (user.role === "institution") {
+      overview.supervision = DiseasePaymentService.buildDiseaseSupervisionProfiles(data.diseasePayment, { institution: user.orgName });
+      overview.summary.supervision = overview.supervision.summary;
+    }
+    sendJson(res, 200, overview);
     return;
   }
 

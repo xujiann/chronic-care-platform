@@ -1205,8 +1205,39 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(pilotAcceptance.body.summary.applications, 8);
     assert.equal(pilotAcceptance.body.summary.onsiteTasks, 10);
     assert.equal(pilotAcceptance.body.summary.interfaceSamples, 4);
+    assert.equal(pilotAcceptance.body.summary.interfaceReviewed, 0);
     assert.equal(pilotAcceptance.body.trialRun.scenarios.length, 7);
     assert.equal(pilotAcceptance.body.interfaceSamples.every((item) => item.containsPatientData === false), true);
+
+    const recordedPilotInterface = await api(baseUrl, "/api/pilot-acceptance/interfaces/official-grouper/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "record-joint-test",
+        executionId: "JT-API-001",
+        evidenceRef: "receipt:pilot-api-001",
+        note: "All four synthetic joint-test scenarios passed.",
+        results: { success: true, failure: true, retry: true, reconciliation: true }
+      })
+    }));
+    assert.equal(recordedPilotInterface.response.status, 200);
+    assert.equal(recordedPilotInterface.body.interfaceReview.workflowStatus, "evidence-recorded");
+
+    const selfReview = await api(baseUrl, "/api/pilot-acceptance/interfaces/official-grouper/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "review-joint-test", note: "Self review must be rejected." })
+    }));
+    assert.equal(selfReview.response.status, 400);
+    assert.match(selfReview.body.message, /independent/);
+
+    const independentPilotReviewer = await login(baseUrl, "city");
+    const reviewedPilotInterface = await api(baseUrl, "/api/pilot-acceptance/interfaces/official-grouper/actions", authorized(independentPilotReviewer.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "review-joint-test", note: "Execution receipt and four scenario results independently verified." })
+    }));
+    assert.equal(reviewedPilotInterface.response.status, 200);
+    assert.equal(reviewedPilotInterface.body.interfaceReview.workflowStatus, "site-reviewed");
+    assert.equal(reviewedPilotInterface.body.center.summary.interfaceReviewed, 1);
+    assert.equal(reviewedPilotInterface.body.center.issues.find((item) => item.id === "PILOT-ISSUE-INT-01").status, "resolved");
 
     const processAudit = await api(baseUrl, "/api/process-audit", authorized(accountLogin.body.token));
     assert.equal(processAudit.response.status, 200);
@@ -2684,6 +2715,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
         assert.equal(scopedState.body.securityAcceptanceLedger, undefined, `${username} 不应读取安全验收台账`);
         assert.equal(scopedState.body.platformCapabilityReviews, undefined, `${username} should not read platform capability review ledger`);
         assert.equal(scopedState.body.platformProductionBlockerReviews, undefined, `${username} should not read production blocker review ledger`);
+        assert.equal(scopedState.body.pilotAcceptanceInterfaceReviews, undefined, `${username} should not read pilot interface acceptance ledger`);
         assert.equal(scopedState.body.productionDeploymentPlan, undefined, `${username} should not read production deployment plan`);
         assert.equal(scopedState.body.hospitalInteroperabilityFunctions, undefined, `${username} should not read hospital interoperability management functions`);
       }
@@ -2735,7 +2767,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(body.securityAcceptanceLedger.length, 4);
     assert.equal(body.productionDeploymentPlan.length, 4);
     assert.equal(body.healthDashboardSnapshots.length, 1);
-    ["residents", "personalRecords", "platformEvidence", "platformCapabilityReviews", "platformProductionBlockerReviews", "productionDeploymentPlan", "applicationCatalog", "hospitalInteroperabilityFunctions", "institutionCreditEvaluations", "securityAcceptanceLedger", "healthDashboardSnapshots"].forEach((key) => {
+    ["residents", "personalRecords", "platformEvidence", "platformCapabilityReviews", "platformProductionBlockerReviews", "pilotAcceptanceInterfaceReviews", "productionDeploymentPlan", "applicationCatalog", "hospitalInteroperabilityFunctions", "institutionCreditEvaluations", "securityAcceptanceLedger", "healthDashboardSnapshots"].forEach((key) => {
       assert.ok(Array.isArray(body[key]), `${key} should keep array contract`);
     });
   });

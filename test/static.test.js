@@ -2768,7 +2768,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   const serviceWorker = read("service-worker.js");
   assert.match(citizenHtml, /rel="manifest"/);
   assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260710journey/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260720actions7/);
   assert.match(citizenHtml, /mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-title/);
@@ -3004,7 +3004,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.equal(manifest.shortcuts.some((item) => item.url === "./citizen.html?client=app&page=escort#service-escort"), true);
   assert.equal(manifest.shortcuts.some((item) => item.url === "./mobile-preview.html?client=app"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v48-physical-examination-highlights/);
+  assert.match(serviceWorker, /chronic-care-citizen-v55-active-rail-alignment/);
   assert.match(serviceWorker, /physical-examination-standards\.js/);
   assert.match(serviceWorker, /physical-examination-highlights\.js/);
   assert.match(citizenHtml, /physical-examination-standards\.js[\s\S]*physical-examination-highlights\.js[\s\S]*physical-examination-service\.js/);
@@ -3124,7 +3124,7 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   assert.match(citizenJs, /setEscortAppointmentAvailability/);
   assert.match(citizenJs, /escortProviderReady/);
   assert.match(citizenJs, /暂无可预约服务主体/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260710journey/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260720actions7/);
   assert.match(citizenJs, /\/escort-services\/orders/);
   assert.match(citizenJs, /getEscortRegistrationOptions/);
   assert.match(citizenJs, /applyLinkedRegistrationToEscortForm/);
@@ -3340,6 +3340,8 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenHtml, /service-summary/);
   assert.match(citizenHtml, /service-mobile-pagebar/);
   assert.match(citizenHtml, /citizen-action-dock/);
+  assert.match(citizenHtml, /citizen\.css\?v=20260720actions6/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260720actions7/);
   assert.match(citizenHtml, /当前服务常用操作/);
   assert.match(citizenHtml, /service-health-record/);
   assert.match(citizenHtml, /service-emr/);
@@ -3386,12 +3388,22 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /renderCitizenPipelineAudit/);
   assert.match(citizenJs, /citizenActionDockFallbacks/);
   assert.match(citizenJs, /CITIZEN_RECENT_ACTION_KEY/);
+  assert.match(citizenJs, /citizenRecentActionCache/);
+  assert.match(citizenJs, /citizenRecentActionSession/);
   assert.match(citizenJs, /rememberCitizenAction/);
+  assert.match(citizenJs, /clearCitizenRecentActions/);
   assert.match(citizenJs, /renderCitizenActionDock/);
   assert.match(citizenJs, /citizenActionDockHint/);
+  assert.match(citizenJs, /immediateRecentLabel/);
+  assert.match(citizenJs, /Array\.isArray\(savedRecentValue\)/);
+  assert.match(citizenJs, /renderCitizenActionDock\(event\.currentTarget\.dataset\.actionDockLabel\)/);
+  assert.match(citizenJs, /renderCitizenActionDock\(button\.dataset\.actionDockLabel\)/);
+  assert.match(citizenJs, /clearCitizenRecentActions\(active\.key\);\s+renderCitizenActionDock\(\);/);
   assert.match(citizenJs, /最近使用：\$\{recent\.label\}/);
   assert.match(citizenJs, /data-action-dock-target/);
   assert.match(citizenJs, /data-action-dock-label/);
+  assert.match(citizenJs, /data-action-dock-reset/);
+  assert.match(citizenJs, /恢复\$\{active\.label\}常用操作默认顺序/);
   assert.match(citizenJs, /aria-label="\$\{active\.label\}：\$\{item\.label\}"/);
   assert.match(citizenJs, /<small>最近<\/small>/);
   assert.match(citizenJs, /常用操作/);
@@ -3526,6 +3538,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /service-mobile-actionbar/);
   assert.match(citizenCss, /service-mobile-action/);
   assert.match(citizenCss, /citizen-action-dock/);
+  assert.match(citizenCss, /citizen-action-dock-reset/);
   assert.match(citizenCss, /citizen-action-chip/);
   assert.match(citizenCss, /citizen-action-chip\.recent/);
   assert.match(citizenJs, /data-service-state/);
@@ -3614,7 +3627,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /longterm-care-form/);
   assert.match(citizenCss, /registration-form/);
   assert.match(citizenHtml, /registration-summary/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260710journey/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260720actions7/);
   assert.match(citizenJs, /registration-summary/);
   assert.match(citizenJs, /hisOrders/);
   assert.match(citizenJs, /insuranceReady/);
@@ -3628,6 +3641,8 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /safe-area-inset-bottom/);
   assert.match(citizenHtml, /mobile-service-rail/);
   assert.match(citizenJs, /renderMobileServiceRail/);
+  assert.match(citizenJs, /alignActiveMobileServiceRail/);
+  assert.match(citizenJs, /scroller\.scrollLeft = Math\.min/);
   assert.match(citizenJs, /renderMobileServicePagebar/);
   assert.match(citizenJs, /bindCitizenServiceSwipe/);
   assert.match(citizenJs, /CITIZEN_SERVICE_SWIPE_THRESHOLD/);
@@ -3672,8 +3687,8 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /body\.service-paged-mode \[data-internal-launch-panel\]/);
   assert.match(citizenCss, /body\.service-paged-mode \.mobile-service-rail/);
   assert.match(citizenCss, /body\.service-paged-mode \.mobile-service-rail-status/);
-  assert.match(citizenCss, /grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
-  assert.match(citizenCss, /scroll-snap-type: none/);
+  assert.match(citizenCss, /grid-auto-columns: 68px/);
+  assert.match(citizenCss, /scroll-snap-type: x proximity/);
   assert.match(citizenCss, /body\.service-paged-mode \.mobile-service-nav/);
   assert.match(citizenCss, /scroll-margin-top: 0/);
   assert.match(citizenCss, /body\.service-paged-mode \.citizen-shell/);
@@ -4541,13 +4556,24 @@ test("priority application pilot acceptance control center is release wired", ()
   const readiness = read("scripts/pilot-acceptance-readiness.js");
   const documentation = read("docs/pilot-acceptance-control-center.md");
   assert.match(server, /\/api\/pilot-acceptance\/center/);
+  assert.match(server, /pilot-acceptance\/interfaces/);
   assert.match(html, /data-platform-section="pilot-acceptance"/);
   ["pilot-acceptance-applications", "pilot-acceptance-alerting", "pilot-acceptance-onsite", "pilot-acceptance-interfaces", "pilot-acceptance-trials", "pilot-acceptance-issues"].forEach((marker) => assert.match(html, new RegExp(marker)));
   assert.match(ui, /pilot-acceptance\/center/);
   assert.match(ui, /data-pilot-acceptance-refresh/);
+  assert.match(ui, /data-pilot-interface-action/);
+  assert.match(model, /reviewer must be independent from recorder/);
+  assert.match(model, /acceptedProductionReceipts/);
   ["official-grouper", "insurance-core", "his-emr-feed", "physical-exam-feed", "pilot-acceptance-tooling-ready", "blocked-until-site-evidence-signed"].forEach((marker) => assert.match(model, new RegExp(marker)));
   assert.match(readiness, /pilot-acceptance-readiness-report\.md/);
   assert.match(documentation, /P0-01至P0-10/);
   assert.match(read("deploy/pilot-alerting.env.template"), /CUTOVER_MONITORING_SIGNOFF=false/);
   assert.match(read("package.json"), /pilot:acceptance-readiness/);
+});
+
+test("2026-07-23 delivery report and onsite work pack preserve release evidence boundaries", () => {
+  const report = read("docs/平台开发今日进展报告-2026-07-23.md");
+  const workPack = read("docs/试点现场验收与接口联调工作包-2026-07-23.md");
+  ["515/515", "8/8", "0/10", "0/4", "blocked-until-site-evidence-signed"].forEach((marker) => assert.ok(report.includes(marker), marker));
+  ["P0-01", "P0-10", "生产告警演练单", "official-grouper", "四方签字页", "不代替医院或主管部门签字"].forEach((marker) => assert.ok(workPack.includes(marker), marker));
 });

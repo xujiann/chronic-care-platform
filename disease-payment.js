@@ -1,10 +1,11 @@
-const paymentFallback = { state: { policy: {}, cases: [], specialCases: [], settlementBatches: [], budgets: [], feedbacks: [], auditTrail: [], schemeVersions: [], parameterVersions: [], parameterImpactReports: [], formalGroupingJobs: [], formalGroupingDeadLetters: [], externalDependencies: [], groupCatalog: [], drg2LibraryProfile: {}, drgPreviewRules: {} }, summary: {}, institutions: [] };
+const paymentFallback = { state: { policy: {}, cases: [], specialCases: [], settlementBatches: [], budgets: [], feedbacks: [], auditTrail: [], schemeVersions: [], parameterVersions: [], parameterImpactReports: [], localPaymentPackages: [], localPaymentPackageValidationReports: [], localPaymentPackageImpactReports: [], localPaymentPackageDiffReports: [], localPaymentPackageActivationSnapshots: [], localPaymentPackageSimulationJobs: [], formalGroupingJobs: [], formalGroupingDeadLetters: [], externalDependencies: [], groupCatalog: [], drg2LibraryProfile: {}, drgPreviewRules: {} }, summary: {}, institutions: [], supervision: { summary: {}, profiles: [], policyBoundary: "" }, localPackageView: { packages: [], validationReports: [], impactReports: [], diffReports: [], activationSnapshots: [], simulationJobs: [], checklist: [] } };
 let paymentView = paymentFallback;
 
 document.addEventListener("DOMContentLoaded", async () => {
   document.querySelector("#calculate-all").addEventListener("click", calculateAll);
   document.querySelector("#create-settlement").addEventListener("click", createSettlement);
   document.querySelector("#feedback-form").addEventListener("submit", submitFeedback);
+  document.querySelector("#local-package-file").addEventListener("change", importLocalPackageFile);
   document.addEventListener("click", handleAction);
   await refresh();
 });
@@ -18,7 +19,11 @@ async function requestPayment(path = "", options = {}) {
 }
 
 async function refresh() {
-  try { paymentView = await requestPayment(); render(); } catch (error) { message(error.message, true); }
+  try {
+    const [overview, localPackageView] = await Promise.all([requestPayment(), requestPayment("/local-packages")]);
+    paymentView = { ...overview, localPackageView };
+    render();
+  } catch (error) { message(error.message, true); }
 }
 
 function message(text, error = false) { const node = document.querySelector("#action-message"); node.textContent = text; node.style.color = error ? "#b91c1c" : "#0f766e"; }
@@ -38,6 +43,18 @@ async function createSettlement() {
 async function submitFeedback(event) {
   event.preventDefault(); const form = new FormData(event.currentTarget);
   try { await requestPayment("/feedbacks", { method: "POST", body: JSON.stringify(Object.fromEntries(form)) }); event.currentTarget.reset(); await refresh(); message("意见已进入反馈台账"); } catch (error) { message(error.message, true); }
+}
+
+async function importLocalPackageFile(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  try {
+    const payload = JSON.parse(await file.text());
+    const result = await requestPayment("/local-packages", { method: "POST", body: JSON.stringify(payload) });
+    await refresh();
+    message(result.validation.ok ? `规则包${result.package.id}校验通过，可开始影响试算` : `规则包校验未通过：${result.validation.errors.join("；")}`, !result.validation.ok);
+  } catch (error) { message(`规则包导入失败：${error.message}`, true); }
+  finally { event.target.value = ""; }
 }
 
 async function handleAction(event) {
@@ -62,6 +79,28 @@ async function handleAction(event) {
       const active = paymentView.state.parameterVersions.find((item) => item.mode === mode && item.status === "已发布");
       await requestPayment("/parameters", { method: "POST", body: JSON.stringify({ mode, schemeId: paymentView.state.schemeVersions.find((item) => item.mode === mode && item.status === "已发布")?.id, name: `${new Date().getFullYear() + 1}年度${mode}支付参数草案`, rate: Number(active?.rate || 1) * 1.02, effectiveFrom: `${new Date().getFullYear() + 1}-01-01` }) });
     }
+    if (button.dataset.paymentAction === "choose-local-package") {
+      document.querySelector("#local-package-file").click();
+      return;
+    }
+    if (button.dataset.paymentAction === "activate-due-local-packages") await requestPayment("/local-packages/activate-due", { method: "POST", body: "{}" });
+    if (button.dataset.paymentAction === "local-package-job-create") await requestPayment(`/local-packages/${encodeURIComponent(button.dataset.id)}/simulation-jobs`, { method: "POST", body: JSON.stringify({ batchSize: 500 }) });
+    if (["local-package-job-process", "local-package-job-retry", "local-package-job-cancel"].includes(button.dataset.paymentAction)) {
+      const action = button.dataset.paymentAction.replace("local-package-job-", "");
+      const body = action === "cancel" ? { reason: "操作人员从工作台取消" } : {};
+      await requestPayment(`/local-packages/simulation-jobs/${encodeURIComponent(button.dataset.id)}/${action}`, { method: "POST", body: JSON.stringify(body) });
+    }
+    if (["local-package-simulate", "local-package-submit", "local-package-review", "local-package-publish", "local-package-activate", "local-package-rollback"].includes(button.dataset.paymentAction)) {
+      const action = button.dataset.paymentAction.replace("local-package-", "");
+      let body = action === "review" ? { approved: true, role: "当地医保规则包复核", opinion: "来源、目录、支付参数、差异和影响报告已复核" } : {};
+      if (action === "rollback") {
+        if (!window.confirm("仅在尚未生成生效后结算批次时允许回退。确认继续？")) return;
+        const reason = window.prompt("填写规则包回退原因");
+        if (!reason) return;
+        body = { reason };
+      }
+      await requestPayment(`/local-packages/${encodeURIComponent(button.dataset.id)}/${action}`, { method: "POST", body: JSON.stringify(body) });
+    }
     if (["parameter-simulate", "parameter-submit", "parameter-review", "parameter-publish"].includes(button.dataset.paymentAction)) {
       const action = button.dataset.paymentAction.replace("parameter-", "");
       const body = action === "review" ? { approved: true, role: "医保参数复核", opinion: "影响分析已复核" } : {};
@@ -85,7 +124,7 @@ function render() {
   const { state, summary, institutions } = paymentView;
   document.querySelector("#payment-mode").value = state.mode || "DRG";
   document.querySelector("#payment-metrics").innerHTML = [["住院病例", summary.caseCount, `已测算 ${summary.calculatedCount || 0}`],["支付标准", fmt(summary.paymentStandard), `总费用 ${fmt(summary.totalCost)}`],["预计结余", fmt(summary.projectedBalance), "负值表示费用超出标准"],["监管线索", summary.riskCount, `未入组 ${summary.ungroupedCount || 0}`],["特例待评", summary.specialPending, "支持复杂危重与新药新技术"],["待办批次", summary.settlementPending, "月结算与年度清算"]].map(([label,value,hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><small>${hint}</small></article>`).join("");
-  renderDrgWorkbench(state, summary.drg || {}); renderParameterGovernance(state); renderFormalGroupingOperations(state); renderIntake(state, summary.intake || {}); renderCases(state); renderPolicy(state); renderVersions(state); renderSpecial(state); renderSettlements(state); renderMonitoring(state, institutions); renderGovernance(state); renderFeedback(state); renderAudit(state);
+  renderDrgWorkbench(state, summary.drg || {}); renderParameterGovernance(state); renderLocalPackageGovernance(paymentView.localPackageView || {}); renderFormalGroupingOperations(state); renderIntake(state, summary.intake || {}); renderCases(state); renderDiseaseSupervision(paymentView.supervision || {}); renderPolicy(state); renderVersions(state); renderSpecial(state); renderSettlements(state); renderMonitoring(state, institutions); renderGovernance(state); renderFeedback(state); renderAudit(state);
 }
 
 function renderDrgWorkbench(state, analytics) {
@@ -101,6 +140,24 @@ function renderParameterGovernance(state) {
   const actionFor = { "草案": ["parameter-simulate", "影响试算"], "已试算": ["parameter-submit", "提交复核"], "待复核": ["parameter-review", "签署复核"], "复核中": ["parameter-review", "第二人复核"], "已批准": ["parameter-publish", "发布并冻结旧版"] };
   document.querySelector("#parameter-version-list").innerHTML = (state.parameterVersions || []).map((item) => { const action = actionFor[item.status]; return `<section class="item"><div><h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.mode)} · ${escapeHtml(item.rateMethod)} ${item.rate} · 方案${escapeHtml(item.schemeId)}</p><small>${(item.approvals || []).length}人签署 · 生效${escapeHtml(item.effectiveFrom)}</small>${action ? `<div class="case-actions"><button data-payment-action="${action[0]}" data-id="${item.id}">${action[1]}</button></div>` : ""}</div><span class="badge ${item.status === "已发布" ? "info" : item.status === "已驳回" ? "danger" : "warn"}">${escapeHtml(item.status)}</span></section>`; }).join("");
   document.querySelector("#parameter-impact-list").innerHTML = (state.parameterImpactReports || []).slice(0, 5).map((item) => `<section class="item"><div><h3>影响报告 · ${escapeHtml(item.parameterId)}</h3><p>${item.caseCount}例 · 当前${fmt(item.currentTotal)} · 候选${fmt(item.candidateTotal)}</p><small>变化${fmt(item.delta)}（${item.changeRate == null ? "无基线" : `${Math.round(item.changeRate * 10000) / 100}%`}） · ${item.byInstitution.length}家机构 · 摘要${item.inputDigest.slice(0, 12)}</small></div><span class="badge ${Math.abs(item.changeRate || 0) > 0.05 ? "warn" : "info"}">${item.delta >= 0 ? "+" : ""}${fmt(item.delta)}</span></section>`).join("") || `<p class="muted">创建草案并完成试算后生成机构影响报告。</p>`;
+}
+
+function renderLocalPackageGovernance(view) {
+  const actionFor = { "校验通过": ["local-package-job-create", "创建分批试算"], "已试算": ["local-package-submit", "提交复核"], "待复核": ["local-package-review", "签署复核"], "复核中": ["local-package-review", "第二人复核"], "已批准": ["local-package-publish", "发布/排期"], "待生效": ["local-package-activate", "到期激活"], "已发布": ["local-package-rollback", "安全回退"] };
+  document.querySelector("#local-package-checklist").innerHTML = (view.checklist || []).map((item, index) => `<div><strong>${index + 1}</strong><span>${escapeHtml(item)}</span></div>`).join("");
+  document.querySelector("#local-package-list").innerHTML = (view.packages || []).map((item) => {
+    const action = actionFor[item.status];
+    const official = item.authority === view.officialAuthority;
+    const signature = item.signatureVerification?.ok ? `签名可信 ${escapeHtml(item.signatureVerification.keyFingerprint?.slice(0, 12))}` : official ? "签名未通过" : "无需正式签名";
+    return `<section class="item"><div><h3>${escapeHtml(item.regionName)} · ${escapeHtml(item.mode)} ${escapeHtml(item.packageVersion)}</h3><p>${escapeHtml(item.documentNo)} · 目录${item.catalogCount || 0}条 · ${escapeHtml(item.payment?.rateMethod)} ${item.payment?.rate ?? "-"}</p><small>${escapeHtml(item.effectiveFrom)}至${escapeHtml(item.effectiveTo)} · 摘要${escapeHtml(item.contentDigest?.slice(0, 16))} · ${official ? "正式批准来源" : "模板/联调用途"} · ${signature} · ${(item.approvals || []).length}人复核</small>${action ? `<div class="case-actions"><button data-payment-action="${action[0]}" data-id="${escapeHtml(item.id)}">${action[1]}</button></div>` : ""}</div><span class="badge ${item.status === "已发布" ? "info" : item.status === "校验失败" || item.status === "已驳回" || item.status === "已回退" ? "danger" : "warn"}">${escapeHtml(item.status)}</span></section>`;
+  }).join("") || `<p class="muted">尚未导入当地医保规则包。可先下载DRG/DIP模板准备数据。</p>`;
+  const validationRows = (view.validationReports || []).slice(0, 4).map((item) => `<section class="item"><div><h3>完整性与签名校验 · ${escapeHtml(item.packageId || "未编号")}</h3><p>${item.summary.catalogCount}条目录 · ${item.summary.coefficientCount}项机构系数 · ${item.summary.sourceFileCount}个来源文件${item.signature ? ` · ${item.signature.trusted ? "可信签名" : "签名不可信"}` : ""}</p><small>${item.ok ? `校验通过${item.warnings.length ? `，提示：${escapeHtml(item.warnings.join("；"))}` : ""}` : escapeHtml(item.errors.join("；"))}</small></div><span class="badge ${item.ok ? "info" : "danger"}">${item.ok ? "通过" : `${item.errors.length}项错误`}</span></section>`);
+  const impactRows = (view.impactReports || []).slice(0, 4).map((item) => `<section class="item"><div><h3>影响试算 · ${escapeHtml(item.packageId)}</h3><p>${item.groupedCount}/${item.caseCount}例入组 · 当前${fmt(item.currentTotal)} · 候选${fmt(item.candidateTotal)}</p><small>变化${fmt(item.delta)} · ${item.byInstitution.length}家机构 · 摘要${escapeHtml(item.inputDigest.slice(0, 16))}</small></div><span class="badge ${Math.abs(item.changeRate || 0) > 0.05 ? "warn" : "info"}">${item.delta >= 0 ? "+" : ""}${fmt(item.delta)}</span></section>`);
+  const diffRows = (view.diffReports || []).slice(0, 4).map((item) => `<section class="item"><div><h3>版本差异 · ${escapeHtml(item.packageId)}</h3><p>目录新增${item.catalog.addedCount} · 删除${item.catalog.removedCount} · 变更${item.catalog.changedCount}</p><small>费率 ${item.payment.rateBefore} → ${item.payment.rateAfter} · 机构系数新增${item.payment.coefficientAddedCount}/删除${item.payment.coefficientRemovedCount}/变更${item.payment.coefficientChangedCount}</small></div><span class="badge info">已比对</span></section>`);
+  const snapshotRows = (view.activationSnapshots || []).slice(0, 3).map((item) => `<section class="item"><div><h3>生效快照 · ${escapeHtml(item.packageId)}</h3><p>${item.catalogCount}条目录 · ${item.schemeCount}个方案 · ${item.parameterCount}个参数</p><small>${escapeHtml(item.activationDate)} · 摘要${escapeHtml(item.snapshotDigest.slice(0, 16))}</small></div><span class="badge info">可回退</span></section>`);
+  document.querySelector("#local-package-report-list").innerHTML = [...impactRows, ...diffRows, ...snapshotRows, ...validationRows].join("") || `<p class="muted">导入后生成完整性、版本差异、影响试算和生效快照报告。</p>`;
+  const jobAction = { queued: ["local-package-job-process", "处理下一批"], running: ["local-package-job-process", "继续下一批"], "retry-ready": ["local-package-job-process", "继续重试"], failed: ["local-package-job-retry", "恢复作业"] };
+  document.querySelector("#local-package-job-list").innerHTML = (view.simulationJobs || []).slice(0, 8).map((item) => { const action = jobAction[item.status]; const percent = item.total ? Math.round(item.processed / item.total * 100) : 0; return `<section class="item"><div><h3>${escapeHtml(item.packageId)} · ${item.processed}/${item.total}例</h3><p>进度${percent}% · 成功${item.succeeded} · 失败${item.failed} · 每批${item.batchSize}</p><small>${item.latestEvent ? `${escapeHtml(item.latestEvent.type)}：${escapeHtml(item.latestEvent.detail)}` : "等待处理"}</small>${action ? `<div class="case-actions"><button data-payment-action="${action[0]}" data-id="${escapeHtml(item.id)}">${action[1]}</button><button class="secondary" data-payment-action="local-package-job-cancel" data-id="${escapeHtml(item.id)}">取消</button></div>` : ""}</div><span class="badge ${item.status === "completed" ? "info" : item.status === "failed" ? "danger" : "warn"}">${escapeHtml(item.status)}</span></section>`; }).join("") || `<p class="muted">尚无批量影响试算作业。</p>`;
 }
 
 function renderFormalGroupingOperations(state) {
@@ -134,6 +191,21 @@ function renderIntake(state, summary) {
 function renderCases(state) {
   document.querySelector("#case-count").textContent = `${state.cases.length}例`;
   document.querySelector("#case-list").innerHTML = `<table class="payment-table"><thead><tr><th>病例/机构</th><th>诊断</th><th>费用</th><th>分组结果</th><th>支付测算</th><th>监管</th><th>操作</th></tr></thead><tbody>${state.cases.map((item) => { const c = item.calculation || {}; const g = c.grouping || {}; const risks = c.risks || []; const hierarchy = g.mode === "DRG" && g.mdcCode ? `${g.mdcCode} → ${g.adrgCode} → ${g.groupCode} · ${g.complicationLevel}` : g.groupCode || "待分组"; return `<tr><td><strong>${escapeHtml(item.patientName)}</strong><small>${escapeHtml(item.settlementListNo)} · ${escapeHtml(item.institution)}</small></td><td>${escapeHtml(item.principalDiagnosis)} ${escapeHtml(item.principalDiagnosisName)}<small>${item.admissionDate} 至 ${item.dischargeDate}</small></td><td>${fmt(item.totalAmount)}<small>申报基金 ${fmt(item.declaredFundAmount)}</small></td><td><strong>${escapeHtml(hierarchy)}</strong><small>${escapeHtml(g.groupName || item.qualityStatus)}</small></td><td>${c.paymentStandard == null ? "待测算" : fmt(c.paymentStandard)}<small>${escapeHtml(c.formula || "")}${c.costRatio ? ` · 倍率${Number(c.costRatio).toFixed(2)}` : ""}</small></td><td><div class="risk-list">${risks.length ? risks.map((risk) => `<span class="risk-pill">${escapeHtml(risk.name)}</span>`).join("") : `<span class="ok-pill">未发现线索</span>`}</div></td><td><div class="case-actions"><button class="secondary" data-payment-action="preview-drg" data-id="${item.id}">DRG试分组</button>${item.specialCaseStatus === "未申报" ? `<button data-payment-action="special" data-id="${item.id}">特例申报</button>` : `<span>${item.specialCaseStatus}</span>`}</div></td></tr>`; }).join("")}</tbody></table>`;
+}
+
+function renderDiseaseSupervision(view) {
+  const summary = view.summary || {};
+  const profiles = view.profiles || [];
+  document.querySelector("#supervision-boundary").textContent = view.policyBoundary || "风险线索须经人工复核";
+  document.querySelector("#supervision-summary").innerHTML = [
+    ["病种档案", summary.profiles || 0],
+    ["风险档案", summary.riskProfiles || 0],
+    ["短期重复住院", summary.repeatAdmissions || 0],
+    ["跨机构重复住院", summary.crossInstitutionAdmissions || 0],
+    ["编码复杂度跃升", summary.codingEscalations || 0],
+    ["疑似基金影响", fmt(summary.estimatedFundImpact || 0)]
+  ].map(([label, value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("");
+  document.querySelector("#supervision-profile-list").innerHTML = profiles.length ? `<table class="payment-table supervision-table"><thead><tr><th>居民/病种</th><th>住院轨迹</th><th>费用与支付</th><th>监管线索</th><th>疑似影响</th></tr></thead><tbody>${profiles.map((profile) => `<tr><td><strong>${escapeHtml(profile.patientName || profile.residentId)}</strong><small>${escapeHtml(profile.diseaseCode)} · ${escapeHtml(profile.diseaseName)}</small></td><td>${profile.admissionCount}次 / ${profile.institutionCount}家机构<small>${escapeHtml(profile.firstAdmissionDate)} 至 ${escapeHtml(profile.lastDischargeDate)}</small><small>${profile.institutions.map(escapeHtml).join("、")}</small></td><td>${fmt(profile.declaredFundAmount)}<small>支付标准 ${fmt(profile.paymentStandard)} · 总费用 ${fmt(profile.totalAmount)}</small></td><td><div class="risk-list">${profile.signals.length ? profile.signals.map((signal) => `<span class="risk-pill" title="${escapeHtml(signal.basis)}">${escapeHtml(signal.name)}</span>`).join("") : `<span class="ok-pill">未发现跨次线索</span>`}</div><small>${profile.signals.slice(0, 2).map((signal) => escapeHtml(signal.basis)).join("；")}</small></td><td><strong>${fmt(profile.estimatedFundImpact)}</strong><small>${escapeHtml(profile.riskLevel)}风险 · 仅供复核</small></td></tr>`).join("")}</tbody></table>` : `<p class="muted">当前筛选范围暂无病种档案。</p>`;
 }
 
 function renderPolicy(state) {

@@ -667,7 +667,8 @@ body.service-paged-mode .citizen-shell {
 .citizen-action-dock-copy,
 .citizen-action-dock-copy span,
 .citizen-action-dock-copy strong,
-.citizen-action-dock-copy small {
+.citizen-action-dock-copy small,
+.citizen-action-dock-meta {
   min-width: 0;
 }
 
@@ -690,6 +691,38 @@ body.service-paged-mode .citizen-shell {
   font-weight: 900;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.citizen-action-dock-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.citizen-action-dock-meta small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.citizen-action-dock-reset {
+  flex: 0 0 auto;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: #fff;
+  color: var(--blue);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.citizen-action-dock-reset:focus-visible {
+  outline: 3px solid rgba(39, 110, 241, 0.35);
+  outline-offset: 2px;
 }
 
 .citizen-action-dock-actions {
@@ -2957,7 +2990,7 @@ dialog::backdrop {
   }
 
   body.service-paged-mode .citizen-shell {
-    padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px));
   }
 
   .citizen-header {
@@ -3283,9 +3316,14 @@ dialog::backdrop {
   }
 
   .citizen-action-dock-copy {
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
     gap: 6px;
+  }
+
+  .citizen-action-dock-meta {
+    grid-column: 1 / -1;
+    justify-content: space-between;
   }
 
   .citizen-action-dock-copy span,
@@ -3296,6 +3334,11 @@ dialog::backdrop {
 
   .citizen-action-dock-copy strong {
     font-size: 15px;
+  }
+
+  .citizen-action-dock-reset {
+    min-height: 44px;
+    padding-inline: 12px;
   }
 
   .citizen-action-dock-actions {
@@ -3344,19 +3387,19 @@ dialog::backdrop {
   }
 
   body.service-paged-mode .mobile-service-rail-scroll {
-    grid-auto-flow: initial;
-    grid-auto-columns: initial;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-auto-flow: column;
+    grid-auto-columns: 68px;
+    grid-template-columns: none;
     gap: 6px;
-    overflow: visible;
+    overflow-x: auto;
     padding-bottom: 0;
-    scroll-snap-type: none;
+    scroll-snap-type: x proximity;
   }
 
   body.service-paged-mode .mobile-service-rail a {
     min-height: 58px;
     padding: 6px 4px;
-    scroll-snap-align: none;
+    scroll-snap-align: start;
   }
 
   body.service-paged-mode .mobile-service-rail a .mobile-service-rail-state {
