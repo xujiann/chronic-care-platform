@@ -638,7 +638,10 @@
       }
     });
     if (!CitizenRecordsV1.authorizationState(merged).active) throw new Error("授权创建响应未确认有效状态");
-    return merged;
+    return {
+      ...merged,
+      ...projectActionReceipt(payload, { residentId: expected.residentId, resourceId: projected.id })
+    };
   }
 
   function projectAuthorizationRevocationResponse(payload = {}, record = {}, reason = "") {
@@ -657,7 +660,7 @@
     if (projected.revokeReason && expectedReason && projected.revokeReason !== expectedReason) {
       throw new Error("授权撤销响应原因不匹配");
     }
-    return CitizenRecordsV1.projectRecord({
+    const revoked = CitizenRecordsV1.projectRecord({
       ...expected,
       status: "已撤销",
       revokedAt,
@@ -669,6 +672,10 @@
         revokedAt
       }
     });
+    return {
+      ...revoked,
+      ...projectActionReceipt(payload, { residentId: expected.residentId, resourceId: expected.id })
+    };
   }
 
   function validateControlledCredential(payload = {}, intent = {}, options = {}) {
