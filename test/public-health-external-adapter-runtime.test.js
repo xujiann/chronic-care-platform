@@ -1,5 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const sourceData = require("../data/db.json");
@@ -33,6 +34,10 @@ const {
 const {
   verifyPublicHealthExternalLaneControlAuditChain
 } = require("../public-health-external-resilience-service");
+const {
+  buildPublicHealthExternalContractGovernance,
+  signPublicHealthExternalContractAttestation
+} = require("../public-health-external-contract-governance-service");
 
 const ROOT = path.resolve(__dirname, "..");
 const REQUEST_SECRET = "runtime-request-secret-1234567890-123456";
@@ -130,6 +135,46 @@ function attemptOptions(idempotencyKey, at = "2026-07-23T08:01:30.000Z", expecte
     expectedVersion,
     at
   };
+}
+
+function runtimeContractGovernance(at) {
+  const digest = (value) => crypto.createHash("sha256").update(value).digest("hex");
+  const attestation = signPublicHealthExternalContractAttestation({
+    laneId: "family-doctor",
+    fromContract: "family-doctor-fulfillment-v1",
+    toContract: "family-doctor-fulfillment-v2",
+    requestSchemaVersion: "public-health-external-dispatch/v2",
+    receiptSchemaVersion: "public-health-external-receipt/v2",
+    changeType: "additive",
+    fieldDictionaryDigest: digest("runtime-family-doctor-fields-v2"),
+    sampleRequestDigest: digest("runtime-family-doctor-request-v2"),
+    sampleReceiptDigest: digest("runtime-family-doctor-receipt-v2"),
+    runtimeReleaseDigest: digest("runtime-family-doctor-release-v2"),
+    producerApproval: {
+      organizationId: "family-doctor-platform",
+      role: "producer-contract-owner",
+      approverIdHash: digest("runtime-producer"),
+      approvedAt: "2026-07-22T08:00:00.000Z"
+    },
+    consumerApproval: {
+      organizationId: "district-health-platform",
+      role: "consumer-contract-owner",
+      approverIdHash: digest("runtime-consumer"),
+      approvedAt: "2026-07-22T09:00:00.000Z"
+    },
+    evidenceRefs: ["field-dictionary-v2", "producer-approval", "consumer-approval"],
+    effectiveAt: "2026-07-25T00:00:00.000Z",
+    sunsetAt: "2026-08-15T00:00:00.000Z",
+    status: "approved",
+    issuedAt: "2026-07-23T08:00:00.000Z",
+    expiresAt: "2026-09-01T00:00:00.000Z",
+    nonce: "runtime-family-doctor-contract-v2"
+  }, REQUEST_SECRET);
+  return buildPublicHealthExternalContractGovernance({
+    attestations: [attestation],
+    signingMaterial: REQUEST_SECRET,
+    at
+  });
 }
 
 function rejectedLane(laneId) {
@@ -873,4 +918,53 @@ test("claimed delivery opens the signed circuit and a half-open probe closes it"
     "health-education",
     REQUEST_SECRET
   ).entries, 4);
+});
+
+test("contract governance allows deprecated work but blocks retired enqueue and claim", () => {
+  const deprecated = enqueueLane("family-doctor");
+  const deprecatedGovernance = runtimeContractGovernance("2026-07-25T00:00:00.000Z");
+  const claimed = claimPublicHealthExternalDispatchToState(
+    deprecated.enqueued.nextData,
+    deprecated.enqueued.dispatch.id,
+    {
+      workerId: "family-doctor-contract-worker",
+      idempotencyKey: "family-doctor:contract:deprecated-claim",
+      expectedVersion: 1,
+      now: "2026-07-25T00:00:00.000Z",
+      leaseSeconds: 60
+    },
+    credentials({ contractGovernance: deprecatedGovernance })
+  );
+  assert.equal(claimed.contractAuthorization.reason, "contract-version-deprecated");
+
+  const retired = enqueueLane("family-doctor");
+  const retiredGovernance = runtimeContractGovernance("2026-08-15T00:00:00.000Z");
+  assert.throws(() => claimPublicHealthExternalDispatchToState(
+    retired.enqueued.nextData,
+    retired.enqueued.dispatch.id,
+    {
+      workerId: "family-doctor-contract-worker",
+      idempotencyKey: "family-doctor:contract:retired-claim",
+      expectedVersion: 1,
+      now: "2026-08-15T00:00:00.000Z",
+      leaseSeconds: 60
+    },
+    credentials({ contractGovernance: retiredGovernance })
+  ), /contract-version-retired/);
+
+  const prepared = advanceToInProgress("family-doctor");
+  assert.throws(() => enqueuePublicHealthExternalDispatchToState(
+    prepared.data,
+    prepared.handoffId,
+    {
+      idempotencyKey: "family-doctor:contract:retired-enqueue",
+      operation: "coordination-handoff",
+      evidenceRefs: ["family-doctor-retired-contract-request"],
+      exceptionOwner: "family-doctor-interface-owner",
+      exceptionDueAt: "2026-08-31",
+      at: "2026-08-15T00:00:00.000Z"
+    },
+    credentials({ contractGovernance: retiredGovernance }),
+    prepared.dependencies
+  ), /contract-version-retired/);
 });
