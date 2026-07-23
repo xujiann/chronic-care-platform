@@ -162,6 +162,7 @@ function buildSpecialtyCutoverPack(options = {}) {
   const evidenceDossier = buildEvidenceDossier(tracks, firstIncrement);
   const pilotBatchPlan = buildPilotBatchPlan(tracks, firstIncrement);
   const siteEvidenceWorkflow = buildSiteEvidenceWorkflow(evidenceDossier, pilotBatchPlan);
+  const acceptanceScenarioSuite = buildAcceptanceScenarioSuite(tracks, firstIncrement, evidenceDossier, siteEvidenceWorkflow);
   const summary = {
     tracks: tracks.length,
     codeReady: tracks.filter((item) => item.codeReady).length,
@@ -184,11 +185,12 @@ function buildSpecialtyCutoverPack(options = {}) {
     goNoGoDecision: buildGoNoGoDecision(tracks, firstIncrement),
     evidenceDossier,
     pilotBatchPlan,
-    siteEvidenceWorkflow
+    siteEvidenceWorkflow,
+    acceptanceScenarioSuite
   };
   pack.integrity = {
     algorithm: "sha256",
-    digest: `sha256:${sha256({ summary, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision, evidenceDossier, pilotBatchPlan, siteEvidenceWorkflow })}`
+    digest: `sha256:${sha256({ summary, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision, evidenceDossier, pilotBatchPlan, siteEvidenceWorkflow, acceptanceScenarioSuite })}`
   };
   return pack;
 }
@@ -584,12 +586,148 @@ function buildSiteEvidenceWorkflow(evidenceDossier, pilotBatchPlan) {
   };
 }
 
+function buildAcceptanceScenarioSuite(tracks, firstIncrement, evidenceDossier, siteEvidenceWorkflow) {
+  const primaryTrack = tracks.find((track) => track.id === firstIncrement.trackId) || tracks[0];
+  const firstEvidenceIds = evidenceDossier.firstIncrementRequired || [];
+  const commonPreconditions = [
+    "pilot scope frozen and signed",
+    "site evidence workflow gate is at least submitted",
+    "operator, reviewer and rollback contacts are assigned",
+    "audit export and SHA-256 digest capture are enabled"
+  ];
+  const scenarios = [
+    {
+      id: "scenario-1-normal-chain",
+      name: "Normal end-to-end emergency life-chain",
+      trackId: primaryTrack.id,
+      type: "happy-path",
+      batchId: "batch-1-single-chain",
+      preconditions: commonPreconditions,
+      steps: [
+        "receive signed device or controlled gateway signal",
+        "dispatcher confirms ambulance dispatch manually",
+        "receiving hospital accepts electronic pre-arrival handover",
+        "export event evidence packet and audit digest"
+      ],
+      expectedEvidence: [
+        "signed signal receipt",
+        "dispatch confirmation record",
+        "hospital handover acknowledgement",
+        "audit digest and evidence packet"
+      ],
+      passCriteria: "all timestamps, operator identities, receipts and handover records replay in order",
+      hardStopOnFail: true
+    },
+    {
+      id: "scenario-2-idempotency-replay",
+      name: "Duplicate signal and idempotency replay",
+      trackId: primaryTrack.id,
+      type: "resilience",
+      batchId: "batch-1-single-chain",
+      preconditions: commonPreconditions,
+      steps: [
+        "send the same event twice with the same idempotency key",
+        "verify the second event is deduplicated",
+        "export retry and duplicate-handling evidence"
+      ],
+      expectedEvidence: [
+        "idempotency key ledger",
+        "duplicate rejection or merge record",
+        "operator-visible retry explanation"
+      ],
+      passCriteria: "duplicate input cannot create a second dispatch, handover or patient timeline item",
+      hardStopOnFail: true
+    },
+    {
+      id: "scenario-3-signature-rejection",
+      name: "Invalid signature and certificate rejection",
+      trackId: primaryTrack.id,
+      type: "security-negative",
+      batchId: "batch-1-single-chain",
+      preconditions: commonPreconditions,
+      steps: [
+        "submit an event with invalid signature or stale timestamp",
+        "verify it is rejected before clinical workflow mutation",
+        "record security audit and site liaison notification"
+      ],
+      expectedEvidence: [
+        "signature verification failure",
+        "no clinical state mutation proof",
+        "security audit event"
+      ],
+      passCriteria: "invalid messages are rejected, visible to operations and cannot enter patient-facing workflow",
+      hardStopOnFail: true
+    },
+    {
+      id: "scenario-4-manual-downgrade",
+      name: "Network outage and manual downgrade",
+      trackId: primaryTrack.id,
+      type: "downgrade",
+      batchId: "batch-1-single-chain",
+      preconditions: commonPreconditions,
+      steps: [
+        "simulate external gateway timeout",
+        "switch to documented manual phone or paper handover path",
+        "backfill evidence after recovery with reviewer signoff"
+      ],
+      expectedEvidence: [
+        "timeout alert",
+        "manual downgrade record",
+        "backfill review and digest"
+      ],
+      passCriteria: "patient-safety path remains available and backfilled evidence is distinguishable from real-time events",
+      hardStopOnFail: true
+    },
+    {
+      id: "scenario-5-evidence-replay",
+      name: "Evidence packet replay and go/no-go update",
+      trackId: primaryTrack.id,
+      type: "audit-replay",
+      batchId: "batch-1-single-chain",
+      preconditions: commonPreconditions,
+      steps: [
+        "load the exported evidence packet",
+        "replay audit events and receipts against the scenario timeline",
+        "mark accepted evidence or return evidence with reason"
+      ],
+      expectedEvidence: [
+        "evidence packet checksum",
+        "append-only audit event sequence",
+        "accepted or returned workflow transition"
+      ],
+      passCriteria: "reviewer can reproduce the chain and update evidence workflow without editing original records",
+      hardStopOnFail: false
+    }
+  ];
+  return {
+    status: "ready-for-controlled-rehearsal-only",
+    primaryTrackId: primaryTrack.id,
+    primaryTrackName: primaryTrack.name,
+    requiredEvidenceIds: firstEvidenceIds,
+    workflowGate: siteEvidenceWorkflow.currentGate,
+    summary: {
+      scenarios: scenarios.length,
+      hardStopScenarios: scenarios.filter((item) => item.hardStopOnFail).length,
+      patientSafetyScenarios: scenarios.filter((item) => ["happy-path", "downgrade"].includes(item.type)).length,
+      auditReplayScenarios: scenarios.filter((item) => item.type === "audit-replay").length
+    },
+    executionRules: [
+      "run scenarios in batch-1 only after required evidence reaches submitted state",
+      "any hard-stop scenario failure immediately keeps the decision at No-Go",
+      "scenario evidence must be replayable without mutating original source records",
+      "watch-only specialties must not receive production write traffic during this suite"
+    ],
+    scenarios
+  };
+}
+
 function renderMarkdown(pack) {
   const rows = pack.tracks.map((item) => `| ${item.name} | ${item.department} | ${item.codeReady ? "是" : "否"} | ${item.productionReady ? "是" : "否"} | ${item.blockers.length} | ${item.page} |`);
   const blockers = pack.tracks.flatMap((track) => track.blockers.map((item) => `| ${track.name} | ${item.id} | ${item.title} | ${item.owner} | ${item.status} |`));
   const evidenceRows = (pack.evidenceDossier?.entries || []).map((item) => `| ${item.trackName} | ${item.evidenceId} | ${item.severity} | ${item.requiredForFirstIncrement ? "yes" : "no"} | ${item.hardStopIfMissing ? "yes" : "no"} | ${item.status} |`);
   const batchRows = (pack.pilotBatchPlan?.batches || []).map((item) => `| ${item.id} | ${item.name} | ${item.scope} | ${item.promotionDecision} |`);
   const workflowRows = (pack.siteEvidenceWorkflow?.transitions || []).map((item) => `| ${item.from} | ${item.action} | ${item.to} | ${item.requiredChecks.join(", ")} |`);
+  const scenarioRows = (pack.acceptanceScenarioSuite?.scenarios || []).map((item) => `| ${item.id} | ${item.type} | ${item.batchId} | ${item.hardStopOnFail ? "yes" : "no"} | ${item.passCriteria} |`);
   return [
     "# T10 急救、用血、影像与体检专项上线割接包",
     "",
@@ -674,6 +812,20 @@ function renderMarkdown(pack) {
     "### Workflow gate rules",
     "",
     ...(pack.siteEvidenceWorkflow?.gateRules || []).map((item) => `- ${item}`),
+    "",
+    "## Acceptance scenario suite",
+    "",
+    `- Status: ${pack.acceptanceScenarioSuite?.status || "ready-for-controlled-rehearsal-only"}`,
+    `- Primary track: ${pack.acceptanceScenarioSuite?.primaryTrackName || pack.firstIncrement.trackName}`,
+    `- Workflow gate: ${pack.acceptanceScenarioSuite?.workflowGate || "submitted-or-accepted-site-evidence-required-before-batch-1"}`,
+    "",
+    "| Scenario | Type | Batch | Hard stop | Pass criteria |",
+    "|---|---|---|---:|---|",
+    ...scenarioRows,
+    "",
+    "### Scenario execution rules",
+    "",
+    ...(pack.acceptanceScenarioSuite?.executionRules || []).map((item) => `- ${item}`),
     ""
   ].join("\n");
 }
@@ -709,5 +861,6 @@ module.exports = {
   buildGoNoGoDecision,
   buildEvidenceDossier,
   buildPilotBatchPlan,
-  buildSiteEvidenceWorkflow
+  buildSiteEvidenceWorkflow,
+  buildAcceptanceScenarioSuite
 };

@@ -38,6 +38,7 @@ function withCutoverDefaults(pack) {
     evidenceDossier: pack.evidenceDossier || fallback.evidenceDossier,
     pilotBatchPlan: pack.pilotBatchPlan || fallback.pilotBatchPlan,
     siteEvidenceWorkflow: pack.siteEvidenceWorkflow || fallback.siteEvidenceWorkflow,
+    acceptanceScenarioSuite: pack.acceptanceScenarioSuite || fallback.acceptanceScenarioSuite,
     integrity: pack.integrity || fallback.integrity
   };
 }
@@ -52,6 +53,7 @@ function renderCutoverPack(pack) {
   renderEvidenceDossier(pack.evidenceDossier || {});
   renderPilotBatchPlan(pack.pilotBatchPlan || {});
   renderSiteEvidenceWorkflow(pack.siteEvidenceWorkflow || {});
+  renderAcceptanceScenarioSuite(pack.acceptanceScenarioSuite || {});
   renderBlockers(pack.tracks || []);
 }
 
@@ -331,6 +333,48 @@ function renderSiteEvidenceWorkflow(workflow) {
   `;
 }
 
+function renderAcceptanceScenarioSuite(suite) {
+  const scenarios = suite.scenarios || [];
+  const summary = suite.summary || {};
+  document.querySelector("#acceptance-scenario-suite").innerHTML = `
+    <div class="cutover-kpis">
+      ${kpi("场景总数", summary.scenarios || scenarios.length, "ok")}
+      ${kpi("硬阻断场景", summary.hardStopScenarios || 0, "warn")}
+      ${kpi("患者安全场景", summary.patientSafetyScenarios || 0, "warn")}
+      ${kpi("审计回放", summary.auditReplayScenarios || 0, "ok")}
+    </div>
+    <div class="cutover-card">
+      <div class="badge-row">
+        <span class="badge warn">${escapeHtml(suite.status || "ready-for-controlled-rehearsal-only")}</span>
+        <span class="badge">${escapeHtml(suite.primaryTrackName || "首增量专项")}</span>
+      </div>
+      <p class="muted">工作流门禁：${escapeHtml(suite.workflowGate || "submitted-or-accepted-site-evidence-required-before-batch-1")}</p>
+      <p class="muted">必需证据：${(suite.requiredEvidenceIds || []).map(escapeHtml).join(" / ") || "待生成"}</p>
+    </div>
+    <div class="track-grid">
+      ${scenarios.map((scenario) => `
+        <article class="cutover-card">
+          <div class="badge-row">
+            <span class="badge">${escapeHtml(scenario.id)}</span>
+            <span class="badge ${scenario.hardStopOnFail ? "warn" : "ok"}">${scenario.hardStopOnFail ? "Hard stop" : "Review"}</span>
+            <span class="badge">${escapeHtml(scenario.type)}</span>
+          </div>
+          <h3>${escapeHtml(scenario.name)}</h3>
+          <p class="muted">批次：${escapeHtml(scenario.batchId)}；通过标准：${escapeHtml(scenario.passCriteria)}</p>
+          <h4>步骤</h4>
+          <ol class="evidence-list">${(scenario.steps || []).map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol>
+          <h4>预期证据</h4>
+          <ul class="evidence-list">${(scenario.expectedEvidence || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+        </article>
+      `).join("")}
+    </div>
+    <div class="cutover-card">
+      <h3>执行规则</h3>
+      <ul class="blocker-list">${(suite.executionRules || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+    </div>
+  `;
+}
+
 function renderBlockers(tracks) {
   const rows = tracks.flatMap((track) => (track.blockers || []).map((blocker) => `
     <tr>
@@ -523,7 +567,47 @@ function fallbackCutoverPack() {
         { eventType: "site-evidence.accept-evidence", appendOnly: true }
       ]
     },
+    acceptanceScenarioSuite: {
+      status: "ready-for-controlled-rehearsal-only",
+      primaryTrackId: "emergency-life-chain",
+      primaryTrackName: "120急救生命链",
+      requiredEvidenceIds: ["emergency-life-chain:external-evidence-1", "emergency-life-chain:external-evidence-2"],
+      workflowGate: "submitted-or-accepted-site-evidence-required-before-batch-1",
+      summary: {
+        scenarios: 5,
+        hardStopScenarios: 4,
+        patientSafetyScenarios: 2,
+        auditReplayScenarios: 1
+      },
+      executionRules: [
+        "run scenarios in batch-1 only after required evidence reaches submitted state",
+        "any hard-stop scenario failure immediately keeps the decision at No-Go",
+        "scenario evidence must be replayable without mutating original source records"
+      ],
+      scenarios: [
+        scenario("scenario-1-normal-chain", "Normal end-to-end emergency life-chain", "happy-path", true, ["receive signed device or controlled gateway signal", "dispatcher confirms ambulance dispatch manually", "receiving hospital accepts electronic handover"], ["signed signal receipt", "dispatch confirmation record", "hospital handover acknowledgement"]),
+        scenario("scenario-2-idempotency-replay", "Duplicate signal and idempotency replay", "resilience", true, ["send the same event twice", "verify the second event is deduplicated"], ["idempotency key ledger", "duplicate rejection or merge record"]),
+        scenario("scenario-3-signature-rejection", "Invalid signature and certificate rejection", "security-negative", true, ["submit invalid signature", "verify no clinical workflow mutation"], ["signature verification failure", "security audit event"]),
+        scenario("scenario-4-manual-downgrade", "Network outage and manual downgrade", "downgrade", true, ["simulate external gateway timeout", "switch to manual phone or paper handover path"], ["timeout alert", "manual downgrade record"]),
+        scenario("scenario-5-evidence-replay", "Evidence packet replay and go/no-go update", "audit-replay", false, ["load evidence packet", "replay audit events and receipts"], ["evidence packet checksum", "append-only audit event sequence"])
+      ]
+    },
     integrity: { algorithm: "sha256", digest: "sha256:static-preview-fallback" }
+  };
+}
+
+function scenario(id, name, type, hardStopOnFail, steps, expectedEvidence) {
+  return {
+    id,
+    name,
+    trackId: "emergency-life-chain",
+    type,
+    batchId: "batch-1-single-chain",
+    preconditions: ["pilot scope frozen and signed", "site evidence workflow gate is at least submitted"],
+    steps,
+    expectedEvidence,
+    passCriteria: "scenario evidence is replayable and does not violate patient-safety or privacy gates",
+    hardStopOnFail
   };
 }
 

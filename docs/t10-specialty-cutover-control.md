@@ -118,6 +118,18 @@ The key transitions are `submit-evidence`, `start-four-eyes-review`, `accept-evi
 
 Every transition emits append-only `site-evidence.*` audit events with evidence ID, track ID, actor, role, from/to state, timestamp, digest and reason.
 
+## Acceptance scenario suite
+
+The pack now includes an `acceptanceScenarioSuite` for the first grey increment. It converts the 120 emergency life-chain pilot into executable scripts:
+
+- normal end-to-end signal, dispatch, hospital handover and evidence export;
+- duplicate signal and idempotency replay;
+- invalid signature and certificate rejection;
+- network outage with manual downgrade;
+- evidence packet replay and Go/No-Go update.
+
+The suite status is `ready-for-controlled-rehearsal-only`. Hard-stop scenario failure keeps the decision at No-Go. The audit replay scenario can return evidence for correction without mutating original records.
+
 ## Verification
 
 Run the focused test directly:
