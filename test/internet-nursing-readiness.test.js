@@ -35,7 +35,9 @@ test("internet nursing readiness validates three-role workflow and policy eviden
   assert.equal(report.checks.some((item) => item.id === "nursing:productionIntegration" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "nursing:paymentIntegration" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "nursing:deviceVerification" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "nursing:specialistHomeCareSafety" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "nursing:regulatorySubmission" && item.passed), true);
+  assert.equal(report.summary.specialistHomeCareServices, 3);
   assert.equal(report.checks.some((item) => item.id === "nursing:siteCutoverPack" && item.passed), true);
   assert.equal(report.summary.highlightFeatures, 10);
   assert.equal(report.innovationCenter.featureCount, 10);

@@ -9,6 +9,8 @@ const DEFAULT_MARKDOWN = path.join(ROOT, "release", "internet-nursing-readiness-
 
 const REQUIRED_POLICY_FIELDS = ["online application", "offline service", "first-visit assessment", "informed consent", "nurse qualification", "location tracking", "full audit trail", "workload statistics"];
 const REQUIRED_ORDER_FIELDS = ["firstVisitAssessment", "informedConsent", "consentAttachment", "identityVerified", "locationTrace", "locationTracePoints", "serviceRecordStatus", "serviceRecord", "serviceAttachments", "notificationReceiptSummary", "qualityCallback", "auditTrail"];
+const SPECIALIST_HOME_CARE_SERVICES = ["intravenous catheter maintenance", "wound and ostomy care", "peritoneal dialysis care"];
+const SPECIALIST_HOME_CARE_SOURCE = "https://www.shdmu.com/web/details/index?coid=23&cnId=18406";
 
 function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(ROOT, relativePath), "utf8"));
@@ -26,6 +28,16 @@ function readOptionalText(relativePath) {
 function fallbackPolicy() {
   return {
     scope: REQUIRED_POLICY_FIELDS,
+    serviceCatalog: SPECIALIST_HOME_CARE_SERVICES,
+    requiredEvidence: ["service equipment readiness", "emergency and coordination readiness", "medical waste handover", "EMR archive receipt"],
+    riskControls: ["one-click alert", "medical waste recovery"],
+    practiceReferences: [{
+      title: "Internet plus home nursing service officially launched",
+      publisher: "The Second Affiliated Hospital of Dalian Medical University",
+      publishedAt: "2026-07-23",
+      url: SPECIALIST_HOME_CARE_SOURCE,
+      serviceItems: SPECIALIST_HOME_CARE_SERVICES
+    }],
     notificationGateway: {
       enabled: true,
       channels: ["in_app", "sms", "hospital_message"],
@@ -238,6 +250,25 @@ function hasDeviceVerificationEvidence(policy, orders, nurses, frontend, server,
     /定位设备|设备核验/.test(moduleDoc + launchPlan);
 }
 
+function hasSpecialistHomeCareSafetyEvidence(policy, domainSource) {
+  const serviceCatalog = new Set(policy.serviceCatalog || []);
+  const requiredEvidence = new Set(policy.requiredEvidence || []);
+  const riskControls = new Set(policy.riskControls || []);
+  const references = Array.isArray(policy.practiceReferences) ? policy.practiceReferences : [];
+  return SPECIALIST_HOME_CARE_SERVICES.every((item) => serviceCatalog.has(item)) &&
+    ["service equipment readiness", "emergency and coordination readiness", "medical waste handover", "EMR archive receipt"].every((item) => requiredEvidence.has(item)) &&
+    ["one-click alert", "medical waste recovery"].every((item) => riskControls.has(item)) &&
+    references.some((item) =>
+      item?.url === SPECIALIST_HOME_CARE_SOURCE &&
+      SPECIALIST_HOME_CARE_SERVICES.every((service) => (item.serviceItems || []).includes(service))
+    ) &&
+    /validateServiceReadiness/.test(domainSource) &&
+    /one-click-alert-not-tested/.test(domainSource) &&
+    /validateMedicalWasteHandover/.test(domainSource) &&
+    /validateServiceArchive/.test(domainSource) &&
+    /service-archive-target-invalid/.test(domainSource);
+}
+
 function hasRegulatorySubmissionEvidence(policy, frontend, server, moduleDoc, launchPlan) {
   const submission = policy.regulatorySubmission || fallbackPolicy().regulatorySubmission;
   const fields = new Set(submission.mappedFields || []);
@@ -391,6 +422,7 @@ function buildInternetNursingReadinessReport(options = {}) {
   const cutoverDoc = options.cutoverDoc ?? readOptionalText("docs/互联网护理现场割接证据包.md");
   const moduleDoc = options.moduleDoc ?? readText("docs/互联网护理服务模块说明.md");
   const launchPlan = options.launchPlan ?? readText("docs/互联网护理上线与下一步开发计划.md");
+  const domainSource = options.domainSource ?? readText("nursing-escort-domain.js");
   const policy = { ...fallbackPolicy(), ...(data.internetNursingPolicy || {}) };
   policy.notificationGateway = { ...fallbackPolicy().notificationGateway, ...(data.internetNursingPolicy?.notificationGateway || {}) };
   policy.pricingRules = { ...fallbackPolicy().pricingRules, ...(data.internetNursingPolicy?.pricingRules || {}) };
@@ -427,6 +459,7 @@ function buildInternetNursingReadinessReport(options = {}) {
     { id: "nursing:productionIntegration", passed: hasProductionIntegrationEvidence(policy, orders, frontend, server, moduleDoc, launchPlan), detail: "production message gateway, signature storage, hospital connectors, and fallback evidence are implemented" },
     { id: "nursing:paymentIntegration", passed: hasPaymentIntegrationEvidence(policy, orders, frontend, server, moduleDoc, launchPlan), detail: "medical insurance e-voucher, mobile self-pay, refund, invoice, and reconciliation contracts are implemented" },
     { id: "nursing:deviceVerification", passed: hasDeviceVerificationEvidence(policy, orders, nurses, frontend, server, moduleDoc, launchPlan), detail: "mobile GPS, location device, recorder, one-click alert, photo attachment, and exception escalation evidence are implemented" },
+    { id: "nursing:specialistHomeCareSafety", passed: hasSpecialistHomeCareSafetyEvidence(policy, domainSource), detail: "catheter, wound and ostomy, and peritoneal dialysis services require equipment, emergency coordination, waste handover, and EMR archive evidence" },
     { id: "nursing:regulatorySubmission", passed: hasRegulatorySubmissionEvidence(policy, frontend, server, moduleDoc, launchPlan), detail: "field mapping, monthly and realtime submission, signoff, and pressure-test evidence are implemented" },
     { id: "nursing:siteCutoverPack", passed: hasCutoverPackEvidence(cutoverPack, `${moduleDoc}\n${cutoverDoc}`, launchPlan), detail: "site cutover signoff pack maps message, signature, connector, payment, device, regulatory, and audit-retention evidence" },
     { id: "nursing:highlightFeatures", passed: innovationCenter.featureCount === 10 && HIGHLIGHT_FEATURE_IDS.every((id) => innovationCenter.features.some((item) => item.id === id)) && /internet-nursing-highlights\.js/.test(frontend) && /renderNursingInnovationCenter/.test(frontend) && /nursing-highlight-center/.test(frontend) && /buildInternetNursingInnovationCenter/.test(server), detail: `${innovationCenter.featureCount}/10 highlight features wired` },
@@ -461,6 +494,7 @@ function buildInternetNursingReadinessReport(options = {}) {
       orders: orders.length,
       highRiskOrders: orders.filter((item) => item.riskLevel === "high").length,
       trackingOrders: orders.filter((item) => item.locationTrace === "tracking").length,
+      specialistHomeCareServices: SPECIALIST_HOME_CARE_SERVICES.filter((item) => (policy.serviceCatalog || []).includes(item)).length,
       highlightFeatures: innovationCenter.featureCount,
       cutoverTracks: cutoverPack.tracks.length,
       cutoverReadyTracks: cutoverPack.tracks.filter((item) => item.ready).length,

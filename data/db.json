@@ -10688,7 +10688,10 @@
       "vital signs measurement",
       "blood glucose measurement",
       "wound care",
+      "wound and ostomy care",
       "tube care",
+      "intravenous catheter maintenance",
+      "peritoneal dialysis care",
       "postpartum care",
       "infant care",
       "PICC maintenance"
@@ -10698,8 +10701,12 @@
       "first diagnosis assessment",
       "signed informed consent",
       "nurse practice certificate",
+      "service equipment readiness",
+      "emergency and coordination readiness",
       "service location trace",
       "nursing record",
+      "medical waste handover",
+      "EMR archive receipt",
       "quality callback"
     ],
     "platformRequirements": [
@@ -10712,6 +10719,7 @@
     "riskControls": [
       "emergency plan",
       "one-click alert",
+      "medical waste recovery",
       "liability insurance",
       "medical accident insurance",
       "service recorder"
@@ -10757,8 +10765,20 @@
           "basePrice": 168,
           "insuranceEligible": true
         },
+        "wound and ostomy care": {
+          "basePrice": 198,
+          "insuranceEligible": true
+        },
         "tube care": {
           "basePrice": 198,
+          "insuranceEligible": true
+        },
+        "intravenous catheter maintenance": {
+          "basePrice": 260,
+          "insuranceEligible": true
+        },
+        "peritoneal dialysis care": {
+          "basePrice": 298,
           "insuranceEligible": true
         },
         "postpartum care": {
@@ -10889,7 +10909,29 @@
         "health commission supervision",
         "platform operations"
       ]
-    }
+    },
+    "practiceReferences": [
+      {
+        "title": "Internet plus home nursing service officially launched",
+        "publisher": "The Second Affiliated Hospital of Dalian Medical University",
+        "publishedAt": "2026-07-23",
+        "url": "https://www.shdmu.com/web/details/index?coid=23&cnId=18406",
+        "serviceItems": [
+          "intravenous catheter maintenance",
+          "wound and ostomy care",
+          "peritoneal dialysis care"
+        ],
+        "controls": [
+          "system review",
+          "specialist nurse dispatch",
+          "professional equipment checklist",
+          "one-click alert and location",
+          "medical waste recovery",
+          "EMR realtime archive",
+          "hospital-community-family coordination"
+        ]
+      }
+    ]
   },
   "internetNursingInstitutions": [
     {
@@ -10911,6 +10953,9 @@
       ],
       "serviceItems": [
         "wound care",
+        "wound and ostomy care",
+        "intravenous catheter maintenance",
+        "peritoneal dialysis care",
         "PICC maintenance",
         "blood glucose measurement",
         "postpartum care"
@@ -11046,6 +11091,9 @@
       "badPracticeRecord": "none",
       "specialties": [
         "wound care",
+        "wound and ostomy care",
+        "intravenous catheter maintenance",
+        "peritoneal dialysis care",
         "PICC maintenance",
         "blood glucose measurement"
       ],

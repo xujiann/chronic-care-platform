@@ -28,6 +28,7 @@ function buildEscortServiceReadinessReport(options = {}) {
   const responsibilityDoc = options.responsibilityDoc ?? readText("docs/陪诊信息平台功能责任与下一步计划.md");
   const deploymentDoc = options.deploymentDoc ?? readText("docs/陪诊服务上线服务器采购与部署方案.md");
   const developmentReport = options.developmentReport ?? readText("docs/陪诊信息平台研发报告.md");
+  const domainSource = options.domainSource ?? readText("nursing-escort-domain.js");
   const policy = data.escortServicePolicy || {};
   const providers = Array.isArray(data.escortServiceProviders) ? data.escortServiceProviders : [];
   const workers = Array.isArray(data.escortWorkers) ? data.escortWorkers : [];
@@ -42,6 +43,7 @@ function buildEscortServiceReadinessReport(options = {}) {
     { id: "escort:orderEvidence", passed: orders.every((item) => REQUIRED_ORDER_FIELDS.every((field) => Object.hasOwn(item, field))), detail: REQUIRED_ORDER_FIELDS.join(", ") },
     { id: "escort:subsidy", passed: orders.some((item) => ["low-income", "80plus-living-alone", "time-bank"].includes(item.subsidyType)), detail: orders.map((item) => item.subsidyType).join(", ") },
     { id: "escort:riskQuality", passed: orders.some((item) => item.riskLevel === "high") && orders.some((item) => item.qualityReview && item.qualityReview !== "closed"), detail: "risk queue and quality callback present" },
+    { id: "escort:serviceReadinessArchive", passed: /validateServiceReadiness/.test(domainSource) && /escort-hospital-route-not-confirmed/.test(domainSource) && /service-coordination-not-confirmed/.test(domainSource) && /validateServiceArchive/.test(domainSource) && /outpatient-guidance-platform/.test(domainSource), detail: "escort start requires equipment, emergency route, and hospital-family coordination; completion requires a bound HIS or guidance-platform archive receipt" },
     { id: "escort:api", passed: /\/api\/escort-services\/dashboard/.test(server) && /\/api\/escort-services\/orders/.test(server) && /canAccessEscortOrder/.test(server), detail: "dashboard, order creation, action, and role guard present" },
     { id: "escort:hospitalInterface", passed: /hospital-handoff/.test(server) && /applyEscortHospitalHandoff/.test(server) && REQUIRED_HOSPITAL_FIELDS.every((field) => server.includes(field)) && (orders.some((item) => item.hospitalInterfaceStatus === "confirmed") || server.includes('hospitalInterfaceStatus: "confirmed"')), detail: REQUIRED_HOSPITAL_FIELDS.join(", ") },
     { id: "escort:hospitalInterfaceDoc", passed: /POST \/api\/escort-services\/orders\/:id\/hospital-handoff/.test(hospitalInterfaceDoc) && /flowchart TD/.test(hospitalInterfaceDoc) && /hospitalCode/.test(hospitalInterfaceDoc) && /hisVisitId/.test(hospitalInterfaceDoc) && /outpatientQueueNo/.test(hospitalInterfaceDoc), detail: "hospital handoff contract and workflow documented" },

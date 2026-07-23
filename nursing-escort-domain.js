@@ -15,6 +15,14 @@
   const ISSUED_DISPATCH_DECISION_LIMIT = 1000;
   const ISSUED_CAPACITY_RESERVATIONS = new Map();
   const ISSUED_CAPACITY_RESERVATION_LIMIT = 2000;
+  const INVASIVE_NURSING_SERVICES = new Set([
+    "intravenous catheter maintenance",
+    "picc maintenance",
+    "wound care",
+    "wound and ostomy care",
+    "tube care",
+    "peritoneal dialysis care"
+  ]);
 
   const WORKFLOWS = Object.freeze({
     nursing: Object.freeze({
@@ -90,8 +98,8 @@
       assessed: ["identity-verification", "first-visit-assessment", "signed-consent"],
       dispatched: ["qualification-snapshot", "capacity-reservation", "dispatch-decision"],
       accepted: ["worker-acceptance"],
-      "in-service": ["identity-verification", "location-start", "service-check-in"],
-      completed: ["service-record", "location-end", "resident-confirmation", "exception-declaration"],
+      "in-service": ["identity-verification", "service-readiness", "location-start", "service-check-in"],
+      completed: ["service-record", "service-archive", "location-end", "resident-confirmation", "exception-declaration"],
       "settlement-pending": ["pricing-confirmation", "financial-dispatch"],
       settled: ["financial-callback", "reconciliation-result"],
       "cancel-requested": ["cancellation-request"],
@@ -112,8 +120,8 @@
       "worker-dispatched": ["qualification-snapshot", "capacity-reservation", "dispatch-decision"],
       accepted: ["worker-acceptance"],
       "hospital-confirmed": ["hospital-handoff"],
-      "in-service": ["identity-verification", "location-start", "service-check-in"],
-      completed: ["service-record", "location-end", "resident-confirmation", "exception-declaration"],
+      "in-service": ["identity-verification", "service-readiness", "location-start", "service-check-in"],
+      completed: ["service-record", "service-archive", "location-end", "resident-confirmation", "exception-declaration"],
       "settlement-pending": ["pricing-confirmation", "financial-dispatch"],
       settled: ["financial-callback", "reconciliation-result"],
       "cancel-requested": ["cancellation-request"],
@@ -772,6 +780,119 @@
     return { ok: reasons.length === 0, trace, reasons };
   }
 
+  function serviceItemsForEvidence(domain, order = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const items = normalizedDomain === "nursing"
+      ? [order.serviceItem]
+      : Array.isArray(order.serviceItems) ? order.serviceItems : [];
+    return [...new Set(items.map((item) => String(item || "").trim()).filter(Boolean))].sort();
+  }
+
+  function validateServiceReadiness(domain, order = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const orderId = String(order.id || "").trim();
+    const residentId = String(order.residentId || "").trim();
+    const subjectId = serviceAssignedSubject(normalizedDomain, order);
+    const expectedItems = serviceItemsForEvidence(normalizedDomain, order);
+    const readiness = order.serviceReadiness;
+    const reasons = [];
+    if (!readiness || typeof readiness !== "object" || Array.isArray(readiness)) {
+      reasons.push("service-readiness-missing");
+    } else {
+      if (readiness.status !== "verified") reasons.push("service-readiness-not-verified");
+      if (readiness.orderId !== orderId) reasons.push("service-readiness-order-mismatch");
+      if (readiness.domain !== normalizedDomain) reasons.push("service-readiness-domain-mismatch");
+      if (readiness.subjectId !== subjectId) reasons.push("service-readiness-subject-mismatch");
+      if (readiness.residentId !== residentId) reasons.push("service-readiness-resident-mismatch");
+      const actualItems = Array.isArray(readiness.serviceItems)
+        ? [...new Set(readiness.serviceItems.map((item) => String(item || "").trim()).filter(Boolean))].sort()
+        : [];
+      if (!expectedItems.length) reasons.push("service-readiness-scope-missing");
+      if (JSON.stringify(actualItems) !== JSON.stringify(expectedItems)) reasons.push("service-readiness-scope-mismatch");
+      if (parseTime(readiness.checkedAt) === null) reasons.push("service-readiness-time-invalid");
+      const equipment = Array.isArray(readiness.equipmentChecklist) ? readiness.equipmentChecklist : [];
+      if (!equipment.length) reasons.push("service-equipment-checklist-missing");
+      if (equipment.some((item) => !String(item?.name || "").trim() || item?.status !== "verified")) {
+        reasons.push("service-equipment-not-verified");
+      }
+      const emergency = readiness.emergencyReadiness;
+      if (!emergency || emergency.status !== "verified") reasons.push("service-emergency-readiness-invalid");
+      if (!String(emergency?.contactId || "").trim()) reasons.push("service-emergency-contact-missing");
+      if (normalizedDomain === "nursing" && emergency?.oneClickAlertTested !== true) reasons.push("one-click-alert-not-tested");
+      if (normalizedDomain === "escort" && emergency?.hospitalRouteConfirmed !== true) reasons.push("escort-hospital-route-not-confirmed");
+      const coordination = readiness.coordinationPlan;
+      if (!coordination || coordination.status !== "confirmed") reasons.push("service-coordination-not-confirmed");
+      if (!String(coordination?.hospitalContactId || "").trim()) reasons.push("service-hospital-contact-missing");
+      if (!String(coordination?.supportContactId || "").trim()) reasons.push("service-support-contact-missing");
+    }
+    return { ok: reasons.length === 0, readiness, reasons };
+  }
+
+  function nursingServiceRequiresWasteHandover(order = {}) {
+    return serviceItemsForEvidence("nursing", order)
+      .some((item) => INVASIVE_NURSING_SERVICES.has(item.toLowerCase()));
+  }
+
+  function validateServiceArchive(domain, order = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const orderId = String(order.id || "").trim();
+    const residentId = String(order.residentId || "").trim();
+    const subjectId = serviceAssignedSubject(normalizedDomain, order);
+    const record = order.serviceRecord;
+    const receipt = order.serviceArchiveReceipt;
+    const reasons = [];
+    if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)) {
+      reasons.push("service-archive-receipt-missing");
+    } else {
+      if (receipt.status !== "accepted") reasons.push("service-archive-not-accepted");
+      if (!receipt.id) reasons.push("service-archive-receipt-id-missing");
+      if (receipt.orderId !== orderId) reasons.push("service-archive-order-mismatch");
+      if (receipt.domain !== normalizedDomain) reasons.push("service-archive-domain-mismatch");
+      if (receipt.subjectId !== subjectId) reasons.push("service-archive-subject-mismatch");
+      if (receipt.residentId !== residentId) reasons.push("service-archive-resident-mismatch");
+      if (receipt.serviceRecordId !== record?.id) reasons.push("service-archive-record-mismatch");
+      const acceptedTargets = normalizedDomain === "nursing"
+        ? new Set(["EMR"])
+        : new Set(["HIS", "outpatient-guidance-platform"]);
+      if (!acceptedTargets.has(receipt.targetSystem)) reasons.push("service-archive-target-invalid");
+      const archivedAt = parseTime(receipt.archivedAt);
+      const completedAt = parseTime(record?.completedAt);
+      if (archivedAt === null) reasons.push("service-archive-time-invalid");
+      if (archivedAt !== null && completedAt !== null && archivedAt < completedAt) reasons.push("service-archive-before-completion");
+    }
+    return { ok: reasons.length === 0, receipt, reasons };
+  }
+
+  function validateMedicalWasteHandover(domain, order = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    if (normalizedDomain !== "nursing" || !nursingServiceRequiresWasteHandover(order)) {
+      return { ok: true, required: false, handover: order.medicalWasteHandover, reasons: [] };
+    }
+    const orderId = String(order.id || "").trim();
+    const subjectId = serviceAssignedSubject(normalizedDomain, order);
+    const record = order.serviceRecord;
+    const handover = order.medicalWasteHandover;
+    const reasons = [];
+    if (!handover || typeof handover !== "object" || Array.isArray(handover)) {
+      reasons.push("medical-waste-handover-missing");
+    } else {
+      if (handover.status !== "received") reasons.push("medical-waste-handover-not-received");
+      if (!handover.id) reasons.push("medical-waste-handover-id-missing");
+      if (handover.orderId !== orderId) reasons.push("medical-waste-order-mismatch");
+      if (handover.domain !== normalizedDomain) reasons.push("medical-waste-domain-mismatch");
+      if (handover.subjectId !== subjectId) reasons.push("medical-waste-subject-mismatch");
+      if (handover.serviceRecordId !== record?.id) reasons.push("medical-waste-record-mismatch");
+      if (!Array.isArray(handover.wasteTypes) || !handover.wasteTypes.filter(Boolean).length) reasons.push("medical-waste-types-missing");
+      if (!String(handover.containerSealId || "").trim()) reasons.push("medical-waste-container-seal-missing");
+      if (!String(handover.receiverId || "").trim()) reasons.push("medical-waste-receiver-missing");
+      const handedOverAt = parseTime(handover.handedOverAt);
+      const completedAt = parseTime(record?.completedAt);
+      if (handedOverAt === null) reasons.push("medical-waste-handover-time-invalid");
+      if (handedOverAt !== null && completedAt !== null && handedOverAt < completedAt) reasons.push("medical-waste-handover-before-completion");
+    }
+    return { ok: reasons.length === 0, required: true, handover, reasons };
+  }
+
   function validateServiceEvidence(domain, order = {}, nextStatus) {
     const normalizedDomain = normalizeDomain(domain);
     const next = canonicalStatus(nextStatus, normalizedDomain);
@@ -784,6 +905,8 @@
     if (!subjectId) reasons.push("service-subject-missing");
 
     if (next === "in-service") {
+      const readiness = validateServiceReadiness(normalizedDomain, order);
+      reasons.push(...readiness.reasons);
       const startTrace = validateBoundServiceTrace(normalizedDomain, order, "service-start");
       reasons.push(...startTrace.reasons);
       const checkIn = order.serviceCheckIn;
@@ -845,6 +968,9 @@
         const completedAt = parseTime(order.serviceRecord?.completedAt);
         if (confirmedAt !== null && completedAt !== null && confirmedAt < completedAt) reasons.push("resident-confirmation-before-completion");
       }
+      const archive = validateServiceArchive(normalizedDomain, order);
+      const wasteHandover = validateMedicalWasteHandover(normalizedDomain, order);
+      reasons.push(...archive.reasons, ...wasteHandover.reasons);
       if (order.adverseEvent?.status && !["none", "closed", "resolved"].includes(order.adverseEvent.status)) reasons.push("adverse-event-open");
     }
 
@@ -866,6 +992,18 @@
     const residentId = String(order.residentId || "").trim();
     const subjectId = serviceAssignedSubject(normalizedDomain, order);
     const traceId = `${normalizedDomain}:${orderId}:service-start:${at}`;
+    const equipmentChecklist = (Array.isArray(details.equipmentItems) ? details.equipmentItems : [])
+      .map((item) => ({
+        name: String(typeof item === "string" ? item : item?.name || ""),
+        status: details.equipmentVerified === true ? "verified" : "pending"
+      }))
+      .filter((item) => item.name);
+    const emergencyVerified = details.emergencyReady === true
+      && Boolean(String(details.emergencyContactId || "").trim())
+      && (normalizedDomain === "nursing" ? details.oneClickAlertTested === true : details.hospitalRouteConfirmed === true);
+    const coordinationConfirmed = details.coordinationConfirmed === true
+      && Boolean(String(details.hospitalContactId || "").trim())
+      && Boolean(String(details.supportContactId || "").trim());
     const tracePoint = {
       id: traceId,
       stage: "service-start",
@@ -890,6 +1028,33 @@
         residentId,
         tracePointId: traceId,
         checkedInAt: at
+      },
+      serviceReadiness: {
+        status: details.readinessVerified === true
+          && equipmentChecklist.length > 0
+          && equipmentChecklist.every((item) => item.status === "verified")
+          && emergencyVerified
+          && coordinationConfirmed ? "verified" : "rejected",
+        orderId,
+        domain: normalizedDomain,
+        subjectId,
+        residentId,
+        serviceItems: serviceItemsForEvidence(normalizedDomain, order),
+        equipmentChecklist,
+        emergencyReadiness: {
+          status: emergencyVerified ? "verified" : "pending",
+          contactId: String(details.emergencyContactId || ""),
+          oneClickAlertTested: normalizedDomain === "nursing" && details.oneClickAlertTested === true,
+          hospitalRouteConfirmed: normalizedDomain === "escort" && details.hospitalRouteConfirmed === true
+        },
+        coordinationPlan: {
+          status: coordinationConfirmed ? "confirmed" : "pending",
+          hospitalContactId: String(details.hospitalContactId || ""),
+          supportContactId: String(details.supportContactId || ""),
+          communityContactId: String(details.communityContactId || "")
+        },
+        checkedAt: at,
+        policyVersion: WORKFLOW_POLICY_VERSION
       },
       serviceRecordStatus: "in-progress",
       serviceRecord: {
@@ -925,16 +1090,34 @@
       verified: details.verified === true
     };
     const actions = Array.isArray(details.actions) ? details.actions.filter(Boolean) : [];
+    const serviceRecordId = String(order.serviceRecord?.id || `${normalizedDomain}:${orderId}:service-record`);
     const exceptionReport = details.exceptionReport && typeof details.exceptionReport === "object"
       ? { ...details.exceptionReport }
       : { status: "none" };
+    const medicalWaste = details.medicalWaste && typeof details.medicalWaste === "object"
+      ? {
+        medicalWasteHandover: {
+          id: String(details.medicalWaste.id || `${normalizedDomain}:${orderId}:medical-waste:${at}`),
+          status: details.medicalWaste.received === true ? "received" : "pending",
+          orderId,
+          domain: normalizedDomain,
+          subjectId,
+          serviceRecordId,
+          wasteTypes: Array.isArray(details.medicalWaste.wasteTypes) ? details.medicalWaste.wasteTypes.filter(Boolean) : [],
+          containerSealId: String(details.medicalWaste.containerSealId || ""),
+          receiverId: String(details.medicalWaste.receiverId || ""),
+          handedOverAt: String(details.medicalWaste.handedOverAt || at),
+          policyVersion: WORKFLOW_POLICY_VERSION
+        }
+      }
+      : {};
     return {
       locationTrace: "completed",
       locationTracePoints: [...(Array.isArray(order.locationTracePoints) ? order.locationTracePoints : []), tracePoint].slice(-30),
       serviceRecordStatus: "completed",
       serviceRecord: {
         ...(order.serviceRecord || {}),
-        id: String(order.serviceRecord?.id || `${normalizedDomain}:${orderId}:service-record`),
+        id: serviceRecordId,
         status: "completed",
         version: WORKFLOW_POLICY_VERSION,
         orderId,
@@ -946,6 +1129,19 @@
         ...(normalizedDomain === "nursing" ? { careActions: actions } : { serviceActions: actions }),
         exceptionReport
       },
+      serviceArchiveReceipt: {
+        id: String(details.archiveReceiptId || `${normalizedDomain}:${orderId}:archive:${at}`),
+        status: details.archiveAccepted === true ? "accepted" : "rejected",
+        orderId,
+        domain: normalizedDomain,
+        subjectId,
+        residentId,
+        serviceRecordId,
+        targetSystem: String(details.archiveTarget || (normalizedDomain === "nursing" ? "EMR" : "HIS")),
+        archivedAt: String(details.archivedAt || at),
+        policyVersion: WORKFLOW_POLICY_VERSION
+      },
+      ...medicalWaste,
       residentConfirmation: {
         status: details.residentConfirmed === true ? "confirmed" : "rejected",
         orderId,
@@ -2254,7 +2450,10 @@
     if (tracePoints.some((item) => item.stage === "service-start" && item.verified !== false)) types.add("location-start");
     if (tracePoints.some((item) => item.stage === "service-complete" && item.verified !== false)) types.add("location-end");
     if (order.serviceCheckInAt || tracePoints.some((item) => item.stage === "service-start")) types.add("service-check-in");
+    if (order.serviceReadiness?.status === "verified") types.add("service-readiness");
     if (order.serviceRecord?.status === "completed" || order.serviceRecordStatus === "completed") types.add("service-record");
+    if (order.serviceArchiveReceipt?.status === "accepted") types.add("service-archive");
+    if (order.medicalWasteHandover?.status === "received") types.add("medical-waste-handover");
     if (order.residentConfirmation?.status === "confirmed" || order.residentConfirmation === "confirmed" || order.residentServiceConfirmation === "confirmed" || (order.serviceAttachments || []).some((item) => item.type === "resident-signature")) types.add("resident-confirmation");
     if (["none", "resolved"].includes(order.serviceRecord?.exceptionReport?.status) || ["none", "closed", "resolved"].includes(order.adverseEvent?.status)) types.add("exception-declaration");
     return types;

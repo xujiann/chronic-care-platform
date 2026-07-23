@@ -823,6 +823,7 @@ test("nursing service start and completion require bound trace record confirmati
     residentId: "r1",
     status: "accepted",
     nurseId: "inn-001",
+    serviceItem: "wound care",
     identityVerified: true,
     adverseEvent: { status: "none" }
   };
@@ -831,8 +832,37 @@ test("nursing service start and completion require bound trace record confirmati
     lng: 121.616,
     source: "nurse-mobile",
     verified: true,
-    identityMatched: true
+    identityMatched: true,
+    readinessVerified: true,
+    equipmentItems: ["sterile wound-care kit", "service recorder"],
+    equipmentVerified: true,
+    emergencyReady: true,
+    emergencyContactId: "nursing-duty-001",
+    oneClickAlertTested: true,
+    coordinationConfirmed: true,
+    hospitalContactId: "wound-center-001",
+    supportContactId: "family-r1",
+    communityContactId: "community-team-001"
   }, { at: NOW });
+  const unsafeStart = Domain.buildServiceStartEvidence("nursing", accepted, {
+    lat: 38.915,
+    lng: 121.616,
+    source: "nurse-mobile",
+    verified: true,
+    identityMatched: true,
+    equipmentItems: ["sterile wound-care kit"],
+    equipmentVerified: false,
+    emergencyReady: false,
+    oneClickAlertTested: false
+  }, { at: NOW });
+  assert.throws(
+    () => Domain.transitionOrder("nursing", accepted, "in-service", { at: NOW, updates: unsafeStart }),
+    (error) => error.code === "ORDER_SERVICE_EVIDENCE_INVALID"
+      && error.details.reasons.includes("service-readiness-not-verified")
+      && error.details.reasons.includes("service-equipment-not-verified")
+      && error.details.reasons.includes("one-click-alert-not-tested")
+      && error.details.reasons.includes("service-coordination-not-confirmed")
+  );
   assert.throws(
     () => Domain.transitionOrder("nursing", accepted, "in-service", {
       at: NOW,
@@ -855,6 +885,8 @@ test("nursing service start and completion require bound trace record confirmati
   });
   assert.equal(inService.status, "in-service");
   assert.equal(inService.serviceCheckIn.subjectId, "inn-001");
+  assert.equal(inService.serviceReadiness.status, "verified");
+  assert.equal(inService.serviceReadiness.coordinationPlan.communityContactId, "community-team-001");
 
   const completionAt = "2026-07-22T10:00:00+08:00";
   const completionEvidence = Domain.buildServiceCompletionEvidence("nursing", inService, {
@@ -865,7 +897,15 @@ test("nursing service start and completion require bound trace record confirmati
     actions: ["identity check", "wound care", "health education"],
     residentConfirmed: true,
     signerName: "Resident A",
-    exceptionReport: { status: "none" }
+    exceptionReport: { status: "none" },
+    archiveAccepted: true,
+    archiveTarget: "EMR",
+    medicalWaste: {
+      received: true,
+      wasteTypes: ["used dressing", "disposable gloves"],
+      containerSealId: "seal-wound-001",
+      receiverId: "hospital-waste-center-001"
+    }
   }, { at: completionAt });
   const completed = Domain.transitionOrder("nursing", inService, "completed", {
     actorId: "inn-001",
@@ -876,6 +916,22 @@ test("nursing service start and completion require bound trace record confirmati
   assert.equal(completed.status, "completed");
   assert.equal(completed.serviceRecord.subjectId, "inn-001");
   assert.equal(completed.residentConfirmation.status, "confirmed");
+  assert.equal(completed.serviceArchiveReceipt.targetSystem, "EMR");
+  assert.equal(completed.medicalWasteHandover.status, "received");
+
+  assert.throws(
+    () => Domain.transitionOrder("nursing", inService, "completed", {
+      at: completionAt,
+      updates: {
+        ...completionEvidence,
+        serviceArchiveReceipt: undefined,
+        medicalWasteHandover: undefined
+      }
+    }),
+    (error) => error.code === "ORDER_SERVICE_EVIDENCE_INVALID"
+      && error.details.reasons.includes("service-archive-receipt-missing")
+      && error.details.reasons.includes("medical-waste-handover-missing")
+  );
 
   assert.throws(
     () => Domain.transitionOrder("nursing", inService, "completed", {
@@ -900,6 +956,7 @@ test("escort service evidence rejects cross-order and cross-worker records witho
     residentId: "r1",
     status: "hospital-confirmed",
     workerId: "ew-001",
+    serviceItems: ["registration", "exam escort"],
     identityVerified: true,
     adverseEvent: { status: "none" }
   };
@@ -908,7 +965,16 @@ test("escort service evidence rejects cross-order and cross-worker records witho
     lng: 121.62,
     source: "escort-mobile",
     verified: true,
-    identityMatched: true
+    identityMatched: true,
+    readinessVerified: true,
+    equipmentItems: ["wheelchair", "mobile service recorder"],
+    equipmentVerified: true,
+    emergencyReady: true,
+    emergencyContactId: "escort-duty-001",
+    hospitalRouteConfirmed: true,
+    coordinationConfirmed: true,
+    hospitalContactId: "outpatient-guide-001",
+    supportContactId: "family-r1"
   }, { at: NOW });
   const inService = Domain.transitionOrder("escort", confirmed, "in-service", { at: NOW, updates: startEvidence });
   const completionAt = "2026-07-22T10:00:00+08:00";
@@ -920,11 +986,14 @@ test("escort service evidence rejects cross-order and cross-worker records witho
     actions: ["registration", "exam escort"],
     residentConfirmed: true,
     signerName: "Resident A",
-    exceptionReport: { status: "none" }
+    exceptionReport: { status: "none" },
+    archiveAccepted: true,
+    archiveTarget: "HIS"
   }, { at: completionAt });
   const completed = Domain.transitionOrder("escort", inService, "completed", { at: completionAt, updates: completionEvidence });
   assert.equal(completed.status, "completed");
   assert.deepEqual(completed.serviceRecord.serviceActions, ["registration", "exam escort"]);
+  assert.equal(completed.serviceArchiveReceipt.targetSystem, "HIS");
 
   assert.throws(
     () => Domain.transitionOrder("escort", inService, "completed", {
@@ -932,11 +1001,13 @@ test("escort service evidence rejects cross-order and cross-worker records witho
       updates: {
         ...completionEvidence,
         serviceRecord: { ...completionEvidence.serviceRecord, subjectId: "ew-forged" },
+        serviceArchiveReceipt: { ...completionEvidence.serviceArchiveReceipt, targetSystem: "EMR" },
         locationTracePoints: completionEvidence.locationTracePoints.map((item) => item.stage === "service-complete" ? { ...item, orderId: "eso-other" } : item)
       }
     }),
     (error) => error.code === "ORDER_SERVICE_EVIDENCE_INVALID"
       && error.details.reasons.includes("service-record-subject-mismatch")
+      && error.details.reasons.includes("service-archive-target-invalid")
       && error.details.reasons.includes("service-complete-trace-order-mismatch")
   );
   assert.equal(inService.status, "in-service");
