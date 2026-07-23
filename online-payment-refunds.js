@@ -77,8 +77,131 @@ function verifyRefundLedger(events = []) {
   });
 }
 
+function reviewProjection(review = {}) {
+  return {
+    id: review.id,
+    reviewer: review.reviewer,
+    reviewDomain: review.reviewDomain,
+    role: review.role,
+    approved: review.approved === true,
+    opinion: review.opinion,
+    reviewedAt: review.reviewedAt
+  };
+}
+
+function reviewFromEvent(event = {}) {
+  return {
+    id: event.idempotencyKey,
+    reviewer: event.actor,
+    reviewDomain: event.detail?.reviewDomain,
+    role: event.detail?.role,
+    approved: event.action === "approve-review",
+    opinion: event.detail?.opinion,
+    reviewedAt: event.at
+  };
+}
+
+function buildRejectionDecisionDigest(row, rejectedAt) {
+  return digest({
+    refundId: row.id,
+    paymentEventId: row.paymentEventId,
+    refundAmountFen: row.refundAmountFen,
+    reviewRevision: row.reviewRevision || 1,
+    reviews: (row.reviews || []).map(reviewProjection),
+    rejectedAt
+  });
+}
+
+function verifyRefundStateProjection(row = {}) {
+  const events = Array.isArray(row.events) ? row.events : [];
+  if (!events.length || events[0].action !== "request" || events[0].from !== "NONE") return false;
+  if (events.some((event, index) => index > 0 && event.from !== events[index - 1].to)) return false;
+  if (row.state !== events.at(-1).to || row.status !== REFUND_STATES[row.state]) return false;
+
+  let currentReviews = [];
+  const expectedHistory = [];
+  const resubmissionEvents = [];
+  let latestRequestEvent = events[0];
+  for (const event of events) {
+    if (["approve-review", "reject-review"].includes(event.action)) currentReviews.push(reviewFromEvent(event));
+    if (event.action !== "resubmit-after-rejection") continue;
+    const rejectionEvent = events[event.sequence - 2];
+    expectedHistory.push({
+      reviewRevision: event.detail?.fromReviewRevision,
+      rejectionDecisionDigest: event.detail?.originalDecisionDigest,
+      rejectedAt: rejectionEvent?.at,
+      reviews: currentReviews
+    });
+    currentReviews = [];
+    resubmissionEvents.push(event);
+    latestRequestEvent = event;
+  }
+
+  if (stableStringify((row.reviews || []).map(reviewProjection)) !== stableStringify(currentReviews)) return false;
+  if ((row.reviewRevision || 1) !== resubmissionEvents.length + 1) return false;
+  if (row.requestedBy !== latestRequestEvent.actor || row.requestedAt !== latestRequestEvent.at) return false;
+
+  const reviewHistory = Array.isArray(row.reviewHistory) ? row.reviewHistory : [];
+  if (reviewHistory.length !== expectedHistory.length) return false;
+  if (reviewHistory.some((item, index) => stableStringify({
+    reviewRevision: item.reviewRevision,
+    rejectionDecisionDigest: item.rejectionDecisionDigest,
+    rejectedAt: item.rejectedAt,
+    reviews: (item.reviews || []).map(reviewProjection)
+  }) !== stableStringify(expectedHistory[index]))) return false;
+
+  const resubmissions = Array.isArray(row.resubmissions) ? row.resubmissions : [];
+  if (resubmissions.length !== resubmissionEvents.length) return false;
+  if (resubmissions.some((item, index) => {
+    const event = resubmissionEvents[index];
+    return stableStringify({
+      fromReviewRevision: item.fromReviewRevision,
+      toReviewRevision: item.toReviewRevision,
+      originalDecisionDigest: item.originalDecisionDigest,
+      evidenceDigest: item.evidenceDigest,
+      correctionReason: item.correctionReason,
+      refundReason: item.refundReason,
+      reasonCode: item.reasonCode,
+      idempotencyKey: item.idempotencyKey,
+      resubmittedAt: item.resubmittedAt,
+      resubmittedBy: item.resubmittedBy
+    }) !== stableStringify({
+      fromReviewRevision: event.detail?.fromReviewRevision,
+      toReviewRevision: event.detail?.toReviewRevision,
+      originalDecisionDigest: event.detail?.originalDecisionDigest,
+      evidenceDigest: event.detail?.evidenceDigest,
+      correctionReason: event.detail?.correctionReason,
+      refundReason: event.detail?.refundReason,
+      reasonCode: event.detail?.reasonCode,
+      idempotencyKey: event.idempotencyKey,
+      resubmittedAt: event.at,
+      resubmittedBy: event.actor
+    });
+  })) return false;
+
+  const dispatchEvents = events.filter((event) => event.action === "dispatch");
+  const attempts = Array.isArray(row.attempts) ? row.attempts : [];
+  if (attempts.length !== dispatchEvents.length) return false;
+  if (attempts.some((item, index) => {
+    const event = dispatchEvents[index];
+    return item.attempt !== index + 1
+      || item.receiptId !== event.detail?.receiptId
+      || item.dispatchedAt !== event.at
+      || item.dispatchedBy !== event.actor;
+  })) return false;
+
+  if (row.state === "REJECTED") {
+    const rejectionEvent = events.at(-1);
+    if (rejectionEvent.action !== "reject-review") return false;
+    const expectedDigest = buildRejectionDecisionDigest(row, row.rejectedAt);
+    if (row.rejectionDecisionDigest !== expectedDigest || rejectionEvent.detail?.rejectionDecisionDigest !== expectedDigest) return false;
+  }
+  return true;
+}
+
 function requireValidRefundLedger(row) {
   if (!Array.isArray(row.events) || row.events.length === 0 || !verifyRefundLedger(row.events)) throw new RefundWorkflowError("退款事件账本校验失败", "REFUND_LEDGER_INVALID");
+  if (!verifyRefundStateProjection(row)) throw new RefundWorkflowError("退款状态投影与事件账本不一致", "REFUND_STATE_PROJECTION_INVALID");
   return row;
 }
 
@@ -136,15 +259,17 @@ function buildRefundExceptionQueue(data = {}, options = {}) {
   return refundCollection(data).flatMap((row) => {
     const sla = buildRefundSla(row, at, policy);
     const issueCodes = [];
-    if (!verifyRefundLedger(row.events)) issueCodes.push("ledger-invalid");
+    const ledgerValid = verifyRefundLedger(row.events);
+    if (!ledgerValid) issueCodes.push("ledger-invalid");
+    if (ledgerValid && row.events?.length && !verifyRefundStateProjection(row)) issueCodes.push("state-projection-invalid");
     if (row.reversalPending) issueCodes.push("provider-reversal-pending");
     if (row.state === "FAILED") issueCodes.push("provider-failed");
     if (row.attempts?.length >= 3 && row.state === "FAILED") issueCodes.push("retry-exhausted");
     if (sla.status === "overdue") issueCodes.push(`${sla.phase}-overdue`);
     if (sla.status === "missing-milestone") issueCodes.push("milestone-missing");
     if (!issueCodes.length) return [];
-    const priority = issueCodes.some((code) => ["ledger-invalid", "provider-reversal-pending", "retry-exhausted", "provider-callback-overdue"].includes(code)) ? "critical" : issueCodes.includes("provider-failed") || sla.status === "overdue" ? "high" : "medium";
-    return [{ id: row.id, orderReference: row.orderReference, refundAmountFen: row.refundAmountFen, reasonCode: row.reasonCode, state: row.state, priority, issueCodes, sla: { phase: sla.phase, status: sla.status, dueAt: sla.dueAt, overdueMinutes: sla.overdueMinutes }, attemptCount: row.attempts?.length || 0, ledgerValid: !issueCodes.includes("ledger-invalid"), productionReady: false }];
+    const priority = issueCodes.some((code) => ["ledger-invalid", "state-projection-invalid", "provider-reversal-pending", "retry-exhausted", "provider-callback-overdue"].includes(code)) ? "critical" : issueCodes.includes("provider-failed") || sla.status === "overdue" ? "high" : "medium";
+    return [{ id: row.id, orderReference: row.orderReference, refundAmountFen: row.refundAmountFen, reasonCode: row.reasonCode, state: row.state, priority, issueCodes, sla: { phase: sla.phase, status: sla.status, dueAt: sla.dueAt, overdueMinutes: sla.overdueMinutes }, attemptCount: row.attempts?.length || 0, ledgerValid: !issueCodes.includes("ledger-invalid"), stateProjectionValid: !issueCodes.includes("state-projection-invalid"), productionReady: false }];
   }).sort((left, right) => priorityRank[left.priority] - priorityRank[right.priority] || right.sla.overdueMinutes - left.sla.overdueMinutes || left.id.localeCompare(right.id));
 }
 
@@ -254,14 +379,7 @@ function reviewRefundRequest(data, id, input = {}, actor = {}) {
   if (row.state === "APPROVED") row.approvedAt = reviewedAt;
   if (row.state === "REJECTED") {
     row.rejectedAt = reviewedAt;
-    row.rejectionDecisionDigest = digest({
-      refundId: row.id,
-      paymentEventId: row.paymentEventId,
-      refundAmountFen: row.refundAmountFen,
-      reviewRevision: row.reviewRevision || 1,
-      review: { id: review.id, reviewer: review.reviewer, reviewDomain: review.reviewDomain, approved: review.approved, opinion: review.opinion },
-      rejectedAt: reviewedAt
-    });
+    row.rejectionDecisionDigest = buildRejectionDecisionDigest(row, reviewedAt);
   }
   appendEvent(row, { id: `refund-event-${randomUUID()}`, action: approved ? "approve-review" : "reject-review", from: before, to: row.state, actor: reviewer, at: reviewedAt, idempotencyKey: review.id, detail: { reviewDomain, role: review.role, opinion: review.opinion, rejectionDecisionDigest: row.state === "REJECTED" ? row.rejectionDecisionDigest : "" } });
   return { row, review };
@@ -336,7 +454,7 @@ function resubmitRejectedRefund(data, id, input = {}, actor = {}) {
   delete row.approvedAt;
   delete row.rejectedAt;
   delete row.rejectionDecisionDigest;
-  appendEvent(row, { id: `refund-event-${randomUUID()}`, action: "resubmit-after-rejection", from: "REJECTED", to: "REQUESTED", actor: resubmittedBy, at: resubmittedAt, idempotencyKey, detail: { fromReviewRevision: reviewRevision, toReviewRevision: reviewRevision + 1, originalDecisionDigest, evidenceDigest, correctionReason, reasonCode } });
+  appendEvent(row, { id: `refund-event-${randomUUID()}`, action: "resubmit-after-rejection", from: "REJECTED", to: "REQUESTED", actor: resubmittedBy, at: resubmittedAt, idempotencyKey, detail: { fromReviewRevision: reviewRevision, toReviewRevision: reviewRevision + 1, originalDecisionDigest, evidenceDigest, correctionReason, refundReason, reasonCode } });
   return { row, resubmission, idempotent: false };
 }
 
@@ -498,9 +616,9 @@ function buildRefundOperations(data = {}, options = {}) {
       refundAmountFen: rows.filter((item) => ["SUCCEEDED", "RECONCILED", "CLOSED"].includes(item.state)).reduce((sum, item) => sum + Number(item.refundAmountFen || 0), 0)
     },
     exceptionQueue: exceptionQueue.slice(0, Number(options.limit || 100)),
-    refunds: rows.slice(0, 100).map((item) => ({ id: item.id, orderReference: item.orderReference, refundAmountFen: item.refundAmountFen, reasonCode: item.reasonCode, state: item.state, status: item.status, reviewRevision: item.reviewRevision || 1, resubmissionCount: item.resubmissions?.length || 0, reviewCount: item.reviews.length, attemptCount: item.attempts.length, providerBusinessDate: item.providerBusinessDate || "", sla: buildRefundSla(item, at, options.policy), ledgerValid: verifyRefundLedger(item.events), productionReady: false })),
+    refunds: rows.slice(0, 100).map((item) => ({ id: item.id, orderReference: item.orderReference, refundAmountFen: item.refundAmountFen, reasonCode: item.reasonCode, state: item.state, status: item.status, reviewRevision: item.reviewRevision || 1, resubmissionCount: item.resubmissions?.length || 0, reviewCount: item.reviews.length, attemptCount: item.attempts.length, providerBusinessDate: item.providerBusinessDate || "", sla: buildRefundSla(item, at, options.policy), ledgerValid: verifyRefundLedger(item.events), stateProjectionValid: item.events?.length ? verifyRefundStateProjection(item) : false, productionReady: false })),
     boundary: "退款申请、复核、额度、可信回调和日终对账账本可运行；真实商户、支付机构回调、账单和财务凭证仍需现场验收。"
   };
 }
 
-module.exports = { REFUND_SLA_POLICY, REFUND_STATES, REQUIRED_REFUND_REVIEW_DOMAINS, RESERVED_STATES, RefundWorkflowError, buildRefundExceptionQueue, buildRefundOperations, buildRefundSla, cancelRefund, closeRefund, createRefundRequest, digest, normalizeRefundSlaPolicy, prepareRefundDispatch, reconcileRefund, recordRefundDispatch, requireValidRefundLedger, reservedRefundAmount, resubmitRejectedRefund, retryRefund, reviewRefundRequest, stableStringify, syncRefundFromFinancialCallback, verifyRefundLedger };
+module.exports = { REFUND_SLA_POLICY, REFUND_STATES, REQUIRED_REFUND_REVIEW_DOMAINS, RESERVED_STATES, RefundWorkflowError, buildRefundExceptionQueue, buildRefundOperations, buildRefundSla, cancelRefund, closeRefund, createRefundRequest, digest, normalizeRefundSlaPolicy, prepareRefundDispatch, reconcileRefund, recordRefundDispatch, requireValidRefundLedger, reservedRefundAmount, resubmitRejectedRefund, retryRefund, reviewRefundRequest, stableStringify, syncRefundFromFinancialCallback, verifyRefundLedger, verifyRefundStateProjection };

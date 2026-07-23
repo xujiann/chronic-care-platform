@@ -105,6 +105,16 @@ test("refund resubmission rejects stale decisions reused evidence and idempotenc
     correctionReason: "再次补齐材料",
     idempotencyKey: "resubmit-reused-evidence"
   }, { username: "cashier-a" }), (error) => error.code === "REFUND_RESUBMISSION_NEW_EVIDENCE_REQUIRED");
+  Refunds.resubmitRejectedRefund(data, row.id, {
+    originalDecisionDigest: row.rejectionDecisionDigest,
+    evidenceDigest: "b".repeat(64),
+    correctionReason: "提交第二轮新增材料",
+    idempotencyKey: "resubmit-second"
+  }, { username: "cashier-a" });
+  assert.equal(row.reviewRevision, 3);
+  assert.equal(row.reviewHistory.length, 2);
+  assert.equal(row.resubmissions.length, 2);
+  assert.equal(Refunds.verifyRefundStateProjection(row), true);
 });
 
 test("refund resubmission rechecks the currently available payment balance", () => {
@@ -161,4 +171,84 @@ test("tampered refund ledger blocks every existing refund transition before muta
     approved: true,
     reviewDomain: "business-review"
   }, { username: "reviewer" }), (error) => error.code === "REFUND_LEDGER_INVALID");
+});
+
+test("direct refund state or review projection tampering is blocked by the valid event ledger", () => {
+  const stateData = createData();
+  const stateRow = requestRefund(stateData);
+  stateRow.state = "APPROVED";
+  stateRow.status = Refunds.REFUND_STATES.APPROVED;
+  assert.equal(Refunds.verifyRefundLedger(stateRow.events), true);
+  assert.equal(Refunds.verifyRefundStateProjection(stateRow), false);
+  assert.throws(() => Refunds.prepareRefundDispatch(stateData, stateRow.id), (error) => error.code === "REFUND_STATE_PROJECTION_INVALID");
+  const exception = Refunds.buildRefundExceptionQueue(stateData).find((item) => item.id === stateRow.id);
+  assert.ok(exception.issueCodes.includes("state-projection-invalid"));
+  assert.equal(exception.priority, "critical");
+
+  const reviewData = createData();
+  const reviewRow = requestRefund(reviewData);
+  Refunds.reviewRefundRequest(reviewData, reviewRow.id, {
+    approved: true,
+    reviewDomain: "business-review",
+    opinion: "同意"
+  }, { username: "business-reviewer" });
+  const persisted = structuredClone(reviewData);
+  persisted.onlinePaymentRefunds[0].reviews[0].opinion = "篡改后的意见";
+  assert.equal(Refunds.verifyRefundLedger(persisted.onlinePaymentRefunds[0].events), true);
+  assert.throws(() => Refunds.reviewRefundRequest(persisted, reviewRow.id, {
+    approved: true,
+    reviewDomain: "finance-review"
+  }, { username: "finance-reviewer" }), (error) => error.code === "REFUND_STATE_PROJECTION_INVALID");
+});
+
+test("tampered correction history or dispatch attempts cannot continue the refund workflow", () => {
+  const correctionData = createData();
+  const rejected = rejectRefund(correctionData, requestRefund(correctionData));
+  Refunds.resubmitRejectedRefund(correctionData, rejected.id, {
+    originalDecisionDigest: rejected.rejectionDecisionDigest,
+    evidenceDigest: "e".repeat(64),
+    correctionReason: "补齐材料",
+    idempotencyKey: "resubmit-history-integrity"
+  }, { username: "cashier-a" });
+  const persistedCorrection = structuredClone(correctionData);
+  persistedCorrection.onlinePaymentRefunds[0].reviewHistory[0].reviews[0].opinion = "篡改历史意见";
+  assert.throws(() => Refunds.reviewRefundRequest(persistedCorrection, rejected.id, {
+    approved: true,
+    reviewDomain: "business-review"
+  }, { username: "business-reviewer-b" }), (error) => error.code === "REFUND_STATE_PROJECTION_INVALID");
+
+  const dispatchData = createData();
+  const dispatchRow = requestRefund(dispatchData);
+  Refunds.reviewRefundRequest(dispatchData, dispatchRow.id, { approved: true, reviewDomain: "business-review" }, { username: "business-reviewer" });
+  Refunds.reviewRefundRequest(dispatchData, dispatchRow.id, { approved: true, reviewDomain: "finance-review" }, { username: "finance-reviewer" });
+  const request = Refunds.prepareRefundDispatch(dispatchData, dispatchRow.id);
+  const gatewayEvent = {
+    id: "gateway-refund-projection",
+    adapterType: "financial",
+    gatewayType: "PAYMENT",
+    operation: "refund",
+    adapterReceipt: { receiptId: "receipt-refund-projection", status: "accepted" },
+    requestPayload: { payload: request.payload }
+  };
+  dispatchData.integrationGatewayEvents.push(gatewayEvent);
+  Refunds.recordRefundDispatch(dispatchData, dispatchRow.id, {
+    type: "PAYMENT",
+    operation: "refund",
+    receiptId: gatewayEvent.adapterReceipt.receiptId,
+    status: "accepted",
+    requestId: "request-refund-projection",
+    acceptedAt: "2026-07-23T14:00:00.000Z"
+  }, gatewayEvent.id, { username: "gateway-worker" });
+  const persistedDispatch = structuredClone(dispatchData);
+  persistedDispatch.onlinePaymentRefunds[0].attempts = [];
+  assert.throws(() => Refunds.syncRefundFromFinancialCallback(persistedDispatch, {
+    gatewayEvent: persistedDispatch.integrationGatewayEvents.find((item) => item.id === gatewayEvent.id),
+    callbackEvent: {
+      receiptId: gatewayEvent.adapterReceipt.receiptId,
+      eventId: "callback-refund-projection",
+      signatureVerified: true,
+      stateApplied: true,
+      status: "succeeded"
+    }
+  }, "financial-callback-adapter", { trustedFinancialCallback: true }), (error) => error.code === "REFUND_STATE_PROJECTION_INVALID");
 });
