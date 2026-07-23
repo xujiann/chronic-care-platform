@@ -86,7 +86,7 @@ test("annual clearance rejects fabricated confirmations and still verifies legac
     target.state = "CONFIRMED";
     target.confirmation = { digest: "3".repeat(64), confirmedAt: new Date().toISOString(), confirmedBy: "fabricated" };
   }
-  assert.throws(() => Settlement.institutionConfirmationDigest(row), /缺少匹配的账本事件/);
+  assert.throws(() => Settlement.institutionConfirmationDigest(row), /状态投影|缺少匹配的账本事件/);
 
   const legacy = {
     id: "annual-legacy-v1",

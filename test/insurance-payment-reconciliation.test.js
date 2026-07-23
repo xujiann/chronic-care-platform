@@ -5,9 +5,10 @@ const test = require("node:test");
 const Settlement = require("../disease-payment-settlement");
 
 function reconcilingBatch() {
-  return {
+  const batch = {
     id: "settlement-difference-test",
     settlementState: "RECONCILING",
+    status: "对账中",
     standardAmountFen: 100000,
     submissionDeadline: "2026-07-01",
     policyWorkingDays: 30,
@@ -15,6 +16,8 @@ function reconcilingBatch() {
     reconciliation: { providerSummaryDigest: "a".repeat(64) },
     events: []
   };
+  Settlement.appendEvent(batch, { id: "fixture-reconciling", action: "start-reconciliation", from: "NONE", to: "RECONCILING", actor: "fixture", at: "2026-07-01T07:00:00.000Z", idempotencyKey: "fixture-reconciling", detail: { providerSummaryDigest: batch.reconciliation.providerSummaryDigest } });
+  return batch;
 }
 
 test("monthly settlement difference requires matching hospital and insurance approvals", () => {

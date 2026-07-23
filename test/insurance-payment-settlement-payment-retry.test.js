@@ -7,7 +7,7 @@ const Settlement = require("../disease-payment-settlement");
 const hash = (character) => character.repeat(64);
 
 function reconciledBatch(id = "settlement-payment-retry") {
-  return {
+  const batch = {
     id,
     period: "2026-06",
     type: "月度结算",
@@ -22,6 +22,8 @@ function reconciledBatch(id = "settlement-payment-retry") {
     workingCalendar: { version: "test-calendar", nonWorkingDates: [], workingWeekendDates: [] },
     events: []
   };
+  Settlement.appendEvent(batch, { id: `fixture-${id}`, action: "confirm-matched", from: "NONE", to: "RECONCILED", actor: "fixture", at: "2026-07-10T08:00:00.000Z", idempotencyKey: id, detail: { providerAmountFen: batch.adjustedAmountFen } });
+  return batch;
 }
 
 function requestPayment(batch, suffix = "1", at = "2026-07-11T08:00:00.000Z") {
