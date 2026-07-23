@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-23T05:50:54.000Z",
+  "updatedAt": "2026-07-23T06:09:40.000Z",
   "decisions": [
     {
       "lineId": "T01",
@@ -76,15 +76,15 @@
     },
     {
       "lineId": "T04",
-      "candidateHead": "52311603e1c8b49ebd69e6bdeb0e24d5a4c9ac10",
+      "candidateHead": "8dec0b977449a18dd373ce26e4e841e9a5b9460b",
       "decision": "accepted",
-      "reviewedAt": "2026-07-23T03:35:58.000Z",
+      "reviewedAt": "2026-07-23T06:09:40.000Z",
       "reviewer": "T00",
       "checks": [
         "git diff --check",
-        "18 citizen record projection and policy tests passed independently",
-        "pending, rejected, suspended and unknown future-dated authorizations independently rejected",
-        "only explicitly active authorization states with valid expiry can grant family access"
+        "109 citizen record projection, policy, continuous-care, static and security tests passed independently",
+        "controlled credentials require one-time HTTPS, five-minute expiry, matching resource and audit evidence",
+        "server responses cannot widen authorization scope, extend expiry or overwrite resident correction security fields"
       ],
       "blockers": []
     }
