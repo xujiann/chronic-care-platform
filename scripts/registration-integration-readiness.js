@@ -76,8 +76,11 @@ function applyRegistrationIntegrationCallback(orders = [], payload = {}, eventMe
   const index = findRegistrationOrderIndex(rows, payload);
   if (index < 0) throw new Error("registration order not found for callback");
   const current = normalizeRegistrationJourneyOrder(rows[index]);
-  if (user.role === "institution" && user.orgCode && current.hospitalCode && user.orgCode !== current.hospitalCode) {
-    throw new Error("registration callback scope denied");
+  if (user.role === "institution") {
+    const actorOrgCode = String(user.orgCode || "").trim();
+    const targetOrgCode = String(current.hospitalCode || "").trim();
+    if (!actorOrgCode) throw new Error("registration callback institution orgCode is required");
+    if (!targetOrgCode || actorOrgCode !== targetOrgCode) throw new Error("registration callback scope denied");
   }
 
   const next = { ...current };

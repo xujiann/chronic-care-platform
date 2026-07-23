@@ -92,6 +92,10 @@ test("appointment callbacks enforce role scope and state ordering", () => {
     /scope denied/
   );
   assert.throws(
+    () => applyRegistrationIntegrationCallback([baseOrder()], callback("payment-succeeded", 3), {}, { role: "institution", username: "missing-org" }),
+    /orgCode is required/
+  );
+  assert.throws(
     () => applyRegistrationIntegrationCallback([baseOrder()], callback("unknown", 4), {}, institution),
     /unsupported/
   );
