@@ -12,7 +12,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="format-detection" content="telephone=no" />
     <link rel="apple-touch-icon" href="./pwa-icon.svg" />
-    <link rel="stylesheet" href="./citizen.css?v=20260720actions6" />
+    <link rel="stylesheet" href="./citizen.css?v=20260723care2" />
     <script src="./auth.js?v=20260627"></script>
     <script>window.HealthCityAuth.requireRole(["citizen"])</script>
   </head>
@@ -259,15 +259,20 @@
 
       <section class="panel vault-panel" data-service-pane="health-record">
         <div class="panel-title">
-          <h2>健康信息归集</h2>
+          <div>
+            <h2>本人健康档案与电子病历</h2>
+            <span>只读查看可信来源摘要；个人提供资料与医疗机构记录分开展示</span>
+          </div>
           <div class="panel-actions">
-            <em class="feature-state ready">已实现</em>
+            <em class="feature-state ready">首增量 V1</em>
             <span id="vault-updated">持续更新</span>
             <a class="small-button" href="./physical-examination.html">全部体检报告</a>
-            <button class="small-button" id="upload-record">上传资料</button>
+            <button class="small-button" id="upload-record">补充个人资料</button>
             <button class="small-button primary" id="grant-auth">新增授权</button>
           </div>
         </div>
+        <div class="resident-records-v1" id="resident-records-v1" aria-live="polite"></div>
+        <p class="resident-records-boundary">病历、检验、用药和影像报告默认为只读；原文及影像调阅需有效授权并记录访问日志。个人补充资料不覆盖医疗机构原始记录。</p>
         <div class="completeness">
           <div>
             <strong id="completeness-score">0%</strong>
@@ -277,8 +282,107 @@
             <div class="progress-fill" id="completeness-bar"></div>
           </div>
         </div>
-        <div class="vault-tabs" id="vault-tabs"></div>
-        <div class="vault-content" id="vault-content"></div>
+        <div class="vault-tabs" id="vault-tabs" role="tablist" aria-label="健康资料分类"></div>
+        <div class="vault-content" id="vault-content" role="tabpanel" aria-live="polite"></div>
+      </section>
+
+      <section class="panel citizen-care-workspace" id="citizen-care-workspace" data-service-pane="health-record" aria-labelledby="citizen-care-workspace-title">
+        <div class="panel-title">
+          <div>
+            <h2 id="citizen-care-workspace-title">健康档案持续照护中心</h2>
+            <span>安全调阅、跨院归集、异常闭环、用药核对、纠错和一次性分享集中管理</span>
+          </div>
+          <div class="panel-actions citizen-accessibility-actions" aria-label="适老化与无障碍设置">
+            <em class="feature-state ready">增强增量 V2</em>
+            <button type="button" class="small-button" data-record-accessibility="simple">简洁模式</button>
+            <button type="button" class="small-button" data-record-accessibility="contrast">高对比度</button>
+            <button type="button" class="small-button" data-record-accessibility="text-down" aria-label="缩小照护中心文字">文字−</button>
+            <button type="button" class="small-button" data-record-accessibility="text-up" aria-label="放大照护中心文字">文字＋</button>
+            <button type="button" class="small-button" data-record-accessibility="read">朗读摘要</button>
+            <output id="citizen-record-text-scale" aria-live="polite">100%</output>
+          </div>
+        </div>
+        <div id="citizen-current-subject" class="citizen-current-subject" role="status"></div>
+        <div id="citizen-care-workspace-summary" class="resident-records-v1" aria-live="polite"></div>
+        <div class="citizen-care-grid">
+          <article class="citizen-care-card wide">
+            <header>
+              <div><h3>异常结果闭环</h3><small>由医疗机构结果生成待办，不生成诊断或治疗建议</small></div>
+              <a class="small-button primary" href="./citizen.html?page=registration">预约复诊</a>
+            </header>
+            <div id="citizen-care-task-cards" class="citizen-care-list"></div>
+          </article>
+
+          <article class="citizen-care-card">
+            <header><div><h3>跨院来源与安全调阅</h3><small>按来源记录去重，原文凭据最长 5 分钟且单次有效</small></div></header>
+            <div id="citizen-provenance-cards" class="citizen-care-list"></div>
+          </article>
+
+          <article class="citizen-care-card">
+            <header><div><h3>家庭与监护关系</h3><small>关系核验和按范围授权缺一不可</small></div></header>
+            <div id="citizen-relationship-status" class="citizen-care-list"></div>
+          </article>
+
+          <article class="citizen-care-card wide">
+            <header><div><h3>结构化电子病历</h3><small>就诊、诊断、处置、医嘱、复诊计划和更正版本</small></div></header>
+            <div id="citizen-emr-structured-cards" class="citizen-care-list"></div>
+          </article>
+
+          <article class="citizen-care-card">
+            <header><div><h3>用药核对</h3><small>重复来源、自报用药和过敏线索仅提示医师或药师复核</small></div></header>
+            <div id="citizen-medication-review" class="citizen-care-list"></div>
+          </article>
+
+          <article class="citizen-care-card">
+            <header><div><h3>疾病专题与趋势</h3><small>按疾病关联检查、用药、随访和可信来源</small></div></header>
+            <div id="citizen-disease-topics" class="citizen-care-list"></div>
+          </article>
+
+          <article class="citizen-care-card">
+            <header><div><h3>档案完整度与更新提醒</h3><small>区分缺失资料和超过 18 个月未更新资料</small></div></header>
+            <div id="citizen-completeness-v2" class="citizen-care-list"></div>
+          </article>
+
+          <article class="citizen-care-card">
+            <header><div><h3>档案纠错与异议</h3><small>原始记录不可覆盖，审核结果形成新版本</small></div></header>
+            <form id="citizen-correction-form" class="citizen-inline-form">
+              <label>需纠错记录<select name="recordId" required></select></label>
+              <label>字段
+                <select name="field" required>
+                  <option value="summary">居民可读摘要</option>
+                  <option value="diagnosis">诊断表述</option>
+                  <option value="allergy">过敏信息</option>
+                  <option value="identity">个人基本信息</option>
+                </select>
+              </label>
+              <label>建议内容<input name="requestedValue" maxlength="1000" placeholder="填写建议更正内容" /></label>
+              <label>纠错原因<textarea name="reason" maxlength="800" required placeholder="说明错误位置及依据"></textarea></label>
+              <button type="submit" class="small-button primary">提交纠错申请</button>
+            </form>
+            <div id="citizen-correction-list" class="citizen-care-list"></div>
+          </article>
+
+          <article class="citizen-care-card wide">
+            <header><div><h3>一次性健康资料包</h3><small>最长 7 天、最小范围、访问码校验、可随时撤销并记录审计</small></div></header>
+            <form id="citizen-share-package-form" class="citizen-inline-form share-package-form">
+              <label>接收机构标识<input name="granteeId" required maxlength="160" placeholder="例如：hospital-2102-a" /></label>
+              <label>用途<input name="purpose" required maxlength="300" placeholder="例如：跨院转诊复诊" /></label>
+              <label>有效期至<input name="expiresAt" type="datetime-local" required /></label>
+              <fieldset>
+                <legend>分享范围</legend>
+                <label><input type="checkbox" name="scopes" value="health-record-summary" />健康摘要</label>
+                <label><input type="checkbox" name="scopes" value="emr-summary" />病历摘要</label>
+                <label><input type="checkbox" name="scopes" value="labs" />检验检查</label>
+                <label><input type="checkbox" name="scopes" value="medications" />用药记录</label>
+                <label><input type="checkbox" name="scopes" value="imaging-report" />影像报告</label>
+                <label><input type="checkbox" name="scopes" value="attachments" />附件资料</label>
+              </fieldset>
+              <button type="submit" class="small-button primary">创建一次性资料包</button>
+            </form>
+            <div id="citizen-share-package-list" class="citizen-care-list"></div>
+          </article>
+        </div>
+        <p class="resident-records-boundary">生产启用仍需 T00 将服务端强制授权、真实主索引/家庭关系、HIS/EMR/LIS/PACS、对象存储/KMS/扫描引擎和统一审计接入公共接口。</p>
       </section>
 
       <section class="panel service-overview-panel" id="service-nursing" data-service-pane="nursing">
@@ -550,7 +654,11 @@
 
           <article class="panel">
             <div class="panel-title">
-              <h2>访问记录</h2>
+              <div>
+                <h2>访问记录</h2>
+                <span id="access-review-summary">仅展示当前居民的最小化审计信息</span>
+              </div>
+              <button type="button" class="small-button" id="refresh-access-review">复核授权与访问</button>
             </div>
             <div id="access-log-cards" class="cards"></div>
           </article>
@@ -591,27 +699,27 @@
     <dialog id="upload-dialog">
       <form method="dialog" class="dialog-form" id="upload-form">
         <header>
-          <h2>上传健康资料</h2>
+          <h2>补充个人健康资料</h2>
           <button type="button" class="close-button" data-close>×</button>
         </header>
         <div class="form-grid">
           <label>资料类型
             <select name="category" required>
-              <option value="labs">检查检验</option>
-              <option value="physical-exam">体检报告</option>
-              <option value="emr">电子病历</option>
-              <option value="medications">用药处方</option>
-              <option value="allergies">过敏史</option>
-              <option value="vaccines">免疫接种</option>
-              <option value="admissions">手术住院</option>
-              <option value="imaging">影像资料</option>
-              <option value="attachments">附件资料</option>
+              <option value="labs">个人提供的检查检验资料</option>
+              <option value="physical-exam">个人提供的体检报告</option>
+              <option value="medications">个人提供的用药资料</option>
+              <option value="allergies">个人确认的过敏史</option>
+              <option value="vaccines">个人提供的接种资料</option>
+              <option value="admissions">个人提供的住院资料</option>
+              <option value="imaging">个人提供的影像报告</option>
+              <option value="attachments">其他个人附件资料</option>
             </select>
           </label>
           <label>日期<input name="date" type="date" required /></label>
           <label>标题<input name="name" placeholder="例如：年度体检报告" required /></label>
-          <label>来源<input name="source" placeholder="例如：个人上传/外院" required /></label>
+          <label>资料来源<input name="source" value="居民个人提供（待核验）" readonly /></label>
           <label class="full">内容摘要<input name="result" placeholder="填写主要结论、指标或说明" required /></label>
+          <p class="form-boundary full">个人提供资料将标记为“待核验”，不能作为医院电子病历或检验报告原文。</p>
         </div>
         <footer>
           <button type="button" class="ghost-link" data-close>取消</button>
@@ -627,10 +735,29 @@
           <button type="button" class="close-button" data-close>×</button>
         </header>
         <div class="form-grid">
-          <label>授权对象<input name="name" placeholder="例如：家庭医生团队" required /></label>
-          <label>有效期至<input name="date" type="date" required /></label>
-          <label class="full">授权范围<input name="result" placeholder="例如：允许查看健康档案和电子病历摘要" required /></label>
-          <label class="full">授权来源<input name="source" value="居民主动授权" required /></label>
+          <label>授权对象<input name="granteeName" placeholder="例如：家庭医生团队" required /></label>
+          <label>对象标识<input name="granteeId" placeholder="团队、机构、账户或居民唯一标识" required /></label>
+          <label>对象类型
+            <select name="granteeType" required>
+              <option value="care-team">家庭医生/医疗团队</option>
+              <option value="institution">医疗机构</option>
+              <option value="guardian">监护人/家庭成员</option>
+            </select>
+          </label>
+          <label class="full">授权用途<input name="purpose" placeholder="例如：高血压复诊和连续健康管理" required /></label>
+          <fieldset class="authorization-scopes full">
+            <legend>授权范围（至少选择一项）</legend>
+            <label><input type="checkbox" name="scopes" value="health-record-summary" />健康档案摘要</label>
+            <label><input type="checkbox" name="scopes" value="emr-summary" />电子病历摘要</label>
+            <label><input type="checkbox" name="scopes" value="labs" />检验检查</label>
+            <label><input type="checkbox" name="scopes" value="medications" />用药记录</label>
+            <label><input type="checkbox" name="scopes" value="imaging-report" />影像报告</label>
+            <label><input type="checkbox" name="scopes" value="attachments" />附件资料</label>
+          </fieldset>
+          <label>有效期至<input name="expiresAt" type="date" required /></label>
+          <label>授权来源<input name="source" value="居民主动授权" readonly /></label>
+          <label class="authorization-confirm full"><input type="checkbox" name="consentConfirmed" value="yes" required />我已了解授权用途、范围、有效期及随时撤销权利</label>
+          <p class="form-boundary full">家庭成员授权仍需权威家庭/监护关系核验；本页面授权不替代关系核验。</p>
         </div>
         <footer>
           <button type="button" class="ghost-link" data-close>取消</button>
@@ -645,7 +772,9 @@
     <script src="./physical-examination-highlights.js"></script>
     <script src="./physical-examination-service.js"></script>
     <script src="./immunization-schedule.js"></script>
-    <script src="./citizen.js?v=20260720actions7"></script>
+    <script src="./citizen-records-v1.js?v=20260723auth2"></script>
+    <script src="./citizen-records-v2.js?v=20260723care2"></script>
+    <script src="./citizen.js?v=20260723care2"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));

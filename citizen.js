@@ -3,6 +3,7 @@ const CITIZEN_EXTRA_KEY = "chronic-care-citizen-extra";
 const LARGE_MODE_KEY = "chronic-care-large-mode";
 const CLIENT_CHANNEL_KEY = "chronic-care-client-channel";
 const CITIZEN_RECENT_ACTION_KEY = "chronic-care-citizen-recent-actions";
+const CITIZEN_RECORDS_ACCESSIBILITY_KEY = "chronic-care-citizen-records-accessibility";
 let citizenRecentActionCache = null;
 const citizenRecentActionSession = {};
 const API_BASE = location.protocol === "file:" ? "" : "/api";
@@ -467,7 +468,19 @@ const residentFunctionAudit = [
   { service: "health-record", name: "历史体检报告", status: "已实现", evidence: "体检中心和医院结果按居民主索引同步，保留异常项、建议、来源机构和外部报告号", mobile: "可按年度查看全部历史报告" },
   { service: "health-record", name: "上传资料", status: "已实现", evidence: "居民可补充报告、图片或自测记录", mobile: "弹窗在窄屏占满可用宽度" },
   { service: "health-record", name: "授权共享与撤销", status: "已实现", evidence: "可新增授权并记录授权对象、范围和来源", mobile: "表单字段单列录入" },
+  { service: "health-record", name: "服务端授权强制契约", status: "已实现", evidence: "本人、家庭关系、受权人、范围、状态和有效期统一 fail-closed 判定", mobile: "拒绝原因以居民可理解状态显示" },
+  { service: "health-record", name: "跨院来源归集与去重", status: "已实现", evidence: "按来源系统和来源记录保留最新版本与可信等级", mobile: "来源和版本信息紧凑展示" },
+  { service: "health-record", name: "短时原文与影像调阅", status: "已实现", evidence: "单次使用、最长五分钟、按用途和范围申请服务端凭据", mobile: "受控入口满足触控尺寸" },
+  { service: "health-record", name: "家庭与监护关系核验", status: "已实现", evidence: "关系证据、到期和成年转换均参与访问判定", mobile: "当前对象与拒绝原因始终可见" },
+  { service: "health-record", name: "异常结果闭环", status: "已实现", evidence: "异常结果关联联系医生、复诊和随访进度", mobile: "危急和一般异常分级展示" },
+  { service: "health-record", name: "档案纠错与异议", status: "已实现", evidence: "纠错申请保留原记录并按状态流转", mobile: "纠错表单单列输入" },
+  { service: "health-record", name: "档案完整度与更新提醒", status: "已实现", evidence: "八类档案区分缺失与超过十八个月未更新", mobile: "提醒逐项堆叠" },
+  { service: "health-record", name: "一次性健康资料包", status: "已实现", evidence: "白名单范围、最长七天、单次访问码、审计与主动撤销", mobile: "分享表单与撤销按钮可单手操作" },
+  { service: "health-record", name: "适老化与无障碍增强", status: "已实现", evidence: "简洁、高对比、朗读、当前对象和敏感操作确认", mobile: "核心按钮不低于44像素" },
   { service: "emr", name: "电子病历时间线", status: "已实现", evidence: "门诊、随访、检查和用药摘要按时间展示", mobile: "时间线与详情卡片单列显示" },
+  { service: "emr", name: "结构化电子病历", status: "已实现", evidence: "展示就诊、诊断、处置、医嘱、复诊计划和更正版本", mobile: "病历详情分段阅读" },
+  { service: "emr", name: "用药核对", status: "已实现", evidence: "重复来源、自报和过敏线索进入医生或药师复核", mobile: "风险线索标签化展示" },
+  { service: "emr", name: "趋势与疾病专题", status: "已实现", evidence: "指标保留来源可信等级并按疾病关联记录", mobile: "专题与最新指标卡片展示" },
   { service: "emr", name: "慢病管理", status: "已实现", evidence: "展示慢病登记、随访提醒和院后反馈", mobile: "表单控件触控高度优化" },
   { service: "emr", name: "转诊和家庭医生服务", status: "已实现", evidence: "居民端可查看转诊指引和签约服务记录", mobile: "服务卡片单列呈现" },
   { service: "emr", name: "出生健康与妇幼接续", status: "已实现", evidence: "居民授权范围内查看出生证明和妇幼连续服务", mobile: "信息卡片按宽度自适应" },
@@ -488,6 +501,8 @@ let activeServiceTab = serviceTabFromRoute() || "health-record";
 let activeClientChannel = clientChannelFromRoute() || localStorage.getItem(CLIENT_CHANNEL_KEY) || "mini-program";
 let state = fallbackState;
 let citizenExtra = loadCitizenExtra();
+let citizenImagingDashboard = null;
+let citizenSecureAttachments = [];
 let escortDashboard = null;
 let registrationDashboard = null;
 let familyDoctorDashboard = null;
@@ -515,6 +530,15 @@ let currentAccountId;
 
 document.addEventListener("DOMContentLoaded", async () => {
   state = await loadState();
+  const initialResidentId = state.accounts?.[0]?.members?.[0]?.residentId || state.residents?.[0]?.id || "";
+  citizenImagingDashboard = await fetchCitizenImagingDashboard();
+  citizenSecureAttachments = await fetchCitizenSecureAttachments(initialResidentId);
+  if (window.CitizenRecordsV1) {
+    state.dataAccessLogs = (state.dataAccessLogs || []).map(window.CitizenRecordsV1.projectAccessLog).filter(Boolean);
+    state.personalRecords = window.CitizenRecordsV1.mergeResidentImagingRecords(state.personalRecords, citizenImagingDashboard);
+    state.personalRecords = window.CitizenRecordsV1.mergeResidentClinicalRecords(state.personalRecords, state);
+    state.personalRecords = window.CitizenRecordsV1.mergeResidentSecureAttachments(state.personalRecords, citizenSecureAttachments);
+  }
   escortDashboard = await fetchCitizenEscortDashboard();
   registrationDashboard = await fetchCitizenRegistrationDashboard();
   familyDoctorDashboard = await fetchCitizenFamilyDoctorDashboard();
@@ -543,6 +567,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderCitizen(account.members[0]?.residentId);
   });
   bindDialogs();
+  bindAccessReview();
+  bindCitizenCareWorkspace();
   bindFollowupFeedback();
   bindResidentExperienceCheckin();
   bindEscortAppointment();
@@ -1218,6 +1244,39 @@ async function fetchCitizenMessages() {
   return Array.isArray(state.taskMessages) ? state.taskMessages : [];
 }
 
+async function fetchCitizenImagingDashboard() {
+  if (API_BASE) {
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/imaging-cloud`);
+      if (response.ok) return await response.json();
+    } catch (error) {
+      // Static and offline previews use the already scoped local study collection.
+    }
+  }
+  return {
+    studies: Array.isArray(state.imageCloudStudies) ? state.imageCloudStudies : [],
+    emrCompatibility: {
+      diagnosticReports: Array.isArray(state.diagnosticReports) ? state.diagnosticReports : []
+    }
+  };
+}
+
+async function fetchCitizenSecureAttachments(residentId) {
+  if (API_BASE && residentId) {
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/attachments?residentId=${encodeURIComponent(residentId)}`);
+      if (response.ok) return (await response.json()).attachments || [];
+    } catch (error) {
+      // Static and offline previews use local attachment metadata when available.
+    }
+  }
+  return Array.isArray(state.secureAttachments)
+    ? state.secureAttachments.filter((item) => !residentId || item.residentId === residentId)
+    : [];
+}
+
 async function fetchCitizenRegistrationDashboard() {
   if (API_BASE) {
     try {
@@ -1414,6 +1473,7 @@ function renderCitizen(residentId) {
   renderDigitalCredentials(resident.id);
   renderAccessLogs(resident.id);
   renderDataGovernance(resident.id);
+  renderCitizenCareWorkspace(resident, diseases);
 }
 
 function bindLargeMode() {
@@ -2279,6 +2339,7 @@ function formatNursingStage(item) {
 
 function renderVault(resident, diseases, followups, records) {
   const grouped = collectVaultData(resident, diseases, followups, records);
+  renderResidentRecordsV1Summary(resident.id);
   const completeCount = vaultSections.filter((section) => section.key === "standard" || grouped[section.key]?.length).length;
   const score = Math.round((completeCount / vaultSections.length) * 100);
   document.querySelector("#completeness-score").textContent = `${score}%`;
@@ -2289,7 +2350,7 @@ function renderVault(resident, diseases, followups, records) {
     .map((section) => {
       const count = grouped[section.key]?.length || 0;
       const active = section.key === activeVaultSection ? "active" : "";
-      return `<button class="${active}" data-vault="${section.key}">${section.label}<span>${count}</span></button>`;
+      return `<button class="${active}" type="button" role="tab" aria-selected="${section.key === activeVaultSection}" data-vault="${escapeHtml(section.key)}">${escapeHtml(section.label)}<span>${count}</span></button>`;
     })
     .join("");
 
@@ -2309,21 +2370,392 @@ function renderVault(resident, diseases, followups, records) {
   document.querySelector("#vault-content").innerHTML = activeItems
     .map((item) => `<article class="vault-item">
       <div>
-        <strong>${item.name}</strong>
-        <p>${item.result}</p>
-        ${item.categoryLabel ? `<p class="muted">${item.categoryLabel}${item.related ? ` · ${item.related}` : ""}</p>` : ""}
+        <strong>${escapeHtml(item.name)}</strong>
+        <p>${escapeHtml(item.result)}</p>
+        ${item.categoryLabel ? `<p class="muted">${escapeHtml(item.categoryLabel)}${item.related ? ` · ${escapeHtml(item.related)}` : ""}</p>` : ""}
         ${renderSourceBadge(item)}
+        ${renderClinicalRecordMeta(item)}
         ${renderPhysicalExamMeta(item)}
         ${renderAttachmentMeta(item)}
         ${activeVaultSection === "authorizations" ? renderAuthorizationState(item) : ""}
       </div>
-      <span>${item.date}<br>${item.source}</span>
-      ${activeVaultSection === "authorizations" && !isRevoked(item) ? `<button class="revoke-button" data-revoke-auth="${item.id}">撤销</button>` : ""}
+      <span>${escapeHtml(item.date)}<br>${escapeHtml(item.source)}</span>
+      ${activeVaultSection === "authorizations" && isAuthorizationActive(item) ? `<button type="button" class="revoke-button" data-revoke-auth="${escapeHtml(item.id)}" aria-label="撤销对${escapeHtml(item.name)}的授权">撤销授权</button>` : ""}
     </article>`)
     .join("") || `<p class="muted">当前分类暂无数据，可通过区域平台、医院电子病历或个人上传更新。</p>`;
   document.querySelectorAll("[data-revoke-auth]").forEach((button) => {
     button.addEventListener("click", () => revokeAuthorization(button.dataset.revokeAuth));
   });
+  document.querySelectorAll("[data-view-imaging]").forEach((button) => {
+    button.addEventListener("click", () => openCitizenImagingViewer(button.dataset.viewImaging));
+  });
+  document.querySelectorAll("[data-download-attachment]").forEach((button) => {
+    button.addEventListener("click", () => downloadCitizenAttachment(button.dataset.downloadAttachment));
+  });
+}
+
+function renderResidentRecordsV1Summary(residentId) {
+  const target = document.querySelector("#resident-records-v1");
+  if (!target) return;
+  const records = Array.isArray(state.personalRecords) ? state.personalRecords : [];
+  const summary = window.CitizenRecordsV1?.summarizeResidentRecords(records, residentId) || {
+    records: records.filter((item) => item.residentId === residentId && item.category !== "authorizations").length,
+    categories: 0,
+    authoritative: 0,
+    selfReported: 0,
+    activeAuthorizations: 0,
+    restrictedOriginals: 0
+  };
+  const cards = [
+    ["只读健康记录", summary.records, `${summary.categories} 类资料`],
+    ["可信来源", summary.authoritative, "医院/基层/公卫"],
+    ["个人补充", summary.selfReported, "单独标记、待核验"],
+    ["有效授权", summary.activeAuthorizations, `${summary.restrictedOriginals} 项原文受控`]
+  ];
+  target.innerHTML = cards.map(([label, value, detail]) => `<article>
+    <span>${escapeHtml(label)}</span>
+    <strong>${escapeHtml(value)}</strong>
+    <small>${escapeHtml(detail)}</small>
+  </article>`).join("");
+}
+
+function residentCareRecords(residentId) {
+  const categories = window.CitizenRecordsV1
+    ? [...window.CitizenRecordsV1.RESIDENT_RECORD_CATEGORIES]
+    : vaultSections.map((item) => item.key);
+  const seen = new Set();
+  return categories.flatMap((category) => getPersonalRecords(residentId, category)).filter((record) => {
+    const key = `${record.category}:${record.id || record.meta?.sourceRecordId || record.name}:${record.date}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function ensureCitizenCareCollections(residentId) {
+  if (!citizenExtra[residentId]) citizenExtra[residentId] = {};
+  ["recordCorrections", "recordSharePackages"].forEach((key) => {
+    if (!Array.isArray(citizenExtra[residentId][key])) citizenExtra[residentId][key] = [];
+  });
+  if (!citizenExtra[residentId].careTaskUpdates || typeof citizenExtra[residentId].careTaskUpdates !== "object") {
+    citizenExtra[residentId].careTaskUpdates = {};
+  }
+  return citizenExtra[residentId];
+}
+
+function saveCitizenCareCollections() {
+  localStorage.setItem(CITIZEN_EXTRA_KEY, JSON.stringify(citizenExtra));
+}
+
+function citizenCareEmpty(message) {
+  return `<p class="muted">${escapeHtml(message)}</p>`;
+}
+
+function renderCitizenCareWorkspace(resident, diseases = []) {
+  const api = window.CitizenRecordsV2;
+  const target = document.querySelector("#citizen-care-workspace");
+  if (!api || !target || !resident) return;
+  const careState = ensureCitizenCareCollections(resident.id);
+  const records = residentCareRecords(resident.id);
+  const workspace = api.summarizeCareWorkspace({
+    residentId: resident.id,
+    resident: { ...resident, identityVerified: Boolean(resident.id && resident.phone) },
+    records,
+    diseases,
+    now: new Date()
+  });
+  const taskUpdates = careState.careTaskUpdates;
+  const activeTasks = workspace.careTasks.map((task) => ({ ...task, ...(taskUpdates[task.id] || {}) }));
+  const activeShares = careState.recordSharePackages.filter((item) => api.sharePackageState(item).active).length;
+  const openCorrections = careState.recordCorrections.filter((item) => !["corrected", "rejected", "withdrawn"].includes(item.status)).length;
+  const summaryCards = [
+    ["跨院归集", workspace.records.length, `${new Set(workspace.records.map((item) => item.provenance?.sourceOrganization).filter(Boolean)).size} 个来源`],
+    ["异常待办", activeTasks.filter((item) => !["completed", "closed"].includes(item.status)).length, "结果—复诊—随访"],
+    ["结构化病历", workspace.emr.length, "保留更正版本"],
+    ["用药核对", workspace.medications.flags.length, workspace.medications.reviewRequired ? "需医师/药师复核" : "暂无核对线索"],
+    ["档案完整度", `${workspace.completeness.score}%`, `${workspace.completeness.reminders.length} 项提醒`],
+    ["安全分享", activeShares, `${openCorrections} 项纠错处理中`]
+  ];
+  document.querySelector("#citizen-care-workspace-summary").innerHTML = summaryCards.map(([label, value, detail]) => `<article>
+    <span>${escapeHtml(label)}</span>
+    <strong>${escapeHtml(value)}</strong>
+    <small>${escapeHtml(detail)}</small>
+  </article>`).join("");
+  document.querySelector("#citizen-current-subject").textContent = `当前查看：${resident.name}（${resident.id}）· 敏感操作会再次确认当前居民与授权范围`;
+
+  document.querySelector("#citizen-care-task-cards").innerHTML = activeTasks.map((task) => `<div class="citizen-care-row ${escapeHtml(task.severity)}">
+    <div><strong>${escapeHtml(task.title)}</strong><span>${task.severity === "critical" ? "危急结果" : "异常结果"}</span><em>${escapeHtml(task.status)}</em></div>
+    <p>${escapeHtml(task.summary)}</p>
+    <small>应于 ${escapeHtml(task.dueAt.slice(0, 10))} 前处理 · ${escapeHtml(task.clinicalBoundary)}${task.auditRef ? ` · 审计 ${escapeHtml(task.auditRef)}` : ""}</small>
+    <footer>${task.actions.map((action) => `<span>${escapeHtml(action)}</span>`).join("")}
+      ${["completed", "closed"].includes(task.status) ? "" : `<button type="button" class="small-button" data-care-task-complete="${escapeHtml(task.id)}">记录已联系/复诊</button>`}
+    </footer>
+  </div>`).join("") || citizenCareEmpty("当前没有需要居民处理的异常结果。");
+
+  document.querySelector("#citizen-provenance-cards").innerHTML = workspace.records.slice(0, 6).map((record) => `<div class="citizen-care-row">
+    <strong>${escapeHtml(record.name || "健康资料")}</strong>
+    <p>${escapeHtml(record.provenance?.sourceOrganization || record.source || "来源待核验")} · ${escapeHtml(record.provenance?.sourceSystem || "系统待核验")}</p>
+    <small>来源记录 ${escapeHtml(record.provenance?.sourceRecordId || "待补录")} · 版本 ${escapeHtml(record.provenance?.version || "1")} · ${escapeHtml(record.provenance?.trust || "待核验")}</small>
+    ${["imaging", "attachments"].includes(record.category) ? `<span>原文仅可申请单次、最长 5 分钟凭据</span>` : ""}
+  </div>`).join("") || citizenCareEmpty("暂无可核验的跨院来源记录。");
+
+  const account = getCurrentAccount();
+  const relationship = account?.members?.find((item) => item.residentId === resident.id) || {};
+  const selfMember = /本人|self/i.test(relationship.relation || "") || account?.role === "本人" && account?.members?.[0]?.residentId === resident.id;
+  const relationshipResult = selfMember
+    ? { active: true, label: "本人访问", reason: "self" }
+    : api.relationshipAccessState(relationship);
+  document.querySelector("#citizen-relationship-status").innerHTML = `<div class="citizen-care-row ${relationshipResult.active ? "" : "denied"}">
+    <div><strong>${escapeHtml(relationship.relation || "家庭成员关系")}</strong><span>${escapeHtml(relationshipResult.label)}</span></div>
+    <p>${selfMember ? "本人读取自己的居民可读摘要；原文仍需受控调阅和审计。" : relationshipResult.active ? "关系核验有效；读取具体分类仍需匹配受权人和授权范围。" : "当前按最小权限拒绝家庭读取，需补齐权威关系证据或重新授权。"}</p>
+    <small>核验时间：${escapeHtml(relationship.verifiedAt || "待补录")} · 证据：${escapeHtml(relationship.evidenceSource || relationship.evidenceId || "待补录")}</small>
+  </div>`;
+
+  document.querySelector("#citizen-emr-structured-cards").innerHTML = workspace.emr.slice(0, 5).map((item) => `<div class="citizen-care-row">
+    <div><strong>${escapeHtml(item.visitAt || "日期待核验")} · ${escapeHtml(item.visitType)}</strong><span>${escapeHtml(item.department || "科室待核验")}</span><em>版本 ${escapeHtml(item.correctedVersion)}</em></div>
+    <p>${item.diagnoses.length ? `诊断：${item.diagnoses.map(escapeHtml).join("、")}` : "诊断表述待机构回传"}；处置：${escapeHtml(item.treatment || "待回传")}</p>
+    <small>${escapeHtml(item.institution)} · 复诊计划：${escapeHtml(item.followupPlan || "待回传")}</small>
+  </div>`).join("") || citizenCareEmpty("暂无结构化电子病历。");
+
+  const medicationFlags = {
+    "duplicate-source": "存在重复来源",
+    "self-reported-review": "居民自报待核验",
+    "allergy-review": "过敏线索待核对"
+  };
+  document.querySelector("#citizen-medication-review").innerHTML = workspace.medications.items.map((item) => `<div class="citizen-care-row ${item.flags.length ? "warning" : ""}">
+    <div><strong>${escapeHtml(item.name)}</strong>${item.flags.map((flag) => `<span>${escapeHtml(medicationFlags[flag] || flag)}</span>`).join("")}</div>
+    <p>${escapeHtml(item.dosage || "剂量待核验")} · ${escapeHtml(item.status)}</p>
+    <small>${escapeHtml(item.source || "来源待核验")} · ${escapeHtml(item.authority)}</small>
+  </div>`).join("") + `<small>${escapeHtml(workspace.medications.clinicalBoundary)}</small>` || citizenCareEmpty("暂无用药记录。");
+
+  const trends = api.buildMetricTrends([{
+    id: `metrics-${resident.id}`,
+    residentId: resident.id,
+    date: new Date().toISOString(),
+    metrics: resident.metrics || {},
+    meta: { sourceTrust: "health-archive" }
+  }]);
+  document.querySelector("#citizen-disease-topics").innerHTML = workspace.diseaseTopics.map((topic) => `<div class="citizen-care-row">
+    <div><strong>${escapeHtml(topic.title)}</strong><span>${escapeHtml(topic.status)}</span></div>
+    <p>${topic.recordIds.length} 条关联资料 · ${topic.categories.map(escapeHtml).join("、") || "待关联"}</p>
+    <small>最近记录：${escapeHtml(topic.latestAt || "待更新")}</small>
+  </div>`).join("") + (trends.length ? `<div class="citizen-care-row"><strong>最新健康指标</strong><div>${trends.map((item) => `<span>${escapeHtml(item.key)} ${escapeHtml(item.latest)}</span>`).join("")}</div><small>居民自测与医疗机构数据在生产接口中须分开展示。</small></div>` : "") || citizenCareEmpty("暂无疾病专题或趋势数据。");
+
+  document.querySelector("#citizen-completeness-v2").innerHTML = `<div class="citizen-care-row">
+    <div><strong>${workspace.completeness.score}%</strong><span>${workspace.completeness.items.filter((item) => item.available).length}/${workspace.completeness.items.length} 类已归集</span></div>
+    <p>${workspace.completeness.reminders.map(escapeHtml).join("；") || "核心档案已归集，继续按机构更新周期同步。"}</p>
+  </div>${workspace.completeness.items.map((item) => `<div class="citizen-care-row ${item.available && !item.stale ? "" : "pending"}">
+    <div><strong>${escapeHtml(item.label)}</strong><span>${item.available ? item.stale ? "需更新" : "已归集" : "待补齐"}</span></div>
+    <small>${item.latestAt ? `最近更新 ${escapeHtml(item.latestAt.slice(0, 10))}` : "暂无可信更新时间"}</small>
+  </div>`).join("")}`;
+
+  const correctionSelect = document.querySelector("#citizen-correction-form select[name='recordId']");
+  if (correctionSelect) correctionSelect.innerHTML = records.slice(0, 50).map((record) => `<option value="${escapeHtml(record.id)}">${escapeHtml(record.date || "日期待核验")} · ${escapeHtml(record.name)}</option>`).join("");
+  document.querySelector("#citizen-correction-list").innerHTML = careState.recordCorrections.map((item) => `<div class="citizen-care-row ${item.status === "rejected" ? "denied" : "pending"}">
+    <div><strong>${escapeHtml(item.field)}纠错</strong><span>${escapeHtml(item.status)}</span></div>
+    <p>${escapeHtml(item.reason)}</p>
+    <small>源记录 ${escapeHtml(item.recordId)} · 原始版本保留${item.receiptId ? ` · 受理 ${escapeHtml(item.receiptId)}` : ""}${item.auditRef ? ` · 审计 ${escapeHtml(item.auditRef)}` : ""}</small>
+  </div>`).join("") || citizenCareEmpty("尚未提交档案纠错申请。");
+
+  document.querySelector("#citizen-share-package-list").innerHTML = careState.recordSharePackages.map((item) => {
+    const packageState = api.sharePackageState(item);
+    return `<div class="citizen-care-row ${packageState.active ? "" : "pending"}">
+      <div><strong>${escapeHtml(item.accessRef)}</strong><span>${escapeHtml(packageState.label)}</span></div>
+      <p>${escapeHtml(item.purpose)} · ${item.scopes.map(escapeHtml).join("、")}</p>
+      <small>接收方 ${escapeHtml(item.granteeId)} · 单次访问码 · 全程审计${item.receiptId ? ` · 受理 ${escapeHtml(item.receiptId)}` : ""}${item.auditRef ? ` · ${escapeHtml(item.auditRef)}` : ""}</small>
+      ${packageState.active ? `<footer><button type="button" class="small-button" data-revoke-share-package="${escapeHtml(item.id)}">立即撤销</button></footer>` : ""}
+    </div>`;
+  }).join("") || citizenCareEmpty("尚未创建一次性健康资料包。");
+
+  const shareExpiry = document.querySelector("#citizen-share-package-form input[name='expiresAt']");
+  if (shareExpiry && !shareExpiry.value) {
+    const tomorrow = new Date(Date.now() + 24 * 3600000);
+    shareExpiry.value = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}T${String(tomorrow.getHours()).padStart(2, "0")}:${String(tomorrow.getMinutes()).padStart(2, "0")}`;
+  }
+  applyCitizenRecordAccessibility();
+}
+
+function citizenCareRequestNonce() {
+  return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+async function submitCitizenCareAction(path, payload, operation) {
+  const action = window.CitizenRecordsV2.buildIdempotentAction({
+    operation,
+    residentId: currentResidentId,
+    nonce: citizenCareRequestNonce(),
+    payload
+  });
+  if (!API_BASE) {
+    return {
+      ...payload,
+      receiptId: `local-${action.idempotencyKey.slice(-32)}`,
+      auditRef: `preview-audit-${Date.now()}`,
+      syncStatus: "local-preview",
+      idempotencyKey: action.idempotencyKey,
+      requestedAt: action.requestedAt
+    };
+  }
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  const response = await request(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Idempotency-Key": action.idempotencyKey
+    },
+    body: JSON.stringify(action)
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.message || "平台未接受本次操作");
+  return { ...result, idempotencyKey: action.idempotencyKey, requestedAt: action.requestedAt };
+}
+
+function currentRecordAccessibility() {
+  let saved = {};
+  try {
+    saved = JSON.parse(localStorage.getItem(CITIZEN_RECORDS_ACCESSIBILITY_KEY) || "{}");
+  } catch {
+    localStorage.removeItem(CITIZEN_RECORDS_ACCESSIBILITY_KEY);
+  }
+  return window.CitizenRecordsV2?.normalizeAccessibilityPreferences(saved) || saved;
+}
+
+function applyCitizenRecordAccessibility() {
+  const preferences = currentRecordAccessibility();
+  document.body.classList.toggle("record-simple-mode", Boolean(preferences.simpleMode));
+  document.body.classList.toggle("record-high-contrast", Boolean(preferences.highContrast));
+  document.documentElement.style.setProperty("--citizen-record-text-scale", String(preferences.textScale || 1));
+  document.querySelectorAll("[data-record-accessibility='simple']").forEach((button) => button.setAttribute("aria-pressed", String(Boolean(preferences.simpleMode))));
+  document.querySelectorAll("[data-record-accessibility='contrast']").forEach((button) => button.setAttribute("aria-pressed", String(Boolean(preferences.highContrast))));
+  const scaleOutput = document.querySelector("#citizen-record-text-scale");
+  if (scaleOutput) scaleOutput.value = `${Math.round((preferences.textScale || 1) * 100)}%`;
+}
+
+function bindCitizenCareWorkspace() {
+  const api = window.CitizenRecordsV2;
+  const section = document.querySelector("#citizen-care-workspace");
+  if (!api || !section) return;
+  applyCitizenRecordAccessibility();
+  document.querySelectorAll("[data-record-accessibility]").forEach((button) => button.addEventListener("click", () => {
+    const action = button.dataset.recordAccessibility;
+    const preferences = currentRecordAccessibility();
+    if (action === "simple") preferences.simpleMode = !preferences.simpleMode;
+    if (action === "contrast") preferences.highContrast = !preferences.highContrast;
+    if (action === "text-down") preferences.textScale = Math.max(1, (preferences.textScale || 1) - 0.1);
+    if (action === "text-up") preferences.textScale = Math.min(1.5, (preferences.textScale || 1) + 0.1);
+    if (action === "read") {
+      const text = cleanTextForSpeech(section.innerText, 1000);
+      if ("speechSynthesis" in window && text) {
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+        showToast("正在朗读照护中心摘要");
+      } else {
+        showToast("当前浏览器不支持语音朗读");
+      }
+      return;
+    }
+    localStorage.setItem(CITIZEN_RECORDS_ACCESSIBILITY_KEY, JSON.stringify(api.normalizeAccessibilityPreferences(preferences)));
+    applyCitizenRecordAccessibility();
+  }));
+
+  document.querySelector("#citizen-correction-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    try {
+      const request = api.buildCorrectionRequest({
+        recordId: form.elements.recordId.value,
+        residentId: currentResidentId,
+        field: form.elements.field.value,
+        requestedValue: form.elements.requestedValue.value,
+        reason: form.elements.reason.value
+      });
+      const response = await submitCitizenCareAction("/record-corrections", request, "correction-submit");
+      const saved = api.projectCorrectionReceipt(response, request);
+      const careState = ensureCitizenCareCollections(currentResidentId);
+      careState.recordCorrections.unshift(saved);
+      saveCitizenCareCollections();
+      form.reset();
+      renderCitizen(currentResidentId);
+      showToast("纠错申请已提交，原始记录保持不变");
+    } catch (error) {
+      showToast(error.message || "纠错申请提交失败");
+    }
+  });
+
+  document.querySelector("#citizen-share-package-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    try {
+      const scopes = [...form.querySelectorAll("input[name='scopes']:checked")].map((item) => item.value);
+      const packageRecord = api.buildSharePackage({
+        residentId: currentResidentId,
+        granteeId: form.elements.granteeId.value,
+        purpose: form.elements.purpose.value,
+        scopes,
+        expiresAt: form.elements.expiresAt.value
+      });
+      const response = await submitCitizenCareAction("/record-share-packages", packageRecord, "share-create");
+      const saved = api.projectSharePackageReceipt(response, packageRecord);
+      const careState = ensureCitizenCareCollections(currentResidentId);
+      careState.recordSharePackages.unshift(saved);
+      saveCitizenCareCollections();
+      form.reset();
+      renderCitizen(currentResidentId);
+      showToast("一次性健康资料包已创建");
+    } catch (error) {
+      showToast(error.message || "资料包创建失败");
+    }
+  });
+
+  section.addEventListener("click", async (event) => {
+    const revokeButton = event.target.closest("[data-revoke-share-package]");
+    const taskButton = event.target.closest("[data-care-task-complete]");
+    if (revokeButton) {
+      const careState = ensureCitizenCareCollections(currentResidentId);
+      const item = careState.recordSharePackages.find((candidate) => candidate.id === revokeButton.dataset.revokeSharePackage);
+      if (!item || !window.confirm(`确认撤销一次性资料包“${item.accessRef}”？`)) return;
+      try {
+        const revoked = api.revokeSharePackage(item);
+        const response = await submitCitizenCareAction(`/record-share-packages/${encodeURIComponent(item.id)}/revoke`, {
+          residentId: currentResidentId,
+          resourceId: item.id,
+          revokedAt: revoked.revokedAt
+        }, "share-revoke");
+        const receipt = api.projectActionReceipt(response, { residentId: currentResidentId, resourceId: item.id });
+        Object.assign(item, revoked, receipt);
+        saveCitizenCareCollections();
+        renderCitizen(currentResidentId);
+        showToast("一次性资料包已撤销");
+      } catch (error) {
+        showToast(error.message || "资料包撤销失败");
+      }
+    }
+    if (taskButton) {
+      const careState = ensureCitizenCareCollections(currentResidentId);
+      const update = { status: "completed", completedAt: new Date().toISOString() };
+      try {
+        const response = await submitCitizenCareAction(`/care-tasks/${encodeURIComponent(taskButton.dataset.careTaskComplete)}/actions`, {
+          ...update,
+          residentId: currentResidentId,
+          resourceId: taskButton.dataset.careTaskComplete
+        }, "care-task-complete");
+        const receipt = api.projectActionReceipt(response, {
+          residentId: currentResidentId,
+          resourceId: taskButton.dataset.careTaskComplete
+        });
+        careState.careTaskUpdates[taskButton.dataset.careTaskComplete] = { ...update, ...receipt };
+        saveCitizenCareCollections();
+        renderCitizen(currentResidentId);
+        showToast("异常结果处置进度已记录");
+      } catch (error) {
+        showToast(error.message || "处置进度保存失败");
+      }
+    }
+  });
+}
+
+function cleanTextForSpeech(value, maximum = 1000) {
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, maximum);
 }
 
 function collectVaultData(resident, diseases, followups, records) {
@@ -2748,25 +3180,26 @@ function renderEmr(records, resident, diseases, followups) {
   const archiveLink = `${resident.organization} · ${diseases.map((item) => item.type).join("、") || "暂无慢病登记"} · ${followups.filter((item) => item.status !== "已完成").length} 项待随访`;
   document.querySelector("#emr-timeline").innerHTML = records
     .map((record) => `<section class="visit">
-      <div class="visit-date">${record.date}<br><span class="tag">${record.meta?.visitType || "病历"}</span></div>
+      <div class="visit-date">${escapeHtml(record.date)}<br><span class="tag">${escapeHtml(record.meta?.visitType || "病历")}</span></div>
       <div class="visit-body">
-        <h3>${record.source}</h3>
-        <p class="muted">${record.name}</p>
-        <p>${record.result}</p>
-        <p class="muted">关联健康档案：${archiveLink}</p>
+        <h3>${escapeHtml(record.source)}</h3>
+        <p class="muted">${escapeHtml(record.name)}</p>
+        <p>${escapeHtml(record.result)}</p>
+        <p class="muted">关联健康档案：${escapeHtml(archiveLink)}</p>
         ${renderSourceBadge(record)}
         <details class="record-detail">
           <summary>查看诊疗详情、医嘱和来源</summary>
           <dl>
-            <div><dt>诊疗来源</dt><dd>${record.source || "居民健康信息库"}</dd></div>
-            <div><dt>记录类型</dt><dd>${record.meta?.visitType || record.category || "电子病历"}</dd></div>
-            <div><dt>诊断/标题</dt><dd>${record.name}</dd></div>
-            <div><dt>医嘱摘要</dt><dd>${record.result}</dd></div>
+            <div><dt>诊疗来源</dt><dd>${escapeHtml(record.source || "居民健康信息库")}</dd></div>
+            <div><dt>记录类型</dt><dd>${escapeHtml(record.meta?.visitType || record.category || "电子病历")}</dd></div>
+            <div><dt>诊断/标题</dt><dd>${escapeHtml(record.name)}</dd></div>
+            <div><dt>医嘱摘要</dt><dd>${escapeHtml(record.result)}</dd></div>
+            <div><dt>最近更新</dt><dd>${escapeHtml(record.updatedAt?.slice(0, 19) || record.date || "待同步")}</dd></div>
           </dl>
         </details>
         <div class="visit-tags">
-          ${(record.meta?.exams || []).map((item) => `<span class="tag">${item}</span>`).join("")}
-          ${(record.meta?.medications || []).map((item) => `<span class="tag">${item}</span>`).join("")}
+          ${(record.meta?.exams || []).map((item) => `<span class="tag">${escapeHtml(item)}</span>`).join("")}
+          ${(record.meta?.medications || []).map((item) => `<span class="tag">${escapeHtml(item)}</span>`).join("")}
         </div>
       </div>
     </section>`)
@@ -4367,15 +4800,53 @@ function maskCredential(value) {
 function renderAccessLogs(residentId) {
   const target = document.querySelector("#access-log-cards");
   if (!target) return;
-  const logs = (state.dataAccessLogs || []).filter((item) => item.residentId === residentId).slice(0, 4);
+  const residentLogs = (state.dataAccessLogs || []).filter((item) => item.residentId === residentId);
+  const logs = residentLogs.slice(0, 6);
+  const summary = document.querySelector("#access-review-summary");
+  if (summary) summary.textContent = residentLogs.length
+    ? `${residentLogs.length} 条记录 · 最近 ${residentLogs[0].at || "时间待核验"}`
+    : "暂无访问记录，可主动发起授权与访问复核";
   target.innerHTML = logs
     .map((item) => `<article class="mini-card">
-      <h3>${item.actor}</h3>
-      <p class="muted">${item.at} · ${item.purpose}</p>
-      <p>${item.scope}</p>
-      <span class="status ${item.result === "拒绝" ? "danger" : ""}">${item.result}</span>
+      <h3>${escapeHtml(item.actor)}</h3>
+      <p class="muted">${escapeHtml(item.at)} · ${escapeHtml(item.purpose)}</p>
+      <p>${escapeHtml(item.scope)}</p>
+      <span class="status ${item.result === "拒绝" ? "danger" : ""}">${escapeHtml(item.result)}</span>
     </article>`)
     .join("") || `<p class="muted">暂无访问记录。</p>`;
+}
+
+function bindAccessReview() {
+  const button = document.querySelector("#refresh-access-review");
+  if (!button) return;
+  button.addEventListener("click", async () => {
+    if (!currentResidentId) return;
+    if (!API_BASE) {
+      renderAccessLogs(currentResidentId);
+      showToast("静态预览已展示本机访问记录");
+      return;
+    }
+    button.disabled = true;
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/access-reviews?residentId=${encodeURIComponent(currentResidentId)}`);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.message || "授权与访问复核失败");
+      const review = window.CitizenRecordsV1
+        ? window.CitizenRecordsV1.projectAccessReviewPayload(payload, currentResidentId)
+        : payload;
+      const otherLogs = (state.dataAccessLogs || []).filter((item) => item.residentId !== currentResidentId);
+      state.dataAccessLogs = [...(review.accessLogs || []), ...otherLogs];
+      const otherRecords = (state.personalRecords || []).filter((item) => item.residentId !== currentResidentId || item.category !== "authorizations");
+      state.personalRecords = [...otherRecords, ...(review.authorizations || [])];
+      renderCitizen(currentResidentId);
+      showToast(`已复核 ${(review.authorizations || []).length} 项授权和 ${(review.accessLogs || []).length} 条访问记录`);
+    } catch (error) {
+      showToast(error.message || "授权与访问复核失败");
+    } finally {
+      button.disabled = false;
+    }
+  });
 }
 
 function assessRisk(resident) {
@@ -4419,7 +4890,8 @@ function bindDialogs() {
   document.querySelector("#grant-auth").addEventListener("click", () => {
     const form = document.querySelector("#auth-form");
     form.reset();
-    form.elements.date.value = todayOffset(365);
+    form.elements.expiresAt.min = todayOffset(1);
+    form.elements.expiresAt.value = todayOffset(365);
     form.elements.source.value = "居民主动授权";
     document.querySelector("#auth-dialog").showModal();
   });
@@ -4428,35 +4900,55 @@ function bindDialogs() {
   });
   document.querySelector("#upload-form").addEventListener("submit", async (event) => {
     event.preventDefault();
-    const data = Object.fromEntries(new FormData(event.currentTarget));
-    await addPersonalRecord({
-      residentId: currentResidentId,
-      category: data.category,
-      date: data.date,
-      name: data.name,
-      result: data.result,
-      source: data.source
-    });
-    activeVaultSection = data.category;
-    event.currentTarget.closest("dialog").close();
-    renderCitizen(currentResidentId);
-    showToast("健康资料已纳入个人健康信息库");
+    const form = event.currentTarget;
+    const data = Object.fromEntries(new FormData(form));
+    try {
+      await addPersonalRecord({
+        residentId: currentResidentId,
+        category: data.category,
+        date: data.date,
+        name: data.name,
+        result: data.result,
+        source: "居民个人提供（待核验）",
+        meta: {
+          authority: "resident-upload",
+          sourceTrust: "self-reported",
+          dataQualityStatus: "unverified",
+          originalAvailable: false,
+          authorizationRequired: false
+        }
+      });
+      activeVaultSection = data.category;
+      form.closest("dialog").close();
+      renderCitizen(currentResidentId);
+      showToast("个人资料已保存并标记为待核验");
+    } catch (error) {
+      showToast(error.message || "保存失败，未写入本地替代记录");
+    }
   });
   document.querySelector("#auth-form").addEventListener("submit", async (event) => {
     event.preventDefault();
-    const data = Object.fromEntries(new FormData(event.currentTarget));
-    await addPersonalRecord({
-      residentId: currentResidentId,
-      category: "authorizations",
-      date: data.date,
-      name: data.name,
-      result: data.result,
-      source: data.source
-    });
-    activeVaultSection = "authorizations";
-    event.currentTarget.closest("dialog").close();
-    renderCitizen(currentResidentId);
-    showToast("授权记录已保存");
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    try {
+      const authorization = window.CitizenRecordsV1.buildAuthorizationRecord({
+        residentId: currentResidentId,
+        granteeName: formData.get("granteeName"),
+        granteeId: formData.get("granteeId"),
+        granteeType: formData.get("granteeType"),
+        purpose: formData.get("purpose"),
+        scopes: formData.getAll("scopes"),
+        expiresAt: formData.get("expiresAt"),
+        source: formData.get("source")
+      });
+      await addPersonalRecord(authorization);
+      activeVaultSection = "authorizations";
+      form.closest("dialog").close();
+      renderCitizen(currentResidentId);
+      showToast("授权已保存，可随时在授权共享中撤销");
+    } catch (error) {
+      showToast(error.message || "授权保存失败");
+    }
   });
 }
 
@@ -4473,13 +4965,15 @@ async function addPersonalRecord(record) {
         const saved = await response.json();
         if (!Array.isArray(state.personalRecords)) state.personalRecords = [];
         state.personalRecords.push(saved);
-        return;
+        return saved;
       }
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.message || "平台未接受本次保存");
     } catch (error) {
-      // Fall back to browser storage below.
+      throw new Error(error.message || "平台连接失败，本次内容未保存");
     }
   }
-    addExtraRecord(record.residentId, record.category, record);
+  return addExtraRecord(record.residentId, record.category, record);
 }
 
 function addExtraRecord(residentId, category, record) {
@@ -4490,6 +4984,7 @@ function addExtraRecord(residentId, category, record) {
   localStorage.setItem(CITIZEN_EXTRA_KEY, JSON.stringify(citizenExtra));
   if (!Array.isArray(state.personalRecords)) state.personalRecords = [];
   state.personalRecords.push(savedRecord);
+  return savedRecord;
 }
 
 function loadCitizenExtra() {
@@ -4503,13 +4998,140 @@ function sortByDateDesc(a, b) {
 
 function renderSourceBadge(item) {
   const source = classifyDataSource(item);
-  return `<span class="source-badge source-${source.key}">来源：${source.label}</span>`;
+  const trust = window.CitizenRecordsV1?.sourceTrust(item);
+  const trustLabel = trust === "authoritative" ? "可信来源" : trust === "self-reported" ? "个人提供·待核验" : "来源待核验";
+  return `<span class="source-badge source-${escapeHtml(source.key)}">来源：${escapeHtml(source.label)} · ${escapeHtml(trustLabel)}</span>`;
 }
 
 function renderAttachmentMeta(item) {
   if (!["imaging", "attachments"].includes(item.category) && !["影像资料", "附件资料"].includes(item.categoryLabel)) return "";
   const meta = item.meta || {};
-  return `<p class="attachment-meta">${meta.attachmentType || "资料"} · ${meta.fileName || item.name} · ${meta.accessMode || "需授权调阅"}</p>`;
+  const accessMode = meta.accessMode || "原文需有效授权并记录访问日志";
+  const reportDetail = meta.imageCloudStudyId
+    ? `<span>${escapeHtml(meta.modality || "影像")} · ${escapeHtml(meta.bodyPart || "检查部位待补录")} · ${escapeHtml(meta.reportStatus || "报告状态待核验")} · ${escapeHtml(meta.qcStatus || "质控状态待核验")}</span>`
+    : "";
+  const controlledViewer = meta.imageCloudStudyId && meta.originalAvailable
+    ? `<button type="button" class="controlled-viewer-button" data-view-imaging="${escapeHtml(meta.imageCloudStudyId)}" aria-label="受控调阅${escapeHtml(item.name)}">进入受控影像调阅</button>`
+    : "";
+  const secureAttachmentDetail = meta.recordKind === "secure-attachment"
+    ? `<span>安全扫描：${escapeHtml(meta.scanStatus || "pending")} · ${escapeHtml(formatFileSize(meta.sizeBytes))} · ${meta.immutable ? "不可变留存" : "按策略留存"}${meta.legalHold ? " · 法律保全" : ""}</span>`
+    : "";
+  const secureDownload = meta.recordKind === "secure-attachment" && meta.originalAvailable
+    ? `<button type="button" class="controlled-viewer-button" data-download-attachment="${escapeHtml(meta.attachmentId)}" aria-label="短时下载${escapeHtml(item.name)}">申请短时下载</button>`
+    : "";
+  return `<div class="attachment-meta">
+    <p>${escapeHtml(meta.attachmentType || "资料")} · ${escapeHtml(meta.fileName || item.name)} · ${escapeHtml(accessMode)}</p>
+    ${reportDetail}
+    ${secureAttachmentDetail}
+    ${controlledViewer}
+    ${secureDownload}
+  </div>`;
+}
+
+function formatFileSize(value) {
+  const bytes = Number(value || 0);
+  if (!Number.isFinite(bytes) || bytes <= 0) return "大小待核验";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function renderClinicalRecordMeta(item) {
+  const meta = item.meta || {};
+  if (meta.recordKind === "diagnostic-report") {
+    const recognition = /recognized|已互认/i.test(meta.mutualRecognitionStatus || "") ? "已互认" : meta.mutualRecognitionStatus || "状态待核验";
+    return `<div class="clinical-record-meta">
+      <span><strong>报告号</strong>${escapeHtml(meta.reportNo || "待回传")}</span>
+      <span><strong>报告状态</strong>${escapeHtml(recognition)}</span>
+      <small>本页展示居民可读摘要；报告原文仍按授权和访问审计规则调阅。</small>
+    </div>`;
+  }
+  if (meta.recordKind === "medication-service") {
+    return `<div class="clinical-record-meta medication-service-meta">
+      <span><strong>用法</strong>${escapeHtml(meta.dosage || "待药师确认")}</span>
+      <span><strong>下次取药</strong>${escapeHtml(meta.nextPickup || "待安排")}</span>
+      <span><strong>机构审核</strong>${escapeHtml(meta.institutionReview || "待确认")}</span>
+      <span><strong>医保审核</strong>${escapeHtml(meta.insuranceReview || "待确认")}</span>
+      <small>取药服务状态不替代医嘱；调整或停用药物请咨询医生或药师。</small>
+    </div>`;
+  }
+  return "";
+}
+
+function controlledCredentialOptions() {
+  const configured = Array.isArray(window.CITIZEN_CONTROLLED_ACCESS_ORIGINS)
+    ? window.CITIZEN_CONTROLLED_ACCESS_ORIGINS
+    : [];
+  return {
+    baseUrl: location.href,
+    allowedOrigins: [...new Set([location.origin, ...configured])],
+    allowHttpLocalhost: ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname)
+  };
+}
+
+async function openCitizenImagingViewer(studyId) {
+  if (!studyId) return;
+  const accessIntent = window.CitizenRecordsV2?.buildControlledAccessIntent({
+    accessDecision: window.CitizenRecordsV2.evaluateProtectedAccess({
+      actor: { residentId: currentResidentId },
+      residentId: currentResidentId,
+      scope: "imaging-report",
+      purpose: "居民本人调阅影像"
+    }),
+    resourceId: studyId,
+    resourceType: "imaging",
+    purpose: "居民本人调阅影像",
+    ttlSeconds: 300
+  });
+  if (!API_BASE) {
+    showToast("静态预览仅展示影像报告摘要，正式调阅需登录区域平台");
+    return;
+  }
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const query = accessIntent ? `?purpose=${encodeURIComponent(accessIntent.purpose)}&ttlSeconds=${accessIntent.ttlSeconds}&oneTime=true` : "";
+    const response = await request(`${API_BASE}/imaging-cloud/studies/${encodeURIComponent(studyId)}/viewer${query}`);
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.message || "影像调阅凭据获取失败");
+    const credential = window.CitizenRecordsV2.validateControlledCredential(payload, accessIntent, controlledCredentialOptions());
+    window.location.assign(credential.url);
+  } catch (error) {
+    showToast(error.message || "影像调阅失败，请稍后重试");
+  }
+}
+
+async function downloadCitizenAttachment(attachmentId) {
+  if (!attachmentId) return;
+  const accessIntent = window.CitizenRecordsV2?.buildControlledAccessIntent({
+    accessDecision: window.CitizenRecordsV2.evaluateProtectedAccess({
+      actor: { residentId: currentResidentId },
+      residentId: currentResidentId,
+      scope: "attachments",
+      purpose: "居民本人下载健康附件"
+    }),
+    resourceId: attachmentId,
+    resourceType: "attachment",
+    purpose: "居民本人下载健康附件",
+    ttlSeconds: 300
+  });
+  if (!API_BASE) {
+    showToast("静态预览不签发附件下载凭据");
+    return;
+  }
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${API_BASE}/attachments/${encodeURIComponent(attachmentId)}/download-intent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(accessIntent)
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.message || "附件短时下载凭据获取失败");
+    const credential = window.CitizenRecordsV2.validateControlledCredential(payload, accessIntent, controlledCredentialOptions());
+    window.location.assign(credential.url);
+  } catch (error) {
+    showToast(error.message || "附件下载失败，请稍后重试");
+  }
 }
 
 function renderPhysicalExamMeta(item) {
@@ -4530,6 +5152,7 @@ function classifyDataSource(item) {
   if (/医保|insurance/i.test(text)) return { key: "insurance", label: "医保" };
   if (/社区|基层|家庭医生|卫生服务|随访/i.test(text)) return { key: "primary", label: "基层/家庭医生" };
   if (/公卫|疾控|疫苗|接种|公共卫生/i.test(text)) return { key: "public", label: "公卫" };
+  if (/居民健康档案/i.test(text)) return { key: "platform", label: "区域健康档案" };
   if (/居民|个人|resident|citizen/i.test(text)) return { key: "self", label: "个人上传/授权" };
   if (/体检中心|医院|医科|中心医院|门诊|住院|HIS|EMR/i.test(text)) return { key: "hospital", label: "体检中心/医院" };
   return { key: "platform", label: "平台归集" };
@@ -4543,8 +5166,11 @@ function getPersonalRecords(residentId, category) {
     ? window.PhysicalExaminationService.seedRecords().filter((item) => item.residentId === residentId && !stateIds.has(item.id))
     : [];
   const extra = (citizenExtra[residentId]?.[category] || []).filter((item) => !stateIds.has(item.id));
-  return [...stateItems, ...seededPhysicalExams, ...extra.map((item) => ({ ...item, residentId, category }))]
-    .sort(sortByDateDesc);
+  const items = [...stateItems, ...seededPhysicalExams, ...extra.map((item) => ({ ...item, residentId, category }))];
+  const projected = window.CitizenRecordsV1
+    ? items.map((item) => window.CitizenRecordsV1.projectRecord(item)).filter(Boolean)
+    : items;
+  return projected.sort(sortByDateDesc);
 }
 
 function buildFallbackPersonalRecords() {
@@ -4576,46 +5202,70 @@ function buildFallbackPersonalRecords() {
 
 function renderAuthorizationState(item) {
   const status = getAuthorizationStatus(item);
-  return `<div class="auth-state ${status.className}">${status.label}</div>`;
+  const scopes = Array.isArray(item.meta?.scopes) ? item.meta.scopes.join("、") : item.result;
+  return `<div class="authorization-detail">
+    <div class="auth-state ${escapeHtml(status.className)}">${escapeHtml(status.label)}</div>
+    <dl>
+      <div><dt>用途</dt><dd>${escapeHtml(item.meta?.purpose || "历史授权，目的待补录")}</dd></div>
+      <div><dt>对象标识</dt><dd>${escapeHtml(item.meta?.granteeId || item.meta?.granteeAccountId || item.meta?.granteeResidentId || "历史授权待补录")}</dd></div>
+      <div><dt>范围</dt><dd>${escapeHtml(scopes || "范围待补录")}</dd></div>
+      <div><dt>凭证版本</dt><dd>${escapeHtml(item.meta?.consentVersion || "legacy-record")}</dd></div>
+    </dl>
+  </div>`;
 }
 
 function getAuthorizationStatus(item) {
-  if (isRevoked(item)) return { label: `已撤销 · ${item.meta?.revokedAt || ""}`, className: "revoked" };
+  const authorization = window.CitizenRecordsV1?.authorizationState(item);
+  if (authorization) return { label: authorization.label, className: authorization.key };
+  if (isRevoked(item)) return { label: `已撤销 · ${item.revokedAt || item.meta?.revokedAt || ""}`, className: "revoked" };
   if (item.date && item.date < todayOffset(0)) return { label: "已过期", className: "expired" };
   return { label: `有效期至 ${item.date || "长期"}`, className: "active" };
 }
 
 function isRevoked(item) {
-  return item.meta?.status === "revoked";
+  return Boolean(item.revokedAt || item.meta?.revokedAt || /revoked|withdrawn|cancelled|撤销/i.test(`${item.status || ""} ${item.meta?.status || ""}`));
+}
+
+function isAuthorizationActive(item) {
+  const status = window.CitizenRecordsV1?.authorizationState(item);
+  return status ? status.active : !isRevoked(item) && (!item.date || item.date >= todayOffset(0));
 }
 
 async function revokeAuthorization(id) {
   const record = state.personalRecords?.find((item) => item.id === id);
   if (!record) return;
-  const patch = { meta: { status: "revoked", revokedAt: todayOffset(0) } };
+  if (!window.confirm(`确认撤销对“${record.name || "该对象"}”的授权？撤销后相关调阅应立即停止。`)) return;
+  const reason = "居民通过居民端主动撤销";
   if (API_BASE) {
     try {
       const request = window.HealthCityAuth?.authFetch || fetch;
-      const response = await request(`${API_BASE}/personal-records/${encodeURIComponent(id)}`, {
-        method: "PATCH",
+      const response = await request(`${API_BASE}/authorizations/${encodeURIComponent(id)}/revoke`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch)
+        body: JSON.stringify({ reason })
       });
       if (response.ok) {
         const updated = await response.json();
         Object.assign(record, updated);
         renderCitizen(currentResidentId);
-        showToast("授权已撤销");
+        showToast("授权已撤销，后续调阅将重新校验");
         return;
       }
+      const error = await response.json().catch(() => ({}));
+      showToast(error.message || "撤销失败，授权状态未改变");
+      return;
     } catch (error) {
-      // Fall back to local state update below.
+      showToast("撤销失败，授权状态未改变");
+      return;
     }
   }
-  record.meta = { ...(record.meta || {}), ...patch.meta };
+  record.status = "已撤销";
+  record.revokedAt = new Date().toISOString();
+  record.revokeReason = reason;
+  record.meta = { ...(record.meta || {}), status: "revoked", revokedAt: record.revokedAt };
   localStorage.setItem(CITIZEN_EXTRA_KEY, JSON.stringify(citizenExtra));
   renderCitizen(currentResidentId);
-  showToast("授权已撤销");
+  showToast("静态预览：授权已在本机撤销");
 }
 
 let toastTimer;
