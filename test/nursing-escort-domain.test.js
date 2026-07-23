@@ -786,6 +786,251 @@ test("escort settlement rejects fabricated and cross-domain financial evidence w
   assert.equal(pending.status, "settlement-pending");
 });
 
+test("nursing cancellation requires a bound resident request and approved no-refund decision", () => {
+  const requested = {
+    id: "ino-cancel-001",
+    residentId: "r1",
+    status: "requested"
+  };
+  const requestEvidence = Domain.buildCancellationRequestEvidence("nursing", requested, {
+    requesterId: "r1",
+    requesterRole: "resident",
+    reasonCode: "schedule-conflict",
+    reason: "Resident cannot receive the visit at the scheduled time.",
+    refundRequested: false
+  }, { at: NOW });
+  const cancelRequested = Domain.transitionOrder("nursing", requested, "cancel-requested", {
+    at: NOW,
+    actorId: "r1",
+    actorRole: "resident",
+    updates: requestEvidence
+  });
+  assert.equal(cancelRequested.status, "cancel-requested");
+  assert.equal(cancelRequested.cancellationRequest.orderId, requested.id);
+
+  const missingRequester = Domain.buildCancellationRequestEvidence("nursing", requested, {
+    reasonCode: "schedule-conflict",
+    reason: "Missing requester must fail."
+  }, { at: NOW });
+  assert.throws(
+    () => Domain.transitionOrder("nursing", requested, "cancel-requested", { at: NOW, updates: missingRequester }),
+    (error) => error.code === "ORDER_CANCELLATION_REFUND_EVIDENCE_INVALID"
+      && error.details.reasons.includes("cancellation-requester-missing")
+  );
+
+  const decisionEvidence = Domain.buildCancellationDecisionEvidence("nursing", cancelRequested, {
+    outcome: "cancel",
+    decidedBy: "nursing-duty-001",
+    reason: "Cancellation is within the no-charge window."
+  }, { at: "2026-07-22T09:05:00+08:00" });
+  assert.throws(
+    () => Domain.transitionOrder("nursing", cancelRequested, "cancelled", {
+      updates: {
+        ...decisionEvidence,
+        cancellationDecision: { ...decisionEvidence.cancellationDecision, orderId: "other-order" }
+      }
+    }),
+    (error) => error.code === "ORDER_CANCELLATION_REFUND_EVIDENCE_INVALID"
+      && error.details.reasons.includes("cancellation-decision-order-mismatch")
+  );
+  const cancelled = Domain.transitionOrder("nursing", cancelRequested, "cancelled", {
+    at: "2026-07-22T09:05:00+08:00",
+    updates: decisionEvidence
+  });
+  assert.equal(cancelled.status, "cancelled");
+  assert.equal(cancelled.cancellationDecision.refundRequired, false);
+  assert.equal(requested.status, "requested");
+});
+
+test("escort cancellation can be withdrawn only with a bound resume decision", () => {
+  const eligible = {
+    id: "eso-cancel-001",
+    residentId: "r2",
+    status: "eligibility-checked"
+  };
+  const requestEvidence = Domain.buildCancellationRequestEvidence("escort", eligible, {
+    requesterId: "family-001",
+    requesterRole: "family",
+    reasonCode: "family-review",
+    reason: "Family requested a temporary cancellation review.",
+    refundRequested: false
+  }, { at: NOW });
+  const cancelRequested = Domain.transitionOrder("escort", eligible, "cancel-requested", {
+    at: NOW,
+    updates: requestEvidence
+  });
+  const resumeEvidence = Domain.buildCancellationDecisionEvidence("escort", cancelRequested, {
+    outcome: "resume",
+    status: "withdrawn",
+    decidedBy: "family-001",
+    reason: "Family confirmed that the escort is still required."
+  }, { at: "2026-07-22T09:03:00+08:00" });
+  const resumed = Domain.transitionOrder("escort", cancelRequested, "requested", {
+    at: "2026-07-22T09:03:00+08:00",
+    updates: resumeEvidence
+  });
+  assert.equal(resumed.status, "requested");
+  assert.equal(resumed.cancellationDecision.outcome, "resume");
+
+  assert.throws(
+    () => Domain.transitionOrder("escort", cancelRequested, "requested", {
+      updates: {
+        ...resumeEvidence,
+        cancellationDecision: { ...resumeEvidence.cancellationDecision, status: "approved", outcome: "cancel" }
+      }
+    }),
+    (error) => error.code === "ORDER_CANCELLATION_REFUND_EVIDENCE_INVALID"
+      && error.details.reasons.includes("cancellation-resume-not-approved")
+  );
+});
+
+test("nursing refund binds approval dispatch callback reconciliation amount and original payment", () => {
+  const settled = {
+    id: "ino-refund-001",
+    residentId: "r1",
+    status: "settled",
+    financialCallback: {
+      id: "settlement-callback-001",
+      status: "succeeded",
+      signatureStatus: "verified",
+      providerTransactionId: "provider-payment-001",
+      orderId: "ino-refund-001",
+      domain: "nursing",
+      amountFen: 16800,
+      idempotencyKey: "nursing:ino-refund-001:settlement:v1",
+      verifiedAt: NOW
+    }
+  };
+  assert.throws(
+    () => Domain.buildRefundDispatchEvidence("nursing", settled, {
+      amountFen: 16801,
+      reason: "Overpayment",
+      requestedBy: "finance-001",
+      approvedBy: "finance-reviewer-001"
+    }, { at: NOW }),
+    (error) => error.code === "REFUND_AMOUNT_INVALID"
+  );
+
+  const refundDispatch = Domain.buildRefundDispatchEvidence("nursing", settled, {
+    amountFen: 5800,
+    reason: "Insurance recalculation reduced the resident self-pay amount.",
+    requestedBy: "finance-001",
+    approvedBy: "finance-reviewer-001"
+  }, { at: "2026-07-22T09:10:00+08:00" });
+  const forged = {
+    ...refundDispatch,
+    refundRequest: { ...refundDispatch.refundRequest, sourceTransactionId: "other-payment" }
+  };
+  assert.throws(
+    () => Domain.transitionOrder("nursing", settled, "refund-pending", { updates: forged }),
+    (error) => error.code === "ORDER_CANCELLATION_REFUND_EVIDENCE_INVALID"
+      && error.details.reasons.includes("refund-source-transaction-mismatch")
+  );
+  const pending = Domain.transitionOrder("nursing", settled, "refund-pending", {
+    at: "2026-07-22T09:10:00+08:00",
+    updates: refundDispatch
+  });
+  assert.equal(pending.status, "refund-pending");
+  assert.equal(pending.refundDispatch.sourceTransactionId, "provider-payment-001");
+
+  const completion = Domain.buildRefundCompletionEvidence("nursing", pending, {
+    providerRefundId: "provider-refund-001",
+    signatureVerified: true,
+    digestVerified: true
+  }, { at: "2026-07-22T09:15:00+08:00" });
+  assert.throws(
+    () => Domain.transitionOrder("nursing", pending, "refunded", {
+      updates: {
+        ...completion,
+        refundCallback: { ...completion.refundCallback, signatureStatus: "rejected" },
+        refundReconciliation: { ...completion.refundReconciliation, callbackId: "forged-callback" }
+      }
+    }),
+    (error) => error.code === "ORDER_CANCELLATION_REFUND_EVIDENCE_INVALID"
+      && error.details.reasons.includes("refund-callback-signature-invalid")
+      && error.details.reasons.includes("refund-reconciliation-callback-mismatch")
+  );
+  const refunded = Domain.transitionOrder("nursing", pending, "refunded", {
+    at: "2026-07-22T09:15:00+08:00",
+    updates: completion
+  });
+  assert.equal(refunded.status, "refunded");
+  assert.equal(refunded.refundReconciliation.callbackId, refunded.refundCallback.id);
+  assert.equal(settled.status, "settled");
+});
+
+test("escort paid cancellation requires refund intent decision and verified payment receipt", () => {
+  const accepted = {
+    id: "eso-refund-001",
+    residentId: "r2",
+    status: "accepted",
+    paymentReceipt: {
+      id: "escort-payment-receipt-001",
+      status: "paid",
+      signatureStatus: "verified",
+      providerTransactionId: "escort-payment-001",
+      orderId: "eso-refund-001",
+      domain: "escort",
+      amountFen: 12000,
+      idempotencyKey: "escort:eso-refund-001:create-payment:v1",
+      paidAt: NOW,
+      policyVersion: "nursing-escort-workflow-v1"
+    }
+  };
+  assert.throws(
+    () => Domain.buildRefundDispatchEvidence("escort", {
+      ...accepted,
+      paymentReceipt: { ...accepted.paymentReceipt, policyVersion: "unknown", paidAt: "" }
+    }, {
+      reason: "Invalid source receipt must fail.",
+      requestedBy: "escort-duty-001",
+      approvedBy: "finance-reviewer-002"
+    }, { at: NOW }),
+    (error) => error.code === "REFUND_SOURCE_PAYMENT_INVALID"
+      && error.details.reasons.includes("refund-source-payment-policy-version-invalid")
+      && error.details.reasons.includes("refund-source-payment-time-invalid")
+  );
+  const requestEvidence = Domain.buildCancellationRequestEvidence("escort", accepted, {
+    requesterId: "r2",
+    requesterRole: "resident",
+    reasonCode: "appointment-cancelled",
+    reason: "The hospital appointment was cancelled.",
+    refundRequested: true
+  }, { at: NOW });
+  const cancelRequested = Domain.transitionOrder("escort", accepted, "cancel-requested", {
+    at: NOW,
+    updates: requestEvidence
+  });
+  const decision = Domain.buildCancellationDecisionEvidence("escort", cancelRequested, {
+    outcome: "refund",
+    decidedBy: "escort-duty-001",
+    reason: "Verified hospital cancellation before service."
+  }, { at: "2026-07-22T09:05:00+08:00" });
+  const refundDispatch = Domain.buildRefundDispatchEvidence("escort", { ...cancelRequested, ...decision }, {
+    reason: "Full refund for cancelled appointment.",
+    requestedBy: "escort-duty-001",
+    approvedBy: "finance-reviewer-002"
+  }, { at: "2026-07-22T09:06:00+08:00" });
+  const pending = Domain.transitionOrder("escort", cancelRequested, "refund-pending", {
+    at: "2026-07-22T09:06:00+08:00",
+    updates: { ...decision, ...refundDispatch }
+  });
+  assert.equal(pending.status, "refund-pending");
+  assert.equal(pending.refundRequest.amountFen, 12000);
+
+  const noRefundIntent = {
+    ...cancelRequested,
+    cancellationRequest: { ...cancelRequested.cancellationRequest, refundRequested: false }
+  };
+  assert.throws(
+    () => Domain.transitionOrder("escort", noRefundIntent, "refund-pending", {
+      updates: { ...decision, ...refundDispatch }
+    }),
+    (error) => error.code === "ORDER_CANCELLATION_REFUND_EVIDENCE_INVALID"
+      && error.details.reasons.includes("cancellation-refund-not-requested")
+  );
+});
+
 test("financial command correlates an order using integer cents and a stable idempotency key", () => {
   const payment = Domain.buildFinancialCommand("escort", { id: "eso-001", feeEstimate: 120 }, "create-payment");
   assert.equal(payment.type, "PAYMENT");

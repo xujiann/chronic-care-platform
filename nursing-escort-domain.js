@@ -86,6 +86,11 @@
       completed: ["service-record", "location-end", "resident-confirmation", "exception-declaration"],
       "settlement-pending": ["pricing-confirmation", "financial-dispatch"],
       settled: ["financial-callback", "reconciliation-result"],
+      "cancel-requested": ["cancellation-request"],
+      cancelled: ["cancellation-decision"],
+      requested: ["cancellation-decision"],
+      "refund-pending": ["refund-request", "refund-approval", "refund-dispatch"],
+      refunded: ["refund-callback", "refund-reconciliation"],
       "quality-review": ["quality-callback"],
       "complaint-open": ["complaint-record"],
       "adverse-event": ["incident-report", "risk-escalation"],
@@ -101,6 +106,11 @@
       completed: ["service-record", "location-end", "resident-confirmation", "exception-declaration"],
       "settlement-pending": ["pricing-confirmation", "financial-dispatch"],
       settled: ["financial-callback", "reconciliation-result"],
+      "cancel-requested": ["cancellation-request"],
+      cancelled: ["cancellation-decision"],
+      requested: ["cancellation-decision"],
+      "refund-pending": ["refund-request", "refund-approval", "refund-dispatch"],
+      refunded: ["refund-callback", "refund-reconciliation"],
       "quality-review": ["quality-callback"],
       "complaint-open": ["complaint-record"],
       "adverse-event": ["incident-report", "risk-escalation"],
@@ -1193,6 +1203,378 @@
     };
   }
 
+  function verifiedRefundPaymentSource(domain, order = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const orderId = String(order.id || "").trim();
+    const callback = order.financialCallback;
+    const receipt = order.paymentReceipt;
+    const source = callback?.status === "succeeded" && callback?.signatureStatus === "verified"
+      ? callback
+      : receipt;
+    const reasons = [];
+    const acceptedReceiptStatuses = new Set(["paid", "captured", "succeeded"]);
+    if (!source || typeof source !== "object" || Array.isArray(source)) {
+      reasons.push("refund-source-payment-missing");
+    } else {
+      const isReceipt = source === receipt;
+      if (isReceipt && !acceptedReceiptStatuses.has(receipt.status)) reasons.push("refund-source-payment-status-invalid");
+      if (!source.id) reasons.push("refund-source-payment-id-missing");
+      if (source.signatureStatus !== "verified") reasons.push("refund-source-payment-signature-invalid");
+      if (source.orderId !== orderId) reasons.push("refund-source-payment-order-mismatch");
+      if (source.domain !== normalizedDomain) reasons.push("refund-source-payment-domain-mismatch");
+      if (!source.providerTransactionId) reasons.push("refund-source-transaction-missing");
+      if (!Number.isSafeInteger(source.amountFen) || source.amountFen <= 0) reasons.push("refund-source-amount-invalid");
+      const expectedOperation = isReceipt ? "create-payment" : "settlement";
+      if (source.idempotencyKey !== `${normalizedDomain}:${orderId}:${expectedOperation}:v1`) reasons.push("refund-source-payment-idempotency-mismatch");
+      if (isReceipt && source.policyVersion !== WORKFLOW_POLICY_VERSION) reasons.push("refund-source-payment-policy-version-invalid");
+      if (parseTime(isReceipt ? source.paidAt : source.verifiedAt) === null) reasons.push("refund-source-payment-time-invalid");
+    }
+    return {
+      ok: reasons.length === 0,
+      sourceTransactionId: String(source?.providerTransactionId || ""),
+      paidAmountFen: Number.isSafeInteger(source?.amountFen) ? source.amountFen : null,
+      reasons
+    };
+  }
+
+  function validateCancellationRefundEvidence(domain, order = {}, nextStatus, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const next = canonicalStatus(nextStatus, normalizedDomain);
+    const current = canonicalStatus(options.currentStatus || order.status, normalizedDomain);
+    const orderId = String(order.id || "").trim();
+    const residentId = String(order.residentId || "").trim();
+    const request = order.cancellationRequest;
+    const decision = order.cancellationDecision;
+    const refundRequest = order.refundRequest;
+    const approval = order.refundApproval;
+    const dispatch = order.refundDispatch;
+    const callback = order.refundCallback;
+    const reconciliation = order.refundReconciliation;
+    const requestReasons = [];
+    const decisionReasons = [];
+    const refundRequestReasons = [];
+    const approvalReasons = [];
+    const dispatchReasons = [];
+    const callbackReasons = [];
+    const reconciliationReasons = [];
+    const needsCancellationRequest = ["cancel-requested", "cancelled", "requested"].includes(next)
+      || (next === "refund-pending" && current === "cancel-requested");
+    const needsCancellationDecision = ["cancelled", "requested"].includes(next)
+      || (next === "refund-pending" && current === "cancel-requested");
+
+    if (needsCancellationRequest) {
+      if (!orderId) requestReasons.push("cancellation-order-id-missing");
+      if (!residentId) requestReasons.push("cancellation-resident-id-missing");
+      if (!request || typeof request !== "object" || Array.isArray(request)) {
+        requestReasons.push("cancellation-request-missing");
+      } else {
+        if (!request.id) requestReasons.push("cancellation-request-id-missing");
+        if (request.status !== "open") requestReasons.push("cancellation-request-status-invalid");
+        if (request.orderId !== orderId) requestReasons.push("cancellation-request-order-mismatch");
+        if (request.domain !== normalizedDomain) requestReasons.push("cancellation-request-domain-mismatch");
+        if (request.residentId !== residentId) requestReasons.push("cancellation-request-resident-mismatch");
+        if (!request.requesterId) requestReasons.push("cancellation-requester-missing");
+        if (!["resident", "family", "authorized-agent", "institution"].includes(request.requesterRole)) requestReasons.push("cancellation-requester-role-invalid");
+        if (request.requesterRole === "resident" && request.requesterId !== residentId) requestReasons.push("cancellation-resident-requester-mismatch");
+        if (!request.reasonCode) requestReasons.push("cancellation-reason-code-missing");
+        if (!request.reason) requestReasons.push("cancellation-reason-missing");
+        if (typeof request.refundRequested !== "boolean") requestReasons.push("cancellation-refund-intent-missing");
+        if (request.policyVersion !== WORKFLOW_POLICY_VERSION) requestReasons.push("cancellation-policy-version-invalid");
+        if (parseTime(request.requestedAt) === null) requestReasons.push("cancellation-request-time-invalid");
+      }
+    }
+
+    if (needsCancellationDecision) {
+      if (!decision || typeof decision !== "object" || Array.isArray(decision)) {
+        decisionReasons.push("cancellation-decision-missing");
+      } else {
+        if (!decision.id) decisionReasons.push("cancellation-decision-id-missing");
+        if (decision.requestId !== request?.id) decisionReasons.push("cancellation-decision-request-mismatch");
+        if (decision.orderId !== orderId) decisionReasons.push("cancellation-decision-order-mismatch");
+        if (decision.domain !== normalizedDomain) decisionReasons.push("cancellation-decision-domain-mismatch");
+        if (!decision.decidedBy) decisionReasons.push("cancellation-decision-actor-missing");
+        if (!decision.reason) decisionReasons.push("cancellation-decision-reason-missing");
+        if (decision.policyVersion !== WORKFLOW_POLICY_VERSION) decisionReasons.push("cancellation-decision-policy-version-invalid");
+        const decidedAt = parseTime(decision.decidedAt);
+        const requestedAt = parseTime(request?.requestedAt);
+        if (decidedAt === null) decisionReasons.push("cancellation-decision-time-invalid");
+        if (decidedAt !== null && requestedAt !== null && decidedAt < requestedAt) decisionReasons.push("cancellation-decision-before-request");
+        if (next === "cancelled") {
+          if (decision.status !== "approved" || decision.outcome !== "cancel") decisionReasons.push("cancellation-decision-not-approved");
+          if (decision.refundRequired !== false || request?.refundRequested !== false) decisionReasons.push("cancellation-refund-required");
+        } else if (next === "requested") {
+          if (!["rejected", "withdrawn"].includes(decision.status) || decision.outcome !== "resume") decisionReasons.push("cancellation-resume-not-approved");
+        } else if (next === "refund-pending") {
+          if (decision.status !== "approved" || decision.outcome !== "refund" || decision.refundRequired !== true) {
+            decisionReasons.push("cancellation-refund-not-approved");
+          }
+          if (request?.refundRequested !== true) decisionReasons.push("cancellation-refund-not-requested");
+        }
+      }
+    }
+
+    const needsRefund = ["refund-pending", "refunded"].includes(next);
+    const paymentSource = needsRefund ? verifiedRefundPaymentSource(normalizedDomain, order) : { ok: true, reasons: [] };
+    if (needsRefund) {
+      if (!orderId) refundRequestReasons.push("refund-order-id-missing");
+      if (!residentId) refundRequestReasons.push("refund-resident-id-missing");
+      if (!refundRequest || typeof refundRequest !== "object" || Array.isArray(refundRequest)) {
+        refundRequestReasons.push("refund-request-missing");
+      } else {
+        if (!refundRequest.id) refundRequestReasons.push("refund-request-id-missing");
+        if (refundRequest.status !== "requested") refundRequestReasons.push("refund-request-status-invalid");
+        if (refundRequest.orderId !== orderId) refundRequestReasons.push("refund-request-order-mismatch");
+        if (refundRequest.domain !== normalizedDomain) refundRequestReasons.push("refund-request-domain-mismatch");
+        if (refundRequest.residentId !== residentId) refundRequestReasons.push("refund-request-resident-mismatch");
+        if (current === "cancel-requested" && refundRequest.cancellationRequestId !== request?.id) refundRequestReasons.push("refund-cancellation-request-mismatch");
+        if (refundRequest.sourceTransactionId !== paymentSource.sourceTransactionId) refundRequestReasons.push("refund-source-transaction-mismatch");
+        if (!Number.isSafeInteger(refundRequest.amountFen) || refundRequest.amountFen <= 0) refundRequestReasons.push("refund-amount-invalid");
+        if (paymentSource.paidAmountFen !== null && refundRequest.amountFen > paymentSource.paidAmountFen) refundRequestReasons.push("refund-amount-exceeds-payment");
+        if (!refundRequest.reason) refundRequestReasons.push("refund-reason-missing");
+        if (!refundRequest.requestedBy) refundRequestReasons.push("refund-requester-missing");
+        if (refundRequest.policyVersion !== WORKFLOW_POLICY_VERSION) refundRequestReasons.push("refund-policy-version-invalid");
+        if (parseTime(refundRequest.requestedAt) === null) refundRequestReasons.push("refund-request-time-invalid");
+      }
+
+      if (!approval || typeof approval !== "object" || Array.isArray(approval)) {
+        approvalReasons.push("refund-approval-missing");
+      } else {
+        if (approval.status !== "approved") approvalReasons.push("refund-not-approved");
+        if (approval.requestId !== refundRequest?.id) approvalReasons.push("refund-approval-request-mismatch");
+        if (approval.orderId !== orderId) approvalReasons.push("refund-approval-order-mismatch");
+        if (approval.domain !== normalizedDomain) approvalReasons.push("refund-approval-domain-mismatch");
+        if (approval.amountFen !== refundRequest?.amountFen) approvalReasons.push("refund-approval-amount-mismatch");
+        if (!approval.approvedBy) approvalReasons.push("refund-approver-missing");
+        if (approval.policyVersion !== WORKFLOW_POLICY_VERSION) approvalReasons.push("refund-approval-policy-version-invalid");
+        const approvedAt = parseTime(approval.approvedAt);
+        const requestedAt = parseTime(refundRequest?.requestedAt);
+        if (approvedAt === null) approvalReasons.push("refund-approval-time-invalid");
+        if (approvedAt !== null && requestedAt !== null && approvedAt < requestedAt) approvalReasons.push("refund-approval-before-request");
+      }
+
+      const expectedIdempotencyKey = refundRequest?.id
+        ? `${normalizedDomain}:${orderId}:refund:${refundRequest.id}:v1`
+        : "";
+      if (!dispatch || typeof dispatch !== "object" || Array.isArray(dispatch)) {
+        dispatchReasons.push("refund-dispatch-missing");
+      } else {
+        if (dispatch.status !== "accepted") dispatchReasons.push("refund-dispatch-not-accepted");
+        if (dispatch.operation !== "refund") dispatchReasons.push("refund-dispatch-operation-invalid");
+        if (dispatch.requestId !== refundRequest?.id) dispatchReasons.push("refund-dispatch-request-mismatch");
+        if (dispatch.orderId !== orderId) dispatchReasons.push("refund-dispatch-order-mismatch");
+        if (dispatch.domain !== normalizedDomain) dispatchReasons.push("refund-dispatch-domain-mismatch");
+        if (dispatch.sourceTransactionId !== paymentSource.sourceTransactionId) dispatchReasons.push("refund-dispatch-source-mismatch");
+        if (dispatch.amountFen !== refundRequest?.amountFen) dispatchReasons.push("refund-dispatch-amount-mismatch");
+        if (dispatch.idempotencyKey !== expectedIdempotencyKey) dispatchReasons.push("refund-dispatch-idempotency-mismatch");
+        if (dispatch.policyVersion !== WORKFLOW_POLICY_VERSION) dispatchReasons.push("refund-dispatch-policy-version-invalid");
+        const dispatchedAt = parseTime(dispatch.dispatchedAt);
+        const approvedAt = parseTime(approval?.approvedAt);
+        if (dispatchedAt === null) dispatchReasons.push("refund-dispatch-time-invalid");
+        if (dispatchedAt !== null && approvedAt !== null && dispatchedAt < approvedAt) dispatchReasons.push("refund-dispatch-before-approval");
+      }
+
+      if (next === "refunded") {
+        if (!callback || typeof callback !== "object" || Array.isArray(callback)) {
+          callbackReasons.push("refund-callback-missing");
+        } else {
+          if (!callback.id) callbackReasons.push("refund-callback-id-missing");
+          if (callback.status !== "succeeded") callbackReasons.push("refund-callback-not-succeeded");
+          if (callback.signatureStatus !== "verified") callbackReasons.push("refund-callback-signature-invalid");
+          if (!callback.providerRefundId) callbackReasons.push("refund-provider-id-missing");
+          if (callback.requestId !== refundRequest?.id) callbackReasons.push("refund-callback-request-mismatch");
+          if (callback.orderId !== orderId) callbackReasons.push("refund-callback-order-mismatch");
+          if (callback.domain !== normalizedDomain) callbackReasons.push("refund-callback-domain-mismatch");
+          if (callback.sourceTransactionId !== paymentSource.sourceTransactionId) callbackReasons.push("refund-callback-source-mismatch");
+          if (callback.amountFen !== refundRequest?.amountFen) callbackReasons.push("refund-callback-amount-mismatch");
+          if (callback.idempotencyKey !== expectedIdempotencyKey) callbackReasons.push("refund-callback-idempotency-mismatch");
+          const verifiedAt = parseTime(callback.verifiedAt);
+          const dispatchedAt = parseTime(dispatch?.dispatchedAt);
+          if (verifiedAt === null) callbackReasons.push("refund-callback-time-invalid");
+          if (verifiedAt !== null && dispatchedAt !== null && verifiedAt < dispatchedAt) callbackReasons.push("refund-callback-before-dispatch");
+        }
+        if (!reconciliation || typeof reconciliation !== "object" || Array.isArray(reconciliation)) {
+          reconciliationReasons.push("refund-reconciliation-missing");
+        } else {
+          if (reconciliation.status !== "matched") reconciliationReasons.push("refund-reconciliation-not-matched");
+          if (reconciliation.digestVerified !== true) reconciliationReasons.push("refund-reconciliation-digest-invalid");
+          if (reconciliation.requestId !== refundRequest?.id) reconciliationReasons.push("refund-reconciliation-request-mismatch");
+          if (reconciliation.orderId !== orderId) reconciliationReasons.push("refund-reconciliation-order-mismatch");
+          if (reconciliation.domain !== normalizedDomain) reconciliationReasons.push("refund-reconciliation-domain-mismatch");
+          if (reconciliation.amountFen !== refundRequest?.amountFen) reconciliationReasons.push("refund-reconciliation-amount-mismatch");
+          if (reconciliation.callbackId !== callback?.id) reconciliationReasons.push("refund-reconciliation-callback-mismatch");
+          const reconciledAt = parseTime(reconciliation.reconciledAt);
+          const verifiedAt = parseTime(callback?.verifiedAt);
+          if (reconciledAt === null) reconciliationReasons.push("refund-reconciliation-time-invalid");
+          if (reconciledAt !== null && verifiedAt !== null && reconciledAt < verifiedAt) reconciliationReasons.push("refund-reconciliation-before-callback");
+        }
+      }
+    }
+
+    const reasons = [...new Set([
+      ...requestReasons,
+      ...decisionReasons,
+      ...paymentSource.reasons,
+      ...refundRequestReasons,
+      ...approvalReasons,
+      ...dispatchReasons,
+      ...callbackReasons,
+      ...reconciliationReasons
+    ])];
+    return {
+      ok: reasons.length === 0,
+      domain: normalizedDomain,
+      current,
+      next,
+      requestOk: !needsCancellationRequest || requestReasons.length === 0,
+      decisionOk: !needsCancellationDecision || decisionReasons.length === 0,
+      refundRequestOk: !needsRefund || refundRequestReasons.length === 0,
+      approvalOk: !needsRefund || approvalReasons.length === 0,
+      dispatchOk: !needsRefund || paymentSource.ok && dispatchReasons.length === 0,
+      callbackOk: next !== "refunded" || callbackReasons.length === 0,
+      reconciliationOk: next !== "refunded" || reconciliationReasons.length === 0,
+      reasons
+    };
+  }
+
+  function buildCancellationRequestEvidence(domain, order = {}, details = {}, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const at = new Date(options.at || Date.now()).toISOString();
+    const orderId = String(order.id || "").trim();
+    return {
+      cancellationStatus: "requested",
+      cancellationRequest: {
+        id: String(details.id || `${normalizedDomain}:${orderId}:cancellation:${at}`),
+        status: "open",
+        orderId,
+        domain: normalizedDomain,
+        residentId: String(order.residentId || ""),
+        requesterId: String(details.requesterId || ""),
+        requesterRole: String(details.requesterRole || "resident"),
+        reasonCode: String(details.reasonCode || ""),
+        reason: String(details.reason || ""),
+        refundRequested: details.refundRequested === true,
+        requestedAt: at,
+        policyVersion: WORKFLOW_POLICY_VERSION
+      }
+    };
+  }
+
+  function buildCancellationDecisionEvidence(domain, order = {}, details = {}, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const at = new Date(options.at || Date.now()).toISOString();
+    const outcome = String(details.outcome || "cancel");
+    const status = String(details.status || (outcome === "resume" ? "withdrawn" : "approved"));
+    return {
+      cancellationStatus: outcome === "resume" ? status : "approved",
+      cancellationDecision: {
+        id: String(details.id || `${normalizedDomain}:${order.id || "order"}:cancellation-decision:${at}`),
+        status,
+        outcome,
+        refundRequired: outcome === "refund",
+        requestId: String(order.cancellationRequest?.id || ""),
+        orderId: String(order.id || ""),
+        domain: normalizedDomain,
+        decidedBy: String(details.decidedBy || ""),
+        reason: String(details.reason || ""),
+        decidedAt: at,
+        policyVersion: WORKFLOW_POLICY_VERSION
+      }
+    };
+  }
+
+  function buildRefundDispatchEvidence(domain, order = {}, details = {}, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const at = new Date(options.at || Date.now()).toISOString();
+    const orderId = String(order.id || "").trim();
+    const paymentSource = verifiedRefundPaymentSource(normalizedDomain, order);
+    if (!paymentSource.ok) {
+      const error = new Error(`refund source payment is invalid: ${paymentSource.reasons.join(", ")}`);
+      error.code = "REFUND_SOURCE_PAYMENT_INVALID";
+      error.details = paymentSource;
+      throw error;
+    }
+    const amountFen = details.amountFen === undefined ? paymentSource.paidAmountFen : Number(details.amountFen);
+    if (!Number.isSafeInteger(amountFen) || amountFen <= 0 || amountFen > paymentSource.paidAmountFen) {
+      const error = new Error("refund amount is invalid");
+      error.code = "REFUND_AMOUNT_INVALID";
+      throw error;
+    }
+    const requestId = String(details.requestId || `${normalizedDomain}:${orderId}:refund:${at}`);
+    const idempotencyKey = `${normalizedDomain}:${orderId}:refund:${requestId}:v1`;
+    return {
+      refundStatus: "pending",
+      refundRequest: {
+        id: requestId,
+        status: "requested",
+        orderId,
+        domain: normalizedDomain,
+        residentId: String(order.residentId || ""),
+        cancellationRequestId: String(order.cancellationRequest?.id || ""),
+        sourceTransactionId: paymentSource.sourceTransactionId,
+        amountFen,
+        reason: String(details.reason || ""),
+        requestedBy: String(details.requestedBy || ""),
+        requestedAt: at,
+        policyVersion: WORKFLOW_POLICY_VERSION
+      },
+      refundApproval: {
+        status: "approved",
+        requestId,
+        orderId,
+        domain: normalizedDomain,
+        amountFen,
+        approvedBy: String(details.approvedBy || ""),
+        approvedAt: at,
+        policyVersion: WORKFLOW_POLICY_VERSION
+      },
+      refundDispatch: {
+        status: "accepted",
+        operation: "refund",
+        requestId,
+        orderId,
+        domain: normalizedDomain,
+        sourceTransactionId: paymentSource.sourceTransactionId,
+        amountFen,
+        idempotencyKey,
+        dispatchedAt: at,
+        policyVersion: WORKFLOW_POLICY_VERSION
+      }
+    };
+  }
+
+  function buildRefundCompletionEvidence(domain, order = {}, details = {}, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const at = new Date(options.at || Date.now()).toISOString();
+    const requestId = String(order.refundRequest?.id || "");
+    const callbackId = String(details.callbackId || `${normalizedDomain}:${order.id || "order"}:refund-callback:${details.providerRefundId || at}`);
+    return {
+      refundStatus: "refunded",
+      refundCallback: {
+        id: callbackId,
+        status: String(details.status || "succeeded"),
+        signatureStatus: details.signatureVerified === true ? "verified" : "rejected",
+        providerRefundId: String(details.providerRefundId || ""),
+        requestId,
+        orderId: String(order.id || ""),
+        domain: normalizedDomain,
+        sourceTransactionId: String(order.refundRequest?.sourceTransactionId || ""),
+        amountFen: order.refundRequest?.amountFen,
+        idempotencyKey: String(order.refundDispatch?.idempotencyKey || ""),
+        verifiedAt: at
+      },
+      refundReconciliation: {
+        status: String(details.reconciliationStatus || "matched"),
+        digestVerified: details.digestVerified === true,
+        requestId,
+        orderId: String(order.id || ""),
+        domain: normalizedDomain,
+        amountFen: order.refundRequest?.amountFen,
+        callbackId,
+        reconciledAt: at
+      }
+    };
+  }
+
   function evidenceTypes(order = {}) {
     const types = new Set((Array.isArray(order.evidence) ? order.evidence : []).map((item) => typeof item === "string" ? item : item?.type).filter(Boolean));
     if (order.identityVerified) types.add("identity-verification");
@@ -1220,6 +1602,7 @@
     let dispatchIntegrity = null;
     let financialIntegrity = null;
     let riskQualityIntegrity = null;
+    let cancellationRefundIntegrity = null;
     if (next === dispatchTargetState(normalizedDomain)) {
       dispatchIntegrity = validateDispatchEvidence(normalizedDomain, order, options);
       if (dispatchIntegrity.qualificationOk) present.add("qualification-snapshot");
@@ -1240,6 +1623,16 @@
       if (["quality-review", "closed"].includes(next) && riskQualityIntegrity.callbackOk) present.add("quality-callback");
       if (next === "closed" && riskQualityIntegrity.decisionOk) present.add("quality-decision");
     }
+    if (["cancel-requested", "cancelled", "requested", "refund-pending", "refunded"].includes(next)) {
+      cancellationRefundIntegrity = validateCancellationRefundEvidence(normalizedDomain, order, next, options);
+      if (next === "cancel-requested" && cancellationRefundIntegrity.requestOk) present.add("cancellation-request");
+      if (["cancelled", "requested"].includes(next) && cancellationRefundIntegrity.decisionOk) present.add("cancellation-decision");
+      if (next === "refund-pending" && cancellationRefundIntegrity.refundRequestOk) present.add("refund-request");
+      if (next === "refund-pending" && cancellationRefundIntegrity.approvalOk) present.add("refund-approval");
+      if (next === "refund-pending" && cancellationRefundIntegrity.dispatchOk) present.add("refund-dispatch");
+      if (next === "refunded" && cancellationRefundIntegrity.callbackOk) present.add("refund-callback");
+      if (next === "refunded" && cancellationRefundIntegrity.reconciliationOk) present.add("refund-reconciliation");
+    }
     const missing = required.filter((item) => !present.has(item));
     return {
       ok: missing.length === 0,
@@ -1250,7 +1643,8 @@
       present: [...present],
       dispatchIntegrity,
       financialIntegrity,
-      riskQualityIntegrity
+      riskQualityIntegrity,
+      cancellationRefundIntegrity
     };
   }
 
@@ -1325,6 +1719,16 @@
         error.code = "ORDER_RISK_QUALITY_EVIDENCE_INVALID";
         error.statusCode = 409;
         error.details = riskQualityEvidence;
+        throw error;
+      }
+    }
+    if (["cancel-requested", "cancelled", "requested", "refund-pending", "refunded"].includes(transition.next)) {
+      const cancellationRefundEvidence = validateCancellationRefundEvidence(domain, candidate, transition.next, { currentStatus: transition.current });
+      if (!cancellationRefundEvidence.ok) {
+        const error = new Error(`invalid cancellation or refund evidence for ${transition.next}: ${cancellationRefundEvidence.reasons.join(", ")}`);
+        error.code = "ORDER_CANCELLATION_REFUND_EVIDENCE_INVALID";
+        error.statusCode = 409;
+        error.details = cancellationRefundEvidence;
         throw error;
       }
     }
@@ -1409,6 +1813,11 @@
     buildComplaintResolutionEvidence,
     buildQualityReviewEvidence,
     buildQualityClosureEvidence,
+    validateCancellationRefundEvidence,
+    buildCancellationRequestEvidence,
+    buildCancellationDecisionEvidence,
+    buildRefundDispatchEvidence,
+    buildRefundCompletionEvidence,
     evidenceTypes,
     validateEvidenceForTransition,
     buildTimelineEvent,

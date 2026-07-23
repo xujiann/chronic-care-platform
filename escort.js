@@ -65,7 +65,8 @@ function withEscortDispatchControls(dashboard = {}) {
       dispatchControl: buildEscortDispatchControl(order, workers, domain),
       serviceEvidenceControl: buildEscortServiceEvidenceControl(order, domain),
       financialEvidenceControl: buildEscortFinancialEvidenceControl(order, domain),
-      riskQualityControl: buildEscortRiskQualityControl(order, domain)
+      riskQualityControl: buildEscortRiskQualityControl(order, domain),
+      cancellationRefundControl: buildEscortCancellationRefundControl(order, domain)
     }))
   };
 }
@@ -176,6 +177,35 @@ function escortRiskQualityActionAttributes(item, target) {
   return `disabled aria-disabled="true" title="${escapeHtml(escortRiskQualityText(item) || `transition to ${target} blocked`)}"`;
 }
 
+function buildEscortCancellationRefundControl(order, domain) {
+  const current = domain.canonicalStatus(order.status, "escort");
+  let target = "";
+  if (current === "refund-pending") target = "refunded";
+  else if (current === "cancel-requested") target = order.cancellationRequest?.refundRequested ? "refund-pending" : "cancelled";
+  else if (["settlement-pending", "settled"].includes(current)) target = "refund-pending";
+  else if (["requested", "eligibility-checked", "provider-matched", "worker-dispatched", "accepted", "hospital-returned", "evidence-pending", "hospital-confirmed", "risk-hold"].includes(current)) {
+    target = "cancel-requested";
+  }
+  if (!target) return null;
+  const transition = domain.validateTransition("escort", current, target);
+  const evidence = domain.validateCancellationRefundEvidence("escort", order, target, { currentStatus: current });
+  return {
+    ok: transition.ok && evidence.ok,
+    target,
+    blockers: [
+      ...(transition.ok ? [] : [`transition:${current}->${target}`]),
+      ...evidence.reasons
+    ]
+  };
+}
+
+function escortCancellationRefundText(item) {
+  const control = item.cancellationRefundControl;
+  if (!control) return "";
+  if (control.ok) return `cancellation/refund evidence passed: ${control.target}`;
+  return `cancellation/refund blocked: ${control.blockers.slice(0, 5).join(", ")}`;
+}
+
 function renderEscortDashboard(dashboard) {
   renderEscortMetrics(dashboard.summary || {});
   renderProviderSelect(dashboard.providers || []);
@@ -224,7 +254,7 @@ function renderEscortOrders(items) {
           <td>${escapeHtml(item.worker?.name || item.workerId || "pending")}<br><small>${escapeHtml((item.serviceItems || []).join(", "))}</small><br><small>${escapeHtml(escortDispatchControlText(item))}</small></td>
           <td>${escapeHtml(item.hospital || "")}<br><small>${escapeHtml(item.department || "")} / ${escapeHtml(item.appointmentAt || item.due || "")}</small><br><small>${statusBadge(item.hospitalInterfaceStatus || "pending")} ${escapeHtml(item.hospitalCheckInNo || item.outpatientQueueNo || item.hospitalNotice || "")}</small><br><small>${escapeHtml(item.hisVisitId || item.appointmentSource || "")} ${escapeHtml(item.departmentCode || "")} ${escapeHtml(item.doctorCode || "")}</small></td>
           <td>${statusBadge(item.subsidyType)} ${statusBadge(item.contractStatus)} ${statusBadge(item.insuranceStatus)}</td>
-          <td>${statusBadge(item.status)} ${statusBadge(item.priority)}<br><small>${escapeHtml(item.qualityReview || "")}</small><br><small>${escapeHtml(escortServiceEvidenceText(item))}</small><br><small>${escapeHtml(escortFinancialEvidenceText(item))}</small><br><small>${escapeHtml(escortRiskQualityText(item))}</small></td>
+          <td>${statusBadge(item.status)} ${statusBadge(item.priority)}<br><small>${escapeHtml(item.qualityReview || "")}</small><br><small>${escapeHtml(escortServiceEvidenceText(item))}</small><br><small>${escapeHtml(escortFinancialEvidenceText(item))}</small><br><small>${escapeHtml(escortRiskQualityText(item))}</small><br><small>${escapeHtml(escortCancellationRefundText(item))}</small></td>
           <td>
             <button class="inline-action" type="button" data-escort-action="${escapeHtml(item.id)}" data-status="in-service" ${item.serviceEvidenceControl?.ok ? "" : `disabled aria-disabled="true" title="${escapeHtml(escortServiceEvidenceText(item))}"`}>开始</button>
             <button class="inline-action" type="button" data-escort-action="${escapeHtml(item.id)}" data-status="quality-review" ${escortRiskQualityActionAttributes(item, "quality-review")}>回访</button>
