@@ -201,8 +201,12 @@ function runGrouping(stateInput, payload, actor, calculateCase) {
     item.simulationCalculation = calculation;
     return result;
   });
-  const run = appendImmutable(state.groupingRuns, { id: runId, environment, mode, adapterId: environment === "formal" ? "official-adapter-v1" : "simulation-local-v1", caseCount: results.length, succeeded: results.filter((item) => item.ok).length, failed: results.filter((item) => !item.ok).length, results, createdAt: new Date().toISOString(), createdBy: actor, inputDigest: digest({ caseIds, mode, environment }) });
-  results.filter((item) => item.ok).forEach((result) => appendImmutable(state.paymentCalculationLedger, { id: `calc-ledger-${randomUUID()}`, groupingRunId: run.id, caseId: result.caseId, environment, mode, authority: result.authority, schemeVersion: result.schemeVersion || result.grouping?.schemeId || "simulation", groupCode: result.groupCode || result.grouping?.groupCode, paymentStandard: result.calculation?.paymentStandard ?? null, parameterId: result.calculation?.parameterId ?? null, createdAt: new Date().toISOString(), createdBy: actor }));
+  const formalSchemeVersions = [...new Set(results.filter((item) => item.ok && item.environment === "formal").map((item) => item.schemeVersion).filter(Boolean))];
+  const schemeVersion = environment === "formal" ? String(payload.schemeVersion || (formalSchemeVersions.length === 1 ? formalSchemeVersions[0] : "")) : undefined;
+  const formalJobId = environment === "formal" ? payload.formalJobId : undefined;
+  const correlationId = environment === "formal" ? payload.correlationId : undefined;
+  const run = appendImmutable(state.groupingRuns, { id: runId, environment, mode, adapterId: environment === "formal" ? "official-adapter-v1" : "simulation-local-v1", schemeVersion, formalJobId, correlationId, caseCount: results.length, succeeded: results.filter((item) => item.ok).length, failed: results.filter((item) => !item.ok).length, results, createdAt: new Date().toISOString(), createdBy: actor, inputDigest: digest({ caseIds, mode, environment, schemeVersion, formalJobId, correlationId }) });
+  results.filter((item) => item.ok).forEach((result) => appendImmutable(state.paymentCalculationLedger, { id: `calc-ledger-${randomUUID()}`, groupingRunId: run.id, formalJobId, caseId: result.caseId, environment, mode, authority: result.authority, schemeVersion: result.schemeVersion || result.grouping?.schemeId || "simulation", groupCode: result.groupCode || result.grouping?.groupCode, paymentStandard: result.calculation?.paymentStandard ?? null, parameterId: result.calculation?.parameterId ?? null, createdAt: new Date().toISOString(), createdBy: actor }));
   return { state, run };
 }
 
@@ -229,6 +233,7 @@ function formalGroupingJobProjection(job) {
     receiptErrors: job.receiptErrors,
     callbackDigest: job.callbackDigest,
     groupingRunId: job.groupingRunId,
+    receiptSetDigest: job.receiptSetDigest,
     completedAt: job.completedAt,
     receiptCount: job.receiptCount,
     deadLetteredAt: job.deadLetteredAt,
@@ -373,6 +378,65 @@ function requireFormalGroupingDeadLetterIntegrity(deadLetter) {
   return deadLetter;
 }
 
+function formalReceiptSetDigest(results = []) {
+  return digest(results.map((item) => ({
+    caseId: item.caseId,
+    receiptId: item.receiptId,
+    receiptDigest: item.receiptDigest
+  })).sort((left, right) => String(left.caseId).localeCompare(String(right.caseId))));
+}
+
+function verifyFormalGroupingResultProjection(stateInput, job) {
+  const state = ensureIntakeState(stateInput);
+  if (!verifyFormalGroupingJobLedger(job)) return false;
+  if (job.status !== "completed") return !job.groupingRunId && !job.callbackDigest && !job.receiptSetDigest && !job.completedAt && job.receiptCount === undefined;
+  if (!verifyLedger(state.groupingRuns) || !verifyLedger(state.paymentCalculationLedger)) return false;
+  const run = state.groupingRuns.find((item) => item.id === job.groupingRunId);
+  if (!run
+    || run.environment !== "formal"
+    || run.adapterId !== job.adapterId
+    || run.formalJobId !== job.id
+    || run.correlationId !== job.correlationId
+    || run.mode !== job.mode
+    || run.schemeVersion !== job.schemeVersion
+    || run.caseCount !== job.caseSnapshots.length
+    || run.succeeded !== job.caseSnapshots.length
+    || run.failed !== 0
+    || !Array.isArray(run.results)
+    || run.results.length !== job.caseSnapshots.length) return false;
+  const snapshots = new Map(job.caseSnapshots.map((item) => [item.caseId, item]));
+  if (snapshots.size !== job.caseSnapshots.length || new Set(run.results.map((item) => item.caseId)).size !== run.results.length) return false;
+  const resultsValid = run.results.every((result) => {
+    const snapshot = snapshots.get(result.caseId);
+    return snapshot
+      && result.ok === true
+      && result.environment === "formal"
+      && result.authority === "official"
+      && result.mode === job.mode
+      && result.schemeVersion === job.schemeVersion
+      && result.inputDigest === snapshot.inputDigest
+      && /^[a-f0-9]{64}$/.test(String(result.receiptDigest || ""));
+  });
+  if (!resultsValid || job.receiptCount !== run.results.length || job.receiptSetDigest !== formalReceiptSetDigest(run.results)) return false;
+  const calculationRows = state.paymentCalculationLedger.filter((item) => item.groupingRunId === run.id);
+  if (calculationRows.length !== run.results.length || new Set(calculationRows.map((item) => item.caseId)).size !== calculationRows.length) return false;
+  return calculationRows.every((row) => {
+    const result = run.results.find((item) => item.caseId === row.caseId);
+    return result
+      && row.formalJobId === job.id
+      && row.environment === "formal"
+      && row.mode === job.mode
+      && row.authority === "official"
+      && row.schemeVersion === result.schemeVersion
+      && row.groupCode === result.groupCode;
+  });
+}
+
+function requireFormalGroupingResultIntegrity(state, job) {
+  if (!verifyFormalGroupingResultProjection(state, job)) throw new Error("正式分组作业、结果运行或支付测算账本交叉校验失败");
+  return job;
+}
+
 function formalGroupingEnvelope(job) {
   return GrouperContract.buildRequestEnvelope(job);
 }
@@ -395,6 +459,7 @@ function createFormalGroupingJob(stateInput, payload, actor = "system") {
   const existing = state.formalGroupingJobs.find((item) => item.idempotencyKey === idempotencyKey);
   if (existing) {
     requireFormalGroupingJobIntegrity(existing);
+    if (existing.status === "completed") requireFormalGroupingResultIntegrity(state, existing);
     if (existing.mode !== mode || existing.schemeVersion !== schemeVersion || digest(existing.caseSnapshots) !== digest(caseSnapshots)) {
       throw new Error("正式分组作业幂等键已绑定不同的模式、方案版本或病例快照");
     }
@@ -479,7 +544,10 @@ function receiveFormalGroupingReceipt(stateInput, id, payload, actor, calculateC
   if (!job) throw new Error("正式分组作业不存在");
   requireFormalGroupingJobIntegrity(job);
   const callbackDigest = digest(payload);
-  if (job.status === "completed" && job.callbackDigest === callbackDigest) return { state, job, run: state.groupingRuns.find((item) => item.id === job.groupingRunId), idempotent: true };
+  if (job.status === "completed" && job.callbackDigest === callbackDigest) {
+    requireFormalGroupingResultIntegrity(state, job);
+    return { state, job, run: state.groupingRuns.find((item) => item.id === job.groupingRunId), idempotent: true };
+  }
   if (job.status !== "awaiting-receipt") throw new Error("正式分组作业尚未处于回执等待状态");
   if (payload.correlationId !== job.correlationId) throw new Error("正式分组回执关联号不匹配");
   const officialResults = Array.isArray(payload.officialResults) ? payload.officialResults : [];
@@ -507,7 +575,7 @@ function receiveFormalGroupingReceipt(stateInput, id, payload, actor, calculateC
     addFormalJobEvent(job, "receipt-rejected", actor, job.receiptErrors.join("；"));
     return { state, job, receiptErrors: job.receiptErrors, idempotent: false };
   }
-  const grouped = runGrouping(state, { environment: "formal", mode: job.mode, caseIds: job.caseIds, officialResults }, actor, calculateCase);
+  const grouped = runGrouping(state, { environment: "formal", mode: job.mode, schemeVersion: job.schemeVersion, formalJobId: job.id, correlationId: job.correlationId, caseIds: job.caseIds, officialResults }, actor, calculateCase);
   if (grouped.run.failed) {
     job.status = "receipt-rejected";
     job.receiptErrors = grouped.run.results.flatMap((item) => item.receiptErrors || [item.error]).filter(Boolean);
@@ -517,6 +585,7 @@ function receiveFormalGroupingReceipt(stateInput, id, payload, actor, calculateC
   job.status = "completed";
   job.callbackDigest = callbackDigest;
   job.groupingRunId = grouped.run.id;
+  job.receiptSetDigest = formalReceiptSetDigest(grouped.run.results);
   job.completedAt = new Date().toISOString();
   job.receiptCount = officialResults.length;
   job.receiptErrors = [];
@@ -580,23 +649,29 @@ function buildFormalGroupingOperations(stateInput) {
   const now = Date.now();
   const statuses = Object.fromEntries(["queued", "awaiting-receipt", "retry-scheduled", "receipt-rejected", "dead-letter", "completed"].map((status) => [status, state.formalGroupingJobs.filter((item) => item.status === status).length]));
   const overdue = state.formalGroupingJobs.filter((item) => item.status === "awaiting-receipt" && now - Date.parse(item.dispatchedAt || item.createdAt) > 30 * 60 * 1000).length;
-  const jobs = state.formalGroupingJobs.map((job) => ({
-    id: job.id,
-    correlationId: job.correlationId,
-    mode: job.mode,
-    schemeVersion: job.schemeVersion,
-    caseCount: job.caseIds?.length || 0,
-    status: job.status,
-    attemptCount: job.attemptCount,
-    maxAttempts: job.maxAttempts,
-    createdAt: job.createdAt,
-    dispatchedAt: job.dispatchedAt,
-    nextRetryAt: job.nextRetryAt,
-    completedAt: job.completedAt,
-    receiptCount: job.receiptCount,
-    lastErrorCode: job.lastError?.code,
-    integrity: verifyFormalGroupingJobLedger(job)
-  }));
+  const jobs = state.formalGroupingJobs.map((job) => {
+    const jobLedgerIntegrity = verifyFormalGroupingJobLedger(job);
+    const resultIntegrity = verifyFormalGroupingResultProjection(state, job);
+    return {
+      id: job.id,
+      correlationId: job.correlationId,
+      mode: job.mode,
+      schemeVersion: job.schemeVersion,
+      caseCount: job.caseIds?.length || 0,
+      status: job.status,
+      attemptCount: job.attemptCount,
+      maxAttempts: job.maxAttempts,
+      createdAt: job.createdAt,
+      dispatchedAt: job.dispatchedAt,
+      nextRetryAt: job.nextRetryAt,
+      completedAt: job.completedAt,
+      receiptCount: job.receiptCount,
+      lastErrorCode: job.lastError?.code,
+      jobLedgerIntegrity,
+      resultIntegrity,
+      integrity: jobLedgerIntegrity && resultIntegrity
+    };
+  });
   const deadLetters = state.formalGroupingDeadLetters.map((deadLetter) => ({
     id: deadLetter.id,
     jobId: deadLetter.jobId,
@@ -656,8 +731,8 @@ function buildIntakeSummary(stateInput) {
     simulationRuns: state.groupingRuns.filter((item) => item.environment === "simulation").length,
     ledgerRecords: state.paymentCalculationLedger.length,
     ledgerValid: verifyLedger(state.groupingRuns) && verifyLedger(state.paymentCalculationLedger),
-    formalGroupingLedgerValid: state.formalGroupingJobs.every(verifyFormalGroupingJobLedger) && state.formalGroupingDeadLetters.every(verifyFormalGroupingDeadLetter)
+    formalGroupingLedgerValid: state.formalGroupingJobs.every((job) => verifyFormalGroupingResultProjection(state, job)) && state.formalGroupingDeadLetters.every(verifyFormalGroupingDeadLetter)
   };
 }
 
-module.exports = { QUALITY_CATEGORIES, buildFormalGroupingOperations, buildIntakeSummary, createFormalGroupingJob, digest, dispatchFormalGroupingJob, ensureIntakeState, failFormalGroupingJob, formalGroupingEnvelope, formalGroupingJobProjection, importBatch, normalizeSettlementList, officialCaseDigest, receiveFormalGroupingReceipt, reconcileFormalGroupingDeadLetter, retryFormalGroupingJob, retryImport, runGrouping, stableStringify, validateOfficialReceipt, validateSettlementList, verifyFormalGroupingDeadLetter, verifyFormalGroupingJobLedger, verifyLedger };
+module.exports = { QUALITY_CATEGORIES, buildFormalGroupingOperations, buildIntakeSummary, createFormalGroupingJob, digest, dispatchFormalGroupingJob, ensureIntakeState, failFormalGroupingJob, formalGroupingEnvelope, formalGroupingJobProjection, importBatch, normalizeSettlementList, officialCaseDigest, receiveFormalGroupingReceipt, reconcileFormalGroupingDeadLetter, retryFormalGroupingJob, retryImport, runGrouping, stableStringify, validateOfficialReceipt, validateSettlementList, verifyFormalGroupingDeadLetter, verifyFormalGroupingJobLedger, verifyFormalGroupingResultProjection, verifyLedger };
