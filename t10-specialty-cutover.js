@@ -41,6 +41,7 @@ function withCutoverDefaults(pack) {
     acceptanceScenarioSuite: pack.acceptanceScenarioSuite || fallback.acceptanceScenarioSuite,
     scenarioEvidenceMatrix: pack.scenarioEvidenceMatrix || fallback.scenarioEvidenceMatrix,
     cutoverCommandCenter: pack.cutoverCommandCenter || fallback.cutoverCommandCenter,
+    observationSignalBoard: pack.observationSignalBoard || fallback.observationSignalBoard,
     integrity: pack.integrity || fallback.integrity
   };
 }
@@ -58,6 +59,7 @@ function renderCutoverPack(pack) {
   renderAcceptanceScenarioSuite(pack.acceptanceScenarioSuite || {});
   renderScenarioEvidenceMatrix(pack.scenarioEvidenceMatrix || {});
   renderCutoverCommandCenter(pack.cutoverCommandCenter || {});
+  renderObservationSignalBoard(pack.observationSignalBoard || {});
   renderBlockers(pack.tracks || []);
 }
 
@@ -489,6 +491,45 @@ function renderCutoverCommandCenter(commandCenter) {
   `;
 }
 
+function renderObservationSignalBoard(board) {
+  const lanes = board.lanes || [];
+  const summary = board.summary || {};
+  document.querySelector("#observation-signal-board").innerHTML = `
+    <div class="cutover-kpis">
+      ${kpi("Observation", board.status || "observation-ready", "warn")}
+      ${kpi("Lanes", summary.lanes || lanes.length, "ok")}
+      ${kpi("P0 signals", summary.p0Signals || 0, "warn")}
+      ${kpi("Seats ready", `${summary.commandSeatsReady || 0}/${summary.lanes || lanes.length || 0}`, "ok")}
+    </div>
+    <div class="track-grid">
+      ${lanes.map((lane) => `
+        <article class="cutover-card">
+          <div class="badge-row">
+            <span class="badge warn">${escapeHtml(lane.ownerSeat)}</span>
+            <span class="badge ${lane.commandSeatReady ? "ok" : "warn"}">${lane.commandSeatReady ? "seat ready" : "seat missing"}</span>
+          </div>
+          <h3>${escapeHtml(lane.name)}</h3>
+          <p class="muted">${escapeHtml(lane.source)}</p>
+          <h4>Signals</h4>
+          <ul class="evidence-list">${(lane.signals || []).map((signal) => `<li><strong>${escapeHtml(signal.id)}</strong> · ${escapeHtml(signal.metric)} ≤ ${escapeHtml(signal.threshold)} · ${escapeHtml(signal.severity)}</li>`).join("")}</ul>
+          <p><strong>No-Go:</strong> ${escapeHtml(lane.noGoRule)}</p>
+          <p class="muted">Artifact: ${escapeHtml(lane.evidenceArtifact)} · Scenarios: ${(lane.linkedScenarios || []).map(escapeHtml).join(" / ")}</p>
+        </article>
+      `).join("")}
+    </div>
+    <div class="control-grid">
+      <article class="cutover-card">
+        <h3>Decision outcomes</h3>
+        <ul class="blocker-list">${(board.decisionOutcomes || []).map((item) => `<li><strong>${escapeHtml(item.id)}</strong> · ${escapeHtml(item.when)} → ${escapeHtml(item.nextStep)}</li>`).join("")}</ul>
+      </article>
+      <article class="cutover-card">
+        <h3>Required artifacts</h3>
+        <ul class="blocker-list">${(board.requiredArtifacts || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+      </article>
+    </div>
+  `;
+}
+
 function renderBlockers(tracks) {
   const rows = tracks.flatMap((track) => (track.blockers || []).map((blocker) => `
     <tr>
@@ -765,7 +806,51 @@ function fallbackCutoverPack() {
         "t-plus-1-observation-memo"
       ]
     },
+    observationSignalBoard: {
+      status: "observation-ready",
+      observationWindow: "T+1",
+      primaryTrackId: "emergency-life-chain",
+      primaryTrackName: "120急救生命链",
+      summary: {
+        lanes: 4,
+        p0Signals: 5,
+        commandSeatsReady: 4,
+        hardStopScenarioLinks: 13
+      },
+      lanes: [
+        observationLane("lane-patient-safety", "Patient safety continuity", "business-commander", "manual downgrade log + scenario run sheet + clinical handover acknowledgement", [["missed-dispatch-or-handover", "missed dispatch / handover / notification", 0, "P0"], ["manual-downgrade-reachable", "manual downgrade path reachable", "100%", "P0"]], "any missed dispatch, handover, notification or unreachable manual downgrade path keeps the decision No-Go", "patient-safety-continuity-review", ["scenario-1-normal-chain", "scenario-2-idempotency-replay", "scenario-3-signature-rejection", "scenario-4-manual-downgrade"]),
+        observationLane("lane-interface-reliability", "Signed interface and idempotency", "operations-duty", "interface receipt ledger + idempotency ledger + retry/dead-letter queue", [["unexplained-interface-failure", "consecutive unexplained failures", 2, "P1"], ["duplicate-mutation", "duplicate input causing second mutation", 0, "P0"]], "duplicate mutation is a hard No-Go; two unexplained failures pause batch-1 and require manual downgrade review", "interface-and-idempotency-observation", ["scenario-1-normal-chain", "scenario-2-idempotency-replay", "scenario-3-signature-rejection", "scenario-4-manual-downgrade"]),
+        observationLane("lane-data-quality-scope", "Data quality, scope and privacy", "security-audit", "resident scope sample + role audit + cross-institution visibility review", [["over-scoped-data-visible", "over-scoped resident or institution data visibility", 0, "P0"], ["unmatched-handover-fields", "unmatched required handover fields", 0, "P1"]], "any over-scoped data visibility keeps the decision No-Go until root cause and evidence are accepted", "scope-and-data-quality-sample", ["scenario-1-normal-chain", "scenario-2-idempotency-replay", "scenario-3-signature-rejection", "scenario-4-manual-downgrade"]),
+        observationLane("lane-evidence-audit", "Evidence replay and audit completeness", "release-commander", "append-only audit export + evidence packet digest + four-eyes review events", [["missing-audit-event", "missing append-only audit event", 0, "P0"], ["digest-mismatch", "evidence packet digest mismatch", 0, "P0"]], "missing audit events or digest mismatch keep the decision No-Go even if the business flow appears successful", "audit-replay-and-digest-review", ["scenario-5-evidence-replay"])
+      ],
+      decisionOutcomes: [
+        { id: "stay-no-go", when: "any P0 signal is open or audit evidence is unreplayable", nextStep: "pause expansion and return evidence for correction" },
+        { id: "repeat-batch-1", when: "P1 signal is explained but needs another controlled run", nextStep: "rerun the affected scenario before scorecard update" },
+        { id: "open-watch-only-batch-2", when: "all lanes are green and T+1 observation memo is accepted", nextStep: "start read-only or synthetic watch-only flow for the next specialty" }
+      ],
+      requiredArtifacts: [
+        "t-plus-1-observation-memo",
+        "patient-safety-continuity-review",
+        "interface-and-idempotency-observation",
+        "scope-and-data-quality-sample",
+        "audit-replay-and-digest-review"
+      ]
+    },
     integrity: { algorithm: "sha256", digest: "sha256:static-preview-fallback" }
+  };
+}
+
+function observationLane(id, name, ownerSeat, source, signals, noGoRule, evidenceArtifact, linkedScenarios) {
+  return {
+    id,
+    name,
+    ownerSeat,
+    source,
+    signals: signals.map(([signalId, metric, threshold, severity]) => ({ id: signalId, metric, threshold, severity })),
+    noGoRule,
+    evidenceArtifact,
+    commandSeatReady: true,
+    linkedScenarios
   };
 }
 
