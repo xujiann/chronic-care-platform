@@ -39,6 +39,7 @@ function withCutoverDefaults(pack) {
     pilotBatchPlan: pack.pilotBatchPlan || fallback.pilotBatchPlan,
     siteEvidenceWorkflow: pack.siteEvidenceWorkflow || fallback.siteEvidenceWorkflow,
     acceptanceScenarioSuite: pack.acceptanceScenarioSuite || fallback.acceptanceScenarioSuite,
+    scenarioEvidenceMatrix: pack.scenarioEvidenceMatrix || fallback.scenarioEvidenceMatrix,
     integrity: pack.integrity || fallback.integrity
   };
 }
@@ -54,6 +55,7 @@ function renderCutoverPack(pack) {
   renderPilotBatchPlan(pack.pilotBatchPlan || {});
   renderSiteEvidenceWorkflow(pack.siteEvidenceWorkflow || {});
   renderAcceptanceScenarioSuite(pack.acceptanceScenarioSuite || {});
+  renderScenarioEvidenceMatrix(pack.scenarioEvidenceMatrix || {});
   renderBlockers(pack.tracks || []);
 }
 
@@ -375,6 +377,47 @@ function renderAcceptanceScenarioSuite(suite) {
   `;
 }
 
+function renderScenarioEvidenceMatrix(matrix) {
+  const rows = matrix.rows || [];
+  const summary = matrix.summary || {};
+  document.querySelector("#scenario-evidence-matrix").innerHTML = `
+    <div class="cutover-kpis">
+      ${kpi("矩阵状态", matrix.status || "not-run", "warn")}
+      ${kpi("场景行", summary.scenarios || rows.length, "ok")}
+      ${kpi("证据链接", summary.evidenceLinks || 0, "warn")}
+      ${kpi("硬阻断行", summary.hardStopRows || 0, "warn")}
+    </div>
+    <div class="table-wrap">
+      <table class="cutover-table">
+        <thead>
+          <tr>
+            <th>场景</th>
+            <th>证据</th>
+            <th>工作流事件</th>
+            <th>Go/No-Go影响</th>
+            <th>结果</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((row) => `
+            <tr>
+              <td><strong>${escapeHtml(row.scenarioId)}</strong><br>${escapeHtml(row.type)}</td>
+              <td>${(row.evidence || []).map((item) => `<span class="badge ${item.minimumState === "accepted" ? "ok" : "warn"}">${escapeHtml(item.evidenceId)} ≥ ${escapeHtml(item.minimumState)}</span>`).join(" ")}</td>
+              <td>${(row.requiredWorkflowEvents || []).map((item) => `<span class="badge">${escapeHtml(item)}</span>`).join(" ")}</td>
+              <td><span class="badge ${row.hardStopOnFail ? "warn" : "ok"}">${escapeHtml(row.goNoGoImpact)}</span></td>
+              <td>${escapeHtml(row.acceptanceResult || "not-run")}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+    <div class="cutover-card">
+      <h3>矩阵判定规则</h3>
+      <ul class="blocker-list">${(matrix.decisionRules || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+    </div>
+  `;
+}
+
 function renderBlockers(tracks) {
   const rows = tracks.flatMap((track) => (track.blockers || []).map((blocker) => `
     <tr>
@@ -592,7 +635,45 @@ function fallbackCutoverPack() {
         scenario("scenario-5-evidence-replay", "Evidence packet replay and go/no-go update", "audit-replay", false, ["load evidence packet", "replay audit events and receipts"], ["evidence packet checksum", "append-only audit event sequence"])
       ]
     },
+    scenarioEvidenceMatrix: {
+      status: "not-run",
+      summary: {
+        scenarios: 5,
+        evidenceLinks: 10,
+        hardStopRows: 4,
+        replayRows: 1
+      },
+      decisionRules: [
+        "all hard-stop rows must pass before any Go/No-Go score can increase",
+        "audit-replay row must prove evidence closure without source-record mutation",
+        "missing required workflow event keeps the linked evidence item at submitted or returned"
+      ],
+      rows: [
+        scenarioMatrixRow("scenario-1-normal-chain", "happy-path", true, "keep-no-go-on-failure"),
+        scenarioMatrixRow("scenario-2-idempotency-replay", "resilience", true, "keep-no-go-on-failure"),
+        scenarioMatrixRow("scenario-3-signature-rejection", "security-negative", true, "keep-no-go-on-failure"),
+        scenarioMatrixRow("scenario-4-manual-downgrade", "downgrade", true, "keep-no-go-on-failure"),
+        scenarioMatrixRow("scenario-5-evidence-replay", "audit-replay", false, "review-scorecard-after-replay", "accepted")
+      ]
+    },
     integrity: { algorithm: "sha256", digest: "sha256:static-preview-fallback" }
+  };
+}
+
+function scenarioMatrixRow(scenarioId, type, hardStopOnFail, goNoGoImpact, minimumState = "submitted") {
+  return {
+    scenarioId,
+    type,
+    batchId: "batch-1-single-chain",
+    hardStopOnFail,
+    evidence: [
+      { evidenceId: "emergency-life-chain:external-evidence-1", minimumState, closesBlocker: minimumState === "accepted", requiredArtifacts: ["signed signal receipt"] },
+      { evidenceId: "emergency-life-chain:external-evidence-2", minimumState, closesBlocker: minimumState === "accepted", requiredArtifacts: ["certificate fingerprint"] }
+    ],
+    requiredWorkflowEvents: ["site-evidence.submit-evidence", minimumState === "accepted" ? "site-evidence.accept-evidence" : "site-evidence.start-four-eyes-review"],
+    goNoGoImpact,
+    replayRequirement: "must reproduce steps, receipts, identities, timestamps and digest without editing original records",
+    acceptanceResult: "not-run"
   };
 }
 
