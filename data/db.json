@@ -10739,6 +10739,17 @@
         "resident timeline and notification receipts"
       ],
       "intakePolicyVersion": "internet-nursing-intake-v1",
+      "writePathVersion": "internet-nursing-write-path-v1",
+      "requesterAuthorization": {
+        "selfSource": "authenticated-session",
+        "delegatedSource": "resident-authorization-registry",
+        "delegatedReceiptRequired": true,
+        "allowedCreateRoles": [
+          "citizen",
+          "institution",
+          "commission"
+        ]
+      },
       "assessmentPolicyVersion": "internet-nursing-assessment-v1",
       "priceCatalogVersion": "internet-nursing-price-2026-v1",
       "specialistProtocols": [

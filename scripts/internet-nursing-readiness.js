@@ -302,6 +302,20 @@ function hasP1LifecycleEvidence(policy, domainSource, frontend) {
     /intake-duplicate-active-order/.test(domainSource);
 }
 
+function hasWritePathAdapterEvidence(policy, source) {
+  const lifecycle = policy.p1Lifecycle || {};
+  return lifecycle.writePathVersion === "internet-nursing-write-path-v1" &&
+    /createInternetNursingOrder/.test(source) &&
+    /transitionInternetNursingOrder/.test(source) &&
+    /NURSING_DELEGATION_EVIDENCE_REQUIRED/.test(source) &&
+    /NURSING_IDEMPOTENCY_CONFLICT/.test(source) &&
+    /NURSING_EVIDENCE_BYPASS_FORBIDDEN/.test(source) &&
+    /validateCatalogAndInstitution/.test(source) &&
+    /intakeFingerprint/.test(source) &&
+    /canAccessResident/.test(source) &&
+    /canAccessOrder/.test(source);
+}
+
 function hasRegulatorySubmissionEvidence(policy, frontend, server, moduleDoc, launchPlan) {
   const submission = policy.regulatorySubmission || fallbackPolicy().regulatorySubmission;
   const fields = new Set(submission.mappedFields || []);
@@ -456,6 +470,7 @@ function buildInternetNursingReadinessReport(options = {}) {
   const moduleDoc = options.moduleDoc ?? readText("docs/互联网护理服务模块说明.md");
   const launchPlan = options.launchPlan ?? readText("docs/互联网护理上线与下一步开发计划.md");
   const domainSource = options.domainSource ?? readText("nursing-escort-domain.js");
+  const writePathSource = options.writePathSource ?? readText("internet-nursing-service.js");
   const policy = { ...fallbackPolicy(), ...(data.internetNursingPolicy || {}) };
   policy.notificationGateway = { ...fallbackPolicy().notificationGateway, ...(data.internetNursingPolicy?.notificationGateway || {}) };
   policy.pricingRules = { ...fallbackPolicy().pricingRules, ...(data.internetNursingPolicy?.pricingRules || {}) };
@@ -494,6 +509,7 @@ function buildInternetNursingReadinessReport(options = {}) {
     { id: "nursing:deviceVerification", passed: hasDeviceVerificationEvidence(policy, orders, nurses, frontend, server, moduleDoc, launchPlan), detail: "mobile GPS, location device, recorder, one-click alert, photo attachment, and exception escalation evidence are implemented" },
     { id: "nursing:specialistHomeCareSafety", passed: hasSpecialistHomeCareSafetyEvidence(policy, domainSource), detail: "catheter, wound and ostomy, and peritoneal dialysis services require equipment, emergency coordination, waste handover, and EMR archive evidence" },
     { id: "nursing:p1Lifecycle", passed: hasP1LifecycleEvidence(policy, domainSource, frontend), detail: "structured assessment, intake scheduling, specialist protocols, locked pricing, SLA risk closure, timeline, and notification receipts are implemented as one P1 domain contract" },
+    { id: "nursing:writePathAdapter", passed: hasWritePathAdapterEvidence(policy, writePathSource), detail: "safe create and transition adapters enforce resident scope, delegated authorization receipts, catalog admission, whitelisted fields, idempotent replay, conflict detection, and evidence gates" },
     { id: "nursing:regulatorySubmission", passed: hasRegulatorySubmissionEvidence(policy, frontend, server, moduleDoc, launchPlan), detail: "field mapping, monthly and realtime submission, signoff, and pressure-test evidence are implemented" },
     { id: "nursing:siteCutoverPack", passed: hasCutoverPackEvidence(cutoverPack, `${moduleDoc}\n${cutoverDoc}`, launchPlan), detail: "site cutover signoff pack maps message, signature, connector, payment, device, regulatory, and audit-retention evidence" },
     { id: "nursing:highlightFeatures", passed: innovationCenter.featureCount === 10 && HIGHLIGHT_FEATURE_IDS.every((id) => innovationCenter.features.some((item) => item.id === id)) && /internet-nursing-highlights\.js/.test(frontend) && /renderNursingInnovationCenter/.test(frontend) && /nursing-highlight-center/.test(frontend) && /buildInternetNursingInnovationCenter/.test(server), detail: `${innovationCenter.featureCount}/10 highlight features wired` },
@@ -530,6 +546,7 @@ function buildInternetNursingReadinessReport(options = {}) {
       trackingOrders: orders.filter((item) => item.locationTrace === "tracking").length,
       specialistHomeCareServices: SPECIALIST_HOME_CARE_SERVICES.filter((item) => (policy.serviceCatalog || []).includes(item)).length,
       p1LifecycleTracks: Array.isArray(policy.p1Lifecycle?.tracks) ? policy.p1Lifecycle.tracks.length : 0,
+      writePathAdapter: policy.p1Lifecycle?.writePathVersion === "internet-nursing-write-path-v1",
       highlightFeatures: innovationCenter.featureCount,
       cutoverTracks: cutoverPack.tracks.length,
       cutoverReadyTracks: cutoverPack.tracks.filter((item) => item.ready).length,

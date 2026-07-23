@@ -574,6 +574,7 @@ function buildNursingP1Tracks(dashboard = {}) {
   const domain = window.NursingEscortDomain || {};
   const orders = Array.isArray(dashboard.orders) ? dashboard.orders : [];
   const protocols = domain.SPECIALIST_NURSING_PROTOCOLS || {};
+  const lifecycle = dashboard.policy?.p1Lifecycle || {};
   const tracks = [
     {
       id: "assessment-signature",
@@ -584,10 +585,12 @@ function buildNursingP1Tracks(dashboard = {}) {
     },
     {
       id: "intake-scheduling",
-      label: "区域时段与幂等调度",
-      ready: typeof domain.validateNursingOrderIntake === "function" && typeof domain.validateSchedulingEvidence === "function",
-      evidence: "未来时段、服务区域、时长、重复订单、改期与爽约门禁",
-      boundary: "服务端事务容量由 T00 接入"
+      label: "区域时段、授权与幂等调度",
+      ready: typeof domain.validateNursingOrderIntake === "function" &&
+        typeof domain.validateSchedulingEvidence === "function" &&
+        lifecycle.writePathVersion === "internet-nursing-write-path-v1",
+      evidence: "本人/家庭代约授权、目录准入、字段白名单、幂等重放与冲突检测",
+      boundary: "T00 仅需接入事务适配器及现有居民授权查询"
     },
     {
       id: "specialist-protocols",
@@ -1513,6 +1516,26 @@ function defaultNursingPolicy() {
     requiredEvidence: ["identity authentication", "first diagnosis assessment", "clinical assessment", "signed informed consent", "consent storage receipt", "nurse practice certificate", "service equipment readiness", "specialist protocol evidence", "service location trace", "nursing record", "medical waste handover", "EMR archive receipt", "price snapshot", "quality callback"],
     riskControls: ["emergency plan", "one-click alert", "liability insurance", "medical accident insurance", "service recorder"],
     platformRequirements: ["grade-3 security protection", "privacy protection", "medical record storage", "traceable service behavior", "workload statistics"],
+    p1Lifecycle: {
+      version: "internet-nursing-p1-v1",
+      tracks: [
+        "structured clinical assessment and consent storage",
+        "service area slot duration and idempotency",
+        "specialist nursing protocols",
+        "order price snapshot and financial reconciliation",
+        "complaint and incident SLA",
+        "resident timeline and notification receipts"
+      ],
+      intakePolicyVersion: "internet-nursing-intake-v1",
+      writePathVersion: "internet-nursing-write-path-v1",
+      assessmentPolicyVersion: "internet-nursing-assessment-v1",
+      priceCatalogVersion: "internet-nursing-price-2026-v1",
+      specialistProtocols: [
+        "intravenous-catheter-maintenance-v1",
+        "wound-ostomy-care-v1",
+        "peritoneal-dialysis-care-v1"
+      ]
+    },
     pricingRules: {
       items: {
         "blood glucose measurement": { basePrice: 86, insuranceEligible: true },
