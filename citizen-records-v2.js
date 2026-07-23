@@ -674,10 +674,54 @@
         }];
       })
       .filter(Boolean));
+    const accessAcknowledgements = (Array.isArray(payload.accessAcknowledgements) ? payload.accessAcknowledgements : [])
+      .filter((item) => !owner || item?.residentId === owner)
+      .map((item) => {
+        const status = cleanText(item.status, 40);
+        if (!item.id || !item.accessLogId || !["submitted", "accepted", "resolved"].includes(status)) return null;
+        return {
+          id: cleanText(item.id, 220),
+          residentId: cleanText(item.residentId, 120),
+          accessLogId: cleanText(item.accessLogId, 160),
+          decision: "recognized",
+          status,
+          acknowledgedAt: cleanText(item.acknowledgedAt, 60),
+          updatedAt: cleanText(item.updatedAt, 60),
+          receiptId: cleanText(item.receiptId, 160),
+          auditRef: cleanText(item.auditRef, 160),
+          syncStatus: "server-synced"
+        };
+      })
+      .filter(Boolean);
+    const accessDisputes = (Array.isArray(payload.accessDisputes) ? payload.accessDisputes : [])
+      .filter((item) => !owner || item?.residentId === owner)
+      .map((item) => {
+        const category = cleanText(item.category, 60);
+        const status = cleanText(item.status, 40);
+        if (!item.id || !item.accessLogId || !["unknown-actor", "purpose-mismatch", "scope-mismatch", "revoked-access", "other"].includes(category)
+          || !["submitted", "accepted", "processing", "resolved", "rejected", "withdrawn"].includes(status)) return null;
+        return {
+          id: cleanText(item.id, 220),
+          residentId: cleanText(item.residentId, 120),
+          accessLogId: cleanText(item.accessLogId, 160),
+          category,
+          reason: cleanText(item.reason, 800),
+          contactPreference: cleanText(item.contactPreference, 40),
+          status,
+          submittedAt: cleanText(item.submittedAt, 60),
+          updatedAt: cleanText(item.updatedAt, 60),
+          receiptId: cleanText(item.receiptId, 160),
+          auditRef: cleanText(item.auditRef, 160),
+          syncStatus: "server-synced"
+        };
+      })
+      .filter(Boolean);
     return {
       recordCorrections: corrections,
       recordSharePackages: sharePackages,
       careTaskUpdates: taskUpdates,
+      accessAcknowledgements,
+      accessDisputes,
       sync: {
         syncedAt: cleanText(payload.syncedAt, 60),
         cursor: cleanText(payload.cursor, 200),
@@ -706,6 +750,8 @@
     return {
       recordCorrections: mergeRows(current.recordCorrections, incoming.recordCorrections),
       recordSharePackages: mergeRows(current.recordSharePackages, incoming.recordSharePackages),
+      accessAcknowledgements: mergeRows(current.accessAcknowledgements, incoming.accessAcknowledgements),
+      accessDisputes: mergeRows(current.accessDisputes, incoming.accessDisputes),
       careTaskUpdates: taskUpdates,
       sync: { ...(current.sync || {}), ...(incoming.sync || {}) }
     };
@@ -726,6 +772,163 @@
     const expiry = toDate(metadata.expiresAt);
     const reference = toDate(now) || new Date();
     return !expiry || expiry.getTime() <= reference.getTime();
+  }
+
+  function normalizedAccessScope(value) {
+    const scope = cleanText(value, 300);
+    if (ACCESS_SCOPES.has(scope)) return scope;
+    if (/电子病历|病历摘要/i.test(scope)) return "emr-summary";
+    if (/检验|检查/i.test(scope)) return "labs";
+    if (/用药|处方/i.test(scope)) return "medications";
+    if (/影像/i.test(scope)) return "imaging-report";
+    if (/附件|原文/i.test(scope)) return "attachments";
+    if (/健康档案|健康摘要|随访/i.test(scope)) return "health-record-summary";
+    return "";
+  }
+
+  function classifyAccessEvent(log = {}, authorizations = [], now = new Date()) {
+    const eventId = cleanText(log.id, 160);
+    const residentId = cleanText(log.residentId, 120);
+    if (!eventId || !residentId) return null;
+    const result = cleanText(log.result || "待核验", 80);
+    const actor = cleanText(log.actor || "主体待核验", 200);
+    const purpose = cleanText(log.purpose, 500);
+    const scope = normalizedAccessScope(log.scope);
+    const denied = /拒绝|denied|blocked|拦截/i.test(result);
+    const allowed = /允许|allowed|success|成功/i.test(result);
+    let reviewState = "recognized";
+    let reason = "active-authorization-match";
+    let label = "授权匹配";
+    let disclosed = allowed ? true : denied ? false : null;
+    if (denied) {
+      reviewState = "blocked";
+      reason = "access-blocked";
+      label = "已拦截，未披露";
+      disclosed = false;
+    } else if (!allowed) {
+      reviewState = "review";
+      reason = "result-unverified";
+      label = "访问结果待核验";
+    } else if (!scope) {
+      reviewState = "review";
+      reason = "unknown-scope";
+      label = "访问范围待复核";
+    } else if (!purpose) {
+      reviewState = "review";
+      reason = "purpose-missing";
+      label = "访问用途待补录";
+    } else if (/居民本人|本人|self/i.test(`${actor} ${log.role || ""}`)) {
+      reviewState = "recognized";
+      reason = "resident-self-access";
+      label = "本人访问";
+    } else {
+      const matchingAuthorization = (Array.isArray(authorizations) ? authorizations : []).find((record) => {
+        const actorMatches = [
+          record.name,
+          record.meta?.granteeId,
+          record.meta?.granteeAccountId,
+          record.meta?.granteeResidentId
+        ].map((item) => cleanText(item, 200)).filter(Boolean).includes(actor);
+        return actorMatches
+          && authorizationAllowsScope(record, scope)
+          && Boolean(CitizenRecordsV1?.authorizationState(record, now).active);
+      });
+      if (!matchingAuthorization) {
+        reviewState = "review";
+        reason = "authorization-unverified";
+        label = "未匹配当前有效授权";
+      }
+    }
+    return {
+      eventId,
+      residentId,
+      at: cleanText(log.at, 60),
+      actor,
+      role: cleanText(log.role, 100),
+      scope: scope || cleanText(log.scope, 300),
+      purpose,
+      result,
+      reviewState,
+      reason,
+      label,
+      disclosed,
+      recommendedAction: reviewState === "review" ? "核对访问主体、用途与授权；无法确认时提交访问异议。" : ""
+    };
+  }
+
+  function buildAccessReviewQueue(logs = [], residentId = "", authorizations = [], now = new Date()) {
+    return (Array.isArray(logs) ? logs : [])
+      .filter((log) => !residentId || log?.residentId === residentId)
+      .map((log) => classifyAccessEvent(log, authorizations, now))
+      .filter(Boolean)
+      .sort((a, b) => b.at.localeCompare(a.at));
+  }
+
+  function buildAccessAcknowledgement(input = {}) {
+    const residentId = cleanText(input.residentId, 120);
+    const accessLogId = cleanText(input.accessLogId, 160);
+    const acknowledgedAt = toDate(input.acknowledgedAt || new Date());
+    if (!residentId || !accessLogId || !acknowledgedAt) throw new Error("居民、访问事件和确认时间均不能为空");
+    return {
+      id: `access-ack-${safeIdentifier(accessLogId)}-${acknowledgedAt.getTime()}`,
+      residentId,
+      accessLogId,
+      decision: "recognized",
+      status: "submitted",
+      acknowledgedAt: acknowledgedAt.toISOString()
+    };
+  }
+
+  function buildAccessDispute(input = {}) {
+    const residentId = cleanText(input.residentId, 120);
+    const accessLogId = cleanText(input.accessLogId, 160);
+    const category = cleanText(input.category, 60);
+    const reason = cleanText(input.reason, 800);
+    const contactPreference = cleanText(input.contactPreference || "in-app", 40);
+    const submittedAt = toDate(input.submittedAt || new Date());
+    const categories = new Set(["unknown-actor", "purpose-mismatch", "scope-mismatch", "revoked-access", "other"]);
+    if (!residentId || !accessLogId || !categories.has(category) || !reason || !submittedAt) {
+      throw new Error("居民、访问事件、异议类型和原因均不能为空");
+    }
+    return {
+      id: `access-dispute-${safeIdentifier(accessLogId)}-${submittedAt.getTime()}`,
+      residentId,
+      accessLogId,
+      category,
+      reason,
+      contactPreference,
+      status: "submitted",
+      submittedAt: submittedAt.toISOString()
+    };
+  }
+
+  function projectAccessReviewActionReceipt(payload = {}, request = {}) {
+    const allowedStatuses = new Set(["submitted", "accepted", "processing", "resolved", "rejected", "withdrawn"]);
+    const status = cleanText(payload.status || request.status, 40);
+    if (!allowedStatuses.has(status)) throw new Error("访问复核回执状态不受支持");
+    return {
+      ...request,
+      status,
+      ...projectActionReceipt(payload, {
+        residentId: request.residentId,
+        resourceId: request.accessLogId
+      }),
+      id: cleanText(request.id, 220),
+      residentId: cleanText(request.residentId, 120),
+      accessLogId: cleanText(request.accessLogId, 160)
+    };
+  }
+
+  function buildAccessExportRows(queue = []) {
+    return (Array.isArray(queue) ? queue : []).map((item) => ({
+      time: cleanText(item.at, 60),
+      actor: cleanText(item.actor, 200),
+      role: cleanText(item.role, 100),
+      scope: cleanText(item.scope, 100),
+      purpose: cleanText(item.purpose, 500),
+      result: cleanText(item.result, 80),
+      review: cleanText(item.label, 100)
+    }));
   }
 
   function summarizeCareWorkspace(input = {}) {
@@ -777,6 +980,13 @@
     mergeCareWorkspaceState,
     buildCarePreviewMetadata,
     isCarePreviewExpired,
+    normalizedAccessScope,
+    classifyAccessEvent,
+    buildAccessReviewQueue,
+    buildAccessAcknowledgement,
+    buildAccessDispute,
+    projectAccessReviewActionReceipt,
+    buildAccessExportRows,
     summarizeCareWorkspace
   };
 });

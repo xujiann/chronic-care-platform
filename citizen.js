@@ -477,6 +477,7 @@ const residentFunctionAudit = [
   { service: "health-record", name: "档案完整度与更新提醒", status: "已实现", evidence: "八类档案区分缺失与超过十八个月未更新", mobile: "提醒逐项堆叠" },
   { service: "health-record", name: "一次性健康资料包", status: "已实现", evidence: "白名单范围、最长七天、单次访问码、审计与主动撤销", mobile: "分享表单与撤销按钮可单手操作" },
   { service: "health-record", name: "适老化与无障碍增强", status: "已实现", evidence: "简洁、高对比、朗读、当前对象和敏感操作确认", mobile: "核心按钮不低于44像素" },
+  { service: "health-record", name: "隐私审计与访问异议", status: "已实现", evidence: "访问匹配、拦截说明、居民确认、异议受理和最小化导出形成闭环", mobile: "访问复核卡片与异议表单单列展示" },
   { service: "emr", name: "电子病历时间线", status: "已实现", evidence: "门诊、随访、检查和用药摘要按时间展示", mobile: "时间线与详情卡片单列显示" },
   { service: "emr", name: "结构化电子病历", status: "已实现", evidence: "展示就诊、诊断、处置、医嘱、复诊计划和更正版本", mobile: "病历详情分段阅读" },
   { service: "emr", name: "用药核对", status: "已实现", evidence: "重复来源、自报和过敏线索进入医生或药师复核", mobile: "风险线索标签化展示" },
@@ -2438,7 +2439,7 @@ function residentCareRecords(residentId) {
 function clearCitizenCareLocalPreview(residentId) {
   const preview = citizenExtra[residentId];
   if (!preview || typeof preview !== "object") return false;
-  const keys = ["recordCorrections", "recordSharePackages", "careTaskUpdates", "careWorkspaceMeta"];
+  const keys = ["recordCorrections", "recordSharePackages", "careTaskUpdates", "accessAcknowledgements", "accessDisputes", "careWorkspaceMeta"];
   const changed = keys.some((key) => Object.hasOwn(preview, key));
   keys.forEach((key) => delete preview[key]);
   if (changed) localStorage.setItem(CITIZEN_EXTRA_KEY, JSON.stringify(citizenExtra));
@@ -2452,6 +2453,8 @@ function ensureCitizenCareCollections(residentId) {
       citizenCareSession.set(residentId, {
         recordCorrections: [],
         recordSharePackages: [],
+        accessAcknowledgements: [],
+        accessDisputes: [],
         careTaskUpdates: {},
         sync: {}
       });
@@ -2460,12 +2463,12 @@ function ensureCitizenCareCollections(residentId) {
   }
   if (!citizenExtra[residentId]) citizenExtra[residentId] = {};
   const preview = citizenExtra[residentId];
-  const hasPreviewData = ["recordCorrections", "recordSharePackages"].some((key) => Array.isArray(preview[key]) && preview[key].length)
+  const hasPreviewData = ["recordCorrections", "recordSharePackages", "accessAcknowledgements", "accessDisputes"].some((key) => Array.isArray(preview[key]) && preview[key].length)
     || Object.keys(preview.careTaskUpdates || {}).length > 0;
   if (hasPreviewData && window.CitizenRecordsV2?.isCarePreviewExpired(preview.careWorkspaceMeta || {})) {
     clearCitizenCareLocalPreview(residentId);
   }
-  ["recordCorrections", "recordSharePackages"].forEach((key) => {
+  ["recordCorrections", "recordSharePackages", "accessAcknowledgements", "accessDisputes"].forEach((key) => {
     if (!Array.isArray(preview[key])) preview[key] = [];
   });
   if (!preview.careTaskUpdates || typeof preview.careTaskUpdates !== "object") {
@@ -2555,6 +2558,37 @@ function markCitizenCareActionSynced(residentId, receipt = {}) {
 
 function citizenCareEmpty(message) {
   return `<p class="muted">${escapeHtml(message)}</p>`;
+}
+
+function citizenAccessReviewQueue(residentId) {
+  if (!window.CitizenRecordsV2) return [];
+  const logs = (state.dataAccessLogs || []).filter((item) => item.residentId === residentId);
+  const authorizations = getPersonalRecords(residentId, "authorizations");
+  return window.CitizenRecordsV2.buildAccessReviewQueue(logs, residentId, authorizations, new Date());
+}
+
+function safeCsvCell(value) {
+  let text = String(value ?? "").replace(/\r?\n/g, " ");
+  if (/^[=+\-@]/.test(text)) text = `'${text}`;
+  return `"${text.replace(/"/g, "\"\"")}"`;
+}
+
+function exportCitizenAccessReview(residentId) {
+  const rows = window.CitizenRecordsV2.buildAccessExportRows(citizenAccessReviewQueue(residentId));
+  if (!rows.length) {
+    showToast("暂无可导出的访问记录");
+    return;
+  }
+  const headers = ["访问时间", "访问主体", "主体角色", "访问范围", "访问用途", "访问结果", "居民复核"];
+  const fields = ["time", "actor", "role", "scope", "purpose", "result", "review"];
+  const csv = `\uFEFF${headers.map(safeCsvCell).join(",")}\r\n${rows.map((row) => fields.map((field) => safeCsvCell(row[field])).join(",")).join("\r\n")}`;
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `resident-access-review-${residentId}-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+  showToast("最小化访问清单已导出");
 }
 
 function renderCitizenCareWorkspace(resident, diseases = []) {
@@ -2672,6 +2706,37 @@ function renderCitizenCareWorkspace(resident, diseases = []) {
       ${packageState.active ? `<footer><button type="button" class="small-button" data-revoke-share-package="${escapeHtml(item.id)}">立即撤销</button></footer>` : ""}
     </div>`;
   }).join("") || citizenCareEmpty("尚未创建一次性健康资料包。");
+
+  const accessQueue = citizenAccessReviewQueue(resident.id);
+  const acknowledged = new Set(careState.accessAcknowledgements.map((item) => item.accessLogId));
+  const disputed = new Set(careState.accessDisputes.filter((item) => !["resolved", "rejected", "withdrawn"].includes(item.status)).map((item) => item.accessLogId));
+  const reviewCount = accessQueue.filter((item) => item.reviewState === "review" && !acknowledged.has(item.eventId)).length;
+  const blockedCount = accessQueue.filter((item) => item.reviewState === "blocked").length;
+  document.querySelector("#citizen-access-review-v2-summary").innerHTML = `<div class="citizen-care-row ${reviewCount ? "warning" : ""}">
+    <div><strong>${accessQueue.length} 条访问事件</strong><span>${reviewCount} 条待复核</span><em>${blockedCount} 条已拦截</em></div>
+    <p>“已拦截”表示访问未获允许，不代表健康数据已经披露；无法确认的已允许访问可提交异议。</p>
+  </div>`;
+  document.querySelector("#citizen-access-review-v2-list").innerHTML = accessQueue.slice(0, 12).map((item) => {
+    const acknowledgedItem = acknowledged.has(item.eventId);
+    const disputedItem = disputed.has(item.eventId);
+    const tone = item.reviewState === "review" ? "warning" : item.reviewState === "blocked" ? "denied" : "";
+    return `<div class="citizen-care-row ${tone}">
+      <div><strong>${escapeHtml(item.actor)}</strong><span>${escapeHtml(item.label)}</span>${acknowledgedItem ? "<em>居民已确认</em>" : ""}${disputedItem ? "<em>异议处理中</em>" : ""}</div>
+      <p>${escapeHtml(item.at || "时间待核验")} · ${escapeHtml(item.scope || "范围待核验")} · ${escapeHtml(item.purpose || "用途待补录")}</p>
+      <small>${escapeHtml(item.result)}${item.recommendedAction ? ` · ${escapeHtml(item.recommendedAction)}` : ""}</small>
+      <footer>
+        ${!acknowledgedItem && item.reviewState !== "blocked" ? `<button type="button" class="small-button" data-acknowledge-access="${escapeHtml(item.eventId)}">这是正常访问</button>` : ""}
+        <button type="button" class="small-button" data-fill-access-dispute="${escapeHtml(item.eventId)}">对此访问有异议</button>
+      </footer>
+    </div>`;
+  }).join("") || citizenCareEmpty("暂无访问事件；可先点击电子病历页的“复核授权与访问”。");
+  const disputeSelect = document.querySelector("#citizen-access-dispute-form select[name='accessLogId']");
+  if (disputeSelect) disputeSelect.innerHTML = accessQueue.map((item) => `<option value="${escapeHtml(item.eventId)}">${escapeHtml(item.at || "时间待核验")} · ${escapeHtml(item.actor)} · ${escapeHtml(item.scope)}</option>`).join("");
+  document.querySelector("#citizen-access-dispute-list").innerHTML = careState.accessDisputes.map((item) => `<div class="citizen-care-row pending">
+    <div><strong>访问异议</strong><span>${escapeHtml(item.status)}</span></div>
+    <p>${escapeHtml(item.reason)}</p>
+    <small>访问事件 ${escapeHtml(item.accessLogId)}${item.receiptId ? ` · 受理 ${escapeHtml(item.receiptId)}` : ""}${item.auditRef ? ` · 审计 ${escapeHtml(item.auditRef)}` : ""}</small>
+  </div>`).join("") || citizenCareEmpty("尚未提交访问异议。");
 
   const shareExpiry = document.querySelector("#citizen-share-package-form input[name='expiresAt']");
   if (shareExpiry && !shareExpiry.value) {
@@ -2817,6 +2882,39 @@ function bindCitizenCareWorkspace() {
     }
   });
 
+  document.querySelector("#citizen-access-dispute-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    try {
+      const dispute = api.buildAccessDispute({
+        residentId: currentResidentId,
+        accessLogId: form.elements.accessLogId.value,
+        category: form.elements.category.value,
+        reason: form.elements.reason.value,
+        contactPreference: form.elements.contactPreference.value
+      });
+      const response = await submitCitizenCareAction(
+        `/access-reviews/${encodeURIComponent(dispute.accessLogId)}/disputes`,
+        dispute,
+        "access-dispute"
+      );
+      const saved = api.projectAccessReviewActionReceipt(response, dispute);
+      const careState = ensureCitizenCareCollections(currentResidentId);
+      careState.accessDisputes.unshift(saved);
+      saveCitizenCareCollections(currentResidentId);
+      markCitizenCareActionSynced(currentResidentId, saved);
+      form.reset();
+      renderCitizen(currentResidentId);
+      showToast("访问异议已提交，平台将按审计回执复核");
+    } catch (error) {
+      showToast(error.message || "访问异议提交失败");
+    }
+  });
+
+  document.querySelector("[data-export-access-review]")?.addEventListener("click", () => {
+    exportCitizenAccessReview(currentResidentId);
+  });
+
   document.querySelector("[data-refresh-care-workspace]")?.addEventListener("click", () => {
     void refreshCitizenCareWorkspace(currentResidentId);
   });
@@ -2838,6 +2936,38 @@ function bindCitizenCareWorkspace() {
   section.addEventListener("click", async (event) => {
     const revokeButton = event.target.closest("[data-revoke-share-package]");
     const taskButton = event.target.closest("[data-care-task-complete]");
+    const acknowledgeButton = event.target.closest("[data-acknowledge-access]");
+    const fillDisputeButton = event.target.closest("[data-fill-access-dispute]");
+    if (fillDisputeButton) {
+      const form = document.querySelector("#citizen-access-dispute-form");
+      form.elements.accessLogId.value = fillDisputeButton.dataset.fillAccessDispute;
+      form.elements.reason.focus();
+      form.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    if (acknowledgeButton) {
+      try {
+        const acknowledgement = api.buildAccessAcknowledgement({
+          residentId: currentResidentId,
+          accessLogId: acknowledgeButton.dataset.acknowledgeAccess
+        });
+        const response = await submitCitizenCareAction(
+          `/access-reviews/${encodeURIComponent(acknowledgement.accessLogId)}/acknowledge`,
+          acknowledgement,
+          "access-acknowledge"
+        );
+        const saved = api.projectAccessReviewActionReceipt(response, acknowledgement);
+        const careState = ensureCitizenCareCollections(currentResidentId);
+        careState.accessAcknowledgements.unshift(saved);
+        saveCitizenCareCollections(currentResidentId);
+        markCitizenCareActionSynced(currentResidentId, saved);
+        renderCitizen(currentResidentId);
+        showToast("已记录为居民确认的正常访问");
+      } catch (error) {
+        showToast(error.message || "访问确认失败");
+      }
+      return;
+    }
     if (revokeButton) {
       const careState = ensureCitizenCareCollections(currentResidentId);
       const item = careState.recordSharePackages.find((candidate) => candidate.id === revokeButton.dataset.revokeSharePackage);
