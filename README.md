@@ -250,7 +250,7 @@ npm.cmd run hybrid:deployment-readiness
 
 `integration:readiness` 会生成 `release/integration-readiness-report.json` 与 `release/integration-readiness-report.md`，检查 P0 接口台账、HIS/EMR/LIS/PACS/医保/证照/统计契约、幂等键、签名和重试策略，并把身份、主索引、安全审计等 P0 覆盖关系纳入发布取证。
 
-`integration:control` 会只读检查 T01-T11 的登记 worktree、统一基线、分支提交、未提交文件和对 `server.js`、`portal.css`、`package.json`、`README.md`、`scripts/release-report.js` 的公共文件占用，并读取 `integration/intake-decisions.json` 中与候选 commit 精确绑定的 T00 审查决定，生成 `release/integration-control-ledger.json` 与 `release/integration-control-ledger.md`。分支新增提交后，旧决定自动转为 `review-stale`，必须重新完成代码审查和定向回归；只有结构检查、commit 绑定接收决定及声明依赖全部通过才进入 `merge-ready`。默认模式用于持续生成台账；`integration:control:gate` 在任一专业线缺失、基线漂移、工作树未清理、触碰 T00 公共文件、审查未接收或专业线尚未全部集成时返回失败。
+`integration:control` 会只读检查 T01-T11 的登记 worktree、统一基线、分支提交、未提交文件和对 `server.js`、`portal.css`、`package.json`、`README.md`、`scripts/release-report.js` 的公共文件占用，并读取 `integration/intake-decisions.json` 中与候选 commit 精确绑定的 T00 审查决定，生成 `release/integration-control-ledger.json` 与 `release/integration-control-ledger.md`。分支新增提交后，旧决定自动转为 `review-stale`，必须重新完成代码审查和定向回归；只有结构检查、commit 绑定接收决定及声明依赖全部通过才进入 `merge-ready`。`integration/publication-receipts.json` 另行保存经过实际核验的 main/Pages 静态发布回执，包括来源候选、发布提交、CI/Pages run、HTTP 200 资源及内容标记；台账会校验这些回执的提交格式、来源、资源路径、状态和标记完整性，但明确保持 `productionReady=false`，历史回执不代替实时网络探测或生产验收。默认模式用于持续生成台账；`integration:control:gate` 在任一专业线缺失、基线漂移、工作树未清理、触碰 T00 公共文件、审查未接收或专业线尚未全部集成时返回失败。
 
 `interface:mapping` 会生成 `release/interface-mapping-report.json` 与 `release/interface-mapping-report.md`，逐项归档 HIS/EMR/LIS/PACS/医保/电子证照/统计契约字段到平台集合和字段的映射、必填字段覆盖、幂等字段落点、签名与重试证据，作为现场接口字段差异确认和联调整改的前置材料。
 

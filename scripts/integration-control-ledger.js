@@ -7,6 +7,7 @@ const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "integration-control-ledger.json");
 const DEFAULT_MARKDOWN = path.join(ROOT, "release", "integration-control-ledger.md");
 const DEFAULT_INTAKE_DECISIONS = path.join(ROOT, "integration", "intake-decisions.json");
+const DEFAULT_PUBLICATION_RECEIPTS = path.join(ROOT, "integration", "publication-receipts.json");
 const ACCEPTED_BASELINE = "e2f2f5e8ce3ed1db576258494d74a6e5986e1c84";
 const SOURCE_MAIN_BASELINE = "b861f1c4e87ee8c2221cb52940674dc9f62fad5b";
 const INTAKE_DECISIONS = new Set(["pending", "accepted", "blocked"]);
@@ -344,6 +345,61 @@ function validateIntakeDecisions(payload = { decisions: [] }, lines = LINE_CONFI
   };
 }
 
+function readPublicationReceipts(file = DEFAULT_PUBLICATION_RECEIPTS) {
+  if (!fs.existsSync(file)) return { schemaVersion: 1, receipts: [] };
+  const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+  if (!Array.isArray(payload.receipts)) throw new Error("integration publication receipts must contain a receipts array");
+  return payload;
+}
+
+function validatePublicationReceipts(payload = { receipts: [] }, lines = LINE_CONFIG, intakeDecisions = []) {
+  const knownLines = new Set(lines.map((line) => line.id));
+  const acceptedByLine = new Map((Array.isArray(intakeDecisions) ? intakeDecisions : [])
+    .filter((item) => item.decision === "accepted")
+    .map((item) => [item.lineId, item.candidateHead]));
+  const receipts = Array.isArray(payload.receipts) ? payload.receipts : [];
+  const shaPattern = /^[a-f0-9]{40}$/;
+  const runIdPattern = /^\d+$/;
+  const safeResourcePattern = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9._/-]+$/;
+  const invalid = [];
+  const keys = [];
+
+  for (const receipt of receipts) {
+    const reasons = [];
+    const resources = Array.isArray(receipt.site?.resources) ? receipt.site.resources : [];
+    const key = `${receipt.lineId || ""}:${receipt.publishedHead || ""}`;
+    keys.push(key);
+    if (!knownLines.has(receipt.lineId)) reasons.push("unknown-line");
+    if (!shaPattern.test(String(receipt.sourceCandidateHead || ""))) reasons.push("invalid-source-head");
+    if (!shaPattern.test(String(receipt.publishedHead || ""))) reasons.push("invalid-published-head");
+    if (acceptedByLine.size && acceptedByLine.get(receipt.lineId) !== receipt.sourceCandidateHead) reasons.push("source-candidate-not-accepted");
+    if (receipt.targetBranch !== "main" || receipt.targetPath !== "/") reasons.push("invalid-pages-source");
+    if (receipt.deploymentType !== "github-pages-legacy") reasons.push("invalid-deployment-type");
+    if (!runIdPattern.test(String(receipt.ci?.runId || "")) || receipt.ci?.status !== "success" || !String(receipt.ci?.url || "").startsWith("https://github.com/")) reasons.push("invalid-ci-receipt");
+    if (!runIdPattern.test(String(receipt.deployment?.runId || "")) || receipt.deployment?.status !== "success" || !String(receipt.deployment?.url || "").startsWith("https://github.com/") || !Number.isFinite(Date.parse(receipt.deployment?.deployedAt || ""))) reasons.push("invalid-deployment-receipt");
+    if (receipt.site?.status !== "built" || !String(receipt.site?.baseUrl || "").startsWith("https://") || !Number.isFinite(Date.parse(receipt.site?.verifiedAt || ""))) reasons.push("invalid-site-receipt");
+    if (!resources.length) reasons.push("missing-resource-evidence");
+    for (const resource of resources) {
+      const required = Array.isArray(resource.requiredMarkers) ? resource.requiredMarkers : [];
+      const observed = new Set(Array.isArray(resource.observedMarkers) ? resource.observedMarkers : []);
+      if (!safeResourcePattern.test(String(resource.path || ""))) reasons.push(`invalid-resource-path:${resource.path || "missing"}`);
+      if (resource.statusCode !== 200) reasons.push(`resource-not-200:${resource.path || "missing"}`);
+      if (!required.length || required.some((marker) => !observed.has(marker))) reasons.push(`resource-markers-incomplete:${resource.path || "missing"}`);
+    }
+    if (receipt.productionReady !== false) reasons.push("static-preview-must-not-be-production-ready");
+    if (!String(receipt.boundary || "").trim()) reasons.push("missing-boundary");
+    if (reasons.length) invalid.push({ lineId: receipt.lineId || "", publishedHead: receipt.publishedHead || "", reasons });
+  }
+
+  const duplicateKeys = keys.filter((key, index) => keys.indexOf(key) !== index);
+  return {
+    valid: invalid.length === 0 && duplicateKeys.length === 0,
+    receipts,
+    invalid,
+    duplicateKeys
+  };
+}
+
 function applyIntakeDecision(line, decision, dependencyWait = [], finalDependencyWait = []) {
   const blockersDetected = line.blockersDetected.slice();
   const recordedDecision = decision || { lineId: line.id, decision: "pending", candidateHead: "", blockers: [] };
@@ -419,6 +475,9 @@ function buildIntegrationControlLedger(options = {}) {
   const intakePayload = options.intakeDecisions || readIntakeDecisions(options.intakeDecisionsFile);
   const intakeValidation = validateIntakeDecisions(intakePayload);
   if (!intakeValidation.valid) throw new Error("integration intake decisions are invalid or duplicated");
+  const publicationPayload = options.publicationReceipts || readPublicationReceipts(options.publicationReceiptsFile);
+  const publicationValidation = validatePublicationReceipts(publicationPayload, LINE_CONFIG, intakeValidation.decisions);
+  if (!publicationValidation.valid) throw new Error("integration publication receipts are invalid or duplicated");
   const intakeByLine = new Map(intakeValidation.decisions.map((item) => [item.lineId, item]));
   const byBranch = new Map(worktrees.map((item) => [item.branch, item]));
   const inspectedLines = LINE_CONFIG.map((line) => inspectLine(line, byBranch.get(line.branch), baseline, integrationHead));
@@ -444,13 +503,18 @@ function buildIntegrationControlLedger(options = {}) {
     dependencyWait: lines.filter((line) => line.state === "accepted-dependency-wait").length,
     integrated: lines.filter((line) => line.state === "integrated").length,
     waitingDeliverable: lines.filter((line) => line.state === "waiting-deliverable").length,
-    blocked: lines.filter((line) => line.state.startsWith("blocked") || line.state === "missing-worktree" || line.state === "accepted-dependency-wait" || line.state === "review-pending" || line.state === "review-stale").length
+    blocked: lines.filter((line) => line.state.startsWith("blocked") || line.state === "missing-worktree" || line.state === "accepted-dependency-wait" || line.state === "review-pending" || line.state === "review-stale").length,
+    publicationReceipts: publicationValidation.receipts.length,
+    publicationResources: publicationValidation.receipts.reduce((sum, receipt) => sum + (receipt.site?.resources?.length || 0), 0)
   };
   const checks = configurationChecks.concat([
     { id: "control:worktrees", passed: summary.worktreesPresent === 11, detail: `${summary.worktreesPresent}/11 registered` },
     { id: "control:baseline", passed: summary.baselineAligned === 11, detail: `${summary.baselineAligned}/11 aligned to ${baseline.slice(0, 12)}` },
     { id: "control:cleanIntake", passed: summary.dirtyLines === 0, detail: `${summary.dirtyLines} dirty professional lines` },
-    { id: "control:publicExclusivity", passed: summary.publicConflictLines === 0, detail: `${summary.publicConflictLines} lines touch T00-owned files` }
+    { id: "control:publicExclusivity", passed: summary.publicConflictLines === 0, detail: `${summary.publicConflictLines} lines touch T00-owned files` },
+    { id: "publication:receipts", passed: publicationValidation.valid, detail: `${summary.publicationReceipts} recorded static preview receipts` },
+    { id: "publication:resources", passed: publicationValidation.receipts.every((receipt) => receipt.site.resources.every((resource) => resource.statusCode === 200)), detail: `${summary.publicationResources} recorded 200 resource checks` },
+    { id: "publication:boundary", passed: publicationValidation.receipts.every((receipt) => receipt.productionReady === false), detail: "static preview receipts never grant production readiness" }
   ]);
   const structuralOk = configurationChecks.every((item) => item.passed) && summary.worktreesPresent === 11;
   const releaseCandidateReady = structuralOk
@@ -475,6 +539,7 @@ function buildIntegrationControlLedger(options = {}) {
       validationCommands: VALIDATION_COMMANDS
     },
     intakeDecisions: intakePayload,
+    publicationReceipts: publicationPayload,
     summary,
     checks,
     lines,
@@ -504,6 +569,7 @@ function renderMarkdown(report) {
   ].map(safeCell).join(" | ")).map((row) => `| ${row} |`);
   const detailRows = report.lines.slice().sort((a, b) => a.mergeOrder - b.mergeOrder).map((line) => `| ${line.id} | ${safeCell(line.input)} | ${safeCell(line.output)} | ${safeCell(line.blockers)} | ${safeCell(line.acceptance)} |`);
   const goNoGo = report.goNoGo || {};
+  const publicationRows = (report.publicationReceipts?.receipts || []).map((receipt) => `| ${safeCell(receipt.lineId)} | ${safeCell(receipt.publishedHead.slice(0, 12))} | ${safeCell(receipt.deploymentType)} | ${safeCell(receipt.site?.status)} | ${safeCell(receipt.site?.resources?.length || 0)} | ${receipt.productionReady ? "yes" : "no"} |`);
   return [
     "# T00 integration control ledger",
     "",
@@ -561,6 +627,14 @@ function renderMarkdown(report) {
     ...report.policy.validationCommands,
     "```",
     "",
+    "## Recorded static publication receipts",
+    "",
+    "These receipts preserve observed CI, deployment and HTTP evidence. They are historical, repository-recorded evidence and do not perform a live network check.",
+    "",
+    "| Line | Published head | Deployment | Site status | Resources checked | Production ready |",
+    "|---|---|---|---|---:|---|",
+    ...(publicationRows.length ? publicationRows : ["| - | - | - | no receipts | 0 | no |"]),
+    "",
     "## Current production Go/No-Go snapshot",
     "",
     `- Runtime state: ${safeCell(goNoGo.runtimeState || "missing")}`,
@@ -604,6 +678,7 @@ function runCli() {
     releaseCandidateReady: report.releaseCandidateReady,
     acceptedBaseline: report.acceptedBaseline,
     summary: report.summary,
+    publicationReceipts: report.publicationReceipts.receipts.map((receipt) => ({ lineId: receipt.lineId, publishedHead: receipt.publishedHead, siteStatus: receipt.site.status, productionReady: receipt.productionReady })),
     intakeReady: report.lines.filter((line) => line.state === "merge-ready" || line.state === "accepted-dependency-wait").map((line) => line.id),
     mergeReady: report.lines.filter((line) => line.state === "merge-ready").map((line) => line.id),
     integrated: report.lines.filter((line) => line.state === "integrated").map((line) => line.id),
@@ -629,10 +704,13 @@ module.exports = {
   CONTRACT_CHANGE_FLOW,
   VALIDATION_COMMANDS,
   DEFAULT_INTAKE_DECISIONS,
+  DEFAULT_PUBLICATION_RECEIPTS,
   inspectLine,
   validateConfiguration,
   readIntakeDecisions,
   validateIntakeDecisions,
+  readPublicationReceipts,
+  validatePublicationReceipts,
   applyIntakeDecision,
   buildIntegrationControlLedger,
   renderMarkdown,

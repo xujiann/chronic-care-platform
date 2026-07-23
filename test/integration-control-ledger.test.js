@@ -10,6 +10,8 @@ const {
   validateConfiguration,
   readIntakeDecisions,
   validateIntakeDecisions,
+  readPublicationReceipts,
+  validatePublicationReceipts,
   applyIntakeDecision,
   buildIntegrationControlLedger,
   renderMarkdown,
@@ -76,6 +78,26 @@ test("intake decisions are valid, commit-bound and fail closed", () => {
   assert.equal(stale.intakeReview.decisionMatchesHead, false);
 });
 
+test("publication receipts preserve static preview evidence without opening production", () => {
+  const payload = readPublicationReceipts();
+  const intake = readIntakeDecisions();
+  const validation = validatePublicationReceipts(payload, undefined, intake.decisions);
+  assert.equal(validation.valid, true);
+  assert.equal(payload.receipts.some((item) => item.lineId === "T06"), true);
+  assert.equal(payload.receipts.every((item) => item.productionReady === false), true);
+
+  const tampered = structuredClone(payload);
+  tampered.receipts[0].site.resources[0].observedMarkers = ["capacityReservation"];
+  const rejected = validatePublicationReceipts(tampered, undefined, intake.decisions);
+  assert.equal(rejected.valid, false);
+  assert.equal(rejected.invalid[0].reasons.some((item) => item.startsWith("resource-markers-incomplete:")), true);
+
+  const unaccepted = structuredClone(payload);
+  unaccepted.receipts[0].sourceCandidateHead = "a".repeat(40);
+  const unacceptedValidation = validatePublicationReceipts(unaccepted, undefined, intake.decisions);
+  assert.equal(unacceptedValidation.invalid[0].reasons.includes("source-candidate-not-accepted"), true);
+});
+
 test("integration control ledger inspects registered worktrees without changing them", () => {
   const report = buildIntegrationControlLedger({ generatedAt: "2026-07-22T00:00:00.000Z" });
   const markdown = renderMarkdown(report);
@@ -88,6 +110,8 @@ test("integration control ledger inspects registered worktrees without changing 
   assert.equal(typeof report.summary.reviewPending, "number");
   assert.equal(typeof report.summary.reviewBlocked, "number");
   assert.equal(typeof report.summary.integrated, "number");
+  assert.equal(report.summary.publicationReceipts >= 1, true);
+  assert.equal(report.summary.publicationResources >= 3, true);
   assert.equal(report.lines.every((line) => typeof line.intakeReview.effectiveState === "string"), true);
   assert.equal(report.lines.every((line) => typeof line.dependenciesSatisfied === "boolean"), true);
   assert.equal(typeof report.goNoGo.available, "boolean");
@@ -97,6 +121,8 @@ test("integration control ledger inspects registered worktrees without changing 
   assert.match(markdown, /Intake review/);
   assert.match(markdown, /Interface contract change flow/);
   assert.match(markdown, /Current production Go\/No-Go snapshot/);
+  assert.match(markdown, /Recorded static publication receipts/);
+  assert.match(markdown, /github-pages-legacy/);
   assert.match(markdown, /server\.js/);
 });
 
@@ -115,6 +141,7 @@ test("integration control report writes deterministic artifact shape", (t) => {
   assert.equal(json.lines.length, 11);
   assert.equal(json.policy.firstWave.length, 6);
   assert.equal(json.policy.publicFiles.length, 5);
+  assert.equal(json.publicationReceipts.receipts.length >= 1, true);
   assert.match(markdown, /Release candidate gate:/);
 });
 

@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-07-23T13:37:59.524Z",
+  "receipts": [
+    {
+      "lineId": "T06",
+      "sourceCandidateHead": "8a161560f69016ec8372cfd89dfbf24afb047a80",
+      "targetBranch": "main",
+      "targetPath": "/",
+      "publishedHead": "d30e499b8396656481e653bf1a2ab2df17e342c6",
+      "deploymentType": "github-pages-legacy",
+      "ci": {
+        "runId": "29991049627",
+        "status": "success",
+        "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/29991049627"
+      },
+      "deployment": {
+        "runId": "29991048858",
+        "status": "success",
+        "deployedAt": "2026-07-23T08:33:34.000Z",
+        "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/29991048858"
+      },
+      "site": {
+        "baseUrl": "https://xujiann.github.io/chronic-care-platform/",
+        "status": "built",
+        "verifiedAt": "2026-07-23T13:37:59.524Z",
+        "resources": [
+          {
+            "path": "nursing-escort-domain.js",
+            "statusCode": 200,
+            "requiredMarkers": [
+              "ORDER_DISPATCH_BINDING_IMMUTABLE",
+              "capacityReservation",
+              "capacityRelease"
+            ],
+            "observedMarkers": [
+              "ORDER_DISPATCH_BINDING_IMMUTABLE",
+              "capacityReservation",
+              "capacityRelease"
+            ]
+          },
+          {
+            "path": "internet-nursing.html",
+            "statusCode": 200,
+            "requiredMarkers": [
+              "nursing-escort-domain.js",
+              "internet-nursing.js"
+            ],
+            "observedMarkers": [
+              "nursing-escort-domain.js",
+              "internet-nursing.js"
+            ]
+          },
+          {
+            "path": "escort.html",
+            "statusCode": 200,
+            "requiredMarkers": [
+              "nursing-escort-domain.js",
+              "escort.js"
+            ],
+            "observedMarkers": [
+              "nursing-escort-domain.js",
+              "escort.js"
+            ]
+          }
+        ]
+      },
+      "productionReady": false,
+      "boundary": "GitHub Pages is a static legacy preview receipt only. It does not prove Node API, trusted identity, production data, live interfaces, monitoring, disaster recovery, or production Go/No-Go readiness."
+    }
+  ]
+}
