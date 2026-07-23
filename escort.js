@@ -8,6 +8,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 async function loadEscortDashboard() {
   escortDashboard = await fetchEscortDashboard();
+  escortDashboard = withEscortDispatchControls(escortDashboard);
   renderEscortDashboard(escortDashboard);
 }
 
@@ -51,6 +52,51 @@ function buildStaticEscortDashboard(state) {
     riskQueue: orders.filter((item) => item.priority === "high" || item.riskLevel === "high"),
     qualityQueue: orders.filter((item) => item.qualityReview && !["closed", "passed"].includes(item.qualityReview))
   };
+}
+
+function withEscortDispatchControls(dashboard = {}) {
+  const domain = window.NursingEscortDomain;
+  if (!domain) return dashboard;
+  const workers = Array.isArray(dashboard.workers) ? dashboard.workers : [];
+  return {
+    ...dashboard,
+    orders: (Array.isArray(dashboard.orders) ? dashboard.orders : []).map((order) => ({
+      ...order,
+      dispatchControl: buildEscortDispatchControl(order, workers, domain)
+    }))
+  };
+}
+
+function buildEscortDispatchControl(order, workers, domain) {
+  const worker = order.worker || workers.find((item) => item.id === order.workerId);
+  const current = domain.canonicalStatus(order.status, "escort");
+  if (worker && !["requested", "eligibility-checked", "provider-matched", "risk-hold", "hospital-returned", "evidence-pending"].includes(current)) {
+    const qualification = domain.validateEscortWorkerQualification(worker, order, { now: new Date() });
+    return {
+      eligible: qualification.ok,
+      assigned: true,
+      personId: worker.id,
+      personName: worker.name,
+      blockers: qualification.reasons.map((item) => `qualification:${item}`)
+    };
+  }
+  const ranked = domain.rankDispatchCandidates("escort", order, workers, { now: new Date(), limit: 3 });
+  return {
+    eligible: ranked.candidates.length > 0,
+    assigned: false,
+    personId: ranked.candidates[0]?.personId || "",
+    personName: ranked.candidates[0]?.personName || "",
+    score: ranked.candidates[0]?.score || 0,
+    blockers: ranked.blockers
+  };
+}
+
+function escortDispatchControlText(item) {
+  const control = item.dispatchControl;
+  if (!control) return "";
+  if (control.assigned && control.eligible) return `assigned qualification passed: ${control.personName || control.personId}`;
+  if (control.eligible) return `dispatch ready: ${control.personName || control.personId} / score ${Math.round(control.score * 10) / 10}`;
+  return `dispatch blocked: ${(control.blockers || []).slice(0, 4).join(", ") || "no eligible worker"}`;
 }
 
 function renderEscortDashboard(dashboard) {
@@ -98,7 +144,7 @@ function renderEscortOrders(items) {
           <td><strong>${escapeHtml(item.id)}</strong><br><small>${escapeHtml(item.sourceChannel || "")}</small></td>
           <td>${escapeHtml(item.residentId || "")}<br><small>${escapeHtml(item.familyContactStatus || "")}</small></td>
           <td>${escapeHtml(item.provider?.name || item.providerName || item.providerId || "")}<br><small>${escapeHtml(item.district || "")}</small></td>
-          <td>${escapeHtml(item.worker?.name || item.workerId || "pending")}<br><small>${escapeHtml((item.serviceItems || []).join(", "))}</small></td>
+          <td>${escapeHtml(item.worker?.name || item.workerId || "pending")}<br><small>${escapeHtml((item.serviceItems || []).join(", "))}</small><br><small>${escapeHtml(escortDispatchControlText(item))}</small></td>
           <td>${escapeHtml(item.hospital || "")}<br><small>${escapeHtml(item.department || "")} / ${escapeHtml(item.appointmentAt || item.due || "")}</small><br><small>${statusBadge(item.hospitalInterfaceStatus || "pending")} ${escapeHtml(item.hospitalCheckInNo || item.outpatientQueueNo || item.hospitalNotice || "")}</small><br><small>${escapeHtml(item.hisVisitId || item.appointmentSource || "")} ${escapeHtml(item.departmentCode || "")} ${escapeHtml(item.doctorCode || "")}</small></td>
           <td>${statusBadge(item.subsidyType)} ${statusBadge(item.contractStatus)} ${statusBadge(item.insuranceStatus)}</td>
           <td>${statusBadge(item.status)} ${statusBadge(item.priority)}<br><small>${escapeHtml(item.qualityReview || "")}</small></td>

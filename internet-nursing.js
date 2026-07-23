@@ -13,6 +13,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 async function loadInternetNursingDashboard() {
   nursingDashboard = await fetchInternetNursingDashboard();
+  nursingDashboard.dispatchRecommendations = buildStaticDispatchRecommendations(nursingDashboard.orders || [], nursingDashboard.nurses || []);
   renderInternetNursingDashboard(nursingDashboard);
 }
 
@@ -108,6 +109,33 @@ function staticNotificationDeliveries(item) {
 }
 
 function buildStaticDispatchRecommendations(orders, nurses) {
+  const domain = window.NursingEscortDomain;
+  if (domain) {
+    return orders
+      .filter((order) => !order.nurseId && !["completed", "closed", "cancelled", "rejected"].includes(order.status))
+      .map((order) => {
+        const ranked = domain.rankDispatchCandidates("nursing", order, nurses, { now: new Date(), limit: 3 });
+        return {
+          orderId: order.id,
+          residentId: order.residentId,
+          serviceItem: order.serviceItem,
+          riskLevel: order.riskLevel,
+          targetStatus: ranked.targetStatus,
+          blockers: ranked.blockers,
+          blockedCandidates: ranked.blockedCandidates,
+          candidates: ranked.candidates.map((item) => {
+            const nurse = nurses.find((row) => row.id === item.personId) || {};
+            return {
+              nurseId: item.personId,
+              nurseName: item.personName,
+              remainingCapacity: Math.max(0, Number(nurse.dailyCapacity || 0) - Number(nurse.assignedToday || 0)),
+              score: item.score,
+              reason: `资质、机构、专科、容量、风险和证据门禁均通过；风险等级 ${item.risk.band}`
+            };
+          })
+        };
+      });
+  }
   return orders
     .filter((order) => !order.nurseId && ["requested", "assessed", "dispatched"].includes(order.status))
     .map((order) => ({
@@ -566,6 +594,7 @@ function renderDispatchRecommendations(items) {
       <strong>${escapeHtml(item.orderId)} · ${escapeHtml(displayText(item.serviceItem))}</strong>
       <span>${first ? `${escapeHtml(displayText(first.nurseName))}，剩余容量 ${escapeHtml(first.remainingCapacity)}，评分 ${escapeHtml(Math.round(first.score * 10) / 10)}` : "暂无合格护士候选"}</span>
       <small>${escapeHtml(first?.reason || "按护士资质、服务项目、服务区域、日容量和风险等级推荐")}</small>
+      ${!first && item.blockers?.length ? `<small>派单阻断：${escapeHtml(item.blockers.slice(0, 5).join("；"))}</small>` : ""}
     </div>`;
   }).join("") : `<div><strong>暂无待推荐订单</strong><span>当前订单均已派单或已进入服务闭环。</span></div>`;
 }

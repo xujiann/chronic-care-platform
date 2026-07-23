@@ -206,6 +206,108 @@
     });
   }
 
+  function dispatchTargetState(domain) {
+    return normalizeDomain(domain) === "nursing" ? "dispatched" : "worker-dispatched";
+  }
+
+  function dispatchPrerequisites(domain, order = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const missing = [];
+    if (!order.identityVerified) missing.push("identity-verification");
+    if (normalizedDomain === "nursing") {
+      if (order.firstVisitAssessment !== "passed") missing.push("first-visit-assessment");
+      if (order.informedConsent !== "signed" || order.consentAttachment?.status !== "signed") missing.push("signed-consent");
+    } else {
+      if (!["eligible", "passed", "approved"].includes(String(order.eligibilityResult?.status || order.eligibilityResult || "").toLowerCase())) missing.push("eligibility-result");
+      if (!order.providerAdmissionSnapshot && order.provider?.published !== true) missing.push("provider-admission-snapshot");
+    }
+    return [...new Set(missing)];
+  }
+
+  function dispatchCandidateScore(domain, person = {}, order = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    if (normalizedDomain === "nursing") {
+      const remainingCapacity = Math.max(0, Number(person.dailyCapacity || 0) - Number(person.assignedToday || 0));
+      const experience = Math.min(20, Number(person.yearsClinical || 0));
+      const riskBonus = order.riskLevel === "high" && Number(person.yearsClinical || 0) >= 8 ? 8 : 0;
+      return remainingCapacity * 4 + experience + riskBonus;
+    }
+    const requestedSkills = Array.isArray(order.serviceItems) ? order.serviceItems.filter(Boolean) : [];
+    const skills = new Set(Array.isArray(person.skills) ? person.skills : []);
+    const skillCoverage = requestedSkills.filter((item) => skills.has(item)).length;
+    return Math.min(20, Number(person.trainingHours || 0) / 2) + skillCoverage * 8;
+  }
+
+  function evaluateDispatchCandidate(domain, order = {}, person = {}, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const target = dispatchTargetState(normalizedDomain);
+    const transition = validateTransition(normalizedDomain, order.status, target);
+    const qualification = normalizedDomain === "nursing"
+      ? validateNurseQualification(person, order, options)
+      : validateEscortWorkerQualification(person, order, options);
+    const risk = assessOrderRisk(normalizedDomain, order);
+    const prerequisites = dispatchPrerequisites(normalizedDomain, order);
+    const blockers = [];
+    if (!transition.ok) blockers.push(`transition:${transition.current}->${target}`);
+    blockers.push(...prerequisites.map((item) => `evidence:${item}`));
+    blockers.push(...qualification.reasons.map((item) => `qualification:${item}`));
+    if (risk.band === "critical") blockers.push("risk:critical");
+    if (risk.band === "high" && order.riskReview?.status !== "approved") blockers.push("risk:review-required");
+    const score = dispatchCandidateScore(normalizedDomain, person, order);
+    const checkedAt = new Date(options.now || Date.now()).toISOString();
+    const personId = String(person.id || "");
+    const personName = String(person.name || personId);
+    const uniqueBlockers = [...new Set(blockers)];
+    const eligible = uniqueBlockers.length === 0;
+    return {
+      eligible,
+      domain: normalizedDomain,
+      orderId: String(order.id || ""),
+      targetStatus: target,
+      personId,
+      personName,
+      score,
+      blockers: uniqueBlockers,
+      transition,
+      qualification,
+      risk,
+      prerequisites,
+      updates: eligible ? {
+        ...(normalizedDomain === "nursing" ? { nurseId: personId, nurseName: personName } : { workerId: personId, workerName: personName }),
+        qualificationSnapshot: {
+          subjectId: personId,
+          subjectType: qualification.subjectType,
+          status: "passed",
+          checkedAt,
+          policyVersion: "nursing-escort-workflow-v1"
+        },
+        dispatchDecision: {
+          status: "approved",
+          score,
+          riskBand: risk.band,
+          checkedAt,
+          subjectId: personId
+        }
+      } : {}
+    };
+  }
+
+  function rankDispatchCandidates(domain, order = {}, roster = [], options = {}) {
+    const decisions = (Array.isArray(roster) ? roster : [])
+      .map((person) => evaluateDispatchCandidate(domain, order, person, options))
+      .sort((left, right) => Number(right.eligible) - Number(left.eligible) || right.score - left.score || left.personId.localeCompare(right.personId));
+    const limit = Math.max(1, Math.min(20, Number(options.limit || 3)));
+    return {
+      domain: normalizeDomain(domain),
+      orderId: String(order.id || ""),
+      targetStatus: dispatchTargetState(domain),
+      candidates: decisions.filter((item) => item.eligible).slice(0, limit),
+      blockedCandidates: decisions.filter((item) => !item.eligible).slice(0, limit),
+      blockers: [...new Set(decisions.flatMap((item) => item.blockers))],
+      evaluated: decisions.length
+    };
+  }
+
   function assessOrderRisk(domain, order = {}) {
     const normalizedDomain = normalizeDomain(domain);
     let score = order.riskLevel === "high" ? 35 : order.riskLevel === "medium" ? 18 : 6;
@@ -366,6 +468,10 @@
     validateTransition,
     validateNurseQualification,
     validateEscortWorkerQualification,
+    dispatchTargetState,
+    dispatchPrerequisites,
+    evaluateDispatchCandidate,
+    rankDispatchCandidates,
     assessOrderRisk,
     evidenceTypes,
     validateEvidenceForTransition,
