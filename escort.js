@@ -64,7 +64,8 @@ function withEscortDispatchControls(dashboard = {}) {
       ...order,
       dispatchControl: buildEscortDispatchControl(order, workers, domain),
       serviceEvidenceControl: buildEscortServiceEvidenceControl(order, domain),
-      financialEvidenceControl: buildEscortFinancialEvidenceControl(order, domain)
+      financialEvidenceControl: buildEscortFinancialEvidenceControl(order, domain),
+      riskQualityControl: buildEscortRiskQualityControl(order, domain)
     }))
   };
 }
@@ -145,6 +146,36 @@ function escortFinancialEvidenceText(item) {
   return `settlement blocked: ${control.blockers.slice(0, 5).join(", ")}`;
 }
 
+function buildEscortRiskQualityControl(order, domain) {
+  const current = domain.canonicalStatus(order.status, "escort");
+  const target = current === "complaint-open"
+    ? "quality-review"
+    : ["quality-review", "adverse-event", "closed"].includes(current) ? "closed" : "quality-review";
+  const transition = current === "closed" ? { ok: true } : domain.validateTransition("escort", current, target);
+  const evidence = domain.validateRiskQualityEvidence("escort", order, target, { currentStatus: current });
+  return {
+    ok: transition.ok && evidence.ok,
+    target,
+    blockers: [
+      ...(transition.ok ? [] : [`transition:${current}->${target}`]),
+      ...evidence.reasons
+    ]
+  };
+}
+
+function escortRiskQualityText(item) {
+  const control = item.riskQualityControl;
+  if (!control) return "";
+  if (control.ok) return control.target === "closed" ? "risk and quality closure passed" : "quality review evidence passed";
+  return `risk/quality blocked: ${control.blockers.slice(0, 5).join(", ")}`;
+}
+
+function escortRiskQualityActionAttributes(item, target) {
+  const control = item.riskQualityControl;
+  if (control?.ok && control.target === target) return "";
+  return `disabled aria-disabled="true" title="${escapeHtml(escortRiskQualityText(item) || `transition to ${target} blocked`)}"`;
+}
+
 function renderEscortDashboard(dashboard) {
   renderEscortMetrics(dashboard.summary || {});
   renderProviderSelect(dashboard.providers || []);
@@ -193,11 +224,11 @@ function renderEscortOrders(items) {
           <td>${escapeHtml(item.worker?.name || item.workerId || "pending")}<br><small>${escapeHtml((item.serviceItems || []).join(", "))}</small><br><small>${escapeHtml(escortDispatchControlText(item))}</small></td>
           <td>${escapeHtml(item.hospital || "")}<br><small>${escapeHtml(item.department || "")} / ${escapeHtml(item.appointmentAt || item.due || "")}</small><br><small>${statusBadge(item.hospitalInterfaceStatus || "pending")} ${escapeHtml(item.hospitalCheckInNo || item.outpatientQueueNo || item.hospitalNotice || "")}</small><br><small>${escapeHtml(item.hisVisitId || item.appointmentSource || "")} ${escapeHtml(item.departmentCode || "")} ${escapeHtml(item.doctorCode || "")}</small></td>
           <td>${statusBadge(item.subsidyType)} ${statusBadge(item.contractStatus)} ${statusBadge(item.insuranceStatus)}</td>
-          <td>${statusBadge(item.status)} ${statusBadge(item.priority)}<br><small>${escapeHtml(item.qualityReview || "")}</small><br><small>${escapeHtml(escortServiceEvidenceText(item))}</small><br><small>${escapeHtml(escortFinancialEvidenceText(item))}</small></td>
+          <td>${statusBadge(item.status)} ${statusBadge(item.priority)}<br><small>${escapeHtml(item.qualityReview || "")}</small><br><small>${escapeHtml(escortServiceEvidenceText(item))}</small><br><small>${escapeHtml(escortFinancialEvidenceText(item))}</small><br><small>${escapeHtml(escortRiskQualityText(item))}</small></td>
           <td>
             <button class="inline-action" type="button" data-escort-action="${escapeHtml(item.id)}" data-status="in-service" ${item.serviceEvidenceControl?.ok ? "" : `disabled aria-disabled="true" title="${escapeHtml(escortServiceEvidenceText(item))}"`}>开始</button>
-            <button class="inline-action" type="button" data-escort-action="${escapeHtml(item.id)}" data-status="quality-review">回访</button>
-            <button class="inline-action" type="button" data-escort-action="${escapeHtml(item.id)}" data-status="closed">关闭</button>
+            <button class="inline-action" type="button" data-escort-action="${escapeHtml(item.id)}" data-status="quality-review" ${escortRiskQualityActionAttributes(item, "quality-review")}>回访</button>
+            <button class="inline-action" type="button" data-escort-action="${escapeHtml(item.id)}" data-status="closed" ${escortRiskQualityActionAttributes(item, "closed")}>关闭</button>
           </td>
         </tr>
       `).join("")}</tbody>
