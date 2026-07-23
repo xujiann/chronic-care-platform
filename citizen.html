@@ -12,7 +12,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="format-detection" content="telephone=no" />
     <link rel="apple-touch-icon" href="./pwa-icon.svg" />
-    <link rel="stylesheet" href="./citizen.css?v=20260723care2" />
+    <link rel="stylesheet" href="./citizen.css?v=20260723care3" />
     <script src="./auth.js?v=20260627"></script>
     <script>window.HealthCityAuth.requireRole(["citizen"])</script>
   </head>
@@ -300,6 +300,9 @@
             <button type="button" class="small-button" data-record-accessibility="text-up" aria-label="放大照护中心文字">文字＋</button>
             <button type="button" class="small-button" data-record-accessibility="read">朗读摘要</button>
             <output id="citizen-record-text-scale" aria-live="polite">100%</output>
+            <span id="citizen-care-sync-status" role="status">等待同步</span>
+            <button type="button" class="small-button" data-refresh-care-workspace>刷新工作台</button>
+            <button type="button" class="small-button" data-clear-care-workspace>清理本机数据</button>
           </div>
         </div>
         <div id="citizen-current-subject" class="citizen-current-subject" role="status"></div>
@@ -773,8 +776,8 @@
     <script src="./physical-examination-service.js"></script>
     <script src="./immunization-schedule.js"></script>
     <script src="./citizen-records-v1.js?v=20260723auth2"></script>
-    <script src="./citizen-records-v2.js?v=20260723care2"></script>
-    <script src="./citizen.js?v=20260723care2"></script>
+    <script src="./citizen-records-v2.js?v=20260723care3"></script>
+    <script src="./citizen.js?v=20260723care3"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));

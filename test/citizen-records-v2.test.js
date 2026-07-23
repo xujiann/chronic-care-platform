@@ -353,6 +353,62 @@ test("controlled credentials require one-time HTTPS, short expiry, matching reso
   }, intent, { now, baseUrl: "https://resident.example/" }), /单次标识/);
 });
 
+test("care workspace sync projection is resident scoped and strips secrets", () => {
+  const projected = V2.projectCareWorkspacePayload({
+    corrections: [
+      { id: "c1", residentId: "r1", recordId: "emr-1", field: "summary", reason: "不一致", status: "accepted", receiptId: "receipt-c1", auditRef: "audit-c1", internalAssignee: "secret" },
+      { id: "c2", residentId: "r2", recordId: "emr-2", field: "summary", reason: "other", status: "accepted" }
+    ],
+    sharePackages: [
+      { id: "s1", residentId: "r1", granteeId: "hospital-a", purpose: "转诊", scopes: ["labs"], status: "active", expiresAt: "2026-07-24T08:00:00Z", accessRef: "HP-1", oneTimeCode: "SECRET", downloadUrl: "https://secret.example" },
+      { id: "s2", residentId: "r1", granteeId: "hospital-a", purpose: "越权", scopes: ["labs", "*"], status: "active", expiresAt: "2026-07-24T08:00:00Z" }
+    ],
+    taskUpdates: {
+      "care-task-1": { residentId: "r1", status: "completed", completedAt: "2026-07-23T09:00:00Z", auditRef: "audit-task" },
+      "care-task-2": { residentId: "r2", status: "completed" }
+    },
+    syncedAt: "2026-07-23T09:05:00Z",
+    cursor: "cursor-1",
+    databaseToken: "SECRET"
+  }, "r1");
+  assert.deepEqual(projected.recordCorrections.map((item) => item.id), ["c1"]);
+  assert.equal("internalAssignee" in projected.recordCorrections[0], false);
+  assert.deepEqual(projected.recordSharePackages.map((item) => item.id), ["s1"]);
+  assert.equal("oneTimeCode" in projected.recordSharePackages[0], false);
+  assert.equal("downloadUrl" in projected.recordSharePackages[0], false);
+  assert.deepEqual(Object.keys(projected.careTaskUpdates), ["care-task-1"]);
+  assert.equal("databaseToken" in projected, false);
+  assert.equal(projected.sync.cursor, "cursor-1");
+});
+
+test("server-synced care state wins conflicts while preserving unsynced local rows", () => {
+  const merged = V2.mergeCareWorkspaceState({
+    recordCorrections: [
+      { id: "c1", status: "submitted", updatedAt: "2026-07-23T10:00:00Z", reason: "local" },
+      { id: "c-local", status: "submitted", updatedAt: "2026-07-23T10:01:00Z" }
+    ],
+    recordSharePackages: [],
+    careTaskUpdates: { task1: { status: "in-progress", updatedAt: "2026-07-23T10:00:00Z" } }
+  }, {
+    recordCorrections: [{ id: "c1", status: "accepted", updatedAt: "2026-07-23T09:00:00Z", reason: "server", syncStatus: "server-synced" }],
+    recordSharePackages: [{ id: "s1", status: "active", syncStatus: "server-synced" }],
+    careTaskUpdates: { task1: { status: "completed", updatedAt: "2026-07-23T09:00:00Z", syncStatus: "server-synced" } },
+    sync: { cursor: "next" }
+  });
+  assert.equal(merged.recordCorrections.find((item) => item.id === "c1").status, "accepted");
+  assert.equal(merged.recordCorrections.some((item) => item.id === "c-local"), true);
+  assert.equal(merged.careTaskUpdates.task1.status, "completed");
+  assert.equal(merged.sync.cursor, "next");
+});
+
+test("static care preview metadata expires within 24 hours", () => {
+  const metadata = V2.buildCarePreviewMetadata(now, 48);
+  assert.equal(metadata.expiresAt, "2026-07-24T08:00:00.000Z");
+  assert.equal(V2.isCarePreviewExpired(metadata, "2026-07-24T07:59:59Z"), false);
+  assert.equal(V2.isCarePreviewExpired(metadata, "2026-07-24T08:00:00Z"), true);
+  assert.equal(V2.isCarePreviewExpired({}, now), true);
+});
+
 test("workspace summary composes deduplication, care tasks, EMR and completeness", () => {
   const result = V2.summarizeCareWorkspace({
     residentId: "r1",

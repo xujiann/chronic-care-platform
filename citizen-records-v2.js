@@ -602,6 +602,132 @@
     };
   }
 
+  function projectCareWorkspacePayload(payload = {}, residentId = "") {
+    const owner = cleanText(residentId, 120);
+    const corrections = (Array.isArray(payload.corrections) ? payload.corrections : [])
+      .filter((item) => !owner || item?.residentId === owner)
+      .map((item) => {
+        const status = cleanText(item.status, 40);
+        if (!item.id || !item.recordId || !CORRECTION_STATUSES.has(status)) return null;
+        return {
+          id: cleanText(item.id, 200),
+          residentId: cleanText(item.residentId, 120),
+          recordId: cleanText(item.recordId, 160),
+          field: cleanText(item.field, 100),
+          requestedValue: cleanText(item.requestedValue, 1000),
+          reason: cleanText(item.reason, 800),
+          status,
+          submittedAt: cleanText(item.submittedAt, 60),
+          updatedAt: cleanText(item.updatedAt, 60),
+          sourceVersion: cleanText(item.sourceVersion || "1", 40),
+          overwriteOriginal: false,
+          receiptId: cleanText(item.receiptId, 160),
+          auditRef: cleanText(item.auditRef, 160),
+          syncStatus: "server-synced"
+        };
+      })
+      .filter(Boolean);
+    const sharePackages = (Array.isArray(payload.sharePackages) ? payload.sharePackages : [])
+      .filter((item) => !owner || item?.residentId === owner)
+      .map((item) => {
+        const scopes = (Array.isArray(item.scopes) ? item.scopes : []).map((scope) => cleanText(scope, 100)).filter(Boolean);
+        const status = cleanText(item.status, 40);
+        if (!item.id || !item.granteeId || !SHARE_PACKAGE_STATUSES.has(status) || !scopes.length || scopes.some((scope) => !ACCESS_SCOPES.has(scope))) {
+          return null;
+        }
+        return {
+          id: cleanText(item.id, 200),
+          residentId: cleanText(item.residentId, 120),
+          granteeId: cleanText(item.granteeId, 160),
+          purpose: cleanText(item.purpose, 300),
+          scopes: [...new Set(scopes)],
+          status,
+          oneTimeCodeRequired: true,
+          accessRef: cleanText(item.accessRef, 80),
+          createdAt: cleanText(item.createdAt, 60),
+          updatedAt: cleanText(item.updatedAt, 60),
+          expiresAt: cleanText(item.expiresAt, 60),
+          revokedAt: cleanText(item.revokedAt, 60),
+          auditRequired: true,
+          receiptId: cleanText(item.receiptId, 160),
+          auditRef: cleanText(item.auditRef, 160),
+          syncStatus: "server-synced"
+        };
+      })
+      .filter(Boolean);
+    const rawTaskUpdates = Array.isArray(payload.taskUpdates)
+      ? payload.taskUpdates
+      : Object.entries(payload.taskUpdates || {}).map(([id, item]) => ({ id, ...(item || {}) }));
+    const taskUpdates = Object.fromEntries(rawTaskUpdates
+      .filter((item) => !owner || !item?.residentId || item.residentId === owner)
+      .map((item) => {
+        const id = cleanText(item.id || item.taskId, 200);
+        const status = cleanText(item.status, 40);
+        if (!id || !["pending-resident", "in-progress", "completed", "closed"].includes(status)) return null;
+        return [id, {
+          status,
+          completedAt: cleanText(item.completedAt, 60),
+          updatedAt: cleanText(item.updatedAt, 60),
+          receiptId: cleanText(item.receiptId, 160),
+          auditRef: cleanText(item.auditRef, 160),
+          syncStatus: "server-synced"
+        }];
+      })
+      .filter(Boolean));
+    return {
+      recordCorrections: corrections,
+      recordSharePackages: sharePackages,
+      careTaskUpdates: taskUpdates,
+      sync: {
+        syncedAt: cleanText(payload.syncedAt, 60),
+        cursor: cleanText(payload.cursor, 200),
+        schemaVersion: cleanText(payload.schemaVersion || "citizen-care-v1", 60)
+      }
+    };
+  }
+
+  function mergeCareWorkspaceState(current = {}, incoming = {}) {
+    function versionTime(item = {}) {
+      return toDate(item.updatedAt || item.acceptedAt || item.completedAt || item.submittedAt || item.createdAt)?.getTime() || 0;
+    }
+    function mergeRows(localRows, remoteRows) {
+      const byId = new Map((Array.isArray(localRows) ? localRows : []).filter((item) => item?.id).map((item) => [item.id, item]));
+      (Array.isArray(remoteRows) ? remoteRows : []).forEach((remote) => {
+        const local = byId.get(remote.id);
+        if (!local || versionTime(remote) >= versionTime(local) || remote.syncStatus === "server-synced") byId.set(remote.id, remote);
+      });
+      return [...byId.values()].sort((a, b) => versionTime(b) - versionTime(a));
+    }
+    const taskUpdates = { ...(current.careTaskUpdates || {}) };
+    Object.entries(incoming.careTaskUpdates || {}).forEach(([id, remote]) => {
+      const local = taskUpdates[id];
+      if (!local || versionTime(remote) >= versionTime(local) || remote.syncStatus === "server-synced") taskUpdates[id] = remote;
+    });
+    return {
+      recordCorrections: mergeRows(current.recordCorrections, incoming.recordCorrections),
+      recordSharePackages: mergeRows(current.recordSharePackages, incoming.recordSharePackages),
+      careTaskUpdates: taskUpdates,
+      sync: { ...(current.sync || {}), ...(incoming.sync || {}) }
+    };
+  }
+
+  function buildCarePreviewMetadata(now = new Date(), retentionHours = 24) {
+    const savedAt = toDate(now);
+    const hours = Math.max(1, Math.min(Number(retentionHours) || 24, 24));
+    if (!savedAt) throw new Error("演示留存时间格式不正确");
+    return {
+      schemaVersion: "citizen-care-preview-v1",
+      savedAt: savedAt.toISOString(),
+      expiresAt: new Date(savedAt.getTime() + hours * 3600000).toISOString()
+    };
+  }
+
+  function isCarePreviewExpired(metadata = {}, now = new Date()) {
+    const expiry = toDate(metadata.expiresAt);
+    const reference = toDate(now) || new Date();
+    return !expiry || expiry.getTime() <= reference.getTime();
+  }
+
   function summarizeCareWorkspace(input = {}) {
     const records = mergeInstitutionRecords(input.records || []);
     const completeness = assessRecordCompleteness({ ...input, records });
@@ -647,6 +773,10 @@
     projectSharePackageReceipt,
     validateControlledCredential,
     normalizeAccessibilityPreferences,
+    projectCareWorkspacePayload,
+    mergeCareWorkspaceState,
+    buildCarePreviewMetadata,
+    isCarePreviewExpired,
     summarizeCareWorkspace
   };
 });
