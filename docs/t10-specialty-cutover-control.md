@@ -152,6 +152,17 @@ The pack now emits a `cutoverCommandCenter` board that turns the evidence, batch
 
 The board also lists command seats (`release-commander`, `business-commander`, `operations-duty`, `security-audit`, `site-liaison`), escalation rules and decision artifacts. Missing append-only audit evidence, unexplained interface failures or any P0 patient-safety/privacy/security event keeps the release at No-Go.
 
+## Observation signal board
+
+`observationSignalBoard` defines the T+1 watch signals that the command center must review before any expansion:
+
+- patient-safety continuity: missed dispatch, handover, notification or unreachable manual downgrade path;
+- signed interface and idempotency: unexplained interface failures, duplicate mutation, retry/dead-letter evidence;
+- data quality, scope and privacy: over-scoped resident or institution visibility and required handover fields;
+- evidence replay and audit completeness: append-only audit events and evidence packet digest replay.
+
+The board returns three explicit outcomes: stay No-Go, repeat batch-1, or open watch-only batch-2. Watch-only expansion requires all lanes to be green and the T+1 observation memo to be accepted.
+
 ## Verification
 
 Run the focused test directly:

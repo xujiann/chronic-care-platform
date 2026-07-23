@@ -35,6 +35,7 @@ test("T00 exposes the T10 specialty cutover pack through public integration cont
   assert.match(client, /renderAcceptanceScenarioSuite/);
   assert.match(client, /renderScenarioEvidenceMatrix/);
   assert.match(client, /renderCutoverCommandCenter/);
+  assert.match(client, /renderObservationSignalBoard/);
   assert.match(client, /evidence-id-present/);
   assert.match(client, /batch-1-single-chain/);
   assert.match(client, /submit-evidence/);
@@ -43,6 +44,9 @@ test("T00 exposes the T10 specialty cutover pack through public integration cont
   assert.match(client, /command-center-ready-for-rehearsal/);
   assert.match(client, /window-t0-controlled-rehearsal/);
   assert.match(client, /release-commander/);
+  assert.match(client, /observation-ready/);
+  assert.match(client, /lane-interface-reliability/);
+  assert.match(client, /open-watch-only-batch-2/);
   assert.match(readme, /t10-specialty-cutover\.html/);
   assert.match(readme, /GET \/api\/t10-specialty\/cutover-pack/);
   assert.match(workbench, /t10-specialty-cutover\.html/);
@@ -57,6 +61,7 @@ test("T00 exposes the T10 specialty cutover pack through public integration cont
   assert.match(releaseReport, /specialtyCutover:acceptanceScenarioSuite/);
   assert.match(releaseReport, /specialtyCutover:scenarioEvidenceMatrix/);
   assert.match(releaseReport, /specialtyCutover:cutoverCommandCenter/);
+  assert.match(releaseReport, /specialtyCutover:observationSignalBoard/);
   assert.match(releaseReport, /t10-specialty-cutover-pack\.json/);
   assert.match(releaseReport, /t10-specialty-cutover-pack\.md/);
 });
@@ -107,4 +112,8 @@ test("T10 public projection keeps all real production gates closed with rehearsa
   assert.equal(pack.cutoverCommandCenter.summary.rosterSeats, 5);
   assert.ok(pack.cutoverCommandCenter.windows.some((item) => item.id === "window-t0-controlled-rehearsal"));
   assert.ok(pack.cutoverCommandCenter.roster.some((item) => item.seat === "release-commander"));
+  assert.equal(pack.observationSignalBoard.status, "observation-ready");
+  assert.equal(pack.observationSignalBoard.summary.lanes, 4);
+  assert.equal(pack.observationSignalBoard.summary.commandSeatsReady, 4);
+  assert.ok(pack.observationSignalBoard.lanes.some((item) => item.id === "lane-evidence-audit" && item.linkedScenarios.includes("scenario-5-evidence-replay")));
 });

@@ -165,6 +165,7 @@ function buildSpecialtyCutoverPack(options = {}) {
   const acceptanceScenarioSuite = buildAcceptanceScenarioSuite(tracks, firstIncrement, evidenceDossier, siteEvidenceWorkflow);
   const scenarioEvidenceMatrix = buildScenarioEvidenceMatrix(acceptanceScenarioSuite, evidenceDossier, siteEvidenceWorkflow);
   const cutoverCommandCenter = buildCutoverCommandCenter(tracks, firstIncrement, pilotBatchPlan, siteEvidenceWorkflow, scenarioEvidenceMatrix);
+  const observationSignalBoard = buildObservationSignalBoard(tracks, firstIncrement, cutoverCommandCenter, scenarioEvidenceMatrix);
   const summary = {
     tracks: tracks.length,
     codeReady: tracks.filter((item) => item.codeReady).length,
@@ -190,11 +191,12 @@ function buildSpecialtyCutoverPack(options = {}) {
     siteEvidenceWorkflow,
     acceptanceScenarioSuite,
     scenarioEvidenceMatrix,
-    cutoverCommandCenter
+    cutoverCommandCenter,
+    observationSignalBoard
   };
   pack.integrity = {
     algorithm: "sha256",
-    digest: `sha256:${sha256({ summary, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision, evidenceDossier, pilotBatchPlan, siteEvidenceWorkflow, acceptanceScenarioSuite, scenarioEvidenceMatrix, cutoverCommandCenter })}`
+    digest: `sha256:${sha256({ summary, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision, evidenceDossier, pilotBatchPlan, siteEvidenceWorkflow, acceptanceScenarioSuite, scenarioEvidenceMatrix, cutoverCommandCenter, observationSignalBoard })}`
   };
   return pack;
 }
@@ -849,6 +851,93 @@ function buildCutoverCommandCenter(tracks, firstIncrement, pilotBatchPlan, siteE
   };
 }
 
+function buildObservationSignalBoard(tracks, firstIncrement, cutoverCommandCenter, scenarioEvidenceMatrix) {
+  const primaryTrack = tracks.find((track) => track.id === firstIncrement.trackId) || tracks[0];
+  const hardStopScenarioIds = (scenarioEvidenceMatrix.rows || [])
+    .filter((row) => row.hardStopOnFail)
+    .map((row) => row.scenarioId);
+  const commandSeats = new Set((cutoverCommandCenter.roster || []).map((item) => item.seat));
+  const lanes = [
+    {
+      id: "lane-patient-safety",
+      name: "Patient safety continuity",
+      ownerSeat: "business-commander",
+      source: "manual downgrade log + scenario run sheet + clinical handover acknowledgement",
+      signals: [
+        { id: "missed-dispatch-or-handover", metric: "missed dispatch / handover / notification", threshold: 0, severity: "P0" },
+        { id: "manual-downgrade-reachable", metric: "manual downgrade path reachable", threshold: "100%", severity: "P0" }
+      ],
+      noGoRule: "any missed dispatch, handover, notification or unreachable manual downgrade path keeps the decision No-Go",
+      evidenceArtifact: "patient-safety-continuity-review"
+    },
+    {
+      id: "lane-interface-reliability",
+      name: "Signed interface and idempotency",
+      ownerSeat: "operations-duty",
+      source: "interface receipt ledger + idempotency ledger + retry/dead-letter queue",
+      signals: [
+        { id: "unexplained-interface-failure", metric: "consecutive unexplained failures", threshold: 2, severity: "P1" },
+        { id: "duplicate-mutation", metric: "duplicate input causing second mutation", threshold: 0, severity: "P0" }
+      ],
+      noGoRule: "duplicate mutation is a hard No-Go; two unexplained failures pause batch-1 and require manual downgrade review",
+      evidenceArtifact: "interface-and-idempotency-observation"
+    },
+    {
+      id: "lane-data-quality-scope",
+      name: "Data quality, scope and privacy",
+      ownerSeat: "security-audit",
+      source: "resident scope sample + role audit + cross-institution visibility review",
+      signals: [
+        { id: "over-scoped-data-visible", metric: "over-scoped resident or institution data visibility", threshold: 0, severity: "P0" },
+        { id: "unmatched-handover-fields", metric: "unmatched required handover fields", threshold: 0, severity: "P1" }
+      ],
+      noGoRule: "any over-scoped data visibility keeps the decision No-Go until root cause and evidence are accepted",
+      evidenceArtifact: "scope-and-data-quality-sample"
+    },
+    {
+      id: "lane-evidence-audit",
+      name: "Evidence replay and audit completeness",
+      ownerSeat: "release-commander",
+      source: "append-only audit export + evidence packet digest + four-eyes review events",
+      signals: [
+        { id: "missing-audit-event", metric: "missing append-only audit event", threshold: 0, severity: "P0" },
+        { id: "digest-mismatch", metric: "evidence packet digest mismatch", threshold: 0, severity: "P0" }
+      ],
+      noGoRule: "missing audit events or digest mismatch keep the decision No-Go even if the business flow appears successful",
+      evidenceArtifact: "audit-replay-and-digest-review"
+    }
+  ].map((lane) => ({
+    ...lane,
+    commandSeatReady: commandSeats.has(lane.ownerSeat),
+    linkedScenarios: lane.id === "lane-evidence-audit" ? ["scenario-5-evidence-replay"] : hardStopScenarioIds
+  }));
+  return {
+    status: "observation-ready",
+    observationWindow: "T+1",
+    primaryTrackId: primaryTrack.id,
+    primaryTrackName: primaryTrack.name,
+    lanes,
+    decisionOutcomes: [
+      { id: "stay-no-go", when: "any P0 signal is open or audit evidence is unreplayable", nextStep: "pause expansion and return evidence for correction" },
+      { id: "repeat-batch-1", when: "P1 signal is explained but needs another controlled run", nextStep: "rerun the affected scenario before scorecard update" },
+      { id: "open-watch-only-batch-2", when: "all lanes are green and T+1 observation memo is accepted", nextStep: "start read-only or synthetic watch-only flow for the next specialty" }
+    ],
+    requiredArtifacts: [
+      "t-plus-1-observation-memo",
+      "patient-safety-continuity-review",
+      "interface-and-idempotency-observation",
+      "scope-and-data-quality-sample",
+      "audit-replay-and-digest-review"
+    ],
+    summary: {
+      lanes: lanes.length,
+      p0Signals: lanes.flatMap((lane) => lane.signals).filter((signal) => signal.severity === "P0").length,
+      commandSeatsReady: lanes.filter((lane) => lane.commandSeatReady).length,
+      hardStopScenarioLinks: lanes.reduce((sum, lane) => sum + lane.linkedScenarios.length, 0)
+    }
+  };
+}
+
 function renderMarkdown(pack) {
   const rows = pack.tracks.map((item) => `| ${item.name} | ${item.department} | ${item.codeReady ? "是" : "否"} | ${item.productionReady ? "是" : "否"} | ${item.blockers.length} | ${item.page} |`);
   const blockers = pack.tracks.flatMap((track) => track.blockers.map((item) => `| ${track.name} | ${item.id} | ${item.title} | ${item.owner} | ${item.status} |`));
@@ -859,6 +948,7 @@ function renderMarkdown(pack) {
   const scenarioEvidenceRows = (pack.scenarioEvidenceMatrix?.rows || []).map((item) => `| ${item.scenarioId} | ${item.evidence.length} | ${item.requiredWorkflowEvents.join(", ")} | ${item.goNoGoImpact} | ${item.acceptanceResult} |`);
   const commandWindowRows = (pack.cutoverCommandCenter?.windows || []).map((item) => `| ${item.stage} | ${item.id} | ${item.name} | ${item.ownerRole} | ${item.entryGate} | ${item.exitGate} |`);
   const commandRosterRows = (pack.cutoverCommandCenter?.roster || []).map((item) => `| ${item.seat} | ${item.owner} | ${item.decisionRight} |`);
+  const observationLaneRows = (pack.observationSignalBoard?.lanes || []).map((item) => `| ${item.id} | ${item.ownerSeat} | ${item.signals.length} | ${item.noGoRule} | ${item.evidenceArtifact} |`);
   return [
     "# T10 急救、用血、影像与体检专项上线割接包",
     "",
@@ -988,6 +1078,20 @@ function renderMarkdown(pack) {
     "### Command escalation rules",
     "",
     ...(pack.cutoverCommandCenter?.escalationRules || []).map((item) => `- ${item}`),
+    "",
+    "## Observation signal board",
+    "",
+    `- Status: ${pack.observationSignalBoard?.status || "observation-ready"}`,
+    `- Window: ${pack.observationSignalBoard?.observationWindow || "T+1"}`,
+    `- P0 signals: ${pack.observationSignalBoard?.summary?.p0Signals || 0}`,
+    "",
+    "| Lane | Owner seat | Signals | No-Go rule | Evidence artifact |",
+    "|---|---|---:|---|---|",
+    ...observationLaneRows,
+    "",
+    "### Observation outcomes",
+    "",
+    ...(pack.observationSignalBoard?.decisionOutcomes || []).map((item) => `- ${item.id}: ${item.when} -> ${item.nextStep}`),
     ""
   ].join("\n");
 }
@@ -1026,5 +1130,6 @@ module.exports = {
   buildSiteEvidenceWorkflow,
   buildAcceptanceScenarioSuite,
   buildScenarioEvidenceMatrix,
-  buildCutoverCommandCenter
+  buildCutoverCommandCenter,
+  buildObservationSignalBoard
 };
