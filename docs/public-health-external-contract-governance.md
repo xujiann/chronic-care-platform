@@ -41,7 +41,9 @@
 - `deprecated`：新版本生效至 `sunsetAt` 之间，旧版仍兼容但必须迁移；
 - `retired`：达到 `sunsetAt` 后，旧版不再允许。
 
-同一领域同时出现多条已批准迁移时，不自动选择任何一条，而是产生 P0 `contract-transition-conflict`，保持原版本并等待人工治理。无效签名或材料产生 P0 `contract-attestation-invalid`。
+同一领域可以形成 v1→v2→v3 的连续迁移链，但每个 `fromContract` 只能存在一个已批准后继。一个版本出现多个后继时产生 P0 `contract-transition-conflict`；缺失前序节点时产生 P0 `contract-transition-disconnected`；后继版本在前序凭据签发前完成审批时产生 P0 `contract-transition-approval-order-invalid`；后一迁移在前一兼容窗口结束前生效时产生 P0 `contract-transition-window-overlap`。任一链路错误都保持该领域基线版本并等待人工治理。无效签名或材料产生 P0 `contract-attestation-invalid`。
+
+连续迁移按版本顺序计算所有历史状态。例如 v3 生效后，v1 保持 `retired`、v2 进入 `deprecated`、v3 成为唯一新任务使用的 `active` 版本。直接验签仍拒绝过期凭据；治理台账对已经完整走完生效和废止窗口的历史节点，在签名废止边界 `sunsetAt` 复核历史签名以防止版本回滚。未知或已吊销密钥仍会使历史链失败关闭，因此生产密钥环必须保留历史验签材料。
 
 `authorizePublicHealthExternalContract()` 同时校验领域、契约、请求 Schema 和回执 Schema：
 
@@ -70,6 +72,8 @@
 
 `buildPublicHealthExternalContractCutoverBoard()` 只把仍可能执行的旧版任务列为切换积压，包括 `pending`、`retry-scheduled`、持有租约的任务和未恢复死信。已投递成功的历史记录以及拥有唯一有效 v2 后继的已恢复死信继续保留审计价值，不因版本废止被误报为 P0。
 
+存在多次连续迁移时，切换板为每个 `fromContract` 建立独立轨道。例如 v3 生效时会同时保留 v1→v2 的历史完成轨道和 v2→v3 的当前排空轨道；较早死信的后继可以是链上任意更晚版本，但仍未完成的中间版本后继会在其自身迁移轨道中继续形成积压。
+
 - 兼容期积压产生 P1 `contract-cutover-backlog`；
 - 废止后积压产生 P0 `contract-cutover-backlog-after-sunset`；
 - 后继缺失、关系错误或仍使用旧契约产生 P0 `contract-cutover-successor-stale`。
@@ -86,6 +90,7 @@
 6. 新版本生效前校验 `runtimeReleaseDigest` 对应的 T08/T00 发布物已经部署，并完成字段字典、双向样例、回滚和现场联合测试。
 7. 废止前处理所有旧版 pending、retry-scheduled、dead-letter successor 和半开探针任务，避免到期后形成无法投递的积压。
 8. 新入队时只使用服务端治理快照解析出的 `currentContract` 和请求/回执 Schema；不得接受客户端 `contractBinding`。死信恢复创建新版本后继时，原任务恢复封印、新任务入队、审计链和协调状态必须在同一事务提交。
+9. 连续版本审批必须读取并锁定同领域前序链；保存 vN→vN+1 时校验前序存在、`fromContract` 唯一和兼容窗口不重叠。历史验签密钥不得因活动密钥轮换被物理删除。
 
 T00 继续负责 `server.js`、`package.json`、`portal.css`、`README.md`、公共发布总表、生产配置和统一持久化。本线程不修改这些公共文件。
 
@@ -98,5 +103,6 @@ T00 继续负责 `server.js`、`package.json`、`portal.css`、`README.md`、公
 - 冲突审批、伪造审批、跳版、Schema 漂移、过期和吊销凭据全部失败关闭。
 - 运维巡检在兼容期产生 P1、废止后产生 P0。
 - 生效后新任务使用新版签名报文；旧版死信可由授权恢复生成唯一新版后继。
+- v1→v2→v3 连续链可稳定重建；分叉、断链和兼容窗口重叠全部失败关闭。
 - 已完成历史记录不阻塞切换，仍可执行的旧版积压和错误后继必须阻塞。
 - 报告不包含密钥和审批人原始身份，并始终保持 `productionReady=false`。

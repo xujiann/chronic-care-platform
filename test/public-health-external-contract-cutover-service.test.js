@@ -15,7 +15,7 @@ function digest(value) {
   return crypto.createHash("sha256").update(value).digest("hex");
 }
 
-function governance(at) {
+function governance(at, includeV3 = false) {
   const attestation = signPublicHealthExternalContractAttestation({
     laneId: "family-doctor",
     fromContract: "family-doctor-fulfillment-v1",
@@ -47,8 +47,42 @@ function governance(at) {
     expiresAt: "2026-09-01T00:00:00.000Z",
     nonce: "family-doctor-cutover-v2"
   }, SECRET);
+  const attestations = [attestation];
+  if (includeV3) {
+    attestations.push(signPublicHealthExternalContractAttestation({
+      laneId: "family-doctor",
+      fromContract: "family-doctor-fulfillment-v2",
+      toContract: "family-doctor-fulfillment-v3",
+      requestSchemaVersion: "public-health-external-dispatch/v3",
+      receiptSchemaVersion: "public-health-external-receipt/v3",
+      changeType: "additive",
+      fieldDictionaryDigest: digest("dictionary-v3"),
+      sampleRequestDigest: digest("request-v3"),
+      sampleReceiptDigest: digest("receipt-v3"),
+      runtimeReleaseDigest: digest("release-v3"),
+      producerApproval: {
+        organizationId: "producer-platform",
+        role: "producer-contract-owner",
+        approverIdHash: digest("producer-v3"),
+        approvedAt: "2026-08-16T08:00:00.000Z"
+      },
+      consumerApproval: {
+        organizationId: "consumer-platform",
+        role: "consumer-contract-owner",
+        approverIdHash: digest("consumer-v3"),
+        approvedAt: "2026-08-16T09:00:00.000Z"
+      },
+      evidenceRefs: ["dictionary-v3", "producer-approval-v3", "consumer-approval-v3"],
+      effectiveAt: "2026-08-20T00:00:00.000Z",
+      sunsetAt: "2026-08-30T00:00:00.000Z",
+      status: "approved",
+      issuedAt: "2026-08-17T08:00:00.000Z",
+      expiresAt: "2026-09-01T00:00:00.000Z",
+      nonce: "family-doctor-cutover-v3"
+    }, SECRET));
+  }
   return buildPublicHealthExternalContractGovernance({
-    attestations: [attestation],
+    attestations,
     signingMaterial: SECRET,
     at
   });
@@ -152,4 +186,32 @@ test("recovered old dead letter requires exactly the active-version successor re
   });
   assert.equal(stale.ok, false);
   assert.equal(stale.issues.some((item) => item.code === "contract-cutover-successor-stale"), true);
+});
+
+test("cutover board tracks every transition in a sequential version chain", () => {
+  const board = buildPublicHealthExternalContractCutoverBoard({
+    data: {
+      publicHealthExternalDispatches: [
+        dispatch("v1-history", "delivered"),
+        {
+          id: "v2-pending",
+          laneId: "family-doctor",
+          contract: "family-doctor-fulfillment-v2",
+          deliveryState: "pending",
+          lease: null,
+          recovery: null
+        }
+      ]
+    },
+    contractGovernance: governance("2026-08-20T00:00:00.000Z", true),
+    now: "2026-08-20T00:00:00.000Z"
+  });
+  assert.equal(board.ok, true);
+  assert.equal(board.summary.transitionLanes, 1);
+  assert.equal(board.summary.transitionTracks, 2);
+  assert.equal(board.summary.completed, 1);
+  assert.equal(board.summary.draining, 1);
+  assert.equal(board.summary.outstanding, 1);
+  assert.equal(board.issues[0].fromContract, "family-doctor-fulfillment-v2");
+  assert.equal(board.issues[0].toContract, "family-doctor-fulfillment-v3");
 });

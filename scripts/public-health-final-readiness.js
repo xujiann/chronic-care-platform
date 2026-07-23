@@ -380,7 +380,43 @@ function runExternalContractGovernanceAcceptance() {
     signingMaterial: ACCEPTANCE_REQUEST_SECRET,
     at: "2026-08-15T00:00:00.000Z"
   });
-  return { attestation, scheduled, active, retired };
+  const nextAttestation = signPublicHealthExternalContractAttestation({
+    laneId: "family-doctor",
+    fromContract: "family-doctor-fulfillment-v2",
+    toContract: "family-doctor-fulfillment-v3",
+    requestSchemaVersion: "public-health-external-dispatch/v3",
+    receiptSchemaVersion: "public-health-external-receipt/v3",
+    changeType: "additive",
+    fieldDictionaryDigest: digest("final-family-doctor-fields-v3"),
+    sampleRequestDigest: digest("final-family-doctor-request-v3"),
+    sampleReceiptDigest: digest("final-family-doctor-receipt-v3"),
+    runtimeReleaseDigest: digest("final-family-doctor-runtime-v3"),
+    producerApproval: {
+      organizationId: "family-doctor-platform",
+      role: "producer-contract-owner",
+      approverIdHash: digest("final-family-doctor-producer-v3"),
+      approvedAt: "2026-08-16T08:00:00.000Z"
+    },
+    consumerApproval: {
+      organizationId: "district-health-platform",
+      role: "consumer-contract-owner",
+      approverIdHash: digest("final-family-doctor-consumer-v3"),
+      approvedAt: "2026-08-16T09:00:00.000Z"
+    },
+    evidenceRefs: ["field-dictionary-v3", "producer-approval-v3", "consumer-approval-v3"],
+    effectiveAt: "2026-08-20T00:00:00.000Z",
+    sunsetAt: "2026-08-30T00:00:00.000Z",
+    status: "approved",
+    issuedAt: "2026-08-17T08:00:00.000Z",
+    expiresAt: "2026-09-01T00:00:00.000Z",
+    nonce: "final-family-doctor-contract-v3"
+  }, ACCEPTANCE_REQUEST_SECRET);
+  const thirdActive = buildPublicHealthExternalContractGovernance({
+    attestations: [attestation, nextAttestation],
+    signingMaterial: ACCEPTANCE_REQUEST_SECRET,
+    at: "2026-08-20T00:00:00.000Z"
+  });
+  return { attestation, nextAttestation, scheduled, active, retired, thirdActive };
 }
 
 function buildPublicHealthFinalReadiness(options = {}) {
@@ -478,6 +514,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
     check("contract:signed-version-lifecycle", contractAcceptance.scheduled.summary.scheduled === 1 && contractAcceptance.active.summary.deprecated === 1 && contractAcceptance.retired.summary.retired === 1 && authorizePublicHealthExternalContract(contractAcceptance.retired, "family-doctor", "family-doctor-fulfillment-v1", "public-health-external-dispatch/v1", "public-health-external-receipt/v1").reason === "contract-version-retired", "signed dual approval advances scheduled, active/deprecated and retired contract states", "contract"),
     check("contract:trust-and-drift-boundary", ["producer-contract-owner", "consumer-contract-owner", "runtimeReleaseDigest", "contract-transition-conflict", "contract-attestation-signature-invalid"].every((token) => contractSource.includes(token)) && ["assertDispatchContractGovernance", "contractGovernance"].every((token) => adapterRuntimeSource.includes(token)) && ["contract-governance-mismatch", "contract-version-deprecated"].every((token) => operationsSource.includes(token)), "dual approvals, release/sample digests, conflicts, runtime admission, tampering and operations drift fail closed", "contract"),
     check("contract:versioned-cutover-runtime", contractCutoverDraining.summary.outstanding === 1 && contractCutoverDraining.issues.some((item) => item.code === "contract-cutover-backlog") && contractCutoverCompleted.ok === true && contractCutoverCompleted.summary.completed === 1 && ["resolveExternalContractBinding", "receiptSchemaForRequest"].every((token) => adapterSource.includes(token)) && ["contract-cutover-backlog-after-sunset", "contract-cutover-successor-stale"].every((token) => contractCutoverSource.includes(token)), "active contracts drive versioned request/receipt signing while only executable old-version backlog blocks sunset", "contract"),
+    check("contract:sequential-version-chain", contractAcceptance.thirdActive.ok === true && contractAcceptance.thirdActive.summary.transitions === 2 && contractAcceptance.thirdActive.entries.find((item) => item.laneId === "family-doctor")?.currentContract === "family-doctor-fulfillment-v3" && ["contract-transition-disconnected", "contract-transition-approval-order-invalid", "contract-transition-window-overlap"].every((token) => contractSource.includes(token)), "signed non-overlapping transitions advance v1 to v2 to v3 while branch, gap, approval-order and overlap controls fail closed", "contract"),
     check("outbox:persisted-enqueue-attempt", outboxAcceptance.delivered.externalRuntime.summary.dispatches === 1 && outboxAcceptance.delivered.externalRuntime.summary.auditEntries === 3, "one signed dispatch and three append-only enqueue/claim/attempt audit entries", "outbox"),
     check("outbox:coordination-advance", outboxAcceptance.delivered.dispatch.deliveryState === "delivered" && outboxAcceptance.handoff.state === "receipt-confirmed", "verified callback advances the linked coordination handoff", "outbox"),
     check("outbox:runtime-state-signature", verifyRuntimeStateSignature(outboxAcceptance.delivered.dispatch, ACCEPTANCE_REQUEST_SECRET), "mutable outbox state retains a trusted runtime signature", "outbox"),
@@ -540,7 +577,8 @@ function buildPublicHealthFinalReadiness(options = {}) {
       operationsSignatureVerified: operationsBoard.summary.signatureVerified,
       resilienceAuditEntries: resilienceAcceptance.recovered.nextData.publicHealthExternalLaneControlAudit.length,
       verifiedContractAttestations: contractAcceptance.active.summary.verifiedAttestations,
-      contractCutoverBacklog: contractCutoverDraining.summary.outstanding
+      contractCutoverBacklog: contractCutoverDraining.summary.outstanding,
+      sequentialContractTransitions: contractAcceptance.thirdActive.summary.transitions
     },
     checks,
     runtime: {
@@ -575,6 +613,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
       scheduled: contractAcceptance.scheduled.summary,
       active: contractAcceptance.active.summary,
       retired: contractAcceptance.retired.summary,
+      thirdActive: contractAcceptance.thirdActive.summary,
       productionReady: false
     },
     contractCutoverAcceptance: {

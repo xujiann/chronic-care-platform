@@ -99,6 +99,43 @@ function signedAttestation(overrides = {}, signingMaterial = oldKeyring()) {
   );
 }
 
+function nextAttestationInput(overrides = {}) {
+  return {
+    ...attestationInput(),
+    fromContract: "family-doctor-fulfillment-v2",
+    toContract: "family-doctor-fulfillment-v3",
+    requestSchemaVersion: "public-health-external-dispatch/v3",
+    receiptSchemaVersion: "public-health-external-receipt/v3",
+    fieldDictionaryDigest: digest("family-doctor-field-dictionary-v3"),
+    sampleRequestDigest: digest("family-doctor-request-sample-v3"),
+    sampleReceiptDigest: digest("family-doctor-receipt-sample-v3"),
+    runtimeReleaseDigest: digest("family-doctor-runtime-release-v3"),
+    producerApproval: {
+      ...attestationInput().producerApproval,
+      approverIdHash: digest("producer-approver-002"),
+      approvedAt: "2026-08-16T08:00:00.000Z"
+    },
+    consumerApproval: {
+      ...attestationInput().consumerApproval,
+      approverIdHash: digest("consumer-approver-002"),
+      approvedAt: "2026-08-16T09:00:00.000Z"
+    },
+    effectiveAt: "2026-08-20T00:00:00.000Z",
+    sunsetAt: "2026-08-30T00:00:00.000Z",
+    issuedAt: "2026-08-17T08:00:00.000Z",
+    expiresAt: "2026-09-10T00:00:00.000Z",
+    nonce: "family-doctor-contract-v3-approval",
+    ...overrides
+  };
+}
+
+function signedNextAttestation(overrides = {}) {
+  return signPublicHealthExternalContractAttestation(
+    nextAttestationInput(overrides),
+    rotatedKeyring()
+  );
+}
+
 test("base contract governance covers all eight registered adapter contracts", () => {
   const governance = buildPublicHealthExternalContractGovernance({
     attestations: [],
@@ -240,6 +277,16 @@ test("missing independent approval version skips and stale or revoked receipts f
     rotatedKeyring(),
     { at: "2026-09-02T00:00:00.000Z" }
   ).reason, "contract attestation has expired");
+  const historical = buildPublicHealthExternalContractGovernance({
+    attestations: [signed],
+    signingMaterial: rotatedKeyring(),
+    at: "2026-10-02T00:00:00.000Z"
+  });
+  assert.equal(historical.ok, true);
+  assert.equal(
+    historical.entries.find((item) => item.laneId === "family-doctor").currentContract,
+    "family-doctor-fulfillment-v2"
+  );
   assert.equal(verifyPublicHealthExternalContractAttestation(
     signed,
     rotatedKeyring("revoked"),
@@ -295,4 +342,105 @@ test("schema mismatch and unknown contracts are rejected even inside a valid reg
     "public-health-external-dispatch/v1",
     "public-health-external-receipt/v1"
   ).reason, "contract-governance-unavailable");
+});
+
+test("sequential signed transitions advance v1 to v2 to v3 without losing history", () => {
+  const first = signedAttestation();
+  const attestations = [first, { ...first }, signedNextAttestation()];
+  const scheduled = buildPublicHealthExternalContractGovernance({
+    attestations,
+    signingMaterial: rotatedKeyring(),
+    at: "2026-08-18T00:00:00.000Z"
+  });
+  const scheduledLane = scheduled.entries.find((item) => item.laneId === "family-doctor");
+  assert.equal(scheduled.ok, true);
+  assert.equal(scheduled.summary.verifiedAttestations, 2);
+  assert.equal(scheduled.summary.transitions, 2);
+  assert.equal(scheduledLane.currentContract, "family-doctor-fulfillment-v2");
+  assert.deepEqual(scheduledLane.contracts.map((item) => [item.contract, item.state]), [
+    ["family-doctor-fulfillment-v1", "retired"],
+    ["family-doctor-fulfillment-v2", "active"],
+    ["family-doctor-fulfillment-v3", "scheduled"]
+  ]);
+
+  const active = buildPublicHealthExternalContractGovernance({
+    attestations,
+    signingMaterial: rotatedKeyring(),
+    at: "2026-08-20T00:00:00.000Z"
+  });
+  const activeLane = active.entries.find((item) => item.laneId === "family-doctor");
+  assert.equal(activeLane.currentContract, "family-doctor-fulfillment-v3");
+  assert.deepEqual(activeLane.acceptedContracts, [
+    "family-doctor-fulfillment-v3",
+    "family-doctor-fulfillment-v2"
+  ]);
+  assert.equal(authorizePublicHealthExternalContract(
+    active,
+    "family-doctor",
+    "family-doctor-fulfillment-v1",
+    "public-health-external-dispatch/v1",
+    "public-health-external-receipt/v1"
+  ).reason, "contract-version-retired");
+  assert.equal(authorizePublicHealthExternalContract(
+    active,
+    "family-doctor",
+    "family-doctor-fulfillment-v3",
+    "public-health-external-dispatch/v3",
+    "public-health-external-receipt/v3"
+  ).ok, true);
+});
+
+test("sequential governance rejects disconnected and overlapping transition chains", () => {
+  const disconnected = buildPublicHealthExternalContractGovernance({
+    attestations: [signedNextAttestation()],
+    signingMaterial: rotatedKeyring(),
+    at: "2026-08-18T00:00:00.000Z"
+  });
+  assert.equal(disconnected.ok, false);
+  assert.equal(disconnected.summary.disconnected, 1);
+  assert.equal(disconnected.entries.find((item) => item.laneId === "family-doctor").currentContract, "family-doctor-fulfillment-v1");
+
+  const overlapping = buildPublicHealthExternalContractGovernance({
+    attestations: [
+      signedAttestation(),
+      signedNextAttestation({
+        producerApproval: {
+          ...nextAttestationInput().producerApproval,
+          approvedAt: "2026-08-11T08:00:00.000Z"
+        },
+        consumerApproval: {
+          ...nextAttestationInput().consumerApproval,
+          approvedAt: "2026-08-11T09:00:00.000Z"
+        },
+        issuedAt: "2026-08-12T08:00:00.000Z",
+        effectiveAt: "2026-08-14T00:00:00.000Z"
+      })
+    ],
+    signingMaterial: rotatedKeyring(),
+    at: "2026-08-18T00:00:00.000Z"
+  });
+  assert.equal(overlapping.ok, false);
+  assert.equal(overlapping.summary.overlappingWindows, 1);
+  assert.equal(overlapping.issues[0].code, "contract-transition-window-overlap");
+
+  const outOfOrder = buildPublicHealthExternalContractGovernance({
+    attestations: [
+      signedAttestation(),
+      signedNextAttestation({
+        producerApproval: {
+          ...nextAttestationInput().producerApproval,
+          approvedAt: "2026-07-22T08:00:00.000Z"
+        },
+        consumerApproval: {
+          ...nextAttestationInput().consumerApproval,
+          approvedAt: "2026-07-22T09:00:00.000Z"
+        }
+      })
+    ],
+    signingMaterial: rotatedKeyring(),
+    at: "2026-08-18T00:00:00.000Z"
+  });
+  assert.equal(outOfOrder.ok, false);
+  assert.equal(outOfOrder.summary.invalidApprovalOrder, 1);
+  assert.equal(outOfOrder.issues[0].code, "contract-transition-approval-order-invalid");
 });

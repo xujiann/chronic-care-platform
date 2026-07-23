@@ -137,7 +137,7 @@ function attemptOptions(idempotencyKey, at = "2026-07-23T08:01:30.000Z", expecte
   };
 }
 
-function runtimeContractGovernance(at) {
+function runtimeContractGovernance(at, includeV3 = false) {
   const digest = (value) => crypto.createHash("sha256").update(value).digest("hex");
   const attestation = signPublicHealthExternalContractAttestation({
     laneId: "family-doctor",
@@ -170,8 +170,42 @@ function runtimeContractGovernance(at) {
     expiresAt: "2026-09-01T00:00:00.000Z",
     nonce: "runtime-family-doctor-contract-v2"
   }, REQUEST_SECRET);
+  const attestations = [attestation];
+  if (includeV3) {
+    attestations.push(signPublicHealthExternalContractAttestation({
+      laneId: "family-doctor",
+      fromContract: "family-doctor-fulfillment-v2",
+      toContract: "family-doctor-fulfillment-v3",
+      requestSchemaVersion: "public-health-external-dispatch/v3",
+      receiptSchemaVersion: "public-health-external-receipt/v3",
+      changeType: "additive",
+      fieldDictionaryDigest: digest("runtime-family-doctor-fields-v3"),
+      sampleRequestDigest: digest("runtime-family-doctor-request-v3"),
+      sampleReceiptDigest: digest("runtime-family-doctor-receipt-v3"),
+      runtimeReleaseDigest: digest("runtime-family-doctor-release-v3"),
+      producerApproval: {
+        organizationId: "family-doctor-platform",
+        role: "producer-contract-owner",
+        approverIdHash: digest("runtime-producer-v3"),
+        approvedAt: "2026-08-16T08:00:00.000Z"
+      },
+      consumerApproval: {
+        organizationId: "district-health-platform",
+        role: "consumer-contract-owner",
+        approverIdHash: digest("runtime-consumer-v3"),
+        approvedAt: "2026-08-16T09:00:00.000Z"
+      },
+      evidenceRefs: ["field-dictionary-v3", "producer-approval-v3", "consumer-approval-v3"],
+      effectiveAt: "2026-08-20T00:00:00.000Z",
+      sunsetAt: "2026-08-30T00:00:00.000Z",
+      status: "approved",
+      issuedAt: "2026-08-17T08:00:00.000Z",
+      expiresAt: "2026-09-01T00:00:00.000Z",
+      nonce: "runtime-family-doctor-contract-v3"
+    }, REQUEST_SECRET));
+  }
   return buildPublicHealthExternalContractGovernance({
-    attestations: [attestation],
+    attestations,
     signingMaterial: REQUEST_SECRET,
     at
   });
@@ -1016,4 +1050,24 @@ test("contract governance allows deprecated work, blocks retired claims and emit
     credentials({ contractGovernance: retiredGovernance })
   );
   assert.equal(nextVersionClaim.contractAuthorization.reason, "verified");
+
+  const thirdVersionPrepared = advanceToInProgress("family-doctor");
+  const thirdVersionGovernance = runtimeContractGovernance("2026-08-30T00:00:00.000Z", true);
+  const thirdVersion = enqueuePublicHealthExternalDispatchToState(
+    thirdVersionPrepared.data,
+    thirdVersionPrepared.handoffId,
+    {
+      idempotencyKey: "family-doctor:contract:v3-enqueue",
+      operation: "coordination-handoff",
+      evidenceRefs: ["family-doctor-v3-contract-request"],
+      exceptionOwner: "family-doctor-interface-owner",
+      exceptionDueAt: "2026-09-05",
+      at: "2026-08-30T00:00:00.000Z"
+    },
+    credentials({ contractGovernance: thirdVersionGovernance }),
+    thirdVersionPrepared.dependencies
+  );
+  assert.equal(thirdVersion.dispatch.contract, "family-doctor-fulfillment-v3");
+  assert.equal(thirdVersion.dispatch.request.schemaVersion, "public-health-external-dispatch/v3");
+  assert.equal(thirdVersion.contractAuthorization.reason, "verified");
 });
