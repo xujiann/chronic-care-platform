@@ -43,6 +43,11 @@ const CLOSURE_COMMAND_CONTRACTS = Object.freeze([
 ]);
 
 const RECEIPT_STATUSES = new Set(["acknowledged", "bounced", "confirmed", "delivered", "failed", "handled", "read", "received"]);
+const ACTIVE_AUTHORIZATION_STATUSES = new Set(["active", "authorized"]);
+const REFERRAL_AUTHORIZATION_SCOPES = Object.freeze({
+  referral: new Set(["referral", "referral-teleconsultation", "referral-and-teleconsultation"]),
+  teleconsultation: new Set(["teleconsultation", "referral-teleconsultation", "referral-and-teleconsultation"])
+});
 
 function rows(value) {
   return Array.isArray(value) ? value : [];
@@ -85,7 +90,11 @@ function requireCommandRole(action, actor = {}) {
 function requireInstitutionScope(actor = {}, institutionCode = "") {
   if (actor.role === "commission") return;
   if (actor.role !== "institution") throw new Error("institution or commission role is required");
-  if (institutionCode && actor.orgCode && actor.orgCode !== institutionCode) throw new Error("institution scope denied");
+  const actorOrgCode = text(actor.orgCode);
+  const targetOrgCode = text(institutionCode);
+  if (!actorOrgCode) throw new Error("institution actor orgCode is required");
+  if (!targetOrgCode) throw new Error("institution target orgCode is required");
+  if (actorOrgCode !== targetOrgCode) throw new Error("institution scope denied");
 }
 
 function requireResidentScope(actor = {}, residentId = "") {
@@ -134,8 +143,36 @@ function findResident(data, residentId) {
   return rows(data.residents).find((item) => item.id === residentId);
 }
 
-function findAuthorization(data, authorizationId, residentId) {
-  return rows(data.personalRecords).find((item) => item.id === authorizationId && item.category === "authorizations" && item.residentId === residentId && item.status !== "revoked" && item.meta?.status !== "revoked");
+function authorizationScopes(authorization = {}) {
+  return [
+    authorization.scope,
+    ...rows(authorization.scopes),
+    authorization.meta?.scope,
+    ...rows(authorization.meta?.scopes)
+  ].map((item) => text(item).toLowerCase()).filter(Boolean);
+}
+
+function authorizationIsUnexpired(authorization = {}, at = "") {
+  const expirationValues = [authorization.expiresAt, authorization.meta?.expiresAt].map(text).filter(Boolean);
+  if (!expirationValues.length) return true;
+  const commandAtMs = Date.parse(at);
+  return Number.isFinite(commandAtMs) && expirationValues.every((expiresAt) => {
+    const expiresAtMs = Date.parse(expiresAt);
+    return Number.isFinite(expiresAtMs) && expiresAtMs > commandAtMs;
+  });
+}
+
+function findAuthorization(data, authorizationId, residentId, options = {}) {
+  const requiredScope = text(options.requiredScope).toLowerCase();
+  const acceptedScopes = REFERRAL_AUTHORIZATION_SCOPES[requiredScope];
+  return rows(data.personalRecords).find((item) => {
+    if (item.id !== authorizationId || item.category !== "authorizations" || item.residentId !== residentId) return false;
+    if (!ACTIVE_AUTHORIZATION_STATUSES.has(text(item.status).toLowerCase())) return false;
+    if (!ACTIVE_AUTHORIZATION_STATUSES.has(text(item.meta?.status).toLowerCase())) return false;
+    if (!authorizationIsUnexpired(item, options.at)) return false;
+    if (!acceptedScopes || !authorizationScopes(item).some((scope) => acceptedScopes.has(scope))) return false;
+    return true;
+  });
 }
 
 function recordPrimaryCareAssessment(data, command, actor) {
@@ -195,12 +232,13 @@ function createReferralFromPrimaryCare(data, command, actor) {
   if (!["refer-up", "teleconsultation"].includes(assessment.disposition)) throw new Error("primary care assessment does not require referral");
   const payload = command.payload;
   const authorizationId = requireText(payload.residentAuthorizationId, "payload.residentAuthorizationId");
-  const authorization = findAuthorization(data, authorizationId, assessment.residentId);
-  if (!authorization) throw new Error("active resident referral authorization not found");
   const targetInstitution = requireText(payload.targetInstitution, "payload.targetInstitution");
   const targetInstitutionCode = requireText(payload.targetInstitutionCode, "payload.targetInstitutionCode");
-  const authorizedTargets = rows(authorization.meta?.authorizedTo).map(text).filter(Boolean);
-  if (authorizedTargets.length && !authorizedTargets.includes(targetInstitutionCode)) throw new Error("resident referral authorization does not cover target institution");
+  const requiredScope = assessment.disposition === "teleconsultation" || payload.createTeleconsultation === true ? "teleconsultation" : "referral";
+  const authorization = findAuthorization(data, authorizationId, assessment.residentId, { at: command.at, requiredScope });
+  if (!authorization) throw new Error(`active unexpired resident ${requiredScope} authorization not found`);
+  const authorizedTargets = [...rows(authorization.authorizedTo), ...rows(authorization.meta?.authorizedTo)].map(text).filter(Boolean);
+  if (!authorizedTargets.includes(targetInstitutionCode)) throw new Error("resident referral authorization does not cover target institution");
   const collaborationOrder = {
     id: text(payload.collaborationOrderId || `cco-${command.commandId}`),
     center: "双向转诊中心",
@@ -298,9 +336,14 @@ function createReferralFromPrimaryCare(data, command, actor) {
 function canAccessMessage(actor, message) {
   if (actor.role === "commission") return true;
   if (actor.role === "citizen") return actorResidentIds(actor).has(message.residentId) && (!message.targetRole || message.targetRole === "citizen");
-  if (message.targetRole && message.targetRole !== actor.role && !(actor.role === "institution" && /institution|hospital|primary-care|family-doctor/.test(message.targetRole))) return false;
-  if (message.targetOrgCode && actor.orgCode && message.targetOrgCode !== actor.orgCode) return false;
-  return ["institution", "county", "insurance"].includes(actor.role);
+  if (actor.role === "institution") {
+    if (message.targetRole && !/institution|hospital|primary-care|family-doctor/.test(message.targetRole)) return false;
+    const actorOrgCode = text(actor.orgCode);
+    const targetOrgCode = text(message.targetOrgCode);
+    return Boolean(actorOrgCode && targetOrgCode && actorOrgCode === targetOrgCode);
+  }
+  if (message.targetRole && message.targetRole !== actor.role) return false;
+  return ["county", "insurance"].includes(actor.role);
 }
 
 function recordNotificationReceipt(data, command, actor) {
@@ -378,8 +421,8 @@ function runNotificationFallback(data, command, actor, policy = DEFAULT_NOTIFICA
 function acceptReferralContinuity(data, command, actor) {
   const item = rows(data.referralTeleconsultations).find((row) => row.id === command.caseId);
   if (!item) throw new Error("referral teleconsultation not found");
-  const targetCode = text(item.targetInstitutionCode);
-  requireInstitutionScope(actor, targetCode);
+  const continuityInstitutionCode = item.type === "down-referral-feedback" ? item.targetInstitutionCode : item.sourceInstitutionCode;
+  requireInstitutionScope(actor, continuityInstitutionCode);
   if (!(item.reportStatus === "returned" || ["report-returned", "closed"].includes(item.status))) throw new Error("referral report has not returned");
   const note = requireText(command.payload.note, "payload.note");
   const nextFollowupAt = requireText(command.payload.nextFollowupAt, "payload.nextFollowupAt");
@@ -401,7 +444,7 @@ function acceptReferralContinuity(data, command, actor) {
     id: text(command.payload.followupId || `followup-${item.id}`),
     residentId: item.residentId,
     personIndex: item.personIndex,
-    institutionCode: targetCode,
+    institutionCode: continuityInstitutionCode,
     diseaseType: item.diseaseType,
     plannedAt: nextFollowupAt,
     assignee: text(command.payload.assignee || actorName(actor)),
@@ -548,7 +591,7 @@ function escalateCase(data, command, actor) {
   const envelope = findCaseEnvelope(data, command.caseType, command.caseId);
   if (!envelope) throw new Error("closure case not found");
   if (["closed", "cancelled"].includes(envelope.unifiedPhase)) throw new Error("terminal closure case cannot be escalated");
-  if (actor.role === "institution" && envelope.responsibleOrg && actor.orgCode && actor.orgCode !== envelope.responsibleOrg) throw new Error("case escalation institution scope denied");
+  if (actor.role === "institution") requireInstitutionScope(actor, envelope.responsibleOrg);
   const escalation = {
     id: `escalation-${command.commandId}`,
     caseType: command.caseType,
@@ -583,7 +626,8 @@ function advanceRegistration(data, command, actor) {
   const index = rows(data.registrationOrders).findIndex((item) => item.id === command.caseId);
   if (index < 0) throw new Error("registration order not found");
   const order = data.registrationOrders[index];
-  if (actor.role === "institution" && actor.orgCode && order.hospitalCode && actor.orgCode !== order.hospitalCode) throw new Error("registration order institution scope denied");
+  if (actor.role === "institution") requireInstitutionScope(actor, order.hospitalCode);
+  if (actor.role === "citizen") requireResidentScope(actor, order.residentId);
   const next = applyRegistrationJourneyAction(order, command.payload, actor);
   data.registrationOrders[index] = next;
   const message = appendMessage(data, makeMessage(command, actor, {
@@ -602,10 +646,15 @@ function advanceRegistration(data, command, actor) {
 function applyRegistrationCallback(data, command, actor) {
   const index = rows(data.registrationOrders).findIndex((item) => item.id === command.caseId);
   if (index < 0) throw new Error("registration order not found");
+  const expectedOrder = data.registrationOrders[index];
+  if (actor.role === "institution") requireInstitutionScope(actor, expectedOrder.hospitalCode);
   const callback = { ...(command.payload.callback || {}), idempotencyKey: command.payload.callback?.idempotencyKey || command.commandId };
-  const validation = validateRegistrationCallbackTransition(data.registrationOrders[index], callback.eventType);
+  const expectedIdentifiers = [expectedOrder.id, expectedOrder.registrationNo, expectedOrder.hisVisitId, expectedOrder.paymentTradeNo, expectedOrder.insurancePrecheckNo].map(text).filter(Boolean);
+  if (!expectedIdentifiers.includes(text(callback.orderNo))) throw new Error("registration callback order does not match caseId");
+  const validation = validateRegistrationCallbackTransition(expectedOrder, callback.eventType);
   if (!validation.allowed) throw new Error(validation.reason);
   const applied = applyRegistrationIntegrationCallback(data.registrationOrders, callback, { receivedAt: command.at, idempotencyKey: callback.idempotencyKey, externalId: callback.externalId }, actor);
+  if (applied.order.id !== expectedOrder.id) throw new Error("registration callback order does not match caseId");
   data.registrationOrders = applied.orders;
   const message = appendMessage(data, makeMessage(command, actor, {
     suffix: "registration-callback",

@@ -144,6 +144,114 @@ test("primary care referral rejects missing authorization and institution scope 
   }, institution), /does not cover target institution/);
 });
 
+test("institution commands fail closed without orgCode while commission keeps the explicit supervision exception", () => {
+  const unscopedInstitution = { role: "institution", username: "unscoped-doctor", name: "Unscoped Doctor" };
+  assert.throws(() => applyClosureCommand(data(), {
+    commandId: "cmd-unscoped-primary-care",
+    action: "record-primary-care-assessment",
+    residentId: "r1",
+    payload: { institutionCode: "MR3", doctorId: "doc-unscoped", diagnosis: "hypertension", assessment: "Assessment.", disposition: "refer-up" }
+  }, unscopedInstitution), /actor orgCode is required/);
+  assert.throws(() => applyClosureCommand(data(), {
+    commandId: "cmd-unscoped-registration",
+    action: "advance-registration",
+    caseType: "registration",
+    caseId: "reg-r1-20260630-cardio",
+    payload: { action: "confirm-his-demo", note: "Missing institution scope." }
+  }, unscopedInstitution), /actor orgCode is required/);
+  assert.throws(() => applyClosureCommand(data(), {
+    commandId: "cmd-unscoped-callback",
+    action: "apply-registration-callback",
+    caseType: "registration",
+    caseId: "reg-r1-20260630-cardio",
+    at: "2026-07-22T09:25:00.000Z",
+    payload: { callback: { eventType: "payment-succeeded", orderNo: "REG-MR1-C08", occurredAt: "2026-07-22T09:25:00.000Z" } }
+  }, unscopedInstitution), /actor orgCode is required/);
+  assert.throws(() => applyClosureCommand(data(), {
+    commandId: "cmd-unscoped-escalation",
+    action: "escalate-case",
+    caseType: "chronic-followup",
+    caseId: "f1",
+    payload: { note: "Missing institution scope." }
+  }, unscopedInstitution), /actor orgCode is required/);
+  const scopedMessageData = data();
+  scopedMessageData.taskMessages.find((item) => item.id === "msg-rtc-001-feedback-institution").targetOrgCode = "MR3";
+  assert.throws(() => applyClosureCommand(scopedMessageData, {
+    commandId: "cmd-unscoped-message-receipt",
+    action: "record-notification-receipt",
+    payload: { messageId: "msg-rtc-001-feedback-institution", status: "handled" }
+  }, unscopedInstitution), /notification message scope denied/);
+  assert.throws(() => applyClosureCommand(scopedMessageData, {
+    commandId: "cmd-unscoped-message-fallback",
+    action: "run-notification-fallback",
+    payload: { messageId: "msg-rtc-001-feedback-institution", note: "Missing institution scope." }
+  }, unscopedInstitution), /notification message scope denied/);
+
+  const supervised = applyClosureCommand(data(), {
+    commandId: "cmd-commission-cross-org-assessment",
+    action: "record-primary-care-assessment",
+    residentId: "r1",
+    payload: { institutionCode: "MR9", doctorId: "commission-review", diagnosis: "hypertension", assessment: "Regulatory supervision assessment.", disposition: "refer-up" }
+  }, commission);
+  assert.equal(supervised.result.assessment.institutionCode, "MR9");
+});
+
+test("resident registration actions are bound to the order resident", () => {
+  const source = data();
+  const originalPaymentStatus = source.registrationOrders.find((item) => item.id === "reg-r1-20260630-cardio").paymentStatus;
+  assert.throws(() => applyClosureCommand(source, {
+    commandId: "cmd-r2-pay-r1-registration",
+    action: "advance-registration",
+    caseType: "registration",
+    caseId: "reg-r1-20260630-cardio",
+    payload: { action: "pay-demo", note: "Attempted payment for another resident." }
+  }, citizenR2), /resident scope denied/);
+  assert.equal(source.registrationOrders.find((item) => item.id === "reg-r1-20260630-cardio").paymentStatus, originalPaymentStatus);
+
+  const supervised = applyClosureCommand(source, {
+    commandId: "cmd-commission-pay-r1-registration",
+    action: "advance-registration",
+    caseType: "registration",
+    caseId: "reg-r1-20260630-cardio",
+    payload: { action: "pay-demo", note: "Commission supervision exception." }
+  }, commission);
+  assert.equal(supervised.result.order.paymentStatus, "paid-demo");
+});
+
+test("referral authorization must be explicitly active, unexpired and applicable", () => {
+  const assessed = applyClosureCommand(data(), {
+    commandId: "cmd-auth-eligibility-assessment",
+    action: "record-primary-care-assessment",
+    residentId: "r1",
+    at: "2026-07-22T09:20:00.000Z",
+    payload: { institutionCode: "MR3", doctorId: "doc-liu", diagnosis: "hypertension", assessment: "Needs referral.", disposition: "teleconsultation" }
+  }, institution);
+  const referralCommand = {
+    action: "create-referral-from-primary-care",
+    caseId: assessed.result.assessment.id,
+    at: "2026-07-22T09:30:00.000Z",
+    payload: { targetInstitution: "Hospital", targetInstitutionCode: "MR1", residentAuthorizationId: "auth-r1-referral-demo", due: "2026-07-23" }
+  };
+
+  const pending = JSON.parse(JSON.stringify(assessed.data));
+  const pendingAuthorization = pending.personalRecords.find((item) => item.id === "auth-r1-referral-demo");
+  pendingAuthorization.status = "pending";
+  pendingAuthorization.meta.status = "pending";
+  assert.throws(() => applyClosureCommand(pending, { ...referralCommand, commandId: "cmd-auth-pending" }, institution), /active unexpired resident teleconsultation authorization not found/);
+
+  const expired = JSON.parse(JSON.stringify(assessed.data));
+  expired.personalRecords.find((item) => item.id === "auth-r1-referral-demo").expiresAt = "2025-01-01";
+  assert.throws(() => applyClosureCommand(expired, { ...referralCommand, commandId: "cmd-auth-expired" }, institution), /active unexpired resident teleconsultation authorization not found/);
+
+  const wrongScope = JSON.parse(JSON.stringify(assessed.data));
+  wrongScope.personalRecords.find((item) => item.id === "auth-r1-referral-demo").meta.scope = "down-referral-feedback";
+  assert.throws(() => applyClosureCommand(wrongScope, { ...referralCommand, commandId: "cmd-auth-wrong-scope" }, institution), /active unexpired resident teleconsultation authorization not found/);
+
+  const noTarget = JSON.parse(JSON.stringify(assessed.data));
+  noTarget.personalRecords.find((item) => item.id === "auth-r1-referral-demo").meta.authorizedTo = [];
+  assert.throws(() => applyClosureCommand(noTarget, { ...referralCommand, commandId: "cmd-auth-no-target" }, institution), /does not cover target institution/);
+});
+
 test("registration commands reuse the existing journey and reject late callbacks", () => {
   const paid = applyClosureCommand(data(), {
     commandId: "cmd-reg-pay-1",
