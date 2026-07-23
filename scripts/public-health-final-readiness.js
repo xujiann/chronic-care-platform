@@ -29,6 +29,7 @@ const {
 const {
   buildPublicHealthExternalOperationsBoard
 } = require("../public-health-external-operations-service");
+const { summarizeKeyring } = require("../public-health-external-keyring-service");
 const { buildPublicHealthSystem } = require("./public-health-readiness");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -314,9 +315,23 @@ function buildPublicHealthFinalReadiness(options = {}) {
   const adapterSource = options.adapterSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-adapter-service.js"), "utf8");
   const adapterRuntimeSource = options.adapterRuntimeSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-adapter-runtime.js"), "utf8");
   const operationsSource = options.operationsSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-operations-service.js"), "utf8");
+  const keyringSource = options.keyringSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-keyring-service.js"), "utf8");
   const pageSource = options.pageSource ?? fs.readFileSync(path.join(ROOT, "public-health.js"), "utf8");
   const doc = options.doc ?? fs.readFileSync(path.join(ROOT, "docs", "public-health-eight-domain-coordination.md"), "utf8");
+  const keyringDoc = options.keyringDoc ?? fs.readFileSync(path.join(ROOT, "docs", "public-health-external-key-rotation.md"), "utf8");
   const serializedDeliveries = JSON.stringify(deliveries);
+  const managedKeyringSummary = summarizeKeyring({
+    purpose: "t08-readiness-request",
+    activeKeyId: "request-2026-07",
+    keys: [{
+      keyId: "request-2026-07",
+      secret: ACCEPTANCE_REQUEST_SECRET,
+      status: "active",
+      notBefore: "2026-07-01T00:00:00.000Z",
+      expiresAt: "2026-08-01T00:00:00.000Z",
+      revokedAt: ""
+    }]
+  }, "2026-07-23T09:31:00.000Z");
   const checks = [
     check("scope:eight-domain-center", system.coordinationCenter?.summary?.lanes === 8 && system.coordinationCenter?.ok, "8/8 coordination lanes are structurally runnable", "scope"),
     check("runtime:eight-handoffs", runtime.handoffs.length === 8 && runtime.functionalState === "eight-lane-coordination-persistence-ready", `${runtime.handoffs.length}/8 runtime handoffs`, "runtime"),
@@ -328,6 +343,8 @@ function buildPublicHealthFinalReadiness(options = {}) {
     check("adapter:eight-signed-deliveries", deliveries.length === 8 && deliveries.every((item) => item.deliveryState === "delivered"), `${deliveries.filter((item) => item.deliveryState === "delivered").length}/8 signed receipts verified`, "adapter"),
     check("adapter:privacy-minimized", !serializedDeliveries.includes("residentId") && !serializedDeliveries.includes(ACCEPTANCE_REQUEST_SECRET) && !serializedDeliveries.includes(ACCEPTANCE_RECEIPT_SECRET), "dispatch artifacts exclude resident identifiers and secrets", "adapter"),
     check("adapter:retry-dead-letter", ["retry-scheduled", "dead-letter", "timingSafeEqual"].every((token) => adapterSource.includes(token)), "transient retry, terminal dead letter and timing-safe verification are implemented", "adapter"),
+    check("adapter:managed-keyring", managedKeyringSummary.productionReady === true && !JSON.stringify(managedKeyringSummary).includes(ACCEPTANCE_REQUEST_SECRET) && ["activeKeyId", "grace", "revoked", "key-expired-or-not-yet-valid"].every((token) => keyringSource.includes(token)), "managed active/grace/revoked key lifecycle is valid and secret-free", "adapter"),
+    check("adapter:callback-anti-replay", ["receipt-issued-in-future", "receipt-expired", "receiptReplayKeyHash", "receipt replay detected"].every((token) => `${adapterSource}\n${adapterRuntimeSource}`.includes(token)), "signed callbacks bind key, issue/expiry time and nonce; stale, future and replayed callbacks fail closed", "adapter"),
     check("outbox:persisted-enqueue-attempt", outboxAcceptance.delivered.externalRuntime.summary.dispatches === 1 && outboxAcceptance.delivered.externalRuntime.summary.auditEntries === 3, "one signed dispatch and three append-only enqueue/claim/attempt audit entries", "outbox"),
     check("outbox:coordination-advance", outboxAcceptance.delivered.dispatch.deliveryState === "delivered" && outboxAcceptance.handoff.state === "receipt-confirmed", "verified callback advances the linked coordination handoff", "outbox"),
     check("outbox:runtime-state-signature", verifyRuntimeStateSignature(outboxAcceptance.delivered.dispatch, ACCEPTANCE_REQUEST_SECRET), "mutable outbox state retains a trusted runtime signature", "outbox"),
@@ -343,7 +360,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
     check("operations:healthy-reconciliation", operationsBoard.ok === true && operationsBoard.operationallyHealthy === true && operationsBoard.summary.signatureVerified === 2 && operationsBoard.summary.issues === 0, "recovered predecessor, successor, signatures, audit and coordination states reconcile", "operations"),
     check("operations:risk-queue-contract", ["audit-dispatch-missing", "coordination-handoff-missing", "coordination-state-mismatch", "worker-lease-expired", "retry-due-unclaimed", "pending-dispatch-overdue", "dead-letter-unrecovered"].every((token) => operationsSource.includes(token)), "integrity, orphan audit/task, mismatch, lease, retry, SLA and dead-letter risks have explicit codes", "operations"),
     check("frontend:action-route-contract", pageSource.includes("/api/public-health/coordination/") && pageSource.includes("idempotencyKey") && pageSource.includes("expectedVersion"), "T00 route boundary has a stable client contract", "integration"),
-    check("integration:documented-boundary", ["public-health-coordination-runtime.js", "public-health-external-adapter-service.js", "T00", "server.js", "productionReady"].every((token) => doc.includes(token)), "runtime, adapter and T00 boundaries are documented", "integration"),
+    check("integration:documented-boundary", ["public-health-coordination-runtime.js", "public-health-external-adapter-service.js", "T00", "server.js", "productionReady"].every((token) => doc.includes(token)) && ["requestKeyring", "receiptKeyring", "receiptReplayKeyHash", "legacy-static"].every((token) => keyringDoc.includes(token)), "runtime, adapter, key lifecycle and T00 boundaries are documented", "integration"),
     check("safety:functional-not-production", runtime.productionReady === false && registry.productionReady === false && deliveries.every((item) => item.productionReady === false), "functional acceptance cannot self-assert production readiness", "safety"),
     check("safety:trusted-site-evidence-blocker", deliveries.every((item) => /site evidence/i.test(item.blocker)), "every accepted delivery retains the trusted site-evidence blocker", "safety")
   ];
@@ -396,13 +413,15 @@ function buildPublicHealthFinalReadiness(options = {}) {
       coordinationRuntime: "public-health-coordination-runtime.js",
       externalAdapters: "public-health-external-adapter-service.js",
       externalAdapterRuntime: "public-health-external-adapter-runtime.js",
+      externalKeyring: "public-health-external-keyring-service.js",
       externalOperations: "public-health-external-operations-service.js",
-      documentation: "docs/public-health-eight-domain-coordination.md"
+      documentation: "docs/public-health-eight-domain-coordination.md",
+      keyRotationDocumentation: "docs/public-health-external-key-rotation.md"
     },
     remainingT00Integration: [
       "Wire coordination actions plus external enqueue, due-worker claim/attempt, signed callback, governed dead-letter recovery and operations-board routes to the T08 controllers and durable data writer.",
       "Register shared server, package, style, README and aggregate release entries owned by T00.",
-      "Provision production HTTPS endpoints and secrets, then verify signed external receipts and trusted site evidence."
+      "Provision production HTTPS endpoints and managed request/receipt keyrings, then verify rotation, revocation, signed external receipts and trusted site evidence."
     ]
   };
 }

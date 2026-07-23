@@ -16,8 +16,8 @@ test("coordination readiness accepts the complete eight-domain functional increm
   assert.equal(report.ok, true);
   assert.equal(report.functionalState, "eight-domain-coordination-complete");
   assert.equal(report.formalGoLiveState, "blocked-until-t00-route-writer-production-endpoints-and-site-evidence-verified");
-  assert.equal(report.summary.checks, 32);
-  assert.equal(report.summary.passed, 32);
+  assert.equal(report.summary.checks, 33);
+  assert.equal(report.summary.passed, 33);
   assert.equal(report.summary.lanes, 8);
   assert.equal(report.summary.structurallyReady, 8);
   assert.equal(report.summary.handoffs, 8);

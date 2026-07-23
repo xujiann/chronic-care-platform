@@ -1,4 +1,9 @@
 const crypto = require("node:crypto");
+const {
+  LEGACY_KEY_ID,
+  resolveVerificationKey,
+  selectSigningKey
+} = require("./public-health-external-keyring-service");
 
 const EXTERNAL_ADAPTER_PROFILES = [
   ["infectious-reporting", "infectious-reporting-v1"],
@@ -24,6 +29,9 @@ const EXTERNAL_ADAPTER_PROFILES = [
 
 const REQUEST_SCHEMA_VERSION = "public-health-external-dispatch/v1";
 const RECEIPT_SCHEMA_VERSION = "public-health-external-receipt/v1";
+const DEFAULT_REQUEST_TTL_SECONDS = 600;
+const DEFAULT_RECEIPT_TTL_SECONDS = 300;
+const DEFAULT_CALLBACK_CLOCK_SKEW_SECONDS = 30;
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -50,6 +58,12 @@ function stableStringify(value) {
 
 function sha256(value) {
   return crypto.createHash("sha256").update(String(value)).digest("hex");
+}
+
+function isoAfter(value, seconds, label) {
+  const parsed = new Date(value).getTime();
+  if (!Number.isFinite(parsed)) throw new Error(`${label} must be a valid date-time`);
+  return new Date(parsed + seconds * 1000).toISOString();
 }
 
 function signPayload(payload, secret) {
@@ -109,11 +123,15 @@ function buildPublicHealthExternalAdapterRegistry(env = process.env) {
   };
 }
 
-function normalizedRequestPayload(handoff, input = {}, profile) {
+function normalizedRequestPayload(handoff, input = {}, profile, signingKey) {
   const idempotencyKey = clean(input.idempotencyKey);
   const operation = clean(input.operation || "coordinate");
   if (!idempotencyKey) throw new Error("idempotencyKey is required for external dispatch");
   if (!operation) throw new Error("operation is required for external dispatch");
+  const issuedAt = clean(input.at || input.issuedAt);
+  const expiresAt = issuedAt
+    ? clean(input.expiresAt || isoAfter(issuedAt, DEFAULT_REQUEST_TTL_SECONDS, "external request issuedAt"))
+    : "";
   const evidenceRefs = Array.isArray(input.evidenceRefs)
     ? [...new Set(input.evidenceRefs.map(clean).filter(Boolean))].sort()
     : [];
@@ -127,7 +145,10 @@ function normalizedRequestPayload(handoff, input = {}, profile) {
     businessKeyHash: sha256(handoff.businessKey),
     operation,
     evidenceRefs,
-    idempotencyKeyHash: sha256(idempotencyKey)
+    idempotencyKeyHash: sha256(idempotencyKey),
+    signingKeyId: signingKey.keyId,
+    issuedAt,
+    expiresAt
   };
 }
 
@@ -135,10 +156,16 @@ function createPublicHealthExternalDispatch(handoff = {}, input = {}, credential
   const profile = profileForLane(handoff.laneId);
   if (handoff.state !== "in-progress") throw new Error("external dispatch requires an in-progress coordination handoff");
   if (!validHttpsEndpoint(credentials.endpoint)) throw new Error("external adapter endpoint must use HTTPS");
-  if (clean(credentials.receiptSecret).length < 32) throw new Error("receipt verification secret must contain at least 32 characters");
   const maxAttempts = Number(credentials.maxAttempts || profile.maxAttempts);
   if (!Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 10) throw new Error("external adapter maxAttempts must be an integer from 1 to 10");
-  const request = normalizedRequestPayload(handoff, input, profile);
+  const requestSigningMaterial = credentials.requestKeyring || credentials.requestSecret;
+  const receiptVerificationMaterial = credentials.receiptKeyring || credentials.receiptSecret;
+  selectSigningKey(receiptVerificationMaterial, clean(input.at || new Date().toISOString()));
+  const requestSigningKey = selectSigningKey(requestSigningMaterial, clean(input.at || new Date().toISOString()));
+  if (!requestSigningKey.legacy && !clean(input.at || input.issuedAt)) {
+    throw new Error("issuedAt is required when a managed request keyring is used");
+  }
+  const request = normalizedRequestPayload(handoff, input, profile, requestSigningKey);
   const dispatchId = `ph-dispatch-${sha256(`${request.laneId}:${request.handoffId}:${request.idempotencyKeyHash}`).slice(0, 24)}`;
   const signedPayload = { ...request, dispatchId };
   const requestDigest = sha256(stableStringify(signedPayload));
@@ -150,7 +177,8 @@ function createPublicHealthExternalDispatch(handoff = {}, input = {}, credential
     contract: profile.contract,
     request: signedPayload,
     requestDigest,
-    requestSignature: signPayload(signedPayload, credentials.requestSecret),
+    requestSignatureKeyId: requestSigningKey.keyId,
+    requestSignature: signPayload(signedPayload, requestSigningKey.secret),
     signatureAlgorithm: "HMAC-SHA256",
     deliveryState: "pending",
     attempts: [],
@@ -162,7 +190,7 @@ function createPublicHealthExternalDispatch(handoff = {}, input = {}, credential
   };
 }
 
-function verifyPublicHealthExternalDispatch(dispatch, requestSecret) {
+function verifyPublicHealthExternalDispatch(dispatch, requestSigningMaterial, options = {}) {
   let profile;
   try {
     profile = profileForLane(dispatch?.laneId);
@@ -172,9 +200,16 @@ function verifyPublicHealthExternalDispatch(dispatch, requestSecret) {
   const request = dispatch?.request || {};
   const expectedId = `ph-dispatch-${sha256(`${request.laneId}:${request.handoffId}:${request.idempotencyKeyHash}`).slice(0, 24)}`;
   const expectedDigest = sha256(stableStringify(request));
+  const keyId = clean(dispatch?.requestSignatureKeyId || request.signingKeyId || LEGACY_KEY_ID);
+  const keyResolution = resolveVerificationKey(
+    requestSigningMaterial,
+    keyId,
+    clean(options.at || request.issuedAt || new Date().toISOString())
+  );
+  if (!keyResolution.ok) return { ok: false, reason: `dispatch-${keyResolution.reason}` };
   let expectedSignature = "";
   try {
-    expectedSignature = signPayload(request, requestSecret);
+    expectedSignature = signPayload(request, keyResolution.key.secret);
   } catch {
     return { ok: false, reason: "dispatch-verification-secret-invalid" };
   }
@@ -187,7 +222,17 @@ function verifyPublicHealthExternalDispatch(dispatch, requestSecret) {
     && dispatch.adapterId === profile.adapterId
     && dispatch.contract === profile.contract
     && dispatch.id === expectedId
-    && dispatch.requestDigest === expectedDigest;
+    && dispatch.requestDigest === expectedDigest
+    && clean(request.signingKeyId || LEGACY_KEY_ID) === keyId
+    && clean(dispatch.requestSignatureKeyId || LEGACY_KEY_ID) === keyId
+    && (
+      (keyId === LEGACY_KEY_ID && !request.issuedAt && !request.expiresAt)
+      || (
+        Number.isFinite(new Date(request.issuedAt).getTime())
+        && Number.isFinite(new Date(request.expiresAt).getTime())
+        && new Date(request.expiresAt).getTime() > new Date(request.issuedAt).getTime()
+      )
+    );
   if (!bindingsValid) return { ok: false, reason: "dispatch-binding-mismatch" };
   if (clean(dispatch.signatureAlgorithm) !== "HMAC-SHA256" || !timingSafeHexEqual(dispatch.requestSignature, expectedSignature)) {
     return { ok: false, reason: "dispatch-signature-invalid" };
@@ -209,22 +254,41 @@ function normalizedReceiptPayload(receipt = {}) {
     receiptCode: clean(receipt.receiptCode),
     evidenceRefs,
     receivedAt: clean(receipt.receivedAt),
+    signingKeyId: clean(receipt.signingKeyId || LEGACY_KEY_ID),
+    issuedAt: clean(receipt.issuedAt),
+    expiresAt: clean(receipt.expiresAt),
+    nonce: clean(receipt.nonce),
     reason: clean(receipt.reason),
     exceptionOwner: clean(receipt.exceptionOwner),
     dueAt: clean(receipt.dueAt)
   };
 }
 
-function signPublicHealthExternalReceipt(receipt, receiptSecret) {
-  const payload = normalizedReceiptPayload(receipt);
+function signPublicHealthExternalReceipt(receipt, receiptSigningMaterial) {
+  const issuedAt = clean(receipt.issuedAt || receipt.receivedAt || new Date().toISOString());
+  const signingKey = selectSigningKey(receiptSigningMaterial, issuedAt);
+  const expiresAt = clean(receipt.expiresAt || isoAfter(issuedAt, DEFAULT_RECEIPT_TTL_SECONDS, "external receipt issuedAt"));
+  const nonce = clean(receipt.nonce || sha256([
+    receipt.dispatchId,
+    receipt.receiptCode,
+    issuedAt,
+    signingKey.keyId
+  ].join(":")).slice(0, 32));
+  const payload = normalizedReceiptPayload({
+    ...receipt,
+    signingKeyId: signingKey.keyId,
+    issuedAt,
+    expiresAt,
+    nonce
+  });
   return {
     ...payload,
     signatureAlgorithm: "HMAC-SHA256",
-    signature: signPayload(payload, receiptSecret)
+    signature: signPayload(payload, signingKey.secret)
   };
 }
 
-function verifyPublicHealthExternalReceipt(dispatch, receipt, receiptSecret) {
+function verifyPublicHealthExternalReceipt(dispatch, receipt, receiptSigningMaterial, options = {}) {
   const payload = normalizedReceiptPayload(receipt);
   const statusValid = ["accepted", "rejected"].includes(payload.status);
   const rejectionValid = payload.status !== "rejected"
@@ -233,10 +297,21 @@ function verifyPublicHealthExternalReceipt(dispatch, receipt, receiptSecret) {
     && payload.requestDigest === dispatch.requestDigest
     && payload.laneId === dispatch.laneId
     && payload.handoffId === dispatch.handoffId;
-  const evidenceValid = Boolean(payload.receiptCode && payload.evidenceRefs.length && payload.receivedAt);
+  const issuedAtValue = new Date(payload.issuedAt).getTime();
+  const expiresAtValue = new Date(payload.expiresAt).getTime();
+  const receivedAtValue = new Date(payload.receivedAt).getTime();
+  const temporalEvidenceValid = Number.isFinite(issuedAtValue)
+    && Number.isFinite(expiresAtValue)
+    && Number.isFinite(receivedAtValue)
+    && expiresAtValue > issuedAtValue
+    && Boolean(payload.nonce);
+  const evidenceValid = Boolean(payload.receiptCode && payload.evidenceRefs.length && payload.receivedAt && temporalEvidenceValid);
+  const verificationAt = clean(options.at || new Date().toISOString());
+  const keyResolution = resolveVerificationKey(receiptSigningMaterial, payload.signingKeyId, verificationAt);
+  if (!keyResolution.ok) return { ok: false, reason: `receipt-${keyResolution.reason}`, payload };
   let expectedSignature = "";
   try {
-    expectedSignature = signPayload(payload, receiptSecret);
+    expectedSignature = signPayload(payload, keyResolution.key.secret);
   } catch {
     return { ok: false, reason: "receipt-verification-secret-invalid", payload };
   }
@@ -246,6 +321,21 @@ function verifyPublicHealthExternalReceipt(dispatch, receipt, receiptSecret) {
   if (!bindingsValid) return { ok: false, reason: "receipt-binding-mismatch", payload };
   if (!evidenceValid || !rejectionValid) return { ok: false, reason: "receipt-evidence-invalid", payload };
   if (!signatureValid) return { ok: false, reason: "receipt-signature-invalid", payload };
+  if (options.enforceFreshness) {
+    const atValue = new Date(verificationAt).getTime();
+    const clockSkewSeconds = Number(options.clockSkewSeconds ?? DEFAULT_CALLBACK_CLOCK_SKEW_SECONDS);
+    const maxAgeSeconds = Number(options.maxAgeSeconds ?? DEFAULT_RECEIPT_TTL_SECONDS);
+    if (!Number.isFinite(atValue)
+      || !Number.isInteger(clockSkewSeconds) || clockSkewSeconds < 0 || clockSkewSeconds > 300
+      || !Number.isInteger(maxAgeSeconds) || maxAgeSeconds < 30 || maxAgeSeconds > 3600) {
+      return { ok: false, reason: "receipt-freshness-policy-invalid", payload };
+    }
+    const skewMs = clockSkewSeconds * 1000;
+    if (issuedAtValue > atValue + skewMs) return { ok: false, reason: "receipt-issued-in-future", payload };
+    if (expiresAtValue < atValue - skewMs || atValue - issuedAtValue > (maxAgeSeconds * 1000) + skewMs) {
+      return { ok: false, reason: "receipt-expired", payload };
+    }
+  }
   return { ok: true, reason: "verified", payload };
 }
 
@@ -266,7 +356,17 @@ function recordPublicHealthExternalDeliveryAttempt(dispatch, result = {}, option
   const transportStatus = Number(result.transportStatus || 0);
   const transient = Boolean(result.networkError) || transportStatus === 429 || transportStatus >= 500;
   const verification = result.receipt
-    ? verifyPublicHealthExternalReceipt(next, result.receipt, options.receiptSecret)
+    ? verifyPublicHealthExternalReceipt(
+      next,
+      result.receipt,
+      options.receiptKeyring || options.receiptSecret,
+      {
+        at,
+        enforceFreshness: true,
+        clockSkewSeconds: options.callbackClockSkewSeconds,
+        maxAgeSeconds: options.callbackMaxAgeSeconds
+      }
+    )
     : { ok: false, reason: "receipt-missing", payload: null };
   const attempt = {
     attempt: attemptNumber,
@@ -310,6 +410,9 @@ function recordPublicHealthExternalDeliveryAttempt(dispatch, result = {}, option
 
 module.exports = {
   EXTERNAL_ADAPTER_PROFILES,
+  DEFAULT_CALLBACK_CLOCK_SKEW_SECONDS,
+  DEFAULT_RECEIPT_TTL_SECONDS,
+  DEFAULT_REQUEST_TTL_SECONDS,
   RECEIPT_SCHEMA_VERSION,
   REQUEST_SCHEMA_VERSION,
   buildPublicHealthExternalAdapterRegistry,

@@ -188,3 +188,37 @@ test("external operations board exposes unrecovered dead letters and missing sec
   assert.equal(missingSecretBoard.issues.some((item) => item.code === "signature-secret-unavailable"), true);
   assert.equal(missingSecretBoard.productionReady, false);
 });
+
+test("external operations board verifies historical records through a managed grace key", () => {
+  const scenario = buildScenario();
+  const accepted = runExternalOutboxAcceptance(scenario.data, scenario.system);
+  const managedKeyring = {
+    purpose: "public-health-request",
+    activeKeyId: "request-2026-08",
+    keys: [
+      {
+        keyId: "legacy-static",
+        secret: REQUEST_SECRET,
+        status: "grace",
+        notBefore: "2026-07-01T00:00:00.000Z",
+        expiresAt: "2026-08-01T00:00:00.000Z",
+        revokedAt: ""
+      },
+      {
+        keyId: "request-2026-08",
+        secret: "operations-next-request-secret-1234567890",
+        status: "active",
+        notBefore: "2026-07-23T08:01:00.000Z",
+        expiresAt: "2026-09-01T00:00:00.000Z",
+        revokedAt: ""
+      }
+    ]
+  };
+  const managedBoard = board(accepted.delivered.nextData, scenario.dependencies, {
+    secretResolver: () => managedKeyring,
+    now: "2026-07-23T08:02:00.000Z"
+  });
+  assert.equal(managedBoard.ok, true);
+  assert.equal(managedBoard.summary.signatureVerified, 1);
+  assert.equal(JSON.stringify(managedBoard).includes(REQUEST_SECRET), false);
+});

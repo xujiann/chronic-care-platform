@@ -5,6 +5,7 @@ const {
   verifyPublicHealthExternalAuditChain,
   verifyRuntimeStateSignature
 } = require("./public-health-external-adapter-runtime");
+const { summarizeKeyring } = require("./public-health-external-keyring-service");
 
 function clean(value) {
   return String(value ?? "").trim();
@@ -19,10 +20,15 @@ function timeValue(value) {
   return Number.isFinite(parsed) ? parsed : NaN;
 }
 
-function secretForLane(secretResolver, laneId) {
-  if (typeof secretResolver === "function") return clean(secretResolver(laneId));
-  if (secretResolver && typeof secretResolver === "object") return clean(secretResolver[laneId]);
+function signingMaterialForLane(secretResolver, laneId) {
+  if (typeof secretResolver === "function") return secretResolver(laneId);
+  if (secretResolver && typeof secretResolver === "object") return secretResolver[laneId];
   return "";
+}
+
+function signingMaterialAvailable(material, now) {
+  if (typeof material === "string") return clean(material).length >= 32;
+  return summarizeKeyring(material, now).ok;
 }
 
 function issue(severity, code, dispatch, detail, action) {
@@ -169,8 +175,8 @@ function buildPublicHealthExternalOperationsBoard({
     if (stateCounter) lane[stateCounter] += 1;
     laneSummary.set(dispatch.laneId, lane);
 
-    const secret = secretForLane(secretResolver, dispatch.laneId);
-    if (secret.length < 32) {
+    const signingMaterial = signingMaterialForLane(secretResolver, dispatch.laneId);
+    if (!signingMaterialAvailable(signingMaterial, now)) {
       issues.push(issue(
         "P0",
         "signature-secret-unavailable",
@@ -179,7 +185,7 @@ function buildPublicHealthExternalOperationsBoard({
         "Provision the lane verification secret before processing this dispatch."
       ));
     } else {
-      const requestVerification = verifyPublicHealthExternalDispatch(dispatch, secret);
+      const requestVerification = verifyPublicHealthExternalDispatch(dispatch, signingMaterial);
       if (!requestVerification.ok) {
         issues.push(issue(
           "P0",
@@ -189,7 +195,7 @@ function buildPublicHealthExternalOperationsBoard({
           "Quarantine the dispatch and restore the signed request envelope."
         ));
       }
-      if (!verifyRuntimeStateSignature(dispatch, secret)) {
+      if (!verifyRuntimeStateSignature(dispatch, signingMaterial)) {
         issues.push(issue(
           "P0",
           "runtime-state-signature-invalid",
@@ -198,7 +204,7 @@ function buildPublicHealthExternalOperationsBoard({
           "Quarantine the dispatch and restore the last trusted state."
         ));
       }
-      const auditVerification = verifyPublicHealthExternalAuditChain(data, dispatch.id, secret);
+      const auditVerification = verifyPublicHealthExternalAuditChain(data, dispatch.id, signingMaterial);
       if (!auditVerification.ok) {
         issues.push(issue(
           "P0",

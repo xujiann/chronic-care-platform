@@ -35,11 +35,13 @@ function buildPublicHealthCoordinationReadiness(options = {}) {
   const runtimeSource = options.runtimeSource ?? read("public-health-coordination-runtime.js");
   const adapterSource = options.adapterSource ?? read("public-health-external-adapter-service.js");
   const adapterRuntimeSource = options.adapterRuntimeSource ?? read("public-health-external-adapter-runtime.js");
+  const keyringSource = options.keyringSource ?? read("public-health-external-keyring-service.js");
   const operationsSource = options.operationsSource ?? read("public-health-external-operations-service.js");
   const publicHealthSource = options.publicHealthSource ?? read("public-health.js");
   const publicHealthHtml = options.publicHealthHtml ?? read("public-health.html");
   const systemBuilderSource = options.systemBuilderSource ?? read("scripts/public-health-readiness.js");
   const doc = options.doc ?? read("docs/public-health-eight-domain-coordination.md");
+  const keyringDoc = options.keyringDoc ?? read("docs/public-health-external-key-rotation.md");
   const lane = (id) => center?.lanes?.find((item) => item.id === id);
   const handoff = (id) => center?.handoffs?.find((item) => item.laneId === id);
   const checks = [
@@ -68,13 +70,14 @@ function buildPublicHealthCoordinationReadiness(options = {}) {
     check("adapter:worker-lease", ["listDuePublicHealthExternalDispatches", "claimPublicHealthExternalDispatchToState", "recordClaimedPublicHealthExternalAttemptToState", "leaseToken", "outboxVersion", "external dispatch version conflict"].every((token) => adapterRuntimeSource.includes(token)), "due selection, signed version, worker lease, claimed attempt and token checks prevent concurrent delivery", "adapter"),
     check("adapter:dead-letter-recovery", ["requeuePublicHealthExternalDeadLetterToState", "remediationEvidenceRefs", "successorDispatchId", "approvedByRole"].every((token) => adapterRuntimeSource.includes(token)), "authorized remediation seals each dead letter and creates one linked successor", "adapter"),
     check("adapter:signed-audit-chain", ["verifyPublicHealthExternalAuditChain", "previousAuditHash", "auditSignature", "auditHead"].every((token) => adapterRuntimeSource.includes(token)), "every outbox write verifies and advances a signed per-dispatch audit chain", "adapter"),
+    check("adapter:key-rotation-anti-replay", ["activeKeyId", "grace", "revoked", "key-expired-or-not-yet-valid"].every((token) => keyringSource.includes(token)) && ["runtimeStateKeyId", "auditKeyId", "receiptReplayKeyHash", "receipt replay detected"].every((token) => adapterRuntimeSource.includes(token)), "managed key rotation spans request/runtime/audit signatures and callback nonce replay fails closed", "adapter"),
     check("operations:reconciliation-board", ["buildPublicHealthExternalOperationsBoard", "coordination-state-mismatch", "worker-lease-expired", "dead-letter-unrecovered"].every((token) => operationsSource.includes(token)), "operations board reconciles signatures, coordination state, leases, SLA and dead letters", "operations"),
     check("runtime:system-builder", system.coordinationCenter?.summary?.lanes === 8 && systemBuilderSource.includes("buildPublicHealthCoordinationCenter") && systemBuilderSource.includes("coordinationCenter"), "buildPublicHealthSystem returns coordinationCenter", "runtime"),
     check("frontend:panel", publicHealthHtml.includes("public-health-coordination-center") && publicHealthSource.includes("renderPublicHealthCoordinationCenter"), "public health page renders the coordination center", "frontend"),
     check("frontend:static-fallback", publicHealthSource.includes("buildStaticCoordinationCenter") && publicHealthSource.includes("eight-lane-static-coordination-runnable"), "file preview builds a local eight-lane fallback", "frontend"),
     check("frontend:action-contract", ["handlePublicHealthCoordinationAction", "assign-coordination", "record-coordination-receipt", "retry-coordination", "close-coordination", "reopen-coordination", "/api/public-health/coordination/", "expectedVersion", "idempotencyKey"].every((token) => publicHealthSource.includes(token)), "six coordination actions carry role-ready idempotent versioned payloads to the public route boundary", "frontend"),
     check("launch:production-boundary", center?.productionReady === false && accepted?.productionReady === false && /blocked/.test(center?.formalGoLiveState || ""), center?.formalGoLiveState || "missing", "launch"),
-    check("docs:t00-boundary", ["T00", "server.js", "package.json", "现场证据", "八领域", "productionReady"].every((token) => doc.includes(token)), "completion scope and remaining T00 integration are documented", "docs")
+    check("docs:t00-boundary", ["T00", "server.js", "package.json", "现场证据", "八领域", "productionReady"].every((token) => doc.includes(token)) && ["requestKeyring", "receiptKeyring", "receiptReplayKeyHash", "legacy-static"].every((token) => keyringDoc.includes(token)), "completion scope, key lifecycle and remaining T00 integration are documented", "docs")
   ];
   return {
     generatedAt: new Date().toISOString(),
@@ -99,17 +102,19 @@ function buildPublicHealthCoordinationReadiness(options = {}) {
       runtime: "public-health-coordination-runtime.js",
       externalAdapters: "public-health-external-adapter-service.js",
       externalAdapterRuntime: "public-health-external-adapter-runtime.js",
+      externalKeyring: "public-health-external-keyring-service.js",
       externalOperations: "public-health-external-operations-service.js",
       page: "public-health.html",
       pageController: "public-health.js",
       test: "test/public-health-coordination-service.test.js",
       documentation: "docs/public-health-eight-domain-coordination.md",
+      keyRotationDocumentation: "docs/public-health-external-key-rotation.md",
       report: "release/public-health-coordination-readiness-report.md"
     },
     remainingT00Integration: [
       "Wire the public server action route and durable writer to the T08 coordination runtime controller.",
       "Add package scripts, public styling and aggregate release manifest entries.",
-      "Provision production adapter endpoints and secrets, run smoke tests, and verify signed receipts and trusted site evidence."
+      "Provision production adapter endpoints and managed request/receipt keyrings, run rotation/revocation smoke tests, and verify signed receipts and trusted site evidence."
     ]
   };
 }

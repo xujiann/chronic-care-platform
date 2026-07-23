@@ -261,6 +261,30 @@ test("verified accepted receipt advances the coordination handoff exactly once",
   ), /idempotency key was reused with a different payload/);
 });
 
+test("a signed callback nonce cannot be replayed under a different idempotency key", () => {
+  const prepared = enqueueLane("immunization");
+  const dispatch = prepared.enqueued.dispatch;
+  const receipt = signedReceipt(dispatch, { nonce: "immunization-callback-nonce-001" });
+  const delivered = recordPublicHealthExternalAttemptToState(
+    prepared.enqueued.nextData,
+    dispatch.id,
+    { transportStatus: 200, receipt },
+    attemptOptions("immunization:callback:first"),
+    prepared.dependencies
+  );
+  assert.match(
+    delivered.nextData.publicHealthExternalDispatchAudit[1].receiptReplayKeyHash,
+    /^[a-f0-9]{64}$/
+  );
+  assert.throws(() => recordPublicHealthExternalAttemptToState(
+    delivered.nextData,
+    dispatch.id,
+    { transportStatus: 200, receipt },
+    attemptOptions("immunization:callback:replay", "2026-07-23T08:02:00.000Z", 2),
+    prepared.dependencies
+  ), /receipt replay detected/);
+});
+
 test("verified rejection opens the signed compensation exception", () => {
   const prepared = enqueueLane("immunization");
   const dispatch = prepared.enqueued.dispatch;
@@ -616,4 +640,90 @@ test("external audit modification deletion and unsigned append are rejected befo
       credentials()
     ), /persisted public health external audit rejected/);
   }
+});
+
+test("external audit chain remains verifiable across an authorized request-key rotation", () => {
+  const oldRequestKeyring = {
+    purpose: "public-health-request",
+    activeKeyId: "request-2026-07",
+    keys: [{
+      keyId: "request-2026-07",
+      secret: REQUEST_SECRET,
+      status: "active",
+      notBefore: "2026-07-01T00:00:00.000Z",
+      expiresAt: "2026-08-01T00:00:00.000Z",
+      revokedAt: ""
+    }]
+  };
+  const receiptKeyring = {
+    purpose: "public-health-receipt",
+    activeKeyId: "receipt-2026-07",
+    keys: [{
+      keyId: "receipt-2026-07",
+      secret: RECEIPT_SECRET,
+      status: "active",
+      notBefore: "2026-07-01T00:00:00.000Z",
+      expiresAt: "2026-08-01T00:00:00.000Z",
+      revokedAt: ""
+    }]
+  };
+  const prepared = advanceToInProgress("senior-health");
+  const enqueued = enqueuePublicHealthExternalDispatchToState(
+    prepared.data,
+    prepared.handoffId,
+    {
+      idempotencyKey: "senior-health:key-rotation:enqueue",
+      operation: "coordination-handoff",
+      evidenceRefs: ["senior-health-key-rotation"],
+      exceptionOwner: "senior-health-interface-owner",
+      exceptionDueAt: "2026-07-31",
+      at: "2026-07-23T08:00:00.000Z"
+    },
+    {
+      endpoint: "https://external-runtime.example.test/dispatch",
+      requestKeyring: oldRequestKeyring,
+      receiptKeyring,
+      maxAttempts: 2
+    },
+    prepared.dependencies
+  );
+  const rotatedRequestKeyring = {
+    purpose: "public-health-request",
+    activeKeyId: "request-2026-08",
+    keys: [
+      { ...oldRequestKeyring.keys[0], status: "grace" },
+      {
+        keyId: "request-2026-08",
+        secret: "runtime-request-next-secret-1234567890-1234",
+        status: "active",
+        notBefore: "2026-07-23T08:01:00.000Z",
+        expiresAt: "2026-09-01T00:00:00.000Z",
+        revokedAt: ""
+      }
+    ]
+  };
+  const claimed = claimPublicHealthExternalDispatchToState(
+    enqueued.nextData,
+    enqueued.dispatch.id,
+    {
+      workerId: "public-health-worker-rotation",
+      idempotencyKey: "senior-health:key-rotation:claim",
+      expectedVersion: 1,
+      now: "2026-07-23T08:02:00.000Z",
+      leaseSeconds: 60
+    },
+    { requestKeyring: rotatedRequestKeyring }
+  );
+  assert.equal(enqueued.dispatch.requestSignatureKeyId, "request-2026-07");
+  assert.equal(claimed.dispatch.runtimeStateKeyId, "request-2026-08");
+  assert.deepEqual(
+    claimed.nextData.publicHealthExternalDispatchAudit.map((item) => item.auditKeyId),
+    ["request-2026-07", "request-2026-08"]
+  );
+  assert.equal(verifyRuntimeStateSignature(claimed.dispatch, rotatedRequestKeyring), true);
+  assert.equal(verifyPublicHealthExternalAuditChain(
+    claimed.nextData,
+    claimed.dispatch.id,
+    rotatedRequestKeyring
+  ).ok, true);
 });
