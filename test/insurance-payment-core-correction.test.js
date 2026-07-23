@@ -161,3 +161,23 @@ test("service keeps settlement state unchanged when correction transition fails"
   }, "insurance-settlement"), /日期|时间/);
   assert.deepEqual(state.settlementBatches[0], before);
 });
+
+test("tampered resubmission evidence blocks the core acceptance callback", () => {
+  let batch = returnFromCore(submit(frozenBatch("settlement-resubmission-tamper")));
+  batch = Settlement.transitionSettlementBatch(batch, {
+    action: "resubmit-core",
+    returnCycleId: "core-return-cycle-1",
+    externalRequestId: "CORE-REQUEST-2",
+    idempotencyKey: "CORE-IDEM-2",
+    correctionDigest: hash("c"),
+    at: "2026-07-17T08:00:00.000Z"
+  }, "insurance-settlement").batch;
+  batch.coreReturnCycles[0].resubmission.correctionDigest = hash("d");
+
+  assert.equal(Settlement.verifyCoreReturnCycleEvidence(batch, batch.coreReturnCycles[0]), false);
+  assert.throws(() => Settlement.transitionSettlementBatch(batch, {
+    action: "core-accepted",
+    receiptId: "CORE-ACCEPT-2",
+    at: "2026-07-17T09:00:00.000Z"
+  }, "insurance-core-adapter", { trustedInsuranceCoreCallback: true }), /摘要或账本证据校验失败/);
+});
