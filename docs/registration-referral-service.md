@@ -8,6 +8,8 @@ Every command requires a unique `commandId`. The service binds that key to a SHA
 
 The service clones the supplied database, applies one authorized command, appends a non-production `registrationReferralClosureEvents` audit row, validates cross-record consistency and returns the changed copy. It never writes a file or claims production evidence.
 
+Business terminal states are also enforced independently of `commandId`: one primary-care assessment cannot create a second referral chain, accepted continuity cannot be accepted again, completed or resident-acknowledged follow-ups cannot be rewritten, family-doctor acknowledgements are final, acknowledged notification receipts cannot regress, and notification fallback stops when the final channel exhausts its configured attempts.
+
 ## Supported commands
 
 | Command | Primary responsibility |

@@ -43,6 +43,7 @@ const CLOSURE_COMMAND_CONTRACTS = Object.freeze([
 ]);
 
 const RECEIPT_STATUSES = new Set(["acknowledged", "bounced", "confirmed", "delivered", "failed", "handled", "read", "received"]);
+const BUSINESS_ACKNOWLEDGEMENT_STATUSES = new Set(["acknowledged", "confirmed", "handled", "read"]);
 const ACTIVE_AUTHORIZATION_STATUSES = new Set(["active", "authorized"]);
 const REFERRAL_AUTHORIZATION_SCOPES = Object.freeze({
   referral: new Set(["referral", "referral-teleconsultation", "referral-and-teleconsultation"]),
@@ -239,6 +240,9 @@ function createReferralFromPrimaryCare(data, command, actor) {
   if (!assessment) throw new Error("primary care assessment not found");
   requireInstitutionScope(actor, assessment.institutionCode);
   if (!["refer-up", "teleconsultation"].includes(assessment.disposition)) throw new Error("primary care assessment does not require referral");
+  if (assessment.status === "referred" || assessment.referralId || assessment.collaborationOrderId || assessment.teleconsultationId) {
+    throw new Error("primary care assessment already has a referral");
+  }
   const payload = command.payload;
   const authorizationId = requireText(payload.residentAuthorizationId, "payload.residentAuthorizationId");
   const targetInstitution = requireText(payload.targetInstitution, "payload.targetInstitution");
@@ -362,6 +366,9 @@ function recordNotificationReceipt(data, command, actor) {
   if (!canAccessMessage(actor, message)) throw new Error("notification message scope denied");
   const status = requireText(command.payload.status, "payload.status").toLowerCase();
   if (!RECEIPT_STATUSES.has(status)) throw new Error("unsupported notification receipt status");
+  if (classifyMessageReceipt(message) === "acknowledged" && !BUSINESS_ACKNOWLEDGEMENT_STATUSES.has(status)) {
+    throw new Error("acknowledged notification receipt cannot regress");
+  }
   const receipt = {
     at: command.at,
     by: text(actor.username || actor.role),
@@ -392,7 +399,10 @@ function runNotificationFallback(data, command, actor, policy = DEFAULT_NOTIFICA
   const currentChannel = text(attempts[0]?.channel || message.channel || channels[0].channel);
   let channelIndex = Math.max(0, channels.findIndex((item) => item.channel === currentChannel));
   const sameChannelAttempts = attempts.filter((item) => item.channel === channels[channelIndex].channel).length;
-  if (sameChannelAttempts >= Number(channels[channelIndex].maxAttempts || 1) && channelIndex < channels.length - 1) channelIndex += 1;
+  if (sameChannelAttempts >= Number(channels[channelIndex].maxAttempts || 1)) {
+    if (channelIndex >= channels.length - 1) throw new Error("notification fallback policy exhausted");
+    channelIndex += 1;
+  }
   const selected = channels[channelIndex];
   const attempt = {
     id: `delivery-${command.commandId}`,
@@ -432,6 +442,9 @@ function acceptReferralContinuity(data, command, actor) {
   if (!item) throw new Error("referral teleconsultation not found");
   const continuityInstitutionCode = item.type === "down-referral-feedback" ? item.targetInstitutionCode : item.sourceInstitutionCode;
   requireInstitutionScope(actor, continuityInstitutionCode);
+  if (item.primaryCareAccepted === true || item.followupAccepted === true || item.continuityStatus === "accepted" || item.status === "closed") {
+    throw new Error("referral continuity is already accepted");
+  }
   if (!(item.reportStatus === "returned" || ["report-returned", "closed"].includes(item.status))) throw new Error("referral report has not returned");
   const note = requireText(command.payload.note, "payload.note");
   const nextFollowupAt = requireText(command.payload.nextFollowupAt, "payload.nextFollowupAt");
@@ -486,6 +499,9 @@ function completeChronicFollowup(data, command, actor) {
   const followup = rows(data.followups).find((item) => item.id === command.caseId);
   if (!followup) throw new Error("chronic follow-up not found");
   requireInstitutionScope(actor, followup.institutionCode);
+  if (/完成|completed|closed|done/i.test(`${text(followup.status)} ${text(followup.resultStatus)}`)) {
+    throw new Error("chronic follow-up is already completed");
+  }
   const note = requireText(command.payload.note, "payload.note");
   followup.status = "已完成";
   followup.result = requireText(command.payload.result, "payload.result");
@@ -511,7 +527,10 @@ function acknowledgeChronicFollowup(data, command, actor) {
   const followup = rows(data.followups).find((item) => item.id === command.caseId);
   if (!followup) throw new Error("chronic follow-up not found");
   requireResidentScope(actor, followup.residentId);
-  if (!/完成|completed|closed/i.test(followup.status)) throw new Error("chronic follow-up is not completed");
+  if (!/完成|completed|closed|done/i.test(followup.status)) throw new Error("chronic follow-up is not completed");
+  if (followup.feedbackStatus === "acknowledged" || followup.residentAcknowledgedAt) {
+    throw new Error("chronic follow-up is already acknowledged");
+  }
   const note = requireText(command.payload.note, "payload.note");
   followup.feedbackStatus = "acknowledged";
   followup.residentAcknowledgedAt = command.at;
@@ -543,6 +562,9 @@ function acknowledgeFamilyDoctorFulfillment(data, command, actor) {
   requireResidentScope(actor, fulfillment.residentId);
   const contract = rows(data.phase2FamilyDoctorContracts).find((item) => item.id === fulfillment.contractId);
   if (!contract || contract.residentId !== fulfillment.residentId) throw new Error("family doctor contract does not match fulfillment resident");
+  if (fulfillment.residentAcknowledgement?.status === "acknowledged" || fulfillment.residentAcknowledgement?.at) {
+    throw new Error("family doctor fulfillment is already acknowledged");
+  }
   const note = requireText(command.payload.note, "payload.note");
   fulfillment.residentAcknowledgement = {
     status: "acknowledged",

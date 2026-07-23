@@ -178,6 +178,19 @@ test("primary care teleconsultation creates a resident-consistent referral chain
   assert.equal(teleconsultation.residentId, collaborationOrder.residentId);
   assert.equal(referred.consistency.dataReady, true);
   assert.equal(referred.result.message.targetOrgCode, "MR1");
+  assert.throws(() => applyClosureCommand(referred.data, {
+    commandId: "cmd-primary-referral-duplicate",
+    action: "create-referral-from-primary-care",
+    caseType: "primary-care",
+    caseId: assessmentId,
+    at: "2026-07-22T09:16:00.000Z",
+    payload: {
+      targetInstitution: "Dalian Central Hospital",
+      targetInstitutionCode: "MR1",
+      residentAuthorizationId: "auth-r1-referral-demo",
+      due: "2026-07-23T12:00:00.000Z"
+    }
+  }, institution), /already has a referral/);
 });
 
 test("primary care referral rejects missing authorization and institution scope mismatch", () => {
@@ -361,6 +374,12 @@ test("notification receipts enforce resident scope and preserve business acknowl
   assert.equal(acknowledged.result.receiptState, "acknowledged");
   assert.equal(acknowledged.result.message.receipts[0].role, "citizen");
   assert.equal(acknowledged.result.message.receipts[0].productionEvidence, false);
+  assert.throws(() => applyClosureCommand(acknowledged.data, {
+    commandId: "cmd-receipt-r4-regression",
+    action: "record-notification-receipt",
+    at: "2026-07-22T10:01:00.000Z",
+    payload: { messageId, status: "failed", channel: "in_app", note: "Late transport failure must not regress acknowledgement." }
+  }, citizenR4), /cannot regress/);
 });
 
 test("notification fallback advances to a manual task under a bounded policy", () => {
@@ -385,6 +404,12 @@ test("notification fallback advances to a manual task under a bounded policy", (
   }
   assert.deepEqual(channels, ["in_app", "sms", "phone", "manual-task"]);
   assert.ok(current.taskMessages.some((item) => item.notificationKey === `registration-referral:manual-fallback:${messageId}`));
+  assert.throws(() => applyClosureCommand(current, {
+    commandId: "cmd-fallback-exhausted",
+    action: "run-notification-fallback",
+    at: "2026-07-22T10:05:00.000Z",
+    payload: { messageId, note: "No attempts remain." }
+  }, commission, { notificationPolicy: policy }), /policy exhausted/);
 });
 
 test("county supervision may trigger referral fallback but cannot acknowledge for the institution", () => {
@@ -423,6 +448,14 @@ test("primary care acceptance closes returned referral and creates follow-up res
   const envelope = normalizeReferralCase(result.result.teleconsultation, { messages: result.data.taskMessages });
   assert.equal(envelope.unifiedPhase, "closed");
   assert.equal(result.consistency.dataReady, true);
+  assert.throws(() => applyClosureCommand(result.data, {
+    commandId: "cmd-continuity-r4-duplicate",
+    action: "accept-referral-continuity",
+    caseType: "referral-teleconsultation",
+    caseId: "rtc-002",
+    at: "2026-07-22T10:31:00.000Z",
+    payload: { note: "Duplicate acceptance.", nextFollowupAt: "2026-08-01", familyDoctorContractId: "p2fdc-r4" }
+  }, institution), /already accepted/);
 });
 
 test("chronic follow-up requires completion then resident acknowledgement", () => {
@@ -435,6 +468,14 @@ test("chronic follow-up requires completion then resident acknowledgement", () =
     payload: { result: "Blood glucose reviewed.", advice: "Repeat HbA1c in three months.", note: "Follow-up completed by phone." }
   }, commission);
   assert.equal(normalizeChronicFollowupCase(completed.result.followup, { messages: completed.data.taskMessages }).unifiedPhase, "result-returned");
+  assert.throws(() => applyClosureCommand(completed.data, {
+    commandId: "cmd-followup-complete-r2-duplicate",
+    action: "complete-chronic-followup",
+    caseType: "chronic-followup",
+    caseId: "f2",
+    at: "2026-07-22T11:01:00.000Z",
+    payload: { result: "Overwritten result.", note: "Duplicate completion." }
+  }, commission), /already completed/);
   const acknowledged = applyClosureCommand(completed.data, {
     commandId: "cmd-followup-ack-r2",
     action: "acknowledge-chronic-followup",
@@ -445,6 +486,14 @@ test("chronic follow-up requires completion then resident acknowledgement", () =
   }, citizenR2);
   assert.equal(acknowledged.result.followup.feedbackStatus, "acknowledged");
   assert.equal(normalizeChronicFollowupCase(acknowledged.result.followup, { messages: acknowledged.data.taskMessages }).unifiedPhase, "closed");
+  assert.throws(() => applyClosureCommand(acknowledged.data, {
+    commandId: "cmd-followup-ack-r2-duplicate",
+    action: "acknowledge-chronic-followup",
+    caseType: "chronic-followup",
+    caseId: "f2",
+    at: "2026-07-22T11:11:00.000Z",
+    payload: { note: "Duplicate acknowledgement." }
+  }, citizenR2), /already acknowledged/);
 });
 
 test("family doctor fulfillment acknowledgement is resident scoped", () => {
@@ -466,6 +515,14 @@ test("family doctor fulfillment acknowledgement is resident scoped", () => {
   assert.equal(result.result.fulfillment.residentAcknowledgement.status, "acknowledged");
   assert.equal(result.result.contract.satisfactionScore, 98);
   assert.equal(result.result.message.receipts[0].status, "acknowledged");
+  assert.throws(() => applyClosureCommand(result.data, {
+    commandId: "cmd-family-r1-ack-duplicate",
+    action: "acknowledge-family-doctor-fulfillment",
+    caseType: "family-doctor",
+    caseId: "p2fdf-r1-bp",
+    at: "2026-07-22T11:31:00.000Z",
+    payload: { note: "Duplicate acknowledgement.", satisfactionScore: 1 }
+  }, citizenR1), /already acknowledged/);
 });
 
 test("case escalation creates one audited task and rejects terminal cases", () => {
