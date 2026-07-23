@@ -29,6 +29,10 @@ test("T00 exposes the T10 specialty cutover pack through public integration cont
   assert.match(client, /release\/t10-specialty-cutover-pack\.json/);
   assert.match(client, /source === "server-api"/);
   assert.match(client, /withCutoverDefaults/);
+  assert.match(client, /renderEvidenceDossier/);
+  assert.match(client, /renderPilotBatchPlan/);
+  assert.match(client, /evidence-id-present/);
+  assert.match(client, /batch-1-single-chain/);
   assert.match(readme, /t10-specialty-cutover\.html/);
   assert.match(readme, /GET \/api\/t10-specialty\/cutover-pack/);
   assert.match(workbench, /t10-specialty-cutover\.html/);
@@ -37,6 +41,8 @@ test("T00 exposes the T10 specialty cutover pack through public integration cont
   assert.match(releaseReport, /specialtyCutoverChecks/);
   assert.match(releaseReport, /specialtyCutover:rehearsalPlan/);
   assert.match(releaseReport, /specialtyCutover:goNoGoDecision/);
+  assert.match(releaseReport, /specialtyCutover:evidenceDossier/);
+  assert.match(releaseReport, /specialtyCutover:pilotBatchPlan/);
   assert.match(releaseReport, /t10-specialty-cutover-pack\.json/);
   assert.match(releaseReport, /t10-specialty-cutover-pack\.md/);
 });
@@ -64,4 +70,10 @@ test("T10 public projection keeps all real production gates closed with rehearsa
   assert.equal(pack.goNoGoDecision.score, 20);
   assert.equal(pack.goNoGoDecision.threshold, 100);
   assert.ok(pack.goNoGoDecision.hardStops.some((item) => item.id === "patient-safety"));
+  assert.equal(pack.evidenceDossier.status, "site-evidence-pending");
+  assert.equal(pack.evidenceDossier.totalEntries, pack.summary.siteBlockers);
+  assert.ok(pack.evidenceDossier.hardStopOpen > 0);
+  assert.ok(pack.evidenceDossier.firstIncrementRequired.every((id) => id.startsWith("emergency-life-chain:")));
+  assert.equal(pack.pilotBatchPlan.status, "ready-to-plan-controlled-rehearsal");
+  assert.equal(pack.pilotBatchPlan.batches.length, 3);
 });
