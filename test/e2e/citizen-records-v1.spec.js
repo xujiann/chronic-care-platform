@@ -72,15 +72,27 @@ test("resident creates a scoped consent and revokes it through the dedicated aud
 test("resident uses the V2 care workspace for correction, one-time sharing and accessibility", async ({ page }) => {
   await page.route("**/api/record-corrections", async (route) => {
     const body = JSON.parse(route.request().postData() || "{}");
-    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ...body, receiptId: "receipt-correction-1", auditRef: "audit-correction-1" }) });
   });
   await page.route("**/api/record-share-packages", async (route) => {
     const body = JSON.parse(route.request().postData() || "{}");
-    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ...body, receiptId: "receipt-share-1", auditRef: "audit-share-1" }) });
   });
   await page.route("**/api/record-share-packages/*/revoke", async (route) => {
     const body = JSON.parse(route.request().postData() || "{}");
-    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ status: "revoked", ...body }) });
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ status: "revoked", ...body, receiptId: "receipt-revoke-1", auditRef: "audit-revoke-1" }) });
+  });
+  await page.route("**/api/imaging-cloud/studies/*/viewer*", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        viewerUrl: "javascript:alert('blocked')",
+        expiresAt: new Date(Date.now() + 60 * 1000).toISOString(),
+        oneTime: true,
+        auditRef: "audit-malicious-viewer"
+      })
+    });
   });
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -97,6 +109,10 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
   await expect(workspace).toContainText("用药核对");
   await expect(workspace).toContainText("档案完整度与更新提醒");
   await expect(page.locator("#citizen-current-subject")).toContainText("当前查看");
+  await page.locator('[data-vault="imaging"]').click();
+  await page.getByRole("button", { name: /受控调阅胸部 CT 影像报告/ }).click();
+  await expect(page.locator("#toast")).toContainText("HTTPS");
+  await expect(page).toHaveURL(/citizen\.html/);
 
   const correctionForm = page.locator("#citizen-correction-form");
   await correctionForm.locator("select[name='field']").selectOption("summary");
@@ -105,6 +121,7 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
   await correctionForm.getByRole("button", { name: "提交纠错申请" }).click();
   await expect(page.locator("#citizen-correction-list")).toContainText("居民发现摘要与纸质报告不一致");
   await expect(page.locator("#citizen-correction-list")).toContainText("原始版本保留");
+  await expect(page.locator("#citizen-correction-list")).toContainText("audit-correction-1");
 
   const shareForm = page.locator("#citizen-share-package-form");
   const expiresAt = await page.evaluate(() => {
@@ -121,6 +138,7 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
   const sharePackage = page.locator("#citizen-share-package-list .citizen-care-row").filter({ hasText: "跨院转诊复诊" });
   await expect(sharePackage).toContainText("单次访问码");
   await expect(sharePackage).toContainText("有效期至");
+  await expect(sharePackage).toContainText("audit-share-1");
   page.once("dialog", (dialog) => dialog.accept());
   await sharePackage.getByRole("button", { name: "立即撤销" }).click();
   await expect(page.locator("#citizen-share-package-list")).toContainText("已撤销");
@@ -129,6 +147,8 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
   await expect(page.locator("body")).toHaveClass(/record-simple-mode/);
   await page.getByRole("button", { name: "高对比度" }).click();
   await expect(page.locator("body")).toHaveClass(/record-high-contrast/);
+  await page.getByRole("button", { name: "放大照护中心文字" }).click();
+  await expect(page.locator("#citizen-record-text-scale")).toHaveText("110%");
   const minimumTouchHeight = await page.getByRole("button", { name: "简洁模式" }).evaluate((element) => element.getBoundingClientRect().height);
   expect(minimumTouchHeight).toBeGreaterThanOrEqual(44);
 });

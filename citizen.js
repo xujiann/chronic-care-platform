@@ -2486,7 +2486,7 @@ function renderCitizenCareWorkspace(resident, diseases = []) {
   document.querySelector("#citizen-care-task-cards").innerHTML = activeTasks.map((task) => `<div class="citizen-care-row ${escapeHtml(task.severity)}">
     <div><strong>${escapeHtml(task.title)}</strong><span>${task.severity === "critical" ? "危急结果" : "异常结果"}</span><em>${escapeHtml(task.status)}</em></div>
     <p>${escapeHtml(task.summary)}</p>
-    <small>应于 ${escapeHtml(task.dueAt.slice(0, 10))} 前处理 · ${escapeHtml(task.clinicalBoundary)}</small>
+    <small>应于 ${escapeHtml(task.dueAt.slice(0, 10))} 前处理 · ${escapeHtml(task.clinicalBoundary)}${task.auditRef ? ` · 审计 ${escapeHtml(task.auditRef)}` : ""}</small>
     <footer>${task.actions.map((action) => `<span>${escapeHtml(action)}</span>`).join("")}
       ${["completed", "closed"].includes(task.status) ? "" : `<button type="button" class="small-button" data-care-task-complete="${escapeHtml(task.id)}">记录已联系/复诊</button>`}
     </footer>
@@ -2554,7 +2554,7 @@ function renderCitizenCareWorkspace(resident, diseases = []) {
   document.querySelector("#citizen-correction-list").innerHTML = careState.recordCorrections.map((item) => `<div class="citizen-care-row ${item.status === "rejected" ? "denied" : "pending"}">
     <div><strong>${escapeHtml(item.field)}纠错</strong><span>${escapeHtml(item.status)}</span></div>
     <p>${escapeHtml(item.reason)}</p>
-    <small>源记录 ${escapeHtml(item.recordId)} · 原始版本保留</small>
+    <small>源记录 ${escapeHtml(item.recordId)} · 原始版本保留${item.receiptId ? ` · 受理 ${escapeHtml(item.receiptId)}` : ""}${item.auditRef ? ` · 审计 ${escapeHtml(item.auditRef)}` : ""}</small>
   </div>`).join("") || citizenCareEmpty("尚未提交档案纠错申请。");
 
   document.querySelector("#citizen-share-package-list").innerHTML = careState.recordSharePackages.map((item) => {
@@ -2562,7 +2562,7 @@ function renderCitizenCareWorkspace(resident, diseases = []) {
     return `<div class="citizen-care-row ${packageState.active ? "" : "pending"}">
       <div><strong>${escapeHtml(item.accessRef)}</strong><span>${escapeHtml(packageState.label)}</span></div>
       <p>${escapeHtml(item.purpose)} · ${item.scopes.map(escapeHtml).join("、")}</p>
-      <small>接收方 ${escapeHtml(item.granteeId)} · 单次访问码 · 全程审计</small>
+      <small>接收方 ${escapeHtml(item.granteeId)} · 单次访问码 · 全程审计${item.receiptId ? ` · 受理 ${escapeHtml(item.receiptId)}` : ""}${item.auditRef ? ` · ${escapeHtml(item.auditRef)}` : ""}</small>
       ${packageState.active ? `<footer><button type="button" class="small-button" data-revoke-share-package="${escapeHtml(item.id)}">立即撤销</button></footer>` : ""}
     </div>`;
   }).join("") || citizenCareEmpty("尚未创建一次性健康资料包。");
@@ -2575,17 +2575,39 @@ function renderCitizenCareWorkspace(resident, diseases = []) {
   applyCitizenRecordAccessibility();
 }
 
-async function submitCitizenCareAction(path, payload) {
-  if (!API_BASE) return payload;
+function citizenCareRequestNonce() {
+  return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+async function submitCitizenCareAction(path, payload, operation) {
+  const action = window.CitizenRecordsV2.buildIdempotentAction({
+    operation,
+    residentId: currentResidentId,
+    nonce: citizenCareRequestNonce(),
+    payload
+  });
+  if (!API_BASE) {
+    return {
+      ...payload,
+      receiptId: `local-${action.idempotencyKey.slice(-32)}`,
+      auditRef: `preview-audit-${Date.now()}`,
+      syncStatus: "local-preview",
+      idempotencyKey: action.idempotencyKey,
+      requestedAt: action.requestedAt
+    };
+  }
   const request = window.HealthCityAuth?.authFetch || fetch;
   const response = await request(`${API_BASE}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
+    headers: {
+      "Content-Type": "application/json",
+      "Idempotency-Key": action.idempotencyKey
+    },
+    body: JSON.stringify(action)
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.message || "平台未接受本次操作");
-  return result;
+  return { ...result, idempotencyKey: action.idempotencyKey, requestedAt: action.requestedAt };
 }
 
 function currentRecordAccessibility() {
@@ -2605,6 +2627,8 @@ function applyCitizenRecordAccessibility() {
   document.documentElement.style.setProperty("--citizen-record-text-scale", String(preferences.textScale || 1));
   document.querySelectorAll("[data-record-accessibility='simple']").forEach((button) => button.setAttribute("aria-pressed", String(Boolean(preferences.simpleMode))));
   document.querySelectorAll("[data-record-accessibility='contrast']").forEach((button) => button.setAttribute("aria-pressed", String(Boolean(preferences.highContrast))));
+  const scaleOutput = document.querySelector("#citizen-record-text-scale");
+  if (scaleOutput) scaleOutput.value = `${Math.round((preferences.textScale || 1) * 100)}%`;
 }
 
 function bindCitizenCareWorkspace() {
@@ -2617,6 +2641,8 @@ function bindCitizenCareWorkspace() {
     const preferences = currentRecordAccessibility();
     if (action === "simple") preferences.simpleMode = !preferences.simpleMode;
     if (action === "contrast") preferences.highContrast = !preferences.highContrast;
+    if (action === "text-down") preferences.textScale = Math.max(1, (preferences.textScale || 1) - 0.1);
+    if (action === "text-up") preferences.textScale = Math.min(1.5, (preferences.textScale || 1) + 0.1);
     if (action === "read") {
       const text = cleanTextForSpeech(section.innerText, 1000);
       if ("speechSynthesis" in window && text) {
@@ -2643,9 +2669,10 @@ function bindCitizenCareWorkspace() {
         requestedValue: form.elements.requestedValue.value,
         reason: form.elements.reason.value
       });
-      const saved = await submitCitizenCareAction("/record-corrections", request);
+      const response = await submitCitizenCareAction("/record-corrections", request, "correction-submit");
+      const saved = api.projectCorrectionReceipt(response, request);
       const careState = ensureCitizenCareCollections(currentResidentId);
-      careState.recordCorrections.unshift({ ...request, ...saved });
+      careState.recordCorrections.unshift(saved);
       saveCitizenCareCollections();
       form.reset();
       renderCitizen(currentResidentId);
@@ -2667,9 +2694,10 @@ function bindCitizenCareWorkspace() {
         scopes,
         expiresAt: form.elements.expiresAt.value
       });
-      const saved = await submitCitizenCareAction("/record-share-packages", packageRecord);
+      const response = await submitCitizenCareAction("/record-share-packages", packageRecord, "share-create");
+      const saved = api.projectSharePackageReceipt(response, packageRecord);
       const careState = ensureCitizenCareCollections(currentResidentId);
-      careState.recordSharePackages.unshift({ ...packageRecord, ...saved });
+      careState.recordSharePackages.unshift(saved);
       saveCitizenCareCollections();
       form.reset();
       renderCitizen(currentResidentId);
@@ -2688,8 +2716,13 @@ function bindCitizenCareWorkspace() {
       if (!item || !window.confirm(`确认撤销一次性资料包“${item.accessRef}”？`)) return;
       try {
         const revoked = api.revokeSharePackage(item);
-        const saved = await submitCitizenCareAction(`/record-share-packages/${encodeURIComponent(item.id)}/revoke`, { revokedAt: revoked.revokedAt });
-        Object.assign(item, revoked, saved);
+        const response = await submitCitizenCareAction(`/record-share-packages/${encodeURIComponent(item.id)}/revoke`, {
+          residentId: currentResidentId,
+          resourceId: item.id,
+          revokedAt: revoked.revokedAt
+        }, "share-revoke");
+        const receipt = api.projectActionReceipt(response, { residentId: currentResidentId, resourceId: item.id });
+        Object.assign(item, revoked, receipt);
         saveCitizenCareCollections();
         renderCitizen(currentResidentId);
         showToast("一次性资料包已撤销");
@@ -2701,8 +2734,16 @@ function bindCitizenCareWorkspace() {
       const careState = ensureCitizenCareCollections(currentResidentId);
       const update = { status: "completed", completedAt: new Date().toISOString() };
       try {
-        const saved = await submitCitizenCareAction(`/care-tasks/${encodeURIComponent(taskButton.dataset.careTaskComplete)}/actions`, update);
-        careState.careTaskUpdates[taskButton.dataset.careTaskComplete] = { ...update, ...saved };
+        const response = await submitCitizenCareAction(`/care-tasks/${encodeURIComponent(taskButton.dataset.careTaskComplete)}/actions`, {
+          ...update,
+          residentId: currentResidentId,
+          resourceId: taskButton.dataset.careTaskComplete
+        }, "care-task-complete");
+        const receipt = api.projectActionReceipt(response, {
+          residentId: currentResidentId,
+          resourceId: taskButton.dataset.careTaskComplete
+        });
+        careState.careTaskUpdates[taskButton.dataset.careTaskComplete] = { ...update, ...receipt };
         saveCitizenCareCollections();
         renderCitizen(currentResidentId);
         showToast("异常结果处置进度已记录");
@@ -5017,6 +5058,17 @@ function renderClinicalRecordMeta(item) {
   return "";
 }
 
+function controlledCredentialOptions() {
+  const configured = Array.isArray(window.CITIZEN_CONTROLLED_ACCESS_ORIGINS)
+    ? window.CITIZEN_CONTROLLED_ACCESS_ORIGINS
+    : [];
+  return {
+    baseUrl: location.href,
+    allowedOrigins: [...new Set([location.origin, ...configured])],
+    allowHttpLocalhost: ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname)
+  };
+}
+
 async function openCitizenImagingViewer(studyId) {
   if (!studyId) return;
   const accessIntent = window.CitizenRecordsV2?.buildControlledAccessIntent({
@@ -5040,8 +5092,9 @@ async function openCitizenImagingViewer(studyId) {
     const query = accessIntent ? `?purpose=${encodeURIComponent(accessIntent.purpose)}&ttlSeconds=${accessIntent.ttlSeconds}&oneTime=true` : "";
     const response = await request(`${API_BASE}/imaging-cloud/studies/${encodeURIComponent(studyId)}/viewer${query}`);
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok || !payload.viewerUrl) throw new Error(payload.message || "影像调阅凭据获取失败");
-    window.location.assign(payload.viewerUrl);
+    if (!response.ok) throw new Error(payload.message || "影像调阅凭据获取失败");
+    const credential = window.CitizenRecordsV2.validateControlledCredential(payload, accessIntent, controlledCredentialOptions());
+    window.location.assign(credential.url);
   } catch (error) {
     showToast(error.message || "影像调阅失败，请稍后重试");
   }
@@ -5073,9 +5126,9 @@ async function downloadCitizenAttachment(attachmentId) {
       body: JSON.stringify(accessIntent)
     });
     const payload = await response.json().catch(() => ({}));
-    const downloadUrl = payload.downloadIntent?.downloadUrl || payload.downloadIntent?.url;
-    if (!response.ok || !downloadUrl) throw new Error(payload.message || "附件短时下载凭据获取失败");
-    window.location.assign(downloadUrl);
+    if (!response.ok) throw new Error(payload.message || "附件短时下载凭据获取失败");
+    const credential = window.CitizenRecordsV2.validateControlledCredential(payload, accessIntent, controlledCredentialOptions());
+    window.location.assign(credential.url);
   } catch (error) {
     showToast(error.message || "附件下载失败，请稍后重试");
   }

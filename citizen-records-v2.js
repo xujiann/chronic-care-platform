@@ -468,6 +468,128 @@
     return { ...item, status: "revoked", revokedAt: toDate(at)?.toISOString() || new Date().toISOString() };
   }
 
+  function buildIdempotentAction(input = {}) {
+    const operation = safeIdentifier(input.operation, 60);
+    const residentId = safeIdentifier(input.residentId, 120);
+    const nonce = safeIdentifier(input.nonce, 100);
+    const requestedAt = toDate(input.requestedAt || new Date());
+    if (!operation || !residentId || !nonce || !requestedAt) {
+      throw new Error("操作、居民、请求标识和请求时间均不能为空");
+    }
+    const idempotencyKey = `citizen-${operation}-${residentId}-${requestedAt.getTime()}-${nonce}`.slice(0, 240);
+    return {
+      ...(input.payload && typeof input.payload === "object" ? input.payload : {}),
+      idempotencyKey,
+      requestedAt: requestedAt.toISOString()
+    };
+  }
+
+  function projectActionReceipt(payload = {}, expected = {}) {
+    const expectedResidentId = cleanText(expected.residentId, 120);
+    const expectedResourceId = cleanText(expected.resourceId || expected.recordId || expected.id, 160);
+    const payloadResidentId = cleanText(payload.residentId, 120);
+    const payloadResourceId = cleanText(payload.resourceId || payload.recordId, 160);
+    if (payloadResidentId && expectedResidentId && payloadResidentId !== expectedResidentId) {
+      throw new Error("操作回执居民不匹配");
+    }
+    if (payloadResourceId && expectedResourceId && payloadResourceId !== expectedResourceId) {
+      throw new Error("操作回执资源不匹配");
+    }
+    const receiptId = cleanText(payload.receiptId || payload.requestId, 160);
+    const auditRef = cleanText(payload.auditRef || payload.auditReference || payload.auditId, 160);
+    if (!receiptId || !auditRef) throw new Error("操作回执缺少受理编号或审计关联号");
+    return {
+      receiptId,
+      auditRef,
+      acceptedAt: cleanText(payload.acceptedAt || payload.updatedAt || payload.createdAt, 60),
+      syncStatus: cleanText(payload.syncStatus || "accepted", 40)
+    };
+  }
+
+  function projectCorrectionReceipt(payload = {}, request = {}) {
+    const allowedStatuses = new Set(["submitted", "accepted", "processing", "corrected", "rejected", "withdrawn"]);
+    const status = cleanText(payload.status || request.status, 40);
+    if (!allowedStatuses.has(status)) throw new Error("纠错回执状态不受支持");
+    return {
+      ...request,
+      status,
+      ...projectActionReceipt(payload, { residentId: request.residentId, recordId: request.recordId }),
+      id: cleanText(request.id, 200)
+    };
+  }
+
+  function projectSharePackageReceipt(payload = {}, packageRecord = {}) {
+    const status = cleanText(payload.status || packageRecord.status, 40);
+    if (status !== "active") throw new Error("资料包创建回执状态不受支持");
+    return {
+      ...packageRecord,
+      status: "active",
+      ...projectActionReceipt(payload, { residentId: packageRecord.residentId, id: packageRecord.id }),
+      id: cleanText(packageRecord.id, 200),
+      residentId: cleanText(packageRecord.residentId, 120),
+      granteeId: cleanText(packageRecord.granteeId, 160),
+      purpose: cleanText(packageRecord.purpose, 300),
+      scopes: [...packageRecord.scopes],
+      expiresAt: cleanText(packageRecord.expiresAt, 60),
+      accessRef: cleanText(payload.accessRef || packageRecord.accessRef, 80)
+    };
+  }
+
+  function validateControlledCredential(payload = {}, intent = {}, options = {}) {
+    const nested = payload.credential || payload.downloadIntent || payload.viewerIntent || {};
+    const candidate = { ...payload, ...nested };
+    const rawUrl = cleanText(candidate.viewerUrl || candidate.downloadUrl || candidate.url, 2000);
+    const expiresAt = toDate(candidate.expiresAt);
+    const now = toDate(options.now || new Date()) || new Date();
+    const maximumTtl = Math.min(Number(intent.ttlSeconds || 300), 300);
+    const auditRef = cleanText(candidate.auditRef || candidate.auditReference || candidate.auditId, 160);
+    if (!rawUrl || !expiresAt || candidate.oneTime !== true || !auditRef) {
+      throw new Error("短时凭据缺少地址、有效期、单次标识或审计关联号");
+    }
+    const ttlSeconds = (expiresAt.getTime() - now.getTime()) / 1000;
+    if (ttlSeconds <= 0 || ttlSeconds > maximumTtl + 5) throw new Error("短时凭据有效期不符合要求");
+    const credentialResourceId = cleanText(candidate.resourceId, 160);
+    if (credentialResourceId && credentialResourceId !== cleanText(intent.resourceId, 160)) {
+      throw new Error("短时凭据资源不匹配");
+    }
+    const credentialScope = cleanText(candidate.scope, 100);
+    if (credentialScope && credentialScope !== cleanText(intent.scope, 100)) {
+      throw new Error("短时凭据范围不匹配");
+    }
+    const baseUrl = cleanText(options.baseUrl || "https://resident.invalid/", 1000);
+    let parsed;
+    try {
+      parsed = new URL(rawUrl, baseUrl);
+    } catch {
+      throw new Error("短时凭据地址格式不正确");
+    }
+    const localhostHttp = parsed.protocol === "http:" && /^(localhost|127\.0\.0\.1|\[::1\])$/i.test(parsed.hostname);
+    if (parsed.protocol !== "https:" && !(options.allowHttpLocalhost && localhostHttp)) {
+      throw new Error("短时凭据地址必须使用 HTTPS");
+    }
+    const baseOrigin = new URL(baseUrl).origin;
+    const allowedOrigins = new Set(
+      (Array.isArray(options.allowedOrigins) && options.allowedOrigins.length ? options.allowedOrigins : [baseOrigin])
+        .map((item) => {
+          try {
+            return new URL(item, baseUrl).origin;
+          } catch {
+            return "";
+          }
+        })
+        .filter(Boolean)
+    );
+    if (!allowedOrigins.has(parsed.origin)) throw new Error("短时凭据地址不在允许域名内");
+    return {
+      url: parsed.href,
+      expiresAt: expiresAt.toISOString(),
+      oneTime: true,
+      auditRef,
+      resourceId: cleanText(intent.resourceId, 160),
+      scope: cleanText(intent.scope, 100)
+    };
+  }
+
   function normalizeAccessibilityPreferences(input = {}) {
     const textScale = Math.max(1, Math.min(Number(input.textScale) || 1, 1.5));
     return {
@@ -519,6 +641,11 @@
     buildSharePackage,
     sharePackageState,
     revokeSharePackage,
+    buildIdempotentAction,
+    projectActionReceipt,
+    projectCorrectionReceipt,
+    projectSharePackageReceipt,
+    validateControlledCredential,
     normalizeAccessibilityPreferences,
     summarizeCareWorkspace
   };

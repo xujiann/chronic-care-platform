@@ -242,6 +242,117 @@ test("12. accessibility preferences clamp text size and retain safety confirmati
   });
 });
 
+test("resident write actions carry stable idempotency metadata", () => {
+  const action = V2.buildIdempotentAction({
+    operation: "share-create",
+    residentId: "r1",
+    nonce: "request-001",
+    requestedAt: now,
+    payload: { purpose: "转诊" }
+  });
+  assert.equal(action.purpose, "转诊");
+  assert.equal(action.requestedAt, now.toISOString());
+  assert.equal(action.idempotencyKey, "citizen-share-create-r1-1784793600000-request-001");
+  assert.throws(() => V2.buildIdempotentAction({ operation: "share-create", residentId: "r1" }), /请求标识/);
+});
+
+test("correction and share receipts cannot overwrite resident security fields", () => {
+  const correction = V2.buildCorrectionRequest({
+    recordId: "emr-1",
+    residentId: "r1",
+    field: "summary",
+    reason: "摘要不一致",
+    submittedAt: now
+  });
+  const correctedReceipt = V2.projectCorrectionReceipt({
+    status: "accepted",
+    residentId: "r1",
+    recordId: "emr-1",
+    receiptId: "receipt-1",
+    auditRef: "audit-1",
+    reason: "恶意覆盖"
+  }, correction);
+  assert.equal(correctedReceipt.reason, "摘要不一致");
+  assert.equal(correctedReceipt.receiptId, "receipt-1");
+  assert.equal(correctedReceipt.auditRef, "audit-1");
+  assert.throws(() => V2.projectCorrectionReceipt({ status: "accepted", residentId: "r2" }, correction), /居民不匹配/);
+  assert.throws(() => V2.projectCorrectionReceipt({ status: "accepted", residentId: "r1", auditRef: "audit-only" }, correction), /受理编号/);
+
+  const share = V2.buildSharePackage({
+    residentId: "r1",
+    granteeId: "hospital-a",
+    purpose: "转诊",
+    scopes: ["labs"],
+    createdAt: now,
+    expiresAt: "2026-07-24T08:00:00Z"
+  });
+  const shareReceipt = V2.projectSharePackageReceipt({
+    status: "active",
+    residentId: "r1",
+    granteeId: "attacker",
+    scopes: ["*"],
+    expiresAt: "2099-01-01",
+    accessRef: "HP-SERVER",
+    receiptId: "receipt-share",
+    auditRef: "audit-share"
+  }, share);
+  assert.equal(shareReceipt.granteeId, "hospital-a");
+  assert.deepEqual(shareReceipt.scopes, ["labs"]);
+  assert.equal(shareReceipt.expiresAt, share.expiresAt);
+  assert.equal(shareReceipt.accessRef, "HP-SERVER");
+});
+
+test("controlled credentials require one-time HTTPS, short expiry, matching resource and audit", () => {
+  const intent = V2.buildControlledAccessIntent({
+    accessDecision: { allowed: true, residentId: "r1", scope: "attachments", purpose: "复诊" },
+    resourceId: "attachment-1",
+    resourceType: "attachment",
+    purpose: "复诊查看原文",
+    ttlSeconds: 300
+  });
+  const valid = V2.validateControlledCredential({
+    downloadIntent: {
+      downloadUrl: "https://records.example/short/abc",
+      expiresAt: "2026-07-23T08:04:00Z",
+      oneTime: true,
+      resourceId: "attachment-1",
+      scope: "attachments",
+      auditRef: "audit-download-1"
+    }
+  }, intent, {
+    now,
+    baseUrl: "https://resident.example/",
+    allowedOrigins: ["https://records.example"]
+  });
+  assert.equal(valid.url, "https://records.example/short/abc");
+  assert.equal(valid.oneTime, true);
+  assert.equal(valid.auditRef, "audit-download-1");
+  assert.throws(() => V2.validateControlledCredential({
+    url: "javascript:alert(1)",
+    expiresAt: "2026-07-23T08:01:00Z",
+    oneTime: true,
+    auditRef: "audit-1"
+  }, intent, { now, baseUrl: "https://resident.example/" }), /HTTPS/);
+  assert.throws(() => V2.validateControlledCredential({
+    url: "https://evil.example/short",
+    expiresAt: "2026-07-23T08:01:00Z",
+    oneTime: true,
+    auditRef: "audit-1"
+  }, intent, { now, baseUrl: "https://resident.example/" }), /允许域名/);
+  assert.throws(() => V2.validateControlledCredential({
+    url: "https://resident.example/short",
+    expiresAt: "2026-07-23T08:10:00Z",
+    oneTime: true,
+    auditRef: "audit-1"
+  }, intent, { now, baseUrl: "https://resident.example/" }), /有效期/);
+  assert.throws(() => V2.validateControlledCredential({
+    url: "https://resident.example/short",
+    expiresAt: "2026-07-23T08:01:00Z",
+    oneTime: false,
+    auditRef: "audit-1"
+  }, intent, { now, baseUrl: "https://resident.example/" }), /单次标识/);
+});
+
 test("workspace summary composes deduplication, care tasks, EMR and completeness", () => {
   const result = V2.summarizeCareWorkspace({
     residentId: "r1",
