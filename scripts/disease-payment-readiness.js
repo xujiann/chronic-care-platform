@@ -8,6 +8,7 @@ const Intake = require("../disease-payment-intake");
 const PackageSignature = require("../disease-payment-package-signature");
 const GrouperContract = require("../disease-payment-grouper-contract");
 const Settlement = require("../disease-payment-settlement");
+const SpecialCase = require("../disease-payment-special-case");
 const OperatingModel = require("../insurance-payment-operating-model");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -58,6 +59,20 @@ function buildDiseasePaymentReadiness() {
   const specialCreated = Service.createSpecialCase(settlementGrouped.state, { caseId: officialCase.id, reason: "readiness complex critical case", requestedPaymentFen: 3200000, evidence: [{ type: "medical-record-summary", digest: `sha256:${"9".repeat(64)}`, issuedBy: "readiness-hospital" }] }, "readiness-hospital");
   const specialFirstReview = Service.reviewSpecialCase(specialCreated.state, specialCreated.row.id, { approved: true, adjustedPaymentFen: 3200000 }, "大连市医保中心审核员");
   const specialApproved = Service.reviewSpecialCase(specialFirstReview.state, specialCreated.row.id, { approved: true, adjustedPaymentFen: 3200000 }, "大连市医保局管理员");
+  const appealExperts = [
+    { id: "readiness-original-medical", reviewerAccount: "readiness-original-medical", role: "medical-insurance-review", institution: "readiness-insurance-center", active: true },
+    { id: "readiness-original-fund", reviewerAccount: "readiness-original-fund", role: "fund-finance-review", institution: "readiness-insurance-bureau", active: true },
+    { id: "readiness-appeal-medical", reviewerAccount: "readiness-appeal-medical", role: "medical-insurance-review", institution: "readiness-appeal-center", active: true },
+    { id: "readiness-appeal-fund", reviewerAccount: "readiness-appeal-fund", role: "fund-finance-review", institution: "readiness-appeal-bureau", active: true }
+  ];
+  const appealRow = SpecialCase.createSpecialCaseApplication({ id: "readiness-appeal-case", institution: "readiness-hospital", totalAmount: 1000 }, { id: "readiness-special-appeal", reason: "readiness original application", requestedPaymentFen: 90000, evidence: [{ type: "medical-summary", digest: `sha256:${"4".repeat(64)}` }] }, "readiness-hospital");
+  SpecialCase.selectSpecialCaseExperts(appealRow, appealExperts, { selectionNonce: "readiness-original-panel" });
+  SpecialCase.reviewSpecialCaseApplication(appealRow, { approved: false, opinion: "readiness evidence incomplete" }, appealRow.expertPanel.members[0].reviewerAccount);
+  const originalAppealExpertIds = new Set(appealRow.expertPanel.members.map((item) => item.expertId));
+  const appeal = SpecialCase.createSpecialCaseAppeal(appealRow, { id: "readiness-appeal", originalDecisionDigest: appealRow.decisionDigest, reason: "readiness new evidence", evidence: [{ type: "supplement", digest: `sha256:${"5".repeat(64)}` }], at: appealRow.rejectedAt }, "readiness-hospital");
+  const appealPanel = SpecialCase.selectSpecialCaseAppealExperts(appealRow, appealExperts, { selectionNonce: "readiness-appeal-panel", at: appeal.submittedAt });
+  SpecialCase.reviewSpecialCaseAppeal(appealRow, { approved: true, adjustedPaymentFen: 85000, at: appeal.submittedAt }, appealPanel.members[0].reviewerAccount);
+  SpecialCase.reviewSpecialCaseAppeal(appealRow, { approved: true, adjustedPaymentFen: 85000, at: appeal.submittedAt }, appealPanel.members[1].reviewerAccount);
   const settlementCreated = Service.createSettlementBatch(specialApproved.state, { period: "2026-06" }, "readiness-settlement");
   const specialSnapshot = settlementCreated.batch.calculationSnapshots.find((item) => item.caseId === officialCase.id);
   const settlementFrozen = settlementCreated.batch.settlementState === "BATCH_FROZEN" && settlementCreated.batch.calculationSnapshots.every((item) => item.formalReceiptId) && specialSnapshot.specialCaseId === specialCreated.row.id && specialSnapshot.paymentStandardFen === 3200000;
@@ -126,6 +141,7 @@ function buildDiseasePaymentReadiness() {
     { id: "dual-mode", label: "DRG/DIP双模式目录与参数", ok: state.groupCatalog.some((item) => item.mode === "DRG") && state.groupCatalog.some((item) => item.mode === "DIP") },
     { id: "case-loop", label: "清单质控、分组、测算与监管", ok: overview.summary.calculatedCount >= 3 && state.cases.slice(0, 3).every((item) => item.calculation?.quality?.ok) },
     { id: "special-case", label: "特例单议专家抽取、利益回避、双人复核、证据账本与正式结算绑定", ok: specialApproved.row.state === "INCLUDED" && specialApproved.row.expertPanel?.members.filter((item) => item.status === "selected").length === 2 && Service.verifySpecialCaseLedger(specialApproved.row.events) && specialSnapshot.specialCaseDecisionDigest === specialApproved.row.decisionDigest },
+    { id: "special-case-appeal", label: "特例单议原决定摘要绑定、限期复议、新专家组双人复核与结算准入", ok: appealRow.state === "APPROVED" && appealPanel.members.every((item) => !originalAppealExpertIds.has(item.expertId)) && appeal.outcome === "APPROVED" && SpecialCase.buildSpecialCaseAppealSla(appealRow, appeal.reviewDueAt).status === "completed-within-sla" && SpecialCase.settlementAdjustment([appealRow], { id: appealRow.caseId })?.decisionDigest === appealRow.decisionDigest },
     { id: "settlement", label: "正式分组结算准入、医保核心回执与整数分状态机", ok: settlementFrozen && settlementPaid.batch.settlementState === "PAID" && Number.isSafeInteger(settlementPaid.batch.standardAmountFen) && Settlement.verifyEventLedger(settlementPaid.batch.events) },
     { id: "settlement-sla", label: "申报截止次日起30工作日结算SLA与工作日历", ok: settlementCreated.batch.policyWorkingDays === 30 && Boolean(settlementCreated.batch.sla?.dueDate) && settlementPaid.batch.sla?.status === "completed-within-sla" },
     { id: "settlement-difference-governance", label: "月度结算差额摘要证据、医院/医保双域复核、处理SLA与哈希账本", ok: settlementDifference.batch.settlementState === "RECONCILED" && settlementDifferenceCase.state === "RESOLVED" && settlementDifferenceCase.reviews.length === 2 && settlementDifferenceCase.sla.status === "completed-within-sla" && Settlement.verifyEventLedger(settlementDifferenceCase.events) },
