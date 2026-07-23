@@ -163,6 +163,7 @@ function buildSpecialtyCutoverPack(options = {}) {
   const pilotBatchPlan = buildPilotBatchPlan(tracks, firstIncrement);
   const siteEvidenceWorkflow = buildSiteEvidenceWorkflow(evidenceDossier, pilotBatchPlan);
   const acceptanceScenarioSuite = buildAcceptanceScenarioSuite(tracks, firstIncrement, evidenceDossier, siteEvidenceWorkflow);
+  const scenarioEvidenceMatrix = buildScenarioEvidenceMatrix(acceptanceScenarioSuite, evidenceDossier, siteEvidenceWorkflow);
   const summary = {
     tracks: tracks.length,
     codeReady: tracks.filter((item) => item.codeReady).length,
@@ -186,11 +187,12 @@ function buildSpecialtyCutoverPack(options = {}) {
     evidenceDossier,
     pilotBatchPlan,
     siteEvidenceWorkflow,
-    acceptanceScenarioSuite
+    acceptanceScenarioSuite,
+    scenarioEvidenceMatrix
   };
   pack.integrity = {
     algorithm: "sha256",
-    digest: `sha256:${sha256({ summary, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision, evidenceDossier, pilotBatchPlan, siteEvidenceWorkflow, acceptanceScenarioSuite })}`
+    digest: `sha256:${sha256({ summary, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision, evidenceDossier, pilotBatchPlan, siteEvidenceWorkflow, acceptanceScenarioSuite, scenarioEvidenceMatrix })}`
   };
   return pack;
 }
@@ -721,6 +723,50 @@ function buildAcceptanceScenarioSuite(tracks, firstIncrement, evidenceDossier, s
   };
 }
 
+function buildScenarioEvidenceMatrix(acceptanceScenarioSuite, evidenceDossier, siteEvidenceWorkflow) {
+  const evidenceIds = evidenceDossier.firstIncrementRequired || [];
+  const workflowEvents = new Set((siteEvidenceWorkflow.auditEvents || []).map((item) => item.eventType));
+  const rows = (acceptanceScenarioSuite.scenarios || []).map((scenario) => {
+    const scenarioEvidence = evidenceIds.map((evidenceId) => ({
+      evidenceId,
+      minimumState: scenario.type === "audit-replay" ? "accepted" : "submitted",
+      closesBlocker: scenario.type === "audit-replay",
+      requiredArtifacts: scenario.expectedEvidence || []
+    }));
+    const workflowAssertions = [
+      "site-evidence.submit-evidence",
+      scenario.type === "audit-replay" ? "site-evidence.accept-evidence" : "site-evidence.start-four-eyes-review"
+    ].filter((eventType) => workflowEvents.has(eventType) || eventType.startsWith("site-evidence."));
+    return {
+      scenarioId: scenario.id,
+      type: scenario.type,
+      batchId: scenario.batchId,
+      hardStopOnFail: scenario.hardStopOnFail,
+      evidence: scenarioEvidence,
+      requiredWorkflowEvents: workflowAssertions,
+      goNoGoImpact: scenario.hardStopOnFail ? "keep-no-go-on-failure" : "review-scorecard-after-replay",
+      replayRequirement: "must reproduce steps, receipts, identities, timestamps and digest without editing original records",
+      acceptanceResult: "not-run"
+    };
+  });
+  return {
+    status: "not-run",
+    rows,
+    summary: {
+      scenarios: rows.length,
+      evidenceLinks: rows.reduce((sum, row) => sum + row.evidence.length, 0),
+      hardStopRows: rows.filter((row) => row.hardStopOnFail).length,
+      replayRows: rows.filter((row) => row.type === "audit-replay").length
+    },
+    decisionRules: [
+      "all hard-stop rows must pass before any Go/No-Go score can increase",
+      "audit-replay row must prove evidence closure without source-record mutation",
+      "missing required workflow event keeps the linked evidence item at submitted or returned",
+      "matrix status remains not-run until every row has accepted, returned or failed result"
+    ]
+  };
+}
+
 function renderMarkdown(pack) {
   const rows = pack.tracks.map((item) => `| ${item.name} | ${item.department} | ${item.codeReady ? "是" : "否"} | ${item.productionReady ? "是" : "否"} | ${item.blockers.length} | ${item.page} |`);
   const blockers = pack.tracks.flatMap((track) => track.blockers.map((item) => `| ${track.name} | ${item.id} | ${item.title} | ${item.owner} | ${item.status} |`));
@@ -728,6 +774,7 @@ function renderMarkdown(pack) {
   const batchRows = (pack.pilotBatchPlan?.batches || []).map((item) => `| ${item.id} | ${item.name} | ${item.scope} | ${item.promotionDecision} |`);
   const workflowRows = (pack.siteEvidenceWorkflow?.transitions || []).map((item) => `| ${item.from} | ${item.action} | ${item.to} | ${item.requiredChecks.join(", ")} |`);
   const scenarioRows = (pack.acceptanceScenarioSuite?.scenarios || []).map((item) => `| ${item.id} | ${item.type} | ${item.batchId} | ${item.hardStopOnFail ? "yes" : "no"} | ${item.passCriteria} |`);
+  const scenarioEvidenceRows = (pack.scenarioEvidenceMatrix?.rows || []).map((item) => `| ${item.scenarioId} | ${item.evidence.length} | ${item.requiredWorkflowEvents.join(", ")} | ${item.goNoGoImpact} | ${item.acceptanceResult} |`);
   return [
     "# T10 急救、用血、影像与体检专项上线割接包",
     "",
@@ -826,6 +873,19 @@ function renderMarkdown(pack) {
     "### Scenario execution rules",
     "",
     ...(pack.acceptanceScenarioSuite?.executionRules || []).map((item) => `- ${item}`),
+    "",
+    "## Scenario evidence matrix",
+    "",
+    `- Status: ${pack.scenarioEvidenceMatrix?.status || "not-run"}`,
+    `- Evidence links: ${pack.scenarioEvidenceMatrix?.summary?.evidenceLinks || 0}`,
+    "",
+    "| Scenario | Evidence links | Workflow events | Go/No-Go impact | Result |",
+    "|---|---:|---|---|---|",
+    ...scenarioEvidenceRows,
+    "",
+    "### Matrix decision rules",
+    "",
+    ...(pack.scenarioEvidenceMatrix?.decisionRules || []).map((item) => `- ${item}`),
     ""
   ].join("\n");
 }
@@ -862,5 +922,6 @@ module.exports = {
   buildEvidenceDossier,
   buildPilotBatchPlan,
   buildSiteEvidenceWorkflow,
-  buildAcceptanceScenarioSuite
+  buildAcceptanceScenarioSuite,
+  buildScenarioEvidenceMatrix
 };

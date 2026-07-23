@@ -130,6 +130,18 @@ The pack now includes an `acceptanceScenarioSuite` for the first grey increment.
 
 The suite status is `ready-for-controlled-rehearsal-only`. Hard-stop scenario failure keeps the decision at No-Go. The audit replay scenario can return evidence for correction without mutating original records.
 
+## Scenario evidence matrix
+
+`scenarioEvidenceMatrix` links each acceptance scenario to:
+
+- required first-increment evidence IDs;
+- minimum evidence state (`submitted` or `accepted`);
+- required workflow audit events;
+- Go/No-Go impact;
+- replay requirement and current result.
+
+All hard-stop scenario rows must pass before the scorecard can improve. The audit replay row must prove evidence closure without changing source records. Missing workflow events keep linked evidence at `submitted` or `returned`.
+
 ## Verification
 
 Run the focused test directly:
