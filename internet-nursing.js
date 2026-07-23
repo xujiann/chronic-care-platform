@@ -14,6 +14,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 async function loadInternetNursingDashboard() {
   nursingDashboard = await fetchInternetNursingDashboard();
   nursingDashboard.dispatchRecommendations = buildStaticDispatchRecommendations(nursingDashboard.orders || [], nursingDashboard.nurses || []);
+  nursingDashboard.orders = withNursingServiceControls(nursingDashboard.orders || []);
   renderInternetNursingDashboard(nursingDashboard);
 }
 
@@ -157,6 +158,38 @@ function buildStaticDispatchRecommendations(orders, nurses) {
         .sort((a, b) => b.score - a.score)
         .slice(0, 3)
     }));
+}
+
+function withNursingServiceControls(orders) {
+  const domain = window.NursingEscortDomain;
+  if (!domain) return orders;
+  return orders.map((order) => {
+    const current = domain.canonicalStatus(order.status, "nursing");
+    if (["completed", "settlement-pending", "settled", "quality-review", "closed", "cancelled", "rejected", "refunded"].includes(current)) {
+      return { ...order, serviceEvidenceControl: null };
+    }
+    const target = current === "in-service" ? "completed" : "in-service";
+    const transition = domain.validateTransition("nursing", current, target);
+    const evidence = domain.validateServiceEvidence("nursing", order, target);
+    return {
+      ...order,
+      serviceEvidenceControl: {
+        ok: transition.ok && evidence.ok,
+        target,
+        blockers: [
+          ...(transition.ok ? [] : [`transition:${current}->${target}`]),
+          ...evidence.reasons
+        ]
+      }
+    };
+  });
+}
+
+function nursingServiceControlText(item) {
+  const control = item?.serviceEvidenceControl;
+  if (!control) return "";
+  if (control.ok) return control.target === "completed" ? "完成证据校验通过" : "开始服务证据校验通过";
+  return `履约阻断：${control.blockers.slice(0, 5).join("；")}`;
 }
 
 function buildStaticRegulatoryMonthlyReport(orders, institutions) {
@@ -835,7 +868,7 @@ function renderHospitalOrders(items) {
           <td>${escapeHtml(displayText(item.serviceItem || ""))}<br><small>${escapeHtml(nursingAddressText(item.address))}</small></td>
           <td>${escapeHtml(displayText(item.institution?.name || item.institutionName || ""))}<br><small>${escapeHtml(item.institutionCode || "")}</small></td>
           <td>${escapeHtml(displayText(item.nurse?.name || item.nurseName || "pending"))}<br><small>${escapeHtml(displayText(item.nurse?.registrationStatus || ""))}</small></td>
-          <td>${statusBadge(item.firstVisitAssessment)} ${statusBadge(item.informedConsent)} ${statusBadge(item.locationTrace)}<br><small>${escapeHtml(consentAttachmentText(item))}</small><br><small>${escapeHtml(locationTraceSummary(item))}</small><br><small>${escapeHtml(notificationSummary(item))}</small></td>
+          <td>${statusBadge(item.firstVisitAssessment)} ${statusBadge(item.informedConsent)} ${statusBadge(item.locationTrace)}<br><small>${escapeHtml(consentAttachmentText(item))}</small><br><small>${escapeHtml(locationTraceSummary(item))}</small><br><small>${escapeHtml(notificationSummary(item))}</small><br><small>${escapeHtml(nursingServiceControlText(item))}</small></td>
           <td>${statusBadge(item.status)} ${statusBadge(item.riskLevel)}<br><small>${escapeHtml(displayText(item.qualityCallback || ""))}</small></td>
           <td>
             ${canManage ? `
@@ -866,7 +899,7 @@ function renderNurseQueue(items) {
           <td><strong>${escapeHtml(item.id)}</strong><br><small>${escapeHtml(displayText(item.serviceItem || ""))}</small></td>
           <td>${escapeHtml(item.preferredAt || "")}<br><small>${escapeHtml(nursingAddressText(item.address))}</small></td>
           <td>${escapeHtml(displayText(item.residentName || item.residentId || ""))}<br><small>${escapeHtml(displayText(item.serviceObject || ""))}</small></td>
-          <td>${nursingEvidenceBadge("首诊", item.firstVisitAssessment, "首诊待评估")} ${nursingEvidenceBadge("同意书", item.informedConsent, "同意书待签署")} ${nursingEvidenceBadge("轨迹", item.locationTrace, "轨迹待采集")} ${nursingEvidenceBadge("护理记录", item.serviceRecordStatus, "护理记录待填写")}<br><small>${escapeHtml(locationTraceSummary(item))}</small><br><small>${escapeHtml(serviceRecordSummary(item))}</small><br><small>${escapeHtml(notificationReceiptSummary(item))}</small></td>
+          <td>${nursingEvidenceBadge("首诊", item.firstVisitAssessment, "首诊待评估")} ${nursingEvidenceBadge("同意书", item.informedConsent, "同意书待签署")} ${nursingEvidenceBadge("轨迹", item.locationTrace, "轨迹待采集")} ${nursingEvidenceBadge("护理记录", item.serviceRecordStatus, "护理记录待填写")}<br><small>${escapeHtml(locationTraceSummary(item))}</small><br><small>${escapeHtml(serviceRecordSummary(item))}</small><br><small>${escapeHtml(notificationReceiptSummary(item))}</small><br><small>${escapeHtml(nursingServiceControlText(item))}</small></td>
           <td>${statusBadge(item.status)} ${statusBadge(item.riskLevel)}</td>
           <td>
             ${nurseActionButtons(item, canAct)}
