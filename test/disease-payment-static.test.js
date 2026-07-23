@@ -37,7 +37,7 @@ test("local official package workbench exposes import validation simulation revi
 
 test("settlement workbench exposes core submission and callback waiting states without manual terminal receipts", () => {
   const script = fs.readFileSync(path.join(ROOT, "disease-payment.js"), "utf8");
-  ["submit-core", "data-payment-action=\"settlement-${action[0]}", "开始对账", "发起拨付申请", "等待医保核心受理/退回回调", "等待医保核心拨付回调", "standardAmountFen"].forEach((marker) => assert.ok(script.includes(marker), marker));
+  ["submit-core", "resubmit-core", "retry-payment", "补正后重报", "核验后重试拨付", "data-payment-action=\"settlement-${action[0]}", "开始对账", "发起拨付申请", "等待医保核心受理/退回回调", "等待医保核心拨付回调", "standardAmountFen"].forEach((marker) => assert.ok(script.includes(marker), marker));
   assert.equal(script.includes('"core-accepted": { action'), false);
   assert.equal(script.includes('"confirm-payment": { action'), false);
 });

@@ -14,6 +14,7 @@ const SETTLEMENT_LABELS = Object.freeze({
   DIFFERENCE_PENDING: "差异待处理",
   RECONCILED: "已对账",
   PAYMENT_REQUESTED: "拨付申请",
+  PAYMENT_FAILED: "拨付失败待处理",
   PAID: "已拨付",
   CLOSED: "已结案"
 });
@@ -29,11 +30,14 @@ const ACTION_TARGETS = Object.freeze({
   "confirm-matched": Object.freeze({ from: ["RECONCILING"], to: "RECONCILED" }),
   "resolve-difference": Object.freeze({ from: ["DIFFERENCE_PENDING"], to: "RECONCILED" }),
   "request-payment": Object.freeze({ from: ["RECONCILED"], to: "PAYMENT_REQUESTED" }),
+  "payment-failed": Object.freeze({ from: ["PAYMENT_REQUESTED"], to: "PAYMENT_FAILED" }),
+  "retry-payment": Object.freeze({ from: ["PAYMENT_FAILED"], to: "PAYMENT_REQUESTED" }),
   "confirm-payment": Object.freeze({ from: ["PAYMENT_REQUESTED"], to: "PAID" }),
   close: Object.freeze({ from: ["PAID"], to: "CLOSED" })
 });
 const DIFFERENCE_REVIEW_DOMAINS = Object.freeze(["hospital-finance", "insurance-settlement"]);
 const CORE_CORRECTION_POLICY = Object.freeze({ correctionWorkingDays: 5, excessiveReturnCycles: 3 });
+const PAYMENT_FAILURE_POLICY = Object.freeze({ resolutionWorkingDays: 2, maxRetryCycles: 3 });
 const CLEARANCE_LABELS = Object.freeze({
   PREPARED: "清算准备",
   INSTITUTION_CONFIRMING: "医院确认中",
@@ -183,11 +187,24 @@ function verifyCoreReturnCycle(cycle = {}) {
 
 function verifyCoreReturnCycleEvidence(batch = {}, cycle = {}) {
   if (!verifyEventLedger(batch.events || []) || !verifyCoreReturnCycle(cycle)) return false;
-  return (batch.events || []).some((event) => event.action === "core-returned"
+  const events = batch.events || [];
+  const returned = events.some((event) => event.action === "core-returned"
     && event.detail?.returnCycleId === cycle.id
     && event.detail?.returnDigest === cycle.returnDigest
     && event.detail?.requirementDigest === cycle.requirementDigest
     && event.detail?.receiptId === cycle.receiptId);
+  if (!returned) return false;
+  if (cycle.resubmission || cycle.status !== "OPEN") {
+    const resubmitted = events.some((event) => event.action === "resubmit-core"
+      && event.detail?.returnCycleId === cycle.id
+      && event.detail?.externalRequestId === cycle.resubmission?.externalRequestId
+      && event.detail?.requestDigest === cycle.resubmission?.requestDigest
+      && event.detail?.correctionDigest === cycle.resubmission?.correctionDigest);
+    if (!resubmitted) return false;
+  }
+  if (cycle.status === "ACCEPTED" && !events.some((event) => event.action === "core-accepted" && event.detail?.returnCycleId === cycle.id && event.detail?.receiptId === cycle.acceptanceReceiptId)) return false;
+  if (cycle.status === "RETURNED_AGAIN" && !events.some((event) => event.action === "core-returned" && event.detail?.receiptId === cycle.nextReturnReceiptId)) return false;
+  return true;
 }
 
 function buildCoreCorrectionSla(cycle = {}, calendarInput = {}, at = new Date().toISOString()) {
@@ -246,6 +263,105 @@ function buildSettlementCoreCorrectionOperations(batches = [], options = {}) {
   };
 }
 
+function paymentFailureDigestPayload(cycle = {}) {
+  return {
+    cycleId: String(cycle.id || ""),
+    batchId: String(cycle.batchId || ""),
+    revision: Number(cycle.revision || 0),
+    paymentRequestId: String(cycle.paymentRequestId || ""),
+    receiptId: String(cycle.receiptId || ""),
+    reasonCode: String(cycle.reasonCode || ""),
+    reason: String(cycle.reason || ""),
+    failureEvidenceDigest: String(cycle.failureEvidenceDigest || ""),
+    failedAt: String(cycle.failedAt || ""),
+    failedBy: String(cycle.failedBy || ""),
+    resolutionWorkingDays: Number(cycle.resolutionWorkingDays || 0),
+    dueDate: String(cycle.dueDate || "")
+  };
+}
+
+function verifyPaymentFailureCycle(cycle = {}) {
+  return /^[a-f0-9]{64}$/.test(String(cycle.failureDigest || "")) && cycle.failureDigest === digest(paymentFailureDigestPayload(cycle));
+}
+
+function verifyPaymentFailureCycleEvidence(batch = {}, cycle = {}) {
+  if (!verifyEventLedger(batch.events || []) || !verifyPaymentFailureCycle(cycle)) return false;
+  const events = batch.events || [];
+  const failed = events.some((event) => event.action === "payment-failed"
+    && event.detail?.failureCycleId === cycle.id
+    && event.detail?.failureDigest === cycle.failureDigest
+    && event.detail?.failureEvidenceDigest === cycle.failureEvidenceDigest
+    && event.detail?.receiptId === cycle.receiptId);
+  if (!failed) return false;
+  if (cycle.retry || cycle.status !== "OPEN") {
+    const retried = events.some((event) => event.action === "retry-payment"
+      && event.detail?.failureCycleId === cycle.id
+      && event.detail?.paymentRequestId === cycle.retry?.paymentRequestId
+      && event.detail?.resolutionDigest === cycle.retry?.resolutionDigest);
+    if (!retried) return false;
+  }
+  if (cycle.status === "SUCCEEDED" && !events.some((event) => event.action === "confirm-payment" && event.detail?.failureCycleId === cycle.id && event.detail?.receiptId === cycle.paymentReceiptId)) return false;
+  if (cycle.status === "FAILED_AGAIN" && !events.some((event) => event.action === "payment-failed" && event.detail?.receiptId === cycle.nextFailureReceiptId)) return false;
+  return true;
+}
+
+function buildPaymentFailureSla(cycle = {}, calendarInput = {}, at = new Date().toISOString()) {
+  const calendar = normalizeWorkingCalendar(calendarInput);
+  const resolutionWorkingDays = Number(cycle.resolutionWorkingDays || PAYMENT_FAILURE_POLICY.resolutionWorkingDays);
+  if (!Number.isInteger(resolutionWorkingDays) || resolutionWorkingDays <= 0 || resolutionWorkingDays > 30) throw new Error("拨付失败处理工作日必须为1至30");
+  const failedDate = dateOnly(cycle.failedAt, "拨付失败日期");
+  const dueDate = addWorkingDays(failedDate, resolutionWorkingDays, calendar);
+  const completedDate = cycle.retriedAt ? dateOnly(cycle.retriedAt, "拨付重试日期") : "";
+  const evaluatedDate = completedDate || dateOnly(at, "拨付失败SLA评估日期");
+  const elapsedWorkingDays = workingDaysBetween(failedDate, evaluatedDate, calendar);
+  const overdueWorkingDays = Math.max(0, elapsedWorkingDays - resolutionWorkingDays);
+  const status = completedDate ? (overdueWorkingDays ? "completed-overdue" : "completed-within-sla") : overdueWorkingDays ? "overdue" : "within-sla";
+  return { resolutionWorkingDays, failedDate, dueDate, completedDate, evaluatedDate, elapsedWorkingDays, remainingWorkingDays: Math.max(0, resolutionWorkingDays - elapsedWorkingDays), overdueWorkingDays, status, calendar };
+}
+
+function buildSettlementPaymentFailureOperations(batches = [], options = {}) {
+  const at = String(options.at || new Date().toISOString());
+  const rows = batches.flatMap((batch) => (batch.paymentFailureCycles || []).map((cycle) => {
+    const integrity = verifyPaymentFailureCycleEvidence(batch, cycle);
+    let sla;
+    try {
+      sla = buildPaymentFailureSla(cycle, batch.workingCalendar || {}, at);
+    } catch (error) {
+      sla = { status: "invalid", error: error.message };
+    }
+    return {
+      batchId: batch.id,
+      period: batch.period,
+      institution: batch.institution,
+      cycleId: cycle.id,
+      revision: cycle.revision,
+      paymentRequestId: cycle.paymentRequestId,
+      status: cycle.status,
+      reasonCode: cycle.reasonCode,
+      failureEvidenceDigest: cycle.failureEvidenceDigest,
+      failureDigest: cycle.failureDigest,
+      resolutionDigest: cycle.retry?.resolutionDigest || "",
+      integrity: integrity ? "valid" : "invalid",
+      sla
+    };
+  }));
+  return {
+    generatedAt: at,
+    summary: {
+      total: rows.length,
+      open: rows.filter((item) => item.status === "OPEN").length,
+      overdue: rows.filter((item) => item.status === "OPEN" && item.sla.status === "overdue").length,
+      retried: rows.filter((item) => item.status === "RETRIED").length,
+      succeeded: rows.filter((item) => item.status === "SUCCEEDED").length,
+      failedAgain: rows.filter((item) => item.status === "FAILED_AGAIN").length,
+      invalid: rows.filter((item) => item.integrity === "invalid").length,
+      retryExhausted: batches.filter((batch) => (batch.paymentFailureCycles || []).length >= PAYMENT_FAILURE_POLICY.maxRetryCycles && batch.settlementState === "PAYMENT_FAILED").length
+    },
+    items: rows,
+    privacyBoundary: "仅返回批次、机构、拨付申请号、原因码、摘要和SLA，不返回病例、患者或失败原因原文。"
+  };
+}
+
 function eventIdentity(payload, action) {
   return String(payload.idempotencyKey || payload.receiptId || payload.externalRequestId || payload.paymentRequestId || `${action}:${payload.at || ""}`).trim();
 }
@@ -300,7 +416,7 @@ function transitionSettlementBatch(batch, payload = {}, actor = "system", option
   const action = String(payload.action || "").trim();
   const rule = ACTION_TARGETS[action];
   if (!rule) throw new Error(`不支持的结算动作：${action || "空动作"}`);
-  if (["core-accepted", "core-returned", "confirm-payment"].includes(action) && options.trustedInsuranceCoreCallback !== true) throw new Error(`${action}只能由医保核心可信回调驱动`);
+  if (["core-accepted", "core-returned", "payment-failed", "confirm-payment"].includes(action) && options.trustedInsuranceCoreCallback !== true) throw new Error(`${action}只能由医保核心可信回调驱动`);
   if (!verifyEventLedger(batch.events || [])) throw new Error("结算批次事件账本校验失败");
   const before = settlementState(batch);
   const identity = eventIdentity(payload, action);
@@ -489,7 +605,65 @@ function transitionSettlementBatch(batch, payload = {}, actor = "system", option
   }
   if (action === "request-payment") {
     detail.paymentRequestId = requireText(payload, "paymentRequestId", "拨付申请号");
-    batch.paymentRequest = { paymentRequestId: detail.paymentRequestId, amountFen: Number(batch.adjustedAmountFen ?? batch.standardAmountFen), requestedAt: now, requestedBy: actor };
+    batch.paymentRequest = { paymentRequestId: detail.paymentRequestId, amountFen: Number(batch.adjustedAmountFen ?? batch.standardAmountFen), requestedAt: now, requestedBy: actor, revision: 1 };
+  }
+  if (action === "payment-failed") {
+    detail.receiptId = requireText(payload, "receiptId", "拨付失败回执号");
+    detail.reasonCode = requireText(payload, "reasonCode", "拨付失败原因码");
+    detail.reason = requireText(payload, "reason", "拨付失败原因");
+    detail.failureEvidenceDigest = requireDigest(payload, "failureEvidenceDigest", "拨付失败证据摘要");
+    const resolutionWorkingDays = Number(payload.resolutionWorkingDays || PAYMENT_FAILURE_POLICY.resolutionWorkingDays);
+    if (!Number.isInteger(resolutionWorkingDays) || resolutionWorkingDays <= 0 || resolutionWorkingDays > 30) throw new Error("拨付失败处理工作日必须为1至30");
+    batch.paymentFailureCycles ||= [];
+    const previousCycle = batch.paymentFailureCycles.at(-1);
+    if (previousCycle?.status === "RETRIED") {
+      if (!verifyPaymentFailureCycleEvidence(batch, previousCycle)) throw new Error("拨付失败周期摘要或账本证据校验失败");
+      previousCycle.status = "FAILED_AGAIN";
+      previousCycle.nextFailureReceiptId = detail.receiptId;
+    }
+    const cycle = {
+      id: String(payload.failureCycleId || `payment-failure-${randomUUID()}`),
+      batchId: batch.id,
+      revision: Number(batch.paymentRequest?.revision || 1),
+      paymentRequestId: String(batch.paymentRequest?.paymentRequestId || ""),
+      receiptId: detail.receiptId,
+      reasonCode: detail.reasonCode,
+      reason: detail.reason,
+      failureEvidenceDigest: detail.failureEvidenceDigest,
+      failedAt: now,
+      failedBy: actor,
+      resolutionWorkingDays,
+      dueDate: addWorkingDays(dateOnly(now), resolutionWorkingDays, batch.workingCalendar || {}),
+      status: "OPEN"
+    };
+    if (!cycle.paymentRequestId) throw new Error("拨付失败回调缺少匹配的拨付申请");
+    if (batch.paymentFailureCycles.some((item) => item.id === cycle.id)) throw new Error("拨付失败周期号已存在");
+    cycle.failureDigest = digest(paymentFailureDigestPayload(cycle));
+    cycle.sla = buildPaymentFailureSla(cycle, batch.workingCalendar || {}, now);
+    batch.paymentFailureCycles.push(cycle);
+    detail.failureCycleId = cycle.id;
+    detail.failureDigest = cycle.failureDigest;
+    detail.resolutionDueDate = cycle.dueDate;
+    batch.paymentFailure = { receiptId: detail.receiptId, reasonCode: detail.reasonCode, reason: detail.reason, failureEvidenceDigest: detail.failureEvidenceDigest, failureCycleId: cycle.id, failureDigest: cycle.failureDigest, failedAt: now, failedBy: actor };
+  }
+  if (action === "retry-payment") {
+    const cycle = (batch.paymentFailureCycles || []).at(-1);
+    if (!cycle || cycle.status !== "OPEN") throw new Error("没有待处理的拨付失败周期");
+    if (!verifyPaymentFailureCycleEvidence(batch, cycle)) throw new Error("拨付失败周期摘要或账本证据校验失败");
+    if (batch.paymentFailureCycles.length >= PAYMENT_FAILURE_POLICY.maxRetryCycles) throw new Error("拨付失败已达到最大重试周期数，必须转人工处置");
+    detail.failureCycleId = requireText(payload, "failureCycleId", "拨付失败周期号");
+    if (detail.failureCycleId !== cycle.id) throw new Error("拨付失败周期号与当前待处理周期不一致");
+    detail.paymentRequestId = requireText(payload, "paymentRequestId", "新拨付申请号");
+    if (detail.paymentRequestId === batch.paymentRequest?.paymentRequestId) throw new Error("拨付重试必须使用新的拨付申请号");
+    detail.resolutionDigest = requireDigest(payload, "resolutionDigest", "拨付失败处置摘要");
+    detail.resolution = requireText(payload, "resolution", "拨付失败处置结论");
+    cycle.status = "RETRIED";
+    cycle.retriedAt = now;
+    cycle.retriedBy = actor;
+    cycle.retry = { paymentRequestId: detail.paymentRequestId, resolutionDigest: detail.resolutionDigest, resolution: detail.resolution };
+    cycle.sla = buildPaymentFailureSla(cycle, batch.workingCalendar || {}, now);
+    detail.failureSlaStatus = cycle.sla.status;
+    batch.paymentRequest = { paymentRequestId: detail.paymentRequestId, amountFen: Number(batch.adjustedAmountFen ?? batch.standardAmountFen), requestedAt: now, requestedBy: actor, revision: Number(batch.paymentRequest?.revision || 1) + 1 };
   }
   if (action === "confirm-payment") {
     detail.receiptId = requireText(payload, "receiptId", "拨付回执号");
@@ -497,6 +671,15 @@ function transitionSettlementBatch(batch, payload = {}, actor = "system", option
     const expected = Number(batch.adjustedAmountFen ?? batch.standardAmountFen);
     if (!Number.isSafeInteger(paidAmountFen) || paidAmountFen !== expected) throw new Error("拨付金额必须与已对账金额一致");
     batch.paymentReceipt = { receiptId: detail.receiptId, paidAmountFen, paidAt: now, confirmedBy: actor };
+    const cycle = (batch.paymentFailureCycles || []).at(-1);
+    if (cycle?.status === "RETRIED") {
+      if (!verifyPaymentFailureCycleEvidence(batch, cycle)) throw new Error("拨付失败周期摘要或账本证据校验失败");
+      cycle.status = "SUCCEEDED";
+      cycle.succeededAt = now;
+      cycle.succeededBy = actor;
+      cycle.paymentReceiptId = detail.receiptId;
+      detail.failureCycleId = cycle.id;
+    }
   }
   if (action === "close") {
     detail.closeReference = requireText(payload, "closeReference", "结案凭证号");
@@ -680,4 +863,4 @@ function transitionAnnualClearance(row, payload = {}, actor = "system") {
   return { row, event, idempotent: false };
 }
 
-module.exports = { ACTION_TARGETS, ANNUAL_CLEARANCE_CONTRACT_ID, ANNUAL_CLEARANCE_CONTRACT_VERSION, CLEARANCE_ACTION_TARGETS, CLEARANCE_LABELS, CORE_CORRECTION_POLICY, DIFFERENCE_REVIEW_DOMAINS, SETTLEMENT_CONTRACT_ID, SETTLEMENT_LABELS, addWorkingDays, annualClearanceDigestPayload, appendEvent, buildAnnualClearanceEnvelope, buildCoreCorrectionSla, buildCoreSettlementCase, buildCoreSettlementEnvelope, buildDifferenceCaseSla, buildSettlementCoreCorrectionOperations, buildSettlementSla, coreReturnDigestPayload, createAnnualClearance, dateOnly, digest, institutionConfirmationDigest, isWorkingDay, normalizeWorkingCalendar, settlementState, stableStringify, transitionAnnualClearance, transitionSettlementBatch, verifyCoreReturnCycle, verifyCoreReturnCycleEvidence, verifyEventLedger, workingDaysBetween, yuanToFen };
+module.exports = { ACTION_TARGETS, ANNUAL_CLEARANCE_CONTRACT_ID, ANNUAL_CLEARANCE_CONTRACT_VERSION, CLEARANCE_ACTION_TARGETS, CLEARANCE_LABELS, CORE_CORRECTION_POLICY, DIFFERENCE_REVIEW_DOMAINS, PAYMENT_FAILURE_POLICY, SETTLEMENT_CONTRACT_ID, SETTLEMENT_LABELS, addWorkingDays, annualClearanceDigestPayload, appendEvent, buildAnnualClearanceEnvelope, buildCoreCorrectionSla, buildCoreSettlementCase, buildCoreSettlementEnvelope, buildDifferenceCaseSla, buildPaymentFailureSla, buildSettlementCoreCorrectionOperations, buildSettlementPaymentFailureOperations, buildSettlementSla, coreReturnDigestPayload, createAnnualClearance, dateOnly, digest, institutionConfirmationDigest, isWorkingDay, normalizeWorkingCalendar, paymentFailureDigestPayload, settlementState, stableStringify, transitionAnnualClearance, transitionSettlementBatch, verifyCoreReturnCycle, verifyCoreReturnCycleEvidence, verifyEventLedger, verifyPaymentFailureCycle, verifyPaymentFailureCycleEvidence, workingDaysBetween, yuanToFen };
