@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-23T05:49:51.000Z",
+  "updatedAt": "2026-07-23T05:50:54.000Z",
   "decisions": [
     {
       "lineId": "T01",
@@ -57,6 +57,20 @@
         "20 priority standard review readiness checks passed",
         "signed-receipt trust-field promotion exploit independently rejected",
         "T08 full targeted regression reported 78 of 78 passed"
+      ],
+      "blockers": []
+    },
+    {
+      "lineId": "T09",
+      "candidateHead": "50838572bc30cce624774aa2317e6133ac76220a",
+      "decision": "accepted",
+      "reviewedAt": "2026-07-23T05:50:54.000Z",
+      "reviewer": "T00",
+      "checks": [
+        "git diff --check",
+        "13 quality, operations and drug-consumable governance tests passed independently",
+        "cross-institution, invalid transition, idempotency conflict and version conflict paths remain audited",
+        "metric catalog ownership, sources and thresholds validate"
       ],
       "blockers": []
     },
