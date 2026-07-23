@@ -6,6 +6,8 @@
   "use strict";
 
   const TERMINAL_STATES = new Set(["closed", "cancelled", "rejected", "refunded"]);
+  const NURSE_AVAILABLE_STATUSES = new Set(["available"]);
+  const ESCORT_WORKER_AVAILABLE_STATUSES = new Set(["available"]);
 
   const WORKFLOWS = Object.freeze({
     nursing: Object.freeze({
@@ -158,10 +160,16 @@
     if (nurse.trainingStatus !== "passed") reasons.push("training-not-passed");
     if (nurse.insuranceStatus !== "covered") reasons.push("insurance-not-covered");
     if (isExpired(nurse.qualificationExpiresAt, options.now)) reasons.push("qualification-expired");
-    if (["suspended", "disabled", "offboarded"].includes(String(nurse.status || "").toLowerCase())) reasons.push("nurse-unavailable");
-    if (order.institutionId && nurse.institutionId && order.institutionId !== nurse.institutionId) reasons.push("institution-mismatch");
-    if (order.institutionCode && nurse.institutionCode && order.institutionCode !== nurse.institutionCode) reasons.push("institution-mismatch");
-    if (order.serviceItem && Array.isArray(nurse.specialties) && !nurse.specialties.includes(order.serviceItem)) reasons.push("specialty-mismatch");
+    const nurseStatus = String(nurse.status || "").trim().toLowerCase();
+    if (!nurseStatus) reasons.push("nurse-status-missing");
+    if (nurseStatus && !NURSE_AVAILABLE_STATUSES.has(nurseStatus)) reasons.push("nurse-status-not-allowed");
+    if (!NURSE_AVAILABLE_STATUSES.has(nurseStatus)) reasons.push("nurse-unavailable");
+    if (order.institutionId && !String(nurse.institutionId || "").trim()) reasons.push("institution-id-missing");
+    else if (order.institutionId && nurse.institutionId !== order.institutionId) reasons.push("institution-mismatch");
+    if (order.institutionCode && !String(nurse.institutionCode || "").trim()) reasons.push("institution-code-missing");
+    else if (order.institutionCode && nurse.institutionCode !== order.institutionCode) reasons.push("institution-mismatch");
+    if (order.serviceItem && !Array.isArray(nurse.specialties)) reasons.push("specialties-missing");
+    else if (order.serviceItem && !nurse.specialties.includes(order.serviceItem)) reasons.push("specialty-mismatch");
     if (Number(nurse.dailyCapacity || 0) > 0 && Number(nurse.assignedToday || 0) >= Number(nurse.dailyCapacity || 0)) reasons.push("daily-capacity-exhausted");
     return qualificationResult([...new Set(reasons)], {
       subjectId: String(nurse.id || ""),
@@ -178,12 +186,17 @@
     if (Number(worker.trainingHours || 0) < minimumTrainingHours) reasons.push("training-hours-insufficient");
     if (worker.examStatus !== "passed") reasons.push("exam-not-passed");
     if (worker.insuranceStatus !== "covered") reasons.push("insurance-not-covered");
-    if (["suspended", "disabled", "offboarded", "training"].includes(String(worker.status || "").toLowerCase())) reasons.push("worker-unavailable");
-    if (order.providerId && worker.providerId && order.providerId !== worker.providerId) reasons.push("provider-mismatch");
+    const workerStatus = String(worker.status || "").trim().toLowerCase();
+    if (!workerStatus) reasons.push("worker-status-missing");
+    if (workerStatus && !ESCORT_WORKER_AVAILABLE_STATUSES.has(workerStatus)) reasons.push("worker-status-not-allowed");
+    if (!ESCORT_WORKER_AVAILABLE_STATUSES.has(workerStatus)) reasons.push("worker-unavailable");
+    if (order.providerId && !String(worker.providerId || "").trim()) reasons.push("provider-id-missing");
+    else if (order.providerId && worker.providerId !== order.providerId) reasons.push("provider-mismatch");
     const requestedSkills = Array.isArray(order.serviceItems) ? order.serviceItems.filter(Boolean) : [];
+    if (requestedSkills.length && !Array.isArray(worker.skills)) reasons.push("skills-missing");
     const workerSkills = new Set(Array.isArray(worker.skills) ? worker.skills : []);
     const missingSkills = requestedSkills.filter((item) => !workerSkills.has(item));
-    if (missingSkills.length && options.requireAllSkills !== false) reasons.push("skill-mismatch");
+    if (missingSkills.length) reasons.push("skill-mismatch");
     return qualificationResult([...new Set(reasons)], {
       subjectId: String(worker.id || ""),
       subjectType: "escort-worker",
@@ -276,6 +289,12 @@
   }
 
   function transitionOrder(domain, order = {}, nextStatus, options = {}) {
+    if (Object.hasOwn(options, "enforceEvidence")) {
+      const error = new Error("evidence enforcement cannot be overridden");
+      error.code = "EVIDENCE_BYPASS_FORBIDDEN";
+      error.statusCode = 409;
+      throw error;
+    }
     const transition = validateTransition(domain, order.status, nextStatus);
     if (!transition.ok) {
       const error = new Error(transition.reason);
@@ -286,7 +305,7 @@
     }
     const candidate = { ...order, ...(options.updates || {}), status: transition.next };
     const evidence = validateEvidenceForTransition(domain, candidate, transition.next);
-    if (!evidence.ok && options.enforceEvidence !== false) {
+    if (!evidence.ok) {
       const error = new Error(`missing evidence for ${transition.next}: ${evidence.missing.join(", ")}`);
       error.code = "ORDER_EVIDENCE_INCOMPLETE";
       error.statusCode = 409;
