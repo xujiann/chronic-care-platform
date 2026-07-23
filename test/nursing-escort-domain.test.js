@@ -474,6 +474,158 @@ test("capacity reservations prevent concurrent nursing and escort overbooking wi
   assert.equal(escortAfterCommit.blockers.includes("capacity:no-slot-available"), true);
 });
 
+test("approved cancellation releases nursing capacity while forged release and binding rewrites keep the slot held", () => {
+  const nursingPerson = qualifiedNurse({ id: "inn-capacity-cancel", dailyCapacity: 1, assignedToday: 0 });
+  const base = {
+    id: "ino-capacity-cancel-001",
+    residentId: "r-cap-cancel",
+    status: "assessed",
+    institutionId: "inh-mr1",
+    institutionCode: "MR1",
+    serviceItem: "wound care",
+    preferredAt: "2026-08-03T09:00:00+08:00",
+    riskLevel: "medium",
+    identityVerified: true,
+    firstVisitAssessment: "passed",
+    informedConsent: "signed",
+    consentAttachment: { status: "signed" }
+  };
+  const resource = Domain.buildResourceReservationEvidence("nursing", base, {
+    resourceId: "nursing-slot-capacity-cancel",
+    slotAt: base.preferredAt,
+    reservedBy: "dispatch-capacity-001"
+  }, { at: NOW });
+  const order = { ...base, ...resource };
+  const rival = { ...base, id: "ino-capacity-cancel-002", residentId: "r-cap-rival" };
+  const dispatch = Domain.evaluateDispatchCandidate("nursing", order, nursingPerson, { now: NOW });
+  const dispatched = Domain.transitionOrder("nursing", order, "dispatched", { at: NOW, updates: dispatch.updates });
+  assert.equal(Domain.evaluateDispatchCandidate("nursing", rival, nursingPerson, { now: NOW }).eligible, false);
+
+  const cancelRequest = Domain.buildCancellationRequestEvidence("nursing", dispatched, {
+    requesterId: "r-cap-cancel",
+    requesterRole: "resident",
+    reasonCode: "schedule-conflict",
+    reason: "Resident cannot receive the scheduled service.",
+    refundRequested: false
+  }, { at: "2026-07-22T09:05:00+08:00" });
+  assert.throws(
+    () => Domain.transitionOrder("nursing", dispatched, "cancel-requested", {
+      at: "2026-07-22T09:05:00+08:00",
+      updates: { ...cancelRequest, capacityReservation: undefined }
+    }),
+    (error) => error.code === "ORDER_DISPATCH_BINDING_IMMUTABLE"
+      && error.details.fields.includes("capacityReservation")
+  );
+  assert.equal(Domain.evaluateDispatchCandidate("nursing", rival, nursingPerson, { now: NOW }).eligible, false);
+
+  const cancelRequested = Domain.transitionOrder("nursing", dispatched, "cancel-requested", {
+    at: "2026-07-22T09:05:00+08:00",
+    updates: cancelRequest
+  });
+  const cancellationDecision = Domain.buildCancellationDecisionEvidence("nursing", cancelRequested, {
+    outcome: "cancel",
+    decidedBy: "nursing-duty-capacity",
+    reason: "Cancellation approved before service."
+  }, { at: "2026-07-22T09:10:00+08:00" });
+  const resourceRelease = Domain.buildResourceReleaseEvidence("nursing", cancelRequested, {
+    releasedBy: "dispatch-capacity-001",
+    reason: "Release nurse slot after cancellation."
+  }, { at: "2026-07-22T09:11:00+08:00" });
+  assert.throws(
+    () => Domain.transitionOrder("nursing", cancelRequested, "cancelled", {
+      at: "2026-07-22T09:11:00+08:00",
+      updates: {
+        ...cancellationDecision,
+        resourceRelease: { ...resourceRelease.resourceRelease, reservationId: "forged-reservation" }
+      }
+    }),
+    (error) => error.code === "ORDER_CANCELLATION_REFUND_EVIDENCE_INVALID"
+      && error.details.reasons.includes("resource-release-reservation-mismatch")
+  );
+  assert.equal(Domain.evaluateDispatchCandidate("nursing", rival, nursingPerson, { now: NOW }).eligible, false);
+
+  const cancelled = Domain.transitionOrder("nursing", cancelRequested, "cancelled", {
+    at: "2026-07-22T09:11:00+08:00",
+    updates: { ...cancellationDecision, ...resourceRelease }
+  });
+  assert.equal(cancelled.capacityRelease.status, "released");
+  assert.equal(cancelled.capacityRelease.reservationId, dispatched.capacityReservation.id);
+  assert.equal(cancelled.timelineEvents[0].evidenceTypes.includes("capacity-release"), true);
+  assert.equal(Domain.evaluateDispatchCandidate("nursing", rival, nursingPerson, { now: NOW }).eligible, true);
+});
+
+test("completed reschedule and dispatch rejection release escort capacity for reassignment", () => {
+  const escortPerson = qualifiedEscortWorker({ id: "ew-capacity-release", dailyCapacity: 1, assignedToday: 0 });
+  const base = {
+    id: "eso-capacity-reschedule-001",
+    residentId: "r-cap-reschedule",
+    status: "provider-matched",
+    providerId: "esp-001",
+    serviceItems: ["registration", "exam escort"],
+    appointmentAt: "2026-08-04T09:00:00+08:00",
+    due: "2026-08-04T09:00:00+08:00",
+    riskLevel: "low",
+    identityVerified: true,
+    eligibilityResult: { status: "eligible" },
+    providerAdmissionSnapshot: { status: "approved" },
+    contractStatus: "signed",
+    insuranceStatus: "covered"
+  };
+  const resource = Domain.buildResourceReservationEvidence("escort", base, {
+    resourceId: "escort-slot-capacity-reschedule",
+    slotAt: base.appointmentAt,
+    reservedBy: "escort-dispatch-capacity"
+  }, { at: NOW });
+  const order = { ...base, ...resource };
+  const rival = { ...base, id: "eso-capacity-reschedule-002", residentId: "r-cap-rival" };
+  const dispatch = Domain.evaluateDispatchCandidate("escort", order, escortPerson, { now: NOW });
+  const dispatched = Domain.transitionOrder("escort", order, "worker-dispatched", { at: NOW, updates: dispatch.updates });
+
+  const request = Domain.buildRescheduleRequestEvidence("escort", dispatched, {
+    proposedSlotAt: "2026-08-05T14:00:00+08:00",
+    requesterId: "r-cap-reschedule",
+    requesterRole: "resident",
+    reason: "Outpatient appointment moved to the next day."
+  }, { at: "2026-07-22T09:05:00+08:00" });
+  const rescheduleRequested = Domain.transitionOrder("escort", dispatched, "reschedule-requested", {
+    at: "2026-07-22T09:05:00+08:00",
+    updates: request
+  });
+  assert.equal(Domain.evaluateDispatchCandidate("escort", rival, escortPerson, { now: NOW }).eligible, false);
+  const completion = Domain.buildRescheduleCompletionEvidence("escort", rescheduleRequested, {
+    decidedBy: "escort-duty-capacity",
+    reason: "Replacement slot approved.",
+    resourceId: "escort-slot-capacity-rescheduled",
+    reservedBy: "escort-duty-capacity"
+  }, { at: "2026-07-22T09:10:00+08:00" });
+  const rescheduled = Domain.transitionOrder("escort", rescheduleRequested, "requested", {
+    at: "2026-07-22T09:10:00+08:00",
+    updates: completion
+  });
+  assert.equal(rescheduled.capacityRelease.reason, "reschedule-completed");
+  assert.equal(Domain.evaluateDispatchCandidate("escort", rival, escortPerson, { now: NOW }).eligible, true);
+
+  const rejectedBase = {
+    ...base,
+    id: "eso-capacity-reject-001",
+    residentId: "r-cap-reject",
+    appointmentAt: "2026-08-06T09:00:00+08:00",
+    due: "2026-08-06T09:00:00+08:00"
+  };
+  const rejectedRival = { ...rejectedBase, id: "eso-capacity-reject-002" };
+  const rejectedDispatch = Domain.evaluateDispatchCandidate("escort", rejectedBase, escortPerson, { now: NOW });
+  const workerDispatched = Domain.transitionOrder("escort", rejectedBase, "worker-dispatched", {
+    at: NOW,
+    updates: rejectedDispatch.updates
+  });
+  assert.equal(Domain.evaluateDispatchCandidate("escort", rejectedRival, escortPerson, { now: NOW }).eligible, false);
+  const rejected = Domain.transitionOrder("escort", workerDispatched, "rejected", {
+    at: "2026-07-22T09:15:00+08:00"
+  });
+  assert.equal(rejected.capacityRelease.reason, "dispatch-rejected");
+  assert.equal(Domain.evaluateDispatchCandidate("escort", rejectedRival, escortPerson, { now: NOW }).eligible, true);
+});
+
 test("transition order blocks missing evidence and emits resident timeline evidence", () => {
   const requested = {
     id: "ino-test-001",
