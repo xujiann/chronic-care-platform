@@ -78,6 +78,7 @@ const PHYSICAL_EXAM_CONTRACT_ID = "physical-exam-report-v1";
 const EmergencyService = require("./emergency-service");
 const EmergencyLifeChain = require("./emergency-lifechain");
 const EmergencyProduction = require("./emergency-production");
+const { buildSpecialtyCutoverPack } = require("./emergency-specialty-cutover");
 const { buildOhifStudyUrl, listOrthancStudySummaries, publishDiagnosticReportToFhir, publishImagingStudyToFhir, solutionAHealth } = require("./solution-a-connectors");
 const {
   SmsDeliveryCallbackError,
@@ -23660,6 +23661,22 @@ async function handleApi(req, res) {
       keySafety: buildPublicHealthKeySafetyBoard(data, loaded.credentials),
       productionReady: false
     }));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/t10-specialty-cutover") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    const pack = buildSpecialtyCutoverPack();
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "t10-specialty-cutover-read",
+      target: url.pathname,
+      result: "allowed",
+      detail: `${pack.summary.codeReady}/${pack.summary.tracks} code-ready; ${pack.summary.productionReady}/${pack.summary.tracks} production-ready.`
+    });
+    sendJson(res, 200, pack);
     return;
   }
 

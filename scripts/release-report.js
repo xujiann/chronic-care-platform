@@ -37,6 +37,7 @@ const { buildEscortServiceReadinessReport, renderMarkdown: renderEscortServiceMa
 const { buildInternetNursingReadinessReport, renderMarkdown: renderInternetNursingMarkdown } = require("./internet-nursing-readiness");
 const { buildEnvironmentMatrixReport, renderMarkdown: renderEnvironmentMatrixMarkdown } = require("./environment-matrix");
 const { buildEmergencyReadinessReport, renderMarkdown: renderEmergencyReadinessMarkdown } = require("./emergency-readiness");
+const { buildSpecialtyCutoverPack, renderMarkdown: renderSpecialtyCutoverMarkdown } = require("../emergency-specialty-cutover");
 const { buildHealthDashboardSummary, buildPriorityApplicationTemplates, renderMarkdown: renderHealthDashboardMarkdown } = require("./health-dashboard-summary");
 const { buildHybridDeploymentReadinessReport, renderMarkdown: renderHybridDeploymentMarkdown } = require("./hybrid-deployment-readiness");
 const { buildProductionDeploymentPackage, verifyProductionDeploymentPackage, renderMarkdown: renderProductionDeploymentMarkdown } = require("./production-deployment-package");
@@ -996,6 +997,16 @@ function emergencyReadinessChecks(emergencyReadiness) {
   ];
 }
 
+function specialtyCutoverChecks(specialtyCutover) {
+  const expectedStages = ["code-readiness", "synthetic-acceptance", "joint-test", "site-evidence", "go-no-go", "grey-release"];
+  return [
+    check("specialtyCutover:tracks", specialtyCutover.summary?.tracks === 4 && specialtyCutover.summary?.codeReady === 4, `${specialtyCutover.summary?.codeReady || 0}/${specialtyCutover.summary?.tracks || 0} specialty tracks code-ready`, "error", "specialty-cutover"),
+    check("specialtyCutover:productionBoundary", specialtyCutover.summary?.productionReady === 0 && specialtyCutover.summary?.formalGoLiveState === "blocked-until-site-evidence-signed" && specialtyCutover.summary?.siteBlockers > 0, `${specialtyCutover.summary?.productionReady || 0}/${specialtyCutover.summary?.tracks || 0} production-ready; ${specialtyCutover.summary?.siteBlockers || 0} site blockers`, "error", "specialty-cutover"),
+    check("specialtyCutover:stages", expectedStages.every((stage) => specialtyCutover.stages?.includes(stage)), `${specialtyCutover.stages?.length || 0}/${expectedStages.length} cutover stages`, "error", "specialty-cutover"),
+    check("specialtyCutover:crossTrackControls", ["identity-and-role-scope", "signed-interface-and-idempotency", "four-eyes-site-evidence", "patient-safety-and-downgrade"].every((id) => specialtyCutover.crossTrackControls?.some((item) => item.id === id)), `${specialtyCutover.crossTrackControls?.length || 0} cross-track controls`, "error", "specialty-cutover")
+  ];
+}
+
 function citizenLaunchFoundationChecks(citizenLaunchFoundation) {
   return [
     check("citizenLaunch:readiness", citizenLaunchFoundation.ok, citizenLaunchFoundation.ok ? "citizen launch foundation checks passed" : "citizen launch foundation checks failed", "error", "citizen-launch"),
@@ -1341,6 +1352,7 @@ function buildReleaseReport(options = {}) {
   const escortServiceReadiness = buildEscortServiceReadinessReport({ data, pkg });
   const internetNursingReadiness = buildInternetNursingReadinessReport({ data, pkg });
   const emergencyReadiness = buildEmergencyReadinessReport();
+  const specialtyCutover = buildSpecialtyCutoverPack();
   const citizenLaunchFoundation = buildCitizenLaunchFoundationReadiness({
     pkg,
     phaseDoc: fs.existsSync(path.join(ROOT, "docs", "citizen-launch-foundation-plan.md"))
@@ -1433,6 +1445,7 @@ function buildReleaseReport(options = {}) {
     ...escortServiceChecks(escortServiceReadiness),
     ...internetNursingChecks(internetNursingReadiness),
     ...emergencyReadinessChecks(emergencyReadiness),
+    ...specialtyCutoverChecks(specialtyCutover),
     ...citizenLaunchFoundationChecks(citizenLaunchFoundation),
     ...operationsReadinessChecks(operationsReadiness),
     ...processAuditChecks(processAudit),
@@ -1528,6 +1541,7 @@ function buildReleaseReport(options = {}) {
     escortServiceReadiness,
     internetNursingReadiness,
     emergencyReadiness,
+    specialtyCutover,
     citizenLaunchFoundation,
     operationsReadiness,
     processAudit,
@@ -2303,6 +2317,8 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       emergencyReadiness: report.emergencyReadiness
     }, null, 2), "utf8");
+    const specialtyCutoverJson = path.join(path.dirname(output), "t10-specialty-cutover-pack.json");
+    fs.writeFileSync(specialtyCutoverJson, JSON.stringify(report.specialtyCutover, null, 2), "utf8");
     const citizenLaunchFoundationJson = path.join(path.dirname(output), "citizen-launch-foundation-readiness.json");
     fs.writeFileSync(citizenLaunchFoundationJson, JSON.stringify({
       project: report.project,
@@ -2546,6 +2562,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(internetNursingMarkdown, renderInternetNursingMarkdown(report.internetNursingReadiness), "utf8");
     const emergencyReadinessMarkdown = path.join(path.dirname(markdown), "emergency-readiness-report.md");
     fs.writeFileSync(emergencyReadinessMarkdown, renderEmergencyReadinessMarkdown(report.emergencyReadiness), "utf8");
+    const specialtyCutoverMarkdown = path.join(path.dirname(markdown), "t10-specialty-cutover-pack.md");
+    fs.writeFileSync(specialtyCutoverMarkdown, renderSpecialtyCutoverMarkdown(report.specialtyCutover), "utf8");
     const citizenLaunchFoundationMarkdown = path.join(path.dirname(markdown), "citizen-launch-foundation-readiness.md");
     fs.writeFileSync(citizenLaunchFoundationMarkdown, renderCitizenLaunchFoundationMarkdown(report.citizenLaunchFoundation), "utf8");
     const productionDbMarkdown = path.join(path.dirname(markdown), "production-db-readiness-report.md");

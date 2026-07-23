@@ -67,6 +67,7 @@ http://localhost:5173/login.html
 | `institution.html` | 医疗机构端：授权档案、转诊、固定取药、证照、多点执业 |
 | `insurance.html` | 医保局/医保中心/区市县医保局：审核、监管、凭证、取药 |
 | `citizen.html` | 居民端个人健康信息库、家庭成员、授权共享、适老化服务 |
+| `t10-specialty-cutover.html` | T10 急救、临床用血、区域影像云和健康体检统一切换总控；区分代码就绪与现场生产证据 |
 | `physical-examination.html` | 体检中心/医院结果接入、专项体检隔离分流、健康时光机、报告翻译、异常行动、个性计划、辐射管家、质量啄木鸟和城市雷达 |
 | `physical-examination-highlights.js` | 居民端与管理端共享的体检创新亮点计算及可审计动作引擎 |
 | `docs/体检系统信息化规范基线-2026-07-15.md` | 体检业务、共享文档、数据元/值域、签名、隐私、安全和留存规范目录 |
@@ -126,6 +127,7 @@ SQLite 结构化镜像已覆盖居民、账户、主索引、个人健康档案�
 | `GET /api/health` | 依赖就绪检查，返回服务、存储和会话存储状态；中央会话不可用时返回 503 |
 | `GET /api/metrics` | 管理端运行指标，返回请求数、状态码、慢请求、任务堆积、死信、质量问题；运营工作台会在服务模式下展示部分指标 |
 | `GET /api/system/readiness` | 管理端系统就绪报告，汇总 P2 集合、接口准备度、审计链、运行负载和现场外部依赖边界 |
+| `GET /api/t10-specialty-cutover` | 卫健委只读查询四条专科切换轨道、现场阻断、首个灰度增量、四眼签收和患者安全降级控制 |
 | `GET /api/physical-exams` | 按角色授权和居民主索引查询全部历史体检报告，返回年度、来源机构、异常项和健康建议 |
 | `POST /api/physical-exams/import` | 体检中心或医院单份/批量接入；一般成人体检同步健康档案，职业/专项体检进入受限分流队列，二者均幂等去重 |
 | `POST /api/physical-exams/abnormal-cases/:id/actions` | 对体检异常结果执行通知居民、复查安排、专科分派、关闭或重开，并生成消息与审计证据 |
@@ -472,6 +474,8 @@ The handoff document is `docs/互联网护理服务模块说明.md`; it covers r
 `docs/居民端下一步开发优先级.md` lists the resident-side next development priorities from P0 production launch foundation through P1 medical data read-only integration, P2 nursing/escort/registration service closure, and P3 pilot operations and accessibility optimization.
 
 `docs/production-go-live-requirements.md` is the platform-level real production go-live requirements baseline. Use it with `release/production-cutover-checklist.md`, `release/site-readiness-pack.md`, `release/launch-smoke-report.md`, `release/release-report.md`, and `release/release-artifact-manifest.md` before deciding that a deployment is ready for real users.
+
+T10 specialty cutover control is available at `t10-specialty-cutover.html`, through the commission-scoped `GET /api/t10-specialty-cutover`, and as `npm.cmd run t10:specialty-cutover`. Its generated `release/t10-specialty-cutover-pack.json` and `.md` artifacts keep all four tracks `productionReady=false` until real external receipts, independent site verification, four-eyes signoff, duty arrangements and downgrade evidence are accepted.
 
 `docs/on-site-launch-materials.md` is the field-owned material checklist for real go-live. It names the production environment, secrets, identity, SMS, HIS/EMR/LIS/PACS, nursing/escort/registration, insurance/certificate, database, security, monitoring, disaster recovery, resident mobile acceptance, gray release, and signoff materials that must be attached before opening to real residents.
 ## Drug Consumable Supervision Evidence

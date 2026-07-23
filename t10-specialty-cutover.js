@@ -11,6 +11,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 async function loadCutoverPack() {
   if (location.protocol !== "file:") {
     try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request("/api/t10-specialty-cutover", { cache: "no-store" });
+      if (response.ok) {
+        cutoverState.source = "server-api";
+        return await response.json();
+      }
+    } catch (error) {
+      // Fall through to the generated release artifact.
+    }
+    try {
       const response = await fetch("./release/t10-specialty-cutover-pack.json", { cache: "no-store" });
       if (response.ok) {
         cutoverState.source = "release-artifact";
