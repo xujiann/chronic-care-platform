@@ -60,6 +60,57 @@
     return scopes[cleanText(category, 60)] || "health-record-summary";
   }
 
+  const AUTHORIZATION_SCOPE_DISCLOSURES = Object.freeze({
+    "health-record-summary": Object.freeze({
+      label: "健康档案摘要",
+      allows: "基础健康指标、体检摘要、过敏和免疫等居民可读摘要",
+      excludes: "不包含医院原始病历、检查原文、影像原图或附件"
+    }),
+    "emr-summary": Object.freeze({
+      label: "电子病历摘要",
+      allows: "就诊、诊断、处置、医嘱和复诊计划等居民可读摘要",
+      excludes: "不包含医院内部工作记录、审计字段或病历原文"
+    }),
+    labs: Object.freeze({
+      label: "检验检查",
+      allows: "检验项目、结果、结论、报告时间和来源机构",
+      excludes: "不包含报告原文、内部互认证据或居民主索引"
+    }),
+    medications: Object.freeze({
+      label: "用药记录",
+      allows: "药品、用法、取药服务状态和机构审核摘要",
+      excludes: "不授权受权人停药、换药或调整剂量"
+    }),
+    "imaging-report": Object.freeze({
+      label: "影像报告",
+      allows: "检查部位、模态、报告结论和质控状态",
+      excludes: "不包含原始 DICOM；影像原图仍需短时受控调阅"
+    }),
+    attachments: Object.freeze({
+      label: "附件资料",
+      allows: "已通过安全扫描的附件状态和短时下载申请",
+      excludes: "不自动包含影像原图，也不签发永久下载地址"
+    })
+  });
+
+  function buildAuthorizationScopeDisclosure(scopes = []) {
+    const normalized = [...new Set((Array.isArray(scopes) ? scopes : [])
+      .map((scope) => cleanText(scope, 100))
+      .filter(Boolean))];
+    const unknown = normalized.filter((scope) => !ACCESS_SCOPES.has(scope) || !AUTHORIZATION_SCOPE_DISCLOSURES[scope]);
+    if (unknown.length) throw new Error("授权范围说明不支持未知范围");
+    const items = normalized.map((scope) => ({
+      scope,
+      ...AUTHORIZATION_SCOPE_DISCLOSURES[scope]
+    }));
+    return {
+      items,
+      selectedCount: items.length,
+      summary: items.length ? `已选择 ${items.length} 项授权范围` : "尚未选择授权范围",
+      boundary: "授权仅限所选居民可读摘要；原文、影像原图和附件下载仍需服务端再次校验并记录审计。"
+    };
+  }
+
   function authorizationTargetsActor(authorization = {}, actor = {}) {
     const meta = authorization.meta || {};
     const targets = new Set([
@@ -1057,11 +1108,13 @@
 
   return {
     ACCESS_SCOPES,
+    AUTHORIZATION_SCOPE_DISCLOSURES,
     ACTIVE_RELATIONSHIP_STATUSES,
     CORRECTION_STATUSES,
     SHARE_PACKAGE_STATUSES,
     DEFAULT_COMPLETENESS_ITEMS,
     scopeForCategory,
+    buildAuthorizationScopeDisclosure,
     authorizationTargetsActor,
     authorizationAllowsScope,
     relationshipAccessState,

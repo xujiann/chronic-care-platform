@@ -476,6 +476,7 @@ const residentFunctionAudit = [
   { service: "health-record", name: "历史体检报告", status: "已实现", evidence: "体检中心和医院结果按居民主索引同步，保留异常项、建议、来源机构和外部报告号", mobile: "可按年度查看全部历史报告" },
   { service: "health-record", name: "上传资料", status: "已实现", evidence: "居民可补充报告、图片或自测记录", mobile: "弹窗在窄屏占满可用宽度" },
   { service: "health-record", name: "授权共享与撤销", status: "已实现", evidence: "可新增授权并记录授权对象、范围和来源", mobile: "表单字段单列录入" },
+  { service: "health-record", name: "授权范围影响预览", status: "已实现", evidence: "每项范围实时说明允许查看内容和明确排除项，未知范围拒绝", mobile: "说明卡片单列展示" },
   { service: "health-record", name: "服务端授权强制契约", status: "已实现", evidence: "本人、家庭关系、受权人、范围、状态和有效期统一 fail-closed 判定", mobile: "拒绝原因以居民可理解状态显示" },
   { service: "health-record", name: "跨院来源归集与去重", status: "已实现", evidence: "按来源系统和来源记录保留最新版本与可信等级", mobile: "来源和版本信息紧凑展示" },
   { service: "health-record", name: "短时原文与影像调阅", status: "已实现", evidence: "单次使用、最长五分钟、按用途和范围申请服务端凭据", mobile: "受控入口满足触控尺寸" },
@@ -2874,6 +2875,24 @@ function applyCitizenRecordAccessibility() {
   if (scaleOutput) scaleOutput.value = `${Math.round((preferences.textScale || 1) * 100)}%`;
 }
 
+function renderAuthorizationScopePreview(form = document.querySelector("#auth-form")) {
+  const target = document.querySelector("#auth-scope-preview");
+  if (!target || !form || !window.CitizenRecordsV2?.buildAuthorizationScopeDisclosure) return;
+  const scopes = [...form.querySelectorAll("input[name='scopes']:checked")].map((input) => input.value);
+  try {
+    const disclosure = window.CitizenRecordsV2.buildAuthorizationScopeDisclosure(scopes);
+    target.innerHTML = `<strong>${escapeHtml(disclosure.summary)}</strong>
+      ${disclosure.items.length ? `<div class="authorization-scope-preview-list">${disclosure.items.map((item) => `<article>
+        <b>${escapeHtml(item.label)}</b>
+        <p><span>允许</span>${escapeHtml(item.allows)}</p>
+        <small><span>不包含</span>${escapeHtml(item.excludes)}</small>
+      </article>`).join("")}</div>` : "<p>勾选范围后，这里会说明允许查看的内容和明确排除项。</p>"}
+      <em>${escapeHtml(disclosure.boundary)}</em>`;
+  } catch (error) {
+    target.innerHTML = `<strong>授权范围待核验</strong><p>${escapeHtml(error.message || "存在不受支持的授权范围")}</p>`;
+  }
+}
+
 function openAuthorizationRenewal(recordId) {
   const record = getPersonalRecords(currentResidentId, "authorizations").find((item) => item.id === recordId);
   if (!record) {
@@ -2897,6 +2916,7 @@ function openAuthorizationRenewal(recordId) {
       input.checked = draft.scopes.includes(input.value);
     });
     form.elements.consentConfirmed.checked = false;
+    renderAuthorizationScopePreview(form);
     document.querySelector("#auth-dialog").showModal();
   } catch (error) {
     showToast(error.message || "该授权暂不能续签");
@@ -5259,7 +5279,11 @@ function bindDialogs() {
     form.elements.expiresAt.min = todayOffset(1);
     form.elements.expiresAt.value = todayOffset(365);
     form.elements.source.value = "居民主动授权";
+    renderAuthorizationScopePreview(form);
     document.querySelector("#auth-dialog").showModal();
+  });
+  document.querySelectorAll("#auth-form input[name='scopes']").forEach((input) => {
+    input.addEventListener("change", () => renderAuthorizationScopePreview(input.form));
   });
   document.querySelectorAll("[data-close]").forEach((button) => {
     button.addEventListener("click", () => button.closest("dialog").close());

@@ -2719,6 +2719,66 @@ body.service-paged-mode .citizen-shell {
   height: 20px;
 }
 
+.authorization-scope-preview {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #b8ddd2;
+  border-radius: 12px;
+  padding: 12px;
+  background: #f0faf7;
+}
+
+.authorization-scope-preview > strong {
+  color: #176b5b;
+  font-size: 15px;
+}
+
+.authorization-scope-preview > p,
+.authorization-scope-preview > em {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.55;
+}
+
+.authorization-scope-preview-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.authorization-scope-preview-list article {
+  display: grid;
+  gap: 5px;
+  border-radius: 9px;
+  padding: 10px;
+  background: #fff;
+}
+
+.authorization-scope-preview-list b {
+  color: var(--ink);
+}
+
+.authorization-scope-preview-list p,
+.authorization-scope-preview-list small {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 6px;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.authorization-scope-preview-list span {
+  color: #176b5b;
+  font-weight: 900;
+}
+
+.authorization-scope-preview-list small span {
+  color: #9a5b00;
+}
+
 .record-detail {
   margin-top: 10px;
   border: 1px dashed var(--line);
@@ -3961,6 +4021,10 @@ dialog::backdrop {
   }
 
   .vault-search-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .authorization-scope-preview-list {
     grid-template-columns: 1fr;
   }
 

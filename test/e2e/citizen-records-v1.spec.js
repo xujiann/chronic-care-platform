@@ -55,6 +55,10 @@ test("resident creates a scoped consent and revokes it through the dedicated aud
   await form.locator("input[name='purpose']").fill("高血压复诊资料核对");
   await form.locator("input[value='health-record-summary']").check();
   await form.locator("input[value='emr-summary']").check();
+  await expect(page.locator("#auth-scope-preview")).toContainText("已选择 2 项授权范围");
+  await expect(page.locator("#auth-scope-preview")).toContainText("健康档案摘要");
+  await expect(page.locator("#auth-scope-preview")).toContainText("电子病历摘要");
+  await expect(page.locator("#auth-scope-preview")).toContainText("不包含");
   await form.locator("input[name='consentConfirmed']").check();
   await form.getByRole("button", { name: "保存" }).click();
 
@@ -186,6 +190,8 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
   await expect(renewalForm.locator("input[name='previousAuthorizationId']")).toHaveValue("auth-renew-e2e");
   await expect(renewalForm.locator("input[name='expiresAt']")).toHaveValue("");
   await expect(renewalForm.locator("input[name='consentConfirmed']")).not.toBeChecked();
+  await expect(page.locator("#auth-scope-preview")).toContainText("已选择 2 项授权范围");
+  await expect(page.locator("#auth-scope-preview")).toContainText("检验检查");
   await renewalForm.getByRole("button", { name: "取消" }).click();
 
   await page.locator("[data-acknowledge-access='access-review-1']").click();

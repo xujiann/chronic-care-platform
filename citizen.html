@@ -12,7 +12,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="format-detection" content="telephone=no" />
     <link rel="apple-touch-icon" href="./pwa-icon.svg" />
-    <link rel="stylesheet" href="./citizen.css?v=20260723care6" />
+    <link rel="stylesheet" href="./citizen.css?v=20260723care7" />
     <script src="./auth.js?v=20260627"></script>
     <script>window.HealthCityAuth.requireRole(["citizen"])</script>
   </head>
@@ -817,6 +817,10 @@
             <label><input type="checkbox" name="scopes" value="imaging-report" />影像报告</label>
             <label><input type="checkbox" name="scopes" value="attachments" />附件资料</label>
           </fieldset>
+          <aside class="authorization-scope-preview full" id="auth-scope-preview" role="status" aria-live="polite">
+            <strong>尚未选择授权范围</strong>
+            <p>勾选范围后，这里会说明允许查看的内容和明确排除项。</p>
+          </aside>
           <label>有效期至<input name="expiresAt" type="date" required /></label>
           <label>授权来源<input name="source" value="居民主动授权" readonly /></label>
           <label class="authorization-confirm full"><input type="checkbox" name="consentConfirmed" value="yes" required />我已了解授权用途、范围、有效期及随时撤销权利</label>
@@ -836,8 +840,8 @@
     <script src="./physical-examination-service.js"></script>
     <script src="./immunization-schedule.js"></script>
     <script src="./citizen-records-v1.js?v=20260723auth2"></script>
-    <script src="./citizen-records-v2.js?v=20260723care6"></script>
-    <script src="./citizen.js?v=20260723care6"></script>
+    <script src="./citizen-records-v2.js?v=20260723care7"></script>
+    <script src="./citizen.js?v=20260723care7"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));

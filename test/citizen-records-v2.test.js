@@ -573,6 +573,22 @@ test("record search rejects inverted date ranges without leaking results", () =>
   assert.deepEqual(result.items, []);
 });
 
+test("authorization scope disclosure explains inclusions and exclusions without broadening scopes", () => {
+  const disclosure = V2.buildAuthorizationScopeDisclosure([
+    "health-record-summary",
+    "attachments",
+    "attachments"
+  ]);
+  assert.equal(disclosure.selectedCount, 2);
+  assert.deepEqual(disclosure.items.map((item) => item.scope), ["health-record-summary", "attachments"]);
+  assert.match(disclosure.items[0].allows, /健康指标/);
+  assert.match(disclosure.items[0].excludes, /不包含医院原始病历/);
+  assert.match(disclosure.items[1].excludes, /不自动包含影像原图/);
+  assert.match(disclosure.boundary, /服务端再次校验/);
+  assert.equal(V2.buildAuthorizationScopeDisclosure([]).selectedCount, 0);
+  assert.throws(() => V2.buildAuthorizationScopeDisclosure(["labs", "internal-all-records"]), /未知范围/);
+});
+
 test("authorization lifecycle highlights expiring and incomplete records", () => {
   const expiring = activeAuthorization({
     id: "auth-expiring",
