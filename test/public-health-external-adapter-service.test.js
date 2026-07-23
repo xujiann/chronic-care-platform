@@ -4,6 +4,7 @@ const {
   EXTERNAL_ADAPTER_PROFILES,
   buildPublicHealthExternalAdapterRegistry,
   createPublicHealthExternalDispatch,
+  receiptSchemaForRequest,
   recordPublicHealthExternalDeliveryAttempt,
   signPublicHealthExternalReceipt,
   verifyPublicHealthExternalDispatch,
@@ -35,6 +36,7 @@ function credentials(overrides = {}) {
 
 function acceptedReceipt(dispatch, overrides = {}) {
   return signPublicHealthExternalReceipt({
+    schemaVersion: receiptSchemaForRequest(dispatch.request.schemaVersion),
     dispatchId: dispatch.id,
     requestDigest: dispatch.requestDigest,
     laneId: dispatch.laneId,
@@ -76,6 +78,54 @@ test("external dispatch is deterministic, signed and excludes resident identifie
   assert.equal(JSON.stringify(first).includes(REQUEST_SECRET), false);
   assert.deepEqual(verifyPublicHealthExternalDispatch(first, REQUEST_SECRET), { ok: true, reason: "verified" });
   assert.equal(first.productionReady, false);
+});
+
+test("governed next-version dispatch and receipt bind the contract schema version", () => {
+  const dispatch = createPublicHealthExternalDispatch(
+    inProgressHandoff("family-doctor"),
+    {
+      idempotencyKey: "family:dispatch:v2",
+      operation: "coordinate-v2",
+      at: "2026-07-25T00:00:00.000Z"
+    },
+    credentials({
+      contractBinding: {
+        contract: "family-doctor-fulfillment-v2",
+        requestSchemaVersion: "public-health-external-dispatch/v2",
+        receiptSchemaVersion: "public-health-external-receipt/v2"
+      }
+    })
+  );
+  assert.equal(dispatch.contract, "family-doctor-fulfillment-v2");
+  assert.equal(dispatch.request.contract, "family-doctor-fulfillment-v2");
+  assert.equal(dispatch.request.schemaVersion, "public-health-external-dispatch/v2");
+  assert.equal(verifyPublicHealthExternalDispatch(dispatch, REQUEST_SECRET).ok, true);
+  const receipt = acceptedReceipt(dispatch, {
+    receivedAt: "2026-07-25T00:00:10.000Z"
+  });
+  assert.equal(receipt.schemaVersion, "public-health-external-receipt/v2");
+  assert.equal(verifyPublicHealthExternalReceipt(
+    dispatch,
+    receipt,
+    RECEIPT_SECRET,
+    { at: "2026-07-25T00:00:20.000Z", enforceFreshness: true }
+  ).ok, true);
+  assert.equal(verifyPublicHealthExternalReceipt(
+    dispatch,
+    { ...receipt, schemaVersion: "public-health-external-receipt/v1" },
+    RECEIPT_SECRET
+  ).reason, "receipt-binding-mismatch");
+  assert.throws(() => createPublicHealthExternalDispatch(
+    inProgressHandoff("family-doctor"),
+    { idempotencyKey: "family:dispatch:v2-mismatch" },
+    credentials({
+      contractBinding: {
+        contract: "family-doctor-fulfillment-v2",
+        requestSchemaVersion: "public-health-external-dispatch/v1",
+        receiptSchemaVersion: "public-health-external-receipt/v2"
+      }
+    })
+  ), /schema versions must match/);
 });
 
 test("persisted dispatch tampering invalidates its request signature and bindings", () => {

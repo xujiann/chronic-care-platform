@@ -432,6 +432,39 @@ test("authorized dead-letter recovery seals the original and creates one success
   ), /already been requeued/);
 });
 
+test("dead-letter recovery after sunset creates a signed active-contract successor", () => {
+  const prepared = rejectedLane("family-doctor");
+  const retiredGovernance = runtimeContractGovernance("2026-08-15T00:00:00.000Z");
+  const recovered = requeuePublicHealthExternalDeadLetterToState(
+    prepared.rejected.nextData,
+    prepared.rejected.dispatch.id,
+    {
+      idempotencyKey: "family-doctor:contract-cutover:requeue",
+      expectedVersion: 2,
+      coordinationExpectedVersion: 4,
+      note: "old contract dead letter migrated to the active contract",
+      remediationEvidenceRefs: ["family-doctor-v2-migration-review"],
+      exceptionOwner: "family-doctor-contract-owner",
+      exceptionDueAt: "2026-08-20",
+      at: "2026-08-15T00:01:00.000Z"
+    },
+    credentials({ contractGovernance: retiredGovernance }),
+    { name: "family doctor contract owner", role: "primary-care" },
+    prepared.dependencies
+  );
+  assert.equal(recovered.originalDispatch.contract, "family-doctor-fulfillment-v1");
+  assert.equal(recovered.originalDispatch.recovery.state, "requeued");
+  assert.equal(recovered.successorDispatch.contract, "family-doctor-fulfillment-v2");
+  assert.equal(recovered.successorDispatch.request.schemaVersion, "public-health-external-dispatch/v2");
+  assert.equal(recovered.successorDispatch.predecessorDispatchId, recovered.originalDispatch.id);
+  assert.equal(verifyRuntimeStateSignature(recovered.successorDispatch, REQUEST_SECRET), true);
+  assert.equal(verifyPublicHealthExternalAuditChain(
+    recovered.nextData,
+    recovered.successorDispatch.id,
+    REQUEST_SECRET
+  ).ok, true);
+});
+
 test("dead-letter recovery requires the lane owner, evidence and current versions", () => {
   const prepared = rejectedLane("immunization");
   const original = prepared.rejected.dispatch;
@@ -920,7 +953,7 @@ test("claimed delivery opens the signed circuit and a half-open probe closes it"
   ).entries, 4);
 });
 
-test("contract governance allows deprecated work but blocks retired enqueue and claim", () => {
+test("contract governance allows deprecated work, blocks retired claims and emits the active next version", () => {
   const deprecated = enqueueLane("family-doctor");
   const deprecatedGovernance = runtimeContractGovernance("2026-07-25T00:00:00.000Z");
   const claimed = claimPublicHealthExternalDispatchToState(
@@ -953,7 +986,7 @@ test("contract governance allows deprecated work but blocks retired enqueue and 
   ), /contract-version-retired/);
 
   const prepared = advanceToInProgress("family-doctor");
-  assert.throws(() => enqueuePublicHealthExternalDispatchToState(
+  const nextVersion = enqueuePublicHealthExternalDispatchToState(
     prepared.data,
     prepared.handoffId,
     {
@@ -966,5 +999,21 @@ test("contract governance allows deprecated work but blocks retired enqueue and 
     },
     credentials({ contractGovernance: retiredGovernance }),
     prepared.dependencies
-  ), /contract-version-retired/);
+  );
+  assert.equal(nextVersion.dispatch.contract, "family-doctor-fulfillment-v2");
+  assert.equal(nextVersion.dispatch.request.schemaVersion, "public-health-external-dispatch/v2");
+  assert.equal(nextVersion.contractAuthorization.reason, "verified");
+  const nextVersionClaim = claimPublicHealthExternalDispatchToState(
+    nextVersion.nextData,
+    nextVersion.dispatch.id,
+    {
+      workerId: "family-doctor-contract-v2-worker",
+      idempotencyKey: "family-doctor:contract:v2-claim",
+      expectedVersion: 1,
+      now: "2026-08-15T00:00:10.000Z",
+      leaseSeconds: 60
+    },
+    credentials({ contractGovernance: retiredGovernance })
+  );
+  assert.equal(nextVersionClaim.contractAuthorization.reason, "verified");
 });

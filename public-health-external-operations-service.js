@@ -13,6 +13,9 @@ const {
 const {
   authorizePublicHealthExternalContract
 } = require("./public-health-external-contract-governance-service");
+const {
+  buildPublicHealthExternalContractCutoverBoard
+} = require("./public-health-external-contract-cutover-service");
 
 function clean(value) {
   return String(value ?? "").trim();
@@ -154,6 +157,14 @@ function buildPublicHealthExternalOperationsBoard({
   const handoffs = new Map((coordinationCenter.handoffs || []).map((item) => [item.id, item]));
   const issues = [];
   const laneSummary = new Map();
+  const contractCutover = contractGovernance
+    ? buildPublicHealthExternalContractCutoverBoard({ data, contractGovernance, now })
+    : {
+      lanes: [],
+      issues: [],
+      summary: { transitionLanes: 0, outstanding: 0, staleSuccessors: 0 }
+    };
+  issues.push(...contractCutover.issues);
   rows(data, "publicHealthExternalDispatchAudit")
     .filter((item) => !dispatchIds.has(item.dispatchId))
     .forEach((item) => issues.push(issue(
@@ -268,21 +279,29 @@ function buildPublicHealthExternalOperationsBoard({
         dispatch.receipt?.schemaVersion || governedContract?.receiptSchemaVersion || ""
       );
       if (!authorization.ok) {
-        issues.push(issue(
-          "P0",
-          "contract-governance-mismatch",
-          dispatch,
-          authorization.reason,
-          "Quarantine the dispatch and reconcile its signed contract and schema versions."
-        ));
+        const cutoverRetirement = authorization.reason === "contract-version-retired"
+          && governedLane?.transition?.fromContract === dispatch.contract;
+        if (!cutoverRetirement) {
+          issues.push(issue(
+            "P0",
+            "contract-governance-mismatch",
+            dispatch,
+            authorization.reason,
+            "Quarantine the dispatch and reconcile its signed contract and schema versions."
+          ));
+        }
       } else if (authorization.state === "deprecated") {
-        issues.push(issue(
-          "P1",
-          "contract-version-deprecated",
-          dispatch,
-          authorization.warning,
-          "Migrate the producer and consumer before the signed sunset deadline."
-        ));
+        const historical = dispatch.deliveryState === "delivered"
+          || (dispatch.deliveryState === "dead-letter" && dispatch.recovery?.state === "requeued");
+        if (!historical) {
+          issues.push(issue(
+            "P1",
+            "contract-version-deprecated",
+            dispatch,
+            authorization.warning,
+            "Migrate the producer and consumer before the signed sunset deadline."
+          ));
+        }
       }
     }
 
@@ -431,8 +450,12 @@ function buildPublicHealthExternalOperationsBoard({
       openCircuits: issues.filter((item) => item.code === "lane-circuit-open").length,
       halfOpenCircuits: issues.filter((item) => item.code === "lane-circuit-half-open").length,
       contractMismatches: issues.filter((item) => item.code === "contract-governance-mismatch").length,
-      deprecatedContracts: issues.filter((item) => item.code === "contract-version-deprecated").length
+      deprecatedContracts: issues.filter((item) => item.code === "contract-version-deprecated").length,
+      contractCutoverLanes: contractCutover.summary.transitionLanes,
+      contractCutoverBacklog: contractCutover.summary.outstanding,
+      contractCutoverStaleSuccessors: contractCutover.summary.staleSuccessors
     },
+    contractCutover,
     lanes: [...laneSummary.values()].sort((left, right) => left.laneId.localeCompare(right.laneId)),
     issues,
     productionReady: false,

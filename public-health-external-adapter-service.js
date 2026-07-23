@@ -84,6 +84,38 @@ function profileForLane(laneId) {
   return profile;
 }
 
+function positiveVersion(value, pattern, label) {
+  const match = clean(value).match(pattern);
+  if (!match) throw new Error(`${label} is invalid`);
+  return { family: match[1], version: Number(match[2]) };
+}
+
+function resolveExternalContractBinding(profile, value = {}) {
+  value = value || {};
+  const contract = clean(value.contract || profile.contract);
+  const requestSchemaVersion = clean(value.requestSchemaVersion || REQUEST_SCHEMA_VERSION);
+  const receiptSchemaVersion = clean(value.receiptSchemaVersion || RECEIPT_SCHEMA_VERSION);
+  const baseline = positiveVersion(profile.contract, /^(.*)-v([1-9]\d*)$/, "adapter profile contract");
+  const selected = positiveVersion(contract, /^(.*)-v([1-9]\d*)$/, "external contract");
+  const request = positiveVersion(requestSchemaVersion, /^(public-health-external-dispatch)\/v([1-9]\d*)$/, "external request schema");
+  const receipt = positiveVersion(receiptSchemaVersion, /^(public-health-external-receipt)\/v([1-9]\d*)$/, "external receipt schema");
+  if (selected.family !== baseline.family
+    || request.version !== selected.version
+    || receipt.version !== selected.version) {
+    throw new Error("external contract and request/receipt schema versions must match the adapter family");
+  }
+  return { contract, requestSchemaVersion, receiptSchemaVersion };
+}
+
+function receiptSchemaForRequest(requestSchemaVersion) {
+  const request = positiveVersion(
+    requestSchemaVersion,
+    /^(public-health-external-dispatch)\/v([1-9]\d*)$/,
+    "external request schema"
+  );
+  return `public-health-external-receipt/v${request.version}`;
+}
+
 function validHttpsEndpoint(value) {
   try {
     const endpoint = new URL(clean(value));
@@ -123,7 +155,7 @@ function buildPublicHealthExternalAdapterRegistry(env = process.env) {
   };
 }
 
-function normalizedRequestPayload(handoff, input = {}, profile, signingKey) {
+function normalizedRequestPayload(handoff, input = {}, profile, signingKey, contractBinding) {
   const idempotencyKey = clean(input.idempotencyKey);
   const operation = clean(input.operation || "coordinate");
   if (!idempotencyKey) throw new Error("idempotencyKey is required for external dispatch");
@@ -136,9 +168,9 @@ function normalizedRequestPayload(handoff, input = {}, profile, signingKey) {
     ? [...new Set(input.evidenceRefs.map(clean).filter(Boolean))].sort()
     : [];
   return {
-    schemaVersion: REQUEST_SCHEMA_VERSION,
+    schemaVersion: contractBinding.requestSchemaVersion,
     adapterId: profile.adapterId,
-    contract: profile.contract,
+    contract: contractBinding.contract,
     laneId: handoff.laneId,
     handoffId: handoff.id,
     handoffVersion: Number(handoff.version),
@@ -154,6 +186,7 @@ function normalizedRequestPayload(handoff, input = {}, profile, signingKey) {
 
 function createPublicHealthExternalDispatch(handoff = {}, input = {}, credentials = {}) {
   const profile = profileForLane(handoff.laneId);
+  const contractBinding = resolveExternalContractBinding(profile, credentials.contractBinding);
   if (handoff.state !== "in-progress") throw new Error("external dispatch requires an in-progress coordination handoff");
   if (!validHttpsEndpoint(credentials.endpoint)) throw new Error("external adapter endpoint must use HTTPS");
   const maxAttempts = Number(credentials.maxAttempts || profile.maxAttempts);
@@ -165,7 +198,7 @@ function createPublicHealthExternalDispatch(handoff = {}, input = {}, credential
   if (!requestSigningKey.legacy && !clean(input.at || input.issuedAt)) {
     throw new Error("issuedAt is required when a managed request keyring is used");
   }
-  const request = normalizedRequestPayload(handoff, input, profile, requestSigningKey);
+  const request = normalizedRequestPayload(handoff, input, profile, requestSigningKey, contractBinding);
   const dispatchId = `ph-dispatch-${sha256(`${request.laneId}:${request.handoffId}:${request.idempotencyKeyHash}`).slice(0, 24)}`;
   const signedPayload = { ...request, dispatchId };
   const requestDigest = sha256(stableStringify(signedPayload));
@@ -174,7 +207,7 @@ function createPublicHealthExternalDispatch(handoff = {}, input = {}, credential
     laneId: request.laneId,
     handoffId: request.handoffId,
     adapterId: profile.adapterId,
-    contract: profile.contract,
+    contract: contractBinding.contract,
     request: signedPayload,
     requestDigest,
     requestSignatureKeyId: requestSigningKey.keyId,
@@ -198,6 +231,16 @@ function verifyPublicHealthExternalDispatch(dispatch, requestSigningMaterial, op
     return { ok: false, reason: "dispatch-lane-invalid" };
   }
   const request = dispatch?.request || {};
+  let contractBinding;
+  try {
+    contractBinding = resolveExternalContractBinding(profile, {
+      contract: dispatch?.contract,
+      requestSchemaVersion: request.schemaVersion,
+      receiptSchemaVersion: receiptSchemaForRequest(request.schemaVersion)
+    });
+  } catch {
+    return { ok: false, reason: "dispatch-contract-binding-invalid" };
+  }
   const expectedId = `ph-dispatch-${sha256(`${request.laneId}:${request.handoffId}:${request.idempotencyKeyHash}`).slice(0, 24)}`;
   const expectedDigest = sha256(stableStringify(request));
   const keyId = clean(dispatch?.requestSignatureKeyId || request.signingKeyId || LEGACY_KEY_ID);
@@ -213,14 +256,14 @@ function verifyPublicHealthExternalDispatch(dispatch, requestSigningMaterial, op
   } catch {
     return { ok: false, reason: "dispatch-verification-secret-invalid" };
   }
-  const bindingsValid = request.schemaVersion === REQUEST_SCHEMA_VERSION
+  const bindingsValid = request.schemaVersion === contractBinding.requestSchemaVersion
     && request.dispatchId === dispatch.id
     && request.laneId === dispatch.laneId
     && request.handoffId === dispatch.handoffId
     && request.adapterId === dispatch.adapterId
     && request.contract === dispatch.contract
     && dispatch.adapterId === profile.adapterId
-    && dispatch.contract === profile.contract
+    && dispatch.contract === contractBinding.contract
     && dispatch.id === expectedId
     && dispatch.requestDigest === expectedDigest
     && clean(request.signingKeyId || LEGACY_KEY_ID) === keyId
@@ -245,7 +288,7 @@ function normalizedReceiptPayload(receipt = {}) {
     ? [...new Set(receipt.evidenceRefs.map(clean).filter(Boolean))].sort()
     : [];
   return {
-    schemaVersion: RECEIPT_SCHEMA_VERSION,
+    schemaVersion: clean(receipt.schemaVersion || RECEIPT_SCHEMA_VERSION),
     dispatchId: clean(receipt.dispatchId),
     requestDigest: clean(receipt.requestDigest),
     laneId: clean(receipt.laneId),
@@ -293,7 +336,14 @@ function verifyPublicHealthExternalReceipt(dispatch, receipt, receiptSigningMate
   const statusValid = ["accepted", "rejected"].includes(payload.status);
   const rejectionValid = payload.status !== "rejected"
     || (payload.reason && payload.exceptionOwner && /^\d{4}-\d{2}-\d{2}/.test(payload.dueAt));
-  const bindingsValid = payload.dispatchId === dispatch.id
+  let expectedReceiptSchema = "";
+  try {
+    expectedReceiptSchema = receiptSchemaForRequest(dispatch?.request?.schemaVersion);
+  } catch {
+    return { ok: false, reason: "receipt-contract-binding-invalid", payload };
+  }
+  const bindingsValid = payload.schemaVersion === expectedReceiptSchema
+    && payload.dispatchId === dispatch.id
     && payload.requestDigest === dispatch.requestDigest
     && payload.laneId === dispatch.laneId
     && payload.handoffId === dispatch.handoffId;
@@ -418,7 +468,9 @@ module.exports = {
   buildPublicHealthExternalAdapterRegistry,
   createPublicHealthExternalDispatch,
   normalizedReceiptPayload,
+  receiptSchemaForRequest,
   recordPublicHealthExternalDeliveryAttempt,
+  resolveExternalContractBinding,
   signPublicHealthExternalReceipt,
   verifyPublicHealthExternalDispatch,
   verifyPublicHealthExternalReceipt

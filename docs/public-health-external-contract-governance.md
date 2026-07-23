@@ -58,6 +58,24 @@
 
 兼容期告警必须包含签名废止日期，并在 `sunsetAt` 前完成生产方、消费方和历史待投递任务迁移。达到废止时间后，旧版任务不得继续领取或通过重试绕过门禁。
 
+## 版本化投递与切换积压
+
+治理快照生效后，`public-health-external-adapter-runtime.js` 从服务端快照选择 `currentContract`，把契约、请求 Schema 和回执 Schema 作为一个不可拆分的绑定传给适配器。客户端不能通过动作 payload 指定目标版本。
+
+- 生效前新任务继续使用 v1；
+- 生效后新任务自动使用 v2 请求和 v2 回执；
+- 兼容期已存在的 v1 任务仍可领取并完成；
+- 废止后 v1 任务不能再领取，但经责任角色批准的死信恢复会创建一个签名 v2 后继任务；
+- v2 回执必须与 v2 请求版本一致，降级回执或签名后修改 Schema 均被拒绝。
+
+`buildPublicHealthExternalContractCutoverBoard()` 只把仍可能执行的旧版任务列为切换积压，包括 `pending`、`retry-scheduled`、持有租约的任务和未恢复死信。已投递成功的历史记录以及拥有唯一有效 v2 后继的已恢复死信继续保留审计价值，不因版本废止被误报为 P0。
+
+- 兼容期积压产生 P1 `contract-cutover-backlog`；
+- 废止后积压产生 P0 `contract-cutover-backlog-after-sunset`；
+- 后继缺失、关系错误或仍使用旧契约产生 P0 `contract-cutover-successor-stale`。
+
+切换板清零只说明旧版运行任务已经排空，不代表发布物、联合测试和现场验收已经通过，因而 `productionReady` 仍固定为 `false`。
+
 ## T00 集成事项
 
 1. 契约审批接口只能由服务端治理角色调用；客户端不得提交 `status=approved` 后直接生效。
@@ -67,6 +85,7 @@
 5. 将治理快照传给 operations board，并为 P0/P1 风险接入告警和迁移工单。
 6. 新版本生效前校验 `runtimeReleaseDigest` 对应的 T08/T00 发布物已经部署，并完成字段字典、双向样例、回滚和现场联合测试。
 7. 废止前处理所有旧版 pending、retry-scheduled、dead-letter successor 和半开探针任务，避免到期后形成无法投递的积压。
+8. 新入队时只使用服务端治理快照解析出的 `currentContract` 和请求/回执 Schema；不得接受客户端 `contractBinding`。死信恢复创建新版本后继时，原任务恢复封印、新任务入队、审计链和协调状态必须在同一事务提交。
 
 T00 继续负责 `server.js`、`package.json`、`portal.css`、`README.md`、公共发布总表、生产配置和统一持久化。本线程不修改这些公共文件。
 
@@ -78,4 +97,6 @@ T00 继续负责 `server.js`、`package.json`、`portal.css`、`README.md`、公
 - 计划、生效、兼容和废止边界由服务端时间稳定复现。
 - 冲突审批、伪造审批、跳版、Schema 漂移、过期和吊销凭据全部失败关闭。
 - 运维巡检在兼容期产生 P1、废止后产生 P0。
+- 生效后新任务使用新版签名报文；旧版死信可由授权恢复生成唯一新版后继。
+- 已完成历史记录不阻塞切换，仍可执行的旧版积压和错误后继必须阻塞。
 - 报告不包含密钥和审批人原始身份，并始终保持 `productionReady=false`。
