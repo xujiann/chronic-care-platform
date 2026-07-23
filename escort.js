@@ -167,7 +167,7 @@ function escortWorkerQualification(item, order = {}) {
     const ok = Number(item.trainingHours || 0) >= 32 && item.examStatus === "passed" && item.insuranceStatus === "covered" && !["training", "suspended", "disabled"].includes(item.status);
     return { ok, reasons: ok ? [] : ["qualification-incomplete"], missingSkills: [] };
   }
-  return domain.validateEscortWorkerQualification(item, order, { now: new Date(), requireAllSkills: false });
+  return domain.validateEscortWorkerQualification(item, order, { now: new Date() });
 }
 
 function escortWorkerQualificationText(item) {

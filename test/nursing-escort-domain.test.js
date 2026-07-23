@@ -59,6 +59,26 @@ test("nurse qualification rejects expired cross-institution and specialty-mismat
   assert.equal(mismatched.reasons.includes("specialty-mismatch"), true);
 });
 
+test("nurse qualification fails closed when ownership capability or availability fields are missing or unknown", () => {
+  const order = { institutionCode: "MR1", serviceItem: "wound care", riskLevel: "high" };
+  const missing = qualifiedNurse();
+  delete missing.institutionId;
+  delete missing.institutionCode;
+  delete missing.specialties;
+  delete missing.status;
+
+  const missingResult = Domain.validateNurseQualification(missing, order, { now: NOW });
+  assert.equal(missingResult.ok, false);
+  assert.equal(missingResult.reasons.includes("institution-code-missing"), true);
+  assert.equal(missingResult.reasons.includes("specialties-missing"), true);
+  assert.equal(missingResult.reasons.includes("nurse-status-missing"), true);
+  assert.equal(missingResult.reasons.includes("nurse-unavailable"), true);
+
+  const unknownStatus = Domain.validateNurseQualification(qualifiedNurse({ status: "unknown" }), order, { now: NOW });
+  assert.equal(unknownStatus.ok, false);
+  assert.equal(unknownStatus.reasons.includes("nurse-status-not-allowed"), true);
+});
+
 test("escort qualification enforces training exam insurance provider and skills", () => {
   const order = { providerId: "esp-001", serviceItems: ["registration", "exam escort"] };
   assert.equal(Domain.validateEscortWorkerQualification(qualifiedEscortWorker(), order, { now: NOW }).ok, true);
@@ -78,6 +98,26 @@ test("escort qualification enforces training exam insurance provider and skills"
   assert.equal(result.reasons.includes("insurance-not-covered"), true);
   assert.equal(result.reasons.includes("worker-unavailable"), true);
   assert.equal(result.reasons.includes("skill-mismatch"), true);
+});
+
+test("escort qualification fails closed when provider skills or availability fields are missing or unknown", () => {
+  const order = { providerId: "esp-001", serviceItems: ["registration", "exam escort"] };
+  const missing = qualifiedEscortWorker();
+  delete missing.providerId;
+  delete missing.skills;
+  delete missing.status;
+
+  const missingResult = Domain.validateEscortWorkerQualification(missing, order, { now: NOW });
+  assert.equal(missingResult.ok, false);
+  assert.equal(missingResult.reasons.includes("provider-id-missing"), true);
+  assert.equal(missingResult.reasons.includes("skills-missing"), true);
+  assert.equal(missingResult.reasons.includes("skill-mismatch"), true);
+  assert.equal(missingResult.reasons.includes("worker-status-missing"), true);
+  assert.equal(missingResult.reasons.includes("worker-unavailable"), true);
+
+  const unknownStatus = Domain.validateEscortWorkerQualification(qualifiedEscortWorker({ status: "mystery" }), order, { now: NOW });
+  assert.equal(unknownStatus.ok, false);
+  assert.equal(unknownStatus.reasons.includes("worker-status-not-allowed"), true);
 });
 
 test("risk assessment turns missing assessment consent and assignment into controls", () => {
@@ -131,6 +171,13 @@ test("transition order blocks missing evidence and emits resident timeline evide
     updates: { nurseId: "inn-001", qualificationSnapshot: { status: "passed" }, dispatchDecision: { score: 12 } }
   });
   assert.equal(dispatched.status, "dispatched");
+});
+
+test("transition order rejects attempts to disable evidence enforcement", () => {
+  assert.throws(
+    () => Domain.transitionOrder("nursing", { id: "ino-bypass", status: "requested" }, "assessed", { enforceEvidence: false }),
+    (error) => error.code === "EVIDENCE_BYPASS_FORBIDDEN" && error.statusCode === 409
+  );
 });
 
 test("completion requires service record trace confirmation and exception declaration", () => {
