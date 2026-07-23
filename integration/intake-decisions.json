@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-23T14:59:30.244Z",
+  "updatedAt": "2026-07-23T15:46:27.316Z",
   "decisions": [
     {
       "lineId": "T01",
@@ -120,32 +120,28 @@
     },
     {
       "lineId": "T06",
-      "candidateHead": "9cc319f2943615557e68da76d30db747cbdcc826",
-      "decision": "blocked",
+      "candidateHead": "50762b31c824897b2cdfb085c8150d0eb46c5e23",
+      "decision": "accepted",
       "acceptedCandidateHeads": [
-        "8a161560f69016ec8372cfd89dfbf24afb047a80"
+        "8a161560f69016ec8372cfd89dfbf24afb047a80",
+        "50762b31c824897b2cdfb085c8150d0eb46c5e23"
       ],
-      "reviewedAt": "2026-07-23T13:46:42.207Z",
+      "reviewedAt": "2026-07-23T15:46:27.316Z",
       "reviewer": "T00",
       "checks": [
         "git diff --check",
-        "49 nursing, escort, internet nursing write-path and readiness tests passed independently",
-        "the previously accepted and published T06 candidate remains 8a161560f69016ec8372cfd89dfbf24afb047a80",
-        "rescheduling releases original resources and requires an approved replacement assignment",
-        "no-show handling requires grace-period attendance evidence and a bound human decision",
-        "resident timeline chronology, notification plans and provider receipts are order-, resident-, status- and idempotency-bound",
-        "issued capacity reservations bind worker, service date, ordinal and digest and reject concurrent overbooking",
-        "cancellation, completed rescheduling and dispatch rejection release only a digest-bound committed capacity reservation",
-        "dispatch assignment and evidence bindings are immutable after issuance",
-        "qualification, institution scope, high-risk, service evidence, complaint, settlement, cancellation and refund paths fail closed",
-        "new order, transition and notification operations emit content-bound outbox events"
+        "T06 candidate 50762b3 was merged exactly before T00 public-file integration",
+        "72 of 72 domain, write-path, transaction, worker, readiness, repository and signed-delivery tests passed",
+        "public nursing and escort create and transition routes now call care-service-platform-adapter instead of legacy direct persistence",
+        "authenticated actor and institution scope, Idempotency-Key and server time are bound before every public command",
+        "order and outbox collections commit through one repository transaction with SQLite collection-version CAS",
+        "signed notification receipts bind domain, order, message, channel and provider result",
+        "health, dead-letter listing, exact-confirmation replay and commission worker endpoints are registered",
+        "CARE_SERVICE_RUNTIME_MODULE resolves to the T00 production runtime with signed HTTPS nursing and escort delivery adapters",
+        "release report passes 403 total checks with 402 passed, 0 failed and 1 warning",
+        "care-service report is codeReady=true, platformIntegrated=true and productionReady=false"
       ],
-      "blockers": [
-        "new write operations do not require expectedVersion before persistence",
-        "transition and notification receipt operations do not fail closed when authenticated actor identity is missing",
-        "rejected create, transition and receipt attempts do not produce persistable rejection audit events",
-        "data/db.json overlaps T00 public state and requires a scoped manual merge after the write contract is corrected"
-      ]
+      "blockers": []
     },
     {
       "lineId": "T07",

@@ -17,8 +17,7 @@ const SECRET = "production-secret-material-0123456789abcdef";
 function productionEnv(overrides = {}) {
   return {
     NODE_ENV: "production",
-    STORAGE_ENGINE: "postgres",
-    DATABASE_URL: "postgresql://care.example.internal/care",
+    STORAGE_ENGINE: "sqlite",
     SESSION_SECRETS: SECRET,
     INTEGRATION_GATEWAY_SECRET: SECRET,
     OIDC_ISSUER_URL: "https://identity.example.gov.cn",
@@ -47,7 +46,10 @@ function productionEnv(overrides = {}) {
     SIEM_ENDPOINT: "https://siem.example.gov.cn/events",
     CARE_OUTBOX_WORKER_ENABLED: "true",
     CARE_OUTBOX_WORKER_ID: "care-outbox-prod-01",
-    CARE_SERVICE_RUNTIME_MODULE: "runtime/care-service-production.js",
+    CARE_SERVICE_RUNTIME_MODULE: "care-service-production-runtime.js",
+    CARE_NURSING_DELIVERY_URL: "https://care.example.gov.cn/nursing/events",
+    CARE_ESCORT_DELIVERY_URL: "https://care.example.gov.cn/escort/events",
+    CARE_OUTBOX_DELIVERY_SECRET: SECRET,
     CARE_CUTOVER_BUSINESS_SIGNOFF: "signed",
     CARE_CUTOVER_INTERFACE_SIGNOFF: "signed",
     CARE_CUTOVER_SECURITY_SIGNOFF: "signed",
@@ -64,13 +66,13 @@ test("default report keeps completed code separate from external production bloc
     at: AT
   });
   assert.equal(report.codeReady, true);
-  assert.equal(report.platformIntegrated, false);
+  assert.equal(report.platformIntegrated, true);
   assert.equal(report.runtimeReady, false);
   assert.equal(report.signoffsReady, false);
   assert.equal(report.productionReady, false);
-  assert.equal(report.formalGoLiveState, "blocked-by-platform-integration");
+  assert.equal(report.formalGoLiveState, "blocked-by-production-configuration-or-health");
   assert.equal(report.summary.codeBlockers, 0);
-  assert.equal(report.summary.platformBlockers, 1);
+  assert.equal(report.summary.platformBlockers, 0);
   assert.equal(report.summary.runtimeBlockers > 0, true);
   assert.equal(report.summary.signoffBlockers, 5);
   assert.match(report.boundary, /real production configuration/);

@@ -1386,7 +1386,7 @@ function bindNursingAppointmentForm() {
         const request = window.HealthCityAuth?.authFetch || fetch;
         const response = await request(`${NURSING_API_BASE}/internet-nursing/orders`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
           body: JSON.stringify(values)
         });
         if (!response.ok) {
@@ -1463,7 +1463,7 @@ async function updateNursingOrder(id, payload) {
       const request = window.HealthCityAuth?.authFetch || fetch;
       const response = await request(`${NURSING_API_BASE}/internet-nursing/orders/${encodeURIComponent(id)}/actions`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
         body: JSON.stringify(payload)
       });
       if (!response.ok) {

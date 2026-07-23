@@ -162,16 +162,21 @@ function buildCodeChecks(sources) {
 
 function buildEnvironmentChecks(env) {
   const storageEngine = String(env.STORAGE_ENGINE || "").trim().toLowerCase();
+  const runtimeModuleValue = String(env.CARE_SERVICE_RUNTIME_MODULE || "").trim();
+  const runtimeModulePath = runtimeModuleValue
+    ? path.isAbsolute(runtimeModuleValue) ? runtimeModuleValue : path.resolve(ROOT, runtimeModuleValue)
+    : "";
+  const runtimeModuleReady = Boolean(runtimeModulePath)
+    && fs.existsSync(runtimeModulePath)
+    && path.basename(runtimeModulePath) === "care-service-production-runtime.js";
   const sessionSecrets = String(env.SESSION_SECRETS || env.SESSION_SECRET || "")
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
-  const databaseReady = ["sqlite", "postgres", "postgresql"].includes(storageEngine)
-    && (!["postgres", "postgresql"].includes(storageEngine)
-      || /^postgres(?:ql)?:\/\//i.test(String(env.DATABASE_URL || "")));
+  const databaseReady = storageEngine === "sqlite";
   return [
     check("runtime:production-profile", "production runtime profile", env.NODE_ENV === "production", env.NODE_ENV || "missing", "运维", "set NODE_ENV=production"),
-    check("runtime:durable-storage", "durable transactional storage", databaseReady, storageEngine || "missing", "数据库运维", "configure SQLite or PostgreSQL; PostgreSQL requires DATABASE_URL"),
+    check("runtime:durable-storage", "durable transactional storage", databaseReady, storageEngine || "missing", "数据库运维", "configure the supported production SQLite runtime, backups and collection-version CAS; PostgreSQL remains blocked until its public runtime adapter is enabled"),
     check("runtime:session-secrets", "strong session secrets", sessionSecrets.length >= 1 && sessionSecrets.every((item) => secretReady(item)), `${sessionSecrets.length} configured`, "安全运维", "configure non-demo SESSION_SECRETS with at least 32 characters each"),
     check("runtime:integration-secret", "strong integration signing secret", secretReady(env.INTEGRATION_GATEWAY_SECRET), env.INTEGRATION_GATEWAY_SECRET ? "configured" : "missing", "接口运维", "configure INTEGRATION_GATEWAY_SECRET"),
     check(
@@ -234,11 +239,20 @@ function buildEnvironmentChecks(env) {
       "outbox worker deployment",
       enabled(env.CARE_OUTBOX_WORKER_ENABLED)
         && Boolean(String(env.CARE_OUTBOX_WORKER_ID || "").trim())
-        && Boolean(String(env.CARE_SERVICE_RUNTIME_MODULE || "").trim())
-        && !/replace-with|placeholder|example/i.test(String(env.CARE_SERVICE_RUNTIME_MODULE || "")),
+        && runtimeModuleReady
+        && !/replace-with|placeholder|example/i.test(runtimeModuleValue),
       enabled(env.CARE_OUTBOX_WORKER_ENABLED) ? "enabled" : "disabled",
       "平台运维",
       "deploy the care-service outbox worker with a stable worker identity, T00 runtime module and health scrape"
+    ),
+    check(
+      "runtime:care-delivery",
+      "signed nursing and escort delivery endpoints",
+      configuredSignedEndpoint(env, "CARE_NURSING_DELIVERY_URL", ["CARE_NURSING_DELIVERY_SECRET", "CARE_OUTBOX_DELIVERY_SECRET"])
+        && configuredSignedEndpoint(env, "CARE_ESCORT_DELIVERY_URL", ["CARE_ESCORT_DELIVERY_SECRET", "CARE_OUTBOX_DELIVERY_SECRET"]),
+      env.CARE_NURSING_DELIVERY_URL && env.CARE_ESCORT_DELIVERY_URL ? "endpoints supplied" : "missing",
+      "平台接口运维",
+      "configure both signed HTTPS care-service delivery endpoints and managed secrets"
     )
   ];
 }
@@ -271,6 +285,9 @@ function buildCareServiceProductionReadiness(options = {}) {
     escort: readText("escort-service.js"),
     runtime: readText("care-service-runtime.js"),
     platformAdapter: readText("care-service-platform-adapter.js"),
+    stateRepository: readText("care-service-state-repository.js"),
+    deliveryAdapters: readText("care-service-delivery-adapters.js"),
+    productionRuntime: readText("care-service-production-runtime.js"),
     server: readText("server.js"),
     worker: readText("scripts/care-service-outbox-worker.js"),
     workerService: readText("deploy/care-service-outbox-worker.service.template"),
@@ -285,17 +302,26 @@ function buildCareServiceProductionReadiness(options = {}) {
   const codeChecks = buildCodeChecks(sources);
   const environmentChecks = buildEnvironmentChecks(env);
   const signoffChecks = buildSignoffChecks(env);
+  const platformWired = (
+    /createCareServicePlatformAdapter/.test(sources.server || "")
+    && /createCareServiceRuntimeDependencies/.test(sources.server || "")
+    && /createCareServiceStateRepository/.test(sources.server || "")
+    && /recordNotificationReceipt/.test(sources.server || "")
+    && /\/api\/care-services\/outbox\/health/.test(sources.server || "")
+    && /\/api\/care-services\/outbox\/worker\/run/.test(sources.server || "")
+    && /createCareServiceRuntimeDependencies/.test(sources.productionRuntime || "")
+    && /CARE_REPOSITORY_VERSION_CONFLICT/.test(sources.stateRepository || "")
+    && /x-care-signature/.test(sources.deliveryAdapters || "")
+  );
   const platformCheck = check(
     "platform:public-write-integration",
     "public API transaction and worker integration",
-    options.platformIntegrated === true || (
-      /care-service-runtime/.test(sources.server || "")
-      && /executeTransactionalCommand/.test(sources.server || "")
-      && /runOutboxWorker/.test(sources.server || "")
-      && /createInternetNursingOrder/.test(sources.server || "")
-      && /createEscortOrder/.test(sources.server || "")
-    ),
-    options.platformIntegrated === true ? "verified by injected integration evidence" : "public server markers missing",
+    options.platformIntegrated === true || platformWired,
+    options.platformIntegrated === true
+      ? "verified by injected integration evidence"
+      : platformWired
+        ? "public API, transaction repository, signed delivery and worker wiring verified"
+        : "public API, transaction repository, signed delivery or worker markers missing",
     "T00 平台集成",
     "wire the T06 service and runtime adapters into the public server repository transaction and worker endpoints",
     "platform"

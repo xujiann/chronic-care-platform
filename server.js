@@ -84,6 +84,10 @@ const {
 const {
   buildPublicHealthExternalContractCutoverBoard
 } = require("./public-health-external-contract-cutover-service");
+const CareServicePlatform = require("./care-service-platform-adapter");
+const CareServiceRuntime = require("./care-service-runtime");
+const { createCareServiceDeliveryAdapters } = require("./care-service-delivery-adapters");
+const { createCareServiceStateRepository } = require("./care-service-state-repository");
 const PHYSICAL_EXAM_CONTRACT_ID = "physical-exam-report-v1";
 const EmergencyService = require("./emergency-service");
 const EmergencyLifeChain = require("./emergency-lifechain");
@@ -10216,6 +10220,7 @@ function normalizeState(data) {
     escortServiceProviders: mergeByKey(seedEscortServiceProviders(), data.escortServiceProviders, "id"),
     escortWorkers: mergeByKey(seedEscortWorkers(), data.escortWorkers, "id"),
     escortServiceOrders: mergeByKey(seedEscortServiceOrders(), data.escortServiceOrders, "id"),
+    escortServiceOutbox: Array.isArray(data.escortServiceOutbox) ? data.escortServiceOutbox.slice(0, 1000) : [],
     registrationSchedules: mergeByKey(seedRegistrationSchedules(), data.registrationSchedules, "id"),
     registrationOrders: mergeByKey(seedRegistrationOrders(), data.registrationOrders, "id").map(normalizeRegistrationJourneyOrder),
     registrationWaitlistEntries: mergeByKey(seedRegistrationWaitlistEntries(), data.registrationWaitlistEntries, "id").map(normalizeRegistrationWaitlistEntry),
@@ -10223,6 +10228,8 @@ function normalizeState(data) {
     internetNursingInstitutions: mergeByKey(seedInternetNursingInstitutions(), data.internetNursingInstitutions, "id"),
     internetNursingNurses: mergeByKey(seedInternetNursingNurses(), data.internetNursingNurses, "id"),
     internetNursingOrders: mergeByKey(seedInternetNursingOrders(), data.internetNursingOrders, "id"),
+    internetNursingOutbox: Array.isArray(data.internetNursingOutbox) ? data.internetNursingOutbox.slice(0, 1000) : [],
+    careServiceOutboxDeadLetters: Array.isArray(data.careServiceOutboxDeadLetters) ? data.careServiceOutboxDeadLetters.slice(0, 1000) : [],
     serviceOrders: Array.isArray(data.serviceOrders) ? data.serviceOrders : [],
     taskMessages: Array.isArray(data.taskMessages) ? data.taskMessages : [],
     dataQualityIssues: Array.isArray(data.dataQualityIssues) ? data.dataQualityIssues : [],
@@ -23465,6 +23472,121 @@ function publicHealthExternalPublicView(value) {
   }, {});
 }
 
+let careServiceRepositoryInstance = null;
+
+function careServiceRepository() {
+  if (!careServiceRepositoryInstance) {
+    careServiceRepositoryInstance = createCareServiceStateRepository({
+      readState: readDatabase,
+      writeState: (state, options) => writeDatabase(state, options)
+    });
+  }
+  return careServiceRepositoryInstance;
+}
+
+function activeCareAuthorizationReceipt(data, residentId) {
+  return (Array.isArray(data.personalRecords) ? data.personalRecords : [])
+    .find((record) => record.category === "authorizations"
+      && record.residentId === residentId
+      && isActiveAuthorizationRecord(record)
+      && !["revoked", "宸叉挙閿€"].includes(record.status))?.id || "";
+}
+
+function careServiceActor(user = {}) {
+  return {
+    ...user,
+    id: String(user.id || user.username || user.accountId || user.residentId || "").trim()
+  };
+}
+
+function createCareServiceRuntimeDependencies(options = {}) {
+  return {
+    repository: careServiceRepository(),
+    deliveryAdapters: createCareServiceDeliveryAdapters({ env: options.env || process.env })
+  };
+}
+
+function careServicePlatformAdapter(options = {}) {
+  const dependencies = createCareServiceRuntimeDependencies(options);
+  return CareServicePlatform.createCareServicePlatformAdapter({
+    ...dependencies,
+    now: () => new Date().toISOString(),
+    access: {
+      canAccessResident(residentId, actor) {
+        return canAccessResident(actor, residentId, readDatabase());
+      },
+      allowedResidentIdsFor(actor) {
+        return [...allowedResidentIdsForUser(readDatabase(), actor)];
+      },
+      authorizationReceiptFor(residentId) {
+        return activeCareAuthorizationReceipt(readDatabase(), residentId);
+      },
+      canAccessOrder(domain, order, actor) {
+        const data = readDatabase();
+        return domain === "nursing"
+          ? canAccessInternetNursingOrder(actor, order, data)
+          : canAccessEscortOrder(actor, order, data);
+      }
+    }
+  });
+}
+
+function careServiceCommandId(req, payload = {}) {
+  return String(req.headers["idempotency-key"] || payload.commandId || payload.idempotencyKey || "").trim().slice(0, 160);
+}
+
+function careServiceCreatePayload(payload = {}, domain = "") {
+  const next = { ...payload };
+  [
+    "id", "status", "state", "workerId", "workerName", "nurseId", "nurseName",
+    "createdAt", "updatedAt", "requestedAt", "at", "expectedVersion",
+    "commandId", "idempotencyKey", "auditTrail", "timelineEvents", "notificationPlans",
+    "notificationReceipts", "capacityReservation", "capacityRelease", "settlement"
+  ].forEach((key) => delete next[key]);
+  if (typeof next.serviceItems === "string") {
+    next.serviceItems = next.serviceItems.split(",").map((item) => item.trim()).filter(Boolean);
+  }
+  if (!next.location && Number.isFinite(Number(next.lat)) && Number.isFinite(Number(next.lng))) {
+    next.location = { lat: Number(next.lat), lng: Number(next.lng), source: String(next.locationSource || "resident-map") };
+  }
+  delete next.lat;
+  delete next.lng;
+  delete next.locationSource;
+  if (domain === "escort") {
+    const data = readDatabase();
+    const provider = (data.escortServiceProviders || []).find((item) => item.id === next.providerId);
+    const registration = (data.registrationOrders || []).find((item) => item.id === next.registrationOrderId);
+    if (!next.district && provider?.district) next.district = provider.district;
+    if (registration) {
+      next.hospital = registration.hospital || next.hospital;
+      next.hospitalCode = registration.hospitalCode || next.hospitalCode;
+      next.department = registration.department || next.department;
+      next.departmentCode = registration.departmentCode || next.departmentCode;
+      next.hisVisitId = registration.hisVisitId || next.hisVisitId;
+      next.outpatientQueueNo = registration.queueNo || next.outpatientQueueNo;
+      next.appointmentSource = "registration-order";
+    }
+  }
+  return next;
+}
+
+function careServiceTransitionInput(payload = {}) {
+  const nextStatus = String(payload.nextStatus || payload.status || "").trim();
+  const updates = { ...payload };
+  [
+    "action", "status", "nextStatus", "commandId", "idempotencyKey",
+    "at", "createdAt", "updatedAt", "expectedVersion"
+  ].forEach((key) => delete updates[key]);
+  const input = { updates };
+  if (Object.hasOwn(payload, "enforceEvidence")) input.enforceEvidence = payload.enforceEvidence;
+  return { nextStatus, input };
+}
+
+function sendCareServiceError(res, error) {
+  const response = CareServicePlatform.errorResponse(error);
+  sendJson(res, response.status, response.body);
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -28330,55 +28452,17 @@ async function handleApi(req, res) {
   if (req.method === "POST" && url.pathname === "/api/escort-services/orders") {
     const user = requireApiRole(req, res, ["commission", "institution", "county", "citizen"], "/api/escort-services/orders");
     if (!user) return;
-    const data = readDatabase();
     try {
-      const order = normalizeEscortServiceOrder(await collectJson(req), user, data);
-      if (!canAccessEscortOrder(user, order, data)) {
-        appendSecurityEvent({ actor: user.name, role: user.role, action: "create escort service order", target: order.residentId, result: "denied", detail: "scope denied" });
-        sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
-        return;
-      }
-      data.escortServiceOrders = [order, ...(Array.isArray(data.escortServiceOrders) ? data.escortServiceOrders : [])].slice(0, 500);
-      data.taskMessages = [
-        {
-          id: `msg-${randomUUID()}`,
-          taskId: `escortServiceOrders:${order.id}`,
-          collection: "escortServiceOrders",
-          sourceId: order.id,
-          residentId: order.residentId,
-          targetRole: "institution",
-          channel: "in_app",
-          title: "New medical escort service request",
-          body: `${order.providerName || order.providerId} needs escort service confirmation for ${order.hospital || "outpatient visit"}.`,
-          status: "sent",
-          receipts: [],
-          createdAt: new Date().toISOString(),
-          createdBy: user.username || user.role,
-          createdByName: user.name
-        },
-        ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])
-      ].slice(0, 300);
-      appendDataAccessLog(data, user, order.residentId, "escortServiceOrders", "create medical escort service order", "allowed");
-      data.securityEvents = [
-        {
-          id: randomUUID(),
-          at: new Date().toLocaleString("zh-CN", { hour12: false }),
-          actor: user.name,
-          role: user.role,
-          action: "create escort service order",
-          target: order.id,
-          result: "allowed",
-          detail: order.status
-        },
-        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-      ].slice(0, 120);
-      writeDatabase(data);
-      sendJson(res, 201, order);
+      const payload = await collectJson(req);
+      const result = await careServicePlatformAdapter().createOrder(
+        "escort",
+        careServiceCreatePayload(payload, "escort"),
+        careServiceActor(user),
+        { commandId: careServiceCommandId(req, payload) }
+      );
+      sendJson(res, result.replayed ? 200 : 201, result.order);
     } catch (error) {
-      const message = error.message || "";
-      const denied = /scope denied|not published/i.test(message);
-      const conflict = /duplicate active escort appointment/i.test(message);
-      sendJson(res, conflict ? 409 : denied ? 403 : 400, { error: conflict ? "Conflict" : denied ? "Forbidden" : "Bad Request", message });
+      sendCareServiceError(res, error);
     }
     return;
   }
@@ -28387,56 +28471,23 @@ async function handleApi(req, res) {
   if (req.method === "POST" && escortHospitalHandoffMatch) {
     const user = requireApiRole(req, res, ["commission", "institution"], "/api/escort-services/orders/:id/hospital-handoff");
     if (!user) return;
-    const data = readDatabase();
-    const rows = Array.isArray(data.escortServiceOrders) ? data.escortServiceOrders : [];
-    const index = rows.findIndex((item) => item.id === decodeURIComponent(escortHospitalHandoffMatch[1]));
-    if (index < 0) {
-      sendJson(res, 404, { error: "Not Found", message: "escort service order not found" });
-      return;
+    try {
+      const payload = await collectJson(req);
+      const decision = String(payload.decision || "").trim().toLowerCase();
+      const result = await careServicePlatformAdapter().transitionOrder(
+        "escort",
+        decodeURIComponent(escortHospitalHandoffMatch[1]),
+        decision === "return" ? "hospital-returned" : "hospital-confirmed",
+        careServiceActor(user),
+        {
+          ...careServiceTransitionInput(payload).input,
+          commandId: careServiceCommandId(req, payload)
+        }
+      );
+      sendJson(res, 200, result.order);
+    } catch (error) {
+      sendCareServiceError(res, error);
     }
-    if (!canAccessEscortOrder(user, rows[index], data)) {
-      appendSecurityEvent({ actor: user.name, role: user.role, action: "hospital handoff escort service order", target: rows[index].id, result: "denied", detail: "scope denied" });
-      sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
-      return;
-    }
-    const payload = await collectJson(req);
-    rows[index] = applyEscortHospitalHandoff(rows[index], payload, user);
-    data.escortServiceOrders = rows;
-    data.taskMessages = [
-      {
-        id: `msg-${randomUUID()}`,
-        taskId: `escortServiceOrders:${rows[index].id}`,
-        collection: "escortServiceOrders",
-        sourceId: rows[index].id,
-        residentId: rows[index].residentId,
-        targetRole: "citizen",
-        channel: "in_app",
-        title: "Medical escort hospital handoff updated",
-        body: `${rows[index].hospital || "Hospital"} ${rows[index].department || ""} reported ${rows[index].hospitalInterfaceStatus}; ${rows[index].hospitalNotice || rows[index].hospitalCheckInNo || "please follow the escort arrangement."}`.trim(),
-        status: "sent",
-        receipts: [],
-        createdAt: new Date().toISOString(),
-        createdBy: user.username || user.role,
-        createdByName: user.name
-      },
-      ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])
-    ].slice(0, 300);
-    appendDataAccessLog(data, user, rows[index].residentId, "escortServiceOrders", payload.note || rows[index].hospitalInterfaceStatus || rows[index].status, "allowed");
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "hospital handoff escort service order",
-        target: rows[index].id,
-        result: "allowed",
-        detail: rows[index].hospitalInterfaceStatus
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
-    writeDatabase(data);
-    sendJson(res, 200, rows[index]);
     return;
   }
 
@@ -28444,37 +28495,175 @@ async function handleApi(req, res) {
   if (req.method === "POST" && escortOrderActionMatch) {
     const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/escort-services/orders/:id/actions");
     if (!user) return;
-    const data = readDatabase();
-    const rows = Array.isArray(data.escortServiceOrders) ? data.escortServiceOrders : [];
-    const index = rows.findIndex((item) => item.id === decodeURIComponent(escortOrderActionMatch[1]));
-    if (index < 0) {
-      sendJson(res, 404, { error: "Not Found", message: "escort service order not found" });
-      return;
+    try {
+      const payload = await collectJson(req);
+      const transition = careServiceTransitionInput(payload);
+      const result = await careServicePlatformAdapter().transitionOrder(
+        "escort",
+        decodeURIComponent(escortOrderActionMatch[1]),
+        transition.nextStatus,
+        careServiceActor(user),
+        {
+          ...transition.input,
+          commandId: careServiceCommandId(req, payload)
+        }
+      );
+      sendJson(res, 200, result.order);
+    } catch (error) {
+      sendCareServiceError(res, error);
     }
-    if (!canAccessEscortOrder(user, rows[index], data)) {
-      appendSecurityEvent({ actor: user.name, role: user.role, action: "update escort service order", target: rows[index].id, result: "denied", detail: "scope denied" });
-      sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
-      return;
-    }
+    return;
+  }
+
+  const careNotificationReceiptMatch = url.pathname.match(/^\/api\/care-services\/(nursing|escort)\/orders\/([^/]+)\/notification-receipts\/([^/]+)$/);
+  if (req.method === "POST" && careNotificationReceiptMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/care-services/:domain/orders/:id/notification-receipts/:messageId");
+    if (!user) return;
     const payload = await collectJson(req);
-    rows[index] = applyEscortServiceOrderAction(rows[index], payload, user);
-    data.escortServiceOrders = rows;
-    appendDataAccessLog(data, user, rows[index].residentId, "escortServiceOrders", payload.note || rows[index].status, "allowed");
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+    if (!verifyIntegrationSignature(payload, req.headers["x-integration-signature"])) {
+      appendSecurityEvent({
         actor: user.name,
         role: user.role,
-        action: "update escort service order",
-        target: rows[index].id,
-        result: "allowed",
-        detail: rows[index].status
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
-    writeDatabase(data);
-    sendJson(res, 200, rows[index]);
+        action: "care service notification receipt",
+        target: decodeURIComponent(careNotificationReceiptMatch[2]),
+        result: "denied",
+        detail: "signature mismatch"
+      });
+      sendJson(res, 401, { error: "Unauthorized", message: "integration signature verification failed" });
+      return;
+    }
+    try {
+      const result = await careServicePlatformAdapter().recordNotificationReceipt(
+        careNotificationReceiptMatch[1],
+        decodeURIComponent(careNotificationReceiptMatch[2]),
+        decodeURIComponent(careNotificationReceiptMatch[3]),
+        {
+          status: payload.status,
+          providerMessageId: payload.providerMessageId,
+          failureCode: payload.failureCode
+        },
+        careServiceActor(user),
+        { commandId: careServiceCommandId(req, payload) }
+      );
+      sendJson(res, 200, { ok: true, order: result.order, receipt: result.receipt, replayed: Boolean(result.replayed) });
+    } catch (error) {
+      sendCareServiceError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/care-services/outbox/health") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/care-services/outbox/health");
+    if (!user) return;
+    try {
+      const health = await careServicePlatformAdapter().readOutboxHealth({
+        maxPendingAgeSeconds: Number(process.env.CARE_OUTBOX_MAX_PENDING_AGE_SECONDS || 300)
+      });
+      sendJson(res, health.ok ? 200 : 503, {
+        ...health,
+        runtimePolicyVersion: CareServiceRuntime.RUNTIME_POLICY_VERSION,
+        productionReady: false
+      });
+    } catch (error) {
+      sendCareServiceError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/care-services/outbox/dead-letters") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/care-services/outbox/dead-letters");
+    if (!user) return;
+    const data = readDatabase();
+    const rows = (Array.isArray(data.careServiceOutboxDeadLetters) ? data.careServiceOutboxDeadLetters : [])
+      .filter((item) => {
+        if (user.role === "commission") return true;
+        const orders = item.domain === "nursing" ? data.internetNursingOrders : data.escortServiceOrders;
+        const order = (orders || []).find((row) => row.id === item.aggregateId);
+        return Boolean(order && (item.domain === "nursing"
+          ? canAccessInternetNursingOrder(user, order, data)
+          : canAccessEscortOrder(user, order, data)));
+      })
+      .map((item) => ({
+        id: item.id,
+        domain: item.domain,
+        eventId: item.eventId,
+        aggregateId: item.aggregateId,
+        eventType: item.eventType,
+        status: item.status,
+        attempts: item.attempts,
+        errorCode: item.errorCode,
+        openedAt: item.openedAt,
+        resolvedAt: item.resolvedAt,
+        resolutionEvidenceRef: item.resolutionEvidenceRef
+      }));
+    sendJson(res, 200, { ok: true, deadLetters: rows, productionReady: false });
+    return;
+  }
+
+  const careDeadLetterRequeueMatch = url.pathname.match(/^\/api\/care-services\/outbox\/(nursing|escort)\/([^/]+)\/requeue$/);
+  if (req.method === "POST" && careDeadLetterRequeueMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/care-services/outbox/:domain/:eventId/requeue");
+    if (!user) return;
+    try {
+      if (user.role === "institution") {
+        const data = readDatabase();
+        const domain = careDeadLetterRequeueMatch[1];
+        const eventId = decodeURIComponent(careDeadLetterRequeueMatch[2]);
+        const event = (domain === "nursing" ? data.internetNursingOutbox : data.escortServiceOutbox)
+          ?.find((item) => item.id === eventId);
+        const order = (domain === "nursing" ? data.internetNursingOrders : data.escortServiceOrders)
+          ?.find((item) => item.id === event?.aggregateId);
+        const allowed = Boolean(order && (domain === "nursing"
+          ? canAccessInternetNursingOrder(user, order, data)
+          : canAccessEscortOrder(user, order, data)));
+        if (!allowed) {
+          sendJson(res, 403, { error: "Forbidden", message: "care-service dead-letter scope denied" });
+          return;
+        }
+      }
+      const payload = await collectJson(req);
+      const result = await careServicePlatformAdapter().requeueDeadLetter(
+        careDeadLetterRequeueMatch[1],
+        decodeURIComponent(careDeadLetterRequeueMatch[2]),
+        careServiceActor(user),
+        {
+          commandId: careServiceCommandId(req, payload),
+          confirmation: payload.confirmation,
+          evidenceRef: payload.evidenceRef
+        }
+      );
+      sendJson(res, 200, { ok: true, eventId: result.event?.id, resolvedDeadLetters: result.resolvedDeadLetters });
+    } catch (error) {
+      sendCareServiceError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/care-services/outbox/worker/run") {
+    const user = requireApiRole(req, res, ["commission"], "/api/care-services/outbox/worker/run");
+    if (!user) return;
+    try {
+      const result = await careServicePlatformAdapter().runOutboxWorker({
+        workerId: process.env.CARE_OUTBOX_WORKER_ID,
+        runId: randomUUID(),
+        batchSize: Number(process.env.CARE_OUTBOX_BATCH_SIZE || 20),
+        leaseSeconds: Number(process.env.CARE_OUTBOX_LEASE_SECONDS || 60),
+        maxAttempts: Number(process.env.CARE_OUTBOX_MAX_ATTEMPTS || 5),
+        retryBaseSeconds: Number(process.env.CARE_OUTBOX_RETRY_BASE_SECONDS || 30),
+        maxRetrySeconds: Number(process.env.CARE_OUTBOX_MAX_RETRY_SECONDS || 1800)
+      });
+      sendJson(res, result.deadLetters ? 503 : 200, {
+        ok: result.deadLetters === 0,
+        runId: result.runId,
+        workerId: result.workerId,
+        claimed: result.claimed,
+        delivered: result.delivered,
+        retried: result.retried,
+        deadLetters: result.deadLetters
+      });
+    } catch (error) {
+      sendCareServiceError(res, error);
+    }
     return;
   }
 
@@ -28883,6 +29072,24 @@ async function handleApi(req, res) {
   if (req.method === "POST" && url.pathname === "/api/internet-nursing/orders") {
     const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/internet-nursing/orders");
     if (!user) return;
+    try {
+      const payload = await collectJson(req);
+      const result = await careServicePlatformAdapter().createOrder(
+        "nursing",
+        careServiceCreatePayload(payload, "nursing"),
+        careServiceActor(user),
+        { commandId: careServiceCommandId(req, payload) }
+      );
+      sendJson(res, result.replayed ? 200 : 201, result.order);
+    } catch (error) {
+      sendCareServiceError(res, error);
+    }
+    return;
+  }
+
+  if (false && req.method === "POST" && url.pathname === "/api/internet-nursing/orders") {
+    const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/internet-nursing/orders");
+    if (!user) return;
     const data = readDatabase();
     try {
       const order = normalizeInternetNursingOrder(await collectJson(req), user, data);
@@ -28938,6 +29145,29 @@ async function handleApi(req, res) {
 
   const internetNursingActionMatch = url.pathname.match(/^\/api\/internet-nursing\/orders\/([^/]+)\/actions$/);
   if (req.method === "POST" && internetNursingActionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/internet-nursing/orders/:id/actions");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req);
+      const transition = careServiceTransitionInput(payload);
+      const result = await careServicePlatformAdapter().transitionOrder(
+        "nursing",
+        decodeURIComponent(internetNursingActionMatch[1]),
+        transition.nextStatus,
+        careServiceActor(user),
+        {
+          ...transition.input,
+          commandId: careServiceCommandId(req, payload)
+        }
+      );
+      sendJson(res, 200, result.order);
+    } catch (error) {
+      sendCareServiceError(res, error);
+    }
+    return;
+  }
+
+  if (false && req.method === "POST" && internetNursingActionMatch) {
     const user = requireApiRole(req, res, ["commission", "institution"], "/api/internet-nursing/orders/:id/actions");
     if (!user) return;
     const data = readDatabase();
@@ -35679,6 +35909,7 @@ if (require.main === module) {
 
 module.exports = {
   assertProductionRuntimeSecurity,
+  createCareServiceRuntimeDependencies,
   cleanupRuntimeSessions,
   ensureDatabase,
   openSqliteDatabase,

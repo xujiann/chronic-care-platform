@@ -512,6 +512,14 @@ After each `effectiveAt`, new enqueue resolves only `currentContract` from the s
 
 The enforced rotation sequence is new active key, old grace key, cross-key audit smoke, cross-key callback smoke, then old-key expiry or revocation. An emergency revocation creates a P0 security-quarantine disposition; automatic resign and automatic recovery remain disabled. Run `npm.cmd run public-health:resilience-test` for the focused contract/resilience regression and `npm.cmd run public-health:final-readiness` for the aggregate 47-check report. All contract and cutover views keep `productionReady=false`. Production remains blocked until real identity and institution directories, HIS/EMR/LIS/PACS, bed/roster/equipment/transfer sources, scanner and insurance callbacks, a production database, SIEM, alert duty coverage and disaster-recovery evidence are connected and accepted.
 
+## Nursing and Escort Transactional Runtime
+
+The public nursing and escort create and transition APIs now call `care-service-platform-adapter.js`; they no longer persist privileged order fields through the legacy server normalizers. Every write requires an `Idempotency-Key`, derives actor and organization scope from the authenticated session, assigns server time and commits the order plus its domain outbox event through the existing SQLite collection-version CAS.
+
+Notification receipts use the signed, order/message/channel-bound route `POST /api/care-services/:domain/orders/:id/notification-receipts/:messageId`. Operations users can read `/api/care-services/outbox/health` and `/api/care-services/outbox/dead-letters`; controlled replay requires the exact confirmation phrase and an evidence reference. The independent worker loads `care-service-production-runtime.js` through `CARE_SERVICE_RUNTIME_MODULE` and sends HMAC-bound HTTPS envelopes. Endpoint, transport or secret failures are retried and dead-lettered rather than reported as successful.
+
+Run `npm.cmd run care-service:test` and `npm.cmd run care-service:readiness`. Platform integration does not make the module production-ready: real identity/organization directories, HIS and appointment interfaces, message/payment/insurance/signature callbacks, production transactional storage, SIEM/alert duty, disaster recovery evidence and all five site signoffs remain hard blockers.
+
 ## Health Dashboard Aggregate Entry
 
 - `health-dashboard.html` is priority application 8: the aggregate entry for the first seven applications.

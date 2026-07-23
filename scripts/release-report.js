@@ -35,6 +35,7 @@ const { buildDrugConsumableReadinessReport, renderMarkdown: renderDrugConsumable
 const { buildEvaluationEvidenceReport, renderMarkdown: renderEvaluationEvidenceMarkdown } = require("./evaluation-evidence");
 const { buildEscortServiceReadinessReport, renderMarkdown: renderEscortServiceMarkdown } = require("./escort-service-readiness");
 const { buildInternetNursingReadinessReport, renderMarkdown: renderInternetNursingMarkdown } = require("./internet-nursing-readiness");
+const { buildCareServiceProductionReadiness, renderMarkdown: renderCareServiceProductionReadinessMarkdown } = require("./care-service-production-readiness");
 const { buildEnvironmentMatrixReport, renderMarkdown: renderEnvironmentMatrixMarkdown } = require("./environment-matrix");
 const { buildEmergencyReadinessReport, renderMarkdown: renderEmergencyReadinessMarkdown } = require("./emergency-readiness");
 const { buildSpecialtyCutoverPack, renderMarkdown: renderSpecialtyCutoverMarkdown } = require("../emergency-specialty-cutover");
@@ -995,6 +996,22 @@ function internetNursingChecks(internetNursingReadiness) {
   ];
 }
 
+function careServiceProductionChecks(careServiceProductionReadiness) {
+  return [
+    check("careService:codeReady", careServiceProductionReadiness.codeReady, `${careServiceProductionReadiness.summary?.codeBlockers || 0} code blockers`, "error", "care-service"),
+    check("careService:platformIntegrated", careServiceProductionReadiness.platformIntegrated, `${careServiceProductionReadiness.summary?.platformBlockers || 0} platform integration blockers`, "error", "care-service"),
+    check(
+      "careService:productionBoundary",
+      careServiceProductionReadiness.productionReady === false
+        && careServiceProductionReadiness.formalGoLiveState !== "ready-for-production-cutover"
+        && (careServiceProductionReadiness.summary?.signoffBlockers || 0) === 5,
+      `${careServiceProductionReadiness.formalGoLiveState}; ${careServiceProductionReadiness.summary?.runtimeBlockers || 0} runtime and ${careServiceProductionReadiness.summary?.signoffBlockers || 0} signoff blockers`,
+      "error",
+      "care-service"
+    )
+  ];
+}
+
 function emergencyReadinessChecks(emergencyReadiness) {
   return [
     check("emergency:readiness", emergencyReadiness.ok, emergencyReadiness.ok ? "prehospital emergency readiness checks passed" : "prehospital emergency readiness checks failed", "error", "emergency"),
@@ -1366,6 +1383,10 @@ function buildReleaseReport(options = {}) {
   const referralTeleconsultationReadiness = buildReferralTeleconsultationReadinessReport({ data, pkg });
   const escortServiceReadiness = buildEscortServiceReadinessReport({ data, pkg });
   const internetNursingReadiness = buildInternetNursingReadinessReport({ data, pkg });
+  const careServiceProductionReadiness = buildCareServiceProductionReadiness({
+    data,
+    env: { ...process.env, ...(options.env || {}) }
+  });
   const emergencyReadiness = buildEmergencyReadinessReport();
   const specialtyCutover = buildSpecialtyCutoverPack();
   const citizenLaunchFoundation = buildCitizenLaunchFoundationReadiness({
@@ -1459,6 +1480,7 @@ function buildReleaseReport(options = {}) {
     ...referralTeleconsultationChecks(referralTeleconsultationReadiness),
     ...escortServiceChecks(escortServiceReadiness),
     ...internetNursingChecks(internetNursingReadiness),
+    ...careServiceProductionChecks(careServiceProductionReadiness),
     ...emergencyReadinessChecks(emergencyReadiness),
     ...specialtyCutoverChecks(specialtyCutover),
     ...citizenLaunchFoundationChecks(citizenLaunchFoundation),
@@ -1555,6 +1577,7 @@ function buildReleaseReport(options = {}) {
     referralTeleconsultationReadiness,
     escortServiceReadiness,
     internetNursingReadiness,
+    careServiceProductionReadiness,
     emergencyReadiness,
     specialtyCutover,
     citizenLaunchFoundation,
@@ -2322,6 +2345,8 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       internetNursingReadiness: report.internetNursingReadiness
     }, null, 2), "utf8");
+    const careServiceProductionJson = path.join(path.dirname(output), "care-service-production-readiness.json");
+    fs.writeFileSync(careServiceProductionJson, JSON.stringify(report.careServiceProductionReadiness, null, 2), "utf8");
     const digitalHospitalPilotJson = path.join(path.dirname(output), "digital-hospital-pilot-readiness-report.json");
     fs.writeFileSync(digitalHospitalPilotJson, JSON.stringify(report.digitalHospitalPilot, null, 2), "utf8");
     const emergencyReadinessJson = path.join(path.dirname(output), "emergency-readiness-report.json");
@@ -2575,6 +2600,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(escortServiceMarkdown, renderEscortServiceMarkdown(report.escortServiceReadiness), "utf8");
     const internetNursingMarkdown = path.join(path.dirname(markdown), "internet-nursing-readiness-report.md");
     fs.writeFileSync(internetNursingMarkdown, renderInternetNursingMarkdown(report.internetNursingReadiness), "utf8");
+    const careServiceProductionMarkdown = path.join(path.dirname(markdown), "care-service-production-readiness.md");
+    fs.writeFileSync(careServiceProductionMarkdown, renderCareServiceProductionReadinessMarkdown(report.careServiceProductionReadiness), "utf8");
     const emergencyReadinessMarkdown = path.join(path.dirname(markdown), "emergency-readiness-report.md");
     fs.writeFileSync(emergencyReadinessMarkdown, renderEmergencyReadinessMarkdown(report.emergencyReadiness), "utf8");
     const specialtyCutoverMarkdown = path.join(path.dirname(markdown), "t10-specialty-cutover-pack.md");
