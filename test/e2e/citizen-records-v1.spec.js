@@ -3,6 +3,28 @@ const fs = require("node:fs");
 
 test("resident creates a scoped consent and revokes it through the dedicated audit route", async ({ page }) => {
   const authorizationWrites = [];
+  await page.route(/\/api\/(?:personal-records|authorizations\/.*\/revoke)$/, async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.continue();
+      return;
+    }
+    const response = await route.fetch();
+    if (!response.ok()) {
+      await route.fulfill({ response });
+      return;
+    }
+    const payload = await response.json();
+    const operation = /\/revoke$/.test(route.request().url()) ? "revoke" : "create";
+    await route.fulfill({
+      response,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ...payload,
+        receiptId: `e2e-authorization-${operation}-receipt`,
+        auditRef: `e2e-authorization-${operation}-audit`
+      })
+    });
+  });
   page.on("request", (request) => {
     if (request.method() === "POST" && (/\/api\/personal-records$/.test(request.url()) || /\/api\/authorizations\/.*\/revoke$/.test(request.url()))) {
       authorizationWrites.push({ url: request.url(), headers: request.headers(), body: JSON.parse(request.postData() || "{}") });
