@@ -43,7 +43,11 @@ function renderCutoverPack(pack) {
 
 function renderKpis(pack) {
   const summary = pack.summary || {};
-  const sourceLabel = cutoverState.source === "release-artifact" ? "release/t10-specialty-cutover-pack.json" : "前端内置边界";
+  const sourceLabel = {
+    "server-api": "/api/t10-specialty-cutover",
+    "release-artifact": "release/t10-specialty-cutover-pack.json",
+    fallback: "前端内置边界"
+  }[cutoverState.source] || "前端内置边界";
   document.querySelector("#cutover-kpis").innerHTML = [
     kpi("代码就绪", `${summary.codeReady || 0}/${summary.tracks || 0}`, "ok"),
     kpi("检查通过", `${summary.passedChecks || 0}/${summary.totalChecks || 0}`, "ok"),

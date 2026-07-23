@@ -24,6 +24,7 @@ test("T00 exposes the T10 specialty cutover pack through public integration cont
   assert.match(client, /HealthCityAuth\?\.authFetch/);
   assert.match(client, /\/api\/t10-specialty-cutover/);
   assert.match(client, /release\/t10-specialty-cutover-pack\.json/);
+  assert.match(client, /"server-api": "\/api\/t10-specialty-cutover"/);
   assert.match(readme, /t10-specialty-cutover\.html/);
   assert.match(readme, /GET \/api\/t10-specialty-cutover/);
   assert.equal(pkg.scripts["t10:specialty-cutover"], "node emergency-specialty-cutover.js");
