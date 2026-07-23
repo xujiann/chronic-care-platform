@@ -332,10 +332,16 @@ function validateIntakeDecisions(payload = { decisions: [] }, lines = LINE_CONFI
   const knownLines = new Set(lines.map((line) => line.id));
   const decisions = Array.isArray(payload.decisions) ? payload.decisions : [];
   const ids = decisions.map((item) => item.lineId);
+  const shaPattern = /^[a-f0-9]{40}$/;
   const invalid = decisions.filter((item) => (
     !knownLines.has(item.lineId)
     || !INTAKE_DECISIONS.has(item.decision)
     || (item.decision !== "pending" && !String(item.candidateHead || "").trim())
+    || (item.acceptedCandidateHeads !== undefined && (
+      !Array.isArray(item.acceptedCandidateHeads)
+      || item.acceptedCandidateHeads.some((head) => !shaPattern.test(String(head || "")))
+      || new Set(item.acceptedCandidateHeads).size !== item.acceptedCandidateHeads.length
+    ))
   ));
   return {
     valid: invalid.length === 0 && new Set(ids).size === ids.length,
@@ -354,9 +360,12 @@ function readPublicationReceipts(file = DEFAULT_PUBLICATION_RECEIPTS) {
 
 function validatePublicationReceipts(payload = { receipts: [] }, lines = LINE_CONFIG, intakeDecisions = []) {
   const knownLines = new Set(lines.map((line) => line.id));
-  const acceptedByLine = new Map((Array.isArray(intakeDecisions) ? intakeDecisions : [])
-    .filter((item) => item.decision === "accepted")
-    .map((item) => [item.lineId, item.candidateHead]));
+  const decisions = Array.isArray(intakeDecisions) ? intakeDecisions : [];
+  const acceptedByLine = new Map(decisions.map((item) => {
+    const heads = new Set(Array.isArray(item.acceptedCandidateHeads) ? item.acceptedCandidateHeads : []);
+    if (item.decision === "accepted" && item.candidateHead) heads.add(item.candidateHead);
+    return [item.lineId, heads];
+  }));
   const receipts = Array.isArray(payload.receipts) ? payload.receipts : [];
   const shaPattern = /^[a-f0-9]{40}$/;
   const runIdPattern = /^\d+$/;
@@ -372,7 +381,7 @@ function validatePublicationReceipts(payload = { receipts: [] }, lines = LINE_CO
     if (!knownLines.has(receipt.lineId)) reasons.push("unknown-line");
     if (!shaPattern.test(String(receipt.sourceCandidateHead || ""))) reasons.push("invalid-source-head");
     if (!shaPattern.test(String(receipt.publishedHead || ""))) reasons.push("invalid-published-head");
-    if (acceptedByLine.size && acceptedByLine.get(receipt.lineId) !== receipt.sourceCandidateHead) reasons.push("source-candidate-not-accepted");
+    if (decisions.length && !acceptedByLine.get(receipt.lineId)?.has(receipt.sourceCandidateHead)) reasons.push("source-candidate-not-accepted");
     if (receipt.targetBranch !== "main" || receipt.targetPath !== "/") reasons.push("invalid-pages-source");
     if (receipt.deploymentType !== "github-pages-legacy") reasons.push("invalid-deployment-type");
     if (!runIdPattern.test(String(receipt.ci?.runId || "")) || receipt.ci?.status !== "success" || !String(receipt.ci?.url || "").startsWith("https://github.com/")) reasons.push("invalid-ci-receipt");

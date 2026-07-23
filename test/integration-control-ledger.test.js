@@ -35,6 +35,11 @@ test("intake decisions are valid, commit-bound and fail closed", () => {
   const validation = validateIntakeDecisions(payload);
   assert.equal(validation.valid, true);
   assert.equal(payload.decisions.some((item) => item.lineId === "T01"), true);
+  assert.equal(payload.decisions.find((item) => item.lineId === "T06").acceptedCandidateHeads.includes("8a161560f69016ec8372cfd89dfbf24afb047a80"), true);
+
+  const malformedHistory = structuredClone(payload);
+  malformedHistory.decisions.find((item) => item.lineId === "T06").acceptedCandidateHeads.push("not-a-commit");
+  assert.equal(validateIntakeDecisions(malformedHistory).valid, false);
 
   const candidate = {
     id: "T01",
@@ -85,6 +90,7 @@ test("publication receipts preserve static preview evidence without opening prod
   assert.equal(validation.valid, true);
   assert.equal(payload.receipts.some((item) => item.lineId === "T06"), true);
   assert.equal(payload.receipts.every((item) => item.productionReady === false), true);
+  assert.equal(intake.decisions.find((item) => item.lineId === "T06").decision, "blocked");
 
   const tampered = structuredClone(payload);
   tampered.receipts[0].site.resources[0].observedMarkers = ["capacityReservation"];
