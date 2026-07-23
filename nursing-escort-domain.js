@@ -2107,8 +2107,263 @@
     };
   }
 
+  function validateTimelineIntegrity(domain, order = {}, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const orderId = String(order.id || "").trim();
+    const residentId = String(order.residentId || "").trim();
+    const events = Array.isArray(order.timelineEvents) ? order.timelineEvents : [];
+    const reasons = [];
+    const ids = new Set();
+    const now = parseTime(options.at || new Date().toISOString());
+    if (events.length > 100) reasons.push("timeline-event-limit-exceeded");
+    events.forEach((event, index) => {
+      if (!event || typeof event !== "object" || Array.isArray(event)) {
+        reasons.push(`timeline-event-invalid:${index}`);
+        return;
+      }
+      if (!event.id) reasons.push(`timeline-event-id-missing:${index}`);
+      else if (ids.has(event.id)) reasons.push(`timeline-event-id-duplicate:${index}`);
+      else ids.add(event.id);
+      if (event.serviceOrderId !== orderId) reasons.push(`timeline-order-mismatch:${index}`);
+      if (event.serviceType !== normalizedDomain) reasons.push(`timeline-domain-mismatch:${index}`);
+      if (event.residentId !== residentId) reasons.push(`timeline-resident-mismatch:${index}`);
+      if (event.eventType !== "status-transition") reasons.push(`timeline-event-type-invalid:${index}`);
+      const occurredAt = parseTime(event.occurredAt);
+      if (occurredAt === null) reasons.push(`timeline-event-time-invalid:${index}`);
+      if (occurredAt !== null && now !== null && occurredAt > now + DISPATCH_EVIDENCE_FUTURE_SKEW_MS) {
+        reasons.push(`timeline-event-in-future:${index}`);
+      }
+      const transition = validateTransition(normalizedDomain, event.fromStatus, event.toStatus);
+      if (!transition.ok) reasons.push(`timeline-transition-invalid:${index}`);
+      const previous = events[index + 1];
+      if (previous) {
+        const previousAt = parseTime(previous.occurredAt);
+        if (occurredAt !== null && previousAt !== null && occurredAt < previousAt) reasons.push(`timeline-order-invalid:${index}`);
+        if (canonicalStatus(event.fromStatus, normalizedDomain) !== canonicalStatus(previous.toStatus, normalizedDomain)) {
+          reasons.push(`timeline-status-chain-broken:${index}`);
+        }
+        if (event.previousEventId && event.previousEventId !== previous.id) reasons.push(`timeline-event-link-mismatch:${index}`);
+        if (Number.isInteger(event.sequence) && Number.isInteger(previous.sequence) && event.sequence !== previous.sequence + 1) {
+          reasons.push(`timeline-sequence-invalid:${index}`);
+        }
+      } else if (event.previousEventId) {
+        reasons.push(`timeline-root-link-invalid:${index}`);
+      }
+    });
+    if (events.length && canonicalStatus(events[0]?.toStatus, normalizedDomain) !== canonicalStatus(order.status, normalizedDomain)) {
+      reasons.push("timeline-latest-status-mismatch");
+    }
+    return {
+      ok: reasons.length === 0,
+      domain: normalizedDomain,
+      orderId,
+      residentId,
+      eventCount: events.length,
+      latestEventId: String(events[0]?.id || ""),
+      reasons
+    };
+  }
+
+  function notificationRecipients(order = {}, toStatus) {
+    const recipients = [{ role: "resident", id: String(order.residentId || "") }];
+    const familyStatuses = new Set([
+      "accepted", "in-service", "completed", "adverse-event", "reschedule-requested",
+      "no-show-review", "cancel-requested", "cancelled", "refund-pending", "refunded"
+    ]);
+    if (order.familyContactId && familyStatuses.has(toStatus)) {
+      recipients.push({ role: "family", id: String(order.familyContactId) });
+    }
+    if (order.emergencyContactId && toStatus === "adverse-event") {
+      recipients.push({ role: "emergency-contact", id: String(order.emergencyContactId) });
+    }
+    return recipients;
+  }
+
+  function buildNotificationPlan(domain, order = {}, timelineEvent = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const orderId = String(order.id || "");
+    const toStatus = canonicalStatus(timelineEvent.toStatus, normalizedDomain);
+    const planId = `${normalizedDomain}:${orderId}:notification:${timelineEvent.id}`;
+    const smsStatuses = new Set([
+      "dispatched", "worker-dispatched", "accepted", "in-service", "completed", "adverse-event",
+      "reschedule-requested", "no-show-review", "cancel-requested", "cancelled", "refund-pending", "refunded"
+    ]);
+    const messages = [];
+    for (const recipient of notificationRecipients(order, toStatus)) {
+      const channels = new Set(["in_app"]);
+      if (smsStatuses.has(toStatus)) channels.add("sms");
+      for (const channel of channels) {
+        messages.push({
+          id: `${planId}:${recipient.role}:${channel}`,
+          recipientRole: recipient.role,
+          recipientId: recipient.id,
+          channel,
+          required: true,
+          status: "planned"
+        });
+      }
+    }
+    return {
+      id: planId,
+      status: "planned",
+      eventId: String(timelineEvent.id || ""),
+      orderId,
+      domain: normalizedDomain,
+      residentId: String(order.residentId || ""),
+      toStatus,
+      templateKey: `service-order-${toStatus}`,
+      createdAt: String(timelineEvent.occurredAt || ""),
+      policyVersion: WORKFLOW_POLICY_VERSION,
+      messages
+    };
+  }
+
+  function validateNotificationPlan(domain, order = {}, plan = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const orderId = String(order.id || "");
+    const residentId = String(order.residentId || "");
+    const timelineEvents = Array.isArray(order.timelineEvents) ? order.timelineEvents : [];
+    const event = timelineEvents.find((item) => item.id === plan?.eventId);
+    const reasons = [];
+    if (!plan || typeof plan !== "object" || Array.isArray(plan)) {
+      reasons.push("notification-plan-missing");
+    } else {
+      if (!plan.id) reasons.push("notification-plan-id-missing");
+      if (event && plan.id !== `${normalizedDomain}:${orderId}:notification:${event.id}`) reasons.push("notification-plan-id-mismatch");
+      if (plan.status !== "planned") reasons.push("notification-plan-status-invalid");
+      if (!event) reasons.push("notification-plan-event-missing");
+      if (plan.orderId !== orderId) reasons.push("notification-plan-order-mismatch");
+      if (plan.domain !== normalizedDomain) reasons.push("notification-plan-domain-mismatch");
+      if (plan.residentId !== residentId) reasons.push("notification-plan-resident-mismatch");
+      if (event && canonicalStatus(plan.toStatus, normalizedDomain) !== canonicalStatus(event.toStatus, normalizedDomain)) {
+        reasons.push("notification-plan-status-mismatch");
+      }
+      if (parseTime(plan.createdAt) === null || (event && parseTime(plan.createdAt) !== parseTime(event.occurredAt))) {
+        reasons.push("notification-plan-time-mismatch");
+      }
+      if (plan.policyVersion !== WORKFLOW_POLICY_VERSION) reasons.push("notification-plan-policy-version-invalid");
+      if (event && plan.templateKey !== `service-order-${canonicalStatus(event.toStatus, normalizedDomain)}`) reasons.push("notification-template-key-mismatch");
+      const messages = Array.isArray(plan.messages) ? plan.messages : [];
+      if (!messages.length) reasons.push("notification-plan-messages-missing");
+      const messageIds = new Set();
+      messages.forEach((message, index) => {
+        if (!message.id) reasons.push(`notification-message-id-missing:${index}`);
+        else if (message.id !== `${plan.id}:${message.recipientRole}:${message.channel}`) reasons.push(`notification-message-id-mismatch:${index}`);
+        else if (messageIds.has(message.id)) reasons.push(`notification-message-id-duplicate:${index}`);
+        else messageIds.add(message.id);
+        if (!["resident", "family", "emergency-contact"].includes(message.recipientRole)) reasons.push(`notification-recipient-role-invalid:${index}`);
+        if (!message.recipientId) reasons.push(`notification-recipient-missing:${index}`);
+        if (!["in_app", "sms", "hospital_message"].includes(message.channel)) reasons.push(`notification-channel-invalid:${index}`);
+        if (message.required !== true) reasons.push(`notification-required-flag-invalid:${index}`);
+        if (message.status !== "planned") reasons.push(`notification-message-status-invalid:${index}`);
+      });
+      if (!messages.some((message) => message.recipientRole === "resident"
+        && message.recipientId === residentId && message.channel === "in_app")) {
+        reasons.push("resident-notification-missing");
+      }
+    }
+    return { ok: reasons.length === 0, planId: String(plan?.id || ""), reasons };
+  }
+
+  function buildNotificationReceiptEvidence(domain, order = {}, message = {}, details = {}, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const at = new Date(options.at || Date.now()).toISOString();
+    const status = String(details.status || "sent");
+    const plan = (Array.isArray(order.notificationPlans) ? order.notificationPlans : [])
+      .find((item) => item.messages?.some((row) => row.id === message.id));
+    return {
+      id: String(details.id || `${message.id}:${status}:${at}`),
+      planId: String(plan?.id || ""),
+      messageId: String(message.id || ""),
+      eventId: String(plan?.eventId || ""),
+      orderId: String(order.id || ""),
+      domain: normalizedDomain,
+      recipientId: String(message.recipientId || ""),
+      channel: String(message.channel || ""),
+      status,
+      providerMessageId: String(details.providerMessageId || ""),
+      failureCode: String(details.failureCode || ""),
+      occurredAt: at,
+      idempotencyKey: `${normalizedDomain}:${order.id || ""}:${message.id || ""}:notify:${status}:v1`,
+      policyVersion: WORKFLOW_POLICY_VERSION
+    };
+  }
+
+  function recordNotificationReceipt(domain, order = {}, receipt = {}, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const timelineIntegrity = validateTimelineIntegrity(normalizedDomain, order, { at: options.at || receipt.occurredAt });
+    const plans = Array.isArray(order.notificationPlans) ? order.notificationPlans : [];
+    const plan = plans.find((item) => item.id === receipt.planId);
+    const planIntegrity = validateNotificationPlan(normalizedDomain, order, plan);
+    const message = plan?.messages?.find((item) => item.id === receipt.messageId);
+    const reasons = [...timelineIntegrity.reasons, ...planIntegrity.reasons];
+    const allowedStatuses = new Set(["queued", "sent", "delivered", "read", "failed"]);
+    const expectedKey = `${normalizedDomain}:${order.id || ""}:${receipt.messageId || ""}:notify:${receipt.status || ""}:v1`;
+    if (!message) reasons.push("notification-receipt-message-missing");
+    if (!receipt.id) reasons.push("notification-receipt-id-missing");
+    if (receipt.eventId !== plan?.eventId) reasons.push("notification-receipt-event-mismatch");
+    if (receipt.orderId !== String(order.id || "")) reasons.push("notification-receipt-order-mismatch");
+    if (receipt.domain !== normalizedDomain) reasons.push("notification-receipt-domain-mismatch");
+    if (receipt.recipientId !== message?.recipientId) reasons.push("notification-receipt-recipient-mismatch");
+    if (receipt.channel !== message?.channel) reasons.push("notification-receipt-channel-mismatch");
+    if (!allowedStatuses.has(receipt.status)) reasons.push("notification-receipt-status-invalid");
+    if (["sent", "delivered", "read"].includes(receipt.status) && !receipt.providerMessageId) reasons.push("notification-provider-message-id-missing");
+    if (receipt.status === "failed" && !receipt.failureCode) reasons.push("notification-failure-code-missing");
+    if (receipt.idempotencyKey !== expectedKey) reasons.push("notification-receipt-idempotency-mismatch");
+    if (receipt.policyVersion !== WORKFLOW_POLICY_VERSION) reasons.push("notification-receipt-policy-version-invalid");
+    const occurredAt = parseTime(receipt.occurredAt);
+    const createdAt = parseTime(plan?.createdAt);
+    if (occurredAt === null) reasons.push("notification-receipt-time-invalid");
+    if (occurredAt !== null && createdAt !== null && occurredAt < createdAt) reasons.push("notification-receipt-before-plan");
+    const receipts = Array.isArray(order.notificationReceipts) ? order.notificationReceipts : [];
+    const duplicate = receipts.find((item) => item.idempotencyKey === receipt.idempotencyKey);
+    if (duplicate) {
+      const same = ["planId", "messageId", "eventId", "orderId", "domain", "recipientId", "channel", "status", "providerMessageId", "failureCode"]
+        .every((key) => String(duplicate[key] || "") === String(receipt[key] || ""));
+      if (!same) reasons.push("notification-idempotency-conflict");
+    }
+    const sameMessage = receipts.filter((item) => item.messageId === receipt.messageId);
+    const latest = [...sameMessage].sort((a, b) => parseTime(b.occurredAt) - parseTime(a.occurredAt))[0];
+    const rank = { queued: 1, sent: 2, delivered: 3, read: 4 };
+    if (!duplicate && latest && receipt.status !== "failed" && latest.status !== "failed"
+      && (rank[receipt.status] || 0) < (rank[latest.status] || 0)) {
+      reasons.push("notification-status-regression");
+    }
+    if (!duplicate && latest && occurredAt !== null && parseTime(latest.occurredAt) !== null
+      && occurredAt < parseTime(latest.occurredAt)) {
+      reasons.push("notification-receipt-time-regression");
+    }
+    const uniqueReasons = [...new Set(reasons)];
+    if (uniqueReasons.length) {
+      const error = new Error(`invalid notification receipt: ${uniqueReasons.join(", ")}`);
+      error.code = "NOTIFICATION_RECEIPT_INVALID";
+      error.statusCode = 409;
+      error.details = { reasons: uniqueReasons };
+      throw error;
+    }
+    if (duplicate) return { ok: true, duplicate: true, order };
+    const nextReceipts = [receipt, ...receipts].slice(0, 200);
+    const summary = {
+      status: "tracked",
+      queued: nextReceipts.filter((item) => item.status === "queued").length,
+      sent: nextReceipts.filter((item) => item.status === "sent").length,
+      delivered: nextReceipts.filter((item) => item.status === "delivered").length,
+      read: nextReceipts.filter((item) => item.status === "read").length,
+      failed: nextReceipts.filter((item) => item.status === "failed").length
+    };
+    return {
+      ok: true,
+      duplicate: false,
+      order: { ...order, notificationReceipts: nextReceipts, notificationReceiptSummary: summary }
+    };
+  }
+
   function buildTimelineEvent(domain, order, transition, options = {}) {
     const at = new Date(options.at || Date.now()).toISOString();
+    const previous = Array.isArray(order.timelineEvents) ? order.timelineEvents[0] : null;
+    const previousSequence = Number.isInteger(previous?.sequence)
+      ? previous.sequence
+      : Array.isArray(order.timelineEvents) ? order.timelineEvents.length : 0;
     return {
       id: String(options.id || `${normalizeDomain(domain)}:${order.id || "order"}:${transition.next}:${at}`),
       serviceOrderId: String(order.id || ""),
@@ -2118,6 +2373,8 @@
       fromStatus: transition.current,
       toStatus: transition.next,
       occurredAt: at,
+      sequence: previousSequence + 1,
+      previousEventId: String(previous?.id || ""),
       actorId: String(options.actorId || options.actor || "system"),
       actorRole: String(options.actorRole || "system"),
       evidenceTypes: validateEvidenceForTransition(domain, order, transition.next, { at, currentStatus: transition.current }).present,
@@ -2130,6 +2387,21 @@
       const error = new Error("evidence enforcement cannot be overridden");
       error.code = "EVIDENCE_BYPASS_FORBIDDEN";
       error.statusCode = 409;
+      throw error;
+    }
+    const timelineIntegrity = validateTimelineIntegrity(domain, order, { at: options.at });
+    const transitionAt = parseTime(options.at || new Date().toISOString());
+    const latestTimelineAt = parseTime(order.timelineEvents?.[0]?.occurredAt);
+    if (transitionAt === null) timelineIntegrity.reasons.push("timeline-transition-time-invalid");
+    if (transitionAt !== null && latestTimelineAt !== null && transitionAt < latestTimelineAt) {
+      timelineIntegrity.reasons.push("timeline-transition-time-regression");
+    }
+    timelineIntegrity.ok = timelineIntegrity.reasons.length === 0;
+    if (!timelineIntegrity.ok) {
+      const error = new Error(`invalid resident timeline: ${timelineIntegrity.reasons.join(", ")}`);
+      error.code = "ORDER_TIMELINE_INTEGRITY_INVALID";
+      error.statusCode = 409;
+      error.details = timelineIntegrity;
       throw error;
     }
     const transition = validateTransition(domain, order.status, nextStatus);
@@ -2222,11 +2494,23 @@
       throw error;
     }
     const event = buildTimelineEvent(domain, candidate, transition, options);
+    const timelineEvents = [event, ...(Array.isArray(order.timelineEvents) ? order.timelineEvents : [])].slice(0, 100);
+    const orderWithTimeline = { ...candidate, timelineEvents };
+    const notificationPlan = buildNotificationPlan(domain, orderWithTimeline, event);
+    const notificationPlanIntegrity = validateNotificationPlan(domain, orderWithTimeline, notificationPlan);
+    if (!notificationPlanIntegrity.ok) {
+      const error = new Error(`invalid notification plan: ${notificationPlanIntegrity.reasons.join(", ")}`);
+      error.code = "ORDER_NOTIFICATION_PLAN_INVALID";
+      error.statusCode = 409;
+      error.details = notificationPlanIntegrity;
+      throw error;
+    }
     return {
       ...candidate,
       workflowVersion: WORKFLOW_POLICY_VERSION,
       updatedAt: event.occurredAt,
-      timelineEvents: [event, ...(Array.isArray(order.timelineEvents) ? order.timelineEvents : [])].slice(0, 100),
+      timelineEvents,
+      notificationPlans: [notificationPlan, ...(Array.isArray(order.notificationPlans) ? order.notificationPlans : [])].slice(0, 100),
       auditTrail: [
         { at: event.occurredAt, action: `transition:${transition.current}->${transition.next}`, by: event.actorId, note: event.note },
         ...(Array.isArray(order.auditTrail) ? order.auditTrail : [])
@@ -2310,6 +2594,11 @@
     buildRefundCompletionEvidence,
     evidenceTypes,
     validateEvidenceForTransition,
+    validateTimelineIntegrity,
+    buildNotificationPlan,
+    validateNotificationPlan,
+    buildNotificationReceiptEvidence,
+    recordNotificationReceipt,
     buildTimelineEvent,
     transitionOrder,
     buildFinancialCommand

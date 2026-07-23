@@ -382,6 +382,9 @@ test("transition order blocks missing evidence and emits resident timeline evide
   assert.equal(assessed.status, "assessed");
   assert.equal(assessed.timelineEvents[0].residentId, "r1");
   assert.equal(assessed.timelineEvents[0].evidenceTypes.includes("signed-consent"), true);
+  assert.equal(assessed.timelineEvents[0].sequence, 1);
+  assert.equal(assessed.notificationPlans[0].eventId, assessed.timelineEvents[0].id);
+  assert.equal(assessed.notificationPlans[0].messages.some((item) => item.recipientRole === "resident" && item.channel === "in_app"), true);
 
   assert.throws(
     () => Domain.transitionOrder("nursing", assessed, "dispatched", { actorId: "hospital", at: NOW }),
@@ -397,6 +400,155 @@ test("transition order blocks missing evidence and emits resident timeline evide
     updates: decision.updates
   });
   assert.equal(dispatched.status, "dispatched");
+});
+
+test("resident timeline enforces order resident chronology state continuity and previous-event links", () => {
+  const requested = {
+    id: "ino-timeline-001",
+    residentId: "r1",
+    status: "requested",
+    identityVerified: true,
+    firstVisitAssessment: "passed",
+    informedConsent: "signed",
+    consentAttachment: { status: "signed" }
+  };
+  const assessed = Domain.transitionOrder("nursing", requested, "assessed", {
+    at: NOW,
+    actorId: "assessment-001",
+    actorRole: "nurse"
+  });
+  const held = Domain.transitionOrder("nursing", assessed, "risk-hold", {
+    at: "2026-07-22T09:05:00+08:00",
+    actorId: "risk-001",
+    actorRole: "risk-reviewer"
+  });
+  assert.equal(held.timelineEvents[0].sequence, 2);
+  assert.equal(held.timelineEvents[0].previousEventId, assessed.timelineEvents[0].id);
+  assert.equal(Domain.validateTimelineIntegrity("nursing", held, { at: "2026-07-22T09:06:00+08:00" }).ok, true);
+  assert.throws(
+    () => Domain.transitionOrder("nursing", held, "assessed", {
+      at: "2026-07-22T09:04:00+08:00"
+    }),
+    (error) => error.code === "ORDER_TIMELINE_INTEGRITY_INVALID"
+      && error.details.reasons.includes("timeline-transition-time-regression")
+  );
+
+  const wrongResident = {
+    ...held,
+    timelineEvents: [
+      { ...held.timelineEvents[0], residentId: "other-resident" },
+      ...held.timelineEvents.slice(1)
+    ]
+  };
+  assert.throws(
+    () => Domain.transitionOrder("nursing", wrongResident, "assessed", {
+      at: "2026-07-22T09:10:00+08:00"
+    }),
+    (error) => error.code === "ORDER_TIMELINE_INTEGRITY_INVALID"
+      && error.details.reasons.includes("timeline-resident-mismatch:0")
+  );
+
+  const brokenChain = {
+    ...held,
+    timelineEvents: [
+      held.timelineEvents[0],
+      { ...held.timelineEvents[1], toStatus: "risk-hold" }
+    ]
+  };
+  assert.throws(
+    () => Domain.transitionOrder("nursing", brokenChain, "assessed", {
+      at: "2026-07-22T09:10:00+08:00"
+    }),
+    (error) => error.code === "ORDER_TIMELINE_INTEGRITY_INVALID"
+      && error.details.reasons.some((item) => item.startsWith("timeline-status-chain-broken"))
+  );
+
+  const outOfOrder = {
+    ...held,
+    timelineEvents: [
+      { ...held.timelineEvents[0], occurredAt: "2026-07-22T08:55:00+08:00" },
+      held.timelineEvents[1]
+    ]
+  };
+  assert.throws(
+    () => Domain.transitionOrder("nursing", outOfOrder, "assessed", {
+      at: "2026-07-22T09:10:00+08:00"
+    }),
+    (error) => error.code === "ORDER_TIMELINE_INTEGRITY_INVALID"
+      && error.details.reasons.includes("timeline-order-invalid:0")
+  );
+  assert.equal(held.status, "risk-hold");
+});
+
+test("notification receipts bind timeline plan message recipient status and idempotency", () => {
+  const requested = {
+    id: "eso-notification-001",
+    residentId: "r2",
+    status: "requested",
+    identityVerified: true,
+    eligibilityResult: { status: "passed" }
+  };
+  const checked = Domain.transitionOrder("escort", requested, "eligibility-checked", {
+    at: NOW,
+    actorId: "eligibility-001",
+    actorRole: "institution"
+  });
+  const plan = checked.notificationPlans[0];
+  const message = plan.messages.find((item) => item.recipientRole === "resident" && item.channel === "in_app");
+  assert.equal(Domain.validateNotificationPlan("escort", checked, plan).ok, true);
+  const forgedPlan = {
+    ...plan,
+    id: "forged-plan",
+    messages: plan.messages.map((item) => ({ ...item, id: `forged-plan:${item.recipientRole}:${item.channel}` }))
+  };
+  assert.equal(Domain.validateNotificationPlan("escort", checked, forgedPlan).reasons.includes("notification-plan-id-mismatch"), true);
+
+  const deliveredReceipt = Domain.buildNotificationReceiptEvidence("escort", checked, message, {
+    status: "delivered",
+    providerMessageId: "provider-message-001"
+  }, { at: "2026-07-22T09:02:00+08:00" });
+  const delivered = Domain.recordNotificationReceipt("escort", checked, deliveredReceipt);
+  assert.equal(delivered.duplicate, false);
+  assert.equal(delivered.order.notificationReceiptSummary.delivered, 1);
+
+  const duplicate = Domain.recordNotificationReceipt("escort", delivered.order, deliveredReceipt);
+  assert.equal(duplicate.duplicate, true);
+  assert.equal(duplicate.order.notificationReceipts.length, 1);
+
+  assert.throws(
+    () => Domain.recordNotificationReceipt("escort", delivered.order, {
+      ...deliveredReceipt,
+      providerMessageId: "other-provider-message"
+    }),
+    (error) => error.code === "NOTIFICATION_RECEIPT_INVALID"
+      && error.details.reasons.includes("notification-idempotency-conflict")
+  );
+
+  const regressed = Domain.buildNotificationReceiptEvidence("escort", delivered.order, message, {
+    status: "queued"
+  }, { at: "2026-07-22T09:03:00+08:00" });
+  assert.throws(
+    () => Domain.recordNotificationReceipt("escort", delivered.order, regressed),
+    (error) => error.code === "NOTIFICATION_RECEIPT_INVALID"
+      && error.details.reasons.includes("notification-status-regression")
+  );
+
+  const failedWithoutCode = Domain.buildNotificationReceiptEvidence("escort", delivered.order, message, {
+    status: "failed"
+  }, { at: "2026-07-22T09:04:00+08:00" });
+  assert.throws(
+    () => Domain.recordNotificationReceipt("escort", delivered.order, failedWithoutCode),
+    (error) => error.code === "NOTIFICATION_RECEIPT_INVALID"
+      && error.details.reasons.includes("notification-failure-code-missing")
+  );
+
+  const crossOrder = { ...deliveredReceipt, orderId: "other-order" };
+  assert.throws(
+    () => Domain.recordNotificationReceipt("escort", checked, crossOrder),
+    (error) => error.code === "NOTIFICATION_RECEIPT_INVALID"
+      && error.details.reasons.includes("notification-receipt-order-mismatch")
+  );
+  assert.equal(checked.notificationReceipts, undefined);
 });
 
 test("transition order rejects attempts to disable evidence enforcement", () => {
