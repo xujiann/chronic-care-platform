@@ -26,6 +26,31 @@
 
       <section class="metric-grid" id="escort-metrics"></section>
 
+      <section class="panel" data-escort-write-path-acceptance>
+        <div class="panel-title">
+          <h2>安全写路径验收</h2>
+          <span>居民预约到机构处理采用统一的 fail-closed 写入契约</span>
+        </div>
+        <div class="claim-grid">
+          <div class="claim-card">
+            <strong>居民与家庭授权</strong>
+            <span>仅接受登录居民本人或授权家庭成员建单，家庭代办必须绑定授权登记回执。</span>
+          </div>
+          <div class="claim-card">
+            <strong>服务商准入与目录</strong>
+            <span>服务商必须已发布、准入审批在有效期内，且显式目录覆盖订单全部服务项目。</span>
+          </div>
+          <div class="claim-card">
+            <strong>幂等建单与事务外盒</strong>
+            <span>同一就诊时段重复请求只生成一笔订单；订单与待投递事件原子返回并校验摘要。</span>
+          </div>
+          <div class="claim-card">
+            <strong>证据化状态迁移</strong>
+            <span>资格核验、服务商匹配、派单及消息回执均校验订单、主体、策略版本和命令幂等。</span>
+          </div>
+        </div>
+      </section>
+
       <section class="panel" id="escort-responsibility-board" data-escort-responsibility-plan>
         <div class="panel-title">
           <h2>功能责任与下一步计划</h2>

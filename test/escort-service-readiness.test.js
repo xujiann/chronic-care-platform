@@ -21,6 +21,9 @@ test("escort service readiness validates policy, registry, workforce, orders and
   assert.equal(report.summary.subsidyOrders >= 1, true);
   assert.equal(report.summary.hospitalConfirmedOrders >= 1, true);
   assert.equal(report.checks.some((item) => item.id === "escort:serviceReadinessArchive" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "escort:providerAdmissionCatalog" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "escort:guardedWritePath" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "escort:eventOutbox" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:api" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:hospitalInterface" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:hospitalInterfaceDoc" && item.passed), true);
@@ -30,6 +33,7 @@ test("escort service readiness validates policy, registry, workforce, orders and
   assert.equal(report.checks.some((item) => item.id === "escort:productionBlockers" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:deploymentPlan" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:frontend" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "escort:writePathAcceptance" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:citizenProviderAvailability" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:citizenProgressTracking" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:citizenSubmitReadiness" && item.passed), true);
@@ -50,6 +54,8 @@ test("escort service readiness validates policy, registry, workforce, orders and
   assert.match(renderMarkdown(report), /order creation rejects missing or unpublished provider registry rows/);
   assert.match(renderMarkdown(report), /open resident escort appointments are idempotency-guarded/);
   assert.match(renderMarkdown(report), /resident escort requests require hospital, department, service items/);
+  assert.match(renderMarkdown(report), /resident scope, family authorization, provider catalog/);
+  assert.match(renderMarkdown(report), /integrity-checked atomic outbox events/);
 });
 
 test("escort service readiness writes release artifacts", (t) => {

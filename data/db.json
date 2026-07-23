@@ -10109,7 +10109,11 @@
       "hospital outpatient guidance",
       "non-emergency transfer",
       "volunteer time bank"
-    ]
+    ],
+    "writePathPolicyVersion": "escort-write-path-v1",
+    "eventOutboxPolicyVersion": "escort-event-outbox-v1",
+    "providerAdmissionPolicyVersion": "escort-provider-admission-v1",
+    "eligibilityPolicyVersion": "escort-eligibility-v1"
   },
   "escortServiceProviders": [
     {
@@ -10121,6 +10125,21 @@
       "serviceCapacity": "regular",
       "trainedWorkers": 128,
       "published": true,
+      "serviceItems": [
+        "mobility assistance",
+        "registration",
+        "exam escort",
+        "payment and medication pickup",
+        "family communication",
+        "psychological comfort"
+      ],
+      "admissionReview": {
+        "status": "approved",
+        "policyVersion": "escort-provider-admission-v1",
+        "approvedAt": "2026-01-05T09:00:00+08:00",
+        "validUntil": "2027-01-05T23:59:59+08:00",
+        "reviewReceiptId": "escort-admission-esp-pudong-carehub-2026"
+      },
       "pricing": {
         "baseFee": 160,
         "halfDayFee": 260,
@@ -10142,6 +10161,21 @@
       "serviceCapacity": "regular",
       "trainedWorkers": 104,
       "published": true,
+      "serviceItems": [
+        "mobility assistance",
+        "registration",
+        "exam escort",
+        "payment and medication pickup",
+        "family communication",
+        "psychological comfort"
+      ],
+      "admissionReview": {
+        "status": "approved",
+        "policyVersion": "escort-provider-admission-v1",
+        "approvedAt": "2026-01-08T09:00:00+08:00",
+        "validUntil": "2027-01-08T23:59:59+08:00",
+        "reviewReceiptId": "escort-admission-esp-xuhui-daycare-2026"
+      },
       "pricing": {
         "baseFee": 120,
         "halfDayFee": 220,
@@ -10163,6 +10197,17 @@
       "serviceCapacity": "pilot",
       "trainedWorkers": 96,
       "published": false,
+      "serviceItems": [
+        "registration",
+        "family communication"
+      ],
+      "admissionReview": {
+        "status": "pending",
+        "policyVersion": "escort-provider-admission-v1",
+        "approvedAt": "",
+        "validUntil": "",
+        "reviewReceiptId": ""
+      },
       "pricing": {
         "baseFee": 0,
         "halfDayFee": 80,
