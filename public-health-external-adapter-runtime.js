@@ -513,7 +513,12 @@ function enqueuePublicHealthExternalDispatchToState(
   const dispatchAt = clean(input.at || new Date().toISOString());
   const contractBinding = currentContractBinding(credentials.contractGovernance, handoff.laneId);
   const createdDispatch = createPublicHealthExternalDispatch(handoff, input, {
-    ...credentials,
+    endpoint: credentials.endpoint,
+    requestKeyring: credentials.requestKeyring,
+    requestSecret: credentials.requestSecret,
+    receiptKeyring: credentials.receiptKeyring,
+    receiptSecret: credentials.receiptSecret,
+    maxAttempts: credentials.maxAttempts,
     contractBinding
   });
   const contractAuthorization = assertDispatchContractGovernance(

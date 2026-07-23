@@ -61,7 +61,7 @@ async function processPublicHealthExternalDispatch(options = {}) {
   if (typeof writeState !== "function") throw new Error("public health external worker durable writer is required");
   const initial = dispatchFor(data, dispatchId);
   const claimedAt = serverTime(clock);
-  const credentials = await loadCredentials(initial.laneId, { at: claimedAt });
+  const credentials = await loadCredentials(initial.laneId, { at: claimedAt, data });
   const expectedLaneControlVersion = laneControlVersionFor(data, initial.laneId);
   const claimed = claimPublicHealthExternalDispatchToState(data, initial.id, {
     workerId: clean(workerId),
@@ -97,6 +97,7 @@ async function processPublicHealthExternalDispatch(options = {}) {
       requestKeyring: credentials.requestKeyring,
       receiptKeyring: credentials.receiptKeyring,
       resiliencePolicies: credentials.resiliencePolicies,
+      contractGovernance: credentials.contractGovernance,
       attemptIdempotencyKey: `${clean(idempotencyKey)}:attempt`,
       expectedVersion: claimed.dispatch.outboxVersion,
       expectedLaneControlVersion: Number(claimed.laneControl?.version ?? expectedLaneControlVersion),

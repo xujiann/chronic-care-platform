@@ -5,6 +5,7 @@ const {
   ROTATION_SEQUENCE,
   buildPublicHealthKeySafetyBoard,
   evaluateRotationEvidence,
+  loadPublicHealthContractGovernance,
   loadPublicHealthLaneCredentials,
   loadPublicHealthResiliencePolicies
 } = require("../public-health-external-key-provider");
@@ -12,6 +13,7 @@ const {
 const AT = "2026-07-23T08:00:00.000Z";
 const REQUEST_SECRET = "provider-request-secret-1234567890-123456";
 const RECEIPT_SECRET = "provider-receipt-secret-1234567890-123456";
+const CONTRACT_SECRET = "provider-contract-secret-1234567890-12345";
 const RESILIENCE_POLICIES = Object.fromEntries([
   "infectious-reporting",
   "immunization",
@@ -101,6 +103,41 @@ test("production loads request and receipt keyrings by lane reference", async ()
   assert.doesNotMatch(JSON.stringify(credentials), /provider-(request|receipt)-secret/);
 });
 
+test("contract governance uses an independent non-enumerable managed keyring", async () => {
+  const contractKeyring = managedKeyring("public-health-contract-governance", "contract-2026-08", [{
+    keyId: "contract-2026-08",
+    secret: CONTRACT_SECRET,
+    status: "active",
+    notBefore: "2026-07-01T00:00:00.000Z",
+    expiresAt: "2026-09-01T00:00:00.000Z",
+    revokedAt: ""
+  }]);
+  const calls = [];
+  const context = await loadPublicHealthContractGovernance({}, {
+    at: AT,
+    production: true,
+    env: {
+      NODE_ENV: "production",
+      PUBLIC_HEALTH_EXTERNAL_CONTRACT_GOVERNANCE_KEYRING_REF: "kms://public-health/contracts/governance"
+    },
+    loader: async (request) => {
+      calls.push(request);
+      return contractKeyring;
+    }
+  });
+  assert.deepEqual(calls, [{
+    laneId: "contract-governance",
+    purpose: "public-health-contract-governance",
+    reference: "kms://public-health/contracts/governance",
+    at: AT
+  }]);
+  assert.equal(context.signingMaterial, contractKeyring);
+  assert.equal(context.governance.summary.lanes, 8);
+  assert.equal(context.summary.source, "managed-key-service");
+  assert.doesNotMatch(JSON.stringify(context), new RegExp(CONTRACT_SECRET));
+  assert.doesNotMatch(JSON.stringify(context), /signingMaterial/);
+});
+
 test("production resilience configuration covers all eight lanes and rejects gaps", () => {
   const policies = loadPublicHealthResiliencePolicies({
     production: true,
@@ -135,6 +172,11 @@ test("production fails closed without references or a managed key service", asyn
       PUBLIC_HEALTH_EXTERNAL_RESILIENCE_POLICIES: JSON.stringify(RESILIENCE_POLICIES)
     }
   }), /managed public health key service is unavailable/);
+  await assert.rejects(() => loadPublicHealthContractGovernance({}, {
+    at: AT,
+    production: true,
+    env: { NODE_ENV: "production" }
+  }), /CONTRACT_GOVERNANCE_KEYRING_REF is required/);
 });
 
 test("rotation evidence must follow active grace smoke and retirement order", () => {

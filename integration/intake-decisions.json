@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-23T14:16:27.956Z",
+  "updatedAt": "2026-07-23T14:44:45.018Z",
   "decisions": [
     {
       "lineId": "T01",
@@ -47,20 +47,24 @@
     },
     {
       "lineId": "T08",
-      "candidateHead": "4b2fbd34a4af0201f8093355136d47ffa7a864f8",
+      "candidateHead": "85608d8aa587d5860f4752ca0747b47e6f8a8628",
       "decision": "accepted",
-      "reviewedAt": "2026-07-23T14:16:27.956Z",
+      "reviewedAt": "2026-07-23T14:44:45.018Z",
       "reviewer": "T00",
       "checks": [
         "git diff --check",
-        "93 public-health coordination, event, external adapter, resilience, operations and readiness tests passed independently",
+        "T08 reported 133 of 133 contract-governance and cutover targeted tests passed",
+        "T00 independently merged exact candidate 85608d8 and passed the focused public-health contract/resilience regression",
         "managed active and grace key verification, callback replay rejection and audit-chain tamper rejection validated",
         "server-only policies cover eight lanes and cannot be overridden by enqueue, claim or attempt payloads",
-        "dispatch and lane-control versions are CAS-checked and four state/audit collections persist in one SQLite transaction",
+        "contract governance keyring is independent and non-enumerable; client-reported approval status and contractBinding are ignored",
+        "deployed T08/T00 artifacts, field dictionary, bidirectional samples, joint test and rollback evidence are digest-bound before server signing",
+        "laneId plus fromContract is unique and accepted/rejected governance attempts persist without last-write-wins",
+        "dispatch and lane-control versions are CAS-checked while outbox, resilience, contract credentials and audit persist in one SQLite transaction",
         "backpressure, rate limiting, concurrent claim, open rejection, single-probe recovery and probe-failure reopen are covered",
+        "active v2 enqueue/receipt binding, deprecated v1 claim, sunset rejection, active-contract dead-letter successor and cutover alerts are covered",
         "legacy-static remains compatibility-only and all external runtime projections remain productionReady false",
-        "T08 reported 119 of 119 targeted, 34 of 34 coordination and 32 of 32 final readiness checks passed",
-        "T00 aggregate final readiness passes 40 of 40 checks"
+        "T00 aggregate final readiness passes 45 of 45 checks"
       ],
       "blockers": []
     },

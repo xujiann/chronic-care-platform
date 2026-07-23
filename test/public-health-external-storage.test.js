@@ -93,3 +93,72 @@ test("SQLite atomically persists dispatch and lane-control state under dual CAS"
   assert.equal(unchanged.publicHealthExternalLaneControls[0].version, 1);
   assert.equal(unchanged.publicHealthExternalLaneControlAudit.length, 1);
 });
+
+test("contract attestation uniqueness shares the outbox and resilience transaction", () => {
+  const current = readDatabase();
+  const next = structuredClone(current);
+  next.publicHealthExternalDispatches[0].outboxVersion = 3;
+  next.publicHealthExternalLaneControls[0].version = 2;
+  next.publicHealthExternalContractAttestations = [{
+    laneId: "immunization",
+    fromContract: "immunization-plan-v1",
+    toContract: "immunization-plan-v2"
+  }];
+  next.publicHealthExternalContractGovernanceAudit = [{
+    id: "contract-audit-accepted",
+    laneId: "immunization",
+    fromContract: "immunization-plan-v1",
+    result: "accepted"
+  }];
+  writeDatabase(next, {
+    event: "public-health-contract-atomic-write",
+    publicHealthExternalCas: {
+      dispatchId: "ph-storage-dispatch-1",
+      expectedOutboxVersion: 2,
+      laneId: "immunization",
+      expectedLaneControlVersion: 1
+    },
+    publicHealthExternalContractInsert: {
+      laneId: "immunization",
+      fromContract: "immunization-plan-v1"
+    }
+  });
+
+  const persisted = readDatabase();
+  assert.equal(persisted.publicHealthExternalDispatches[0].outboxVersion, 3);
+  assert.equal(persisted.publicHealthExternalLaneControls[0].version, 2);
+  assert.equal(persisted.publicHealthExternalContractAttestations.length, 1);
+  assert.equal(persisted.publicHealthExternalContractGovernanceAudit.length, 1);
+
+  const conflicting = structuredClone(persisted);
+  conflicting.publicHealthExternalDispatches[0].outboxVersion = 4;
+  conflicting.publicHealthExternalLaneControls[0].version = 3;
+  conflicting.publicHealthExternalContractAttestations = [{
+    laneId: "immunization",
+    fromContract: "immunization-plan-v1",
+    toContract: "immunization-plan-v2-forged"
+  }];
+  conflicting.publicHealthExternalContractGovernanceAudit.push({
+    id: "contract-audit-overwrite",
+    result: "accepted"
+  });
+  assert.throws(() => writeDatabase(conflicting, {
+    event: "public-health-contract-conflicting-write",
+    publicHealthExternalCas: {
+      dispatchId: "ph-storage-dispatch-1",
+      expectedOutboxVersion: 3,
+      laneId: "immunization",
+      expectedLaneControlVersion: 2
+    },
+    publicHealthExternalContractInsert: {
+      laneId: "immunization",
+      fromContract: "immunization-plan-v1"
+    }
+  }), /contract attestation unique conflict/);
+
+  const unchanged = readDatabase();
+  assert.equal(unchanged.publicHealthExternalDispatches[0].outboxVersion, 3);
+  assert.equal(unchanged.publicHealthExternalLaneControls[0].version, 2);
+  assert.equal(unchanged.publicHealthExternalContractAttestations[0].toContract, "immunization-plan-v2");
+  assert.equal(unchanged.publicHealthExternalContractGovernanceAudit.length, 1);
+});

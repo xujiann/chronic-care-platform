@@ -868,6 +868,8 @@ function publicHealthFinalReadinessChecks(publicHealthFinalReadiness) {
     check("publicHealthFinal:resiliencePolicy", publicHealthFinalReadiness.checks?.some((item) => item.id === "integration:t00-resilience-policy" && item.passed), "server-only eight-lane resilience policies registered", "error", "public-health"),
     check("publicHealthFinal:dualCas", publicHealthFinalReadiness.checks?.some((item) => item.id === "integration:t00-dual-cas" && item.passed), "dispatch and lane-control versions share one CAS persistence boundary", "error", "public-health"),
     check("publicHealthFinal:resilienceAlerts", publicHealthFinalReadiness.checks?.some((item) => item.id === "integration:t00-resilience-alerts" && item.passed), "P0/P1 lane-control risks registered on operations board", "error", "public-health"),
+    check("publicHealthFinal:contractGovernance", publicHealthFinalReadiness.checks?.some((item) => item.id === "integration:t00-contract-governance" && item.passed), "server-only signed contract approvals bind deployed T08/T00 artifacts and persist accepted/rejected audit", "error", "public-health"),
+    check("publicHealthFinal:contractCutover", publicHealthFinalReadiness.checks?.some((item) => item.id === "integration:t00-contract-cutover" && item.passed), "active-contract recovery and cutover backlog share the outbox/resilience transaction boundary", "error", "public-health"),
     check("publicHealthFinal:productionBoundary", publicHealthFinalReadiness.productionReady === false && /blocked-until-production-key-service/.test(publicHealthFinalReadiness.formalGoLiveState || ""), publicHealthFinalReadiness.formalGoLiveState || "missing", "error", "public-health")
   ];
 }

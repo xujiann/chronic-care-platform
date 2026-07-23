@@ -9,6 +9,9 @@ const {
 const {
   normalizePublicHealthExternalResiliencePolicy
 } = require("./public-health-external-resilience-service");
+const {
+  buildPublicHealthExternalContractGovernance
+} = require("./public-health-external-contract-governance-service");
 
 const ROTATION_SEQUENCE = Object.freeze([
   "new-active",
@@ -126,9 +129,74 @@ function privateCredentials(values, summary) {
     requestKeyring: { value: values.requestKeyring, enumerable: false },
     receiptKeyring: { value: values.receiptKeyring, enumerable: false },
     maxAttempts: { value: values.maxAttempts, enumerable: false },
-    resiliencePolicies: { value: values.resiliencePolicies, enumerable: false }
+    resiliencePolicies: { value: values.resiliencePolicies, enumerable: false },
+    contractGovernance: { value: values.contractGovernance, enumerable: false }
   });
   return Object.freeze(credentials);
+}
+
+function privateContractGovernanceMaterial(keyring, governance, summary) {
+  const material = { governance, summary };
+  Object.defineProperty(material, "signingMaterial", {
+    value: keyring,
+    enumerable: false
+  });
+  return Object.freeze(material);
+}
+
+async function loadPublicHealthContractGovernance(data = {}, options = {}) {
+  const env = options.env || process.env;
+  const at = clean(options.at || new Date().toISOString());
+  const production = options.production === undefined
+    ? clean(env.NODE_ENV).toLowerCase() === "production"
+    : Boolean(options.production);
+  const loader = options.loader === undefined ? managedKeyringLoader : options.loader;
+  const referenceName = "PUBLIC_HEALTH_EXTERNAL_CONTRACT_GOVERNANCE_KEYRING_REF";
+  const reference = clean(env[referenceName]);
+  let keyring;
+  let source;
+  if (loader && reference) {
+    keyring = await loader({
+      laneId: "contract-governance",
+      purpose: "public-health-contract-governance",
+      reference,
+      at
+    });
+    selectSigningKey(keyring, at);
+    source = "managed-key-service";
+  } else {
+    if (production) {
+      if (!reference) throw new Error(`${referenceName} is required in production`);
+      throw new Error("managed public health contract governance key service is unavailable");
+    }
+    keyring = clean(env.PUBLIC_HEALTH_EXTERNAL_CONTRACT_GOVERNANCE_SECRET);
+    if (keyring.length < 32) {
+      throw new Error("PUBLIC_HEALTH_EXTERNAL_CONTRACT_GOVERNANCE_SECRET must contain at least 32 characters for local compatibility");
+    }
+    selectSigningKey(keyring, at);
+    source = "legacy-static";
+  }
+  const keyringSummary = summarizeKeyring(keyring, at);
+  const attestations = Array.isArray(data.publicHealthExternalContractAttestations)
+    ? data.publicHealthExternalContractAttestations
+    : [];
+  const governance = buildPublicHealthExternalContractGovernance({
+    attestations,
+    signingMaterial: keyring,
+    at
+  });
+  return privateContractGovernanceMaterial(keyring, governance, {
+    source,
+    referenceConfigured: Boolean(reference),
+    keyring: keyringSummary,
+    attestations: attestations.length,
+    governanceOk: governance.ok,
+    productionReady: false,
+    blockers: [
+      ...(keyringSummary.productionReady ? [] : keyringSummary.blockers),
+      "Signed contract governance does not replace deployed release, migration or site acceptance evidence."
+    ]
+  });
 }
 
 async function loadPublicHealthLaneCredentials(laneId, options = {}) {
@@ -145,6 +213,10 @@ async function loadPublicHealthLaneCredentials(laneId, options = {}) {
   });
   const request = await loadPurposeKeyring(profile, "request", { env, at, loader, production });
   const receipt = await loadPurposeKeyring(profile, "receipt", { env, at, loader, production });
+  const contractGovernance = options.contractGovernance
+    || (options.data
+      ? (await loadPublicHealthContractGovernance(options.data, { env, at, loader, production })).governance
+      : null);
   const maxAttempts = Number(env[`${profile.endpointEnv.replace(/_ENDPOINT$/, "")}_MAX_ATTEMPTS`] || profile.maxAttempts);
   const requestSummary = summarizeKeyring(request.keyring, at);
   const receiptSummary = summarizeKeyring(receipt.keyring, at);
@@ -175,7 +247,8 @@ async function loadPublicHealthLaneCredentials(laneId, options = {}) {
     requestKeyring: request.keyring,
     receiptKeyring: receipt.keyring,
     maxAttempts,
-    resiliencePolicies
+    resiliencePolicies,
+    contractGovernance
   }, summary);
 }
 
@@ -269,6 +342,7 @@ module.exports = {
   buildPublicHealthKeySafetyBoard,
   configurePublicHealthKeyringLoader,
   evaluateRotationEvidence,
+  loadPublicHealthContractGovernance,
   loadPublicHealthLaneCredentialMap,
   loadPublicHealthLaneCredentials,
   loadPublicHealthResiliencePolicies,

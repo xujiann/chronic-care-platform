@@ -441,6 +441,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
   const resilienceSource = options.resilienceSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-resilience-service.js"), "utf8");
   const contractSource = options.contractSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-contract-governance-service.js"), "utf8");
   const contractCutoverSource = options.contractCutoverSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-contract-cutover-service.js"), "utf8");
+  const contractIntegrationSource = options.contractIntegrationSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-contract-integration.js"), "utf8");
   const pageSource = options.pageSource ?? fs.readFileSync(path.join(ROOT, "public-health.js"), "utf8");
   const doc = options.doc ?? fs.readFileSync(path.join(ROOT, "docs", "public-health-eight-domain-coordination.md"), "utf8");
   const keyringDoc = options.keyringDoc ?? fs.readFileSync(path.join(ROOT, "docs", "public-health-external-key-rotation.md"), "utf8");
@@ -501,6 +502,8 @@ function buildPublicHealthFinalReadiness(options = {}) {
       "publicHealthExternalAttemptMatch",
       "publicHealthExternalCallbackMatch",
       "publicHealthExternalRecoveryMatch",
+      "/api/public-health/external/contracts/governance",
+      "/api/public-health/external/contracts/attestations",
       "/api/public-health/external/operations-board",
       "/api/public-health/external/key-rotation"
     ].every((token) => serverSource.includes(token)), "coordination, enqueue, worker, callback, recovery, operations and rotation routes are registered", "integration"),
@@ -510,6 +513,8 @@ function buildPublicHealthFinalReadiness(options = {}) {
     check("integration:t00-resilience-policy", ["PUBLIC_HEALTH_EXTERNAL_RESILIENCE_POLICIES", "loadPublicHealthResiliencePolicies", "resiliencePolicies"].every((token) => keyProviderSource.includes(token)) && serverSource.includes("credentials.resiliencePolicies"), "eight-lane resilience policies are injected from non-enumerable server configuration", "integration"),
     check("integration:t00-dual-cas", ["assertPublicHealthExternalCas", "publicHealthExternalCas", "expectedOutboxVersion", "expectedLaneControlVersion"].every((token) => serverSource.includes(token)) && ["laneControlVersionFor", "claimed.laneControl?.version", "publicHealthExternalCas"].every((token) => workerSource.includes(token)), "worker and durable writer bind dispatch and lane-control versions", "integration"),
     check("integration:t00-resilience-alerts", ["lane-control-audit-orphan", "lane-control-signature-secret-unavailable", "lane-control-integrity-invalid", "lane-circuit-open", "lane-circuit-half-open"].every((token) => operationsSource.includes(token)) && serverSource.includes("/api/public-health/external/operations-board"), "P0 and P1 lane-control risks are registered on the operations board", "integration"),
+    check("integration:t00-contract-governance", ["signTrustedPublicHealthContractAttestation", "runtimeReleaseDigest", "t08ReleaseDigest", "t00ReleaseDigest", "deployed-and-verified"].every((token) => contractIntegrationSource.includes(token)) && ["PUBLIC_HEALTH_EXTERNAL_CONTRACT_GOVERNANCE_KEYRING_REF", "loadPublicHealthContractGovernance", "contractGovernance"].every((token) => keyProviderSource.includes(token)) && ["publicHealthExternalContractInsert", "publicHealthExternalContractGovernanceAudit"].every((token) => serverSource.includes(token)), "server-only signed approvals bind deployed T08/T00 artifacts and persist unique accepted/rejected governance audit", "integration"),
+    check("integration:t00-contract-cutover", ["contractCutover", "contract-cutover-backlog", "contract-cutover-backlog-after-sunset", "contract-cutover-successor-stale"].every((token) => operationsSource.includes(token) || contractCutoverSource.includes(token)) && serverSource.includes("event: \"public-health-external-recovery\"") && serverSource.includes("expectedLaneControlVersion"), "active-contract recovery and cutover backlog share the public outbox/resilience CAS boundary", "integration"),
     check("safety:functional-not-production", runtime.productionReady === false && registry.productionReady === false && deliveries.every((item) => item.productionReady === false), "functional acceptance cannot self-assert production readiness", "safety"),
     check("safety:trusted-site-evidence-blocker", deliveries.every((item) => /site evidence/i.test(item.blocker)), "every accepted delivery retains the trusted site-evidence blocker", "safety"),
     check("safety:emergency-revocation-quarantine", ["security-quarantine", "automaticResignAllowed", "automaticRecoveryAllowed", "key-revoked"].every((token) => keyProviderSource.includes(token)), "emergency revocation is quarantined without automatic resign or recovery", "safety")
@@ -589,6 +594,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
       externalResilience: "public-health-external-resilience-service.js",
       externalContractGovernance: "public-health-external-contract-governance-service.js",
       externalContractCutover: "public-health-external-contract-cutover-service.js",
+      externalContractIntegration: "public-health-external-contract-integration.js",
       externalOperations: "public-health-external-operations-service.js",
       documentation: "docs/public-health-eight-domain-coordination.md",
       keyRotationDocumentation: "docs/public-health-external-key-rotation.md",
@@ -596,7 +602,6 @@ function buildPublicHealthFinalReadiness(options = {}) {
       contractGovernanceDocumentation: "docs/public-health-external-contract-governance.md"
     },
     remainingT00Integration: [
-      "Wire signed contract governance, trusted release-evidence validation, active-contract dead-letter recovery and cutover backlog into the existing T00 public routes and durable data writer.",
       "Production remains blocked until the real managed key service, HTTPS endpoints, worker identity, externally approved per-lane resilience policies, contract cutover and backlog-drain evidence, load evidence, cross-key audit/callback smoke, trusted site evidence and formal operations acceptance are available."
     ]
   };

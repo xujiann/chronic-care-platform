@@ -72,8 +72,17 @@ const {
 } = require("./public-health-external-operations-service");
 const {
   buildPublicHealthKeySafetyBoard,
+  loadPublicHealthContractGovernance,
   loadPublicHealthLaneCredentials
 } = require("./public-health-external-key-provider");
+const {
+  assertUniquePublicHealthContractAttestations,
+  contractAttestationUniqueKey,
+  signTrustedPublicHealthContractAttestation
+} = require("./public-health-external-contract-integration");
+const {
+  buildPublicHealthExternalContractCutoverBoard
+} = require("./public-health-external-contract-cutover-service");
 const PHYSICAL_EXAM_CONTRACT_ID = "physical-exam-report-v1";
 const EmergencyService = require("./emergency-service");
 const EmergencyLifeChain = require("./emergency-lifechain");
@@ -6578,22 +6587,37 @@ function assertPublicHealthExternalCas(data = {}, cas = {}) {
   return current;
 }
 
+function assertPublicHealthContractAttestationInsert(data = {}, constraint = {}) {
+  const key = contractAttestationUniqueKey(constraint);
+  const existing = (Array.isArray(data.publicHealthExternalContractAttestations)
+    ? data.publicHealthExternalContractAttestations
+    : []).find((item) => contractAttestationUniqueKey(item) === key);
+  if (existing) throw new Error(`public health contract attestation unique conflict: ${key}`);
+  return key;
+}
+
 function writeDatabase(data, options = {}) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   const publicHealthExternalCas = options.publicHealthExternalCas || null;
+  const publicHealthExternalContractInsert = options.publicHealthExternalContractInsert || null;
   const sqlite = shouldUseSqlite();
-  if (publicHealthExternalCas && !sqlite) {
+  if ((publicHealthExternalCas || publicHealthExternalContractInsert) && !sqlite) {
     const persisted = fs.existsSync(DB_FILE) ? JSON.parse(fs.readFileSync(DB_FILE, "utf8")) : {};
-    assertPublicHealthExternalCas(persisted, publicHealthExternalCas);
+    if (publicHealthExternalCas) assertPublicHealthExternalCas(persisted, publicHealthExternalCas);
+    if (publicHealthExternalContractInsert) {
+      assertPublicHealthContractAttestationInsert(persisted, publicHealthExternalContractInsert);
+    }
   }
   const normalized = normalizeState(data);
+  assertUniquePublicHealthContractAttestations(normalized.publicHealthExternalContractAttestations);
   normalized.storageMeta = data.storageMeta || storageMeta();
   if (sqlite) {
     writeSqliteState(
       normalized,
       String(options.event || "write-state"),
       data.storageMeta?.collectionVersions,
-      publicHealthExternalCas
+      publicHealthExternalCas,
+      publicHealthExternalContractInsert
     );
   }
   const snapshot = {
@@ -6774,7 +6798,13 @@ function readSqliteStateFromConnection(db) {
   }, {});
 }
 
-function writeSqliteState(data, event = "write-state", expectedVersions = null, publicHealthExternalCas = null) {
+function writeSqliteState(
+  data,
+  event = "write-state",
+  expectedVersions = null,
+  publicHealthExternalCas = null,
+  publicHealthExternalContractInsert = null
+) {
   const db = openSqliteDatabase();
   const now = new Date().toISOString();
   try {
@@ -6788,6 +6818,13 @@ function writeSqliteState(data, event = "write-state", expectedVersions = null, 
         publicHealthExternalDispatches: dispatchRow ? JSON.parse(dispatchRow.payload) : [],
         publicHealthExternalLaneControls: laneControlRow ? JSON.parse(laneControlRow.payload) : []
       }, publicHealthExternalCas);
+    }
+    if (publicHealthExternalContractInsert) {
+      const row = db.prepare("SELECT payload FROM state_collections WHERE key = ?")
+        .get("publicHealthExternalContractAttestations");
+      assertPublicHealthContractAttestationInsert({
+        publicHealthExternalContractAttestations: row ? JSON.parse(row.payload) : []
+      }, publicHealthExternalContractInsert);
     }
     const normalized = normalizeState(data);
     const entries = Object.entries(normalized).filter(([key]) => key !== "storageMeta");
@@ -10062,6 +10099,12 @@ function normalizeState(data) {
       : [],
     publicHealthExternalKeyRotationEvidence: Array.isArray(data.publicHealthExternalKeyRotationEvidence)
       ? data.publicHealthExternalKeyRotationEvidence.slice(-100)
+      : [],
+    publicHealthExternalContractAttestations: Array.isArray(data.publicHealthExternalContractAttestations)
+      ? data.publicHealthExternalContractAttestations.slice(-100)
+      : [],
+    publicHealthExternalContractGovernanceAudit: Array.isArray(data.publicHealthExternalContractGovernanceAudit)
+      ? data.publicHealthExternalContractGovernanceAudit.slice(-2000)
       : [],
     publicHealthSignals: mergeByKey(seedPublicHealthSignals(), data.publicHealthSignals, "id"),
     publicHealthAlerts: mergeByKey(seedPublicHealthAlerts(), data.publicHealthAlerts, "id"),
@@ -23287,8 +23330,8 @@ function governanceHttpStatus(code) {
 function publicHealthExternalHttpStatus(error) {
   const message = String(error?.message || "");
   if (/unknown public health/i.test(message)) return 404;
-  if (/role .* not allowed|scope denied|forbidden/i.test(message)) return 403;
-  if (/version conflict|CAS conflict|idempotency|already claimed|already been requeued|not due/i.test(message)) return 409;
+  if (/role.*not allowed|scope denied|forbidden/i.test(message)) return 403;
+  if (/version conflict|CAS conflict|unique conflict|idempotency|already claimed|already been requeued|not due/i.test(message)) return 409;
   if (/rate limit|backpressure|half-open probe limit/i.test(message)) return 429;
   if (/circuit is open|key service is unavailable|KEYRING_REF is required|RESILIENCE_POLICIES is required|resilience policy is required|SECRET must contain|endpoint must use HTTPS/i.test(message)) return 503;
   return 400;
@@ -23303,6 +23346,7 @@ function publicHealthExternalAttemptOptions(credentials, input, user, at) {
     requestKeyring: credentials.requestKeyring,
     receiptKeyring: credentials.receiptKeyring,
     resiliencePolicies: credentials.resiliencePolicies,
+    contractGovernance: credentials.contractGovernance,
     attemptIdempotencyKey: String(input.idempotencyKey || "").trim(),
     expectedVersion: input.expectedVersion,
     expectedLaneControlVersion: input.expectedLaneControlVersion,
@@ -23321,13 +23365,17 @@ function publicHealthExternalLaneVersion(data = {}, laneId) {
 async function publicHealthCredentialsForDispatch(data, dispatchId, at) {
   const dispatch = (data.publicHealthExternalDispatches || []).find((item) => item.id === dispatchId);
   if (!dispatch) throw new Error(`unknown public health external dispatch: ${dispatchId || "missing"}`);
-  return loadPublicHealthLaneCredentials(dispatch.laneId, { at });
+  return loadPublicHealthLaneCredentials(dispatch.laneId, { at, data });
 }
 
-async function loadAvailablePublicHealthCredentialMap(at) {
+async function loadAvailablePublicHealthCredentialMap(data, at, contractGovernance = null) {
   const entries = await Promise.all(EXTERNAL_ADAPTER_PROFILES.map(async (profile) => {
     try {
-      return [profile.laneId, await loadPublicHealthLaneCredentials(profile.laneId, { at }), null];
+      return [profile.laneId, await loadPublicHealthLaneCredentials(profile.laneId, {
+        at,
+        data,
+        contractGovernance
+      }), null];
     } catch (error) {
       return [profile.laneId, null, String(error.message || "credential unavailable")];
     }
@@ -23341,6 +23389,43 @@ async function loadAvailablePublicHealthCredentialMap(at) {
       blockers: [error]
     })
   };
+}
+
+function publicHealthContractGovernanceAuditEvent(user, input = {}) {
+  const actorId = String(user?.id || user?.username || "unknown").trim();
+  return {
+    id: randomUUID(),
+    at: String(input.at || new Date().toISOString()).trim(),
+    actorIdHash: createHash("sha256").update(actorId).digest("hex"),
+    actorOrganizationId: String(user?.orgCode || "").trim(),
+    actorRole: String(user?.role || "unknown").trim(),
+    governanceRole: "public-health-contract-governance",
+    action: String(input.action || "contract-attestation").trim(),
+    result: String(input.result || "rejected").trim(),
+    idempotencyKey: String(input.idempotencyKey || "").trim(),
+    requestDigest: String(input.requestDigest || "").trim(),
+    evidenceId: String(input.evidenceId || "").trim(),
+    laneId: String(input.laneId || "").trim(),
+    fromContract: String(input.fromContract || "").trim(),
+    detail: String(input.detail || "").trim().slice(0, 500),
+    productionReady: false
+  };
+}
+
+function publicHealthContractAttestationRequestDigest(attestation, evidenceId) {
+  return createHash("sha256").update(JSON.stringify({
+    evidenceId: String(evidenceId || "").trim(),
+    laneId: String(attestation?.laneId || "").trim(),
+    fromContract: String(attestation?.fromContract || "").trim(),
+    toContract: String(attestation?.toContract || "").trim(),
+    effectiveAt: String(attestation?.effectiveAt || "").trim(),
+    sunsetAt: String(attestation?.sunsetAt || "").trim(),
+    runtimeReleaseDigest: String(attestation?.runtimeReleaseDigest || "").trim()
+  })).digest("hex");
+}
+
+async function publicHealthContractGovernanceContext(data, at) {
+  return loadPublicHealthContractGovernance(data, { at });
 }
 
 function publicHealthExternalResult(result) {
@@ -23510,6 +23595,145 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/public-health/external/contracts/governance") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    try {
+      const at = new Date().toISOString();
+      const data = readDatabase();
+      const context = await publicHealthContractGovernanceContext(data, at);
+      sendJson(res, 200, publicHealthExternalPublicView({
+        ...context.governance,
+        contractCutover: buildPublicHealthExternalContractCutoverBoard({
+          data,
+          contractGovernance: context.governance,
+          now: at
+        }),
+        keyProvider: context.summary,
+        productionReady: false
+      }));
+    } catch (error) {
+      sendJson(res, publicHealthExternalHttpStatus(error), {
+        error: "Public health external contract governance unavailable",
+        message: error.message,
+        productionReady: false
+      });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/public-health/external/contracts/attestations") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    const at = new Date().toISOString();
+    const idempotencyKey = String(req.headers["idempotency-key"] || "").trim();
+    let payload = {};
+    let requestDigest = "";
+    try {
+      payload = await collectJson(req);
+      if (!idempotencyKey) throw new Error("public health contract attestation idempotency key is required");
+      if (Number(payload.expectedVersion) !== 0) {
+        throw new Error(`public health contract attestation version conflict: expected ${payload.expectedVersion ?? "missing"}, current 0`);
+      }
+      const data = readDatabase();
+      const context = await publicHealthContractGovernanceContext(data, at);
+      const signed = signTrustedPublicHealthContractAttestation({
+        payload,
+        evidenceConfig: process.env.PUBLIC_HEALTH_EXTERNAL_CONTRACT_RELEASE_EVIDENCE,
+        signingMaterial: context.signingMaterial,
+        user,
+        at
+      });
+      requestDigest = publicHealthContractAttestationRequestDigest(signed.attestation, payload.evidenceId);
+      const key = contractAttestationUniqueKey(signed.attestation);
+      const replayAudit = (data.publicHealthExternalContractGovernanceAudit || [])
+        .find((item) => item.idempotencyKey === idempotencyKey && item.result === "accepted");
+      if (replayAudit) {
+        const existing = (data.publicHealthExternalContractAttestations || [])
+          .find((item) => contractAttestationUniqueKey(item) === key);
+        if (!existing
+          || replayAudit.laneId !== existing.laneId
+          || replayAudit.fromContract !== existing.fromContract
+          || replayAudit.requestDigest !== requestDigest) {
+          throw new Error("public health contract attestation idempotency conflict");
+        }
+        sendJson(res, 200, publicHealthExternalPublicView({
+          ok: true,
+          idempotent: true,
+          attestation: existing,
+          productionReady: false
+        }));
+        return;
+      }
+      if ((data.publicHealthExternalContractGovernanceAudit || [])
+        .some((item) => item.idempotencyKey === idempotencyKey)) {
+        throw new Error("public health contract attestation idempotency conflict");
+      }
+      const nextData = {
+        ...data,
+        publicHealthExternalContractAttestations: [
+          ...(data.publicHealthExternalContractAttestations || []),
+          signed.attestation
+        ],
+        publicHealthExternalContractGovernanceAudit: [
+          ...(data.publicHealthExternalContractGovernanceAudit || []),
+          publicHealthContractGovernanceAuditEvent(user, {
+            at,
+            action: "contract-attestation-sign",
+            result: "accepted",
+            idempotencyKey,
+            requestDigest,
+            evidenceId: payload.evidenceId,
+            laneId: signed.attestation.laneId,
+            fromContract: signed.attestation.fromContract,
+            detail: `${signed.attestation.toContract} / ${signed.attestation.runtimeReleaseDigest}`
+          })
+        ]
+      };
+      writeDatabase(nextData, {
+        event: "public-health-external-contract-attestation",
+        publicHealthExternalContractInsert: {
+          laneId: signed.attestation.laneId,
+          fromContract: signed.attestation.fromContract
+        }
+      });
+      sendJson(res, 201, publicHealthExternalPublicView({
+        ok: true,
+        idempotent: false,
+        attestation: signed.attestation,
+        releaseEvidence: signed.releaseEvidence,
+        productionReady: false
+      }));
+    } catch (error) {
+      try {
+        const rejectedData = readDatabase();
+        rejectedData.publicHealthExternalContractGovernanceAudit = [
+          ...(rejectedData.publicHealthExternalContractGovernanceAudit || []),
+          publicHealthContractGovernanceAuditEvent(user, {
+            at,
+            action: "contract-attestation-sign",
+            result: "rejected",
+            idempotencyKey,
+            requestDigest,
+            evidenceId: payload.evidenceId,
+            laneId: payload.laneId,
+            fromContract: payload.fromContract,
+            detail: error.message
+          })
+        ];
+        writeDatabase(rejectedData, { event: "public-health-external-contract-attestation-rejected" });
+      } catch {
+        // The rejection response must not expose a secondary persistence failure.
+      }
+      sendJson(res, publicHealthExternalHttpStatus(error), {
+        error: "Public health external contract attestation rejected",
+        message: error.message,
+        productionReady: false
+      });
+    }
+    return;
+  }
+
   const publicHealthCoordinationActionMatch = url.pathname.match(/^\/api\/public-health\/coordination\/([^/]+)\/actions$/);
   if (req.method === "POST" && publicHealthCoordinationActionMatch) {
     const user = requireApiRole(req, res, ["commission"], "/api/public-health/coordination/:id/actions");
@@ -23553,7 +23777,7 @@ async function handleApi(req, res) {
       const handoff = runtime.handoffs.find((item) => item.id === handoffId);
       if (!handoff) throw new Error(`unknown public health coordination handoff: ${handoffId || "missing"}`);
       const at = new Date().toISOString();
-      const credentials = await loadPublicHealthLaneCredentials(handoff.laneId, { at });
+      const credentials = await loadPublicHealthLaneCredentials(handoff.laneId, { at, data });
       const result = enqueuePublicHealthExternalDispatchToState(data, handoffId, {
         ...payload,
         idempotencyKey: String(req.headers["idempotency-key"] || "").trim(),
@@ -23705,13 +23929,24 @@ async function handleApi(req, res) {
       const data = readDatabase();
       const dispatchId = decodeURIComponent(publicHealthExternalRecoveryMatch[1]);
       const at = new Date().toISOString();
+      const dispatch = (data.publicHealthExternalDispatches || []).find((item) => item.id === dispatchId);
+      if (!dispatch) throw new Error(`unknown public health external dispatch: ${dispatchId || "missing"}`);
+      const expectedLaneControlVersion = publicHealthExternalLaneVersion(data, dispatch.laneId);
       const credentials = await publicHealthCredentialsForDispatch(data, dispatchId, at);
       const result = requeuePublicHealthExternalDeadLetterToState(data, dispatchId, {
         ...payload,
         idempotencyKey: String(req.headers["idempotency-key"] || "").trim(),
         at
       }, credentials, user);
-      writeDatabase(result.nextData);
+      writeDatabase(result.nextData, {
+        event: "public-health-external-recovery",
+        publicHealthExternalCas: {
+          dispatchId,
+          expectedOutboxVersion: Number(payload.expectedVersion),
+          laneId: dispatch.laneId,
+          expectedLaneControlVersion
+        }
+      });
       sendJson(res, 200, publicHealthExternalPublicView(publicHealthExternalResult(result)));
     } catch (error) {
       sendJson(res, publicHealthExternalHttpStatus(error), { error: "Public health external recovery rejected", message: error.message, productionReady: false });
@@ -23724,17 +23959,20 @@ async function handleApi(req, res) {
     if (!user) return;
     const at = new Date().toISOString();
     const data = readDatabase();
-    const loaded = await loadAvailablePublicHealthCredentialMap(at);
+    const contractContext = await publicHealthContractGovernanceContext(data, at);
+    const loaded = await loadAvailablePublicHealthCredentialMap(data, at, contractContext.governance);
     const coordinationCenter = buildPublicHealthCoordinationRuntime({ data });
     const operations = buildPublicHealthExternalOperationsBoard({
       data,
       coordinationCenter,
       secretResolver: (laneId) => loaded.credentials[laneId]?.requestKeyring,
+      contractGovernance: contractContext.governance,
       now: at
     });
     const keySafety = buildPublicHealthKeySafetyBoard(data, loaded.credentials);
     sendJson(res, 200, publicHealthExternalPublicView({
       ...operations,
+      contractGovernance: contractContext.governance,
       keySafety,
       productionReady: false
     }));
@@ -23746,10 +23984,12 @@ async function handleApi(req, res) {
     if (!user) return;
     const at = new Date().toISOString();
     const data = readDatabase();
-    const loaded = await loadAvailablePublicHealthCredentialMap(at);
+    const contractContext = await publicHealthContractGovernanceContext(data, at);
+    const loaded = await loadAvailablePublicHealthCredentialMap(data, at, contractContext.governance);
     sendJson(res, 200, publicHealthExternalPublicView({
       generatedAt: at,
       lanes: loaded.summaries,
+      contractGovernance: contractContext.summary,
       keySafety: buildPublicHealthKeySafetyBoard(data, loaded.credentials),
       productionReady: false
     }));
