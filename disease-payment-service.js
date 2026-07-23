@@ -625,10 +625,12 @@ function createSettlementBatch(input, payload, actor) {
 
 function transitionSettlement(input, id, payload, actor, options = {}) {
   const state = normalizeState(input);
-  const batch = state.settlementBatches.find((item) => item.id === id);
-  if (!batch) throw new Error("结算批次不存在");
+  const batchIndex = state.settlementBatches.findIndex((item) => item.id === id);
+  if (batchIndex < 0) throw new Error("结算批次不存在");
+  const batch = structuredClone(state.settlementBatches[batchIndex]);
   const before = Settlement.settlementState(batch);
   const transitioned = Settlement.transitionSettlementBatch(batch, payload, actor, options);
+  state.settlementBatches[batchIndex] = batch;
   state.cases.filter((item) => item.settlementBatchId === id).forEach((item) => {
     item.status = ["PAID", "CLOSED"].includes(batch.settlementState) ? "已结算" : batch.status;
     if (batch.settlementState === "PAID") item.fundPaid = item.formalCalculation?.paymentStandard || 0;
@@ -644,6 +646,11 @@ function reconcileBatch(input, id, payload, actor) {
 function applyInsuranceCoreSettlementCallback(input, id, payload, actor = "insurance-core-adapter") {
   if (!["core-accepted", "core-returned", "confirm-payment"].includes(payload.action)) throw new Error("医保核心回调动作不受支持");
   return transitionSettlement(input, id, payload, actor, { trustedInsuranceCoreCallback: true });
+}
+
+function buildSettlementCoreCorrectionOperations(input, options = {}) {
+  const state = normalizeState(input);
+  return Settlement.buildSettlementCoreCorrectionOperations(state.settlementBatches, options);
 }
 
 function createAnnualClearance(input, payload, actor) {
@@ -960,4 +967,4 @@ function buildOverview(input) {
   return { state: clientState, summary: { caseCount: state.cases.length, calculatedCount: calculated.length, ungroupedCount: state.cases.filter((item) => item.calculation?.grouping && !item.calculation.grouping.ok).length, totalCost, paymentStandard, projectedBalance: round(paymentStandard - totalCost), riskCount: risks.length, specialPending: state.specialCases.filter((item) => ["APPLIED", "UNDER_REVIEW"].includes(SpecialCase.specialCaseState(item))).length, specialCapRate, specialUsageRate: round(state.specialCases.filter((item) => SpecialCase.ACTIVE_STATES.has(SpecialCase.specialCaseState(item))).length / Math.max(1, state.cases.length), 4), settlementPending: state.settlementBatches.filter((item) => !["PAID", "CLOSED"].includes(Settlement.settlementState(item))).length, annualClearancePending: state.annualClearances.filter((item) => item.state !== "LOCKED").length, prepaymentPending: state.prepayments.filter((item) => item.status === "待审批").length, unpaidPending: state.unpaidItems.filter((item) => item.status !== "已支付").length, negotiationPending: state.negotiationRounds.filter((item) => item.status !== "已达成一致").length, trainingPending: state.trainings.filter((item) => item.status !== "已完成").length, intake: DiseasePaymentIntake.buildIntakeSummary(state), drg: buildDrgAnalytics(state) }, institutions };
 }
 
-module.exports = { POLICY, SETTLEMENT_ACTIONS: Settlement.ACTION_TARGETS, SETTLEMENT_LABELS: Settlement.SETTLEMENT_LABELS, SPECIAL_CASE_LABELS: SpecialCase.SPECIAL_CASE_LABELS, activateDueLocalPaymentPackages, activateLocalPaymentPackage, applyAnnualClearanceAction, applyGovernanceAction, applyInsuranceCoreSettlementCallback, buildCatalogIndexStats, buildDrgAnalytics, buildDrgCatalogView, buildLocalPaymentPackageView, buildOverview, buildParameterGovernanceView, buildSpecialCaseDisclosure, calculateAll, calculateCase, calculateFormalCase, cancelLocalPaymentPackageSimulationJob, compareLocalPaymentPackage, createAnnualClearance, createLocalPaymentPackageSimulationJob, createPaymentParameter, createSettlementBatch, createSpecialCase, createSpecialCaseAppeal, drgCatalogMatch, getLocalPaymentPackageCatalogPage, getLocalPaymentPackageReport, importLocalPaymentPackage, inferDrgComplicationLevel, normalizeState, processLocalPaymentPackageSimulationJob, publishLocalPaymentPackage, publishPaymentParameter, reconcileBatch, reselectSpecialCaseExpert, retryLocalPaymentPackageSimulationJob, reviewLocalPaymentPackage, reviewPaymentParameter, reviewSpecialCase, reviewSpecialCaseAppeal, rollbackLocalPaymentPackage, seedDiseasePaymentState, simulateDrgCase, simulateLocalPaymentPackage, simulatePaymentParameter, submitLocalPaymentPackage, submitPaymentParameter, validateCase, validateLocalPaymentPackage: LocalPaymentPackage.validateLocalPaymentPackage, verifySpecialCaseLedger: SpecialCase.verifySpecialCaseLedger };
+module.exports = { POLICY, SETTLEMENT_ACTIONS: Settlement.ACTION_TARGETS, SETTLEMENT_LABELS: Settlement.SETTLEMENT_LABELS, SPECIAL_CASE_LABELS: SpecialCase.SPECIAL_CASE_LABELS, activateDueLocalPaymentPackages, activateLocalPaymentPackage, applyAnnualClearanceAction, applyGovernanceAction, applyInsuranceCoreSettlementCallback, buildCatalogIndexStats, buildDrgAnalytics, buildDrgCatalogView, buildLocalPaymentPackageView, buildOverview, buildParameterGovernanceView, buildSettlementCoreCorrectionOperations, buildSpecialCaseDisclosure, calculateAll, calculateCase, calculateFormalCase, cancelLocalPaymentPackageSimulationJob, compareLocalPaymentPackage, createAnnualClearance, createLocalPaymentPackageSimulationJob, createPaymentParameter, createSettlementBatch, createSpecialCase, createSpecialCaseAppeal, drgCatalogMatch, getLocalPaymentPackageCatalogPage, getLocalPaymentPackageReport, importLocalPaymentPackage, inferDrgComplicationLevel, normalizeState, processLocalPaymentPackageSimulationJob, publishLocalPaymentPackage, publishPaymentParameter, reconcileBatch, reselectSpecialCaseExpert, retryLocalPaymentPackageSimulationJob, reviewLocalPaymentPackage, reviewPaymentParameter, reviewSpecialCase, reviewSpecialCaseAppeal, rollbackLocalPaymentPackage, seedDiseasePaymentState, simulateDrgCase, simulateLocalPaymentPackage, simulatePaymentParameter, submitLocalPaymentPackage, submitPaymentParameter, validateCase, validateLocalPaymentPackage: LocalPaymentPackage.validateLocalPaymentPackage, verifySpecialCaseLedger: SpecialCase.verifySpecialCaseLedger };

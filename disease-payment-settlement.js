@@ -33,6 +33,7 @@ const ACTION_TARGETS = Object.freeze({
   close: Object.freeze({ from: ["PAID"], to: "CLOSED" })
 });
 const DIFFERENCE_REVIEW_DOMAINS = Object.freeze(["hospital-finance", "insurance-settlement"]);
+const CORE_CORRECTION_POLICY = Object.freeze({ correctionWorkingDays: 5, excessiveReturnCycles: 3 });
 const CLEARANCE_LABELS = Object.freeze({
   PREPARED: "清算准备",
   INSTITUTION_CONFIRMING: "医院确认中",
@@ -160,6 +161,91 @@ function buildDifferenceCaseSla(differenceCase = {}, calendarInput = {}, at = ne
   return { reviewWorkingDays, openedDate, dueDate, completedDate, evaluatedDate, elapsedWorkingDays, remainingWorkingDays: Math.max(0, reviewWorkingDays - elapsedWorkingDays), overdueWorkingDays, status, calendar };
 }
 
+function coreReturnDigestPayload(cycle = {}) {
+  return {
+    cycleId: String(cycle.id || ""),
+    batchId: String(cycle.batchId || ""),
+    revision: Number(cycle.revision || 0),
+    receiptId: String(cycle.receiptId || ""),
+    reasonCode: String(cycle.reasonCode || ""),
+    reason: String(cycle.reason || ""),
+    requirementDigest: String(cycle.requirementDigest || ""),
+    returnedAt: String(cycle.returnedAt || ""),
+    returnedBy: String(cycle.returnedBy || ""),
+    correctionWorkingDays: Number(cycle.correctionWorkingDays || 0),
+    dueDate: String(cycle.dueDate || "")
+  };
+}
+
+function verifyCoreReturnCycle(cycle = {}) {
+  return /^[a-f0-9]{64}$/.test(String(cycle.returnDigest || "")) && cycle.returnDigest === digest(coreReturnDigestPayload(cycle));
+}
+
+function verifyCoreReturnCycleEvidence(batch = {}, cycle = {}) {
+  if (!verifyEventLedger(batch.events || []) || !verifyCoreReturnCycle(cycle)) return false;
+  return (batch.events || []).some((event) => event.action === "core-returned"
+    && event.detail?.returnCycleId === cycle.id
+    && event.detail?.returnDigest === cycle.returnDigest
+    && event.detail?.requirementDigest === cycle.requirementDigest
+    && event.detail?.receiptId === cycle.receiptId);
+}
+
+function buildCoreCorrectionSla(cycle = {}, calendarInput = {}, at = new Date().toISOString()) {
+  const calendar = normalizeWorkingCalendar(calendarInput);
+  const correctionWorkingDays = Number(cycle.correctionWorkingDays || CORE_CORRECTION_POLICY.correctionWorkingDays);
+  if (!Number.isInteger(correctionWorkingDays) || correctionWorkingDays <= 0 || correctionWorkingDays > 30) throw new Error("医保核心补正工作日必须为1至30");
+  const returnedDate = dateOnly(cycle.returnedAt, "医保核心退回日期");
+  const dueDate = addWorkingDays(returnedDate, correctionWorkingDays, calendar);
+  const completedDate = cycle.resubmittedAt ? dateOnly(cycle.resubmittedAt, "医保核心补正重报日期") : "";
+  const evaluatedDate = completedDate || dateOnly(at, "医保核心补正SLA评估日期");
+  const elapsedWorkingDays = workingDaysBetween(returnedDate, evaluatedDate, calendar);
+  const overdueWorkingDays = Math.max(0, elapsedWorkingDays - correctionWorkingDays);
+  const status = completedDate ? (overdueWorkingDays ? "completed-overdue" : "completed-within-sla") : overdueWorkingDays ? "overdue" : "within-sla";
+  return { correctionWorkingDays, returnedDate, dueDate, completedDate, evaluatedDate, elapsedWorkingDays, remainingWorkingDays: Math.max(0, correctionWorkingDays - elapsedWorkingDays), overdueWorkingDays, status, calendar };
+}
+
+function buildSettlementCoreCorrectionOperations(batches = [], options = {}) {
+  const at = String(options.at || new Date().toISOString());
+  const rows = batches.flatMap((batch) => (batch.coreReturnCycles || []).map((cycle) => {
+    const integrity = verifyCoreReturnCycleEvidence(batch, cycle);
+    let sla;
+    try {
+      sla = buildCoreCorrectionSla(cycle, batch.workingCalendar || {}, at);
+    } catch (error) {
+      sla = { status: "invalid", error: error.message };
+    }
+    return {
+      batchId: batch.id,
+      period: batch.period,
+      institution: batch.institution,
+      cycleId: cycle.id,
+      revision: cycle.revision,
+      status: cycle.status,
+      reasonCode: cycle.reasonCode,
+      requirementDigest: cycle.requirementDigest,
+      returnDigest: cycle.returnDigest,
+      correctionDigest: cycle.resubmission?.correctionDigest || "",
+      integrity: integrity ? "valid" : "invalid",
+      sla
+    };
+  }));
+  return {
+    generatedAt: at,
+    summary: {
+      total: rows.length,
+      open: rows.filter((item) => item.status === "OPEN").length,
+      overdue: rows.filter((item) => item.status === "OPEN" && item.sla.status === "overdue").length,
+      resubmitted: rows.filter((item) => item.status === "RESUBMITTED").length,
+      accepted: rows.filter((item) => item.status === "ACCEPTED").length,
+      returnedAgain: rows.filter((item) => item.status === "RETURNED_AGAIN").length,
+      invalid: rows.filter((item) => item.integrity === "invalid").length,
+      excessiveBatches: batches.filter((batch) => (batch.coreReturnCycles || []).length > CORE_CORRECTION_POLICY.excessiveReturnCycles).length
+    },
+    items: rows,
+    privacyBoundary: "仅返回批次、机构、原因码、摘要和SLA，不返回病例、患者或退回原因原文。"
+  };
+}
+
 function eventIdentity(payload, action) {
   return String(payload.idempotencyKey || payload.receiptId || payload.externalRequestId || payload.paymentRequestId || `${action}:${payload.at || ""}`).trim();
 }
@@ -215,6 +301,7 @@ function transitionSettlementBatch(batch, payload = {}, actor = "system", option
   const rule = ACTION_TARGETS[action];
   if (!rule) throw new Error(`不支持的结算动作：${action || "空动作"}`);
   if (["core-accepted", "core-returned", "confirm-payment"].includes(action) && options.trustedInsuranceCoreCallback !== true) throw new Error(`${action}只能由医保核心可信回调驱动`);
+  if (!verifyEventLedger(batch.events || [])) throw new Error("结算批次事件账本校验失败");
   const before = settlementState(batch);
   const identity = eventIdentity(payload, action);
   const duplicate = (batch.events || []).find((event) => event.idempotencyKey === identity && event.action === action);
@@ -223,21 +310,77 @@ function transitionSettlementBatch(batch, payload = {}, actor = "system", option
   const now = String(payload.at || new Date().toISOString());
   const detail = {};
   if (["submit-core", "resubmit-core"].includes(action)) {
+    const previousSubmission = batch.coreSubmission;
     detail.externalRequestId = requireText(payload, "externalRequestId", "医保核心请求号");
     detail.idempotencyKey = requireText(payload, "idempotencyKey", "医保核心幂等键");
     detail.requestDigest = requireDigest({ requestDigest: payload.requestDigest || digest(buildCoreSettlementEnvelope(batch)) }, "requestDigest", "医保核心请求摘要");
-    batch.coreSubmission = { ...detail, submittedAt: now, submittedBy: actor, revision: action === "resubmit-core" ? Number(batch.coreSubmission?.revision || 1) + 1 : 1 };
-    if (action === "resubmit-core") batch.correctionDigest = requireDigest(payload, "correctionDigest", "补正摘要");
+    if (action === "resubmit-core") {
+      const cycle = (batch.coreReturnCycles || []).at(-1);
+      if (!cycle || cycle.status !== "OPEN") throw new Error("没有待补正的医保核心退回周期");
+      if (!verifyCoreReturnCycleEvidence(batch, cycle)) throw new Error("医保核心退回周期摘要或账本证据校验失败");
+      detail.returnCycleId = requireText(payload, "returnCycleId", "医保核心退回周期号");
+      if (detail.returnCycleId !== cycle.id) throw new Error("医保核心退回周期号与当前待补正周期不一致");
+      detail.correctionDigest = requireDigest(payload, "correctionDigest", "补正摘要");
+      if (detail.externalRequestId === previousSubmission?.externalRequestId || detail.idempotencyKey === previousSubmission?.idempotencyKey) throw new Error("补正重报必须使用新的医保核心请求号和幂等键");
+      cycle.status = "RESUBMITTED";
+      cycle.resubmittedAt = now;
+      cycle.resubmittedBy = actor;
+      cycle.resubmission = { externalRequestId: detail.externalRequestId, idempotencyKey: detail.idempotencyKey, requestDigest: detail.requestDigest, correctionDigest: detail.correctionDigest };
+      cycle.sla = buildCoreCorrectionSla(cycle, batch.workingCalendar || {}, now);
+      detail.correctionSlaStatus = cycle.sla.status;
+      batch.correctionDigest = detail.correctionDigest;
+    }
+    batch.coreSubmission = { externalRequestId: detail.externalRequestId, idempotencyKey: detail.idempotencyKey, requestDigest: detail.requestDigest, submittedAt: now, submittedBy: actor, revision: action === "resubmit-core" ? Number(previousSubmission?.revision || 1) + 1 : 1 };
   }
   if (action === "core-accepted") {
     detail.receiptId = requireText(payload, "receiptId", "医保核心受理回执号");
     batch.coreAcceptance = { receiptId: detail.receiptId, acceptedAt: now, acceptedBy: actor };
+    const cycle = (batch.coreReturnCycles || []).at(-1);
+    if (cycle?.status === "RESUBMITTED") {
+      if (!verifyCoreReturnCycleEvidence(batch, cycle)) throw new Error("医保核心退回周期摘要或账本证据校验失败");
+      cycle.status = "ACCEPTED";
+      cycle.acceptedAt = now;
+      cycle.acceptedBy = actor;
+      cycle.acceptanceReceiptId = detail.receiptId;
+      detail.returnCycleId = cycle.id;
+    }
   }
   if (action === "core-returned") {
     detail.receiptId = requireText(payload, "receiptId", "医保核心退回回执号");
     detail.reasonCode = requireText(payload, "reasonCode", "退回原因码");
     detail.reason = requireText(payload, "reason", "退回原因");
-    batch.returned = { ...detail, returnedAt: now, returnedBy: actor };
+    detail.requirementDigest = requireDigest(payload, "requirementDigest", "补正要求摘要");
+    const correctionWorkingDays = Number(payload.correctionWorkingDays || CORE_CORRECTION_POLICY.correctionWorkingDays);
+    if (!Number.isInteger(correctionWorkingDays) || correctionWorkingDays <= 0 || correctionWorkingDays > 30) throw new Error("医保核心补正工作日必须为1至30");
+    batch.coreReturnCycles ||= [];
+    const previousCycle = batch.coreReturnCycles.at(-1);
+    if (previousCycle?.status === "RESUBMITTED") {
+      if (!verifyCoreReturnCycleEvidence(batch, previousCycle)) throw new Error("医保核心退回周期摘要或账本证据校验失败");
+      previousCycle.status = "RETURNED_AGAIN";
+      previousCycle.nextReturnReceiptId = detail.receiptId;
+    }
+    const cycle = {
+      id: String(payload.returnCycleId || `core-return-${randomUUID()}`),
+      batchId: batch.id,
+      revision: Number(batch.coreSubmission?.revision || 1),
+      receiptId: detail.receiptId,
+      reasonCode: detail.reasonCode,
+      reason: detail.reason,
+      requirementDigest: detail.requirementDigest,
+      returnedAt: now,
+      returnedBy: actor,
+      correctionWorkingDays,
+      dueDate: addWorkingDays(dateOnly(now), correctionWorkingDays, batch.workingCalendar || {}),
+      status: "OPEN"
+    };
+    if (batch.coreReturnCycles.some((item) => item.id === cycle.id)) throw new Error("医保核心退回周期号已存在");
+    cycle.returnDigest = digest(coreReturnDigestPayload(cycle));
+    cycle.sla = buildCoreCorrectionSla(cycle, batch.workingCalendar || {}, now);
+    batch.coreReturnCycles.push(cycle);
+    detail.returnCycleId = cycle.id;
+    detail.returnDigest = cycle.returnDigest;
+    detail.correctionDueDate = cycle.dueDate;
+    batch.returned = { receiptId: detail.receiptId, reasonCode: detail.reasonCode, reason: detail.reason, requirementDigest: detail.requirementDigest, returnCycleId: cycle.id, returnDigest: cycle.returnDigest, returnedAt: now, returnedBy: actor };
   }
   if (action === "start-reconciliation") {
     detail.providerSummaryDigest = requireDigest(payload, "providerSummaryDigest", "医保核心对账摘要");
@@ -537,4 +680,4 @@ function transitionAnnualClearance(row, payload = {}, actor = "system") {
   return { row, event, idempotent: false };
 }
 
-module.exports = { ACTION_TARGETS, ANNUAL_CLEARANCE_CONTRACT_ID, ANNUAL_CLEARANCE_CONTRACT_VERSION, CLEARANCE_ACTION_TARGETS, CLEARANCE_LABELS, DIFFERENCE_REVIEW_DOMAINS, SETTLEMENT_CONTRACT_ID, SETTLEMENT_LABELS, addWorkingDays, annualClearanceDigestPayload, appendEvent, buildAnnualClearanceEnvelope, buildCoreSettlementCase, buildCoreSettlementEnvelope, buildDifferenceCaseSla, buildSettlementSla, createAnnualClearance, dateOnly, digest, institutionConfirmationDigest, isWorkingDay, normalizeWorkingCalendar, settlementState, stableStringify, transitionAnnualClearance, transitionSettlementBatch, verifyEventLedger, workingDaysBetween, yuanToFen };
+module.exports = { ACTION_TARGETS, ANNUAL_CLEARANCE_CONTRACT_ID, ANNUAL_CLEARANCE_CONTRACT_VERSION, CLEARANCE_ACTION_TARGETS, CLEARANCE_LABELS, CORE_CORRECTION_POLICY, DIFFERENCE_REVIEW_DOMAINS, SETTLEMENT_CONTRACT_ID, SETTLEMENT_LABELS, addWorkingDays, annualClearanceDigestPayload, appendEvent, buildAnnualClearanceEnvelope, buildCoreCorrectionSla, buildCoreSettlementCase, buildCoreSettlementEnvelope, buildDifferenceCaseSla, buildSettlementCoreCorrectionOperations, buildSettlementSla, coreReturnDigestPayload, createAnnualClearance, dateOnly, digest, institutionConfirmationDigest, isWorkingDay, normalizeWorkingCalendar, settlementState, stableStringify, transitionAnnualClearance, transitionSettlementBatch, verifyCoreReturnCycle, verifyCoreReturnCycleEvidence, verifyEventLedger, workingDaysBetween, yuanToFen };
