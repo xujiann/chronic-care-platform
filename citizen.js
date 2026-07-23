@@ -828,13 +828,13 @@ function renderDataGovernance(residentId = currentResidentId) {
   const target = document.querySelector("#data-governance-grid");
   if (!target) return;
   const authorizations = residentId ? getPersonalRecords(residentId, "authorizations") : [];
-  const activeAuthorizations = authorizations.filter((item) => !isRevoked(item));
+  const authorizationLifecycle = getAuthorizationLifecycle(authorizations);
   const emrSources = residentId ? new Set(getPersonalRecords(residentId, "emr").map((item) => classifyDataSource(item).label)) : new Set();
   const accessLogs = residentId ? (state.dataAccessLogs || []).filter((item) => item.residentId === residentId) : [];
   const residentMessages = residentId ? citizenMessages.filter((item) => !item.residentId || item.residentId === residentId) : [];
   const metrics = {
     identity: currentAccountId ? "居民账号已绑定" : "待登录",
-    authorization: `${activeAuthorizations.length}/${authorizations.length || 0} 条有效授权`,
+    authorization: `${authorizationLifecycle.active}/${authorizations.length || 0} 条有效授权`,
     emr: `${emrSources.size || 0} 类来源`,
     access: `${accessLogs.length} 条访问记录`,
     notification: `${residentMessages.length} 条消息`
@@ -1673,17 +1673,19 @@ function buildResidentServiceTasks(residentId) {
       qualityCallback: item.qualityCallback,
       priority: item.riskLevel === "high" ? "high" : "normal"
     })),
-    ...getPersonalRecords(residentId, "authorizations").filter((item) => !isRevoked(item) && item.date <= todayOffset(30)).map((item) => ({
+    ...getAuthorizationLifecycle(getPersonalRecords(residentId, "authorizations"), new Date(), 30).items
+      .filter((item) => ["expiring", "expired"].includes(item.lifecycleKey))
+      .map((item) => ({
       taskId: `digitalCredentials:${item.id}`,
       collection: "digitalCredentials",
       service: "授权管理",
-      title: `${item.name}授权`,
-      detail: `${item.result} · 有效期至 ${item.date}`,
-      status: item.date < todayOffset(0) ? "已过期" : "即将到期",
-      due: item.date,
+      title: `${item.granteeName || "授权对象待核验"}授权`,
+      detail: `${item.purpose || "用途待补录"} · 有效期至 ${item.expiresAt.slice(0, 10)}`,
+      status: item.lifecycleKey === "expired" ? "已过期" : "即将到期",
+      due: item.expiresAt,
       page: "health-record",
       action: "管理授权",
-      priority: item.date < todayOffset(0) ? "high" : "normal"
+      priority: item.lifecycleKey === "expired" ? "high" : "normal"
     }))
   ].sort((a, b) => String(a.due || "9999-12-31").localeCompare(String(b.due || "9999-12-31")));
 }
@@ -1963,7 +1965,7 @@ function buildCitizenHighlightItems(resident, diseases = [], followups = [], rec
   const labs = getPersonalRecords(residentId, "labs");
   const medications = getPersonalRecords(residentId, "medications");
   const authorizations = getPersonalRecords(residentId, "authorizations");
-  const activeAuthorizations = authorizations.filter((item) => !isRevoked(item));
+  const authorizationLifecycle = getAuthorizationLifecycle(authorizations);
   const accessLogs = (state.dataAccessLogs || []).filter((item) => item.residentId === residentId).slice(0, 6);
   const orders = buildUnifiedServiceOrders(residentId);
   const reminders = buildResidentServiceTasks(residentId);
@@ -2002,7 +2004,7 @@ function buildCitizenHighlightItems(resident, diseases = [], followups = [], rec
     {
       id: "privacy-control-deck",
       title: "居民授权与隐私驾驶舱",
-      status: `${activeAuthorizations.length}/${authorizations.length} 有效授权`,
+      status: `${authorizationLifecycle.active}/${authorizations.length} 有效授权`,
       metric: accessLogs.length,
       action: "管理授权",
       href: citizenPageHref("health-record"),
@@ -5645,6 +5647,32 @@ function isRevoked(item) {
 function isAuthorizationActive(item) {
   const status = window.CitizenRecordsV1?.authorizationState(item);
   return status ? status.active : !isRevoked(item) && (!item.date || item.date >= todayOffset(0));
+}
+
+function getAuthorizationLifecycle(records = [], now = new Date(), warningDays = 30) {
+  const scoped = Array.isArray(records) ? records.filter((item) => item?.category === "authorizations") : [];
+  if (window.CitizenRecordsV2?.buildAuthorizationLifecycle) {
+    return window.CitizenRecordsV2.buildAuthorizationLifecycle(scoped, now, warningDays);
+  }
+  return {
+    items: scoped.map((item) => {
+      const active = isAuthorizationActive(item);
+      const expired = !active && !isRevoked(item) && item.date && item.date < todayOffset(0);
+      return {
+        id: item.id,
+        residentId: item.residentId,
+        granteeName: item.name,
+        purpose: item.meta?.purpose || item.result,
+        expiresAt: item.meta?.expiresAt || item.date || "",
+        lifecycleKey: active ? "active" : expired ? "expired" : "inactive",
+        active
+      };
+    }),
+    active: scoped.filter((item) => isAuthorizationActive(item)).length,
+    expiring: 0,
+    expired: scoped.filter((item) => !isAuthorizationActive(item) && !isRevoked(item) && item.date && item.date < todayOffset(0)).length,
+    incomplete: 0
+  };
 }
 
 async function revokeAuthorization(id) {

@@ -689,6 +689,29 @@ test("authorization lifecycle highlights expiring and incomplete records", () =>
   assert.equal("sourceRecord" in lifecycle.items[0], false);
 });
 
+test("authorization lifecycle counts only explicit active states with future expiry", () => {
+  const future = "2026-08-30";
+  const records = ["active", "pending", "rejected", "suspended"].map((status) => activeAuthorization({
+    id: `auth-${status}`,
+    status,
+    date: future,
+    meta: {
+      status,
+      granteeId: `team-${status}`,
+      granteeType: "care-team",
+      purpose: "慢病复诊",
+      scopes: ["health-record-summary"],
+      expiresAt: future
+    }
+  }));
+  const lifecycle = V2.buildAuthorizationLifecycle(records, now, 30);
+  assert.equal(lifecycle.active, 1);
+  assert.equal(lifecycle.items.filter((item) => item.active).length, 1);
+  ["pending", "rejected", "suspended"].forEach((status) => {
+    assert.equal(lifecycle.items.find((item) => item.id === `auth-${status}`).lifecycleKey, "inactive");
+  });
+});
+
 test("authorization renewal is an explicit new consent draft without an expiry", () => {
   const record = activeAuthorization({
     id: "auth-renew",

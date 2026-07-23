@@ -147,7 +147,23 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
             expiresAt: authorizationExpiry,
             grantedAt: new Date().toISOString()
           }
-        }],
+        }, ...["pending", "rejected", "suspended"].map((status) => ({
+          id: `auth-${status}-e2e`,
+          residentId: "r1",
+          category: "authorizations",
+          date: authorizationExpiry.slice(0, 10),
+          name: `${status}未来授权`,
+          status,
+          meta: {
+            status,
+            granteeId: `team-${status}-e2e`,
+            granteeType: "care-team",
+            purpose: "不得计入有效授权",
+            scopes: ["health-record-summary"],
+            expiresAt: authorizationExpiry,
+            grantedAt: new Date().toISOString()
+          }
+        }))],
         accessLogs: [
           { id: "access-review-1", residentId: "r1", at: new Date().toISOString(), actor: "陌生机构A", role: "医疗机构", scope: "检验检查", purpose: "复诊资料核对", result: "允许", auditHash: "must-not-export" },
           { id: "access-review-2", residentId: "r1", at: new Date(Date.now() - 60000).toISOString(), actor: "未知主体", role: "未知", scope: "电子病历摘要", purpose: "查询", result: "拒绝" }
@@ -197,6 +213,8 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
   await expect(page.locator("#citizen-access-review-v2-list")).toContainText("已拦截，未披露");
   await expect(page.locator("#citizen-authorization-lifecycle-list")).toContainText("家庭医生续约团队");
   await expect(page.locator("#citizen-authorization-lifecycle-list")).toContainText("即将到期");
+  await expect(page.locator("#data-governance-grid")).toContainText("1/4 条有效授权");
+  await expect(page.locator("#citizen-highlight-grid")).toContainText("1/4 有效授权");
   await page.locator("[data-renew-authorization='auth-renew-e2e']").click();
   const renewalForm = page.locator("#auth-form");
   await expect(page.locator("#auth-dialog-title")).toHaveText("续授权");
