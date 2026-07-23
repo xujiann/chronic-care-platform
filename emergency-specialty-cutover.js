@@ -166,6 +166,7 @@ function buildSpecialtyCutoverPack(options = {}) {
   const scenarioEvidenceMatrix = buildScenarioEvidenceMatrix(acceptanceScenarioSuite, evidenceDossier, siteEvidenceWorkflow);
   const cutoverCommandCenter = buildCutoverCommandCenter(tracks, firstIncrement, pilotBatchPlan, siteEvidenceWorkflow, scenarioEvidenceMatrix);
   const observationSignalBoard = buildObservationSignalBoard(tracks, firstIncrement, cutoverCommandCenter, scenarioEvidenceMatrix);
+  const runtimeSmokePlan = buildRuntimeSmokePlan(tracks, firstIncrement, observationSignalBoard);
   const summary = {
     tracks: tracks.length,
     codeReady: tracks.filter((item) => item.codeReady).length,
@@ -192,11 +193,12 @@ function buildSpecialtyCutoverPack(options = {}) {
     acceptanceScenarioSuite,
     scenarioEvidenceMatrix,
     cutoverCommandCenter,
-    observationSignalBoard
+    observationSignalBoard,
+    runtimeSmokePlan
   };
   pack.integrity = {
     algorithm: "sha256",
-    digest: `sha256:${sha256({ summary, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision, evidenceDossier, pilotBatchPlan, siteEvidenceWorkflow, acceptanceScenarioSuite, scenarioEvidenceMatrix, cutoverCommandCenter, observationSignalBoard })}`
+    digest: `sha256:${sha256({ summary, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision, evidenceDossier, pilotBatchPlan, siteEvidenceWorkflow, acceptanceScenarioSuite, scenarioEvidenceMatrix, cutoverCommandCenter, observationSignalBoard, runtimeSmokePlan })}`
   };
   return pack;
 }
@@ -938,6 +940,97 @@ function buildObservationSignalBoard(tracks, firstIncrement, cutoverCommandCente
   };
 }
 
+function buildRuntimeSmokePlan(tracks, firstIncrement, observationSignalBoard) {
+  const primaryTrack = tracks.find((track) => track.id === firstIncrement.trackId) || tracks[0];
+  const trackRoutes = tracks.map((track) => ({
+    trackId: track.id,
+    page: track.page,
+    api: track.api,
+    expectedState: track.id === primaryTrack.id ? "controlled-rehearsal-only" : "watch-only"
+  }));
+  const suites = [
+    {
+      id: "smoke-artifact-generation",
+      name: "Cutover artifact generation",
+      automation: "automated",
+      command: "node emergency-specialty-cutover.js",
+      checks: [
+        "release/t10-specialty-cutover-pack.json exists",
+        "release/t10-specialty-cutover-pack.md exists",
+        "integrity digest is sha256-addressed",
+        "formalGoLiveState remains blocked until site evidence is accepted"
+      ],
+      failureAction: "stop release packaging and keep batch-1 closed"
+    },
+    {
+      id: "smoke-static-preview",
+      name: "Static preview and route rendering",
+      automation: "automated-or-browser",
+      command: "open t10-specialty-cutover.html and specialty pages",
+      checks: [
+        "t10-specialty-cutover.html renders release artifact or fallback pack",
+        ...trackRoutes.map((route) => `${route.page} loads for ${route.trackId}`),
+        "runtime smoke, observation and command-center sections are visible"
+      ],
+      failureAction: "fix frontend projection before any production rehearsal"
+    },
+    {
+      id: "smoke-server-api",
+      name: "Server API and authorization contract",
+      automation: "automated",
+      command: "GET /api/t10-specialty/cutover-pack with commission role",
+      checks: [
+        "/api/t10-specialty/cutover-pack returns the same module id",
+        "/api/t10-specialty-cutover remains available as compatibility route",
+        ...trackRoutes.map((route) => `${route.api} remains protected and reachable for ${route.trackId}`)
+      ],
+      failureAction: "do not start batch-1 until API auth and route contracts pass"
+    },
+    {
+      id: "smoke-release-gates",
+      name: "Release report and deployment gates",
+      automation: "automated",
+      command: "node --test test/emergency-specialty-cutover.test.js && npm run t10:specialty-cutover && npm run release:report && npm run deploy:check",
+      checks: [
+        "focused T10 tests pass",
+        "release report has zero error failures",
+        "deploy check has zero failed gates",
+        "runtime smoke plan is included in the public integration checks"
+      ],
+      failureAction: "block deploy and return to code readiness"
+    },
+    {
+      id: "smoke-observation-artifacts",
+      name: "T+1 observation artifact readiness",
+      automation: "manual-with-audit",
+      command: "review observation lanes and attach required artifacts",
+      checks: observationSignalBoard.requiredArtifacts || [],
+      failureAction: "stay No-Go or repeat batch-1; do not open watch-only batch-2"
+    }
+  ];
+  return {
+    status: "ready-for-runtime-smoke",
+    launchMode: "controlled-rehearsal-only",
+    primaryTrackId: primaryTrack.id,
+    primaryTrackName: primaryTrack.name,
+    trackRoutes,
+    suites,
+    hardStops: [
+      "any failed automated smoke suite blocks runtime launch",
+      "any missing T+1 observation artifact keeps the release at No-Go",
+      "server API smoke cannot be waived by static preview success",
+      "watch-only expansion cannot start until release report and deploy check are both green"
+    ],
+    summary: {
+      suites: suites.length,
+      automatedSuites: suites.filter((suite) => suite.automation !== "manual-with-audit").length,
+      manualSuites: suites.filter((suite) => suite.automation === "manual-with-audit").length,
+      routeChecks: trackRoutes.length,
+      hardStops: 4
+    }
+  };
+}
+
 function renderMarkdown(pack) {
   const rows = pack.tracks.map((item) => `| ${item.name} | ${item.department} | ${item.codeReady ? "是" : "否"} | ${item.productionReady ? "是" : "否"} | ${item.blockers.length} | ${item.page} |`);
   const blockers = pack.tracks.flatMap((track) => track.blockers.map((item) => `| ${track.name} | ${item.id} | ${item.title} | ${item.owner} | ${item.status} |`));
@@ -949,6 +1042,7 @@ function renderMarkdown(pack) {
   const commandWindowRows = (pack.cutoverCommandCenter?.windows || []).map((item) => `| ${item.stage} | ${item.id} | ${item.name} | ${item.ownerRole} | ${item.entryGate} | ${item.exitGate} |`);
   const commandRosterRows = (pack.cutoverCommandCenter?.roster || []).map((item) => `| ${item.seat} | ${item.owner} | ${item.decisionRight} |`);
   const observationLaneRows = (pack.observationSignalBoard?.lanes || []).map((item) => `| ${item.id} | ${item.ownerSeat} | ${item.signals.length} | ${item.noGoRule} | ${item.evidenceArtifact} |`);
+  const runtimeSmokeRows = (pack.runtimeSmokePlan?.suites || []).map((item) => `| ${item.id} | ${item.automation} | ${item.command} | ${item.checks.length} | ${item.failureAction} |`);
   return [
     "# T10 急救、用血、影像与体检专项上线割接包",
     "",
@@ -1092,6 +1186,20 @@ function renderMarkdown(pack) {
     "### Observation outcomes",
     "",
     ...(pack.observationSignalBoard?.decisionOutcomes || []).map((item) => `- ${item.id}: ${item.when} -> ${item.nextStep}`),
+    "",
+    "## Runtime smoke plan",
+    "",
+    `- Status: ${pack.runtimeSmokePlan?.status || "ready-for-runtime-smoke"}`,
+    `- Launch mode: ${pack.runtimeSmokePlan?.launchMode || "controlled-rehearsal-only"}`,
+    `- Primary track: ${pack.runtimeSmokePlan?.primaryTrackName || pack.firstIncrement.trackName}`,
+    "",
+    "| Suite | Automation | Command | Checks | Failure action |",
+    "|---|---|---|---:|---|",
+    ...runtimeSmokeRows,
+    "",
+    "### Runtime smoke hard stops",
+    "",
+    ...(pack.runtimeSmokePlan?.hardStops || []).map((item) => `- ${item}`),
     ""
   ].join("\n");
 }
@@ -1131,5 +1239,6 @@ module.exports = {
   buildAcceptanceScenarioSuite,
   buildScenarioEvidenceMatrix,
   buildCutoverCommandCenter,
-  buildObservationSignalBoard
+  buildObservationSignalBoard,
+  buildRuntimeSmokePlan
 };

@@ -13,6 +13,7 @@ const {
   buildScenarioEvidenceMatrix,
   buildCutoverCommandCenter,
   buildObservationSignalBoard,
+  buildRuntimeSmokePlan,
   normalizeTrack,
   renderMarkdown,
   selectFirstIncrement,
@@ -126,6 +127,10 @@ test("buildSpecialtyCutoverPack aggregates site blockers and cross-track control
   assert.equal(pack.observationSignalBoard.summary.lanes, 4);
   assert.equal(pack.observationSignalBoard.summary.commandSeatsReady, 4);
   assert.ok(pack.observationSignalBoard.lanes.some((item) => item.id === "lane-evidence-audit" && item.linkedScenarios.includes("scenario-5-evidence-replay")));
+  assert.equal(pack.runtimeSmokePlan.status, "ready-for-runtime-smoke");
+  assert.equal(pack.runtimeSmokePlan.launchMode, "controlled-rehearsal-only");
+  assert.equal(pack.runtimeSmokePlan.summary.suites, 5);
+  assert.ok(pack.runtimeSmokePlan.suites.some((item) => item.id === "smoke-server-api"));
   assert.match(pack.integrity.digest, /^sha256:[a-f0-9]{64}$/);
 });
 
@@ -183,6 +188,9 @@ test("renderMarkdown exposes the digest, departments, blockers and first grey in
   assert.match(markdown, /Observation signal board/);
   assert.match(markdown, /lane-patient-safety/);
   assert.match(markdown, /open-watch-only-batch-2/);
+  assert.match(markdown, /Runtime smoke plan/);
+  assert.match(markdown, /smoke-release-gates/);
+  assert.match(markdown, /controlled-rehearsal-only/);
 });
 
 test("buildEvidenceDossier maps blockers to reviewable evidence and hard-stop policy", () => {
@@ -320,6 +328,32 @@ test("buildObservationSignalBoard turns T+1 observation into lane-level No-Go si
   assert.ok(board.requiredArtifacts.includes("audit-replay-and-digest-review"));
 });
 
+test("buildRuntimeSmokePlan defines the final code-side launch smoke gates", () => {
+  const normalized = tracks.map((track) => normalizeTrack(track, report()));
+  const firstIncrement = {
+    trackId: "emergency-life-chain",
+    requiredBeforeStart: ["SITE-01", "SITE-02"]
+  };
+  const dossier = buildEvidenceDossier(normalized, firstIncrement);
+  const plan = buildPilotBatchPlan(normalized, firstIncrement);
+  const workflow = buildSiteEvidenceWorkflow(dossier, plan);
+  const suite = buildAcceptanceScenarioSuite(normalized, firstIncrement, dossier, workflow);
+  const matrix = buildScenarioEvidenceMatrix(suite, dossier, workflow);
+  const commandCenter = buildCutoverCommandCenter(normalized, firstIncrement, plan, workflow, matrix);
+  const board = buildObservationSignalBoard(normalized, firstIncrement, commandCenter, matrix);
+  const smoke = buildRuntimeSmokePlan(normalized, firstIncrement, board);
+
+  assert.equal(smoke.status, "ready-for-runtime-smoke");
+  assert.equal(smoke.launchMode, "controlled-rehearsal-only");
+  assert.equal(smoke.summary.suites, 5);
+  assert.equal(smoke.summary.automatedSuites, 4);
+  assert.equal(smoke.summary.manualSuites, 1);
+  assert.ok(smoke.trackRoutes.some((route) => route.trackId === "emergency-life-chain" && route.expectedState === "controlled-rehearsal-only"));
+  assert.ok(smoke.suites.some((item) => item.id === "smoke-release-gates" && /deploy:check/.test(item.command)));
+  assert.ok(smoke.suites.some((item) => item.id === "smoke-observation-artifacts" && item.checks.includes("t-plus-1-observation-memo")));
+  assert.ok(smoke.hardStops.some((item) => /server API smoke/.test(item)));
+});
+
 test("writeCutoverPack writes JSON and Markdown artifacts without touching runtime data", () => {
   const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "t10-cutover-"));
   const pack = buildSpecialtyCutoverPack({
@@ -350,7 +384,8 @@ test("static cutover preview page exposes T10 tracks and release-artifact fallba
   assert.match(html, /场景-证据判定矩阵/);
   assert.match(html, /切换指挥台与值守责任/);
   assert.match(html, /observation-signal-board/);
-  assert.match(html, /t10-specialty-cutover\.js\?v=observation-signal-board/);
+  assert.match(html, /runtime-smoke-plan/);
+  assert.match(html, /t10-specialty-cutover\.js\?v=runtime-smoke-plan/);
   assert.match(html, /emergency\.html/);
   assert.match(html, /blood\.html/);
   assert.match(html, /imaging-cloud\.html/);
@@ -367,6 +402,7 @@ test("static cutover preview page exposes T10 tracks and release-artifact fallba
   assert.match(client, /renderScenarioEvidenceMatrix/);
   assert.match(client, /renderCutoverCommandCenter/);
   assert.match(client, /renderObservationSignalBoard/);
+  assert.match(client, /renderRuntimeSmokePlan/);
   assert.match(client, /evidence-id-present/);
   assert.match(client, /batch-1-single-chain/);
   assert.match(client, /submit-evidence/);
@@ -381,6 +417,9 @@ test("static cutover preview page exposes T10 tracks and release-artifact fallba
   assert.match(client, /observation-ready/);
   assert.match(client, /lane-interface-reliability/);
   assert.match(client, /open-watch-only-batch-2/);
+  assert.match(client, /ready-for-runtime-smoke/);
+  assert.match(client, /smoke-server-api/);
+  assert.match(client, /smoke-release-gates/);
   assert.match(client, /120急救生命链/);
   assert.match(client, /四眼现场证据签收/);
   assert.match(client, /T\+1 observation/);

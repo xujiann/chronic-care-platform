@@ -163,6 +163,18 @@ The board also lists command seats (`release-commander`, `business-commander`, `
 
 The board returns three explicit outcomes: stay No-Go, repeat batch-1, or open watch-only batch-2. Watch-only expansion requires all lanes to be green and the T+1 observation memo to be accepted.
 
+## Runtime smoke plan
+
+`runtimeSmokePlan` is the last code-side gate before controlled rehearsal. It covers:
+
+- cutover artifact generation (`node emergency-specialty-cutover.js`);
+- static preview and specialty route rendering;
+- server API and authorization contracts, including `/api/t10-specialty/cutover-pack`;
+- release report and deployment gates;
+- T+1 observation artifacts.
+
+The plan status is `ready-for-runtime-smoke` and the launch mode remains `controlled-rehearsal-only`. A green runtime smoke run means the system is ready for controlled rehearsal, not that formal production Go-Live evidence has been waived. Any failed automated smoke suite, missing observation artifact, failed server API smoke or failed release/deploy gate blocks launch.
+
 ## Verification
 
 Run the focused test directly:

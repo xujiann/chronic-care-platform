@@ -52,6 +52,7 @@ function withCutoverDefaults(pack) {
     scenarioEvidenceMatrix: pack.scenarioEvidenceMatrix || fallback.scenarioEvidenceMatrix,
     cutoverCommandCenter: pack.cutoverCommandCenter || fallback.cutoverCommandCenter,
     observationSignalBoard: pack.observationSignalBoard || fallback.observationSignalBoard,
+    runtimeSmokePlan: pack.runtimeSmokePlan || fallback.runtimeSmokePlan,
     integrity: pack.integrity || fallback.integrity
   };
 }
@@ -70,6 +71,7 @@ function renderCutoverPack(pack) {
   renderScenarioEvidenceMatrix(pack.scenarioEvidenceMatrix || {});
   renderCutoverCommandCenter(pack.cutoverCommandCenter || {});
   renderObservationSignalBoard(pack.observationSignalBoard || {});
+  renderRuntimeSmokePlan(pack.runtimeSmokePlan || {});
   renderBlockers(pack.tracks || []);
 }
 
@@ -544,6 +546,50 @@ function renderObservationSignalBoard(board) {
   `;
 }
 
+function renderRuntimeSmokePlan(plan) {
+  const suites = plan.suites || [];
+  const summary = plan.summary || {};
+  document.querySelector("#runtime-smoke-plan").innerHTML = `
+    <div class="cutover-kpis">
+      ${kpi("Runtime smoke", plan.status || "ready-for-runtime-smoke", "warn")}
+      ${kpi("Launch mode", plan.launchMode || "controlled-rehearsal-only", "warn")}
+      ${kpi("Suites", summary.suites || suites.length, "ok")}
+      ${kpi("Hard stops", summary.hardStops || 0, "warn")}
+    </div>
+    <div class="cutover-card">
+      <div class="badge-row">
+        <span class="badge warn">${escapeHtml(plan.primaryTrackName || "first increment")}</span>
+        <span class="badge">routes ${(plan.trackRoutes || []).length}</span>
+      </div>
+      <p class="muted">Runtime smoke is the final code-side gate before controlled rehearsal. It does not close site evidence or formal Go-Live approval.</p>
+    </div>
+    <div class="track-grid">
+      ${suites.map((suite) => `
+        <article class="cutover-card">
+          <div class="badge-row">
+            <span class="badge ${suite.automation === "manual-with-audit" ? "warn" : "ok"}">${escapeHtml(suite.automation)}</span>
+            <span class="badge">${escapeHtml(suite.id)}</span>
+          </div>
+          <h3>${escapeHtml(suite.name)}</h3>
+          <p><code>${escapeHtml(suite.command)}</code></p>
+          <ul class="evidence-list">${(suite.checks || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+          <p><strong>Failure:</strong> ${escapeHtml(suite.failureAction)}</p>
+        </article>
+      `).join("")}
+    </div>
+    <div class="control-grid">
+      <article class="cutover-card">
+        <h3>Route contracts</h3>
+        <ul class="blocker-list">${(plan.trackRoutes || []).map((route) => `<li><strong>${escapeHtml(route.trackId)}</strong> 路 ${escapeHtml(route.page)} 路 <code>${escapeHtml(route.api)}</code> 路 ${escapeHtml(route.expectedState)}</li>`).join("")}</ul>
+      </article>
+      <article class="cutover-card">
+        <h3>Runtime hard stops</h3>
+        <ul class="blocker-list">${(plan.hardStops || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+      </article>
+    </div>
+  `;
+}
+
 function renderBlockers(tracks) {
   const rows = tracks.flatMap((track) => (track.blockers || []).map((blocker) => `
     <tr>
@@ -850,8 +896,48 @@ function fallbackCutoverPack() {
         "audit-replay-and-digest-review"
       ]
     },
+    runtimeSmokePlan: {
+      status: "ready-for-runtime-smoke",
+      launchMode: "controlled-rehearsal-only",
+      primaryTrackId: "emergency-life-chain",
+      primaryTrackName: "120 emergency life-chain",
+      summary: {
+        suites: 5,
+        automatedSuites: 4,
+        manualSuites: 1,
+        routeChecks: 4,
+        hardStops: 4
+      },
+      trackRoutes: [
+        smokeRoute("emergency-life-chain", "emergency.html", "/api/emergency/production-center", "controlled-rehearsal-only"),
+        smokeRoute("clinical-blood", "blood.html", "/api/blood-system/go-live", "watch-only"),
+        smokeRoute("regional-imaging-cloud", "imaging-cloud.html", "/api/imaging-cloud/production-center", "watch-only"),
+        smokeRoute("physical-examination", "physical-examination.html", "/api/physical-exams", "watch-only")
+      ],
+      suites: [
+        smokeSuite("smoke-artifact-generation", "Cutover artifact generation", "automated", "node emergency-specialty-cutover.js", ["release/t10-specialty-cutover-pack.json exists", "release/t10-specialty-cutover-pack.md exists", "integrity digest is sha256-addressed"], "stop release packaging and keep batch-1 closed"),
+        smokeSuite("smoke-static-preview", "Static preview and route rendering", "automated-or-browser", "open t10-specialty-cutover.html and specialty pages", ["t10-specialty-cutover.html renders release artifact or fallback pack", "runtime smoke, observation and command-center sections are visible"], "fix frontend projection before any production rehearsal"),
+        smokeSuite("smoke-server-api", "Server API and authorization contract", "automated", "GET /api/t10-specialty/cutover-pack with commission role", ["/api/t10-specialty/cutover-pack returns the same module id", "/api/t10-specialty-cutover remains available as compatibility route"], "do not start batch-1 until API auth and route contracts pass"),
+        smokeSuite("smoke-release-gates", "Release report and deployment gates", "automated", "node --test test/emergency-specialty-cutover.test.js && npm run t10:specialty-cutover && npm run release:report && npm run deploy:check", ["focused T10 tests pass", "release report has zero error failures", "deploy check has zero failed gates"], "block deploy and return to code readiness"),
+        smokeSuite("smoke-observation-artifacts", "T+1 observation artifact readiness", "manual-with-audit", "review observation lanes and attach required artifacts", ["t-plus-1-observation-memo", "patient-safety-continuity-review", "interface-and-idempotency-observation", "scope-and-data-quality-sample", "audit-replay-and-digest-review"], "stay No-Go or repeat batch-1; do not open watch-only batch-2")
+      ],
+      hardStops: [
+        "any failed automated smoke suite blocks runtime launch",
+        "any missing T+1 observation artifact keeps the release at No-Go",
+        "server API smoke cannot be waived by static preview success",
+        "watch-only expansion cannot start until release report and deploy check are both green"
+      ]
+    },
     integrity: { algorithm: "sha256", digest: "sha256:static-preview-fallback" }
   };
+}
+
+function smokeRoute(trackId, page, api, expectedState) {
+  return { trackId, page, api, expectedState };
+}
+
+function smokeSuite(id, name, automation, command, checks, failureAction) {
+  return { id, name, automation, command, checks, failureAction };
 }
 
 function observationLane(id, name, ownerSeat, source, signals, noGoRule, evidenceArtifact, linkedScenarios) {
