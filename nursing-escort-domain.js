@@ -87,6 +87,8 @@
       "settlement-pending": ["pricing-confirmation", "financial-dispatch"],
       settled: ["financial-callback", "reconciliation-result"],
       "quality-review": ["quality-callback"],
+      "complaint-open": ["complaint-record"],
+      "adverse-event": ["incident-report", "risk-escalation"],
       closed: ["quality-decision"]
     }),
     escort: Object.freeze({
@@ -100,6 +102,8 @@
       "settlement-pending": ["pricing-confirmation", "financial-dispatch"],
       settled: ["financial-callback", "reconciliation-result"],
       "quality-review": ["quality-callback"],
+      "complaint-open": ["complaint-record"],
+      "adverse-event": ["incident-report", "risk-escalation"],
       closed: ["quality-decision"]
     })
   });
@@ -880,6 +884,315 @@
     };
   }
 
+  function validateRiskQualityEvidence(domain, order = {}, nextStatus, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const next = canonicalStatus(nextStatus, normalizedDomain);
+    const current = canonicalStatus(options.currentStatus || order.status, normalizedDomain);
+    const orderId = String(order.id || "").trim();
+    const residentId = String(order.residentId || "").trim();
+    const subjectId = serviceAssignedSubject(normalizedDomain, order);
+    const incident = order.adverseEvent;
+    const escalation = order.riskEscalation;
+    const complaint = order.complaint;
+    const callback = order.qualityCallback;
+    const decision = order.qualityDecision;
+    const incidentReasons = [];
+    const escalationReasons = [];
+    const complaintReasons = [];
+    const callbackReasons = [];
+    const decisionReasons = [];
+
+    if (next === "adverse-event") {
+      if (!orderId) incidentReasons.push("incident-order-id-missing");
+      if (!residentId) incidentReasons.push("incident-resident-id-missing");
+      if (!subjectId) incidentReasons.push("incident-subject-missing");
+      if (!incident || typeof incident !== "object" || Array.isArray(incident)) {
+        incidentReasons.push("incident-report-missing");
+      } else {
+        if (!incident.id) incidentReasons.push("incident-id-missing");
+        if (!["open", "in-review"].includes(incident.status)) incidentReasons.push("incident-status-invalid");
+        if (incident.orderId !== orderId) incidentReasons.push("incident-order-mismatch");
+        if (incident.domain !== normalizedDomain) incidentReasons.push("incident-domain-mismatch");
+        if (incident.residentId !== residentId) incidentReasons.push("incident-resident-mismatch");
+        if (incident.subjectId !== subjectId) incidentReasons.push("incident-subject-mismatch");
+        if (!["low", "medium", "high", "critical"].includes(incident.severity)) incidentReasons.push("incident-severity-invalid");
+        if (!incident.type) incidentReasons.push("incident-type-missing");
+        if (!incident.description) incidentReasons.push("incident-description-missing");
+        if (!incident.ownerId) incidentReasons.push("incident-owner-missing");
+        const occurredAt = parseTime(incident.occurredAt);
+        const reportedAt = parseTime(incident.reportedAt);
+        const dueAt = parseTime(incident.dueAt);
+        if (occurredAt === null) incidentReasons.push("incident-occurred-time-invalid");
+        if (reportedAt === null) incidentReasons.push("incident-reported-time-invalid");
+        if (dueAt === null) incidentReasons.push("incident-due-time-invalid");
+        if (occurredAt !== null && reportedAt !== null && reportedAt < occurredAt) incidentReasons.push("incident-reported-before-occurrence");
+        if (reportedAt !== null && dueAt !== null && dueAt <= reportedAt) incidentReasons.push("incident-sla-invalid");
+      }
+      if (!escalation || typeof escalation !== "object" || Array.isArray(escalation)) {
+        escalationReasons.push("risk-escalation-missing");
+      } else {
+        if (!["notified", "accepted"].includes(escalation.status)) escalationReasons.push("risk-escalation-status-invalid");
+        if (escalation.incidentId !== incident?.id) escalationReasons.push("risk-escalation-incident-mismatch");
+        if (escalation.orderId !== orderId) escalationReasons.push("risk-escalation-order-mismatch");
+        if (escalation.domain !== normalizedDomain) escalationReasons.push("risk-escalation-domain-mismatch");
+        if (!escalation.ownerId || escalation.ownerId !== incident?.ownerId) escalationReasons.push("risk-escalation-owner-mismatch");
+        if (!escalation.channel) escalationReasons.push("risk-escalation-channel-missing");
+        const notifiedAt = parseTime(escalation.notifiedAt);
+        const dueAt = parseTime(escalation.dueAt);
+        if (notifiedAt === null) escalationReasons.push("risk-escalation-time-invalid");
+        if (dueAt === null || dueAt !== parseTime(incident?.dueAt)) escalationReasons.push("risk-escalation-sla-mismatch");
+        if (["high", "critical"].includes(incident?.severity) && escalation.emergencyContactStatus !== "notified") {
+          escalationReasons.push("emergency-contact-not-notified");
+        }
+      }
+    }
+
+    if (next === "complaint-open") {
+      if (!orderId) complaintReasons.push("complaint-order-id-missing");
+      if (!residentId) complaintReasons.push("complaint-resident-id-missing");
+      if (!complaint || typeof complaint !== "object" || Array.isArray(complaint)) {
+        complaintReasons.push("complaint-record-missing");
+      } else {
+        if (!complaint.id) complaintReasons.push("complaint-id-missing");
+        if (complaint.status !== "open") complaintReasons.push("complaint-status-invalid");
+        if (complaint.orderId !== orderId) complaintReasons.push("complaint-order-mismatch");
+        if (complaint.domain !== normalizedDomain) complaintReasons.push("complaint-domain-mismatch");
+        if (complaint.residentId !== residentId) complaintReasons.push("complaint-resident-mismatch");
+        if (!["low", "medium", "high", "critical"].includes(complaint.severity)) complaintReasons.push("complaint-severity-invalid");
+        if (!complaint.category) complaintReasons.push("complaint-category-missing");
+        if (!complaint.description) complaintReasons.push("complaint-description-missing");
+        if (!complaint.ownerId) complaintReasons.push("complaint-owner-missing");
+        const submittedAt = parseTime(complaint.submittedAt);
+        const acknowledgedAt = parseTime(complaint.acknowledgedAt);
+        const dueAt = parseTime(complaint.dueAt);
+        if (submittedAt === null) complaintReasons.push("complaint-submitted-time-invalid");
+        if (acknowledgedAt === null) complaintReasons.push("complaint-acknowledgment-missing");
+        if (dueAt === null) complaintReasons.push("complaint-due-time-invalid");
+        if (submittedAt !== null && acknowledgedAt !== null && acknowledgedAt < submittedAt) complaintReasons.push("complaint-acknowledged-before-submission");
+        if (submittedAt !== null && dueAt !== null && dueAt <= submittedAt) complaintReasons.push("complaint-sla-invalid");
+      }
+    }
+
+    if (next === "quality-review" || next === "closed") {
+      if (!orderId) callbackReasons.push("quality-order-id-missing");
+      if (!callback || typeof callback !== "object" || Array.isArray(callback)) {
+        callbackReasons.push("quality-callback-missing");
+      } else {
+        if (callback.status !== "completed") callbackReasons.push("quality-callback-not-completed");
+        if (callback.orderId !== orderId) callbackReasons.push("quality-callback-order-mismatch");
+        if (callback.domain !== normalizedDomain) callbackReasons.push("quality-callback-domain-mismatch");
+        if (!callback.reviewerId) callbackReasons.push("quality-callback-reviewer-missing");
+        if (!["passed", "follow-up-required"].includes(callback.result)) callbackReasons.push("quality-callback-result-invalid");
+        if (!callback.notes) callbackReasons.push("quality-callback-notes-missing");
+        if (parseTime(callback.completedAt) === null) callbackReasons.push("quality-callback-time-invalid");
+        if (next === "closed" && callback.result !== "passed") callbackReasons.push("quality-follow-up-incomplete");
+      }
+      if (incident?.status && incident.status !== "none" && !["resolved", "closed"].includes(incident.status)) {
+        incidentReasons.push("incident-unresolved");
+      }
+      if ((current === "complaint-open" || complaint?.status) && complaint?.status !== "none" && !["resolved", "closed"].includes(complaint?.status)) {
+        complaintReasons.push("complaint-unresolved");
+      }
+      if (["resolved", "closed"].includes(complaint?.status)) {
+        if (!complaint.resolution) complaintReasons.push("complaint-resolution-missing");
+        if (!complaint.resolvedBy) complaintReasons.push("complaint-resolver-missing");
+        const resolvedAt = parseTime(complaint.resolvedAt);
+        const submittedAt = parseTime(complaint.submittedAt);
+        const dueAt = parseTime(complaint.dueAt);
+        const residentNotifiedAt = parseTime(complaint.residentNotifiedAt);
+        if (resolvedAt === null) complaintReasons.push("complaint-resolved-time-invalid");
+        if (resolvedAt !== null && submittedAt !== null && resolvedAt < submittedAt) complaintReasons.push("complaint-resolved-before-submission");
+        if (residentNotifiedAt === null) complaintReasons.push("complaint-resident-notification-missing");
+        if (residentNotifiedAt !== null && resolvedAt !== null && residentNotifiedAt < resolvedAt) complaintReasons.push("complaint-resident-notified-before-resolution");
+        if (resolvedAt !== null && dueAt !== null && resolvedAt > dueAt
+          && (!complaint.slaBreachReason || parseTime(complaint.escalatedAt) === null)) {
+          complaintReasons.push("complaint-sla-breach-unexplained");
+        }
+      }
+      if (["resolved", "closed"].includes(incident?.status)) {
+        if (!incident.resolution) incidentReasons.push("incident-resolution-missing");
+        if (!incident.reviewedBy) incidentReasons.push("incident-reviewer-missing");
+        const resolvedAt = parseTime(incident.resolvedAt);
+        const reportedAt = parseTime(incident.reportedAt);
+        const dueAt = parseTime(incident.dueAt);
+        if (resolvedAt === null) incidentReasons.push("incident-resolved-time-invalid");
+        if (resolvedAt !== null && reportedAt !== null && resolvedAt < reportedAt) incidentReasons.push("incident-resolved-before-report");
+        if (resolvedAt !== null && dueAt !== null && resolvedAt > dueAt
+          && (!incident.slaBreachReason || parseTime(incident.escalatedAt) === null)) {
+          incidentReasons.push("incident-sla-breach-unexplained");
+        }
+      }
+    }
+
+    if (next === "closed") {
+      if (!decision || typeof decision !== "object" || Array.isArray(decision)) {
+        decisionReasons.push("quality-decision-missing");
+      } else {
+        if (decision.status !== "passed") decisionReasons.push("quality-decision-not-passed");
+        if (decision.orderId !== orderId) decisionReasons.push("quality-decision-order-mismatch");
+        if (decision.domain !== normalizedDomain) decisionReasons.push("quality-decision-domain-mismatch");
+        if (!decision.reviewerId) decisionReasons.push("quality-decision-reviewer-missing");
+        if (!Array.isArray(decision.basis) || decision.basis.filter(Boolean).length === 0) decisionReasons.push("quality-decision-basis-missing");
+        const decidedAt = parseTime(decision.decidedAt);
+        if (decidedAt === null) decisionReasons.push("quality-decision-time-invalid");
+        const callbackAt = parseTime(callback?.completedAt);
+        if (decidedAt !== null && callbackAt !== null && decidedAt < callbackAt) decisionReasons.push("quality-decision-before-callback");
+      }
+    }
+
+    const reasons = [...new Set([
+      ...incidentReasons,
+      ...escalationReasons,
+      ...complaintReasons,
+      ...callbackReasons,
+      ...decisionReasons
+    ])];
+    return {
+      ok: reasons.length === 0,
+      domain: normalizedDomain,
+      current,
+      next,
+      orderId,
+      incidentOk: incidentReasons.length === 0,
+      escalationOk: escalationReasons.length === 0,
+      complaintOk: complaintReasons.length === 0,
+      callbackOk: callbackReasons.length === 0,
+      decisionOk: decisionReasons.length === 0,
+      reasons
+    };
+  }
+
+  function buildRiskIncidentEvidence(domain, order = {}, details = {}, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const at = new Date(options.at || Date.now()).toISOString();
+    const severity = String(details.severity || "medium");
+    const dueHours = ["high", "critical"].includes(severity) ? 2 : 24;
+    const dueAt = new Date(new Date(at).getTime() + dueHours * 60 * 60 * 1000).toISOString();
+    const orderId = String(order.id || "");
+    const incidentId = String(details.id || `${normalizedDomain}:${orderId}:incident:${at}`);
+    const ownerId = String(details.ownerId || "");
+    return {
+      adverseEvent: {
+        id: incidentId,
+        status: "open",
+        orderId,
+        domain: normalizedDomain,
+        residentId: String(order.residentId || ""),
+        subjectId: serviceAssignedSubject(normalizedDomain, order),
+        severity,
+        type: String(details.type || ""),
+        description: String(details.description || ""),
+        ownerId,
+        occurredAt: new Date(details.occurredAt || at).toISOString(),
+        reportedAt: at,
+        dueAt
+      },
+      riskEscalation: {
+        status: "notified",
+        incidentId,
+        orderId,
+        domain: normalizedDomain,
+        ownerId,
+        channel: String(details.channel || "risk-duty"),
+        notifiedAt: at,
+        dueAt,
+        emergencyContactStatus: details.emergencyContactNotified === true ? "notified" : "pending"
+      }
+    };
+  }
+
+  function buildRiskResolutionEvidence(order = {}, details = {}, options = {}) {
+    const at = new Date(options.at || Date.now()).toISOString();
+    return {
+      adverseEvent: {
+        ...(order.adverseEvent || {}),
+        status: "resolved",
+        resolution: String(details.resolution || ""),
+        reviewedBy: String(details.reviewedBy || ""),
+        resolvedAt: at,
+        slaBreachReason: String(details.slaBreachReason || ""),
+        escalatedAt: details.escalatedAt ? new Date(details.escalatedAt).toISOString() : ""
+      },
+      riskEscalation: {
+        ...(order.riskEscalation || {}),
+        status: "closed",
+        closedAt: at
+      }
+    };
+  }
+
+  function buildComplaintEvidence(domain, order = {}, details = {}, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const at = new Date(options.at || Date.now()).toISOString();
+    const severity = String(details.severity || "medium");
+    const dueHours = ["high", "critical"].includes(severity) ? 4 : 24;
+    return {
+      complaintStatus: "open",
+      complaint: {
+        id: String(details.id || `${normalizedDomain}:${order.id || "order"}:complaint:${at}`),
+        status: "open",
+        orderId: String(order.id || ""),
+        domain: normalizedDomain,
+        residentId: String(order.residentId || ""),
+        severity,
+        category: String(details.category || ""),
+        description: String(details.description || ""),
+        ownerId: String(details.ownerId || ""),
+        submittedAt: at,
+        acknowledgedAt: at,
+        dueAt: new Date(new Date(at).getTime() + dueHours * 60 * 60 * 1000).toISOString()
+      }
+    };
+  }
+
+  function buildComplaintResolutionEvidence(order = {}, details = {}, options = {}) {
+    const at = new Date(options.at || Date.now()).toISOString();
+    return {
+      complaintStatus: "closed",
+      complaint: {
+        ...(order.complaint || {}),
+        status: "resolved",
+        resolution: String(details.resolution || ""),
+        resolvedBy: String(details.resolvedBy || ""),
+        resolvedAt: at,
+        residentNotifiedAt: details.residentNotified === true ? at : "",
+        slaBreachReason: String(details.slaBreachReason || ""),
+        escalatedAt: details.escalatedAt ? new Date(details.escalatedAt).toISOString() : ""
+      }
+    };
+  }
+
+  function buildQualityReviewEvidence(domain, order = {}, details = {}, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const at = new Date(options.at || Date.now()).toISOString();
+    return {
+      qualityCallback: {
+        status: "completed",
+        orderId: String(order.id || ""),
+        domain: normalizedDomain,
+        reviewerId: String(details.reviewerId || ""),
+        result: String(details.result || "passed"),
+        notes: String(details.notes || ""),
+        completedAt: at
+      }
+    };
+  }
+
+  function buildQualityClosureEvidence(domain, order = {}, details = {}, options = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    const at = new Date(options.at || Date.now()).toISOString();
+    return {
+      qualityDecision: {
+        status: details.status || "passed",
+        orderId: String(order.id || ""),
+        domain: normalizedDomain,
+        reviewerId: String(details.reviewerId || ""),
+        basis: Array.isArray(details.basis) ? details.basis.filter(Boolean) : [],
+        decidedAt: at
+      }
+    };
+  }
+
   function evidenceTypes(order = {}) {
     const types = new Set((Array.isArray(order.evidence) ? order.evidence : []).map((item) => typeof item === "string" ? item : item?.type).filter(Boolean));
     if (order.identityVerified) types.add("identity-verification");
@@ -896,8 +1209,6 @@
     if (order.serviceRecord?.status === "completed" || order.serviceRecordStatus === "completed") types.add("service-record");
     if (order.residentConfirmation?.status === "confirmed" || order.residentConfirmation === "confirmed" || order.residentServiceConfirmation === "confirmed" || (order.serviceAttachments || []).some((item) => item.type === "resident-signature")) types.add("resident-confirmation");
     if (["none", "resolved"].includes(order.serviceRecord?.exceptionReport?.status) || ["none", "closed", "resolved"].includes(order.adverseEvent?.status)) types.add("exception-declaration");
-    if (order.qualityCallback === "closed" || order.qualityReview === "closed" || order.satisfaction?.status === "submitted") types.add("quality-callback");
-    if (order.qualityDecision?.status === "passed" || order.qualityInspection?.status === "closed") types.add("quality-decision");
     return types;
   }
 
@@ -908,6 +1219,7 @@
     const present = evidenceTypes(order);
     let dispatchIntegrity = null;
     let financialIntegrity = null;
+    let riskQualityIntegrity = null;
     if (next === dispatchTargetState(normalizedDomain)) {
       dispatchIntegrity = validateDispatchEvidence(normalizedDomain, order, options);
       if (dispatchIntegrity.qualificationOk) present.add("qualification-snapshot");
@@ -920,8 +1232,26 @@
       if (financialIntegrity.callbackOk && next === "settled") present.add("financial-callback");
       if (financialIntegrity.reconciliationOk && next === "settled") present.add("reconciliation-result");
     }
+    if (["adverse-event", "complaint-open", "quality-review", "closed"].includes(next)) {
+      riskQualityIntegrity = validateRiskQualityEvidence(normalizedDomain, order, next, options);
+      if (next === "adverse-event" && riskQualityIntegrity.incidentOk) present.add("incident-report");
+      if (next === "adverse-event" && riskQualityIntegrity.escalationOk) present.add("risk-escalation");
+      if (next === "complaint-open" && riskQualityIntegrity.complaintOk) present.add("complaint-record");
+      if (["quality-review", "closed"].includes(next) && riskQualityIntegrity.callbackOk) present.add("quality-callback");
+      if (next === "closed" && riskQualityIntegrity.decisionOk) present.add("quality-decision");
+    }
     const missing = required.filter((item) => !present.has(item));
-    return { ok: missing.length === 0, domain: normalizedDomain, next, required, missing, present: [...present], dispatchIntegrity, financialIntegrity };
+    return {
+      ok: missing.length === 0,
+      domain: normalizedDomain,
+      next,
+      required,
+      missing,
+      present: [...present],
+      dispatchIntegrity,
+      financialIntegrity,
+      riskQualityIntegrity
+    };
   }
 
   function buildTimelineEvent(domain, order, transition, options = {}) {
@@ -937,7 +1267,7 @@
       occurredAt: at,
       actorId: String(options.actorId || options.actor || "system"),
       actorRole: String(options.actorRole || "system"),
-      evidenceTypes: validateEvidenceForTransition(domain, order, transition.next, { at }).present,
+      evidenceTypes: validateEvidenceForTransition(domain, order, transition.next, { at, currentStatus: transition.current }).present,
       note: String(options.note || "")
     };
   }
@@ -988,7 +1318,17 @@
         throw error;
       }
     }
-    const evidence = validateEvidenceForTransition(domain, candidate, transition.next, { at: options.at });
+    if (["adverse-event", "complaint-open", "quality-review", "closed"].includes(transition.next)) {
+      const riskQualityEvidence = validateRiskQualityEvidence(domain, candidate, transition.next, { currentStatus: transition.current });
+      if (!riskQualityEvidence.ok) {
+        const error = new Error(`invalid risk or quality evidence for ${transition.next}: ${riskQualityEvidence.reasons.join(", ")}`);
+        error.code = "ORDER_RISK_QUALITY_EVIDENCE_INVALID";
+        error.statusCode = 409;
+        error.details = riskQualityEvidence;
+        throw error;
+      }
+    }
+    const evidence = validateEvidenceForTransition(domain, candidate, transition.next, { at: options.at, currentStatus: transition.current });
     if (!evidence.ok) {
       const error = new Error(`missing evidence for ${transition.next}: ${evidence.missing.join(", ")}`);
       error.code = "ORDER_EVIDENCE_INCOMPLETE";
@@ -1062,6 +1402,13 @@
     validateFinancialEvidence,
     buildSettlementDispatchEvidence,
     buildSettlementCompletionEvidence,
+    validateRiskQualityEvidence,
+    buildRiskIncidentEvidence,
+    buildRiskResolutionEvidence,
+    buildComplaintEvidence,
+    buildComplaintResolutionEvidence,
+    buildQualityReviewEvidence,
+    buildQualityClosureEvidence,
     evidenceTypes,
     validateEvidenceForTransition,
     buildTimelineEvent,

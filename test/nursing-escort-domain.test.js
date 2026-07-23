@@ -531,6 +531,164 @@ test("escort service evidence rejects cross-order and cross-worker records witho
   assert.equal(inService.status, "in-service");
 });
 
+test("nursing adverse events require escalation and cannot close before resolution and quality review", () => {
+  const inService = {
+    id: "ino-risk-001",
+    residentId: "r1",
+    status: "in-service",
+    nurseId: "inn-001"
+  };
+  const incidentEvidence = Domain.buildRiskIncidentEvidence("nursing", inService, {
+    severity: "high",
+    type: "resident-fall",
+    description: "Resident slipped while moving from the bed.",
+    ownerId: "risk-duty-001",
+    channel: "emergency-duty",
+    emergencyContactNotified: true
+  }, { at: NOW });
+  const incidentOrder = Domain.transitionOrder("nursing", inService, "adverse-event", { at: NOW, updates: incidentEvidence });
+  assert.equal(incidentOrder.status, "adverse-event");
+  assert.equal(incidentOrder.riskEscalation.incidentId, incidentOrder.adverseEvent.id);
+
+  const missingEmergencyNotice = Domain.buildRiskIncidentEvidence("nursing", inService, {
+    severity: "critical",
+    type: "acute-deterioration",
+    description: "Resident condition deteriorated.",
+    ownerId: "risk-duty-002",
+    emergencyContactNotified: false
+  }, { at: NOW });
+  assert.throws(
+    () => Domain.transitionOrder("nursing", inService, "adverse-event", { at: NOW, updates: missingEmergencyNotice }),
+    (error) => error.code === "ORDER_RISK_QUALITY_EVIDENCE_INVALID"
+      && error.details.reasons.includes("emergency-contact-not-notified")
+  );
+
+  const callback = Domain.buildQualityReviewEvidence("nursing", incidentOrder, {
+    reviewerId: "quality-001",
+    result: "passed",
+    notes: "Incident follow-up completed."
+  }, { at: "2026-07-22T10:05:00+08:00" });
+  const decision = Domain.buildQualityClosureEvidence("nursing", { ...incidentOrder, ...callback }, {
+    reviewerId: "quality-001",
+    basis: ["incident report", "resident callback"]
+  }, { at: "2026-07-22T10:10:00+08:00" });
+  assert.throws(
+    () => Domain.transitionOrder("nursing", incidentOrder, "closed", { updates: { ...callback, ...decision } }),
+    (error) => error.code === "ORDER_RISK_QUALITY_EVIDENCE_INVALID" && error.details.reasons.includes("incident-unresolved")
+  );
+
+  const resolution = Domain.buildRiskResolutionEvidence(incidentOrder, {
+    resolution: "Resident assessed, family informed, and fall controls updated.",
+    reviewedBy: "risk-reviewer-001"
+  }, { at: "2026-07-22T10:00:00+08:00" });
+  const closed = Domain.transitionOrder("nursing", incidentOrder, "closed", {
+    at: "2026-07-22T10:10:00+08:00",
+    updates: { ...resolution, ...callback, ...decision }
+  });
+  assert.equal(closed.status, "closed");
+  assert.equal(closed.adverseEvent.status, "resolved");
+  assert.equal(inService.status, "in-service");
+});
+
+test("escort complaints require owner SLA resolution resident notice and final quality decision", () => {
+  const qualityReview = {
+    id: "eso-complaint-001",
+    residentId: "r1",
+    status: "quality-review",
+    workerId: "ew-001"
+  };
+  const complaintEvidence = Domain.buildComplaintEvidence("escort", qualityReview, {
+    severity: "high",
+    category: "service-attitude",
+    description: "Resident reported an incomplete hospital handoff.",
+    ownerId: "complaint-owner-001"
+  }, { at: NOW });
+  const complaintOrder = Domain.transitionOrder("escort", qualityReview, "complaint-open", { at: NOW, updates: complaintEvidence });
+  assert.equal(complaintOrder.status, "complaint-open");
+  assert.equal(complaintOrder.complaintStatus, "open");
+
+  const missingOwner = Domain.buildComplaintEvidence("escort", qualityReview, {
+    severity: "medium",
+    category: "service-delay",
+    description: "Escort arrived late."
+  }, { at: NOW });
+  assert.throws(
+    () => Domain.transitionOrder("escort", qualityReview, "complaint-open", { at: NOW, updates: missingOwner }),
+    (error) => error.code === "ORDER_RISK_QUALITY_EVIDENCE_INVALID"
+      && error.details.reasons.includes("complaint-owner-missing")
+  );
+
+  const unresolvedCallback = Domain.buildQualityReviewEvidence("escort", complaintOrder, {
+    reviewerId: "quality-escort-001",
+    result: "follow-up-required",
+    notes: "Complaint still requires resident confirmation."
+  }, { at: "2026-07-22T10:05:00+08:00" });
+  assert.throws(
+    () => Domain.transitionOrder("escort", complaintOrder, "quality-review", { updates: unresolvedCallback }),
+    (error) => error.code === "ORDER_RISK_QUALITY_EVIDENCE_INVALID" && error.details.reasons.includes("complaint-unresolved")
+  );
+
+  const overdueResolution = Domain.buildComplaintResolutionEvidence(complaintOrder, {
+    resolution: "Late remediation completed.",
+    resolvedBy: "complaint-owner-001",
+    residentNotified: true
+  }, { at: "2026-07-22T14:00:00+08:00" });
+  const overdueCallback = Domain.buildQualityReviewEvidence("escort", { ...complaintOrder, ...overdueResolution }, {
+    reviewerId: "quality-escort-001",
+    result: "passed",
+    notes: "Late remediation reviewed."
+  }, { at: "2026-07-22T14:05:00+08:00" });
+  assert.throws(
+    () => Domain.transitionOrder("escort", complaintOrder, "quality-review", {
+      updates: { ...overdueResolution, ...overdueCallback }
+    }),
+    (error) => error.code === "ORDER_RISK_QUALITY_EVIDENCE_INVALID"
+      && error.details.reasons.includes("complaint-sla-breach-unexplained")
+  );
+
+  const resolution = Domain.buildComplaintResolutionEvidence(complaintOrder, {
+    resolution: "Provider completed the handoff and apologized to the resident.",
+    resolvedBy: "complaint-owner-001",
+    residentNotified: true
+  }, { at: "2026-07-22T10:00:00+08:00" });
+  const callback = Domain.buildQualityReviewEvidence("escort", { ...complaintOrder, ...resolution }, {
+    reviewerId: "quality-escort-001",
+    result: "passed",
+    notes: "Resident confirmed that remediation was completed."
+  }, { at: "2026-07-22T10:05:00+08:00" });
+  const reviewed = Domain.transitionOrder("escort", complaintOrder, "quality-review", {
+    at: "2026-07-22T10:05:00+08:00",
+    updates: { ...resolution, ...callback }
+  });
+  const followupCallback = Domain.buildQualityReviewEvidence("escort", reviewed, {
+    reviewerId: "quality-escort-001",
+    result: "follow-up-required",
+    notes: "A second resident callback is still required."
+  }, { at: "2026-07-22T10:06:00+08:00" });
+  const prematureClosure = Domain.buildQualityClosureEvidence("escort", { ...reviewed, ...followupCallback }, {
+    reviewerId: "quality-escort-001",
+    basis: ["complaint resolution"]
+  }, { at: "2026-07-22T10:10:00+08:00" });
+  assert.throws(
+    () => Domain.transitionOrder("escort", reviewed, "closed", {
+      updates: { ...followupCallback, ...prematureClosure }
+    }),
+    (error) => error.code === "ORDER_RISK_QUALITY_EVIDENCE_INVALID"
+      && error.details.reasons.includes("quality-follow-up-incomplete")
+  );
+  const closure = Domain.buildQualityClosureEvidence("escort", reviewed, {
+    reviewerId: "quality-escort-001",
+    basis: ["complaint resolution", "resident notification", "quality callback"]
+  }, { at: "2026-07-22T10:10:00+08:00" });
+  const closed = Domain.transitionOrder("escort", reviewed, "closed", {
+    at: "2026-07-22T10:10:00+08:00",
+    updates: closure
+  });
+  assert.equal(closed.status, "closed");
+  assert.equal(closed.complaint.status, "resolved");
+  assert.equal(closed.complaintStatus, "closed");
+});
+
 test("nursing settlement binds pricing dispatch callback and reconciliation to order and amount", () => {
   const completed = {
     id: "ino-financial-001",

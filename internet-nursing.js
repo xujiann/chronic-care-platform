@@ -15,6 +15,7 @@ async function loadInternetNursingDashboard() {
   nursingDashboard = await fetchInternetNursingDashboard();
   nursingDashboard.dispatchRecommendations = buildStaticDispatchRecommendations(nursingDashboard.orders || [], nursingDashboard.nurses || []);
   nursingDashboard.orders = withNursingServiceControls(nursingDashboard.orders || []);
+  nursingDashboard.orders = withNursingRiskQualityControls(nursingDashboard.orders);
   nursingDashboard.paymentReadiness = buildStaticPaymentReadiness(nursingDashboard.policy || {}, nursingDashboard.orders);
   renderInternetNursingDashboard(nursingDashboard);
 }
@@ -191,6 +192,45 @@ function nursingServiceControlText(item) {
   if (!control) return "";
   if (control.ok) return control.target === "completed" ? "完成证据校验通过" : "开始服务证据校验通过";
   return `履约阻断：${control.blockers.slice(0, 5).join("；")}`;
+}
+
+function withNursingRiskQualityControls(orders) {
+  const domain = window.NursingEscortDomain;
+  if (!domain) return orders;
+  return orders.map((order) => {
+    const current = domain.canonicalStatus(order.status, "nursing");
+    const hasIncident = order.adverseEvent?.status && order.adverseEvent.status !== "none";
+    const hasComplaint = order.complaintStatus && order.complaintStatus !== "none";
+    let target = "";
+    if (current === "complaint-open") target = "quality-review";
+    else if (["quality-review", "adverse-event", "closed"].includes(current)) target = "closed";
+    else if (["completed", "settled"].includes(current)) target = "quality-review";
+    else if (hasIncident) target = "adverse-event";
+    else if (hasComplaint) target = "complaint-open";
+    if (!target) return { ...order, riskQualityControl: null };
+    const transition = current === "closed"
+      ? { ok: true }
+      : domain.validateTransition("nursing", current, target);
+    const evidence = domain.validateRiskQualityEvidence("nursing", order, target, { currentStatus: current });
+    return {
+      ...order,
+      riskQualityControl: {
+        ok: transition.ok && evidence.ok,
+        target,
+        blockers: [
+          ...(transition.ok ? [] : [`transition:${current}->${target}`]),
+          ...evidence.reasons
+        ]
+      }
+    };
+  });
+}
+
+function nursingRiskQualityControlText(item) {
+  const control = item?.riskQualityControl;
+  if (!control) return "";
+  if (control.ok) return control.target === "closed" ? "风险与质控关闭证据通过" : "风险与质控流转证据通过";
+  return `风险质控阻断：${control.blockers.slice(0, 5).join("；")}`;
 }
 
 function buildStaticRegulatoryMonthlyReport(orders, institutions) {
@@ -665,6 +705,7 @@ function renderFinanceQuality(items) {
     <strong>${escapeHtml(item.id)} · ${escapeHtml(displayText(item.residentName || item.residentId || ""))}</strong>
     <span>${escapeHtml(settlementSummary(item))}</span>
     <small>${escapeHtml(qualitySummary(item))}</small>
+    <small>${escapeHtml(nursingRiskQualityControlText(item))}</small>
   </div>`).join("") : `<div><strong>暂无费用质量记录</strong><span>完成订单后将展示结算预估、投诉、满意度和质控抽查。</span></div>`;
 }
 
