@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-23T07:43:37.718Z",
+  "updatedAt": "2026-07-23T07:57:57.048Z",
   "decisions": [
     {
       "lineId": "T01",
@@ -90,33 +90,35 @@
     },
     {
       "lineId": "T04",
-      "candidateHead": "f9a8d70b08db796beb1a1031b352837a6223c3f6",
+      "candidateHead": "5e930d38b589e740d618730d91f9b26a05d85719",
       "decision": "accepted",
-      "reviewedAt": "2026-07-23T07:09:39.254Z",
+      "reviewedAt": "2026-07-23T07:57:57.048Z",
       "reviewer": "T00",
       "checks": [
         "git diff --check",
-        "116 citizen record projection, policy, privacy review, static and security tests passed independently",
+        "119 citizen record projection, policy, privacy review, authorization lifecycle, static and security tests passed independently",
         "2 resident care workspace end-to-end tests passed independently",
         "controlled credentials require one-time HTTPS, five-minute expiry, matching resource and audit evidence",
         "server responses cannot widen authorization scope, extend expiry or overwrite resident correction security fields",
         "production care workspace state stays out of localStorage and restores through resident-scoped secret-free synchronization",
+        "authorization renewal creates a new explicit consent linked only by the previous authorization reference",
         "resident privacy review exports minimized fields and keeps trusted authorization and directory evidence production-blocked"
       ],
       "blockers": []
     },
     {
       "lineId": "T06",
-      "candidateHead": "ff0a618f7bb2331aae9b89d0e8775f2fed110dc8",
+      "candidateHead": "a5cfe07812e93b428baa007aaf644b608bba7ce8",
       "decision": "accepted",
-      "reviewedAt": "2026-07-23T07:37:13.083Z",
+      "reviewedAt": "2026-07-23T07:57:57.048Z",
       "reviewer": "T00",
       "checks": [
         "git diff --check",
-        "104 nursing, escort domain, readiness and static portal tests passed independently",
+        "105 nursing, escort domain, readiness and static portal tests passed independently",
         "rescheduling releases original resources and requires an approved replacement assignment",
         "no-show handling requires grace-period attendance evidence and a bound human decision",
         "resident timeline chronology, notification plans and provider receipts are order-, resident-, status- and idempotency-bound",
+        "issued capacity reservations bind worker, service date, ordinal and digest and reject concurrent overbooking",
         "qualification, institution scope, high-risk, service evidence, complaint, settlement, cancellation and refund paths fail closed"
       ],
       "blockers": []
