@@ -30,6 +30,11 @@ const {
   buildPublicHealthExternalOperationsBoard
 } = require("../public-health-external-operations-service");
 const { summarizeKeyring } = require("../public-health-external-keyring-service");
+const {
+  recordPublicHealthExternalLaneOutcomeToState,
+  reservePublicHealthExternalLaneCapacityToState,
+  verifyPublicHealthExternalLaneControlAuditChain
+} = require("../public-health-external-resilience-service");
 const { buildPublicHealthSystem } = require("./public-health-readiness");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -277,6 +282,47 @@ function runDeadLetterRecoveryAcceptance(sourceData, system) {
   return { enqueued, rejected, recovered, handoff };
 }
 
+function runExternalResilienceAcceptance() {
+  const policy = {
+    failureThreshold: 1,
+    openSeconds: 30,
+    halfOpenMaxProbes: 1,
+    rateLimitPerMinute: 10,
+    maxPending: 10
+  };
+  const reserved = reservePublicHealthExternalLaneCapacityToState(
+    {},
+    "family-doctor",
+    { at: "2026-07-23T10:00:00.000Z", expectedVersion: 0 },
+    ACCEPTANCE_REQUEST_SECRET,
+    policy
+  );
+  const failed = recordPublicHealthExternalLaneOutcomeToState(
+    reserved.nextData,
+    "family-doctor",
+    { type: "failure", reason: "network-error" },
+    { at: "2026-07-23T10:00:10.000Z", expectedVersion: 1 },
+    ACCEPTANCE_REQUEST_SECRET,
+    policy
+  );
+  const probe = reservePublicHealthExternalLaneCapacityToState(
+    failed.nextData,
+    "family-doctor",
+    { at: "2026-07-23T10:00:40.000Z", expectedVersion: 2 },
+    ACCEPTANCE_REQUEST_SECRET,
+    policy
+  );
+  const recovered = recordPublicHealthExternalLaneOutcomeToState(
+    probe.nextData,
+    "family-doctor",
+    { type: "success", reason: "verified-signed-receipt" },
+    { at: "2026-07-23T10:00:45.000Z", expectedVersion: 3 },
+    ACCEPTANCE_REQUEST_SECRET,
+    policy
+  );
+  return { policy, reserved, failed, probe, recovered };
+}
+
 function buildPublicHealthFinalReadiness(options = {}) {
   const sourceData = options.data || data;
   const system = options.system || buildPublicHealthSystem({ ...options, data: sourceData });
@@ -291,6 +337,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
   const deliveries = runExternalAdapterAcceptance(system.coordinationCenter);
   const outboxAcceptance = runExternalOutboxAcceptance(sourceData, system);
   const recoveryAcceptance = runDeadLetterRecoveryAcceptance(sourceData, system);
+  const resilienceAcceptance = runExternalResilienceAcceptance();
   const recoveryCoordination = buildPublicHealthCoordinationRuntime({
     data: recoveryAcceptance.recovered.nextData,
     eventReporting: system.infectiousEventReporting,
@@ -320,9 +367,11 @@ function buildPublicHealthFinalReadiness(options = {}) {
   const keyProviderSource = options.keyProviderSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-key-provider.js"), "utf8");
   const serverSource = options.serverSource ?? fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
   const packageSource = options.packageSource ?? fs.readFileSync(path.join(ROOT, "package.json"), "utf8");
+  const resilienceSource = options.resilienceSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-resilience-service.js"), "utf8");
   const pageSource = options.pageSource ?? fs.readFileSync(path.join(ROOT, "public-health.js"), "utf8");
   const doc = options.doc ?? fs.readFileSync(path.join(ROOT, "docs", "public-health-eight-domain-coordination.md"), "utf8");
   const keyringDoc = options.keyringDoc ?? fs.readFileSync(path.join(ROOT, "docs", "public-health-external-key-rotation.md"), "utf8");
+  const resilienceDoc = options.resilienceDoc ?? fs.readFileSync(path.join(ROOT, "docs", "public-health-external-resilience.md"), "utf8");
   const serializedDeliveries = JSON.stringify(deliveries);
   const managedKeyringSummary = summarizeKeyring({
     purpose: "t08-readiness-request",
@@ -349,6 +398,8 @@ function buildPublicHealthFinalReadiness(options = {}) {
     check("adapter:retry-dead-letter", ["retry-scheduled", "dead-letter", "timingSafeEqual"].every((token) => adapterSource.includes(token)), "transient retry, terminal dead letter and timing-safe verification are implemented", "adapter"),
     check("adapter:managed-keyring", managedKeyringSummary.productionReady === true && !JSON.stringify(managedKeyringSummary).includes(ACCEPTANCE_REQUEST_SECRET) && ["activeKeyId", "grace", "revoked", "key-expired-or-not-yet-valid"].every((token) => keyringSource.includes(token)), "managed active/grace/revoked key lifecycle is valid and secret-free", "adapter"),
     check("adapter:callback-anti-replay", ["receipt-issued-in-future", "receipt-expired", "receiptReplayKeyHash", "receipt replay detected"].every((token) => `${adapterSource}\n${adapterRuntimeSource}`.includes(token)), "signed callbacks bind key, issue/expiry time and nonce; stale, future and replayed callbacks fail closed", "adapter"),
+    check("resilience:signed-circuit-recovery", resilienceAcceptance.failed.control.circuitState === "open" && resilienceAcceptance.probe.control.circuitState === "half-open" && resilienceAcceptance.recovered.control.circuitState === "closed" && verifyPublicHealthExternalLaneControlAuditChain(resilienceAcceptance.recovered.nextData, "family-doctor", ACCEPTANCE_REQUEST_SECRET).entries === 4, "signed failure, open gate, half-open probe and recovery form a four-entry lane-control audit chain", "resilience"),
+    check("resilience:runtime-enforcement", ["assertPublicHealthExternalBackpressure", "reservePublicHealthExternalLaneCapacityToState", "recordPublicHealthExternalLaneOutcomeToState", "expectedLaneControlVersion"].every((token) => adapterRuntimeSource.includes(token)) && ["rateLimitPerMinute", "maxPending", "halfOpenMaxProbes", "lane-control-signature-invalid"].every((token) => resilienceSource.includes(token)), "enqueue backpressure, claim rate/circuit admission and claimed-attempt outcomes use signed CAS controls", "resilience"),
     check("outbox:persisted-enqueue-attempt", outboxAcceptance.delivered.externalRuntime.summary.dispatches === 1 && outboxAcceptance.delivered.externalRuntime.summary.auditEntries === 3, "one signed dispatch and three append-only enqueue/claim/attempt audit entries", "outbox"),
     check("outbox:coordination-advance", outboxAcceptance.delivered.dispatch.deliveryState === "delivered" && outboxAcceptance.handoff.state === "receipt-confirmed", "verified callback advances the linked coordination handoff", "outbox"),
     check("outbox:runtime-state-signature", verifyRuntimeStateSignature(outboxAcceptance.delivered.dispatch, ACCEPTANCE_REQUEST_SECRET), "mutable outbox state retains a trusted runtime signature", "outbox"),
@@ -362,9 +413,9 @@ function buildPublicHealthFinalReadiness(options = {}) {
     check("audit:signed-append-only-chain", verifyPublicHealthExternalAuditChain(outboxAcceptance.delivered.nextData, outboxAcceptance.delivered.dispatch.id, ACCEPTANCE_REQUEST_SECRET).entries === 3 && ["previousAuditHash", "auditSignature", "auditHead"].every((token) => adapterRuntimeSource.includes(token)), "enqueue, claim and attempt form a signed per-dispatch audit chain", "audit"),
     check("audit:tampering-fails-closed", tamperedOperationsBoard.ok === false && tamperedOperationsBoard.issues.some((item) => item.code === "audit-chain-invalid"), "modified audit entry blocks the operations integrity gate", "audit"),
     check("operations:healthy-reconciliation", operationsBoard.ok === true && operationsBoard.operationallyHealthy === true && operationsBoard.summary.signatureVerified === 2 && operationsBoard.summary.issues === 0, "recovered predecessor, successor, signatures, audit and coordination states reconcile", "operations"),
-    check("operations:risk-queue-contract", ["audit-dispatch-missing", "coordination-handoff-missing", "coordination-state-mismatch", "worker-lease-expired", "retry-due-unclaimed", "pending-dispatch-overdue", "dead-letter-unrecovered"].every((token) => operationsSource.includes(token)), "integrity, orphan audit/task, mismatch, lease, retry, SLA and dead-letter risks have explicit codes", "operations"),
+    check("operations:risk-queue-contract", ["audit-dispatch-missing", "coordination-handoff-missing", "coordination-state-mismatch", "worker-lease-expired", "retry-due-unclaimed", "pending-dispatch-overdue", "dead-letter-unrecovered", "lane-control-audit-orphan", "lane-control-integrity-invalid", "lane-circuit-open"].every((token) => operationsSource.includes(token)), "integrity, orphan audit/task/control, mismatch, lease, retry, SLA, dead-letter and lane resilience risks have explicit codes", "operations"),
     check("frontend:action-route-contract", pageSource.includes("/api/public-health/coordination/") && pageSource.includes("idempotencyKey") && pageSource.includes("expectedVersion"), "T00 route boundary has a stable client contract", "integration"),
-    check("integration:documented-boundary", ["public-health-coordination-runtime.js", "public-health-external-adapter-service.js", "T00", "server.js", "productionReady"].every((token) => doc.includes(token)) && ["requestKeyring", "receiptKeyring", "receiptReplayKeyHash", "legacy-static"].every((token) => keyringDoc.includes(token)), "runtime, adapter, key lifecycle and T00 boundaries are documented", "integration"),
+    check("integration:documented-boundary", ["public-health-coordination-runtime.js", "public-health-external-adapter-service.js", "T00", "server.js", "productionReady"].every((token) => doc.includes(token)) && ["requestKeyring", "receiptKeyring", "receiptReplayKeyHash", "legacy-static"].every((token) => keyringDoc.includes(token)) && ["expectedLaneControlVersion", "maxPending", "lane-circuit-open"].every((token) => resilienceDoc.includes(token)), "runtime, adapter, key lifecycle, resilience and T00 boundaries are documented", "integration"),
     check("integration:t00-public-routes", [
       "/api/public-health/coordination-runtime",
       "publicHealthExternalEnqueueMatch",
@@ -401,7 +452,8 @@ function buildPublicHealthFinalReadiness(options = {}) {
       recoveredDeadLetters: recoveryAcceptance.recovered.externalRuntime.summary.recoveredDeadLetters,
       recoverySuccessors: recoveryAcceptance.recovered.externalRuntime.summary.recoverySuccessors,
       operationsIssues: operationsBoard.summary.issues,
-      operationsSignatureVerified: operationsBoard.summary.signatureVerified
+      operationsSignatureVerified: operationsBoard.summary.signatureVerified,
+      resilienceAuditEntries: resilienceAcceptance.recovered.nextData.publicHealthExternalLaneControlAudit.length
     },
     checks,
     runtime: {
@@ -426,6 +478,12 @@ function buildPublicHealthFinalReadiness(options = {}) {
       productionReady: false
     },
     operationsBoard,
+    resilienceAcceptance: {
+      opened: resilienceAcceptance.failed.control,
+      probe: resilienceAcceptance.probe.control,
+      recovered: resilienceAcceptance.recovered.control,
+      productionReady: false
+    },
     productionReady: false,
     artifacts: {
       coordinationService: "public-health-coordination-service.js",
@@ -435,12 +493,14 @@ function buildPublicHealthFinalReadiness(options = {}) {
       externalKeyring: "public-health-external-keyring-service.js",
       externalKeyProvider: "public-health-external-key-provider.js",
       externalWorker: "public-health-external-worker.js",
+      externalResilience: "public-health-external-resilience-service.js",
       externalOperations: "public-health-external-operations-service.js",
       documentation: "docs/public-health-eight-domain-coordination.md",
-      keyRotationDocumentation: "docs/public-health-external-key-rotation.md"
+      keyRotationDocumentation: "docs/public-health-external-key-rotation.md",
+      resilienceDocumentation: "docs/public-health-external-resilience.md"
     },
     remainingT00Integration: [
-      "Production remains blocked until the real managed key service, HTTPS endpoints, worker identity, cross-key audit/callback smoke, trusted site evidence and formal operations acceptance are available."
+      "Production remains blocked until the real managed key service, HTTPS endpoints, worker identity, externally approved per-lane resilience policies, load evidence, cross-key audit/callback smoke, trusted site evidence and formal operations acceptance are available."
     ]
   };
 }
@@ -504,6 +564,7 @@ module.exports = {
   renderMarkdown,
   runExternalAdapterAcceptance,
   runExternalOutboxAcceptance,
+  runExternalResilienceAcceptance,
   runDeadLetterRecoveryAcceptance,
   runRuntimeAcceptance,
   writeOutput
