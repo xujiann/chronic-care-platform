@@ -22,6 +22,7 @@ const {
   listDuePublicHealthExternalDispatches,
   recordClaimedPublicHealthExternalAttemptToState,
   recordPublicHealthExternalAttemptToState,
+  requeuePublicHealthExternalDeadLetterToState,
   verifyRuntimeStateSignature
 } = require("../public-health-external-adapter-runtime");
 const {
@@ -125,6 +126,26 @@ function attemptOptions(idempotencyKey, at = "2026-07-23T08:01:30.000Z", expecte
     expectedVersion,
     at
   };
+}
+
+function rejectedLane(laneId) {
+  const prepared = enqueueLane(laneId);
+  const dispatch = prepared.enqueued.dispatch;
+  const receipt = signedReceipt(dispatch, {
+    status: "rejected",
+    receiptCode: `${laneId}-REJECT-RECOVERY`,
+    reason: "外部字段版本不匹配",
+    exceptionOwner: `${laneId}原异常专班`,
+    dueAt: "2026-07-30"
+  });
+  const rejected = recordPublicHealthExternalAttemptToState(
+    prepared.enqueued.nextData,
+    dispatch.id,
+    { transportStatus: 200, receipt },
+    attemptOptions(`${laneId}:attempt:recovery-reject`),
+    prepared.dependencies
+  );
+  return { ...prepared, rejected };
 }
 
 test("external outbox enqueue is persisted, signed, private and idempotent", () => {
@@ -248,6 +269,116 @@ test("verified rejection opens the signed compensation exception", () => {
   assert.equal(handoff.receipt.status, "rejected");
   assert.equal(handoff.exception.owner, "免疫规划接口专班");
   assert.equal(handoff.exception.dueAt, "2026-07-30");
+});
+
+test("authorized dead-letter recovery seals the original and creates one successor", () => {
+  const prepared = rejectedLane("immunization");
+  const original = prepared.rejected.dispatch;
+  const input = {
+    idempotencyKey: "immunization:dead-letter:requeue",
+    expectedVersion: 2,
+    coordinationExpectedVersion: 4,
+    note: "已完成字段版本修复并复核映射",
+    remediationEvidenceRefs: ["immunization-field-map-v2", "remediation-review-signoff"],
+    exceptionOwner: "免疫规划恢复专班",
+    exceptionDueAt: "2026-08-02",
+    at: "2026-07-23T09:00:00.000Z"
+  };
+  const recovered = requeuePublicHealthExternalDeadLetterToState(
+    prepared.rejected.nextData,
+    original.id,
+    input,
+    credentials(),
+    { name: "免疫规划责任人", role: "cdc" },
+    prepared.dependencies
+  );
+  const coordination = buildPublicHealthCoordinationRuntime({
+    data: recovered.nextData,
+    ...prepared.dependencies
+  }).handoffs.find((item) => item.id === prepared.handoffId);
+  assert.equal(recovered.originalDispatch.deliveryState, "dead-letter");
+  assert.equal(recovered.originalDispatch.outboxVersion, 3);
+  assert.equal(recovered.originalDispatch.recovery.state, "requeued");
+  assert.equal(recovered.originalDispatch.recovery.successorDispatchId, recovered.successorDispatch.id);
+  assert.equal(recovered.successorDispatch.deliveryState, "pending");
+  assert.equal(recovered.successorDispatch.predecessorDispatchId, original.id);
+  assert.deepEqual(recovered.successorDispatch.remediationEvidenceRefs, input.remediationEvidenceRefs.sort());
+  assert.equal(verifyRuntimeStateSignature(recovered.originalDispatch, REQUEST_SECRET), true);
+  assert.equal(verifyRuntimeStateSignature(recovered.successorDispatch, REQUEST_SECRET), true);
+  assert.equal(recovered.externalRuntime.summary.recoveredDeadLetters, 1);
+  assert.equal(recovered.externalRuntime.summary.recoverySuccessors, 1);
+  assert.equal(coordination.state, "in-progress");
+  assert.equal(coordination.exception.status, "retry-submitted");
+  assert.equal(listDuePublicHealthExternalDispatches(recovered.nextData, {
+    now: "2026-07-23T09:00:01.000Z"
+  }).map((item) => item.id).includes(recovered.successorDispatch.id), true);
+
+  const replay = requeuePublicHealthExternalDeadLetterToState(
+    recovered.nextData,
+    original.id,
+    input,
+    credentials(),
+    { name: "免疫规划责任人", role: "cdc" },
+    prepared.dependencies
+  );
+  assert.equal(replay.idempotent, true);
+  assert.equal(replay.nextData.publicHealthExternalDispatches.length, 2);
+  assert.equal(replay.nextData.publicHealthExternalDispatchAudit.length, 4);
+  assert.throws(() => requeuePublicHealthExternalDeadLetterToState(
+    recovered.nextData,
+    original.id,
+    { ...input, idempotencyKey: "immunization:second-requeue" },
+    credentials(),
+    { name: "免疫规划责任人", role: "cdc" },
+    prepared.dependencies
+  ), /already been requeued/);
+});
+
+test("dead-letter recovery requires the lane owner, evidence and current versions", () => {
+  const prepared = rejectedLane("immunization");
+  const original = prepared.rejected.dispatch;
+  const input = {
+    idempotencyKey: "immunization:dead-letter:governed-requeue",
+    expectedVersion: 2,
+    coordinationExpectedVersion: 4,
+    note: "完成修复",
+    remediationEvidenceRefs: ["approved-remediation"],
+    exceptionOwner: "免疫规划恢复专班",
+    exceptionDueAt: "2026-08-02"
+  };
+  assert.throws(() => requeuePublicHealthExternalDeadLetterToState(
+    prepared.rejected.nextData,
+    original.id,
+    input,
+    credentials(),
+    { name: "基层人员", role: "primary-care" },
+    prepared.dependencies
+  ), /role primary-care is not allowed/);
+  assert.throws(() => requeuePublicHealthExternalDeadLetterToState(
+    prepared.rejected.nextData,
+    original.id,
+    { ...input, remediationEvidenceRefs: [] },
+    credentials(),
+    { name: "免疫规划责任人", role: "cdc" },
+    prepared.dependencies
+  ), /remediationEvidenceRefs are required/);
+  assert.throws(() => requeuePublicHealthExternalDeadLetterToState(
+    prepared.rejected.nextData,
+    original.id,
+    { ...input, expectedVersion: 1 },
+    credentials(),
+    { name: "免疫规划责任人", role: "cdc" },
+    prepared.dependencies
+  ), /external dispatch version conflict/);
+  assert.throws(() => requeuePublicHealthExternalDeadLetterToState(
+    prepared.rejected.nextData,
+    original.id,
+    { ...input, coordinationExpectedVersion: 3 },
+    credentials(),
+    { name: "免疫规划责任人", role: "cdc" },
+    prepared.dependencies
+  ), /version conflict/);
+  assert.equal(prepared.rejected.nextData.publicHealthExternalDispatches.length, 1);
 });
 
 test("retry exhaustion opens a receipt-free compensation exception", () => {

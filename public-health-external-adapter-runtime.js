@@ -51,6 +51,9 @@ function runtimeStatePayload(dispatch) {
     blocker: dispatch.blocker,
     compensation: dispatch.compensation,
     lease: dispatch.lease || null,
+    recovery: dispatch.recovery || null,
+    predecessorDispatchId: dispatch.predecessorDispatchId || "",
+    remediationEvidenceRefs: dispatch.remediationEvidenceRefs || [],
     productionReady: false
   };
 }
@@ -119,6 +122,8 @@ function buildPublicHealthExternalAdapterRuntime(data = {}) {
       leased: dispatches.filter((item) => item.lease).length,
       delivered: dispatches.filter((item) => item.deliveryState === "delivered").length,
       deadLetter: dispatches.filter((item) => item.deliveryState === "dead-letter").length,
+      recoveredDeadLetters: dispatches.filter((item) => item.recovery?.state === "requeued").length,
+      recoverySuccessors: dispatches.filter((item) => item.predecessorDispatchId).length,
       auditEntries: audit.length
     },
     productionReady: false,
@@ -534,6 +539,174 @@ function recordClaimedPublicHealthExternalAttemptToState(
   );
 }
 
+function remediationEvidence(input) {
+  const evidenceRefs = Array.isArray(input.remediationEvidenceRefs)
+    ? [...new Set(input.remediationEvidenceRefs.map(clean).filter(Boolean))].sort()
+    : [];
+  if (!evidenceRefs.length) throw new Error("remediationEvidenceRefs are required to requeue external dead letter");
+  return evidenceRefs;
+}
+
+function deadLetterRetryPayload(dispatch, input) {
+  return {
+    action: "retry-coordination",
+    idempotencyKey: `external:${dispatch.id}:requeue:${sha256(input.idempotencyKey)}`,
+    expectedVersion: input.coordinationExpectedVersion,
+    note: clean(input.note),
+    at: clean(input.at || new Date().toISOString())
+  };
+}
+
+function requeuePublicHealthExternalDeadLetterToState(
+  data = {},
+  dispatchId,
+  input = {},
+  credentials = {},
+  user = {},
+  dependencies = {}
+) {
+  const idempotencyKey = clean(input.idempotencyKey);
+  const note = clean(input.note);
+  if (!idempotencyKey || !note) throw new Error("idempotencyKey and note are required to requeue external dead letter");
+  const evidenceRefs = remediationEvidence(input);
+  const compensation = requireCompensation(input);
+  const dispatches = clone(rows(data, "publicHealthExternalDispatches"));
+  const index = dispatches.findIndex((item) => item.id === clean(dispatchId));
+  if (index < 0) throw new Error(`unknown public health external dispatch: ${clean(dispatchId) || "missing"}`);
+  const current = dispatches[index];
+  const requestVerification = verifyPublicHealthExternalDispatch(current, credentials.requestSecret);
+  if (!requestVerification.ok || !verifyRuntimeStateSignature(current, credentials.requestSecret)) {
+    throw new Error(`persisted public health external dispatch rejected: ${requestVerification.ok ? "runtime-state-signature-invalid" : requestVerification.reason}`);
+  }
+  const idempotencyKeyHash = sha256(idempotencyKey);
+  const noteDigest = sha256(note);
+  if (current.recovery) {
+    const conflict = current.recovery.idempotencyKeyHash !== idempotencyKeyHash
+      || current.recovery.noteDigest !== noteDigest
+      || JSON.stringify(current.recovery.remediationEvidenceRefs) !== JSON.stringify(evidenceRefs)
+      || current.recovery.exceptionOwner !== compensation.owner
+      || current.recovery.exceptionDueAt !== compensation.dueAt;
+    if (conflict) throw new Error("external dead letter has already been requeued with a different recovery payload");
+    const authorizedReplay = applyPublicHealthCoordinationActionToState(
+      data,
+      current.handoffId,
+      deadLetterRetryPayload(current, input),
+      user,
+      dependencies
+    );
+    const successor = rows(authorizedReplay.nextData, "publicHealthExternalDispatches")
+      .find((item) => item.id === current.recovery.successorDispatchId);
+    if (!successor) throw new Error("external dead letter recovery successor is missing");
+    const successorVerification = verifyPublicHealthExternalDispatch(successor, credentials.requestSecret);
+    if (!successorVerification.ok || !verifyRuntimeStateSignature(successor, credentials.requestSecret)) {
+      throw new Error("external dead letter recovery successor signature is invalid");
+    }
+    if (successor.predecessorDispatchId !== current.id
+      || JSON.stringify(successor.remediationEvidenceRefs) !== JSON.stringify(evidenceRefs)) {
+      throw new Error("external dead letter recovery successor relationship is invalid");
+    }
+    return {
+      ok: true,
+      idempotent: true,
+      originalDispatch: current,
+      successorDispatch: successor,
+      coordinationAction: authorizedReplay.action,
+      nextData: authorizedReplay.nextData,
+      externalRuntime: buildPublicHealthExternalAdapterRuntime(authorizedReplay.nextData),
+      productionReady: false
+    };
+  }
+  if (current.deliveryState !== "dead-letter") throw new Error("only a dead-letter external dispatch can be requeued");
+  if (current.lease) throw new Error("dead-letter external dispatch cannot be requeued while leased");
+  const coordinated = applyPublicHealthCoordinationActionToState(
+    data,
+    current.handoffId,
+    deadLetterRetryPayload(current, input),
+    user,
+    dependencies
+  );
+  if (input.expectedVersion === undefined || Number(input.expectedVersion) !== Number(current.outboxVersion)) {
+    throw new Error(`external dispatch version conflict: expected ${input.expectedVersion ?? "missing"}, current ${current.outboxVersion}`);
+  }
+  const successorEnqueue = enqueuePublicHealthExternalDispatchToState(
+    coordinated.nextData,
+    current.handoffId,
+    {
+      idempotencyKey: `dead-letter-requeue:${current.id}:${idempotencyKey}`,
+      operation: current.request.operation,
+      evidenceRefs,
+      exceptionOwner: compensation.owner,
+      exceptionDueAt: compensation.dueAt,
+      at: clean(input.at || new Date().toISOString())
+    },
+    credentials,
+    dependencies
+  );
+  const nextDispatches = clone(rows(successorEnqueue.nextData, "publicHealthExternalDispatches"));
+  const originalIndex = nextDispatches.findIndex((item) => item.id === current.id);
+  const successorIndex = nextDispatches.findIndex((item) => item.id === successorEnqueue.dispatch.id);
+  if (originalIndex < 0 || successorIndex < 0) throw new Error("external dead letter recovery persistence relationship is incomplete");
+  const recovery = {
+    state: "requeued",
+    idempotencyKeyHash,
+    noteDigest,
+    remediationEvidenceRefs: evidenceRefs,
+    exceptionOwner: compensation.owner,
+    exceptionDueAt: compensation.dueAt,
+    successorDispatchId: successorEnqueue.dispatch.id,
+    approvedByRole: coordinated.action.role,
+    approvedByHash: sha256(coordinated.action.actor),
+    requeuedAt: coordinated.action.at
+  };
+  const original = withRuntimeStateSignature({
+    ...nextDispatches[originalIndex],
+    recovery,
+    outboxVersion: Number(current.outboxVersion) + 1
+  }, credentials.requestSecret);
+  const successor = withRuntimeStateSignature({
+    ...nextDispatches[successorIndex],
+    predecessorDispatchId: current.id,
+    remediationEvidenceRefs: evidenceRefs
+  }, credentials.requestSecret);
+  nextDispatches[originalIndex] = original;
+  nextDispatches[successorIndex] = successor;
+  const recoveryAudit = {
+    id: `${current.id}:audit:requeue:${idempotencyKeyHash.slice(0, 16)}`,
+    dispatchId: current.id,
+    successorDispatchId: successor.id,
+    handoffId: current.handoffId,
+    laneId: current.laneId,
+    action: "requeue-external-dead-letter",
+    from: "dead-letter",
+    to: "dead-letter-requeued",
+    fromVersion: current.outboxVersion,
+    toVersion: original.outboxVersion,
+    at: recovery.requeuedAt,
+    approvedByRole: recovery.approvedByRole,
+    approvedByHash: recovery.approvedByHash,
+    remediationEvidenceRefs: evidenceRefs,
+    idempotencyKeyHash
+  };
+  const nextData = {
+    ...successorEnqueue.nextData,
+    publicHealthExternalDispatches: nextDispatches,
+    publicHealthExternalDispatchAudit: [
+      ...clone(rows(successorEnqueue.nextData, "publicHealthExternalDispatchAudit")),
+      recoveryAudit
+    ]
+  };
+  return {
+    ok: true,
+    idempotent: false,
+    originalDispatch: clone(original),
+    successorDispatch: clone(successor),
+    coordinationAction: coordinated.action,
+    nextData,
+    externalRuntime: buildPublicHealthExternalAdapterRuntime(nextData),
+    productionReady: false
+  };
+}
+
 module.exports = {
   buildPublicHealthExternalAdapterRuntime,
   claimPublicHealthExternalDispatchToState,
@@ -541,6 +714,7 @@ module.exports = {
   listDuePublicHealthExternalDispatches,
   recordClaimedPublicHealthExternalAttemptToState,
   recordPublicHealthExternalAttemptToState,
+  requeuePublicHealthExternalDeadLetterToState,
   runtimeStatePayload,
   verifyRuntimeStateSignature
 };
