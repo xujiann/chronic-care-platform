@@ -37,6 +37,31 @@
         </article>
       </section>
 
+      <section class="panel" data-care-service-runtime>
+        <div class="panel-title">
+          <h2>生产写入与可靠投递</h2>
+          <span>事务提交 / 独占租约 / 指数退避 / 死信补偿 / 队列健康</span>
+        </div>
+        <div class="claim-grid">
+          <div class="claim-card">
+            <strong>订单与外盒原子提交</strong>
+            <span>安全建单和状态迁移通过仓储事务契约同时保存订单与外盒事件，失败时整体回滚。</span>
+          </div>
+          <div class="claim-card">
+            <strong>多实例独占领取</strong>
+            <span>worker 以租约领取事件；租约到期后可安全接管，并继续校验事件摘要和尝试次数。</span>
+          </div>
+          <div class="claim-card">
+            <strong>重试与死信补偿</strong>
+            <span>供应商失败采用有界指数退避，达到上限进入死信；人工重开要求运维角色、精确确认和处置证据。</span>
+          </div>
+          <div class="claim-card">
+            <strong>正式上线仍受门禁</strong>
+            <span>公共 API 集成、生产配置、真实接口联调、灾备演练和现场签字未完成前不会判定 production-ready。</span>
+          </div>
+        </div>
+      </section>
+
       <section class="portal-grid single" id="nursing-highlight-section">
         <article class="panel wide">
           <div class="panel-title">

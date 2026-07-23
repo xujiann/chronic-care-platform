@@ -302,10 +302,11 @@ function hasP1LifecycleEvidence(policy, domainSource, frontend) {
     /intake-duplicate-active-order/.test(domainSource);
 }
 
-function hasWritePathAdapterEvidence(policy, source) {
+function hasWritePathAdapterEvidence(policy, source, runtimeSource) {
   const lifecycle = policy.p1Lifecycle || {};
   return lifecycle.writePathVersion === "internet-nursing-write-path-v1" &&
     lifecycle.eventOutboxVersion === "internet-nursing-event-outbox-v1" &&
+    lifecycle.careServiceRuntimeVersion === "care-service-runtime-v1" &&
     /createInternetNursingOrder/.test(source) &&
     /transitionInternetNursingOrder/.test(source) &&
     /recordInternetNursingNotificationReceipt/.test(source) &&
@@ -322,7 +323,12 @@ function hasWritePathAdapterEvidence(policy, source) {
     /validateCatalogAndInstitution/.test(source) &&
     /intakeFingerprint/.test(source) &&
     /canAccessResident/.test(source) &&
-    /canAccessOrder/.test(source);
+    /canAccessOrder/.test(source) &&
+    /executeTransactionalCommand/.test(runtimeSource) &&
+    /claimOutboxEvents/.test(runtimeSource) &&
+    /runOutboxWorker/.test(runtimeSource) &&
+    /requeueDeadLetter/.test(runtimeSource) &&
+    /buildOutboxHealth/.test(runtimeSource);
 }
 
 function hasRegulatorySubmissionEvidence(policy, frontend, server, moduleDoc, launchPlan) {
@@ -480,6 +486,7 @@ function buildInternetNursingReadinessReport(options = {}) {
   const launchPlan = options.launchPlan ?? readText("docs/互联网护理上线与下一步开发计划.md");
   const domainSource = options.domainSource ?? readText("nursing-escort-domain.js");
   const writePathSource = options.writePathSource ?? readText("internet-nursing-service.js");
+  const runtimeSource = options.runtimeSource ?? readText("care-service-runtime.js");
   const policy = { ...fallbackPolicy(), ...(data.internetNursingPolicy || {}) };
   policy.notificationGateway = { ...fallbackPolicy().notificationGateway, ...(data.internetNursingPolicy?.notificationGateway || {}) };
   policy.pricingRules = { ...fallbackPolicy().pricingRules, ...(data.internetNursingPolicy?.pricingRules || {}) };
@@ -518,7 +525,8 @@ function buildInternetNursingReadinessReport(options = {}) {
     { id: "nursing:deviceVerification", passed: hasDeviceVerificationEvidence(policy, orders, nurses, frontend, server, moduleDoc, launchPlan), detail: "mobile GPS, location device, recorder, one-click alert, photo attachment, and exception escalation evidence are implemented" },
     { id: "nursing:specialistHomeCareSafety", passed: hasSpecialistHomeCareSafetyEvidence(policy, domainSource), detail: "catheter, wound and ostomy, and peritoneal dialysis services require equipment, emergency coordination, waste handover, and EMR archive evidence" },
     { id: "nursing:p1Lifecycle", passed: hasP1LifecycleEvidence(policy, domainSource, frontend), detail: "structured assessment, intake scheduling, specialist protocols, locked pricing, SLA risk closure, timeline, and notification receipts are implemented as one P1 domain contract" },
-    { id: "nursing:writePathAdapter", passed: hasWritePathAdapterEvidence(policy, writePathSource), detail: "safe create and transition adapters enforce resident scope, delegated authorization receipts, catalog admission, whitelisted fields, idempotent replay, conflict detection, and evidence gates" },
+    { id: "nursing:writePathAdapter", passed: hasWritePathAdapterEvidence(policy, writePathSource, runtimeSource), detail: "safe create and transition adapters enforce resident scope, delegated authorization receipts, catalog admission, whitelisted fields, idempotent replay, conflict detection, evidence gates, transactional execution, and reliable outbox delivery" },
+    { id: "nursing:reliableRuntimeVisibility", passed: /data-care-service-runtime/.test(frontend) && /独占租约/.test(frontend) && /死信补偿/.test(frontend) && /care-service-production-readiness\.js/.test(launchPlan) && /productionReady=true/.test(launchPlan), detail: "operators can see transactional delivery controls and the joint production gate remains fail-closed until platform, runtime and signoff evidence pass" },
     { id: "nursing:regulatorySubmission", passed: hasRegulatorySubmissionEvidence(policy, frontend, server, moduleDoc, launchPlan), detail: "field mapping, monthly and realtime submission, signoff, and pressure-test evidence are implemented" },
     { id: "nursing:siteCutoverPack", passed: hasCutoverPackEvidence(cutoverPack, `${moduleDoc}\n${cutoverDoc}`, launchPlan), detail: "site cutover signoff pack maps message, signature, connector, payment, device, regulatory, and audit-retention evidence" },
     { id: "nursing:highlightFeatures", passed: innovationCenter.featureCount === 10 && HIGHLIGHT_FEATURE_IDS.every((id) => innovationCenter.features.some((item) => item.id === id)) && /internet-nursing-highlights\.js/.test(frontend) && /renderNursingInnovationCenter/.test(frontend) && /nursing-highlight-center/.test(frontend) && /buildInternetNursingInnovationCenter/.test(server), detail: `${innovationCenter.featureCount}/10 highlight features wired` },
@@ -557,6 +565,7 @@ function buildInternetNursingReadinessReport(options = {}) {
       p1LifecycleTracks: Array.isArray(policy.p1Lifecycle?.tracks) ? policy.p1Lifecycle.tracks.length : 0,
       writePathAdapter: policy.p1Lifecycle?.writePathVersion === "internet-nursing-write-path-v1",
       eventOutbox: policy.p1Lifecycle?.eventOutboxVersion === "internet-nursing-event-outbox-v1",
+      careServiceRuntime: policy.p1Lifecycle?.careServiceRuntimeVersion === "care-service-runtime-v1",
       highlightFeatures: innovationCenter.featureCount,
       cutoverTracks: cutoverPack.tracks.length,
       cutoverReadyTracks: cutoverPack.tracks.filter((item) => item.ready).length,

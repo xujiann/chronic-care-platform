@@ -107,7 +107,7 @@ function validateOutboxEvent(event = {}) {
   if (!event.aggregateId) reasons.push("outbox-aggregate-id-missing");
   if (!event.eventType) reasons.push("outbox-event-type-missing");
   if (!event.payload || typeof event.payload !== "object" || Array.isArray(event.payload)) reasons.push("outbox-payload-invalid");
-  if (!["pending", "processing", "delivered", "failed"].includes(event.status)) reasons.push("outbox-status-invalid");
+  if (!["pending", "processing", "retry", "delivered", "failed", "dead-letter"].includes(event.status)) reasons.push("outbox-status-invalid");
   if (!Number.isFinite(Date.parse(String(event.occurredAt || "")))) reasons.push("outbox-time-invalid");
   if (!event.idempotencyKey) reasons.push("outbox-idempotency-key-missing");
   if (event.payloadDigest !== expectedPayloadDigest) reasons.push("outbox-payload-digest-invalid");

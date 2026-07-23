@@ -10112,6 +10112,7 @@
     ],
     "writePathPolicyVersion": "escort-write-path-v1",
     "eventOutboxPolicyVersion": "escort-event-outbox-v1",
+    "careServiceRuntimeVersion": "care-service-runtime-v1",
     "providerAdmissionPolicyVersion": "escort-provider-admission-v1",
     "eligibilityPolicyVersion": "escort-eligibility-v1"
   },
@@ -10786,6 +10787,7 @@
       "intakePolicyVersion": "internet-nursing-intake-v1",
       "writePathVersion": "internet-nursing-write-path-v1",
       "eventOutboxVersion": "internet-nursing-event-outbox-v1",
+      "careServiceRuntimeVersion": "care-service-runtime-v1",
       "requesterAuthorization": {
         "selfSource": "authenticated-session",
         "delegatedSource": "resident-authorization-registry",
