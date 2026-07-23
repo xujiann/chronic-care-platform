@@ -32,9 +32,11 @@ test("T00 exposes the T10 specialty cutover pack through public integration cont
   assert.match(client, /renderEvidenceDossier/);
   assert.match(client, /renderPilotBatchPlan/);
   assert.match(client, /renderSiteEvidenceWorkflow/);
+  assert.match(client, /renderAcceptanceScenarioSuite/);
   assert.match(client, /evidence-id-present/);
   assert.match(client, /batch-1-single-chain/);
   assert.match(client, /submit-evidence/);
+  assert.match(client, /scenario-3-signature-rejection/);
   assert.match(readme, /t10-specialty-cutover\.html/);
   assert.match(readme, /GET \/api\/t10-specialty\/cutover-pack/);
   assert.match(workbench, /t10-specialty-cutover\.html/);
@@ -46,6 +48,7 @@ test("T00 exposes the T10 specialty cutover pack through public integration cont
   assert.match(releaseReport, /specialtyCutover:evidenceDossier/);
   assert.match(releaseReport, /specialtyCutover:pilotBatchPlan/);
   assert.match(releaseReport, /specialtyCutover:siteEvidenceWorkflow/);
+  assert.match(releaseReport, /specialtyCutover:acceptanceScenarioSuite/);
   assert.match(releaseReport, /t10-specialty-cutover-pack\.json/);
   assert.match(releaseReport, /t10-specialty-cutover-pack\.md/);
 });
@@ -83,4 +86,8 @@ test("T10 public projection keeps all real production gates closed with rehearsa
   assert.equal(pack.siteEvidenceWorkflow.states.length, 6);
   assert.ok(pack.siteEvidenceWorkflow.transitions.some((item) => item.action === "accept-evidence"));
   assert.equal(pack.siteEvidenceWorkflow.batchOneEntryRequires.minimumStatus, "submitted");
+  assert.equal(pack.acceptanceScenarioSuite.status, "ready-for-controlled-rehearsal-only");
+  assert.equal(pack.acceptanceScenarioSuite.summary.scenarios, 5);
+  assert.equal(pack.acceptanceScenarioSuite.summary.hardStopScenarios, 4);
+  assert.ok(pack.acceptanceScenarioSuite.scenarios.some((item) => item.id === "scenario-4-manual-downgrade"));
 });
