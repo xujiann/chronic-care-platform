@@ -251,6 +251,7 @@ test("authorization model requires purpose scope expiry and evaluates active exp
 
   assert.equal(record.category, "authorizations");
   assert.equal(record.meta.granteeId, "team-family-doctor-r1");
+  assert.equal("previousAuthorizationId" in record.meta, false);
   assert.deepEqual(record.meta.scopes, ["health-record-summary", "emr-summary"]);
   assert.equal(record.meta.consentVersion, "resident-record-consent-v1");
   assert.equal(authorizationState(record, new Date("2026-07-22T09:00:00+08:00")).key, "active");
@@ -265,6 +266,25 @@ test("authorization model requires purpose scope expiry and evaluates active exp
   assert.throws(() => buildAuthorizationRecord({ residentId: "r1", granteeName: "团队", granteeId: "team-r1", purpose: "复诊", scopes: ["*"], expiresAt: "2026-12-31", grantedAt: "2026-07-22T08:00:00.000Z" }), /范围不受支持/);
   assert.throws(() => buildAuthorizationRecord({ residentId: "r1", granteeName: "团队", granteeId: "team-r1", purpose: "复诊", scopes: ["labs", "internal-all-records"], expiresAt: "2026-12-31", grantedAt: "2026-07-22T08:00:00.000Z" }), /范围不受支持/);
   assert.throws(() => buildAuthorizationRecord({ residentId: "r1", granteeName: "团队", granteeId: "team-r1", purpose: "复诊", scopes: ["labs"], expiresAt: "2026-07-21", grantedAt: "2026-07-22T08:00:00.000Z" }), /不能早于/);
+});
+
+test("renewed authorization keeps only the previous authorization reference", () => {
+  const record = buildAuthorizationRecord({
+    residentId: "r1",
+    granteeName: "家庭医生团队",
+    granteeId: "team-family-doctor-r1",
+    granteeType: "care-team",
+    previousAuthorizationId: "auth-previous-1",
+    purpose: "高血压复诊",
+    scopes: ["health-record-summary", "labs"],
+    expiresAt: "2026-12-31",
+    grantedAt: "2026-07-22T08:00:00.000Z",
+    previousAuthorization: { secret: "must-not-pass" }
+  });
+
+  assert.equal(record.meta.previousAuthorizationId, "auth-previous-1");
+  assert.equal("previousAuthorization" in record.meta, false);
+  assert.doesNotMatch(JSON.stringify(projectRecord(record)), /must-not-pass/);
 });
 
 test("resident summary separates authoritative and self-reported records", () => {

@@ -386,6 +386,12 @@
           </article>
 
           <article class="citizen-care-card wide">
+            <header><div><h3>授权生命周期与到期提醒</h3><small>续授权必须重新选择有效期并再次确认，不会静默延长原授权</small></div></header>
+            <div id="citizen-authorization-lifecycle-summary" class="citizen-care-list"></div>
+            <div id="citizen-authorization-lifecycle-list" class="citizen-care-list"></div>
+          </article>
+
+          <article class="citizen-care-card wide">
             <header>
               <div><h3>隐私审计与访问异议</h3><small>复核谁在何时、因何用途访问了哪些范围；已拦截不等于数据已披露</small></div>
               <button type="button" class="small-button" data-export-access-review>导出最小化访问清单</button>
@@ -763,8 +769,9 @@
 
     <dialog id="auth-dialog">
       <form method="dialog" class="dialog-form" id="auth-form">
+        <input type="hidden" name="previousAuthorizationId" value="" />
         <header>
-          <h2>新增授权</h2>
+          <h2 id="auth-dialog-title">新增授权</h2>
           <button type="button" class="close-button" data-close>×</button>
         </header>
         <div class="form-grid">
@@ -806,8 +813,8 @@
     <script src="./physical-examination-service.js"></script>
     <script src="./immunization-schedule.js"></script>
     <script src="./citizen-records-v1.js?v=20260723auth2"></script>
-    <script src="./citizen-records-v2.js?v=20260723care4"></script>
-    <script src="./citizen.js?v=20260723care4"></script>
+    <script src="./citizen-records-v2.js?v=20260723care5"></script>
+    <script src="./citizen.js?v=20260723care5"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));
