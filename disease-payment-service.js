@@ -444,6 +444,140 @@ function calculateAll(input, actor) {
   return state;
 }
 
+function diseaseCategory(code) {
+  const normalized = String(code || "").trim().toUpperCase();
+  const match = normalized.match(/^[A-Z][0-9]{2}/);
+  return match ? match[0] : normalized || "UNKNOWN";
+}
+
+function dateGapDays(from, to) {
+  const start = Date.parse(String(from || ""));
+  const end = Date.parse(String(to || ""));
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+  return Math.floor((end - start) / 86400000);
+}
+
+function estimatedClaimAmount(item) {
+  const declared = Number(item.declaredFundAmount || 0);
+  const standard = Number(item.calculation?.paymentStandard || 0);
+  const total = Number(item.totalAmount || 0);
+  if (declared > 0 && standard > 0) return round(Math.min(declared, standard));
+  return round(Math.max(0, declared || standard || total));
+}
+
+function complicationRank(value) {
+  return { NONE: 0, CC: 1, MCC: 2 }[String(value || "").toUpperCase()] ?? 0;
+}
+
+function buildDiseaseSupervisionProfiles(input, options = {}) {
+  const state = normalizeState(input);
+  const repeatWindowDays = Math.max(1, Math.min(180, Number(options.repeatWindowDays) || 30));
+  const institution = String(options.institution || "").trim();
+  const residentId = String(options.residentId || "").trim();
+  const requestedDisease = String(options.diseaseCode || "").trim().toUpperCase();
+  const requestedRisk = String(options.riskCode || "").trim().toUpperCase();
+  const limit = Math.max(1, Math.min(500, Number(options.limit) || 100));
+  const calculatedCases = state.cases.map((item) => item.calculation ? item : { ...item, calculation: calculateCase(state, item, state.mode) });
+  const grouped = new Map();
+
+  calculatedCases.forEach((item) => {
+    if (institution && item.institution !== institution && item.institutionCode !== institution) return;
+    if (residentId && item.residentId !== residentId) return;
+    const category = diseaseCategory(item.principalDiagnosis);
+    if (requestedDisease && category !== requestedDisease && String(item.principalDiagnosis || "").toUpperCase() !== requestedDisease) return;
+    const key = `${item.residentId || "NO_RESIDENT"}:${category}`;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(item);
+  });
+
+  const profiles = [...grouped.entries()].map(([key, rows]) => {
+    const admissions = rows.slice().sort((a, b) => String(a.admissionDate || "").localeCompare(String(b.admissionDate || "")) || String(a.id || "").localeCompare(String(b.id || "")));
+    const signals = [];
+    admissions.forEach((item, index) => {
+      const previous = index > 0 ? admissions[index - 1] : null;
+      const base = { caseId: item.id, settlementListNo: item.settlementListNo, institution: item.institution, occurredAt: item.admissionDate };
+      (item.calculation?.risks || []).forEach((risk) => {
+        const amount = risk.code === "HIGH_OUTLIER" ? Math.max(0, Number(item.declaredFundAmount || 0) - Number(item.calculation?.paymentStandard || 0)) : 0;
+        signals.push({ ...base, code: risk.code, name: risk.name, level: risk.level, estimatedFundImpact: round(amount), basis: risk.value ? `倍率${risk.value}，阈值${risk.threshold}` : "单病例规则命中" });
+      });
+      if (!previous) return;
+      const gapDays = dateGapDays(previous.dischargeDate, item.admissionDate);
+      if (gapDays == null || gapDays < 0 || gapDays > repeatWindowDays) return;
+      const crossInstitution = previous.institution !== item.institution;
+      signals.push({
+        ...base,
+        code: crossInstitution ? "CROSS_INSTITUTION_REPEAT_ADMISSION" : "REPEAT_ADMISSION",
+        name: crossInstitution ? "短期跨机构重复住院线索" : "短期重复住院线索",
+        level: gapDays <= 7 ? "高" : "中",
+        estimatedFundImpact: estimatedClaimAmount(item),
+        basis: `同一居民同一病种前次出院后${gapDays}天再次入院`,
+        linkedCaseIds: [previous.id, item.id],
+        previousInstitution: previous.institution,
+        gapDays
+      });
+      const previousDiagnoses = (previous.otherDiagnoses || []).length;
+      const currentDiagnoses = (item.otherDiagnoses || []).length;
+      const previousRank = complicationRank(previous.calculation?.grouping?.complicationLevel);
+      const currentRank = complicationRank(item.calculation?.grouping?.complicationLevel);
+      if (currentDiagnoses - previousDiagnoses >= 3 || currentRank > previousRank) {
+        signals.push({
+          ...base,
+          code: "CODING_COMPLEXITY_ESCALATION",
+          name: "诊断复杂度短期跃升线索",
+          level: currentRank - previousRank >= 2 ? "高" : "中",
+          estimatedFundImpact: round(Math.max(0, Number(item.calculation?.paymentStandard || 0) - Number(previous.calculation?.paymentStandard || 0))),
+          basis: `其他诊断${previousDiagnoses}→${currentDiagnoses}，并发症层级${previous.calculation?.grouping?.complicationLevel || "NONE"}→${item.calculation?.grouping?.complicationLevel || "NONE"}`,
+          linkedCaseIds: [previous.id, item.id],
+          gapDays
+        });
+      }
+    });
+    const uniqueSignals = [...new Map(signals.map((item) => [`${item.code}:${item.caseId}:${(item.linkedCaseIds || []).join("-")}`, item])).values()];
+    const visibleSignals = requestedRisk ? uniqueSignals.filter((item) => item.code === requestedRisk) : uniqueSignals;
+    const institutions = [...new Set(admissions.map((item) => item.institution).filter(Boolean))];
+    const latest = admissions.at(-1);
+    return {
+      id: key,
+      residentId: latest.residentId || "",
+      patientName: latest.patientName || "",
+      diseaseCode: diseaseCategory(latest.principalDiagnosis),
+      diseaseName: latest.principalDiagnosisName || latest.principalDiagnosis || "未命名病种",
+      admissionCount: admissions.length,
+      institutionCount: institutions.length,
+      institutions,
+      firstAdmissionDate: admissions[0]?.admissionDate || "",
+      lastDischargeDate: latest.dischargeDate || "",
+      totalAmount: round(admissions.reduce((sum, item) => sum + Number(item.totalAmount || 0), 0)),
+      declaredFundAmount: round(admissions.reduce((sum, item) => sum + Number(item.declaredFundAmount || 0), 0)),
+      paymentStandard: round(admissions.reduce((sum, item) => sum + Number(item.calculation?.paymentStandard || 0), 0)),
+      estimatedFundImpact: round(visibleSignals.reduce((sum, item) => sum + Number(item.estimatedFundImpact || 0), 0)),
+      riskLevel: visibleSignals.some((item) => item.level === "高") ? "高" : visibleSignals.length ? "中" : "低",
+      signals: visibleSignals,
+      admissions: admissions.map((item) => ({ id: item.id, settlementListNo: item.settlementListNo, institution: item.institution, admissionDate: item.admissionDate, dischargeDate: item.dischargeDate, principalDiagnosis: item.principalDiagnosis, groupCode: item.calculation?.grouping?.groupCode || "UNGROUPED", complicationLevel: item.calculation?.grouping?.complicationLevel || "", declaredFundAmount: Number(item.declaredFundAmount || 0), paymentStandard: Number(item.calculation?.paymentStandard || 0) }))
+    };
+  }).filter((item) => !requestedRisk || item.signals.length > 0)
+    .sort((a, b) => (({ "高": 2, "中": 1, "低": 0 }[b.riskLevel] || 0) - ({ "高": 2, "中": 1, "低": 0 }[a.riskLevel] || 0)) || b.estimatedFundImpact - a.estimatedFundImpact || String(b.lastDischargeDate).localeCompare(String(a.lastDischargeDate)))
+    .slice(0, limit);
+  const allSignals = profiles.flatMap((item) => item.signals);
+  return {
+    policyBoundary: "风险线索用于智能审核和人工复核，不直接认定违规或作为扣款依据",
+    ruleVersion: "disease-supervision-profile-v1",
+    repeatWindowDays,
+    generatedAt: new Date().toISOString(),
+    summary: {
+      profiles: profiles.length,
+      monitoredCases: profiles.reduce((sum, item) => sum + item.admissionCount, 0),
+      riskProfiles: profiles.filter((item) => item.signals.length).length,
+      signals: allSignals.length,
+      estimatedFundImpact: round(allSignals.reduce((sum, item) => sum + Number(item.estimatedFundImpact || 0), 0)),
+      repeatAdmissions: allSignals.filter((item) => item.code === "REPEAT_ADMISSION").length,
+      crossInstitutionAdmissions: allSignals.filter((item) => item.code === "CROSS_INSTITUTION_REPEAT_ADMISSION").length,
+      codingEscalations: allSignals.filter((item) => item.code === "CODING_COMPLEXITY_ESCALATION").length
+    },
+    profiles
+  };
+}
+
 function createSpecialCase(input, payload, actor) {
   const state = normalizeState(input);
   const item = state.cases.find((row) => row.id === payload.caseId);
@@ -791,7 +925,8 @@ function buildOverview(input) {
     return { institution, caseCount: cases.length, totalCost: round(cases.reduce((sum, item) => sum + Number(item.totalAmount || 0), 0)), standardAmount: round(cases.reduce((sum, item) => sum + Number(item.calculation?.paymentStandard || 0), 0)), riskCount: cases.reduce((sum, item) => sum + (item.calculation?.risks?.length || 0), 0) };
   });
   const specialCapRate = state.mode === "DRG" ? 0.05 : 0.005;
-  return { state: clientState, summary: { caseCount: state.cases.length, calculatedCount: calculated.length, ungroupedCount: state.cases.filter((item) => item.calculation?.grouping && !item.calculation.grouping.ok).length, totalCost, paymentStandard, projectedBalance: round(paymentStandard - totalCost), riskCount: risks.length, specialPending: state.specialCases.filter((item) => item.status === "待评审").length, specialCapRate, specialUsageRate: round(state.specialCases.filter((item) => !["不予通过", "已撤回"].includes(item.status)).length / Math.max(1, state.cases.length), 4), settlementPending: state.settlementBatches.filter((item) => item.status !== "已拨付").length, prepaymentPending: state.prepayments.filter((item) => item.status === "待审批").length, unpaidPending: state.unpaidItems.filter((item) => item.status !== "已支付").length, negotiationPending: state.negotiationRounds.filter((item) => item.status !== "已达成一致").length, trainingPending: state.trainings.filter((item) => item.status !== "已完成").length, intake: DiseasePaymentIntake.buildIntakeSummary(state), drg: buildDrgAnalytics(state) }, institutions };
+  const supervision = buildDiseaseSupervisionProfiles(state);
+  return { state: clientState, summary: { caseCount: state.cases.length, calculatedCount: calculated.length, ungroupedCount: state.cases.filter((item) => item.calculation?.grouping && !item.calculation.grouping.ok).length, totalCost, paymentStandard, projectedBalance: round(paymentStandard - totalCost), riskCount: risks.length, specialPending: state.specialCases.filter((item) => item.status === "待评审").length, specialCapRate, specialUsageRate: round(state.specialCases.filter((item) => !["不予通过", "已撤回"].includes(item.status)).length / Math.max(1, state.cases.length), 4), settlementPending: state.settlementBatches.filter((item) => item.status !== "已拨付").length, prepaymentPending: state.prepayments.filter((item) => item.status === "待审批").length, unpaidPending: state.unpaidItems.filter((item) => item.status !== "已支付").length, negotiationPending: state.negotiationRounds.filter((item) => item.status !== "已达成一致").length, trainingPending: state.trainings.filter((item) => item.status !== "已完成").length, intake: DiseasePaymentIntake.buildIntakeSummary(state), drg: buildDrgAnalytics(state), supervision: supervision.summary }, institutions, supervision };
 }
 
-module.exports = { POLICY, activateDueLocalPaymentPackages, activateLocalPaymentPackage, applyGovernanceAction, buildCatalogIndexStats, buildDrgAnalytics, buildDrgCatalogView, buildLocalPaymentPackageView, buildOverview, buildParameterGovernanceView, calculateAll, calculateCase, cancelLocalPaymentPackageSimulationJob, compareLocalPaymentPackage, createLocalPaymentPackageSimulationJob, createPaymentParameter, createSettlementBatch, createSpecialCase, drgCatalogMatch, getLocalPaymentPackageCatalogPage, getLocalPaymentPackageReport, importLocalPaymentPackage, inferDrgComplicationLevel, normalizeState, processLocalPaymentPackageSimulationJob, publishLocalPaymentPackage, publishPaymentParameter, reconcileBatch, retryLocalPaymentPackageSimulationJob, reviewLocalPaymentPackage, reviewPaymentParameter, reviewSpecialCase, rollbackLocalPaymentPackage, seedDiseasePaymentState, simulateDrgCase, simulateLocalPaymentPackage, simulatePaymentParameter, submitLocalPaymentPackage, submitPaymentParameter, validateCase, validateLocalPaymentPackage: LocalPaymentPackage.validateLocalPaymentPackage };
+module.exports = { POLICY, activateDueLocalPaymentPackages, activateLocalPaymentPackage, applyGovernanceAction, buildCatalogIndexStats, buildDiseaseSupervisionProfiles, buildDrgAnalytics, buildDrgCatalogView, buildLocalPaymentPackageView, buildOverview, buildParameterGovernanceView, calculateAll, calculateCase, cancelLocalPaymentPackageSimulationJob, compareLocalPaymentPackage, createLocalPaymentPackageSimulationJob, createPaymentParameter, createSettlementBatch, createSpecialCase, drgCatalogMatch, getLocalPaymentPackageCatalogPage, getLocalPaymentPackageReport, importLocalPaymentPackage, inferDrgComplicationLevel, normalizeState, processLocalPaymentPackageSimulationJob, publishLocalPaymentPackage, publishPaymentParameter, reconcileBatch, retryLocalPaymentPackageSimulationJob, reviewLocalPaymentPackage, reviewPaymentParameter, reviewSpecialCase, rollbackLocalPaymentPackage, seedDiseasePaymentState, simulateDrgCase, simulateLocalPaymentPackage, simulatePaymentParameter, submitLocalPaymentPackage, submitPaymentParameter, validateCase, validateLocalPaymentPackage: LocalPaymentPackage.validateLocalPaymentPackage };

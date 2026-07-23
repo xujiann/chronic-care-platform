@@ -97,7 +97,7 @@ const {
 const { buildProcessAuditReport } = require("./scripts/process-audit");
 const { buildSiteReadinessPack, renderTemplateReadmes } = require("./scripts/site-readiness-pack");
 const { buildHealthDashboardSummary, buildPriorityApplicationTemplates } = require("./scripts/health-dashboard-summary");
-const { buildPilotAcceptanceCenter } = require("./pilot-acceptance");
+const { applyPilotInterfaceReviewAction, buildInterfaceReviews, buildPilotAcceptanceCenter } = require("./pilot-acceptance");
 const { buildReleaseReport, buildServiceAcceptanceSummary } = require("./scripts/release-report");
 const { buildReleaseArtifactManifest } = require("./scripts/release-artifact-manifest");
 const { buildCapabilityMap, renderCapabilityMapMarkdown } = require("./platform-capability-map");
@@ -1134,6 +1134,7 @@ function seedState() {
     platformEvidence: seedPlatformEvidence(),
     platformCapabilityReviews: seedPlatformCapabilityReviews(),
     platformProductionBlockerReviews: seedPlatformProductionBlockerReviews(),
+    pilotAcceptanceInterfaceReviews: [],
     productionDeploymentPlan: seedProductionDeploymentPlan(),
     productionDatabaseMigrationBatches: seedProductionDatabaseMigrationBatches(),
     productionDatabaseCutoverRuns: seedProductionDatabaseCutoverRuns(),
@@ -10180,6 +10181,7 @@ function normalizeState(data) {
     platformEvidence: cleanPlatformEvidenceText(mergeByKey(seedPlatformEvidence(), data.platformEvidence, "id")),
     platformCapabilityReviews: normalizePlatformCapabilityReviews(data.platformCapabilityReviews),
     platformProductionBlockerReviews: normalizePlatformProductionBlockerReviews(data.platformProductionBlockerReviews),
+    pilotAcceptanceInterfaceReviews: buildInterfaceReviews(data),
     productionDeploymentPlan: mergeByKey(seedProductionDeploymentPlan(), data.productionDeploymentPlan, "id"),
     productionDatabaseMigrationBatches: mergeByKey(seedProductionDatabaseMigrationBatches(), data.productionDatabaseMigrationBatches, "id"),
     productionDatabaseCutoverRuns: mergeByKey(seedProductionDatabaseCutoverRuns(), data.productionDatabaseCutoverRuns, "id"),
@@ -10391,6 +10393,7 @@ function completeSystemTargets(state) {
   }));
   state.platformCapabilityReviews = normalizePlatformCapabilityReviews(state.platformCapabilityReviews);
   state.platformProductionBlockerReviews = normalizePlatformProductionBlockerReviews(state.platformProductionBlockerReviews);
+  state.pilotAcceptanceInterfaceReviews = buildInterfaceReviews(state);
   state.productionDeploymentPlan = mergeByKey(seedProductionDeploymentPlan(), state.productionDeploymentPlan, "id").map((item) => ({
     ...item,
     requiredConfig: Array.isArray(item.requiredConfig) ? item.requiredConfig : [],
@@ -15940,6 +15943,7 @@ function scopeStateForUser(data, user) {
   delete scoped.platformEvidence;
   delete scoped.platformCapabilityReviews;
   delete scoped.platformProductionBlockerReviews;
+  delete scoped.pilotAcceptanceInterfaceReviews;
   delete scoped.productionDeploymentPlan;
   delete scoped.productionDatabaseMigrationBatches;
   delete scoped.productionDatabaseCutoverRuns;
@@ -24922,6 +24926,43 @@ async function handleApi(req, res) {
     return;
   }
 
+  const pilotAcceptanceInterfaceActionMatch = url.pathname.match(/^\/api\/pilot-acceptance\/interfaces\/([^/]+)\/actions$/);
+  if (req.method === "POST" && pilotAcceptanceInterfaceActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/pilot-acceptance/interfaces/:id/actions");
+    if (!user) return;
+    const interfaceId = decodeURIComponent(pilotAcceptanceInterfaceActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    let result;
+    try {
+      result = applyPilotInterfaceReviewAction(data, interfaceId, payload, user);
+    } catch (error) {
+      sendJson(res, /not found/.test(error.message) ? 404 : 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    data.pilotAcceptanceInterfaceReviews = result.reviews;
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "pilot-interface-joint-test-action",
+        target: interfaceId,
+        result: "allowed",
+        detail: `${payload.action} / ${result.item.workflowStatus} / ${result.item.evidenceRef || "no-evidence"}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, {
+      ok: true,
+      interfaceReview: result.item,
+      center: buildPilotAcceptanceCenter({ data, env: process.env })
+    });
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/health-dashboard/production-readiness") {
     const user = requireApiRole(req, res, ["commission"], "/api/health-dashboard/production-readiness");
     if (!user) return;
@@ -33325,7 +33366,27 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
     if (!user) return;
     const data = readDatabase();
-    sendJson(res, 200, DiseasePaymentService.buildOverview(data.diseasePayment));
+    const overview = DiseasePaymentService.buildOverview(data.diseasePayment);
+    if (user.role === "institution") {
+      overview.supervision = DiseasePaymentService.buildDiseaseSupervisionProfiles(data.diseasePayment, { institution: user.orgName });
+      overview.summary.supervision = overview.supervision.summary;
+    }
+    sendJson(res, 200, overview);
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/supervision/profiles" && req.method === "GET") {
+    const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    sendJson(res, 200, DiseasePaymentService.buildDiseaseSupervisionProfiles(data.diseasePayment, {
+      institution: user.role === "institution" ? user.orgName : url.searchParams.get("institution"),
+      residentId: url.searchParams.get("residentId"),
+      diseaseCode: url.searchParams.get("diseaseCode"),
+      riskCode: url.searchParams.get("riskCode"),
+      repeatWindowDays: url.searchParams.get("repeatWindowDays"),
+      limit: url.searchParams.get("limit")
+    }));
     return;
   }
 
@@ -33583,7 +33644,12 @@ async function handleApi(req, res) {
     if (["DRG", "DIP"].includes(payload.mode)) current.mode = payload.mode;
     data.diseasePayment = DiseasePaymentService.calculateAll(current, user.name);
     writeDatabase(data);
-    sendJson(res, 200, DiseasePaymentService.buildOverview(data.diseasePayment));
+    const overview = DiseasePaymentService.buildOverview(data.diseasePayment);
+    if (user.role === "institution") {
+      overview.supervision = DiseasePaymentService.buildDiseaseSupervisionProfiles(data.diseasePayment, { institution: user.orgName });
+      overview.summary.supervision = overview.supervision.summary;
+    }
+    sendJson(res, 200, overview);
     return;
   }
 

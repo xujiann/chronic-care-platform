@@ -4182,6 +4182,20 @@ dialog::backdrop {
   text-align: right;
 }
 
+#capability-matrix .capability-side,
+#capability-matrix .capability-side > * {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+#pilot-acceptance-status {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .workflow-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

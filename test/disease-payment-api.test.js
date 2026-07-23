@@ -59,6 +59,16 @@ test("disease payment API runs an authenticated end-to-end workflow", async (t) 
   const overview = await json(baseUrl, "/api/disease-payment", { headers });
   assert.equal(overview.response.status, 200);
   assert.equal(overview.body.state.policy.id, "nhsa-2025-18");
+  assert.equal(overview.body.supervision.ruleVersion, "disease-supervision-profile-v1");
+  const supervision = await json(baseUrl, "/api/disease-payment/supervision/profiles?diseaseCode=I10&limit=20", { headers });
+  assert.equal(supervision.response.status, 200);
+  assert.ok(Array.isArray(supervision.body.profiles));
+  assert.match(supervision.body.policyBoundary, /人工复核/);
+  const hospitalLogin = await json(baseUrl, "/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: "hospital", password: "123456" }) });
+  const hospitalHeaders = { Authorization: `Bearer ${hospitalLogin.body.token}` };
+  const hospitalSupervision = await json(baseUrl, "/api/disease-payment/supervision/profiles?institution=大连市普兰店区中心医院", { headers: hospitalHeaders });
+  assert.equal(hospitalSupervision.response.status, 200);
+  assert.ok(hospitalSupervision.body.profiles.every((item) => item.institutions.every((name) => name === "大连市中心医院")));
   const catalog = await json(baseUrl, "/api/disease-payment/drg/catalog", { headers });
   assert.equal(catalog.response.status, 200);
   assert.equal(catalog.body.profile.mdcCount, 26);

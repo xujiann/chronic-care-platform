@@ -4556,13 +4556,24 @@ test("priority application pilot acceptance control center is release wired", ()
   const readiness = read("scripts/pilot-acceptance-readiness.js");
   const documentation = read("docs/pilot-acceptance-control-center.md");
   assert.match(server, /\/api\/pilot-acceptance\/center/);
+  assert.match(server, /pilot-acceptance\/interfaces/);
   assert.match(html, /data-platform-section="pilot-acceptance"/);
   ["pilot-acceptance-applications", "pilot-acceptance-alerting", "pilot-acceptance-onsite", "pilot-acceptance-interfaces", "pilot-acceptance-trials", "pilot-acceptance-issues"].forEach((marker) => assert.match(html, new RegExp(marker)));
   assert.match(ui, /pilot-acceptance\/center/);
   assert.match(ui, /data-pilot-acceptance-refresh/);
+  assert.match(ui, /data-pilot-interface-action/);
+  assert.match(model, /reviewer must be independent from recorder/);
+  assert.match(model, /acceptedProductionReceipts/);
   ["official-grouper", "insurance-core", "his-emr-feed", "physical-exam-feed", "pilot-acceptance-tooling-ready", "blocked-until-site-evidence-signed"].forEach((marker) => assert.match(model, new RegExp(marker)));
   assert.match(readiness, /pilot-acceptance-readiness-report\.md/);
   assert.match(documentation, /P0-01至P0-10/);
   assert.match(read("deploy/pilot-alerting.env.template"), /CUTOVER_MONITORING_SIGNOFF=false/);
   assert.match(read("package.json"), /pilot:acceptance-readiness/);
+});
+
+test("2026-07-23 delivery report and onsite work pack preserve release evidence boundaries", () => {
+  const report = read("docs/平台开发今日进展报告-2026-07-23.md");
+  const workPack = read("docs/试点现场验收与接口联调工作包-2026-07-23.md");
+  ["515/515", "8/8", "0/10", "0/4", "blocked-until-site-evidence-signed"].forEach((marker) => assert.ok(report.includes(marker), marker));
+  ["P0-01", "P0-10", "生产告警演练单", "official-grouper", "四方签字页", "不代替医院或主管部门签字"].forEach((marker) => assert.ok(workPack.includes(marker), marker));
 });
