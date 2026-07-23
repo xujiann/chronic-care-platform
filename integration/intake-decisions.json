@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-23T06:59:43.077Z",
+  "updatedAt": "2026-07-23T07:04:45.981Z",
   "decisions": [
     {
       "lineId": "T01",
@@ -105,28 +105,30 @@
     },
     {
       "lineId": "T06",
-      "candidateHead": "bceee20bca687210fb0fea09e5a0705b170147dd",
+      "candidateHead": "7cc9a09b9b4aa1af375e829107ad1e4fb3c8096f",
       "decision": "accepted",
-      "reviewedAt": "2026-07-23T06:52:07.738Z",
+      "reviewedAt": "2026-07-23T07:04:45.981Z",
       "reviewer": "T00",
       "checks": [
         "git diff --check",
-        "24 nursing and escort domain workflow tests passed independently",
-        "75 nursing, escort and static portal regressions passed independently",
+        "102 nursing, escort domain, readiness and static portal tests passed independently",
+        "rescheduling releases original resources and requires an approved replacement assignment",
+        "no-show handling requires grace-period attendance evidence and a bound human decision",
         "qualification, institution scope, high-risk, service evidence, complaint, settlement, cancellation and refund paths fail closed"
       ],
       "blockers": []
     },
     {
       "lineId": "T07",
-      "candidateHead": "65b87d38fec0b48b3aadcd1680859ddfebde96b8",
+      "candidateHead": "bf0e78d7af8990bac476e54d14bb85fe89d24524",
       "decision": "accepted",
-      "reviewedAt": "2026-07-23T06:52:07.738Z",
+      "reviewedAt": "2026-07-23T07:04:45.981Z",
       "reviewer": "T00",
       "checks": [
         "git diff --check",
-        "78 disease-payment, financial gateway and insurance-payment tests passed independently",
+        "83 disease-payment, financial gateway and insurance-payment tests passed independently",
         "signed callbacks, replay protection, dual-review refunds, difference reconciliation and per-institution annual clearance validated",
+        "special-case appeals bind the original decision and require a fresh two-person panel disjoint from original reviewers",
         "evidence packets remain digest-bound, privacy-minimized and productionReady false"
       ],
       "blockers": []
