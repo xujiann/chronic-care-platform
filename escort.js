@@ -8,6 +8,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 async function loadEscortDashboard() {
   escortDashboard = await fetchEscortDashboard();
+  escortDashboard = withEscortDispatchControls(escortDashboard);
   renderEscortDashboard(escortDashboard);
 }
 
@@ -51,6 +52,158 @@ function buildStaticEscortDashboard(state) {
     riskQueue: orders.filter((item) => item.priority === "high" || item.riskLevel === "high"),
     qualityQueue: orders.filter((item) => item.qualityReview && !["closed", "passed"].includes(item.qualityReview))
   };
+}
+
+function withEscortDispatchControls(dashboard = {}) {
+  const domain = window.NursingEscortDomain;
+  if (!domain) return dashboard;
+  const workers = Array.isArray(dashboard.workers) ? dashboard.workers : [];
+  return {
+    ...dashboard,
+    orders: (Array.isArray(dashboard.orders) ? dashboard.orders : []).map((order) => ({
+      ...order,
+      dispatchControl: buildEscortDispatchControl(order, workers, domain),
+      serviceEvidenceControl: buildEscortServiceEvidenceControl(order, domain),
+      financialEvidenceControl: buildEscortFinancialEvidenceControl(order, domain),
+      riskQualityControl: buildEscortRiskQualityControl(order, domain),
+      cancellationRefundControl: buildEscortCancellationRefundControl(order, domain)
+    }))
+  };
+}
+
+function buildEscortDispatchControl(order, workers, domain) {
+  const worker = order.worker || workers.find((item) => item.id === order.workerId);
+  const current = domain.canonicalStatus(order.status, "escort");
+  if (worker && !["requested", "eligibility-checked", "provider-matched", "risk-hold", "hospital-returned", "evidence-pending"].includes(current)) {
+    const qualification = domain.validateEscortWorkerQualification(worker, order, { now: new Date() });
+    return {
+      eligible: qualification.ok,
+      assigned: true,
+      personId: worker.id,
+      personName: worker.name,
+      blockers: qualification.reasons.map((item) => `qualification:${item}`)
+    };
+  }
+  const ranked = domain.rankDispatchCandidates("escort", order, workers, { now: new Date(), limit: 3 });
+  return {
+    eligible: ranked.candidates.length > 0,
+    assigned: false,
+    personId: ranked.candidates[0]?.personId || "",
+    personName: ranked.candidates[0]?.personName || "",
+    score: ranked.candidates[0]?.score || 0,
+    blockers: ranked.blockers
+  };
+}
+
+function escortDispatchControlText(item) {
+  const control = item.dispatchControl;
+  if (!control) return "";
+  if (control.assigned && control.eligible) return `assigned qualification passed: ${control.personName || control.personId}`;
+  if (control.eligible) return `dispatch ready: ${control.personName || control.personId} / score ${Math.round(control.score * 10) / 10}`;
+  return `dispatch blocked: ${(control.blockers || []).slice(0, 4).join(", ") || "no eligible worker"}`;
+}
+
+function buildEscortServiceEvidenceControl(order, domain) {
+  const current = domain.canonicalStatus(order.status, "escort");
+  const target = current === "in-service" ? "completed" : "in-service";
+  const transition = domain.validateTransition("escort", current, target);
+  const evidence = domain.validateServiceEvidence("escort", order, target);
+  return {
+    ok: transition.ok && evidence.ok,
+    target,
+    blockers: [
+      ...(transition.ok ? [] : [`transition:${current}->${target}`]),
+      ...evidence.reasons
+    ]
+  };
+}
+
+function escortServiceEvidenceText(item) {
+  const control = item.serviceEvidenceControl;
+  if (!control) return "";
+  if (control.ok) return control.target === "completed" ? "completion evidence passed" : "service-start evidence passed";
+  return `service blocked: ${control.blockers.slice(0, 5).join(", ")}`;
+}
+
+function buildEscortFinancialEvidenceControl(order, domain) {
+  const current = domain.canonicalStatus(order.status, "escort");
+  const target = current === "settlement-pending" ? "settled" : "settlement-pending";
+  const transition = domain.validateTransition("escort", current, target);
+  const evidence = domain.validateFinancialEvidence("escort", order, target);
+  return {
+    ok: transition.ok && evidence.ok,
+    target,
+    blockers: [
+      ...(transition.ok ? [] : [`transition:${current}->${target}`]),
+      ...evidence.reasons
+    ]
+  };
+}
+
+function escortFinancialEvidenceText(item) {
+  const control = item.financialEvidenceControl;
+  if (!control) return "";
+  if (control.ok) return control.target === "settled" ? "settlement callback and reconciliation passed" : "pricing and financial dispatch passed";
+  return `settlement blocked: ${control.blockers.slice(0, 5).join(", ")}`;
+}
+
+function buildEscortRiskQualityControl(order, domain) {
+  const current = domain.canonicalStatus(order.status, "escort");
+  const target = current === "complaint-open"
+    ? "quality-review"
+    : ["quality-review", "adverse-event", "closed"].includes(current) ? "closed" : "quality-review";
+  const transition = current === "closed" ? { ok: true } : domain.validateTransition("escort", current, target);
+  const evidence = domain.validateRiskQualityEvidence("escort", order, target, { currentStatus: current });
+  return {
+    ok: transition.ok && evidence.ok,
+    target,
+    blockers: [
+      ...(transition.ok ? [] : [`transition:${current}->${target}`]),
+      ...evidence.reasons
+    ]
+  };
+}
+
+function escortRiskQualityText(item) {
+  const control = item.riskQualityControl;
+  if (!control) return "";
+  if (control.ok) return control.target === "closed" ? "risk and quality closure passed" : "quality review evidence passed";
+  return `risk/quality blocked: ${control.blockers.slice(0, 5).join(", ")}`;
+}
+
+function escortRiskQualityActionAttributes(item, target) {
+  const control = item.riskQualityControl;
+  if (control?.ok && control.target === target) return "";
+  return `disabled aria-disabled="true" title="${escapeHtml(escortRiskQualityText(item) || `transition to ${target} blocked`)}"`;
+}
+
+function buildEscortCancellationRefundControl(order, domain) {
+  const current = domain.canonicalStatus(order.status, "escort");
+  let target = "";
+  if (current === "refund-pending") target = "refunded";
+  else if (current === "cancel-requested") target = order.cancellationRequest?.refundRequested ? "refund-pending" : "cancelled";
+  else if (["settlement-pending", "settled"].includes(current)) target = "refund-pending";
+  else if (["requested", "eligibility-checked", "provider-matched", "worker-dispatched", "accepted", "hospital-returned", "evidence-pending", "hospital-confirmed", "risk-hold"].includes(current)) {
+    target = "cancel-requested";
+  }
+  if (!target) return null;
+  const transition = domain.validateTransition("escort", current, target);
+  const evidence = domain.validateCancellationRefundEvidence("escort", order, target, { currentStatus: current });
+  return {
+    ok: transition.ok && evidence.ok,
+    target,
+    blockers: [
+      ...(transition.ok ? [] : [`transition:${current}->${target}`]),
+      ...evidence.reasons
+    ]
+  };
+}
+
+function escortCancellationRefundText(item) {
+  const control = item.cancellationRefundControl;
+  if (!control) return "";
+  if (control.ok) return `cancellation/refund evidence passed: ${control.target}`;
+  return `cancellation/refund blocked: ${control.blockers.slice(0, 5).join(", ")}`;
 }
 
 function renderEscortDashboard(dashboard) {
@@ -98,14 +251,14 @@ function renderEscortOrders(items) {
           <td><strong>${escapeHtml(item.id)}</strong><br><small>${escapeHtml(item.sourceChannel || "")}</small></td>
           <td>${escapeHtml(item.residentId || "")}<br><small>${escapeHtml(item.familyContactStatus || "")}</small></td>
           <td>${escapeHtml(item.provider?.name || item.providerName || item.providerId || "")}<br><small>${escapeHtml(item.district || "")}</small></td>
-          <td>${escapeHtml(item.worker?.name || item.workerId || "pending")}<br><small>${escapeHtml((item.serviceItems || []).join(", "))}</small></td>
+          <td>${escapeHtml(item.worker?.name || item.workerId || "pending")}<br><small>${escapeHtml((item.serviceItems || []).join(", "))}</small><br><small>${escapeHtml(escortDispatchControlText(item))}</small></td>
           <td>${escapeHtml(item.hospital || "")}<br><small>${escapeHtml(item.department || "")} / ${escapeHtml(item.appointmentAt || item.due || "")}</small><br><small>${statusBadge(item.hospitalInterfaceStatus || "pending")} ${escapeHtml(item.hospitalCheckInNo || item.outpatientQueueNo || item.hospitalNotice || "")}</small><br><small>${escapeHtml(item.hisVisitId || item.appointmentSource || "")} ${escapeHtml(item.departmentCode || "")} ${escapeHtml(item.doctorCode || "")}</small></td>
           <td>${statusBadge(item.subsidyType)} ${statusBadge(item.contractStatus)} ${statusBadge(item.insuranceStatus)}</td>
-          <td>${statusBadge(item.status)} ${statusBadge(item.priority)}<br><small>${escapeHtml(item.qualityReview || "")}</small></td>
+          <td>${statusBadge(item.status)} ${statusBadge(item.priority)}<br><small>${escapeHtml(item.qualityReview || "")}</small><br><small>${escapeHtml(escortServiceEvidenceText(item))}</small><br><small>${escapeHtml(escortFinancialEvidenceText(item))}</small><br><small>${escapeHtml(escortRiskQualityText(item))}</small><br><small>${escapeHtml(escortCancellationRefundText(item))}</small></td>
           <td>
-            <button class="inline-action" type="button" data-escort-action="${escapeHtml(item.id)}" data-status="in-service">开始</button>
-            <button class="inline-action" type="button" data-escort-action="${escapeHtml(item.id)}" data-status="quality-review">回访</button>
-            <button class="inline-action" type="button" data-escort-action="${escapeHtml(item.id)}" data-status="closed">关闭</button>
+            <button class="inline-action" type="button" data-escort-action="${escapeHtml(item.id)}" data-status="in-service" ${item.serviceEvidenceControl?.ok ? "" : `disabled aria-disabled="true" title="${escapeHtml(escortServiceEvidenceText(item))}"`}>开始</button>
+            <button class="inline-action" type="button" data-escort-action="${escapeHtml(item.id)}" data-status="quality-review" ${escortRiskQualityActionAttributes(item, "quality-review")}>回访</button>
+            <button class="inline-action" type="button" data-escort-action="${escapeHtml(item.id)}" data-status="closed" ${escortRiskQualityActionAttributes(item, "closed")}>关闭</button>
           </td>
         </tr>
       `).join("")}</tbody>
@@ -154,11 +307,25 @@ function renderEscortWorkers(items) {
           <td>${escapeHtml(item.providerId || "")}</td>
           <td>${escapeHtml(item.trainingHours || 0)}h / ${statusBadge(item.examStatus)}</td>
           <td>${escapeHtml((item.skills || []).join(", "))}</td>
-          <td>${statusBadge(item.status)}<br><small>${escapeHtml(item.insuranceStatus || "")}</small></td>
+          <td>${statusBadge(item.status)} ${statusBadge(escortWorkerQualification(item).ok ? "qualified" : "blocked")}<br><small>${escapeHtml(escortWorkerQualificationText(item))}</small></td>
         </tr>
       `).join("")}</tbody>
     </table>
   `;
+}
+
+function escortWorkerQualification(item, order = {}) {
+  const domain = window.NursingEscortDomain;
+  if (!domain) {
+    const ok = Number(item.trainingHours || 0) >= 32 && item.examStatus === "passed" && item.insuranceStatus === "covered" && !["training", "suspended", "disabled"].includes(item.status);
+    return { ok, reasons: ok ? [] : ["qualification-incomplete"], missingSkills: [] };
+  }
+  return domain.validateEscortWorkerQualification(item, order, { now: new Date() });
+}
+
+function escortWorkerQualificationText(item) {
+  const result = escortWorkerQualification(item);
+  return result.ok ? `qualified / ${item.insuranceStatus || "insurance pending"}` : `blocked: ${result.reasons.join(", ")}`;
 }
 
 function renderEscortRisks(items) {

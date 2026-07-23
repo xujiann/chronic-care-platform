@@ -13,6 +13,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 async function loadInternetNursingDashboard() {
   nursingDashboard = await fetchInternetNursingDashboard();
+  nursingDashboard.dispatchRecommendations = buildStaticDispatchRecommendations(nursingDashboard.orders || [], nursingDashboard.nurses || []);
+  nursingDashboard.orders = withNursingServiceControls(nursingDashboard.orders || []);
+  nursingDashboard.orders = withNursingRiskQualityControls(nursingDashboard.orders);
+  nursingDashboard.orders = withNursingCancellationRefundControls(nursingDashboard.orders);
+  nursingDashboard.paymentReadiness = buildStaticPaymentReadiness(nursingDashboard.policy || {}, nursingDashboard.orders);
   renderInternetNursingDashboard(nursingDashboard);
 }
 
@@ -108,6 +113,33 @@ function staticNotificationDeliveries(item) {
 }
 
 function buildStaticDispatchRecommendations(orders, nurses) {
+  const domain = window.NursingEscortDomain;
+  if (domain) {
+    return orders
+      .filter((order) => !order.nurseId && !["completed", "closed", "cancelled", "rejected"].includes(order.status))
+      .map((order) => {
+        const ranked = domain.rankDispatchCandidates("nursing", order, nurses, { now: new Date(), limit: 3 });
+        return {
+          orderId: order.id,
+          residentId: order.residentId,
+          serviceItem: order.serviceItem,
+          riskLevel: order.riskLevel,
+          targetStatus: ranked.targetStatus,
+          blockers: ranked.blockers,
+          blockedCandidates: ranked.blockedCandidates,
+          candidates: ranked.candidates.map((item) => {
+            const nurse = nurses.find((row) => row.id === item.personId) || {};
+            return {
+              nurseId: item.personId,
+              nurseName: item.personName,
+              remainingCapacity: Math.max(0, Number(nurse.dailyCapacity || 0) - Number(nurse.assignedToday || 0)),
+              score: item.score,
+              reason: `资质、机构、专科、容量、风险和证据门禁均通过；风险等级 ${item.risk.band}`
+            };
+          })
+        };
+      });
+  }
   return orders
     .filter((order) => !order.nurseId && ["requested", "assessed", "dispatched"].includes(order.status))
     .map((order) => ({
@@ -129,6 +161,111 @@ function buildStaticDispatchRecommendations(orders, nurses) {
         .sort((a, b) => b.score - a.score)
         .slice(0, 3)
     }));
+}
+
+function withNursingServiceControls(orders) {
+  const domain = window.NursingEscortDomain;
+  if (!domain) return orders;
+  return orders.map((order) => {
+    const current = domain.canonicalStatus(order.status, "nursing");
+    if (["completed", "settlement-pending", "settled", "quality-review", "closed", "cancelled", "rejected", "refunded"].includes(current)) {
+      return { ...order, serviceEvidenceControl: null };
+    }
+    const target = current === "in-service" ? "completed" : "in-service";
+    const transition = domain.validateTransition("nursing", current, target);
+    const evidence = domain.validateServiceEvidence("nursing", order, target);
+    return {
+      ...order,
+      serviceEvidenceControl: {
+        ok: transition.ok && evidence.ok,
+        target,
+        blockers: [
+          ...(transition.ok ? [] : [`transition:${current}->${target}`]),
+          ...evidence.reasons
+        ]
+      }
+    };
+  });
+}
+
+function nursingServiceControlText(item) {
+  const control = item?.serviceEvidenceControl;
+  if (!control) return "";
+  if (control.ok) return control.target === "completed" ? "完成证据校验通过" : "开始服务证据校验通过";
+  return `履约阻断：${control.blockers.slice(0, 5).join("；")}`;
+}
+
+function withNursingRiskQualityControls(orders) {
+  const domain = window.NursingEscortDomain;
+  if (!domain) return orders;
+  return orders.map((order) => {
+    const current = domain.canonicalStatus(order.status, "nursing");
+    const hasIncident = order.adverseEvent?.status && order.adverseEvent.status !== "none";
+    const hasComplaint = order.complaintStatus && order.complaintStatus !== "none";
+    let target = "";
+    if (current === "complaint-open") target = "quality-review";
+    else if (["quality-review", "adverse-event", "closed"].includes(current)) target = "closed";
+    else if (["completed", "settled"].includes(current)) target = "quality-review";
+    else if (hasIncident) target = "adverse-event";
+    else if (hasComplaint) target = "complaint-open";
+    if (!target) return { ...order, riskQualityControl: null };
+    const transition = current === "closed"
+      ? { ok: true }
+      : domain.validateTransition("nursing", current, target);
+    const evidence = domain.validateRiskQualityEvidence("nursing", order, target, { currentStatus: current });
+    return {
+      ...order,
+      riskQualityControl: {
+        ok: transition.ok && evidence.ok,
+        target,
+        blockers: [
+          ...(transition.ok ? [] : [`transition:${current}->${target}`]),
+          ...evidence.reasons
+        ]
+      }
+    };
+  });
+}
+
+function nursingRiskQualityControlText(item) {
+  const control = item?.riskQualityControl;
+  if (!control) return "";
+  if (control.ok) return control.target === "closed" ? "风险与质控关闭证据通过" : "风险与质控流转证据通过";
+  return `风险质控阻断：${control.blockers.slice(0, 5).join("；")}`;
+}
+
+function withNursingCancellationRefundControls(orders) {
+  const domain = window.NursingEscortDomain;
+  if (!domain) return orders;
+  return orders.map((order) => {
+    const current = domain.canonicalStatus(order.status, "nursing");
+    let target = "";
+    if (current === "refund-pending") target = "refunded";
+    else if (current === "cancel-requested") target = order.cancellationRequest?.refundRequested ? "refund-pending" : "cancelled";
+    else if (["settlement-pending", "settled"].includes(current)) target = "refund-pending";
+    else if (["requested", "assessed", "risk-hold", "dispatched", "accepted"].includes(current)) target = "cancel-requested";
+    if (!target) return { ...order, cancellationRefundControl: null };
+    const transition = domain.validateTransition("nursing", current, target);
+    const evidence = domain.validateCancellationRefundEvidence("nursing", order, target, { currentStatus: current });
+    return {
+      ...order,
+      cancellationRefundControl: {
+        ok: transition.ok && evidence.ok,
+        target,
+        blockers: [
+          ...(transition.ok ? [] : [`transition:${current}->${target}`]),
+          ...evidence.reasons
+        ]
+      }
+    };
+  });
+}
+
+function nursingCancellationRefundControlText(item) {
+  const control = item?.cancellationRefundControl;
+  if (!control) return "";
+  if (control.ok) return `取消退费证据通过：${control.target}`;
+  return `取消退费阻断：${control.blockers.slice(0, 5).join("，")}`;
 }
 
 function buildStaticRegulatoryMonthlyReport(orders, institutions) {
@@ -201,7 +338,8 @@ function buildStaticPaymentReadiness(policy, orders) {
     insuranceEstimate: item.settlement?.insuranceEstimate || 0,
     estimatedSelfPay: item.settlement?.estimatedSelfPay || 0,
     invoiceStatus: ["completed", "closed"].includes(item.status) ? "invoice-ready" : "waiting-service-complete",
-    reconciliationStatus: item.settlement?.paymentStatus === "prechecked" ? "precheck-matched" : "pending"
+    reconciliationStatus: item.settlement?.paymentStatus === "prechecked" ? "precheck-matched" : "pending",
+    financialControl: buildNursingFinancialControl(item)
   }));
   return {
     ...payment,
@@ -211,6 +349,29 @@ function buildStaticPaymentReadiness(policy, orders) {
     precheckedOrders: paymentRows.filter((item) => item.paymentStatus === "prechecked").length,
     paymentRows
   };
+}
+
+function buildNursingFinancialControl(order) {
+  const domain = window.NursingEscortDomain;
+  if (!domain) return null;
+  const current = domain.canonicalStatus(order.status, "nursing");
+  const target = current === "settlement-pending" ? "settled" : "settlement-pending";
+  const transition = domain.validateTransition("nursing", current, target);
+  const evidence = domain.validateFinancialEvidence("nursing", order, target);
+  return {
+    ok: transition.ok && evidence.ok,
+    target,
+    blockers: [
+      ...(transition.ok ? [] : [`transition:${current}->${target}`]),
+      ...evidence.reasons
+    ]
+  };
+}
+
+function nursingFinancialControlText(control) {
+  if (!control) return "";
+  if (control.ok) return control.target === "settled" ? "回调与对账证据通过" : "定价与财务下发证据通过";
+  return `结算阻断：${control.blockers.slice(0, 5).join("；")}`;
 }
 
 function buildStaticDeviceVerification(policy, orders, nurses) {
@@ -566,6 +727,7 @@ function renderDispatchRecommendations(items) {
       <strong>${escapeHtml(item.orderId)} · ${escapeHtml(displayText(item.serviceItem))}</strong>
       <span>${first ? `${escapeHtml(displayText(first.nurseName))}，剩余容量 ${escapeHtml(first.remainingCapacity)}，评分 ${escapeHtml(Math.round(first.score * 10) / 10)}` : "暂无合格护士候选"}</span>
       <small>${escapeHtml(first?.reason || "按护士资质、服务项目、服务区域、日容量和风险等级推荐")}</small>
+      ${!first && item.blockers?.length ? `<small>派单阻断：${escapeHtml(item.blockers.slice(0, 5).join("；"))}</small>` : ""}
     </div>`;
   }).join("") : `<div><strong>暂无待推荐订单</strong><span>当前订单均已派单或已进入服务闭环。</span></div>`;
 }
@@ -578,6 +740,8 @@ function renderFinanceQuality(items) {
     <strong>${escapeHtml(item.id)} · ${escapeHtml(displayText(item.residentName || item.residentId || ""))}</strong>
     <span>${escapeHtml(settlementSummary(item))}</span>
     <small>${escapeHtml(qualitySummary(item))}</small>
+    <small>${escapeHtml(nursingRiskQualityControlText(item))}</small>
+    <small>${escapeHtml(nursingCancellationRefundControlText(item))}</small>
   </div>`).join("") : `<div><strong>暂无费用质量记录</strong><span>完成订单后将展示结算预估、投诉、满意度和质控抽查。</span></div>`;
 }
 
@@ -655,6 +819,7 @@ function renderPaymentReadiness(payment) {
       <strong>${escapeHtml(item.orderId)} · ${escapeHtml(displayText(item.serviceItem))}</strong>
       <span>${escapeHtml(displayText(item.paymentStatus))} / ${escapeHtml(displayText(item.reconciliationStatus))}</span>
       <small>发票 ${escapeHtml(displayText(item.invoiceStatus))}，自费 ${escapeHtml(item.estimatedSelfPay || 0)}</small>
+      <small>${escapeHtml(nursingFinancialControlText(item.financialControl))}</small>
     </div>`).join("")}
   `;
 }
@@ -806,8 +971,8 @@ function renderHospitalOrders(items) {
           <td>${escapeHtml(displayText(item.serviceItem || ""))}<br><small>${escapeHtml(nursingAddressText(item.address))}</small></td>
           <td>${escapeHtml(displayText(item.institution?.name || item.institutionName || ""))}<br><small>${escapeHtml(item.institutionCode || "")}</small></td>
           <td>${escapeHtml(displayText(item.nurse?.name || item.nurseName || "pending"))}<br><small>${escapeHtml(displayText(item.nurse?.registrationStatus || ""))}</small></td>
-          <td>${statusBadge(item.firstVisitAssessment)} ${statusBadge(item.informedConsent)} ${statusBadge(item.locationTrace)}<br><small>${escapeHtml(consentAttachmentText(item))}</small><br><small>${escapeHtml(locationTraceSummary(item))}</small><br><small>${escapeHtml(notificationSummary(item))}</small></td>
-          <td>${statusBadge(item.status)} ${statusBadge(item.riskLevel)}<br><small>${escapeHtml(displayText(item.qualityCallback || ""))}</small></td>
+          <td>${statusBadge(item.firstVisitAssessment)} ${statusBadge(item.informedConsent)} ${statusBadge(item.locationTrace)}<br><small>${escapeHtml(consentAttachmentText(item))}</small><br><small>${escapeHtml(locationTraceSummary(item))}</small><br><small>${escapeHtml(notificationSummary(item))}</small><br><small>${escapeHtml(nursingServiceControlText(item))}</small></td>
+          <td>${statusBadge(item.status)} ${statusBadge(item.riskLevel)}<br><small>${escapeHtml(displayText(item.qualityCallback || ""))}</small><br><small>${escapeHtml(nursingRiskQualityControlText(item))}</small><br><small>${escapeHtml(nursingCancellationRefundControlText(item))}</small></td>
           <td>
             ${canManage ? `
             <button class="inline-action" type="button" data-nursing-action="${escapeHtml(item.id)}" data-action-kind="assessment">评估</button>
@@ -837,7 +1002,7 @@ function renderNurseQueue(items) {
           <td><strong>${escapeHtml(item.id)}</strong><br><small>${escapeHtml(displayText(item.serviceItem || ""))}</small></td>
           <td>${escapeHtml(item.preferredAt || "")}<br><small>${escapeHtml(nursingAddressText(item.address))}</small></td>
           <td>${escapeHtml(displayText(item.residentName || item.residentId || ""))}<br><small>${escapeHtml(displayText(item.serviceObject || ""))}</small></td>
-          <td>${nursingEvidenceBadge("首诊", item.firstVisitAssessment, "首诊待评估")} ${nursingEvidenceBadge("同意书", item.informedConsent, "同意书待签署")} ${nursingEvidenceBadge("轨迹", item.locationTrace, "轨迹待采集")} ${nursingEvidenceBadge("护理记录", item.serviceRecordStatus, "护理记录待填写")}<br><small>${escapeHtml(locationTraceSummary(item))}</small><br><small>${escapeHtml(serviceRecordSummary(item))}</small><br><small>${escapeHtml(notificationReceiptSummary(item))}</small></td>
+          <td>${nursingEvidenceBadge("首诊", item.firstVisitAssessment, "首诊待评估")} ${nursingEvidenceBadge("同意书", item.informedConsent, "同意书待签署")} ${nursingEvidenceBadge("轨迹", item.locationTrace, "轨迹待采集")} ${nursingEvidenceBadge("护理记录", item.serviceRecordStatus, "护理记录待填写")}<br><small>${escapeHtml(locationTraceSummary(item))}</small><br><small>${escapeHtml(serviceRecordSummary(item))}</small><br><small>${escapeHtml(notificationReceiptSummary(item))}</small><br><small>${escapeHtml(nursingServiceControlText(item))}</small></td>
           <td>${statusBadge(item.status)} ${statusBadge(item.riskLevel)}</td>
           <td>
             ${nurseActionButtons(item, canAct)}
@@ -1253,6 +1418,8 @@ function defaultNursingOrders() {
 }
 
 function isQualifiedNurse(item) {
+  const domain = window.NursingEscortDomain;
+  if (domain) return domain.validateNurseQualification(item, {}, { now: new Date() }).ok;
   return Number(item.yearsClinical || 0) >= 5 && item.registrationStatus === "verified" && item.badPracticeRecord === "none" && item.trainingStatus === "passed" && item.insuranceStatus === "covered";
 }
 
