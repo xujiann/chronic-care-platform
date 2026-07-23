@@ -23,6 +23,7 @@ const {
   recordClaimedPublicHealthExternalAttemptToState,
   recordPublicHealthExternalAttemptToState,
   requeuePublicHealthExternalDeadLetterToState,
+  verifyPublicHealthExternalAuditChain,
   verifyRuntimeStateSignature
 } = require("../public-health-external-adapter-runtime");
 const {
@@ -154,6 +155,16 @@ test("external outbox enqueue is persisted, signed, private and idempotent", () 
   assert.equal(enqueued.nextData.publicHealthExternalDispatches.length, 1);
   assert.equal(enqueued.nextData.publicHealthExternalDispatchAudit.length, 1);
   assert.equal(verifyRuntimeStateSignature(enqueued.dispatch, REQUEST_SECRET), true);
+  assert.deepEqual(verifyPublicHealthExternalAuditChain(
+    enqueued.nextData,
+    enqueued.dispatch.id,
+    REQUEST_SECRET
+  ), {
+    ok: true,
+    reason: "verified",
+    entries: 1,
+    auditHead: enqueued.dispatch.auditHead
+  });
   const serialized = JSON.stringify(enqueued.nextData.publicHealthExternalDispatches);
   assert.equal(serialized.includes(REQUEST_SECRET), false);
   assert.equal(serialized.includes(RECEIPT_SECRET), false);
@@ -206,6 +217,11 @@ test("verified accepted receipt advances the coordination handoff exactly once",
   const handoff = runtime.handoffs.find((item) => item.id === prepared.handoffId);
   assert.equal(delivered.dispatch.deliveryState, "delivered");
   assert.equal(verifyPublicHealthExternalReceipt(delivered.dispatch, delivered.dispatch.receipt, RECEIPT_SECRET).ok, true);
+  assert.equal(verifyPublicHealthExternalAuditChain(
+    delivered.nextData,
+    delivered.dispatch.id,
+    REQUEST_SECRET
+  ).entries, 2);
   assert.equal(delivered.coordinationAction.action, "record-coordination-receipt");
   assert.equal(handoff.state, "receipt-confirmed");
   assert.equal(handoff.receipt.status, "accepted");
@@ -305,6 +321,16 @@ test("authorized dead-letter recovery seals the original and creates one success
   assert.deepEqual(recovered.successorDispatch.remediationEvidenceRefs, input.remediationEvidenceRefs.sort());
   assert.equal(verifyRuntimeStateSignature(recovered.originalDispatch, REQUEST_SECRET), true);
   assert.equal(verifyRuntimeStateSignature(recovered.successorDispatch, REQUEST_SECRET), true);
+  assert.equal(verifyPublicHealthExternalAuditChain(
+    recovered.nextData,
+    recovered.originalDispatch.id,
+    REQUEST_SECRET
+  ).entries, 3);
+  assert.equal(verifyPublicHealthExternalAuditChain(
+    recovered.nextData,
+    recovered.successorDispatch.id,
+    REQUEST_SECRET
+  ).entries, 1);
   assert.equal(recovered.externalRuntime.summary.recoveredDeadLetters, 1);
   assert.equal(recovered.externalRuntime.summary.recoverySuccessors, 1);
   assert.equal(coordination.state, "in-progress");
@@ -557,4 +583,37 @@ test("persisted outbox state tampering is rejected before callback processing", 
     attemptOptions("family:attempt:tampered"),
     prepared.dependencies
   ), /runtime-state-signature-invalid/);
+});
+
+test("external audit modification deletion and unsigned append are rejected before writes", () => {
+  const prepared = enqueueLane("chronic-management");
+  const dispatch = prepared.enqueued.dispatch;
+  const variants = [
+    (data) => { data.publicHealthExternalDispatchAudit[0].action = "forged-action"; },
+    (data) => { data.publicHealthExternalDispatchAudit = []; },
+    (data) => {
+      data.publicHealthExternalDispatchAudit.push({
+        dispatchId: dispatch.id,
+        action: "unsigned-append",
+        previousAuditHash: dispatch.auditHead
+      });
+    }
+  ];
+  for (const mutate of variants) {
+    const tampered = JSON.parse(JSON.stringify(prepared.enqueued.nextData));
+    mutate(tampered);
+    assert.equal(verifyPublicHealthExternalAuditChain(tampered, dispatch.id, REQUEST_SECRET).ok, false);
+    assert.throws(() => claimPublicHealthExternalDispatchToState(
+      tampered,
+      dispatch.id,
+      {
+        workerId: "audit-chain-worker",
+        idempotencyKey: "audit-chain-claim",
+        expectedVersion: 1,
+        now: "2026-07-23T08:00:30.000Z",
+        leaseSeconds: 60
+      },
+      credentials()
+    ), /persisted public health external audit rejected/);
+  }
 });

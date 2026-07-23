@@ -41,13 +41,14 @@ T08 自有实现边界：
 - `public-health-coordination-runtime.js`：从业务集合重建八领域任务，安全恢复持久化操作字段，并输出不可变的数据补丁和最小化追加审计；拒绝领域、业务键和来源引用篡改。
 - `public-health-external-adapter-service.js`：八领域适配器注册表、最小化签名请求、可信回执验签、瞬时故障重试、永久故障/重试耗尽死信和补偿责任。
 - `public-health-external-adapter-runtime.js`：持久化出站箱、可变投递状态签名、到期扫描、worker 租约与过期接管、回调幂等、成功/拒绝回执自动推进、无回执死信补偿异常联动及受控死信恢复。
+- `public-health-external-operations-service.js`：请求、运行状态、签名审计、协调状态和恢复关系对账，以及过期租约、逾期待领取、到期重试和未恢复死信风险队列。
 - `scripts/public-health-coordination-readiness.js`：功能完成度与上线边界门禁。
 - `scripts/public-health-final-readiness.js`：持久化写模型、八领域签名回执和失败关闭边界的最终端到端验收。
 - `scripts/public-health-readiness.js`：将事件直报、标准复核和协同中心聚合到公共卫生系统视图。
 - `public-health.html`、`public-health.js`：协同中心页面容器、接口渲染、静态回退，以及分派、接单、成功/拒收回执、重试、证据关闭和重开动作载荷。
 - `test/public-health-coordination-*.test.js`：服务、验收和页面契约测试。
 
-T00 继续负责公共 `server.js` 动作路由及持久化写入器接线、`portal.css` 公共样式、`package.json` 脚本、`README` 和发布总表。本线程不修改这些公共文件。协调路由应调用 `applyPublicHealthCoordinationActionToState()`；外部入队调用 `enqueuePublicHealthExternalDispatchToState()`；worker 依次调用 `listDuePublicHealthExternalDispatches()`、`claimPublicHealthExternalDispatchToState()` 和 `recordClaimedPublicHealthExternalAttemptToState()`；外部系统主动回调调用 `recordPublicHealthExternalAttemptToState()`；责任人修复死信后调用 `requeuePublicHealthExternalDeadLetterToState()`。所有路由只把返回的 `nextData` 交给统一持久化写入器，不应复制状态转换、授权、幂等、版本、签名、租约、恢复或补偿判断。
+T00 继续负责公共 `server.js` 动作路由及持久化写入器接线、`portal.css` 公共样式、`package.json` 脚本、`README` 和发布总表。本线程不修改这些公共文件。协调路由应调用 `applyPublicHealthCoordinationActionToState()`；外部入队调用 `enqueuePublicHealthExternalDispatchToState()`；worker 依次调用 `listDuePublicHealthExternalDispatches()`、`claimPublicHealthExternalDispatchToState()` 和 `recordClaimedPublicHealthExternalAttemptToState()`；外部系统主动回调调用 `recordPublicHealthExternalAttemptToState()`；责任人修复死信后调用 `requeuePublicHealthExternalDeadLetterToState()`；运行巡检调用 `buildPublicHealthExternalOperationsBoard()`。所有写路由只把返回的 `nextData` 交给统一持久化写入器，不应复制状态转换、授权、幂等、版本、签名、租约、恢复或补偿判断。
 
 ## 持久化与外部适配实施契约
 
@@ -59,9 +60,13 @@ T00 继续负责公共 `server.js` 动作路由及持久化写入器接线、`po
 
 出站箱持久化 `publicHealthExternalDispatches` 和最小化追加审计 `publicHealthExternalDispatchAudit`。初始请求签名保护固定契约；运行时状态签名额外绑定投递状态、尝试次数、最大重试次数、下次重试时间、回执、阻断原因、补偿责任和 worker 租约，防止持久化后篡改状态影响信任判定。可信回执连同原签名持久化，可再次独立验签；每次响应还保留内容摘要用于无敏感正文的取证。每个回调必须携带独立幂等键：相同回调不重复增加尝试、审计或协调版本。可信接受回执自动把任务推进到 `receipt-confirmed`；可信拒绝回执打开签名所绑定的异常；无可信回执的永久失败或重试耗尽通过 `open-coordination-exception` 打开预先指定的补偿异常。
 
+每个出站任务拥有独立签名审计链。审计项包含前一项 `previousAuditHash`、当前内容哈希和 HMAC 签名；任务运行状态同时绑定最新 `auditHead`。入队、领取、投递尝试和死信恢复在写入前先验证完整链，再追加新签名项并推进链头。删除、修改、重排旧项或追加未签名项都会造成链路、签名或链头不一致，后续写动作及巡检门禁立即失败关闭。
+
 worker 只能领取状态为 `pending` 或已经到达 `nextRetryAt` 的任务。到期列表返回签名保护的 `outboxVersion`；领取和投递尝试均须提交 `expectedVersion`，每次成功写动作版本加一，供 T00 持久化写入器执行原子 CAS。领取时生成 15—900 秒签名租约，持久化 worker 标识哈希、租约令牌哈希和到期时间，原始租约令牌只返回给领取者而不落库。活动租约阻止其他 worker 并发投递；租约过期后任务重新进入到期队列并可由新 worker 接管。认领后的投递必须同时匹配版本、worker 和租约令牌且发生在有效期内，尝试完成后自动释放租约。外部系统主动回调不需要 worker 租约，但必须先通过独立回执验签并使用服务端当前版本；伪造回调直接拒绝且不进入死信，避免攻击者借无效回调改变任务状态。
 
 死信不得原地改回待投递。责任角色或委级角色必须提交修复说明、`remediationEvidenceRefs`、新的补偿责任和协调/出站箱双版本，控制器先调用协调 `retry-coordination` 完成人工授权，再封存原死信并创建唯一后继任务。原记录保持 `dead-letter`，其签名恢复封印绑定修复证据、审批角色哈希和 `successorDispatchId`；后继记录绑定 `predecessorDispatchId` 和同一修复证据。相同请求幂等返回，异载荷复用、越权、版本冲突及同一死信第二次恢复全部拒绝。
+
+运行巡检板逐任务复核请求签名、运行状态签名、审计链、协调任务存在性与状态，以及恢复前后继关系。签名无密钥/无效、孤儿审计、孤儿任务、协调状态错配、恢复链缺失或多后继列为 P0；过期租约、到期未领取重试、超过领取 SLA 的待投递任务和未恢复死信列为 P1。巡检输出只含任务、领域、风险代码和处置动作，不输出居民标识、端点或密钥；即使零风险，`productionReady` 仍保持 `false`。
 
 ## 测试清单
 
@@ -75,11 +80,13 @@ worker 只能领取状态为 `pending` 或已经到达 `nextRetryAt` 的任务�
 - 出站入队、成功/拒绝回调、瞬时重试、重试耗尽和回调重放均通过不可变状态补丁持久化；篡改请求或运行时状态签名必须在处理前拒绝。
 - 到期排序、乐观版本冲突、活动租约并发互斥、租约令牌不落库、过期接管、旧 worker 拒绝和投递后释放均须通过；公网主动回调必须先验签再改变状态。
 - 死信恢复要求领域授权和修复证据，原记录保持终态并带签名封印，只产生一个带前驱引用的后继任务；重复恢复、异载荷幂等和双版本冲突必须拒绝。
+- 入队、认领、尝试和恢复审计组成逐任务签名哈希链；审计删除、修改、重排及未签名追加必须在下一写入和巡检时拒绝。
+- 运行巡检须识别签名异常、孤儿审计、孤儿任务、协调状态错配、恢复关系异常、过期租约、逾期待领取、到期重试和未恢复死信，且报告不含居民标识和密钥。
 - 缺少任何必需业务集合时，结构就绪门禁失败。
 - 功能验收通过仍保持 `productionReady=false`，不替代生产现场证据。
 
 ## 验收标准
 
-功能完成须同时满足：八领域全部结构就绪、八个任务拥有稳定业务键和源引用、传染病直报链及八轨标准复核已关联、验收场景关闭 8/8、审计记录为 32 条、出站箱回执能自动联动协调状态且篡改失败关闭、死信能凭授权证据生成唯一后继任务、页面及静态回退契约存在、专项就绪报告全部通过。
+功能完成须同时满足：八领域全部结构就绪、八个任务拥有稳定业务键和源引用、传染病直报链及八轨标准复核已关联、验收场景关闭 8/8、审计记录为 32 条、出站箱回执能自动联动协调状态且篡改失败关闭、死信能凭授权证据生成唯一后继任务、逐任务签名审计链和运行巡检无 P0/P1、页面及静态回退契约存在、专项就绪报告全部通过。
 
 正式上线还须由 T00 把动作路由和统一持久化写入器接到 T08 运行时控制器、完成公共脚本接线和发布总表更新，并配置生产 HTTPS 端点与密钥，在生产端点冒烟后核验签名回执和可信现场证据。未完成这些事项时，正式状态保持阻断。

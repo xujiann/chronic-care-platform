@@ -10,6 +10,8 @@ const {
   verifyPublicHealthExternalReceipt
 } = require("./public-health-external-adapter-service");
 
+const EXTERNAL_AUDIT_SCHEMA_VERSION = "public-health-external-audit/v1";
+
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -54,6 +56,7 @@ function runtimeStatePayload(dispatch) {
     recovery: dispatch.recovery || null,
     predecessorDispatchId: dispatch.predecessorDispatchId || "",
     remediationEvidenceRefs: dispatch.remediationEvidenceRefs || [],
+    auditHead: dispatch.auditHead || "",
     productionReady: false
   };
 }
@@ -88,6 +91,68 @@ function verifyRuntimeStateSignature(dispatch, requestSecret) {
 
 function rows(data, key) {
   return Array.isArray(data?.[key]) ? data[key] : [];
+}
+
+function auditPayload(entry) {
+  const { auditHash, auditSignature, ...payload } = entry;
+  return payload;
+}
+
+function signExternalAuditEntry(entry, previousAuditHash, requestSecret) {
+  if (clean(requestSecret).length < 32) throw new Error("external audit signing secret must contain at least 32 characters");
+  const payload = {
+    ...entry,
+    auditSchemaVersion: EXTERNAL_AUDIT_SCHEMA_VERSION,
+    previousAuditHash: clean(previousAuditHash)
+  };
+  const auditHash = sha256(JSON.stringify(stableValue(payload)));
+  const auditSignature = crypto.createHmac("sha256", requestSecret).update(auditHash).digest("hex");
+  return { ...payload, auditHash, auditSignature };
+}
+
+function verifyPublicHealthExternalAuditChain(data = {}, dispatchId, requestSecret) {
+  const dispatch = rows(data, "publicHealthExternalDispatches").find((item) => item.id === clean(dispatchId));
+  if (!dispatch) return { ok: false, reason: "dispatch-missing", entries: 0, auditHead: "" };
+  const audit = rows(data, "publicHealthExternalDispatchAudit").filter((item) => item.dispatchId === dispatch.id);
+  if (clean(requestSecret).length < 32) {
+    return { ok: false, reason: "audit-verification-secret-invalid", entries: audit.length, auditHead: "" };
+  }
+  let previousAuditHash = "";
+  for (const entry of audit) {
+    if (entry.auditSchemaVersion !== EXTERNAL_AUDIT_SCHEMA_VERSION || clean(entry.previousAuditHash) !== previousAuditHash) {
+      return { ok: false, reason: "audit-chain-link-invalid", entries: audit.length, auditHead: previousAuditHash };
+    }
+    const expectedHash = sha256(JSON.stringify(stableValue(auditPayload(entry))));
+    let expectedSignature = "";
+    expectedSignature = crypto.createHmac("sha256", requestSecret).update(expectedHash).digest("hex");
+    if (!timingSafeHexEqual(entry.auditHash, expectedHash) || !timingSafeHexEqual(entry.auditSignature, expectedSignature)) {
+      return { ok: false, reason: "audit-entry-signature-invalid", entries: audit.length, auditHead: previousAuditHash };
+    }
+    previousAuditHash = entry.auditHash;
+  }
+  if (clean(dispatch.auditHead) !== previousAuditHash) {
+    return { ok: false, reason: "audit-head-mismatch", entries: audit.length, auditHead: previousAuditHash };
+  }
+  return { ok: true, reason: "verified", entries: audit.length, auditHead: previousAuditHash };
+}
+
+function assertExternalAuditChain(data, dispatch, requestSecret) {
+  const verification = verifyPublicHealthExternalAuditChain(data, dispatch.id, requestSecret);
+  if (!verification.ok) throw new Error(`persisted public health external audit rejected: ${verification.reason}`);
+  return verification;
+}
+
+function appendExternalAudit(auditRows, dispatch, audit, requestSecret) {
+  const signedAudit = signExternalAuditEntry(audit, dispatch.auditHead, requestSecret);
+  const updatedDispatch = withRuntimeStateSignature({
+    ...dispatch,
+    auditHead: signedAudit.auditHash
+  }, requestSecret);
+  return {
+    auditRows: [...auditRows, signedAudit],
+    dispatch: updatedDispatch,
+    audit: signedAudit
+  };
 }
 
 function timeValue(value, label) {
@@ -189,6 +254,7 @@ function claimPublicHealthExternalDispatchToState(data = {}, dispatchId, input =
   if (!requestVerification.ok || !verifyRuntimeStateSignature(current, credentials.requestSecret)) {
     throw new Error(`persisted public health external dispatch rejected: ${requestVerification.ok ? "runtime-state-signature-invalid" : requestVerification.reason}`);
   }
+  assertExternalAuditChain(data, current, credentials.requestSecret);
   const workerIdHash = sha256(workerId);
   const idempotencyKeyHash = sha256(idempotencyKey);
   const auditRows = clone(rows(data, "publicHealthExternalDispatchAudit"));
@@ -224,12 +290,11 @@ function claimPublicHealthExternalDispatchToState(data = {}, dispatchId, input =
   const lease = { workerIdHash, idempotencyKeyHash, claimedAt: new Date(nowValue).toISOString(), expiresAt };
   const leaseToken = leaseTokenFor(current.id, lease, credentials.requestSecret);
   lease.tokenHash = sha256(leaseToken);
-  const updated = withRuntimeStateSignature({
+  const updatedBase = {
     ...current,
     lease,
     outboxVersion: Number(current.outboxVersion) + 1
-  }, credentials.requestSecret);
-  dispatches[index] = updated;
+  };
   const audit = {
     id: `${current.id}:audit:lease:${idempotencyKeyHash.slice(0, 16)}`,
     dispatchId: current.id,
@@ -239,17 +304,20 @@ function claimPublicHealthExternalDispatchToState(data = {}, dispatchId, input =
     from: current.deliveryState,
     to: current.deliveryState,
     fromVersion: current.outboxVersion,
-    toVersion: updated.outboxVersion,
+    toVersion: updatedBase.outboxVersion,
     at: lease.claimedAt,
     leaseExpiresAt: expiresAt,
     workerIdHash,
     idempotencyKeyHash,
     reclaimedExpiredLease: Boolean(current.lease)
   };
+  const appended = appendExternalAudit(auditRows, updatedBase, audit, credentials.requestSecret);
+  const updated = appended.dispatch;
+  dispatches[index] = updated;
   const nextData = {
     ...data,
     publicHealthExternalDispatches: dispatches,
-    publicHealthExternalDispatchAudit: [...auditRows, audit]
+    publicHealthExternalDispatchAudit: appended.auditRows
   };
   return {
     ok: true,
@@ -298,6 +366,7 @@ function enqueuePublicHealthExternalDispatchToState(
     if (!requestVerification.ok || !verifyRuntimeStateSignature(existing, credentials.requestSecret)) {
       throw new Error(`persisted public health external dispatch rejected: ${requestVerification.ok ? "runtime-state-signature-invalid" : requestVerification.reason}`);
     }
+    assertExternalAuditChain(data, existing, credentials.requestSecret);
     return {
       ok: true,
       idempotent: true,
@@ -315,31 +384,31 @@ function enqueuePublicHealthExternalDispatchToState(
   const handoff = coordination.handoffs.find((item) => item.id === clean(handoffId));
   if (!handoff) throw new Error(`unknown public health coordination handoff: ${clean(handoffId) || "missing"}`);
   const compensation = requireCompensation(input);
-  const dispatch = withRuntimeStateSignature({
+  const initialDispatch = withRuntimeStateSignature({
     ...createPublicHealthExternalDispatch(handoff, input, credentials),
     compensation,
-    outboxVersion: 1
+    outboxVersion: 1,
+    auditHead: ""
   }, credentials.requestSecret);
-  const audit = [
-    ...clone(rows(data, "publicHealthExternalDispatchAudit")),
-    {
-      id: `${dispatch.id}:audit:enqueued`,
-      dispatchId: dispatch.id,
-      handoffId: dispatch.handoffId,
-      laneId: dispatch.laneId,
+  const existingAudit = clone(rows(data, "publicHealthExternalDispatchAudit"));
+  const appended = appendExternalAudit(existingAudit, initialDispatch, {
+      id: `${initialDispatch.id}:audit:enqueued`,
+      dispatchId: initialDispatch.id,
+      handoffId: initialDispatch.handoffId,
+      laneId: initialDispatch.laneId,
       action: "enqueue-external-dispatch",
       from: "not-enqueued",
       to: "pending",
       fromVersion: 0,
-      toVersion: dispatch.outboxVersion,
+      toVersion: initialDispatch.outboxVersion,
       at: clean(input.at || new Date().toISOString()),
-      idempotencyKeyHash: dispatch.request.idempotencyKeyHash
-    }
-  ];
+      idempotencyKeyHash: initialDispatch.request.idempotencyKeyHash
+  }, credentials.requestSecret);
+  const dispatch = appended.dispatch;
   const nextData = {
     ...data,
     publicHealthExternalDispatches: [...existingDispatches, dispatch],
-    publicHealthExternalDispatchAudit: audit
+    publicHealthExternalDispatchAudit: appended.auditRows
   };
   return {
     ok: true,
@@ -444,6 +513,7 @@ function recordPublicHealthExternalAttemptToState(
   if (!verifyRuntimeStateSignature(current, options.requestSecret)) {
     throw new Error("persisted public health external dispatch rejected: runtime-state-signature-invalid");
   }
+  assertExternalAuditChain(data, current, options.requestSecret);
   const idempotencyKeyHash = sha256(attemptIdempotencyKey);
   const auditRows = clone(rows(data, "publicHealthExternalDispatchAudit"));
   const duplicate = auditRows.find((item) => (
@@ -486,15 +556,14 @@ function recordPublicHealthExternalAttemptToState(
   const attempted = recordPublicHealthExternalDeliveryAttempt(current, result, options);
   if (options.requireLease || ["delivered", "dead-letter"].includes(attempted.deliveryState)) attempted.lease = null;
   attempted.outboxVersion = Number(current.outboxVersion) + 1;
-  const updated = withRuntimeStateSignature(
-    attempted,
-    options.requestSecret
-  );
+  const audit = externalAttemptAudit(current, attempted, result, options);
+  const appended = appendExternalAudit(auditRows, attempted, audit, options.requestSecret);
+  const updated = appended.dispatch;
   dispatches[index] = updated;
   const nextData = {
     ...data,
     publicHealthExternalDispatches: dispatches,
-    publicHealthExternalDispatchAudit: [...auditRows, externalAttemptAudit(current, updated, result, options)]
+    publicHealthExternalDispatchAudit: appended.auditRows
   };
   let finalData = nextData;
   let coordinationAction = null;
@@ -578,6 +647,7 @@ function requeuePublicHealthExternalDeadLetterToState(
   if (!requestVerification.ok || !verifyRuntimeStateSignature(current, credentials.requestSecret)) {
     throw new Error(`persisted public health external dispatch rejected: ${requestVerification.ok ? "runtime-state-signature-invalid" : requestVerification.reason}`);
   }
+  assertExternalAuditChain(data, current, credentials.requestSecret);
   const idempotencyKeyHash = sha256(idempotencyKey);
   const noteDigest = sha256(note);
   if (current.recovery) {
@@ -601,6 +671,7 @@ function requeuePublicHealthExternalDeadLetterToState(
     if (!successorVerification.ok || !verifyRuntimeStateSignature(successor, credentials.requestSecret)) {
       throw new Error("external dead letter recovery successor signature is invalid");
     }
+    assertExternalAuditChain(authorizedReplay.nextData, successor, credentials.requestSecret);
     if (successor.predecessorDispatchId !== current.id
       || JSON.stringify(successor.remediationEvidenceRefs) !== JSON.stringify(evidenceRefs)) {
       throw new Error("external dead letter recovery successor relationship is invalid");
@@ -658,18 +729,16 @@ function requeuePublicHealthExternalDeadLetterToState(
     approvedByHash: sha256(coordinated.action.actor),
     requeuedAt: coordinated.action.at
   };
-  const original = withRuntimeStateSignature({
+  const originalBase = {
     ...nextDispatches[originalIndex],
     recovery,
     outboxVersion: Number(current.outboxVersion) + 1
-  }, credentials.requestSecret);
+  };
   const successor = withRuntimeStateSignature({
     ...nextDispatches[successorIndex],
     predecessorDispatchId: current.id,
     remediationEvidenceRefs: evidenceRefs
   }, credentials.requestSecret);
-  nextDispatches[originalIndex] = original;
-  nextDispatches[successorIndex] = successor;
   const recoveryAudit = {
     id: `${current.id}:audit:requeue:${idempotencyKeyHash.slice(0, 16)}`,
     dispatchId: current.id,
@@ -680,20 +749,26 @@ function requeuePublicHealthExternalDeadLetterToState(
     from: "dead-letter",
     to: "dead-letter-requeued",
     fromVersion: current.outboxVersion,
-    toVersion: original.outboxVersion,
+    toVersion: originalBase.outboxVersion,
     at: recovery.requeuedAt,
     approvedByRole: recovery.approvedByRole,
     approvedByHash: recovery.approvedByHash,
     remediationEvidenceRefs: evidenceRefs,
     idempotencyKeyHash
   };
+  const recoveryAppend = appendExternalAudit(
+    clone(rows(successorEnqueue.nextData, "publicHealthExternalDispatchAudit")),
+    originalBase,
+    recoveryAudit,
+    credentials.requestSecret
+  );
+  const original = recoveryAppend.dispatch;
+  nextDispatches[originalIndex] = original;
+  nextDispatches[successorIndex] = successor;
   const nextData = {
     ...successorEnqueue.nextData,
     publicHealthExternalDispatches: nextDispatches,
-    publicHealthExternalDispatchAudit: [
-      ...clone(rows(successorEnqueue.nextData, "publicHealthExternalDispatchAudit")),
-      recoveryAudit
-    ]
+    publicHealthExternalDispatchAudit: recoveryAppend.auditRows
   };
   return {
     ok: true,
@@ -716,5 +791,6 @@ module.exports = {
   recordPublicHealthExternalAttemptToState,
   requeuePublicHealthExternalDeadLetterToState,
   runtimeStatePayload,
+  verifyPublicHealthExternalAuditChain,
   verifyRuntimeStateSignature
 };

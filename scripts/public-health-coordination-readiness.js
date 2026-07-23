@@ -35,6 +35,7 @@ function buildPublicHealthCoordinationReadiness(options = {}) {
   const runtimeSource = options.runtimeSource ?? read("public-health-coordination-runtime.js");
   const adapterSource = options.adapterSource ?? read("public-health-external-adapter-service.js");
   const adapterRuntimeSource = options.adapterRuntimeSource ?? read("public-health-external-adapter-runtime.js");
+  const operationsSource = options.operationsSource ?? read("public-health-external-operations-service.js");
   const publicHealthSource = options.publicHealthSource ?? read("public-health.js");
   const publicHealthHtml = options.publicHealthHtml ?? read("public-health.html");
   const systemBuilderSource = options.systemBuilderSource ?? read("scripts/public-health-readiness.js");
@@ -66,6 +67,8 @@ function buildPublicHealthCoordinationReadiness(options = {}) {
     check("adapter:persistent-outbox-link", ["publicHealthExternalDispatches", "runtimeStateSignature", "recordPublicHealthExternalAttemptToState", "open-coordination-exception"].every((token) => adapterRuntimeSource.includes(token)), "signed persistent outbox links verified callbacks and dead letters to coordination state", "adapter"),
     check("adapter:worker-lease", ["listDuePublicHealthExternalDispatches", "claimPublicHealthExternalDispatchToState", "recordClaimedPublicHealthExternalAttemptToState", "leaseToken", "outboxVersion", "external dispatch version conflict"].every((token) => adapterRuntimeSource.includes(token)), "due selection, signed version, worker lease, claimed attempt and token checks prevent concurrent delivery", "adapter"),
     check("adapter:dead-letter-recovery", ["requeuePublicHealthExternalDeadLetterToState", "remediationEvidenceRefs", "successorDispatchId", "approvedByRole"].every((token) => adapterRuntimeSource.includes(token)), "authorized remediation seals each dead letter and creates one linked successor", "adapter"),
+    check("adapter:signed-audit-chain", ["verifyPublicHealthExternalAuditChain", "previousAuditHash", "auditSignature", "auditHead"].every((token) => adapterRuntimeSource.includes(token)), "every outbox write verifies and advances a signed per-dispatch audit chain", "adapter"),
+    check("operations:reconciliation-board", ["buildPublicHealthExternalOperationsBoard", "coordination-state-mismatch", "worker-lease-expired", "dead-letter-unrecovered"].every((token) => operationsSource.includes(token)), "operations board reconciles signatures, coordination state, leases, SLA and dead letters", "operations"),
     check("runtime:system-builder", system.coordinationCenter?.summary?.lanes === 8 && systemBuilderSource.includes("buildPublicHealthCoordinationCenter") && systemBuilderSource.includes("coordinationCenter"), "buildPublicHealthSystem returns coordinationCenter", "runtime"),
     check("frontend:panel", publicHealthHtml.includes("public-health-coordination-center") && publicHealthSource.includes("renderPublicHealthCoordinationCenter"), "public health page renders the coordination center", "frontend"),
     check("frontend:static-fallback", publicHealthSource.includes("buildStaticCoordinationCenter") && publicHealthSource.includes("eight-lane-static-coordination-runnable"), "file preview builds a local eight-lane fallback", "frontend"),
@@ -96,6 +99,7 @@ function buildPublicHealthCoordinationReadiness(options = {}) {
       runtime: "public-health-coordination-runtime.js",
       externalAdapters: "public-health-external-adapter-service.js",
       externalAdapterRuntime: "public-health-external-adapter-runtime.js",
+      externalOperations: "public-health-external-operations-service.js",
       page: "public-health.html",
       pageController: "public-health.js",
       test: "test/public-health-coordination-service.test.js",

@@ -23,8 +23,12 @@ const {
   recordClaimedPublicHealthExternalAttemptToState,
   recordPublicHealthExternalAttemptToState,
   requeuePublicHealthExternalDeadLetterToState,
+  verifyPublicHealthExternalAuditChain,
   verifyRuntimeStateSignature
 } = require("../public-health-external-adapter-runtime");
+const {
+  buildPublicHealthExternalOperationsBoard
+} = require("../public-health-external-operations-service");
 const { buildPublicHealthSystem } = require("./public-health-readiness");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -286,9 +290,30 @@ function buildPublicHealthFinalReadiness(options = {}) {
   const deliveries = runExternalAdapterAcceptance(system.coordinationCenter);
   const outboxAcceptance = runExternalOutboxAcceptance(sourceData, system);
   const recoveryAcceptance = runDeadLetterRecoveryAcceptance(sourceData, system);
+  const recoveryCoordination = buildPublicHealthCoordinationRuntime({
+    data: recoveryAcceptance.recovered.nextData,
+    eventReporting: system.infectiousEventReporting,
+    standardReview: system.priorityStandardReview,
+    center: system.coordinationCenter
+  });
+  const operationsBoard = buildPublicHealthExternalOperationsBoard({
+    data: recoveryAcceptance.recovered.nextData,
+    coordinationCenter: recoveryCoordination,
+    secretResolver: () => ACCEPTANCE_REQUEST_SECRET,
+    now: "2026-07-23T09:31:00.000Z"
+  });
+  const tamperedAuditData = JSON.parse(JSON.stringify(recoveryAcceptance.recovered.nextData));
+  tamperedAuditData.publicHealthExternalDispatchAudit[0].action = "forged-final-readiness-audit";
+  const tamperedOperationsBoard = buildPublicHealthExternalOperationsBoard({
+    data: tamperedAuditData,
+    coordinationCenter: recoveryCoordination,
+    secretResolver: () => ACCEPTANCE_REQUEST_SECRET,
+    now: "2026-07-23T09:31:00.000Z"
+  });
   const runtimeSource = options.runtimeSource ?? fs.readFileSync(path.join(ROOT, "public-health-coordination-runtime.js"), "utf8");
   const adapterSource = options.adapterSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-adapter-service.js"), "utf8");
   const adapterRuntimeSource = options.adapterRuntimeSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-adapter-runtime.js"), "utf8");
+  const operationsSource = options.operationsSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-operations-service.js"), "utf8");
   const pageSource = options.pageSource ?? fs.readFileSync(path.join(ROOT, "public-health.js"), "utf8");
   const doc = options.doc ?? fs.readFileSync(path.join(ROOT, "docs", "public-health-eight-domain-coordination.md"), "utf8");
   const serializedDeliveries = JSON.stringify(deliveries);
@@ -313,6 +338,10 @@ function buildPublicHealthFinalReadiness(options = {}) {
     check("recovery:sealed-predecessor", recoveryAcceptance.recovered.originalDispatch.deliveryState === "dead-letter" && recoveryAcceptance.recovered.originalDispatch.recovery?.state === "requeued", "original dead letter remains terminal with a signed recovery seal", "recovery"),
     check("recovery:single-successor", recoveryAcceptance.recovered.successorDispatch.deliveryState === "pending" && recoveryAcceptance.recovered.successorDispatch.predecessorDispatchId === recoveryAcceptance.rejected.dispatch.id && recoveryAcceptance.recovered.externalRuntime.summary.recoverySuccessors === 1, "one pending successor preserves the predecessor link", "recovery"),
     check("recovery:authorized-coordination-retry", recoveryAcceptance.handoff.state === "in-progress" && recoveryAcceptance.handoff.exception?.status === "retry-submitted" && ["requeuePublicHealthExternalDeadLetterToState", "remediationEvidenceRefs", "approvedByRole"].every((token) => adapterRuntimeSource.includes(token)), "lane-authorized remediation evidence reopens coordination for delivery", "recovery"),
+    check("audit:signed-append-only-chain", verifyPublicHealthExternalAuditChain(outboxAcceptance.delivered.nextData, outboxAcceptance.delivered.dispatch.id, ACCEPTANCE_REQUEST_SECRET).entries === 3 && ["previousAuditHash", "auditSignature", "auditHead"].every((token) => adapterRuntimeSource.includes(token)), "enqueue, claim and attempt form a signed per-dispatch audit chain", "audit"),
+    check("audit:tampering-fails-closed", tamperedOperationsBoard.ok === false && tamperedOperationsBoard.issues.some((item) => item.code === "audit-chain-invalid"), "modified audit entry blocks the operations integrity gate", "audit"),
+    check("operations:healthy-reconciliation", operationsBoard.ok === true && operationsBoard.operationallyHealthy === true && operationsBoard.summary.signatureVerified === 2 && operationsBoard.summary.issues === 0, "recovered predecessor, successor, signatures, audit and coordination states reconcile", "operations"),
+    check("operations:risk-queue-contract", ["audit-dispatch-missing", "coordination-handoff-missing", "coordination-state-mismatch", "worker-lease-expired", "retry-due-unclaimed", "pending-dispatch-overdue", "dead-letter-unrecovered"].every((token) => operationsSource.includes(token)), "integrity, orphan audit/task, mismatch, lease, retry, SLA and dead-letter risks have explicit codes", "operations"),
     check("frontend:action-route-contract", pageSource.includes("/api/public-health/coordination/") && pageSource.includes("idempotencyKey") && pageSource.includes("expectedVersion"), "T00 route boundary has a stable client contract", "integration"),
     check("integration:documented-boundary", ["public-health-coordination-runtime.js", "public-health-external-adapter-service.js", "T00", "server.js", "productionReady"].every((token) => doc.includes(token)), "runtime, adapter and T00 boundaries are documented", "integration"),
     check("safety:functional-not-production", runtime.productionReady === false && registry.productionReady === false && deliveries.every((item) => item.productionReady === false), "functional acceptance cannot self-assert production readiness", "safety"),
@@ -334,7 +363,9 @@ function buildPublicHealthFinalReadiness(options = {}) {
       persistedOutboxDispatches: outboxAcceptance.delivered.externalRuntime.summary.dispatches,
       persistedOutboxAuditEntries: outboxAcceptance.delivered.externalRuntime.summary.auditEntries,
       recoveredDeadLetters: recoveryAcceptance.recovered.externalRuntime.summary.recoveredDeadLetters,
-      recoverySuccessors: recoveryAcceptance.recovered.externalRuntime.summary.recoverySuccessors
+      recoverySuccessors: recoveryAcceptance.recovered.externalRuntime.summary.recoverySuccessors,
+      operationsIssues: operationsBoard.summary.issues,
+      operationsSignatureVerified: operationsBoard.summary.signatureVerified
     },
     checks,
     runtime: {
@@ -358,16 +389,18 @@ function buildPublicHealthFinalReadiness(options = {}) {
       summary: recoveryAcceptance.recovered.externalRuntime.summary,
       productionReady: false
     },
+    operationsBoard,
     productionReady: false,
     artifacts: {
       coordinationService: "public-health-coordination-service.js",
       coordinationRuntime: "public-health-coordination-runtime.js",
       externalAdapters: "public-health-external-adapter-service.js",
       externalAdapterRuntime: "public-health-external-adapter-runtime.js",
+      externalOperations: "public-health-external-operations-service.js",
       documentation: "docs/public-health-eight-domain-coordination.md"
     },
     remainingT00Integration: [
-      "Wire coordination actions plus external enqueue, due-worker claim/attempt, signed callback and governed dead-letter recovery routes to the T08 runtime controllers and durable data writer.",
+      "Wire coordination actions plus external enqueue, due-worker claim/attempt, signed callback, governed dead-letter recovery and operations-board routes to the T08 controllers and durable data writer.",
       "Register shared server, package, style, README and aggregate release entries owned by T00.",
       "Provision production HTTPS endpoints and secrets, then verify signed external receipts and trusted site evidence."
     ]
