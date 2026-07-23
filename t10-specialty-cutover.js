@@ -40,6 +40,7 @@ function withCutoverDefaults(pack) {
     siteEvidenceWorkflow: pack.siteEvidenceWorkflow || fallback.siteEvidenceWorkflow,
     acceptanceScenarioSuite: pack.acceptanceScenarioSuite || fallback.acceptanceScenarioSuite,
     scenarioEvidenceMatrix: pack.scenarioEvidenceMatrix || fallback.scenarioEvidenceMatrix,
+    cutoverCommandCenter: pack.cutoverCommandCenter || fallback.cutoverCommandCenter,
     integrity: pack.integrity || fallback.integrity
   };
 }
@@ -56,6 +57,7 @@ function renderCutoverPack(pack) {
   renderSiteEvidenceWorkflow(pack.siteEvidenceWorkflow || {});
   renderAcceptanceScenarioSuite(pack.acceptanceScenarioSuite || {});
   renderScenarioEvidenceMatrix(pack.scenarioEvidenceMatrix || {});
+  renderCutoverCommandCenter(pack.cutoverCommandCenter || {});
   renderBlockers(pack.tracks || []);
 }
 
@@ -418,6 +420,75 @@ function renderScenarioEvidenceMatrix(matrix) {
   `;
 }
 
+function renderCutoverCommandCenter(commandCenter) {
+  const windows = commandCenter.windows || [];
+  const roster = commandCenter.roster || [];
+  const summary = commandCenter.summary || {};
+  document.querySelector("#cutover-command-center").innerHTML = `
+    <div class="cutover-kpis">
+      ${kpi("Command status", commandCenter.status || "command-center-ready-for-rehearsal", "warn")}
+      ${kpi("Windows", summary.windows || windows.length, "ok")}
+      ${kpi("Roster seats", summary.rosterSeats || roster.length, "ok")}
+      ${kpi("No-Go rules", summary.noGoRules || 0, "warn")}
+    </div>
+    <div class="cutover-card">
+      <div class="badge-row">
+        <span class="badge warn">${escapeHtml(commandCenter.primaryTrackName || "first increment")}</span>
+        <span class="badge">watch-only ${(commandCenter.watchOnlyTrackIds || []).map(escapeHtml).join(" / ") || "none"}</span>
+      </div>
+      <p class="muted">Command center keeps scope freeze, batch-1 rehearsal, T+1 observation and watch-only expansion under one accountable duty board.</p>
+    </div>
+    <div class="track-grid">
+      ${windows.map((windowItem) => `
+        <article class="cutover-card">
+          <div class="badge-row">
+            <span class="badge warn">${escapeHtml(windowItem.stage)}</span>
+            <span class="badge">${escapeHtml(windowItem.ownerRole)}</span>
+          </div>
+          <h3>${escapeHtml(windowItem.name)}</h3>
+          <p class="muted">${escapeHtml(windowItem.ownerDepartment)}</p>
+          <p><strong>Entry:</strong> ${escapeHtml(windowItem.entryGate)}</p>
+          <p><strong>Exit:</strong> ${escapeHtml(windowItem.exitGate)}</p>
+          <h4>Produces</h4>
+          <ul class="evidence-list">${(windowItem.produces || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+          <h4>No-Go if missing</h4>
+          <ul class="blocker-list">${(windowItem.noGoIfMissing || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+        </article>
+      `).join("")}
+    </div>
+    <div class="table-wrap">
+      <table class="cutover-table">
+        <thead>
+          <tr>
+            <th>Seat</th>
+            <th>Owner</th>
+            <th>Decision right</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${roster.map((item) => `
+            <tr>
+              <td><strong>${escapeHtml(item.seat)}</strong></td>
+              <td>${escapeHtml(item.owner)}</td>
+              <td>${escapeHtml(item.decisionRight)}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+    <div class="control-grid">
+      <article class="cutover-card">
+        <h3>Escalation rules</h3>
+        <ul class="blocker-list">${(commandCenter.escalationRules || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+      </article>
+      <article class="cutover-card">
+        <h3>Decision artifacts</h3>
+        <ul class="blocker-list">${(commandCenter.decisionArtifacts || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+      </article>
+    </div>
+  `;
+}
+
 function renderBlockers(tracks) {
   const rows = tracks.flatMap((track) => (track.blockers || []).map((blocker) => `
     <tr>
@@ -656,8 +727,50 @@ function fallbackCutoverPack() {
         scenarioMatrixRow("scenario-5-evidence-replay", "audit-replay", false, "review-scorecard-after-replay", "accepted")
       ]
     },
+    cutoverCommandCenter: {
+      status: "command-center-ready-for-rehearsal",
+      primaryTrackId: "emergency-life-chain",
+      primaryTrackName: "120急救生命链",
+      watchOnlyTrackIds: ["clinical-blood", "regional-imaging-cloud", "physical-examination"],
+      summary: {
+        windows: 3,
+        rosterSeats: 5,
+        watchOnlyTracks: 3,
+        noGoRules: 9
+      },
+      windows: [
+        commandWindow("window-t-1-freeze", "T-1 scope freeze and evidence preflight", "T-1", "release commander", "commission release office + platform operations", "all pilot scope, endpoint, account, evidence and rollback owners are assigned", "first-increment evidence reaches submitted state and batch-1 scope is frozen", ["emergency-life-chain:external-evidence-1", "emergency-life-chain:external-evidence-2"], ["frozen pilot roster", "signed evidence preflight checklist", "rollback contact sheet"], ["required evidence owner", "external endpoint receipt", "rollback contact"]),
+        commandWindow("window-t0-controlled-rehearsal", "T0 controlled batch-1 rehearsal", "T0", "business commander", "120急救中心/卫健应急办", "T+1 observation before any expansion", "all hard-stop scenarios pass or remain No-Go with recorded reason", ["scenario-1-normal-chain", "scenario-2-idempotency-replay", "scenario-3-signature-rejection", "scenario-4-manual-downgrade"], ["scenario run sheet", "interface receipt ledger", "manual downgrade proof", "audit export digest"], ["patient safety proof", "signature/idempotency proof", "append-only audit digest"]),
+        commandWindow("window-t-plus-1-observation", "T+1 observation and promotion decision", "T+1", "quality reviewer", "operations duty + quality control + business owner", "batch-1 rehearsal has no unexplained P0/P1 issue", "decide stay No-Go, repeat batch-1, or open watch-only batch-2", ["alert review", "audit replay", "data-quality sample", "manual-handling review"], ["T+1 observation memo", "go/no-go scorecard update", "next specialty watch-only recommendation"], ["unexplained P0/P1 event", "missing audit replay", "unreviewed manual handling"])
+      ],
+      roster: [
+        { seat: "release-commander", owner: "commission release office", decisionRight: "freeze scope, pause rehearsal, call No-Go" },
+        { seat: "business-commander", owner: "120急救中心/卫健应急办", decisionRight: "confirm patient-safety continuity and manual downgrade" },
+        { seat: "operations-duty", owner: "platform operations", decisionRight: "observe service, logs, alerts, rollback window and deployment health" },
+        { seat: "security-audit", owner: "security office", decisionRight: "reject unsigned, over-scoped or unreplayable evidence" },
+        { seat: "site-liaison", owner: "pilot institution information office", decisionRight: "coordinate external system, device and clinical department availability" }
+      ],
+      escalationRules: [
+        "any P0 patient-safety, privacy or security event pages release-commander and business-commander immediately",
+        "two consecutive unexplained interface failures pause batch-1 and switch to manual downgrade",
+        "missing append-only audit evidence keeps the decision No-Go even when the business flow appears successful",
+        "watch-only specialty expansion can start only after the T+1 observation memo is accepted"
+      ],
+      decisionArtifacts: [
+        "frozen-scope-sheet",
+        "command-roster-and-contact-sheet",
+        "scenario-run-sheet",
+        "interface-and-idempotency-ledger",
+        "manual-downgrade-or-rollback-proof",
+        "t-plus-1-observation-memo"
+      ]
+    },
     integrity: { algorithm: "sha256", digest: "sha256:static-preview-fallback" }
   };
+}
+
+function commandWindow(id, name, stage, ownerRole, ownerDepartment, entryGate, exitGate, requiredInputs, produces, noGoIfMissing) {
+  return { id, name, stage, ownerRole, ownerDepartment, entryGate, exitGate, requiredInputs, produces, noGoIfMissing };
 }
 
 function scenarioMatrixRow(scenarioId, type, hardStopOnFail, goNoGoImpact, minimumState = "submitted") {

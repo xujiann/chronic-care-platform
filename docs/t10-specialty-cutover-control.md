@@ -142,6 +142,16 @@ The suite status is `ready-for-controlled-rehearsal-only`. Hard-stop scenario fa
 
 All hard-stop scenario rows must pass before the scorecard can improve. The audit replay row must prove evidence closure without changing source records. Missing workflow events keep linked evidence at `submitted` or `returned`.
 
+## Cutover command center
+
+The pack now emits a `cutoverCommandCenter` board that turns the evidence, batch and scenario controls into an accountable duty model:
+
+- `window-t-1-freeze`: freezes pilot scope, endpoints, accounts, evidence owners and rollback contacts before batch-1 can start;
+- `window-t0-controlled-rehearsal`: runs the hard-stop scenarios, captures interface/idempotency ledgers and records patient-safety downgrade proof;
+- `window-t-plus-1-observation`: reviews alerts, audit replay, data-quality samples and manual handling before deciding No-Go, repeat batch-1 or open watch-only batch-2.
+
+The board also lists command seats (`release-commander`, `business-commander`, `operations-duty`, `security-audit`, `site-liaison`), escalation rules and decision artifacts. Missing append-only audit evidence, unexplained interface failures or any P0 patient-safety/privacy/security event keeps the release at No-Go.
+
 ## Verification
 
 Run the focused test directly:
