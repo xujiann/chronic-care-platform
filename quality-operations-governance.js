@@ -367,6 +367,9 @@ function validateCommand(command) {
   if (!String(command.actor?.id || "").trim() || !String(command.actor?.role || "").trim()) {
     return commandError("INVALID_COMMAND", "actor id and role are required");
   }
+  if (!Number.isInteger(command.expectedVersion) || command.expectedVersion < 0) {
+    return commandError("INVALID_COMMAND", "expectedVersion must be a non-negative integer");
+  }
   return null;
 }
 

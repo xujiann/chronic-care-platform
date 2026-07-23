@@ -43,6 +43,15 @@ const {
   buildQualitySafetyInterfaceJointTestPack,
   validateQualitySafetyInterfaceMessage
 } = require("./scripts/quality-safety-interface-joint-test");
+const { executeGovernanceCommand } = require("./quality-operations-governance");
+const {
+  applyGovernanceResultToData,
+  buildGovernanceCatalog,
+  buildGovernanceRuntimeState,
+  governanceAuditForRecord,
+  listGovernanceRecords,
+  publicGovernanceRecord
+} = require("./quality-operations-governance-adapter");
 const PHYSICAL_EXAM_CONTRACT_ID = "physical-exam-report-v1";
 const EmergencyService = require("./emergency-service");
 const EmergencyLifeChain = require("./emergency-lifechain");
@@ -10075,6 +10084,14 @@ function normalizeState(data) {
     medicationPickups: Array.isArray(data.medicationPickups) ? data.medicationPickups : seedMedicationPickups(),
     institutionSupervisions: Array.isArray(data.institutionSupervisions) ? data.institutionSupervisions : seedInstitutionSupervisions(),
     drugConsumableSupervisions: mergeByKey(seedDrugConsumableSupervisions(), data.drugConsumableSupervisions, "id"),
+    qualityOperationsGovernanceAuditEvents: Array.isArray(data.qualityOperationsGovernanceAuditEvents)
+      ? data.qualityOperationsGovernanceAuditEvents.slice(0, 5000)
+      : [],
+    qualityOperationsGovernanceCommandReceipts: data.qualityOperationsGovernanceCommandReceipts
+      && typeof data.qualityOperationsGovernanceCommandReceipts === "object"
+      && !Array.isArray(data.qualityOperationsGovernanceCommandReceipts)
+      ? data.qualityOperationsGovernanceCommandReceipts
+      : {},
     insuranceClaims: Array.isArray(data.insuranceClaims) ? data.insuranceClaims : seedInsuranceClaims(),
     diseasePayment: DiseasePaymentService.normalizeState(data.diseasePayment),
     policyAlignment: Array.isArray(data.policyAlignment) ? data.policyAlignment : seedPolicyAlignment(),
@@ -23156,6 +23173,22 @@ function buildRuntimeProductionGoNoGoCenter(data) {
   }, securityCenter);
 }
 
+function governanceActorFromUser(user = {}) {
+  return {
+    id: String(user.id || user.username || user.name || "").trim(),
+    role: String(user.role || "").trim(),
+    institutionId: String(user.orgCode || "").trim(),
+    scopeInstitutionIds: Array.isArray(user.scopeInstitutionIds) ? user.scopeInstitutionIds : []
+  };
+}
+
+function governanceHttpStatus(code) {
+  if (["ACTOR_FORBIDDEN", "INSTITUTION_SCOPE_DENIED"].includes(code)) return 403;
+  if (code === "RECORD_NOT_FOUND") return 404;
+  if (["INVALID_TRANSITION", "DOMAIN_MISMATCH", "VERSION_CONFLICT", "IDEMPOTENCY_CONFLICT"].includes(code)) return 409;
+  return 400;
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -23218,6 +23251,72 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/system/readiness");
     if (!user) return;
     sendJson(res, 200, buildSystemReadinessReport(readDatabase()));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/quality-operations-governance/catalog") {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance"], url.pathname);
+    if (!user) return;
+    sendJson(res, 200, buildGovernanceCatalog(readDatabase()));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/quality-operations-governance/items") {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance"], url.pathname);
+    if (!user) return;
+    sendJson(res, 200, listGovernanceRecords(readDatabase(), user, {
+      domain: url.searchParams.get("domain"),
+      status: url.searchParams.get("status"),
+      institutionId: url.searchParams.get("institutionId")
+    }));
+    return;
+  }
+
+  const governanceAuditMatch = url.pathname.match(/^\/api\/quality-operations-governance\/items\/([^/]+)\/audit$/);
+  if (req.method === "GET" && governanceAuditMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance"], "/api/quality-operations-governance/items/:id/audit");
+    if (!user) return;
+    const result = governanceAuditForRecord(readDatabase(), decodeURIComponent(governanceAuditMatch[1]), user);
+    if (!result.found) {
+      sendJson(res, 404, { error: "Not Found", code: "RECORD_NOT_FOUND", message: "governance record not found" });
+      return;
+    }
+    if (!result.allowed) {
+      sendJson(res, 403, { error: "Forbidden", code: "INSTITUTION_SCOPE_DENIED", message: "record is outside the actor scope" });
+      return;
+    }
+    sendJson(res, 200, result);
+    return;
+  }
+
+  const governanceActionMatch = url.pathname.match(/^\/api\/quality-operations-governance\/items\/([^/]+)\/actions$/);
+  if (req.method === "POST" && governanceActionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance"], "/api/quality-operations-governance/items/:id/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const command = {
+      idempotencyKey: String(req.headers["idempotency-key"] || "").trim(),
+      domain: String(payload.domain || "").trim(),
+      recordId: decodeURIComponent(governanceActionMatch[1]),
+      action: String(payload.action || "").trim(),
+      actor: governanceActorFromUser(user),
+      expectedVersion: payload.expectedVersion,
+      occurredAt: new Date().toISOString(),
+      payload: payload.payload && typeof payload.payload === "object" ? payload.payload : {}
+    };
+    const runtime = buildGovernanceRuntimeState(data);
+    const result = executeGovernanceCommand(runtime.state, command);
+    applyGovernanceResultToData(data, result);
+    data.securityEvents = sealAuditTrail(data.securityEvents, { recompute: true });
+    writeDatabase(data);
+    sendJson(res, result.ok ? 200 : governanceHttpStatus(result.error?.code), {
+      ok: result.ok,
+      replayed: result.replayed,
+      record: publicGovernanceRecord(result.record),
+      auditEvent: result.auditEvent,
+      error: result.error
+    });
     return;
   }
 

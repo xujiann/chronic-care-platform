@@ -614,6 +614,10 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.qualitySafetyInterfaceJointTest.ok, true);
   assert.equal(report.qualitySafetyInterfaceJointTest.summary.sampleAccepted, report.qualitySafetyInterfaceJointTest.summary.sampleRequests);
   assert.equal(report.qualitySafetyInterfaceJointTest.summary.siteSampleReady, report.qualitySafetyInterfaceJointTest.summary.siteSampleAcceptance);
+  assert.equal(report.qualityOperationsGovernance.ok, true);
+  assert.equal(report.qualityOperationsGovernance.productionReady, false);
+  assert.equal(report.qualityOperationsGovernance.catalog.sourceCollections.length, 3);
+  assert.equal(report.checks.some((item) => item.name === "qualityOperationsGovernance:readiness" && item.passed), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-env-file"), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-institution-interfaces" && !item.passed), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-chronic-launch-core" && !item.passed), true);

@@ -482,6 +482,14 @@ Implemented drug-consumable capabilities include role-scoped supervision access,
 
 Before production launch, bind real scanner/HIS/pharmacy fields to `traceabilityEvidenceRequirements`, ingest real insurance-code/commodity-code/trace-code mapping versions, connect insurance settlement callbacks, attach high-value consumable catalog and charge-item cross-checks, configure production identity/secrets/audit-retention storage, and archive signed site evidence for interface joint tests, monitoring, and disaster-recovery rehearsal.
 
+## Unified Quality and Operations Governance
+
+`quality-operations-governance-adapter.js` adapts the existing `qualityRectificationOrders`, `resourceDispatchRequests`, and `drugConsumableSupervisions` collections into one canonical governance record without copying resident identifiers. The public read surface is `GET /api/quality-operations-governance/catalog`, `GET /api/quality-operations-governance/items`, and `GET /api/quality-operations-governance/items/:id/audit`; role and institution scope are applied before records or audit events are returned.
+
+Writes use `POST /api/quality-operations-governance/items/:id/actions`. The server requires an `Idempotency-Key` header and a non-negative `expectedVersion`, derives actor identity and institution scope only from the authenticated session, and assigns server time. Successful and rejected attempts are persisted in the domain audit ledger and projected into the platform process and sealed security audit collections; idempotent replay does not duplicate those events.
+
+Run `npm.cmd run quality-operations:governance-readiness` to generate `release/quality-operations-governance-readiness-report.json` and `release/quality-operations-governance-readiness-report.md`. Local routing readiness does not mean production readiness: `productionReady` remains `false` until trusted identity and institution directories, HIS/EMR/LIS/PACS, bed/roster/equipment/transfer sources, scanner and insurance callbacks, production database, SIEM, alert duty coverage, and disaster-recovery evidence are connected and accepted.
+
 ## Health Dashboard Aggregate Entry
 
 - `health-dashboard.html` is priority application 8: the aggregate entry for the first seven applications.

@@ -69,6 +69,7 @@ const { buildRegionalReferralOverlapReport, renderMarkdown: renderRegionalReferr
 const { buildQualitySafetyReport, renderMarkdown: renderQualitySafetyMarkdown } = require("./quality-safety-report");
 const { buildQualitySafetyInterfaceStandard, renderMarkdown: renderQualitySafetyInterfaceStandardMarkdown } = require("./quality-safety-interface-standard");
 const { buildQualitySafetyInterfaceJointTestPack, renderMarkdown: renderQualitySafetyInterfaceJointTestMarkdown } = require("./quality-safety-interface-joint-test");
+const { buildQualityOperationsGovernanceReadiness, renderMarkdown: renderQualityOperationsGovernanceMarkdown } = require("./quality-operations-governance-readiness");
 const { buildReleaseArtifactManifest, renderMarkdown: renderReleaseArtifactManifestMarkdown } = require("./release-artifact-manifest");
 const { buildCapabilityMap, renderCapabilityMapMarkdown } = require("../platform-capability-map");
 const { buildPlatformGoLiveSlices, renderPlatformGoLiveSlicesMarkdown } = require("../platform-go-live-slices");
@@ -827,6 +828,15 @@ function qualitySafetyInterfaceJointTestChecks(pack) {
   ];
 }
 
+function qualityOperationsGovernanceChecks(report) {
+  return [
+    check("qualityOperationsGovernance:readiness", report.ok, report.ok ? "unified quality and operations governance checks passed" : "unified quality and operations governance checks failed", "error", "quality-operations-governance"),
+    check("qualityOperationsGovernance:collections", report.catalog?.sourceCollections?.length === 3, `${report.catalog?.sourceCollections?.length || 0}/3 source collections adapted`, "error", "quality-operations-governance"),
+    check("qualityOperationsGovernance:mapping", report.catalog?.summary?.unmapped === 0, `${report.catalog?.summary?.records || 0} records / ${report.catalog?.summary?.unmapped || 0} unmapped`, "error", "quality-operations-governance"),
+    check("qualityOperationsGovernance:productionBoundary", report.productionReady === false && (report.blockers?.length || 0) >= 4, `${report.blockers?.length || 0} production blockers retained`, "error", "quality-operations-governance")
+  ];
+}
+
 function digitalHospitalStandardsChecks(digitalHospitalStandards) {
   return [
     check("digitalHospitalStandards:readiness", digitalHospitalStandards.ok, digitalHospitalStandards.ok ? "digital hospital standards checks passed" : "digital hospital standards checks failed", "error", "digital-hospital-standards"),
@@ -1280,6 +1290,7 @@ function buildReleaseReport(options = {}) {
   const qualitySafety = buildQualitySafetyReport({ data });
   const qualitySafetyInterfaceStandard = buildQualitySafetyInterfaceStandard({ data });
   const qualitySafetyInterfaceJointTest = buildQualitySafetyInterfaceJointTestPack({ data, standardReport: qualitySafetyInterfaceStandard });
+  const qualityOperationsGovernance = buildQualityOperationsGovernanceReadiness({ data, pkg });
   const drugConsumable = buildDrugConsumableReadinessReport({ data, pkg });
   const integrationReadiness = buildIntegrationReadinessReport({ data });
   const objectStorageReadiness = buildObjectStorageReadiness({ data, pkg });
@@ -1388,6 +1399,7 @@ function buildReleaseReport(options = {}) {
     ...qualitySafetyChecks(qualitySafety),
     ...qualitySafetyInterfaceStandardChecks(qualitySafetyInterfaceStandard),
     ...qualitySafetyInterfaceJointTestChecks(qualitySafetyInterfaceJointTest),
+    ...qualityOperationsGovernanceChecks(qualityOperationsGovernance),
     ...drugConsumableChecks(drugConsumable),
     ...integrationReadinessChecks(integrationReadiness),
     ...objectStorageReadinessChecks(objectStorageReadiness),
@@ -1481,6 +1493,7 @@ function buildReleaseReport(options = {}) {
     qualitySafety,
     qualitySafetyInterfaceStandard,
     qualitySafetyInterfaceJointTest,
+    qualityOperationsGovernance,
     drugConsumable,
     integrationReadiness,
     objectStorageReadiness,
@@ -1839,6 +1852,7 @@ function renderMarkdown(report) {
     "See `maternal-child-readiness-report.json` and `maternal-child-readiness-report.md` for maternal-child policy, birth certificate workflow, role scope, API, privacy, and release evidence.",
     "See `immunization-readiness-report.json` and `immunization-readiness-report.md` for 2026 immunization rules, special health-state decision support, launch blockers, evidence ledger and production go-live boundary.",
     "See `public-health-readiness-report.json` and `public-health-readiness-report.md` for the 21/125/421 public-health standard matrix, institution scopes, event loop, exchange tasks, cutover blockers, API, and release evidence.",
+    "See `quality-operations-governance-readiness-report.json` and `quality-operations-governance-readiness-report.md` for the unified quality rectification, resource dispatch, and drug-consumable governance contract, scoped read APIs, idempotent writes, audit persistence, and retained production blockers.",
     "See `policy-coverage-report.json` and `policy-coverage-report.md` for About-page policy IDs, policy documents, template rules, CI, deploy check, release manifest, and operator documentation coverage.",
     "",
     "## Release artifact manifest",
@@ -2090,6 +2104,8 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       qualitySafetyInterfaceJointTest: report.qualitySafetyInterfaceJointTest
     }, null, 2), "utf8");
+    const qualityOperationsGovernanceJson = path.join(path.dirname(output), "quality-operations-governance-readiness-report.json");
+    fs.writeFileSync(qualityOperationsGovernanceJson, JSON.stringify(report.qualityOperationsGovernance, null, 2), "utf8");
     const integrationJson = path.join(path.dirname(output), "integration-readiness-report.json");
     fs.writeFileSync(integrationJson, JSON.stringify({
       project: report.project,
@@ -2462,6 +2478,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(qualitySafetyInterfaceMarkdown, renderQualitySafetyInterfaceStandardMarkdown(report.qualitySafetyInterfaceStandard), "utf8");
     const qualitySafetyJointTestMarkdown = path.join(path.dirname(markdown), "quality-safety-interface-joint-test-pack.md");
     fs.writeFileSync(qualitySafetyJointTestMarkdown, renderQualitySafetyInterfaceJointTestMarkdown(report.qualitySafetyInterfaceJointTest), "utf8");
+    const qualityOperationsGovernanceMarkdown = path.join(path.dirname(markdown), "quality-operations-governance-readiness-report.md");
+    fs.writeFileSync(qualityOperationsGovernanceMarkdown, renderQualityOperationsGovernanceMarkdown(report.qualityOperationsGovernance), "utf8");
     const integrationMarkdown = path.join(path.dirname(markdown), "integration-readiness-report.md");
     fs.writeFileSync(integrationMarkdown, renderIntegrationReadinessMarkdown(report.integrationReadiness), "utf8");
     const objectStorageMarkdown = path.join(path.dirname(markdown), "object-storage-readiness-report.md");

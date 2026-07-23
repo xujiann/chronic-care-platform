@@ -30,7 +30,7 @@ function command(idempotencyKey, record, action, actor, extra = {}) {
     action,
     actor,
     occurredAt: extra.occurredAt || "2026-07-23T09:00:00.000Z",
-    expectedVersion: extra.expectedVersion,
+    expectedVersion: extra.expectedVersion ?? record.version ?? 0,
     payload: extra.payload || {}
   };
 }
@@ -279,6 +279,18 @@ test("optimistic version conflicts are audited and do not advance the record", (
   assert.equal(result.error.code, "VERSION_CONFLICT");
   assert.equal(result.record.version, 2);
   assert.equal(result.auditEvent.outcome, "denied");
+});
+
+test("write commands require an explicit non-negative expectedVersion", () => {
+  const initial = createGovernanceState([qualityRecord()]);
+  const missing = command("q-version-missing", qualityRecord(), "start", HOSPITAL_A);
+  delete missing.expectedVersion;
+  const denied = executeGovernanceCommand(initial, missing);
+  assert.equal(denied.ok, false);
+  assert.equal(denied.error.code, "INVALID_COMMAND");
+  assert.match(denied.error.message, /expectedVersion/);
+  assert.equal(denied.state.records["quality-1"].version, 0);
+  assert.equal(denied.auditEvent.outcome, "denied");
 });
 
 test("metric catalog has unique ownership source and threshold contracts", () => {
