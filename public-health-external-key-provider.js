@@ -6,6 +6,9 @@ const {
   selectSigningKey,
   summarizeKeyring
 } = require("./public-health-external-keyring-service");
+const {
+  normalizePublicHealthExternalResiliencePolicy
+} = require("./public-health-external-resilience-service");
 
 const ROTATION_SEQUENCE = Object.freeze([
   "new-active",
@@ -16,6 +19,14 @@ const ROTATION_SEQUENCE = Object.freeze([
 ]);
 
 let managedKeyringLoader = null;
+
+const DEFAULT_RESILIENCE_POLICY = Object.freeze({
+  failureThreshold: 3,
+  openSeconds: 120,
+  halfOpenMaxProbes: 1,
+  rateLimitPerMinute: 30,
+  maxPending: 100
+});
 
 function clean(value) {
   return String(value ?? "").trim();
@@ -41,6 +52,45 @@ function configurePublicHealthKeyringLoader(loader) {
     throw new Error("public health managed keyring loader must be a function or null");
   }
   managedKeyringLoader = loader;
+}
+
+function parseResiliencePolicyConfig(value) {
+  if (value && typeof value === "object" && !Array.isArray(value)) return value;
+  const serialized = clean(value);
+  if (!serialized) return null;
+  try {
+    const parsed = JSON.parse(serialized);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("object required");
+    return parsed;
+  } catch (error) {
+    throw new Error(`PUBLIC_HEALTH_EXTERNAL_RESILIENCE_POLICIES must be a JSON object: ${error.message}`);
+  }
+}
+
+function loadPublicHealthResiliencePolicies(options = {}) {
+  const env = options.env || process.env;
+  const production = options.production === undefined
+    ? clean(env.NODE_ENV).toLowerCase() === "production"
+    : Boolean(options.production);
+  const configured = parseResiliencePolicyConfig(
+    options.resiliencePolicies === undefined
+      ? env.PUBLIC_HEALTH_EXTERNAL_RESILIENCE_POLICIES
+      : options.resiliencePolicies
+  );
+  if (production && !configured) {
+    throw new Error("PUBLIC_HEALTH_EXTERNAL_RESILIENCE_POLICIES is required in production");
+  }
+  const entries = EXTERNAL_ADAPTER_PROFILES.map((profile) => {
+    const lanePolicy = configured?.[profile.laneId];
+    if (production && !lanePolicy) {
+      throw new Error(`production resilience policy is required for public health lane ${profile.laneId}`);
+    }
+    return [
+      profile.laneId,
+      Object.freeze(normalizePublicHealthExternalResiliencePolicy(lanePolicy || DEFAULT_RESILIENCE_POLICY))
+    ];
+  });
+  return Object.freeze(Object.fromEntries(entries));
 }
 
 async function loadPurposeKeyring(profile, purpose, options) {
@@ -75,7 +125,8 @@ function privateCredentials(values, summary) {
     endpoint: { value: values.endpoint, enumerable: false },
     requestKeyring: { value: values.requestKeyring, enumerable: false },
     receiptKeyring: { value: values.receiptKeyring, enumerable: false },
-    maxAttempts: { value: values.maxAttempts, enumerable: false }
+    maxAttempts: { value: values.maxAttempts, enumerable: false },
+    resiliencePolicies: { value: values.resiliencePolicies, enumerable: false }
   });
   return Object.freeze(credentials);
 }
@@ -87,6 +138,11 @@ async function loadPublicHealthLaneCredentials(laneId, options = {}) {
   const production = clean(env.NODE_ENV).toLowerCase() === "production";
   const loader = options.loader === undefined ? managedKeyringLoader : options.loader;
   const endpoint = clean(env[profile.endpointEnv]);
+  const resiliencePolicies = loadPublicHealthResiliencePolicies({
+    env,
+    production,
+    resiliencePolicies: options.resiliencePolicies
+  });
   const request = await loadPurposeKeyring(profile, "request", { env, at, loader, production });
   const receipt = await loadPurposeKeyring(profile, "receipt", { env, at, loader, production });
   const maxAttempts = Number(env[`${profile.endpointEnv.replace(/_ENDPOINT$/, "")}_MAX_ATTEMPTS`] || profile.maxAttempts);
@@ -100,6 +156,13 @@ async function loadPublicHealthLaneCredentials(laneId, options = {}) {
     source: request.source === "managed-key-service" && receipt.source === "managed-key-service"
       ? "managed-key-service"
       : "legacy-static",
+    resilience: {
+      configured: true,
+      lanes: Object.keys(resiliencePolicies).length,
+      source: clean(env.PUBLIC_HEALTH_EXTERNAL_RESILIENCE_POLICIES) || options.resiliencePolicies
+        ? "server-config"
+        : "local-compatibility-defaults"
+    },
     productionReady: false,
     blockers: [
       ...(requestSummary.productionReady ? [] : requestSummary.blockers),
@@ -111,7 +174,8 @@ async function loadPublicHealthLaneCredentials(laneId, options = {}) {
     endpoint,
     requestKeyring: request.keyring,
     receiptKeyring: receipt.keyring,
-    maxAttempts
+    maxAttempts,
+    resiliencePolicies
   }, summary);
 }
 
@@ -207,6 +271,8 @@ module.exports = {
   evaluateRotationEvidence,
   loadPublicHealthLaneCredentialMap,
   loadPublicHealthLaneCredentials,
+  loadPublicHealthResiliencePolicies,
   profileForLane,
-  revokedReferenceIssues
+  revokedReferenceIssues,
+  DEFAULT_RESILIENCE_POLICY
 };

@@ -124,6 +124,7 @@ test("public health external routes use server time full keyrings and secret-fre
       evidenceRefs: ["api-immunization-request"],
       exceptionOwner: "immunization compensation team",
       exceptionDueAt: "2026-07-31",
+      resiliencePolicies: { immunization: { maxPending: 0 } },
       at: "1999-01-01T00:00:00.000Z"
     }
   );
@@ -136,6 +137,7 @@ test("public health external routes use server time full keyrings and secret-fre
 
   const due = await request(baseUrl, "/api/public-health/external/outbox/due", token);
   assert.equal(due.response.status, 200);
+  assert.equal(due.body.candidateOnly, true);
   assert.equal(due.body.due.some((item) => item.id === dispatch.id), true);
 
   const claimed = await post(
@@ -143,23 +145,41 @@ test("public health external routes use server time full keyrings and secret-fre
     `/api/public-health/external/dispatches/${dispatch.id}/claim`,
     token,
     "api-immunization-claim",
-    { expectedVersion: 1, leaseSeconds: 60 }
+    { expectedVersion: 1, expectedLaneControlVersion: 999, leaseSeconds: 60 }
   );
   assert.equal(claimed.response.status, 200, JSON.stringify(claimed.body));
   assert.match(claimed.body.leaseToken, /^[a-f0-9]{64}$/);
   assert.equal(claimed.body.dispatch.outboxVersion, 2);
+  assert.equal(claimed.body.laneControl.version, 1);
+  assert.equal(claimed.body.laneControl.circuitState, "closed");
+
+  const staleLaneAttempt = await post(
+    baseUrl,
+    `/api/public-health/external/dispatches/${dispatch.id}/attempt`,
+    token,
+    "api-immunization-attempt-stale-lane",
+    { expectedVersion: 2, expectedLaneControlVersion: 0, transportStatus: 503 },
+    { "X-Public-Health-Lease-Token": claimed.body.leaseToken }
+  );
+  assert.equal(staleLaneAttempt.response.status, 409, JSON.stringify(staleLaneAttempt.body));
 
   const attempted = await post(
     baseUrl,
     `/api/public-health/external/dispatches/${dispatch.id}/attempt`,
     token,
     "api-immunization-attempt",
-    { expectedVersion: 2, transportStatus: 503, at: "1999-01-01T00:00:00.000Z" },
+    {
+      expectedVersion: 2,
+      expectedLaneControlVersion: claimed.body.laneControl.version,
+      transportStatus: 503,
+      at: "1999-01-01T00:00:00.000Z"
+    },
     { "X-Public-Health-Lease-Token": claimed.body.leaseToken }
   );
   assert.equal(attempted.response.status, 200, JSON.stringify(attempted.body));
   assert.equal(attempted.body.dispatch.deliveryState, "retry-scheduled");
   assert.equal(attempted.body.dispatch.outboxVersion, 3);
+  assert.equal(attempted.body.laneControl.version, 2);
   assert.notEqual(attempted.body.dispatch.attempts[0].at, "1999-01-01T00:00:00.000Z");
 
   const receiptAt = new Date().toISOString();
@@ -212,6 +232,8 @@ test("public health external routes use server time full keyrings and secret-fre
   assert.equal(persistedDispatch.deliveryState, "delivered");
   assert.notEqual(persistedDispatch.attempts.at(-1).at, "1999-01-01T00:00:00.000Z");
   assert.equal(persisted.publicHealthExternalDispatchAudit.length, 4);
+  assert.equal(persisted.publicHealthExternalLaneControls.find((item) => item.laneId === "immunization").version, 2);
+  assert.equal(persisted.publicHealthExternalLaneControlAudit.length, 2);
   const serializedState = JSON.stringify(persisted);
   assert.doesNotMatch(serializedState, new RegExp(REQUEST_SECRET));
   assert.doesNotMatch(serializedState, new RegExp(RECEIPT_SECRET));

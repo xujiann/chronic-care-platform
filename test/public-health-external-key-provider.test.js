@@ -5,12 +5,29 @@ const {
   ROTATION_SEQUENCE,
   buildPublicHealthKeySafetyBoard,
   evaluateRotationEvidence,
-  loadPublicHealthLaneCredentials
+  loadPublicHealthLaneCredentials,
+  loadPublicHealthResiliencePolicies
 } = require("../public-health-external-key-provider");
 
 const AT = "2026-07-23T08:00:00.000Z";
 const REQUEST_SECRET = "provider-request-secret-1234567890-123456";
 const RECEIPT_SECRET = "provider-receipt-secret-1234567890-123456";
+const RESILIENCE_POLICIES = Object.fromEntries([
+  "infectious-reporting",
+  "immunization",
+  "maternal-child",
+  "senior-health",
+  "chronic-management",
+  "public-health-followup",
+  "health-education",
+  "family-doctor"
+].map((laneId) => [laneId, {
+  failureThreshold: 3,
+  openSeconds: 120,
+  halfOpenMaxProbes: 1,
+  rateLimitPerMinute: 30,
+  maxPending: 100
+}]));
 
 function managedKeyring(purpose, activeKeyId, keys) {
   return { purpose, activeKeyId, keys };
@@ -29,12 +46,15 @@ test("local compatibility credentials stay non-enumerable and production blocked
   assert.equal(credentials.endpoint, "https://immunization.example.test/dispatch");
   assert.equal(credentials.requestKeyring, REQUEST_SECRET);
   assert.equal(credentials.receiptKeyring, RECEIPT_SECRET);
+  assert.equal(credentials.resiliencePolicies.immunization.maxPending, 100);
   assert.equal(credentials.summary.source, "legacy-static");
+  assert.equal(credentials.summary.resilience.lanes, 8);
   assert.equal(credentials.summary.productionReady, false);
   const serialized = JSON.stringify(credentials);
   assert.doesNotMatch(serialized, new RegExp(REQUEST_SECRET));
   assert.doesNotMatch(serialized, new RegExp(RECEIPT_SECRET));
   assert.doesNotMatch(serialized, /example\.test\/dispatch/);
+  assert.doesNotMatch(serialized, /failureThreshold|maxPending/);
 });
 
 test("production loads request and receipt keyrings by lane reference", async () => {
@@ -61,7 +81,8 @@ test("production loads request and receipt keyrings by lane reference", async ()
       NODE_ENV: "production",
       PUBLIC_HEALTH_IMMUNIZATION_ENDPOINT: "https://immunization.example.test/dispatch",
       PUBLIC_HEALTH_IMMUNIZATION_REQUEST_KEYRING_REF: "kms://public-health/immunization/request",
-      PUBLIC_HEALTH_IMMUNIZATION_RECEIPT_KEYRING_REF: "kms://public-health/immunization/receipt"
+      PUBLIC_HEALTH_IMMUNIZATION_RECEIPT_KEYRING_REF: "kms://public-health/immunization/receipt",
+      PUBLIC_HEALTH_EXTERNAL_RESILIENCE_POLICIES: JSON.stringify(RESILIENCE_POLICIES)
     },
     loader: async (request) => {
       calls.push(request);
@@ -74,22 +95,44 @@ test("production loads request and receipt keyrings by lane reference", async ()
   ]);
   assert.equal(credentials.requestKeyring, requestKeyring);
   assert.equal(credentials.receiptKeyring, receiptKeyring);
+  assert.deepEqual(credentials.resiliencePolicies.immunization, RESILIENCE_POLICIES.immunization);
   assert.equal(credentials.summary.source, "managed-key-service");
   assert.equal(credentials.summary.productionReady, false);
   assert.doesNotMatch(JSON.stringify(credentials), /provider-(request|receipt)-secret/);
 });
 
+test("production resilience configuration covers all eight lanes and rejects gaps", () => {
+  const policies = loadPublicHealthResiliencePolicies({
+    production: true,
+    resiliencePolicies: RESILIENCE_POLICIES
+  });
+  assert.equal(Object.keys(policies).length, 8);
+  assert.equal(policies["family-doctor"].halfOpenMaxProbes, 1);
+  assert.throws(() => loadPublicHealthResiliencePolicies({
+    production: true,
+    resiliencePolicies: { immunization: RESILIENCE_POLICIES.immunization }
+  }), /production resilience policy is required/);
+  assert.throws(() => loadPublicHealthResiliencePolicies({
+    production: true,
+    resiliencePolicies: { ...RESILIENCE_POLICIES, immunization: { ...RESILIENCE_POLICIES.immunization, maxPending: 0 } }
+  }), /maxPending must be an integer/);
+});
+
 test("production fails closed without references or a managed key service", async () => {
   await assert.rejects(() => loadPublicHealthLaneCredentials("immunization", {
     at: AT,
-    env: { NODE_ENV: "production" }
+    env: {
+      NODE_ENV: "production",
+      PUBLIC_HEALTH_EXTERNAL_RESILIENCE_POLICIES: JSON.stringify(RESILIENCE_POLICIES)
+    }
   }), /REQUEST_KEYRING_REF is required/);
   await assert.rejects(() => loadPublicHealthLaneCredentials("immunization", {
     at: AT,
     env: {
       NODE_ENV: "production",
       PUBLIC_HEALTH_IMMUNIZATION_REQUEST_KEYRING_REF: "kms://request",
-      PUBLIC_HEALTH_IMMUNIZATION_RECEIPT_KEYRING_REF: "kms://receipt"
+      PUBLIC_HEALTH_IMMUNIZATION_RECEIPT_KEYRING_REF: "kms://receipt",
+      PUBLIC_HEALTH_EXTERNAL_RESILIENCE_POLICIES: JSON.stringify(RESILIENCE_POLICIES)
     }
   }), /managed public health key service is unavailable/);
 });

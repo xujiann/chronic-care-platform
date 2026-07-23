@@ -6547,19 +6547,61 @@ function readDatabase() {
   return data;
 }
 
-function writeDatabase(data) {
+function currentPublicHealthExternalVersions(data = {}, cas = {}) {
+  const dispatch = (Array.isArray(data.publicHealthExternalDispatches) ? data.publicHealthExternalDispatches : [])
+    .find((item) => item.id === String(cas.dispatchId || "").trim());
+  const laneControl = (Array.isArray(data.publicHealthExternalLaneControls) ? data.publicHealthExternalLaneControls : [])
+    .find((item) => item.laneId === String(cas.laneId || "").trim());
+  return {
+    dispatch,
+    outboxVersion: dispatch ? Number(dispatch.outboxVersion) : null,
+    laneControlVersion: Number(laneControl?.version || 0)
+  };
+}
+
+function assertPublicHealthExternalCas(data = {}, cas = {}) {
+  const dispatchId = String(cas.dispatchId || "").trim();
+  const laneId = String(cas.laneId || "").trim();
+  const expectedOutboxVersion = Number(cas.expectedOutboxVersion);
+  const expectedLaneControlVersion = Number(cas.expectedLaneControlVersion);
+  if (!dispatchId || !laneId || !Number.isInteger(expectedOutboxVersion) || !Number.isInteger(expectedLaneControlVersion)) {
+    throw new Error("public health external CAS requires dispatchId, laneId and integer expected versions");
+  }
+  const current = currentPublicHealthExternalVersions(data, { dispatchId, laneId });
+  if (!current.dispatch) throw new Error(`public health external CAS dispatch missing: ${dispatchId}`);
+  if (current.outboxVersion !== expectedOutboxVersion) {
+    throw new Error(`public health external dispatch CAS conflict: expected ${expectedOutboxVersion}, current ${current.outboxVersion}`);
+  }
+  if (current.laneControlVersion !== expectedLaneControlVersion) {
+    throw new Error(`public health external lane control CAS conflict: expected ${expectedLaneControlVersion}, current ${current.laneControlVersion}`);
+  }
+  return current;
+}
+
+function writeDatabase(data, options = {}) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
+  const publicHealthExternalCas = options.publicHealthExternalCas || null;
+  const sqlite = shouldUseSqlite();
+  if (publicHealthExternalCas && !sqlite) {
+    const persisted = fs.existsSync(DB_FILE) ? JSON.parse(fs.readFileSync(DB_FILE, "utf8")) : {};
+    assertPublicHealthExternalCas(persisted, publicHealthExternalCas);
+  }
   const normalized = normalizeState(data);
   normalized.storageMeta = data.storageMeta || storageMeta();
-  if (shouldUseSqlite()) {
-    writeSqliteState(normalized, "write-state", data.storageMeta?.collectionVersions);
+  if (sqlite) {
+    writeSqliteState(
+      normalized,
+      String(options.event || "write-state"),
+      data.storageMeta?.collectionVersions,
+      publicHealthExternalCas
+    );
   }
   const snapshot = {
     ...normalized,
     storageMeta: {
       ...normalized.storageMeta,
-      engine: shouldUseSqlite() ? "json-snapshot" : "json",
-      mode: shouldUseSqlite() ? "GitHub Pages 静态预览 JSON 快照" : "JSON 文件存储"
+      engine: sqlite ? "json-snapshot" : "json",
+      mode: sqlite ? "GitHub Pages 静态预览 JSON 快照" : "JSON 文件存储"
     }
   };
   fs.writeFileSync(DB_FILE, JSON.stringify(snapshot, null, 2), "utf8");
@@ -6732,12 +6774,21 @@ function readSqliteStateFromConnection(db) {
   }, {});
 }
 
-function writeSqliteState(data, event = "write-state", expectedVersions = null) {
+function writeSqliteState(data, event = "write-state", expectedVersions = null, publicHealthExternalCas = null) {
   const db = openSqliteDatabase();
   const now = new Date().toISOString();
   try {
     db.exec("PRAGMA foreign_keys = ON");
     db.exec("BEGIN");
+    if (publicHealthExternalCas) {
+      const getCollection = db.prepare("SELECT payload FROM state_collections WHERE key = ?");
+      const dispatchRow = getCollection.get("publicHealthExternalDispatches");
+      const laneControlRow = getCollection.get("publicHealthExternalLaneControls");
+      assertPublicHealthExternalCas({
+        publicHealthExternalDispatches: dispatchRow ? JSON.parse(dispatchRow.payload) : [],
+        publicHealthExternalLaneControls: laneControlRow ? JSON.parse(laneControlRow.payload) : []
+      }, publicHealthExternalCas);
+    }
     const normalized = normalizeState(data);
     const entries = Object.entries(normalized).filter(([key]) => key !== "storageMeta");
     verifySqliteCollectionVersions(db, entries.map(([key]) => key), expectedVersions);
@@ -10002,6 +10053,12 @@ function normalizeState(data) {
       : [],
     publicHealthExternalDispatchAudit: Array.isArray(data.publicHealthExternalDispatchAudit)
       ? data.publicHealthExternalDispatchAudit.slice(-5000)
+      : [],
+    publicHealthExternalLaneControls: Array.isArray(data.publicHealthExternalLaneControls)
+      ? data.publicHealthExternalLaneControls.slice(-100)
+      : [],
+    publicHealthExternalLaneControlAudit: Array.isArray(data.publicHealthExternalLaneControlAudit)
+      ? data.publicHealthExternalLaneControlAudit.slice(-10000)
       : [],
     publicHealthExternalKeyRotationEvidence: Array.isArray(data.publicHealthExternalKeyRotationEvidence)
       ? data.publicHealthExternalKeyRotationEvidence.slice(-100)
@@ -23231,8 +23288,9 @@ function publicHealthExternalHttpStatus(error) {
   const message = String(error?.message || "");
   if (/unknown public health/i.test(message)) return 404;
   if (/role .* not allowed|scope denied|forbidden/i.test(message)) return 403;
-  if (/version conflict|idempotency|already claimed|already been requeued|not due/i.test(message)) return 409;
-  if (/key service is unavailable|KEYRING_REF is required|SECRET must contain|endpoint must use HTTPS/i.test(message)) return 503;
+  if (/version conflict|CAS conflict|idempotency|already claimed|already been requeued|not due/i.test(message)) return 409;
+  if (/rate limit|backpressure|half-open probe limit/i.test(message)) return 429;
+  if (/circuit is open|key service is unavailable|KEYRING_REF is required|RESILIENCE_POLICIES is required|resilience policy is required|SECRET must contain|endpoint must use HTTPS/i.test(message)) return 503;
   return 400;
 }
 
@@ -23244,12 +23302,20 @@ function publicHealthExternalAttemptOptions(credentials, input, user, at) {
   return {
     requestKeyring: credentials.requestKeyring,
     receiptKeyring: credentials.receiptKeyring,
+    resiliencePolicies: credentials.resiliencePolicies,
     attemptIdempotencyKey: String(input.idempotencyKey || "").trim(),
     expectedVersion: input.expectedVersion,
+    expectedLaneControlVersion: input.expectedLaneControlVersion,
     workerId: publicHealthExternalWorkerId(user),
     leaseToken: String(input.leaseToken || "").trim(),
     at
   };
+}
+
+function publicHealthExternalLaneVersion(data = {}, laneId) {
+  const control = (Array.isArray(data.publicHealthExternalLaneControls) ? data.publicHealthExternalLaneControls : [])
+    .find((item) => item.laneId === String(laneId || "").trim());
+  return Number(control?.version || 0);
 }
 
 async function publicHealthCredentialsForDispatch(data, dispatchId, at) {
@@ -23278,12 +23344,19 @@ async function loadAvailablePublicHealthCredentialMap(at) {
 }
 
 function publicHealthExternalResult(result) {
+  const laneControl = result.laneControl ? {
+    laneId: result.laneControl.laneId,
+    version: result.laneControl.version,
+    circuitState: result.laneControl.circuitState,
+    productionReady: false
+  } : undefined;
   return {
     ok: result.ok,
     idempotent: Boolean(result.idempotent),
     dispatch: result.dispatch,
     originalDispatch: result.originalDispatch,
     successorDispatch: result.successorDispatch,
+    laneControl,
     coordinationAction: result.coordinationAction,
     productionReady: false
   };
@@ -23503,7 +23576,7 @@ async function handleApi(req, res) {
         now: at,
         limit: Number(url.searchParams.get("limit") || 20)
       });
-      sendJson(res, 200, { generatedAt: at, due, productionReady: false });
+      sendJson(res, 200, { generatedAt: at, candidateOnly: true, due, productionReady: false });
     } catch (error) {
       sendJson(res, publicHealthExternalHttpStatus(error), { error: "Public health external due queue rejected", message: error.message, productionReady: false });
     }
@@ -23520,14 +23593,25 @@ async function handleApi(req, res) {
       const dispatchId = decodeURIComponent(publicHealthExternalClaimMatch[1]);
       const at = new Date().toISOString();
       const credentials = await publicHealthCredentialsForDispatch(data, dispatchId, at);
+      const dispatch = data.publicHealthExternalDispatches.find((item) => item.id === dispatchId);
+      const expectedLaneControlVersion = publicHealthExternalLaneVersion(data, dispatch.laneId);
       const result = claimPublicHealthExternalDispatchToState(data, dispatchId, {
         workerId: publicHealthExternalWorkerId(user),
         idempotencyKey: String(req.headers["idempotency-key"] || "").trim(),
         expectedVersion: payload.expectedVersion,
+        expectedLaneControlVersion,
         leaseSeconds: payload.leaseSeconds,
         now: at
       }, credentials);
-      writeDatabase(result.nextData);
+      writeDatabase(result.nextData, {
+        event: "public-health-external-claim",
+        publicHealthExternalCas: {
+          dispatchId,
+          expectedOutboxVersion: Number(payload.expectedVersion),
+          laneId: dispatch.laneId,
+          expectedLaneControlVersion
+        }
+      });
       sendJson(res, 200, publicHealthExternalPublicView({
         ...publicHealthExternalResult(result),
         leaseToken: result.leaseToken
@@ -23562,7 +23646,15 @@ async function handleApi(req, res) {
           leaseToken: String(req.headers["x-public-health-lease-token"] || "").trim()
         }, user, at)
       );
-      writeDatabase(result.nextData);
+      writeDatabase(result.nextData, {
+        event: "public-health-external-attempt",
+        publicHealthExternalCas: {
+          dispatchId,
+          expectedOutboxVersion: Number(payload.expectedVersion),
+          laneId: result.dispatch.laneId,
+          expectedLaneControlVersion: Number(payload.expectedLaneControlVersion)
+        }
+      });
       sendJson(res, 200, publicHealthExternalPublicView(publicHealthExternalResult(result)));
     } catch (error) {
       sendJson(res, publicHealthExternalHttpStatus(error), { error: "Public health external attempt rejected", message: error.message, productionReady: false });

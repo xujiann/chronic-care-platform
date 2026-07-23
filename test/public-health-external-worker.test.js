@@ -106,9 +106,19 @@ test("worker injects full keyrings at server times and persists claim before att
   assert.equal(result.attempted.deliveryState, "delivered");
   assert.equal(writes.length, 2);
   assert.equal(writes[0].metadata.event, "public-health-external-claim");
+  assert.deepEqual(writes[0].metadata.publicHealthExternalCas, {
+    dispatchId: enqueued.dispatch.id,
+    expectedOutboxVersion: 1,
+    laneId: "immunization",
+    expectedLaneControlVersion: 0
+  });
   assert.equal(writes[0].state.publicHealthExternalDispatches[0].outboxVersion, 2);
+  assert.equal(writes[0].state.publicHealthExternalLaneControls[0].version, 1);
   assert.equal(writes[1].metadata.event, "public-health-external-attempt");
+  assert.equal(writes[1].metadata.publicHealthExternalCas.expectedOutboxVersion, 2);
+  assert.equal(writes[1].metadata.publicHealthExternalCas.expectedLaneControlVersion, 1);
   assert.equal(writes[1].state.publicHealthExternalDispatches[0].outboxVersion, 3);
+  assert.equal(writes[1].state.publicHealthExternalLaneControls[0].version, 2);
   assert.equal(writes[1].state.publicHealthExternalDispatches[0].attempts[0].at, "2026-07-23T08:01:00.000Z");
   const serialized = JSON.stringify(result);
   assert.doesNotMatch(serialized, new RegExp(REQUEST_SECRET));
@@ -140,5 +150,7 @@ test("worker transport failures stay generic and never trigger automatic recover
   assert.equal(dispatch.attempts[0].reason, "network-error");
   assert.equal(dispatch.attempts[0].receiptDigest, "");
   assert.equal(dispatch.recovery, undefined);
+  assert.equal(result.claimed.laneControlVersion, 1);
+  assert.equal(result.attempted.laneControlVersion, 2);
   assert.doesNotMatch(JSON.stringify(result), new RegExp(REQUEST_SECRET));
 });

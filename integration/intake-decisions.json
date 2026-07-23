@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-23T13:46:42.207Z",
+  "updatedAt": "2026-07-23T14:16:27.956Z",
   "decisions": [
     {
       "lineId": "T01",
@@ -47,16 +47,20 @@
     },
     {
       "lineId": "T08",
-      "candidateHead": "a7e163dbdadd657de7c3d74d8ac15606820d22b2",
+      "candidateHead": "4b2fbd34a4af0201f8093355136d47ffa7a864f8",
       "decision": "accepted",
-      "reviewedAt": "2026-07-23T06:11:34.000Z",
+      "reviewedAt": "2026-07-23T14:16:27.956Z",
       "reviewer": "T00",
       "checks": [
         "git diff --check",
-        "85 public-health coordination, event, external adapter, keyring, operations and readiness tests passed independently",
+        "93 public-health coordination, event, external adapter, resilience, operations and readiness tests passed independently",
         "managed active and grace key verification, callback replay rejection and audit-chain tamper rejection validated",
+        "server-only policies cover eight lanes and cannot be overridden by enqueue, claim or attempt payloads",
+        "dispatch and lane-control versions are CAS-checked and four state/audit collections persist in one SQLite transaction",
+        "backpressure, rate limiting, concurrent claim, open rejection, single-probe recovery and probe-failure reopen are covered",
         "legacy-static remains compatibility-only and all external runtime projections remain productionReady false",
-        "T08 reported 111 of 111 targeted, 33 of 33 coordination and 30 of 30 final readiness checks passed"
+        "T08 reported 119 of 119 targeted, 34 of 34 coordination and 32 of 32 final readiness checks passed",
+        "T00 aggregate final readiness passes 40 of 40 checks"
       ],
       "blockers": []
     },

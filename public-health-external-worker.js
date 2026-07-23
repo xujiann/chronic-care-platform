@@ -24,6 +24,12 @@ function dispatchFor(data, dispatchId) {
   return dispatch;
 }
 
+function laneControlVersionFor(data, laneId) {
+  const control = (Array.isArray(data.publicHealthExternalLaneControls) ? data.publicHealthExternalLaneControls : [])
+    .find((item) => item.laneId === clean(laneId));
+  return Number(control?.version || 0);
+}
+
 function deliveryEnvelope(dispatch, endpoint) {
   return {
     endpoint,
@@ -56,14 +62,25 @@ async function processPublicHealthExternalDispatch(options = {}) {
   const initial = dispatchFor(data, dispatchId);
   const claimedAt = serverTime(clock);
   const credentials = await loadCredentials(initial.laneId, { at: claimedAt });
+  const expectedLaneControlVersion = laneControlVersionFor(data, initial.laneId);
   const claimed = claimPublicHealthExternalDispatchToState(data, initial.id, {
     workerId: clean(workerId),
     idempotencyKey: clean(idempotencyKey),
     expectedVersion,
+    expectedLaneControlVersion,
     leaseSeconds,
     now: claimedAt
   }, credentials);
-  await writeState(claimed.nextData, { event: "public-health-external-claim", at: claimedAt });
+  await writeState(claimed.nextData, {
+    event: "public-health-external-claim",
+    at: claimedAt,
+    publicHealthExternalCas: {
+      dispatchId: initial.id,
+      expectedOutboxVersion: Number(initial.outboxVersion),
+      laneId: initial.laneId,
+      expectedLaneControlVersion
+    }
+  });
 
   let transportResult;
   try {
@@ -79,26 +96,39 @@ async function processPublicHealthExternalDispatch(options = {}) {
     {
       requestKeyring: credentials.requestKeyring,
       receiptKeyring: credentials.receiptKeyring,
+      resiliencePolicies: credentials.resiliencePolicies,
       attemptIdempotencyKey: `${clean(idempotencyKey)}:attempt`,
       expectedVersion: claimed.dispatch.outboxVersion,
+      expectedLaneControlVersion: Number(claimed.laneControl?.version ?? expectedLaneControlVersion),
       workerId: clean(workerId),
       leaseToken: claimed.leaseToken,
       at: attemptedAt
     },
     dependencies
   );
-  await writeState(attempted.nextData, { event: "public-health-external-attempt", at: attemptedAt });
+  await writeState(attempted.nextData, {
+    event: "public-health-external-attempt",
+    at: attemptedAt,
+    publicHealthExternalCas: {
+      dispatchId: claimed.dispatch.id,
+      expectedOutboxVersion: Number(claimed.dispatch.outboxVersion),
+      laneId: claimed.dispatch.laneId,
+      expectedLaneControlVersion: Number(claimed.laneControl?.version ?? expectedLaneControlVersion)
+    }
+  });
   return {
     ok: true,
     claimed: {
       idempotent: claimed.idempotent,
       dispatchId: claimed.dispatch.id,
-      outboxVersion: claimed.dispatch.outboxVersion
+      outboxVersion: claimed.dispatch.outboxVersion,
+      laneControlVersion: claimed.laneControl?.version ?? null
     },
     attempted: {
       idempotent: attempted.idempotent,
       dispatchId: attempted.dispatch.id,
       outboxVersion: attempted.dispatch.outboxVersion,
+      laneControlVersion: attempted.laneControl?.version ?? null,
       deliveryState: attempted.dispatch.deliveryState
     },
     nextData: attempted.nextData,
@@ -138,6 +168,7 @@ async function runPublicHealthExternalWorkerCycle(options = {}) {
 
 module.exports = {
   deliveryEnvelope,
+  laneControlVersionFor,
   processPublicHealthExternalDispatch,
   runPublicHealthExternalWorkerCycle
 };
