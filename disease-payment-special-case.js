@@ -75,13 +75,111 @@ function appendEvent(row, event) {
 function verifySpecialCaseLedger(events = []) {
   return events.every((event, index) => {
     const { eventHash, ...base } = event;
-    return base.sequence === index + 1 && base.previousHash === (index ? events[index - 1].eventHash : "GENESIS") && eventHash === digest(base);
+    return base.sequence === index + 1
+      && base.previousHash === (index ? events[index - 1].eventHash : "GENESIS")
+      && (index === 0 || base.from === events[index - 1].to)
+      && eventHash === digest(base);
   });
 }
 
 function specialCaseState(row = {}) {
   if (SPECIAL_CASE_LABELS[row.state]) return row.state;
   return Object.entries(SPECIAL_CASE_LABELS).find(([, label]) => label === row.status)?.[0] || "APPLIED";
+}
+
+function specialReviewProjection(review = {}) {
+  return {
+    id: review.id,
+    reviewer: review.reviewer,
+    expertId: review.expertId,
+    role: review.role,
+    approved: review.approved === true,
+    adjustedPaymentFen: review.adjustedPaymentFen,
+    opinion: review.opinion,
+    reviewedAt: review.reviewedAt
+  };
+}
+
+function specialReviewFromEvent(event = {}) {
+  return {
+    id: event.detail?.reviewId,
+    reviewer: event.actor,
+    expertId: event.detail?.expertId,
+    role: event.detail?.role,
+    approved: ["approve-review", "approve-appeal"].includes(event.action),
+    adjustedPaymentFen: event.detail?.adjustedPaymentFen,
+    opinion: event.detail?.opinion,
+    reviewedAt: event.at
+  };
+}
+
+function originalDecisionDigest(row, reviews, outcome) {
+  if (outcome === "APPROVED") {
+    const adjustedPaymentFen = reviews.find((item) => item.approved)?.adjustedPaymentFen;
+    return digest({ caseId: row.caseId, requestedPaymentFen: row.requestedPaymentFen, adjustedPaymentFen, evidenceDigest: row.evidenceDigest, approvals: reviews.filter((item) => item.approved).map((item) => ({ reviewer: item.reviewer, role: item.role, reviewedAt: item.reviewedAt })) });
+  }
+  const rejection = [...reviews].reverse().find((item) => !item.approved);
+  return rejection ? digest({ caseId: row.caseId, outcome: "REJECTED", requestedPaymentFen: row.requestedPaymentFen, evidenceDigest: row.evidenceDigest, rejection: { reviewer: rejection.reviewer, role: rejection.role, opinion: rejection.opinion, reviewedAt: rejection.reviewedAt } }) : "";
+}
+
+function appealDecisionDigest(appeal = {}, reviews = [], outcome = "") {
+  return digest({ appealId: appeal.id, originalDecisionDigest: appeal.originalDecisionDigest, evidenceDigest: appeal.evidenceDigest, outcome, reviews: reviews.map((item) => ({ reviewer: item.reviewer, role: item.role, approved: item.approved, adjustedPaymentFen: item.adjustedPaymentFen, reviewedAt: item.reviewedAt })) });
+}
+
+function verifySpecialCaseStateProjection(row = {}) {
+  const events = Array.isArray(row.events) ? row.events : [];
+  if (!events.length || !verifySpecialCaseLedger(events) || events[0].action !== "apply" || events[0].from !== "NONE") return false;
+  if (specialCaseState(row) !== events.at(-1).to || row.status !== SPECIAL_CASE_LABELS[events.at(-1).to]) return false;
+  const applied = events[0];
+  if (row.submittedAt !== applied.at || row.submittedBy !== applied.actor || row.reasonCode !== applied.detail?.reasonCode || row.requestedPaymentFen !== applied.detail?.requestedPaymentFen || row.evidenceDigest !== applied.detail?.evidenceDigest || row.evidenceDigest !== digest(row.evidence || [])) return false;
+
+  const appealEventIndex = events.findIndex((event) => event.action === "appeal");
+  const originalReviewEvents = events.slice(0, appealEventIndex < 0 ? events.length : appealEventIndex).filter((event) => ["approve-review", "reject-review"].includes(event.action));
+  const expectedReviews = originalReviewEvents.map(specialReviewFromEvent);
+  if (stableStringify((row.reviews || []).map(specialReviewProjection)) !== stableStringify(expectedReviews)) return false;
+  const originalOutcome = originalReviewEvents.at(-1)?.action === "reject-review" ? "REJECTED" : originalReviewEvents.filter((event) => event.action === "approve-review").length >= 2 ? "APPROVED" : "";
+  const expectedOriginalDecision = originalOutcome ? originalDecisionDigest(row, expectedReviews, originalOutcome) : "";
+  if (originalOutcome && originalReviewEvents.at(-1).detail?.decisionDigest !== expectedOriginalDecision) return false;
+
+  const appeals = Array.isArray(row.appeals) ? row.appeals : [];
+  if (appealEventIndex < 0) {
+    if (appeals.length) return false;
+    if (expectedOriginalDecision && row.decisionDigest !== expectedOriginalDecision) return false;
+  } else {
+    if (appeals.length !== 1) return false;
+    const appealEvent = events[appealEventIndex];
+    const appeal = appeals[0];
+    if (appeal.id !== appealEvent.detail?.appealId
+      || appeal.originalDecisionDigest !== expectedOriginalDecision
+      || appeal.originalDecisionDigest !== appealEvent.detail?.originalDecisionDigest
+      || appeal.evidenceDigest !== digest(appeal.evidence || [])
+      || appeal.evidenceDigest !== appealEvent.detail?.evidenceDigest
+      || appeal.reason !== appealEvent.detail?.reason
+      || appeal.reasonCode !== appealEvent.detail?.reasonCode
+      || appeal.submittedAt !== appealEvent.at
+      || appeal.submittedBy !== appealEvent.actor
+      || appeal.appealDeadline !== appealEvent.detail?.appealDeadline
+      || appeal.reviewDueAt !== appealEvent.detail?.reviewDueAt) return false;
+    const appealReviewEvents = events.slice(appealEventIndex + 1).filter((event) => ["approve-appeal", "reject-appeal"].includes(event.action));
+    const expectedAppealReviews = appealReviewEvents.map(specialReviewFromEvent);
+    if (stableStringify((appeal.reviews || []).map(specialReviewProjection)) !== stableStringify(expectedAppealReviews)) return false;
+    const appealOutcome = appealReviewEvents.at(-1)?.action === "reject-appeal" ? "APPEAL_REJECTED" : appealReviewEvents.filter((event) => event.action === "approve-appeal").length >= 2 ? "APPROVED" : "";
+    const expectedAppealState = appealOutcome || (appealReviewEvents.length ? "APPEAL_UNDER_REVIEW" : "APPEALED");
+    if (appeal.state !== expectedAppealState) return false;
+    if (appealOutcome) {
+      const expectedAppealDecision = appealDecisionDigest(appeal, expectedAppealReviews, appealOutcome);
+      if (appeal.outcome !== appealOutcome || appeal.decisionDigest !== expectedAppealDecision || appealReviewEvents.at(-1).detail?.decisionDigest !== expectedAppealDecision || row.decisionDigest !== expectedAppealDecision || appeal.decidedAt !== appealReviewEvents.at(-1).at) return false;
+    } else if (row.decisionDigest !== expectedOriginalDecision) return false;
+  }
+  const includeEvent = events.find((event) => event.action === "include-settlement");
+  if (includeEvent && (row.settlementBatchId !== includeEvent.detail?.batchId || row.includedAt !== includeEvent.at || row.includedBy !== includeEvent.actor || row.decisionDigest !== includeEvent.detail?.decisionDigest)) return false;
+  return true;
+}
+
+function requireSpecialCaseStateProjection(row) {
+  if (!verifySpecialCaseLedger(row.events || [])) throw new SpecialCaseWorkflowError("特例单议事件账本校验失败", "SPECIAL_CASE_LEDGER_INVALID");
+  if (!verifySpecialCaseStateProjection(row)) throw new SpecialCaseWorkflowError("特例单议状态投影与事件账本不一致", "SPECIAL_CASE_STATE_PROJECTION_INVALID");
+  return row;
 }
 
 function createSpecialCaseApplication(item, payload = {}, actor = "operator") {
@@ -125,6 +223,7 @@ function chooseExpert(candidates, seed) {
 }
 
 function selectSpecialCaseExperts(row, experts = [], payload = {}, actor = "expert-panel-service") {
+  requireSpecialCaseStateProjection(row);
   if (specialCaseState(row) !== "APPLIED" || (row.reviews || []).length) throw new SpecialCaseWorkflowError("特例单议已开始评审，不能重新抽取专家", "SPECIAL_CASE_PANEL_STATE_INVALID");
   const roles = Array.isArray(payload.roles) && payload.roles.length ? payload.roles.map((item) => safeText(item, 80)) : ["medical-insurance-review", "fund-finance-review"];
   const excludedIds = new Set((payload.excludedExpertIds || []).map(String));
@@ -153,6 +252,7 @@ function verifySpecialCaseExpertPanel(row = {}) {
 }
 
 function reselectSpecialCaseExpert(row, experts = [], payload = {}, actor = "expert-panel-service") {
+  requireSpecialCaseStateProjection(row);
   if (specialCaseState(row) !== "APPLIED" || (row.reviews || []).length) throw new SpecialCaseWorkflowError("特例单议已开始评审，不能更换专家", "SPECIAL_CASE_PANEL_STATE_INVALID");
   const expertId = safeText(payload.expertId, 120);
   const reason = safeText(payload.reason);
@@ -174,6 +274,7 @@ function reselectSpecialCaseExpert(row, experts = [], payload = {}, actor = "exp
 }
 
 function reviewSpecialCaseApplication(row, payload = {}, actor = "reviewer") {
+  requireSpecialCaseStateProjection(row);
   const before = specialCaseState(row);
   if (!["APPLIED", "UNDER_REVIEW"].includes(before)) throw new SpecialCaseWorkflowError("当前状态不允许评审特例单议", "SPECIAL_CASE_REVIEW_STATE_INVALID");
   if (row.expertPanel && !verifySpecialCaseExpertPanel(row)) throw new SpecialCaseWorkflowError("特例单议专家抽取记录校验失败", "SPECIAL_CASE_PANEL_INVALID");
@@ -201,12 +302,12 @@ function reviewSpecialCaseApplication(row, payload = {}, actor = "reviewer") {
     row.adjustedPayment = adjustedPaymentFen / 100;
     row.reviewedAt = now;
     row.reviewedBy = row.reviews.map((item) => item.reviewer);
-    row.decisionDigest = digest({ caseId: row.caseId, requestedPaymentFen: row.requestedPaymentFen, adjustedPaymentFen, evidenceDigest: row.evidenceDigest, approvals: row.reviews.filter((item) => item.approved).map((item) => ({ reviewer: item.reviewer, role: item.role, reviewedAt: item.reviewedAt })) });
+    row.decisionDigest = originalDecisionDigest(row, row.reviews, "APPROVED");
   } else if (row.state === "REJECTED") {
     row.rejectedAt = now;
-    row.decisionDigest = digest({ caseId: row.caseId, outcome: "REJECTED", requestedPaymentFen: row.requestedPaymentFen, evidenceDigest: row.evidenceDigest, rejection: { reviewer: review.reviewer, role: review.role, opinion: review.opinion, reviewedAt: review.reviewedAt } });
+    row.decisionDigest = originalDecisionDigest(row, row.reviews, "REJECTED");
   }
-  appendEvent(row, { id: `special-event-${randomUUID()}`, action: approved ? "approve-review" : "reject-review", from: before, to: row.state, actor: reviewer, at: now, idempotencyKey: review.id, detail: { role: review.role, adjustedPaymentFen, opinion: review.opinion, decisionDigest: row.decisionDigest || "" } });
+  appendEvent(row, { id: `special-event-${randomUUID()}`, action: approved ? "approve-review" : "reject-review", from: before, to: row.state, actor: reviewer, at: now, idempotencyKey: review.id, detail: { reviewId: review.id, expertId: review.expertId, role: review.role, adjustedPaymentFen, opinion: review.opinion, decisionDigest: row.decisionDigest || "" } });
   return { row, review };
 }
 
@@ -225,7 +326,7 @@ function buildSpecialCaseAppealSla(row = {}, at = new Date().toISOString()) {
 }
 
 function createSpecialCaseAppeal(row, payload = {}, actor = "institution") {
-  if (!verifySpecialCaseLedger(row.events)) throw new SpecialCaseWorkflowError("特例单议事件账本校验失败", "SPECIAL_CASE_LEDGER_INVALID");
+  requireSpecialCaseStateProjection(row);
   if ((row.appeals || []).length) throw new SpecialCaseWorkflowError("同一特例单议只能申请一次复议", "SPECIAL_CASE_APPEAL_DUPLICATE");
   if (specialCaseState(row) !== "REJECTED") throw new SpecialCaseWorkflowError("只有原评审驳回的特例单议可以申请复议", "SPECIAL_CASE_APPEAL_STATE_INVALID");
   const appellant = safeText(actor, 120);
@@ -264,11 +365,12 @@ function createSpecialCaseAppeal(row, payload = {}, actor = "institution") {
   row.status = SPECIAL_CASE_LABELS.APPEALED;
   row.updatedAt = at;
   row.updatedBy = appellant;
-  appendEvent(row, { id: `special-event-${randomUUID()}`, action: "appeal", from: "REJECTED", to: "APPEALED", actor: appellant, at, idempotencyKey: safeText(payload.idempotencyKey || appeal.id, 160), detail: { appealId: appeal.id, originalDecisionDigest, evidenceDigest: appeal.evidenceDigest, reviewDueAt: appeal.reviewDueAt } });
+  appendEvent(row, { id: `special-event-${randomUUID()}`, action: "appeal", from: "REJECTED", to: "APPEALED", actor: appellant, at, idempotencyKey: safeText(payload.idempotencyKey || appeal.id, 160), detail: { appealId: appeal.id, originalDecisionDigest, reason: appeal.reason, reasonCode: appeal.reasonCode, evidenceDigest: appeal.evidenceDigest, appealDeadline: appeal.appealDeadline, reviewDueAt: appeal.reviewDueAt } });
   return appeal;
 }
 
 function selectSpecialCaseAppealExperts(row, experts = [], payload = {}, actor = "appeal-panel-service") {
+  requireSpecialCaseStateProjection(row);
   if (specialCaseState(row) !== "APPEALED") throw new SpecialCaseWorkflowError("当前状态不允许抽取复议专家", "SPECIAL_CASE_APPEAL_PANEL_STATE_INVALID");
   const appeal = currentAppeal(row);
   if (!appeal || appeal.expertPanel) throw new SpecialCaseWorkflowError("复议专家组不存在或已完成抽取", "SPECIAL_CASE_APPEAL_PANEL_STATE_INVALID");
@@ -308,7 +410,7 @@ function verifySpecialCaseAppealPanel(row = {}) {
 function reviewSpecialCaseAppeal(row, payload = {}, actor = "appeal-reviewer") {
   const before = specialCaseState(row);
   if (!["APPEALED", "APPEAL_UNDER_REVIEW"].includes(before)) throw new SpecialCaseWorkflowError("当前状态不允许评审复议", "SPECIAL_CASE_APPEAL_REVIEW_STATE_INVALID");
-  if (!verifySpecialCaseLedger(row.events) || !verifySpecialCaseAppealPanel(row)) throw new SpecialCaseWorkflowError("复议专家组或事件账本校验失败", "SPECIAL_CASE_APPEAL_PANEL_INVALID");
+  if (!verifySpecialCaseStateProjection(row) || !verifySpecialCaseAppealPanel(row)) throw new SpecialCaseWorkflowError("复议专家组、状态投影或事件账本校验失败", "SPECIAL_CASE_APPEAL_PANEL_INVALID");
   const appeal = currentAppeal(row);
   const reviewer = safeText(actor, 120);
   const assigned = appeal.expertPanel.members.find((item) => item.reviewerAccount === reviewer);
@@ -344,12 +446,12 @@ function reviewSpecialCaseAppeal(row, payload = {}, actor = "appeal-reviewer") {
   if (["APPROVED", "APPEAL_REJECTED"].includes(row.state)) {
     appeal.decidedAt = at;
     appeal.outcome = row.state;
-    appeal.decisionDigest = digest({ appealId: appeal.id, originalDecisionDigest: appeal.originalDecisionDigest, evidenceDigest: appeal.evidenceDigest, outcome: appeal.outcome, reviews: appeal.reviews.map((item) => ({ reviewer: item.reviewer, role: item.role, approved: item.approved, adjustedPaymentFen: item.adjustedPaymentFen, reviewedAt: item.reviewedAt })) });
+    appeal.decisionDigest = appealDecisionDigest(appeal, appeal.reviews, appeal.outcome);
     row.decisionDigest = appeal.decisionDigest;
     row.reviewedAt = at;
     row.reviewedBy = appeal.reviews.map((item) => item.reviewer);
   }
-  appendEvent(row, { id: `special-event-${randomUUID()}`, action: approved ? "approve-appeal" : "reject-appeal", from: before, to: row.state, actor: reviewer, at, idempotencyKey: review.id, detail: { appealId: appeal.id, role: review.role, adjustedPaymentFen, decisionDigest: appeal.decisionDigest || "" } });
+  appendEvent(row, { id: `special-event-${randomUUID()}`, action: approved ? "approve-appeal" : "reject-appeal", from: before, to: row.state, actor: reviewer, at, idempotencyKey: review.id, detail: { appealId: appeal.id, reviewId: review.id, expertId: review.expertId, role: review.role, adjustedPaymentFen, opinion: review.opinion, decisionDigest: appeal.decisionDigest || "" } });
   return { row, appeal, review };
 }
 
@@ -357,11 +459,12 @@ function settlementAdjustment(specialCases = [], item = {}) {
   const row = specialCases.find((candidate) => candidate.caseId === item.id && specialCaseState(candidate) === "APPROVED");
   if (!row) return null;
   const appeal = currentAppeal(row);
-  if (!verifySpecialCaseLedger(row.events) || !verifySpecialCaseExpertPanel(row) || (appeal?.outcome === "APPROVED" && !verifySpecialCaseAppealPanel(row)) || !/^[a-f0-9]{64}$/.test(String(row.decisionDigest || ""))) throw new SpecialCaseWorkflowError("特例单议决议、专家抽取或事件账本校验失败", "SPECIAL_CASE_LEDGER_INVALID");
+  if (!verifySpecialCaseStateProjection(row) || !verifySpecialCaseExpertPanel(row) || (appeal?.outcome === "APPROVED" && !verifySpecialCaseAppealPanel(row)) || !/^[a-f0-9]{64}$/.test(String(row.decisionDigest || ""))) throw new SpecialCaseWorkflowError("特例单议决议、专家抽取、状态投影或事件账本校验失败", "SPECIAL_CASE_LEDGER_INVALID");
   return { row, adjustedPaymentFen: toFen(row.adjustedPaymentFen, "特例单议支付金额"), decisionDigest: row.decisionDigest };
 }
 
 function includeSpecialCaseInSettlement(row, batchId, actor = "settlement-service") {
+  requireSpecialCaseStateProjection(row);
   if (specialCaseState(row) !== "APPROVED") throw new SpecialCaseWorkflowError("只有已批准特例单议可纳入结算", "SPECIAL_CASE_INCLUDE_STATE_INVALID");
   const now = new Date().toISOString();
   row.state = "INCLUDED";
@@ -384,4 +487,4 @@ function buildSpecialCaseDisclosure(specialCases = [], caseCountByInstitution = 
   return { generatedAt: new Date().toISOString(), institutions: rows, totals: { applications: rows.reduce((sum, item) => sum + item.applications, 0), approved: rows.reduce((sum, item) => sum + item.approved, 0), included: rows.reduce((sum, item) => sum + item.included, 0), adjustedPaymentFen: rows.reduce((sum, item) => sum + item.adjustedPaymentFen, 0) }, privacyBoundary: "仅公开机构汇总，不返回病例、患者、证据或专家身份。" };
 }
 
-module.exports = { ACTIVE_STATES, SPECIAL_CASE_APPEAL_POLICY, SPECIAL_CASE_LABELS, SpecialCaseWorkflowError, addCalendarDays, appendEvent, buildSpecialCaseAppealSla, buildSpecialCaseDisclosure, createSpecialCaseAppeal, createSpecialCaseApplication, currentAppeal, digest, eligibleExperts, includeSpecialCaseInSettlement, reselectSpecialCaseExpert, reviewSpecialCaseAppeal, reviewSpecialCaseApplication, selectSpecialCaseAppealExperts, selectSpecialCaseExperts, settlementAdjustment, specialCaseState, stableStringify, verifySpecialCaseAppealPanel, verifySpecialCaseExpertPanel, verifySpecialCaseLedger };
+module.exports = { ACTIVE_STATES, SPECIAL_CASE_APPEAL_POLICY, SPECIAL_CASE_LABELS, SpecialCaseWorkflowError, addCalendarDays, appendEvent, buildSpecialCaseAppealSla, buildSpecialCaseDisclosure, createSpecialCaseAppeal, createSpecialCaseApplication, currentAppeal, digest, eligibleExperts, includeSpecialCaseInSettlement, reselectSpecialCaseExpert, reviewSpecialCaseAppeal, reviewSpecialCaseApplication, selectSpecialCaseAppealExperts, selectSpecialCaseExperts, settlementAdjustment, specialCaseState, stableStringify, verifySpecialCaseAppealPanel, verifySpecialCaseExpertPanel, verifySpecialCaseLedger, verifySpecialCaseStateProjection };
