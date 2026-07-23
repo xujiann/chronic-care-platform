@@ -6,6 +6,8 @@ const {
   allowedResidentIdsForCitizen,
   canCitizenReadRecord,
   canCitizenReadResident,
+  buildCitizenControlledAccessIntent,
+  evaluateCitizenRecordAccess,
   evaluateCitizenResidentRead,
   normalizeCitizenSupplement,
   projectCitizenRecordResponse
@@ -173,4 +175,60 @@ test("server response projection applies the same resident and field allowlist",
   assert.equal("personIndex" in projected, false);
   assert.equal("uploadUrl" in projected.meta, false);
   assert.equal(projectCitizenRecordResponse(record, "r2"), null);
+});
+
+test("server integration decision returns an auditable fail-closed contract", () => {
+  const verifiedMember = {
+    residentId: "r4",
+    relation: "母亲",
+    relationshipStatus: "verified",
+    verifiedAt: "2026-07-20T09:00:00.000Z",
+    evidenceSource: "公安亲属关系核验回执"
+  };
+  const labAuthorization = authorization({ meta: { scopes: ["labs"] } });
+  const access = evaluateCitizenRecordAccess(
+    dataWith(verifiedMember, [labAuthorization]),
+    citizen,
+    { id: "lab-r4", residentId: "r4", category: "labs" },
+    { now: NOW, purpose: "协助复诊" }
+  );
+  assert.equal(access.allowed, true);
+  assert.equal(access.auditRequired, true);
+  assert.equal(access.scope, "labs");
+
+  const denied = evaluateCitizenRecordAccess(
+    dataWith(verifiedMember, [labAuthorization]),
+    citizen,
+    { id: "attachment-r4", residentId: "r4", category: "attachments" },
+    { now: NOW, purpose: "下载原文" }
+  );
+  assert.equal(denied.allowed, false);
+  assert.equal(denied.reason, "active-authorization-required");
+});
+
+test("server integration builds only a one-time short-lived controlled access request", () => {
+  const verifiedMember = {
+    residentId: "r4",
+    relation: "母亲",
+    relationshipStatus: "verified",
+    verifiedAt: "2026-07-20T09:00:00.000Z",
+    evidenceSource: "公安亲属关系核验回执"
+  };
+  const attachmentAuthorization = authorization({ meta: { scopes: ["attachments"] } });
+  const intent = buildCitizenControlledAccessIntent(
+    dataWith(verifiedMember, [attachmentAuthorization]),
+    citizen,
+    { id: "attachment-record-r4", residentId: "r4", category: "attachments" },
+    {
+      now: NOW,
+      purpose: "协助复诊查看原文",
+      resourceId: "attachment-r4",
+      resourceType: "attachment",
+      ttlSeconds: 900
+    }
+  );
+  assert.equal(intent.oneTime, true);
+  assert.equal(intent.ttlSeconds, 300);
+  assert.equal(intent.auditRequired, true);
+  assert.equal(Object.hasOwn(intent, "downloadUrl"), false);
 });

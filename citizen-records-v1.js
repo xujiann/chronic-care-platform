@@ -27,8 +27,18 @@
 
   const SAFE_META_FIELDS = new Set([
     "visitType",
+    "department",
+    "chiefComplaint",
+    "diagnosis",
+    "diagnoses",
+    "treatment",
+    "orders",
+    "followupPlan",
     "exams",
     "medications",
+    "metrics",
+    "severity",
+    "abnormalLevel",
     "attachmentType",
     "fileName",
     "accessMode",

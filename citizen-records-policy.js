@@ -1,6 +1,7 @@
 "use strict";
 
 const CitizenRecordsV1 = require("./citizen-records-v1");
+const CitizenRecordsV2 = require("./citizen-records-v2");
 
 const CITIZEN_SUPPLEMENT_CATEGORIES = new Set([
   "labs",
@@ -96,6 +97,60 @@ function canCitizenReadRecord(data, user, record = {}, options = {}) {
   });
 }
 
+function evaluateCitizenRecordAccess(data = {}, user = {}, record = {}, options = {}) {
+  const scope = cleanText(options.scope || scopeForRecordCategory(record.category), 100);
+  if (!user || user.role !== "citizen") {
+    return {
+      allowed: false,
+      residentId: cleanText(record.residentId, 120),
+      scope,
+      purpose: cleanText(options.purpose, 300),
+      auditRequired: true,
+      reason: "citizen-role-required"
+    };
+  }
+  if (record.residentId === user?.residentId) {
+    return CitizenRecordsV2.evaluateProtectedAccess({
+      actor: user,
+      residentId: record.residentId,
+      record,
+      scope,
+      purpose: options.purpose || "居民本人查看健康资料",
+      now: options.now
+    });
+  }
+  const account = (Array.isArray(data.accounts) ? data.accounts : []).find((item) => item.id === user?.accountId);
+  const relationship = (Array.isArray(account?.members) ? account.members : []).find((member) => member.residentId === record.residentId);
+  const authorization = (Array.isArray(data.personalRecords) ? data.personalRecords : []).find((candidate) => (
+    candidate?.residentId === record.residentId
+    && candidate?.category === "authorizations"
+    && authorizationTargetsUser(candidate, user)
+    && authorizationHasScope(candidate, scope)
+    && CitizenRecordsV1.authorizationState(candidate, options.now || new Date()).active
+  ));
+  return CitizenRecordsV2.evaluateProtectedAccess({
+    actor: user,
+    residentId: record.residentId,
+    record,
+    relationship,
+    authorization,
+    scope,
+    purpose: options.purpose || "家庭协助查看健康资料",
+    now: options.now
+  });
+}
+
+function buildCitizenControlledAccessIntent(data = {}, user = {}, record = {}, options = {}) {
+  const accessDecision = evaluateCitizenRecordAccess(data, user, record, options);
+  return CitizenRecordsV2.buildControlledAccessIntent({
+    accessDecision,
+    resourceId: options.resourceId,
+    resourceType: options.resourceType,
+    purpose: options.purpose,
+    ttlSeconds: options.ttlSeconds
+  });
+}
+
 function allowedResidentIdsForCitizen(data = {}, user = {}, options = {}) {
   if (!user || user.role !== "citizen") return new Set();
   const account = (Array.isArray(data.accounts) ? data.accounts : []).find((item) => item.id === user.accountId);
@@ -141,6 +196,8 @@ module.exports = {
   authorizationTargetsUser,
   canCitizenReadRecord,
   canCitizenReadResident,
+  evaluateCitizenRecordAccess,
+  buildCitizenControlledAccessIntent,
   evaluateCitizenResidentRead,
   hasActiveResidentAuthorization,
   isVerifiedRelationship,

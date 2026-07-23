@@ -38,6 +38,9 @@ test("resident record projection keeps display fields and removes storage and id
       sourceSystem: "PACS",
       reportNo: "RPT-001",
       authorizationRequired: true,
+      department: "影像科",
+      diagnoses: ["待临床结合"],
+      followupPlan: "按报告机构建议复诊",
       objectKey: "clinical/r1/original.dcm",
       uploadUrl: "https://storage.example/upload"
     }
@@ -46,6 +49,9 @@ test("resident record projection keeps display fields and removes storage and id
   assert.equal(projected.id, "record-001");
   assert.equal(projected.meta.sourceSystem, "PACS");
   assert.equal(projected.meta.authorizationRequired, true);
+  assert.equal(projected.meta.department, "影像科");
+  assert.deepEqual(projected.meta.diagnoses, ["待临床结合"]);
+  assert.equal(projected.meta.followupPlan, "按报告机构建议复诊");
   assert.equal("personIndex" in projected, false);
   assert.equal("secret" in projected, false);
   assert.equal("objectKey" in projected.meta, false);
