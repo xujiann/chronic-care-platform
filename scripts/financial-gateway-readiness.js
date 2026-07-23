@@ -42,12 +42,16 @@ function buildFinancialGatewayReadiness(options = {}) {
       markers: [
         "createRefundRequest",
         "reviewRefundRequest",
+        "resubmitRejectedRefund",
+        "rejectionDecisionDigest",
+        "REFUND_RESUBMISSION_NEW_EVIDENCE_REQUIRED",
         "REQUIRED_REFUND_REVIEW_DOMAINS",
         "prepareRefundDispatch",
         "syncRefundFromFinancialCallback",
         "providerReversal",
         "REFUND_AMOUNT_EXCEEDS_AVAILABLE",
         "REFUND_LEDGER_INVALID",
+        "requireValidRefundLedger",
         "reconcileRefund",
         "refundOperations"
       ]

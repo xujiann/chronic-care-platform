@@ -22,6 +22,8 @@ test("responsibility authorization requires both role and organization boundary"
   assert.equal(OperatingModel.authorizeAction("special-case.apply", { role: "insurance", organizationType: "insurance_center" }).allowed, false);
   assert.equal(OperatingModel.authorizeAction("settlement.core-callback", { role: "system", organizationType: "insurance_core_adapter" }).allowed, true);
   assert.equal(OperatingModel.authorizeAction("settlement.core-callback", { role: "insurance", organizationType: "insurance_center" }).allowed, false);
+  assert.equal(OperatingModel.authorizeAction("refund.resubmit", { role: "institution", organizationType: "medical_institution" }).allowed, true);
+  assert.equal(OperatingModel.authorizeAction("refund.resubmit", { role: "finance", organizationType: "hospital_finance" }).allowed, false);
 });
 
 test("T00 handoff lists public and trusted callback wiring without claiming it is complete", () => {
@@ -30,6 +32,7 @@ test("T00 handoff lists public and trusted callback wiring without claiming it i
   assert.equal(handoff.readyForIntegration, true);
   assert.ok(handoff.pending > 0);
   assert.ok(handoff.routes.some((item) => item.id === "refund-callback-hook" && !item.wired));
+  assert.ok(handoff.routes.some((item) => item.id === "refund-resubmit" && !item.wired));
   assert.ok(handoff.routes.some((item) => item.id === "annual-clearance-create" && !item.wired));
   const domainHandlers = { ...DiseasePayment, ...FinancialGateway };
   assert.ok(handoff.routes.every((item) => (item.handlers || [item.handler]).every((handler) => typeof domainHandlers[handler] === "function")));
