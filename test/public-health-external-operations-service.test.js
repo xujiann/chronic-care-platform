@@ -331,7 +331,7 @@ test("external operations board warns during contract deprecation and blocks ret
     signingMaterial: REQUEST_SECRET,
     at: "2026-07-24T00:00:00.000Z"
   });
-  const scheduledBoard = board(accepted.delivered.nextData, scenario.dependencies, {
+  const scheduledBoard = board(accepted.enqueued.nextData, scenario.dependencies, {
     now: "2026-07-24T00:00:00.000Z",
     contractGovernance: scheduledGovernance
   });
@@ -343,13 +343,14 @@ test("external operations board warns during contract deprecation and blocks ret
     signingMaterial: REQUEST_SECRET,
     at: "2026-07-25T00:00:00.000Z"
   });
-  const deprecatedBoard = board(accepted.delivered.nextData, scenario.dependencies, {
+  const deprecatedBoard = board(accepted.enqueued.nextData, scenario.dependencies, {
     now: "2026-07-25T00:00:00.000Z",
     contractGovernance: activeGovernance
   });
   assert.equal(deprecatedBoard.ok, true);
   assert.equal(deprecatedBoard.operationallyHealthy, false);
   assert.equal(deprecatedBoard.summary.deprecatedContracts, 1);
+  assert.equal(deprecatedBoard.summary.contractCutoverBacklog, 1);
   assert.equal(deprecatedBoard.issues.some((item) => item.code === "contract-version-deprecated"), true);
 
   const retiredGovernance = buildPublicHealthExternalContractGovernance({
@@ -357,11 +358,20 @@ test("external operations board warns during contract deprecation and blocks ret
     signingMaterial: REQUEST_SECRET,
     at: "2026-08-15T00:00:00.000Z"
   });
-  const retiredBoard = board(accepted.delivered.nextData, scenario.dependencies, {
+  const retiredBoard = board(accepted.enqueued.nextData, scenario.dependencies, {
     now: "2026-08-15T00:00:00.000Z",
     contractGovernance: retiredGovernance
   });
   assert.equal(retiredBoard.ok, false);
-  assert.equal(retiredBoard.summary.contractMismatches, 1);
-  assert.equal(retiredBoard.issues.some((item) => item.code === "contract-governance-mismatch"), true);
+  assert.equal(retiredBoard.summary.contractMismatches, 0);
+  assert.equal(retiredBoard.summary.contractCutoverBacklog, 1);
+  assert.equal(retiredBoard.issues.some((item) => item.code === "contract-cutover-backlog-after-sunset"), true);
+
+  const historicalBoard = board(accepted.delivered.nextData, scenario.dependencies, {
+    now: "2026-08-15T00:00:00.000Z",
+    contractGovernance: retiredGovernance
+  });
+  assert.equal(historicalBoard.ok, true);
+  assert.equal(historicalBoard.summary.contractMismatches, 0);
+  assert.equal(historicalBoard.summary.contractCutoverBacklog, 0);
 });

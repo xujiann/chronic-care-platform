@@ -116,6 +116,21 @@ function assertDispatchContractGovernance(dispatch, governance) {
   return authorization;
 }
 
+function currentContractBinding(governance, laneId) {
+  if (!governance) return null;
+  if (!governance.ok) throw new Error("public health external contract rejected: contract-governance-unavailable");
+  const lane = governance.entries?.find((item) => item.laneId === laneId);
+  const contract = lane?.contracts?.find((item) => item.contract === lane.currentContract);
+  if (!lane || !contract || contract.state !== "active") {
+    throw new Error("public health external contract rejected: active-contract-unavailable");
+  }
+  return {
+    contract: contract.contract,
+    requestSchemaVersion: contract.requestSchemaVersion,
+    receiptSchemaVersion: contract.receiptSchemaVersion
+  };
+}
+
 function signRuntimeState(dispatch, key) {
   return crypto.createHmac("sha256", key.secret)
     .update(JSON.stringify(stableValue(runtimeStatePayload(dispatch))))
@@ -496,7 +511,11 @@ function enqueuePublicHealthExternalDispatchToState(
   const compensation = requireCompensation(input);
   const signingMaterial = requestSigningMaterial(credentials);
   const dispatchAt = clean(input.at || new Date().toISOString());
-  const createdDispatch = createPublicHealthExternalDispatch(handoff, input, credentials);
+  const contractBinding = currentContractBinding(credentials.contractGovernance, handoff.laneId);
+  const createdDispatch = createPublicHealthExternalDispatch(handoff, input, {
+    ...credentials,
+    contractBinding
+  });
   const contractAuthorization = assertDispatchContractGovernance(
     createdDispatch,
     credentials.contractGovernance

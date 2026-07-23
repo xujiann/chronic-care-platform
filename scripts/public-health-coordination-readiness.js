@@ -38,6 +38,7 @@ function buildPublicHealthCoordinationReadiness(options = {}) {
   const keyringSource = options.keyringSource ?? read("public-health-external-keyring-service.js");
   const resilienceSource = options.resilienceSource ?? read("public-health-external-resilience-service.js");
   const contractSource = options.contractSource ?? read("public-health-external-contract-governance-service.js");
+  const contractCutoverSource = options.contractCutoverSource ?? read("public-health-external-contract-cutover-service.js");
   const operationsSource = options.operationsSource ?? read("public-health-external-operations-service.js");
   const publicHealthSource = options.publicHealthSource ?? read("public-health.js");
   const publicHealthHtml = options.publicHealthHtml ?? read("public-health.html");
@@ -77,6 +78,7 @@ function buildPublicHealthCoordinationReadiness(options = {}) {
     check("adapter:key-rotation-anti-replay", ["activeKeyId", "grace", "revoked", "key-expired-or-not-yet-valid"].every((token) => keyringSource.includes(token)) && ["runtimeStateKeyId", "auditKeyId", "receiptReplayKeyHash", "receipt replay detected"].every((token) => adapterRuntimeSource.includes(token)), "managed key rotation spans request/runtime/audit signatures and callback nonce replay fails closed", "adapter"),
     check("adapter:signed-resilience-control", ["failureThreshold", "openSeconds", "rateLimitPerMinute", "maxPending", "half-open", "verifyPublicHealthExternalLaneControlAuditChain"].every((token) => resilienceSource.includes(token)) && ["assertPublicHealthExternalBackpressure", "expectedLaneControlVersion", "recordPublicHealthExternalLaneOutcomeToState"].every((token) => adapterRuntimeSource.includes(token)), "per-lane backpressure, rate limit, circuit and half-open recovery use signed versioned controls", "adapter"),
     check("adapter:signed-contract-governance", ["producer-contract-owner", "consumer-contract-owner", "runtimeReleaseDigest", "contract-transition-conflict", "contract-version-deprecated", "\"retired\""].every((token) => contractSource.includes(token)) && ["assertDispatchContractGovernance", "contractGovernance"].every((token) => adapterRuntimeSource.includes(token)) && ["contract-governance-mismatch", "contract-version-deprecated"].every((token) => operationsSource.includes(token)), "signed dual approval governs next-version activation, runtime admission, compatibility, retirement and operations drift", "adapter"),
+    check("adapter:versioned-contract-cutover", ["resolveExternalContractBinding", "receiptSchemaForRequest"].every((token) => adapterSource.includes(token)) && ["currentContractBinding", "contractBinding"].every((token) => adapterRuntimeSource.includes(token)) && ["contract-cutover-backlog", "contract-cutover-backlog-after-sunset", "contract-cutover-successor-stale"].every((token) => contractCutoverSource.includes(token)), "server-selected contract versions bind request/receipt schemas and executable old-version backlog blocks sunset", "adapter"),
     check("operations:reconciliation-board", ["buildPublicHealthExternalOperationsBoard", "coordination-state-mismatch", "worker-lease-expired", "dead-letter-unrecovered"].every((token) => operationsSource.includes(token)), "operations board reconciles signatures, coordination state, leases, SLA and dead letters", "operations"),
     check("runtime:system-builder", system.coordinationCenter?.summary?.lanes === 8 && systemBuilderSource.includes("buildPublicHealthCoordinationCenter") && systemBuilderSource.includes("coordinationCenter"), "buildPublicHealthSystem returns coordinationCenter", "runtime"),
     check("frontend:panel", publicHealthHtml.includes("public-health-coordination-center") && publicHealthSource.includes("renderPublicHealthCoordinationCenter"), "public health page renders the coordination center", "frontend"),
@@ -111,6 +113,7 @@ function buildPublicHealthCoordinationReadiness(options = {}) {
       externalKeyring: "public-health-external-keyring-service.js",
       externalResilience: "public-health-external-resilience-service.js",
       externalContractGovernance: "public-health-external-contract-governance-service.js",
+      externalContractCutover: "public-health-external-contract-cutover-service.js",
       externalOperations: "public-health-external-operations-service.js",
       page: "public-health.html",
       pageController: "public-health.js",
@@ -124,7 +127,7 @@ function buildPublicHealthCoordinationReadiness(options = {}) {
     remainingT00Integration: [
       "Wire the public server action route and durable writer to the T08 coordination runtime controller.",
       "Add package scripts, public styling and aggregate release manifest entries.",
-      "Provision production adapter endpoints, managed keyrings, per-lane resilience policies and contract approval storage, run load/migration/rotation/revocation smoke tests, and verify signed receipts and trusted site evidence."
+      "Provision production adapter endpoints, managed keyrings, per-lane resilience policies and contract approval storage, run load/version-cutover/backlog-drain/rotation/revocation smoke tests, and verify signed receipts and trusted site evidence."
     ]
   };
 }

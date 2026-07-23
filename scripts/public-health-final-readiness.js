@@ -41,6 +41,9 @@ const {
   buildPublicHealthExternalContractGovernance,
   signPublicHealthExternalContractAttestation
 } = require("../public-health-external-contract-governance-service");
+const {
+  buildPublicHealthExternalContractCutoverBoard
+} = require("../public-health-external-contract-cutover-service");
 const { buildPublicHealthSystem } = require("./public-health-readiness");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -396,6 +399,16 @@ function buildPublicHealthFinalReadiness(options = {}) {
   const recoveryAcceptance = runDeadLetterRecoveryAcceptance(sourceData, system);
   const resilienceAcceptance = runExternalResilienceAcceptance();
   const contractAcceptance = runExternalContractGovernanceAcceptance();
+  const contractCutoverDraining = buildPublicHealthExternalContractCutoverBoard({
+    data: outboxAcceptance.enqueued.nextData,
+    contractGovernance: contractAcceptance.active,
+    now: "2026-07-25T00:00:00.000Z"
+  });
+  const contractCutoverCompleted = buildPublicHealthExternalContractCutoverBoard({
+    data: outboxAcceptance.delivered.nextData,
+    contractGovernance: contractAcceptance.retired,
+    now: "2026-08-15T00:00:00.000Z"
+  });
   const recoveryCoordination = buildPublicHealthCoordinationRuntime({
     data: recoveryAcceptance.recovered.nextData,
     eventReporting: system.infectiousEventReporting,
@@ -427,6 +440,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
   const packageSource = options.packageSource ?? fs.readFileSync(path.join(ROOT, "package.json"), "utf8");
   const resilienceSource = options.resilienceSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-resilience-service.js"), "utf8");
   const contractSource = options.contractSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-contract-governance-service.js"), "utf8");
+  const contractCutoverSource = options.contractCutoverSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-contract-cutover-service.js"), "utf8");
   const pageSource = options.pageSource ?? fs.readFileSync(path.join(ROOT, "public-health.js"), "utf8");
   const doc = options.doc ?? fs.readFileSync(path.join(ROOT, "docs", "public-health-eight-domain-coordination.md"), "utf8");
   const keyringDoc = options.keyringDoc ?? fs.readFileSync(path.join(ROOT, "docs", "public-health-external-key-rotation.md"), "utf8");
@@ -462,6 +476,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
     check("resilience:runtime-enforcement", ["assertPublicHealthExternalBackpressure", "reservePublicHealthExternalLaneCapacityToState", "recordPublicHealthExternalLaneOutcomeToState", "expectedLaneControlVersion"].every((token) => adapterRuntimeSource.includes(token)) && ["rateLimitPerMinute", "maxPending", "halfOpenMaxProbes", "lane-control-signature-invalid"].every((token) => resilienceSource.includes(token)), "enqueue backpressure, claim rate/circuit admission and claimed-attempt outcomes use signed CAS controls", "resilience"),
     check("contract:signed-version-lifecycle", contractAcceptance.scheduled.summary.scheduled === 1 && contractAcceptance.active.summary.deprecated === 1 && contractAcceptance.retired.summary.retired === 1 && authorizePublicHealthExternalContract(contractAcceptance.retired, "family-doctor", "family-doctor-fulfillment-v1", "public-health-external-dispatch/v1", "public-health-external-receipt/v1").reason === "contract-version-retired", "signed dual approval advances scheduled, active/deprecated and retired contract states", "contract"),
     check("contract:trust-and-drift-boundary", ["producer-contract-owner", "consumer-contract-owner", "runtimeReleaseDigest", "contract-transition-conflict", "contract-attestation-signature-invalid"].every((token) => contractSource.includes(token)) && ["assertDispatchContractGovernance", "contractGovernance"].every((token) => adapterRuntimeSource.includes(token)) && ["contract-governance-mismatch", "contract-version-deprecated"].every((token) => operationsSource.includes(token)), "dual approvals, release/sample digests, conflicts, runtime admission, tampering and operations drift fail closed", "contract"),
+    check("contract:versioned-cutover-runtime", contractCutoverDraining.summary.outstanding === 1 && contractCutoverDraining.issues.some((item) => item.code === "contract-cutover-backlog") && contractCutoverCompleted.ok === true && contractCutoverCompleted.summary.completed === 1 && ["resolveExternalContractBinding", "receiptSchemaForRequest"].every((token) => adapterSource.includes(token)) && ["contract-cutover-backlog-after-sunset", "contract-cutover-successor-stale"].every((token) => contractCutoverSource.includes(token)), "active contracts drive versioned request/receipt signing while only executable old-version backlog blocks sunset", "contract"),
     check("outbox:persisted-enqueue-attempt", outboxAcceptance.delivered.externalRuntime.summary.dispatches === 1 && outboxAcceptance.delivered.externalRuntime.summary.auditEntries === 3, "one signed dispatch and three append-only enqueue/claim/attempt audit entries", "outbox"),
     check("outbox:coordination-advance", outboxAcceptance.delivered.dispatch.deliveryState === "delivered" && outboxAcceptance.handoff.state === "receipt-confirmed", "verified callback advances the linked coordination handoff", "outbox"),
     check("outbox:runtime-state-signature", verifyRuntimeStateSignature(outboxAcceptance.delivered.dispatch, ACCEPTANCE_REQUEST_SECRET), "mutable outbox state retains a trusted runtime signature", "outbox"),
@@ -519,7 +534,8 @@ function buildPublicHealthFinalReadiness(options = {}) {
       operationsIssues: operationsBoard.summary.issues,
       operationsSignatureVerified: operationsBoard.summary.signatureVerified,
       resilienceAuditEntries: resilienceAcceptance.recovered.nextData.publicHealthExternalLaneControlAudit.length,
-      verifiedContractAttestations: contractAcceptance.active.summary.verifiedAttestations
+      verifiedContractAttestations: contractAcceptance.active.summary.verifiedAttestations,
+      contractCutoverBacklog: contractCutoverDraining.summary.outstanding
     },
     checks,
     runtime: {
@@ -556,6 +572,11 @@ function buildPublicHealthFinalReadiness(options = {}) {
       retired: contractAcceptance.retired.summary,
       productionReady: false
     },
+    contractCutoverAcceptance: {
+      draining: contractCutoverDraining.summary,
+      completed: contractCutoverCompleted.summary,
+      productionReady: false
+    },
     productionReady: false,
     artifacts: {
       coordinationService: "public-health-coordination-service.js",
@@ -567,6 +588,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
       externalWorker: "public-health-external-worker.js",
       externalResilience: "public-health-external-resilience-service.js",
       externalContractGovernance: "public-health-external-contract-governance-service.js",
+      externalContractCutover: "public-health-external-contract-cutover-service.js",
       externalOperations: "public-health-external-operations-service.js",
       documentation: "docs/public-health-eight-domain-coordination.md",
       keyRotationDocumentation: "docs/public-health-external-key-rotation.md",
@@ -574,8 +596,8 @@ function buildPublicHealthFinalReadiness(options = {}) {
       contractGovernanceDocumentation: "docs/public-health-external-contract-governance.md"
     },
     remainingT00Integration: [
-      "Wire signed contract governance and release-evidence validation into the existing T00 public routes and durable data writer.",
-      "Production remains blocked until the real managed key service, HTTPS endpoints, worker identity, externally approved per-lane resilience policies, contract migration evidence, load evidence, cross-key audit/callback smoke, trusted site evidence and formal operations acceptance are available."
+      "Wire signed contract governance, trusted release-evidence validation, active-contract dead-letter recovery and cutover backlog into the existing T00 public routes and durable data writer.",
+      "Production remains blocked until the real managed key service, HTTPS endpoints, worker identity, externally approved per-lane resilience policies, contract cutover and backlog-drain evidence, load evidence, cross-key audit/callback smoke, trusted site evidence and formal operations acceptance are available."
     ]
   };
 }
