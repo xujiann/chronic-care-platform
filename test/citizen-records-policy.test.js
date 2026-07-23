@@ -70,6 +70,34 @@ test("family access requires both verified relationship evidence and active matc
   assert.equal(canCitizenReadResident(dataWith(verifiedMember, [authorization({ meta: { expiresAt: "2026-07-21" }, date: "2026-07-21" })]), citizen, "r4", { now: NOW }), false);
 });
 
+test("future expiry never activates pending rejected or suspended family authorizations", () => {
+  const verifiedMember = {
+    residentId: "r4",
+    relation: "母亲",
+    relationshipStatus: "verified",
+    verifiedAt: "2026-07-20T09:00:00.000Z",
+    evidenceSource: "公安亲属关系核验回执"
+  };
+
+  for (const status of ["pending", "rejected", "suspended"]) {
+    const record = authorization({ status, meta: { status, expiresAt: "2026-12-31" } });
+    assert.equal(
+      canCitizenReadResident(dataWith(verifiedMember, [record]), citizen, "r4", {
+        now: NOW,
+        scope: "health-record-summary"
+      }),
+      false,
+      `${status} authorization must fail closed even with a future expiry`
+    );
+  }
+
+  const active = authorization({ status: "active", meta: { status: "active", expiresAt: "2026-12-31" } });
+  assert.equal(canCitizenReadResident(dataWith(verifiedMember, [active]), citizen, "r4", {
+    now: NOW,
+    scope: "health-record-summary"
+  }), true);
+});
+
 test("resident supplement normalization prevents authority impersonation and cross-resident writes", () => {
   const normalized = normalizeCitizenSupplement({
     residentId: "r1",

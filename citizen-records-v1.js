@@ -15,6 +15,7 @@
     "admissions",
     "authorizations"
   ]);
+  const ACTIVE_AUTHORIZATION_STATUSES = new Set(["active", "authorized", "有效", "已授权"]);
 
   const SAFE_META_FIELDS = new Set([
     "visitType",
@@ -133,12 +134,15 @@
     if (revokedAt || /revoked|withdrawn|cancelled|撤销/i.test(statusText)) {
       return { key: "revoked", label: revokedAt ? `已撤销 · ${revokedAt.slice(0, 10)}` : "已撤销", active: false };
     }
+    const statuses = [projected.status, projected.meta?.status]
+      .map((value) => cleanText(value, 80).toLowerCase())
+      .filter(Boolean);
+    const explicitlyActive = statuses.length > 0 && statuses.every((status) => ACTIVE_AUTHORIZATION_STATUSES.has(status));
     const expiresAt = cleanText(projected.meta?.expiresAt || projected.date, 40);
     if (!expiresAt) {
-      const explicitlyActive = /(^|\s)(active|authorized|有效|已授权)(\s|$)/i.test(statusText);
       return explicitlyActive
         ? { key: "active", label: "有效 · 历史长期授权", active: true }
-        : { key: "incomplete", label: "待补录有效期", active: false };
+        : { key: "inactive", label: statuses.length ? `未激活 · ${statuses.join(" / ")}` : "待补录有效状态", active: false };
     }
     const expiry = expiresAt ? new Date(`${expiresAt.slice(0, 10)}T23:59:59`) : null;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(expiresAt.slice(0, 10)) || Number.isNaN(expiry.getTime())) {
@@ -146,6 +150,9 @@
     }
     if (expiry.getTime() < today.getTime()) {
       return { key: "expired", label: `已过期 · ${expiresAt.slice(0, 10)}`, active: false };
+    }
+    if (!explicitlyActive) {
+      return { key: "inactive", label: statuses.length ? `未激活 · ${statuses.join(" / ")}` : "待补录有效状态", active: false };
     }
     return { key: "active", label: expiresAt ? `有效期至 ${expiresAt.slice(0, 10)}` : "长期有效", active: true };
   }
@@ -467,6 +474,7 @@
 
   return {
     RESIDENT_RECORD_CATEGORIES,
+    ACTIVE_AUTHORIZATION_STATUSES,
     SAFE_META_FIELDS,
     projectRecord,
     projectResidentRecords,

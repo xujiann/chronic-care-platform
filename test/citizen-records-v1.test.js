@@ -250,6 +250,8 @@ test("authorization model requires purpose scope expiry and evaluates active exp
   assert.equal(authorizationState({ ...record, status: "已撤销", revokedAt: "2026-07-23T00:00:00.000Z" }).key, "revoked");
   assert.equal(authorizationState({ residentId: "r1", category: "authorizations", status: "pending" }).active, false);
   assert.equal(authorizationState({ residentId: "r1", category: "authorizations", status: "authorized" }).active, true);
+  assert.equal(authorizationState({ ...record, status: "pending", meta: { ...record.meta, status: "pending" } }, new Date("2026-07-22T09:00:00+08:00")).active, false);
+  assert.equal(authorizationState({ ...record, status: "active", meta: { ...record.meta, status: "pending" } }, new Date("2026-07-22T09:00:00+08:00")).active, false);
   assert.throws(() => buildAuthorizationRecord({ residentId: "r1", granteeName: "团队", purpose: "复诊", expiresAt: "2026-12-31" }), /范围/);
   assert.throws(() => buildAuthorizationRecord({ residentId: "r1", granteeName: "团队", purpose: "复诊", scopes: ["emr-summary"], expiresAt: "not-a-date" }), /格式/);
 });
