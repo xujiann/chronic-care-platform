@@ -712,6 +712,32 @@ test("authorization lifecycle counts only explicit active states with future exp
   });
 });
 
+test("authorization lifecycle uses calendar-day expiry boundaries consistently", () => {
+  const reference = new Date("2026-07-23T22:00:00+08:00");
+  const record = (id, expiresAt) => activeAuthorization({
+    id,
+    date: expiresAt,
+    meta: {
+      status: "active",
+      granteeId: `team-${id}`,
+      granteeType: "care-team",
+      purpose: "慢病复诊",
+      scopes: ["health-record-summary"],
+      expiresAt
+    }
+  });
+  const lifecycle = V2.buildAuthorizationLifecycle([
+    record("today", "2026-07-23"),
+    record("day-30", "2026-08-22"),
+    record("day-31", "2026-08-23")
+  ], reference, 30);
+  assert.equal(lifecycle.items.find((item) => item.id === "today").lifecycleKey, "expiring");
+  assert.equal(lifecycle.items.find((item) => item.id === "today").remainingDays, 0);
+  assert.equal(lifecycle.items.find((item) => item.id === "day-30").lifecycleKey, "expiring");
+  assert.equal(lifecycle.items.find((item) => item.id === "day-30").remainingDays, 30);
+  assert.equal(lifecycle.items.find((item) => item.id === "day-31").lifecycleKey, "active");
+});
+
 test("authorization renewal is an explicit new consent draft without an expiry", () => {
   const record = activeAuthorization({
     id: "auth-renew",

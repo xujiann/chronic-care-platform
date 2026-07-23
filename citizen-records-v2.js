@@ -45,6 +45,22 @@
     return date ? date.toISOString().slice(0, 10) : "";
   }
 
+  function authorizationExpiryDate(value) {
+    const text = cleanText(value, 60);
+    if (!text) return null;
+    const calendarDate = text.slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(calendarDate)) return null;
+    const expiry = new Date(`${calendarDate}T23:59:59.999`);
+    return Number.isNaN(expiry.getTime()) ? null : expiry;
+  }
+
+  function calendarDayDistance(from, to) {
+    if (!from || !to) return Number.POSITIVE_INFINITY;
+    const fromDay = Date.UTC(from.getFullYear(), from.getMonth(), from.getDate());
+    const toDay = Date.UTC(to.getFullYear(), to.getMonth(), to.getDate());
+    return Math.round((toDay - fromDay) / 86400000);
+  }
+
   function safeIdentifier(value, maximum = 160) {
     return cleanText(value, maximum).replace(/[^a-zA-Z0-9._:-]/g, "-");
   }
@@ -1095,17 +1111,17 @@
 
   function buildAuthorizationLifecycle(records = [], now = new Date(), warningDays = 30) {
     const reference = toDate(now) || new Date();
-    const warningWindow = Math.max(1, Math.min(Number(warningDays) || 30, 90)) * 86400000;
+    const warningWindowDays = Math.max(1, Math.min(Number(warningDays) || 30, 90));
     const items = (Array.isArray(records) ? records : [])
       .filter((record) => record?.category === "authorizations")
       .map((record) => {
         const state = CitizenRecordsV1?.authorizationState(record, reference) || { key: "incomplete", label: "状态待核验", active: false };
-        const expiresAt = toDate(record.meta?.expiresAt || record.date);
+        const expiresAt = authorizationExpiryDate(record.meta?.expiresAt || record.date);
         const missingIdentity = !cleanText(record.meta?.granteeId || record.meta?.granteeAccountId || record.meta?.granteeResidentId, 160);
         const scopes = Array.isArray(record.meta?.scopes) ? record.meta.scopes.map((item) => cleanText(item, 100)).filter(Boolean) : [];
         const incomplete = missingIdentity || !cleanText(record.meta?.purpose, 300) || !scopes.length || scopes.some((scope) => !ACCESS_SCOPES.has(scope));
-        const remainingMs = expiresAt ? expiresAt.getTime() - reference.getTime() : Number.POSITIVE_INFINITY;
-        const expiring = state.active && remainingMs >= 0 && remainingMs <= warningWindow;
+        const remainingDays = calendarDayDistance(reference, expiresAt);
+        const expiring = state.active && remainingDays >= 0 && remainingDays <= warningWindowDays;
         const lifecycleKey = incomplete ? "incomplete" : expiring ? "expiring" : state.key;
         const labels = {
           active: "有效",
@@ -1128,7 +1144,7 @@
           label: labels[lifecycleKey] || state.label,
           active: state.active && !incomplete,
           renewEligible: !incomplete && ["active", "expiring", "expired", "revoked"].includes(lifecycleKey),
-          remainingDays: Number.isFinite(remainingMs) ? Math.max(0, Math.ceil(remainingMs / 86400000)) : null
+          remainingDays: Number.isFinite(remainingDays) ? Math.max(0, remainingDays) : null
         };
       });
     const order = { expiring: 0, incomplete: 1, active: 2, expired: 3, revoked: 4, inactive: 5 };
