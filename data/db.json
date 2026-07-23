@@ -10699,14 +10699,18 @@
     "requiredEvidence": [
       "identity authentication",
       "first diagnosis assessment",
+      "clinical assessment",
       "signed informed consent",
+      "consent storage receipt",
       "nurse practice certificate",
       "service equipment readiness",
       "emergency and coordination readiness",
+      "specialist protocol evidence",
       "service location trace",
       "nursing record",
       "medical waste handover",
       "EMR archive receipt",
+      "price snapshot",
       "quality callback"
     ],
     "platformRequirements": [
@@ -10724,6 +10728,37 @@
       "medical accident insurance",
       "service recorder"
     ],
+    "p1Lifecycle": {
+      "version": "internet-nursing-p1-v1",
+      "tracks": [
+        "structured clinical assessment and consent storage",
+        "service area slot duration and idempotency",
+        "specialist nursing protocols",
+        "order price snapshot and financial reconciliation",
+        "complaint and incident SLA",
+        "resident timeline and notification receipts"
+      ],
+      "intakePolicyVersion": "internet-nursing-intake-v1",
+      "assessmentPolicyVersion": "internet-nursing-assessment-v1",
+      "priceCatalogVersion": "internet-nursing-price-2026-v1",
+      "specialistProtocols": [
+        "intravenous-catheter-maintenance-v1",
+        "wound-ostomy-care-v1",
+        "peritoneal-dialysis-care-v1"
+      ],
+      "complaintSlaHours": {
+        "critical": 4,
+        "high": 4,
+        "medium": 24,
+        "low": 24
+      },
+      "incidentSlaHours": {
+        "critical": 2,
+        "high": 2,
+        "medium": 24,
+        "low": 24
+      }
+    },
     "notificationGateway": {
       "mode": "simulation",
       "enabled": true,

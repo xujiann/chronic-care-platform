@@ -40,6 +40,29 @@ function qualifiedEscortWorker(overrides = {}) {
   };
 }
 
+function withNursingAssessment(order = {}, overrides = {}) {
+  const base = { ...order };
+  return {
+    ...base,
+    ...Domain.buildNursingAssessmentEvidence(base, {
+      eligible: true,
+      identityVerified: true,
+      clinicianId: "clinician-001",
+      sourceEncounterId: `encounter-${base.id || "nursing"}`,
+      conditions: ["home nursing indication confirmed"],
+      contraindicationChecks: [{ code: "unstable-vital-signs", status: "cleared" }],
+      consentSigned: true,
+      signerId: base.residentId || "r1",
+      signerName: "Resident A",
+      objectKey: `consent/${base.id || "nursing"}.pdf`,
+      contentHash: `sha256:${"a".repeat(64)}`,
+      storageReceiptId: `storage-${base.id || "nursing"}`,
+      validUntil: "2026-07-25T09:00:00+08:00",
+      ...overrides
+    }, { at: NOW })
+  };
+}
+
 test("workflow exposes guarded nursing and escort state transitions", () => {
   assert.deepEqual(Domain.allowedNextStates("nursing", "requested"), ["assessed", "risk-hold", "reschedule-requested", "cancel-requested", "rejected"]);
   assert.equal(Domain.validateTransition("nursing", "accepted", "in-service").ok, true);
@@ -151,7 +174,7 @@ test("risk assessment turns missing assessment consent and assignment into contr
 });
 
 test("dispatch evaluation produces evidence-backed nursing updates for an eligible candidate", () => {
-  const order = {
+  const order = withNursingAssessment({
     id: "ino-dispatch-001",
     residentId: "r1",
     status: "assessed",
@@ -163,7 +186,7 @@ test("dispatch evaluation produces evidence-backed nursing updates for an eligib
     firstVisitAssessment: "passed",
     informedConsent: "signed",
     consentAttachment: { status: "signed" }
-  };
+  });
   const decision = Domain.evaluateDispatchCandidate("nursing", order, qualifiedNurse(), { now: NOW });
   assert.equal(decision.eligible, true);
   assert.equal(decision.targetStatus, "dispatched");
@@ -193,7 +216,7 @@ test("dispatch evaluation produces evidence-backed nursing updates for an eligib
 });
 
 test("nursing dispatch rejects failed denied missing mismatched and stale evidence without mutation", () => {
-  const order = {
+  const order = withNursingAssessment({
     id: "ino-integrity-001",
     residentId: "r1",
     status: "assessed",
@@ -205,7 +228,7 @@ test("nursing dispatch rejects failed denied missing mismatched and stale eviden
     firstVisitAssessment: "passed",
     informedConsent: "signed",
     consentAttachment: { status: "signed" }
-  };
+  });
   const updates = Domain.evaluateDispatchCandidate("nursing", order, qualifiedNurse(), { now: NOW }).updates;
   assert.throws(
     () => Domain.transitionOrder("nursing", order, "dispatched", {
@@ -285,7 +308,7 @@ test("nursing dispatch rejects failed denied missing mismatched and stale eviden
 });
 
 test("dispatch ranking excludes fail-closed candidates and reports order blockers", () => {
-  const order = {
+  const order = withNursingAssessment({
     id: "ino-dispatch-002",
     status: "assessed",
     institutionId: "inh-mr1",
@@ -296,7 +319,7 @@ test("dispatch ranking excludes fail-closed candidates and reports order blocker
     firstVisitAssessment: "passed",
     informedConsent: "signed",
     consentAttachment: { status: "signed" }
-  };
+  });
   const missingFields = qualifiedNurse({ id: "inn-missing" });
   delete missingFields.institutionCode;
   delete missingFields.specialties;
@@ -340,7 +363,7 @@ test("dispatch evaluation requires escort prerequisites and blocks critical nurs
   assert.equal(missingEligibility.eligible, false);
   assert.equal(missingEligibility.blockers.includes("evidence:eligibility-result"), true);
 
-  const criticalNursing = {
+  const criticalNursing = withNursingAssessment({
     id: "ino-critical",
     status: "assessed",
     institutionId: "inh-mr1",
@@ -353,7 +376,7 @@ test("dispatch evaluation requires escort prerequisites and blocks critical nurs
     consentAttachment: { status: "signed" },
     adverseEvent: { status: "open" },
     riskReview: { status: "approved" }
-  };
+  }, { riskLevel: "high" });
   const criticalDecision = Domain.evaluateDispatchCandidate("nursing", criticalNursing, qualifiedNurse(), { now: NOW });
   assert.equal(criticalDecision.eligible, false);
   assert.equal(criticalDecision.blockers.includes("risk:critical"), true);
@@ -426,8 +449,8 @@ test("capacity reservations prevent concurrent nursing and escort overbooking wi
     consentAttachment: { status: "signed" }
   };
   const nursingPerson = qualifiedNurse({ id: "inn-capacity-001", dailyCapacity: 1, assignedToday: 0 });
-  const nursingFirst = { ...nursingBase, id: "ino-capacity-001" };
-  const nursingSecond = { ...nursingBase, id: "ino-capacity-002" };
+  const nursingFirst = withNursingAssessment({ ...nursingBase, id: "ino-capacity-001" });
+  const nursingSecond = withNursingAssessment({ ...nursingBase, id: "ino-capacity-002" });
   const nursingFirstDecision = Domain.evaluateDispatchCandidate("nursing", nursingFirst, nursingPerson, { now: NOW });
   const nursingSecondDecision = Domain.evaluateDispatchCandidate("nursing", nursingSecond, nursingPerson, { now: NOW });
   assert.equal(nursingFirstDecision.eligible, true);
@@ -476,7 +499,7 @@ test("capacity reservations prevent concurrent nursing and escort overbooking wi
 
 test("approved cancellation releases nursing capacity while forged release and binding rewrites keep the slot held", () => {
   const nursingPerson = qualifiedNurse({ id: "inn-capacity-cancel", dailyCapacity: 1, assignedToday: 0 });
-  const base = {
+  const base = withNursingAssessment({
     id: "ino-capacity-cancel-001",
     residentId: "r-cap-cancel",
     status: "assessed",
@@ -489,14 +512,14 @@ test("approved cancellation releases nursing capacity while forged release and b
     firstVisitAssessment: "passed",
     informedConsent: "signed",
     consentAttachment: { status: "signed" }
-  };
+  });
   const resource = Domain.buildResourceReservationEvidence("nursing", base, {
     resourceId: "nursing-slot-capacity-cancel",
     slotAt: base.preferredAt,
     reservedBy: "dispatch-capacity-001"
   }, { at: NOW });
   const order = { ...base, ...resource };
-  const rival = { ...base, id: "ino-capacity-cancel-002", residentId: "r-cap-rival" };
+  const rival = withNursingAssessment({ ...base, id: "ino-capacity-cancel-002", residentId: "r-cap-rival" });
   const dispatch = Domain.evaluateDispatchCandidate("nursing", order, nursingPerson, { now: NOW });
   const dispatched = Domain.transitionOrder("nursing", order, "dispatched", { at: NOW, updates: dispatch.updates });
   assert.equal(Domain.evaluateDispatchCandidate("nursing", rival, nursingPerson, { now: NOW }).eligible, false);
@@ -627,7 +650,7 @@ test("completed reschedule and dispatch rejection release escort capacity for re
 });
 
 test("transition order blocks missing evidence and emits resident timeline evidence", () => {
-  const requested = {
+  const requested = withNursingAssessment({
     id: "ino-test-001",
     residentId: "r1",
     status: "requested",
@@ -636,7 +659,7 @@ test("transition order blocks missing evidence and emits resident timeline evide
     informedConsent: "signed",
     consentAttachment: { status: "signed" },
     auditTrail: []
-  };
+  });
   const assessed = Domain.transitionOrder("nursing", requested, "assessed", { actorId: "hospital", actorRole: "institution", at: NOW });
   assert.equal(assessed.status, "assessed");
   assert.equal(assessed.timelineEvents[0].residentId, "r1");
@@ -662,7 +685,7 @@ test("transition order blocks missing evidence and emits resident timeline evide
 });
 
 test("resident timeline enforces order resident chronology state continuity and previous-event links", () => {
-  const requested = {
+  const requested = withNursingAssessment({
     id: "ino-timeline-001",
     residentId: "r1",
     status: "requested",
@@ -670,7 +693,7 @@ test("resident timeline enforces order resident chronology state continuity and 
     firstVisitAssessment: "passed",
     informedConsent: "signed",
     consentAttachment: { status: "signed" }
-  };
+  });
   const assessed = Domain.transitionOrder("nursing", requested, "assessed", {
     at: NOW,
     actorId: "assessment-001",

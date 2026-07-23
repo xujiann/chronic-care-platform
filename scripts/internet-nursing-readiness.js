@@ -269,6 +269,39 @@ function hasSpecialistHomeCareSafetyEvidence(policy, domainSource) {
     /service-archive-target-invalid/.test(domainSource);
 }
 
+function hasP1LifecycleEvidence(policy, domainSource, frontend) {
+  const lifecycle = policy.p1Lifecycle || {};
+  const evidence = new Set(policy.requiredEvidence || []);
+  const requiredP1Evidence = [
+    "clinical assessment",
+    "consent storage receipt",
+    "specialist protocol evidence",
+    "price snapshot"
+  ];
+  const requiredDomainFunctions = [
+    "validateNursingOrderIntake",
+    "validateNursingAssessmentEvidence",
+    "validateNursingSpecialistProtocolEvidence",
+    "validateOrderPriceSnapshot",
+    "validateSchedulingEvidence",
+    "validateCancellationRefundEvidence",
+    "validateRiskQualityEvidence",
+    "validateTimelineIntegrity",
+    "recordNotificationReceipt"
+  ];
+  return lifecycle.version === "internet-nursing-p1-v1" &&
+    Array.isArray(lifecycle.tracks) &&
+    lifecycle.tracks.length === 6 &&
+    (lifecycle.specialistProtocols || []).length === 3 &&
+    requiredP1Evidence.every((item) => evidence.has(item)) &&
+    requiredDomainFunctions.every((name) => new RegExp(`\\b${name}\\b`).test(domainSource)) &&
+    /data-nursing-p1-center/.test(frontend) &&
+    /buildNursingP1Tracks/.test(frontend) &&
+    /renderNursingDistrictSelect/.test(frontend) &&
+    /durationMinutes/.test(frontend) &&
+    /intake-duplicate-active-order/.test(domainSource);
+}
+
 function hasRegulatorySubmissionEvidence(policy, frontend, server, moduleDoc, launchPlan) {
   const submission = policy.regulatorySubmission || fallbackPolicy().regulatorySubmission;
   const fields = new Set(submission.mappedFields || []);
@@ -460,6 +493,7 @@ function buildInternetNursingReadinessReport(options = {}) {
     { id: "nursing:paymentIntegration", passed: hasPaymentIntegrationEvidence(policy, orders, frontend, server, moduleDoc, launchPlan), detail: "medical insurance e-voucher, mobile self-pay, refund, invoice, and reconciliation contracts are implemented" },
     { id: "nursing:deviceVerification", passed: hasDeviceVerificationEvidence(policy, orders, nurses, frontend, server, moduleDoc, launchPlan), detail: "mobile GPS, location device, recorder, one-click alert, photo attachment, and exception escalation evidence are implemented" },
     { id: "nursing:specialistHomeCareSafety", passed: hasSpecialistHomeCareSafetyEvidence(policy, domainSource), detail: "catheter, wound and ostomy, and peritoneal dialysis services require equipment, emergency coordination, waste handover, and EMR archive evidence" },
+    { id: "nursing:p1Lifecycle", passed: hasP1LifecycleEvidence(policy, domainSource, frontend), detail: "structured assessment, intake scheduling, specialist protocols, locked pricing, SLA risk closure, timeline, and notification receipts are implemented as one P1 domain contract" },
     { id: "nursing:regulatorySubmission", passed: hasRegulatorySubmissionEvidence(policy, frontend, server, moduleDoc, launchPlan), detail: "field mapping, monthly and realtime submission, signoff, and pressure-test evidence are implemented" },
     { id: "nursing:siteCutoverPack", passed: hasCutoverPackEvidence(cutoverPack, `${moduleDoc}\n${cutoverDoc}`, launchPlan), detail: "site cutover signoff pack maps message, signature, connector, payment, device, regulatory, and audit-retention evidence" },
     { id: "nursing:highlightFeatures", passed: innovationCenter.featureCount === 10 && HIGHLIGHT_FEATURE_IDS.every((id) => innovationCenter.features.some((item) => item.id === id)) && /internet-nursing-highlights\.js/.test(frontend) && /renderNursingInnovationCenter/.test(frontend) && /nursing-highlight-center/.test(frontend) && /buildInternetNursingInnovationCenter/.test(server), detail: `${innovationCenter.featureCount}/10 highlight features wired` },
@@ -495,6 +529,7 @@ function buildInternetNursingReadinessReport(options = {}) {
       highRiskOrders: orders.filter((item) => item.riskLevel === "high").length,
       trackingOrders: orders.filter((item) => item.locationTrace === "tracking").length,
       specialistHomeCareServices: SPECIALIST_HOME_CARE_SERVICES.filter((item) => (policy.serviceCatalog || []).includes(item)).length,
+      p1LifecycleTracks: Array.isArray(policy.p1Lifecycle?.tracks) ? policy.p1Lifecycle.tracks.length : 0,
       highlightFeatures: innovationCenter.featureCount,
       cutoverTracks: cutoverPack.tracks.length,
       cutoverReadyTracks: cutoverPack.tracks.filter((item) => item.ready).length,
