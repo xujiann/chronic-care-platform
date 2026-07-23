@@ -18,6 +18,7 @@ async function loadInternetNursingDashboard() {
   nursingDashboard.orders = withNursingRiskQualityControls(nursingDashboard.orders);
   nursingDashboard.orders = withNursingSchedulingControls(nursingDashboard.orders);
   nursingDashboard.orders = withNursingCancellationRefundControls(nursingDashboard.orders);
+  nursingDashboard.orders = withNursingTimelineNotificationControls(nursingDashboard.orders);
   nursingDashboard.paymentReadiness = buildStaticPaymentReadiness(nursingDashboard.policy || {}, nursingDashboard.orders);
   renderInternetNursingDashboard(nursingDashboard);
 }
@@ -308,6 +309,38 @@ function nursingCancellationRefundControlText(item) {
   if (!control) return "";
   if (control.ok) return `取消退费证据通过：${control.target}`;
   return `取消退费阻断：${control.blockers.slice(0, 5).join("，")}`;
+}
+
+function withNursingTimelineNotificationControls(orders) {
+  const domain = window.NursingEscortDomain;
+  if (!domain) return orders;
+  return orders.map((order) => {
+    const events = Array.isArray(order.timelineEvents) ? order.timelineEvents : [];
+    const plans = Array.isArray(order.notificationPlans) ? order.notificationPlans : [];
+    if (!events.length && !plans.length) return { ...order, timelineNotificationControl: null };
+    const timeline = domain.validateTimelineIntegrity("nursing", order);
+    const planReasons = plans.flatMap((plan) => domain.validateNotificationPlan("nursing", order, plan).reasons);
+    const receipts = Array.isArray(order.notificationReceipts) ? order.notificationReceipts : [];
+    const completedStatuses = new Set(["sent", "delivered", "read"]);
+    const pending = plans.flatMap((plan) => plan.messages || []).filter((message) => message.required
+      && !receipts.some((receipt) => receipt.messageId === message.id && completedStatuses.has(receipt.status))).length;
+    return {
+      ...order,
+      timelineNotificationControl: {
+        ok: timeline.ok && planReasons.length === 0,
+        eventCount: events.length,
+        pending,
+        blockers: [...timeline.reasons, ...planReasons]
+      }
+    };
+  });
+}
+
+function nursingTimelineNotificationControlText(item) {
+  const control = item?.timelineNotificationControl;
+  if (!control) return "";
+  if (!control.ok) return `居民时间轴阻断：${control.blockers.slice(0, 5).join("，")}`;
+  return `居民时间轴 ${control.eventCount} 条，通知待回执 ${control.pending} 条`;
 }
 
 function buildStaticRegulatoryMonthlyReport(orders, institutions) {
@@ -1014,7 +1047,7 @@ function renderHospitalOrders(items) {
           <td>${escapeHtml(displayText(item.institution?.name || item.institutionName || ""))}<br><small>${escapeHtml(item.institutionCode || "")}</small></td>
           <td>${escapeHtml(displayText(item.nurse?.name || item.nurseName || "pending"))}<br><small>${escapeHtml(displayText(item.nurse?.registrationStatus || ""))}</small></td>
           <td>${statusBadge(item.firstVisitAssessment)} ${statusBadge(item.informedConsent)} ${statusBadge(item.locationTrace)}<br><small>${escapeHtml(consentAttachmentText(item))}</small><br><small>${escapeHtml(locationTraceSummary(item))}</small><br><small>${escapeHtml(notificationSummary(item))}</small><br><small>${escapeHtml(nursingServiceControlText(item))}</small></td>
-          <td>${statusBadge(item.status)} ${statusBadge(item.riskLevel)}<br><small>${escapeHtml(displayText(item.qualityCallback || ""))}</small><br><small>${escapeHtml(nursingRiskQualityControlText(item))}</small><br><small>${escapeHtml(nursingSchedulingControlText(item))}</small><br><small>${escapeHtml(nursingCancellationRefundControlText(item))}</small></td>
+          <td>${statusBadge(item.status)} ${statusBadge(item.riskLevel)}<br><small>${escapeHtml(displayText(item.qualityCallback || ""))}</small><br><small>${escapeHtml(nursingRiskQualityControlText(item))}</small><br><small>${escapeHtml(nursingSchedulingControlText(item))}</small><br><small>${escapeHtml(nursingCancellationRefundControlText(item))}</small><br><small>${escapeHtml(nursingTimelineNotificationControlText(item))}</small></td>
           <td>
             ${canManage ? `
             <button class="inline-action" type="button" data-nursing-action="${escapeHtml(item.id)}" data-action-kind="assessment">评估</button>

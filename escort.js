@@ -67,7 +67,8 @@ function withEscortDispatchControls(dashboard = {}) {
       financialEvidenceControl: buildEscortFinancialEvidenceControl(order, domain),
       riskQualityControl: buildEscortRiskQualityControl(order, domain),
       schedulingControl: buildEscortSchedulingControl(order, domain),
-      cancellationRefundControl: buildEscortCancellationRefundControl(order, domain)
+      cancellationRefundControl: buildEscortCancellationRefundControl(order, domain),
+      timelineNotificationControl: buildEscortTimelineNotificationControl(order, domain)
     }))
   };
 }
@@ -239,6 +240,31 @@ function escortCancellationRefundText(item) {
   return `cancellation/refund blocked: ${control.blockers.slice(0, 5).join(", ")}`;
 }
 
+function buildEscortTimelineNotificationControl(order, domain) {
+  const events = Array.isArray(order.timelineEvents) ? order.timelineEvents : [];
+  const plans = Array.isArray(order.notificationPlans) ? order.notificationPlans : [];
+  if (!events.length && !plans.length) return null;
+  const timeline = domain.validateTimelineIntegrity("escort", order);
+  const planReasons = plans.flatMap((plan) => domain.validateNotificationPlan("escort", order, plan).reasons);
+  const receipts = Array.isArray(order.notificationReceipts) ? order.notificationReceipts : [];
+  const completedStatuses = new Set(["sent", "delivered", "read"]);
+  const pending = plans.flatMap((plan) => plan.messages || []).filter((message) => message.required
+    && !receipts.some((receipt) => receipt.messageId === message.id && completedStatuses.has(receipt.status))).length;
+  return {
+    ok: timeline.ok && planReasons.length === 0,
+    eventCount: events.length,
+    pending,
+    blockers: [...timeline.reasons, ...planReasons]
+  };
+}
+
+function escortTimelineNotificationText(item) {
+  const control = item.timelineNotificationControl;
+  if (!control) return "";
+  if (!control.ok) return `resident timeline blocked: ${control.blockers.slice(0, 5).join(", ")}`;
+  return `resident timeline ${control.eventCount}, notification receipts pending ${control.pending}`;
+}
+
 function renderEscortDashboard(dashboard) {
   renderEscortMetrics(dashboard.summary || {});
   renderProviderSelect(dashboard.providers || []);
@@ -287,7 +313,7 @@ function renderEscortOrders(items) {
           <td>${escapeHtml(item.worker?.name || item.workerId || "pending")}<br><small>${escapeHtml((item.serviceItems || []).join(", "))}</small><br><small>${escapeHtml(escortDispatchControlText(item))}</small></td>
           <td>${escapeHtml(item.hospital || "")}<br><small>${escapeHtml(item.department || "")} / ${escapeHtml(item.appointmentAt || item.due || "")}</small><br><small>${statusBadge(item.hospitalInterfaceStatus || "pending")} ${escapeHtml(item.hospitalCheckInNo || item.outpatientQueueNo || item.hospitalNotice || "")}</small><br><small>${escapeHtml(item.hisVisitId || item.appointmentSource || "")} ${escapeHtml(item.departmentCode || "")} ${escapeHtml(item.doctorCode || "")}</small></td>
           <td>${statusBadge(item.subsidyType)} ${statusBadge(item.contractStatus)} ${statusBadge(item.insuranceStatus)}</td>
-          <td>${statusBadge(item.status)} ${statusBadge(item.priority)}<br><small>${escapeHtml(item.qualityReview || "")}</small><br><small>${escapeHtml(escortServiceEvidenceText(item))}</small><br><small>${escapeHtml(escortFinancialEvidenceText(item))}</small><br><small>${escapeHtml(escortRiskQualityText(item))}</small><br><small>${escapeHtml(escortSchedulingText(item))}</small><br><small>${escapeHtml(escortCancellationRefundText(item))}</small></td>
+          <td>${statusBadge(item.status)} ${statusBadge(item.priority)}<br><small>${escapeHtml(item.qualityReview || "")}</small><br><small>${escapeHtml(escortServiceEvidenceText(item))}</small><br><small>${escapeHtml(escortFinancialEvidenceText(item))}</small><br><small>${escapeHtml(escortRiskQualityText(item))}</small><br><small>${escapeHtml(escortSchedulingText(item))}</small><br><small>${escapeHtml(escortCancellationRefundText(item))}</small><br><small>${escapeHtml(escortTimelineNotificationText(item))}</small></td>
           <td>
             <button class="inline-action" type="button" data-escort-action="${escapeHtml(item.id)}" data-status="in-service" ${item.serviceEvidenceControl?.ok ? "" : `disabled aria-disabled="true" title="${escapeHtml(escortServiceEvidenceText(item))}"`}>开始</button>
             <button class="inline-action" type="button" data-escort-action="${escapeHtml(item.id)}" data-status="quality-review" ${escortRiskQualityActionAttributes(item, "quality-review")}>回访</button>
