@@ -773,5 +773,6 @@ module.exports = {
   syncRefundFromFinancialCallback: OnlinePaymentRefunds.syncRefundFromFinancialCallback,
   validateFinancialRequest,
   verifyFinancialCallback,
-  verifyRefundLedger: OnlinePaymentRefunds.verifyRefundLedger
+  verifyRefundLedger: OnlinePaymentRefunds.verifyRefundLedger,
+  verifyRefundStateProjection: OnlinePaymentRefunds.verifyRefundStateProjection
 };

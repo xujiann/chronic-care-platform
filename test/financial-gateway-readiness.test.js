@@ -38,6 +38,15 @@ test("financial gateway readiness requires governed rejected-refund resubmission
   assert.equal(report.capabilities.find((item) => item.id === "online-refund-closed-loop").passed, false);
 });
 
+test("financial gateway readiness requires refund ledger state projection verification", () => {
+  const source = fs
+    .readFileSync(path.join(ROOT, "online-payment-refunds.js"), "utf8")
+    .replaceAll("REFUND_STATE_PROJECTION_INVALID", "REMOVED_REFUND_STATE_PROJECTION");
+  const report = buildFinancialGatewayReadiness({ refundSource: source });
+  assert.equal(report.ok, false);
+  assert.equal(report.capabilities.find((item) => item.id === "online-refund-closed-loop").passed, false);
+});
+
 test("financial gateway readiness fails when sensitive payload protection is removed", () => {
   const source = fs.readFileSync(path.join(ROOT, "financial-gateways.js"), "utf8").replaceAll("FORBIDDEN_PAYLOAD_KEYS", "REMOVED_PAYLOAD_GUARD");
   const report = buildFinancialGatewayReadiness({ adapterSource: source });

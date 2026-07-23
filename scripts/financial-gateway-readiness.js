@@ -52,6 +52,9 @@ function buildFinancialGatewayReadiness(options = {}) {
         "REFUND_AMOUNT_EXCEEDS_AVAILABLE",
         "REFUND_LEDGER_INVALID",
         "requireValidRefundLedger",
+        "verifyRefundStateProjection",
+        "REFUND_STATE_PROJECTION_INVALID",
+        "state-projection-invalid",
         "reconcileRefund",
         "refundOperations"
       ]
