@@ -34,6 +34,8 @@ function qualifiedEscortWorker(overrides = {}) {
     insuranceStatus: "covered",
     status: "available",
     skills: ["registration", "exam escort"],
+    dailyCapacity: 6,
+    assignedToday: 1,
     ...overrides
   };
 }
@@ -66,6 +68,8 @@ test("nurse qualification fails closed when ownership capability or availability
   delete missing.institutionCode;
   delete missing.specialties;
   delete missing.status;
+  delete missing.dailyCapacity;
+  delete missing.assignedToday;
 
   const missingResult = Domain.validateNurseQualification(missing, order, { now: NOW });
   assert.equal(missingResult.ok, false);
@@ -73,6 +77,8 @@ test("nurse qualification fails closed when ownership capability or availability
   assert.equal(missingResult.reasons.includes("specialties-missing"), true);
   assert.equal(missingResult.reasons.includes("nurse-status-missing"), true);
   assert.equal(missingResult.reasons.includes("nurse-unavailable"), true);
+  assert.equal(missingResult.reasons.includes("daily-capacity-invalid"), true);
+  assert.equal(missingResult.reasons.includes("assigned-count-invalid"), true);
 
   const unknownStatus = Domain.validateNurseQualification(qualifiedNurse({ status: "unknown" }), order, { now: NOW });
   assert.equal(unknownStatus.ok, false);
@@ -170,6 +176,11 @@ test("dispatch evaluation produces evidence-backed nursing updates for an eligib
   assert.equal(decision.updates.dispatchDecision.domain, "nursing");
   assert.equal(decision.updates.dispatchDecision.subjectId, "inn-001");
   assert.match(decision.updates.dispatchDecision.id, /^dispatch:fnv1a32:/);
+  assert.equal(decision.updates.capacityReservation.status, "reserved");
+  assert.equal(decision.updates.capacityReservation.orderId, order.id);
+  assert.equal(decision.updates.capacityReservation.subjectId, "inn-001");
+  assert.equal(decision.updates.capacityReservation.serviceDate, "2026-07-22");
+  assert.equal(decision.updates.dispatchDecision.capacityReservationId, decision.updates.capacityReservation.id);
 
   const dispatched = Domain.transitionOrder("nursing", order, "dispatched", {
     at: NOW,
@@ -227,6 +238,21 @@ test("nursing dispatch rejects failed denied missing mismatched and stale eviden
       reason: "dispatch-decision-missing"
     },
     {
+      name: "missing capacity reservation",
+      updates: { ...updates, capacityReservation: undefined },
+      reason: "capacity-reservation-missing"
+    },
+    {
+      name: "mismatched capacity subject",
+      updates: { ...updates, capacityReservation: { ...updates.capacityReservation, subjectId: "missing-nurse" } },
+      reason: "capacity-subject-mismatch"
+    },
+    {
+      name: "forged capacity ordinal",
+      updates: { ...updates, capacityReservation: { ...updates.capacityReservation, reservedOrdinal: 99 } },
+      reason: "capacity-limit-exceeded"
+    },
+    {
       name: "mismatched subject",
       updates: { ...updates, nurseId: "missing-nurse" },
       reason: "qualification-subject-mismatch"
@@ -252,6 +278,7 @@ test("nursing dispatch rejects failed denied missing mismatched and stale eviden
     () => Domain.transitionOrder("nursing", order, "dispatched", { at: "2026-07-22T10:00:01+08:00", updates }),
     (error) => error.code === "ORDER_DISPATCH_INTEGRITY_INVALID"
       && error.details.reasons.includes("qualification-stale")
+      && error.details.reasons.includes("capacity-stale")
       && error.details.reasons.includes("dispatch-stale")
   );
   assert.equal(order.status, "assessed");
@@ -285,6 +312,13 @@ test("dispatch ranking excludes fail-closed candidates and reports order blocker
   assert.equal(ranked.blockers.includes("qualification:institution-code-missing"), true);
   assert.equal(ranked.blockers.includes("qualification:specialties-missing"), true);
   assert.equal(ranked.blockers.includes("qualification:nurse-status-missing"), true);
+  assert.throws(
+    () => Domain.transitionOrder("nursing", order, "dispatched", { at: NOW, updates: ranked.candidates[0].updates }),
+    (error) => error.code === "ORDER_DISPATCH_INTEGRITY_INVALID"
+      && error.details.reasons.includes("dispatch-decision-not-issued")
+      && error.details.reasons.includes("capacity-reservation-not-issued")
+  );
+  assert.equal(order.status, "assessed");
 });
 
 test("dispatch evaluation requires escort prerequisites and blocks critical nursing risk", () => {
@@ -345,6 +379,7 @@ test("escort dispatch accepts evaluator evidence and rejects forged subject doma
   assert.equal(dispatched.workerId, "ew-001");
   assert.equal(dispatched.dispatchDecision.orderId, order.id);
   assert.equal(dispatched.dispatchDecision.domain, "escort");
+  assert.equal(dispatched.capacityReservation.subjectId, "ew-001");
 
   assert.throws(
     () => Domain.transitionOrder("escort", order, "worker-dispatched", { at: NOW, updates: { ...updates, workerId: "ew-forged" } }),
@@ -360,11 +395,83 @@ test("escort dispatch accepts evaluator evidence and rejects forged subject doma
     (error) => error.code === "ORDER_DISPATCH_INTEGRITY_INVALID" && error.details.reasons.includes("dispatch-domain-mismatch")
   );
   assert.throws(
+    () => Domain.transitionOrder("escort", order, "worker-dispatched", {
+      at: NOW,
+      updates: { ...updates, capacityReservation: { ...updates.capacityReservation, serviceDate: "2026-07-23" } }
+    }),
+    (error) => error.code === "ORDER_DISPATCH_INTEGRITY_INVALID"
+      && error.details.reasons.includes("capacity-service-date-mismatch")
+      && error.details.reasons.includes("capacity-digest-mismatch")
+  );
+  assert.throws(
     () => Domain.transitionOrder("escort", order, "worker-dispatched", { at: "2026-07-22T10:00:01+08:00", updates }),
     (error) => error.code === "ORDER_DISPATCH_INTEGRITY_INVALID" && error.details.reasons.includes("dispatch-stale")
   );
   assert.equal(order.status, "provider-matched");
   assert.equal(order.timelineEvents, undefined);
+});
+
+test("capacity reservations prevent concurrent nursing and escort overbooking without mutating rejected orders", () => {
+  const nursingBase = {
+    residentId: "r-cap",
+    status: "assessed",
+    institutionId: "inh-mr1",
+    institutionCode: "MR1",
+    serviceItem: "wound care",
+    preferredAt: "2026-08-01",
+    riskLevel: "medium",
+    identityVerified: true,
+    firstVisitAssessment: "passed",
+    informedConsent: "signed",
+    consentAttachment: { status: "signed" }
+  };
+  const nursingPerson = qualifiedNurse({ id: "inn-capacity-001", dailyCapacity: 1, assignedToday: 0 });
+  const nursingFirst = { ...nursingBase, id: "ino-capacity-001" };
+  const nursingSecond = { ...nursingBase, id: "ino-capacity-002" };
+  const nursingFirstDecision = Domain.evaluateDispatchCandidate("nursing", nursingFirst, nursingPerson, { now: NOW });
+  const nursingSecondDecision = Domain.evaluateDispatchCandidate("nursing", nursingSecond, nursingPerson, { now: NOW });
+  assert.equal(nursingFirstDecision.eligible, true);
+  assert.equal(nursingSecondDecision.eligible, true);
+  assert.equal(nursingFirstDecision.updates.capacityReservation.reservedOrdinal, 1);
+  Domain.transitionOrder("nursing", nursingFirst, "dispatched", { at: NOW, updates: nursingFirstDecision.updates });
+  assert.throws(
+    () => Domain.transitionOrder("nursing", nursingSecond, "dispatched", { at: NOW, updates: nursingSecondDecision.updates }),
+    (error) => error.code === "ORDER_DISPATCH_INTEGRITY_INVALID" && error.details.reasons.includes("capacity-slot-conflict")
+  );
+  assert.equal(nursingSecond.status, "assessed");
+  assert.equal(nursingSecond.timelineEvents, undefined);
+  const nursingAfterCommit = Domain.evaluateDispatchCandidate("nursing", nursingSecond, nursingPerson, { now: NOW });
+  assert.equal(nursingAfterCommit.eligible, false);
+  assert.equal(nursingAfterCommit.blockers.includes("capacity:no-slot-available"), true);
+
+  const escortBase = {
+    residentId: "r-cap",
+    status: "provider-matched",
+    providerId: "esp-001",
+    serviceItems: ["registration", "exam escort"],
+    appointmentAt: "2026-08-02",
+    riskLevel: "low",
+    identityVerified: true,
+    eligibilityResult: { status: "eligible" },
+    providerAdmissionSnapshot: { status: "approved" },
+    contractStatus: "signed",
+    insuranceStatus: "covered"
+  };
+  const escortPerson = qualifiedEscortWorker({ id: "ew-capacity-001", dailyCapacity: 1, assignedToday: 0 });
+  const escortFirst = { ...escortBase, id: "eso-capacity-001" };
+  const escortSecond = { ...escortBase, id: "eso-capacity-002" };
+  const escortFirstDecision = Domain.evaluateDispatchCandidate("escort", escortFirst, escortPerson, { now: NOW });
+  const escortSecondDecision = Domain.evaluateDispatchCandidate("escort", escortSecond, escortPerson, { now: NOW });
+  Domain.transitionOrder("escort", escortFirst, "worker-dispatched", { at: NOW, updates: escortFirstDecision.updates });
+  assert.throws(
+    () => Domain.transitionOrder("escort", escortSecond, "worker-dispatched", { at: NOW, updates: escortSecondDecision.updates }),
+    (error) => error.code === "ORDER_DISPATCH_INTEGRITY_INVALID" && error.details.reasons.includes("capacity-slot-conflict")
+  );
+  assert.equal(escortSecond.status, "provider-matched");
+  assert.equal(escortSecond.timelineEvents, undefined);
+  const escortAfterCommit = Domain.evaluateDispatchCandidate("escort", escortSecond, escortPerson, { now: NOW });
+  assert.equal(escortAfterCommit.eligible, false);
+  assert.equal(escortAfterCommit.blockers.includes("capacity:no-slot-available"), true);
 });
 
 test("transition order blocks missing evidence and emits resident timeline evidence", () => {
