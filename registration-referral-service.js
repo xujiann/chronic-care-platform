@@ -33,6 +33,9 @@ const CLOSURE_COMMAND_CONTRACTS = Object.freeze([
   { action: "apply-registration-callback", roles: ["institution", "insurance", "commission"], requiredFields: ["caseId", "payload.callback.eventType", "payload.callback.orderNo"], suggestedEndpoint: "POST /api/registration-referral/commands/apply-registration-callback" },
   { action: "record-primary-care-assessment", roles: ["institution", "commission"], requiredFields: ["residentId", "payload.institutionCode", "payload.doctorId", "payload.diagnosis", "payload.disposition"], suggestedEndpoint: "POST /api/registration-referral/commands/record-primary-care-assessment" },
   { action: "create-referral-from-primary-care", roles: ["institution", "commission"], requiredFields: ["caseId", "payload.targetInstitution", "payload.targetInstitutionCode", "payload.residentAuthorizationId"], suggestedEndpoint: "POST /api/registration-referral/commands/create-referral-from-primary-care" },
+  { action: "accept-referral-request", roles: ["institution", "commission"], requiredFields: ["caseId", "payload.receivingFeedback", "payload.note"], suggestedEndpoint: "POST /api/registration-referral/commands/accept-referral-request" },
+  { action: "schedule-teleconsultation", roles: ["institution", "commission"], requiredFields: ["caseId", "payload.meetingWindow", "payload.receivingDoctor", "payload.note"], suggestedEndpoint: "POST /api/registration-referral/commands/schedule-teleconsultation" },
+  { action: "return-referral-report", roles: ["institution", "commission"], requiredFields: ["caseId", "payload.reportSummary", "payload.note"], suggestedEndpoint: "POST /api/registration-referral/commands/return-referral-report" },
   { action: "accept-referral-continuity", roles: ["institution", "commission"], requiredFields: ["caseId", "payload.note", "payload.nextFollowupAt"], suggestedEndpoint: "POST /api/registration-referral/commands/accept-referral-continuity" },
   { action: "complete-chronic-followup", roles: ["institution", "commission"], requiredFields: ["caseId", "payload.result", "payload.note"], suggestedEndpoint: "POST /api/registration-referral/commands/complete-chronic-followup" },
   { action: "acknowledge-chronic-followup", roles: ["citizen", "commission"], requiredFields: ["caseId", "payload.note"], suggestedEndpoint: "POST /api/registration-referral/commands/acknowledge-chronic-followup" },
@@ -346,6 +349,220 @@ function createReferralFromPrimaryCare(data, command, actor) {
   return { assessment, referral, collaborationOrder, teleconsultation, message };
 }
 
+function findReferralRecord(data, caseId) {
+  const teleconsultation = rows(data.referralTeleconsultations).find((item) => item.id === caseId);
+  if (teleconsultation) return { item: teleconsultation, kind: "teleconsultation" };
+  const referral = rows(data.referralSystem?.referrals).find((item) => item.id === caseId);
+  return referral ? { item: referral, kind: "referral" } : null;
+}
+
+function referralSourceOrgCode(item = {}) {
+  return text(item.sourceInstitutionCode || item.fromInstitutionCode);
+}
+
+function referralTargetOrgCode(item = {}) {
+  return text(item.targetInstitutionCode || item.toInstitutionCode);
+}
+
+function linkedReferral(data, record) {
+  if (record.kind === "referral") return record.item;
+  return rows(data.referralSystem?.referrals).find((item) => item.id === record.item.referralId) || null;
+}
+
+function linkedCollaborationOrder(data, item) {
+  return rows(data.countyCollaborationOrders).find((row) => row.id === item.collaborationOrderId) || null;
+}
+
+function appendReferralAudit(item, command, actor, action, note) {
+  item.auditTrail = [{
+    at: command.at,
+    actor: actorName(actor),
+    role: actor.role,
+    action,
+    note,
+    productionEvidence: false
+  }, ...rows(item.auditTrail)].slice(0, 40);
+}
+
+function appendReferralProgressMessages(data, command, actor, item, kind, title, body) {
+  const sourceOrgCode = requireText(referralSourceOrgCode(item), "referral source institutionCode");
+  const collection = rows(data.referralTeleconsultations).includes(item) ? "referralTeleconsultations" : "referrals";
+  const citizen = appendMessage(data, makeMessage(command, actor, {
+    suffix: `${kind}-citizen`,
+    collection,
+    sourceId: item.id,
+    residentId: item.residentId,
+    targetRole: "citizen",
+    title,
+    body,
+    notificationKey: `registration-referral:${item.id}:${kind}:citizen`
+  }));
+  const institution = appendMessage(data, makeMessage(command, actor, {
+    suffix: `${kind}-institution`,
+    collection,
+    sourceId: item.id,
+    residentId: item.residentId,
+    targetRole: "institution",
+    targetOrgCode: sourceOrgCode,
+    title,
+    body,
+    notificationKey: `registration-referral:${item.id}:${kind}:institution`
+  }));
+  return [citizen, institution];
+}
+
+function acceptReferralRequest(data, command, actor) {
+  const record = findReferralRecord(data, command.caseId);
+  if (!record) throw new Error("referral request not found");
+  const item = record.item;
+  const targetOrgCode = requireText(referralTargetOrgCode(item), "referral target institutionCode");
+  requireInstitutionScope(actor, targetOrgCode);
+  if (["accepted", "feedback-returned", "scheduled", "report-returned", "closed"].includes(text(item.status).toLowerCase()) || item.acceptedAt) {
+    throw new Error("referral request is already accepted");
+  }
+  if (text(item.status).toLowerCase() !== "requested") throw new Error("referral request is not awaiting acceptance");
+  const note = requireText(command.payload.note, "payload.note");
+  const feedback = requireText(command.payload.receivingFeedback, "payload.receivingFeedback");
+  item.status = "accepted";
+  item.receivingFeedback = feedback;
+  item.feedbackStatus = "returned";
+  item.feedbackAt = command.at;
+  item.acceptedAt = command.at;
+  item.acceptedBy = actorName(actor);
+  if (command.payload.receivingDoctor) item.receivingDoctor = text(command.payload.receivingDoctor);
+  if (command.payload.reservedResource) item.reservedResource = text(command.payload.reservedResource);
+  appendReferralAudit(item, command, actor, "referral-accepted", note);
+
+  const referral = linkedReferral(data, record);
+  if (referral && referral !== item) {
+    referral.status = "accepted";
+    referral.acceptedAt = command.at;
+    referral.acceptedBy = actorName(actor);
+    referral.reservedResource = text(command.payload.reservedResource || referral.reservedResource);
+  }
+  const collaborationOrder = linkedCollaborationOrder(data, item);
+  if (collaborationOrder) {
+    collaborationOrder.status = "accepted";
+    collaborationOrder.result = feedback;
+    collaborationOrder.acceptedAt = command.at;
+  }
+  const messages = appendReferralProgressMessages(data, command, actor, item, "feedback", "Referral request accepted", feedback);
+  return { referral, teleconsultation: record.kind === "teleconsultation" ? item : null, collaborationOrder, messages };
+}
+
+function scheduleTeleconsultation(data, command, actor) {
+  const record = findReferralRecord(data, command.caseId);
+  if (!record || record.kind !== "teleconsultation") throw new Error("teleconsultation not found");
+  const item = record.item;
+  const targetOrgCode = requireText(referralTargetOrgCode(item), "referral target institutionCode");
+  requireInstitutionScope(actor, targetOrgCode);
+  if (["scheduled", "report-returned", "closed"].includes(text(item.status).toLowerCase()) || item.meetingWindow) {
+    throw new Error("teleconsultation is already scheduled");
+  }
+  if (!["accepted", "feedback-returned"].includes(text(item.status).toLowerCase())) throw new Error("teleconsultation must be accepted before scheduling");
+  const note = requireText(command.payload.note, "payload.note");
+  const meetingWindow = requireText(command.payload.meetingWindow, "payload.meetingWindow");
+  const receivingDoctor = requireText(command.payload.receivingDoctor, "payload.receivingDoctor");
+  item.status = "scheduled";
+  item.meetingWindow = meetingWindow;
+  item.receivingDoctor = receivingDoctor;
+  item.department = text(command.payload.department || item.department);
+  item.scheduledAt = command.at;
+  item.scheduledBy = actorName(actor);
+  appendReferralAudit(item, command, actor, "teleconsultation-scheduled", note);
+
+  const referral = linkedReferral(data, record);
+  if (referral) {
+    referral.status = "scheduled";
+    referral.reservedResource = text(command.payload.reservedResource || `${meetingWindow} / ${receivingDoctor}`);
+  }
+  const collaborationOrder = linkedCollaborationOrder(data, item);
+  if (collaborationOrder) {
+    collaborationOrder.status = "scheduled";
+    collaborationOrder.result = `Scheduled ${meetingWindow}`;
+  }
+  const messages = appendReferralProgressMessages(data, command, actor, item, "schedule", "Teleconsultation scheduled", `Teleconsultation scheduled for ${meetingWindow}.`);
+  return { referral, teleconsultation: item, collaborationOrder, messages };
+}
+
+function returnReferralReport(data, command, actor) {
+  const record = findReferralRecord(data, command.caseId);
+  if (!record) throw new Error("referral request not found");
+  const item = record.item;
+  const targetOrgCode = requireText(referralTargetOrgCode(item), "referral target institutionCode");
+  requireInstitutionScope(actor, targetOrgCode);
+  if (item.reportStatus === "returned" || ["report-returned", "closed"].includes(text(item.status).toLowerCase()) || item.reportRecordId) {
+    throw new Error("referral report is already returned");
+  }
+  const allowedStatuses = record.kind === "teleconsultation" ? ["scheduled"] : ["accepted", "feedback-returned"];
+  if (!allowedStatuses.includes(text(item.status).toLowerCase())) {
+    throw new Error(record.kind === "teleconsultation" ? "teleconsultation must be scheduled before report return" : "referral must be accepted before report return");
+  }
+  const note = requireText(command.payload.note, "payload.note");
+  const reportSummary = requireText(command.payload.reportSummary, "payload.reportSummary");
+  const reportReturnedAt = new Date(command.payload.reportReturnedAt || command.at);
+  if (Number.isNaN(reportReturnedAt.getTime())) throw new Error("payload.reportReturnedAt must be an ISO-compatible timestamp");
+  const requestedAt = Date.parse(item.requestedAt || item.date || "");
+  if (Number.isFinite(requestedAt) && reportReturnedAt.getTime() < requestedAt) throw new Error("referral report cannot return before the request");
+  const returnedAt = reportReturnedAt.toISOString();
+  item.status = "report-returned";
+  item.reportStatus = "returned";
+  item.reportReturnedAt = returnedAt;
+  item.reportSummary = reportSummary;
+  item.reportReturnedBy = actorName(actor);
+  if (command.payload.receivingFeedback) item.receivingFeedback = text(command.payload.receivingFeedback);
+  item.performance = {
+    ...(item.performance || {}),
+    reportReturnHours: Number.isFinite(requestedAt) ? Math.max(0, Math.round((reportReturnedAt.getTime() - requestedAt) / 36_000) / 100) : item.performance?.reportReturnHours
+  };
+  appendReferralAudit(item, command, actor, "referral-report-returned", note);
+
+  const referral = linkedReferral(data, record);
+  if (referral && referral !== item) {
+    referral.status = "report-returned";
+    referral.reportStatus = "returned";
+    referral.reportReturnedAt = returnedAt;
+    referral.reportSummary = reportSummary;
+  }
+  const collaborationOrder = linkedCollaborationOrder(data, item);
+  if (collaborationOrder) {
+    collaborationOrder.status = "report-returned";
+    collaborationOrder.result = reportSummary;
+    collaborationOrder.reportReturnedAt = returnedAt;
+  }
+  const reportRecord = {
+    id: text(command.payload.reportRecordId || `pr-${record.kind}-${command.commandId}`),
+    residentId: item.residentId,
+    personIndex: item.personIndex,
+    category: record.kind === "teleconsultation" ? "teleconsultation-report" : "referral-report",
+    date: returnedAt.slice(0, 10),
+    recordDate: returnedAt.slice(0, 10),
+    name: text(command.payload.reportName || `${item.department || item.diseaseType || "Referral"} report`),
+    result: reportSummary,
+    source: text(command.payload.sourceSystem || item.targetInstitution || item.to || targetOrgCode),
+    teleconsultationId: record.kind === "teleconsultation" ? item.id : "",
+    referralId: referral?.id || item.referralId || item.id,
+    externalReportId: text(command.payload.externalReportId),
+    idempotencyKey: command.commandId,
+    reportReturnedAt: returnedAt,
+    createdAt: command.at,
+    createdBy: text(actor.username || actor.role),
+    createdByName: actorName(actor),
+    productionEvidence: false,
+    meta: {
+      sourceInstitutionCode: referralSourceOrgCode(item),
+      targetInstitutionCode: targetOrgCode,
+      receivingDoctor: text(item.receivingDoctor),
+      reportStatus: "returned"
+    }
+  };
+  data.personalRecords = appendById(data.personalRecords, reportRecord, 500);
+  item.reportRecordId = reportRecord.id;
+  if (referral && referral !== item) referral.reportRecordId = reportRecord.id;
+  const messages = appendReferralProgressMessages(data, command, actor, item, "report", "Referral report returned", `Report returned: ${reportSummary}`);
+  return { referral, teleconsultation: record.kind === "teleconsultation" ? item : null, collaborationOrder, reportRecord, messages };
+}
+
 function canAccessMessage(actor, message) {
   if (actor.role === "commission") return true;
   if (actor.role === "citizen") return actorResidentIds(actor).has(message.residentId) && (!message.targetRole || message.targetRole === "citizen");
@@ -438,9 +655,11 @@ function runNotificationFallback(data, command, actor, policy = DEFAULT_NOTIFICA
 }
 
 function acceptReferralContinuity(data, command, actor) {
-  const item = rows(data.referralTeleconsultations).find((row) => row.id === command.caseId);
-  if (!item) throw new Error("referral teleconsultation not found");
-  const continuityInstitutionCode = item.type === "down-referral-feedback" ? item.targetInstitutionCode : item.sourceInstitutionCode;
+  const record = findReferralRecord(data, command.caseId);
+  if (!record) throw new Error("referral request not found");
+  const item = record.item;
+  const isDownReferral = item.type === "down-referral-feedback" || item.direction === "downward";
+  const continuityInstitutionCode = isDownReferral ? referralTargetOrgCode(item) : referralSourceOrgCode(item);
   requireInstitutionScope(actor, continuityInstitutionCode);
   if (item.primaryCareAccepted === true || item.followupAccepted === true || item.continuityStatus === "accepted" || item.status === "closed") {
     throw new Error("referral continuity is already accepted");
@@ -473,8 +692,8 @@ function acceptReferralContinuity(data, command, actor) {
     status: "待随访",
     result: "未记录",
     advice: text(command.payload.advice || item.reportSummary || note),
-    referralId: item.referralId,
-    teleconsultationId: item.id,
+    referralId: item.referralId || item.id,
+    teleconsultationId: record.kind === "teleconsultation" ? item.id : "",
     familyDoctorContractId: contractId,
     productionEvidence: false
   };
@@ -485,14 +704,19 @@ function acceptReferralContinuity(data, command, actor) {
   });
   const residentMessage = appendMessage(data, makeMessage(command, actor, {
     suffix: "continuity-resident",
-    collection: "referralTeleconsultations",
+    collection: record.kind === "teleconsultation" ? "referralTeleconsultations" : "referrals",
     sourceId: item.id,
     residentId: item.residentId,
     targetRole: "citizen",
     title: "Referral report accepted by primary care",
     body: `Primary care accepted the returned report. Next follow-up: ${nextFollowupAt}.`
   }));
-  return { teleconsultation: item, followup, residentMessage };
+  return {
+    referral: record.kind === "referral" ? item : linkedReferral(data, record),
+    teleconsultation: record.kind === "teleconsultation" ? item : null,
+    followup,
+    residentMessage
+  };
 }
 
 function completeChronicFollowup(data, command, actor) {
@@ -603,8 +827,8 @@ function findCaseEnvelope(data, caseType, caseId) {
     return item ? normalizePrimaryCareCase(item, { messages }) : null;
   }
   if (["referral", "referral-teleconsultation"].includes(caseType)) {
-    const item = rows(data.referralTeleconsultations).find((row) => row.id === caseId);
-    return item ? normalizeReferralCase(item, { messages }) : null;
+    const record = findReferralRecord(data, caseId);
+    return record ? normalizeReferralCase(record.item, { messages }) : null;
   }
   if (caseType === "family-doctor") {
     const item = [...rows(data.phase2FamilyDoctorApplications), ...rows(data.phase2FamilyDoctorContracts)].find((row) => row.id === caseId);
@@ -745,8 +969,8 @@ function appendClosureEvent(data, command, actor, result, fingerprint) {
     commandFingerprint: fingerprint,
     action: command.action,
     caseType: command.caseType,
-    caseId: command.caseId || result?.assessment?.id || result?.order?.id || result?.teleconsultation?.id || result?.followup?.id || "",
-    residentId: command.residentId || result?.assessment?.residentId || result?.teleconsultation?.residentId || result?.followup?.residentId || "",
+    caseId: command.caseId || result?.assessment?.id || result?.order?.id || result?.teleconsultation?.id || result?.referral?.id || result?.followup?.id || "",
+    residentId: command.residentId || result?.assessment?.residentId || result?.teleconsultation?.residentId || result?.referral?.residentId || result?.followup?.residentId || "",
     at: command.at,
     actor: actorName(actor),
     actorRole: actor.role,
@@ -773,6 +997,9 @@ function applyClosureCommand(sourceData = {}, input = {}, actor = {}, options = 
     "apply-registration-callback": () => applyRegistrationCallback(data, command, actor),
     "record-primary-care-assessment": () => recordPrimaryCareAssessment(data, command, actor),
     "create-referral-from-primary-care": () => createReferralFromPrimaryCare(data, command, actor),
+    "accept-referral-request": () => acceptReferralRequest(data, command, actor),
+    "schedule-teleconsultation": () => scheduleTeleconsultation(data, command, actor),
+    "return-referral-report": () => returnReferralReport(data, command, actor),
     "record-notification-receipt": () => recordNotificationReceipt(data, command, actor),
     "run-notification-fallback": () => runNotificationFallback(data, command, actor, options.notificationPolicy || DEFAULT_NOTIFICATION_POLICY),
     "accept-referral-continuity": () => acceptReferralContinuity(data, command, actor),

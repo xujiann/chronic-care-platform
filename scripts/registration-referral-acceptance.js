@@ -59,6 +59,9 @@ function buildRegistrationReferralAcceptance(options = {}) {
     "apply-registration-callback",
     "record-primary-care-assessment",
     "create-referral-from-primary-care",
+    "accept-referral-request",
+    "schedule-teleconsultation",
+    "return-referral-report",
     "accept-referral-continuity",
     "complete-chronic-followup",
     "acknowledge-chronic-followup",
@@ -80,7 +83,7 @@ function buildRegistrationReferralAcceptance(options = {}) {
     check("registrationReferralAcceptance:commandContracts", "thread", CLOSURE_COMMAND_CONTRACTS.every((item) => item.roles.length && item.requiredFields.length && item.suggestedEndpoint), `${CLOSURE_COMMAND_CONTRACTS.length} command contracts`),
     check("registrationReferralAcceptance:notificationFallback", "thread", DEFAULT_NOTIFICATION_POLICY.channels.map((item) => item.channel).join(",") === "in_app,sms,phone,manual-task", DEFAULT_NOTIFICATION_POLICY.channels.map((item) => `${item.channel}:${item.maxAttempts}`).join(";")),
     check("registrationReferralAcceptance:idempotencyAudit", "thread", serviceSource.includes("registrationReferralClosureEvents") && serviceSource.includes("commandId") && serviceSource.includes("idempotent: true"), "command idempotency and non-production audit event are implemented"),
-    check("registrationReferralAcceptance:tests", "thread", ["terminal registration rejects late insurance callbacks", "notification resident mismatch", "primary care teleconsultation creates a resident-consistent referral chain", "notification fallback advances to a manual task", "closure readiness reports repaired current data"].every((marker) => `${domainTestSource}\n${serviceTestSource}\n${readinessTestSource}`.includes(marker)), "domain, service and readiness regression markers present"),
+    check("registrationReferralAcceptance:tests", "thread", ["terminal registration rejects late insurance callbacks", "notification resident mismatch", "primary care teleconsultation creates a resident-consistent referral chain", "teleconsultation command path completes acceptance scheduling report and continuity", "notification fallback advances to a manual task", "closure readiness reports repaired current data"].every((marker) => `${domainTestSource}\n${serviceTestSource}\n${readinessTestSource}`.includes(marker)), "domain, service and readiness regression markers present"),
     check("registrationReferralAcceptance:docs", "thread", domainDoc.includes("Safe repair planning") && serviceDoc.includes("T00 integration contract") && serviceDoc.includes("Persistence transaction"), "domain, service and integration boundaries documented")
   ];
   const integrationChecks = [

@@ -20,7 +20,7 @@ test("T05 acceptance passes while reporting T00 public integration blockers", ()
   assert.equal(report.status, "thread-ready-t00-integration-pending");
   assert.equal(report.summary.threadPassed, report.summary.threadChecks);
   assert.equal(report.summary.p0ConsistencyIssues, 0);
-  assert.equal(report.summary.commands, 11);
+  assert.equal(report.summary.commands, 14);
   assert.ok(report.integrationChecks.some((item) => item.id.endsWith("serverReferralSeed") && item.passed));
   assert.ok(report.integrationChecks.some((item) => item.id.endsWith("serverMessageSeed") && !item.passed));
 });

@@ -18,6 +18,9 @@ Business terminal states are also enforced independently of `commandId`: one pri
 | `apply-registration-callback` | Enforce strict terminal/state ordering before applying a signed appointment callback. |
 | `record-primary-care-assessment` | Record grassroots first diagnosis and either create a local follow-up or mark referral as the next action. |
 | `create-referral-from-primary-care` | Create a resident-consistent collaboration order, referral and optional teleconsultation from an authorized assessment. |
+| `accept-referral-request` | Let the receiving institution accept a scoped referral, return triage feedback and synchronize the linked referral/collaboration order. |
+| `schedule-teleconsultation` | Reserve the receiving doctor and consultation window after acceptance and notify the resident and source institution. |
+| `return-referral-report` | Return a signed business report, archive it to the resident record and hand responsibility back to primary care. |
 | `accept-referral-continuity` | Accept a returned report, create the primary-care/family-doctor follow-up and close the referral continuity hand-off. |
 | `complete-chronic-followup` | Record the institution result and send a resident acknowledgement request. |
 | `acknowledge-chronic-followup` | Record resident understanding and close follow-up evidence. |
@@ -29,7 +32,7 @@ Business terminal states are also enforced independently of `commandId`: one pri
 ## Authorization
 
 - Commission users can operate across organizations for supervision and reconciliation.
-- Institution commands enforce `orgCode` when the source or target institution code is available.
+- Institution commands that operate on institution-scoped data require `orgCode` and enforce an exact source or target institution match.
 - Citizen acknowledgements require the message, fulfillment or follow-up resident to be in the actor's resident scope.
 - Notification access additionally checks `targetRole` and `targetOrgCode`.
 - Referral creation requires an active resident authorization and a resident-consistent target chain.

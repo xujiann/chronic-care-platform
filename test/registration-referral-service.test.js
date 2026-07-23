@@ -13,6 +13,7 @@ function data() {
 }
 
 const institution = { role: "institution", orgCode: "MR3", username: "doc-liu", name: "Doctor Liu" };
+const receivingInstitution = { role: "institution", orgCode: "MR1", username: "doc-wang", name: "Doctor Wang" };
 const commission = { role: "commission", username: "commission", name: "Commission Operator" };
 const citizenR1 = { role: "citizen", username: "resident-r1", name: "Resident One", residentIds: ["r1"] };
 const citizenR2 = { role: "citizen", username: "resident-r2", name: "Resident Two", residentIds: ["r2"] };
@@ -25,6 +26,9 @@ test("command catalog covers registration, primary care, referral, follow-up, re
     "apply-registration-callback",
     "record-primary-care-assessment",
     "create-referral-from-primary-care",
+    "accept-referral-request",
+    "schedule-teleconsultation",
+    "return-referral-report",
     "accept-referral-continuity",
     "complete-chronic-followup",
     "acknowledge-chronic-followup",
@@ -191,6 +195,217 @@ test("primary care teleconsultation creates a resident-consistent referral chain
       due: "2026-07-23T12:00:00.000Z"
     }
   }, institution), /already has a referral/);
+});
+
+test("teleconsultation command path completes acceptance scheduling report and continuity", () => {
+  const assessed = applyClosureCommand(data(), {
+    commandId: "cmd-full-tele-assessment",
+    action: "record-primary-care-assessment",
+    residentId: "r1",
+    at: "2026-07-22T08:00:00.000Z",
+    payload: {
+      institutionCode: "MR3",
+      institutionName: "Qingniwaqiao Community Health Service Center",
+      doctorId: "doc-liu",
+      diagnosis: "hypertension",
+      assessment: "Specialist review required.",
+      disposition: "teleconsultation"
+    }
+  }, institution);
+  const created = applyClosureCommand(assessed.data, {
+    commandId: "cmd-full-tele-create",
+    action: "create-referral-from-primary-care",
+    caseType: "primary-care",
+    caseId: assessed.result.assessment.id,
+    at: "2026-07-22T08:05:00.000Z",
+    payload: {
+      targetInstitution: "Dalian Central Hospital",
+      targetInstitutionCode: "MR1",
+      department: "Cardiology",
+      residentAuthorizationId: "auth-r1-referral-demo",
+      due: "2026-07-24T12:00:00.000Z",
+      note: "Create full teleconsultation path."
+    }
+  }, institution);
+  const teleconsultationId = created.result.teleconsultation.id;
+  assert.throws(() => applyClosureCommand(created.data, {
+    commandId: "cmd-full-tele-accept-wrong-org",
+    action: "accept-referral-request",
+    caseId: teleconsultationId,
+    payload: { receivingFeedback: "Accepted.", note: "Wrong institution." }
+  }, institution), /institution scope denied/);
+  assert.throws(() => applyClosureCommand(created.data, {
+    commandId: "cmd-full-tele-schedule-too-early",
+    action: "schedule-teleconsultation",
+    caseId: teleconsultationId,
+    payload: { meetingWindow: "2026-07-23 10:00-10:30", receivingDoctor: "doc-wang", note: "Not accepted yet." }
+  }, receivingInstitution), /must be accepted/);
+
+  const accepted = applyClosureCommand(created.data, {
+    commandId: "cmd-full-tele-accept",
+    action: "accept-referral-request",
+    caseType: "referral-teleconsultation",
+    caseId: teleconsultationId,
+    at: "2026-07-22T08:20:00.000Z",
+    payload: {
+      receivingFeedback: "Cardiology accepted the request.",
+      receivingDoctor: "doc-wang",
+      reservedResource: "video-room-2",
+      note: "Triage completed."
+    }
+  }, receivingInstitution);
+  assert.equal(accepted.result.teleconsultation.status, "accepted");
+  assert.equal(accepted.result.referral.status, "accepted");
+  assert.equal(accepted.result.collaborationOrder.status, "accepted");
+  assert.ok(accepted.result.messages.some((item) => item.targetRole === "institution" && item.targetOrgCode === "MR3"));
+  assert.throws(() => applyClosureCommand(accepted.data, {
+    commandId: "cmd-full-tele-report-too-early",
+    action: "return-referral-report",
+    caseId: teleconsultationId,
+    payload: { reportSummary: "Report before scheduling.", note: "Invalid order." }
+  }, receivingInstitution), /must be scheduled/);
+
+  const scheduled = applyClosureCommand(accepted.data, {
+    commandId: "cmd-full-tele-schedule",
+    action: "schedule-teleconsultation",
+    caseType: "referral-teleconsultation",
+    caseId: teleconsultationId,
+    at: "2026-07-22T08:30:00.000Z",
+    payload: {
+      meetingWindow: "2026-07-23 10:00-10:30",
+      receivingDoctor: "doc-wang",
+      department: "Cardiology",
+      note: "Specialist and video room reserved."
+    }
+  }, receivingInstitution);
+  assert.equal(scheduled.result.teleconsultation.status, "scheduled");
+  assert.equal(scheduled.result.referral.status, "scheduled");
+  assert.throws(() => applyClosureCommand(scheduled.data, {
+    commandId: "cmd-full-tele-report-wrong-org",
+    action: "return-referral-report",
+    caseId: teleconsultationId,
+    payload: { reportSummary: "Wrong institution report.", note: "Denied." }
+  }, institution), /institution scope denied/);
+
+  const returned = applyClosureCommand(scheduled.data, {
+    commandId: "cmd-full-tele-report",
+    action: "return-referral-report",
+    caseType: "referral-teleconsultation",
+    caseId: teleconsultationId,
+    at: "2026-07-23T10:35:00.000Z",
+    payload: {
+      reportSummary: "Continue current therapy and review blood pressure in one week.",
+      reportReturnedAt: "2026-07-23T10:34:00.000Z",
+      sourceSystem: "MR1-EMR",
+      externalReportId: "EMR-FULL-TELE-1",
+      note: "Signed specialist report returned."
+    }
+  }, receivingInstitution);
+  assert.equal(returned.result.teleconsultation.reportStatus, "returned");
+  assert.equal(returned.result.referral.status, "report-returned");
+  assert.equal(returned.result.reportRecord.category, "teleconsultation-report");
+  assert.equal(returned.result.reportRecord.teleconsultationId, teleconsultationId);
+  assert.equal(normalizeReferralCase(returned.result.teleconsultation, { messages: returned.data.taskMessages }).unifiedPhase, "primary-care-followup-pending");
+
+  const closed = applyClosureCommand(returned.data, {
+    commandId: "cmd-full-tele-continuity",
+    action: "accept-referral-continuity",
+    caseType: "referral-teleconsultation",
+    caseId: teleconsultationId,
+    at: "2026-07-23T11:00:00.000Z",
+    payload: {
+      note: "Primary care accepted the specialist report.",
+      nextFollowupAt: "2026-07-30",
+      assignee: "Doctor Liu"
+    }
+  }, institution);
+  assert.equal(closed.result.teleconsultation.status, "closed");
+  assert.equal(closed.result.followup.institutionCode, "MR3");
+  assert.equal(normalizeReferralCase(closed.result.teleconsultation, { messages: closed.data.taskMessages }).unifiedPhase, "closed");
+});
+
+test("plain upward referral completes acceptance report return and primary-care continuity", () => {
+  const assessed = applyClosureCommand(data(), {
+    commandId: "cmd-full-referral-assessment",
+    action: "record-primary-care-assessment",
+    residentId: "r1",
+    at: "2026-07-22T07:00:00.000Z",
+    payload: {
+      institutionCode: "MR3",
+      institutionName: "Qingniwaqiao Community Health Service Center",
+      doctorId: "doc-liu",
+      diagnosis: "hypertension",
+      assessment: "In-person specialist referral required.",
+      disposition: "refer-up"
+    }
+  }, institution);
+  const created = applyClosureCommand(assessed.data, {
+    commandId: "cmd-full-referral-create",
+    action: "create-referral-from-primary-care",
+    caseId: assessed.result.assessment.id,
+    at: "2026-07-22T07:05:00.000Z",
+    payload: {
+      targetInstitution: "Dalian Central Hospital",
+      targetInstitutionCode: "MR1",
+      department: "Cardiology",
+      residentAuthorizationId: "auth-r1-referral-demo",
+      due: "2026-07-25",
+      note: "Create ordinary upward referral."
+    }
+  }, institution);
+  const referralId = created.result.referral.id;
+  assert.equal(created.result.teleconsultation, null);
+
+  const accepted = applyClosureCommand(created.data, {
+    commandId: "cmd-full-referral-accept",
+    action: "accept-referral-request",
+    caseType: "referral",
+    caseId: referralId,
+    at: "2026-07-22T07:30:00.000Z",
+    payload: {
+      receivingFeedback: "Outpatient slot accepted.",
+      reservedResource: "Cardiology clinic C12",
+      note: "Receiving hospital accepted."
+    }
+  }, receivingInstitution);
+  assert.equal(accepted.result.referral.status, "accepted");
+  assert.throws(() => applyClosureCommand(accepted.data, {
+    commandId: "cmd-full-referral-no-tele-schedule",
+    action: "schedule-teleconsultation",
+    caseId: referralId,
+    payload: { meetingWindow: "2026-07-23", receivingDoctor: "doc-wang", note: "Not a teleconsultation." }
+  }, receivingInstitution), /teleconsultation not found/);
+
+  const returned = applyClosureCommand(accepted.data, {
+    commandId: "cmd-full-referral-report",
+    action: "return-referral-report",
+    caseType: "referral",
+    caseId: referralId,
+    at: "2026-07-23T09:00:00.000Z",
+    payload: {
+      reportSummary: "Specialist assessment completed; community follow-up in two weeks.",
+      sourceSystem: "MR1-EMR",
+      note: "Referral report returned."
+    }
+  }, receivingInstitution);
+  assert.equal(returned.result.referral.status, "report-returned");
+  assert.equal(returned.result.reportRecord.category, "referral-report");
+  assert.equal(returned.result.messages.every((item) => item.collection === "referrals"), true);
+  assert.equal(normalizeReferralCase(returned.result.referral, { messages: returned.data.taskMessages }).responsibleOrg, "MR3");
+
+  const closed = applyClosureCommand(returned.data, {
+    commandId: "cmd-full-referral-continuity",
+    action: "accept-referral-continuity",
+    caseType: "referral",
+    caseId: referralId,
+    at: "2026-07-23T09:30:00.000Z",
+    payload: { note: "Community accepted the returned referral report.", nextFollowupAt: "2026-08-06" }
+  }, institution);
+  assert.equal(closed.result.referral.status, "closed");
+  assert.equal(closed.result.teleconsultation, null);
+  assert.equal(closed.result.followup.referralId, referralId);
+  assert.equal(closed.result.followup.teleconsultationId, "");
+  assert.equal(normalizeReferralCase(closed.result.referral, { messages: closed.data.taskMessages }).unifiedPhase, "closed");
 });
 
 test("primary care referral rejects missing authorization and institution scope mismatch", () => {

@@ -221,11 +221,14 @@ function referralContinuityAccepted(item = {}, notification = {}) {
 function normalizeReferralCase(item = {}, context = {}) {
   const notification = summarizeNotificationReceipts(context.messages, item.id);
   const envelope = baseEnvelope("referral-teleconsultation", item, notification);
-  envelope.sourceOrg = text(item.sourceInstitutionCode || item.sourceInstitution);
+  envelope.sourceOrg = text(item.sourceInstitutionCode || item.fromInstitutionCode || item.sourceInstitution || item.from);
   envelope.upstreamRefs = [text(item.referralId), text(item.collaborationOrderId), text(item.residentAuthorizationId)].filter(Boolean);
   envelope.downstreamRefs = [text(item.reportRecordId), text(item.followupId), text(item.familyDoctorContractId)].filter(Boolean);
   const status = lower(item.status);
   const reportReturned = item.reportStatus === "returned" || ["report-returned", "closed"].includes(status);
+  const continuityOrg = item.type === "down-referral-feedback" || item.direction === "downward"
+    ? item.targetInstitutionCode || item.toInstitutionCode || item.targetInstitution || item.to
+    : item.sourceInstitutionCode || item.fromInstitutionCode || item.sourceInstitution || item.from;
 
   if (reportReturned) {
     if (status === "closed" && referralContinuityAccepted(item, notification)) {
@@ -234,18 +237,18 @@ function normalizeReferralCase(item = {}, context = {}) {
     } else {
       envelope.unifiedPhase = "primary-care-followup-pending";
       envelope.exceptionState = notification.receiptState === "acknowledged" ? "none" : "business-acknowledgement-pending";
-      Object.assign(envelope, responsibility(item.targetInstitutionCode || item.targetInstitution, "primary-care-institution", item.nextFollowupAt || item.due, "accept report and create follow-up task"));
+      Object.assign(envelope, responsibility(continuityOrg, "primary-care-institution", item.nextFollowupAt || item.due, "accept report and create follow-up task"));
     }
     return envelope;
   }
   if (status === "scheduled") {
     envelope.unifiedPhase = "scheduled";
-    Object.assign(envelope, responsibility(item.targetInstitutionCode || item.targetInstitution, "receiving-hospital", item.due, "perform consultation and return signed report"));
+    Object.assign(envelope, responsibility(item.targetInstitutionCode || item.toInstitutionCode || item.targetInstitution || item.to, "receiving-hospital", item.due, "perform consultation and return signed report"));
     return envelope;
   }
   if (["accepted", "feedback-returned"].includes(status)) {
     envelope.unifiedPhase = "accepted";
-    Object.assign(envelope, responsibility(item.targetInstitutionCode || item.targetInstitution, "receiving-hospital", item.due, "reserve specialist resource and schedule consultation"));
+    Object.assign(envelope, responsibility(item.targetInstitutionCode || item.toInstitutionCode || item.targetInstitution || item.to, "receiving-hospital", item.due, "reserve specialist resource and schedule consultation"));
     return envelope;
   }
   if (status === "cancelled") {
@@ -254,7 +257,7 @@ function normalizeReferralCase(item = {}, context = {}) {
     return envelope;
   }
   envelope.unifiedPhase = "requested";
-  Object.assign(envelope, responsibility(item.targetInstitutionCode || item.targetInstitution, "referral-center", item.due, "triage and accept referral"));
+  Object.assign(envelope, responsibility(item.targetInstitutionCode || item.toInstitutionCode || item.targetInstitution || item.to, "referral-center", item.due, "triage and accept referral"));
   return envelope;
 }
 
