@@ -37,6 +37,7 @@ function withCutoverDefaults(pack) {
     goNoGoDecision: pack.goNoGoDecision || fallback.goNoGoDecision,
     evidenceDossier: pack.evidenceDossier || fallback.evidenceDossier,
     pilotBatchPlan: pack.pilotBatchPlan || fallback.pilotBatchPlan,
+    siteEvidenceWorkflow: pack.siteEvidenceWorkflow || fallback.siteEvidenceWorkflow,
     integrity: pack.integrity || fallback.integrity
   };
 }
@@ -50,6 +51,7 @@ function renderCutoverPack(pack) {
   renderDecisionMatrix(pack.goNoGoDecision || {});
   renderEvidenceDossier(pack.evidenceDossier || {});
   renderPilotBatchPlan(pack.pilotBatchPlan || {});
+  renderSiteEvidenceWorkflow(pack.siteEvidenceWorkflow || {});
   renderBlockers(pack.tracks || []);
 }
 
@@ -268,6 +270,67 @@ function renderPilotBatchPlan(plan) {
   `;
 }
 
+function renderSiteEvidenceWorkflow(workflow) {
+  const states = workflow.states || [];
+  const transitions = workflow.transitions || [];
+  const sla = workflow.sla || [];
+  document.querySelector("#site-evidence-workflow").innerHTML = `
+    <div class="cutover-card">
+      <div class="badge-row">
+        <span class="badge warn">${escapeHtml(workflow.currentGate || "submitted-or-accepted-site-evidence-required-before-batch-1")}</span>
+        <span class="badge">Batch-1 ≥ ${escapeHtml(workflow.batchOneEntryRequires?.minimumStatus || "submitted")}</span>
+        <span class="badge ok">Preferred ${escapeHtml(workflow.batchOneEntryRequires?.preferredStatus || "accepted")}</span>
+      </div>
+      <p class="muted">Batch-1 必需证据：${(workflow.batchOneEntryRequires?.evidenceIds || []).map(escapeHtml).join(" / ") || "待生成"}</p>
+    </div>
+    <div class="track-grid">
+      ${states.map((state) => `
+        <article class="cutover-card">
+          <h3>${escapeHtml(state.id)}</h3>
+          <p>${escapeHtml(state.name)}</p>
+          <p class="muted">责任：${escapeHtml(state.owner)}；终态：${state.terminal ? "是" : "否"}</p>
+        </article>
+      `).join("")}
+    </div>
+    <div class="table-wrap">
+      <table class="cutover-table">
+        <thead>
+          <tr>
+            <th>From</th>
+            <th>Action</th>
+            <th>To</th>
+            <th>Required checks</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${transitions.map((item) => `
+            <tr>
+              <td>${escapeHtml(item.from)}</td>
+              <td><strong>${escapeHtml(item.action)}</strong></td>
+              <td>${escapeHtml(item.to)}</td>
+              <td>${(item.requiredChecks || []).map((check) => `<span class="badge">${escapeHtml(check)}</span>`).join(" ")}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+    <div class="control-grid">
+      <article class="cutover-card">
+        <h3>SLA 与升级</h3>
+        <ul class="blocker-list">${sla.map((item) => `<li>${escapeHtml(item.state)}：${escapeHtml(item.targetHours)}h → ${escapeHtml(item.escalation)}</li>`).join("")}</ul>
+      </article>
+      <article class="cutover-card">
+        <h3>门禁规则</h3>
+        <ul class="blocker-list">${(workflow.gateRules || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+      </article>
+      <article class="cutover-card">
+        <h3>审计事件</h3>
+        <ul class="blocker-list">${(workflow.auditEvents || []).slice(0, 6).map((item) => `<li>${escapeHtml(item.eventType)} · append-only</li>`).join("")}</ul>
+      </article>
+    </div>
+  `;
+}
+
 function renderBlockers(tracks) {
   const rows = tracks.flatMap((track) => (track.blockers || []).map((blocker) => `
     <tr>
@@ -423,8 +486,49 @@ function fallbackCutoverPack() {
         }
       ]
     },
+    siteEvidenceWorkflow: {
+      currentGate: "submitted-or-accepted-site-evidence-required-before-batch-1",
+      states: [
+        { id: "draft", name: "Evidence drafted", owner: "site submitter", terminal: false },
+        { id: "submitted", name: "Submitted for four-eyes review", owner: "site submitter", terminal: false },
+        { id: "under-review", name: "Business and technical review", owner: "commission reviewer", terminal: false },
+        { id: "returned", name: "Returned for correction", owner: "site submitter", terminal: false },
+        { id: "accepted", name: "Accepted and digest-locked", owner: "commission reviewer", terminal: true },
+        { id: "expired", name: "Expired after scope or interface change", owner: "release manager", terminal: true }
+      ],
+      transitions: [
+        workflowTransition("draft", "submit-evidence", "submitted", ["required-artifacts-present", "sha256-digest-recorded"]),
+        workflowTransition("submitted", "start-four-eyes-review", "under-review", ["submitter-reviewer-separation", "role-scope-verified"]),
+        workflowTransition("under-review", "accept-evidence", "accepted", ["verification-checks-pass", "audit-chain-linked"]),
+        workflowTransition("under-review", "return-for-correction", "returned", ["rejection-reason-recorded", "next-owner-assigned"]),
+        workflowTransition("returned", "resubmit-evidence", "submitted", ["correction-summary-present", "digest-refreshed"])
+      ],
+      sla: [
+        { state: "submitted", targetHours: 24, escalation: "commission release manager" },
+        { state: "under-review", targetHours: 48, escalation: "business owner + security audit" },
+        { state: "returned", targetHours: 72, escalation: "site liaison" }
+      ],
+      gateRules: [
+        "batch-1-single-chain cannot start until every first-increment evidence entry is submitted or accepted",
+        "P0 evidence cannot be bypassed by a waiver; it must be accepted or the decision remains No-Go"
+      ],
+      batchOneEntryRequires: {
+        batchId: "batch-1-single-chain",
+        evidenceIds: ["emergency-life-chain:external-evidence-1", "emergency-life-chain:external-evidence-2"],
+        minimumStatus: "submitted",
+        preferredStatus: "accepted"
+      },
+      auditEvents: [
+        { eventType: "site-evidence.submit-evidence", appendOnly: true },
+        { eventType: "site-evidence.accept-evidence", appendOnly: true }
+      ]
+    },
     integrity: { algorithm: "sha256", digest: "sha256:static-preview-fallback" }
   };
+}
+
+function workflowTransition(from, action, to, requiredChecks) {
+  return { from, action, to, requiredChecks };
 }
 
 function evidenceEntry(trackId, trackName, blockerId, title, severity, requiredForFirstIncrement) {

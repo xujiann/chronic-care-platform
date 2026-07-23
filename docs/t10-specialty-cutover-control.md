@@ -101,6 +101,23 @@ The pack also emits a `pilotBatchPlan`:
 
 Each batch has entry criteria, exit criteria and a promotion decision. Expansion is blocked until the previous batch has no unexplained P0/P1 issue.
 
+## Site evidence workflow
+
+The pack adds a `siteEvidenceWorkflow` state machine so evidence closure can be rehearsed before live cutover:
+
+1. `draft`
+2. `submitted`
+3. `under-review`
+4. `returned`
+5. `accepted`
+6. `expired`
+
+The key transitions are `submit-evidence`, `start-four-eyes-review`, `accept-evidence`, `return-for-correction`, `resubmit-evidence` and `invalidate-after-scope-change`.
+
+`batch-1-single-chain` requires every first-increment evidence ID to be at least `submitted`; `accepted` is preferred before any real grey-release decision. P0 evidence cannot be waived. If evidence is returned, the linked blocker is reopened and the Go/No-Go scorecard item returns to `pending`. Accepted evidence expires when pilot scope, external endpoint, certificate, device, institution or interface version changes.
+
+Every transition emits append-only `site-evidence.*` audit events with evidence ID, track ID, actor, role, from/to state, timestamp, digest and reason.
+
 ## Verification
 
 Run the focused test directly:

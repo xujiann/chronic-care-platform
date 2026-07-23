@@ -159,6 +159,9 @@ function buildSpecialtyCutoverPack(options = {}) {
     return normalizeTrack(track, report);
   });
   const firstIncrement = selectFirstIncrement(tracks);
+  const evidenceDossier = buildEvidenceDossier(tracks, firstIncrement);
+  const pilotBatchPlan = buildPilotBatchPlan(tracks, firstIncrement);
+  const siteEvidenceWorkflow = buildSiteEvidenceWorkflow(evidenceDossier, pilotBatchPlan);
   const summary = {
     tracks: tracks.length,
     codeReady: tracks.filter((item) => item.codeReady).length,
@@ -179,12 +182,13 @@ function buildSpecialtyCutoverPack(options = {}) {
     acceptanceChecklist: buildAcceptanceChecklist(tracks),
     rehearsalPlan: buildRehearsalPlan(tracks, firstIncrement),
     goNoGoDecision: buildGoNoGoDecision(tracks, firstIncrement),
-    evidenceDossier: buildEvidenceDossier(tracks, firstIncrement),
-    pilotBatchPlan: buildPilotBatchPlan(tracks, firstIncrement)
+    evidenceDossier,
+    pilotBatchPlan,
+    siteEvidenceWorkflow
   };
   pack.integrity = {
     algorithm: "sha256",
-    digest: `sha256:${sha256({ summary, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision, evidenceDossier: pack.evidenceDossier, pilotBatchPlan: pack.pilotBatchPlan })}`
+    digest: `sha256:${sha256({ summary, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision, evidenceDossier, pilotBatchPlan, siteEvidenceWorkflow })}`
   };
   return pack;
 }
@@ -502,11 +506,90 @@ function buildPilotBatchPlan(tracks, firstIncrement) {
   };
 }
 
+function buildSiteEvidenceWorkflow(evidenceDossier, pilotBatchPlan) {
+  const states = [
+    { id: "draft", name: "Evidence drafted", owner: "site submitter", terminal: false },
+    { id: "submitted", name: "Submitted for four-eyes review", owner: "site submitter", terminal: false },
+    { id: "under-review", name: "Business and technical review", owner: "commission reviewer", terminal: false },
+    { id: "returned", name: "Returned for correction", owner: "site submitter", terminal: false },
+    { id: "accepted", name: "Accepted and digest-locked", owner: "commission reviewer", terminal: true },
+    { id: "expired", name: "Expired after scope or interface change", owner: "release manager", terminal: true }
+  ];
+  const transitions = [
+    {
+      from: "draft",
+      to: "submitted",
+      action: "submit-evidence",
+      requiredChecks: ["required-artifacts-present", "sha256-digest-recorded", "operator-and-reviewer-identities-present"]
+    },
+    {
+      from: "submitted",
+      to: "under-review",
+      action: "start-four-eyes-review",
+      requiredChecks: ["submitter-reviewer-separation", "role-scope-verified"]
+    },
+    {
+      from: "under-review",
+      to: "accepted",
+      action: "accept-evidence",
+      requiredChecks: ["verification-checks-pass", "audit-chain-linked", "original-record-replayable"]
+    },
+    {
+      from: "under-review",
+      to: "returned",
+      action: "return-for-correction",
+      requiredChecks: ["rejection-reason-recorded", "next-owner-assigned"]
+    },
+    {
+      from: "returned",
+      to: "submitted",
+      action: "resubmit-evidence",
+      requiredChecks: ["correction-summary-present", "digest-refreshed"]
+    },
+    {
+      from: "accepted",
+      to: "expired",
+      action: "invalidate-after-scope-change",
+      requiredChecks: ["scope-change-or-interface-version-recorded", "new-evidence-required"]
+    }
+  ];
+  const auditEvents = transitions.map((transition) => ({
+    eventType: `site-evidence.${transition.action}`,
+    requiredFields: ["evidenceId", "trackId", "actor", "role", "from", "to", "occurredAt", "digest", "reason"],
+    appendOnly: true
+  }));
+  const firstBatch = (pilotBatchPlan.batches || []).find((batch) => batch.id === "batch-1-single-chain");
+  return {
+    currentGate: "submitted-or-accepted-site-evidence-required-before-batch-1",
+    states,
+    transitions,
+    sla: [
+      { state: "submitted", targetHours: 24, escalation: "commission release manager" },
+      { state: "under-review", targetHours: 48, escalation: "business owner + security audit" },
+      { state: "returned", targetHours: 72, escalation: "site liaison" }
+    ],
+    gateRules: [
+      "batch-1-single-chain cannot start until every first-increment evidence entry is submitted or accepted",
+      "accepted evidence expires when pilot scope, external endpoint, certificate, device, institution or interface version changes",
+      "P0 evidence cannot be bypassed by a waiver; it must be accepted or the decision remains No-Go",
+      "returned evidence reopens the linked blocker and resets the Go/No-Go scorecard item to pending"
+    ],
+    batchOneEntryRequires: {
+      batchId: firstBatch?.id || "batch-1-single-chain",
+      evidenceIds: evidenceDossier.firstIncrementRequired || [],
+      minimumStatus: "submitted",
+      preferredStatus: "accepted"
+    },
+    auditEvents
+  };
+}
+
 function renderMarkdown(pack) {
   const rows = pack.tracks.map((item) => `| ${item.name} | ${item.department} | ${item.codeReady ? "是" : "否"} | ${item.productionReady ? "是" : "否"} | ${item.blockers.length} | ${item.page} |`);
   const blockers = pack.tracks.flatMap((track) => track.blockers.map((item) => `| ${track.name} | ${item.id} | ${item.title} | ${item.owner} | ${item.status} |`));
   const evidenceRows = (pack.evidenceDossier?.entries || []).map((item) => `| ${item.trackName} | ${item.evidenceId} | ${item.severity} | ${item.requiredForFirstIncrement ? "yes" : "no"} | ${item.hardStopIfMissing ? "yes" : "no"} | ${item.status} |`);
   const batchRows = (pack.pilotBatchPlan?.batches || []).map((item) => `| ${item.id} | ${item.name} | ${item.scope} | ${item.promotionDecision} |`);
+  const workflowRows = (pack.siteEvidenceWorkflow?.transitions || []).map((item) => `| ${item.from} | ${item.action} | ${item.to} | ${item.requiredChecks.join(", ")} |`);
   return [
     "# T10 急救、用血、影像与体检专项上线割接包",
     "",
@@ -578,6 +661,19 @@ function renderMarkdown(pack) {
     "| Batch | Name | Scope | Promotion decision |",
     "|---|---|---|---|",
     ...batchRows,
+    "",
+    "## Site evidence workflow",
+    "",
+    `- Current gate: ${pack.siteEvidenceWorkflow?.currentGate || "submitted-or-accepted-site-evidence-required-before-batch-1"}`,
+    `- Batch-1 minimum status: ${pack.siteEvidenceWorkflow?.batchOneEntryRequires?.minimumStatus || "submitted"}`,
+    "",
+    "| From | Action | To | Required checks |",
+    "|---|---|---|---|",
+    ...workflowRows,
+    "",
+    "### Workflow gate rules",
+    "",
+    ...(pack.siteEvidenceWorkflow?.gateRules || []).map((item) => `- ${item}`),
     ""
   ].join("\n");
 }
@@ -612,5 +708,6 @@ module.exports = {
   buildRehearsalPlan,
   buildGoNoGoDecision,
   buildEvidenceDossier,
-  buildPilotBatchPlan
+  buildPilotBatchPlan,
+  buildSiteEvidenceWorkflow
 };
