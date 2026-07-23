@@ -531,6 +531,103 @@ test("escort service evidence rejects cross-order and cross-worker records witho
   assert.equal(inService.status, "in-service");
 });
 
+test("nursing settlement binds pricing dispatch callback and reconciliation to order and amount", () => {
+  const completed = {
+    id: "ino-financial-001",
+    residentId: "r1",
+    institutionCode: "MR1",
+    status: "completed",
+    feeEstimate: 168
+  };
+  const dispatchEvidence = Domain.buildSettlementDispatchEvidence("nursing", completed, { at: NOW });
+  const pending = Domain.transitionOrder("nursing", completed, "settlement-pending", {
+    at: NOW,
+    actorId: "finance",
+    actorRole: "finance",
+    updates: dispatchEvidence
+  });
+  assert.equal(pending.status, "settlement-pending");
+  assert.equal(pending.pricingConfirmation.amountFen, 16800);
+  assert.equal(pending.financialDispatch.idempotencyKey, "nursing:ino-financial-001:settlement:v1");
+
+  const settledAt = "2026-07-22T09:05:00+08:00";
+  const completionEvidence = Domain.buildSettlementCompletionEvidence("nursing", pending, {
+    providerTransactionId: "provider-tx-001",
+    signatureVerified: true,
+    digestVerified: true
+  }, { at: settledAt });
+  const settled = Domain.transitionOrder("nursing", pending, "settled", { at: settledAt, updates: completionEvidence });
+  assert.equal(settled.status, "settled");
+  assert.equal(settled.reconciliationResult.callbackId, settled.financialCallback.id);
+
+  assert.throws(
+    () => Domain.transitionOrder("nursing", pending, "settled", {
+      at: settledAt,
+      updates: {
+        ...completionEvidence,
+        financialCallback: { ...completionEvidence.financialCallback, status: "failed", amountFen: 1 },
+        reconciliationResult: { ...completionEvidence.reconciliationResult, status: "difference" }
+      }
+    }),
+    (error) => error.code === "ORDER_FINANCIAL_EVIDENCE_INVALID"
+      && error.details.reasons.includes("financial-callback-not-succeeded")
+      && error.details.reasons.includes("financial-callback-amount-mismatch")
+      && error.details.reasons.includes("reconciliation-not-matched")
+  );
+  assert.equal(pending.status, "settlement-pending");
+});
+
+test("escort settlement rejects fabricated and cross-domain financial evidence without mutation", () => {
+  const completed = {
+    id: "eso-financial-001",
+    residentId: "r1",
+    status: "completed",
+    feeEstimate: 120
+  };
+  const missingFee = { ...completed };
+  delete missingFee.feeEstimate;
+  assert.throws(
+    () => Domain.buildSettlementDispatchEvidence("escort", missingFee, { at: NOW }),
+    (error) => error.code === "FINANCIAL_AMOUNT_INVALID"
+  );
+  assert.throws(
+    () => Domain.transitionOrder("escort", completed, "settlement-pending", {
+      at: NOW,
+      updates: {
+        pricingConfirmedAt: NOW,
+        pricingConfirmation: { status: "confirmed", amountFen: 12000 },
+        financialDispatch: { status: "accepted", idempotencyKey: "forged" }
+      }
+    }),
+    (error) => error.code === "ORDER_FINANCIAL_EVIDENCE_INVALID"
+      && error.details.reasons.includes("pricing-order-mismatch")
+      && error.details.reasons.includes("financial-dispatch-idempotency-mismatch")
+  );
+
+  const dispatchEvidence = Domain.buildSettlementDispatchEvidence("escort", completed, { at: NOW });
+  const pending = Domain.transitionOrder("escort", completed, "settlement-pending", { at: NOW, updates: dispatchEvidence });
+  const completionEvidence = Domain.buildSettlementCompletionEvidence("escort", pending, {
+    providerTransactionId: "provider-tx-escort-001",
+    signatureVerified: true,
+    digestVerified: true
+  }, { at: "2026-07-22T09:05:00+08:00" });
+  assert.throws(
+    () => Domain.transitionOrder("escort", pending, "settled", {
+      at: "2026-07-22T09:05:00+08:00",
+      updates: {
+        ...completionEvidence,
+        financialCallback: { ...completionEvidence.financialCallback, domain: "nursing" },
+        reconciliationResult: { ...completionEvidence.reconciliationResult, callbackId: "other-callback" }
+      }
+    }),
+    (error) => error.code === "ORDER_FINANCIAL_EVIDENCE_INVALID"
+      && error.details.reasons.includes("financial-callback-domain-mismatch")
+      && error.details.reasons.includes("reconciliation-callback-mismatch")
+  );
+  assert.equal(completed.status, "completed");
+  assert.equal(pending.status, "settlement-pending");
+});
+
 test("financial command correlates an order using integer cents and a stable idempotency key", () => {
   const payment = Domain.buildFinancialCommand("escort", { id: "eso-001", feeEstimate: 120 }, "create-payment");
   assert.equal(payment.type, "PAYMENT");

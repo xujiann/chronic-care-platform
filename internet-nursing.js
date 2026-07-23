@@ -15,6 +15,7 @@ async function loadInternetNursingDashboard() {
   nursingDashboard = await fetchInternetNursingDashboard();
   nursingDashboard.dispatchRecommendations = buildStaticDispatchRecommendations(nursingDashboard.orders || [], nursingDashboard.nurses || []);
   nursingDashboard.orders = withNursingServiceControls(nursingDashboard.orders || []);
+  nursingDashboard.paymentReadiness = buildStaticPaymentReadiness(nursingDashboard.policy || {}, nursingDashboard.orders);
   renderInternetNursingDashboard(nursingDashboard);
 }
 
@@ -262,7 +263,8 @@ function buildStaticPaymentReadiness(policy, orders) {
     insuranceEstimate: item.settlement?.insuranceEstimate || 0,
     estimatedSelfPay: item.settlement?.estimatedSelfPay || 0,
     invoiceStatus: ["completed", "closed"].includes(item.status) ? "invoice-ready" : "waiting-service-complete",
-    reconciliationStatus: item.settlement?.paymentStatus === "prechecked" ? "precheck-matched" : "pending"
+    reconciliationStatus: item.settlement?.paymentStatus === "prechecked" ? "precheck-matched" : "pending",
+    financialControl: buildNursingFinancialControl(item)
   }));
   return {
     ...payment,
@@ -272,6 +274,29 @@ function buildStaticPaymentReadiness(policy, orders) {
     precheckedOrders: paymentRows.filter((item) => item.paymentStatus === "prechecked").length,
     paymentRows
   };
+}
+
+function buildNursingFinancialControl(order) {
+  const domain = window.NursingEscortDomain;
+  if (!domain) return null;
+  const current = domain.canonicalStatus(order.status, "nursing");
+  const target = current === "settlement-pending" ? "settled" : "settlement-pending";
+  const transition = domain.validateTransition("nursing", current, target);
+  const evidence = domain.validateFinancialEvidence("nursing", order, target);
+  return {
+    ok: transition.ok && evidence.ok,
+    target,
+    blockers: [
+      ...(transition.ok ? [] : [`transition:${current}->${target}`]),
+      ...evidence.reasons
+    ]
+  };
+}
+
+function nursingFinancialControlText(control) {
+  if (!control) return "";
+  if (control.ok) return control.target === "settled" ? "回调与对账证据通过" : "定价与财务下发证据通过";
+  return `结算阻断：${control.blockers.slice(0, 5).join("；")}`;
 }
 
 function buildStaticDeviceVerification(policy, orders, nurses) {
@@ -717,6 +742,7 @@ function renderPaymentReadiness(payment) {
       <strong>${escapeHtml(item.orderId)} · ${escapeHtml(displayText(item.serviceItem))}</strong>
       <span>${escapeHtml(displayText(item.paymentStatus))} / ${escapeHtml(displayText(item.reconciliationStatus))}</span>
       <small>发票 ${escapeHtml(displayText(item.invoiceStatus))}，自费 ${escapeHtml(item.estimatedSelfPay || 0)}</small>
+      <small>${escapeHtml(nursingFinancialControlText(item.financialControl))}</small>
     </div>`).join("")}
   `;
 }
