@@ -421,6 +421,78 @@
     return true;
   }
 
+  function capacityReleaseDigestPayload(release = {}) {
+    return {
+      status: release.status,
+      reservationId: release.reservationId,
+      orderId: release.orderId,
+      domain: release.domain,
+      subjectId: release.subjectId,
+      serviceDate: release.serviceDate,
+      reason: release.reason,
+      releasedAt: release.releasedAt,
+      policyVersion: release.policyVersion
+    };
+  }
+
+  function shouldReleaseCapacity(transition, order = {}) {
+    if (!order.capacityReservation) return false;
+    if (transition.next === "rejected" || transition.next === "cancelled") return true;
+    if (transition.current === "cancel-requested" && transition.next === "refund-pending") return true;
+    return transition.current === "reschedule-requested" && transition.next === "requested";
+  }
+
+  function releaseCapacityReservation(domain, order = {}, transition, at) {
+    const normalizedDomain = normalizeDomain(domain);
+    const reservation = order.capacityReservation;
+    const expectedDigest = stableDigest(capacityReservationDigestPayload(reservation));
+    const entry = ISSUED_CAPACITY_RESERVATIONS.get(reservation?.id);
+    if (!reservation || reservation.digest !== expectedDigest || reservation.id !== `capacity:${expectedDigest}`) return null;
+    if (!entry || entry.state !== "committed"
+      || entry.orderId !== String(order.id || "")
+      || entry.domain !== normalizedDomain
+      || entry.subjectId !== reservation.subjectId
+      || entry.serviceDate !== reservation.serviceDate) return null;
+    const reason = transition.current === "reschedule-requested"
+      ? "reschedule-completed"
+      : transition.next === "rejected" ? "dispatch-rejected" : "service-cancelled";
+    const capacityRelease = {
+      status: "released",
+      reservationId: reservation.id,
+      orderId: String(order.id || ""),
+      domain: normalizedDomain,
+      subjectId: reservation.subjectId,
+      serviceDate: reservation.serviceDate,
+      reason,
+      releasedAt: new Date(at || Date.now()).toISOString(),
+      policyVersion: WORKFLOW_POLICY_VERSION
+    };
+    capacityRelease.digest = stableDigest(capacityReleaseDigestPayload(capacityRelease));
+    capacityRelease.id = `capacity-release:${capacityRelease.digest}`;
+    entry.state = "released";
+    entry.releasedAt = capacityRelease.releasedAt;
+    entry.releaseId = capacityRelease.id;
+    return capacityRelease;
+  }
+
+  function validateImmutableDispatchBindings(domain, order = {}, nextStatus, updates = {}) {
+    const normalizedDomain = normalizeDomain(domain);
+    if (canonicalStatus(nextStatus, normalizedDomain) === dispatchTargetState(normalizedDomain)) return [];
+    const assignedField = normalizedDomain === "nursing" ? "nurseId" : "workerId";
+    const assignedNameField = normalizedDomain === "nursing" ? "nurseName" : "workerName";
+    const protectedFields = [
+      assignedField,
+      assignedNameField,
+      "qualificationSnapshot",
+      "capacityReservation",
+      "dispatchDecision",
+      "capacityRelease",
+      "capacityReleaseHistory"
+    ];
+    return protectedFields.filter((field) => Object.hasOwn(updates, field)
+      && JSON.stringify(updates[field]) !== JSON.stringify(order[field]));
+  }
+
   function evidenceTimeReasons(prefix, evidence = {}, at) {
     const reasons = [];
     const checkedAt = parseTime(evidence.checkedAt);
@@ -2568,7 +2640,16 @@
       error.details = transition;
       throw error;
     }
-    const candidate = { ...order, ...(options.updates || {}), status: transition.next };
+    const updates = options.updates || {};
+    const immutableDispatchBindings = validateImmutableDispatchBindings(domain, order, transition.next, updates);
+    if (immutableDispatchBindings.length) {
+      const error = new Error(`dispatch bindings are immutable after issuance: ${immutableDispatchBindings.join(", ")}`);
+      error.code = "ORDER_DISPATCH_BINDING_IMMUTABLE";
+      error.statusCode = 409;
+      error.details = { fields: immutableDispatchBindings };
+      throw error;
+    }
+    const candidate = { ...order, ...updates, status: transition.next };
     let dispatchIntegrity = null;
     if (transition.next === dispatchTargetState(domain)) {
       dispatchIntegrity = validateDispatchEvidence(domain, candidate, { at: options.at });
@@ -2668,8 +2749,26 @@
       error.statusCode = 409;
       throw error;
     }
+    let capacityRelease = null;
+    if (shouldReleaseCapacity(transition, candidate)) {
+      capacityRelease = releaseCapacityReservation(domain, candidate, transition, event.occurredAt);
+      if (!capacityRelease) {
+        const error = new Error("committed capacity reservation could not be released");
+        error.code = "ORDER_CAPACITY_RELEASE_FAILED";
+        error.statusCode = 409;
+        throw error;
+      }
+      event.evidenceTypes = [...new Set([...event.evidenceTypes, "capacity-release"])];
+    }
     return {
       ...candidate,
+      ...(capacityRelease ? {
+        capacityRelease,
+        capacityReleaseHistory: [
+          capacityRelease,
+          ...(Array.isArray(order.capacityReleaseHistory) ? order.capacityReleaseHistory : [])
+        ].slice(0, 100)
+      } : {}),
       workflowVersion: WORKFLOW_POLICY_VERSION,
       updatedAt: event.occurredAt,
       timelineEvents,
