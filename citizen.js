@@ -2707,6 +2707,18 @@ function renderCitizenCareWorkspace(resident, diseases = []) {
     </div>`;
   }).join("") || citizenCareEmpty("尚未创建一次性健康资料包。");
 
+  const authorizationLifecycle = api.buildAuthorizationLifecycle(records, new Date(), 30);
+  document.querySelector("#citizen-authorization-lifecycle-summary").innerHTML = `<div class="citizen-care-row ${authorizationLifecycle.expiring || authorizationLifecycle.incomplete ? "warning" : ""}">
+    <div><strong>${authorizationLifecycle.active} 条有效授权</strong><span>${authorizationLifecycle.expiring} 条 30 天内到期</span><em>${authorizationLifecycle.incomplete} 条历史资料待补录</em></div>
+    <p>续授权会创建新的同意记录；原授权历史、撤权状态和审计记录保持不变。</p>
+  </div>`;
+  document.querySelector("#citizen-authorization-lifecycle-list").innerHTML = authorizationLifecycle.items.slice(0, 12).map((item) => `<div class="citizen-care-row ${["expiring", "incomplete"].includes(item.lifecycleKey) ? "warning" : item.lifecycleKey === "revoked" ? "pending" : ""}">
+    <div><strong>${escapeHtml(item.granteeName || "授权对象待核验")}</strong><span>${escapeHtml(item.label)}</span>${item.remainingDays !== null && item.active ? `<em>剩余 ${escapeHtml(item.remainingDays)} 天</em>` : ""}</div>
+    <p>${escapeHtml(item.purpose || "用途待补录")} · ${item.scopes.map(escapeHtml).join("、") || "范围待补录"}</p>
+    <small>对象标识：${escapeHtml(item.granteeId || "待重新核验")}${item.expiresAt ? ` · 有效期 ${escapeHtml(item.expiresAt.slice(0, 10))}` : ""}</small>
+    ${item.renewEligible ? `<footer><button type="button" class="small-button" data-renew-authorization="${escapeHtml(item.id)}">准备续授权</button></footer>` : ""}
+  </div>`).join("") || citizenCareEmpty("暂无授权记录。");
+
   const accessQueue = citizenAccessReviewQueue(resident.id);
   const acknowledged = new Set(careState.accessAcknowledgements.map((item) => item.accessLogId));
   const disputed = new Set(careState.accessDisputes.filter((item) => !["resolved", "rejected", "withdrawn"].includes(item.status)).map((item) => item.accessLogId));
@@ -2802,6 +2814,35 @@ function applyCitizenRecordAccessibility() {
   document.querySelectorAll("[data-record-accessibility='contrast']").forEach((button) => button.setAttribute("aria-pressed", String(Boolean(preferences.highContrast))));
   const scaleOutput = document.querySelector("#citizen-record-text-scale");
   if (scaleOutput) scaleOutput.value = `${Math.round((preferences.textScale || 1) * 100)}%`;
+}
+
+function openAuthorizationRenewal(recordId) {
+  const record = getPersonalRecords(currentResidentId, "authorizations").find((item) => item.id === recordId);
+  if (!record) {
+    showToast("未找到可续签的授权记录");
+    return;
+  }
+  try {
+    const draft = window.CitizenRecordsV2.buildAuthorizationRenewalDraft(record);
+    const form = document.querySelector("#auth-form");
+    form.reset();
+    document.querySelector("#auth-dialog-title").textContent = "续授权";
+    form.elements.previousAuthorizationId.value = draft.previousAuthorizationId;
+    form.elements.granteeName.value = draft.granteeName;
+    form.elements.granteeId.value = draft.granteeId;
+    form.elements.granteeType.value = draft.granteeType;
+    form.elements.purpose.value = draft.purpose;
+    form.elements.expiresAt.min = todayOffset(1);
+    form.elements.expiresAt.value = "";
+    form.elements.source.value = draft.source;
+    form.querySelectorAll("input[name='scopes']").forEach((input) => {
+      input.checked = draft.scopes.includes(input.value);
+    });
+    form.elements.consentConfirmed.checked = false;
+    document.querySelector("#auth-dialog").showModal();
+  } catch (error) {
+    showToast(error.message || "该授权暂不能续签");
+  }
 }
 
 function bindCitizenCareWorkspace() {
@@ -2938,6 +2979,11 @@ function bindCitizenCareWorkspace() {
     const taskButton = event.target.closest("[data-care-task-complete]");
     const acknowledgeButton = event.target.closest("[data-acknowledge-access]");
     const fillDisputeButton = event.target.closest("[data-fill-access-dispute]");
+    const renewAuthorizationButton = event.target.closest("[data-renew-authorization]");
+    if (renewAuthorizationButton) {
+      openAuthorizationRenewal(renewAuthorizationButton.dataset.renewAuthorization);
+      return;
+    }
     if (fillDisputeButton) {
       const form = document.querySelector("#citizen-access-dispute-form");
       form.elements.accessLogId.value = fillDisputeButton.dataset.fillAccessDispute;
@@ -5150,6 +5196,8 @@ function bindDialogs() {
   document.querySelector("#grant-auth").addEventListener("click", () => {
     const form = document.querySelector("#auth-form");
     form.reset();
+    document.querySelector("#auth-dialog-title").textContent = "新增授权";
+    form.elements.previousAuthorizationId.value = "";
     form.elements.expiresAt.min = todayOffset(1);
     form.elements.expiresAt.value = todayOffset(365);
     form.elements.source.value = "居民主动授权";
@@ -5196,6 +5244,7 @@ function bindDialogs() {
         granteeName: formData.get("granteeName"),
         granteeId: formData.get("granteeId"),
         granteeType: formData.get("granteeType"),
+        previousAuthorizationId: formData.get("previousAuthorizationId"),
         purpose: formData.get("purpose"),
         scopes: formData.getAll("scopes"),
         expiresAt: formData.get("expiresAt"),

@@ -60,6 +60,7 @@
     "granteeId",
     "granteeResidentId",
     "granteeAccountId",
+    "previousAuthorizationId",
     "purpose",
     "scopes",
     "expiresAt",
@@ -180,6 +181,7 @@
     const expiresAt = cleanText(input.expiresAt, 20);
     const granteeName = cleanText(input.granteeName, 200);
     const granteeId = cleanText(input.granteeId, 160);
+    const previousAuthorizationId = cleanText(input.previousAuthorizationId, 200);
     const purpose = cleanText(input.purpose, 300);
     const grantedAt = cleanText(input.grantedAt || new Date().toISOString(), 60);
     if (!input.residentId || !granteeName || !granteeId || !purpose || !scopes.length || !expiresAt) {
@@ -206,6 +208,7 @@
         status: "active",
         granteeType: cleanText(input.granteeType || "care-team", 80),
         granteeId,
+        ...(previousAuthorizationId ? { previousAuthorizationId } : {}),
         purpose,
         scopes,
         expiresAt,

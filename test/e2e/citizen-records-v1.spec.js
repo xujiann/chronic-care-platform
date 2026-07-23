@@ -97,11 +97,28 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ status: "revoked", ...body, receiptId: "receipt-revoke-1", auditRef: "audit-revoke-1" }) });
   });
   await page.route(/\/api\/access-reviews\?residentId=/, async (route) => {
+    const authorizationExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        authorizations: [],
+        authorizations: [{
+          id: "auth-renew-e2e",
+          residentId: "r1",
+          category: "authorizations",
+          date: authorizationExpiry.slice(0, 10),
+          name: "家庭医生续约团队",
+          status: "active",
+          meta: {
+            status: "active",
+            granteeId: "team-renew-e2e",
+            granteeType: "care-team",
+            purpose: "慢病复诊资料核对",
+            scopes: ["health-record-summary", "labs"],
+            expiresAt: authorizationExpiry,
+            grantedAt: new Date().toISOString()
+          }
+        }],
         accessLogs: [
           { id: "access-review-1", residentId: "r1", at: new Date().toISOString(), actor: "陌生机构A", role: "医疗机构", scope: "检验检查", purpose: "复诊资料核对", result: "允许", auditHash: "must-not-export" },
           { id: "access-review-2", residentId: "r1", at: new Date(Date.now() - 60000).toISOString(), actor: "未知主体", role: "未知", scope: "电子病历摘要", purpose: "查询", result: "拒绝" }
@@ -149,6 +166,16 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
   await expect(page.locator("#citizen-access-review-v2-list")).toContainText("陌生机构A");
   await expect(page.locator("#citizen-access-review-v2-list")).toContainText("未匹配当前有效授权");
   await expect(page.locator("#citizen-access-review-v2-list")).toContainText("已拦截，未披露");
+  await expect(page.locator("#citizen-authorization-lifecycle-list")).toContainText("家庭医生续约团队");
+  await expect(page.locator("#citizen-authorization-lifecycle-list")).toContainText("即将到期");
+  await page.locator("[data-renew-authorization='auth-renew-e2e']").click();
+  const renewalForm = page.locator("#auth-form");
+  await expect(page.locator("#auth-dialog-title")).toHaveText("续授权");
+  await expect(renewalForm.locator("input[name='granteeId']")).toHaveValue("team-renew-e2e");
+  await expect(renewalForm.locator("input[name='previousAuthorizationId']")).toHaveValue("auth-renew-e2e");
+  await expect(renewalForm.locator("input[name='expiresAt']")).toHaveValue("");
+  await expect(renewalForm.locator("input[name='consentConfirmed']")).not.toBeChecked();
+  await renewalForm.getByRole("button", { name: "取消" }).click();
 
   await page.locator("[data-acknowledge-access='access-review-1']").click();
   await expect(page.locator("#citizen-access-review-v2-list")).toContainText("居民已确认");

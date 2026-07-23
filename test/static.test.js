@@ -2769,8 +2769,8 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(citizenHtml, /rel="manifest"/);
   assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
   assert.match(citizenHtml, /citizen-records-v1\.js\?v=20260723auth2/);
-  assert.match(citizenHtml, /citizen-records-v2\.js\?v=20260723care4/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260723care4/);
+  assert.match(citizenHtml, /citizen-records-v2\.js\?v=20260723care5/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260723care5/);
   assert.match(citizenHtml, /mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-title/);
@@ -3126,7 +3126,7 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   assert.match(citizenJs, /setEscortAppointmentAvailability/);
   assert.match(citizenJs, /escortProviderReady/);
   assert.match(citizenJs, /暂无可预约服务主体/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260723care4/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260723care5/);
   assert.match(citizenJs, /\/escort-services\/orders/);
   assert.match(citizenJs, /getEscortRegistrationOptions/);
   assert.match(citizenJs, /applyLinkedRegistrationToEscortForm/);
@@ -3343,7 +3343,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenHtml, /service-mobile-pagebar/);
   assert.match(citizenHtml, /citizen-action-dock/);
   assert.match(citizenHtml, /citizen\.css\?v=20260723care4/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260723care4/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260723care5/);
   assert.match(citizenHtml, /当前服务常用操作/);
   assert.match(citizenHtml, /service-health-record/);
   assert.match(citizenHtml, /service-emr/);
@@ -3629,7 +3629,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /longterm-care-form/);
   assert.match(citizenCss, /registration-form/);
   assert.match(citizenHtml, /registration-summary/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260723care4/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260723care5/);
   assert.match(citizenJs, /registration-summary/);
   assert.match(citizenJs, /hisOrders/);
   assert.match(citizenJs, /insuranceReady/);
@@ -4616,7 +4616,9 @@ test("citizen record V2 exposes twelve governed care capabilities", () => {
     "buildAccessAcknowledgement",
     "buildAccessDispute",
     "projectAccessReviewActionReceipt",
-    "buildAccessExportRows"
+    "buildAccessExportRows",
+    "buildAuthorizationLifecycle",
+    "buildAuthorizationRenewalDraft"
   ].forEach((contract) => assert.match(model, new RegExp(contract)));
   assert.match(policy, /evaluateCitizenRecordAccess/);
   assert.match(policy, /buildCitizenControlledAccessIntent/);
@@ -4631,12 +4633,15 @@ test("citizen record V2 exposes twelve governed care capabilities", () => {
   assert.match(ui, /\/access-reviews\/.*\/acknowledge/);
   assert.match(ui, /\/access-reviews\/.*\/disputes/);
   assert.match(ui, /safeCsvCell/);
+  assert.match(ui, /data-renew-authorization/);
+  assert.match(ui, /openAuthorizationRenewal/);
   assert.match(css, /record-high-contrast/);
   assert.match(css, /min-height: 44px/);
   assert.match(documentation, /持续照护中心 V2/);
   assert.match(documentation, /生产响应信任边界收口/);
   assert.match(documentation, /安全同步与本地最小留存/);
   assert.match(documentation, /居民隐私审计闭环/);
+  assert.match(documentation, /授权生命周期与显式续授权/);
   assert.match(html, /data-record-accessibility="text-down"/);
   assert.match(html, /data-record-accessibility="text-up"/);
   assert.match(html, /citizen-record-text-scale/);
@@ -4645,5 +4650,8 @@ test("citizen record V2 exposes twelve governed care capabilities", () => {
   assert.match(html, /citizen-access-review-v2-list/);
   assert.match(html, /citizen-access-dispute-form/);
   assert.match(html, /data-export-access-review/);
-  assert.match(html, /citizen-records-v2\.js\?v=20260723care4/);
+  assert.match(html, /citizen-authorization-lifecycle-list/);
+  assert.match(html, /previousAuthorizationId/);
+  assert.match(html, /citizen-records-v2\.js\?v=20260723care5/);
+  assert.match(html, /citizen\.js\?v=20260723care5/);
 });

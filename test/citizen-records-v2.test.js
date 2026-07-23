@@ -511,6 +511,70 @@ test("access export contains only minimized resident-readable columns", () => {
   assert.equal("auditHash" in rows[0], false);
 });
 
+test("authorization lifecycle highlights expiring and incomplete records", () => {
+  const expiring = activeAuthorization({
+    id: "auth-expiring",
+    residentId: "r1",
+    name: "医院A",
+    date: "2026-07-30",
+    meta: {
+      status: "active",
+      granteeId: "hospital-a",
+      granteeType: "institution",
+      purpose: "复诊",
+      scopes: ["labs"],
+      expiresAt: "2026-07-30"
+    }
+  });
+  const incomplete = {
+    id: "auth-legacy",
+    residentId: "r1",
+    category: "authorizations",
+    name: "历史团队",
+    status: "active",
+    date: "2026-12-31",
+    meta: { status: "active", expiresAt: "2026-12-31" }
+  };
+  const lifecycle = V2.buildAuthorizationLifecycle([expiring, incomplete], now, 30);
+  assert.equal(lifecycle.expiring, 1);
+  assert.equal(lifecycle.incomplete, 1);
+  assert.equal(lifecycle.active, 1);
+  assert.equal(lifecycle.items[0].lifecycleKey, "expiring");
+  assert.equal(lifecycle.items[1].renewEligible, false);
+  assert.equal(lifecycle.items[1].active, false);
+  assert.equal("sourceRecord" in lifecycle.items[0], false);
+});
+
+test("authorization renewal is an explicit new consent draft without an expiry", () => {
+  const record = activeAuthorization({
+    id: "auth-renew",
+    residentId: "r1",
+    name: "医院A",
+    meta: {
+      status: "active",
+      granteeId: "hospital-a",
+      granteeType: "institution",
+      purpose: "复诊资料核对",
+      scopes: ["emr-summary", "labs"],
+      expiresAt: "2026-07-30"
+    }
+  });
+  const draft = V2.buildAuthorizationRenewalDraft(record);
+  assert.equal(draft.previousAuthorizationId, "auth-renew");
+  assert.equal(draft.granteeId, "hospital-a");
+  assert.deepEqual(draft.scopes, ["emr-summary", "labs"]);
+  assert.equal(draft.expiresAt, "");
+  assert.equal(draft.consentConfirmed, false);
+  assert.throws(() => V2.buildAuthorizationRenewalDraft({
+    id: "legacy",
+    residentId: "r1",
+    category: "authorizations",
+    status: "active",
+    date: "2026-12-31",
+    meta: { status: "active", expiresAt: "2026-12-31" }
+  }), /重新核验对象/);
+});
+
 test("workspace summary composes deduplication, care tasks, EMR and completeness", () => {
   const result = V2.summarizeCareWorkspace({
     residentId: "r1",

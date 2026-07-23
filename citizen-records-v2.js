@@ -931,6 +931,74 @@
     }));
   }
 
+  function buildAuthorizationLifecycle(records = [], now = new Date(), warningDays = 30) {
+    const reference = toDate(now) || new Date();
+    const warningWindow = Math.max(1, Math.min(Number(warningDays) || 30, 90)) * 86400000;
+    const items = (Array.isArray(records) ? records : [])
+      .filter((record) => record?.category === "authorizations")
+      .map((record) => {
+        const state = CitizenRecordsV1?.authorizationState(record, reference) || { key: "incomplete", label: "状态待核验", active: false };
+        const expiresAt = toDate(record.meta?.expiresAt || record.date);
+        const missingIdentity = !cleanText(record.meta?.granteeId || record.meta?.granteeAccountId || record.meta?.granteeResidentId, 160);
+        const scopes = Array.isArray(record.meta?.scopes) ? record.meta.scopes.map((item) => cleanText(item, 100)).filter(Boolean) : [];
+        const incomplete = missingIdentity || !cleanText(record.meta?.purpose, 300) || !scopes.length || scopes.some((scope) => !ACCESS_SCOPES.has(scope));
+        const remainingMs = expiresAt ? expiresAt.getTime() - reference.getTime() : Number.POSITIVE_INFINITY;
+        const expiring = state.active && remainingMs >= 0 && remainingMs <= warningWindow;
+        const lifecycleKey = incomplete ? "incomplete" : expiring ? "expiring" : state.key;
+        const labels = {
+          active: "有效",
+          expiring: "即将到期",
+          expired: "已过期",
+          revoked: "已撤销",
+          inactive: "未激活",
+          incomplete: "历史资料待补录"
+        };
+        return {
+          id: cleanText(record.id, 200),
+          residentId: cleanText(record.residentId, 120),
+          granteeName: cleanText(record.name, 200),
+          granteeId: cleanText(record.meta?.granteeId || record.meta?.granteeAccountId || record.meta?.granteeResidentId, 160),
+          granteeType: cleanText(record.meta?.granteeType || "care-team", 80),
+          purpose: cleanText(record.meta?.purpose, 300),
+          scopes,
+          expiresAt: expiresAt?.toISOString() || "",
+          lifecycleKey,
+          label: labels[lifecycleKey] || state.label,
+          active: state.active && !incomplete,
+          renewEligible: !incomplete && ["active", "expiring", "expired", "revoked"].includes(lifecycleKey),
+          remainingDays: Number.isFinite(remainingMs) ? Math.max(0, Math.ceil(remainingMs / 86400000)) : null
+        };
+      });
+    const order = { expiring: 0, incomplete: 1, active: 2, expired: 3, revoked: 4, inactive: 5 };
+    items.sort((a, b) => (order[a.lifecycleKey] ?? 9) - (order[b.lifecycleKey] ?? 9) || a.granteeName.localeCompare(b.granteeName));
+    return {
+      items,
+      active: items.filter((item) => item.active).length,
+      expiring: items.filter((item) => item.lifecycleKey === "expiring").length,
+      expired: items.filter((item) => item.lifecycleKey === "expired").length,
+      incomplete: items.filter((item) => item.lifecycleKey === "incomplete").length
+    };
+  }
+
+  function buildAuthorizationRenewalDraft(record = {}) {
+    const lifecycle = buildAuthorizationLifecycle([record], new Date(), 90).items[0];
+    if (!lifecycle || !lifecycle.renewEligible || !lifecycle.granteeId || !lifecycle.purpose || !lifecycle.scopes.length) {
+      throw new Error("历史授权资料不完整，需重新核验对象后创建授权");
+    }
+    return {
+      previousAuthorizationId: lifecycle.id,
+      residentId: lifecycle.residentId,
+      granteeName: lifecycle.granteeName,
+      granteeId: lifecycle.granteeId,
+      granteeType: lifecycle.granteeType,
+      purpose: lifecycle.purpose,
+      scopes: [...lifecycle.scopes],
+      expiresAt: "",
+      source: "居民续授权",
+      consentConfirmed: false
+    };
+  }
+
   function summarizeCareWorkspace(input = {}) {
     const records = mergeInstitutionRecords(input.records || []);
     const completeness = assessRecordCompleteness({ ...input, records });
@@ -987,6 +1055,8 @@
     buildAccessDispute,
     projectAccessReviewActionReceipt,
     buildAccessExportRows,
+    buildAuthorizationLifecycle,
+    buildAuthorizationRenewalDraft,
     summarizeCareWorkspace
   };
 });
