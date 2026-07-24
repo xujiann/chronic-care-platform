@@ -119,10 +119,13 @@ function validateAcceptanceScenario(scenario = {}) {
   common.forEach((field) => { if (!scenario[field]) errors.push(`${field} is required`); });
   if (!validateBagId(scenario.bagId).valid) errors.push("valid bagId is required");
 
-  if (scenario.type === "dual-person-crossmatch") {
-    if (!scenario.operatorA || !scenario.operatorB || scenario.operatorA === scenario.operatorB) {
-      errors.push("two different operators are required");
+  if (scenario.type === "crossmatch-operation-review") {
+    if (!scenario.performedBy) errors.push("one crossmatch operator is required");
+    if (!scenario.reviewedBy || scenario.reviewedBy === scenario.performedBy) errors.push("independent result reviewer is required");
+    if (!scenario.releasedBy || [scenario.performedBy, scenario.reviewedBy].includes(scenario.releasedBy)) {
+      errors.push("independent report releaser is required");
     }
+    if (!scenario.performedAt || !scenario.reviewedAt || !scenario.releasedAt) errors.push("operation, review and release timestamps are required");
     if (scenario.result !== "compatible") errors.push("compatible result is required");
   } else if (scenario.type === "bedside-transfusion") {
     if (!scenario.patientWristbandMatched || !scenario.bagBarcodeMatched || !scenario.orderMatched || !scenario.operatorMatched) {
@@ -155,7 +158,7 @@ function evaluateProductionReadiness(state = {}) {
   const receiptsValid = data.siteReceipts.length > 0 && data.siteReceipts.every((item) => validateReceipt(item).valid);
   const mastersValid = validateMasterDataMappings(data.masterDataContracts).valid;
   const coldChainValid = data.coldChainEvidence.length > 0 && data.coldChainEvidence.every((item) => validateColdChainEvidence(item).valid);
-  const requiredScenarios = ["dual-person-crossmatch", "bedside-transfusion", "recall"];
+  const requiredScenarios = ["crossmatch-operation-review", "bedside-transfusion", "recall"];
   const scenariosValid = requiredScenarios.every((type) =>
     data.acceptanceScenarios.some((item) => item.type === type && validateAcceptanceScenario(item).valid));
   const smokePassed = data.smokeRuns.some((item) => item.result === "passed" && item.moduleId === MODULE_ID && item.evidenceRef);

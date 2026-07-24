@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>血液系统上线控制中心</title>
+  <title>临床用血上线控制中心</title>
   <link rel="stylesheet" href="./portal.css">
   <script src="./auth.js"></script>
   <script>window.HealthCityAuth.requireRole(["commission", "institution"]);</script>
@@ -29,23 +29,32 @@
 <body>
   <main class="gl">
     <header class="gl-hero">
-      <h1>血液系统上线控制中心</h1>
-      <p>软件就绪不等于正式上线。真实接口、现场证据、迁移对账、演练和双签全部完成后，生产状态才会开放。</p>
-      <a href="./blood-innovation.html">返回创新指挥中心</a>
+      <h1>临床用血独立模块上线控制中心</h1>
+      <p>软件就绪不等于正式上线。真实接口、现场证据、主数据契约、临床验收、独立冒烟和回退演练全部签收后，生产状态才会开放。</p>
+      <a href="./blood-innovation.html">返回血液创新指挥中心</a>
     </header>
     <section class="gl-grid" id="gl-summary"></section>
-    <div class="gl-layout">
+    <section class="gl-panel">
+      <h2>独立模块六项生产门禁</h2>
+      <div id="gl-clinical-gates"></div>
+    </section>
+    <section class="gl-panel" style="margin-top:14px">
+      <h2>WS/T 866—2025 数据集注册表</h2>
+      <div id="gl-standard-registry"></div>
+    </section>
+    <div class="gl-layout" style="margin-top:14px">
       <section class="gl-panel"><h2>生产接口与设备</h2><div id="gl-endpoints"></div></section>
       <section class="gl-panel"><h2>现场上线要求</h2><div id="gl-requirements"></div></section>
       <section class="gl-panel"><h2>生产演练</h2><div id="gl-drills"></div></section>
       <section class="gl-panel"><h2>数据迁移批次</h2><div id="gl-migrations"></div></section>
     </div>
-    <section class="gl-panel" style="margin-top: 14px">
+    <section class="gl-panel" style="margin-top:14px">
       <h2>上线审批与回滚边界</h2>
       <div id="gl-approvals"></div>
       <p id="gl-rollback"></p>
     </section>
   </main>
+  <script src="./blood-standard-registry.js"></script>
   <script src="./blood-go-live.js"></script>
 </body>
 </html>

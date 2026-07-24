@@ -40,9 +40,12 @@ test("receipt workflow is idempotent, digest-bound and independently verified", 
   assert.equal(clinical.validateReceipt(state.siteReceipts[0]).valid, true);
 });
 
-test("dual-person, bedside four-code and recall scenarios are enforced", () => {
+test("single-operator crossmatch with independent review/release, bedside four-code and recall are enforced", () => {
   const base = { patientId: "P1", bagId, evidenceRef: "site://scenario" };
-  assert.equal(clinical.validateAcceptanceScenario({ ...base, scenarioId: "S1", type: "dual-person-crossmatch", operatorA: "A", operatorB: "B", result: "compatible" }).valid, true);
+  const crossmatch = { ...base, scenarioId: "S1", type: "crossmatch-operation-review", performedBy: "A", reviewedBy: "B", releasedBy: "C", performedAt: "1", reviewedAt: "2", releasedAt: "3", result: "compatible" };
+  assert.equal(clinical.validateAcceptanceScenario(crossmatch).valid, true);
+  assert.equal(clinical.validateAcceptanceScenario({ ...crossmatch, reviewedBy: "A" }).valid, false);
+  assert.equal(clinical.validateAcceptanceScenario({ ...crossmatch, type: "dual-person-crossmatch" }).valid, false);
   assert.equal(clinical.validateAcceptanceScenario({ ...base, scenarioId: "S2", type: "bedside-transfusion", patientWristbandMatched: true, bagBarcodeMatched: true, orderMatched: true, operatorMatched: true }).valid, true);
   assert.equal(clinical.validateAcceptanceScenario({ ...base, scenarioId: "S3", type: "recall", recallAcknowledgedAt: "1", unitIsolatedAt: "2", closedAt: "3" }).valid, true);
 });
@@ -63,7 +66,7 @@ test("all six production gates can reach ready-for-production", () => {
     masterDataContracts: [master("BIS"), master("BTIS")],
     coldChainEvidence: [{ deviceId: "D1", serialNumber: "S1", calibrationCertificateRef: "site://cal", calibrationDigest: sha, calibratedAt: "2026-01-01", calibrationExpiresAt: "2099-01-01", alarmTestResult: "passed", alarmEvidenceRef: "site://alarm", performedBy: "A", verifiedBy: "B" }],
     acceptanceScenarios: [
-      { ...base, scenarioId: "S1", type: "dual-person-crossmatch", operatorA: "A", operatorB: "B", result: "compatible" },
+      { ...base, scenarioId: "S1", type: "crossmatch-operation-review", performedBy: "A", reviewedBy: "B", releasedBy: "C", performedAt: "1", reviewedAt: "2", releasedAt: "3", result: "compatible" },
       { ...base, scenarioId: "S2", type: "bedside-transfusion", patientWristbandMatched: true, bagBarcodeMatched: true, orderMatched: true, operatorMatched: true },
       { ...base, scenarioId: "S3", type: "recall", recallAcknowledgedAt: "1", unitIsolatedAt: "2", closedAt: "3" }
     ],
