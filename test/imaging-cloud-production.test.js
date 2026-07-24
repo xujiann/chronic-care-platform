@@ -53,6 +53,36 @@ function signAllRequirements(data) {
   });
 }
 
+function receiptPayload(type, index) {
+  const common = {
+    confirmation: Production.SUBMIT_CONFIRMATION,
+    contractVersion: "1.0",
+    evidenceRef: `site/imaging/receipt/${type}`,
+    evidenceDigest: digest(index + 60),
+    externalSigner: `现场责任人${index + 1}`,
+    externalOrganization: "试点医院/平台联合组"
+  };
+  const details = {
+    "pacs-ris-dicom-tls": { transport: "DICOM-TLS", tlsMinimum: "TLS1.2", messageProfiles: ["C-STORE", "C-MOVE"], gatewayReceiptRef: "gateway-receipt-001" },
+    "fhir-report-writeback": { fhirVersion: "R4", resources: ["Patient", "ImagingStudy", "DiagnosticReport"], writebackStatus: "accepted", callbackReceiptRef: "emr-callback-001" },
+    "object-storage-authorization-audit": { storageRegion: "liaoning-in-province", encryptionAtRest: "enabled", authorizationMode: "authenticated-and-authorized", auditRetentionDays: 180, terminalPolicy: "no-original-dicom-on-mobile" },
+    "mutual-recognition-appeal": { appealPolicyVersion: "1.0", independentReviewerRole: "county-or-commission", minimizedEvidenceOnly: true, appealReceiptRef: "appeal-review-001" },
+    "failure-degradation-rollback": { failureScenarios: ["pacs-ris-unavailable", "fhir-writeback-failed", "object-storage-unavailable"], fallbackPath: "original-pacs-and-report-priority", reconciliationReceiptRef: "reconcile-001", rollbackDecisionRef: "rollback-001" }
+  };
+  return { ...common, ...details[type] };
+}
+
+function verifyAllSiteReceipts(data) {
+  Production.SITE_RECEIPT_CONTRACTS.forEach((contract, index) => {
+    const submitted = Production.submitSiteReceipt(data, submitter, contract.type, receiptPayload(contract.type, index));
+    Production.verifySiteReceipt(data, verifier, contract.type, {
+      confirmation: Production.VERIFY_CONFIRMATION,
+      evidenceDigest: submitted.evidenceDigest,
+      verificationRef: `verification/imaging/receipt/${contract.type}`
+    });
+  });
+}
+
 test("initial imaging state is ready for synthetic acceptance but formally blocked", () => {
   const result = Production.center({});
   assert.equal(result.functionalState, "ready-for-synthetic-acceptance");
@@ -61,15 +91,16 @@ test("initial imaging state is ready for synthetic acceptance but formally block
   assert.equal(result.summary.syntheticChecks, 10);
   assert.equal(result.summary.endpoints, 5);
   assert.equal(result.summary.requirements, 7);
+  assert.equal(result.summary.siteReceipts, 5);
   assert.equal(result.summary.drills, 4);
-  assert.equal(result.routeContracts.length, 6);
+  assert.equal(result.routeContracts.length, 9);
 });
 
 test("T00 route contract declares role guards and domain handlers for every production action", () => {
-  assert.equal(Production.ROUTE_CONTRACTS.length, 6);
+  assert.equal(Production.ROUTE_CONTRACTS.length, 9);
   assert.ok(Production.ROUTE_CONTRACTS.every((route)=>Array.isArray(route.roles) && route.roles.length > 0));
   assert.ok(Production.ROUTE_CONTRACTS.every((route)=>route.handler.startsWith("ImagingCloudProduction.")));
-  assert.deepEqual(Production.ROUTE_CONTRACTS.at(-1).roles, ["commission"]);
+  assert.deepEqual(Production.ROUTE_CONTRACTS.find((route) => route.path.includes("/receipts/:type/verify")).roles, ["commission"]);
 });
 
 test("synthetic acceptance requires explicit synthetic data evidence", () => {
@@ -132,11 +163,37 @@ test("site evidence needs external provenance, endpoint probes and an independen
   assert.equal(row.status, "evidence-submitted");
 });
 
+test("site receipt validators enforce protocol contracts and reject patient identifiers", () => {
+  const data = {};
+  assert.throws(() => Production.submitSiteReceipt(data, submitter, "pacs-ris-dicom-tls", {
+    ...receiptPayload("pacs-ris-dicom-tls", 1),
+    transport: "HTTPS"
+  }), /DICOM-TLS/);
+  assert.throws(() => Production.submitSiteReceipt(data, submitter, "fhir-report-writeback", {
+    ...receiptPayload("fhir-report-writeback", 2),
+    patientName: "不得写入现场回执"
+  }), /patient-identifying/);
+  const submitted = Production.submitSiteReceipt(data, submitter, "object-storage-authorization-audit", receiptPayload("object-storage-authorization-audit", 3));
+  assert.equal(submitted.status, "evidence-submitted");
+  assert.throws(() => Production.verifySiteReceipt(data, submitter, "object-storage-authorization-audit", {
+    confirmation: Production.VERIFY_CONFIRMATION,
+    evidenceDigest: submitted.evidenceDigest,
+    verificationRef: "self-review"
+  }), /current role|independent/);
+  const verified = Production.verifySiteReceipt(data, verifier, "object-storage-authorization-audit", {
+    confirmation: Production.VERIFY_CONFIRMATION,
+    evidenceDigest: submitted.evidenceDigest,
+    verificationRef: "verification/imaging/object-storage"
+  });
+  assert.equal(verified.status, "verified");
+});
+
 test("complete evidence opens the gate only after distinct dual approval", () => {
   const data = {};
   recordAllSyntheticChecks(data);
   probeAllEndpoints(data);
   signAllRequirements(data);
+  verifyAllSiteReceipts(data);
   data.imagingProductionDrills.forEach((item) => Production.completeDrill(data, verifier, item.id, {
     result: "passed",
     evidenceRef: `drill/imaging/${item.id}`
@@ -145,6 +202,7 @@ test("complete evidence opens the gate only after distinct dual approval", () =>
   assert.equal(beforeApproval.preflight.syntheticAcceptancePassed, true);
   assert.equal(beforeApproval.preflight.endpointsReady, true);
   assert.equal(beforeApproval.preflight.requirementsSigned, true);
+  assert.equal(beforeApproval.preflight.siteReceiptsVerified, true);
   assert.equal(beforeApproval.preflight.drillsPassed, true);
   assert.equal(beforeApproval.productionReady, false);
 
@@ -166,6 +224,7 @@ test("complete evidence opens the gate only after distinct dual approval", () =>
   assert.equal(result.formalGoLiveState, "ready-for-production");
   assert.equal(result.summary.endpointsReady, 5);
   assert.equal(result.summary.requirementsSigned, 7);
+  assert.equal(result.summary.siteReceiptsVerified, 5);
   assert.equal(result.summary.drillsPassed, 4);
   assert.equal(result.summary.approvalsSigned, 2);
   assert.ok(result.audit.length > 0);
@@ -191,4 +250,14 @@ test("production audit entries form a tamper-evident digest chain", () => {
   const [latest, previous] = data.imagingProductionAudit;
   assert.match(latest.digest, /^sha256:[a-f0-9]{64}$/);
   assert.equal(latest.previousDigest, previous.digest);
+});
+
+test("standalone smoke remains no-go until site evidence is fully accepted and exposes rollback gate", () => {
+  const smoke = Production.runStandaloneSmoke({});
+  assert.equal(smoke.module, "regional-imaging-cloud");
+  assert.equal(smoke.codeReady, true);
+  assert.equal(smoke.releaseDecision, "no-go");
+  assert.equal(smoke.formalGoLiveState, "blocked-until-site-evidence-signed");
+  assert.equal(smoke.checks.some((item) => item.id === "rollback-gate" && item.passed), true);
+  assert.equal(smoke.checks.some((item) => item.id === "site-receipt-contracts" && item.passed), true);
 });

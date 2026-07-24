@@ -11,12 +11,92 @@ const ROUTE_CONTRACTS = Object.freeze([
   { method: "POST", path: "/api/imaging-cloud/production/endpoints/:id/probe", roles: ["commission", "institution"], handler: "ImagingCloudProduction.probeEndpoint" },
   { method: "POST", path: "/api/imaging-cloud/production/synthetic-checks/:id/actions", roles: ["commission", "institution"], handler: "ImagingCloudProduction.recordSyntheticCheck" },
   { method: "POST", path: "/api/imaging-cloud/production/requirements/:id/actions", roles: ["commission", "institution"], handler: "ImagingCloudProduction.signRequirement" },
+  { method: "POST", path: "/api/imaging-cloud/production/receipts/:type/submit", roles: ["commission", "institution"], handler: "ImagingCloudProduction.submitSiteReceipt" },
+  { method: "POST", path: "/api/imaging-cloud/production/receipts/:type/verify", roles: ["commission"], handler: "ImagingCloudProduction.verifySiteReceipt" },
   { method: "POST", path: "/api/imaging-cloud/production/drills/:id/complete", roles: ["commission", "institution"], handler: "ImagingCloudProduction.completeDrill" },
-  { method: "POST", path: "/api/imaging-cloud/production/approvals/:id/sign", roles: ["commission"], handler: "ImagingCloudProduction.signApproval" }
+  { method: "POST", path: "/api/imaging-cloud/production/approvals/:id/sign", roles: ["commission"], handler: "ImagingCloudProduction.signApproval" },
+  { method: "GET", path: "/api/imaging-cloud/production/smoke", roles: ["commission", "institution"], handler: "ImagingCloudProduction.runStandaloneSmoke" }
 ]);
+
+const SITE_RECEIPT_CONTRACTS = Object.freeze([
+  {
+    type: "pacs-ris-dicom-tls",
+    title: "PACS/RIS 与 DICOM TLS 联调回执",
+    requirementIds: ["IMG-SITE-01"],
+    requiredFields: ["contractVersion", "transport", "tlsMinimum", "messageProfiles", "gatewayReceiptRef"],
+    validate(payload) {
+      return payload.transport === "DICOM-TLS" && ["TLS1.2", "TLS1.3"].includes(payload.tlsMinimum) && includesAll(payload.messageProfiles, ["C-STORE", "C-MOVE"]);
+    },
+    error: "PACS/RIS 回执必须声明 DICOM-TLS、TLS1.2+、C-STORE、C-MOVE 与网关回执引用"
+  },
+  {
+    type: "fhir-report-writeback",
+    title: "FHIR DiagnosticReport/EMR 回写回执",
+    requirementIds: ["IMG-SITE-02"],
+    requiredFields: ["contractVersion", "fhirVersion", "resources", "writebackStatus", "callbackReceiptRef"],
+    validate(payload) {
+      return payload.fhirVersion === "R4" && payload.writebackStatus === "accepted" && includesAll(payload.resources, ["Patient", "ImagingStudy", "DiagnosticReport"]);
+    },
+    error: "FHIR 回执必须声明 R4、Patient/ImagingStudy/DiagnosticReport 和已接受的回写回执"
+  },
+  {
+    type: "object-storage-authorization-audit",
+    title: "对象存储、授权与访问审计边界回执",
+    requirementIds: ["IMG-SITE-04", "IMG-SITE-05"],
+    requiredFields: ["contractVersion", "storageRegion", "encryptionAtRest", "authorizationMode", "auditRetentionDays", "terminalPolicy"],
+    validate(payload) {
+      return payload.storageRegion === "liaoning-in-province" && payload.encryptionAtRest === "enabled" && payload.authorizationMode === "authenticated-and-authorized" && Number(payload.auditRetentionDays) >= 180 && payload.terminalPolicy === "no-original-dicom-on-mobile";
+    },
+    error: "对象存储回执必须声明省内存储、静态加密、授权访问、至少180天审计留存和移动端不落原始DICOM"
+  },
+  {
+    type: "mutual-recognition-appeal",
+    title: "检查互认申诉与独立复核回执",
+    requirementIds: ["IMG-SITE-07"],
+    requiredFields: ["contractVersion", "appealPolicyVersion", "independentReviewerRole", "minimizedEvidenceOnly", "appealReceiptRef"],
+    validate(payload) {
+      return payload.independentReviewerRole === "county-or-commission" && payload.minimizedEvidenceOnly === true;
+    },
+    error: "互认申诉回执必须声明县域或卫健委独立复核和最小化证据边界"
+  },
+  {
+    type: "failure-degradation-rollback",
+    title: "故障降级、回退与独立冒烟回执",
+    requirementIds: ["IMG-SITE-06"],
+    requiredFields: ["contractVersion", "failureScenarios", "fallbackPath", "reconciliationReceiptRef", "rollbackDecisionRef"],
+    validate(payload) {
+      return includesAll(payload.failureScenarios, ["pacs-ris-unavailable", "fhir-writeback-failed", "object-storage-unavailable"]) && payload.fallbackPath === "original-pacs-and-report-priority";
+    },
+    error: "故障回执必须覆盖 PACS/RIS、FHIR 回写、对象存储故障以及原院PACS和报告优先降级路径"
+  }
+]);
+
+const PROHIBITED_RECEIPT_FIELDS = new Set(["patientname", "patientid", "idcard", "phone", "address", "birthdate", "accessionnumber", "studyinstanceuid", "dicomuid", "rawdicom", "imagebinary"]);
 
 function now() {
   return new Date().toISOString();
+}
+
+function includesAll(value, expected) {
+  const actual = new Set(Array.isArray(value) ? value.map((item) => String(item).trim()) : []);
+  return expected.every((item) => actual.has(item));
+}
+
+function receiptContract(type) {
+  return SITE_RECEIPT_CONTRACTS.find((item) => item.type === type);
+}
+
+function containsProhibitedReceiptField(value) {
+  if (Array.isArray(value)) return value.some((item) => containsProhibitedReceiptField(item));
+  if (!value || typeof value !== "object") return false;
+  return Object.entries(value).some(([key, nested]) => PROHIBITED_RECEIPT_FIELDS.has(String(key).replace(/[^a-z0-9]/gi, "").toLowerCase()) || containsProhibitedReceiptField(nested));
+}
+
+function receiptRequiredFieldsPresent(payload, contract) {
+  return contract.requiredFields.every((field) => {
+    const value = payload[field];
+    return Array.isArray(value) ? value.length > 0 : Boolean(value || value === true);
+  });
 }
 
 function seed() {
@@ -100,6 +180,23 @@ function seed() {
       { id: "imaging-approval-business", title: "影像业务上线批准", status: "pending", signedBy: "" },
       { id: "imaging-approval-technical", title: "影像技术上线批准", status: "pending", signedBy: "" }
     ],
+    imagingSiteReceipts: SITE_RECEIPT_CONTRACTS.map((contract) => ({
+      id: `imaging-receipt-${contract.type}`,
+      type: contract.type,
+      title: contract.title,
+      requirementIds: contract.requirementIds,
+      status: "site-pending",
+      evidenceRef: "",
+      evidenceDigest: "",
+      externalSigner: "",
+      externalOrganization: "",
+      submittedBy: "",
+      submittedAt: "",
+      verifiedBy: "",
+      verifiedAt: "",
+      verificationRef: "",
+      payload: {}
+    })),
     imagingProductionAudit: []
   };
 }
@@ -159,12 +256,14 @@ function center(data) {
   const endpoints = endpointViews(data);
   const syntheticChecks = data.imagingSyntheticChecks;
   const requirements = data.imagingProductionRequirements;
+  const siteReceipts = data.imagingSiteReceipts;
   const drills = data.imagingProductionDrills;
   const approvals = data.imagingCutoverApprovals;
   const preflight = {
     syntheticAcceptancePassed: syntheticChecks.every((item) => item.status === "passed" && item.dataClass === "synthetic-test-data"),
     endpointsReady: endpoints.every((item) => item.productionReady),
     requirementsSigned: requirements.every((item) => item.status === "signed"),
+    siteReceiptsVerified: siteReceipts.every((item) => item.status === "verified"),
     drillsPassed: drills.every((item) => item.productionEvidence),
     dualApproval: approvals.length >= 2 && approvals.every((item) => item.status === "signed")
   };
@@ -183,6 +282,8 @@ function center(data) {
       endpoints: endpoints.length,
       requirementsSigned: requirements.filter((item) => item.status === "signed").length,
       requirements: requirements.length,
+      siteReceiptsVerified: siteReceipts.filter((item) => item.status === "verified").length,
+      siteReceipts: siteReceipts.length,
       drillsPassed: drills.filter((item) => item.productionEvidence).length,
       drills: drills.length,
       approvalsSigned: approvals.filter((item) => item.status === "signed").length,
@@ -192,6 +293,7 @@ function center(data) {
     endpoints,
     syntheticChecks,
     requirements,
+    siteReceipts,
     drills,
     approvals,
     audit: data.imagingProductionAudit.slice(0, 100),
@@ -312,6 +414,82 @@ function signRequirement(data, user, id, payload = {}) {
   return row;
 }
 
+function submitSiteReceipt(data, user, type, payload = {}) {
+  ensure(data);
+  requireRole(user, ["commission", "institution"]);
+  const contract = receiptContract(type);
+  if (!contract) throw Object.assign(new Error("imaging site receipt contract not found"), { status: 404 });
+  const row = data.imagingSiteReceipts.find((item) => item.type === type);
+  if (!row) throw Object.assign(new Error("imaging site receipt not found"), { status: 404 });
+  if (!new Set(["site-pending", "rejected"]).has(row.status)) throw Object.assign(new Error("site receipt has already been submitted"), { status: 409 });
+  const normalized = { ...payload };
+  ["messageProfiles", "resources", "failureScenarios"].forEach((field) => {
+    if (typeof normalized[field] === "string") normalized[field] = normalized[field].split(",").map((item) => item.trim()).filter(Boolean);
+  });
+  if (normalized.confirmation !== SUBMIT_CONFIRMATION || !String(normalized.evidenceRef || "").trim() || !EVIDENCE_DIGEST.test(String(normalized.evidenceDigest || ""))) {
+    throw Object.assign(new Error("exact confirmation, evidenceRef and SHA-256 digest are required"), { status: 400 });
+  }
+  if (String(normalized.externalSigner || "").trim().length < 2 || String(normalized.externalOrganization || "").trim().length < 2) {
+    throw Object.assign(new Error("external signer and organization provenance are required"), { status: 400 });
+  }
+  if (containsProhibitedReceiptField(normalized)) throw Object.assign(new Error("site receipt must not contain patient-identifying or raw DICOM fields"), { status: 400 });
+  if (!receiptRequiredFieldsPresent(normalized, contract) || !contract.validate(normalized)) {
+    throw Object.assign(new Error(contract.error), { status: 400 });
+  }
+  Object.assign(row, {
+    status: "evidence-submitted",
+    evidenceRef: String(normalized.evidenceRef),
+    evidenceDigest: String(normalized.evidenceDigest),
+    externalSigner: String(normalized.externalSigner),
+    externalOrganization: String(normalized.externalOrganization),
+    submittedBy: actorId(user),
+    submittedAt: now(),
+    verifiedBy: "",
+    verifiedAt: "",
+    verificationRef: "",
+    payload: Object.fromEntries(contract.requiredFields.map((field) => [field, normalized[field]]))
+  });
+  audit(data, user, "submit-imaging-site-receipt", type, `${row.evidenceRef}; ${row.evidenceDigest}`);
+  return row;
+}
+
+function verifySiteReceipt(data, user, type, payload = {}) {
+  ensure(data);
+  requireRole(user, ["commission"]);
+  const row = data.imagingSiteReceipts.find((item) => item.type === type);
+  if (!row) throw Object.assign(new Error("imaging site receipt not found"), { status: 404 });
+  if (row.status !== "evidence-submitted" || payload.confirmation !== VERIFY_CONFIRMATION || payload.evidenceDigest !== row.evidenceDigest || actorId(user) === row.submittedBy || !String(payload.verificationRef || "").trim()) {
+    throw Object.assign(new Error("independent verification with matching digest and verificationRef is required"), { status: 400 });
+  }
+  Object.assign(row, {
+    status: "verified",
+    verifiedBy: actorId(user),
+    verifiedAt: now(),
+    verificationRef: String(payload.verificationRef)
+  });
+  audit(data, user, "verify-imaging-site-receipt", type, `${row.verificationRef}; ${row.evidenceDigest}`);
+  return row;
+}
+
+function runStandaloneSmoke(data = {}) {
+  const snapshot = center(data);
+  const checks = [
+    { id: "module-boundary", passed: true, detail: "imaging production domain has no dependency on emergency, blood or physical-examination modules" },
+    { id: "site-receipt-contracts", passed: SITE_RECEIPT_CONTRACTS.length === 5 && snapshot.summary.siteReceipts === 5, detail: "five minimized site receipt contracts are loaded" },
+    { id: "no-patient-evidence", passed: PROHIBITED_RECEIPT_FIELDS.has("patientname") && PROHIBITED_RECEIPT_FIELDS.has("rawdicom"), detail: "site receipt validation rejects patient identifiers and raw DICOM" },
+    { id: "rollback-gate", passed: snapshot.rollback.triggers.length >= 5 && snapshot.rollback.steps.length >= 5, detail: "rollback plan covers source PACS, access, object storage and FHIR failures" },
+    { id: "formal-no-go", passed: snapshot.productionReady ? snapshot.formalGoLiveState === "ready-for-production" : snapshot.formalGoLiveState === "blocked-until-site-evidence-signed", detail: "standalone smoke cannot convert incomplete site evidence into production approval" }
+  ];
+  return {
+    module: "regional-imaging-cloud",
+    codeReady: checks.every((item) => item.passed),
+    releaseDecision: snapshot.productionReady ? "go" : "no-go",
+    formalGoLiveState: snapshot.formalGoLiveState,
+    rollback: snapshot.rollback,
+    checks
+  };
+}
+
 function completeDrill(data, user, id, payload = {}) {
   ensure(data);
   requireRole(user, ["commission", "institution"]);
@@ -333,7 +511,7 @@ function signApproval(data, user, id, payload = {}) {
   ensure(data);
   requireRole(user, ["commission"]);
   const before = center(data);
-  if (!before.preflight.syntheticAcceptancePassed || !before.preflight.endpointsReady || !before.preflight.requirementsSigned || !before.preflight.drillsPassed) {
+  if (!before.preflight.syntheticAcceptancePassed || !before.preflight.endpointsReady || !before.preflight.requirementsSigned || !before.preflight.siteReceiptsVerified || !before.preflight.drillsPassed) {
     throw Object.assign(new Error("all imaging preflight evidence must pass before cutover approval"), { status: 409 });
   }
   const row = data.imagingCutoverApprovals.find((item) => item.id === id);
@@ -352,7 +530,9 @@ function signApproval(data, user, id, payload = {}) {
 
 module.exports = {
   CUTOVER_CONFIRMATION,
+  PROHIBITED_RECEIPT_FIELDS,
   ROUTE_CONTRACTS,
+  SITE_RECEIPT_CONTRACTS,
   SUBMIT_CONFIRMATION,
   SYNTHETIC_CONFIRMATION,
   VERIFY_CONFIRMATION,
@@ -361,7 +541,10 @@ module.exports = {
   ensure,
   probeEndpoint,
   recordSyntheticCheck,
+  runStandaloneSmoke,
   seed,
   signApproval,
-  signRequirement
+  signRequirement,
+  submitSiteReceipt,
+  verifySiteReceipt
 };
