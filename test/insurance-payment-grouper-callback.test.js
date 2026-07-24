@@ -77,6 +77,32 @@ test("trusted grouper callback requires source allowlist time window and HMAC", 
   );
 });
 
+test("formal grouper production configuration is strict redacted and evidence-gated", () => {
+  const missing = GrouperContract.buildGrouperProductionConfiguration({});
+  assert.equal(missing.configured, false);
+  assert.equal(missing.productionReady, false);
+  const productionEnv = {
+    DISEASE_PAYMENT_GROUPER_ENDPOINT: "https://grouper.example.test/v1/jobs",
+    DISEASE_PAYMENT_GROUPER_CALLBACK_SECRET: callbackSecret,
+    DISEASE_PAYMENT_GROUPER_CALLBACK_ALLOWED_SOURCES: `${callbackSourceId},backup-official-grouper`,
+    DISEASE_PAYMENT_GROUPER_TRUSTED_SIGNER_FINGERPRINTS: `${"a".repeat(64)},${"b".repeat(64)}`,
+    DISEASE_PAYMENT_GROUPER_CREDENTIAL_REFERENCE: "vault://insurance/grouper/client-credential",
+    DISEASE_PAYMENT_GROUPER_CALLBACK_MAX_SKEW_SECONDS: "300"
+  };
+  const configured = GrouperContract.buildGrouperProductionConfiguration(productionEnv);
+  assert.equal(configured.configured, true);
+  assert.equal(configured.productionReady, false);
+  assert.equal(configured.summary.allowedSourceCount, 2);
+  assert.equal(configured.summary.trustedSignerCount, 2);
+  assert.equal(JSON.stringify(configured).includes(callbackSecret), false);
+  assert.equal(JSON.stringify(configured).includes("grouper.example.test"), false);
+  assert.equal(JSON.stringify(configured).includes("vault://insurance"), false);
+  const evidenced = GrouperContract.buildGrouperProductionConfiguration(productionEnv, { externalEvidenceVerified: true });
+  assert.equal(evidenced.productionReady, true);
+  const credentialLeak = GrouperContract.buildGrouperProductionConfiguration({ ...productionEnv, DISEASE_PAYMENT_GROUPER_ENDPOINT: "https://user:password@grouper.example.test/v1" });
+  assert.equal(credentialLeak.checks.find((item) => item.id === "https-endpoint").passed, false);
+});
+
 test("trusted grouper callback is recorded once and bound to the completed result", () => {
   const { dispatched, payload } = completedCallbackFixture();
   const options = transportOptions(payload);

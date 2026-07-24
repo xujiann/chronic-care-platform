@@ -255,12 +255,54 @@ function verifyTrustedGrouperCallback(payload, options = {}) {
   };
 }
 
+function buildGrouperProductionConfiguration(env = process.env, options = {}) {
+  const endpointText = String(env.DISEASE_PAYMENT_GROUPER_ENDPOINT || "").trim();
+  let endpointValid = false;
+  try {
+    const endpoint = new URL(endpointText);
+    endpointValid = endpoint.protocol === "https:" && !endpoint.username && !endpoint.password;
+  } catch {
+    endpointValid = false;
+  }
+  const callbackSecret = String(env.DISEASE_PAYMENT_GROUPER_CALLBACK_SECRET || "").trim();
+  const allowedSources = [...valueSet(env.DISEASE_PAYMENT_GROUPER_CALLBACK_ALLOWED_SOURCES)];
+  const signerFingerprints = [...valueSet(env.DISEASE_PAYMENT_GROUPER_TRUSTED_SIGNER_FINGERPRINTS)].map((item) => item.toLowerCase());
+  const clientCertificateFingerprint = String(env.DISEASE_PAYMENT_GROUPER_CLIENT_CERT_FINGERPRINT || "").trim().toLowerCase();
+  const credentialReference = String(env.DISEASE_PAYMENT_GROUPER_CREDENTIAL_REFERENCE || "").trim();
+  const maxSkewSeconds = Number(env.DISEASE_PAYMENT_GROUPER_CALLBACK_MAX_SKEW_SECONDS || 300);
+  const checks = [
+    { id: "https-endpoint", passed: endpointValid },
+    { id: "callback-secret-strength", passed: callbackSecret.length >= 32 },
+    { id: "callback-source-allowlist", passed: allowedSources.length > 0 && allowedSources.every((item) => /^[A-Za-z0-9._:-]{3,160}$/.test(item)) },
+    { id: "receipt-signer-trust", passed: signerFingerprints.length > 0 && signerFingerprints.every((item) => /^[a-f0-9]{64}$/.test(item)) },
+    { id: "adapter-credential-reference", passed: /^[a-f0-9]{64}$/.test(clientCertificateFingerprint) || /^(vault|kms|secret|cert):\/\/[A-Za-z0-9._:/-]+$/i.test(credentialReference) },
+    { id: "callback-time-window", passed: Number.isSafeInteger(maxSkewSeconds) && maxSkewSeconds >= 30 && maxSkewSeconds <= 900 }
+  ];
+  const configured = checks.every((item) => item.passed);
+  return {
+    schema: "disease-payment-grouper-production-configuration-v1",
+    configured,
+    externalEvidenceVerified: options.externalEvidenceVerified === true,
+    productionReady: configured && options.externalEvidenceVerified === true,
+    checks,
+    summary: {
+      passed: checks.filter((item) => item.passed).length,
+      total: checks.length,
+      allowedSourceCount: allowedSources.length,
+      trustedSignerCount: signerFingerprints.length
+    },
+    secretsExposed: false,
+    boundary: "Configuration readiness does not prove official grouper connectivity, certificate ownership, callback delivery, reconciliation or onsite acceptance."
+  };
+}
+
 module.exports = {
   CALLBACK_SIGNATURE_SCHEMA_VERSION,
   CONTRACT_ID,
   CONTRACT_VERSION,
   GrouperCallbackError,
   SIGNATURE_SCHEMA_VERSION,
+  buildGrouperProductionConfiguration,
   buildRequestEnvelope,
   canonicalStringify,
   caseInputDigest,

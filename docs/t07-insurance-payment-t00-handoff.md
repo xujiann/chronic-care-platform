@@ -61,6 +61,7 @@ T00 负责公共路由、统一认证鉴权、请求体与错误响应映射、�
 15. 特例单议事件同样必须保持相邻状态连续；当前状态、原审意见、复议材料摘要、复议意见、决定摘要和结算批次绑定必须能由事件重建。`SPECIAL_CASE_STATE_PROJECTION_INVALID` 不得映射为可重试业务错误。
 16. 正式分组作业的幂等返回、派发、回执、失败、重试和死信重开前必须通过 `verifyFormalGroupingJobLedger`；完成态幂等返回还必须通过 `verifyFormalGroupingResultProjection`，死信重开还必须通过 `verifyFormalGroupingDeadLetter`。正式分组运行和支付测算账本必须与作业编号、关联号、方案版本、病例输入摘要及回执集合一一对应。完整性失败只能进入人工安全审计。公共运维路由必须使用 `buildFormalGroupingOperations` 的脱敏摘要，不得从领域状态直接返回 `caseSnapshots`、病例输入、适配器内部端点、错误详情或死信处置结论。
 17. 正式回执和派发受理结果只能由 `system / official_grouper_adapter` 主体写入，且回执入口必须先执行 `verifyTrustedGrouperCallback` 的来源白名单、时间窗、防重放和传输层签名校验，再执行逐病例官方回执验签。人工 `insurance/commission` 会话不得直接提交 `accepted=true` 或正式回执正文；死信对账仅允许医保经办机构完成。
+18. T00 部署前必须调用 `buildGrouperProductionConfiguration` 校验正式分组器 HTTPS 端点、凭据引用、回执签名证书指纹、回调密钥强度、来源白名单和时间窗。报告只能保存布尔检查及白名单/证书数量，不得输出端点、凭据引用、密钥或来源值。配置通过不能替代真实联调与现场证据。
 
 ## 生产证据交接
 
