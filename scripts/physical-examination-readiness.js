@@ -24,6 +24,10 @@ function buildReport(options = {}) {
   const service = read("physical-examination-service.js");
   const highlights = read("physical-examination-highlights.js");
   const standards = read("physical-examination-standards.js");
+  const production = read("physical-examination-production.js");
+  const standalonePage = read("physical-examination-standalone.html");
+  const standaloneClient = read("physical-examination-standalone.js");
+  const standaloneReadiness = read("scripts/physical-examination-standalone-readiness.js");
   const standardsBaseline = read("docs/体检系统信息化规范基线-2026-07-15.md");
   const traceability = read("docs/体检系统规范需求追溯矩阵-2026-07-15.md");
   const citizen = read("citizen.js");
@@ -71,7 +75,12 @@ function buildReport(options = {}) {
     check("ui:launch-workbench", page.includes("上线门禁") && page.includes("异常结果闭环") && page.includes("机构联调验收") && client.includes("renderGatewayEvents"), "上线门禁、异常闭环、联调与死信工作台"),
     check("ui:resident-history", citizen.includes('{ key: "physical-exam", label: "体检报告" }') && citizen.includes("renderPhysicalExamMeta"), "居民健康档案体检分类与详情"),
     check("ui:highlight-experience", page.includes("健康时光机") && page.includes("报告质量啄木鸟") && citizenPage.includes("我的体检健康时光机") && citizen.includes("renderCitizenPhysicalExamHighlights"), "管理端和居民端完整亮点体验"),
-    check("ui:idempotency", client.includes("result.routedDuplicates") && client.includes("未重复归档"), "前端反馈一般体检和专项分流幂等去重结果")
+    check("ui:idempotency", client.includes("result.routedDuplicates") && client.includes("未重复归档"), "前端反馈一般体检和专项分流幂等去重结果"),
+    check("standalone:entry", page.includes("physical-examination-standalone.html") && standalonePage.includes("健康体检独立生产控制面"), "平台体检页可进入独立生产控制面"),
+    check("standalone:domain-boundary", !/(emergency|blood|imaging)-(service|ui|innovation)/i.test(standalonePage) && standalonePage.includes("physical-examination-production.js"), "独立入口只加载体检域脚本，不依赖急救、用血或影像模块"),
+    check("standalone:production-control", production.includes("mapSourceReport") && production.includes("validateIntegrationReceipt") && production.includes("validateReportSignatureContract") && production.includes("validateArchiveEvidence"), "字段映射、接入回执、医学签名和原件扫描归档门禁"),
+    check("standalone:care-closure", production.includes("schedule-review") && production.includes("family-doctor-followup") && production.includes("真实送达回执"), "异常确认、送达、复查、家医随访和关闭顺序门禁"),
+    check("standalone:operations-gates", production.includes("validateStandaloneSmoke") && production.includes("validateRollbackGate") && standaloneClient.includes("NO-GO") && standaloneReadiness.includes("goLiveReady: false"), "独立冒烟、回退演练及现场证据未齐时NO-GO")
   ];
   const passed = checks.filter((item) => item.passed).length;
   return {
