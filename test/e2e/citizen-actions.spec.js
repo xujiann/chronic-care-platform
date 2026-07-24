@@ -5,6 +5,19 @@ test("citizen mobile action dock remembers and resets the current service order"
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
   });
+  await page.route("**/api/record-care-workspace**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        corrections: [],
+        sharePackages: [],
+        taskUpdates: {},
+        syncedAt: new Date().toISOString(),
+        cursor: "e2e-citizen-actions"
+      })
+    });
+  });
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/login.html");
