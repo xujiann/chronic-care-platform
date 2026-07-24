@@ -2388,6 +2388,8 @@ function bindVaultSearch(resident, diseases, followups, records) {
       document.querySelector("#vault-search-keyword")?.focus();
     };
   }
+  const exportButton = document.querySelector("#export-health-record");
+  if (exportButton) exportButton.onclick = () => exportCitizenHealthRecord(resident.id);
 }
 
 function renderVault(resident, diseases, followups, records) {
@@ -2669,6 +2671,23 @@ function exportCitizenAuthorizationReceipts(residentId) {
   link.click();
   URL.revokeObjectURL(url);
   showToast("最小化授权回执证据已导出");
+}
+
+function exportCitizenHealthRecord(residentId) {
+  const records = residentCareRecords(residentId);
+  const archive = window.CitizenRecordsV2.buildResidentPortableArchive(records, residentId);
+  if (!archive.recordCount) {
+    showToast("暂无可导出的健康档案摘要");
+    return;
+  }
+  const payload = JSON.stringify(archive, null, 2).replace(/</g, "\\u003c");
+  const url = URL.createObjectURL(new Blob([payload], { type: "application/json;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `resident-health-record-${new Date().toISOString().slice(0, 10)}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+  showToast(`已导出 ${archive.recordCount} 条最小化健康摘要`);
 }
 
 function renderCitizenCareWorkspace(resident, diseases = []) {
