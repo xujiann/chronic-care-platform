@@ -29,7 +29,7 @@ test("production gate opens only with public integration and non-placeholder evi
     "test/citizen-records-policy.test.js": read("test/citizen-records-policy.test.js"),
     "test/e2e/citizen-records-v1.spec.js": read("test/e2e/citizen-records-v1.spec.js"),
     "server.js": "require('./citizen-records-policy'); evaluateCitizenRecordAccess(); record-care-workspace record-corrections record-share-packages",
-    "service-worker.js": "citizen-records-v2.js?v=20260724care11 citizen.js?v=20260724care11"
+    "service-worker.js": "citizen-records-v2.js?v=20260724care12 citizen.js?v=20260724care12"
   };
   const env = {
     OIDC_ISSUER_URL: "https://identity.health.gov.cn/issuer",

@@ -2769,8 +2769,8 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(citizenHtml, /rel="manifest"/);
   assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
   assert.match(citizenHtml, /citizen-records-v1\.js\?v=20260724auth3/);
-  assert.match(citizenHtml, /citizen-records-v2\.js\?v=20260724care11/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260724care11/);
+  assert.match(citizenHtml, /citizen-records-v2\.js\?v=20260724care12/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260724care12/);
   assert.match(citizenHtml, /mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-title/);
@@ -3126,7 +3126,7 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   assert.match(citizenJs, /setEscortAppointmentAvailability/);
   assert.match(citizenJs, /escortProviderReady/);
   assert.match(citizenJs, /暂无可预约服务主体/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260724care11/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260724care12/);
   assert.match(citizenJs, /\/escort-services\/orders/);
   assert.match(citizenJs, /getEscortRegistrationOptions/);
   assert.match(citizenJs, /applyLinkedRegistrationToEscortForm/);
@@ -3342,8 +3342,8 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenHtml, /service-summary/);
   assert.match(citizenHtml, /service-mobile-pagebar/);
   assert.match(citizenHtml, /citizen-action-dock/);
-  assert.match(citizenHtml, /citizen\.css\?v=20260724care8/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260724care11/);
+  assert.match(citizenHtml, /citizen\.css\?v=20260724care9/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260724care12/);
   assert.match(citizenHtml, /当前服务常用操作/);
   assert.match(citizenHtml, /service-health-record/);
   assert.match(citizenHtml, /service-emr/);
@@ -3629,7 +3629,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /longterm-care-form/);
   assert.match(citizenCss, /registration-form/);
   assert.match(citizenHtml, /registration-summary/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260724care11/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260724care12/);
   assert.match(citizenJs, /registration-summary/);
   assert.match(citizenJs, /hisOrders/);
   assert.match(citizenJs, /insuranceReady/);
@@ -4623,6 +4623,7 @@ test("citizen record V2 exposes twelve governed care capabilities", () => {
     "projectAuthorizationCreateResponse",
     "projectAuthorizationRevocationResponse",
     "buildAuthorizationReceiptLedger",
+    "buildAuthorizationReceiptExportRows",
     "buildAuthorizationLifecycle",
     "buildAuthorizationRenewalDraft"
   ].forEach((contract) => assert.match(model, new RegExp(contract)));
@@ -4650,6 +4651,7 @@ test("citizen record V2 exposes twelve governed care capabilities", () => {
   assert.match(ui, /authorization-create/);
   assert.match(ui, /authorization-revoke/);
   assert.match(ui, /citizen-authorization-receipt-summary/);
+  assert.match(ui, /exportCitizenAuthorizationReceipts/);
   assert.match(css, /record-high-contrast/);
   assert.match(css, /min-height: 44px/);
   assert.match(css, /vault-search-fields/);
@@ -4666,6 +4668,7 @@ test("citizen record V2 exposes twelve governed care capabilities", () => {
   assert.match(documentation, /授权状态展示一致性/);
   assert.match(documentation, /授权有效期自然日边界/);
   assert.match(documentation, /授权操作回执核验台/);
+  assert.match(documentation, /授权回执最小化证据导出/);
   assert.match(documentation, /T04 上线门禁/);
   assert.match(html, /data-record-accessibility="text-down"/);
   assert.match(html, /data-record-accessibility="text-up"/);
@@ -4677,11 +4680,12 @@ test("citizen record V2 exposes twelve governed care capabilities", () => {
   assert.match(html, /data-export-access-review/);
   assert.match(html, /citizen-authorization-lifecycle-list/);
   assert.match(html, /citizen-authorization-receipt-list/);
+  assert.match(html, /data-export-authorization-receipts/);
   assert.match(html, /previousAuthorizationId/);
   assert.match(html, /vault-search-keyword/);
   assert.match(html, /vault-search-trust/);
   assert.match(html, /vault-search-status/);
   assert.match(html, /auth-scope-preview/);
-  assert.match(html, /citizen-records-v2\.js\?v=20260724care11/);
-  assert.match(html, /citizen\.js\?v=20260724care11/);
+  assert.match(html, /citizen-records-v2\.js\?v=20260724care12/);
+  assert.match(html, /citizen\.js\?v=20260724care12/);
 });

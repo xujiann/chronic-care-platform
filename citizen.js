@@ -2652,6 +2652,25 @@ function exportCitizenAccessReview(residentId) {
   showToast("最小化访问清单已导出");
 }
 
+function exportCitizenAuthorizationReceipts(residentId) {
+  const records = getPersonalRecords(residentId, "authorizations");
+  const rows = window.CitizenRecordsV2.buildAuthorizationReceiptExportRows(records, residentId);
+  if (!rows.length) {
+    showToast("暂无可导出的授权回执");
+    return;
+  }
+  const headers = ["授权标识", "授权对象", "生命周期", "证据状态", "创建受理号", "创建审计号", "创建受理时间", "撤销受理号", "撤销审计号", "撤销受理时间"];
+  const fields = ["authorizationId", "granteeName", "lifecycle", "evidenceState", "creationReceiptId", "creationAuditRef", "creationAcceptedAt", "revocationReceiptId", "revocationAuditRef", "revocationAcceptedAt"];
+  const csv = `\uFEFF${headers.map(safeCsvCell).join(",")}\r\n${rows.map((row) => fields.map((field) => safeCsvCell(row[field])).join(",")).join("\r\n")}`;
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `resident-authorization-receipts-${residentId}-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+  showToast("最小化授权回执证据已导出");
+}
+
 function renderCitizenCareWorkspace(resident, diseases = []) {
   const api = window.CitizenRecordsV2;
   const target = document.querySelector("#citizen-care-workspace");
@@ -3046,6 +3065,10 @@ function bindCitizenCareWorkspace() {
 
   document.querySelector("[data-export-access-review]")?.addEventListener("click", () => {
     exportCitizenAccessReview(currentResidentId);
+  });
+
+  document.querySelector("[data-export-authorization-receipts]")?.addEventListener("click", () => {
+    exportCitizenAuthorizationReceipts(currentResidentId);
   });
 
   document.querySelector("[data-refresh-care-workspace]")?.addEventListener("click", () => {

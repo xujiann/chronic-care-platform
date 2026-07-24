@@ -1182,6 +1182,21 @@
     };
   }
 
+  function buildAuthorizationReceiptExportRows(records = [], residentId = "") {
+    return buildAuthorizationReceiptLedger(records, residentId).items.map((item) => ({
+      authorizationId: item.id,
+      granteeName: item.granteeName,
+      lifecycle: item.lifecycleLabel,
+      evidenceState: item.verified ? "complete" : "incomplete",
+      creationReceiptId: item.creation.receiptId,
+      creationAuditRef: item.creation.auditRef,
+      creationAcceptedAt: item.creation.acceptedAt,
+      revocationReceiptId: item.revocation.required ? item.revocation.receiptId : "",
+      revocationAuditRef: item.revocation.required ? item.revocation.auditRef : "",
+      revocationAcceptedAt: item.revocation.required ? item.revocation.acceptedAt : ""
+    }));
+  }
+
   function buildAuthorizationLifecycle(records = [], now = new Date(), warningDays = 30) {
     const reference = toDate(now) || new Date();
     const warningWindowDays = Math.max(1, Math.min(Number(warningDays) || 30, 90));
@@ -1312,6 +1327,7 @@
     buildAccessExportRows,
     filterResidentRecords,
     buildAuthorizationReceiptLedger,
+    buildAuthorizationReceiptExportRows,
     buildAuthorizationLifecycle,
     buildAuthorizationRenewalDraft,
     summarizeCareWorkspace
