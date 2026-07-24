@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="健康体检独立模块生产控制面" />
+    <title>健康体检独立模块 · 生产控制面</title>
+    <style>
+      :root { color-scheme: light; --ink:#17342f; --muted:#61736f; --line:#d8e5e1; --soft:#f1f8f6; --brand:#087f6d; --warn:#a35b00; --bad:#a3261d; }
+      * { box-sizing:border-box; }
+      body { margin:0; color:var(--ink); background:#f4f8f7; font:15px/1.55 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif; }
+      main { width:min(1180px,calc(100% - 28px)); margin:auto; padding:24px 0 48px; }
+      header,section { padding:20px; border:1px solid var(--line); border-radius:16px; background:#fff; box-shadow:0 8px 24px rgba(23,52,47,.06); }
+      header { color:#fff; background:linear-gradient(135deg,#075d51,#149580); }
+      h1,h2,p { margin-top:0; }
+      h1 { margin-bottom:8px; }
+      .boundary { max-width:850px; opacity:.9; }
+      .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin-top:16px; }
+      .cards { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+      .card { padding:13px; border:1px solid var(--line); border-radius:11px; background:var(--soft); }
+      .card span,.card small { display:block; color:var(--muted); }
+      .card strong { display:block; margin:4px 0; font-size:20px; overflow-wrap:anywhere; }
+      .status { display:inline-block; padding:6px 10px; border-radius:999px; font-weight:800; color:#fff; background:var(--warn); }
+      .status.go { background:var(--brand); }
+      textarea { width:100%; min-height:370px; padding:12px; border:1px solid var(--line); border-radius:10px; font:13px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace; resize:vertical; }
+      button { padding:10px 14px; border:0; border-radius:9px; color:#fff; background:var(--brand); font:inherit; font-weight:800; cursor:pointer; }
+      ul { padding-left:20px; }
+      code { padding:2px 5px; border-radius:5px; background:var(--soft); }
+      .checks { display:grid; gap:8px; padding:0; list-style:none; }
+      .checks li { padding:10px; border-left:4px solid var(--brand); border-radius:8px; background:var(--soft); }
+      .checks li.failed { border-left-color:var(--bad); background:#fff1ef; }
+      .checks small { display:block; color:var(--muted); overflow-wrap:anywhere; }
+      .error { color:var(--bad); font-weight:800; }
+      @media (max-width:820px) { .grid,.cards { grid-template-columns:1fr; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <span>模块 ID · physical-examination</span>
+        <h1>健康体检独立生产控制面</h1>
+        <p class="boundary">只加载体检域文件，不依赖急救、用血或影像模块。真实现场回执、医学文档签名、原件扫描归档、异常闭环、独立签署、冒烟和回退证据任一缺失时，结论固定为 NO-GO。</p>
+        <strong class="status" id="standalone-decision">NO-GO</strong>
+      </header>
+
+      <section style="margin-top:16px">
+        <h2>独立模块能力</h2>
+        <div class="cards" id="standalone-capabilities"></div>
+      </section>
+
+      <div class="grid">
+        <section>
+          <h2>体检源系统字段映射</h2>
+          <p>内置体检中心与医院两个版本化画像，输出统一成人健康体检文档字段和映射回执。</p>
+          <div id="standalone-mapping-profiles"></div>
+        </section>
+        <section>
+          <h2>生产证据要求</h2>
+          <p>所有证据只记录引用、摘要和回执，不在浏览器持久化患者原始载荷。</p>
+          <div id="standalone-evidence-requirements"></div>
+        </section>
+      </div>
+
+      <div class="grid">
+        <section>
+          <h2>现场证据包</h2>
+          <p>粘贴已脱敏的证据包 JSON 后执行本地校验。页面不会上传或保存内容。</p>
+          <textarea id="standalone-bundle" spellcheck="false" aria-label="现场证据包 JSON"></textarea>
+          <p><button id="standalone-run" type="button">运行 Go-Live 门禁</button></p>
+          <p id="standalone-error" class="error" role="alert"></p>
+        </section>
+        <section>
+          <h2>门禁结果</h2>
+          <div class="cards" id="standalone-summary"></div>
+          <ul class="checks" id="standalone-checks"></ul>
+          <h3>阻断项</h3>
+          <ul id="standalone-blockers"></ul>
+        </section>
+      </div>
+    </main>
+    <script src="./physical-examination-standards.js"></script>
+    <script src="./physical-examination-production.js"></script>
+    <script src="./physical-examination-standalone.js"></script>
+  </body>
+</html>
