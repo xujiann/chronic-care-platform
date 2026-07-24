@@ -65,6 +65,13 @@ test("resident creates a scoped consent and revokes it through the dedicated aud
   expect(healthRecordExport.recordCount).toBeGreaterThan(0);
   expect(healthRecordExport.records.every((item) => ["labs", "imaging"].includes(item.category))).toBe(true);
   expect(Object.keys(healthRecordExport.categoryCounts).sort()).toEqual(["imaging", "labs"]);
+  expect(healthRecordExport.integrity.algorithm).toBe("SHA-256");
+  expect(healthRecordExport.integrity.digest).toMatch(/^[a-f0-9]{64}$/);
+  expect(healthRecordExport.integrity.assurance).toBe("integrity-only-not-source-signature");
+  expect(await page.evaluate((archive) => window.CitizenRecordsV2.verifyResidentPortableArchive(archive), healthRecordExport)).toBe(true);
+  const changedHealthRecordExport = structuredClone(healthRecordExport);
+  changedHealthRecordExport.records[0].summary = "tampered";
+  expect(await page.evaluate((archive) => window.CitizenRecordsV2.verifyResidentPortableArchive(archive), changedHealthRecordExport)).toBe(false);
   const healthRecordText = JSON.stringify(healthRecordExport);
   expect(healthRecordText).not.toMatch(/residentId|personIndex|auditHash|sourceRecordId|studyInstanceUID|imageCloudStudyId|attachmentId|objectPath|viewerUrl/);
 

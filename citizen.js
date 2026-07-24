@@ -2711,21 +2711,22 @@ function openCitizenHealthRecordExport(residentId) {
   dialog.showModal();
 }
 
-function exportCitizenHealthRecord(residentId, categories) {
+async function exportCitizenHealthRecord(residentId, categories) {
   const records = residentCareRecords(residentId);
   const archive = window.CitizenRecordsV2.buildResidentPortableArchive(records, residentId, new Date(), categories);
   if (!archive.recordCount) {
     showToast("所选分类暂无可导出的健康档案摘要");
     return false;
   }
-  const payload = JSON.stringify(archive, null, 2).replace(/</g, "\\u003c");
+  const sealedArchive = await window.CitizenRecordsV2.sealResidentPortableArchive(archive);
+  const payload = JSON.stringify(sealedArchive, null, 2).replace(/</g, "\\u003c");
   const url = URL.createObjectURL(new Blob([payload], { type: "application/json;charset=utf-8" }));
   const link = document.createElement("a");
   link.href = url;
   link.download = `resident-health-record-${new Date().toISOString().slice(0, 10)}.json`;
   link.click();
   URL.revokeObjectURL(url);
-  showToast(`已导出 ${archive.recordCount} 条最小化健康摘要`);
+  showToast(`已导出 ${archive.recordCount} 条摘要，并附 SHA-256 完整性校验`);
   return true;
 }
 
@@ -5383,14 +5384,22 @@ function bindDialogs() {
   document.querySelectorAll("#health-record-export-form input[name='categories']").forEach((input) => {
     input.addEventListener("change", () => renderCitizenHealthRecordExportPreview(currentResidentId));
   });
-  document.querySelector("#health-record-export-form")?.addEventListener("submit", (event) => {
+  document.querySelector("#health-record-export-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const categories = selectedCitizenHealthRecordExportCategories(event.currentTarget);
     if (!categories.length) {
       showToast("请至少选择一类健康资料");
       return;
     }
-    if (exportCitizenHealthRecord(currentResidentId, categories)) event.currentTarget.closest("dialog").close();
+    const confirmButton = document.querySelector("#health-record-export-confirm");
+    if (confirmButton) confirmButton.disabled = true;
+    try {
+      if (await exportCitizenHealthRecord(currentResidentId, categories)) event.currentTarget.closest("dialog").close();
+    } catch (error) {
+      showToast(error.message || "档案副本完整性校验失败，未生成文件");
+    } finally {
+      if (event.currentTarget.closest("dialog")?.open) renderCitizenHealthRecordExportPreview(currentResidentId);
+    }
   });
   document.querySelectorAll("[data-close]").forEach((button) => {
     button.addEventListener("click", () => button.closest("dialog").close());

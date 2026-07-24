@@ -1260,6 +1260,59 @@
     };
   }
 
+  function stablePortableArchiveJson(value) {
+    if (Array.isArray(value)) return `[${value.map((item) => stablePortableArchiveJson(item)).join(",")}]`;
+    if (value && typeof value === "object") {
+      return `{${Object.keys(value)
+        .filter((key) => value[key] !== undefined)
+        .sort()
+        .map((key) => `${JSON.stringify(key)}:${stablePortableArchiveJson(value[key])}`)
+        .join(",")}}`;
+    }
+    return JSON.stringify(value);
+  }
+
+  function portableArchiveDigestPayload(archive = {}) {
+    if (!archive || archive.schema !== "resident-health-record-export-v1" || !Array.isArray(archive.records)) {
+      throw new Error("健康档案副本格式不受支持");
+    }
+    const { integrity, ...payload } = archive;
+    return stablePortableArchiveJson(payload);
+  }
+
+  async function portableArchiveSha256(value, cryptoProvider = globalThis.crypto) {
+    if (!cryptoProvider?.subtle || typeof TextEncoder === "undefined") {
+      throw new Error("当前环境不支持健康档案完整性校验");
+    }
+    const digest = await cryptoProvider.subtle.digest("SHA-256", new TextEncoder().encode(value));
+    return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+
+  async function sealResidentPortableArchive(archive = {}, cryptoProvider = globalThis.crypto) {
+    const digest = await portableArchiveSha256(portableArchiveDigestPayload(archive), cryptoProvider);
+    return {
+      ...archive,
+      integrity: {
+        algorithm: "SHA-256",
+        digest,
+        scope: "canonical-json-without-integrity",
+        assurance: "integrity-only-not-source-signature"
+      }
+    };
+  }
+
+  async function verifyResidentPortableArchive(archive = {}, cryptoProvider = globalThis.crypto) {
+    if (archive?.integrity?.algorithm !== "SHA-256"
+      || archive.integrity.scope !== "canonical-json-without-integrity"
+      || !/^[a-f0-9]{64}$/.test(archive.integrity.digest || "")) return false;
+    try {
+      const expected = await portableArchiveSha256(portableArchiveDigestPayload(archive), cryptoProvider);
+      return expected === archive.integrity.digest;
+    } catch {
+      return false;
+    }
+  }
+
   function buildAuthorizationReceiptLedger(records = [], residentId = "") {
     const expectedResidentId = cleanText(residentId, 120);
     const items = (Array.isArray(records) ? records : [])
@@ -1455,6 +1508,8 @@
     buildAccessExportRows,
     filterResidentRecords,
     buildResidentPortableArchive,
+    sealResidentPortableArchive,
+    verifyResidentPortableArchive,
     buildAuthorizationReceiptLedger,
     buildAuthorizationReceiptExportRows,
     buildAuthorizationLifecycle,
