@@ -167,6 +167,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
   process.env.DATA_DIR = dataDir;
   process.env.STORAGE_ENGINE = "json";
   process.env.SMS_DELIVERY_CALLBACK_SECRET = "sms-callback-secret-with-at-least-32-characters";
+  delete process.env.CARE_CUTOVER_EVIDENCE_FILE;
+  delete process.env.CARE_CUTOVER_EVIDENCE_SHA256;
   const { server, startServer, stopServer } = require(path.join(ROOT, "server.js"));
   startServer(0);
   await once(server, "listening");
@@ -2749,6 +2751,50 @@ test("API authentication, scoping and governance regression suite", async (t) =>
   const commissionLogin = await login(baseUrl, "health");
   assert.equal(commissionLogin.response.status, 200);
   const commissionToken = commissionLogin.body.token;
+
+  await t.test("exposes only a commission-scoped redacted care-service readiness summary", async () => {
+    const anonymous = await api(baseUrl, "/api/care-services/readiness");
+    assert.equal(anonymous.response.status, 401);
+
+    const institutionLogin = await login(baseUrl, "hospital");
+    const forbidden = await api(baseUrl, "/api/care-services/readiness", authorized(institutionLogin.body.token));
+    assert.equal(forbidden.response.status, 403);
+
+    const readiness = await api(
+      baseUrl,
+      "/api/care-services/readiness?platformIntegrated=false&cutoverEvidenceValidation=approved&CARE_CUTOVER_EVIDENCE_FILE=forged",
+      authorized(commissionToken)
+    );
+    assert.equal(readiness.response.status, 200);
+    assert.deepEqual(
+      Object.keys(readiness.body).sort(),
+      ["blockerCounts", "formalGoLiveState", "safeErrorCodes", "scopes"]
+    );
+    assert.equal(readiness.body.formalGoLiveState, "blocked-by-production-configuration-or-health");
+    assert.equal(readiness.body.blockerCounts.platform, 0);
+    assert.equal(readiness.body.blockerCounts.signoff, 5);
+    assert.deepEqual(readiness.body.scopes.map((item) => item.scope), ["business", "interface", "security", "dr", "oncall"]);
+    assert.equal(readiness.body.scopes.every((item) => item.passed === false), true);
+    assert.equal(readiness.body.safeErrorCodes.includes("CUTOVER_EVIDENCE_DIGEST_MISMATCH"), true);
+    assert.equal(readiness.body.safeErrorCodes.every((code) => /^CUTOVER_EVIDENCE_[A-Z0-9_]+$/.test(code)), true);
+    const serialized = JSON.stringify(readiness.body);
+    ["signerId", "evidenceRef", "CARE_CUTOVER_EVIDENCE_FILE", "cutover-evidence.json", "secret"].forEach((marker) => {
+      assert.equal(serialized.includes(marker), false, `${marker} must not be exposed`);
+    });
+
+    const forgedWrite = await api(baseUrl, "/api/care-services/readiness", authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({
+        platformIntegrated: true,
+        cutoverEvidenceValidation: {
+          ok: true,
+          approvedScopes: ["business", "interface", "security", "dr", "oncall"]
+        },
+        env: { CARE_CUTOVER_EVIDENCE_FILE: "forged" }
+      })
+    }));
+    assert.equal(forgedWrite.response.status, 405);
+  });
 
   await t.test("returns governance modules to the commission role and repairs seeded text", async () => {
     const { response, body } = await api(baseUrl, "/api/state", authorized(commissionToken));

@@ -88,6 +88,7 @@ const CareServicePlatform = require("./care-service-platform-adapter");
 const CareServiceRuntime = require("./care-service-runtime");
 const { createCareServiceDeliveryAdapters } = require("./care-service-delivery-adapters");
 const { createCareServiceStateRepository } = require("./care-service-state-repository");
+const { buildCareServiceProductionReadiness } = require("./scripts/care-service-production-readiness");
 const PHYSICAL_EXAM_CONTRACT_ID = "physical-exam-report-v1";
 const EmergencyService = require("./emergency-service");
 const EmergencyLifeChain = require("./emergency-lifechain");
@@ -23587,6 +23588,47 @@ function sendCareServiceError(res, error) {
   sendJson(res, response.status, response.body);
 }
 
+function careServiceReadinessPublicSummary(report = {}) {
+  const requiredScopes = ["business", "interface", "security", "dr", "oncall"];
+  const errors = Array.isArray(report.cutoverEvidence?.errors) ? report.cutoverEvidence.errors : [];
+  const safeCode = (value) => /^CUTOVER_EVIDENCE_[A-Z0-9_]+$/.test(String(value || ""));
+  const globalCodes = errors
+    .filter((item) => !item?.scope)
+    .map((item) => String(item.code || ""))
+    .filter(safeCode);
+  const signoffChecks = new Map(
+    (Array.isArray(report.checks) ? report.checks : [])
+      .filter((item) => String(item.id || "").startsWith("signoff:"))
+      .map((item) => [String(item.id).slice("signoff:".length), item])
+  );
+  const scopes = requiredScopes.map((scope) => {
+    const errorCodes = [
+      ...globalCodes,
+      ...errors
+        .filter((item) => item?.scope === scope)
+        .map((item) => String(item.code || ""))
+        .filter(safeCode)
+    ];
+    return {
+      scope,
+      passed: signoffChecks.get(scope)?.passed === true,
+      errorCodes: [...new Set(errorCodes)]
+    };
+  });
+  return {
+    formalGoLiveState: String(report.formalGoLiveState || "blocked-by-production-configuration-or-health"),
+    blockerCounts: {
+      total: Number(report.summary?.blockers || 0),
+      code: Number(report.summary?.codeBlockers || 0),
+      platform: Number(report.summary?.platformBlockers || 0),
+      runtime: Number(report.summary?.runtimeBlockers || 0),
+      signoff: Number(report.summary?.signoffBlockers || 0)
+    },
+    scopes,
+    safeErrorCodes: [...new Set(scopes.flatMap((item) => item.errorCodes))]
+  };
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -28567,6 +28609,30 @@ async function handleApi(req, res) {
     } catch (error) {
       sendCareServiceError(res, error);
     }
+    return;
+  }
+
+  if (url.pathname === "/api/care-services/readiness") {
+    const user = requireApiRole(req, res, ["commission"], "/api/care-services/readiness");
+    if (!user) return;
+    if (req.method !== "GET") {
+      sendJson(res, 405, { error: "Method Not Allowed", message: "care-service readiness is read-only" });
+      return;
+    }
+    const report = buildCareServiceProductionReadiness({
+      data: readDatabase(),
+      env: process.env
+    });
+    const summary = careServiceReadinessPublicSummary(report);
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "care-service-production-readiness",
+      target: "/api/care-services/readiness",
+      result: "allowed",
+      detail: `${summary.formalGoLiveState}; ${summary.blockerCounts.total} blockers`
+    });
+    sendJson(res, 200, summary);
     return;
   }
 
@@ -35909,6 +35975,7 @@ if (require.main === module) {
 
 module.exports = {
   assertProductionRuntimeSecurity,
+  careServiceReadinessPublicSummary,
   createCareServiceRuntimeDependencies,
   cleanupRuntimeSessions,
   ensureDatabase,

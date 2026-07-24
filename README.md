@@ -518,7 +518,9 @@ The public nursing and escort create and transition APIs now call `care-service-
 
 Notification receipts use the signed, order/message/channel-bound route `POST /api/care-services/:domain/orders/:id/notification-receipts/:messageId`. Operations users can read `/api/care-services/outbox/health` and `/api/care-services/outbox/dead-letters`; controlled replay requires the exact confirmation phrase and an evidence reference. The independent worker loads `care-service-production-runtime.js` through `CARE_SERVICE_RUNTIME_MODULE` and sends HMAC-bound HTTPS envelopes. Endpoint, transport or secret failures are retried and dead-lettered rather than reported as successful.
 
-Run `npm.cmd run care-service:test` and `npm.cmd run care-service:readiness`. Platform integration does not make the module production-ready: real identity/organization directories, HIS and appointment interfaces, message/payment/insurance/signature callbacks, production transactional storage, SIEM/alert duty, disaster recovery evidence and all five site signoffs remain hard blockers.
+Production cutover approval is accepted only from the exact file configured by `CARE_CUTOVER_EVIDENCE_FILE` when its bytes match `CARE_CUTOVER_EVIDENCE_SHA256`. The manifest must contain current, production- and policy-bound, independently signed approvals for business, interface, security, disaster recovery and on-call scopes; standalone `CARE_CUTOVER_*_SIGNOFF=signed` flags are ignored. Commission users can read the redacted gate at `GET /api/care-services/readiness`; it exposes only the formal state, blocker counts, per-scope pass/fail and safe validation error codes.
+
+Run `npm.cmd run care-service:test` and `npm.cmd run care-service:readiness`. Platform integration does not make the module production-ready: real identity/organization directories, HIS and appointment interfaces, message/payment/insurance/signature callbacks, production transactional storage, SIEM/alert duty, disaster recovery evidence and all five evidence-bound site approvals remain hard blockers.
 
 ## Health Dashboard Aggregate Entry
 

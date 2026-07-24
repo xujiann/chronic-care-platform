@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-23T15:46:27.316Z",
+  "updatedAt": "2026-07-24T01:33:00.000Z",
   "decisions": [
     {
       "lineId": "T01",
@@ -120,26 +120,30 @@
     },
     {
       "lineId": "T06",
-      "candidateHead": "50762b31c824897b2cdfb085c8150d0eb46c5e23",
+      "candidateHead": "ffc0fd9b8d5a759a1f60d68871092cd738fe0b39",
       "decision": "accepted",
       "acceptedCandidateHeads": [
         "8a161560f69016ec8372cfd89dfbf24afb047a80",
-        "50762b31c824897b2cdfb085c8150d0eb46c5e23"
+        "50762b31c824897b2cdfb085c8150d0eb46c5e23",
+        "ffc0fd9b8d5a759a1f60d68871092cd738fe0b39"
       ],
-      "reviewedAt": "2026-07-23T15:46:27.316Z",
+      "reviewedAt": "2026-07-24T01:33:00.000Z",
       "reviewer": "T00",
       "checks": [
         "git diff --check",
-        "T06 candidate 50762b3 was merged exactly before T00 public-file integration",
-        "72 of 72 domain, write-path, transaction, worker, readiness, repository and signed-delivery tests passed",
+        "T06 candidate ffc0fd9 was cherry-picked exactly as c205561 with T00 platform gate conflict resolution",
+        "77 of 77 domain, write-path, transaction, worker, cutover-evidence, readiness, repository and signed-delivery tests passed",
         "public nursing and escort create and transition routes now call care-service-platform-adapter instead of legacy direct persistence",
         "authenticated actor and institution scope, Idempotency-Key and server time are bound before every public command",
         "order and outbox collections commit through one repository transaction with SQLite collection-version CAS",
         "signed notification receipts bind domain, order, message, channel and provider result",
         "health, dead-letter listing, exact-confirmation replay and commission worker endpoints are registered",
         "CARE_SERVICE_RUNTIME_MODULE resolves to the T00 production runtime with signed HTTPS nursing and escort delivery adapters",
-        "release report passes 403 total checks with 402 passed, 0 failed and 1 warning",
-        "care-service report is codeReady=true, platformIntegrated=true and productionReady=false"
+        "cutover approval requires a deployment-pinned evidence manifest with five current independent scopes; standalone signed flags and injected validation are ignored",
+        "commission-only care-service readiness endpoint returns only formal state, blocker counts, five scope results and safe error codes",
+        "37 of 37 public API tests and 15 of 15 release/evidence tests passed",
+        "release report passes 406 total checks with 405 passed, 0 failed and 1 warning",
+        "care-service report is codeReady=true, platformIntegrated=true, runtimeReady=false, signoffsReady=false and productionReady=false"
       ],
       "blockers": []
     },

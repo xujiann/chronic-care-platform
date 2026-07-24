@@ -5,8 +5,8 @@
   "description": "慢病医防融合管理平台本地 MVP",
   "scripts": {
     "dev": "node server.js",
-    "care-service:check": "node --check care-service-runtime.js && node --check care-service-platform-adapter.js && node --check care-service-state-repository.js && node --check care-service-delivery-adapters.js && node --check care-service-production-runtime.js && node --check scripts/care-service-outbox-worker.js && node --check scripts/care-service-production-readiness.js",
-    "care-service:test": "node --test test/nursing-escort-domain.test.js test/internet-nursing-service.test.js test/escort-service.test.js test/care-service-runtime.test.js test/care-service-platform-adapter.test.js test/care-service-outbox-worker.test.js test/care-service-production-readiness.test.js test/care-service-state-repository.test.js test/care-service-delivery-adapters.test.js",
+    "care-service:check": "node --check care-service-runtime.js && node --check care-service-platform-adapter.js && node --check care-service-state-repository.js && node --check care-service-delivery-adapters.js && node --check care-service-production-runtime.js && node --check care-service-cutover-evidence.js && node --check scripts/care-service-outbox-worker.js && node --check scripts/care-service-production-readiness.js",
+    "care-service:test": "node --test test/nursing-escort-domain.test.js test/internet-nursing-service.test.js test/escort-service.test.js test/care-service-runtime.test.js test/care-service-platform-adapter.test.js test/care-service-outbox-worker.test.js test/care-service-cutover-evidence.test.js test/care-service-production-readiness.test.js test/care-service-state-repository.test.js test/care-service-delivery-adapters.test.js",
     "care-service:readiness": "node scripts/care-service-production-readiness.js",
     "care-service:worker": "node scripts/care-service-outbox-worker.js",
     "t10:specialty-cutover": "node emergency-specialty-cutover.js",
