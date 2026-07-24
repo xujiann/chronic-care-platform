@@ -52,6 +52,15 @@ function buildDiseasePaymentReadiness() {
   const formalCallback = { eventId: "readiness-grouper-event-001", correlationId: formalJobDispatched.job.correlationId, officialResults: [officialReceipt] };
   const callbackSignature = GrouperContract.signTrustedGrouperCallback(formalCallback, { secret: callbackSecret, timestamp: callbackTimestamp, nonce: callbackNonce, sourceId: callbackSourceId });
   const formalJobReceived = Intake.receiveTrustedFormalGroupingReceipt(formalJobDispatched.state, formalJobCreated.job.id, formalCallback, { env: { NODE_ENV: "production" }, secret: callbackSecret, timestamp: callbackTimestamp, nonce: callbackNonce, sourceId: callbackSourceId, allowedSourceIds: [callbackSourceId], signature: callbackSignature, nowMs: callbackNowMs }, Service.calculateCase);
+  const grouperProductionContract = GrouperContract.buildGrouperProductionConfiguration({
+    DISEASE_PAYMENT_GROUPER_ENDPOINT: "https://readiness-grouper.example.test/v1/jobs",
+    DISEASE_PAYMENT_GROUPER_CALLBACK_SECRET: callbackSecret,
+    DISEASE_PAYMENT_GROUPER_CALLBACK_ALLOWED_SOURCES: callbackSourceId,
+    DISEASE_PAYMENT_GROUPER_TRUSTED_SIGNER_FINGERPRINTS: grouperFingerprint,
+    DISEASE_PAYMENT_GROUPER_CREDENTIAL_REFERENCE: "vault://readiness/grouper/client-credential",
+    DISEASE_PAYMENT_GROUPER_CALLBACK_MAX_SKEW_SECONDS: "300"
+  });
+  const grouperProductionConfiguration = GrouperContract.buildGrouperProductionConfiguration(process.env);
   const failureJobCreated = Intake.createFormalGroupingJob(formalJobReceived.state, { id: "readiness-formal-failure", mode: "DRG", schemeVersion: "DRG-2.0-DL", caseIds: [state.cases[1].id], maxAttempts: 1 }, "readiness-operator");
   const failureJobDead = Intake.dispatchFormalGroupingJob(failureJobCreated.state, failureJobCreated.job.id, { accepted: false, errorCode: "ADAPTER_UNAVAILABLE", errorMessage: "readiness failure rehearsal" }, "readiness-dispatcher");
   const failureJobReconciled = Intake.reconcileFormalGroupingDeadLetter(failureJobDead.state, failureJobCreated.job.id, { resolution: "readiness reconciliation completed" }, "readiness-reconciler");
@@ -178,6 +187,7 @@ function buildDiseasePaymentReadiness() {
     { id: "drg-preview-boundary", label: "DRG试分组非结算效力与正式结果隔离", ok: state.drgPreviewRules?.authority === "non-binding" && Service.simulateDrgCase(state, { caseId: "dp-case-001" }).binding === false },
     { id: "official-receipt-contract", label: "正式回执病例摘要、方案版本与可信数字签名合同", ok: receiptValidation.ok && receiptValidation.signatureVerification?.cryptographicallyValid && receiptValidation.signatureVerification?.trusted && receiptValidation.verificationContract === GrouperContract.SIGNATURE_SCHEMA_VERSION },
     { id: "formal-grouping-async", label: "正式分组异步作业、可信回调、幂等入账与结果账本交叉验真", ok: formalJobDuplicate.idempotent && formalJobReceived.job.status === "completed" && formalJobReceived.run.succeeded === 1 && formalJobReceived.job.receiptCount === 1 && formalJobReceived.callbackEvent.signatureVerified && formalJobReceived.job.trustedCallbackEventId === formalJobReceived.callbackEvent.eventId && Intake.verifyFormalGroupingJobLedger(formalJobReceived.job) && Intake.verifyFormalGroupingResultProjection(formalJobReceived.state, formalJobReceived.job) },
+    { id: "formal-grouper-production-config-contract", label: "正式分组器HTTPS端点、凭据引用、证书指纹、回调密钥/白名单/时间窗脱敏配置门禁", ok: grouperProductionContract.configured && !grouperProductionContract.productionReady && grouperProductionContract.secretsExposed === false && grouperProductionContract.checks.length === 6 },
     { id: "formal-grouping-compensation", label: "正式分组指数退避、死信与人工对账重开", ok: failureJobDead.state.formalGroupingDeadLetters.length === 1 && failureJobReconciled.deadLetter.status === "resolved" && failureJobReconciled.job.status === "queued" && Intake.verifyFormalGroupingJobLedger(failureJobReconciled.job) && Intake.verifyFormalGroupingDeadLetter(failureJobReconciled.deadLetter) && formalOperations.retryPolicy.backoffSeconds.join(",") === "60,120,240" },
     { id: "formal-grouping-integrity", label: "正式分组作业/死信状态投影、结果/测算账本交叉验真与运维最小披露", ok: formalOperations.summary.invalidJobs === 0 && formalOperations.summary.invalidDeadLetters === 0 && formalOperations.jobs.every((item) => item.jobLedgerIntegrity && item.resultIntegrity && item.integrity && item.caseSnapshots === undefined) && formalOperations.deadLetters.every((item) => item.integrity && item.errorMessage === undefined && item.resolution === undefined) },
     { id: "parameter-impact", label: "支付参数病例与机构影响试算", ok: parameterSimulation.report.caseCount === state.cases.length && parameterSimulation.report.byInstitution.length >= 2 && Boolean(parameterSimulation.report.inputDigest) },
@@ -215,7 +225,7 @@ function buildDiseasePaymentReadiness() {
     { id: "formal-grouping-ui", label: "正式分组异步联调与死信工作台", ok: ["data-payment-section=\"formal-grouping-operations\"", "formal-grouping-job-list", "formal-grouping-dead-letter-list"].every((marker) => fs.readFileSync(path.join(ROOT, "disease-payment.html"), "utf8").includes(marker)) },
     { id: "local-package-ui", label: "当地医保正式规则包导入治理工作台", ok: ["data-payment-section=\"local-package-governance\"", "local-package-file", "local-package-list", "local-package-report-list"].every((marker) => fs.readFileSync(path.join(ROOT, "disease-payment.html"), "utf8").includes(marker)) }
   ];
-  return { generatedAt: new Date().toISOString(), policy: state.policy, policy2: state.policy2, summary: { ...overview.summary, intake: intakeSummary, formalGrouping: formalOperations.summary }, checks, ready: checks.every((item) => item.ok), operatingModel, integrationHandoff, externalBlockers: state.externalDependencies.filter((item) => item.requiredForProduction && item.status !== "已联调") };
+  return { generatedAt: new Date().toISOString(), policy: state.policy, policy2: state.policy2, summary: { ...overview.summary, intake: intakeSummary, formalGrouping: formalOperations.summary, grouperProductionConfiguration }, checks, ready: checks.every((item) => item.ok), operatingModel, integrationHandoff, externalBlockers: state.externalDependencies.filter((item) => item.requiredForProduction && item.status !== "已联调") };
 }
 
 function renderMarkdown(report) {
