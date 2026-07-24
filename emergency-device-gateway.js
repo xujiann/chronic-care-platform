@@ -4,6 +4,15 @@ const ATTESTATION_CONFIRMATION = "VERIFY EMERGENCY DEVICE ATTESTATION";
 const DEVICE_CONTROL_CONFIRMATION = "CONFIRM EMERGENCY DEVICE CONTROL";
 const DEFAULT_MAX_SIGNAL_AGE_SECONDS = 120;
 
+// This is a transport contract, not a substitute for a real PKI integration.
+// The gateway keeps only certificate fingerprints and secret references; the TLS
+// terminator and the signing adapter must provide the verification result.
+const INTEGRATION_CERTIFICATE_CONTRACTS = Object.freeze([
+  { id:"120-dispatch-receipt", source:"120-dispatch", messageType:"dispatch-receipt", transport:"mTLS", signatureAlgorithm:"JWS-ES256", maxAgeSeconds:180, requiredFields:["receiptId","eventId","correlationId","occurredAt","decision","signature"] },
+  { id:"ambulance-monitor", source:"ambulance-terminal", messageType:"vital-signal", transport:"mTLS", signatureAlgorithm:"HMAC-SHA256", maxAgeSeconds:120, requiredFields:["deviceId","sourceSignalId","occurredAt","counter","signature"] },
+  { id:"wearable-sos", source:"wearable", messageType:"risk-signal", transport:"mTLS", signatureAlgorithm:"HMAC-SHA256", maxAgeSeconds:120, requiredFields:["deviceId","sourceSignalId","occurredAt","counter","signature"] }
+]);
+
 const ROUTE_CONTRACTS = Object.freeze([
   { method:"GET", path:"/api/emergency/device-gateway", roles:["commission","institution"], handler:"EmergencyDeviceGateway.center" },
   { method:"POST", path:"/api/emergency/device-gateway/devices", roles:["commission"], handler:"EmergencyDeviceGateway.registerDevice" },
@@ -20,6 +29,37 @@ function actor(user = {}) { return clean(user.name || user.username || user.id, 
 function fail(message, status = 400) { throw Object.assign(new Error(message), { status, statusCode:status }); }
 function requireCommission(user) { if (user?.role !== "commission") fail("commission role is required", 403); }
 function validSha256(value) { return /^[a-f0-9]{64}$/i.test(clean(value, 64)); }
+
+function integrationCertificateContract(id) {
+  const contract = INTEGRATION_CERTIFICATE_CONTRACTS.find((item)=>item.id === clean(id, 80));
+  if (!contract) fail("integration certificate contract not found", 404);
+  return contract;
+}
+
+function validateIntegrationEnvelope(contractId, payload = {}, options = {}) {
+  const contract = integrationCertificateContract(contractId);
+  const peer = options.mtlsPeer || {};
+  if (peer.verified !== true || !validSha256(peer.certificateFingerprint)) fail("verified mTLS peer certificate fingerprint is required", 401);
+  if (clean(payload.signatureAlgorithm, 40) !== contract.signatureAlgorithm) fail("signature algorithm does not match the integration contract", 400);
+  if (!contract.requiredFields.every((field)=>clean(payload[field], 300))) fail("integration envelope is missing required contract fields", 400);
+  const occurredAt = new Date(payload.occurredAt);
+  const receivedAt = new Date(now(options));
+  if (Number.isNaN(occurredAt.getTime()) || Number.isNaN(receivedAt.getTime()) || Math.abs(receivedAt - occurredAt) > contract.maxAgeSeconds * 1000) fail("integration envelope is outside the accepted clock window", 409);
+  if (typeof options.signatureVerifier !== "function") fail("integration signature verifier is not configured", 503);
+  const verified = options.signatureVerifier({ contract, payload, certificateFingerprint:clean(peer.certificateFingerprint, 64).toLowerCase() });
+  if (verified !== true) fail("integration envelope signature is invalid", 401);
+  return {
+    contractId:contract.id,
+    source:contract.source,
+    messageType:contract.messageType,
+    correlationId:clean(payload.correlationId, 150),
+    certificateFingerprint:clean(peer.certificateFingerprint, 64).toLowerCase(),
+    signatureAlgorithm:contract.signatureAlgorithm,
+    verifiedAt:receivedAt.toISOString(),
+    rawCertificatePersisted:false,
+    rawSecretPersisted:false
+  };
+}
 
 function seed() {
   return {
@@ -265,14 +305,17 @@ module.exports = {
   ATTESTATION_CONFIRMATION,
   DEFAULT_MAX_SIGNAL_AGE_SECONDS,
   DEVICE_CONTROL_CONFIRMATION,
+  INTEGRATION_CERTIFICATE_CONTRACTS,
   ROUTE_CONTRACTS,
   canonicalSignal,
   center,
   ensure,
+  integrationCertificateContract,
   manageDevice,
   receiveSignedSignal,
   registerDevice,
   seed,
   submitAttestation,
+  validateIntegrationEnvelope,
   verifyAttestation
 };
