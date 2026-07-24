@@ -1,0 +1,138 @@
+{
+  "schemaVersion": "care-service-dependency-evidence-v1",
+  "policyVersion": "care-service-runtime-v1",
+  "environment": "production",
+  "releaseId": "replace-with-approved-change-id",
+  "probes": [
+    {
+      "dependency": "storage",
+      "status": "pending",
+      "checkType": "signed-health",
+      "checkedAt": null,
+      "expiresAt": null,
+      "targetDigest": "replace-with-storage-target-sha256",
+      "receiptRef": "replace-with-storage-receipt-reference",
+      "receiptDigest": "replace-with-storage-receipt-sha256"
+    },
+    {
+      "dependency": "identity",
+      "status": "pending",
+      "checkType": "authenticated-read-only",
+      "checkedAt": null,
+      "expiresAt": null,
+      "targetDigest": "replace-with-identity-target-sha256",
+      "receiptRef": "replace-with-identity-receipt-reference",
+      "receiptDigest": "replace-with-identity-receipt-sha256"
+    },
+    {
+      "dependency": "sms",
+      "status": "pending",
+      "checkType": "controlled-smoke",
+      "checkedAt": null,
+      "expiresAt": null,
+      "targetDigest": "replace-with-sms-target-sha256",
+      "receiptRef": "replace-with-sms-receipt-reference",
+      "receiptDigest": "replace-with-sms-receipt-sha256"
+    },
+    {
+      "dependency": "his",
+      "status": "pending",
+      "checkType": "authenticated-read-only",
+      "checkedAt": null,
+      "expiresAt": null,
+      "targetDigest": "replace-with-his-target-sha256",
+      "receiptRef": "replace-with-his-receipt-reference",
+      "receiptDigest": "replace-with-his-receipt-sha256"
+    },
+    {
+      "dependency": "appointment",
+      "status": "pending",
+      "checkType": "authenticated-read-only",
+      "checkedAt": null,
+      "expiresAt": null,
+      "targetDigest": "replace-with-appointment-target-sha256",
+      "receiptRef": "replace-with-appointment-receipt-reference",
+      "receiptDigest": "replace-with-appointment-receipt-sha256"
+    },
+    {
+      "dependency": "object-storage",
+      "status": "pending",
+      "checkType": "controlled-smoke",
+      "checkedAt": null,
+      "expiresAt": null,
+      "targetDigest": "replace-with-object-storage-target-sha256",
+      "receiptRef": "replace-with-object-storage-receipt-reference",
+      "receiptDigest": "replace-with-object-storage-receipt-sha256"
+    },
+    {
+      "dependency": "payment",
+      "status": "pending",
+      "checkType": "signed-health",
+      "checkedAt": null,
+      "expiresAt": null,
+      "targetDigest": "replace-with-payment-target-sha256",
+      "receiptRef": "replace-with-payment-receipt-reference",
+      "receiptDigest": "replace-with-payment-receipt-sha256"
+    },
+    {
+      "dependency": "insurance",
+      "status": "pending",
+      "checkType": "signed-health",
+      "checkedAt": null,
+      "expiresAt": null,
+      "targetDigest": "replace-with-insurance-target-sha256",
+      "receiptRef": "replace-with-insurance-receipt-reference",
+      "receiptDigest": "replace-with-insurance-receipt-sha256"
+    },
+    {
+      "dependency": "certificate",
+      "status": "pending",
+      "checkType": "signed-health",
+      "checkedAt": null,
+      "expiresAt": null,
+      "targetDigest": "replace-with-certificate-target-sha256",
+      "receiptRef": "replace-with-certificate-receipt-reference",
+      "receiptDigest": "replace-with-certificate-receipt-sha256"
+    },
+    {
+      "dependency": "audit",
+      "status": "pending",
+      "checkType": "controlled-smoke",
+      "checkedAt": null,
+      "expiresAt": null,
+      "targetDigest": "replace-with-audit-target-sha256",
+      "receiptRef": "replace-with-audit-receipt-reference",
+      "receiptDigest": "replace-with-audit-receipt-sha256"
+    },
+    {
+      "dependency": "outbox-worker",
+      "status": "pending",
+      "checkType": "signed-health",
+      "checkedAt": null,
+      "expiresAt": null,
+      "targetDigest": "replace-with-outbox-worker-target-sha256",
+      "receiptRef": "replace-with-outbox-worker-receipt-reference",
+      "receiptDigest": "replace-with-outbox-worker-receipt-sha256"
+    },
+    {
+      "dependency": "nursing-delivery",
+      "status": "pending",
+      "checkType": "controlled-smoke",
+      "checkedAt": null,
+      "expiresAt": null,
+      "targetDigest": "replace-with-nursing-delivery-target-sha256",
+      "receiptRef": "replace-with-nursing-delivery-receipt-reference",
+      "receiptDigest": "replace-with-nursing-delivery-receipt-sha256"
+    },
+    {
+      "dependency": "escort-delivery",
+      "status": "pending",
+      "checkType": "controlled-smoke",
+      "checkedAt": null,
+      "expiresAt": null,
+      "targetDigest": "replace-with-escort-delivery-target-sha256",
+      "receiptRef": "replace-with-escort-delivery-receipt-reference",
+      "receiptDigest": "replace-with-escort-delivery-receipt-sha256"
+    }
+  ]
+}
