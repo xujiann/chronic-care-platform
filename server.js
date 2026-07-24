@@ -23612,9 +23612,15 @@ function sendCareServiceError(res, error) {
 
 function careServiceReadinessPublicSummary(report = {}) {
   const requiredScopes = ["business", "interface", "security", "dr", "oncall"];
-  const errors = Array.isArray(report.cutoverEvidence?.errors) ? report.cutoverEvidence.errors : [];
-  const safeCode = (value) => /^CUTOVER_EVIDENCE_[A-Z0-9_]+$/.test(String(value || ""));
-  const globalCodes = errors
+  const requiredDependencies = [
+    "storage", "identity", "sms", "his", "appointment", "object-storage",
+    "payment", "insurance", "certificate", "audit", "outbox-worker",
+    "nursing-delivery", "escort-delivery"
+  ];
+  const cutoverErrors = Array.isArray(report.cutoverEvidence?.errors) ? report.cutoverEvidence.errors : [];
+  const dependencyErrors = Array.isArray(report.dependencyEvidence?.errors) ? report.dependencyEvidence.errors : [];
+  const safeCode = (value) => /^(?:CUTOVER_EVIDENCE|CARE_DEPENDENCY_EVIDENCE)_[A-Z0-9_]+$/.test(String(value || ""));
+  const globalCodes = cutoverErrors
     .filter((item) => !item?.scope)
     .map((item) => String(item.code || ""))
     .filter(safeCode);
@@ -23626,7 +23632,7 @@ function careServiceReadinessPublicSummary(report = {}) {
   const scopes = requiredScopes.map((scope) => {
     const errorCodes = [
       ...globalCodes,
-      ...errors
+      ...cutoverErrors
         .filter((item) => item?.scope === scope)
         .map((item) => String(item.code || ""))
         .filter(safeCode)
@@ -23637,6 +23643,26 @@ function careServiceReadinessPublicSummary(report = {}) {
       errorCodes: [...new Set(errorCodes)]
     };
   });
+  const globalDependencyCodes = dependencyErrors
+    .filter((item) => !item?.dependency)
+    .map((item) => String(item.code || ""))
+    .filter(safeCode);
+  const healthyDependencies = new Set(
+    Array.isArray(report.dependencyEvidence?.healthyDependencies)
+      ? report.dependencyEvidence.healthyDependencies
+      : []
+  );
+  const dependencies = requiredDependencies.map((dependency) => ({
+    dependency,
+    passed: healthyDependencies.has(dependency),
+    errorCodes: [...new Set([
+      ...globalDependencyCodes,
+      ...dependencyErrors
+        .filter((item) => item?.dependency === dependency)
+        .map((item) => String(item.code || ""))
+        .filter(safeCode)
+    ])]
+  }));
   return {
     formalGoLiveState: String(report.formalGoLiveState || "blocked-by-production-configuration-or-health"),
     blockerCounts: {
@@ -23647,7 +23673,11 @@ function careServiceReadinessPublicSummary(report = {}) {
       signoff: Number(report.summary?.signoffBlockers || 0)
     },
     scopes,
-    safeErrorCodes: [...new Set(scopes.flatMap((item) => item.errorCodes))]
+    dependencies,
+    safeErrorCodes: [...new Set([
+      ...scopes.flatMap((item) => item.errorCodes),
+      ...dependencies.flatMap((item) => item.errorCodes)
+    ])]
   };
 }
 
