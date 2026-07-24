@@ -9,10 +9,48 @@ const {
   renderMarkdown,
   writeReport
 } = require("../scripts/care-service-production-readiness");
+const {
+  EVIDENCE_SCHEMA_VERSION,
+  REQUIRED_SCOPES,
+  sha256
+} = require("../care-service-cutover-evidence");
+const Runtime = require("../care-service-runtime");
 const NursingService = require("../internet-nursing-service");
 
 const AT = "2026-07-23T01:00:00.000Z";
 const SECRET = "production-secret-material-0123456789abcdef";
+
+function approvedCutoverManifest(overrides = {}) {
+  return {
+    schemaVersion: EVIDENCE_SCHEMA_VERSION,
+    policyVersion: Runtime.RUNTIME_POLICY_VERSION,
+    environment: "production",
+    releaseId: "CARE-CHANGE-20260724-001",
+    approvals: REQUIRED_SCOPES.map((scope, index) => ({
+      scope,
+      decision: "approved",
+      signerId: `${scope}-approver-001`,
+      signedAt: "2026-07-23T00:30:00.000Z",
+      expiresAt: "2026-08-23T00:30:00.000Z",
+      evidenceRef: `urn:care-cutover:${scope}:20260723`,
+      evidenceDigest: `sha256:${String(index + 1).repeat(64)}`
+    })),
+    ...overrides
+  };
+}
+
+function withApprovedCutoverEvidence(t, env = productionEnv()) {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "care-service-cutover-ready-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const raw = Buffer.from(JSON.stringify(approvedCutoverManifest(), null, 2), "utf8");
+  const file = path.join(directory, "cutover-evidence.json");
+  fs.writeFileSync(file, raw);
+  return {
+    ...env,
+    CARE_CUTOVER_EVIDENCE_FILE: file,
+    CARE_CUTOVER_EVIDENCE_SHA256: sha256(raw)
+  };
+}
 
 function productionEnv(overrides = {}) {
   return {
@@ -75,12 +113,12 @@ test("default report keeps completed code separate from external production bloc
   assert.equal(report.summary.signoffBlockers, 5);
   assert.match(report.boundary, /real production configuration/);
   assert.match(renderMarkdown(report), /Production ready: NO/);
-  assert.match(renderMarkdown(report), /Demo values must not be used/);
+  assert.match(renderMarkdown(report), /Demo values or standalone signed flags must not be used/);
 });
 
-test("fully configured environment and healthy queue produce a cutover-ready result", () => {
+test("fully configured environment and healthy queue produce a cutover-ready result", (t) => {
   const report = buildCareServiceProductionReadiness({
-    env: productionEnv(),
+    env: withApprovedCutoverEvidence(t),
     data: {},
     at: AT,
     platformIntegrated: true
@@ -92,6 +130,28 @@ test("fully configured environment and healthy queue produce a cutover-ready res
   assert.equal(report.productionReady, true);
   assert.equal(report.formalGoLiveState, "ready-for-production-cutover");
   assert.equal(report.blockers.length, 0);
+});
+
+test("standalone signed flags and injected validation cannot bypass the archived cutover evidence gate", () => {
+  const report = buildCareServiceProductionReadiness({
+    env: productionEnv(),
+    data: {},
+    at: AT,
+    platformIntegrated: true,
+    cutoverEvidenceValidation: {
+      ok: true,
+      releaseId: "forged-release",
+      requiredScopes: [...REQUIRED_SCOPES],
+      approvedScopes: [...REQUIRED_SCOPES],
+      errors: []
+    }
+  });
+  assert.equal(report.runtimeReady, true);
+  assert.equal(report.signoffsReady, false);
+  assert.equal(report.productionReady, false);
+  assert.equal(report.formalGoLiveState, "blocked-until-site-evidence-signed");
+  assert.equal(report.summary.signoffBlockers, 5);
+  assert.equal(report.cutoverEvidence.errors.some((item) => item.code === "CUTOVER_EVIDENCE_DIGEST_MISMATCH"), true);
 });
 
 test("dead letters and insecure endpoints block otherwise complete production configuration", () => {
