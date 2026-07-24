@@ -183,6 +183,14 @@
         <div id="solution-a-studies"><p>正在读取DICOMweb检查清单...</p></div>
       </section>
 
+      <section class="panel wide" data-imaging-section="production-gate">
+        <div class="panel-title">
+          <h2>生产上线门禁</h2>
+          <span>现场证据、独立核验、故障演练和双人审批未齐备时，系统固定为 No-Go。</span>
+        </div>
+        <div id="production-gate"><p>正在加载生产门禁状态...</p></div>
+      </section>
+
       <section class="panel wide">
         <div class="panel-title">
           <h2>运行总览</h2>
@@ -253,6 +261,15 @@
               <span>影像云检查发起后生成医共体协同工单、互认记录和主索引引用；医共体或卫健端复核后回写结果。</span>
             </div>
             <div class="table-wrap" id="mutual-recognition-table"></div>
+          </section>
+
+          <section class="panel wide" data-imaging-section="recognition-governance">
+            <div class="panel-title">
+              <h2>互认治理与移动性能</h2>
+              <span>按项目目录、质控、时效和负面清单评估；性能采样不包含患者身份信息。</span>
+            </div>
+            <div class="metric-grid" id="imaging-governance-summary"></div>
+            <div class="table-wrap" id="imaging-governance-table"></div>
           </section>
 
           <section class="panel wide" data-imaging-section="development-plan">

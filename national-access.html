@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>国家全民健康数智化平台机构接入门户</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+    <script>window.HealthCityAuth.requireRole(["commission", "institution"])</script>
+  </head>
+  <body class="national-access-page">
+    <main class="portal-shell">
+      <header class="portal-header national-access-hero">
+        <div>
+          <span>国家全民健康数智化平台</span>
+          <h1>机构接入与分级节点控制面</h1>
+          <p>统一管理国家能力中心、分级节点、接入机构、服务包、节点健康和跨省路由。业务数据保留在来源机构或合规节点，按授权、按目的、按最小必要原则流动。</p>
+        </div>
+        <nav aria-label="平台主管导航">
+          <a href="./platform.html">平台主管</a>
+          <a href="./regional-data-sharing.html">区域共享</a>
+          <a href="./imaging-cloud.html">影像云</a>
+          <a href="./about.html">关于</a>
+        </nav>
+      </header>
+
+      <div id="national-access-message" class="national-access-message" role="status" aria-live="polite"></div>
+
+      <section class="metric-grid" id="national-access-metrics" aria-label="接入控制面指标"></section>
+
+      <section class="panel national-architecture-panel">
+        <div class="panel-title">
+          <div>
+            <h2>1+N+M分级协同架构</h2>
+            <p class="muted">国家统一目录、标准和路由；节点承接属地协同；机构按需订阅能力。</p>
+          </div>
+          <span class="badge info" id="cross-province-ready">检查中</span>
+        </div>
+        <div class="national-architecture-flow" aria-label="国家平台分级架构">
+          <article>
+            <strong>1</strong>
+            <h3>国家能力中心</h3>
+            <p>机构注册、服务目录、跨省路由、主索引、授权同意和审计存证。</p>
+          </article>
+          <article>
+            <strong>N</strong>
+            <h3>分级节点</h3>
+            <p>省级、区域或行业节点负责属地治理、协议适配、交换和运行保障。</p>
+          </article>
+          <article>
+            <strong>M</strong>
+            <h3>接入机构</h3>
+            <p>医院、基层、检验、影像、公卫、医保、医药、养老和科研机构按需接入。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <div>
+            <h2>国家服务目录</h2>
+            <p class="muted">机构可独立选择或组合开通，基础依赖由平台自动校验。</p>
+          </div>
+          <span id="service-package-count" class="badge info">0项</span>
+        </div>
+        <div id="national-service-packages" class="national-package-grid"></div>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <div>
+              <h2>分级节点与健康状态</h2>
+              <p class="muted">节点认证和运行健康共同决定跨省路由是否可用。</p>
+            </div>
+          </div>
+          <div id="national-node-table" class="table-wrap"></div>
+        </article>
+        <article class="panel" data-commission-only>
+          <h2>登记节点健康</h2>
+          <form id="node-health-form" class="filter-grid national-access-form">
+            <label>节点<select name="nodeId" required></select></label>
+            <label>状态
+              <select name="status" required>
+                <option value="healthy">健康</option>
+                <option value="degraded">降级</option>
+                <option value="unavailable">不可用</option>
+              </select>
+            </label>
+            <label>延迟（毫秒）<input name="latencyMs" type="number" min="0" max="120000" value="80" required /></label>
+            <label class="full">说明<input name="detail" maxlength="240" placeholder="探测来源、故障或恢复说明" /></label>
+            <button class="primary-button" type="submit">记录健康探测</button>
+          </form>
+        </article>
+      </section>
+
+      <section class="portal-grid" data-commission-only>
+        <article class="panel">
+          <h2>注册分级节点</h2>
+          <form id="node-register-form" class="filter-grid national-access-form">
+            <label>节点编码<input name="nodeCode" placeholder="CN-44" required /></label>
+            <label>节点名称<input name="name" placeholder="省级或区域节点名称" required /></label>
+            <label>节点类型
+              <select name="nodeType" required>
+                <option value="provincial">省级节点</option>
+                <option value="regional">区域节点</option>
+                <option value="sector">行业节点</option>
+              </select>
+            </label>
+            <label>行政区划<input name="regionCode" inputmode="numeric" placeholder="44" required /></label>
+            <label class="full">能力清单<input name="capabilities" placeholder="institution-gateway,clinical-routing,local-policy" /></label>
+            <button class="primary-button" type="submit">提交节点注册</button>
+          </form>
+        </article>
+        <article class="panel">
+          <h2>注册接入机构</h2>
+          <form id="institution-register-form" class="filter-grid national-access-form">
+            <label>本地机构编码<input name="orgCode" placeholder="GD-H001" required /></label>
+            <label>国家机构编码<input name="nationalOrgCode" placeholder="CN-440100-H-001" required /></label>
+            <label class="full">机构名称<input name="name" required /></label>
+            <label>机构类型
+              <select name="institutionType" required>
+                <option value="hospital">医院</option>
+                <option value="primary-care">基层医疗</option>
+                <option value="laboratory">独立检验</option>
+                <option value="imaging-center">影像中心</option>
+                <option value="public-health">公共卫生</option>
+                <option value="insurance">医保</option>
+                <option value="pharmaceutical">医药</option>
+                <option value="elder-care">养老</option>
+                <option value="research">科研</option>
+              </select>
+            </label>
+            <label>行政区划<input name="regionCode" inputmode="numeric" required /></label>
+            <label>接入节点<select name="nodeId" required></select></label>
+            <label>接入方式
+              <select name="accessMode">
+                <option value="provincial-node">经省级节点</option>
+                <option value="institution-gateway">机构接入网关</option>
+                <option value="national-api">国家API直连</option>
+              </select>
+            </label>
+            <button class="primary-button" type="submit">提交机构注册</button>
+          </form>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <div>
+            <h2>接入机构与租户</h2>
+            <p class="muted">机构账户仅显示本机构数据，国家管理账户可管理全部接入机构。</p>
+          </div>
+        </div>
+        <div id="national-institution-table" class="table-wrap"></div>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel">
+          <h2>按需订阅服务包</h2>
+          <form id="subscription-form" class="filter-grid national-access-form">
+            <label>机构<select name="orgCode" required></select></label>
+            <label>服务包<select name="packageId" required></select></label>
+            <label>环境
+              <select name="environment">
+                <option value="sandbox">国家沙箱</option>
+                <option value="pilot">试点环境</option>
+              </select>
+            </label>
+            <label class="full">使用目的<input name="purpose" maxlength="240" placeholder="说明业务场景和使用目的" required /></label>
+            <button class="primary-button" type="submit">申请开通</button>
+          </form>
+        </article>
+        <article class="panel">
+          <h2>规划跨省路由</h2>
+          <form id="route-plan-form" class="filter-grid national-access-form">
+            <label>来源机构<select name="sourceOrgCode" required></select></label>
+            <label>目标机构编码<input name="targetOrgCode" placeholder="ZJ-H001" required /></label>
+            <label>服务包<select name="packageId" required></select></label>
+            <label>居民引用<input name="residentReference" placeholder="脱敏或令牌化引用" /></label>
+            <label class="full">访问目的<input name="purpose" maxlength="120" value="授权临床查询" required /></label>
+            <button class="primary-button" type="submit">验证并生成路由</button>
+          </form>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>服务订阅生命周期</h2>
+          <span class="muted">申请 → 审批 → 激活 → 暂停/取消</span>
+        </div>
+        <div id="national-subscription-table" class="table-wrap"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>跨省路由记录</h2>
+          <span class="muted">只保存寻址、路由和审计元数据，不集中复制原始业务数据。</span>
+        </div>
+        <div id="national-route-table" class="table-wrap"></div>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel" data-commission-only>
+          <h2>签发接入证书</h2>
+          <p class="muted">沙箱和试点证书由控制面管理；生产证书必须使用正式外部CA并提交验收证据。</p>
+          <form id="certificate-form" class="filter-grid national-access-form">
+            <label class="full">证书主体<select name="subjectRef" required></select></label>
+            <label>环境
+              <select name="environment">
+                <option value="sandbox">国家沙箱</option>
+                <option value="pilot">试点环境</option>
+              </select>
+            </label>
+            <label>到期时间<input name="expiresAt" type="datetime-local" /></label>
+            <label class="full">SHA-256公钥指纹<input name="publicKeyFingerprint" minlength="64" maxlength="95" placeholder="64位十六进制指纹" required /></label>
+            <button class="primary-button" type="submit">签发接入证书</button>
+          </form>
+        </article>
+        <article class="panel">
+          <h2>创建开发者密钥</h2>
+          <p class="muted">密钥明文只显示一次；只允许选择机构已激活的服务包权限。</p>
+          <form id="credential-form" class="filter-grid national-access-form">
+            <label>机构<select name="orgCode" required></select></label>
+            <label>环境
+              <select name="environment">
+                <option value="sandbox">国家沙箱</option>
+                <option value="pilot">试点环境</option>
+              </select>
+            </label>
+            <label class="full">密钥名称<input name="name" maxlength="100" placeholder="例如：LIS沙箱接入密钥" required /></label>
+            <label class="full">服务包权限<input name="scopes" placeholder="pkg-identity-basic,pkg-lab-imaging" required /></label>
+            <button class="primary-button" type="submit">创建一次性密钥</button>
+          </form>
+          <div id="credential-secret-output" class="credential-secret-output" hidden>
+            <strong>请立即安全保存，刷新后不再显示：</strong>
+            <code></code>
+          </div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <div>
+              <h2>接入证书</h2>
+              <p class="muted">支持证书签发、到期检查和吊销，不在控制面保存私钥。</p>
+            </div>
+          </div>
+          <div id="national-certificate-table" class="table-wrap"></div>
+        </article>
+        <article class="panel wide">
+          <div class="panel-title">
+            <div>
+              <h2>开发者密钥</h2>
+              <p class="muted">控制面仅保存不可逆摘要和前缀，用于轮换、吊销与审计。</p>
+            </div>
+          </div>
+          <div id="national-credential-table" class="table-wrap"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel">
+          <h2>开发者沙箱调用</h2>
+          <p class="muted">使用创建或轮换时显示的一次性密钥验真。沙箱只接收合同、幂等键和SHA-256摘要，不接收患者原始业务载荷。</p>
+          <form id="sandbox-invoke-form" class="filter-grid national-access-form" autocomplete="off">
+            <label class="full">开发者密钥<input name="developerKey" type="password" autocomplete="new-password" placeholder="nhp_..." required /></label>
+            <label>服务包<select name="packageId" required></select></label>
+            <label>交换合同
+              <select name="contractId" required>
+                <option value="ORG_NODE_REGISTER">机构节点注册</option>
+                <option value="LIS_LAB_REPORT_PUBLISH">LIS检验报告发布</option>
+                <option value="PACS_IMAGING_MANIFEST_PUBLISH">PACS影像清单发布</option>
+                <option value="SHARED_RESULT_QUERY">共享结果查询</option>
+                <option value="MUTUAL_RECOGNITION_DECISION_CALLBACK">互认决策回调</option>
+              </select>
+            </label>
+            <label class="full">幂等键<input name="idempotencyKey" minlength="8" maxlength="120" placeholder="例如：lis-report-20260724-0001" required /></label>
+            <label class="full">业务载荷SHA-256摘要<input name="payloadDigest" minlength="64" maxlength="64" placeholder="64位十六进制摘要" required /></label>
+            <button class="primary-button" type="submit">发送元数据沙箱调用</button>
+          </form>
+          <div id="sandbox-invoke-output" class="credential-secret-output" hidden></div>
+        </article>
+        <article class="panel wide">
+          <div class="panel-title">
+            <div>
+              <h2>API配额与调用审计</h2>
+              <p class="muted">按开发者密钥执行分钟与自然日配额，重复幂等键返回原回执且不重复计量。</p>
+            </div>
+          </div>
+          <div id="national-quota-table" class="table-wrap"></div>
+          <div id="national-api-usage-table" class="table-wrap"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel">
+          <h2>居民授权登记</h2>
+          <p class="muted">国家控制面仅保存脱敏居民引用、授权范围和证据摘要；授权原文始终留在来源机构。</p>
+          <form id="consent-form" class="filter-grid national-access-form">
+            <label class="full">居民脱敏引用<input name="residentReference" placeholder="例如：resident-token-20260724-001" required /></label>
+            <label>来源机构<select name="sourceOrgCode" required></select></label>
+            <label>目标机构代码<input name="targetOrgCodes" placeholder="多个代码用逗号分隔" required /></label>
+            <label>服务包权限<input name="packageIds" value="pkg-lab-imaging" placeholder="多个服务包用逗号分隔" required /></label>
+            <label>交换合同<input name="contractIds" value="SHARED_RESULT_QUERY" placeholder="多个合同用逗号分隔" required /></label>
+            <label class="full">授权用途<input name="purpose" value="授权临床查询" required /></label>
+            <label>法律依据
+              <select name="legalBasis" required>
+                <option value="resident-consent">居民本人同意</option>
+                <option value="legal-representative-consent">法定代理人同意</option>
+                <option value="statutory-public-health-duty">法定公共卫生职责</option>
+                <option value="continuity-of-care">连续医疗服务</option>
+              </select>
+            </label>
+            <label>授权截止时间<input name="validUntil" type="datetime-local" required /></label>
+            <label class="full">授权原文SHA-256摘要<input name="evidenceDigest" minlength="64" maxlength="64" placeholder="64位十六进制摘要" required /></label>
+            <button class="primary-button" type="submit">登记授权范围</button>
+          </form>
+        </article>
+        <article class="panel wide">
+          <div class="panel-title">
+            <div>
+              <h2>授权生命周期</h2>
+              <p class="muted">授权按来源机构、目标机构、服务包、合同、用途和有效期精确校验；撤销后实时阻断新信封。</p>
+            </div>
+          </div>
+          <div id="national-consent-table" class="table-wrap"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel">
+          <h2>开发者 SDK</h2>
+          <p class="muted">浏览器与 Node.js 通用客户端只发送合同、幂等键和摘要，不会透传未知临床字段，也不会持久化密钥。</p>
+          <p><a class="primary-button" href="./national-access-developer-sdk.js" download>下载 JavaScript SDK</a></p>
+          <pre id="national-sdk-example" class="credential-secret-output">正在加载机构适用示例……</pre>
+        </article>
+        <article class="panel wide">
+          <div class="panel-title">
+            <div>
+              <h2>机器可读接入合同</h2>
+              <p class="muted">合同清单依据本机构已激活服务包动态裁剪，生产环境保持硬阻断。</p>
+            </div>
+          </div>
+          <div id="national-sdk-contract-table" class="table-wrap"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel">
+          <h2>登记现有系统适配器</h2>
+          <p class="muted">登记HIS、EMR、LIS、PACS/RIS等系统的配置引用和合同范围；不在控制面保存接口密钥。</p>
+          <form id="adapter-form" class="filter-grid national-access-form">
+            <label>接入机构<select name="orgCode" required></select></label>
+            <label>系统类型
+              <select name="systemType" required>
+                <option value="HIS">HIS</option>
+                <option value="EMR">EMR</option>
+                <option value="LIS" selected>LIS</option>
+                <option value="PACS_RIS">PACS/RIS</option>
+                <option value="EHR">电子健康档案</option>
+                <option value="PUBLIC_HEALTH">公共卫生</option>
+                <option value="INSURANCE">医保</option>
+                <option value="PHARMACY">医药</option>
+              </select>
+            </label>
+            <label class="full">适配器名称<input name="name" value="机构LIS试点适配器" required /></label>
+            <label>厂商<input name="vendor" placeholder="厂商或自研团队" /></label>
+            <label>系统版本<input name="systemVersion" placeholder="例如：2026.1" /></label>
+            <label>接入方式<input name="integrationMode" value="signed-event-callback" required /></label>
+            <label>环境
+              <select name="environment" required>
+                <option value="sandbox">国家沙箱</option>
+                <option value="pilot" selected>试点环境</option>
+              </select>
+            </label>
+            <label class="full">端点配置引用<input name="endpointReference" value="vault://national-access/institution/system/pilot" placeholder="仅填写配置中心引用，不填写密钥" required /></label>
+            <label class="full">机构接入证书<select name="certificateId" required></select></label>
+            <label class="full">支持合同<input name="supportedContracts" value="LIS_LAB_REPORT_PUBLISH" placeholder="多个合同用逗号分隔" required /></label>
+            <label class="full">适配器配置SHA-256摘要<input name="adapterConfigDigest" minlength="64" maxlength="64" placeholder="64位十六进制摘要" required /></label>
+            <button class="primary-button" type="submit">登记适配器</button>
+          </form>
+        </article>
+        <article class="panel wide">
+          <div class="panel-title">
+            <div>
+              <h2>机构适配器台账</h2>
+              <p class="muted">机构完成配置和合同测试，国家管理方根据通过记录执行独立认证。</p>
+            </div>
+          </div>
+          <div id="national-adapter-table" class="table-wrap"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel">
+          <h2>运行合同一致性测试</h2>
+          <form id="contract-test-form" class="filter-grid national-access-form">
+            <label class="full">适配器<select name="adapterId" required></select></label>
+            <label class="full">交换合同<select name="contractId" required></select></label>
+            <label><input name="schemaValid" type="checkbox" value="true" checked /> 模式校验</label>
+            <label><input name="signatureVerified" type="checkbox" value="true" checked /> 签名验真</label>
+            <label><input name="idempotencyVerified" type="checkbox" value="true" checked /> 幂等重放</label>
+            <label><input name="retryVerified" type="checkbox" value="true" checked /> 失败重试</label>
+            <label><input name="auditVerified" type="checkbox" value="true" checked /> 审计追踪</label>
+            <label><input name="minimizationVerified" type="checkbox" value="true" checked /> 最小必要</label>
+            <label class="full">测试证据SHA-256摘要<input name="evidenceDigest" minlength="64" maxlength="64" placeholder="测试报告或证据包摘要" required /></label>
+            <button class="primary-button" type="submit">执行合同测试</button>
+          </form>
+        </article>
+        <article class="panel wide">
+          <div class="panel-title">
+            <div>
+              <h2>合同测试记录</h2>
+              <p class="muted">测试仅登记检查结果和证据摘要，不上传真实接口报文或患者数据。</p>
+            </div>
+          </div>
+          <div id="national-contract-test-table" class="table-wrap"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel">
+          <h2>登记事件回调</h2>
+          <p class="muted">控制面生成签名投递任务，当前只运行沙箱和试点回执闭环，不对生产端点发起网络请求。</p>
+          <form id="callback-form" class="filter-grid national-access-form">
+            <label>接入机构<select name="orgCode" required></select></label>
+            <label>环境
+              <select name="environment" required>
+                <option value="sandbox">国家沙箱</option>
+                <option value="pilot" selected>试点环境</option>
+              </select>
+            </label>
+            <label class="full">订阅名称<input name="name" value="机构联调事件回调" required /></label>
+            <label class="full">端点配置引用<input name="endpointReference" value="vault://national-access/institution/callback" required /></label>
+            <label class="full">事件类型<input name="eventTypes" value="routing-envelope.prepared,consent.revoked,contract-test.completed" required /></label>
+            <label class="full">回调验签公钥SHA-256指纹<input name="publicKeyFingerprint" minlength="64" maxlength="95" placeholder="64位十六进制指纹" required /></label>
+            <button class="primary-button" type="submit">激活回调订阅</button>
+          </form>
+        </article>
+        <article class="panel wide">
+          <div class="panel-title">
+            <div>
+              <h2>回调订阅与投递回执</h2>
+              <p class="muted">每次投递使用稳定幂等键；接收方提交回执摘要后形成完整审计链。</p>
+            </div>
+          </div>
+          <div id="national-callback-table" class="table-wrap"></div>
+          <div id="national-callback-delivery-table" class="table-wrap"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel">
+          <h2>生成LIS/PACS路由信封</h2>
+          <p class="muted">信封携带合同、摘要、同意授权和路由元数据，不携带检验或影像原文。</p>
+          <form id="routing-envelope-form" class="filter-grid national-access-form">
+            <label class="full">已验证路由<select name="routeId" required></select></label>
+            <label class="full">国家交换合同
+              <select name="contractId" required>
+                <option value="LIS_LAB_REPORT_PUBLISH">LIS检验报告发布</option>
+                <option value="PACS_IMAGING_MANIFEST_PUBLISH">PACS影像清单发布</option>
+                <option value="SHARED_RESULT_QUERY">共享结果查询</option>
+                <option value="MUTUAL_RECOGNITION_DECISION_CALLBACK">互认决策回调</option>
+                <option value="ORG_NODE_REGISTER">机构节点注册</option>
+              </select>
+            </label>
+            <label>协议版本<input name="schemaVersion" value="1.0.0" required /></label>
+            <label>同意授权引用<select name="consentReference" required></select></label>
+            <label class="full">业务载荷SHA-256摘要<input name="payloadDigest" minlength="64" maxlength="64" placeholder="64位十六进制摘要" required /></label>
+            <button class="primary-button" type="submit">生成元数据路由信封</button>
+          </form>
+        </article>
+        <article class="panel wide">
+          <div class="panel-title">
+            <div>
+              <h2>路由信封记录</h2>
+              <p class="muted">用于跨省合同校验、全链路追踪、授权核验和防篡改校验。</p>
+            </div>
+          </div>
+          <div id="national-envelope-table" class="table-wrap"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel" data-commission-only>
+          <div class="panel-title">
+            <div>
+              <h2>SLA自动评估</h2>
+              <p class="muted">根据节点状态、探测延迟、探测新鲜度和路由延迟生成告警；自动识别故障转移。</p>
+            </div>
+          </div>
+          <form id="operations-evaluate-form">
+            <button class="primary-button" type="submit">立即评估全国运行状态</button>
+          </form>
+        </article>
+        <article class="panel wide">
+          <div class="panel-title">
+            <div>
+              <h2>SLA告警</h2>
+              <p class="muted">未恢复告警持续保持打开；条件消失后由下一次评估自动关闭。</p>
+            </div>
+          </div>
+          <div id="national-sla-alert-table" class="table-wrap"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel" data-commission-only>
+          <h2>安全凭证生命周期评估</h2>
+          <p class="muted">自动识别30天内到期和已到期证书或密钥；已到期凭证立即失效，恢复条件消失后关闭告警。</p>
+          <form id="security-evaluate-form">
+            <button class="primary-button" type="submit">扫描证书与密钥到期风险</button>
+          </form>
+        </article>
+        <article class="panel wide">
+          <div class="panel-title">
+            <div>
+              <h2>安全凭证告警</h2>
+              <p class="muted">机构账号仅查看本机构告警，国家管理账号查看全国风险。</p>
+            </div>
+          </div>
+          <div id="national-security-alert-table" class="table-wrap"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel" data-commission-only>
+          <h2>出具机构接入认证报告</h2>
+          <p class="muted">检查机构、节点、服务包、证书、开发者密钥和安全告警，认证结果仍不代替生产网络、安全和多方验收。</p>
+          <form id="certification-report-form" class="filter-grid national-access-form">
+            <label class="full">接入机构<select name="orgCode" required></select></label>
+            <label>环境
+              <select name="environment">
+                <option value="sandbox">国家沙箱</option>
+                <option value="pilot" selected>试点环境</option>
+              </select>
+            </label>
+            <button class="primary-button" type="submit">执行检查并出具报告</button>
+          </form>
+        </article>
+        <article class="panel wide">
+          <div class="panel-title">
+            <div>
+              <h2>机构接入认证记录</h2>
+              <p class="muted">通过或有条件通过仅表示接入控制面条件具备，生产开放始终为否。</p>
+            </div>
+          </div>
+          <div id="national-certification-table" class="table-wrap"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid" data-commission-only>
+        <article class="panel">
+          <h2>登记属地标准扩展</h2>
+          <p class="muted">扩展必须基于当前国家版本，字段必须使用节点编码作为命名空间。</p>
+          <form id="standard-extension-form" class="filter-grid national-access-form">
+            <label>属地节点<select name="nodeId" required></select></label>
+            <label>国家标准<select name="standardId" required></select></label>
+            <label>基于版本<input name="basedOnVersion" value="1.0.0" required /></label>
+            <label>扩展版本<input name="extensionVersion" placeholder="1.0.0-local.1" required /></label>
+            <label class="full">扩展名称<input name="name" maxlength="120" required /></label>
+            <label class="full">扩展字段<input name="fields" placeholder="CN-44.localPolicyCode,CN-44.sourceSystem" required /></label>
+            <button class="primary-button" type="submit">校验并登记扩展</button>
+          </form>
+        </article>
+        <article class="panel wide">
+          <div class="panel-title">
+            <div>
+              <h2>国家标准与属地扩展</h2>
+              <p class="muted">兼容扩展可审批；版本或命名空间冲突必须整改或驳回。</p>
+            </div>
+          </div>
+          <div id="national-standard-table" class="table-wrap"></div>
+          <div id="national-extension-table" class="table-wrap"></div>
+        </article>
+      </section>
+    </main>
+    <script src="./national-access.js"></script>
+  </body>
+</html>

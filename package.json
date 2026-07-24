@@ -114,7 +114,9 @@
     "security:commercial-crypto-readiness": "node scripts/commercial-crypto-readiness.js",
     "security:production-readiness": "node scripts/production-security-readiness.js",
     "production:go-no-go-readiness": "node scripts/production-go-no-go-readiness.js",
-    "platform:standards-ledgers": "node scripts/platform-standards-ledgers.js"
+    "platform:standards-ledgers": "node scripts/platform-standards-ledgers.js",
+    "integration:kickoff-readiness": "node --test test/existing-system-integration-readiness.test.js && node scripts/existing-system-integration-readiness.js",
+    "national-access:test": "node --check national-access-service.js && node --check national-access.js && node --check national-access-developer-sdk.js && node --check server.js && node --test test/national-access.test.js test/static.test.js"
   },
   "engines": {
     "node": ">=22.5"

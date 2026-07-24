@@ -44,9 +44,13 @@ const {
   validateQualitySafetyInterfaceMessage
 } = require("./scripts/quality-safety-interface-joint-test");
 const PHYSICAL_EXAM_CONTRACT_ID = "physical-exam-report-v1";
+const DIAGNOSTIC_INTEGRATION_CONTRACT_IDS = new Set(["lis-report-v1", "pacs-report-v1"]);
 const EmergencyService = require("./emergency-service");
 const EmergencyLifeChain = require("./emergency-lifechain");
 const EmergencyProduction = require("./emergency-production");
+const ImagingCloudProduction = require("./imaging-cloud-production");
+const ImagingCloudGovernance = require("./imaging-cloud-governance");
+const NationalAccessService = require("./national-access-service");
 const { buildOhifStudyUrl, listOrthancStudySummaries, publishDiagnosticReportToFhir, publishImagingStudyToFhir, solutionAHealth } = require("./solution-a-connectors");
 const {
   SmsDeliveryCallbackError,
@@ -1024,8 +1028,11 @@ function seedState() {
     countyAiDiagnosisCases: seedCountyAiDiagnosisCases(),
     countyMutualRecognitionRecords: seedCountyMutualRecognitionRecords(),
     countyAcceptanceLedger: seedCountyAcceptanceLedger(),
+    ...NationalAccessService.seed(),
     imageCloudGateways: seedImageCloudGateways(),
     imageCloudStudies: seedImageCloudStudies(),
+    ...ImagingCloudProduction.seed(),
+    ...ImagingCloudGovernance.seed(),
     bloodUnits: BloodService.seedBloodUnits(),
     transfusionRequests: BloodService.seedTransfusionRequests(),
     bloodAuditEvents: BloodService.seedBloodAuditEvents(),
@@ -9930,6 +9937,8 @@ function collectJson(req, maxLength = 2_000_000) {
 }
 
 function normalizeState(data) {
+  const imagingProductionDefaults = ImagingCloudProduction.seed();
+  const imagingGovernanceDefaults = ImagingCloudGovernance.seed();
   const auditTrailSource = {
     dataAccessLogs: Array.isArray(data?.dataAccessLogs) ? data.dataAccessLogs : null,
     securityEvents: Array.isArray(data?.securityEvents) ? data.securityEvents : null
@@ -10021,6 +10030,19 @@ function normalizeState(data) {
     countyAcceptanceLedger: mergeByKey(seedCountyAcceptanceLedger(), data.countyAcceptanceLedger, "id"),
     imageCloudGateways: mergeByKey(seedImageCloudGateways(), data.imageCloudGateways, "id"),
     imageCloudStudies: mergeByKey(seedImageCloudStudies(), data.imageCloudStudies, "id"),
+    imagingProductionEndpoints: mergeByKey(imagingProductionDefaults.imagingProductionEndpoints, data.imagingProductionEndpoints, "id"),
+    imagingSyntheticChecks: mergeByKey(imagingProductionDefaults.imagingSyntheticChecks, data.imagingSyntheticChecks, "id"),
+    imagingProductionRequirements: mergeByKey(imagingProductionDefaults.imagingProductionRequirements, data.imagingProductionRequirements, "id"),
+    imagingProductionDrills: mergeByKey(imagingProductionDefaults.imagingProductionDrills, data.imagingProductionDrills, "id"),
+    imagingCutoverApprovals: mergeByKey(imagingProductionDefaults.imagingCutoverApprovals, data.imagingCutoverApprovals, "id"),
+    imagingSiteReceipts: mergeByKey(imagingProductionDefaults.imagingSiteReceipts, data.imagingSiteReceipts, "id"),
+    imagingProductionAudit: Array.isArray(data.imagingProductionAudit) ? data.imagingProductionAudit.slice(0, 2000) : [],
+    imagingRecognitionCatalog: mergeByKey(imagingGovernanceDefaults.imagingRecognitionCatalog, data.imagingRecognitionCatalog, "id"),
+    imagingRecognitionInstitutions: Array.isArray(data.imagingRecognitionInstitutions) ? data.imagingRecognitionInstitutions : [],
+    imagingRecognitionNegativeRules: mergeByKey(imagingGovernanceDefaults.imagingRecognitionNegativeRules, data.imagingRecognitionNegativeRules, "id"),
+    imagingQualityPlans: mergeByKey(imagingGovernanceDefaults.imagingQualityPlans, data.imagingQualityPlans, "id"),
+    imagingPerformanceEvents: Array.isArray(data.imagingPerformanceEvents) ? data.imagingPerformanceEvents.slice(0, 2000) : [],
+    imagingGovernanceAudit: Array.isArray(data.imagingGovernanceAudit) ? data.imagingGovernanceAudit.slice(0, 500) : [],
     bloodUnits: mergeByKey(BloodService.seedBloodUnits(), data.bloodUnits, "id"),
     transfusionRequests: mergeByKey(BloodService.seedTransfusionRequests(), data.transfusionRequests, "id"),
     bloodAuditEvents: mergeByKey(BloodService.seedBloodAuditEvents(), data.bloodAuditEvents, "id"),
@@ -10119,6 +10141,7 @@ function normalizeState(data) {
     healthArchiveStandard: data.healthArchiveStandard && typeof data.healthArchiveStandard === "object" ? data.healthArchiveStandard : seedHealthArchiveStandard(),
     authOrganizations: mergeByKey(seedAuthOrganizations(), data.authOrganizations, "orgCode"),
     authUsers: mergeByKey(seedAuthUsers(), data.authUsers, "username"),
+    ...NationalAccessService.normalizeState(data),
     interfaceRequirements: mergeByKey(seedInterfaceRequirements(), data.interfaceRequirements, "id"),
     hospitalInteroperabilityFunctions: mergeByKey(seedHospitalInteroperabilityFunctions(), data.hospitalInteroperabilityFunctions, "id"),
     integrationContracts: mergeByKey(seedIntegrationContracts(), data.integrationContracts, "id"),
@@ -10937,6 +10960,7 @@ function buildImageCloudDashboard(data, user, filters = {}) {
     shares,
     qualityReviews: reviews,
     mutualRecognition,
+    governance: ImagingCloudGovernance.dashboard(data, studies),
     implementedFeatures: seedImageCloudImplementedFeatures(),
     developmentPlan: seedImageCloudDevelopmentPlan(),
     emrCompatibility: {
@@ -12357,6 +12381,381 @@ function normalizeDiagnosticReport(payload, user, data) {
     createdBy: user.username || user.role
   } : null;
   return { report, recognition, personalRecord, criticalSignal, rule };
+}
+
+function diagnosticIntegrationField(payload, field, fallback = "") {
+  if (payload?.[field] !== undefined) return payload[field];
+  if (payload?.payload?.[field] !== undefined) return payload.payload[field];
+  return fallback;
+}
+
+function diagnosticIntegrationPayload(payload, event, user) {
+  const contractId = event.contractId;
+  if (!DIAGNOSTIC_INTEGRATION_CONTRACT_IDS.has(contractId)) return null;
+  const isImaging = contractId === "pacs-report-v1";
+  const externalId = String(diagnosticIntegrationField(payload, "externalId")).trim();
+  const residentId = String(diagnosticIntegrationField(payload, "residentId")).trim();
+  const modality = String(diagnosticIntegrationField(payload, "modality")).trim();
+  const bodyPart = String(diagnosticIntegrationField(payload, "bodyPart")).trim();
+  const conclusion = String(diagnosticIntegrationField(payload, "conclusion")).trim();
+  const result = String(diagnosticIntegrationField(payload, "result", conclusion)).trim();
+  const item = String(diagnosticIntegrationField(
+    payload,
+    "item",
+    isImaging ? [modality, bodyPart].filter(Boolean).join(" ") : ""
+  )).trim();
+  const sourceInstitutionCode = String(diagnosticIntegrationField(payload, "sourceInstitutionCode", user.orgCode || "")).trim();
+  const sourceInstitution = String(diagnosticIntegrationField(payload, "sourceInstitution", user.orgName || user.name || sourceInstitutionCode)).trim();
+  const targetInstitution = String(diagnosticIntegrationField(payload, "targetInstitution", "regional-sharing-center")).trim();
+  const reportVersion = Number(diagnosticIntegrationField(payload, "reportVersion", 1));
+  const reportStatus = String(diagnosticIntegrationField(payload, "reportStatus", "final")).trim().toLowerCase();
+  const reportedAt = String(diagnosticIntegrationField(payload, "reportedAt")).trim();
+  if (!externalId) throw new Error("externalId is required");
+  if (!residentId) throw new Error("residentId is required");
+  if (!item) throw new Error("item is required");
+  if (!Number.isInteger(reportVersion) || reportVersion < 1) throw new Error("reportVersion must be a positive integer");
+  if (!Number.isFinite(Date.parse(reportedAt))) throw new Error("reportedAt must be a valid date-time");
+  if (!["final", "published", "approved", "corrected", "amended", "revised", "revoked", "cancelled", "withdrawn"].includes(reportStatus)) {
+    throw new Error("unsupported reportStatus");
+  }
+  if (user.role === "institution" && sourceInstitutionCode && sourceInstitutionCode !== user.orgCode) {
+    throw new Error("source institution scope denied");
+  }
+  return {
+    externalId,
+    residentId,
+    item,
+    itemCode: String(diagnosticIntegrationField(payload, "itemCode")).trim(),
+    category: isImaging ? "imaging" : String(diagnosticIntegrationField(payload, "category", "lab")).trim(),
+    sourceInstitution,
+    sourceInstitutionCode,
+    targetInstitution,
+    result,
+    conclusion: conclusion || result,
+    reportedAt,
+    reportVersion,
+    reportStatus,
+    qualityStatus: String(diagnosticIntegrationField(payload, "qualityStatus", "passed")).trim(),
+    unit: String(diagnosticIntegrationField(payload, "unit")).trim(),
+    referenceRange: String(diagnosticIntegrationField(payload, "referenceRange")).trim(),
+    abnormalFlag: String(diagnosticIntegrationField(payload, "abnormalFlag")).trim(),
+    modality,
+    bodyPart,
+    studyInstanceUID: String(diagnosticIntegrationField(payload, "studyInstanceUID")).trim(),
+    accessionNumber: String(diagnosticIntegrationField(payload, "accessionNumber")).trim(),
+    viewerEndpoint: String(diagnosticIntegrationField(payload, "viewerEndpoint")).trim(),
+    critical: Boolean(diagnosticIntegrationField(payload, "critical", false)),
+    criticalLevel: String(diagnosticIntegrationField(payload, "criticalLevel")).trim(),
+    criticalAction: String(diagnosticIntegrationField(payload, "criticalAction")).trim()
+  };
+}
+
+function diagnosticIntegrationVersionEntry(normalized, event, payloadHash, action, at) {
+  return {
+    version: normalized.reportVersion,
+    sourceStatus: normalized.reportStatus,
+    action,
+    receivedAt: at,
+    eventId: event.id,
+    idempotencyKey: event.idempotencyKey,
+    payloadHash
+  };
+}
+
+function landDiagnosticIntegrationEvent(data, payload, event, user) {
+  if (!DIAGNOSTIC_INTEGRATION_CONTRACT_IDS.has(event.contractId)) return { applied: false, event };
+  try {
+    const normalizedPayload = diagnosticIntegrationPayload(payload, event, user);
+    if (!canAccessResident(user, normalizedPayload.residentId, data)) throw new Error("forbidden resident scope");
+    const now = new Date().toISOString();
+    const payloadHash = createHash("sha256").update(stableStringify(payload)).digest("hex");
+    const reports = Array.isArray(data.diagnosticReports) ? data.diagnosticReports : [];
+    const existing = reports.find((item) =>
+      item.externalId === normalizedPayload.externalId
+      && (
+        String(item.sourceInstitutionCode || "") === normalizedPayload.sourceInstitutionCode
+        || (!item.sourceInstitutionCode && !normalizedPayload.sourceInstitutionCode && item.sourceInstitution === normalizedPayload.sourceInstitution)
+      )
+    );
+    const sourceStatus = normalizedPayload.reportStatus;
+    const action = ["revoked", "cancelled", "withdrawn"].includes(sourceStatus)
+      ? "revoked"
+      : ["corrected", "amended", "revised"].includes(sourceStatus)
+        ? "corrected"
+        : "published";
+
+    if (!existing && action !== "published") throw new Error(`cannot ${action} a report that has not been published`);
+    if (existing && action === "published" && normalizedPayload.reportVersion > Number(existing.reportVersion || 1)) {
+      throw new Error("a higher report version must use corrected, amended or revised status");
+    }
+    if (existing && normalizedPayload.reportVersion < Number(existing.reportVersion || 1)) {
+      throw new Error("stale reportVersion");
+    }
+    if (existing && normalizedPayload.reportVersion === Number(existing.reportVersion || 1)) {
+      if (existing.integrationPayloadHash !== payloadHash) throw new Error("reportVersion conflict");
+      Object.assign(event, {
+        status: "accepted",
+        landingStatus: "matched-existing-version",
+        reconciliationStatus: "matched",
+        deadLetter: false,
+        deadLetterReason: "",
+        reportId: existing.id,
+        reportVersion: existing.reportVersion,
+        sourceReportStatus: existing.reportStatus,
+        resourceId: existing.id,
+        productionEvidence: false
+      });
+      return { applied: true, event, report: existing, idempotentLanding: true };
+    }
+
+    if (!existing) {
+      const derived = normalizeDiagnosticReport(normalizedPayload, user, data);
+      const versionEntry = diagnosticIntegrationVersionEntry(normalizedPayload, event, payloadHash, action, now);
+      let imageCloudStudy = null;
+      Object.assign(derived.report, {
+        sourceInstitutionCode: normalizedPayload.sourceInstitutionCode,
+        reportVersion: normalizedPayload.reportVersion,
+        reportStatus: normalizedPayload.reportStatus,
+        integrationContractId: event.contractId,
+        integrationEventId: event.id,
+        integrationPayloadHash: payloadHash,
+        itemCode: normalizedPayload.itemCode,
+        unit: normalizedPayload.unit,
+        referenceRange: normalizedPayload.referenceRange,
+        abnormalFlag: normalizedPayload.abnormalFlag,
+        modality: normalizedPayload.modality,
+        bodyPart: normalizedPayload.bodyPart,
+        studyInstanceUID: normalizedPayload.studyInstanceUID,
+        accessionNumber: normalizedPayload.accessionNumber,
+        viewerEndpoint: normalizedPayload.viewerEndpoint,
+        versionHistory: [versionEntry],
+        updatedAt: now
+      });
+      if (event.contractId === "pacs-report-v1" && normalizedPayload.studyInstanceUID && normalizedPayload.accessionNumber) {
+        imageCloudStudy = normalizeImageCloudStudy({
+          residentId: normalizedPayload.residentId,
+          institutionCode: normalizedPayload.sourceInstitutionCode,
+          institutionName: normalizedPayload.sourceInstitution,
+          accessionNumber: normalizedPayload.accessionNumber,
+          studyInstanceUID: normalizedPayload.studyInstanceUID,
+          modality: normalizedPayload.modality,
+          bodyPart: normalizedPayload.bodyPart,
+          studyDate: normalizedPayload.reportedAt.slice(0, 10),
+          reportStatus: normalizedPayload.reportStatus,
+          reportConclusion: normalizedPayload.conclusion,
+          accessUrl: normalizedPayload.viewerEndpoint,
+          qcStatus: normalizedPayload.qualityStatus
+        }, user, data);
+        imageCloudStudy.diagnosticReportId = derived.report.id;
+        imageCloudStudy.integrationContractId = event.contractId;
+        imageCloudStudy.integrationEventId = event.id;
+        imageCloudStudy.reportVersion = normalizedPayload.reportVersion;
+        derived.report.imageCloudStudyId = imageCloudStudy.id;
+        derived.report.mainIndex = imageCloudStudy.mainIndex;
+        derived.personalRecord.meta = {
+          ...(derived.personalRecord.meta || {}),
+          imageCloudStudyId: imageCloudStudy.id,
+          mainIndex: imageCloudStudy.mainIndex
+        };
+        data.imageCloudStudies = mergeByKey([imageCloudStudy], data.imageCloudStudies, "id").slice(0, 300);
+      }
+      derived.recognition.sourceInstitutionCode = normalizedPayload.sourceInstitutionCode;
+      derived.recognition.reportVersion = normalizedPayload.reportVersion;
+      derived.personalRecord.status = "active";
+      derived.personalRecord.sourceInstitutionCode = normalizedPayload.sourceInstitutionCode;
+      derived.personalRecord.institutionId = normalizedPayload.sourceInstitutionCode;
+      derived.personalRecord.meta = {
+        ...(derived.personalRecord.meta || {}),
+        reportVersion: normalizedPayload.reportVersion,
+        reportStatus: normalizedPayload.reportStatus,
+        sourceInstitutionCode: normalizedPayload.sourceInstitutionCode,
+        integrationContractId: event.contractId,
+        studyInstanceUID: normalizedPayload.studyInstanceUID,
+        viewerEndpoint: normalizedPayload.viewerEndpoint
+      };
+      if (derived.criticalSignal) derived.criticalSignal.integrationEventId = event.id;
+      data.diagnosticReports = [derived.report, ...reports].slice(0, 300);
+      data.countyMutualRecognitionRecords = [derived.recognition, ...(Array.isArray(data.countyMutualRecognitionRecords) ? data.countyMutualRecognitionRecords : [])].slice(0, 300);
+      data.personalRecords = [derived.personalRecord, ...(Array.isArray(data.personalRecords) ? data.personalRecords : [])].slice(0, 500);
+      if (derived.criticalSignal) {
+        data.emergencySignals = [derived.criticalSignal, ...(Array.isArray(data.emergencySignals) ? data.emergencySignals : [])].slice(0, 200);
+      }
+      Object.assign(event, {
+        status: "accepted",
+        landingStatus: "created",
+        reconciliationStatus: "matched",
+        deadLetter: false,
+        deadLetterReason: "",
+        reportId: derived.report.id,
+        recognitionRecordId: derived.recognition.id,
+        personalRecordId: derived.personalRecord.id,
+        imageCloudStudyId: imageCloudStudy?.id || "",
+        reportVersion: normalizedPayload.reportVersion,
+        sourceReportStatus: normalizedPayload.reportStatus,
+        resourceId: derived.report.id,
+        productionEvidence: false
+      });
+      return { applied: true, event, ...derived, imageCloudStudy, action };
+    }
+
+    const versionEntry = diagnosticIntegrationVersionEntry(normalizedPayload, event, payloadHash, action, now);
+    const recognition = (Array.isArray(data.countyMutualRecognitionRecords) ? data.countyMutualRecognitionRecords : [])
+      .find((item) => item.id === existing.recognitionRecordId);
+    const personalRecord = (Array.isArray(data.personalRecords) ? data.personalRecords : [])
+      .find((item) => item.reportId === existing.id);
+    const imageCloudStudy = (Array.isArray(data.imageCloudStudies) ? data.imageCloudStudies : [])
+      .find((item) => item.id === existing.imageCloudStudyId || (
+        normalizedPayload.studyInstanceUID
+        && item.studyInstanceUID === normalizedPayload.studyInstanceUID
+        && item.institutionCode === normalizedPayload.sourceInstitutionCode
+      ));
+
+    if (action === "revoked") {
+      Object.assign(existing, {
+        reportVersion: normalizedPayload.reportVersion,
+        reportStatus: "revoked",
+        status: "revoked",
+        revokedAt: now,
+        revokedByEventId: event.id,
+        integrationEventId: event.id,
+        integrationPayloadHash: payloadHash,
+        versionHistory: [...(Array.isArray(existing.versionHistory) ? existing.versionHistory : []), versionEntry],
+        updatedAt: now
+      });
+      if (recognition) Object.assign(recognition, {
+        status: "withdrawn",
+        reviewStatus: "withdrawn",
+        reason: "source report revoked",
+        reportVersion: normalizedPayload.reportVersion,
+        updatedAt: now
+      });
+      if (personalRecord) Object.assign(personalRecord, {
+        status: "revoked",
+        visibilityStatus: "hidden",
+        result: "Source report revoked",
+        updatedAt: now,
+        meta: {
+          ...(personalRecord.meta || {}),
+          reportVersion: normalizedPayload.reportVersion,
+          reportStatus: "revoked"
+        }
+      });
+      data.emergencySignals = (Array.isArray(data.emergencySignals) ? data.emergencySignals : []).map((item) =>
+        item.sourceReportId === existing.id && !["resolved", "cancelled"].includes(item.status)
+          ? { ...item, status: "cancelled", action: "Source report revoked; stop pending disposition.", updatedAt: now }
+          : item
+      );
+      if (imageCloudStudy) Object.assign(imageCloudStudy, {
+        reportStatus: "revoked",
+        uploadStatus: "revoked",
+        shareEnabled: false,
+        reportVersion: normalizedPayload.reportVersion,
+        integrationEventId: event.id,
+        updatedAt: now,
+        updatedBy: user.username || user.role
+      });
+    } else {
+      Object.assign(existing, {
+        item: normalizedPayload.item,
+        itemCode: normalizedPayload.itemCode,
+        result: normalizedPayload.result,
+        conclusion: normalizedPayload.conclusion,
+        reportedAt: normalizedPayload.reportedAt,
+        qualityStatus: normalizedPayload.qualityStatus,
+        unit: normalizedPayload.unit,
+        referenceRange: normalizedPayload.referenceRange,
+        abnormalFlag: normalizedPayload.abnormalFlag,
+        modality: normalizedPayload.modality,
+        bodyPart: normalizedPayload.bodyPart,
+        studyInstanceUID: normalizedPayload.studyInstanceUID,
+        accessionNumber: normalizedPayload.accessionNumber,
+        viewerEndpoint: normalizedPayload.viewerEndpoint,
+        reportVersion: normalizedPayload.reportVersion,
+        reportStatus: normalizedPayload.reportStatus,
+        status: "pending_review",
+        reviewStatus: "pending_review",
+        integrationEventId: event.id,
+        integrationPayloadHash: payloadHash,
+        versionHistory: [...(Array.isArray(existing.versionHistory) ? existing.versionHistory : []), versionEntry],
+        updatedAt: now
+      });
+      if (recognition) Object.assign(recognition, {
+        item: normalizedPayload.item,
+        status: "pending_review",
+        reviewStatus: "pending_review",
+        reason: "source report corrected; mutual recognition requires review",
+        qualityStatus: normalizedPayload.qualityStatus,
+        reportVersion: normalizedPayload.reportVersion,
+        updatedAt: now
+      });
+      if (personalRecord) Object.assign(personalRecord, {
+        name: normalizedPayload.item,
+        result: normalizedPayload.conclusion || normalizedPayload.result,
+        recordDate: normalizedPayload.reportedAt.slice(0, 10),
+        status: "active",
+        visibilityStatus: "visible",
+        updatedAt: now,
+        updatedBy: user.username || user.role,
+        updatedByName: user.name,
+        meta: {
+          ...(personalRecord.meta || {}),
+          reportVersion: normalizedPayload.reportVersion,
+          reportStatus: normalizedPayload.reportStatus,
+          studyInstanceUID: normalizedPayload.studyInstanceUID,
+          viewerEndpoint: normalizedPayload.viewerEndpoint
+        }
+      });
+      if (imageCloudStudy) Object.assign(imageCloudStudy, {
+        reportStatus: normalizedPayload.reportStatus,
+        reportConclusion: normalizedPayload.conclusion,
+        modality: normalizedPayload.modality || imageCloudStudy.modality,
+        bodyPart: normalizedPayload.bodyPart || imageCloudStudy.bodyPart,
+        accessUrl: normalizedPayload.viewerEndpoint || imageCloudStudy.accessUrl,
+        qcStatus: normalizedPayload.qualityStatus,
+        reportVersion: normalizedPayload.reportVersion,
+        diagnosticReportId: existing.id,
+        integrationEventId: event.id,
+        updatedAt: now,
+        updatedBy: user.username || user.role
+      });
+      if (normalizedPayload.critical) {
+        const derived = normalizeDiagnosticReport(normalizedPayload, user, data);
+        if (derived.criticalSignal) {
+          derived.criticalSignal.sourceReportId = existing.id;
+          derived.criticalSignal.recognitionRecordId = existing.recognitionRecordId;
+          derived.criticalSignal.integrationEventId = event.id;
+          data.emergencySignals = [derived.criticalSignal, ...(Array.isArray(data.emergencySignals) ? data.emergencySignals : [])].slice(0, 200);
+        }
+      }
+    }
+
+    Object.assign(event, {
+      status: "accepted",
+      landingStatus: action === "revoked" ? "revoked" : "updated",
+      reconciliationStatus: "matched",
+      deadLetter: false,
+      deadLetterReason: "",
+      reportId: existing.id,
+      recognitionRecordId: existing.recognitionRecordId,
+      personalRecordId: personalRecord?.id || "",
+      imageCloudStudyId: imageCloudStudy?.id || existing.imageCloudStudyId || "",
+      reportVersion: normalizedPayload.reportVersion,
+      sourceReportStatus: normalizedPayload.reportStatus,
+      resourceId: existing.id,
+      productionEvidence: false
+    });
+    return { applied: true, event, report: existing, recognition, personalRecord, imageCloudStudy, action };
+  } catch (error) {
+    Object.assign(event, {
+      status: "failed",
+      landingStatus: "rejected",
+      reconciliationStatus: "dead-letter",
+      deadLetter: true,
+      deadLetterReason: String(error.message || "diagnostic report landing failed").slice(0, 240),
+      productionEvidence: false
+    });
+    return { applied: false, event, error };
+  }
 }
 
 function reviewMutualRecognitionRecord(data, id, payload, user) {
@@ -23161,6 +23560,43 @@ function buildRuntimeProductionGoNoGoCenter(data) {
   }, securityCenter);
 }
 
+function sendNationalAccessError(res, error) {
+  if (error instanceof NationalAccessService.NationalAccessError) {
+    sendJson(res, error.status, {
+      ok: false,
+      error: error.code,
+      message: error.message
+    });
+    return;
+  }
+  throw error;
+}
+
+function prependNationalAccessAudit(data, entry) {
+  data.nationalAccessAudit = [entry, ...(Array.isArray(data.nationalAccessAudit) ? data.nationalAccessAudit : [])].slice(0, 2000);
+}
+
+function prepareNationalCallbackDeliveries(data, event, actor) {
+  const prepared = NationalAccessService.createCallbackDeliveries(data, event, actor);
+  if (!prepared.entities.length) return [];
+  data.nationalCallbackDeliveries = [
+    ...prepared.entities,
+    ...(Array.isArray(data.nationalCallbackDeliveries) ? data.nationalCallbackDeliveries : [])
+  ].slice(0, 10000);
+  for (const entry of prepared.audits) prependNationalAccessAudit(data, entry);
+  return prepared.entities;
+}
+
+function assertNationalInstitutionScope(user, orgCode) {
+  if (user?.role !== "institution") return;
+  if (String(user.orgCode || "").toUpperCase() !== String(orgCode || "").toUpperCase()) {
+    throw new NationalAccessService.NationalAccessError("institution users can only manage their own organization", {
+      status: 403,
+      code: "NATIONAL_ACCESS_SCOPE_FORBIDDEN"
+    });
+  }
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -23209,6 +23645,704 @@ async function handleApi(req, res) {
       storage: storageMeta(),
       sessionStore: sessionStoreHealthStatus(sessionStore)
     });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/national-access/sandbox/invoke") {
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      const invoked = NationalAccessService.invokeDeveloperSandbox(
+        data,
+        String(req.headers["x-national-access-key"] || ""),
+        payload
+      );
+      if (!invoked.duplicate) {
+        data.nationalApiUsageEvents = [invoked.event, ...(data.nationalApiUsageEvents || [])].slice(0, 10000);
+        const credentialIndex = (data.nationalDeveloperCredentials || [])
+          .findIndex((item) => item.id === invoked.credential.id);
+        if (credentialIndex >= 0) data.nationalDeveloperCredentials[credentialIndex] = invoked.credential;
+        if (invoked.audit) prependNationalAccessAudit(data, invoked.audit);
+        writeDatabase(data);
+      }
+      res.setHeader("Cache-Control", "no-store");
+      sendJson(res, invoked.duplicate ? 200 : 202, {
+        ok: true,
+        duplicate: invoked.duplicate,
+        acknowledgement: invoked.event.responseMetadata,
+        usage: {
+          credentialId: invoked.event.credentialId,
+          orgCode: invoked.event.orgCode,
+          packageId: invoked.event.packageId,
+          contractId: invoked.event.contractId,
+          minuteUsage: invoked.event.minuteUsage,
+          dailyUsage: invoked.event.dailyUsage,
+          quotaPolicyId: invoked.event.quotaPolicyId
+        }
+      });
+    } catch (error) {
+      sendNationalAccessError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/national-access") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/national-access");
+    if (!user) return;
+    sendJson(res, 200, {
+      ok: true,
+      ...NationalAccessService.buildCenter(readDatabase(), user)
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/national-access/service-packages") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/national-access/service-packages");
+    if (!user) return;
+    const center = NationalAccessService.buildCenter(readDatabase(), user);
+    sendJson(res, 200, {
+      ok: true,
+      generatedAt: center.generatedAt,
+      architecture: center.architecture,
+      servicePackages: center.servicePackages
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/national-access/sdk/manifest") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/national-access/sdk/manifest");
+    if (!user) return;
+    sendJson(res, 200, {
+      ok: true,
+      ...NationalAccessService.buildDeveloperSdkManifest(readDatabase(), user)
+    });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/national-access/nodes") {
+    const user = requireApiRole(req, res, ["commission"], "/api/national-access/nodes");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      const created = NationalAccessService.createNode(data, payload, user);
+      data.nationalAccessNodes = [created.entity, ...(data.nationalAccessNodes || [])];
+      prependNationalAccessAudit(data, created.audit);
+      writeDatabase(data);
+      sendJson(res, 201, { ok: true, node: created.entity });
+    } catch (error) {
+      sendNationalAccessError(res, error);
+    }
+    return;
+  }
+
+  const nationalNodeActionMatch = url.pathname.match(/^\/api\/national-access\/nodes\/([^/]+)\/actions$/);
+  if (req.method === "POST" && nationalNodeActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/national-access/nodes/:id/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const id = decodeURIComponent(nationalNodeActionMatch[1]);
+    try {
+      const index = (data.nationalAccessNodes || []).findIndex((item) => item.id === id);
+      const applied = NationalAccessService.applyLifecycleAction(data.nationalAccessNodes?.[index], String(payload.action || ""), user, "node");
+      data.nationalAccessNodes[index] = applied.entity;
+      prependNationalAccessAudit(data, applied.audit);
+      writeDatabase(data);
+      sendJson(res, 200, { ok: true, node: applied.entity });
+    } catch (error) {
+      sendNationalAccessError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/national-access/institutions") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/national-access/institutions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      assertNationalInstitutionScope(user, payload.orgCode);
+      const created = NationalAccessService.createInstitution(data, payload, user);
+      data.nationalAccessInstitutions = [created.entity, ...(data.nationalAccessInstitutions || [])];
+      prependNationalAccessAudit(data, created.audit);
+      writeDatabase(data);
+      sendJson(res, 201, { ok: true, institution: created.entity });
+    } catch (error) {
+      sendNationalAccessError(res, error);
+    }
+    return;
+  }
+
+  const nationalInstitutionActionMatch = url.pathname.match(/^\/api\/national-access\/institutions\/([^/]+)\/actions$/);
+  if (req.method === "POST" && nationalInstitutionActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/national-access/institutions/:id/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const id = decodeURIComponent(nationalInstitutionActionMatch[1]);
+    try {
+      const index = (data.nationalAccessInstitutions || []).findIndex((item) => item.id === id);
+      const applied = NationalAccessService.applyLifecycleAction(
+        data.nationalAccessInstitutions?.[index],
+        String(payload.action || ""),
+        user,
+        "institution"
+      );
+      data.nationalAccessInstitutions[index] = applied.entity;
+      prependNationalAccessAudit(data, applied.audit);
+      writeDatabase(data);
+      sendJson(res, 200, { ok: true, institution: applied.entity });
+    } catch (error) {
+      sendNationalAccessError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/national-access/subscriptions") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/national-access/subscriptions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      assertNationalInstitutionScope(user, payload.orgCode);
+      const created = NationalAccessService.createSubscription(data, payload, user);
+      data.nationalServiceSubscriptions = [created.entity, ...(data.nationalServiceSubscriptions || [])];
+      prependNationalAccessAudit(data, created.audit);
+      writeDatabase(data);
+      sendJson(res, 201, { ok: true, subscription: created.entity });
+    } catch (error) {
+      sendNationalAccessError(res, error);
+    }
+    return;
+  }
+
+  const nationalSubscriptionActionMatch = url.pathname.match(/^\/api\/national-access\/subscriptions\/([^/]+)\/actions$/);
+  if (req.method === "POST" && nationalSubscriptionActionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/national-access/subscriptions/:id/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const id = decodeURIComponent(nationalSubscriptionActionMatch[1]);
+    try {
+      const index = (data.nationalServiceSubscriptions || []).findIndex((item) => item.id === id);
+      const existing = data.nationalServiceSubscriptions?.[index];
+      assertNationalInstitutionScope(user, existing?.orgCode);
+      if (user.role === "institution" && String(payload.action || "") !== "cancel") {
+        throw new NationalAccessService.NationalAccessError("institution users may only cancel their own subscription request", {
+          status: 403,
+          code: "NATIONAL_ACCESS_ACTION_FORBIDDEN"
+        });
+      }
+      const applied = NationalAccessService.applyLifecycleAction(existing, String(payload.action || ""), user, "subscription");
+      data.nationalServiceSubscriptions[index] = applied.entity;
+      prependNationalAccessAudit(data, applied.audit);
+      writeDatabase(data);
+      sendJson(res, 200, { ok: true, subscription: applied.entity });
+    } catch (error) {
+      sendNationalAccessError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/national-access/node-health") {
+    const user = requireApiRole(req, res, ["commission"], "/api/national-access/node-health");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      const recorded = NationalAccessService.recordNodeHealthProbe(data, payload, user);
+      data.nationalNodeHealthProbes = [recorded.entity, ...(data.nationalNodeHealthProbes || [])].slice(0, 5000);
+      prependNationalAccessAudit(data, recorded.audit);
+      writeDatabase(data);
+      sendJson(res, 201, { ok: true, nodeHealth: recorded.entity });
+    } catch (error) {
+      sendNationalAccessError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/national-access/routes/plan") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/national-access/routes/plan");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      if (user.role === "institution") {
+        assertNationalInstitutionScope(user, payload.sourceOrgCode);
+      }
+      const planned = NationalAccessService.planCrossProvinceRoute(data, payload, user);
+      data.nationalRoutingTraces = [planned.entity, ...(data.nationalRoutingTraces || [])].slice(0, 5000);
+      prependNationalAccessAudit(data, planned.audit);
+      writeDatabase(data);
+      sendJson(res, 201, { ok: true, route: planned.entity });
+    } catch (error) {
+      sendNationalAccessError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/national-access/adapters") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/national-access/adapters");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      assertNationalInstitutionScope(user, payload.orgCode);
+      const created = NationalAccessService.createIntegrationAdapter(data, payload, user);
+      data.nationalIntegrationAdapters = [
+        created.entity,
+        ...(data.nationalIntegrationAdapters || [])
+      ].slice(0, 5000);
+      prependNationalAccessAudit(data, created.audit);
+      writeDatabase(data);
+      sendJson(res, 201, { ok: true, adapter: created.entity });
+    } catch (error) {
+      sendNationalAccessError(res, error);
+    }
+    return;
+  }
+
+  const nationalAdapterTestMatch = url.pathname.match(/^\/api\/national-access\/adapters\/([^/]+)\/contract-tests$/);
+  if (req.method === "POST" && nationalAdapterTestMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/national-access/adapters/:id/contract-tests");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const id = decodeURIComponent(nationalAdapterTestMatch[1]);
+    try {
+      const adapter = (data.nationalIntegrationAdapters || []).find((item) => item.id === id);
+      assertNationalInstitutionScope(user, adapter?.orgCode);
+      const executed = NationalAccessService.runContractConformanceTest(data, id, payload, user);
+      data.nationalContractTestRuns = [
+        executed.entity,
+        ...(data.nationalContractTestRuns || [])
+      ].slice(0, 10000);
+      prependNationalAccessAudit(data, executed.audit);
+      const deliveries = prepareNationalCallbackDeliveries(data, {
+        orgCode: executed.entity.orgCode,
+        eventType: "contract-test.completed",
+        subjectReference: executed.entity.id,
+        eventDigest: executed.entity.evidenceDigest
+      }, user);
+      writeDatabase(data);
+      sendJson(res, 201, { ok: true, contractTest: executed.entity, callbackDeliveries: deliveries });
+    } catch (error) {
+      sendNationalAccessError(res, error);
+    }
+    return;
+  }
+
+  const nationalAdapterActionMatch = url.pathname.match(/^\/api\/national-access\/adapters\/([^/]+)\/actions$/);
+  if (req.method === "POST" && nationalAdapterActionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/national-access/adapters/:id/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const id = decodeURIComponent(nationalAdapterActionMatch[1]);
+    try {
+      const index = (data.nationalIntegrationAdapters || []).findIndex((item) => item.id === id);
+      const existing = data.nationalIntegrationAdapters?.[index];
+      assertNationalInstitutionScope(user, existing?.orgCode);
+      const applied = NationalAccessService.applyIntegrationAdapterAction(
+        data,
+        existing,
+        String(payload.action || ""),
+        user
+      );
+      data.nationalIntegrationAdapters[index] = applied.entity;
+      prependNationalAccessAudit(data, applied.audit);
+      writeDatabase(data);
+      sendJson(res, 200, { ok: true, adapter: applied.entity });
+    } catch (error) {
+      sendNationalAccessError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/national-access/callbacks") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/national-access/callbacks");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      assertNationalInstitutionScope(user, payload.orgCode);
+      const created = NationalAccessService.createCallbackSubscription(data, payload, user);
+      data.nationalCallbackSubscriptions = [
+        created.entity,
+        ...(data.nationalCallbackSubscriptions || [])
+      ].slice(0, 5000);
+      prependNationalAccessAudit(data, created.audit);
+      writeDatabase(data);
+      sendJson(res, 201, { ok: true, callback: created.entity });
+    } catch (error) {
+      sendNationalAccessError(res, error);
+    }
+    return;
+  }
+
+  const nationalCallbackActionMatch = url.pathname.match(/^\/api\/national-access\/callbacks\/([^/]+)\/actions$/);
+  if (req.method === "POST" && nationalCallbackActionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/national-access/callbacks/:id/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const id = decodeURIComponent(nationalCallbackActionMatch[1]);
+    try {
+      const index = (data.nationalCallbackSubscriptions || []).findIndex((item) => item.id === id);
+      const existing = data.nationalCallbackSubscriptions?.[index];
+      assertNationalInstitutionScope(user, existing?.orgCode);
+      const applied = NationalAccessService.applyCallbackSubscriptionAction(
+        existing,
+        String(payload.action || ""),
+        user
+      );
+      data.nationalCallbackSubscriptions[index] = applied.entity;
+      prependNationalAccessAudit(data, applied.audit);
+      writeDatabase(data);
+      sendJson(res, 200, { ok: true, callback: applied.entity });
+    } catch (error) {
+      sendNationalAccessError(res, error);
+    }
+    return;
+  }
+
+  const nationalCallbackDeliveryActionMatch = url.pathname.match(/^\/api\/national-access\/callback-deliveries\/([^/]+)\/actions$/);
+  if (req.method === "POST" && nationalCallbackDeliveryActionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/national-access/callback-deliveries/:id/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const id = decodeURIComponent(nationalCallbackDeliveryActionMatch[1]);
+    try {
+      const index = (data.nationalCallbackDeliveries || []).findIndex((item) => item.id === id);
+      const existing = data.nationalCallbackDeliveries?.[index];
+      assertNationalInstitutionScope(user, existing?.orgCode);
+      const applied = NationalAccessService.applyCallbackDeliveryAction(
+        existing,
+        String(payload.action || ""),
+        payload,
+        user
+      );
+      data.nationalCallbackDeliveries[index] = applied.entity;
+      prependNationalAccessAudit(data, applied.audit);
+      writeDatabase(data);
+      sendJson(res, 200, { ok: true, callbackDelivery: applied.entity });
+    } catch (error) {
+      sendNationalAccessError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/national-access/consents") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/national-access/consents");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      assertNationalInstitutionScope(user, payload.sourceOrgCode);
+      const created = NationalAccessService.createConsentAuthorization(data, payload, user);
+      data.nationalConsentAuthorizations = [
+        created.entity,
+        ...(data.nationalConsentAuthorizations || [])
+      ].slice(0, 5000);
+      prependNationalAccessAudit(data, created.audit);
+      writeDatabase(data);
+      sendJson(res, 201, { ok: true, consent: created.entity });
+    } catch (error) {
+      sendNationalAccessError(res, error);
+    }
+    return;
+  }
+
+  const nationalConsentActionMatch = url.pathname.match(/^\/api\/national-access\/consents\/([^/]+)\/actions$/);
+  if (req.method === "POST" && nationalConsentActionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/national-access/consents/:id/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const id = decodeURIComponent(nationalConsentActionMatch[1]);
+    try {
+      const index = (data.nationalConsentAuthorizations || []).findIndex((item) => item.id === id);
+      const existing = data.nationalConsentAuthorizations?.[index];
+      assertNationalInstitutionScope(user, existing?.sourceOrgCode);
+      const applied = NationalAccessService.applyConsentAuthorizationAction(
+        existing,
+        String(payload.action || ""),
+        user
+      );
+      data.nationalConsentAuthorizations[index] = applied.entity;
+      prependNationalAccessAudit(data, applied.audit);
+      const deliveries = prepareNationalCallbackDeliveries(data, {
+        orgCode: applied.entity.sourceOrgCode,
+        eventType: "consent.revoked",
+        subjectReference: applied.entity.id,
+        eventDigest: applied.entity.evidenceDigest
+      }, user);
+      writeDatabase(data);
+      sendJson(res, 200, { ok: true, consent: applied.entity, callbackDeliveries: deliveries });
+    } catch (error) {
+      sendNationalAccessError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/national-access/certificates") {
+    const user = requireApiRole(req, res, ["commission"], "/api/national-access/certificates");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      const issued = NationalAccessService.issueAccessCertificate(data, payload, user);
+      data.nationalAccessCertificates = [issued.entity, ...(data.nationalAccessCertificates || [])].slice(0, 5000);
+      prependNationalAccessAudit(data, issued.audit);
+      writeDatabase(data);
+      sendJson(res, 201, { ok: true, certificate: issued.entity });
+    } catch (error) {
+      sendNationalAccessError(res, error);
+    }
+    return;
+  }
+
+  const nationalCertificateActionMatch = url.pathname.match(/^\/api\/national-access\/certificates\/([^/]+)\/actions$/);
+  if (req.method === "POST" && nationalCertificateActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/national-access/certificates/:id/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const id = decodeURIComponent(nationalCertificateActionMatch[1]);
+    try {
+      const index = (data.nationalAccessCertificates || []).findIndex((item) => item.id === id);
+      const applied = NationalAccessService.applyCertificateAction(data.nationalAccessCertificates?.[index], String(payload.action || ""), user);
+      data.nationalAccessCertificates[index] = applied.entity;
+      prependNationalAccessAudit(data, applied.audit);
+      writeDatabase(data);
+      sendJson(res, 200, { ok: true, certificate: applied.entity });
+    } catch (error) {
+      sendNationalAccessError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/national-access/credentials") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/national-access/credentials");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      assertNationalInstitutionScope(user, payload.orgCode);
+      const issued = NationalAccessService.issueDeveloperCredential(data, payload, user);
+      data.nationalDeveloperCredentials = [issued.entity, ...(data.nationalDeveloperCredentials || [])].slice(0, 5000);
+      prependNationalAccessAudit(data, issued.audit);
+      writeDatabase(data);
+      sendJson(res, 201, {
+        ok: true,
+        credential: {
+          id: issued.entity.id,
+          orgCode: issued.entity.orgCode,
+          name: issued.entity.name,
+          environment: issued.entity.environment,
+          scopes: issued.entity.scopes,
+          secretPrefix: issued.entity.secretPrefix,
+          status: issued.entity.status,
+          issuedAt: issued.entity.issuedAt,
+          expiresAt: issued.entity.expiresAt
+        },
+        secret: issued.secret,
+        secretDisplay: "one-time"
+      });
+    } catch (error) {
+      sendNationalAccessError(res, error);
+    }
+    return;
+  }
+
+  const nationalCredentialActionMatch = url.pathname.match(/^\/api\/national-access\/credentials\/([^/]+)\/actions$/);
+  if (req.method === "POST" && nationalCredentialActionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/national-access/credentials/:id/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const id = decodeURIComponent(nationalCredentialActionMatch[1]);
+    try {
+      const index = (data.nationalDeveloperCredentials || []).findIndex((item) => item.id === id);
+      const existing = data.nationalDeveloperCredentials?.[index];
+      assertNationalInstitutionScope(user, existing?.orgCode);
+      const applied = NationalAccessService.applyDeveloperCredentialAction(existing, String(payload.action || ""), user);
+      data.nationalDeveloperCredentials[index] = applied.entity;
+      prependNationalAccessAudit(data, applied.audit);
+      writeDatabase(data);
+      const { secretHash, ...credential } = applied.entity;
+      sendJson(res, 200, {
+        ok: true,
+        credential,
+        ...(applied.secret ? { secret: applied.secret, secretDisplay: "one-time" } : {})
+      });
+    } catch (error) {
+      sendNationalAccessError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/national-access/routes/envelopes") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/national-access/routes/envelopes");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      const route = (data.nationalRoutingTraces || []).find((item) => item.id === payload.routeId);
+      if (user.role === "institution") assertNationalInstitutionScope(user, route?.sourceOrgCode);
+      const created = NationalAccessService.createRoutingEnvelope(data, payload, user);
+      data.nationalRoutingEnvelopes = [created.entity, ...(data.nationalRoutingEnvelopes || [])].slice(0, 5000);
+      prependNationalAccessAudit(data, created.audit);
+      const deliveries = prepareNationalCallbackDeliveries(data, {
+        orgCode: created.entity.sourceOrgCode,
+        eventType: "routing-envelope.prepared",
+        subjectReference: created.entity.id,
+        eventDigest: created.entity.payloadDigest
+      }, user);
+      writeDatabase(data);
+      sendJson(res, 201, { ok: true, envelope: created.entity, callbackDeliveries: deliveries });
+    } catch (error) {
+      sendNationalAccessError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/national-access/operations/evaluate") {
+    const user = requireApiRole(req, res, ["commission"], "/api/national-access/operations/evaluate");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      const evaluation = NationalAccessService.evaluateOperations(data, user, payload);
+      const activeKeys = new Set(evaluation.alerts.map((item) => item.key));
+      const resolved = (data.nationalSlaAlerts || [])
+        .filter((item) => item.status === "open" && !activeKeys.has(item.key))
+        .map((item) => ({ ...item, status: "resolved", resolvedAt: evaluation.evaluatedAt, updatedAt: evaluation.evaluatedAt }));
+      const existingByKey = new Map((data.nationalSlaAlerts || []).map((item) => [item.key, item]));
+      const openAlerts = evaluation.alerts.map((item) => ({
+        ...(existingByKey.get(item.key) || {}),
+        ...item,
+        detectedAt: existingByKey.get(item.key)?.detectedAt || item.detectedAt
+      }));
+      data.nationalSlaAlerts = [...openAlerts, ...resolved, ...(data.nationalSlaAlerts || []).filter((item) => item.status !== "open")].slice(0, 5000);
+      prependNationalAccessAudit(data, evaluation.audit);
+      writeDatabase(data);
+      sendJson(res, 200, {
+        ok: true,
+        evaluatedAt: evaluation.evaluatedAt,
+        summary: evaluation.summary,
+        alerts: openAlerts
+      });
+    } catch (error) {
+      sendNationalAccessError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/national-access/security/evaluate") {
+    const user = requireApiRole(req, res, ["commission"], "/api/national-access/security/evaluate");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      const evaluation = NationalAccessService.evaluateSecurityLifecycle(data, user, payload);
+      const activeKeys = new Set(evaluation.alerts.map((item) => item.key));
+      const existingAlerts = data.nationalSecurityAlerts || [];
+      const existingByKey = new Map(existingAlerts.map((item) => [item.key, item]));
+      const openAlerts = evaluation.alerts.map((item) => ({
+        ...(existingByKey.get(item.key) || {}),
+        ...item,
+        detectedAt: existingByKey.get(item.key)?.detectedAt || item.detectedAt
+      }));
+      const resolvedAlerts = existingAlerts
+        .filter((item) => item.status === "open" && !activeKeys.has(item.key))
+        .map((item) => ({
+          ...item,
+          status: "resolved",
+          resolvedAt: evaluation.evaluatedAt,
+          updatedAt: evaluation.evaluatedAt
+        }));
+      data.nationalAccessCertificates = evaluation.certificates;
+      data.nationalDeveloperCredentials = evaluation.credentials;
+      data.nationalSecurityAlerts = [
+        ...openAlerts,
+        ...resolvedAlerts,
+        ...existingAlerts.filter((item) => item.status !== "open")
+      ].slice(0, 5000);
+      prependNationalAccessAudit(data, evaluation.audit);
+      writeDatabase(data);
+      sendJson(res, 200, {
+        ok: true,
+        evaluatedAt: evaluation.evaluatedAt,
+        summary: evaluation.summary,
+        alerts: openAlerts
+      });
+    } catch (error) {
+      sendNationalAccessError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/national-access/certification-reports") {
+    const user = requireApiRole(req, res, ["commission"], "/api/national-access/certification-reports");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      const created = NationalAccessService.createCertificationReport(data, payload, user);
+      data.nationalCertificationReports = [
+        created.entity,
+        ...(data.nationalCertificationReports || [])
+      ].slice(0, 5000);
+      prependNationalAccessAudit(data, created.audit);
+      writeDatabase(data);
+      sendJson(res, 201, { ok: true, report: created.entity });
+    } catch (error) {
+      sendNationalAccessError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/national-access/standards/extensions") {
+    const user = requireApiRole(req, res, ["commission"], "/api/national-access/standards/extensions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      const created = NationalAccessService.registerStandardExtension(data, payload, user);
+      data.nationalStandardExtensions = [created.entity, ...(data.nationalStandardExtensions || [])].slice(0, 5000);
+      prependNationalAccessAudit(data, created.audit);
+      writeDatabase(data);
+      sendJson(res, 201, { ok: true, extension: created.entity });
+    } catch (error) {
+      sendNationalAccessError(res, error);
+    }
+    return;
+  }
+
+  const nationalStandardExtensionActionMatch = url.pathname.match(/^\/api\/national-access\/standards\/extensions\/([^/]+)\/actions$/);
+  if (req.method === "POST" && nationalStandardExtensionActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/national-access/standards/extensions/:id/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const id = decodeURIComponent(nationalStandardExtensionActionMatch[1]);
+    try {
+      const index = (data.nationalStandardExtensions || []).findIndex((item) => item.id === id);
+      const applied = NationalAccessService.applyStandardExtensionAction(
+        data.nationalStandardExtensions?.[index],
+        String(payload.action || ""),
+        user
+      );
+      data.nationalStandardExtensions[index] = applied.entity;
+      prependNationalAccessAudit(data, applied.audit);
+      writeDatabase(data);
+      sendJson(res, 200, { ok: true, extension: applied.entity });
+    } catch (error) {
+      sendNationalAccessError(res, error);
+    }
     return;
   }
 
@@ -32168,12 +33302,17 @@ async function handleApi(req, res) {
     }
     const duplicate = (data.integrationGatewayEvents || []).find((item) => item.idempotencyKey === payload.idempotencyKey);
     if (duplicate) {
+      if (duplicate.contractId !== payload.contractId || stableStringify(duplicate.requestPayload) !== stableStringify(payload)) {
+        sendJson(res, 409, { error: "Conflict", message: "idempotencyKey already exists with a different integration payload" });
+        return;
+      }
       sendJson(res, 200, { ...duplicate, idempotentReplay: true });
       return;
     }
     const event = normalizeIntegrationEvent(payload, user, contract);
     landAppointmentIntegrationEvent(data, payload, event, user);
     landPhysicalExamIntegrationEvent(data, payload, event, user);
+    landDiagnosticIntegrationEvent(data, payload, event, user);
     data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
     data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
       id: randomUUID(),
@@ -32213,6 +33352,7 @@ async function handleApi(req, res) {
     };
     landAppointmentIntegrationEvent(data, sample.payload, event, user);
     landPhysicalExamIntegrationEvent(data, sample.payload, event, user);
+    landDiagnosticIntegrationEvent(data, sample.payload, event, user);
     data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
     data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
       id: randomUUID(),
@@ -32387,6 +33527,9 @@ async function handleApi(req, res) {
     }
     if (event.contractId === PHYSICAL_EXAM_CONTRACT_ID && event.requestPayload) {
       landPhysicalExamIntegrationEvent(data, event.requestPayload, event, user);
+    }
+    if (DIAGNOSTIC_INTEGRATION_CONTRACT_IDS.has(event.contractId) && event.requestPayload) {
+      landDiagnosticIntegrationEvent(data, event.requestPayload, event, user);
     }
     if (event.adapterType === "hospital" && event.requestPayload) {
       try {
@@ -32681,6 +33824,97 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/imaging-cloud/production-center") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/imaging-cloud/production-center");
+    if (!user) return;
+    const data = readDatabase();
+    ImagingCloudProduction.ensure(data);
+    sendJson(res, 200, ImagingCloudProduction.center(data));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/imaging-cloud/production/smoke") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/imaging-cloud/production/smoke");
+    if (!user) return;
+    const data = readDatabase();
+    ImagingCloudProduction.ensure(data);
+    sendJson(res, 200, ImagingCloudProduction.runStandaloneSmoke(data));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/imaging-cloud/governance") {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/imaging-cloud/governance");
+    if (!user) return;
+    const data = readDatabase();
+    const studies = (data.imageCloudStudies || []).filter((item) => user.role !== "institution" || item.institutionCode === user.orgCode || item.institutionName === user.orgName);
+    sendJson(res, 200, ImagingCloudGovernance.dashboard(data, studies));
+    return;
+  }
+
+  const imagingCatalogAction = url.pathname.match(/^\/api\/imaging-cloud\/governance\/catalog\/([^/]+)\/actions$/);
+  if (req.method === "POST" && imagingCatalogAction) {
+    const user = requireApiRole(req, res, ["commission"], "/api/imaging-cloud/governance/catalog/:id/actions");
+    if (!user) return;
+    const data = readDatabase();
+    try {
+      const item = ImagingCloudGovernance.updateCatalog(data, user, decodeURIComponent(imagingCatalogAction[1]), await collectJson(req));
+      writeDatabase(data);
+      sendJson(res, 200, { item, governance: ImagingCloudGovernance.dashboard(data, data.imageCloudStudies || []) });
+    } catch (error) {
+      sendJson(res, Number(error.status) || 400, { error: "Imaging Governance Rejected", message: error.message });
+    }
+    return;
+  }
+
+  const imagingPerformanceMatch = url.pathname.match(/^\/api\/imaging-cloud\/studies\/([^/]+)\/performance$/);
+  if (req.method === "POST" && imagingPerformanceMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "county", "citizen"], "/api/imaging-cloud/studies/:id/performance");
+    if (!user) return;
+    const data = readDatabase();
+    const study = (data.imageCloudStudies || []).find((item) => item.id === decodeURIComponent(imagingPerformanceMatch[1]));
+    if (!study) { sendJson(res, 404, { error: "Not Found", message: "未找到影像检查" }); return; }
+    if (!canAccessResident(user, study.residentId, data)) { sendJson(res, 403, { error: "Forbidden", message: "无权记录该影像检查的性能数据" }); return; }
+    try {
+      const event = ImagingCloudGovernance.recordPerformance(data, user, study, await collectJson(req));
+      appendDataAccessLog(data, user, study.residentId, "医学影像云性能采样", "记录匿名化移动端影像浏览性能");
+      writeDatabase(data);
+      sendJson(res, 201, { event, performance: ImagingCloudGovernance.dashboard(data, [study]).performance });
+    } catch (error) {
+      sendJson(res, Number(error.status) || 400, { error: "Imaging Performance Rejected", message: error.message });
+    }
+    return;
+  }
+
+  const imagingProductionAction = [
+    [/^\/api\/imaging-cloud\/production\/endpoints\/([^/]+)\/probe$/, ["commission", "institution"], "probeEndpoint"],
+    [/^\/api\/imaging-cloud\/production\/synthetic-checks\/([^/]+)\/actions$/, ["commission", "institution"], "recordSyntheticCheck"],
+    [/^\/api\/imaging-cloud\/production\/requirements\/([^/]+)\/actions$/, ["commission", "institution"], "signRequirement"],
+    [/^\/api\/imaging-cloud\/production\/receipts\/([^/]+)\/submit$/, ["commission", "institution"], "submitSiteReceipt"],
+    [/^\/api\/imaging-cloud\/production\/receipts\/([^/]+)\/verify$/, ["commission"], "verifySiteReceipt"],
+    [/^\/api\/imaging-cloud\/production\/drills\/([^/]+)\/complete$/, ["commission", "institution"], "completeDrill"],
+    [/^\/api\/imaging-cloud\/production\/approvals\/([^/]+)\/sign$/, ["commission"], "signApproval"]
+  ].map(([pattern, roles, action]) => ({ match: url.pathname.match(pattern), roles, action })).find((item) => item.match);
+  if (req.method === "POST" && imagingProductionAction) {
+    const user = requireApiRole(req, res, imagingProductionAction.roles, url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    const payload = await collectJson(req);
+    try {
+      ImagingCloudProduction.ensure(data);
+      const item = ImagingCloudProduction[imagingProductionAction.action](
+        data,
+        user,
+        decodeURIComponent(imagingProductionAction.match[1]),
+        payload
+      );
+      writeDatabase(data);
+      sendJson(res, 200, { item, productionCenter: ImagingCloudProduction.center(data) });
+    } catch (error) {
+      sendJson(res, Number(error.status) || 400, { error: "Imaging Production Gate Rejected", message: error.message });
+    }
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/imaging-cloud") {
     const user = requireApiRole(req, res, ["commission", "institution", "county", "citizen"], "/api/imaging-cloud");
     if (!user) return;
@@ -32941,12 +34175,19 @@ async function handleApi(req, res) {
       return;
     }
     const payload = await collectJson(req);
+    const assessment = ImagingCloudGovernance.evaluateStudy(data, study, {
+      clinicalChange: Boolean(payload.clinicalChange),
+      emergencyOrMajorProcedure: Boolean(payload.emergencyOrMajorProcedure),
+      legalOrAppraisal: Boolean(payload.legalOrAppraisal)
+    });
     const chain = createImageCloudMutualRecognitionChain(data, study, payload, user);
     data.imageCloudStudies[studyIndex] = {
       ...study,
       mutualRecognitionStatus: chain.recognition.status,
       mutualRecognitionRecordId: chain.recognition.id,
       countyCollaborationOrderId: chain.order.id,
+      mutualRecognitionAssessment: assessment,
+      mutualRecognitionReason: assessment.eligible ? "符合目录与质量条件，等待独立复核。" : assessment.negativeRules.map((item) => item.title).join("；") || "未满足互认目录条件，须复查或独立复核。",
       updatedAt: new Date().toISOString()
     };
     appendDataAccessLog(data, user, study.residentId, "医学影像云", `纳入跨机构互认 ${study.accessionNumber} · ${study.mainIndex}`);
@@ -32988,6 +34229,15 @@ async function handleApi(req, res) {
       return;
     }
     const payload = await collectJson(req);
+    const assessment = ImagingCloudGovernance.evaluateStudy(data, study, {
+      clinicalChange: Boolean(payload.clinicalChange),
+      emergencyOrMajorProcedure: Boolean(payload.emergencyOrMajorProcedure),
+      legalOrAppraisal: Boolean(payload.legalOrAppraisal)
+    });
+    if (/^(recognize|approved)$/i.test(String(payload.decision || "")) && !assessment.eligible) {
+      sendJson(res, 409, { error: "Recognition Review Required", message: "目录、时效、质控或诊断级完整性未满足，不能直接确认互认。", assessment });
+      return;
+    }
     let reviewed;
     try {
       reviewed = reviewMutualRecognitionRecord(data, record.id, payload, user);

@@ -22,6 +22,7 @@ test("role pages keep explicit page guards", () => {
     "health-dashboard.html": ["commission"],
     "public-health.html": ["commission"],
     "platform.html": ["commission"],
+    "national-access.html": ["commission", "institution"],
     "digital-hospital-standards.html": ["commission"],
     "workbench.html": ["commission"],
     "operations-about.html": ["commission"],
@@ -55,7 +56,7 @@ test("citizen pages do not expose cross-role module links or management collecti
 });
 
 test("application pages avoid placeholder navigation", () => {
-  const pages = ["about.html", "citizen.html", "mobile-preview.html", "doctor.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "digital-hospital-standards.html", "digital-hospital-evaluation.html", "digital-hospital-self-assessment.html", "workbench.html", "quality-safety.html", "health-dashboard.html", "public-health.html"];
+  const pages = ["about.html", "citizen.html", "mobile-preview.html", "doctor.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "national-access.html", "digital-hospital-standards.html", "digital-hospital-evaluation.html", "digital-hospital-self-assessment.html", "workbench.html", "quality-safety.html", "health-dashboard.html", "public-health.html"];
   pages.forEach((file) => assert.doesNotMatch(read(file), /href=["']#["']/, `${file} 存在空链接占位`));
 });
 
@@ -4578,4 +4579,63 @@ test("2026-07-23 delivery report and onsite work pack preserve release evidence 
   ["517/517", "8/8", "0/10", "0/4", "blocked-until-site-evidence-signed"].forEach((marker) => assert.ok(report.includes(marker), marker));
   ["P0-01", "P0-10", "生产告警演练单", "official-grouper", "四方签字页", "不代替医院或主管部门签字"].forEach((marker) => assert.ok(workPack.includes(marker), marker));
   ["属地标准增补", "标准原文与条款解析", "证据治理", "专家评审治理", "规模化运营"].forEach((marker) => assert.ok(roadmap.includes(marker), marker));
+});
+
+test("national access portal exposes the 1+N+M self-service control plane", () => {
+  const html = read("national-access.html");
+  const script = read("national-access.js");
+  const auth = read("auth.js");
+  assert.match(html, /1\+N\+M分级协同架构/);
+  assert.match(html, /国家服务目录/);
+  assert.match(html, /按需订阅服务包/);
+  assert.match(html, /规划跨省路由/);
+  assert.match(html, /node-health-form/);
+  assert.match(html, /certificate-form/);
+  assert.match(html, /credential-form/);
+  assert.match(html, /routing-envelope-form/);
+  assert.match(html, /consent-form/);
+  assert.match(html, /national-consent-table/);
+  assert.match(html, /national-access-developer-sdk\.js/);
+  assert.match(html, /national-sdk-contract-table/);
+  assert.match(html, /adapter-form/);
+  assert.match(html, /contract-test-form/);
+  assert.match(html, /callback-form/);
+  assert.match(html, /national-adapter-table/);
+  assert.match(html, /national-contract-test-table/);
+  assert.match(html, /national-callback-delivery-table/);
+  assert.match(html, /operations-evaluate-form/);
+  assert.match(html, /sandbox-invoke-form/);
+  assert.match(html, /security-evaluate-form/);
+  assert.match(html, /certification-report-form/);
+  assert.match(html, /API配额与调用审计/);
+  assert.match(html, /不接收患者原始业务载荷/);
+  assert.match(html, /standard-extension-form/);
+  assert.match(html, /密钥明文只显示一次/);
+  assert.match(html, /不携带检验或影像原文/);
+  assert.match(script, /\/routes\/plan/);
+  assert.match(script, /\/node-health/);
+  assert.match(script, /\/certificates/);
+  assert.match(script, /\/credentials/);
+  assert.match(script, /\/routes\/envelopes/);
+  assert.match(script, /\/consents/);
+  assert.match(script, /\/sdk\/manifest/);
+  assert.match(script, /renderConsents/);
+  assert.match(script, /renderSdkManifest/);
+  assert.match(script, /\/adapters/);
+  assert.match(script, /\/contract-tests/);
+  assert.match(script, /\/callbacks/);
+  assert.match(script, /\/callback-deliveries/);
+  assert.match(script, /renderAdapters/);
+  assert.match(script, /renderContractTests/);
+  assert.match(script, /renderCallbacks/);
+  assert.match(script, /\/operations\/evaluate/);
+  assert.match(script, /\/sandbox\/invoke/);
+  assert.match(script, /\/security\/evaluate/);
+  assert.match(script, /\/certification-reports/);
+  assert.match(script, /X-National-Access-Key/);
+  assert.match(script, /\/standards\/extensions/);
+  assert.match(script, /showCredentialSecret/);
+  assert.match(script, /data-lifecycle-kind/);
+  assert.match(auth, /"national-access\.html": \["commission", "institution"\]/);
+  assert.match(read("platform.html"), /href="\.\/national-access\.html"/);
 });

@@ -39,6 +39,7 @@ function buildImagingCloudReadinessReport(options = {}) {
     docs: read(IMAGE_CLOUD_DOC),
     packageSource: read("package.json"),
     production: read("imaging-cloud-production.js"),
+    governance: read("imaging-cloud-governance.js"),
     solutionA: read("solution-a-connectors.js"),
     solutionAAcceptance: read("scripts/solution-a-acceptance.js")
   };
@@ -68,7 +69,9 @@ function buildImagingCloudReadinessReport(options = {}) {
     check("production:ui", sources.html.includes('data-imaging-section="production-gate"') && sources.pageJs.includes("renderProductionGate"), "production boundary and blockers are visible in the imaging workbench", "ui"),
     check("ui:production-operations", ["data-production-action=\"endpoint\"", "data-production-action=\"synthetic\"", "data-production-action=\"requirement\"", "data-production-action=\"drill\"", "data-production-action=\"approval\"", "静态预览不写入生产证据"].every((marker)=>sources.pageJs.includes(marker)), "endpoint, synthetic, evidence, drill and approval operations are available while static preview stays read-only", "ui"),
     check("production:standalone-smoke", standaloneSmoke.codeReady && standaloneSmoke.releaseDecision === "no-go" && standaloneSmoke.checks.some((item) => item.id === "rollback-gate" && item.passed), "standalone module smoke verifies rollback controls while incomplete site evidence remains No-Go", "release"),
-    check("production:route-contract", ImagingCloudProduction.ROUTE_CONTRACTS.length === 9 && ImagingCloudProduction.ROUTE_CONTRACTS.every((item)=>item.roles?.length && item.handler?.startsWith("ImagingCloudProduction.")) && sources.docs.includes("/api/imaging-cloud/production-center"), "nine role-guarded T00 integration route contracts are documented", "integration")
+    check("production:route-contract", ImagingCloudProduction.ROUTE_CONTRACTS.length === 9 && ImagingCloudProduction.ROUTE_CONTRACTS.every((item)=>item.roles?.length && item.handler?.startsWith("ImagingCloudProduction.")) && sources.docs.includes("/api/imaging-cloud/production-center"), "nine role-guarded production route contracts are documented", "integration"),
+    check("governance:recognition-catalog", ["imagingRecognitionCatalog", "imagingRecognitionNegativeRules", "quality-not-qualified", "dicom-incomplete"].every((marker) => sources.governance.includes(marker)) && sources.server.includes("Recognition Review Required"), "catalog, negative rules and DICOM/quality checks govern imaging mutual recognition", "governance"),
+    check("governance:performance", ["imagingPerformanceEvents", "firstFrameMs", "seriesLoadMs", "networkClass", "viewportClass"].every((marker) => sources.governance.includes(marker)) && sources.server.includes("/api/imaging-cloud/studies/:id/performance") && sources.pageJs.includes("recordImagingPerformance"), "minimized mobile performance sampling is role-scoped and visible in the imaging workbench", "governance")
   ];
   const codeReady = checks.every((item) => item.passed);
   return {
@@ -103,7 +106,7 @@ function buildImagingCloudReadinessReport(options = {}) {
       standaloneSmoke
     },
     t00Integration: {
-      status: "pending-shared-file-integration",
+      status: "integrated-in-server",
       sharedFiles: ["server.js", "package.json", "service-worker.js", "README.md", "release summary"],
       routeContracts: productionCenter.routeContracts
     },

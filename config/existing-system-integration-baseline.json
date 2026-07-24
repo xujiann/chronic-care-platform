@@ -1,0 +1,292 @@
+{
+  "metadata": {
+    "id": "全民健康数智化-现有系统融合-首期基线",
+    "version": "1.0.0",
+    "updatedAt": "2026-07-24",
+    "pilot": "首家综合医院及其县域医共体",
+    "productionReady": false,
+    "scope": "复用现有平台，优先打通检验检查共享互认闭环"
+  },
+  "principles": [
+    "现有业务系统继续作为业务事实来源",
+    "平台通过标准接口、消息或院内前置适配器集成",
+    "禁止平台直接写入现有业务系统数据库",
+    "居民身份统一使用主索引，接口只传递完成业务所需的最小数据",
+    "所有查询、调阅、互认和回写均须授权、留痕并可追溯",
+    "辅助判断不得替代医务人员作出诊疗决定"
+  ],
+  "systems": [
+    {
+      "id": "PLATFORM",
+      "name": "全民健康信息平台",
+      "systemOfRecord": false,
+      "owner": "市卫生健康信息中心",
+      "integrationMode": "API网关、事件总线、共享服务",
+      "pilotPriority": "P0",
+      "status": "available"
+    },
+    {
+      "id": "HIS",
+      "name": "医院信息系统",
+      "systemOfRecord": true,
+      "owner": "试点医院信息部门及HIS厂商",
+      "integrationMode": "HTTPS API或院内前置适配器",
+      "pilotPriority": "P0",
+      "status": "onsite-input-required"
+    },
+    {
+      "id": "EMR",
+      "name": "电子病历系统",
+      "systemOfRecord": true,
+      "owner": "试点医院信息部门及EMR厂商",
+      "integrationMode": "工作站插件、HTTPS API",
+      "pilotPriority": "P0",
+      "status": "onsite-input-required"
+    },
+    {
+      "id": "LIS",
+      "name": "检验信息系统",
+      "systemOfRecord": true,
+      "owner": "试点医院检验科、信息部门及LIS厂商",
+      "integrationMode": "报告事件回调、批量补传",
+      "pilotPriority": "P0",
+      "status": "onsite-input-required"
+    },
+    {
+      "id": "PACS",
+      "name": "影像与放射信息系统",
+      "systemOfRecord": true,
+      "owner": "试点医院影像科、信息部门及PACS/RIS厂商",
+      "integrationMode": "DICOMweb或影像网关、报告事件回调",
+      "pilotPriority": "P0",
+      "status": "onsite-input-required"
+    },
+    {
+      "id": "EHR",
+      "name": "居民电子健康档案",
+      "systemOfRecord": false,
+      "owner": "市卫生健康信息中心",
+      "integrationMode": "档案索引及只读查询API",
+      "pilotPriority": "P1",
+      "status": "planned"
+    },
+    {
+      "id": "PUBLIC_HEALTH",
+      "name": "公共卫生业务系统",
+      "systemOfRecord": true,
+      "owner": "公共卫生业务管理部门",
+      "integrationMode": "事件推送、任务回流",
+      "pilotPriority": "P1",
+      "status": "planned"
+    },
+    {
+      "id": "INSURANCE",
+      "name": "医保业务系统",
+      "systemOfRecord": true,
+      "owner": "医保部门",
+      "integrationMode": "政务外网或专线API",
+      "pilotPriority": "P2",
+      "status": "external-coordination-required"
+    },
+    {
+      "id": "PHARMACY",
+      "name": "药品及供应链系统",
+      "systemOfRecord": true,
+      "owner": "医院药学部门及相关平台",
+      "integrationMode": "目录、库存和处方状态API",
+      "pilotPriority": "P2",
+      "status": "planned"
+    }
+  ],
+  "contracts": [
+    {
+      "id": "MPI_PATIENT_UPSERT",
+      "name": "患者身份登记与主索引匹配",
+      "sourceSystem": "HIS",
+      "targetSystem": "PLATFORM",
+      "trigger": "患者建档或身份信息变更",
+      "mode": "HTTPS API",
+      "standard": "居民主索引最小数据集 v1",
+      "payloadMinimum": ["sourcePatientId", "institutionCode", "name", "idType", "idNumber", "birthDate"],
+      "idempotencyKey": "institutionCode + sourcePatientId + sourceUpdatedAt",
+      "retry": "指数退避，最多3次",
+      "errorQueue": "院内前置机失败队列",
+      "security": {
+        "transport": "HTTPS或mTLS",
+        "authentication": "HMAC-SHA256、timestamp、requestId",
+        "authorization": "机构白名单",
+        "audit": "请求、匹配结果和人工合并记录",
+        "minimization": "不传递诊疗明细"
+      },
+      "acceptanceEvidence": ["身份匹配样例", "重复患者合并样例", "越权请求拒绝日志"],
+      "status": "engineering-ready"
+    },
+    {
+      "id": "LIS_LAB_REPORT_PUBLISH",
+      "runtimeContractId": "lis-report-v1",
+      "name": "LIS检验报告发布",
+      "sourceSystem": "LIS",
+      "targetSystem": "PLATFORM",
+      "trigger": "报告审核、修订或撤销",
+      "mode": "签名事件回调",
+      "standard": "结构化检验报告 v1",
+      "payloadMinimum": ["reportId", "residentMainIndex", "encounterId", "itemCode", "result", "unit", "referenceRange", "abnormalFlag", "status", "reportedAt"],
+      "idempotencyKey": "institutionCode + reportId + reportVersion",
+      "retry": "指数退避，最多3次",
+      "errorQueue": "LIS适配器待重放队列",
+      "security": {
+        "transport": "HTTPS或mTLS",
+        "authentication": "HMAC-SHA256、timestamp、requestId",
+        "authorization": "LIS接口账户最小权限",
+        "audit": "报告版本、回执和撤销链",
+        "minimization": "仅共享互认所需字段"
+      },
+      "acceptanceEvidence": ["正常报告回执", "报告修订回放", "报告撤销回放", "重复报文幂等证明"],
+      "status": "engineering-ready"
+    },
+    {
+      "id": "PACS_IMAGING_MANIFEST_PUBLISH",
+      "runtimeContractId": "pacs-report-v1",
+      "name": "PACS/RIS影像检查索引发布",
+      "sourceSystem": "PACS",
+      "targetSystem": "PLATFORM",
+      "trigger": "检查报告审核或影像入库完成",
+      "mode": "报告回调加DICOMweb索引",
+      "standard": "DICOM/DICOMweb、结构化检查报告 v1",
+      "payloadMinimum": ["studyInstanceUID", "accessionNumber", "residentMainIndex", "modality", "bodyPart", "reportId", "reportStatus", "viewerEndpoint"],
+      "idempotencyKey": "institutionCode + studyInstanceUID + reportVersion",
+      "retry": "指数退避，最多3次",
+      "errorQueue": "影像网关失败队列",
+      "security": {
+        "transport": "DICOM TLS、HTTPS或mTLS",
+        "authentication": "网关证书、HMAC签名",
+        "authorization": "按机构、人员、居民授权校验",
+        "audit": "影像调阅、分享和质控日志",
+        "minimization": "平台先存索引，像素数据按需受控调阅"
+      },
+      "acceptanceEvidence": ["影像索引入库回执", "诊断报告回写记录", "移动端授权调阅记录", "越权调阅拒绝日志"],
+      "status": "engineering-ready"
+    },
+    {
+      "id": "SHARED_RESULT_QUERY",
+      "name": "医生工作站历史结果查询",
+      "sourceSystem": "EMR",
+      "targetSystem": "PLATFORM",
+      "trigger": "医生打开患者病历或开立检验检查申请",
+      "mode": "单点登录加只读查询API",
+      "standard": "共享检验检查查询 v1",
+      "payloadMinimum": ["residentMainIndex", "encounterId", "purposeOfUse", "requestingClinician", "requestingInstitution"],
+      "idempotencyKey": "requestId",
+      "retry": "只读查询失败可重试2次",
+      "errorQueue": "不入队，记录查询失败指标",
+      "security": {
+        "transport": "HTTPS或mTLS",
+        "authentication": "统一身份认证和短期访问令牌",
+        "authorization": "当前诊疗关系、机构范围和用途校验",
+        "audit": "查询人、居民、用途、结果范围和时间",
+        "minimization": "默认仅返回摘要，按需调阅详情"
+      },
+      "acceptanceEvidence": ["工作站单点登录截图", "同一居民跨机构结果样例", "无诊疗关系拒绝日志", "查询性能报告"],
+      "status": "engineering-ready"
+    },
+    {
+      "id": "MUTUAL_RECOGNITION_DECISION_CALLBACK",
+      "name": "互认决定回写HIS/EMR",
+      "sourceSystem": "PLATFORM",
+      "targetSystem": "HIS",
+      "trigger": "医生引用外院结果或登记复查原因",
+      "mode": "签名回调",
+      "standard": "互认决定与例外原因 v1",
+      "payloadMinimum": ["recognitionId", "residentMainIndex", "sourceReportId", "decision", "reasonCode", "decidedBy", "decidedAt"],
+      "idempotencyKey": "recognitionId + decisionVersion",
+      "retry": "指数退避，最多3次",
+      "errorQueue": "平台回写失败队列",
+      "security": {
+        "transport": "HTTPS或mTLS",
+        "authentication": "HMAC-SHA256、timestamp、requestId",
+        "authorization": "医生本人决定、机构范围校验",
+        "audit": "引用、不互认原因、修订和回执",
+        "minimization": "仅回写决定及来源报告引用"
+      },
+      "acceptanceEvidence": ["互认引用回执", "不互认原因回执", "回写失败重放记录", "独立审计查询结果"],
+      "status": "engineering-ready"
+    },
+    {
+      "id": "EHR_RECORD_INDEX_SYNC",
+      "name": "电子健康档案索引同步",
+      "sourceSystem": "PLATFORM",
+      "targetSystem": "EHR",
+      "trigger": "检验检查共享记录可见状态变化",
+      "mode": "事件推送",
+      "standard": "电子健康档案首页索引 v1",
+      "payloadMinimum": ["residentMainIndex", "recordType", "recordId", "sourceInstitution", "occurredAt", "visibilityStatus"],
+      "idempotencyKey": "recordType + recordId + visibilityVersion",
+      "retry": "指数退避，最多3次",
+      "errorQueue": "档案同步失败队列",
+      "security": {
+        "transport": "HTTPS或mTLS",
+        "authentication": "平台服务身份",
+        "authorization": "居民本人或合法代理授权",
+        "audit": "生成、查询、下载、撤销",
+        "minimization": "同步索引，详情按授权查询"
+      },
+      "acceptanceEvidence": ["居民本人查询样例", "家属代理授权样例", "授权撤销样例"],
+      "status": "planned"
+    },
+    {
+      "id": "PUBLIC_HEALTH_EVENT_PUBLISH",
+      "name": "公共卫生事件推送",
+      "sourceSystem": "EMR",
+      "targetSystem": "PUBLIC_HEALTH",
+      "trigger": "诊断、检验或重点症状满足报告条件",
+      "mode": "事件推送并由医生确认",
+      "standard": "公共卫生事件最小数据集 v1",
+      "payloadMinimum": ["eventId", "residentMainIndex", "eventType", "triggerEvidence", "reportingInstitution", "status"],
+      "idempotencyKey": "eventId + eventVersion",
+      "retry": "指数退避，最多3次",
+      "errorQueue": "公卫事件待补报队列",
+      "security": {
+        "transport": "专网HTTPS或mTLS",
+        "authentication": "机构服务身份",
+        "authorization": "公卫职责范围",
+        "audit": "触发、医生确认、上报和处置回流",
+        "minimization": "按事件类别传递法定或业务必需字段"
+      },
+      "acceptanceEvidence": ["事件自动预填样例", "医生确认上报记录", "处置结果回流记录"],
+      "status": "planned"
+    }
+  ],
+  "firstLoop": {
+    "name": "检验检查跨机构共享互认",
+    "requiredContracts": [
+      "MPI_PATIENT_UPSERT",
+      "LIS_LAB_REPORT_PUBLISH",
+      "PACS_IMAGING_MANIFEST_PUBLISH",
+      "SHARED_RESULT_QUERY",
+      "MUTUAL_RECOGNITION_DECISION_CALLBACK"
+    ],
+    "acceptanceScenarios": [
+      "同一居民在来源医院产生检验报告，目标医院工作站可查询并引用",
+      "影像检查生成索引，授权医生可调阅报告与影像",
+      "报告修订或撤销后共享端同步更新且保留版本链",
+      "不满足互认规则时医生登记标准原因并回写原系统",
+      "无诊疗关系或无居民授权时查询被拒绝并形成审计日志"
+    ]
+  },
+  "onsiteInputs": [
+    "试点机构及厂商联系人、系统版本和部署拓扑",
+    "HIS、EMR、LIS、PACS/RIS接口文档与测试环境地址",
+    "机构、科室、人员、检验项目和检查项目字典",
+    "首批互认目录、有效期、质控条件和不互认原因",
+    "测试居民与脱敏报告样例",
+    "网络白名单、证书、公钥及密钥交付流程",
+    "联调窗口、故障联系人和回退方案"
+  ],
+  "productionBlockers": [
+    "尚未配置试点医院真实接口地址、证书和签名密钥",
+    "尚未取得HIS、EMR、LIS、PACS/RIS厂商字段映射确认",
+    "尚未完成真实互认目录和例外规则业务签字",
+    "尚未完成生产网络、性能、安全和灾备演练",
+    "尚未形成医院、平台、业务和安全四方联调验收单"
+  ]
+}

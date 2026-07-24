@@ -37,6 +37,7 @@
     "public-health.html": ["commission"],
     "workbench.html": ["commission"],
     "platform.html": ["commission"],
+    "national-access.html": ["commission", "institution"],
     "digital-hospital-standards.html": ["commission"],
     "digital-hospital-self-assessment.html": ["commission", "institution"],
     "digital-hospital-evaluation.html": ["commission", "institution"],
@@ -60,8 +61,8 @@
   };
 
   const roleLinks = {
-    commission: [["platform.html", "全民健康平台"], ["digital-hospital-standards.html", "数智医院"], ["digital-hospital-self-assessment.html", "医院自评"], ["public-health.html", "公共卫生"], ["regional-data-sharing.html", "区域共享"], ["quality-safety.html", "质量安全"], ["operations.html", "运行监测"], ["operations-about.html", "运行说明"], ["escort.html", "助医陪诊"], ["blood.html", "血液管理"], ["health-city.html", "总览"], ["about.html", "关于"], ["workbench.html", "工作台"], ["index.html", "卫健管理"]],
-    institution: [["health-city.html", "总览"], ["digital-hospital-self-assessment.html", "医院自评"], ["doctor.html", "医生端"], ["regional-data-sharing.html", "区域共享"], ["blood.html", "血液管理"], ["about.html", "关于"], ["institution.html", "医疗机构"]],
+    commission: [["national-access.html", "国家接入"], ["platform.html", "全民健康平台"], ["digital-hospital-standards.html", "数智医院"], ["digital-hospital-self-assessment.html", "医院自评"], ["public-health.html", "公共卫生"], ["regional-data-sharing.html", "区域共享"], ["quality-safety.html", "质量安全"], ["operations.html", "运行监测"], ["operations-about.html", "运行说明"], ["escort.html", "助医陪诊"], ["blood.html", "血液管理"], ["health-city.html", "总览"], ["about.html", "关于"], ["workbench.html", "工作台"], ["index.html", "卫健管理"]],
+    institution: [["national-access.html", "国家接入"], ["health-city.html", "总览"], ["digital-hospital-self-assessment.html", "医院自评"], ["doctor.html", "医生端"], ["regional-data-sharing.html", "区域共享"], ["blood.html", "血液管理"], ["about.html", "关于"], ["institution.html", "医疗机构"]],
     insurance: [["health-city.html", "总览"], ["about.html", "关于"], ["insurance.html", "医保"]],
     citizen: [["health-city.html", "总览"], ["about.html", "关于"], ["citizen.html", "个人端"], ["mobile-preview.html", "手机预览"]],
     county: [["health-city.html", "总览"], ["about.html", "关于"], ["referral-teleconsultation-about.html", "转诊会诊"], ["county.html", "医共体"]]

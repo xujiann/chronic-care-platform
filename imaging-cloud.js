@@ -86,6 +86,7 @@ function renderImagingCloud() {
   renderProductionGate(imagingState.productionCenter || payload.productionCenter || fallbackProductionCenter());
   renderStudyTable(studies);
   renderMutualRecognition(payload.mutualRecognition || []);
+  renderGovernance(payload.governance || {});
   renderDevelopmentPlan(payload);
   renderGateways(payload);
   renderMobileViewer(studies.find((item) => item.id === imagingState.selectedStudyId) || studies[0], payload);
@@ -412,6 +413,33 @@ function renderDevelopmentPlan(payload) {
   }
 }
 
+function renderGovernance(governance = {}) {
+  const summaryTarget = document.querySelector("#imaging-governance-summary");
+  const tableTarget = document.querySelector("#imaging-governance-table");
+  const catalog = governance.recognitionCatalog || [];
+  const assessments = governance.recognitionAssessment || [];
+  const performance = governance.performance || {};
+  if (summaryTarget) {
+    summaryTarget.innerHTML = [
+      ["互认目录", catalog.filter((item) => item.status === "active").length, `共 ${catalog.length} 项`],
+      ["负面清单", (governance.negativeRules || []).filter((item) => item.status === "active").length, "复查/复核情形"],
+      ["质控计划", (governance.qualityPlans || []).filter((item) => item.status === "active").length, "抽样与评分阈值"],
+      ["移动性能", `${performance.withinTarget || 0}/${performance.samples || 0}`, `首帧目标 ${performance.targets?.firstFrameMs || 5000}ms`]
+    ].map(([label, value, hint]) => `<article class="metric-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(hint)}</small></article>`).join("");
+  }
+  if (tableTarget) {
+    tableTarget.innerHTML = `<table>
+      <thead><tr><th>检查</th><th>目录</th><th>互认评估</th><th>复查/复核原因</th></tr></thead>
+      <tbody>${assessments.map((item) => `<tr>
+        <td>${escapeHtml(item.studyId)}</td>
+        <td>${item.catalog ? `${escapeHtml(item.catalog.modality)} · ${escapeHtml(item.catalog.bodyPart)} · ${escapeHtml(item.catalog.validDays)}天` : "未纳入目录"}</td>
+        <td><span class="badge ${item.eligible ? "ok" : "warn"}">${escapeHtml(item.decision)}</span></td>
+        <td>${escapeHtml((item.negativeRules || []).map((rule) => rule.title).join("；") || "无")}</td>
+      </tr>`).join("") || `<tr><td colspan="4">当前筛选范围暂无可评估检查。</td></tr>`}</tbody>
+    </table>`;
+  }
+}
+
 function renderMobileViewer(study, payload) {
   const target = document.querySelector("#mobile-viewer");
   const title = document.querySelector("#phone-title");
@@ -448,6 +476,7 @@ function renderMobileViewer(study, payload) {
     </div>
     <div class="share-box">
       <div><strong>分享状态</strong><br>${share ? `${escapeHtml(share.channel)} · ${escapeHtml(share.expiresAt)}` : "未生成有效分享，可按需创建二维码或短信链接。"}</div>
+      <button class="inline-action" type="button" data-record-imaging-performance="${escapeHtml(study.id)}">记录本次浏览性能</button>
     </div>`;
 }
 
@@ -508,6 +537,7 @@ async function handleImagingAction(event) {
   const decideRecognitionButton = event.target.closest("[data-decide-recognition]");
   const appealRecognitionButton = event.target.closest("[data-appeal-recognition]");
   const reviewAppealButton = event.target.closest("[data-review-recognition-appeal]");
+  const performanceButton = event.target.closest("[data-record-imaging-performance]");
   if (linkExternalButton) {
     await linkExternalStudy(linkExternalButton.dataset.linkExternalStudy);
     return;
@@ -543,7 +573,26 @@ async function handleImagingAction(event) {
   }
   if (reviewAppealButton) {
     await reviewMutualRecognitionAppeal(reviewAppealButton.dataset.reviewRecognitionAppeal, reviewAppealButton.dataset.appealDecision);
+    return;
   }
+  if (performanceButton) {
+    await recordImagingPerformance(performanceButton.dataset.recordImagingPerformance);
+  }
+}
+
+async function recordImagingPerformance(studyId) {
+  if (!IMAGING_API_BASE) { window.alert("静态预览不会上传性能采样。"); return; }
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  const elapsed = Math.max(1, Math.round(performance.now()));
+  const response = await request(`${IMAGING_API_BASE}/imaging-cloud/studies/${encodeURIComponent(studyId)}/performance`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ firstFrameMs: elapsed, seriesLoadMs: elapsed, interactionMs: 120, viewportClass: "mobile", networkClass: "unknown" })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) { window.alert(payload.message || "性能采样记录失败"); return; }
+  await loadImagingCloud();
+  renderImagingCloud();
 }
 
 async function linkExternalStudy(studyInstanceUID) {

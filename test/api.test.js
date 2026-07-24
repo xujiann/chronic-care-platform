@@ -6852,6 +6852,166 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(noGo.body.center.gate.productionGoRecorded, false);
   });
 
+  await t.test("lands versioned signed LIS and PACS events into the mutual-recognition record chain", async () => {
+    const institution = await login(baseUrl, "hospital");
+    const sendIntegrationEvent = (payload) => api(baseUrl, "/api/integration/events", authorized(institution.body.token, {
+      method: "POST",
+      headers: { "x-integration-signature": integrationSignature(payload) },
+      body: JSON.stringify(payload)
+    }));
+
+    const lisPublishedPayload = {
+      contractId: "lis-report-v1",
+      idempotencyKey: "lis-gateway-versioned-001-v1",
+      externalId: "LIS-GATEWAY-VERSIONED-001",
+      residentId: "r1",
+      item: "HbA1c",
+      result: "6.6%",
+      reportedAt: "2026-07-24T01:00:00.000Z",
+      sourceInstitutionCode: "MR1",
+      sourceInstitution: "大连市中心医院",
+      reportVersion: 1,
+      reportStatus: "final",
+      payload: {
+        itemCode: "LAB-HBA1C",
+        category: "lab",
+        unit: "%",
+        referenceRange: "4.0-6.0",
+        abnormalFlag: "H",
+        qualityStatus: "passed"
+      }
+    };
+    const lisPublished = await sendIntegrationEvent(lisPublishedPayload);
+    assert.equal(lisPublished.response.status, 202, JSON.stringify(lisPublished.body));
+    assert.equal(lisPublished.body.status, "accepted");
+    assert.equal(lisPublished.body.landingStatus, "created");
+    assert.equal(lisPublished.body.reconciliationStatus, "matched");
+    assert.equal(lisPublished.body.reportVersion, 1);
+    assert.ok(lisPublished.body.reportId);
+
+    const lisReplay = await sendIntegrationEvent(lisPublishedPayload);
+    assert.equal(lisReplay.response.status, 200);
+    assert.equal(lisReplay.body.id, lisPublished.body.id);
+    assert.equal(lisReplay.body.idempotentReplay, true);
+
+    const lisIdempotencyConflictPayload = {
+      ...lisPublishedPayload,
+      result: "7.9%"
+    };
+    const lisIdempotencyConflict = await sendIntegrationEvent(lisIdempotencyConflictPayload);
+    assert.equal(lisIdempotencyConflict.response.status, 409);
+
+    const lisCorrectedPayload = {
+      ...lisPublishedPayload,
+      idempotencyKey: "lis-gateway-versioned-001-v2",
+      result: "6.4%",
+      reportVersion: 2,
+      reportStatus: "corrected",
+      reportedAt: "2026-07-24T01:15:00.000Z"
+    };
+    const lisCorrected = await sendIntegrationEvent(lisCorrectedPayload);
+    assert.equal(lisCorrected.response.status, 202, JSON.stringify(lisCorrected.body));
+    assert.equal(lisCorrected.body.landingStatus, "updated");
+    assert.equal(lisCorrected.body.reportId, lisPublished.body.reportId);
+    assert.equal(lisCorrected.body.reportVersion, 2);
+
+    let institutionState = await api(baseUrl, "/api/state", authorized(institution.body.token));
+    let lisReport = institutionState.body.diagnosticReports.find((item) => item.id === lisPublished.body.reportId);
+    assert.equal(lisReport.result, "6.4%");
+    assert.equal(lisReport.reportStatus, "corrected");
+    assert.equal(lisReport.status, "pending_review");
+    assert.equal(lisReport.versionHistory.length, 2);
+    const correctedRecognition = institutionState.body.countyMutualRecognitionRecords.find((item) => item.id === lisReport.recognitionRecordId);
+    assert.equal(correctedRecognition.status, "pending_review");
+    const correctedPersonalRecord = institutionState.body.personalRecords.find((item) => item.reportId === lisReport.id);
+    assert.equal(correctedPersonalRecord.meta.reportVersion, 2);
+
+    const lisStalePayload = {
+      ...lisPublishedPayload,
+      idempotencyKey: "lis-gateway-versioned-001-stale",
+      reportVersion: 1,
+      reportStatus: "corrected"
+    };
+    const lisStale = await sendIntegrationEvent(lisStalePayload);
+    assert.equal(lisStale.response.status, 202);
+    assert.equal(lisStale.body.status, "failed");
+    assert.equal(lisStale.body.deadLetter, true);
+    assert.match(lisStale.body.deadLetterReason, /stale reportVersion/);
+
+    const lisRevokedPayload = {
+      ...lisPublishedPayload,
+      idempotencyKey: "lis-gateway-versioned-001-v3",
+      reportVersion: 3,
+      reportStatus: "revoked",
+      reportedAt: "2026-07-24T01:30:00.000Z"
+    };
+    const lisRevoked = await sendIntegrationEvent(lisRevokedPayload);
+    assert.equal(lisRevoked.response.status, 202, JSON.stringify(lisRevoked.body));
+    assert.equal(lisRevoked.body.landingStatus, "revoked");
+    assert.equal(lisRevoked.body.reportId, lisPublished.body.reportId);
+
+    institutionState = await api(baseUrl, "/api/state", authorized(institution.body.token));
+    lisReport = institutionState.body.diagnosticReports.find((item) => item.id === lisPublished.body.reportId);
+    assert.equal(lisReport.status, "revoked");
+    assert.equal(lisReport.reportVersion, 3);
+    assert.equal(lisReport.versionHistory.length, 3);
+    const revokedRecognition = institutionState.body.countyMutualRecognitionRecords.find((item) => item.id === lisReport.recognitionRecordId);
+    assert.equal(revokedRecognition.status, "withdrawn");
+    const revokedPersonalRecord = institutionState.body.personalRecords.find((item) => item.reportId === lisReport.id);
+    assert.equal(revokedPersonalRecord.status, "revoked");
+    assert.equal(revokedPersonalRecord.visibilityStatus, "hidden");
+
+    const pacsPublishedPayload = {
+      contractId: "pacs-report-v1",
+      idempotencyKey: "pacs-gateway-versioned-001-v1",
+      externalId: "PACS-GATEWAY-VERSIONED-001",
+      residentId: "r1",
+      modality: "CT",
+      conclusion: "未见急性胸部异常。",
+      reportedAt: "2026-07-24T02:00:00.000Z",
+      sourceInstitutionCode: "MR1",
+      sourceInstitution: "大连市中心医院",
+      reportVersion: 1,
+      reportStatus: "final",
+      payload: {
+        bodyPart: "胸部",
+        studyInstanceUID: "1.2.826.0.1.3680043.10.20260724001",
+        accessionNumber: "ACC-20260724-001",
+        viewerEndpoint: "/dicomweb/studies/1.2.826.0.1.3680043.10.20260724001",
+        qualityStatus: "passed"
+      }
+    };
+    const pacsPublished = await sendIntegrationEvent(pacsPublishedPayload);
+    assert.equal(pacsPublished.response.status, 202, JSON.stringify(pacsPublished.body));
+    assert.equal(pacsPublished.body.landingStatus, "created");
+    assert.ok(pacsPublished.body.reportId);
+
+    institutionState = await api(baseUrl, "/api/state", authorized(institution.body.token));
+    const pacsReport = institutionState.body.diagnosticReports.find((item) => item.id === pacsPublished.body.reportId);
+    assert.equal(pacsReport.category, "imaging");
+    assert.equal(pacsReport.modality, "CT");
+    assert.equal(pacsReport.bodyPart, "胸部");
+    assert.equal(pacsReport.studyInstanceUID, "1.2.826.0.1.3680043.10.20260724001");
+    assert.match(pacsReport.viewerEndpoint, /dicomweb/);
+    assert.ok(pacsReport.imageCloudStudyId);
+    const pacsStudy = institutionState.body.imageCloudStudies.find((item) => item.id === pacsReport.imageCloudStudyId);
+    assert.equal(pacsStudy.studyInstanceUID, pacsReport.studyInstanceUID);
+    assert.equal(pacsStudy.diagnosticReportId, pacsReport.id);
+    assert.equal(pacsStudy.reportVersion, 1);
+
+    const outOfScopePayload = {
+      ...pacsPublishedPayload,
+      idempotencyKey: "pacs-gateway-out-of-scope-001",
+      externalId: "PACS-GATEWAY-OUT-OF-SCOPE-001",
+      sourceInstitutionCode: "MR3"
+    };
+    const outOfScope = await sendIntegrationEvent(outOfScopePayload);
+    assert.equal(outOfScope.response.status, 202);
+    assert.equal(outOfScope.body.status, "failed");
+    assert.equal(outOfScope.body.deadLetter, true);
+    assert.match(outOfScope.body.deadLetterReason, /source institution scope denied/);
+  });
+
   await t.test("invalidates a session after logout", async () => {
     const session = await login(baseUrl, "county");
     const logout = await api(baseUrl, "/api/auth/logout", authorized(session.body.token, { method: "POST" }));
