@@ -723,6 +723,14 @@ test("authorization receipt ledger is resident scoped and flags incomplete opera
   assert.equal(revoked.creation.verified, true);
   assert.equal(revoked.revocation.verified, false);
   assert.deepEqual(revoked.issues, ["撤销回执缺少受理编号或审计关联号"]);
+  const exportRows = V2.buildAuthorizationReceiptExportRows([complete, revokedMissingReceipt, otherResident], "r1");
+  assert.equal(exportRows.length, 2);
+  assert.deepEqual(Object.keys(exportRows[0]), [
+    "authorizationId", "granteeName", "lifecycle", "evidenceState",
+    "creationReceiptId", "creationAuditRef", "creationAcceptedAt",
+    "revocationReceiptId", "revocationAuditRef", "revocationAcceptedAt"
+  ]);
+  assert.equal(exportRows.some((item) => item.authorizationId === "auth-ledger-r2"), false);
 });
 
 test("authorization lifecycle highlights expiring and incomplete records", () => {

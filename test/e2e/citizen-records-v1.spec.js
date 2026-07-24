@@ -178,8 +178,10 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
           residentId: "r1",
           category: "authorizations",
           date: authorizationExpiry.slice(0, 10),
-          name: `${status}未来授权`,
+          name: status === "pending" ? "=HYPERLINK(\"https://invalid.example\")" : `${status}未来授权`,
           status,
+          personIndex: "must-not-export",
+          auditHash: "must-not-export",
           meta: {
             status,
             granteeId: `team-${status}-e2e`,
@@ -238,6 +240,17 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
   await expect(page.locator("#citizen-authorization-receipt-summary")).toContainText("1/4 条操作证据完整");
   await expect(page.locator("#citizen-authorization-receipt-summary")).toContainText("3 条待补回执");
   await expect(page.locator("#citizen-authorization-receipt-list")).toContainText("receipt-auth-renew-e2e");
+  const [authorizationReceiptDownload] = await Promise.all([
+    page.waitForEvent("download"),
+    page.locator("[data-export-authorization-receipts]").click()
+  ]);
+  const authorizationReceiptExport = fs.readFileSync(await authorizationReceiptDownload.path(), "utf8");
+  expect(authorizationReceiptDownload.suggestedFilename()).toMatch(/^resident-authorization-receipts-r1-/);
+  expect(authorizationReceiptExport).toContain("receipt-auth-renew-e2e");
+  expect(authorizationReceiptExport).toContain("'=HYPERLINK");
+  expect(authorizationReceiptExport).not.toContain("personIndex");
+  expect(authorizationReceiptExport).not.toContain("auditHash");
+  expect(authorizationReceiptExport).not.toContain("must-not-export");
   await expect(page.locator("#citizen-access-review-v2-list")).toContainText("陌生机构A");
   await expect(page.locator("#citizen-access-review-v2-list")).toContainText("未匹配当前有效授权");
   await expect(page.locator("#citizen-access-review-v2-list")).toContainText("已拦截，未披露");

@@ -12,7 +12,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="format-detection" content="telephone=no" />
     <link rel="apple-touch-icon" href="./pwa-icon.svg" />
-    <link rel="stylesheet" href="./citizen.css?v=20260724care8" />
+    <link rel="stylesheet" href="./citizen.css?v=20260724care9" />
     <script src="./auth.js?v=20260627"></script>
     <script>window.HealthCityAuth.requireRole(["citizen"])</script>
   </head>
@@ -413,7 +413,10 @@
             <div id="citizen-authorization-lifecycle-summary" class="citizen-care-list"></div>
             <div id="citizen-authorization-lifecycle-list" class="citizen-care-list"></div>
             <section class="citizen-authorization-receipts" aria-labelledby="citizen-authorization-receipts-title">
-              <h4 id="citizen-authorization-receipts-title">授权操作回执核验</h4>
+              <div class="citizen-authorization-receipt-heading">
+                <h4 id="citizen-authorization-receipts-title">授权操作回执核验</h4>
+                <button type="button" class="small-button" data-export-authorization-receipts>导出最小化回执证据</button>
+              </div>
               <small>创建和撤销均须同时具备受理编号与审计关联号；缺失证据的历史记录不得视为已完成在线闭环。</small>
               <div id="citizen-authorization-receipt-summary" class="citizen-care-list" aria-live="polite"></div>
               <div id="citizen-authorization-receipt-list" class="citizen-care-list"></div>
@@ -846,8 +849,8 @@
     <script src="./physical-examination-service.js"></script>
     <script src="./immunization-schedule.js"></script>
     <script src="./citizen-records-v1.js?v=20260724auth3"></script>
-    <script src="./citizen-records-v2.js?v=20260724care11"></script>
-    <script src="./citizen.js?v=20260724care11"></script>
+    <script src="./citizen-records-v2.js?v=20260724care12"></script>
+    <script src="./citizen.js?v=20260724care12"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));
