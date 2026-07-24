@@ -100,6 +100,7 @@ function renderProductionGate(center = {}) {
     ["合成验收", summary.syntheticChecksPassed || 0, summary.syntheticChecks || 10],
     ["生产端点", summary.endpointsReady || 0, summary.endpoints || 5],
     ["现场签署", summary.requirementsSigned || 0, summary.requirements || 7],
+    ["结构化回执", summary.siteReceiptsVerified || 0, summary.siteReceipts || 5],
     ["故障演练", summary.drillsPassed || 0, summary.drills || 4],
     ["上线审批", summary.approvalsSigned || 0, summary.approvals || 2]
   ];
@@ -119,6 +120,15 @@ function renderProductionGate(center = {}) {
         <td><span class="badge warn">${escapeHtml(item.status)}</span></td>
         <td>${escapeHtml(item.evidenceRef || "待现场提交")}</td>
       </tr>`).join("") || `<tr><td colspan="5">全部现场证据已签署；仍需确认故障演练和双人审批。</td></tr>`}</tbody>
+    </table></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>结构化现场回执</th><th>覆盖现场要求</th><th>状态</th><th>证据</th></tr></thead>
+      <tbody>${(center.siteReceipts || []).map((item) => `<tr>
+        <td><strong>${escapeHtml(item.title)}</strong><br><small>${escapeHtml(item.type)}</small></td>
+        <td>${escapeHtml((item.requirementIds || []).join("、"))}</td>
+        <td><span class="badge ${item.status === "verified" ? "ok" : "warn"}">${escapeHtml(item.status)}</span></td>
+        <td>${escapeHtml(item.evidenceRef || "待现场提交")}</td>
+      </tr>`).join("") || `<tr><td colspan="4">等待 T00 接入生产领域回执接口。</td></tr>`}</tbody>
     </table></div>
     <p><small>生产控制接口由 <code>imaging-cloud-production.js</code> 提供领域契约，公共路由由T00集成。</small></p>
     ${renderProductionOperations(center)}`;
@@ -163,6 +173,25 @@ function renderProductionOperations(center = {}) {
         <label>核验引用<input name="verificationRef"></label>
         <button class="inline-action primary" type="submit">执行证据动作</button>
       </form>
+      <form class="ingest-form" data-production-action="receipt">
+        <h3>结构化现场回执</h3>
+        <label>回执类型<select name="id">${options(center.siteReceipts, "title")}</select></label>
+        <label>精确确认语<input name="confirmation" required placeholder="SUBMIT IMAGING SITE EVIDENCE"></label>
+        <label>证据引用<input name="evidenceRef" required></label>
+        <label>证据摘要<input name="evidenceDigest" required placeholder="sha256:64位摘要"></label>
+        <label>外部签署人<input name="externalSigner" required></label>
+        <label>外部机构<input name="externalOrganization" required></label>
+        <label class="full">契约字段 JSON<textarea name="receiptPayload" rows="5" required placeholder='{"contractVersion":"1.0"}'></textarea></label>
+        <button class="inline-action primary" type="submit">提交结构化回执</button>
+      </form>
+      <form class="ingest-form" data-production-action="receipt-verify">
+        <h3>独立核验结构化回执</h3>
+        <label>回执类型<select name="id">${options(center.siteReceipts, "title")}</select></label>
+        <label>精确确认语<input name="confirmation" required placeholder="VERIFY IMAGING SITE EVIDENCE"></label>
+        <label>证据摘要<input name="evidenceDigest" required placeholder="sha256:64位摘要"></label>
+        <label>核验引用<input name="verificationRef" required></label>
+        <button class="inline-action primary" type="submit">独立核验回执</button>
+      </form>
       <form class="ingest-form" data-production-action="drill">
         <h3>生产故障演练</h3>
         <label>演练<select name="id">${options(center.drills, "title")}</select></label>
@@ -186,12 +215,24 @@ async function handleProductionSubmit(event) {
   event.preventDefault();
   const kind = form.dataset.productionAction;
   const values = Object.fromEntries([...new FormData(form).entries()].filter(([, value])=>String(value).trim() !== ""));
+  if (values.receiptPayload) {
+    try {
+      Object.assign(values, JSON.parse(values.receiptPayload));
+    } catch {
+      const status = document.querySelector("#production-action-status");
+      if (status) status.textContent = "提交失败：契约字段必须为有效 JSON。";
+      return;
+    }
+    delete values.receiptPayload;
+  }
   const id = encodeURIComponent(values.id || "");
   delete values.id;
   const contracts = {
     endpoint:{ path:`/imaging-cloud/production/endpoints/${id}/probe`, defaults:{ environment:"production", result:"passed" } },
     synthetic:{ path:`/imaging-cloud/production/synthetic-checks/${id}/actions`, defaults:{ result:"passed", dataClass:"synthetic-test-data" } },
     requirement:{ path:`/imaging-cloud/production/requirements/${id}/actions`, defaults:{} },
+    receipt:{ path:`/imaging-cloud/production/receipts/${id}/submit`, defaults:{} },
+    "receipt-verify":{ path:`/imaging-cloud/production/receipts/${id}/verify`, defaults:{} },
     drill:{ path:`/imaging-cloud/production/drills/${id}/complete`, defaults:{ result:"passed" } },
     approval:{ path:`/imaging-cloud/production/approvals/${id}/sign`, defaults:{} }
   };
@@ -696,7 +737,7 @@ function fallbackProductionCenter() {
     functionalState: "ready-for-synthetic-acceptance",
     formalGoLiveState: "blocked-until-site-evidence-signed",
     productionReady: false,
-    summary: { syntheticChecksPassed: 0, syntheticChecks: 10, endpointsReady: 0, endpoints: 5, requirementsSigned: 0, requirements: 7, drillsPassed: 0, drills: 4, approvalsSigned: 0, approvals: 2 },
+    summary: { syntheticChecksPassed: 0, syntheticChecks: 10, endpointsReady: 0, endpoints: 5, requirementsSigned: 0, requirements: 7, siteReceiptsVerified: 0, siteReceipts: 5, drillsPassed: 0, drills: 4, approvalsSigned: 0, approvals: 2 },
     requirements: [
       { id: "IMG-SITE-01", title: "试点医院PACS/RIS/DICOM TLS全链路联调", owner: "试点医院信息科/放射科", endpointIds: ["imaging-pacs-ris", "imaging-orthanc"], status: "site-pending" },
       { id: "IMG-SITE-02", title: "FHIR资源引用与EMR报告回写验收", owner: "平台互联互通组/医院病案部门", endpointIds: ["imaging-fhir"], status: "site-pending" },
@@ -705,6 +746,13 @@ function fallbackProductionCenter() {
       { id: "IMG-SITE-05", title: "省内本地存储、等保三级、密码和隐私评估", owner: "网信与安全责任部门", endpointIds: [], status: "site-pending" },
       { id: "IMG-SITE-06", title: "性能容量、备份恢复和灾备切换验收", owner: "平台运维组", endpointIds: ["imaging-fhir", "imaging-orthanc", "imaging-ohif"], status: "site-pending" },
       { id: "IMG-SITE-07", title: "业务、技术和管理多方现场验收", owner: "项目办", endpointIds: [], status: "site-pending" }
+    ],
+    siteReceipts: [
+      { type: "pacs-ris-dicom-tls", title: "PACS/RIS 与 DICOM TLS 联调回执", requirementIds: ["IMG-SITE-01"], status: "site-pending" },
+      { type: "fhir-report-writeback", title: "FHIR DiagnosticReport/EMR 回写回执", requirementIds: ["IMG-SITE-02"], status: "site-pending" },
+      { type: "object-storage-authorization-audit", title: "对象存储、授权与访问审计边界回执", requirementIds: ["IMG-SITE-04", "IMG-SITE-05"], status: "site-pending" },
+      { type: "mutual-recognition-appeal", title: "检查互认申诉与独立复核回执", requirementIds: ["IMG-SITE-07"], status: "site-pending" },
+      { type: "failure-degradation-rollback", title: "故障降级、回退与独立冒烟回执", requirementIds: ["IMG-SITE-06"], status: "site-pending" }
     ]
   };
 }

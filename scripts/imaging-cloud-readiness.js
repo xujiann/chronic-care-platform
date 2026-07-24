@@ -43,6 +43,7 @@ function buildImagingCloudReadinessReport(options = {}) {
     solutionAAcceptance: read("scripts/solution-a-acceptance.js")
   };
   const productionCenter = ImagingCloudProduction.center({});
+  const standaloneSmoke = ImagingCloudProduction.runStandaloneSmoke({});
   const checks = [
     check("spec:function-mobile", sources.html.includes("mobile-viewer") && sources.pageJs.includes("data-share-study") && sources.pageJs.includes("shareStudy") && sources.pageJs.includes("DICOM"), "mobile patient viewing, no-terminal-storage and share channel are visible", "spec"),
     check("spec:hospital-ingest", sources.server.includes("/api/imaging-cloud/ingest") && sources.server.includes("DICOM TLS") && sources.server.includes("C-STORE") && sources.server.includes("C-MOVE"), "hospital DICOM/RIS/PACS ingest API and protocols are modeled", "integration"),
@@ -60,12 +61,14 @@ function buildImagingCloudReadinessReport(options = {}) {
     check("production:formal-boundary", productionCenter.formalGoLiveState === "blocked-until-site-evidence-signed" && productionCenter.productionReady === false, "software readiness cannot silently open the formal production gate", "production"),
     check("production:synthetic-acceptance", productionCenter.summary.syntheticChecks === 10 && sources.production.includes("synthetic-test-data") && sources.solutionAAcceptance.includes("syntheticPatient"), "ten-step synthetic FHIR/DICOM/OHIF acceptance is tracked without real patient data", "production"),
     check("production:site-evidence", productionCenter.summary.requirements === 7 && ["externalSigner", "externalOrganization", "independent verification", "evidenceDigest"].every((marker) => sources.production.includes(marker)), "seven site blockers require external provenance and independent SHA-256 verification", "production"),
+    check("production:structured-receipts", productionCenter.summary.siteReceipts === 5 && ImagingCloudProduction.SITE_RECEIPT_CONTRACTS.every((item) => item.requiredFields.length && item.requirementIds.length) && ["DICOM-TLS", "DiagnosticReport", "no-original-dicom-on-mobile", "independentReviewerRole", "original-pacs-and-report-priority"].every((marker) => sources.production.includes(marker)), "PACS/RIS, FHIR writeback, object storage, appeal and degradation receipts use minimized typed contracts", "production"),
     check("production:endpoints-and-drills", productionCenter.summary.endpoints === 5 && productionCenter.summary.drills === 4 && sources.production.includes("production endpoint must use HTTPS or DICOM TLS"), "five production endpoints and four failure drills are governed", "production"),
     check("production:dual-approval", productionCenter.summary.approvals === 2 && sources.production.includes("business and technical approvals require different signers"), "business and technical cutover approvals require distinct accountable signers", "production"),
     check("production:audit-chain", sources.production.includes("previousDigest") && sources.production.includes("\"GENESIS\"") && sources.production.includes("JSON.stringify(row)"), "production operations are recorded in a tamper-evident digest chain", "security"),
     check("production:ui", sources.html.includes('data-imaging-section="production-gate"') && sources.pageJs.includes("renderProductionGate"), "production boundary and blockers are visible in the imaging workbench", "ui"),
     check("ui:production-operations", ["data-production-action=\"endpoint\"", "data-production-action=\"synthetic\"", "data-production-action=\"requirement\"", "data-production-action=\"drill\"", "data-production-action=\"approval\"", "静态预览不写入生产证据"].every((marker)=>sources.pageJs.includes(marker)), "endpoint, synthetic, evidence, drill and approval operations are available while static preview stays read-only", "ui"),
-    check("production:route-contract", ImagingCloudProduction.ROUTE_CONTRACTS.length === 6 && ImagingCloudProduction.ROUTE_CONTRACTS.every((item)=>item.roles?.length && item.handler?.startsWith("ImagingCloudProduction.")) && sources.docs.includes("/api/imaging-cloud/production-center"), "six role-guarded T00 integration route contracts are documented", "integration")
+    check("production:standalone-smoke", standaloneSmoke.codeReady && standaloneSmoke.releaseDecision === "no-go" && standaloneSmoke.checks.some((item) => item.id === "rollback-gate" && item.passed), "standalone module smoke verifies rollback controls while incomplete site evidence remains No-Go", "release"),
+    check("production:route-contract", ImagingCloudProduction.ROUTE_CONTRACTS.length === 9 && ImagingCloudProduction.ROUTE_CONTRACTS.every((item)=>item.roles?.length && item.handler?.startsWith("ImagingCloudProduction.")) && sources.docs.includes("/api/imaging-cloud/production-center"), "nine role-guarded T00 integration route contracts are documented", "integration")
   ];
   const codeReady = checks.every((item) => item.passed);
   return {
@@ -96,7 +99,8 @@ function buildImagingCloudReadinessReport(options = {}) {
       summary: productionCenter.summary,
       preflight: productionCenter.preflight,
       rollback: productionCenter.rollback,
-      routeContracts: productionCenter.routeContracts
+      routeContracts: productionCenter.routeContracts,
+      standaloneSmoke
     },
     t00Integration: {
       status: "pending-shared-file-integration",
@@ -140,6 +144,8 @@ function renderMarkdown(report) {
     `- Site requirements signed: ${report.productionCenter.summary.requirementsSigned}/${report.productionCenter.summary.requirements}`,
     `- Drills passed: ${report.productionCenter.summary.drillsPassed}/${report.productionCenter.summary.drills}`,
     `- Approvals signed: ${report.productionCenter.summary.approvalsSigned}/${report.productionCenter.summary.approvals}`,
+    `- Typed site receipts verified: ${report.productionCenter.summary.siteReceiptsVerified}/${report.productionCenter.summary.siteReceipts}`,
+    `- Standalone smoke: ${report.productionCenter.standaloneSmoke.codeReady ? "PASS" : "FAIL"}; release decision: ${report.productionCenter.standaloneSmoke.releaseDecision.toUpperCase()}`,
     "",
     "Formal production go-live remains blocked until runtime synthetic acceptance, production endpoint probes, site evidence, drills and dual approvals are actually recorded.",
     ""
