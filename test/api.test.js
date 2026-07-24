@@ -103,6 +103,16 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     status: "启用",
     passwordHash: passwordHash("hashed-pass")
   });
+  fixture.authOrganizations.push({
+    orgCode: "MR-OUTSIDE-TEST",
+    name: "\u57df\u5916\u533b\u7597\u673a\u6784",
+    orgType: "medical_institution",
+    orgLevel: "\u533a\u53bf\u7ea7",
+    parentCode: "ORG-HEALTH-DL",
+    portal: "institution.html",
+    dataScope: "\u672c\u673a\u6784",
+    interfaces: ["HIS"]
+  });
   fixture.authUsers.push({
     id: "u-citizen-r2-test",
     username: "citizen_r2",
@@ -118,6 +128,21 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     residentId: "r2",
     accountId: "a2",
     status: "\u542f\u7528"
+  });
+  fixture.authUsers.push({
+    id: "u-out-of-scope-hospital-test",
+    username: "out_of_scope_hospital",
+    name: "\u57df\u5916\u533b\u7597\u673a\u6784\u6d4b\u8bd5\u8d26\u53f7",
+    role: "institution",
+    roleName: "\u533b\u7597\u673a\u6784\u7aef",
+    orgCode: "MR-OUTSIDE-TEST",
+    orgName: "\u57df\u5916\u533b\u7597\u673a\u6784",
+    orgType: "medical_institution",
+    orgLevel: "\u533a\u53bf\u7ea7",
+    dataScope: "\u672c\u673a\u6784",
+    home: "institution.html",
+    status: "\u542f\u7528",
+    passwordHash: passwordHash("123456")
   });
   fixture.smsDeliveryReceipts = [{
     id: "sms-delivery-api-fixture",
@@ -4351,7 +4376,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     }));
     assert.equal(workflowWrite.response.status, 403);
 
-    const hospital = await login(baseUrl, "hospital");
+    const hospital = await login(baseUrl, "out_of_scope_hospital");
     const outOfScopeTeleconsultationWrite = await api(baseUrl, "/api/workflow-actions", authorized(hospital.body.token, {
       method: "POST",
       body: JSON.stringify({ collection: "referralTeleconsultations", id: "rtc-002", status: "已接收" })
