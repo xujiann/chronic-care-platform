@@ -18,6 +18,13 @@ T00 负责公共路由、统一认证鉴权、请求体与错误响应映射、�
 
 | ID | 方法 | 路径或挂钩点 | T07 领域函数 | 允许角色 |
 |---|---|---|---|---|
+| formal-grouping-operations | GET | `/api/disease-payment/formal-grouping/operations` | `buildFormalGroupingOperations` | insurance, commission, institution（同时校验机构类型） |
+| formal-grouping-create | POST | `/api/disease-payment/formal-grouping/jobs` | `createFormalGroupingJob` | insurance, commission（同时校验机构类型） |
+| formal-grouping-dispatch | POST | `/api/disease-payment/formal-grouping/jobs/:id/dispatch` | `dispatchFormalGroupingJob` | system / official_grouper_adapter |
+| formal-grouping-receipt | POST | `/api/disease-payment/formal-grouping/jobs/:id/receipts` | `receiveTrustedFormalGroupingReceipt`（内部执行 `verifyTrustedGrouperCallback`） | system / official_grouper_adapter |
+| formal-grouping-fail | POST | `/api/disease-payment/formal-grouping/jobs/:id/fail` | `failFormalGroupingJob` | system / official_grouper_adapter 或 platform |
+| formal-grouping-retry | POST | `/api/disease-payment/formal-grouping/jobs/:id/retry` | `retryFormalGroupingJob` | insurance, commission（同时校验机构类型） |
+| formal-grouping-reconcile | POST | `/api/disease-payment/formal-grouping/jobs/:id/reconcile` | `reconcileFormalGroupingDeadLetter` | insurance / insurance_center 或 insurance_bureau |
 | refund-create | POST | `/api/online-payments/refunds` | `createRefundRequest` | institution, commission |
 | refund-resubmit | POST | `/api/online-payments/refunds/:id/resubmit` | `resubmitRejectedRefund` | institution, commission |
 | refund-review | POST | `/api/online-payments/refunds/:id/reviews` | `reviewRefundRequest` | institution, commission |
@@ -53,10 +60,11 @@ T00 负责公共路由、统一认证鉴权、请求体与错误响应映射、�
 14. 月结、差额和年清事件必须保持相邻 `from/to` 语义连续，空事件账本不得承载任何状态迁移。状态投影不一致属于账务完整性事件，T00 只能记录告警并交由医保、医院财务和基金财务联合核查。
 15. 特例单议事件同样必须保持相邻状态连续；当前状态、原审意见、复议材料摘要、复议意见、决定摘要和结算批次绑定必须能由事件重建。`SPECIAL_CASE_STATE_PROJECTION_INVALID` 不得映射为可重试业务错误。
 16. 正式分组作业的幂等返回、派发、回执、失败、重试和死信重开前必须通过 `verifyFormalGroupingJobLedger`；完成态幂等返回还必须通过 `verifyFormalGroupingResultProjection`，死信重开还必须通过 `verifyFormalGroupingDeadLetter`。正式分组运行和支付测算账本必须与作业编号、关联号、方案版本、病例输入摘要及回执集合一一对应。完整性失败只能进入人工安全审计。公共运维路由必须使用 `buildFormalGroupingOperations` 的脱敏摘要，不得从领域状态直接返回 `caseSnapshots`、病例输入、适配器内部端点、错误详情或死信处置结论。
+17. 正式回执和派发受理结果只能由 `system / official_grouper_adapter` 主体写入，且回执入口必须先执行 `verifyTrustedGrouperCallback` 的来源白名单、时间窗、防重放和传输层签名校验，再执行逐病例官方回执验签。人工 `insurance/commission` 会话不得直接提交 `accepted=true` 或正式回执正文；死信对账仅允许医保经办机构完成。
 
 ## 生产证据交接
 
-`insurance-payment-production-handoff.js` 将 16 个待接项和外部阻断项转换为摘要绑定、职责分离、可验真的证据台账。T00 接线完成后，应由 `integration-owner` 提交路由测试证据，再由不同主体的 `acceptance-reviewer`、`security-reviewer` 或 `finance-auditor` 核验。
+`insurance-payment-production-handoff.js` 将 23 个待接项和外部阻断项转换为摘要绑定、职责分离、可验真的证据台账。T00 接线完成后，应由 `integration-owner` 提交路由测试证据，再由不同主体的 `acceptance-reviewer`、`security-reviewer` 或 `finance-auditor` 核验。
 
 当前仍有 9 项外部生产条件：
 

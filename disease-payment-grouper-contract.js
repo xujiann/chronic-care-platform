@@ -1,10 +1,20 @@
 "use strict";
 
-const { createHash, createPrivateKey, createPublicKey, sign, verify } = require("node:crypto");
+const { createHash, createHmac, createPrivateKey, createPublicKey, sign, timingSafeEqual, verify } = require("node:crypto");
 
 const CONTRACT_ID = "disease-payment-formal-grouper-v1";
 const CONTRACT_VERSION = "1.0.0";
 const SIGNATURE_SCHEMA_VERSION = "disease-payment-grouper-receipt-signature-v1";
+const CALLBACK_SIGNATURE_SCHEMA_VERSION = "disease-payment-grouper-callback-hmac-v1";
+
+class GrouperCallbackError extends Error {
+  constructor(message, code, statusCode = 400) {
+    super(message);
+    this.name = "GrouperCallbackError";
+    this.code = code;
+    this.statusCode = statusCode;
+  }
+}
 
 function canonicalStringify(value) {
   if (Array.isArray(value)) return `[${value.map((item) => canonicalStringify(item)).join(",")}]`;
@@ -184,9 +194,72 @@ function verifyReceiptSignature(receipt = {}, options = {}) {
   };
 }
 
+function callbackSigningInput(payload, timestamp, nonce, sourceId) {
+  return `${CALLBACK_SIGNATURE_SCHEMA_VERSION}\n${sourceId}\n${timestamp}\n${nonce}\n${sha256(payload)}`;
+}
+
+function signTrustedGrouperCallback(payload, options = {}) {
+  const secret = String(options.secret || "").trim();
+  const timestamp = String(options.timestamp || "").trim();
+  const nonce = String(options.nonce || "").trim();
+  const sourceId = String(options.sourceId || "").trim();
+  if (!secret || !timestamp || !nonce || !sourceId) throw new GrouperCallbackError("正式分组回调签名缺少密钥、时间戳、随机数或来源", "GROUPER_CALLBACK_SIGNING_INPUT_REQUIRED");
+  return createHmac("sha256", secret).update(callbackSigningInput(payload, timestamp, nonce, sourceId)).digest("hex");
+}
+
+function valueSet(value) {
+  if (value instanceof Set) return new Set([...value].map((item) => String(item).trim()).filter(Boolean));
+  return new Set((Array.isArray(value) ? value : String(value || "").split(",")).map((item) => String(item).trim()).filter(Boolean));
+}
+
+function verifyTrustedGrouperCallback(payload, options = {}) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new GrouperCallbackError("正式分组回调正文必须是对象", "GROUPER_CALLBACK_BODY_INVALID");
+  const env = options.env || process.env;
+  const secret = String(options.secret || env.DISEASE_PAYMENT_GROUPER_CALLBACK_SECRET || "").trim();
+  if (!secret) throw new GrouperCallbackError("正式分组回调密钥未配置", "GROUPER_CALLBACK_NOT_CONFIGURED", 503);
+  if (String(env.NODE_ENV || "").toLowerCase() === "production" && secret.length < 32) throw new GrouperCallbackError("正式分组回调密钥不满足生产强度", "GROUPER_CALLBACK_SECRET_WEAK", 503);
+  const sourceId = String(options.sourceId || "").trim();
+  const allowedSourceIds = valueSet(options.allowedSourceIds || env.DISEASE_PAYMENT_GROUPER_CALLBACK_ALLOWED_SOURCES);
+  if (!sourceId || !allowedSourceIds.size || !allowedSourceIds.has(sourceId)) throw new GrouperCallbackError("正式分组回调来源不在白名单", "GROUPER_CALLBACK_SOURCE_DENIED", 403);
+  const eventId = String(payload.eventId || "").trim();
+  const correlationId = String(payload.correlationId || "").trim();
+  if (!/^[A-Za-z0-9._:-]{3,160}$/.test(eventId) || !correlationId) throw new GrouperCallbackError("正式分组回调缺少有效事件号或关联号", "GROUPER_CALLBACK_IDENTITY_INVALID");
+  const timestamp = String(options.timestamp || "").trim();
+  const timestampNumber = Number(timestamp);
+  if (!/^\d{10,13}$/.test(timestamp) || !Number.isFinite(timestampNumber)) throw new GrouperCallbackError("正式分组回调时间戳无效", "GROUPER_CALLBACK_TIMESTAMP_INVALID");
+  const callbackTimeMs = timestamp.length === 13 ? timestampNumber : timestampNumber * 1000;
+  const nowMs = Number(options.nowMs ?? Date.now());
+  const maxSkewSeconds = Math.min(900, Math.max(30, Number(options.maxSkewSeconds || env.DISEASE_PAYMENT_GROUPER_CALLBACK_MAX_SKEW_SECONDS || 300)));
+  if (!Number.isFinite(nowMs) || !Number.isFinite(maxSkewSeconds) || Math.abs(nowMs - callbackTimeMs) > maxSkewSeconds * 1000) throw new GrouperCallbackError("正式分组回调超出允许时间窗", "GROUPER_CALLBACK_TIMESTAMP_EXPIRED", 401);
+  const nonce = String(options.nonce || "").trim();
+  if (!/^[A-Za-z0-9._:-]{8,160}$/.test(nonce)) throw new GrouperCallbackError("正式分组回调随机数无效", "GROUPER_CALLBACK_NONCE_INVALID");
+  const signature = String(options.signature || "").trim().replace(/^sha256=/i, "").toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(signature)) throw new GrouperCallbackError("正式分组回调传输签名无效", "GROUPER_CALLBACK_SIGNATURE_INVALID", 401);
+  const expected = signTrustedGrouperCallback(payload, { secret, timestamp, nonce, sourceId });
+  const receivedBuffer = Buffer.from(signature, "hex");
+  const expectedBuffer = Buffer.from(expected, "hex");
+  if (receivedBuffer.length !== expectedBuffer.length || !timingSafeEqual(receivedBuffer, expectedBuffer)) throw new GrouperCallbackError("正式分组回调传输签名校验失败", "GROUPER_CALLBACK_SIGNATURE_MISMATCH", 401);
+  const nonceDigest = sha256(nonce);
+  if (valueSet(options.seenEventIds).has(eventId)) throw new GrouperCallbackError("正式分组回调事件号已处理", "GROUPER_CALLBACK_EVENT_REPLAY", 409);
+  if (valueSet(options.seenNonceDigests).has(nonceDigest)) throw new GrouperCallbackError("正式分组回调随机数已使用", "GROUPER_CALLBACK_NONCE_REPLAY", 409);
+  return {
+    schemaVersion: CALLBACK_SIGNATURE_SCHEMA_VERSION,
+    eventId,
+    correlationId,
+    sourceId,
+    timestamp,
+    receivedAt: new Date(nowMs).toISOString(),
+    payloadDigest: sha256(payload),
+    nonceDigest,
+    signatureVerified: true
+  };
+}
+
 module.exports = {
+  CALLBACK_SIGNATURE_SCHEMA_VERSION,
   CONTRACT_ID,
   CONTRACT_VERSION,
+  GrouperCallbackError,
   SIGNATURE_SCHEMA_VERSION,
   buildRequestEnvelope,
   canonicalStringify,
@@ -196,7 +269,9 @@ module.exports = {
   normalizedCaseSnapshot,
   publicKeyFingerprint,
   sha256,
+  signTrustedGrouperCallback,
   unsignedReceiptContent,
   validateRequestEnvelope,
-  verifyReceiptSignature
+  verifyReceiptSignature,
+  verifyTrustedGrouperCallback
 };
