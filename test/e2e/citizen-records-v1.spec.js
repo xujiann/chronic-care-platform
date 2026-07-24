@@ -41,6 +41,18 @@ test("resident creates a scoped consent and revokes it through the dedicated aud
   await expect(page.locator("#resident-records-v1")).toBeVisible();
   await expect(page.locator("#resident-records-v1")).toContainText("只读健康记录");
   await expect(page.locator("#upload-form select[name='category'] option[value='emr']")).toHaveCount(0);
+  const [healthRecordDownload] = await Promise.all([
+    page.waitForEvent("download"),
+    page.locator("#export-health-record").click()
+  ]);
+  const healthRecordExport = JSON.parse(fs.readFileSync(await healthRecordDownload.path(), "utf8"));
+  expect(healthRecordDownload.suggestedFilename()).toMatch(/^resident-health-record-\d{4}-\d{2}-\d{2}\.json$/);
+  expect(healthRecordExport.schema).toBe("resident-health-record-export-v1");
+  expect(healthRecordExport.subject).toBe("self");
+  expect(healthRecordExport.recordCount).toBeGreaterThan(0);
+  expect(healthRecordExport.records.every((item) => item.category !== "authorizations")).toBe(true);
+  const healthRecordText = JSON.stringify(healthRecordExport);
+  expect(healthRecordText).not.toMatch(/residentId|personIndex|auditHash|sourceRecordId|studyInstanceUID|imageCloudStudyId|attachmentId|objectPath|viewerUrl/);
 
   await page.locator('[data-vault="imaging"]').click();
   const imageCloudReport = page.locator(".vault-item").filter({ hasText: "双肺纹理增多" });

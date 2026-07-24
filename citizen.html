@@ -267,6 +267,7 @@
             <em class="feature-state ready">首增量 V1</em>
             <span id="vault-updated">持续更新</span>
             <a class="small-button" href="./physical-examination.html">全部体检报告</a>
+            <button type="button" class="small-button" id="export-health-record">导出档案副本</button>
             <button class="small-button" id="upload-record">补充个人资料</button>
             <button class="small-button primary" id="grant-auth">新增授权</button>
           </div>
@@ -849,8 +850,8 @@
     <script src="./physical-examination-service.js"></script>
     <script src="./immunization-schedule.js"></script>
     <script src="./citizen-records-v1.js?v=20260724auth3"></script>
-    <script src="./citizen-records-v2.js?v=20260724care12"></script>
-    <script src="./citizen.js?v=20260724care12"></script>
+    <script src="./citizen-records-v2.js?v=20260724care13"></script>
+    <script src="./citizen.js?v=20260724care13"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));

@@ -20,6 +20,70 @@
   const ACTIVE_RELATIONSHIP_STATUSES = new Set(["verified", "confirmed", "核验通过", "已核验"]);
   const CORRECTION_STATUSES = new Set(["submitted", "accepted", "processing", "corrected", "rejected", "withdrawn"]);
   const SHARE_PACKAGE_STATUSES = new Set(["active", "revoked", "expired"]);
+  const PORTABLE_RECORD_CATEGORIES = new Set([
+    "emr",
+    "labs",
+    "medications",
+    "imaging",
+    "attachments",
+    "physical-exam",
+    "allergies",
+    "vaccines",
+    "admissions"
+  ]);
+  const PORTABLE_META_FIELDS = new Set([
+    "visitType",
+    "department",
+    "diagnosis",
+    "diagnoses",
+    "treatment",
+    "followupPlan",
+    "exams",
+    "medications",
+    "metrics",
+    "severity",
+    "abnormalLevel",
+    "attachmentType",
+    "fileName",
+    "reportNo",
+    "findings",
+    "recommendations",
+    "physicalExam",
+    "sourceOrganization",
+    "dataQualityStatus",
+    "sourceTrust",
+    "originalAvailable",
+    "authorizationRequired",
+    "modality",
+    "bodyPart",
+    "reportStatus",
+    "recordKind",
+    "dosage",
+    "nextPickup",
+    "pharmacy",
+    "pharmacyStatus",
+    "mutualRecognitionStatus",
+    "contentType",
+    "sizeBytes",
+    "scanStatus",
+    "retentionPolicy"
+  ]);
+  const PORTABLE_NESTED_FIELDS = new Set([
+    "name",
+    "label",
+    "value",
+    "unit",
+    "date",
+    "result",
+    "summary",
+    "status",
+    "code",
+    "system",
+    "description",
+    "dose",
+    "frequency",
+    "route"
+  ]);
   const DEFAULT_COMPLETENESS_ITEMS = Object.freeze([
     { key: "identity", label: "实名与主索引", categories: [] },
     { key: "health-summary", label: "基础健康摘要", categories: ["physical-exam"] },
@@ -1132,6 +1196,63 @@
     };
   }
 
+  function portableRecordValue(value, depth = 0) {
+    if (typeof value === "string") return cleanText(value, 500);
+    if (["number", "boolean"].includes(typeof value) || value === null) return value;
+    if (Array.isArray(value)) {
+      return value.slice(0, 20).map((item) => portableRecordValue(item, depth + 1)).filter((item) => item !== undefined);
+    }
+    if (!value || typeof value !== "object" || depth >= 2) return undefined;
+    const entries = Object.entries(value)
+      .filter(([key]) => PORTABLE_NESTED_FIELDS.has(key))
+      .map(([key, item]) => [key, portableRecordValue(item, depth + 1)])
+      .filter(([, item]) => item !== undefined);
+    return entries.length ? Object.fromEntries(entries) : undefined;
+  }
+
+  function buildResidentPortableArchive(records = [], residentId = "", generatedAt = new Date()) {
+    const scoped = CitizenRecordsV1.projectResidentRecords(records, cleanText(residentId, 120))
+      .filter((record) => PORTABLE_RECORD_CATEGORIES.has(record.category))
+      .sort((left, right) => {
+        return cleanText(right.date, 40).localeCompare(cleanText(left.date, 40))
+          || cleanText(left.category, 60).localeCompare(cleanText(right.category, 60))
+          || cleanText(left.name, 300).localeCompare(cleanText(right.name, 300));
+      });
+    const items = scoped.map((record, index) => {
+      const details = Object.fromEntries(
+        Object.entries(record.meta || {})
+          .filter(([key]) => PORTABLE_META_FIELDS.has(key))
+          .map(([key, value]) => [key, portableRecordValue(value)])
+          .filter(([, value]) => value !== undefined)
+      );
+      return {
+        recordRef: `record-${index + 1}`,
+        category: record.category,
+        date: cleanText(record.date, 40),
+        title: cleanText(record.name, 300),
+        summary: cleanText(record.result, 1200),
+        source: cleanText(record.source, 300),
+        status: cleanText(record.status, 80),
+        trust: CitizenRecordsV1.sourceTrust(record),
+        ...(Object.keys(details).length ? { details } : {})
+      };
+    });
+    const exportTime = toDate(generatedAt) || new Date();
+    const categoryCounts = items.reduce((counts, item) => {
+      counts[item.category] = (counts[item.category] || 0) + 1;
+      return counts;
+    }, {});
+    return {
+      schema: "resident-health-record-export-v1",
+      generatedAt: exportTime.toISOString(),
+      subject: "self",
+      recordCount: items.length,
+      categoryCounts,
+      records: items,
+      notice: "仅包含当前居民可读的最小化健康摘要；不包含授权记录、居民主索引、审计字段、对象存储标识、原文地址或影像原图。"
+    };
+  }
+
   function buildAuthorizationReceiptLedger(records = [], residentId = "") {
     const expectedResidentId = cleanText(residentId, 120);
     const items = (Array.isArray(records) ? records : [])
@@ -1326,6 +1447,7 @@
     projectAccessReviewActionReceipt,
     buildAccessExportRows,
     filterResidentRecords,
+    buildResidentPortableArchive,
     buildAuthorizationReceiptLedger,
     buildAuthorizationReceiptExportRows,
     buildAuthorizationLifecycle,

@@ -37,6 +37,7 @@ function assessCitizenRecordsReadiness(options = {}) {
     { id: "authorization-write-trust", label: "授权创建与撤销响应信任边界", passed: /projectAuthorizationCreateResponse/.test(v2) && /projectAuthorizationRevocationResponse/.test(v2) && /authorization-create/.test(ui) && /authorization-revoke/.test(ui) },
     { id: "authorization-receipt-ledger", label: "授权操作回执按居民核验", passed: /buildAuthorizationReceiptLedger/.test(v2) && /creationReceiptId/.test(v1) && /revocationReceiptId/.test(v1) && /citizen-authorization-receipt-summary/.test(html) && /receipt-auth-renew-e2e/.test(e2e) },
     { id: "authorization-receipt-export", label: "授权回执证据最小化导出", passed: /buildAuthorizationReceiptExportRows/.test(v2) && /data-export-authorization-receipts/.test(html) && /exportCitizenAuthorizationReceipts/.test(ui) && /'=HYPERLINK/.test(e2e) },
+    { id: "portable-record-export", label: "居民健康档案最小化可携带副本", passed: /buildResidentPortableArchive/.test(v2) && /export-health-record/.test(html) && /exportCitizenHealthRecord/.test(ui) && /resident-health-record-export-v1/.test(e2e) },
     { id: "authorization-status-consistency", label: "居民端有效授权统计与提醒一致", passed: /getAuthorizationLifecycle/.test(ui) && /pending", "rejected", "suspended/.test(unit) && /1\/4 条有效授权/.test(e2e) },
     { id: "authorization-calendar-boundary", label: "授权有效期自然日边界一致", passed: /authorizationExpiryDate/.test(v2) && /calendarDayDistance/.test(v2) && /day-30/.test(unit) && /day-31/.test(unit) },
     { id: "controlled-access", label: "原文影像附件短时受控调阅", passed: /validateControlledCredential/.test(v2) && /oneTime/.test(v2) && /ttlSeconds/.test(v2) },
@@ -46,7 +47,7 @@ function assessCitizenRecordsReadiness(options = {}) {
     { id: "server-policy-contract", label: "服务端授权策略契约", passed: /evaluateCitizenRecordAccess/.test(policy) && /buildCitizenControlledAccessIntent/.test(policy) },
     { id: "negative-policy-tests", label: "非激活授权与跨居民负向测试", passed: /pending rejected or suspended/.test(policyTest) && /cross-resident|resident scoped/.test(`${unit}\n${policyTest}`) },
     { id: "resident-journey-e2e", label: "居民创建撤销续授权与检索旅程", passed: /idempotency-key/.test(e2e) && /auth-scope-preview/.test(e2e) && /vault-search-keyword/.test(e2e) },
-    { id: "acceptance-documentation", label: "居民验收标准与外部依赖", passed: /第十六增量/.test(documentation) && /## 外部依赖/.test(documentation) }
+    { id: "acceptance-documentation", label: "居民验收标准与外部依赖", passed: /第十七增量/.test(documentation) && /## 外部依赖/.test(documentation) }
   ];
 
   const integrationChecks = [
@@ -63,7 +64,7 @@ function assessCitizenRecordsReadiness(options = {}) {
     {
       id: "t00-pwa-cache",
       label: "T00 Service Worker 缓存当前居民脚本版本",
-      passed: /citizen-records-v2\.js\?v=20260724care12/.test(serviceWorker) && /citizen\.js\?v=20260724care12/.test(serviceWorker)
+      passed: /citizen-records-v2\.js\?v=20260724care13/.test(serviceWorker) && /citizen\.js\?v=20260724care13/.test(serviceWorker)
     }
   ];
 

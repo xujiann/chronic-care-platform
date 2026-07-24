@@ -573,6 +573,55 @@ test("record search rejects inverted date ranges without leaking results", () =>
   assert.deepEqual(result.items, []);
 });
 
+test("portable resident archive is minimized, resident scoped and excludes authorization data", () => {
+  const archive = V2.buildResidentPortableArchive([
+    {
+      id: "lab-r1",
+      residentId: "r1",
+      category: "labs",
+      date: "2026-07-20",
+      name: "血糖",
+      result: "5.6 mmol/L",
+      source: "医院 LIS",
+      status: "已归档",
+      personIndex: "must-not-export",
+      auditHash: "must-not-export",
+      meta: {
+        reportNo: "LAB-001",
+        sourceRecordId: "internal-source-id",
+        objectKey: "oss://must-not-export",
+        metrics: [{ name: "血糖", value: "5.6", unit: "mmol/L", auditHash: "nested-secret" }]
+      }
+    },
+    {
+      id: "auth-r1",
+      residentId: "r1",
+      category: "authorizations",
+      date: "2027-07-20",
+      name: "医院 A",
+      result: "授权摘要",
+      source: "居民授权"
+    },
+    {
+      id: "lab-r2",
+      residentId: "r2",
+      category: "labs",
+      date: "2026-07-21",
+      name: "跨居民记录",
+      result: "must-not-export",
+      source: "医院 LIS"
+    }
+  ], "r1", "2026-07-24T08:00:00.000Z");
+  assert.equal(archive.schema, "resident-health-record-export-v1");
+  assert.equal(archive.subject, "self");
+  assert.equal(archive.recordCount, 1);
+  assert.deepEqual(archive.categoryCounts, { labs: 1 });
+  assert.equal(archive.records[0].recordRef, "record-1");
+  assert.equal(archive.records[0].details.reportNo, "LAB-001");
+  assert.deepEqual(archive.records[0].details.metrics, [{ name: "血糖", value: "5.6", unit: "mmol/L" }]);
+  assert.doesNotMatch(JSON.stringify(archive), /residentId|authorizations|personIndex|auditHash|sourceRecordId|objectKey|internal-source-id|nested-secret|跨居民记录/);
+});
+
 test("authorization scope disclosure explains inclusions and exclusions without broadening scopes", () => {
   const disclosure = V2.buildAuthorizationScopeDisclosure([
     "health-record-summary",
