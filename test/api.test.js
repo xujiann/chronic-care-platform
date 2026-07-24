@@ -169,6 +169,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
   process.env.SMS_DELIVERY_CALLBACK_SECRET = "sms-callback-secret-with-at-least-32-characters";
   delete process.env.CARE_CUTOVER_EVIDENCE_FILE;
   delete process.env.CARE_CUTOVER_EVIDENCE_SHA256;
+  delete process.env.CARE_DEPENDENCY_EVIDENCE_FILE;
+  delete process.env.CARE_DEPENDENCY_EVIDENCE_SHA256;
   const { server, startServer, stopServer } = require(path.join(ROOT, "server.js"));
   startServer(0);
   await once(server, "listening");
@@ -2762,23 +2764,40 @@ test("API authentication, scoping and governance regression suite", async (t) =>
 
     const readiness = await api(
       baseUrl,
-      "/api/care-services/readiness?platformIntegrated=false&cutoverEvidenceValidation=approved&CARE_CUTOVER_EVIDENCE_FILE=forged",
+      "/api/care-services/readiness?platformIntegrated=false&cutoverEvidenceValidation=approved&dependencyEvidenceValidation=healthy&CARE_CUTOVER_EVIDENCE_FILE=forged&CARE_DEPENDENCY_EVIDENCE_FILE=forged",
       authorized(commissionToken)
     );
     assert.equal(readiness.response.status, 200);
     assert.deepEqual(
       Object.keys(readiness.body).sort(),
-      ["blockerCounts", "formalGoLiveState", "safeErrorCodes", "scopes"]
+      ["blockerCounts", "dependencies", "formalGoLiveState", "safeErrorCodes", "scopes"]
     );
     assert.equal(readiness.body.formalGoLiveState, "blocked-by-production-configuration-or-health");
     assert.equal(readiness.body.blockerCounts.platform, 0);
     assert.equal(readiness.body.blockerCounts.signoff, 5);
     assert.deepEqual(readiness.body.scopes.map((item) => item.scope), ["business", "interface", "security", "dr", "oncall"]);
     assert.equal(readiness.body.scopes.every((item) => item.passed === false), true);
+    assert.deepEqual(
+      readiness.body.dependencies.map((item) => item.dependency),
+      [
+        "storage", "identity", "sms", "his", "appointment", "object-storage",
+        "payment", "insurance", "certificate", "audit", "outbox-worker",
+        "nursing-delivery", "escort-delivery"
+      ]
+    );
+    assert.equal(readiness.body.dependencies.every((item) => item.passed === false), true);
     assert.equal(readiness.body.safeErrorCodes.includes("CUTOVER_EVIDENCE_DIGEST_MISMATCH"), true);
-    assert.equal(readiness.body.safeErrorCodes.every((code) => /^CUTOVER_EVIDENCE_[A-Z0-9_]+$/.test(code)), true);
+    assert.equal(readiness.body.safeErrorCodes.includes("CARE_DEPENDENCY_EVIDENCE_DIGEST_MISMATCH"), true);
+    assert.equal(
+      readiness.body.safeErrorCodes.every((code) => /^(?:CUTOVER_EVIDENCE|CARE_DEPENDENCY_EVIDENCE)_[A-Z0-9_]+$/.test(code)),
+      true
+    );
     const serialized = JSON.stringify(readiness.body);
-    ["signerId", "evidenceRef", "CARE_CUTOVER_EVIDENCE_FILE", "cutover-evidence.json", "secret"].forEach((marker) => {
+    [
+      "signerId", "evidenceRef", "receiptRef", "targetDigest", "receiptDigest",
+      "CARE_CUTOVER_EVIDENCE_FILE", "CARE_DEPENDENCY_EVIDENCE_FILE",
+      "cutover-evidence.json", "dependency-evidence.json", "secret", "http"
+    ].forEach((marker) => {
       assert.equal(serialized.includes(marker), false, `${marker} must not be exposed`);
     });
 
@@ -2790,7 +2809,14 @@ test("API authentication, scoping and governance regression suite", async (t) =>
           ok: true,
           approvedScopes: ["business", "interface", "security", "dr", "oncall"]
         },
-        env: { CARE_CUTOVER_EVIDENCE_FILE: "forged" }
+        dependencyEvidenceValidation: {
+          ok: true,
+          healthyDependencies: ["storage", "identity", "sms"]
+        },
+        env: {
+          CARE_CUTOVER_EVIDENCE_FILE: "forged",
+          CARE_DEPENDENCY_EVIDENCE_FILE: "forged"
+        }
       })
     }));
     assert.equal(forgedWrite.response.status, 405);
