@@ -79,6 +79,19 @@ The cutover pack also emits a `goNoGoDecision` section. It is intentionally cons
 
 The current default decision remains `no-go-site-evidence-pending` because the four specialties have code evidence but still lack signed site receipts and observation evidence.
 
+## Independent institution selection
+
+The four specialties are installable modules rather than a mandatory bundle. Each module owns its business page, API route, external-system adapters, data boundary and acceptance scenarios. A module may use shared platform capabilities such as institution identity, authorization, signed interfaces and append-only audit evidence, but it has no runtime dependency on another specialty module.
+
+Generate a standalone or institution-specific pack with:
+
+```powershell
+node emergency-specialty-cutover.js --tracks clinical-blood --output-prefix t10-clinical-blood
+node emergency-specialty-cutover.js --tracks regional-imaging-cloud,physical-examination --output-prefix institution-a-specialties
+```
+
+The default command still generates the four-module T10 integration pack. `moduleCatalog` records enabled and disabled module IDs, deployment units, external systems, data boundaries, shared platform capabilities and peer-module dependencies. The peer dependency count must remain zero so an institution can adopt any one module without installing the other three.
+
 ## Site evidence dossier
 
 The cutover pack now emits an `evidenceDossier` section. It converts every site blocker into a reviewable evidence entry with:
