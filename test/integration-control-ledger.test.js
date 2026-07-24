@@ -90,7 +90,10 @@ test("publication receipts preserve static preview evidence without opening prod
   assert.equal(validation.valid, true);
   assert.equal(payload.receipts.some((item) => item.lineId === "T06"), true);
   assert.equal(payload.receipts.every((item) => item.productionReady === false), true);
-  assert.equal(intake.decisions.find((item) => item.lineId === "T06").decision, "blocked");
+  const t06Receipt = payload.receipts.find((item) => item.lineId === "T06");
+  const t06Decision = intake.decisions.find((item) => item.lineId === "T06");
+  assert.equal(t06Decision.decision, "accepted");
+  assert.equal(t06Decision.acceptedCandidateHeads.includes(t06Receipt.sourceCandidateHead), true);
 
   const tampered = structuredClone(payload);
   tampered.receipts[0].site.resources[0].observedMarkers = ["capacityReservation"];
