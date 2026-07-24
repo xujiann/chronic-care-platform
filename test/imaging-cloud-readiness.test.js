@@ -35,12 +35,16 @@ test("imaging cloud readiness validates province-spec capabilities", () => {
   assert.equal(report.checks.some((item) => item.id === "production:formal-boundary" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "production:synthetic-acceptance" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "production:site-evidence" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "production:structured-receipts" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "production:standalone-smoke" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "production:route-contract" && item.passed), true);
   assert.equal(report.summary.requiredCapabilities.includes("development plan"), true);
   assert.equal(report.summary.requiredCapabilities.includes("mutual-recognition appeal"), true);
   assert.equal(report.summary.requiredCapabilities.includes("formal production gate"), true);
   assert.equal(report.summary.production.syntheticChecks, 10);
   assert.equal(report.summary.production.requirements, 7);
+  assert.equal(report.summary.production.siteReceipts, 5);
+  assert.equal(report.productionCenter.standaloneSmoke.releaseDecision, "no-go");
   assert.equal(report.t00Integration.status, "pending-shared-file-integration");
   assert.match(markdown, /Imaging cloud readiness report/);
   assert.match(markdown, /imaging-cloud\.html/);
