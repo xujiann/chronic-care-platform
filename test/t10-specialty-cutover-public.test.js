@@ -16,6 +16,7 @@ test("T00 exposes the T10 specialty cutover pack through public integration cont
   const workbench = read("workbench.html");
   const readme = read("README.md");
   const releaseReport = read("scripts/release-report.js");
+  const runtimeSmoke = read("scripts/t10-runtime-smoke.js");
   const pkg = JSON.parse(read("package.json"));
 
   assert.match(server, /buildSpecialtyCutoverPack/);
@@ -56,6 +57,10 @@ test("T00 exposes the T10 specialty cutover pack through public integration cont
   assert.match(workbench, /t10-specialty-cutover\.html/);
   assert.match(workbench, /T10割接总控/);
   assert.equal(pkg.scripts["t10:specialty-cutover"], "node emergency-specialty-cutover.js");
+  assert.equal(pkg.scripts["t10:runtime-smoke"], "node scripts/t10-runtime-smoke.js");
+  assert.match(runtimeSmoke, /buildT10RuntimeSmokeReport/);
+  assert.match(runtimeSmoke, /t10-runtime-smoke-report\.json/);
+  assert.match(runtimeSmoke, /t10:runtime-smoke-plan/);
   assert.match(releaseReport, /specialtyCutoverChecks/);
   assert.match(releaseReport, /specialtyCutover:rehearsalPlan/);
   assert.match(releaseReport, /specialtyCutover:goNoGoDecision/);

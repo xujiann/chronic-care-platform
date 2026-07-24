@@ -175,6 +175,17 @@ The board returns three explicit outcomes: stay No-Go, repeat batch-1, or open w
 
 The plan status is `ready-for-runtime-smoke` and the launch mode remains `controlled-rehearsal-only`. A green runtime smoke run means the system is ready for controlled rehearsal, not that formal production Go-Live evidence has been waived. Any failed automated smoke suite, missing observation artifact, failed server API smoke or failed release/deploy gate blocks launch.
 
+The executable smoke runner is `scripts/t10-runtime-smoke.js`. It writes:
+
+- `release/t10-runtime-smoke-report.json`
+- `release/t10-runtime-smoke-report.md`
+
+Run it after generating the cutover pack:
+
+```powershell
+node scripts\t10-runtime-smoke.js
+```
+
 ## Verification
 
 Run the focused test directly:
