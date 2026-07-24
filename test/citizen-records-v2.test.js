@@ -620,6 +620,18 @@ test("portable resident archive is minimized, resident scoped and excludes autho
   assert.equal(archive.records[0].details.reportNo, "LAB-001");
   assert.deepEqual(archive.records[0].details.metrics, [{ name: "血糖", value: "5.6", unit: "mmol/L" }]);
   assert.doesNotMatch(JSON.stringify(archive), /residentId|authorizations|personIndex|auditHash|sourceRecordId|objectKey|internal-source-id|nested-secret|跨居民记录/);
+  const selected = V2.buildResidentPortableArchive([
+    ...archive.records,
+    { id: "image-r1", residentId: "r1", category: "imaging", date: "2026-07-22", name: "影像报告", result: "摘要", source: "医院 PACS" },
+    { id: "lab-selected-r1", residentId: "r1", category: "labs", date: "2026-07-20", name: "血糖", result: "5.6 mmol/L", source: "医院 LIS" }
+  ], "r1", "2026-07-24T08:00:00.000Z", ["labs"]);
+  assert.equal(selected.recordCount, 1);
+  assert.deepEqual(Object.keys(selected.categoryCounts), ["labs"]);
+  assert.equal(V2.buildResidentPortableArchive([], "r1", "2026-07-24T08:00:00.000Z", []).recordCount, 0);
+  assert.throws(
+    () => V2.buildResidentPortableArchive([], "r1", "2026-07-24T08:00:00.000Z", ["labs", "internal-all-records"]),
+    /不受支持的分类/
+  );
 });
 
 test("authorization scope disclosure explains inclusions and exclusions without broadening scopes", () => {

@@ -843,6 +843,35 @@
       </form>
     </dialog>
 
+    <dialog id="health-record-export-dialog" aria-labelledby="health-record-export-title" aria-describedby="health-record-export-boundary">
+      <form method="dialog" class="dialog-form" id="health-record-export-form">
+        <header>
+          <h2 id="health-record-export-title">选择档案副本范围</h2>
+          <button type="button" class="close-button" data-close aria-label="关闭档案导出">×</button>
+        </header>
+        <div class="form-grid">
+          <fieldset class="authorization-scopes full">
+            <legend>仅勾选本次确实需要的资料分类</legend>
+            <label><input type="checkbox" name="categories" value="emr" />电子病历摘要</label>
+            <label><input type="checkbox" name="categories" value="labs" />检验检查</label>
+            <label><input type="checkbox" name="categories" value="medications" />用药记录</label>
+            <label><input type="checkbox" name="categories" value="imaging" />影像报告</label>
+            <label><input type="checkbox" name="categories" value="attachments" />附件摘要</label>
+            <label><input type="checkbox" name="categories" value="physical-exam" />体检摘要</label>
+            <label><input type="checkbox" name="categories" value="allergies" />过敏史</label>
+            <label><input type="checkbox" name="categories" value="vaccines" />免疫接种</label>
+            <label><input type="checkbox" name="categories" value="admissions" />住院记录摘要</label>
+          </fieldset>
+          <output class="authorization-scope-preview full" id="health-record-export-preview" role="status" aria-live="polite">请选择至少一类资料</output>
+          <p class="form-boundary full" id="health-record-export-boundary">副本不包含授权记录、居民主索引、审计字段、原文地址或影像原图；导出不会自动分享给任何机构。</p>
+        </div>
+        <footer>
+          <button type="button" class="ghost-link" data-close>取消</button>
+          <button type="submit" class="small-button primary" id="health-record-export-confirm" disabled>确认导出</button>
+        </footer>
+      </form>
+    </dialog>
+
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="./health-archive-standard.js"></script>
     <script src="./physical-examination-standards.js"></script>
@@ -850,8 +879,8 @@
     <script src="./physical-examination-service.js"></script>
     <script src="./immunization-schedule.js"></script>
     <script src="./citizen-records-v1.js?v=20260724auth3"></script>
-    <script src="./citizen-records-v2.js?v=20260724care13"></script>
-    <script src="./citizen.js?v=20260724care13"></script>
+    <script src="./citizen-records-v2.js?v=20260724care14"></script>
+    <script src="./citizen.js?v=20260724care14"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));
