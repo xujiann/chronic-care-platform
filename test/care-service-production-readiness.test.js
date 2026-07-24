@@ -14,6 +14,7 @@ const {
   REQUIRED_SCOPES,
   sha256
 } = require("../care-service-cutover-evidence");
+const DependencyEvidence = require("../care-service-dependency-evidence");
 const Runtime = require("../care-service-runtime");
 const NursingService = require("../internet-nursing-service");
 
@@ -52,40 +53,71 @@ function withApprovedCutoverEvidence(t, env = productionEnv()) {
   };
 }
 
+function withHealthyDependencyEvidence(t, env = productionEnv()) {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "care-service-dependency-ready-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const manifest = {
+    schemaVersion: DependencyEvidence.EVIDENCE_SCHEMA_VERSION,
+    policyVersion: Runtime.RUNTIME_POLICY_VERSION,
+    environment: "production",
+    releaseId: "CARE-CHANGE-20260724-002",
+    probes: DependencyEvidence.REQUIRED_DEPENDENCIES.map((dependency, index) => ({
+      dependency,
+      status: "healthy",
+      checkType: "signed-health",
+      checkedAt: "2026-07-23T00:55:00.000Z",
+      expiresAt: "2026-07-23T01:10:00.000Z",
+      targetDigest: DependencyEvidence.targetDigestForDependency(env, dependency),
+      receiptRef: `urn:care-probe:${dependency}:20260723`,
+      receiptDigest: `sha256:${(index + 1).toString(16).repeat(64)}`
+    }))
+  };
+  const raw = Buffer.from(JSON.stringify(manifest, null, 2), "utf8");
+  const file = path.join(directory, "dependency-evidence.json");
+  fs.writeFileSync(file, raw);
+  return {
+    ...env,
+    CARE_DEPENDENCY_EVIDENCE_FILE: file,
+    CARE_DEPENDENCY_EVIDENCE_SHA256: DependencyEvidence.sha256(raw)
+  };
+}
+
 function productionEnv(overrides = {}) {
   return {
     NODE_ENV: "production",
     STORAGE_ENGINE: "postgres",
-    DATABASE_URL: "postgresql://care.example.internal/care",
+    DATABASE_URL: "postgresql://care.db.health.internal/care",
     SESSION_SECRETS: SECRET,
     INTEGRATION_GATEWAY_SECRET: SECRET,
-    OIDC_ISSUER_URL: "https://identity.example.gov.cn",
+    OIDC_ISSUER_URL: "https://identity.health.gov.cn",
     OIDC_CLIENT_ID: "care-service",
     OIDC_CLIENT_SECRET: SECRET,
-    SMS_GATEWAY_URL: "https://sms.example.gov.cn/messages",
+    SMS_GATEWAY_URL: "https://sms.health.gov.cn/messages",
     SMS_TEMPLATE_ID: "care-status-v1",
     SMS_GATEWAY_TOKEN: SECRET,
     SMS_DELIVERY_CALLBACK_SECRET: SECRET,
-    HIS_ADAPTER_URL: "https://his.example.org/events",
+    HIS_ADAPTER_URL: "https://his.hospital.cn/events",
     HIS_ADAPTER_SECRET: SECRET,
-    APPOINTMENT_ADAPTER_URL: "https://appointment.example.org/events",
+    APPOINTMENT_ADAPTER_URL: "https://appointment.hospital.cn/events",
     APPOINTMENT_ADAPTER_SECRET: SECRET,
-    OBJECT_STORAGE_GATEWAY_URL: "https://storage.example.gov.cn",
+    OBJECT_STORAGE_GATEWAY_URL: "https://storage.health.gov.cn",
     OBJECT_STORAGE_BUCKET: "care-evidence",
     OBJECT_STORAGE_SIGNING_SECRET: SECRET,
-    PAYMENT_GATEWAY_URL: "https://payment.example.gov.cn",
+    PAYMENT_GATEWAY_URL: "https://payment.health.gov.cn",
     PAYMENT_GATEWAY_SECRET: SECRET,
     PAYMENT_CALLBACK_SECRET: SECRET,
-    INSURANCE_GATEWAY_URL: "https://insurance.example.gov.cn",
+    INSURANCE_GATEWAY_URL: "https://insurance.health.gov.cn",
     INSURANCE_GATEWAY_SECRET: SECRET,
     INSURANCE_CALLBACK_SECRET: SECRET,
-    CERTIFICATE_GATEWAY_URL: "https://certificate.example.gov.cn",
+    CERTIFICATE_GATEWAY_URL: "https://certificate.health.gov.cn",
     CERTIFICATE_GATEWAY_SECRET: SECRET,
     CERTIFICATE_CALLBACK_SECRET: SECRET,
-    SIEM_ENDPOINT: "https://siem.example.gov.cn/events",
+    SIEM_ENDPOINT: "https://siem.health.gov.cn/events",
     CARE_OUTBOX_WORKER_ENABLED: "true",
     CARE_OUTBOX_WORKER_ID: "care-outbox-prod-01",
     CARE_SERVICE_RUNTIME_MODULE: "runtime/care-service-production.js",
+    CARE_NURSING_DELIVERY_URL: "https://nursing.health.gov.cn/care/events",
+    CARE_ESCORT_DELIVERY_URL: "https://escort.health.gov.cn/care/events",
     CARE_CUTOVER_BUSINESS_SIGNOFF: "signed",
     CARE_CUTOVER_INTERFACE_SIGNOFF: "signed",
     CARE_CUTOVER_SECURITY_SIGNOFF: "signed",
@@ -118,7 +150,7 @@ test("default report keeps completed code separate from external production bloc
 
 test("fully configured environment and healthy queue produce a cutover-ready result", (t) => {
   const report = buildCareServiceProductionReadiness({
-    env: withApprovedCutoverEvidence(t),
+    env: withApprovedCutoverEvidence(t, withHealthyDependencyEvidence(t)),
     data: {},
     at: AT,
     platformIntegrated: true
@@ -132,9 +164,9 @@ test("fully configured environment and healthy queue produce a cutover-ready res
   assert.equal(report.blockers.length, 0);
 });
 
-test("standalone signed flags and injected validation cannot bypass the archived cutover evidence gate", () => {
+test("standalone signed flags and injected validation cannot bypass the archived cutover evidence gate", (t) => {
   const report = buildCareServiceProductionReadiness({
-    env: productionEnv(),
+    env: withHealthyDependencyEvidence(t),
     data: {},
     at: AT,
     platformIntegrated: true,
@@ -154,7 +186,45 @@ test("standalone signed flags and injected validation cannot bypass the archived
   assert.equal(report.cutoverEvidence.errors.some((item) => item.code === "CUTOVER_EVIDENCE_DIGEST_MISMATCH"), true);
 });
 
-test("dead letters and insecure endpoints block otherwise complete production configuration", () => {
+test("injected dependency validation cannot replace the deployment-pinned probe manifest", (t) => {
+  const report = buildCareServiceProductionReadiness({
+    env: withApprovedCutoverEvidence(t, productionEnv()),
+    data: {},
+    at: AT,
+    platformIntegrated: true,
+    dependencyEvidenceValidation: {
+      ok: true,
+      requiredDependencies: [...DependencyEvidence.REQUIRED_DEPENDENCIES],
+      healthyDependencies: [...DependencyEvidence.REQUIRED_DEPENDENCIES],
+      errors: []
+    }
+  });
+  assert.equal(report.signoffsReady, true);
+  assert.equal(report.runtimeReady, false);
+  assert.equal(report.productionReady, false);
+  assert.equal(report.dependencyEvidence.healthyDependencies.length, 0);
+  assert.equal(report.dependencyEvidence.errors.some((item) => item.code === "CARE_DEPENDENCY_EVIDENCE_DIGEST_MISMATCH"), true);
+});
+
+test("fresh probe receipts cannot make placeholder or loopback targets production ready", (t) => {
+  const configured = productionEnv({
+    OIDC_ISSUER_URL: "https://identity.example.gov.cn",
+    SMS_GATEWAY_URL: "https://localhost/messages"
+  });
+  const report = buildCareServiceProductionReadiness({
+    env: withApprovedCutoverEvidence(t, withHealthyDependencyEvidence(t, configured)),
+    data: {},
+    at: AT,
+    platformIntegrated: true
+  });
+  assert.equal(report.dependencyEvidence.ok, true);
+  assert.equal(report.runtimeReady, false);
+  assert.equal(report.blockers.some((item) => item.id === "runtime:identity"), true);
+  assert.equal(report.blockers.some((item) => item.id === "runtime:sms"), true);
+  assert.equal(report.productionReady, false);
+});
+
+test("dead letters and insecure endpoints block otherwise complete production configuration", (t) => {
   const event = NursingService.buildOutboxEvent({
     aggregateId: "ino-dead-001",
     eventType: "internet-nursing-order-created",
@@ -165,7 +235,10 @@ test("dead letters and insecure endpoints block otherwise complete production co
   event.status = "dead-letter";
   event.attempts = 5;
   const report = buildCareServiceProductionReadiness({
-    env: productionEnv({ SMS_GATEWAY_URL: "http://insecure.example.org" }),
+    env: withApprovedCutoverEvidence(
+      t,
+      withHealthyDependencyEvidence(t, productionEnv({ SMS_GATEWAY_URL: "http://insecure.example.org" }))
+    ),
     data: { internetNursingOutbox: [event] },
     at: "2026-07-23T01:00:05.000Z",
     platformIntegrated: true
