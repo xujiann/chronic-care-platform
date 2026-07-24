@@ -990,7 +990,7 @@ function buildRuntimeSmokePlan(tracks, firstIncrement, observationSignalBoard) {
       id: "smoke-release-gates",
       name: "Release report and deployment gates",
       automation: "automated",
-      command: "node --test test/emergency-specialty-cutover.test.js && npm run t10:specialty-cutover && npm run release:report && npm run deploy:check",
+      command: "node --test test/emergency-specialty-cutover.test.js test/t10-runtime-smoke.test.js && node scripts/t10-runtime-smoke.js && npm run release:report && npm run deploy:check",
       checks: [
         "focused T10 tests pass",
         "release report has zero error failures",
