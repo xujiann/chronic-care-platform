@@ -4,6 +4,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const Runtime = require("../care-service-runtime");
+const CutoverEvidence = require("../care-service-cutover-evidence");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_JSON = path.join(ROOT, "release", "care-service-production-readiness.json");
@@ -156,6 +157,22 @@ function buildCodeChecks(sources) {
       "T06/T00",
       "restore worker entry point and hardened deployment templates",
       "code"
+    ),
+    check(
+      "code:cutover-evidence",
+      "evidence-bound production cutover approvals",
+      [
+        "validateCutoverEvidence", "loadCutoverEvidence", "CUTOVER_EVIDENCE_DIGEST_MISMATCH",
+        "CUTOVER_EVIDENCE_SIGNER_REUSED", "CUTOVER_EVIDENCE_STALE", "REQUIRED_SCOPES"
+      ].every((marker) => sources.cutoverEvidence.includes(marker))
+        && /accepts five current independent approvals/.test(sources.cutoverEvidenceTest)
+        && /loader verifies the exact archived file bytes/.test(sources.cutoverEvidenceTest)
+        && /CARE_CUTOVER_EVIDENCE_FILE/.test(sources.cutoverEnv)
+        && /care-service-cutover-evidence-v1/.test(sources.cutoverTemplate),
+      "cutover requires a deployment-pinned evidence manifest with five current independent approvals",
+      "T06/T00",
+      "restore the evidence manifest validator, templates and negative tests",
+      "code"
     )
   ];
 }
@@ -257,23 +274,32 @@ function buildEnvironmentChecks(env) {
   ];
 }
 
-function buildSignoffChecks(env) {
+function buildSignoffChecks(cutoverEvidence) {
   const definitions = [
-    ["signoff:business", "service catalog, risk and operating procedure signoff", "CARE_CUTOVER_BUSINESS_SIGNOFF", "老龄健康/护理管理部门"],
-    ["signoff:interface", "identity, message, HIS and gateway joint-test signoff", "CARE_CUTOVER_INTERFACE_SIGNOFF", "医院信息科/接口责任方"],
-    ["signoff:security", "privacy, security assessment and audit signoff", "CARE_CUTOVER_SECURITY_SIGNOFF", "网信与安全责任部门"],
-    ["signoff:dr", "backup restore and disaster recovery rehearsal signoff", "CARE_CUTOVER_DR_SIGNOFF", "数据库与灾备责任方"],
-    ["signoff:oncall", "monitoring, alert and on-call handoff signoff", "CARE_CUTOVER_ONCALL_SIGNOFF", "运维值守负责人"]
+    ["signoff:business", "business", "service catalog, risk and operating procedure signoff", "老龄健康/护理管理部门"],
+    ["signoff:interface", "interface", "identity, message, HIS and gateway joint-test signoff", "医院信息科/接口责任方"],
+    ["signoff:security", "security", "privacy, security assessment and audit signoff", "网信与安全责任部门"],
+    ["signoff:dr", "dr", "backup restore and disaster recovery rehearsal signoff", "数据库与灾备责任方"],
+    ["signoff:oncall", "oncall", "monitoring, alert and on-call handoff signoff", "运维值守负责人"]
   ];
-  return definitions.map(([id, name, variable, owner]) => check(
-    id,
-    name,
-    enabled(env[variable]),
-    env[variable] || "missing",
-    owner,
-    `set ${variable}=signed only after signed evidence is archived`,
-    "signoff"
+  const globalErrors = cutoverEvidence.errors.filter((error) => (
+    !error.scope || !cutoverEvidence.requiredScopes.includes(error.scope)
   ));
+  return definitions.map(([id, scope, name, owner]) => {
+    const scopeErrors = cutoverEvidence.errors.filter((error) => error.scope === scope);
+    const passed = globalErrors.length === 0 && scopeErrors.length === 0
+      && cutoverEvidence.approvedScopes.includes(scope);
+    const codes = [...globalErrors, ...scopeErrors].map((error) => error.code);
+    return check(
+      id,
+      name,
+      passed,
+      passed ? `approved in ${cutoverEvidence.releaseId}` : (codes.join(", ") || "approval missing"),
+      owner,
+      "archive the signed evidence packet, add a current independent approval to the cutover manifest, and pin the exact manifest SHA-256 in deployment configuration",
+      "signoff"
+    );
+  });
 }
 
 function buildCareServiceProductionReadiness(options = {}) {
@@ -293,6 +319,10 @@ function buildCareServiceProductionReadiness(options = {}) {
     workerService: readText("deploy/care-service-outbox-worker.service.template"),
     workerTimer: readText("deploy/care-service-outbox-worker.timer.template"),
     workerEnv: readText("deploy/care-service-outbox.env.template"),
+    cutoverEvidence: readText("care-service-cutover-evidence.js"),
+    cutoverEvidenceTest: readText("test/care-service-cutover-evidence.test.js"),
+    cutoverEnv: readText("deploy/care-service-cutover.env.template"),
+    cutoverTemplate: readText("deploy/care-service-cutover-evidence.template.json"),
     runtimeTest: readText("test/care-service-runtime.test.js"),
     platformAdapterTest: readText("test/care-service-platform-adapter.test.js"),
     workerTest: readText("test/care-service-outbox-worker.test.js"),
@@ -301,7 +331,6 @@ function buildCareServiceProductionReadiness(options = {}) {
   };
   const codeChecks = buildCodeChecks(sources);
   const environmentChecks = buildEnvironmentChecks(env);
-  const signoffChecks = buildSignoffChecks(env);
   const platformWired = (
     /createCareServicePlatformAdapter/.test(sources.server || "")
     && /createCareServiceRuntimeDependencies/.test(sources.server || "")
@@ -313,6 +342,13 @@ function buildCareServiceProductionReadiness(options = {}) {
     && /CARE_REPOSITORY_VERSION_CONFLICT/.test(sources.stateRepository || "")
     && /x-care-signature/.test(sources.deliveryAdapters || "")
   );
+  const cutoverEvidence = CutoverEvidence.loadCutoverEvidence(env, {
+    root: ROOT,
+    at: options.at || new Date().toISOString(),
+    policyVersion: Runtime.RUNTIME_POLICY_VERSION,
+    maximumAgeDays: Number(env.CARE_CUTOVER_SIGNOFF_MAX_AGE_DAYS || 30)
+  });
+  const signoffChecks = buildSignoffChecks(cutoverEvidence);
   const platformCheck = check(
     "platform:public-write-integration",
     "public API transaction and worker integration",
@@ -374,7 +410,8 @@ function buildCareServiceProductionReadiness(options = {}) {
     checks,
     blockers,
     outboxHealth,
-    boundary: "A production-ready result requires real production configuration, healthy delivery state and signed site evidence. Demo values must not be used to satisfy cutover."
+    cutoverEvidence,
+    boundary: "A production-ready result requires real production configuration, healthy delivery state and a deployment-pinned manifest of current independent site approvals. Demo values or standalone signed flags must not be used to satisfy cutover."
   };
 }
 
@@ -408,7 +445,14 @@ function renderMarkdown(report) {
     `- Dead letters: ${report.outboxHealth.summary.deadLetters}`,
     `- Stale leases: ${report.outboxHealth.summary.staleLeases}`,
     `- Overdue: ${report.outboxHealth.summary.overdue}`,
-    `- Integrity failures: ${report.outboxHealth.summary.integrityFailures}`
+    `- Integrity failures: ${report.outboxHealth.summary.integrityFailures}`,
+    "",
+    "## Cutover evidence",
+    "",
+    `- Manifest valid: ${report.cutoverEvidence.ok ? "YES" : "NO"}`,
+    `- Release ID: ${report.cutoverEvidence.releaseId || "missing"}`,
+    `- Approved scopes: ${report.cutoverEvidence.approvedScopes.join(", ") || "none"}`,
+    `- Validation errors: ${report.cutoverEvidence.errors.map((item) => item.code).join(", ") || "none"}`
   ].join("\n");
 }
 
