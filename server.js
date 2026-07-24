@@ -102,6 +102,13 @@ const { buildProcessAuditReport } = require("./scripts/process-audit");
 const { buildSiteReadinessPack, renderTemplateReadmes } = require("./scripts/site-readiness-pack");
 const { buildHealthDashboardSummary, buildPriorityApplicationTemplates } = require("./scripts/health-dashboard-summary");
 const { applyPilotInterfaceReviewAction, buildInterfaceReviews, buildPilotAcceptanceCenter } = require("./pilot-acceptance");
+const {
+  applyResearchProjectAcceptanceAction,
+  buildResearchProjectAcceptanceCenter,
+  normalizeResearchProjectAcceptanceItems,
+  renderResearchProjectAcceptanceMarkdown,
+  seedResearchProjectAcceptanceItems
+} = require("./research-project-acceptance");
 const { buildReleaseReport, buildServiceAcceptanceSummary } = require("./scripts/release-report");
 const { buildReleaseArtifactManifest } = require("./scripts/release-artifact-manifest");
 const { buildCapabilityMap, renderCapabilityMapMarkdown } = require("./platform-capability-map");
@@ -1143,6 +1150,7 @@ function seedState() {
     platformCapabilityReviews: seedPlatformCapabilityReviews(),
     platformProductionBlockerReviews: seedPlatformProductionBlockerReviews(),
     pilotAcceptanceInterfaceReviews: [],
+    researchProjectAcceptanceItems: seedResearchProjectAcceptanceItems(),
     productionDeploymentPlan: seedProductionDeploymentPlan(),
     productionDatabaseMigrationBatches: seedProductionDatabaseMigrationBatches(),
     productionDatabaseCutoverRuns: seedProductionDatabaseCutoverRuns(),
@@ -10206,6 +10214,7 @@ function normalizeState(data) {
     platformCapabilityReviews: normalizePlatformCapabilityReviews(data.platformCapabilityReviews),
     platformProductionBlockerReviews: normalizePlatformProductionBlockerReviews(data.platformProductionBlockerReviews),
     pilotAcceptanceInterfaceReviews: buildInterfaceReviews(data),
+    researchProjectAcceptanceItems: normalizeResearchProjectAcceptanceItems(data.researchProjectAcceptanceItems),
     productionDeploymentPlan: mergeByKey(seedProductionDeploymentPlan(), data.productionDeploymentPlan, "id"),
     productionDatabaseMigrationBatches: mergeByKey(seedProductionDatabaseMigrationBatches(), data.productionDatabaseMigrationBatches, "id"),
     productionDatabaseCutoverRuns: mergeByKey(seedProductionDatabaseCutoverRuns(), data.productionDatabaseCutoverRuns, "id"),
@@ -10418,6 +10427,7 @@ function completeSystemTargets(state) {
   state.platformCapabilityReviews = normalizePlatformCapabilityReviews(state.platformCapabilityReviews);
   state.platformProductionBlockerReviews = normalizePlatformProductionBlockerReviews(state.platformProductionBlockerReviews);
   state.pilotAcceptanceInterfaceReviews = buildInterfaceReviews(state);
+  state.researchProjectAcceptanceItems = normalizeResearchProjectAcceptanceItems(state.researchProjectAcceptanceItems);
   state.productionDeploymentPlan = mergeByKey(seedProductionDeploymentPlan(), state.productionDeploymentPlan, "id").map((item) => ({
     ...item,
     requiredConfig: Array.isArray(item.requiredConfig) ? item.requiredConfig : [],
@@ -16344,6 +16354,7 @@ function scopeStateForUser(data, user) {
   delete scoped.platformCapabilityReviews;
   delete scoped.platformProductionBlockerReviews;
   delete scoped.pilotAcceptanceInterfaceReviews;
+  delete scoped.researchProjectAcceptanceItems;
   delete scoped.productionDeploymentPlan;
   delete scoped.productionDatabaseMigrationBatches;
   delete scoped.productionDatabaseCutoverRuns;
@@ -30805,6 +30816,59 @@ async function handleApi(req, res) {
     if (!user) return;
     const data = readDatabase();
     sendJson(res, 200, buildMasterDataDirectory(data));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/research-project/acceptance-center") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/research-project/acceptance-center");
+    if (!user) return;
+    const center = buildResearchProjectAcceptanceCenter(readDatabase());
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "research-project-acceptance-center-read",
+      target: "/api/research-project/acceptance-center",
+      result: "allowed",
+      detail: `${center.summary.verified}/${center.summary.acceptanceItems} verified`
+    });
+    if (url.searchParams.get("format") === "markdown") {
+      sendText(res, 200, renderResearchProjectAcceptanceMarkdown(center), "text/markdown; charset=utf-8");
+    } else {
+      sendJson(res, 200, center);
+    }
+    return;
+  }
+
+  const researchProjectAcceptanceActionMatch = url.pathname.match(/^\/api\/research-project\/acceptance-items\/([^/]+)\/actions$/);
+  if (req.method === "POST" && researchProjectAcceptanceActionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/research-project/acceptance-items/:id/actions");
+    if (!user) return;
+    try {
+      const data = readDatabase();
+      const items = normalizeResearchProjectAcceptanceItems(data.researchProjectAcceptanceItems);
+      const itemId = decodeURIComponent(researchProjectAcceptanceActionMatch[1]);
+      const index = items.findIndex((item) => item.id === itemId);
+      if (index < 0) throw Object.assign(new Error("research project acceptance item not found"), { status: 404 });
+      const payload = await collectJson(req);
+      items[index] = applyResearchProjectAcceptanceAction(items[index], payload, user);
+      data.researchProjectAcceptanceItems = items;
+      writeDatabase(normalizeState(data));
+      const center = buildResearchProjectAcceptanceCenter(data);
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: `research-project-${String(payload.action || "unknown")}`,
+        target: itemId,
+        result: "allowed",
+        detail: `${items[index].name} -> ${items[index].status}`
+      });
+      sendJson(res, 200, { ok: true, item: items[index], center });
+    } catch (error) {
+      sendJson(res, error.status || 400, {
+        error: error.status === 404 ? "Not Found" : error.status === 403 ? "Forbidden" : "Bad Request",
+        message: error.message
+      });
+    }
     return;
   }
 

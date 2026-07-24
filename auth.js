@@ -41,6 +41,7 @@
     "digital-hospital-standards.html": ["commission"],
     "digital-hospital-self-assessment.html": ["commission", "institution"],
     "digital-hospital-evaluation.html": ["commission", "institution"],
+    "research-project-acceptance.html": ["commission", "institution"],
     "regional-data-sharing.html": ["commission", "institution"],
     "regional-data-sharing-about.html": ["commission", "institution"],
     "quality-safety.html": ["commission"],
@@ -79,6 +80,8 @@
 
   roleLinks.commission.splice(2, 0, ["digital-hospital-evaluation.html", "评价预评"]);
   roleLinks.institution.splice(1, 0, ["digital-hospital-evaluation.html", "评价预评"]);
+  roleLinks.commission.splice(3, 0, ["research-project-acceptance.html", "科研验收"]);
+  roleLinks.institution.splice(2, 0, ["research-project-acceptance.html", "科研验收"]);
 
   roleLinks.commission.splice(6, 0, ["regional-data-sharing-about.html", "共享说明"]);
   roleLinks.institution.splice(5, 0, ["regional-data-sharing-about.html", "共享说明"]);

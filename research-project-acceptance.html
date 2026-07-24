@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>科研项目验收追溯中心</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <link rel="stylesheet" href="./digital-hospital-evaluation.css" />
+    <link rel="stylesheet" href="./research-project-acceptance.css" />
+    <script src="./auth.js"></script>
+    <script>window.HealthCityAuth.requireRole(["commission", "institution"])</script>
+  </head>
+  <body class="research-project-page">
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>委托任务、六域指标、平台能力、证据与成果统一追溯</span>
+          <h1>科研项目验收追溯中心</h1>
+          <p id="research-project-title">数智医院新标准平台设计与标准平台的关键技术研究</p>
+        </div>
+        <nav>
+          <a href="./digital-hospital-standards.html">标准治理</a>
+          <a href="./digital-hospital-evaluation.html">评价试点</a>
+          <a href="./platform.html">平台驾驶舱</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid" id="research-project-metrics"></section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>申报与验收边界</h2>
+          <button class="inline-action" id="research-project-export" type="button">导出追溯报告</button>
+        </div>
+        <div class="table-wrap" id="research-project-facts"></div>
+        <p id="research-project-boundary"></p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>委托任务追溯矩阵</h2>
+          <span>研究内容—六域—平台模块—API—验收项</span>
+        </div>
+        <div class="table-wrap" id="research-project-requirements"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>两报告一方案及配套成果</h2>
+          <span>平台实现证据不自动替代正式项目验收证据</span>
+        </div>
+        <div class="table-wrap" id="research-project-deliverables"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>量化考核指标</h2>
+          <span>专家咨询、信效度、数据质量、试点和整改闭环</span>
+        </div>
+        <div class="table-wrap" id="research-project-acceptance-metrics"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>证据登记与独立复核</h2>
+          <span id="research-project-action-hint">选择验收项后登记受控证据</span>
+        </div>
+        <form id="research-project-action-form" class="filter-grid" autocomplete="off">
+          <label class="full">验收项<select id="research-project-item-id" required></select></label>
+          <label>动作<select id="research-project-action" required></select></label>
+          <label>证据引用<input id="research-project-evidence-ref" placeholder="受控文档编号、归档地址或回执编号" /></label>
+          <label>指标实测值<input id="research-project-measured-value" type="number" step="any" placeholder="量化指标必填" /></label>
+          <label class="full">处理说明<textarea id="research-project-note" rows="3" required></textarea></label>
+          <label class="check-line"><input id="research-project-no-pii" type="checkbox" checked /> 确认证据引用不含患者可识别信息</label>
+          <button class="inline-action" type="submit">提交验收动作</button>
+        </form>
+        <p id="research-project-feedback"></p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>研究进度与阶段门禁</h2>
+          <span>2026年8月至2027年7月</span>
+        </div>
+        <div class="table-wrap" id="research-project-milestones"></div>
+      </section>
+    </main>
+    <script src="./research-project-acceptance-ui.js"></script>
+  </body>
+</html>

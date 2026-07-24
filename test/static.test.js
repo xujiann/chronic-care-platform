@@ -45,7 +45,7 @@ test("server-backed pages reject stale local demo sessions without bearer tokens
 
 test("citizen pages do not expose cross-role module links or management collections", () => {
   const citizenHtml = `${read("citizen.html")}\n${read("mobile-preview.html")}`;
-  ["institution.html", "insurance.html", "county.html", "index.html", "platform.html", "digital-hospital-standards.html", "digital-hospital-evaluation.html", "digital-hospital-self-assessment.html", "workbench.html", "quality-safety.html", "health-dashboard.html", "public-health.html"].forEach((target) => {
+  ["institution.html", "insurance.html", "county.html", "index.html", "platform.html", "digital-hospital-standards.html", "digital-hospital-evaluation.html", "digital-hospital-self-assessment.html", "research-project-acceptance.html", "workbench.html", "quality-safety.html", "health-dashboard.html", "public-health.html"].forEach((target) => {
     assert.doesNotMatch(citizenHtml, new RegExp(`href=[\\"']\\./${target}`), `居民页面不应链接到 ${target}`);
   });
 
@@ -56,7 +56,7 @@ test("citizen pages do not expose cross-role module links or management collecti
 });
 
 test("application pages avoid placeholder navigation", () => {
-  const pages = ["about.html", "citizen.html", "mobile-preview.html", "doctor.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "national-access.html", "digital-hospital-standards.html", "digital-hospital-evaluation.html", "digital-hospital-self-assessment.html", "workbench.html", "quality-safety.html", "health-dashboard.html", "public-health.html"];
+  const pages = ["about.html", "citizen.html", "mobile-preview.html", "doctor.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "national-access.html", "digital-hospital-standards.html", "digital-hospital-evaluation.html", "digital-hospital-self-assessment.html", "research-project-acceptance.html", "workbench.html", "quality-safety.html", "health-dashboard.html", "public-health.html"];
   pages.forEach((file) => assert.doesNotMatch(read(file), /href=["']#["']/, `${file} 存在空链接占位`));
 });
 
