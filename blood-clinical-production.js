@@ -30,16 +30,40 @@ function validateMasterData(payload = {}) {
   return { valid: errors.length === 0, errors };
 }
 
+function validateMasterDataMappings(records = []) {
+  const errors = [];
+  const keys = new Map();
+  records.forEach((item, index) => {
+    const validation = validateMasterData(item);
+    validation.errors.forEach((error) => errors.push(`record[${index}]: ${error}`));
+    const key = `${item.organizationCode || ""}:${item.system || ""}:${item.code || ""}`;
+    if (keys.has(key) && keys.get(key) !== item.name) errors.push(`conflicting name for ${key}`);
+    keys.set(key, item.name);
+  });
+  const sharedCodes = new Set(records.filter((item) => item.system === "BIS").map((item) => item.code));
+  if (![...sharedCodes].some((code) => records.some((item) => item.system === "BTIS" && item.code === code))) {
+    errors.push("BIS and BTIS require at least one shared mapped code");
+  }
+  for (const code of sharedCodes) {
+    const names = new Set(records.filter((item) => item.code === code).map((item) => item.name));
+    if (names.size > 1) errors.push(`BIS/BTIS mapped code ${code} has conflicting names`);
+  }
+  return { valid: errors.length === 0, errors };
+}
+
 function validateReceipt(receipt = {}) {
   const errors = [];
   if (!receipt.evidenceRef) errors.push("evidenceRef is required");
   if (!SHA256.test(String(receipt.evidenceDigest || ""))) errors.push("valid SHA-256 evidenceDigest is required");
   if (!receipt.organizationCode || !receipt.signedBy || !receipt.signedAt) errors.push("organizationCode, signedBy and signedAt are required");
+  if (!receipt.verifiedBy || !receipt.verifiedAt || receipt.verifiedBy === receipt.signedBy) {
+    errors.push("independent receipt verification is required");
+  }
   if (!receipt.correlationId || !receipt.idempotencyKey) errors.push("correlationId and idempotencyKey are required");
   return { valid: errors.length === 0, errors };
 }
 
-function validateColdChainEvidence(evidence = {}) {
+function validateColdChainEvidence(evidence = {}, asOf = new Date()) {
   const errors = [];
   if (!evidence.deviceId || !evidence.serialNumber) errors.push("deviceId and serialNumber are required");
   if (!evidence.calibrationCertificateRef || !SHA256.test(String(evidence.calibrationDigest || ""))) {
@@ -50,9 +74,43 @@ function validateColdChainEvidence(evidence = {}) {
   if (!Number.isFinite(calibratedAt) || !Number.isFinite(expiresAt) || expiresAt <= calibratedAt) {
     errors.push("valid calibration period is required");
   }
+  if (Number.isFinite(expiresAt) && expiresAt < new Date(asOf).getTime()) errors.push("calibration certificate has expired");
   if (evidence.alarmTestResult !== "passed" || !evidence.alarmEvidenceRef) errors.push("passed alarm test evidence is required");
   if (!evidence.verifiedBy || evidence.verifiedBy === evidence.performedBy) errors.push("independent verification is required");
   return { valid: errors.length === 0, errors };
+}
+
+function submitReceipt(state, payload = {}, actor = {}) {
+  const data = state || seedProductionEvidence();
+  if (!Array.isArray(data.siteReceipts)) data.siteReceipts = [];
+  const existing = data.siteReceipts.find((item) => item.idempotencyKey === payload.idempotencyKey);
+  if (existing) {
+    if (existing.evidenceDigest !== payload.evidenceDigest) throw new Error("idempotency key replay has different evidence digest");
+    return existing;
+  }
+  const draft = {
+    ...payload,
+    signedBy: actor.id || actor.username || actor.name,
+    signedAt: new Date().toISOString(),
+    status: "submitted"
+  };
+  const validation = validateReceipt({ ...draft, verifiedBy: "pending-verifier", verifiedAt: draft.signedAt });
+  const nonVerificationErrors = validation.errors.filter((error) => error !== "independent receipt verification is required");
+  if (nonVerificationErrors.length) throw new Error(nonVerificationErrors.join("; "));
+  data.siteReceipts.push(draft);
+  return draft;
+}
+
+function verifyReceipt(state, idempotencyKey, actor = {}, evidenceDigest) {
+  const data = state || seedProductionEvidence();
+  const receipt = data.siteReceipts?.find((item) => item.idempotencyKey === idempotencyKey);
+  if (!receipt) throw new Error("site receipt not found");
+  const verifier = actor.id || actor.username || actor.name;
+  if (!verifier || verifier === receipt.signedBy) throw new Error("independent verifier is required");
+  if (receipt.evidenceDigest !== evidenceDigest) throw new Error("evidence digest mismatch");
+  if (receipt.status === "verified") return receipt;
+  Object.assign(receipt, { status: "verified", verifiedBy: verifier, verifiedAt: new Date().toISOString() });
+  return receipt;
 }
 
 function validateAcceptanceScenario(scenario = {}) {
@@ -95,8 +153,7 @@ function seedProductionEvidence() {
 function evaluateProductionReadiness(state = {}) {
   const data = { ...seedProductionEvidence(), ...state };
   const receiptsValid = data.siteReceipts.length > 0 && data.siteReceipts.every((item) => validateReceipt(item).valid);
-  const mastersValid = ["BIS", "BTIS"].every((system) =>
-    data.masterDataContracts.some((item) => item.system === system && validateMasterData(item).valid));
+  const mastersValid = validateMasterDataMappings(data.masterDataContracts).valid;
   const coldChainValid = data.coldChainEvidence.length > 0 && data.coldChainEvidence.every((item) => validateColdChainEvidence(item).valid);
   const requiredScenarios = ["dual-person-crossmatch", "bedside-transfusion", "recall"];
   const scenariosValid = requiredScenarios.every((type) =>
@@ -128,8 +185,11 @@ module.exports = {
   digest,
   validateBagId,
   validateMasterData,
+  validateMasterDataMappings,
   validateReceipt,
   validateColdChainEvidence,
+  submitReceipt,
+  verifyReceipt,
   validateAcceptanceScenario,
   seedProductionEvidence,
   evaluateProductionReadiness,

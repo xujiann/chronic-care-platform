@@ -1,0 +1,24 @@
+{
+  "moduleId": "clinical-blood",
+  "siteReceipts": [
+    {
+      "evidenceRef": "site://change-ticket/replace-me",
+      "evidenceDigest": "sha256:replace-with-64-lowercase-hex-characters",
+      "organizationCode": "replace-me",
+      "signedBy": "site-business-owner",
+      "signedAt": "2026-07-24T00:00:00+08:00",
+      "verifiedBy": "independent-site-reviewer",
+      "verifiedAt": "2026-07-24T00:00:00+08:00",
+      "correlationId": "replace-me",
+      "idempotencyKey": "replace-me"
+    }
+  ],
+  "masterDataContracts": [
+    { "organizationCode": "replace-me", "system": "BIS", "code": "RBCS", "name": "红细胞", "version": "replace-me", "effectiveAt": "2026-07-24T00:00:00+08:00" },
+    { "organizationCode": "replace-me", "system": "BTIS", "code": "RBCS", "name": "红细胞", "version": "replace-me", "effectiveAt": "2026-07-24T00:00:00+08:00" }
+  ],
+  "coldChainEvidence": [],
+  "acceptanceScenarios": [],
+  "smokeRuns": [],
+  "rollbackRuns": []
+}
