@@ -2796,6 +2796,126 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(forgedWrite.response.status, 405);
   });
 
+  await t.test("governs institution T10 module selection without bypassing scope audit or site No-Go", async () => {
+    const institutionLogin = await login(baseUrl, "hospital");
+    const institutionId = institutionLogin.body.user.orgCode;
+    const otherInstitution = fixture.authOrganizations.find((item) => (
+      item.orgCode !== institutionId
+      && ["medical_institution", "institution"].includes(String(item.orgType || "").toLowerCase())
+    ));
+    assert.ok(institutionId);
+    assert.ok(otherInstitution);
+
+    const ownView = await api(
+      baseUrl,
+      `/api/t10-specialty/modules?institutionId=${encodeURIComponent(institutionId)}`,
+      authorized(institutionLogin.body.token)
+    );
+    assert.equal(ownView.response.status, 200);
+    assert.equal(ownView.body.version, 0);
+    assert.equal(ownView.body.enabledModuleIds.length, 4);
+    assert.equal(ownView.body.productionReady, false);
+    assert.equal(ownView.body.siteNoGoEnforced, true);
+
+    const crossScope = await api(
+      baseUrl,
+      `/api/t10-specialty/modules?institutionId=${encodeURIComponent(otherInstitution.orgCode)}`,
+      authorized(institutionLogin.body.token)
+    );
+    assert.equal(crossScope.response.status, 403);
+    assert.equal(crossScope.body.code, "T10_MODULE_SCOPE_DENIED");
+
+    const institutionWrite = await api(
+      baseUrl,
+      `/api/t10-specialty/modules/${encodeURIComponent(institutionId)}/actions`,
+      authorized(institutionLogin.body.token, {
+        method: "POST",
+        headers: { "Idempotency-Key": "t10-api-institution-denied-001" },
+        body: JSON.stringify({
+          action: "disable-module",
+          moduleId: "physical-examination",
+          expectedVersion: 0,
+          evidenceRef: "urn:t10-module-change:institution-denied"
+        })
+      })
+    );
+    assert.equal(institutionWrite.response.status, 403);
+
+    const commandId = "t10-api-module-change-001";
+    const changePayload = {
+      action: "disable-module",
+      moduleId: "physical-examination",
+      expectedVersion: 0,
+      evidenceRef: "urn:t10-module-change:MR1:20260724:001"
+    };
+    const changed = await api(
+      baseUrl,
+      `/api/t10-specialty/modules/${encodeURIComponent(institutionId)}/actions`,
+      authorized(commissionToken, {
+        method: "POST",
+        headers: { "Idempotency-Key": commandId },
+        body: JSON.stringify(changePayload)
+      })
+    );
+    assert.equal(changed.response.status, 200);
+    assert.equal(changed.body.version, 1);
+    assert.equal(changed.body.enabledModuleIds.includes("physical-examination"), false);
+    assert.equal(changed.body.formalGoLiveState, "blocked-until-site-evidence-signed");
+    assert.equal(changed.body.siteNoGoEnforced, true);
+    assert.equal(changed.body.productionReady, false);
+    assert.equal(changed.body.replayed, false);
+
+    const replayed = await api(
+      baseUrl,
+      `/api/t10-specialty/modules/${encodeURIComponent(institutionId)}/actions`,
+      authorized(commissionToken, {
+        method: "POST",
+        headers: { "Idempotency-Key": commandId },
+        body: JSON.stringify(changePayload)
+      })
+    );
+    assert.equal(replayed.response.status, 200);
+    assert.equal(replayed.body.replayed, true);
+    assert.equal(replayed.body.version, 1);
+
+    const forgedBoundary = await api(
+      baseUrl,
+      `/api/t10-specialty/modules/${encodeURIComponent(institutionId)}/actions`,
+      authorized(commissionToken, {
+        method: "POST",
+        headers: { "Idempotency-Key": "t10-api-module-forged-001" },
+        body: JSON.stringify({
+          action: "disable-module",
+          moduleId: "regional-imaging-cloud",
+          expectedVersion: 1,
+          evidenceRef: "urn:t10-module-change:MR1:forged",
+          productionReady: true,
+          formalGoLiveState: "production-ready",
+          enabledModuleIds: ["regional-imaging-cloud"]
+        })
+      })
+    );
+    assert.equal(forgedBoundary.response.status, 400);
+    assert.equal(forgedBoundary.body.code, "T10_MODULE_BOUNDARY_OVERRIDE_FORBIDDEN");
+
+    const scopedPack = await api(
+      baseUrl,
+      `/api/t10-specialty/cutover-pack?institutionId=${encodeURIComponent(institutionId)}&enabledTrackIds=physical-examination`,
+      authorized(commissionToken)
+    );
+    assert.equal(scopedPack.response.status, 200);
+    assert.equal(scopedPack.body.summary.tracks, 3);
+    assert.equal(scopedPack.body.moduleCatalog.enabledModuleIds.includes("physical-examination"), false);
+    assert.equal(scopedPack.body.institutionModuleSelection.version, 1);
+    assert.equal(scopedPack.body.summary.productionReady, 0);
+    assert.equal(scopedPack.body.goNoGoDecision.currentDecision, "no-go-site-evidence-pending");
+
+    const state = await api(baseUrl, "/api/state", authorized(commissionToken));
+    assert.equal(state.body.t10SpecialtyModuleSelections.some((item) => item.institutionId === institutionId && item.version === 1), true);
+    assert.equal(state.body.t10SpecialtyModuleAudit.some((item) => item.institutionId === institutionId && item.action === "disable-module"), true);
+    assert.equal(state.body.t10SpecialtyModuleAudit.every((item) => item.productionReady === false), true);
+  });
+
   await t.test("returns governance modules to the commission role and repairs seeded text", async () => {
     const { response, body } = await api(baseUrl, "/api/state", authorized(commissionToken));
     assert.equal(response.status, 200);

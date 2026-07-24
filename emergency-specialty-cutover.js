@@ -76,6 +76,141 @@ const CUTOVER_STAGES = [
   "grey-release"
 ];
 
+const SPECIALTY_MODULE_BOUNDARIES = {
+  "emergency-life-chain": {
+    deploymentUnit: "t10-emergency-life-chain",
+    dataBoundary: "emergency event, dispatch, pre-arrival handover and device-signal evidence",
+    externalSystems: ["120 dispatch", "ambulance or wearable gateway", "receiving hospital EMR"],
+    sharedPlatformCapabilities: ["institution-directory", "identity-and-role-scope", "signed-interface", "audit-evidence"],
+    requiredPeerModules: []
+  },
+  "clinical-blood": {
+    deploymentUnit: "t10-clinical-blood",
+    dataBoundary: "blood order, bag identity, compatibility, cold-chain, issue, transfusion and recall evidence",
+    externalSystems: ["BIS or BTIS", "hospital transfusion service", "cold-chain IoT gateway"],
+    sharedPlatformCapabilities: ["institution-directory", "identity-and-role-scope", "signed-interface", "audit-evidence"],
+    requiredPeerModules: []
+  },
+  "regional-imaging-cloud": {
+    deploymentUnit: "t10-regional-imaging-cloud",
+    dataBoundary: "study index, image-object reference, report, authorization, mutual recognition and appeal evidence",
+    externalSystems: ["PACS or RIS", "DICOM TLS gateway", "FHIR or EMR report endpoint"],
+    sharedPlatformCapabilities: ["institution-directory", "identity-and-role-scope", "signed-interface", "audit-evidence"],
+    requiredPeerModules: []
+  },
+  "physical-examination": {
+    deploymentUnit: "t10-physical-examination",
+    dataBoundary: "exam order, signed report, abnormal finding, notification, recheck and follow-up evidence",
+    externalSystems: ["physical-exam source system", "report signature service", "primary-care follow-up service"],
+    sharedPlatformCapabilities: ["institution-directory", "identity-and-role-scope", "signed-interface", "audit-evidence"],
+    requiredPeerModules: []
+  }
+};
+
+const TRACK_SCENARIO_PROFILES = {
+  "emergency-life-chain": {
+    normalName: "Normal end-to-end emergency life-chain",
+    normalSteps: [
+      "receive signed device or controlled gateway signal",
+      "dispatcher confirms ambulance dispatch manually",
+      "receiving hospital accepts electronic pre-arrival handover",
+      "export event evidence packet and audit digest"
+    ],
+    normalEvidence: ["signed signal receipt", "dispatch confirmation record", "hospital handover acknowledgement", "audit digest and evidence packet"],
+    normalPass: "all timestamps, operator identities, receipts and handover records replay in order",
+    duplicateMutation: "dispatch, handover or patient timeline item",
+    manualPath: "manual phone or paper handover path"
+  },
+  "clinical-blood": {
+    normalName: "Normal end-to-end clinical blood workflow",
+    normalSteps: [
+      "receive a signed blood order and resolve the patient and bag identities",
+      "complete compatibility and dual-person verification",
+      "record issue, bedside transfusion and cold-chain checkpoints",
+      "export transfusion evidence packet and audit digest"
+    ],
+    normalEvidence: ["signed blood order", "bag identity and compatibility record", "dual-person bedside verification", "cold-chain and transfusion audit digest"],
+    normalPass: "the order, bag, patient, reviewers, cold-chain and transfusion timestamps replay in order",
+    duplicateMutation: "blood issue, compatibility result or transfusion record",
+    manualPath: "approved downtime blood issue and paper verification path"
+  },
+  "regional-imaging-cloud": {
+    normalName: "Normal end-to-end regional imaging workflow",
+    normalSteps: [
+      "receive a DICOM TLS study from the pilot institution",
+      "index the study and write back the signed report",
+      "verify authorized cross-institution viewing and mutual-recognition status",
+      "export imaging evidence packet and audit digest"
+    ],
+    normalEvidence: ["DICOM transfer receipt", "study index and report write-back", "authorization and mutual-recognition decision", "access audit digest"],
+    normalPass: "the study, report, authorization and access-audit records replay without exposing image objects outside policy",
+    duplicateMutation: "study index, report version or mutual-recognition record",
+    manualPath: "approved local PACS reading and delayed report synchronization path"
+  },
+  "physical-examination": {
+    normalName: "Normal end-to-end physical examination workflow",
+    normalSteps: [
+      "receive a signed examination report from the pilot center",
+      "validate physician signatures and archive the original report",
+      "create an abnormal-finding task and record resident notification",
+      "complete recheck or primary-care follow-up and export the audit digest"
+    ],
+    normalEvidence: ["signed source report", "physician signature validation", "abnormal notification receipt", "recheck or follow-up closure digest"],
+    normalPass: "the original report, signatures, abnormal finding, notification and follow-up records replay in order",
+    duplicateMutation: "exam report, abnormal-finding task or follow-up record",
+    manualPath: "approved manual notification and recheck registration path"
+  }
+};
+
+function resolveEnabledTracks(tracks, enabledTrackIds) {
+  if (enabledTrackIds == null) return tracks.slice();
+  if (!Array.isArray(enabledTrackIds) || enabledTrackIds.length === 0) {
+    throw new Error("enabledTrackIds must contain at least one specialty module id");
+  }
+  const requested = [...new Set(enabledTrackIds)];
+  const availableIds = new Set(tracks.map((track) => track.id));
+  const unknown = requested.filter((id) => !availableIds.has(id));
+  if (unknown.length > 0) throw new Error(`unknown specialty module id: ${unknown.join(", ")}`);
+  return tracks.filter((track) => requested.includes(track.id));
+}
+
+function buildModuleCatalog(allTracks, enabledTracks) {
+  const enabledIds = new Set(enabledTracks.map((track) => track.id));
+  const modules = allTracks.map((track) => {
+    const boundary = SPECIALTY_MODULE_BOUNDARIES[track.id] || {
+      deploymentUnit: `t10-${track.id}`,
+      dataBoundary: `${track.id} business and evidence records`,
+      externalSystems: [],
+      sharedPlatformCapabilities: ["institution-directory", "identity-and-role-scope", "audit-evidence"],
+      requiredPeerModules: []
+    };
+    return {
+      id: track.id,
+      name: track.name,
+      deploymentUnit: boundary.deploymentUnit,
+      independentlySelectable: true,
+      selected: enabledIds.has(track.id),
+      page: track.page,
+      api: track.api,
+      department: track.department,
+      dataBoundary: boundary.dataBoundary,
+      externalSystems: boundary.externalSystems,
+      sharedPlatformCapabilities: boundary.sharedPlatformCapabilities,
+      requiredPeerModules: boundary.requiredPeerModules
+    };
+  });
+  const enabled = modules.filter((item) => item.selected);
+  return {
+    contractVersion: "1.0.0",
+    selectionMode: enabled.length === 1 ? "standalone-module" : "composable-module-suite",
+    enabledModuleIds: enabled.map((item) => item.id),
+    disabledModuleIds: modules.filter((item) => !item.selected).map((item) => item.id),
+    peerModuleDependencyCount: enabled.reduce((sum, item) => sum + item.requiredPeerModules.length, 0),
+    sharedPlatformPolicy: "shared capabilities are platform contracts, not dependencies on another specialty module",
+    modules
+  };
+}
+
 function sha256(value) {
   return crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
@@ -154,10 +289,13 @@ function normalizeTrack(track, report) {
 
 function buildSpecialtyCutoverPack(options = {}) {
   const generatedAt = options.generatedAt || new Date().toISOString();
-  const tracks = (options.tracks || DEFAULT_TRACKS).map((track) => {
+  const allTracks = options.tracks || DEFAULT_TRACKS;
+  const enabledTracks = resolveEnabledTracks(allTracks, options.enabledTrackIds);
+  const tracks = enabledTracks.map((track) => {
     const report = options.reports?.[track.id] || track.readinessBuilder();
     return normalizeTrack(track, report);
   });
+  const moduleCatalog = buildModuleCatalog(allTracks, enabledTracks);
   const firstIncrement = selectFirstIncrement(tracks);
   const evidenceDossier = buildEvidenceDossier(tracks, firstIncrement);
   const pilotBatchPlan = buildPilotBatchPlan(tracks, firstIncrement);
@@ -181,6 +319,7 @@ function buildSpecialtyCutoverPack(options = {}) {
     generatedAt,
     summary,
     stages: CUTOVER_STAGES,
+    moduleCatalog,
     tracks,
     firstIncrement,
     crossTrackControls: buildCrossTrackControls(tracks),
@@ -198,7 +337,7 @@ function buildSpecialtyCutoverPack(options = {}) {
   };
   pack.integrity = {
     algorithm: "sha256",
-    digest: `sha256:${sha256({ summary, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision, evidenceDossier, pilotBatchPlan, siteEvidenceWorkflow, acceptanceScenarioSuite, scenarioEvidenceMatrix, cutoverCommandCenter, observationSignalBoard, runtimeSmokePlan })}`
+    digest: `sha256:${sha256({ summary, moduleCatalog, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision, evidenceDossier, pilotBatchPlan, siteEvidenceWorkflow, acceptanceScenarioSuite, scenarioEvidenceMatrix, cutoverCommandCenter, observationSignalBoard, runtimeSmokePlan })}`
   };
   return pack;
 }
@@ -596,6 +735,14 @@ function buildSiteEvidenceWorkflow(evidenceDossier, pilotBatchPlan) {
 
 function buildAcceptanceScenarioSuite(tracks, firstIncrement, evidenceDossier, siteEvidenceWorkflow) {
   const primaryTrack = tracks.find((track) => track.id === firstIncrement.trackId) || tracks[0];
+  const scenarioProfile = TRACK_SCENARIO_PROFILES[primaryTrack.id] || {
+    normalName: `Normal end-to-end ${primaryTrack.name} workflow`,
+    normalSteps: ["receive signed source event", "complete controlled business workflow", "export evidence packet and audit digest"],
+    normalEvidence: ["signed source receipt", "business workflow record", "audit digest and evidence packet"],
+    normalPass: "all source, operator and business records replay in order",
+    duplicateMutation: "business workflow record",
+    manualPath: "approved specialty downtime path"
+  };
   const firstEvidenceIds = evidenceDossier.firstIncrementRequired || [];
   const commonPreconditions = [
     "pilot scope frozen and signed",
@@ -606,24 +753,14 @@ function buildAcceptanceScenarioSuite(tracks, firstIncrement, evidenceDossier, s
   const scenarios = [
     {
       id: "scenario-1-normal-chain",
-      name: "Normal end-to-end emergency life-chain",
+      name: scenarioProfile.normalName,
       trackId: primaryTrack.id,
       type: "happy-path",
       batchId: "batch-1-single-chain",
       preconditions: commonPreconditions,
-      steps: [
-        "receive signed device or controlled gateway signal",
-        "dispatcher confirms ambulance dispatch manually",
-        "receiving hospital accepts electronic pre-arrival handover",
-        "export event evidence packet and audit digest"
-      ],
-      expectedEvidence: [
-        "signed signal receipt",
-        "dispatch confirmation record",
-        "hospital handover acknowledgement",
-        "audit digest and evidence packet"
-      ],
-      passCriteria: "all timestamps, operator identities, receipts and handover records replay in order",
+      steps: scenarioProfile.normalSteps,
+      expectedEvidence: scenarioProfile.normalEvidence,
+      passCriteria: scenarioProfile.normalPass,
       hardStopOnFail: true
     },
     {
@@ -643,7 +780,7 @@ function buildAcceptanceScenarioSuite(tracks, firstIncrement, evidenceDossier, s
         "duplicate rejection or merge record",
         "operator-visible retry explanation"
       ],
-      passCriteria: "duplicate input cannot create a second dispatch, handover or patient timeline item",
+      passCriteria: `duplicate input cannot create a second ${scenarioProfile.duplicateMutation}`,
       hardStopOnFail: true
     },
     {
@@ -675,7 +812,7 @@ function buildAcceptanceScenarioSuite(tracks, firstIncrement, evidenceDossier, s
       preconditions: commonPreconditions,
       steps: [
         "simulate external gateway timeout",
-        "switch to documented manual phone or paper handover path",
+        `switch to documented ${scenarioProfile.manualPath}`,
         "backfill evidence after recovery with reviewer signoff"
       ],
       expectedEvidence: [
@@ -1033,6 +1170,7 @@ function buildRuntimeSmokePlan(tracks, firstIncrement, observationSignalBoard) {
 
 function renderMarkdown(pack) {
   const rows = pack.tracks.map((item) => `| ${item.name} | ${item.department} | ${item.codeReady ? "是" : "否"} | ${item.productionReady ? "是" : "否"} | ${item.blockers.length} | ${item.page} |`);
+  const moduleRows = (pack.moduleCatalog?.modules || []).map((item) => `| ${item.name} | ${item.deploymentUnit} | ${item.selected ? "yes" : "no"} | ${item.requiredPeerModules.length} | ${item.page} | ${item.api} |`);
   const blockers = pack.tracks.flatMap((track) => track.blockers.map((item) => `| ${track.name} | ${item.id} | ${item.title} | ${item.owner} | ${item.status} |`));
   const evidenceRows = (pack.evidenceDossier?.entries || []).map((item) => `| ${item.trackName} | ${item.evidenceId} | ${item.severity} | ${item.requiredForFirstIncrement ? "yes" : "no"} | ${item.hardStopIfMissing ? "yes" : "no"} | ${item.status} |`);
   const batchRows = (pack.pilotBatchPlan?.batches || []).map((item) => `| ${item.id} | ${item.name} | ${item.scope} | ${item.promotionDecision} |`);
@@ -1052,6 +1190,16 @@ function renderMarkdown(pack) {
     `- Production readiness: ${pack.summary.productionReady}/${pack.summary.tracks}`,
     `- Site blockers: ${pack.summary.siteBlockers}`,
     `- Integrity: ${pack.integrity.digest}`,
+    "",
+    "## Institution module selection",
+    "",
+    `- Selection mode: ${pack.moduleCatalog?.selectionMode || "composable-module-suite"}`,
+    `- Enabled modules: ${(pack.moduleCatalog?.enabledModuleIds || pack.tracks.map((item) => item.id)).join(", ")}`,
+    `- Peer specialty dependencies: ${pack.moduleCatalog?.peerModuleDependencyCount || 0}`,
+    "",
+    "| Module | Deployment unit | Enabled | Peer dependencies | Page | API |",
+    "|---|---|---:|---:|---|---|",
+    ...moduleRows,
     "",
     "## 专项状态",
     "",
@@ -1214,9 +1362,36 @@ function writeCutoverPack(pack, options = {}) {
   return { jsonPath, markdownPath };
 }
 
+function parseCliOptions(argv = process.argv.slice(2), env = process.env) {
+  const options = {};
+  for (let index = 0; index < argv.length; index += 1) {
+    const argument = argv[index];
+    if (argument === "--tracks") {
+      options.enabledTrackIds = String(argv[index + 1] || "").split(",").map((item) => item.trim()).filter(Boolean);
+      index += 1;
+    } else if (argument === "--output-prefix") {
+      options.outputPrefix = String(argv[index + 1] || "").trim();
+      index += 1;
+    } else {
+      throw new Error(`unknown argument: ${argument}`);
+    }
+  }
+  if (!options.enabledTrackIds && env.T10_ENABLED_TRACKS) {
+    options.enabledTrackIds = env.T10_ENABLED_TRACKS.split(",").map((item) => item.trim()).filter(Boolean);
+  }
+  if (options.outputPrefix && !/^[a-z0-9][a-z0-9-]*$/i.test(options.outputPrefix)) {
+    throw new Error("output prefix may contain only letters, numbers and hyphens");
+  }
+  return options;
+}
+
 function runCli() {
-  const pack = buildSpecialtyCutoverPack();
-  const output = writeCutoverPack(pack);
+  const cli = parseCliOptions();
+  const pack = buildSpecialtyCutoverPack({ enabledTrackIds: cli.enabledTrackIds });
+  const output = writeCutoverPack(pack, cli.outputPrefix ? {
+    jsonName: `${cli.outputPrefix}.json`,
+    markdownName: `${cli.outputPrefix}.md`
+  } : {});
   console.log(JSON.stringify({ summary: pack.summary, firstIncrement: pack.firstIncrement, integrity: pack.integrity, output }, null, 2));
   if (pack.summary.codeReady !== pack.summary.tracks) process.exitCode = 1;
 }
@@ -1226,7 +1401,12 @@ if (require.main === module) runCli();
 module.exports = {
   DEFAULT_TRACKS,
   CUTOVER_STAGES,
+  SPECIALTY_MODULE_BOUNDARIES,
+  TRACK_SCENARIO_PROFILES,
   buildSpecialtyCutoverPack,
+  buildModuleCatalog,
+  resolveEnabledTracks,
+  parseCliOptions,
   renderMarkdown,
   writeCutoverPack,
   normalizeTrack,

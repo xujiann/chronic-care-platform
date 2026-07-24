@@ -62,6 +62,7 @@ test("T00 exposes the T10 specialty cutover pack through public integration cont
   assert.match(runtimeSmoke, /t10-runtime-smoke-report\.json/);
   assert.match(runtimeSmoke, /t10:runtime-smoke-plan/);
   assert.match(releaseReport, /specialtyCutoverChecks/);
+  assert.match(releaseReport, /specialtyCutover:moduleCatalog/);
   assert.match(releaseReport, /specialtyCutover:rehearsalPlan/);
   assert.match(releaseReport, /specialtyCutover:goNoGoDecision/);
   assert.match(releaseReport, /specialtyCutover:evidenceDossier/);
@@ -84,6 +85,10 @@ test("T10 public projection keeps all real production gates closed with rehearsa
   assert.equal(pack.summary.productionReady, 0);
   assert.equal(pack.summary.formalGoLiveState, "blocked-until-site-evidence-signed");
   assert.ok(pack.summary.siteBlockers > 0);
+  assert.equal(pack.moduleCatalog.modules.length, 4);
+  assert.equal(pack.moduleCatalog.enabledModuleIds.length, 4);
+  assert.equal(pack.moduleCatalog.peerModuleDependencyCount, 0);
+  assert.ok(pack.moduleCatalog.modules.every((item) => item.independentlySelectable && item.requiredPeerModules.length === 0));
   assert.ok(pack.tracks.every((track) => track.productionReady === false && track.blockers.length > 0));
   assert.deepEqual(pack.stages, [
     "code-readiness",

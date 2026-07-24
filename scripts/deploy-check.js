@@ -121,6 +121,7 @@ function buildDeployCheckReport(options = {}) {
   const traceabilityEvidenceRequirements = Array.isArray(data.drugTraceabilityEvidenceRequirements) ? data.drugTraceabilityEvidenceRequirements : [];
   const drugConsumableSupervisions = Array.isArray(data.drugConsumableSupervisions) ? data.drugConsumableSupervisions : [];
   const serverSource = fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
+  const t10SpecialtyModuleGovernanceSource = fs.readFileSync(path.join(ROOT, "t10-specialty-module-governance.js"), "utf8");
   const sessionStoreSource = fs.readFileSync(path.join(ROOT, "session-store.js"), "utf8");
   const authSource = fs.readFileSync(path.join(ROOT, "auth.js"), "utf8");
   const bloodBusinessSource = fs.readFileSync(path.join(ROOT, "blood-business.js"), "utf8");
@@ -604,7 +605,27 @@ function buildDeployCheckReport(options = {}) {
     { name: "manifest:internetNursingReadiness", ok: manifestSource.includes("internet-nursing-readiness-report.md") && manifestSource.includes("internet-nursing:readiness"), detail: "internet nursing readiness artifact is indexed" },
     { name: "manifest:internetNursingHighlightCenter", ok: manifestSource.includes("internet-nursing-highlight-center.md") && manifestSource.includes("nursing-highlight-section"), detail: "internet nursing highlight center handoff is indexed" },
     { name: "manifest:emergencyReadiness", ok: manifestSource.includes("emergency-readiness-report.md") && manifestSource.includes("emergency:readiness") && manifestSource.includes("/api/emergency/production-center") && manifestSource.includes("emergency-evidence-package-api") && manifestSource.includes("emergency-evidence-export-api") && manifestSource.includes("/api/emergency/events/:id/evidence-package/export?format=json") && manifestSource.includes("emergency-sos-aed-api") && manifestSource.includes("/api/emergency/sos /api/emergency/aed-map") && manifestSource.includes("emergency-life-chain") && manifestSource.includes("/api/emergency/life-chain/device-sos /api/emergency/life-chain/command-center /api/emergency/life-chain/quality"), detail: "prehospital emergency readiness, evidence exports, SOS/AED and golden four-minute life-chain artifacts are indexed" },
-    { name: "manifest:t10SpecialtyCutover", ok: manifestSource.includes("t10-specialty-cutover-pack.md") && manifestSource.includes("t10:specialty-cutover") && manifestSource.includes("/api/t10-specialty/cutover-pack") && serverSource.includes("/api/t10-specialty/cutover-pack") && fs.readFileSync(path.join(ROOT, "workbench.html"), "utf8").includes("t10-specialty-cutover.html") && fs.readFileSync(path.join(ROOT, "t10-specialty-cutover.js"), "utf8").includes("/api/t10-specialty/cutover-pack"), detail: "T10 specialty cutover API, portal entry and release artifact are indexed" },
+    { name: "manifest:t10SpecialtyCutover", ok: manifestSource.includes("t10-specialty-cutover-pack.md") && manifestSource.includes("t10:specialty-cutover") && manifestSource.includes("/api/t10-specialty/cutover-pack") && serverSource.includes("/api/t10-specialty/cutover-pack") && fs.readFileSync(path.join(ROOT, "workbench.html"), "utf8").includes("t10-specialty-cutover.html") && fs.readFileSync(path.join(ROOT, "t10-specialty-cutover.js"), "utf8").includes("/api/t10-specialty/cutover-pack") && fs.readFileSync(path.join(ROOT, "scripts", "release-report.js"), "utf8").includes("specialtyCutover:moduleCatalog"), detail: "T10 specialty module catalog, cutover API, portal entry and release artifact are indexed" },
+    {
+      name: "api:t10SpecialtyModuleGovernance",
+      ok: [
+        "/api/t10-specialty/modules",
+        "t10-specialty-module-selection-change",
+        "trustedT10Institution",
+        "canReadT10InstitutionModules"
+      ].every((marker) => serverSource.includes(marker))
+        && [
+          "T10_MODULE_ACTOR_FORBIDDEN",
+          "T10_MODULE_BOUNDARY_OVERRIDE_FORBIDDEN",
+          "T10_MODULE_VERSION_CONFLICT",
+          "T10_MODULE_IDEMPOTENCY_CONFLICT",
+          "siteNoGoEnforced",
+          "productionReady: false"
+        ].every((marker) => t10SpecialtyModuleGovernanceSource.includes(marker))
+        && Boolean(pkg.scripts?.["t10:specialty-cutover:check"])
+        && Boolean(pkg.scripts?.["t10:specialty-cutover:test"]),
+      detail: "institution module selection is commission-controlled, versioned, idempotent, audited and fixed to the site No-Go boundary"
+    },
     { name: "manifest:multiPracticeReadiness", ok: manifestSource.includes("multi-practice-readiness-report.md") && manifestSource.includes("multi-practice:readiness"), detail: "multi-practice readiness artifact is indexed" },
     { name: "manifest:hybridDeploymentReadiness", ok: manifestSource.includes("hybrid-deployment-readiness-report.md") && manifestSource.includes("hybrid:deployment-readiness"), detail: "hybrid deployment readiness artifact is indexed" },
     { name: "snapshot:storageMeta", ok: Boolean(data.storageMeta?.engine && data.storageMeta?.mode), detail: data.storageMeta ? `${data.storageMeta.engine}/${data.storageMeta.mode}` : "missing" }

@@ -14,8 +14,11 @@ const {
   buildCutoverCommandCenter,
   buildObservationSignalBoard,
   buildRuntimeSmokePlan,
+  buildModuleCatalog,
   normalizeTrack,
+  parseCliOptions,
   renderMarkdown,
+  resolveEnabledTracks,
   selectFirstIncrement,
   writeCutoverPack
 } = require("../emergency-specialty-cutover");
@@ -83,6 +86,10 @@ test("buildSpecialtyCutoverPack aggregates site blockers and cross-track control
   assert.equal(pack.summary.totalChecks, 22);
   assert.equal(pack.summary.passedChecks, 22);
   assert.equal(pack.summary.formalGoLiveState, "blocked-until-site-evidence-signed");
+  assert.equal(pack.moduleCatalog.selectionMode, "composable-module-suite");
+  assert.deepEqual(pack.moduleCatalog.enabledModuleIds, ["emergency-life-chain", "clinical-blood"]);
+  assert.equal(pack.moduleCatalog.peerModuleDependencyCount, 0);
+  assert.ok(pack.moduleCatalog.modules.every((item) => item.independentlySelectable));
   assert.equal(pack.crossTrackControls.length, 4);
   assert.ok(pack.crossTrackControls.some((item) => item.id === "four-eyes-site-evidence"));
   assert.equal(pack.rehearsalPlan.scope.primaryTrackId, "emergency-life-chain");
@@ -134,6 +141,51 @@ test("buildSpecialtyCutoverPack aggregates site blockers and cross-track control
   assert.match(pack.integrity.digest, /^sha256:[a-f0-9]{64}$/);
 });
 
+test("institution selection can package one specialty without installing peer specialties", () => {
+  const pack = buildSpecialtyCutoverPack({
+    generatedAt: "2026-07-24T00:00:00.000Z",
+    tracks,
+    enabledTrackIds: ["clinical-blood"],
+    reports: { "clinical-blood": report() }
+  });
+
+  assert.equal(pack.summary.tracks, 1);
+  assert.equal(pack.tracks[0].id, "clinical-blood");
+  assert.equal(pack.firstIncrement.trackId, "clinical-blood");
+  assert.equal(pack.moduleCatalog.selectionMode, "standalone-module");
+  assert.deepEqual(pack.moduleCatalog.enabledModuleIds, ["clinical-blood"]);
+  assert.deepEqual(pack.moduleCatalog.disabledModuleIds, ["emergency-life-chain"]);
+  assert.deepEqual(pack.moduleCatalog.modules.find((item) => item.id === "clinical-blood").requiredPeerModules, []);
+  assert.equal(pack.acceptanceScenarioSuite.scenarios[0].name, "Normal end-to-end clinical blood workflow");
+  assert.match(pack.acceptanceScenarioSuite.scenarios[0].passCriteria, /bag/);
+  assert.ok(pack.runtimeSmokePlan.trackRoutes.every((item) => item.trackId === "clinical-blood"));
+});
+
+test("module selection rejects an empty or unknown specialty selection", () => {
+  assert.throws(() => resolveEnabledTracks(tracks, []), /at least one/);
+  assert.throws(() => resolveEnabledTracks(tracks, ["unknown-module"]), /unknown specialty module id/);
+});
+
+test("module catalog keeps platform contracts separate from peer specialty dependencies", () => {
+  const catalog = buildModuleCatalog(tracks, [tracks[0]]);
+  const emergency = catalog.modules.find((item) => item.id === "emergency-life-chain");
+  assert.equal(emergency.selected, true);
+  assert.deepEqual(emergency.requiredPeerModules, []);
+  assert.ok(emergency.sharedPlatformCapabilities.includes("audit-evidence"));
+  assert.equal(catalog.peerModuleDependencyCount, 0);
+});
+
+test("CLI selection supports standalone output profiles and environment configuration", () => {
+  assert.deepEqual(parseCliOptions(["--tracks", "clinical-blood,physical-examination", "--output-prefix", "institution-a"]), {
+    enabledTrackIds: ["clinical-blood", "physical-examination"],
+    outputPrefix: "institution-a"
+  });
+  assert.deepEqual(parseCliOptions([], { T10_ENABLED_TRACKS: "regional-imaging-cloud" }), {
+    enabledTrackIds: ["regional-imaging-cloud"]
+  });
+  assert.throws(() => parseCliOptions(["--output-prefix", "../escape"], {}), /only letters/);
+});
+
 test("selectFirstIncrement prioritizes emergency life chain when code is ready but site evidence is pending", () => {
   const pack = buildSpecialtyCutoverPack({
     tracks,
@@ -161,6 +213,9 @@ test("renderMarkdown exposes the digest, departments, blockers and first grey in
   assert.match(markdown, /120急救生命链/);
   assert.match(markdown, /临床用血/);
   assert.match(markdown, /Site blockers: 4/);
+  assert.match(markdown, /Institution module selection/);
+  assert.match(markdown, /composable-module-suite/);
+  assert.match(markdown, /Peer specialty dependencies: 0/);
   assert.match(markdown, /sha256:[a-f0-9]{64}/);
   assert.match(markdown, /首个可验收灰度增量/);
   assert.match(markdown, /灰度演练计划/);

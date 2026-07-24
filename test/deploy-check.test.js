@@ -219,6 +219,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "manifest:internetNursingReadiness",
     "manifest:internetNursingHighlightCenter",
     "manifest:t10SpecialtyCutover",
+    "api:t10SpecialtyModuleGovernance",
     "manifest:platformProductionAudit",
     "manifest:platformCapabilityMap",
     "manifest:platformGoLiveSlices",
@@ -259,6 +260,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
   assert.match(report.checks.find((item) => item.name === "api:productionHospitalConnectors").detail, /outbound connectors/);
   assert.match(report.checks.find((item) => item.name === "api:diseasePaymentFormalGroupingOperations").detail, /async dispatch, receipt, retry and dead-letter/);
   assert.match(report.checks.find((item) => item.name === "manifest:citizenLaunchFoundation").detail, /resident pipeline acceptance panel/);
+  assert.match(report.checks.find((item) => item.name === "api:t10SpecialtyModuleGovernance").detail, /commission-controlled, versioned, idempotent, audited/);
   assert.match(report.checks.find((item) => item.name === "api:secureObjectStorage").detail, /malware scan/);
   assert.match(report.checks.find((item) => item.name === "api:financialGateways").detail, /signed replay-safe amount-aware callbacks/);
   assert.match(report.checks.find((item) => item.name === "docs:citizenExternalDependencyOwners").detail, /blockers, evidence, and onsite acceptance/);

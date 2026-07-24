@@ -94,6 +94,7 @@ const EmergencyService = require("./emergency-service");
 const EmergencyLifeChain = require("./emergency-lifechain");
 const EmergencyProduction = require("./emergency-production");
 const { buildSpecialtyCutoverPack } = require("./emergency-specialty-cutover");
+const T10SpecialtyModuleGovernance = require("./t10-specialty-module-governance");
 const { buildOhifStudyUrl, listOrthancStudySummaries, publishDiagnosticReportToFhir, publishImagingStudyToFhir, solutionAHealth } = require("./solution-a-connectors");
 const {
   SmsDeliveryCallbackError,
@@ -10086,6 +10087,20 @@ function normalizeState(data) {
       : [],
     disasterRecoveryDrills: mergeByKey(seedDisasterRecoveryDrills(), data.disasterRecoveryDrills, "id").map((item) => ({ ...item, requiredEvidence: Array.isArray(item.requiredEvidence) ? item.requiredEvidence : [], checks: Array.isArray(item.checks) ? item.checks : [], actionHistory: Array.isArray(item.actionHistory) ? item.actionHistory.slice(0, 20) : [], productionReady: false })),
     operationsEvidencePackets: mergeByKey(seedOperationsEvidencePackets(), data.operationsEvidencePackets, "id").map((item) => ({ ...item, productionEvidence: false })),
+    t10SpecialtyModuleSelections: Array.isArray(data.t10SpecialtyModuleSelections)
+      ? data.t10SpecialtyModuleSelections.slice(0, 500).map((item) => ({
+          ...item,
+          productionReady: false,
+          formalGoLiveState: "blocked-until-site-evidence-signed"
+        }))
+      : [],
+    t10SpecialtyModuleAudit: Array.isArray(data.t10SpecialtyModuleAudit)
+      ? data.t10SpecialtyModuleAudit.slice(0, 5000).map((item) => ({
+          ...item,
+          productionReady: false,
+          formalGoLiveState: "blocked-until-site-evidence-signed"
+        }))
+      : [],
     healthStatistics: data.healthStatistics && typeof data.healthStatistics === "object" ? data.healthStatistics : seedHealthStatistics(),
     publicHealthStandards: mergeByKey(seedPublicHealthStandards(), data.publicHealthStandards, "id"),
     publicHealthStandardImplementationLedger: mergeByKey(seedPublicHealthStandardImplementationLedger(), data.publicHealthStandardImplementationLedger, "id"),
@@ -16061,6 +16076,13 @@ function scopeStateForUser(data, user) {
   delete scoped.authUsers;
   delete scoped.authOrganizations;
   delete scoped.securityEvents;
+  delete scoped.t10SpecialtyModuleAudit;
+  if (user.role === "institution") {
+    scoped.t10SpecialtyModuleSelections = (scoped.t10SpecialtyModuleSelections || [])
+      .filter((item) => item.institutionId === String(user.orgCode || "").trim());
+  } else {
+    delete scoped.t10SpecialtyModuleSelections;
+  }
   delete scoped.smsDeliveryReceipts;
   delete scoped.interfaceRequirements;
   delete scoped.hospitalInteroperabilityFunctions;
@@ -23629,6 +23651,36 @@ function careServiceReadinessPublicSummary(report = {}) {
   };
 }
 
+function trustedT10Institution(data = {}, institutionIdValue) {
+  const institutionId = String(institutionIdValue || "").trim();
+  return (Array.isArray(data.authOrganizations) ? data.authOrganizations : [])
+    .find((item) => {
+      const id = String(item.orgCode || item.id || "").trim();
+      const type = String(item.orgType || item.type || "").trim().toLowerCase();
+      return id === institutionId && (
+        type === "medical_institution"
+        || type === "institution"
+        || type.includes("medical")
+        || type.includes("hospital")
+      );
+    }) || null;
+}
+
+function canReadT10InstitutionModules(user = {}, institutionIdValue) {
+  const institutionId = String(institutionIdValue || "").trim();
+  return user.role === "commission"
+    || (user.role === "institution" && String(user.orgCode || "").trim() === institutionId);
+}
+
+function sendT10SpecialtyModuleError(res, error) {
+  const status = Number(error?.statusCode || 400);
+  sendJson(res, status, {
+    error: status === 403 ? "Forbidden" : status === 404 ? "Not Found" : status === 409 ? "Conflict" : "Bad Request",
+    code: String(error?.code || "T10_MODULE_REQUEST_INVALID"),
+    message: String(error?.message || "T10 specialty module request was rejected")
+  });
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -24176,16 +24228,131 @@ async function handleApi(req, res) {
   if (req.method === "GET" && (url.pathname === "/api/t10-specialty/cutover-pack" || url.pathname === "/api/t10-specialty-cutover")) {
     const user = requireApiRole(req, res, ["commission"], url.pathname);
     if (!user) return;
-    const pack = buildSpecialtyCutoverPack();
+    const data = readDatabase();
+    const institutionId = String(url.searchParams.get("institutionId") || "").trim();
+    let institutionModuleSelection = null;
+    if (institutionId) {
+      if (!trustedT10Institution(data, institutionId)) {
+        sendJson(res, 404, { error: "Not Found", code: "T10_INSTITUTION_NOT_FOUND", message: "trusted institution was not found" });
+        return;
+      }
+      institutionModuleSelection = T10SpecialtyModuleGovernance.buildInstitutionModuleView(data, institutionId);
+    }
+    const pack = buildSpecialtyCutoverPack({
+      enabledTrackIds: institutionModuleSelection?.enabledModuleIds
+    });
     appendSecurityEvent({
       actor: user.name,
       role: user.role,
       action: "t10-specialty-cutover-read",
       target: url.pathname,
       result: "allowed",
-      detail: `${pack.summary.codeReady}/${pack.summary.tracks} code-ready; ${pack.summary.productionReady}/${pack.summary.tracks} production-ready.`
+      detail: `${institutionId || "all-institutions"}; ${pack.summary.codeReady}/${pack.summary.tracks} code-ready; ${pack.summary.productionReady}/${pack.summary.tracks} production-ready.`
     });
-    sendJson(res, 200, pack);
+    sendJson(res, 200, {
+      ...pack,
+      ...(institutionModuleSelection ? { institutionModuleSelection } : {})
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/t10-specialty/modules") {
+    const user = requireApiRole(req, res, ["commission", "institution"], url.pathname);
+    if (!user) return;
+    const institutionId = String(url.searchParams.get("institutionId") || user.orgCode || "").trim();
+    const data = readDatabase();
+    if (!canReadT10InstitutionModules(user, institutionId)) {
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: "t10-specialty-module-selection-read",
+        target: institutionId,
+        result: "denied",
+        detail: "institution scope denied"
+      });
+      sendJson(res, 403, { error: "Forbidden", code: "T10_MODULE_SCOPE_DENIED", message: "institution module scope denied" });
+      return;
+    }
+    if (!trustedT10Institution(data, institutionId)) {
+      sendJson(res, 404, { error: "Not Found", code: "T10_INSTITUTION_NOT_FOUND", message: "trusted institution was not found" });
+      return;
+    }
+    const view = T10SpecialtyModuleGovernance.buildInstitutionModuleView(data, institutionId);
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "t10-specialty-module-selection-read",
+      target: institutionId,
+      result: "allowed",
+      detail: `${view.enabledModuleIds.length} controlled-rehearsal modules; ${view.formalGoLiveState}`
+    });
+    sendJson(res, 200, view);
+    return;
+  }
+
+  const t10SpecialtyModuleActionMatch = url.pathname.match(/^\/api\/t10-specialty\/modules\/([^/]+)\/actions$/);
+  if (req.method === "POST" && t10SpecialtyModuleActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/t10-specialty/modules/:institutionId/actions");
+    if (!user) return;
+    const institutionId = decodeURIComponent(t10SpecialtyModuleActionMatch[1]);
+    const payload = await collectJson(req);
+    try {
+      const data = readDatabase();
+      const at = new Date().toISOString();
+      const result = T10SpecialtyModuleGovernance.applyInstitutionModuleAction(
+        data,
+        institutionId,
+        payload,
+        {
+          ...user,
+          id: String(user.id || user.username || "").trim()
+        },
+        {
+          at,
+          idempotencyKey: String(req.headers["idempotency-key"] || "").trim(),
+          institutionExists: (candidate) => Boolean(trustedT10Institution(data, candidate))
+        }
+      );
+      result.state.securityEvents = resealAuditTrail([
+        {
+          id: randomUUID(),
+          at: new Date(at).toLocaleString("zh-CN", { hour12: false }),
+          actor: user.name,
+          role: user.role,
+          action: "t10-specialty-module-selection-change",
+          target: institutionId,
+          result: "allowed",
+          detail: `${payload.action}:${payload.moduleId}; version=${result.record.version}; ${result.view.formalGoLiveState}`
+        },
+        ...(Array.isArray(result.state.securityEvents) ? result.state.securityEvents : [])
+      ].slice(0, 120));
+      if (result.replayed) {
+        appendSecurityEvent({
+          actor: user.name,
+          role: user.role,
+          action: "t10-specialty-module-selection-replay",
+          target: institutionId,
+          result: "allowed",
+          detail: `${payload.action}:${payload.moduleId}; version=${result.record.version}`
+        });
+      } else {
+        writeDatabase(result.state);
+      }
+      sendJson(res, 200, {
+        ...result.view,
+        replayed: result.replayed
+      });
+    } catch (error) {
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: "t10-specialty-module-selection-change",
+        target: institutionId,
+        result: "denied",
+        detail: `${String(error?.code || "T10_MODULE_REQUEST_INVALID")}:${String(error?.message || "").slice(0, 240)}`
+      });
+      sendT10SpecialtyModuleError(res, error);
+    }
     return;
   }
 
