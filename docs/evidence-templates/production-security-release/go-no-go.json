@@ -1,0 +1,39 @@
+{
+  "evidenceId": "<go-no-go-evidence-id>",
+  "gateId": "P0-10-GLOBAL",
+  "environment": "production",
+  "ownerDepartment": "cutover-committee",
+  "independentVerifier": "<cab-reviewer>",
+  "releaseId": "<approved-release-id>",
+  "artifactDigest": "sha256:<64-hex-artifact-digest>",
+  "changeTicket": "<change-ticket>",
+  "executedAt": "<ISO-8601-time>",
+  "target": "<production-cutover-window>",
+  "steps": ["Verify five current prerequisites", "Record four independent approvals", "Issue an independent command decision"],
+  "expectedResult": "GO is bound to the current evidence fingerprint and has an assigned rollback owner",
+  "actualResult": "<minimized-result-summary>",
+  "result": "pending",
+  "evidenceFingerprint": "<current-evidence-fingerprint>",
+  "prerequisites": [
+    { "id": "siteAcceptances", "passed": false, "evidenceRef": "controlled://<site-acceptance-evidence>" },
+    { "id": "securityOpinion", "passed": false, "evidenceRef": "controlled://<security-opinion-evidence>" },
+    { "id": "launchSmoke", "passed": false, "evidenceRef": "controlled://<production-smoke-evidence>" },
+    { "id": "cutoverChecklist", "passed": false, "evidenceRef": "controlled://<cutover-checklist-evidence>" },
+    { "id": "drSignoff", "passed": false, "evidenceRef": "controlled://<dr-signoff-evidence>" }
+  ],
+  "approvals": [
+    { "role": "business", "account": "<business-account>", "status": "pending", "evidenceRef": "controlled://<business-approval>" },
+    { "role": "information", "account": "<information-account>", "status": "pending", "evidenceRef": "controlled://<information-approval>" },
+    { "role": "operations", "account": "<operations-account>", "status": "pending", "evidenceRef": "controlled://<operations-approval>" },
+    { "role": "security", "account": "<security-account>", "status": "pending", "evidenceRef": "controlled://<security-approval>" }
+  ],
+  "decision": {
+    "value": "NO-GO",
+    "account": "<independent-command-owner>",
+    "confirmation": "<exact-confirmation-after-all-gates-pass>",
+    "rollbackOwner": "<rollback-owner>"
+  },
+  "attachments": [{ "reference": "controlled://<go-no-go-package>", "digest": "sha256:<64-hex-attachment-digest>" }],
+  "dataBoundary": { "containsPatientData": false, "containsSecretValues": false },
+  "exceptions": []
+}

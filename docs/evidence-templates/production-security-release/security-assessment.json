@@ -1,0 +1,29 @@
+{
+  "evidenceId": "<security-evidence-id>",
+  "gateId": "P0-07",
+  "environment": "production",
+  "ownerDepartment": "security-compliance",
+  "independentVerifier": "<independent-security-reviewer>",
+  "releaseId": "<approved-release-id>",
+  "artifactDigest": "sha256:<64-hex-artifact-digest>",
+  "changeTicket": "<change-ticket>",
+  "executedAt": "<ISO-8601-time>",
+  "target": "<production-system-boundary>",
+  "steps": ["Archive formal reports", "Verify remediation and independent retest", "Record two independent release opinions"],
+  "expectedResult": "No open critical or high finding and all formal reports accepted",
+  "actualResult": "<minimized-result-summary>",
+  "result": "pending",
+  "assessments": [
+    { "id": "classified-protection", "status": "pending", "reportRef": "controlled://<classified-protection-report>" },
+    { "id": "commercial-crypto", "status": "pending", "reportRef": "controlled://<commercial-crypto-report>" },
+    { "id": "penetration-test", "status": "pending", "reportRef": "controlled://<penetration-retest-report>" }
+  ],
+  "findings": { "openCritical": -1, "openHigh": -1, "activeWaivers": [] },
+  "securityOpinions": [
+    { "role": "security-owner", "account": "<security-owner-account>", "status": "pending", "evidenceRef": "controlled://<security-opinion>" },
+    { "role": "release-owner", "account": "<release-owner-account>", "status": "pending", "evidenceRef": "controlled://<release-opinion>" }
+  ],
+  "attachments": [{ "reference": "controlled://<security-evidence-package>", "digest": "sha256:<64-hex-attachment-digest>" }],
+  "dataBoundary": { "containsPatientData": false, "containsSecretValues": false },
+  "exceptions": []
+}

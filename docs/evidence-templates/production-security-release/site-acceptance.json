@@ -1,0 +1,31 @@
+{
+  "evidenceId": "<site-acceptance-evidence-id>",
+  "gateId": "P0-SITE-ACCEPTANCE",
+  "environment": "production",
+  "ownerDepartment": "project-office",
+  "independentVerifier": "<hospital-acceptance-reviewer>",
+  "releaseId": "<approved-release-id>",
+  "artifactDigest": "sha256:<64-hex-artifact-digest>",
+  "changeTicket": "<change-ticket>",
+  "executedAt": "<ISO-8601-time>",
+  "target": "<pilot-site>",
+  "steps": ["Verify ten P0 evidence packages", "Record four-party signatures for every task", "Freeze the accepted evidence fingerprint"],
+  "expectedResult": "P0-01 through P0-10 are site accepted by four independent roles",
+  "actualResult": "<minimized-result-summary>",
+  "result": "pending",
+  "tasks": [
+    { "id": "P0-01", "status": "pending", "evidenceRef": "controlled://<P0-01-evidence>", "signatures": [] },
+    { "id": "P0-02", "status": "pending", "evidenceRef": "controlled://<P0-02-evidence>", "signatures": [] },
+    { "id": "P0-03", "status": "pending", "evidenceRef": "controlled://<P0-03-evidence>", "signatures": [] },
+    { "id": "P0-04", "status": "pending", "evidenceRef": "controlled://<P0-04-evidence>", "signatures": [] },
+    { "id": "P0-05", "status": "pending", "evidenceRef": "controlled://<P0-05-evidence>", "signatures": [] },
+    { "id": "P0-06", "status": "pending", "evidenceRef": "controlled://<P0-06-evidence>", "signatures": [] },
+    { "id": "P0-07", "status": "pending", "evidenceRef": "controlled://<P0-07-evidence>", "signatures": [] },
+    { "id": "P0-08", "status": "pending", "evidenceRef": "controlled://<P0-08-evidence>", "signatures": [] },
+    { "id": "P0-09", "status": "pending", "evidenceRef": "controlled://<P0-09-evidence>", "signatures": [] },
+    { "id": "P0-10", "status": "pending", "evidenceRef": "controlled://<P0-10-evidence>", "signatures": [] }
+  ],
+  "attachments": [{ "reference": "controlled://<site-acceptance-package>", "digest": "sha256:<64-hex-attachment-digest>" }],
+  "dataBoundary": { "containsPatientData": false, "containsSecretValues": false },
+  "exceptions": []
+}
