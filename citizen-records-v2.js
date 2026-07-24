@@ -1210,9 +1210,16 @@
     return entries.length ? Object.fromEntries(entries) : undefined;
   }
 
-  function buildResidentPortableArchive(records = [], residentId = "", generatedAt = new Date()) {
+  function buildResidentPortableArchive(records = [], residentId = "", generatedAt = new Date(), selectedCategories) {
+    const requestedCategories = selectedCategories === undefined
+      ? [...PORTABLE_RECORD_CATEGORIES]
+      : [...new Set((Array.isArray(selectedCategories) ? selectedCategories : []).map((item) => cleanText(item, 60)).filter(Boolean))];
+    if (requestedCategories.some((category) => !PORTABLE_RECORD_CATEGORIES.has(category))) {
+      throw new Error("健康档案导出包含不受支持的分类");
+    }
+    const categorySelection = new Set(requestedCategories);
     const scoped = CitizenRecordsV1.projectResidentRecords(records, cleanText(residentId, 120))
-      .filter((record) => PORTABLE_RECORD_CATEGORIES.has(record.category))
+      .filter((record) => categorySelection.has(record.category))
       .sort((left, right) => {
         return cleanText(right.date, 40).localeCompare(cleanText(left.date, 40))
           || cleanText(left.category, 60).localeCompare(cleanText(right.category, 60))

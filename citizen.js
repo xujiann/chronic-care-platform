@@ -2389,7 +2389,7 @@ function bindVaultSearch(resident, diseases, followups, records) {
     };
   }
   const exportButton = document.querySelector("#export-health-record");
-  if (exportButton) exportButton.onclick = () => exportCitizenHealthRecord(resident.id);
+  if (exportButton) exportButton.onclick = () => openCitizenHealthRecordExport(resident.id);
 }
 
 function renderVault(resident, diseases, followups, records) {
@@ -2673,12 +2673,50 @@ function exportCitizenAuthorizationReceipts(residentId) {
   showToast("最小化授权回执证据已导出");
 }
 
-function exportCitizenHealthRecord(residentId) {
+const citizenHealthRecordExportLabels = {
+  emr: "电子病历摘要",
+  labs: "检验检查",
+  medications: "用药记录",
+  imaging: "影像报告",
+  attachments: "附件摘要",
+  "physical-exam": "体检摘要",
+  allergies: "过敏史",
+  vaccines: "免疫接种",
+  admissions: "住院记录摘要"
+};
+
+function selectedCitizenHealthRecordExportCategories(form = document.querySelector("#health-record-export-form")) {
+  return form ? new FormData(form).getAll("categories") : [];
+}
+
+function renderCitizenHealthRecordExportPreview(residentId) {
+  const form = document.querySelector("#health-record-export-form");
+  const output = document.querySelector("#health-record-export-preview");
+  const confirmButton = document.querySelector("#health-record-export-confirm");
+  if (!form || !output || !confirmButton) return;
+  const categories = selectedCitizenHealthRecordExportCategories(form);
+  const archive = window.CitizenRecordsV2.buildResidentPortableArchive(residentCareRecords(residentId), residentId, new Date(), categories);
+  confirmButton.disabled = categories.length === 0;
+  output.textContent = categories.length
+    ? `已选择 ${categories.length} 类，预计导出 ${archive.recordCount} 条：${categories.map((category) => `${citizenHealthRecordExportLabels[category]} ${archive.categoryCounts[category] || 0} 条`).join("；")}`
+    : "请选择至少一类资料；未选择时不会生成文件";
+}
+
+function openCitizenHealthRecordExport(residentId) {
+  const dialog = document.querySelector("#health-record-export-dialog");
+  const form = document.querySelector("#health-record-export-form");
+  if (!dialog || !form) return;
+  form.reset();
+  renderCitizenHealthRecordExportPreview(residentId);
+  dialog.showModal();
+}
+
+function exportCitizenHealthRecord(residentId, categories) {
   const records = residentCareRecords(residentId);
-  const archive = window.CitizenRecordsV2.buildResidentPortableArchive(records, residentId);
+  const archive = window.CitizenRecordsV2.buildResidentPortableArchive(records, residentId, new Date(), categories);
   if (!archive.recordCount) {
-    showToast("暂无可导出的健康档案摘要");
-    return;
+    showToast("所选分类暂无可导出的健康档案摘要");
+    return false;
   }
   const payload = JSON.stringify(archive, null, 2).replace(/</g, "\\u003c");
   const url = URL.createObjectURL(new Blob([payload], { type: "application/json;charset=utf-8" }));
@@ -2688,6 +2726,7 @@ function exportCitizenHealthRecord(residentId) {
   link.click();
   URL.revokeObjectURL(url);
   showToast(`已导出 ${archive.recordCount} 条最小化健康摘要`);
+  return true;
 }
 
 function renderCitizenCareWorkspace(resident, diseases = []) {
@@ -5340,6 +5379,18 @@ function bindDialogs() {
   });
   document.querySelectorAll("#auth-form input[name='scopes']").forEach((input) => {
     input.addEventListener("change", () => renderAuthorizationScopePreview(input.form));
+  });
+  document.querySelectorAll("#health-record-export-form input[name='categories']").forEach((input) => {
+    input.addEventListener("change", () => renderCitizenHealthRecordExportPreview(currentResidentId));
+  });
+  document.querySelector("#health-record-export-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const categories = selectedCitizenHealthRecordExportCategories(event.currentTarget);
+    if (!categories.length) {
+      showToast("请至少选择一类健康资料");
+      return;
+    }
+    if (exportCitizenHealthRecord(currentResidentId, categories)) event.currentTarget.closest("dialog").close();
   });
   document.querySelectorAll("[data-close]").forEach((button) => {
     button.addEventListener("click", () => button.closest("dialog").close());

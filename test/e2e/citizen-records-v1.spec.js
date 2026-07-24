@@ -41,16 +41,30 @@ test("resident creates a scoped consent and revokes it through the dedicated aud
   await expect(page.locator("#resident-records-v1")).toBeVisible();
   await expect(page.locator("#resident-records-v1")).toContainText("只读健康记录");
   await expect(page.locator("#upload-form select[name='category'] option[value='emr']")).toHaveCount(0);
+  await page.locator("#export-health-record").click();
+  const healthRecordExportDialog = page.locator("#health-record-export-dialog");
+  await expect(healthRecordExportDialog).toHaveAttribute("open", "");
+  await expect(page.locator("#health-record-export-confirm")).toBeDisabled();
+  await expect(page.locator("#health-record-export-preview")).toContainText("未选择时不会生成文件");
+  await healthRecordExportDialog.getByRole("button", { name: "取消" }).click();
+  await expect(healthRecordExportDialog).not.toHaveAttribute("open", "");
+  await page.locator("#export-health-record").click();
+  await healthRecordExportDialog.locator("input[value='labs']").check();
+  await healthRecordExportDialog.locator("input[value='imaging']").check();
+  await expect(page.locator("#health-record-export-preview")).toContainText("已选择 2 类");
+  await expect(page.locator("#health-record-export-preview")).toContainText("检验检查");
+  await expect(page.locator("#health-record-export-confirm")).toBeEnabled();
   const [healthRecordDownload] = await Promise.all([
     page.waitForEvent("download"),
-    page.locator("#export-health-record").click()
+    page.locator("#health-record-export-confirm").click()
   ]);
   const healthRecordExport = JSON.parse(fs.readFileSync(await healthRecordDownload.path(), "utf8"));
   expect(healthRecordDownload.suggestedFilename()).toMatch(/^resident-health-record-\d{4}-\d{2}-\d{2}\.json$/);
   expect(healthRecordExport.schema).toBe("resident-health-record-export-v1");
   expect(healthRecordExport.subject).toBe("self");
   expect(healthRecordExport.recordCount).toBeGreaterThan(0);
-  expect(healthRecordExport.records.every((item) => item.category !== "authorizations")).toBe(true);
+  expect(healthRecordExport.records.every((item) => ["labs", "imaging"].includes(item.category))).toBe(true);
+  expect(Object.keys(healthRecordExport.categoryCounts).sort()).toEqual(["imaging", "labs"]);
   const healthRecordText = JSON.stringify(healthRecordExport);
   expect(healthRecordText).not.toMatch(/residentId|personIndex|auditHash|sourceRecordId|studyInstanceUID|imageCloudStudyId|attachmentId|objectPath|viewerUrl/);
 
