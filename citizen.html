@@ -863,7 +863,7 @@
             <label><input type="checkbox" name="categories" value="admissions" />住院记录摘要</label>
           </fieldset>
           <output class="authorization-scope-preview full" id="health-record-export-preview" role="status" aria-live="polite">请选择至少一类资料</output>
-          <p class="form-boundary full" id="health-record-export-boundary">副本不包含授权记录、居民主索引、审计字段、原文地址或影像原图；导出不会自动分享给任何机构。</p>
+          <p class="form-boundary full" id="health-record-export-boundary">副本不包含授权记录、居民主索引、审计字段、原文地址或影像原图；导出不会自动分享给任何机构。文件附带 SHA-256 完整性摘要，但该摘要不是医疗机构数字签名或真实性证明。</p>
         </div>
         <footer>
           <button type="button" class="ghost-link" data-close>取消</button>
@@ -879,8 +879,8 @@
     <script src="./physical-examination-service.js"></script>
     <script src="./immunization-schedule.js"></script>
     <script src="./citizen-records-v1.js?v=20260724auth3"></script>
-    <script src="./citizen-records-v2.js?v=20260724care14"></script>
-    <script src="./citizen.js?v=20260724care14"></script>
+    <script src="./citizen-records-v2.js?v=20260724care15"></script>
+    <script src="./citizen.js?v=20260724care15"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));

@@ -2,6 +2,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const { webcrypto } = require("node:crypto");
 const V1 = require("../citizen-records-v1");
 const V2 = require("../citizen-records-v2");
 
@@ -573,7 +574,7 @@ test("record search rejects inverted date ranges without leaking results", () =>
   assert.deepEqual(result.items, []);
 });
 
-test("portable resident archive is minimized, resident scoped and excludes authorization data", () => {
+test("portable resident archive is minimized, scoped and detects integrity changes", async () => {
   const archive = V2.buildResidentPortableArchive([
     {
       id: "lab-r1",
@@ -632,6 +633,15 @@ test("portable resident archive is minimized, resident scoped and excludes autho
     () => V2.buildResidentPortableArchive([], "r1", "2026-07-24T08:00:00.000Z", ["labs", "internal-all-records"]),
     /不受支持的分类/
   );
+  const sealed = await V2.sealResidentPortableArchive(archive, webcrypto);
+  assert.equal(sealed.integrity.algorithm, "SHA-256");
+  assert.match(sealed.integrity.digest, /^[a-f0-9]{64}$/);
+  assert.equal(sealed.integrity.assurance, "integrity-only-not-source-signature");
+  assert.equal(await V2.verifyResidentPortableArchive(sealed, webcrypto), true);
+  const changed = structuredClone(sealed);
+  changed.records[0].summary = "被修改的结果";
+  assert.equal(await V2.verifyResidentPortableArchive(changed, webcrypto), false);
+  assert.equal(await V2.verifyResidentPortableArchive({ ...sealed, extra: "unexpected" }, webcrypto), false);
 });
 
 test("authorization scope disclosure explains inclusions and exclusions without broadening scopes", () => {
