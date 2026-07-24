@@ -52,6 +52,7 @@ function buildImagingCloudReadinessReport(options = {}) {
     check("spec:hospital-ingest", sources.server.includes("/api/imaging-cloud/ingest") && sources.server.includes("DICOM TLS") && sources.server.includes("C-STORE") && sources.server.includes("C-MOVE"), "hospital DICOM/RIS/PACS ingest API and protocols are modeled", "integration"),
     check("spec:main-index", sources.server.includes("mainIndexRule") && sources.server.includes("mainIndex") && sources.docs.includes("mainIndex"), "regional main-index rule is implemented and documented", "integration"),
     check("spec:emr-compatibility", sources.server.includes("diagnosticReports") && sources.server.includes("personalRecords") && sources.html.includes("emr-compatibility"), "ingest creates diagnostic report and personal health-record evidence", "emr"),
+    check("emr:writeback-retry", sources.server.includes("/api/imaging-cloud/studies/:id/fhir-writeback/retry") && sources.server.includes("fhirReportLastError") && sources.pageJs.includes("retryFhirWriteback") && sources.docs.includes("fhir-writeback/retry"), "failed FHIR DiagnosticReport writeback remains auditable and can only be retried after the FHIR reference chain and quality review exist", "emr"),
     check("spec:mutual-recognition", sources.server.includes("createImageCloudMutualRecognitionChain") && sources.server.includes("/api/imaging-cloud/studies/:id/mutual-recognition") && sources.html.includes("mutual-recognition-table") && sources.pageJs.includes("startMutualRecognition"), "imaging studies can create and close a county mutual-recognition chain on the same main index", "integration"),
     check("spec:recognition-appeal", ["submitImageCloudRecognitionAppeal", "reviewImageCloudRecognitionAppeal", "/api/imaging-cloud/studies/:id/mutual-recognition/appeal", "independent reviewer"].every((marker) => sources.server.includes(marker)) && ["submitMutualRecognitionAppeal", "reviewMutualRecognitionAppeal", "data-appeal-recognition", "data-review-recognition-appeal"].every((marker) => sources.pageJs.includes(marker)), "rejected recognition decisions support minimized institution appeals and independent review", "integration"),
     check("spec:security", sources.server.includes("dataAccessLogs") && sources.server.includes("securityEvents") && sources.docs.includes("DICOM TLS") && sources.docs.includes("HTTPS") && sources.docs.includes("AES"), "security baseline covers level protection, encryption and local controllability", "security"),
@@ -89,7 +90,7 @@ function buildImagingCloudReadinessReport(options = {}) {
     summary: {
       checks: checks.length,
       passed: checks.filter((item) => item.passed).length,
-      requiredCapabilities: ["hospital ingest", "patient mobile viewing", "EMR compatibility", "authorization sharing", "quality control", "mutual-recognition appeal", "security baseline", "development plan", "synthetic acceptance", "formal production gate"],
+      requiredCapabilities: ["hospital ingest", "patient mobile viewing", "EMR compatibility", "FHIR writeback retry", "authorization sharing", "quality control", "mutual-recognition appeal", "security baseline", "development plan", "synthetic acceptance", "formal production gate"],
       production: productionCenter.summary
     },
     artifacts: {

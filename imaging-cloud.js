@@ -305,12 +305,13 @@ function renderStudyTable(studies) {
       <td>${escapeHtml(item.institutionName)}<br><small>${escapeHtml(item.uploadMode)}</small></td>
       <td><small>${escapeHtml(item.mainIndex)}</small></td>
       <td><span class="badge ok">${escapeHtml(item.uploadStatus)}</span><br><small>${escapeHtml(item.integrityCheck)} · ${escapeHtml(item.imageCount)} 幅</small></td>
-      <td><span class="badge ${/通过|已写入|passed/i.test(`${item.qcStatus} ${item.emrSyncStatus}`) ? "ok" : "warn"}">${escapeHtml(item.qcStatus)}</span><br><small>${escapeHtml(item.emrSyncStatus)}</small></td>
+      <td><span class="badge ${/通过|已写入|passed/i.test(`${item.qcStatus} ${item.emrSyncStatus}`) ? "ok" : "warn"}">${escapeHtml(item.qcStatus)}</span><br><small>${escapeHtml(item.emrSyncStatus)}${item.fhirReportSyncStatus === "failed" ? ` · FHIR回写失败：${escapeHtml(item.fhirReportLastError || "待重试")}` : item.fhirReportSyncStatus === "synced" ? " · FHIR已同步" : ""}</small></td>
       <td><span class="badge ${/已互认|recognized/i.test(item.mutualRecognitionStatus || "") ? "ok" : /不予|拒绝/i.test(item.mutualRecognitionStatus || "") ? "warn" : "info"}">${escapeHtml(item.mutualRecognitionStatus || "未发起")}</span><br><small>${escapeHtml(item.mutualRecognitionReason || "可发起区域互认")}</small></td>
       <td>
         <button class="inline-action" type="button" data-view-study="${escapeHtml(item.id)}">手机查看</button>
         <button class="inline-action primary" type="button" data-open-ohif="${escapeHtml(item.id)}">OHIF调阅</button>
         <button class="inline-action" type="button" data-share-study="${escapeHtml(item.id)}">分享</button>
+        ${canRetryFhirWriteback(item) ? `<button class="inline-action" type="button" data-retry-fhir-writeback="${escapeHtml(item.id)}">重试FHIR回写</button>` : ""}
         ${canManageMutualRecognition() && !item.mutualRecognitionRecordId ? `<button class="inline-action" type="button" data-start-recognition="${escapeHtml(item.id)}">纳入互认</button>` : ""}
       </td>
     </tr>`).join("") || `<tr><td colspan="7">暂无影像云检查。</td></tr>`}</tbody>
@@ -360,6 +361,10 @@ function canDecideMutualRecognition() {
 
 function canSubmitRecognitionAppeal() {
   return window.HealthCityAuth?.getUser?.()?.role === "institution";
+}
+
+function canRetryFhirWriteback(item) {
+  return ["commission", "institution"].includes(window.HealthCityAuth?.getUser?.()?.role) && item?.fhirReportSyncStatus === "failed";
 }
 
 function renderGateways(payload) {
@@ -573,6 +578,7 @@ async function handleImagingAction(event) {
   const performanceButton = event.target.closest("[data-record-imaging-performance]");
   const revokeShareButton = event.target.closest("[data-revoke-imaging-share]");
   const catalogActionButton = event.target.closest("[data-imaging-catalog-action]");
+  const retryFhirWritebackButton = event.target.closest("[data-retry-fhir-writeback]");
   if (linkExternalButton) {
     await linkExternalStudy(linkExternalButton.dataset.linkExternalStudy);
     return;
@@ -618,6 +624,10 @@ async function handleImagingAction(event) {
     await updateRecognitionCatalog(catalogActionButton.dataset.imagingCatalogAction, catalogActionButton.dataset.imagingCatalogStatus);
     return;
   }
+  if (retryFhirWritebackButton) {
+    await retryFhirWriteback(retryFhirWritebackButton.dataset.retryFhirWriteback);
+    return;
+  }
   if (performanceButton) {
     await recordImagingPerformance(performanceButton.dataset.recordImagingPerformance);
   }
@@ -658,6 +668,22 @@ async function revokeImagingShare(studyId, shareId) {
   if (!response.ok) { window.alert(payload.message || "撤销分享失败"); return; }
   await loadImagingCloud();
   renderImagingCloud();
+}
+
+async function retryFhirWriteback(studyId) {
+  if (!window.confirm("将按现有主索引、FHIR引用和质控记录重试报告回写。确认继续？")) return;
+  if (!IMAGING_API_BASE) { window.alert("静态预览不执行FHIR报告回写。\n"); return; }
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  const response = await request(`${IMAGING_API_BASE}/imaging-cloud/studies/${encodeURIComponent(studyId)}/fhir-writeback/retry`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ source: "imaging-workbench" })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) { window.alert(payload.message || "FHIR报告回写失败，已记录供运维处理。"); await loadImagingCloud(); renderImagingCloud(); return; }
+  await loadImagingCloud();
+  renderImagingCloud();
+  window.alert("FHIR影像报告回写成功。");
 }
 
 async function recordImagingPerformance(studyId) {

@@ -34200,6 +34200,64 @@ async function handleApi(req, res) {
     return;
   }
 
+  const imagingFhirRetryMatch = url.pathname.match(/^\/api\/imaging-cloud\/studies\/([^/]+)\/fhir-writeback\/retry$/);
+  if (req.method === "POST" && imagingFhirRetryMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/imaging-cloud/studies/:id/fhir-writeback/retry");
+    if (!user) return;
+    const data = readDatabase();
+    const studyId = decodeURIComponent(imagingFhirRetryMatch[1]);
+    const index = (data.imageCloudStudies || []).findIndex((item) => item.id === studyId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到影像云检查" });
+      return;
+    }
+    const study = data.imageCloudStudies[index];
+    if (!canAccessResident(user, study.residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "retry imaging FHIR writeback", target: studyId, result: "denied", detail: "resident scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "无权重试该居民影像报告回写" });
+      return;
+    }
+    const review = (data.imageCloudQualityReviews || []).find((item) => item.studyId === studyId);
+    if (!study.fhirPatientId || !study.fhirImagingStudyId || !review) {
+      sendJson(res, 409, { error: "FHIR Writeback Prerequisite Missing", message: "FHIR Patient、ImagingStudy 引用和质控记录齐备后才能重试报告回写" });
+      return;
+    }
+    const attemptedAt = new Date().toISOString();
+    try {
+      const fhirReportSync = await publishDiagnosticReportToFhir(study, review);
+      const updatedStudy = {
+        ...study,
+        fhirDiagnosticReportId: fhirReportSync.diagnosticReport.id,
+        fhirReportSyncStatus: "synced",
+        fhirReportSyncedAt: attemptedAt,
+        fhirReportLastAttemptAt: attemptedAt,
+        fhirReportLastError: "",
+        fhirReportSyncAttempts: Number(study.fhirReportSyncAttempts || 0) + 1,
+        emrSyncStatus: "已写入电子病历索引"
+      };
+      data.imageCloudStudies[index] = updatedStudy;
+      appendDataAccessLog(data, user, study.residentId, "医学影像云", `重试FHIR影像报告回写 ${study.accessionNumber} 成功`);
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "retry imaging FHIR writeback", target: studyId, result: "allowed", detail: fhirReportSync.diagnosticReport.id });
+      writeDatabase(data);
+      sendJson(res, 200, { study: updatedStudy, fhirReportSync, retried: true });
+    } catch (error) {
+      const message = String(error.message || "FHIR DiagnosticReport 回写失败").slice(0, 240);
+      const updatedStudy = {
+        ...study,
+        fhirReportSyncStatus: "failed",
+        fhirReportLastAttemptAt: attemptedAt,
+        fhirReportLastError: message,
+        fhirReportSyncAttempts: Number(study.fhirReportSyncAttempts || 0) + 1
+      };
+      data.imageCloudStudies[index] = updatedStudy;
+      appendDataAccessLog(data, user, study.residentId, "医学影像云", `重试FHIR影像报告回写 ${study.accessionNumber} 失败`);
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "retry imaging FHIR writeback", target: studyId, result: "failed", detail: message });
+      writeDatabase(data);
+      sendJson(res, 502, { error: "FHIR DiagnosticReport Sync Failed", message, study: updatedStudy });
+    }
+    return;
+  }
+
   const imagingRecognitionMatch = url.pathname.match(/^\/api\/imaging-cloud\/studies\/([^/]+)\/mutual-recognition$/);
   if (req.method === "POST" && imagingRecognitionMatch) {
     const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/imaging-cloud/studies/:id/mutual-recognition");
