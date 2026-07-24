@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const Runtime = require("../care-service-runtime");
 const CutoverEvidence = require("../care-service-cutover-evidence");
+const DependencyEvidence = require("../care-service-dependency-evidence");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_JSON = path.join(ROOT, "release", "care-service-production-readiness.json");
@@ -28,9 +29,16 @@ function secretReady(value, minimum = 32) {
     && !/replace-with|change-me|changeme|placeholder|example|demo[-_]/i.test(candidate);
 }
 
+function productionValueReady(value) {
+  const candidate = String(value || "").trim();
+  return Boolean(candidate)
+    && !/replace-with|change-me|changeme|placeholder|example|demo[-_]|localhost|127\.0\.0\.1|\[?::1\]?/i.test(candidate);
+}
+
 function httpsUrl(value) {
   try {
-    return new URL(String(value || "")).protocol === "https:";
+    const candidate = String(value || "").trim();
+    return productionValueReady(candidate) && new URL(candidate).protocol === "https:";
   } catch {
     return false;
   }
@@ -173,11 +181,30 @@ function buildCodeChecks(sources) {
       "T06/T00",
       "restore the evidence manifest validator, templates and negative tests",
       "code"
+    ),
+    check(
+      "code:dependency-evidence",
+      "fresh production dependency probe evidence",
+      [
+        "validateDependencyEvidence", "loadDependencyEvidence", "targetDigestForDependency",
+        "CARE_DEPENDENCY_EVIDENCE_DIGEST_MISMATCH", "CARE_DEPENDENCY_EVIDENCE_TARGET_MISMATCH",
+        "CARE_DEPENDENCY_EVIDENCE_STALE", "REQUIRED_DEPENDENCIES"
+      ].every((marker) => sources.dependencyEvidence.includes(marker))
+        && /accepts fresh independently receipted probes/.test(sources.dependencyEvidenceTest)
+        && /rejects any change to the pinned file bytes/.test(sources.dependencyEvidenceTest)
+        && /buildDependencyTargetInventory/.test(sources.dependencyTargets)
+        && /digest-only production bindings/.test(sources.dependencyTargetsTest)
+        && /CARE_DEPENDENCY_EVIDENCE_FILE/.test(sources.dependencyEvidenceEnv)
+        && /care-service-dependency-evidence-v1/.test(sources.dependencyEvidenceTemplate),
+      "configured production targets require fresh independently receipted health evidence bound to their target digests",
+      "T06/T00",
+      "restore the dependency evidence validator, templates and failure-path tests",
+      "code"
     )
   ];
 }
 
-function buildEnvironmentChecks(env) {
+function buildEnvironmentChecks(env, dependencyEvidence) {
   const storageEngine = String(env.STORAGE_ENGINE || "").trim().toLowerCase();
   const runtimeModuleValue = String(env.CARE_SERVICE_RUNTIME_MODULE || "").trim();
   const runtimeModulePath = runtimeModuleValue
@@ -191,16 +218,25 @@ function buildEnvironmentChecks(env) {
     .map((item) => item.trim())
     .filter(Boolean);
   const databaseReady = storageEngine === "sqlite";
+  const healthyDependencies = new Set(dependencyEvidence.healthyDependencies || []);
+  const probesReady = (...dependencies) => dependencies.every((dependency) => healthyDependencies.has(dependency));
+  const probeDetail = (...dependencies) => {
+    const codes = dependencyEvidence.errors
+      .filter((error) => !error.dependency || dependencies.includes(error.dependency))
+      .map((error) => error.code);
+    return codes.length ? codes.join(", ") : "fresh target-bound probe receipts verified";
+  };
   return [
     check("runtime:production-profile", "production runtime profile", env.NODE_ENV === "production", env.NODE_ENV || "missing", "运维", "set NODE_ENV=production"),
-    check("runtime:durable-storage", "durable transactional storage", databaseReady, storageEngine || "missing", "数据库运维", "configure the supported production SQLite runtime, backups and collection-version CAS; PostgreSQL remains blocked until its public runtime adapter is enabled"),
+    check("runtime:durable-storage", "durable transactional storage", databaseReady && probesReady("storage"), databaseReady ? probeDetail("storage") : (storageEngine || "missing"), "数据库运维", "configure the supported production SQLite runtime, backups and collection-version CAS, then archive a fresh transactional storage probe receipt; PostgreSQL remains blocked until its public runtime adapter is enabled"),
     check("runtime:session-secrets", "strong session secrets", sessionSecrets.length >= 1 && sessionSecrets.every((item) => secretReady(item)), `${sessionSecrets.length} configured`, "安全运维", "configure non-demo SESSION_SECRETS with at least 32 characters each"),
     check("runtime:integration-secret", "strong integration signing secret", secretReady(env.INTEGRATION_GATEWAY_SECRET), env.INTEGRATION_GATEWAY_SECRET ? "configured" : "missing", "接口运维", "configure INTEGRATION_GATEWAY_SECRET"),
     check(
       "runtime:identity",
       "government identity and family authorization",
-      httpsUrl(env.OIDC_ISSUER_URL) && Boolean(env.OIDC_CLIENT_ID) && secretReady(env.OIDC_CLIENT_SECRET),
-      env.OIDC_ISSUER_URL ? "issuer supplied" : "missing",
+      httpsUrl(env.OIDC_ISSUER_URL) && Boolean(env.OIDC_CLIENT_ID) && secretReady(env.OIDC_CLIENT_SECRET)
+        && probesReady("identity"),
+      env.OIDC_ISSUER_URL ? probeDetail("identity") : "missing",
       "统一身份责任方",
       "configure production OIDC issuer, client and secret; complete resident/family scope joint test"
     ),
@@ -208,8 +244,9 @@ function buildEnvironmentChecks(env) {
       "runtime:sms",
       "SMS gateway and signed callback",
       httpsUrl(env.SMS_GATEWAY_URL) && Boolean(env.SMS_TEMPLATE_ID)
-        && secretReady(env.SMS_GATEWAY_TOKEN) && secretReady(env.SMS_DELIVERY_CALLBACK_SECRET),
-      env.SMS_GATEWAY_URL ? "gateway supplied" : "missing",
+        && secretReady(env.SMS_GATEWAY_TOKEN) && secretReady(env.SMS_DELIVERY_CALLBACK_SECRET)
+        && probesReady("sms"),
+      env.SMS_GATEWAY_URL ? probeDetail("sms") : "missing",
       "消息平台责任方",
       "configure HTTPS SMS gateway, approved template, credential and callback secret"
     ),
@@ -217,8 +254,9 @@ function buildEnvironmentChecks(env) {
       "runtime:hospital",
       "HIS and appointment adapters",
       configuredSignedEndpoint(env, "HIS_ADAPTER_URL", ["HIS_ADAPTER_SECRET", "HOSPITAL_ADAPTER_SECRET"])
-        && configuredSignedEndpoint(env, "APPOINTMENT_ADAPTER_URL", ["APPOINTMENT_ADAPTER_SECRET", "HOSPITAL_ADAPTER_SECRET"]),
-      env.HIS_ADAPTER_URL && env.APPOINTMENT_ADAPTER_URL ? "endpoints supplied" : "missing",
+        && configuredSignedEndpoint(env, "APPOINTMENT_ADAPTER_URL", ["APPOINTMENT_ADAPTER_SECRET", "HOSPITAL_ADAPTER_SECRET"])
+        && probesReady("his", "appointment"),
+      env.HIS_ADAPTER_URL && env.APPOINTMENT_ADAPTER_URL ? probeDetail("his", "appointment") : "missing",
       "医院信息科",
       "configure HTTPS HIS and appointment endpoints with signing secrets"
     ),
@@ -226,8 +264,9 @@ function buildEnvironmentChecks(env) {
       "runtime:object-storage",
       "clinical evidence object storage",
       httpsUrl(env.OBJECT_STORAGE_GATEWAY_URL) && Boolean(env.OBJECT_STORAGE_BUCKET)
-        && secretReady(env.OBJECT_STORAGE_SIGNING_SECRET),
-      env.OBJECT_STORAGE_GATEWAY_URL ? "gateway supplied" : "missing",
+        && secretReady(env.OBJECT_STORAGE_SIGNING_SECRET)
+        && probesReady("object-storage"),
+      env.OBJECT_STORAGE_GATEWAY_URL ? probeDetail("object-storage") : "missing",
       "存储运维",
       "configure HTTPS object storage, bucket, signing secret, retention and malware scan"
     ),
@@ -238,16 +277,22 @@ function buildEnvironmentChecks(env) {
         ["PAYMENT_GATEWAY_URL", "PAYMENT_GATEWAY_SECRET", "PAYMENT_CALLBACK_SECRET"],
         ["INSURANCE_GATEWAY_URL", "INSURANCE_GATEWAY_SECRET", "INSURANCE_CALLBACK_SECRET"],
         ["CERTIFICATE_GATEWAY_URL", "CERTIFICATE_GATEWAY_SECRET", "CERTIFICATE_CALLBACK_SECRET"]
-      ].every(([url, secret, callback]) => httpsUrl(env[url]) && secretReady(env[secret]) && secretReady(env[callback])),
-      env.PAYMENT_GATEWAY_URL && env.INSURANCE_GATEWAY_URL && env.CERTIFICATE_GATEWAY_URL ? "endpoints supplied" : "missing",
+      ].every(([url, secret, callback]) => httpsUrl(env[url]) && secretReady(env[secret]) && secretReady(env[callback]))
+        && probesReady("payment", "insurance", "certificate"),
+      env.PAYMENT_GATEWAY_URL && env.INSURANCE_GATEWAY_URL && env.CERTIFICATE_GATEWAY_URL
+        ? probeDetail("payment", "insurance", "certificate")
+        : "missing",
       "财务/医保/签章责任方",
       "configure signed HTTPS payment, insurance and certificate gateways and callbacks"
     ),
     check(
       "runtime:audit",
       "audit retention and SIEM",
-      Boolean(env.AUDIT_EXPORT_PATH || httpsUrl(env.SIEM_ENDPOINT)),
-      env.AUDIT_EXPORT_PATH || env.SIEM_ENDPOINT ? "target supplied" : "missing",
+      Boolean(
+        (productionValueReady(env.AUDIT_EXPORT_PATH) && env.AUDIT_EXPORT_PATH)
+        || httpsUrl(env.SIEM_ENDPOINT)
+      ) && probesReady("audit"),
+      env.AUDIT_EXPORT_PATH || env.SIEM_ENDPOINT ? probeDetail("audit") : "missing",
       "安全运维",
       "configure immutable audit export or HTTPS SIEM endpoint"
     ),
@@ -257,8 +302,9 @@ function buildEnvironmentChecks(env) {
       enabled(env.CARE_OUTBOX_WORKER_ENABLED)
         && Boolean(String(env.CARE_OUTBOX_WORKER_ID || "").trim())
         && runtimeModuleReady
-        && !/replace-with|placeholder|example/i.test(runtimeModuleValue),
-      enabled(env.CARE_OUTBOX_WORKER_ENABLED) ? "enabled" : "disabled",
+        && !/replace-with|placeholder|example/i.test(runtimeModuleValue)
+        && probesReady("outbox-worker"),
+      enabled(env.CARE_OUTBOX_WORKER_ENABLED) ? probeDetail("outbox-worker") : "disabled",
       "平台运维",
       "deploy the care-service outbox worker with a stable worker identity, T00 runtime module and health scrape"
     ),
@@ -266,10 +312,23 @@ function buildEnvironmentChecks(env) {
       "runtime:care-delivery",
       "signed nursing and escort delivery endpoints",
       configuredSignedEndpoint(env, "CARE_NURSING_DELIVERY_URL", ["CARE_NURSING_DELIVERY_SECRET", "CARE_OUTBOX_DELIVERY_SECRET"])
-        && configuredSignedEndpoint(env, "CARE_ESCORT_DELIVERY_URL", ["CARE_ESCORT_DELIVERY_SECRET", "CARE_OUTBOX_DELIVERY_SECRET"]),
-      env.CARE_NURSING_DELIVERY_URL && env.CARE_ESCORT_DELIVERY_URL ? "endpoints supplied" : "missing",
+        && configuredSignedEndpoint(env, "CARE_ESCORT_DELIVERY_URL", ["CARE_ESCORT_DELIVERY_SECRET", "CARE_OUTBOX_DELIVERY_SECRET"])
+        && probesReady("nursing-delivery", "escort-delivery"),
+      env.CARE_NURSING_DELIVERY_URL && env.CARE_ESCORT_DELIVERY_URL
+        ? probeDetail("nursing-delivery", "escort-delivery")
+        : "missing",
       "平台接口运维",
       "configure both signed HTTPS care-service delivery endpoints and managed secrets"
+    ),
+    check(
+      "runtime:dependency-evidence",
+      "fresh production dependency evidence manifest",
+      dependencyEvidence.ok,
+      dependencyEvidence.ok
+        ? `${dependencyEvidence.healthyDependencies.length} target-bound probes verified`
+        : dependencyEvidence.errors.map((error) => error.code).join(", "),
+      "平台运维/接口责任方",
+      "run approved production probes, archive independent receipts, and pin the exact dependency evidence manifest SHA-256"
     )
   ];
 }
@@ -323,6 +382,12 @@ function buildCareServiceProductionReadiness(options = {}) {
     cutoverEvidenceTest: readText("test/care-service-cutover-evidence.test.js"),
     cutoverEnv: readText("deploy/care-service-cutover.env.template"),
     cutoverTemplate: readText("deploy/care-service-cutover-evidence.template.json"),
+    dependencyEvidence: readText("care-service-dependency-evidence.js"),
+    dependencyEvidenceTest: readText("test/care-service-dependency-evidence.test.js"),
+    dependencyTargets: readText("scripts/care-service-dependency-targets.js"),
+    dependencyTargetsTest: readText("test/care-service-dependency-targets.test.js"),
+    dependencyEvidenceEnv: readText("deploy/care-service-dependency-evidence.env.template"),
+    dependencyEvidenceTemplate: readText("deploy/care-service-dependency-evidence.template.json"),
     runtimeTest: readText("test/care-service-runtime.test.js"),
     platformAdapterTest: readText("test/care-service-platform-adapter.test.js"),
     workerTest: readText("test/care-service-outbox-worker.test.js"),
@@ -330,7 +395,13 @@ function buildCareServiceProductionReadiness(options = {}) {
     escortTest: readText("test/escort-service.test.js")
   };
   const codeChecks = buildCodeChecks(sources);
-  const environmentChecks = buildEnvironmentChecks(env);
+  const dependencyEvidence = DependencyEvidence.loadDependencyEvidence(env, {
+    root: ROOT,
+    at: options.at || new Date().toISOString(),
+    policyVersion: Runtime.RUNTIME_POLICY_VERSION,
+    maximumAgeMinutes: Number(env.CARE_DEPENDENCY_PROBE_MAX_AGE_MINUTES || 15)
+  });
+  const environmentChecks = buildEnvironmentChecks(env, dependencyEvidence);
   const platformWired = (
     /createCareServicePlatformAdapter/.test(sources.server || "")
     && /createCareServiceRuntimeDependencies/.test(sources.server || "")
@@ -410,6 +481,7 @@ function buildCareServiceProductionReadiness(options = {}) {
     checks,
     blockers,
     outboxHealth,
+    dependencyEvidence,
     cutoverEvidence,
     boundary: "A production-ready result requires real production configuration, healthy delivery state and a deployment-pinned manifest of current independent site approvals. Demo values or standalone signed flags must not be used to satisfy cutover."
   };
@@ -446,6 +518,13 @@ function renderMarkdown(report) {
     `- Stale leases: ${report.outboxHealth.summary.staleLeases}`,
     `- Overdue: ${report.outboxHealth.summary.overdue}`,
     `- Integrity failures: ${report.outboxHealth.summary.integrityFailures}`,
+    "",
+    "## Production dependency evidence",
+    "",
+    `- Manifest valid: ${report.dependencyEvidence.ok ? "YES" : "NO"}`,
+    `- Release ID: ${report.dependencyEvidence.releaseId || "missing"}`,
+    `- Healthy dependencies: ${report.dependencyEvidence.healthyDependencies.join(", ") || "none"}`,
+    `- Validation errors: ${report.dependencyEvidence.errors.map((item) => item.code).join(", ") || "none"}`,
     "",
     "## Cutover evidence",
     "",
