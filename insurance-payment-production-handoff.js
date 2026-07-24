@@ -55,20 +55,60 @@ function requireActorRole(actor, allowedRoles, code) {
   return identity;
 }
 
+function handoffItemProjection(item = {}) {
+  return {
+    id: item.id,
+    scope: item.scope,
+    owner: item.owner,
+    requirement: item.requirement,
+    requirementDigest: item.requirementDigest,
+    required: item.required,
+    state: item.state,
+    evidence: item.evidence,
+    verification: item.verification
+  };
+}
+
 function appendEvent(item, event) {
   item.events ||= [];
   const previousHash = item.events.length ? item.events[item.events.length - 1].eventHash : "GENESIS";
-  const base = { ...event, sequence: item.events.length + 1, previousHash };
+  const base = { ...event, projectionDigest: `sha256:${digest(handoffItemProjection(item))}`, sequence: item.events.length + 1, previousHash };
   const sealed = Object.freeze({ ...base, eventHash: digest(base) });
   item.events.push(sealed);
   return sealed;
 }
 
-function verifyItemLedger(events = []) {
+function verifyItemEventLedger(events = []) {
+  const transitionRules = {
+    "requirement-created": { from: ["NONE"], to: [HANDOFF_STATES.PENDING] },
+    "requirement-reactivated": { from: Object.values(HANDOFF_STATES), to: [HANDOFF_STATES.PENDING] },
+    "requirement-changed": { from: Object.values(HANDOFF_STATES), to: [HANDOFF_STATES.PENDING] },
+    "requirement-retired": { from: Object.values(HANDOFF_STATES), sameState: true },
+    "evidence-submitted": { from: [HANDOFF_STATES.PENDING, HANDOFF_STATES.REJECTED], to: [HANDOFF_STATES.SUBMITTED] },
+    "evidence-verified": { from: [HANDOFF_STATES.SUBMITTED], to: [HANDOFF_STATES.VERIFIED] },
+    "evidence-rejected": { from: [HANDOFF_STATES.SUBMITTED], to: [HANDOFF_STATES.REJECTED] }
+  };
   return events.length > 0 && events.every((event, index) => {
     const { eventHash, ...base } = event;
-    return base.sequence === index + 1 && base.previousHash === (index ? events[index - 1].eventHash : "GENESIS") && eventHash === digest(base);
+    const rule = transitionRules[event.action];
+    const previous = events[index - 1];
+    const transitionValid = rule
+      && rule.from.includes(event.from)
+      && (rule.sameState ? event.to === event.from : rule.to.includes(event.to))
+      && (index === 0 ? event.action === "requirement-created" : previous.to === event.from);
+    return base.sequence === index + 1
+      && base.previousHash === (index ? previous.eventHash : "GENESIS")
+      && eventHash === digest(base)
+      && /^sha256:[a-f0-9]{64}$/.test(String(event.projectionDigest || ""))
+      && transitionValid;
   });
+}
+
+function verifyItemLedger(itemOrEvents = []) {
+  if (Array.isArray(itemOrEvents)) return verifyItemEventLedger(itemOrEvents);
+  const item = itemOrEvents;
+  if (!item || !verifyItemEventLedger(item.events || [])) return false;
+  return item.events.at(-1).projectionDigest === `sha256:${digest(handoffItemProjection(item))}`;
 }
 
 function requirementsFromAcceptance(acceptance = {}) {
@@ -117,6 +157,13 @@ function ensureProductionHandoff(data = {}, acceptance = {}, at = new Date().toI
       appendEvent(item, { action: "requirement-created", from: "NONE", to: HANDOFF_STATES.PENDING, actor: "system:t07-handoff-model", at, detail: { requirementDigest: item.requirementDigest } });
       continue;
     }
+    if (!verifyItemLedger(item)) continue;
+    if (item.required === false) {
+      const before = item.state;
+      Object.assign(item, requirement, { required: true, state: HANDOFF_STATES.PENDING, evidence: null, verification: null });
+      appendEvent(item, { action: "requirement-reactivated", from: before, to: HANDOFF_STATES.PENDING, actor: "system:t07-handoff-model", at, detail: { requirementDigest: item.requirementDigest } });
+      continue;
+    }
     item.required = true;
     if (item.requirementDigest !== requirement.requirementDigest) {
       const before = item.state;
@@ -127,6 +174,7 @@ function ensureProductionHandoff(data = {}, acceptance = {}, at = new Date().toI
 
   for (const item of state.items) {
     if (activeIds.has(item.id) || item.required === false) continue;
+    if (!verifyItemLedger(item)) continue;
     const before = item.state;
     item.required = false;
     appendEvent(item, { action: "requirement-retired", from: before, to: before, actor: "system:t07-handoff-model", at, detail: { requirementDigest: item.requirementDigest } });
@@ -138,9 +186,11 @@ function ensureProductionHandoff(data = {}, acceptance = {}, at = new Date().toI
 
 function requiredItem(data, acceptance, itemId, at) {
   const state = ensureProductionHandoff(data, acceptance, at);
-  const item = state.items.find((candidate) => candidate.id === safeText(itemId, 240) && candidate.required);
-  if (!item) throw new ProductionHandoffError("生产交接要求不存在或已停用", "HANDOFF_REQUIREMENT_NOT_FOUND", 404);
-  if (!verifyItemLedger(item.events)) throw new ProductionHandoffError("生产交接事件账本校验失败", "HANDOFF_LEDGER_INVALID");
+  const normalizedItemId = safeText(itemId, 240);
+  const activeIds = new Set(requirementsFromAcceptance(acceptance).map((item) => item.id));
+  const item = state.items.find((candidate) => candidate.id === normalizedItemId);
+  if (!item || !activeIds.has(normalizedItemId)) throw new ProductionHandoffError("生产交接要求不存在或已停用", "HANDOFF_REQUIREMENT_NOT_FOUND", 404);
+  if (!verifyItemLedger(item)) throw new ProductionHandoffError("生产交接事件账本或状态投影校验失败", "HANDOFF_LEDGER_INVALID");
   return item;
 }
 
@@ -207,8 +257,9 @@ function verifyHandoffEvidence(data, acceptance, itemId, input = {}, actor = {})
 
 function buildProductionHandoffStatus(data = {}, acceptance = {}) {
   const state = ensureProductionHandoff(data, acceptance);
-  const required = state.items.filter((item) => item.required);
-  const ledgerValid = required.every((item) => verifyItemLedger(item.events));
+  const activeIds = new Set(requirementsFromAcceptance(acceptance).map((item) => item.id));
+  const required = state.items.filter((item) => activeIds.has(item.id));
+  const ledgerValid = state.items.every((item) => verifyItemLedger(item));
   const counts = Object.fromEntries(Object.keys(HANDOFF_STATES).map((stateName) => [stateName.toLowerCase(), required.filter((item) => item.state === stateName).length]));
   const evidenceComplete = required.length > 0 && required.every((item) => item.state === HANDOFF_STATES.VERIFIED);
   return {
@@ -219,7 +270,7 @@ function buildProductionHandoffStatus(data = {}, acceptance = {}) {
     productionReady: acceptance.productionReady === true && evidenceComplete && ledgerValid,
     ledgerValid,
     summary: { required: required.length, ...counts },
-    items: required.map((item) => ({ id: item.id, scope: item.scope, owner: item.owner, reviewerRole: item.requirement?.reviewerRole || "", state: item.state, requirementDigest: item.requirementDigest, evidenceDigest: item.evidence?.evidenceDigest || "", evidenceRecordDigest: item.evidence?.recordDigest || "", verificationDigest: item.verification?.recordDigest || "", ledgerValid: verifyItemLedger(item.events) })),
+    items: required.map((item) => ({ id: item.id, scope: item.scope, owner: item.owner, reviewerRole: item.requirement?.reviewerRole || "", state: item.state, requirementDigest: item.requirementDigest, evidenceDigest: item.evidence?.evidenceDigest || "", evidenceRecordDigest: item.evidence?.recordDigest || "", verificationDigest: item.verification?.recordDigest || "", ledgerValid: verifyItemLedger(item) })),
     boundary: "Verified handoff evidence closes documentary requirements only; productionReady also requires the acceptance report to confirm real public wiring and live-environment acceptance."
   };
 }
@@ -232,6 +283,7 @@ module.exports = {
   buildProductionHandoffStatus,
   digest,
   ensureProductionHandoff,
+  handoffItemProjection,
   requirementsFromAcceptance,
   stableStringify,
   submitHandoffEvidence,

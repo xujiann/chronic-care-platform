@@ -85,3 +85,69 @@ test("changed requirements invalidate previously verified evidence", () => {
   assert.equal(item.events.at(-1).action, "requirement-changed");
   assert.equal(Handoff.verifyItemLedger(item.events), true);
 });
+
+test("production handoff blocks direct state evidence and verification projection tampering", () => {
+  const acceptance = buildInsurancePaymentAcceptance();
+  const route = acceptance.integrationHandoff.routes.find((item) => !item.wired);
+  const itemId = `route:${route.id}`;
+  const buildVerified = () => {
+    const data = {};
+    Handoff.submitHandoffEvidence(data, acceptance, itemId, evidenceInput(), { username: "t00-integrator", role: "integration-owner" });
+    Handoff.verifyHandoffEvidence(data, acceptance, itemId, { approved: true, verificationReference: "REVIEW-001", verifiedAt: "2026-07-22T10:00:00.000Z", idempotencyKey: "verify-001" }, { username: "acceptance-lead", role: "acceptance-reviewer" });
+    return data;
+  };
+
+  const stateTampered = buildVerified();
+  const stateItem = stateTampered.insurancePaymentProductionHandoff.items.find((item) => item.id === itemId);
+  stateItem.state = Handoff.HANDOFF_STATES.PENDING;
+  assert.equal(Handoff.verifyItemLedger(stateItem.events), true);
+  assert.equal(Handoff.verifyItemLedger(stateItem), false);
+  assert.equal(Handoff.buildProductionHandoffStatus(stateTampered, acceptance).ledgerValid, false);
+  assert.throws(
+    () => Handoff.submitHandoffEvidence(stateTampered, acceptance, itemId, evidenceInput({ idempotencyKey: "tampered-state-submit" }), { username: "t00-integrator", role: "integration-owner" }),
+    (error) => error.code === "HANDOFF_LEDGER_INVALID"
+  );
+
+  const requiredTampered = buildVerified();
+  const requiredItem = requiredTampered.insurancePaymentProductionHandoff.items.find((item) => item.id === itemId);
+  requiredItem.required = false;
+  const requiredStatus = Handoff.buildProductionHandoffStatus(requiredTampered, acceptance);
+  assert.equal(requiredStatus.ledgerValid, false);
+  assert.equal(requiredStatus.summary.required, acceptance.summary.t00RoutesPending + acceptance.summary.externalBlockers);
+  assert.equal(requiredItem.required, false);
+  assert.throws(
+    () => Handoff.submitHandoffEvidence(requiredTampered, acceptance, itemId, evidenceInput({ idempotencyKey: "tampered-required-submit" }), { username: "t00-integrator", role: "integration-owner" }),
+    (error) => error.code === "HANDOFF_LEDGER_INVALID"
+  );
+
+  const evidenceTampered = buildVerified();
+  const evidenceItem = evidenceTampered.insurancePaymentProductionHandoff.items.find((item) => item.id === itemId);
+  evidenceItem.evidence.evidenceDigest = `sha256:${"f".repeat(64)}`;
+  assert.equal(Handoff.verifyItemLedger(evidenceItem), false);
+
+  const verificationTampered = buildVerified();
+  const verificationItem = verificationTampered.insurancePaymentProductionHandoff.items.find((item) => item.id === itemId);
+  verificationItem.verification.verifiedBy = "forged-reviewer";
+  assert.equal(Handoff.verifyItemLedger(verificationItem), false);
+});
+
+test("production handoff rejects a rehashed transition that skips evidence submission", () => {
+  const acceptance = buildInsurancePaymentAcceptance();
+  const data = {};
+  const state = Handoff.ensureProductionHandoff(data, acceptance, "2026-07-22T08:00:00.000Z");
+  const item = state.items.find((candidate) => candidate.required);
+  const previous = item.events.at(-1);
+  const forgedBase = {
+    action: "evidence-verified",
+    from: Handoff.HANDOFF_STATES.PENDING,
+    to: Handoff.HANDOFF_STATES.VERIFIED,
+    actor: "forged-reviewer",
+    at: "2026-07-22T09:00:00.000Z",
+    projectionDigest: previous.projectionDigest,
+    sequence: previous.sequence + 1,
+    previousHash: previous.eventHash
+  };
+  item.events.push({ ...forgedBase, eventHash: Handoff.digest(forgedBase) });
+  assert.equal(Handoff.verifyItemLedger(item.events), false);
+  assert.equal(Handoff.verifyItemLedger(item), false);
+});

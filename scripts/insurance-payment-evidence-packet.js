@@ -17,7 +17,8 @@ const EVIDENCE_FILES = Object.freeze([
   "insurance-payment-operating-model.js",
   "insurance-payment-production-handoff.js",
   "docs/t07-insurance-payment-t00-handoff.md",
-  "scripts/insurance-payment-acceptance.js"
+  "scripts/insurance-payment-acceptance.js",
+  "test/insurance-payment-production-handoff.test.js"
 ]);
 
 function stableStringify(value) {
