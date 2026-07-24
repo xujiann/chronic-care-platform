@@ -26,9 +26,35 @@ function seedDiseasePaymentState() {
     policy2: { id: "nhsa-drg-dip-2.0-2024", name: "DRG/DIP付费2.0版分组方案落地要求", publishedAt: "2024-07-23", source: "https://www.nhsa.gov.cn/art/2024/7/23/art_105_13316.html", switchDeadline: "2024-12-31", annualClearanceDeadline: "次年6月30日", settlementSlaWorkingDays: 30 },
     mode: "DRG",
     externalDependencies: [
-      { id: "official-grouper", name: "国家/地方正式分组器", status: "待联调", owner: "医保部门", requiredForProduction: true },
-      { id: "insurance-core", name: "医保核心结算与拨付", status: "待联调", owner: "医保中心", requiredForProduction: true },
-      { id: "medical-record-feed", name: "HIS/EMR/病案首页全量接口", status: "样例可用", owner: "医疗机构", requiredForProduction: true }
+      {
+        id: "official-grouper", name: "国家/地方正式分组器", status: "待联调", owner: "医保部门", requiredForProduction: true,
+        evidenceRequirements: [
+          { id: "connectivity", detail: "正式HTTPS/专线连通、双向身份认证和超时重试报告", reviewerRole: "security-reviewer" },
+          { id: "certificate-ownership", detail: "客户端凭据与正式回执签名证书归属、指纹及有效期核验", reviewerRole: "security-reviewer" },
+          { id: "trusted-callback", detail: "真实回调来源白名单、HMAC时间窗、防重放和逐病例签名验证记录", reviewerRole: "security-reviewer" },
+          { id: "result-consistency", detail: "正式分组结果、方案版本、病例摘要和支付测算逐项一致性对账", reviewerRole: "acceptance-reviewer" },
+          { id: "onsite-acceptance", detail: "医保正式分组器负责人和试点医院联合现场签字", reviewerRole: "acceptance-reviewer" }
+        ]
+      },
+      {
+        id: "insurance-core", name: "医保核心结算与拨付", status: "待联调", owner: "医保中心", requiredForProduction: true,
+        evidenceRequirements: [
+          { id: "settlement-callback", detail: "医保核心受理、退回补正和幂等回调字段映射联调记录", reviewerRole: "acceptance-reviewer" },
+          { id: "payment-callback", detail: "拨付成功、失败、重试上限和可信回执联调记录", reviewerRole: "finance-auditor" },
+          { id: "statement-reconciliation", detail: "月结/年清对账单传输、金额核对和差异闭环报告", reviewerRole: "finance-auditor" },
+          { id: "failure-drill", detail: "超时、重复、乱序、摘要不匹配和人工处置演练记录", reviewerRole: "security-reviewer" },
+          { id: "onsite-acceptance", detail: "医保经办、基金财务和医院财务联合现场签字", reviewerRole: "finance-auditor" }
+        ]
+      },
+      {
+        id: "medical-record-feed", name: "HIS/EMR/病案首页全量接口", status: "样例可用", owner: "医疗机构", requiredForProduction: true,
+        evidenceRequirements: [
+          { id: "field-mapping", detail: "结算清单、病案首页、诊断操作和费用明细全字段映射签字", reviewerRole: "acceptance-reviewer" },
+          { id: "volume-quality", detail: "全量数据性能、完整率、编码质量和错误补正验收报告", reviewerRole: "acceptance-reviewer" },
+          { id: "privacy-security", detail: "最小必要采集、传输加密、访问审计和隐私安全评估", reviewerRole: "security-reviewer" },
+          { id: "onsite-acceptance", detail: "试点医院信息科、病案室和医保办联合现场签字", reviewerRole: "acceptance-reviewer" }
+        ]
+      }
     ],
     schemeVersions: [
       { id: "drg-demo-2026", mode: "DRG", name: "DRG本地联调方案", nationalVersion: "国家版2.0", localVersion: "DL-DEMO-2026", status: "已发布", effectiveFrom: "2026-01-01", effectiveTo: "2026-12-31" },

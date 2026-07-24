@@ -12,6 +12,10 @@ test("T07 unified acceptance covers all six workflows without claiming productio
   assert.equal(report.summary.workflowsReady, 6);
   assert.ok(report.summary.t00RoutesPending > 0);
   assert.ok(report.externalBlockers.length > 0);
+  assert.equal(report.summary.externalBlockers, 20);
+  assert.equal(report.externalBlockers.filter((item) => item.source === "disease-payment").length, 14);
+  assert.ok(report.externalBlockers.some((item) => item.id === "official-grouper:trusted-callback" && item.reviewerRole === "security-reviewer"));
+  assert.ok(report.externalBlockers.some((item) => item.id === "insurance-core:statement-reconciliation" && item.reviewerRole === "finance-auditor"));
   assert.match(renderMarkdown(report), /在线支付退费 \| PASS/);
   assert.match(renderMarkdown(report), /年度清算 \| PASS/);
 });

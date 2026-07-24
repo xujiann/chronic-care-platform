@@ -81,12 +81,15 @@ function requirementsFromAcceptance(acceptance = {}) {
       owner: "T00",
       requirement: { id: route.id, method: route.method, path: route.path, handler: route.handler || route.handlers }
     })),
-    ...blockers.map((blocker) => ({
-      id: `external:${safeText(blocker.source, 80)}:${safeText(blocker.id, 120)}`,
-      scope: "external",
-      owner: safeText(blocker.source, 120) || "external-owner",
-      requirement: { source: blocker.source, id: blocker.id, detail: blocker.detail }
-    }))
+    ...blockers.map((blocker) => {
+      const reviewerRole = VERIFICATION_ROLES.includes(blocker.reviewerRole) ? blocker.reviewerRole : "";
+      return {
+        id: `external:${safeText(blocker.source, 80)}:${safeText(blocker.id, 120)}`,
+        scope: "external",
+        owner: safeText(blocker.owner || blocker.source, 120) || "external-owner",
+        requirement: { source: blocker.source, id: blocker.id, dependencyId: blocker.dependencyId, detail: blocker.detail, reviewerRole }
+      };
+    })
   ].map((item) => ({ ...item, requirementDigest: `sha256:${digest({ scope: item.scope, owner: item.owner, requirement: item.requirement })}` }));
 }
 
@@ -178,7 +181,8 @@ function submitHandoffEvidence(data, acceptance, itemId, input = {}, actor = {})
 function verifyHandoffEvidence(data, acceptance, itemId, input = {}, actor = {}) {
   const verifiedAt = input.verifiedAt || new Date().toISOString();
   const item = requiredItem(data, acceptance, itemId, verifiedAt);
-  const verifiedBy = requireActorRole(actor, VERIFICATION_ROLES, "HANDOFF_VERIFICATION_RESPONSIBILITY_DENIED");
+  const requiredReviewerRole = safeText(item.requirement?.reviewerRole, 80);
+  const verifiedBy = requireActorRole(actor, requiredReviewerRole ? [requiredReviewerRole] : VERIFICATION_ROLES, "HANDOFF_VERIFICATION_RESPONSIBILITY_DENIED");
   if (typeof input.approved !== "boolean") throw new ProductionHandoffError("核验结论不能为空", "HANDOFF_VERDICT_REQUIRED", 400);
   const verificationReference = safeText(input.verificationReference);
   const idempotencyKey = safeText(input.idempotencyKey, 160);
@@ -215,7 +219,7 @@ function buildProductionHandoffStatus(data = {}, acceptance = {}) {
     productionReady: acceptance.productionReady === true && evidenceComplete && ledgerValid,
     ledgerValid,
     summary: { required: required.length, ...counts },
-    items: required.map((item) => ({ id: item.id, scope: item.scope, owner: item.owner, state: item.state, requirementDigest: item.requirementDigest, evidenceDigest: item.evidence?.evidenceDigest || "", evidenceRecordDigest: item.evidence?.recordDigest || "", verificationDigest: item.verification?.recordDigest || "", ledgerValid: verifyItemLedger(item.events) })),
+    items: required.map((item) => ({ id: item.id, scope: item.scope, owner: item.owner, reviewerRole: item.requirement?.reviewerRole || "", state: item.state, requirementDigest: item.requirementDigest, evidenceDigest: item.evidence?.evidenceDigest || "", evidenceRecordDigest: item.evidence?.recordDigest || "", verificationDigest: item.verification?.recordDigest || "", ledgerValid: verifyItemLedger(item.events) })),
     boundary: "Verified handoff evidence closes documentary requirements only; productionReady also requires the acceptance report to confirm real public wiring and live-environment acceptance."
   };
 }

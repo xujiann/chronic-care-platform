@@ -56,6 +56,10 @@ test("production handoff supports rejection resubmission and detects ledger tamp
   const blocker = acceptance.externalBlockers[0];
   const itemId = `external:${blocker.source}:${blocker.id}`;
   Handoff.submitHandoffEvidence(data, acceptance, itemId, evidenceInput({ idempotencyKey: "external-v1" }), { username: "provider-owner", role: "external-owner" });
+  assert.throws(
+    () => Handoff.verifyHandoffEvidence(data, acceptance, itemId, { approved: true, verificationReference: "WRONG-REVIEW-001", idempotencyKey: "wrong-review-v1" }, { username: "acceptance-reviewer", role: "acceptance-reviewer" }),
+    (error) => error.code === "HANDOFF_VERIFICATION_RESPONSIBILITY_DENIED"
+  );
   Handoff.verifyHandoffEvidence(data, acceptance, itemId, { approved: false, reasonCode: "SIGNATURE_INVALID", verificationReference: "SEC-REVIEW-001", verifiedAt: "2026-07-22T10:00:00.000Z", idempotencyKey: "reject-v1" }, { username: "security-reviewer", role: "security-reviewer" });
   const resubmitted = Handoff.submitHandoffEvidence(data, acceptance, itemId, evidenceInput({ evidenceDigest: `sha256:${"b".repeat(64)}`, evidenceReference: "PROVIDER-RECEIPT-002", idempotencyKey: "external-v2" }), { username: "provider-owner", role: "external-owner" });
   assert.equal(resubmitted.item.state, Handoff.HANDOFF_STATES.SUBMITTED);

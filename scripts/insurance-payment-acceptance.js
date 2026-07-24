@@ -17,6 +17,22 @@ function capabilityById(report, id) {
   return report.capabilities.find((item) => item.id === id)?.passed === true;
 }
 
+function diseasePaymentExternalEvidence(blockers = []) {
+  return blockers.flatMap((item) => {
+    const requirements = Array.isArray(item.evidenceRequirements) && item.evidenceRequirements.length
+      ? item.evidenceRequirements
+      : [{ id: "acceptance", detail: item.name, reviewerRole: "acceptance-reviewer" }];
+    return requirements.map((requirement) => ({
+      source: "disease-payment",
+      id: `${item.id}:${requirement.id}`,
+      dependencyId: item.id,
+      detail: requirement.detail,
+      owner: item.owner,
+      reviewerRole: requirement.reviewerRole
+    }));
+  });
+}
+
 function buildInsurancePaymentAcceptance(options = {}) {
   const diseasePayment = options.diseasePayment || buildDiseasePaymentReadiness();
   const financialGateway = options.financialGateway || buildFinancialGatewayReadiness();
@@ -32,16 +48,17 @@ function buildInsurancePaymentAcceptance(options = {}) {
     { id: "annual-clearance", label: "年度清算", ready: checkById(diseasePayment, "annual-clearance") && checkById(diseasePayment, "annual-clearance-institution-confirmation"), evidence: ["per-institution-confirmation", "institution-bound-dispute", "aggregate-confirmation-digest", "adjustment-fund", "retained-balance", "risk-reserve", "finance-posting", "locked-ledger", "clearance-state-projection"] }
   ];
   const localReady = diseasePayment.ready && financialGateway.ok && operatingModel.ok && workflows.every((item) => item.ready);
+  const externalBlockers = [...diseasePaymentExternalEvidence(diseasePayment.externalBlockers), ...financialGateway.blockers.map((detail, index) => ({ source: "financial-gateway", id: `financial-${index + 1}`, detail }))];
   return {
     generatedAt: new Date().toISOString(),
     status: localReady ? "domain-ready-public-wiring-and-site-acceptance-pending" : "domain-incomplete",
     localReady,
     productionReady: false,
-    summary: { workflows: workflows.length, workflowsReady: workflows.filter((item) => item.ready).length, t00RoutesPending: integrationHandoff.pending, externalBlockers: diseasePayment.externalBlockers.length + financialGateway.blockers.length },
+    summary: { workflows: workflows.length, workflowsReady: workflows.filter((item) => item.ready).length, t00RoutesPending: integrationHandoff.pending, externalBlockers: externalBlockers.length },
     workflows,
     operatingModel,
     integrationHandoff,
-    externalBlockers: [...diseasePayment.externalBlockers.map((item) => ({ source: "disease-payment", id: item.id, detail: item.name })), ...financialGateway.blockers.map((detail, index) => ({ source: "financial-gateway", id: `financial-${index + 1}`, detail }))]
+    externalBlockers
   };
 }
 
@@ -68,4 +85,4 @@ if (require.main === module) {
   if (!report.localReady) process.exitCode = 1;
 }
 
-module.exports = { buildInsurancePaymentAcceptance, renderMarkdown };
+module.exports = { buildInsurancePaymentAcceptance, diseasePaymentExternalEvidence, renderMarkdown };
