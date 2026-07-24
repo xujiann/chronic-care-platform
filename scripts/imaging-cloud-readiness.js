@@ -41,7 +41,9 @@ function buildImagingCloudReadinessReport(options = {}) {
     production: read("imaging-cloud-production.js"),
     governance: read("imaging-cloud-governance.js"),
     solutionA: read("solution-a-connectors.js"),
-    solutionAAcceptance: read("scripts/solution-a-acceptance.js")
+    solutionAAcceptance: read("scripts/solution-a-acceptance.js"),
+    deploymentReadiness: read("scripts/imaging-cloud-deployment-readiness.js"),
+    deploymentTemplate: read("deploy/solution-a/imaging-cloud.production.env.template")
   };
   const productionCenter = ImagingCloudProduction.center({});
   const standaloneSmoke = ImagingCloudProduction.runStandaloneSmoke({});
@@ -70,8 +72,10 @@ function buildImagingCloudReadinessReport(options = {}) {
     check("ui:production-operations", ["data-production-action=\"endpoint\"", "data-production-action=\"synthetic\"", "data-production-action=\"requirement\"", "data-production-action=\"drill\"", "data-production-action=\"approval\"", "静态预览不写入生产证据"].every((marker)=>sources.pageJs.includes(marker)), "endpoint, synthetic, evidence, drill and approval operations are available while static preview stays read-only", "ui"),
     check("production:standalone-smoke", standaloneSmoke.codeReady && standaloneSmoke.releaseDecision === "no-go" && standaloneSmoke.checks.some((item) => item.id === "rollback-gate" && item.passed), "standalone module smoke verifies rollback controls while incomplete site evidence remains No-Go", "release"),
     check("production:route-contract", ImagingCloudProduction.ROUTE_CONTRACTS.length === 9 && ImagingCloudProduction.ROUTE_CONTRACTS.every((item)=>item.roles?.length && item.handler?.startsWith("ImagingCloudProduction.")) && sources.docs.includes("/api/imaging-cloud/production-center"), "nine role-guarded production route contracts are documented", "integration"),
+    check("production:deployment-contract", ["IMAGING_FHIR_BASE_URL", "IMAGING_DICOMWEB_BASE_URL", "IMAGING_OHIF_BASE_URL", "IMAGING_PACS_DICOM_TLS_CERT_SHA256", "IMAGING_OBJECT_STORAGE_REGION", "IMAGING_AUDIT_RETENTION_DAYS"].every((marker) => sources.deploymentReadiness.includes(marker) && sources.deploymentTemplate.includes(marker)) && sources.docs.includes("imaging-cloud-deployment-readiness.js"), "independent deployment contract validates TLS endpoints, DICOM TLS, in-province storage and audit retention without reading secret values", "production"),
     check("governance:recognition-catalog", ["imagingRecognitionCatalog", "imagingRecognitionNegativeRules", "quality-not-qualified", "dicom-incomplete"].every((marker) => sources.governance.includes(marker)) && sources.server.includes("Recognition Review Required"), "catalog, negative rules and DICOM/quality checks govern imaging mutual recognition", "governance"),
-    check("governance:performance", ["imagingPerformanceEvents", "firstFrameMs", "seriesLoadMs", "networkClass", "viewportClass"].every((marker) => sources.governance.includes(marker)) && sources.server.includes("/api/imaging-cloud/studies/:id/performance") && sources.pageJs.includes("recordImagingPerformance"), "minimized mobile performance sampling is role-scoped and visible in the imaging workbench", "governance")
+    check("governance:performance", ["imagingPerformanceEvents", "firstFrameMs", "seriesLoadMs", "networkClass", "viewportClass"].every((marker) => sources.governance.includes(marker)) && sources.server.includes("/api/imaging-cloud/studies/:id/performance") && sources.pageJs.includes("recordImagingPerformance"), "minimized mobile performance sampling is role-scoped and visible in the imaging workbench", "governance"),
+    check("governance:catalog-operations", sources.server.includes("/api/imaging-cloud/governance/catalog/:id/actions") && sources.pageJs.includes("updateRecognitionCatalog") && sources.pageJs.includes("data-imaging-catalog-action"), "commission users can activate or suspend catalog items with policy evidence", "governance")
   ];
   const codeReady = checks.every((item) => item.passed);
   return {
@@ -95,6 +99,8 @@ function buildImagingCloudReadinessReport(options = {}) {
       doc: IMAGE_CLOUD_DOC,
       productionService: "imaging-cloud-production.js",
       productionTest: "test/imaging-cloud-production.test.js",
+      deploymentReadiness: "scripts/imaging-cloud-deployment-readiness.js",
+      deploymentTemplate: "deploy/solution-a/imaging-cloud.production.env.template",
       report: "release/imaging-cloud-readiness-report.md"
     },
     siteBlockers: productionCenter.requirements,

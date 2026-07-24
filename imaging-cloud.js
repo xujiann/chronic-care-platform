@@ -418,6 +418,7 @@ function renderGovernance(governance = {}) {
   const tableTarget = document.querySelector("#imaging-governance-table");
   const catalog = governance.recognitionCatalog || [];
   const assessments = governance.recognitionAssessment || [];
+  const ranking = governance.operations?.institutionRanking || [];
   const performance = governance.performance || {};
   if (summaryTarget) {
     summaryTarget.innerHTML = [
@@ -436,8 +437,39 @@ function renderGovernance(governance = {}) {
         <td><span class="badge ${item.eligible ? "ok" : "warn"}">${escapeHtml(item.decision)}</span></td>
         <td>${escapeHtml((item.negativeRules || []).map((rule) => rule.title).join("；") || "无")}</td>
       </tr>`).join("") || `<tr><td colspan="4">当前筛选范围暂无可评估检查。</td></tr>`}</tbody>
-    </table>`;
+    </table>
+    <h3>机构接入与质量排名</h3>
+    <table>
+      <thead><tr><th>机构</th><th>入云检查</th><th>诊断级</th><th>质控通过</th><th>互认</th></tr></thead>
+      <tbody>${ranking.map((item) => `<tr>
+        <td><strong>${escapeHtml(item.institutionName)}</strong><br><small>${escapeHtml(item.institutionCode)}</small></td>
+        <td>${escapeHtml(item.studies)}</td>
+        <td>${escapeHtml(item.diagnosticLevel)} · ${escapeHtml(item.diagnosticLevelRate)}%</td>
+        <td>${escapeHtml(item.qualityPassed)} · ${escapeHtml(item.qualityPassRate)}%</td>
+        <td>${escapeHtml(item.recognized)} 已互认 / ${escapeHtml(item.pendingRecognition)} 待复核</td>
+      </tr>`).join("") || `<tr><td colspan="5">暂无机构统计。</td></tr>`}</tbody>
+    </table>
+    ${renderRecognitionCatalogActions(catalog)}`;
   }
+}
+
+function renderRecognitionCatalogActions(catalog = []) {
+  if (window.HealthCityAuth?.getUser?.()?.role !== "commission") return "";
+  return `<details class="production-operations">
+    <summary>互认目录治理</summary>
+    <div class="table-wrap"><table>
+      <thead><tr><th>目录项</th><th>时效/质控</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody>${catalog.map((item) => {
+        const nextStatus = item.status === "active" ? "suspended" : "active";
+        return `<tr>
+          <td><strong>${escapeHtml(item.modality)} · ${escapeHtml(item.bodyPart)}</strong><br><small>${escapeHtml(item.id)}</small></td>
+          <td>${escapeHtml(item.validDays)} 天 · ${escapeHtml(item.qualityRule)}</td>
+          <td><span class="badge ${item.status === "active" ? "ok" : "warn"}">${escapeHtml(item.status)}</span><br><small>${escapeHtml(item.policyVersion)}</small></td>
+          <td><button class="inline-action" type="button" data-imaging-catalog-action="${escapeHtml(item.id)}" data-imaging-catalog-status="${nextStatus}">${nextStatus === "active" ? "启用" : "暂停"}</button></td>
+        </tr>`;
+      }).join("") || `<tr><td colspan="4">暂无互认目录项。</td></tr>`}</tbody>
+    </table></div>
+  </details>`;
 }
 
 function renderMobileViewer(study, payload) {
@@ -451,7 +483,7 @@ function renderMobileViewer(study, payload) {
   }
   title.textContent = `${study.modality} ${study.bodyPart}`;
   subtitle.textContent = `${study.institutionName} · ${study.studyDate}`;
-  const share = (payload.shares || []).find((item) => item.studyId === study.id && item.status === "active");
+  const share = (payload.shares || []).find((item) => item.studyId === study.id && item.status === "active" && new Date(item.expiresAt).getTime() > Date.now());
   target.innerHTML = `
     <div class="dicom-stage">
       <div>
@@ -476,6 +508,7 @@ function renderMobileViewer(study, payload) {
     </div>
     <div class="share-box">
       <div><strong>分享状态</strong><br>${share ? `${escapeHtml(share.channel)} · ${escapeHtml(share.expiresAt)}` : "未生成有效分享，可按需创建二维码或短信链接。"}</div>
+      ${share ? `<button class="inline-action" type="button" data-revoke-imaging-share="${escapeHtml(share.id)}" data-share-study-id="${escapeHtml(study.id)}">撤销分享</button>` : ""}
       <button class="inline-action" type="button" data-record-imaging-performance="${escapeHtml(study.id)}">记录本次浏览性能</button>
     </div>`;
 }
@@ -538,6 +571,8 @@ async function handleImagingAction(event) {
   const appealRecognitionButton = event.target.closest("[data-appeal-recognition]");
   const reviewAppealButton = event.target.closest("[data-review-recognition-appeal]");
   const performanceButton = event.target.closest("[data-record-imaging-performance]");
+  const revokeShareButton = event.target.closest("[data-revoke-imaging-share]");
+  const catalogActionButton = event.target.closest("[data-imaging-catalog-action]");
   if (linkExternalButton) {
     await linkExternalStudy(linkExternalButton.dataset.linkExternalStudy);
     return;
@@ -575,9 +610,54 @@ async function handleImagingAction(event) {
     await reviewMutualRecognitionAppeal(reviewAppealButton.dataset.reviewRecognitionAppeal, reviewAppealButton.dataset.appealDecision);
     return;
   }
+  if (revokeShareButton) {
+    await revokeImagingShare(revokeShareButton.dataset.shareStudyId, revokeShareButton.dataset.revokeImagingShare);
+    return;
+  }
+  if (catalogActionButton) {
+    await updateRecognitionCatalog(catalogActionButton.dataset.imagingCatalogAction, catalogActionButton.dataset.imagingCatalogStatus);
+    return;
+  }
   if (performanceButton) {
     await recordImagingPerformance(performanceButton.dataset.recordImagingPerformance);
   }
+}
+
+async function updateRecognitionCatalog(catalogId, status) {
+  if (!IMAGING_API_BASE) { window.alert("静态预览不写入互认目录。\n"); return; }
+  const policyVersion = (window.prompt("请输入政策或目录版本", "2026.07") || "").trim();
+  const evidenceRef = (window.prompt("请输入已审定目录或政策证据引用") || "").trim();
+  if (!policyVersion || !evidenceRef) return;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  const response = await request(`${IMAGING_API_BASE}/imaging-cloud/governance/catalog/${encodeURIComponent(catalogId)}/actions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status, policyVersion, evidenceRef })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) { window.alert(payload.message || "更新互认目录失败"); return; }
+  await loadImagingCloud();
+  renderImagingCloud();
+}
+
+async function revokeImagingShare(studyId, shareId) {
+  if (!window.confirm("撤销后，该二维码或短信链接将立即失效。确认撤销？")) return;
+  if (!IMAGING_API_BASE) {
+    const share = (imagingState.payload.shares || []).find((item) => item.id === shareId && item.studyId === studyId);
+    if (share) Object.assign(share, { status: "revoked", revokedAt: new Date().toISOString(), revokeReason: "静态预览撤销" });
+    renderImagingCloud();
+    return;
+  }
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  const response = await request(`${IMAGING_API_BASE}/imaging-cloud/studies/${encodeURIComponent(studyId)}/shares/${encodeURIComponent(shareId)}/revoke`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason: "用户在影像云移动端主动撤销" })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) { window.alert(payload.message || "撤销分享失败"); return; }
+  await loadImagingCloud();
+  renderImagingCloud();
 }
 
 async function recordImagingPerformance(studyId) {

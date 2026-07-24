@@ -61,6 +61,27 @@ function positiveQuality(value) {
   return /通过|passed|qualified/i.test(String(value || ""));
 }
 
+function qualityPlanForStudy(data, study) {
+  return data.imagingQualityPlans.find((item) => item.status === "active" && item.modality === String(study?.modality || "").trim().toUpperCase()) || null;
+}
+
+function evaluateQualityReview(data, study, review = {}) {
+  ensure(data);
+  const plan = qualityPlanForStudy(data, study);
+  const scanScore = Number(review.scanScore);
+  const reportScore = Number(review.reportScore);
+  const requestedPass = positiveQuality(review.result || "质控通过");
+  const scorePresent = Number.isFinite(scanScore) && Number.isFinite(reportScore);
+  const scoresPass = !plan || !scorePresent || (scanScore >= Number(plan.scanPassScore) && reportScore >= Number(plan.reportPassScore));
+  const passed = requestedPass && scoresPass;
+  return {
+    plan,
+    passed,
+    result: passed ? "质控通过" : "质控不通过",
+    reason: passed ? "质量计划阈值满足" : plan && scorePresent ? `扫描评分或报告评分低于 ${plan.name} 阈值` : "提交结果标记为不通过"
+  };
+}
+
 function studyAgeDays(study, now = Date.now()) {
   const time = Date.parse(String(study?.studyDate || ""));
   return Number.isFinite(time) ? Math.max(0, (now - time) / 86_400_000) : Number.POSITIVE_INFINITY;
@@ -137,6 +158,23 @@ function recordPerformance(data, user, study, payload = {}) {
   return event;
 }
 
+function institutionRanking(studies = []) {
+  const rows = new Map();
+  studies.forEach((study) => {
+    const id = String(study.institutionCode || study.institutionName || "unknown");
+    const row = rows.get(id) || { institutionCode: id, institutionName: study.institutionName || id, studies: 0, diagnosticLevel: 0, qualityPassed: 0, recognized: 0, pendingRecognition: 0 };
+    row.studies += 1;
+    if (study.diagnosticLevel) row.diagnosticLevel += 1;
+    if (positiveQuality(study.qcStatus)) row.qualityPassed += 1;
+    if (/recognized|已互认/i.test(String(study.mutualRecognitionStatus || ""))) row.recognized += 1;
+    if (/pending|待/i.test(String(study.mutualRecognitionStatus || ""))) row.pendingRecognition += 1;
+    rows.set(id, row);
+  });
+  return [...rows.values()]
+    .map((row) => ({ ...row, qualityPassRate: row.studies ? Math.round((row.qualityPassed / row.studies) * 100) : 0, diagnosticLevelRate: row.studies ? Math.round((row.diagnosticLevel / row.studies) * 100) : 0 }))
+    .sort((left, right) => right.qualityPassRate - left.qualityPassRate || right.studies - left.studies || left.institutionCode.localeCompare(right.institutionCode));
+}
+
 function dashboard(data, studies = []) {
   ensure(data);
   const performance = data.imagingPerformanceEvents;
@@ -148,6 +186,7 @@ function dashboard(data, studies = []) {
     negativeRules: data.imagingRecognitionNegativeRules,
     qualityPlans: data.imagingQualityPlans,
     recognitionAssessment: studies.map((study) => ({ studyId: study.id, ...evaluateStudy(data, study) })),
+    operations: { institutionRanking: institutionRanking(studies) },
     performance: {
       targets: PERFORMANCE_LIMITS,
       samples,
@@ -159,4 +198,4 @@ function dashboard(data, studies = []) {
   };
 }
 
-module.exports = { PERFORMANCE_LIMITS, dashboard, ensure, evaluateStudy, recordPerformance, seed, updateCatalog };
+module.exports = { PERFORMANCE_LIMITS, dashboard, ensure, evaluateQualityReview, evaluateStudy, institutionRanking, recordPerformance, seed, updateCatalog };

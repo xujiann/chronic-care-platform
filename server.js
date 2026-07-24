@@ -34111,6 +34111,42 @@ async function handleApi(req, res) {
     return;
   }
 
+  const imagingShareRevokeMatch = url.pathname.match(/^\/api\/imaging-cloud\/studies\/([^/]+)\/shares\/([^/]+)\/revoke$/);
+  if (req.method === "POST" && imagingShareRevokeMatch) {
+    const user = requireApiRole(req, res, ["citizen", "institution", "commission"], "/api/imaging-cloud/studies/:id/shares/:shareId/revoke");
+    if (!user) return;
+    const data = readDatabase();
+    const studyId = decodeURIComponent(imagingShareRevokeMatch[1]);
+    const shareId = decodeURIComponent(imagingShareRevokeMatch[2]);
+    const study = (data.imageCloudStudies || []).find((item) => item.id === studyId);
+    const share = (data.imageCloudShares || []).find((item) => item.id === shareId && item.studyId === studyId);
+    if (!study || !share) {
+      sendJson(res, 404, { error: "Not Found", message: "影像检查或分享授权不存在" });
+      return;
+    }
+    if (!canAccessResident(user, study.residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "revoke imaging share", target: shareId, result: "denied", detail: "resident scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "无权撤销该居民影像分享" });
+      return;
+    }
+    if (share.status !== "active") {
+      sendJson(res, 409, { error: "Conflict", message: "该分享已失效或已撤销" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const reason = String(payload.reason || "居民或授权机构主动撤销分享").trim().slice(0, 200);
+    Object.assign(share, {
+      status: "revoked",
+      revokedAt: new Date().toISOString(),
+      revokedBy: user.username || user.role,
+      revokeReason: reason
+    });
+    appendDataAccessLog(data, user, study.residentId, "医学影像云", `撤销影像分享 ${study.accessionNumber} · ${share.channel} · ${reason}`);
+    writeDatabase(data);
+    sendJson(res, 200, { share });
+    return;
+  }
+
   const imagingQcMatch = url.pathname.match(/^\/api\/imaging-cloud\/studies\/([^/]+)\/qc$/);
   if (req.method === "POST" && imagingQcMatch) {
     const user = requireApiRole(req, res, ["commission", "institution"], "/api/imaging-cloud/studies/:id/qc");
@@ -34127,13 +34163,20 @@ async function handleApi(req, res) {
       id: `icq-${randomUUID()}`,
       studyId,
       group: String(payload.group || "影像云抽样质控").trim(),
-      scanScore: Number(payload.scanScore || 90),
-      reportScore: Number(payload.reportScore || 90),
+      scanScore: Number.isFinite(Number(payload.scanScore)) ? Number(payload.scanScore) : 90,
+      reportScore: Number.isFinite(Number(payload.reportScore)) ? Number(payload.reportScore) : 90,
       reviewer: user.name,
       result: String(payload.result || "质控通过").trim(),
       sampledAt: new Date().toISOString(),
       comment: String(payload.comment || "质控记录已回写影像云。").trim()
     };
+    const qualityAssessment = ImagingCloudGovernance.evaluateQualityReview(data, data.imageCloudStudies[index], review);
+    Object.assign(review, {
+      result: qualityAssessment.result,
+      qualityPlanId: qualityAssessment.plan?.id || "",
+      qualityPlanName: qualityAssessment.plan?.name || "未匹配专项计划",
+      qualityPlanReason: qualityAssessment.reason
+    });
     const updatedStudy = {
       ...data.imageCloudStudies[index],
       qcStatus: review.result,
@@ -34153,7 +34196,7 @@ async function handleApi(req, res) {
     data.imageCloudStudies[index] = updatedStudy;
     data.imageCloudQualityReviews = [review, ...(Array.isArray(data.imageCloudQualityReviews) ? data.imageCloudQualityReviews : [])].slice(0, 300);
     writeDatabase(data);
-    sendJson(res, 200, { study: data.imageCloudStudies[index], review, fhirReportSync });
+    sendJson(res, 200, { study: data.imageCloudStudies[index], review, qualityAssessment, fhirReportSync });
     return;
   }
 
