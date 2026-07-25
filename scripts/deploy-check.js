@@ -135,6 +135,8 @@ function buildDeployCheckReport(options = {}) {
   const envTemplateSource = fs.readFileSync(path.join(ROOT, ".env.example"), "utf8");
   const deploymentSource = fs.readFileSync(path.join(ROOT, "DEPLOYMENT.md"), "utf8");
   const publicHealthSource = fs.readFileSync(path.join(ROOT, "scripts", "public-health-readiness.js"), "utf8");
+  const publicHealthEndpointVerificationSource = fs.readFileSync(path.join(ROOT, "public-health-external-endpoint-verification-service.js"), "utf8");
+  const publicHealthEndpointVerificationDoc = fs.readFileSync(path.join(ROOT, "docs", "public-health-external-endpoint-verification.md"), "utf8");
   const imagingCloudSource = fs.readFileSync(path.join(ROOT, "imaging-cloud.js"), "utf8");
   const imagingCloudReadinessSource = fs.readFileSync(path.join(ROOT, "scripts", "imaging-cloud-readiness.js"), "utf8");
   const digitalHospitalStandardsSource = fs.readFileSync(path.join(ROOT, "scripts", "digital-hospital-standards-readiness.js"), "utf8");
@@ -256,6 +258,8 @@ function buildDeployCheckReport(options = {}) {
     assertFile("data/db.json"),
     assertFile("drug-consumable-about.html"),
     assertFile("server.js"),
+    assertFile("public-health-external-endpoint-verification-service.js"),
+    assertFile("docs/public-health-external-endpoint-verification.md"),
     assertFile("session-store.js"),
     assertFile("production-adapters.js"),
     assertFile("docs/production-identity-message-adapters.md"),
@@ -496,6 +500,35 @@ function buildDeployCheckReport(options = {}) {
     { name: "snapshot:chronicFollowupStatusPolicy", ok: Boolean(data.chronicFollowupStatusPolicy?.version && data.chronicFollowupStatusPolicy?.statusGroups?.open && data.chronicFollowupStatusPolicy?.requiredEvidence?.followup), detail: data.chronicFollowupStatusPolicy?.version || "missing" },
     { name: "snapshot:publicHealth", ok: (data.publicHealthStandards || []).length === 21 && (data.publicHealthInstitutionScopes || []).length >= 7 && (data.publicHealthEvents || []).length >= 6 && (data.publicHealthExchangeTasks || []).length >= 6 && (data.publicHealthExchangeRuns || []).length >= 6 && (data.publicHealthInstitutionTasks || []).length >= 7 && (data.publicHealthOnsiteAcceptances || []).length >= 6 && (data.publicHealthCutoverBlockers || []).length >= 6 && (data.publicHealthCutoverEvidencePackets || []).length >= 6 && (data.publicHealthCutoverDrills || []).length >= 4 && (data.publicHealthProductionHandoffs || []).length >= 6 && (data.publicHealthGoLiveObservations || []).length >= 6 && (data.publicHealthLaunchIncidents || []).length >= 6 && (data.publicHealthLaunchDutyShifts || []).length >= 6 && (data.publicHealthLaunchCommandBriefs || []).length >= 5 && (data.publicHealthSiteEvidenceVerificationTasks || []).length >= 9 && (data.publicHealthLaunchApprovals || []).length >= 6 && (data.publicHealthTriggerRules || []).length >= 5 && (data.publicHealthSignals || []).length >= 6 && (data.publicHealthAlerts || []).length >= 4 && (data.publicHealthCommandTasks || []).length >= 4 && (data.publicHealthResources || []).length >= 5 && (data.publicHealthAiReviews || []).length >= 2 && (data.publicHealthEvidenceRecords || []).length >= 8, detail: `${data.publicHealthStandards?.length || 0} standards, ${data.publicHealthInstitutionScopes?.length || 0} scopes, ${data.publicHealthEvents?.length || 0} events, ${data.publicHealthExchangeTasks?.length || 0} exchange tasks, ${data.publicHealthExchangeRuns?.length || 0} runs, ${data.publicHealthInstitutionTasks?.length || 0} institution tasks, ${data.publicHealthOnsiteAcceptances?.length || 0} onsite rows, ${data.publicHealthCutoverBlockers?.length || 0} cutover blockers, ${data.publicHealthCutoverEvidencePackets?.length || 0} evidence packets, ${data.publicHealthCutoverDrills?.length || 0} cutover drills, ${data.publicHealthProductionHandoffs?.length || 0} production handoffs, ${data.publicHealthGoLiveObservations?.length || 0} go-live observations, ${data.publicHealthLaunchIncidents?.length || 0} launch incidents, ${data.publicHealthLaunchDutyShifts?.length || 0} launch duty shifts, ${data.publicHealthLaunchCommandBriefs?.length || 0} launch command briefs, ${data.publicHealthSiteEvidenceVerificationTasks?.length || 0} site evidence verification tasks, ${data.publicHealthLaunchApprovals?.length || 0} launch approvals, ${data.publicHealthTriggerRules?.length || 0} trigger rules, ${data.publicHealthSignals?.length || 0} signals, ${data.publicHealthAlerts?.length || 0} alerts, ${data.publicHealthCommandTasks?.length || 0} command tasks, ${data.publicHealthResources?.length || 0} resources, ${data.publicHealthAiReviews?.length || 0} AI reviews, ${data.publicHealthEvidenceRecords?.length || 0} evidence records` },
     { name: "api:publicHealth", ok: serverSource.includes("/api/public-health/system") && serverSource.includes("buildPublicHealthSystem") && fs.existsSync(path.join(ROOT, "public-health.html")) && fs.existsSync(path.join(ROOT, "public-health.js")), detail: "public health page and API are wired" },
+    {
+      name: "api:publicHealthExternalEndpointVerification",
+      ok: [
+        "/api/public-health/external/endpoints/summary",
+        "/api/public-health/external/endpoints/receipts",
+        "publicHealthEndpointVerificationContext",
+        "publicHealthEndpointVerificationSummaryView",
+        "publicHealthExternalEndpointProbeReceipts",
+        "assertUniquePublicHealthEndpointProbeReceipts",
+        "assertPublicHealthEndpointProbeInsert",
+        "publicHealthEndpointProbeInsert"
+      ].every((marker) => serverSource.includes(marker))
+        && [
+          "expectedEndpoint",
+          "expectedContract",
+          "resolvedAddress",
+          "sniHostname",
+          "attestationOrigin",
+          "verificationSource",
+          "seenReceiptIds",
+          "seenNonces",
+          "endpointConnectivityReady",
+          "productionReady: false"
+        ].every((marker) => publicHealthEndpointVerificationSource.includes(marker))
+        && ["server-generated", "platform-observability", "endpointConnectivityReady", "productionReady"].every((marker) => publicHealthEndpointVerificationDoc.includes(marker))
+        && pkg.scripts?.["public-health:resilience-check"]?.includes("public-health-external-endpoint-verification-service.js")
+        && pkg.scripts?.["public-health:resilience-test"]?.includes("test/public-health-external-endpoint-verification-service.test.js"),
+      detail: "commission-only redacted endpoint summaries and server-config-bound signed receipts enforce durable receiptId/nonce replay protection while production readiness remains blocked"
+    },
     { name: "api:publicHealthHighlights", ok: ["/api/public-health/highlights", "/api/public-health/highlights/signals", "/api/public-health/highlights/alerts/:id/actions", "/api/public-health/highlights/command-tasks/:id/actions", "/api/public-health/highlights/ai-reviews/:id/actions", "/api/public-health/highlights/evidence/:id/actions"].every((marker) => serverSource.includes(marker)) && fs.readFileSync(path.join(ROOT, "public-health.html"), "utf8").includes("public-health-highlight-center") && fs.readFileSync(path.join(ROOT, "public-health.js"), "utf8").includes("renderPublicHealthHighlights"), detail: "public health five-suite trigger, map, AI, command and evidence center is wired" },
     { name: "api:publicHealthHighlightsStandalone", ok: fs.existsSync(path.join(ROOT, "public-health-highlights.html")) && fs.existsSync(path.join(ROOT, "public-health-highlights.js")) && fs.existsSync(path.join(ROOT, "scripts", "public-health-highlights-readiness.js")) && serverSource.includes("buildPublicHealthHighlights") && fs.readFileSync(path.join(ROOT, "scripts", "public-health-highlights-readiness.js"), "utf8").includes("functionalState"), detail: "standalone public health five-suite command center and readiness report are present" },
     { name: "docs:publicHealthHighlights", ok: ["五件套", "多点触发", "GIS", "AI", "应急指挥", "证据链", "formalGoLiveState"].every((marker) => fs.readFileSync(path.join(ROOT, "docs", "公共卫生五件套功能说明与验收.md"), "utf8").includes(marker)), detail: "public health five-suite implementation, acceptance and go-live boundary are documented" },

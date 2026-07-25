@@ -12,12 +12,52 @@ const {
 const {
   publicHealthContractRuntimeReleaseDigest
 } = require("../public-health-external-contract-integration");
+const {
+  ENDPOINT_PROBE_SCHEMA_VERSION,
+  signPublicHealthExternalEndpointProbeReceipt
+} = require("../public-health-external-endpoint-verification-service");
 
 const ROOT = path.resolve(__dirname, "..");
 const REQUEST_SECRET = "api-request-secret-1234567890-123456789";
 const RECEIPT_SECRET = "api-receipt-secret-1234567890-123456789";
 const CONTRACT_SECRET = "api-contract-secret-1234567890-12345678";
+const IMMUNIZATION_ENDPOINT = "https://immunization.public-health.dalian.gov.cn/dispatch";
 const hex = (value) => crypto.createHash("sha256").update(value).digest("hex");
+
+function signedEndpointProbe(overrides = {}) {
+  const issuedAt = new Date();
+  const expiresAt = new Date(issuedAt.getTime() + 5 * 60 * 1000);
+  return signPublicHealthExternalEndpointProbeReceipt({
+    schemaVersion: ENDPOINT_PROBE_SCHEMA_VERSION,
+    receiptId: "api-endpoint-probe-immunization-001",
+    laneId: "immunization",
+    adapterId: "ph-adapter-immunization",
+    contract: "immunization-registry-v1",
+    endpoint: IMMUNIZATION_ENDPOINT,
+    status: "healthy",
+    httpStatus: 204,
+    latencyMs: 87,
+    network: {
+      resolvedAddress: "8.8.8.8",
+      sniHostname: "immunization.public-health.dalian.gov.cn"
+    },
+    tls: {
+      authorized: true,
+      protocol: "TLSv1.3",
+      certificateFingerprintSha256: hex("api-immunization-endpoint-certificate"),
+      mutualTlsVerified: true
+    },
+    verification: {
+      attestationOrigin: "server-generated",
+      verificationSource: "platform-observability",
+      signatureVerified: true
+    },
+    issuedAt: issuedAt.toISOString(),
+    expiresAt: expiresAt.toISOString(),
+    nonce: "api-endpoint-probe-nonce-immunization-001",
+    ...overrides
+  }, RECEIPT_SECRET);
+}
 
 function contractReleaseEvidence(now) {
   const t08ReleaseDigest = hex("T08-904e2e0");
@@ -109,7 +149,7 @@ test("public health external routes use server time full keyrings and secret-fre
     STORAGE_ENGINE: "json",
     SESSION_SECRETS: "public-health-external-api-session-secret-2026",
     SESSION_STORE: "memory",
-    PUBLIC_HEALTH_IMMUNIZATION_ENDPOINT: "https://immunization.example.test/dispatch",
+    PUBLIC_HEALTH_IMMUNIZATION_ENDPOINT: IMMUNIZATION_ENDPOINT,
     PUBLIC_HEALTH_IMMUNIZATION_REQUEST_SECRET: REQUEST_SECRET,
     PUBLIC_HEALTH_IMMUNIZATION_RECEIPT_SECRET: RECEIPT_SECRET,
     PUBLIC_HEALTH_EXTERNAL_CONTRACT_GOVERNANCE_SECRET: CONTRACT_SECRET,
@@ -226,6 +266,115 @@ test("public health external routes use server time full keyrings and secret-fre
   assert.equal(contractGovernance.response.status, 200, JSON.stringify(contractGovernance.body));
   assert.equal(contractGovernance.body.summary.scheduled, 1);
   assert.equal(contractGovernance.body.productionReady, false);
+
+  const anonymousEndpointSummary = await request(
+    baseUrl,
+    "/api/public-health/external/endpoints/summary"
+  );
+  assert.equal(anonymousEndpointSummary.response.status, 401);
+  const hospitalToken = await login(baseUrl, "hospital");
+  const forbiddenEndpointSummary = await request(
+    baseUrl,
+    "/api/public-health/external/endpoints/summary",
+    hospitalToken
+  );
+  assert.equal(forbiddenEndpointSummary.response.status, 403);
+  const forbiddenEndpointReceipt = await post(
+    baseUrl,
+    "/api/public-health/external/endpoints/receipts",
+    hospitalToken,
+    "api-endpoint-forbidden",
+    { receipt: signedEndpointProbe() }
+  );
+  assert.equal(forbiddenEndpointReceipt.response.status, 403);
+
+  const initialEndpointSummary = await request(
+    baseUrl,
+    "/api/public-health/external/endpoints/summary",
+    token
+  );
+  assert.equal(initialEndpointSummary.response.status, 200);
+  assert.equal(initialEndpointSummary.body.endpointConnectivityReady, false);
+  assert.equal(initialEndpointSummary.body.productionReady, false);
+
+  const endpointReceipt = signedEndpointProbe();
+  const acceptedEndpointReceipt = await post(
+    baseUrl,
+    "/api/public-health/external/endpoints/receipts?expectedEndpoint=https%3A%2F%2Fattacker.invalid%2Fdispatch&contract=immunization-registry-v99",
+    token,
+    "api-endpoint-accepted",
+    {
+      receipt: endpointReceipt,
+      expectedEndpoint: "https://attacker.invalid/dispatch",
+      expectedContract: "immunization-registry-v99",
+      keyring: "attacker-controlled-keyring",
+      at: "1999-01-01T00:00:00.000Z"
+    }
+  );
+  assert.equal(acceptedEndpointReceipt.response.status, 201, JSON.stringify(acceptedEndpointReceipt.body));
+  assert.equal(acceptedEndpointReceipt.body.lane.connectivityVerified, true);
+  assert.equal(acceptedEndpointReceipt.body.productionReady, false);
+
+  const replayedEndpointReceipt = await post(
+    baseUrl,
+    "/api/public-health/external/endpoints/receipts",
+    token,
+    "api-endpoint-replay",
+    { receipt: endpointReceipt }
+  );
+  assert.equal(replayedEndpointReceipt.response.status, 409, JSON.stringify(replayedEndpointReceipt.body));
+
+  const nonceReplayReceipt = signedEndpointProbe({
+    receiptId: "api-endpoint-probe-immunization-002"
+  });
+  const nonceReplay = await post(
+    baseUrl,
+    "/api/public-health/external/endpoints/receipts",
+    token,
+    "api-endpoint-nonce-replay",
+    { receipt: nonceReplayReceipt }
+  );
+  assert.equal(nonceReplay.response.status, 409, JSON.stringify(nonceReplay.body));
+
+  const forgedEndpointReceipt = signedEndpointProbe({
+    receiptId: "api-endpoint-probe-immunization-003",
+    endpoint: "https://other.public-health.dalian.gov.cn/dispatch",
+    network: {
+      resolvedAddress: "1.1.1.1",
+      sniHostname: "other.public-health.dalian.gov.cn"
+    },
+    nonce: "api-endpoint-probe-nonce-immunization-003"
+  });
+  const forgedEndpoint = await post(
+    baseUrl,
+    "/api/public-health/external/endpoints/receipts",
+    token,
+    "api-endpoint-forged-config",
+    {
+      receipt: forgedEndpointReceipt,
+      expectedEndpoint: "https://other.public-health.dalian.gov.cn/dispatch",
+      keyring: RECEIPT_SECRET
+    }
+  );
+  assert.equal(forgedEndpoint.response.status, 400, JSON.stringify(forgedEndpoint.body));
+
+  const endpointSummary = await request(
+    baseUrl,
+    "/api/public-health/external/endpoints/summary",
+    token
+  );
+  assert.equal(endpointSummary.response.status, 200, JSON.stringify(endpointSummary.body));
+  assert.equal(endpointSummary.body.summary.endpointProbesVerified, 1);
+  assert.equal(endpointSummary.body.endpointConnectivityReady, false);
+  assert.equal(endpointSummary.body.productionReady, false);
+  const serializedEndpointSummary = JSON.stringify(endpointSummary.body);
+  assert.doesNotMatch(serializedEndpointSummary, /https:\/\//);
+  assert.doesNotMatch(serializedEndpointSummary, /8\.8\.8\.8/);
+  assert.doesNotMatch(serializedEndpointSummary, new RegExp(RECEIPT_SECRET));
+  assert.doesNotMatch(serializedEndpointSummary, /"receiptId"|"signingKeyId"|"network"|"signature"|"verification"/i);
+  const scopedState = await request(baseUrl, "/api/state", token);
+  assert.equal(scopedState.response.status, 200);
+  assert.equal("publicHealthExternalEndpointProbeReceipts" in scopedState.body, false);
 
   const runtime = await request(baseUrl, "/api/public-health/coordination-runtime", token);
   assert.equal(runtime.response.status, 200);
@@ -368,6 +517,10 @@ test("public health external routes use server time full keyrings and secret-fre
   assert.doesNotMatch(JSON.stringify(board.body), new RegExp(RECEIPT_SECRET));
   assert.doesNotMatch(JSON.stringify(board.body), new RegExp(CONTRACT_SECRET));
   assert.equal(board.body.contractGovernance.summary.scheduled, 1);
+  assert.equal(board.body.endpointVerification.summary.endpointProbesVerified, 1);
+  assert.equal(board.body.endpointVerification.endpointConnectivityReady, false);
+  assert.equal(board.body.endpointVerification.productionReady, false);
+  assert.doesNotMatch(JSON.stringify(board.body.endpointVerification), /https:\/\/|8\.8\.8\.8|"receiptId"|"signingKeyId"/i);
 
   const rotation = await request(baseUrl, "/api/public-health/external/key-rotation", token);
   assert.equal(rotation.response.status, 200);
@@ -392,6 +545,9 @@ test("public health external routes use server time full keyrings and secret-fre
   assert.equal(persisted.publicHealthExternalLaneControlAudit.length, 2);
   assert.equal(persisted.publicHealthExternalContractAttestations.length, 1);
   assert.equal(persisted.publicHealthExternalContractGovernanceAudit.length, 5);
+  assert.equal(persisted.publicHealthExternalEndpointProbeReceipts.length, 1);
+  assert.equal(persisted.publicHealthExternalEndpointProbeReceipts[0].endpoint, IMMUNIZATION_ENDPOINT);
+  assert.equal(persisted.publicHealthExternalEndpointProbeReceipts[0].network.resolvedAddress, "8.8.8.8");
   assert.deepEqual(
     persisted.publicHealthExternalContractGovernanceAudit.map((item) => item.result).sort(),
     ["accepted", "rejected", "rejected", "rejected", "rejected"]

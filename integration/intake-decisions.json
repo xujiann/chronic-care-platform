@@ -47,17 +47,20 @@
     },
     {
       "lineId": "T08",
-      "candidateHead": "771c727b8abe7c722248d40656d6b91dfb67f3cf",
+      "candidateHead": "09a88c7c6ce98789e559dcd8a18bd9b5a51a99a2",
       "decision": "accepted",
-      "reviewedAt": "2026-07-24T15:33:00.000Z",
+      "acceptedCandidateHeads": [
+        "771c727b8abe7c722248d40656d6b91dfb67f3cf",
+        "09a88c7c6ce98789e559dcd8a18bd9b5a51a99a2"
+      ],
+      "reviewedAt": "2026-07-25T01:50:00.000Z",
       "reviewer": "T00",
       "checks": [
         "git diff --check",
-        "T08 reported 136 of 136 chained contract-governance and cutover targeted tests passed",
-        "T00 independently merged exact candidate 771c727 and passed the focused public-health contract/resilience regression",
-        "post-T06 baseline revalidation passed 57 of 57 external adapter, resilience, contract, storage and API tests",
-        "public health static resources and coordination UI passed 79 of 79 tests; aggregate public API passed 38 of 38 tests",
-        "release report passed 405 of 406 checks with 0 failures and 1 warning; deploy check passed 362 of 362 checks",
+        "T00 independently merged exact candidate 09a88c7 and passed all 9 candidate endpoint-verification and final-readiness tests",
+        "focused public-health external adapter, resilience, contract, endpoint, storage and API regression passed 64 of 64 tests",
+        "aggregate public API, static resource and final-readiness regression passed 112 of 112 tests",
+        "release report passed 406 of 407 checks with 0 failures and 1 warning; deploy check passed 365 of 365 checks",
         "managed active and grace key verification, callback replay rejection and audit-chain tamper rejection validated",
         "server-only policies cover eight lanes and cannot be overridden by enqueue, claim or attempt payloads",
         "contract governance keyring is independent and non-enumerable; client-reported approval status and contractBinding are ignored",
@@ -68,8 +71,12 @@
         "backpressure, rate limiting, concurrent claim, open rejection, single-probe recovery and probe-failure reopen are covered",
         "active v3 enqueue/receipt binding, retired v1, deprecated v2, later-chain recovery successors and per-transition cutover tracks are covered",
         "historical attestations rebuild at sunsetAt and production keyrings must retain their verification material",
+        "commission-only endpoint receipt writes resolve endpoint, active contract, server time and keyring only from server configuration",
+        "signed endpoint receipts persist under receiptId and nonce uniqueness; replay, client-origin trust, private targets, DNS rebinding and forged overrides fail closed",
+        "endpoint summaries and operations-board projections omit URL, resolved IP, key identifiers, key material and evidence bodies",
         "legacy-static remains compatibility-only and all external runtime projections remain productionReady false",
-        "T00 aggregate final readiness passes 47 of 47 checks"
+        "endpointConnectivityReady remains separate from productionReady; trusted site evidence, P0/P1 closure, production handoff and launch approval remain blockers",
+        "T00 aggregate final readiness passes 52 of 52 checks"
       ],
       "blockers": []
     },

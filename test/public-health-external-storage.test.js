@@ -300,3 +300,48 @@ test("sequential contract attestations share the outbox and resilience transacti
   assert.equal(unchanged.publicHealthExternalContractAttestations.at(-1).toContract, "immunization-registry-v3");
   assert.equal(unchanged.publicHealthExternalContractGovernanceAudit.length, 2);
 });
+
+test("SQLite endpoint probe receipts persist with receiptId and nonce uniqueness", () => {
+  const current = readDatabase();
+  const receipt = {
+    receiptId: "ph-storage-endpoint-receipt-001",
+    nonce: "ph-storage-endpoint-nonce-001",
+    laneId: "immunization",
+    adapterId: "ph-adapter-immunization"
+  };
+  const accepted = structuredClone(current);
+  accepted.publicHealthExternalEndpointProbeReceipts = [receipt];
+  writeDatabase(accepted, {
+    event: "public-health-endpoint-probe-storage",
+    publicHealthEndpointProbeInsert: { receipt }
+  });
+
+  const persisted = readDatabase();
+  assert.equal(persisted.publicHealthExternalEndpointProbeReceipts.length, 1);
+  assert.equal(persisted.publicHealthExternalEndpointProbeReceipts[0].receiptId, receipt.receiptId);
+
+  const duplicateReceiptId = structuredClone(persisted);
+  const receiptIdConflict = {
+    ...receipt,
+    nonce: "ph-storage-endpoint-nonce-002"
+  };
+  duplicateReceiptId.publicHealthExternalEndpointProbeReceipts.push(receiptIdConflict);
+  assert.throws(() => writeDatabase(duplicateReceiptId, {
+    event: "public-health-endpoint-probe-receipt-id-conflict",
+    publicHealthEndpointProbeInsert: { receipt: receiptIdConflict }
+  }), /receiptId unique conflict/);
+
+  const duplicateNonce = structuredClone(persisted);
+  const nonceConflict = {
+    ...receipt,
+    receiptId: "ph-storage-endpoint-receipt-002"
+  };
+  duplicateNonce.publicHealthExternalEndpointProbeReceipts.push(nonceConflict);
+  assert.throws(() => writeDatabase(duplicateNonce, {
+    event: "public-health-endpoint-probe-nonce-conflict",
+    publicHealthEndpointProbeInsert: { receipt: nonceConflict }
+  }), /nonce unique conflict/);
+
+  const unchanged = readDatabase();
+  assert.equal(unchanged.publicHealthExternalEndpointProbeReceipts.length, 1);
+});

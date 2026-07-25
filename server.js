@@ -84,6 +84,10 @@ const {
 const {
   buildPublicHealthExternalContractCutoverBoard
 } = require("./public-health-external-contract-cutover-service");
+const {
+  buildPublicHealthExternalEndpointProbeRegistry,
+  verifyPublicHealthExternalEndpointProbeReceipt
+} = require("./public-health-external-endpoint-verification-service");
 const CareServicePlatform = require("./care-service-platform-adapter");
 const CareServiceRuntime = require("./care-service-runtime");
 const { createCareServiceDeliveryAdapters } = require("./care-service-delivery-adapters");
@@ -6606,13 +6610,48 @@ function assertPublicHealthContractAttestationInsert(data = {}, constraint = {},
   });
 }
 
+function assertUniquePublicHealthEndpointProbeReceipts(receipts = []) {
+  const receiptIds = new Set();
+  const nonces = new Set();
+  (Array.isArray(receipts) ? receipts : []).forEach((receipt) => {
+    const receiptId = String(receipt?.receiptId || "").trim();
+    const nonce = String(receipt?.nonce || "").trim();
+    if (!receiptId || !nonce) throw new Error("public health endpoint probe receiptId and nonce are required");
+    if (receiptIds.has(receiptId)) {
+      throw new Error(`public health endpoint probe receiptId unique conflict: ${receiptId}`);
+    }
+    if (nonces.has(nonce)) {
+      throw new Error("public health endpoint probe nonce unique conflict");
+    }
+    receiptIds.add(receiptId);
+    nonces.add(nonce);
+  });
+}
+
+function assertPublicHealthEndpointProbeInsert(data = {}, constraint = {}) {
+  const receipt = constraint.receipt || constraint;
+  const receiptId = String(receipt?.receiptId || "").trim();
+  const nonce = String(receipt?.nonce || "").trim();
+  if (!receiptId || !nonce) throw new Error("public health endpoint probe receiptId and nonce are required");
+  const persisted = Array.isArray(data.publicHealthExternalEndpointProbeReceipts)
+    ? data.publicHealthExternalEndpointProbeReceipts
+    : [];
+  if (persisted.some((item) => String(item?.receiptId || "").trim() === receiptId)) {
+    throw new Error(`public health endpoint probe receiptId unique conflict: ${receiptId}`);
+  }
+  if (persisted.some((item) => String(item?.nonce || "").trim() === nonce)) {
+    throw new Error("public health endpoint probe nonce unique conflict");
+  }
+}
+
 function writeDatabase(data, options = {}) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   const publicHealthExternalCas = options.publicHealthExternalCas || null;
   const publicHealthExternalContractInsert = options.publicHealthExternalContractInsert || null;
+  const publicHealthEndpointProbeInsert = options.publicHealthEndpointProbeInsert || null;
   const sqlite = shouldUseSqlite();
   const normalized = normalizeState(data);
-  if ((publicHealthExternalCas || publicHealthExternalContractInsert) && !sqlite) {
+  if ((publicHealthExternalCas || publicHealthExternalContractInsert || publicHealthEndpointProbeInsert) && !sqlite) {
     const persisted = fs.existsSync(DB_FILE) ? JSON.parse(fs.readFileSync(DB_FILE, "utf8")) : {};
     if (publicHealthExternalCas) assertPublicHealthExternalCas(persisted, publicHealthExternalCas);
     if (publicHealthExternalContractInsert) {
@@ -6622,8 +6661,12 @@ function writeDatabase(data, options = {}) {
         normalized.publicHealthExternalContractAttestations
       );
     }
+    if (publicHealthEndpointProbeInsert) {
+      assertPublicHealthEndpointProbeInsert(persisted, publicHealthEndpointProbeInsert);
+    }
   }
   assertUniquePublicHealthContractAttestations(normalized.publicHealthExternalContractAttestations);
+  assertUniquePublicHealthEndpointProbeReceipts(normalized.publicHealthExternalEndpointProbeReceipts);
   normalized.storageMeta = data.storageMeta || storageMeta();
   if (sqlite) {
     writeSqliteState(
@@ -6631,7 +6674,8 @@ function writeDatabase(data, options = {}) {
       String(options.event || "write-state"),
       data.storageMeta?.collectionVersions,
       publicHealthExternalCas,
-      publicHealthExternalContractInsert
+      publicHealthExternalContractInsert,
+      publicHealthEndpointProbeInsert
     );
   }
   const snapshot = {
@@ -6817,7 +6861,8 @@ function writeSqliteState(
   event = "write-state",
   expectedVersions = null,
   publicHealthExternalCas = null,
-  publicHealthExternalContractInsert = null
+  publicHealthExternalContractInsert = null,
+  publicHealthEndpointProbeInsert = null
 ) {
   const db = openSqliteDatabase();
   const now = new Date().toISOString();
@@ -6839,6 +6884,13 @@ function writeSqliteState(
       assertPublicHealthContractAttestationInsert({
         publicHealthExternalContractAttestations: row ? JSON.parse(row.payload) : []
       }, publicHealthExternalContractInsert, data.publicHealthExternalContractAttestations);
+    }
+    if (publicHealthEndpointProbeInsert) {
+      const row = db.prepare("SELECT payload FROM state_collections WHERE key = ?")
+        .get("publicHealthExternalEndpointProbeReceipts");
+      assertPublicHealthEndpointProbeInsert({
+        publicHealthExternalEndpointProbeReceipts: row ? JSON.parse(row.payload) : []
+      }, publicHealthEndpointProbeInsert);
     }
     const normalized = normalizeState(data);
     const entries = Object.entries(normalized).filter(([key]) => key !== "storageMeta");
@@ -10133,6 +10185,9 @@ function normalizeState(data) {
       : [],
     publicHealthExternalContractGovernanceAudit: Array.isArray(data.publicHealthExternalContractGovernanceAudit)
       ? data.publicHealthExternalContractGovernanceAudit.slice(-2000)
+      : [],
+    publicHealthExternalEndpointProbeReceipts: Array.isArray(data.publicHealthExternalEndpointProbeReceipts)
+      ? data.publicHealthExternalEndpointProbeReceipts
       : [],
     publicHealthSignals: mergeByKey(seedPublicHealthSignals(), data.publicHealthSignals, "id"),
     publicHealthAlerts: mergeByKey(seedPublicHealthAlerts(), data.publicHealthAlerts, "id"),
@@ -16071,6 +16126,7 @@ function buildPrimaryPracticeConfirmation(payload = {}, user = {}, profile = {},
 
 function scopeStateForUser(data, user) {
   const scoped = structuredClone(data);
+  delete scoped.publicHealthExternalEndpointProbeReceipts;
   if (user.role === "commission") return scoped;
 
   delete scoped.authUsers;
@@ -23369,7 +23425,7 @@ function publicHealthExternalHttpStatus(error) {
   const message = String(error?.message || "");
   if (/unknown public health/i.test(message)) return 404;
   if (/role.*not allowed|scope denied|forbidden/i.test(message)) return 403;
-  if (/version conflict|CAS conflict|unique conflict|idempotency|already claimed|already been requeued|not due/i.test(message)) return 409;
+  if (/version conflict|CAS conflict|unique conflict|replay detected|idempotency|already claimed|already been requeued|not due/i.test(message)) return 409;
   if (/rate limit|backpressure|half-open probe limit/i.test(message)) return 429;
   if (/circuit is open|key service is unavailable|KEYRING_REF is required|RESILIENCE_POLICIES is required|resilience policy is required|SECRET must contain|endpoint must use HTTPS/i.test(message)) return 503;
   return 400;
@@ -23464,6 +23520,86 @@ function publicHealthContractAttestationRequestDigest(attestation, evidenceId) {
 
 async function publicHealthContractGovernanceContext(data, at) {
   return loadPublicHealthContractGovernance(data, { at });
+}
+
+function publicHealthActiveContract(credentials, laneId) {
+  const governance = credentials?.contractGovernance;
+  if (!governance?.ok) throw new Error("public health active contract governance is unavailable");
+  const entry = (governance.entries || [])
+    .find((item) => item.laneId === String(laneId || "").trim());
+  if (!entry?.currentContract) throw new Error("public health active contract is unavailable");
+  return entry.currentContract;
+}
+
+async function publicHealthEndpointVerificationContext(data, laneId, at) {
+  const credentials = await loadPublicHealthLaneCredentials(laneId, { at, data });
+  return Object.freeze({
+    endpoint: credentials.endpoint,
+    contract: publicHealthActiveContract(credentials, laneId),
+    keyring: credentials.receiptKeyring
+  });
+}
+
+function publicHealthEndpointVerificationSummaryView(registry = {}) {
+  return {
+    ok: registry.ok === true,
+    generatedAt: String(registry.generatedAt || new Date().toISOString()),
+    functionalState: String(registry.functionalState || "endpoint-probe-verification-pending"),
+    formalGoLiveState: String(registry.formalGoLiveState || "blocked-until-trusted-site-evidence-and-launch-approval"),
+    summary: {
+      lanes: Number(registry.summary?.lanes || 0),
+      endpointsConfigured: Number(registry.summary?.endpointsConfigured || 0),
+      endpointProbesVerified: Number(registry.summary?.endpointProbesVerified || 0),
+      endpointProbesPending: Number(registry.summary?.endpointProbesPending || 0)
+    },
+    entries: (Array.isArray(registry.entries) ? registry.entries : []).map((entry) => ({
+      laneId: String(entry.laneId || ""),
+      adapterId: String(entry.adapterId || ""),
+      contract: String(entry.contract || ""),
+      endpointConfigured: entry.endpointConfigured === true,
+      endpointDigest: String(entry.endpointDigest || ""),
+      connectivityVerified: entry.connectivityVerified === true,
+      issuedAt: String(entry.issuedAt || ""),
+      expiresAt: String(entry.expiresAt || ""),
+      latencyMs: Number.isFinite(entry.latencyMs) ? Number(entry.latencyMs) : null,
+      resolvedAddressDigest: String(entry.resolvedAddressDigest || ""),
+      tlsProtocol: String(entry.tlsProtocol || ""),
+      mutualTlsVerified: entry.mutualTlsVerified === true,
+      blockerCode: String(entry.blockerCode || "trusted-endpoint-probe-required")
+    })),
+    endpointConnectivityReady: registry.endpointConnectivityReady === true,
+    productionReady: false,
+    blockers: [
+      "Endpoint connectivity evidence does not replace trusted site evidence.",
+      "P0/P1 closure, production handoff and launch approval remain required."
+    ]
+  };
+}
+
+async function buildPublicHealthEndpointVerificationSummary(data, at) {
+  const receipts = Array.isArray(data.publicHealthExternalEndpointProbeReceipts)
+    ? data.publicHealthExternalEndpointProbeReceipts
+    : [];
+  const laneIds = [...new Set(receipts.map((item) => String(item?.laneId || "").trim()).filter(Boolean))];
+  const contextEntries = await Promise.all(laneIds.map(async (laneId) => {
+    try {
+      return [laneId, await publicHealthEndpointVerificationContext(data, laneId, at)];
+    } catch {
+      return [laneId, null];
+    }
+  }));
+  const contexts = Object.fromEntries(contextEntries);
+  const registry = buildPublicHealthExternalEndpointProbeRegistry({
+    env: process.env,
+    receipts,
+    contractResolver: (laneId, profile) => contexts[laneId]?.contract || `unavailable:${profile.contract}`,
+    keyringResolver: (laneId) => contexts[laneId]?.keyring,
+    at
+  });
+  return publicHealthEndpointVerificationSummaryView({
+    ...registry,
+    generatedAt: at
+  });
 }
 
 function publicHealthExternalResult(result) {
@@ -23993,6 +24129,99 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/public-health/external/endpoints/summary") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    try {
+      const at = new Date().toISOString();
+      const summary = await buildPublicHealthEndpointVerificationSummary(readDatabase(), at);
+      sendJson(res, 200, summary);
+    } catch (error) {
+      sendJson(res, publicHealthExternalHttpStatus(error), {
+        error: "Public health endpoint verification summary unavailable",
+        message: error.message,
+        productionReady: false
+      });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/public-health/external/endpoints/receipts") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    let laneId = "";
+    try {
+      const input = await collectJson(req);
+      const receipt = input?.receipt && typeof input.receipt === "object" && !Array.isArray(input.receipt)
+        ? input.receipt
+        : input;
+      laneId = String(receipt?.laneId || "").trim();
+      const at = new Date().toISOString();
+      const data = readDatabase();
+      const context = await publicHealthEndpointVerificationContext(data, laneId, at);
+      const persistedReceipts = Array.isArray(data.publicHealthExternalEndpointProbeReceipts)
+        ? data.publicHealthExternalEndpointProbeReceipts
+        : [];
+      const verification = verifyPublicHealthExternalEndpointProbeReceipt(receipt, {
+        expectedEndpoint: context.endpoint,
+        expectedContract: context.contract,
+        keyring: context.keyring,
+        at,
+        seenReceiptIds: new Set(persistedReceipts.map((item) => String(item?.receiptId || "").trim())),
+        seenNonces: new Set(persistedReceipts.map((item) => String(item?.nonce || "").trim()))
+      });
+      if (!verification.ok) throw new Error(verification.reason);
+      const storedReceipt = {
+        ...verification.payload,
+        signature: String(receipt.signature || "").trim(),
+        acceptedAt: at,
+        productionReady: false
+      };
+      const nextData = {
+        ...data,
+        publicHealthExternalEndpointProbeReceipts: [
+          ...persistedReceipts,
+          storedReceipt
+        ]
+      };
+      writeDatabase(nextData, {
+        event: "public-health-external-endpoint-probe-accepted",
+        publicHealthEndpointProbeInsert: { receipt: storedReceipt }
+      });
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: "public-health-external-endpoint-probe-accept",
+        target: laneId,
+        result: "allowed",
+        detail: "server-config-bound signed endpoint probe accepted"
+      });
+      const summary = await buildPublicHealthEndpointVerificationSummary(nextData, at);
+      sendJson(res, 201, {
+        ok: true,
+        accepted: true,
+        lane: summary.entries.find((item) => item.laneId === laneId) || null,
+        endpointConnectivityReady: summary.endpointConnectivityReady,
+        productionReady: false
+      });
+    } catch (error) {
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: "public-health-external-endpoint-probe-accept",
+        target: laneId || "unknown-lane",
+        result: "denied",
+        detail: String(error.message || "endpoint probe rejected").slice(0, 200)
+      });
+      sendJson(res, publicHealthExternalHttpStatus(error), {
+        error: "Public health endpoint probe rejected",
+        message: error.message,
+        productionReady: false
+      });
+    }
+    return;
+  }
+
   const publicHealthCoordinationActionMatch = url.pathname.match(/^\/api\/public-health\/coordination\/([^/]+)\/actions$/);
   if (req.method === "POST" && publicHealthCoordinationActionMatch) {
     const user = requireApiRole(req, res, ["commission"], "/api/public-health/coordination/:id/actions");
@@ -24229,9 +24458,11 @@ async function handleApi(req, res) {
       now: at
     });
     const keySafety = buildPublicHealthKeySafetyBoard(data, loaded.credentials);
+    const endpointVerification = await buildPublicHealthEndpointVerificationSummary(data, at);
     sendJson(res, 200, publicHealthExternalPublicView({
       ...operations,
       contractGovernance: contractContext.governance,
+      endpointVerification,
       keySafety,
       productionReady: false
     }));
