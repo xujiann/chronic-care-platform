@@ -310,7 +310,7 @@ function renderStudyTable(studies) {
       <td><span class="badge ${/已互认|recognized/i.test(item.mutualRecognitionStatus || "") ? "ok" : /不予|拒绝/i.test(item.mutualRecognitionStatus || "") ? "warn" : "info"}">${escapeHtml(item.mutualRecognitionStatus || "未发起")}</span><br><small>${escapeHtml(item.mutualRecognitionReason || "可发起区域互认")}</small></td>
       <td>
         <button class="inline-action" type="button" data-view-study="${escapeHtml(item.id)}">手机查看</button>
-        <button class="inline-action primary" type="button" data-open-ohif="${escapeHtml(item.id)}">OHIF调阅</button>
+        ${canOpenDiagnosticViewer(item) ? `<button class="inline-action primary" type="button" data-open-ohif="${escapeHtml(item.id)}">诊断调阅</button>` : ""}
         <button class="inline-action" type="button" data-share-study="${escapeHtml(item.id)}">分享</button>
         ${canRetryFhirWriteback(item) ? `<button class="inline-action" type="button" data-retry-fhir-writeback="${escapeHtml(item.id)}">重试FHIR回写</button>` : ""}
         ${canStartImagingTeleconsultation(item) ? `<button class="inline-action" type="button" data-start-imaging-teleconsultation="${escapeHtml(item.id)}">发起远程会诊</button>` : ""}
@@ -367,6 +367,10 @@ function canSubmitRecognitionAppeal() {
 
 function canRetryFhirWriteback(item) {
   return ["commission", "institution"].includes(window.HealthCityAuth?.getUser?.()?.role) && item?.fhirReportSyncStatus === "failed";
+}
+
+function canOpenDiagnosticViewer(item) {
+  return Boolean(item?.diagnosticLevel) && ["commission", "institution", "county"].includes(window.HealthCityAuth?.getUser?.()?.role);
 }
 
 function canStartImagingTeleconsultation(item) {
@@ -518,10 +522,7 @@ function renderMobileViewer(study, payload) {
       </div>
     </div>
     <div class="viewer-toolbar" aria-label="影像工具">
-      <button class="inline-action" type="button">窗宽窗位</button>
-      <button class="inline-action" type="button">缩放</button>
-      <button class="inline-action" type="button">三维</button>
-      <button class="inline-action" type="button">报告</button>
+      ${canOpenDiagnosticViewer(study) ? `<button class="inline-action primary" type="button" data-open-ohif="${escapeHtml(study.id)}">诊断级调阅</button>` : `<span>${study.diagnosticLevel ? "诊断级序列仅对授权医护人员开放" : "当前为浏览级预览，不开放诊断级原始序列"}</span>`}
     </div>
     <div class="series-strip">
       ${Array.from({ length: Math.max(1, Math.min(Number(study.seriesCount || 1), 4)) }, (_, index) => `<button type="button">S${index + 1}<br><small>${index === 0 ? "定位" : "序列"}</small></button>`).join("")}

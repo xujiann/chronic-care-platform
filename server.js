@@ -34203,7 +34203,7 @@ async function handleApi(req, res) {
 
   const imagingViewerMatch = url.pathname.match(/^\/api\/imaging-cloud\/studies\/([^/]+)\/viewer$/);
   if (req.method === "GET" && imagingViewerMatch) {
-    const user = requireApiRole(req, res, ["commission", "institution", "county", "citizen"], "/api/imaging-cloud/studies/:id/viewer");
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/imaging-cloud/studies/:id/viewer");
     if (!user) return;
     const data = readDatabase();
     const studyId = decodeURIComponent(imagingViewerMatch[1]);
@@ -34212,6 +34212,11 @@ async function handleApi(req, res) {
     if (!canAccessResident(user, study.residentId, data)) {
       appendSecurityEvent({ actor: user.name, role: user.role, action: "open OHIF viewer", target: studyId, result: "denied", detail: "resident scope denied" });
       sendJson(res, 403, { error: "Forbidden", message: "无权调阅该居民影像" });
+      return;
+    }
+    if (!study.diagnosticLevel) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "open OHIF viewer", target: studyId, result: "denied", detail: "diagnostic-level series unavailable" });
+      sendJson(res, 409, { error: "Diagnostic Series Unavailable", message: "该检查仅提供浏览级预览，不能生成诊断级 OHIF 调阅链接" });
       return;
     }
     const viewerUrl = buildOhifStudyUrl(study.studyInstanceUID);
