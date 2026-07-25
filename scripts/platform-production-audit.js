@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 const fs = require("node:fs");
 const path = require("node:path");
+const {
+  buildAuditSourceSnapshot,
+  compareAuditSourceSnapshots
+} = require("./audit-source-snapshot");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "platform-production-audit.json");
@@ -272,6 +276,15 @@ function clean(value) {
 function buildPlatformProductionAudit(options = {}) {
   const pkg = options.pkg || readJson("package.json");
   const releaseReport = options.releaseReport || readJson("release/release-report.json");
+  const currentSourceSnapshot = options.currentSourceSnapshot || buildAuditSourceSnapshot({
+    pkg,
+    data: options.data,
+    profile: releaseReport.sourceSnapshot?.profile || releaseReport.profile || options.profile || "demo",
+    configFile: releaseReport.sourceSnapshot?.configFile || options.configFile || ".env.example",
+    dataFile: releaseReport.sourceSnapshot?.dataFile || options.dataFile || "data/db.json"
+  });
+  const releaseSourceComparison = compareAuditSourceSnapshots(releaseReport.sourceSnapshot, currentSourceSnapshot);
+  const releaseReportFresh = releaseSourceComparison.matches;
   const cutoverArtifact = options.cutoverArtifact || readJson("release/production-cutover-checklist.json");
   const cutoverRows = options.cutoverRows || cutoverArtifact.checklist || releaseReport.productionCutover || [];
   const evidenceExists = options.evidenceExists || exists;
@@ -320,6 +333,9 @@ function buildPlatformProductionAudit(options = {}) {
     check("platformAudit:identityLifecycleAdapter", ["refreshOidcAccessToken", "revokeOidcToken", "fetchIdentityDirectory", "identityLifecycleReady"].every((marker) => runtimeSources.identityAdapter.includes(marker)) && ["/api/auth/identity-lifecycle", "/api/auth/oidc/refresh", "/api/auth/oidc/revoke", "/api/auth/identity-directory/preview", "/api/auth/identity-directory/bind", "/api/auth/identity-directory/apply", "BIND EXTERNAL IDENTITY", "IDENTITY_BINDING_REASSIGNMENT_BLOCKED", "IDENTITY_DIRECTORY_SELF_DEACTIVATION_BLOCKED", "IDENTITY_DIRECTORY_LAST_COMMISSION_BLOCKED"].every((marker) => runtimeSources.server.includes(marker)) && runtimeSources.html.includes("identity-lifecycle-center") && ["renderIdentityLifecycleCenter", "runIdentityBindingAction", "runIdentityDirectoryAction"].every((marker) => runtimeSources.client.includes(marker)) && ["不按同名用户名自动回退", "不自动开户", "不自动提权", "不自动复活", "现场联合测试回执"].every((marker) => runtimeSources.identityDocumentation.includes(marker)), "P0-03 OIDC subject binding, lifecycle, safe directory deactivation, operations UI and production boundary are runnable, audited and documented"),
     check("platformAudit:smsDeliveryCallback", ["verifySmsDeliveryCallback", "applySmsDeliveryCallback", "buildSmsDeliveryCenter", "SMS_CALLBACK_REPLAY_DETECTED", "terminal-conflict"].every((marker) => runtimeSources.identityAdapter.includes(marker)) && ["/api/auth/sms-delivery-callback", "/api/auth/sms-deliveries", "smsDeliveryReceipts", "recordSmsDeliveryAcceptance"].every((marker) => runtimeSources.server.includes(marker)) && ["sms-delivery-status", "sms-delivery-metrics", "sms-delivery-receipts"].every((marker) => runtimeSources.html.includes(marker)) && runtimeSources.client.includes("smsDelivery") && ["SMS_DELIVERY_CALLBACK_SECRET", "回调验签", "重放", "乱序"].every((marker) => runtimeSources.identityDocumentation.includes(marker)), "P0-04 signed SMS final-delivery callbacks, replay protection, ordered persistence, operations visibility and site boundary are runnable, audited and documented"),
     check("platformAudit:financialCallbackReconciliation", ["verifyFinancialCallback", "applyFinancialCallback", "createFinancialReconciliationRun", "FINANCIAL_CALLBACK_REPLAY_DETECTED", "amount-mismatch", "superseded-receipt"].every((marker) => runtimeSources.financialAdapter.includes(marker)) && ["/api/financial-gateways/callbacks/", "/api/financial-gateways/operations", "/api/financial-gateways/reconciliation-runs", "financialReconciliationRuns"].every((marker) => runtimeSources.server.includes(marker)) && ["financial-gateway-operations-center", "financial-gateway-callback-events", "financial-reconciliation-runs"].every((marker) => runtimeSources.html.includes(marker)) && ["renderFinancialGatewayOperationsCenter", "loadFinancialGatewayOperationsCenter"].every((marker) => runtimeSources.client.includes(marker)) && ["FINANCIAL_CALLBACK_SECRET", "签名回调代码就绪", "摘要级日终对账", "现场联合测试回执"].every((marker) => runtimeSources.financialDocumentation.includes(marker)), "P0-06 signed financial callbacks, amount-safe ordered persistence, digest-only daily reconciliation, operations visibility and site boundary are runnable, audited and documented"),
+    check("platformAudit:releaseArtifactFreshness", releaseReportFresh, releaseReportFresh
+      ? `release report is bound to ${currentSourceSnapshot.commitSha} / ${currentSourceSnapshot.dataSha256}`
+      : `release report source drift: ${releaseSourceComparison.mismatches.join(", ")}`),
     check("platformAudit:releaseWiring", Boolean(pkg.scripts?.["platform:production-audit"]) && scriptSources.manifest.includes("platform-production-audit") && scriptSources.deploy.includes("platformProductionAudit") && scriptSources.release.includes("buildPlatformProductionAudit"), "package, manifest, deploy check and release report are wired"),
     check("platformAudit:formalDocument", ["审计结论", "正式生产前已实现的主要功能", "生产割接差距", "下一步开发规划", "正式上线退出条件"].every((marker) => document.includes(marker)), "formal audit document contains conclusion, capability inventory, gaps, roadmap and exit criteria")
   ];
@@ -343,6 +359,7 @@ function buildPlatformProductionAudit(options = {}) {
       cutoverBlocked: Math.max(0, cutoverRows.length - passedCutover),
       releaseChecks: Number(releaseReport.summary?.total || 0),
       releaseChecksPassed: Number(releaseReport.summary?.passed || 0),
+      releaseReportFresh,
       capabilityOperationsCenter: checks.some((item) => item.id === "platformAudit:capabilityOperationsCenter" && item.passed),
       productionDatabaseAdapter: checks.some((item) => item.id === "platformAudit:productionDatabaseAdapter" && item.passed),
       identityLifecycleAdapter: checks.some((item) => item.id === "platformAudit:identityLifecycleAdapter" && item.passed),
@@ -361,6 +378,13 @@ function buildPlatformProductionAudit(options = {}) {
     mvpRequiredModules: MVP_REQUIRED_MODULES,
     productionBlockers: PRODUCTION_BLOCKERS,
     roadmap: ROADMAP,
+    releaseReportBinding: {
+      fresh: releaseReportFresh,
+      generatedAt: String(releaseReport.generatedAt || ""),
+      expected: releaseReport.sourceSnapshot || null,
+      current: currentSourceSnapshot,
+      mismatches: releaseSourceComparison.mismatches
+    },
     checks
   };
 }
@@ -373,10 +397,13 @@ function renderMarkdown(report) {
     `- 审计结果：${report.ok ? "PASS" : "FAIL"}`,
     `- 当前状态：${report.status}`,
     `- 正式生产就绪：${report.productionReady ? "是" : "否"}`,
+    `- 发布工件来源：${report.summary.releaseReportFresh ? "当前有效" : "已失效"}`,
     "",
     "## 一、审计结论",
     "",
     report.conclusion,
+    "",
+    `发布报告来源绑定：提交 ${report.releaseReportBinding.current.commitSha}，数据摘要 ${report.releaseReportBinding.current.dataSha256}，配置档案 ${report.releaseReportBinding.current.profile}/${report.releaseReportBinding.current.configFile}，数据文件 ${report.releaseReportBinding.current.dataFile}。${report.releaseReportBinding.fresh ? "归档工件与当前来源一致。" : `检测到漂移（${report.releaseReportBinding.mismatches.join("、")}），归档结果不得用于 go/no-go。`}`,
     "",
     `本次审计覆盖 ${report.summary.capabilityDomains} 个能力域，其中 ${report.summary.implementedDomains} 个具备仓库内可运行证据；正式生产就绪能力按审慎口径计为 ${report.summary.productionReadyDomains} 个。当前演示发布检查为 ${report.summary.releaseChecksPassed}/${report.summary.releaseChecks}，生产割接检查为 ${report.summary.cutoverPassed}/${report.summary.cutoverChecks}。发布检查通过只证明代码、文档和演示证据结构完整，不等同于现场生产验收。`,
     `平台能力运营中心已${report.summary.capabilityOperationsCenter ? "纳入" : "未纳入"}发布门禁，用于统一管理能力域责任人、生产阻断整改、证据提交、生产前复核和审计留痕。`,
@@ -468,7 +495,11 @@ function writeOutput(report, flags = {}) {
 
 function runCli() {
   const flags = parseArgs();
-  const report = buildPlatformProductionAudit();
+  const report = buildPlatformProductionAudit({
+    releaseReport: flags["release-report"] ? readJson(String(flags["release-report"])) : undefined,
+    data: flags["data-file"] ? readJson(String(flags["data-file"])) : undefined,
+    dataFile: flags["data-file"] || "data/db.json"
+  });
   if (flags.write !== "false" && flags.write !== false) writeOutput(report, flags);
   console.log(JSON.stringify(report, null, 2));
   if (!report.ok) process.exitCode = 1;

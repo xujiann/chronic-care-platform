@@ -23,6 +23,7 @@ const { buildDataGovernanceReadiness, renderMarkdown: renderDataGovernanceMarkdo
 const { buildDataQualityReport, renderMarkdown: renderDataQualityMarkdown } = require("./data-quality-report");
 const { buildDigitalHospitalStandardsReadiness, renderMarkdown: renderDigitalHospitalStandardsMarkdown } = require("./digital-hospital-standards-readiness");
 const { buildDigitalHospitalPilotReadiness, renderMarkdown: renderDigitalHospitalPilotMarkdown } = require("./digital-hospital-pilot-readiness");
+const { buildAuditSourceSnapshot } = require("./audit-source-snapshot");
 const { buildPlatformProductionAudit, renderMarkdown: renderPlatformProductionAuditMarkdown } = require("./platform-production-audit");
 const { buildPhase2CatalogReadiness, renderMarkdown: renderPhase2CatalogMarkdown } = require("./phase2-catalog-readiness");
 const { buildPhase2JointTestReadiness, renderMarkdown: renderPhase2JointTestMarkdown } = require("./phase2-joint-test-readiness");
@@ -1270,6 +1271,13 @@ function buildReleaseReport(options = {}) {
   const pkg = options.pkg || readJson("package.json");
   const data = options.data || readJson("data/db.json");
   const env = validateProductionConfig(options);
+  const sourceSnapshot = buildAuditSourceSnapshot({
+    pkg,
+    data,
+    profile: env.profile,
+    configFile: options.envFile || ".env.example",
+    dataFile: options.dataFile || "data/db.json"
+  });
   const storageModel = inspectStorageModel({ dataDir: path.join(ROOT, "data") });
   const identityContract = buildIdentityContract({ data });
   const auditRetention = buildAuditRetentionReport({ data, env: auditRetentionEnvForRelease(options, env.profile) });
@@ -1289,7 +1297,16 @@ function buildReleaseReport(options = {}) {
   const dataGovernance = buildDataGovernanceReadiness({ data, pkg, interfaceMapping, dataQuality });
   const digitalHospitalStandards = buildDigitalHospitalStandardsReadiness({ pkg });
   const digitalHospitalPilot = buildDigitalHospitalPilotReadiness({ data, pkg });
-  const platformProductionAudit = buildPlatformProductionAudit({ pkg });
+  const platformProductionAudit = buildPlatformProductionAudit({
+    pkg,
+    data,
+    releaseReport: {
+      profile: env.profile,
+      summary: { total: 0, passed: 0 },
+      sourceSnapshot
+    },
+    currentSourceSnapshot: sourceSnapshot
+  });
   const phase2Catalog = buildPhase2CatalogReadiness({ data, pkg });
   const phase2JointTest = buildPhase2JointTestReadiness({ data, pkg });
   const phase2MutualRecognition = buildPhase2MutualRecognitionReadiness({ data, pkg });
@@ -1445,6 +1462,7 @@ function buildReleaseReport(options = {}) {
     project: pkg.name,
     version: pkg.version,
     profile: env.profile,
+    sourceSnapshot,
     summary: {
       total: checks.length,
       passed: checks.filter((item) => item.passed).length,
@@ -2554,8 +2572,10 @@ function runCli() {
   const options = {
     profile: flags.profile || "demo",
     envFile: flags["config-env"] || flags["env-file"] || ".env.example",
-    runCommands: flags["run-commands"] === true
+    runCommands: flags["run-commands"] === true,
+    dataFile: flags["data-file"] || "data/db.json"
   };
+  if (flags["data-file"]) options.data = readJson(String(flags["data-file"]));
   if (command === "env-check") {
     const result = validateProductionConfig(options);
     console.log(JSON.stringify(result, null, 2));
@@ -2573,7 +2593,7 @@ function runCli() {
     if (!report.ok) process.exitCode = 1;
     return;
   }
-  throw new Error("Usage: release-report.js env-check|report [--profile=demo|production] [--config-env=.env] [--run-commands] [--output=path] [--markdown=path]");
+  throw new Error("Usage: release-report.js env-check|report [--profile=demo|production] [--config-env=.env] [--data-file=data/db.json] [--run-commands] [--output=path] [--markdown=path]");
 }
 
 if (require.main === module) {

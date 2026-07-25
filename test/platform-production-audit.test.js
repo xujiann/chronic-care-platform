@@ -19,9 +19,33 @@ const {
 
 const ROOT = path.resolve(__dirname, "..");
 
+function currentReleaseBinding() {
+  const sourceSnapshot = {
+    version: 1,
+    commitSha: "test-commit",
+    sourceTreeSha256: "source-tree",
+    sourceFileCount: 5,
+    packageSha256: "package",
+    dataSha256: "data",
+    profile: "demo",
+    configFile: ".env.example",
+    dataFile: "db.json"
+  };
+  return {
+    releaseReport: {
+      generatedAt: "2026-07-25T00:00:00.000Z",
+      profile: "demo",
+      summary: { total: 374, passed: 374 },
+      sourceSnapshot
+    },
+    currentSourceSnapshot: { ...sourceSnapshot }
+  };
+}
+
 test("platform production audit separates implemented capabilities from production readiness", () => {
   const document = ["审计结论", "正式生产前已实现的主要功能", "生产割接差距", "下一步开发规划", "正式上线退出条件"].join("\n");
   const report = buildPlatformProductionAudit({
+    ...currentReleaseBinding(),
     document,
     cutoverRows: Array.from({ length: 10 }, (_, index) => ({ id: `cutover-${index + 1}`, passed: index === 0 }))
   });
@@ -38,6 +62,7 @@ test("platform production audit separates implemented capabilities from producti
   assert.equal(report.summary.identityLifecycleAdapter, true);
   assert.equal(report.summary.smsDeliveryCallbackAdapter, true);
   assert.equal(report.summary.financialCallbackReconciliationAdapter, true);
+  assert.equal(report.summary.releaseReportFresh, true);
   assert.equal(report.summary.cutoverPassed, 1);
   assert.equal(report.summary.cutoverBlocked, 9);
   assert.equal(report.capabilities.every((item) => item.evidenceReady && item.boundary), true);
@@ -70,6 +95,7 @@ test("platform production audit separates implemented capabilities from producti
   assert.equal(report.checks.find((item) => item.id === "platformAudit:identityLifecycleAdapter").passed, true);
   assert.equal(report.checks.find((item) => item.id === "platformAudit:smsDeliveryCallback").passed, true);
   assert.equal(report.checks.find((item) => item.id === "platformAudit:financialCallbackReconciliation").passed, true);
+  assert.equal(report.checks.find((item) => item.id === "platformAudit:releaseArtifactFreshness").passed, true);
 });
 
 test("platform capability operations center keeps evidence-backed reviews pre-production only", () => {
@@ -195,6 +221,7 @@ test("platform production blocker workflow requires remediation, evidence submis
 
 test("platform production audit does not require ignored release artifacts before report generation", () => {
   const report = buildPlatformProductionAudit({
+    ...currentReleaseBinding(),
     evidenceExists: (item) => !item.startsWith("release/")
   });
   assert.equal(report.ok, true);
@@ -206,6 +233,7 @@ test("platform production audit renders and writes machine-readable and formal r
   const outputDir = path.join(ROOT, "tmp", "platform-production-audit-test");
   t.after(() => fs.rmSync(outputDir, { recursive: true, force: true }));
   const report = buildPlatformProductionAudit({
+    ...currentReleaseBinding(),
     document: ["审计结论", "正式生产前已实现的主要功能", "生产割接差距", "下一步开发规划", "正式上线退出条件"].join("\n")
   });
   const markdown = renderMarkdown(report);
@@ -226,12 +254,38 @@ test("platform production audit renders and writes machine-readable and formal r
 
   const written = JSON.parse(fs.readFileSync(path.join(outputDir, "audit.json"), "utf8"));
   assert.equal(written.productionReady, false);
+  assert.equal(written.releaseReportBinding.fresh, true);
   assert.match(fs.readFileSync(path.join(outputDir, "formal.md"), "utf8"), /正式上线退出条件/);
 });
 
+test("platform production audit invalidates a release report after source or data drift", () => {
+  const binding = currentReleaseBinding();
+  const report = buildPlatformProductionAudit({
+    ...binding,
+    currentSourceSnapshot: {
+      ...binding.currentSourceSnapshot,
+      sourceTreeSha256: "changed-source-tree",
+      dataSha256: "changed-data"
+    }
+  });
+
+  assert.equal(report.ok, false);
+  assert.equal(report.summary.releaseReportFresh, false);
+  assert.deepEqual(report.releaseReportBinding.mismatches, ["sourceTreeSha256", "dataSha256"]);
+  assert.equal(report.checks.find((item) => item.id === "platformAudit:releaseArtifactFreshness").passed, false);
+  assert.match(renderMarkdown(report), /归档结果不得用于 go\/no-go/);
+});
+
 test("platform production audit CLI parser keeps output paths", () => {
-  assert.deepEqual(parseArgs(["--output=release/audit.json", "--document=docs/audit.md"]), {
+  assert.deepEqual(parseArgs([
+    "--output=release/audit.json",
+    "--document=docs/audit.md",
+    "--release-report=release/release-report.json",
+    "--data-file=release/frozen-db.json"
+  ]), {
     output: "release/audit.json",
-    document: "docs/audit.md"
+    document: "docs/audit.md",
+    "release-report": "release/release-report.json",
+    "data-file": "release/frozen-db.json"
   });
 });

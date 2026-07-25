@@ -1,11 +1,29 @@
 const assert = require("node:assert/strict");
+const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 
-const { buildReleaseReport, parseArgs, renderCutoverMarkdown, renderMarkdown, renderServiceAcceptanceMarkdown, renderStorageModelMarkdown, validateProductionConfig, writeOutput } = require("../scripts/release-report");
+const { buildReleaseReport: buildReleaseReportFromData, parseArgs, renderCutoverMarkdown, renderMarkdown, renderServiceAcceptanceMarkdown, renderStorageModelMarkdown, validateProductionConfig, writeOutput } = require("../scripts/release-report");
 
 const ROOT = path.resolve(__dirname, "..");
+let committedReleaseFixture;
+
+function releaseFixtureData() {
+  if (!committedReleaseFixture) {
+    committedReleaseFixture = JSON.parse(execFileSync("git", ["show", "HEAD:data/db.json"], {
+      cwd: ROOT,
+      encoding: "utf8",
+      maxBuffer: 64 * 1024 * 1024,
+      windowsHide: true
+    }));
+  }
+  return structuredClone(committedReleaseFixture);
+}
+
+function buildReleaseReport(options = {}) {
+  return buildReleaseReportFromData({ data: releaseFixtureData(), ...options });
+}
 
 test("release report validates demo and production environment profiles", () => {
   const demo = validateProductionConfig({
@@ -212,7 +230,7 @@ test("release report shows configured audit retention target detail", () => {
 });
 
 test("release report keeps the site evidence verification desk ready while evidence is awaiting review", () => {
-  const data = JSON.parse(fs.readFileSync(path.join(ROOT, "data/db.json"), "utf8"));
+  const data = releaseFixtureData();
   data.siteLaunchEvidence = [{
     id: "sle-release-report-partial",
     templateId: "interface-statistics-report-v1",
@@ -257,6 +275,13 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.ok, true);
   assert.equal(report.summary.failed, 0);
   assert.equal(report.summary.warnings, 0);
+  assert.equal(report.sourceSnapshot.version, 1);
+  assert.equal(report.sourceSnapshot.commitSha.length > 0, true);
+  assert.equal(report.sourceSnapshot.sourceTreeSha256.length, 64);
+  assert.equal(report.sourceSnapshot.dataSha256.length, 64);
+  assert.equal(report.sourceSnapshot.dataFile, "db.json");
+  assert.equal(report.platformProductionAudit.summary.releaseReportFresh, true);
+  assert.deepEqual(report.platformProductionAudit.releaseReportBinding.mismatches, []);
   assert.equal(report.checks.some((item) => item.name === "monitoring:alertRouting" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "monitoring:productionBoundary" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "env:ALERTING.routes" && item.passed), true);
@@ -1035,9 +1060,10 @@ test("release report writes standalone production cutover and storage artifacts"
 });
 
 test("release report CLI argument parser keeps command and flags", () => {
-  const parsed = parseArgs(["report", "--profile=production", "--config-env=.env", "--run-commands"]);
+  const parsed = parseArgs(["report", "--profile=production", "--config-env=.env", "--data-file=release/frozen-db.json", "--run-commands"]);
   assert.equal(parsed.command, "report");
   assert.equal(parsed.flags.profile, "production");
   assert.equal(parsed.flags["config-env"], ".env");
+  assert.equal(parsed.flags["data-file"], "release/frozen-db.json");
   assert.equal(parsed.flags["run-commands"], true);
 });
