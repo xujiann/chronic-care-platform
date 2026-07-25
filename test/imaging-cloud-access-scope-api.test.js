@@ -31,6 +31,9 @@ async function login(baseUrl, username) {
 test("imaging cloud applies institution scope and removes clinical identifiers from patient browsing", async (t) => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "imaging-access-scope-"));
   fs.copyFileSync(path.join(ROOT, "data", "db.json"), path.join(dataDir, "db.json"));
+  const seeded = JSON.parse(fs.readFileSync(path.join(dataDir, "db.json"), "utf8"));
+  seeded.imageCloudStudies[0].viewerUrl = "https://outside.example/ohif/should-not-leak";
+  fs.writeFileSync(path.join(dataDir, "db.json"), JSON.stringify(seeded, null, 2));
   const previous = Object.fromEntries(["NODE_ENV", "DATA_DIR", "STORAGE_ENGINE", "SESSION_STORE"].map((key) => [key, process.env[key]]));
   Object.assign(process.env, { NODE_ENV: "test", DATA_DIR: dataDir, STORAGE_ENGINE: "json", SESSION_STORE: "memory" });
   const { server, startServer, stopServer } = require("../server");
@@ -49,6 +52,7 @@ test("imaging cloud applies institution scope and removes clinical identifiers f
   const institutionDashboard = await requestJson(baseUrl, "/api/imaging-cloud", institution);
   assert.equal(institutionDashboard.response.status, 200, JSON.stringify(institutionDashboard.body));
   assert.equal(institutionDashboard.body.studies.every((study) => study.institutionCode === "MR1"), true);
+  assert.equal(institutionDashboard.body.studies.every((study) => !Object.hasOwn(study, "viewerUrl") && !Object.hasOwn(study, "accessUrl")), true);
 
   const crossInstitutionDashboard = await requestJson(baseUrl, "/api/imaging-cloud?institutionCode=MR3", institution);
   assert.equal(crossInstitutionDashboard.response.status, 200);

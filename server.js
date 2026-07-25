@@ -12482,7 +12482,13 @@ function diagnosticIntegrationPayload(payload, event, user) {
 
 function buildImageCloudDashboardResponse(data, user, filters = {}) {
   const dashboard = buildImageCloudDashboard(data, user, filters);
-  if (user.role !== "citizen") return dashboard;
+  const removeExternalViewerLinks = ({ viewerUrl, accessUrl, ...study }) => study;
+  const safeDashboard = {
+    ...dashboard,
+    studies: dashboard.studies.map(removeExternalViewerLinks),
+    mutualRecognition: dashboard.mutualRecognition.map(removeExternalViewerLinks)
+  };
+  if (user.role !== "citizen") return safeDashboard;
 
   // Patient browsing never exposes identifiers reusable against clinical systems.
   const removeClinicalIdentifiers = ({
@@ -12498,13 +12504,13 @@ function buildImageCloudDashboardResponse(data, user, filters = {}) {
     ...study
   }) => study;
   return {
-    ...dashboard,
+    ...safeDashboard,
     gateways: [],
-    studies: dashboard.studies.map(removeClinicalIdentifiers),
-    shares: dashboard.shares.map(({ token, ...share }) => share),
-    mutualRecognition: dashboard.mutualRecognition.map(removeClinicalIdentifiers),
+    studies: safeDashboard.studies.map(removeClinicalIdentifiers),
+    shares: safeDashboard.shares.map(({ token, ...share }) => share),
+    mutualRecognition: safeDashboard.mutualRecognition.map(removeClinicalIdentifiers),
     emrCompatibility: {
-      ...dashboard.emrCompatibility,
+      ...safeDashboard.emrCompatibility,
       mainIndexRule: "clinical index withheld from patient view",
       diagnosticReports: [],
       personalRecords: []
@@ -14364,6 +14370,11 @@ function canAccessBusinessRow(user, item, data) {
 
 function canAccessImageCloudStudy(data, user, study) {
   return Boolean(study) && canAccessBusinessRow(user, study, data);
+}
+
+function normalizeImagingViewerPurpose(value) {
+  const purpose = String(value || "").replace(/\s+/g, " ").trim().slice(0, 120);
+  return purpose.length >= 4 ? purpose : "";
 }
 
 function canAccessResident(user, residentId, data) {
@@ -34183,7 +34194,8 @@ async function handleApi(req, res) {
     if (!user) return;
     const studies = await listOrthancStudySummaries();
     appendSecurityEvent({ actor: user.name, role: user.role, action: "list solution A studies", target: url.pathname, result: "allowed", detail: `${studies.length} normalized DICOMweb studies` });
-    sendJson(res, 200, { generatedAt: new Date().toISOString(), summary: { studies: studies.length, synthetic: studies.filter((item) => item.synthetic).length }, studies, boundary: "Non-synthetic patient identity is masked; resident linkage requires an explicit governed mapping workflow." });
+    const summaries = studies.map(({ viewerUrl, ...study }) => study);
+    sendJson(res, 200, { generatedAt: new Date().toISOString(), summary: { studies: summaries.length, synthetic: summaries.filter((item) => item.synthetic).length }, studies: summaries, boundary: "External OHIF URLs are withheld; resident linkage and diagnostic viewing require the governed imaging-cloud workflow." });
     return;
   }
 
@@ -34245,6 +34257,8 @@ async function handleApi(req, res) {
     study.fhirImagingStudyId = fhirSync.imagingStudy.id;
     study.fhirSyncStatus = "synced";
     study.fhirSyncedAt = now;
+    delete study.viewerUrl;
+    delete study.accessUrl;
     if (existingIndex >= 0) data.imageCloudStudies[existingIndex] = study;
     else data.imageCloudStudies = [study, ...(data.imageCloudStudies || [])].slice(0, 500);
     appendDataAccessLog(data, user, residentId, "医学影像云", `关联Orthanc检查 ${study.accessionNumber}`);
@@ -34271,8 +34285,15 @@ async function handleApi(req, res) {
       sendJson(res, 409, { error: "Diagnostic Series Unavailable", message: "该检查仅提供浏览级预览，不能生成诊断级 OHIF 调阅链接" });
       return;
     }
+    const purpose = normalizeImagingViewerPurpose(url.searchParams.get("purpose"));
+    if (!purpose) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "open OHIF viewer", target: studyId, result: "denied", detail: "diagnostic purpose missing or invalid" });
+      sendJson(res, 400, { error: "Diagnostic Purpose Required", message: "诊断级调阅必须声明用途，且不得填写患者身份信息" });
+      return;
+    }
     const viewerUrl = buildOhifStudyUrl(study.studyInstanceUID);
-    appendDataAccessLog(data, user, study.residentId, "医学影像云", `通过OHIF调阅 ${study.accessionNumber}`);
+    appendDataAccessLog(data, user, study.residentId, "医学影像云", `OHIF诊断调阅用途：${purpose}；检查号：${study.accessionNumber}`);
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "open OHIF viewer", target: studyId, result: "allowed", detail: `purpose=${purpose}` });
     writeDatabase(data);
     sendJson(res, 200, { studyId, studyInstanceUID: study.studyInstanceUID, viewerUrl, viewer: "OHIF", archive: "Orthanc DICOMweb", expiresAt: null });
     return;

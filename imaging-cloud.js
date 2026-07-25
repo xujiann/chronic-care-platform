@@ -591,7 +591,6 @@ async function submitImagingIngest(event) {
 
 async function handleImagingAction(event) {
   const linkExternalButton = event.target.closest("[data-link-external-study]");
-  const externalOhifButton = event.target.closest("[data-open-external-ohif]");
   const ohifButton = event.target.closest("[data-open-ohif]");
   const viewButton = event.target.closest("[data-view-study]");
   const shareButton = event.target.closest("[data-share-study]");
@@ -606,10 +605,6 @@ async function handleImagingAction(event) {
   const startImagingTeleconsultationButton = event.target.closest("[data-start-imaging-teleconsultation]");
   if (linkExternalButton) {
     await linkExternalStudy(linkExternalButton.dataset.linkExternalStudy);
-    return;
-  }
-  if (externalOhifButton) {
-    window.open(externalOhifButton.dataset.openExternalOhif, "_blank", "noopener,noreferrer");
     return;
   }
   if (ohifButton) {
@@ -780,8 +775,11 @@ async function loadSolutionAHealth() {
 
 async function openOhifViewer(studyId) {
   if (!IMAGING_API_BASE) return;
+  const purpose = (window.prompt("请输入诊断调阅用途（不得填写患者身份信息）", "影像诊断复核") || "").trim();
+  if (!purpose) return;
   const request = window.HealthCityAuth?.authFetch || fetch;
-  const response = await request(`${IMAGING_API_BASE}/imaging-cloud/studies/${encodeURIComponent(studyId)}/viewer`);
+  const params = new URLSearchParams({ purpose });
+  const response = await request(`${IMAGING_API_BASE}/imaging-cloud/studies/${encodeURIComponent(studyId)}/viewer?${params}`);
   const payload = await response.json();
   if (!response.ok) { window.alert(payload.message || "OHIF调阅失败"); return; }
   window.open(payload.viewerUrl, "_blank", "noopener,noreferrer");
@@ -801,8 +799,7 @@ async function loadSolutionAStudies() {
       <td>${escapeHtml(item.studyDescription || "未命名检查")}<br><small>${escapeHtml(item.studyDate || "日期未提供")}</small></td>
       <td>${escapeHtml(item.modalities || "OT")}</td>
       <td><small>${escapeHtml(item.studyInstanceUID)}</small></td>
-      <td><button class="inline-action primary" type="button" data-open-external-ohif="${escapeHtml(item.viewerUrl)}">OHIF调阅</button>
-      <button class="inline-action" type="button" data-link-external-study="${escapeHtml(item.studyInstanceUID)}">关联当前居民</button></td>
+      <td><button class="inline-action" type="button" data-link-external-study="${escapeHtml(item.studyInstanceUID)}">关联当前居民</button></td>
     </tr>`).join("") || `<tr><td colspan="5">Orthanc中暂无检查。</td></tr>`}</tbody></table><p class="hint">${escapeHtml(payload.boundary || "")}</p>`;
   } catch (error) {
     target.innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`;

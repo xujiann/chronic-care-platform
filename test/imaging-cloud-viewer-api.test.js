@@ -42,7 +42,10 @@ test("diagnostic OHIF links stay unavailable to citizens and browser-level studi
   const citizenAttempt = await requestJson(baseUrl, "/api/imaging-cloud/studies/ics-ct-r1-20260521/viewer", citizen);
   assert.equal(citizenAttempt.response.status, 403);
 
-  const clinicalViewer = await requestJson(baseUrl, "/api/imaging-cloud/studies/ics-ct-r1-20260521/viewer", institution);
+  const missingPurpose = await requestJson(baseUrl, "/api/imaging-cloud/studies/ics-ct-r1-20260521/viewer", institution);
+  assert.equal(missingPurpose.response.status, 400);
+
+  const clinicalViewer = await requestJson(baseUrl, "/api/imaging-cloud/studies/ics-ct-r1-20260521/viewer?purpose=diagnostic%20review", institution);
   assert.equal(clinicalViewer.response.status, 200, JSON.stringify(clinicalViewer.body));
   assert.equal(clinicalViewer.body.viewer, "OHIF");
 
