@@ -10952,7 +10952,8 @@ function buildImageCloudDashboard(data, user, filters = {}) {
   const residentId = filters.residentId || (user.role === "citizen" ? user.residentId : "");
   const studies = (Array.isArray(data.imageCloudStudies) ? data.imageCloudStudies : [])
     .filter((item) => (!residentId || item.residentId === residentId))
-    .filter((item) => !filters.institutionCode || item.institutionCode === filters.institutionCode);
+    .filter((item) => !filters.institutionCode || item.institutionCode === filters.institutionCode)
+    .filter((item) => canAccessImageCloudStudy(data, user, item));
   const studyIds = new Set(studies.map((item) => item.id));
   const shares = (Array.isArray(data.imageCloudShares) ? data.imageCloudShares : []).filter((item) => studyIds.has(item.studyId));
   const reviews = (Array.isArray(data.imageCloudQualityReviews) ? data.imageCloudQualityReviews : []).filter((item) => studyIds.has(item.studyId));
@@ -10963,7 +10964,9 @@ function buildImageCloudDashboard(data, user, filters = {}) {
   const teleconsultations = (Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [])
     .filter((item) => studyIds.has(item.imageCloudStudyId));
   const gateways = (Array.isArray(data.imageCloudGateways) ? data.imageCloudGateways : [])
-    .filter((item) => !filters.institutionCode || item.institutionCode === filters.institutionCode);
+    .filter((item) => user.role !== "citizen")
+    .filter((item) => !filters.institutionCode || item.institutionCode === filters.institutionCode)
+    .filter((item) => user.role !== "institution" || rowMatchesOrganizationScope(data, user, item));
   const activeShares = shares.filter((item) => item.status === "active" && new Date(item.expiresAt).getTime() > Date.now());
   return {
     summary: {
@@ -11021,6 +11024,9 @@ function normalizeImageCloudStudy(payload, user, data) {
   const bodyPart = String(payload.bodyPart || "未标注部位").trim();
   const institutionName = String(payload.institutionName || gateway?.institutionName || user.orgName || "医疗机构").trim();
   const id = String(payload.id || `ics-${institutionCode.toLowerCase()}-${accessionNumber.toLowerCase().replace(/[^a-z0-9-]/g, "-")}`).slice(0, 90);
+  if (user.role === "institution" && !rowMatchesOrganizationScope(data, user, { institutionCode, institutionName })) {
+    throw new Error("forbidden institution scope");
+  }
   return {
     id,
     residentId,
@@ -12471,6 +12477,38 @@ function diagnosticIntegrationPayload(payload, event, user) {
     critical: Boolean(diagnosticIntegrationField(payload, "critical", false)),
     criticalLevel: String(diagnosticIntegrationField(payload, "criticalLevel")).trim(),
     criticalAction: String(diagnosticIntegrationField(payload, "criticalAction")).trim()
+  };
+}
+
+function buildImageCloudDashboardResponse(data, user, filters = {}) {
+  const dashboard = buildImageCloudDashboard(data, user, filters);
+  if (user.role !== "citizen") return dashboard;
+
+  // Patient browsing never exposes identifiers reusable against clinical systems.
+  const removeClinicalIdentifiers = ({
+    mainIndex,
+    studyInstanceUID,
+    personIndex,
+    patientName,
+    fhirPatientId,
+    fhirImagingStudyId,
+    fhirDiagnosticReportId,
+    viewerUrl,
+    accessUrl,
+    ...study
+  }) => study;
+  return {
+    ...dashboard,
+    gateways: [],
+    studies: dashboard.studies.map(removeClinicalIdentifiers),
+    shares: dashboard.shares.map(({ token, ...share }) => share),
+    mutualRecognition: dashboard.mutualRecognition.map(removeClinicalIdentifiers),
+    emrCompatibility: {
+      ...dashboard.emrCompatibility,
+      mainIndexRule: "clinical index withheld from patient view",
+      diagnosticReports: [],
+      personalRecords: []
+    }
   };
 }
 
@@ -14322,6 +14360,10 @@ function canAccessBusinessRow(user, item, data) {
   if (user.role !== "institution") return true;
   if (rowHasOrganizationScope(item)) return rowMatchesOrganizationScope(data, user, item);
   return references.every((residentId) => residentPrimaryMatchesOrganization(data, user, residentId));
+}
+
+function canAccessImageCloudStudy(data, user, study) {
+  return Boolean(study) && canAccessBusinessRow(user, study, data);
 }
 
 function canAccessResident(user, residentId, data) {
@@ -34036,7 +34078,7 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/imaging-cloud/governance");
     if (!user) return;
     const data = readDatabase();
-    const studies = (data.imageCloudStudies || []).filter((item) => user.role !== "institution" || item.institutionCode === user.orgCode || item.institutionName === user.orgName);
+    const studies = (data.imageCloudStudies || []).filter((item) => canAccessImageCloudStudy(data, user, item));
     sendJson(res, 200, ImagingCloudGovernance.dashboard(data, studies));
     return;
   }
@@ -34063,7 +34105,7 @@ async function handleApi(req, res) {
     const data = readDatabase();
     const study = (data.imageCloudStudies || []).find((item) => item.id === decodeURIComponent(imagingPerformanceMatch[1]));
     if (!study) { sendJson(res, 404, { error: "Not Found", message: "未找到影像检查" }); return; }
-    if (!canAccessResident(user, study.residentId, data)) { sendJson(res, 403, { error: "Forbidden", message: "无权记录该影像检查的性能数据" }); return; }
+    if (!canAccessImageCloudStudy(data, user, study)) { sendJson(res, 403, { error: "Forbidden", message: "无权记录该影像检查的性能数据" }); return; }
     try {
       const event = ImagingCloudGovernance.recordPerformance(data, user, study, await collectJson(req));
       appendDataAccessLog(data, user, study.residentId, "医学影像云性能采样", "记录匿名化移动端影像浏览性能");
@@ -34119,7 +34161,7 @@ async function handleApi(req, res) {
       appendDataAccessLog(data, user, residentId, "医学影像云", "查询影像检查、报告和电子病历索引");
       writeDatabase(data);
     }
-    const dashboard = buildImageCloudDashboard(data, user, {
+    const dashboard = buildImageCloudDashboardResponse(data, user, {
       residentId,
       institutionCode: url.searchParams.get("institutionCode") || ""
     });
@@ -34153,6 +34195,12 @@ async function handleApi(req, res) {
     const residentId = String(payload.residentId || "").trim();
     const approvalEvidence = String(payload.approvalEvidence || "").trim();
     const data = readDatabase();
+    const institutionCode = String(payload.institutionCode || user.orgCode || "SOLUTION-A").trim();
+    const institutionName = String(payload.institutionName || user.orgName || "Solution A pilot institution").trim();
+    if (user.role === "institution" && !rowMatchesOrganizationScope(data, user, { institutionCode, institutionName })) {
+      sendJson(res, 403, { error: "Forbidden", message: "institution scope denied" });
+      return;
+    }
     if (!residentId || !canAccessResident(user, residentId, data)) {
       sendJson(res, residentId ? 403 : 400, { error: residentId ? "Forbidden" : "Bad Request", message: residentId ? "无权关联该居民" : "residentId不能为空" });
       return;
@@ -34167,14 +34215,18 @@ async function handleApi(req, res) {
     const resident = (data.residents || []).find((item) => item.id === residentId);
     if (!resident) { sendJson(res, 404, { error: "Not Found", message: "未找到居民" }); return; }
     const existingIndex = (data.imageCloudStudies || []).findIndex((item) => item.studyInstanceUID === studyInstanceUID);
+    if (existingIndex >= 0 && !canAccessImageCloudStudy(data, user, data.imageCloudStudies[existingIndex])) {
+      sendJson(res, 403, { error: "Forbidden", message: "existing study scope denied" });
+      return;
+    }
     const now = new Date().toISOString();
     const study = {
       ...(existingIndex >= 0 ? data.imageCloudStudies[existingIndex] : {}),
       id: existingIndex >= 0 ? data.imageCloudStudies[existingIndex].id : `ics-orthanc-${createHash("sha256").update(studyInstanceUID).digest("hex").slice(0, 16)}`,
       residentId, personIndex: personIndexForResident(new Map(data.residents.map((item) => [item.id, item])), residentId),
-      institutionCode: String(payload.institutionCode || user.orgCode || "SOLUTION-A"), institutionName: String(payload.institutionName || user.orgName || "方案A试点机构"),
+      institutionCode, institutionName,
       accessionNumber: externalStudy.accessionNumber || `ORTHANC-${studyInstanceUID.split(".").pop()}`,
-      studyInstanceUID, mainIndex: `${String(payload.institutionCode || user.orgCode || "SOLUTION-A")}#${resident.idCard || residentId}#${externalStudy.accessionNumber || studyInstanceUID}`,
+      studyInstanceUID, mainIndex: `${institutionCode}#${resident.idCard || residentId}#${externalStudy.accessionNumber || studyInstanceUID}`,
       patientName: resident.name, modality: externalStudy.modalities || "OT", bodyPart: externalStudy.studyDescription || "合成影像预览",
       studyDate: externalStudy.studyDate || new Date().toISOString().slice(0, 10), reportConclusion: "方案A外部影像已完成受控索引关联，诊断报告待正式系统回传。",
       seriesCount: 1, imageCount: 1, diagnosticLevel: false, browserLevel: true, uploadMode: "Orthanc DICOMweb",
@@ -34209,7 +34261,7 @@ async function handleApi(req, res) {
     const studyId = decodeURIComponent(imagingViewerMatch[1]);
     const study = (data.imageCloudStudies || []).find((item) => item.id === studyId);
     if (!study) { sendJson(res, 404, { error: "Not Found", message: "未找到影像检查" }); return; }
-    if (!canAccessResident(user, study.residentId, data)) {
+    if (!canAccessImageCloudStudy(data, user, study)) {
       appendSecurityEvent({ actor: user.name, role: user.role, action: "open OHIF viewer", target: studyId, result: "denied", detail: "resident scope denied" });
       sendJson(res, 403, { error: "Forbidden", message: "无权调阅该居民影像" });
       return;
@@ -34279,7 +34331,7 @@ async function handleApi(req, res) {
       sendJson(res, 404, { error: "Not Found", message: "未找到影像云检查" });
       return;
     }
-    if (!canAccessResident(user, study.residentId, data)) {
+    if (!canAccessImageCloudStudy(data, user, study)) {
       appendSecurityEvent({ actor: user.name, role: user.role, action: "share imaging study", target: studyId, result: "denied", detail: "resident scope denied" });
       sendJson(res, 403, { error: "Forbidden", message: "无权分享该居民影像资料" });
       return;
@@ -34319,7 +34371,7 @@ async function handleApi(req, res) {
       sendJson(res, 404, { error: "Not Found", message: "影像检查或分享授权不存在" });
       return;
     }
-    if (!canAccessResident(user, study.residentId, data)) {
+    if (!canAccessImageCloudStudy(data, user, study)) {
       appendSecurityEvent({ actor: user.name, role: user.role, action: "revoke imaging share", target: shareId, result: "denied", detail: "resident scope denied" });
       sendJson(res, 403, { error: "Forbidden", message: "无权撤销该居民影像分享" });
       return;
@@ -34354,7 +34406,7 @@ async function handleApi(req, res) {
       return;
     }
     const study = data.imageCloudStudies[studyIndex];
-    if (!canAccessResident(user, study.residentId, data)) {
+    if (!canAccessImageCloudStudy(data, user, study)) {
       appendSecurityEvent({ actor: user.name, role: user.role, action: "create imaging teleconsultation", target: studyId, result: "denied", detail: "resident scope denied" });
       sendJson(res, 403, { error: "Forbidden", message: "无权为该居民影像发起远程会诊" });
       return;
@@ -34430,6 +34482,11 @@ async function handleApi(req, res) {
       sendJson(res, 404, { error: "Not Found", message: "未找到影像云检查" });
       return;
     }
+    if (!canAccessImageCloudStudy(data, user, data.imageCloudStudies[index])) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "review imaging quality", target: studyId, result: "denied", detail: "clinical and institution scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "无权质控该影像检查" });
+      return;
+    }
     const payload = await collectJson(req);
     const review = {
       id: `icq-${randomUUID()}`,
@@ -34484,7 +34541,7 @@ async function handleApi(req, res) {
       return;
     }
     const study = data.imageCloudStudies[index];
-    if (!canAccessResident(user, study.residentId, data)) {
+    if (!canAccessImageCloudStudy(data, user, study)) {
       appendSecurityEvent({ actor: user.name, role: user.role, action: "retry imaging FHIR writeback", target: studyId, result: "denied", detail: "resident scope denied" });
       sendJson(res, 403, { error: "Forbidden", message: "无权重试该居民影像报告回写" });
       return;
@@ -34542,7 +34599,7 @@ async function handleApi(req, res) {
       return;
     }
     const study = data.imageCloudStudies[studyIndex];
-    if (!canAccessResident(user, study.residentId, data)) {
+    if (!canAccessImageCloudStudy(data, user, study)) {
       appendSecurityEvent({ actor: user.name, role: user.role, action: "start imaging mutual recognition", target: studyId, result: "denied", detail: "resident scope denied" });
       sendJson(res, 403, { error: "Forbidden", message: "无权将该居民影像纳入跨机构互认" });
       return;
@@ -34591,7 +34648,7 @@ async function handleApi(req, res) {
       return;
     }
     const study = data.imageCloudStudies[studyIndex];
-    if (!canAccessResident(user, study.residentId, data)) {
+    if (!canAccessImageCloudStudy(data, user, study)) {
       appendSecurityEvent({ actor: user.name, role: user.role, action: "decide imaging mutual recognition", target: studyId, result: "denied", detail: "resident scope denied" });
       sendJson(res, 403, { error: "Forbidden", message: "无权确认该居民影像互认结果" });
       return;

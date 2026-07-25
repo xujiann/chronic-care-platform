@@ -258,11 +258,13 @@ async function handleProductionSubmit(event) {
 }
 
 function renderFilters(payload) {
+  const isPatientView = window.HealthCityAuth?.getUser?.()?.role === "citizen";
   const residents = getFallbackResidents();
   const residentSelect = document.querySelector("#resident-filter");
   const ingestResidentSelect = document.querySelector("#ingest-form select[name='residentId']");
   const residentOptions = [`<option value="">全部可授权居民</option>`].concat(residents.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)} · ${escapeHtml(item.id)}</option>`)).join("");
   if (residentSelect) {
+    residentSelect.closest("label")?.toggleAttribute("hidden", isPatientView);
     residentSelect.innerHTML = residentOptions;
     residentSelect.value = imagingState.selectedResidentId;
   }
@@ -272,6 +274,7 @@ function renderFilters(payload) {
   const institutions = [...new Map([...(payload.gateways || []).map((item) => [item.institutionCode, item.institutionName]), ...(payload.studies || []).map((item) => [item.institutionCode, item.institutionName])]).entries()];
   const institutionSelect = document.querySelector("#institution-filter");
   if (institutionSelect) {
+    institutionSelect.closest("label")?.toggleAttribute("hidden", isPatientView);
     institutionSelect.innerHTML = [`<option value="">全部机构</option>`].concat(institutions.map(([code, name]) => `<option value="${escapeHtml(code)}">${escapeHtml(name)} · ${escapeHtml(code)}</option>`)).join("");
     institutionSelect.value = imagingState.selectedInstitutionCode;
   }
