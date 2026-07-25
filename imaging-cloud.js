@@ -86,6 +86,7 @@ function renderImagingCloud() {
   renderProductionGate(imagingState.productionCenter || payload.productionCenter || fallbackProductionCenter());
   renderStudyTable(studies);
   renderMutualRecognition(payload.mutualRecognition || []);
+  renderImagingTeleconsultations(payload.teleconsultations || []);
   renderGovernance(payload.governance || {});
   renderDevelopmentPlan(payload);
   renderGateways(payload);
@@ -312,6 +313,7 @@ function renderStudyTable(studies) {
         <button class="inline-action primary" type="button" data-open-ohif="${escapeHtml(item.id)}">OHIF调阅</button>
         <button class="inline-action" type="button" data-share-study="${escapeHtml(item.id)}">分享</button>
         ${canRetryFhirWriteback(item) ? `<button class="inline-action" type="button" data-retry-fhir-writeback="${escapeHtml(item.id)}">重试FHIR回写</button>` : ""}
+        ${canStartImagingTeleconsultation(item) ? `<button class="inline-action" type="button" data-start-imaging-teleconsultation="${escapeHtml(item.id)}">发起远程会诊</button>` : ""}
         ${canManageMutualRecognition() && !item.mutualRecognitionRecordId ? `<button class="inline-action" type="button" data-start-recognition="${escapeHtml(item.id)}">纳入互认</button>` : ""}
       </td>
     </tr>`).join("") || `<tr><td colspan="7">暂无影像云检查。</td></tr>`}</tbody>
@@ -365,6 +367,24 @@ function canSubmitRecognitionAppeal() {
 
 function canRetryFhirWriteback(item) {
   return ["commission", "institution"].includes(window.HealthCityAuth?.getUser?.()?.role) && item?.fhirReportSyncStatus === "failed";
+}
+
+function canStartImagingTeleconsultation(item) {
+  return ["commission", "institution", "county"].includes(window.HealthCityAuth?.getUser?.()?.role) && !item?.teleconsultationId;
+}
+
+function renderImagingTeleconsultations(rows) {
+  const target = document.querySelector("#imaging-teleconsultation-table");
+  if (!target) return;
+  target.innerHTML = `<table>
+    <thead><tr><th>影像检查</th><th>会诊路径</th><th>状态</th><th>材料边界</th></tr></thead>
+    <tbody>${rows.map((item) => `<tr>
+      <td><strong>${escapeHtml(item.imageReference?.modality || "影像检查")} · ${escapeHtml(item.imageReference?.bodyPart || "")}</strong><br><small>${escapeHtml(item.imageCloudStudyId || "")}</small></td>
+      <td>${escapeHtml(item.sourceInstitution)}<br><small>至 ${escapeHtml(item.targetInstitution)} · ${escapeHtml(item.department || "待分诊")}</small></td>
+      <td><span class="badge ${/returned|closed/i.test(`${item.status} ${item.reportStatus}`) ? "ok" : "info"}">${escapeHtml(item.status)}</span><br><small>${escapeHtml(item.reportStatus || "待报告回传")}</small></td>
+      <td><small>${escapeHtml((item.materials || []).join("、"))}<br>原始 DICOM：${item.imageReference?.rawDicomIncluded === false ? "未携带" : "受控调阅"}</small></td>
+    </tr>`).join("") || `<tr><td colspan="4">暂无影像远程会诊；机构端可从检查列表发起。</td></tr>`}</tbody>
+  </table>`;
 }
 
 function renderGateways(payload) {
@@ -579,6 +599,7 @@ async function handleImagingAction(event) {
   const revokeShareButton = event.target.closest("[data-revoke-imaging-share]");
   const catalogActionButton = event.target.closest("[data-imaging-catalog-action]");
   const retryFhirWritebackButton = event.target.closest("[data-retry-fhir-writeback]");
+  const startImagingTeleconsultationButton = event.target.closest("[data-start-imaging-teleconsultation]");
   if (linkExternalButton) {
     await linkExternalStudy(linkExternalButton.dataset.linkExternalStudy);
     return;
@@ -626,6 +647,10 @@ async function handleImagingAction(event) {
   }
   if (retryFhirWritebackButton) {
     await retryFhirWriteback(retryFhirWritebackButton.dataset.retryFhirWriteback);
+    return;
+  }
+  if (startImagingTeleconsultationButton) {
+    await startImagingTeleconsultation(startImagingTeleconsultationButton.dataset.startImagingTeleconsultation);
     return;
   }
   if (performanceButton) {
@@ -684,6 +709,24 @@ async function retryFhirWriteback(studyId) {
   await loadImagingCloud();
   renderImagingCloud();
   window.alert("FHIR影像报告回写成功。");
+}
+
+async function startImagingTeleconsultation(studyId) {
+  const targetInstitution = (window.prompt("请输入接诊机构", "大连市中心医院") || "").trim();
+  const department = (window.prompt("请输入会诊科室", "放射科") || "").trim();
+  const clinicalQuestion = (window.prompt("请输入会诊问题（不填写患者身份信息）", "请结合影像报告给予诊断与后续检查建议") || "").trim();
+  if (!targetInstitution || !department || !clinicalQuestion) return;
+  if (!IMAGING_API_BASE) { window.alert("静态预览不创建远程会诊工单。\n"); return; }
+  const response = await (window.HealthCityAuth?.authFetch || fetch)(`${IMAGING_API_BASE}/imaging-cloud/studies/${encodeURIComponent(studyId)}/teleconsultations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ targetInstitution, department, clinicalQuestion, priority: "normal" })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) { window.alert(payload.message || "发起影像远程会诊失败"); return; }
+  await loadImagingCloud();
+  renderImagingCloud();
+  window.alert("影像远程会诊工单已创建，等待接诊机构反馈与报告回传。");
 }
 
 async function recordImagingPerformance(studyId) {

@@ -28,6 +28,7 @@ test("imaging cloud readiness validates province-spec capabilities", () => {
   assert.equal(report.checks.some((item) => item.id === "spec:hospital-ingest" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "spec:emr-compatibility" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "emr:writeback-retry" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "spec:imaging-teleconsultation" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "spec:mutual-recognition" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "spec:recognition-appeal" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "spec:security" && item.passed), true);
@@ -46,6 +47,7 @@ test("imaging cloud readiness validates province-spec capabilities", () => {
   assert.equal(report.summary.requiredCapabilities.includes("development plan"), true);
   assert.equal(report.summary.requiredCapabilities.includes("mutual-recognition appeal"), true);
   assert.equal(report.summary.requiredCapabilities.includes("FHIR writeback retry"), true);
+  assert.equal(report.summary.requiredCapabilities.includes("imaging teleconsultation"), true);
   assert.equal(report.summary.requiredCapabilities.includes("formal production gate"), true);
   assert.equal(report.summary.production.syntheticChecks, 10);
   assert.equal(report.summary.production.requirements, 7);

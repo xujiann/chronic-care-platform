@@ -10948,6 +10948,8 @@ function buildImageCloudDashboard(data, user, filters = {}) {
   const personalRecords = (Array.isArray(data.personalRecords) ? data.personalRecords : []).filter((item) => item.category === "imaging" && studyIds.has(item.meta?.imageCloudStudyId));
   const mutualRecognition = (Array.isArray(data.countyMutualRecognitionRecords) ? data.countyMutualRecognitionRecords : [])
     .filter((item) => studyIds.has(item.imageCloudStudyId));
+  const teleconsultations = (Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [])
+    .filter((item) => studyIds.has(item.imageCloudStudyId));
   const gateways = (Array.isArray(data.imageCloudGateways) ? data.imageCloudGateways : [])
     .filter((item) => !filters.institutionCode || item.institutionCode === filters.institutionCode);
   const activeShares = shares.filter((item) => item.status === "active" && new Date(item.expiresAt).getTime() > Date.now());
@@ -34208,6 +34210,83 @@ async function handleApi(req, res) {
     appendDataAccessLog(data, user, study.residentId, "医学影像云", `撤销影像分享 ${study.accessionNumber} · ${share.channel} · ${reason}`);
     writeDatabase(data);
     sendJson(res, 200, { share });
+    return;
+  }
+
+  const imagingTeleconsultationMatch = url.pathname.match(/^\/api\/imaging-cloud\/studies\/([^/]+)\/teleconsultations$/);
+  if (req.method === "POST" && imagingTeleconsultationMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/imaging-cloud/studies/:id/teleconsultations");
+    if (!user) return;
+    const data = readDatabase();
+    const studyId = decodeURIComponent(imagingTeleconsultationMatch[1]);
+    const studyIndex = (data.imageCloudStudies || []).findIndex((item) => item.id === studyId);
+    if (studyIndex < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到影像云检查" });
+      return;
+    }
+    const study = data.imageCloudStudies[studyIndex];
+    if (!canAccessResident(user, study.residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "create imaging teleconsultation", target: studyId, result: "denied", detail: "resident scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "无权为该居民影像发起远程会诊" });
+      return;
+    }
+    if ((data.referralTeleconsultations || []).some((item) => item.imageCloudStudyId === studyId && !isClosedTaskStatus(item.status))) {
+      sendJson(res, 409, { error: "Conflict", message: "该影像检查已有进行中的远程会诊" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const authorization = String(payload.residentAuthorizationId || "").trim()
+      ? (data.personalRecords || []).find((item) => item.id === String(payload.residentAuthorizationId).trim() && item.residentId === study.residentId)
+      : (data.personalRecords || []).find((item) => item.residentId === study.residentId && item.category === "authorizations");
+    if (!authorization || !hasResidentAuthorization(data, study.residentId, authorization.id)) {
+      sendJson(res, 409, { error: "Resident Authorization Required", message: "居民有效授权记录是发起影像远程会诊的前置条件" });
+      return;
+    }
+    const report = (data.diagnosticReports || []).find((item) => item.imageCloudStudyId === studyId);
+    try {
+      const consultation = normalizeReferralTeleconsultation({
+        residentId: study.residentId,
+        residentAuthorizationId: authorization.id,
+        type: "imaging-teleconsultation",
+        diseaseType: String(payload.diseaseType || study.modality || "imaging").trim(),
+        sourceInstitution: study.institutionName,
+        sourceInstitutionCode: study.institutionCode,
+        targetInstitution: payload.targetInstitution,
+        targetInstitutionCode: payload.targetInstitutionCode,
+        department: payload.department,
+        priority: payload.priority || "normal",
+        due: payload.due,
+        clinicalQuestion: payload.clinicalQuestion,
+        collaborationOrderId: study.countyCollaborationOrderId || payload.collaborationOrderId || "",
+        materials: [`image-cloud-study:${study.id}`, ...(report ? [`diagnostic-report:${report.id}`] : [])],
+        note: "影像云检查授权发起远程会诊"
+      }, user, data);
+      consultation.imageCloudStudyId = study.id;
+      consultation.imageReference = {
+        studyId: study.id,
+        modality: study.modality,
+        bodyPart: study.bodyPart,
+        reportId: report?.id || "",
+        rawDicomIncluded: false
+      };
+      if (!canAccessReferralTeleconsultation(user, consultation, data)) {
+        sendJson(res, 403, { error: "Forbidden", message: "无权创建该机构远程会诊工单" });
+        return;
+      }
+      data.referralTeleconsultations = [consultation, ...(Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [])].slice(0, 300);
+      data.imageCloudStudies[studyIndex] = {
+        ...study,
+        teleconsultationId: consultation.id,
+        teleconsultationStatus: consultation.status,
+        updatedAt: new Date().toISOString()
+      };
+      appendDataAccessLog(data, user, study.residentId, "医学影像云", `发起影像远程会诊 ${study.accessionNumber} · ${consultation.id}`);
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "create imaging teleconsultation", target: studyId, result: "allowed", detail: `${consultation.id} · ${consultation.targetInstitution}` });
+      writeDatabase(data);
+      sendJson(res, 201, { consultation, study: data.imageCloudStudies[studyIndex] });
+    } catch (error) {
+      sendJson(res, error.status || 400, { error: "Bad Request", message: error.message });
+    }
     return;
   }
 
