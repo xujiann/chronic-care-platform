@@ -118,6 +118,15 @@ const {
   renderExpertConsultationMarkdown,
   synchronizeAcceptanceMetrics
 } = require("./research-expert-consultation");
+const {
+  applyRaterConsistencyBatchAction,
+  buildRaterConsistencyCenter,
+  createRaterConsistencyBatch,
+  normalizeRaterConsistencyBatches,
+  recordRaterSubmission,
+  renderRaterConsistencyMarkdown,
+  synchronizeRaterConsistencyAcceptance
+} = require("./research-rater-consistency");
 const { buildReleaseReport, buildServiceAcceptanceSummary } = require("./scripts/release-report");
 const { buildReleaseArtifactManifest } = require("./scripts/release-artifact-manifest");
 const { buildCapabilityMap, renderCapabilityMapMarkdown } = require("./platform-capability-map");
@@ -1161,6 +1170,7 @@ function seedState() {
     pilotAcceptanceInterfaceReviews: [],
     researchProjectAcceptanceItems: seedResearchProjectAcceptanceItems(),
     researchExpertConsultationRounds: [],
+    researchRaterConsistencyBatches: [],
     productionDeploymentPlan: seedProductionDeploymentPlan(),
     productionDatabaseMigrationBatches: seedProductionDatabaseMigrationBatches(),
     productionDatabaseCutoverRuns: seedProductionDatabaseCutoverRuns(),
@@ -10226,6 +10236,7 @@ function normalizeState(data) {
     pilotAcceptanceInterfaceReviews: buildInterfaceReviews(data),
     researchProjectAcceptanceItems: normalizeResearchProjectAcceptanceItems(data.researchProjectAcceptanceItems),
     researchExpertConsultationRounds: normalizeExpertConsultationRounds(data.researchExpertConsultationRounds),
+    researchRaterConsistencyBatches: normalizeRaterConsistencyBatches(data.researchRaterConsistencyBatches),
     productionDeploymentPlan: mergeByKey(seedProductionDeploymentPlan(), data.productionDeploymentPlan, "id"),
     productionDatabaseMigrationBatches: mergeByKey(seedProductionDatabaseMigrationBatches(), data.productionDatabaseMigrationBatches, "id"),
     productionDatabaseCutoverRuns: mergeByKey(seedProductionDatabaseCutoverRuns(), data.productionDatabaseCutoverRuns, "id"),
@@ -10440,6 +10451,7 @@ function completeSystemTargets(state) {
   state.pilotAcceptanceInterfaceReviews = buildInterfaceReviews(state);
   state.researchProjectAcceptanceItems = normalizeResearchProjectAcceptanceItems(state.researchProjectAcceptanceItems);
   state.researchExpertConsultationRounds = normalizeExpertConsultationRounds(state.researchExpertConsultationRounds);
+  state.researchRaterConsistencyBatches = normalizeRaterConsistencyBatches(state.researchRaterConsistencyBatches);
   state.productionDeploymentPlan = mergeByKey(seedProductionDeploymentPlan(), state.productionDeploymentPlan, "id").map((item) => ({
     ...item,
     requiredConfig: Array.isArray(item.requiredConfig) ? item.requiredConfig : [],
@@ -16423,6 +16435,7 @@ function scopeStateForUser(data, user) {
   delete scoped.pilotAcceptanceInterfaceReviews;
   delete scoped.researchProjectAcceptanceItems;
   delete scoped.researchExpertConsultationRounds;
+  delete scoped.researchRaterConsistencyBatches;
   delete scoped.productionDeploymentPlan;
   delete scoped.productionDatabaseMigrationBatches;
   delete scoped.productionDatabaseCutoverRuns;
@@ -30884,6 +30897,108 @@ async function handleApi(req, res) {
     if (!user) return;
     const data = readDatabase();
     sendJson(res, 200, buildMasterDataDirectory(data));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/research-project/rater-consistency") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/research-project/rater-consistency");
+    if (!user) return;
+    const center = buildRaterConsistencyCenter(readDatabase());
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "research-rater-consistency-read",
+      target: "/api/research-project/rater-consistency",
+      result: "allowed",
+      detail: `${center.summary.verified}/${center.summary.batches} batches verified`
+    });
+    if (url.searchParams.get("format") === "markdown") {
+      sendText(res, 200, renderRaterConsistencyMarkdown(center), "text/markdown; charset=utf-8");
+    } else {
+      sendJson(res, 200, center);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/research-project/rater-consistency/batches") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/research-project/rater-consistency/batches");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req);
+      const data = readDatabase();
+      data.researchRaterConsistencyBatches = createRaterConsistencyBatch(data.researchRaterConsistencyBatches, payload, user);
+      data.researchProjectAcceptanceItems = synchronizeRaterConsistencyAcceptance(data);
+      writeDatabase(normalizeState(data));
+      const center = buildRaterConsistencyCenter(data);
+      const batch = center.batches.find((item) => item.batchNumber === Number(payload.batchNumber));
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: "research-rater-batch-create",
+        target: batch?.id || "research-rater-batch",
+        result: "allowed",
+        detail: `${batch?.method || "unknown"} / ${batch?.cases.length || 0} cases / ${batch?.expectedRaters || 0} raters`
+      });
+      sendJson(res, 201, { ok: true, batch, center, acceptanceCenter: buildResearchProjectAcceptanceCenter(data) });
+    } catch (error) {
+      sendJson(res, error.status || 400, { error: error.status === 403 ? "Forbidden" : "Bad Request", message: error.message });
+    }
+    return;
+  }
+
+  const researchRaterSubmissionMatch = url.pathname.match(/^\/api\/research-project\/rater-consistency\/batches\/([^/]+)\/ratings$/);
+  if (req.method === "POST" && researchRaterSubmissionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/research-project/rater-consistency/batches/:id/ratings");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req);
+      const data = readDatabase();
+      const batchId = decodeURIComponent(researchRaterSubmissionMatch[1]);
+      const result = recordRaterSubmission(data.researchRaterConsistencyBatches, batchId, payload, user);
+      data.researchRaterConsistencyBatches = result.batches;
+      data.researchProjectAcceptanceItems = synchronizeRaterConsistencyAcceptance(data);
+      writeDatabase(normalizeState(data));
+      const center = buildRaterConsistencyCenter(data);
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: "research-rater-submission-record",
+        target: batchId,
+        result: "allowed",
+        detail: `${result.submission.id} / anonymized`
+      });
+      sendJson(res, 201, { ok: true, submission: result.submission, center, acceptanceCenter: buildResearchProjectAcceptanceCenter(data) });
+    } catch (error) {
+      sendJson(res, error.status || 400, { error: error.status === 404 ? "Not Found" : error.status === 403 ? "Forbidden" : "Bad Request", message: error.message });
+    }
+    return;
+  }
+
+  const researchRaterBatchActionMatch = url.pathname.match(/^\/api\/research-project\/rater-consistency\/batches\/([^/]+)\/actions$/);
+  if (req.method === "POST" && researchRaterBatchActionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/research-project/rater-consistency/batches/:id/actions");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req);
+      const data = readDatabase();
+      const batchId = decodeURIComponent(researchRaterBatchActionMatch[1]);
+      data.researchRaterConsistencyBatches = applyRaterConsistencyBatchAction(data.researchRaterConsistencyBatches, batchId, payload, user);
+      data.researchProjectAcceptanceItems = synchronizeRaterConsistencyAcceptance(data);
+      writeDatabase(normalizeState(data));
+      const center = buildRaterConsistencyCenter(data);
+      const batch = center.batches.find((item) => item.id === batchId);
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: `research-rater-${String(payload.action || "unknown")}`,
+        target: batchId,
+        result: "allowed",
+        detail: `${batch?.name || batchId} -> ${batch?.status || "unknown"}`
+      });
+      sendJson(res, 200, { ok: true, batch, center, acceptanceCenter: buildResearchProjectAcceptanceCenter(data) });
+    } catch (error) {
+      sendJson(res, error.status || 400, { error: error.status === 404 ? "Not Found" : error.status === 403 ? "Forbidden" : "Bad Request", message: error.message });
+    }
     return;
   }
 

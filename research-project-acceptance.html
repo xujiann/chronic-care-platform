@@ -105,6 +105,53 @@
         <p id="research-expert-feedback"></p>
       </section>
 
+      <section class="panel" id="research-rater-consistency-panel">
+        <div class="panel-title">
+          <h2>评价者间一致性研究</h2>
+          <button class="inline-action" id="research-rater-export" type="button">导出一致性报告</button>
+        </div>
+        <div class="expert-stat-strip" id="research-rater-summary"></div>
+        <div class="table-wrap" id="research-rater-batches"></div>
+        <div class="consultation-workspace consistency-workspace">
+          <fieldset>
+            <legend>新建研究批次</legend>
+            <form id="research-rater-batch-form" class="consultation-form" autocomplete="off">
+              <label>批次<input id="research-rater-batch-number" type="number" min="1" max="99" required /></label>
+              <label>批次名称<input id="research-rater-batch-name" maxlength="200" required /></label>
+              <label>统计方法<select id="research-rater-method" required><option value="fleiss-kappa">Fleiss Kappa</option><option value="icc-a1">ICC(A,1)</option></select></label>
+              <label>计划评价者数<input id="research-rater-expected" type="number" min="2" max="50" value="2" required /></label>
+              <label>案例编号<textarea id="research-rater-case-codes" rows="5" placeholder="每行一个受控案例编号" required></textarea></label>
+              <label>分类值<input id="research-rater-categories" value="通过,不通过" /></label>
+              <div class="expert-ahp-grid">
+                <label>最低分<input id="research-rater-score-min" type="number" value="0" /></label>
+                <label>最高分<input id="research-rater-score-max" type="number" value="100" /></label>
+              </div>
+              <button class="inline-action" type="submit">建立批次</button>
+            </form>
+          </fieldset>
+          <fieldset>
+            <legend>登记独立评价</legend>
+            <form id="research-rater-rating-form" class="consultation-form" autocomplete="off">
+              <label>研究批次<select id="research-rater-rating-batch" required></select></label>
+              <label>评价者代号<input id="research-rater-code" maxlength="80" required /></label>
+              <div class="rater-case-grid" id="research-rater-case-ratings"></div>
+              <label class="check-line"><input id="research-rater-no-pii" type="checkbox" checked /> 确认案例和评价者均使用匿名代号</label>
+              <button class="inline-action" type="submit">登记评价</button>
+            </form>
+          </fieldset>
+          <fieldset>
+            <legend>批次锁定与复核</legend>
+            <form id="research-rater-action-form" class="consultation-form" autocomplete="off">
+              <label>研究批次<select id="research-rater-action-batch" required></select></label>
+              <label>处理动作<select id="research-rater-action" required></select></label>
+              <label>处理意见<textarea id="research-rater-action-note" rows="3" maxlength="1000" required></textarea></label>
+              <button class="inline-action" type="submit">提交批次动作</button>
+            </form>
+          </fieldset>
+        </div>
+        <p id="research-rater-feedback"></p>
+      </section>
+
       <section class="panel">
         <div class="panel-title">
           <h2>证据登记与独立复核</h2>
@@ -132,5 +179,6 @@
     </main>
     <script src="./research-project-acceptance-ui.js"></script>
     <script src="./research-expert-consultation-ui.js"></script>
+    <script src="./research-rater-consistency-ui.js"></script>
   </body>
 </html>

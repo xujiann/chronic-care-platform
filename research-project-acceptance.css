@@ -13,6 +13,11 @@
   color: var(--muted);
 }
 
+.research-project-page #research-rater-feedback {
+  min-height: 24px;
+  color: var(--muted);
+}
+
 .expert-stat-strip {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -73,16 +78,28 @@
 }
 
 .expert-rating-grid,
-.expert-ahp-grid {
+.expert-ahp-grid,
+.rater-case-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
 .expert-rating-grid label,
-.expert-ahp-grid label {
+.expert-ahp-grid label,
+.rater-case-grid label {
   min-width: 0;
   font-size: 13px;
+}
+
+.rater-case-grid {
+  max-height: 420px;
+  padding-right: 4px;
+  overflow-y: auto;
+}
+
+.consistency-workspace {
+  grid-template-columns: minmax(230px, 0.9fr) minmax(300px, 1.2fr) minmax(220px, 0.8fr);
 }
 
 .research-project-page .empty-state {
@@ -160,7 +177,8 @@
 
   .consultation-workspace,
   .expert-rating-grid,
-  .expert-ahp-grid {
+  .expert-ahp-grid,
+  .rater-case-grid {
     grid-template-columns: 1fr;
   }
 
