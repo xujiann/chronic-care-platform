@@ -2707,8 +2707,28 @@ function openCitizenHealthRecordExport(residentId) {
   const form = document.querySelector("#health-record-export-form");
   if (!dialog || !form) return;
   form.reset();
+  const verifyResult = document.querySelector("#health-record-verify-result");
+  if (verifyResult) verifyResult.textContent = "文件仅在本机读取；最大 2MB，不会上传或保存";
   renderCitizenHealthRecordExportPreview(residentId);
   dialog.showModal();
+}
+
+async function verifyCitizenHealthRecordFile(file) {
+  const output = document.querySelector("#health-record-verify-result");
+  if (!output || !file) return;
+  output.textContent = "正在本机校验档案副本…";
+  try {
+    if (file.size > window.CitizenRecordsV2.MAX_PORTABLE_ARCHIVE_BYTES) {
+      throw new Error("健康档案副本超过 2MB 大小上限");
+    }
+    const archive = window.CitizenRecordsV2.parseResidentPortableArchive(await file.text());
+    const valid = await window.CitizenRecordsV2.verifyResidentPortableArchive(archive);
+    output.textContent = valid
+      ? `完整性校验通过：${archive.recordCount} 条记录，生成于 ${archive.generatedAt || "时间待核验"}。该结果不是来源真实性证明。`
+      : "完整性校验失败：文件内容与 SHA-256 摘要不一致，或缺少受支持的完整性信息。";
+  } catch (error) {
+    output.textContent = `校验失败：${error.message || "文件格式不受支持"}`;
+  }
 }
 
 async function exportCitizenHealthRecord(residentId, categories) {
@@ -5383,6 +5403,9 @@ function bindDialogs() {
   });
   document.querySelectorAll("#health-record-export-form input[name='categories']").forEach((input) => {
     input.addEventListener("change", () => renderCitizenHealthRecordExportPreview(currentResidentId));
+  });
+  document.querySelector("#health-record-verify-file")?.addEventListener("change", (event) => {
+    void verifyCitizenHealthRecordFile(event.currentTarget.files?.[0]);
   });
   document.querySelector("#health-record-export-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();

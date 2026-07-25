@@ -84,6 +84,7 @@
     "frequency",
     "route"
   ]);
+  const MAX_PORTABLE_ARCHIVE_BYTES = 2 * 1024 * 1024;
   const DEFAULT_COMPLETENESS_ITEMS = Object.freeze([
     { key: "identity", label: "实名与主索引", categories: [] },
     { key: "health-summary", label: "基础健康摘要", categories: ["physical-exam"] },
@@ -1301,6 +1302,45 @@
     };
   }
 
+  function parseResidentPortableArchive(value) {
+    if (typeof value !== "string" || !value.trim()) throw new Error("健康档案副本内容为空");
+    if (typeof TextEncoder === "undefined") throw new Error("当前环境不支持健康档案大小校验");
+    if (new TextEncoder().encode(value).byteLength > MAX_PORTABLE_ARCHIVE_BYTES) {
+      throw new Error("健康档案副本超过 2MB 大小上限");
+    }
+    let archive;
+    try {
+      archive = JSON.parse(value);
+    } catch {
+      throw new Error("健康档案副本不是有效 JSON");
+    }
+    portableArchiveDigestPayload(archive);
+    if (archive.subject !== "self"
+      || !Number.isInteger(archive.recordCount)
+      || archive.recordCount < 0
+      || archive.recordCount !== archive.records.length
+      || archive.records.length > 2000
+      || !archive.categoryCounts
+      || typeof archive.categoryCounts !== "object"
+      || Array.isArray(archive.categoryCounts)
+      || archive.records.some((record) => !record || typeof record !== "object" || Array.isArray(record))) {
+      throw new Error("健康档案副本结构不完整");
+    }
+    const actualCategoryCounts = archive.records.reduce((counts, record) => {
+      if (!PORTABLE_RECORD_CATEGORIES.has(record.category)) throw new Error("健康档案副本包含未知分类");
+      counts[record.category] = (counts[record.category] || 0) + 1;
+      return counts;
+    }, {});
+    const declaredCategories = Object.keys(archive.categoryCounts).sort();
+    const actualCategories = Object.keys(actualCategoryCounts).sort();
+    if (declaredCategories.length !== actualCategories.length
+      || declaredCategories.some((category, index) => category !== actualCategories[index])
+      || declaredCategories.some((category) => archive.categoryCounts[category] !== actualCategoryCounts[category])) {
+      throw new Error("健康档案副本分类计数不一致");
+    }
+    return archive;
+  }
+
   async function verifyResidentPortableArchive(archive = {}, cryptoProvider = globalThis.crypto) {
     if (archive?.integrity?.algorithm !== "SHA-256"
       || archive.integrity.scope !== "canonical-json-without-integrity"
@@ -1462,6 +1502,7 @@
 
   return {
     ACCESS_SCOPES,
+    MAX_PORTABLE_ARCHIVE_BYTES,
     AUTHORIZATION_SCOPE_DISCLOSURES,
     ACTIVE_RELATIONSHIP_STATUSES,
     CORRECTION_STATUSES,
@@ -1509,6 +1550,7 @@
     filterResidentRecords,
     buildResidentPortableArchive,
     sealResidentPortableArchive,
+    parseResidentPortableArchive,
     verifyResidentPortableArchive,
     buildAuthorizationReceiptLedger,
     buildAuthorizationReceiptExportRows,

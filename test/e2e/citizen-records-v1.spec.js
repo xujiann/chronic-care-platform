@@ -72,6 +72,21 @@ test("resident creates a scoped consent and revokes it through the dedicated aud
   const changedHealthRecordExport = structuredClone(healthRecordExport);
   changedHealthRecordExport.records[0].summary = "tampered";
   expect(await page.evaluate((archive) => window.CitizenRecordsV2.verifyResidentPortableArchive(archive), changedHealthRecordExport)).toBe(false);
+  await page.locator("#export-health-record").click();
+  await page.locator("#health-record-verify-file").setInputFiles({
+    name: "resident-health-record.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(healthRecordExport), "utf8")
+  });
+  await expect(page.locator("#health-record-verify-result")).toContainText("完整性校验通过");
+  await expect(page.locator("#health-record-verify-result")).toContainText("不是来源真实性证明");
+  await page.locator("#health-record-verify-file").setInputFiles({
+    name: "resident-health-record-tampered.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(changedHealthRecordExport), "utf8")
+  });
+  await expect(page.locator("#health-record-verify-result")).toContainText("完整性校验失败");
+  await healthRecordExportDialog.getByRole("button", { name: "取消" }).click();
   const healthRecordText = JSON.stringify(healthRecordExport);
   expect(healthRecordText).not.toMatch(/residentId|personIndex|auditHash|sourceRecordId|studyInstanceUID|imageCloudStudyId|attachmentId|objectPath|viewerUrl/);
 
