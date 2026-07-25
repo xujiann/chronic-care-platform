@@ -642,6 +642,26 @@ test("portable resident archive is minimized, scoped and detects integrity chang
   changed.records[0].summary = "被修改的结果";
   assert.equal(await V2.verifyResidentPortableArchive(changed, webcrypto), false);
   assert.equal(await V2.verifyResidentPortableArchive({ ...sealed, extra: "unexpected" }, webcrypto), false);
+  const parsed = V2.parseResidentPortableArchive(JSON.stringify(sealed));
+  assert.equal(parsed.integrity.digest, sealed.integrity.digest);
+  assert.throws(() => V2.parseResidentPortableArchive(""), /内容为空/);
+  assert.throws(() => V2.parseResidentPortableArchive("{broken"), /不是有效 JSON/);
+  assert.throws(
+    () => V2.parseResidentPortableArchive(JSON.stringify({ ...sealed, recordCount: sealed.recordCount + 1 })),
+    /结构不完整/
+  );
+  assert.throws(
+    () => V2.parseResidentPortableArchive(JSON.stringify({ ...sealed, categoryCounts: { labs: sealed.recordCount + 1 } })),
+    /分类计数不一致/
+  );
+  const unknownCategory = structuredClone(sealed);
+  unknownCategory.records[0].category = "internal-all-records";
+  unknownCategory.categoryCounts = { "internal-all-records": unknownCategory.recordCount };
+  assert.throws(() => V2.parseResidentPortableArchive(JSON.stringify(unknownCategory)), /未知分类/);
+  assert.throws(
+    () => V2.parseResidentPortableArchive("x".repeat(V2.MAX_PORTABLE_ARCHIVE_BYTES + 1)),
+    /超过 2MB/
+  );
 });
 
 test("authorization scope disclosure explains inclusions and exclusions without broadening scopes", () => {
