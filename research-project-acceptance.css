@@ -8,6 +8,108 @@
   min-height: 24px;
 }
 
+.research-project-page #research-expert-feedback {
+  min-height: 24px;
+  color: var(--muted);
+}
+
+.expert-stat-strip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-bottom: 18px;
+  border-block: 1px solid var(--line);
+}
+
+.expert-stat-strip > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 14px 16px;
+  border-right: 1px solid var(--line);
+}
+
+.expert-stat-strip > div:last-child {
+  border-right: 0;
+}
+
+.expert-stat-strip span,
+.expert-stat-strip small {
+  color: var(--muted);
+}
+
+.expert-stat-strip strong {
+  font-size: 22px;
+  overflow-wrap: anywhere;
+}
+
+.consultation-workspace {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.7fr) minmax(320px, 1.5fr) minmax(220px, 0.8fr);
+  gap: 18px;
+  margin-top: 22px;
+}
+
+.consultation-workspace fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.consultation-workspace legend {
+  padding: 0 6px;
+  font-weight: 700;
+}
+
+.consultation-form,
+.consultation-form label {
+  display: grid;
+  gap: 8px;
+}
+
+.consultation-form {
+  gap: 14px;
+}
+
+.expert-rating-grid,
+.expert-ahp-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.expert-rating-grid label,
+.expert-ahp-grid label {
+  min-width: 0;
+  font-size: 13px;
+}
+
+.research-project-page .empty-state {
+  padding: 24px;
+  color: var(--muted);
+  text-align: center;
+  border-block: 1px solid var(--line);
+}
+
+@media (max-width: 1080px) {
+  .expert-stat-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .expert-stat-strip > div:nth-child(3) {
+    border-right: 0;
+  }
+
+  .consultation-workspace {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .consultation-workspace fieldset:nth-child(2) {
+    grid-row: span 2;
+  }
+}
+
 @media (max-width: 720px) {
   .research-project-page .auth-bar nav,
   .research-project-page .portal-header nav {
@@ -40,5 +142,29 @@
   .research-project-page .metric-card strong,
   .research-project-page .metric-card small {
     overflow-wrap: anywhere;
+  }
+
+  .expert-stat-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .expert-stat-strip > div,
+  .expert-stat-strip > div:nth-child(3) {
+    border-right: 1px solid var(--line);
+  }
+
+  .expert-stat-strip > div:nth-child(even),
+  .expert-stat-strip > div:last-child {
+    border-right: 0;
+  }
+
+  .consultation-workspace,
+  .expert-rating-grid,
+  .expert-ahp-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .consultation-workspace fieldset:nth-child(2) {
+    grid-row: auto;
   }
 }

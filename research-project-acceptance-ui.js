@@ -171,6 +171,8 @@ async function refreshCenter() {
   renderAll();
 }
 
+window.refreshResearchProjectCenter = refreshCenter;
+
 document.getElementById("research-project-item-id").addEventListener("change", renderActionForm);
 
 document.getElementById("research-project-action-form").addEventListener("submit", async (event) => {

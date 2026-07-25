@@ -60,6 +60,51 @@
         <div class="table-wrap" id="research-project-acceptance-metrics"></div>
       </section>
 
+      <section class="panel" id="research-expert-consultation-panel">
+        <div class="panel-title">
+          <h2>专家咨询与统计</h2>
+          <button class="inline-action" id="research-expert-export" type="button">导出统计报告</button>
+        </div>
+        <div class="expert-stat-strip" id="research-expert-summary"></div>
+        <div class="table-wrap" id="research-expert-rounds"></div>
+        <div class="consultation-workspace">
+          <fieldset>
+            <legend>新建咨询轮次</legend>
+            <form id="research-expert-round-form" class="consultation-form" autocomplete="off">
+              <label>轮次<input id="research-expert-round-number" type="number" min="1" max="99" required /></label>
+              <label>轮次名称<input id="research-expert-round-name" maxlength="200" required /></label>
+              <label>邀请专家数<input id="research-expert-invited" type="number" min="1" max="500" required /></label>
+              <button class="inline-action" type="submit">建立轮次</button>
+            </form>
+          </fieldset>
+          <fieldset>
+            <legend>登记匿名问卷</legend>
+            <form id="research-expert-response-form" class="consultation-form" autocomplete="off">
+              <label>咨询轮次<select id="research-expert-response-round" required></select></label>
+              <label>专家代号<input id="research-expert-code" maxlength="80" required /></label>
+              <div class="expert-rating-grid" id="research-expert-ratings"></div>
+              <div class="expert-ahp-grid">
+                <label>标准治理 / 应用成效<input id="research-expert-ahp-standard-outcomes" type="number" min="0.111111" max="9" step="any" value="1" required /></label>
+                <label>标准治理 / 数据安全<input id="research-expert-ahp-standard-security" type="number" min="0.111111" max="9" step="any" value="1" required /></label>
+                <label>应用成效 / 数据安全<input id="research-expert-ahp-outcomes-security" type="number" min="0.111111" max="9" step="any" value="1" required /></label>
+              </div>
+              <label class="check-line"><input id="research-expert-no-pii" type="checkbox" checked /> 确认仅使用匿名专家代号且不含患者信息</label>
+              <button class="inline-action" type="submit">登记问卷</button>
+            </form>
+          </fieldset>
+          <fieldset>
+            <legend>轮次定稿与复核</legend>
+            <form id="research-expert-action-form" class="consultation-form" autocomplete="off">
+              <label>咨询轮次<select id="research-expert-action-round" required></select></label>
+              <label>处理动作<select id="research-expert-round-action" required></select></label>
+              <label>处理意见<textarea id="research-expert-action-note" rows="3" maxlength="1000" required></textarea></label>
+              <button class="inline-action" type="submit">提交轮次动作</button>
+            </form>
+          </fieldset>
+        </div>
+        <p id="research-expert-feedback"></p>
+      </section>
+
       <section class="panel">
         <div class="panel-title">
           <h2>证据登记与独立复核</h2>
@@ -86,5 +131,6 @@
       </section>
     </main>
     <script src="./research-project-acceptance-ui.js"></script>
+    <script src="./research-expert-consultation-ui.js"></script>
   </body>
 </html>

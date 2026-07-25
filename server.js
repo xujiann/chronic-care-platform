@@ -109,6 +109,15 @@ const {
   renderResearchProjectAcceptanceMarkdown,
   seedResearchProjectAcceptanceItems
 } = require("./research-project-acceptance");
+const {
+  applyExpertConsultationRoundAction,
+  buildExpertConsultationCenter,
+  createExpertConsultationRound,
+  normalizeExpertConsultationRounds,
+  recordExpertConsultationResponse,
+  renderExpertConsultationMarkdown,
+  synchronizeAcceptanceMetrics
+} = require("./research-expert-consultation");
 const { buildReleaseReport, buildServiceAcceptanceSummary } = require("./scripts/release-report");
 const { buildReleaseArtifactManifest } = require("./scripts/release-artifact-manifest");
 const { buildCapabilityMap, renderCapabilityMapMarkdown } = require("./platform-capability-map");
@@ -1151,6 +1160,7 @@ function seedState() {
     platformProductionBlockerReviews: seedPlatformProductionBlockerReviews(),
     pilotAcceptanceInterfaceReviews: [],
     researchProjectAcceptanceItems: seedResearchProjectAcceptanceItems(),
+    researchExpertConsultationRounds: [],
     productionDeploymentPlan: seedProductionDeploymentPlan(),
     productionDatabaseMigrationBatches: seedProductionDatabaseMigrationBatches(),
     productionDatabaseCutoverRuns: seedProductionDatabaseCutoverRuns(),
@@ -10215,6 +10225,7 @@ function normalizeState(data) {
     platformProductionBlockerReviews: normalizePlatformProductionBlockerReviews(data.platformProductionBlockerReviews),
     pilotAcceptanceInterfaceReviews: buildInterfaceReviews(data),
     researchProjectAcceptanceItems: normalizeResearchProjectAcceptanceItems(data.researchProjectAcceptanceItems),
+    researchExpertConsultationRounds: normalizeExpertConsultationRounds(data.researchExpertConsultationRounds),
     productionDeploymentPlan: mergeByKey(seedProductionDeploymentPlan(), data.productionDeploymentPlan, "id"),
     productionDatabaseMigrationBatches: mergeByKey(seedProductionDatabaseMigrationBatches(), data.productionDatabaseMigrationBatches, "id"),
     productionDatabaseCutoverRuns: mergeByKey(seedProductionDatabaseCutoverRuns(), data.productionDatabaseCutoverRuns, "id"),
@@ -10428,6 +10439,7 @@ function completeSystemTargets(state) {
   state.platformProductionBlockerReviews = normalizePlatformProductionBlockerReviews(state.platformProductionBlockerReviews);
   state.pilotAcceptanceInterfaceReviews = buildInterfaceReviews(state);
   state.researchProjectAcceptanceItems = normalizeResearchProjectAcceptanceItems(state.researchProjectAcceptanceItems);
+  state.researchExpertConsultationRounds = normalizeExpertConsultationRounds(state.researchExpertConsultationRounds);
   state.productionDeploymentPlan = mergeByKey(seedProductionDeploymentPlan(), state.productionDeploymentPlan, "id").map((item) => ({
     ...item,
     requiredConfig: Array.isArray(item.requiredConfig) ? item.requiredConfig : [],
@@ -16357,6 +16369,7 @@ function scopeStateForUser(data, user) {
   delete scoped.platformProductionBlockerReviews;
   delete scoped.pilotAcceptanceInterfaceReviews;
   delete scoped.researchProjectAcceptanceItems;
+  delete scoped.researchExpertConsultationRounds;
   delete scoped.productionDeploymentPlan;
   delete scoped.productionDatabaseMigrationBatches;
   delete scoped.productionDatabaseCutoverRuns;
@@ -30818,6 +30831,117 @@ async function handleApi(req, res) {
     if (!user) return;
     const data = readDatabase();
     sendJson(res, 200, buildMasterDataDirectory(data));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/research-project/expert-consultation") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/research-project/expert-consultation");
+    if (!user) return;
+    const center = buildExpertConsultationCenter(readDatabase());
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "research-expert-consultation-read",
+      target: "/api/research-project/expert-consultation",
+      result: "allowed",
+      detail: `${center.summary.verified}/${center.summary.rounds} rounds verified`
+    });
+    if (url.searchParams.get("format") === "markdown") {
+      sendText(res, 200, renderExpertConsultationMarkdown(center), "text/markdown; charset=utf-8");
+    } else {
+      sendJson(res, 200, center);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/research-project/expert-consultation/rounds") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/research-project/expert-consultation/rounds");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req);
+      const data = readDatabase();
+      data.researchExpertConsultationRounds = createExpertConsultationRound(data.researchExpertConsultationRounds, payload, user);
+      data.researchProjectAcceptanceItems = synchronizeAcceptanceMetrics(data);
+      writeDatabase(normalizeState(data));
+      const center = buildExpertConsultationCenter(data);
+      const round = center.rounds.find((item) => item.roundNumber === Number(payload.roundNumber));
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: "research-expert-round-create",
+        target: round?.id || "research-expert-round",
+        result: "allowed",
+        detail: `${round?.name || "round"} / ${round?.invitedExperts || 0} invited`
+      });
+      sendJson(res, 201, { ok: true, round, center, acceptanceCenter: buildResearchProjectAcceptanceCenter(data) });
+    } catch (error) {
+      sendJson(res, error.status || 400, {
+        error: error.status === 403 ? "Forbidden" : "Bad Request",
+        message: error.message
+      });
+    }
+    return;
+  }
+
+  const researchExpertResponseMatch = url.pathname.match(/^\/api\/research-project\/expert-consultation\/rounds\/([^/]+)\/responses$/);
+  if (req.method === "POST" && researchExpertResponseMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/research-project/expert-consultation/rounds/:id/responses");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req);
+      const data = readDatabase();
+      const roundId = decodeURIComponent(researchExpertResponseMatch[1]);
+      const result = recordExpertConsultationResponse(data.researchExpertConsultationRounds, roundId, payload, user);
+      data.researchExpertConsultationRounds = result.rounds;
+      data.researchProjectAcceptanceItems = synchronizeAcceptanceMetrics(data);
+      writeDatabase(normalizeState(data));
+      const center = buildExpertConsultationCenter(data);
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: "research-expert-response-record",
+        target: roundId,
+        result: "allowed",
+        detail: `${result.response.id} / anonymized`
+      });
+      sendJson(res, 201, { ok: true, response: result.response, center, acceptanceCenter: buildResearchProjectAcceptanceCenter(data) });
+    } catch (error) {
+      sendJson(res, error.status || 400, {
+        error: error.status === 404 ? "Not Found" : error.status === 403 ? "Forbidden" : "Bad Request",
+        message: error.message
+      });
+    }
+    return;
+  }
+
+  const researchExpertRoundActionMatch = url.pathname.match(/^\/api\/research-project\/expert-consultation\/rounds\/([^/]+)\/actions$/);
+  if (req.method === "POST" && researchExpertRoundActionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/research-project/expert-consultation/rounds/:id/actions");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req);
+      const data = readDatabase();
+      const roundId = decodeURIComponent(researchExpertRoundActionMatch[1]);
+      data.researchExpertConsultationRounds = applyExpertConsultationRoundAction(data.researchExpertConsultationRounds, roundId, payload, user);
+      data.researchProjectAcceptanceItems = synchronizeAcceptanceMetrics(data);
+      writeDatabase(normalizeState(data));
+      const center = buildExpertConsultationCenter(data);
+      const round = center.rounds.find((item) => item.id === roundId);
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: `research-expert-${String(payload.action || "unknown")}`,
+        target: roundId,
+        result: "allowed",
+        detail: `${round?.name || roundId} -> ${round?.status || "unknown"}`
+      });
+      sendJson(res, 200, { ok: true, round, center, acceptanceCenter: buildResearchProjectAcceptanceCenter(data) });
+    } catch (error) {
+      sendJson(res, error.status || 400, {
+        error: error.status === 404 ? "Not Found" : error.status === 403 ? "Forbidden" : "Bad Request",
+        message: error.message
+      });
+    }
     return;
   }
 
