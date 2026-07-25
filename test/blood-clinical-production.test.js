@@ -10,6 +10,9 @@ test("clinical-blood manifest has no emergency, imaging or exam dependency", () 
   assert.deepEqual(clinical.manifest.requiredDependencies, ["identity", "mpi", "his", "lis", "pda", "iot", "audit"]);
   assert.equal(clinical.validateDependencyIsolation('require("./emergency-service")').valid, false);
   assert.equal(clinical.validateDependencyIsolation('require("./blood-service")').valid, true);
+  const optional = clinical.validateDependencyIsolation('const contract={consumers:["emergency","operations"]}');
+  assert.equal(optional.valid, true);
+  assert.deepEqual(optional.optionalIntegrations, ["emergency"]);
 });
 
 test("BIS/BTIS master data and unique blood bag contract are enforced", () => {
@@ -23,10 +26,24 @@ test("BIS/BTIS master data and unique blood bag contract are enforced", () => {
 
 test("site receipt and cold-chain evidence require signed tamper evidence and independent verification", () => {
   assert.equal(clinical.validateReceipt({ evidenceRef: "site://1", evidenceDigest: sha, organizationCode: "ORG", signedBy: "owner", signedAt: "2026-07-24", verifiedBy: "reviewer", verifiedAt: "2026-07-24", correlationId: "c", idempotencyKey: "i" }).valid, true);
-  const cold = { deviceId: "D1", serialNumber: "S1", calibrationCertificateRef: "site://cal", calibrationDigest: sha, calibratedAt: "2026-01-01", calibrationExpiresAt: "2027-01-01", alarmTestResult: "passed", alarmEvidenceRef: "site://alarm", performedBy: "A", verifiedBy: "B" };
+  const cold = { deviceId: "D1", serialNumber: "S1", calibrationCertificateRef: "site://cal", calibrationDigest: sha, calibratedAt: "2026-01-01", calibrationExpiresAt: "2027-01-01", alarmTestResult: "passed", alarmEvidenceRef: "site://alarm", performedBy: "A", verifiedBy: "B", componentCode: "RBC", phase: "transport", minimumTemperature: 2.1, maximumTemperature: 9.8, sampleCount: 10 };
   assert.equal(clinical.validateColdChainEvidence(cold, new Date("2026-07-24")).valid, true);
   assert.equal(clinical.validateColdChainEvidence({ ...cold, verifiedBy: "A" }, new Date("2026-07-24")).valid, false);
   assert.equal(clinical.validateColdChainEvidence(cold, new Date("2027-01-02")).valid, false);
+  assert.equal(clinical.validateColdChainEvidence({ ...cold, maximumTemperature: 10.1 }, new Date("2026-07-24")).valid, false);
+  const platelet = { ...cold, componentCode: "PLT", phase: "storage", minimumTemperature: 20, maximumTemperature: 24, agitationMaintained: true };
+  assert.equal(clinical.validateColdChainEvidence(platelet, new Date("2026-07-24")).valid, true);
+  assert.equal(clinical.validateColdChainEvidence({ ...platelet, agitationMaintained: false }, new Date("2026-07-24")).valid, false);
+});
+
+test("pretransfusion gate blocks typing conflicts and unresolved antibodies", () => {
+  const valid = { patientId: "P1", specimenId: "S1", forwardABO: "A", reverseABO: "A", rhD: "positive", currentBloodType: "A+", historicalBloodType: "A+", antibodyScreen: "negative" };
+  assert.equal(clinical.assessPretransfusionCompatibility(valid).allowed, true);
+  assert.equal(clinical.assessPretransfusionCompatibility({ ...valid, reverseABO: "B" }).allowed, false);
+  assert.equal(clinical.assessPretransfusionCompatibility({ ...valid, historicalBloodType: "O+" }).allowed, false);
+  assert.equal(clinical.assessPretransfusionCompatibility({ ...valid, antibodyScreen: "positive" }).allowed, false);
+  assert.equal(clinical.assessPretransfusionCompatibility({ ...valid, historicalAntibodies: ["anti-E"], selectedUnitAntigenNegative: false }).allowed, false);
+  assert.equal(clinical.assessPretransfusionCompatibility({ ...valid, emergencyUncrossmatched: true }).manualReview, true);
 });
 
 test("receipt workflow is idempotent, digest-bound and independently verified", () => {
@@ -64,7 +81,7 @@ test("all six production gates can reach ready-for-production", () => {
   const state = {
     siteReceipts: [receipt],
     masterDataContracts: [master("BIS"), master("BTIS")],
-    coldChainEvidence: [{ deviceId: "D1", serialNumber: "S1", calibrationCertificateRef: "site://cal", calibrationDigest: sha, calibratedAt: "2026-01-01", calibrationExpiresAt: "2099-01-01", alarmTestResult: "passed", alarmEvidenceRef: "site://alarm", performedBy: "A", verifiedBy: "B" }],
+    coldChainEvidence: [{ deviceId: "D1", serialNumber: "S1", calibrationCertificateRef: "site://cal", calibrationDigest: sha, calibratedAt: "2026-01-01", calibrationExpiresAt: "2099-01-01", alarmTestResult: "passed", alarmEvidenceRef: "site://alarm", performedBy: "A", verifiedBy: "B", componentCode: "RBC", phase: "storage", minimumTemperature: 2.2, maximumTemperature: 5.8, sampleCount: 1440 }],
     acceptanceScenarios: [
       { ...base, scenarioId: "S1", type: "crossmatch-operation-review", performedBy: "A", reviewedBy: "B", releasedBy: "C", performedAt: "1", reviewedAt: "2", releasedAt: "3", result: "compatible" },
       { ...base, scenarioId: "S2", type: "bedside-transfusion", patientWristbandMatched: true, bagBarcodeMatched: true, orderMatched: true, operatorMatched: true },

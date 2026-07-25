@@ -4,6 +4,13 @@ const MODULE_ID = "clinical-blood";
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
 const BAG_ID = /^(?<donation>[A-Z0-9]{13})-(?<component>[A-Z0-9]{3,8})-(?<sequence>\d{2})$/;
 const FORBIDDEN_DEPENDENCIES = ["emergency", "imaging", "exam", "physical-exam"];
+const coldChainProfiles = Object.freeze({
+  "RBC": { storage: { min: 2, max: 6 }, transport: { min: 2, max: 10 }, label: "全血/红细胞" },
+  "PLT": { storage: { min: 20, max: 24, agitationRequired: true }, transport: { min: 20, max: 24 }, label: "血小板" },
+  "GRAN": { storage: { min: 20, max: 24 }, transport: { min: 20, max: 24 }, label: "粒细胞" },
+  "PLASMA": { storage: { frozenRequired: true }, transport: { frozenRequired: true }, label: "冰冻血浆" },
+  "CRYO": { storage: { frozenRequired: true }, transport: { frozenRequired: true }, label: "冷沉淀" }
+});
 
 const manifest = Object.freeze({
   moduleId: MODULE_ID,
@@ -77,7 +84,36 @@ function validateColdChainEvidence(evidence = {}, asOf = new Date()) {
   if (Number.isFinite(expiresAt) && expiresAt < new Date(asOf).getTime()) errors.push("calibration certificate has expired");
   if (evidence.alarmTestResult !== "passed" || !evidence.alarmEvidenceRef) errors.push("passed alarm test evidence is required");
   if (!evidence.verifiedBy || evidence.verifiedBy === evidence.performedBy) errors.push("independent verification is required");
+  const profile = coldChainProfiles[evidence.componentCode]?.[evidence.phase];
+  if (!profile) {
+    errors.push("supported componentCode and storage/transport phase are required");
+  } else if (profile.frozenRequired) {
+    if (evidence.frozenStateMaintained !== true) errors.push("frozen state must be maintained");
+  } else {
+    const minimum = Number(evidence.minimumTemperature);
+    const maximum = Number(evidence.maximumTemperature);
+    if (!Number.isFinite(minimum) || !Number.isFinite(maximum)) errors.push("minimum and maximum temperature are required");
+    else if (minimum < profile.min || maximum > profile.max) errors.push(`temperature must remain within ${profile.min}-${profile.max}C`);
+    if (profile.agitationRequired && evidence.agitationMaintained !== true) errors.push("platelet agitation evidence is required");
+  }
+  if (!Number.isInteger(Number(evidence.sampleCount)) || Number(evidence.sampleCount) < 1) errors.push("positive sampleCount is required");
   return { valid: errors.length === 0, errors };
+}
+
+function assessPretransfusionCompatibility(payload = {}) {
+  const blockers = [];
+  const warnings = [];
+  if (!payload.patientId || !payload.specimenId) blockers.push("patient and specimen identity are required");
+  if (!payload.forwardABO || !payload.reverseABO || payload.forwardABO !== payload.reverseABO) blockers.push("ABO forward/reverse typing mismatch");
+  if (!payload.rhD) blockers.push("RhD result is required");
+  if (payload.currentBloodType && payload.historicalBloodType && payload.currentBloodType !== payload.historicalBloodType) {
+    blockers.push("current and historical blood type mismatch");
+  }
+  if (payload.antibodyScreen === "positive" && !payload.antibodyIdentification) blockers.push("positive antibody screen requires identification");
+  if (payload.historicalAntibodies?.length && !payload.selectedUnitAntigenNegative) blockers.push("antigen-negative unit is required for historical antibodies");
+  if (payload.drugInterference) warnings.push("drug interference requires specialist review");
+  if (payload.emergencyUncrossmatched === true) warnings.push("emergency uncrossmatched issue requires retrospective testing and approval");
+  return { allowed: blockers.length === 0, blockers, warnings, manualReview: warnings.length > 0 };
 }
 
 function submitReceipt(state, payload = {}, actor = {}) {
@@ -178,8 +214,12 @@ function evaluateProductionReadiness(state = {}) {
 }
 
 function validateDependencyIsolation(sourceText) {
-  const found = FORBIDDEN_DEPENDENCIES.filter((name) => new RegExp(`(?:require|import).*${name}`, "i").test(String(sourceText)));
-  return { valid: found.length === 0, forbiddenDependencies: found };
+  const source = String(sourceText);
+  const hard = FORBIDDEN_DEPENDENCIES.filter((name) =>
+    new RegExp(`(?:require|import|href\\s*=|fetch\\s*\\(|requiredDependencies)[^\\n]{0,160}${name}`, "i").test(source));
+  const optional = FORBIDDEN_DEPENDENCIES.filter((name) =>
+    new RegExp(`(?:consumers|optionalConsumers|event)[^\\n]{0,160}${name}`, "i").test(source) && !hard.includes(name));
+  return { valid: hard.length === 0, forbiddenDependencies: hard, optionalIntegrations: optional };
 }
 
 module.exports = {
@@ -190,7 +230,9 @@ module.exports = {
   validateMasterData,
   validateMasterDataMappings,
   validateReceipt,
+  coldChainProfiles,
   validateColdChainEvidence,
+  assessPretransfusionCompatibility,
   submitReceipt,
   verifyReceipt,
   validateAcceptanceScenario,
