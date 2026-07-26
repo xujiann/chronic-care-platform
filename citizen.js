@@ -609,8 +609,8 @@ function bindServiceTabs() {
       <strong class="ready">${item.status}</strong>
       <small>${item.detail}</small>
       <small class="service-tab-meta">${meta.featureCount} 项可用能力</small>
-      <small class="service-tab-interface">${meta.interfaceLabel}</small>
-      <small class="service-tab-boundary">待生产化：${meta.productionBoundary}</small>
+      <small class="service-tab-interface">按身份与授权范围展示</small>
+      <small class="service-tab-boundary">连接状态由平台后台核验</small>
       <em>二级页面</em>
     </a>`;
     }).join("");
@@ -631,7 +631,7 @@ function renderMobileServiceNav() {
   target.innerHTML = getLaunchedCitizenServiceTabs().map((item) => {
     const active = item.key === activeServiceTab;
     const meta = serviceNavigationMeta(item);
-    return `<a href="${citizenPageHref(item.key)}" data-mobile-service-tab="${item.key}" data-mobile-service-state="${item.status}" data-mobile-service-count="${meta.featureCount}" title="${item.label}：${meta.featureCount}项已实现能力；接口：${meta.interfaceLabel}；待生产化：${meta.productionBoundary}" aria-label="${item.label}，${item.status}，${meta.featureCount}项已实现能力，接口：${meta.interfaceLabel}，待生产化：${meta.productionBoundary}" aria-current="${active ? "page" : "false"}">
+    return `<a href="${citizenPageHref(item.key)}" data-mobile-service-tab="${item.key}" data-mobile-service-state="${item.status}" data-mobile-service-count="${meta.featureCount}" title="${item.label}：${meta.featureCount}项已实现能力；连接状态由平台后台核验" aria-label="${item.label}，${item.status}，${meta.featureCount}项已实现能力，连接状态由平台后台核验" aria-current="${active ? "page" : "false"}">
     <span>${item.label}</span>
     <small class="ready service-count-badge">${mobileServiceBadgeLabel(item, active)}</small>
   </a>`;
@@ -663,7 +663,7 @@ function renderMobileServiceRail() {
     ${tabs.map((item, index) => {
       const activeItem = item.key === activeServiceTab;
       const meta = serviceNavigationMeta(item);
-      return `<a href="${citizenPageHref(item.key)}" role="listitem" data-mobile-rail-tab="${item.key}" data-mobile-rail-index="${index + 1}" aria-current="${activeItem ? "page" : "false"}" aria-label="${item.label} - ${activeItem ? "current secondary page" : `${meta.featureCount} launched features`}">
+      return `<a href="${citizenPageHref(item.key)}" role="listitem" data-mobile-rail-tab="${item.key}" data-mobile-rail-index="${index + 1}" aria-current="${activeItem ? "page" : "false"}" aria-label="${item.label}，${activeItem ? "当前二级页面" : `${meta.featureCount}项已上线功能`}">
         <span>${item.label}</span>
         <small class="mobile-service-rail-state">${item.status}</small>
         <small>${activeItem ? "\u5f53\u524d" : `${meta.featureCount}\u9879`}</small>
@@ -1142,7 +1142,6 @@ function renderServiceSummary() {
   const internalAction = !active.actionHref;
   const activeItems = getLaunchedResidentFunctionAudit(active.key);
   const meta = serviceNavigationMeta(active);
-  const callContract = serviceCallContract(active);
   const activeIndex = Math.max(0, launchedTabs.findIndex((item) => item.key === active.key));
   target.innerHTML = `<div class="service-summary-copy">
     <span>当前二级页面 · ${channel.label}</span>
@@ -1150,14 +1149,14 @@ function renderServiceSummary() {
     <small>${active.title} · ${active.detail}</small>
     <div class="service-summary-meta">
       <span>${meta.featureCount} 项已实现能力</span>
-      <span>接口：${meta.interfaceLabel}</span>
-      <span>待生产化：${meta.productionBoundary}</span>
+      <span>仅展示当前居民有权查看的内容</span>
+      <span>正式连接状态由平台后台统一核验</span>
     </div>
     <div class="service-call-contract" data-service-call-contract>
-      <span>${callContract.mode}</span>
-      <strong>${callContract.handoff}</strong>
-      <small>入口：${callContract.entry}</small>
-      <small>接口：${callContract.api}</small>
+      <span>居民服务入口已就绪</span>
+      <strong>按本人身份和授权范围读取</strong>
+      <small>敏感操作会再次确认当前居民</small>
+      <small>访问行为进入安全审计记录</small>
     </div>
   </div>
   <div class="service-summary-actions">
@@ -2708,7 +2707,7 @@ function openCitizenHealthRecordExport(residentId) {
   if (!dialog || !form) return;
   form.reset();
   const verifyResult = document.querySelector("#health-record-verify-result");
-  if (verifyResult) verifyResult.textContent = "文件仅在本机读取；最大 2MB，不会上传或保存";
+  if (verifyResult) verifyResult.textContent = "文件仅在本机读取；最大 2 兆字节，不会上传或保存";
   renderCitizenHealthRecordExportPreview(residentId);
   dialog.showModal();
 }
@@ -2719,7 +2718,7 @@ async function verifyCitizenHealthRecordFile(file) {
   output.textContent = "正在本机校验档案副本…";
   try {
     if (file.size > window.CitizenRecordsV2.MAX_PORTABLE_ARCHIVE_BYTES) {
-      throw new Error("健康档案副本超过 2MB 大小上限");
+      throw new Error("健康档案副本超过 2 兆字节大小上限");
     }
     const archive = window.CitizenRecordsV2.parseResidentPortableArchive(await file.text());
     const valid = await window.CitizenRecordsV2.verifyResidentPortableArchive(archive);

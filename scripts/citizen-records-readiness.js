@@ -24,6 +24,8 @@ function assessCitizenRecordsReadiness(options = {}) {
   const policy = file("citizen-records-policy.js");
   const html = file("citizen.html");
   const ui = file("citizen.js");
+  const uiZh = file("citizen-ui-zh.js");
+  const css = file("citizen.css");
   const documentation = file("docs/citizen-records-first-increment.md");
   const unit = file("test/citizen-records-v2.test.js");
   const policyTest = file("test/citizen-records-policy.test.js");
@@ -47,7 +49,8 @@ function assessCitizenRecordsReadiness(options = {}) {
     { id: "server-policy-contract", label: "服务端授权策略契约", passed: /evaluateCitizenRecordAccess/.test(policy) && /buildCitizenControlledAccessIntent/.test(policy) },
     { id: "negative-policy-tests", label: "非激活授权与跨居民负向测试", passed: /pending rejected or suspended/.test(policyTest) && /cross-resident|resident scoped/.test(`${unit}\n${policyTest}`) },
     { id: "resident-journey-e2e", label: "居民创建撤销续授权与检索旅程", passed: /idempotency-key/.test(e2e) && /auth-scope-preview/.test(e2e) && /vault-search-keyword/.test(e2e) },
-    { id: "acceptance-documentation", label: "居民验收标准与外部依赖", passed: /第二十增量/.test(documentation) && /## 外部依赖/.test(documentation) }
+    { id: "chinese-only-interface", label: "居民端全中文展示与内部面板隐藏", passed: /translateVisibleText/.test(uiZh) && /MutationObserver/.test(uiZh) && /\[data-internal-launch-panel\]\[hidden\]/.test(css) && /English business copy/.test(e2e) },
+    { id: "acceptance-documentation", label: "居民验收标准与外部依赖", passed: /第二十一增量/.test(documentation) && /## 外部依赖/.test(documentation) }
   ];
 
   const integrationChecks = [
