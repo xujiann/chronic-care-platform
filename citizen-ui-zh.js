@@ -38,6 +38,13 @@
   ]);
 
   const PHRASE_REPLACEMENTS = [
+    ["mobile-preview、manifest、service worker", "移动端预览、应用清单、离线服务"],
+    ["FD-PKG-ELDERLY", "老年人家庭医生服务包"],
+    ["FD-PKG-BASIC", "基础家庭医生服务包"],
+    ["FD-PKG-HBP", "高血压家庭医生服务包"],
+    ["FD-PKG-DM", "糖尿病家庭医生服务包"],
+    ["esp-pudong-carehub", "浦东照护中心"],
+    ["关联Orthanc检查", "关联影像归档检查"],
     ["Dalian Central Hospital outpatient clinic demo", "大连市中心医院门诊"],
     ["Dalian Central Hospital teleconsultation report is overdue; confirm report callback or manual reconciliation.", "大连市中心医院远程会诊报告已逾期，请核对报告回传或进行人工对账。"],
     ["Receiving feedback from Dalian Central Hospital: Specialist slot reserved; review current prescription before video consultation.", "已收到大连市中心医院反馈：专家号源已预留，视频会诊前请复核当前处方。"],
@@ -83,6 +90,16 @@
   ].sort((left, right) => right[0].length - left[0].length);
 
   const TERM_REPLACEMENTS = [
+    [/\bservice worker\b/gi, "离线服务"],
+    [/\bmobile-preview\b/gi, "移动端预览"],
+    [/\bmanifest\b/gi, "应用清单"],
+    [/\bsystolic\b/gi, "收缩压"],
+    [/\bdiastolic\b/gi, "舒张压"],
+    [/\bglucose\b/gi, "血糖"],
+    [/\bOrthanc\b/g, "影像归档系统"],
+    [/\bST-T\b/g, "心电图复极段"],
+    [/\bAM\b/g, "上午"],
+    [/\bPM\b/g, "下午"],
     [/\bSHA-256\b/gi, "摘要校验"],
     [/\bDICOM\b/g, "医学影像原图"],
     [/\bPACS\b/g, "医学影像系统"],
@@ -99,7 +116,7 @@
     [/\bJSON\b/g, "标准数据文件"],
     [/\bECG\b/g, "心电图"],
     [/\bCT\b/g, "计算机断层扫描"],
-    [/\bBMI\b/g, "体质指数"],
+    [/\bBMI\b/gi, "体质指数"],
     [/\bBP\b/g, "血压"],
     [/\bV1\b/g, "第一版"],
     [/\bV2\b/g, "第二版"],
@@ -110,7 +127,7 @@
     [/kg\/m²/gi, "千克/平方米"],
     [/kg\/m2/gi, "千克/平方米"],
     [/MB/g, "兆字节"],
-    [/\bpx\b/gi, "像素"]
+    [/px\b/gi, "像素"]
   ];
 
   function replaceStandaloneStatuses(value) {
@@ -123,6 +140,7 @@
     let output = String(value ?? "");
     if (!/[A-Za-z]/.test(output)) return output;
     for (const [source, target] of PHRASE_REPLACEMENTS) output = output.split(source).join(target);
+    output = output.replace(/来源记录\s+[A-Za-z0-9-]+(?=\s*·)/gi, "来源记录已核验");
     const protectedIdentifiers = [];
     output = output.replace(/\b(?=[A-Z0-9-]*\d)[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+\b/g, (match) => {
       if (match.toUpperCase() === "SHA-256") return match;

@@ -35,3 +35,14 @@ test("中文内容和程序标识保持稳定", () => {
   assert.equal(uiZh.translateVisibleText("报告号 TJ202605180028"), "报告号 TJ202605180028");
   assert.equal(uiZh.translateVisibleText("心电图编号 ECG-DEMO-001"), "心电图编号 ECG-DEMO-001");
 });
+
+test("居民端现场动态数据中的指标、时段和技术来源统一转换为中文", () => {
+  const source = "来源记录 43c562cd-568c-4f79-bdab-0d47c0ac0cf3 · systolic 166 · bmi 29.4 · 2026-07-18 AM · 关联Orthanc检查 ORTHANC-701636 · FD-PKG-HBP";
+  const translated = uiZh.translateVisibleText(source);
+
+  assert.equal(
+    translated,
+    "来源记录已核验 · 收缩压 166 · 体质指数 29.4 · 2026-07-18 上午 · 关联影像归档检查 ORTHANC-701636 · 高血压家庭医生服务包"
+  );
+  assert.doesNotMatch(translated, /systolic|bmi|\bAM\b|关联Orthanc检查|FD-PKG-HBP/i);
+});
