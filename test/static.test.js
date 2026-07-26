@@ -4705,7 +4705,7 @@ test("citizen record V2 exposes twelve governed care capabilities", () => {
   assert.match(html, /auth-scope-preview/);
   assert.match(html, /citizen-records-v2\.js\?v=20260725care16/);
   assert.match(html, /citizen\.js\?v=20260725zh1/);
-  assert.match(html, /citizen-ui-zh\.js\?v=20260725zh2/);
+  assert.match(html, /citizen-ui-zh\.js\?v=20260725zh4/);
   assert.match(html, /citizen\.css\?v=20260725zh1/);
   assert.match(css, /\[data-internal-launch-panel\]\[hidden\]\s*\{\s*display:\s*none\s*!important;/);
   assert.match(read("citizen-ui-zh.js"), /translateVisibleText/);

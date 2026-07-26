@@ -45,4 +45,9 @@ test("居民端现场动态数据中的指标、时段和技术来源统一转�
     "来源记录已核验 · 收缩压 166 · 体质指数 29.4 · 2026-07-18 上午 · 关联影像归档检查 ORTHANC-701636 · 高血压家庭医生服务包"
   );
   assert.doesNotMatch(translated, /systolic|bmi|\bAM\b|关联Orthanc检查|FD-PKG-HBP/i);
+
+  const appointment = uiZh.translateVisibleText("Qingniwaqiao Community Health Service Center demo · General Practice · Doctor Chen · schedule-change replacement · Internet hospital source pool · Ready");
+  assert.equal(appointment, "青泥洼桥社区卫生服务中心演示点 · 全科医学科 · 陈医生 · 改期替补号源 · 互联网医院号源池 · 已就绪");
+
+  assert.equal(uiZh.translateVisibleText("HC-****3219 · MI-****E-R1 · 2.0-demo"), "健康卡尾号3219 · 医保凭证已脱敏 · 2.0-演示版");
 });
