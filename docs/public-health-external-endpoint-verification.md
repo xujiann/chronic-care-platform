@@ -83,3 +83,7 @@ T00 后续需要在公共层完成：
 6. 保持 `endpointConnectivityReady` 与 `productionReady` 分离。
 
 T08 不修改公共 `server.js`、`package.json`、`portal.css`、README 或发布总表。
+
+## 主动探测补充
+
+`public-health-external-endpoint-probe-runner.js` 进一步提供服务端主动探测执行边界。执行器只接受领域编号，端点、活动契约、DNS、TLS 策略、证书 pin、mTLS 要求和 keyring 均由服务端解析；混合私网 DNS、实际 peer 不在固定解析集合、重定向、TLS 或证书策略不匹配时不会签发回执。完整流程见 `docs/public-health-external-active-probing.md`。
