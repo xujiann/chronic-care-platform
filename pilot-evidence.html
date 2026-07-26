@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>试点证据仓 · 数智医院标准平台</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <link rel="stylesheet" href="./pilot-evidence.css" />
+  </head>
+  <body>
+    <main class="evidence-workspace">
+      <header class="evidence-header">
+        <div>
+          <p class="eyebrow">数智医院标准平台</p>
+          <h1>试点证据仓</h1>
+        </div>
+        <nav aria-label="平台导航">
+          <a href="./digital-hospital-evaluation.html">医院评价</a>
+          <a href="./platform.html">平台治理</a>
+          <a href="./operations.html">运行中心</a>
+        </nav>
+      </header>
+
+      <section class="evidence-command-band" aria-label="批次操作">
+        <form id="pilot-evidence-batch-form" class="batch-create-form">
+          <label>
+            <span>试点编号</span>
+            <input name="pilotId" required maxlength="80" placeholder="例如 DL-DMU2-2026-01" />
+          </label>
+          <label>
+            <span>试点医院</span>
+            <input name="hospitalName" required maxlength="120" placeholder="医院全称" />
+          </label>
+          <label>
+            <span>批次名称</span>
+            <input name="title" maxlength="160" placeholder="首轮试点验收批次" />
+          </label>
+          <button type="submit" class="primary-command">新建批次</button>
+        </form>
+      </section>
+
+      <section class="evidence-layout">
+        <aside class="batch-rail" aria-label="试点批次">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">批次台账</p>
+              <h2>验收批次</h2>
+            </div>
+            <button type="button" class="icon-command" id="pilot-evidence-refresh" title="刷新批次" aria-label="刷新批次">↻</button>
+          </div>
+          <div id="pilot-evidence-batches" class="batch-list">
+            <p class="empty-state">正在读取批次...</p>
+          </div>
+        </aside>
+
+        <section class="batch-detail" aria-live="polite">
+          <div id="pilot-evidence-empty" class="empty-detail">
+            <h2>选择一个验收批次</h2>
+            <p>批次创建后，20 项现场证据将在此统一登记和复核。</p>
+          </div>
+
+          <div id="pilot-evidence-detail" hidden>
+            <div class="batch-title-row">
+              <div>
+                <p class="eyebrow" id="pilot-evidence-pilot-id"></p>
+                <h2 id="pilot-evidence-title"></h2>
+                <p id="pilot-evidence-hospital" class="batch-subtitle"></p>
+              </div>
+              <div class="batch-actions">
+                <button type="button" id="pilot-evidence-export" class="secondary-command">导出验收包</button>
+                <button type="button" id="pilot-evidence-freeze" class="primary-command">冻结批次</button>
+              </div>
+            </div>
+
+            <div id="pilot-evidence-metrics" class="metric-strip"></div>
+
+            <div class="requirement-toolbar">
+              <div class="segmented-control" id="pilot-evidence-filters" role="tablist" aria-label="证据分组">
+                <button type="button" class="active" data-filter="all" role="tab" aria-selected="true">全部</button>
+                <button type="button" data-filter="site-task" role="tab" aria-selected="false">现场任务</button>
+                <button type="button" data-filter="interface-receipt" role="tab" aria-selected="false">接口回执</button>
+                <button type="button" data-filter="alert-route" role="tab" aria-selected="false">告警路由</button>
+                <button type="button" data-filter="four-party-signoff" role="tab" aria-selected="false">四方签字</button>
+              </div>
+              <span id="pilot-evidence-revision" class="revision-label"></span>
+            </div>
+
+            <div class="table-scroll">
+              <table class="evidence-table">
+                <thead>
+                  <tr>
+                    <th>编号</th>
+                    <th>验收要求</th>
+                    <th>状态</th>
+                    <th>有效证据</th>
+                    <th>版本</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="pilot-evidence-requirements"></tbody>
+              </table>
+            </div>
+
+            <section class="audit-band">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">访问与变更</p>
+                  <h3>审计链</h3>
+                </div>
+                <span id="pilot-evidence-audit-tail" class="digest-value"></span>
+              </div>
+              <div id="pilot-evidence-audit" class="audit-list"></div>
+            </section>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <dialog id="pilot-evidence-artifact-dialog">
+      <form id="pilot-evidence-artifact-form" method="dialog" class="dialog-form">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">对象存储回执</p>
+            <h2>登记证据附件</h2>
+          </div>
+          <button type="button" class="icon-command" data-close-dialog aria-label="关闭">×</button>
+        </div>
+        <input type="hidden" name="requirementId" />
+        <input type="hidden" name="expectedRevision" />
+        <label>
+          <span>验收要求</span>
+          <input name="requirementTitle" readonly />
+        </label>
+        <label>
+          <span>安全附件 ID</span>
+          <input name="attachmentId" required maxlength="120" placeholder="att-..." />
+        </label>
+        <div class="dialog-actions">
+          <button type="button" class="secondary-command" data-close-dialog>取消</button>
+          <button type="submit" class="primary-command">登记版本</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="pilot-evidence-review-dialog">
+      <form id="pilot-evidence-review-form" method="dialog" class="dialog-form">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">独立复核</p>
+            <h2>复核证据</h2>
+          </div>
+          <button type="button" class="icon-command" data-close-dialog aria-label="关闭">×</button>
+        </div>
+        <input type="hidden" name="artifactId" />
+        <input type="hidden" name="expectedRevision" />
+        <label>
+          <span>SHA-256</span>
+          <input name="evidenceDigest" required pattern="[a-f0-9]{64}" readonly />
+        </label>
+        <label>
+          <span>复核结论</span>
+          <select name="outcome">
+            <option value="verified">通过</option>
+            <option value="rejected">退回</option>
+          </select>
+        </label>
+        <label>
+          <span>复核意见</span>
+          <textarea name="note" required maxlength="500" rows="4"></textarea>
+        </label>
+        <div class="dialog-actions">
+          <button type="button" class="secondary-command" data-close-dialog>取消</button>
+          <button type="submit" class="primary-command">提交复核</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="pilot-evidence-toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script src="./auth.js"></script>
+    <script src="./pilot-evidence.js"></script>
+  </body>
+</html>

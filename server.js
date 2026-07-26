@@ -51,6 +51,7 @@ const EmergencyProduction = require("./emergency-production");
 const ImagingCloudProduction = require("./imaging-cloud-production");
 const ImagingCloudGovernance = require("./imaging-cloud-governance");
 const NationalAccessService = require("./national-access-service");
+const PilotEvidenceApi = require("./pilot-evidence-api");
 const { buildOhifStudyUrl, listOrthancStudySummaries, publishDiagnosticReportToFhir, publishImagingStudyToFhir, solutionAHealth } = require("./solution-a-connectors");
 const {
   SmsDeliveryCallbackError,
@@ -10169,6 +10170,7 @@ function normalizeState(data) {
     healthArchiveStandard: data.healthArchiveStandard && typeof data.healthArchiveStandard === "object" ? data.healthArchiveStandard : seedHealthArchiveStandard(),
     authOrganizations: mergeByKey(seedAuthOrganizations(), data.authOrganizations, "orgCode"),
     authUsers: mergeByKey(seedAuthUsers(), data.authUsers, "username"),
+    ...PilotEvidenceApi.normalizeState(data),
     ...NationalAccessService.normalizeState(data),
     interfaceRequirements: mergeByKey(seedInterfaceRequirements(), data.interfaceRequirements, "id"),
     hospitalInteroperabilityFunctions: mergeByKey(seedHospitalInteroperabilityFunctions(), data.hospitalInteroperabilityFunctions, "id"),
@@ -23739,6 +23741,16 @@ async function handleApi(req, res) {
     });
     return;
   }
+
+  if (await PilotEvidenceApi.handlePilotEvidenceApi(req, res, {
+    url,
+    requireApiRole,
+    readDatabase,
+    writeDatabase,
+    collectJson,
+    sendJson,
+    sendDownload
+  })) return;
 
   if (req.method === "POST" && url.pathname === "/api/national-access/sandbox/invoke") {
     const payload = await collectJson(req);

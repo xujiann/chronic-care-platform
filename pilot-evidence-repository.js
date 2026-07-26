@@ -128,6 +128,7 @@ function createPilotEvidenceBatch(input = {}, context = {}) {
     id: String(input.id || randomUUID()),
     pilotId,
     hospitalName,
+    organizationCode: String(input.organizationCode || "").trim(),
     title: String(input.title || `${hospitalName} pilot acceptance evidence`).trim(),
     status: "open",
     revision: 1,
@@ -189,6 +190,7 @@ function registerEvidenceArtifact(batch, input = {}, context = {}) {
     requirementId: requirement.id,
     version,
     status: "submitted",
+    attachmentId: String(input.attachmentId || "").trim(),
     objectKey,
     objectVersion,
     filename: metadata.filename,
@@ -264,6 +266,7 @@ function recordEvidenceAccess(batch, input = {}, context = {}) {
   const outcome = String(input.outcome || "allowed").trim().toLowerCase();
   if (!purpose) throw new Error("pilot evidence access purpose is required");
   if (!["allowed", "denied"].includes(outcome)) throw new Error("pilot evidence access outcome must be allowed or denied");
+  batch.revision += 1;
   return appendAuditEvent(batch, "artifact-accessed", artifact.id, actor, {
     purpose,
     outcome,
@@ -281,6 +284,7 @@ function acceptancePackPayload(batch) {
       status: requirement.status,
       artifact: {
         id: artifact.id,
+        attachmentId: artifact.attachmentId || "",
         version: artifact.version,
         filename: artifact.filename,
         contentType: artifact.contentType,
@@ -306,6 +310,7 @@ function acceptancePackPayload(batch) {
       id: batch.id,
       pilotId: batch.pilotId,
       hospitalName: batch.hospitalName,
+      organizationCode: batch.organizationCode || "",
       title: batch.title,
       revision: batch.revision,
       frozenAt: batch.frozenAt,
@@ -393,6 +398,7 @@ function buildPilotEvidenceRepositoryCenter(batches = []) {
       id: batch.id,
       pilotId: batch.pilotId,
       hospitalName: batch.hospitalName,
+      organizationCode: batch.organizationCode || "",
       status: batch.status,
       revision: batch.revision,
       verified: (batch.requirements || []).filter((item) => item.status === "verified").length,

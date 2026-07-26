@@ -72,7 +72,11 @@ function buildExercisedBatch() {
 function buildPilotEvidenceRepositoryReadiness(options = {}) {
   const pkg = options.pkg || readJson("package.json");
   const serviceSource = options.serviceSource ?? read("pilot-evidence-repository.js");
+  const apiSource = options.apiSource ?? read("pilot-evidence-api.js");
   const storageSource = options.storageSource ?? read("secure-object-storage.js");
+  const serverSource = options.serverSource ?? read("server.js");
+  const htmlSource = options.htmlSource ?? read("pilot-evidence.html");
+  const clientSource = options.clientSource ?? read("pilot-evidence.js");
   const documentation = options.documentation ?? read("docs/pilot-evidence-repository.md");
   const releaseSource = options.releaseSource ?? read("scripts/release-report.js");
   const manifestSource = options.manifestSource ?? read("scripts/release-artifact-manifest.js");
@@ -120,6 +124,30 @@ function buildPilotEvidenceRepositoryReadiness(options = {}) {
       detail: `${pack.summary.verified}/20 requirements frozen with ${pack.manifestSha256}`
     },
     {
+      id: "persistent-api",
+      passed: [
+        "handlePilotEvidenceApi",
+        "expectedRevision",
+        "completedEvidenceAttachment",
+        "acceptance-pack",
+        "download-intent"
+      ].every((marker) => apiSource.includes(marker))
+        && ["PilotEvidenceApi.normalizeState", "PilotEvidenceApi.handlePilotEvidenceApi"].every((marker) => serverSource.includes(marker)),
+      detail: "role-scoped persistent API, attachment linkage, optimistic locking, freeze and export routes"
+    },
+    {
+      id: "operations-ui",
+      passed: [
+        "pilot-evidence-batch-form",
+        "pilot-evidence-requirements",
+        "pilot-evidence-artifact-dialog",
+        "pilot-evidence-review-dialog",
+        "pilot-evidence-freeze"
+      ].every((marker) => htmlSource.includes(marker))
+        && ["/api/pilot-evidence", "expectedRevision", "acceptance-pack?download=1"].every((marker) => clientSource.includes(marker)),
+      detail: "batch, requirement, attachment, review, freeze and export workflows are available in the operations UI"
+    },
+    {
       id: "documentation",
       passed: ["20 required controls", "immutable", "independent review", "manifest SHA-256", "production boundary"].every((marker) => documentation.includes(marker)),
       detail: "workflow, controls, acceptance pack and production boundary documented"
@@ -133,7 +161,7 @@ function buildPilotEvidenceRepositoryReadiness(options = {}) {
     }
   ];
   const blockers = [
-    "persistent runtime API and role-scoped operations UI",
+    "production database migration, retention and backup acceptance for pilotEvidenceBatches",
     "real object-storage bucket, KMS policy and WORM/object-lock acceptance",
     "production malware engine and signature update receipt",
     "pilot hospital identities, interface receipts and alert acknowledgements",
@@ -143,7 +171,7 @@ function buildPilotEvidenceRepositoryReadiness(options = {}) {
   return {
     ok: controls.every((item) => item.passed),
     generatedAt: new Date().toISOString(),
-    status: "batch-freeze-service-ready-api-persistence-site-acceptance-pending",
+    status: "persistent-api-operations-ui-ready-site-acceptance-pending",
     productionReady: false,
     summary: {
       controls: controls.length,

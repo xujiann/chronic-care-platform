@@ -43,14 +43,29 @@
 
 验收包不包含附件正文。接收方可重新计算 manifest SHA-256，识别清单、证据引用或复核记录被篡改的情况。
 
+## 持久化接口与操作台
+
+`pilot-evidence.html` 提供批次、20 项验收要求、证据版本、独立复核、访问审计、冻结和导出操作台。运行接口包括：
+
+- `GET /api/pilot-evidence`：读取当前角色可访问的批次中心；
+- `POST /api/pilot-evidence/batches`：建立绑定当前机构的试点批次；
+- `GET /api/pilot-evidence/batches/:id`：读取批次、证据和审计链；
+- `POST /api/pilot-evidence/batches/:id/artifacts`：通过安全附件 ID 登记已完成扫描的对象版本；
+- `POST /api/pilot-evidence/batches/:id/artifacts/:artifactId/review`：卫健委角色独立复核；
+- `POST /api/pilot-evidence/batches/:id/artifacts/:artifactId/access`：登记证据调阅目的；
+- `POST /api/pilot-evidence/batches/:id/freeze`：在 20/20 通过后冻结；
+- `GET /api/pilot-evidence/batches/:id/acceptance-pack`：复验或下载冻结验收包。
+
+批次写操作必须提交 `expectedRevision`。版本不一致返回冲突，不覆盖其他操作者刚刚提交的证据或复核结果。机构用户只能访问本机构批次和本机构上传的安全附件；冻结和独立复核仅允许卫健委角色执行。
+
 ## production boundary
 
-当前增量完成批次模型、对象存储控制校验、版本替换、独立复核、访问审计、冻结封包和摘要复验。正式试点上线前仍需完成：
+当前增量完成批次模型、持久化接口、角色化操作台、对象存储回执联动、版本替换、独立复核、访问审计、冻结封包和摘要复验。正式试点上线前仍需完成：
 
-1. 持久化运行接口和按角色授权的操作界面；
+1. `pilotEvidenceBatches` 生产数据库迁移、保留期和备份恢复验收；
 2. 真实对象存储、KMS、WORM/对象锁和备份恢复验收；
 3. 生产病毒库更新与扫描回执；
 4. 医院真实接口回执、告警确认和四方签字原件；
-5. 保留期、调阅审计和容灾演练签字。
+5. 调阅审计和容灾演练签字。
 
 仓库内演练通过仅证明软件控制可运行，不代表现场材料已经提交或正式生产已经批准。
