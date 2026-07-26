@@ -9,9 +9,12 @@ const { buildReport, renderMarkdown } = require("../scripts/physical-examination
 const DIGEST_A = "a".repeat(64);
 const DIGEST_B = "b".repeat(64);
 const DIGEST_C = "c".repeat(64);
+const DIGEST_D = "d".repeat(64);
+const BUNDLE_ID = "pe-go-live-20260726-001";
 
 function signedReport() {
   return {
+    bundleId: BUNDLE_ID,
     id: "report-production-001",
     residentId: "resident-001",
     documentProfile: {
@@ -57,6 +60,7 @@ function signedReport() {
 function mappingEvidence(profileId, sourceSystem) {
   const profile = Production.SOURCE_MAPPING_PROFILES[profileId];
   return {
+    bundleId: BUNDLE_ID,
     profileId,
     profileVersion: profile.version,
     sourceSystem,
@@ -72,6 +76,7 @@ function mappingEvidence(profileId, sourceSystem) {
 
 function integrationReceipt(sourceSystem, sequence) {
   return {
+    bundleId: BUNDLE_ID,
     eventId: `event-${sequence}`,
     idempotencyKey: `idempotency-${sequence}`,
     sourceSystem,
@@ -89,6 +94,7 @@ function integrationReceipt(sourceSystem, sequence) {
 
 function archiveEvidence(scanStatus = "clean") {
   return {
+    bundleId: BUNDLE_ID,
     reportId: "report-production-001",
     objectId: "object-001",
     objectVersionId: "version-001",
@@ -113,7 +119,7 @@ function closedWorkflow() {
     residentId: "resident-001",
     examDate: "2026-07-24",
     findings: [{ code: "BP", name: "血压", abnormal: true, value: "152/92" }]
-  }, { actor: "system", now: "2026-07-24T08:00:00.000Z" });
+  }, { actor: "system", bundleId: BUNDLE_ID, now: "2026-07-24T08:00:00.000Z" });
   const caseId = workflow.cases[0].id;
   Production.applyAbnormalClosureAction(workflow, caseId, { action: "confirm", physicianId: "doctor-001", evidenceRef: "confirm-001" }, { actor: "doctor-001", now: "2026-07-24T08:10:00.000Z" });
   Production.applyAbnormalClosureAction(workflow, caseId, { action: "notify", evidenceRef: "notice-001", deliveryReceipt: { receiptId: "delivery-001", channel: "sms", status: "delivered", deliveredAt: "2026-07-24T08:12:00.000Z" } }, { actor: "operator-001", now: "2026-07-24T08:12:00.000Z" });
@@ -125,14 +131,16 @@ function closedWorkflow() {
 
 function siteSignoff(sequence) {
   return {
+    bundleId: BUNDLE_ID,
+    sourceType: sequence === 1 ? "exam-center" : "hospital",
     submittedBy: `institution-operator-${sequence}`,
     verifiedBy: `commission-reviewer-${sequence}`,
     externalSigner: `机构负责人${sequence}`,
     signerOrganization: sequence === 1 ? "体检中心" : "医院",
     submissionRef: `site-submission-${sequence}`,
     verificationRef: `site-verification-${sequence}`,
-    evidenceDigest: DIGEST_C,
-    verifiedDigest: DIGEST_C,
+    evidenceDigest: DIGEST_D,
+    verifiedDigest: DIGEST_D,
     status: "independently-verified",
     submittedAt: "2026-07-24T10:00:00.000Z",
     verifiedAt: "2026-07-24T11:00:00.000Z"
@@ -141,6 +149,7 @@ function siteSignoff(sequence) {
 
 function smokeEvidence() {
   return {
+    bundleId: BUNDLE_ID,
     moduleId: "physical-examination",
     entry: "physical-examination-standalone.html",
     loadedModules: ["physical-examination-standards", "physical-examination-production", "physical-examination-standalone"],
@@ -153,6 +162,7 @@ function smokeEvidence() {
 
 function rollbackEvidence() {
   return {
+    bundleId: BUNDLE_ID,
     currentVersion: Production.VERSION,
     previousVersion: "physical-examination-production-v0",
     artifactSha256: DIGEST_B,
@@ -165,6 +175,78 @@ function rollbackEvidence() {
     preparedBy: "ops-a",
     approvedBy: "ops-b",
     approved: true
+  };
+}
+
+function evidenceManifest() {
+  const now = Date.now();
+  const artifacts = [
+    ["mapping-center", "source-mapping", "center-prod-mapping-evidence-001", DIGEST_B],
+    ["mapping-hospital", "source-mapping", "hospital-prod-mapping-evidence-001", DIGEST_B],
+    ["receipt-center", "integration-receipt", "receipt-1", DIGEST_B],
+    ["receipt-hospital", "integration-receipt", "receipt-2", DIGEST_B],
+    ["report-signature", "report-signature", "signature://SIGN-001", DIGEST_A],
+    ["archive-original", "archive-scan", "archive-receipt-001", DIGEST_A],
+    ["care-closure", "care-closure", "closure-001", DIGEST_A],
+    ["signoff-center", "independent-signoff", "site-verification-1", DIGEST_D],
+    ["signoff-hospital", "independent-signoff", "site-verification-2", DIGEST_D],
+    ["standalone-smoke", "standalone-smoke", "standalone-smoke-001", DIGEST_B],
+    ["rollback-gate", "rollback-gate", "rollback-rehearsal-001", DIGEST_B]
+  ].map(([id, type, evidenceRef, sha256]) => ({ id, type, evidenceRef, sha256, productionEvidence: true }));
+  return {
+    bundleId: BUNDLE_ID,
+    moduleId: Production.MODULE_ID,
+    moduleVersion: Production.VERSION,
+    issuedAt: new Date(now - 60 * 60 * 1000).toISOString(),
+    expiresAt: new Date(now + 6 * 24 * 60 * 60 * 1000).toISOString(),
+    evidenceSetSha256: DIGEST_D,
+    evidenceSetCanonicalization: "JCS-RFC8785",
+    evidenceSetVerified: true,
+    manifestSha256: DIGEST_C,
+    canonicalization: "JCS-RFC8785",
+    canonicalPayloadSha256: DIGEST_C,
+    canonicalPayloadVerified: true,
+    preparedBy: "institution-operator",
+    approvedBy: "commission-reviewer",
+    replayProtection: {
+      nonce: "nonce-pe-20260726-0001",
+      sequence: 1,
+      registryRef: "replay-registry-001",
+      registeredDigest: DIGEST_C,
+      registryVerified: true,
+      status: "reserved",
+      checkedAt: new Date(now - 5 * 60 * 1000).toISOString()
+    },
+    artifacts,
+    signature: {
+      mode: "external-production",
+      asymmetricAlgorithm: "SM2",
+      digestAlgorithm: "SM3",
+      certificateSerial: "CA-MANIFEST-001",
+      signatureValueRef: "signature://manifest-001",
+      certificateChainVerified: true,
+      revocationStatusVerified: true,
+      timestampVerified: true,
+      timestamp: new Date(now - 30 * 60 * 1000).toISOString(),
+      verifiedAt: new Date(now - 25 * 60 * 1000).toISOString(),
+      signedDigest: DIGEST_C
+    }
+  };
+}
+
+function productionBundle() {
+  return {
+    environment: "production",
+    enabledSourceTypes: ["exam-center", "hospital"],
+    mappingEvidence: [mappingEvidence("exam-center-v1", "center-prod"), mappingEvidence("hospital-v1", "hospital-prod")],
+    integrationReceipts: [integrationReceipt("center-prod", 1), integrationReceipt("hospital-prod", 2)],
+    reports: [signedReport()],
+    archiveEvidence: [archiveEvidence()],
+    workflows: [closedWorkflow()],
+    siteSignoffs: [siteSignoff(1), siteSignoff(2)],
+    smoke: smokeEvidence(),
+    rollback: rollbackEvidence(),
+    evidenceManifest: evidenceManifest()
   };
 }
 
@@ -252,29 +334,52 @@ test("独立模块冒烟拒绝急救、用血或影像依赖，回退门禁要�
   assert.equal(Production.validateRollbackGate(selfApproved).issues.includes("rollback-independent-approval-invalid"), true);
 });
 
+test("现场证据清单必须具备生产签名、七日有效期和防重放登记", () => {
+  const manifest = evidenceManifest();
+  assert.equal(Production.validateEvidenceManifest(manifest).ok, true);
+  const expired = structuredClone(manifest);
+  const afterExpiry = new Date(new Date(expired.expiresAt).getTime() + 1000).toISOString();
+  assert.equal(Production.validateEvidenceManifest(expired, { now: afterExpiry }).issues.includes("manifest-expired"), true);
+  const replayed = structuredClone(manifest);
+  replayed.replayProtection.status = "consumed";
+  assert.equal(Production.validateEvidenceManifest(replayed).issues.includes("manifest-replay-status-invalid"), true);
+  const wrongDigest = structuredClone(manifest);
+  wrongDigest.signature.signedDigest = DIGEST_B;
+  assert.equal(Production.validateEvidenceManifest(wrongDigest).issues.includes("manifest-signature-digest-mismatch"), true);
+  const unverifiedCanonicalPayload = structuredClone(manifest);
+  unverifiedCanonicalPayload.canonicalPayloadVerified = false;
+  assert.equal(Production.validateEvidenceManifest(unverifiedCanonicalPayload).issues.includes("manifest-canonical-payload-not-verified"), true);
+  const unverifiedEvidenceSet = structuredClone(manifest);
+  unverifiedEvidenceSet.evidenceSetVerified = false;
+  assert.equal(Production.validateEvidenceManifest(unverifiedEvidenceSet).issues.includes("manifest-evidence-set-not-verified"), true);
+});
+
+test("跨证据绑定拒绝不同批次、源回执摘要错配和重复事件", () => {
+  assert.equal(Production.validateEvidenceLinkage(productionBundle()).ok, true);
+  const mixedBundle = productionBundle();
+  mixedBundle.archiveEvidence[0].bundleId = "pe-other-bundle-001";
+  assert.equal(Production.validateEvidenceLinkage(mixedBundle).issues.includes("archive-0:bundle-id-mismatch"), true);
+  const mismatchedReceipt = productionBundle();
+  mismatchedReceipt.integrationReceipts[0].payloadSha256 = DIGEST_A;
+  assert.equal(Production.validateEvidenceLinkage(mismatchedReceipt).issues.some((item) => item.startsWith("source-receipt-digest-mismatch:exam-center")), true);
+  const duplicateReceipt = productionBundle();
+  duplicateReceipt.integrationReceipts.push({ ...duplicateReceipt.integrationReceipts[0] });
+  assert.equal(Production.validateEvidenceLinkage(duplicateReceipt).issues.includes("receipt-event-id-duplicate:event-1"), true);
+});
+
 test("现场证据未签收时保持 NO-GO，全部真实证据齐备才允许生产切换", () => {
   const incomplete = Production.buildGoLiveDecision({ environment: "production" });
   assert.equal(incomplete.decision, "NO-GO");
   assert.equal(incomplete.goLiveReady, false);
   assert.equal(incomplete.blockers.length > 0, true);
 
-  const complete = Production.buildGoLiveDecision({
-    environment: "production",
-    enabledSourceTypes: ["exam-center", "hospital"],
-    mappingEvidence: [mappingEvidence("exam-center-v1", "center-prod"), mappingEvidence("hospital-v1", "hospital-prod")],
-    integrationReceipts: [integrationReceipt("center-prod", 1), integrationReceipt("hospital-prod", 2)],
-    reports: [signedReport()],
-    archiveEvidence: [archiveEvidence()],
-    workflows: [closedWorkflow()],
-    siteSignoffs: [siteSignoff(1), siteSignoff(2)],
-    smoke: smokeEvidence(),
-    rollback: rollbackEvidence()
-  });
+  const bundle = productionBundle();
+  const complete = Production.buildGoLiveDecision(bundle);
   assert.equal(complete.decision, "GO");
   assert.equal(complete.goLiveReady, true);
   assert.equal(complete.checks.every((item) => item.ok), true);
 
-  const staging = Production.buildGoLiveDecision({ ...complete, environment: "staging" });
+  const staging = Production.buildGoLiveDecision({ ...bundle, environment: "staging" });
   assert.equal(staging.decision, "NO-GO");
 });
 

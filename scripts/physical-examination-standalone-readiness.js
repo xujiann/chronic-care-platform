@@ -42,6 +42,9 @@ function buildReport(options = {}) {
     check("site:independent-signoff", typeof Production.validateIndependentSignoff === "function" && productionSource.includes("signoff-self-verification-forbidden"), "submitter and verifier separation"),
     check("operations:smoke", typeof Production.validateStandaloneSmoke === "function" && standaloneHtml.includes("运行 Go-Live 门禁"), "standalone browser gate"),
     check("operations:rollback", typeof Production.validateRollbackGate === "function" && productionSource.includes("rollback-rto-not-met"), "snapshot + rehearsal + RTO + reconciliation"),
+    check("evidence:signed-manifest", typeof Production.validateEvidenceManifest === "function" && productionSource.includes("manifest-signature-digest-mismatch") && productionSource.includes("manifest-canonical-payload-not-verified"), "RFC 8785 canonical payload + SM2/SM3 signed evidence manifest"),
+    check("evidence:freshness-replay", productionSource.includes("manifest-expired") && productionSource.includes("manifest-replay-status-invalid") && Production.MAX_EVIDENCE_VALIDITY_MS === 7 * 24 * 60 * 60 * 1000 && Production.MAX_REPLAY_CHECK_AGE_MS === 10 * 60 * 1000, "7-day validity + fresh nonce/sequence registry verification"),
+    check("evidence:cross-linkage", typeof Production.validateEvidenceLinkage === "function" && productionSource.includes("source-receipt-digest-mismatch") && productionSource.includes("source-signoff-evidence-set-mismatch") && productionSource.includes("bundle-id-mismatch"), "bundle, evidence set, source receipt, report and archive digest binding"),
     check("boundary:no-go-default", noGoProbe.goLiveReady === false && noGoProbe.decision === "NO-GO" && noGoProbe.blockers.length > 0, `${noGoProbe.decision} / ${noGoProbe.blockers.length} blockers`)
   ];
   const passed = checks.filter((item) => item.passed).length;
@@ -60,7 +63,8 @@ function buildReport(options = {}) {
       "WS/T 847—2024生产CA、SM2/SM3、ES-T时间戳和证书状态验证服务",
       "生产对象存储、服务端恶意文件扫描、15年不可变留存和备份恢复",
       "居民消息送达回执、复查预约回执、家庭医生随访回执",
-      "双人现场验收、独立核验和正式回退演练证据"
+      "双人现场验收、独立核验和正式回退演练证据",
+      "证据清单生产签名、防重放登记和七日有效期服务"
     ],
     blockers: noGoProbe.blockers,
     commands: {

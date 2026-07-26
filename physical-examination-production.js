@@ -8,9 +8,11 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function (Standards) {
   if (!Standards) throw new Error("PhysicalExaminationStandards is required");
 
-  const VERSION = "physical-examination-production-v1";
+  const VERSION = "physical-examination-production-v2";
   const MODULE_ID = "physical-examination";
   const DIGEST_PATTERN = /^[a-f0-9]{64}$/i;
+  const MAX_EVIDENCE_VALIDITY_MS = 7 * 24 * 60 * 60 * 1000;
+  const MAX_REPLAY_CHECK_AGE_MS = 10 * 60 * 1000;
   const FORBIDDEN_DOMAIN_PATTERN = /(emergency|blood|imaging|急救|用血|影像)/i;
   const CLOSURE_ACTIONS = Object.freeze(["confirm", "notify", "schedule-review", "family-doctor-followup", "close", "reopen"]);
   const REQUIRED_STANDALONE_FILES = Object.freeze([
@@ -18,6 +20,16 @@
     "physical-examination-standalone.js",
     "physical-examination-production.js",
     "physical-examination-standards.js"
+  ]);
+  const REQUIRED_EVIDENCE_ARTIFACT_TYPES = Object.freeze([
+    "source-mapping",
+    "integration-receipt",
+    "report-signature",
+    "archive-scan",
+    "care-closure",
+    "independent-signoff",
+    "standalone-smoke",
+    "rollback-gate"
   ]);
 
   const SOURCE_MAPPING_PROFILES = Object.freeze({
@@ -95,7 +107,9 @@
     { id: "care-closure", name: "异常通知复查家医随访闭环", validator: "validateAbnormalClosure" },
     { id: "independent-signoff", name: "现场证据独立核验", validator: "validateIndependentSignoff" },
     { id: "standalone-smoke", name: "独立运行冒烟", validator: "validateStandaloneSmoke" },
-    { id: "rollback-gate", name: "回退演练", validator: "validateRollbackGate" }
+    { id: "rollback-gate", name: "回退演练", validator: "validateRollbackGate" },
+    { id: "evidence-manifest", name: "现场证据包签名清单", validator: "validateEvidenceManifest" },
+    { id: "evidence-linkage", name: "跨证据摘要与批次绑定", validator: "validateEvidenceLinkage" }
   ]);
 
   function mapSourceReport(payload = {}, profileId, options = {}) {
@@ -262,7 +276,7 @@
         actions: [{ action: "created", at: String(context.now || new Date().toISOString()), actor: String(context.actor || "system"), evidenceRef: String(context.evidenceRef || "") }]
       };
     });
-    return { id: `pe-closure-batch-${stableHash(reportId)}`, reportId, residentId, status: cases.length ? "open" : "not-required", cases };
+    return { id: `pe-closure-batch-${stableHash(reportId)}`, bundleId: String(context.bundleId || "").trim(), reportId, residentId, status: cases.length ? "open" : "not-required", cases };
   }
 
   function applyAbnormalClosureAction(workflow, caseId, payload = {}, context = {}) {
@@ -344,6 +358,7 @@
 
   function validateIndependentSignoff(signoff = {}) {
     const issues = [];
+    const sourceType = String(signoff.sourceType || "").trim();
     const submittedBy = String(signoff.submittedBy || "").trim();
     const verifiedBy = String(signoff.verifiedBy || "").trim();
     const evidenceDigest = normalizeDigest(signoff.evidenceDigest);
@@ -353,10 +368,12 @@
     if (submittedBy && verifiedBy && submittedBy.toLowerCase() === verifiedBy.toLowerCase()) issues.push("signoff-self-verification-forbidden");
     if (!String(signoff.externalSigner || "").trim() || !String(signoff.signerOrganization || "").trim()) issues.push("external-signer-incomplete");
     if (!String(signoff.submissionRef || "").trim() || !String(signoff.verificationRef || "").trim()) issues.push("signoff-evidence-ref-incomplete");
+    if (!["exam-center", "hospital"].includes(sourceType)) issues.push("signoff-source-type-invalid");
     if (!evidenceDigest || !verifiedDigest || evidenceDigest !== verifiedDigest) issues.push("signoff-digest-mismatch");
     if (signoff.status !== "independently-verified") issues.push("signoff-not-independently-verified");
     if (!validDate(signoff.submittedAt) || !validDate(signoff.verifiedAt)) issues.push("signoff-time-invalid");
-    return result("independent-site-signoff", issues, { submittedBy, verifiedBy, evidenceDigest });
+    if (dateValue(signoff.submittedAt) && dateValue(signoff.verifiedAt) < dateValue(signoff.submittedAt)) issues.push("signoff-time-order-invalid");
+    return result("independent-site-signoff", issues, { sourceType, submittedBy, verifiedBy, evidenceDigest });
   }
 
   function validateStandaloneSmoke(smoke = {}) {
@@ -394,6 +411,133 @@
     return result("rollback-gate", issues, { previousVersion: String(rollback.previousVersion || "").trim(), snapshotRef: String(rollback.snapshotRef || "").trim(), restoreDurationMinutes: Number(rollback.restoreDurationMinutes || 0) });
   }
 
+  function validateEvidenceManifest(manifest = {}, context = {}) {
+    const issues = [];
+    const bundleId = String(manifest.bundleId || "").trim();
+    const evidenceSetSha256 = normalizeDigest(manifest.evidenceSetSha256);
+    const manifestSha256 = normalizeDigest(manifest.manifestSha256);
+    const issuedAt = dateValue(manifest.issuedAt);
+    const expiresAt = dateValue(manifest.expiresAt);
+    const now = dateValue(context.now) || Date.now();
+    if (bundleId.length < 12) issues.push("manifest-bundle-id-invalid");
+    if (manifest.moduleId !== MODULE_ID) issues.push("manifest-module-id-invalid");
+    if (manifest.moduleVersion !== VERSION) issues.push("manifest-module-version-invalid");
+    if (!evidenceSetSha256) issues.push("manifest-evidence-set-sha256-invalid");
+    if (manifest.evidenceSetCanonicalization !== "JCS-RFC8785" || manifest.evidenceSetVerified !== true) issues.push("manifest-evidence-set-not-verified");
+    if (!manifestSha256) issues.push("manifest-sha256-invalid");
+    if (manifest.canonicalization !== "JCS-RFC8785" || normalizeDigest(manifest.canonicalPayloadSha256) !== manifestSha256 || manifest.canonicalPayloadVerified !== true) issues.push("manifest-canonical-payload-not-verified");
+    if (!issuedAt || !expiresAt) issues.push("manifest-validity-time-invalid");
+    if (issuedAt && issuedAt > now + 5 * 60 * 1000) issues.push("manifest-issued-in-future");
+    if (expiresAt && expiresAt <= now) issues.push("manifest-expired");
+    if (issuedAt && expiresAt && (expiresAt <= issuedAt || expiresAt - issuedAt > MAX_EVIDENCE_VALIDITY_MS)) issues.push("manifest-validity-window-invalid");
+    const preparedBy = String(manifest.preparedBy || "").trim();
+    const approvedBy = String(manifest.approvedBy || "").trim();
+    if (!preparedBy || !approvedBy || preparedBy.toLowerCase() === approvedBy.toLowerCase()) issues.push("manifest-independent-approval-invalid");
+
+    const replay = manifest.replayProtection || {};
+    if (String(replay.nonce || "").trim().length < 16 || !(Number(replay.sequence) > 0) || !String(replay.registryRef || "").trim()) issues.push("manifest-replay-protection-incomplete");
+    const replayCheckedAt = dateValue(replay.checkedAt);
+    if (replay.status !== "reserved" || replay.registryVerified !== true || normalizeDigest(replay.registeredDigest) !== manifestSha256 || !replayCheckedAt) issues.push("manifest-replay-status-invalid");
+    if (replayCheckedAt && (replayCheckedAt > now + 5 * 60 * 1000 || now - replayCheckedAt > MAX_REPLAY_CHECK_AGE_MS)) issues.push("manifest-replay-check-stale");
+    if (replayCheckedAt && issuedAt && replayCheckedAt < issuedAt) issues.push("manifest-replay-check-before-issue");
+
+    const artifacts = Array.isArray(manifest.artifacts) ? manifest.artifacts : [];
+    REQUIRED_EVIDENCE_ARTIFACT_TYPES.forEach((type) => {
+      if (!artifacts.some((item) => item?.type === type)) issues.push(`manifest-artifact-type-missing:${type}`);
+    });
+    artifacts.forEach((item, index) => {
+      const prefix = `manifest-artifact-${index}`;
+      if (!String(item?.id || "").trim()) issues.push(`${prefix}:id-missing`);
+      if (!REQUIRED_EVIDENCE_ARTIFACT_TYPES.includes(String(item?.type || ""))) issues.push(`${prefix}:type-invalid`);
+      if (!String(item?.evidenceRef || "").trim()) issues.push(`${prefix}:evidence-ref-missing`);
+      if (!normalizeDigest(item?.sha256)) issues.push(`${prefix}:sha256-invalid`);
+      if (item?.productionEvidence !== true) issues.push(`${prefix}:not-production-evidence`);
+    });
+    duplicateValues(artifacts, "id").forEach((value) => issues.push(`manifest-artifact-id-duplicate:${value}`));
+    duplicateValues(artifacts, "evidenceRef").forEach((value) => issues.push(`manifest-evidence-ref-duplicate:${value}`));
+
+    const signature = manifest.signature || {};
+    if (signature.mode !== "external-production") issues.push("manifest-signature-not-production");
+    if (String(signature.asymmetricAlgorithm || "").toUpperCase() !== "SM2" || String(signature.digestAlgorithm || "").toUpperCase() !== "SM3") issues.push("manifest-signature-algorithm-invalid");
+    if (!String(signature.certificateSerial || "").trim() || !String(signature.signatureValueRef || "").trim()) issues.push("manifest-signature-evidence-incomplete");
+    if (signature.certificateChainVerified !== true || signature.revocationStatusVerified !== true || signature.timestampVerified !== true) issues.push("manifest-signature-trust-invalid");
+    if (!validDate(signature.timestamp) || !validDate(signature.verifiedAt)) issues.push("manifest-signature-time-invalid");
+    const signatureAt = dateValue(signature.timestamp);
+    const signatureVerifiedAt = dateValue(signature.verifiedAt);
+    if (signatureAt && issuedAt && expiresAt && (signatureAt < issuedAt || signatureAt > expiresAt)) issues.push("manifest-signature-outside-validity-window");
+    if (signatureAt && signatureVerifiedAt && (signatureVerifiedAt < signatureAt || signatureVerifiedAt > now + 5 * 60 * 1000)) issues.push("manifest-signature-time-order-invalid");
+    if (!manifestSha256 || normalizeDigest(signature.signedDigest) !== manifestSha256) issues.push("manifest-signature-digest-mismatch");
+    return result("evidence-manifest", issues, { bundleId, evidenceSetSha256, manifestSha256, artifacts: artifacts.length, expiresAt: String(manifest.expiresAt || "") });
+  }
+
+  function validateEvidenceLinkage(bundle = {}) {
+    const issues = [];
+    const manifest = bundle.evidenceManifest || {};
+    const bundleId = String(manifest.bundleId || "").trim();
+    const evidenceSetDigest = normalizeDigest(manifest.evidenceSetSha256);
+    const enabledSourceTypes = normalizeList(bundle.enabledSourceTypes).length ? normalizeList(bundle.enabledSourceTypes) : ["exam-center", "hospital"];
+    const mappings = Array.isArray(bundle.mappingEvidence) ? bundle.mappingEvidence : [];
+    const receipts = Array.isArray(bundle.integrationReceipts) ? bundle.integrationReceipts : [];
+    const reports = Array.isArray(bundle.reports) ? bundle.reports : [];
+    const archives = Array.isArray(bundle.archiveEvidence) ? bundle.archiveEvidence : [];
+    const workflows = Array.isArray(bundle.workflows) ? bundle.workflows : [];
+    const signoffs = Array.isArray(bundle.siteSignoffs) ? bundle.siteSignoffs : [];
+    const evidenceGroups = [
+      ["mapping", mappings], ["receipt", receipts], ["report", reports], ["archive", archives],
+      ["workflow", workflows], ["signoff", signoffs], ["smoke", bundle.smoke ? [bundle.smoke] : []], ["rollback", bundle.rollback ? [bundle.rollback] : []]
+    ];
+    evidenceGroups.forEach(([group, rows]) => rows.forEach((row, index) => {
+      if (!bundleId || String(row?.bundleId || "").trim() !== bundleId) issues.push(`${group}-${index}:bundle-id-mismatch`);
+    }));
+
+    enabledSourceTypes.forEach((sourceType) => {
+      const sourceMappings = mappings.filter((item) => SOURCE_MAPPING_PROFILES[item.profileId]?.sourceType === sourceType);
+      if (!sourceMappings.length) return;
+      sourceMappings.forEach((mapping) => {
+        const matched = receipts.some((receipt) => receipt.sourceSystem === mapping.sourceSystem && normalizeDigest(receipt.payloadSha256) === normalizeDigest(mapping.payloadSha256));
+        if (!matched) issues.push(`source-receipt-digest-mismatch:${sourceType}:${mapping.sourceSystem || "missing"}`);
+      });
+      if (!signoffs.some((signoff) => signoff.sourceType === sourceType && normalizeDigest(signoff.evidenceDigest) === evidenceSetDigest)) issues.push(`source-signoff-evidence-set-mismatch:${sourceType}`);
+    });
+
+    duplicateValues(receipts, "eventId").forEach((value) => issues.push(`receipt-event-id-duplicate:${value}`));
+    duplicateValues(receipts, "idempotencyKey").forEach((value) => issues.push(`receipt-idempotency-key-duplicate:${value}`));
+    duplicateValues(receipts, "receiptRef").forEach((value) => issues.push(`receipt-ref-duplicate:${value}`));
+    duplicateValues(reports, "id").forEach((value) => issues.push(`report-id-duplicate:${value}`));
+    duplicateValues(archives, "objectId").forEach((value) => issues.push(`archive-object-id-duplicate:${value}`));
+
+    const reportById = new Map(reports.map((report) => [String(report.id || "").trim(), report]));
+    archives.forEach((archive, index) => {
+      const report = reportById.get(String(archive.reportId || "").trim());
+      if (!report) issues.push(`archive-${index}:report-not-found`);
+      else if (normalizeDigest(archive.sha256) !== normalizeDigest(report.documentProfile?.sourceDocumentHash)) issues.push(`archive-${index}:report-digest-mismatch`);
+    });
+    reports.forEach((report, index) => {
+      if (!archives.some((archive) => archive.reportId === report.id)) issues.push(`report-${index}:archive-not-found`);
+    });
+    workflows.forEach((workflow, index) => {
+      if (!reportById.has(String(workflow.reportId || "").trim())) issues.push(`workflow-${index}:report-not-found`);
+    });
+
+    const artifactRefs = new Map((Array.isArray(manifest.artifacts) ? manifest.artifacts : []).map((item) => [`${item.type}|${item.evidenceRef}`, normalizeDigest(item.sha256)]));
+    const expectedArtifacts = [
+      ...mappings.map((item) => ["source-mapping", item.evidenceRef, item.payloadSha256]),
+      ...receipts.map((item) => ["integration-receipt", item.receiptRef, item.payloadSha256]),
+      ...reports.map((item) => ["report-signature", item.signature?.signatureValueRef, item.documentProfile?.sourceDocumentHash]),
+      ...archives.map((item) => ["archive-scan", item.evidenceRef, item.sha256]),
+      ...workflows.flatMap((item) => (item.cases || []).filter((row) => row.status === "closed").map((row) => ["care-closure", row.closureEvidenceRef, null])),
+      ...signoffs.map((item) => ["independent-signoff", item.verificationRef, item.evidenceDigest]),
+      ...(bundle.smoke ? [["standalone-smoke", bundle.smoke.evidenceRef, null]] : []),
+      ...(bundle.rollback ? [["rollback-gate", bundle.rollback.rehearsalRef, bundle.rollback.artifactSha256]] : [])
+    ];
+    expectedArtifacts.forEach(([type, evidenceRef, digest]) => {
+      const key = `${type}|${String(evidenceRef || "").trim()}`;
+      if (!artifactRefs.has(key)) issues.push(`manifest-reference-missing:${key}`);
+      else if (digest && artifactRefs.get(key) !== normalizeDigest(digest)) issues.push(`manifest-reference-digest-mismatch:${key}`);
+    });
+    return result("evidence-linkage", issues, { bundleId, linkedArtifacts: expectedArtifacts.length, manifestArtifacts: artifactRefs.size });
+  }
+
   function buildGoLiveDecision(bundle = {}) {
     const enabledSourceTypes = normalizeList(bundle.enabledSourceTypes).length
       ? normalizeList(bundle.enabledSourceTypes)
@@ -406,6 +550,8 @@
     const signoffs = Array.isArray(bundle.siteSignoffs) ? bundle.siteSignoffs.map(validateIndependentSignoff) : [];
     const smoke = validateStandaloneSmoke(bundle.smoke || {});
     const rollback = validateRollbackGate(bundle.rollback || {});
+    const manifest = validateEvidenceManifest(bundle.evidenceManifest || {});
+    const linkage = validateEvidenceLinkage(bundle);
     const checks = [
       aggregate("source-mappings", mappings, enabledSourceTypes.length, enabledSourceTypes),
       aggregate("integration-receipts", receipts, enabledSourceTypes.length),
@@ -414,7 +560,9 @@
       aggregate("care-closures", workflows, 1),
       aggregate("site-signoffs", signoffs, enabledSourceTypes.length),
       smoke,
-      rollback
+      rollback,
+      manifest,
+      linkage
     ];
     const sourceCoverageIssues = enabledSourceTypes.filter((sourceType) => !mappings.some((item) => item.ok && item.evidence?.sourceType === sourceType));
     if (sourceCoverageIssues.length) checks.push(failed("source-coverage", sourceCoverageIssues.map((item) => `source-not-covered:${item}`)));
@@ -440,7 +588,7 @@
       blockers,
       boundary: goLiveReady
         ? "本次判定仅对所提交的体检模块现场证据包有效；证据或配置变化后必须重新评估。"
-        : "现场回执、真实签名、原件扫描归档、异常闭环、独立签署、冒烟或回退证据任一缺失时保持 NO-GO。"
+        : "现场回执、真实签名、原件扫描归档、异常闭环、独立签署、证据清单、冒烟或回退证据任一缺失时保持 NO-GO。"
     };
   }
 
@@ -509,6 +657,23 @@
     return DIGEST_PATTERN.test(digest) ? digest : "";
   }
 
+  function dateValue(value) {
+    const timestamp = new Date(value || "").getTime();
+    return Number.isNaN(timestamp) ? 0 : timestamp;
+  }
+
+  function duplicateValues(rows, field) {
+    const seen = new Set();
+    const duplicates = new Set();
+    (rows || []).forEach((row) => {
+      const value = String(row?.[field] || "").trim();
+      if (!value) return;
+      if (seen.has(value)) duplicates.add(value);
+      seen.add(value);
+    });
+    return [...duplicates];
+  }
+
   function normalizeList(value) {
     if (Array.isArray(value)) return [...new Set(value.map((item) => String(item || "").trim()).filter(Boolean))];
     return String(value || "").split(/[;,；\n]/).map((item) => item.trim()).filter(Boolean);
@@ -558,7 +723,10 @@
   return {
     CLOSURE_ACTIONS,
     DIGEST_PATTERN,
+    MAX_EVIDENCE_VALIDITY_MS,
+    MAX_REPLAY_CHECK_AGE_MS,
     MODULE_ID,
+    REQUIRED_EVIDENCE_ARTIFACT_TYPES,
     REQUIRED_STANDALONE_FILES,
     SITE_EVIDENCE_REQUIREMENTS,
     SOURCE_MAPPING_PROFILES,
@@ -569,6 +737,8 @@
     mapSourceReport,
     validateAbnormalClosure,
     validateArchiveEvidence,
+    validateEvidenceLinkage,
+    validateEvidenceManifest,
     validateIndependentSignoff,
     validateIntegrationReceipt,
     validateReportSignatureContract,

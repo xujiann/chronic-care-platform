@@ -12,6 +12,25 @@
       archiveEvidence: [],
       workflows: [],
       siteSignoffs: [],
+      evidenceManifest: {
+        bundleId: "",
+        moduleId: Production.MODULE_ID,
+        moduleVersion: Production.VERSION,
+        issuedAt: "",
+        expiresAt: "",
+        evidenceSetSha256: "",
+        evidenceSetCanonicalization: "JCS-RFC8785",
+        evidenceSetVerified: false,
+        manifestSha256: "",
+        canonicalization: "JCS-RFC8785",
+        canonicalPayloadSha256: "",
+        canonicalPayloadVerified: false,
+        preparedBy: "",
+        approvedBy: "",
+        replayProtection: { nonce: "", sequence: 0, registryRef: "", registeredDigest: "", registryVerified: false, status: "", checkedAt: "" },
+        artifacts: [],
+        signature: {}
+      },
       smoke: {
         moduleId: "physical-examination",
         entry: "physical-examination-standalone.html",
@@ -52,6 +71,7 @@
       ["字段映射", "2类", "体检中心 / 医院"],
       ["报告签名", "WS/T 847", "SM2 / SM3 / ES-T"],
       ["异常闭环", "5步", "确认至家医随访关闭"],
+      ["证据防串包", "7天", "签名清单 / 防重放 / 摘要绑定"],
       ["上线结论", "NO-GO默认", "现场证据齐备才GO"]
     ];
     document.querySelector("#standalone-capabilities").innerHTML = capabilities.map(([label, value, hint]) => `<article class="card"><span>${label}</span><strong>${value}</strong><small>${hint}</small></article>`).join("");
