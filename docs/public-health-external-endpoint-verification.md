@@ -87,3 +87,5 @@ T08 不修改公共 `server.js`、`package.json`、`portal.css`、README 或发�
 ## 主动探测补充
 
 `public-health-external-endpoint-probe-runner.js` 进一步提供服务端主动探测执行边界。执行器只接受领域编号，端点、活动契约、DNS、TLS 策略、证书 pin、mTLS 要求和 keyring 均由服务端解析；混合私网 DNS、实际 peer 不在固定解析集合、重定向、TLS 或证书策略不匹配时不会签发回执。完整流程见 `docs/public-health-external-active-probing.md`。
+
+登记表会使用 `policyResolver` 提供的每领域 `maxLatencyMs`、certificate pins 和 mTLS 要求重新核验已持久化回执；策略收紧后，不再符合当前策略的旧回执不能继续维持 `endpointConnectivityReady=true`。

@@ -78,3 +78,7 @@ T00 后续需在公共层：
 7. 保持 `endpointConnectivityReady` 与 `productionReady` 分离。
 
 T08 不修改公共 `server.js`、`package.json`、`portal.css`、README 或发布总表。
+
+## 连续活动补充
+
+单条回执和单次八领域探测仍可能只反映一个瞬时窗口。`public-health-external-endpoint-probe-campaign-service.js` 进一步把八领域回执、当前策略摘要和活动窗口绑定到独立签名，并要求多个不重叠活动才能得到 `continuousConnectivityReady=true`。完整边界见 `docs/public-health-external-endpoint-probe-campaigns.md`。
