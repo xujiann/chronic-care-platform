@@ -344,7 +344,7 @@ function buildPublicHealthExternalEndpointProbeRegistry(options = {}) {
           ? options.keyringResolver(profile.laneId, candidate)
           : options.keyring,
         at: options.at,
-        maxLatencyMs: options.maxLatencyMs,
+        maxLatencyMs: lanePolicy.maxLatencyMs ?? options.maxLatencyMs,
         clockSkewSeconds: options.clockSkewSeconds,
         certificatePins: lanePolicy.certificatePins,
         requireMutualTls: lanePolicy.requireMutualTls === true,
