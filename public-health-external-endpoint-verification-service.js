@@ -70,7 +70,9 @@ function privateIpv4(hostname) {
     || (octets[0] === 169 && octets[1] === 254)
     || (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31)
     || (octets[0] === 192 && octets[1] === 168)
+    || (octets[0] === 192 && octets[1] === 0 && octets[2] === 0)
     || (octets[0] === 192 && octets[1] === 0 && octets[2] === 2)
+    || (octets[0] === 192 && octets[1] === 88 && octets[2] === 99)
     || (octets[0] === 198 && [18, 19].includes(octets[1]))
     || (octets[0] === 198 && octets[1] === 51 && octets[2] === 100)
     || (octets[0] === 203 && octets[1] === 0 && octets[2] === 113)
@@ -80,17 +82,31 @@ function privateIpv4(hostname) {
 
 function privateIpv6(hostname) {
   const normalized = hostname.toLowerCase();
-  return normalized === "::1"
-    || normalized === "::"
-    || normalized.startsWith("fc")
-    || normalized.startsWith("fd")
-    || /^fe[89ab]/.test(normalized)
-    || normalized.startsWith("2001:db8:")
-    || normalized.startsWith("ff");
+  if (normalized === "::1" || normalized === "::") return true;
+  const mappedIpv4 = normalized.match(/^(?:::ffff:)(\d{1,3}(?:\.\d{1,3}){3})$/);
+  if (mappedIpv4) return privateIpv4(mappedIpv4[1]);
+  const firstHextet = Number.parseInt(normalized.split(":")[0] || "0", 16);
+  if (!Number.isInteger(firstHextet) || firstHextet < 0x2000 || firstHextet > 0x3fff) return true;
+  return normalized.startsWith("2001:db8:")
+    || normalized.startsWith("2001:2:")
+    || /^2001:0?1[0-9a-f]:/.test(normalized);
+}
+
+function isPublicEndpointAddress(value) {
+  const normalized = clean(value).toLowerCase().replace(/^\[|\]$/g, "");
+  const addressType = net.isIP(normalized);
+  if (addressType === 4) return !privateIpv4(normalized);
+  if (addressType === 6) return !privateIpv6(normalized);
+  return false;
+}
+
+function certificatePins(value) {
+  const pins = Array.isArray(value) ? value : value ? [value] : [];
+  return [...new Set(pins.map((item) => digest(item, "endpoint probe certificate pin")))];
 }
 
 function reservedHostname(hostname) {
-  const normalized = hostname.toLowerCase().replace(/\.$/, "");
+  const normalized = hostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
   if (!normalized || normalized === "localhost") return true;
   if ([".localhost", ".local", ".invalid", ".test", ".example"].some((suffix) => normalized.endsWith(suffix))) return true;
   if (["example.com", "example.net", "example.org"].includes(normalized)) return true;
@@ -110,6 +126,9 @@ function normalizeProductionEndpoint(value) {
   if (endpoint.protocol !== "https:") throw new Error("endpoint probe target must use HTTPS");
   if (!endpoint.hostname || endpoint.username || endpoint.password || endpoint.hash) {
     throw new Error("endpoint probe target must not contain credentials or fragments");
+  }
+  if (net.isIP(endpoint.hostname.replace(/^\[|\]$/g, ""))) {
+    throw new Error("endpoint probe target must use a DNS hostname for TLS SNI verification");
   }
   if (reservedHostname(endpoint.hostname)) {
     throw new Error("endpoint probe target must not use loopback, private or reserved hostnames");
@@ -184,10 +203,7 @@ function validateEndpointProbePayload(payload, options = {}) {
   if (!timingSafeHexEqual(payload.endpointDigest, sha256(endpoint))) {
     throw new Error("endpoint probe target digest is invalid");
   }
-  const resolvedAddressType = net.isIP(payload.network.resolvedAddress);
-  if (!resolvedAddressType
-    || (resolvedAddressType === 4 && privateIpv4(payload.network.resolvedAddress))
-    || (resolvedAddressType === 6 && privateIpv6(payload.network.resolvedAddress))) {
+  if (!isPublicEndpointAddress(payload.network.resolvedAddress)) {
     throw new Error("endpoint probe resolved address must be a public IP address");
   }
   if (payload.network.sniHostname !== new URL(endpoint).hostname.toLowerCase()) {
@@ -209,6 +225,14 @@ function validateEndpointProbePayload(payload, options = {}) {
     throw new Error("endpoint probe TLS protocol must be TLSv1.2 or TLSv1.3");
   }
   digest(payload.tls.certificateFingerprintSha256, "endpoint probe certificate fingerprint");
+  const expectedCertificatePins = certificatePins(options.certificatePins);
+  if (expectedCertificatePins.length
+    && !expectedCertificatePins.includes(payload.tls.certificateFingerprintSha256)) {
+    throw new Error("endpoint probe certificate fingerprint does not match server policy");
+  }
+  if (options.requireMutualTls === true && !payload.tls.mutualTlsVerified) {
+    throw new Error("endpoint probe mutual TLS verification is required by server policy");
+  }
   if (payload.verification.attestationOrigin !== TRUSTED_ATTESTATION_ORIGIN
     || payload.verification.verificationSource !== TRUSTED_VERIFICATION_SOURCE
     || payload.verification.signatureVerified !== true) {
@@ -307,6 +331,9 @@ function buildPublicHealthExternalEndpointProbeRegistry(options = {}) {
       .sort((left, right) => clean(right.issuedAt).localeCompare(clean(left.issuedAt)));
     let verified = null;
     const invalidReasons = [];
+    const lanePolicy = typeof options.policyResolver === "function"
+      ? options.policyResolver(profile.laneId, profile) || {}
+      : {};
     for (const candidate of candidates) {
       const result = verifyPublicHealthExternalEndpointProbeReceipt(candidate, {
         expectedEndpoint: configuredEndpoint,
@@ -319,6 +346,8 @@ function buildPublicHealthExternalEndpointProbeRegistry(options = {}) {
         at: options.at,
         maxLatencyMs: options.maxLatencyMs,
         clockSkewSeconds: options.clockSkewSeconds,
+        certificatePins: lanePolicy.certificatePins,
+        requireMutualTls: lanePolicy.requireMutualTls === true,
         seenReceiptIds,
         seenNonces
       });
@@ -388,6 +417,7 @@ module.exports = {
   TRUSTED_VERIFICATION_SOURCE,
   buildPublicHealthExternalEndpointProbeRegistry,
   endpointProbeSignaturePayload,
+  isPublicEndpointAddress,
   normalizeProductionEndpoint,
   normalizedEndpointProbePayload,
   signPublicHealthExternalEndpointProbeReceipt,
