@@ -112,6 +112,21 @@ function verifyItemEventLedger(events = []) {
     const timestampValid = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(String(event.at || ""))
       && Number.isFinite(eventTime)
       && (!previous || eventTime >= Date.parse(previous.at));
+    const requirementEvent = event.action?.startsWith("requirement-");
+    const evidenceEvent = event.action === "evidence-submitted";
+    const verificationEvent = event.action === "evidence-verified" || event.action === "evidence-rejected";
+    const detailValid = requirementEvent
+      ? /^sha256:[a-f0-9]{64}$/.test(String(event.detail?.requirementDigest || ""))
+      : evidenceEvent
+        ? /^sha256:[a-f0-9]{64}$/.test(String(event.detail?.evidenceDigest || ""))
+          && /^sha256:[a-f0-9]{64}$/.test(String(event.detail?.recordDigest || ""))
+          && Boolean(safeText(event.idempotencyKey, 160))
+        : verificationEvent
+          ? /^sha256:[a-f0-9]{64}$/.test(String(event.detail?.evidenceRecordDigest || ""))
+            && /^sha256:[a-f0-9]{64}$/.test(String(event.detail?.verificationDigest || ""))
+            && Boolean(safeText(event.idempotencyKey, 160))
+            && (event.action !== "evidence-rejected" || Boolean(safeText(event.detail?.reasonCode, 100)))
+          : false;
     const transitionValid = rule
       && rule.from.includes(event.from)
       && (rule.sameState ? event.to === event.from : rule.to.includes(event.to))
@@ -121,6 +136,7 @@ function verifyItemEventLedger(events = []) {
       && eventHash === digest(base)
       && /^sha256:[a-f0-9]{64}$/.test(String(event.projectionDigest || ""))
       && timestampValid
+      && detailValid
       && transitionValid;
   });
 }
@@ -130,6 +146,38 @@ function verifyItemLedger(itemOrEvents = []) {
   const item = itemOrEvents;
   if (!item || !verifyItemEventLedger(item.events || [])) return false;
   return item.events.at(-1).projectionDigest === `sha256:${digest(handoffItemProjection(item))}`;
+}
+
+function verifyHandoffCollection(state = {}) {
+  if (!Array.isArray(state.items)) return false;
+  const itemIds = new Set();
+  const idempotencyKeys = new Set();
+  const evidenceDigests = new Set();
+  for (const item of state.items) {
+    if (!item?.id || itemIds.has(item.id) || !verifyItemLedger(item)) return false;
+    itemIds.add(item.id);
+    for (const event of item.events) {
+      if (event.idempotencyKey) {
+        if (idempotencyKeys.has(event.idempotencyKey)) return false;
+        idempotencyKeys.add(event.idempotencyKey);
+      }
+      if (event.action === "evidence-submitted") {
+        const evidenceDigest = event.detail?.evidenceDigest;
+        if (evidenceDigests.has(evidenceDigest)) return false;
+        evidenceDigests.add(evidenceDigest);
+      }
+    }
+  }
+  return true;
+}
+
+function findEventReuse(state, item, predicate) {
+  for (const candidate of state.items || []) {
+    for (const event of candidate.events || []) {
+      if (predicate(event)) return { itemId: candidate.id, sameItem: candidate === item, event };
+    }
+  }
+  return null;
 }
 
 function requirementsFromAcceptance(acceptance = {}) {
@@ -215,7 +263,7 @@ function requiredItem(data, acceptance, itemId, at) {
   const activeIds = new Set(requirementsFromAcceptance(acceptance).map((item) => item.id));
   const item = state.items.find((candidate) => candidate.id === normalizedItemId);
   if (!item || !activeIds.has(normalizedItemId)) throw new ProductionHandoffError("生产交接要求不存在或已停用", "HANDOFF_REQUIREMENT_NOT_FOUND", 404);
-  if (!verifyItemLedger(item)) throw new ProductionHandoffError("生产交接事件账本或状态投影校验失败", "HANDOFF_LEDGER_INVALID");
+  if (!verifyHandoffCollection(state)) throw new ProductionHandoffError("生产交接事件账本、状态投影或跨项唯一性校验失败", "HANDOFF_LEDGER_INVALID");
   return item;
 }
 
@@ -248,6 +296,16 @@ function submitHandoffEvidence(data, acceptance, itemId, input = {}, actor = {})
     return { item, idempotent: true };
   }
   if (![HANDOFF_STATES.PENDING, HANDOFF_STATES.REJECTED].includes(item.state)) throw new ProductionHandoffError("当前状态不允许提交证据", "HANDOFF_SUBMISSION_STATE_INVALID");
+  const state = data.insurancePaymentProductionHandoff;
+  const idempotencyReuse = findEventReuse(state, item, (event) => event.idempotencyKey === idempotencyKey);
+  if (idempotencyReuse) throw new ProductionHandoffError("幂等键已被其他交接动作使用", "HANDOFF_IDEMPOTENCY_REUSED");
+  const evidenceReuse = findEventReuse(state, item, (event) => event.action === "evidence-submitted" && event.detail?.evidenceDigest === evidenceDigest);
+  if (evidenceReuse) {
+    throw new ProductionHandoffError(
+      evidenceReuse.sameItem ? "驳回补证必须使用新的证据摘要" : "同一证据摘要不得用于多个交接要求",
+      evidenceReuse.sameItem ? "HANDOFF_EVIDENCE_DIGEST_REUSED" : "HANDOFF_EVIDENCE_CROSS_REQUIREMENT_REUSE"
+    );
+  }
   const before = item.state;
   item.state = HANDOFF_STATES.SUBMITTED;
   item.evidence = evidence;
@@ -274,6 +332,8 @@ function verifyHandoffEvidence(data, acceptance, itemId, input = {}, actor = {})
     return item;
   }
   if (item.state !== HANDOFF_STATES.SUBMITTED || !item.evidence) throw new ProductionHandoffError("仅已提交证据可以核验", "HANDOFF_VERIFICATION_STATE_INVALID");
+  const idempotencyReuse = findEventReuse(data.insurancePaymentProductionHandoff, item, (event) => event.idempotencyKey === idempotencyKey);
+  if (idempotencyReuse) throw new ProductionHandoffError("幂等键已被其他交接动作使用", "HANDOFF_IDEMPOTENCY_REUSED");
   if (verifiedBy === item.evidence.submittedBy) throw new ProductionHandoffError("证据提交人与核验人必须分离", "HANDOFF_FOUR_EYES_REQUIRED", 403);
   if (Date.parse(verifiedAt) < Date.parse(item.evidence.submittedAt)) throw new ProductionHandoffError("核验时间不得早于证据提交时间", "HANDOFF_VERIFICATION_TIME_BACKDATED", 400);
   requireEventChronology(item, verifiedAt);
@@ -289,7 +349,7 @@ function buildProductionHandoffStatus(data = {}, acceptance = {}) {
   const state = ensureProductionHandoff(data, acceptance);
   const activeIds = new Set(requirementsFromAcceptance(acceptance).map((item) => item.id));
   const required = state.items.filter((item) => activeIds.has(item.id));
-  const ledgerValid = state.items.every((item) => verifyItemLedger(item));
+  const ledgerValid = verifyHandoffCollection(state);
   const counts = Object.fromEntries(Object.keys(HANDOFF_STATES).map((stateName) => [stateName.toLowerCase(), required.filter((item) => item.state === stateName).length]));
   const evidenceComplete = required.length > 0 && required.every((item) => item.state === HANDOFF_STATES.VERIFIED);
   return {
@@ -319,5 +379,6 @@ module.exports = {
   stableStringify,
   submitHandoffEvidence,
   verifyHandoffEvidence,
+  verifyHandoffCollection,
   verifyItemLedger
 };

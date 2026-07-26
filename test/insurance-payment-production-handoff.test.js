@@ -143,6 +143,8 @@ test("production handoff rejects a rehashed transition that skips evidence submi
     to: Handoff.HANDOFF_STATES.VERIFIED,
     actor: "forged-reviewer",
     at: "2026-07-22T09:00:00.000Z",
+    idempotencyKey: "forged-skip-submit",
+    detail: { evidenceRecordDigest: `sha256:${"a".repeat(64)}`, verificationDigest: `sha256:${"b".repeat(64)}`, reasonCode: "" },
     projectionDigest: previous.projectionDigest,
     sequence: previous.sequence + 1,
     previousHash: previous.eventHash
@@ -190,10 +192,51 @@ test("production handoff rejects a rehashed but backdated event", () => {
     to: Handoff.HANDOFF_STATES.SUBMITTED,
     actor: "t00-integrator",
     at: "2026-07-22T08:59:59.999Z",
+    idempotencyKey: "forged-backdated-submit",
+    detail: { evidenceDigest: `sha256:${"a".repeat(64)}`, recordDigest: `sha256:${"b".repeat(64)}` },
     projectionDigest: previous.projectionDigest,
     sequence: previous.sequence + 1,
     previousHash: previous.eventHash
   };
   item.events.push({ ...forgedBase, eventHash: Handoff.digest(forgedBase) });
   assert.equal(Handoff.verifyItemLedger(item.events), false);
+});
+
+test("production handoff prevents evidence and idempotency reuse across requirements", () => {
+  const acceptance = buildInsurancePaymentAcceptance();
+  const routes = acceptance.integrationHandoff.routes.filter((item) => !item.wired).slice(0, 2);
+  const firstId = `route:${routes[0].id}`;
+  const secondId = `route:${routes[1].id}`;
+  const data = {};
+  const actor = { username: "t00-integrator", role: "integration-owner" };
+
+  Handoff.submitHandoffEvidence(data, acceptance, firstId, evidenceInput({ idempotencyKey: "first-submit" }), actor);
+  assert.throws(
+    () => Handoff.submitHandoffEvidence(data, acceptance, secondId, evidenceInput({ idempotencyKey: "second-submit" }), actor),
+    (error) => error.code === "HANDOFF_EVIDENCE_CROSS_REQUIREMENT_REUSE"
+  );
+  assert.throws(
+    () => Handoff.submitHandoffEvidence(data, acceptance, secondId, evidenceInput({ evidenceDigest: `sha256:${"b".repeat(64)}`, idempotencyKey: "first-submit" }), actor),
+    (error) => error.code === "HANDOFF_IDEMPOTENCY_REUSED"
+  );
+
+  Handoff.submitHandoffEvidence(data, acceptance, secondId, evidenceInput({ evidenceDigest: `sha256:${"b".repeat(64)}`, idempotencyKey: "second-submit" }), actor);
+  Handoff.verifyHandoffEvidence(data, acceptance, firstId, { approved: true, verificationReference: "FIRST-REVIEW", verifiedAt: "2026-07-22T10:00:00.000Z", idempotencyKey: "shared-review" }, { username: "first-reviewer", role: "acceptance-reviewer" });
+  assert.throws(
+    () => Handoff.verifyHandoffEvidence(data, acceptance, secondId, { approved: true, verificationReference: "SECOND-REVIEW", verifiedAt: "2026-07-22T10:00:00.000Z", idempotencyKey: "shared-review" }, { username: "second-reviewer", role: "acceptance-reviewer" }),
+    (error) => error.code === "HANDOFF_IDEMPOTENCY_REUSED"
+  );
+});
+
+test("production handoff requires fresh evidence after rejection", () => {
+  const acceptance = buildInsurancePaymentAcceptance();
+  const route = acceptance.integrationHandoff.routes.find((item) => !item.wired);
+  const itemId = `route:${route.id}`;
+  const data = {};
+  Handoff.submitHandoffEvidence(data, acceptance, itemId, evidenceInput(), { username: "t00-integrator", role: "integration-owner" });
+  Handoff.verifyHandoffEvidence(data, acceptance, itemId, { approved: false, reasonCode: "INCOMPLETE", verificationReference: "REJECT-REVIEW", verifiedAt: "2026-07-22T10:00:00.000Z", idempotencyKey: "reject-review" }, { username: "acceptance-lead", role: "acceptance-reviewer" });
+  assert.throws(
+    () => Handoff.submitHandoffEvidence(data, acceptance, itemId, evidenceInput({ submittedAt: "2026-07-22T11:00:00.000Z", idempotencyKey: "resubmit-same-evidence" }), { username: "t00-integrator", role: "integration-owner" }),
+    (error) => error.code === "HANDOFF_EVIDENCE_DIGEST_REUSED"
+  );
 });
