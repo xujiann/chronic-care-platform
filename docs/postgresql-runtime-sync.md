@@ -74,6 +74,8 @@ Prometheus 指标包括 `health_platform_postgres_sync_backlog`、`health_platfo
 - 主写入使用 `SERIALIZABLE`、事务级 advisory lock、`FOR UPDATE` 和全集合 `expectedVersions`，任何缺失版本或版本漂移均拒绝提交，并避免空表首写或并发批次造成摘要链分叉。
 - 写入复用链式批次摘要，并在 `runtime_primary_write_audit` 记录操作者、原因、前后快照摘要和变更计数，不保存业务正文或数据库凭据。
 - `npm.cmd run postgres:adapter-status` 输出无凭据配置状态；`npm.cmd run postgres:adapter-verify` 以只读事务验证运行表、状态表和主写审计表。
+
+试点证据仓在通用集合适配之外增加领域投影。`pilotEvidenceBatches` 写入会在同一个串行化事务中更新 `health_platform.pilot_evidence_batches`，并向 `health_platform.pilot_evidence_batch_versions` 追加当前修订；后者通过触发器拒绝更新和删除。迁移包中的 `pilot-evidence-load.sql` 和 `pilot-evidence-verify.sql` 用于基线投影与复验。未提供备份、RTO/RPO、恢复演练和切换批准证据时，该能力不得打开生产写入。
 - `GET /api/production-database/adapter` 仅向卫健管理角色暴露安全状态和事务能力，不返回连接串或证据正文。
 
 写能力必须同时配置 `POSTGRES_ADAPTER_MODE=rehearsal`、`POSTGRES_PRODUCTION_WRITE_MODE=evidence-gated`、`POSTGRES_CUTOVER_APPROVAL_ID`、`POSTGRES_BACKUP_EVIDENCE_ID` 和 `POSTGRES_RTO_RPO_EVIDENCE_ID`，调用方还必须显式传入写许可、操作者、原因和完整预期版本。上述门禁只允许开展受控适配器验收，不会自动修改主服务的 `STORAGE_ENGINE`，也不会把 `productionPrimary` 或 `runtimeCutoverEnabled` 标记为真。

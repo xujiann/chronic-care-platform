@@ -31,6 +31,7 @@
     "integration:readiness": "node scripts/integration-readiness.js",
     "object-storage:readiness": "node scripts/object-storage-readiness.js",
     "pilot-evidence:readiness": "node scripts/pilot-evidence-repository-readiness.js",
+    "pilot-evidence:postgres-test": "node --check pilot-evidence-postgres.js && node --test test/pilot-evidence-postgres.test.js test/postgres-migration-package.test.js test/postgres-production-adapter.test.js",
     "financial-gateway:readiness": "node scripts/financial-gateway-readiness.js",
     "interface:mapping": "node scripts/interface-mapping.js",
     "monitoring:readiness": "node scripts/monitoring-readiness.js",

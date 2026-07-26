@@ -13,6 +13,7 @@ const {
   verifyAuditChain,
   verifyAcceptancePack
 } = require("../pilot-evidence-repository");
+const { buildPilotEvidencePostgresReadiness } = require("../pilot-evidence-postgres");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "pilot-evidence-repository-readiness.json");
@@ -36,7 +37,8 @@ function buildExercisedBatch() {
   const batch = createPilotEvidenceBatch({
     id: "pilot-evidence-readiness",
     pilotId: "pilot-readiness",
-    hospitalName: "Pilot hospital"
+    hospitalName: "Pilot hospital",
+    organizationCode: "ORG-PILOT-READINESS"
   }, owner);
   batch.requirements.forEach((requirement, index) => {
     const checksumSha256 = digest(requirement.id);
@@ -77,6 +79,9 @@ function buildPilotEvidenceRepositoryReadiness(options = {}) {
   const serverSource = options.serverSource ?? read("server.js");
   const htmlSource = options.htmlSource ?? read("pilot-evidence.html");
   const clientSource = options.clientSource ?? read("pilot-evidence.js");
+  const postgresSource = options.postgresSource ?? read("pilot-evidence-postgres.js");
+  const postgresAdapterSource = options.postgresAdapterSource ?? read("postgres-production-adapter.js");
+  const migrationSource = options.migrationSource ?? read("scripts/postgres-migration-package.js");
   const documentation = options.documentation ?? read("docs/pilot-evidence-repository.md");
   const releaseSource = options.releaseSource ?? read("scripts/release-report.js");
   const manifestSource = options.manifestSource ?? read("scripts/release-artifact-manifest.js");
@@ -84,6 +89,10 @@ function buildPilotEvidenceRepositoryReadiness(options = {}) {
   const verification = verifyAcceptancePack(pack);
   const auditVerification = verifyAuditChain(batch);
   const center = buildPilotEvidenceRepositoryCenter([batch]);
+  const databaseReadiness = buildPilotEvidencePostgresReadiness({
+    batches: [batch],
+    env: options.env || {}
+  });
   const groupCounts = Object.fromEntries(["site-task", "interface-receipt", "alert-route", "four-party-signoff"].map((group) => [
     group,
     batch.requirements.filter((item) => item.group === group).length
@@ -148,6 +157,19 @@ function buildPilotEvidenceRepositoryReadiness(options = {}) {
       detail: "batch, requirement, attachment, review, freeze and export workflows are available in the operations UI"
     },
     {
+      id: "postgres-domain-adapter",
+      passed: databaseReadiness.softwareReady
+        && [
+          "pilot_evidence_batches",
+          "pilot_evidence_batch_versions",
+          "reject_pilot_evidence_version_mutation",
+          "retention_until"
+        ].every((marker) => postgresSource.includes(marker))
+        && ["syncPilotEvidenceProjection", "PILOT_EVIDENCE_COLLECTION_DELETE_BLOCKED"].every((marker) => postgresAdapterSource.includes(marker))
+        && ["pilot-evidence-load.sql", "pilot-evidence-verify.sql"].every((marker) => migrationSource.includes(marker)),
+      detail: `${databaseReadiness.projectedBatches} batch projected with append-only revisions and ${databaseReadiness.retentionYears}-year minimum retention`
+    },
+    {
       id: "documentation",
       passed: ["20 required controls", "immutable", "independent review", "manifest SHA-256", "production boundary"].every((marker) => documentation.includes(marker)),
       detail: "workflow, controls, acceptance pack and production boundary documented"
@@ -161,7 +183,7 @@ function buildPilotEvidenceRepositoryReadiness(options = {}) {
     }
   ];
   const blockers = [
-    "production database migration, retention and backup acceptance for pilotEvidenceBatches",
+    "full-volume PostgreSQL migration, native backup and signed restore rehearsal evidence",
     "real object-storage bucket, KMS policy and WORM/object-lock acceptance",
     "production malware engine and signature update receipt",
     "pilot hospital identities, interface receipts and alert acknowledgements",
@@ -171,7 +193,7 @@ function buildPilotEvidenceRepositoryReadiness(options = {}) {
   return {
     ok: controls.every((item) => item.passed),
     generatedAt: new Date().toISOString(),
-    status: "persistent-api-operations-ui-ready-site-acceptance-pending",
+    status: "postgres-domain-adapter-ready-site-acceptance-pending",
     productionReady: false,
     summary: {
       controls: controls.length,
@@ -194,6 +216,7 @@ function buildPilotEvidenceRepositoryReadiness(options = {}) {
       verification,
       auditVerification
     },
+    database: databaseReadiness,
     controls,
     blockers
   };

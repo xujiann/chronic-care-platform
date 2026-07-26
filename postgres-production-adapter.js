@@ -6,6 +6,10 @@ const {
   postgresPoolConfig
 } = require("./postgres-runtime-sync");
 const { canonicalStringify } = require("./scripts/postgres-migration-package");
+const {
+  PILOT_EVIDENCE_COLLECTION,
+  buildPilotEvidenceProjection
+} = require("./pilot-evidence-postgres");
 
 const ADAPTER_MODES = new Set(["disabled", "rehearsal"]);
 const WRITE_MODES = new Set(["disabled", "evidence-gated"]);
@@ -98,6 +102,13 @@ function buildPostgresPrimaryWritePlan(currentRows = [], incomingState = {}, opt
   assertExpectedVersions(currentRows, incomingState, options.expectedVersions);
   const current = new Map(currentRows.map((row) => [String(row.collection_name), row]));
   const incomingEntries = Object.entries(incomingState).filter(([collection]) => collection !== "storageMeta");
+  if (current.has(PILOT_EVIDENCE_COLLECTION) && !Object.hasOwn(incomingState, PILOT_EVIDENCE_COLLECTION)) {
+    throw new PostgresProductionAdapterError(
+      "pilot evidence collection deletion is blocked",
+      "PILOT_EVIDENCE_COLLECTION_DELETE_BLOCKED",
+      409
+    );
+  }
   if (!incomingEntries.length) throw new PostgresProductionAdapterError("PostgreSQL production write state is empty", "INVALID_POSTGRES_PRIMARY_STATE");
   const incomingNames = new Set(incomingEntries.map(([collection]) => collection));
   const changes = [];
@@ -142,6 +153,113 @@ function buildPostgresPrimaryWritePlan(currentRows = [], incomingState = {}, opt
       resultingSnapshotSha256: metadataSnapshotSha256([...resultingRows.values()])
     }
   };
+}
+
+async function syncPilotEvidenceProjection(client, batches, options = {}) {
+  const rows = buildPilotEvidenceProjection(batches, {
+    retentionYears: options.retentionYears
+  });
+  const existing = await client.query(`
+    SELECT batch_id
+    FROM health_platform.pilot_evidence_batches
+    ORDER BY batch_id
+    FOR UPDATE
+  `);
+  const incomingIds = new Set(rows.map((row) => row.batchId));
+  const removed = existing.rows.filter((row) => !incomingIds.has(String(row.batch_id)));
+  if (removed.length) {
+    throw new PostgresProductionAdapterError(
+      "pilot evidence batch deletion is blocked",
+      "PILOT_EVIDENCE_BATCH_DELETE_BLOCKED",
+      409
+    );
+  }
+  for (const row of rows) {
+    const projected = await client.query(`
+      INSERT INTO health_platform.pilot_evidence_batches (
+        batch_id, organization_code, pilot_id, hospital_name, title, status, revision, payload,
+        payload_sha256, manifest_sha256, created_at, updated_at, frozen_at, retention_until, legal_hold
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13, $14, $15
+      )
+      ON CONFLICT (batch_id) DO UPDATE SET
+        organization_code = EXCLUDED.organization_code,
+        pilot_id = EXCLUDED.pilot_id,
+        hospital_name = EXCLUDED.hospital_name,
+        title = EXCLUDED.title,
+        status = EXCLUDED.status,
+        revision = EXCLUDED.revision,
+        payload = EXCLUDED.payload,
+        payload_sha256 = EXCLUDED.payload_sha256,
+        manifest_sha256 = EXCLUDED.manifest_sha256,
+        updated_at = EXCLUDED.updated_at,
+        frozen_at = EXCLUDED.frozen_at,
+        retention_until = GREATEST(health_platform.pilot_evidence_batches.retention_until, EXCLUDED.retention_until),
+        legal_hold = health_platform.pilot_evidence_batches.legal_hold OR EXCLUDED.legal_hold
+      WHERE (
+           health_platform.pilot_evidence_batches.status != 'frozen'
+           AND health_platform.pilot_evidence_batches.revision < EXCLUDED.revision
+         )
+         OR (
+           health_platform.pilot_evidence_batches.revision = EXCLUDED.revision
+           AND health_platform.pilot_evidence_batches.payload_sha256 = EXCLUDED.payload_sha256
+         )
+      RETURNING batch_id
+    `, [
+      row.batchId,
+      row.organizationCode,
+      row.pilotId,
+      row.hospitalName,
+      row.title,
+      row.status,
+      row.revision,
+      row.payload,
+      row.payloadSha256,
+      row.manifestSha256,
+      row.createdAt,
+      row.updatedAt,
+      row.frozenAt,
+      row.retentionUntil,
+      row.legalHold
+    ]);
+    if (projected.rowCount !== 1) {
+      throw new PostgresProductionAdapterError(
+        "pilot evidence projection revision conflict",
+        "PILOT_EVIDENCE_PROJECTION_CONFLICT",
+        409
+      );
+    }
+    const version = await client.query(`
+      WITH inserted AS (
+        INSERT INTO health_platform.pilot_evidence_batch_versions (
+          batch_id, revision, payload, payload_sha256, actor, recorded_at
+        ) VALUES ($1, $2, $3::jsonb, $4, $5, $6)
+        ON CONFLICT (batch_id, revision) DO NOTHING
+        RETURNING batch_id
+      )
+      SELECT batch_id FROM inserted
+      UNION ALL
+      SELECT batch_id
+      FROM health_platform.pilot_evidence_batch_versions
+      WHERE batch_id = $1 AND revision = $2 AND payload_sha256 = $4
+      LIMIT 1
+    `, [
+      row.batchId,
+      row.revision,
+      row.payload,
+      row.payloadSha256,
+      options.actor,
+      options.at || row.updatedAt
+    ]);
+    if (version.rowCount !== 1) {
+      throw new PostgresProductionAdapterError(
+        "pilot evidence version digest conflict",
+        "PILOT_EVIDENCE_VERSION_CONFLICT",
+        409
+      );
+    }
+  }
+  return { batches: rows.length, versions: rows.length };
 }
 
 function safeAdapterFailure(error, fallbackCode = "POSTGRES_PRODUCTION_ADAPTER_FAILED") {
@@ -261,6 +379,13 @@ async function writePostgresProductionState(state, options = {}) {
           updated_at = EXCLUDED.updated_at
       `, [change.collection, change.payload, change.payloadSha256, change.sourceVersion, batch.batchId, batch.createdAt]);
     }
+    const pilotEvidenceProjection = plan.changes.some((change) => change.collection === PILOT_EVIDENCE_COLLECTION)
+      ? await syncPilotEvidenceProjection(client, state[PILOT_EVIDENCE_COLLECTION], {
+        actor,
+        at: batch.createdAt,
+        retentionYears: env.PILOT_EVIDENCE_RETENTION_YEARS
+      })
+      : { batches: 0, versions: 0 };
     await client.query("UPDATE health_platform.runtime_sync_batches SET status = 'applied', applied_at = now() WHERE batch_id = $1", [batch.batchId]);
     await client.query(`
       INSERT INTO health_platform.runtime_primary_write_audit (
@@ -285,6 +410,10 @@ async function writePostgresProductionState(state, options = {}) {
       ...plan.summary,
       credentialsPersisted: false,
       payloadsExposed: false,
+      pilotEvidenceProjection: {
+        batches: pilotEvidenceProjection.batches,
+        versions: pilotEvidenceProjection.versions
+      },
       productionPrimary: false,
       runtimeCutoverEnabled: false
     };
@@ -312,14 +441,18 @@ async function verifyPostgresProductionAdapterSchema(options = {}) {
       SELECT
         to_regclass('health_platform.runtime_sync_batches') AS sync_batches,
         to_regclass('health_platform.runtime_collection_state') AS collection_state,
-        to_regclass('health_platform.runtime_primary_write_audit') AS primary_write_audit
+        to_regclass('health_platform.runtime_primary_write_audit') AS primary_write_audit,
+        to_regclass('health_platform.pilot_evidence_batches') AS pilot_evidence_batches,
+        to_regclass('health_platform.pilot_evidence_batch_versions') AS pilot_evidence_batch_versions
     `);
     await client.query("COMMIT");
     const row = result.rows[0] || {};
     const checks = {
       syncBatches: Boolean(row.sync_batches),
       collectionState: Boolean(row.collection_state),
-      primaryWriteAudit: Boolean(row.primary_write_audit)
+      primaryWriteAudit: Boolean(row.primary_write_audit),
+      pilotEvidenceBatches: Boolean(row.pilot_evidence_batches),
+      pilotEvidenceBatchVersions: Boolean(row.pilot_evidence_batch_versions)
     };
     return {
       ok: Object.values(checks).every(Boolean),
@@ -361,6 +494,7 @@ module.exports = {
   createPostgresProductionAdapter,
   metadataSnapshotSha256,
   readPostgresProductionState,
+  syncPilotEvidenceProjection,
   verifyPostgresProductionAdapterSchema,
   writePostgresProductionState
 };

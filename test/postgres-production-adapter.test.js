@@ -7,6 +7,7 @@ const {
   buildPostgresProductionAdapterConfig,
   createPostgresProductionAdapter,
   readPostgresProductionState,
+  syncPilotEvidenceProjection,
   verifyPostgresProductionAdapterSchema,
   writePostgresProductionState
 } = require("../postgres-production-adapter");
@@ -70,6 +71,11 @@ test("PostgreSQL primary write plan requires complete optimistic versions", () =
   assert.equal(plan.changes[0].sourceVersion, 3);
   assert.equal(plan.summary.changedCollections, 1);
   assert.match(plan.summary.resultingSnapshotSha256, /^[a-f0-9]{64}$/);
+
+  const evidenceRows = [currentRow("pilotEvidenceBatches", [], 1)];
+  assert.throws(() => buildPostgresPrimaryWritePlan(evidenceRows, { settings: {} }, {
+    expectedVersions: { pilotEvidenceBatches: 1, settings: 0 }
+  }), (error) => error.code === "PILOT_EVIDENCE_COLLECTION_DELETE_BLOCKED");
 });
 
 test("PostgreSQL production adapter reads a verified state in a repeatable read-only transaction", async () => {
@@ -156,6 +162,79 @@ test("PostgreSQL production adapter blocks writes without evidence and rolls bac
   assert.equal(queries.at(-1), "ROLLBACK");
 });
 
+test("PostgreSQL production adapter projects pilot evidence and appends its revision", async () => {
+  const previous = [{
+    id: "pilot-batch-1",
+    organizationCode: "ORG-01",
+    pilotId: "PILOT-01",
+    hospitalName: "Pilot Hospital",
+    title: "Acceptance",
+    status: "open",
+    revision: 1,
+    createdAt: "2026-07-26T00:00:00.000Z",
+    auditEvents: []
+  }];
+  const incoming = [{
+    ...previous[0],
+    revision: 2,
+    auditEvents: [{ action: "artifact-accessed", at: "2026-07-26T01:00:00.000Z" }]
+  }];
+  const queries = [];
+  const client = {
+    async query(sql, params) {
+      const normalized = sql.trim();
+      queries.push({ sql: normalized, params });
+      if (/SELECT collection_name/.test(sql)) return { rows: [currentRow("pilotEvidenceBatches", previous, 4)] };
+      if (/SELECT chain_hash/.test(sql)) return { rows: [] };
+      if (/SELECT batch_id[\s\S]+pilot_evidence_batches/.test(sql)) return { rows: [{ batch_id: "pilot-batch-1" }] };
+      if (/INSERT INTO health_platform\.runtime_sync_batches/.test(sql)) return { rowCount: 1, rows: [{ batch_id: "inserted" }] };
+      if (/INSERT INTO health_platform\.pilot_evidence_batches/.test(sql)) return { rowCount: 1, rows: [{ batch_id: "pilot-batch-1" }] };
+      if (/INSERT INTO health_platform\.pilot_evidence_batch_versions/.test(sql)) return { rowCount: 1, rows: [{ batch_id: "pilot-batch-1" }] };
+      return { rowCount: 1, rows: [] };
+    },
+    release() {}
+  };
+  const result = await writePostgresProductionState({ pilotEvidenceBatches: incoming }, {
+    pool: { async connect() { return client; } },
+    config: { writeEnabled: true },
+    allowWrite: true,
+    expectedVersions: { pilotEvidenceBatches: 4 },
+    actor: "database release manager",
+    reason: "Project pilot evidence revision into the production domain ledger.",
+    env: { PILOT_EVIDENCE_RETENTION_YEARS: "12" }
+  });
+  assert.equal(queries.some((item) => /pilot_evidence_batches/.test(item.sql)), true);
+  assert.equal(queries.some((item) => /pilot_evidence_batch_versions/.test(item.sql)), true);
+  assert.equal(queries.some((item) => /status != 'frozen'/.test(item.sql)), true);
+  assert.deepEqual(result.pilotEvidenceProjection, { batches: 1, versions: 1 });
+  assert.equal(result.payloadsExposed, false);
+  assert.doesNotMatch(JSON.stringify(result), /Pilot Hospital|database release manager/);
+});
+
+test("PostgreSQL pilot evidence projection blocks removing an existing batch", async () => {
+  const client = {
+    async query(sql) {
+      if (/SELECT batch_id[\s\S]+pilot_evidence_batches/.test(sql)) {
+        return { rows: [{ batch_id: "pilot-batch-1" }, { batch_id: "pilot-batch-2" }] };
+      }
+      return { rowCount: 1, rows: [] };
+    }
+  };
+  await assert.rejects(() => syncPilotEvidenceProjection(client, [{
+    id: "pilot-batch-1",
+    organizationCode: "ORG-01",
+    pilotId: "PILOT-01",
+    hospitalName: "Pilot Hospital",
+    title: "Acceptance",
+    status: "open",
+    revision: 2,
+    createdAt: "2026-07-26T00:00:00.000Z",
+    auditEvents: []
+  }], {
+    actor: "database release manager"
+  }), (error) => error.code === "PILOT_EVIDENCE_BATCH_DELETE_BLOCKED");
+});
+
 test("PostgreSQL production adapter verifies the runtime and audit schema without exposing credentials", async () => {
   const queries = [];
   const client = {
@@ -165,7 +244,9 @@ test("PostgreSQL production adapter verifies the runtime and audit schema withou
         return { rows: [{
           sync_batches: "health_platform.runtime_sync_batches",
           collection_state: "health_platform.runtime_collection_state",
-          primary_write_audit: "health_platform.runtime_primary_write_audit"
+          primary_write_audit: "health_platform.runtime_primary_write_audit",
+          pilot_evidence_batches: "health_platform.pilot_evidence_batches",
+          pilot_evidence_batch_versions: "health_platform.pilot_evidence_batch_versions"
         }] };
       }
       return { rows: [] };

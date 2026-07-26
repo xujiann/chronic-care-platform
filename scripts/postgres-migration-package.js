@@ -2,6 +2,12 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { createHash } = require("node:crypto");
+const {
+  PILOT_EVIDENCE_COLLECTION,
+  pilotEvidenceLoadSql,
+  pilotEvidenceSchemaStatements,
+  pilotEvidenceVerifySql
+} = require("../pilot-evidence-postgres");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT_DIR = path.join(ROOT, "release", "postgres-migration-package");
@@ -160,6 +166,7 @@ function schemaSql() {
     ");",
     "CREATE INDEX IF NOT EXISTS auth_sessions_user_active_idx ON health_platform.auth_sessions (user_id, expires_at) WHERE revoked_at IS NULL;",
     "CREATE INDEX IF NOT EXISTS auth_sessions_retention_idx ON health_platform.auth_sessions (revoked_at, expires_at);",
+    ...pilotEvidenceSchemaStatements(),
     "COMMIT;",
     ""
   ].join("\n");
@@ -234,8 +241,10 @@ function packageReadme(manifest) {
     "Manifest mode contains schemas, counts and digests only. It never contains source record payloads or database credentials.",
     "Full mode contains sensitive business data and must be generated into an access-controlled directory outside the repository with explicit acknowledgement.",
     "Apply `schema.sql`, create the migration run with `load.sql`, use psql `\\copy` for the two TSV files, compare imported counts with `manifest.json`, then run `verify.sql`.",
+    "After the record copy, run `pilot-evidence-load.sql` and require `pilot-evidence-verify.sql` to report zero invalid batches and zero missing versions.",
     "Use `rollback.sql` only with an approved migration run id and a verified pre-cutover backup.",
     "This package does not enable the PostgreSQL runtime adapter and does not represent production acceptance.",
+    `The ${PILOT_EVIDENCE_COLLECTION} collection has a domain projection, append-only version ledger, retention index, dedicated load script and verification script.`,
     ""
   ].join("\n");
 }
@@ -263,7 +272,13 @@ function buildPostgresMigrationPackage(options = {}) {
     mode,
     migrationRunId,
     source: { type: "json-snapshot", digest: sourceDigest, canonicalBytes: Buffer.byteLength(sourceCanonical) },
-    target: { engine: "postgresql", schema: "health_platform", runtimeAdapterImplemented: true, runtimeAdapterEnabled: false },
+    target: {
+      engine: "postgresql",
+      schema: "health_platform",
+      runtimeAdapterImplemented: true,
+      runtimeAdapterEnabled: false,
+      domainProjections: [PILOT_EVIDENCE_COLLECTION]
+    },
     summary,
     collections: inventory,
     secretBoundary: { databaseUrlPersisted: false, credentialsPersisted: false },
@@ -280,6 +295,8 @@ function buildPostgresMigrationPackage(options = {}) {
     "load.sql": loadSql(),
     "verify.sql": verifySql(),
     "rollback.sql": rollbackSql(),
+    "pilot-evidence-load.sql": pilotEvidenceLoadSql(),
+    "pilot-evidence-verify.sql": pilotEvidenceVerifySql(),
     "README.md": packageReadme(manifest)
   };
   if (mode === "full") {
@@ -291,6 +308,13 @@ function buildPostgresMigrationPackage(options = {}) {
     check("postgresPackage:sourceDigest", /^[a-f0-9]{64}$/.test(sourceDigest), sourceDigest),
     check("postgresPackage:secretBoundary", manifest.secretBoundary.databaseUrlPersisted === false && manifest.secretBoundary.credentialsPersisted === false, "database credentials are not persisted"),
     check("postgresPackage:runtimeBoundary", manifest.target.runtimeAdapterImplemented === true && manifest.target.runtimeAdapterEnabled === false && manifest.productionReady === false, "production adapter schema is present but migration tooling cannot enable runtime cutover"),
+    check(
+      "postgresPackage:pilotEvidenceProjection",
+      pilotEvidenceSchemaStatements().some((line) => line.includes("pilot_evidence_batch_versions"))
+        && files["pilot-evidence-load.sql"].includes(PILOT_EVIDENCE_COLLECTION)
+        && files["pilot-evidence-verify.sql"].includes("missing_versions"),
+      `${PILOT_EVIDENCE_COLLECTION} domain projection declared`
+    ),
     check("postgresPackage:fullExport", mode === "manifest" || (files["records.copy.tsv"].split("\n").filter(Boolean).length === summary.records && files["snapshots.copy.tsv"].split("\n").filter(Boolean).length === summary.snapshots), mode)
   ];
   return { ok: checks.every((item) => item.passed), manifest, files, checks };

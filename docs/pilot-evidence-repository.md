@@ -58,11 +58,22 @@
 
 批次写操作必须提交 `expectedRevision`。版本不一致返回冲突，不覆盖其他操作者刚刚提交的证据或复核结果。机构用户只能访问本机构批次和本机构上传的安全附件；冻结和独立复核仅允许卫健委角色执行。
 
+## PostgreSQL 生产适配
+
+`pilot-evidence-postgres.js` 把 `pilotEvidenceBatches` 从通用运行集合投影为两个领域表：
+
+- `health_platform.pilot_evidence_batches`：保存机构范围、批次状态、当前修订、验收包摘要、保留期和法律保全状态；
+- `health_platform.pilot_evidence_batch_versions`：按批次和修订只追加保存版本，数据库触发器拒绝更新和删除。
+
+`postgres-production-adapter.js` 在同一个串行化事务内更新通用集合和领域投影，拒绝删除整个证据集合、拒绝修订倒退或同修订摘要冲突。PostgreSQL 迁移包同时生成 `pilot-evidence-load.sql` 与 `pilot-evidence-verify.sql`，用于基线装载、无效批次检查和当前版本缺失检查。
+
+最低保留期由 `PILOT_EVIDENCE_RETENTION_YEARS` 配置，当前软件门禁不允许低于 10 年。生产批准还必须提供 `POSTGRES_BACKUP_EVIDENCE_ID`、`POSTGRES_RTO_RPO_EVIDENCE_ID`、`PILOT_EVIDENCE_RESTORE_EVIDENCE_ID` 和 `POSTGRES_CUTOVER_APPROVAL_ID`。这些编号仅作为运行环境输入，不写入仓库或业务返回。
+
 ## production boundary
 
-当前增量完成批次模型、持久化接口、角色化操作台、对象存储回执联动、版本替换、独立复核、访问审计、冻结封包和摘要复验。正式试点上线前仍需完成：
+当前增量完成批次模型、持久化接口、角色化操作台、PostgreSQL 领域投影和迁移复验脚本、对象存储回执联动、版本替换、独立复核、访问审计、冻结封包和摘要复验。正式试点上线前仍需完成：
 
-1. `pilotEvidenceBatches` 生产数据库迁移、保留期和备份恢复验收；
+1. `pilotEvidenceBatches` 全量迁移、原生备份和恢复演练签字；
 2. 真实对象存储、KMS、WORM/对象锁和备份恢复验收；
 3. 生产病毒库更新与扫描回执；
 4. 医院真实接口回执、告警确认和四方签字原件；
