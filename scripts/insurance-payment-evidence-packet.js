@@ -18,7 +18,9 @@ const EVIDENCE_FILES = Object.freeze([
   "insurance-payment-production-handoff.js",
   "docs/t07-insurance-payment-t00-handoff.md",
   "scripts/insurance-payment-acceptance.js",
-  "test/insurance-payment-production-handoff.test.js"
+  "scripts/insurance-payment-evidence-packet.js",
+  "test/insurance-payment-production-handoff.test.js",
+  "test/insurance-payment-evidence-packet.test.js"
 ]);
 
 function stableStringify(value) {
@@ -68,8 +70,28 @@ function buildInsurancePaymentEvidencePacket(options = {}) {
   return { ...packet, packetDigest: `sha256:${sha256(stableStringify(packet))}` };
 }
 
-function verifyInsurancePaymentEvidencePacket(packet = {}) {
-  return /^sha256:[a-f0-9]{64}$/.test(String(packet.packetDigest || "")) && packet.packetDigest === `sha256:${sha256(stableStringify(packetPayload(packet)))}`;
+function verifyArtifactManifest(artifacts = [], artifactRoot = ROOT) {
+  if (!Array.isArray(artifacts) || artifacts.length !== EVIDENCE_FILES.length) return false;
+  const resolvedRoot = path.resolve(artifactRoot);
+  return artifacts.every((artifact, index) => {
+    const expectedPath = EVIDENCE_FILES[index];
+    if (!artifact || artifact.path !== expectedPath || !/^[a-f0-9]{64}$/.test(String(artifact.sha256 || "")) || !Number.isSafeInteger(artifact.bytes) || artifact.bytes < 0) return false;
+    const absolutePath = path.resolve(resolvedRoot, expectedPath);
+    const relativePath = path.relative(resolvedRoot, absolutePath);
+    if (!relativePath || relativePath.startsWith("..") || path.isAbsolute(relativePath)) return false;
+    try {
+      const source = fs.readFileSync(absolutePath);
+      return artifact.bytes === source.length && artifact.sha256 === sha256(source);
+    } catch {
+      return false;
+    }
+  });
+}
+
+function verifyInsurancePaymentEvidencePacket(packet = {}, options = {}) {
+  const digestValid = /^sha256:[a-f0-9]{64}$/.test(String(packet.packetDigest || ""))
+    && packet.packetDigest === `sha256:${sha256(stableStringify(packetPayload(packet)))}`;
+  return digestValid && verifyArtifactManifest(packet.artifacts, options.artifactRoot || ROOT);
 }
 
 function renderMarkdown(packet) {
@@ -113,4 +135,4 @@ if (require.main === module) {
   if (!packet.localReady || !verifyInsurancePaymentEvidencePacket(packet)) process.exitCode = 1;
 }
 
-module.exports = { EVIDENCE_FILES, buildInsurancePaymentEvidencePacket, packetPayload, parseArgs, renderMarkdown, sha256, stableStringify, verifyInsurancePaymentEvidencePacket };
+module.exports = { EVIDENCE_FILES, buildInsurancePaymentEvidencePacket, packetPayload, parseArgs, renderMarkdown, sha256, stableStringify, verifyArtifactManifest, verifyInsurancePaymentEvidencePacket };

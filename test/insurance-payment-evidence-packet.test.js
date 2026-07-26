@@ -25,5 +25,18 @@ test("insurance payment evidence packet detects acceptance or artifact tampering
   const tampered = structuredClone(packet);
   tampered.workflows[0].ready = false;
   assert.equal(Evidence.verifyInsurancePaymentEvidencePacket(tampered), false);
+
+  const rehashedArtifactTampering = structuredClone(packet);
+  rehashedArtifactTampering.artifacts[0].sha256 = "f".repeat(64);
+  rehashedArtifactTampering.packetDigest = `sha256:${Evidence.sha256(Evidence.stableStringify(Evidence.packetPayload(rehashedArtifactTampering)))}`;
+  assert.equal(Evidence.verifyInsurancePaymentEvidencePacket(rehashedArtifactTampering), false);
+
+  const missingArtifact = structuredClone(packet);
+  missingArtifact.artifacts.pop();
+  missingArtifact.packetDigest = `sha256:${Evidence.sha256(Evidence.stableStringify(Evidence.packetPayload(missingArtifact)))}`;
+  assert.equal(Evidence.verifyInsurancePaymentEvidencePacket(missingArtifact), false);
+
+  const wrongRoot = structuredClone(packet);
+  assert.equal(Evidence.verifyInsurancePaymentEvidencePacket(wrongRoot, { artifactRoot: __dirname }), false);
   assert.deepEqual(Evidence.parseArgs(["--output=tmp/evidence.json", "--markdown=tmp/evidence.md"]), { output: "tmp/evidence.json", markdown: "tmp/evidence.md" });
 });

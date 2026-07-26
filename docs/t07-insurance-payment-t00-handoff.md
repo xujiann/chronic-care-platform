@@ -67,7 +67,7 @@ T00 负责公共路由、统一认证鉴权、请求体与错误响应映射、�
 
 `insurance-payment-production-handoff.js` 将 23 个待接项和外部阻断项转换为摘要绑定、职责分离、可验真的证据台账。T00 接线完成后，应由 `integration-owner` 提交路由测试证据，再由不同主体的 `acceptance-reviewer`、`security-reviewer` 或 `finance-auditor` 核验。
 
-每个交接项的职责、要求摘要、启停状态、流转状态、证据记录和核验记录均绑定到事件的 `projectionDigest`。系统同时校验哈希链、相邻 `from/to` 以及“创建→提交→核验/驳回”的语义顺序；直接改写 `required`、状态、证据摘要或核验人，或者重算哈希后跳过提交步骤，都会使 `ledgerValid=false`，后续提交和核验返回 `HANDOFF_LEDGER_INVALID`。证据包对该实现及专用测试文件一并做 SHA-256 摘要绑定。
+每个交接项的职责、要求摘要、启停状态、流转状态、证据记录和核验记录均绑定到事件的 `projectionDigest`。系统同时校验哈希链、相邻 `from/to` 以及“创建→提交→核验/驳回”的语义顺序；直接改写 `required`、状态、证据摘要或核验人，或者重算哈希后跳过提交步骤，都会使 `ledgerValid=false`，后续提交和核验返回 `HANDOFF_LEDGER_INVALID`。证据包对该实现及专用测试文件一并做 SHA-256 摘要绑定；离线校验还会逐项重读固定清单中的当前文件，核对路径、字节数和摘要，不能用重新计算包摘要掩盖缺失、过期或被替换的工件。
 
 当前仍有 9 类外部生产条件，并展开为 20 项必须分别提交、分别核验的证据要求：
 
