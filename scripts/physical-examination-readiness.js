@@ -80,7 +80,9 @@ function buildReport(options = {}) {
     check("standalone:domain-boundary", !/(emergency|blood|imaging)-(service|ui|innovation)/i.test(standalonePage) && standalonePage.includes("physical-examination-production.js"), "独立入口只加载体检域脚本，不依赖急救、用血或影像模块"),
     check("standalone:production-control", production.includes("mapSourceReport") && production.includes("validateIntegrationReceipt") && production.includes("validateReportSignatureContract") && production.includes("validateArchiveEvidence"), "字段映射、接入回执、医学签名和原件扫描归档门禁"),
     check("standalone:care-closure", production.includes("schedule-review") && production.includes("family-doctor-followup") && production.includes("真实送达回执"), "异常确认、送达、复查、家医随访和关闭顺序门禁"),
-    check("standalone:operations-gates", production.includes("validateStandaloneSmoke") && production.includes("validateRollbackGate") && standaloneClient.includes("NO-GO") && standaloneReadiness.includes("goLiveReady: false"), "独立冒烟、回退演练及现场证据未齐时NO-GO")
+    check("standalone:operations-gates", production.includes("validateStandaloneSmoke") && production.includes("validateRollbackGate") && standaloneClient.includes("NO-GO") && standaloneReadiness.includes("goLiveReady: false"), "独立冒烟、回退演练及现场证据未齐时NO-GO"),
+    check("standalone:evidence-manifest", production.includes("validateEvidenceManifest") && production.includes("manifest-signature-digest-mismatch") && production.includes("manifest-canonical-payload-not-verified") && production.includes("manifest-expired"), "现场证据包规范化摘要、生产签名、七日有效期和防重放门禁"),
+    check("standalone:evidence-linkage", production.includes("validateEvidenceLinkage") && production.includes("bundle-id-mismatch") && production.includes("source-receipt-digest-mismatch") && production.includes("source-signoff-evidence-set-mismatch"), "源回执、报告、原件、闭环和现场签署按批次及两层摘要绑定")
   ];
   const passed = checks.filter((item) => item.passed).length;
   return {
