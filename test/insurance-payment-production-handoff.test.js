@@ -240,3 +240,21 @@ test("production handoff requires fresh evidence after rejection", () => {
     (error) => error.code === "HANDOFF_EVIDENCE_DIGEST_REUSED"
   );
 });
+
+test("production handoff fails closed when an external requirement has no reviewer responsibility", () => {
+  const acceptance = buildInsurancePaymentAcceptance();
+  const changed = structuredClone(acceptance);
+  const blocker = changed.externalBlockers.find((item) => item.source === "financial-gateway");
+  blocker.reviewerRole = "";
+  const data = {};
+  const state = Handoff.ensureProductionHandoff(data, changed, "2026-07-22T08:00:00.000Z");
+  const itemId = `external:${blocker.source}:${blocker.id}`;
+  const item = state.items.find((candidate) => candidate.id === itemId);
+  assert.equal(Handoff.verifyItemLedger(item), true);
+  assert.equal(Handoff.verifyHandoffCollection(state), false);
+  assert.equal(Handoff.buildProductionHandoffStatus(data, changed).ledgerValid, false);
+  assert.throws(
+    () => Handoff.submitHandoffEvidence(data, changed, itemId, evidenceInput(), { username: "provider-owner", role: "external-owner" }),
+    (error) => error.code === "HANDOFF_LEDGER_INVALID"
+  );
+});

@@ -155,6 +155,7 @@ function verifyHandoffCollection(state = {}) {
   const evidenceDigests = new Set();
   for (const item of state.items) {
     if (!item?.id || itemIds.has(item.id) || !verifyItemLedger(item)) return false;
+    if (item.scope === "external" && !VERIFICATION_ROLES.includes(item.requirement?.reviewerRole)) return false;
     itemIds.add(item.id);
     for (const event of item.events) {
       if (event.idempotencyKey) {
@@ -318,6 +319,7 @@ function verifyHandoffEvidence(data, acceptance, itemId, input = {}, actor = {})
   const verifiedAt = canonicalTimestamp(input.verifiedAt || new Date().toISOString(), "HANDOFF_VERIFIED_AT_INVALID");
   const item = requiredItem(data, acceptance, itemId, verifiedAt);
   const requiredReviewerRole = safeText(item.requirement?.reviewerRole, 80);
+  if (item.scope === "external" && !VERIFICATION_ROLES.includes(requiredReviewerRole)) throw new ProductionHandoffError("外部生产证据缺少明确核验职责", "HANDOFF_REVIEWER_ROLE_REQUIRED", 409);
   const verifiedBy = requireActorRole(actor, requiredReviewerRole ? [requiredReviewerRole] : VERIFICATION_ROLES, "HANDOFF_VERIFICATION_RESPONSIBILITY_DENIED");
   if (typeof input.approved !== "boolean") throw new ProductionHandoffError("核验结论不能为空", "HANDOFF_VERDICT_REQUIRED", 400);
   const verificationReference = safeText(input.verificationReference);

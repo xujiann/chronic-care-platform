@@ -87,6 +87,8 @@ T00 负责公共路由、统一认证鉴权、请求体与错误响应映射、�
 
 任何本地测试、模拟回调或自签名证据都不能关闭这些阻断项。每项证据必须由其指定的 `security-reviewer`、`acceptance-reviewer` 或 `finance-auditor` 核验，不能用一份笼统“已联调”材料批量关闭。`productionReady` 必须保持 `false`，直至真实公共接线、可信外部访问和现场证据全部完成。
 
+金融网关6项证据同样采用确定性职责映射：生产凭据、可信回调和安全评估由 `security-reviewer` 核验；账单传输及日终对账由 `finance-auditor` 核验；字段字典及错误码、现场联合签收由 `acceptance-reviewer` 核验。新增但尚未配置责任映射的外部要求会使 `externalEvidenceGoverned=false`，且交接账本失败关闭，不允许退化为任意审核角色。
+
 ## T00 集成后的验收
 
 ```powershell
