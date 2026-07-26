@@ -31,6 +31,7 @@
     ["public-health", "基本公共卫生服务"],
     ["public-health-plus", "基本公共卫生增强服务"],
     ["quarterly", "每季度"],
+    ["ready", "已就绪"],
     ["scheduled", "已安排"],
     ["system", "系统"],
     ["unknown", "待确认"],
@@ -38,6 +39,26 @@
   ]);
 
   const PHRASE_REPLACEMENTS = [
+    ["send medication pickup and follow-up reminder, collect receipt before next visit", "发送取药与随访提醒，并在下次就诊前确认回执"],
+    ["Qingniwaqiao Community Health Service Center demo", "青泥洼桥社区卫生服务中心演示点"],
+    ["Hypertension follow-up and medication adjustment", "高血压随访与用药调整"],
+    ["Primary care appointment source pool", "基层预约号源池"],
+    ["Internet hospital source pool", "互联网医院号源池"],
+    ["resident and family proxy", "居民及家庭代办人"],
+    ["chronic reminder outreach", "慢病提醒触达"],
+    ["schedule-change replacement", "改期替补号源"],
+    ["diabetes follow-up", "糖尿病随访"],
+    ["chronic follow-up", "慢病随访"],
+    ["online revisit", "线上复诊"],
+    ["waitlist-enabled", "可候补"],
+    ["full-capacity", "号源已满"],
+    ["family doctor", "家庭医生"],
+    ["General Practice", "全科医学科"],
+    ["Doctor Chen", "陈医生"],
+    ["Doctor Sun", "孙医生"],
+    ["Doctor Zhao", "赵医生"],
+    ["Doctor Liu", "刘医生"],
+    ["Framingham", "国际心血管风险评估模型"],
     ["mobile-preview、manifest、service worker", "移动端预览、应用清单、离线服务"],
     ["FD-PKG-ELDERLY", "老年人家庭医生服务包"],
     ["FD-PKG-BASIC", "基础家庭医生服务包"],
@@ -96,6 +117,8 @@
     [/\bsystolic\b/gi, "收缩压"],
     [/\bdiastolic\b/gi, "舒张压"],
     [/\bglucose\b/gi, "血糖"],
+    [/\bundefined\b/gi, "未提供"],
+    [/\bsms\b/gi, "短信"],
     [/\bOrthanc\b/g, "影像归档系统"],
     [/\bST-T\b/g, "心电图复极段"],
     [/\bAM\b/g, "上午"],
@@ -131,7 +154,7 @@
   ];
 
   function replaceStandaloneStatuses(value) {
-    return value.replace(/\b(active|allowed|approved|archived|assessed-and-approved|clean|clinical-service|clinical|completed|confirmed|dispatched|in_app|legacy-record|matched|monthly|new-contract|not-due|pending-verification|pending|public-health-plus|public-health|quarterly|scheduled|system|unknown|yearly)\b/gi, (match) => (
+    return value.replace(/\b(active|allowed|approved|archived|assessed-and-approved|clean|clinical-service|clinical|completed|confirmed|dispatched|in_app|legacy-record|matched|monthly|new-contract|not-due|pending-verification|pending|public-health-plus|public-health|quarterly|ready|scheduled|system|unknown|yearly)\b/gi, (match) => (
       EXACT_TEXT.get(match.toLowerCase()) || match
     ));
   }
@@ -140,6 +163,9 @@
     let output = String(value ?? "");
     if (!/[A-Za-z]/.test(output)) return output;
     for (const [source, target] of PHRASE_REPLACEMENTS) output = output.split(source).join(target);
+    output = output.replace(/\bHC-\*{4}(\d+)\b/g, "健康卡尾号$1");
+    output = output.replace(/\bMI-\*{4}[A-Za-z0-9-]+\b/g, "医保凭证已脱敏");
+    output = output.replace(/\b(\d+\.\d+)-demo\b/gi, "$1-演示版");
     output = output.replace(/来源记录\s+[A-Za-z0-9-]+(?=\s*·)/gi, "来源记录已核验");
     const protectedIdentifiers = [];
     output = output.replace(/\b(?=[A-Z0-9-]*\d)[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+\b/g, (match) => {
