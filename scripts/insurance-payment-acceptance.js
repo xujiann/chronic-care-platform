@@ -8,6 +8,15 @@ const { buildFinancialGatewayReadiness } = require("./financial-gateway-readines
 const OperatingModel = require("../insurance-payment-operating-model");
 
 const ROOT = path.resolve(__dirname, "..");
+const FINANCIAL_GATEWAY_EVIDENCE_POLICY = Object.freeze([
+  Object.freeze({ id: "financial-1", owner: "金融网关与证书责任方", reviewerRole: "security-reviewer" }),
+  Object.freeze({ id: "financial-2", owner: "金融网关适配责任方", reviewerRole: "security-reviewer" }),
+  Object.freeze({ id: "financial-3", owner: "医院财务与医保经办", reviewerRole: "finance-auditor" }),
+  Object.freeze({ id: "financial-4", owner: "金融网关适配责任方", reviewerRole: "acceptance-reviewer" }),
+  Object.freeze({ id: "financial-5", owner: "信息安全责任方", reviewerRole: "security-reviewer" }),
+  Object.freeze({ id: "financial-6", owner: "现场实施与医保经办", reviewerRole: "acceptance-reviewer" })
+]);
+const EXTERNAL_REVIEWER_ROLES = new Set(["acceptance-reviewer", "security-reviewer", "finance-auditor"]);
 
 function checkById(report, id) {
   return report.checks.find((item) => item.id === id)?.ok === true;
@@ -33,6 +42,19 @@ function diseasePaymentExternalEvidence(blockers = []) {
   });
 }
 
+function financialGatewayExternalEvidence(blockers = []) {
+  return blockers.map((detail, index) => {
+    const policy = FINANCIAL_GATEWAY_EVIDENCE_POLICY[index] || {};
+    return {
+      source: "financial-gateway",
+      id: policy.id || `financial-unmapped-${index + 1}`,
+      detail,
+      owner: policy.owner || "",
+      reviewerRole: policy.reviewerRole || ""
+    };
+  });
+}
+
 function buildInsurancePaymentAcceptance(options = {}) {
   const diseasePayment = options.diseasePayment || buildDiseasePaymentReadiness();
   const financialGateway = options.financialGateway || buildFinancialGatewayReadiness();
@@ -47,14 +69,15 @@ function buildInsurancePaymentAcceptance(options = {}) {
     { id: "monthly-settlement", label: "月度结算", ready: checkById(diseasePayment, "settlement") && checkById(diseasePayment, "settlement-sla") && checkById(diseasePayment, "settlement-difference-governance"), evidence: ["frozen-batch", "30-working-day-sla", "digest-bound-difference-evidence", "dual-domain-difference-resolution", "difference-state-projection", "payment-receipt"] },
     { id: "annual-clearance", label: "年度清算", ready: checkById(diseasePayment, "annual-clearance") && checkById(diseasePayment, "annual-clearance-institution-confirmation"), evidence: ["per-institution-confirmation", "institution-bound-dispute", "aggregate-confirmation-digest", "adjustment-fund", "retained-balance", "risk-reserve", "finance-posting", "locked-ledger", "clearance-state-projection"] }
   ];
-  const localReady = diseasePayment.ready && financialGateway.ok && operatingModel.ok && workflows.every((item) => item.ready);
-  const externalBlockers = [...diseasePaymentExternalEvidence(diseasePayment.externalBlockers), ...financialGateway.blockers.map((detail, index) => ({ source: "financial-gateway", id: `financial-${index + 1}`, detail }))];
+  const externalBlockers = [...diseasePaymentExternalEvidence(diseasePayment.externalBlockers), ...financialGatewayExternalEvidence(financialGateway.blockers)];
+  const externalEvidenceGoverned = externalBlockers.every((item) => item.owner && EXTERNAL_REVIEWER_ROLES.has(item.reviewerRole));
+  const localReady = diseasePayment.ready && financialGateway.ok && operatingModel.ok && workflows.every((item) => item.ready) && externalEvidenceGoverned;
   return {
     generatedAt: new Date().toISOString(),
     status: localReady ? "domain-ready-public-wiring-and-site-acceptance-pending" : "domain-incomplete",
     localReady,
     productionReady: false,
-    summary: { workflows: workflows.length, workflowsReady: workflows.filter((item) => item.ready).length, t00RoutesPending: integrationHandoff.pending, externalBlockers: externalBlockers.length },
+    summary: { workflows: workflows.length, workflowsReady: workflows.filter((item) => item.ready).length, t00RoutesPending: integrationHandoff.pending, externalBlockers: externalBlockers.length, externalEvidenceGoverned },
     workflows,
     operatingModel,
     integrationHandoff,
@@ -85,4 +108,4 @@ if (require.main === module) {
   if (!report.localReady) process.exitCode = 1;
 }
 
-module.exports = { buildInsurancePaymentAcceptance, diseasePaymentExternalEvidence, renderMarkdown };
+module.exports = { FINANCIAL_GATEWAY_EVIDENCE_POLICY, buildInsurancePaymentAcceptance, diseasePaymentExternalEvidence, financialGatewayExternalEvidence, renderMarkdown };
