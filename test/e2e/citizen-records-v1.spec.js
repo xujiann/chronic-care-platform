@@ -92,17 +92,17 @@ test("resident creates a scoped consent and revokes it through the dedicated aud
 
   await page.locator('[data-vault="imaging"]').click();
   const imageCloudReport = page.locator(".vault-item").filter({ hasText: "双肺纹理增多" });
-  await expect(imageCloudReport).toContainText("胸部 CT 影像报告");
+  await expect(imageCloudReport).toContainText("胸部 计算机断层扫描 影像报告");
   await expect(imageCloudReport).toContainText("质控通过");
-  await expect(imageCloudReport.getByRole("button", { name: /受控调阅胸部 CT 影像报告/ })).toHaveText("进入受控影像调阅");
+  await expect(imageCloudReport.getByRole("button", { name: /受控调阅胸部 计算机断层扫描 影像报告/ })).toHaveText("进入受控影像调阅");
   await expect(page.locator("#vault-content")).not.toContainText("oss://");
   await expect(page.locator("#vault-content")).not.toContainText("objectPath");
-  const imagingTouchHeight = await imageCloudReport.getByRole("button", { name: /受控调阅胸部 CT 影像报告/ }).evaluate((element) => element.getBoundingClientRect().height);
+  const imagingTouchHeight = await imageCloudReport.getByRole("button", { name: /受控调阅胸部 计算机断层扫描 影像报告/ }).evaluate((element) => element.getBoundingClientRect().height);
   expect(imagingTouchHeight).toBeGreaterThanOrEqual(44);
 
   await page.locator('[data-vault="labs"]').click();
   const diagnosticReport = page.locator(".vault-item").filter({ hasText: "ECG-DEMO-001" });
-  await expect(diagnosticReport).toContainText("ECG检查报告");
+  await expect(diagnosticReport).toContainText("心电图检查报告");
   await expect(diagnosticReport).toContainText("已互认");
   await expect(diagnosticReport).toContainText("报告原文仍按授权和访问审计规则调阅");
   const recordSearch = page.locator("#vault-search-keyword");
@@ -335,8 +335,8 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
   expect(accessExport).not.toContain("auditHash");
   expect(accessExport).not.toContain("must-not-export");
   await page.locator('[data-vault="imaging"]').click();
-  await page.getByRole("button", { name: /受控调阅胸部 CT 影像报告/ }).click();
-  await expect(page.locator("#toast")).toContainText("HTTPS");
+  await page.getByRole("button", { name: /受控调阅胸部 计算机断层扫描 影像报告/ }).click();
+  await expect(page.locator("#toast")).toContainText("加密网络连接");
   await expect(page).toHaveURL(/citizen\.html/);
 
   const correctionForm = page.locator("#citizen-correction-form");
@@ -386,4 +386,44 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
   await page.locator("[data-clear-care-workspace]").click();
   await expect(page.locator("#citizen-care-sync-status")).toContainText("会话缓存已清理");
   await expect(page.locator("#citizen-correction-list")).toContainText("尚未提交");
+});
+
+test("resident-facing pages do not expose English business copy", async ({ page }) => {
+  const routes = ["health-record", "emr", "escort", "family-doctor", "registration"];
+
+  await page.goto("/login.html");
+  await page.locator("#login-user").selectOption("citizen");
+  await page.locator("input[name='password']").fill("123456");
+  await page.getByRole("button", { name: "进入系统" }).click();
+  await expect(page).toHaveURL(/citizen\.html$/);
+
+  for (const route of routes) {
+    await page.goto(`/citizen.html?client=mini-program&page=${route}`);
+    await page.waitForLoadState("domcontentloaded");
+    await expect(page.locator("html")).toHaveAttribute("data-citizen-chinese-ui-installed", "true");
+    const untranslated = await page.evaluate(() => {
+      const rows = [];
+      for (const element of Array.from(document.querySelectorAll("main *")).slice(0, 5000)) {
+        if (element.closest("[data-internal-launch-panel]")) continue;
+        const style = getComputedStyle(element);
+        if (style.display === "none" || style.visibility === "hidden") continue;
+        const text = Array.from(element.childNodes)
+          .filter((node) => node.nodeType === Node.TEXT_NODE)
+          .map((node) => node.textContent || "")
+          .join(" ")
+          .trim();
+        const candidates = [text, element.getAttribute("aria-label"), element.getAttribute("placeholder"), element.getAttribute("title")].filter(Boolean);
+        for (const candidate of candidates) {
+          const withoutIdentifiers = candidate
+            .replace(/https?:\/\/\S+|\/api\/\S+/gi, "")
+            .replace(/\b(?=[A-Za-z0-9-]*\d)[A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)+\b/g, "")
+            .replace(/\b[A-Z]{1,8}\d{4,}\b/g, "");
+          if (/[A-Za-z]{2,}/.test(withoutIdentifiers)) rows.push(candidate);
+        }
+        if (rows.length >= 20) break;
+      }
+      return rows;
+    });
+    expect(untranslated, `${route} still contains English business copy`).toEqual([]);
+  }
 });

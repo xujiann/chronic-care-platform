@@ -436,6 +436,10 @@ select,
   display: none !important;
 }
 
+[data-internal-launch-panel][hidden] {
+  display: none !important;
+}
+
 body.service-paged-mode .service-page-content-anchor {
   display: none;
 }

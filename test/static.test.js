@@ -2770,7 +2770,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
   assert.match(citizenHtml, /citizen-records-v1\.js\?v=20260724auth3/);
   assert.match(citizenHtml, /citizen-records-v2\.js\?v=20260725care16/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260725care16/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260725zh1/);
   assert.match(citizenHtml, /mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-title/);
@@ -3126,7 +3126,7 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   assert.match(citizenJs, /setEscortAppointmentAvailability/);
   assert.match(citizenJs, /escortProviderReady/);
   assert.match(citizenJs, /暂无可预约服务主体/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260725care16/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260725zh1/);
   assert.match(citizenJs, /\/escort-services\/orders/);
   assert.match(citizenJs, /getEscortRegistrationOptions/);
   assert.match(citizenJs, /applyLinkedRegistrationToEscortForm/);
@@ -3227,7 +3227,7 @@ test("citizen portal aggregates cross-service resident tasks", () => {
   assert.match(citizenHtml, /service-order-metrics/);
   assert.match(citizenHtml, /service-order-cards/);
   assert.match(citizenHtml, /citizen-highlight-center/);
-  assert.match(citizenHtml, /C端亮点中心/);
+  assert.match(citizenHtml, /居民端亮点中心/);
   assert.match(citizenHtml, /citizen-highlight-grid/);
   assert.match(citizenHtml, /citizen-notification-panel/);
   assert.match(citizenHtml, /居民通知/);
@@ -3342,8 +3342,8 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenHtml, /service-summary/);
   assert.match(citizenHtml, /service-mobile-pagebar/);
   assert.match(citizenHtml, /citizen-action-dock/);
-  assert.match(citizenHtml, /citizen\.css\?v=20260724care9/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260725care16/);
+  assert.match(citizenHtml, /citizen\.css\?v=20260725zh1/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260725zh1/);
   assert.match(citizenHtml, /当前服务常用操作/);
   assert.match(citizenHtml, /service-health-record/);
   assert.match(citizenHtml, /service-emr/);
@@ -3546,7 +3546,8 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /data-service-state/);
   assert.match(citizenJs, /service-tab-boundary/);
   assert.match(citizenJs, /service-summary-meta/);
-  assert.match(citizenJs, /待生产化：/);
+  assert.match(citizenJs, /连接状态由平台后台核验/);
+  assert.match(citizenJs, /按身份与授权范围展示/);
   assert.doesNotMatch(citizenJs, /status: "待开发"/);
   assert.match(citizenJs, /手机号验证码登录/);
   assert.match(citizenJs, /长期照护评估/);
@@ -3629,7 +3630,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /longterm-care-form/);
   assert.match(citizenCss, /registration-form/);
   assert.match(citizenHtml, /registration-summary/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260725care16/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260725zh1/);
   assert.match(citizenJs, /registration-summary/);
   assert.match(citizenJs, /hisOrders/);
   assert.match(citizenJs, /insuranceReady/);
@@ -4703,5 +4704,10 @@ test("citizen record V2 exposes twelve governed care capabilities", () => {
   assert.match(html, /vault-search-status/);
   assert.match(html, /auth-scope-preview/);
   assert.match(html, /citizen-records-v2\.js\?v=20260725care16/);
-  assert.match(html, /citizen\.js\?v=20260725care16/);
+  assert.match(html, /citizen\.js\?v=20260725zh1/);
+  assert.match(html, /citizen-ui-zh\.js\?v=20260725zh1/);
+  assert.match(html, /citizen\.css\?v=20260725zh1/);
+  assert.match(css, /\[data-internal-launch-panel\]\[hidden\]\s*\{\s*display:\s*none\s*!important;/);
+  assert.match(read("citizen-ui-zh.js"), /translateVisibleText/);
+  assert.match(read("citizen-ui-zh.js"), /MutationObserver/);
 });
