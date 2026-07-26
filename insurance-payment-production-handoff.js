@@ -39,6 +39,22 @@ function safeText(value, maximum = 300) {
   return String(value || "").replace(/[\r\n\0]/g, " ").trim().slice(0, maximum);
 }
 
+function canonicalTimestamp(value, code = "HANDOFF_TIMESTAMP_INVALID") {
+  const text = safeText(value, 40);
+  const parsed = new Date(text);
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(text) || Number.isNaN(parsed.getTime())) {
+    throw new ProductionHandoffError("生产交接时间必须为有效的 UTC ISO-8601 时间", code, 400);
+  }
+  return parsed.toISOString();
+}
+
+function requireEventChronology(item, at) {
+  const previousAt = item?.events?.at(-1)?.at;
+  if (previousAt && Date.parse(at) < Date.parse(previousAt)) {
+    throw new ProductionHandoffError("生产交接事件时间不得早于前一事件", "HANDOFF_EVENT_TIME_BACKDATED", 409);
+  }
+}
+
 function actorIdentity(actor = {}) {
   return safeText(actor.username || actor.name || actor.id, 120);
 }
@@ -92,6 +108,10 @@ function verifyItemEventLedger(events = []) {
     const { eventHash, ...base } = event;
     const rule = transitionRules[event.action];
     const previous = events[index - 1];
+    const eventTime = Date.parse(event.at);
+    const timestampValid = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(String(event.at || ""))
+      && Number.isFinite(eventTime)
+      && (!previous || eventTime >= Date.parse(previous.at));
     const transitionValid = rule
       && rule.from.includes(event.from)
       && (rule.sameState ? event.to === event.from : rule.to.includes(event.to))
@@ -100,6 +120,7 @@ function verifyItemEventLedger(events = []) {
       && base.previousHash === (index ? previous.eventHash : "GENESIS")
       && eventHash === digest(base)
       && /^sha256:[a-f0-9]{64}$/.test(String(event.projectionDigest || ""))
+      && timestampValid
       && transitionValid;
   });
 }
@@ -134,6 +155,7 @@ function requirementsFromAcceptance(acceptance = {}) {
 }
 
 function ensureProductionHandoff(data = {}, acceptance = {}, at = new Date().toISOString()) {
+  at = canonicalTimestamp(at);
   const requirements = requirementsFromAcceptance(acceptance);
   const state = data.insurancePaymentProductionHandoff ||= {
     schema: "insurance-payment-production-handoff-v1",
@@ -159,6 +181,7 @@ function ensureProductionHandoff(data = {}, acceptance = {}, at = new Date().toI
     }
     if (!verifyItemLedger(item)) continue;
     if (item.required === false) {
+      requireEventChronology(item, at);
       const before = item.state;
       Object.assign(item, requirement, { required: true, state: HANDOFF_STATES.PENDING, evidence: null, verification: null });
       appendEvent(item, { action: "requirement-reactivated", from: before, to: HANDOFF_STATES.PENDING, actor: "system:t07-handoff-model", at, detail: { requirementDigest: item.requirementDigest } });
@@ -166,6 +189,7 @@ function ensureProductionHandoff(data = {}, acceptance = {}, at = new Date().toI
     }
     item.required = true;
     if (item.requirementDigest !== requirement.requirementDigest) {
+      requireEventChronology(item, at);
       const before = item.state;
       Object.assign(item, requirement, { state: HANDOFF_STATES.PENDING, evidence: null, verification: null });
       appendEvent(item, { action: "requirement-changed", from: before, to: HANDOFF_STATES.PENDING, actor: "system:t07-handoff-model", at, detail: { requirementDigest: item.requirementDigest } });
@@ -175,6 +199,7 @@ function ensureProductionHandoff(data = {}, acceptance = {}, at = new Date().toI
   for (const item of state.items) {
     if (activeIds.has(item.id) || item.required === false) continue;
     if (!verifyItemLedger(item)) continue;
+    requireEventChronology(item, at);
     const before = item.state;
     item.required = false;
     appendEvent(item, { action: "requirement-retired", from: before, to: before, actor: "system:t07-handoff-model", at, detail: { requirementDigest: item.requirementDigest } });
@@ -195,7 +220,9 @@ function requiredItem(data, acceptance, itemId, at) {
 }
 
 function submitHandoffEvidence(data, acceptance, itemId, input = {}, actor = {}) {
-  const submittedAt = input.submittedAt || new Date().toISOString();
+  const submittedAt = canonicalTimestamp(input.submittedAt || new Date().toISOString(), "HANDOFF_SUBMITTED_AT_INVALID");
+  const issuedAt = canonicalTimestamp(input.issuedAt || submittedAt, "HANDOFF_ISSUED_AT_INVALID");
+  if (Date.parse(issuedAt) > Date.parse(submittedAt)) throw new ProductionHandoffError("证据签发时间不得晚于提交时间", "HANDOFF_EVIDENCE_ISSUED_IN_FUTURE", 400);
   const item = requiredItem(data, acceptance, itemId, submittedAt);
   const submittedBy = requireActorRole(actor, SUBMISSION_ROLES[item.scope] || [], "HANDOFF_SUBMISSION_RESPONSIBILITY_DENIED");
   const evidenceReference = safeText(input.evidenceReference);
@@ -204,11 +231,12 @@ function submitHandoffEvidence(data, acceptance, itemId, input = {}, actor = {})
   if (!evidenceReference) throw new ProductionHandoffError("证据引用不能为空", "HANDOFF_EVIDENCE_REFERENCE_REQUIRED", 400);
   if (!/^sha256:[a-f0-9]{64}$/.test(evidenceDigest)) throw new ProductionHandoffError("证据摘要必须为 SHA-256", "HANDOFF_EVIDENCE_DIGEST_INVALID", 400);
   if (!idempotencyKey) throw new ProductionHandoffError("证据提交幂等键不能为空", "HANDOFF_IDEMPOTENCY_REQUIRED", 400);
+  requireEventChronology(item, submittedAt);
   const evidenceRequest = {
     evidenceReference,
     evidenceDigest,
     artifactType: safeText(input.artifactType, 100) || "acceptance-evidence",
-    issuedAt: safeText(input.issuedAt, 40) || submittedAt,
+    issuedAt,
     submittedBy,
     idempotencyKey
   };
@@ -229,7 +257,7 @@ function submitHandoffEvidence(data, acceptance, itemId, input = {}, actor = {})
 }
 
 function verifyHandoffEvidence(data, acceptance, itemId, input = {}, actor = {}) {
-  const verifiedAt = input.verifiedAt || new Date().toISOString();
+  const verifiedAt = canonicalTimestamp(input.verifiedAt || new Date().toISOString(), "HANDOFF_VERIFIED_AT_INVALID");
   const item = requiredItem(data, acceptance, itemId, verifiedAt);
   const requiredReviewerRole = safeText(item.requirement?.reviewerRole, 80);
   const verifiedBy = requireActorRole(actor, requiredReviewerRole ? [requiredReviewerRole] : VERIFICATION_ROLES, "HANDOFF_VERIFICATION_RESPONSIBILITY_DENIED");
@@ -247,6 +275,8 @@ function verifyHandoffEvidence(data, acceptance, itemId, input = {}, actor = {})
   }
   if (item.state !== HANDOFF_STATES.SUBMITTED || !item.evidence) throw new ProductionHandoffError("仅已提交证据可以核验", "HANDOFF_VERIFICATION_STATE_INVALID");
   if (verifiedBy === item.evidence.submittedBy) throw new ProductionHandoffError("证据提交人与核验人必须分离", "HANDOFF_FOUR_EYES_REQUIRED", 403);
+  if (Date.parse(verifiedAt) < Date.parse(item.evidence.submittedAt)) throw new ProductionHandoffError("核验时间不得早于证据提交时间", "HANDOFF_VERIFICATION_TIME_BACKDATED", 400);
+  requireEventChronology(item, verifiedAt);
   const before = item.state;
   item.state = input.approved ? HANDOFF_STATES.VERIFIED : HANDOFF_STATES.REJECTED;
   item.verification = { ...verificationRequest, verifiedAt, requestDigest };
@@ -281,6 +311,7 @@ module.exports = {
   SUBMISSION_ROLES,
   VERIFICATION_ROLES,
   buildProductionHandoffStatus,
+  canonicalTimestamp,
   digest,
   ensureProductionHandoff,
   handoffItemProjection,

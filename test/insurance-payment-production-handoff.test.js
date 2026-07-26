@@ -61,7 +61,7 @@ test("production handoff supports rejection resubmission and detects ledger tamp
     (error) => error.code === "HANDOFF_VERIFICATION_RESPONSIBILITY_DENIED"
   );
   Handoff.verifyHandoffEvidence(data, acceptance, itemId, { approved: false, reasonCode: "SIGNATURE_INVALID", verificationReference: "SEC-REVIEW-001", verifiedAt: "2026-07-22T10:00:00.000Z", idempotencyKey: "reject-v1" }, { username: "security-reviewer", role: "security-reviewer" });
-  const resubmitted = Handoff.submitHandoffEvidence(data, acceptance, itemId, evidenceInput({ evidenceDigest: `sha256:${"b".repeat(64)}`, evidenceReference: "PROVIDER-RECEIPT-002", idempotencyKey: "external-v2" }), { username: "provider-owner", role: "external-owner" });
+  const resubmitted = Handoff.submitHandoffEvidence(data, acceptance, itemId, evidenceInput({ evidenceDigest: `sha256:${"b".repeat(64)}`, evidenceReference: "PROVIDER-RECEIPT-002", submittedAt: "2026-07-22T11:00:00.000Z", idempotencyKey: "external-v2" }), { username: "provider-owner", role: "external-owner" });
   assert.equal(resubmitted.item.state, Handoff.HANDOFF_STATES.SUBMITTED);
   assert.equal(Handoff.verifyItemLedger(resubmitted.item.events), true);
   resubmitted.item.events[0] = { ...resubmitted.item.events[0], actor: "tampered" };
@@ -150,4 +150,50 @@ test("production handoff rejects a rehashed transition that skips evidence submi
   item.events.push({ ...forgedBase, eventHash: Handoff.digest(forgedBase) });
   assert.equal(Handoff.verifyItemLedger(item.events), false);
   assert.equal(Handoff.verifyItemLedger(item), false);
+});
+
+test("production handoff enforces canonical evidence and verification chronology without mutation", () => {
+  const acceptance = buildInsurancePaymentAcceptance();
+  const route = acceptance.integrationHandoff.routes.find((item) => !item.wired);
+  const itemId = `route:${route.id}`;
+  const actor = { username: "t00-integrator", role: "integration-owner" };
+  const data = {};
+
+  assert.throws(
+    () => Handoff.submitHandoffEvidence(data, acceptance, itemId, evidenceInput({ submittedAt: "not-a-time" }), actor),
+    (error) => error.code === "HANDOFF_SUBMITTED_AT_INVALID"
+  );
+  assert.throws(
+    () => Handoff.submitHandoffEvidence(data, acceptance, itemId, evidenceInput({ issuedAt: "2026-07-22T10:00:00.000Z" }), actor),
+    (error) => error.code === "HANDOFF_EVIDENCE_ISSUED_IN_FUTURE"
+  );
+  assert.deepEqual(data, {});
+
+  const submitted = Handoff.submitHandoffEvidence(data, acceptance, itemId, evidenceInput(), actor).item;
+  const snapshot = structuredClone(submitted);
+  assert.throws(
+    () => Handoff.verifyHandoffEvidence(data, acceptance, itemId, { approved: true, verificationReference: "REVIEW-BACKDATED", verifiedAt: "2026-07-22T08:59:59.999Z", idempotencyKey: "verify-backdated" }, { username: "acceptance-lead", role: "acceptance-reviewer" }),
+    (error) => error.code === "HANDOFF_VERIFICATION_TIME_BACKDATED"
+  );
+  assert.deepEqual(submitted, snapshot);
+});
+
+test("production handoff rejects a rehashed but backdated event", () => {
+  const acceptance = buildInsurancePaymentAcceptance();
+  const data = {};
+  const state = Handoff.ensureProductionHandoff(data, acceptance, "2026-07-22T09:00:00.000Z");
+  const item = state.items.find((candidate) => candidate.required);
+  const previous = item.events.at(-1);
+  const forgedBase = {
+    action: "evidence-submitted",
+    from: Handoff.HANDOFF_STATES.PENDING,
+    to: Handoff.HANDOFF_STATES.SUBMITTED,
+    actor: "t00-integrator",
+    at: "2026-07-22T08:59:59.999Z",
+    projectionDigest: previous.projectionDigest,
+    sequence: previous.sequence + 1,
+    previousHash: previous.eventHash
+  };
+  item.events.push({ ...forgedBase, eventHash: Handoff.digest(forgedBase) });
+  assert.equal(Handoff.verifyItemLedger(item.events), false);
 });
