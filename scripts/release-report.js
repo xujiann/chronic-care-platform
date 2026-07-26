@@ -44,6 +44,7 @@ const { buildProductionDeploymentPackage, verifyProductionDeploymentPackage, ren
 const { buildIdentityContract, renderMarkdown: renderIdentityContractMarkdown } = require("./identity-contract");
 const { buildIntegrationReadinessReport, renderMarkdown: renderIntegrationReadinessMarkdown } = require("./integration-readiness");
 const { buildObjectStorageReadiness, renderMarkdown: renderObjectStorageMarkdown } = require("./object-storage-readiness");
+const { buildPilotEvidenceRepositoryReadiness, renderMarkdown: renderPilotEvidenceRepositoryMarkdown } = require("./pilot-evidence-repository-readiness");
 const { buildFinancialGatewayReadiness, renderMarkdown: renderFinancialGatewayMarkdown } = require("./financial-gateway-readiness");
 const { buildInterfaceMappingReport, renderMarkdown: renderInterfaceMappingMarkdown } = require("./interface-mapping");
 const { buildHospitalOperationsReadinessReport, renderMarkdown: renderHospitalOperationsReadinessMarkdown } = require("./hospital-operations-readiness");
@@ -526,6 +527,15 @@ function objectStorageReadinessChecks(objectStorageReadiness) {
     check("objectStorage:controls", objectStorageReadiness.summary?.controlsReady === objectStorageReadiness.summary?.controls && (objectStorageReadiness.summary?.controls || 0) >= 6, `${objectStorageReadiness.summary?.controlsReady || 0}/${objectStorageReadiness.summary?.controls || 0} security controls`, "error", "object-storage"),
     check("objectStorage:api", objectStorageReadiness.summary?.apiGroupsReady === objectStorageReadiness.summary?.apiGroups && (objectStorageReadiness.summary?.apiGroups || 0) >= 5, `${objectStorageReadiness.summary?.apiGroupsReady || 0}/${objectStorageReadiness.summary?.apiGroups || 0} runtime API groups`, "error", "object-storage"),
     check("objectStorage:productionBoundary", objectStorageReadiness.productionReady === false && (objectStorageReadiness.summary?.productionBlockers || 0) >= 8, `${objectStorageReadiness.summary?.productionBlockers || 0} site production blockers remain explicit`, "error", "object-storage")
+  ];
+}
+
+function pilotEvidenceRepositoryChecks(pilotEvidenceRepository) {
+  return [
+    check("pilotEvidence:readiness", pilotEvidenceRepository.ok, pilotEvidenceRepository.ok ? "pilot evidence repository controls passed" : "pilot evidence repository controls failed", "error", "pilot-evidence"),
+    check("pilotEvidence:batchScope", pilotEvidenceRepository.template?.siteTasks === 10 && pilotEvidenceRepository.template?.interfaceReceipts === 4 && pilotEvidenceRepository.template?.alertRoutes === 2 && pilotEvidenceRepository.template?.fourPartySignoffs === 4, "10 site tasks, 4 interface receipts, 2 alert routes and 4 signoffs share one batch", "error", "pilot-evidence"),
+    check("pilotEvidence:freezeVerification", pilotEvidenceRepository.summary?.verifiedItems === 20 && pilotEvidenceRepository.exercisedPack?.verification?.ok === true, `${pilotEvidenceRepository.summary?.verifiedItems || 0}/20 lifecycle items and manifest verification exercised`, "error", "pilot-evidence"),
+    check("pilotEvidence:productionBoundary", pilotEvidenceRepository.productionReady === false && (pilotEvidenceRepository.summary?.productionBlockers || 0) >= 6, `${pilotEvidenceRepository.summary?.productionBlockers || 0} site production blockers remain explicit`, "error", "pilot-evidence")
   ];
 }
 
@@ -1292,6 +1302,7 @@ function buildReleaseReport(options = {}) {
   const drugConsumable = buildDrugConsumableReadinessReport({ data, pkg });
   const integrationReadiness = buildIntegrationReadinessReport({ data });
   const objectStorageReadiness = buildObjectStorageReadiness({ data, pkg });
+  const pilotEvidenceRepository = buildPilotEvidenceRepositoryReadiness({ pkg });
   const financialGatewayReadiness = buildFinancialGatewayReadiness({ pkg });
   const interfaceMapping = buildInterfaceMappingReport({ data, pkg });
   const dataGovernance = buildDataGovernanceReadiness({ data, pkg, interfaceMapping, dataQuality });
@@ -1409,6 +1420,7 @@ function buildReleaseReport(options = {}) {
     ...drugConsumableChecks(drugConsumable),
     ...integrationReadinessChecks(integrationReadiness),
     ...objectStorageReadinessChecks(objectStorageReadiness),
+    ...pilotEvidenceRepositoryChecks(pilotEvidenceRepository),
     ...financialGatewayReadinessChecks(financialGatewayReadiness),
     ...interfaceMappingChecks(interfaceMapping),
     ...regionalDataSharingChecks(regionalDataSharing),
@@ -1503,6 +1515,7 @@ function buildReleaseReport(options = {}) {
     drugConsumable,
     integrationReadiness,
     objectStorageReadiness,
+    pilotEvidenceRepository,
     financialGatewayReadiness,
     interfaceMapping,
     regionalDataSharing,
@@ -2229,6 +2242,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       objectStorageReadiness: report.objectStorageReadiness
     }, null, 2), "utf8");
+    const pilotEvidenceRepositoryJson = path.join(path.dirname(output), "pilot-evidence-repository-readiness.json");
+    fs.writeFileSync(pilotEvidenceRepositoryJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      pilotEvidenceRepository: report.pilotEvidenceRepository
+    }, null, 2), "utf8");
     const financialGatewayJson = path.join(path.dirname(output), "financial-gateway-readiness-report.json");
     fs.writeFileSync(financialGatewayJson, JSON.stringify({
       project: report.project,
@@ -2485,6 +2506,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(integrationMarkdown, renderIntegrationReadinessMarkdown(report.integrationReadiness), "utf8");
     const objectStorageMarkdown = path.join(path.dirname(markdown), "object-storage-readiness-report.md");
     fs.writeFileSync(objectStorageMarkdown, renderObjectStorageMarkdown(report.objectStorageReadiness), "utf8");
+    const pilotEvidenceRepositoryMarkdown = path.join(path.dirname(markdown), "pilot-evidence-repository-readiness.md");
+    fs.writeFileSync(pilotEvidenceRepositoryMarkdown, renderPilotEvidenceRepositoryMarkdown(report.pilotEvidenceRepository), "utf8");
     const financialGatewayMarkdown = path.join(path.dirname(markdown), "financial-gateway-readiness-report.md");
     fs.writeFileSync(financialGatewayMarkdown, renderFinancialGatewayMarkdown(report.financialGatewayReadiness), "utf8");
     const interfaceMappingMarkdown = path.join(path.dirname(markdown), "interface-mapping-report.md");

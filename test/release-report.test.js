@@ -424,6 +424,11 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "objectStorage:productionBoundary" && item.passed), true);
   assert.equal(report.objectStorageReadiness.ok, true);
   assert.equal(report.objectStorageReadiness.productionReady, false);
+  assert.equal(report.checks.some((item) => item.name === "pilotEvidence:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "pilotEvidence:freezeVerification" && item.passed), true);
+  assert.equal(report.pilotEvidenceRepository.ok, true);
+  assert.equal(report.pilotEvidenceRepository.productionReady, false);
+  assert.equal(report.pilotEvidenceRepository.summary.verifiedItems, 20);
   assert.equal(report.checks.some((item) => item.name === "financialGateway:readiness" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "financialGateway:productionBoundary" && item.passed), true);
   assert.equal(report.financialGatewayReadiness.ok, true);
@@ -819,6 +824,8 @@ test("release report writes standalone production cutover and storage artifacts"
   const integrationMarkdown = fs.readFileSync(path.join(outputDir, "integration-readiness-report.md"), "utf8");
   const objectStorageJson = JSON.parse(fs.readFileSync(path.join(outputDir, "object-storage-readiness-report.json"), "utf8"));
   const objectStorageMarkdown = fs.readFileSync(path.join(outputDir, "object-storage-readiness-report.md"), "utf8");
+  const pilotEvidenceRepositoryJson = JSON.parse(fs.readFileSync(path.join(outputDir, "pilot-evidence-repository-readiness.json"), "utf8"));
+  const pilotEvidenceRepositoryMarkdown = fs.readFileSync(path.join(outputDir, "pilot-evidence-repository-readiness.md"), "utf8");
   const interfaceMappingJson = JSON.parse(fs.readFileSync(path.join(outputDir, "interface-mapping-report.json"), "utf8"));
   const interfaceMappingMarkdown = fs.readFileSync(path.join(outputDir, "interface-mapping-report.md"), "utf8");
   const regionalDataSharingJson = JSON.parse(fs.readFileSync(path.join(outputDir, "regional-data-sharing-report.json"), "utf8"));
@@ -974,6 +981,9 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.equal(objectStorageJson.objectStorageReadiness.ok, true);
   assert.equal(objectStorageJson.objectStorageReadiness.productionReady, false);
   assert.match(objectStorageMarkdown, /Object storage and attachment security readiness/);
+  assert.equal(pilotEvidenceRepositoryJson.pilotEvidenceRepository.ok, true);
+  assert.equal(pilotEvidenceRepositoryJson.pilotEvidenceRepository.exercisedPack.verification.ok, true);
+  assert.match(pilotEvidenceRepositoryMarkdown, /Pilot evidence repository readiness/);
   assert.equal(interfaceMappingJson.interfaceMapping.ok, true);
   assert.match(interfaceMappingMarkdown, /Contract field mappings/);
   assert.equal(regionalDataSharingJson.regionalDataSharing.summary.referralHandoffReady >= 1, true);
