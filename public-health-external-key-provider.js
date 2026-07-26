@@ -12,6 +12,9 @@ const {
 const {
   buildPublicHealthExternalContractGovernance
 } = require("./public-health-external-contract-governance-service");
+const {
+  normalizeProbePolicy
+} = require("./public-health-external-endpoint-probe-runner");
 
 const ROTATION_SEQUENCE = Object.freeze([
   "new-active",
@@ -22,6 +25,7 @@ const ROTATION_SEQUENCE = Object.freeze([
 ]);
 
 let managedKeyringLoader = null;
+let managedEndpointProbeTlsLoader = null;
 
 const DEFAULT_RESILIENCE_POLICY = Object.freeze({
   failureThreshold: 3,
@@ -42,12 +46,20 @@ function profileForLane(laneId) {
 }
 
 function keyringReferenceEnv(profile, purpose) {
-  const suffix = purpose === "request" ? "REQUEST_KEYRING_REF" : "RECEIPT_KEYRING_REF";
+  const suffix = purpose === "request"
+    ? "REQUEST_KEYRING_REF"
+    : purpose === "endpoint-probe"
+      ? "ENDPOINT_PROBE_KEYRING_REF"
+      : "RECEIPT_KEYRING_REF";
   return `${profile.endpointEnv.replace(/_ENDPOINT$/, "")}_${suffix}`;
 }
 
 function legacySecretEnv(profile, purpose) {
-  return purpose === "request" ? profile.requestSecretEnv : profile.receiptSecretEnv;
+  if (purpose === "request") return profile.requestSecretEnv;
+  if (purpose === "endpoint-probe") {
+    return `${profile.endpointEnv.replace(/_ENDPOINT$/, "")}_ENDPOINT_PROBE_SECRET`;
+  }
+  return profile.receiptSecretEnv;
 }
 
 function configurePublicHealthKeyringLoader(loader) {
@@ -55,6 +67,57 @@ function configurePublicHealthKeyringLoader(loader) {
     throw new Error("public health managed keyring loader must be a function or null");
   }
   managedKeyringLoader = loader;
+}
+
+function configurePublicHealthEndpointProbeTlsLoader(loader) {
+  if (loader !== null && typeof loader !== "function") {
+    throw new Error("public health endpoint probe TLS loader must be a function or null");
+  }
+  managedEndpointProbeTlsLoader = loader;
+}
+
+function parseEndpointProbePolicyConfig(value) {
+  if (value && typeof value === "object" && !Array.isArray(value)) return value;
+  const serialized = clean(value);
+  if (!serialized) return null;
+  try {
+    const parsed = JSON.parse(serialized);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("object required");
+    return parsed;
+  } catch (error) {
+    throw new Error(`PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_POLICIES must be a JSON object: ${error.message}`);
+  }
+}
+
+function normalizeEndpointProbePolicy(value = {}) {
+  const policy = normalizeProbePolicy(value);
+  const minIntervalSeconds = Number(value.minIntervalSeconds ?? 60);
+  if (!Number.isInteger(minIntervalSeconds) || minIntervalSeconds < 1 || minIntervalSeconds > 86400) {
+    throw new Error("endpoint probe minIntervalSeconds must be an integer from 1 to 86400");
+  }
+  return Object.freeze({ ...policy, minIntervalSeconds });
+}
+
+function loadPublicHealthEndpointProbePolicies(options = {}) {
+  const env = options.env || process.env;
+  const production = options.production === undefined
+    ? clean(env.NODE_ENV).toLowerCase() === "production"
+    : Boolean(options.production);
+  const configured = parseEndpointProbePolicyConfig(
+    options.endpointProbePolicies === undefined
+      ? env.PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_POLICIES
+      : options.endpointProbePolicies
+  );
+  if (production && !configured) {
+    throw new Error("PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_POLICIES is required in production");
+  }
+  return Object.freeze(Object.fromEntries(EXTERNAL_ADAPTER_PROFILES.map((profile) => {
+    const lanePolicy = configured?.[profile.laneId];
+    if (production && !lanePolicy) {
+      throw new Error(`production endpoint probe policy is required for public health lane ${profile.laneId}`);
+    }
+    return [profile.laneId, normalizeEndpointProbePolicy(lanePolicy || {})];
+  })));
 }
 
 function parseResiliencePolicyConfig(value) {
@@ -144,6 +207,18 @@ function privateContractGovernanceMaterial(keyring, governance, summary) {
   return Object.freeze(material);
 }
 
+function privateEndpointProbeContext(values, summary) {
+  const context = { summary };
+  Object.defineProperties(context, {
+    endpoint: { value: values.endpoint, enumerable: false },
+    contract: { value: values.contract, enumerable: false },
+    keyring: { value: values.keyring, enumerable: false },
+    policy: { value: values.policy, enumerable: false },
+    tlsOptions: { value: values.tlsOptions, enumerable: false }
+  });
+  return Object.freeze(context);
+}
+
 async function loadPublicHealthContractGovernance(data = {}, options = {}) {
   const env = options.env || process.env;
   const at = clean(options.at || new Date().toISOString());
@@ -195,6 +270,83 @@ async function loadPublicHealthContractGovernance(data = {}, options = {}) {
     blockers: [
       ...(keyringSummary.productionReady ? [] : keyringSummary.blockers),
       "Signed contract governance does not replace deployed release, migration or site acceptance evidence."
+    ]
+  });
+}
+
+async function loadPublicHealthEndpointProbeContext(laneId, data = {}, options = {}) {
+  const profile = profileForLane(laneId);
+  const env = options.env || process.env;
+  const at = clean(options.at || new Date().toISOString());
+  const production = options.production === undefined
+    ? clean(env.NODE_ENV).toLowerCase() === "production"
+    : Boolean(options.production);
+  const keyringLoader = options.loader === undefined ? managedKeyringLoader : options.loader;
+  const tlsLoader = options.tlsLoader === undefined ? managedEndpointProbeTlsLoader : options.tlsLoader;
+  const endpoint = clean(env[profile.endpointEnv]);
+  const policies = loadPublicHealthEndpointProbePolicies({
+    env,
+    production,
+    endpointProbePolicies: options.endpointProbePolicies
+  });
+  const policy = policies[profile.laneId];
+  const signing = await loadPurposeKeyring(profile, "endpoint-probe", {
+    env,
+    at,
+    loader: keyringLoader,
+    production
+  });
+  const contractGovernance = options.contractGovernance
+    || (await loadPublicHealthContractGovernance(data, {
+      env,
+      at,
+      loader: keyringLoader,
+      production
+    })).governance;
+  const contractEntry = (contractGovernance.entries || [])
+    .find((item) => item.laneId === profile.laneId);
+  const contract = clean(contractEntry?.currentContract);
+  if (!contractGovernance.ok || !contract) {
+    throw new Error(`active endpoint probe contract is unavailable for public health lane ${profile.laneId}`);
+  }
+  const tlsReferenceName = `${profile.endpointEnv.replace(/_ENDPOINT$/, "")}_ENDPOINT_PROBE_TLS_REF`;
+  const tlsReference = clean(env[tlsReferenceName]);
+  let tlsOptions = {};
+  if (tlsReference) {
+    if (!tlsLoader) throw new Error(`managed endpoint probe TLS service is unavailable for ${profile.laneId}`);
+    tlsOptions = await tlsLoader({
+      laneId: profile.laneId,
+      purpose: "public-health-endpoint-probe-tls",
+      reference: tlsReference,
+      at
+    });
+    if (!tlsOptions || typeof tlsOptions !== "object" || Array.isArray(tlsOptions)) {
+      throw new Error(`managed endpoint probe TLS credentials are invalid for ${profile.laneId}`);
+    }
+  } else if (production && policy.requireMutualTls) {
+    throw new Error(`${tlsReferenceName} is required when mutual TLS is required`);
+  }
+  const keyringSummary = summarizeKeyring(signing.keyring, at);
+  return privateEndpointProbeContext({
+    endpoint,
+    contract,
+    keyring: signing.keyring,
+    policy,
+    tlsOptions
+  }, {
+    laneId: profile.laneId,
+    endpointConfigured: /^https:\/\//i.test(endpoint),
+    contractConfigured: Boolean(contract),
+    policyConfigured: true,
+    certificatePinningEnabled: policy.certificatePins.length > 0,
+    mutualTlsRequired: policy.requireMutualTls,
+    tlsReferenceConfigured: Boolean(tlsReference),
+    keyring: keyringSummary,
+    source: signing.source,
+    productionReady: false,
+    blockers: [
+      ...(keyringSummary.productionReady ? [] : keyringSummary.blockers),
+      "Active endpoint probing does not replace trusted site evidence, production handoff or launch approval."
     ]
   });
 }
@@ -340,9 +492,12 @@ function buildPublicHealthKeySafetyBoard(data = {}, credentialMap = {}) {
 module.exports = {
   ROTATION_SEQUENCE,
   buildPublicHealthKeySafetyBoard,
+  configurePublicHealthEndpointProbeTlsLoader,
   configurePublicHealthKeyringLoader,
   evaluateRotationEvidence,
   loadPublicHealthContractGovernance,
+  loadPublicHealthEndpointProbeContext,
+  loadPublicHealthEndpointProbePolicies,
   loadPublicHealthLaneCredentialMap,
   loadPublicHealthLaneCredentials,
   loadPublicHealthResiliencePolicies,

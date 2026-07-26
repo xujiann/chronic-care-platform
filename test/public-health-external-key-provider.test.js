@@ -6,6 +6,8 @@ const {
   buildPublicHealthKeySafetyBoard,
   evaluateRotationEvidence,
   loadPublicHealthContractGovernance,
+  loadPublicHealthEndpointProbeContext,
+  loadPublicHealthEndpointProbePolicies,
   loadPublicHealthLaneCredentials,
   loadPublicHealthResiliencePolicies
 } = require("../public-health-external-key-provider");
@@ -14,7 +16,8 @@ const AT = "2026-07-23T08:00:00.000Z";
 const REQUEST_SECRET = "provider-request-secret-1234567890-123456";
 const RECEIPT_SECRET = "provider-receipt-secret-1234567890-123456";
 const CONTRACT_SECRET = "provider-contract-secret-1234567890-12345";
-const RESILIENCE_POLICIES = Object.fromEntries([
+const ENDPOINT_PROBE_SECRET = "provider-endpoint-probe-secret-1234567890";
+const LANE_IDS = [
   "infectious-reporting",
   "immunization",
   "maternal-child",
@@ -23,12 +26,23 @@ const RESILIENCE_POLICIES = Object.fromEntries([
   "public-health-followup",
   "health-education",
   "family-doctor"
+];
+const RESILIENCE_POLICIES = Object.fromEntries([
+  ...LANE_IDS
 ].map((laneId) => [laneId, {
   failureThreshold: 3,
   openSeconds: 120,
   halfOpenMaxProbes: 1,
   rateLimitPerMinute: 30,
   maxPending: 100
+}]));
+const ENDPOINT_PROBE_POLICIES = Object.fromEntries(LANE_IDS.map((laneId) => [laneId, {
+  timeoutMs: 2000,
+  maxLatencyMs: 1200,
+  receiptTtlSeconds: 600,
+  minIntervalSeconds: 60,
+  certificatePins: ["a".repeat(64)],
+  requireMutualTls: true
 }]));
 
 function managedKeyring(purpose, activeKeyId, keys) {
@@ -138,6 +152,82 @@ test("contract governance uses an independent non-enumerable managed keyring", a
   assert.doesNotMatch(JSON.stringify(context), /signingMaterial/);
 });
 
+test("active endpoint probe context keeps endpoint, policy, TLS and signing keyring server-only", async () => {
+  const context = await loadPublicHealthEndpointProbeContext("immunization", {}, {
+    at: AT,
+    env: {
+      NODE_ENV: "test",
+      PUBLIC_HEALTH_IMMUNIZATION_ENDPOINT: "https://immunization.example.test/dispatch",
+      PUBLIC_HEALTH_IMMUNIZATION_ENDPOINT_PROBE_SECRET: ENDPOINT_PROBE_SECRET,
+      PUBLIC_HEALTH_EXTERNAL_CONTRACT_GOVERNANCE_SECRET: CONTRACT_SECRET,
+      PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_POLICIES: JSON.stringify(ENDPOINT_PROBE_POLICIES)
+    }
+  });
+  assert.equal(context.endpoint, "https://immunization.example.test/dispatch");
+  assert.equal(context.contract, "immunization-registry-v1");
+  assert.equal(context.keyring, ENDPOINT_PROBE_SECRET);
+  assert.equal(context.policy.requireMutualTls, true);
+  assert.equal(context.policy.minIntervalSeconds, 60);
+  assert.deepEqual(context.tlsOptions, {});
+  assert.equal(context.summary.productionReady, false);
+  const serialized = JSON.stringify(context);
+  assert.doesNotMatch(serialized, /example\.test\/dispatch/);
+  assert.doesNotMatch(serialized, new RegExp(ENDPOINT_PROBE_SECRET));
+  assert.doesNotMatch(serialized, /certificatePins|timeoutMs|maxLatencyMs/);
+});
+
+test("production active probe resolves independent keyring, TLS credentials and complete policies", async () => {
+  const endpointProbeKeyring = managedKeyring("public-health-endpoint-probe", "probe-2026-08", [{
+    keyId: "probe-2026-08",
+    secret: ENDPOINT_PROBE_SECRET,
+    status: "active",
+    notBefore: "2026-07-01T00:00:00.000Z",
+    expiresAt: "2026-09-01T00:00:00.000Z",
+    revokedAt: ""
+  }]);
+  const keyCalls = [];
+  const tlsCalls = [];
+  const context = await loadPublicHealthEndpointProbeContext("immunization", {}, {
+    at: AT,
+    production: true,
+    env: {
+      NODE_ENV: "production",
+      PUBLIC_HEALTH_IMMUNIZATION_ENDPOINT: "https://immunization.example.test/dispatch",
+      PUBLIC_HEALTH_IMMUNIZATION_ENDPOINT_PROBE_KEYRING_REF: "kms://public-health/immunization/endpoint-probe",
+      PUBLIC_HEALTH_IMMUNIZATION_ENDPOINT_PROBE_TLS_REF: "vault://public-health/immunization/probe-tls",
+      PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_POLICIES: JSON.stringify(ENDPOINT_PROBE_POLICIES)
+    },
+    contractGovernance: {
+      ok: true,
+      entries: [{ laneId: "immunization", currentContract: "immunization-registry-v1" }]
+    },
+    loader: async (request) => {
+      keyCalls.push(request);
+      return endpointProbeKeyring;
+    },
+    tlsLoader: async (request) => {
+      tlsCalls.push(request);
+      return { cert: "managed-cert", key: "managed-private-key" };
+    }
+  });
+  assert.deepEqual(keyCalls.map((item) => [item.laneId, item.purpose, item.reference]), [[
+    "immunization",
+    "public-health-endpoint-probe",
+    "kms://public-health/immunization/endpoint-probe"
+  ]]);
+  assert.deepEqual(tlsCalls.map((item) => [item.laneId, item.purpose, item.reference]), [[
+    "immunization",
+    "public-health-endpoint-probe-tls",
+    "vault://public-health/immunization/probe-tls"
+  ]]);
+  assert.equal(context.keyring, endpointProbeKeyring);
+  assert.deepEqual(context.tlsOptions, { cert: "managed-cert", key: "managed-private-key" });
+  assert.equal(context.summary.source, "managed-key-service");
+  assert.equal(context.summary.tlsReferenceConfigured, true);
+  assert.equal(context.summary.productionReady, false);
+  assert.doesNotMatch(JSON.stringify(context), /managed-private-key|provider-endpoint-probe-secret/);
+});
+
 test("production resilience configuration covers all eight lanes and rejects gaps", () => {
   const policies = loadPublicHealthResiliencePolicies({
     production: true,
@@ -153,6 +243,54 @@ test("production resilience configuration covers all eight lanes and rejects gap
     production: true,
     resiliencePolicies: { ...RESILIENCE_POLICIES, immunization: { ...RESILIENCE_POLICIES.immunization, maxPending: 0 } }
   }), /maxPending must be an integer/);
+});
+
+test("production endpoint probe policies and managed material fail closed when incomplete", async () => {
+  const policies = loadPublicHealthEndpointProbePolicies({
+    production: true,
+    endpointProbePolicies: ENDPOINT_PROBE_POLICIES
+  });
+  assert.equal(Object.keys(policies).length, 8);
+  assert.equal(policies.immunization.requireMutualTls, true);
+  assert.throws(() => loadPublicHealthEndpointProbePolicies({
+    production: true,
+    endpointProbePolicies: { immunization: ENDPOINT_PROBE_POLICIES.immunization }
+  }), /production endpoint probe policy is required/);
+  await assert.rejects(() => loadPublicHealthEndpointProbeContext("immunization", {}, {
+    at: AT,
+    production: true,
+    env: {
+      NODE_ENV: "production",
+      PUBLIC_HEALTH_IMMUNIZATION_ENDPOINT: "https://immunization.example.test/dispatch",
+      PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_POLICIES: JSON.stringify(ENDPOINT_PROBE_POLICIES)
+    },
+    contractGovernance: {
+      ok: true,
+      entries: [{ laneId: "immunization", currentContract: "immunization-registry-v1" }]
+    }
+  }), /ENDPOINT_PROBE_KEYRING_REF is required/);
+  await assert.rejects(() => loadPublicHealthEndpointProbeContext("immunization", {}, {
+    at: AT,
+    production: true,
+    env: {
+      NODE_ENV: "production",
+      PUBLIC_HEALTH_IMMUNIZATION_ENDPOINT: "https://immunization.example.test/dispatch",
+      PUBLIC_HEALTH_IMMUNIZATION_ENDPOINT_PROBE_KEYRING_REF: "kms://endpoint-probe",
+      PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_POLICIES: JSON.stringify(ENDPOINT_PROBE_POLICIES)
+    },
+    contractGovernance: {
+      ok: true,
+      entries: [{ laneId: "immunization", currentContract: "immunization-registry-v1" }]
+    },
+    loader: async () => managedKeyring("public-health-endpoint-probe", "probe-active", [{
+      keyId: "probe-active",
+      secret: ENDPOINT_PROBE_SECRET,
+      status: "active",
+      notBefore: "2026-07-01T00:00:00.000Z",
+      expiresAt: "2026-09-01T00:00:00.000Z",
+      revokedAt: ""
+    }])
+  }), /ENDPOINT_PROBE_TLS_REF is required/);
 });
 
 test("production fails closed without references or a managed key service", async () => {

@@ -73,6 +73,7 @@ const {
 const {
   buildPublicHealthKeySafetyBoard,
   loadPublicHealthContractGovernance,
+  loadPublicHealthEndpointProbeContext,
   loadPublicHealthLaneCredentials
 } = require("./public-health-external-key-provider");
 const {
@@ -88,6 +89,10 @@ const {
   buildPublicHealthExternalEndpointProbeRegistry,
   verifyPublicHealthExternalEndpointProbeReceipt
 } = require("./public-health-external-endpoint-verification-service");
+const {
+  assertServerOnlyCommand,
+  runPublicHealthExternalEndpointProbe
+} = require("./public-health-external-endpoint-probe-runner");
 const CareServicePlatform = require("./care-service-platform-adapter");
 const CareServiceRuntime = require("./care-service-runtime");
 const { createCareServiceDeliveryAdapters } = require("./care-service-delivery-adapters");
@@ -10189,6 +10194,9 @@ function normalizeState(data) {
     publicHealthExternalEndpointProbeReceipts: Array.isArray(data.publicHealthExternalEndpointProbeReceipts)
       ? data.publicHealthExternalEndpointProbeReceipts
       : [],
+    publicHealthExternalEndpointProbeAudit: Array.isArray(data.publicHealthExternalEndpointProbeAudit)
+      ? data.publicHealthExternalEndpointProbeAudit.slice(-4000)
+      : [],
     publicHealthSignals: mergeByKey(seedPublicHealthSignals(), data.publicHealthSignals, "id"),
     publicHealthAlerts: mergeByKey(seedPublicHealthAlerts(), data.publicHealthAlerts, "id"),
     publicHealthCommandTasks: mergeByKey(seedPublicHealthCommandTasks(), data.publicHealthCommandTasks, "id"),
@@ -16127,6 +16135,7 @@ function buildPrimaryPracticeConfirmation(payload = {}, user = {}, profile = {},
 function scopeStateForUser(data, user) {
   const scoped = structuredClone(data);
   delete scoped.publicHealthExternalEndpointProbeReceipts;
+  delete scoped.publicHealthExternalEndpointProbeAudit;
   if (user.role === "commission") return scoped;
 
   delete scoped.authUsers;
@@ -23431,6 +23440,84 @@ function publicHealthExternalHttpStatus(error) {
   return 400;
 }
 
+let publicHealthEndpointProbeRuntime = Object.freeze({});
+const publicHealthEndpointProbeInFlight = new Set();
+let publicHealthEndpointProbeActiveCount = 0;
+
+function configurePublicHealthEndpointProbeRuntime(dependencies = null) {
+  if (dependencies === null) {
+    publicHealthEndpointProbeRuntime = Object.freeze({});
+    return;
+  }
+  if (!dependencies || typeof dependencies !== "object" || Array.isArray(dependencies)) {
+    throw new Error("public health endpoint probe runtime must be an object or null");
+  }
+  const allowed = new Set(["resolveAddresses", "transport", "tlsLoader", "randomUUID", "runProbe"]);
+  const unknown = Object.keys(dependencies).filter((key) => !allowed.has(key));
+  if (unknown.length) throw new Error("public health endpoint probe runtime contains unsupported dependencies");
+  ["resolveAddresses", "transport", "tlsLoader", "randomUUID", "runProbe"].forEach((key) => {
+    if (dependencies[key] !== undefined && typeof dependencies[key] !== "function") {
+      throw new Error(`public health endpoint probe runtime ${key} must be a function`);
+    }
+  });
+  publicHealthEndpointProbeRuntime = Object.freeze({ ...dependencies });
+}
+
+function publicHealthEndpointProbeMaxConcurrent(env = process.env) {
+  const value = Number(env.PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_MAX_CONCURRENT || 2);
+  if (!Number.isInteger(value) || value < 1 || value > 16) {
+    throw new Error("PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_MAX_CONCURRENT must be an integer from 1 to 16");
+  }
+  return value;
+}
+
+function publicHealthEndpointProbeAuditEntry(user, laneId, result, code, at) {
+  return {
+    id: `ph-endpoint-probe-audit-${randomUUID()}`,
+    laneId: String(laneId || "").trim(),
+    actorRole: String(user?.role || "system"),
+    actorOrgCode: String(user?.orgCode || ""),
+    result,
+    code,
+    at,
+    productionReady: false
+  };
+}
+
+function appendPublicHealthEndpointProbeAudit(data, entry) {
+  return {
+    ...data,
+    publicHealthExternalEndpointProbeAudit: [
+      ...(Array.isArray(data.publicHealthExternalEndpointProbeAudit)
+        ? data.publicHealthExternalEndpointProbeAudit
+        : []),
+      entry
+    ]
+  };
+}
+
+function publicHealthEndpointProbeLastStartedAt(data, laneId) {
+  return (Array.isArray(data.publicHealthExternalEndpointProbeAudit)
+    ? data.publicHealthExternalEndpointProbeAudit
+    : [])
+    .filter((item) => item?.laneId === laneId && item?.result === "started")
+    .map((item) => Date.parse(item.at))
+    .filter(Number.isFinite)
+    .sort((left, right) => right - left)[0] || 0;
+}
+
+function publicHealthEndpointProbeSafeCode(error) {
+  const code = String(error?.code || "").trim();
+  return /^ENDPOINT_PROBE_[A-Z0-9_]+$/.test(code) ? code : "ENDPOINT_PROBE_FAILED";
+}
+
+function publicHealthEndpointProbeHttpStatus(code) {
+  if (["ENDPOINT_PROBE_CONCURRENCY_LIMIT", "ENDPOINT_PROBE_FREQUENCY_LIMIT"].includes(code)) return 429;
+  if (code === "ENDPOINT_PROBE_LANE_INVALID") return 404;
+  if (/CONFIG|POLICY|KEY|TLS_SERVICE|CONTRACT|FAILED|DNS|TRANSPORT|TIMEOUT/.test(code)) return 503;
+  return 400;
+}
+
 function publicHealthExternalWorkerId(user = {}) {
   return `public-health-worker:${String(user.id || user.username || "unknown").trim()}`;
 }
@@ -23522,21 +23609,10 @@ async function publicHealthContractGovernanceContext(data, at) {
   return loadPublicHealthContractGovernance(data, { at });
 }
 
-function publicHealthActiveContract(credentials, laneId) {
-  const governance = credentials?.contractGovernance;
-  if (!governance?.ok) throw new Error("public health active contract governance is unavailable");
-  const entry = (governance.entries || [])
-    .find((item) => item.laneId === String(laneId || "").trim());
-  if (!entry?.currentContract) throw new Error("public health active contract is unavailable");
-  return entry.currentContract;
-}
-
 async function publicHealthEndpointVerificationContext(data, laneId, at) {
-  const credentials = await loadPublicHealthLaneCredentials(laneId, { at, data });
-  return Object.freeze({
-    endpoint: credentials.endpoint,
-    contract: publicHealthActiveContract(credentials, laneId),
-    keyring: credentials.receiptKeyring
+  return loadPublicHealthEndpointProbeContext(laneId, data, {
+    at,
+    tlsLoader: publicHealthEndpointProbeRuntime.tlsLoader
   });
 }
 
@@ -23594,12 +23670,137 @@ async function buildPublicHealthEndpointVerificationSummary(data, at) {
     receipts,
     contractResolver: (laneId, profile) => contexts[laneId]?.contract || `unavailable:${profile.contract}`,
     keyringResolver: (laneId) => contexts[laneId]?.keyring,
+    policyResolver: (laneId) => contexts[laneId]?.policy || {},
     at
   });
-  return publicHealthEndpointVerificationSummaryView({
+  const summary = publicHealthEndpointVerificationSummaryView({
     ...registry,
     generatedAt: at
   });
+  const audit = Array.isArray(data.publicHealthExternalEndpointProbeAudit)
+    ? data.publicHealthExternalEndpointProbeAudit
+    : [];
+  return {
+    ...summary,
+    worker: {
+      active: publicHealthEndpointProbeActiveCount,
+      maxConcurrent: publicHealthEndpointProbeMaxConcurrent(),
+      auditEntries: audit.length,
+      succeeded: audit.filter((item) => item.result === "succeeded").length,
+      rejected: audit.filter((item) => item.result === "rejected").length,
+      productionReady: false
+    }
+  };
+}
+
+async function runControlledPublicHealthEndpointProbe(command, user) {
+  let laneId = String(command?.laneId || "").trim();
+  let acquired = false;
+  try {
+    const profile = assertServerOnlyCommand(command);
+    laneId = profile.laneId;
+    const at = new Date().toISOString();
+    const data = readDatabase();
+    const context = await publicHealthEndpointVerificationContext(data, laneId, at);
+    const maxConcurrent = publicHealthEndpointProbeMaxConcurrent();
+    if (publicHealthEndpointProbeInFlight.has(laneId)
+      || publicHealthEndpointProbeActiveCount >= maxConcurrent) {
+      const error = new Error("endpoint probe concurrency limit reached");
+      error.code = "ENDPOINT_PROBE_CONCURRENCY_LIMIT";
+      throw error;
+    }
+    const lastStartedAt = publicHealthEndpointProbeLastStartedAt(data, laneId);
+    if (lastStartedAt && Date.parse(at) - lastStartedAt < context.policy.minIntervalSeconds * 1000) {
+      const error = new Error("endpoint probe frequency limit reached");
+      error.code = "ENDPOINT_PROBE_FREQUENCY_LIMIT";
+      throw error;
+    }
+    publicHealthEndpointProbeInFlight.add(laneId);
+    publicHealthEndpointProbeActiveCount += 1;
+    acquired = true;
+    writeDatabase(appendPublicHealthEndpointProbeAudit(
+      data,
+      publicHealthEndpointProbeAuditEntry(user, laneId, "started", "ENDPOINT_PROBE_STARTED", at)
+    ), { event: "public-health-endpoint-probe-started" });
+
+    const runner = publicHealthEndpointProbeRuntime.runProbe || runPublicHealthExternalEndpointProbe;
+    const result = await runner({ laneId }, {
+      env: process.env,
+      at,
+      contractResolver: () => context.contract,
+      keyringResolver: () => context.keyring,
+      policyResolver: () => context.policy,
+      tlsOptionsResolver: () => context.tlsOptions,
+      ...(publicHealthEndpointProbeRuntime.resolveAddresses
+        ? { resolveAddresses: publicHealthEndpointProbeRuntime.resolveAddresses }
+        : {}),
+      ...(publicHealthEndpointProbeRuntime.transport
+        ? { transport: publicHealthEndpointProbeRuntime.transport }
+        : {}),
+      ...(publicHealthEndpointProbeRuntime.randomUUID
+        ? { randomUUID: publicHealthEndpointProbeRuntime.randomUUID }
+        : {})
+    });
+    const latest = readDatabase();
+    const persistedReceipts = Array.isArray(latest.publicHealthExternalEndpointProbeReceipts)
+      ? latest.publicHealthExternalEndpointProbeReceipts
+      : [];
+    const verification = verifyPublicHealthExternalEndpointProbeReceipt(result?.receipt, {
+      expectedEndpoint: context.endpoint,
+      expectedContract: context.contract,
+      keyring: context.keyring,
+      at,
+      maxLatencyMs: context.policy.maxLatencyMs,
+      certificatePins: context.policy.certificatePins,
+      requireMutualTls: context.policy.requireMutualTls,
+      seenReceiptIds: new Set(persistedReceipts.map((item) => String(item?.receiptId || "").trim())),
+      seenNonces: new Set(persistedReceipts.map((item) => String(item?.nonce || "").trim()))
+    });
+    if (!verification.ok) {
+      const error = new Error("active endpoint probe receipt failed trusted persistence verification");
+      error.code = "ENDPOINT_PROBE_PERSISTENCE_VERIFICATION_FAILED";
+      throw error;
+    }
+    const storedReceipt = {
+      ...verification.payload,
+      signature: String(result.receipt.signature || "").trim(),
+      acceptedAt: at,
+      productionReady: false
+    };
+    const nextData = appendPublicHealthEndpointProbeAudit({
+      ...latest,
+      publicHealthExternalEndpointProbeReceipts: [
+        ...persistedReceipts,
+        storedReceipt
+      ]
+    }, publicHealthEndpointProbeAuditEntry(
+      user,
+      laneId,
+      "succeeded",
+      "ENDPOINT_PROBE_SUCCEEDED",
+      new Date().toISOString()
+    ));
+    writeDatabase(nextData, {
+      event: "public-health-active-endpoint-probe-succeeded",
+      publicHealthEndpointProbeInsert: { receipt: storedReceipt }
+    });
+    return buildPublicHealthEndpointVerificationSummary(nextData, new Date().toISOString());
+  } catch (error) {
+    const code = publicHealthEndpointProbeSafeCode(error);
+    const rejectedAt = new Date().toISOString();
+    const latest = readDatabase();
+    writeDatabase(appendPublicHealthEndpointProbeAudit(
+      latest,
+      publicHealthEndpointProbeAuditEntry(user, laneId || "unknown-lane", "rejected", code, rejectedAt)
+    ), { event: "public-health-active-endpoint-probe-rejected" });
+    error.publicCode = code;
+    throw error;
+  } finally {
+    if (acquired) {
+      publicHealthEndpointProbeInFlight.delete(laneId);
+      publicHealthEndpointProbeActiveCount = Math.max(0, publicHealthEndpointProbeActiveCount - 1);
+    }
+  }
 }
 
 function publicHealthExternalResult(result) {
@@ -24146,6 +24347,54 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "POST" && url.pathname === "/api/public-health/external/endpoints/probes") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    let laneId = "";
+    try {
+      const input = await collectJson(req);
+      const query = Object.fromEntries(url.searchParams.entries());
+      laneId = String(input?.laneId || query.laneId || "").trim();
+      const command = { ...input, ...query, laneId };
+      if (input?.laneId && query.laneId && String(input.laneId).trim() !== String(query.laneId).trim()) {
+        command.laneConflict = true;
+      }
+      const summary = await runControlledPublicHealthEndpointProbe(command, user);
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: "public-health-active-endpoint-probe",
+        target: laneId,
+        result: "allowed",
+        detail: "server-controlled endpoint probe completed"
+      });
+      sendJson(res, 201, {
+        ok: true,
+        lane: summary.entries.find((item) => item.laneId === laneId) || null,
+        worker: summary.worker,
+        endpointConnectivityReady: summary.endpointConnectivityReady,
+        productionReady: false
+      });
+    } catch (error) {
+      const code = error.publicCode || publicHealthEndpointProbeSafeCode(error);
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: "public-health-active-endpoint-probe",
+        target: laneId || "unknown-lane",
+        result: "denied",
+        detail: code
+      });
+      sendJson(res, publicHealthEndpointProbeHttpStatus(code), {
+        ok: false,
+        code,
+        message: "Endpoint probe failed closed; inspect restricted server diagnostics.",
+        productionReady: false
+      });
+    }
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/public-health/external/endpoints/receipts") {
     const user = requireApiRole(req, res, ["commission"], url.pathname);
     if (!user) return;
@@ -24167,6 +24416,9 @@ async function handleApi(req, res) {
         expectedContract: context.contract,
         keyring: context.keyring,
         at,
+        maxLatencyMs: context.policy.maxLatencyMs,
+        certificatePins: context.policy.certificatePins,
+        requireMutualTls: context.policy.requireMutualTls,
         seenReceiptIds: new Set(persistedReceipts.map((item) => String(item?.receiptId || "").trim())),
         seenNonces: new Set(persistedReceipts.map((item) => String(item?.nonce || "").trim()))
       });
@@ -36404,6 +36656,7 @@ if (require.main === module) {
 module.exports = {
   assertProductionRuntimeSecurity,
   careServiceReadinessPublicSummary,
+  configurePublicHealthEndpointProbeRuntime,
   createCareServiceRuntimeDependencies,
   cleanupRuntimeSessions,
   ensureDatabase,

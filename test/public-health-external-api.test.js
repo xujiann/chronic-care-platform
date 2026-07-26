@@ -21,8 +21,10 @@ const ROOT = path.resolve(__dirname, "..");
 const REQUEST_SECRET = "api-request-secret-1234567890-123456789";
 const RECEIPT_SECRET = "api-receipt-secret-1234567890-123456789";
 const CONTRACT_SECRET = "api-contract-secret-1234567890-12345678";
+const ENDPOINT_PROBE_SECRET = "api-endpoint-probe-secret-1234567890-12345";
 const IMMUNIZATION_ENDPOINT = "https://immunization.public-health.dalian.gov.cn/dispatch";
 const hex = (value) => crypto.createHash("sha256").update(value).digest("hex");
+const ENDPOINT_CERTIFICATE_FINGERPRINT = hex("api-immunization-endpoint-certificate");
 
 function signedEndpointProbe(overrides = {}) {
   const issuedAt = new Date();
@@ -44,7 +46,7 @@ function signedEndpointProbe(overrides = {}) {
     tls: {
       authorized: true,
       protocol: "TLSv1.3",
-      certificateFingerprintSha256: hex("api-immunization-endpoint-certificate"),
+      certificateFingerprintSha256: ENDPOINT_CERTIFICATE_FINGERPRINT,
       mutualTlsVerified: true
     },
     verification: {
@@ -56,7 +58,7 @@ function signedEndpointProbe(overrides = {}) {
     expiresAt: expiresAt.toISOString(),
     nonce: "api-endpoint-probe-nonce-immunization-001",
     ...overrides
-  }, RECEIPT_SECRET);
+  }, ENDPOINT_PROBE_SECRET);
 }
 
 function contractReleaseEvidence(now) {
@@ -138,6 +140,10 @@ test("public health external routes use server time full keyrings and secret-fre
     "PUBLIC_HEALTH_IMMUNIZATION_ENDPOINT",
     "PUBLIC_HEALTH_IMMUNIZATION_REQUEST_SECRET",
     "PUBLIC_HEALTH_IMMUNIZATION_RECEIPT_SECRET",
+    "PUBLIC_HEALTH_IMMUNIZATION_ENDPOINT_PROBE_SECRET",
+    "PUBLIC_HEALTH_IMMUNIZATION_ENDPOINT_PROBE_TLS_REF",
+    "PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_POLICIES",
+    "PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_MAX_CONCURRENT",
     "PUBLIC_HEALTH_EXTERNAL_CONTRACT_GOVERNANCE_SECRET",
     "PUBLIC_HEALTH_EXTERNAL_CONTRACT_RELEASE_EVIDENCE"
   ];
@@ -152,16 +158,68 @@ test("public health external routes use server time full keyrings and secret-fre
     PUBLIC_HEALTH_IMMUNIZATION_ENDPOINT: IMMUNIZATION_ENDPOINT,
     PUBLIC_HEALTH_IMMUNIZATION_REQUEST_SECRET: REQUEST_SECRET,
     PUBLIC_HEALTH_IMMUNIZATION_RECEIPT_SECRET: RECEIPT_SECRET,
+    PUBLIC_HEALTH_IMMUNIZATION_ENDPOINT_PROBE_SECRET: ENDPOINT_PROBE_SECRET,
+    PUBLIC_HEALTH_IMMUNIZATION_ENDPOINT_PROBE_TLS_REF: "secret://public-health/immunization/probe-tls",
+    PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_POLICIES: JSON.stringify({
+      immunization: {
+        maxLatencyMs: 1200,
+        timeoutMs: 2000,
+        ttlSeconds: 600,
+        minIntervalSeconds: 60,
+        requireMutualTls: true,
+        certificatePins: [ENDPOINT_CERTIFICATE_FINGERPRINT]
+      }
+    }),
+    PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_MAX_CONCURRENT: "1",
     PUBLIC_HEALTH_EXTERNAL_CONTRACT_GOVERNANCE_SECRET: CONTRACT_SECRET,
     PUBLIC_HEALTH_EXTERNAL_CONTRACT_RELEASE_EVIDENCE: JSON.stringify(contractReleaseEvidence(testNow))
   });
 
-  const { readDatabase, server, startServer, stopServer } = require("../server");
+  const {
+    configurePublicHealthEndpointProbeRuntime,
+    readDatabase,
+    server,
+    startServer,
+    stopServer
+  } = require("../server");
+  let releaseProbeTransport;
+  let notifyProbeTransport;
+  const probeTransportEntered = new Promise((resolve) => {
+    notifyProbeTransport = resolve;
+  });
+  const probeTransportRelease = new Promise((resolve) => {
+    releaseProbeTransport = resolve;
+  });
+  let probeTransportCalls = 0;
+  configurePublicHealthEndpointProbeRuntime({
+    tlsLoader: async () => ({
+      cert: "restricted-client-certificate",
+      key: "restricted-client-key",
+      hostname: "attacker.invalid",
+      rejectUnauthorized: false
+    }),
+    resolveAddresses: async () => [{ address: "8.8.8.8", family: 4 }],
+    transport: async (context) => {
+      probeTransportCalls += 1;
+      notifyProbeTransport();
+      await probeTransportRelease;
+      return {
+        statusCode: 204,
+        latencyMs: 82,
+        remoteAddress: context.resolvedAddress,
+        authorized: true,
+        tlsProtocol: "TLSv1.3",
+        certificateFingerprintSha256: ENDPOINT_CERTIFICATE_FINGERPRINT,
+        mutualTlsVerified: true
+      };
+    }
+  });
   startServer(0);
   await once(server, "listening");
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
   t.after(async () => {
     await stopServer();
+    configurePublicHealthEndpointProbeRuntime(null);
     Object.entries(previousEnv).forEach(([key, value]) => {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
@@ -287,6 +345,14 @@ test("public health external routes use server time full keyrings and secret-fre
     { receipt: signedEndpointProbe() }
   );
   assert.equal(forbiddenEndpointReceipt.response.status, 403);
+  const forbiddenActiveProbe = await post(
+    baseUrl,
+    "/api/public-health/external/endpoints/probes",
+    hospitalToken,
+    "api-active-probe-forbidden",
+    { laneId: "immunization" }
+  );
+  assert.equal(forbiddenActiveProbe.response.status, 403);
 
   const initialEndpointSummary = await request(
     baseUrl,
@@ -296,6 +362,84 @@ test("public health external routes use server time full keyrings and secret-fre
   assert.equal(initialEndpointSummary.response.status, 200);
   assert.equal(initialEndpointSummary.body.endpointConnectivityReady, false);
   assert.equal(initialEndpointSummary.body.productionReady, false);
+
+  const injectedActiveProbe = await post(
+    baseUrl,
+    "/api/public-health/external/endpoints/probes",
+    token,
+    "api-active-probe-injected-body",
+    {
+      laneId: "immunization",
+      endpoint: "https://attacker.invalid/dispatch",
+      policy: { requireMutualTls: false },
+      keyring: "attacker-keyring"
+    }
+  );
+  assert.equal(injectedActiveProbe.response.status, 400, JSON.stringify(injectedActiveProbe.body));
+  assert.equal(injectedActiveProbe.body.code, "ENDPOINT_PROBE_COMMAND_OVERRIDE_FORBIDDEN");
+  assert.doesNotMatch(JSON.stringify(injectedActiveProbe.body), /attacker|keyring/i);
+
+  const queryInjectedActiveProbe = await post(
+    baseUrl,
+    "/api/public-health/external/endpoints/probes?laneId=immunization&timeoutMs=1&requireMutualTls=false",
+    token,
+    "api-active-probe-injected-query",
+    { laneId: "immunization" }
+  );
+  assert.equal(queryInjectedActiveProbe.response.status, 400, JSON.stringify(queryInjectedActiveProbe.body));
+  assert.equal(queryInjectedActiveProbe.body.code, "ENDPOINT_PROBE_COMMAND_OVERRIDE_FORBIDDEN");
+
+  delete process.env.PUBLIC_HEALTH_IMMUNIZATION_ENDPOINT_PROBE_SECRET;
+  const missingProbeConfig = await post(
+    baseUrl,
+    "/api/public-health/external/endpoints/probes",
+    token,
+    "api-active-probe-config-missing",
+    { laneId: "immunization" }
+  );
+  process.env.PUBLIC_HEALTH_IMMUNIZATION_ENDPOINT_PROBE_SECRET = ENDPOINT_PROBE_SECRET;
+  assert.equal(missingProbeConfig.response.status, 503, JSON.stringify(missingProbeConfig.body));
+  assert.equal(missingProbeConfig.body.code, "ENDPOINT_PROBE_FAILED");
+
+  const activeProbePromise = post(
+    baseUrl,
+    "/api/public-health/external/endpoints/probes",
+    token,
+    "api-active-probe-success",
+    { laneId: "immunization" }
+  );
+  await probeTransportEntered;
+  const concurrentActiveProbe = await post(
+    baseUrl,
+    "/api/public-health/external/endpoints/probes",
+    token,
+    "api-active-probe-concurrent",
+    { laneId: "immunization" }
+  );
+  assert.equal(concurrentActiveProbe.response.status, 429, JSON.stringify(concurrentActiveProbe.body));
+  assert.equal(concurrentActiveProbe.body.code, "ENDPOINT_PROBE_CONCURRENCY_LIMIT");
+  releaseProbeTransport();
+  const activeProbe = await activeProbePromise;
+  assert.equal(activeProbe.response.status, 201, JSON.stringify(activeProbe.body));
+  assert.equal(activeProbe.body.lane.connectivityVerified, true);
+  assert.equal(activeProbe.body.endpointConnectivityReady, false);
+  assert.equal(activeProbe.body.productionReady, false);
+  assert.equal(probeTransportCalls, 1);
+  const serializedActiveProbe = JSON.stringify(activeProbe.body);
+  assert.doesNotMatch(serializedActiveProbe, /https:\/\//);
+  assert.doesNotMatch(serializedActiveProbe, /8\.8\.8\.8/);
+  assert.doesNotMatch(serializedActiveProbe, new RegExp(ENDPOINT_PROBE_SECRET));
+  assert.doesNotMatch(serializedActiveProbe, new RegExp(ENDPOINT_CERTIFICATE_FINGERPRINT));
+
+  const frequencyLimitedProbe = await post(
+    baseUrl,
+    "/api/public-health/external/endpoints/probes",
+    token,
+    "api-active-probe-frequency",
+    { laneId: "immunization" }
+  );
+  assert.equal(frequencyLimitedProbe.response.status, 429, JSON.stringify(frequencyLimitedProbe.body));
+  assert.equal(frequencyLimitedProbe.body.code, "ENDPOINT_PROBE_FREQUENCY_LIMIT");
 
   const endpointReceipt = signedEndpointProbe();
   const acceptedEndpointReceipt = await post(
@@ -371,10 +515,13 @@ test("public health external routes use server time full keyrings and secret-fre
   assert.doesNotMatch(serializedEndpointSummary, /https:\/\//);
   assert.doesNotMatch(serializedEndpointSummary, /8\.8\.8\.8/);
   assert.doesNotMatch(serializedEndpointSummary, new RegExp(RECEIPT_SECRET));
+  assert.doesNotMatch(serializedEndpointSummary, new RegExp(ENDPOINT_PROBE_SECRET));
+  assert.doesNotMatch(serializedEndpointSummary, new RegExp(ENDPOINT_CERTIFICATE_FINGERPRINT));
   assert.doesNotMatch(serializedEndpointSummary, /"receiptId"|"signingKeyId"|"network"|"signature"|"verification"/i);
   const scopedState = await request(baseUrl, "/api/state", token);
   assert.equal(scopedState.response.status, 200);
   assert.equal("publicHealthExternalEndpointProbeReceipts" in scopedState.body, false);
+  assert.equal("publicHealthExternalEndpointProbeAudit" in scopedState.body, false);
 
   const runtime = await request(baseUrl, "/api/public-health/coordination-runtime", token);
   assert.equal(runtime.response.status, 200);
@@ -516,6 +663,8 @@ test("public health external routes use server time full keyrings and secret-fre
   assert.doesNotMatch(JSON.stringify(board.body), new RegExp(REQUEST_SECRET));
   assert.doesNotMatch(JSON.stringify(board.body), new RegExp(RECEIPT_SECRET));
   assert.doesNotMatch(JSON.stringify(board.body), new RegExp(CONTRACT_SECRET));
+  assert.doesNotMatch(JSON.stringify(board.body), new RegExp(ENDPOINT_PROBE_SECRET));
+  assert.doesNotMatch(JSON.stringify(board.body), new RegExp(ENDPOINT_CERTIFICATE_FINGERPRINT));
   assert.equal(board.body.contractGovernance.summary.scheduled, 1);
   assert.equal(board.body.endpointVerification.summary.endpointProbesVerified, 1);
   assert.equal(board.body.endpointVerification.endpointConnectivityReady, false);
@@ -545,9 +694,36 @@ test("public health external routes use server time full keyrings and secret-fre
   assert.equal(persisted.publicHealthExternalLaneControlAudit.length, 2);
   assert.equal(persisted.publicHealthExternalContractAttestations.length, 1);
   assert.equal(persisted.publicHealthExternalContractGovernanceAudit.length, 5);
-  assert.equal(persisted.publicHealthExternalEndpointProbeReceipts.length, 1);
-  assert.equal(persisted.publicHealthExternalEndpointProbeReceipts[0].endpoint, IMMUNIZATION_ENDPOINT);
-  assert.equal(persisted.publicHealthExternalEndpointProbeReceipts[0].network.resolvedAddress, "8.8.8.8");
+  assert.equal(persisted.publicHealthExternalEndpointProbeReceipts.length, 2);
+  assert.equal(
+    persisted.publicHealthExternalEndpointProbeReceipts.every((item) => item.endpoint === IMMUNIZATION_ENDPOINT),
+    true
+  );
+  assert.equal(
+    persisted.publicHealthExternalEndpointProbeReceipts.every((item) => item.network.resolvedAddress === "8.8.8.8"),
+    true
+  );
+  assert.equal(
+    persisted.publicHealthExternalEndpointProbeReceipts.every((item) => item.productionReady === false),
+    true
+  );
+  assert.equal(persisted.publicHealthExternalEndpointProbeAudit.length, 7);
+  assert.deepEqual(
+    persisted.publicHealthExternalEndpointProbeAudit.reduce((counts, item) => {
+      counts[item.result] = (counts[item.result] || 0) + 1;
+      return counts;
+    }, {}),
+    { rejected: 5, started: 1, succeeded: 1 }
+  );
+  assert.equal(
+    persisted.publicHealthExternalEndpointProbeAudit.every((item) =>
+      !("endpoint" in item)
+      && !("resolvedAddress" in item)
+      && !("certificate" in item)
+      && !("error" in item)
+    ),
+    true
+  );
   assert.deepEqual(
     persisted.publicHealthExternalContractGovernanceAudit.map((item) => item.result).sort(),
     ["accepted", "rejected", "rejected", "rejected", "rejected"]
@@ -560,6 +736,7 @@ test("public health external routes use server time full keyrings and secret-fre
   const serializedState = JSON.stringify(persisted);
   assert.doesNotMatch(serializedState, new RegExp(REQUEST_SECRET));
   assert.doesNotMatch(serializedState, new RegExp(RECEIPT_SECRET));
+  assert.doesNotMatch(serializedState, new RegExp(ENDPOINT_PROBE_SECRET));
   assert.doesNotMatch(serializedState, /requestKeyring|receiptKeyring/);
   assert.doesNotMatch(serializedState, new RegExp(CONTRACT_SECRET));
   assert.doesNotMatch(serializedState, /signingMaterial/);

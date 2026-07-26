@@ -311,6 +311,16 @@ test("SQLite endpoint probe receipts persist with receiptId and nonce uniqueness
   };
   const accepted = structuredClone(current);
   accepted.publicHealthExternalEndpointProbeReceipts = [receipt];
+  accepted.publicHealthExternalEndpointProbeAudit = [{
+    id: "ph-storage-endpoint-audit-001",
+    laneId: "immunization",
+    actorRole: "commission",
+    actorOrgCode: "commission-office",
+    result: "succeeded",
+    code: "ENDPOINT_PROBE_SUCCEEDED",
+    at: "2026-07-27T00:00:00.000Z",
+    productionReady: false
+  }];
   writeDatabase(accepted, {
     event: "public-health-endpoint-probe-storage",
     publicHealthEndpointProbeInsert: { receipt }
@@ -319,6 +329,10 @@ test("SQLite endpoint probe receipts persist with receiptId and nonce uniqueness
   const persisted = readDatabase();
   assert.equal(persisted.publicHealthExternalEndpointProbeReceipts.length, 1);
   assert.equal(persisted.publicHealthExternalEndpointProbeReceipts[0].receiptId, receipt.receiptId);
+  assert.equal(persisted.publicHealthExternalEndpointProbeAudit.length, 1);
+  assert.equal(persisted.publicHealthExternalEndpointProbeAudit[0].result, "succeeded");
+  assert.equal("endpoint" in persisted.publicHealthExternalEndpointProbeAudit[0], false);
+  assert.equal("resolvedAddress" in persisted.publicHealthExternalEndpointProbeAudit[0], false);
 
   const duplicateReceiptId = structuredClone(persisted);
   const receiptIdConflict = {
@@ -344,4 +358,5 @@ test("SQLite endpoint probe receipts persist with receiptId and nonce uniqueness
 
   const unchanged = readDatabase();
   assert.equal(unchanged.publicHealthExternalEndpointProbeReceipts.length, 1);
+  assert.equal(unchanged.publicHealthExternalEndpointProbeAudit.length, 1);
 });

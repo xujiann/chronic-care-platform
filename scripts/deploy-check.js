@@ -137,6 +137,9 @@ function buildDeployCheckReport(options = {}) {
   const publicHealthSource = fs.readFileSync(path.join(ROOT, "scripts", "public-health-readiness.js"), "utf8");
   const publicHealthEndpointVerificationSource = fs.readFileSync(path.join(ROOT, "public-health-external-endpoint-verification-service.js"), "utf8");
   const publicHealthEndpointVerificationDoc = fs.readFileSync(path.join(ROOT, "docs", "public-health-external-endpoint-verification.md"), "utf8");
+  const publicHealthEndpointProbeRunnerSource = fs.readFileSync(path.join(ROOT, "public-health-external-endpoint-probe-runner.js"), "utf8");
+  const publicHealthEndpointProbeKeyProviderSource = fs.readFileSync(path.join(ROOT, "public-health-external-key-provider.js"), "utf8");
+  const publicHealthEndpointProbeDoc = fs.readFileSync(path.join(ROOT, "docs", "public-health-external-active-probing.md"), "utf8");
   const imagingCloudSource = fs.readFileSync(path.join(ROOT, "imaging-cloud.js"), "utf8");
   const imagingCloudReadinessSource = fs.readFileSync(path.join(ROOT, "scripts", "imaging-cloud-readiness.js"), "utf8");
   const digitalHospitalStandardsSource = fs.readFileSync(path.join(ROOT, "scripts", "digital-hospital-standards-readiness.js"), "utf8");
@@ -260,6 +263,8 @@ function buildDeployCheckReport(options = {}) {
     assertFile("server.js"),
     assertFile("public-health-external-endpoint-verification-service.js"),
     assertFile("docs/public-health-external-endpoint-verification.md"),
+    assertFile("public-health-external-endpoint-probe-runner.js"),
+    assertFile("docs/public-health-external-active-probing.md"),
     assertFile("session-store.js"),
     assertFile("production-adapters.js"),
     assertFile("docs/production-identity-message-adapters.md"),
@@ -528,6 +533,40 @@ function buildDeployCheckReport(options = {}) {
         && pkg.scripts?.["public-health:resilience-check"]?.includes("public-health-external-endpoint-verification-service.js")
         && pkg.scripts?.["public-health:resilience-test"]?.includes("test/public-health-external-endpoint-verification-service.test.js"),
       detail: "commission-only redacted endpoint summaries and server-config-bound signed receipts enforce durable receiptId/nonce replay protection while production readiness remains blocked"
+    },
+    {
+      name: "api:publicHealthExternalActiveEndpointProbe",
+      ok: [
+        "/api/public-health/external/endpoints/probes",
+        "runControlledPublicHealthEndpointProbe",
+        "publicHealthEndpointProbeMaxConcurrent",
+        "publicHealthEndpointProbeInFlight",
+        "publicHealthExternalEndpointProbeAudit",
+        "ENDPOINT_PROBE_FREQUENCY_LIMIT",
+        "publicHealthEndpointProbeInsert"
+      ].every((marker) => serverSource.includes(marker))
+        && [
+          "ALLOWED_COMMAND_KEYS",
+          "resolveAddresses",
+          "lookup:",
+          "rejectUnauthorized: true",
+          "certificatePins",
+          "requireMutualTls",
+          "ENDPOINT_PROBE_CERTIFICATE_PIN_MISMATCH",
+          "ENDPOINT_PROBE_MTLS_REQUIRED",
+          "productionReady: false"
+        ].every((marker) => publicHealthEndpointProbeRunnerSource.includes(marker))
+        && [
+          "loadPublicHealthEndpointProbeContext",
+          "PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_POLICIES",
+          "ENDPOINT_PROBE_KEYRING_REF",
+          "ENDPOINT_PROBE_TLS_REF",
+          "privateEndpointProbeContext"
+        ].every((marker) => publicHealthEndpointProbeKeyProviderSource.includes(marker))
+        && ["laneId", "DNS rebinding", "certificatePins", "requireMutualTls", "productionReady=false"].every((marker) => publicHealthEndpointProbeDoc.includes(marker))
+        && pkg.scripts?.["public-health:resilience-check"]?.includes("public-health-external-endpoint-probe-runner.js")
+        && pkg.scripts?.["public-health:resilience-test"]?.includes("test/public-health-external-endpoint-probe-runner.test.js"),
+      detail: "commission-only active endpoint probes accept only laneId, enforce server-owned DNS/TLS/pin/mTLS policy, controlled concurrency/frequency, redacted audit and durable receiptId/nonce replay protection while production readiness remains blocked"
     },
     { name: "api:publicHealthHighlights", ok: ["/api/public-health/highlights", "/api/public-health/highlights/signals", "/api/public-health/highlights/alerts/:id/actions", "/api/public-health/highlights/command-tasks/:id/actions", "/api/public-health/highlights/ai-reviews/:id/actions", "/api/public-health/highlights/evidence/:id/actions"].every((marker) => serverSource.includes(marker)) && fs.readFileSync(path.join(ROOT, "public-health.html"), "utf8").includes("public-health-highlight-center") && fs.readFileSync(path.join(ROOT, "public-health.js"), "utf8").includes("renderPublicHealthHighlights"), detail: "public health five-suite trigger, map, AI, command and evidence center is wired" },
     { name: "api:publicHealthHighlightsStandalone", ok: fs.existsSync(path.join(ROOT, "public-health-highlights.html")) && fs.existsSync(path.join(ROOT, "public-health-highlights.js")) && fs.existsSync(path.join(ROOT, "scripts", "public-health-highlights-readiness.js")) && serverSource.includes("buildPublicHealthHighlights") && fs.readFileSync(path.join(ROOT, "scripts", "public-health-highlights-readiness.js"), "utf8").includes("functionalState"), detail: "standalone public health five-suite command center and readiness report are present" },

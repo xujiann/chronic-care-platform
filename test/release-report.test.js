@@ -585,7 +585,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.publicHealthReadiness.launchGate.summary.requirements >= 8, true);
   assert.equal(report.publicHealthReadiness.launchGate.releaseGate, "site-evidence-required");
   assert.equal(report.publicHealthFinalReadiness.ok, true);
-  assert.equal(report.publicHealthFinalReadiness.summary.passed, 47);
+  assert.equal(report.publicHealthFinalReadiness.summary.passed, 57);
   assert.equal(report.publicHealthFinalReadiness.productionReady, false);
   assert.equal(report.checks.some((item) => item.name === "publicHealthFinal:keyProvider" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "publicHealthFinal:dualCas" && item.passed), true);
@@ -594,6 +594,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "publicHealthFinal:contractCutover" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "publicHealthFinal:contractChain" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "publicHealthFinal:contractChainPersistence" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "publicHealthFinal:activeEndpointProbe" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "citizenLaunch:readiness" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "citizenLaunch:phoneCodeDelivery" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "citizenLaunch:accountProvisioning" && item.passed), true);
