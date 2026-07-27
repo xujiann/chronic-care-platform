@@ -55,6 +55,20 @@ function financialGatewayExternalEvidence(blockers = []) {
   });
 }
 
+function buildAcceptanceProductionGate(report = {}) {
+  const checks = [
+    { id: "local-domain-ready", passed: report.localReady === true, detail: `${report.summary?.workflowsReady || 0}/${report.summary?.workflows || 0} workflows ready` },
+    { id: "external-evidence-governed", passed: report.summary?.externalEvidenceGoverned === true, detail: `${report.summary?.externalBlockers || 0} external requirements assigned` },
+    { id: "t00-public-wiring-complete", passed: report.summary?.t00RoutesPending === 0, detail: `${report.summary?.t00RoutesPending || 0} routes pending` },
+    { id: "live-site-acceptance-confirmed", passed: report.productionReady === true, detail: report.productionReady === true ? "live acceptance confirmed" : "live access and signed site acceptance pending" }
+  ];
+  return {
+    passed: checks.every((item) => item.passed),
+    blockers: checks.filter((item) => !item.passed).map((item) => item.id),
+    checks
+  };
+}
+
 function buildInsurancePaymentAcceptance(options = {}) {
   const diseasePayment = options.diseasePayment || buildDiseasePaymentReadiness();
   const financialGateway = options.financialGateway || buildFinancialGatewayReadiness();
@@ -72,7 +86,7 @@ function buildInsurancePaymentAcceptance(options = {}) {
   const externalBlockers = [...diseasePaymentExternalEvidence(diseasePayment.externalBlockers), ...financialGatewayExternalEvidence(financialGateway.blockers)];
   const externalEvidenceGoverned = externalBlockers.every((item) => item.owner && EXTERNAL_REVIEWER_ROLES.has(item.reviewerRole));
   const localReady = diseasePayment.ready && financialGateway.ok && operatingModel.ok && workflows.every((item) => item.ready) && externalEvidenceGoverned;
-  return {
+  const report = {
     generatedAt: new Date().toISOString(),
     status: localReady ? "domain-ready-public-wiring-and-site-acceptance-pending" : "domain-incomplete",
     localReady,
@@ -83,6 +97,8 @@ function buildInsurancePaymentAcceptance(options = {}) {
     integrationHandoff,
     externalBlockers
   };
+  report.productionGate = buildAcceptanceProductionGate(report);
+  return report;
 }
 
 function renderMarkdown(report) {
@@ -110,7 +126,7 @@ function parseArgs(argv = process.argv.slice(2)) {
 }
 
 function shouldFailAcceptance(report = {}, args = {}) {
-  return report.localReady !== true || (args["require-production"] === true && report.productionReady !== true);
+  return report.localReady !== true || (args["require-production"] === true && report.productionGate?.passed !== true);
 }
 
 if (require.main === module) {
@@ -120,4 +136,4 @@ if (require.main === module) {
   if (shouldFailAcceptance(report, args)) process.exitCode = 1;
 }
 
-module.exports = { FINANCIAL_GATEWAY_EVIDENCE_POLICY, buildInsurancePaymentAcceptance, diseasePaymentExternalEvidence, financialGatewayExternalEvidence, parseArgs, renderMarkdown, shouldFailAcceptance };
+module.exports = { FINANCIAL_GATEWAY_EVIDENCE_POLICY, buildAcceptanceProductionGate, buildInsurancePaymentAcceptance, diseasePaymentExternalEvidence, financialGatewayExternalEvidence, parseArgs, renderMarkdown, shouldFailAcceptance };

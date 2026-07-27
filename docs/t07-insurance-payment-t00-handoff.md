@@ -100,3 +100,5 @@ node .\scripts\insurance-payment-evidence-packet.js --require-production
 ```
 
 前两条命令用于验证T07本地领域能力，当前应成功；后两条是发布流水线严格门禁，在公共接线和现场证据未齐备时必须以非零状态退出。不得用本地验收命令的成功退出替代生产门禁。
+
+统一验收报告和证据包均输出 `productionGate`，包含稳定检查编号、布尔结果、明细及 `blockers` 数组。当前严格门禁应明确报告 `t00-public-wiring-complete`、`handoff-evidence-complete` 和 `live-site-acceptance-confirmed` 等未通过项，便于CI直接生成阻断清单。
