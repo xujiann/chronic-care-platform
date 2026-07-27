@@ -2,10 +2,14 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const {
+  EXTERNAL_ADAPTER_PROFILES
+} = require("../public-health-external-adapter-service");
+const {
   ROTATION_SEQUENCE,
   buildPublicHealthKeySafetyBoard,
   evaluateRotationEvidence,
   loadPublicHealthContractGovernance,
+  loadPublicHealthEndpointProbeCampaignContext,
   loadPublicHealthEndpointProbeContext,
   loadPublicHealthEndpointProbePolicies,
   loadPublicHealthLaneCredentials,
@@ -17,6 +21,7 @@ const REQUEST_SECRET = "provider-request-secret-1234567890-123456";
 const RECEIPT_SECRET = "provider-receipt-secret-1234567890-123456";
 const CONTRACT_SECRET = "provider-contract-secret-1234567890-12345";
 const ENDPOINT_PROBE_SECRET = "provider-endpoint-probe-secret-1234567890";
+const CAMPAIGN_SECRET = "provider-endpoint-campaign-secret-1234567890";
 const LANE_IDS = [
   "infectious-reporting",
   "immunization",
@@ -47,6 +52,24 @@ const ENDPOINT_PROBE_POLICIES = Object.fromEntries(LANE_IDS.map((laneId) => [lan
 
 function managedKeyring(purpose, activeKeyId, keys) {
   return { purpose, activeKeyId, keys };
+}
+
+function laneEnvironment(overrides = {}) {
+  return {
+    ...Object.fromEntries(EXTERNAL_ADAPTER_PROFILES.flatMap((profile) => {
+      const base = profile.endpointEnv.replace(/_ENDPOINT$/, "");
+      return [
+        [profile.endpointEnv, `https://${profile.laneId}.example.test/dispatch`],
+        [`${base}_REQUEST_SECRET`, REQUEST_SECRET],
+        [`${base}_RECEIPT_SECRET`, RECEIPT_SECRET],
+        [`${base}_ENDPOINT_PROBE_SECRET`, ENDPOINT_PROBE_SECRET]
+      ];
+    })),
+    PUBLIC_HEALTH_EXTERNAL_CONTRACT_GOVERNANCE_SECRET: CONTRACT_SECRET,
+    PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_CAMPAIGN_SECRET: CAMPAIGN_SECRET,
+    PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_POLICIES: JSON.stringify(ENDPOINT_PROBE_POLICIES),
+    ...overrides
+  };
 }
 
 test("local compatibility credentials stay non-enumerable and production blocked", async () => {
@@ -226,6 +249,125 @@ test("production active probe resolves independent keyring, TLS credentials and 
   assert.equal(context.summary.tlsReferenceConfigured, true);
   assert.equal(context.summary.productionReady, false);
   assert.doesNotMatch(JSON.stringify(context), /managed-private-key|provider-endpoint-probe-secret/);
+});
+
+test("campaign context is global, non-enumerable and independent from every lane key", async () => {
+  const context = await loadPublicHealthEndpointProbeCampaignContext({}, {
+    at: AT,
+    env: laneEnvironment({ NODE_ENV: "test" })
+  });
+  assert.equal(context.campaignKeyring.purpose, "public-health-endpoint-probe-campaign");
+  assert.equal(Object.keys(context.laneContexts).length, 8);
+  assert.equal(context.requiredConsecutiveCampaigns, 3);
+  assert.equal(context.maxCampaignGapSeconds, 900);
+  assert.equal(context.ttlSeconds, 3600);
+  assert.equal(context.summary.independentFromLaneKeys, true);
+  assert.equal(context.summary.productionReady, false);
+  const serialized = JSON.stringify(context);
+  assert.doesNotMatch(serialized, new RegExp(CAMPAIGN_SECRET));
+  assert.doesNotMatch(serialized, new RegExp(ENDPOINT_PROBE_SECRET));
+  assert.doesNotMatch(serialized, /example\.test\/dispatch|certificatePins|campaignKeyring|laneContexts/);
+
+  await assert.rejects(() => loadPublicHealthEndpointProbeCampaignContext({}, {
+    at: AT,
+    env: laneEnvironment({
+      NODE_ENV: "test",
+      PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_CAMPAIGN_SECRET: REQUEST_SECRET
+    })
+  }), /independent from request, receipt and single-probe keys/);
+  await assert.rejects(() => loadPublicHealthEndpointProbeCampaignContext({}, {
+    at: AT,
+    env: laneEnvironment({
+      NODE_ENV: "test",
+      PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_CAMPAIGN_SECRET: ENDPOINT_PROBE_SECRET
+    })
+  }), /independent from request, receipt and single-probe keys/);
+});
+
+test("production campaign context requires a purpose-bound managed global keyring", async () => {
+  const productionPolicies = Object.fromEntries(LANE_IDS.map((laneId) => [laneId, {
+    ...ENDPOINT_PROBE_POLICIES[laneId],
+    certificatePins: [],
+    requireMutualTls: false
+  }]));
+  const env = {
+    NODE_ENV: "production",
+    PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_CAMPAIGN_KEYRING_REF: "kms://public-health/endpoint-campaign",
+    PUBLIC_HEALTH_EXTERNAL_CONTRACT_GOVERNANCE_KEYRING_REF: "kms://public-health/contracts",
+    PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_POLICIES: JSON.stringify(productionPolicies),
+    PUBLIC_HEALTH_EXTERNAL_RESILIENCE_POLICIES: JSON.stringify(RESILIENCE_POLICIES),
+    ...Object.fromEntries(EXTERNAL_ADAPTER_PROFILES.flatMap((profile) => {
+      const base = profile.endpointEnv.replace(/_ENDPOINT$/, "");
+      return [
+        [profile.endpointEnv, `https://${profile.laneId}.example.test/dispatch`],
+        [`${base}_REQUEST_KEYRING_REF`, `kms://${profile.laneId}/request`],
+        [`${base}_RECEIPT_KEYRING_REF`, `kms://${profile.laneId}/receipt`],
+        [`${base}_ENDPOINT_PROBE_KEYRING_REF`, `kms://${profile.laneId}/probe`]
+      ];
+    }))
+  };
+  const secretForPurpose = (purpose) => {
+    if (purpose === "public-health-endpoint-probe-campaign") return CAMPAIGN_SECRET;
+    if (purpose === "public-health-contract-governance") return CONTRACT_SECRET;
+    if (purpose === "public-health-endpoint-probe") return ENDPOINT_PROBE_SECRET;
+    if (purpose === "public-health-request") return REQUEST_SECRET;
+    return RECEIPT_SECRET;
+  };
+  const loader = async ({ purpose }) => managedKeyring(purpose, `${purpose}-active`, [{
+    keyId: `${purpose}-active`,
+    secret: secretForPurpose(purpose),
+    status: "active",
+    notBefore: "2026-07-01T00:00:00.000Z",
+    expiresAt: "2026-09-01T00:00:00.000Z",
+    revokedAt: ""
+  }]);
+  const context = await loadPublicHealthEndpointProbeCampaignContext({}, {
+    at: AT,
+    env,
+    loader
+  });
+  assert.equal(context.campaignKeyring.purpose, "public-health-endpoint-probe-campaign");
+  assert.equal(context.summary.source, "managed-key-service");
+  assert.equal(context.summary.referenceConfigured, true);
+  assert.equal(context.summary.productionReady, false);
+
+  await assert.rejects(() => loadPublicHealthEndpointProbeCampaignContext({}, {
+    at: AT,
+    env,
+    loader: async (request) => {
+      const keyring = await loader(request);
+      return request.purpose === "public-health-endpoint-probe-campaign"
+        ? { ...keyring, purpose: "public-health-endpoint-probe" }
+        : keyring;
+    }
+  }), /campaign keyring purpose is invalid/);
+
+  await assert.rejects(() => loadPublicHealthEndpointProbeCampaignContext({}, {
+    at: AT,
+    env,
+    loader: async (request) => {
+      const keyring = await loader(request);
+      if (request.purpose !== "public-health-request") return keyring;
+      return managedKeyring("public-health-request", "request-active", [
+        {
+          keyId: "request-active",
+          secret: REQUEST_SECRET,
+          status: "active",
+          notBefore: "2026-07-01T00:00:00.000Z",
+          expiresAt: "2026-09-01T00:00:00.000Z",
+          revokedAt: ""
+        },
+        {
+          keyId: "request-grace",
+          secret: CAMPAIGN_SECRET,
+          status: "grace",
+          notBefore: "2026-06-01T00:00:00.000Z",
+          expiresAt: "2026-08-01T00:00:00.000Z",
+          revokedAt: ""
+        }
+      ]);
+    }
+  }), /independent from request, receipt and single-probe keys/);
 });
 
 test("production resilience configuration covers all eight lanes and rejects gaps", () => {

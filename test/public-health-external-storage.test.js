@@ -24,6 +24,16 @@ const {
 
 const CONTRACT_SECRET = "storage-contract-secret-1234567890-123456";
 const digest = (value) => crypto.createHash("sha256").update(value).digest("hex");
+const CAMPAIGN_LANES = [
+  "infectious-reporting",
+  "immunization",
+  "maternal-child",
+  "senior-health",
+  "chronic-management",
+  "public-health-followup",
+  "health-education",
+  "family-doctor"
+];
 
 function signedTransition({
   fromContract,
@@ -359,4 +369,92 @@ test("SQLite endpoint probe receipts persist with receiptId and nonce uniqueness
   const unchanged = readDatabase();
   assert.equal(unchanged.publicHealthExternalEndpointProbeReceipts.length, 1);
   assert.equal(unchanged.publicHealthExternalEndpointProbeAudit.length, 1);
+});
+
+function campaignRecord(campaignId, campaignNonce, prefix) {
+  return {
+    attestation: {
+      campaignId,
+      nonce: campaignNonce,
+      status: "completed",
+      signature: digest(`campaign-signature:${campaignId}`)
+    },
+    receiptReferences: CAMPAIGN_LANES.map((laneId) => ({
+      laneId,
+      receiptId: `${prefix}-${laneId}-receipt`,
+      nonce: `${prefix}-${laneId}-nonce`,
+      receiptDigest: digest(`${prefix}:${laneId}`)
+    })),
+    productionReady: false
+  };
+}
+
+test("SQLite atomically persists campaign attestations and rejects every cross-campaign replay key", () => {
+  const current = readDatabase();
+  const campaign = campaignRecord(
+    "ph-storage-campaign-001",
+    "ph-storage-campaign-nonce-001",
+    "ph-storage-campaign-001"
+  );
+  const accepted = structuredClone(current);
+  accepted.publicHealthExternalEndpointProbeCampaigns = [campaign];
+  accepted.publicHealthExternalEndpointProbeCampaignAudit = [{
+    id: "ph-storage-campaign-audit-001",
+    campaignId: campaign.attestation.campaignId,
+    result: "succeeded",
+    code: "ENDPOINT_PROBE_CAMPAIGN_SUCCEEDED",
+    productionReady: false
+  }];
+  writeDatabase(accepted, {
+    event: "public-health-endpoint-probe-campaign-storage",
+    publicHealthEndpointProbeCampaignInsert: { campaign }
+  });
+
+  const persisted = readDatabase();
+  assert.equal(persisted.publicHealthExternalEndpointProbeCampaigns.length, 1);
+  assert.equal(persisted.publicHealthExternalEndpointProbeCampaigns[0].receiptReferences.length, 8);
+  assert.equal(persisted.publicHealthExternalEndpointProbeCampaignAudit.length, 1);
+
+  const conflicts = [
+    campaignRecord(
+      campaign.attestation.campaignId,
+      "ph-storage-campaign-nonce-002",
+      "ph-storage-campaign-002"
+    ),
+    campaignRecord(
+      "ph-storage-campaign-002",
+      campaign.attestation.nonce,
+      "ph-storage-campaign-002"
+    ),
+    campaignRecord(
+      "ph-storage-campaign-003",
+      "ph-storage-campaign-nonce-003",
+      "ph-storage-campaign-003"
+    ),
+    campaignRecord(
+      "ph-storage-campaign-004",
+      "ph-storage-campaign-nonce-004",
+      "ph-storage-campaign-004"
+    )
+  ];
+  conflicts[2].receiptReferences[0].receiptId = campaign.receiptReferences[0].receiptId;
+  conflicts[3].receiptReferences[0].nonce = campaign.receiptReferences[0].nonce;
+  const patterns = [
+    /campaignId unique conflict/,
+    /campaign nonce unique conflict/,
+    /receiptId unique conflict/,
+    /receipt nonce unique conflict/
+  ];
+  conflicts.forEach((conflict, index) => {
+    const invalid = structuredClone(persisted);
+    invalid.publicHealthExternalEndpointProbeCampaigns.push(conflict);
+    assert.throws(() => writeDatabase(invalid, {
+      event: "public-health-endpoint-probe-campaign-conflict",
+      publicHealthEndpointProbeCampaignInsert: { campaign: conflict }
+    }), patterns[index]);
+  });
+
+  const unchanged = readDatabase();
+  assert.equal(unchanged.publicHealthExternalEndpointProbeCampaigns.length, 1);
+  assert.equal(unchanged.publicHealthExternalEndpointProbeCampaignAudit.length, 1);
 });

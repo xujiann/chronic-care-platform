@@ -732,12 +732,14 @@ function buildPublicHealthFinalReadiness(options = {}) {
       "/api/public-health/external/endpoints/summary",
       "/api/public-health/external/endpoints/receipts",
       "/api/public-health/external/endpoints/probes",
+      "/api/public-health/external/endpoints/campaigns",
+      "/api/public-health/external/endpoints/campaigns/summary",
       "/api/public-health/external/operations-board",
       "/api/public-health/external/key-rotation"
     ].every((token) => serverSource.includes(token)), "coordination, enqueue, worker, callback, recovery, endpoint verification, controlled active probe, operations and rotation routes are registered", "integration"),
     check("integration:t00-managed-key-provider", ["loadPublicHealthLaneCredentials", "managed-key-service", "REQUEST_KEYRING_REF", "RECEIPT_KEYRING_REF", "privateCredentials"].every((token) => keyProviderSource.includes(token)), "lane keyrings load through a non-enumerable managed-key provider contract", "integration"),
     check("integration:t00-server-time", serverSource.includes("publicHealthExternalCallbackMatch") && serverSource.includes("const at = new Date().toISOString()") && serverSource.includes("requestKeyring: credentials.requestKeyring") && serverSource.includes("receiptKeyring: credentials.receiptKeyring") && ["serverTime", "requestKeyring: credentials.requestKeyring", "receiptKeyring: credentials.receiptKeyring", "writeState(claimed.nextData"].every((token) => workerSource.includes(token)), "enqueue, worker and callback controllers inject server time and complete keyrings; worker persists its lease before transport", "integration"),
-    check("integration:t00-release-script", packageSource.includes("\"public-health:final-readiness\"") && packageSource.includes("test/public-health-external-api.test.js") && packageSource.includes("test/public-health-external-endpoint-verification-service.test.js") && packageSource.includes("test/public-health-external-endpoint-probe-runner.test.js"), "package scripts register final readiness, endpoint verification, active probe runner and public API regression", "integration"),
+    check("integration:t00-release-script", packageSource.includes("\"public-health:final-readiness\"") && packageSource.includes("test/public-health-external-api.test.js") && packageSource.includes("test/public-health-external-endpoint-verification-service.test.js") && packageSource.includes("test/public-health-external-endpoint-probe-runner.test.js") && packageSource.includes("test/public-health-external-endpoint-probe-campaign-service.test.js"), "package scripts register final readiness, endpoint verification, active probe, campaign and public API regressions", "integration"),
     check("integration:t00-resilience-policy", ["PUBLIC_HEALTH_EXTERNAL_RESILIENCE_POLICIES", "loadPublicHealthResiliencePolicies", "resiliencePolicies"].every((token) => keyProviderSource.includes(token)) && serverSource.includes("credentials.resiliencePolicies"), "eight-lane resilience policies are injected from non-enumerable server configuration", "integration"),
     check("integration:t00-dual-cas", ["assertPublicHealthExternalCas", "publicHealthExternalCas", "expectedOutboxVersion", "expectedLaneControlVersion"].every((token) => serverSource.includes(token)) && ["laneControlVersionFor", "claimed.laneControl?.version", "publicHealthExternalCas"].every((token) => workerSource.includes(token)), "worker and durable writer bind dispatch and lane-control versions", "integration"),
     check("integration:t00-resilience-alerts", ["lane-control-audit-orphan", "lane-control-signature-secret-unavailable", "lane-control-integrity-invalid", "lane-circuit-open", "lane-circuit-half-open"].every((token) => operationsSource.includes(token)) && serverSource.includes("/api/public-health/external/operations-board"), "P0 and P1 lane-control risks are registered on the operations board", "integration"),
@@ -774,6 +776,27 @@ function buildPublicHealthFinalReadiness(options = {}) {
       "seenReceiptIds",
       "seenNonces"
     ].every((token) => endpointProbeSource.includes(token)), "commission-only active probes resolve endpoint, contract, keyring, pin and mTLS policy on the server; concurrency, frequency, audit and receipt replay controls remain fail-closed", "integration"),
+    check("integration:t00-endpoint-probe-campaign", [
+      "loadPublicHealthEndpointProbeCampaignContext",
+      "PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_CAMPAIGN_KEYRING_REF",
+      "ENDPOINT_PROBE_CAMPAIGN_KEYRING_PURPOSE",
+      "independentFromLaneKeys"
+    ].every((token) => keyProviderSource.includes(token)) && [
+      "runControlledPublicHealthEndpointProbeCampaign",
+      "publicHealthExternalEndpointProbeCampaigns",
+      "publicHealthExternalEndpointProbeCampaignAudit",
+      "assertUniquePublicHealthEndpointProbeCampaigns",
+      "publicHealthEndpointProbeCampaignInsert",
+      "/api/public-health/external/endpoints/campaigns",
+      "/api/public-health/external/endpoints/campaigns/summary",
+      "endpointProbeContinuity"
+    ].every((token) => serverSource.includes(token)) && [
+      "public-health-endpoint-probe-campaign",
+      "receiptDigest",
+      "policyDigest",
+      "continuousConnectivityReady",
+      "productionReady: false"
+    ].every((token) => endpointCampaignSource.includes(token)), "commission-only eight-lane campaigns use an independent managed key, atomic replay-safe persistence, redacted continuity projection and a production-false boundary", "integration"),
     check("safety:functional-not-production", runtime.productionReady === false && registry.productionReady === false && deliveries.every((item) => item.productionReady === false), "functional acceptance cannot self-assert production readiness", "safety"),
     check("safety:endpoint-connectivity-not-production", endpointProbeAcceptance.endpointConnectivityReady === true && endpointProbeAcceptance.productionReady === false && endpointProbeAcceptance.entries.every((item) => item.blockerCode === "trusted-site-evidence-still-required"), "verified connectivity never replaces trusted site evidence or launch approval", "safety"),
     check("safety:continuous-connectivity-not-production", endpointProbeCampaignAcceptance.continuousConnectivityReady === true && endpointProbeCampaignAcceptance.productionReady === false && endpointProbeCampaignAcceptance.blockers.every((item) => /site evidence|handoff|P0\/P1|approval/i.test(item)), "three consecutive campaigns still retain site evidence, blocker, handoff and approval boundaries", "safety"),

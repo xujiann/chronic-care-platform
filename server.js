@@ -73,6 +73,7 @@ const {
 const {
   buildPublicHealthKeySafetyBoard,
   loadPublicHealthContractGovernance,
+  loadPublicHealthEndpointProbeCampaignContext,
   loadPublicHealthEndpointProbeContext,
   loadPublicHealthLaneCredentials
 } = require("./public-health-external-key-provider");
@@ -93,6 +94,12 @@ const {
   assertServerOnlyCommand,
   runPublicHealthExternalEndpointProbe
 } = require("./public-health-external-endpoint-probe-runner");
+const {
+  buildPublicHealthExternalEndpointProbeCampaignRegistry,
+  createPublicHealthExternalEndpointProbeCampaign,
+  endpointProbeReceiptDigest,
+  verifyPublicHealthExternalEndpointProbeCampaign
+} = require("./public-health-external-endpoint-probe-campaign-service");
 const CareServicePlatform = require("./care-service-platform-adapter");
 const CareServiceRuntime = require("./care-service-runtime");
 const { createCareServiceDeliveryAdapters } = require("./care-service-delivery-adapters");
@@ -6649,14 +6656,82 @@ function assertPublicHealthEndpointProbeInsert(data = {}, constraint = {}) {
   }
 }
 
+function publicHealthEndpointProbeCampaignIdentity(campaign = {}) {
+  const attestation = campaign.attestation || campaign;
+  return {
+    campaignId: String(attestation?.campaignId || "").trim(),
+    campaignNonce: String(attestation?.nonce || "").trim(),
+    receiptReferences: Array.isArray(campaign.receiptReferences)
+      ? campaign.receiptReferences
+      : []
+  };
+}
+
+function assertUniquePublicHealthEndpointProbeCampaigns(campaigns = []) {
+  const campaignIds = new Set();
+  const campaignNonces = new Set();
+  const receiptIds = new Set();
+  const receiptNonces = new Set();
+  (Array.isArray(campaigns) ? campaigns : []).forEach((campaign) => {
+    const identity = publicHealthEndpointProbeCampaignIdentity(campaign);
+    if (!identity.campaignId || !identity.campaignNonce) {
+      throw new Error("public health endpoint probe campaignId and campaign nonce are required");
+    }
+    if (campaignIds.has(identity.campaignId)) {
+      throw new Error(`public health endpoint probe campaignId unique conflict: ${identity.campaignId}`);
+    }
+    if (campaignNonces.has(identity.campaignNonce)) {
+      throw new Error("public health endpoint probe campaign nonce unique conflict");
+    }
+    if (identity.receiptReferences.length !== EXTERNAL_ADAPTER_PROFILES.length) {
+      throw new Error("public health endpoint probe campaign must reference exactly eight receipts");
+    }
+    const laneIds = new Set();
+    identity.receiptReferences.forEach((reference) => {
+      const laneId = String(reference?.laneId || "").trim();
+      const receiptId = String(reference?.receiptId || "").trim();
+      const nonce = String(reference?.nonce || "").trim();
+      if (!laneId || !receiptId || !nonce) {
+        throw new Error("public health endpoint probe campaign receipt references are incomplete");
+      }
+      if (laneIds.has(laneId)) {
+        throw new Error("public health endpoint probe campaign lane reference is duplicated");
+      }
+      if (receiptIds.has(receiptId)) {
+        throw new Error(`public health endpoint probe campaign receiptId unique conflict: ${receiptId}`);
+      }
+      if (receiptNonces.has(nonce)) {
+        throw new Error("public health endpoint probe campaign receipt nonce unique conflict");
+      }
+      laneIds.add(laneId);
+      receiptIds.add(receiptId);
+      receiptNonces.add(nonce);
+    });
+    campaignIds.add(identity.campaignId);
+    campaignNonces.add(identity.campaignNonce);
+  });
+}
+
+function assertPublicHealthEndpointProbeCampaignInsert(data = {}, constraint = {}) {
+  const campaign = constraint.campaign || constraint;
+  const persisted = Array.isArray(data.publicHealthExternalEndpointProbeCampaigns)
+    ? data.publicHealthExternalEndpointProbeCampaigns
+    : [];
+  assertUniquePublicHealthEndpointProbeCampaigns([...persisted, campaign]);
+}
+
 function writeDatabase(data, options = {}) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   const publicHealthExternalCas = options.publicHealthExternalCas || null;
   const publicHealthExternalContractInsert = options.publicHealthExternalContractInsert || null;
   const publicHealthEndpointProbeInsert = options.publicHealthEndpointProbeInsert || null;
+  const publicHealthEndpointProbeCampaignInsert = options.publicHealthEndpointProbeCampaignInsert || null;
   const sqlite = shouldUseSqlite();
   const normalized = normalizeState(data);
-  if ((publicHealthExternalCas || publicHealthExternalContractInsert || publicHealthEndpointProbeInsert) && !sqlite) {
+  if ((publicHealthExternalCas
+    || publicHealthExternalContractInsert
+    || publicHealthEndpointProbeInsert
+    || publicHealthEndpointProbeCampaignInsert) && !sqlite) {
     const persisted = fs.existsSync(DB_FILE) ? JSON.parse(fs.readFileSync(DB_FILE, "utf8")) : {};
     if (publicHealthExternalCas) assertPublicHealthExternalCas(persisted, publicHealthExternalCas);
     if (publicHealthExternalContractInsert) {
@@ -6669,9 +6744,13 @@ function writeDatabase(data, options = {}) {
     if (publicHealthEndpointProbeInsert) {
       assertPublicHealthEndpointProbeInsert(persisted, publicHealthEndpointProbeInsert);
     }
+    if (publicHealthEndpointProbeCampaignInsert) {
+      assertPublicHealthEndpointProbeCampaignInsert(persisted, publicHealthEndpointProbeCampaignInsert);
+    }
   }
   assertUniquePublicHealthContractAttestations(normalized.publicHealthExternalContractAttestations);
   assertUniquePublicHealthEndpointProbeReceipts(normalized.publicHealthExternalEndpointProbeReceipts);
+  assertUniquePublicHealthEndpointProbeCampaigns(normalized.publicHealthExternalEndpointProbeCampaigns);
   normalized.storageMeta = data.storageMeta || storageMeta();
   if (sqlite) {
     writeSqliteState(
@@ -6680,7 +6759,8 @@ function writeDatabase(data, options = {}) {
       data.storageMeta?.collectionVersions,
       publicHealthExternalCas,
       publicHealthExternalContractInsert,
-      publicHealthEndpointProbeInsert
+      publicHealthEndpointProbeInsert,
+      publicHealthEndpointProbeCampaignInsert
     );
   }
   const snapshot = {
@@ -6867,7 +6947,8 @@ function writeSqliteState(
   expectedVersions = null,
   publicHealthExternalCas = null,
   publicHealthExternalContractInsert = null,
-  publicHealthEndpointProbeInsert = null
+  publicHealthEndpointProbeInsert = null,
+  publicHealthEndpointProbeCampaignInsert = null
 ) {
   const db = openSqliteDatabase();
   const now = new Date().toISOString();
@@ -6896,6 +6977,13 @@ function writeSqliteState(
       assertPublicHealthEndpointProbeInsert({
         publicHealthExternalEndpointProbeReceipts: row ? JSON.parse(row.payload) : []
       }, publicHealthEndpointProbeInsert);
+    }
+    if (publicHealthEndpointProbeCampaignInsert) {
+      const row = db.prepare("SELECT payload FROM state_collections WHERE key = ?")
+        .get("publicHealthExternalEndpointProbeCampaigns");
+      assertPublicHealthEndpointProbeCampaignInsert({
+        publicHealthExternalEndpointProbeCampaigns: row ? JSON.parse(row.payload) : []
+      }, publicHealthEndpointProbeCampaignInsert);
     }
     const normalized = normalizeState(data);
     const entries = Object.entries(normalized).filter(([key]) => key !== "storageMeta");
@@ -10196,6 +10284,12 @@ function normalizeState(data) {
       : [],
     publicHealthExternalEndpointProbeAudit: Array.isArray(data.publicHealthExternalEndpointProbeAudit)
       ? data.publicHealthExternalEndpointProbeAudit.slice(-4000)
+      : [],
+    publicHealthExternalEndpointProbeCampaigns: Array.isArray(data.publicHealthExternalEndpointProbeCampaigns)
+      ? data.publicHealthExternalEndpointProbeCampaigns.slice(-100)
+      : [],
+    publicHealthExternalEndpointProbeCampaignAudit: Array.isArray(data.publicHealthExternalEndpointProbeCampaignAudit)
+      ? data.publicHealthExternalEndpointProbeCampaignAudit.slice(-1000)
       : [],
     publicHealthSignals: mergeByKey(seedPublicHealthSignals(), data.publicHealthSignals, "id"),
     publicHealthAlerts: mergeByKey(seedPublicHealthAlerts(), data.publicHealthAlerts, "id"),
@@ -16136,6 +16230,8 @@ function scopeStateForUser(data, user) {
   const scoped = structuredClone(data);
   delete scoped.publicHealthExternalEndpointProbeReceipts;
   delete scoped.publicHealthExternalEndpointProbeAudit;
+  delete scoped.publicHealthExternalEndpointProbeCampaigns;
+  delete scoped.publicHealthExternalEndpointProbeCampaignAudit;
   if (user.role === "commission") return scoped;
 
   delete scoped.authUsers;
@@ -23443,6 +23539,7 @@ function publicHealthExternalHttpStatus(error) {
 let publicHealthEndpointProbeRuntime = Object.freeze({});
 const publicHealthEndpointProbeInFlight = new Set();
 let publicHealthEndpointProbeActiveCount = 0;
+let publicHealthEndpointProbeCampaignInFlight = false;
 
 function configurePublicHealthEndpointProbeRuntime(dependencies = null) {
   if (dependencies === null) {
@@ -23516,6 +23613,60 @@ function publicHealthEndpointProbeHttpStatus(code) {
   if (code === "ENDPOINT_PROBE_LANE_INVALID") return 404;
   if (/CONFIG|POLICY|KEY|TLS_SERVICE|CONTRACT|FAILED|DNS|TRANSPORT|TIMEOUT/.test(code)) return 503;
   return 400;
+}
+
+function assertPublicHealthEndpointProbeCampaignCommand(command = {}) {
+  if (!command || typeof command !== "object" || Array.isArray(command)) {
+    const error = new Error("endpoint probe campaign command must be an object");
+    error.code = "ENDPOINT_PROBE_CAMPAIGN_COMMAND_INVALID";
+    throw error;
+  }
+  if (Object.keys(command).length) {
+    const error = new Error("endpoint probe campaign command cannot override server configuration");
+    error.code = "ENDPOINT_PROBE_CAMPAIGN_COMMAND_OVERRIDE_FORBIDDEN";
+    throw error;
+  }
+}
+
+function publicHealthEndpointProbeCampaignSafeCode(error) {
+  const code = String(error?.code || "").trim();
+  return /^ENDPOINT_PROBE_CAMPAIGN_[A-Z0-9_]+$/.test(code)
+    ? code
+    : "ENDPOINT_PROBE_CAMPAIGN_FAILED";
+}
+
+function publicHealthEndpointProbeCampaignHttpStatus(code) {
+  if (code === "ENDPOINT_PROBE_CAMPAIGN_CONCURRENCY_LIMIT") return 429;
+  if (["ENDPOINT_PROBE_CAMPAIGN_COMMAND_INVALID", "ENDPOINT_PROBE_CAMPAIGN_COMMAND_OVERRIDE_FORBIDDEN"].includes(code)) {
+    return 400;
+  }
+  if (/CONFIG|KEY|POLICY|FAILED|PROBE/.test(code)) return 503;
+  return 400;
+}
+
+function publicHealthEndpointProbeCampaignAuditEntry(user, result, code, at, campaignId = "") {
+  return {
+    id: `ph-endpoint-probe-campaign-audit-${randomUUID()}`,
+    campaignId: String(campaignId || "").trim(),
+    actorRole: String(user?.role || "system"),
+    actorOrgCode: String(user?.orgCode || ""),
+    result,
+    code,
+    at,
+    productionReady: false
+  };
+}
+
+function appendPublicHealthEndpointProbeCampaignAudit(data, entry) {
+  return {
+    ...data,
+    publicHealthExternalEndpointProbeCampaignAudit: [
+      ...(Array.isArray(data.publicHealthExternalEndpointProbeCampaignAudit)
+        ? data.publicHealthExternalEndpointProbeCampaignAudit
+        : []),
+      entry
+    ]
+  };
 }
 
 function publicHealthExternalWorkerId(user = {}) {
@@ -23693,7 +23844,110 @@ async function buildPublicHealthEndpointVerificationSummary(data, at) {
   };
 }
 
-async function runControlledPublicHealthEndpointProbe(command, user) {
+function publicHealthEndpointProbeCampaignVerificationOptions(context, at) {
+  return {
+    env: process.env,
+    at,
+    campaignKeyring: context.campaignKeyring,
+    contractResolver: (laneId) => context.laneContexts[laneId]?.contract,
+    keyringResolver: (laneId) => context.laneContexts[laneId]?.keyring,
+    policyResolver: (laneId) => context.laneContexts[laneId]?.policy || {},
+    requiredConsecutiveCampaigns: context.requiredConsecutiveCampaigns,
+    maxCampaignGapSeconds: context.maxCampaignGapSeconds
+  };
+}
+
+function materializePublicHealthEndpointProbeCampaigns(data = {}) {
+  const receipts = new Map((Array.isArray(data.publicHealthExternalEndpointProbeReceipts)
+    ? data.publicHealthExternalEndpointProbeReceipts
+    : []).map((receipt) => [String(receipt?.receiptId || "").trim(), receipt]));
+  return (Array.isArray(data.publicHealthExternalEndpointProbeCampaigns)
+    ? data.publicHealthExternalEndpointProbeCampaigns
+    : []).map((campaign) => ({
+    attestation: campaign.attestation,
+    receipts: (Array.isArray(campaign.receiptReferences) ? campaign.receiptReferences : [])
+      .map((reference) => receipts.get(String(reference?.receiptId || "").trim()))
+      .filter(Boolean)
+  }));
+}
+
+function publicHealthEndpointProbeCampaignSummaryView(registry = {}, audit = []) {
+  return {
+    ok: registry.ok === true,
+    functionalState: String(registry.functionalState || "endpoint-probe-campaign-continuity-pending"),
+    formalGoLiveState: String(registry.formalGoLiveState || "blocked-until-trusted-site-evidence-and-launch-approval"),
+    summary: {
+      campaignsSubmitted: Number(registry.summary?.campaignsSubmitted || 0),
+      campaignsVerified: Number(registry.summary?.campaignsVerified || 0),
+      campaignsRejected: Number(registry.summary?.campaignsRejected || 0),
+      consecutiveCampaigns: Number(registry.summary?.consecutiveCampaigns || 0),
+      requiredConsecutiveCampaigns: Number(registry.summary?.requiredConsecutiveCampaigns || 3),
+      maxCampaignGapSeconds: Number(registry.summary?.maxCampaignGapSeconds || 900)
+    },
+    campaigns: (Array.isArray(registry.campaigns) ? registry.campaigns : []).map((campaign) => ({
+      campaignId: String(campaign.campaignId || ""),
+      startedAt: String(campaign.startedAt || ""),
+      completedAt: String(campaign.completedAt || ""),
+      expiresAt: String(campaign.expiresAt || ""),
+      verifiedReceipts: Number(campaign.verifiedReceipts || 0),
+      campaignConnectivityReady: campaign.campaignConnectivityReady === true
+    })),
+    rejected: (Array.isArray(registry.rejected) ? registry.rejected : []).map((campaign) => ({
+      campaignId: String(campaign.campaignId || ""),
+      code: "ENDPOINT_PROBE_CAMPAIGN_VERIFICATION_FAILED"
+    })),
+    worker: {
+      active: publicHealthEndpointProbeCampaignInFlight,
+      auditEntries: audit.length,
+      succeeded: audit.filter((entry) => entry.result === "succeeded").length,
+      rejected: audit.filter((entry) => entry.result === "rejected").length,
+      productionReady: false
+    },
+    continuousConnectivityReady: registry.continuousConnectivityReady === true,
+    productionReady: false,
+    blockers: [
+      ...(Array.isArray(registry.blockers) ? registry.blockers : []),
+      "Continuous endpoint connectivity cannot authorize production launch."
+    ]
+  };
+}
+
+async function buildPublicHealthEndpointProbeCampaignSummary(data, at, suppliedContext = null) {
+  const audit = Array.isArray(data.publicHealthExternalEndpointProbeCampaignAudit)
+    ? data.publicHealthExternalEndpointProbeCampaignAudit
+    : [];
+  try {
+    const context = suppliedContext
+      || await loadPublicHealthEndpointProbeCampaignContext(data, {
+        at,
+        tlsLoader: publicHealthEndpointProbeRuntime.tlsLoader
+      });
+    const registry = buildPublicHealthExternalEndpointProbeCampaignRegistry({
+      campaigns: materializePublicHealthEndpointProbeCampaigns(data),
+      ...publicHealthEndpointProbeCampaignVerificationOptions(context, at)
+    });
+    return publicHealthEndpointProbeCampaignSummaryView(registry, audit);
+  } catch {
+    return publicHealthEndpointProbeCampaignSummaryView({
+      ok: false,
+      functionalState: "endpoint-probe-campaign-configuration-unavailable",
+      summary: {
+        campaignsSubmitted: Array.isArray(data.publicHealthExternalEndpointProbeCampaigns)
+          ? data.publicHealthExternalEndpointProbeCampaigns.length
+          : 0,
+        requiredConsecutiveCampaigns: 3,
+        maxCampaignGapSeconds: 900
+      },
+      continuousConnectivityReady: false,
+      blockers: [
+        "Server-managed campaign keyring, eight-lane probe credentials and current policy are required.",
+        "Trusted site evidence, production handoffs, P0/P1 closure and launch approval remain required."
+      ]
+    }, audit);
+  }
+}
+
+async function runControlledPublicHealthEndpointProbe(command, user, options = {}) {
   let laneId = String(command?.laneId || "").trim();
   let acquired = false;
   try {
@@ -23701,7 +23955,7 @@ async function runControlledPublicHealthEndpointProbe(command, user) {
     laneId = profile.laneId;
     const at = new Date().toISOString();
     const data = readDatabase();
-    const context = await publicHealthEndpointVerificationContext(data, laneId, at);
+    const context = options.context || await publicHealthEndpointVerificationContext(data, laneId, at);
     const maxConcurrent = publicHealthEndpointProbeMaxConcurrent();
     if (publicHealthEndpointProbeInFlight.has(laneId)
       || publicHealthEndpointProbeActiveCount >= maxConcurrent) {
@@ -23784,7 +24038,10 @@ async function runControlledPublicHealthEndpointProbe(command, user) {
       event: "public-health-active-endpoint-probe-succeeded",
       publicHealthEndpointProbeInsert: { receipt: storedReceipt }
     });
-    return buildPublicHealthEndpointVerificationSummary(nextData, new Date().toISOString());
+    return {
+      summary: await buildPublicHealthEndpointVerificationSummary(nextData, new Date().toISOString()),
+      receipt: storedReceipt
+    };
   } catch (error) {
     const code = publicHealthEndpointProbeSafeCode(error);
     const rejectedAt = new Date().toISOString();
@@ -23800,6 +24057,147 @@ async function runControlledPublicHealthEndpointProbe(command, user) {
       publicHealthEndpointProbeInFlight.delete(laneId);
       publicHealthEndpointProbeActiveCount = Math.max(0, publicHealthEndpointProbeActiveCount - 1);
     }
+  }
+}
+
+async function runControlledPublicHealthEndpointProbeCampaign(command, user) {
+  assertPublicHealthEndpointProbeCampaignCommand(command);
+  if (publicHealthEndpointProbeCampaignInFlight) {
+    const error = new Error("endpoint probe campaign is already running");
+    error.code = "ENDPOINT_PROBE_CAMPAIGN_CONCURRENCY_LIMIT";
+    const latest = readDatabase();
+    writeDatabase(appendPublicHealthEndpointProbeCampaignAudit(
+      latest,
+      publicHealthEndpointProbeCampaignAuditEntry(
+        user,
+        "rejected",
+        error.code,
+        new Date().toISOString()
+      )
+    ), { event: "public-health-endpoint-probe-campaign-rejected" });
+    error.campaignAuditPersisted = true;
+    throw error;
+  }
+  const startedAt = new Date().toISOString();
+  publicHealthEndpointProbeCampaignInFlight = true;
+  let campaignId = "";
+  try {
+    const initialData = readDatabase();
+    writeDatabase(appendPublicHealthEndpointProbeCampaignAudit(
+      initialData,
+      publicHealthEndpointProbeCampaignAuditEntry(
+        user,
+        "started",
+        "ENDPOINT_PROBE_CAMPAIGN_STARTED",
+        startedAt
+      )
+    ), { event: "public-health-endpoint-probe-campaign-started" });
+    const initialContext = await loadPublicHealthEndpointProbeCampaignContext(initialData, {
+      at: startedAt,
+      tlsLoader: publicHealthEndpointProbeRuntime.tlsLoader
+    });
+    const receipts = [];
+    for (const profile of EXTERNAL_ADAPTER_PROFILES) {
+      const result = await runControlledPublicHealthEndpointProbe(
+        { laneId: profile.laneId },
+        user,
+        { context: initialContext.laneContexts[profile.laneId] }
+      );
+      receipts.push(result.receipt);
+    }
+    const completedAt = new Date().toISOString();
+    const latest = readDatabase();
+    const finalContext = await loadPublicHealthEndpointProbeCampaignContext(latest, {
+      at: completedAt,
+      tlsLoader: publicHealthEndpointProbeRuntime.tlsLoader
+    });
+    const campaignOptions = {
+      ...publicHealthEndpointProbeCampaignVerificationOptions(finalContext, completedAt),
+      startedAt,
+      ttlSeconds: finalContext.ttlSeconds,
+      randomUUID: publicHealthEndpointProbeRuntime.randomUUID || randomUUID
+    };
+    const campaign = createPublicHealthExternalEndpointProbeCampaign(receipts, campaignOptions);
+    campaignId = String(campaign.attestation?.campaignId || "").trim();
+    const persistedCampaigns = Array.isArray(latest.publicHealthExternalEndpointProbeCampaigns)
+      ? latest.publicHealthExternalEndpointProbeCampaigns
+      : [];
+    const seenCampaignIds = new Set();
+    const seenCampaignNonces = new Set();
+    const seenReceiptIds = new Set();
+    const seenNonces = new Set();
+    persistedCampaigns.forEach((item) => {
+      const identity = publicHealthEndpointProbeCampaignIdentity(item);
+      seenCampaignIds.add(identity.campaignId);
+      seenCampaignNonces.add(identity.campaignNonce);
+      identity.receiptReferences.forEach((reference) => {
+        seenReceiptIds.add(String(reference.receiptId || "").trim());
+        seenNonces.add(String(reference.nonce || "").trim());
+      });
+    });
+    const verification = verifyPublicHealthExternalEndpointProbeCampaign(campaign, {
+      ...campaignOptions,
+      seenCampaignIds,
+      seenCampaignNonces,
+      seenReceiptIds,
+      seenNonces
+    });
+    if (!verification.ok) {
+      const error = new Error("endpoint probe campaign failed trusted persistence verification");
+      error.code = "ENDPOINT_PROBE_CAMPAIGN_VERIFICATION_FAILED";
+      throw error;
+    }
+    const storedCampaign = {
+      attestation: campaign.attestation,
+      receiptReferences: receipts.map((receipt) => ({
+        laneId: String(receipt.laneId || "").trim(),
+        receiptId: String(receipt.receiptId || "").trim(),
+        nonce: String(receipt.nonce || "").trim(),
+        receiptDigest: endpointProbeReceiptDigest(receipt)
+      })),
+      acceptedAt: completedAt,
+      productionReady: false
+    };
+    const nextData = appendPublicHealthEndpointProbeCampaignAudit({
+      ...latest,
+      publicHealthExternalEndpointProbeCampaigns: [
+        ...persistedCampaigns,
+        storedCampaign
+      ]
+    }, publicHealthEndpointProbeCampaignAuditEntry(
+      user,
+      "succeeded",
+      "ENDPOINT_PROBE_CAMPAIGN_SUCCEEDED",
+      completedAt,
+      campaignId
+    ));
+    writeDatabase(nextData, {
+      event: "public-health-endpoint-probe-campaign-succeeded",
+      publicHealthEndpointProbeCampaignInsert: { campaign: storedCampaign }
+    });
+    return buildPublicHealthEndpointProbeCampaignSummary(
+      nextData,
+      new Date().toISOString(),
+      finalContext
+    );
+  } catch (error) {
+    const code = publicHealthEndpointProbeCampaignSafeCode(error);
+    const latest = readDatabase();
+    writeDatabase(appendPublicHealthEndpointProbeCampaignAudit(
+      latest,
+      publicHealthEndpointProbeCampaignAuditEntry(
+        user,
+        "rejected",
+        code,
+        new Date().toISOString(),
+        campaignId
+      )
+    ), { event: "public-health-endpoint-probe-campaign-rejected" });
+    error.publicCode = code;
+    error.campaignAuditPersisted = true;
+    throw error;
+  } finally {
+    publicHealthEndpointProbeCampaignInFlight = false;
   }
 }
 
@@ -24347,6 +24745,82 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/public-health/external/endpoints/campaigns/summary") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    const at = new Date().toISOString();
+    const data = readDatabase();
+    const continuity = await buildPublicHealthEndpointProbeCampaignSummary(data, at);
+    const endpointVerification = await buildPublicHealthEndpointVerificationSummary(data, at);
+    sendJson(res, 200, {
+      ...continuity,
+      endpointConnectivityReady: endpointVerification.endpointConnectivityReady,
+      continuousConnectivityReady: continuity.continuousConnectivityReady,
+      productionReady: false
+    });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/public-health/external/endpoints/campaigns") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    try {
+      const input = await collectJson(req);
+      const query = Object.fromEntries(url.searchParams.entries());
+      const command = { ...input, ...query };
+      const continuity = await runControlledPublicHealthEndpointProbeCampaign(command, user);
+      const endpointVerification = await buildPublicHealthEndpointVerificationSummary(
+        readDatabase(),
+        new Date().toISOString()
+      );
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: "public-health-endpoint-probe-campaign",
+        target: "eight-lane-campaign",
+        result: "allowed",
+        detail: "server-controlled endpoint probe campaign completed"
+      });
+      sendJson(res, 201, {
+        ...continuity,
+        endpointConnectivityReady: endpointVerification.endpointConnectivityReady,
+        continuousConnectivityReady: continuity.continuousConnectivityReady,
+        productionReady: false
+      });
+    } catch (error) {
+      const code = error.publicCode || publicHealthEndpointProbeCampaignSafeCode(error);
+      if (!error.campaignAuditPersisted) {
+        const latest = readDatabase();
+        writeDatabase(appendPublicHealthEndpointProbeCampaignAudit(
+          latest,
+          publicHealthEndpointProbeCampaignAuditEntry(
+            user,
+            "rejected",
+            code,
+            new Date().toISOString()
+          )
+        ), { event: "public-health-endpoint-probe-campaign-rejected" });
+      }
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: "public-health-endpoint-probe-campaign",
+        target: "eight-lane-campaign",
+        result: "denied",
+        detail: code
+      });
+      sendJson(res, publicHealthEndpointProbeCampaignHttpStatus(code), {
+        ok: false,
+        code,
+        message: "Endpoint probe campaign failed closed; inspect restricted server diagnostics.",
+        endpointConnectivityReady: false,
+        continuousConnectivityReady: false,
+        productionReady: false
+      });
+    }
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/public-health/external/endpoints/probes") {
     const user = requireApiRole(req, res, ["commission"], url.pathname);
     if (!user) return;
@@ -24359,7 +24833,8 @@ async function handleApi(req, res) {
       if (input?.laneId && query.laneId && String(input.laneId).trim() !== String(query.laneId).trim()) {
         command.laneConflict = true;
       }
-      const summary = await runControlledPublicHealthEndpointProbe(command, user);
+      const result = await runControlledPublicHealthEndpointProbe(command, user);
+      const summary = result.summary;
       appendSecurityEvent({
         actor: user.name,
         role: user.role,
@@ -24711,10 +25186,18 @@ async function handleApi(req, res) {
     });
     const keySafety = buildPublicHealthKeySafetyBoard(data, loaded.credentials);
     const endpointVerification = await buildPublicHealthEndpointVerificationSummary(data, at);
+    const endpointProbeContinuitySummary = await buildPublicHealthEndpointProbeCampaignSummary(data, at);
+    const endpointProbeContinuity = {
+      ...endpointProbeContinuitySummary,
+      endpointConnectivityReady: endpointVerification.endpointConnectivityReady,
+      continuousConnectivityReady: endpointProbeContinuitySummary.continuousConnectivityReady,
+      productionReady: false
+    };
     sendJson(res, 200, publicHealthExternalPublicView({
       ...operations,
       contractGovernance: contractContext.governance,
       endpointVerification,
+      endpointProbeContinuity,
       keySafety,
       productionReady: false
     }));

@@ -1,3 +1,4 @@
+const crypto = require("node:crypto");
 const {
   EXTERNAL_ADAPTER_PROFILES
 } = require("./public-health-external-adapter-service");
@@ -15,6 +16,9 @@ const {
 const {
   normalizeProbePolicy
 } = require("./public-health-external-endpoint-probe-runner");
+const {
+  ENDPOINT_PROBE_CAMPAIGN_KEYRING_PURPOSE
+} = require("./public-health-external-endpoint-probe-campaign-service");
 
 const ROTATION_SEQUENCE = Object.freeze([
   "new-active",
@@ -219,6 +223,58 @@ function privateEndpointProbeContext(values, summary) {
   return Object.freeze(context);
 }
 
+function privateEndpointProbeCampaignContext(values, summary) {
+  const context = { summary };
+  Object.defineProperties(context, {
+    campaignKeyring: { value: values.campaignKeyring, enumerable: false },
+    laneContexts: { value: values.laneContexts, enumerable: false },
+    requiredConsecutiveCampaigns: { value: values.requiredConsecutiveCampaigns, enumerable: false },
+    maxCampaignGapSeconds: { value: values.maxCampaignGapSeconds, enumerable: false },
+    ttlSeconds: { value: values.ttlSeconds, enumerable: false }
+  });
+  return Object.freeze(context);
+}
+
+function boundedInteger(value, fallback, minimum, maximum, label) {
+  const normalized = Number(value ?? fallback);
+  if (!Number.isInteger(normalized) || normalized < minimum || normalized > maximum) {
+    throw new Error(`${label} must be an integer from ${minimum} to ${maximum}`);
+  }
+  return normalized;
+}
+
+function keySecretDigests(material) {
+  const secrets = typeof material === "string"
+    ? [clean(material)]
+    : (Array.isArray(material?.keys) ? material.keys : [])
+      .map((key) => clean(key?.secret));
+  return secrets
+    .filter(Boolean)
+    .map((secret) => crypto.createHash("sha256").update(secret).digest());
+}
+
+function assertIndependentCampaignKey(campaignKeyring, laneContexts, laneCredentials) {
+  const campaignDigests = keySecretDigests(campaignKeyring);
+  if (!campaignDigests.length) {
+    throw new Error("endpoint probe campaign keyring has no signing material");
+  }
+  const compared = [];
+  Object.values(laneContexts).forEach((context) => compared.push(context.keyring));
+  Object.values(laneCredentials).forEach((credentials) => {
+    compared.push(credentials.requestKeyring, credentials.receiptKeyring);
+  });
+  compared.forEach((material) => {
+    const comparedDigests = keySecretDigests(material);
+    campaignDigests.forEach((campaignDigest) => {
+      comparedDigests.forEach((digest) => {
+        if (campaignDigest.length === digest.length && crypto.timingSafeEqual(campaignDigest, digest)) {
+          throw new Error("endpoint probe campaign key must be independent from request, receipt and single-probe keys");
+        }
+      });
+    });
+  });
+}
+
 async function loadPublicHealthContractGovernance(data = {}, options = {}) {
   const env = options.env || process.env;
   const at = clean(options.at || new Date().toISOString());
@@ -347,6 +403,134 @@ async function loadPublicHealthEndpointProbeContext(laneId, data = {}, options =
     blockers: [
       ...(keyringSummary.productionReady ? [] : keyringSummary.blockers),
       "Active endpoint probing does not replace trusted site evidence, production handoff or launch approval."
+    ]
+  });
+}
+
+async function loadPublicHealthEndpointProbeCampaignContext(data = {}, options = {}) {
+  const env = options.env || process.env;
+  const at = clean(options.at || new Date().toISOString());
+  const production = options.production === undefined
+    ? clean(env.NODE_ENV).toLowerCase() === "production"
+    : Boolean(options.production);
+  const keyringLoader = options.loader === undefined ? managedKeyringLoader : options.loader;
+  const tlsLoader = options.tlsLoader === undefined ? managedEndpointProbeTlsLoader : options.tlsLoader;
+  const referenceName = "PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_CAMPAIGN_KEYRING_REF";
+  const reference = clean(env[referenceName]);
+  let campaignKeyring;
+  let source;
+  if (keyringLoader && reference) {
+    campaignKeyring = await keyringLoader({
+      laneId: "endpoint-probe-campaign",
+      purpose: ENDPOINT_PROBE_CAMPAIGN_KEYRING_PURPOSE,
+      reference,
+      at
+    });
+    source = "managed-key-service";
+  } else {
+    if (production) {
+      if (!reference) throw new Error(`${referenceName} is required in production`);
+      throw new Error("managed endpoint probe campaign key service is unavailable");
+    }
+    const secretName = "PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_CAMPAIGN_SECRET";
+    const secret = clean(env[secretName]);
+    if (secret.length < 32) {
+      throw new Error(`${secretName} must contain at least 32 characters for local compatibility`);
+    }
+    campaignKeyring = {
+      purpose: ENDPOINT_PROBE_CAMPAIGN_KEYRING_PURPOSE,
+      activeKeyId: "campaign-local-compatibility",
+      keys: [{
+        keyId: "campaign-local-compatibility",
+        secret,
+        status: "active",
+        notBefore: "1970-01-01T00:00:00.000Z",
+        expiresAt: "9999-12-31T23:59:59.999Z",
+        revokedAt: ""
+      }]
+    };
+    source = "legacy-static";
+  }
+  const signingKey = selectSigningKey(campaignKeyring, at);
+  if (clean(signingKey.purpose) !== ENDPOINT_PROBE_CAMPAIGN_KEYRING_PURPOSE) {
+    throw new Error("endpoint probe campaign keyring purpose is invalid");
+  }
+  const governance = options.contractGovernance
+    || (await loadPublicHealthContractGovernance(data, {
+      env,
+      at,
+      loader: keyringLoader,
+      production
+    })).governance;
+  const laneEntries = await Promise.all(EXTERNAL_ADAPTER_PROFILES.map(async (profile) => {
+    const context = await loadPublicHealthEndpointProbeContext(profile.laneId, data, {
+      env,
+      at,
+      production,
+      loader: keyringLoader,
+      tlsLoader,
+      contractGovernance: governance,
+      endpointProbePolicies: options.endpointProbePolicies
+    });
+    const credentials = await loadPublicHealthLaneCredentials(profile.laneId, {
+      env,
+      at,
+      loader: keyringLoader,
+      contractGovernance: governance,
+      resiliencePolicies: options.resiliencePolicies
+    });
+    return [profile.laneId, context, credentials];
+  }));
+  const laneContexts = Object.freeze(Object.fromEntries(
+    laneEntries.map(([laneId, context]) => [laneId, context])
+  ));
+  const laneCredentials = Object.freeze(Object.fromEntries(
+    laneEntries.map(([laneId, , credentials]) => [laneId, credentials])
+  ));
+  assertIndependentCampaignKey(campaignKeyring, laneContexts, laneCredentials);
+  const requiredConsecutiveCampaigns = boundedInteger(
+    options.requiredConsecutiveCampaigns
+      ?? env.PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_CAMPAIGN_REQUIRED,
+    3,
+    1,
+    12,
+    "PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_CAMPAIGN_REQUIRED"
+  );
+  const maxCampaignGapSeconds = boundedInteger(
+    options.maxCampaignGapSeconds
+      ?? env.PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_CAMPAIGN_MAX_GAP_SECONDS,
+    900,
+    60,
+    3600,
+    "PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_CAMPAIGN_MAX_GAP_SECONDS"
+  );
+  const ttlSeconds = boundedInteger(
+    options.ttlSeconds
+      ?? env.PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_CAMPAIGN_TTL_SECONDS,
+    3600,
+    60,
+    3600,
+    "PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_CAMPAIGN_TTL_SECONDS"
+  );
+  const keyringSummary = summarizeKeyring(campaignKeyring, at);
+  return privateEndpointProbeCampaignContext({
+    campaignKeyring,
+    laneContexts,
+    requiredConsecutiveCampaigns,
+    maxCampaignGapSeconds,
+    ttlSeconds
+  }, {
+    source,
+    referenceConfigured: Boolean(reference),
+    purposeValid: keyringSummary.purpose === ENDPOINT_PROBE_CAMPAIGN_KEYRING_PURPOSE,
+    lanes: Object.keys(laneContexts).length,
+    independentFromLaneKeys: true,
+    requiredConsecutiveCampaigns,
+    maxCampaignGapSeconds,
+    productionReady: false,
+    blockers: [
+      ...(keyringSummary.productionReady ? [] : keyringSummary.blockers),
+      "Continuous connectivity does not replace trusted site evidence, production handoff or launch approval."
     ]
   });
 }
@@ -496,6 +680,7 @@ module.exports = {
   configurePublicHealthKeyringLoader,
   evaluateRotationEvidence,
   loadPublicHealthContractGovernance,
+  loadPublicHealthEndpointProbeCampaignContext,
   loadPublicHealthEndpointProbeContext,
   loadPublicHealthEndpointProbePolicies,
   loadPublicHealthLaneCredentialMap,

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-26T17:22:00.000Z",
+  "updatedAt": "2026-07-27T03:26:00.000Z",
   "decisions": [
     {
       "lineId": "T01",
@@ -47,21 +47,22 @@
     },
     {
       "lineId": "T08",
-      "candidateHead": "d4bfdbaf2ab3ea2317a2a2778fabdd22221b2117",
+      "candidateHead": "4f9f22b92b47ad50d36dccf0ad01437451019179",
       "decision": "accepted",
       "acceptedCandidateHeads": [
         "771c727b8abe7c722248d40656d6b91dfb67f3cf",
         "09a88c7c6ce98789e559dcd8a18bd9b5a51a99a2",
-        "d4bfdbaf2ab3ea2317a2a2778fabdd22221b2117"
+        "d4bfdbaf2ab3ea2317a2a2778fabdd22221b2117",
+        "4f9f22b92b47ad50d36dccf0ad01437451019179"
       ],
-      "reviewedAt": "2026-07-26T17:22:00.000Z",
+      "reviewedAt": "2026-07-27T03:26:00.000Z",
       "reviewer": "T00",
       "checks": [
         "git diff --check",
-        "T00 independently merged exact candidate d4bfdbaf and passed all 18 active-runner, endpoint-verification and final-readiness candidate tests",
-        "focused public-health external adapter, resilience, contract, endpoint, storage, worker and API regression passed 76 of 76 tests",
-        "public API passed 37 of 37; static resources passed 71 of 71; final, release and deploy test suites passed 12 of 12",
-        "release report passed 407 of 408 checks with 0 failures and 1 warning; deploy check passed 368 of 368 checks",
+        "T00 independently merged exact candidate 4f9f22b9 and passed all 26 campaign, active-runner, endpoint-verification and final-readiness candidate tests",
+        "focused public-health external adapter, resilience, contract, campaign, endpoint, storage, worker and API regression passed 87 of 87 tests",
+        "public API passed 38 of 38; static resources passed 71 of 71; final-readiness passed 62 of 62 integration and safety checks",
+        "release report passed 408 of 409 checks with 0 failures and 1 warning; deploy check passed 371 of 371 checks",
         "managed active and grace key verification, callback replay rejection and audit-chain tamper rejection validated",
         "server-only policies cover eight lanes and cannot be overridden by enqueue, claim or attempt payloads",
         "contract governance keyring is independent and non-enumerable; client-reported approval status and contractBinding are ignored",
@@ -80,9 +81,15 @@
         "controlled probe execution enforces lane/global concurrency and minimum intervals, with safe started, succeeded and rejected audit rows",
         "all DNS answers must be public; HTTPS lookup and peer verification stay pinned while redirects, weak TLS, pin mismatch and mTLS mismatch fail closed",
         "active probe receipts self-verify and reuse durable receiptId and nonce uniqueness; response, audit and public state omit URL, IP, certificate, key material and raw network errors",
+        "T00 exactly received 4f9f22b9 and registered commission-only empty-command eight-lane campaign trigger and redacted continuity summary routes",
+        "campaign keyrings use purpose public-health-endpoint-probe-campaign and are rejected when signing material matches request, receipt or single-probe keys",
+        "campaign attestations bind eight fresh receipt digests, current policy and contract/endpoint snapshots, trust metadata and server time before self-verification",
+        "SQLite atomically persists the campaign attestation, eight receipt references and success audit while campaignId, campaign nonce, cross-campaign receiptId and receipt nonce replay fail closed",
+        "permissions, body/query injection, missing configuration, concurrency, replay, policy drift, overlap, interval, key-purpose, key-reuse and response/audit redaction paths are covered",
+        "continuousConnectivityReady remains separate from endpointConnectivityReady and productionReady; three fresh non-overlapping campaigns with at most 900 seconds gap are required",
         "legacy-static remains compatibility-only and all external runtime projections remain productionReady false",
         "endpointConnectivityReady remains separate from productionReady; trusted site evidence, P0/P1 closure, production handoff and launch approval remain blockers",
-        "T00 aggregate final readiness covers 57 controlled integration and production-boundary checks"
+        "T00 aggregate final readiness covers 62 controlled integration and production-boundary checks"
       ],
       "blockers": []
     },

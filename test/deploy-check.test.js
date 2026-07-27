@@ -22,6 +22,8 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "file:session-store.js",
     "file:public-health-external-endpoint-verification-service.js",
     "file:docs/public-health-external-endpoint-verification.md",
+    "file:public-health-external-endpoint-probe-campaign-service.js",
+    "file:docs/public-health-external-endpoint-probe-campaigns.md",
     "file:production-adapters.js",
     "file:docs/production-identity-message-adapters.md",
     "file:hospital-connectors.js",
@@ -112,6 +114,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "api:publicHealth",
     "api:publicHealthExternalEndpointVerification",
     "api:publicHealthExternalActiveEndpointProbe",
+    "api:publicHealthExternalEndpointProbeCampaign",
     "api:publicHealthEventActions",
     "api:publicHealthAdvancedActions",
     "api:chronicPublicHealthLoop",
@@ -237,6 +240,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
   assert.match(report.checks.find((item) => item.name === "api:publicHealthAdvancedActions").detail, /exchange exception, institution, onsite and cutover action APIs/);
   assert.match(report.checks.find((item) => item.name === "api:publicHealthExternalEndpointVerification").detail, /receiptId\/nonce replay protection/);
   assert.match(report.checks.find((item) => item.name === "api:publicHealthExternalActiveEndpointProbe").detail, /server-owned DNS\/TLS\/pin\/mTLS policy/);
+  assert.match(report.checks.find((item) => item.name === "api:publicHealthExternalEndpointProbeCampaign").detail, /atomic replay-safe persistence/);
   assert.match(report.checks.find((item) => item.name === "api:publicHealthCutoverReadiness").detail, /cutover readiness API and board/);
   assert.match(report.checks.find((item) => item.name === "api:publicHealthCutoverEvidencePackets").detail, /cutover evidence packet API and board/);
   assert.match(report.checks.find((item) => item.name === "api:publicHealthCutoverDrills").detail, /cutover drill API and board/);
