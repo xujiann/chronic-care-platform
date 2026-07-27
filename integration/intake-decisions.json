@@ -199,13 +199,21 @@
     },
     {
       "lineId": "T10",
-      "candidateHead": "b2df2231913c5a44a5cbf6e306e1cf5c4d11a68c",
+      "candidateHead": "dac43b4ecabb10ecbb8ecd580d6dad8715851f08",
       "decision": "accepted",
-      "reviewedAt": "2026-07-23T07:43:37.718Z",
+      "acceptedCandidateHeads": [
+        "b2df2231913c5a44a5cbf6e306e1cf5c4d11a68c",
+        "dac43b4ecabb10ecbb8ecd580d6dad8715851f08"
+      ],
+      "reviewedAt": "2026-07-27T16:27:11.513Z",
       "reviewer": "T00",
       "checks": [
         "git diff --check",
-        "50 emergency device, life-chain, imaging, blood, physical-examination and specialty-cutover tests passed independently",
+        "23 changed JavaScript files passed syntax validation in a clean detached worktree",
+        "50/50 T10 candidate emergency, blood, imaging, physical-examination and cutover tests passed",
+        "53/53 T00 public integration and API tests passed",
+        "the five later source commits are patch-equivalent and the earlier cutover-control commits are semantically superseded by the stricter T00 public implementation",
+        "the source worktree data/db.json snapshot remains excluded and unmodified",
         "device identities retain references only; signed signals enforce HMAC, clock and monotonic replay controls",
         "four specialty tracks share code, synthetic, joint-test, site-evidence, go/no-go and grey-release stages",
         "the read-only cutover pack keeps site blockers, four-eyes signoff and downgrade controls visible",
