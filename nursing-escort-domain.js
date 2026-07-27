@@ -437,14 +437,16 @@
     return normalizeDomain(domain) === "nursing" ? "dispatched" : "worker-dispatched";
   }
 
-  function dispatchPrerequisites(domain, order = {}) {
+  function dispatchPrerequisites(domain, order = {}, options = {}) {
     const normalizedDomain = normalizeDomain(domain);
     const missing = [];
     if (!order.identityVerified) missing.push("identity-verification");
     if (normalizedDomain === "nursing") {
       if (order.firstVisitAssessment !== "passed") missing.push("first-visit-assessment");
       if (order.informedConsent !== "signed" || order.consentAttachment?.status !== "signed") missing.push("signed-consent");
-      const assessment = validateNursingAssessmentEvidence(order);
+      const assessment = validateNursingAssessmentEvidence(order, {
+        at: options.now || options.at
+      });
       if (!assessment.ok) {
         missing.push("clinical-assessment");
         if (assessment.reasons.some((item) => item.startsWith("consent-"))) missing.push("consent-storage-receipt");
@@ -810,7 +812,7 @@
       ? validateNurseQualification(person, order, options)
       : validateEscortWorkerQualification(person, order, options);
     const risk = assessOrderRisk(normalizedDomain, order);
-    const prerequisites = dispatchPrerequisites(normalizedDomain, order);
+    const prerequisites = dispatchPrerequisites(normalizedDomain, order, options);
     const checkedAt = new Date(options.now || Date.now()).toISOString();
     const capacity = capacityAvailability(normalizedDomain, order, person, checkedAt);
     const blockers = [];
