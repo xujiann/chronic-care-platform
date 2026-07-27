@@ -15,6 +15,9 @@ test("T07 unified acceptance covers all six workflows without claiming productio
   assert.equal(report.summary.externalBlockers, 20);
   assert.equal(report.externalBlockers.filter((item) => item.source === "disease-payment").length, 14);
   assert.equal(report.summary.externalEvidenceGoverned, true);
+  assert.equal(report.productionGate.passed, false);
+  assert.deepEqual(report.productionGate.blockers, ["t00-public-wiring-complete", "live-site-acceptance-confirmed"]);
+  assert.equal(report.productionGate.checks.find((item) => item.id === "local-domain-ready").passed, true);
   assert.ok(report.externalBlockers.every((item) => item.owner && ["acceptance-reviewer", "security-reviewer", "finance-auditor"].includes(item.reviewerRole)));
   assert.ok(report.externalBlockers.some((item) => item.id === "official-grouper:trusted-callback" && item.reviewerRole === "security-reviewer"));
   assert.ok(report.externalBlockers.some((item) => item.id === "insurance-core:statement-reconciliation" && item.reviewerRole === "finance-auditor"));
@@ -41,6 +44,7 @@ test("T07 unified acceptance fails closed for an unmapped financial evidence req
   assert.equal(report.localReady, false);
   assert.equal(shouldFailAcceptance(report), true);
   assert.equal(report.summary.externalEvidenceGoverned, false);
+  assert.ok(report.productionGate.blockers.includes("external-evidence-governed"));
   assert.ok(report.externalBlockers.some((item) => item.id === "financial-unmapped-7" && item.owner === "" && item.reviewerRole === ""));
 });
 
@@ -53,5 +57,6 @@ test("T07 unified acceptance fails when one workflow evidence is missing", () =>
     serverSource: ""
   });
   assert.equal(report.localReady, false);
+  assert.ok(report.productionGate.blockers.includes("local-domain-ready"));
   assert.equal(report.workflows.find((item) => item.id === "special-case").ready, false);
 });

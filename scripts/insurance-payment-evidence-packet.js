@@ -39,6 +39,23 @@ function packetPayload(packet = {}) {
   return payload;
 }
 
+function buildEvidenceProductionGate(packet = {}) {
+  const handoff = packet.productionHandoff || {};
+  const checks = [
+    { id: "local-domain-ready", passed: packet.localReady === true, detail: `${packet.workflows?.filter((item) => item.ready).length || 0}/${packet.workflows?.length || 0} workflows ready` },
+    { id: "evidence-artifact-manifest-valid", passed: verifyArtifactManifest(packet.artifacts), detail: `${packet.artifacts?.length || 0}/${EVIDENCE_FILES.length} artifacts verified` },
+    { id: "t00-public-wiring-complete", passed: (packet.t00PendingRoutes?.length || 0) === 0, detail: `${packet.t00PendingRoutes?.length || 0} routes pending` },
+    { id: "handoff-ledger-valid", passed: handoff.ledgerValid === true, detail: handoff.ledgerValid === true ? "handoff ledger valid" : "handoff ledger invalid" },
+    { id: "handoff-evidence-complete", passed: handoff.evidenceComplete === true, detail: `${handoff.summary?.verified || 0}/${handoff.summary?.required || 0} requirements verified` },
+    { id: "live-site-acceptance-confirmed", passed: handoff.productionReady === true, detail: handoff.productionReady === true ? "live acceptance confirmed" : "live access and signed site acceptance pending" }
+  ];
+  return {
+    passed: checks.every((item) => item.passed),
+    blockers: checks.filter((item) => !item.passed).map((item) => item.id),
+    checks
+  };
+}
+
 function buildInsurancePaymentEvidencePacket(options = {}) {
   const acceptance = options.acceptance || buildInsurancePaymentAcceptance();
   const generatedAt = options.generatedAt || new Date().toISOString();
@@ -47,6 +64,7 @@ function buildInsurancePaymentEvidencePacket(options = {}) {
     const source = fs.readFileSync(path.join(ROOT, relativePath));
     return { path: relativePath, sha256: sha256(source), bytes: source.length };
   });
+  const t00PendingRoutes = acceptance.integrationHandoff.routes.filter((item) => !item.wired).map((item) => ({ id: item.id, method: item.method, path: item.path, handler: item.handler || item.handlers }));
   const packet = {
     schema: "insurance-payment-acceptance-evidence-v1",
     generatedAt,
@@ -54,12 +72,12 @@ function buildInsurancePaymentEvidencePacket(options = {}) {
     integrationOwner: "T00",
     status: acceptance.status,
     localReady: acceptance.localReady,
-    productionReady: false,
+    productionReady: acceptance.productionReady === true && productionHandoff.productionReady === true && t00PendingRoutes.length === 0,
     summary: acceptance.summary,
     workflows: acceptance.workflows.map((item) => ({ id: item.id, label: item.label, ready: item.ready, evidence: item.evidence })),
     responsibilityChecks: acceptance.operatingModel.checks,
     productionHandoff,
-    t00PendingRoutes: acceptance.integrationHandoff.routes.filter((item) => !item.wired).map((item) => ({ id: item.id, method: item.method, path: item.path, handler: item.handler || item.handlers })),
+    t00PendingRoutes,
     externalBlockers: acceptance.externalBlockers,
     artifacts,
     validationCommands: [
@@ -68,6 +86,7 @@ function buildInsurancePaymentEvidencePacket(options = {}) {
     ],
     boundary: "The packet proves local domain behavior and handoff completeness only. Production readiness requires real provider credentials, callbacks, statements, security assessment and signed site acceptance."
   };
+  packet.productionGate = buildEvidenceProductionGate(packet);
   return { ...packet, packetDigest: `sha256:${sha256(stableStringify(packet))}` };
 }
 
@@ -130,7 +149,7 @@ function parseArgs(argv = process.argv.slice(2)) {
 function shouldFailEvidencePacket(packet = {}, args = {}) {
   return packet.localReady !== true
     || !verifyInsurancePaymentEvidencePacket(packet)
-    || (args["require-production"] === true && (packet.productionReady !== true || packet.productionHandoff?.productionReady !== true));
+    || (args["require-production"] === true && packet.productionGate?.passed !== true);
 }
 
 if (require.main === module) {
@@ -142,4 +161,4 @@ if (require.main === module) {
   if (shouldFailEvidencePacket(packet, args)) process.exitCode = 1;
 }
 
-module.exports = { EVIDENCE_FILES, buildInsurancePaymentEvidencePacket, packetPayload, parseArgs, renderMarkdown, sha256, shouldFailEvidencePacket, stableStringify, verifyArtifactManifest, verifyInsurancePaymentEvidencePacket };
+module.exports = { EVIDENCE_FILES, buildEvidenceProductionGate, buildInsurancePaymentEvidencePacket, packetPayload, parseArgs, renderMarkdown, sha256, shouldFailEvidencePacket, stableStringify, verifyArtifactManifest, verifyInsurancePaymentEvidencePacket };
