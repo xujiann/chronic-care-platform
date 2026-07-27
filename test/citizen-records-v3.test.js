@@ -190,3 +190,35 @@ test("八项增强工作台一次生成全部居民可验收视图", () => {
     ["integration", "governance", "family", "carePlan", "explanations", "medicationSafety", "emergencyPack", "operations"]
   );
 });
+
+test("八项安全操作只导航或预填且未知操作默认拒绝", () => {
+  const expectedActions = [
+    "review-integration-boundary",
+    "review-provenance",
+    "correct-conflict",
+    "manage-family-authorization",
+    "manage-care-plan",
+    "schedule-report-revisit",
+    "review-medications",
+    "prepare-emergency-authorization",
+    "review-operations"
+  ];
+  for (const action of expectedActions) {
+    const intent = api.buildSafeActionIntent(action);
+    assert.equal(intent.action, action);
+    assert.equal(intent.writes, false);
+    assert.ok(intent.targetSelector || intent.page || intent.authorizationDraft);
+  }
+  assert.throws(() => api.buildSafeActionIntent("download-all-records"), /不支持/);
+});
+
+test("紧急和家庭授权草稿保持最小范围且不预先确认居民同意", () => {
+  const emergency = api.buildSafeActionIntent("prepare-emergency-authorization");
+  assert.deepEqual(emergency.authorizationDraft.scopes, ["health-record-summary"]);
+  assert.equal(emergency.authorizationDraft.granteeType, "institution");
+  assert.equal(Object.hasOwn(emergency.authorizationDraft, "consentConfirmed"), false);
+
+  const family = api.buildSafeActionIntent("manage-family-authorization");
+  assert.deepEqual(family.authorizationDraft.scopes, ["health-record-summary"]);
+  assert.equal(family.authorizationDraft.granteeType, "guardian");
+});

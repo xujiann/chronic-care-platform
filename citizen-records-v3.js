@@ -27,6 +27,27 @@
     { pattern: /阴性/, explanation: "本次检查未发现该项目所指的异常证据" },
     { pattern: /阳性/, explanation: "本次检查发现相关证据，需要由医生结合临床情况判断" }
   ]);
+  const SAFE_ACTION_INTENTS = Object.freeze({
+    "review-integration-boundary": Object.freeze({ targetSelector: ".resident-records-boundary", announcement: "已定位生产接入边界和现场依赖。", writes: false }),
+    "review-provenance": Object.freeze({ targetSelector: "#citizen-provenance-cards", announcement: "已定位跨院档案来源明细。", writes: false }),
+    "correct-conflict": Object.freeze({ targetSelector: "#citizen-correction-form", announcement: "已定位纠错申请。提交后只生成复核申请，不覆盖原始记录。", writes: false }),
+    "manage-family-authorization": Object.freeze({
+      dialogId: "auth-dialog",
+      announcement: "已准备家庭代办授权，请核对对象、范围和有效期。",
+      writes: false,
+      authorizationDraft: Object.freeze({ granteeType: "guardian", purpose: "家庭成员协助健康管理", scopes: Object.freeze(["health-record-summary"]) })
+    }),
+    "manage-care-plan": Object.freeze({ page: "registration", announcement: "正在前往挂号服务处理复诊或随访安排。", writes: false }),
+    "schedule-report-revisit": Object.freeze({ page: "registration", announcement: "正在前往挂号服务预约报告复诊。", writes: false }),
+    "review-medications": Object.freeze({ targetSelector: "#citizen-medication-review", announcement: "已定位用药核对，请由医生或药师复核风险提示。", writes: false }),
+    "prepare-emergency-authorization": Object.freeze({
+      dialogId: "auth-dialog",
+      announcement: "已准备紧急救治授权，仅预选最小健康摘要，请核对后再决定是否保存。",
+      writes: false,
+      authorizationDraft: Object.freeze({ granteeType: "institution", purpose: "紧急救治最小健康摘要", scopes: Object.freeze(["health-record-summary"]) })
+    }),
+    "review-operations": Object.freeze({ targetSelector: "#citizen-access-review-v2-summary", announcement: "已定位授权与访问复核记录。", writes: false })
+  });
 
   function cleanText(value, maximum = 500) {
     return String(value ?? "").trim().slice(0, maximum);
@@ -454,8 +475,30 @@
     };
   }
 
+  function buildSafeActionIntent(action) {
+    const normalizedAction = cleanText(action, 80);
+    const definition = SAFE_ACTION_INTENTS[normalizedAction];
+    if (!definition) throw new Error("不支持的居民健康档案操作");
+    return {
+      action: normalizedAction,
+      targetSelector: definition.targetSelector || "",
+      dialogId: definition.dialogId || "",
+      page: definition.page || "",
+      announcement: definition.announcement,
+      writes: false,
+      authorizationDraft: definition.authorizationDraft
+        ? {
+          granteeType: definition.authorizationDraft.granteeType,
+          purpose: definition.authorizationDraft.purpose,
+          scopes: [...definition.authorizationDraft.scopes]
+        }
+        : null
+    };
+  }
+
   return {
     REQUIRED_INTEGRATIONS,
+    SAFE_ACTION_INTENTS,
     buildProductionIntegrationStatus,
     governCrossInstitutionRecords,
     buildFamilyDelegationCenter,
@@ -464,6 +507,7 @@
     assessMedicationSafety,
     buildEmergencyHealthPack,
     buildOperationsSnapshot,
-    buildNextStageWorkspace
+    buildNextStageWorkspace,
+    buildSafeActionIntent
   };
 });

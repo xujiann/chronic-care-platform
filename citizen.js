@@ -2969,6 +2969,7 @@ function renderCitizenRecordsNextStage(resident, diseases = [], records = [], ca
     <div><strong>${workspace.integration.readyCount}/${workspace.integration.items.length} 类已核验</strong><span>${escapeHtml(workspace.integration.summary)}</span></div>
     <p>${workspace.integration.items.map((item) => `${escapeHtml(item.label)}：${escapeHtml(item.status)}`).join("；")}</p>
     <small>${escapeHtml(workspace.integration.boundary)}</small>
+    <footer><button type="button" class="small-button" data-v3-action="review-integration-boundary">查看接入边界</button></footer>
   </div>`;
 
   const governanceTarget = document.querySelector("#citizen-governance-v3");
@@ -2976,26 +2977,27 @@ function renderCitizenRecordsNextStage(resident, diseases = [], records = [], ca
     <div><strong>${workspace.governance.sourceCount} 个可信来源</strong><span>${workspace.governance.duplicates.length} 组重复</span><em>${workspace.governance.conflicts.length} 组冲突</em></div>
     <p>${workspace.governance.conflicts.slice(0, 3).map((item) => `${escapeHtml(item.label)}：${escapeHtml(item.action)}`).join("；") || "当前没有需要居民处理的跨院冲突。"}</p>
     <small>${escapeHtml(workspace.governance.boundary)}</small>
+    <footer><button type="button" class="small-button" data-v3-action="${workspace.governance.conflicts.length ? "correct-conflict" : "review-provenance"}">${workspace.governance.conflicts.length ? "发起纠错复核" : "查看来源明细"}</button></footer>
   </div>`;
 
   const familyTarget = document.querySelector("#citizen-family-v3");
   if (familyTarget) familyTarget.innerHTML = workspace.family.items.slice(0, 6).map((item) => `<div class="citizen-care-row ${item.canAct ? "" : "denied"}">
     <div><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(item.relation)}</span><em>${item.canAct ? "可按范围访问" : "暂不可代办"}</em></div>
     <p>${escapeHtml(item.action)}${item.scopes.length ? ` · ${item.scopes.map(escapeHtml).join("、")}` : ""}</p>
-  </div>`).join("") + `<small>${escapeHtml(workspace.family.boundary)}</small>`;
+  </div>`).join("") + `<small>${escapeHtml(workspace.family.boundary)}</small><footer><button type="button" class="small-button" data-v3-action="manage-family-authorization">管理家庭授权</button></footer>`;
 
   const carePlanTarget = document.querySelector("#citizen-care-plan-v3");
   if (carePlanTarget) carePlanTarget.innerHTML = workspace.carePlan.tasks.slice(0, 6).map((item) => `<div class="citizen-care-row ${["逾期", "紧急"].includes(item.priority) ? "warning" : ""}">
     <div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.type)}</span><em>${escapeHtml(item.priority)}</em></div>
     <p>${escapeHtml(item.action)}${item.dueAt ? ` · ${escapeHtml(item.dueAt)}` : ""}</p>
-  </div>`).join("") + `<small>${escapeHtml(workspace.carePlan.boundary)}</small>` || citizenCareEmpty("当前没有需要处理的主动健康任务。");
+  </div>`).join("") + `<small>${escapeHtml(workspace.carePlan.boundary)}</small><footer><button type="button" class="small-button" data-v3-action="manage-care-plan">安排复诊或随访</button></footer>` || citizenCareEmpty("当前没有需要处理的主动健康任务。");
 
   const explanationTarget = document.querySelector("#citizen-report-explain-v3");
   if (explanationTarget) explanationTarget.innerHTML = workspace.explanations.reports.slice(0, 4).map((item) => `<div class="citizen-care-row ${["critical", "abnormal"].includes(item.severity) ? "warning" : ""}">
     <div><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(item.level)}</span></div>
     <p>${escapeHtml(item.plainSummary)}</p>
     <small>${escapeHtml(item.explanations.join("；") || "暂无需要解释的医学术语")} · ${escapeHtml(item.nextStep)}</small>
-  </div>`).join("") + `<small>${escapeHtml(workspace.explanations.boundary)}</small>` || citizenCareEmpty("暂无可解读的检查或影像报告。");
+  </div>`).join("") + `<small>${escapeHtml(workspace.explanations.boundary)}</small><footer><button type="button" class="small-button" data-v3-action="schedule-report-revisit">预约报告复诊</button></footer>` || citizenCareEmpty("暂无可解读的检查或影像报告。");
 
   const medicationTarget = document.querySelector("#citizen-medication-safety-v3");
   if (medicationTarget) {
@@ -3008,6 +3010,7 @@ function renderCitizenRecordsNextStage(resident, diseases = [], records = [], ca
       <div><strong>${workspace.medicationSafety.medications.length} 种用药</strong><span>${workspace.medicationSafety.warningCount} 项需复核</span></div>
       <p>${warnings.map(escapeHtml).join("；") || "当前未识别到重复、过敏文字匹配或已配置的严重相互作用。"}</p>
       <small>${escapeHtml(workspace.medicationSafety.boundary)}</small>
+      <footer><button type="button" class="small-button" data-v3-action="review-medications">查看用药核对</button></footer>
     </div>`;
   }
 
@@ -3016,6 +3019,7 @@ function renderCitizenRecordsNextStage(resident, diseases = [], records = [], ca
     <div><strong>${escapeHtml(workspace.emergencyPack.status)}</strong><span>过敏 ${workspace.emergencyPack.allergies.length} 项</span><em>用药 ${workspace.emergencyPack.medications.length} 项</em></div>
     <p>慢病：${workspace.emergencyPack.diseases.map(escapeHtml).join("、") || "待补齐"}；联系人：${workspace.emergencyPack.contacts.map((item) => `${escapeHtml(item.relation)} ${escapeHtml(item.name)} ${escapeHtml(item.phone)}`).join("、") || "待补齐"}</p>
     <small>${escapeHtml(workspace.emergencyPack.boundary)}</small>
+    <footer><button type="button" class="small-button" data-v3-action="prepare-emergency-authorization">准备紧急授权</button></footer>
   </div>`;
 
   const operationsTarget = document.querySelector("#citizen-operations-v3");
@@ -3023,7 +3027,53 @@ function renderCitizenRecordsNextStage(resident, diseases = [], records = [], ca
     <div>${workspace.operations.metrics.map((item) => `<span><strong>${escapeHtml(item.label)}</strong> ${escapeHtml(item.value)} · ${escapeHtml(item.status)}</span>`).join("")}</div>
     <p>${workspace.operations.latestEventAt ? `最近居民范围事件：${escapeHtml(workspace.operations.latestEventAt.slice(0, 19).replace("T", " "))}` : "暂无可展示的居民范围运营事件。"}</p>
     <small>${escapeHtml(workspace.operations.boundary)}</small>
+    <footer><button type="button" class="small-button" data-v3-action="review-operations">复核访问记录</button></footer>
   </div>`;
+}
+
+function focusCitizenRecordsV3Target(selector) {
+  const target = document.querySelector(selector);
+  if (!target) throw new Error("未找到对应的居民服务入口");
+  document.querySelectorAll(".v3-action-target").forEach((item) => item.classList.remove("v3-action-target"));
+  target.classList.add("v3-action-target");
+  target.scrollIntoView({ behavior: "smooth", block: "center" });
+  const control = target.matches("input, select, textarea, button")
+    ? target
+    : target.querySelector("input:not([type='hidden']), select, textarea, button");
+  control?.focus({ preventScroll: true });
+  window.setTimeout(() => target.classList.remove("v3-action-target"), 2400);
+}
+
+function openCitizenRecordsV3Authorization(intent) {
+  const form = document.querySelector("#auth-form");
+  const dialog = document.querySelector(`#${intent.dialogId}`);
+  if (!form || !dialog || !intent.authorizationDraft) throw new Error("授权服务暂不可用");
+  form.reset();
+  document.querySelector("#auth-dialog-title").textContent = intent.action === "prepare-emergency-authorization" ? "紧急救治授权" : "家庭代办授权";
+  form.elements.previousAuthorizationId.value = "";
+  form.elements.granteeName.value = "";
+  form.elements.granteeId.value = "";
+  form.elements.granteeType.value = intent.authorizationDraft.granteeType;
+  form.elements.purpose.value = intent.authorizationDraft.purpose;
+  form.elements.expiresAt.min = todayOffset(1);
+  form.elements.expiresAt.value = "";
+  form.elements.source.value = "居民主动授权";
+  form.querySelectorAll("input[name='scopes']").forEach((input) => {
+    input.checked = intent.authorizationDraft.scopes.includes(input.value);
+  });
+  form.elements.consentConfirmed.checked = false;
+  renderAuthorizationScopePreview(form);
+  dialog.showModal();
+  form.elements.granteeName.focus();
+}
+
+function handleCitizenRecordsV3Action(action) {
+  const intent = window.CitizenRecordsV3?.buildSafeActionIntent(action);
+  if (!intent || intent.writes) throw new Error("该居民操作未通过安全校验");
+  if (intent.authorizationDraft) openCitizenRecordsV3Authorization(intent);
+  else if (intent.targetSelector) focusCitizenRecordsV3Target(intent.targetSelector);
+  else if (intent.page) window.location.href = citizenPageHref(intent.page);
+  showToast(intent.announcement);
 }
 
 function citizenCareRequestNonce() {
@@ -3264,11 +3314,20 @@ function bindCitizenCareWorkspace() {
   });
 
   section.addEventListener("click", async (event) => {
+    const nextStageActionButton = event.target.closest("[data-v3-action]");
     const revokeButton = event.target.closest("[data-revoke-share-package]");
     const taskButton = event.target.closest("[data-care-task-complete]");
     const acknowledgeButton = event.target.closest("[data-acknowledge-access]");
     const fillDisputeButton = event.target.closest("[data-fill-access-dispute]");
     const renewAuthorizationButton = event.target.closest("[data-renew-authorization]");
+    if (nextStageActionButton) {
+      try {
+        handleCitizenRecordsV3Action(nextStageActionButton.dataset.v3Action);
+      } catch (error) {
+        showToast(error.message || "居民服务入口暂不可用");
+      }
+      return;
+    }
     if (renewAuthorizationButton) {
       openAuthorizationRenewal(renewAuthorizationButton.dataset.renewAuthorization);
       return;

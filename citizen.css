@@ -4130,6 +4130,19 @@ dialog::backdrop {
   color: var(--ink);
 }
 
+.citizen-next-stage-card .citizen-care-list > footer,
+.citizen-next-stage-card .citizen-care-row > footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.v3-action-target {
+  outline: 3px solid rgba(13, 123, 104, .28);
+  outline-offset: 4px;
+  border-radius: 10px;
+}
+
 .citizen-care-card > header {
   display: flex;
   align-items: flex-start;
