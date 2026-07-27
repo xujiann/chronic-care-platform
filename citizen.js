@@ -2925,9 +2925,105 @@ function renderCitizenCareWorkspace(resident, diseases = []) {
     const tomorrow = new Date(Date.now() + 24 * 3600000);
     shareExpiry.value = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}T${String(tomorrow.getHours()).padStart(2, "0")}:${String(tomorrow.getMinutes()).padStart(2, "0")}`;
   }
+  renderCitizenRecordsNextStage(resident, diseases, records, careState);
   renderCitizenCareSyncStatus(resident.id);
   applyCitizenRecordAccessibility();
   scheduleCitizenCareWorkspaceSync(resident.id);
+}
+
+function renderCitizenRecordsNextStage(resident, diseases = [], records = [], careState = {}) {
+  const api = window.CitizenRecordsV3;
+  if (!api || !resident) return;
+  const account = getCurrentAccount() || {};
+  const members = (account.members || []).map((member) => ({
+    ...member,
+    name: state.residents?.find((item) => item.id === member.residentId)?.name || member.name || member.relation
+  }));
+  const authorizations = records.filter((record) => record.category === "authorizations");
+  const emergencyConsent = authorizations.find((record) => (
+    /急救|紧急/i.test(`${record.name || ""}${record.meta?.purpose || ""}`)
+    && record.meta?.scopes?.includes("health-record-summary")
+  ));
+  const workspace = api.buildNextStageWorkspace({
+    resident: {
+      ...resident,
+      age: ageOf(resident.birthDate)
+    },
+    records,
+    diseases,
+    members,
+    authorizations,
+    followups: (state.followups || []).filter((item) => item.residentId === resident.id),
+    pickups: (state.medicationPickups || []).filter((item) => item.residentId === resident.id),
+    contacts: (state.emergencyContacts || resident.emergencyContacts || []).filter((item) => !item.residentId || item.residentId === resident.id),
+    emergencyConsent,
+    integrations: globalThis.__CITIZEN_PRODUCTION_EVIDENCE__ || {},
+    accessLogs: citizenAccessReviewQueue(resident.id),
+    corrections: careState.recordCorrections || [],
+    complaints: (state.citizenComplaints || state.serviceComplaints || []).filter((item) => !item.residentId || item.residentId === resident.id),
+    now: new Date()
+  });
+
+  const integrationTarget = document.querySelector("#citizen-integration-v3");
+  if (integrationTarget) integrationTarget.innerHTML = `<div class="citizen-care-row ${workspace.integration.productionReady ? "" : "warning"}">
+    <div><strong>${workspace.integration.readyCount}/${workspace.integration.items.length} 类已核验</strong><span>${escapeHtml(workspace.integration.summary)}</span></div>
+    <p>${workspace.integration.items.map((item) => `${escapeHtml(item.label)}：${escapeHtml(item.status)}`).join("；")}</p>
+    <small>${escapeHtml(workspace.integration.boundary)}</small>
+  </div>`;
+
+  const governanceTarget = document.querySelector("#citizen-governance-v3");
+  if (governanceTarget) governanceTarget.innerHTML = `<div class="citizen-care-row ${workspace.governance.conflicts.length ? "warning" : ""}">
+    <div><strong>${workspace.governance.sourceCount} 个可信来源</strong><span>${workspace.governance.duplicates.length} 组重复</span><em>${workspace.governance.conflicts.length} 组冲突</em></div>
+    <p>${workspace.governance.conflicts.slice(0, 3).map((item) => `${escapeHtml(item.label)}：${escapeHtml(item.action)}`).join("；") || "当前没有需要居民处理的跨院冲突。"}</p>
+    <small>${escapeHtml(workspace.governance.boundary)}</small>
+  </div>`;
+
+  const familyTarget = document.querySelector("#citizen-family-v3");
+  if (familyTarget) familyTarget.innerHTML = workspace.family.items.slice(0, 6).map((item) => `<div class="citizen-care-row ${item.canAct ? "" : "denied"}">
+    <div><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(item.relation)}</span><em>${item.canAct ? "可按范围访问" : "暂不可代办"}</em></div>
+    <p>${escapeHtml(item.action)}${item.scopes.length ? ` · ${item.scopes.map(escapeHtml).join("、")}` : ""}</p>
+  </div>`).join("") + `<small>${escapeHtml(workspace.family.boundary)}</small>`;
+
+  const carePlanTarget = document.querySelector("#citizen-care-plan-v3");
+  if (carePlanTarget) carePlanTarget.innerHTML = workspace.carePlan.tasks.slice(0, 6).map((item) => `<div class="citizen-care-row ${["逾期", "紧急"].includes(item.priority) ? "warning" : ""}">
+    <div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.type)}</span><em>${escapeHtml(item.priority)}</em></div>
+    <p>${escapeHtml(item.action)}${item.dueAt ? ` · ${escapeHtml(item.dueAt)}` : ""}</p>
+  </div>`).join("") + `<small>${escapeHtml(workspace.carePlan.boundary)}</small>` || citizenCareEmpty("当前没有需要处理的主动健康任务。");
+
+  const explanationTarget = document.querySelector("#citizen-report-explain-v3");
+  if (explanationTarget) explanationTarget.innerHTML = workspace.explanations.reports.slice(0, 4).map((item) => `<div class="citizen-care-row ${["critical", "abnormal"].includes(item.severity) ? "warning" : ""}">
+    <div><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(item.level)}</span></div>
+    <p>${escapeHtml(item.plainSummary)}</p>
+    <small>${escapeHtml(item.explanations.join("；") || "暂无需要解释的医学术语")} · ${escapeHtml(item.nextStep)}</small>
+  </div>`).join("") + `<small>${escapeHtml(workspace.explanations.boundary)}</small>` || citizenCareEmpty("暂无可解读的检查或影像报告。");
+
+  const medicationTarget = document.querySelector("#citizen-medication-safety-v3");
+  if (medicationTarget) {
+    const warnings = [
+      ...workspace.medicationSafety.duplicateGroups.map((item) => `${item.label}存在 ${item.count} 条来源记录`),
+      ...workspace.medicationSafety.allergyWarnings.map((item) => `${item.medication}与过敏信息存在文字匹配`),
+      ...workspace.medicationSafety.interactionWarnings.map((item) => item.warning)
+    ];
+    medicationTarget.innerHTML = `<div class="citizen-care-row ${warnings.length ? "warning" : ""}">
+      <div><strong>${workspace.medicationSafety.medications.length} 种用药</strong><span>${workspace.medicationSafety.warningCount} 项需复核</span></div>
+      <p>${warnings.map(escapeHtml).join("；") || "当前未识别到重复、过敏文字匹配或已配置的严重相互作用。"}</p>
+      <small>${escapeHtml(workspace.medicationSafety.boundary)}</small>
+    </div>`;
+  }
+
+  const emergencyTarget = document.querySelector("#citizen-emergency-pack-v3");
+  if (emergencyTarget) emergencyTarget.innerHTML = `<div class="citizen-care-row ${workspace.emergencyPack.ready ? "" : "warning"}">
+    <div><strong>${escapeHtml(workspace.emergencyPack.status)}</strong><span>过敏 ${workspace.emergencyPack.allergies.length} 项</span><em>用药 ${workspace.emergencyPack.medications.length} 项</em></div>
+    <p>慢病：${workspace.emergencyPack.diseases.map(escapeHtml).join("、") || "待补齐"}；联系人：${workspace.emergencyPack.contacts.map((item) => `${escapeHtml(item.relation)} ${escapeHtml(item.name)} ${escapeHtml(item.phone)}`).join("、") || "待补齐"}</p>
+    <small>${escapeHtml(workspace.emergencyPack.boundary)}</small>
+  </div>`;
+
+  const operationsTarget = document.querySelector("#citizen-operations-v3");
+  if (operationsTarget) operationsTarget.innerHTML = `<div class="citizen-care-row ${workspace.operations.productionReady ? "" : "warning"}">
+    <div>${workspace.operations.metrics.map((item) => `<span><strong>${escapeHtml(item.label)}</strong> ${escapeHtml(item.value)} · ${escapeHtml(item.status)}</span>`).join("")}</div>
+    <p>${workspace.operations.latestEventAt ? `最近居民范围事件：${escapeHtml(workspace.operations.latestEventAt.slice(0, 19).replace("T", " "))}` : "暂无可展示的居民范围运营事件。"}</p>
+    <small>${escapeHtml(workspace.operations.boundary)}</small>
+  </div>`;
 }
 
 function citizenCareRequestNonce() {
