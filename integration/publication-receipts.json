@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-27T14:49:34.547Z",
+  "updatedAt": "2026-07-27T14:56:50.866Z",
   "latestAggregateRelease": {
     "sourceIntegrationHead": "9d2afbf05efe0f10cff098493805b4a1e2d213d7",
     "publishedHead": "ef5a2cd6c77c4dfab98741fc0cf1843f46c65d86",
@@ -212,7 +212,7 @@
     },
     {
       "lineId": "T05",
-      "sourceCandidateHead": "c237d584e59c05cc6070a0b5802632295a4b1b57",
+      "sourceCandidateHead": "fb263dc51f52be2922e5a4758dcfc2862f72d7cb",
       "sourceIntegrationHead": "9d2afbf05efe0f10cff098493805b4a1e2d213d7",
       "targetBranch": "main", "targetPath": "/", "publishedHead": "ef5a2cd6c77c4dfab98741fc0cf1843f46c65d86", "deploymentType": "github-pages-legacy",
       "ci": { "runId": "30273804120", "status": "success", "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/30273804120" },
