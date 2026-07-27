@@ -59,7 +59,7 @@ function buildEvidenceProductionGate(packet = {}) {
 function buildInsurancePaymentEvidencePacket(options = {}) {
   const acceptance = options.acceptance || buildInsurancePaymentAcceptance();
   const generatedAt = options.generatedAt || new Date().toISOString();
-  const productionHandoff = Handoff.buildProductionHandoffStatus(options.handoffData || {}, acceptance);
+  const productionHandoff = Handoff.buildProductionHandoffStatus(options.handoffData || {}, acceptance, generatedAt);
   const artifacts = EVIDENCE_FILES.map((relativePath) => {
     const source = fs.readFileSync(path.join(ROOT, relativePath));
     return { path: relativePath, sha256: sha256(source), bytes: source.length };

@@ -15,6 +15,12 @@ const SUBMISSION_ROLES = Object.freeze({
 });
 
 const VERIFICATION_ROLES = Object.freeze(["acceptance-reviewer", "security-reviewer", "finance-auditor"]);
+const EVIDENCE_VALIDITY_DAYS = Object.freeze({
+  route: 30,
+  "security-reviewer": 90,
+  "finance-auditor": 90,
+  "acceptance-reviewer": 180
+});
 
 class ProductionHandoffError extends Error {
   constructor(message, code, statusCode = 409) {
@@ -53,6 +59,21 @@ function requireEventChronology(item, at) {
   if (previousAt && Date.parse(at) < Date.parse(previousAt)) {
     throw new ProductionHandoffError("生产交接事件时间不得早于前一事件", "HANDOFF_EVENT_TIME_BACKDATED", 409);
   }
+}
+
+function evidenceValidityDays(item = {}) {
+  if (item.scope === "route") return EVIDENCE_VALIDITY_DAYS.route;
+  return EVIDENCE_VALIDITY_DAYS[item.requirement?.reviewerRole] || 30;
+}
+
+function evidenceExpired(item = {}, at = new Date().toISOString()) {
+  if (item.state !== HANDOFF_STATES.VERIFIED) return false;
+  const validUntil = item.evidence?.validUntil;
+  return !validUntil || Date.parse(validUntil) <= Date.parse(at);
+}
+
+function isEvidenceSubmissionAction(action) {
+  return action === "evidence-submitted" || action === "evidence-renewed";
 }
 
 function actorIdentity(actor = {}) {
@@ -101,6 +122,7 @@ function verifyItemEventLedger(events = []) {
     "requirement-changed": { from: Object.values(HANDOFF_STATES), to: [HANDOFF_STATES.PENDING] },
     "requirement-retired": { from: Object.values(HANDOFF_STATES), sameState: true },
     "evidence-submitted": { from: [HANDOFF_STATES.PENDING, HANDOFF_STATES.REJECTED], to: [HANDOFF_STATES.SUBMITTED] },
+    "evidence-renewed": { from: [HANDOFF_STATES.VERIFIED], to: [HANDOFF_STATES.SUBMITTED] },
     "evidence-verified": { from: [HANDOFF_STATES.SUBMITTED], to: [HANDOFF_STATES.VERIFIED] },
     "evidence-rejected": { from: [HANDOFF_STATES.SUBMITTED], to: [HANDOFF_STATES.REJECTED] }
   };
@@ -113,7 +135,7 @@ function verifyItemEventLedger(events = []) {
       && Number.isFinite(eventTime)
       && (!previous || eventTime >= Date.parse(previous.at));
     const requirementEvent = event.action?.startsWith("requirement-");
-    const evidenceEvent = event.action === "evidence-submitted";
+    const evidenceEvent = isEvidenceSubmissionAction(event.action);
     const verificationEvent = event.action === "evidence-verified" || event.action === "evidence-rejected";
     const detailValid = requirementEvent
       ? /^sha256:[a-f0-9]{64}$/.test(String(event.detail?.requirementDigest || ""))
@@ -162,7 +184,7 @@ function verifyHandoffCollection(state = {}) {
         if (idempotencyKeys.has(event.idempotencyKey)) return false;
         idempotencyKeys.add(event.idempotencyKey);
       }
-      if (event.action === "evidence-submitted") {
+      if (isEvidenceSubmissionAction(event.action)) {
         const evidenceDigest = event.detail?.evidenceDigest;
         if (evidenceDigests.has(evidenceDigest)) return false;
         evidenceDigests.add(evidenceDigest);
@@ -280,12 +302,18 @@ function submitHandoffEvidence(data, acceptance, itemId, input = {}, actor = {})
   if (!evidenceReference) throw new ProductionHandoffError("证据引用不能为空", "HANDOFF_EVIDENCE_REFERENCE_REQUIRED", 400);
   if (!/^sha256:[a-f0-9]{64}$/.test(evidenceDigest)) throw new ProductionHandoffError("证据摘要必须为 SHA-256", "HANDOFF_EVIDENCE_DIGEST_INVALID", 400);
   if (!idempotencyKey) throw new ProductionHandoffError("证据提交幂等键不能为空", "HANDOFF_IDEMPOTENCY_REQUIRED", 400);
+  const maximumValidityDays = evidenceValidityDays(item);
+  const maximumValidUntil = new Date(Date.parse(submittedAt) + maximumValidityDays * 86400000).toISOString();
+  const validUntil = canonicalTimestamp(input.validUntil || maximumValidUntil, "HANDOFF_VALID_UNTIL_INVALID");
+  if (Date.parse(validUntil) <= Date.parse(submittedAt)) throw new ProductionHandoffError("证据有效期必须晚于提交时间", "HANDOFF_EVIDENCE_ALREADY_EXPIRED", 400);
+  if (Date.parse(validUntil) > Date.parse(maximumValidUntil)) throw new ProductionHandoffError(`证据有效期不得超过${maximumValidityDays}天`, "HANDOFF_EVIDENCE_VALIDITY_TOO_LONG", 400);
   requireEventChronology(item, submittedAt);
   const evidenceRequest = {
     evidenceReference,
     evidenceDigest,
     artifactType: safeText(input.artifactType, 100) || "acceptance-evidence",
     issuedAt,
+    validUntil,
     submittedBy,
     idempotencyKey
   };
@@ -296,11 +324,12 @@ function submitHandoffEvidence(data, acceptance, itemId, input = {}, actor = {})
     if (item.evidence.requestDigest !== requestDigest) throw new ProductionHandoffError("幂等键对应的证据内容不一致", "HANDOFF_IDEMPOTENCY_CONFLICT");
     return { item, idempotent: true };
   }
-  if (![HANDOFF_STATES.PENDING, HANDOFF_STATES.REJECTED].includes(item.state)) throw new ProductionHandoffError("当前状态不允许提交证据", "HANDOFF_SUBMISSION_STATE_INVALID");
+  const renewingExpiredEvidence = evidenceExpired(item, submittedAt);
+  if (![HANDOFF_STATES.PENDING, HANDOFF_STATES.REJECTED].includes(item.state) && !renewingExpiredEvidence) throw new ProductionHandoffError("当前状态不允许提交证据", "HANDOFF_SUBMISSION_STATE_INVALID");
   const state = data.insurancePaymentProductionHandoff;
   const idempotencyReuse = findEventReuse(state, item, (event) => event.idempotencyKey === idempotencyKey);
   if (idempotencyReuse) throw new ProductionHandoffError("幂等键已被其他交接动作使用", "HANDOFF_IDEMPOTENCY_REUSED");
-  const evidenceReuse = findEventReuse(state, item, (event) => event.action === "evidence-submitted" && event.detail?.evidenceDigest === evidenceDigest);
+  const evidenceReuse = findEventReuse(state, item, (event) => isEvidenceSubmissionAction(event.action) && event.detail?.evidenceDigest === evidenceDigest);
   if (evidenceReuse) {
     throw new ProductionHandoffError(
       evidenceReuse.sameItem ? "驳回补证必须使用新的证据摘要" : "同一证据摘要不得用于多个交接要求",
@@ -311,7 +340,7 @@ function submitHandoffEvidence(data, acceptance, itemId, input = {}, actor = {})
   item.state = HANDOFF_STATES.SUBMITTED;
   item.evidence = evidence;
   item.verification = null;
-  appendEvent(item, { action: "evidence-submitted", from: before, to: item.state, actor: submittedBy, at: submittedAt, idempotencyKey, detail: { evidenceDigest, recordDigest: evidence.recordDigest } });
+  appendEvent(item, { action: renewingExpiredEvidence ? "evidence-renewed" : "evidence-submitted", from: before, to: item.state, actor: submittedBy, at: submittedAt, idempotencyKey, detail: { evidenceDigest, recordDigest: evidence.recordDigest } });
   return { item, idempotent: false };
 }
 
@@ -347,13 +376,15 @@ function verifyHandoffEvidence(data, acceptance, itemId, input = {}, actor = {})
   return item;
 }
 
-function buildProductionHandoffStatus(data = {}, acceptance = {}) {
-  const state = ensureProductionHandoff(data, acceptance);
+function buildProductionHandoffStatus(data = {}, acceptance = {}, at = new Date().toISOString()) {
+  const asOf = canonicalTimestamp(at);
+  const state = ensureProductionHandoff(data, acceptance, asOf);
   const activeIds = new Set(requirementsFromAcceptance(acceptance).map((item) => item.id));
   const required = state.items.filter((item) => activeIds.has(item.id));
   const ledgerValid = verifyHandoffCollection(state);
   const counts = Object.fromEntries(Object.keys(HANDOFF_STATES).map((stateName) => [stateName.toLowerCase(), required.filter((item) => item.state === stateName).length]));
-  const evidenceComplete = required.length > 0 && required.every((item) => item.state === HANDOFF_STATES.VERIFIED);
+  const expired = required.filter((item) => evidenceExpired(item, asOf));
+  const evidenceComplete = required.length > 0 && required.every((item) => item.state === HANDOFF_STATES.VERIFIED && !evidenceExpired(item, asOf));
   return {
     schema: state.schema,
     requirementsDigest: state.requirementsDigest,
@@ -361,14 +392,15 @@ function buildProductionHandoffStatus(data = {}, acceptance = {}) {
     evidenceComplete,
     productionReady: acceptance.productionReady === true && evidenceComplete && ledgerValid,
     ledgerValid,
-    summary: { required: required.length, ...counts },
-    items: required.map((item) => ({ id: item.id, scope: item.scope, owner: item.owner, reviewerRole: item.requirement?.reviewerRole || "", state: item.state, requirementDigest: item.requirementDigest, evidenceDigest: item.evidence?.evidenceDigest || "", evidenceRecordDigest: item.evidence?.recordDigest || "", verificationDigest: item.verification?.recordDigest || "", ledgerValid: verifyItemLedger(item) })),
+    summary: { required: required.length, ...counts, expired: expired.length },
+    items: required.map((item) => ({ id: item.id, scope: item.scope, owner: item.owner, reviewerRole: item.requirement?.reviewerRole || "", state: item.state, requirementDigest: item.requirementDigest, evidenceDigest: item.evidence?.evidenceDigest || "", evidenceRecordDigest: item.evidence?.recordDigest || "", validUntil: item.evidence?.validUntil || "", expired: evidenceExpired(item, asOf), verificationDigest: item.verification?.recordDigest || "", ledgerValid: verifyItemLedger(item) })),
     boundary: "Verified handoff evidence closes documentary requirements only; productionReady also requires the acceptance report to confirm real public wiring and live-environment acceptance."
   };
 }
 
 module.exports = {
   HANDOFF_STATES,
+  EVIDENCE_VALIDITY_DAYS,
   ProductionHandoffError,
   SUBMISSION_ROLES,
   VERIFICATION_ROLES,
@@ -376,6 +408,8 @@ module.exports = {
   canonicalTimestamp,
   digest,
   ensureProductionHandoff,
+  evidenceExpired,
+  evidenceValidityDays,
   handoffItemProjection,
   requirementsFromAcceptance,
   stableStringify,
