@@ -181,13 +181,15 @@
     },
     {
       "lineId": "T07",
-      "candidateHead": "76dcf77fa189864b66ba62f6cf0727ec224b5415",
+      "candidateHead": "488255c5ffdfb85d234f5fd1ffc2c4e95f86fc53",
       "decision": "accepted",
-      "reviewedAt": "2026-07-23T07:37:13.083Z",
+      "reviewedAt": "2026-07-27T15:00:42.157Z",
       "reviewer": "T00",
       "checks": [
         "git diff --check",
-        "87 disease-payment, financial gateway and insurance-payment tests passed independently",
+        "all 18 source commits are patch-equivalent to changes already present in the T00 integration branch",
+        "71/71 insurance-payment workflow, projection, callback, handoff and evidence tests passed",
+        "6/6 governed workflows and 23/23 T00 routes are wired while productionReady=false",
         "signed callbacks, replay protection, dual-review refunds, difference reconciliation and per-institution annual clearance validated",
         "special-case appeals bind the original decision and require a fresh two-person panel disjoint from original reviewers",
         "insurance-core return correction cycles bind trusted receipts, requirements, SLA, resubmission identity and tamper-evident ledgers",
