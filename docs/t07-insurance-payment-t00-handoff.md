@@ -95,6 +95,8 @@ T00 负责公共路由、统一认证鉴权、请求体与错误响应映射、�
 node --test .\test\disease-payment*.test.js .\test\financial*.test.js .\test\insurance-payment*.test.js
 node .\scripts\insurance-payment-acceptance.js
 node .\scripts\insurance-payment-evidence-packet.js
+node .\scripts\insurance-payment-acceptance.js --require-production
+node .\scripts\insurance-payment-evidence-packet.js --require-production
 ```
 
-预期 T07 六条业务链全部通过；在外部证据未齐备时，证据包仍必须输出 `productionReady=false`。
+前两条命令用于验证T07本地领域能力，当前应成功；后两条是发布流水线严格门禁，在公共接线和现场证据未齐备时必须以非零状态退出。不得用本地验收命令的成功退出替代生产门禁。
