@@ -392,7 +392,10 @@ test("resident reviews all eight next-stage health record capabilities", async (
   await page.goto("/login.html");
   await page.locator("#login-user").selectOption("citizen");
   await page.locator("input[name='password']").fill("123456");
-  await page.getByRole("button", { name: "进入系统" }).click();
+  await Promise.all([
+    page.waitForURL(/citizen\.html/),
+    page.getByRole("button", { name: "进入系统" }).click()
+  ]);
   await page.goto("/citizen.html?client=mini-program&page=health-record");
 
   await expect(page.getByRole("heading", { name: "居民健康档案八项增强服务" })).toBeVisible();
@@ -415,6 +418,31 @@ test("resident reviews all eight next-stage health record capabilities", async (
   await expect(page.locator("#citizen-medication-safety-v3")).toContainText("不得据此自行停药");
   await expect(page.locator("#citizen-emergency-pack-v3")).toContainText("待补齐紧急授权或联系人");
   await expect(page.locator("#citizen-operations-v3")).toContainText("居民范围汇总");
+
+  await page.getByRole("button", { name: "管理家庭授权" }).click();
+  await expect(page.locator("#auth-dialog")).toBeVisible();
+  await expect(page.locator("#auth-dialog-title")).toHaveText("家庭代办授权");
+  await expect(page.locator("#auth-form select[name='granteeType']")).toHaveValue("guardian");
+  await expect(page.locator("#auth-form input[name='purpose']")).toHaveValue("家庭成员协助健康管理");
+  await expect(page.locator("#auth-form input[name='scopes']:checked")).toHaveCount(1);
+  await expect(page.locator("#auth-form input[value='health-record-summary']")).toBeChecked();
+  await expect(page.locator("#auth-form input[name='consentConfirmed']")).not.toBeChecked();
+  await expect(page.locator("#auth-form input[name='expiresAt']")).toHaveValue("");
+  await page.locator("#auth-dialog [data-close]").first().click();
+
+  await page.getByRole("button", { name: "查看用药核对" }).click();
+  await expect(page.locator("#citizen-medication-review")).toHaveClass(/v3-action-target/);
+
+  await page.getByRole("button", { name: "准备紧急授权" }).click();
+  await expect(page.locator("#auth-dialog-title")).toHaveText("紧急救治授权");
+  await expect(page.locator("#auth-form select[name='granteeType']")).toHaveValue("institution");
+  await expect(page.locator("#auth-form input[name='purpose']")).toHaveValue("紧急救治最小健康摘要");
+  await expect(page.locator("#auth-form input[name='scopes']:checked")).toHaveCount(1);
+  await expect(page.locator("#auth-form input[name='consentConfirmed']")).not.toBeChecked();
+  await page.locator("#auth-dialog [data-close]").first().click();
+
+  await page.getByRole("button", { name: "复核访问记录" }).click();
+  await expect(page.locator("#citizen-access-review-v2-summary")).toHaveClass(/v3-action-target/);
 
   await page.setViewportSize({ width: 390, height: 844 });
   const nextStageCards = page.locator(".citizen-next-stage-card");
