@@ -41,6 +41,9 @@ const { buildCareServiceProductionReadiness, renderMarkdown: renderCareServicePr
 const { buildEnvironmentMatrixReport, renderMarkdown: renderEnvironmentMatrixMarkdown } = require("./environment-matrix");
 const { buildEmergencyReadinessReport, renderMarkdown: renderEmergencyReadinessMarkdown } = require("./emergency-readiness");
 const { buildSpecialtyCutoverPack, renderMarkdown: renderSpecialtyCutoverMarkdown } = require("../emergency-specialty-cutover");
+const BloodClinicalProduction = require("../blood-clinical-production");
+const EmergencyModuleGate = require("../emergency-module-gate");
+const ImagingCloudProduction = require("../imaging-cloud-production");
 const { buildHealthDashboardSummary, buildPriorityApplicationTemplates, renderMarkdown: renderHealthDashboardMarkdown } = require("./health-dashboard-summary");
 const { buildHybridDeploymentReadinessReport, renderMarkdown: renderHybridDeploymentMarkdown } = require("./hybrid-deployment-readiness");
 const { buildProductionDeploymentPackage, verifyProductionDeploymentPackage, renderMarkdown: renderProductionDeploymentMarkdown } = require("./production-deployment-package");
@@ -1421,6 +1424,21 @@ function buildReleaseReport(options = {}) {
   });
   const emergencyReadiness = buildEmergencyReadinessReport();
   const specialtyCutover = buildSpecialtyCutoverPack();
+  const t10ClinicalBloodReadiness = {
+    ...BloodClinicalProduction.evaluateProductionReadiness({}),
+    productionReady: false,
+    formalGoLiveState: "blocked-until-trusted-site-evidence-and-platform-launch-approval"
+  };
+  const t10EmergencyModuleReadiness = {
+    ...EmergencyModuleGate.buildIndependentModuleReadiness(data),
+    productionReady: false,
+    formalGoLiveState: "blocked-until-trusted-site-evidence-and-platform-launch-approval"
+  };
+  const t10ImagingProductionReadiness = {
+    ...ImagingCloudProduction.center(data),
+    productionReady: false,
+    formalGoLiveState: "blocked-until-trusted-site-evidence-and-platform-launch-approval"
+  };
   const citizenLaunchFoundation = buildCitizenLaunchFoundationReadiness({
     pkg,
     phaseDoc: fs.existsSync(path.join(ROOT, "docs", "citizen-launch-foundation-plan.md"))
@@ -1527,6 +1545,9 @@ function buildReleaseReport(options = {}) {
     ...careServiceProductionChecks(careServiceProductionReadiness),
     ...emergencyReadinessChecks(emergencyReadiness),
     ...specialtyCutoverChecks(specialtyCutover),
+    check("specialtyCutover:clinicalBloodIndependentGate", t10ClinicalBloodReadiness.standalone === true && t10ClinicalBloodReadiness.productionReady === false && (t10ClinicalBloodReadiness.blockers?.length || 0) === 6, `${t10ClinicalBloodReadiness.blockers?.length || 0} clinical-blood site evidence blockers; platform gate closed`, "error", "cutover"),
+    check("specialtyCutover:emergencyIndependentGate", t10EmergencyModuleReadiness.deployment === "independent-emergency-module" && t10EmergencyModuleReadiness.productionReady === false && t10EmergencyModuleReadiness.rollback?.formalGoLiveState, `${t10EmergencyModuleReadiness.rollback?.triggers?.length || 0} emergency rollback triggers; platform gate closed`, "error", "cutover"),
+    check("specialtyCutover:imagingSiteReceiptGate", t10ImagingProductionReadiness.summary?.siteReceipts === 5 && t10ImagingProductionReadiness.routeContracts?.length === 9 && t10ImagingProductionReadiness.productionReady === false, `${t10ImagingProductionReadiness.summary?.siteReceiptsVerified || 0}/5 imaging receipts verified; platform gate closed`, "error", "cutover"),
     ...citizenLaunchFoundationChecks(citizenLaunchFoundation),
     ...citizenRecordsChecks(citizenRecords),
     ...registrationReferralAcceptanceChecks(registrationReferralAcceptance),
@@ -1630,6 +1651,9 @@ function buildReleaseReport(options = {}) {
     careServiceProductionReadiness,
     emergencyReadiness,
     specialtyCutover,
+    t10ClinicalBloodReadiness,
+    t10EmergencyModuleReadiness,
+    t10ImagingProductionReadiness,
     citizenLaunchFoundation,
     citizenRecords,
     registrationReferralAcceptance,

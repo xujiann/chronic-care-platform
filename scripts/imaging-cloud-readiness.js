@@ -44,6 +44,18 @@ function buildImagingCloudReadinessReport(options = {}) {
   };
   const productionCenter = ImagingCloudProduction.center({});
   const standaloneSmoke = ImagingCloudProduction.runStandaloneSmoke({});
+  const t00RouteMarkers = [
+    "/api/imaging-cloud/production-center",
+    "imagingProductionEndpointMatch",
+    "imagingProductionSyntheticMatch",
+    "imagingProductionRequirementMatch",
+    "imagingProductionReceiptMatch",
+    "imagingProductionDrillMatch",
+    "imagingProductionApprovalMatch",
+    "ImagingCloudProduction.runStandaloneSmoke",
+    "blocked-until-trusted-site-evidence-and-platform-launch-approval"
+  ];
+  const t00Integrated = t00RouteMarkers.every((marker) => sources.server.includes(marker));
   const checks = [
     check("spec:function-mobile", sources.html.includes("mobile-viewer") && sources.pageJs.includes("data-share-study") && sources.pageJs.includes("shareStudy") && sources.pageJs.includes("DICOM"), "mobile patient viewing, no-terminal-storage and share channel are visible", "spec"),
     check("spec:hospital-ingest", sources.server.includes("/api/imaging-cloud/ingest") && sources.server.includes("DICOM TLS") && sources.server.includes("C-STORE") && sources.server.includes("C-MOVE"), "hospital DICOM/RIS/PACS ingest API and protocols are modeled", "integration"),
@@ -68,7 +80,8 @@ function buildImagingCloudReadinessReport(options = {}) {
     check("production:ui", sources.html.includes('data-imaging-section="production-gate"') && sources.pageJs.includes("renderProductionGate"), "production boundary and blockers are visible in the imaging workbench", "ui"),
     check("ui:production-operations", ["data-production-action=\"endpoint\"", "data-production-action=\"synthetic\"", "data-production-action=\"requirement\"", "data-production-action=\"drill\"", "data-production-action=\"approval\"", "静态预览不写入生产证据"].every((marker)=>sources.pageJs.includes(marker)), "endpoint, synthetic, evidence, drill and approval operations are available while static preview stays read-only", "ui"),
     check("production:standalone-smoke", standaloneSmoke.codeReady && standaloneSmoke.releaseDecision === "no-go" && standaloneSmoke.checks.some((item) => item.id === "rollback-gate" && item.passed), "standalone module smoke verifies rollback controls while incomplete site evidence remains No-Go", "release"),
-    check("production:route-contract", ImagingCloudProduction.ROUTE_CONTRACTS.length === 9 && ImagingCloudProduction.ROUTE_CONTRACTS.every((item)=>item.roles?.length && item.handler?.startsWith("ImagingCloudProduction.")) && sources.docs.includes("/api/imaging-cloud/production-center"), "nine role-guarded T00 integration route contracts are documented", "integration")
+    check("production:route-contract", ImagingCloudProduction.ROUTE_CONTRACTS.length === 9 && ImagingCloudProduction.ROUTE_CONTRACTS.every((item)=>item.roles?.length && item.handler?.startsWith("ImagingCloudProduction.")) && sources.docs.includes("/api/imaging-cloud/production-center"), "nine role-guarded T00 integration route contracts are documented", "integration"),
+    check("production:t00-public-wiring", t00Integrated, "nine imaging production routes are wired while the T00 platform launch gate remains closed", "integration")
   ];
   const codeReady = checks.every((item) => item.passed);
   return {
@@ -103,7 +116,7 @@ function buildImagingCloudReadinessReport(options = {}) {
       standaloneSmoke
     },
     t00Integration: {
-      status: "pending-shared-file-integration",
+      status: t00Integrated ? "integrated-platform-gate-still-blocked" : "pending-shared-file-integration",
       sharedFiles: ["server.js", "package.json", "service-worker.js", "README.md", "release summary"],
       routeContracts: productionCenter.routeContracts
     },

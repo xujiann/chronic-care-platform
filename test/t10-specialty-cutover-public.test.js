@@ -58,6 +58,17 @@ test("T00 exposes the T10 specialty cutover pack through public integration cont
   assert.match(workbench, /T10割接总控/);
   assert.equal(pkg.scripts["t10:specialty-cutover"], "node emergency-specialty-cutover.js");
   assert.equal(pkg.scripts["t10:runtime-smoke"], "node scripts/t10-runtime-smoke.js");
+  assert.equal(pkg.scripts["t10:clinical-blood:readiness"], "node scripts/blood-clinical-module-readiness.js");
+  assert.equal(pkg.scripts["t10:clinical-blood:smoke"], "node scripts/blood-clinical-smoke.js");
+  assert.equal(pkg.scripts["t10:emergency-module:smoke"], "node scripts/emergency-module-smoke.js");
+  assert.match(server, /\/api\/t10-specialty\/modules\/clinical-blood\/readiness/);
+  assert.match(server, /\/api\/t10-specialty\/modules\/emergency-life-chain\/readiness/);
+  assert.match(server, /\/api\/imaging-cloud\/production-center/);
+  assert.match(server, /imagingProductionEndpointMatch/);
+  assert.match(server, /imagingProductionReceiptMatch/);
+  assert.match(server, /blocked-until-trusted-site-evidence-and-platform-launch-approval/);
+  assert.match(server, /moduleEvidenceReady/);
+  assert.match(server, /productionReady: false/);
   assert.match(runtimeSmoke, /buildT10RuntimeSmokeReport/);
   assert.match(runtimeSmoke, /t10-runtime-smoke-report\.json/);
   assert.match(runtimeSmoke, /t10:runtime-smoke-plan/);

@@ -2942,6 +2942,77 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(state.body.t10SpecialtyModuleAudit.every((item) => item.productionReady === false), true);
   });
 
+  await t.test("keeps independent T10 production evidence subordinate to the platform launch gate", async () => {
+    const institutionLogin = await login(baseUrl, "hospital");
+    const anonymous = await api(baseUrl, "/api/t10-specialty/modules/clinical-blood/readiness");
+    assert.equal(anonymous.response.status, 401);
+
+    const institutionDenied = await api(
+      baseUrl,
+      "/api/t10-specialty/modules/clinical-blood/readiness",
+      authorized(institutionLogin.body.token)
+    );
+    assert.equal(institutionDenied.response.status, 403);
+
+    const clinicalBlood = await api(
+      baseUrl,
+      "/api/t10-specialty/modules/clinical-blood/readiness",
+      authorized(commissionToken)
+    );
+    assert.equal(clinicalBlood.response.status, 200);
+    assert.equal(clinicalBlood.body.productionReady, false);
+    assert.equal(clinicalBlood.body.blockers.length, 6);
+    assert.equal(clinicalBlood.body.formalGoLiveState, "blocked-until-trusted-site-evidence-and-platform-launch-approval");
+
+    const emergencyModule = await api(
+      baseUrl,
+      "/api/t10-specialty/modules/emergency-life-chain/readiness",
+      authorized(commissionToken)
+    );
+    assert.equal(emergencyModule.response.status, 200);
+    assert.equal(emergencyModule.body.productionReady, false);
+    assert.equal(emergencyModule.body.deployment, "independent-emergency-module");
+    assert.equal(emergencyModule.body.formalGoLiveState, "blocked-until-trusted-site-evidence-and-platform-launch-approval");
+
+    const imaging = await api(
+      baseUrl,
+      "/api/imaging-cloud/production-center",
+      authorized(institutionLogin.body.token)
+    );
+    assert.equal(imaging.response.status, 200);
+    assert.equal(imaging.body.productionReady, false);
+    assert.equal(imaging.body.moduleEvidenceReady, false);
+    assert.equal(imaging.body.summary.siteReceipts, 5);
+    assert.equal(imaging.body.routeContracts.length, 9);
+
+    const forgedProbe = await api(
+      baseUrl,
+      "/api/imaging-cloud/production/endpoints/imaging-fhir/probe",
+      authorized(institutionLogin.body.token, {
+        method: "POST",
+        body: JSON.stringify({
+          endpoint: "http://127.0.0.1/fhir",
+          environment: "production",
+          result: "passed",
+          productionReady: true,
+          credentialRef: "client-controlled",
+          certificateFingerprint: `sha256:${"a".repeat(64)}`
+        })
+      })
+    );
+    assert.equal(forgedProbe.response.status, 400);
+    assert.equal(forgedProbe.body.productionReady, false);
+
+    const smoke = await api(
+      baseUrl,
+      "/api/imaging-cloud/production/smoke",
+      authorized(institutionLogin.body.token)
+    );
+    assert.equal(smoke.response.status, 200);
+    assert.equal(smoke.body.productionReady, false);
+    assert.equal(smoke.body.releaseDecision, "no-go-platform-approval-pending");
+  });
+
   await t.test("returns governance modules to the commission role and repairs seeded text", async () => {
     const { response, body } = await api(baseUrl, "/api/state", authorized(commissionToken));
     assert.equal(response.status, 200);

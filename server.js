@@ -118,6 +118,9 @@ const EmergencyLifeChain = require("./emergency-lifechain");
 const EmergencyProduction = require("./emergency-production");
 const { buildSpecialtyCutoverPack } = require("./emergency-specialty-cutover");
 const T10SpecialtyModuleGovernance = require("./t10-specialty-module-governance");
+const BloodClinicalProduction = require("./blood-clinical-production");
+const EmergencyModuleGate = require("./emergency-module-gate");
+const ImagingCloudProduction = require("./imaging-cloud-production");
 const { buildOhifStudyUrl, listOrthancStudySummaries, publishDiagnosticReportToFhir, publishImagingStudyToFhir, solutionAHealth } = require("./solution-a-connectors");
 const {
   SmsDeliveryCallbackError,
@@ -10591,6 +10594,7 @@ function normalizeState(data) {
     physicalExamSpecializedIntakes: Array.isArray(data.physicalExamSpecializedIntakes) ? data.physicalExamSpecializedIntakes.slice(0, 1000) : []
   };
   completeSystemTargets(state);
+  ImagingCloudProduction.ensure(state);
   PhysicalExaminationService.synchronizeCareLinks(state, { notify: false, actor: "state-normalizer" });
   refreshDemoAppointmentDates(state);
   refreshDeathStatistics(state);
@@ -24620,6 +24624,35 @@ function sendT10SpecialtyModuleError(res, error) {
   });
 }
 
+function buildT10PlatformBlockedReadiness(moduleReadiness = {}) {
+  return {
+    ...moduleReadiness,
+    moduleEvidenceReady: moduleReadiness.productionReady === true,
+    productionReady: false,
+    formalGoLiveState: "blocked-until-trusted-site-evidence-and-platform-launch-approval",
+    platformBlockers: [
+      "trusted production identity and organization directory",
+      "independently verified site evidence",
+      "T00 platform launch approval",
+      "signed duty, SIEM, disaster-recovery and rollback evidence"
+    ]
+  };
+}
+
+function buildImagingCloudProductionResponse(data = {}) {
+  return buildT10PlatformBlockedReadiness(ImagingCloudProduction.center(data));
+}
+
+function sendT10ProductionControlError(res, error) {
+  const status = Number(error?.status || error?.statusCode || 400);
+  sendJson(res, status, {
+    error: status === 403 ? "Forbidden" : status === 404 ? "Not Found" : status === 409 ? "Conflict" : "Bad Request",
+    code: String(error?.code || "T10_PRODUCTION_CONTROL_REJECTED"),
+    message: String(error?.message || "T10 production control action was rejected"),
+    productionReady: false
+  });
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -25522,6 +25555,143 @@ async function handleApi(req, res) {
         detail: `${String(error?.code || "T10_MODULE_REQUEST_INVALID")}:${String(error?.message || "").slice(0, 240)}`
       });
       sendT10SpecialtyModuleError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/t10-specialty/modules/clinical-blood/readiness") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    const readiness = buildT10PlatformBlockedReadiness(BloodClinicalProduction.evaluateProductionReadiness({}));
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "t10-clinical-blood-readiness-read",
+      target: url.pathname,
+      result: "allowed",
+      detail: `${readiness.blockers?.length || 0} module evidence blockers; platform production gate closed`
+    });
+    sendJson(res, 200, readiness);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/t10-specialty/modules/emergency-life-chain/readiness") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    const readiness = buildT10PlatformBlockedReadiness(EmergencyModuleGate.buildIndependentModuleReadiness(readDatabase()));
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "t10-emergency-module-readiness-read",
+      target: url.pathname,
+      result: "allowed",
+      detail: `${readiness.rollback?.triggers?.length || 0} rollback triggers; platform production gate closed`
+    });
+    sendJson(res, 200, readiness);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/imaging-cloud/production-center") {
+    const user = requireApiRole(req, res, ["commission", "institution"], url.pathname);
+    if (!user) return;
+    const center = buildImagingCloudProductionResponse(readDatabase());
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "imaging-production-center-read",
+      target: url.pathname,
+      result: "allowed",
+      detail: `${center.summary?.blockers || 0} module blockers; platform production gate closed`
+    });
+    sendJson(res, 200, center);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/imaging-cloud/production/smoke") {
+    const user = requireApiRole(req, res, ["commission", "institution"], url.pathname);
+    if (!user) return;
+    const smoke = ImagingCloudProduction.runStandaloneSmoke(readDatabase());
+    sendJson(res, 200, {
+      ...smoke,
+      moduleEvidenceReady: smoke.releaseDecision === "go",
+      releaseDecision: "no-go-platform-approval-pending",
+      productionReady: false,
+      formalGoLiveState: "blocked-until-trusted-site-evidence-and-platform-launch-approval"
+    });
+    return;
+  }
+
+  const imagingProductionEndpointMatch = url.pathname.match(/^\/api\/imaging-cloud\/production\/endpoints\/([^/]+)\/probe$/);
+  const imagingProductionSyntheticMatch = url.pathname.match(/^\/api\/imaging-cloud\/production\/synthetic-checks\/([^/]+)\/actions$/);
+  const imagingProductionRequirementMatch = url.pathname.match(/^\/api\/imaging-cloud\/production\/requirements\/([^/]+)\/actions$/);
+  const imagingProductionReceiptMatch = url.pathname.match(/^\/api\/imaging-cloud\/production\/receipts\/([^/]+)\/(submit|verify)$/);
+  const imagingProductionDrillMatch = url.pathname.match(/^\/api\/imaging-cloud\/production\/drills\/([^/]+)\/complete$/);
+  const imagingProductionApprovalMatch = url.pathname.match(/^\/api\/imaging-cloud\/production\/approvals\/([^/]+)\/sign$/);
+  if (req.method === "POST" && (
+    imagingProductionEndpointMatch
+    || imagingProductionSyntheticMatch
+    || imagingProductionRequirementMatch
+    || imagingProductionReceiptMatch
+    || imagingProductionDrillMatch
+    || imagingProductionApprovalMatch
+  )) {
+    const commissionOnly = Boolean(
+      (imagingProductionReceiptMatch && imagingProductionReceiptMatch[2] === "verify")
+      || imagingProductionApprovalMatch
+    );
+    const user = requireApiRole(req, res, commissionOnly ? ["commission"] : ["commission", "institution"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    const payload = await collectJson(req);
+    try {
+      let item;
+      let action;
+      if (imagingProductionEndpointMatch) {
+        action = "probe-production-endpoint";
+        item = ImagingCloudProduction.probeEndpoint(data, user, decodeURIComponent(imagingProductionEndpointMatch[1]), payload);
+      } else if (imagingProductionSyntheticMatch) {
+        action = "record-synthetic-check";
+        item = ImagingCloudProduction.recordSyntheticCheck(data, user, decodeURIComponent(imagingProductionSyntheticMatch[1]), payload);
+      } else if (imagingProductionRequirementMatch) {
+        action = "govern-site-requirement";
+        item = ImagingCloudProduction.signRequirement(data, user, decodeURIComponent(imagingProductionRequirementMatch[1]), payload);
+      } else if (imagingProductionReceiptMatch) {
+        const type = decodeURIComponent(imagingProductionReceiptMatch[1]);
+        action = imagingProductionReceiptMatch[2] === "verify" ? "verify-site-receipt" : "submit-site-receipt";
+        item = imagingProductionReceiptMatch[2] === "verify"
+          ? ImagingCloudProduction.verifySiteReceipt(data, user, type, payload)
+          : ImagingCloudProduction.submitSiteReceipt(data, user, type, payload);
+      } else if (imagingProductionDrillMatch) {
+        action = "complete-production-drill";
+        item = ImagingCloudProduction.completeDrill(data, user, decodeURIComponent(imagingProductionDrillMatch[1]), payload);
+      } else {
+        action = "sign-module-cutover-approval";
+        item = ImagingCloudProduction.signApproval(data, user, decodeURIComponent(imagingProductionApprovalMatch[1]), payload);
+      }
+      writeDatabase(data);
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: `imaging-production-${action}`,
+        target: String(item?.id || item?.type || url.pathname),
+        result: "allowed",
+        detail: "module evidence updated; platform production gate remains closed"
+      });
+      sendJson(res, 200, {
+        item,
+        center: buildImagingCloudProductionResponse(data),
+        productionReady: false
+      });
+    } catch (error) {
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: "imaging-production-control",
+        target: url.pathname,
+        result: "denied",
+        detail: String(error?.message || "control rejected").slice(0, 240)
+      });
+      sendT10ProductionControlError(res, error);
     }
     return;
   }

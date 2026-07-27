@@ -122,6 +122,8 @@ function buildDeployCheckReport(options = {}) {
   const drugConsumableSupervisions = Array.isArray(data.drugConsumableSupervisions) ? data.drugConsumableSupervisions : [];
   const serverSource = fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
   const t10SpecialtyModuleGovernanceSource = fs.readFileSync(path.join(ROOT, "t10-specialty-module-governance.js"), "utf8");
+  const bloodClinicalProductionSource = fs.readFileSync(path.join(ROOT, "blood-clinical-production.js"), "utf8");
+  const emergencyModuleGateSource = fs.readFileSync(path.join(ROOT, "emergency-module-gate.js"), "utf8");
   const sessionStoreSource = fs.readFileSync(path.join(ROOT, "session-store.js"), "utf8");
   const authSource = fs.readFileSync(path.join(ROOT, "auth.js"), "utf8");
   const bloodBusinessSource = fs.readFileSync(path.join(ROOT, "blood-business.js"), "utf8");
@@ -146,6 +148,7 @@ function buildDeployCheckReport(options = {}) {
   const publicHealthEndpointProbeCampaignDoc = fs.readFileSync(path.join(ROOT, "docs", "public-health-external-endpoint-probe-campaigns.md"), "utf8");
   const imagingCloudSource = fs.readFileSync(path.join(ROOT, "imaging-cloud.js"), "utf8");
   const imagingCloudReadinessSource = fs.readFileSync(path.join(ROOT, "scripts", "imaging-cloud-readiness.js"), "utf8");
+  const imagingCloudProductionSource = fs.readFileSync(path.join(ROOT, "imaging-cloud-production.js"), "utf8");
   const digitalHospitalStandardsSource = fs.readFileSync(path.join(ROOT, "scripts", "digital-hospital-standards-readiness.js"), "utf8");
   const digitalHospitalStandardsHtml = fs.readFileSync(path.join(ROOT, "digital-hospital-standards.html"), "utf8");
   const digitalHospitalStandardsJs = fs.readFileSync(path.join(ROOT, "digital-hospital-standards.js"), "utf8");
@@ -727,6 +730,45 @@ function buildDeployCheckReport(options = {}) {
     { name: "manifest:internetNursingHighlightCenter", ok: manifestSource.includes("internet-nursing-highlight-center.md") && manifestSource.includes("nursing-highlight-section"), detail: "internet nursing highlight center handoff is indexed" },
     { name: "manifest:emergencyReadiness", ok: manifestSource.includes("emergency-readiness-report.md") && manifestSource.includes("emergency:readiness") && manifestSource.includes("/api/emergency/production-center") && manifestSource.includes("emergency-evidence-package-api") && manifestSource.includes("emergency-evidence-export-api") && manifestSource.includes("/api/emergency/events/:id/evidence-package/export?format=json") && manifestSource.includes("emergency-sos-aed-api") && manifestSource.includes("/api/emergency/sos /api/emergency/aed-map") && manifestSource.includes("emergency-life-chain") && manifestSource.includes("/api/emergency/life-chain/device-sos /api/emergency/life-chain/command-center /api/emergency/life-chain/quality"), detail: "prehospital emergency readiness, evidence exports, SOS/AED and golden four-minute life-chain artifacts are indexed" },
     { name: "manifest:t10SpecialtyCutover", ok: manifestSource.includes("t10-specialty-cutover-pack.md") && manifestSource.includes("t10:specialty-cutover") && manifestSource.includes("/api/t10-specialty/cutover-pack") && serverSource.includes("/api/t10-specialty/cutover-pack") && fs.readFileSync(path.join(ROOT, "workbench.html"), "utf8").includes("t10-specialty-cutover.html") && fs.readFileSync(path.join(ROOT, "t10-specialty-cutover.js"), "utf8").includes("/api/t10-specialty/cutover-pack") && fs.readFileSync(path.join(ROOT, "scripts", "release-report.js"), "utf8").includes("specialtyCutover:moduleCatalog"), detail: "T10 specialty module catalog, cutover API, portal entry and release artifact are indexed" },
+    {
+      name: "api:t10IndependentProductionGates",
+      ok: [
+        "/api/t10-specialty/modules/clinical-blood/readiness",
+        "/api/t10-specialty/modules/emergency-life-chain/readiness",
+        "/api/imaging-cloud/production-center",
+        "imagingProductionEndpointMatch",
+        "imagingProductionSyntheticMatch",
+        "imagingProductionRequirementMatch",
+        "imagingProductionReceiptMatch",
+        "imagingProductionDrillMatch",
+        "imagingProductionApprovalMatch",
+        "blocked-until-trusted-site-evidence-and-platform-launch-approval"
+      ].every((marker) => serverSource.includes(marker))
+        && bloodClinicalProductionSource.includes("blocked-until-site-evidence-signed")
+        && emergencyModuleGateSource.includes("independent-emergency-module")
+        && imagingCloudProductionSource.includes("SITE_RECEIPT_CONTRACTS")
+        && imagingCloudProductionSource.includes("ROUTE_CONTRACTS"),
+      detail: "clinical blood, emergency and imaging module evidence remain subordinate to the T00 platform launch gate"
+    },
+    {
+      name: "package:t10IndependentProductionGates",
+      ok: [
+        "t10:clinical-blood:readiness",
+        "t10:clinical-blood:smoke",
+        "t10:emergency-module:smoke",
+        "imaging-cloud:test"
+      ].every((name) => Boolean(pkg.scripts?.[name])),
+      detail: "T10 independent module check, smoke and readiness commands are registered"
+    },
+    {
+      name: "manifest:t10IndependentProductionGates",
+      ok: [
+        "t10-clinical-blood-independent-gate",
+        "t10-emergency-independent-gate",
+        "t10-imaging-production-gate"
+      ].every((marker) => manifestSource.includes(marker)),
+      detail: "T10 clinical blood, emergency and imaging production gates are indexed"
+    },
     {
       name: "api:t10SpecialtyModuleGovernance",
       ok: [
