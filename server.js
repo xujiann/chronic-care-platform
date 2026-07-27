@@ -41,6 +41,7 @@ const PhysicalExaminationService = require("./physical-examination-service");
 const CitizenRecordsPolicy = require("./citizen-records-policy");
 const CitizenRecordsV1 = require("./citizen-records-v1");
 const CitizenRecordsV2 = require("./citizen-records-v2");
+const RegistrationReferralService = require("./registration-referral-service");
 const { buildQualitySafetyInterfaceStandard } = require("./scripts/quality-safety-interface-standard");
 const {
   buildQualitySafetyInterfaceJointTestPack,
@@ -1236,6 +1237,11 @@ function seedState() {
     careTaskUpdates: [],
     accessAcknowledgements: [],
     accessDisputes: [],
+    primaryCareAssessments: [],
+    registrationReferralClosureEvents: [],
+    registrationReferralEscalations: [],
+    registrationReferralNotificationDeadLetters: [],
+    phase2FamilyDoctorServiceTasks: [],
     physicalExamAbnormalCases: PhysicalExaminationService.seedAbnormalCases(),
     physicalExamJointTests: PhysicalExaminationService.seedJointTests(),
     physicalExamHealthPassports: [],
@@ -1288,7 +1294,7 @@ function seedTaskMessages() {
       taskId: "referralTeleconsultations:rtc-002",
       collection: "referralTeleconsultations",
       sourceId: "rtc-002",
-      residentId: "r2",
+      residentId: "r4",
       targetRole: "citizen",
       channel: "in_app",
       title: "Teleconsultation report returned",
@@ -1305,7 +1311,7 @@ function seedTaskMessages() {
       taskId: "referralTeleconsultations:rtc-002",
       collection: "referralTeleconsultations",
       sourceId: "rtc-002",
-      residentId: "r2",
+      residentId: "r4",
       targetRole: "institution",
       channel: "in_app",
       title: "Teleconsultation report returned",
@@ -10567,6 +10573,11 @@ function normalizeState(data) {
     careTaskUpdates: Array.isArray(data.careTaskUpdates) ? data.careTaskUpdates.slice(-2000) : [],
     accessAcknowledgements: Array.isArray(data.accessAcknowledgements) ? data.accessAcknowledgements.slice(-2000) : [],
     accessDisputes: Array.isArray(data.accessDisputes) ? data.accessDisputes.slice(-2000) : [],
+    primaryCareAssessments: Array.isArray(data.primaryCareAssessments) ? data.primaryCareAssessments.slice(-1000) : [],
+    registrationReferralClosureEvents: Array.isArray(data.registrationReferralClosureEvents) ? data.registrationReferralClosureEvents.slice(0, 300) : [],
+    registrationReferralEscalations: Array.isArray(data.registrationReferralEscalations) ? data.registrationReferralEscalations.slice(-1000) : [],
+    registrationReferralNotificationDeadLetters: Array.isArray(data.registrationReferralNotificationDeadLetters) ? data.registrationReferralNotificationDeadLetters.slice(-1000) : [],
+    phase2FamilyDoctorServiceTasks: Array.isArray(data.phase2FamilyDoctorServiceTasks) ? data.phase2FamilyDoctorServiceTasks.slice(-2000) : [],
     physicalExamAbnormalCases: mergeByKey(PhysicalExaminationService.seedAbnormalCases(), data.physicalExamAbnormalCases, "id"),
     physicalExamJointTests: mergeByKey(PhysicalExaminationService.seedJointTests(), data.physicalExamJointTests, "id"),
     physicalExamHealthPassports: Array.isArray(data.physicalExamHealthPassports) ? data.physicalExamHealthPassports.slice(0, 500) : [],
@@ -36629,6 +36640,105 @@ async function handleApi(req, res) {
     }
     writeDatabase(data);
     sendJson(res, 200, item);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/registration-referral/operations") {
+    const user = requireApiRole(req, res, ["citizen", "institution", "county", "commission"], "/api/registration-referral/operations");
+    if (!user) return;
+    const data = readDatabase();
+    const actor = {
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      role: user.role,
+      orgCode: user.orgCode,
+      residentId: user.residentId,
+      residentIds: user.residentId ? [user.residentId] : []
+    };
+    const asOf = new Date().toISOString();
+    const queue = RegistrationReferralService.buildClosureWorkQueue(data, { asOf, actor });
+    appendDataAccessLog(data, user, user.residentId || "", "挂号转诊闭环", "查询责任事项、质量指标和通知可靠性");
+    writeDatabase(normalizeState(data));
+    sendJson(res, 200, redactSensitiveResponse({
+      asOf,
+      queue,
+      quality: RegistrationReferralService.buildClosureQualityMetrics(data, { asOf }),
+      notificationReliability: RegistrationReferralService.buildNotificationReliability(data),
+      productionReady: false
+    }, user));
+    return;
+  }
+
+  const registrationReferralCommandMatch = url.pathname.match(/^\/api\/registration-referral\/commands(?:\/([^/]+))?$/);
+  if (req.method === "POST" && registrationReferralCommandMatch) {
+    const user = requireApiRole(req, res, ["citizen", "institution", "county", "insurance", "commission"], "/api/registration-referral/commands");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const routeAction = registrationReferralCommandMatch[1] ? decodeURIComponent(registrationReferralCommandMatch[1]) : "";
+    const headerKey = String(req.headers["idempotency-key"] || "").trim().slice(0, 240);
+    const bodyKey = String(payload.commandId || payload.idempotencyKey || "").trim();
+    try {
+      if (!headerKey) throw new Error("Idempotency-Key is required");
+      if (bodyKey && bodyKey !== headerKey) throw new Error("idempotency key conflict");
+      if (routeAction && payload.action && routeAction !== payload.action) throw new Error("route action does not match request action");
+      const action = routeAction || String(payload.action || "").trim();
+      if (!action) throw new Error("action is required");
+      const data = readDatabase();
+      const actor = {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        role: user.role,
+        orgCode: user.orgCode,
+        residentId: user.residentId,
+        residentIds: user.residentId ? [user.residentId] : []
+      };
+      const command = {
+        commandId: headerKey,
+        action,
+        caseType: payload.caseType,
+        caseId: payload.caseId,
+        residentId: payload.residentId,
+        expectedVersion: payload.expectedVersion,
+        payload: payload.payload
+      };
+      const applied = RegistrationReferralService.applyClosureCommand(data, command, actor, {
+        requireExpectedVersion: true
+      });
+      if ((applied.consistency?.summary?.P0 || 0) > 0) {
+        throw new Error(`registration/referral consistency rejected with ${applied.consistency.summary.P0} P0 issue(s)`);
+      }
+      applied.data.securityEvents = prependAuditTrailEntry(applied.data.securityEvents, {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "执行挂号转诊闭环命令",
+        target: `${action}:${applied.event.caseId || headerKey}`,
+        result: "允许",
+        detail: `${applied.event.id}; idempotent=${applied.idempotent}; productionEvidence=false`
+      });
+      writeDatabase(normalizeState(applied.data));
+      sendJson(res, applied.idempotent ? 200 : 201, redactSensitiveResponse({
+        ok: true,
+        idempotent: applied.idempotent,
+        event: applied.event,
+        result: applied.result,
+        consistency: applied.consistency,
+        productionReady: false
+      }, user));
+    } catch (error) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "执行挂号转诊闭环命令", target: routeAction || String(payload.action || bodyKey || ""), result: "拒绝", detail: error.message });
+      const status = /role |scope denied|只能|无权/i.test(error.message)
+        ? 403
+        : /not found/i.test(error.message)
+          ? 404
+          : /conflict|version/i.test(error.message)
+            ? 409
+            : 400;
+      sendJson(res, status, { error: status === 403 ? "Forbidden" : status === 404 ? "Not Found" : status === 409 ? "Conflict" : "Bad Request", message: error.message });
+    }
     return;
   }
 

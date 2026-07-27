@@ -4714,6 +4714,82 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(referralTeleconsultations.response.status, 403);
   });
 
+  await t.test("executes registration referral commands with server time scope idempotency and versions", async () => {
+    const commandKey = `registration-referral-${randomUUID()}`;
+    const commandBody = {
+      action: "record-notification-receipt",
+      expectedVersion: 0,
+      at: "2000-01-01T00:00:00.000Z",
+      payload: {
+        messageId: "msg-rtc-001-feedback-citizen",
+        status: "read"
+      }
+    };
+    const created = await api(baseUrl, "/api/registration-referral/commands", authorized(citizenToken, {
+      method: "POST",
+      headers: { "Idempotency-Key": commandKey },
+      body: JSON.stringify(commandBody)
+    }));
+    assert.equal(created.response.status, 201);
+    assert.equal(created.body.idempotent, false);
+    assert.equal(created.body.event.commandId, commandKey);
+    assert.equal(created.body.event.actorRole, "citizen");
+    assert.equal(created.body.event.residentId, "r1");
+    assert.equal(created.body.event.aggregateVersion, 1);
+    assert.notEqual(created.body.event.at, commandBody.at);
+    assert.equal(created.body.productionReady, false);
+
+    const replay = await api(baseUrl, "/api/registration-referral/commands", authorized(citizenToken, {
+      method: "POST",
+      headers: { "Idempotency-Key": commandKey },
+      body: JSON.stringify(commandBody)
+    }));
+    assert.equal(replay.response.status, 200);
+    assert.equal(replay.body.idempotent, true);
+    assert.equal(replay.body.event.id, created.body.event.id);
+
+    const stale = await api(baseUrl, "/api/registration-referral/commands/record-notification-receipt", authorized(citizenToken, {
+      method: "POST",
+      headers: { "Idempotency-Key": `registration-referral-${randomUUID()}` },
+      body: JSON.stringify({
+        expectedVersion: 0,
+        payload: {
+          messageId: "msg-rtc-001-feedback-citizen",
+          status: "handled"
+        }
+      })
+    }));
+    assert.equal(stale.response.status, 409);
+
+    const mismatch = await api(baseUrl, "/api/registration-referral/commands/record-notification-receipt", authorized(citizenToken, {
+      method: "POST",
+      headers: { "Idempotency-Key": `registration-referral-${randomUUID()}` },
+      body: JSON.stringify({
+        action: "run-notification-fallback",
+        expectedVersion: 1,
+        payload: { messageId: "msg-rtc-001-feedback-citizen", status: "handled" }
+      })
+    }));
+    assert.equal(mismatch.response.status, 400);
+
+    const operations = await api(baseUrl, "/api/registration-referral/operations", authorized(citizenToken));
+    assert.equal(operations.response.status, 200);
+    assert.equal(operations.body.productionReady, false);
+    assert.equal(operations.body.queue.every((item) => item.residentId === "r1"), true);
+
+    const outsider = await login(baseUrl, "out_of_scope_hospital", "out-of-scope-pass");
+    const denied = await api(baseUrl, "/api/registration-referral/commands/accept-referral-request", authorized(outsider.body.token, {
+      method: "POST",
+      headers: { "Idempotency-Key": `registration-referral-${randomUUID()}` },
+      body: JSON.stringify({
+        caseId: "rtc-002",
+        expectedVersion: 0,
+        payload: { receivingFeedback: "scope bypass attempt", note: "must fail" }
+      })
+    }));
+    assert.equal(denied.response.status, 403);
+  });
+
   await t.test("accepts signed idempotent integration gateway events", async (t) => {
     const institution = await login(baseUrl, "hospital");
     const contracts = await api(baseUrl, "/api/integration/contracts", authorized(institution.body.token));

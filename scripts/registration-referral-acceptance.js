@@ -105,6 +105,11 @@ function buildRegistrationReferralAcceptance(options = {}) {
   const rtc002 = extractSeedObject(referralSeed, "rtc-002");
   const msgRtc002Citizen = extractSeedObject(taskSeed, "msg-rtc-002-report-citizen");
   const msgRtc002Institution = extractSeedObject(taskSeed, "msg-rtc-002-report-institution");
+  const releaseWired = options.releaseWired === true || (
+    readText("scripts/release-artifact-manifest.js").includes("registration-referral-acceptance-report.md")
+    && readText("scripts/deploy-check.js").includes("manifest:registrationReferralAcceptance")
+    && readText("scripts/release-report.js").includes("registrationReferral:integrationReady")
+  );
   const threadChecks = [
     check("registrationReferralAcceptance:dataConsistency", "thread", consistency.dataReady, `${consistency.summary.P0} P0 / ${consistency.summary.P1} P1 issues`),
     check("registrationReferralAcceptance:readiness", "thread", readiness.functionalOk && readiness.dataReady && !readiness.productionReady, `${readiness.summary.cases} cases / ${readiness.summary.openCases} open / production false`),
@@ -123,7 +128,7 @@ function buildRegistrationReferralAcceptance(options = {}) {
     check("registrationReferralAcceptance:serverMessageSeed", "T00", msgRtc002Citizen.includes('residentId: "r4"') && msgRtc002Institution.includes('residentId: "r4"'), "shared server task-message seed matches repaired resident scope"),
     check("registrationReferralAcceptance:publicCommandApi", "T00", serverSource.includes("/api/registration-referral/commands") && serverSource.includes("applyClosureCommand"), "public command endpoint persists service results transactionally"),
     check("registrationReferralAcceptance:packageScript", "T00", Boolean(pkg.scripts?.["registration-referral:acceptance"]), pkg.scripts?.["registration-referral:acceptance"] || "missing package script"),
-    check("registrationReferralAcceptance:releaseWiring", "T00", options.releaseWired === true, "release manifest, deploy check and release report wiring")
+    check("registrationReferralAcceptance:releaseWiring", "T00", releaseWired, "release manifest, deploy check and release report wiring")
   ];
   const threadReady = threadChecks.every((item) => item.passed);
   const integrationReady = integrationChecks.every((item) => item.passed);

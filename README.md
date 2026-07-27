@@ -6,6 +6,8 @@
 
 居民健康档案公共接入可通过 `npm.cmd run citizen-records:check`、`npm.cmd run citizen-records:test` 和 `npm.cmd run citizen-records:readiness` 验证。T00 已接入授权策略、照护工作区路由和当前 PWA 缓存；真实身份与关系目录、HIS/EMR/LIS/PACS、对象存储、SIEM、法务同意版本、上线签字及公网 TLS 未提供前，`productionReady` 保持 `false`。
 
+挂号、双向转诊与家庭医生闭环可通过 `npm.cmd run registration-referral:check`、`npm.cmd run registration-referral:test` 和 `npm.cmd run registration-referral:acceptance` 验证。公共 API 使用服务端时间、`Idempotency-Key`、演员/机构范围及既有聚合 `expectedVersion` 执行 40 类命令，并持久化哈希链审计；真实 HIS、支付、医保、转诊和消息回调以及现场责任、SLA、切换和回滚签字未齐前，生产上线继续阻断。
+
 ## 当前能力总览
 
 | 范围 | 已完成能力 |

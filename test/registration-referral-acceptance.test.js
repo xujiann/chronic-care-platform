@@ -11,18 +11,18 @@ const {
   writeOutput
 } = require("../scripts/registration-referral-acceptance");
 
-test("T05 acceptance passes while reporting T00 public integration blockers", () => {
+test("T05 acceptance passes after T00 public integration while production stays blocked", () => {
   const report = buildRegistrationReferralAcceptance({ asOf: "2026-07-22T00:00:00.000Z" });
   assert.equal(report.ok, true);
   assert.equal(report.threadReady, true);
-  assert.equal(report.integrationReady, false);
+  assert.equal(report.integrationReady, true);
   assert.equal(report.productionReady, false);
-  assert.equal(report.status, "thread-ready-t00-integration-pending");
+  assert.equal(report.status, "integrated-local-ready-production-blocked");
   assert.equal(report.summary.threadPassed, report.summary.threadChecks);
   assert.equal(report.summary.p0ConsistencyIssues, 0);
   assert.equal(report.summary.commands, 40);
   assert.ok(report.integrationChecks.some((item) => item.id.endsWith("serverReferralSeed") && item.passed));
-  assert.ok(report.integrationChecks.some((item) => item.id.endsWith("serverMessageSeed") && !item.passed));
+  assert.ok(report.integrationChecks.some((item) => item.id.endsWith("serverMessageSeed") && item.passed));
 });
 
 test("acceptance recognizes a fully wired synthetic T00 integration", () => {
@@ -58,7 +58,7 @@ test("acceptance renders and writes T00 handoff evidence", (t) => {
   const report = buildRegistrationReferralAcceptance({ asOf: "2026-07-22T00:00:00.000Z" });
   const markdown = renderMarkdown(report);
   assert.match(markdown, /Thread ready: PASS/);
-  assert.match(markdown, /T00 integration ready: PENDING/);
+  assert.match(markdown, /T00 integration ready: PASS/);
   assert.match(markdown, /serverReferralSeed/);
   assert.match(markdown, /record-primary-care-assessment/);
   assert.match(markdown, /terminate-family-doctor-contract/);
