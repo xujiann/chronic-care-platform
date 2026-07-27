@@ -149,6 +149,9 @@ function buildDeployCheckReport(options = {}) {
   const imagingCloudSource = fs.readFileSync(path.join(ROOT, "imaging-cloud.js"), "utf8");
   const imagingCloudReadinessSource = fs.readFileSync(path.join(ROOT, "scripts", "imaging-cloud-readiness.js"), "utf8");
   const imagingCloudProductionSource = fs.readFileSync(path.join(ROOT, "imaging-cloud-production.js"), "utf8");
+  const physicalExaminationProductionSource = fs.readFileSync(path.join(ROOT, "physical-examination-production.js"), "utf8");
+  const physicalExaminationStandaloneHtml = fs.readFileSync(path.join(ROOT, "physical-examination-standalone.html"), "utf8");
+  const physicalExaminationStandaloneReadinessSource = fs.readFileSync(path.join(ROOT, "scripts", "physical-examination-standalone-readiness.js"), "utf8");
   const productionReleaseEvidenceSource = fs.readFileSync(path.join(ROOT, "scripts", "production-release-evidence-readiness.js"), "utf8");
   const digitalHospitalStandardsSource = fs.readFileSync(path.join(ROOT, "scripts", "digital-hospital-standards-readiness.js"), "utf8");
   const digitalHospitalStandardsHtml = fs.readFileSync(path.join(ROOT, "digital-hospital-standards.html"), "utf8");
@@ -758,8 +761,12 @@ function buildDeployCheckReport(options = {}) {
         && bloodClinicalProductionSource.includes("blocked-until-site-evidence-signed")
         && emergencyModuleGateSource.includes("independent-emergency-module")
         && imagingCloudProductionSource.includes("SITE_RECEIPT_CONTRACTS")
-        && imagingCloudProductionSource.includes("ROUTE_CONTRACTS"),
-      detail: "clinical blood, emergency and imaging module evidence remain subordinate to the T00 platform launch gate"
+        && imagingCloudProductionSource.includes("ROUTE_CONTRACTS")
+        && physicalExaminationProductionSource.includes("REQUIRED_STANDALONE_FILES")
+        && physicalExaminationProductionSource.includes('decision: goLiveReady ? "GO" : "NO-GO"')
+        && physicalExaminationStandaloneHtml.includes("physical-examination-production.js")
+        && physicalExaminationStandaloneReadinessSource.includes('decision: "NO-GO"'),
+      detail: "clinical blood, emergency, imaging and physical-examination module evidence remain subordinate to the T00 platform launch gate"
     },
     {
       name: "package:t10IndependentProductionGates",
@@ -767,7 +774,9 @@ function buildDeployCheckReport(options = {}) {
         "t10:clinical-blood:readiness",
         "t10:clinical-blood:smoke",
         "t10:emergency-module:smoke",
-        "imaging-cloud:test"
+        "imaging-cloud:test",
+        "t10:physical-examination:readiness",
+        "t10:physical-examination:test"
       ].every((name) => Boolean(pkg.scripts?.[name])),
       detail: "T10 independent module check, smoke and readiness commands are registered"
     },
@@ -776,9 +785,10 @@ function buildDeployCheckReport(options = {}) {
       ok: [
         "t10-clinical-blood-independent-gate",
         "t10-emergency-independent-gate",
-        "t10-imaging-production-gate"
+        "t10-imaging-production-gate",
+        "t10-physical-examination-independent-gate"
       ].every((marker) => manifestSource.includes(marker)),
-      detail: "T10 clinical blood, emergency and imaging production gates are indexed"
+      detail: "T10 clinical blood, emergency, imaging and physical-examination production gates are indexed"
     },
     {
       name: "api:t10SpecialtyModuleGovernance",

@@ -61,6 +61,8 @@ test("T00 exposes the T10 specialty cutover pack through public integration cont
   assert.equal(pkg.scripts["t10:clinical-blood:readiness"], "node scripts/blood-clinical-module-readiness.js");
   assert.equal(pkg.scripts["t10:clinical-blood:smoke"], "node scripts/blood-clinical-smoke.js");
   assert.equal(pkg.scripts["t10:emergency-module:smoke"], "node scripts/emergency-module-smoke.js");
+  assert.equal(pkg.scripts["t10:physical-examination:readiness"], "node scripts/physical-examination-standalone-readiness.js");
+  assert.equal(pkg.scripts["t10:physical-examination:test"], "node --test test/physical-examination-production.test.js");
   assert.match(server, /\/api\/t10-specialty\/modules\/clinical-blood\/readiness/);
   assert.match(server, /\/api\/t10-specialty\/modules\/emergency-life-chain\/readiness/);
   assert.match(server, /\/api\/imaging-cloud\/production-center/);
@@ -84,6 +86,7 @@ test("T00 exposes the T10 specialty cutover pack through public integration cont
   assert.match(releaseReport, /specialtyCutover:cutoverCommandCenter/);
   assert.match(releaseReport, /specialtyCutover:observationSignalBoard/);
   assert.match(releaseReport, /specialtyCutover:runtimeSmokePlan/);
+  assert.match(releaseReport, /specialtyCutover:physicalExaminationIndependentGate/);
   assert.match(releaseReport, /t10-specialty-cutover-pack\.json/);
   assert.match(releaseReport, /t10-specialty-cutover-pack\.md/);
 });
