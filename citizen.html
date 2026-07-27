@@ -12,7 +12,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="format-detection" content="telephone=no" />
     <link rel="apple-touch-icon" href="./pwa-icon.svg" />
-    <link rel="stylesheet" href="./citizen.css?v=20260725zh1" />
+    <link rel="stylesheet" href="./citizen.css?v=20260727next1" />
     <script src="./auth.js?v=20260627"></script>
     <script>window.HealthCityAuth.requireRole(["citizen"])</script>
   </head>
@@ -453,6 +453,50 @@
             </form>
             <div id="citizen-access-dispute-list" class="citizen-care-list"></div>
           </article>
+
+          <article class="citizen-care-card wide citizen-next-stage">
+            <header>
+              <div>
+                <h3>居民健康档案八项增强服务</h3>
+                <small>生产接入、跨院治理、家庭代办、主动任务、报告解读、用药安全、紧急资料和运营监测统一展示</small>
+              </div>
+              <em class="feature-state ready">第三版增量</em>
+            </header>
+            <div class="citizen-next-stage-grid">
+              <section class="citizen-next-stage-card" aria-labelledby="citizen-integration-v3-title">
+                <header><h4 id="citizen-integration-v3-title">生产接口闭环</h4><small>只接受正式连接证据</small></header>
+                <div id="citizen-integration-v3" class="citizen-care-list"></div>
+              </section>
+              <section class="citizen-next-stage-card" aria-labelledby="citizen-governance-v3-title">
+                <header><h4 id="citizen-governance-v3-title">跨院档案治理</h4><small>重复、冲突、版本和来源追踪</small></header>
+                <div id="citizen-governance-v3" class="citizen-care-list"></div>
+              </section>
+              <section class="citizen-next-stage-card" aria-labelledby="citizen-family-v3-title">
+                <header><h4 id="citizen-family-v3-title">家庭健康管理</h4><small>关系与授权双重校验</small></header>
+                <div id="citizen-family-v3" class="citizen-care-list"></div>
+              </section>
+              <section class="citizen-next-stage-card" aria-labelledby="citizen-care-plan-v3-title">
+                <header><h4 id="citizen-care-plan-v3-title">主动健康计划</h4><small>随访、复诊、取药和授权提醒</small></header>
+                <div id="citizen-care-plan-v3" class="citizen-care-list"></div>
+              </section>
+              <section class="citizen-next-stage-card" aria-labelledby="citizen-report-explain-v3-title">
+                <header><h4 id="citizen-report-explain-v3-title">报告通俗解读</h4><small>解释术语但不替代医生诊断</small></header>
+                <div id="citizen-report-explain-v3" class="citizen-care-list"></div>
+              </section>
+              <section class="citizen-next-stage-card" aria-labelledby="citizen-medication-safety-v3-title">
+                <header><h4 id="citizen-medication-safety-v3-title">用药安全</h4><small>重复、过敏和相互作用复核</small></header>
+                <div id="citizen-medication-safety-v3" class="citizen-care-list"></div>
+              </section>
+              <section class="citizen-next-stage-card" aria-labelledby="citizen-emergency-pack-v3-title">
+                <header><h4 id="citizen-emergency-pack-v3-title">紧急资料包</h4><small>最小摘要、短时授权、全程审计</small></header>
+                <div id="citizen-emergency-pack-v3" class="citizen-care-list"></div>
+              </section>
+              <section class="citizen-next-stage-card" aria-labelledby="citizen-operations-v3-title">
+                <header><h4 id="citizen-operations-v3-title">上线运营中心</h4><small>接口、拦截、纠错和投诉汇总</small></header>
+                <div id="citizen-operations-v3" class="citizen-care-list"></div>
+              </section>
+            </div>
+          </article>
         </div>
         <p class="resident-records-boundary">生产启用仍需平台集成线程将服务端强制授权、真实主索引和家庭关系、医院信息系统、电子病历系统、检验信息系统、医学影像系统、对象存储、密钥管理系统、扫描引擎和统一审计接入公共接口。</p>
       </section>
@@ -884,7 +928,8 @@
     <script src="./immunization-schedule.js"></script>
     <script src="./citizen-records-v1.js?v=20260724auth3"></script>
     <script src="./citizen-records-v2.js?v=20260725care16"></script>
-    <script src="./citizen.js?v=20260725zh1"></script>
+    <script src="./citizen-records-v3.js?v=20260727next2"></script>
+    <script src="./citizen.js?v=20260727next1"></script>
     <script src="./citizen-ui-zh.js?v=20260725zh4"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {

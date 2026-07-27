@@ -388,6 +388,44 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
   await expect(page.locator("#citizen-correction-list")).toContainText("尚未提交");
 });
 
+test("resident reviews all eight next-stage health record capabilities", async ({ page }) => {
+  await page.goto("/login.html");
+  await page.locator("#login-user").selectOption("citizen");
+  await page.locator("input[name='password']").fill("123456");
+  await page.getByRole("button", { name: "进入系统" }).click();
+  await page.goto("/citizen.html?client=mini-program&page=health-record");
+
+  await expect(page.getByRole("heading", { name: "居民健康档案八项增强服务" })).toBeVisible();
+  for (const heading of [
+    "生产接口闭环",
+    "跨院档案治理",
+    "家庭健康管理",
+    "主动健康计划",
+    "报告通俗解读",
+    "用药安全",
+    "紧急资料包",
+    "上线运营中心"
+  ]) await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+
+  await expect(page.locator("#citizen-integration-v3")).toContainText("待现场接入");
+  await expect(page.locator("#citizen-governance-v3")).toContainText("原始记录");
+  await expect(page.locator("#citizen-family-v3")).toContainText("本人访问");
+  await expect(page.locator("#citizen-care-plan-v3")).toContainText("不自动生成诊断、处方或治疗决定");
+  await expect(page.locator("#citizen-report-explain-v3")).toContainText("不替代医生解释");
+  await expect(page.locator("#citizen-medication-safety-v3")).toContainText("不得据此自行停药");
+  await expect(page.locator("#citizen-emergency-pack-v3")).toContainText("待补齐紧急授权或联系人");
+  await expect(page.locator("#citizen-operations-v3")).toContainText("居民范围汇总");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const nextStageCards = page.locator(".citizen-next-stage-card");
+  await expect(nextStageCards).toHaveCount(8);
+  const firstBox = await nextStageCards.nth(0).boundingBox();
+  const secondBox = await nextStageCards.nth(1).boundingBox();
+  expect(firstBox).toBeTruthy();
+  expect(secondBox).toBeTruthy();
+  expect(Math.abs(firstBox.x - secondBox.x)).toBeLessThan(4);
+});
+
 test("resident-facing pages do not expose English business copy", async ({ page }) => {
   const routes = ["health-record", "emr", "escort", "family-doctor", "registration"];
 
