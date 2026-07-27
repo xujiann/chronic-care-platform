@@ -19,6 +19,11 @@ const { buildCitizenOperationsReadiness, renderMarkdown: renderCitizenOperations
 const { buildCommercialCryptoReadiness, renderMarkdown: renderCommercialCryptoMarkdown } = require("./commercial-crypto-readiness");
 const { buildProductionSecurityReadiness, renderMarkdown: renderProductionSecurityMarkdown } = require("./production-security-readiness");
 const { buildProductionGoNoGoReadiness, renderMarkdown: renderProductionGoNoGoMarkdown } = require("./production-go-no-go-readiness");
+const {
+  DEFAULT_EVIDENCE_DIR: DEFAULT_PRODUCTION_RELEASE_EVIDENCE_DIR,
+  buildProductionReleaseEvidenceReadiness,
+  renderMarkdown: renderProductionReleaseEvidenceMarkdown
+} = require("./production-release-evidence-readiness");
 const { buildPilotAcceptanceCenter } = require("../pilot-acceptance");
 const { renderMarkdown: renderPilotAcceptanceMarkdown } = require("./pilot-acceptance-readiness");
 const { buildDataGovernanceReadiness, renderMarkdown: renderDataGovernanceMarkdown } = require("./data-governance-readiness");
@@ -1405,6 +1410,14 @@ function buildReleaseReport(options = {}) {
   const commercialCrypto = buildCommercialCryptoReadiness({ data, pkg });
   const productionSecurity = buildProductionSecurityReadiness({ data, pkg });
   const productionGoNoGo = buildProductionGoNoGoReadiness({ data, pkg, drRehearsalSigned: false });
+  const productionReleaseEvidenceSource = buildProductionReleaseEvidenceReadiness({
+    directory: (options.env || process.env).PRODUCTION_RELEASE_EVIDENCE_DIR || DEFAULT_PRODUCTION_RELEASE_EVIDENCE_DIR
+  });
+  const productionReleaseEvidenceReadiness = {
+    ...productionReleaseEvidenceSource,
+    evidenceDirectory: "server-configured-controlled-directory",
+    productionReady: false
+  };
   const pilotAcceptance = buildPilotAcceptanceCenter({ data, pkg, env: { ...process.env, ...(options.env || {}) } });
   const phase2Proposal = buildPhase2ProposalReadiness({ pkg });
   const regionalDataSharing = buildRegionalDataSharingReport({ data, pkg });
@@ -1520,6 +1533,9 @@ function buildReleaseReport(options = {}) {
     ...commercialCryptoChecks(commercialCrypto),
     ...productionSecurityChecks(productionSecurity),
     ...productionGoNoGoChecks(productionGoNoGo),
+    check("productionReleaseEvidence:contract", productionReleaseEvidenceReadiness.summary?.documents === 5 && productionReleaseEvidenceReadiness.gates?.length === 5 && productionReleaseEvidenceReadiness.checks?.length >= 5, `${productionReleaseEvidenceReadiness.summary?.present || 0}/5 controlled evidence documents present`, "error", "production-release-evidence"),
+    check("productionReleaseEvidence:publicSummary", fs.readFileSync(path.join(ROOT, "server.js"), "utf8").includes("/api/production-release/evidence-readiness") && fs.readFileSync(path.join(ROOT, "server.js"), "utf8").includes("buildProductionReleaseEvidencePublicSummary"), "commission-only redacted readiness summary is wired", "error", "production-release-evidence"),
+    check("productionReleaseEvidence:formalGate", productionReleaseEvidenceReadiness.ok === true, `${productionReleaseEvidenceReadiness.status}; external evidence validation does not itself authorize production`, "warn", "production-release-evidence"),
     ...pilotAcceptanceChecks(pilotAcceptance),
     ...phase2ProposalChecks(phase2Proposal),
     ...qualitySafetyChecks(qualitySafety),
@@ -1626,6 +1642,7 @@ function buildReleaseReport(options = {}) {
     commercialCrypto,
     productionSecurity,
     productionGoNoGo,
+    productionReleaseEvidenceReadiness,
     pilotAcceptance,
     phase2Proposal,
     qualitySafety,
@@ -2235,6 +2252,8 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       productionGoNoGo: report.productionGoNoGo
     }, null, 2), "utf8");
+    const productionReleaseEvidenceJson = path.join(path.dirname(output), "production-release-evidence-readiness.json");
+    fs.writeFileSync(productionReleaseEvidenceJson, JSON.stringify(report.productionReleaseEvidenceReadiness, null, 2), "utf8");
     const pilotAcceptanceJson = path.join(path.dirname(output), "pilot-acceptance-readiness-report.json");
     fs.writeFileSync(pilotAcceptanceJson, JSON.stringify(report.pilotAcceptance, null, 2), "utf8");
     const qualitySafetyJson = path.join(path.dirname(output), "quality-safety-report.json");
@@ -2641,6 +2660,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(productionSecurityMarkdown, renderProductionSecurityMarkdown(report.productionSecurity), "utf8");
     const productionGoNoGoMarkdown = path.join(path.dirname(markdown), "production-go-no-go-readiness-report.md");
     fs.writeFileSync(productionGoNoGoMarkdown, renderProductionGoNoGoMarkdown(report.productionGoNoGo), "utf8");
+    const productionReleaseEvidenceMarkdown = path.join(path.dirname(markdown), "production-release-evidence-readiness.md");
+    fs.writeFileSync(productionReleaseEvidenceMarkdown, renderProductionReleaseEvidenceMarkdown(report.productionReleaseEvidenceReadiness), "utf8");
     const pilotAcceptanceMarkdown = path.join(path.dirname(markdown), "pilot-acceptance-readiness-report.md");
     fs.writeFileSync(pilotAcceptanceMarkdown, renderPilotAcceptanceMarkdown(report.pilotAcceptance), "utf8");
     const qualitySafetyMarkdown = path.join(path.dirname(markdown), "quality-safety-report.md");

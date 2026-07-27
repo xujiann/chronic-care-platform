@@ -7239,6 +7239,34 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(noGo.body.center.gate.productionGoRecorded, false);
   });
 
+  await t.test("exposes only a server-configured redacted T11 evidence summary", async () => {
+    const anonymous = await api(baseUrl, "/api/production-release/evidence-readiness");
+    assert.equal(anonymous.response.status, 401);
+    const citizenDenied = await api(
+      baseUrl,
+      "/api/production-release/evidence-readiness",
+      authorized(citizenToken)
+    );
+    assert.equal(citizenDenied.response.status, 403);
+
+    const summary = await api(
+      baseUrl,
+      "/api/production-release/evidence-readiness?evidence-dir=docs/evidence-templates/production-security-release&productionReady=true",
+      authorized(commissionToken)
+    );
+    assert.equal(summary.response.status, 200);
+    assert.equal(summary.body.evidenceReady, false);
+    assert.equal(summary.body.productionReady, false);
+    assert.equal(summary.body.status, "no-go-evidence-incomplete");
+    assert.equal(summary.body.summary.documents, 5);
+    assert.equal(summary.body.summary.present, 0);
+    assert.equal(summary.body.gates.length, 5);
+    assert.equal(summary.body.failedCheckIds.length, 5);
+    assert.equal(summary.body.evidenceDirectory, undefined);
+    assert.equal(summary.body.gates.every((item) => item.owner === undefined && item.externalDependencies === undefined), true);
+    assert.doesNotMatch(JSON.stringify(summary.body), /controlled:\/\/|independentVerifier|account|attachment|PRIVATE KEY|token-value/i);
+  });
+
   await t.test("invalidates a session after logout", async () => {
     const session = await login(baseUrl, "county");
     const logout = await api(baseUrl, "/api/auth/logout", authorized(session.body.token, { method: "POST" }));

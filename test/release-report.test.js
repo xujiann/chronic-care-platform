@@ -256,7 +256,8 @@ test("release report summarizes repository readiness and renders markdown", () =
   });
   assert.equal(report.ok, true);
   assert.equal(report.summary.failed, 0);
-  assert.equal(report.summary.warnings, 0);
+  assert.equal(report.summary.warnings, 1);
+  assert.equal(report.checks.some((item) => item.name === "productionReleaseEvidence:formalGate" && !item.passed && item.severity === "warn"), true);
   assert.equal(report.checks.some((item) => item.name === "monitoring:alertRouting" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "monitoring:productionBoundary" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "env:ALERTING.routes" && item.passed), true);

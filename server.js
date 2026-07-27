@@ -112,6 +112,10 @@ const CareServiceRuntime = require("./care-service-runtime");
 const { createCareServiceDeliveryAdapters } = require("./care-service-delivery-adapters");
 const { createCareServiceStateRepository } = require("./care-service-state-repository");
 const { buildCareServiceProductionReadiness } = require("./scripts/care-service-production-readiness");
+const {
+  DEFAULT_EVIDENCE_DIR: DEFAULT_PRODUCTION_RELEASE_EVIDENCE_DIR,
+  buildProductionReleaseEvidenceReadiness
+} = require("./scripts/production-release-evidence-readiness");
 const PHYSICAL_EXAM_CONTRACT_ID = "physical-exam-report-v1";
 const EmergencyService = require("./emergency-service");
 const EmergencyLifeChain = require("./emergency-lifechain");
@@ -24653,6 +24657,28 @@ function sendT10ProductionControlError(res, error) {
   });
 }
 
+function buildProductionReleaseEvidencePublicSummary() {
+  const report = buildProductionReleaseEvidenceReadiness({
+    directory: process.env.PRODUCTION_RELEASE_EVIDENCE_DIR || DEFAULT_PRODUCTION_RELEASE_EVIDENCE_DIR
+  });
+  return {
+    evidenceReady: report.ok === true,
+    productionReady: false,
+    status: report.status,
+    generatedAt: report.generatedAt,
+    evidenceFingerprint: report.evidenceFingerprint,
+    summary: report.summary,
+    gates: report.gates.map((item) => ({
+      id: item.id,
+      gateId: item.gateId,
+      environment: item.environment,
+      present: item.present
+    })),
+    failedCheckIds: report.checks.filter((item) => !item.passed).map((item) => item.id),
+    boundary: "Evidence validation does not authorize platform production cutover; global blockers and an independent launch decision remain required."
+  };
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -28724,6 +28750,22 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/production-go-no-go/center");
     if (!user) return;
     sendJson(res, 200, buildRuntimeProductionGoNoGoCenter(readDatabase()));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/production-release/evidence-readiness") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    const summary = buildProductionReleaseEvidencePublicSummary();
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "production-release-evidence-readiness-read",
+      target: url.pathname,
+      result: "allowed",
+      detail: `${summary.summary.present}/${summary.summary.documents} documents; ${summary.status}; production gate closed`
+    });
+    sendJson(res, 200, summary);
     return;
   }
 
