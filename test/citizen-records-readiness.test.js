@@ -8,11 +8,12 @@ const { assessCitizenRecordsReadiness, evidenceValue } = require("../scripts/cit
 const ROOT = path.resolve(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(ROOT, file), "utf8");
 
-test("T04 software candidate passes while unresolved production dependencies stay blocked", () => {
+test("T04 public integration passes while unresolved production dependencies stay blocked", () => {
   const report = assessCitizenRecordsReadiness({ root: ROOT, env: {} });
   assert.equal(report.summary.softwareReady, true);
+  assert.equal(report.summary.integrationReady, true);
   assert.equal(report.summary.productionReady, false);
-  assert.ok(report.blockers.some((item) => item.id === "t00-policy-wiring"));
+  assert.equal(report.blockers.some((item) => item.id === "t00-policy-wiring"), false);
   assert.ok(report.blockers.some((item) => item.id === "identity-provider"));
   assert.ok(report.blockers.some((item) => item.id === "release-signoff"));
 });

@@ -5640,9 +5640,9 @@ async function addPersonalRecord(record) {
   if (API_BASE) {
     try {
       const request = window.HealthCityAuth?.authFetch || fetch;
-      const authorizationAction = record.category === "authorizations" && window.CitizenRecordsV2
+      const recordAction = window.CitizenRecordsV2
         ? window.CitizenRecordsV2.buildIdempotentAction({
-          operation: "authorization-create",
+          operation: record.category === "authorizations" ? "authorization-create" : "record-supplement",
           residentId: record.residentId,
           nonce: citizenCareRequestNonce(),
           payload: {}
@@ -5652,17 +5652,17 @@ async function addPersonalRecord(record) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(authorizationAction ? { "Idempotency-Key": authorizationAction.idempotencyKey } : {})
+          ...(recordAction ? { "Idempotency-Key": recordAction.idempotencyKey } : {})
         },
-        body: JSON.stringify(authorizationAction ? {
+        body: JSON.stringify(recordAction ? {
           ...record,
-          idempotencyKey: authorizationAction.idempotencyKey,
-          requestedAt: authorizationAction.requestedAt
+          idempotencyKey: recordAction.idempotencyKey,
+          requestedAt: recordAction.requestedAt
         } : record)
       });
       if (response.ok) {
         const payload = await response.json();
-        const saved = authorizationAction
+        const saved = record.category === "authorizations"
           ? window.CitizenRecordsV2.projectAuthorizationCreateResponse(payload, record)
           : payload;
         if (!Array.isArray(state.personalRecords)) state.personalRecords = [];

@@ -4381,14 +4381,14 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const ownRecords = await api(baseUrl, "/api/personal-records?residentId=r1", authorized(citizenToken));
     assert.equal(ownRecords.response.status, 200);
     assert.ok(Array.isArray(ownRecords.body));
-    assert.match(ownRecords.body[0].personIndex, /^已脱敏-/);
+    assert.equal(ownRecords.body[0].personIndex, undefined);
 
     const otherRecords = await api(baseUrl, "/api/personal-records?residentId=r2", authorized(citizenToken));
     assert.equal(otherRecords.response.status, 403);
 
     const created = await api(baseUrl, "/api/personal-records", authorized(citizenToken, {
       method: "POST",
-      body: JSON.stringify({ id: "client-controlled-id", residentId: "r1", category: "self-upload", name: "居民自测记录", result: "正常", expectedVersion: 20260701 })
+      body: JSON.stringify({ id: "client-controlled-id", residentId: "r1", category: "attachments", name: "居民自测记录", result: "正常", expectedVersion: 20260701 })
     }));
     assert.equal(created.response.status, 201);
     assert.notEqual(created.body.id, "client-controlled-id");
@@ -4421,16 +4421,106 @@ test("API authentication, scoping and governance regression suite", async (t) =>
 
     const versionedCreate = await api(baseUrl, "/api/personal-records", authorized(citizenToken, {
       method: "POST",
-      body: JSON.stringify({ residentId: "r1", category: "self-upload", name: "versioned record", result: "ok", expectedVersion: 43 })
+      body: JSON.stringify({ residentId: "r1", category: "attachments", name: "versioned record", result: "ok", expectedVersion: 43 })
     }));
     assert.equal(versionedCreate.response.status, 201);
     assert.equal(versionedCreate.body.residentId, "r1");
 
     const forbiddenCreate = await api(baseUrl, "/api/personal-records", authorized(citizenToken, {
       method: "POST",
-      body: JSON.stringify({ residentId: "r2", category: "self-upload", name: "越权记录" })
+      body: JSON.stringify({ residentId: "r2", category: "attachments", name: "越权记录" })
     }));
     assert.equal(forbiddenCreate.response.status, 403);
+  });
+
+  await t.test("persists resident care workspace actions with scoped idempotent receipts", async () => {
+    const ownRecords = await api(baseUrl, "/api/personal-records?residentId=r1", authorized(citizenToken));
+    const target = ownRecords.body.find((item) => item.id);
+    const correctionKey = `citizen-correction-${randomUUID()}`;
+    const correctionPayload = {
+      id: `correction-${randomUUID()}`,
+      residentId: "r1",
+      recordId: target.id,
+      field: "result",
+      requestedValue: "居民申请复核",
+      reason: "居民认为展示结果与纸质报告不一致",
+      requestedAt: new Date().toISOString(),
+      idempotencyKey: correctionKey
+    };
+    const correction = await api(baseUrl, "/api/record-corrections", authorized(citizenToken, {
+      method: "POST",
+      headers: { "Idempotency-Key": correctionKey },
+      body: JSON.stringify(correctionPayload)
+    }));
+    assert.equal(correction.response.status, 201);
+    assert.equal(correction.body.residentId, "r1");
+    assert.ok(correction.body.receiptId);
+    assert.ok(correction.body.auditRef);
+    assert.equal(correction.body.idempotencyKeyHash, undefined);
+    assert.equal(correction.body.requestDigest, undefined);
+
+    const correctionReplay = await api(baseUrl, "/api/record-corrections", authorized(citizenToken, {
+      method: "POST",
+      headers: { "Idempotency-Key": correctionKey },
+      body: JSON.stringify(correctionPayload)
+    }));
+    assert.equal(correctionReplay.response.status, 200);
+    assert.equal(correctionReplay.body.receiptId, correction.body.receiptId);
+
+    const correctionConflict = await api(baseUrl, "/api/record-corrections", authorized(citizenToken, {
+      method: "POST",
+      headers: { "Idempotency-Key": correctionKey },
+      body: JSON.stringify({ ...correctionPayload, reason: "同一幂等键不得覆盖原申请" })
+    }));
+    assert.equal(correctionConflict.response.status, 400);
+
+    const shareKey = `citizen-share-${randomUUID()}`;
+    const sharePayload = {
+      id: `share-${randomUUID()}`,
+      residentId: "r1",
+      granteeId: "care-team-001",
+      purpose: "复诊前提供最小健康摘要",
+      scopes: ["health-record-summary", "labs"],
+      expiresAt: new Date(Date.now() + 2 * 86400000).toISOString(),
+      requestedAt: new Date().toISOString(),
+      idempotencyKey: shareKey
+    };
+    const share = await api(baseUrl, "/api/record-share-packages", authorized(citizenToken, {
+      method: "POST",
+      headers: { "Idempotency-Key": shareKey },
+      body: JSON.stringify(sharePayload)
+    }));
+    assert.equal(share.response.status, 201);
+    assert.equal(share.body.status, "active");
+    assert.ok(share.body.receiptId);
+
+    const revokeKey = `citizen-share-revoke-${randomUUID()}`;
+    const revokePayload = {
+      residentId: "r1",
+      resourceId: share.body.id,
+      requestedAt: new Date().toISOString(),
+      idempotencyKey: revokeKey
+    };
+    const revoked = await api(baseUrl, `/api/record-share-packages/${share.body.id}/revoke`, authorized(citizenToken, {
+      method: "POST",
+      headers: { "Idempotency-Key": revokeKey },
+      body: JSON.stringify(revokePayload)
+    }));
+    assert.equal(revoked.response.status, 200);
+    assert.equal(revoked.body.status, "revoked");
+    assert.equal(revoked.body.revocationIdempotencyKeyHash, undefined);
+
+    const workspace = await api(baseUrl, "/api/record-care-workspace?residentId=r1", authorized(citizenToken));
+    assert.equal(workspace.response.status, 200);
+    assert.equal(workspace.body.corrections.some((item) => item.receiptId === correction.body.receiptId), true);
+    assert.equal(workspace.body.sharePackages.some((item) => item.id === share.body.id && item.status === "revoked"), true);
+
+    const forbiddenWorkspace = await api(baseUrl, "/api/record-care-workspace?residentId=r2", authorized(citizenToken));
+    assert.equal(forbiddenWorkspace.response.status, 403);
+
+    const commissionState = await api(baseUrl, "/api/state", authorized(commissionToken));
+    assert.equal(commissionState.body.recordCorrections, undefined);
+    assert.equal(commissionState.body.recordSharePackages, undefined);
   });
 
   await t.test("supports authorization revocation and access history review", async () => {
@@ -4496,7 +4586,19 @@ test("API authentication, scoping and governance regression suite", async (t) =>
 
     const versionedAuthorization = await api(baseUrl, "/api/personal-records", authorized(citizenToken, {
       method: "POST",
-      body: JSON.stringify({ residentId: "r1", category: "authorizations", name: "versioned authorization", result: "active" })
+      body: JSON.stringify({
+        residentId: "r1",
+        category: "authorizations",
+        name: "versioned authorization",
+        date: "2026-12-31",
+        meta: {
+          granteeId: "care-team-versioned",
+          granteeType: "care-team",
+          purpose: "versioned authorization regression",
+          scopes: ["health-record-summary"],
+          expiresAt: "2026-12-31"
+        }
+      })
     }));
     assert.equal(versionedAuthorization.response.status, 201);
     const versionedRevoked = await api(baseUrl, `/api/authorizations/${versionedAuthorization.body.id}/revoke`, authorized(citizenToken, {

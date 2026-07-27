@@ -38,6 +38,9 @@ const BloodGoLiveService = require("./blood-go-live-service");
 const DiseasePaymentService = require("./disease-payment-service");
 const DiseasePaymentIntake = require("./disease-payment-intake");
 const PhysicalExaminationService = require("./physical-examination-service");
+const CitizenRecordsPolicy = require("./citizen-records-policy");
+const CitizenRecordsV1 = require("./citizen-records-v1");
+const CitizenRecordsV2 = require("./citizen-records-v2");
 const { buildQualitySafetyInterfaceStandard } = require("./scripts/quality-safety-interface-standard");
 const {
   buildQualitySafetyInterfaceJointTestPack,
@@ -1228,6 +1231,11 @@ function seedState() {
     platformAudit: seedPlatformAudit(),
     platformProcessAudit: seedPlatformProcessAudit(),
     personalRecords: PhysicalExaminationService.mergeSeedRecords(seedPersonalRecords()),
+    recordCorrections: [],
+    recordSharePackages: [],
+    careTaskUpdates: [],
+    accessAcknowledgements: [],
+    accessDisputes: [],
     physicalExamAbnormalCases: PhysicalExaminationService.seedAbnormalCases(),
     physicalExamJointTests: PhysicalExaminationService.seedJointTests(),
     physicalExamHealthPassports: [],
@@ -10554,6 +10562,11 @@ function normalizeState(data) {
     platformAudit: Array.isArray(data.platformAudit) ? data.platformAudit : seedPlatformAudit(),
     platformProcessAudit: Array.isArray(data.platformProcessAudit) ? data.platformProcessAudit : seedPlatformProcessAudit(),
     personalRecords: PhysicalExaminationService.mergeSeedRecords(Array.isArray(data.personalRecords) ? data.personalRecords : seedPersonalRecords()).map(cleanPersonalRecordText),
+    recordCorrections: Array.isArray(data.recordCorrections) ? data.recordCorrections.slice(-1000) : [],
+    recordSharePackages: Array.isArray(data.recordSharePackages) ? data.recordSharePackages.slice(-1000) : [],
+    careTaskUpdates: Array.isArray(data.careTaskUpdates) ? data.careTaskUpdates.slice(-2000) : [],
+    accessAcknowledgements: Array.isArray(data.accessAcknowledgements) ? data.accessAcknowledgements.slice(-2000) : [],
+    accessDisputes: Array.isArray(data.accessDisputes) ? data.accessDisputes.slice(-2000) : [],
     physicalExamAbnormalCases: mergeByKey(PhysicalExaminationService.seedAbnormalCases(), data.physicalExamAbnormalCases, "id"),
     physicalExamJointTests: mergeByKey(PhysicalExaminationService.seedJointTests(), data.physicalExamJointTests, "id"),
     physicalExamHealthPassports: Array.isArray(data.physicalExamHealthPassports) ? data.physicalExamHealthPassports.slice(0, 500) : [],
@@ -11067,6 +11080,64 @@ function normalizePersonalRecord(data) {
     meta: data.meta && typeof data.meta === "object" ? data.meta : {},
     createdBy: data.createdBy || "resident",
     createdAt: data.createdAt || new Date().toISOString()
+  };
+}
+
+function citizenCareIdempotencyKey(req, payload = {}) {
+  const headerKey = String(req.headers["idempotency-key"] || "").trim();
+  const bodyKey = String(payload.idempotencyKey || "").trim();
+  if (headerKey && bodyKey && headerKey !== bodyKey) throw new Error("幂等键请求头与请求体不一致");
+  const key = (headerKey || bodyKey).slice(0, 240);
+  if (!key || !/^[a-z0-9._:-]{8,240}$/i.test(key)) throw new Error("缺少有效的居民操作幂等键");
+  return key;
+}
+
+function citizenCareRequestDigest(payload = {}) {
+  const copy = { ...payload };
+  delete copy.idempotencyKey;
+  return createHash("sha256").update(stableStringify(copy)).digest("hex");
+}
+
+function citizenCareReplay(rows = [], idempotencyKey, requestDigest) {
+  const keyHash = createHash("sha256").update(idempotencyKey).digest("hex");
+  const existing = rows.find((item) => item.idempotencyKeyHash === keyHash);
+  if (!existing) return { keyHash, existing: null };
+  if (existing.requestDigest !== requestDigest) throw new Error("幂等键已用于不同的居民操作");
+  return { keyHash, existing };
+}
+
+function citizenCareReceipt(item = {}) {
+  const result = { ...item };
+  ["idempotencyKeyHash", "requestDigest", "revocationIdempotencyKeyHash", "revocationRequestDigest", "actorId"].forEach((key) => {
+    delete result[key];
+  });
+  return result;
+}
+
+function citizenCareWorkspace(data, residentId) {
+  const projected = CitizenRecordsV2.projectCareWorkspacePayload({
+    corrections: data.recordCorrections,
+    sharePackages: data.recordSharePackages,
+    taskUpdates: data.careTaskUpdates,
+    accessAcknowledgements: data.accessAcknowledgements,
+    accessDisputes: data.accessDisputes,
+    syncedAt: new Date().toISOString(),
+    cursor: createHash("sha256").update(stableStringify([
+      data.recordCorrections?.length || 0,
+      data.recordSharePackages?.length || 0,
+      data.careTaskUpdates?.length || 0,
+      data.accessAcknowledgements?.length || 0,
+      data.accessDisputes?.length || 0
+    ])).digest("hex"),
+    schemaVersion: "citizen-care-v1"
+  }, residentId);
+  return {
+    corrections: projected.recordCorrections,
+    sharePackages: projected.recordSharePackages,
+    taskUpdates: Object.entries(projected.careTaskUpdates).map(([id, item]) => ({ id, residentId, ...item })),
+    accessAcknowledgements: projected.accessAcknowledgements,
+    accessDisputes: projected.accessDisputes,
+    ...projected.sync
   };
 }
 
@@ -16232,6 +16303,11 @@ function scopeStateForUser(data, user) {
   delete scoped.publicHealthExternalEndpointProbeAudit;
   delete scoped.publicHealthExternalEndpointProbeCampaigns;
   delete scoped.publicHealthExternalEndpointProbeCampaignAudit;
+  delete scoped.recordCorrections;
+  delete scoped.recordSharePackages;
+  delete scoped.careTaskUpdates;
+  delete scoped.accessAcknowledgements;
+  delete scoped.accessDisputes;
   if (user.role === "commission") return scoped;
 
   delete scoped.authUsers;
@@ -16401,6 +16477,9 @@ function scopeStateForUser(data, user) {
     scoped.referralSystem.familyDoctorServices = (data.referralSystem?.familyDoctorServices || []).filter(hasAllowedResident);
   }
   scoped.citizenLifecycleActions = buildCitizenLifecycleActions(scoped, user).actions;
+  ["recordCorrections", "recordSharePackages", "careTaskUpdates", "accessAcknowledgements", "accessDisputes"].forEach((key) => {
+    delete scoped[key];
+  });
   return scoped;
 }
 
@@ -36921,18 +37000,203 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/record-care-workspace") {
+    const user = requireApiRole(req, res, ["citizen", "commission"], "/api/record-care-workspace");
+    if (!user) return;
+    const residentId = String(url.searchParams.get("residentId") || "").trim();
+    const data = readDatabase();
+    if (!residentId || !canAccessResident(user, residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "查询居民照护工作台", target: residentId || "missing", result: "拒绝", detail: "超出居民授权范围" });
+      sendJson(res, residentId ? 403 : 400, { error: residentId ? "Forbidden" : "Bad Request", message: residentId ? "无权查询该居民照护工作台" : "residentId 不能为空" });
+      return;
+    }
+    appendDataAccessLog(data, user, residentId, "居民照护工作台", "查询纠错、资料包和处置进度");
+    writeDatabase(normalizeState(data));
+    sendJson(res, 200, citizenCareWorkspace(data, residentId));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/record-corrections") {
+    const user = requireApiRole(req, res, ["citizen"], "/api/record-corrections");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      if (!user.residentId || (payload.residentId && payload.residentId !== user.residentId)) {
+        throw new Error("居民只能为本人提交纠错申请");
+      }
+      const idempotencyKey = citizenCareIdempotencyKey(req, payload);
+      const requestDigest = citizenCareRequestDigest(payload);
+      const replay = citizenCareReplay(data.recordCorrections, idempotencyKey, requestDigest);
+      if (replay.existing) {
+        sendJson(res, 200, citizenCareReceipt(replay.existing));
+        return;
+      }
+      const target = data.personalRecords.find((item) => item.id === String(payload.recordId || "") && item.residentId === user.residentId);
+      if (!target) throw new Error("未找到本人可纠错的健康记录");
+      const at = new Date();
+      const built = CitizenRecordsV2.buildCorrectionRequest({
+        ...payload,
+        residentId: user.residentId,
+        submittedAt: at
+      });
+      const clientId = String(payload.id || "").trim().slice(0, 200);
+      const id = /^correction-[a-z0-9._:-]+$/i.test(clientId) ? clientId : `correction-${randomUUID()}`;
+      if (data.recordCorrections.some((item) => item.id === id)) throw new Error("纠错申请标识已存在");
+      const item = {
+        ...built,
+        id,
+        receiptId: `care-receipt-${randomUUID()}`,
+        auditRef: `care-audit-${randomUUID()}`,
+        acceptedAt: at.toISOString(),
+        updatedAt: at.toISOString(),
+        syncStatus: "accepted",
+        idempotencyKeyHash: replay.keyHash,
+        requestDigest,
+        actorId: user.username || user.id || user.residentId
+      };
+      data.recordCorrections.push(item);
+      appendDataAccessLog(data, user, user.residentId, "健康记录纠错", `提交 ${target.id} 的纠错申请`);
+      data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+        id: randomUUID(), at: at.toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role,
+        action: "提交居民健康记录纠错", target: id, result: "允许", detail: item.auditRef
+      });
+      writeDatabase(normalizeState(data));
+      sendJson(res, 201, citizenCareReceipt(item));
+    } catch (error) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "提交居民健康记录纠错", target: String(payload.recordId || user.residentId || ""), result: "拒绝", detail: error.message });
+      sendJson(res, /本人|超出/.test(error.message) ? 403 : 400, { error: /本人|超出/.test(error.message) ? "Forbidden" : "Bad Request", message: error.message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/record-share-packages") {
+    const user = requireApiRole(req, res, ["citizen"], "/api/record-share-packages");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      if (!user.residentId || (payload.residentId && payload.residentId !== user.residentId)) {
+        throw new Error("居民只能为本人创建健康资料包");
+      }
+      const idempotencyKey = citizenCareIdempotencyKey(req, payload);
+      const requestDigest = citizenCareRequestDigest(payload);
+      const replay = citizenCareReplay(data.recordSharePackages, idempotencyKey, requestDigest);
+      if (replay.existing) {
+        sendJson(res, 200, citizenCareReceipt(replay.existing));
+        return;
+      }
+      const at = new Date();
+      const built = CitizenRecordsV2.buildSharePackage({
+        ...payload,
+        residentId: user.residentId,
+        createdAt: at
+      });
+      const clientId = String(payload.id || "").trim().slice(0, 200);
+      const id = /^share-[a-z0-9._:-]+$/i.test(clientId) ? clientId : `share-${randomUUID()}`;
+      if (data.recordSharePackages.some((item) => item.id === id)) throw new Error("健康资料包标识已存在");
+      const item = {
+        ...built,
+        id,
+        receiptId: `care-receipt-${randomUUID()}`,
+        auditRef: `care-audit-${randomUUID()}`,
+        acceptedAt: at.toISOString(),
+        updatedAt: at.toISOString(),
+        syncStatus: "accepted",
+        idempotencyKeyHash: replay.keyHash,
+        requestDigest,
+        actorId: user.username || user.id || user.residentId
+      };
+      data.recordSharePackages.push(item);
+      appendDataAccessLog(data, user, user.residentId, "一次性健康资料包", `创建 ${item.accessRef}`);
+      data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+        id: randomUUID(), at: at.toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role,
+        action: "创建居民健康资料包", target: id, result: "允许", detail: item.auditRef
+      });
+      writeDatabase(normalizeState(data));
+      sendJson(res, 201, citizenCareReceipt(item));
+    } catch (error) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "创建居民健康资料包", target: user.residentId || "", result: "拒绝", detail: error.message });
+      sendJson(res, /本人|超出/.test(error.message) ? 403 : 400, { error: /本人|超出/.test(error.message) ? "Forbidden" : "Bad Request", message: error.message });
+    }
+    return;
+  }
+
+  const recordShareRevokeMatch = url.pathname.match(/^\/api\/record-share-packages\/([^/]+)\/revoke$/);
+  if (req.method === "POST" && recordShareRevokeMatch) {
+    const user = requireApiRole(req, res, ["citizen"], "/api/record-share-packages/:id/revoke");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const id = decodeURIComponent(recordShareRevokeMatch[1]);
+    try {
+      if (!user.residentId || (payload.residentId && payload.residentId !== user.residentId)) {
+        throw new Error("居民只能撤销本人的健康资料包");
+      }
+      const idempotencyKey = citizenCareIdempotencyKey(req, payload);
+      const requestDigest = citizenCareRequestDigest(payload);
+      const keyHash = createHash("sha256").update(idempotencyKey).digest("hex");
+      const item = data.recordSharePackages.find((candidate) => candidate.id === id && candidate.residentId === user.residentId);
+      if (!item) throw new Error("未找到本人可撤销的健康资料包");
+      if (item.revocationIdempotencyKeyHash === keyHash) {
+        if (item.revocationRequestDigest !== requestDigest) throw new Error("幂等键已用于不同的撤销操作");
+        sendJson(res, 200, citizenCareReceipt(item));
+        return;
+      }
+      if (item.revocationIdempotencyKeyHash) throw new Error("健康资料包已经撤销");
+      const at = new Date();
+      Object.assign(item, CitizenRecordsV2.revokeSharePackage(item, at), {
+        receiptId: `care-receipt-${randomUUID()}`,
+        auditRef: `care-audit-${randomUUID()}`,
+        acceptedAt: at.toISOString(),
+        updatedAt: at.toISOString(),
+        syncStatus: "accepted",
+        revocationIdempotencyKeyHash: keyHash,
+        revocationRequestDigest: requestDigest,
+        actorId: user.username || user.id || user.residentId
+      });
+      appendDataAccessLog(data, user, user.residentId, "一次性健康资料包", `撤销 ${item.accessRef}`);
+      data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+        id: randomUUID(), at: at.toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role,
+        action: "撤销居民健康资料包", target: id, result: "允许", detail: item.auditRef
+      });
+      writeDatabase(normalizeState(data));
+      sendJson(res, 200, citizenCareReceipt(item));
+    } catch (error) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "撤销居民健康资料包", target: id, result: "拒绝", detail: error.message });
+      sendJson(res, /本人|超出/.test(error.message) ? 403 : 400, { error: /本人|超出/.test(error.message) ? "Forbidden" : "Bad Request", message: error.message });
+    }
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/personal-records") {
     const user = requireApiRole(req, res, ["citizen", "institution", "insurance", "county", "commission"], "/api/personal-records");
     if (!user) return;
     const data = readDatabase();
     const residentId = url.searchParams.get("residentId");
     const category = url.searchParams.get("category");
-    if (!canAccessResident(user, residentId, data)) {
+    const citizenDecision = user.role === "citizen"
+      ? CitizenRecordsPolicy.evaluateCitizenRecordAccess(data, user, {
+          residentId,
+          category: category || "health-record-summary"
+        }, {
+          scope: category ? CitizenRecordsPolicy.scopeForRecordCategory(category) : "health-record-summary",
+          purpose: "居民健康记录查询",
+          now: new Date()
+        })
+      : null;
+    if (user.role === "citizen" ? !citizenDecision.allowed : !canAccessResident(user, residentId, data)) {
       appendSecurityEvent({ actor: user.name, role: user.role, action: "访问个人健康信息", target: residentId || "all", result: "拒绝", detail: "超出居民授权范围" });
       sendJson(res, 403, { error: "Forbidden", message: "无权访问该居民健康信息" });
       return;
     }
-    const records = data.personalRecords.filter((item) => (!residentId || item.residentId === residentId) && (!category || item.category === category));
+    let records = data.personalRecords.filter((item) => (!residentId || item.residentId === residentId) && (!category || item.category === category));
+    if (user.role === "citizen") {
+      records = records
+        .filter((item) => CitizenRecordsPolicy.canCitizenReadRecord(data, user, item, { purpose: "居民健康记录查询", now: new Date() }))
+        .map((item) => CitizenRecordsPolicy.projectCitizenRecordResponse(item, residentId))
+        .filter(Boolean);
+    }
     if (residentId) {
       appendDataAccessLog(data, user, residentId, "个人健康信息库", `查询 ${category || "全部"} 记录`);
       writeDatabase(data);
@@ -36946,7 +37210,44 @@ async function handleApi(req, res) {
     if (!user) return;
     const data = readDatabase();
     const payload = await collectJson(req);
-    const recordData = normalizePersonalRecord(payload);
+    let recordData;
+    let replay = null;
+    let requestDigest = "";
+    try {
+      if (user.role === "citizen") {
+        const idempotencyKey = citizenCareIdempotencyKey(req, payload);
+        requestDigest = citizenCareRequestDigest(payload);
+        replay = citizenCareReplay(data.personalRecords, idempotencyKey, requestDigest);
+        if (replay.existing) {
+          sendJson(res, 200, redactSensitiveResponse(citizenCareReceipt(replay.existing), user));
+          return;
+        }
+        if (payload.category === "authorizations") {
+          recordData = normalizePersonalRecord(CitizenRecordsV1.buildAuthorizationRecord({
+            residentId: user.residentId,
+            granteeName: payload.name,
+            granteeId: payload.meta?.granteeId,
+            granteeType: payload.meta?.granteeType,
+            previousAuthorizationId: payload.meta?.previousAuthorizationId,
+            purpose: payload.meta?.purpose,
+            scopes: payload.meta?.scopes,
+            expiresAt: payload.meta?.expiresAt || payload.date,
+            consentVersion: payload.meta?.consentVersion,
+            source: payload.source,
+            grantedAt: new Date().toISOString()
+          }));
+        } else {
+          recordData = normalizePersonalRecord(CitizenRecordsPolicy.normalizeCitizenSupplement(payload, user));
+        }
+      } else {
+        recordData = normalizePersonalRecord(payload);
+      }
+    } catch (error) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "新增个人健康信息", target: String(payload.residentId || user.residentId || ""), result: "拒绝", detail: error.message });
+      const forbidden = /本人|self record|超出/i.test(error.message);
+      sendJson(res, forbidden ? 403 : 400, { error: forbidden ? "Forbidden" : "Bad Request", message: error.message });
+      return;
+    }
     if (!canAccessResident(user, recordData.residentId, data)) {
       appendSecurityEvent({ actor: user.name, role: user.role, action: "create personal health record", target: recordData.residentId, result: "拒绝", detail: "超出居民授权范围" });
       sendJson(res, 403, { error: "Forbidden", message: "无权新增该居民健康信息" });
@@ -36957,6 +37258,14 @@ async function handleApi(req, res) {
     recordData.personIndex = recordData.personIndex || personIndexForResident(residentMap, recordData.residentId);
     recordData.createdBy = user.username || user.role;
     recordData.createdByName = user.name;
+    if (user.role === "citizen") {
+      recordData.receiptId = `record-receipt-${randomUUID()}`;
+      recordData.auditRef = `record-audit-${randomUUID()}`;
+      recordData.acceptedAt = new Date().toISOString();
+      recordData.syncStatus = "accepted";
+      recordData.idempotencyKeyHash = replay.keyHash;
+      recordData.requestDigest = requestDigest;
+    }
     data.personalRecords.push(recordData);
     if (Object.hasOwn(payload, "expectedVersion")) {
       data.storageMeta = {
@@ -36984,6 +37293,11 @@ async function handleApi(req, res) {
     if (!canAccessResident(user, data.personalRecords[index].residentId, data)) {
       appendSecurityEvent({ actor: user.name, role: user.role, action: "更新个人健康信息", target: data.personalRecords[index].residentId, result: "拒绝", detail: "超出居民授权范围" });
       sendJson(res, 403, { error: "Forbidden", message: "无权更新该居民健康信息" });
+      return;
+    }
+    if (user.role === "citizen" && data.personalRecords[index].meta?.authority !== "resident-upload") {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "更新个人健康信息", target: data.personalRecords[index].residentId, result: "拒绝", detail: "权威来源记录不得由居民直接覆盖，请提交纠错申请" });
+      sendJson(res, 403, { error: "Forbidden", message: "权威来源记录不得由居民直接覆盖，请提交纠错申请" });
       return;
     }
     const safePatch = Object.fromEntries(Object.entries(patch).filter(([key]) => !PERSONAL_RECORD_PROTECTED_FIELDS.has(key)));

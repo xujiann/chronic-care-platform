@@ -13,6 +13,7 @@ const { buildChronicInformatizationSourceReport, renderMarkdown: renderChronicIn
 const { buildChronicInstitutionInterfaceReport, renderMarkdown: renderChronicInstitutionInterfaceMarkdown } = require("./chronic-institution-interfaces");
 const { buildChronicLaunchCoreReport, renderMarkdown: renderChronicLaunchCoreMarkdown } = require("./chronic-launch-core");
 const { buildCitizenLaunchFoundationReadiness, renderMarkdown: renderCitizenLaunchFoundationMarkdown } = require("./citizen-launch-foundation-readiness");
+const { assessCitizenRecordsReadiness, renderMarkdown: renderCitizenRecordsMarkdown } = require("./citizen-records-readiness");
 const { buildCitizenOperationsReadiness, renderMarkdown: renderCitizenOperationsMarkdown } = require("./citizen-operations-readiness");
 const { buildCommercialCryptoReadiness, renderMarkdown: renderCommercialCryptoMarkdown } = require("./commercial-crypto-readiness");
 const { buildProductionSecurityReadiness, renderMarkdown: renderProductionSecurityMarkdown } = require("./production-security-readiness");
@@ -1058,6 +1059,20 @@ function citizenLaunchFoundationChecks(citizenLaunchFoundation) {
   ];
 }
 
+function citizenRecordsChecks(citizenRecords) {
+  return [
+    check("citizenRecords:softwareReady", citizenRecords.summary?.softwareReady, `${citizenRecords.softwareChecks?.filter((item) => item.passed).length || 0}/${citizenRecords.softwareChecks?.length || 0} software checks`, "error", "citizen-records"),
+    check("citizenRecords:integrationReady", citizenRecords.summary?.integrationReady, `${citizenRecords.integrationChecks?.filter((item) => item.passed).length || 0}/${citizenRecords.integrationChecks?.length || 0} T00 integration checks`, "error", "citizen-records"),
+    check(
+      "citizenRecords:productionBoundary",
+      citizenRecords.summary?.productionReady === false && citizenRecords.summary?.externalReady === false && (citizenRecords.blockers?.length || 0) >= 1,
+      `${citizenRecords.blockers?.length || 0} external or site blockers; productionReady=false`,
+      "error",
+      "citizen-records"
+    )
+  ];
+}
+
 function productionDbReadinessChecks(productionDbReadiness) {
   return [
     check("productionDb:readiness", productionDbReadiness.ok, productionDbReadiness.ok ? "production database readiness checks passed" : "production database readiness checks failed", "error", "production-db"),
@@ -1401,6 +1416,11 @@ function buildReleaseReport(options = {}) {
       ? fs.readFileSync(path.join(ROOT, "docs", "citizen-launch-foundation-plan.md"), "utf8")
       : ""
   });
+  const citizenRecords = assessCitizenRecordsReadiness({
+    root: ROOT,
+    env: { ...process.env, ...(options.env || {}) },
+    profile: "software"
+  });
   const operationsReadiness = buildOperationsReadinessReport({ data, pkg });
   const processAudit = buildProcessAuditReport({ data });
   const serviceAcceptance = buildServiceAcceptanceSummary(data);
@@ -1490,6 +1510,7 @@ function buildReleaseReport(options = {}) {
     ...emergencyReadinessChecks(emergencyReadiness),
     ...specialtyCutoverChecks(specialtyCutover),
     ...citizenLaunchFoundationChecks(citizenLaunchFoundation),
+    ...citizenRecordsChecks(citizenRecords),
     ...operationsReadinessChecks(operationsReadiness),
     ...processAuditChecks(processAudit),
     ...serviceAcceptanceChecks(serviceAcceptance),
@@ -1587,6 +1608,7 @@ function buildReleaseReport(options = {}) {
     emergencyReadiness,
     specialtyCutover,
     citizenLaunchFoundation,
+    citizenRecords,
     operationsReadiness,
     processAudit,
     serviceAcceptance,
@@ -1899,6 +1921,10 @@ function renderMarkdown(report) {
     "## Citizen launch foundation readiness report",
     "",
     "See `citizen-launch-foundation-readiness.json` and `citizen-launch-foundation-readiness.md` for resident phone-code delivery, PWA/app shell refresh, mini-program/app routing, copyable C-end pipeline acceptance checklist, and production SMS, real-name, guardian, HTTPS, signing, push, and monitoring dependencies with owners, blockers, evidence, and onsite acceptance.",
+    "",
+    "## Citizen health record readiness report",
+    "",
+    "See `citizen-records-readiness-report.json` and `citizen-records-readiness-report.md` for T04 resident projection, fail-closed authorization, care workspace routes, PWA cache integration, and unresolved production identity, clinical connector, storage, audit, legal, signoff, and TLS blockers.",
     "",
     "## Production database readiness report",
     "",
@@ -2373,6 +2399,8 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       citizenLaunchFoundation: report.citizenLaunchFoundation
     }, null, 2), "utf8");
+    const citizenRecordsJson = path.join(path.dirname(output), "citizen-records-readiness-report.json");
+    fs.writeFileSync(citizenRecordsJson, JSON.stringify(report.citizenRecords, null, 2), "utf8");
     const productionDbJson = path.join(path.dirname(output), "production-db-readiness-report.json");
     fs.writeFileSync(productionDbJson, JSON.stringify({
       project: report.project,
@@ -2614,6 +2642,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(specialtyCutoverMarkdown, renderSpecialtyCutoverMarkdown(report.specialtyCutover), "utf8");
     const citizenLaunchFoundationMarkdown = path.join(path.dirname(markdown), "citizen-launch-foundation-readiness.md");
     fs.writeFileSync(citizenLaunchFoundationMarkdown, renderCitizenLaunchFoundationMarkdown(report.citizenLaunchFoundation), "utf8");
+    const citizenRecordsMarkdown = path.join(path.dirname(markdown), "citizen-records-readiness-report.md");
+    fs.writeFileSync(citizenRecordsMarkdown, renderCitizenRecordsMarkdown(report.citizenRecords), "utf8");
     const productionDbMarkdown = path.join(path.dirname(markdown), "production-db-readiness-report.md");
     fs.writeFileSync(productionDbMarkdown, renderProductionDbReadinessMarkdown(report.productionDbReadiness), "utf8");
     const evaluationMarkdown = path.join(path.dirname(markdown), "evaluation-evidence-report.md");

@@ -136,6 +136,40 @@ function assessCitizenRecordsReadiness(options = {}) {
   };
 }
 
+function renderMarkdown(report) {
+  const rows = (items) => items.map((item) => `| ${item.id} | ${item.label} | ${item.passed ? "通过" : "阻断"} |`).join("\n");
+  return [
+    "# 居民健康档案就绪报告",
+    "",
+    `生成时间：${report.generatedAt}`,
+    "",
+    `- 软件就绪：${report.summary.softwareReady ? "是" : "否"}`,
+    `- 公共层集成就绪：${report.summary.integrationReady ? "是" : "否"}`,
+    `- 外部依赖就绪：${report.summary.externalReady ? "是" : "否"}`,
+    `- 生产就绪：${report.summary.productionReady ? "是" : "否"}`,
+    "",
+    "## 软件检查",
+    "",
+    "| ID | 检查 | 结果 |",
+    "|---|---|---|",
+    rows(report.softwareChecks),
+    "",
+    "## T00 公共层检查",
+    "",
+    "| ID | 检查 | 结果 |",
+    "|---|---|---|",
+    rows(report.integrationChecks),
+    "",
+    "## 外部依赖",
+    "",
+    "| ID | 检查 | 结果 |",
+    "|---|---|---|",
+    rows(report.externalChecks),
+    "",
+    "生产门禁不得由演示配置、占位证据或客户端自报状态解除。"
+  ].join("\n");
+}
+
 function main() {
   const profileArg = process.argv.find((arg) => arg.startsWith("--profile="));
   const profile = profileArg ? profileArg.split("=")[1] : "software";
@@ -147,4 +181,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { assessCitizenRecordsReadiness, evidenceValue };
+module.exports = { assessCitizenRecordsReadiness, evidenceValue, renderMarkdown };
