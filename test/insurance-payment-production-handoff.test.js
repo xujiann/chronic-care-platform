@@ -258,3 +258,44 @@ test("production handoff fails closed when an external requirement has no review
     (error) => error.code === "HANDOFF_LEDGER_INVALID"
   );
 });
+
+test("production handoff expires verified evidence and renews it with a fresh digest", () => {
+  const acceptance = buildInsurancePaymentAcceptance();
+  const route = acceptance.integrationHandoff.routes.find((item) => !item.wired);
+  const itemId = `route:${route.id}`;
+  const data = {};
+  const actor = { username: "t00-integrator", role: "integration-owner" };
+  const submitted = Handoff.submitHandoffEvidence(data, acceptance, itemId, evidenceInput(), actor).item;
+  assert.equal(submitted.evidence.validUntil, "2026-08-21T09:00:00.000Z");
+  Handoff.verifyHandoffEvidence(data, acceptance, itemId, { approved: true, verificationReference: "EXPIRY-REVIEW", verifiedAt: "2026-07-22T10:00:00.000Z", idempotencyKey: "expiry-review" }, { username: "acceptance-lead", role: "acceptance-reviewer" });
+
+  const currentStatus = Handoff.buildProductionHandoffStatus(data, acceptance, "2026-08-21T08:59:59.999Z");
+  assert.equal(currentStatus.items.find((item) => item.id === itemId).expired, false);
+  assert.equal(currentStatus.summary.expired, 0);
+  assert.throws(
+    () => Handoff.submitHandoffEvidence(data, acceptance, itemId, evidenceInput({ evidenceDigest: `sha256:${"b".repeat(64)}`, submittedAt: "2026-08-21T08:59:59.999Z", idempotencyKey: "early-renewal" }), actor),
+    (error) => error.code === "HANDOFF_SUBMISSION_STATE_INVALID"
+  );
+
+  const expiredStatus = Handoff.buildProductionHandoffStatus(data, acceptance, "2026-08-21T09:00:00.000Z");
+  assert.equal(expiredStatus.items.find((item) => item.id === itemId).expired, true);
+  assert.equal(expiredStatus.summary.expired, 1);
+  const renewed = Handoff.submitHandoffEvidence(data, acceptance, itemId, evidenceInput({ evidenceDigest: `sha256:${"b".repeat(64)}`, submittedAt: "2026-08-21T09:00:00.000Z", idempotencyKey: "renew-expired-evidence" }), actor).item;
+  assert.equal(renewed.state, Handoff.HANDOFF_STATES.SUBMITTED);
+  assert.equal(renewed.events.at(-1).action, "evidence-renewed");
+  assert.equal(Handoff.verifyItemLedger(renewed), true);
+});
+
+test("production handoff caps evidence validity by responsibility", () => {
+  const acceptance = buildInsurancePaymentAcceptance();
+  const route = acceptance.integrationHandoff.routes.find((item) => !item.wired);
+  const itemId = `route:${route.id}`;
+  const data = {};
+  assert.equal(Handoff.evidenceValidityDays({ scope: "route" }), 30);
+  assert.equal(Handoff.evidenceValidityDays({ scope: "external", requirement: { reviewerRole: "security-reviewer" } }), 90);
+  assert.equal(Handoff.evidenceValidityDays({ scope: "external", requirement: { reviewerRole: "acceptance-reviewer" } }), 180);
+  assert.throws(
+    () => Handoff.submitHandoffEvidence(data, acceptance, itemId, evidenceInput({ validUntil: "2026-08-22T09:00:00.000Z" }), { username: "t00-integrator", role: "integration-owner" }),
+    (error) => error.code === "HANDOFF_EVIDENCE_VALIDITY_TOO_LONG"
+  );
+});
