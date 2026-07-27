@@ -534,6 +534,14 @@ Production dependency health is accepted only from the exact `CARE_DEPENDENCY_EV
 
 Run `npm.cmd run care-service:test` and `npm.cmd run care-service:readiness`. Platform integration does not make the module production-ready: real identity/organization directories, HIS and appointment interfaces, message/payment/insurance/signature callbacks, production transactional storage, fresh dependency receipts, SIEM/alert duty, disaster recovery evidence and all five evidence-bound site approvals remain hard blockers.
 
+## Insurance Payment and Disease Payment Production Boundary
+
+The insurance-payment public boundary exposes the 23 reviewed refund, formal grouping, special-case appeal and annual-clearance routes recorded by `npm.cmd run insurance-payment:acceptance`. Actors and institution scope come from the authenticated server session. Refund requests retain their trusted organization binding, dual review ignores client-supplied roles, and outbound dispatches use the signed financial adapter. Signed financial callbacks synchronize payment refunds and insurance settlements in the same durable state update.
+
+Formal grouping dispatch and failure commands require a server-system HMAC over the action, path, resource and payload. Grouper receipts are accepted only through the configured callback source, nonce/timestamp window and signature verification. Expert reselection and appeal actions apply the responsibility matrix; finance-only refund reconciliation/closure and annual-clearance posting/locking remain fail-closed until a trusted finance identity source is connected.
+
+Run `npm.cmd run insurance-payment:check`, `npm.cmd run insurance-payment:test`, `npm.cmd run insurance-payment:acceptance` and `npm.cmd run insurance-payment:evidence`. The generated acceptance report and evidence packet verify the local contract and public wiring, but `productionReady` remains false until the listed live identity, institution, insurance-core, financial, database, SIEM, duty, disaster-recovery and signed site-acceptance evidence is independently supplied.
+
 ## Health Dashboard Aggregate Entry
 
 - `health-dashboard.html` is priority application 8: the aggregate entry for the first seven applications.

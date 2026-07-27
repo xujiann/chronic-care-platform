@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
-const { generateKeyPairSync } = require("node:crypto");
+const { createHmac, generateKeyPairSync } = require("node:crypto");
 const test = require("node:test");
 const Intake = require("../disease-payment-intake");
 const Service = require("../disease-payment-service");
@@ -17,6 +17,39 @@ const apiPackageKeys = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
 const apiPackageFingerprint = PackageSignature.publicKeyFingerprint(apiPackageKeys.publicKey.export({ type: "spki", format: "pem" }));
 const apiGrouperKeys = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
 const apiGrouperFingerprint = GrouperContract.publicKeyFingerprint(apiGrouperKeys.publicKey.export({ type: "spki", format: "pem" }));
+const apiIntegrationSecret = "api-insurance-integration-secret-with-at-least-32-characters";
+const apiGrouperCallbackSecret = "api-grouper-callback-secret-with-at-least-32-characters";
+const apiGrouperSource = "api-official-grouper";
+
+function stableStringify(value) {
+  if (Array.isArray(value)) return `[${value.map((item) => stableStringify(item)).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(",")}}`;
+  return JSON.stringify(value);
+}
+
+function systemCommandHeaders(pathname, id, action, payload) {
+  const signedPayload = { action: `formal-grouping.${action}`, target: `${pathname}:${id}`, payload };
+  return {
+    "Content-Type": "application/json",
+    "X-Integration-Signature": createHmac("sha256", apiIntegrationSecret).update(stableStringify(signedPayload)).digest("hex")
+  };
+}
+
+function grouperCallbackHeaders(payload, nonce) {
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  return {
+    "Content-Type": "application/json",
+    "X-Grouper-Timestamp": timestamp,
+    "X-Grouper-Nonce": nonce,
+    "X-Grouper-Source": apiGrouperSource,
+    "X-Grouper-Signature": GrouperContract.signTrustedGrouperCallback(payload, {
+      secret: apiGrouperCallbackSecret,
+      timestamp,
+      nonce,
+      sourceId: apiGrouperSource
+    })
+  };
+}
 
 function signApiPackage(payload) {
   payload.signatureEvidence = PackageSignature.createPackageSignature(payload, apiPackageKeys.privateKey.export({ type: "pkcs8", format: "pem" }), { signerId: "api-insurance-signer", signerOrganization: payload.sourceOrganization, validUntil: "2036-12-31T23:59:59.000Z" });
@@ -56,7 +89,20 @@ test("disease payment API runs an authenticated end-to-end workflow", async (t) 
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "disease-payment-api-"));
   fs.copyFileSync(path.join(ROOT, "data", "db.json"), path.join(dataDir, "db.json"));
   const port = 19500 + Math.floor(Math.random() * 1000);
-  const server = spawn(process.execPath, ["server.js"], { cwd: ROOT, env: { ...process.env, PORT: String(port), DATA_DIR: dataDir, DISEASE_PAYMENT_TRUSTED_SIGNER_FINGERPRINTS: apiPackageFingerprint, DISEASE_PAYMENT_GROUPER_TRUSTED_SIGNER_FINGERPRINTS: apiGrouperFingerprint }, stdio: "ignore" });
+  const server = spawn(process.execPath, ["server.js"], {
+    cwd: ROOT,
+    env: {
+      ...process.env,
+      PORT: String(port),
+      DATA_DIR: dataDir,
+      INTEGRATION_GATEWAY_SECRET: apiIntegrationSecret,
+      DISEASE_PAYMENT_TRUSTED_SIGNER_FINGERPRINTS: apiPackageFingerprint,
+      DISEASE_PAYMENT_GROUPER_TRUSTED_SIGNER_FINGERPRINTS: apiGrouperFingerprint,
+      DISEASE_PAYMENT_GROUPER_CALLBACK_SECRET: apiGrouperCallbackSecret,
+      DISEASE_PAYMENT_GROUPER_CALLBACK_ALLOWED_SOURCES: apiGrouperSource
+    },
+    stdio: "ignore"
+  });
   t.after(() => { server.kill(); fs.rmSync(dataDir, { recursive: true, force: true }); });
   const baseUrl = `http://127.0.0.1:${port}`;
   await waitForServer(baseUrl);
@@ -182,7 +228,13 @@ test("disease payment API runs an authenticated end-to-end workflow", async (t) 
   const formalJob = await json(baseUrl, "/api/disease-payment/formal-grouping/jobs", { method: "POST", headers, body: JSON.stringify({ id: "api-formal-job-success", idempotencyKey: "api-formal-idem-success", mode: "DRG", schemeVersion: "DRG-2.0-DL", caseIds: formalCaseIds }) });
   assert.equal(formalJob.response.status, 201);
   assert.equal(formalJob.body.job.status, "queued");
-  const formalDispatch = await json(baseUrl, "/api/disease-payment/formal-grouping/jobs/api-formal-job-success/dispatch", { method: "POST", headers, body: JSON.stringify({ accepted: true, transportId: "api-transport-success" }) });
+  const formalDispatchPath = "/api/disease-payment/formal-grouping/jobs/api-formal-job-success/dispatch";
+  const formalDispatchPayload = { accepted: true, transportId: "api-transport-success" };
+  const formalDispatch = await json(baseUrl, formalDispatchPath, {
+    method: "POST",
+    headers: systemCommandHeaders(formalDispatchPath, "api-formal-job-success", "dispatch", formalDispatchPayload),
+    body: JSON.stringify(formalDispatchPayload)
+  });
   assert.equal(formalDispatch.body.job.status, "awaiting-receipt");
   const formalState = Service.seedDiseasePaymentState();
   const officialResults = formalCaseIds.map((caseId, index) => {
@@ -190,7 +242,16 @@ test("disease payment API runs an authenticated end-to-end workflow", async (t) 
     const preview = Service.calculateCase(formalState, formalCase, "DRG").grouping;
     return signApiOfficialReceipt({ caseId: formalCase.id, receiptId: `API-OFFICIAL-${index + 1}`, groupCode: preview.groupCode, groupName: preview.groupName, mdcCode: preview.mdcCode, adrgCode: preview.adrgCode, schemeVersion: "DRG-2.0-DL", inputDigest: Intake.officialCaseDigest(formalCase, "DRG"), signedAt: "2026-07-20T08:00:00.000Z" });
   });
-  const formalReceipt = await json(baseUrl, "/api/disease-payment/formal-grouping/jobs/api-formal-job-success/receipts", { method: "POST", headers, body: JSON.stringify({ correlationId: formalDispatch.body.job.correlationId, officialResults }) });
+  const formalReceiptPayload = {
+    eventId: "api-formal-grouper-event-success",
+    correlationId: formalDispatch.body.job.correlationId,
+    officialResults
+  };
+  const formalReceipt = await json(baseUrl, "/api/disease-payment/formal-grouping/jobs/api-formal-job-success/receipts", {
+    method: "POST",
+    headers: grouperCallbackHeaders(formalReceiptPayload, "api-grouper-callback-nonce-success"),
+    body: JSON.stringify(formalReceiptPayload)
+  });
   assert.equal(formalReceipt.response.status, 200);
   assert.equal(formalReceipt.body.job.status, "completed");
   assert.equal(formalReceipt.body.groupingRun.environment, "formal");
@@ -204,8 +265,20 @@ test("disease payment API runs an authenticated end-to-end workflow", async (t) 
   const manualCoreAccepted = await json(baseUrl, settlementPath, { method: "POST", headers, body: JSON.stringify({ action: "core-accepted", receiptId: "API-MANUAL-CORE-ACCEPTED" }) });
   assert.equal(manualCoreAccepted.response.status, 500);
   const failedJob = await json(baseUrl, "/api/disease-payment/formal-grouping/jobs", { method: "POST", headers, body: JSON.stringify({ id: "api-formal-job-failure", mode: "DRG", schemeVersion: "DRG-2.0-DL", caseIds: ["dp-case-002"], maxAttempts: 1 }) });
-  await json(baseUrl, "/api/disease-payment/formal-grouping/jobs/api-formal-job-failure/dispatch", { method: "POST", headers, body: JSON.stringify({ accepted: true }) });
-  const formalFailure = await json(baseUrl, "/api/disease-payment/formal-grouping/jobs/api-formal-job-failure/fail", { method: "POST", headers, body: JSON.stringify({ errorCode: "RECEIPT_TIMEOUT", errorMessage: "回执超时" }) });
+  const failedDispatchPath = "/api/disease-payment/formal-grouping/jobs/api-formal-job-failure/dispatch";
+  const failedDispatchPayload = { accepted: true };
+  await json(baseUrl, failedDispatchPath, {
+    method: "POST",
+    headers: systemCommandHeaders(failedDispatchPath, "api-formal-job-failure", "dispatch", failedDispatchPayload),
+    body: JSON.stringify(failedDispatchPayload)
+  });
+  const formalFailurePath = "/api/disease-payment/formal-grouping/jobs/api-formal-job-failure/fail";
+  const formalFailurePayload = { errorCode: "RECEIPT_TIMEOUT", errorMessage: "回执超时" };
+  const formalFailure = await json(baseUrl, formalFailurePath, {
+    method: "POST",
+    headers: systemCommandHeaders(formalFailurePath, "api-formal-job-failure", "fail", formalFailurePayload),
+    body: JSON.stringify(formalFailurePayload)
+  });
   assert.equal(formalFailure.body.job.status, "dead-letter");
   const formalReconciled = await json(baseUrl, "/api/disease-payment/formal-grouping/jobs/api-formal-job-failure/reconcile", { method: "POST", headers, body: JSON.stringify({ resolution: "链路恢复，完成手工对账" }) });
   assert.equal(formalReconciled.body.job.status, "queued");

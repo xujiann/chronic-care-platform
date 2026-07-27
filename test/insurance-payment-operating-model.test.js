@@ -31,16 +31,16 @@ test("responsibility authorization requires both role and organization boundary"
   assert.equal(OperatingModel.authorizeAction("formal-grouping.reconcile", { role: "commission", organizationType: "platform" }).allowed, false);
 });
 
-test("T00 handoff lists public and trusted callback wiring without claiming it is complete", () => {
+test("T00 handoff confirms public and trusted callback wiring without claiming production readiness", () => {
   const serverSource = fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
   const handoff = OperatingModel.buildT00IntegrationHandoff(serverSource);
   assert.equal(handoff.readyForIntegration, true);
-  assert.ok(handoff.pending > 0);
-  assert.ok(handoff.routes.some((item) => item.id === "refund-callback-hook" && !item.wired));
-  assert.ok(handoff.routes.some((item) => item.id === "refund-resubmit" && !item.wired));
-  assert.ok(handoff.routes.some((item) => item.id === "annual-clearance-create" && !item.wired));
+  assert.equal(handoff.pending, 0);
+  assert.ok(handoff.routes.some((item) => item.id === "refund-callback-hook" && item.wired));
+  assert.ok(handoff.routes.some((item) => item.id === "refund-resubmit" && item.wired));
+  assert.ok(handoff.routes.some((item) => item.id === "annual-clearance-create" && item.wired));
   const formalReceipt = handoff.routes.find((item) => item.id === "formal-grouping-receipt");
-  assert.equal(formalReceipt.wired, false);
+  assert.equal(formalReceipt.wired, true);
   assert.deepEqual(formalReceipt.roles, ["system"]);
   assert.deepEqual(formalReceipt.organizations, ["official_grouper_adapter"]);
   assert.ok(formalReceipt.integrationMarkers.includes("verifyTrustedGrouperCallback"));

@@ -68,6 +68,8 @@ const { buildPublicHealthHighlightsReadiness, renderMarkdown: renderPublicHealth
 const { buildPublicHealthFinalReadiness, renderMarkdown: renderPublicHealthFinalMarkdown } = require("./public-health-final-readiness");
 const { buildBloodSystemReadinessReport, renderMarkdown: renderBloodSystemMarkdown } = require("./blood-system-readiness");
 const { buildDiseasePaymentReadiness, renderMarkdown: renderDiseasePaymentMarkdown } = require("./disease-payment-readiness");
+const { buildInsurancePaymentAcceptance, renderMarkdown: renderInsurancePaymentAcceptanceMarkdown } = require("./insurance-payment-acceptance");
+const { buildInsurancePaymentEvidencePacket, renderMarkdown: renderInsurancePaymentEvidenceMarkdown, verifyInsurancePaymentEvidencePacket } = require("./insurance-payment-evidence-packet");
 const { renderMarkdown: renderPriorityApplicationTemplatesMarkdown } = require("./priority-application-templates");
 const { buildRegionalDataSharingReport, renderMarkdown: renderRegionalDataSharingMarkdown } = require("./regional-data-sharing");
 const { buildRegionalReferralOverlapReport, renderMarkdown: renderRegionalReferralOverlapMarkdown } = require("./regional-referral-overlap");
@@ -1453,6 +1455,8 @@ function buildReleaseReport(options = {}) {
   const publicHealthFinalReadiness = buildPublicHealthFinalReadiness({ data });
   const bloodSystemReadiness = buildBloodSystemReadinessReport({ pkg });
   const diseasePaymentReadiness = buildDiseasePaymentReadiness();
+  const insurancePaymentAcceptance = buildInsurancePaymentAcceptance();
+  const insurancePaymentEvidencePacket = buildInsurancePaymentEvidencePacket();
   const diseasePaymentFormalGroupingIds = ["formal-grouping-async", "formal-grouping-compensation", "formal-grouping-api-routes", "formal-grouping-ui"];
   const diseasePaymentFormalGroupingReady = diseasePaymentFormalGroupingIds
     .every((id) => diseasePaymentReadiness.checks?.some((item) => item.id === id && item.ok));
@@ -1548,6 +1552,10 @@ function buildReleaseReport(options = {}) {
     check("diseasePayment:readiness", diseasePaymentReadiness.ready, diseasePaymentReadiness.ready ? `${diseasePaymentReadiness.checks.length}/${diseasePaymentReadiness.checks.length} disease payment readiness checks passed` : "disease payment readiness failed", "error", "disease-payment"),
     check("diseasePayment:formalGroupingOperations", diseasePaymentFormalGroupingReady && (diseasePaymentReadiness.summary?.formalGrouping?.completed || 0) >= 1, `${diseasePaymentReadiness.summary?.formalGrouping?.total || 0} formal grouping jobs, ${diseasePaymentReadiness.summary?.formalGrouping?.pendingDeadLetters || 0} pending dead letters`, "error", "disease-payment"),
     check("diseasePayment:localPackageGovernance", diseasePaymentLocalPackageReady, diseasePaymentLocalPackageReady ? "local official catalog and payment parameter package governance passed" : "local official package governance failed", "error", "disease-payment"),
+    check("insurancePayment:domainAcceptance", insurancePaymentAcceptance.localReady === true && insurancePaymentAcceptance.summary?.workflowsReady === 6, `${insurancePaymentAcceptance.summary?.workflowsReady || 0}/6 insurance payment workflows ready`, "error", "insurance-payment"),
+    check("insurancePayment:publicWiring", insurancePaymentAcceptance.integrationHandoff?.pending === 0 && insurancePaymentAcceptance.integrationHandoff?.wired === 23, `${insurancePaymentAcceptance.integrationHandoff?.wired || 0}/23 T00 routes and callback hooks wired`, "error", "insurance-payment"),
+    check("insurancePayment:evidencePacket", verifyInsurancePaymentEvidencePacket(insurancePaymentEvidencePacket), `evidence packet ${insurancePaymentEvidencePacket.packetDigest || "missing"}`, "error", "insurance-payment"),
+    check("insurancePayment:productionBoundary", insurancePaymentAcceptance.productionReady === false && insurancePaymentAcceptance.productionGate?.passed === false && insurancePaymentAcceptance.productionGate?.blockers?.includes("live-site-acceptance-confirmed") && (insurancePaymentAcceptance.externalBlockers?.length || 0) >= 20, `${insurancePaymentAcceptance.externalBlockers?.length || 0} external evidence blockers and live-site acceptance remain`, "error", "insurance-payment"),
     ...policyCoverageChecks(policyCoverage),
     ...platformCapabilityMapChecks(platformCapabilityMap),
     ...platformGoLiveSlicesChecks(platformGoLiveSlices),
@@ -1644,6 +1652,8 @@ function buildReleaseReport(options = {}) {
     publicHealthFinalReadiness,
     bloodSystemReadiness,
     diseasePaymentReadiness,
+    insurancePaymentAcceptance,
+    insurancePaymentEvidencePacket,
     policyCoverage,
     platformCapabilityMap,
     platformGoLiveSlices,
@@ -2531,6 +2541,10 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       diseasePaymentReadiness: report.diseasePaymentReadiness
     }, null, 2), "utf8");
+    const insurancePaymentAcceptanceJson = path.join(path.dirname(output), "insurance-payment-acceptance-report.json");
+    fs.writeFileSync(insurancePaymentAcceptanceJson, JSON.stringify(report.insurancePaymentAcceptance, null, 2), "utf8");
+    const insurancePaymentEvidenceJson = path.join(path.dirname(output), "insurance-payment-evidence-packet.json");
+    fs.writeFileSync(insurancePaymentEvidenceJson, JSON.stringify(report.insurancePaymentEvidencePacket, null, 2), "utf8");
     const platformCapabilityMapJson = path.join(path.dirname(output), "platform-capability-map.json");
     fs.writeFileSync(platformCapabilityMapJson, JSON.stringify(report.platformCapabilityMap, null, 2), "utf8");
     const platformGoLiveSlicesJson = path.join(path.dirname(output), "platform-go-live-slices.json");
@@ -2696,6 +2710,10 @@ function writeOutput(report, flags) {
     fs.writeFileSync(bloodSystemReadinessMarkdown, renderBloodSystemMarkdown(report.bloodSystemReadiness), "utf8");
     const diseasePaymentReadinessMarkdown = path.join(path.dirname(markdown), "disease-payment-readiness-report.md");
     fs.writeFileSync(diseasePaymentReadinessMarkdown, renderDiseasePaymentMarkdown(report.diseasePaymentReadiness), "utf8");
+    const insurancePaymentAcceptanceMarkdown = path.join(path.dirname(markdown), "insurance-payment-acceptance-report.md");
+    fs.writeFileSync(insurancePaymentAcceptanceMarkdown, renderInsurancePaymentAcceptanceMarkdown(report.insurancePaymentAcceptance), "utf8");
+    const insurancePaymentEvidenceMarkdown = path.join(path.dirname(markdown), "insurance-payment-evidence-packet.md");
+    fs.writeFileSync(insurancePaymentEvidenceMarkdown, renderInsurancePaymentEvidenceMarkdown(report.insurancePaymentEvidencePacket), "utf8");
     const policyCoverageMarkdown = path.join(path.dirname(markdown), "policy-coverage-report.md");
     fs.writeFileSync(policyCoverageMarkdown, renderPolicyCoverageMarkdown(report.policyCoverage), "utf8");
     const platformCapabilityMapMarkdown = path.join(path.dirname(markdown), "platform-capability-map.md");

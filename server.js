@@ -37,6 +37,9 @@ const BloodEventHub = require("./blood-event-hub");
 const BloodGoLiveService = require("./blood-go-live-service");
 const DiseasePaymentService = require("./disease-payment-service");
 const DiseasePaymentIntake = require("./disease-payment-intake");
+const DiseasePaymentGrouperContract = require("./disease-payment-grouper-contract");
+const OnlinePaymentRefunds = require("./online-payment-refunds");
+const InsurancePaymentOperatingModel = require("./insurance-payment-operating-model");
 const PhysicalExaminationService = require("./physical-examination-service");
 const CitizenRecordsPolicy = require("./citizen-records-policy");
 const CitizenRecordsV1 = require("./citizen-records-v1");
@@ -10433,6 +10436,7 @@ function normalizeState(data) {
       ? data.qualityOperationsGovernanceCommandReceipts
       : {},
     insuranceClaims: Array.isArray(data.insuranceClaims) ? data.insuranceClaims : seedInsuranceClaims(),
+    onlinePaymentRefunds: Array.isArray(data.onlinePaymentRefunds) ? data.onlinePaymentRefunds.slice(0, 2000) : [],
     diseasePayment: DiseasePaymentService.normalizeState(data.diseasePayment),
     policyAlignment: Array.isArray(data.policyAlignment) ? data.policyAlignment : seedPolicyAlignment(),
     drugTraceabilityPolicySources: mergeByKey(seedDrugTraceabilityPolicySources(), data.drugTraceabilityPolicySources, "id"),
@@ -14233,6 +14237,86 @@ function requireApiRole(req, res, roles, target) {
     return null;
   }
   return session.user;
+}
+
+function insurancePaymentActor(user = {}) {
+  const organizationTypes = new Set([String(user.orgType || "").trim()].filter(Boolean));
+  if (user.role === "commission") organizationTypes.add("platform");
+  return {
+    role: user.role,
+    roles: [user.role],
+    organizationType: String(user.orgType || ""),
+    organizationTypes: [...organizationTypes],
+    actorId: String(user.username || user.id || user.role || ""),
+    organizationId: String(user.orgCode || "")
+  };
+}
+
+function authorizeInsurancePaymentAction(action, user, res, target) {
+  const decision = InsurancePaymentOperatingModel.authorizeAction(action, insurancePaymentActor(user));
+  if (decision.allowed) return true;
+  appendSecurityEvent({
+    actor: user?.name || user?.username || "unknown",
+    role: user?.role || "unknown",
+    action: "insurance payment responsibility check",
+    target,
+    result: "denied",
+    detail: decision.code
+  });
+  sendJson(res, 403, {
+    error: "Forbidden",
+    code: decision.code,
+    message: "current actor role and organization scope cannot perform this insurance payment action"
+  });
+  return false;
+}
+
+function requireInsuranceSystemCommand(req, res, payload, action, organizationType, target) {
+  const secret = integrationGatewaySecret();
+  if (String(process.env.NODE_ENV || "").toLowerCase() === "production"
+    && (secret === "health-platform-demo-integration-secret" || secret.length < 32)) {
+    sendJson(res, 503, {
+      error: "Service Unavailable",
+      code: "INSURANCE_PAYMENT_SYSTEM_SECRET_UNAVAILABLE",
+      message: "trusted system command verification is not configured"
+    });
+    return null;
+  }
+  const signedPayload = { action, target, payload };
+  if (!verifyIntegrationSignature(signedPayload, req.headers["x-integration-signature"])) {
+    appendSecurityEvent({
+      actor: "insurance-system-adapter",
+      role: "system",
+      action: "insurance payment system command",
+      target,
+      result: "denied",
+      detail: "INSURANCE_PAYMENT_SYSTEM_SIGNATURE_INVALID"
+    });
+    sendJson(res, 401, {
+      error: "Unauthorized",
+      code: "INSURANCE_PAYMENT_SYSTEM_SIGNATURE_INVALID",
+      message: "trusted system command signature verification failed"
+    });
+    return null;
+  }
+  const actor = {
+    name: "insurance-system-adapter",
+    username: "insurance-system-adapter",
+    role: "system",
+    orgType: organizationType,
+    orgCode: organizationType
+  };
+  return actor;
+}
+
+function sendInsurancePaymentError(res, error) {
+  const status = Number(error?.statusCode || 0)
+    || (/not found|涓嶅瓨鍦/i.test(String(error?.message || "")) ? 404 : 409);
+  sendJson(res, status, {
+    error: status === 403 ? "Forbidden" : status === 404 ? "Not Found" : status === 400 ? "Bad Request" : "Conflict",
+    code: error?.code || "INSURANCE_PAYMENT_COMMAND_REJECTED",
+    message: String(error?.message || "insurance payment command was rejected")
+  });
 }
 
 const RESIDENT_REFERENCE_FIELDS = ["residentId", "maternalResidentId", "patientResidentId", "subjectResidentId"];
@@ -34161,6 +34245,42 @@ async function handleApi(req, res) {
       });
       const data = readDatabase();
       const result = applyFinancialCallback(data, verified);
+      let domainResult = null;
+      if (result.gatewayEvent.gatewayType === "PAYMENT" && result.gatewayEvent.operation === "refund") {
+        domainResult = OnlinePaymentRefunds.syncRefundFromFinancialCallback(
+          data,
+          result,
+          "financial-callback-adapter",
+          { trustedFinancialCallback: true }
+        );
+      }
+      if (result.gatewayEvent.gatewayType === "INSURANCE"
+        && result.gatewayEvent.operation === "settlement"
+        && ["core-accepted", "core-returned", "payment-failed", "confirm-payment"].includes(String(payload.action || ""))) {
+        const callbackPayload = {
+          action: String(payload.action),
+          receiptId: verified.receiptId,
+          idempotencyKey: verified.eventId,
+          paidAmountFen: verified.amountFen,
+          returnCycleId: payload.returnCycleId,
+          failureCycleId: payload.failureCycleId,
+          reasonCode: verified.providerCode || payload.reasonCode,
+          reason: verified.failureReason || payload.reason,
+          requirementDigest: payload.requirementDigest,
+          failureEvidenceDigest: payload.failureEvidenceDigest,
+          correctionWorkingDays: payload.correctionWorkingDays,
+          resolutionWorkingDays: payload.resolutionWorkingDays,
+          at: verified.receivedAt
+        };
+        const settlementResult = DiseasePaymentService.applyInsuranceCoreSettlementCallback(
+          data.diseasePayment,
+          result.gatewayEvent.externalId,
+          callbackPayload,
+          "insurance-core-adapter"
+        );
+        data.diseasePayment = settlementResult.state;
+        domainResult = settlementResult;
+      }
       writeDatabase(normalizeState(data));
       appendSecurityEvent({
         actor: `${verified.gatewayType.toLowerCase()}-provider`,
@@ -34186,7 +34306,8 @@ async function handleApi(req, res) {
           status: result.callbackEvent.status,
           stateApplied: result.callbackEvent.stateApplied,
           ignoredReason: result.callbackEvent.ignoredReason
-        }
+        },
+        domainSynchronized: Boolean(domainResult)
       });
     } catch (error) {
       const unsupportedType = /unsupported financial gateway type/i.test(String(error.message || ""));
@@ -35877,9 +35998,145 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (url.pathname === "/api/online-payments/refunds" && req.method === "POST") {
+    const user = requireApiRole(req, res, ["institution", "commission"], url.pathname);
+    if (!user) return;
+    if (!authorizeInsurancePaymentAction("refund.request", user, res, url.pathname)) return;
+    const data = readDatabase();
+    try {
+      const payload = await collectJson(req);
+      payload.idempotencyKey = String(req.headers["idempotency-key"] || payload.idempotencyKey || "").trim();
+      const result = OnlinePaymentRefunds.createRefundRequest(data, payload, user);
+      result.row.organizationId ||= String(user.orgCode || "");
+      result.row.organizationName ||= String(user.orgName || "");
+      writeDatabase(normalizeState(data));
+      sendJson(res, result.idempotent ? 200 : 201, {
+        refund: result.row,
+        idempotent: result.idempotent,
+        productionReady: false
+      });
+    } catch (error) {
+      sendInsurancePaymentError(res, error);
+    }
+    return;
+  }
+
+  const onlinePaymentRefundActionMatch = url.pathname.match(/^\/api\/online-payments\/refunds\/([^/]+)\/(resubmit|reviews|dispatch|retry|cancel|reconcile|close)$/);
+  if (onlinePaymentRefundActionMatch && req.method === "POST") {
+    const [, encodedId, action] = onlinePaymentRefundActionMatch;
+    const id = decodeURIComponent(encodedId);
+    const routeRoles = ["resubmit", "reviews", "cancel"].includes(action)
+      ? ["institution", "commission"]
+      : ["commission"];
+    const user = requireApiRole(req, res, routeRoles, url.pathname);
+    if (!user) return;
+    const modelActions = {
+      resubmit: "refund.resubmit",
+      reviews: "refund.review",
+      reconcile: "refund.reconcile-close",
+      close: "refund.reconcile-close"
+    };
+    if (modelActions[action] && !authorizeInsurancePaymentAction(modelActions[action], user, res, url.pathname)) return;
+    const data = readDatabase();
+    try {
+      const scopedRefund = (Array.isArray(data.onlinePaymentRefunds) ? data.onlinePaymentRefunds : []).find((item) => item.id === id);
+      if (user.role === "institution"
+        && (!scopedRefund?.organizationId || scopedRefund.organizationId !== user.orgCode)) {
+        sendJson(res, 403, {
+          error: "Forbidden",
+          code: "REFUND_ORGANIZATION_SCOPE_DENIED",
+          message: "refund belongs to another organization or lacks a trusted organization binding"
+        });
+        return;
+      }
+      const payload = await collectJson(req);
+      const headerIdempotencyKey = String(req.headers["idempotency-key"] || "").trim();
+      if (headerIdempotencyKey) payload.idempotencyKey = headerIdempotencyKey;
+      if (action === "reviews") payload.role = user.role;
+      let result;
+      if (action === "resubmit") {
+        result = OnlinePaymentRefunds.resubmitRejectedRefund(data, id, payload, user);
+      } else if (action === "reviews") {
+        result = OnlinePaymentRefunds.reviewRefundRequest(data, id, payload, user);
+      } else if (action === "retry") {
+        result = OnlinePaymentRefunds.retryRefund(data, id, payload, user);
+      } else if (action === "cancel") {
+        result = OnlinePaymentRefunds.cancelRefund(data, id, payload, user);
+      } else if (action === "reconcile") {
+        result = OnlinePaymentRefunds.reconcileRefund(data, id, payload, user);
+      } else if (action === "close") {
+        result = OnlinePaymentRefunds.closeRefund(data, id, payload, user);
+      } else {
+        const requestPayload = OnlinePaymentRefunds.prepareRefundDispatch(data, id);
+        const duplicate = (data.integrationGatewayEvents || []).find((item) =>
+          item.adapterType === "financial"
+          && item.gatewayType === "PAYMENT"
+          && item.operation === "refund"
+          && item.idempotencyKey === requestPayload.idempotencyKey
+        );
+        let event = duplicate;
+        if (!event) {
+          const receipt = await dispatchFinancialRequest(requestPayload);
+          event = {
+            id: `igw-${randomUUID()}`,
+            direction: "outbound",
+            adapterType: "financial",
+            gatewayType: "PAYMENT",
+            operation: "refund",
+            contractId: requestPayload.contractId,
+            domain: "PAYMENT",
+            resource: "FinancialGatewayRequest",
+            idempotencyKey: requestPayload.idempotencyKey,
+            externalId: id,
+            residentId: "",
+            status: receipt.status,
+            signatureVerified: false,
+            outboundSigned: true,
+            receivedBy: user.username || user.role,
+            requestPayload,
+            payload: requestPayload.payload,
+            retryCount: 0,
+            deadLetter: false,
+            reconciliationStatus: "provider-accepted",
+            receivedAt: new Date().toISOString(),
+            adapterReceipt: receipt,
+            adapterReceiptHistory: [],
+            providerStatus: receipt.status,
+            callbackEvents: [],
+            businessDate: String(receipt.acceptedAt || "").slice(0, 10),
+            dispatchedAt: receipt.acceptedAt
+          };
+          data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
+        }
+        result = OnlinePaymentRefunds.recordRefundDispatch(
+          data,
+          id,
+          event.adapterReceipt,
+          event.id,
+          user
+        );
+        result.gatewayEventId = event.id;
+        result.idempotent = Boolean(duplicate);
+      }
+      writeDatabase(normalizeState(data));
+      sendJson(res, action === "dispatch" ? 202 : 200, {
+        refund: result.row,
+        review: result.review,
+        resubmission: result.resubmission,
+        gatewayEventId: result.gatewayEventId,
+        idempotent: result.idempotent === true,
+        productionReady: false
+      });
+    } catch (error) {
+      sendInsurancePaymentError(res, error);
+    }
+    return;
+  }
+
   if (url.pathname === "/api/disease-payment/formal-grouping/operations" && req.method === "GET") {
     const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
     if (!user) return;
+    if (!authorizeInsurancePaymentAction("formal-grouping.operations.read", user, res, url.pathname)) return;
     const state = DiseasePaymentService.normalizeState(readDatabase().diseasePayment);
     sendJson(res, 200, DiseasePaymentIntake.buildFormalGroupingOperations(state));
     return;
@@ -35888,6 +36145,7 @@ async function handleApi(req, res) {
   if (url.pathname === "/api/disease-payment/formal-grouping/jobs" && req.method === "POST") {
     const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
     if (!user) return;
+    if (!authorizeInsurancePaymentAction("formal-grouping.create", user, res, url.pathname)) return;
     const data = readDatabase();
     try {
       const result = DiseasePaymentIntake.createFormalGroupingJob(DiseasePaymentService.normalizeState(data.diseasePayment), await collectJson(req), user.name);
@@ -35902,27 +36160,81 @@ async function handleApi(req, res) {
 
   const diseasePaymentFormalGroupingActionMatch = url.pathname.match(/^\/api\/disease-payment\/formal-grouping\/jobs\/([^/]+)\/(dispatch|receipts|fail|retry|reconcile)$/);
   if (diseasePaymentFormalGroupingActionMatch && req.method === "POST") {
-    const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
-    if (!user) return;
     const [, encodedId, action] = diseasePaymentFormalGroupingActionMatch;
     const id = decodeURIComponent(encodedId);
     const payload = await collectJson(req);
     const data = readDatabase();
     const state = DiseasePaymentService.normalizeState(data.diseasePayment);
     try {
-      const handlers = {
-        dispatch: () => DiseasePaymentIntake.dispatchFormalGroupingJob(state, id, payload, user.name),
-        receipts: () => DiseasePaymentIntake.receiveFormalGroupingReceipt(state, id, payload, user.name, DiseasePaymentService.calculateCase),
-        fail: () => DiseasePaymentIntake.failFormalGroupingJob(state, id, payload, user.name),
-        retry: () => DiseasePaymentIntake.retryFormalGroupingJob(state, id, user.name),
-        reconcile: () => DiseasePaymentIntake.reconcileFormalGroupingDeadLetter(state, id, payload, user.name)
-      };
-      const result = handlers[action]();
+      let result;
+      if (action === "receipts") {
+        const grouperConfiguration = DiseasePaymentGrouperContract.buildGrouperProductionConfiguration(process.env);
+        if (String(process.env.NODE_ENV || "").toLowerCase() === "production" && !grouperConfiguration.configured) {
+          sendJson(res, 503, {
+            error: "Service Unavailable",
+            code: "GROUPER_PRODUCTION_CONFIGURATION_INVALID",
+            message: "official grouper callback verification is not fully configured"
+          });
+          return;
+        }
+        const trustedActor = {
+          name: "official-grouper-adapter",
+          username: "official-grouper-adapter",
+          role: "system",
+          orgType: "official_grouper_adapter",
+          orgCode: "official_grouper_adapter"
+        };
+        if (!authorizeInsurancePaymentAction("formal-grouping.receipt", trustedActor, res, url.pathname)) return;
+        // receiveTrustedFormalGroupingReceipt invokes
+        // DiseasePaymentGrouperContract.verifyTrustedGrouperCallback before any state write.
+        result = DiseasePaymentIntake.receiveTrustedFormalGroupingReceipt(
+          state,
+          id,
+          payload,
+          {
+            env: process.env,
+            timestamp: req.headers["x-grouper-timestamp"],
+            nonce: req.headers["x-grouper-nonce"],
+            sourceId: req.headers["x-grouper-source"],
+            signature: req.headers["x-grouper-signature"],
+            nowMs: Date.now()
+          },
+          DiseasePaymentService.calculateCase
+        );
+      } else if (action === "dispatch" || action === "fail") {
+        const modelAction = action === "dispatch" ? "formal-grouping.dispatch" : "formal-grouping.fail";
+        const systemActor = requireInsuranceSystemCommand(
+          req,
+          res,
+          payload,
+          modelAction,
+          action === "fail" ? "platform" : "official_grouper_adapter",
+          `${url.pathname}:${id}`
+        );
+        if (!systemActor) return;
+        if (action === "dispatch") {
+          if (!authorizeInsurancePaymentAction("formal-grouping.dispatch", systemActor, res, url.pathname)) return;
+          result = DiseasePaymentIntake.dispatchFormalGroupingJob(state, id, payload, systemActor.username);
+        } else {
+          if (!authorizeInsurancePaymentAction("formal-grouping.fail", systemActor, res, url.pathname)) return;
+          result = DiseasePaymentIntake.failFormalGroupingJob(state, id, payload, systemActor.username);
+        }
+      } else {
+        const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
+        if (!user) return;
+        if (action === "retry") {
+          if (!authorizeInsurancePaymentAction("formal-grouping.retry", user, res, url.pathname)) return;
+          result = DiseasePaymentIntake.retryFormalGroupingJob(state, id, user.name);
+        } else {
+          if (!authorizeInsurancePaymentAction("formal-grouping.reconcile", user, res, url.pathname)) return;
+          result = DiseasePaymentIntake.reconcileFormalGroupingDeadLetter(state, id, payload, user.name);
+        }
+      }
       data.diseasePayment = result.state;
       writeDatabase(data);
       sendJson(res, 200, { job: result.job, envelope: result.envelope, groupingRun: result.run, deadLetter: result.deadLetter, receiptErrors: result.receiptErrors || [], idempotent: result.idempotent || false, operations: DiseasePaymentIntake.buildFormalGroupingOperations(result.state) });
     } catch (error) {
-      sendJson(res, 409, { error: "Conflict", message: error.message });
+      sendInsurancePaymentError(res, error);
     }
     return;
   }
@@ -35951,6 +36263,53 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (url.pathname === "/api/disease-payment/special-cases/disclosure" && req.method === "GET") {
+    const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
+    if (!user) return;
+    sendJson(res, 200, {
+      ...DiseasePaymentService.buildSpecialCaseDisclosure(readDatabase().diseasePayment),
+      productionReady: false
+    });
+    return;
+  }
+
+  const diseasePaymentSpecialCaseCommandMatch = url.pathname.match(/^\/api\/disease-payment\/special-cases\/([^/]+)\/(expert-reselection|appeals|appeals\/review)$/);
+  if (diseasePaymentSpecialCaseCommandMatch && req.method === "POST") {
+    const [, encodedId, action] = diseasePaymentSpecialCaseCommandMatch;
+    const id = decodeURIComponent(encodedId);
+    const requiredRoles = action === "appeals" ? ["institution"] : ["insurance"];
+    const user = requireApiRole(req, res, requiredRoles, url.pathname);
+    if (!user) return;
+    const modelAction = action === "appeals"
+      ? "special-case.appeal"
+      : action === "appeals/review"
+        ? "special-case.review-appeal"
+        : "special-case.review-medical";
+    if (!authorizeInsurancePaymentAction(modelAction, user, res, url.pathname)) return;
+    const data = readDatabase();
+    try {
+      const payload = await collectJson(req);
+      payload.idempotencyKey = String(req.headers["idempotency-key"] || payload.idempotencyKey || "").trim();
+      const result = action === "appeals"
+        ? DiseasePaymentService.createSpecialCaseAppeal(data.diseasePayment, id, payload, user.name)
+        : action === "appeals/review"
+          ? DiseasePaymentService.reviewSpecialCaseAppeal(data.diseasePayment, id, payload, user.name)
+          : DiseasePaymentService.reselectSpecialCaseExpert(data.diseasePayment, id, payload, user.name);
+      data.diseasePayment = result.state;
+      writeDatabase(normalizeState(data));
+      sendJson(res, action === "appeals" ? 201 : 200, {
+        specialCase: result.row,
+        appeal: result.appeal,
+        panel: result.panel,
+        review: result.review,
+        productionReady: false
+      });
+    } catch (error) {
+      sendInsurancePaymentError(res, error);
+    }
+    return;
+  }
+
   const diseasePaymentSpecialReviewMatch = url.pathname.match(/^\/api\/disease-payment\/special-cases\/([^/]+)\/review$/);
   if (diseasePaymentSpecialReviewMatch && req.method === "POST") {
     const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
@@ -35971,6 +36330,69 @@ async function handleApi(req, res) {
     data.diseasePayment = result.state;
     writeDatabase(data);
     sendJson(res, 201, result.batch);
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/annual-clearances" && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    try {
+      const payload = await collectJson(req);
+      const result = DiseasePaymentService.createAnnualClearance(data.diseasePayment, payload, user.name);
+      data.diseasePayment = result.state;
+      writeDatabase(normalizeState(data));
+      sendJson(res, 201, { clearance: result.row, productionReady: false });
+    } catch (error) {
+      sendInsurancePaymentError(res, error);
+    }
+    return;
+  }
+
+  const diseasePaymentAnnualClearanceActionMatch = url.pathname.match(/^\/api\/disease-payment\/annual-clearances\/([^/]+)\/actions$/);
+  if (diseasePaymentAnnualClearanceActionMatch && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "institution", "commission"], url.pathname);
+    if (!user) return;
+    const id = decodeURIComponent(diseasePaymentAnnualClearanceActionMatch[1]);
+    const payload = await collectJson(req);
+    const action = String(payload.action || "").trim();
+    const institutionActions = new Set(["confirm-institution", "record-dispute"]);
+    const insuranceActions = new Set(["start-confirmation", "resolve-dispute", "confirm-institutions", "approve"]);
+    if (institutionActions.has(action) && user.role !== "institution") {
+      sendJson(res, 403, { error: "Forbidden", code: "ANNUAL_CLEARANCE_INSTITUTION_ROLE_REQUIRED", message: "institution action requires an institution actor" });
+      return;
+    }
+    if (insuranceActions.has(action) && user.role !== "insurance") {
+      sendJson(res, 403, { error: "Forbidden", code: "ANNUAL_CLEARANCE_INSURANCE_ROLE_REQUIRED", message: "insurance action requires an insurance actor" });
+      return;
+    }
+    if (["post", "lock"].includes(action)) {
+      sendJson(res, 403, {
+        error: "Forbidden",
+        code: "ANNUAL_CLEARANCE_TRUSTED_FINANCE_ACTOR_REQUIRED",
+        message: "posting and locking require a trusted fund-finance identity that is not available in the shared directory"
+      });
+      return;
+    }
+    if (![...institutionActions, ...insuranceActions].includes(action)) {
+      sendJson(res, 400, { error: "Bad Request", code: "ANNUAL_CLEARANCE_ACTION_INVALID", message: "annual clearance action is not supported" });
+      return;
+    }
+    if (institutionActions.has(action)) payload.institutionId = user.orgCode;
+    payload.idempotencyKey = String(req.headers["idempotency-key"] || payload.idempotencyKey || "").trim();
+    const data = readDatabase();
+    try {
+      const result = DiseasePaymentService.applyAnnualClearanceAction(data.diseasePayment, id, payload, user.name);
+      data.diseasePayment = result.state;
+      writeDatabase(normalizeState(data));
+      sendJson(res, 200, {
+        clearance: result.row,
+        idempotent: result.idempotent === true,
+        productionReady: false
+      });
+    } catch (error) {
+      sendInsurancePaymentError(res, error);
+    }
     return;
   }
 

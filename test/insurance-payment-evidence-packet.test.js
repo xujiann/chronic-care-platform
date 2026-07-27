@@ -16,7 +16,7 @@ test("insurance payment evidence packet is complete digest-bound and privacy-saf
   assert.equal(packet.productionHandoff.evidenceComplete, false);
   assert.equal(packet.productionHandoff.productionReady, false);
   assert.equal(packet.productionGate.passed, false);
-  assert.deepEqual(packet.productionGate.blockers, ["t00-public-wiring-complete", "handoff-evidence-complete", "live-site-acceptance-confirmed"]);
+  assert.deepEqual(packet.productionGate.blockers, ["handoff-evidence-complete", "live-site-acceptance-confirmed"]);
   assert.equal(packet.productionGate.checks.find((item) => item.id === "evidence-artifact-manifest-valid").passed, true);
   assert.equal(Evidence.verifyInsurancePaymentEvidencePacket(packet), true);
   assert.equal(Evidence.shouldFailEvidencePacket(packet), false);

@@ -207,7 +207,7 @@ test("readiness report distinguishes locally ready functions from external block
   const report = buildDiseasePaymentReadiness();
   assert.equal(report.ready, true);
   assert.equal(report.operatingModel.ok, true);
-  assert.ok(report.integrationHandoff.pending > 0);
+  assert.equal(report.integrationHandoff.pending, 0);
   assert.ok(report.externalBlockers.some((item) => item.id === "official-grouper"));
   assert.ok(report.externalBlockers.some((item) => item.id === "insurance-core"));
 });

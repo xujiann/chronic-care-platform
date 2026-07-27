@@ -17,8 +17,18 @@ function evidenceInput(overrides = {}) {
   };
 }
 
-test("production handoff seeds every pending route and external blocker without claiming production readiness", () => {
+function acceptanceWithPendingRoutes(count = 2) {
   const acceptance = buildInsurancePaymentAcceptance();
+  const pendingRoutes = acceptance.integrationHandoff.routes.slice(0, count);
+  for (const route of pendingRoutes) route.wired = false;
+  acceptance.integrationHandoff.pending = pendingRoutes.length;
+  acceptance.integrationHandoff.wired = acceptance.integrationHandoff.routes.length - pendingRoutes.length;
+  acceptance.summary.t00RoutesPending = pendingRoutes.length;
+  return acceptance;
+}
+
+test("production handoff seeds every pending route and external blocker without claiming production readiness", () => {
+  const acceptance = acceptanceWithPendingRoutes();
   const data = {};
   const state = Handoff.ensureProductionHandoff(data, acceptance, "2026-07-22T08:00:00.000Z");
   const status = Handoff.buildProductionHandoffStatus(data, acceptance);
@@ -32,7 +42,7 @@ test("production handoff seeds every pending route and external blocker without 
 });
 
 test("production handoff enforces scoped submitters four-eyes verification and digest-only status", () => {
-  const acceptance = buildInsurancePaymentAcceptance();
+  const acceptance = acceptanceWithPendingRoutes();
   const data = {};
   const itemId = `route:${acceptance.integrationHandoff.routes.find((item) => !item.wired).id}`;
   assert.throws(() => Handoff.submitHandoffEvidence(data, acceptance, itemId, evidenceInput(), { username: "t07", role: "external-owner" }), (error) => error.code === "HANDOFF_SUBMISSION_RESPONSIBILITY_DENIED");
@@ -51,7 +61,7 @@ test("production handoff enforces scoped submitters four-eyes verification and d
 });
 
 test("production handoff supports rejection resubmission and detects ledger tampering", () => {
-  const acceptance = buildInsurancePaymentAcceptance();
+  const acceptance = acceptanceWithPendingRoutes();
   const data = {};
   const blocker = acceptance.externalBlockers[0];
   const itemId = `external:${blocker.source}:${blocker.id}`;
@@ -70,7 +80,7 @@ test("production handoff supports rejection resubmission and detects ledger tamp
 });
 
 test("changed requirements invalidate previously verified evidence", () => {
-  const acceptance = buildInsurancePaymentAcceptance();
+  const acceptance = acceptanceWithPendingRoutes();
   const data = {};
   const route = acceptance.integrationHandoff.routes.find((item) => !item.wired);
   const itemId = `route:${route.id}`;
@@ -87,7 +97,7 @@ test("changed requirements invalidate previously verified evidence", () => {
 });
 
 test("production handoff blocks direct state evidence and verification projection tampering", () => {
-  const acceptance = buildInsurancePaymentAcceptance();
+  const acceptance = acceptanceWithPendingRoutes();
   const route = acceptance.integrationHandoff.routes.find((item) => !item.wired);
   const itemId = `route:${route.id}`;
   const buildVerified = () => {
@@ -132,7 +142,7 @@ test("production handoff blocks direct state evidence and verification projectio
 });
 
 test("production handoff rejects a rehashed transition that skips evidence submission", () => {
-  const acceptance = buildInsurancePaymentAcceptance();
+  const acceptance = acceptanceWithPendingRoutes();
   const data = {};
   const state = Handoff.ensureProductionHandoff(data, acceptance, "2026-07-22T08:00:00.000Z");
   const item = state.items.find((candidate) => candidate.required);
@@ -155,7 +165,7 @@ test("production handoff rejects a rehashed transition that skips evidence submi
 });
 
 test("production handoff enforces canonical evidence and verification chronology without mutation", () => {
-  const acceptance = buildInsurancePaymentAcceptance();
+  const acceptance = acceptanceWithPendingRoutes();
   const route = acceptance.integrationHandoff.routes.find((item) => !item.wired);
   const itemId = `route:${route.id}`;
   const actor = { username: "t00-integrator", role: "integration-owner" };
@@ -181,7 +191,7 @@ test("production handoff enforces canonical evidence and verification chronology
 });
 
 test("production handoff rejects a rehashed but backdated event", () => {
-  const acceptance = buildInsurancePaymentAcceptance();
+  const acceptance = acceptanceWithPendingRoutes();
   const data = {};
   const state = Handoff.ensureProductionHandoff(data, acceptance, "2026-07-22T09:00:00.000Z");
   const item = state.items.find((candidate) => candidate.required);
@@ -203,7 +213,7 @@ test("production handoff rejects a rehashed but backdated event", () => {
 });
 
 test("production handoff prevents evidence and idempotency reuse across requirements", () => {
-  const acceptance = buildInsurancePaymentAcceptance();
+  const acceptance = acceptanceWithPendingRoutes();
   const routes = acceptance.integrationHandoff.routes.filter((item) => !item.wired).slice(0, 2);
   const firstId = `route:${routes[0].id}`;
   const secondId = `route:${routes[1].id}`;
@@ -229,7 +239,7 @@ test("production handoff prevents evidence and idempotency reuse across requirem
 });
 
 test("production handoff requires fresh evidence after rejection", () => {
-  const acceptance = buildInsurancePaymentAcceptance();
+  const acceptance = acceptanceWithPendingRoutes();
   const route = acceptance.integrationHandoff.routes.find((item) => !item.wired);
   const itemId = `route:${route.id}`;
   const data = {};
@@ -242,7 +252,7 @@ test("production handoff requires fresh evidence after rejection", () => {
 });
 
 test("production handoff fails closed when an external requirement has no reviewer responsibility", () => {
-  const acceptance = buildInsurancePaymentAcceptance();
+  const acceptance = acceptanceWithPendingRoutes();
   const changed = structuredClone(acceptance);
   const blocker = changed.externalBlockers.find((item) => item.source === "financial-gateway");
   blocker.reviewerRole = "";
@@ -260,7 +270,7 @@ test("production handoff fails closed when an external requirement has no review
 });
 
 test("production handoff expires verified evidence and renews it with a fresh digest", () => {
-  const acceptance = buildInsurancePaymentAcceptance();
+  const acceptance = acceptanceWithPendingRoutes();
   const route = acceptance.integrationHandoff.routes.find((item) => !item.wired);
   const itemId = `route:${route.id}`;
   const data = {};
@@ -287,7 +297,7 @@ test("production handoff expires verified evidence and renews it with a fresh di
 });
 
 test("production handoff caps evidence validity by responsibility", () => {
-  const acceptance = buildInsurancePaymentAcceptance();
+  const acceptance = acceptanceWithPendingRoutes();
   const route = acceptance.integrationHandoff.routes.find((item) => !item.wired);
   const itemId = `route:${route.id}`;
   const data = {};
