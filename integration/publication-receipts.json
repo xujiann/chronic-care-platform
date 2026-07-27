@@ -1,6 +1,34 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-24T15:46:17.706Z",
+  "updatedAt": "2026-07-27T14:20:11.008Z",
+  "latestAggregateRelease": {
+    "sourceIntegrationHead": "9d2afbf05efe0f10cff098493805b4a1e2d213d7",
+    "publishedHead": "ef5a2cd6c77c4dfab98741fc0cf1843f46c65d86",
+    "tests": {
+      "pretest": "123/123",
+      "main": "369/369",
+      "posttest": "209/209",
+      "total": "701/701",
+      "publicApi": "42/42",
+      "static": "73/73",
+      "conflictTargeted": "37/37"
+    },
+    "releaseReport": {
+      "total": 426,
+      "passed": 424,
+      "failed": 0,
+      "warnings": [
+        "productionReleaseEvidence:formalGate",
+        "env:ALERTING.routes"
+      ]
+    },
+    "onlineHashVerification": {
+      "algorithm": "SHA-256",
+      "resources": 18,
+      "matched": 18
+    },
+    "productionReady": false
+  },
   "receipts": [
     {
       "lineId": "T06",
@@ -126,6 +154,152 @@
       },
       "productionReady": false,
       "boundary": "This receipt covers only the accepted public-health.html and public-health.js static GitHub Pages slice. It does not assert that db49df0 was merged into main, and it does not prove Node API routes, managed key services, live external adapters, trusted site evidence, production data, SIEM, on-call, disaster recovery, or production Go/No-Go readiness."
+    },
+    {
+      "lineId": "T01",
+      "sourceCandidateHead": "c672959c9aa307b9a6bc3f6da1cceb65a668c390",
+      "sourceIntegrationHead": "9d2afbf05efe0f10cff098493805b4a1e2d213d7",
+      "targetBranch": "main",
+      "targetPath": "/",
+      "publishedHead": "ef5a2cd6c77c4dfab98741fc0cf1843f46c65d86",
+      "deploymentType": "github-pages-legacy",
+      "ci": { "runId": "30273804120", "status": "success", "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/30273804120" },
+      "deployment": { "runId": "30273801042", "status": "success", "deployedAt": "2026-07-27T14:11:20.000Z", "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/30273801042" },
+      "site": { "baseUrl": "https://xujiann.github.io/chronic-care-platform/", "status": "built", "verifiedAt": "2026-07-27T14:20:11.008Z", "resources": [
+        { "path": "auth.js", "statusCode": 200, "sha256": "da7b050a711f07aba9a39c96b77c3966b2165aa50e28e388446c3464d3302ca8", "requiredMarkers": ["DEFAULT_USERS", "role: \"institution\""], "observedMarkers": ["DEFAULT_USERS", "role: \"institution\""] }
+      ] },
+      "productionReady": false,
+      "boundary": "Static publication confirms accepted T01 source bytes only; real identity and organization directories remain production blockers."
+    },
+    {
+      "lineId": "T02",
+      "sourceCandidateHead": "983d019551ae936d1e785a95943ebaf1040a3137",
+      "sourceIntegrationHead": "9d2afbf05efe0f10cff098493805b4a1e2d213d7",
+      "targetBranch": "main", "targetPath": "/", "publishedHead": "ef5a2cd6c77c4dfab98741fc0cf1843f46c65d86", "deploymentType": "github-pages-legacy",
+      "ci": { "runId": "30273804120", "status": "success", "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/30273804120" },
+      "deployment": { "runId": "30273801042", "status": "success", "deployedAt": "2026-07-27T14:11:20.000Z", "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/30273801042" },
+      "site": { "baseUrl": "https://xujiann.github.io/chronic-care-platform/", "status": "built", "verifiedAt": "2026-07-27T14:20:11.008Z", "resources": [
+        { "path": "postgres-mpi-foundation.js", "statusCode": 200, "sha256": "06a5318be86340169bfdc5fe5eb8f37a7bb553a72ba1a0ed55fc78d1c36c4017", "requiredMarkers": ["MPI_RULE_VERSION", "manual-review"], "observedMarkers": ["MPI_RULE_VERSION", "manual-review"] }
+      ] },
+      "productionReady": false,
+      "boundary": "Static publication does not prove production database, backup, reconciliation or disaster-recovery readiness."
+    },
+    {
+      "lineId": "T03",
+      "sourceCandidateHead": "26a42dcba1efabae9641cd0ef335bfbee9c6fc43",
+      "sourceIntegrationHead": "9d2afbf05efe0f10cff098493805b4a1e2d213d7",
+      "targetBranch": "main", "targetPath": "/", "publishedHead": "ef5a2cd6c77c4dfab98741fc0cf1843f46c65d86", "deploymentType": "github-pages-legacy",
+      "ci": { "runId": "30273804120", "status": "success", "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/30273804120" },
+      "deployment": { "runId": "30273801042", "status": "success", "deployedAt": "2026-07-27T14:11:20.000Z", "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/30273801042" },
+      "site": { "baseUrl": "https://xujiann.github.io/chronic-care-platform/", "status": "built", "verifiedAt": "2026-07-27T14:20:11.008Z", "resources": [
+        { "path": "interface-domain-integration.js", "statusCode": 200, "sha256": "6464f9d4de3625570d7620e10ccf25e1af3c25f3deca0763d76c5342a5bb62f8", "requiredMarkers": ["INTERFACE_IDEMPOTENCY_KEY_REQUIRED", "idempotentReplay"], "observedMarkers": ["INTERFACE_IDEMPOTENCY_KEY_REQUIRED", "idempotentReplay"] }
+      ] },
+      "productionReady": false,
+      "boundary": "Static publication does not prove live HIS, EMR, LIS, PACS, insurance endpoints, vendor keys or joint-test receipts."
+    },
+    {
+      "lineId": "T04",
+      "sourceCandidateHead": "8f389b567c1d25b5c203eeae62fe6526c4a23b8b",
+      "sourceIntegrationHead": "9d2afbf05efe0f10cff098493805b4a1e2d213d7",
+      "targetBranch": "main", "targetPath": "/", "publishedHead": "ef5a2cd6c77c4dfab98741fc0cf1843f46c65d86", "deploymentType": "github-pages-legacy",
+      "ci": { "runId": "30273804120", "status": "success", "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/30273804120" },
+      "deployment": { "runId": "30273801042", "status": "success", "deployedAt": "2026-07-27T14:11:20.000Z", "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/30273801042" },
+      "site": { "baseUrl": "https://xujiann.github.io/chronic-care-platform/", "status": "built", "verifiedAt": "2026-07-27T14:20:11.008Z", "resources": [
+        { "path": "citizen-records-v3.js", "statusCode": 200, "sha256": "dfbaa3a033de1be2812fb125fb72ef47536d49f1fd7a16ff8c373002526df1db", "requiredMarkers": ["buildProductionIntegrationStatus", "buildOperationsSnapshot"], "observedMarkers": ["buildProductionIntegrationStatus", "buildOperationsSnapshot"] }
+      ] },
+      "productionReady": false,
+      "boundary": "Static citizen-record publication does not prove real-name relationships, clinical source systems or image object storage."
+    },
+    {
+      "lineId": "T05",
+      "sourceCandidateHead": "c237d584e59c05cc6070a0b5802632295a4b1b57",
+      "sourceIntegrationHead": "9d2afbf05efe0f10cff098493805b4a1e2d213d7",
+      "targetBranch": "main", "targetPath": "/", "publishedHead": "ef5a2cd6c77c4dfab98741fc0cf1843f46c65d86", "deploymentType": "github-pages-legacy",
+      "ci": { "runId": "30273804120", "status": "success", "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/30273804120" },
+      "deployment": { "runId": "30273801042", "status": "success", "deployedAt": "2026-07-27T14:11:20.000Z", "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/30273801042" },
+      "site": { "baseUrl": "https://xujiann.github.io/chronic-care-platform/", "status": "built", "verifiedAt": "2026-07-27T14:20:11.008Z", "resources": [
+        { "path": "registration-referral-service.js", "statusCode": 200, "sha256": "e9de803a040563ba2a690498adcfcbce9b2d4a14068125f5ccf639aed9489566", "requiredMarkers": ["idempotencyKey", "productionEvidence: false"], "observedMarkers": ["idempotencyKey", "productionEvidence: false"] }
+      ] },
+      "productionReady": false,
+      "boundary": "Static publication does not prove live appointment inventory, HIS/EMR callbacks, family-doctor contracts or prescription systems."
+    },
+    {
+      "lineId": "T06",
+      "sourceCandidateHead": "597160ba95d00a3c3fd773f8738dd143fc3c9a46",
+      "sourceIntegrationHead": "9d2afbf05efe0f10cff098493805b4a1e2d213d7",
+      "targetBranch": "main", "targetPath": "/", "publishedHead": "ef5a2cd6c77c4dfab98741fc0cf1843f46c65d86", "deploymentType": "github-pages-legacy",
+      "ci": { "runId": "30273804120", "status": "success", "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/30273804120" },
+      "deployment": { "runId": "30273801042", "status": "success", "deployedAt": "2026-07-27T14:11:20.000Z", "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/30273801042" },
+      "site": { "baseUrl": "https://xujiann.github.io/chronic-care-platform/", "status": "built", "verifiedAt": "2026-07-27T14:20:11.008Z", "resources": [
+        { "path": "nursing-escort-domain.js", "statusCode": 200, "sha256": "e1d48e1b94a24234f7dd08b4d5b9f0fed845f3a6ea15eeff2c979349d8acde99", "requiredMarkers": ["ORDER_DISPATCH_BINDING_IMMUTABLE", "capacityReservation", "capacityRelease"], "observedMarkers": ["ORDER_DISPATCH_BINDING_IMMUTABLE", "capacityReservation", "capacityRelease"] }
+      ] },
+      "productionReady": false,
+      "boundary": "Static publication does not replace fresh 13-scope dependency evidence, transactional runtime, delivery callbacks or five-party cutover evidence."
+    },
+    {
+      "lineId": "T07",
+      "sourceCandidateHead": "76dcf77fa189864b66ba62f6cf0727ec224b5415",
+      "sourceIntegrationHead": "9d2afbf05efe0f10cff098493805b4a1e2d213d7",
+      "targetBranch": "main", "targetPath": "/", "publishedHead": "ef5a2cd6c77c4dfab98741fc0cf1843f46c65d86", "deploymentType": "github-pages-legacy",
+      "ci": { "runId": "30273804120", "status": "success", "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/30273804120" },
+      "deployment": { "runId": "30273801042", "status": "success", "deployedAt": "2026-07-27T14:11:20.000Z", "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/30273801042" },
+      "site": { "baseUrl": "https://xujiann.github.io/chronic-care-platform/", "status": "built", "verifiedAt": "2026-07-27T14:20:11.008Z", "resources": [
+        { "path": "disease-payment-service.js", "statusCode": 200, "sha256": "52787446b8f9cb0064b217a1626d2dff10822f765c49ab34db642db54e0c0a66", "requiredMarkers": ["buildSpecialCaseDisclosure", "buildDiseaseSupervisionProfiles"], "observedMarkers": ["buildSpecialCaseDisclosure", "buildDiseaseSupervisionProfiles"] }
+      ] },
+      "productionReady": false,
+      "boundary": "Static publication does not prove insurance-core, payment-gateway, formal grouper, signed callback or financial reconciliation readiness."
+    },
+    {
+      "lineId": "T08",
+      "sourceCandidateHead": "4f9f22b92b47ad50d36dccf0ad01437451019179",
+      "sourceIntegrationHead": "9d2afbf05efe0f10cff098493805b4a1e2d213d7",
+      "targetBranch": "main", "targetPath": "/", "publishedHead": "ef5a2cd6c77c4dfab98741fc0cf1843f46c65d86", "deploymentType": "github-pages-legacy",
+      "ci": { "runId": "30273804120", "status": "success", "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/30273804120" },
+      "deployment": { "runId": "30273801042", "status": "success", "deployedAt": "2026-07-27T14:11:20.000Z", "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/30273801042" },
+      "site": { "baseUrl": "https://xujiann.github.io/chronic-care-platform/", "status": "built", "verifiedAt": "2026-07-27T14:20:11.008Z", "resources": [
+        { "path": "public-health-external-endpoint-probe-campaign-service.js", "statusCode": 200, "sha256": "134262fdd6697a753a48e9fff3eac752e9d87958cc2ad100a25b904697e6ce36", "requiredMarkers": ["public-health-endpoint-probe-campaign", "continuousConnectivityReady"], "observedMarkers": ["public-health-endpoint-probe-campaign", "continuousConnectivityReady"] }
+      ] },
+      "productionReady": false,
+      "boundary": "Static publication does not prove managed keys, live eight-lane endpoints, continuous production probes, external receipts or launch approval."
+    },
+    {
+      "lineId": "T09",
+      "sourceCandidateHead": "50838572bc30cce624774aa2317e6133ac76220a",
+      "sourceIntegrationHead": "9d2afbf05efe0f10cff098493805b4a1e2d213d7",
+      "targetBranch": "main", "targetPath": "/", "publishedHead": "ef5a2cd6c77c4dfab98741fc0cf1843f46c65d86", "deploymentType": "github-pages-legacy",
+      "ci": { "runId": "30273804120", "status": "success", "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/30273804120" },
+      "deployment": { "runId": "30273801042", "status": "success", "deployedAt": "2026-07-27T14:11:20.000Z", "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/30273801042" },
+      "site": { "baseUrl": "https://xujiann.github.io/chronic-care-platform/", "status": "built", "verifiedAt": "2026-07-27T14:20:11.008Z", "resources": [
+        { "path": "quality-operations-governance.js", "statusCode": 200, "sha256": "1021a9674bcd3f9c59ea57547a739960f0d82a489d7abe07bac6c3cd15ec208e", "requiredMarkers": ["expectedVersion", "idempotencyKey"], "observedMarkers": ["expectedVersion", "idempotencyKey"] }
+      ] },
+      "productionReady": false,
+      "boundary": "Static publication does not prove live bed, scheduling, equipment, transfer, inventory, quality-center or insurance feeds."
+    },
+    {
+      "lineId": "T10",
+      "sourceCandidateHead": "b2df2231913c5a44a5cbf6e306e1cf5c4d11a68c",
+      "sourceIntegrationHead": "9d2afbf05efe0f10cff098493805b4a1e2d213d7",
+      "targetBranch": "main", "targetPath": "/", "publishedHead": "ef5a2cd6c77c4dfab98741fc0cf1843f46c65d86", "deploymentType": "github-pages-legacy",
+      "ci": { "runId": "30273804120", "status": "success", "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/30273804120" },
+      "deployment": { "runId": "30273801042", "status": "success", "deployedAt": "2026-07-27T14:11:20.000Z", "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/30273801042" },
+      "site": { "baseUrl": "https://xujiann.github.io/chronic-care-platform/", "status": "built", "verifiedAt": "2026-07-27T14:20:11.008Z", "resources": [
+        { "path": "t10-specialty-module-governance.js", "statusCode": 200, "sha256": "a474e0f7b223c385de46a9e43ea83773d881ad4ee8d70cae6aa7aedbec59129b", "requiredMarkers": ["moduleCatalog", "productionReady: false"], "observedMarkers": ["moduleCatalog", "productionReady: false"] }
+      ] },
+      "productionReady": false,
+      "boundary": "Static publication does not prove 120, blood-center, imaging-vendor, device, examination-site or downgrade evidence."
+    },
+    {
+      "lineId": "T11",
+      "sourceCandidateHead": "2f551cfa19919af68b30b7f475a0cebca2073e00",
+      "sourceIntegrationHead": "9d2afbf05efe0f10cff098493805b4a1e2d213d7",
+      "targetBranch": "main", "targetPath": "/", "publishedHead": "ef5a2cd6c77c4dfab98741fc0cf1843f46c65d86", "deploymentType": "github-pages-legacy",
+      "ci": { "runId": "30273804120", "status": "success", "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/30273804120" },
+      "deployment": { "runId": "30273801042", "status": "success", "deployedAt": "2026-07-27T14:11:20.000Z", "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/30273801042" },
+      "site": { "baseUrl": "https://xujiann.github.io/chronic-care-platform/", "status": "built", "verifiedAt": "2026-07-27T14:20:11.008Z", "resources": [
+        { "path": "scripts/production-release-evidence-readiness.js", "statusCode": 200, "sha256": "90fb399a4efb544314805d21963aa8ed2726dd51eece0b5eeecebcff85e71c3e", "requiredMarkers": ["no-go-evidence-incomplete", "findSensitiveMaterial"], "observedMarkers": ["no-go-evidence-incomplete", "findSensitiveMaterial"] }
+      ] },
+      "productionReady": false,
+      "boundary": "Static publication and valid evidence structure do not authorize production; SIEM, duty, disaster recovery and independent site approvals remain required."
     }
   ]
 }
