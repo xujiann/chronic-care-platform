@@ -109,13 +109,16 @@
     },
     {
       "lineId": "T05",
-      "candidateHead": "c237d584e59c05cc6070a0b5802632295a4b1b57",
+      "candidateHead": "fb263dc51f52be2922e5a4758dcfc2862f72d7cb",
       "decision": "accepted",
-      "reviewedAt": "2026-07-23T06:10:35.000Z",
+      "reviewedAt": "2026-07-27T14:56:50.866Z",
       "reviewer": "T00",
       "checks": [
         "git diff --check",
-        "83 registration, referral, continuity, family-doctor and readiness tests passed independently",
+        "the functional increment is patch-equivalent to the T00 implementation and its out-of-scope institution fixture is semantically superseded by the stronger public API fixture",
+        "52/52 registration, referral, continuity, family-doctor and readiness tests passed",
+        "42/42 public API tests passed",
+        "threadReady=true and integrationReady=true while productionReady=false",
         "institution commands and callbacks fail closed without authenticated orgCode",
         "expectedVersion, content-bound idempotency and resident authorization enforcement validated"
       ],
