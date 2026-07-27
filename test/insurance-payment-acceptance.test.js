@@ -2,7 +2,7 @@
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { buildInsurancePaymentAcceptance, renderMarkdown } = require("../scripts/insurance-payment-acceptance");
+const { buildInsurancePaymentAcceptance, parseArgs, renderMarkdown, shouldFailAcceptance } = require("../scripts/insurance-payment-acceptance");
 
 test("T07 unified acceptance covers all six workflows without claiming production readiness", () => {
   const report = buildInsurancePaymentAcceptance();
@@ -23,6 +23,9 @@ test("T07 unified acceptance covers all six workflows without claiming productio
   assert.ok(report.externalBlockers.some((item) => item.id === "financial-6" && item.reviewerRole === "acceptance-reviewer"));
   assert.match(renderMarkdown(report), /在线支付退费 \| PASS/);
   assert.match(renderMarkdown(report), /年度清算 \| PASS/);
+  assert.equal(shouldFailAcceptance(report), false);
+  assert.equal(shouldFailAcceptance(report, { "require-production": true }), true);
+  assert.deepEqual(parseArgs(["--require-production", "--output=acceptance.json"]), { "require-production": true, output: "acceptance.json" });
 });
 
 test("T07 unified acceptance fails closed for an unmapped financial evidence requirement", () => {
@@ -36,6 +39,7 @@ test("T07 unified acceptance fails closed for an unmapped financial evidence req
   });
   assert.equal(baseline.localReady, true);
   assert.equal(report.localReady, false);
+  assert.equal(shouldFailAcceptance(report), true);
   assert.equal(report.summary.externalEvidenceGoverned, false);
   assert.ok(report.externalBlockers.some((item) => item.id === "financial-unmapped-7" && item.owner === "" && item.reviewerRole === ""));
 });

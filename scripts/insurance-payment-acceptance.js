@@ -102,10 +102,22 @@ function renderMarkdown(report) {
   ].join("\n");
 }
 
-if (require.main === module) {
-  const report = buildInsurancePaymentAcceptance();
-  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
-  if (!report.localReady) process.exitCode = 1;
+function parseArgs(argv = process.argv.slice(2)) {
+  return Object.fromEntries(argv.filter((item) => item.startsWith("--")).map((item) => {
+    const [key, ...value] = item.slice(2).split("=");
+    return [key, value.length ? value.join("=") : true];
+  }));
 }
 
-module.exports = { FINANCIAL_GATEWAY_EVIDENCE_POLICY, buildInsurancePaymentAcceptance, diseasePaymentExternalEvidence, financialGatewayExternalEvidence, renderMarkdown };
+function shouldFailAcceptance(report = {}, args = {}) {
+  return report.localReady !== true || (args["require-production"] === true && report.productionReady !== true);
+}
+
+if (require.main === module) {
+  const args = parseArgs();
+  const report = buildInsurancePaymentAcceptance();
+  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  if (shouldFailAcceptance(report, args)) process.exitCode = 1;
+}
+
+module.exports = { FINANCIAL_GATEWAY_EVIDENCE_POLICY, buildInsurancePaymentAcceptance, diseasePaymentExternalEvidence, financialGatewayExternalEvidence, parseArgs, renderMarkdown, shouldFailAcceptance };

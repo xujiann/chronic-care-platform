@@ -121,10 +121,16 @@ function renderMarkdown(packet) {
 }
 
 function parseArgs(argv = process.argv.slice(2)) {
-  return Object.fromEntries(argv.filter((item) => item.startsWith("--") && item.includes("=")).map((item) => {
+  return Object.fromEntries(argv.filter((item) => item.startsWith("--")).map((item) => {
     const [key, ...value] = item.slice(2).split("=");
-    return [key, value.join("=")];
+    return [key, value.length ? value.join("=") : true];
   }));
+}
+
+function shouldFailEvidencePacket(packet = {}, args = {}) {
+  return packet.localReady !== true
+    || !verifyInsurancePaymentEvidencePacket(packet)
+    || (args["require-production"] === true && (packet.productionReady !== true || packet.productionHandoff?.productionReady !== true));
 }
 
 if (require.main === module) {
@@ -133,7 +139,7 @@ if (require.main === module) {
   if (args.output) fs.writeFileSync(path.resolve(ROOT, args.output), `${JSON.stringify(packet, null, 2)}\n`, "utf8");
   if (args.markdown) fs.writeFileSync(path.resolve(ROOT, args.markdown), renderMarkdown(packet), "utf8");
   process.stdout.write(`${JSON.stringify({ packetDigest: packet.packetDigest, localReady: packet.localReady, productionReady: packet.productionReady, workflows: packet.workflows.length, t00PendingRoutes: packet.t00PendingRoutes.length, externalBlockers: packet.externalBlockers.length }, null, 2)}\n`);
-  if (!packet.localReady || !verifyInsurancePaymentEvidencePacket(packet)) process.exitCode = 1;
+  if (shouldFailEvidencePacket(packet, args)) process.exitCode = 1;
 }
 
-module.exports = { EVIDENCE_FILES, buildInsurancePaymentEvidencePacket, packetPayload, parseArgs, renderMarkdown, sha256, stableStringify, verifyArtifactManifest, verifyInsurancePaymentEvidencePacket };
+module.exports = { EVIDENCE_FILES, buildInsurancePaymentEvidencePacket, packetPayload, parseArgs, renderMarkdown, sha256, shouldFailEvidencePacket, stableStringify, verifyArtifactManifest, verifyInsurancePaymentEvidencePacket };

@@ -16,6 +16,8 @@ test("insurance payment evidence packet is complete digest-bound and privacy-saf
   assert.equal(packet.productionHandoff.evidenceComplete, false);
   assert.equal(packet.productionHandoff.productionReady, false);
   assert.equal(Evidence.verifyInsurancePaymentEvidencePacket(packet), true);
+  assert.equal(Evidence.shouldFailEvidencePacket(packet), false);
+  assert.equal(Evidence.shouldFailEvidencePacket(packet, { "require-production": true }), true);
   assert.doesNotMatch(JSON.stringify(packet), /residentId|patientName|FINANCIAL_GATEWAY_SECRET|PRIVATE KEY/);
   assert.match(Evidence.renderMarkdown(packet), /医保支付与按病种付费验收证据包/);
 });
@@ -38,5 +40,6 @@ test("insurance payment evidence packet detects acceptance or artifact tampering
 
   const wrongRoot = structuredClone(packet);
   assert.equal(Evidence.verifyInsurancePaymentEvidencePacket(wrongRoot, { artifactRoot: __dirname }), false);
-  assert.deepEqual(Evidence.parseArgs(["--output=tmp/evidence.json", "--markdown=tmp/evidence.md"]), { output: "tmp/evidence.json", markdown: "tmp/evidence.md" });
+  assert.equal(Evidence.shouldFailEvidencePacket(tampered), true);
+  assert.deepEqual(Evidence.parseArgs(["--output=tmp/evidence.json", "--markdown=tmp/evidence.md", "--require-production"]), { output: "tmp/evidence.json", markdown: "tmp/evidence.md", "require-production": true });
 });
