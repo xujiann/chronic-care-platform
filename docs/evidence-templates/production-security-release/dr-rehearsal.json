@@ -1,0 +1,35 @@
+{
+  "evidenceId": "<dr-evidence-id>",
+  "gateId": "P0-10-DR",
+  "environment": "disaster-recovery",
+  "ownerDepartment": "data-platform",
+  "independentVerifier": "<independent-dr-reviewer>",
+  "releaseId": "<approved-release-id>",
+  "artifactDigest": "sha256:<64-hex-artifact-digest>",
+  "changeTicket": "<change-ticket>",
+  "executedAt": "<ISO-8601-time>",
+  "target": "<production-and-dr-topology>",
+  "steps": ["Create native backup", "Restore into isolated target", "Fail over traffic", "Roll back application and data"],
+  "expectedResult": "All scenarios pass within approved RPO and RTO",
+  "actualResult": "<minimized-result-summary>",
+  "result": "pending",
+  "objectives": { "rpoMinutes": 0, "rtoMinutes": 0 },
+  "measurements": { "rpoMinutes": -1, "rtoMinutes": -1 },
+  "nativeBackupRef": "controlled://<native-backup-manifest>",
+  "offsiteReplicaRef": "controlled://<offsite-replica-proof>",
+  "rehearsalScenarios": [
+    { "id": "backup", "passed": false, "receiptRef": "controlled://<backup-receipt>" },
+    { "id": "restore", "passed": false, "receiptRef": "controlled://<restore-receipt>" },
+    { "id": "failover", "passed": false, "receiptRef": "controlled://<failover-receipt>" },
+    { "id": "rollback", "passed": false, "receiptRef": "controlled://<rollback-receipt>" }
+  ],
+  "signoffs": [
+    { "role": "business", "account": "<business-account>" },
+    { "role": "information", "account": "<information-account>" },
+    { "role": "operations", "account": "<operations-account>" },
+    { "role": "security", "account": "<security-account>" }
+  ],
+  "attachments": [{ "reference": "controlled://<dr-rehearsal-package>", "digest": "sha256:<64-hex-attachment-digest>" }],
+  "dataBoundary": { "containsPatientData": false, "containsSecretValues": false },
+  "exceptions": []
+}

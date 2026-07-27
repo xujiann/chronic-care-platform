@@ -37,16 +37,94 @@ const BloodEventHub = require("./blood-event-hub");
 const BloodGoLiveService = require("./blood-go-live-service");
 const DiseasePaymentService = require("./disease-payment-service");
 const DiseasePaymentIntake = require("./disease-payment-intake");
+const DiseasePaymentGrouperContract = require("./disease-payment-grouper-contract");
+const OnlinePaymentRefunds = require("./online-payment-refunds");
+const InsurancePaymentOperatingModel = require("./insurance-payment-operating-model");
 const PhysicalExaminationService = require("./physical-examination-service");
+const CitizenRecordsPolicy = require("./citizen-records-policy");
+const CitizenRecordsV1 = require("./citizen-records-v1");
+const CitizenRecordsV2 = require("./citizen-records-v2");
+const RegistrationReferralService = require("./registration-referral-service");
 const { buildQualitySafetyInterfaceStandard } = require("./scripts/quality-safety-interface-standard");
 const {
   buildQualitySafetyInterfaceJointTestPack,
   validateQualitySafetyInterfaceMessage
 } = require("./scripts/quality-safety-interface-joint-test");
+const { executeGovernanceCommand } = require("./quality-operations-governance");
+const {
+  applyGovernanceResultToData,
+  buildGovernanceCatalog,
+  buildGovernanceRuntimeState,
+  governanceAuditForRecord,
+  listGovernanceRecords,
+  publicGovernanceRecord
+} = require("./quality-operations-governance-adapter");
+const {
+  applyPublicHealthCoordinationActionToState,
+  buildPublicHealthCoordinationRuntime
+} = require("./public-health-coordination-runtime");
+const {
+  claimPublicHealthExternalDispatchToState,
+  enqueuePublicHealthExternalDispatchToState,
+  listDuePublicHealthExternalDispatches,
+  recordClaimedPublicHealthExternalAttemptToState,
+  recordPublicHealthExternalAttemptToState,
+  requeuePublicHealthExternalDeadLetterToState
+} = require("./public-health-external-adapter-runtime");
+const {
+  EXTERNAL_ADAPTER_PROFILES
+} = require("./public-health-external-adapter-service");
+const {
+  buildPublicHealthExternalOperationsBoard
+} = require("./public-health-external-operations-service");
+const {
+  buildPublicHealthKeySafetyBoard,
+  loadPublicHealthContractGovernance,
+  loadPublicHealthEndpointProbeCampaignContext,
+  loadPublicHealthEndpointProbeContext,
+  loadPublicHealthLaneCredentials
+} = require("./public-health-external-key-provider");
+const {
+  assertPublicHealthContractAttestationChain,
+  assertUniquePublicHealthContractAttestations,
+  contractAttestationUniqueKey,
+  signTrustedPublicHealthContractAttestation
+} = require("./public-health-external-contract-integration");
+const {
+  buildPublicHealthExternalContractCutoverBoard
+} = require("./public-health-external-contract-cutover-service");
+const {
+  buildPublicHealthExternalEndpointProbeRegistry,
+  verifyPublicHealthExternalEndpointProbeReceipt
+} = require("./public-health-external-endpoint-verification-service");
+const {
+  assertServerOnlyCommand,
+  runPublicHealthExternalEndpointProbe
+} = require("./public-health-external-endpoint-probe-runner");
+const {
+  buildPublicHealthExternalEndpointProbeCampaignRegistry,
+  createPublicHealthExternalEndpointProbeCampaign,
+  endpointProbeReceiptDigest,
+  verifyPublicHealthExternalEndpointProbeCampaign
+} = require("./public-health-external-endpoint-probe-campaign-service");
+const CareServicePlatform = require("./care-service-platform-adapter");
+const CareServiceRuntime = require("./care-service-runtime");
+const { createCareServiceDeliveryAdapters } = require("./care-service-delivery-adapters");
+const { createCareServiceStateRepository } = require("./care-service-state-repository");
+const { buildCareServiceProductionReadiness } = require("./scripts/care-service-production-readiness");
+const {
+  DEFAULT_EVIDENCE_DIR: DEFAULT_PRODUCTION_RELEASE_EVIDENCE_DIR,
+  buildProductionReleaseEvidenceReadiness
+} = require("./scripts/production-release-evidence-readiness");
 const PHYSICAL_EXAM_CONTRACT_ID = "physical-exam-report-v1";
 const EmergencyService = require("./emergency-service");
 const EmergencyLifeChain = require("./emergency-lifechain");
 const EmergencyProduction = require("./emergency-production");
+const { buildSpecialtyCutoverPack } = require("./emergency-specialty-cutover");
+const T10SpecialtyModuleGovernance = require("./t10-specialty-module-governance");
+const BloodClinicalProduction = require("./blood-clinical-production");
+const EmergencyModuleGate = require("./emergency-module-gate");
+const ImagingCloudProduction = require("./imaging-cloud-production");
 const { buildOhifStudyUrl, listOrthancStudySummaries, publishDiagnosticReportToFhir, publishImagingStudyToFhir, solutionAHealth } = require("./solution-a-connectors");
 const {
   SmsDeliveryCallbackError,
@@ -1165,6 +1243,16 @@ function seedState() {
     platformAudit: seedPlatformAudit(),
     platformProcessAudit: seedPlatformProcessAudit(),
     personalRecords: PhysicalExaminationService.mergeSeedRecords(seedPersonalRecords()),
+    recordCorrections: [],
+    recordSharePackages: [],
+    careTaskUpdates: [],
+    accessAcknowledgements: [],
+    accessDisputes: [],
+    primaryCareAssessments: [],
+    registrationReferralClosureEvents: [],
+    registrationReferralEscalations: [],
+    registrationReferralNotificationDeadLetters: [],
+    phase2FamilyDoctorServiceTasks: [],
     physicalExamAbnormalCases: PhysicalExaminationService.seedAbnormalCases(),
     physicalExamJointTests: PhysicalExaminationService.seedJointTests(),
     physicalExamHealthPassports: [],
@@ -1217,7 +1305,7 @@ function seedTaskMessages() {
       taskId: "referralTeleconsultations:rtc-002",
       collection: "referralTeleconsultations",
       sourceId: "rtc-002",
-      residentId: "r2",
+      residentId: "r4",
       targetRole: "citizen",
       channel: "in_app",
       title: "Teleconsultation report returned",
@@ -1234,7 +1322,7 @@ function seedTaskMessages() {
       taskId: "referralTeleconsultations:rtc-002",
       collection: "referralTeleconsultations",
       sourceId: "rtc-002",
-      residentId: "r2",
+      residentId: "r4",
       targetRole: "institution",
       channel: "in_app",
       title: "Teleconsultation report returned",
@@ -6516,19 +6604,196 @@ function readDatabase() {
   return data;
 }
 
-function writeDatabase(data) {
+function currentPublicHealthExternalVersions(data = {}, cas = {}) {
+  const dispatch = (Array.isArray(data.publicHealthExternalDispatches) ? data.publicHealthExternalDispatches : [])
+    .find((item) => item.id === String(cas.dispatchId || "").trim());
+  const laneControl = (Array.isArray(data.publicHealthExternalLaneControls) ? data.publicHealthExternalLaneControls : [])
+    .find((item) => item.laneId === String(cas.laneId || "").trim());
+  return {
+    dispatch,
+    outboxVersion: dispatch ? Number(dispatch.outboxVersion) : null,
+    laneControlVersion: Number(laneControl?.version || 0)
+  };
+}
+
+function assertPublicHealthExternalCas(data = {}, cas = {}) {
+  const dispatchId = String(cas.dispatchId || "").trim();
+  const laneId = String(cas.laneId || "").trim();
+  const expectedOutboxVersion = Number(cas.expectedOutboxVersion);
+  const expectedLaneControlVersion = Number(cas.expectedLaneControlVersion);
+  if (!dispatchId || !laneId || !Number.isInteger(expectedOutboxVersion) || !Number.isInteger(expectedLaneControlVersion)) {
+    throw new Error("public health external CAS requires dispatchId, laneId and integer expected versions");
+  }
+  const current = currentPublicHealthExternalVersions(data, { dispatchId, laneId });
+  if (!current.dispatch) throw new Error(`public health external CAS dispatch missing: ${dispatchId}`);
+  if (current.outboxVersion !== expectedOutboxVersion) {
+    throw new Error(`public health external dispatch CAS conflict: expected ${expectedOutboxVersion}, current ${current.outboxVersion}`);
+  }
+  if (current.laneControlVersion !== expectedLaneControlVersion) {
+    throw new Error(`public health external lane control CAS conflict: expected ${expectedLaneControlVersion}, current ${current.laneControlVersion}`);
+  }
+  return current;
+}
+
+function assertPublicHealthContractAttestationInsert(data = {}, constraint = {}, incomingAttestations = []) {
+  return assertPublicHealthContractAttestationChain({
+    persistedAttestations: Array.isArray(data.publicHealthExternalContractAttestations)
+      ? data.publicHealthExternalContractAttestations
+      : [],
+    incomingAttestations,
+    attestation: constraint.attestation || constraint,
+    signingMaterial: constraint.signingMaterial,
+    at: constraint.at
+  });
+}
+
+function assertUniquePublicHealthEndpointProbeReceipts(receipts = []) {
+  const receiptIds = new Set();
+  const nonces = new Set();
+  (Array.isArray(receipts) ? receipts : []).forEach((receipt) => {
+    const receiptId = String(receipt?.receiptId || "").trim();
+    const nonce = String(receipt?.nonce || "").trim();
+    if (!receiptId || !nonce) throw new Error("public health endpoint probe receiptId and nonce are required");
+    if (receiptIds.has(receiptId)) {
+      throw new Error(`public health endpoint probe receiptId unique conflict: ${receiptId}`);
+    }
+    if (nonces.has(nonce)) {
+      throw new Error("public health endpoint probe nonce unique conflict");
+    }
+    receiptIds.add(receiptId);
+    nonces.add(nonce);
+  });
+}
+
+function assertPublicHealthEndpointProbeInsert(data = {}, constraint = {}) {
+  const receipt = constraint.receipt || constraint;
+  const receiptId = String(receipt?.receiptId || "").trim();
+  const nonce = String(receipt?.nonce || "").trim();
+  if (!receiptId || !nonce) throw new Error("public health endpoint probe receiptId and nonce are required");
+  const persisted = Array.isArray(data.publicHealthExternalEndpointProbeReceipts)
+    ? data.publicHealthExternalEndpointProbeReceipts
+    : [];
+  if (persisted.some((item) => String(item?.receiptId || "").trim() === receiptId)) {
+    throw new Error(`public health endpoint probe receiptId unique conflict: ${receiptId}`);
+  }
+  if (persisted.some((item) => String(item?.nonce || "").trim() === nonce)) {
+    throw new Error("public health endpoint probe nonce unique conflict");
+  }
+}
+
+function publicHealthEndpointProbeCampaignIdentity(campaign = {}) {
+  const attestation = campaign.attestation || campaign;
+  return {
+    campaignId: String(attestation?.campaignId || "").trim(),
+    campaignNonce: String(attestation?.nonce || "").trim(),
+    receiptReferences: Array.isArray(campaign.receiptReferences)
+      ? campaign.receiptReferences
+      : []
+  };
+}
+
+function assertUniquePublicHealthEndpointProbeCampaigns(campaigns = []) {
+  const campaignIds = new Set();
+  const campaignNonces = new Set();
+  const receiptIds = new Set();
+  const receiptNonces = new Set();
+  (Array.isArray(campaigns) ? campaigns : []).forEach((campaign) => {
+    const identity = publicHealthEndpointProbeCampaignIdentity(campaign);
+    if (!identity.campaignId || !identity.campaignNonce) {
+      throw new Error("public health endpoint probe campaignId and campaign nonce are required");
+    }
+    if (campaignIds.has(identity.campaignId)) {
+      throw new Error(`public health endpoint probe campaignId unique conflict: ${identity.campaignId}`);
+    }
+    if (campaignNonces.has(identity.campaignNonce)) {
+      throw new Error("public health endpoint probe campaign nonce unique conflict");
+    }
+    if (identity.receiptReferences.length !== EXTERNAL_ADAPTER_PROFILES.length) {
+      throw new Error("public health endpoint probe campaign must reference exactly eight receipts");
+    }
+    const laneIds = new Set();
+    identity.receiptReferences.forEach((reference) => {
+      const laneId = String(reference?.laneId || "").trim();
+      const receiptId = String(reference?.receiptId || "").trim();
+      const nonce = String(reference?.nonce || "").trim();
+      if (!laneId || !receiptId || !nonce) {
+        throw new Error("public health endpoint probe campaign receipt references are incomplete");
+      }
+      if (laneIds.has(laneId)) {
+        throw new Error("public health endpoint probe campaign lane reference is duplicated");
+      }
+      if (receiptIds.has(receiptId)) {
+        throw new Error(`public health endpoint probe campaign receiptId unique conflict: ${receiptId}`);
+      }
+      if (receiptNonces.has(nonce)) {
+        throw new Error("public health endpoint probe campaign receipt nonce unique conflict");
+      }
+      laneIds.add(laneId);
+      receiptIds.add(receiptId);
+      receiptNonces.add(nonce);
+    });
+    campaignIds.add(identity.campaignId);
+    campaignNonces.add(identity.campaignNonce);
+  });
+}
+
+function assertPublicHealthEndpointProbeCampaignInsert(data = {}, constraint = {}) {
+  const campaign = constraint.campaign || constraint;
+  const persisted = Array.isArray(data.publicHealthExternalEndpointProbeCampaigns)
+    ? data.publicHealthExternalEndpointProbeCampaigns
+    : [];
+  assertUniquePublicHealthEndpointProbeCampaigns([...persisted, campaign]);
+}
+
+function writeDatabase(data, options = {}) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
+  const publicHealthExternalCas = options.publicHealthExternalCas || null;
+  const publicHealthExternalContractInsert = options.publicHealthExternalContractInsert || null;
+  const publicHealthEndpointProbeInsert = options.publicHealthEndpointProbeInsert || null;
+  const publicHealthEndpointProbeCampaignInsert = options.publicHealthEndpointProbeCampaignInsert || null;
+  const sqlite = shouldUseSqlite();
   const normalized = normalizeState(data);
+  if ((publicHealthExternalCas
+    || publicHealthExternalContractInsert
+    || publicHealthEndpointProbeInsert
+    || publicHealthEndpointProbeCampaignInsert) && !sqlite) {
+    const persisted = fs.existsSync(DB_FILE) ? JSON.parse(fs.readFileSync(DB_FILE, "utf8")) : {};
+    if (publicHealthExternalCas) assertPublicHealthExternalCas(persisted, publicHealthExternalCas);
+    if (publicHealthExternalContractInsert) {
+      assertPublicHealthContractAttestationInsert(
+        persisted,
+        publicHealthExternalContractInsert,
+        normalized.publicHealthExternalContractAttestations
+      );
+    }
+    if (publicHealthEndpointProbeInsert) {
+      assertPublicHealthEndpointProbeInsert(persisted, publicHealthEndpointProbeInsert);
+    }
+    if (publicHealthEndpointProbeCampaignInsert) {
+      assertPublicHealthEndpointProbeCampaignInsert(persisted, publicHealthEndpointProbeCampaignInsert);
+    }
+  }
+  assertUniquePublicHealthContractAttestations(normalized.publicHealthExternalContractAttestations);
+  assertUniquePublicHealthEndpointProbeReceipts(normalized.publicHealthExternalEndpointProbeReceipts);
+  assertUniquePublicHealthEndpointProbeCampaigns(normalized.publicHealthExternalEndpointProbeCampaigns);
   normalized.storageMeta = data.storageMeta || storageMeta();
-  if (shouldUseSqlite()) {
-    writeSqliteState(normalized, "write-state", data.storageMeta?.collectionVersions);
+  if (sqlite) {
+    writeSqliteState(
+      normalized,
+      String(options.event || "write-state"),
+      data.storageMeta?.collectionVersions,
+      publicHealthExternalCas,
+      publicHealthExternalContractInsert,
+      publicHealthEndpointProbeInsert,
+      publicHealthEndpointProbeCampaignInsert
+    );
   }
   const snapshot = {
     ...normalized,
     storageMeta: {
       ...normalized.storageMeta,
-      engine: shouldUseSqlite() ? "json-snapshot" : "json",
-      mode: shouldUseSqlite() ? "GitHub Pages 静态预览 JSON 快照" : "JSON 文件存储"
+      engine: sqlite ? "json-snapshot" : "json",
+      mode: sqlite ? "GitHub Pages 静态预览 JSON 快照" : "JSON 文件存储"
     }
   };
   fs.writeFileSync(DB_FILE, JSON.stringify(snapshot, null, 2), "utf8");
@@ -6701,12 +6966,50 @@ function readSqliteStateFromConnection(db) {
   }, {});
 }
 
-function writeSqliteState(data, event = "write-state", expectedVersions = null) {
+function writeSqliteState(
+  data,
+  event = "write-state",
+  expectedVersions = null,
+  publicHealthExternalCas = null,
+  publicHealthExternalContractInsert = null,
+  publicHealthEndpointProbeInsert = null,
+  publicHealthEndpointProbeCampaignInsert = null
+) {
   const db = openSqliteDatabase();
   const now = new Date().toISOString();
   try {
     db.exec("PRAGMA foreign_keys = ON");
     db.exec("BEGIN");
+    if (publicHealthExternalCas) {
+      const getCollection = db.prepare("SELECT payload FROM state_collections WHERE key = ?");
+      const dispatchRow = getCollection.get("publicHealthExternalDispatches");
+      const laneControlRow = getCollection.get("publicHealthExternalLaneControls");
+      assertPublicHealthExternalCas({
+        publicHealthExternalDispatches: dispatchRow ? JSON.parse(dispatchRow.payload) : [],
+        publicHealthExternalLaneControls: laneControlRow ? JSON.parse(laneControlRow.payload) : []
+      }, publicHealthExternalCas);
+    }
+    if (publicHealthExternalContractInsert) {
+      const row = db.prepare("SELECT payload FROM state_collections WHERE key = ?")
+        .get("publicHealthExternalContractAttestations");
+      assertPublicHealthContractAttestationInsert({
+        publicHealthExternalContractAttestations: row ? JSON.parse(row.payload) : []
+      }, publicHealthExternalContractInsert, data.publicHealthExternalContractAttestations);
+    }
+    if (publicHealthEndpointProbeInsert) {
+      const row = db.prepare("SELECT payload FROM state_collections WHERE key = ?")
+        .get("publicHealthExternalEndpointProbeReceipts");
+      assertPublicHealthEndpointProbeInsert({
+        publicHealthExternalEndpointProbeReceipts: row ? JSON.parse(row.payload) : []
+      }, publicHealthEndpointProbeInsert);
+    }
+    if (publicHealthEndpointProbeCampaignInsert) {
+      const row = db.prepare("SELECT payload FROM state_collections WHERE key = ?")
+        .get("publicHealthExternalEndpointProbeCampaigns");
+      assertPublicHealthEndpointProbeCampaignInsert({
+        publicHealthExternalEndpointProbeCampaigns: row ? JSON.parse(row.payload) : []
+      }, publicHealthEndpointProbeCampaignInsert);
+    }
     const normalized = normalizeState(data);
     const entries = Object.entries(normalized).filter(([key]) => key !== "storageMeta");
     verifySqliteCollectionVersions(db, entries.map(([key]) => key), expectedVersions);
@@ -9954,12 +10257,65 @@ function normalizeState(data) {
       : [],
     disasterRecoveryDrills: mergeByKey(seedDisasterRecoveryDrills(), data.disasterRecoveryDrills, "id").map((item) => ({ ...item, requiredEvidence: Array.isArray(item.requiredEvidence) ? item.requiredEvidence : [], checks: Array.isArray(item.checks) ? item.checks : [], actionHistory: Array.isArray(item.actionHistory) ? item.actionHistory.slice(0, 20) : [], productionReady: false })),
     operationsEvidencePackets: mergeByKey(seedOperationsEvidencePackets(), data.operationsEvidencePackets, "id").map((item) => ({ ...item, productionEvidence: false })),
+    t10SpecialtyModuleSelections: Array.isArray(data.t10SpecialtyModuleSelections)
+      ? data.t10SpecialtyModuleSelections.slice(0, 500).map((item) => ({
+          ...item,
+          productionReady: false,
+          formalGoLiveState: "blocked-until-site-evidence-signed"
+        }))
+      : [],
+    t10SpecialtyModuleAudit: Array.isArray(data.t10SpecialtyModuleAudit)
+      ? data.t10SpecialtyModuleAudit.slice(0, 5000).map((item) => ({
+          ...item,
+          productionReady: false,
+          formalGoLiveState: "blocked-until-site-evidence-signed"
+        }))
+      : [],
     healthStatistics: data.healthStatistics && typeof data.healthStatistics === "object" ? data.healthStatistics : seedHealthStatistics(),
     publicHealthStandards: mergeByKey(seedPublicHealthStandards(), data.publicHealthStandards, "id"),
     publicHealthStandardImplementationLedger: mergeByKey(seedPublicHealthStandardImplementationLedger(), data.publicHealthStandardImplementationLedger, "id"),
     publicHealthInstitutionScopes: mergeByKey(seedPublicHealthInstitutionScopes(), data.publicHealthInstitutionScopes, "id"),
     publicHealthEvents: mergeByKey(seedPublicHealthEvents(), data.publicHealthEvents, "id"),
     publicHealthTriggerRules: mergeByKey(seedPublicHealthTriggerRules(), data.publicHealthTriggerRules, "id"),
+    publicHealthCoordinationHandoffs: Array.isArray(data.publicHealthCoordinationHandoffs)
+      ? data.publicHealthCoordinationHandoffs.slice(0, 100)
+      : [],
+    publicHealthCoordinationAudit: Array.isArray(data.publicHealthCoordinationAudit)
+      ? data.publicHealthCoordinationAudit.slice(-2000)
+      : [],
+    publicHealthExternalDispatches: Array.isArray(data.publicHealthExternalDispatches)
+      ? data.publicHealthExternalDispatches.slice(-2000)
+      : [],
+    publicHealthExternalDispatchAudit: Array.isArray(data.publicHealthExternalDispatchAudit)
+      ? data.publicHealthExternalDispatchAudit.slice(-5000)
+      : [],
+    publicHealthExternalLaneControls: Array.isArray(data.publicHealthExternalLaneControls)
+      ? data.publicHealthExternalLaneControls.slice(-100)
+      : [],
+    publicHealthExternalLaneControlAudit: Array.isArray(data.publicHealthExternalLaneControlAudit)
+      ? data.publicHealthExternalLaneControlAudit.slice(-10000)
+      : [],
+    publicHealthExternalKeyRotationEvidence: Array.isArray(data.publicHealthExternalKeyRotationEvidence)
+      ? data.publicHealthExternalKeyRotationEvidence.slice(-100)
+      : [],
+    publicHealthExternalContractAttestations: Array.isArray(data.publicHealthExternalContractAttestations)
+      ? data.publicHealthExternalContractAttestations.slice(-100)
+      : [],
+    publicHealthExternalContractGovernanceAudit: Array.isArray(data.publicHealthExternalContractGovernanceAudit)
+      ? data.publicHealthExternalContractGovernanceAudit.slice(-2000)
+      : [],
+    publicHealthExternalEndpointProbeReceipts: Array.isArray(data.publicHealthExternalEndpointProbeReceipts)
+      ? data.publicHealthExternalEndpointProbeReceipts
+      : [],
+    publicHealthExternalEndpointProbeAudit: Array.isArray(data.publicHealthExternalEndpointProbeAudit)
+      ? data.publicHealthExternalEndpointProbeAudit.slice(-4000)
+      : [],
+    publicHealthExternalEndpointProbeCampaigns: Array.isArray(data.publicHealthExternalEndpointProbeCampaigns)
+      ? data.publicHealthExternalEndpointProbeCampaigns.slice(-100)
+      : [],
+    publicHealthExternalEndpointProbeCampaignAudit: Array.isArray(data.publicHealthExternalEndpointProbeCampaignAudit)
+      ? data.publicHealthExternalEndpointProbeCampaignAudit.slice(-1000)
+      : [],
     publicHealthSignals: mergeByKey(seedPublicHealthSignals(), data.publicHealthSignals, "id"),
     publicHealthAlerts: mergeByKey(seedPublicHealthAlerts(), data.publicHealthAlerts, "id"),
     publicHealthCommandTasks: mergeByKey(seedPublicHealthCommandTasks(), data.publicHealthCommandTasks, "id"),
@@ -10062,6 +10418,7 @@ function normalizeState(data) {
     escortServiceProviders: mergeByKey(seedEscortServiceProviders(), data.escortServiceProviders, "id"),
     escortWorkers: mergeByKey(seedEscortWorkers(), data.escortWorkers, "id"),
     escortServiceOrders: mergeByKey(seedEscortServiceOrders(), data.escortServiceOrders, "id"),
+    escortServiceOutbox: Array.isArray(data.escortServiceOutbox) ? data.escortServiceOutbox.slice(0, 1000) : [],
     registrationSchedules: mergeByKey(seedRegistrationSchedules(), data.registrationSchedules, "id"),
     registrationOrders: mergeByKey(seedRegistrationOrders(), data.registrationOrders, "id").map(normalizeRegistrationJourneyOrder),
     registrationWaitlistEntries: mergeByKey(seedRegistrationWaitlistEntries(), data.registrationWaitlistEntries, "id").map(normalizeRegistrationWaitlistEntry),
@@ -10069,6 +10426,8 @@ function normalizeState(data) {
     internetNursingInstitutions: mergeByKey(seedInternetNursingInstitutions(), data.internetNursingInstitutions, "id"),
     internetNursingNurses: mergeByKey(seedInternetNursingNurses(), data.internetNursingNurses, "id"),
     internetNursingOrders: mergeByKey(seedInternetNursingOrders(), data.internetNursingOrders, "id"),
+    internetNursingOutbox: Array.isArray(data.internetNursingOutbox) ? data.internetNursingOutbox.slice(0, 1000) : [],
+    careServiceOutboxDeadLetters: Array.isArray(data.careServiceOutboxDeadLetters) ? data.careServiceOutboxDeadLetters.slice(0, 1000) : [],
     serviceOrders: Array.isArray(data.serviceOrders) ? data.serviceOrders : [],
     taskMessages: Array.isArray(data.taskMessages) ? data.taskMessages : [],
     dataQualityIssues: Array.isArray(data.dataQualityIssues) ? data.dataQualityIssues : [],
@@ -10076,7 +10435,16 @@ function normalizeState(data) {
     medicationPickups: Array.isArray(data.medicationPickups) ? data.medicationPickups : seedMedicationPickups(),
     institutionSupervisions: Array.isArray(data.institutionSupervisions) ? data.institutionSupervisions : seedInstitutionSupervisions(),
     drugConsumableSupervisions: mergeByKey(seedDrugConsumableSupervisions(), data.drugConsumableSupervisions, "id"),
+    qualityOperationsGovernanceAuditEvents: Array.isArray(data.qualityOperationsGovernanceAuditEvents)
+      ? data.qualityOperationsGovernanceAuditEvents.slice(0, 5000)
+      : [],
+    qualityOperationsGovernanceCommandReceipts: data.qualityOperationsGovernanceCommandReceipts
+      && typeof data.qualityOperationsGovernanceCommandReceipts === "object"
+      && !Array.isArray(data.qualityOperationsGovernanceCommandReceipts)
+      ? data.qualityOperationsGovernanceCommandReceipts
+      : {},
     insuranceClaims: Array.isArray(data.insuranceClaims) ? data.insuranceClaims : seedInsuranceClaims(),
+    onlinePaymentRefunds: Array.isArray(data.onlinePaymentRefunds) ? data.onlinePaymentRefunds.slice(0, 2000) : [],
     diseasePayment: DiseasePaymentService.normalizeState(data.diseasePayment),
     policyAlignment: Array.isArray(data.policyAlignment) ? data.policyAlignment : seedPolicyAlignment(),
     drugTraceabilityPolicySources: mergeByKey(seedDrugTraceabilityPolicySources(), data.drugTraceabilityPolicySources, "id"),
@@ -10213,6 +10581,16 @@ function normalizeState(data) {
     platformAudit: Array.isArray(data.platformAudit) ? data.platformAudit : seedPlatformAudit(),
     platformProcessAudit: Array.isArray(data.platformProcessAudit) ? data.platformProcessAudit : seedPlatformProcessAudit(),
     personalRecords: PhysicalExaminationService.mergeSeedRecords(Array.isArray(data.personalRecords) ? data.personalRecords : seedPersonalRecords()).map(cleanPersonalRecordText),
+    recordCorrections: Array.isArray(data.recordCorrections) ? data.recordCorrections.slice(-1000) : [],
+    recordSharePackages: Array.isArray(data.recordSharePackages) ? data.recordSharePackages.slice(-1000) : [],
+    careTaskUpdates: Array.isArray(data.careTaskUpdates) ? data.careTaskUpdates.slice(-2000) : [],
+    accessAcknowledgements: Array.isArray(data.accessAcknowledgements) ? data.accessAcknowledgements.slice(-2000) : [],
+    accessDisputes: Array.isArray(data.accessDisputes) ? data.accessDisputes.slice(-2000) : [],
+    primaryCareAssessments: Array.isArray(data.primaryCareAssessments) ? data.primaryCareAssessments.slice(-1000) : [],
+    registrationReferralClosureEvents: Array.isArray(data.registrationReferralClosureEvents) ? data.registrationReferralClosureEvents.slice(0, 300) : [],
+    registrationReferralEscalations: Array.isArray(data.registrationReferralEscalations) ? data.registrationReferralEscalations.slice(-1000) : [],
+    registrationReferralNotificationDeadLetters: Array.isArray(data.registrationReferralNotificationDeadLetters) ? data.registrationReferralNotificationDeadLetters.slice(-1000) : [],
+    phase2FamilyDoctorServiceTasks: Array.isArray(data.phase2FamilyDoctorServiceTasks) ? data.phase2FamilyDoctorServiceTasks.slice(-2000) : [],
     physicalExamAbnormalCases: mergeByKey(PhysicalExaminationService.seedAbnormalCases(), data.physicalExamAbnormalCases, "id"),
     physicalExamJointTests: mergeByKey(PhysicalExaminationService.seedJointTests(), data.physicalExamJointTests, "id"),
     physicalExamHealthPassports: Array.isArray(data.physicalExamHealthPassports) ? data.physicalExamHealthPassports.slice(0, 500) : [],
@@ -10222,6 +10600,7 @@ function normalizeState(data) {
     physicalExamSpecializedIntakes: Array.isArray(data.physicalExamSpecializedIntakes) ? data.physicalExamSpecializedIntakes.slice(0, 1000) : []
   };
   completeSystemTargets(state);
+  ImagingCloudProduction.ensure(state);
   PhysicalExaminationService.synchronizeCareLinks(state, { notify: false, actor: "state-normalizer" });
   refreshDemoAppointmentDates(state);
   refreshDeathStatistics(state);
@@ -10727,6 +11106,64 @@ function normalizePersonalRecord(data) {
     meta: data.meta && typeof data.meta === "object" ? data.meta : {},
     createdBy: data.createdBy || "resident",
     createdAt: data.createdAt || new Date().toISOString()
+  };
+}
+
+function citizenCareIdempotencyKey(req, payload = {}) {
+  const headerKey = String(req.headers["idempotency-key"] || "").trim();
+  const bodyKey = String(payload.idempotencyKey || "").trim();
+  if (headerKey && bodyKey && headerKey !== bodyKey) throw new Error("幂等键请求头与请求体不一致");
+  const key = (headerKey || bodyKey).slice(0, 240);
+  if (!key || !/^[a-z0-9._:-]{8,240}$/i.test(key)) throw new Error("缺少有效的居民操作幂等键");
+  return key;
+}
+
+function citizenCareRequestDigest(payload = {}) {
+  const copy = { ...payload };
+  delete copy.idempotencyKey;
+  return createHash("sha256").update(stableStringify(copy)).digest("hex");
+}
+
+function citizenCareReplay(rows = [], idempotencyKey, requestDigest) {
+  const keyHash = createHash("sha256").update(idempotencyKey).digest("hex");
+  const existing = rows.find((item) => item.idempotencyKeyHash === keyHash);
+  if (!existing) return { keyHash, existing: null };
+  if (existing.requestDigest !== requestDigest) throw new Error("幂等键已用于不同的居民操作");
+  return { keyHash, existing };
+}
+
+function citizenCareReceipt(item = {}) {
+  const result = { ...item };
+  ["idempotencyKeyHash", "requestDigest", "revocationIdempotencyKeyHash", "revocationRequestDigest", "actorId"].forEach((key) => {
+    delete result[key];
+  });
+  return result;
+}
+
+function citizenCareWorkspace(data, residentId) {
+  const projected = CitizenRecordsV2.projectCareWorkspacePayload({
+    corrections: data.recordCorrections,
+    sharePackages: data.recordSharePackages,
+    taskUpdates: data.careTaskUpdates,
+    accessAcknowledgements: data.accessAcknowledgements,
+    accessDisputes: data.accessDisputes,
+    syncedAt: new Date().toISOString(),
+    cursor: createHash("sha256").update(stableStringify([
+      data.recordCorrections?.length || 0,
+      data.recordSharePackages?.length || 0,
+      data.careTaskUpdates?.length || 0,
+      data.accessAcknowledgements?.length || 0,
+      data.accessDisputes?.length || 0
+    ])).digest("hex"),
+    schemaVersion: "citizen-care-v1"
+  }, residentId);
+  return {
+    corrections: projected.recordCorrections,
+    sharePackages: projected.recordSharePackages,
+    taskUpdates: Object.entries(projected.careTaskUpdates).map(([id, item]) => ({ id, residentId, ...item })),
+    accessAcknowledgements: projected.accessAcknowledgements,
+    accessDisputes: projected.accessDisputes,
+    ...projected.sync
   };
 }
 
@@ -13813,6 +14250,86 @@ function requireApiRole(req, res, roles, target) {
   return session.user;
 }
 
+function insurancePaymentActor(user = {}) {
+  const organizationTypes = new Set([String(user.orgType || "").trim()].filter(Boolean));
+  if (user.role === "commission") organizationTypes.add("platform");
+  return {
+    role: user.role,
+    roles: [user.role],
+    organizationType: String(user.orgType || ""),
+    organizationTypes: [...organizationTypes],
+    actorId: String(user.username || user.id || user.role || ""),
+    organizationId: String(user.orgCode || "")
+  };
+}
+
+function authorizeInsurancePaymentAction(action, user, res, target) {
+  const decision = InsurancePaymentOperatingModel.authorizeAction(action, insurancePaymentActor(user));
+  if (decision.allowed) return true;
+  appendSecurityEvent({
+    actor: user?.name || user?.username || "unknown",
+    role: user?.role || "unknown",
+    action: "insurance payment responsibility check",
+    target,
+    result: "denied",
+    detail: decision.code
+  });
+  sendJson(res, 403, {
+    error: "Forbidden",
+    code: decision.code,
+    message: "current actor role and organization scope cannot perform this insurance payment action"
+  });
+  return false;
+}
+
+function requireInsuranceSystemCommand(req, res, payload, action, organizationType, target) {
+  const secret = integrationGatewaySecret();
+  if (String(process.env.NODE_ENV || "").toLowerCase() === "production"
+    && (secret === "health-platform-demo-integration-secret" || secret.length < 32)) {
+    sendJson(res, 503, {
+      error: "Service Unavailable",
+      code: "INSURANCE_PAYMENT_SYSTEM_SECRET_UNAVAILABLE",
+      message: "trusted system command verification is not configured"
+    });
+    return null;
+  }
+  const signedPayload = { action, target, payload };
+  if (!verifyIntegrationSignature(signedPayload, req.headers["x-integration-signature"])) {
+    appendSecurityEvent({
+      actor: "insurance-system-adapter",
+      role: "system",
+      action: "insurance payment system command",
+      target,
+      result: "denied",
+      detail: "INSURANCE_PAYMENT_SYSTEM_SIGNATURE_INVALID"
+    });
+    sendJson(res, 401, {
+      error: "Unauthorized",
+      code: "INSURANCE_PAYMENT_SYSTEM_SIGNATURE_INVALID",
+      message: "trusted system command signature verification failed"
+    });
+    return null;
+  }
+  const actor = {
+    name: "insurance-system-adapter",
+    username: "insurance-system-adapter",
+    role: "system",
+    orgType: organizationType,
+    orgCode: organizationType
+  };
+  return actor;
+}
+
+function sendInsurancePaymentError(res, error) {
+  const status = Number(error?.statusCode || 0)
+    || (/not found|涓嶅瓨鍦/i.test(String(error?.message || "")) ? 404 : 409);
+  sendJson(res, status, {
+    error: status === 403 ? "Forbidden" : status === 404 ? "Not Found" : status === 400 ? "Bad Request" : "Conflict",
+    code: error?.code || "INSURANCE_PAYMENT_COMMAND_REJECTED",
+    message: String(error?.message || "insurance payment command was rejected")
+  });
+}
+
 const RESIDENT_REFERENCE_FIELDS = ["residentId", "maternalResidentId", "patientResidentId", "subjectResidentId"];
 const ORGANIZATION_CODE_FIELDS = ["orgCode", "institutionCode", "institutionId", "hospitalCode", "sourceInstitutionCode", "targetInstitutionCode", "createdByOrgCode"];
 const ORGANIZATION_NAME_FIELDS = ["organization", "organizationName", "institution", "institutionName", "hospital", "sourceInstitution", "targetInstitution", "fromInstitution", "toInstitution"];
@@ -15888,11 +16405,27 @@ function buildPrimaryPracticeConfirmation(payload = {}, user = {}, profile = {},
 
 function scopeStateForUser(data, user) {
   const scoped = structuredClone(data);
+  delete scoped.publicHealthExternalEndpointProbeReceipts;
+  delete scoped.publicHealthExternalEndpointProbeAudit;
+  delete scoped.publicHealthExternalEndpointProbeCampaigns;
+  delete scoped.publicHealthExternalEndpointProbeCampaignAudit;
+  delete scoped.recordCorrections;
+  delete scoped.recordSharePackages;
+  delete scoped.careTaskUpdates;
+  delete scoped.accessAcknowledgements;
+  delete scoped.accessDisputes;
   if (user.role === "commission") return scoped;
 
   delete scoped.authUsers;
   delete scoped.authOrganizations;
   delete scoped.securityEvents;
+  delete scoped.t10SpecialtyModuleAudit;
+  if (user.role === "institution") {
+    scoped.t10SpecialtyModuleSelections = (scoped.t10SpecialtyModuleSelections || [])
+      .filter((item) => item.institutionId === String(user.orgCode || "").trim());
+  } else {
+    delete scoped.t10SpecialtyModuleSelections;
+  }
   delete scoped.smsDeliveryReceipts;
   delete scoped.interfaceRequirements;
   delete scoped.hospitalInteroperabilityFunctions;
@@ -16051,6 +16584,9 @@ function scopeStateForUser(data, user) {
     scoped.referralSystem.familyDoctorServices = (data.referralSystem?.familyDoctorServices || []).filter(hasAllowedResident);
   }
   scoped.citizenLifecycleActions = buildCitizenLifecycleActions(scoped, user).actions;
+  ["recordCorrections", "recordSharePackages", "careTaskUpdates", "accessAcknowledgements", "accessDisputes"].forEach((key) => {
+    delete scoped[key];
+  });
   return scoped;
 }
 
@@ -23160,6 +23696,993 @@ function buildRuntimeProductionGoNoGoCenter(data) {
   }, securityCenter);
 }
 
+function governanceActorFromUser(user = {}) {
+  return {
+    id: String(user.id || user.username || user.name || "").trim(),
+    role: String(user.role || "").trim(),
+    institutionId: String(user.orgCode || "").trim(),
+    scopeInstitutionIds: Array.isArray(user.scopeInstitutionIds) ? user.scopeInstitutionIds : []
+  };
+}
+
+function governanceHttpStatus(code) {
+  if (["ACTOR_FORBIDDEN", "INSTITUTION_SCOPE_DENIED"].includes(code)) return 403;
+  if (code === "RECORD_NOT_FOUND") return 404;
+  if (["INVALID_TRANSITION", "DOMAIN_MISMATCH", "VERSION_CONFLICT", "IDEMPOTENCY_CONFLICT"].includes(code)) return 409;
+  return 400;
+}
+
+function publicHealthExternalHttpStatus(error) {
+  const message = String(error?.message || "");
+  if (/unknown public health/i.test(message)) return 404;
+  if (/role.*not allowed|scope denied|forbidden/i.test(message)) return 403;
+  if (/version conflict|CAS conflict|unique conflict|replay detected|idempotency|already claimed|already been requeued|not due/i.test(message)) return 409;
+  if (/rate limit|backpressure|half-open probe limit/i.test(message)) return 429;
+  if (/circuit is open|key service is unavailable|KEYRING_REF is required|RESILIENCE_POLICIES is required|resilience policy is required|SECRET must contain|endpoint must use HTTPS/i.test(message)) return 503;
+  return 400;
+}
+
+let publicHealthEndpointProbeRuntime = Object.freeze({});
+const publicHealthEndpointProbeInFlight = new Set();
+let publicHealthEndpointProbeActiveCount = 0;
+let publicHealthEndpointProbeCampaignInFlight = false;
+
+function configurePublicHealthEndpointProbeRuntime(dependencies = null) {
+  if (dependencies === null) {
+    publicHealthEndpointProbeRuntime = Object.freeze({});
+    return;
+  }
+  if (!dependencies || typeof dependencies !== "object" || Array.isArray(dependencies)) {
+    throw new Error("public health endpoint probe runtime must be an object or null");
+  }
+  const allowed = new Set(["resolveAddresses", "transport", "tlsLoader", "randomUUID", "runProbe"]);
+  const unknown = Object.keys(dependencies).filter((key) => !allowed.has(key));
+  if (unknown.length) throw new Error("public health endpoint probe runtime contains unsupported dependencies");
+  ["resolveAddresses", "transport", "tlsLoader", "randomUUID", "runProbe"].forEach((key) => {
+    if (dependencies[key] !== undefined && typeof dependencies[key] !== "function") {
+      throw new Error(`public health endpoint probe runtime ${key} must be a function`);
+    }
+  });
+  publicHealthEndpointProbeRuntime = Object.freeze({ ...dependencies });
+}
+
+function publicHealthEndpointProbeMaxConcurrent(env = process.env) {
+  const value = Number(env.PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_MAX_CONCURRENT || 2);
+  if (!Number.isInteger(value) || value < 1 || value > 16) {
+    throw new Error("PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_MAX_CONCURRENT must be an integer from 1 to 16");
+  }
+  return value;
+}
+
+function publicHealthEndpointProbeAuditEntry(user, laneId, result, code, at) {
+  return {
+    id: `ph-endpoint-probe-audit-${randomUUID()}`,
+    laneId: String(laneId || "").trim(),
+    actorRole: String(user?.role || "system"),
+    actorOrgCode: String(user?.orgCode || ""),
+    result,
+    code,
+    at,
+    productionReady: false
+  };
+}
+
+function appendPublicHealthEndpointProbeAudit(data, entry) {
+  return {
+    ...data,
+    publicHealthExternalEndpointProbeAudit: [
+      ...(Array.isArray(data.publicHealthExternalEndpointProbeAudit)
+        ? data.publicHealthExternalEndpointProbeAudit
+        : []),
+      entry
+    ]
+  };
+}
+
+function publicHealthEndpointProbeLastStartedAt(data, laneId) {
+  return (Array.isArray(data.publicHealthExternalEndpointProbeAudit)
+    ? data.publicHealthExternalEndpointProbeAudit
+    : [])
+    .filter((item) => item?.laneId === laneId && item?.result === "started")
+    .map((item) => Date.parse(item.at))
+    .filter(Number.isFinite)
+    .sort((left, right) => right - left)[0] || 0;
+}
+
+function publicHealthEndpointProbeSafeCode(error) {
+  const code = String(error?.code || "").trim();
+  return /^ENDPOINT_PROBE_[A-Z0-9_]+$/.test(code) ? code : "ENDPOINT_PROBE_FAILED";
+}
+
+function publicHealthEndpointProbeHttpStatus(code) {
+  if (["ENDPOINT_PROBE_CONCURRENCY_LIMIT", "ENDPOINT_PROBE_FREQUENCY_LIMIT"].includes(code)) return 429;
+  if (code === "ENDPOINT_PROBE_LANE_INVALID") return 404;
+  if (/CONFIG|POLICY|KEY|TLS_SERVICE|CONTRACT|FAILED|DNS|TRANSPORT|TIMEOUT/.test(code)) return 503;
+  return 400;
+}
+
+function assertPublicHealthEndpointProbeCampaignCommand(command = {}) {
+  if (!command || typeof command !== "object" || Array.isArray(command)) {
+    const error = new Error("endpoint probe campaign command must be an object");
+    error.code = "ENDPOINT_PROBE_CAMPAIGN_COMMAND_INVALID";
+    throw error;
+  }
+  if (Object.keys(command).length) {
+    const error = new Error("endpoint probe campaign command cannot override server configuration");
+    error.code = "ENDPOINT_PROBE_CAMPAIGN_COMMAND_OVERRIDE_FORBIDDEN";
+    throw error;
+  }
+}
+
+function publicHealthEndpointProbeCampaignSafeCode(error) {
+  const code = String(error?.code || "").trim();
+  return /^ENDPOINT_PROBE_CAMPAIGN_[A-Z0-9_]+$/.test(code)
+    ? code
+    : "ENDPOINT_PROBE_CAMPAIGN_FAILED";
+}
+
+function publicHealthEndpointProbeCampaignHttpStatus(code) {
+  if (code === "ENDPOINT_PROBE_CAMPAIGN_CONCURRENCY_LIMIT") return 429;
+  if (["ENDPOINT_PROBE_CAMPAIGN_COMMAND_INVALID", "ENDPOINT_PROBE_CAMPAIGN_COMMAND_OVERRIDE_FORBIDDEN"].includes(code)) {
+    return 400;
+  }
+  if (/CONFIG|KEY|POLICY|FAILED|PROBE/.test(code)) return 503;
+  return 400;
+}
+
+function publicHealthEndpointProbeCampaignAuditEntry(user, result, code, at, campaignId = "") {
+  return {
+    id: `ph-endpoint-probe-campaign-audit-${randomUUID()}`,
+    campaignId: String(campaignId || "").trim(),
+    actorRole: String(user?.role || "system"),
+    actorOrgCode: String(user?.orgCode || ""),
+    result,
+    code,
+    at,
+    productionReady: false
+  };
+}
+
+function appendPublicHealthEndpointProbeCampaignAudit(data, entry) {
+  return {
+    ...data,
+    publicHealthExternalEndpointProbeCampaignAudit: [
+      ...(Array.isArray(data.publicHealthExternalEndpointProbeCampaignAudit)
+        ? data.publicHealthExternalEndpointProbeCampaignAudit
+        : []),
+      entry
+    ]
+  };
+}
+
+function publicHealthExternalWorkerId(user = {}) {
+  return `public-health-worker:${String(user.id || user.username || "unknown").trim()}`;
+}
+
+function publicHealthExternalAttemptOptions(credentials, input, user, at) {
+  return {
+    requestKeyring: credentials.requestKeyring,
+    receiptKeyring: credentials.receiptKeyring,
+    resiliencePolicies: credentials.resiliencePolicies,
+    contractGovernance: credentials.contractGovernance,
+    attemptIdempotencyKey: String(input.idempotencyKey || "").trim(),
+    expectedVersion: input.expectedVersion,
+    expectedLaneControlVersion: input.expectedLaneControlVersion,
+    workerId: publicHealthExternalWorkerId(user),
+    leaseToken: String(input.leaseToken || "").trim(),
+    at
+  };
+}
+
+function publicHealthExternalLaneVersion(data = {}, laneId) {
+  const control = (Array.isArray(data.publicHealthExternalLaneControls) ? data.publicHealthExternalLaneControls : [])
+    .find((item) => item.laneId === String(laneId || "").trim());
+  return Number(control?.version || 0);
+}
+
+async function publicHealthCredentialsForDispatch(data, dispatchId, at) {
+  const dispatch = (data.publicHealthExternalDispatches || []).find((item) => item.id === dispatchId);
+  if (!dispatch) throw new Error(`unknown public health external dispatch: ${dispatchId || "missing"}`);
+  return loadPublicHealthLaneCredentials(dispatch.laneId, { at, data });
+}
+
+async function loadAvailablePublicHealthCredentialMap(data, at, contractGovernance = null) {
+  const entries = await Promise.all(EXTERNAL_ADAPTER_PROFILES.map(async (profile) => {
+    try {
+      return [profile.laneId, await loadPublicHealthLaneCredentials(profile.laneId, {
+        at,
+        data,
+        contractGovernance
+      }), null];
+    } catch (error) {
+      return [profile.laneId, null, String(error.message || "credential unavailable")];
+    }
+  }));
+  return {
+    credentials: Object.fromEntries(entries.filter(([, value]) => value).map(([laneId, value]) => [laneId, value])),
+    summaries: entries.map(([laneId, value, error]) => value?.summary || {
+      laneId,
+      productionReady: false,
+      available: false,
+      blockers: [error]
+    })
+  };
+}
+
+function publicHealthContractGovernanceAuditEvent(user, input = {}) {
+  const actorId = String(user?.id || user?.username || "unknown").trim();
+  return {
+    id: randomUUID(),
+    at: String(input.at || new Date().toISOString()).trim(),
+    actorIdHash: createHash("sha256").update(actorId).digest("hex"),
+    actorOrganizationId: String(user?.orgCode || "").trim(),
+    actorRole: String(user?.role || "unknown").trim(),
+    governanceRole: "public-health-contract-governance",
+    action: String(input.action || "contract-attestation").trim(),
+    result: String(input.result || "rejected").trim(),
+    idempotencyKey: String(input.idempotencyKey || "").trim(),
+    requestDigest: String(input.requestDigest || "").trim(),
+    evidenceId: String(input.evidenceId || "").trim(),
+    laneId: String(input.laneId || "").trim(),
+    fromContract: String(input.fromContract || "").trim(),
+    detail: String(input.detail || "").trim().slice(0, 500),
+    productionReady: false
+  };
+}
+
+function publicHealthContractAttestationRequestDigest(attestation, evidenceId) {
+  return createHash("sha256").update(JSON.stringify({
+    evidenceId: String(evidenceId || "").trim(),
+    laneId: String(attestation?.laneId || "").trim(),
+    fromContract: String(attestation?.fromContract || "").trim(),
+    toContract: String(attestation?.toContract || "").trim(),
+    effectiveAt: String(attestation?.effectiveAt || "").trim(),
+    sunsetAt: String(attestation?.sunsetAt || "").trim(),
+    runtimeReleaseDigest: String(attestation?.runtimeReleaseDigest || "").trim()
+  })).digest("hex");
+}
+
+async function publicHealthContractGovernanceContext(data, at) {
+  return loadPublicHealthContractGovernance(data, { at });
+}
+
+async function publicHealthEndpointVerificationContext(data, laneId, at) {
+  return loadPublicHealthEndpointProbeContext(laneId, data, {
+    at,
+    tlsLoader: publicHealthEndpointProbeRuntime.tlsLoader
+  });
+}
+
+function publicHealthEndpointVerificationSummaryView(registry = {}) {
+  return {
+    ok: registry.ok === true,
+    generatedAt: String(registry.generatedAt || new Date().toISOString()),
+    functionalState: String(registry.functionalState || "endpoint-probe-verification-pending"),
+    formalGoLiveState: String(registry.formalGoLiveState || "blocked-until-trusted-site-evidence-and-launch-approval"),
+    summary: {
+      lanes: Number(registry.summary?.lanes || 0),
+      endpointsConfigured: Number(registry.summary?.endpointsConfigured || 0),
+      endpointProbesVerified: Number(registry.summary?.endpointProbesVerified || 0),
+      endpointProbesPending: Number(registry.summary?.endpointProbesPending || 0)
+    },
+    entries: (Array.isArray(registry.entries) ? registry.entries : []).map((entry) => ({
+      laneId: String(entry.laneId || ""),
+      adapterId: String(entry.adapterId || ""),
+      contract: String(entry.contract || ""),
+      endpointConfigured: entry.endpointConfigured === true,
+      endpointDigest: String(entry.endpointDigest || ""),
+      connectivityVerified: entry.connectivityVerified === true,
+      issuedAt: String(entry.issuedAt || ""),
+      expiresAt: String(entry.expiresAt || ""),
+      latencyMs: Number.isFinite(entry.latencyMs) ? Number(entry.latencyMs) : null,
+      resolvedAddressDigest: String(entry.resolvedAddressDigest || ""),
+      tlsProtocol: String(entry.tlsProtocol || ""),
+      mutualTlsVerified: entry.mutualTlsVerified === true,
+      blockerCode: String(entry.blockerCode || "trusted-endpoint-probe-required")
+    })),
+    endpointConnectivityReady: registry.endpointConnectivityReady === true,
+    productionReady: false,
+    blockers: [
+      "Endpoint connectivity evidence does not replace trusted site evidence.",
+      "P0/P1 closure, production handoff and launch approval remain required."
+    ]
+  };
+}
+
+async function buildPublicHealthEndpointVerificationSummary(data, at) {
+  const receipts = Array.isArray(data.publicHealthExternalEndpointProbeReceipts)
+    ? data.publicHealthExternalEndpointProbeReceipts
+    : [];
+  const laneIds = [...new Set(receipts.map((item) => String(item?.laneId || "").trim()).filter(Boolean))];
+  const contextEntries = await Promise.all(laneIds.map(async (laneId) => {
+    try {
+      return [laneId, await publicHealthEndpointVerificationContext(data, laneId, at)];
+    } catch {
+      return [laneId, null];
+    }
+  }));
+  const contexts = Object.fromEntries(contextEntries);
+  const registry = buildPublicHealthExternalEndpointProbeRegistry({
+    env: process.env,
+    receipts,
+    contractResolver: (laneId, profile) => contexts[laneId]?.contract || `unavailable:${profile.contract}`,
+    keyringResolver: (laneId) => contexts[laneId]?.keyring,
+    policyResolver: (laneId) => contexts[laneId]?.policy || {},
+    at
+  });
+  const summary = publicHealthEndpointVerificationSummaryView({
+    ...registry,
+    generatedAt: at
+  });
+  const audit = Array.isArray(data.publicHealthExternalEndpointProbeAudit)
+    ? data.publicHealthExternalEndpointProbeAudit
+    : [];
+  return {
+    ...summary,
+    worker: {
+      active: publicHealthEndpointProbeActiveCount,
+      maxConcurrent: publicHealthEndpointProbeMaxConcurrent(),
+      auditEntries: audit.length,
+      succeeded: audit.filter((item) => item.result === "succeeded").length,
+      rejected: audit.filter((item) => item.result === "rejected").length,
+      productionReady: false
+    }
+  };
+}
+
+function publicHealthEndpointProbeCampaignVerificationOptions(context, at) {
+  return {
+    env: process.env,
+    at,
+    campaignKeyring: context.campaignKeyring,
+    contractResolver: (laneId) => context.laneContexts[laneId]?.contract,
+    keyringResolver: (laneId) => context.laneContexts[laneId]?.keyring,
+    policyResolver: (laneId) => context.laneContexts[laneId]?.policy || {},
+    requiredConsecutiveCampaigns: context.requiredConsecutiveCampaigns,
+    maxCampaignGapSeconds: context.maxCampaignGapSeconds
+  };
+}
+
+function materializePublicHealthEndpointProbeCampaigns(data = {}) {
+  const receipts = new Map((Array.isArray(data.publicHealthExternalEndpointProbeReceipts)
+    ? data.publicHealthExternalEndpointProbeReceipts
+    : []).map((receipt) => [String(receipt?.receiptId || "").trim(), receipt]));
+  return (Array.isArray(data.publicHealthExternalEndpointProbeCampaigns)
+    ? data.publicHealthExternalEndpointProbeCampaigns
+    : []).map((campaign) => ({
+    attestation: campaign.attestation,
+    receipts: (Array.isArray(campaign.receiptReferences) ? campaign.receiptReferences : [])
+      .map((reference) => receipts.get(String(reference?.receiptId || "").trim()))
+      .filter(Boolean)
+  }));
+}
+
+function publicHealthEndpointProbeCampaignSummaryView(registry = {}, audit = []) {
+  return {
+    ok: registry.ok === true,
+    functionalState: String(registry.functionalState || "endpoint-probe-campaign-continuity-pending"),
+    formalGoLiveState: String(registry.formalGoLiveState || "blocked-until-trusted-site-evidence-and-launch-approval"),
+    summary: {
+      campaignsSubmitted: Number(registry.summary?.campaignsSubmitted || 0),
+      campaignsVerified: Number(registry.summary?.campaignsVerified || 0),
+      campaignsRejected: Number(registry.summary?.campaignsRejected || 0),
+      consecutiveCampaigns: Number(registry.summary?.consecutiveCampaigns || 0),
+      requiredConsecutiveCampaigns: Number(registry.summary?.requiredConsecutiveCampaigns || 3),
+      maxCampaignGapSeconds: Number(registry.summary?.maxCampaignGapSeconds || 900)
+    },
+    campaigns: (Array.isArray(registry.campaigns) ? registry.campaigns : []).map((campaign) => ({
+      campaignId: String(campaign.campaignId || ""),
+      startedAt: String(campaign.startedAt || ""),
+      completedAt: String(campaign.completedAt || ""),
+      expiresAt: String(campaign.expiresAt || ""),
+      verifiedReceipts: Number(campaign.verifiedReceipts || 0),
+      campaignConnectivityReady: campaign.campaignConnectivityReady === true
+    })),
+    rejected: (Array.isArray(registry.rejected) ? registry.rejected : []).map((campaign) => ({
+      campaignId: String(campaign.campaignId || ""),
+      code: "ENDPOINT_PROBE_CAMPAIGN_VERIFICATION_FAILED"
+    })),
+    worker: {
+      active: publicHealthEndpointProbeCampaignInFlight,
+      auditEntries: audit.length,
+      succeeded: audit.filter((entry) => entry.result === "succeeded").length,
+      rejected: audit.filter((entry) => entry.result === "rejected").length,
+      productionReady: false
+    },
+    continuousConnectivityReady: registry.continuousConnectivityReady === true,
+    productionReady: false,
+    blockers: [
+      ...(Array.isArray(registry.blockers) ? registry.blockers : []),
+      "Continuous endpoint connectivity cannot authorize production launch."
+    ]
+  };
+}
+
+async function buildPublicHealthEndpointProbeCampaignSummary(data, at, suppliedContext = null) {
+  const audit = Array.isArray(data.publicHealthExternalEndpointProbeCampaignAudit)
+    ? data.publicHealthExternalEndpointProbeCampaignAudit
+    : [];
+  try {
+    const context = suppliedContext
+      || await loadPublicHealthEndpointProbeCampaignContext(data, {
+        at,
+        tlsLoader: publicHealthEndpointProbeRuntime.tlsLoader
+      });
+    const registry = buildPublicHealthExternalEndpointProbeCampaignRegistry({
+      campaigns: materializePublicHealthEndpointProbeCampaigns(data),
+      ...publicHealthEndpointProbeCampaignVerificationOptions(context, at)
+    });
+    return publicHealthEndpointProbeCampaignSummaryView(registry, audit);
+  } catch {
+    return publicHealthEndpointProbeCampaignSummaryView({
+      ok: false,
+      functionalState: "endpoint-probe-campaign-configuration-unavailable",
+      summary: {
+        campaignsSubmitted: Array.isArray(data.publicHealthExternalEndpointProbeCampaigns)
+          ? data.publicHealthExternalEndpointProbeCampaigns.length
+          : 0,
+        requiredConsecutiveCampaigns: 3,
+        maxCampaignGapSeconds: 900
+      },
+      continuousConnectivityReady: false,
+      blockers: [
+        "Server-managed campaign keyring, eight-lane probe credentials and current policy are required.",
+        "Trusted site evidence, production handoffs, P0/P1 closure and launch approval remain required."
+      ]
+    }, audit);
+  }
+}
+
+async function runControlledPublicHealthEndpointProbe(command, user, options = {}) {
+  let laneId = String(command?.laneId || "").trim();
+  let acquired = false;
+  try {
+    const profile = assertServerOnlyCommand(command);
+    laneId = profile.laneId;
+    const at = new Date().toISOString();
+    const data = readDatabase();
+    const context = options.context || await publicHealthEndpointVerificationContext(data, laneId, at);
+    const maxConcurrent = publicHealthEndpointProbeMaxConcurrent();
+    if (publicHealthEndpointProbeInFlight.has(laneId)
+      || publicHealthEndpointProbeActiveCount >= maxConcurrent) {
+      const error = new Error("endpoint probe concurrency limit reached");
+      error.code = "ENDPOINT_PROBE_CONCURRENCY_LIMIT";
+      throw error;
+    }
+    const lastStartedAt = publicHealthEndpointProbeLastStartedAt(data, laneId);
+    if (lastStartedAt && Date.parse(at) - lastStartedAt < context.policy.minIntervalSeconds * 1000) {
+      const error = new Error("endpoint probe frequency limit reached");
+      error.code = "ENDPOINT_PROBE_FREQUENCY_LIMIT";
+      throw error;
+    }
+    publicHealthEndpointProbeInFlight.add(laneId);
+    publicHealthEndpointProbeActiveCount += 1;
+    acquired = true;
+    writeDatabase(appendPublicHealthEndpointProbeAudit(
+      data,
+      publicHealthEndpointProbeAuditEntry(user, laneId, "started", "ENDPOINT_PROBE_STARTED", at)
+    ), { event: "public-health-endpoint-probe-started" });
+
+    const runner = publicHealthEndpointProbeRuntime.runProbe || runPublicHealthExternalEndpointProbe;
+    const result = await runner({ laneId }, {
+      env: process.env,
+      at,
+      contractResolver: () => context.contract,
+      keyringResolver: () => context.keyring,
+      policyResolver: () => context.policy,
+      tlsOptionsResolver: () => context.tlsOptions,
+      ...(publicHealthEndpointProbeRuntime.resolveAddresses
+        ? { resolveAddresses: publicHealthEndpointProbeRuntime.resolveAddresses }
+        : {}),
+      ...(publicHealthEndpointProbeRuntime.transport
+        ? { transport: publicHealthEndpointProbeRuntime.transport }
+        : {}),
+      ...(publicHealthEndpointProbeRuntime.randomUUID
+        ? { randomUUID: publicHealthEndpointProbeRuntime.randomUUID }
+        : {})
+    });
+    const latest = readDatabase();
+    const persistedReceipts = Array.isArray(latest.publicHealthExternalEndpointProbeReceipts)
+      ? latest.publicHealthExternalEndpointProbeReceipts
+      : [];
+    const verification = verifyPublicHealthExternalEndpointProbeReceipt(result?.receipt, {
+      expectedEndpoint: context.endpoint,
+      expectedContract: context.contract,
+      keyring: context.keyring,
+      at,
+      maxLatencyMs: context.policy.maxLatencyMs,
+      certificatePins: context.policy.certificatePins,
+      requireMutualTls: context.policy.requireMutualTls,
+      seenReceiptIds: new Set(persistedReceipts.map((item) => String(item?.receiptId || "").trim())),
+      seenNonces: new Set(persistedReceipts.map((item) => String(item?.nonce || "").trim()))
+    });
+    if (!verification.ok) {
+      const error = new Error("active endpoint probe receipt failed trusted persistence verification");
+      error.code = "ENDPOINT_PROBE_PERSISTENCE_VERIFICATION_FAILED";
+      throw error;
+    }
+    const storedReceipt = {
+      ...verification.payload,
+      signature: String(result.receipt.signature || "").trim(),
+      acceptedAt: at,
+      productionReady: false
+    };
+    const nextData = appendPublicHealthEndpointProbeAudit({
+      ...latest,
+      publicHealthExternalEndpointProbeReceipts: [
+        ...persistedReceipts,
+        storedReceipt
+      ]
+    }, publicHealthEndpointProbeAuditEntry(
+      user,
+      laneId,
+      "succeeded",
+      "ENDPOINT_PROBE_SUCCEEDED",
+      new Date().toISOString()
+    ));
+    writeDatabase(nextData, {
+      event: "public-health-active-endpoint-probe-succeeded",
+      publicHealthEndpointProbeInsert: { receipt: storedReceipt }
+    });
+    return {
+      summary: await buildPublicHealthEndpointVerificationSummary(nextData, new Date().toISOString()),
+      receipt: storedReceipt
+    };
+  } catch (error) {
+    const code = publicHealthEndpointProbeSafeCode(error);
+    const rejectedAt = new Date().toISOString();
+    const latest = readDatabase();
+    writeDatabase(appendPublicHealthEndpointProbeAudit(
+      latest,
+      publicHealthEndpointProbeAuditEntry(user, laneId || "unknown-lane", "rejected", code, rejectedAt)
+    ), { event: "public-health-active-endpoint-probe-rejected" });
+    error.publicCode = code;
+    throw error;
+  } finally {
+    if (acquired) {
+      publicHealthEndpointProbeInFlight.delete(laneId);
+      publicHealthEndpointProbeActiveCount = Math.max(0, publicHealthEndpointProbeActiveCount - 1);
+    }
+  }
+}
+
+async function runControlledPublicHealthEndpointProbeCampaign(command, user) {
+  assertPublicHealthEndpointProbeCampaignCommand(command);
+  if (publicHealthEndpointProbeCampaignInFlight) {
+    const error = new Error("endpoint probe campaign is already running");
+    error.code = "ENDPOINT_PROBE_CAMPAIGN_CONCURRENCY_LIMIT";
+    const latest = readDatabase();
+    writeDatabase(appendPublicHealthEndpointProbeCampaignAudit(
+      latest,
+      publicHealthEndpointProbeCampaignAuditEntry(
+        user,
+        "rejected",
+        error.code,
+        new Date().toISOString()
+      )
+    ), { event: "public-health-endpoint-probe-campaign-rejected" });
+    error.campaignAuditPersisted = true;
+    throw error;
+  }
+  const startedAt = new Date().toISOString();
+  publicHealthEndpointProbeCampaignInFlight = true;
+  let campaignId = "";
+  try {
+    const initialData = readDatabase();
+    writeDatabase(appendPublicHealthEndpointProbeCampaignAudit(
+      initialData,
+      publicHealthEndpointProbeCampaignAuditEntry(
+        user,
+        "started",
+        "ENDPOINT_PROBE_CAMPAIGN_STARTED",
+        startedAt
+      )
+    ), { event: "public-health-endpoint-probe-campaign-started" });
+    const initialContext = await loadPublicHealthEndpointProbeCampaignContext(initialData, {
+      at: startedAt,
+      tlsLoader: publicHealthEndpointProbeRuntime.tlsLoader
+    });
+    const receipts = [];
+    for (const profile of EXTERNAL_ADAPTER_PROFILES) {
+      const result = await runControlledPublicHealthEndpointProbe(
+        { laneId: profile.laneId },
+        user,
+        { context: initialContext.laneContexts[profile.laneId] }
+      );
+      receipts.push(result.receipt);
+    }
+    const completedAt = new Date().toISOString();
+    const latest = readDatabase();
+    const finalContext = await loadPublicHealthEndpointProbeCampaignContext(latest, {
+      at: completedAt,
+      tlsLoader: publicHealthEndpointProbeRuntime.tlsLoader
+    });
+    const campaignOptions = {
+      ...publicHealthEndpointProbeCampaignVerificationOptions(finalContext, completedAt),
+      startedAt,
+      ttlSeconds: finalContext.ttlSeconds,
+      randomUUID: publicHealthEndpointProbeRuntime.randomUUID || randomUUID
+    };
+    const campaign = createPublicHealthExternalEndpointProbeCampaign(receipts, campaignOptions);
+    campaignId = String(campaign.attestation?.campaignId || "").trim();
+    const persistedCampaigns = Array.isArray(latest.publicHealthExternalEndpointProbeCampaigns)
+      ? latest.publicHealthExternalEndpointProbeCampaigns
+      : [];
+    const seenCampaignIds = new Set();
+    const seenCampaignNonces = new Set();
+    const seenReceiptIds = new Set();
+    const seenNonces = new Set();
+    persistedCampaigns.forEach((item) => {
+      const identity = publicHealthEndpointProbeCampaignIdentity(item);
+      seenCampaignIds.add(identity.campaignId);
+      seenCampaignNonces.add(identity.campaignNonce);
+      identity.receiptReferences.forEach((reference) => {
+        seenReceiptIds.add(String(reference.receiptId || "").trim());
+        seenNonces.add(String(reference.nonce || "").trim());
+      });
+    });
+    const verification = verifyPublicHealthExternalEndpointProbeCampaign(campaign, {
+      ...campaignOptions,
+      seenCampaignIds,
+      seenCampaignNonces,
+      seenReceiptIds,
+      seenNonces
+    });
+    if (!verification.ok) {
+      const error = new Error("endpoint probe campaign failed trusted persistence verification");
+      error.code = "ENDPOINT_PROBE_CAMPAIGN_VERIFICATION_FAILED";
+      throw error;
+    }
+    const storedCampaign = {
+      attestation: campaign.attestation,
+      receiptReferences: receipts.map((receipt) => ({
+        laneId: String(receipt.laneId || "").trim(),
+        receiptId: String(receipt.receiptId || "").trim(),
+        nonce: String(receipt.nonce || "").trim(),
+        receiptDigest: endpointProbeReceiptDigest(receipt)
+      })),
+      acceptedAt: completedAt,
+      productionReady: false
+    };
+    const nextData = appendPublicHealthEndpointProbeCampaignAudit({
+      ...latest,
+      publicHealthExternalEndpointProbeCampaigns: [
+        ...persistedCampaigns,
+        storedCampaign
+      ]
+    }, publicHealthEndpointProbeCampaignAuditEntry(
+      user,
+      "succeeded",
+      "ENDPOINT_PROBE_CAMPAIGN_SUCCEEDED",
+      completedAt,
+      campaignId
+    ));
+    writeDatabase(nextData, {
+      event: "public-health-endpoint-probe-campaign-succeeded",
+      publicHealthEndpointProbeCampaignInsert: { campaign: storedCampaign }
+    });
+    return buildPublicHealthEndpointProbeCampaignSummary(
+      nextData,
+      new Date().toISOString(),
+      finalContext
+    );
+  } catch (error) {
+    const code = publicHealthEndpointProbeCampaignSafeCode(error);
+    const latest = readDatabase();
+    writeDatabase(appendPublicHealthEndpointProbeCampaignAudit(
+      latest,
+      publicHealthEndpointProbeCampaignAuditEntry(
+        user,
+        "rejected",
+        code,
+        new Date().toISOString(),
+        campaignId
+      )
+    ), { event: "public-health-endpoint-probe-campaign-rejected" });
+    error.publicCode = code;
+    error.campaignAuditPersisted = true;
+    throw error;
+  } finally {
+    publicHealthEndpointProbeCampaignInFlight = false;
+  }
+}
+
+function publicHealthExternalResult(result) {
+  const laneControl = result.laneControl ? {
+    laneId: result.laneControl.laneId,
+    version: result.laneControl.version,
+    circuitState: result.laneControl.circuitState,
+    productionReady: false
+  } : undefined;
+  return {
+    ok: result.ok,
+    idempotent: Boolean(result.idempotent),
+    dispatch: result.dispatch,
+    originalDispatch: result.originalDispatch,
+    successorDispatch: result.successorDispatch,
+    laneControl,
+    coordinationAction: result.coordinationAction,
+    productionReady: false
+  };
+}
+
+function publicHealthExternalPublicView(value) {
+  if (Array.isArray(value)) return value.map(publicHealthExternalPublicView);
+  if (!value || typeof value !== "object") return value;
+  return Object.entries(value).reduce((output, [key, item]) => {
+    if (key === "residentId" || key === "requestKeyring" || key === "receiptKeyring" || /secret/i.test(key)) return output;
+    output[key] = publicHealthExternalPublicView(item);
+    return output;
+  }, {});
+}
+
+let careServiceRepositoryInstance = null;
+
+function careServiceRepository() {
+  if (!careServiceRepositoryInstance) {
+    careServiceRepositoryInstance = createCareServiceStateRepository({
+      readState: readDatabase,
+      writeState: (state, options) => writeDatabase(state, options)
+    });
+  }
+  return careServiceRepositoryInstance;
+}
+
+function activeCareAuthorizationReceipt(data, residentId) {
+  return (Array.isArray(data.personalRecords) ? data.personalRecords : [])
+    .find((record) => record.category === "authorizations"
+      && record.residentId === residentId
+      && isActiveAuthorizationRecord(record)
+      && !["revoked", "宸叉挙閿€"].includes(record.status))?.id || "";
+}
+
+function careServiceActor(user = {}) {
+  return {
+    ...user,
+    id: String(user.id || user.username || user.accountId || user.residentId || "").trim()
+  };
+}
+
+function createCareServiceRuntimeDependencies(options = {}) {
+  return {
+    repository: careServiceRepository(),
+    deliveryAdapters: createCareServiceDeliveryAdapters({ env: options.env || process.env })
+  };
+}
+
+function careServicePlatformAdapter(options = {}) {
+  const dependencies = createCareServiceRuntimeDependencies(options);
+  return CareServicePlatform.createCareServicePlatformAdapter({
+    ...dependencies,
+    now: () => new Date().toISOString(),
+    access: {
+      canAccessResident(residentId, actor) {
+        return canAccessResident(actor, residentId, readDatabase());
+      },
+      allowedResidentIdsFor(actor) {
+        return [...allowedResidentIdsForUser(readDatabase(), actor)];
+      },
+      authorizationReceiptFor(residentId) {
+        return activeCareAuthorizationReceipt(readDatabase(), residentId);
+      },
+      canAccessOrder(domain, order, actor) {
+        const data = readDatabase();
+        return domain === "nursing"
+          ? canAccessInternetNursingOrder(actor, order, data)
+          : canAccessEscortOrder(actor, order, data);
+      }
+    }
+  });
+}
+
+function careServiceCommandId(req, payload = {}) {
+  return String(req.headers["idempotency-key"] || payload.commandId || payload.idempotencyKey || "").trim().slice(0, 160);
+}
+
+function careServiceCreatePayload(payload = {}, domain = "") {
+  const next = { ...payload };
+  [
+    "id", "status", "state", "workerId", "workerName", "nurseId", "nurseName",
+    "createdAt", "updatedAt", "requestedAt", "at", "expectedVersion",
+    "commandId", "idempotencyKey", "auditTrail", "timelineEvents", "notificationPlans",
+    "notificationReceipts", "capacityReservation", "capacityRelease", "settlement"
+  ].forEach((key) => delete next[key]);
+  if (typeof next.serviceItems === "string") {
+    next.serviceItems = next.serviceItems.split(",").map((item) => item.trim()).filter(Boolean);
+  }
+  if (!next.location && Number.isFinite(Number(next.lat)) && Number.isFinite(Number(next.lng))) {
+    next.location = { lat: Number(next.lat), lng: Number(next.lng), source: String(next.locationSource || "resident-map") };
+  }
+  delete next.lat;
+  delete next.lng;
+  delete next.locationSource;
+  if (domain === "escort") {
+    const data = readDatabase();
+    const provider = (data.escortServiceProviders || []).find((item) => item.id === next.providerId);
+    const registration = (data.registrationOrders || []).find((item) => item.id === next.registrationOrderId);
+    if (!next.district && provider?.district) next.district = provider.district;
+    if (registration) {
+      next.hospital = registration.hospital || next.hospital;
+      next.hospitalCode = registration.hospitalCode || next.hospitalCode;
+      next.department = registration.department || next.department;
+      next.departmentCode = registration.departmentCode || next.departmentCode;
+      next.hisVisitId = registration.hisVisitId || next.hisVisitId;
+      next.outpatientQueueNo = registration.queueNo || next.outpatientQueueNo;
+      next.appointmentSource = "registration-order";
+    }
+  }
+  return next;
+}
+
+function careServiceTransitionInput(payload = {}) {
+  const nextStatus = String(payload.nextStatus || payload.status || "").trim();
+  const updates = { ...payload };
+  [
+    "action", "status", "nextStatus", "commandId", "idempotencyKey",
+    "at", "createdAt", "updatedAt", "expectedVersion"
+  ].forEach((key) => delete updates[key]);
+  const input = { updates };
+  if (Object.hasOwn(payload, "enforceEvidence")) input.enforceEvidence = payload.enforceEvidence;
+  return { nextStatus, input };
+}
+
+function sendCareServiceError(res, error) {
+  const response = CareServicePlatform.errorResponse(error);
+  sendJson(res, response.status, response.body);
+}
+
+function careServiceReadinessPublicSummary(report = {}) {
+  const requiredScopes = ["business", "interface", "security", "dr", "oncall"];
+  const requiredDependencies = [
+    "storage", "identity", "sms", "his", "appointment", "object-storage",
+    "payment", "insurance", "certificate", "audit", "outbox-worker",
+    "nursing-delivery", "escort-delivery"
+  ];
+  const cutoverErrors = Array.isArray(report.cutoverEvidence?.errors) ? report.cutoverEvidence.errors : [];
+  const dependencyErrors = Array.isArray(report.dependencyEvidence?.errors) ? report.dependencyEvidence.errors : [];
+  const safeCode = (value) => /^(?:CUTOVER_EVIDENCE|CARE_DEPENDENCY_EVIDENCE)_[A-Z0-9_]+$/.test(String(value || ""));
+  const globalCodes = cutoverErrors
+    .filter((item) => !item?.scope)
+    .map((item) => String(item.code || ""))
+    .filter(safeCode);
+  const signoffChecks = new Map(
+    (Array.isArray(report.checks) ? report.checks : [])
+      .filter((item) => String(item.id || "").startsWith("signoff:"))
+      .map((item) => [String(item.id).slice("signoff:".length), item])
+  );
+  const scopes = requiredScopes.map((scope) => {
+    const errorCodes = [
+      ...globalCodes,
+      ...cutoverErrors
+        .filter((item) => item?.scope === scope)
+        .map((item) => String(item.code || ""))
+        .filter(safeCode)
+    ];
+    return {
+      scope,
+      passed: signoffChecks.get(scope)?.passed === true,
+      errorCodes: [...new Set(errorCodes)]
+    };
+  });
+  const globalDependencyCodes = dependencyErrors
+    .filter((item) => !item?.dependency)
+    .map((item) => String(item.code || ""))
+    .filter(safeCode);
+  const healthyDependencies = new Set(
+    Array.isArray(report.dependencyEvidence?.healthyDependencies)
+      ? report.dependencyEvidence.healthyDependencies
+      : []
+  );
+  const dependencies = requiredDependencies.map((dependency) => ({
+    dependency,
+    passed: healthyDependencies.has(dependency),
+    errorCodes: [...new Set([
+      ...globalDependencyCodes,
+      ...dependencyErrors
+        .filter((item) => item?.dependency === dependency)
+        .map((item) => String(item.code || ""))
+        .filter(safeCode)
+    ])]
+  }));
+  return {
+    formalGoLiveState: String(report.formalGoLiveState || "blocked-by-production-configuration-or-health"),
+    blockerCounts: {
+      total: Number(report.summary?.blockers || 0),
+      code: Number(report.summary?.codeBlockers || 0),
+      platform: Number(report.summary?.platformBlockers || 0),
+      runtime: Number(report.summary?.runtimeBlockers || 0),
+      signoff: Number(report.summary?.signoffBlockers || 0)
+    },
+    scopes,
+    dependencies,
+    safeErrorCodes: [...new Set([
+      ...scopes.flatMap((item) => item.errorCodes),
+      ...dependencies.flatMap((item) => item.errorCodes)
+    ])]
+  };
+}
+
+function trustedT10Institution(data = {}, institutionIdValue) {
+  const institutionId = String(institutionIdValue || "").trim();
+  return (Array.isArray(data.authOrganizations) ? data.authOrganizations : [])
+    .find((item) => {
+      const id = String(item.orgCode || item.id || "").trim();
+      const type = String(item.orgType || item.type || "").trim().toLowerCase();
+      return id === institutionId && (
+        type === "medical_institution"
+        || type === "institution"
+        || type.includes("medical")
+        || type.includes("hospital")
+      );
+    }) || null;
+}
+
+function canReadT10InstitutionModules(user = {}, institutionIdValue) {
+  const institutionId = String(institutionIdValue || "").trim();
+  return user.role === "commission"
+    || (user.role === "institution" && String(user.orgCode || "").trim() === institutionId);
+}
+
+function sendT10SpecialtyModuleError(res, error) {
+  const status = Number(error?.statusCode || 400);
+  sendJson(res, status, {
+    error: status === 403 ? "Forbidden" : status === 404 ? "Not Found" : status === 409 ? "Conflict" : "Bad Request",
+    code: String(error?.code || "T10_MODULE_REQUEST_INVALID"),
+    message: String(error?.message || "T10 specialty module request was rejected")
+  });
+}
+
+function buildT10PlatformBlockedReadiness(moduleReadiness = {}) {
+  return {
+    ...moduleReadiness,
+    moduleEvidenceReady: moduleReadiness.productionReady === true,
+    productionReady: false,
+    formalGoLiveState: "blocked-until-trusted-site-evidence-and-platform-launch-approval",
+    platformBlockers: [
+      "trusted production identity and organization directory",
+      "independently verified site evidence",
+      "T00 platform launch approval",
+      "signed duty, SIEM, disaster-recovery and rollback evidence"
+    ]
+  };
+}
+
+function buildImagingCloudProductionResponse(data = {}) {
+  return buildT10PlatformBlockedReadiness(ImagingCloudProduction.center(data));
+}
+
+function sendT10ProductionControlError(res, error) {
+  const status = Number(error?.status || error?.statusCode || 400);
+  sendJson(res, status, {
+    error: status === 403 ? "Forbidden" : status === 404 ? "Not Found" : status === 409 ? "Conflict" : "Bad Request",
+    code: String(error?.code || "T10_PRODUCTION_CONTROL_REJECTED"),
+    message: String(error?.message || "T10 production control action was rejected"),
+    productionReady: false
+  });
+}
+
+function buildProductionReleaseEvidencePublicSummary() {
+  const report = buildProductionReleaseEvidenceReadiness({
+    directory: process.env.PRODUCTION_RELEASE_EVIDENCE_DIR || DEFAULT_PRODUCTION_RELEASE_EVIDENCE_DIR
+  });
+  return {
+    evidenceReady: report.ok === true,
+    productionReady: false,
+    status: report.status,
+    generatedAt: report.generatedAt,
+    evidenceFingerprint: report.evidenceFingerprint,
+    summary: report.summary,
+    gates: report.gates.map((item) => ({
+      id: item.id,
+      gateId: item.gateId,
+      environment: item.environment,
+      present: item.present
+    })),
+    failedCheckIds: report.checks.filter((item) => !item.passed).map((item) => item.id),
+    boundary: "Evidence validation does not authorize platform production cutover; global blockers and an independent launch decision remain required."
+  };
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -23222,6 +24745,984 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/system/readiness");
     if (!user) return;
     sendJson(res, 200, buildSystemReadinessReport(readDatabase()));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/quality-operations-governance/catalog") {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance"], url.pathname);
+    if (!user) return;
+    sendJson(res, 200, buildGovernanceCatalog(readDatabase()));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/quality-operations-governance/items") {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance"], url.pathname);
+    if (!user) return;
+    sendJson(res, 200, listGovernanceRecords(readDatabase(), user, {
+      domain: url.searchParams.get("domain"),
+      status: url.searchParams.get("status"),
+      institutionId: url.searchParams.get("institutionId")
+    }));
+    return;
+  }
+
+  const governanceAuditMatch = url.pathname.match(/^\/api\/quality-operations-governance\/items\/([^/]+)\/audit$/);
+  if (req.method === "GET" && governanceAuditMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance"], "/api/quality-operations-governance/items/:id/audit");
+    if (!user) return;
+    const result = governanceAuditForRecord(readDatabase(), decodeURIComponent(governanceAuditMatch[1]), user);
+    if (!result.found) {
+      sendJson(res, 404, { error: "Not Found", code: "RECORD_NOT_FOUND", message: "governance record not found" });
+      return;
+    }
+    if (!result.allowed) {
+      sendJson(res, 403, { error: "Forbidden", code: "INSTITUTION_SCOPE_DENIED", message: "record is outside the actor scope" });
+      return;
+    }
+    sendJson(res, 200, result);
+    return;
+  }
+
+  const governanceActionMatch = url.pathname.match(/^\/api\/quality-operations-governance\/items\/([^/]+)\/actions$/);
+  if (req.method === "POST" && governanceActionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance"], "/api/quality-operations-governance/items/:id/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const command = {
+      idempotencyKey: String(req.headers["idempotency-key"] || "").trim(),
+      domain: String(payload.domain || "").trim(),
+      recordId: decodeURIComponent(governanceActionMatch[1]),
+      action: String(payload.action || "").trim(),
+      actor: governanceActorFromUser(user),
+      expectedVersion: payload.expectedVersion,
+      occurredAt: new Date().toISOString(),
+      payload: payload.payload && typeof payload.payload === "object" ? payload.payload : {}
+    };
+    const runtime = buildGovernanceRuntimeState(data);
+    const result = executeGovernanceCommand(runtime.state, command);
+    applyGovernanceResultToData(data, result);
+    data.securityEvents = sealAuditTrail(data.securityEvents, { recompute: true });
+    writeDatabase(data);
+    sendJson(res, result.ok ? 200 : governanceHttpStatus(result.error?.code), {
+      ok: result.ok,
+      replayed: result.replayed,
+      record: publicGovernanceRecord(result.record),
+      auditEvent: result.auditEvent,
+      error: result.error
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/coordination-runtime") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    sendJson(res, 200, publicHealthExternalPublicView(buildPublicHealthCoordinationRuntime({ data: readDatabase() })));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/external/contracts/governance") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    try {
+      const at = new Date().toISOString();
+      const data = readDatabase();
+      const context = await publicHealthContractGovernanceContext(data, at);
+      sendJson(res, 200, publicHealthExternalPublicView({
+        ...context.governance,
+        contractCutover: buildPublicHealthExternalContractCutoverBoard({
+          data,
+          contractGovernance: context.governance,
+          now: at
+        }),
+        keyProvider: context.summary,
+        productionReady: false
+      }));
+    } catch (error) {
+      sendJson(res, publicHealthExternalHttpStatus(error), {
+        error: "Public health external contract governance unavailable",
+        message: error.message,
+        productionReady: false
+      });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/public-health/external/contracts/attestations") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    const at = new Date().toISOString();
+    const idempotencyKey = String(req.headers["idempotency-key"] || "").trim();
+    let payload = {};
+    let requestDigest = "";
+    let signedAttestation = null;
+    try {
+      payload = await collectJson(req);
+      if (!idempotencyKey) throw new Error("public health contract attestation idempotency key is required");
+      if (Number(payload.expectedVersion) !== 0) {
+        throw new Error(`public health contract attestation version conflict: expected ${payload.expectedVersion ?? "missing"}, current 0`);
+      }
+      const data = readDatabase();
+      const context = await publicHealthContractGovernanceContext(data, at);
+      const signed = signTrustedPublicHealthContractAttestation({
+        payload,
+        evidenceConfig: process.env.PUBLIC_HEALTH_EXTERNAL_CONTRACT_RELEASE_EVIDENCE,
+        signingMaterial: context.signingMaterial,
+        user,
+        at
+      });
+      signedAttestation = signed.attestation;
+      requestDigest = publicHealthContractAttestationRequestDigest(signed.attestation, payload.evidenceId);
+      const key = contractAttestationUniqueKey(signed.attestation);
+      const replayAudit = (data.publicHealthExternalContractGovernanceAudit || [])
+        .find((item) => item.idempotencyKey === idempotencyKey && item.result === "accepted");
+      if (replayAudit) {
+        const existing = (data.publicHealthExternalContractAttestations || [])
+          .find((item) => contractAttestationUniqueKey(item) === key);
+        if (!existing
+          || replayAudit.laneId !== existing.laneId
+          || replayAudit.fromContract !== existing.fromContract
+          || replayAudit.requestDigest !== requestDigest) {
+          throw new Error("public health contract attestation idempotency conflict");
+        }
+        sendJson(res, 200, publicHealthExternalPublicView({
+          ok: true,
+          idempotent: true,
+          attestation: existing,
+          productionReady: false
+        }));
+        return;
+      }
+      if ((data.publicHealthExternalContractGovernanceAudit || [])
+        .some((item) => item.idempotencyKey === idempotencyKey)) {
+        throw new Error("public health contract attestation idempotency conflict");
+      }
+      const nextData = {
+        ...data,
+        publicHealthExternalContractAttestations: [
+          ...(data.publicHealthExternalContractAttestations || []),
+          signed.attestation
+        ],
+        publicHealthExternalContractGovernanceAudit: [
+          ...(data.publicHealthExternalContractGovernanceAudit || []),
+          publicHealthContractGovernanceAuditEvent(user, {
+            at,
+            action: "contract-attestation-sign",
+            result: "accepted",
+            idempotencyKey,
+            requestDigest,
+            evidenceId: payload.evidenceId,
+            laneId: signed.attestation.laneId,
+            fromContract: signed.attestation.fromContract,
+            detail: `${signed.attestation.toContract} / ${signed.attestation.runtimeReleaseDigest}`
+          })
+        ]
+      };
+      writeDatabase(nextData, {
+        event: "public-health-external-contract-attestation",
+        publicHealthExternalContractInsert: {
+          laneId: signed.attestation.laneId,
+          fromContract: signed.attestation.fromContract,
+          attestation: signed.attestation,
+          signingMaterial: context.signingMaterial,
+          at
+        }
+      });
+      sendJson(res, 201, publicHealthExternalPublicView({
+        ok: true,
+        idempotent: false,
+        attestation: signed.attestation,
+        releaseEvidence: signed.releaseEvidence,
+        productionReady: false
+      }));
+    } catch (error) {
+      try {
+        const rejectedData = readDatabase();
+        rejectedData.publicHealthExternalContractGovernanceAudit = [
+          ...(rejectedData.publicHealthExternalContractGovernanceAudit || []),
+          publicHealthContractGovernanceAuditEvent(user, {
+            at,
+            action: "contract-attestation-sign",
+            result: "rejected",
+            idempotencyKey,
+            requestDigest,
+            evidenceId: payload.evidenceId,
+            laneId: signedAttestation?.laneId || payload.laneId,
+            fromContract: signedAttestation?.fromContract || payload.fromContract,
+            detail: error.message
+          })
+        ];
+        writeDatabase(rejectedData, { event: "public-health-external-contract-attestation-rejected" });
+      } catch {
+        // The rejection response must not expose a secondary persistence failure.
+      }
+      sendJson(res, publicHealthExternalHttpStatus(error), {
+        error: "Public health external contract attestation rejected",
+        message: error.message,
+        productionReady: false
+      });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/external/endpoints/summary") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    try {
+      const at = new Date().toISOString();
+      const summary = await buildPublicHealthEndpointVerificationSummary(readDatabase(), at);
+      sendJson(res, 200, summary);
+    } catch (error) {
+      sendJson(res, publicHealthExternalHttpStatus(error), {
+        error: "Public health endpoint verification summary unavailable",
+        message: error.message,
+        productionReady: false
+      });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/external/endpoints/campaigns/summary") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    const at = new Date().toISOString();
+    const data = readDatabase();
+    const continuity = await buildPublicHealthEndpointProbeCampaignSummary(data, at);
+    const endpointVerification = await buildPublicHealthEndpointVerificationSummary(data, at);
+    sendJson(res, 200, {
+      ...continuity,
+      endpointConnectivityReady: endpointVerification.endpointConnectivityReady,
+      continuousConnectivityReady: continuity.continuousConnectivityReady,
+      productionReady: false
+    });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/public-health/external/endpoints/campaigns") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    try {
+      const input = await collectJson(req);
+      const query = Object.fromEntries(url.searchParams.entries());
+      const command = { ...input, ...query };
+      const continuity = await runControlledPublicHealthEndpointProbeCampaign(command, user);
+      const endpointVerification = await buildPublicHealthEndpointVerificationSummary(
+        readDatabase(),
+        new Date().toISOString()
+      );
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: "public-health-endpoint-probe-campaign",
+        target: "eight-lane-campaign",
+        result: "allowed",
+        detail: "server-controlled endpoint probe campaign completed"
+      });
+      sendJson(res, 201, {
+        ...continuity,
+        endpointConnectivityReady: endpointVerification.endpointConnectivityReady,
+        continuousConnectivityReady: continuity.continuousConnectivityReady,
+        productionReady: false
+      });
+    } catch (error) {
+      const code = error.publicCode || publicHealthEndpointProbeCampaignSafeCode(error);
+      if (!error.campaignAuditPersisted) {
+        const latest = readDatabase();
+        writeDatabase(appendPublicHealthEndpointProbeCampaignAudit(
+          latest,
+          publicHealthEndpointProbeCampaignAuditEntry(
+            user,
+            "rejected",
+            code,
+            new Date().toISOString()
+          )
+        ), { event: "public-health-endpoint-probe-campaign-rejected" });
+      }
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: "public-health-endpoint-probe-campaign",
+        target: "eight-lane-campaign",
+        result: "denied",
+        detail: code
+      });
+      sendJson(res, publicHealthEndpointProbeCampaignHttpStatus(code), {
+        ok: false,
+        code,
+        message: "Endpoint probe campaign failed closed; inspect restricted server diagnostics.",
+        endpointConnectivityReady: false,
+        continuousConnectivityReady: false,
+        productionReady: false
+      });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/public-health/external/endpoints/probes") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    let laneId = "";
+    try {
+      const input = await collectJson(req);
+      const query = Object.fromEntries(url.searchParams.entries());
+      laneId = String(input?.laneId || query.laneId || "").trim();
+      const command = { ...input, ...query, laneId };
+      if (input?.laneId && query.laneId && String(input.laneId).trim() !== String(query.laneId).trim()) {
+        command.laneConflict = true;
+      }
+      const result = await runControlledPublicHealthEndpointProbe(command, user);
+      const summary = result.summary;
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: "public-health-active-endpoint-probe",
+        target: laneId,
+        result: "allowed",
+        detail: "server-controlled endpoint probe completed"
+      });
+      sendJson(res, 201, {
+        ok: true,
+        lane: summary.entries.find((item) => item.laneId === laneId) || null,
+        worker: summary.worker,
+        endpointConnectivityReady: summary.endpointConnectivityReady,
+        productionReady: false
+      });
+    } catch (error) {
+      const code = error.publicCode || publicHealthEndpointProbeSafeCode(error);
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: "public-health-active-endpoint-probe",
+        target: laneId || "unknown-lane",
+        result: "denied",
+        detail: code
+      });
+      sendJson(res, publicHealthEndpointProbeHttpStatus(code), {
+        ok: false,
+        code,
+        message: "Endpoint probe failed closed; inspect restricted server diagnostics.",
+        productionReady: false
+      });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/public-health/external/endpoints/receipts") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    let laneId = "";
+    try {
+      const input = await collectJson(req);
+      const receipt = input?.receipt && typeof input.receipt === "object" && !Array.isArray(input.receipt)
+        ? input.receipt
+        : input;
+      laneId = String(receipt?.laneId || "").trim();
+      const at = new Date().toISOString();
+      const data = readDatabase();
+      const context = await publicHealthEndpointVerificationContext(data, laneId, at);
+      const persistedReceipts = Array.isArray(data.publicHealthExternalEndpointProbeReceipts)
+        ? data.publicHealthExternalEndpointProbeReceipts
+        : [];
+      const verification = verifyPublicHealthExternalEndpointProbeReceipt(receipt, {
+        expectedEndpoint: context.endpoint,
+        expectedContract: context.contract,
+        keyring: context.keyring,
+        at,
+        maxLatencyMs: context.policy.maxLatencyMs,
+        certificatePins: context.policy.certificatePins,
+        requireMutualTls: context.policy.requireMutualTls,
+        seenReceiptIds: new Set(persistedReceipts.map((item) => String(item?.receiptId || "").trim())),
+        seenNonces: new Set(persistedReceipts.map((item) => String(item?.nonce || "").trim()))
+      });
+      if (!verification.ok) throw new Error(verification.reason);
+      const storedReceipt = {
+        ...verification.payload,
+        signature: String(receipt.signature || "").trim(),
+        acceptedAt: at,
+        productionReady: false
+      };
+      const nextData = {
+        ...data,
+        publicHealthExternalEndpointProbeReceipts: [
+          ...persistedReceipts,
+          storedReceipt
+        ]
+      };
+      writeDatabase(nextData, {
+        event: "public-health-external-endpoint-probe-accepted",
+        publicHealthEndpointProbeInsert: { receipt: storedReceipt }
+      });
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: "public-health-external-endpoint-probe-accept",
+        target: laneId,
+        result: "allowed",
+        detail: "server-config-bound signed endpoint probe accepted"
+      });
+      const summary = await buildPublicHealthEndpointVerificationSummary(nextData, at);
+      sendJson(res, 201, {
+        ok: true,
+        accepted: true,
+        lane: summary.entries.find((item) => item.laneId === laneId) || null,
+        endpointConnectivityReady: summary.endpointConnectivityReady,
+        productionReady: false
+      });
+    } catch (error) {
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: "public-health-external-endpoint-probe-accept",
+        target: laneId || "unknown-lane",
+        result: "denied",
+        detail: String(error.message || "endpoint probe rejected").slice(0, 200)
+      });
+      sendJson(res, publicHealthExternalHttpStatus(error), {
+        error: "Public health endpoint probe rejected",
+        message: error.message,
+        productionReady: false
+      });
+    }
+    return;
+  }
+
+  const publicHealthCoordinationActionMatch = url.pathname.match(/^\/api\/public-health\/coordination\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthCoordinationActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/coordination/:id/actions");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req);
+      const data = readDatabase();
+      const result = applyPublicHealthCoordinationActionToState(
+        data,
+        decodeURIComponent(publicHealthCoordinationActionMatch[1]),
+        {
+          ...payload,
+          idempotencyKey: String(req.headers["idempotency-key"] || "").trim(),
+          at: new Date().toISOString()
+        },
+        user
+      );
+      writeDatabase(result.nextData);
+      sendJson(res, 200, publicHealthExternalPublicView({
+        ok: true,
+        idempotent: result.idempotent,
+        handoff: result.handoff,
+        action: result.action,
+        productionReady: false
+      }));
+    } catch (error) {
+      sendJson(res, publicHealthExternalHttpStatus(error), { error: "Public health coordination rejected", message: error.message, productionReady: false });
+    }
+    return;
+  }
+
+  const publicHealthExternalEnqueueMatch = url.pathname.match(/^\/api\/public-health\/external\/handoffs\/([^/]+)\/enqueue$/);
+  if (req.method === "POST" && publicHealthExternalEnqueueMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/external/handoffs/:id/enqueue");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req);
+      const data = readDatabase();
+      const handoffId = decodeURIComponent(publicHealthExternalEnqueueMatch[1]);
+      const runtime = buildPublicHealthCoordinationRuntime({ data });
+      const handoff = runtime.handoffs.find((item) => item.id === handoffId);
+      if (!handoff) throw new Error(`unknown public health coordination handoff: ${handoffId || "missing"}`);
+      const at = new Date().toISOString();
+      const credentials = await loadPublicHealthLaneCredentials(handoff.laneId, { at, data });
+      const result = enqueuePublicHealthExternalDispatchToState(data, handoffId, {
+        ...payload,
+        idempotencyKey: String(req.headers["idempotency-key"] || "").trim(),
+        at
+      }, credentials);
+      writeDatabase(result.nextData);
+      sendJson(res, 200, publicHealthExternalPublicView(publicHealthExternalResult(result)));
+    } catch (error) {
+      sendJson(res, publicHealthExternalHttpStatus(error), { error: "Public health external enqueue rejected", message: error.message, productionReady: false });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/external/outbox/due") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    try {
+      const at = new Date().toISOString();
+      const due = listDuePublicHealthExternalDispatches(readDatabase(), {
+        now: at,
+        limit: Number(url.searchParams.get("limit") || 20)
+      });
+      sendJson(res, 200, { generatedAt: at, candidateOnly: true, due, productionReady: false });
+    } catch (error) {
+      sendJson(res, publicHealthExternalHttpStatus(error), { error: "Public health external due queue rejected", message: error.message, productionReady: false });
+    }
+    return;
+  }
+
+  const publicHealthExternalClaimMatch = url.pathname.match(/^\/api\/public-health\/external\/dispatches\/([^/]+)\/claim$/);
+  if (req.method === "POST" && publicHealthExternalClaimMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/external/dispatches/:id/claim");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req);
+      const data = readDatabase();
+      const dispatchId = decodeURIComponent(publicHealthExternalClaimMatch[1]);
+      const at = new Date().toISOString();
+      const credentials = await publicHealthCredentialsForDispatch(data, dispatchId, at);
+      const dispatch = data.publicHealthExternalDispatches.find((item) => item.id === dispatchId);
+      const expectedLaneControlVersion = publicHealthExternalLaneVersion(data, dispatch.laneId);
+      const result = claimPublicHealthExternalDispatchToState(data, dispatchId, {
+        workerId: publicHealthExternalWorkerId(user),
+        idempotencyKey: String(req.headers["idempotency-key"] || "").trim(),
+        expectedVersion: payload.expectedVersion,
+        expectedLaneControlVersion,
+        leaseSeconds: payload.leaseSeconds,
+        now: at
+      }, credentials);
+      writeDatabase(result.nextData, {
+        event: "public-health-external-claim",
+        publicHealthExternalCas: {
+          dispatchId,
+          expectedOutboxVersion: Number(payload.expectedVersion),
+          laneId: dispatch.laneId,
+          expectedLaneControlVersion
+        }
+      });
+      sendJson(res, 200, publicHealthExternalPublicView({
+        ...publicHealthExternalResult(result),
+        leaseToken: result.leaseToken
+      }));
+    } catch (error) {
+      sendJson(res, publicHealthExternalHttpStatus(error), { error: "Public health external claim rejected", message: error.message, productionReady: false });
+    }
+    return;
+  }
+
+  const publicHealthExternalAttemptMatch = url.pathname.match(/^\/api\/public-health\/external\/dispatches\/([^/]+)\/attempt$/);
+  if (req.method === "POST" && publicHealthExternalAttemptMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/external/dispatches/:id/attempt");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req);
+      const data = readDatabase();
+      const dispatchId = decodeURIComponent(publicHealthExternalAttemptMatch[1]);
+      const at = new Date().toISOString();
+      const credentials = await publicHealthCredentialsForDispatch(data, dispatchId, at);
+      const result = recordClaimedPublicHealthExternalAttemptToState(
+        data,
+        dispatchId,
+        {
+          transportStatus: payload.transportStatus,
+          receipt: payload.receipt,
+          networkError: payload.networkError
+        },
+        publicHealthExternalAttemptOptions(credentials, {
+          ...payload,
+          idempotencyKey: String(req.headers["idempotency-key"] || "").trim(),
+          leaseToken: String(req.headers["x-public-health-lease-token"] || "").trim()
+        }, user, at)
+      );
+      writeDatabase(result.nextData, {
+        event: "public-health-external-attempt",
+        publicHealthExternalCas: {
+          dispatchId,
+          expectedOutboxVersion: Number(payload.expectedVersion),
+          laneId: result.dispatch.laneId,
+          expectedLaneControlVersion: Number(payload.expectedLaneControlVersion)
+        }
+      });
+      sendJson(res, 200, publicHealthExternalPublicView(publicHealthExternalResult(result)));
+    } catch (error) {
+      sendJson(res, publicHealthExternalHttpStatus(error), { error: "Public health external attempt rejected", message: error.message, productionReady: false });
+    }
+    return;
+  }
+
+  const publicHealthExternalCallbackMatch = url.pathname.match(/^\/api\/public-health\/external\/callbacks\/([^/]+)$/);
+  if (req.method === "POST" && publicHealthExternalCallbackMatch) {
+    try {
+      const payload = await collectJson(req);
+      const data = readDatabase();
+      const dispatchId = decodeURIComponent(publicHealthExternalCallbackMatch[1]);
+      const at = new Date().toISOString();
+      const credentials = await publicHealthCredentialsForDispatch(data, dispatchId, at);
+      const result = recordPublicHealthExternalAttemptToState(
+        data,
+        dispatchId,
+        { transportStatus: 200, receipt: payload.receipt },
+        {
+          requestKeyring: credentials.requestKeyring,
+          receiptKeyring: credentials.receiptKeyring,
+          attemptIdempotencyKey: String(req.headers["idempotency-key"] || "").trim(),
+          expectedVersion: payload.expectedVersion,
+          at
+        }
+      );
+      writeDatabase(result.nextData);
+      sendJson(res, 200, {
+        ok: result.ok,
+        idempotent: Boolean(result.idempotent),
+        dispatchId: result.dispatch.id,
+        deliveryState: result.dispatch.deliveryState,
+        productionReady: false
+      });
+    } catch (error) {
+      sendJson(res, publicHealthExternalHttpStatus(error), { error: "Public health external callback rejected", message: error.message, productionReady: false });
+    }
+    return;
+  }
+
+  const publicHealthExternalRecoveryMatch = url.pathname.match(/^\/api\/public-health\/external\/dispatches\/([^/]+)\/recover$/);
+  if (req.method === "POST" && publicHealthExternalRecoveryMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/external/dispatches/:id/recover");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req);
+      const data = readDatabase();
+      const dispatchId = decodeURIComponent(publicHealthExternalRecoveryMatch[1]);
+      const at = new Date().toISOString();
+      const dispatch = (data.publicHealthExternalDispatches || []).find((item) => item.id === dispatchId);
+      if (!dispatch) throw new Error(`unknown public health external dispatch: ${dispatchId || "missing"}`);
+      const expectedLaneControlVersion = publicHealthExternalLaneVersion(data, dispatch.laneId);
+      const credentials = await publicHealthCredentialsForDispatch(data, dispatchId, at);
+      const result = requeuePublicHealthExternalDeadLetterToState(data, dispatchId, {
+        ...payload,
+        idempotencyKey: String(req.headers["idempotency-key"] || "").trim(),
+        at
+      }, credentials, user);
+      writeDatabase(result.nextData, {
+        event: "public-health-external-recovery",
+        publicHealthExternalCas: {
+          dispatchId,
+          expectedOutboxVersion: Number(payload.expectedVersion),
+          laneId: dispatch.laneId,
+          expectedLaneControlVersion
+        }
+      });
+      sendJson(res, 200, publicHealthExternalPublicView(publicHealthExternalResult(result)));
+    } catch (error) {
+      sendJson(res, publicHealthExternalHttpStatus(error), { error: "Public health external recovery rejected", message: error.message, productionReady: false });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/external/operations-board") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    const at = new Date().toISOString();
+    const data = readDatabase();
+    const contractContext = await publicHealthContractGovernanceContext(data, at);
+    const loaded = await loadAvailablePublicHealthCredentialMap(data, at, contractContext.governance);
+    const coordinationCenter = buildPublicHealthCoordinationRuntime({ data });
+    const operations = buildPublicHealthExternalOperationsBoard({
+      data,
+      coordinationCenter,
+      secretResolver: (laneId) => loaded.credentials[laneId]?.requestKeyring,
+      contractGovernance: contractContext.governance,
+      now: at
+    });
+    const keySafety = buildPublicHealthKeySafetyBoard(data, loaded.credentials);
+    const endpointVerification = await buildPublicHealthEndpointVerificationSummary(data, at);
+    const endpointProbeContinuitySummary = await buildPublicHealthEndpointProbeCampaignSummary(data, at);
+    const endpointProbeContinuity = {
+      ...endpointProbeContinuitySummary,
+      endpointConnectivityReady: endpointVerification.endpointConnectivityReady,
+      continuousConnectivityReady: endpointProbeContinuitySummary.continuousConnectivityReady,
+      productionReady: false
+    };
+    sendJson(res, 200, publicHealthExternalPublicView({
+      ...operations,
+      contractGovernance: contractContext.governance,
+      endpointVerification,
+      endpointProbeContinuity,
+      keySafety,
+      productionReady: false
+    }));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/external/key-rotation") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    const at = new Date().toISOString();
+    const data = readDatabase();
+    const contractContext = await publicHealthContractGovernanceContext(data, at);
+    const loaded = await loadAvailablePublicHealthCredentialMap(data, at, contractContext.governance);
+    sendJson(res, 200, publicHealthExternalPublicView({
+      generatedAt: at,
+      lanes: loaded.summaries,
+      contractGovernance: contractContext.summary,
+      keySafety: buildPublicHealthKeySafetyBoard(data, loaded.credentials),
+      productionReady: false
+    }));
+    return;
+  }
+
+  if (req.method === "GET" && (url.pathname === "/api/t10-specialty/cutover-pack" || url.pathname === "/api/t10-specialty-cutover")) {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    const institutionId = String(url.searchParams.get("institutionId") || "").trim();
+    let institutionModuleSelection = null;
+    if (institutionId) {
+      if (!trustedT10Institution(data, institutionId)) {
+        sendJson(res, 404, { error: "Not Found", code: "T10_INSTITUTION_NOT_FOUND", message: "trusted institution was not found" });
+        return;
+      }
+      institutionModuleSelection = T10SpecialtyModuleGovernance.buildInstitutionModuleView(data, institutionId);
+    }
+    const pack = buildSpecialtyCutoverPack({
+      enabledTrackIds: institutionModuleSelection?.enabledModuleIds
+    });
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "t10-specialty-cutover-read",
+      target: url.pathname,
+      result: "allowed",
+      detail: `${institutionId || "all-institutions"}; ${pack.summary.codeReady}/${pack.summary.tracks} code-ready; ${pack.summary.productionReady}/${pack.summary.tracks} production-ready.`
+    });
+    sendJson(res, 200, {
+      ...pack,
+      ...(institutionModuleSelection ? { institutionModuleSelection } : {})
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/t10-specialty/modules") {
+    const user = requireApiRole(req, res, ["commission", "institution"], url.pathname);
+    if (!user) return;
+    const institutionId = String(url.searchParams.get("institutionId") || user.orgCode || "").trim();
+    const data = readDatabase();
+    if (!canReadT10InstitutionModules(user, institutionId)) {
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: "t10-specialty-module-selection-read",
+        target: institutionId,
+        result: "denied",
+        detail: "institution scope denied"
+      });
+      sendJson(res, 403, { error: "Forbidden", code: "T10_MODULE_SCOPE_DENIED", message: "institution module scope denied" });
+      return;
+    }
+    if (!trustedT10Institution(data, institutionId)) {
+      sendJson(res, 404, { error: "Not Found", code: "T10_INSTITUTION_NOT_FOUND", message: "trusted institution was not found" });
+      return;
+    }
+    const view = T10SpecialtyModuleGovernance.buildInstitutionModuleView(data, institutionId);
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "t10-specialty-module-selection-read",
+      target: institutionId,
+      result: "allowed",
+      detail: `${view.enabledModuleIds.length} controlled-rehearsal modules; ${view.formalGoLiveState}`
+    });
+    sendJson(res, 200, view);
+    return;
+  }
+
+  const t10SpecialtyModuleActionMatch = url.pathname.match(/^\/api\/t10-specialty\/modules\/([^/]+)\/actions$/);
+  if (req.method === "POST" && t10SpecialtyModuleActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/t10-specialty/modules/:institutionId/actions");
+    if (!user) return;
+    const institutionId = decodeURIComponent(t10SpecialtyModuleActionMatch[1]);
+    const payload = await collectJson(req);
+    try {
+      const data = readDatabase();
+      const at = new Date().toISOString();
+      const result = T10SpecialtyModuleGovernance.applyInstitutionModuleAction(
+        data,
+        institutionId,
+        payload,
+        {
+          ...user,
+          id: String(user.id || user.username || "").trim()
+        },
+        {
+          at,
+          idempotencyKey: String(req.headers["idempotency-key"] || "").trim(),
+          institutionExists: (candidate) => Boolean(trustedT10Institution(data, candidate))
+        }
+      );
+      result.state.securityEvents = resealAuditTrail([
+        {
+          id: randomUUID(),
+          at: new Date(at).toLocaleString("zh-CN", { hour12: false }),
+          actor: user.name,
+          role: user.role,
+          action: "t10-specialty-module-selection-change",
+          target: institutionId,
+          result: "allowed",
+          detail: `${payload.action}:${payload.moduleId}; version=${result.record.version}; ${result.view.formalGoLiveState}`
+        },
+        ...(Array.isArray(result.state.securityEvents) ? result.state.securityEvents : [])
+      ].slice(0, 120));
+      if (result.replayed) {
+        appendSecurityEvent({
+          actor: user.name,
+          role: user.role,
+          action: "t10-specialty-module-selection-replay",
+          target: institutionId,
+          result: "allowed",
+          detail: `${payload.action}:${payload.moduleId}; version=${result.record.version}`
+        });
+      } else {
+        writeDatabase(result.state);
+      }
+      sendJson(res, 200, {
+        ...result.view,
+        replayed: result.replayed
+      });
+    } catch (error) {
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: "t10-specialty-module-selection-change",
+        target: institutionId,
+        result: "denied",
+        detail: `${String(error?.code || "T10_MODULE_REQUEST_INVALID")}:${String(error?.message || "").slice(0, 240)}`
+      });
+      sendT10SpecialtyModuleError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/t10-specialty/modules/clinical-blood/readiness") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    const readiness = buildT10PlatformBlockedReadiness(BloodClinicalProduction.evaluateProductionReadiness({}));
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "t10-clinical-blood-readiness-read",
+      target: url.pathname,
+      result: "allowed",
+      detail: `${readiness.blockers?.length || 0} module evidence blockers; platform production gate closed`
+    });
+    sendJson(res, 200, readiness);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/t10-specialty/modules/emergency-life-chain/readiness") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    const readiness = buildT10PlatformBlockedReadiness(EmergencyModuleGate.buildIndependentModuleReadiness(readDatabase()));
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "t10-emergency-module-readiness-read",
+      target: url.pathname,
+      result: "allowed",
+      detail: `${readiness.rollback?.triggers?.length || 0} rollback triggers; platform production gate closed`
+    });
+    sendJson(res, 200, readiness);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/imaging-cloud/production-center") {
+    const user = requireApiRole(req, res, ["commission", "institution"], url.pathname);
+    if (!user) return;
+    const center = buildImagingCloudProductionResponse(readDatabase());
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "imaging-production-center-read",
+      target: url.pathname,
+      result: "allowed",
+      detail: `${center.summary?.blockers || 0} module blockers; platform production gate closed`
+    });
+    sendJson(res, 200, center);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/imaging-cloud/production/smoke") {
+    const user = requireApiRole(req, res, ["commission", "institution"], url.pathname);
+    if (!user) return;
+    const smoke = ImagingCloudProduction.runStandaloneSmoke(readDatabase());
+    sendJson(res, 200, {
+      ...smoke,
+      moduleEvidenceReady: smoke.releaseDecision === "go",
+      releaseDecision: "no-go-platform-approval-pending",
+      productionReady: false,
+      formalGoLiveState: "blocked-until-trusted-site-evidence-and-platform-launch-approval"
+    });
+    return;
+  }
+
+  const imagingProductionEndpointMatch = url.pathname.match(/^\/api\/imaging-cloud\/production\/endpoints\/([^/]+)\/probe$/);
+  const imagingProductionSyntheticMatch = url.pathname.match(/^\/api\/imaging-cloud\/production\/synthetic-checks\/([^/]+)\/actions$/);
+  const imagingProductionRequirementMatch = url.pathname.match(/^\/api\/imaging-cloud\/production\/requirements\/([^/]+)\/actions$/);
+  const imagingProductionReceiptMatch = url.pathname.match(/^\/api\/imaging-cloud\/production\/receipts\/([^/]+)\/(submit|verify)$/);
+  const imagingProductionDrillMatch = url.pathname.match(/^\/api\/imaging-cloud\/production\/drills\/([^/]+)\/complete$/);
+  const imagingProductionApprovalMatch = url.pathname.match(/^\/api\/imaging-cloud\/production\/approvals\/([^/]+)\/sign$/);
+  if (req.method === "POST" && (
+    imagingProductionEndpointMatch
+    || imagingProductionSyntheticMatch
+    || imagingProductionRequirementMatch
+    || imagingProductionReceiptMatch
+    || imagingProductionDrillMatch
+    || imagingProductionApprovalMatch
+  )) {
+    const commissionOnly = Boolean(
+      (imagingProductionReceiptMatch && imagingProductionReceiptMatch[2] === "verify")
+      || imagingProductionApprovalMatch
+    );
+    const user = requireApiRole(req, res, commissionOnly ? ["commission"] : ["commission", "institution"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    const payload = await collectJson(req);
+    try {
+      let item;
+      let action;
+      if (imagingProductionEndpointMatch) {
+        action = "probe-production-endpoint";
+        item = ImagingCloudProduction.probeEndpoint(data, user, decodeURIComponent(imagingProductionEndpointMatch[1]), payload);
+      } else if (imagingProductionSyntheticMatch) {
+        action = "record-synthetic-check";
+        item = ImagingCloudProduction.recordSyntheticCheck(data, user, decodeURIComponent(imagingProductionSyntheticMatch[1]), payload);
+      } else if (imagingProductionRequirementMatch) {
+        action = "govern-site-requirement";
+        item = ImagingCloudProduction.signRequirement(data, user, decodeURIComponent(imagingProductionRequirementMatch[1]), payload);
+      } else if (imagingProductionReceiptMatch) {
+        const type = decodeURIComponent(imagingProductionReceiptMatch[1]);
+        action = imagingProductionReceiptMatch[2] === "verify" ? "verify-site-receipt" : "submit-site-receipt";
+        item = imagingProductionReceiptMatch[2] === "verify"
+          ? ImagingCloudProduction.verifySiteReceipt(data, user, type, payload)
+          : ImagingCloudProduction.submitSiteReceipt(data, user, type, payload);
+      } else if (imagingProductionDrillMatch) {
+        action = "complete-production-drill";
+        item = ImagingCloudProduction.completeDrill(data, user, decodeURIComponent(imagingProductionDrillMatch[1]), payload);
+      } else {
+        action = "sign-module-cutover-approval";
+        item = ImagingCloudProduction.signApproval(data, user, decodeURIComponent(imagingProductionApprovalMatch[1]), payload);
+      }
+      writeDatabase(data);
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: `imaging-production-${action}`,
+        target: String(item?.id || item?.type || url.pathname),
+        result: "allowed",
+        detail: "module evidence updated; platform production gate remains closed"
+      });
+      sendJson(res, 200, {
+        item,
+        center: buildImagingCloudProductionResponse(data),
+        productionReady: false
+      });
+    } catch (error) {
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: "imaging-production-control",
+        target: url.pathname,
+        result: "denied",
+        detail: String(error?.message || "control rejected").slice(0, 240)
+      });
+      sendT10ProductionControlError(res, error);
+    }
     return;
   }
 
@@ -26293,6 +28794,22 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/production-release/evidence-readiness") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    const summary = buildProductionReleaseEvidencePublicSummary();
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "production-release-evidence-readiness-read",
+      target: url.pathname,
+      result: "allowed",
+      detail: `${summary.summary.present}/${summary.summary.documents} documents; ${summary.status}; production gate closed`
+    });
+    sendJson(res, 200, summary);
+    return;
+  }
+
   const productionGoNoGoApprovalMatch = url.pathname.match(/^\/api\/production-go-no-go\/approvals\/([^/]+)\/actions$/);
   if (req.method === "POST" && productionGoNoGoApprovalMatch) {
     const user = requireApiRole(req, res, ["commission"], "/api/production-go-no-go/approvals/:id/actions");
@@ -27567,55 +30084,17 @@ async function handleApi(req, res) {
   if (req.method === "POST" && url.pathname === "/api/escort-services/orders") {
     const user = requireApiRole(req, res, ["commission", "institution", "county", "citizen"], "/api/escort-services/orders");
     if (!user) return;
-    const data = readDatabase();
     try {
-      const order = normalizeEscortServiceOrder(await collectJson(req), user, data);
-      if (!canAccessEscortOrder(user, order, data)) {
-        appendSecurityEvent({ actor: user.name, role: user.role, action: "create escort service order", target: order.residentId, result: "denied", detail: "scope denied" });
-        sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
-        return;
-      }
-      data.escortServiceOrders = [order, ...(Array.isArray(data.escortServiceOrders) ? data.escortServiceOrders : [])].slice(0, 500);
-      data.taskMessages = [
-        {
-          id: `msg-${randomUUID()}`,
-          taskId: `escortServiceOrders:${order.id}`,
-          collection: "escortServiceOrders",
-          sourceId: order.id,
-          residentId: order.residentId,
-          targetRole: "institution",
-          channel: "in_app",
-          title: "New medical escort service request",
-          body: `${order.providerName || order.providerId} needs escort service confirmation for ${order.hospital || "outpatient visit"}.`,
-          status: "sent",
-          receipts: [],
-          createdAt: new Date().toISOString(),
-          createdBy: user.username || user.role,
-          createdByName: user.name
-        },
-        ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])
-      ].slice(0, 300);
-      appendDataAccessLog(data, user, order.residentId, "escortServiceOrders", "create medical escort service order", "allowed");
-      data.securityEvents = [
-        {
-          id: randomUUID(),
-          at: new Date().toLocaleString("zh-CN", { hour12: false }),
-          actor: user.name,
-          role: user.role,
-          action: "create escort service order",
-          target: order.id,
-          result: "allowed",
-          detail: order.status
-        },
-        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-      ].slice(0, 120);
-      writeDatabase(data);
-      sendJson(res, 201, order);
+      const payload = await collectJson(req);
+      const result = await careServicePlatformAdapter().createOrder(
+        "escort",
+        careServiceCreatePayload(payload, "escort"),
+        careServiceActor(user),
+        { commandId: careServiceCommandId(req, payload) }
+      );
+      sendJson(res, result.replayed ? 200 : 201, result.order);
     } catch (error) {
-      const message = error.message || "";
-      const denied = /scope denied|not published/i.test(message);
-      const conflict = /duplicate active escort appointment/i.test(message);
-      sendJson(res, conflict ? 409 : denied ? 403 : 400, { error: conflict ? "Conflict" : denied ? "Forbidden" : "Bad Request", message });
+      sendCareServiceError(res, error);
     }
     return;
   }
@@ -27624,56 +30103,23 @@ async function handleApi(req, res) {
   if (req.method === "POST" && escortHospitalHandoffMatch) {
     const user = requireApiRole(req, res, ["commission", "institution"], "/api/escort-services/orders/:id/hospital-handoff");
     if (!user) return;
-    const data = readDatabase();
-    const rows = Array.isArray(data.escortServiceOrders) ? data.escortServiceOrders : [];
-    const index = rows.findIndex((item) => item.id === decodeURIComponent(escortHospitalHandoffMatch[1]));
-    if (index < 0) {
-      sendJson(res, 404, { error: "Not Found", message: "escort service order not found" });
-      return;
+    try {
+      const payload = await collectJson(req);
+      const decision = String(payload.decision || "").trim().toLowerCase();
+      const result = await careServicePlatformAdapter().transitionOrder(
+        "escort",
+        decodeURIComponent(escortHospitalHandoffMatch[1]),
+        decision === "return" ? "hospital-returned" : "hospital-confirmed",
+        careServiceActor(user),
+        {
+          ...careServiceTransitionInput(payload).input,
+          commandId: careServiceCommandId(req, payload)
+        }
+      );
+      sendJson(res, 200, result.order);
+    } catch (error) {
+      sendCareServiceError(res, error);
     }
-    if (!canAccessEscortOrder(user, rows[index], data)) {
-      appendSecurityEvent({ actor: user.name, role: user.role, action: "hospital handoff escort service order", target: rows[index].id, result: "denied", detail: "scope denied" });
-      sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
-      return;
-    }
-    const payload = await collectJson(req);
-    rows[index] = applyEscortHospitalHandoff(rows[index], payload, user);
-    data.escortServiceOrders = rows;
-    data.taskMessages = [
-      {
-        id: `msg-${randomUUID()}`,
-        taskId: `escortServiceOrders:${rows[index].id}`,
-        collection: "escortServiceOrders",
-        sourceId: rows[index].id,
-        residentId: rows[index].residentId,
-        targetRole: "citizen",
-        channel: "in_app",
-        title: "Medical escort hospital handoff updated",
-        body: `${rows[index].hospital || "Hospital"} ${rows[index].department || ""} reported ${rows[index].hospitalInterfaceStatus}; ${rows[index].hospitalNotice || rows[index].hospitalCheckInNo || "please follow the escort arrangement."}`.trim(),
-        status: "sent",
-        receipts: [],
-        createdAt: new Date().toISOString(),
-        createdBy: user.username || user.role,
-        createdByName: user.name
-      },
-      ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])
-    ].slice(0, 300);
-    appendDataAccessLog(data, user, rows[index].residentId, "escortServiceOrders", payload.note || rows[index].hospitalInterfaceStatus || rows[index].status, "allowed");
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "hospital handoff escort service order",
-        target: rows[index].id,
-        result: "allowed",
-        detail: rows[index].hospitalInterfaceStatus
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
-    writeDatabase(data);
-    sendJson(res, 200, rows[index]);
     return;
   }
 
@@ -27681,37 +30127,199 @@ async function handleApi(req, res) {
   if (req.method === "POST" && escortOrderActionMatch) {
     const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/escort-services/orders/:id/actions");
     if (!user) return;
-    const data = readDatabase();
-    const rows = Array.isArray(data.escortServiceOrders) ? data.escortServiceOrders : [];
-    const index = rows.findIndex((item) => item.id === decodeURIComponent(escortOrderActionMatch[1]));
-    if (index < 0) {
-      sendJson(res, 404, { error: "Not Found", message: "escort service order not found" });
-      return;
+    try {
+      const payload = await collectJson(req);
+      const transition = careServiceTransitionInput(payload);
+      const result = await careServicePlatformAdapter().transitionOrder(
+        "escort",
+        decodeURIComponent(escortOrderActionMatch[1]),
+        transition.nextStatus,
+        careServiceActor(user),
+        {
+          ...transition.input,
+          commandId: careServiceCommandId(req, payload)
+        }
+      );
+      sendJson(res, 200, result.order);
+    } catch (error) {
+      sendCareServiceError(res, error);
     }
-    if (!canAccessEscortOrder(user, rows[index], data)) {
-      appendSecurityEvent({ actor: user.name, role: user.role, action: "update escort service order", target: rows[index].id, result: "denied", detail: "scope denied" });
-      sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
-      return;
-    }
+    return;
+  }
+
+  const careNotificationReceiptMatch = url.pathname.match(/^\/api\/care-services\/(nursing|escort)\/orders\/([^/]+)\/notification-receipts\/([^/]+)$/);
+  if (req.method === "POST" && careNotificationReceiptMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/care-services/:domain/orders/:id/notification-receipts/:messageId");
+    if (!user) return;
     const payload = await collectJson(req);
-    rows[index] = applyEscortServiceOrderAction(rows[index], payload, user);
-    data.escortServiceOrders = rows;
-    appendDataAccessLog(data, user, rows[index].residentId, "escortServiceOrders", payload.note || rows[index].status, "allowed");
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+    if (!verifyIntegrationSignature(payload, req.headers["x-integration-signature"])) {
+      appendSecurityEvent({
         actor: user.name,
         role: user.role,
-        action: "update escort service order",
-        target: rows[index].id,
-        result: "allowed",
-        detail: rows[index].status
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
-    writeDatabase(data);
-    sendJson(res, 200, rows[index]);
+        action: "care service notification receipt",
+        target: decodeURIComponent(careNotificationReceiptMatch[2]),
+        result: "denied",
+        detail: "signature mismatch"
+      });
+      sendJson(res, 401, { error: "Unauthorized", message: "integration signature verification failed" });
+      return;
+    }
+    try {
+      const result = await careServicePlatformAdapter().recordNotificationReceipt(
+        careNotificationReceiptMatch[1],
+        decodeURIComponent(careNotificationReceiptMatch[2]),
+        decodeURIComponent(careNotificationReceiptMatch[3]),
+        {
+          status: payload.status,
+          providerMessageId: payload.providerMessageId,
+          failureCode: payload.failureCode
+        },
+        careServiceActor(user),
+        { commandId: careServiceCommandId(req, payload) }
+      );
+      sendJson(res, 200, { ok: true, order: result.order, receipt: result.receipt, replayed: Boolean(result.replayed) });
+    } catch (error) {
+      sendCareServiceError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/care-services/outbox/health") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/care-services/outbox/health");
+    if (!user) return;
+    try {
+      const health = await careServicePlatformAdapter().readOutboxHealth({
+        maxPendingAgeSeconds: Number(process.env.CARE_OUTBOX_MAX_PENDING_AGE_SECONDS || 300)
+      });
+      sendJson(res, health.ok ? 200 : 503, {
+        ...health,
+        runtimePolicyVersion: CareServiceRuntime.RUNTIME_POLICY_VERSION,
+        productionReady: false
+      });
+    } catch (error) {
+      sendCareServiceError(res, error);
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/care-services/readiness") {
+    const user = requireApiRole(req, res, ["commission"], "/api/care-services/readiness");
+    if (!user) return;
+    if (req.method !== "GET") {
+      sendJson(res, 405, { error: "Method Not Allowed", message: "care-service readiness is read-only" });
+      return;
+    }
+    const report = buildCareServiceProductionReadiness({
+      data: readDatabase(),
+      env: process.env
+    });
+    const summary = careServiceReadinessPublicSummary(report);
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "care-service-production-readiness",
+      target: "/api/care-services/readiness",
+      result: "allowed",
+      detail: `${summary.formalGoLiveState}; ${summary.blockerCounts.total} blockers`
+    });
+    sendJson(res, 200, summary);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/care-services/outbox/dead-letters") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/care-services/outbox/dead-letters");
+    if (!user) return;
+    const data = readDatabase();
+    const rows = (Array.isArray(data.careServiceOutboxDeadLetters) ? data.careServiceOutboxDeadLetters : [])
+      .filter((item) => {
+        if (user.role === "commission") return true;
+        const orders = item.domain === "nursing" ? data.internetNursingOrders : data.escortServiceOrders;
+        const order = (orders || []).find((row) => row.id === item.aggregateId);
+        return Boolean(order && (item.domain === "nursing"
+          ? canAccessInternetNursingOrder(user, order, data)
+          : canAccessEscortOrder(user, order, data)));
+      })
+      .map((item) => ({
+        id: item.id,
+        domain: item.domain,
+        eventId: item.eventId,
+        aggregateId: item.aggregateId,
+        eventType: item.eventType,
+        status: item.status,
+        attempts: item.attempts,
+        errorCode: item.errorCode,
+        openedAt: item.openedAt,
+        resolvedAt: item.resolvedAt,
+        resolutionEvidenceRef: item.resolutionEvidenceRef
+      }));
+    sendJson(res, 200, { ok: true, deadLetters: rows, productionReady: false });
+    return;
+  }
+
+  const careDeadLetterRequeueMatch = url.pathname.match(/^\/api\/care-services\/outbox\/(nursing|escort)\/([^/]+)\/requeue$/);
+  if (req.method === "POST" && careDeadLetterRequeueMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/care-services/outbox/:domain/:eventId/requeue");
+    if (!user) return;
+    try {
+      if (user.role === "institution") {
+        const data = readDatabase();
+        const domain = careDeadLetterRequeueMatch[1];
+        const eventId = decodeURIComponent(careDeadLetterRequeueMatch[2]);
+        const event = (domain === "nursing" ? data.internetNursingOutbox : data.escortServiceOutbox)
+          ?.find((item) => item.id === eventId);
+        const order = (domain === "nursing" ? data.internetNursingOrders : data.escortServiceOrders)
+          ?.find((item) => item.id === event?.aggregateId);
+        const allowed = Boolean(order && (domain === "nursing"
+          ? canAccessInternetNursingOrder(user, order, data)
+          : canAccessEscortOrder(user, order, data)));
+        if (!allowed) {
+          sendJson(res, 403, { error: "Forbidden", message: "care-service dead-letter scope denied" });
+          return;
+        }
+      }
+      const payload = await collectJson(req);
+      const result = await careServicePlatformAdapter().requeueDeadLetter(
+        careDeadLetterRequeueMatch[1],
+        decodeURIComponent(careDeadLetterRequeueMatch[2]),
+        careServiceActor(user),
+        {
+          commandId: careServiceCommandId(req, payload),
+          confirmation: payload.confirmation,
+          evidenceRef: payload.evidenceRef
+        }
+      );
+      sendJson(res, 200, { ok: true, eventId: result.event?.id, resolvedDeadLetters: result.resolvedDeadLetters });
+    } catch (error) {
+      sendCareServiceError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/care-services/outbox/worker/run") {
+    const user = requireApiRole(req, res, ["commission"], "/api/care-services/outbox/worker/run");
+    if (!user) return;
+    try {
+      const result = await careServicePlatformAdapter().runOutboxWorker({
+        workerId: process.env.CARE_OUTBOX_WORKER_ID,
+        runId: randomUUID(),
+        batchSize: Number(process.env.CARE_OUTBOX_BATCH_SIZE || 20),
+        leaseSeconds: Number(process.env.CARE_OUTBOX_LEASE_SECONDS || 60),
+        maxAttempts: Number(process.env.CARE_OUTBOX_MAX_ATTEMPTS || 5),
+        retryBaseSeconds: Number(process.env.CARE_OUTBOX_RETRY_BASE_SECONDS || 30),
+        maxRetrySeconds: Number(process.env.CARE_OUTBOX_MAX_RETRY_SECONDS || 1800)
+      });
+      sendJson(res, result.deadLetters ? 503 : 200, {
+        ok: result.deadLetters === 0,
+        runId: result.runId,
+        workerId: result.workerId,
+        claimed: result.claimed,
+        delivered: result.delivered,
+        retried: result.retried,
+        deadLetters: result.deadLetters
+      });
+    } catch (error) {
+      sendCareServiceError(res, error);
+    }
     return;
   }
 
@@ -28120,6 +30728,24 @@ async function handleApi(req, res) {
   if (req.method === "POST" && url.pathname === "/api/internet-nursing/orders") {
     const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/internet-nursing/orders");
     if (!user) return;
+    try {
+      const payload = await collectJson(req);
+      const result = await careServicePlatformAdapter().createOrder(
+        "nursing",
+        careServiceCreatePayload(payload, "nursing"),
+        careServiceActor(user),
+        { commandId: careServiceCommandId(req, payload) }
+      );
+      sendJson(res, result.replayed ? 200 : 201, result.order);
+    } catch (error) {
+      sendCareServiceError(res, error);
+    }
+    return;
+  }
+
+  if (false && req.method === "POST" && url.pathname === "/api/internet-nursing/orders") {
+    const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/internet-nursing/orders");
+    if (!user) return;
     const data = readDatabase();
     try {
       const order = normalizeInternetNursingOrder(await collectJson(req), user, data);
@@ -28175,6 +30801,29 @@ async function handleApi(req, res) {
 
   const internetNursingActionMatch = url.pathname.match(/^\/api\/internet-nursing\/orders\/([^/]+)\/actions$/);
   if (req.method === "POST" && internetNursingActionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/internet-nursing/orders/:id/actions");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req);
+      const transition = careServiceTransitionInput(payload);
+      const result = await careServicePlatformAdapter().transitionOrder(
+        "nursing",
+        decodeURIComponent(internetNursingActionMatch[1]),
+        transition.nextStatus,
+        careServiceActor(user),
+        {
+          ...transition.input,
+          commandId: careServiceCommandId(req, payload)
+        }
+      );
+      sendJson(res, 200, result.order);
+    } catch (error) {
+      sendCareServiceError(res, error);
+    }
+    return;
+  }
+
+  if (false && req.method === "POST" && internetNursingActionMatch) {
     const user = requireApiRole(req, res, ["commission", "institution"], "/api/internet-nursing/orders/:id/actions");
     if (!user) return;
     const data = readDatabase();
@@ -31849,6 +34498,42 @@ async function handleApi(req, res) {
       });
       const data = readDatabase();
       const result = applyFinancialCallback(data, verified);
+      let domainResult = null;
+      if (result.gatewayEvent.gatewayType === "PAYMENT" && result.gatewayEvent.operation === "refund") {
+        domainResult = OnlinePaymentRefunds.syncRefundFromFinancialCallback(
+          data,
+          result,
+          "financial-callback-adapter",
+          { trustedFinancialCallback: true }
+        );
+      }
+      if (result.gatewayEvent.gatewayType === "INSURANCE"
+        && result.gatewayEvent.operation === "settlement"
+        && ["core-accepted", "core-returned", "payment-failed", "confirm-payment"].includes(String(payload.action || ""))) {
+        const callbackPayload = {
+          action: String(payload.action),
+          receiptId: verified.receiptId,
+          idempotencyKey: verified.eventId,
+          paidAmountFen: verified.amountFen,
+          returnCycleId: payload.returnCycleId,
+          failureCycleId: payload.failureCycleId,
+          reasonCode: verified.providerCode || payload.reasonCode,
+          reason: verified.failureReason || payload.reason,
+          requirementDigest: payload.requirementDigest,
+          failureEvidenceDigest: payload.failureEvidenceDigest,
+          correctionWorkingDays: payload.correctionWorkingDays,
+          resolutionWorkingDays: payload.resolutionWorkingDays,
+          at: verified.receivedAt
+        };
+        const settlementResult = DiseasePaymentService.applyInsuranceCoreSettlementCallback(
+          data.diseasePayment,
+          result.gatewayEvent.externalId,
+          callbackPayload,
+          "insurance-core-adapter"
+        );
+        data.diseasePayment = settlementResult.state;
+        domainResult = settlementResult;
+      }
       writeDatabase(normalizeState(data));
       appendSecurityEvent({
         actor: `${verified.gatewayType.toLowerCase()}-provider`,
@@ -31874,7 +34559,8 @@ async function handleApi(req, res) {
           status: result.callbackEvent.status,
           stateApplied: result.callbackEvent.stateApplied,
           ignoredReason: result.callbackEvent.ignoredReason
-        }
+        },
+        domainSynchronized: Boolean(domainResult)
       });
     } catch (error) {
       const unsupportedType = /unsupported financial gateway type/i.test(String(error.message || ""));
@@ -33585,9 +36271,145 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (url.pathname === "/api/online-payments/refunds" && req.method === "POST") {
+    const user = requireApiRole(req, res, ["institution", "commission"], url.pathname);
+    if (!user) return;
+    if (!authorizeInsurancePaymentAction("refund.request", user, res, url.pathname)) return;
+    const data = readDatabase();
+    try {
+      const payload = await collectJson(req);
+      payload.idempotencyKey = String(req.headers["idempotency-key"] || payload.idempotencyKey || "").trim();
+      const result = OnlinePaymentRefunds.createRefundRequest(data, payload, user);
+      result.row.organizationId ||= String(user.orgCode || "");
+      result.row.organizationName ||= String(user.orgName || "");
+      writeDatabase(normalizeState(data));
+      sendJson(res, result.idempotent ? 200 : 201, {
+        refund: result.row,
+        idempotent: result.idempotent,
+        productionReady: false
+      });
+    } catch (error) {
+      sendInsurancePaymentError(res, error);
+    }
+    return;
+  }
+
+  const onlinePaymentRefundActionMatch = url.pathname.match(/^\/api\/online-payments\/refunds\/([^/]+)\/(resubmit|reviews|dispatch|retry|cancel|reconcile|close)$/);
+  if (onlinePaymentRefundActionMatch && req.method === "POST") {
+    const [, encodedId, action] = onlinePaymentRefundActionMatch;
+    const id = decodeURIComponent(encodedId);
+    const routeRoles = ["resubmit", "reviews", "cancel"].includes(action)
+      ? ["institution", "commission"]
+      : ["commission"];
+    const user = requireApiRole(req, res, routeRoles, url.pathname);
+    if (!user) return;
+    const modelActions = {
+      resubmit: "refund.resubmit",
+      reviews: "refund.review",
+      reconcile: "refund.reconcile-close",
+      close: "refund.reconcile-close"
+    };
+    if (modelActions[action] && !authorizeInsurancePaymentAction(modelActions[action], user, res, url.pathname)) return;
+    const data = readDatabase();
+    try {
+      const scopedRefund = (Array.isArray(data.onlinePaymentRefunds) ? data.onlinePaymentRefunds : []).find((item) => item.id === id);
+      if (user.role === "institution"
+        && (!scopedRefund?.organizationId || scopedRefund.organizationId !== user.orgCode)) {
+        sendJson(res, 403, {
+          error: "Forbidden",
+          code: "REFUND_ORGANIZATION_SCOPE_DENIED",
+          message: "refund belongs to another organization or lacks a trusted organization binding"
+        });
+        return;
+      }
+      const payload = await collectJson(req);
+      const headerIdempotencyKey = String(req.headers["idempotency-key"] || "").trim();
+      if (headerIdempotencyKey) payload.idempotencyKey = headerIdempotencyKey;
+      if (action === "reviews") payload.role = user.role;
+      let result;
+      if (action === "resubmit") {
+        result = OnlinePaymentRefunds.resubmitRejectedRefund(data, id, payload, user);
+      } else if (action === "reviews") {
+        result = OnlinePaymentRefunds.reviewRefundRequest(data, id, payload, user);
+      } else if (action === "retry") {
+        result = OnlinePaymentRefunds.retryRefund(data, id, payload, user);
+      } else if (action === "cancel") {
+        result = OnlinePaymentRefunds.cancelRefund(data, id, payload, user);
+      } else if (action === "reconcile") {
+        result = OnlinePaymentRefunds.reconcileRefund(data, id, payload, user);
+      } else if (action === "close") {
+        result = OnlinePaymentRefunds.closeRefund(data, id, payload, user);
+      } else {
+        const requestPayload = OnlinePaymentRefunds.prepareRefundDispatch(data, id);
+        const duplicate = (data.integrationGatewayEvents || []).find((item) =>
+          item.adapterType === "financial"
+          && item.gatewayType === "PAYMENT"
+          && item.operation === "refund"
+          && item.idempotencyKey === requestPayload.idempotencyKey
+        );
+        let event = duplicate;
+        if (!event) {
+          const receipt = await dispatchFinancialRequest(requestPayload);
+          event = {
+            id: `igw-${randomUUID()}`,
+            direction: "outbound",
+            adapterType: "financial",
+            gatewayType: "PAYMENT",
+            operation: "refund",
+            contractId: requestPayload.contractId,
+            domain: "PAYMENT",
+            resource: "FinancialGatewayRequest",
+            idempotencyKey: requestPayload.idempotencyKey,
+            externalId: id,
+            residentId: "",
+            status: receipt.status,
+            signatureVerified: false,
+            outboundSigned: true,
+            receivedBy: user.username || user.role,
+            requestPayload,
+            payload: requestPayload.payload,
+            retryCount: 0,
+            deadLetter: false,
+            reconciliationStatus: "provider-accepted",
+            receivedAt: new Date().toISOString(),
+            adapterReceipt: receipt,
+            adapterReceiptHistory: [],
+            providerStatus: receipt.status,
+            callbackEvents: [],
+            businessDate: String(receipt.acceptedAt || "").slice(0, 10),
+            dispatchedAt: receipt.acceptedAt
+          };
+          data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
+        }
+        result = OnlinePaymentRefunds.recordRefundDispatch(
+          data,
+          id,
+          event.adapterReceipt,
+          event.id,
+          user
+        );
+        result.gatewayEventId = event.id;
+        result.idempotent = Boolean(duplicate);
+      }
+      writeDatabase(normalizeState(data));
+      sendJson(res, action === "dispatch" ? 202 : 200, {
+        refund: result.row,
+        review: result.review,
+        resubmission: result.resubmission,
+        gatewayEventId: result.gatewayEventId,
+        idempotent: result.idempotent === true,
+        productionReady: false
+      });
+    } catch (error) {
+      sendInsurancePaymentError(res, error);
+    }
+    return;
+  }
+
   if (url.pathname === "/api/disease-payment/formal-grouping/operations" && req.method === "GET") {
     const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
     if (!user) return;
+    if (!authorizeInsurancePaymentAction("formal-grouping.operations.read", user, res, url.pathname)) return;
     const state = DiseasePaymentService.normalizeState(readDatabase().diseasePayment);
     sendJson(res, 200, DiseasePaymentIntake.buildFormalGroupingOperations(state));
     return;
@@ -33596,6 +36418,7 @@ async function handleApi(req, res) {
   if (url.pathname === "/api/disease-payment/formal-grouping/jobs" && req.method === "POST") {
     const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
     if (!user) return;
+    if (!authorizeInsurancePaymentAction("formal-grouping.create", user, res, url.pathname)) return;
     const data = readDatabase();
     try {
       const result = DiseasePaymentIntake.createFormalGroupingJob(DiseasePaymentService.normalizeState(data.diseasePayment), await collectJson(req), user.name);
@@ -33610,27 +36433,81 @@ async function handleApi(req, res) {
 
   const diseasePaymentFormalGroupingActionMatch = url.pathname.match(/^\/api\/disease-payment\/formal-grouping\/jobs\/([^/]+)\/(dispatch|receipts|fail|retry|reconcile)$/);
   if (diseasePaymentFormalGroupingActionMatch && req.method === "POST") {
-    const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
-    if (!user) return;
     const [, encodedId, action] = diseasePaymentFormalGroupingActionMatch;
     const id = decodeURIComponent(encodedId);
     const payload = await collectJson(req);
     const data = readDatabase();
     const state = DiseasePaymentService.normalizeState(data.diseasePayment);
     try {
-      const handlers = {
-        dispatch: () => DiseasePaymentIntake.dispatchFormalGroupingJob(state, id, payload, user.name),
-        receipts: () => DiseasePaymentIntake.receiveFormalGroupingReceipt(state, id, payload, user.name, DiseasePaymentService.calculateCase),
-        fail: () => DiseasePaymentIntake.failFormalGroupingJob(state, id, payload, user.name),
-        retry: () => DiseasePaymentIntake.retryFormalGroupingJob(state, id, user.name),
-        reconcile: () => DiseasePaymentIntake.reconcileFormalGroupingDeadLetter(state, id, payload, user.name)
-      };
-      const result = handlers[action]();
+      let result;
+      if (action === "receipts") {
+        const grouperConfiguration = DiseasePaymentGrouperContract.buildGrouperProductionConfiguration(process.env);
+        if (String(process.env.NODE_ENV || "").toLowerCase() === "production" && !grouperConfiguration.configured) {
+          sendJson(res, 503, {
+            error: "Service Unavailable",
+            code: "GROUPER_PRODUCTION_CONFIGURATION_INVALID",
+            message: "official grouper callback verification is not fully configured"
+          });
+          return;
+        }
+        const trustedActor = {
+          name: "official-grouper-adapter",
+          username: "official-grouper-adapter",
+          role: "system",
+          orgType: "official_grouper_adapter",
+          orgCode: "official_grouper_adapter"
+        };
+        if (!authorizeInsurancePaymentAction("formal-grouping.receipt", trustedActor, res, url.pathname)) return;
+        // receiveTrustedFormalGroupingReceipt invokes
+        // DiseasePaymentGrouperContract.verifyTrustedGrouperCallback before any state write.
+        result = DiseasePaymentIntake.receiveTrustedFormalGroupingReceipt(
+          state,
+          id,
+          payload,
+          {
+            env: process.env,
+            timestamp: req.headers["x-grouper-timestamp"],
+            nonce: req.headers["x-grouper-nonce"],
+            sourceId: req.headers["x-grouper-source"],
+            signature: req.headers["x-grouper-signature"],
+            nowMs: Date.now()
+          },
+          DiseasePaymentService.calculateCase
+        );
+      } else if (action === "dispatch" || action === "fail") {
+        const modelAction = action === "dispatch" ? "formal-grouping.dispatch" : "formal-grouping.fail";
+        const systemActor = requireInsuranceSystemCommand(
+          req,
+          res,
+          payload,
+          modelAction,
+          action === "fail" ? "platform" : "official_grouper_adapter",
+          `${url.pathname}:${id}`
+        );
+        if (!systemActor) return;
+        if (action === "dispatch") {
+          if (!authorizeInsurancePaymentAction("formal-grouping.dispatch", systemActor, res, url.pathname)) return;
+          result = DiseasePaymentIntake.dispatchFormalGroupingJob(state, id, payload, systemActor.username);
+        } else {
+          if (!authorizeInsurancePaymentAction("formal-grouping.fail", systemActor, res, url.pathname)) return;
+          result = DiseasePaymentIntake.failFormalGroupingJob(state, id, payload, systemActor.username);
+        }
+      } else {
+        const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
+        if (!user) return;
+        if (action === "retry") {
+          if (!authorizeInsurancePaymentAction("formal-grouping.retry", user, res, url.pathname)) return;
+          result = DiseasePaymentIntake.retryFormalGroupingJob(state, id, user.name);
+        } else {
+          if (!authorizeInsurancePaymentAction("formal-grouping.reconcile", user, res, url.pathname)) return;
+          result = DiseasePaymentIntake.reconcileFormalGroupingDeadLetter(state, id, payload, user.name);
+        }
+      }
       data.diseasePayment = result.state;
       writeDatabase(data);
       sendJson(res, 200, { job: result.job, envelope: result.envelope, groupingRun: result.run, deadLetter: result.deadLetter, receiptErrors: result.receiptErrors || [], idempotent: result.idempotent || false, operations: DiseasePaymentIntake.buildFormalGroupingOperations(result.state) });
     } catch (error) {
-      sendJson(res, 409, { error: "Conflict", message: error.message });
+      sendInsurancePaymentError(res, error);
     }
     return;
   }
@@ -33664,6 +36541,53 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (url.pathname === "/api/disease-payment/special-cases/disclosure" && req.method === "GET") {
+    const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
+    if (!user) return;
+    sendJson(res, 200, {
+      ...DiseasePaymentService.buildSpecialCaseDisclosure(readDatabase().diseasePayment),
+      productionReady: false
+    });
+    return;
+  }
+
+  const diseasePaymentSpecialCaseCommandMatch = url.pathname.match(/^\/api\/disease-payment\/special-cases\/([^/]+)\/(expert-reselection|appeals|appeals\/review)$/);
+  if (diseasePaymentSpecialCaseCommandMatch && req.method === "POST") {
+    const [, encodedId, action] = diseasePaymentSpecialCaseCommandMatch;
+    const id = decodeURIComponent(encodedId);
+    const requiredRoles = action === "appeals" ? ["institution"] : ["insurance"];
+    const user = requireApiRole(req, res, requiredRoles, url.pathname);
+    if (!user) return;
+    const modelAction = action === "appeals"
+      ? "special-case.appeal"
+      : action === "appeals/review"
+        ? "special-case.review-appeal"
+        : "special-case.review-medical";
+    if (!authorizeInsurancePaymentAction(modelAction, user, res, url.pathname)) return;
+    const data = readDatabase();
+    try {
+      const payload = await collectJson(req);
+      payload.idempotencyKey = String(req.headers["idempotency-key"] || payload.idempotencyKey || "").trim();
+      const result = action === "appeals"
+        ? DiseasePaymentService.createSpecialCaseAppeal(data.diseasePayment, id, payload, user.name)
+        : action === "appeals/review"
+          ? DiseasePaymentService.reviewSpecialCaseAppeal(data.diseasePayment, id, payload, user.name)
+          : DiseasePaymentService.reselectSpecialCaseExpert(data.diseasePayment, id, payload, user.name);
+      data.diseasePayment = result.state;
+      writeDatabase(normalizeState(data));
+      sendJson(res, action === "appeals" ? 201 : 200, {
+        specialCase: result.row,
+        appeal: result.appeal,
+        panel: result.panel,
+        review: result.review,
+        productionReady: false
+      });
+    } catch (error) {
+      sendInsurancePaymentError(res, error);
+    }
+    return;
+  }
+
   const diseasePaymentSpecialReviewMatch = url.pathname.match(/^\/api\/disease-payment\/special-cases\/([^/]+)\/review$/);
   if (diseasePaymentSpecialReviewMatch && req.method === "POST") {
     const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
@@ -33684,6 +36608,69 @@ async function handleApi(req, res) {
     data.diseasePayment = result.state;
     writeDatabase(data);
     sendJson(res, 201, result.batch);
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/annual-clearances" && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    try {
+      const payload = await collectJson(req);
+      const result = DiseasePaymentService.createAnnualClearance(data.diseasePayment, payload, user.name);
+      data.diseasePayment = result.state;
+      writeDatabase(normalizeState(data));
+      sendJson(res, 201, { clearance: result.row, productionReady: false });
+    } catch (error) {
+      sendInsurancePaymentError(res, error);
+    }
+    return;
+  }
+
+  const diseasePaymentAnnualClearanceActionMatch = url.pathname.match(/^\/api\/disease-payment\/annual-clearances\/([^/]+)\/actions$/);
+  if (diseasePaymentAnnualClearanceActionMatch && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "institution", "commission"], url.pathname);
+    if (!user) return;
+    const id = decodeURIComponent(diseasePaymentAnnualClearanceActionMatch[1]);
+    const payload = await collectJson(req);
+    const action = String(payload.action || "").trim();
+    const institutionActions = new Set(["confirm-institution", "record-dispute"]);
+    const insuranceActions = new Set(["start-confirmation", "resolve-dispute", "confirm-institutions", "approve"]);
+    if (institutionActions.has(action) && user.role !== "institution") {
+      sendJson(res, 403, { error: "Forbidden", code: "ANNUAL_CLEARANCE_INSTITUTION_ROLE_REQUIRED", message: "institution action requires an institution actor" });
+      return;
+    }
+    if (insuranceActions.has(action) && user.role !== "insurance") {
+      sendJson(res, 403, { error: "Forbidden", code: "ANNUAL_CLEARANCE_INSURANCE_ROLE_REQUIRED", message: "insurance action requires an insurance actor" });
+      return;
+    }
+    if (["post", "lock"].includes(action)) {
+      sendJson(res, 403, {
+        error: "Forbidden",
+        code: "ANNUAL_CLEARANCE_TRUSTED_FINANCE_ACTOR_REQUIRED",
+        message: "posting and locking require a trusted fund-finance identity that is not available in the shared directory"
+      });
+      return;
+    }
+    if (![...institutionActions, ...insuranceActions].includes(action)) {
+      sendJson(res, 400, { error: "Bad Request", code: "ANNUAL_CLEARANCE_ACTION_INVALID", message: "annual clearance action is not supported" });
+      return;
+    }
+    if (institutionActions.has(action)) payload.institutionId = user.orgCode;
+    payload.idempotencyKey = String(req.headers["idempotency-key"] || payload.idempotencyKey || "").trim();
+    const data = readDatabase();
+    try {
+      const result = DiseasePaymentService.applyAnnualClearanceAction(data.diseasePayment, id, payload, user.name);
+      data.diseasePayment = result.state;
+      writeDatabase(normalizeState(data));
+      sendJson(res, 200, {
+        clearance: result.row,
+        idempotent: result.idempotent === true,
+        productionReady: false
+      });
+    } catch (error) {
+      sendInsurancePaymentError(res, error);
+    }
     return;
   }
 
@@ -34356,6 +37343,105 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/registration-referral/operations") {
+    const user = requireApiRole(req, res, ["citizen", "institution", "county", "commission"], "/api/registration-referral/operations");
+    if (!user) return;
+    const data = readDatabase();
+    const actor = {
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      role: user.role,
+      orgCode: user.orgCode,
+      residentId: user.residentId,
+      residentIds: user.residentId ? [user.residentId] : []
+    };
+    const asOf = new Date().toISOString();
+    const queue = RegistrationReferralService.buildClosureWorkQueue(data, { asOf, actor });
+    appendDataAccessLog(data, user, user.residentId || "", "挂号转诊闭环", "查询责任事项、质量指标和通知可靠性");
+    writeDatabase(normalizeState(data));
+    sendJson(res, 200, redactSensitiveResponse({
+      asOf,
+      queue,
+      quality: RegistrationReferralService.buildClosureQualityMetrics(data, { asOf }),
+      notificationReliability: RegistrationReferralService.buildNotificationReliability(data),
+      productionReady: false
+    }, user));
+    return;
+  }
+
+  const registrationReferralCommandMatch = url.pathname.match(/^\/api\/registration-referral\/commands(?:\/([^/]+))?$/);
+  if (req.method === "POST" && registrationReferralCommandMatch) {
+    const user = requireApiRole(req, res, ["citizen", "institution", "county", "insurance", "commission"], "/api/registration-referral/commands");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const routeAction = registrationReferralCommandMatch[1] ? decodeURIComponent(registrationReferralCommandMatch[1]) : "";
+    const headerKey = String(req.headers["idempotency-key"] || "").trim().slice(0, 240);
+    const bodyKey = String(payload.commandId || payload.idempotencyKey || "").trim();
+    try {
+      if (!headerKey) throw new Error("Idempotency-Key is required");
+      if (bodyKey && bodyKey !== headerKey) throw new Error("idempotency key conflict");
+      if (routeAction && payload.action && routeAction !== payload.action) throw new Error("route action does not match request action");
+      const action = routeAction || String(payload.action || "").trim();
+      if (!action) throw new Error("action is required");
+      const data = readDatabase();
+      const actor = {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        role: user.role,
+        orgCode: user.orgCode,
+        residentId: user.residentId,
+        residentIds: user.residentId ? [user.residentId] : []
+      };
+      const command = {
+        commandId: headerKey,
+        action,
+        caseType: payload.caseType,
+        caseId: payload.caseId,
+        residentId: payload.residentId,
+        expectedVersion: payload.expectedVersion,
+        payload: payload.payload
+      };
+      const applied = RegistrationReferralService.applyClosureCommand(data, command, actor, {
+        requireExpectedVersion: true
+      });
+      if ((applied.consistency?.summary?.P0 || 0) > 0) {
+        throw new Error(`registration/referral consistency rejected with ${applied.consistency.summary.P0} P0 issue(s)`);
+      }
+      applied.data.securityEvents = prependAuditTrailEntry(applied.data.securityEvents, {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "执行挂号转诊闭环命令",
+        target: `${action}:${applied.event.caseId || headerKey}`,
+        result: "允许",
+        detail: `${applied.event.id}; idempotent=${applied.idempotent}; productionEvidence=false`
+      });
+      writeDatabase(normalizeState(applied.data));
+      sendJson(res, applied.idempotent ? 200 : 201, redactSensitiveResponse({
+        ok: true,
+        idempotent: applied.idempotent,
+        event: applied.event,
+        result: applied.result,
+        consistency: applied.consistency,
+        productionReady: false
+      }, user));
+    } catch (error) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "执行挂号转诊闭环命令", target: routeAction || String(payload.action || bodyKey || ""), result: "拒绝", detail: error.message });
+      const status = /role |scope denied|只能|无权/i.test(error.message)
+        ? 403
+        : /not found/i.test(error.message)
+          ? 404
+          : /conflict|version/i.test(error.message)
+            ? 409
+            : 400;
+      sendJson(res, status, { error: status === 403 ? "Forbidden" : status === 404 ? "Not Found" : status === 409 ? "Conflict" : "Bad Request", message: error.message });
+    }
+    return;
+  }
+
   if (req.method === "POST" && url.pathname.startsWith("/api/authorizations/") && url.pathname.endsWith("/revoke")) {
     const user = requireApiRole(req, res, ["citizen", "commission"], "/api/authorizations/:id/revoke");
     if (!user) return;
@@ -34724,18 +37810,203 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/record-care-workspace") {
+    const user = requireApiRole(req, res, ["citizen", "commission"], "/api/record-care-workspace");
+    if (!user) return;
+    const residentId = String(url.searchParams.get("residentId") || "").trim();
+    const data = readDatabase();
+    if (!residentId || !canAccessResident(user, residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "查询居民照护工作台", target: residentId || "missing", result: "拒绝", detail: "超出居民授权范围" });
+      sendJson(res, residentId ? 403 : 400, { error: residentId ? "Forbidden" : "Bad Request", message: residentId ? "无权查询该居民照护工作台" : "residentId 不能为空" });
+      return;
+    }
+    appendDataAccessLog(data, user, residentId, "居民照护工作台", "查询纠错、资料包和处置进度");
+    writeDatabase(normalizeState(data));
+    sendJson(res, 200, citizenCareWorkspace(data, residentId));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/record-corrections") {
+    const user = requireApiRole(req, res, ["citizen"], "/api/record-corrections");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      if (!user.residentId || (payload.residentId && payload.residentId !== user.residentId)) {
+        throw new Error("居民只能为本人提交纠错申请");
+      }
+      const idempotencyKey = citizenCareIdempotencyKey(req, payload);
+      const requestDigest = citizenCareRequestDigest(payload);
+      const replay = citizenCareReplay(data.recordCorrections, idempotencyKey, requestDigest);
+      if (replay.existing) {
+        sendJson(res, 200, citizenCareReceipt(replay.existing));
+        return;
+      }
+      const target = data.personalRecords.find((item) => item.id === String(payload.recordId || "") && item.residentId === user.residentId);
+      if (!target) throw new Error("未找到本人可纠错的健康记录");
+      const at = new Date();
+      const built = CitizenRecordsV2.buildCorrectionRequest({
+        ...payload,
+        residentId: user.residentId,
+        submittedAt: at
+      });
+      const clientId = String(payload.id || "").trim().slice(0, 200);
+      const id = /^correction-[a-z0-9._:-]+$/i.test(clientId) ? clientId : `correction-${randomUUID()}`;
+      if (data.recordCorrections.some((item) => item.id === id)) throw new Error("纠错申请标识已存在");
+      const item = {
+        ...built,
+        id,
+        receiptId: `care-receipt-${randomUUID()}`,
+        auditRef: `care-audit-${randomUUID()}`,
+        acceptedAt: at.toISOString(),
+        updatedAt: at.toISOString(),
+        syncStatus: "accepted",
+        idempotencyKeyHash: replay.keyHash,
+        requestDigest,
+        actorId: user.username || user.id || user.residentId
+      };
+      data.recordCorrections.push(item);
+      appendDataAccessLog(data, user, user.residentId, "健康记录纠错", `提交 ${target.id} 的纠错申请`);
+      data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+        id: randomUUID(), at: at.toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role,
+        action: "提交居民健康记录纠错", target: id, result: "允许", detail: item.auditRef
+      });
+      writeDatabase(normalizeState(data));
+      sendJson(res, 201, citizenCareReceipt(item));
+    } catch (error) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "提交居民健康记录纠错", target: String(payload.recordId || user.residentId || ""), result: "拒绝", detail: error.message });
+      sendJson(res, /本人|超出/.test(error.message) ? 403 : 400, { error: /本人|超出/.test(error.message) ? "Forbidden" : "Bad Request", message: error.message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/record-share-packages") {
+    const user = requireApiRole(req, res, ["citizen"], "/api/record-share-packages");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      if (!user.residentId || (payload.residentId && payload.residentId !== user.residentId)) {
+        throw new Error("居民只能为本人创建健康资料包");
+      }
+      const idempotencyKey = citizenCareIdempotencyKey(req, payload);
+      const requestDigest = citizenCareRequestDigest(payload);
+      const replay = citizenCareReplay(data.recordSharePackages, idempotencyKey, requestDigest);
+      if (replay.existing) {
+        sendJson(res, 200, citizenCareReceipt(replay.existing));
+        return;
+      }
+      const at = new Date();
+      const built = CitizenRecordsV2.buildSharePackage({
+        ...payload,
+        residentId: user.residentId,
+        createdAt: at
+      });
+      const clientId = String(payload.id || "").trim().slice(0, 200);
+      const id = /^share-[a-z0-9._:-]+$/i.test(clientId) ? clientId : `share-${randomUUID()}`;
+      if (data.recordSharePackages.some((item) => item.id === id)) throw new Error("健康资料包标识已存在");
+      const item = {
+        ...built,
+        id,
+        receiptId: `care-receipt-${randomUUID()}`,
+        auditRef: `care-audit-${randomUUID()}`,
+        acceptedAt: at.toISOString(),
+        updatedAt: at.toISOString(),
+        syncStatus: "accepted",
+        idempotencyKeyHash: replay.keyHash,
+        requestDigest,
+        actorId: user.username || user.id || user.residentId
+      };
+      data.recordSharePackages.push(item);
+      appendDataAccessLog(data, user, user.residentId, "一次性健康资料包", `创建 ${item.accessRef}`);
+      data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+        id: randomUUID(), at: at.toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role,
+        action: "创建居民健康资料包", target: id, result: "允许", detail: item.auditRef
+      });
+      writeDatabase(normalizeState(data));
+      sendJson(res, 201, citizenCareReceipt(item));
+    } catch (error) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "创建居民健康资料包", target: user.residentId || "", result: "拒绝", detail: error.message });
+      sendJson(res, /本人|超出/.test(error.message) ? 403 : 400, { error: /本人|超出/.test(error.message) ? "Forbidden" : "Bad Request", message: error.message });
+    }
+    return;
+  }
+
+  const recordShareRevokeMatch = url.pathname.match(/^\/api\/record-share-packages\/([^/]+)\/revoke$/);
+  if (req.method === "POST" && recordShareRevokeMatch) {
+    const user = requireApiRole(req, res, ["citizen"], "/api/record-share-packages/:id/revoke");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const id = decodeURIComponent(recordShareRevokeMatch[1]);
+    try {
+      if (!user.residentId || (payload.residentId && payload.residentId !== user.residentId)) {
+        throw new Error("居民只能撤销本人的健康资料包");
+      }
+      const idempotencyKey = citizenCareIdempotencyKey(req, payload);
+      const requestDigest = citizenCareRequestDigest(payload);
+      const keyHash = createHash("sha256").update(idempotencyKey).digest("hex");
+      const item = data.recordSharePackages.find((candidate) => candidate.id === id && candidate.residentId === user.residentId);
+      if (!item) throw new Error("未找到本人可撤销的健康资料包");
+      if (item.revocationIdempotencyKeyHash === keyHash) {
+        if (item.revocationRequestDigest !== requestDigest) throw new Error("幂等键已用于不同的撤销操作");
+        sendJson(res, 200, citizenCareReceipt(item));
+        return;
+      }
+      if (item.revocationIdempotencyKeyHash) throw new Error("健康资料包已经撤销");
+      const at = new Date();
+      Object.assign(item, CitizenRecordsV2.revokeSharePackage(item, at), {
+        receiptId: `care-receipt-${randomUUID()}`,
+        auditRef: `care-audit-${randomUUID()}`,
+        acceptedAt: at.toISOString(),
+        updatedAt: at.toISOString(),
+        syncStatus: "accepted",
+        revocationIdempotencyKeyHash: keyHash,
+        revocationRequestDigest: requestDigest,
+        actorId: user.username || user.id || user.residentId
+      });
+      appendDataAccessLog(data, user, user.residentId, "一次性健康资料包", `撤销 ${item.accessRef}`);
+      data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+        id: randomUUID(), at: at.toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role,
+        action: "撤销居民健康资料包", target: id, result: "允许", detail: item.auditRef
+      });
+      writeDatabase(normalizeState(data));
+      sendJson(res, 200, citizenCareReceipt(item));
+    } catch (error) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "撤销居民健康资料包", target: id, result: "拒绝", detail: error.message });
+      sendJson(res, /本人|超出/.test(error.message) ? 403 : 400, { error: /本人|超出/.test(error.message) ? "Forbidden" : "Bad Request", message: error.message });
+    }
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/personal-records") {
     const user = requireApiRole(req, res, ["citizen", "institution", "insurance", "county", "commission"], "/api/personal-records");
     if (!user) return;
     const data = readDatabase();
     const residentId = url.searchParams.get("residentId");
     const category = url.searchParams.get("category");
-    if (!canAccessResident(user, residentId, data)) {
+    const citizenDecision = user.role === "citizen"
+      ? CitizenRecordsPolicy.evaluateCitizenRecordAccess(data, user, {
+          residentId,
+          category: category || "health-record-summary"
+        }, {
+          scope: category ? CitizenRecordsPolicy.scopeForRecordCategory(category) : "health-record-summary",
+          purpose: "居民健康记录查询",
+          now: new Date()
+        })
+      : null;
+    if (user.role === "citizen" ? !citizenDecision.allowed : !canAccessResident(user, residentId, data)) {
       appendSecurityEvent({ actor: user.name, role: user.role, action: "访问个人健康信息", target: residentId || "all", result: "拒绝", detail: "超出居民授权范围" });
       sendJson(res, 403, { error: "Forbidden", message: "无权访问该居民健康信息" });
       return;
     }
-    const records = data.personalRecords.filter((item) => (!residentId || item.residentId === residentId) && (!category || item.category === category));
+    let records = data.personalRecords.filter((item) => (!residentId || item.residentId === residentId) && (!category || item.category === category));
+    if (user.role === "citizen") {
+      records = records
+        .filter((item) => CitizenRecordsPolicy.canCitizenReadRecord(data, user, item, { purpose: "居民健康记录查询", now: new Date() }))
+        .map((item) => CitizenRecordsPolicy.projectCitizenRecordResponse(item, residentId))
+        .filter(Boolean);
+    }
     if (residentId) {
       appendDataAccessLog(data, user, residentId, "个人健康信息库", `查询 ${category || "全部"} 记录`);
       writeDatabase(data);
@@ -34749,7 +38020,44 @@ async function handleApi(req, res) {
     if (!user) return;
     const data = readDatabase();
     const payload = await collectJson(req);
-    const recordData = normalizePersonalRecord(payload);
+    let recordData;
+    let replay = null;
+    let requestDigest = "";
+    try {
+      if (user.role === "citizen") {
+        const idempotencyKey = citizenCareIdempotencyKey(req, payload);
+        requestDigest = citizenCareRequestDigest(payload);
+        replay = citizenCareReplay(data.personalRecords, idempotencyKey, requestDigest);
+        if (replay.existing) {
+          sendJson(res, 200, redactSensitiveResponse(citizenCareReceipt(replay.existing), user));
+          return;
+        }
+        if (payload.category === "authorizations") {
+          recordData = normalizePersonalRecord(CitizenRecordsV1.buildAuthorizationRecord({
+            residentId: user.residentId,
+            granteeName: payload.name,
+            granteeId: payload.meta?.granteeId,
+            granteeType: payload.meta?.granteeType,
+            previousAuthorizationId: payload.meta?.previousAuthorizationId,
+            purpose: payload.meta?.purpose,
+            scopes: payload.meta?.scopes,
+            expiresAt: payload.meta?.expiresAt || payload.date,
+            consentVersion: payload.meta?.consentVersion,
+            source: payload.source,
+            grantedAt: new Date().toISOString()
+          }));
+        } else {
+          recordData = normalizePersonalRecord(CitizenRecordsPolicy.normalizeCitizenSupplement(payload, user));
+        }
+      } else {
+        recordData = normalizePersonalRecord(payload);
+      }
+    } catch (error) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "新增个人健康信息", target: String(payload.residentId || user.residentId || ""), result: "拒绝", detail: error.message });
+      const forbidden = /本人|self record|超出/i.test(error.message);
+      sendJson(res, forbidden ? 403 : 400, { error: forbidden ? "Forbidden" : "Bad Request", message: error.message });
+      return;
+    }
     if (!canAccessResident(user, recordData.residentId, data)) {
       appendSecurityEvent({ actor: user.name, role: user.role, action: "create personal health record", target: recordData.residentId, result: "拒绝", detail: "超出居民授权范围" });
       sendJson(res, 403, { error: "Forbidden", message: "无权新增该居民健康信息" });
@@ -34760,6 +38068,14 @@ async function handleApi(req, res) {
     recordData.personIndex = recordData.personIndex || personIndexForResident(residentMap, recordData.residentId);
     recordData.createdBy = user.username || user.role;
     recordData.createdByName = user.name;
+    if (user.role === "citizen") {
+      recordData.receiptId = `record-receipt-${randomUUID()}`;
+      recordData.auditRef = `record-audit-${randomUUID()}`;
+      recordData.acceptedAt = new Date().toISOString();
+      recordData.syncStatus = "accepted";
+      recordData.idempotencyKeyHash = replay.keyHash;
+      recordData.requestDigest = requestDigest;
+    }
     data.personalRecords.push(recordData);
     if (Object.hasOwn(payload, "expectedVersion")) {
       data.storageMeta = {
@@ -34787,6 +38103,11 @@ async function handleApi(req, res) {
     if (!canAccessResident(user, data.personalRecords[index].residentId, data)) {
       appendSecurityEvent({ actor: user.name, role: user.role, action: "更新个人健康信息", target: data.personalRecords[index].residentId, result: "拒绝", detail: "超出居民授权范围" });
       sendJson(res, 403, { error: "Forbidden", message: "无权更新该居民健康信息" });
+      return;
+    }
+    if (user.role === "citizen" && data.personalRecords[index].meta?.authority !== "resident-upload") {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "更新个人健康信息", target: data.personalRecords[index].residentId, result: "拒绝", detail: "权威来源记录不得由居民直接覆盖，请提交纠错申请" });
+      sendJson(res, 403, { error: "Forbidden", message: "权威来源记录不得由居民直接覆盖，请提交纠错申请" });
       return;
     }
     const safePatch = Object.fromEntries(Object.entries(patch).filter(([key]) => !PERSONAL_RECORD_PROTECTED_FIELDS.has(key)));
@@ -34941,6 +38262,9 @@ if (require.main === module) {
 
 module.exports = {
   assertProductionRuntimeSecurity,
+  careServiceReadinessPublicSummary,
+  configurePublicHealthEndpointProbeRuntime,
+  createCareServiceRuntimeDependencies,
   cleanupRuntimeSessions,
   ensureDatabase,
   openSqliteDatabase,

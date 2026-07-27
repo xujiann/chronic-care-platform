@@ -4,6 +4,10 @@
 
 当前仓库已经完成 P0/P1/P2 的本地演示级与 API 基础闭环；剩余生产化事项主要依赖真实身份源、医疗机构接口、医保核心系统、公安民政共享、安全测评和现场部署资源。
 
+居民健康档案公共接入可通过 `npm.cmd run citizen-records:check`、`npm.cmd run citizen-records:test` 和 `npm.cmd run citizen-records:readiness` 验证。T00 已接入授权策略、照护工作区路由和当前 PWA 缓存；真实身份与关系目录、HIS/EMR/LIS/PACS、对象存储、SIEM、法务同意版本、上线签字及公网 TLS 未提供前，`productionReady` 保持 `false`。
+
+挂号、双向转诊与家庭医生闭环可通过 `npm.cmd run registration-referral:check`、`npm.cmd run registration-referral:test` 和 `npm.cmd run registration-referral:acceptance` 验证。公共 API 使用服务端时间、`Idempotency-Key`、演员/机构范围及既有聚合 `expectedVersion` 执行 40 类命令，并持久化哈希链审计；真实 HIS、支付、医保、转诊和消息回调以及现场责任、SLA、切换和回滚签字未齐前，生产上线继续阻断。
+
 ## 当前能力总览
 
 | 范围 | 已完成能力 |
@@ -67,6 +71,7 @@ http://localhost:5173/login.html
 | `institution.html` | 医疗机构端：授权档案、转诊、固定取药、证照、多点执业 |
 | `insurance.html` | 医保局/医保中心/区市县医保局：审核、监管、凭证、取药 |
 | `citizen.html` | 居民端个人健康信息库、家庭成员、授权共享、适老化服务 |
+| `t10-specialty-cutover.html` | T10 急救、临床用血、区域影像云和健康体检统一切换总控；区分代码就绪与现场生产证据 |
 | `physical-examination.html` | 体检中心/医院结果接入、专项体检隔离分流、健康时光机、报告翻译、异常行动、个性计划、辐射管家、质量啄木鸟和城市雷达 |
 | `physical-examination-highlights.js` | 居民端与管理端共享的体检创新亮点计算及可审计动作引擎 |
 | `docs/体检系统信息化规范基线-2026-07-15.md` | 体检业务、共享文档、数据元/值域、签名、隐私、安全和留存规范目录 |
@@ -126,6 +131,7 @@ SQLite 结构化镜像已覆盖居民、账户、主索引、个人健康档案�
 | `GET /api/health` | 依赖就绪检查，返回服务、存储和会话存储状态；中央会话不可用时返回 503 |
 | `GET /api/metrics` | 管理端运行指标，返回请求数、状态码、慢请求、任务堆积、死信、质量问题；运营工作台会在服务模式下展示部分指标 |
 | `GET /api/system/readiness` | 管理端系统就绪报告，汇总 P2 集合、接口准备度、审计链、运行负载和现场外部依赖边界 |
+| `GET /api/t10-specialty/cutover-pack` | 卫健委只读查询四条专科切换轨道、现场阻断、首个灰度增量、演练计划、Go/No-Go 决策矩阵、四眼签收和患者安全降级控制；`/api/t10-specialty-cutover` 保留为兼容路径 |
 | `GET /api/physical-exams` | 按角色授权和居民主索引查询全部历史体检报告，返回年度、来源机构、异常项和健康建议 |
 | `POST /api/physical-exams/import` | 体检中心或医院单份/批量接入；一般成人体检同步健康档案，职业/专项体检进入受限分流队列，二者均幂等去重 |
 | `POST /api/physical-exams/abnormal-cases/:id/actions` | 对体检异常结果执行通知居民、复查安排、专科分派、关闭或重开，并生成消息与审计证据 |
@@ -215,6 +221,8 @@ npm.cmd run env:check
 npm.cmd run release:report
 npm.cmd run release:report:full
 npm.cmd run release:manifest
+npm.cmd run integration:control
+npm.cmd run integration:control:gate
 npm.cmd run launch:smoke
 npm.cmd run priority-apps:templates
 npm.cmd run maternal-child:readiness
@@ -245,6 +253,8 @@ npm.cmd run hybrid:deployment-readiness
 `audit:retention` 会生成 `release/audit-retention-report.json` 与 `release/audit-retention-report.md`，离线验证安全事件和数据访问日志哈希链，记录导出摘要、保全目标和安全验收台账；默认 `release:report` 在演示环境使用发布包内审计报告作为本地归档目标，生产切换仍必须通过 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT` 绑定真实保全路径。
 
 `integration:readiness` 会生成 `release/integration-readiness-report.json` 与 `release/integration-readiness-report.md`，检查 P0 接口台账、HIS/EMR/LIS/PACS/医保/证照/统计契约、幂等键、签名和重试策略，并把身份、主索引、安全审计等 P0 覆盖关系纳入发布取证。
+
+`integration:control` 会只读检查 T01-T11 的登记 worktree、统一基线、分支提交、未提交文件和对 `server.js`、`portal.css`、`package.json`、`README.md`、`scripts/release-report.js` 的公共文件占用，并读取 `integration/intake-decisions.json` 中与候选 commit 精确绑定的 T00 审查决定，生成 `release/integration-control-ledger.json` 与 `release/integration-control-ledger.md`。分支新增提交后，旧决定自动转为 `review-stale`，必须重新完成代码审查和定向回归；只有结构检查、commit 绑定接收决定及声明依赖全部通过才进入 `merge-ready`。决定中的 `acceptedCandidateHeads` 只记录已经接收的历史候选，使后续候选被阻塞时仍可验证既有发布回执，但不会把历史接收状态继承给当前 HEAD。`integration/publication-receipts.json` 另行保存经过实际核验的 main/Pages 静态发布回执，包括来源候选、发布提交、CI/Pages run、HTTP 200 资源及内容标记；台账会校验这些回执的提交格式、来源、资源路径、状态和标记完整性，但明确保持 `productionReady=false`，历史回执不代替实时网络探测或生产验收。默认模式用于持续生成台账；`integration:control:gate` 在任一专业线缺失、基线漂移、工作树未清理、触碰 T00 公共文件、审查未接收或专业线尚未全部集成时返回失败。
 
 `interface:mapping` 会生成 `release/interface-mapping-report.json` 与 `release/interface-mapping-report.md`，逐项归档 HIS/EMR/LIS/PACS/医保/电子证照/统计契约字段到平台集合和字段的映射、必填字段覆盖、幂等字段落点、签名与重试证据，作为现场接口字段差异确认和联调整改的前置材料。
 
@@ -469,6 +479,12 @@ The handoff document is `docs/互联网护理服务模块说明.md`; it covers r
 
 `docs/production-go-live-requirements.md` is the platform-level real production go-live requirements baseline. Use it with `release/production-cutover-checklist.md`, `release/site-readiness-pack.md`, `release/launch-smoke-report.md`, `release/release-report.md`, and `release/release-artifact-manifest.md` before deciding that a deployment is ready for real users.
 
+T10 specialty cutover control is available at `t10-specialty-cutover.html`, through the commission-scoped `GET /api/t10-specialty/cutover-pack` endpoint, and as `npm.cmd run t10:specialty-cutover`. The legacy `GET /api/t10-specialty-cutover` path remains available for older previews. Its generated `release/t10-specialty-cutover-pack.json` and `.md` artifacts keep all four tracks `productionReady=false` until real external receipts, independent site verification, four-eyes signoff, duty arrangements, Go/No-Go hard-stop review and downgrade evidence are accepted.
+
+The independently deployable clinical-blood, emergency-life-chain and imaging-cloud gates are registered through `t10:clinical-blood:readiness`, `t10:clinical-blood:smoke`, `t10:emergency-module:smoke`, `imaging-cloud:readiness` and `imaging-cloud:test`. Commission-only readiness summaries are exposed at `/api/t10-specialty/modules/clinical-blood/readiness` and `/api/t10-specialty/modules/emergency-life-chain/readiness`; the imaging workbench uses the nine role-guarded `/api/imaging-cloud/production/*` contracts. Module evidence can become complete without opening the platform: every public response keeps `productionReady=false` until trusted site identity/evidence, the T00 launch approval, duty/SIEM, disaster-recovery and rollback evidence are independently accepted.
+
+T11 production security evidence is governed by `docs/production-security-release-execution-pack.md` and five placeholder-safe templates under `docs/evidence-templates/production-security-release/`. Run `npm.cmd run production-release:evidence:check`, `npm.cmd run production-release:evidence:test` and `npm.cmd run production-release:evidence:readiness`; the last command intentionally exits No-Go while the server-configured controlled evidence directory is incomplete. `GET /api/production-release/evidence-readiness` is commission-only and returns only document/check counts, gate IDs, a digest and safe failed-check IDs. Query/body values cannot select an evidence directory or turn on production, and the response omits paths, signer accounts, attachment references and evidence bodies. Even a structurally valid evidence package does not by itself authorize platform production cutover.
+
 `docs/on-site-launch-materials.md` is the field-owned material checklist for real go-live. It names the production environment, secrets, identity, SMS, HIS/EMR/LIS/PACS, nursing/escort/registration, insurance/certificate, database, security, monitoring, disaster recovery, resident mobile acceptance, gray release, and signoff materials that must be attached before opening to real residents.
 ## Drug Consumable Supervision Evidence
 
@@ -477,6 +493,58 @@ The handoff document is `docs/互联网护理服务模块说明.md`; it covers r
 Implemented drug-consumable capabilities include role-scoped supervision access, rational-medication and prescription-review rows, fixed-pickup and high-value consumable clues, insurance settlement coordination, institution remediation actions, traceability policy sources, traceability evidence requirements and submission, per-row evidence coverage, audit logging, runnable insurance/institution/commission panels, `drug-consumable-about.html`, and release artifacts through `drug-consumable:readiness`, `deploy:check`, `release:report`, and `release:manifest`.
 
 Before production launch, bind real scanner/HIS/pharmacy fields to `traceabilityEvidenceRequirements`, ingest real insurance-code/commodity-code/trace-code mapping versions, connect insurance settlement callbacks, attach high-value consumable catalog and charge-item cross-checks, configure production identity/secrets/audit-retention storage, and archive signed site evidence for interface joint tests, monitoring, and disaster-recovery rehearsal.
+
+## Unified Quality and Operations Governance
+
+`quality-operations-governance-adapter.js` adapts the existing `qualityRectificationOrders`, `resourceDispatchRequests`, and `drugConsumableSupervisions` collections into one canonical governance record without copying resident identifiers. The public read surface is `GET /api/quality-operations-governance/catalog`, `GET /api/quality-operations-governance/items`, and `GET /api/quality-operations-governance/items/:id/audit`; role and institution scope are applied before records or audit events are returned.
+
+Writes use `POST /api/quality-operations-governance/items/:id/actions`. The server requires an `Idempotency-Key` header and a non-negative `expectedVersion`, derives actor identity and institution scope only from the authenticated session, and assigns server time. Successful and rejected attempts are persisted in the domain audit ledger and projected into the platform process and sealed security audit collections; idempotent replay does not duplicate those events.
+
+Run `npm.cmd run quality-operations:governance-readiness` to generate `release/quality-operations-governance-readiness-report.json` and `release/quality-operations-governance-readiness-report.md`. Local routing readiness does not mean production readiness: `productionReady` remains `false` until trusted identity and institution directories, HIS/EMR/LIS/PACS, bed/roster/equipment/transfer sources, scanner and insurance callbacks, production database, SIEM, alert duty coverage, and disaster-recovery evidence are connected and accepted.
+
+## Public Health External Coordination and Key Rotation
+
+T00 registers the eight-lane coordination runtime and external outbox through `GET /api/public-health/coordination-runtime`, versioned coordination actions, external enqueue, due-worker claim and attempt, signed public callback, governed dead-letter recovery, operations-board, and key-rotation routes under `/api/public-health/external/`. Every write uses the server receive time; client-supplied validation time is ignored.
+
+`public-health-external-key-provider.js` loads separate request and receipt keyrings by lane plus an independent contract-governance keyring through an injectable managed-key-service contract. Keyring values are non-enumerable and are never merged into shared state, logs, responses, or release reports. Non-production static secrets remain compatibility-only, while production fails closed without keyring references and a managed loader. Claim, attempt, recovery, audit reconciliation, and operations-board verification receive the complete request keyring so records signed by a grace key remain verifiable; external runtime calls receive only the server-built `credentials.contractGovernance` snapshot.
+
+`public-health-external-worker.js` is the transport-injected worker boundary. It obtains lane credentials at execution time, persists the signed claim lease before calling transport, assigns server time to the attempt, and persists the signed result afterward. It does not contain a real network connector or trusted credential implementation; those remain production-owned dependencies.
+
+`PUBLIC_HEALTH_EXTERNAL_RESILIENCE_POLICIES` is the server-only JSON configuration for all eight lanes. Production startup paths fail closed when any lane is missing or when `failureThreshold`, `openSeconds`, `halfOpenMaxProbes`, `rateLimitPerMinute`, or `maxPending` is outside the governed range. The policy map is non-enumerable in the credential context; enqueue, claim, and attempt payloads cannot replace it.
+
+The due endpoint is candidate scanning only. A worker must call the claim controller with the current dispatch version; the server reads the current lane-control version, and the claimed attempt returns that version for the next CAS. The shared writer checks `dispatch.outboxVersion` and `laneControl.version` together and persists `publicHealthExternalDispatches`, `publicHealthExternalDispatchAudit`, `publicHealthExternalLaneControls`, and `publicHealthExternalLaneControlAudit` in one SQLite transaction. Operations-board output includes the P0 lane-control integrity risks and P1 open/half-open circuit alerts.
+
+Contract governance is read through `GET /api/public-health/external/contracts/governance`. Only an authenticated health-administration governance actor can call `POST /api/public-health/external/contracts/attestations`; the request requires `Idempotency-Key` and `expectedVersion: 0`. The server ignores client-reported approval status, identities, digests and contract bindings, then reconstructs the attestation from `PUBLIC_HEALTH_EXTERNAL_CONTRACT_RELEASE_EVIDENCE`, verifies the deployed T08/T00 artifact binding, field dictionary, bidirectional samples, joint test and rollback evidence, assigns server time and calls `signPublicHealthExternalContractAttestation()`. Signed credentials are unique on `laneId + fromContract`, so one lane can append v1→v2→v3 transitions while the same source version cannot acquire two successors. The durable writer locks and verifies the complete lane chain in the same transaction; branch conflict, missing predecessor, approval-order inversion and overlapping compatibility windows fail closed as P0 `contract-transition-conflict`, `contract-transition-disconnected`, `contract-transition-approval-order-invalid` and `contract-transition-window-overlap`. Accepted and rejected attempts are persisted without raw approver identity or key material.
+
+After each `effectiveAt`, new enqueue resolves only `currentContract` from the server snapshot and emits the matching signed request/receipt Schema; once v3 is active, v1 is retired and v2 is deprecated. Compatibility-period older work can still be claimed, while each transition sunset blocks its own old-version track. Existing dead-letter recovery creates exactly one later chain-version successor and seals the predecessor, successor, two audit relationships and coordination retry in the same durable state update. The operations board embeds one `contractCutover` track per `fromContract`, reporting P1 compatibility backlog, P0 post-sunset backlog and P0 stale/missing successors while excluding delivered history and valid recovered predecessors. Historical verification keys must remain in the production keyring through their signed sunset reconstruction horizon; unknown or revoked keys fail closed and are never silently replaced.
+
+Only commission users can register a trusted endpoint receipt through `POST /api/public-health/external/endpoints/receipts` or read the redacted result from `GET /api/public-health/external/endpoints/summary`. Expected endpoints, current contracts, receive time and verification keyrings come only from server configuration; request bodies and query strings cannot override them. Accepted signed receipts are stored with durable `receiptId` and `nonce` uniqueness in the same SQLite transaction boundary. The summary exposes digests and connectivity state only—not URLs, resolved IP addresses, key identifiers, key material or receipt evidence—and the raw receipt collection is excluded from `/api/state`.
+
+Commission users can trigger a controlled active check at `POST /api/public-health/external/endpoints/probes` with only `laneId`; body and query parameters cannot provide an endpoint, contract, policy, time, keyring, TLS option or transport setting. The server resolves the active contract, independent endpoint-probe keyring, `PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_POLICIES`, certificate pins, mTLS requirement and managed TLS reference (`*_ENDPOINT_PROBE_TLS_REF`). A bounded worker enforces global/lane concurrency and per-lane minimum intervals, rejects mixed public/private DNS answers, pins HTTPS lookup and peer addresses, disables redirects, requires 2xx and governed latency, TLS 1.2/1.3, certificate authorization, configured pins and mTLS, then self-verifies the signed receipt before reusing the durable `receiptId`/`nonce` insert. Started, succeeded and rejected audit rows contain only stable codes and actor scope; URLs, IPs, certificate material, keys and raw network errors never enter the response or audit.
+
+Commission users can trigger one server-controlled eight-lane campaign at `POST /api/public-health/external/endpoints/campaigns`; the body and query must both be empty. The worker resolves every endpoint, active contract, policy, threshold, TLS credential, time and keyring from server configuration, runs all eight probes in one bounded 300-second window, then signs and self-verifies the campaign. `PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_CAMPAIGN_KEYRING_REF` must resolve a global managed keyring whose purpose is `public-health-endpoint-probe-campaign`; the provider rejects reuse of request, receipt or single-probe signing material. Campaign ID, campaign nonce, cross-campaign receipt ID and receipt nonce uniqueness are checked in the same SQLite transaction as the attestation, eight receipt references and success audit. `GET /api/public-health/external/endpoints/campaigns/summary` returns only a commission-scoped redacted continuity view. Three fresh, non-overlapping campaigns with no interval above 900 seconds are required for `continuousConnectivityReady=true`; that flag remains separate from `endpointConnectivityReady` and never changes `productionReady=false`.
+
+The enforced rotation sequence is new active key, old grace key, cross-key audit smoke, cross-key callback smoke, then old-key expiry or revocation. An emergency revocation creates a P0 security-quarantine disposition; automatic resign and automatic recovery remain disabled. Run `npm.cmd run public-health:resilience-test` for the focused contract/resilience regression and `npm.cmd run public-health:final-readiness` for the aggregate 62-check report. `endpointConnectivityReady` and `continuousConnectivityReady` are independent of production authorization, and all contract, cutover and endpoint views keep `productionReady=false`. Production remains blocked until real identity and institution directories, HIS/EMR/LIS/PACS, bed/roster/equipment/transfer sources, scanner and insurance callbacks, a production database, SIEM, alert duty coverage, P0/P1 closure, trusted site evidence, production handoff, launch approval and disaster-recovery evidence are connected and accepted.
+
+## Nursing and Escort Transactional Runtime
+
+The public nursing and escort create and transition APIs now call `care-service-platform-adapter.js`; they no longer persist privileged order fields through the legacy server normalizers. Every write requires an `Idempotency-Key`, derives actor and organization scope from the authenticated session, assigns server time and commits the order plus its domain outbox event through the existing SQLite collection-version CAS.
+
+Notification receipts use the signed, order/message/channel-bound route `POST /api/care-services/:domain/orders/:id/notification-receipts/:messageId`. Operations users can read `/api/care-services/outbox/health` and `/api/care-services/outbox/dead-letters`; controlled replay requires the exact confirmation phrase and an evidence reference. The independent worker loads `care-service-production-runtime.js` through `CARE_SERVICE_RUNTIME_MODULE` and sends HMAC-bound HTTPS envelopes. Endpoint, transport or secret failures are retried and dead-lettered rather than reported as successful.
+
+Production cutover approval is accepted only from the exact file configured by `CARE_CUTOVER_EVIDENCE_FILE` when its bytes match `CARE_CUTOVER_EVIDENCE_SHA256`. The manifest must contain current, production- and policy-bound, independently signed approvals for business, interface, security, disaster recovery and on-call scopes; standalone `CARE_CUTOVER_*_SIGNOFF=signed` flags are ignored. Commission users can read the redacted gate at `GET /api/care-services/readiness`; it exposes only the formal state, blocker counts, per-scope pass/fail and safe validation error codes.
+
+Production dependency health is accepted only from the exact `CARE_DEPENDENCY_EVIDENCE_FILE` bytes pinned by `CARE_DEPENDENCY_EVIDENCE_SHA256`. Its 13 storage, identity, messaging, hospital, object-storage, financial, audit, worker and care-delivery probes must be fresh, healthy, independently receipted and bound to the currently configured target digest. `npm.cmd run care-service:dependency-targets` prints digest-only bindings without URLs or credentials; it does not perform or replace the probes. Example, demo, localhost and loopback targets remain blocked even when a probe manifest claims success. The commission readiness response exposes only per-dependency pass/fail and allowlisted error codes.
+
+Run `npm.cmd run care-service:test` and `npm.cmd run care-service:readiness`. Platform integration does not make the module production-ready: real identity/organization directories, HIS and appointment interfaces, message/payment/insurance/signature callbacks, production transactional storage, fresh dependency receipts, SIEM/alert duty, disaster recovery evidence and all five evidence-bound site approvals remain hard blockers.
+
+## Insurance Payment and Disease Payment Production Boundary
+
+The insurance-payment public boundary exposes the 23 reviewed refund, formal grouping, special-case appeal and annual-clearance routes recorded by `npm.cmd run insurance-payment:acceptance`. Actors and institution scope come from the authenticated server session. Refund requests retain their trusted organization binding, dual review ignores client-supplied roles, and outbound dispatches use the signed financial adapter. Signed financial callbacks synchronize payment refunds and insurance settlements in the same durable state update.
+
+Formal grouping dispatch and failure commands require a server-system HMAC over the action, path, resource and payload. Grouper receipts are accepted only through the configured callback source, nonce/timestamp window and signature verification. Expert reselection and appeal actions apply the responsibility matrix; finance-only refund reconciliation/closure and annual-clearance posting/locking remain fail-closed until a trusted finance identity source is connected.
+
+Run `npm.cmd run insurance-payment:check`, `npm.cmd run insurance-payment:test`, `npm.cmd run insurance-payment:acceptance` and `npm.cmd run insurance-payment:evidence`. The generated acceptance report and evidence packet verify the local contract and public wiring, but `productionReady` remains false until the listed live identity, institution, insurance-core, financial, database, SIEM, duty, disaster-recovery and signed site-acceptance evidence is independently supplied.
 
 ## Health Dashboard Aggregate Entry
 

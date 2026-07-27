@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>T10专项上线割接总控 · 健康城市协同系统</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+    <script>window.HealthCityAuth.requireRole(["commission", "institution", "county"])</script>
+    <style>
+      .cutover-hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.25fr) minmax(300px, 0.75fr);
+        gap: 16px;
+        align-items: stretch;
+      }
+      .cutover-kpis,
+      .track-grid,
+      .control-grid {
+        display: grid;
+        gap: 12px;
+      }
+      .cutover-kpis {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+      .track-grid {
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      }
+      .control-grid {
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      }
+      .cutover-card {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px;
+        background: #fff;
+      }
+      .cutover-card h3,
+      .cutover-card h4 {
+        margin-top: 0;
+      }
+      .kpi-value {
+        display: block;
+        font-size: 26px;
+        font-weight: 800;
+        color: var(--primary);
+      }
+      .stage-list,
+      .blocker-list,
+      .evidence-list {
+        margin: 8px 0 0;
+        padding-left: 18px;
+      }
+      .stage-list li {
+        margin: 4px 0;
+      }
+      .stage-active {
+        color: #b45309;
+        font-weight: 800;
+      }
+      .badge-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .badge {
+        display: inline-flex;
+        border-radius: 999px;
+        padding: 4px 10px;
+        background: #eef2ff;
+        color: #3730a3;
+        font-size: 12px;
+        font-weight: 800;
+      }
+      .badge.warn {
+        background: #fff7ed;
+        color: #c2410c;
+      }
+      .badge.ok {
+        background: #ecfdf5;
+        color: #047857;
+      }
+      .cutover-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .cutover-table th,
+      .cutover-table td {
+        border-bottom: 1px solid var(--line);
+        padding: 10px;
+        text-align: left;
+        vertical-align: top;
+      }
+      .cutover-table th {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      @media (max-width: 860px) {
+        .cutover-hero,
+        .cutover-kpis {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="portal-header">
+      <div>
+        <p class="eyebrow">T10专项生产化</p>
+        <h1>急救、用血、影像与体检上线割接总控</h1>
+        <p class="lead">统一查看四个专项的代码就绪、现场阻断、责任部门、跨专项控制和首个灰度验收增量。</p>
+      </div>
+      <nav class="top-nav">
+        <a href="./emergency.html">急救生命链</a>
+        <a href="./blood.html">临床用血</a>
+        <a href="./imaging-cloud.html">影像云</a>
+        <a href="./physical-examination.html">健康体检</a>
+      </nav>
+    </header>
+
+    <main class="portal-main">
+      <section class="cutover-hero">
+        <article class="panel">
+          <div class="section-heading">
+            <p class="eyebrow">Go/No-Go</p>
+            <h2>当前上线结论</h2>
+          </div>
+          <div class="cutover-kpis" id="cutover-kpis"></div>
+          <p id="cutover-state-note" class="muted"></p>
+        </article>
+        <article class="panel">
+          <div class="section-heading">
+            <p class="eyebrow">First increment</p>
+            <h2>首个可验收灰度增量</h2>
+          </div>
+          <div id="first-increment"></div>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <p class="eyebrow">Tracks</p>
+          <h2>四专项状态与文件边界</h2>
+        </div>
+        <div class="track-grid" id="track-grid"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <p class="eyebrow">Controls</p>
+          <h2>跨专项上线控制</h2>
+        </div>
+        <div class="control-grid" id="control-grid"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <p class="eyebrow">Rehearsal</p>
+          <h2>灰度演练、回退与值守计划</h2>
+        </div>
+        <div id="rehearsal-plan"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <p class="eyebrow">Decision</p>
+          <h2>Go/No-Go 决策矩阵</h2>
+        </div>
+        <div id="decision-matrix"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <p class="eyebrow">Evidence dossier</p>
+          <h2>现场证据包与硬阻断收口</h2>
+        </div>
+        <div id="evidence-dossier"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <p class="eyebrow">Pilot batches</p>
+          <h2>受控灰度批次推进计划</h2>
+        </div>
+        <div id="pilot-batch-plan"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <p class="eyebrow">Evidence workflow</p>
+          <h2>现场证据闭环状态机</h2>
+        </div>
+        <div id="site-evidence-workflow"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <p class="eyebrow">Scenario suite</p>
+          <h2>首增量验收场景脚本</h2>
+        </div>
+        <div id="acceptance-scenario-suite"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <p class="eyebrow">Evidence matrix</p>
+          <h2>场景-证据判定矩阵</h2>
+        </div>
+        <div id="scenario-evidence-matrix"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <p class="eyebrow">Command center</p>
+          <h2>切换指挥台与值守责任</h2>
+        </div>
+        <div id="cutover-command-center"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <p class="eyebrow">Observation</p>
+          <h2>T+1观察信号板与停机线</h2>
+        </div>
+        <div id="observation-signal-board"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <p class="eyebrow">Runtime smoke</p>
+          <h2>上线运行冒烟清单</h2>
+        </div>
+        <div id="runtime-smoke-plan"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <p class="eyebrow">Blockers</p>
+          <h2>现场阻断项台账</h2>
+        </div>
+        <div class="table-wrap">
+          <table class="cutover-table">
+            <thead>
+              <tr>
+                <th>专项</th>
+                <th>阻断项</th>
+                <th>责任方</th>
+                <th>状态</th>
+              </tr>
+            </thead>
+            <tbody id="blocker-table"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script src="./t10-specialty-cutover.js?v=runtime-smoke-plan"></script>
+  </body>
+</html>

@@ -3,6 +3,8 @@
 const { randomUUID } = require("crypto");
 const DiseasePaymentIntake = require("./disease-payment-intake");
 const LocalPaymentPackage = require("./disease-payment-local-package");
+const SpecialCase = require("./disease-payment-special-case");
+const Settlement = require("./disease-payment-settlement");
 const catalogIndexCache = new WeakMap();
 
 const POLICY = {
@@ -24,9 +26,35 @@ function seedDiseasePaymentState() {
     policy2: { id: "nhsa-drg-dip-2.0-2024", name: "DRG/DIP付费2.0版分组方案落地要求", publishedAt: "2024-07-23", source: "https://www.nhsa.gov.cn/art/2024/7/23/art_105_13316.html", switchDeadline: "2024-12-31", annualClearanceDeadline: "次年6月30日", settlementSlaWorkingDays: 30 },
     mode: "DRG",
     externalDependencies: [
-      { id: "official-grouper", name: "国家/地方正式分组器", status: "待联调", owner: "医保部门", requiredForProduction: true },
-      { id: "insurance-core", name: "医保核心结算与拨付", status: "待联调", owner: "医保中心", requiredForProduction: true },
-      { id: "medical-record-feed", name: "HIS/EMR/病案首页全量接口", status: "样例可用", owner: "医疗机构", requiredForProduction: true }
+      {
+        id: "official-grouper", name: "国家/地方正式分组器", status: "待联调", owner: "医保部门", requiredForProduction: true,
+        evidenceRequirements: [
+          { id: "connectivity", detail: "正式HTTPS/专线连通、双向身份认证和超时重试报告", reviewerRole: "security-reviewer" },
+          { id: "certificate-ownership", detail: "客户端凭据与正式回执签名证书归属、指纹及有效期核验", reviewerRole: "security-reviewer" },
+          { id: "trusted-callback", detail: "真实回调来源白名单、HMAC时间窗、防重放和逐病例签名验证记录", reviewerRole: "security-reviewer" },
+          { id: "result-consistency", detail: "正式分组结果、方案版本、病例摘要和支付测算逐项一致性对账", reviewerRole: "acceptance-reviewer" },
+          { id: "onsite-acceptance", detail: "医保正式分组器负责人和试点医院联合现场签字", reviewerRole: "acceptance-reviewer" }
+        ]
+      },
+      {
+        id: "insurance-core", name: "医保核心结算与拨付", status: "待联调", owner: "医保中心", requiredForProduction: true,
+        evidenceRequirements: [
+          { id: "settlement-callback", detail: "医保核心受理、退回补正和幂等回调字段映射联调记录", reviewerRole: "acceptance-reviewer" },
+          { id: "payment-callback", detail: "拨付成功、失败、重试上限和可信回执联调记录", reviewerRole: "finance-auditor" },
+          { id: "statement-reconciliation", detail: "月结/年清对账单传输、金额核对和差异闭环报告", reviewerRole: "finance-auditor" },
+          { id: "failure-drill", detail: "超时、重复、乱序、摘要不匹配和人工处置演练记录", reviewerRole: "security-reviewer" },
+          { id: "onsite-acceptance", detail: "医保经办、基金财务和医院财务联合现场签字", reviewerRole: "finance-auditor" }
+        ]
+      },
+      {
+        id: "medical-record-feed", name: "HIS/EMR/病案首页全量接口", status: "样例可用", owner: "医疗机构", requiredForProduction: true,
+        evidenceRequirements: [
+          { id: "field-mapping", detail: "结算清单、病案首页、诊断操作和费用明细全字段映射签字", reviewerRole: "acceptance-reviewer" },
+          { id: "volume-quality", detail: "全量数据性能、完整率、编码质量和错误补正验收报告", reviewerRole: "acceptance-reviewer" },
+          { id: "privacy-security", detail: "最小必要采集、传输加密、访问审计和隐私安全评估", reviewerRole: "security-reviewer" },
+          { id: "onsite-acceptance", detail: "试点医院信息科、病案室和医保办联合现场签字", reviewerRole: "acceptance-reviewer" }
+        ]
+      }
     ],
     schemeVersions: [
       { id: "drg-demo-2026", mode: "DRG", name: "DRG本地联调方案", nationalVersion: "国家版2.0", localVersion: "DL-DEMO-2026", status: "已发布", effectiveFrom: "2026-01-01", effectiveTo: "2026-12-31" },
@@ -127,12 +155,22 @@ function seedDiseasePaymentState() {
     importRetryQueue: [],
     formalGroupingJobs: [],
     formalGroupingDeadLetters: [],
+    formalGroupingCallbackEvents: [],
     grouperAdapters: [
       { id: "simulation-local-v1", environment: "simulation", name: "本地可解释模拟分组器", status: "ready", authority: "non-binding" },
-      { id: "official-adapter-v1", environment: "formal", name: "国家/地方正式分组器适配器", status: "external-blocked", authority: "official-receipt-required", acceptedSchemeVersions: ["DRG-2.0-DL", "drg-demo-2026", "DIP-2.0-DL", "dip-demo-2026"], verificationContract: "detached-signature-attestation-v1" }
+      { id: "official-adapter-v1", environment: "formal", name: "国家/地方正式分组器适配器", status: "external-blocked", authority: "official-receipt-required", acceptedSchemeVersions: ["DRG-2.0-DL", "drg-demo-2026", "DIP-2.0-DL", "dip-demo-2026"], trustedSignerFingerprints: String(process.env.DISEASE_PAYMENT_GROUPER_TRUSTED_SIGNER_FINGERPRINTS || "").split(",").map((item) => item.trim().toLowerCase()).filter(Boolean), verificationContract: "disease-payment-grouper-receipt-signature-v1" }
     ],
     specialCases: [],
+    specialCaseExperts: [
+      { id: "special-expert-medical-primary", name: "医保医学评审专家", displayName: "医保医学评审专家", reviewerAccount: "大连市医保中心审核员", role: "medical-insurance-review", institution: "大连市医保中心", expertise: ["复杂危重症", "DRG/DIP支付"], conflictInstitutions: [], active: true },
+      { id: "special-expert-fund-primary", name: "基金财务评审专家", displayName: "基金财务评审专家", reviewerAccount: "大连市医保局管理员", role: "fund-finance-review", institution: "大连市医保局", expertise: ["基金预算", "支付标准"], conflictInstitutions: [], active: true },
+      { id: "special-expert-medical-backup", name: "医学评审备选专家", displayName: "医学评审备选专家", reviewerAccount: "district-medical-reviewer", role: "medical-insurance-review", institution: "区县医保经办机构", expertise: ["复杂病例", "病案编码"], conflictInstitutions: [], active: false },
+      { id: "special-expert-fund-backup", name: "基金评审备选专家", displayName: "基金评审备选专家", reviewerAccount: "fund-reviewer-backup", role: "fund-finance-review", institution: "区县医保局", expertise: ["基金财务", "年度预算"], conflictInstitutions: [], active: false },
+      { id: "special-expert-medical-appeal", name: "医学复议专家", displayName: "医学复议专家", reviewerAccount: "medical-appeal-reviewer", role: "medical-insurance-review", institution: "省级医保复议专家库", expertise: ["疑难重症", "复议审查"], conflictInstitutions: [], active: true, appealOnly: true },
+      { id: "special-expert-fund-appeal", name: "基金复议专家", displayName: "基金复议专家", reviewerAccount: "fund-appeal-reviewer", role: "fund-finance-review", institution: "省级医保复议专家库", expertise: ["基金监管", "复议审查"], conflictInstitutions: [], active: true, appealOnly: true }
+    ],
     settlementBatches: [],
+    annualClearances: [],
     budgets: [
       { id: "budget-2026", year: 2026, total: 3200000000, diseasePaymentTotal: 2380000000, executed: 1286000000, status: "执行中", rateMethod: "固定费率法" }
     ],
@@ -429,6 +467,59 @@ function calculateCase(state, item, mode = state.mode || "DRG") {
   };
 }
 
+function calculateFormalCase(state, item) {
+  const quality = validateCase(item);
+  if (!quality.ok) return { ok: false, quality, error: "结算清单质控未通过" };
+  const formal = item.formalGrouping;
+  if (!formal || formal.authority !== "official" || !formal.receiptId || !formal.inputDigest || !formal.verification?.keyFingerprint) {
+    return { ok: false, quality, error: "缺少可信正式分组回执" };
+  }
+  if (formal.inputDigest !== DiseasePaymentIntake.officialCaseDigest(item, formal.mode || state.mode || "DRG")) {
+    return { ok: false, quality, error: "正式分组回执与当前病例快照不一致" };
+  }
+  const mode = formal.mode === "DIP" ? "DIP" : "DRG";
+  const catalogRows = state.groupCatalog.filter((row) => row.mode === mode && row.code === formal.groupCode);
+  const catalog = catalogRows.find((row) => row.authority === "official-local" && effectiveOn(row, item.dischargeDate)) || catalogRows[0];
+  if (!catalog) return { ok: false, quality, error: "正式分组编码未匹配支付目录" };
+  const parameter = activeParameter(state, mode, item.dischargeDate);
+  if (!parameter || !["已发布", "已冻结"].includes(parameter.status)) return { ok: false, quality, error: "没有已发布或已冻结的正式支付参数" };
+  const grouping = {
+    ...formal,
+    ok: true,
+    mode,
+    groupName: formal.groupName || catalog.name,
+    mdcCode: formal.mdcCode || catalog.mdcCode,
+    adrgCode: formal.adrgCode || catalog.adrgCode,
+    weight: catalog.weight,
+    score: catalog.score,
+    adjustment: catalog.adjustment || 1,
+    authority: "official"
+  };
+  const unit = mode === "DRG" ? Number(grouping.weight || 0) : Number(grouping.score || 0);
+  if (!(unit > 0)) return { ok: false, quality, grouping, error: "正式分组编码缺少有效权重或分值" };
+  const institutionCoefficientRow = (parameter.institutionCoefficients || []).find((row) => (row.institutionCode && row.institutionCode === item.institutionCode) || (row.institution && row.institution === item.institution));
+  const institutionCoefficient = Number(institutionCoefficientRow?.coefficient || 1);
+  const standard = round(unit * Number(parameter.rate) * Number(grouping.adjustment || 1) * institutionCoefficient);
+  const risks = detectRisks(state, item, grouping, standard, mode);
+  return {
+    ok: true,
+    quality,
+    grouping,
+    authority: "official-grouping",
+    parameterId: parameter.id,
+    parameterStatus: parameter.status,
+    rateMethod: parameter.rateMethod,
+    rate: parameter.rate,
+    institutionCoefficient,
+    formula: `${mode === "DRG" ? "正式权重 × 费率 × 调整系数" : "正式分值 × 点值 × 调整系数"}${institutionCoefficient !== 1 ? " × 机构系数" : ""}`,
+    paymentStandard: standard,
+    variance: round(Number(item.totalAmount) - standard),
+    projectedBalance: round(standard - Number(item.totalAmount)),
+    risks,
+    calculatedAt: new Date().toISOString()
+  };
+}
+
 function audit(state, action, target, actor, detail = "") {
   state.auditTrail.unshift({ id: randomUUID(), at: new Date().toISOString(), actor: actor || "system", action, target, detail });
   state.auditTrail = state.auditTrail.slice(0, 200);
@@ -582,57 +673,170 @@ function createSpecialCase(input, payload, actor) {
   const state = normalizeState(input);
   const item = state.cases.find((row) => row.id === payload.caseId);
   if (!item) throw new Error("病例不存在");
-  if (state.specialCases.some((row) => row.caseId === item.id && !["不予通过", "已撤回"].includes(row.status))) throw new Error("该病例已有在办特例单议");
+  if (state.specialCases.some((row) => row.caseId === item.id && SpecialCase.ACTIVE_STATES.has(SpecialCase.specialCaseState(row)))) throw new Error("该病例已有在办特例单议");
   const discharged = Math.max(1, state.cases.length);
-  const activeApplications = state.specialCases.filter((row) => !["不予通过", "已撤回"].includes(row.status)).length;
+  const activeApplications = state.specialCases.filter((row) => SpecialCase.ACTIVE_STATES.has(SpecialCase.specialCaseState(row))).length;
   const capRate = state.mode === "DRG" ? 0.05 : 0.005;
   if ((activeApplications + 1) / discharged > capRate && discharged >= (state.mode === "DRG" ? 20 : 200)) throw new Error(`${state.mode}特例单议申报数量超过政策上限`);
-  const row = { id: `special-${Date.now()}`, caseId: item.id, institution: item.institution, reason: String(payload.reason || "复杂危重症或资源消耗异常"), requestedMethod: String(payload.requestedMethod || "调整支付标准"), evidence: payload.evidence || [], status: "待评审", submittedAt: new Date().toISOString(), submittedBy: actor };
+  const row = SpecialCase.createSpecialCaseApplication(item, payload, actor);
+  const panel = SpecialCase.selectSpecialCaseExperts(row, state.specialCaseExperts, { excludedExpertIds: payload.excludedExpertIds, selectionNonce: payload.selectionNonce }, "special-case-panel-service");
   state.specialCases.unshift(row);
-  item.specialCaseStatus = "待评审";
+  item.specialCaseStatus = row.status;
   audit(state, "特例单议申报", row.id, actor, row.reason);
-  return { state, row };
+  return { state, row, panel };
+}
+
+function reselectSpecialCaseExpert(input, id, payload, actor) {
+  const state = normalizeState(input);
+  const row = state.specialCases.find((item) => item.id === id);
+  if (!row) throw new Error("特例单议不存在");
+  const result = SpecialCase.reselectSpecialCaseExpert(row, state.specialCaseExperts, payload, actor);
+  audit(state, "特例单议专家回避", row.id, actor, `${result.recused.expertId}->${result.replacement.expertId}`);
+  return { state, row, ...result };
+}
+
+function buildSpecialCaseDisclosure(input) {
+  const state = normalizeState(input);
+  const caseCountByInstitution = Object.fromEntries([...new Set(state.cases.map((item) => item.institution))].map((institution) => [institution, state.cases.filter((item) => item.institution === institution).length]));
+  return SpecialCase.buildSpecialCaseDisclosure(state.specialCases, caseCountByInstitution);
 }
 
 function reviewSpecialCase(input, id, payload, actor) {
   const state = normalizeState(input);
   const row = state.specialCases.find((item) => item.id === id);
   if (!row) throw new Error("特例单议不存在");
-  row.status = payload.approved ? "评审通过" : "不予通过";
-  row.reviewMethod = payload.reviewMethod || "智能评审+专家评审";
-  row.reviewOpinion = payload.opinion || (payload.approved ? "符合特例单议范围" : "仍按病种标准付费");
-  row.adjustedPayment = payload.approved ? round(Number(payload.adjustedPayment || state.cases.find((item) => item.id === row.caseId)?.totalAmount || 0)) : 0;
-  row.reviewedAt = new Date().toISOString();
-  row.reviewedBy = actor;
+  const reviewed = SpecialCase.reviewSpecialCaseApplication(row, payload, actor);
   const target = state.cases.find((item) => item.id === row.caseId);
   if (target) target.specialCaseStatus = row.status;
   audit(state, "特例单议评审", row.id, actor, row.status);
-  return { state, row };
+  return { state, row, review: reviewed.review };
+}
+
+function createSpecialCaseAppeal(input, id, payload, actor) {
+  const state = normalizeState(input);
+  const rowIndex = state.specialCases.findIndex((item) => item.id === id);
+  if (rowIndex < 0) throw new Error("特例单议不存在");
+  const row = structuredClone(state.specialCases[rowIndex]);
+  const appeal = SpecialCase.createSpecialCaseAppeal(row, payload, actor);
+  const panel = SpecialCase.selectSpecialCaseAppealExperts(row, state.specialCaseExperts, { excludedExpertIds: payload.excludedExpertIds, selectionNonce: payload.selectionNonce, at: payload.at }, "special-case-appeal-panel-service");
+  state.specialCases[rowIndex] = row;
+  const target = state.cases.find((item) => item.id === row.caseId);
+  if (target) target.specialCaseStatus = row.status;
+  audit(state, "特例单议复议申请", row.id, actor, `复议=${appeal.id}，原决定=${appeal.originalDecisionDigest}`);
+  return { state, row, appeal, panel };
+}
+
+function reviewSpecialCaseAppeal(input, id, payload, actor) {
+  const state = normalizeState(input);
+  const row = state.specialCases.find((item) => item.id === id);
+  if (!row) throw new Error("特例单议不存在");
+  const reviewed = SpecialCase.reviewSpecialCaseAppeal(row, payload, actor);
+  const target = state.cases.find((item) => item.id === row.caseId);
+  if (target) target.specialCaseStatus = row.status;
+  audit(state, "特例单议复议评审", row.id, actor, row.status);
+  return { state, row, appeal: reviewed.appeal, review: reviewed.review };
 }
 
 function createSettlementBatch(input, payload, actor) {
-  let state = calculateAll(input, actor);
+  const state = normalizeState(input);
+  if (payload.type === "annual") throw new Error("年度清算必须基于已拨付月度批次单独创建");
   const period = String(payload.period || new Date().toISOString().slice(0, 7));
-  const candidates = state.cases.filter((item) => item.status === "已测算" && !item.settlementBatchId && item.dischargeDate.startsWith(period));
+  if (!/^\d{4}-\d{2}$/.test(period)) throw new Error("结算期间必须为YYYY-MM");
+  const [periodYear, periodMonth] = period.split("-").map(Number);
+  if (periodMonth < 1 || periodMonth > 12) throw new Error("结算期间月份无效");
+  const defaultDeadline = new Date(Date.UTC(periodYear, periodMonth, 10)).toISOString().slice(0, 10);
+  const submissionDeadline = Settlement.dateOnly(payload.submissionDeadline || defaultDeadline, "申报截止日");
+  const periodEnd = new Date(Date.UTC(periodYear, periodMonth, 0));
+  const deadlineDate = new Date(`${submissionDeadline}T00:00:00.000Z`);
+  const latestDeadline = new Date(periodEnd);
+  latestDeadline.setUTCDate(latestDeadline.getUTCDate() + 90);
+  if (deadlineDate <= periodEnd || deadlineDate > latestDeadline) throw new Error("申报截止日必须在结算月结束后90日内");
+  const workingCalendar = Settlement.normalizeWorkingCalendar(payload.workingCalendar || {});
+  const institution = String(payload.institution || "").trim();
+  const candidates = state.cases.filter((item) => !item.settlementBatchId && String(item.dischargeDate || "").startsWith(period) && (!institution || item.institution === institution || item.institutionCode === institution));
   if (!candidates.length) throw new Error("该期间没有可结算病例");
-  const batch = { id: `settlement-${period}-${Date.now()}`, type: payload.type === "annual" ? "年度清算" : "月度结算", period, institution: payload.institution || "全部机构", caseCount: candidates.length, declaredAmount: round(candidates.reduce((sum, item) => sum + Number(item.declaredFundAmount || 0), 0)), standardAmount: round(candidates.reduce((sum, item) => sum + Number(item.calculation?.paymentStandard || 0), 0)), adjustedAmount: 0, status: "待对账", createdAt: new Date().toISOString(), createdBy: actor };
-  candidates.forEach((item) => { item.settlementBatchId = batch.id; item.status = "待对账"; });
+  const admission = candidates.map((item) => {
+    const calculation = calculateFormalCase(state, item);
+    const specialCase = calculation.ok ? SpecialCase.settlementAdjustment(state.specialCases, item) : null;
+    const basePaymentStandardFen = calculation.ok ? Settlement.yuanToFen(calculation.paymentStandard, "病例基础支付标准") : 0;
+    const paymentStandardFen = specialCase?.adjustedPaymentFen || basePaymentStandardFen;
+    return { item, calculation, specialCase, basePaymentStandardFen, paymentStandardFen, paymentStandard: paymentStandardFen / 100 };
+  });
+  const blocked = admission.filter((row) => !row.calculation.ok);
+  if (blocked.length) throw new Error(`结算准入失败：${blocked.map((row) => `${row.item.settlementListNo || row.item.id}(${row.calculation.error})`).join("；")}`);
+  const snapshots = admission.map(({ item, calculation, specialCase, basePaymentStandardFen, paymentStandardFen, paymentStandard }) => ({ caseId: item.id, settlementListNo: item.settlementListNo, institution: item.institution, institutionCode: item.institutionCode, formalReceiptId: calculation.grouping.receiptId, formalReceiptDigest: calculation.grouping.receiptDigest, schemeVersion: calculation.grouping.schemeVersion, groupCode: calculation.grouping.groupCode, parameterId: calculation.parameterId, basePaymentStandardFen, paymentStandardFen, paymentStandard, specialCaseId: specialCase?.row.id || "", specialCaseDecisionDigest: specialCase?.decisionDigest || "" }));
+  const declaredAmount = round(candidates.reduce((sum, item) => sum + Number(item.declaredFundAmount || 0), 0));
+  const standardAmount = round(admission.reduce((sum, row) => sum + row.paymentStandard, 0));
+  const batch = { id: `settlement-${period}-${Date.now()}`, type: "月度结算", period, institution: institution || "全部机构", caseCount: candidates.length, declaredAmount, declaredAmountFen: Settlement.yuanToFen(declaredAmount, "申报金额"), standardAmount, standardAmountFen: Settlement.yuanToFen(standardAmount, "标准金额"), adjustedAmount: standardAmount, adjustedAmountFen: Settlement.yuanToFen(standardAmount, "调整后金额"), submissionDeadline, policyWorkingDays: 30, workingCalendar, status: Settlement.SETTLEMENT_LABELS.BATCH_FROZEN, settlementState: "BATCH_FROZEN", calculationSnapshots: snapshots, batchDigest: DiseasePaymentIntake.digest({ period, institution: institution || "全部机构", submissionDeadline, workingCalendar, snapshots }), frozenAt: new Date().toISOString(), createdAt: new Date().toISOString(), createdBy: actor, events: [] };
+  batch.sla = Settlement.buildSettlementSla(batch, batch.frozenAt);
+  Settlement.appendEvent(batch, { id: `settlement-event-${randomUUID()}`, action: "freeze", from: "NONE", to: "BATCH_FROZEN", actor, at: batch.frozenAt, idempotencyKey: batch.id, detail: { batchDigest: batch.batchDigest, standardAmountFen: batch.standardAmountFen, submissionDeadline, slaDueDate: batch.sla.dueDate } });
+  admission.forEach(({ item, calculation, specialCase, basePaymentStandardFen, paymentStandardFen, paymentStandard }) => {
+    item.settlementBatchId = batch.id;
+    item.status = Settlement.SETTLEMENT_LABELS.BATCH_FROZEN;
+    item.formalCalculation = { ...calculation, basePaymentStandard: basePaymentStandardFen / 100, basePaymentStandardFen, paymentStandard, paymentStandardFen, specialCaseId: specialCase?.row.id || "", specialCaseDecisionDigest: specialCase?.decisionDigest || "" };
+    if (specialCase) {
+      SpecialCase.includeSpecialCaseInSettlement(specialCase.row, batch.id, actor);
+      item.specialCaseStatus = specialCase.row.status;
+    }
+  });
   state.settlementBatches.unshift(batch);
-  audit(state, "生成结算批次", batch.id, actor, `${batch.caseCount}个病例`);
+  audit(state, "生成正式结算批次", batch.id, actor, `${batch.caseCount}个病例，摘要=${batch.batchDigest}`);
   return { state, batch };
 }
 
-function reconcileBatch(input, id, payload, actor) {
+function transitionSettlement(input, id, payload, actor, options = {}) {
   const state = normalizeState(input);
-  const batch = state.settlementBatches.find((item) => item.id === id);
-  if (!batch) throw new Error("结算批次不存在");
-  batch.adjustedAmount = round(Number(payload.adjustedAmount ?? batch.standardAmount));
-  batch.status = payload.status || "已对账";
-  batch.reconciledAt = new Date().toISOString();
-  batch.reconciledBy = actor;
-  state.cases.filter((item) => item.settlementBatchId === id).forEach((item) => { item.status = batch.status === "已拨付" ? "已结算" : "已对账"; item.fundPaid = batch.status === "已拨付" ? item.calculation?.paymentStandard || 0 : item.fundPaid; });
-  audit(state, "结算批次对账", id, actor, batch.status);
-  return { state, batch };
+  const batchIndex = state.settlementBatches.findIndex((item) => item.id === id);
+  if (batchIndex < 0) throw new Error("结算批次不存在");
+  const batch = structuredClone(state.settlementBatches[batchIndex]);
+  const before = Settlement.settlementState(batch);
+  const transitioned = Settlement.transitionSettlementBatch(batch, payload, actor, options);
+  state.settlementBatches[batchIndex] = batch;
+  state.cases.filter((item) => item.settlementBatchId === id).forEach((item) => {
+    item.status = ["PAID", "CLOSED"].includes(batch.settlementState) ? "已结算" : batch.status;
+    if (batch.settlementState === "PAID") item.fundPaid = item.formalCalculation?.paymentStandard || 0;
+  });
+  if (!transitioned.idempotent) audit(state, "结算状态转换", id, actor, `${before}->${batch.settlementState}`);
+  return { state, batch, event: transitioned.event, idempotent: transitioned.idempotent };
+}
+
+function reconcileBatch(input, id, payload, actor) {
+  return transitionSettlement(input, id, payload, actor);
+}
+
+function applyInsuranceCoreSettlementCallback(input, id, payload, actor = "insurance-core-adapter") {
+  if (!["core-accepted", "core-returned", "payment-failed", "confirm-payment"].includes(payload.action)) throw new Error("医保核心回调动作不受支持");
+  return transitionSettlement(input, id, payload, actor, { trustedInsuranceCoreCallback: true });
+}
+
+function buildSettlementCoreCorrectionOperations(input, options = {}) {
+  const state = normalizeState(input);
+  return Settlement.buildSettlementCoreCorrectionOperations(state.settlementBatches, options);
+}
+
+function buildSettlementPaymentFailureOperations(input, options = {}) {
+  const state = normalizeState(input);
+  return Settlement.buildSettlementPaymentFailureOperations(state.settlementBatches, options);
+}
+
+function createAnnualClearance(input, payload, actor) {
+  const state = normalizeState(input);
+  const year = Number(payload.year);
+  if (state.annualClearances.some((item) => item.year === year && item.state !== "LOCKED")) throw new Error("该年度已有在办清算批次");
+  const row = Settlement.createAnnualClearance(state.settlementBatches, payload, actor);
+  state.annualClearances.unshift(row);
+  audit(state, "创建年度清算", row.id, actor, `${row.batchCount}个月度批次，摘要=${row.clearanceDigest}`);
+  return { state, row };
+}
+
+function applyAnnualClearanceAction(input, id, payload, actor) {
+  const state = normalizeState(input);
+  const row = state.annualClearances.find((item) => item.id === id);
+  if (!row) throw new Error("年度清算批次不存在");
+  const before = row.state;
+  const transitioned = Settlement.transitionAnnualClearance(row, payload, actor);
+  if (!transitioned.idempotent) audit(state, "年度清算状态转换", id, actor, `${before}->${row.state}`);
+  return { state, row, event: transitioned.event, idempotent: transitioned.idempotent };
 }
 
 function applyGovernanceAction(input, resource, id, payload, actor) {
@@ -914,7 +1118,8 @@ function buildOverview(input) {
     localPaymentPackageImpactReports: localPackageView.impactReports,
     localPaymentPackageDiffReports: localPackageView.diffReports,
     localPaymentPackageActivationSnapshots: localPackageView.activationSnapshots,
-    localPaymentPackageSimulationJobs: localPackageView.simulationJobs
+    localPaymentPackageSimulationJobs: localPackageView.simulationJobs,
+    specialCaseDisclosure: buildSpecialCaseDisclosure(state)
   };
   const calculated = state.cases.filter((item) => item.calculation?.ok);
   const risks = state.cases.flatMap((item) => item.calculation?.risks || []);
@@ -926,7 +1131,7 @@ function buildOverview(input) {
   });
   const specialCapRate = state.mode === "DRG" ? 0.05 : 0.005;
   const supervision = buildDiseaseSupervisionProfiles(state);
-  return { state: clientState, summary: { caseCount: state.cases.length, calculatedCount: calculated.length, ungroupedCount: state.cases.filter((item) => item.calculation?.grouping && !item.calculation.grouping.ok).length, totalCost, paymentStandard, projectedBalance: round(paymentStandard - totalCost), riskCount: risks.length, specialPending: state.specialCases.filter((item) => item.status === "待评审").length, specialCapRate, specialUsageRate: round(state.specialCases.filter((item) => !["不予通过", "已撤回"].includes(item.status)).length / Math.max(1, state.cases.length), 4), settlementPending: state.settlementBatches.filter((item) => item.status !== "已拨付").length, prepaymentPending: state.prepayments.filter((item) => item.status === "待审批").length, unpaidPending: state.unpaidItems.filter((item) => item.status !== "已支付").length, negotiationPending: state.negotiationRounds.filter((item) => item.status !== "已达成一致").length, trainingPending: state.trainings.filter((item) => item.status !== "已完成").length, intake: DiseasePaymentIntake.buildIntakeSummary(state), drg: buildDrgAnalytics(state), supervision: supervision.summary }, institutions, supervision };
+  return { state: clientState, summary: { caseCount: state.cases.length, calculatedCount: calculated.length, ungroupedCount: state.cases.filter((item) => item.calculation?.grouping && !item.calculation.grouping.ok).length, totalCost, paymentStandard, projectedBalance: round(paymentStandard - totalCost), riskCount: risks.length, specialPending: state.specialCases.filter((item) => ["APPLIED", "UNDER_REVIEW"].includes(SpecialCase.specialCaseState(item))).length, specialCapRate, specialUsageRate: round(state.specialCases.filter((item) => SpecialCase.ACTIVE_STATES.has(SpecialCase.specialCaseState(item))).length / Math.max(1, state.cases.length), 4), settlementPending: state.settlementBatches.filter((item) => !["PAID", "CLOSED"].includes(Settlement.settlementState(item))).length, annualClearancePending: state.annualClearances.filter((item) => item.state !== "LOCKED").length, prepaymentPending: state.prepayments.filter((item) => item.status === "待审批").length, unpaidPending: state.unpaidItems.filter((item) => item.status !== "已支付").length, negotiationPending: state.negotiationRounds.filter((item) => item.status !== "已达成一致").length, trainingPending: state.trainings.filter((item) => item.status !== "已完成").length, intake: DiseasePaymentIntake.buildIntakeSummary(state), drg: buildDrgAnalytics(state), supervision: supervision.summary }, institutions, supervision };
 }
 
-module.exports = { POLICY, activateDueLocalPaymentPackages, activateLocalPaymentPackage, applyGovernanceAction, buildCatalogIndexStats, buildDiseaseSupervisionProfiles, buildDrgAnalytics, buildDrgCatalogView, buildLocalPaymentPackageView, buildOverview, buildParameterGovernanceView, calculateAll, calculateCase, cancelLocalPaymentPackageSimulationJob, compareLocalPaymentPackage, createLocalPaymentPackageSimulationJob, createPaymentParameter, createSettlementBatch, createSpecialCase, drgCatalogMatch, getLocalPaymentPackageCatalogPage, getLocalPaymentPackageReport, importLocalPaymentPackage, inferDrgComplicationLevel, normalizeState, processLocalPaymentPackageSimulationJob, publishLocalPaymentPackage, publishPaymentParameter, reconcileBatch, retryLocalPaymentPackageSimulationJob, reviewLocalPaymentPackage, reviewPaymentParameter, reviewSpecialCase, rollbackLocalPaymentPackage, seedDiseasePaymentState, simulateDrgCase, simulateLocalPaymentPackage, simulatePaymentParameter, submitLocalPaymentPackage, submitPaymentParameter, validateCase, validateLocalPaymentPackage: LocalPaymentPackage.validateLocalPaymentPackage };
+module.exports = { POLICY, SETTLEMENT_ACTIONS: Settlement.ACTION_TARGETS, SETTLEMENT_LABELS: Settlement.SETTLEMENT_LABELS, SPECIAL_CASE_LABELS: SpecialCase.SPECIAL_CASE_LABELS, activateDueLocalPaymentPackages, activateLocalPaymentPackage, applyAnnualClearanceAction, applyGovernanceAction, applyInsuranceCoreSettlementCallback, buildCatalogIndexStats, buildDiseaseSupervisionProfiles, buildDrgAnalytics, buildDrgCatalogView, buildLocalPaymentPackageView, buildOverview, buildParameterGovernanceView, buildSettlementCoreCorrectionOperations, buildSettlementPaymentFailureOperations, buildSpecialCaseDisclosure, calculateAll, calculateCase, calculateFormalCase, cancelLocalPaymentPackageSimulationJob, compareLocalPaymentPackage, createAnnualClearance, createLocalPaymentPackageSimulationJob, createPaymentParameter, createSettlementBatch, createSpecialCase, createSpecialCaseAppeal, drgCatalogMatch, getLocalPaymentPackageCatalogPage, getLocalPaymentPackageReport, importLocalPaymentPackage, inferDrgComplicationLevel, normalizeState, processLocalPaymentPackageSimulationJob, publishLocalPaymentPackage, publishPaymentParameter, reconcileBatch, reselectSpecialCaseExpert, retryLocalPaymentPackageSimulationJob, reviewLocalPaymentPackage, reviewPaymentParameter, reviewSpecialCase, reviewSpecialCaseAppeal, rollbackLocalPaymentPackage, seedDiseasePaymentState, simulateDrgCase, simulateLocalPaymentPackage, simulatePaymentParameter, submitLocalPaymentPackage, submitPaymentParameter, validateCase, validateLocalPaymentPackage: LocalPaymentPackage.validateLocalPaymentPackage, verifySpecialCaseLedger: SpecialCase.verifySpecialCaseLedger };

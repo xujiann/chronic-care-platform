@@ -6,12 +6,19 @@ const { generateKeyPairSync } = require("crypto");
 const Service = require("../disease-payment-service");
 const Intake = require("../disease-payment-intake");
 const PackageSignature = require("../disease-payment-package-signature");
+const GrouperContract = require("../disease-payment-grouper-contract");
+const Settlement = require("../disease-payment-settlement");
+const SpecialCase = require("../disease-payment-special-case");
+const OperatingModel = require("../insurance-payment-operating-model");
 
 const ROOT = path.resolve(__dirname, "..");
 
 function buildDiseasePaymentReadiness() {
   const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
   const signatureOptions = { trustedSignerFingerprints: [PackageSignature.publicKeyFingerprint(publicKey.export({ type: "spki", format: "pem" }))] };
+  const grouperKeys = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+  const grouperFingerprint = GrouperContract.publicKeyFingerprint(grouperKeys.publicKey.export({ type: "spki", format: "pem" }));
+  const signOfficialReceipt = (payload) => GrouperContract.createSignedReceipt(payload, grouperKeys.privateKey.export({ type: "pkcs8", format: "pem" }), { keyId: "readiness-official-grouper", signerOrganization: "就绪检查医保正式分组器", validUntil: "2036-12-31T23:59:59.000Z" });
   const signPackage = (payload) => ({
     ...payload,
     signatureEvidence: PackageSignature.createPackageSignature(payload, privateKey.export({ type: "pkcs8", format: "pem" }), {
@@ -21,6 +28,7 @@ function buildDiseasePaymentReadiness() {
     })
   });
   const state = Service.calculateAll(Service.seedDiseasePaymentState(), "readiness-check");
+  state.grouperAdapters.find((item) => item.id === "official-adapter-v1").trustedSignerFingerprints = [grouperFingerprint];
   const overview = Service.buildOverview(state);
   const supervisionState = Service.seedDiseasePaymentState();
   supervisionState.cases = [
@@ -28,22 +36,100 @@ function buildDiseasePaymentReadiness() {
     { ...supervisionState.cases[2], id: "readiness-profile-second", residentId: "readiness-resident", institution: "测试乙医院", admissionDate: "2026-05-08", dischargeDate: "2026-05-11", otherDiagnoses: ["J96.0", "N17.9", "E11.9"] }
   ];
   const supervision = Service.buildDiseaseSupervisionProfiles(supervisionState);
-  const requiredFiles = ["disease-payment-service.js", "disease-payment-intake.js", "disease-payment-local-package.js", "disease-payment.html", "disease-payment.js", "disease-payment.css", "scripts/disease-payment-package-builder.js", "config/disease-payment/templates/local-drg-package.template.json", "config/disease-payment/templates/local-dip-package.template.json"];
+  const requiredFiles = ["disease-payment-service.js", "disease-payment-intake.js", "disease-payment-grouper-contract.js", "disease-payment-special-case.js", "disease-payment-settlement.js", "insurance-payment-operating-model.js", "disease-payment-local-package.js", "disease-payment.html", "disease-payment.js", "disease-payment.css", "scripts/disease-payment-package-builder.js", "config/disease-payment/templates/local-drg-package.template.json", "config/disease-payment/templates/local-dip-package.template.json"];
+  const serverSource = fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
+  const operatingModel = OperatingModel.validateOperatingModel();
+  const integrationHandoff = OperatingModel.buildT00IntegrationHandoff(serverSource);
   const sample = { settlementListNo: "READINESS-001", institutionCode: "HOSP-001", institution: "测试医院", admissionDate: "2026-07-01", dischargeDate: "2026-07-02", principalDiagnosis: "I10", totalAmount: 1000, declaredFundAmount: 800, costItems: [{ itemCode: "P001", itemName: "项目", amount: 1000 }] };
   const imported = Intake.importBatch(state, { sourceSystem: "readiness", rows: [sample] }, "readiness-check");
   const grouped = Intake.runGrouping(imported.state, { environment: "simulation", mode: "DRG", caseIds: [imported.state.cases.at(-1).id] }, "readiness-check", Service.calculateCase);
   const intakeSummary = Intake.buildIntakeSummary(grouped.state);
   const officialCase = state.cases[0];
-  const officialReceipt = { caseId: officialCase.id, receiptId: "READINESS-OFFICIAL-001", groupCode: "BR23", schemeVersion: "DRG-2.0-DL", inputDigest: Intake.officialCaseDigest(officialCase, "DRG"), signedAt: "2026-07-18T08:00:00.000Z", signatureValid: true, verification: { verifiedBy: "official-adapter-v1", algorithm: "SM2/SM3", keyId: "readiness-key", verifiedAt: "2026-07-18T08:00:01.000Z" } };
+  const officialReceipt = signOfficialReceipt({ caseId: officialCase.id, receiptId: "READINESS-OFFICIAL-001", groupCode: "BR23", schemeVersion: "DRG-2.0-DL", inputDigest: Intake.officialCaseDigest(officialCase, "DRG"), signedAt: "2026-07-18T08:00:00.000Z" });
   const receiptValidation = Intake.validateOfficialReceipt(state, officialCase, officialReceipt, "DRG");
   const formalJobCreated = Intake.createFormalGroupingJob(state, { id: "readiness-formal-job", idempotencyKey: "readiness-formal-job-v1", mode: "DRG", schemeVersion: "DRG-2.0-DL", caseIds: [officialCase.id] }, "readiness-operator");
   const formalJobDuplicate = Intake.createFormalGroupingJob(formalJobCreated.state, { idempotencyKey: "readiness-formal-job-v1", mode: "DRG", schemeVersion: "DRG-2.0-DL", caseIds: [officialCase.id] }, "readiness-operator");
   const formalJobDispatched = Intake.dispatchFormalGroupingJob(formalJobCreated.state, formalJobCreated.job.id, { accepted: true, transportId: "readiness-transport" }, "readiness-dispatcher");
-  const formalJobReceived = Intake.receiveFormalGroupingReceipt(formalJobDispatched.state, formalJobCreated.job.id, { correlationId: formalJobDispatched.job.correlationId, officialResults: [officialReceipt] }, "readiness-callback", Service.calculateCase);
+  const callbackNowMs = Date.parse("2026-07-18T08:00:05.000Z");
+  const callbackTimestamp = String(Math.floor(callbackNowMs / 1000));
+  const callbackNonce = "readiness-grouper-callback-nonce";
+  const callbackSourceId = "readiness-official-grouper";
+  const callbackSecret = "readiness-grouper-callback-secret-at-least-32-characters";
+  const formalCallback = { eventId: "readiness-grouper-event-001", correlationId: formalJobDispatched.job.correlationId, officialResults: [officialReceipt] };
+  const callbackSignature = GrouperContract.signTrustedGrouperCallback(formalCallback, { secret: callbackSecret, timestamp: callbackTimestamp, nonce: callbackNonce, sourceId: callbackSourceId });
+  const formalJobReceived = Intake.receiveTrustedFormalGroupingReceipt(formalJobDispatched.state, formalJobCreated.job.id, formalCallback, { env: { NODE_ENV: "production" }, secret: callbackSecret, timestamp: callbackTimestamp, nonce: callbackNonce, sourceId: callbackSourceId, allowedSourceIds: [callbackSourceId], signature: callbackSignature, nowMs: callbackNowMs }, Service.calculateCase);
+  const grouperProductionContract = GrouperContract.buildGrouperProductionConfiguration({
+    DISEASE_PAYMENT_GROUPER_ENDPOINT: "https://readiness-grouper.example.test/v1/jobs",
+    DISEASE_PAYMENT_GROUPER_CALLBACK_SECRET: callbackSecret,
+    DISEASE_PAYMENT_GROUPER_CALLBACK_ALLOWED_SOURCES: callbackSourceId,
+    DISEASE_PAYMENT_GROUPER_TRUSTED_SIGNER_FINGERPRINTS: grouperFingerprint,
+    DISEASE_PAYMENT_GROUPER_CREDENTIAL_REFERENCE: "vault://readiness/grouper/client-credential",
+    DISEASE_PAYMENT_GROUPER_CALLBACK_MAX_SKEW_SECONDS: "300"
+  });
+  const grouperProductionConfiguration = GrouperContract.buildGrouperProductionConfiguration(process.env);
   const failureJobCreated = Intake.createFormalGroupingJob(formalJobReceived.state, { id: "readiness-formal-failure", mode: "DRG", schemeVersion: "DRG-2.0-DL", caseIds: [state.cases[1].id], maxAttempts: 1 }, "readiness-operator");
   const failureJobDead = Intake.dispatchFormalGroupingJob(failureJobCreated.state, failureJobCreated.job.id, { accepted: false, errorCode: "ADAPTER_UNAVAILABLE", errorMessage: "readiness failure rehearsal" }, "readiness-dispatcher");
   const failureJobReconciled = Intake.reconcileFormalGroupingDeadLetter(failureJobDead.state, failureJobCreated.job.id, { resolution: "readiness reconciliation completed" }, "readiness-reconciler");
   const formalOperations = Intake.buildFormalGroupingOperations(failureJobReconciled.state);
+  const settlementState = Service.seedDiseasePaymentState();
+  settlementState.grouperAdapters.find((item) => item.id === "official-adapter-v1").trustedSignerFingerprints = [grouperFingerprint];
+  const settlementReceipts = settlementState.cases.map((item, index) => {
+    const preview = Service.calculateCase(settlementState, item, "DRG").grouping;
+    return signOfficialReceipt({ caseId: item.id, receiptId: `READINESS-SETTLEMENT-${index + 1}`, groupCode: preview.groupCode, groupName: preview.groupName, mdcCode: preview.mdcCode, adrgCode: preview.adrgCode, schemeVersion: "DRG-2.0-DL", inputDigest: Intake.officialCaseDigest(item, "DRG"), signedAt: "2026-07-18T08:00:00.000Z" });
+  });
+  const settlementGrouped = Intake.runGrouping(settlementState, { environment: "formal", mode: "DRG", caseIds: settlementState.cases.map((item) => item.id), officialResults: settlementReceipts }, "readiness-grouper", Service.calculateCase);
+  const specialCreated = Service.createSpecialCase(settlementGrouped.state, { caseId: officialCase.id, reason: "readiness complex critical case", requestedPaymentFen: 3200000, evidence: [{ type: "medical-record-summary", digest: `sha256:${"9".repeat(64)}`, issuedBy: "readiness-hospital" }] }, "readiness-hospital");
+  const specialFirstReview = Service.reviewSpecialCase(specialCreated.state, specialCreated.row.id, { approved: true, adjustedPaymentFen: 3200000 }, "大连市医保中心审核员");
+  const specialApproved = Service.reviewSpecialCase(specialFirstReview.state, specialCreated.row.id, { approved: true, adjustedPaymentFen: 3200000 }, "大连市医保局管理员");
+  const appealExperts = [
+    { id: "readiness-original-medical", reviewerAccount: "readiness-original-medical", role: "medical-insurance-review", institution: "readiness-insurance-center", active: true },
+    { id: "readiness-original-fund", reviewerAccount: "readiness-original-fund", role: "fund-finance-review", institution: "readiness-insurance-bureau", active: true },
+    { id: "readiness-appeal-medical", reviewerAccount: "readiness-appeal-medical", role: "medical-insurance-review", institution: "readiness-appeal-center", active: true },
+    { id: "readiness-appeal-fund", reviewerAccount: "readiness-appeal-fund", role: "fund-finance-review", institution: "readiness-appeal-bureau", active: true }
+  ];
+  const appealRow = SpecialCase.createSpecialCaseApplication({ id: "readiness-appeal-case", institution: "readiness-hospital", totalAmount: 1000 }, { id: "readiness-special-appeal", reason: "readiness original application", requestedPaymentFen: 90000, evidence: [{ type: "medical-summary", digest: `sha256:${"4".repeat(64)}` }] }, "readiness-hospital");
+  SpecialCase.selectSpecialCaseExperts(appealRow, appealExperts, { selectionNonce: "readiness-original-panel" });
+  SpecialCase.reviewSpecialCaseApplication(appealRow, { approved: false, opinion: "readiness evidence incomplete" }, appealRow.expertPanel.members[0].reviewerAccount);
+  const originalAppealExpertIds = new Set(appealRow.expertPanel.members.map((item) => item.expertId));
+  const appeal = SpecialCase.createSpecialCaseAppeal(appealRow, { id: "readiness-appeal", originalDecisionDigest: appealRow.decisionDigest, reason: "readiness new evidence", evidence: [{ type: "supplement", digest: `sha256:${"5".repeat(64)}` }], at: appealRow.rejectedAt }, "readiness-hospital");
+  const appealPanel = SpecialCase.selectSpecialCaseAppealExperts(appealRow, appealExperts, { selectionNonce: "readiness-appeal-panel", at: appeal.submittedAt });
+  SpecialCase.reviewSpecialCaseAppeal(appealRow, { approved: true, adjustedPaymentFen: 85000, at: appeal.submittedAt }, appealPanel.members[0].reviewerAccount);
+  SpecialCase.reviewSpecialCaseAppeal(appealRow, { approved: true, adjustedPaymentFen: 85000, at: appeal.submittedAt }, appealPanel.members[1].reviewerAccount);
+  const settlementCreated = Service.createSettlementBatch(specialApproved.state, { period: "2026-06" }, "readiness-settlement");
+  const specialSnapshot = settlementCreated.batch.calculationSnapshots.find((item) => item.caseId === officialCase.id);
+  const settlementFrozen = settlementCreated.batch.settlementState === "BATCH_FROZEN" && settlementCreated.batch.calculationSnapshots.every((item) => item.formalReceiptId) && specialSnapshot.specialCaseId === specialCreated.row.id && specialSnapshot.paymentStandardFen === 3200000;
+  let settlementCorrection = Service.reconcileBatch(structuredClone(settlementCreated.state), settlementCreated.batch.id, { action: "submit-core", externalRequestId: "READINESS-CORRECTION-REQUEST-1", idempotencyKey: "READINESS-CORRECTION-IDEM-1", at: "2026-07-11T08:00:00.000Z" }, "readiness-settlement");
+  settlementCorrection = Service.applyInsuranceCoreSettlementCallback(settlementCorrection.state, settlementCreated.batch.id, { action: "core-returned", receiptId: "READINESS-CORE-RETURNED", returnCycleId: "readiness-core-return-cycle", reasonCode: "FIELD_VALIDATION", reason: "readiness field correction required", requirementDigest: "6".repeat(64), correctionWorkingDays: 5, at: "2026-07-13T08:00:00.000Z" }, "readiness-insurance-core");
+  const settlementCorrectionOverdue = Service.buildSettlementCoreCorrectionOperations(settlementCorrection.state, { at: "2026-07-21T08:00:00.000Z" });
+  settlementCorrection = Service.reconcileBatch(settlementCorrection.state, settlementCreated.batch.id, { action: "resubmit-core", returnCycleId: "readiness-core-return-cycle", externalRequestId: "READINESS-CORRECTION-REQUEST-2", idempotencyKey: "READINESS-CORRECTION-IDEM-2", correctionDigest: "5".repeat(64), at: "2026-07-17T08:00:00.000Z" }, "readiness-settlement");
+  settlementCorrection = Service.applyInsuranceCoreSettlementCallback(settlementCorrection.state, settlementCreated.batch.id, { action: "core-accepted", receiptId: "READINESS-CORRECTION-ACCEPTED", at: "2026-07-17T09:00:00.000Z" }, "readiness-insurance-core");
+  const settlementCorrectionOperations = Service.buildSettlementCoreCorrectionOperations(settlementCorrection.state, { at: "2026-07-17T09:00:00.000Z" });
+  const settlementSubmitted = Service.reconcileBatch(settlementCreated.state, settlementCreated.batch.id, { action: "submit-core", externalRequestId: "READINESS-CORE-REQUEST", idempotencyKey: "READINESS-CORE-IDEM" }, "readiness-settlement");
+  const settlementAccepted = Service.applyInsuranceCoreSettlementCallback(settlementSubmitted.state, settlementCreated.batch.id, { action: "core-accepted", receiptId: "READINESS-CORE-ACCEPTED" }, "readiness-insurance-core");
+  const settlementReconciling = Service.reconcileBatch(settlementAccepted.state, settlementCreated.batch.id, { action: "start-reconciliation", idempotencyKey: "READINESS-RECON", providerSummaryDigest: "c".repeat(64) }, "readiness-finance");
+  let settlementDifference = Service.reconcileBatch(structuredClone(settlementReconciling.state), settlementCreated.batch.id, { action: "record-difference", idempotencyKey: "READINESS-DIFFERENCE", at: "2026-07-08T08:00:00.000Z", differenceAmountFen: -100, reasonCode: "READINESS_DEDUCTION", evidenceDigest: "8".repeat(64), reviewWorkingDays: 5 }, "readiness-finance");
+  settlementDifference = Service.reconcileBatch(settlementDifference.state, settlementCreated.batch.id, { action: "review-difference", idempotencyKey: "READINESS-DIFFERENCE-HOSPITAL", at: "2026-07-09T08:00:00.000Z", reviewDomain: "hospital-finance", approved: true, adjustedAmountFen: settlementCreated.batch.standardAmountFen - 100, resolutionDigest: "7".repeat(64) }, "readiness-hospital-finance");
+  settlementDifference = Service.reconcileBatch(settlementDifference.state, settlementCreated.batch.id, { action: "review-difference", idempotencyKey: "READINESS-DIFFERENCE-INSURANCE", at: "2026-07-10T08:00:00.000Z", reviewDomain: "insurance-settlement", approved: true, adjustedAmountFen: settlementCreated.batch.standardAmountFen - 100, resolutionDigest: "7".repeat(64) }, "readiness-insurance");
+  settlementDifference = Service.reconcileBatch(settlementDifference.state, settlementCreated.batch.id, { action: "resolve-difference", idempotencyKey: "READINESS-DIFFERENCE-RESOLVE", at: "2026-07-13T08:00:00.000Z", resolution: "readiness dual-domain difference resolution", resolutionDigest: "7".repeat(64), adjustedAmountFen: settlementCreated.batch.standardAmountFen - 100 }, "readiness-finance");
+  const settlementDifferenceCase = settlementDifference.batch.reconciliation.differenceCase;
+  const settlementReconciled = Service.reconcileBatch(settlementReconciling.state, settlementCreated.batch.id, { action: "confirm-matched", idempotencyKey: "READINESS-MATCHED", providerAmountFen: settlementCreated.batch.standardAmountFen }, "readiness-finance");
+  let settlementPaymentRetry = Service.reconcileBatch(structuredClone(settlementReconciled.state), settlementCreated.batch.id, { action: "request-payment", paymentRequestId: "READINESS-PAYMENT-RETRY-REQUEST-1", idempotencyKey: "READINESS-PAYMENT-RETRY-IDEM-1", at: "2026-07-14T08:00:00.000Z" }, "readiness-settlement");
+  settlementPaymentRetry = Service.applyInsuranceCoreSettlementCallback(settlementPaymentRetry.state, settlementCreated.batch.id, { action: "payment-failed", receiptId: "READINESS-PAYMENT-FAILED", failureCycleId: "readiness-payment-failure-cycle", reasonCode: "ACCOUNT_VALIDATION", reason: "readiness payment account validation failed", failureEvidenceDigest: "4".repeat(64), resolutionWorkingDays: 2, at: "2026-07-15T08:00:00.000Z" }, "readiness-insurance-core");
+  const settlementPaymentFailureOverdue = Service.buildSettlementPaymentFailureOperations(settlementPaymentRetry.state, { at: "2026-07-20T08:00:00.000Z" });
+  settlementPaymentRetry = Service.reconcileBatch(settlementPaymentRetry.state, settlementCreated.batch.id, { action: "retry-payment", failureCycleId: "readiness-payment-failure-cycle", paymentRequestId: "READINESS-PAYMENT-RETRY-REQUEST-2", idempotencyKey: "READINESS-PAYMENT-RETRY-IDEM-2", resolution: "readiness account evidence corrected", resolutionDigest: "3".repeat(64), at: "2026-07-16T08:00:00.000Z" }, "readiness-settlement");
+  settlementPaymentRetry = Service.applyInsuranceCoreSettlementCallback(settlementPaymentRetry.state, settlementCreated.batch.id, { action: "confirm-payment", receiptId: "READINESS-PAYMENT-RETRY-SUCCEEDED", paidAmountFen: settlementCreated.batch.standardAmountFen, at: "2026-07-16T09:00:00.000Z" }, "readiness-insurance-core");
+  const settlementPaymentFailureOperations = Service.buildSettlementPaymentFailureOperations(settlementPaymentRetry.state, { at: "2026-07-16T09:00:00.000Z" });
+  const settlementPaymentRequested = Service.reconcileBatch(settlementReconciled.state, settlementCreated.batch.id, { action: "request-payment", paymentRequestId: "READINESS-PAYMENT-REQUEST" }, "readiness-settlement");
+  const settlementPaid = Service.applyInsuranceCoreSettlementCallback(settlementPaymentRequested.state, settlementCreated.batch.id, { action: "confirm-payment", receiptId: "READINESS-PAYMENT-RECEIPT", paidAmountFen: settlementCreated.batch.standardAmountFen }, "readiness-insurance-core");
+  const annualCreated = Service.createAnnualClearance(settlementPaid.state, { id: "readiness-annual-2026", year: 2026 }, "readiness-settlement");
+  let annualProgress = Service.applyAnnualClearanceAction(annualCreated.state, annualCreated.row.id, { action: "start-confirmation", idempotencyKey: "READINESS-ANNUAL-START" }, "readiness-settlement");
+  for (const target of annualProgress.row.institutionConfirmations) {
+    annualProgress = Service.applyAnnualClearanceAction(annualProgress.state, annualCreated.row.id, { action: "confirm-institution", idempotencyKey: `READINESS-ANNUAL-CONFIRM-${target.institutionId}`, institutionId: target.institutionId, confirmationDigest: "d".repeat(64) }, `readiness-hospital-finance-${target.institutionId}`);
+  }
+  annualProgress = Service.applyAnnualClearanceAction(annualProgress.state, annualCreated.row.id, { action: "confirm-institutions", idempotencyKey: "READINESS-ANNUAL-CONFIRM", confirmationDigest: Settlement.institutionConfirmationDigest(annualProgress.row) }, "readiness-hospital-finance");
+  annualProgress = Service.applyAnnualClearanceAction(annualProgress.state, annualCreated.row.id, { action: "approve", idempotencyKey: "READINESS-ANNUAL-APPROVE", approvalNo: "READINESS-APPROVAL" }, "readiness-insurance");
+  annualProgress = Service.applyAnnualClearanceAction(annualProgress.state, annualCreated.row.id, { action: "post", idempotencyKey: "READINESS-ANNUAL-POST", voucherNo: "READINESS-VOUCHER" }, "readiness-finance");
+  annualProgress = Service.applyAnnualClearanceAction(annualProgress.state, annualCreated.row.id, { action: "lock", idempotencyKey: "READINESS-ANNUAL-LOCK", lockReference: "READINESS-LOCK" }, "readiness-finance");
   const parameterDraft = Service.createPaymentParameter(state, { id: "readiness-param-drg", mode: "DRG", schemeId: "drg-demo-2026", rate: 11000, effectiveFrom: "2027-01-01" }, "readiness-drafter");
   const parameterSimulation = Service.simulatePaymentParameter(parameterDraft.state, parameterDraft.row.id, "readiness-analyst");
   const parameterSubmitted = Service.submitPaymentParameter(parameterSimulation.state, parameterDraft.row.id, "readiness-drafter");
@@ -89,8 +175,16 @@ function buildDiseasePaymentReadiness() {
     { id: "dual-mode", label: "DRG/DIP双模式目录与参数", ok: state.groupCatalog.some((item) => item.mode === "DRG") && state.groupCatalog.some((item) => item.mode === "DIP") },
     { id: "case-loop", label: "清单质控、分组、测算与监管", ok: overview.summary.calculatedCount >= 3 && state.cases.slice(0, 3).every((item) => item.calculation?.quality?.ok) },
     { id: "disease-supervision-profile", label: "一病种一档案、跨次住院关联与疑似基金影响测算", ok: supervision.summary.profiles === 1 && supervision.summary.crossInstitutionAdmissions === 1 && supervision.summary.codingEscalations === 1 && supervision.summary.estimatedFundImpact > 0 && supervision.policyBoundary.includes("不直接认定违规") },
-    { id: "special-case", label: "特例单议状态机", ok: Array.isArray(state.specialCases) },
-    { id: "settlement", label: "月结算与年度清算批次模型", ok: Array.isArray(state.settlementBatches) && Array.isArray(state.budgets) },
+    { id: "special-case", label: "特例单议专家抽取、利益回避、双人复核、状态投影与正式结算绑定", ok: specialApproved.row.state === "INCLUDED" && specialApproved.row.expertPanel?.members.filter((item) => item.status === "selected").length === 2 && SpecialCase.verifySpecialCaseStateProjection(specialApproved.row) && specialSnapshot.specialCaseDecisionDigest === specialApproved.row.decisionDigest },
+    { id: "special-case-appeal", label: "特例单议原决定摘要绑定、限期复议、新专家组双人复核、状态投影与结算准入", ok: appealRow.state === "APPROVED" && appealPanel.members.every((item) => !originalAppealExpertIds.has(item.expertId)) && appeal.outcome === "APPROVED" && SpecialCase.verifySpecialCaseStateProjection(appealRow) && SpecialCase.buildSpecialCaseAppealSla(appealRow, appeal.reviewDueAt).status === "completed-within-sla" && SpecialCase.settlementAdjustment([appealRow], { id: appealRow.caseId })?.decisionDigest === appealRow.decisionDigest },
+    { id: "settlement", label: "正式分组结算准入、医保核心回执、整数分状态机与账本状态投影", ok: settlementFrozen && settlementPaid.batch.settlementState === "PAID" && Number.isSafeInteger(settlementPaid.batch.standardAmountFen) && Settlement.verifySettlementBatchProjection(settlementPaid.batch) },
+    { id: "settlement-core-correction", label: "医保核心退回要求摘要、补正SLA、重报身份更新与多周期账本", ok: settlementCorrection.batch.settlementState === "CORE_ACCEPTED" && settlementCorrection.batch.coreSubmission.revision === 2 && settlementCorrection.batch.coreReturnCycles[0].status === "ACCEPTED" && settlementCorrection.batch.coreReturnCycles[0].sla.status === "completed-within-sla" && settlementCorrectionOverdue.summary.overdue === 1 && settlementCorrectionOperations.summary.accepted === 1 && settlementCorrectionOperations.summary.invalid === 0 && Settlement.verifySettlementBatchProjection(settlementCorrection.batch) },
+    { id: "settlement-payment-retry", label: "拨付失败可信回调、处置SLA、新申请号重试与多周期账本", ok: settlementPaymentRetry.batch.settlementState === "PAID" && settlementPaymentRetry.batch.paymentRequest.revision === 2 && settlementPaymentRetry.batch.paymentFailureCycles[0].status === "SUCCEEDED" && settlementPaymentRetry.batch.paymentFailureCycles[0].sla.status === "completed-within-sla" && settlementPaymentFailureOverdue.summary.overdue === 1 && settlementPaymentFailureOperations.summary.succeeded === 1 && settlementPaymentFailureOperations.summary.invalid === 0 && Settlement.verifySettlementBatchProjection(settlementPaymentRetry.batch) },
+    { id: "settlement-sla", label: "申报截止次日起30工作日结算SLA与工作日历", ok: settlementCreated.batch.policyWorkingDays === 30 && Boolean(settlementCreated.batch.sla?.dueDate) && settlementPaid.batch.sla?.status === "completed-within-sla" },
+    { id: "settlement-difference-governance", label: "月度结算差额摘要证据、医院/医保双域复核、处理SLA与账本投影", ok: settlementDifference.batch.settlementState === "RECONCILED" && settlementDifferenceCase.state === "RESOLVED" && settlementDifferenceCase.reviews.length === 2 && settlementDifferenceCase.sla.status === "completed-within-sla" && Settlement.verifyDifferenceCaseProjection(settlementDifferenceCase) },
+    { id: "annual-clearance", label: "年度清算确认、资金调整、入账、锁账与状态投影", ok: annualProgress.row.state === "LOCKED" && annualProgress.row.posting?.postedAmountFen === annualProgress.row.finalClearanceAmountFen && Settlement.buildAnnualClearanceEnvelope(annualProgress.row).contractId === Settlement.ANNUAL_CLEARANCE_CONTRACT_ID && Settlement.verifyAnnualClearanceProjection(annualProgress.row) },
+    { id: "annual-clearance-institution-confirmation", label: "年度清算逐机构确认清单、机构争议定位与汇总摘要", ok: annualProgress.row.institutionConfirmations.length === annualProgress.row.institutionCount && annualProgress.row.institutionConfirmations.every((item) => item.state === "CONFIRMED" && item.confirmation?.digest) && annualProgress.row.institutionConfirmation?.digest === Settlement.institutionConfirmationDigest(annualProgress.row) },
+    { id: "responsibility-operating-model", label: "医保、医院、财务、适配器职责与证据矩阵", ok: operatingModel.ok && operatingModel.responsibilityCapabilities === 7 && integrationHandoff.readyForIntegration },
     { id: "external-boundary", label: "正式分组和医保核心外部边界", ok: state.externalDependencies.filter((item) => item.requiredForProduction).length >= 3 },
     { id: "grouping-2.0", label: "DRG/DIP 2.0版切换与期限", ok: state.policy2?.switchDeadline === "2024-12-31" && state.policy2?.settlementSlaWorkingDays === 30 },
     { id: "drg2-library-profile", label: "DRG 2.0版MDC/ADRG/DRG目录结构", ok: state.drg2LibraryProfile?.mdcCount === 26 && state.drg2LibraryProfile?.adrgCount === 409 && state.drg2LibraryProfile?.drgCount === 634 },
@@ -98,9 +192,11 @@ function buildDiseasePaymentReadiness() {
     { id: "drg-hierarchy", label: "DRG本地模拟MDC、ADRG和CC/MCC分层", ok: state.cases.slice(0, 3).every((item) => item.calculation?.grouping?.mdcCode && item.calculation?.grouping?.adrgCode && item.calculation?.grouping?.complicationLevel) },
     { id: "drg-analytics", label: "DRG入组率、CMI、权重与倍率病例指标", ok: overview.summary.drg.groupedCount >= 3 && overview.summary.drg.cmi > 0 && ["highOutliers", "lowOutliers", "totalWeight"].every((key) => Object.hasOwn(overview.summary.drg, key)) },
     { id: "drg-preview-boundary", label: "DRG试分组非结算效力与正式结果隔离", ok: state.drgPreviewRules?.authority === "non-binding" && Service.simulateDrgCase(state, { caseId: "dp-case-001" }).binding === false },
-    { id: "official-receipt-contract", label: "正式回执病例摘要、方案版本与适配器验签合同", ok: receiptValidation.ok && receiptValidation.verificationContract === "detached-signature-attestation-v1" },
-    { id: "formal-grouping-async", label: "正式分组异步作业、幂等派发与关联回执", ok: formalJobDuplicate.idempotent && formalJobReceived.job.status === "completed" && formalJobReceived.run.succeeded === 1 && formalJobReceived.job.receiptCount === 1 },
-    { id: "formal-grouping-compensation", label: "正式分组指数退避、死信与人工对账重开", ok: failureJobDead.state.formalGroupingDeadLetters.length === 1 && failureJobReconciled.deadLetter.status === "resolved" && failureJobReconciled.job.status === "queued" && formalOperations.retryPolicy.backoffSeconds.join(",") === "60,120,240" },
+    { id: "official-receipt-contract", label: "正式回执病例摘要、方案版本与可信数字签名合同", ok: receiptValidation.ok && receiptValidation.signatureVerification?.cryptographicallyValid && receiptValidation.signatureVerification?.trusted && receiptValidation.verificationContract === GrouperContract.SIGNATURE_SCHEMA_VERSION },
+    { id: "formal-grouping-async", label: "正式分组异步作业、可信回调、幂等入账与结果账本交叉验真", ok: formalJobDuplicate.idempotent && formalJobReceived.job.status === "completed" && formalJobReceived.run.succeeded === 1 && formalJobReceived.job.receiptCount === 1 && formalJobReceived.callbackEvent.signatureVerified && formalJobReceived.job.trustedCallbackEventId === formalJobReceived.callbackEvent.eventId && Intake.verifyFormalGroupingJobLedger(formalJobReceived.job) && Intake.verifyFormalGroupingResultProjection(formalJobReceived.state, formalJobReceived.job) },
+    { id: "formal-grouper-production-config-contract", label: "正式分组器HTTPS端点、凭据引用、证书指纹、回调密钥/白名单/时间窗脱敏配置门禁", ok: grouperProductionContract.configured && !grouperProductionContract.productionReady && grouperProductionContract.secretsExposed === false && grouperProductionContract.checks.length === 6 },
+    { id: "formal-grouping-compensation", label: "正式分组指数退避、死信与人工对账重开", ok: failureJobDead.state.formalGroupingDeadLetters.length === 1 && failureJobReconciled.deadLetter.status === "resolved" && failureJobReconciled.job.status === "queued" && Intake.verifyFormalGroupingJobLedger(failureJobReconciled.job) && Intake.verifyFormalGroupingDeadLetter(failureJobReconciled.deadLetter) && formalOperations.retryPolicy.backoffSeconds.join(",") === "60,120,240" },
+    { id: "formal-grouping-integrity", label: "正式分组作业/死信状态投影、结果/测算账本交叉验真与运维最小披露", ok: formalOperations.summary.invalidJobs === 0 && formalOperations.summary.invalidDeadLetters === 0 && formalOperations.jobs.every((item) => item.jobLedgerIntegrity && item.resultIntegrity && item.integrity && item.caseSnapshots === undefined) && formalOperations.deadLetters.every((item) => item.integrity && item.errorMessage === undefined && item.resolution === undefined) },
     { id: "parameter-impact", label: "支付参数病例与机构影响试算", ok: parameterSimulation.report.caseCount === state.cases.length && parameterSimulation.report.byInstitution.length >= 2 && Boolean(parameterSimulation.report.inputDigest) },
     { id: "parameter-dual-review", label: "支付参数双人复核、发布与旧版冻结", ok: parameterPublished.row.status === "已发布" && parameterPublished.row.approvals.length === 2 && parameterPublished.state.parameterVersions.some((item) => item.id === "param-drg-2026" && item.status === "已冻结") },
     { id: "local-package-validation", label: "当地医保目录、权重/分值、费率和来源文件整包校验", ok: localPackageImported.validation.ok && localPackageImported.validation.summary.catalogCount === 1 && Boolean(localPackageImported.validation.digest) },
@@ -138,7 +234,7 @@ function buildDiseasePaymentReadiness() {
     { id: "local-package-ui", label: "当地医保正式规则包导入治理工作台", ok: ["data-payment-section=\"local-package-governance\"", "local-package-file", "local-package-list", "local-package-report-list"].every((marker) => fs.readFileSync(path.join(ROOT, "disease-payment.html"), "utf8").includes(marker)) },
     { id: "disease-supervision-ui", label: "一病种一档案监管工作台", ok: ["data-payment-section=\"disease-supervision\"", "supervision-summary", "supervision-profile-list"].every((marker) => fs.readFileSync(path.join(ROOT, "disease-payment.html"), "utf8").includes(marker)) }
   ];
-  return { generatedAt: new Date().toISOString(), policy: state.policy, policy2: state.policy2, summary: { ...overview.summary, supervision: supervision.summary, intake: intakeSummary, formalGrouping: formalOperations.summary }, checks, ready: checks.every((item) => item.ok), externalBlockers: state.externalDependencies.filter((item) => item.requiredForProduction && item.status !== "已联调") };
+  return { generatedAt: new Date().toISOString(), policy: state.policy, policy2: state.policy2, summary: { ...overview.summary, supervision: supervision.summary, intake: intakeSummary, formalGrouping: formalOperations.summary, grouperProductionConfiguration }, checks, ready: checks.every((item) => item.ok), operatingModel, integrationHandoff, externalBlockers: state.externalDependencies.filter((item) => item.requiredForProduction && item.status !== "已联调") };
 }
 
 function renderMarkdown(report) {
@@ -149,6 +245,7 @@ function renderMarkdown(report) {
     `- 本地可开发能力：${report.ready ? "通过" : "未通过"}`,
     `- 检查：${report.checks.filter((item) => item.ok).length}/${report.checks.length}`,
     `- 外部生产依赖：${report.externalBlockers.length}项`,
+    `- T00待接公共端点：${report.integrationHandoff?.pending || 0}项`,
     "",
     "## DRG运行摘要",
     "",

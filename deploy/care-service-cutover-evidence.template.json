@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "care-service-cutover-evidence-v1",
+  "policyVersion": "care-service-runtime-v1",
+  "environment": "production",
+  "releaseId": "replace-with-approved-change-id",
+  "approvals": [
+    {
+      "scope": "business",
+      "decision": "pending",
+      "signerId": "replace-with-business-approver-id",
+      "signedAt": null,
+      "expiresAt": null,
+      "evidenceRef": "replace-with-immutable-business-evidence-reference",
+      "evidenceDigest": "replace-with-sha256-digest"
+    },
+    {
+      "scope": "interface",
+      "decision": "pending",
+      "signerId": "replace-with-interface-approver-id",
+      "signedAt": null,
+      "expiresAt": null,
+      "evidenceRef": "replace-with-immutable-interface-evidence-reference",
+      "evidenceDigest": "replace-with-sha256-digest"
+    },
+    {
+      "scope": "security",
+      "decision": "pending",
+      "signerId": "replace-with-security-approver-id",
+      "signedAt": null,
+      "expiresAt": null,
+      "evidenceRef": "replace-with-immutable-security-evidence-reference",
+      "evidenceDigest": "replace-with-sha256-digest"
+    },
+    {
+      "scope": "dr",
+      "decision": "pending",
+      "signerId": "replace-with-dr-approver-id",
+      "signedAt": null,
+      "expiresAt": null,
+      "evidenceRef": "replace-with-immutable-dr-evidence-reference",
+      "evidenceDigest": "replace-with-sha256-digest"
+    },
+    {
+      "scope": "oncall",
+      "decision": "pending",
+      "signerId": "replace-with-oncall-approver-id",
+      "signedAt": null,
+      "expiresAt": null,
+      "evidenceRef": "replace-with-immutable-oncall-evidence-reference",
+      "evidenceDigest": "replace-with-sha256-digest"
+    }
+  ]
+}

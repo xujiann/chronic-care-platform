@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-07-24T15:46:17.706Z",
+  "receipts": [
+    {
+      "lineId": "T06",
+      "sourceCandidateHead": "8a161560f69016ec8372cfd89dfbf24afb047a80",
+      "targetBranch": "main",
+      "targetPath": "/",
+      "publishedHead": "d30e499b8396656481e653bf1a2ab2df17e342c6",
+      "deploymentType": "github-pages-legacy",
+      "ci": {
+        "runId": "29991049627",
+        "status": "success",
+        "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/29991049627"
+      },
+      "deployment": {
+        "runId": "29991048858",
+        "status": "success",
+        "deployedAt": "2026-07-23T08:33:34.000Z",
+        "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/29991048858"
+      },
+      "site": {
+        "baseUrl": "https://xujiann.github.io/chronic-care-platform/",
+        "status": "built",
+        "verifiedAt": "2026-07-23T13:37:59.524Z",
+        "resources": [
+          {
+            "path": "nursing-escort-domain.js",
+            "statusCode": 200,
+            "requiredMarkers": [
+              "ORDER_DISPATCH_BINDING_IMMUTABLE",
+              "capacityReservation",
+              "capacityRelease"
+            ],
+            "observedMarkers": [
+              "ORDER_DISPATCH_BINDING_IMMUTABLE",
+              "capacityReservation",
+              "capacityRelease"
+            ]
+          },
+          {
+            "path": "internet-nursing.html",
+            "statusCode": 200,
+            "requiredMarkers": [
+              "nursing-escort-domain.js",
+              "internet-nursing.js"
+            ],
+            "observedMarkers": [
+              "nursing-escort-domain.js",
+              "internet-nursing.js"
+            ]
+          },
+          {
+            "path": "escort.html",
+            "statusCode": 200,
+            "requiredMarkers": [
+              "nursing-escort-domain.js",
+              "escort.js"
+            ],
+            "observedMarkers": [
+              "nursing-escort-domain.js",
+              "escort.js"
+            ]
+          }
+        ]
+      },
+      "productionReady": false,
+      "boundary": "GitHub Pages is a static legacy preview receipt only. It does not prove Node API, trusted identity, production data, live interfaces, monitoring, disaster recovery, or production Go/No-Go readiness."
+    },
+    {
+      "lineId": "T08",
+      "sourceCandidateHead": "771c727b8abe7c722248d40656d6b91dfb67f3cf",
+      "sourceIntegrationHead": "db49df0240da4cfb6b98ea9ad22eccda0c5c44e6",
+      "targetBranch": "main",
+      "targetPath": "/",
+      "publishedHead": "e7bf11f9fdd2114c15b0e9ee83a4588a3ba5f4fa",
+      "publishedScope": [
+        "public-health.html",
+        "public-health.js"
+      ],
+      "deploymentType": "github-pages-legacy",
+      "ci": {
+        "runId": "30106391484",
+        "status": "success",
+        "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/30106391484"
+      },
+      "deployment": {
+        "runId": "30106389887",
+        "status": "success",
+        "deployedAt": "2026-07-24T15:42:36.000Z",
+        "url": "https://github.com/xujiann/chronic-care-platform/actions/runs/30106389887"
+      },
+      "site": {
+        "baseUrl": "https://xujiann.github.io/chronic-care-platform/",
+        "status": "built",
+        "verifiedAt": "2026-07-24T15:46:17.706Z",
+        "resources": [
+          {
+            "path": "public-health.html",
+            "statusCode": 200,
+            "requiredMarkers": [
+              "public-health-coordination-center",
+              "八领域协同中心"
+            ],
+            "observedMarkers": [
+              "public-health-coordination-center",
+              "八领域协同中心"
+            ]
+          },
+          {
+            "path": "public-health.js",
+            "statusCode": 200,
+            "requiredMarkers": [
+              "buildStaticCoordinationCenter",
+              "renderPublicHealthCoordinationCenter",
+              "productionReady: false"
+            ],
+            "observedMarkers": [
+              "buildStaticCoordinationCenter",
+              "renderPublicHealthCoordinationCenter",
+              "productionReady: false"
+            ]
+          }
+        ]
+      },
+      "productionReady": false,
+      "boundary": "This receipt covers only the accepted public-health.html and public-health.js static GitHub Pages slice. It does not assert that db49df0 was merged into main, and it does not prove Node API routes, managed key services, live external adapters, trusted site evidence, production data, SIEM, on-call, disaster recovery, or production Go/No-Go readiness."
+    }
+  ]
+}

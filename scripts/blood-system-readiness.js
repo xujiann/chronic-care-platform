@@ -70,6 +70,7 @@ function buildBloodSystemReadinessReport(options = {}) {
     ["Integration test and retry actions", js.includes("IOT-TEMPERATURE/receive") && js.includes("dead-letters/")]
     ,["All BIS and BTIS business domains", server.includes("BloodBusinessService.dashboard") && readText("blood-business-service.js").includes("autologous-treatment")],
     ["Business records and governed actions", server.includes("BloodBusinessService.create") && server.includes("BloodBusinessService.action")]
+    ,["All business state transitions are ordered", readText("blood-business-service.js").includes("rule.transitions?.[from]") && Object.values(require(path.join(ROOT, "blood-business-service.js")).resourceRules).every((rule)=>rule.statuses.every((status)=>Array.isArray(rule.transitions[status])))]
     ,["Role-scoped business operations UI", readText("blood-business.html").includes("血液业务中心") && readText("blood-business.js").includes("business/resources")],
     ["All business page entry", html.includes("blood-business.html")],
     ["Thirteen innovation capabilities", readText("blood-innovation-service.js").includes('"pda-bedside"') && require(path.join(ROOT, "blood-innovation-service.js")).capabilities.length === 13],
@@ -83,7 +84,7 @@ function buildBloodSystemReadinessReport(options = {}) {
     ["Four consumer dashboards receive blood projections", ["emergency.html", "quality-safety.html", "operations.html", "health-dashboard.html"].every((file) => readText(file).includes("blood-coordination")) && ["emergency.js", "quality-safety.js", "operations.js", "health-dashboard.js"].every((file) => readText(file).includes("renderBloodCoordination"))],
     ["Consumer APIs expose scoped blood coordination", server.includes("dashboard.bloodCoordination") && server.includes("bloodCoordination: { ...bloodCoordination") && server.includes("bloodCoordination: BloodEventHub.dashboard")],
     ["Blood production cutover center", server.includes("BloodGoLiveService.center") && readText("blood-go-live.html").includes("血液系统上线控制中心") && readText("blood-go-live.js").includes("/api/blood-system/go-live")],
-    ["Formal go-live boundary preserved", readText("blood-go-live-service.js").includes("blocked-until-site-evidence-signed") && readText("blood-go-live-service.js").includes("ready-for-production") && readText("blood-go-live-service.js").includes("independent verification")],
+    ["Formal go-live boundary preserved", readText("blood-go-live-service.js").includes("blocked-until-site-evidence-signed") && readText("blood-go-live-service.js").includes("ready-for-production") && readText("blood-go-live-service.js").includes("independent verification") && readText("blood-go-live-service.js").includes("previousDigest") && readText("blood-go-live-service.js").includes("\"GENESIS\"")],
     ["Interfaces drills migrations and dual approvals", ["bloodGoLiveEndpoints","bloodGoLiveDrills","bloodMigrationBatches","bloodCutoverApprovals"].every((token)=>readText("blood-go-live-service.js").includes(token)) && server.includes("BloodGoLiveService.signApproval")]
   ];
   const normalizedChecks = checks.map((item) => ({ name: item?.[0] || "Unnamed check", ok: Boolean(item?.[1]) }));

@@ -553,12 +553,12 @@ test("full appointment schedule automatically promotes the first waitlist reside
 
   await login(page, "citizen", "citizen.html");
   await page.goto("/citizen.html?client=app&page=registration#service-registration");
-  const fullScheduleCard = page.locator(".registration-schedule-card", { hasText: "Doctor Sun" });
+  const fullScheduleCard = page.locator(".registration-schedule-card", { hasText: "孙医生" });
   await expect(fullScheduleCard).toContainText("余号 0 个");
   await expect(fullScheduleCard.getByRole("button", { name: "加入候补" })).toHaveCount(1);
   await fullScheduleCard.getByLabel("候补通知方式").selectOption("sms");
   await fullScheduleCard.getByRole("button", { name: "加入候补" }).click();
-  const waitingCard = page.locator("[data-registration-waitlist-entry]", { hasText: "Doctor Sun" });
+  const waitingCard = page.locator("[data-registration-waitlist-entry]", { hasText: "孙医生" });
   await expect(waitingCard).toContainText("候补排队中");
   await expect(waitingCard).toContainText("当前第 1 位");
 
@@ -568,7 +568,7 @@ test("full appointment schedule automatically promotes the first waitlist reside
   });
   expect(releaseResponse.status()).toBe(200);
   await page.reload();
-  const offerCard = page.locator("[data-registration-waitlist-entry]", { hasText: "Doctor Sun" });
+  const offerCard = page.locator("[data-registration-waitlist-entry]", { hasText: "孙医生" });
   await expect(offerCard).toContainText("号源待我确认");
   await expect(offerCard.getByRole("button", { name: "确认候补号源" })).toHaveCount(1);
   await offerCard.scrollIntoViewIfNeeded();
@@ -583,7 +583,7 @@ test("full appointment schedule automatically promotes the first waitlist reside
   await offerCard.getByRole("button", { name: "确认候补号源" }).click();
   await expect(offerCard).toContainText("候补已转预约");
   await expect(offerCard.getByRole("button", { name: "确认候补号源" })).toHaveCount(0);
-  await expect(page.locator("[data-registration-order]", { hasText: "Doctor Sun" })).toContainText("候补");
+  await expect(page.locator("[data-registration-order]", { hasText: "孙医生" })).toContainText("候补");
   await expect(page.locator("#registration-journey-timeline")).toContainText("候补待确认");
 });
 

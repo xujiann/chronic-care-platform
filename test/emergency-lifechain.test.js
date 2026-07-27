@@ -1,6 +1,8 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
+const { createHmac } = require("node:crypto");
 const EmergencyService = require("../emergency-service");
+const Gateway = require("../emergency-device-gateway");
 const LifeChain = require("../emergency-lifechain");
 
 test("pre-authorized device SOS coordinates the golden four minutes without replacing 120", () => {
@@ -52,4 +54,63 @@ test("pre-authorized device SOS coordinates the golden four minutes without repl
   assert.equal(quality.summary.cancellationReviews, 1);
   const revoked = LifeChain.revokeAuthorization(data, citizen, data.emergencySosAuthorizations[0].id, { confirmed:true });
   assert.equal(revoked.active, false);
+});
+
+test("trusted gateway signal can be linked into automatic SOS without bypassing consent", () => {
+  const data = EmergencyService.seed();
+  Gateway.ensure(data);
+  const citizen = { role:"citizen", name:"resident", residentId:"r-100" };
+  const submitter = { role:"commission", name:"device submitter" };
+  const verifier = { role:"commission", name:"device verifier" };
+  const secret = "site-secret-reference-value-2026";
+  const evidenceDigest = "a".repeat(64);
+  const device = Gateway.registerDevice(data, submitter, {
+    deviceId:"ambulance-monitor-001",
+    vendor:"设备厂商",
+    model:"ECG-X",
+    serialNo:"SN-001",
+    ownerOrganization:"120急救中心",
+    credentialRef:"vault://emergency/device/SN-001",
+    certificateFingerprint:"b".repeat(64),
+    allowedSignals:["cardiac-risk"]
+  }, { now:"2026-07-22T06:00:00.000Z" });
+  Gateway.submitAttestation(data, submitter, device.id, {
+    evidenceRef:"evidence://device/SN-001",
+    evidenceDigest,
+    externalSigner:"厂商现场工程师",
+    externalOrganization:"设备厂商"
+  }, { now:"2026-07-22T06:01:00.000Z" });
+  Gateway.verifyAttestation(data, verifier, device.id, {
+    confirmation:Gateway.ATTESTATION_CONFIRMATION,
+    evidenceDigest,
+    verificationRef:"verification://commission/SN-001"
+  }, { now:"2026-07-22T06:02:00.000Z" });
+  LifeChain.createAuthorization(data, citizen, { deviceId:"ambulance-monitor-001", confirmed:true });
+  const payload = {
+    deviceId:"ambulance-monitor-001",
+    signal:"cardiac-risk",
+    riskScore:88,
+    sourceSignalId:"signal-001",
+    occurredAt:"2026-07-22T06:03:00.000Z",
+    counter:1,
+    residentId:"r-100"
+  };
+  payload.signature = createHmac("sha256", secret).update(Gateway.canonicalSignal(payload)).digest("hex");
+  const signal = Gateway.receiveSignedSignal(data, payload, {
+    now:"2026-07-22T06:03:30.000Z",
+    secretResolver:()=>secret
+  });
+  assert.throws(() => LifeChain.createAutomaticSosFromTrustedSignal(data, { role:"citizen", name:"other", residentId:"r-200" }, signal.id, EmergencyService), /cannot use this trusted device signal/);
+  const event = LifeChain.createAutomaticSosFromTrustedSignal(data, citizen, signal.id, EmergencyService, {
+    address:"test location",
+    latitude:38.92,
+    longitude:121.65
+  });
+  assert.equal(event.sos.trustedDeviceSignalId, signal.id);
+  assert.equal(event.sos.trustedDeviceId, device.id);
+  assert.equal(signal.lifeChainEventId, event.id);
+  assert.equal(signal.lifeChainStatus, "linked");
+  const replay = LifeChain.createAutomaticSosFromTrustedSignal(data, citizen, signal.sourceSignalId, EmergencyService);
+  assert.equal(replay.id, event.id);
+  assert.equal(replay.automaticSosSubmission.deduplicated, true);
 });

@@ -20,6 +20,10 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "file:README.md",
     "file:DEPLOYMENT.md",
     "file:session-store.js",
+    "file:public-health-external-endpoint-verification-service.js",
+    "file:docs/public-health-external-endpoint-verification.md",
+    "file:public-health-external-endpoint-probe-campaign-service.js",
+    "file:docs/public-health-external-endpoint-probe-campaigns.md",
     "file:production-adapters.js",
     "file:docs/production-identity-message-adapters.md",
     "file:hospital-connectors.js",
@@ -108,6 +112,9 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "snapshot:chronicFollowupStatusPolicy",
     "snapshot:publicHealth",
     "api:publicHealth",
+    "api:publicHealthExternalEndpointVerification",
+    "api:publicHealthExternalActiveEndpointProbe",
+    "api:publicHealthExternalEndpointProbeCampaign",
     "api:publicHealthEventActions",
     "api:publicHealthAdvancedActions",
     "api:chronicPublicHealthLoop",
@@ -218,6 +225,8 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "manifest:registrationIntegrationReadiness",
     "manifest:internetNursingReadiness",
     "manifest:internetNursingHighlightCenter",
+    "manifest:t10SpecialtyCutover",
+    "api:t10SpecialtyModuleGovernance",
     "manifest:platformProductionAudit",
     "manifest:platformCapabilityMap",
     "manifest:platformGoLiveSlices",
@@ -229,6 +238,9 @@ test("deploy check report covers release-critical snapshot gates", () => {
   ].forEach((name) => assert.equal(checkNames.has(name), true, `${name} should be checked`));
   assert.match(report.checks.find((item) => item.name === "api:chronicPublicHealthLoop").detail, /immunization infectious-reporting and CDC command summary/);
   assert.match(report.checks.find((item) => item.name === "api:publicHealthAdvancedActions").detail, /exchange exception, institution, onsite and cutover action APIs/);
+  assert.match(report.checks.find((item) => item.name === "api:publicHealthExternalEndpointVerification").detail, /receiptId\/nonce replay protection/);
+  assert.match(report.checks.find((item) => item.name === "api:publicHealthExternalActiveEndpointProbe").detail, /server-owned DNS\/TLS\/pin\/mTLS policy/);
+  assert.match(report.checks.find((item) => item.name === "api:publicHealthExternalEndpointProbeCampaign").detail, /atomic replay-safe persistence/);
   assert.match(report.checks.find((item) => item.name === "api:publicHealthCutoverReadiness").detail, /cutover readiness API and board/);
   assert.match(report.checks.find((item) => item.name === "api:publicHealthCutoverEvidencePackets").detail, /cutover evidence packet API and board/);
   assert.match(report.checks.find((item) => item.name === "api:publicHealthCutoverDrills").detail, /cutover drill API and board/);
@@ -258,6 +270,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
   assert.match(report.checks.find((item) => item.name === "api:productionHospitalConnectors").detail, /outbound connectors/);
   assert.match(report.checks.find((item) => item.name === "api:diseasePaymentFormalGroupingOperations").detail, /async dispatch, receipt, retry and dead-letter/);
   assert.match(report.checks.find((item) => item.name === "manifest:citizenLaunchFoundation").detail, /resident pipeline acceptance panel/);
+  assert.match(report.checks.find((item) => item.name === "api:t10SpecialtyModuleGovernance").detail, /commission-controlled, versioned, idempotent, audited/);
   assert.match(report.checks.find((item) => item.name === "api:secureObjectStorage").detail, /malware scan/);
   assert.match(report.checks.find((item) => item.name === "api:financialGateways").detail, /signed replay-safe amount-aware callbacks/);
   assert.match(report.checks.find((item) => item.name === "docs:citizenExternalDependencyOwners").detail, /blockers, evidence, and onsite acceptance/);

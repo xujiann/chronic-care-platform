@@ -1,4 +1,5 @@
 const { createHash, createHmac, randomUUID, timingSafeEqual } = require("node:crypto");
+const OnlinePaymentRefunds = require("./online-payment-refunds");
 
 const DEFAULT_FINANCIAL_CALLBACK_MAX_SKEW_SECONDS = 300;
 const FINANCIAL_CALLBACK_STATUSES = new Set(["accepted", "processing", "succeeded", "failed", "cancelled", "reversed"]);
@@ -545,6 +546,7 @@ function financialGatewayOperationsCenter(data = {}, env = process.env, scopeTyp
   const callbackEvents = events.flatMap((item) => Array.isArray(item.callbackEvents) ? item.callbackEvents : []);
   const eventStatuses = new Map(events.map((item) => [item, financialEventProviderStatus(item)]));
   const gatewayCenter = financialGatewayCenter(env);
+  const refundOperations = !scopedType || scopedType === "PAYMENT" ? OnlinePaymentRefunds.buildRefundOperations(data) : null;
   return {
     ok: true,
     productionReady: false,
@@ -559,7 +561,9 @@ function financialGatewayOperationsCenter(data = {}, env = process.env, scopeTyp
       callbackEvents: callbackEvents.length,
       ignoredEvents: callbackEvents.filter((item) => item.stateApplied === false).length,
       reconciliationRuns: runs.length,
-      reconciliationDifferences: runs.filter((item) => item.status === "difference").length
+      reconciliationDifferences: runs.filter((item) => item.status === "difference").length,
+      refundRequests: refundOperations?.summary.total || 0,
+      refundExceptions: refundOperations?.summary.failed || 0
     },
     gateways: gatewayCenter.gateways.filter((item) => !scopedType || item.type === scopedType),
     events: events.slice(0, 100).map((item) => ({
@@ -577,6 +581,7 @@ function financialGatewayOperationsCenter(data = {}, env = process.env, scopeTyp
       productionEvidence: false
     })),
     reconciliationRuns: runs,
+    refundOperations,
     boundary: "Signed generic callbacks and digest-only daily reconciliation are runnable. Provider-specific fields, source allowlists, managed callback keys, statement transport and agency signoff remain production dependencies."
   };
 }
@@ -744,6 +749,10 @@ module.exports = {
   GATEWAY_DEFINITIONS,
   REQUIRED_FIELDS,
   applyFinancialCallback,
+  buildRefundOperations: OnlinePaymentRefunds.buildRefundOperations,
+  cancelRefund: OnlinePaymentRefunds.cancelRefund,
+  closeRefund: OnlinePaymentRefunds.closeRefund,
+  createRefundRequest: OnlinePaymentRefunds.createRefundRequest,
   createFinancialReconciliationRun,
   dispatchFinancialRequest,
   financialGatewayOperationsCenter,
@@ -752,9 +761,18 @@ module.exports = {
   normalizeFinancialCallback,
   normalizeFinancialCallbackStatus,
   normalizeFinancialReconciliationRun,
+  prepareRefundDispatch: OnlinePaymentRefunds.prepareRefundDispatch,
+  reconcileRefund: OnlinePaymentRefunds.reconcileRefund,
+  recordRefundDispatch: OnlinePaymentRefunds.recordRefundDispatch,
+  resubmitRejectedRefund: OnlinePaymentRefunds.resubmitRejectedRefund,
+  retryRefund: OnlinePaymentRefunds.retryRefund,
+  reviewRefundRequest: OnlinePaymentRefunds.reviewRefundRequest,
   signFinancialCallback,
   signFinancialRequest,
   stableStringify,
+  syncRefundFromFinancialCallback: OnlinePaymentRefunds.syncRefundFromFinancialCallback,
   validateFinancialRequest,
-  verifyFinancialCallback
+  verifyFinancialCallback,
+  verifyRefundLedger: OnlinePaymentRefunds.verifyRefundLedger,
+  verifyRefundStateProjection: OnlinePaymentRefunds.verifyRefundStateProjection
 };

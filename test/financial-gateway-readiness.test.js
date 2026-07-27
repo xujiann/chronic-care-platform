@@ -15,8 +15,36 @@ test("financial gateway readiness separates adapter foundation from production a
   assert.equal(report.summary.gateways, 3);
   assert.equal(report.summary.operations, 14);
   assert.equal(report.summary.capabilityGroupsReady, report.summary.capabilityGroups);
+  assert.equal(report.capabilities.find((item) => item.id === "online-refund-closed-loop").passed, true);
   assert.equal(report.checks.find((item) => item.id === "financialGateway:operationsUi").passed, true);
   assert.equal(report.blockers.length, 6);
+});
+
+test("financial gateway readiness detects an incomplete online refund closed loop", () => {
+  const source = fs
+    .readFileSync(path.join(ROOT, "online-payment-refunds.js"), "utf8")
+    .replaceAll("REFUND_LEDGER_INVALID", "REMOVED_REFUND_LEDGER_VERIFICATION");
+  const report = buildFinancialGatewayReadiness({ refundSource: source });
+  assert.equal(report.ok, false);
+  assert.equal(report.capabilities.find((item) => item.id === "online-refund-closed-loop").passed, false);
+});
+
+test("financial gateway readiness requires governed rejected-refund resubmission", () => {
+  const source = fs
+    .readFileSync(path.join(ROOT, "online-payment-refunds.js"), "utf8")
+    .replaceAll("REFUND_RESUBMISSION_NEW_EVIDENCE_REQUIRED", "REMOVED_REFUND_RESUBMISSION");
+  const report = buildFinancialGatewayReadiness({ refundSource: source });
+  assert.equal(report.ok, false);
+  assert.equal(report.capabilities.find((item) => item.id === "online-refund-closed-loop").passed, false);
+});
+
+test("financial gateway readiness requires refund ledger state projection verification", () => {
+  const source = fs
+    .readFileSync(path.join(ROOT, "online-payment-refunds.js"), "utf8")
+    .replaceAll("REFUND_STATE_PROJECTION_INVALID", "REMOVED_REFUND_STATE_PROJECTION");
+  const report = buildFinancialGatewayReadiness({ refundSource: source });
+  assert.equal(report.ok, false);
+  assert.equal(report.capabilities.find((item) => item.id === "online-refund-closed-loop").passed, false);
 });
 
 test("financial gateway readiness fails when sensitive payload protection is removed", () => {

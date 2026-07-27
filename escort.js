@@ -430,7 +430,7 @@ function bindEscortOrderForm() {
       const request = window.HealthCityAuth?.authFetch || fetch;
       await request(`${ESCORT_API_BASE}/escort-services/orders`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
         body: JSON.stringify(values)
       });
     }
@@ -443,7 +443,7 @@ async function updateEscortOrder(id, status) {
   const request = window.HealthCityAuth?.authFetch || fetch;
   await request(`${ESCORT_API_BASE}/escort-services/orders/${encodeURIComponent(id)}/actions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
     body: JSON.stringify({
       status,
       qualityReview: status === "closed" ? "closed" : "follow-up-call-required",
@@ -460,7 +460,7 @@ async function updateEscortHospitalHandoff(id, decision) {
   const confirmed = decision !== "return";
   await request(`${ESCORT_API_BASE}/escort-services/orders/${encodeURIComponent(id)}/hospital-handoff`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
     body: JSON.stringify({
       decision,
       hospitalCheckInStatus: confirmed ? "confirmed" : "pending",

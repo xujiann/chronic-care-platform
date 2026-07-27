@@ -1,0 +1,12 @@
+[Unit]
+Description=Run internet nursing and escort outbox worker every 15 seconds
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=15s
+AccuracySec=1s
+Persistent=true
+Unit=care-service-outbox-worker.service
+
+[Install]
+WantedBy=timers.target

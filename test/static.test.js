@@ -2768,7 +2768,9 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   const serviceWorker = read("service-worker.js");
   assert.match(citizenHtml, /rel="manifest"/);
   assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260720actions7/);
+  assert.match(citizenHtml, /citizen-records-v1\.js\?v=20260724auth3/);
+  assert.match(citizenHtml, /citizen-records-v2\.js\?v=20260725care16/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260727next2/);
   assert.match(citizenHtml, /mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-title/);
@@ -3004,7 +3006,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.equal(manifest.shortcuts.some((item) => item.url === "./citizen.html?client=app&page=escort#service-escort"), true);
   assert.equal(manifest.shortcuts.some((item) => item.url === "./mobile-preview.html?client=app"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v55-active-rail-alignment/);
+  assert.match(serviceWorker, /chronic-care-citizen-v56-record-care/);
   assert.match(serviceWorker, /physical-examination-standards\.js/);
   assert.match(serviceWorker, /physical-examination-highlights\.js/);
   assert.match(citizenHtml, /physical-examination-standards\.js[\s\S]*physical-examination-highlights\.js[\s\S]*physical-examination-service\.js/);
@@ -3124,7 +3126,7 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   assert.match(citizenJs, /setEscortAppointmentAvailability/);
   assert.match(citizenJs, /escortProviderReady/);
   assert.match(citizenJs, /暂无可预约服务主体/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260720actions7/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260727next2/);
   assert.match(citizenJs, /\/escort-services\/orders/);
   assert.match(citizenJs, /getEscortRegistrationOptions/);
   assert.match(citizenJs, /applyLinkedRegistrationToEscortForm/);
@@ -3225,7 +3227,7 @@ test("citizen portal aggregates cross-service resident tasks", () => {
   assert.match(citizenHtml, /service-order-metrics/);
   assert.match(citizenHtml, /service-order-cards/);
   assert.match(citizenHtml, /citizen-highlight-center/);
-  assert.match(citizenHtml, /C端亮点中心/);
+  assert.match(citizenHtml, /居民端亮点中心/);
   assert.match(citizenHtml, /citizen-highlight-grid/);
   assert.match(citizenHtml, /citizen-notification-panel/);
   assert.match(citizenHtml, /居民通知/);
@@ -3340,8 +3342,8 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenHtml, /service-summary/);
   assert.match(citizenHtml, /service-mobile-pagebar/);
   assert.match(citizenHtml, /citizen-action-dock/);
-  assert.match(citizenHtml, /citizen\.css\?v=20260720actions6/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260720actions7/);
+  assert.match(citizenHtml, /citizen\.css\?v=20260727next2/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260727next2/);
   assert.match(citizenHtml, /当前服务常用操作/);
   assert.match(citizenHtml, /service-health-record/);
   assert.match(citizenHtml, /service-emr/);
@@ -3544,7 +3546,8 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /data-service-state/);
   assert.match(citizenJs, /service-tab-boundary/);
   assert.match(citizenJs, /service-summary-meta/);
-  assert.match(citizenJs, /待生产化：/);
+  assert.match(citizenJs, /连接状态由平台后台核验/);
+  assert.match(citizenJs, /按身份与授权范围展示/);
   assert.doesNotMatch(citizenJs, /status: "待开发"/);
   assert.match(citizenJs, /手机号验证码登录/);
   assert.match(citizenJs, /长期照护评估/);
@@ -3627,7 +3630,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /longterm-care-form/);
   assert.match(citizenCss, /registration-form/);
   assert.match(citizenHtml, /registration-summary/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260720actions7/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260727next2/);
   assert.match(citizenJs, /registration-summary/);
   assert.match(citizenJs, /hisOrders/);
   assert.match(citizenJs, /insuranceReady/);
@@ -4576,4 +4579,181 @@ test("2026-07-23 delivery report and onsite work pack preserve release evidence 
   const workPack = read("docs/试点现场验收与接口联调工作包-2026-07-23.md");
   ["515/515", "8/8", "0/10", "0/4", "blocked-until-site-evidence-signed"].forEach((marker) => assert.ok(report.includes(marker), marker));
   ["P0-01", "P0-10", "生产告警演练单", "official-grouper", "四方签字页", "不代替医院或主管部门签字"].forEach((marker) => assert.ok(workPack.includes(marker), marker));
+});
+
+test("citizen record V2 exposes twelve governed care capabilities", () => {
+  const html = read("citizen.html");
+  const ui = read("citizen.js");
+  const model = read("citizen-records-v2.js");
+  const policy = read("citizen-records-policy.js");
+  const readiness = read("scripts/citizen-records-readiness.js");
+  const css = read("citizen.css");
+  const documentation = read("docs/citizen-records-first-increment.md");
+  [
+    "异常结果闭环",
+    "跨院来源与安全调阅",
+    "家庭与监护关系",
+    "结构化电子病历",
+    "用药核对",
+    "疾病专题与趋势",
+    "档案完整度与更新提醒",
+    "档案纠错与异议",
+    "一次性健康资料包",
+    "简洁模式",
+    "高对比度",
+    "朗读摘要"
+  ].forEach((label) => assert.match(html, new RegExp(label)));
+  [
+    "evaluateProtectedAccess",
+    "mergeInstitutionRecords",
+    "buildControlledAccessIntent",
+    "relationshipAccessState",
+    "buildAbnormalCareTasks",
+    "structuredEmrSummary",
+    "reconcileMedicationList",
+    "buildCorrectionRequest",
+    "buildMetricTrends",
+    "assessRecordCompleteness",
+    "buildSharePackage",
+    "normalizeAccessibilityPreferences",
+    "buildIdempotentAction",
+    "projectCorrectionReceipt",
+    "projectSharePackageReceipt",
+    "validateControlledCredential",
+    "projectCareWorkspacePayload",
+    "mergeCareWorkspaceState",
+    "buildCarePreviewMetadata",
+    "isCarePreviewExpired",
+    "classifyAccessEvent",
+    "buildAccessReviewQueue",
+    "buildAccessAcknowledgement",
+    "buildAccessDispute",
+    "projectAccessReviewActionReceipt",
+    "buildAccessExportRows",
+    "filterResidentRecords",
+    "buildAuthorizationScopeDisclosure",
+    "projectAuthorizationCreateResponse",
+    "projectAuthorizationRevocationResponse",
+    "buildAuthorizationReceiptLedger",
+    "buildAuthorizationReceiptExportRows",
+    "buildResidentPortableArchive",
+    "sealResidentPortableArchive",
+    "parseResidentPortableArchive",
+    "verifyResidentPortableArchive",
+    "buildAuthorizationLifecycle",
+    "buildAuthorizationRenewalDraft"
+  ].forEach((contract) => assert.match(model, new RegExp(contract)));
+  assert.match(policy, /evaluateCitizenRecordAccess/);
+  assert.match(policy, /buildCitizenControlledAccessIntent/);
+  assert.match(readiness, /softwareReady/);
+  assert.match(readiness, /productionReady/);
+  assert.match(readiness, /CITIZEN_RECORDS_RELEASE_SIGNOFF/);
+  assert.match(ui, /\/record-corrections/);
+  assert.match(ui, /\/record-share-packages/);
+  assert.match(ui, /\/care-tasks\//);
+  assert.match(ui, /Idempotency-Key/);
+  assert.match(ui, /CITIZEN_CONTROLLED_ACCESS_ORIGINS/);
+  assert.match(ui, /\/record-care-workspace\?residentId=/);
+  assert.match(ui, /citizenCareSession/);
+  assert.match(ui, /data-clear-care-workspace/);
+  assert.match(ui, /\/access-reviews\/.*\/acknowledge/);
+  assert.match(ui, /\/access-reviews\/.*\/disputes/);
+  assert.match(ui, /safeCsvCell/);
+  assert.match(ui, /data-renew-authorization/);
+  assert.match(ui, /openAuthorizationRenewal/);
+  assert.match(ui, /vaultSearchState/);
+  assert.match(ui, /filterResidentRecords/);
+  assert.match(ui, /renderAuthorizationScopePreview/);
+  assert.match(ui, /authorization-create/);
+  assert.match(ui, /authorization-revoke/);
+  assert.match(ui, /citizen-authorization-receipt-summary/);
+  assert.match(ui, /exportCitizenAuthorizationReceipts/);
+  assert.match(ui, /exportCitizenHealthRecord/);
+  assert.match(ui, /renderCitizenHealthRecordExportPreview/);
+  assert.match(ui, /verifyCitizenHealthRecordFile/);
+  assert.match(css, /record-high-contrast/);
+  assert.match(css, /min-height: 44px/);
+  assert.match(css, /vault-search-fields/);
+  assert.match(css, /authorization-scope-preview-list/);
+  assert.match(css, /overflow-wrap: anywhere/);
+  assert.match(documentation, /持续照护中心 V2/);
+  assert.match(documentation, /生产响应信任边界收口/);
+  assert.match(documentation, /安全同步与本地最小留存/);
+  assert.match(documentation, /居民隐私审计闭环/);
+  assert.match(documentation, /授权生命周期与显式续授权/);
+  assert.match(documentation, /档案检索与快速定位/);
+  assert.match(documentation, /授权范围影响预览/);
+  assert.match(documentation, /授权写入响应信任边界/);
+  assert.match(documentation, /授权状态展示一致性/);
+  assert.match(documentation, /授权有效期自然日边界/);
+  assert.match(documentation, /授权操作回执核验台/);
+  assert.match(documentation, /授权回执最小化证据导出/);
+  assert.match(documentation, /居民健康档案可携带副本/);
+  assert.match(documentation, /档案副本范围确认/);
+  assert.match(documentation, /档案副本完整性校验/);
+  assert.match(documentation, /档案副本本机校验/);
+  assert.match(documentation, /T04 上线门禁/);
+  assert.match(html, /data-record-accessibility="text-down"/);
+  assert.match(html, /data-record-accessibility="text-up"/);
+  assert.match(html, /citizen-record-text-scale/);
+  assert.match(html, /data-refresh-care-workspace/);
+  assert.match(html, /data-clear-care-workspace/);
+  assert.match(html, /citizen-access-review-v2-list/);
+  assert.match(html, /citizen-access-dispute-form/);
+  assert.match(html, /data-export-access-review/);
+  assert.match(html, /citizen-authorization-lifecycle-list/);
+  assert.match(html, /citizen-authorization-receipt-list/);
+  assert.match(html, /data-export-authorization-receipts/);
+  assert.match(html, /export-health-record/);
+  assert.match(html, /health-record-export-dialog/);
+  assert.match(html, /health-record-export-preview/);
+  assert.match(html, /health-record-verify-file/);
+  assert.match(html, /health-record-verify-result/);
+  assert.match(html, /previousAuthorizationId/);
+  assert.match(html, /vault-search-keyword/);
+  assert.match(html, /vault-search-trust/);
+  assert.match(html, /vault-search-status/);
+  assert.match(html, /auth-scope-preview/);
+  assert.match(html, /citizen-records-v2\.js\?v=20260725care16/);
+  assert.match(html, /citizen\.js\?v=20260727next2/);
+  assert.match(html, /citizen-ui-zh\.js\?v=20260725zh4/);
+  assert.match(html, /citizen\.css\?v=20260727next2/);
+  assert.match(css, /\[data-internal-launch-panel\]\[hidden\]\s*\{\s*display:\s*none\s*!important;/);
+  assert.match(read("citizen-ui-zh.js"), /translateVisibleText/);
+  assert.match(read("citizen-ui-zh.js"), /MutationObserver/);
+});
+
+test("citizen record V3 exposes eight governed next-stage capabilities", () => {
+  const html = read("citizen.html");
+  const ui = read("citizen.js");
+  const v3 = read("citizen-records-v3.js");
+  const documentation = read("docs/citizen-records-first-increment.md");
+
+  assert.match(html, /居民健康档案八项增强服务/);
+  assert.match(html, /citizen-records-v3\.js\?v=20260727next3/);
+  for (const id of [
+    "citizen-integration-v3",
+    "citizen-governance-v3",
+    "citizen-family-v3",
+    "citizen-care-plan-v3",
+    "citizen-report-explain-v3",
+    "citizen-medication-safety-v3",
+    "citizen-emergency-pack-v3",
+    "citizen-operations-v3"
+  ]) assert.match(html, new RegExp(id));
+  for (const functionName of [
+    "buildProductionIntegrationStatus",
+    "governCrossInstitutionRecords",
+    "buildFamilyDelegationCenter",
+    "buildProactiveCarePlan",
+    "explainResidentReports",
+    "assessMedicationSafety",
+    "buildEmergencyHealthPack",
+    "buildOperationsSnapshot"
+  ]) assert.match(v3, new RegExp(`function ${functionName}`));
+  assert.match(v3, /function buildSafeActionIntent/);
+  assert.match(ui, /handleCitizenRecordsV3Action/);
+  assert.match(ui, /data-v3-action="prepare-emergency-authorization"/);
+  assert.match(ui, /renderCitizenRecordsNextStage/);
+  assert.match(documentation, /第二十三增量/);
 });

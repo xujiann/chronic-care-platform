@@ -121,6 +121,9 @@ function buildDeployCheckReport(options = {}) {
   const traceabilityEvidenceRequirements = Array.isArray(data.drugTraceabilityEvidenceRequirements) ? data.drugTraceabilityEvidenceRequirements : [];
   const drugConsumableSupervisions = Array.isArray(data.drugConsumableSupervisions) ? data.drugConsumableSupervisions : [];
   const serverSource = fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
+  const t10SpecialtyModuleGovernanceSource = fs.readFileSync(path.join(ROOT, "t10-specialty-module-governance.js"), "utf8");
+  const bloodClinicalProductionSource = fs.readFileSync(path.join(ROOT, "blood-clinical-production.js"), "utf8");
+  const emergencyModuleGateSource = fs.readFileSync(path.join(ROOT, "emergency-module-gate.js"), "utf8");
   const sessionStoreSource = fs.readFileSync(path.join(ROOT, "session-store.js"), "utf8");
   const authSource = fs.readFileSync(path.join(ROOT, "auth.js"), "utf8");
   const bloodBusinessSource = fs.readFileSync(path.join(ROOT, "blood-business.js"), "utf8");
@@ -131,11 +134,22 @@ function buildDeployCheckReport(options = {}) {
   const diseasePaymentHtml = fs.readFileSync(path.join(ROOT, "disease-payment.html"), "utf8");
   const diseasePaymentUiSource = fs.readFileSync(path.join(ROOT, "disease-payment.js"), "utf8");
   const diseasePaymentReadinessSource = fs.readFileSync(path.join(ROOT, "scripts", "disease-payment-readiness.js"), "utf8");
+  const insurancePaymentOperatingModelSource = fs.readFileSync(path.join(ROOT, "insurance-payment-operating-model.js"), "utf8");
+  const insurancePaymentAcceptanceSource = fs.readFileSync(path.join(ROOT, "scripts", "insurance-payment-acceptance.js"), "utf8");
   const envTemplateSource = fs.readFileSync(path.join(ROOT, ".env.example"), "utf8");
   const deploymentSource = fs.readFileSync(path.join(ROOT, "DEPLOYMENT.md"), "utf8");
   const publicHealthSource = fs.readFileSync(path.join(ROOT, "scripts", "public-health-readiness.js"), "utf8");
+  const publicHealthEndpointVerificationSource = fs.readFileSync(path.join(ROOT, "public-health-external-endpoint-verification-service.js"), "utf8");
+  const publicHealthEndpointVerificationDoc = fs.readFileSync(path.join(ROOT, "docs", "public-health-external-endpoint-verification.md"), "utf8");
+  const publicHealthEndpointProbeRunnerSource = fs.readFileSync(path.join(ROOT, "public-health-external-endpoint-probe-runner.js"), "utf8");
+  const publicHealthEndpointProbeCampaignSource = fs.readFileSync(path.join(ROOT, "public-health-external-endpoint-probe-campaign-service.js"), "utf8");
+  const publicHealthEndpointProbeKeyProviderSource = fs.readFileSync(path.join(ROOT, "public-health-external-key-provider.js"), "utf8");
+  const publicHealthEndpointProbeDoc = fs.readFileSync(path.join(ROOT, "docs", "public-health-external-active-probing.md"), "utf8");
+  const publicHealthEndpointProbeCampaignDoc = fs.readFileSync(path.join(ROOT, "docs", "public-health-external-endpoint-probe-campaigns.md"), "utf8");
   const imagingCloudSource = fs.readFileSync(path.join(ROOT, "imaging-cloud.js"), "utf8");
   const imagingCloudReadinessSource = fs.readFileSync(path.join(ROOT, "scripts", "imaging-cloud-readiness.js"), "utf8");
+  const imagingCloudProductionSource = fs.readFileSync(path.join(ROOT, "imaging-cloud-production.js"), "utf8");
+  const productionReleaseEvidenceSource = fs.readFileSync(path.join(ROOT, "scripts", "production-release-evidence-readiness.js"), "utf8");
   const digitalHospitalStandardsSource = fs.readFileSync(path.join(ROOT, "scripts", "digital-hospital-standards-readiness.js"), "utf8");
   const digitalHospitalStandardsHtml = fs.readFileSync(path.join(ROOT, "digital-hospital-standards.html"), "utf8");
   const digitalHospitalStandardsJs = fs.readFileSync(path.join(ROOT, "digital-hospital-standards.js"), "utf8");
@@ -255,6 +269,12 @@ function buildDeployCheckReport(options = {}) {
     assertFile("data/db.json"),
     assertFile("drug-consumable-about.html"),
     assertFile("server.js"),
+    assertFile("public-health-external-endpoint-verification-service.js"),
+    assertFile("docs/public-health-external-endpoint-verification.md"),
+    assertFile("public-health-external-endpoint-probe-runner.js"),
+    assertFile("docs/public-health-external-active-probing.md"),
+    assertFile("public-health-external-endpoint-probe-campaign-service.js"),
+    assertFile("docs/public-health-external-endpoint-probe-campaigns.md"),
     assertFile("session-store.js"),
     assertFile("production-adapters.js"),
     assertFile("docs/production-identity-message-adapters.md"),
@@ -377,6 +397,19 @@ function buildDeployCheckReport(options = {}) {
     assertFile("config/disease-payment/templates/local-dip-package.template.json"),
     assertFile("disease-payment.html"),
     assertFile("scripts/disease-payment-readiness.js"),
+    assertFile("scripts/production-release-evidence-readiness.js"),
+    assertFile("docs/production-security-release-execution-pack.md"),
+    assertFile("docs/evidence-templates/production-security-release/security-assessment.json"),
+    assertFile("docs/evidence-templates/production-security-release/monitoring-drill.json"),
+    assertFile("docs/evidence-templates/production-security-release/dr-rehearsal.json"),
+    assertFile("docs/evidence-templates/production-security-release/site-acceptance.json"),
+    assertFile("docs/evidence-templates/production-security-release/go-no-go.json"),
+    assertFile("insurance-payment-operating-model.js"),
+    assertFile("insurance-payment-production-handoff.js"),
+    assertFile("online-payment-refunds.js"),
+    assertFile("scripts/insurance-payment-acceptance.js"),
+    assertFile("scripts/insurance-payment-evidence-packet.js"),
+    assertFile("test/insurance-payment-public-api.test.js"),
     assertFile("docs/按病种付费系统实施说明.md"),
     assertFile("emergency.html"),
     assertFile("emergency.js"),
@@ -396,6 +429,10 @@ function buildDeployCheckReport(options = {}) {
     assertFile("test/blood-transaction-service.test.js"),
     { name: "package:bloodSystemReadiness", ok: Boolean(pkg.scripts?.["blood-system:readiness"]), detail: pkg.scripts?.["blood-system:readiness"] || "missing" },
     { name: "package:diseasePaymentReadiness", ok: Boolean(pkg.scripts?.["disease-payment:readiness"] && pkg.scripts?.["disease-payment:test"] && pkg.scripts?.["disease-payment:package"]), detail: `${pkg.scripts?.["disease-payment:readiness"] || "missing"} / ${pkg.scripts?.["disease-payment:test"] || "missing"} / ${pkg.scripts?.["disease-payment:package"] || "missing"}` },
+    { name: "package:insurancePaymentAcceptance", ok: Boolean(pkg.scripts?.["insurance-payment:check"] && pkg.scripts?.["insurance-payment:test"] && pkg.scripts?.["insurance-payment:acceptance"] && pkg.scripts?.["insurance-payment:evidence"]), detail: ["insurance-payment:check", "insurance-payment:test", "insurance-payment:acceptance", "insurance-payment:evidence"].filter((name) => !pkg.scripts?.[name]).join(",") || "T07 scripts registered" },
+    { name: "package:productionReleaseEvidence", ok: Boolean(pkg.scripts?.["production-release:evidence:check"] && pkg.scripts?.["production-release:evidence:test"] && pkg.scripts?.["production-release:evidence:readiness"]), detail: "T11 evidence check, test and readiness commands are registered" },
+    { name: "api:productionReleaseEvidenceSummary", ok: serverSource.includes("/api/production-release/evidence-readiness") && serverSource.includes("buildProductionReleaseEvidencePublicSummary") && serverSource.includes("productionReady: false") && productionReleaseEvidenceSource.includes("createEvidenceFingerprint") && productionReleaseEvidenceSource.includes("findSensitiveMaterial") && envTemplateSource.includes("PRODUCTION_RELEASE_EVIDENCE_DIR"), detail: "commission-only T11 summary uses only the server-controlled directory and keeps global production authorization closed" },
+    { name: "api:insurancePaymentPublicWiring", ok: ["/api/online-payments/refunds", "/api/disease-payment/special-cases/disclosure", "expert-reselection|appeals|appeals\\/review", "/api/disease-payment/annual-clearances", "applyInsuranceCoreSettlementCallback", "syncRefundFromFinancialCallback", "authorizeInsurancePaymentAction(\"formal-grouping.receipt\"", "receiveTrustedFormalGroupingReceipt", "INSURANCE_PAYMENT_SYSTEM_SIGNATURE_INVALID"].every((marker) => serverSource.includes(marker)) && insurancePaymentOperatingModelSource.includes("T00_ROUTE_CONTRACTS") && insurancePaymentAcceptanceSource.includes("t00RoutesPending"), detail: "23 T07 routes and callback hooks use responsibility, trusted callback and organization-scope controls" },
     { name: "api:diseasePaymentFormalGroupingOperations", ok: ["/api/disease-payment/formal-grouping/operations", "/api/disease-payment/formal-grouping/jobs", "dispatch|receipts|fail|retry|reconcile"].every((marker) => serverSource.includes(marker)) && ["createFormalGroupingJob", "dispatchFormalGroupingJob", "receiveFormalGroupingReceipt", "retryFormalGroupingJob", "reconcileFormalGroupingDeadLetter", "backoffSeconds: [60, 120, 240]"].every((marker) => diseasePaymentIntakeSource.includes(marker)) && ["data-payment-section=\"formal-grouping-operations\"", "formal-grouping-job-list", "formal-grouping-dead-letter-list"].every((marker) => diseasePaymentHtml.includes(marker)) && ["formal-dispatch", "formal-fail", "formal-retry", "formal-reconcile", "/formal-grouping/jobs"].every((marker) => diseasePaymentUiSource.includes(marker)) && ["formal-grouping-async", "formal-grouping-compensation", "formalGrouping"].every((marker) => diseasePaymentReadinessSource.includes(marker)), detail: "formal grouping async dispatch, receipt, retry and dead-letter operations are release-gated" },
     { name: "api:diseasePaymentLocalPackageGovernance", ok: ["/api/disease-payment/local-packages", "/api/disease-payment/local-packages/activate-due", "/api/disease-payment/local-packages/simulation-jobs", "catalog|diff-report|impact-report", "compare|simulate|submit|review|publish|activate|rollback", "process|retry|cancel", "collectJson(req, 30_000_000)", "DISEASE_PAYMENT_TRUSTED_SIGNER_FINGERPRINTS"].every((marker) => serverSource.includes(marker)) && ["validateLocalPaymentPackage", "compareLocalPaymentPackage", "getLocalPaymentPackageCatalogPage", "createLocalPaymentPackageSimulationJob", "processLocalPaymentPackageSimulationJob", "activateDueLocalPaymentPackages", "rollbackLocalPaymentPackage", "local-medical-insurance-approved", "verifyPackageSignature"].every((marker) => diseasePaymentLocalPackageSource.includes(marker)) && ["canonicalStringify", "createPackageSignature", "publicKeyFingerprint", "verifyPackageSignature", "crypto.verify"].every((marker) => diseasePaymentPackageSignatureSource.includes(marker)) && ["data-payment-section=\"local-package-governance\"", "local-package-file", "local-package-report-list", "local-package-job-list", "activate-due-local-packages"].every((marker) => diseasePaymentHtml.includes(marker)) && ["renderLocalPackageGovernance", "local-package-job-create", "local-package-job-process", "local-package-review", "local-package-publish", "local-package-activate", "local-package-rollback"].every((marker) => diseasePaymentUiSource.includes(marker)) && ["local-package-validation", "local-package-impact", "local-package-diff", "local-package-release", "local-package-scheduling", "local-package-rollback", "local-package-pagination", "catalog-prefix-index", "local-package-batch-simulation", "local-package-signature"].every((marker) => diseasePaymentReadinessSource.includes(marker)), detail: "large catalog index, resumable simulation, trusted signature, scheduled activation and safe rollback governance is release-gated" },
     { name: "package:emergencyReadiness", ok: Boolean(pkg.scripts?.["emergency:readiness"] && pkg.scripts?.["emergency:test"]), detail: `${pkg.scripts?.["emergency:readiness"] || "missing"} / ${pkg.scripts?.["emergency:test"] || "missing"}` },
@@ -495,6 +532,101 @@ function buildDeployCheckReport(options = {}) {
     { name: "snapshot:chronicFollowupStatusPolicy", ok: Boolean(data.chronicFollowupStatusPolicy?.version && data.chronicFollowupStatusPolicy?.statusGroups?.open && data.chronicFollowupStatusPolicy?.requiredEvidence?.followup), detail: data.chronicFollowupStatusPolicy?.version || "missing" },
     { name: "snapshot:publicHealth", ok: (data.publicHealthStandards || []).length === 21 && (data.publicHealthInstitutionScopes || []).length >= 7 && (data.publicHealthEvents || []).length >= 6 && (data.publicHealthExchangeTasks || []).length >= 6 && (data.publicHealthExchangeRuns || []).length >= 6 && (data.publicHealthInstitutionTasks || []).length >= 7 && (data.publicHealthOnsiteAcceptances || []).length >= 6 && (data.publicHealthCutoverBlockers || []).length >= 6 && (data.publicHealthCutoverEvidencePackets || []).length >= 6 && (data.publicHealthCutoverDrills || []).length >= 4 && (data.publicHealthProductionHandoffs || []).length >= 6 && (data.publicHealthGoLiveObservations || []).length >= 6 && (data.publicHealthLaunchIncidents || []).length >= 6 && (data.publicHealthLaunchDutyShifts || []).length >= 6 && (data.publicHealthLaunchCommandBriefs || []).length >= 5 && (data.publicHealthSiteEvidenceVerificationTasks || []).length >= 9 && (data.publicHealthLaunchApprovals || []).length >= 6 && (data.publicHealthTriggerRules || []).length >= 5 && (data.publicHealthSignals || []).length >= 6 && (data.publicHealthAlerts || []).length >= 4 && (data.publicHealthCommandTasks || []).length >= 4 && (data.publicHealthResources || []).length >= 5 && (data.publicHealthAiReviews || []).length >= 2 && (data.publicHealthEvidenceRecords || []).length >= 8, detail: `${data.publicHealthStandards?.length || 0} standards, ${data.publicHealthInstitutionScopes?.length || 0} scopes, ${data.publicHealthEvents?.length || 0} events, ${data.publicHealthExchangeTasks?.length || 0} exchange tasks, ${data.publicHealthExchangeRuns?.length || 0} runs, ${data.publicHealthInstitutionTasks?.length || 0} institution tasks, ${data.publicHealthOnsiteAcceptances?.length || 0} onsite rows, ${data.publicHealthCutoverBlockers?.length || 0} cutover blockers, ${data.publicHealthCutoverEvidencePackets?.length || 0} evidence packets, ${data.publicHealthCutoverDrills?.length || 0} cutover drills, ${data.publicHealthProductionHandoffs?.length || 0} production handoffs, ${data.publicHealthGoLiveObservations?.length || 0} go-live observations, ${data.publicHealthLaunchIncidents?.length || 0} launch incidents, ${data.publicHealthLaunchDutyShifts?.length || 0} launch duty shifts, ${data.publicHealthLaunchCommandBriefs?.length || 0} launch command briefs, ${data.publicHealthSiteEvidenceVerificationTasks?.length || 0} site evidence verification tasks, ${data.publicHealthLaunchApprovals?.length || 0} launch approvals, ${data.publicHealthTriggerRules?.length || 0} trigger rules, ${data.publicHealthSignals?.length || 0} signals, ${data.publicHealthAlerts?.length || 0} alerts, ${data.publicHealthCommandTasks?.length || 0} command tasks, ${data.publicHealthResources?.length || 0} resources, ${data.publicHealthAiReviews?.length || 0} AI reviews, ${data.publicHealthEvidenceRecords?.length || 0} evidence records` },
     { name: "api:publicHealth", ok: serverSource.includes("/api/public-health/system") && serverSource.includes("buildPublicHealthSystem") && fs.existsSync(path.join(ROOT, "public-health.html")) && fs.existsSync(path.join(ROOT, "public-health.js")), detail: "public health page and API are wired" },
+    {
+      name: "api:publicHealthExternalEndpointVerification",
+      ok: [
+        "/api/public-health/external/endpoints/summary",
+        "/api/public-health/external/endpoints/receipts",
+        "publicHealthEndpointVerificationContext",
+        "publicHealthEndpointVerificationSummaryView",
+        "publicHealthExternalEndpointProbeReceipts",
+        "assertUniquePublicHealthEndpointProbeReceipts",
+        "assertPublicHealthEndpointProbeInsert",
+        "publicHealthEndpointProbeInsert"
+      ].every((marker) => serverSource.includes(marker))
+        && [
+          "expectedEndpoint",
+          "expectedContract",
+          "resolvedAddress",
+          "sniHostname",
+          "attestationOrigin",
+          "verificationSource",
+          "seenReceiptIds",
+          "seenNonces",
+          "endpointConnectivityReady",
+          "productionReady: false"
+        ].every((marker) => publicHealthEndpointVerificationSource.includes(marker))
+        && ["server-generated", "platform-observability", "endpointConnectivityReady", "productionReady"].every((marker) => publicHealthEndpointVerificationDoc.includes(marker))
+        && pkg.scripts?.["public-health:resilience-check"]?.includes("public-health-external-endpoint-verification-service.js")
+        && pkg.scripts?.["public-health:resilience-test"]?.includes("test/public-health-external-endpoint-verification-service.test.js"),
+      detail: "commission-only redacted endpoint summaries and server-config-bound signed receipts enforce durable receiptId/nonce replay protection while production readiness remains blocked"
+    },
+    {
+      name: "api:publicHealthExternalActiveEndpointProbe",
+      ok: [
+        "/api/public-health/external/endpoints/probes",
+        "runControlledPublicHealthEndpointProbe",
+        "publicHealthEndpointProbeMaxConcurrent",
+        "publicHealthEndpointProbeInFlight",
+        "publicHealthExternalEndpointProbeAudit",
+        "ENDPOINT_PROBE_FREQUENCY_LIMIT",
+        "publicHealthEndpointProbeInsert"
+      ].every((marker) => serverSource.includes(marker))
+        && [
+          "ALLOWED_COMMAND_KEYS",
+          "resolveAddresses",
+          "lookup:",
+          "rejectUnauthorized: true",
+          "certificatePins",
+          "requireMutualTls",
+          "ENDPOINT_PROBE_CERTIFICATE_PIN_MISMATCH",
+          "ENDPOINT_PROBE_MTLS_REQUIRED",
+          "productionReady: false"
+        ].every((marker) => publicHealthEndpointProbeRunnerSource.includes(marker))
+        && [
+          "loadPublicHealthEndpointProbeContext",
+          "PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_POLICIES",
+          "ENDPOINT_PROBE_KEYRING_REF",
+          "ENDPOINT_PROBE_TLS_REF",
+          "privateEndpointProbeContext"
+        ].every((marker) => publicHealthEndpointProbeKeyProviderSource.includes(marker))
+        && ["laneId", "DNS rebinding", "certificatePins", "requireMutualTls", "productionReady=false"].every((marker) => publicHealthEndpointProbeDoc.includes(marker))
+        && pkg.scripts?.["public-health:resilience-check"]?.includes("public-health-external-endpoint-probe-runner.js")
+        && pkg.scripts?.["public-health:resilience-test"]?.includes("test/public-health-external-endpoint-probe-runner.test.js"),
+      detail: "commission-only active endpoint probes accept only laneId, enforce server-owned DNS/TLS/pin/mTLS policy, controlled concurrency/frequency, redacted audit and durable receiptId/nonce replay protection while production readiness remains blocked"
+    },
+    {
+      name: "api:publicHealthExternalEndpointProbeCampaign",
+      ok: [
+        "/api/public-health/external/endpoints/campaigns",
+        "/api/public-health/external/endpoints/campaigns/summary",
+        "runControlledPublicHealthEndpointProbeCampaign",
+        "publicHealthExternalEndpointProbeCampaigns",
+        "publicHealthExternalEndpointProbeCampaignAudit",
+        "assertUniquePublicHealthEndpointProbeCampaigns",
+        "publicHealthEndpointProbeCampaignInsert",
+        "endpointProbeContinuity"
+      ].every((marker) => serverSource.includes(marker))
+        && [
+          "public-health-endpoint-probe-campaign",
+          "receiptDigest",
+          "policyDigest",
+          "continuousConnectivityReady",
+          "requiredConsecutiveCampaigns",
+          "productionReady: false"
+        ].every((marker) => publicHealthEndpointProbeCampaignSource.includes(marker))
+        && [
+          "loadPublicHealthEndpointProbeCampaignContext",
+          "PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_CAMPAIGN_KEYRING_REF",
+          "independentFromLaneKeys"
+        ].every((marker) => publicHealthEndpointProbeKeyProviderSource.includes(marker))
+        && ["300", "900", "continuousConnectivityReady", "productionReady=false"].every((marker) =>
+          publicHealthEndpointProbeCampaignDoc.includes(marker)
+        )
+        && pkg.scripts?.["public-health:resilience-check"]?.includes("public-health-external-endpoint-probe-campaign-service.js")
+        && pkg.scripts?.["public-health:resilience-test"]?.includes("test/public-health-external-endpoint-probe-campaign-service.test.js"),
+      detail: "commission-only eight-lane endpoint campaigns use independent managed signing, atomic replay-safe persistence and redacted continuity evidence while connectivity and production readiness remain separate"
+    },
     { name: "api:publicHealthHighlights", ok: ["/api/public-health/highlights", "/api/public-health/highlights/signals", "/api/public-health/highlights/alerts/:id/actions", "/api/public-health/highlights/command-tasks/:id/actions", "/api/public-health/highlights/ai-reviews/:id/actions", "/api/public-health/highlights/evidence/:id/actions"].every((marker) => serverSource.includes(marker)) && fs.readFileSync(path.join(ROOT, "public-health.html"), "utf8").includes("public-health-highlight-center") && fs.readFileSync(path.join(ROOT, "public-health.js"), "utf8").includes("renderPublicHealthHighlights"), detail: "public health five-suite trigger, map, AI, command and evidence center is wired" },
     { name: "api:publicHealthHighlightsStandalone", ok: fs.existsSync(path.join(ROOT, "public-health-highlights.html")) && fs.existsSync(path.join(ROOT, "public-health-highlights.js")) && fs.existsSync(path.join(ROOT, "scripts", "public-health-highlights-readiness.js")) && serverSource.includes("buildPublicHealthHighlights") && fs.readFileSync(path.join(ROOT, "scripts", "public-health-highlights-readiness.js"), "utf8").includes("functionalState"), detail: "standalone public health five-suite command center and readiness report are present" },
     { name: "docs:publicHealthHighlights", ok: ["五件套", "多点触发", "GIS", "AI", "应急指挥", "证据链", "formalGoLiveState"].every((marker) => fs.readFileSync(path.join(ROOT, "docs", "公共卫生五件套功能说明与验收.md"), "utf8").includes(marker)), detail: "public health five-suite implementation, acceptance and go-live boundary are documented" },
@@ -561,7 +693,7 @@ function buildDeployCheckReport(options = {}) {
     { name: "snapshot:commercialCrypto", ok: (data.commercialCryptoCapabilities || []).length === 6 && (data.commercialCryptoCapabilities || []).every((item) => item.productionReady === false && Array.isArray(item.requiredPrimitives) && item.requiredPrimitives.length > 0) && (data.commercialCryptoEvidencePackets || []).length >= 2, detail: `${data.commercialCryptoCapabilities?.length || 0} contracts / ${data.commercialCryptoEvidencePackets?.length || 0} evidence packets / production ready 0` },
     { name: "api:productionSecurityAcceptance", ok: ["/api/production-security/center", "/api/production-security/findings/:id/actions", "/api/production-security/release-approvals/:id/actions", "production-security-finding-action"].every((marker) => serverSource.includes(marker)) && platformHtml.includes('data-platform-section="production-security-acceptance"') && ["data-production-security-action", "data-production-security-approval"].every((marker) => productionSecuritySource.includes(marker)), detail: "P0-07 finding remediation, independent retest, time-bound waiver, release opinions and platform UI are wired" },
     { name: "api:productionGoNoGo", ok: ["/api/production-go-no-go/center", "/api/production-go-no-go/approvals/:id/actions", "/api/production-go-no-go/decision", "production-go-no-go-decision"].every((marker) => serverSource.includes(marker)) && ["evidenceFingerprint", "staleApprovals", "APPROVE PRODUCTION GO LIVE", "goNoGo:drSignoff"].every((marker) => productionGoNoGoSource.includes(marker)) && platformHtml.includes('data-platform-section="production-go-no-go"') && ["data-go-no-go-approval", "data-go-no-go-decision", "data-go-no-go-drift", "data-go-no-go-approval-drift"].every((marker) => productionGoNoGoUi.includes(marker)), detail: "P0-10 global prerequisites, evidence fingerprint, stale approval drift, four-party approvals, command decision and UI are wired" },
-    { name: "api:pilotAcceptance", ok: ["/api/pilot-acceptance/center", "/api/pilot-acceptance/interfaces/:id/actions", "pilot-interface-joint-test-action"].every((marker) => serverSource.includes(marker)) && ["pilot-acceptance-tooling-ready", "blocked-until-site-evidence-signed", "official-grouper", "insurance-core", "his-emr-feed", "physical-exam-feed", "synthetic-no-patient-data", "reviewer must be independent from recorder"].every((marker) => pilotAcceptanceSource.includes(marker)) && platformHtml.includes('data-platform-section="pilot-acceptance"') && ["pilot-acceptance-applications", "pilot-acceptance-alerting", "pilot-acceptance-onsite", "pilot-acceptance-interfaces", "pilot-acceptance-trials", "pilot-acceptance-issues", "data-pilot-interface-action"].every((marker) => pilotAcceptanceUi.includes(marker)) && pilotAcceptanceReadiness.includes("pilot-acceptance-readiness-report.md") && ["P0-01至P0-10", "不会写入真实接收端", "独立复核"].every((marker) => pilotAcceptanceDoc.includes(marker)) && ["SIEM_ENDPOINT", "ALERT_WEBHOOK_URL", "CUTOVER_MONITORING_SIGNOFF=false"].every((marker) => pilotAlertingTemplate.includes(marker)), detail: "eight-application regression, alerting preflight, P0 task pack, governed interface joint-tests, trial run, issue ledger and production boundary are wired" },
+    { name: "api:pilotAcceptance", ok: ["/api/pilot-acceptance/center", "pilot-acceptance-center"].every((marker) => serverSource.includes(marker)) && ["pilot-acceptance-tooling-ready", "blocked-until-site-evidence-signed", "official-grouper", "insurance-core", "his-emr-feed", "physical-exam-feed", "synthetic-no-patient-data"].every((marker) => pilotAcceptanceSource.includes(marker)) && platformHtml.includes('data-platform-section="pilot-acceptance"') && ["pilot-acceptance-applications", "pilot-acceptance-alerting", "pilot-acceptance-onsite", "pilot-acceptance-interfaces", "pilot-acceptance-trials", "pilot-acceptance-issues"].every((marker) => pilotAcceptanceUi.includes(marker)) && pilotAcceptanceReadiness.includes("pilot-acceptance-readiness-report.md") && ["P0-01至P0-10", "不会写入真实接收端"].every((marker) => pilotAcceptanceDoc.includes(marker)) && ["SIEM_ENDPOINT", "ALERT_WEBHOOK_URL", "CUTOVER_MONITORING_SIGNOFF=false"].every((marker) => pilotAlertingTemplate.includes(marker)), detail: "eight-application regression, alerting preflight, P0 task pack, synthetic interface samples, trial run, issue ledger and production boundary are wired" },
     { name: "snapshot:productionOperations", ok: (data.productionServiceLevels || []).length >= 4 && (data.operationsDutyShifts || []).length >= 3 && (data.operationsIncidents || []).length >= 3 && (data.disasterRecoveryDrills || []).length >= 3 && (data.operationsEvidencePackets || []).length >= 2 && [data.productionServiceLevels, data.operationsDutyShifts, data.operationsIncidents, data.disasterRecoveryDrills].flat().every((item) => item.productionReady === false), detail: `${data.productionServiceLevels?.length || 0} SLOs / ${data.operationsDutyShifts?.length || 0} shifts / ${data.operationsIncidents?.length || 0} incidents / ${data.disasterRecoveryDrills?.length || 0} drills / production ready 0` },
     { name: "snapshot:registrationJourney", ok: (data.registrationOrders || []).length >= 1 && (data.registrationOrders || []).every((item) => item.productionReady === false && item.journeyStage && item.hisConfirmationStatus && item.checkInStatus), detail: `${data.registrationOrders?.length || 0} appointment journeys / production ready 0` },
     { name: "snapshot:registrationIntegration", ok: (data.integrationContracts || []).some((item) => item.id === "appointment-order-v1" && item.signature === "HMAC-SHA256" && item.idempotencyKey === "externalId") && Array.isArray(data.integrationGatewayEvents), detail: `${data.integrationContracts?.length || 0} integration contracts / appointment callback contract present` },
@@ -594,20 +726,92 @@ function buildDeployCheckReport(options = {}) {
     { name: "manifest:onsiteLaunchRequirements", ok: manifestSource.includes("onsite-launch-requirements.md") && manifestSource.includes("onsite:launch-requirements"), detail: "on-site launch requirements artifact is indexed" },
     { name: "manifest:priorityApplicationTemplates", ok: manifestSource.includes("priority-application-templates.md") && manifestSource.includes("priority-apps:templates"), detail: "priority application template artifact is indexed" },
     { name: "manifest:citizenLaunchFoundation", ok: manifestSource.includes("citizen-launch-foundation-readiness.md") && manifestSource.includes("citizen:launch-foundation") && manifestSource.includes("citizen-pipeline-panel"), detail: "citizen launch foundation artifact links to the resident pipeline acceptance panel" },
+    { name: "manifest:citizenRecordsReadiness", ok: manifestSource.includes("citizen-records-readiness-report.md") && manifestSource.includes("citizen-records:readiness") && manifestSource.includes("citizen-care-workspace") && serverSource.includes("/api/record-care-workspace") && serverSource.includes("evaluateCitizenRecordAccess"), detail: "T04 resident record readiness, public policy and care workspace routes are indexed" },
+    { name: "manifest:registrationReferralAcceptance", ok: manifestSource.includes("registration-referral-acceptance-report.md") && manifestSource.includes("registration-referral:acceptance") && manifestSource.includes("/api/registration-referral/operations") && serverSource.includes("/api/registration-referral/commands") && serverSource.includes("applyClosureCommand"), detail: "T05 command, operations, acceptance and release wiring are indexed" },
     { name: "manifest:policyCoverage", ok: manifestSource.includes("policy-coverage-report.md") && manifestSource.includes("policy:coverage"), detail: "policy coverage artifact is indexed" },
     { name: "manifest:maternalChildReadiness", ok: manifestSource.includes("maternal-child-readiness-report.md") && manifestSource.includes("maternal-child:readiness"), detail: "maternal-child readiness artifact is indexed" },
     { name: "manifest:immunizationReadiness", ok: manifestSource.includes("immunization-readiness-report.md") && manifestSource.includes("immunization:readiness") && manifestSource.includes("immunization.html"), detail: "immunization readiness artifact is indexed" },
     { name: "manifest:publicHealthReadiness", ok: manifestSource.includes("public-health-readiness-report.md") && manifestSource.includes("public-health:readiness"), detail: "public health readiness artifact is indexed" },
     { name: "manifest:publicHealthHighlights", ok: manifestSource.includes("public-health-highlights-readiness-report.md") && manifestSource.includes("public-health:highlights:readiness") && manifestSource.includes("/api/public-health/highlights"), detail: "public health five-suite readiness artifact is indexed" },
     { name: "manifest:diseasePaymentReadiness", ok: manifestSource.includes("disease-payment-readiness-report.md") && manifestSource.includes("disease-payment:readiness") && manifestSource.includes("/api/disease-payment"), detail: "disease payment DRG/DIP readiness artifact is indexed" },
+    { name: "manifest:insurancePaymentAcceptance", ok: manifestSource.includes("insurance-payment-acceptance-report.md") && manifestSource.includes("insurance-payment:acceptance") && manifestSource.includes("insurance-payment-evidence-packet.md") && manifestSource.includes("insurance-payment:evidence"), detail: "T07 unified acceptance and digest-bound evidence are indexed" },
+    { name: "manifest:productionReleaseEvidence", ok: manifestSource.includes("production-release-evidence-readiness.md") && manifestSource.includes("production-release:evidence:readiness") && manifestSource.includes("/api/production-release/evidence-readiness"), detail: "T11 production security release evidence is indexed" },
     { name: "manifest:escortServiceReadiness", ok: manifestSource.includes("escort-service-readiness-report.md") && manifestSource.includes("escort:readiness"), detail: "escort service readiness artifact is indexed" },
     { name: "manifest:internetNursingReadiness", ok: manifestSource.includes("internet-nursing-readiness-report.md") && manifestSource.includes("internet-nursing:readiness"), detail: "internet nursing readiness artifact is indexed" },
     { name: "manifest:internetNursingHighlightCenter", ok: manifestSource.includes("internet-nursing-highlight-center.md") && manifestSource.includes("nursing-highlight-section"), detail: "internet nursing highlight center handoff is indexed" },
     { name: "manifest:emergencyReadiness", ok: manifestSource.includes("emergency-readiness-report.md") && manifestSource.includes("emergency:readiness") && manifestSource.includes("/api/emergency/production-center") && manifestSource.includes("emergency-evidence-package-api") && manifestSource.includes("emergency-evidence-export-api") && manifestSource.includes("/api/emergency/events/:id/evidence-package/export?format=json") && manifestSource.includes("emergency-sos-aed-api") && manifestSource.includes("/api/emergency/sos /api/emergency/aed-map") && manifestSource.includes("emergency-life-chain") && manifestSource.includes("/api/emergency/life-chain/device-sos /api/emergency/life-chain/command-center /api/emergency/life-chain/quality"), detail: "prehospital emergency readiness, evidence exports, SOS/AED and golden four-minute life-chain artifacts are indexed" },
+    { name: "manifest:t10SpecialtyCutover", ok: manifestSource.includes("t10-specialty-cutover-pack.md") && manifestSource.includes("t10:specialty-cutover") && manifestSource.includes("/api/t10-specialty/cutover-pack") && serverSource.includes("/api/t10-specialty/cutover-pack") && fs.readFileSync(path.join(ROOT, "workbench.html"), "utf8").includes("t10-specialty-cutover.html") && fs.readFileSync(path.join(ROOT, "t10-specialty-cutover.js"), "utf8").includes("/api/t10-specialty/cutover-pack") && fs.readFileSync(path.join(ROOT, "scripts", "release-report.js"), "utf8").includes("specialtyCutover:moduleCatalog"), detail: "T10 specialty module catalog, cutover API, portal entry and release artifact are indexed" },
+    {
+      name: "api:t10IndependentProductionGates",
+      ok: [
+        "/api/t10-specialty/modules/clinical-blood/readiness",
+        "/api/t10-specialty/modules/emergency-life-chain/readiness",
+        "/api/imaging-cloud/production-center",
+        "imagingProductionEndpointMatch",
+        "imagingProductionSyntheticMatch",
+        "imagingProductionRequirementMatch",
+        "imagingProductionReceiptMatch",
+        "imagingProductionDrillMatch",
+        "imagingProductionApprovalMatch",
+        "blocked-until-trusted-site-evidence-and-platform-launch-approval"
+      ].every((marker) => serverSource.includes(marker))
+        && bloodClinicalProductionSource.includes("blocked-until-site-evidence-signed")
+        && emergencyModuleGateSource.includes("independent-emergency-module")
+        && imagingCloudProductionSource.includes("SITE_RECEIPT_CONTRACTS")
+        && imagingCloudProductionSource.includes("ROUTE_CONTRACTS"),
+      detail: "clinical blood, emergency and imaging module evidence remain subordinate to the T00 platform launch gate"
+    },
+    {
+      name: "package:t10IndependentProductionGates",
+      ok: [
+        "t10:clinical-blood:readiness",
+        "t10:clinical-blood:smoke",
+        "t10:emergency-module:smoke",
+        "imaging-cloud:test"
+      ].every((name) => Boolean(pkg.scripts?.[name])),
+      detail: "T10 independent module check, smoke and readiness commands are registered"
+    },
+    {
+      name: "manifest:t10IndependentProductionGates",
+      ok: [
+        "t10-clinical-blood-independent-gate",
+        "t10-emergency-independent-gate",
+        "t10-imaging-production-gate"
+      ].every((marker) => manifestSource.includes(marker)),
+      detail: "T10 clinical blood, emergency and imaging production gates are indexed"
+    },
+    {
+      name: "api:t10SpecialtyModuleGovernance",
+      ok: [
+        "/api/t10-specialty/modules",
+        "t10-specialty-module-selection-change",
+        "trustedT10Institution",
+        "canReadT10InstitutionModules"
+      ].every((marker) => serverSource.includes(marker))
+        && [
+          "T10_MODULE_ACTOR_FORBIDDEN",
+          "T10_MODULE_BOUNDARY_OVERRIDE_FORBIDDEN",
+          "T10_MODULE_VERSION_CONFLICT",
+          "T10_MODULE_IDEMPOTENCY_CONFLICT",
+          "siteNoGoEnforced",
+          "productionReady: false"
+        ].every((marker) => t10SpecialtyModuleGovernanceSource.includes(marker))
+        && Boolean(pkg.scripts?.["t10:specialty-cutover:check"])
+        && Boolean(pkg.scripts?.["t10:specialty-cutover:test"]),
+      detail: "institution module selection is commission-controlled, versioned, idempotent, audited and fixed to the site No-Go boundary"
+    },
     { name: "manifest:multiPracticeReadiness", ok: manifestSource.includes("multi-practice-readiness-report.md") && manifestSource.includes("multi-practice:readiness"), detail: "multi-practice readiness artifact is indexed" },
     { name: "manifest:hybridDeploymentReadiness", ok: manifestSource.includes("hybrid-deployment-readiness-report.md") && manifestSource.includes("hybrid:deployment-readiness"), detail: "hybrid deployment readiness artifact is indexed" },
     { name: "snapshot:storageMeta", ok: Boolean(data.storageMeta?.engine && data.storageMeta?.mode), detail: data.storageMeta ? `${data.storageMeta.engine}/${data.storageMeta.mode}` : "missing" }
   ];
+
+  checks.push({
+    name: "api:pilotAcceptanceInterfaceGovernance",
+    ok: ["/api/pilot-acceptance/interfaces/:id/actions", "pilot-interface-joint-test-action"].every((marker) => serverSource.includes(marker))
+      && ["reviewer must be independent from recorder", "acceptedProductionReceipts"].every((marker) => pilotAcceptanceSource.includes(marker))
+      && pilotAcceptanceUi.includes("data-pilot-interface-action"),
+    detail: "pilot interface evidence requires commission control, independent review and auditable production receipts"
+  });
 
   const runCommands = options.runCommands === true;
   const npm = process.platform === "win32" ? "npm.cmd" : "npm";

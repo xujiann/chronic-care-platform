@@ -4,13 +4,19 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const { generateKeyPairSync } = require("node:crypto");
 const Service = require("../disease-payment-service");
+const Intake = require("../disease-payment-intake");
+const GrouperContract = require("../disease-payment-grouper-contract");
+const Settlement = require("../disease-payment-settlement");
 const PackageSignature = require("../disease-payment-package-signature");
 const { buildDiseasePaymentReadiness } = require("../scripts/disease-payment-readiness");
 
 const packageSigningKeys = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
 const packageSignerFingerprint = PackageSignature.publicKeyFingerprint(packageSigningKeys.publicKey.export({ type: "spki", format: "pem" }));
 const packageSignatureOptions = { trustedSignerFingerprints: [packageSignerFingerprint] };
+const grouperSigningKeys = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+const grouperSignerFingerprint = GrouperContract.publicKeyFingerprint(grouperSigningKeys.publicKey.export({ type: "spki", format: "pem" }));
 const signedOptions = (options = {}) => ({ ...options, ...packageSignatureOptions });
+const specialEvidence = () => [{ type: "medical-record-summary", digest: `sha256:${"e".repeat(64)}`, issuedBy: "hospital-medical-records" }];
 
 function signLocalPackage(payload) {
   payload.signatureEvidence = PackageSignature.createPackageSignature(payload, packageSigningKeys.privateKey.export({ type: "pkcs8", format: "pem" }), { signerId: "test-insurance-signer", signerOrganization: payload.sourceOrganization, validUntil: "2036-12-31T23:59:59.000Z" });
@@ -44,6 +50,16 @@ function publishLocalPackage(payload, options) {
   return Service.publishLocalPaymentPackage(approved.state, payload.id, "publisher", signedOptions(options));
 }
 
+function formallyGroupAll(state = Service.seedDiseasePaymentState(), caseIds = state.cases.map((item) => item.id)) {
+  state.grouperAdapters.find((item) => item.id === "official-adapter-v1").trustedSignerFingerprints = [grouperSignerFingerprint];
+  const officialResults = caseIds.map((caseId, index) => {
+    const item = state.cases.find((row) => row.id === caseId);
+    const local = Service.calculateCase(state, item, state.mode).grouping;
+    return GrouperContract.createSignedReceipt({ caseId, receiptId: `TEST-OFFICIAL-${index + 1}`, groupCode: local.groupCode, groupName: local.groupName, mdcCode: local.mdcCode, adrgCode: local.adrgCode, schemeVersion: "DRG-2.0-DL", inputDigest: Intake.officialCaseDigest(item, "DRG"), signedAt: "2026-07-20T08:00:00.000Z" }, grouperSigningKeys.privateKey.export({ type: "pkcs8", format: "pem" }), { keyId: "test-settlement-grouper", validUntil: "2036-12-31T23:59:59.000Z" });
+  });
+  return Intake.runGrouping(state, { environment: "formal", mode: "DRG", caseIds, officialResults }, "formal-adapter", Service.calculateCase).state;
+}
+
 test("DRG cases pass quality control, grouping, calculation and risk screening", () => {
   const state = Service.calculateAll(Service.seedDiseasePaymentState(), "tester");
   assert.equal(state.cases.length, 3);
@@ -66,26 +82,132 @@ test("DIP mode uses score and point value", () => {
 
 test("special case workflow supports application and review", () => {
   let state = Service.calculateAll(Service.seedDiseasePaymentState(), "tester");
-  const created = Service.createSpecialCase(state, { caseId: "dp-case-001", reason: "复杂危重症" }, "hospital");
+  const created = Service.createSpecialCase(state, { caseId: "dp-case-001", reason: "复杂危重症", requestedPaymentFen: 3200000, evidence: specialEvidence() }, "hospital");
   assert.equal(created.row.status, "待评审");
-  const reviewed = Service.reviewSpecialCase(created.state, created.row.id, { approved: true, adjustedPayment: 32000 }, "insurance");
+  assert.equal(created.panel.members.length, 2);
+  assert.ok(created.panel.members.every((item) => item.organization !== created.row.institution));
+  assert.throws(() => Service.reviewSpecialCase(created.state, created.row.id, { approved: true, adjustedPaymentFen: 3200000 }, "hospital"), (error) => error.code === "SPECIAL_CASE_REVIEWER_SEPARATION_REQUIRED");
+  created.state.specialCaseExperts.find((item) => item.id === "special-expert-medical-backup").active = true;
+  const replaced = Service.reselectSpecialCaseExpert(created.state, created.row.id, { expertId: "special-expert-medical-primary", reason: "专家申报与医院存在项目合作利益冲突" }, "panel-manager");
+  assert.equal(replaced.replacement.expertId, "special-expert-medical-backup");
+  const first = Service.reviewSpecialCase(replaced.state, created.row.id, { approved: true, adjustedPaymentFen: 3200000 }, "district-medical-reviewer");
+  assert.equal(first.row.status, "复核中");
+  assert.throws(() => Service.reviewSpecialCase(first.state, created.row.id, { approved: true, adjustedPaymentFen: 3200000 }, "district-medical-reviewer"), (error) => error.code === "SPECIAL_CASE_DUPLICATE_REVIEWER");
+  assert.throws(() => Service.reviewSpecialCase(first.state, created.row.id, { approved: true, adjustedPaymentFen: 3190000 }, "大连市医保局管理员"), (error) => error.code === "SPECIAL_CASE_REVIEW_AMOUNT_CONFLICT");
+  const reviewed = Service.reviewSpecialCase(first.state, created.row.id, { approved: true, adjustedPaymentFen: 3200000 }, "大连市医保局管理员");
   assert.equal(reviewed.row.status, "评审通过");
   assert.equal(reviewed.row.adjustedPayment, 32000);
+  assert.equal(Service.verifySpecialCaseLedger(reviewed.row.events), true);
+  const tampered = structuredClone(reviewed.row.events);
+  tampered[0].detail.requestedPaymentFen = 1;
+  assert.equal(Service.verifySpecialCaseLedger(tampered), false);
+  const disclosure = Service.buildSpecialCaseDisclosure(reviewed.state);
+  assert.equal(disclosure.totals.approved, 1);
+  assert.doesNotMatch(JSON.stringify(disclosure), /dp-case-001|medical-record-summary|district-medical-reviewer/);
 });
 
 test("monthly settlement supports reconciliation and payment", () => {
-  const created = Service.createSettlementBatch(Service.seedDiseasePaymentState(), { period: "2026-06" }, "insurance");
+  assert.throws(() => Service.createSettlementBatch(Service.seedDiseasePaymentState(), { period: "2026-06" }, "insurance"), /结算准入失败.*缺少可信正式分组回执/);
+  assert.throws(() => Service.createSettlementBatch(formallyGroupAll(), { period: "2026-06", submissionDeadline: "2026-06-30" }, "insurance"), /结算月结束后90日内/);
+  const workingCalendar = { version: "test-calendar-2026", nonWorkingDates: ["2026-07-13"], workingWeekendDates: ["2026-07-18"] };
+  const created = Service.createSettlementBatch(formallyGroupAll(), { period: "2026-06", submissionDeadline: "2026-07-10", workingCalendar }, "insurance");
   assert.equal(created.batch.caseCount, 3);
-  assert.equal(created.batch.status, "待对账");
-  const reconciled = Service.reconcileBatch(created.state, created.batch.id, { status: "已对账" }, "insurance");
+  assert.equal(created.batch.status, "待申报");
+  assert.equal(created.batch.settlementState, "BATCH_FROZEN");
+  assert.equal(Number.isSafeInteger(created.batch.standardAmountFen), true);
+  assert.ok(created.batch.batchDigest);
+  assert.equal(created.batch.sla.submissionDeadline, "2026-07-10");
+  assert.equal(Settlement.addWorkingDays("2026-07-10", 1, workingCalendar), "2026-07-14");
+  assert.equal(created.batch.sla.status, "within-sla");
+  assert.ok(created.batch.calculationSnapshots.every((item) => item.formalReceiptId && item.parameterId));
+  assert.throws(() => Service.applyInsuranceCoreSettlementCallback(created.state, created.batch.id, { action: "confirm-payment", receiptId: "PAY-TOO-EARLY", paidAmountFen: created.batch.standardAmountFen }), /结算状态不允许/);
+  const submitted = Service.reconcileBatch(created.state, created.batch.id, { action: "submit-core", externalRequestId: "CORE-REQ-001", idempotencyKey: "CORE-IDEM-001" }, "insurance");
+  assert.equal(submitted.batch.settlementState, "CORE_SUBMITTED");
+  const duplicate = Service.reconcileBatch(submitted.state, created.batch.id, { action: "submit-core", externalRequestId: "CORE-REQ-001", idempotencyKey: "CORE-IDEM-001" }, "insurance");
+  assert.equal(duplicate.idempotent, true);
+  assert.throws(() => Service.reconcileBatch(duplicate.state, created.batch.id, { action: "core-accepted", receiptId: "MANUAL-FAKE-RECEIPT" }, "insurance"), /只能由医保核心可信回调驱动/);
+  const accepted = Service.applyInsuranceCoreSettlementCallback(duplicate.state, created.batch.id, { action: "core-accepted", receiptId: "CORE-ACCEPT-001" });
+  const reconciling = Service.reconcileBatch(accepted.state, created.batch.id, { action: "start-reconciliation", idempotencyKey: "RECON-001", providerSummaryDigest: "a".repeat(64) }, "finance");
+  const reconciled = Service.reconcileBatch(reconciling.state, created.batch.id, { action: "confirm-matched", idempotencyKey: "MATCH-001", providerAmountFen: created.batch.standardAmountFen }, "finance");
   assert.equal(reconciled.batch.status, "已对账");
-  const paid = Service.reconcileBatch(reconciled.state, created.batch.id, { status: "已拨付" }, "insurance");
+  assert.equal(reconciled.batch.settlementState, "RECONCILED");
+  const requested = Service.reconcileBatch(reconciled.state, created.batch.id, { action: "request-payment", paymentRequestId: "PAY-REQ-001" }, "insurance");
+  const paid = Service.applyInsuranceCoreSettlementCallback(requested.state, created.batch.id, { action: "confirm-payment", receiptId: "PAY-RECEIPT-001", paidAmountFen: created.batch.standardAmountFen });
+  assert.equal(paid.batch.settlementState, "PAID");
+  assert.equal(paid.batch.sla.status, "completed-within-sla");
   assert.ok(paid.state.cases.every((item) => item.status === "已结算"));
+  assert.ok(paid.state.cases.every((item) => item.fundPaid === item.formalCalculation.paymentStandard));
+  assert.equal(Settlement.verifyEventLedger(paid.batch.events), true);
+});
+
+test("approved special case is frozen into the formal settlement contract", () => {
+  let state = formallyGroupAll();
+  const created = Service.createSpecialCase(state, { caseId: "dp-case-001", reason: "复杂危重病例资源消耗异常", requestedPaymentFen: 3200000, evidence: specialEvidence() }, "hospital");
+  let reviewed = Service.reviewSpecialCase(created.state, created.row.id, { approved: true, adjustedPaymentFen: 3200000 }, "大连市医保中心审核员");
+  reviewed = Service.reviewSpecialCase(reviewed.state, created.row.id, { approved: true, adjustedPaymentFen: 3200000 }, "大连市医保局管理员");
+  const panelTampered = structuredClone(reviewed.state);
+  panelTampered.specialCases[0].expertPanel.members[0].displayName = "被篡改的专家";
+  assert.throws(() => Service.createSettlementBatch(panelTampered, { period: "2026-06" }, "insurance"), /专家抽取|账本校验失败/);
+  const batchResult = Service.createSettlementBatch(reviewed.state, { period: "2026-06" }, "insurance");
+  const snapshot = batchResult.batch.calculationSnapshots.find((item) => item.caseId === "dp-case-001");
+  assert.equal(snapshot.specialCaseId, created.row.id);
+  assert.equal(snapshot.paymentStandardFen, 3200000);
+  assert.ok(snapshot.basePaymentStandardFen < snapshot.paymentStandardFen);
+  assert.match(snapshot.specialCaseDecisionDigest, /^[a-f0-9]{64}$/);
+  const envelope = Settlement.buildCoreSettlementEnvelope(batchResult.batch);
+  assert.equal(envelope.cases.find((item) => item.caseId === "dp-case-001").specialCaseDecisionDigest, snapshot.specialCaseDecisionDigest);
+  const tamperedBatch = structuredClone(batchResult.batch);
+  tamperedBatch.calculationSnapshots.find((item) => item.caseId === "dp-case-001").specialCaseDecisionDigest = "invalid";
+  assert.throws(() => Settlement.buildCoreSettlementEnvelope(tamperedBatch), /有效决议摘要/);
+  assert.equal(batchResult.state.specialCases[0].state, "INCLUDED");
+  assert.equal(Service.verifySpecialCaseLedger(batchResult.state.specialCases[0].events), true);
+  assert.throws(() => Service.createSpecialCase(batchResult.state, { caseId: "dp-case-001", reason: "重复申请", requestedPaymentFen: 10000, evidence: specialEvidence() }, "hospital"), /已有在办特例单议/);
+});
+
+test("settlement difference correction and annual clearance remain auditable until lock", () => {
+  const created = Service.createSettlementBatch(formallyGroupAll(), { period: "2026-06" }, "insurance");
+  let result = Service.reconcileBatch(created.state, created.batch.id, { action: "submit-core", externalRequestId: "CORE-REQ-DIFF", idempotencyKey: "CORE-IDEM-DIFF" }, "insurance");
+  result = Service.applyInsuranceCoreSettlementCallback(result.state, created.batch.id, { action: "core-accepted", receiptId: "CORE-ACCEPT-DIFF" });
+  result = Service.reconcileBatch(result.state, created.batch.id, { action: "start-reconciliation", idempotencyKey: "RECON-DIFF", providerSummaryDigest: "b".repeat(64) }, "finance");
+  result = Service.reconcileBatch(result.state, created.batch.id, { action: "record-difference", idempotencyKey: "DIFF-001", differenceAmountFen: -100, reasonCode: "ROUNDING", evidenceDigest: "d".repeat(64) }, "finance");
+  assert.equal(result.batch.settlementState, "DIFFERENCE_PENDING");
+  result = Service.reconcileBatch(result.state, created.batch.id, { action: "review-difference", idempotencyKey: "DIFF-HOSPITAL-REVIEW", reviewDomain: "hospital-finance", approved: true, adjustedAmountFen: created.batch.standardAmountFen - 100, resolutionDigest: "e".repeat(64) }, "hospital-finance");
+  result = Service.reconcileBatch(result.state, created.batch.id, { action: "review-difference", idempotencyKey: "DIFF-INSURANCE-REVIEW", reviewDomain: "insurance-settlement", approved: true, adjustedAmountFen: created.batch.standardAmountFen - 100, resolutionDigest: "e".repeat(64) }, "insurance");
+  result = Service.reconcileBatch(result.state, created.batch.id, { action: "resolve-difference", idempotencyKey: "DIFF-RESOLVE-001", resolution: "医保核心核减1元并由双方确认", resolutionDigest: "e".repeat(64), adjustedAmountFen: created.batch.standardAmountFen - 100 }, "finance");
+  assert.equal(result.batch.reconciliation.differenceCase.state, "RESOLVED");
+  assert.equal(Settlement.verifyEventLedger(result.batch.reconciliation.differenceCase.events), true);
+  result = Service.reconcileBatch(result.state, created.batch.id, { action: "request-payment", paymentRequestId: "PAY-REQ-DIFF" }, "insurance");
+  result = Service.applyInsuranceCoreSettlementCallback(result.state, created.batch.id, { action: "confirm-payment", receiptId: "PAY-RECEIPT-DIFF", paidAmountFen: created.batch.standardAmountFen - 100 });
+  const annual = Service.createAnnualClearance(result.state, { id: "annual-2026", year: 2026, adjustmentFundFen: 500, retainedBalanceFen: 200, riskReserveFen: 100, adjustmentReason: "年度基金预算与质量考核调节" }, "insurance");
+  assert.equal(annual.row.state, "PREPARED");
+  assert.equal(annual.row.finalClearanceAmountFen, annual.row.paidAmountFen + 200);
+  assert.equal(Settlement.buildAnnualClearanceEnvelope(annual.row).contractId, "insurance-annual-clearance-v1");
+  const clearanceTampered = structuredClone(annual.row);
+  clearanceTampered.adjustmentFundFen += 1;
+  assert.throws(() => Settlement.transitionAnnualClearance(clearanceTampered, { action: "start-confirmation", idempotencyKey: "TAMPERED" }, "insurance"), /摘要校验失败/);
+  let clearance = Service.applyAnnualClearanceAction(annual.state, annual.row.id, { action: "start-confirmation", idempotencyKey: "ANNUAL-CONFIRM-START" }, "insurance");
+  const disputedInstitutionId = clearance.row.institutionConfirmations[0].institutionId;
+  clearance = Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "record-dispute", idempotencyKey: "ANNUAL-DISPUTE", disputeId: "ANNUAL-DISPUTE-001", institutionId: disputedInstitutionId, reasonCode: "ADJUSTMENT_SCOPE", reason: "调节金口径待确认", amountFen: 100, evidenceDigest: "9".repeat(64) }, "hospital-finance");
+  assert.throws(() => Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "confirm-institutions", confirmationDigest: "c".repeat(64) }, "hospital-finance"), /状态不允许|未解决/);
+  clearance = Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "resolve-dispute", idempotencyKey: "ANNUAL-DISPUTE-RESOLVE", disputeId: "ANNUAL-DISPUTE-001", resolution: "按双方签署口径处理", resolutionDigest: "8".repeat(64), resolvedAmountFen: 0 }, "insurance");
+  for (const target of clearance.row.institutionConfirmations) {
+    clearance = Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "confirm-institution", idempotencyKey: `ANNUAL-CONFIRM-${target.institutionId}`, institutionId: target.institutionId, confirmationDigest: "c".repeat(64) }, `hospital-finance-${target.institutionId}`);
+  }
+  clearance = Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "confirm-institutions", idempotencyKey: "ANNUAL-CONFIRMED", confirmationDigest: Settlement.institutionConfirmationDigest(clearance.row) }, "hospital-finance");
+  clearance = Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "approve", idempotencyKey: "ANNUAL-APPROVE", approvalNo: "医保清算〔2027〕1号", adjustmentApprovalDigest: "f".repeat(64) }, "insurance-bureau");
+  assert.throws(() => Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "post", idempotencyKey: "ANNUAL-POST-BAD", voucherNo: "VOUCHER-BAD", postedAmountFen: clearance.row.finalClearanceAmountFen - 1 }, "finance"), /最终清算金额一致/);
+  clearance = Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "post", idempotencyKey: "ANNUAL-POST", voucherNo: "VOUCHER-2026-001", postedAmountFen: clearance.row.finalClearanceAmountFen }, "finance");
+  clearance = Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "lock", idempotencyKey: "ANNUAL-LOCK", lockReference: "LOCK-2026-001" }, "finance");
+  assert.equal(clearance.row.state, "LOCKED");
+  assert.equal(Settlement.verifyEventLedger(clearance.row.events), true);
+  assert.throws(() => Service.applyAnnualClearanceAction(clearance.state, annual.row.id, { action: "record-dispute", institution: "测试医院", reason: "锁账后争议", amountFen: 1 }, "hospital"), /状态不允许/);
 });
 
 test("readiness report distinguishes locally ready functions from external blockers", () => {
   const report = buildDiseasePaymentReadiness();
   assert.equal(report.ready, true);
+  assert.equal(report.operatingModel.ok, true);
+  assert.equal(report.integrationHandoff.pending, 0);
   assert.ok(report.externalBlockers.some((item) => item.id === "official-grouper"));
   assert.ok(report.externalBlockers.some((item) => item.id === "insurance-core"));
 });

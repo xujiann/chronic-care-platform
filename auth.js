@@ -2,6 +2,14 @@
   const SESSION_KEY = "health-city-auth-session";
   const API_BASE = isStaticPreview() ? "" : "/api";
   const DEMO_SMS_CODE = "888888";
+  const DELEGATION_SENSITIVE_PERMISSIONS = new Set([
+    "resident.record.export",
+    "resident.identity.update",
+    "payment.submit",
+    "delegation.manage"
+  ]);
+  const ACCEPTED_STEP_UP_LEVELS = new Set(["aal2", "aal3", "substantial", "high", "l2", "l3"]);
+  const DEFAULT_STEP_UP_MAX_AGE_MS = 15 * 60 * 1000;
   const demoUsers = [
     { id: "u-nurse", username: "nurse", password: "123456", name: "互联网护理演示护士", role: "institution", roleName: "护士工作站", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "互联网护理订单与服务轨迹", home: "internet-nursing.html", nurseId: "inn-001", accountType: "nurse" },
     { id: "u-blood-quality", username: "blood_quality", password: "123456", name: "血液中心质控审核员", role: "commission", roleName: "血液中心冷链质控", orgCode: "BLOOD-DL", orgName: "大连市血液中心", orgType: "blood_center", orgLevel: "市级", dataScope: "冷链异常、质量处置与血液放行", home: "blood.html", accountType: "blood_quality", bloodPermissions: ["cold_chain_quality_review"] },
@@ -196,6 +204,113 @@
     return safeUser;
   }
 
+  function normalizeAccountType(user = {}) {
+    const raw = String(user.accountType || "").trim().toLowerCase();
+    const aliases = {
+      citizen: "resident",
+      family_proxy: "guardian",
+      family_proxy_guardian: "guardian",
+      proxy: "guardian"
+    };
+    if (raw) return aliases[raw] || raw;
+    if (user.doctorId) return "doctor";
+    if (user.nurseId) return "nurse";
+    if (user.role === "citizen") return "resident";
+    if (["commission", "institution", "insurance", "county"].includes(user.role)) return "manager";
+    return "";
+  }
+
+  function buildExternalIdentityKey(identity = {}) {
+    const issuer = String(identity.externalIssuer || identity.issuer || identity.iss || "").trim();
+    const subject = String(identity.externalSubject || identity.subject || identity.sub || "").trim();
+    if (!issuer || !subject) return "";
+    return `${encodeURIComponent(issuer)}::${encodeURIComponent(subject)}`;
+  }
+
+  function timestampMs(value) {
+    if (typeof value === "number" && Number.isFinite(value)) return value < 1e12 ? value * 1000 : value;
+    const parsed = Date.parse(String(value || ""));
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function hasRecentStepUp(user = {}, options = {}) {
+    const level = String(user.assuranceLevel || user.acr || "").trim().toLowerCase();
+    if (!ACCEPTED_STEP_UP_LEVELS.has(level)) return false;
+    const authenticatedAt = timestampMs(user.stepUpAt || user.authTime || user.auth_time);
+    const nowMs = timestampMs(options.now) || Date.now();
+    const maxAgeMs = Number(options.maxAgeMs || DEFAULT_STEP_UP_MAX_AGE_MS);
+    return authenticatedAt > 0 && maxAgeMs > 0 && authenticatedAt <= nowMs && nowMs - authenticatedAt <= maxAgeMs;
+  }
+
+  function delegationDenied(reason, detail = "") {
+    return { ok: false, reason, detail, clientHintOnly: true };
+  }
+
+  function validateDelegation(delegation, user, subjectResidentId, permission, options = {}) {
+    const actorAccountId = String(user.accountId || user.id || "").trim();
+    const requiredAuditFields = ["id", "actorAccountId", "relationship", "legalBasis"];
+    const missingAuditFields = requiredAuditFields.filter((field) => !String(delegation[field] || "").trim());
+    if (missingAuditFields.length) {
+      return delegationDenied("DELEGATION_AUDIT_FIELDS_REQUIRED", `missing auditable delegation fields: ${missingAuditFields.join(", ")}`);
+    }
+    if (String(delegation.actorAccountId).trim() !== actorAccountId) {
+      return delegationDenied("DELEGATION_ACTOR_MISMATCH", "delegation belongs to another actor account");
+    }
+    if (String(delegation.status || "").toLowerCase() !== "active") {
+      return delegationDenied("DELEGATION_NOT_ACTIVE", "delegation status must be active");
+    }
+    const validFrom = timestampMs(delegation.validFrom);
+    const validUntil = timestampMs(delegation.validUntil);
+    const nowMs = timestampMs(options.now) || Date.now();
+    if (!validFrom || !validUntil || validUntil <= validFrom) {
+      return delegationDenied("DELEGATION_VALIDITY_INVALID", "delegation requires a valid start and end time");
+    }
+    if (nowMs < validFrom) return delegationDenied("DELEGATION_NOT_STARTED", "delegation is not active yet");
+    if (nowMs >= validUntil) return delegationDenied("DELEGATION_EXPIRED", "delegation has expired");
+    const permissions = Array.isArray(delegation.permissions) ? delegation.permissions.map(String) : [];
+    if (permissions.includes("*")) return delegationDenied("DELEGATION_WILDCARD_FORBIDDEN", "delegated permissions must be explicit");
+    if (!permissions.includes(permission)) return delegationDenied("DELEGATION_PERMISSION_DENIED", "permission is outside the delegated scope");
+    if (DELEGATION_SENSITIVE_PERMISSIONS.has(permission) && !hasRecentStepUp(user, options)) {
+      return delegationDenied("DELEGATION_STEP_UP_REQUIRED", "sensitive delegated actions require recent strong authentication");
+    }
+    return {
+      ok: true,
+      mode: "delegated",
+      actorAccountId,
+      actorUserId: String(user.id || ""),
+      subjectResidentId,
+      permission,
+      delegationId: String(delegation.id || ""),
+      relationship: String(delegation.relationship || ""),
+      legalBasis: String(delegation.legalBasis || ""),
+      authorizedAt: new Date(nowMs).toISOString(),
+      clientHintOnly: true
+    };
+  }
+
+  function authorizeDelegatedResidentAccess(subjectResidentId, permission, options = {}) {
+    // This fails closed for browser routing only; every API must independently authorize actor, subject and scope.
+    const user = options.user || getUser();
+    if (!user) return delegationDenied("AUTHENTICATION_REQUIRED", "no authenticated actor session");
+    if (normalizeAccountType(user) !== "guardian") {
+      return delegationDenied("GUARDIAN_ACCOUNT_REQUIRED", "delegated resident access requires a guardian account");
+    }
+    const subject = String(subjectResidentId || "").trim();
+    const requestedPermission = String(permission || "").trim();
+    if (!subject) return delegationDenied("DELEGATION_SUBJECT_REQUIRED", "delegated resident subject is required");
+    if (!requestedPermission) return delegationDenied("DELEGATION_PERMISSION_REQUIRED", "delegated permission is required");
+    const candidates = (Array.isArray(user.delegations) ? user.delegations : [])
+      .filter((item) => String(item.subjectResidentId || "").trim() === subject);
+    if (!candidates.length) return delegationDenied("DELEGATION_NOT_FOUND", "no delegation exists for the resident subject");
+    const failures = [];
+    for (const delegation of candidates) {
+      const result = validateDelegation(delegation, user, subject, requestedPermission, options);
+      if (result.ok) return result;
+      failures.push(result);
+    }
+    return failures[0] || delegationDenied("DELEGATION_NOT_FOUND", "no usable delegation exists");
+  }
+
   function isStaticPreview() {
     return location.protocol === "file:" || location.hostname.endsWith("github.io");
   }
@@ -378,6 +493,10 @@
     login,
     loginByPhone,
     sendPhoneCode,
+    normalizeAccountType,
+    buildExternalIdentityKey,
+    hasRecentStepUp,
+    authorizeDelegatedResidentAccess,
     logout,
     getUser,
     getToken,

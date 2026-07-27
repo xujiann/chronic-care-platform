@@ -27,6 +27,41 @@
       <section class="metric-grid" id="nursing-metrics"></section>
       <div id="nursing-operation-message" class="auth-bar" role="status" aria-live="polite" hidden></div>
 
+      <section class="portal-grid single" id="nursing-p1-section" data-nursing-p1-center>
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>P1 业务闭环验收中心</h2>
+            <span>评估签名 / 调度 / 专科协议 / 结算 / 风险 / 时间轴</span>
+          </div>
+          <div id="nursing-p1-center" class="rules"></div>
+        </article>
+      </section>
+
+      <section class="panel" data-care-service-runtime>
+        <div class="panel-title">
+          <h2>生产写入与可靠投递</h2>
+          <span>事务提交 / 独占租约 / 指数退避 / 死信补偿 / 队列健康</span>
+        </div>
+        <div class="claim-grid">
+          <div class="claim-card">
+            <strong>订单与外盒原子提交</strong>
+            <span>安全建单和状态迁移通过仓储事务契约同时保存订单与外盒事件，失败时整体回滚。</span>
+          </div>
+          <div class="claim-card">
+            <strong>多实例独占领取</strong>
+            <span>worker 以租约领取事件；租约到期后可安全接管，并继续校验事件摘要和尝试次数。</span>
+          </div>
+          <div class="claim-card">
+            <strong>重试与死信补偿</strong>
+            <span>供应商失败采用有界指数退避，达到上限进入死信；人工重开要求运维角色、精确确认和处置证据。</span>
+          </div>
+          <div class="claim-card">
+            <strong>正式上线仍受门禁</strong>
+            <span>公共 API 集成、生产配置、真实接口联调、灾备演练和现场签字未完成前不会判定 production-ready。</span>
+          </div>
+        </div>
+      </section>
+
       <section class="portal-grid single" id="nursing-highlight-section">
         <article class="panel wide">
           <div class="panel-title">
@@ -118,6 +153,22 @@
               </select>
             </label>
             <label>预约日期<input name="preferredAt" type="date" /></label>
+            <label>上门时段<input name="serviceTime" type="time" value="09:30" /></label>
+            <label>预计时长
+              <select name="durationMinutes">
+                <option value="60">60 分钟</option>
+                <option value="90">90 分钟</option>
+                <option value="120">120 分钟</option>
+              </select>
+            </label>
+            <label>服务区域
+              <select name="district" id="nursing-district-select">
+                <option value="Zhongshan">中山区</option>
+                <option value="Xigang">西岗区</option>
+                <option value="Shahekou">沙河口区</option>
+                <option value="Ganjingzi">甘井子区</option>
+              </select>
+            </label>
             <label>风险等级
               <select name="riskLevel">
                 <option value="medium">中风险</option>
@@ -126,6 +177,8 @@
               </select>
             </label>
             <label class="full">服务地址<input name="address" value="中山区示例地址" /></label>
+            <input name="lat" type="hidden" value="38.915" />
+            <input name="lng" type="hidden" value="121.616" />
             <label class="full">护理需求<input name="note" value="居民端提交上门护理预约" /></label>
             <button class="inline-action" type="submit">提交预约</button>
           </form>

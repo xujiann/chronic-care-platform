@@ -256,7 +256,8 @@ test("release report summarizes repository readiness and renders markdown", () =
   });
   assert.equal(report.ok, true);
   assert.equal(report.summary.failed, 0);
-  assert.equal(report.summary.warnings, 0);
+  assert.equal(report.summary.warnings, 1);
+  assert.equal(report.checks.some((item) => item.name === "productionReleaseEvidence:formalGate" && !item.passed && item.severity === "warn"), true);
   assert.equal(report.checks.some((item) => item.name === "monitoring:alertRouting" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "monitoring:productionBoundary" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "env:ALERTING.routes" && item.passed), true);
@@ -584,6 +585,18 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.publicHealthReadiness.cutoverDrillBoard.summary.openFindings >= 4, true);
   assert.equal(report.publicHealthReadiness.launchGate.summary.requirements >= 8, true);
   assert.equal(report.publicHealthReadiness.launchGate.releaseGate, "site-evidence-required");
+  assert.equal(report.publicHealthFinalReadiness.ok, true);
+  assert.equal(report.publicHealthFinalReadiness.summary.passed, 62);
+  assert.equal(report.publicHealthFinalReadiness.productionReady, false);
+  assert.equal(report.checks.some((item) => item.name === "publicHealthFinal:keyProvider" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "publicHealthFinal:dualCas" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "publicHealthFinal:resilienceAlerts" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "publicHealthFinal:contractGovernance" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "publicHealthFinal:contractCutover" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "publicHealthFinal:contractChain" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "publicHealthFinal:contractChainPersistence" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "publicHealthFinal:activeEndpointProbe" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "publicHealthFinal:endpointProbeCampaign" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "citizenLaunch:readiness" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "citizenLaunch:phoneCodeDelivery" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "citizenLaunch:accountProvisioning" && item.passed), true);
@@ -614,6 +627,10 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.qualitySafetyInterfaceJointTest.ok, true);
   assert.equal(report.qualitySafetyInterfaceJointTest.summary.sampleAccepted, report.qualitySafetyInterfaceJointTest.summary.sampleRequests);
   assert.equal(report.qualitySafetyInterfaceJointTest.summary.siteSampleReady, report.qualitySafetyInterfaceJointTest.summary.siteSampleAcceptance);
+  assert.equal(report.qualityOperationsGovernance.ok, true);
+  assert.equal(report.qualityOperationsGovernance.productionReady, false);
+  assert.equal(report.qualityOperationsGovernance.catalog.sourceCollections.length, 3);
+  assert.equal(report.checks.some((item) => item.name === "qualityOperationsGovernance:readiness" && item.passed), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-env-file"), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-institution-interfaces" && !item.passed), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-chronic-launch-core" && !item.passed), true);
@@ -670,6 +687,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(markdown, /Environment matrix report/);
   assert.match(markdown, /Hybrid deployment readiness report/);
   assert.match(markdown, /public-health-readiness-report\.md/);
+  assert.match(markdown, /public-health-final-readiness-report\.md/);
   assert.match(markdown, /Release artifact manifest/);
   assert.match(markdown, /Quality-safety institution interface standard/);
   assert.match(markdown, /Quality-safety institution joint-test pack/);

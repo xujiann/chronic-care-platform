@@ -80,7 +80,8 @@ function actorId(user) {
 
 function audit(data, user, action, target, detail) {
   const at = now();
-  data.bloodGoLiveAudit.unshift({
+  const previousDigest = data.bloodGoLiveAudit[0]?.digest || "GENESIS";
+  const row = {
     id: randomUUID(),
     at,
     actor: user.name || user.username,
@@ -88,8 +89,10 @@ function audit(data, user, action, target, detail) {
     action,
     target,
     detail,
-    digest: digest({ action, target, detail, at })
-  });
+    previousDigest
+  };
+  row.digest = digest(row);
+  data.bloodGoLiveAudit.unshift(row);
   data.bloodGoLiveAudit = data.bloodGoLiveAudit.slice(0, 2000);
 }
 
