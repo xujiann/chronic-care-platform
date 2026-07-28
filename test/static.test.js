@@ -2377,7 +2377,7 @@ test("data governance foundation exposes platform cards API and release evidence
   assert.match(read("scripts/release-artifact-manifest.js"), /data-governance-readiness-report\.md/);
 });
 
-test("digital hospital v0.16 prototype is publishable from GitHub Pages", () => {
+test("digital hospital v0.17 task runtime is publishable from GitHub Pages", () => {
   const standardsEntry = read("digital-hospital-standards.html");
   const index = read("digital-hospital-standard-platform/index.html");
   const app = read("digital-hospital-standard-platform/app.js");
@@ -2387,14 +2387,14 @@ test("digital hospital v0.16 prototype is publishable from GitHub Pages", () => 
 
   const executionDomain = read("digital-hospital-integration-execution.js");
 
-  assert.match(standardsEntry, /href="\.\/digital-hospital-standard-platform\/">新标准平台 v0\.16/);
+  assert.match(standardsEntry, /href="\.\/digital-hospital-standard-platform\/">新标准平台 v0\.17/);
   assert.match(index, /data-view="assistant">评价助手/);
   assert.match(index, /data-view="integration">接入联调/);
   assert.match(index, /data-view="execution">接入执行/);
   assert.match(index, /data-view="assessment">试点评估/);
   assert.match(index, /data-view="monitoring">运营监控/);
-  assert.match(app, /digitalHospitalMvpState:v0\.16/);
-  assert.match(app, /prototypeVersion: "mvp-0\.16"/);
+  assert.match(app, /digitalHospitalMvpState:v0\.17/);
+  assert.match(app, /prototypeVersion: "mvp-0\.17"/);
   assert.match(app, /function renderAssistant\(\)/);
   assert.match(app, /function renderIntegration\(\)/);
   assert.match(app, /function renderExecution\(\)/);
@@ -2412,6 +2412,13 @@ test("digital hospital v0.16 prototype is publishable from GitHub Pages", () => 
   assert.match(app, /data-action="verify-execution-environment"/);
   assert.match(app, /data-action="rotate-vault-reference"/);
   assert.match(app, /data-action="enqueue-execution-job"/);
+  assert.match(app, /data-action="dispatch-execution-job"/);
+  assert.match(app, /data-action="heartbeat-execution-job"/);
+  assert.match(app, /data-action="fail-execution-job"/);
+  assert.match(app, /data-action="recover-execution-leases"/);
+  assert.match(app, /data-action="restore-execution-worker"/);
+  assert.match(app, /data-action="redrive-execution-dead-letter"/);
+  assert.match(app, /\{ id: "runtime", label: "任务运行中心" \}/);
   assert.match(app, /function verifyCallbackReceipt\(jobId\)/);
   assert.match(app, /data-action="simulate-replay-callback"/);
   assert.match(app, /data-action="release-execution-quarantine"/);
@@ -2455,6 +2462,13 @@ test("digital hospital v0.16 prototype is publishable from GitHub Pages", () => 
   assert.match(openapi, /\/api\/v1\/integration-environments\/\{environmentId\}:verify/);
   assert.match(openapi, /\/api\/v1\/credential-vault-references\/\{entryId\}:rotate/);
   assert.match(openapi, /\/api\/v1\/integration-execution-jobs\/\{jobId\}:advance/);
+  assert.match(openapi, /\/api\/v1\/integration-execution-workers/);
+  assert.match(openapi, /\/api\/v1\/integration-execution-jobs\/\{jobId\}:claim/);
+  assert.match(openapi, /\/api\/v1\/integration-execution-jobs\/\{jobId\}:heartbeat/);
+  assert.match(openapi, /\/api\/v1\/integration-execution-jobs\/\{jobId\}:complete-attempt/);
+  assert.match(openapi, /\/api\/v1\/integration-execution-jobs\/\{jobId\}:fail/);
+  assert.match(openapi, /\/api\/v1\/integration-execution-leases:recover-expired/);
+  assert.match(openapi, /\/api\/v1\/integration-dead-letters\/\{deadLetterId\}:redrive/);
   assert.match(openapi, /\/api\/v1\/integration-callback-receipts\/\{receiptId\}:verify/);
   assert.match(openapi, /\/api\/v1\/integration-quarantines\/\{quarantineId\}:release/);
   assert.match(openapi, /\/api\/v1\/integration-cutover-windows\/\{windowId\}:rollback/);
@@ -2506,6 +2520,9 @@ test("digital hospital v0.16 prototype is publishable from GitHub Pages", () => 
   assert.ok(schema.properties.integrationEnvironments);
   assert.ok(schema.properties.credentialVaultEntries);
   assert.ok(schema.properties.integrationExecutionJobs);
+  assert.ok(schema.properties.integrationExecutionWorkers);
+  assert.ok(schema.properties.integrationDeadLetters);
+  assert.ok(schema.properties.integrationExecutionEvents);
   assert.ok(schema.properties.integrationCallbackReceipts);
   assert.ok(schema.properties.integrationReplayEvents);
   assert.ok(schema.properties.integrationQuarantines);
@@ -2515,7 +2532,12 @@ test("digital hospital v0.16 prototype is publishable from GitHub Pages", () => 
   assert.ok(schema.properties.meta.properties.packageType.enum.includes("execution"));
   assert.match(executionDomain, /function verifyExecutionCallback/);
   assert.match(executionDomain, /function evaluateCutoverWindow/);
+  assert.match(executionDomain, /function claimExecutionJob/);
+  assert.match(executionDomain, /function heartbeatExecutionJob/);
+  assert.match(executionDomain, /function recoverExpiredLeases/);
+  assert.match(executionDomain, /function redriveDeadLetter/);
   assert.match(executionDomain, /vaultRefFingerprint/);
+  assert.match(executionDomain, /leaseTokenHash/);
   assert.doesNotMatch(executionDomain, /state\.vaultEntries.*vaultRef:/);
 });
 

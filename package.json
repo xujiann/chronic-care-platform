@@ -153,7 +153,7 @@
     "production-release:evidence:test": "node --test test/production-release-evidence-readiness.test.js",
     "production-release:evidence:readiness": "node scripts/production-release-evidence-readiness.js",
     "platform:standards-ledgers": "node scripts/platform-standards-ledgers.js",
-    "digital-hospital:execution-check": "node --check digital-hospital-integration-execution.js && node --check test/digital-hospital-integration-execution.test.js && node --test test/digital-hospital-integration-execution.test.js"
+    "digital-hospital:execution-check": "node --check digital-hospital-integration-execution.js && node --check digital-hospital-standard-platform/app.js && node --check test/digital-hospital-integration-execution.test.js && node --test test/digital-hospital-integration-execution.test.js"
   },
   "engines": {
     "node": ">=22.5"

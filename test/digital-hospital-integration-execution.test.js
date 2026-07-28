@@ -3,9 +3,17 @@ const test = require("node:test");
 
 const {
   advanceExecutionJob,
+  claimExecutionJob,
+  completeExecutionAttempt,
   createExecutionState,
   enqueueExecutionJob,
   evaluateCutoverWindow,
+  failExecutionAttempt,
+  getExecutionRuntimeSummary,
+  heartbeatExecutionJob,
+  recoverExpiredLeases,
+  redriveDeadLetter,
+  registerExecutionWorker,
   registerVaultReference,
   releaseQuarantine,
   verifyExecutionCallback
@@ -23,6 +31,13 @@ function readyState() {
       status: "pending"
     }]
   });
+}
+
+function moveToAwaitingReceipt(state, jobId, base = "2026-07-28T10:00:00.000Z") {
+  const started = new Date(Date.parse(base) + 1000).toISOString();
+  const finished = new Date(Date.parse(base) + 2000).toISOString();
+  advanceExecutionJob(state, jobId, started);
+  advanceExecutionJob(state, jobId, finished);
 }
 
 test("vault registration stores only a reference fingerprint and rejects secret material", () => {
@@ -118,6 +133,8 @@ test("replayed callbacks are blocked and quarantine the connector", () => {
     idempotencyKey: "probe-002",
     payload: { sequence: 1 }
   }).job;
+  moveToAwaitingReceipt(state, firstJob.id);
+  moveToAwaitingReceipt(state, secondJob.id);
   const callback = {
     source: "CONN-001",
     signatureValid: true,
@@ -148,6 +165,7 @@ test("invalid callback signatures and expired timestamps fail closed", () => {
     idempotencyKey: "probe-001",
     payload: {}
   }).job;
+  moveToAwaitingReceipt(state, job.id);
   const result = verifyExecutionCallback(state, {
     jobId: job.id,
     source: "CONN-001",
@@ -162,6 +180,28 @@ test("invalid callback signatures and expired timestamps fail closed", () => {
   assert.equal(result.receipt.timestampStatus, "expired");
   assert.equal(state.jobs[0].status, "blocked");
   assert.equal(state.quarantines.length, 1);
+});
+
+test("callbacks cannot complete jobs before worker execution reaches receipt state", () => {
+  const state = createExecutionState();
+  const job = enqueueExecutionJob(state, {
+    id: "JOB-001",
+    connectorId: "CONN-001",
+    environmentId: "ENV-UAT",
+    jobType: "probe",
+    idempotencyKey: "callback-state-001",
+    payload: {}
+  }).job;
+  assert.throws(() => verifyExecutionCallback(state, {
+    jobId: job.id,
+    source: "CONN-001",
+    signatureValid: true,
+    timestamp: "2026-07-28T10:00:00.000Z",
+    now: "2026-07-28T10:00:01.000Z",
+    nonce: "nonce-001",
+    payloadDigest: state.jobs[0].payloadDigest
+  }), /not awaiting a receipt/);
+  assert.equal(state.receipts.length, 0);
 });
 
 test("cutover readiness requires environment vault receipt approval and no quarantine", () => {
@@ -185,4 +225,180 @@ test("cutover readiness requires environment vault receipt approval and no quara
   assert.equal(evaluateCutoverWindow(state, "CUT-001").status, "blocked");
   releaseQuarantine(state, "QUAR-001", { reviewNote: "Verified new credential and callback nonce", releasedBy: "security-reviewer" });
   assert.equal(evaluateCutoverWindow(state, "CUT-001").status, "ready");
+});
+
+test("workers claim eligible jobs with a hashed lease and heartbeat extension", () => {
+  const state = createExecutionState({
+    environments: [{ id: "ENV-UAT", status: "healthy" }]
+  });
+  registerExecutionWorker(state, {
+    id: "WORKER-001",
+    pool: "certification",
+    capabilities: ["contract-certification"],
+    now: "2026-07-28T10:00:00.000Z"
+  });
+  enqueueExecutionJob(state, {
+    id: "JOB-001",
+    connectorId: "CONN-001",
+    environmentId: "ENV-UAT",
+    jobType: "contract-certification",
+    idempotencyKey: "worker-claim-001",
+    payload: { batch: 1 },
+    now: "2026-07-28T10:00:01.000Z"
+  });
+  const claimed = claimExecutionJob(state, {
+    workerId: "WORKER-001",
+    now: "2026-07-28T10:00:02.000Z",
+    leaseSeconds: 30
+  });
+  assert.equal(claimed.job.status, "running");
+  assert.equal(claimed.job.leaseOwner, "WORKER-001");
+  assert.equal(claimed.leaseToken.startsWith("lease-"), true);
+  assert.equal(JSON.stringify(state).includes(claimed.leaseToken), false);
+  const heartbeat = heartbeatExecutionJob(state, "JOB-001", {
+    workerId: "WORKER-001",
+    leaseToken: claimed.leaseToken,
+    progress: 60,
+    now: "2026-07-28T10:00:20.000Z",
+    leaseSeconds: 45
+  });
+  assert.equal(heartbeat.progress, 60);
+  assert.equal(heartbeat.leaseExpiresAt, "2026-07-28T10:01:05.000Z");
+  const awaitingReceipt = completeExecutionAttempt(state, "JOB-001", {
+    workerId: "WORKER-001",
+    leaseToken: claimed.leaseToken,
+    now: "2026-07-28T10:00:25.000Z"
+  });
+  assert.equal(awaitingReceipt.status, "awaiting-receipt");
+  assert.equal(state.workers[0].status, "ready");
+  assert.equal(state.jobs[0].leaseTokenHash, "");
+});
+
+test("claiming fails closed for unhealthy environments quarantines and worker capabilities", () => {
+  const state = createExecutionState({
+    environments: [{ id: "ENV-UAT", status: "degraded" }],
+    quarantines: [{ id: "QUAR-001", connectorId: "CONN-002", status: "active" }]
+  });
+  registerExecutionWorker(state, {
+    id: "WORKER-001",
+    capabilities: ["contract-certification"],
+    now: "2026-07-28T10:00:00.000Z"
+  });
+  enqueueExecutionJob(state, {
+    id: "JOB-UNHEALTHY",
+    connectorId: "CONN-001",
+    environmentId: "ENV-UAT",
+    jobType: "contract-certification",
+    idempotencyKey: "unhealthy"
+  });
+  assert.equal(claimExecutionJob(state, { workerId: "WORKER-001", now: "2026-07-28T10:00:01.000Z" }), null);
+  state.environments[0].status = "healthy";
+  state.jobs[0].connectorId = "CONN-002";
+  assert.equal(claimExecutionJob(state, { workerId: "WORKER-001", now: "2026-07-28T10:00:02.000Z" }), null);
+  state.jobs[0].connectorId = "CONN-001";
+  state.jobs[0].jobType = "full-chain";
+  assert.equal(claimExecutionJob(state, { workerId: "WORKER-001", now: "2026-07-28T10:00:03.000Z" }), null);
+});
+
+test("transient failures use exponential backoff before dead-lettering", () => {
+  const state = createExecutionState({
+    environments: [{ id: "ENV-UAT", status: "healthy" }]
+  });
+  registerExecutionWorker(state, { id: "WORKER-001", now: "2026-07-28T10:00:00.000Z" });
+  enqueueExecutionJob(state, {
+    id: "JOB-RETRY",
+    connectorId: "CONN-001",
+    environmentId: "ENV-UAT",
+    jobType: "probe",
+    idempotencyKey: "retry-001",
+    maxAttempts: 2,
+    retryBaseSeconds: 30,
+    retryMaxSeconds: 120,
+    now: "2026-07-28T10:00:00.000Z"
+  });
+  const firstClaim = claimExecutionJob(state, { workerId: "WORKER-001", now: "2026-07-28T10:00:01.000Z" });
+  const retry = failExecutionAttempt(state, "JOB-RETRY", {
+    workerId: "WORKER-001",
+    leaseToken: firstClaim.leaseToken,
+    errorCode: "GATEWAY_TIMEOUT",
+    failureClass: "transient",
+    now: "2026-07-28T10:00:10.000Z"
+  });
+  assert.equal(retry.retryScheduled, true);
+  assert.equal(retry.job.nextAttemptAt, "2026-07-28T10:00:40.000Z");
+  assert.equal(claimExecutionJob(state, { workerId: "WORKER-001", now: "2026-07-28T10:00:39.000Z" }), null);
+  const secondClaim = claimExecutionJob(state, { workerId: "WORKER-001", now: "2026-07-28T10:00:40.000Z" });
+  const exhausted = failExecutionAttempt(state, "JOB-RETRY", {
+    workerId: "WORKER-001",
+    leaseToken: secondClaim.leaseToken,
+    errorCode: "GATEWAY_TIMEOUT",
+    failureClass: "transient",
+    now: "2026-07-28T10:00:50.000Z"
+  });
+  assert.equal(exhausted.retryScheduled, false);
+  assert.equal(exhausted.job.status, "dead-lettered");
+  assert.equal(exhausted.deadLetter.errorCode, "GATEWAY_TIMEOUT");
+  assert.equal(state.deadLetters.length, 1);
+});
+
+test("expired worker leases are recovered and worker state becomes stale", () => {
+  const state = createExecutionState({
+    environments: [{ id: "ENV-UAT", status: "healthy" }]
+  });
+  registerExecutionWorker(state, { id: "WORKER-001", now: "2026-07-28T10:00:00.000Z" });
+  enqueueExecutionJob(state, {
+    id: "JOB-LEASE",
+    connectorId: "CONN-001",
+    environmentId: "ENV-UAT",
+    jobType: "probe",
+    idempotencyKey: "lease-expiry",
+    retryBaseSeconds: 15,
+    now: "2026-07-28T10:00:00.000Z"
+  });
+  claimExecutionJob(state, {
+    workerId: "WORKER-001",
+    now: "2026-07-28T10:00:01.000Z",
+    leaseSeconds: 10
+  });
+  const recovered = recoverExpiredLeases(state, { now: "2026-07-28T10:00:12.000Z" });
+  assert.equal(recovered.length, 1);
+  assert.equal(recovered[0].retryScheduled, true);
+  assert.equal(state.jobs[0].errorCode, "WORKER_LEASE_EXPIRED");
+  assert.equal(state.workers[0].status, "stale");
+});
+
+test("dead-letter redrive requires review evidence and starts a new generation", () => {
+  const state = createExecutionState({
+    environments: [{ id: "ENV-UAT", status: "healthy" }]
+  });
+  registerExecutionWorker(state, { id: "WORKER-001", now: "2026-07-28T10:00:00.000Z" });
+  enqueueExecutionJob(state, {
+    id: "JOB-DLQ",
+    connectorId: "CONN-001",
+    environmentId: "ENV-UAT",
+    jobType: "probe",
+    idempotencyKey: "dlq-001",
+    now: "2026-07-28T10:00:00.000Z"
+  });
+  const claim = claimExecutionJob(state, { workerId: "WORKER-001", now: "2026-07-28T10:00:01.000Z" });
+  const failed = failExecutionAttempt(state, "JOB-DLQ", {
+    workerId: "WORKER-001",
+    leaseToken: claim.leaseToken,
+    errorCode: "CONTRACT_REJECTED",
+    failureClass: "permanent",
+    now: "2026-07-28T10:00:02.000Z"
+  });
+  assert.throws(
+    () => redriveDeadLetter(state, failed.deadLetter.id, { reviewedBy: "security-reviewer", reviewNote: "short" }),
+    /requires an approver/
+  );
+  const redriven = redriveDeadLetter(state, failed.deadLetter.id, {
+    reviewedBy: "security-reviewer",
+    reviewNote: "Contract mapping was corrected and independently reviewed.",
+    now: "2026-07-28T10:05:00.000Z"
+  });
+  assert.equal(redriven.job.status, "queued");
+  assert.equal(redriven.job.generation, 2);
+  assert.equal(redriven.deadLetter.status, "redriven");
+  assert.equal(getExecutionRuntimeSummary(state, "2026-07-28T10:05:00.000Z").claimableJobs, 1);
 });
