@@ -608,13 +608,17 @@ function buildDeployCheckReport(options = {}) {
         "publicHealthExternalEndpointProbeCampaignAudit",
         "assertUniquePublicHealthEndpointProbeCampaigns",
         "publicHealthEndpointProbeCampaignInsert",
-        "endpointProbeContinuity"
+        "endpointProbeContinuity",
+        "continuityBreaks",
+        "publicHealthEndpointProbeContinuityBreakView"
       ].every((marker) => serverSource.includes(marker))
         && [
           "public-health-endpoint-probe-campaign",
           "receiptDigest",
           "policyDigest",
           "continuousConnectivityReady",
+          "continuityBreak",
+          "campaign-verification-failed",
           "requiredConsecutiveCampaigns",
           "productionReady: false"
         ].every((marker) => publicHealthEndpointProbeCampaignSource.includes(marker))
@@ -623,12 +627,12 @@ function buildDeployCheckReport(options = {}) {
           "PUBLIC_HEALTH_EXTERNAL_ENDPOINT_PROBE_CAMPAIGN_KEYRING_REF",
           "independentFromLaneKeys"
         ].every((marker) => publicHealthEndpointProbeKeyProviderSource.includes(marker))
-        && ["300", "900", "continuousConnectivityReady", "productionReady=false"].every((marker) =>
+        && ["300", "900", "continuousConnectivityReady", "continuityBreak", "productionReady=false"].every((marker) =>
           publicHealthEndpointProbeCampaignDoc.includes(marker)
         )
         && pkg.scripts?.["public-health:resilience-check"]?.includes("public-health-external-endpoint-probe-campaign-service.js")
         && pkg.scripts?.["public-health:resilience-test"]?.includes("test/public-health-external-endpoint-probe-campaign-service.test.js"),
-      detail: "commission-only eight-lane endpoint campaigns use independent managed signing, atomic replay-safe persistence and redacted continuity evidence while connectivity and production readiness remain separate"
+      detail: "commission-only eight-lane endpoint campaigns use independent managed signing, atomic replay-safe persistence and redacted fail-closed continuity gaps while connectivity and production readiness remain separate"
     },
     { name: "api:publicHealthHighlights", ok: ["/api/public-health/highlights", "/api/public-health/highlights/signals", "/api/public-health/highlights/alerts/:id/actions", "/api/public-health/highlights/command-tasks/:id/actions", "/api/public-health/highlights/ai-reviews/:id/actions", "/api/public-health/highlights/evidence/:id/actions"].every((marker) => serverSource.includes(marker)) && fs.readFileSync(path.join(ROOT, "public-health.html"), "utf8").includes("public-health-highlight-center") && fs.readFileSync(path.join(ROOT, "public-health.js"), "utf8").includes("renderPublicHealthHighlights"), detail: "public health five-suite trigger, map, AI, command and evidence center is wired" },
     { name: "api:publicHealthHighlightsStandalone", ok: fs.existsSync(path.join(ROOT, "public-health-highlights.html")) && fs.existsSync(path.join(ROOT, "public-health-highlights.js")) && fs.existsSync(path.join(ROOT, "scripts", "public-health-highlights-readiness.js")) && serverSource.includes("buildPublicHealthHighlights") && fs.readFileSync(path.join(ROOT, "scripts", "public-health-highlights-readiness.js"), "utf8").includes("functionalState"), detail: "standalone public health five-suite command center and readiness report are present" },

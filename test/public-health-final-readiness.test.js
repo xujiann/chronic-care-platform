@@ -16,6 +16,10 @@ test("final readiness accepts every planned T08 functional increment", () => {
   assert.equal(report.functionalState, "t08-public-health-planned-functions-complete");
   assert.equal(report.summary.checks, 63);
   assert.equal(report.summary.passed, 63);
+  assert.equal(report.summary.t08FunctionalChecks, 49);
+  assert.equal(report.summary.t08FunctionalPassed, 49);
+  assert.equal(report.summary.t00BoundaryChecks, 14);
+  assert.equal(report.summary.t00BoundaryPassed, 14);
   assert.equal(report.summary.lanes, 8);
   assert.equal(report.summary.handoffs, 8);
   assert.equal(report.summary.adapterProfiles, 8);
@@ -41,7 +45,9 @@ test("final readiness accepts every planned T08 functional increment", () => {
   assert.equal(report.endpointProbeCampaignFailureRegistry.continuityBreak.code, "campaign-verification-failed");
   assert.equal(report.endpointProbeCampaignFailureRegistry.productionReady, false);
   assert.equal(report.productionReady, false);
+  assert.equal(report.remainingProductionBoundaries.length, 1);
   assert.equal(report.remainingT00Integration.length, 1);
+  assert.deepEqual(report.remainingT00Integration, report.remainingProductionBoundaries);
   assert.equal(report.checks.find((item) => item.id === "integration:t00-public-routes").passed, true);
   assert.equal(report.checks.find((item) => item.id === "resilience:runtime-enforcement").passed, true);
   assert.equal(report.checks.find((item) => item.id === "integration:t00-dual-cas").passed, true);
@@ -72,5 +78,7 @@ test("final readiness renders and writes machine and human reports", () => {
   assert.match(fs.readFileSync(markdown, "utf8"), /Signed acceptance deliveries: 8\/8/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Verified endpoint probes: 8\/8/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Verified endpoint probe campaigns: 3\/3/);
+  assert.match(fs.readFileSync(markdown, "utf8"), /T08 functional checks: 49\/49/);
+  assert.match(fs.readFileSync(markdown, "utf8"), /T00 public boundary checks: 14\/14/);
   assert.match(renderMarkdown(report), /Remaining production integration/);
 });

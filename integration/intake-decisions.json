@@ -47,15 +47,16 @@
     },
     {
       "lineId": "T08",
-      "candidateHead": "4f9f22b92b47ad50d36dccf0ad01437451019179",
+      "candidateHead": "4527485a6f8990abd3cc29c1203dbcb5134c21b3",
       "decision": "accepted",
       "acceptedCandidateHeads": [
         "771c727b8abe7c722248d40656d6b91dfb67f3cf",
         "09a88c7c6ce98789e559dcd8a18bd9b5a51a99a2",
         "d4bfdbaf2ab3ea2317a2a2778fabdd22221b2117",
-        "4f9f22b92b47ad50d36dccf0ad01437451019179"
+        "4f9f22b92b47ad50d36dccf0ad01437451019179",
+        "4527485a6f8990abd3cc29c1203dbcb5134c21b3"
       ],
-      "reviewedAt": "2026-07-27T03:26:00.000Z",
+      "reviewedAt": "2026-07-28T04:00:00.000Z",
       "reviewer": "T00",
       "checks": [
         "git diff --check",
@@ -89,7 +90,13 @@
         "continuousConnectivityReady remains separate from endpointConnectivityReady and productionReady; three fresh non-overlapping campaigns with at most 900 seconds gap are required",
         "legacy-static remains compatibility-only and all external runtime projections remain productionReady false",
         "endpointConnectivityReady remains separate from productionReady; trusted site evidence, P0/P1 closure, production handoff and launch approval remain blockers",
-        "T00 aggregate final readiness covers 62 controlled integration and production-boundary checks"
+        "T00 exactly received 4527485a and evaluates current campaign continuity newest-first without filtering rejected records",
+        "latest signed failure and a failed or tampered campaign between successes break the current continuity chain; a historical rejection outside the required fresh window remains visible without blocking it",
+        "commission-only continuity projections expose only summary.continuityBreaks plus continuityBreak campaignId and stable safe code, without raw verification reasons, endpoint or cryptographic material",
+        "T08 functional readiness now covers 49 checks; T00 adds 14 public integration and safety-boundary checks for an aggregate 63 of 63",
+        "full public-health resilience regression passed 90 of 90; candidate service and final-readiness focus passed 14 of 14; public API and storage focus passed 5 of 5; static resources passed 72 of 72",
+        "clean isolated release report passed 425 of 427 with 0 failures and 2 expected site warnings; deploy check passed 395 of 395",
+        "the pre-existing uncommitted data/db.json was hash-preserved and excluded; its unrelated nursing and escort readiness drift was not added to this candidate"
       ],
       "blockers": []
     },

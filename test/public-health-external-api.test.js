@@ -204,7 +204,8 @@ test("public health external routes use server time full keyrings and secret-fre
     readDatabase,
     server,
     startServer,
-    stopServer
+    stopServer,
+    writeDatabase
   } = require("../server");
   let releaseProbeTransport;
   let notifyProbeTransport;
@@ -408,6 +409,8 @@ test("public health external routes use server time full keyrings and secret-fre
   assert.equal(initialCampaignSummary.response.status, 200, JSON.stringify(initialCampaignSummary.body));
   assert.equal(initialCampaignSummary.body.endpointConnectivityReady, false);
   assert.equal(initialCampaignSummary.body.continuousConnectivityReady, false);
+  assert.equal(initialCampaignSummary.body.summary.continuityBreaks, 0);
+  assert.equal(initialCampaignSummary.body.continuityBreak, null);
   assert.equal(initialCampaignSummary.body.productionReady, false);
 
   const injectedCampaign = await post(
@@ -611,6 +614,8 @@ test("public health external routes use server time full keyrings and secret-fre
   assert.equal(campaignSummary.body.continuousConnectivityReady, false);
   assert.equal(campaignSummary.body.productionReady, false);
   assert.equal(campaignSummary.body.summary.campaignsVerified, 1);
+  assert.equal(campaignSummary.body.summary.continuityBreaks, 0);
+  assert.equal(campaignSummary.body.continuityBreak, null);
   assert.doesNotMatch(JSON.stringify(campaignSummary.body), /https:\/\/|8\.8\.8\.8|"receiptId"|"nonce"|"signature"/i);
 
   const endpointReceipt = signedEndpointProbe();
@@ -953,4 +958,87 @@ test("public health external routes use server time full keyrings and secret-fre
   assert.doesNotMatch(serializedState, /requestKeyring|receiptKeyring/);
   assert.doesNotMatch(serializedState, new RegExp(CONTRACT_SECRET));
   assert.doesNotMatch(serializedState, /signingMaterial/);
+
+  for (let campaignIndex = 2; campaignIndex <= 4; campaignIndex += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    const additionalCampaign = await post(
+      baseUrl,
+      "/api/public-health/external/endpoints/campaigns",
+      token,
+      `api-endpoint-campaign-gap-${campaignIndex}`,
+      {}
+    );
+    assert.equal(additionalCampaign.response.status, 201, JSON.stringify(additionalCampaign.body));
+  }
+
+  const fourCampaignState = readDatabase();
+  const campaignsOldestFirst = fourCampaignState.publicHealthExternalEndpointProbeCampaigns
+    .slice()
+    .sort((left, right) =>
+      String(left.attestation.completedAt).localeCompare(String(right.attestation.completedAt))
+    );
+  assert.equal(campaignsOldestFirst.length, 4);
+
+  const middleTamperedState = structuredClone(fourCampaignState);
+  const middleCampaignId = campaignsOldestFirst[1].attestation.campaignId;
+  middleTamperedState.publicHealthExternalEndpointProbeCampaigns
+    .find((item) => item.attestation.campaignId === middleCampaignId)
+    .attestation.signature = "f".repeat(64);
+  writeDatabase(middleTamperedState, { event: "public-health-endpoint-probe-campaign-middle-tamper-test" });
+  const middleBreakSummary = await request(
+    baseUrl,
+    "/api/public-health/external/endpoints/campaigns/summary",
+    token
+  );
+  assert.equal(middleBreakSummary.response.status, 200, JSON.stringify(middleBreakSummary.body));
+  assert.equal(middleBreakSummary.body.summary.campaignsVerified, 3);
+  assert.equal(middleBreakSummary.body.summary.campaignsRejected, 1);
+  assert.equal(middleBreakSummary.body.summary.consecutiveCampaigns, 2);
+  assert.equal(middleBreakSummary.body.summary.continuityBreaks, 1);
+  assert.deepEqual(middleBreakSummary.body.continuityBreak, {
+    campaignId: middleCampaignId,
+    code: "ENDPOINT_PROBE_CAMPAIGN_VERIFICATION_FAILED"
+  });
+  assert.equal(middleBreakSummary.body.continuousConnectivityReady, false);
+  assert.equal(middleBreakSummary.body.productionReady, false);
+
+  const latestTamperedState = structuredClone(fourCampaignState);
+  const latestCampaignId = campaignsOldestFirst.at(-1).attestation.campaignId;
+  latestTamperedState.publicHealthExternalEndpointProbeCampaigns
+    .find((item) => item.attestation.campaignId === latestCampaignId)
+    .attestation.signature = "e".repeat(64);
+  writeDatabase(latestTamperedState, { event: "public-health-endpoint-probe-campaign-latest-tamper-test" });
+  const latestBreakSummary = await request(
+    baseUrl,
+    "/api/public-health/external/endpoints/campaigns/summary",
+    token
+  );
+  assert.equal(latestBreakSummary.body.summary.consecutiveCampaigns, 0);
+  assert.equal(latestBreakSummary.body.summary.continuityBreaks, 1);
+  assert.equal(latestBreakSummary.body.continuityBreak.campaignId, latestCampaignId);
+  assert.equal(latestBreakSummary.body.continuousConnectivityReady, false);
+
+  const historicalTamperedState = structuredClone(fourCampaignState);
+  const historicalCampaignId = campaignsOldestFirst[0].attestation.campaignId;
+  historicalTamperedState.publicHealthExternalEndpointProbeCampaigns
+    .find((item) => item.attestation.campaignId === historicalCampaignId)
+    .attestation.signature = "d".repeat(64);
+  writeDatabase(historicalTamperedState, { event: "public-health-endpoint-probe-campaign-historical-tamper-test" });
+  const historicalBreakSummary = await request(
+    baseUrl,
+    "/api/public-health/external/endpoints/campaigns/summary",
+    token
+  );
+  assert.equal(historicalBreakSummary.body.summary.campaignsRejected, 1);
+  assert.equal(historicalBreakSummary.body.summary.consecutiveCampaigns, 3);
+  assert.equal(historicalBreakSummary.body.summary.continuityBreaks, 0);
+  assert.equal(historicalBreakSummary.body.continuityBreak, null);
+  assert.equal(historicalBreakSummary.body.continuousConnectivityReady, true);
+  assert.equal(historicalBreakSummary.body.productionReady, false);
+
+  for (const summary of [middleBreakSummary.body, latestBreakSummary.body, historicalBreakSummary.body]) {
+    const serializedSummary = JSON.stringify(summary);
+    assert.doesNotMatch(serializedSummary, /https:\/\/|8\.8\.8\.8|"receiptId"|"nonce"|"signature"/i);
+    assert.doesNotMatch(serializedSummary, /invalid|tamper|untrusted|certificate|keyring|signingKeyId/i);
+  }
 });

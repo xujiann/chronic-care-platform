@@ -810,6 +810,14 @@ function buildPublicHealthFinalReadiness(options = {}) {
     check("safety:trusted-site-evidence-blocker", deliveries.every((item) => /site evidence/i.test(item.blocker)), "every accepted delivery retains the trusted site-evidence blocker", "safety"),
     check("safety:emergency-revocation-quarantine", ["security-quarantine", "automaticResignAllowed", "automaticRecoveryAllowed", "key-revoked"].every((token) => keyProviderSource.includes(token)), "emergency revocation is quarantined without automatic resign or recovery", "safety")
   ];
+  const t00BoundaryChecks = checks.filter((item) =>
+    item.id.startsWith("integration:t00-")
+    || item.id === "safety:emergency-revocation-quarantine"
+  );
+  const t08FunctionalChecks = checks.filter((item) => !t00BoundaryChecks.includes(item));
+  const remainingProductionBoundaries = [
+    "Production remains blocked until real independent managed campaign and lane keyrings, verified HTTPS endpoints, certificate pins or mTLS policy, restricted probe workers, worker identity, approved campaign cadence, externally approved per-lane resilience policies, contract cutover and backlog-drain evidence, load evidence, cross-key audit/callback smoke, trusted site evidence and formal operations acceptance are available."
+  ];
   return {
     generatedAt: new Date().toISOString(),
     ok: checks.every((item) => item.passed),
@@ -818,6 +826,10 @@ function buildPublicHealthFinalReadiness(options = {}) {
     summary: {
       checks: checks.length,
       passed: checks.filter((item) => item.passed).length,
+      t08FunctionalChecks: t08FunctionalChecks.length,
+      t08FunctionalPassed: t08FunctionalChecks.filter((item) => item.passed).length,
+      t00BoundaryChecks: t00BoundaryChecks.length,
+      t00BoundaryPassed: t00BoundaryChecks.filter((item) => item.passed).length,
       lanes: runtime.summary.lanes,
       handoffs: runtime.summary.handoffs,
       adapterProfiles: registry.summary.adapters,
@@ -905,9 +917,9 @@ function buildPublicHealthFinalReadiness(options = {}) {
       activeProbeDocumentation: "docs/public-health-external-active-probing.md",
       endpointProbeCampaignDocumentation: "docs/public-health-external-endpoint-probe-campaigns.md"
     },
-    remainingT00Integration: [
-      "Production remains blocked until real independent managed campaign and lane keyrings, verified HTTPS endpoints, certificate pins or mTLS policy, restricted probe workers, worker identity, approved campaign cadence, externally approved per-lane resilience policies, contract cutover and backlog-drain evidence, load evidence, cross-key audit/callback smoke, trusted site evidence and formal operations acceptance are available."
-    ]
+    remainingProductionBoundaries,
+    // Compatibility alias retained for existing release consumers.
+    remainingT00Integration: remainingProductionBoundaries
   };
 }
 
@@ -919,6 +931,8 @@ function renderMarkdown(report) {
     `- Functional state: ${report.functionalState}`,
     `- Formal go-live state: ${report.formalGoLiveState}`,
     `- Checks: ${report.summary.passed}/${report.summary.checks}`,
+    `- T08 functional checks: ${report.summary.t08FunctionalPassed}/${report.summary.t08FunctionalChecks}`,
+    `- T00 public boundary checks: ${report.summary.t00BoundaryPassed}/${report.summary.t00BoundaryChecks}`,
     `- Signed acceptance deliveries: ${report.summary.verifiedAcceptanceDeliveries}/8`,
     `- Verified endpoint probes: ${report.summary.verifiedEndpointProbes}/8`,
     `- Verified endpoint probe campaigns: ${report.summary.verifiedEndpointProbeCampaigns}/3`,
@@ -932,7 +946,8 @@ function renderMarkdown(report) {
     "",
     "## Remaining production integration",
     "",
-    ...report.remainingT00Integration.map((item) => `- ${item}`),
+    ...(report.remainingProductionBoundaries || report.remainingT00Integration || [])
+      .map((item) => `- ${item}`),
     ""
   ].join("\n");
 }

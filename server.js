@@ -24053,7 +24053,24 @@ function materializePublicHealthEndpointProbeCampaigns(data = {}) {
   }));
 }
 
+const PUBLIC_HEALTH_ENDPOINT_PROBE_CONTINUITY_CODES = Object.freeze({
+  "campaign-verification-failed": "ENDPOINT_PROBE_CAMPAIGN_VERIFICATION_FAILED",
+  "campaign-window-overlap": "ENDPOINT_PROBE_CAMPAIGN_WINDOW_OVERLAP",
+  "campaign-gap-exceeded": "ENDPOINT_PROBE_CAMPAIGN_GAP_EXCEEDED"
+});
+
+function publicHealthEndpointProbeContinuityBreakView(value = null) {
+  if (!value || typeof value !== "object") return null;
+  const campaignId = /^[a-z0-9][a-z0-9._:-]{7,127}$/i.test(String(value.campaignId || "").trim())
+    ? String(value.campaignId || "").trim()
+    : "";
+  const code = PUBLIC_HEALTH_ENDPOINT_PROBE_CONTINUITY_CODES[String(value.code || "").trim()]
+    || "ENDPOINT_PROBE_CAMPAIGN_VERIFICATION_FAILED";
+  return { campaignId, code };
+}
+
 function publicHealthEndpointProbeCampaignSummaryView(registry = {}, audit = []) {
+  const continuityBreak = publicHealthEndpointProbeContinuityBreakView(registry.continuityBreak);
   return {
     ok: registry.ok === true,
     functionalState: String(registry.functionalState || "endpoint-probe-campaign-continuity-pending"),
@@ -24063,6 +24080,7 @@ function publicHealthEndpointProbeCampaignSummaryView(registry = {}, audit = [])
       campaignsVerified: Number(registry.summary?.campaignsVerified || 0),
       campaignsRejected: Number(registry.summary?.campaignsRejected || 0),
       consecutiveCampaigns: Number(registry.summary?.consecutiveCampaigns || 0),
+      continuityBreaks: continuityBreak ? 1 : 0,
       requiredConsecutiveCampaigns: Number(registry.summary?.requiredConsecutiveCampaigns || 3),
       maxCampaignGapSeconds: Number(registry.summary?.maxCampaignGapSeconds || 900)
     },
@@ -24078,6 +24096,7 @@ function publicHealthEndpointProbeCampaignSummaryView(registry = {}, audit = [])
       campaignId: String(campaign.campaignId || ""),
       code: "ENDPOINT_PROBE_CAMPAIGN_VERIFICATION_FAILED"
     })),
+    continuityBreak,
     worker: {
       active: publicHealthEndpointProbeCampaignInFlight,
       auditEntries: audit.length,
