@@ -4732,6 +4732,9 @@ test("citizen record V3 exposes eight governed next-stage capabilities", () => {
   ]) assert.match(html, new RegExp(id));
   for (const functionName of [
     "buildProductionIntegrationStatus",
+    "validateClinicalSourceSample",
+    "projectClinicalSourceSample",
+    "assessResidentRecordQuality",
     "governCrossInstitutionRecords",
     "buildFamilyDelegationCenter",
     "buildProactiveCarePlan",
@@ -4749,5 +4752,5 @@ test("citizen record V3 exposes eight governed next-stage capabilities", () => {
   assert.match(ui, /renderCitizenRecordsNextStage/);
   assert.match(v3, /function taskDueState/);
   assert.match(v3, /function calendarDayDistance/);
-  assert.match(documentation, /第二十六增量/);
+  assert.match(documentation, /第二十八增量/);
 });

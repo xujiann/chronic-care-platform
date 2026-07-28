@@ -2973,10 +2973,11 @@ function renderCitizenRecordsNextStage(resident, diseases = [], records = [], ca
   </div>`;
 
   const governanceTarget = document.querySelector("#citizen-governance-v3");
-  if (governanceTarget) governanceTarget.innerHTML = `<div class="citizen-care-row ${workspace.governance.conflicts.length ? "warning" : ""}">
-    <div><strong>${workspace.governance.sourceCount} 个可信来源</strong><span>${workspace.governance.duplicates.length} 组重复</span><em>${workspace.governance.conflicts.length} 组冲突</em></div>
-    <p>${workspace.governance.conflicts.slice(0, 3).map((item) => `${escapeHtml(item.label)}：${escapeHtml(item.action)}`).join("；") || "当前没有需要居民处理的跨院冲突。"}</p>
-    <small>${escapeHtml(workspace.governance.boundary)}</small>
+  if (governanceTarget) governanceTarget.innerHTML = `<div class="citizen-care-row ${workspace.governance.conflicts.length || workspace.governance.quality.reviewCount ? "warning" : ""}">
+    <div><strong>${workspace.governance.sourceCount} 个来源机构</strong><span>${workspace.governance.duplicates.length} 组重复</span><em>${workspace.governance.conflicts.length} 组冲突</em></div>
+    <p>质量完整 ${workspace.governance.quality.completeCount} 条，待复核 ${workspace.governance.quality.reviewCount} 条${workspace.governance.quality.staleCount ? `，其中超期 ${workspace.governance.quality.staleCount} 条` : ""}。</p>
+    <p>${workspace.governance.conflicts.slice(0, 3).map((item) => `${escapeHtml(item.label)}：${escapeHtml(item.action)}`).join("；") || workspace.governance.quality.items.filter((item) => !item.complete).slice(0, 3).map((item) => `${escapeHtml(item.name)}：${escapeHtml(item.status)}`).join("；") || "当前没有需要居民处理的跨院冲突或质量问题。"}</p>
+    <small>${escapeHtml(workspace.governance.boundary)} ${escapeHtml(workspace.governance.quality.boundary)}</small>
     <footer><button type="button" class="small-button" data-v3-action="${workspace.governance.conflicts.length ? "correct-conflict" : "review-provenance"}">${workspace.governance.conflicts.length ? "发起纠错复核" : "查看来源明细"}</button></footer>
   </div>`;
 

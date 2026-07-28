@@ -18,6 +18,12 @@
     { key: "legal", label: "授权文本与上线签字" }
   ]);
   const TRUSTED_SOURCES = new Set(["clinical", "clinical-service", "医疗机构可信来源", "医疗服务可信来源", "health-archive"]);
+  const CLINICAL_SOURCE_SYSTEMS = Object.freeze({
+    EMR: Object.freeze({ category: "emr", label: "电子病历系统" }),
+    LIS: Object.freeze({ category: "labs", label: "检验信息系统" }),
+    PACS: Object.freeze({ category: "imaging", label: "医学影像系统" })
+  });
+  const SENSITIVE_SOURCE_FIELD = /(?:token|secret|password|credential|object(?:key|path)|storage(?:key|path)|signedurl|downloadurl|sourceurl|audit(?:hash|payload)|personindex|masterpatientindex|studyinstanceuid)/i;
   const TERMINAL_TASK_STATES = new Set(["completed", "closed", "cancelled", "已完成", "已关闭", "已取消", "已取药"]);
   const GLOSSARY = Object.freeze([
     { pattern: /窦性心律/, explanation: "心脏节律由正常起搏点发出" },
@@ -94,6 +100,228 @@
 
   function recordTrust(record = {}) {
     return cleanText(record.provenance?.trust || record.meta?.sourceTrust || record.sourceTrust || "来源待核验", 80);
+  }
+
+  function firstValue(source = {}, paths = []) {
+    for (const path of paths) {
+      const value = path.split(".").reduce((current, key) => current?.[key], source);
+      if (value !== undefined && value !== null && cleanText(value, 2000)) return value;
+    }
+    return "";
+  }
+
+  function clinicalSourceSystem(sample = {}) {
+    const source = cleanText(firstValue(sample, ["sourceSystem", "system", "meta.sourceSystem", "provenance.sourceSystem"]), 120).toUpperCase();
+    if (/(^|[^A-Z])EMR([^A-Z]|$)/.test(source) || /电子病历/.test(source)) return "EMR";
+    if (/(^|[^A-Z])LIS([^A-Z]|$)/.test(source) || /检验信息/.test(source)) return "LIS";
+    if (/(^|[^A-Z])PACS([^A-Z]|$)/.test(source) || /医学影像/.test(source)) return "PACS";
+    return "";
+  }
+
+  function collectSensitiveSourceFields(value, prefix = "", depth = 0, output = []) {
+    if (!value || typeof value !== "object" || depth > 5) return output;
+    for (const [key, item] of Object.entries(value).slice(0, 200)) {
+      const path = prefix ? `${prefix}.${key}` : key;
+      if (SENSITIVE_SOURCE_FIELD.test(key)) output.push(path);
+      if (item && typeof item === "object") collectSensitiveSourceFields(item, path, depth + 1, output);
+    }
+    return unique(output).slice(0, 50);
+  }
+
+  function clinicalResultItems(sample = {}) {
+    const value = firstValue(sample, ["results", "items", "observations", "meta.results", "meta.metrics"]);
+    return Array.isArray(value) ? value.filter((item) => item && typeof item === "object").slice(0, 100) : [];
+  }
+
+  function validateClinicalSourceSample(sample = {}, expectedResidentId = "") {
+    const system = clinicalSourceSystem(sample);
+    const residentId = cleanText(firstValue(sample, ["residentId", "subject.residentId", "patient.residentId"]), 120);
+    const sourceOrganization = cleanText(firstValue(sample, ["sourceOrganization", "institutionName", "sourceInstitution", "meta.sourceOrganization", "provenance.sourceOrganization"]), 200);
+    const sourceRecordId = cleanText(firstValue(sample, ["sourceRecordId", "externalId", "reportNo", "accessionNumber", "meta.sourceRecordId", "provenance.sourceRecordId", "id"]), 160);
+    const version = cleanText(firstValue(sample, ["version", "meta.version", "provenance.version"]), 40);
+    const occurredAt = cleanText(firstValue(sample, ["occurredAt", "visitAt", "reportedAt", "studyDate", "date", "updatedAt"]), 60);
+    const errors = [];
+    if (!system) errors.push("来源系统必须明确为 EMR、LIS 或 PACS");
+    if (!residentId) errors.push("缺少居民标识");
+    if (expectedResidentId && residentId !== cleanText(expectedResidentId, 120)) errors.push("样例报文居民与当前居民不一致");
+    if (!sourceOrganization) errors.push("缺少来源机构");
+    if (!sourceRecordId) errors.push("缺少来源记录号");
+    if (!version) errors.push("缺少记录版本");
+    if (!toDate(occurredAt)) errors.push("缺少有效发生或报告时间");
+
+    if (system === "EMR") {
+      const diagnoses = firstValue(sample, ["diagnoses", "diagnosis", "meta.diagnoses", "meta.diagnosis"]);
+      const summary = firstValue(sample, ["summary", "treatment", "result", "meta.treatment"]);
+      const visitType = firstValue(sample, ["visitType", "encounterType", "meta.visitType"]);
+      if (!cleanText(diagnoses, 2000)) errors.push("电子病历样例缺少诊断摘要");
+      if (!cleanText(summary, 2000)) errors.push("电子病历样例缺少诊疗摘要");
+      if (!cleanText(visitType, 200)) errors.push("电子病历样例缺少就诊类型");
+    }
+    if (system === "LIS") {
+      if (!clinicalResultItems(sample).length) errors.push("检验样例缺少结构化结果项目");
+      if (!cleanText(firstValue(sample, ["reportNo", "externalId", "meta.reportNo"]), 160)) errors.push("检验样例缺少报告号");
+    }
+    if (system === "PACS") {
+      if (!cleanText(firstValue(sample, ["modality", "meta.modality"]), 80)) errors.push("影像样例缺少检查设备类型");
+      if (!cleanText(firstValue(sample, ["conclusion", "reportConclusion", "result", "summary", "meta.findings"]), 2000)) errors.push("影像样例缺少报告结论");
+      if (!cleanText(firstValue(sample, ["reportNo", "accessionNumber", "externalId", "meta.reportNo"]), 160)) errors.push("影像样例缺少报告号");
+    }
+
+    const ignoredSensitiveFields = collectSensitiveSourceFields(sample);
+    return {
+      valid: errors.length === 0,
+      system,
+      systemLabel: CLINICAL_SOURCE_SYSTEMS[system]?.label || "未知临床来源",
+      residentId,
+      sourceOrganization,
+      sourceRecordId,
+      version,
+      occurredAt: toDate(occurredAt)?.toISOString() || "",
+      errors,
+      ignoredSensitiveFields,
+      boundary: "校验只确认最小字段契约；居民投影会丢弃令牌、永久地址、对象键、审计载荷、主索引和影像内部标识。"
+    };
+  }
+
+  function resultItemSummary(item = {}) {
+    const name = cleanText(item.name || item.item || item.codeName || "检验项目", 120);
+    const value = cleanText(item.value ?? item.result, 120);
+    const unit = cleanText(item.unit, 40);
+    const status = cleanText(item.status || item.abnormalFlag, 40);
+    return [name, value, unit, status].filter(Boolean).join(" ");
+  }
+
+  function projectClinicalSourceSample(sample = {}, expectedResidentId = "") {
+    const validation = validateClinicalSourceSample(sample, expectedResidentId);
+    if (!validation.valid) throw new Error(`临床来源样例校验失败：${validation.errors.join("；")}`);
+    const common = {
+      id: `clinical-${validation.system.toLowerCase()}-${validation.sourceRecordId}`,
+      residentId: validation.residentId,
+      category: CLINICAL_SOURCE_SYSTEMS[validation.system].category,
+      date: validation.occurredAt.slice(0, 10),
+      source: validation.sourceOrganization,
+      updatedAt: cleanText(firstValue(sample, ["updatedAt", "reportedAt", "occurredAt", "visitAt", "studyDate", "date"]), 60),
+      status: cleanText(firstValue(sample, ["status", "reportStatus", "meta.status"]), 80),
+      meta: {
+        sourceSystem: validation.system,
+        sourceOrganization: validation.sourceOrganization,
+        sourceRecordId: validation.sourceRecordId,
+        version: validation.version,
+        sourceTrust: "clinical",
+        authority: "clinical",
+        dataQualityStatus: "样例契约已通过"
+      }
+    };
+    if (validation.system === "EMR") {
+      const diagnoses = firstValue(sample, ["diagnoses", "diagnosis", "meta.diagnoses", "meta.diagnosis"]);
+      const diagnosisItems = Array.isArray(diagnoses) ? diagnoses.map((item) => cleanText(item, 160)).filter(Boolean).slice(0, 20) : [cleanText(diagnoses, 500)].filter(Boolean);
+      return CitizenRecordsV1?.projectRecord({
+        ...common,
+        name: diagnosisItems.join("、") || "电子病历摘要",
+        result: firstValue(sample, ["summary", "treatment", "result", "meta.treatment"]),
+        meta: {
+          ...common.meta,
+          recordKind: "emr-summary",
+          visitType: cleanText(firstValue(sample, ["visitType", "encounterType", "meta.visitType"]), 80),
+          department: cleanText(firstValue(sample, ["department", "meta.department"]), 120),
+          chiefComplaint: cleanText(firstValue(sample, ["chiefComplaint", "meta.chiefComplaint"]), 500),
+          diagnoses: diagnosisItems,
+          treatment: cleanText(firstValue(sample, ["treatment", "summary", "result", "meta.treatment"]), 1000),
+          followupPlan: cleanText(firstValue(sample, ["followupPlan", "recommendations", "meta.followupPlan"]), 600)
+        }
+      });
+    }
+    if (validation.system === "LIS") {
+      const results = clinicalResultItems(sample);
+      return CitizenRecordsV1?.projectRecord({
+        ...common,
+        name: cleanText(firstValue(sample, ["item", "name", "title"]) || "检验报告", 200),
+        result: results.map(resultItemSummary).filter(Boolean).slice(0, 20).join("；"),
+        meta: {
+          ...common.meta,
+          recordKind: "diagnostic-report",
+          reportNo: cleanText(firstValue(sample, ["reportNo", "externalId", "meta.reportNo"]), 120),
+          metrics: results.slice(0, 20).map((item) => ({
+            name: cleanText(item.name || item.item || item.codeName, 120),
+            value: cleanText(item.value ?? item.result, 120),
+            unit: cleanText(item.unit, 40),
+            status: cleanText(item.status || item.abnormalFlag, 40)
+          }))
+        }
+      });
+    }
+    return CitizenRecordsV1?.projectRecord({
+      ...common,
+      name: `${cleanText(firstValue(sample, ["bodyPart", "examMethod", "meta.bodyPart"]) || "影像", 100)}报告`,
+      result: firstValue(sample, ["conclusion", "reportConclusion", "result", "summary", "meta.findings"]),
+      meta: {
+        ...common.meta,
+        recordKind: "diagnostic-report",
+        reportNo: cleanText(firstValue(sample, ["reportNo", "accessionNumber", "externalId", "meta.reportNo"]), 120),
+        modality: cleanText(firstValue(sample, ["modality", "meta.modality"]), 40),
+        bodyPart: cleanText(firstValue(sample, ["bodyPart", "examMethod", "meta.bodyPart"]), 100),
+        reportStatus: cleanText(firstValue(sample, ["reportStatus", "status", "meta.reportStatus"]), 80),
+        originalAvailable: false,
+        authorizationRequired: true,
+        accessMode: "受控调阅"
+      }
+    });
+  }
+
+  function assessResidentRecordQuality(records = [], now = new Date(), expectedResidentId = "") {
+    const referenceTime = toDate(now) || new Date();
+    const categoryLabels = {
+      emr: "电子病历",
+      labs: "检验检查",
+      imaging: "影像报告",
+      medications: "用药记录",
+      attachments: "附件资料",
+      "physical-exam": "体检报告",
+      allergies: "过敏信息",
+      vaccines: "预防接种",
+      admissions: "住院记录"
+    };
+    const items = (Array.isArray(records) ? records : [])
+      .filter((record) => record && record.category !== "authorizations")
+      .map((record) => {
+        const sourceOrganization = cleanText(record.provenance?.sourceOrganization || record.meta?.sourceOrganization || record.source, 200);
+        const sourceSystem = cleanText(record.provenance?.sourceSystem || record.meta?.sourceSystem, 120);
+        const sourceRecordId = cleanText(record.provenance?.sourceRecordId || record.meta?.sourceRecordId, 160);
+        const updatedAt = record.provenance?.lastSynchronizedAt || record.updatedAt || record.createdAt || record.date;
+        const ageDays = calendarDayDistance(updatedAt, referenceTime);
+        const issues = [];
+        if (expectedResidentId && cleanText(record.residentId, 120) !== cleanText(expectedResidentId, 120)) issues.push("居民范围不一致");
+        if (!sourceOrganization || /待核验|未知|未提供/.test(sourceOrganization)) issues.push("来源机构待补");
+        if (!sourceSystem || /待核验|未知|未提供/.test(sourceSystem)) issues.push("来源系统待补");
+        if (!sourceRecordId) issues.push("来源记录号待补");
+        if (!toDate(updatedAt)) issues.push("更新时间待补");
+        else if (ageDays > 548) issues.push("超过十八个月待复核");
+        const trust = recordTrust(record);
+        if (!TRUSTED_SOURCES.has(trust)) issues.push(trust === "self-reported" ? "个人补充待机构核验" : "来源可信度待核验");
+        const rawName = cleanText(record.name || record.title, 160);
+        const displayName = !rawName || /^(已核验|已确认|待核验|已通过|verified|approved|confirmed)$/i.test(rawName)
+          ? categoryLabels[record.category] || "健康资料"
+          : rawName;
+        return {
+          id: cleanText(record.id, 160),
+          name: displayName,
+          category: cleanText(record.category, 60),
+          sourceOrganization: sourceOrganization || "来源机构待补",
+          updatedAt: taskDateOnly(updatedAt),
+          ageDays: Number.isFinite(ageDays) ? ageDays : null,
+          complete: issues.length === 0,
+          issues,
+          status: issues.length ? issues[0] : "来源与时效完整"
+        };
+      });
+    return {
+      items,
+      completeCount: items.filter((item) => item.complete).length,
+      reviewCount: items.filter((item) => !item.complete).length,
+      staleCount: items.filter((item) => item.issues.includes("超过十八个月待复核")).length,
+      crossResidentCount: items.filter((item) => item.issues.includes("居民范围不一致")).length,
+      boundary: "质量状态用于提示来源、字段和更新时间是否齐全，不改变医疗机构原始内容，也不把个人补充资料提升为临床权威记录。"
+    };
   }
 
   function nonPlaceholderEvidence(item = {}) {
@@ -490,9 +718,11 @@
     const authorizations = Array.isArray(input.authorizations)
       ? input.authorizations
       : records.filter((record) => record.category === "authorizations");
+    const governance = governCrossInstitutionRecords(records);
+    governance.quality = assessResidentRecordQuality(records, input.now, input.resident?.id);
     return {
       integration: buildProductionIntegrationStatus(input.integrations || {}, input.now),
-      governance: governCrossInstitutionRecords(records),
+      governance,
       family: buildFamilyDelegationCenter({ members: input.members, authorizations, now: input.now }),
       carePlan: buildProactiveCarePlan({
         records,
@@ -573,8 +803,12 @@
 
   return {
     REQUIRED_INTEGRATIONS,
+    CLINICAL_SOURCE_SYSTEMS,
     SAFE_ACTION_INTENTS,
     buildProductionIntegrationStatus,
+    validateClinicalSourceSample,
+    projectClinicalSourceSample,
+    assessResidentRecordQuality,
     governCrossInstitutionRecords,
     buildFamilyDelegationCenter,
     buildProactiveCarePlan,

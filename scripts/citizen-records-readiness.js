@@ -57,7 +57,9 @@ function assessCitizenRecordsReadiness(options = {}) {
     { id: "proactive-care-task-routing", label: "主动健康任务逐项安全分流", passed: /buildCareTaskActionIntent/.test(v3) && /handleCitizenRecordsV3CareTaskAction/.test(ui) && /主动健康任务标识与类型不匹配/.test(nextStageUnit) && /data-v3-care-task/.test(e2e) },
     { id: "proactive-care-calendar-day", label: "主动任务东八区自然日到期计算", passed: /taskDueState/.test(v3) && /calendarDayDistance/.test(v3) && /东八区自然日判断今日到期/.test(nextStageUnit) && /未来 7 天/.test(e2e) },
     { id: "integration-evidence-time-window", label: "生产接入证据精确时间窗", passed: /futureTimestamp/.test(v3) && /clockSkewMinutes/.test(v3) && /拒绝异常未来时间无效时间/.test(nextStageUnit) && /成功时间异常/.test(e2e) },
-    { id: "acceptance-documentation", label: "居民验收标准与外部依赖", passed: /第二十六增量/.test(documentation) && /## 外部依赖/.test(documentation) }
+    { id: "clinical-source-contracts", label: "EMR/LIS/PACS 样例契约与安全投影", passed: /function validateClinicalSourceSample/.test(v3) && /function projectClinicalSourceSample/.test(v3) && /LIS 与 PACS 样例缺少结构化结果/.test(nextStageUnit) && /清除内部敏感字段/.test(nextStageUnit) },
+    { id: "record-quality-assessment", label: "档案来源完整性与时效质量评估", passed: /function assessResidentRecordQuality/.test(v3) && /超过十八个月待复核/.test(v3) && /质量完整/.test(ui) && /档案质量评估识别来源缺失/.test(nextStageUnit) },
+    { id: "acceptance-documentation", label: "居民验收标准与外部依赖", passed: /第二十八增量/.test(documentation) && /## 外部依赖/.test(documentation) }
   ];
 
   const integrationChecks = [

@@ -97,6 +97,123 @@ test("跨院档案治理识别重复来源与互相冲突的结果并保留原�
   assert.match(result.conflicts[0].action, /原始版本均保留/);
 });
 
+test("EMR 样例必须满足居民、来源、版本和结构化诊疗最小契约", () => {
+  const sample = {
+    sourceSystem: "EMR",
+    residentId: "r1",
+    sourceOrganization: "甲医院",
+    sourceRecordId: "visit-100",
+    version: "3",
+    visitAt: "2026-07-27T07:00:00.000Z",
+    visitType: "门诊",
+    diagnoses: ["高血压"],
+    summary: "复诊，继续观察血压",
+    department: "全科"
+  };
+  const valid = api.validateClinicalSourceSample(sample, "r1");
+  assert.equal(valid.valid, true);
+  assert.equal(valid.system, "EMR");
+
+  const crossResident = api.validateClinicalSourceSample({ ...sample, residentId: "r2" }, "r1");
+  assert.equal(crossResident.valid, false);
+  assert.match(crossResident.errors.join("；"), /居民与当前居民不一致/);
+
+  const incomplete = api.validateClinicalSourceSample({ ...sample, version: "", diagnoses: [] }, "r1");
+  assert.equal(incomplete.valid, false);
+  assert.match(incomplete.errors.join("；"), /版本/);
+  assert.match(incomplete.errors.join("；"), /诊断摘要/);
+});
+
+test("LIS 与 PACS 样例缺少结构化结果或报告结论时默认拒绝", () => {
+  const common = {
+    residentId: "r1",
+    sourceOrganization: "甲医院",
+    sourceRecordId: "report-1",
+    version: "1",
+    reportedAt: "2026-07-27T07:00:00.000Z",
+    reportNo: "R-1"
+  };
+  assert.equal(api.validateClinicalSourceSample({ ...common, sourceSystem: "LIS", results: [] }, "r1").valid, false);
+  assert.equal(api.validateClinicalSourceSample({ ...common, sourceSystem: "PACS", modality: "CT" }, "r1").valid, false);
+  assert.match(
+    api.validateClinicalSourceSample({ ...common, sourceSystem: "HIS" }, "r1").errors.join("；"),
+    /EMR、LIS 或 PACS/
+  );
+});
+
+test("临床样例居民投影按系统白名单保留摘要并清除内部敏感字段", () => {
+  const sample = {
+    sourceSystem: "LIS",
+    residentId: "r1",
+    sourceOrganization: "甲医院",
+    sourceRecordId: "lab-100",
+    version: "2",
+    reportedAt: "2026-07-27T07:00:00.000Z",
+    reportNo: "LAB-100",
+    name: "肾功能",
+    results: [{ name: "肌酐", value: "80", unit: "μmol/L", status: "正常", auditHash: "nested-secret" }],
+    objectPath: "private/lab-100.pdf",
+    signedUrl: "https://storage.example/private",
+    accessToken: "must-not-leak",
+    meta: { personIndex: "mpi-secret" }
+  };
+  const validation = api.validateClinicalSourceSample(sample, "r1");
+  assert.equal(validation.valid, true);
+  assert.ok(validation.ignoredSensitiveFields.includes("objectPath"));
+  assert.ok(validation.ignoredSensitiveFields.includes("results.0.auditHash"));
+
+  const projected = api.projectClinicalSourceSample(sample, "r1");
+  assert.equal(projected.category, "labs");
+  assert.equal(projected.meta.sourceSystem, "LIS");
+  assert.match(projected.result, /肌酐 80 μmol\/L 正常/);
+  assert.doesNotMatch(JSON.stringify(projected), /private\/lab|storage\.example|must-not-leak|nested-secret|mpi-secret/);
+});
+
+test("档案质量评估识别来源缺失、超期、个人补充和跨居民记录", () => {
+  const quality = api.assessResidentRecordQuality([
+    {
+      id: "complete",
+      residentId: "r1",
+      category: "emr",
+      name: "已核验",
+      updatedAt: "2026-07-20",
+      meta: { sourceSystem: "EMR", sourceOrganization: "甲医院", sourceRecordId: "v1", sourceTrust: "clinical" }
+    },
+    {
+      id: "stale",
+      residentId: "r1",
+      category: "labs",
+      name: "历史检验",
+      updatedAt: "2024-01-01",
+      meta: { sourceSystem: "LIS", sourceOrganization: "甲医院", sourceRecordId: "l1", sourceTrust: "clinical" }
+    },
+    {
+      id: "self",
+      residentId: "r1",
+      category: "medications",
+      name: "个人补充用药",
+      updatedAt: "2026-07-20",
+      source: "个人上传",
+      meta: { sourceTrust: "self-reported" }
+    },
+    {
+      id: "other",
+      residentId: "r2",
+      category: "imaging",
+      name: "跨居民影像",
+      updatedAt: "2026-07-20",
+      meta: { sourceSystem: "PACS", sourceOrganization: "乙医院", sourceRecordId: "p1", sourceTrust: "clinical" }
+    }
+  ], now, "r1");
+  assert.equal(quality.completeCount, 1);
+  assert.equal(quality.reviewCount, 3);
+  assert.equal(quality.staleCount, 1);
+  assert.equal(quality.crossResidentCount, 1);
+  assert.equal(quality.items.find((item) => item.id === "complete").name, "电子病历");
+  assert.match(quality.items.find((item) => item.id === "self").issues.join("；"), /个人补充待机构核验/);
+  assert.match(quality.boundary, /不改变医疗机构原始内容/);
+});
+
 test("家庭代办必须同时具备权威关系和有效最小范围授权", () => {
   const verifiedMember = {
     residentId: "r1",
