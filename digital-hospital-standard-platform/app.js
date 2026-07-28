@@ -1,5 +1,5 @@
 (function () {
-  const storageKey = "digitalHospitalMvpState:v0.13";
+  const storageKey = "digitalHospitalMvpState:v0.14";
 
   const domains = [
     { code: "A", name: "基础设施与平台支撑", weight: 100 },
@@ -404,6 +404,17 @@
       { id: "QWIN-ASSIST-20260711-01", deploymentId: "DEP-ASSIST-20260711", version: "ASSIST-2026.07.11", period: "最近30分钟", sampleCount: 1268, citationCoverage: 100, answerAcceptance: 94, noAnswerRate: 3.2, escalationRate: 6.8, p95LatencyMs: 642, safetyEvents: 0, driftScore: 1.8, status: "健康", collectedAt: "2026-07-28 11:05" },
     ],
     assistantQualityIncidents: [],
+    assistantFeedbackRecords: [
+      { id: "AFB-20260728-001", deploymentId: "DEP-ASSIST-20260711", version: "ASSIST-2026.07.11", questionId: "QA-20260728-002", channel: "回答评价", rating: 2, sentiment: "负向", reason: "引用不足", comment: "回答说明了统计口径，但没有引用失败重试去重的具体规则条款。", citationUseful: false, userRole: "医院填报员", status: "待研判", createdAt: "2026-07-28 11:18", reviewedBy: "", reviewedAt: "" },
+      { id: "AFB-20260728-002", deploymentId: "DEP-ASSIST-20260711", version: "ASSIST-2026.07.11", questionId: "QA-20260728-001", channel: "回答评价", rating: 5, sentiment: "正向", reason: "口径清晰", comment: "有效期基准、补充材料和人工确认边界都很明确。", citationUseful: true, userRole: "医院管理员", status: "已关闭", createdAt: "2026-07-28 11:20", reviewedBy: "评价助手治理组", reviewedAt: "2026-07-28 11:24" },
+      { id: "AFB-20260728-003", deploymentId: "DEP-ASSIST-20260711", version: "ASSIST-2026.07.11", questionId: "QA-20260728-003", channel: "试点工单", rating: 2, sentiment: "负向", reason: "答案不完整", comment: "适老化证据还需要明确持续运行记录的时间范围。", citationUseful: true, userRole: "试点协调员", status: "已转样本", createdAt: "2026-07-28 11:25", reviewedBy: "标准规则组", reviewedAt: "2026-07-28 11:30" },
+    ],
+    assistantImprovementSamples: [
+      { id: "AIS-20260728-001", feedbackId: "AFB-20260728-003", sourceVersion: "ASSIST-2026.07.11", domain: "D6", question: "适老化服务持续运行记录应覆盖多长时间？", expectedAnswer: "", sourceEvidence: ["D6指标证据要求", "证据材料目录EVD-D6-03"], riskLevel: "中", targetSuiteId: "EVALSET-CORE-2026-01", status: "待标注", owner: "试点培训组", createdAt: "2026-07-28 11:30", updatedAt: "2026-07-28 11:30" },
+    ],
+    assistantImprovementCycles: [
+      { id: "AIC-20260728-001", name: "首批试点引用完整性改进", sourceFeedbackIds: ["AFB-20260720-006"], sampleIds: ["AIS-20260720-006"], targetSuiteId: "EVALSET-CORE-2026-01", targetVersion: "ASSIST-2026.07.11", evaluationRunId: "EVALRUN-20260728-001", status: "已完成", owner: "评价助手治理组", startedAt: "2026-07-20 14:00", completedAt: "2026-07-28 10:29" },
+    ],
     anomalyExplanations: [
       { id: "AEX-20260728-001", sourceId: "VAL-H000001-B3-RATE", hospitalCode: "H000001", indicatorCode: "B3", title: "接口成功率接近等级边界", summary: "当前接口成功率99.5%，接近优秀级规则阈值，微小口径差异可能影响等级判断。", possibleCause: "失败调用是否重试计数、计划停机是否纳入分母等统计口径尚未完全确认。", impact: "可能影响B3得分及专家复核结论。", recommendation: "核对接口调用日志、失败重试去重规则和统计周期，并补充数据质量说明。", status: "待确认", generatedAt: "2026-07-28 09:30", editable: true },
       { id: "AEX-20260728-002", sourceId: "VAL-H000002-D1-VOL", hospitalCode: "H000002", indicatorCode: "D1", title: "预约诊疗量较历史同期波动较大", summary: "本期线上预约量较历史同期上升42%，超过历史波动阈值。", possibleCause: "统计渠道扩展、口径调整或业务量真实增长均可能导致波动。", impact: "不会自动扣分，但需要医院说明并由审核员确认。", recommendation: "补充渠道范围、统计口径变更和同期业务量对比。", status: "已编辑", generatedAt: "2026-07-28 09:32", editable: true },
@@ -556,6 +567,9 @@
     if (!Array.isArray(next.assistantDeployments)) next.assistantDeployments = JSON.parse(JSON.stringify(seedState.assistantDeployments));
     if (!Array.isArray(next.assistantOnlineQualityWindows)) next.assistantOnlineQualityWindows = JSON.parse(JSON.stringify(seedState.assistantOnlineQualityWindows));
     if (!Array.isArray(next.assistantQualityIncidents)) next.assistantQualityIncidents = JSON.parse(JSON.stringify(seedState.assistantQualityIncidents));
+    if (!Array.isArray(next.assistantFeedbackRecords)) next.assistantFeedbackRecords = JSON.parse(JSON.stringify(seedState.assistantFeedbackRecords));
+    if (!Array.isArray(next.assistantImprovementSamples)) next.assistantImprovementSamples = JSON.parse(JSON.stringify(seedState.assistantImprovementSamples));
+    if (!Array.isArray(next.assistantImprovementCycles)) next.assistantImprovementCycles = JSON.parse(JSON.stringify(seedState.assistantImprovementCycles));
     if (!Array.isArray(next.anomalyExplanations)) next.anomalyExplanations = JSON.parse(JSON.stringify(seedState.anomalyExplanations));
     if (!Array.isArray(next.rectificationSuggestions)) next.rectificationSuggestions = JSON.parse(JSON.stringify(seedState.rectificationSuggestions));
     if (!Array.isArray(next.reviewRiskSignals)) next.reviewRiskSignals = JSON.parse(JSON.stringify(seedState.reviewRiskSignals));
@@ -878,6 +892,7 @@
     const latestQualityWindow = state.assistantOnlineQualityWindows.slice().sort((left, right) => String(right.collectedAt).localeCompare(String(left.collectedAt)))[0];
     const healthyWindows = state.assistantOnlineQualityWindows.filter((item) => item.status === "健康");
     const openQualityIncidents = state.assistantQualityIncidents.filter((item) => item.status !== "已解决");
+    const negativeFeedback = state.assistantFeedbackRecords.filter((item) => item.sentiment === "负向");
     return {
       activeSources: state.assistantKnowledgeSources.filter((item) => item.status === "已启用").length,
       knowledgeChunks: state.assistantKnowledgeSources.reduce((sum, item) => sum + Number(item.chunks || 0), 0),
@@ -898,6 +913,11 @@
       onlineHealthyRate: Math.round((healthyWindows.length / Math.max(1, state.assistantOnlineQualityWindows.length)) * 100),
       latestOnlineStatus: latestQualityWindow?.status === "异常" && !openQualityIncidents.length ? "已恢复" : latestQualityWindow?.status || "未采集",
       openQualityIncidents: openQualityIncidents.length,
+      negativeFeedback: negativeFeedback.length,
+      pendingFeedbackReview: state.assistantFeedbackRecords.filter((item) => item.status === "待研判").length,
+      pendingSampleLabeling: state.assistantImprovementSamples.filter((item) => item.status === "待标注").length,
+      includedSamples: state.assistantImprovementSamples.filter((item) => item.status === "已入集" || item.status === "已验证").length,
+      openImprovementCycles: state.assistantImprovementCycles.filter((item) => item.status !== "已完成").length,
       pendingExplanations: pendingExplanations.length,
       pendingSuggestions: pendingSuggestions.length,
       adoptedSuggestions: state.rectificationSuggestions.filter((item) => item.status === "已采纳").length,
@@ -926,9 +946,9 @@
   }
 
   function statusClass(status) {
-    if (status === "已完成" || status === "已通过" || status === "已发布" || status === "已批准" || status === "已归档" || status === "已关闭" || status === "已解决" || status === "已就绪" || status === "已闭环" || status === "已启动" || status === "可启动" || status === "可推广" || status === "达标" || status === "通过" || status === "历史版本" || status === "启用" || status === "已启用" || status === "已采纳" || status === "已回答" || status === "已编辑" || status === "已转复核" || status === "已排除" || status === "复核通过" || status === "已校验" || status === "命中充分" || status === "成功" || status === "已复核" || status === "正常" || status === "稳定" || status === "健康" || status === "已恢复") return "";
-    if (status === "进行中" || status === "处理中" || status === "推进中" || status === "关注" || status === "条件通过" || status === "分析完成" || status === "改进中" || status === "待验收" || status === "准备中" || status === "已确认" || status === "待确认" || status === "待采纳" || status === "待分派" || status === "待回复" || status === "待评估" || status === "待审批" || status === "待复核" || status === "需补充" || status === "人工复核" || status === "草稿" || status === "报名中" || status === "候选" || status === "已回滚" || status === "试运行" || status === "预归档" || status === "填报中" || status === "审核中" || status === "上传中" || status === "扫描中" || status === "排队中" || status === "预警" || status === "降级" || status === "灰度中" || status === "已暂停" || status === "开放") return "warn";
-    if (status === "阻断" || status === "门禁阻断" || status === "有阻塞" || status === "有风险" || status === "需优化" || status === "未达标" || status === "逾期" || status === "高" || status === "紧急" || status === "异常" || status === "故障" || status === "失败" || status === "高负荷" || status === "高风险" || status === "拥堵") return "danger";
+    if (status === "已完成" || status === "已通过" || status === "已发布" || status === "已批准" || status === "已归档" || status === "已关闭" || status === "已解决" || status === "已就绪" || status === "已闭环" || status === "已启动" || status === "可启动" || status === "可推广" || status === "达标" || status === "通过" || status === "历史版本" || status === "启用" || status === "已启用" || status === "已采纳" || status === "已回答" || status === "已编辑" || status === "已转复核" || status === "已排除" || status === "复核通过" || status === "已校验" || status === "命中充分" || status === "成功" || status === "已复核" || status === "正常" || status === "稳定" || status === "健康" || status === "已恢复" || status === "已转样本" || status === "已入集" || status === "已验证" || status === "正向") return "";
+    if (status === "进行中" || status === "处理中" || status === "推进中" || status === "关注" || status === "条件通过" || status === "分析完成" || status === "改进中" || status === "待验收" || status === "准备中" || status === "已确认" || status === "待确认" || status === "待采纳" || status === "待分派" || status === "待回复" || status === "待评估" || status === "待审批" || status === "待复核" || status === "需补充" || status === "人工复核" || status === "草稿" || status === "报名中" || status === "候选" || status === "已回滚" || status === "试运行" || status === "预归档" || status === "填报中" || status === "审核中" || status === "上传中" || status === "扫描中" || status === "排队中" || status === "预警" || status === "降级" || status === "灰度中" || status === "已暂停" || status === "开放" || status === "待研判" || status === "已研判" || status === "待标注" || status === "已标注" || status === "待回归") return "warn";
+    if (status === "阻断" || status === "门禁阻断" || status === "有阻塞" || status === "有风险" || status === "需优化" || status === "未达标" || status === "逾期" || status === "高" || status === "紧急" || status === "异常" || status === "故障" || status === "失败" || status === "高负荷" || status === "高风险" || status === "拥堵" || status === "负向") return "danger";
     return "warn";
   }
 
@@ -986,7 +1006,7 @@
       standardVersion: state.task.standard,
       hospitalCode: hospital.code,
       hospitalName: hospital.name,
-      prototypeVersion: "mvp-0.13",
+      prototypeVersion: "mvp-0.14",
     };
     if (kind === "submission") {
       return {
@@ -1169,6 +1189,9 @@
         assistantDeployments: state.assistantDeployments,
         assistantOnlineQualityWindows: state.assistantOnlineQualityWindows,
         assistantQualityIncidents: state.assistantQualityIncidents,
+        assistantFeedbackRecords: state.assistantFeedbackRecords,
+        assistantImprovementSamples: state.assistantImprovementSamples,
+        assistantImprovementCycles: state.assistantImprovementCycles,
         anomalyExplanations: state.anomalyExplanations,
         rectificationSuggestions: state.rectificationSuggestions,
         reviewRiskSignals: state.reviewRiskSignals,
@@ -1235,6 +1258,9 @@
       assistantDeployments: state.assistantDeployments,
       assistantOnlineQualityWindows: state.assistantOnlineQualityWindows,
       assistantQualityIncidents: state.assistantQualityIncidents,
+      assistantFeedbackRecords: state.assistantFeedbackRecords,
+      assistantImprovementSamples: state.assistantImprovementSamples,
+      assistantImprovementCycles: state.assistantImprovementCycles,
       anomalyExplanations: state.anomalyExplanations,
       rectificationSuggestions: state.rectificationSuggestions,
       reviewRiskSignals: state.reviewRiskSignals,
@@ -2433,6 +2459,7 @@
       { id: "governance", label: "治理审计" },
       { id: "quality", label: "质量门禁" },
       { id: "canary", label: "灰度" },
+      { id: "feedback", label: "反馈" },
     ];
     let content = "";
 
@@ -3005,6 +3032,116 @@
                         .join("")
                     : `<tr><td colspan="8"><span class="muted-text">暂无质量事件，当前线上指标处于护栏范围内。</span></td></tr>`
                 }
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "feedback") {
+      content = `
+        <div class="grid-4">
+          ${metric("负向反馈", summary.negativeFeedback, `${state.assistantFeedbackRecords.length}条线上反馈`, summary.negativeFeedback ? "warn" : "")}
+          ${metric("待人工研判", summary.pendingFeedbackReview, "反馈不得直接修改模型", summary.pendingFeedbackReview ? "danger" : "")}
+          ${metric("待标注样本", summary.pendingSampleLabeling, `${summary.includedSamples}条已入集或验证`, summary.pendingSampleLabeling ? "warn" : "")}
+          ${metric("开放改进周期", summary.openImprovementCycles, "入集后必须完成回归验证", summary.openImprovementCycles ? "warn" : "")}
+        </div>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">线上反馈研判</h3>
+              <p class="panel-subtitle">统一接收回答评价和试点工单；负向反馈需人工确认问题性质后，才能转为改进样本。</p>
+            </div>
+            <button class="button secondary" type="button" data-action="collect-assistant-feedback">采集试点反馈</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>反馈</th><th>版本/问答</th><th>评分</th><th>问题原因</th><th>反馈说明</th><th>引用有效</th><th>来源/时间</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.assistantFeedbackRecords
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.id}</strong><br /><span class="status-pill ${statusClass(item.sentiment)}">${item.sentiment}</span></td>
+                        <td>${item.version}<br /><span class="muted-text">${item.deploymentId} · ${item.questionId}</span></td>
+                        <td><strong>${item.rating}/5</strong></td>
+                        <td>${item.reason}</td>
+                        <td>${escapeHtml(item.comment)}</td>
+                        <td>${item.citationUseful ? "是" : "否"}</td>
+                        <td>${item.channel} · ${item.userRole}<br /><span class="muted-text">${item.createdAt}</span></td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span><br /><span class="muted-text">${item.reviewedBy || "待指派"}</span></td>
+                        <td><div class="toolbar inline"><button class="button ghost" type="button" data-action="review-assistant-feedback" data-id="${item.id}" ${item.status === "待研判" ? "" : "disabled"}>人工研判</button><button class="button ghost" type="button" data-action="convert-feedback-sample" data-id="${item.id}" ${item.sentiment === "负向" && item.status === "已研判" ? "" : "disabled"}>转改进样本</button></div></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">改进样本标注与入集</h3>
+              <p class="panel-subtitle">样本必须补充标准答案和来源证据，经标注后才能纳入指定评测集并形成新的改进周期。</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>样本</th><th>来源反馈/版本</th><th>领域</th><th>问题</th><th>标准答案</th><th>来源证据</th><th>风险</th><th>目标评测集</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.assistantImprovementSamples
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.id}</strong><br /><span class="muted-text">${item.owner}</span></td>
+                        <td>${item.feedbackId}<br /><span class="muted-text">${item.sourceVersion}</span></td>
+                        <td><span class="tag">${item.domain}</span></td>
+                        <td>${escapeHtml(item.question)}</td>
+                        <td>${item.expectedAnswer ? escapeHtml(item.expectedAnswer) : `<span class="muted-text">待专家标注</span>`}</td>
+                        <td>${item.sourceEvidence.map((source) => `<span class="tag">${source}</span>`).join(" ")}</td>
+                        <td><span class="status-pill ${statusClass(item.riskLevel)}">${item.riskLevel}</span></td>
+                        <td>${item.targetSuiteId}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span><br /><span class="muted-text">${item.updatedAt}</span></td>
+                        <td><div class="toolbar inline"><button class="button ghost" type="button" data-action="annotate-improvement-sample" data-id="${item.id}" ${item.status === "待标注" ? "" : "disabled"}>专家标注</button><button class="button ghost" type="button" data-action="include-improvement-sample" data-id="${item.id}" ${item.status === "已标注" ? "" : "disabled"}>纳入评测集</button></div></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">持续改进回归周期</h3>
+              <p class="panel-subtitle">每次样本入集形成独立周期，固定反馈、样本、评测集和目标版本；通过回归后才关闭问题。</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>改进周期</th><th>反馈证据</th><th>样本</th><th>目标评测集</th><th>目标版本</th><th>回归运行</th><th>责任组</th><th>开始/完成</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.assistantImprovementCycles
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.name}</strong><br /><span class="muted-text">${item.id}</span></td>
+                        <td>${item.sourceFeedbackIds.join("<br />")}</td>
+                        <td>${item.sampleIds.join("<br />")}</td>
+                        <td>${item.targetSuiteId}</td>
+                        <td>${item.targetVersion}</td>
+                        <td>${item.evaluationRunId || "待运行"}</td>
+                        <td>${item.owner}</td>
+                        <td>${item.startedAt}<br /><span class="muted-text">${item.completedAt || "待完成"}</span></td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td><button class="button ghost" type="button" data-action="run-improvement-regression" data-id="${item.id}" ${item.status === "待回归" ? "" : "disabled"}>运行回归验证</button></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
               </tbody>
             </table>
           </div>
@@ -6144,6 +6281,173 @@
     render();
   }
 
+  function collectAssistantFeedback() {
+    const deployment = state.assistantDeployments.find((item) => item.status === "稳定")
+      || state.assistantDeployments.find((item) => item.status === "已完成")
+      || state.assistantDeployments[0];
+    const question = state.standardQaRecords.find((item) => item.scope.startsWith("B3")) || state.standardQaRecords[0];
+    const feedback = {
+      id: `AFB-${Date.now()}`,
+      deploymentId: deployment?.id || "",
+      version: deployment?.version || assistantSummary().activeReleaseVersion,
+      questionId: question?.id || "",
+      channel: "试点工单",
+      rating: 2,
+      sentiment: "负向",
+      reason: "边界口径不完整",
+      comment: "失败重试去重说明缺少同一业务请求标识和重试窗口的明确引用，需要补充标准依据。",
+      citationUseful: false,
+      userRole: "试点协调员",
+      status: "待研判",
+      createdAt: nowText(),
+      reviewedBy: "",
+      reviewedAt: "",
+    };
+    state.assistantFeedbackRecords.unshift(feedback);
+    addAudit("采集评价助手线上反馈", feedback.id, `${feedback.version} · ${feedback.reason}`);
+    saveState();
+    showNotice(`${feedback.id}已进入人工研判队列。`);
+    render();
+  }
+
+  function reviewAssistantFeedback(id) {
+    const feedback = state.assistantFeedbackRecords.find((item) => item.id === id);
+    if (!feedback || feedback.status !== "待研判") return;
+    feedback.status = feedback.sentiment === "负向" ? "已研判" : "已关闭";
+    feedback.reviewedBy = state.activeRole;
+    feedback.reviewedAt = nowText();
+    addAudit("人工研判评价助手反馈", feedback.id, `${feedback.sentiment} · ${feedback.reason}`);
+    saveState();
+    showNotice(`${feedback.id}已完成研判${feedback.sentiment === "负向" ? "，可转为改进样本" : "并关闭"}。`);
+    render();
+  }
+
+  function convertFeedbackSample(id) {
+    const feedback = state.assistantFeedbackRecords.find((item) => item.id === id);
+    if (!feedback || feedback.sentiment !== "负向" || feedback.status !== "已研判") return;
+    if (state.assistantImprovementSamples.some((item) => item.feedbackId === feedback.id)) return;
+    const question = state.standardQaRecords.find((item) => item.id === feedback.questionId);
+    const domain = question?.scope?.split(" ")[0] || "通用";
+    const sample = {
+      id: `AIS-${Date.now()}`,
+      feedbackId: feedback.id,
+      sourceVersion: feedback.version,
+      domain,
+      question: question?.question || feedback.comment,
+      expectedAnswer: "",
+      sourceEvidence: question?.citations?.slice() || [],
+      riskLevel: feedback.rating <= 1 ? "高" : "中",
+      targetSuiteId: "EVALSET-CORE-2026-01",
+      status: "待标注",
+      owner: "标准规则组",
+      createdAt: nowText(),
+      updatedAt: nowText(),
+    };
+    feedback.status = "已转样本";
+    state.assistantImprovementSamples.unshift(sample);
+    addAudit("反馈转评价助手改进样本", sample.id, `${feedback.id} · ${domain}`);
+    saveState();
+    showNotice(`${feedback.id}已转为${sample.id}，等待专家标注。`);
+    render();
+  }
+
+  function annotateImprovementSample(id) {
+    const sample = state.assistantImprovementSamples.find((item) => item.id === id);
+    if (!sample || sample.status !== "待标注") return;
+    const template = answerTemplateForQuestion(`${sample.domain} ${sample.question}`);
+    sample.expectedAnswer = template.answer;
+    sample.sourceEvidence = Array.from(new Set([...sample.sourceEvidence, ...template.citations]));
+    sample.status = "已标注";
+    sample.owner = state.activeRole;
+    sample.updatedAt = nowText();
+    addAudit("专家标注评价助手改进样本", sample.id, `${sample.domain} · ${sample.sourceEvidence.length}项证据`);
+    saveState();
+    showNotice(`${sample.id}已完成标准答案和来源证据标注。`);
+    render();
+  }
+
+  function includeImprovementSample(id) {
+    const sample = state.assistantImprovementSamples.find((item) => item.id === id);
+    if (!sample || sample.status !== "已标注") return;
+    const suite = state.assistantEvaluationSuites.find((item) => item.id === sample.targetSuiteId);
+    if (!suite || suite.status !== "已发布") {
+      showNotice("目标评测集尚未发布，不能纳入正式回归。");
+      return;
+    }
+    suite.caseCount += 1;
+    suite.updatedAt = nowText();
+    sample.status = "已入集";
+    sample.updatedAt = nowText();
+    const maxSequence = state.assistantReleaseCandidates.reduce((max, item) => {
+      const sequence = Number(String(item.version).split(".").pop());
+      return Number.isFinite(sequence) ? Math.max(max, sequence) : max;
+    }, 13);
+    const cycle = {
+      id: `AIC-${Date.now()}`,
+      name: `${sample.domain}线上反馈持续改进`,
+      sourceFeedbackIds: [sample.feedbackId],
+      sampleIds: [sample.id],
+      targetSuiteId: suite.id,
+      targetVersion: `ASSIST-2026.07.${String(maxSequence + 1).padStart(2, "0")}`,
+      evaluationRunId: "",
+      status: "待回归",
+      owner: "评价助手治理组",
+      startedAt: nowText(),
+      completedAt: "",
+    };
+    state.assistantImprovementCycles.unshift(cycle);
+    addAudit("改进样本纳入正式评测集", sample.id, `${suite.id} · 样本数${suite.caseCount}`);
+    saveState();
+    showNotice(`${sample.id}已纳入${suite.name}，并创建${cycle.id}。`);
+    render();
+  }
+
+  function runImprovementRegression(id) {
+    const cycle = state.assistantImprovementCycles.find((item) => item.id === id);
+    if (!cycle || cycle.status !== "待回归") return;
+    const suite = state.assistantEvaluationSuites.find((item) => item.id === cycle.targetSuiteId);
+    const metrics = {
+      citationCoverage: 100,
+      answerAccuracy: 96,
+      retrievalRecall: 94,
+      safetyCompliance: 100,
+      averageLatencyMs: 532,
+      baselineDelta: 1.7,
+    };
+    const run = {
+      id: `EVALRUN-${Date.now()}`,
+      candidateVersion: cycle.targetVersion,
+      suiteVersion: `${suite?.id || cycle.targetSuiteId}@${suite?.version || "v1"}`,
+      knowledgeVersion: state.assistantKnowledgeVersions.find((item) => item.status === "已发布")?.version || "STD-2026-TRIAL",
+      promptVersion: "QA-PROMPT-v2.3",
+      ...metrics,
+      score: Math.round((metrics.citationCoverage + metrics.answerAccuracy + metrics.retrievalRecall + metrics.safetyCompliance) / 4),
+      gateStatus: assistantQualityGateStatus(metrics),
+      status: "已完成",
+      startedAt: nowText(),
+      finishedAt: nowText(),
+    };
+    state.assistantEvaluationRuns.unshift(run);
+    cycle.evaluationRunId = run.id;
+    cycle.status = run.gateStatus === "通过" ? "已完成" : "待回归";
+    cycle.completedAt = run.gateStatus === "通过" ? nowText() : "";
+    state.assistantImprovementSamples
+      .filter((item) => cycle.sampleIds.includes(item.id))
+      .forEach((item) => {
+        item.status = run.gateStatus === "通过" ? "已验证" : "已入集";
+        item.updatedAt = nowText();
+      });
+    state.assistantFeedbackRecords
+      .filter((item) => cycle.sourceFeedbackIds.includes(item.id))
+      .forEach((item) => {
+        if (run.gateStatus === "通过") item.status = "已关闭";
+      });
+    addAudit("运行评价助手改进回归", run.id, `${cycle.id} · ${run.gateStatus} · 得分${run.score}`);
+    saveState();
+    showNotice(`${cycle.name}回归${run.gateStatus}，${run.gateStatus === "通过" ? "反馈问题已关闭" : "仍需继续改进"}。`);
+    render();
+  }
+
   function answerTemplateForQuestion(question) {
     if (/H1|等保|安全/.test(question)) {
       return {
@@ -7034,6 +7338,12 @@
     if (name === "advance-canary-deployment") advanceCanaryDeployment(action.dataset.id);
     if (name === "simulate-online-degradation") simulateOnlineDegradation();
     if (name === "rollback-canary-deployment") rollbackCanaryDeployment(action.dataset.id);
+    if (name === "collect-assistant-feedback") collectAssistantFeedback();
+    if (name === "review-assistant-feedback") reviewAssistantFeedback(action.dataset.id);
+    if (name === "convert-feedback-sample") convertFeedbackSample(action.dataset.id);
+    if (name === "annotate-improvement-sample") annotateImprovementSample(action.dataset.id);
+    if (name === "include-improvement-sample") includeImprovementSample(action.dataset.id);
+    if (name === "run-improvement-regression") runImprovementRegression(action.dataset.id);
     if (name === "ask-standard-question") askStandardQuestion();
     if (name === "confirm-standard-answer") confirmStandardAnswer(action.dataset.id);
     if (name === "generate-anomaly-explanations") generateAnomalyExplanations();

@@ -641,6 +641,70 @@
         }
       }
     },
+    "assistantFeedbackRecords": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "deploymentId", "version", "questionId", "channel", "rating", "sentiment", "reason", "comment", "citationUseful", "userRole", "status", "createdAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "deploymentId": { "type": "string" },
+          "version": { "type": "string" },
+          "questionId": { "type": "string" },
+          "channel": { "type": "string", "enum": ["回答评价", "试点工单", "审核反馈"] },
+          "rating": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "sentiment": { "type": "string", "enum": ["正向", "负向"] },
+          "reason": { "type": "string" },
+          "comment": { "type": "string" },
+          "citationUseful": { "type": "boolean" },
+          "userRole": { "type": "string" },
+          "status": { "type": "string", "enum": ["待研判", "已研判", "已转样本", "已关闭"] },
+          "createdAt": { "type": "string" }
+        }
+      }
+    },
+    "assistantImprovementSamples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "feedbackId", "sourceVersion", "domain", "question", "expectedAnswer", "sourceEvidence", "riskLevel", "targetSuiteId", "status", "owner", "createdAt", "updatedAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "feedbackId": { "type": "string" },
+          "sourceVersion": { "type": "string" },
+          "domain": { "type": "string" },
+          "question": { "type": "string" },
+          "expectedAnswer": { "type": "string" },
+          "sourceEvidence": { "type": "array", "items": { "type": "string" } },
+          "riskLevel": { "type": "string", "enum": ["低", "中", "高"] },
+          "targetSuiteId": { "type": "string" },
+          "status": { "type": "string", "enum": ["待标注", "已标注", "已入集", "已验证", "已排除"] },
+          "owner": { "type": "string" },
+          "createdAt": { "type": "string" },
+          "updatedAt": { "type": "string" }
+        }
+      }
+    },
+    "assistantImprovementCycles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "sourceFeedbackIds", "sampleIds", "targetSuiteId", "targetVersion", "evaluationRunId", "status", "owner", "startedAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "sourceFeedbackIds": { "type": "array", "items": { "type": "string" } },
+          "sampleIds": { "type": "array", "items": { "type": "string" } },
+          "targetSuiteId": { "type": "string" },
+          "targetVersion": { "type": "string" },
+          "evaluationRunId": { "type": "string" },
+          "status": { "type": "string", "enum": ["待回归", "已完成"] },
+          "owner": { "type": "string" },
+          "startedAt": { "type": "string" },
+          "completedAt": { "type": "string" }
+        }
+      }
+    },
     "anomalyExplanations": {
       "type": "array",
       "items": {
