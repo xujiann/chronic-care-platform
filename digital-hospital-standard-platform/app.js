@@ -1,5 +1,5 @@
 (function () {
-  const storageKey = "digitalHospitalMvpState:v0.15";
+  const storageKey = "digitalHospitalMvpState:v0.16";
 
   const domains = [
     { code: "A", name: "基础设施与平台支撑", weight: 100 },
@@ -315,6 +315,31 @@
       { hospitalCode: "H000002", hospitalName: "大连市示例专科医院", requiredConnectors: 1, readyConnectors: 0, requiredMappings: 1, readyMappings: 0, openCriticalIssues: 1, securityReview: "待复核", businessReview: "待复核", status: "待整改", evaluatedAt: "2026-07-28 09:05", approvedBy: "", approvedAt: "" },
       { hospitalCode: "H000003", hospitalName: "区县示例人民医院", requiredConnectors: 1, readyConnectors: 0, requiredMappings: 1, readyMappings: 0, openCriticalIssues: 2, securityReview: "不通过", businessReview: "不通过", status: "阻断", evaluatedAt: "2026-07-28 08:48", approvedBy: "", approvedAt: "" },
     ],
+    integrationEnvironments: [
+      { id: "ENV-UAT", name: "统一接入验证环境", type: "UAT", networkZone: "政务外网验证区", endpointAlias: "uat-integration-gateway", tlsMode: "TLS1.3+mTLS", configVersion: "cfg-uat-16.2", status: "健康", lastVerifiedAt: "2026-07-28 09:25", owner: "平台接入组" },
+      { id: "ENV-PROD", name: "统一接入生产环境", type: "PROD", networkZone: "政务外网生产区", endpointAlias: "prod-integration-gateway", tlsMode: "TLS1.3+mTLS", configVersion: "cfg-prod-16.1", status: "待核验", lastVerifiedAt: "-", owner: "运维安全组" },
+    ],
+    credentialVaultEntries: [
+      { id: "VAULT-H000001-EMR-PROD", connectorId: "CONN-H000001-EMR", environmentId: "ENV-PROD", provider: "国密凭据保险库", vaultRefFingerprint: "sha256:4f7d…a32b", keyVersion: "kv-2026-07", rotationDueAt: "2027-01-28", lastRotatedAt: "2026-07-28 09:30", accessPolicy: "execution-runtime-only", status: "有效", owner: "运维安全组" },
+      { id: "VAULT-H000001-LIS-PROD", connectorId: "CONN-H000001-LIS", environmentId: "ENV-PROD", provider: "国密凭据保险库", vaultRefFingerprint: "sha256:782c…d911", keyVersion: "kv-2026-07", rotationDueAt: "2027-01-28", lastRotatedAt: "2026-07-28 09:32", accessPolicy: "execution-runtime-only", status: "有效", owner: "运维安全组" },
+      { id: "VAULT-H000002-HIS-UAT", connectorId: "CONN-H000002-HIS", environmentId: "ENV-UAT", provider: "国密凭据保险库", vaultRefFingerprint: "sha256:9a16…0c55", keyVersion: "kv-2026-05", rotationDueAt: "2026-08-05", lastRotatedAt: "2026-05-05 10:10", accessPolicy: "execution-runtime-only", status: "临期", owner: "医院信息中心" },
+    ],
+    integrationExecutionJobs: [
+      { id: "EXEC-20260728-001", connectorId: "CONN-H000001-EMR", environmentId: "ENV-PROD", jobType: "全量基线校验", idempotencyKeyHash: "sha256:05ba…cc12", idempotencyHits: 0, payloadDigest: "sha256:19b2…f810", status: "成功", attempts: 1, progress: 100, queuedAt: "2026-07-28 09:35", startedAt: "2026-07-28 09:36", completedAt: "2026-07-28 09:38", receiptId: "RCPT-20260728-001", errorCode: "" },
+      { id: "EXEC-20260728-002", connectorId: "CONN-H000001-LIS", environmentId: "ENV-PROD", jobType: "增量连通校验", idempotencyKeyHash: "sha256:d791…2fe0", idempotencyHits: 0, payloadDigest: "sha256:89ad…00c4", status: "等待回执", attempts: 1, progress: 75, queuedAt: "2026-07-28 09:40", startedAt: "2026-07-28 09:41", completedAt: "", receiptId: "", errorCode: "" },
+    ],
+    integrationCallbackReceipts: [
+      { id: "RCPT-20260728-001", jobId: "EXEC-20260728-001", connectorId: "CONN-H000001-EMR", source: "emr-gateway", eventType: "EXECUTION_COMPLETED", signatureStatus: "已验证", timestampStatus: "已验证", nonceStatus: "已验证", nonceHash: "sha256:8b19…05ce", payloadDigest: "sha256:19b2…f810", digestStatus: "已验证", status: "已验证", decision: "接收", receivedAt: "2026-07-28 09:38" },
+    ],
+    integrationReplayEvents: [
+      { id: "REPLAY-20260728-001", source: "county-emr", connectorId: "CONN-H000003-EMR", nonceHash: "sha256:replay…0161", firstSeenAt: "2026-07-28 08:42", lastSeenAt: "2026-07-28 08:43", hits: 2, action: "拒绝并隔离连接器", status: "待处置" },
+    ],
+    integrationQuarantines: [
+      { id: "QUAR-20260728-001", connectorId: "CONN-H000003-EMR", reason: "检测到回调nonce重放", trigger: "REPLAY-20260728-001", hits: 2, status: "隔离中", owner: "运维安全组", openedAt: "2026-07-28 08:43", updatedAt: "2026-07-28 08:43", releasedAt: "", reviewNote: "" },
+    ],
+    integrationCutoverWindows: [
+      { id: "CUT-H000001-001", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", environmentId: "ENV-PROD", connectorIds: ["CONN-H000001-EMR", "CONN-H000001-LIS"], plannedAt: "2026-08-05 21:00", windowMinutes: 90, integrationApproved: false, rollbackPlan: "切回模板上传通道并恢复上一配置版本", checks: { environment: false, vault: true, jobs: false, quarantine: true, gate: false, rollback: true }, status: "待评估", evaluatedAt: "", approvedBy: "", startedAt: "", completedAt: "", rollbackAt: "" },
+    ],
     pilotTickets: [
       { id: "TKT-20260727-001", title: "接口统计模板机构代码校验失败", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", category: "数据口径", priority: "高", status: "处理中", owner: "数据治理组", createdAt: "2026-07-27 10:20", dueAt: "2026-07-27 18:20", slaHours: 8, elapsedHours: 6.5, channel: "试点群", description: "导入模板中的机构代码与平台主数据不一致。" },
       { id: "TKT-20260727-002", title: "材料分片上传在弱网环境中断", hospitalCode: "H000003", hospitalName: "区县示例人民医院", category: "材料上传", priority: "紧急", status: "待分派", owner: "未分派", createdAt: "2026-07-27 13:05", dueAt: "2026-07-27 17:05", slaHours: 4, elapsedHours: 3.2, channel: "服务热线", description: "大文件上传至42%后中断，需核验断点续传。" },
@@ -581,6 +606,13 @@
     if (!Array.isArray(next.pilotIntegrationTests)) next.pilotIntegrationTests = JSON.parse(JSON.stringify(seedState.pilotIntegrationTests));
     if (!Array.isArray(next.pilotIntegrationIssues)) next.pilotIntegrationIssues = JSON.parse(JSON.stringify(seedState.pilotIntegrationIssues));
     if (!Array.isArray(next.pilotIntegrationGates)) next.pilotIntegrationGates = JSON.parse(JSON.stringify(seedState.pilotIntegrationGates));
+    if (!Array.isArray(next.integrationEnvironments)) next.integrationEnvironments = JSON.parse(JSON.stringify(seedState.integrationEnvironments));
+    if (!Array.isArray(next.credentialVaultEntries)) next.credentialVaultEntries = JSON.parse(JSON.stringify(seedState.credentialVaultEntries));
+    if (!Array.isArray(next.integrationExecutionJobs)) next.integrationExecutionJobs = JSON.parse(JSON.stringify(seedState.integrationExecutionJobs));
+    if (!Array.isArray(next.integrationCallbackReceipts)) next.integrationCallbackReceipts = JSON.parse(JSON.stringify(seedState.integrationCallbackReceipts));
+    if (!Array.isArray(next.integrationReplayEvents)) next.integrationReplayEvents = JSON.parse(JSON.stringify(seedState.integrationReplayEvents));
+    if (!Array.isArray(next.integrationQuarantines)) next.integrationQuarantines = JSON.parse(JSON.stringify(seedState.integrationQuarantines));
+    if (!Array.isArray(next.integrationCutoverWindows)) next.integrationCutoverWindows = JSON.parse(JSON.stringify(seedState.integrationCutoverWindows));
     if (!Array.isArray(next.pilotTickets)) next.pilotTickets = JSON.parse(JSON.stringify(seedState.pilotTickets));
     if (!Array.isArray(next.trainingSessions)) next.trainingSessions = JSON.parse(JSON.stringify(seedState.trainingSessions));
     if (!Array.isArray(next.pilotReleases)) next.pilotReleases = JSON.parse(JSON.stringify(seedState.pilotReleases));
@@ -920,6 +952,22 @@
     };
   }
 
+  function executionSummary() {
+    const pendingJobs = state.integrationExecutionJobs.filter((item) => !["成功", "阻断"].includes(item.status));
+    const activeQuarantines = state.integrationQuarantines.filter((item) => item.status === "隔离中");
+    const blockedReceipts = state.integrationCallbackReceipts.filter((item) => item.status === "已阻断");
+    return {
+      healthyEnvironments: state.integrationEnvironments.filter((item) => item.status === "健康").length,
+      activeVaultEntries: state.credentialVaultEntries.filter((item) => item.status === "有效").length,
+      pendingJobs: pendingJobs.length,
+      successfulJobs: state.integrationExecutionJobs.filter((item) => item.status === "成功").length,
+      verifiedReceipts: state.integrationCallbackReceipts.filter((item) => item.status === "已验证").length,
+      blockedReceipts: blockedReceipts.length,
+      activeQuarantines: activeQuarantines.length,
+      readyCutovers: state.integrationCutoverWindows.filter((item) => item.status === "可切换" || item.status === "已切换").length,
+    };
+  }
+
   function assessmentSummary() {
     const totalWeight = state.pilotOutcomeMetrics.reduce((sum, item) => sum + Number(item.weight || 0), 0);
     const weightedScore = state.pilotOutcomeMetrics.reduce((sum, item) => sum + Number(item.current || 0) * Number(item.weight || 0), 0) / Math.max(1, totalWeight);
@@ -1003,9 +1051,9 @@
   }
 
   function statusClass(status) {
-    if (status === "已完成" || status === "已通过" || status === "已发布" || status === "已批准" || status === "已归档" || status === "已关闭" || status === "已解决" || status === "已就绪" || status === "已闭环" || status === "已启动" || status === "可启动" || status === "可推广" || status === "达标" || status === "通过" || status === "历史版本" || status === "启用" || status === "已启用" || status === "已采纳" || status === "已回答" || status === "已编辑" || status === "已转复核" || status === "已排除" || status === "复核通过" || status === "已校验" || status === "命中充分" || status === "成功" || status === "已复核" || status === "正常" || status === "稳定" || status === "健康" || status === "已恢复" || status === "已转样本" || status === "已入集" || status === "已验证" || status === "正向" || status === "已受理" || status === "联调完成" || status === "在线" || status === "有效" || status === "契约通过" || status === "映射就绪" || status === "脱敏通过" || status === "可上线" || status === "已准入") return "";
-    if (status === "进行中" || status === "处理中" || status === "推进中" || status === "关注" || status === "条件通过" || status === "分析完成" || status === "改进中" || status === "待验收" || status === "准备中" || status === "已确认" || status === "待确认" || status === "待采纳" || status === "待分派" || status === "待回复" || status === "待评估" || status === "待审批" || status === "待复核" || status === "需补充" || status === "人工复核" || status === "草稿" || status === "报名中" || status === "候选" || status === "已回滚" || status === "试运行" || status === "预归档" || status === "填报中" || status === "审核中" || status === "上传中" || status === "扫描中" || status === "排队中" || status === "预警" || status === "降级" || status === "灰度中" || status === "已暂停" || status === "开放" || status === "待研判" || status === "已研判" || status === "待标注" || status === "已标注" || status === "待回归" || status === "资料待补" || status === "联调中" || status === "待探测" || status === "待认证" || status === "待抽样" || status === "待完善" || status === "待处理" || status === "临期" || status === "待整改") return "warn";
-    if (status === "阻断" || status === "门禁阻断" || status === "有阻塞" || status === "有风险" || status === "需优化" || status === "未达标" || status === "逾期" || status === "高" || status === "紧急" || status === "异常" || status === "故障" || status === "失败" || status === "高负荷" || status === "高风险" || status === "拥堵" || status === "负向" || status === "失效" || status === "不通过" || status === "发现风险") return "danger";
+    if (status === "已完成" || status === "已通过" || status === "已发布" || status === "已批准" || status === "已归档" || status === "已关闭" || status === "已解决" || status === "已就绪" || status === "已闭环" || status === "已启动" || status === "可启动" || status === "可推广" || status === "达标" || status === "通过" || status === "历史版本" || status === "启用" || status === "已启用" || status === "已采纳" || status === "已回答" || status === "已编辑" || status === "已转复核" || status === "已排除" || status === "复核通过" || status === "已校验" || status === "命中充分" || status === "成功" || status === "已复核" || status === "正常" || status === "稳定" || status === "健康" || status === "已恢复" || status === "已转样本" || status === "已入集" || status === "已验证" || status === "正向" || status === "已受理" || status === "联调完成" || status === "在线" || status === "有效" || status === "契约通过" || status === "映射就绪" || status === "脱敏通过" || status === "可上线" || status === "已准入" || status === "接收" || status === "可切换" || status === "已切换" || status === "已解除") return "";
+    if (status === "进行中" || status === "处理中" || status === "推进中" || status === "关注" || status === "条件通过" || status === "分析完成" || status === "改进中" || status === "待验收" || status === "准备中" || status === "已确认" || status === "待确认" || status === "待采纳" || status === "待分派" || status === "待回复" || status === "待评估" || status === "待审批" || status === "待复核" || status === "需补充" || status === "人工复核" || status === "草稿" || status === "报名中" || status === "候选" || status === "已回滚" || status === "试运行" || status === "预归档" || status === "填报中" || status === "审核中" || status === "上传中" || status === "扫描中" || status === "排队中" || status === "预警" || status === "降级" || status === "灰度中" || status === "已暂停" || status === "开放" || status === "待研判" || status === "已研判" || status === "待标注" || status === "已标注" || status === "待回归" || status === "资料待补" || status === "联调中" || status === "待探测" || status === "待认证" || status === "待抽样" || status === "待完善" || status === "待处理" || status === "临期" || status === "待整改" || status === "执行中" || status === "等待回执" || status === "待核验" || status === "待处置" || status === "切换中") return "warn";
+    if (status === "阻断" || status === "门禁阻断" || status === "有阻塞" || status === "有风险" || status === "需优化" || status === "未达标" || status === "逾期" || status === "高" || status === "紧急" || status === "异常" || status === "故障" || status === "失败" || status === "高负荷" || status === "高风险" || status === "拥堵" || status === "负向" || status === "失效" || status === "不通过" || status === "发现风险" || status === "已阻断" || status === "隔离中" || status === "拒绝") return "danger";
     return "warn";
   }
 
@@ -1063,7 +1111,7 @@
       standardVersion: state.task.standard,
       hospitalCode: hospital.code,
       hospitalName: hospital.name,
-      prototypeVersion: "mvp-0.15",
+      prototypeVersion: "mvp-0.16",
     };
     if (kind === "submission") {
       return {
@@ -1229,6 +1277,19 @@
         pilotIntegrationGates: state.pilotIntegrationGates,
       };
     }
+    if (kind === "execution") {
+      return {
+        meta,
+        executionSummary: executionSummary(),
+        integrationEnvironments: state.integrationEnvironments,
+        credentialVaultEntries: state.credentialVaultEntries,
+        integrationExecutionJobs: state.integrationExecutionJobs,
+        integrationCallbackReceipts: state.integrationCallbackReceipts,
+        integrationReplayEvents: state.integrationReplayEvents,
+        integrationQuarantines: state.integrationQuarantines,
+        integrationCutoverWindows: state.integrationCutoverWindows,
+      };
+    }
     if (kind === "assessment") {
       return {
         meta,
@@ -1314,6 +1375,13 @@
       pilotIntegrationTests: state.pilotIntegrationTests,
       pilotIntegrationIssues: state.pilotIntegrationIssues,
       pilotIntegrationGates: state.pilotIntegrationGates,
+      integrationEnvironments: state.integrationEnvironments,
+      credentialVaultEntries: state.credentialVaultEntries,
+      integrationExecutionJobs: state.integrationExecutionJobs,
+      integrationCallbackReceipts: state.integrationCallbackReceipts,
+      integrationReplayEvents: state.integrationReplayEvents,
+      integrationQuarantines: state.integrationQuarantines,
+      integrationCutoverWindows: state.integrationCutoverWindows,
       pilotOutcomeMetrics: state.pilotOutcomeMetrics,
       pilotHospitalOutcomes: state.pilotHospitalOutcomes,
       pilotIssueThemes: state.pilotIssueThemes,
@@ -1369,6 +1437,7 @@
       pilot: "试点运营包",
       collaboration: "试点协同包",
       integration: "接入联调包",
+      execution: "接入执行包",
       assessment: "试点评估包",
       assistant: "评价助手包",
       monitoring: "运营监控包",
@@ -2515,6 +2584,289 @@
       </div>
       <div class="segmented integration-tabs" role="tablist" aria-label="接入联调功能">
         ${tabs.map((item) => `<button type="button" role="tab" aria-selected="${item.id === tab}" class="${item.id === tab ? "active" : ""}" data-integration-tab="${item.id}">${item.label}</button>`).join("")}
+      </div>
+      ${content}
+    `;
+  }
+
+  function executionJobActionLabel(status) {
+    return {
+      排队中: "开始执行",
+      执行中: "等待回执",
+      等待回执: "核验回执",
+      成功: "已完成",
+      阻断: "已阻断",
+    }[status] || "推进";
+  }
+
+  function renderExecution() {
+    header("接入执行");
+    const tab = workspace.dataset.executionTab || "environment";
+    const summary = executionSummary();
+    const tabs = [
+      { id: "environment", label: "环境与凭据" },
+      { id: "jobs", label: "任务与回执" },
+      { id: "cutover", label: "隔离与切换" },
+    ];
+    let content = "";
+
+    if (tab === "environment") {
+      content = `
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">执行环境</h3>
+              <p class="panel-subtitle">生产与验证环境分别核验网络区、TLS策略和配置版本，端点仅展示业务别名。</p>
+            </div>
+            <button class="button ghost" type="button" data-action="download-package" data-kind="execution">下载执行包</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>环境</th><th>类型</th><th>网络区域</th><th>端点别名</th><th>TLS策略</th><th>配置版本</th><th>状态</th><th>最近核验</th><th>责任组</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.integrationEnvironments
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.name}</strong><br /><span class="muted-text">${item.id}</span></td>
+                        <td>${item.type}</td>
+                        <td>${item.networkZone}</td>
+                        <td>${item.endpointAlias}</td>
+                        <td>${item.tlsMode}</td>
+                        <td>${item.configVersion}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td>${item.lastVerifiedAt}</td>
+                        <td>${item.owner}</td>
+                        <td><button class="button secondary" type="button" data-action="verify-execution-environment" data-id="${item.id}">执行核验</button></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">凭据保险库引用</h3>
+              <p class="panel-subtitle">平台只保留不可逆引用指纹、密钥版本和轮换记录，原始凭据不进入业务状态与导出数据包。</p>
+            </div>
+            <span class="tag">${summary.activeVaultEntries}/${state.credentialVaultEntries.length}项引用有效</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>引用</th><th>连接器/环境</th><th>托管方</th><th>引用指纹</th><th>密钥版本</th><th>轮换期限</th><th>访问策略</th><th>状态</th><th>责任组</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.credentialVaultEntries
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.id}</strong><br /><span class="muted-text">${item.lastRotatedAt}</span></td>
+                        <td>${item.connectorId}<br /><span class="muted-text">${item.environmentId}</span></td>
+                        <td>${item.provider}</td>
+                        <td>${item.vaultRefFingerprint}</td>
+                        <td>${item.keyVersion}</td>
+                        <td>${item.rotationDueAt}</td>
+                        <td>${item.accessPolicy}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td>${item.owner}</td>
+                        <td><button class="button ghost" type="button" data-action="rotate-vault-reference" data-id="${item.id}">轮换引用</button></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "jobs") {
+      content = `
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">异步认证任务</h3>
+              <p class="panel-subtitle">任务以幂等键摘要防重，按排队、执行、等待回执和完成状态推进。</p>
+            </div>
+            <button class="button secondary" type="button" data-action="enqueue-execution-job">创建执行任务</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>任务</th><th>连接器/环境</th><th>类型</th><th>幂等摘要</th><th>防重命中</th><th>载荷摘要</th><th>进度</th><th>状态</th><th>回执</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.integrationExecutionJobs
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.id}</strong><br /><span class="muted-text">${item.queuedAt}</span></td>
+                        <td>${item.connectorId}<br /><span class="muted-text">${item.environmentId}</span></td>
+                        <td>${item.jobType}</td>
+                        <td>${item.idempotencyKeyHash}</td>
+                        <td>${item.idempotencyHits}</td>
+                        <td>${item.payloadDigest}</td>
+                        <td>${item.progress}%</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td>${item.receiptId || "-"}</td>
+                        <td><button class="button ${item.status === "等待回执" ? "secondary" : "ghost"}" type="button" data-action="${item.status === "等待回执" ? "verify-callback-receipt" : "advance-execution-job"}" data-id="${item.id}" ${["成功", "阻断"].includes(item.status) ? "disabled" : ""}>${executionJobActionLabel(item.status)}</button></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">签名回执</h3>
+              <p class="panel-subtitle">同时核验签名、时间窗、nonce和载荷摘要；任何一项失败均拒绝并触发隔离。</p>
+            </div>
+            <button class="button ghost" type="button" data-action="simulate-replay-callback">模拟重放阻断</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>回执</th><th>任务/连接器</th><th>来源与事件</th><th>签名</th><th>时间窗</th><th>nonce</th><th>载荷摘要</th><th>决定</th><th>接收时间</th></tr></thead>
+              <tbody>
+                ${state.integrationCallbackReceipts
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.id}</strong></td>
+                        <td>${item.jobId}<br /><span class="muted-text">${item.connectorId}</span></td>
+                        <td>${item.source}<br /><span class="muted-text">${item.eventType}</span></td>
+                        <td><span class="status-pill ${statusClass(item.signatureStatus)}">${item.signatureStatus}</span></td>
+                        <td><span class="status-pill ${statusClass(item.timestampStatus)}">${item.timestampStatus}</span></td>
+                        <td><span class="status-pill ${statusClass(item.nonceStatus)}">${item.nonceStatus}</span><br /><span class="muted-text">${item.nonceHash}</span></td>
+                        <td><span class="status-pill ${statusClass(item.digestStatus)}">${item.digestStatus}</span><br /><span class="muted-text">${item.payloadDigest}</span></td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.decision}</span></td>
+                        <td>${item.receivedAt}</td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "cutover") {
+      content = `
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">重放事件与连接器隔离</h3>
+              <p class="panel-subtitle">疑似重放立即拒绝回调并隔离连接器；解除隔离必须写入安全复核结论。</p>
+            </div>
+            <span class="status-pill ${summary.activeQuarantines ? "danger" : ""}">${summary.activeQuarantines}个连接器隔离中</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>事件</th><th>连接器/来源</th><th>nonce摘要</th><th>首次/最近</th><th>命中</th><th>处置</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.integrationReplayEvents
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.id}</strong></td>
+                        <td>${item.connectorId}<br /><span class="muted-text">${item.source}</span></td>
+                        <td>${item.nonceHash}</td>
+                        <td>${item.firstSeenAt}<br /><span class="muted-text">${item.lastSeenAt}</span></td>
+                        <td>${item.hits}</td>
+                        <td>${item.action}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td><button class="button ghost" type="button" data-action="resolve-replay-event" data-id="${item.id}" ${item.status === "已处置" ? "disabled" : ""}>确认处置</button></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>隔离记录</th><th>连接器</th><th>原因</th><th>触发事件</th><th>状态</th><th>责任组</th><th>复核结论</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.integrationQuarantines
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.id}</strong><br /><span class="muted-text">${item.openedAt}</span></td>
+                        <td>${item.connectorId}</td>
+                        <td>${item.reason}</td>
+                        <td>${item.trigger}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td>${item.owner}</td>
+                        <td>${item.reviewNote || "-"}</td>
+                        <td><button class="button secondary" type="button" data-action="release-execution-quarantine" data-id="${item.id}" ${item.status === "已解除" ? "disabled" : ""}>复核并解除</button></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">生产切换窗口</h3>
+              <p class="panel-subtitle">环境、凭据、执行回执、隔离、联调准入和回滚预案全部通过后，授权角色方可切换。</p>
+            </div>
+            <button class="button secondary" type="button" data-action="create-cutover-window">创建切换窗口</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>窗口</th><th>医院/环境</th><th>连接器</th><th>计划时间</th><th>门禁检查</th><th>回滚预案</th><th>状态</th><th>执行记录</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.integrationCutoverWindows
+                  .map(
+                    (item) => {
+                      const passed = Object.values(item.checks || {}).filter(Boolean).length;
+                      const total = Object.keys(item.checks || {}).length;
+                      return `
+                        <tr>
+                          <td><strong>${item.id}</strong><br /><span class="muted-text">${item.windowMinutes}分钟</span></td>
+                          <td>${item.hospitalName}<br /><span class="muted-text">${item.hospitalCode} · ${item.environmentId}</span></td>
+                          <td>${item.connectorIds.join("<br />")}</td>
+                          <td>${item.plannedAt}</td>
+                          <td>${passed}/${total}<br /><span class="muted-text">${item.evaluatedAt || "待评估"}</span></td>
+                          <td>${item.rollbackPlan}</td>
+                          <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                          <td>${item.approvedBy || "-"}<br /><span class="muted-text">${item.completedAt || item.startedAt || item.rollbackAt || ""}</span></td>
+                          <td>
+                            <div class="toolbar inline">
+                              <button class="button ghost" type="button" data-action="evaluate-cutover-window" data-id="${item.id}">评估</button>
+                              <button class="button secondary" type="button" data-action="${item.status === "切换中" ? "complete-cutover-window" : "start-cutover-window"}" data-id="${item.id}" ${["已切换", "已回滚"].includes(item.status) ? "disabled" : ""}>${item.status === "切换中" ? "完成切换" : "开始切换"}</button>
+                              <button class="button ghost" type="button" data-action="rollback-cutover-window" data-id="${item.id}" ${!["切换中", "已切换"].includes(item.status) ? "disabled" : ""}>回滚</button>
+                            </div>
+                          </td>
+                        </tr>
+                      `;
+                    },
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    workspace.innerHTML = `
+      <div class="grid-4">
+        ${metric("健康执行环境", summary.healthyEnvironments, `${state.integrationEnvironments.length}个环境已登记`)}
+        ${metric("执行任务", summary.successfulJobs, `${summary.pendingJobs}个任务待完成`, summary.pendingJobs ? "warn" : "")}
+        ${metric("签名回执", summary.verifiedReceipts, `${summary.blockedReceipts}次回调被阻断`, summary.blockedReceipts ? "danger" : "")}
+        ${metric("生产切换", summary.readyCutovers, `${summary.activeQuarantines}个连接器隔离中`, summary.activeQuarantines ? "danger" : "")}
+      </div>
+      <div class="segmented execution-tabs" role="tablist" aria-label="接入执行功能">
+        ${tabs.map((item) => `<button type="button" role="tab" aria-selected="${item.id === tab}" class="${item.id === tab ? "active" : ""}" data-execution-tab="${item.id}">${item.label}</button>`).join("")}
       </div>
       ${content}
     `;
@@ -4819,6 +5171,10 @@
           <span>接入申请、连接器凭据、字段映射、认证测试、联调问题与上线准入</span>
         </article>
         <article class="package-card">
+          <strong>接入执行包</strong>
+          <span>环境配置、凭据引用、异步任务、签名回执、重放隔离与生产切换</span>
+        </article>
+        <article class="package-card">
           <strong>试点评估包</strong>
           <span>成效指标、医院评分、问题复盘、优化计划、推广准备与评估报告</span>
         </article>
@@ -4855,7 +5211,7 @@
           <label class="field">
             <span>数据包类型</span>
             <select data-package-kind>
-              ${["task", "pilot", "collaboration", "integration", "assessment", "assistant", "monitoring", "evidence", "submission", "review", "expert", "rectification", "analytics", "intelligence", "system", "operations", "full"]
+              ${["task", "pilot", "collaboration", "integration", "execution", "assessment", "assistant", "monitoring", "evidence", "submission", "review", "expert", "rectification", "analytics", "intelligence", "system", "operations", "full"]
                 .map((item) => `<option value="${item}" ${item === kind ? "selected" : ""}>${packageKindLabel(item)}</option>`)
                 .join("")}
             </select>
@@ -4894,6 +5250,9 @@
               <tr><td>数据映射抽样</td><td>GET/POST</td><td>/api/v1/pilot-data-mappings/{mappingId}:sample-check</td><td>字段覆盖、转换规则与个人信息去标识化抽样</td><td><span class="priority">P1</span></td></tr>
               <tr><td>联调问题</td><td>GET/POST/PUT</td><td>/api/v1/pilot-integration-issues</td><td>阻断、高风险问题与处置结论</td><td><span class="priority">P1</span></td></tr>
               <tr><td>上线准入</td><td>GET/POST</td><td>/api/v1/pilot-integration-gates/{hospitalCode}:evaluate</td><td>连接器、映射、关键问题与双重复核门禁</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>接入执行任务</td><td>GET/POST</td><td>/api/v1/integration-execution-jobs</td><td>幂等防重、异步状态推进与载荷摘要</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>签名回执核验</td><td>POST</td><td>/api/v1/integration-callback-receipts/{receiptId}:verify</td><td>签名、时间窗、nonce、载荷摘要与隔离处置</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>生产切换窗口</td><td>GET/POST</td><td>/api/v1/integration-cutover-windows</td><td>切换门禁、授权执行、完成与回滚记录</td><td><span class="priority">P1</span></td></tr>
               <tr><td>试点成效</td><td>GET/POST</td><td>/api/v1/pilot-assessment/outcomes</td><td>成效指标、医院评分与推广结论</td><td><span class="priority">P1</span></td></tr>
               <tr><td>问题复盘</td><td>GET/POST</td><td>/api/v1/pilot-assessment/issue-themes</td><td>跨工单、反馈、校验和告警归并</td><td><span class="priority">P1</span></td></tr>
               <tr><td>优化计划</td><td>GET/PUT</td><td>/api/v1/pilot-assessment/improvement-plans/{planId}</td><td>责任组、目标版本、进度和验收标准</td><td><span class="priority">P1</span></td></tr>
@@ -5115,6 +5474,7 @@
       pilot: "试点运营",
       collaboration: "试点协同",
       integration: "接入联调",
+      execution: "接入执行",
       assessment: "试点评估",
       assistant: "评价助手",
       monitoring: "运营监控",
@@ -5137,6 +5497,7 @@
     else if (state.activeView === "pilot") renderPilot();
     else if (state.activeView === "collaboration") renderCollaboration();
     else if (state.activeView === "integration") renderIntegration();
+    else if (state.activeView === "execution") renderExecution();
     else if (state.activeView === "assessment") renderAssessment();
     else if (state.activeView === "assistant") renderAssistant();
     else if (state.activeView === "monitoring") renderMonitoring();
@@ -5942,6 +6303,326 @@
     addAudit("批准试点医院上线", gate.hospitalName, `已准入 · ${gate.approvedBy}`);
     saveState();
     showNotice(`${gate.hospitalName}已通过上线准入，批准记录已写入审计日志。`);
+    render();
+  }
+
+  function verifyExecutionEnvironment(id) {
+    const environment = state.integrationEnvironments.find((item) => item.id === id);
+    if (!environment) return;
+    environment.status = "健康";
+    environment.lastVerifiedAt = nowText();
+    addAudit("核验接入执行环境", environment.name, `${environment.tlsMode} · ${environment.configVersion} · 健康`);
+    saveState();
+    showNotice(`${environment.name}已通过网络、TLS和配置版本核验。`);
+    render();
+  }
+
+  function rotateVaultReference(id) {
+    const entry = state.credentialVaultEntries.find((item) => item.id === id);
+    if (!entry) return;
+    entry.keyVersion = `kv-${new Date().toISOString().slice(0, 10)}`;
+    entry.vaultRefFingerprint = digestText(`${entry.id}|${entry.keyVersion}|${Date.now()}`);
+    entry.lastRotatedAt = nowText();
+    entry.rotationDueAt = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    entry.status = "有效";
+    addAudit("轮换凭据保险库引用", entry.connectorId, `${entry.keyVersion} · 仅保存引用指纹`);
+    saveState();
+    showNotice(`${entry.connectorId}的凭据引用已轮换，原始凭据未进入平台状态。`);
+    render();
+  }
+
+  function enqueueExecutionJob() {
+    const connector = state.pilotConnectors.find((item) => item.hospitalCode === state.selectedHospital);
+    const environment = state.integrationEnvironments.find((item) => item.type === "PROD") || state.integrationEnvironments[0];
+    if (!connector || !environment) {
+      showNotice("当前医院尚未配置可执行的连接器或环境。");
+      return;
+    }
+    const activeQuarantine = state.integrationQuarantines.find((item) => item.connectorId === connector.id && item.status === "隔离中");
+    if (activeQuarantine) {
+      showNotice(`${connector.id}处于隔离状态，不能创建执行任务。`);
+      return;
+    }
+    const idempotencyKeyHash = digestText(`${state.selectedHospital}|${connector.id}|${environment.id}|INTEGRATION-CERTIFICATION`);
+    const existing = state.integrationExecutionJobs.find((item) => item.idempotencyKeyHash === idempotencyKeyHash);
+    if (existing) {
+      existing.idempotencyHits = Number(existing.idempotencyHits || 0) + 1;
+      addAudit("阻止重复执行任务", existing.id, `${existing.idempotencyHits}次幂等命中`);
+      saveState();
+      showNotice(`检测到相同幂等键，已复用${existing.id}，未创建重复任务。`);
+      render();
+      return;
+    }
+    const job = {
+      id: `EXEC-${Date.now()}`,
+      connectorId: connector.id,
+      environmentId: environment.id,
+      jobType: "接入认证执行",
+      idempotencyKeyHash,
+      idempotencyHits: 0,
+      payloadDigest: digestText(`${connector.id}|${environment.configVersion}|${state.task.standard}`),
+      status: "排队中",
+      attempts: 0,
+      progress: 0,
+      queuedAt: nowText(),
+      startedAt: "",
+      completedAt: "",
+      receiptId: "",
+      errorCode: "",
+    };
+    state.integrationExecutionJobs.unshift(job);
+    addAudit("创建接入执行任务", job.id, `${connector.id} · ${environment.id} · 幂等防重`);
+    saveState();
+    showNotice(`${job.id}已进入异步执行队列。`);
+    render();
+  }
+
+  function advanceExecutionJob(id) {
+    const job = state.integrationExecutionJobs.find((item) => item.id === id);
+    if (!job || ["成功", "阻断", "等待回执"].includes(job.status)) return;
+    if (job.status === "排队中") {
+      job.status = "执行中";
+      job.progress = 40;
+      job.attempts = Number(job.attempts || 0) + 1;
+      job.startedAt = nowText();
+    } else {
+      job.status = "等待回执";
+      job.progress = 75;
+    }
+    addAudit("推进接入执行任务", job.id, `${job.status} · ${job.progress}%`);
+    saveState();
+    showNotice(`${job.id}已推进至“${job.status}”。`);
+    render();
+  }
+
+  function verifyCallbackReceipt(jobId) {
+    const job = state.integrationExecutionJobs.find((item) => item.id === jobId);
+    if (!job || job.status !== "等待回执") return;
+    const connector = state.pilotConnectors.find((item) => item.id === job.connectorId);
+    const receivedAt = nowText();
+    const receipt = {
+      id: `RCPT-${Date.now()}`,
+      jobId: job.id,
+      connectorId: job.connectorId,
+      source: connector?.endpointAlias || job.connectorId,
+      eventType: "EXECUTION_COMPLETED",
+      signatureStatus: "已验证",
+      timestampStatus: "已验证",
+      nonceStatus: "已验证",
+      nonceHash: digestText(`${job.id}|${receivedAt}|nonce`),
+      payloadDigest: job.payloadDigest,
+      digestStatus: "已验证",
+      status: "已验证",
+      decision: "接收",
+      receivedAt,
+    };
+    state.integrationCallbackReceipts.unshift(receipt);
+    job.status = "成功";
+    job.progress = 100;
+    job.completedAt = receivedAt;
+    job.receiptId = receipt.id;
+    addAudit("核验接入执行回执", receipt.id, "签名、时间窗、nonce与载荷摘要全部通过");
+    saveState();
+    showNotice(`${job.id}回执已验证，任务执行成功。`);
+    render();
+  }
+
+  function simulateReplayCallback() {
+    const connector = state.pilotConnectors.find((item) => item.hospitalCode === state.selectedHospital) || state.pilotConnectors[0];
+    if (!connector) return;
+    const now = nowText();
+    const nonceHash = digestText(`${connector.id}|replay-demo`);
+    const existingEvent = state.integrationReplayEvents.find((item) => item.connectorId === connector.id && item.nonceHash === nonceHash);
+    let replayEvent = existingEvent;
+    if (replayEvent) {
+      replayEvent.hits = Number(replayEvent.hits || 1) + 1;
+      replayEvent.lastSeenAt = now;
+      replayEvent.status = "待处置";
+    } else {
+      replayEvent = {
+        id: `REPLAY-${Date.now()}`,
+        source: connector.endpointAlias,
+        connectorId: connector.id,
+        nonceHash,
+        firstSeenAt: now,
+        lastSeenAt: now,
+        hits: 2,
+        action: "拒绝并隔离连接器",
+        status: "待处置",
+      };
+      state.integrationReplayEvents.unshift(replayEvent);
+    }
+    const receipt = {
+      id: `RCPT-BLOCK-${Date.now()}`,
+      jobId: "-",
+      connectorId: connector.id,
+      source: connector.endpointAlias,
+      eventType: "EXECUTION_COMPLETED",
+      signatureStatus: "已验证",
+      timestampStatus: "已验证",
+      nonceStatus: "重放",
+      nonceHash,
+      payloadDigest: digestText(`${connector.id}|replay-payload`),
+      digestStatus: "已验证",
+      status: "已阻断",
+      decision: "拒绝",
+      receivedAt: now,
+    };
+    state.integrationCallbackReceipts.unshift(receipt);
+    const quarantine = state.integrationQuarantines.find((item) => item.connectorId === connector.id && item.status === "隔离中");
+    if (quarantine) {
+      quarantine.hits = Number(quarantine.hits || 1) + 1;
+      quarantine.updatedAt = now;
+      quarantine.trigger = replayEvent.id;
+    } else {
+      state.integrationQuarantines.unshift({
+        id: `QUAR-${Date.now()}`,
+        connectorId: connector.id,
+        reason: "检测到回调nonce重放",
+        trigger: replayEvent.id,
+        hits: replayEvent.hits,
+        status: "隔离中",
+        owner: "运维安全组",
+        openedAt: now,
+        updatedAt: now,
+        releasedAt: "",
+        reviewNote: "",
+      });
+    }
+    addAudit("阻断重放回调", connector.id, `${receipt.id} · 拒绝并隔离`);
+    saveState();
+    showNotice(`已阻断${connector.id}的重放回调并执行连接器隔离。`);
+    render();
+  }
+
+  function resolveReplayEvent(id) {
+    const replayEvent = state.integrationReplayEvents.find((item) => item.id === id);
+    if (!replayEvent) return;
+    replayEvent.status = "已处置";
+    replayEvent.lastSeenAt = nowText();
+    addAudit("确认重放事件处置", replayEvent.id, `${replayEvent.hits}次命中已复核`);
+    saveState();
+    showNotice(`${replayEvent.id}已完成安全事件确认。`);
+    render();
+  }
+
+  function releaseExecutionQuarantine(id) {
+    const quarantine = state.integrationQuarantines.find((item) => item.id === id);
+    if (!quarantine || quarantine.status === "已解除") return;
+    quarantine.status = "已解除";
+    quarantine.reviewNote = "已核验调用方时钟、签名密钥与nonce缓存，完成凭据轮换和回归测试。";
+    quarantine.releasedAt = nowText();
+    quarantine.updatedAt = quarantine.releasedAt;
+    addAudit("解除连接器隔离", quarantine.connectorId, quarantine.reviewNote);
+    saveState();
+    showNotice(`${quarantine.connectorId}已完成安全复核并解除隔离。`);
+    render();
+  }
+
+  function createCutoverWindow() {
+    const hospital = activeHospital();
+    const gate = state.pilotIntegrationGates.find((item) => item.hospitalCode === hospital.code);
+    if (!gate || gate.status !== "已准入") {
+      showNotice("当前医院尚未通过接入联调准入，请先在“接入联调”完成门禁评估与批准。");
+      return;
+    }
+    const connectors = state.pilotConnectors.filter((item) => item.hospitalCode === hospital.code);
+    const environment = state.integrationEnvironments.find((item) => item.type === "PROD");
+    const windowItem = {
+      id: `CUT-${hospital.code}-${Date.now()}`,
+      hospitalCode: hospital.code,
+      hospitalName: hospital.name,
+      environmentId: environment?.id || "ENV-PROD",
+      connectorIds: connectors.map((item) => item.id),
+      plannedAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleString("zh-CN", { hour12: false }),
+      windowMinutes: 90,
+      integrationApproved: true,
+      rollbackPlan: "切回模板上传通道并恢复上一配置版本",
+      checks: {},
+      status: "待评估",
+      evaluatedAt: "",
+      approvedBy: "",
+      startedAt: "",
+      completedAt: "",
+      rollbackAt: "",
+    };
+    state.integrationCutoverWindows.unshift(windowItem);
+    addAudit("创建生产切换窗口", windowItem.id, `${hospital.name} · ${windowItem.connectorIds.length}个连接器`);
+    saveState();
+    showNotice(`${windowItem.id}已创建，请执行生产切换评估。`);
+    render();
+  }
+
+  function evaluateCutoverWindow(id) {
+    const windowItem = state.integrationCutoverWindows.find((item) => item.id === id);
+    if (!windowItem) return;
+    const environment = state.integrationEnvironments.find((item) => item.id === windowItem.environmentId);
+    const gate = state.pilotIntegrationGates.find((item) => item.hospitalCode === windowItem.hospitalCode);
+    const connectorIds = windowItem.connectorIds || [];
+    const vaultReady = connectorIds.length > 0 && connectorIds.every((connectorId) =>
+      state.credentialVaultEntries.some((item) => item.connectorId === connectorId && item.environmentId === windowItem.environmentId && item.status === "有效"),
+    );
+    const jobsReady = connectorIds.length > 0 && connectorIds.every((connectorId) =>
+      state.integrationExecutionJobs.some((item) => item.connectorId === connectorId && item.environmentId === windowItem.environmentId && item.status === "成功"),
+    );
+    const quarantineReady = !state.integrationQuarantines.some((item) => connectorIds.includes(item.connectorId) && item.status === "隔离中");
+    windowItem.integrationApproved = gate?.status === "已准入";
+    windowItem.checks = {
+      environment: environment?.status === "健康",
+      vault: vaultReady,
+      jobs: jobsReady,
+      quarantine: quarantineReady,
+      gate: windowItem.integrationApproved,
+      rollback: Boolean(windowItem.rollbackPlan),
+    };
+    windowItem.status = Object.values(windowItem.checks).every(Boolean) ? "可切换" : "阻断";
+    windowItem.evaluatedAt = nowText();
+    addAudit("评估生产切换窗口", windowItem.id, `${windowItem.status} · ${Object.values(windowItem.checks).filter(Boolean).length}/6项通过`);
+    saveState();
+    showNotice(`${windowItem.id}评估结果：${windowItem.status}。`);
+    render();
+  }
+
+  function startCutoverWindow(id) {
+    const windowItem = state.integrationCutoverWindows.find((item) => item.id === id);
+    if (!windowItem) return;
+    if (windowItem.status !== "可切换") {
+      showNotice("切换门禁尚未全部通过，请先重新评估。");
+      return;
+    }
+    const allowedRoles = ["国家级管理员", "省级管理员", "运维安全员"];
+    if (!allowedRoles.includes(state.activeRole)) {
+      showNotice("当前角色无生产切换权限，请切换国家级、省级或运维安全角色。");
+      return;
+    }
+    windowItem.status = "切换中";
+    windowItem.startedAt = nowText();
+    windowItem.approvedBy = state.activeRole;
+    addAudit("开始生产切换", windowItem.id, `${windowItem.approvedBy}批准 · 回滚预案已锁定`);
+    saveState();
+    showNotice(`${windowItem.id}已进入生产切换窗口。`);
+    render();
+  }
+
+  function completeCutoverWindow(id) {
+    const windowItem = state.integrationCutoverWindows.find((item) => item.id === id);
+    if (!windowItem || windowItem.status !== "切换中") return;
+    windowItem.status = "已切换";
+    windowItem.completedAt = nowText();
+    addAudit("完成生产切换", windowItem.id, `${windowItem.connectorIds.length}个连接器已切换`);
+    saveState();
+    showNotice(`${windowItem.id}生产切换已完成并留痕。`);
+    render();
+  }
+
+  function rollbackCutoverWindow(id) {
+    const windowItem = state.integrationCutoverWindows.find((item) => item.id === id);
+    if (!windowItem || !["切换中", "已切换"].includes(windowItem.status)) return;
+    windowItem.status = "已回滚";
+    windowItem.rollbackAt = nowText();
+    addAudit("回滚生产切换", windowItem.id, windowItem.rollbackPlan);
+    saveState();
+    showNotice(`${windowItem.id}已按预案回滚。`);
     render();
   }
 
@@ -7828,6 +8509,12 @@
       renderIntegration();
       return;
     }
+    const executionTab = event.target.closest("button[data-execution-tab]");
+    if (executionTab) {
+      workspace.dataset.executionTab = executionTab.dataset.executionTab;
+      renderExecution();
+      return;
+    }
     const assessmentTab = event.target.closest("button[data-assessment-tab]");
     if (assessmentTab) {
       workspace.dataset.assessmentTab = assessmentTab.dataset.assessmentTab;
@@ -7886,6 +8573,19 @@
     if (name === "resolve-integration-issue") resolveIntegrationIssue(action.dataset.id);
     if (name === "evaluate-integration-gate") evaluateIntegrationGate(action.dataset.id);
     if (name === "approve-integration-gate") approveIntegrationGate(action.dataset.id);
+    if (name === "verify-execution-environment") verifyExecutionEnvironment(action.dataset.id);
+    if (name === "rotate-vault-reference") rotateVaultReference(action.dataset.id);
+    if (name === "enqueue-execution-job") enqueueExecutionJob();
+    if (name === "advance-execution-job") advanceExecutionJob(action.dataset.id);
+    if (name === "verify-callback-receipt") verifyCallbackReceipt(action.dataset.id);
+    if (name === "simulate-replay-callback") simulateReplayCallback();
+    if (name === "resolve-replay-event") resolveReplayEvent(action.dataset.id);
+    if (name === "release-execution-quarantine") releaseExecutionQuarantine(action.dataset.id);
+    if (name === "create-cutover-window") createCutoverWindow();
+    if (name === "evaluate-cutover-window") evaluateCutoverWindow(action.dataset.id);
+    if (name === "start-cutover-window") startCutoverWindow(action.dataset.id);
+    if (name === "complete-cutover-window") completeCutoverWindow(action.dataset.id);
+    if (name === "rollback-cutover-window") rollbackCutoverWindow(action.dataset.id);
     if (name === "create-pilot-ticket") createPilotTicket();
     if (name === "assign-pilot-tickets") assignPilotTickets();
     if (name === "advance-pilot-ticket") advancePilotTicket(action.dataset.id);

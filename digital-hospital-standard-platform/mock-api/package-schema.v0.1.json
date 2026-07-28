@@ -11,7 +11,7 @@
       "properties": {
         "packageType": {
           "type": "string",
-          "enum": ["submission", "review", "expert", "rectification", "task", "pilot", "collaboration", "integration", "assessment", "assistant", "monitoring", "evidence", "analytics", "intelligence", "operations", "system", "full"]
+          "enum": ["submission", "review", "expert", "rectification", "task", "pilot", "collaboration", "integration", "execution", "assessment", "assistant", "monitoring", "evidence", "analytics", "intelligence", "operations", "system", "full"]
         },
         "generatedAt": {
           "type": "string",
@@ -451,6 +451,78 @@
       }
     },
     "pilotIntegrationGates": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "executionSummary": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "integrationEnvironments": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "credentialVaultEntries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["vaultRefFingerprint", "keyVersion", "status"],
+        "properties": {
+          "vaultRefFingerprint": {
+            "type": "string"
+          },
+          "keyVersion": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "not": {
+          "anyOf": [
+            { "required": ["secret"] },
+            { "required": ["token"] },
+            { "required": ["privateKey"] },
+            { "required": ["credential"] }
+          ]
+        }
+      }
+    },
+    "integrationExecutionJobs": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "integrationCallbackReceipts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "not": {
+          "anyOf": [
+            { "required": ["signature"] },
+            { "required": ["nonce"] }
+          ]
+        }
+      }
+    },
+    "integrationReplayEvents": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "integrationQuarantines": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "integrationCutoverWindows": {
       "type": "array",
       "items": {
         "type": "object"
