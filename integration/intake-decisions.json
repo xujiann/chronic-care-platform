@@ -47,7 +47,7 @@
     },
     {
       "lineId": "T08",
-      "candidateHead": "44df575d554bae6c892e664dd959f2ede95326be",
+      "candidateHead": "7b59ec1fa227aef6e513e6977b3f160e03fd30d5",
       "decision": "accepted",
       "acceptedCandidateHeads": [
         "771c727b8abe7c722248d40656d6b91dfb67f3cf",
@@ -55,9 +55,10 @@
         "d4bfdbaf2ab3ea2317a2a2778fabdd22221b2117",
         "4f9f22b92b47ad50d36dccf0ad01437451019179",
         "4527485a6f8990abd3cc29c1203dbcb5134c21b3",
-        "44df575d554bae6c892e664dd959f2ede95326be"
+        "44df575d554bae6c892e664dd959f2ede95326be",
+        "7b59ec1fa227aef6e513e6977b3f160e03fd30d5"
       ],
-      "reviewedAt": "2026-07-28T07:52:24.585Z",
+      "reviewedAt": "2026-07-28T12:00:00.000Z",
       "reviewer": "T00",
       "checks": [
         "git diff --check",
@@ -110,7 +111,17 @@
         "the commission panel renders signed predecessor progress such as 2/2 or a stable safe blocker while endpoint, continuity and production gates remain separate",
         "focused public-health resilience, API, storage, operations and UI regression passed 99 of 99; static/UI/final report tests passed 81 of 81; final-readiness passed 65 of 65",
         "clean committed-data release evaluation passed 426 of 428 with 0 failures and 2 expected production warnings; the direct dirty-data report correctly retained 2 unrelated nursing/escort failures",
-        "deploy check passed 396 of 396 and the pre-existing data/db.json SHA-256 remained C0DC947F0EEEE1F9F161D48B8B9D6B6EFFA48DFDCFE3D50A258EBEBBD4A30F55"
+        "deploy check passed 396 of 396 and the pre-existing data/db.json SHA-256 remained C0DC947F0EEEE1F9F161D48B8B9D6B6EFFA48DFDCFE3D50A258EBEBBD4A30F55",
+        "T00 exactly received 7b59ec1 and delegates source intake, human verification, rule evaluation, alert lifecycle and medical-prevention task transitions to the T08 services without copying domain decisions",
+        "commission-only data-foundation, surveillance-center and medical-prevention routes expose minimized projections; actor identity, organization scope, server time and Idempotency-Key are server-owned and body/query overrides fail closed",
+        "all nine modernization collections persist only service-returned nextData in one SQLite transaction with entity expectedVersion CAS and unique source-record/idempotency hashes",
+        "the public-health page adds responsive data-foundation, monitoring-warning and medical-prevention workbenches with executable human actions and explicit productionReady=false boundaries",
+        "authoritative sources, sharing authorization, official receipts, staffed review, verified medical-prevention handoffs, site evidence and launch approval remain production blockers",
+        "focused public-health resilience, modernization API/storage and UI regression passed 122 of 122; all public-health tests passed 198 of 198",
+        "committed-baseline public API and static regression passed 116 of 116; the live worktree data snapshot retained its unrelated escort/nursing readiness drift and was not used as acceptance evidence",
+        "public-health final readiness passed 71 of 71: 53 T08 functional checks plus 18 T00 public integration and safety-boundary checks",
+        "committed-baseline release report passed 429 checks with 0 failures and 2 expected production warnings; deploy check passed 400 of 400",
+        "the pre-existing data/db.json SHA-256 remained C0DC947F0EEEE1F9F161D48B8B9D6B6EFFA48DFDCFE3D50A258EBEBBD4A30F55 and was excluded from the integration commit"
       ],
       "blockers": []
     },

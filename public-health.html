@@ -85,6 +85,87 @@
         </article>
       </section>
 
+      <section class="portal-grid public-health-modernization-grid" aria-label="公共卫生现代化工作台">
+        <article class="panel public-health-modernization-panel" aria-labelledby="public-health-data-foundation-title">
+          <div class="panel-title">
+            <div>
+              <h2 id="public-health-data-foundation-title">数据底座</h2>
+              <span>八类来源、七类目录、最小化信号与血缘审计</span>
+            </div>
+            <span id="public-health-data-foundation-status" class="badge warn">加载前未就绪</span>
+          </div>
+          <div id="public-health-data-foundation-metrics" class="modernization-metrics"></div>
+          <div id="public-health-data-foundation-sources" class="modernization-list" aria-live="polite"></div>
+          <form id="public-health-signal-intake-form" class="modernization-form">
+            <h3>接入监测信号</h3>
+            <label>数据来源
+              <select name="sourceId" required>
+                <option value="ph-source-clinical-syndrome">临床症候群</option>
+                <option value="ph-source-laboratory-pathogen">实验室病原</option>
+                <option value="ph-source-case-report">传染病病例报告</option>
+                <option value="ph-source-public-health-event">突发公共卫生事件</option>
+                <option value="ph-source-immunization-aefi">免疫接种与 AEFI</option>
+                <option value="ph-source-vector-environment">病媒与环境</option>
+                <option value="ph-source-department-collaboration">跨部门协同</option>
+                <option value="ph-source-social-sensing">社会感知</option>
+              </select>
+            </label>
+            <label>信号类型
+              <select name="signalType" required>
+                <option value="clinical-syndrome">临床症候群</option>
+                <option value="laboratory-pathogen">实验室病原</option>
+                <option value="case-report">传染病病例</option>
+                <option value="public-health-event">突发公共卫生事件</option>
+                <option value="immunization-aefi">免疫接种与 AEFI</option>
+                <option value="vector-environment">病媒与环境</option>
+                <option value="department-collaboration">跨部门协同</option>
+                <option value="social-sensing">社会感知</option>
+              </select>
+            </label>
+            <label>来源记录编号<input name="externalSignalId" minlength="8" maxlength="128" required autocomplete="off"></label>
+            <label>机构编号<input name="institutionId" minlength="3" maxlength="64" required></label>
+            <label>区划编号<input name="regionCode" minlength="3" maxlength="32" required></label>
+            <label>观察时间<input name="observedAt" type="datetime-local" required></label>
+            <label>指标代码<input name="metricCode" value="fever-respiratory-count" required></label>
+            <label>观测值<input name="metricValue" type="number" step="any" required></label>
+            <label>单位<input name="metricUnit" value="count"></label>
+            <label>基线<input name="metricBaseline" type="number" step="any"></label>
+            <label class="wide-field">证据引用<input name="evidenceRef" required></label>
+            <button type="submit" class="inline-action">提交最小化信号</button>
+            <p id="public-health-signal-intake-status" role="status" aria-live="polite"></p>
+          </form>
+        </article>
+
+        <article class="panel public-health-modernization-panel" aria-labelledby="public-health-surveillance-title">
+          <div class="panel-title">
+            <div>
+              <h2 id="public-health-surveillance-title">监测预警</h2>
+              <span>人工核实、规则评估、风险研判与预警流转</span>
+            </div>
+            <span id="public-health-surveillance-status" class="badge warn">加载前未就绪</span>
+          </div>
+          <p class="modernization-boundary-note">规则与模型仅提供建议；确认、研判、正式报告和关闭均保留人工责任。</p>
+          <div id="public-health-surveillance-metrics" class="modernization-metrics"></div>
+          <h3>待处理信号</h3>
+          <div id="public-health-surveillance-signals" class="modernization-list" aria-live="polite"></div>
+          <h3>预警队列</h3>
+          <div id="public-health-surveillance-alerts" class="modernization-list" aria-live="polite"></div>
+        </article>
+
+        <article class="panel public-health-modernization-panel" aria-labelledby="public-health-medical-prevention-title">
+          <div class="panel-title">
+            <div>
+              <h2 id="public-health-medical-prevention-title">医防协同</h2>
+              <span>医院公卫科与基层机构双任务、回执、异常和闭环</span>
+            </div>
+            <span id="public-health-medical-prevention-status" class="badge warn">加载前未就绪</span>
+          </div>
+          <div id="public-health-medical-prevention-metrics" class="modernization-metrics"></div>
+          <div id="public-health-medical-prevention-tasks" class="modernization-list" aria-live="polite"></div>
+          <p class="modernization-boundary-note">工作台功能可运行，但真实来源授权、正式接口回执、现场验收与上线审批未完成，productionReady 始终为 false。</p>
+        </article>
+      </section>
+
       <section class="portal-grid">
         <article class="panel wide">
           <div class="panel-title">

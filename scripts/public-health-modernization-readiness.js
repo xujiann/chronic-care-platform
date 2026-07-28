@@ -219,11 +219,11 @@ function buildPublicHealthModernizationReadiness(options = {}) {
       alertState: acceptance.final.alert.status,
       alertVersion: acceptance.final.alert.version
     },
+    remainingProductionBoundaries: [
+      "Verify authoritative national/provincial source interfaces, data-sharing authorizations, official receipts, staffed review, medical-prevention handoffs, site evidence and launch approval."
+    ],
     remainingT00Integration: [
-      "Wire public API routes to the T08 controllers without duplicating domain transitions.",
-      "Persist nextData through SQLite transactions with unique source-record and idempotency constraints.",
-      "Expose only minimized data, surveillance and collaboration summaries on the public-health workbench.",
-      "Add readiness, release and deploy gates while preserving productionReady=false until trusted site evidence."
+      "Verify authoritative national/provincial source interfaces, data-sharing authorizations, official receipts, staffed review, medical-prevention handoffs, site evidence and launch approval."
     ],
     productionReady: false
   };
@@ -254,9 +254,9 @@ function renderMarkdown(report) {
     "|---|---|---|---|",
     ...rows,
     "",
-    "## Remaining T00 integration",
+    "## Remaining production boundaries",
     "",
-    ...report.remainingT00Integration.map((item) => `- ${item}`),
+    ...(report.remainingProductionBoundaries || report.remainingT00Integration || []).map((item) => `- ${item}`),
     ""
   ].join("\n");
 }

@@ -855,6 +855,47 @@ function buildPublicHealthFinalReadiness(options = {}) {
       "connectivity-detail-grid",
       "@media (max-width: 720px)"
     ].every((token) => portalCss.includes(token)) && packageSource.includes("test/public-health-connectivity-ui.test.js"), "commission UI renders fail-closed redacted summaries and submits only allowlisted lane or empty campaign commands while keeping every security input and production authorization server-owned", "integration"),
+    check("integration:t00-modernization-routes", [
+      "/api/public-health/data-foundation",
+      "/api/public-health/surveillance-signals",
+      "/api/public-health/surveillance-signals/:id/actions",
+      "/api/public-health/surveillance-center",
+      "/api/public-health/surveillance-alerts/:id/actions",
+      "/api/public-health/medical-prevention-tasks",
+      "/api/public-health/medical-prevention-tasks/:id/actions",
+      "publicHealthModernizationCommand",
+      "PUBLIC_HEALTH_MODERNIZATION_SERVER_CONTEXT_FORBIDDEN"
+    ].every((token) => serverSource.includes(token)), "commission-only data, surveillance and medical-prevention routes inject server actor, time and idempotency context and reject client overrides", "integration"),
+    check("integration:t00-modernization-persistence", [
+      "PUBLIC_HEALTH_MODERNIZATION_COLLECTIONS",
+      "assertUniquePublicHealthModernizationState",
+      "assertPublicHealthModernizationWrite",
+      "publicHealthModernizationWrite",
+      "sourceRecordHash",
+      "expectedVersion",
+      "PUBLIC_HEALTH_MODERNIZATION_CAS_CONFLICT"
+    ].every((token) => serverSource.includes(token)), "all nine modernization collections persist nextData with SQLite transaction CAS and unique source-record/idempotency hashes", "integration"),
+    check("integration:t00-modernization-ui-release", [
+      "public-health-data-foundation-title",
+      "public-health-surveillance-title",
+      "public-health-medical-prevention-title",
+      "public-health-signal-intake-form",
+      "aria-live=\"polite\""
+    ].every((token) => pageHtml.includes(token)) && [
+      "loadPublicHealthModernizationWorkbenches",
+      "handlePublicHealthModernizationAction",
+      "Idempotency-Key",
+      "expectedVersion",
+      "人工核实"
+    ].every((token) => pageSource.includes(token)) && [
+      "public-health-modernization-grid",
+      "modernization-form",
+      "@media (max-width: 1100px)"
+    ].every((token) => portalCss.includes(token)) && [
+      "\"public-health:modernization-readiness\"",
+      "test/public-health-modernization-ui.test.js",
+      "test/public-health-modernization-api.test.js"
+    ].every((token) => packageSource.includes(token)), "three responsive workbenches expose only minimized summaries and executable governed actions while release scripts preserve productionReady=false", "integration"),
     check("safety:functional-not-production", runtime.productionReady === false && registry.productionReady === false && deliveries.every((item) => item.productionReady === false), "functional acceptance cannot self-assert production readiness", "safety"),
     check("safety:endpoint-connectivity-not-production", endpointProbeAcceptance.endpointConnectivityReady === true && endpointProbeAcceptance.productionReady === false && endpointProbeAcceptance.entries.every((item) => item.blockerCode === "trusted-site-evidence-still-required"), "verified connectivity never replaces trusted site evidence or launch approval", "safety"),
     check("safety:continuous-connectivity-not-production", endpointProbeCampaignAcceptance.continuousConnectivityReady === true && endpointProbeCampaignAcceptance.productionReady === false && endpointProbeCampaignAcceptance.blockers.every((item) => /site evidence|handoff|P0\/P1|approval/i.test(item)), "three consecutive campaigns still retain site evidence, blocker, handoff and approval boundaries", "safety"),

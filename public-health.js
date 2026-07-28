@@ -2,6 +2,11 @@ const PUBLIC_HEALTH_API_BASE = location.protocol === "file:" ? "" : "/api";
 const PUBLIC_HEALTH_ROUTE = "/api/public-health/system";
 const PUBLIC_HEALTH_PATH = PUBLIC_HEALTH_ROUTE.replace(/^\/api/, "");
 let currentPublicHealthSystem = null;
+let currentPublicHealthModernization = {
+  foundation: null,
+  surveillance: null,
+  collaboration: null
+};
 
 const FALLBACK_STANDARD_DOMAINS = [
   ["ph-infectious", 1, "传染病防控", "management", 6, 49, "疾控中心", ["病例报告", "流行病学调查", "实验室检测"], ["publicHealthEvents", "emergencySignals"]],
@@ -52,6 +57,7 @@ const PUBLIC_HEALTH_SITE_EVIDENCE_LINKS = [
 
 document.addEventListener("DOMContentLoaded", async () => {
   void loadPublicHealthConnectivitySummaries();
+  void loadPublicHealthModernizationWorkbenches();
   const system = await loadPublicHealthSystem();
   renderPublicHealthSystem(system);
 });
@@ -84,6 +90,8 @@ document.addEventListener("click", handlePublicHealthSiteEvidenceBridgeAction);
 document.addEventListener("click", handlePublicHealthSiteEvidenceVerificationTaskAction);
 document.addEventListener("click", handlePublicHealthStandardImplementationAction);
 document.addEventListener("click", handlePublicHealthLaunchGateAction);
+document.addEventListener("click", handlePublicHealthModernizationAction);
+document.addEventListener("submit", handlePublicHealthSignalIntake);
 
 async function loadPublicHealthSystem() {
   if (PUBLIC_HEALTH_API_BASE) {
@@ -103,6 +111,343 @@ const PUBLIC_HEALTH_CONNECTIVITY_ENDPOINTS = Object.freeze({
   endpoint: "/api/public-health/external/endpoints/summary",
   campaign: "/api/public-health/external/endpoints/campaigns/summary"
 });
+
+const PUBLIC_HEALTH_MODERNIZATION_ENDPOINTS = Object.freeze({
+  foundation: "/api/public-health/data-foundation",
+  surveillance: "/api/public-health/surveillance-center",
+  collaboration: "/api/public-health/medical-prevention-tasks"
+});
+
+function publicHealthModernizationIdempotencyKey(prefix) {
+  const nonce = globalThis.crypto?.randomUUID?.()
+    || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `${prefix}:${nonce}`;
+}
+
+async function readPublicHealthModernizationResponse(response) {
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error("公共卫生工作台服务端校验未通过");
+    error.status = response.status;
+    error.code = body.code || "PUBLIC_HEALTH_MODERNIZATION_UNAVAILABLE";
+    throw error;
+  }
+  return body;
+}
+
+async function loadPublicHealthModernizationWorkbenches() {
+  renderPublicHealthModernizationLoading();
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  const results = await Promise.allSettled(Object.values(PUBLIC_HEALTH_MODERNIZATION_ENDPOINTS)
+    .map((endpoint) => request(endpoint).then(readPublicHealthModernizationResponse)));
+  currentPublicHealthModernization = {
+    foundation: results[0].status === "fulfilled" ? results[0].value : null,
+    surveillance: results[1].status === "fulfilled" ? results[1].value : null,
+    collaboration: results[2].status === "fulfilled" ? results[2].value : null
+  };
+  renderPublicHealthModernizationWorkbenches(currentPublicHealthModernization, results);
+}
+
+function renderPublicHealthModernizationLoading() {
+  [
+    "#public-health-data-foundation-status",
+    "#public-health-surveillance-status",
+    "#public-health-medical-prevention-status"
+  ].forEach((selector) => {
+    const target = document.querySelector(selector);
+    if (!target) return;
+    target.className = "badge warn";
+    target.textContent = "加载中，按未就绪处理";
+  });
+}
+
+function modernizationMetric(label, value) {
+  return `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
+}
+
+function renderModernizationStatus(selector, value, available) {
+  const target = document.querySelector(selector);
+  if (!target) return;
+  const runnable = available && value?.ok === true;
+  target.className = `badge ${runnable ? "ok" : "warn"}`;
+  target.textContent = runnable ? "功能可运行 / 未获生产授权" : "失败关闭 / 未就绪";
+}
+
+function renderPublicHealthModernizationWorkbenches(state, results = []) {
+  const foundation = state.foundation;
+  const surveillance = state.surveillance;
+  const collaboration = state.collaboration;
+  renderModernizationStatus("#public-health-data-foundation-status", foundation, Boolean(foundation));
+  renderModernizationStatus("#public-health-surveillance-status", surveillance, Boolean(surveillance));
+  renderModernizationStatus("#public-health-medical-prevention-status", collaboration, Boolean(collaboration));
+
+  const foundationMetrics = document.querySelector("#public-health-data-foundation-metrics");
+  if (foundationMetrics) {
+    foundationMetrics.innerHTML = foundation
+      ? [
+          modernizationMetric("数据目录", foundation.summary?.catalogEntries || 0),
+          modernizationMetric("已登记来源", `${foundation.summary?.registeredSources || 0}/${foundation.summary?.sources || 0}`),
+          modernizationMetric("监测信号", foundation.summary?.signals || 0),
+          modernizationMetric("质量问题", foundation.summary?.qualityFindings || 0)
+        ].join("")
+      : modernizationMetric("数据底座", "不可用");
+  }
+  const sources = document.querySelector("#public-health-data-foundation-sources");
+  if (sources) {
+    sources.innerHTML = foundation
+      ? (foundation.sources || []).map((item) => `<article class="modernization-item">
+          <div><strong>${escapeHtml(item.name || item.id)}</strong><small>${escapeHtml(item.owner || "责任部门待确认")}</small></div>
+          <span class="badge ${item.status === "registered" ? "ok" : "warn"}">${escapeHtml(item.status || "unknown")}</span>
+        </article>`).join("")
+      : "<p class=\"modernization-empty\">服务不可用或无 commission 权限；数据底座按未就绪处理。</p>";
+  }
+
+  const surveillanceMetrics = document.querySelector("#public-health-surveillance-metrics");
+  if (surveillanceMetrics) {
+    surveillanceMetrics.innerHTML = surveillance
+      ? [
+          modernizationMetric("人工核实", surveillance.summary?.humanVerifiedSignals || 0),
+          modernizationMetric("活动规则", `${surveillance.summary?.activeRules || 0}/${surveillance.summary?.rules || 0}`),
+          modernizationMetric("开放预警", surveillance.summary?.openAlerts || 0),
+          modernizationMetric("人工研判", surveillance.summary?.humanRiskAssessments || 0)
+        ].join("")
+      : modernizationMetric("监测预警", "不可用");
+  }
+  renderPublicHealthModernizationSignals(surveillance?.dataFoundation?.signals || foundation?.signals || []);
+  renderPublicHealthModernizationAlerts(surveillance?.alerts || []);
+
+  const collaborationMetrics = document.querySelector("#public-health-medical-prevention-metrics");
+  if (collaborationMetrics) {
+    collaborationMetrics.innerHTML = collaboration
+      ? [
+          modernizationMetric("协同任务", collaboration.summary?.tasks || 0),
+          modernizationMetric("开放任务", collaboration.summary?.openTasks || 0),
+          modernizationMetric("异常任务", collaboration.summary?.exceptions || 0),
+          modernizationMetric("业务闭环", collaboration.summary?.closedTasks || 0)
+        ].join("")
+      : modernizationMetric("医防协同", "不可用");
+  }
+  renderPublicHealthModernizationTasks(collaboration?.tasks || []);
+
+  results.filter((item) => item.status === "rejected").forEach((item) => {
+    if (item.reason?.status === 403) {
+      document.querySelectorAll(".public-health-modernization-panel .inline-action")
+        .forEach((button) => { button.disabled = true; });
+    }
+  });
+}
+
+function renderPublicHealthModernizationSignals(signals) {
+  const target = document.querySelector("#public-health-surveillance-signals");
+  if (!target) return;
+  if (!signals.length) {
+    target.innerHTML = "<p class=\"modernization-empty\">暂无可处理的脱敏信号。</p>";
+    return;
+  }
+  target.innerHTML = signals.map((signal) => {
+    let actions = "";
+    if (signal.workflowState === "received") {
+      actions = `<button class="inline-action" data-modernization-kind="signal" data-modernization-id="${escapeHtml(signal.id)}" data-modernization-version="${escapeHtml(signal.version)}" data-modernization-action="verify-signal" data-modernization-decision="confirmed">人工确认</button>
+        <button class="inline-action" data-modernization-kind="signal" data-modernization-id="${escapeHtml(signal.id)}" data-modernization-version="${escapeHtml(signal.version)}" data-modernization-action="verify-signal" data-modernization-decision="dismissed">排除信号</button>`;
+    } else if (signal.workflowState === "human-verified") {
+      actions = `<button class="inline-action" data-modernization-kind="signal" data-modernization-id="${escapeHtml(signal.id)}" data-modernization-version="${escapeHtml(signal.version)}" data-modernization-action="evaluate-signal">运行规则评估</button>`;
+    }
+    return `<article class="modernization-item">
+      <div><strong>${escapeHtml(signal.signalType || signal.id)}</strong><small>${escapeHtml(signal.regionCode || "")} / ${escapeHtml(signal.institutionId || "")} / ${escapeHtml(signal.workflowState || "")}</small></div>
+      <div class="action-row">${actions}</div>
+    </article>`;
+  }).join("");
+}
+
+function renderPublicHealthModernizationAlerts(alerts) {
+  const target = document.querySelector("#public-health-surveillance-alerts");
+  if (!target) return;
+  if (!alerts.length) {
+    target.innerHTML = "<p class=\"modernization-empty\">暂无预警；未经人工确认的信号不会自动升级。</p>";
+    return;
+  }
+  target.innerHTML = alerts.map((alert) => {
+    const actionByState = {
+      open: ["verify-alert", "人工研判"],
+      verified: ["dispatch-alert", "派发医防任务"],
+      dispatched: ["start-investigation", "开始调查"],
+      investigating: ["record-official-report", "登记正式报告"],
+      reported: ["record-feedback", "登记反馈"],
+      "feedback-confirmed": ["close-alert", "关闭预警"],
+      closed: ["reopen-alert", "重新打开"]
+    }[alert.status];
+    const action = actionByState
+      ? `<button class="inline-action" data-modernization-kind="alert" data-modernization-id="${escapeHtml(alert.id)}" data-modernization-version="${escapeHtml(alert.version)}" data-modernization-action="${escapeHtml(actionByState[0])}">${escapeHtml(actionByState[1])}</button>`
+      : "";
+    return `<article class="modernization-item">
+      <div><strong>${escapeHtml(alert.signalType || alert.id)}</strong><small>${escapeHtml(alert.severity || "")} / ${escapeHtml(alert.status || "")} / v${escapeHtml(alert.version || 0)}</small></div>
+      <div class="action-row">${action}</div>
+    </article>`;
+  }).join("");
+}
+
+function renderPublicHealthModernizationTasks(tasks) {
+  const target = document.querySelector("#public-health-medical-prevention-tasks");
+  if (!target) return;
+  if (!tasks.length) {
+    target.innerHTML = "<p class=\"modernization-empty\">暂无医防协同任务；预警完成人工研判并派发后生成双任务。</p>";
+    return;
+  }
+  const actionByState = {
+    pending: ["accept-task", "接单"],
+    accepted: ["start-task", "开始办理"],
+    "in-progress": ["record-task-receipt", "登记回执"],
+    "receipt-confirmed": ["close-task", "业务闭环"],
+    "exception-open": ["retry-task", "受控重试"],
+    closed: ["reopen-task", "重新打开"]
+  };
+  target.innerHTML = tasks.map((task) => {
+    const definition = actionByState[task.state];
+    const action = definition
+      ? `<button class="inline-action" data-modernization-kind="task" data-modernization-id="${escapeHtml(task.id)}" data-modernization-version="${escapeHtml(task.version)}" data-modernization-task-type="${escapeHtml(task.taskType)}" data-modernization-action="${escapeHtml(definition[0])}">${escapeHtml(definition[1])}</button>`
+      : "";
+    return `<article class="modernization-item">
+      <div><strong>${escapeHtml(task.taskType || task.id)}</strong><small>${escapeHtml(task.ownerRole || "")} / ${escapeHtml(task.state || "")} / v${escapeHtml(task.version || 0)}</small></div>
+      <div class="action-row">${action}</div>
+    </article>`;
+  }).join("");
+}
+
+async function postPublicHealthModernization(pathname, idempotencyPrefix, body) {
+  const request = window.HealthCityAuth?.authFetch;
+  if (!request) throw new Error("当前预览没有 commission 服务端会话");
+  const response = await request(pathname, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Idempotency-Key": publicHealthModernizationIdempotencyKey(idempotencyPrefix)
+    },
+    body: JSON.stringify(body)
+  });
+  return readPublicHealthModernizationResponse(response);
+}
+
+async function handlePublicHealthSignalIntake(event) {
+  const form = event.target.closest("#public-health-signal-intake-form");
+  if (!form) return;
+  event.preventDefault();
+  const status = form.querySelector("#public-health-signal-intake-status");
+  const values = new FormData(form);
+  const baseline = String(values.get("metricBaseline") || "").trim();
+  const payload = {
+    expectedVersion: 0,
+    sourceId: String(values.get("sourceId") || ""),
+    externalSignalId: String(values.get("externalSignalId") || ""),
+    signalType: String(values.get("signalType") || ""),
+    institutionId: String(values.get("institutionId") || ""),
+    regionCode: String(values.get("regionCode") || ""),
+    observedAt: new Date(String(values.get("observedAt") || "")).toISOString(),
+    metrics: [{
+      metricCode: String(values.get("metricCode") || ""),
+      value: Number(values.get("metricValue")),
+      unit: String(values.get("metricUnit") || "count"),
+      ...(baseline ? { baseline: Number(baseline) } : {})
+    }],
+    evidenceRefs: [String(values.get("evidenceRef") || "")]
+  };
+  try {
+    status.textContent = "正在提交；来源编号和幂等键不会显示在工作台。";
+    await postPublicHealthModernization(
+      PUBLIC_HEALTH_MODERNIZATION_ENDPOINTS.foundation.replace("/data-foundation", "/surveillance-signals"),
+      "public-health-signal-intake",
+      payload
+    );
+    status.textContent = "信号已按服务端时间接入并写入审计。";
+    form.reset();
+    await loadPublicHealthModernizationWorkbenches();
+  } catch (error) {
+    status.textContent = `提交失败关闭：${escapeHtml(error.code || error.message || "服务不可用")}`;
+  }
+}
+
+function promptRequired(label, fallback = "") {
+  const value = window.prompt(label, fallback);
+  if (value === null) throw new Error("操作已取消");
+  if (!String(value).trim()) throw new Error(`${label}不能为空`);
+  return String(value).trim();
+}
+
+function publicHealthModernizationActionBody(button) {
+  const action = button.dataset.modernizationAction;
+  const expectedVersion = Number(button.dataset.modernizationVersion);
+  const body = { action, expectedVersion };
+  if (action === "verify-signal") {
+    body.decision = button.dataset.modernizationDecision;
+    body.note = promptRequired("人工核实说明");
+    body.evidenceRefs = [promptRequired("核实证据引用")];
+  } else if (action === "verify-alert") {
+    body.riskLevel = promptRequired("风险等级：low / medium / high / critical", "medium");
+    body.conclusion = promptRequired("人工研判结论");
+    body.evidenceRefs = [promptRequired("研判证据引用")];
+  } else if (action === "dispatch-alert") {
+    body.medicalInstitutionId = promptRequired("医疗机构编号");
+    body.primaryCareOrganizationId = promptRequired("基层机构编号");
+    body.dueAt = promptRequired("完成期限（ISO 日期时间）", new Date(Date.now() + 86400000).toISOString());
+    body.note = promptRequired("派发说明");
+  } else if (action === "start-investigation") {
+    body.investigationOwner = promptRequired("调查责任人");
+    body.note = promptRequired("调查说明");
+  } else if (action === "record-official-report") {
+    body.reportId = promptRequired("正式报告编号");
+    body.receiptCode = promptRequired("正式报告回执编号");
+    body.evidenceRefs = [promptRequired("正式报告证据引用")];
+  } else if (action === "record-feedback") {
+    body.feedbackCode = promptRequired("反馈编号");
+    body.conclusion = promptRequired("反馈结论");
+    body.evidenceRefs = [promptRequired("反馈证据引用")];
+  } else if (action === "close-alert") {
+    body.conclusion = promptRequired("关闭结论");
+    body.evidenceRefs = [promptRequired("关闭证据引用")];
+  } else if (action === "reopen-alert" || ["start-task", "retry-task", "reopen-task"].includes(action)) {
+    body.note = promptRequired("操作说明");
+  } else if (action === "accept-task") {
+    body.assignedTo = promptRequired("责任人");
+    body.note = promptRequired("接单说明");
+  } else if (action === "record-task-receipt") {
+    body.receiptStatus = promptRequired("回执状态：accepted / rejected", "accepted");
+    body.receiptCode = promptRequired("回执编号");
+    body.evidenceRefs = [promptRequired("回执证据引用")];
+    if (body.receiptStatus === "rejected") {
+      body.reason = promptRequired("拒收原因");
+      body.exceptionOwner = promptRequired("异常责任人");
+      body.exceptionDueAt = promptRequired("异常期限（ISO 日期时间）", new Date(Date.now() + 86400000).toISOString());
+    }
+  } else if (action === "close-task") {
+    body.conclusion = promptRequired("任务闭环结论");
+    body.evidenceRefs = button.dataset.modernizationTaskType === "medical-public-health-verification"
+      ? ["case-source-review", "medical-public-health-receipt"]
+      : ["primary-care-followup-record", "community-health-receipt"];
+  }
+  return body;
+}
+
+async function handlePublicHealthModernizationAction(event) {
+  const button = event.target.closest("[data-modernization-action]");
+  if (!button) return;
+  const kind = button.dataset.modernizationKind;
+  const id = button.dataset.modernizationId;
+  const action = button.dataset.modernizationAction;
+  const routes = {
+    signal: `/api/public-health/surveillance-signals/${encodeURIComponent(id)}/actions`,
+    alert: `/api/public-health/surveillance-alerts/${encodeURIComponent(id)}/actions`,
+    task: `/api/public-health/medical-prevention-tasks/${encodeURIComponent(id)}/actions`
+  };
+  if (!routes[kind]) return;
+  button.disabled = true;
+  try {
+    await postPublicHealthModernization(routes[kind], `public-health-${kind}-${action}`, publicHealthModernizationActionBody(button));
+    await loadPublicHealthModernizationWorkbenches();
+  } catch (error) {
+    window.alert(`操作失败关闭：${error.code || error.message || "服务不可用"}`);
+  } finally {
+    button.disabled = false;
+  }
+}
 
 const PUBLIC_HEALTH_CONTINUITY_BREAK_LABELS = Object.freeze({
   "campaign-verification-failed": "活动签名或完整性验证失败",

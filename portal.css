@@ -758,6 +758,155 @@ h1 { margin-top: 4px; font-size: 28px; }
   }
 }
 
+.public-health-modernization-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.public-health-modernization-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  min-height: 100%;
+}
+
+.public-health-modernization-panel .panel-title {
+  align-items: flex-start;
+  margin-bottom: 0;
+}
+
+.public-health-modernization-panel h3 {
+  margin: 0;
+  font-size: 0.98rem;
+}
+
+.modernization-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.modernization-metrics > div {
+  padding: 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: var(--surface, #f7f9fc);
+}
+
+.modernization-metrics span,
+.modernization-metrics strong,
+.modernization-item small {
+  display: block;
+}
+
+.modernization-metrics strong {
+  margin-top: 0.25rem;
+  font-size: 1.15rem;
+}
+
+.modernization-list {
+  display: grid;
+  gap: 0.55rem;
+  max-height: 22rem;
+  overflow: auto;
+}
+
+.modernization-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: var(--paper);
+}
+
+.modernization-item > div {
+  min-width: 0;
+}
+
+.modernization-item strong,
+.modernization-item small {
+  overflow-wrap: anywhere;
+}
+
+.modernization-item small {
+  margin-top: 0.25rem;
+  color: var(--muted);
+}
+
+.modernization-item .action-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+.modernization-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-top: auto;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--line);
+}
+
+.modernization-form h3,
+.modernization-form .wide-field,
+.modernization-form > p {
+  grid-column: 1 / -1;
+}
+
+.modernization-form label {
+  display: grid;
+  gap: 0.3rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.modernization-form input,
+.modernization-form select {
+  width: 100%;
+  min-width: 0;
+}
+
+.modernization-form > p {
+  min-height: 1.3rem;
+  margin: 0;
+  color: var(--muted);
+}
+
+.modernization-boundary-note,
+.modernization-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+@media (max-width: 1100px) {
+  .public-health-modernization-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .modernization-form,
+  .modernization-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .modernization-form > *,
+  .modernization-form .wide-field {
+    grid-column: 1;
+  }
+
+  .modernization-item {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
 .list {
   display: grid;
   gap: 10px;

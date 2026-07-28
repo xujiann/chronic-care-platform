@@ -28,7 +28,8 @@ test("modernization readiness accepts data surveillance and medical-prevention f
   assert.equal(report.summary.closedCollaborationTasks, 2);
   assert.equal(report.acceptance.alertState, "closed");
   assert.equal(report.productionReady, false);
-  assert.equal(report.remainingT00Integration.length, 4);
+  assert.equal(report.remainingProductionBoundaries.length, 1);
+  assert.deepEqual(report.remainingT00Integration, report.remainingProductionBoundaries);
 });
 
 test("modernization readiness fails when the privacy control contract is absent", () => {
@@ -48,5 +49,5 @@ test("modernization readiness renders and writes machine and human reports", () 
   assert.equal(JSON.parse(fs.readFileSync(output, "utf8")).summary.closedAlerts, 1);
   assert.match(fs.readFileSync(markdown, "utf8"), /Data sources: 8\/8/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Closed medical-prevention tasks: 2\/2/);
-  assert.match(renderMarkdown(report), /Remaining T00 integration/);
+  assert.match(renderMarkdown(report), /Remaining production boundaries/);
 });

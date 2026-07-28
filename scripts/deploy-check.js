@@ -682,6 +682,58 @@ function buildDeployCheckReport(options = {}) {
         && pkg.scripts?.posttest?.includes("test/public-health-connectivity-ui.test.js"),
       detail: "commission public-health panel loads redacted summaries and submits only allowlisted lane or empty campaign commands; failures stay safe and endpoint, continuity and production gates remain separate"
     },
+    {
+      name: "api:publicHealthModernization",
+      ok: [
+        "/api/public-health/data-foundation",
+        "/api/public-health/surveillance-signals",
+        "/api/public-health/surveillance-signals/:id/actions",
+        "/api/public-health/surveillance-center",
+        "/api/public-health/surveillance-alerts/:id/actions",
+        "/api/public-health/medical-prevention-tasks",
+        "/api/public-health/medical-prevention-tasks/:id/actions",
+        "publicHealthModernizationCommand",
+        "PUBLIC_HEALTH_MODERNIZATION_SERVER_CONTEXT_FORBIDDEN"
+      ].every((marker) => serverSource.includes(marker))
+        && fs.existsSync(path.join(ROOT, "public-health-data-foundation-service.js"))
+        && fs.existsSync(path.join(ROOT, "public-health-surveillance-workflow-service.js"))
+        && fs.existsSync(path.join(ROOT, "public-health-medical-prevention-collaboration-service.js")),
+      detail: "commission-only modernization routes delegate domain transitions and bind actor, server time, idempotency and expectedVersion"
+    },
+    {
+      name: "storage:publicHealthModernization",
+      ok: [
+        "PUBLIC_HEALTH_MODERNIZATION_COLLECTIONS",
+        "assertUniquePublicHealthModernizationState",
+        "assertPublicHealthModernizationWrite",
+        "publicHealthModernizationWrite",
+        "sourceRecordHash",
+        "PUBLIC_HEALTH_MODERNIZATION_CAS_CONFLICT"
+      ].every((marker) => serverSource.includes(marker))
+        && pkg.scripts?.["public-health:resilience-test"]?.includes("test/public-health-modernization-api.test.js")
+        && pkg.scripts?.["public-health:modernization-readiness"] === "node scripts/public-health-modernization-readiness.js",
+      detail: "nine modernization collections use nextData-only SQLite transaction CAS and unique source-record/idempotency constraints"
+    },
+    {
+      name: "static:publicHealthModernizationWorkbenches",
+      ok: [
+        "public-health-data-foundation-title",
+        "public-health-surveillance-title",
+        "public-health-medical-prevention-title",
+        "public-health-signal-intake-form",
+        "aria-live=\"polite\""
+      ].every((marker) => publicHealthHtml.includes(marker))
+        && [
+          "loadPublicHealthModernizationWorkbenches",
+          "handlePublicHealthModernizationAction",
+          "Idempotency-Key",
+          "expectedVersion",
+          "人工核实"
+        ].every((marker) => publicHealthUiSource.includes(marker))
+        && ["public-health-modernization-grid", "modernization-form", "@media (max-width: 1100px)"].every((marker) => portalCss.includes(marker))
+        && pkg.scripts?.["public-health:resilience-test"]?.includes("test/public-health-modernization-ui.test.js"),
+      detail: "responsive data, surveillance and medical-prevention workbenches expose redacted summaries, human actions and a production-false boundary"
+    },
     { name: "api:publicHealthHighlights", ok: ["/api/public-health/highlights", "/api/public-health/highlights/signals", "/api/public-health/highlights/alerts/:id/actions", "/api/public-health/highlights/command-tasks/:id/actions", "/api/public-health/highlights/ai-reviews/:id/actions", "/api/public-health/highlights/evidence/:id/actions"].every((marker) => serverSource.includes(marker)) && fs.readFileSync(path.join(ROOT, "public-health.html"), "utf8").includes("public-health-highlight-center") && fs.readFileSync(path.join(ROOT, "public-health.js"), "utf8").includes("renderPublicHealthHighlights"), detail: "public health five-suite trigger, map, AI, command and evidence center is wired" },
     { name: "api:publicHealthHighlightsStandalone", ok: fs.existsSync(path.join(ROOT, "public-health-highlights.html")) && fs.existsSync(path.join(ROOT, "public-health-highlights.js")) && fs.existsSync(path.join(ROOT, "scripts", "public-health-highlights-readiness.js")) && serverSource.includes("buildPublicHealthHighlights") && fs.readFileSync(path.join(ROOT, "scripts", "public-health-highlights-readiness.js"), "utf8").includes("functionalState"), detail: "standalone public health five-suite command center and readiness report are present" },
     { name: "docs:publicHealthHighlights", ok: ["五件套", "多点触发", "GIS", "AI", "应急指挥", "证据链", "formalGoLiveState"].every((marker) => fs.readFileSync(path.join(ROOT, "docs", "公共卫生五件套功能说明与验收.md"), "utf8").includes(marker)), detail: "public health five-suite implementation, acceptance and go-live boundary are documented" },
@@ -801,6 +853,7 @@ function buildDeployCheckReport(options = {}) {
     { name: "manifest:immunizationReadiness", ok: manifestSource.includes("immunization-readiness-report.md") && manifestSource.includes("immunization:readiness") && manifestSource.includes("immunization.html"), detail: "immunization readiness artifact is indexed" },
     { name: "manifest:publicHealthReadiness", ok: manifestSource.includes("public-health-readiness-report.md") && manifestSource.includes("public-health:readiness"), detail: "public health readiness artifact is indexed" },
     { name: "manifest:publicHealthHighlights", ok: manifestSource.includes("public-health-highlights-readiness-report.md") && manifestSource.includes("public-health:highlights:readiness") && manifestSource.includes("/api/public-health/highlights"), detail: "public health five-suite readiness artifact is indexed" },
+    { name: "manifest:publicHealthModernization", ok: manifestSource.includes("public-health-modernization-readiness-report.md") && manifestSource.includes("public-health:modernization-readiness") && manifestSource.includes("/api/public-health/surveillance-center"), detail: "public health data, surveillance and medical-prevention modernization readiness artifact is indexed" },
     { name: "manifest:diseasePaymentReadiness", ok: manifestSource.includes("disease-payment-readiness-report.md") && manifestSource.includes("disease-payment:readiness") && manifestSource.includes("/api/disease-payment"), detail: "disease payment DRG/DIP readiness artifact is indexed" },
     { name: "manifest:insurancePaymentAcceptance", ok: manifestSource.includes("insurance-payment-acceptance-report.md") && manifestSource.includes("insurance-payment:acceptance") && manifestSource.includes("insurance-payment-evidence-packet.md") && manifestSource.includes("insurance-payment:evidence"), detail: "T07 unified acceptance and digest-bound evidence are indexed" },
     { name: "manifest:productionReleaseEvidence", ok: manifestSource.includes("production-release-evidence-readiness.md") && manifestSource.includes("production-release:evidence:readiness") && manifestSource.includes("/api/production-release/evidence-readiness"), detail: "T11 production security release evidence is indexed" },

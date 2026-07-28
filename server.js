@@ -108,6 +108,20 @@ const {
   endpointProbeReceiptDigest,
   verifyPublicHealthExternalEndpointProbeCampaign
 } = require("./public-health-external-endpoint-probe-campaign-service");
+const {
+  buildPublicHealthDataFoundation,
+  ingestPublicHealthSurveillanceSignalToState
+} = require("./public-health-data-foundation-service");
+const {
+  applyPublicHealthSurveillanceAlertActionToState,
+  buildPublicHealthSurveillanceCenter,
+  evaluatePublicHealthSurveillanceSignalToState,
+  verifyPublicHealthSurveillanceSignalToState
+} = require("./public-health-surveillance-workflow-service");
+const {
+  applyPublicHealthMedicalPreventionTaskActionToState,
+  buildPublicHealthMedicalPreventionBoard
+} = require("./public-health-medical-prevention-collaboration-service");
 const CareServicePlatform = require("./care-service-platform-adapter");
 const CareServiceRuntime = require("./care-service-runtime");
 const { createCareServiceDeliveryAdapters } = require("./care-service-delivery-adapters");
@@ -892,6 +906,24 @@ const SQLITE_MIGRATIONS = [
     name: "add durable authentication sessions",
     apply(db) {
       createSqliteSessionSchema(db);
+    }
+  },
+  {
+    version: 12,
+    name: "add public health modernization unique signal keys",
+    apply(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS public_health_modernization_signal_keys (
+          signal_id TEXT PRIMARY KEY,
+          source_record_hash TEXT NOT NULL UNIQUE,
+          idempotency_key_hash TEXT NOT NULL UNIQUE,
+          updated_at TEXT NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_public_health_modernization_source_record_hash
+          ON public_health_modernization_signal_keys(source_record_hash);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_public_health_modernization_idempotency_key_hash
+          ON public_health_modernization_signal_keys(idempotency_key_hash);
+      `);
     }
   }
 ];
@@ -6768,18 +6800,157 @@ function assertPublicHealthEndpointProbeCampaignInsert(data = {}, constraint = {
   assertUniquePublicHealthEndpointProbeCampaigns([...persisted, campaign]);
 }
 
+const PUBLIC_HEALTH_MODERNIZATION_COLLECTIONS = Object.freeze([
+  "publicHealthDataSources",
+  "publicHealthSurveillanceSignals",
+  "publicHealthDataLineageAudit",
+  "publicHealthSurveillanceAudit",
+  "publicHealthSurveillanceRules",
+  "publicHealthSurveillanceAlerts",
+  "publicHealthRiskAssessments",
+  "publicHealthMedicalPreventionTasks",
+  "publicHealthMedicalPreventionAudit"
+]);
+
+function publicHealthModernizationConflict(message) {
+  const error = new Error(message);
+  error.code = "PUBLIC_HEALTH_MODERNIZATION_CAS_CONFLICT";
+  return error;
+}
+
+function assertUniquePublicHealthModernizationState(data = {}) {
+  const uniqueValues = (items, field, label) => {
+    const seen = new Set();
+    (Array.isArray(items) ? items : []).forEach((item) => {
+      const value = String(item?.[field] || "").trim();
+      if (!value) throw new Error(`${label} is required`);
+      if (seen.has(value)) throw publicHealthModernizationConflict(`${label} unique conflict`);
+      seen.add(value);
+    });
+  };
+  const signals = Array.isArray(data.publicHealthSurveillanceSignals)
+    ? data.publicHealthSurveillanceSignals
+    : [];
+  const alerts = Array.isArray(data.publicHealthSurveillanceAlerts)
+    ? data.publicHealthSurveillanceAlerts
+    : [];
+  const tasks = Array.isArray(data.publicHealthMedicalPreventionTasks)
+    ? data.publicHealthMedicalPreventionTasks
+    : [];
+  uniqueValues(data.publicHealthDataSources, "id", "public health data source id");
+  uniqueValues(signals, "id", "public health surveillance signal id");
+  uniqueValues(signals, "externalSignalKeyHash", "public health source record hash");
+  uniqueValues(signals, "idempotencyKeyHash", "public health signal idempotency key hash");
+  uniqueValues(data.publicHealthDataLineageAudit, "id", "public health lineage audit id");
+  uniqueValues(data.publicHealthSurveillanceAudit, "id", "public health surveillance audit id");
+  uniqueValues(data.publicHealthSurveillanceRules, "id", "public health surveillance rule id");
+  uniqueValues(alerts, "id", "public health surveillance alert id");
+  uniqueValues(data.publicHealthRiskAssessments, "id", "public health risk assessment id");
+  uniqueValues(tasks, "id", "public health medical-prevention task id");
+  uniqueValues(data.publicHealthMedicalPreventionAudit, "id", "public health medical-prevention audit id");
+  signals.forEach((signal) => {
+    const hashes = [
+      signal.verification?.idempotencyKeyHash,
+      signal.lastRuleEvaluation?.idempotencyKeyHash
+    ].map((value) => String(value || "").trim()).filter(Boolean);
+    if (new Set(hashes).size !== hashes.length) {
+      throw publicHealthModernizationConflict("public health signal action idempotency key unique conflict");
+    }
+  });
+  alerts.forEach((alert) => {
+    const hashes = (Array.isArray(alert.timeline) ? alert.timeline : [])
+      .map((item) => String(item?.idempotencyKeyHash || "").trim())
+      .filter(Boolean);
+    if (new Set(hashes).size !== hashes.length) {
+      throw publicHealthModernizationConflict("public health alert idempotency key unique conflict");
+    }
+  });
+  tasks.forEach((task) => {
+    const hashes = (Array.isArray(task.timeline) ? task.timeline : [])
+      .map((item) => String(item?.idempotencyKeyHash || "").trim())
+      .filter(Boolean);
+    if (new Set(hashes).size !== hashes.length) {
+      throw publicHealthModernizationConflict("public health task idempotency key unique conflict");
+    }
+  });
+}
+
+function assertPublicHealthModernizationWrite(data = {}, constraint = {}, incoming = {}) {
+  const collection = String(constraint.collection || "").trim();
+  if (!PUBLIC_HEALTH_MODERNIZATION_COLLECTIONS.includes(collection)) {
+    throw new Error("public health modernization CAS collection is invalid");
+  }
+  const rows = Array.isArray(data[collection]) ? data[collection] : [];
+  const entityId = String(constraint.entityId || "").trim();
+  const expectedVersion = Number(constraint.expectedVersion);
+  if (!entityId || !Number.isInteger(expectedVersion) || expectedVersion < 0) {
+    throw new Error("public health modernization CAS entityId and expectedVersion are required");
+  }
+  const current = rows.find((item) => String(item?.id || "").trim() === entityId);
+  const currentVersion = current ? Number(current.version || 0) : 0;
+  if (currentVersion !== expectedVersion) {
+    throw publicHealthModernizationConflict(
+      `public health modernization version conflict: expected ${expectedVersion}, current ${currentVersion}`
+    );
+  }
+  if (constraint.operation === "insert-signal") {
+    const sourceRecordHash = String(constraint.sourceRecordHash || "").trim();
+    const idempotencyKeyHash = String(constraint.idempotencyKeyHash || "").trim();
+    const signals = Array.isArray(data.publicHealthSurveillanceSignals)
+      ? data.publicHealthSurveillanceSignals
+      : [];
+    if (!/^[a-f0-9]{64}$/.test(sourceRecordHash) || !/^[a-f0-9]{64}$/.test(idempotencyKeyHash)) {
+      throw new Error("public health signal unique hashes are invalid");
+    }
+    if (signals.some((item) => String(item?.externalSignalKeyHash || "").trim() === sourceRecordHash)
+      || signals.some((item) => String(item?.idempotencyKeyHash || "").trim() === idempotencyKeyHash)) {
+      throw publicHealthModernizationConflict("public health signal source record or idempotency key conflict");
+    }
+  }
+  assertUniquePublicHealthModernizationState(incoming);
+}
+
+function syncPublicHealthModernizationUniqueKeys(db, data, at) {
+  const signals = Array.isArray(data.publicHealthSurveillanceSignals)
+    ? data.publicHealthSurveillanceSignals
+    : [];
+  const insert = db.prepare(`
+    INSERT INTO public_health_modernization_signal_keys (
+      signal_id, source_record_hash, idempotency_key_hash, updated_at
+    ) VALUES (?, ?, ?, ?)
+  `);
+  db.prepare("DELETE FROM public_health_modernization_signal_keys").run();
+  try {
+    signals.forEach((signal) => {
+      insert.run(
+        String(signal?.id || "").trim(),
+        String(signal?.externalSignalKeyHash || "").trim(),
+        String(signal?.idempotencyKeyHash || "").trim(),
+        at
+      );
+    });
+  } catch (error) {
+    if (/unique constraint/i.test(String(error?.message || ""))) {
+      throw publicHealthModernizationConflict("public health source record or idempotency key unique conflict");
+    }
+    throw error;
+  }
+}
+
 function writeDatabase(data, options = {}) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   const publicHealthExternalCas = options.publicHealthExternalCas || null;
   const publicHealthExternalContractInsert = options.publicHealthExternalContractInsert || null;
   const publicHealthEndpointProbeInsert = options.publicHealthEndpointProbeInsert || null;
   const publicHealthEndpointProbeCampaignInsert = options.publicHealthEndpointProbeCampaignInsert || null;
+  const publicHealthModernizationWrite = options.publicHealthModernizationWrite || null;
   const sqlite = shouldUseSqlite();
   const normalized = normalizeState(data);
   if ((publicHealthExternalCas
     || publicHealthExternalContractInsert
     || publicHealthEndpointProbeInsert
-    || publicHealthEndpointProbeCampaignInsert) && !sqlite) {
+    || publicHealthEndpointProbeCampaignInsert
+    || publicHealthModernizationWrite) && !sqlite) {
     const persisted = fs.existsSync(DB_FILE) ? JSON.parse(fs.readFileSync(DB_FILE, "utf8")) : {};
     if (publicHealthExternalCas) assertPublicHealthExternalCas(persisted, publicHealthExternalCas);
     if (publicHealthExternalContractInsert) {
@@ -6795,10 +6966,14 @@ function writeDatabase(data, options = {}) {
     if (publicHealthEndpointProbeCampaignInsert) {
       assertPublicHealthEndpointProbeCampaignInsert(persisted, publicHealthEndpointProbeCampaignInsert);
     }
+    if (publicHealthModernizationWrite) {
+      assertPublicHealthModernizationWrite(persisted, publicHealthModernizationWrite, normalized);
+    }
   }
   assertUniquePublicHealthContractAttestations(normalized.publicHealthExternalContractAttestations);
   assertUniquePublicHealthEndpointProbeReceipts(normalized.publicHealthExternalEndpointProbeReceipts);
   assertUniquePublicHealthEndpointProbeCampaigns(normalized.publicHealthExternalEndpointProbeCampaigns);
+  assertUniquePublicHealthModernizationState(normalized);
   normalized.storageMeta = data.storageMeta || storageMeta();
   if (sqlite) {
     writeSqliteState(
@@ -6808,7 +6983,8 @@ function writeDatabase(data, options = {}) {
       publicHealthExternalCas,
       publicHealthExternalContractInsert,
       publicHealthEndpointProbeInsert,
-      publicHealthEndpointProbeCampaignInsert
+      publicHealthEndpointProbeCampaignInsert,
+      publicHealthModernizationWrite
     );
   }
   const snapshot = {
@@ -6996,7 +7172,8 @@ function writeSqliteState(
   publicHealthExternalCas = null,
   publicHealthExternalContractInsert = null,
   publicHealthEndpointProbeInsert = null,
-  publicHealthEndpointProbeCampaignInsert = null
+  publicHealthEndpointProbeCampaignInsert = null,
+  publicHealthModernizationWrite = null
 ) {
   const db = openSqliteDatabase();
   const now = new Date().toISOString();
@@ -7033,7 +7210,17 @@ function writeSqliteState(
         publicHealthExternalEndpointProbeCampaigns: row ? JSON.parse(row.payload) : []
       }, publicHealthEndpointProbeCampaignInsert);
     }
+    if (publicHealthModernizationWrite) {
+      const getCollection = db.prepare("SELECT payload FROM state_collections WHERE key = ?");
+      const persisted = PUBLIC_HEALTH_MODERNIZATION_COLLECTIONS.reduce((state, collection) => {
+        const row = getCollection.get(collection);
+        state[collection] = row ? JSON.parse(row.payload) : [];
+        return state;
+      }, {});
+      assertPublicHealthModernizationWrite(persisted, publicHealthModernizationWrite, data);
+    }
     const normalized = normalizeState(data);
+    syncPublicHealthModernizationUniqueKeys(db, normalized, now);
     const entries = Object.entries(normalized).filter(([key]) => key !== "storageMeta");
     verifySqliteCollectionVersions(db, entries.map(([key]) => key), expectedVersions);
     const incomingKeys = new Set(entries.map(([key]) => key));
@@ -10338,6 +10525,33 @@ function normalizeState(data) {
       : [],
     publicHealthExternalEndpointProbeCampaignAudit: Array.isArray(data.publicHealthExternalEndpointProbeCampaignAudit)
       ? data.publicHealthExternalEndpointProbeCampaignAudit.slice(-1000)
+      : [],
+    publicHealthDataSources: Array.isArray(data.publicHealthDataSources)
+      ? data.publicHealthDataSources.slice(-100)
+      : [],
+    publicHealthSurveillanceSignals: Array.isArray(data.publicHealthSurveillanceSignals)
+      ? data.publicHealthSurveillanceSignals.slice(-5000)
+      : [],
+    publicHealthDataLineageAudit: Array.isArray(data.publicHealthDataLineageAudit)
+      ? data.publicHealthDataLineageAudit.slice(-10000)
+      : [],
+    publicHealthSurveillanceAudit: Array.isArray(data.publicHealthSurveillanceAudit)
+      ? data.publicHealthSurveillanceAudit.slice(-20000)
+      : [],
+    publicHealthSurveillanceRules: Array.isArray(data.publicHealthSurveillanceRules)
+      ? data.publicHealthSurveillanceRules.slice(-100)
+      : [],
+    publicHealthSurveillanceAlerts: Array.isArray(data.publicHealthSurveillanceAlerts)
+      ? data.publicHealthSurveillanceAlerts.slice(-5000)
+      : [],
+    publicHealthRiskAssessments: Array.isArray(data.publicHealthRiskAssessments)
+      ? data.publicHealthRiskAssessments.slice(-5000)
+      : [],
+    publicHealthMedicalPreventionTasks: Array.isArray(data.publicHealthMedicalPreventionTasks)
+      ? data.publicHealthMedicalPreventionTasks.slice(-10000)
+      : [],
+    publicHealthMedicalPreventionAudit: Array.isArray(data.publicHealthMedicalPreventionAudit)
+      ? data.publicHealthMedicalPreventionAudit.slice(-20000)
       : [],
     publicHealthSignals: mergeByKey(seedPublicHealthSignals(), data.publicHealthSignals, "id"),
     publicHealthAlerts: mergeByKey(seedPublicHealthAlerts(), data.publicHealthAlerts, "id"),
@@ -16430,6 +16644,9 @@ function scopeStateForUser(data, user) {
   delete scoped.publicHealthExternalEndpointProbeAudit;
   delete scoped.publicHealthExternalEndpointProbeCampaigns;
   delete scoped.publicHealthExternalEndpointProbeCampaignAudit;
+  PUBLIC_HEALTH_MODERNIZATION_COLLECTIONS.forEach((collection) => {
+    delete scoped[collection];
+  });
   delete scoped.recordCorrections;
   delete scoped.recordSharePackages;
   delete scoped.careTaskUpdates;
@@ -24520,6 +24737,110 @@ function publicHealthExternalPublicView(value) {
   }, {});
 }
 
+const PUBLIC_HEALTH_MODERNIZATION_SERVER_FIELDS = new Set([
+  "at",
+  "receivedAt",
+  "idempotencyKey",
+  "actor",
+  "user",
+  "role",
+  "orgCode",
+  "institutionScope",
+  "nextData",
+  "productionReady"
+]);
+
+function publicHealthModernizationCommand(req, url, payload = {}, { insert = false } = {}) {
+  if ([...url.searchParams.keys()].length) {
+    const error = new Error("public health modernization query overrides are forbidden");
+    error.code = "PUBLIC_HEALTH_MODERNIZATION_SERVER_CONTEXT_FORBIDDEN";
+    throw error;
+  }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    const error = new Error("public health modernization request body must be an object");
+    error.code = "PUBLIC_HEALTH_MODERNIZATION_COMMAND_INVALID";
+    throw error;
+  }
+  const overridden = Object.keys(payload).find((key) => PUBLIC_HEALTH_MODERNIZATION_SERVER_FIELDS.has(key));
+  if (overridden) {
+    const error = new Error("public health modernization server context cannot be overridden");
+    error.code = "PUBLIC_HEALTH_MODERNIZATION_SERVER_CONTEXT_FORBIDDEN";
+    throw error;
+  }
+  const idempotencyKey = String(req.headers["idempotency-key"] || "").trim();
+  if (!idempotencyKey) {
+    const error = new Error("Idempotency-Key header is required");
+    error.code = "PUBLIC_HEALTH_MODERNIZATION_IDEMPOTENCY_REQUIRED";
+    throw error;
+  }
+  const expectedVersion = Number(payload.expectedVersion);
+  if (!Number.isInteger(expectedVersion) || expectedVersion < (insert ? 0 : 1)
+    || (insert && expectedVersion !== 0)) {
+    const error = new Error("expectedVersion is invalid");
+    error.code = "PUBLIC_HEALTH_MODERNIZATION_EXPECTED_VERSION_REQUIRED";
+    throw error;
+  }
+  return {
+    ...payload,
+    idempotencyKey,
+    expectedVersion,
+    ...(insert ? { receivedAt: new Date().toISOString() } : { at: new Date().toISOString() })
+  };
+}
+
+function publicHealthModernizationSafeCode(error) {
+  const explicit = String(error?.code || "").trim();
+  if (/^PUBLIC_HEALTH_MODERNIZATION_[A-Z0-9_]+$/.test(explicit)) return explicit;
+  const message = String(error?.message || "");
+  if (/unknown public health surveillance signal|unknown public health surveillance alert|unknown medical-prevention task/i.test(message)) {
+    return "PUBLIC_HEALTH_MODERNIZATION_RECORD_NOT_FOUND";
+  }
+  if (/role .*not allowed/i.test(message)) return "PUBLIC_HEALTH_MODERNIZATION_FORBIDDEN";
+  if (/version conflict|CAS conflict/i.test(message)) return "PUBLIC_HEALTH_MODERNIZATION_VERSION_CONFLICT";
+  if (/idempotency|conflict detected|unique conflict/i.test(message)) return "PUBLIC_HEALTH_MODERNIZATION_CONFLICT";
+  if (/integrity invalid|integrity is invalid|audit is missing/i.test(message)) {
+    return "PUBLIC_HEALTH_MODERNIZATION_INTEGRITY_INVALID";
+  }
+  if (/not allowed from|only a human-verified|cannot be closed/i.test(message)) {
+    return "PUBLIC_HEALTH_MODERNIZATION_STATE_CONFLICT";
+  }
+  return "PUBLIC_HEALTH_MODERNIZATION_COMMAND_INVALID";
+}
+
+function publicHealthModernizationHttpStatus(code) {
+  if (code === "PUBLIC_HEALTH_MODERNIZATION_RECORD_NOT_FOUND") return 404;
+  if (code === "PUBLIC_HEALTH_MODERNIZATION_FORBIDDEN") return 403;
+  if (/CONFLICT|INTEGRITY_INVALID/.test(code)) return 409;
+  return 400;
+}
+
+function publicHealthModernizationError(res, error) {
+  const code = publicHealthModernizationSafeCode(error);
+  sendJson(res, publicHealthModernizationHttpStatus(code), {
+    ok: false,
+    error: "Public health modernization command rejected",
+    code,
+    productionReady: false
+  });
+}
+
+function publicHealthSafeSignal(data, signalId) {
+  return buildPublicHealthDataFoundation({ data }).signals
+    .find((item) => item.id === signalId) || null;
+}
+
+function publicHealthSafeAlert(data, alertId) {
+  return buildPublicHealthSurveillanceCenter({ data }).alerts
+    .find((item) => item.id === alertId) || null;
+}
+
+function publicHealthSafeMedicalPreventionTask(data, taskId) {
+  return buildPublicHealthMedicalPreventionBoard({
+    data,
+    alerts: data.publicHealthSurveillanceAlerts
+  }).tasks.find((item) => item.id === taskId) || null;
+}
+
 let careServiceRepositoryInstance = null;
 
 function careServiceRepository() {
@@ -24915,6 +25236,172 @@ async function handleApi(req, res) {
       auditEvent: result.auditEvent,
       error: result.error
     });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/data-foundation") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    sendJson(res, 200, buildPublicHealthDataFoundation({ data: readDatabase() }));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/public-health/surveillance-signals") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    try {
+      const payload = publicHealthModernizationCommand(req, url, await collectJson(req), { insert: true });
+      const data = readDatabase();
+      const result = ingestPublicHealthSurveillanceSignalToState(data, payload, user);
+      if (!result.idempotent) {
+        writeDatabase(result.nextData, {
+          event: "public-health-surveillance-signal-ingested",
+          publicHealthModernizationWrite: {
+            collection: "publicHealthSurveillanceSignals",
+            entityId: result.signal.id,
+            expectedVersion: 0,
+            operation: "insert-signal",
+            sourceRecordHash: result.signal.externalSignalKeyHash,
+            idempotencyKeyHash: result.signal.idempotencyKeyHash
+          }
+        });
+      }
+      sendJson(res, result.idempotent ? 200 : 201, {
+        ok: true,
+        idempotent: Boolean(result.idempotent),
+        signal: publicHealthSafeSignal(result.nextData, result.signal.id),
+        summary: result.dataFoundation.summary,
+        productionReady: false
+      });
+    } catch (error) {
+      publicHealthModernizationError(res, error);
+    }
+    return;
+  }
+
+  const publicHealthSignalActionMatch = url.pathname.match(/^\/api\/public-health\/surveillance-signals\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthSignalActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/surveillance-signals/:id/actions");
+    if (!user) return;
+    try {
+      const signalId = decodeURIComponent(publicHealthSignalActionMatch[1]);
+      const payload = publicHealthModernizationCommand(req, url, await collectJson(req));
+      const data = readDatabase();
+      const action = String(payload.action || "").trim();
+      const result = action === "verify-signal"
+        ? verifyPublicHealthSurveillanceSignalToState(data, signalId, payload, user)
+        : action === "evaluate-signal"
+          ? evaluatePublicHealthSurveillanceSignalToState(data, signalId, payload, user)
+          : (() => {
+              const error = new Error("unsupported public health signal action");
+              error.code = "PUBLIC_HEALTH_MODERNIZATION_COMMAND_INVALID";
+              throw error;
+            })();
+      if (!result.idempotent) {
+        writeDatabase(result.nextData, {
+          event: `public-health-surveillance-${action}`,
+          publicHealthModernizationWrite: {
+            collection: "publicHealthSurveillanceSignals",
+            entityId: signalId,
+            expectedVersion: payload.expectedVersion
+          }
+        });
+      }
+      sendJson(res, 200, {
+        ok: true,
+        idempotent: Boolean(result.idempotent),
+        matched: action === "evaluate-signal" ? Boolean(result.matched) : undefined,
+        signal: publicHealthSafeSignal(result.nextData, signalId),
+        alert: result.alert ? publicHealthSafeAlert(result.nextData, result.alert.id) : undefined,
+        productionReady: false
+      });
+    } catch (error) {
+      publicHealthModernizationError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/surveillance-center") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    sendJson(res, 200, buildPublicHealthSurveillanceCenter({ data: readDatabase() }));
+    return;
+  }
+
+  const publicHealthAlertActionMatch = url.pathname.match(/^\/api\/public-health\/surveillance-alerts\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthAlertActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/surveillance-alerts/:id/actions");
+    if (!user) return;
+    try {
+      const alertId = decodeURIComponent(publicHealthAlertActionMatch[1]);
+      const payload = publicHealthModernizationCommand(req, url, await collectJson(req));
+      const data = readDatabase();
+      const result = applyPublicHealthSurveillanceAlertActionToState(data, alertId, payload, user);
+      if (!result.idempotent) {
+        writeDatabase(result.nextData, {
+          event: `public-health-surveillance-alert-${String(payload.action || "action")}`,
+          publicHealthModernizationWrite: {
+            collection: "publicHealthSurveillanceAlerts",
+            entityId: alertId,
+            expectedVersion: payload.expectedVersion
+          }
+        });
+      }
+      sendJson(res, 200, {
+        ok: true,
+        idempotent: Boolean(result.idempotent),
+        alert: publicHealthSafeAlert(result.nextData, alertId),
+        createdCollaborationTasks: (result.createdCollaborationTasks || [])
+          .map((task) => publicHealthSafeMedicalPreventionTask(result.nextData, task.id))
+          .filter(Boolean),
+        productionReady: false
+      });
+    } catch (error) {
+      publicHealthModernizationError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/medical-prevention-tasks") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    sendJson(res, 200, buildPublicHealthMedicalPreventionBoard({
+      data,
+      alerts: data.publicHealthSurveillanceAlerts
+    }));
+    return;
+  }
+
+  const publicHealthMedicalPreventionActionMatch = url.pathname.match(/^\/api\/public-health\/medical-prevention-tasks\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthMedicalPreventionActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/medical-prevention-tasks/:id/actions");
+    if (!user) return;
+    try {
+      const taskId = decodeURIComponent(publicHealthMedicalPreventionActionMatch[1]);
+      const payload = publicHealthModernizationCommand(req, url, await collectJson(req));
+      const data = readDatabase();
+      const result = applyPublicHealthMedicalPreventionTaskActionToState(data, taskId, payload, user);
+      if (!result.idempotent) {
+        writeDatabase(result.nextData, {
+          event: `public-health-medical-prevention-${String(payload.action || "action")}`,
+          publicHealthModernizationWrite: {
+            collection: "publicHealthMedicalPreventionTasks",
+            entityId: taskId,
+            expectedVersion: payload.expectedVersion
+          }
+        });
+      }
+      sendJson(res, 200, {
+        ok: true,
+        idempotent: Boolean(result.idempotent),
+        task: publicHealthSafeMedicalPreventionTask(result.nextData, taskId),
+        summary: result.collaboration.summary,
+        productionReady: false
+      });
+    } catch (error) {
+      publicHealthModernizationError(res, error);
+    }
     return;
   }
 

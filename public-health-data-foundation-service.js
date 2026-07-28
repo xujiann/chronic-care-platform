@@ -378,6 +378,7 @@ function buildPublicHealthDataFoundation({ data = {} } = {}) {
     sources,
     signals: signals.map((signal) => ({
       id: clean(signal.id),
+      version: Number(signal.version || 0),
       sourceId: clean(signal.sourceId),
       signalType: clean(signal.signalType),
       institutionId: clean(signal.institutionId),
