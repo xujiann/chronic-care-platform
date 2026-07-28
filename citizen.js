@@ -2987,10 +2987,14 @@ function renderCitizenRecordsNextStage(resident, diseases = [], records = [], ca
   </div>`).join("") + `<small>${escapeHtml(workspace.family.boundary)}</small><footer><button type="button" class="small-button" data-v3-action="manage-family-authorization">管理家庭授权</button></footer>`;
 
   const carePlanTarget = document.querySelector("#citizen-care-plan-v3");
-  if (carePlanTarget) carePlanTarget.innerHTML = workspace.carePlan.tasks.slice(0, 6).map((item) => `<div class="citizen-care-row ${["逾期", "紧急"].includes(item.priority) ? "warning" : ""}">
-    <div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.type)}</span><em>${escapeHtml(item.priority)}</em></div>
-    <p>${escapeHtml(item.action)}${item.dueAt ? ` · ${escapeHtml(item.dueAt)}` : ""}</p>
-  </div>`).join("") + `<small>${escapeHtml(workspace.carePlan.boundary)}</small><footer><button type="button" class="small-button" data-v3-action="manage-care-plan">安排复诊或随访</button></footer>` || citizenCareEmpty("当前没有需要处理的主动健康任务。");
+  if (carePlanTarget) carePlanTarget.innerHTML = workspace.carePlan.tasks.slice(0, 6).map((item) => {
+    const intent = api.buildCareTaskActionIntent(item);
+    return `<div class="citizen-care-row ${["逾期", "紧急"].includes(item.priority) ? "warning" : ""}">
+      <div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.type)}</span><em>${escapeHtml(item.priority)}</em></div>
+      <p>${escapeHtml(item.action)}${item.dueAt ? ` · ${escapeHtml(item.dueAt)}` : ""}</p>
+      <footer><button type="button" class="small-button" data-v3-care-task="${escapeHtml(intent.taskId)}" data-v3-care-task-type="${escapeHtml(intent.type)}">${escapeHtml(intent.buttonLabel)}</button></footer>
+    </div>`;
+  }).join("") + `<small>${escapeHtml(workspace.carePlan.boundary)}</small>` || citizenCareEmpty("当前没有需要处理的主动健康任务。");
 
   const explanationTarget = document.querySelector("#citizen-report-explain-v3");
   if (explanationTarget) explanationTarget.innerHTML = workspace.explanations.reports.slice(0, 4).map((item) => `<div class="citizen-care-row ${["critical", "abnormal"].includes(item.severity) ? "warning" : ""}">
@@ -3071,6 +3075,15 @@ function handleCitizenRecordsV3Action(action) {
   const intent = window.CitizenRecordsV3?.buildSafeActionIntent(action);
   if (!intent || intent.writes) throw new Error("该居民操作未通过安全校验");
   if (intent.authorizationDraft) openCitizenRecordsV3Authorization(intent);
+  else if (intent.targetSelector) focusCitizenRecordsV3Target(intent.targetSelector);
+  else if (intent.page) window.location.href = citizenPageHref(intent.page);
+  showToast(intent.announcement);
+}
+
+function handleCitizenRecordsV3CareTaskAction(taskId, taskType) {
+  const intent = window.CitizenRecordsV3?.buildCareTaskActionIntent({ id: taskId, type: taskType });
+  if (!intent || intent.writes) throw new Error("该健康任务未通过安全校验");
+  if (intent.authorizationId) openAuthorizationRenewal(intent.authorizationId);
   else if (intent.targetSelector) focusCitizenRecordsV3Target(intent.targetSelector);
   else if (intent.page) window.location.href = citizenPageHref(intent.page);
   showToast(intent.announcement);
@@ -3315,11 +3328,20 @@ function bindCitizenCareWorkspace() {
 
   section.addEventListener("click", async (event) => {
     const nextStageActionButton = event.target.closest("[data-v3-action]");
+    const carePlanTaskButton = event.target.closest("[data-v3-care-task]");
     const revokeButton = event.target.closest("[data-revoke-share-package]");
     const taskButton = event.target.closest("[data-care-task-complete]");
     const acknowledgeButton = event.target.closest("[data-acknowledge-access]");
     const fillDisputeButton = event.target.closest("[data-fill-access-dispute]");
     const renewAuthorizationButton = event.target.closest("[data-renew-authorization]");
+    if (carePlanTaskButton) {
+      try {
+        handleCitizenRecordsV3CareTaskAction(carePlanTaskButton.dataset.v3CareTask, carePlanTaskButton.dataset.v3CareTaskType);
+      } catch (error) {
+        showToast(error.message || "主动健康任务入口暂不可用");
+      }
+      return;
+    }
     if (nextStageActionButton) {
       try {
         handleCitizenRecordsV3Action(nextStageActionButton.dataset.v3Action);

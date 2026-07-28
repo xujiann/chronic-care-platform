@@ -54,7 +54,8 @@ function assessCitizenRecordsReadiness(options = {}) {
     { id: "chinese-only-interface", label: "居民端全中文展示与内部面板隐藏", passed: /translateVisibleText/.test(uiZh) && /MutationObserver/.test(uiZh) && /\[data-internal-launch-panel\]\[hidden\]/.test(css) && /English business copy/.test(e2e) },
     { id: "next-stage-eight-capabilities", label: "居民健康档案八项增强服务", passed: /buildNextStageWorkspace/.test(v3) && /生产接入状态只接受/.test(nextStageUnit) && /citizen-operations-v3/.test(html) },
     { id: "next-stage-action-intents", label: "八项增强服务安全操作闭环", passed: /buildSafeActionIntent/.test(v3) && /handleCitizenRecordsV3Action/.test(ui) && /紧急和家庭授权草稿保持最小范围/.test(nextStageUnit) && /准备紧急授权/.test(e2e) },
-    { id: "acceptance-documentation", label: "居民验收标准与外部依赖", passed: /第二十三增量/.test(documentation) && /## 外部依赖/.test(documentation) }
+    { id: "proactive-care-task-routing", label: "主动健康任务逐项安全分流", passed: /buildCareTaskActionIntent/.test(v3) && /handleCitizenRecordsV3CareTaskAction/.test(ui) && /主动健康任务标识与类型不匹配/.test(nextStageUnit) && /data-v3-care-task/.test(e2e) },
+    { id: "acceptance-documentation", label: "居民验收标准与外部依赖", passed: /第二十四增量/.test(documentation) && /## 外部依赖/.test(documentation) }
   ];
 
   const integrationChecks = [
@@ -71,7 +72,7 @@ function assessCitizenRecordsReadiness(options = {}) {
     {
       id: "t00-pwa-cache",
       label: "T00 Service Worker 缓存当前居民脚本版本",
-      passed: /citizen-records-v2\.js\?v=20260725care16/.test(serviceWorker) && /citizen-records-v3\.js\?v=20260727next3/.test(serviceWorker) && /citizen\.js\?v=20260727next2/.test(serviceWorker)
+      passed: /citizen-records-v2\.js\?v=20260725care16/.test(serviceWorker) && /citizen-records-v3\.js\?v=20260728next4/.test(serviceWorker) && /citizen\.js\?v=20260728next3/.test(serviceWorker)
     }
   ];
 

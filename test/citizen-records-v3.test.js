@@ -222,3 +222,23 @@ test("紧急和家庭授权草稿保持最小范围且不预先确认居民同�
   assert.deepEqual(family.authorizationDraft.scopes, ["health-record-summary"]);
   assert.equal(family.authorizationDraft.granteeType, "guardian");
 });
+
+test("主动健康任务按随访复诊取药和授权进入精确既有流程", () => {
+  const cases = [
+    [{ id: "followup:f1", type: "随访" }, { page: "registration", buttonLabel: "安排随访" }],
+    [{ id: "revisit:r1", type: "复诊" }, { page: "registration", buttonLabel: "预约复诊" }],
+    [{ id: "pickup:p1", type: "取药" }, { targetSelector: "#citizen-medication-review", buttonLabel: "核对用药" }],
+    [{ id: "authorization:a1", type: "授权" }, { authorizationId: "a1", buttonLabel: "重新授权" }]
+  ];
+  for (const [task, expected] of cases) {
+    const intent = api.buildCareTaskActionIntent(task);
+    assert.equal(intent.writes, false);
+    for (const [key, value] of Object.entries(expected)) assert.equal(intent[key], value);
+  }
+});
+
+test("主动健康任务标识与类型不匹配或未知时默认拒绝", () => {
+  assert.throws(() => api.buildCareTaskActionIntent({ id: "pickup:p1", type: "授权" }), /无效/);
+  assert.throws(() => api.buildCareTaskActionIntent({ id: "authorization:", type: "授权" }), /无效/);
+  assert.throws(() => api.buildCareTaskActionIntent({ id: "report:r1", type: "报告" }), /无效/);
+});
