@@ -56,7 +56,7 @@
         "4f9f22b92b47ad50d36dccf0ad01437451019179",
         "4527485a6f8990abd3cc29c1203dbcb5134c21b3"
       ],
-      "reviewedAt": "2026-07-28T04:00:00.000Z",
+      "reviewedAt": "2026-07-28T08:30:00.000Z",
       "reviewer": "T00",
       "checks": [
         "git diff --check",
@@ -93,7 +93,10 @@
         "T00 exactly received 4527485a and evaluates current campaign continuity newest-first without filtering rejected records",
         "latest signed failure and a failed or tampered campaign between successes break the current continuity chain; a historical rejection outside the required fresh window remains visible without blocking it",
         "commission-only continuity projections expose only summary.continuityBreaks plus continuityBreak campaignId and stable safe code, without raw verification reasons, endpoint or cryptographic material",
-        "T08 functional readiness now covers 49 checks; T00 adds 14 public integration and safety-boundary checks for an aggregate 63 of 63",
+        "T08 functional readiness remains 49 checks; T00 now adds 15 public integration and safety-boundary checks for an aggregate 64 of 64",
+        "commission public-health UI loads the endpoint and campaign summary routes and displays only eight-lane counts, independent readiness gates, safe continuity-break campaign ID/code, worker counts and normalized blockers",
+        "UI configuration, 403 and network failures remain fail closed without interrupting existing boards; URL, IP, certificate, key, signature and raw verification reason fields are never rendered",
+        "endpointConnectivityReady, continuousConnectivityReady and productionReady remain three separate server-owned states; the UI never derives or grants production authorization",
         "full public-health resilience regression passed 90 of 90; candidate service and final-readiness focus passed 14 of 14; public API and storage focus passed 5 of 5; static resources passed 72 of 72",
         "clean isolated release report passed 425 of 427 with 0 failures and 2 expected site warnings; deploy check passed 395 of 395",
         "the pre-existing uncommitted data/db.json was hash-preserved and excluded; its unrelated nursing and escort readiness drift was not added to this candidate"

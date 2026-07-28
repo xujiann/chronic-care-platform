@@ -401,6 +401,11 @@ test("public health external routes use server time full keyrings and secret-fre
   assert.equal(initialEndpointSummary.response.status, 200);
   assert.equal(initialEndpointSummary.body.endpointConnectivityReady, false);
   assert.equal(initialEndpointSummary.body.productionReady, false);
+  assert.equal(Number.isInteger(initialEndpointSummary.body.summary.lanes), true);
+  assert.equal(Number.isInteger(initialEndpointSummary.body.summary.endpointsConfigured), true);
+  assert.equal(Number.isInteger(initialEndpointSummary.body.summary.endpointProbesVerified), true);
+  assert.equal(Number.isInteger(initialEndpointSummary.body.worker.succeeded), true);
+  assert.equal(Number.isInteger(initialEndpointSummary.body.worker.rejected), true);
   const initialCampaignSummary = await request(
     baseUrl,
     "/api/public-health/external/endpoints/campaigns/summary",
@@ -410,7 +415,12 @@ test("public health external routes use server time full keyrings and secret-fre
   assert.equal(initialCampaignSummary.body.endpointConnectivityReady, false);
   assert.equal(initialCampaignSummary.body.continuousConnectivityReady, false);
   assert.equal(initialCampaignSummary.body.summary.continuityBreaks, 0);
+  assert.equal(Number.isInteger(initialCampaignSummary.body.summary.campaignsVerified), true);
+  assert.equal(Number.isInteger(initialCampaignSummary.body.summary.consecutiveCampaigns), true);
+  assert.equal(initialCampaignSummary.body.summary.requiredConsecutiveCampaigns, 3);
   assert.equal(initialCampaignSummary.body.continuityBreak, null);
+  assert.equal(Number.isInteger(initialCampaignSummary.body.worker.succeeded), true);
+  assert.equal(Number.isInteger(initialCampaignSummary.body.worker.rejected), true);
   assert.equal(initialCampaignSummary.body.productionReady, false);
 
   const injectedCampaign = await post(

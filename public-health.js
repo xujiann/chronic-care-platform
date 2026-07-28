@@ -51,10 +51,16 @@ const PUBLIC_HEALTH_SITE_EVIDENCE_LINKS = [
 ];
 
 document.addEventListener("DOMContentLoaded", async () => {
+  void loadPublicHealthConnectivitySummaries();
   const system = await loadPublicHealthSystem();
   renderPublicHealthSystem(system);
 });
 
+document.addEventListener("click", (event) => {
+  if (event.target.closest("#public-health-connectivity-refresh")) {
+    void loadPublicHealthConnectivitySummaries();
+  }
+});
 document.addEventListener("click", handlePublicHealthEventAction);
 document.addEventListener("click", handlePublicHealthCoordinationAction);
 document.addEventListener("click", handlePublicHealthExchangeRun);
@@ -86,6 +92,182 @@ async function loadPublicHealthSystem() {
   }
   const state = await loadPlatformState({});
   return buildStaticPublicHealthSystem(state);
+}
+
+const PUBLIC_HEALTH_CONNECTIVITY_ENDPOINTS = Object.freeze({
+  endpoint: "/api/public-health/external/endpoints/summary",
+  campaign: "/api/public-health/external/endpoints/campaigns/summary"
+});
+
+const PUBLIC_HEALTH_CONTINUITY_BREAK_LABELS = Object.freeze({
+  "campaign-verification-failed": "活动签名或完整性验证失败",
+  "campaign-window-overlap": "活动窗口重叠",
+  "campaign-gap-exceeded": "活动间隔超过门限",
+  ENDPOINT_PROBE_CAMPAIGN_VERIFICATION_FAILED: "活动签名或完整性验证失败",
+  ENDPOINT_PROBE_CAMPAIGN_WINDOW_OVERLAP: "活动窗口重叠",
+  ENDPOINT_PROBE_CAMPAIGN_GAP_EXCEEDED: "活动间隔超过门限"
+});
+
+async function loadPublicHealthConnectivitySummaries() {
+  renderPublicHealthConnectivityLoading();
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  const results = await Promise.allSettled([
+    request(PUBLIC_HEALTH_CONNECTIVITY_ENDPOINTS.endpoint).then(readPublicHealthConnectivityResponse),
+    request(PUBLIC_HEALTH_CONNECTIVITY_ENDPOINTS.campaign).then(readPublicHealthConnectivityResponse)
+  ]);
+  const endpointResult = results[0];
+  const campaignResult = results[1];
+  renderPublicHealthConnectivitySummaries({
+    endpoint: endpointResult.status === "fulfilled" ? endpointResult.value : null,
+    campaign: campaignResult.status === "fulfilled" ? campaignResult.value : null,
+    endpointError: endpointResult.status === "rejected" ? endpointResult.reason : null,
+    campaignError: campaignResult.status === "rejected" ? campaignResult.reason : null
+  });
+}
+
+async function readPublicHealthConnectivityResponse(response) {
+  if (!response?.ok) {
+    const error = new Error(`connectivity-summary-http-${Number(response?.status || 0)}`);
+    error.status = Number(response?.status || 0);
+    throw error;
+  }
+  return response.json();
+}
+
+function renderPublicHealthConnectivityLoading() {
+  const status = document.querySelector("#public-health-connectivity-status");
+  if (status) {
+    status.className = "connectivity-status warn";
+    status.textContent = "正在从服务端加载可信摘要；加载完成前按未就绪处理。";
+  }
+}
+
+function renderPublicHealthConnectivitySummaries({ endpoint, campaign, endpointError, campaignError }) {
+  const metrics = document.querySelector("#public-health-connectivity-metrics");
+  const status = document.querySelector("#public-health-connectivity-status");
+  if (!metrics || !status) return;
+
+  const endpointAvailable = Boolean(endpoint);
+  const campaignAvailable = Boolean(campaign);
+  const endpointSummary = endpoint?.summary || {};
+  const campaignSummary = campaign?.summary || {};
+  const endpointReady = endpointAvailable && endpoint.endpointConnectivityReady === true;
+  const continuousReady = campaignAvailable && campaign.continuousConnectivityReady === true;
+  const productionDenied = endpoint?.productionReady === false && campaign?.productionReady === false;
+  const lanes = boundedConnectivityCount(endpointSummary.lanes, 8);
+  const configured = boundedConnectivityCount(endpointSummary.endpointsConfigured, 8);
+  const verified = boundedConnectivityCount(endpointSummary.endpointProbesVerified, 8);
+  const campaignsVerified = boundedConnectivityCount(campaignSummary.campaignsVerified);
+  const consecutive = boundedConnectivityCount(campaignSummary.consecutiveCampaigns);
+  const required = Math.max(1, boundedConnectivityCount(campaignSummary.requiredConsecutiveCampaigns) || 3);
+
+  metrics.innerHTML = [
+    connectivityMetric("通道配置", endpointAvailable ? `${configured}/${lanes || 8}` : "未确认", endpointReady ? "ok" : "warn", "服务端配置的八领域通道"),
+    connectivityMetric("可信端点", endpointAvailable ? `${verified}/${lanes || 8}` : "未确认", endpointReady ? "ok" : "warn", "已通过当前策略复核的通道"),
+    connectivityMetric("端点门禁", endpointReady ? "已就绪" : "未就绪", endpointReady ? "ok" : "danger", "endpointConnectivityReady"),
+    connectivityMetric("活动验签", campaignAvailable ? String(campaignsVerified) : "未确认", continuousReady ? "ok" : "warn", "服务端验签通过的探测活动"),
+    connectivityMetric("连续活动", campaignAvailable ? `${consecutive}/${required}` : "未确认", continuousReady ? "ok" : "warn", "新鲜、不重叠且满足间隔要求"),
+    connectivityMetric("连续门禁", continuousReady ? "已就绪" : "未就绪", continuousReady ? "ok" : "danger", "continuousConnectivityReady"),
+    connectivityMetric("生产上线", productionDenied ? "未授权" : "状态不可确认", "danger", "productionReady 仅由服务端和现场门禁决定")
+  ].join("");
+
+  const errors = [endpointError, campaignError].filter(Boolean);
+  if (errors.length) {
+    status.className = "connectivity-status danger";
+    status.textContent = connectivityFailureMessage(errors);
+  } else if (!endpointAvailable || !campaignAvailable) {
+    status.className = "connectivity-status danger";
+    status.textContent = "可信摘要不完整，当前按端点、连续性和生产上线均未就绪处理；现有页面其余功能不受影响。";
+  } else {
+    status.className = `connectivity-status ${endpointReady && continuousReady ? "ok" : "warn"}`;
+    status.textContent = endpointReady && continuousReady
+      ? "端点与连续性摘要均已通过；生产上线仍须独立完成现场证据和审批。"
+      : "服务端摘要已加载；未通过的连通性门禁继续失败关闭，生产上线保持未授权。";
+  }
+
+  renderPublicHealthContinuityBreak(campaignAvailable ? campaign.continuityBreak : null);
+  renderPublicHealthConnectivityWorker(endpoint?.worker, campaign?.worker);
+  renderPublicHealthConnectivityBlockers({
+    endpointAvailable,
+    campaignAvailable,
+    endpointReady,
+    continuousReady,
+    endpointBlockers: endpoint?.blockers,
+    campaignBlockers: campaign?.blockers
+  });
+}
+
+function connectivityMetric(label, value, state, detail) {
+  return `<article class="connectivity-metric ${state}">
+    <span>${escapeHtml(label)}</span>
+    <strong>${escapeHtml(value)}</strong>
+    <small>${escapeHtml(detail)}</small>
+  </article>`;
+}
+
+function boundedConnectivityCount(value, maximum = Number.MAX_SAFE_INTEGER) {
+  const count = Number(value);
+  if (!Number.isFinite(count) || count < 0) return 0;
+  return Math.min(Math.floor(count), maximum);
+}
+
+function connectivityFailureMessage(errors) {
+  const statuses = errors.map((error) => Number(error?.status || 0));
+  if (statuses.includes(403)) return "当前账号无权查看 commission 摘要；面板按未就绪处理，且不会阻断现有页面。";
+  if (statuses.some((status) => status === 503 || status === 500)) {
+    return "服务端可信配置或摘要暂不可用；面板按未就绪处理，且不会采用客户端替代值。";
+  }
+  return "无法连接外部端点摘要服务；面板按未就绪处理，现有页面其余功能不受影响。";
+}
+
+function renderPublicHealthContinuityBreak(continuityBreak) {
+  const target = document.querySelector("#public-health-connectivity-break");
+  if (!target) return;
+  if (!continuityBreak) {
+    target.innerHTML = "<p>当前摘要未报告连续性断点。</p>";
+    return;
+  }
+  const campaignId = safeConnectivityCampaignId(continuityBreak.campaignId);
+  const code = String(continuityBreak.code || "");
+  const label = PUBLIC_HEALTH_CONTINUITY_BREAK_LABELS[code] || "连续性验证失败";
+  const safeCode = PUBLIC_HEALTH_CONTINUITY_BREAK_LABELS[code] ? code : "continuity-verification-failed";
+  target.innerHTML = `<p><strong>${escapeHtml(campaignId)}</strong></p><p>${escapeHtml(label)} <code>${escapeHtml(safeCode)}</code></p>`;
+}
+
+function safeConnectivityCampaignId(value) {
+  const campaignId = String(value || "").trim();
+  return /^[A-Za-z0-9][A-Za-z0-9._:-]{0,95}$/.test(campaignId) ? campaignId : "未提供安全活动标识";
+}
+
+function renderPublicHealthConnectivityWorker(endpointWorker, campaignWorker) {
+  const target = document.querySelector("#public-health-connectivity-worker");
+  if (!target) return;
+  const endpointSucceeded = boundedConnectivityCount(endpointWorker?.succeeded);
+  const endpointRejected = boundedConnectivityCount(endpointWorker?.rejected);
+  const campaignSucceeded = boundedConnectivityCount(campaignWorker?.succeeded);
+  const campaignRejected = boundedConnectivityCount(campaignWorker?.rejected);
+  target.innerHTML = `<p>单通道探测：成功 <strong>${endpointSucceeded}</strong>，拒绝 <strong>${endpointRejected}</strong></p>
+    <p>八通道活动：成功 <strong>${campaignSucceeded}</strong>，拒绝 <strong>${campaignRejected}</strong></p>`;
+}
+
+function renderPublicHealthConnectivityBlockers({
+  endpointAvailable,
+  campaignAvailable,
+  endpointReady,
+  continuousReady,
+  endpointBlockers,
+  campaignBlockers
+}) {
+  const target = document.querySelector("#public-health-connectivity-blockers");
+  if (!target) return;
+  const blockerCount = (Array.isArray(endpointBlockers) ? endpointBlockers.length : 0)
+    + (Array.isArray(campaignBlockers) ? campaignBlockers.length : 0);
+  const blockers = [];
+  if (!endpointAvailable || !endpointReady) blockers.push("八通道端点配置或可信探测回执尚未全部通过。");
+  if (!campaignAvailable || !continuousReady) blockers.push("连续探测活动尚未满足新鲜度、完整性和连续窗口要求。");
+  blockers.push("现场证据、P0/P1 闭环、生产移交、值班与灾备证据及上线审批仍需独立完成。");
+  if (blockerCount) blockers.push(`服务端另报告 ${blockerCount} 项受控阻断；详细诊断仅在受限运维边界处理。`);
+  target.innerHTML = blockers.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
 }
 
 function buildStaticPublicHealthSystem(state) {

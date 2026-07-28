@@ -139,6 +139,9 @@ function buildDeployCheckReport(options = {}) {
   const envTemplateSource = fs.readFileSync(path.join(ROOT, ".env.example"), "utf8");
   const deploymentSource = fs.readFileSync(path.join(ROOT, "DEPLOYMENT.md"), "utf8");
   const publicHealthSource = fs.readFileSync(path.join(ROOT, "scripts", "public-health-readiness.js"), "utf8");
+  const publicHealthUiSource = fs.readFileSync(path.join(ROOT, "public-health.js"), "utf8");
+  const publicHealthHtml = fs.readFileSync(path.join(ROOT, "public-health.html"), "utf8");
+  const portalCss = fs.readFileSync(path.join(ROOT, "portal.css"), "utf8");
   const publicHealthEndpointVerificationSource = fs.readFileSync(path.join(ROOT, "public-health-external-endpoint-verification-service.js"), "utf8");
   const publicHealthEndpointVerificationDoc = fs.readFileSync(path.join(ROOT, "docs", "public-health-external-endpoint-verification.md"), "utf8");
   const publicHealthEndpointProbeRunnerSource = fs.readFileSync(path.join(ROOT, "public-health-external-endpoint-probe-runner.js"), "utf8");
@@ -636,6 +639,29 @@ function buildDeployCheckReport(options = {}) {
         && pkg.scripts?.["public-health:resilience-check"]?.includes("public-health-external-endpoint-probe-campaign-service.js")
         && pkg.scripts?.["public-health:resilience-test"]?.includes("test/public-health-external-endpoint-probe-campaign-service.test.js"),
       detail: "commission-only eight-lane endpoint campaigns use independent managed signing, atomic replay-safe persistence and redacted fail-closed continuity gaps while connectivity and production readiness remain separate"
+    },
+    {
+      name: "static:publicHealthExternalConnectivityPanel",
+      ok: [
+        "public-health-connectivity-status",
+        "public-health-connectivity-metrics",
+        "public-health-connectivity-break",
+        "public-health-connectivity-worker",
+        "public-health-connectivity-blockers",
+        "aria-live=\"polite\""
+      ].every((marker) => publicHealthHtml.includes(marker))
+        && [
+          "/api/public-health/external/endpoints/summary",
+          "/api/public-health/external/endpoints/campaigns/summary",
+          "endpointConnectivityReady",
+          "continuousConnectivityReady",
+          "safeConnectivityCampaignId",
+          "connectivityFailureMessage",
+          "productionReady 仅由服务端和现场门禁决定"
+        ].every((marker) => publicHealthUiSource.includes(marker))
+        && ["connectivity-metric-grid", "connectivity-detail-grid", "@media (max-width: 720px)"].every((marker) => portalCss.includes(marker))
+        && pkg.scripts?.posttest?.includes("test/public-health-connectivity-ui.test.js"),
+      detail: "commission public-health panel loads redacted endpoint and campaign summaries, fails closed without blocking the page, and keeps endpoint, continuity and production gates separate"
     },
     { name: "api:publicHealthHighlights", ok: ["/api/public-health/highlights", "/api/public-health/highlights/signals", "/api/public-health/highlights/alerts/:id/actions", "/api/public-health/highlights/command-tasks/:id/actions", "/api/public-health/highlights/ai-reviews/:id/actions", "/api/public-health/highlights/evidence/:id/actions"].every((marker) => serverSource.includes(marker)) && fs.readFileSync(path.join(ROOT, "public-health.html"), "utf8").includes("public-health-highlight-center") && fs.readFileSync(path.join(ROOT, "public-health.js"), "utf8").includes("renderPublicHealthHighlights"), detail: "public health five-suite trigger, map, AI, command and evidence center is wired" },
     { name: "api:publicHealthHighlightsStandalone", ok: fs.existsSync(path.join(ROOT, "public-health-highlights.html")) && fs.existsSync(path.join(ROOT, "public-health-highlights.js")) && fs.existsSync(path.join(ROOT, "scripts", "public-health-highlights-readiness.js")) && serverSource.includes("buildPublicHealthHighlights") && fs.readFileSync(path.join(ROOT, "scripts", "public-health-highlights-readiness.js"), "utf8").includes("functionalState"), detail: "standalone public health five-suite command center and readiness report are present" },

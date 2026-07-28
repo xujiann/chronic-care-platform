@@ -573,6 +573,131 @@ h1 { margin-top: 4px; font-size: 28px; }
   font-weight: 800;
 }
 
+.public-health-connectivity-panel .panel-title {
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.public-health-connectivity-panel h3 {
+  margin: 0 0 0.65rem;
+  font-size: 0.96rem;
+}
+
+.connectivity-status {
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.75rem;
+  background: #eef5ff;
+  color: #184a91;
+}
+
+.connectivity-status.ok {
+  background: #e8f7ef;
+  color: #17633a;
+}
+
+.connectivity-status.warn {
+  background: #fff3d8;
+  color: var(--amber);
+}
+
+.connectivity-status.danger {
+  background: #fde9e7;
+  color: var(--red);
+}
+
+.connectivity-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.8rem;
+}
+
+.connectivity-metric {
+  min-width: 0;
+  padding: 0.9rem;
+  border: 1px solid var(--line);
+  border-left: 4px solid #6e8bb7;
+  border-radius: 0.8rem;
+  background: var(--paper);
+}
+
+.connectivity-metric.ok {
+  border-left-color: #2b8a57;
+}
+
+.connectivity-metric.warn {
+  border-left-color: var(--amber);
+}
+
+.connectivity-metric.danger {
+  border-left-color: var(--red);
+}
+
+.connectivity-metric span,
+.connectivity-metric small {
+  display: block;
+}
+
+.connectivity-metric strong {
+  display: block;
+  margin: 0.35rem 0;
+  font-size: 1.25rem;
+}
+
+.connectivity-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.connectivity-detail-grid > section,
+.public-health-connectivity-panel > section {
+  min-width: 0;
+}
+
+.connectivity-detail {
+  min-height: 4.5rem;
+  padding: 0.8rem;
+  border-radius: 0.75rem;
+  background: var(--surface, #f7f9fc);
+}
+
+.connectivity-detail p {
+  margin: 0 0 0.4rem;
+  overflow-wrap: anywhere;
+}
+
+.connectivity-detail p:last-child {
+  margin-bottom: 0;
+}
+
+.connectivity-blockers {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.connectivity-blockers li + li {
+  margin-top: 0.35rem;
+}
+
+.connectivity-boundary-note {
+  margin: 1rem 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+@media (max-width: 720px) {
+  .public-health-connectivity-panel .panel-title {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .connectivity-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .list {
   display: grid;
   gap: 10px;

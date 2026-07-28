@@ -335,8 +335,18 @@ test("public health informatization system is reachable and source-standard alig
   assert.match(html, /public-health-site-evidence-bridge/);
   assert.match(html, /public-health-standard-implementation/);
   assert.match(html, /public-health-launch-gate/);
+  assert.match(html, /public-health-connectivity-status/);
+  assert.match(html, /public-health-connectivity-metrics/);
+  assert.match(html, /public-health-connectivity-break/);
+  assert.match(html, /public-health-connectivity-worker/);
+  assert.match(html, /public-health-connectivity-blockers/);
   assert.match(js, /FALLBACK_STANDARD_DOMAINS/);
   assert.match(js, /renderPublicHealthSystem/);
+  assert.match(js, /loadPublicHealthConnectivitySummaries/);
+  assert.match(js, /\/api\/public-health\/external\/endpoints\/summary/);
+  assert.match(js, /\/api\/public-health\/external\/endpoints\/campaigns\/summary/);
+  assert.match(js, /safeConnectivityCampaignId/);
+  assert.match(js, /productionReady 仅由服务端和现场门禁决定/);
   assert.match(js, /data-public-health-action/);
   assert.match(js, /data-public-health-latest-action/);
   assert.match(js, /data-public-health-exchange-run/);

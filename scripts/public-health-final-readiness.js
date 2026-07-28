@@ -660,6 +660,8 @@ function buildPublicHealthFinalReadiness(options = {}) {
   const activeProbeSource = options.activeProbeSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-endpoint-probe-runner.js"), "utf8");
   const endpointCampaignSource = options.endpointCampaignSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-endpoint-probe-campaign-service.js"), "utf8");
   const pageSource = options.pageSource ?? fs.readFileSync(path.join(ROOT, "public-health.js"), "utf8");
+  const pageHtml = options.pageHtml ?? fs.readFileSync(path.join(ROOT, "public-health.html"), "utf8");
+  const portalCss = options.portalCss ?? fs.readFileSync(path.join(ROOT, "portal.css"), "utf8");
   const doc = options.doc ?? fs.readFileSync(path.join(ROOT, "docs", "public-health-eight-domain-coordination.md"), "utf8");
   const keyringDoc = options.keyringDoc ?? fs.readFileSync(path.join(ROOT, "docs", "public-health-external-key-rotation.md"), "utf8");
   const resilienceDoc = options.resilienceDoc ?? fs.readFileSync(path.join(ROOT, "docs", "public-health-external-resilience.md"), "utf8");
@@ -804,6 +806,26 @@ function buildPublicHealthFinalReadiness(options = {}) {
       "continuousConnectivityReady",
       "productionReady: false"
     ].every((token) => endpointCampaignSource.includes(token)), "commission-only eight-lane campaigns use an independent managed key, atomic replay-safe persistence, redacted continuity projection and a production-false boundary", "integration"),
+    check("integration:t00-endpoint-connectivity-ui", [
+      "public-health-connectivity-status",
+      "public-health-connectivity-metrics",
+      "public-health-connectivity-break",
+      "public-health-connectivity-worker",
+      "public-health-connectivity-blockers",
+      "aria-live=\"polite\""
+    ].every((token) => pageHtml.includes(token)) && [
+      "/api/public-health/external/endpoints/summary",
+      "/api/public-health/external/endpoints/campaigns/summary",
+      "endpointConnectivityReady",
+      "continuousConnectivityReady",
+      "productionReady 仅由服务端和现场门禁决定",
+      "safeConnectivityCampaignId",
+      "connectivityFailureMessage"
+    ].every((token) => pageSource.includes(token)) && [
+      "connectivity-metric-grid",
+      "connectivity-detail-grid",
+      "@media (max-width: 720px)"
+    ].every((token) => portalCss.includes(token)) && packageSource.includes("test/public-health-connectivity-ui.test.js"), "commission UI renders only fail-closed redacted endpoint and continuity summaries while keeping production authorization server-owned", "integration"),
     check("safety:functional-not-production", runtime.productionReady === false && registry.productionReady === false && deliveries.every((item) => item.productionReady === false), "functional acceptance cannot self-assert production readiness", "safety"),
     check("safety:endpoint-connectivity-not-production", endpointProbeAcceptance.endpointConnectivityReady === true && endpointProbeAcceptance.productionReady === false && endpointProbeAcceptance.entries.every((item) => item.blockerCode === "trusted-site-evidence-still-required"), "verified connectivity never replaces trusted site evidence or launch approval", "safety"),
     check("safety:continuous-connectivity-not-production", endpointProbeCampaignAcceptance.continuousConnectivityReady === true && endpointProbeCampaignAcceptance.productionReady === false && endpointProbeCampaignAcceptance.blockers.every((item) => /site evidence|handoff|P0\/P1|approval/i.test(item)), "three consecutive campaigns still retain site evidence, blocker, handoff and approval boundaries", "safety"),

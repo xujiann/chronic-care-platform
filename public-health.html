@@ -31,6 +31,39 @@
       <p id="public-health-api-error" class="login-error" role="alert"></p>
 
       <section class="portal-grid">
+        <article class="panel wide public-health-connectivity-panel" aria-labelledby="public-health-connectivity-title">
+          <div class="panel-title">
+            <div>
+              <h2 id="public-health-connectivity-title">外部端点与连续探测</h2>
+              <span>仅展示 commission 脱敏摘要；端点连通、连续性和生产上线是三个独立门禁</span>
+            </div>
+            <button type="button" class="inline-action" id="public-health-connectivity-refresh">刷新摘要</button>
+          </div>
+          <p id="public-health-connectivity-status" class="connectivity-status" role="status" aria-live="polite">
+            正在从服务端加载可信摘要；加载完成前按未就绪处理。
+          </p>
+          <div id="public-health-connectivity-metrics" class="connectivity-metric-grid" aria-label="外部端点与连续探测门禁"></div>
+          <div class="connectivity-detail-grid">
+            <section aria-labelledby="public-health-connectivity-break-title">
+              <h3 id="public-health-connectivity-break-title">连续性断点</h3>
+              <div id="public-health-connectivity-break" class="connectivity-detail"></div>
+            </section>
+            <section aria-labelledby="public-health-connectivity-worker-title">
+              <h3 id="public-health-connectivity-worker-title">受控 worker</h3>
+              <div id="public-health-connectivity-worker" class="connectivity-detail"></div>
+            </section>
+          </div>
+          <section aria-labelledby="public-health-connectivity-blockers-title">
+            <h3 id="public-health-connectivity-blockers-title">上线阻断</h3>
+            <ul id="public-health-connectivity-blockers" class="connectivity-blockers"></ul>
+          </section>
+          <p class="connectivity-boundary-note">
+            本面板不会展示 URL、解析 IP、证书、密钥、签名或原始验签原因，也不会在客户端推导或授予 productionReady。
+          </p>
+        </article>
+      </section>
+
+      <section class="portal-grid">
         <article class="panel wide">
           <div class="panel-title">
             <h2>公共卫生亮点能力</h2>
