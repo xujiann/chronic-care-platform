@@ -8,12 +8,14 @@ const {
   buildSpecialtyPlanReview,
   renderSpecialtyPlanReviewMarkdown
 } = require("../t10-specialty-plan-review");
+const { buildExternalActionWorkflowPlan } = require("../t10-external-action-workflow");
 
 const ROOT = path.resolve(__dirname, "..");
 
 function writeSpecialtyPlanReview(review, options = {}) {
   const outputDir = path.resolve(options.outputDir || path.join(ROOT, "release", "t10-specialty-plan-review"));
   fs.mkdirSync(outputDir, { recursive: true });
+  const workflow = buildExternalActionWorkflowPlan(review);
   const documents = {
     "specialty-plan-review.json": `${JSON.stringify(review, null, 2)}\n`,
     "specialty-plan-review.md": `${renderSpecialtyPlanReviewMarkdown(review)}\n`,
@@ -21,6 +23,25 @@ function writeSpecialtyPlanReview(review, options = {}) {
       generatedAt: review.generatedAt,
       productionBoundary: review.productionBoundary,
       actions: review.externalActions
+    }, null, 2)}\n`,
+    "external-action-board.json": `${JSON.stringify(workflow.board, null, 2)}\n`,
+    "external-action-command-template.json": `${JSON.stringify({
+      actionId: "<external-action-id>",
+      action: "assign | submit-evidence | resubmit-evidence | start-review | accept | return | escalate | resolve-escalation | reopen",
+      actorId: "<real-account-id>",
+      assigneeId: "<required-for-assign-or-resolution>",
+      evidenceRef: "<required-for-submit>",
+      originalReference: "<required-for-submit>",
+      interfaceVersion: "<required-for-submit>",
+      evidenceDigest: "<sha256:digest>",
+      verificationRef: "<required-for-accept>",
+      confirmation: workflow.acceptanceConfirmation,
+      occurredAt: "<ISO-8601 timestamp>"
+    }, null, 2)}\n`,
+    "external-action-audit-export.json": `${JSON.stringify({
+      generatedAt: review.generatedAt,
+      boardDigest: workflow.board.integrity.digest,
+      audit: workflow.board.audit
     }, null, 2)}\n`
   };
   const payloadArtifacts = Object.entries(documents).map(([file, content]) => {

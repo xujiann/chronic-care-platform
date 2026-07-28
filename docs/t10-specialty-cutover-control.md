@@ -255,6 +255,20 @@ Real DICOMweb performance runs and production regulatory event feeds remain site
 node scripts\t10-specialty-plan-review.js
 ```
 
+### External action closure workflow
+
+The 12 remaining `site` and `t00` actions are executable workflow records, not production-readiness assertions. Each action starts at `open`, receives a priority deadline (P0 seven days, P1 21 days, P2 45 days), and moves through assignment, evidence submission and independent review. Returned evidence increments its revision; overdue or escalated P0 actions remain hard stops.
+
+Evidence submission requires the original receipt reference, interface or drill version and a SHA-256 digest. The acceptor must differ from the submitter, confirm the exact submitted digest, provide an independent verification reference and use the exact acceptance confirmation. Every state change is appended to a digest-chained audit.
+
+An accepted action is reopened when its endpoint, interface version or other verified boundary changes. Even when every action for a specialty is accepted, the workflow only opens formal Go/No-Go review: `productionReady` remains false until the authorized decision and site evidence process complete.
+
+The review and institution operations generators include:
+
+- `external-action-board.json`
+- `external-action-command-template.json`
+- `external-action-audit-export.json`
+
 ## Verification
 
 Run the focused test directly:

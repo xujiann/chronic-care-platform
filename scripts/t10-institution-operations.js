@@ -115,6 +115,26 @@ function buildOperationsArtifacts(options = {}) {
       "observation-template.json": `${JSON.stringify(observationTemplate, null, 2)}\n`,
       "upgrade-rollback-template.json": `${JSON.stringify(upgradeRollbackTemplate, null, 2)}\n`,
       "specialty-plan-review.json": `${JSON.stringify(cutoverPack.specialtyPlanReview, null, 2)}\n`,
+      "external-action-board.json": `${JSON.stringify(cutoverPack.externalActionWorkflowPlan.board, null, 2)}\n`,
+      "external-action-command-template.json": `${JSON.stringify({
+        actionId: "<external-action-id>",
+        action: "assign | submit-evidence | start-review | accept | return | escalate | resolve-escalation | reopen",
+        actorId: "<real-account-id>",
+        assigneeId: "<required-for-assign>",
+        evidenceRef: "<required-for-submit>",
+        originalReference: "<required-for-submit>",
+        interfaceVersion: "<required-for-submit>",
+        evidenceDigest: "<sha256:digest>",
+        verificationRef: "<required-for-accept>",
+        confirmation: "<exact-confirmation-for-accept>",
+        occurredAt: "<ISO-8601 timestamp>"
+      }, null, 2)}\n`,
+      "external-action-audit-export.json": `${JSON.stringify({
+        institutionId: institutionPackage.institutionId,
+        generatedAt: plan.generatedAt,
+        boardDigest: cutoverPack.externalActionWorkflowPlan.board.integrity.digest,
+        audit: cutoverPack.externalActionWorkflowPlan.board.audit
+      }, null, 2)}\n`,
       "t00-integration-contract.json": `${JSON.stringify(buildT00IntegrationContract(), null, 2)}\n`
     }
   };

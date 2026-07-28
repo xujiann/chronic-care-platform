@@ -45,6 +45,7 @@ function withCutoverDefaults(pack) {
     institutionPackagePlan: pack.institutionPackagePlan || fallback.institutionPackagePlan,
     institutionOperationsCapabilityPlan: pack.institutionOperationsCapabilityPlan || fallback.institutionOperationsCapabilityPlan,
     specialtyPlanReview: pack.specialtyPlanReview || fallback.specialtyPlanReview,
+    externalActionWorkflowPlan: pack.externalActionWorkflowPlan || fallback.externalActionWorkflowPlan,
     crossTrackControls: pack.crossTrackControls || fallback.crossTrackControls,
     rehearsalPlan: pack.rehearsalPlan || fallback.rehearsalPlan,
     goNoGoDecision: pack.goNoGoDecision || fallback.goNoGoDecision,
@@ -71,7 +72,7 @@ function renderCutoverPack(pack) {
     pack.institutionPackagePlan || {}
   );
   renderInstitutionOperations(pack.institutionOperationsCapabilityPlan || {});
-  renderSpecialtyPlanReview(pack.specialtyPlanReview || {});
+  renderSpecialtyPlanReview(pack.specialtyPlanReview || {}, pack.externalActionWorkflowPlan || {});
   renderControls(pack.crossTrackControls || []);
   renderRehearsalPlan(pack.rehearsalPlan || {});
   renderDecisionMatrix(pack.goNoGoDecision || {});
@@ -213,7 +214,7 @@ function renderInstitutionOperations(plan) {
   `;
 }
 
-function renderSpecialtyPlanReview(review) {
+function renderSpecialtyPlanReview(review, workflow) {
   const target = document.querySelector("#specialty-plan-review");
   if (!target) return;
   const summary = review.summary || {};
@@ -249,6 +250,26 @@ function renderSpecialtyPlanReview(review) {
           <td>${escapeHtml(item.action)}</td>
         </tr>`).join("") || `<tr><td colspan="5">没有开放的外部行动。</td></tr>`}</tbody>
       </table>
+    </div>
+    <div class="cutover-card">
+      <div class="badge-row">
+        <span class="badge ${workflow.status === "external-action-workflow-code-ready" ? "ok" : "warn"}">${escapeHtml(workflow.status || "external-action-workflow-missing")}</span>
+        <span class="badge">${workflow.summary?.actions || 0} 项受控行动</span>
+        <span class="badge warn">${workflow.summary?.p0 || 0} 项 P0</span>
+        <span class="badge">${workflow.summary?.t00 || 0} 项 T00</span>
+      </div>
+      <p class="muted">${escapeHtml(workflow.formalBoundary || "")}</p>
+      <p><strong>状态机：</strong>${(workflow.states || []).map(escapeHtml).join(" → ")}</p>
+    </div>
+    <div class="track-grid">
+      ${(workflow.trackGates || []).map((gate) => `
+        <article class="cutover-card">
+          <span class="badge warn">${escapeHtml(gate.status)}</span>
+          <h3>${escapeHtml(gate.trackId)}</h3>
+          <p>已接受 ${gate.summary?.accepted || 0}/${gate.summary?.total || 0}；开放 P0 ${gate.summary?.openP0 || 0}；逾期 ${gate.summary?.overdue || 0}。</p>
+          <p class="muted">下一决策：${escapeHtml(gate.nextDecision)}</p>
+        </article>
+      `).join("")}
     </div>
   `;
 }
@@ -857,7 +878,7 @@ function fallbackCutoverPack() {
         ],
         integrationRule: "T00 只暴露已验证只读产物，不得从代码就绪推断现场验收或生产上线。"
       },
-      generatedArtifacts: ["operations-plan.json", "operations-plan.md", "configuration-template.json", "evidence-import-template.json", "rehearsal-results-template.json", "observation-template.json", "upgrade-rollback-template.json", "specialty-plan-review.json", "t00-integration-contract.json", "artifact-index.json"],
+      generatedArtifacts: ["operations-plan.json", "operations-plan.md", "configuration-template.json", "evidence-import-template.json", "rehearsal-results-template.json", "observation-template.json", "upgrade-rollback-template.json", "specialty-plan-review.json", "external-action-board.json", "external-action-command-template.json", "external-action-audit-export.json", "t00-integration-contract.json", "artifact-index.json"],
       summary: { capabilities: 6, implemented: 6, blocked: 0 },
       formalGoLiveBoundary: "代码就绪不替代真实凭据、接口回执、现场演练、T+1观察或正式签字。"
     },
@@ -886,6 +907,20 @@ function fallbackCutoverPack() {
         planAction("P1", "健康体检", "site", "体检中心/基层公卫/慢病管理团队", "用真实回执完成异常闭环和质控指标验收")
       ],
       summary: { tracks: 4, plannedCapabilities: 32, implementedCapabilities: 32, missingCapabilities: 0, externalActions: 12, p0ExternalActions: 8, coveragePercent: 100 }
+    },
+    externalActionWorkflowPlan: {
+      status: "external-action-workflow-code-ready",
+      states: ["open", "assigned", "evidence-submitted", "under-review", "returned", "escalated", "accepted"],
+      acceptanceConfirmation: "ACCEPT T10 EXTERNAL ACTION EVIDENCE",
+      summary: { actions: 12, p0: 8, site: 9, t00: 3, accepted: 0 },
+      trackGates: [
+        externalActionFallbackGate("emergency-life-chain"),
+        externalActionFallbackGate("clinical-blood"),
+        externalActionFallbackGate("regional-imaging-cloud"),
+        externalActionFallbackGate("physical-examination")
+      ],
+      generatedArtifacts: ["external-action-board.json", "external-action-command-template.json", "external-action-audit-export.json"],
+      formalBoundary: "Accepted external actions only open formal Go/No-Go review; they never set productionReady by themselves."
     },
     crossTrackControls: [
       control("identity-and-role-scope", "统一身份与最小权限", "平台账号管理员/机构管理员", "每个专项均使用现场实名账号、机构编码和角色授权；演示账号不得进入生产灰度。"),
@@ -1298,6 +1333,19 @@ function packageArtifact(file, purpose) {
 
 function operationsCapability(id, acceptance) {
   return { id, status: "implemented", acceptance };
+}
+
+function externalActionFallbackGate(trackId) {
+  return {
+    trackId,
+    status: "external-actions-open",
+    ok: false,
+    productionReady: false,
+    formalDecisionRequired: true,
+    summary: { total: 3, accepted: 0, open: 3, openP0: 2, overdue: 0, escalated: 0 },
+    hardStops: [],
+    nextDecision: "keep-production-blocked"
+  };
 }
 
 function planTrack(trackId, trackName, owner, capabilityNames, siteBlockers) {

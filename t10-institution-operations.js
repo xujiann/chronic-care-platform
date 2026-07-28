@@ -542,6 +542,9 @@ function buildInstitutionOperationsCapabilityPlan(options = {}) {
       "observation-template.json",
       "upgrade-rollback-template.json",
       "specialty-plan-review.json",
+      "external-action-board.json",
+      "external-action-command-template.json",
+      "external-action-audit-export.json",
       "t00-integration-contract.json",
       "artifact-index.json"
     ],

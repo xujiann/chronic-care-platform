@@ -78,7 +78,10 @@ test("plan review artifacts are digest indexed and tamper evident", (t) => {
   writeSpecialtyPlanReview(review, { outputDir });
   const verified = verifySpecialtyPlanReview(outputDir);
   assert.equal(verified.ok, true);
-  assert.equal(verified.summary.total, 3);
+  assert.equal(verified.summary.total, 6);
+  assert.ok(fs.existsSync(path.join(outputDir, "external-action-board.json")));
+  assert.ok(fs.existsSync(path.join(outputDir, "external-action-command-template.json")));
+  assert.ok(fs.existsSync(path.join(outputDir, "external-action-audit-export.json")));
   fs.appendFileSync(path.join(outputDir, "specialty-plan-review.md"), "\ntampered\n", "utf8");
   assert.equal(verifySpecialtyPlanReview(outputDir).ok, false);
 });

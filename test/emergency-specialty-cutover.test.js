@@ -105,6 +105,10 @@ test("buildSpecialtyCutoverPack aggregates site blockers and cross-track control
   assert.equal(pack.specialtyPlanReview.summary.implementedCapabilities, 16);
   assert.equal(pack.specialtyPlanReview.summary.missingCapabilities, 0);
   assert.equal(pack.specialtyPlanReview.summary.externalActions, 6);
+  assert.equal(pack.externalActionWorkflowPlan.status, "external-action-workflow-code-ready");
+  assert.equal(pack.externalActionWorkflowPlan.summary.actions, 6);
+  assert.equal(pack.externalActionWorkflowPlan.trackGates.length, 2);
+  assert.equal(pack.externalActionWorkflowPlan.trackGates.every((item) => item.productionReady === false), true);
   assert.equal(pack.summary.plannedCapabilities, 16);
   assert.equal(pack.crossTrackControls.length, 4);
   assert.ok(pack.crossTrackControls.some((item) => item.id === "four-eyes-site-evidence"));
@@ -507,7 +511,7 @@ test("static cutover preview page exposes T10 tracks and release-artifact fallba
   assert.match(html, /specialty-plan-review/);
   assert.match(html, /observation-signal-board/);
   assert.match(html, /runtime-smoke-plan/);
-  assert.match(html, /t10-specialty-cutover\.js\?v=specialty-plan-review/);
+  assert.match(html, /t10-specialty-cutover\.js\?v=external-action-workflow/);
   assert.match(html, /overflow-wrap:\s*anywhere/);
   assert.match(html, /scroll-margin-top:\s*200px/);
   assert.match(html, /emergency\.html/);
@@ -519,6 +523,8 @@ test("static cutover preview page exposes T10 tracks and release-artifact fallba
   assert.match(client, /withCutoverDefaults/);
   assert.match(client, /restoreLocationAnchor/);
   assert.match(client, /renderRehearsalPlan/);
+  assert.match(client, /renderSpecialtyPlanReview/);
+  assert.match(client, /external-action-workflow-code-ready/);
   assert.match(client, /renderDecisionMatrix/);
   assert.match(client, /renderEvidenceDossier/);
   assert.match(client, /renderPilotBatchPlan/);

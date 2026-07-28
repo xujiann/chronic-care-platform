@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { buildInstitutionOperationsCapabilityPlan } = require("./t10-institution-operations");
 const { buildSpecialtyPlanReview } = require("./t10-specialty-plan-review");
+const { buildExternalActionWorkflowPlan } = require("./t10-external-action-workflow");
 
 const DEFAULT_TRACKS = [
   {
@@ -526,6 +527,7 @@ function buildSpecialtyCutoverPack(options = {}) {
     tracks,
     generatedAt
   });
+  const externalActionWorkflowPlan = buildExternalActionWorkflowPlan(specialtyPlanReview);
   const summary = {
     tracks: tracks.length,
     codeReady: tracks.filter((item) => item.codeReady).length,
@@ -563,11 +565,12 @@ function buildSpecialtyCutoverPack(options = {}) {
     observationSignalBoard,
     institutionOperationsCapabilityPlan,
     specialtyPlanReview,
+    externalActionWorkflowPlan,
     runtimeSmokePlan
   };
   pack.integrity = {
     algorithm: "sha256",
-    digest: `sha256:${sha256({ summary, moduleCatalog, institutionDeploymentManifest, institutionDeploymentGate, specialtyCompatibilityMatrix, institutionPackagePlan, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision, evidenceDossier, pilotBatchPlan, siteEvidenceWorkflow, acceptanceScenarioSuite, scenarioEvidenceMatrix, cutoverCommandCenter, observationSignalBoard, institutionOperationsCapabilityPlan, specialtyPlanReview, runtimeSmokePlan })}`
+    digest: `sha256:${sha256({ summary, moduleCatalog, institutionDeploymentManifest, institutionDeploymentGate, specialtyCompatibilityMatrix, institutionPackagePlan, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision, evidenceDossier, pilotBatchPlan, siteEvidenceWorkflow, acceptanceScenarioSuite, scenarioEvidenceMatrix, cutoverCommandCenter, observationSignalBoard, institutionOperationsCapabilityPlan, specialtyPlanReview, externalActionWorkflowPlan, runtimeSmokePlan })}`
   };
   return pack;
 }
@@ -1328,7 +1331,8 @@ function buildRuntimeSmokePlan(tracks, firstIncrement, observationSignalBoard) {
         "formalGoLiveState remains blocked until site evidence is accepted",
         "institution package plan and all 15 non-empty specialty combinations are valid",
         "institution operations lifecycle implements configuration, signing, evidence, rehearsal, observation and rollback",
-        "specialty plan review has complete source and acceptance-test evidence for every selected capability"
+        "specialty plan review has complete source and acceptance-test evidence for every selected capability",
+        "external site and T00 actions use assignment, digest evidence, independent review, escalation and reopen controls"
       ],
       failureAction: "stop release packaging and keep batch-1 closed"
     },
@@ -1418,6 +1422,7 @@ function renderMarkdown(pack) {
   const operationsRows = (pack.institutionOperationsCapabilityPlan?.capabilities || []).map((item) => `| ${item.id} | ${item.status} | ${item.acceptance} |`);
   const planCoverageRows = (pack.specialtyPlanReview?.trackReviews || []).map((item) => `| ${item.trackName} | ${item.summary.implemented}/${item.summary.planned} | ${item.summary.missing} | ${item.summary.externalActions} | ${item.formalState} |`);
   const externalActionRows = (pack.specialtyPlanReview?.externalActions || []).map((item) => `| ${item.priority} | ${item.trackName} | ${item.dependencyType} | ${item.owner} | ${item.action} |`);
+  const workflowGateRows = (pack.externalActionWorkflowPlan?.trackGates || []).map((item) => `| ${item.trackId} | ${item.status} | ${item.summary.accepted}/${item.summary.total} | ${item.summary.openP0} | ${item.nextDecision} |`);
   return [
     "# T10 急救、用血、影像与体检专项上线割接包",
     "",
@@ -1486,6 +1491,16 @@ function renderMarkdown(pack) {
     "| Priority | Specialty | Dependency | Owner | Action |",
     "|---|---|---|---|---|",
     ...externalActionRows,
+    "",
+    "### External action execution workflow",
+    "",
+    `- Status: ${pack.externalActionWorkflowPlan?.status || "external-action-workflow-missing"}`,
+    `- States: ${(pack.externalActionWorkflowPlan?.states || []).join(" -> ")}`,
+    `- Formal boundary: ${pack.externalActionWorkflowPlan?.formalBoundary || "formal Go/No-Go remains required"}`,
+    "",
+    "| Track | Gate | Accepted | Open P0 | Next decision |",
+    "|---|---|---:|---:|---|",
+    ...workflowGateRows,
     "",
     "## 专项状态",
     "",

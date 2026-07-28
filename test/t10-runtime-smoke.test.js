@@ -22,7 +22,7 @@ function smokeFixture() {
     pack,
     writeCutoverArtifacts: false,
     exists: (relativePath) => ["release/t10-specialty-cutover-pack.json", "release/t10-specialty-cutover-pack.md"].includes(relativePath),
-    html: '<div id="runtime-smoke-plan"></div><script src="./t10-specialty-cutover.js?v=specialty-plan-review"></script>',
+    html: '<div id="runtime-smoke-plan"></div><script src="./t10-specialty-cutover.js?v=external-action-workflow"></script>',
     client: 'fetch("./release/t10-specialty-cutover-pack.json"); function renderRuntimeSmokePlan() {}',
     releaseReportSource: "function specialtyCutoverChecks() { return ['specialtyCutover:runtimeSmokePlan']; }"
   };
@@ -43,6 +43,7 @@ test("T10 runtime smoke report validates code-side launch gates without closing 
   assert.ok(report.checks.some((item) => item.id === "t10:institution-package-plan" && item.passed));
   assert.ok(report.checks.some((item) => item.id === "t10:institution-operations" && item.passed));
   assert.ok(report.checks.some((item) => item.id === "t10:specialty-plan-coverage" && item.passed));
+  assert.ok(report.checks.some((item) => item.id === "t10:external-action-workflow" && item.passed));
   assert.ok(report.checks.some((item) => item.id === "t10:route-contracts" && item.passed));
   assert.match(markdown, /T10 runtime smoke report/);
   assert.match(markdown, /smoke-server-api/);

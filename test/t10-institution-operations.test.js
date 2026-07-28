@@ -355,15 +355,18 @@ test("operations artifact pack contains executable templates and detects post-wr
   const output = writeOperationsArtifacts(artifacts, { outputDir });
   const verification = verifyOperationsArtifacts(output.outputDir);
 
-  assert.equal(Object.keys(artifacts.documents).length, 9);
+  assert.equal(Object.keys(artifacts.documents).length, 12);
   assert.equal(verification.ok, true);
-  assert.equal(verification.summary.passed, 9);
+  assert.equal(verification.summary.passed, 12);
   assert.ok(fs.existsSync(path.join(outputDir, "configuration-template.json")));
   assert.ok(fs.existsSync(path.join(outputDir, "evidence-import-template.json")));
   assert.ok(fs.existsSync(path.join(outputDir, "rehearsal-results-template.json")));
   assert.ok(fs.existsSync(path.join(outputDir, "observation-template.json")));
   assert.ok(fs.existsSync(path.join(outputDir, "upgrade-rollback-template.json")));
   assert.ok(fs.existsSync(path.join(outputDir, "specialty-plan-review.json")));
+  assert.ok(fs.existsSync(path.join(outputDir, "external-action-board.json")));
+  assert.ok(fs.existsSync(path.join(outputDir, "external-action-command-template.json")));
+  assert.ok(fs.existsSync(path.join(outputDir, "external-action-audit-export.json")));
   assert.ok(fs.existsSync(path.join(outputDir, "t00-integration-contract.json")));
 
   fs.appendFileSync(path.join(outputDir, "observation-template.json"), "\n", "utf8");
