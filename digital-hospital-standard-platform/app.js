@@ -1,5 +1,5 @@
 (function () {
-  const storageKey = "digitalHospitalMvpState:v0.16";
+  const storageKey = "digitalHospitalMvpState:v0.17";
 
   const domains = [
     { code: "A", name: "基础设施与平台支撑", weight: 100 },
@@ -325,8 +325,22 @@
       { id: "VAULT-H000002-HIS-UAT", connectorId: "CONN-H000002-HIS", environmentId: "ENV-UAT", provider: "国密凭据保险库", vaultRefFingerprint: "sha256:9a16…0c55", keyVersion: "kv-2026-05", rotationDueAt: "2026-08-05", lastRotatedAt: "2026-05-05 10:10", accessPolicy: "execution-runtime-only", status: "临期", owner: "医院信息中心" },
     ],
     integrationExecutionJobs: [
-      { id: "EXEC-20260728-001", connectorId: "CONN-H000001-EMR", environmentId: "ENV-PROD", jobType: "全量基线校验", idempotencyKeyHash: "sha256:05ba…cc12", idempotencyHits: 0, payloadDigest: "sha256:19b2…f810", status: "成功", attempts: 1, progress: 100, queuedAt: "2026-07-28 09:35", startedAt: "2026-07-28 09:36", completedAt: "2026-07-28 09:38", receiptId: "RCPT-20260728-001", errorCode: "" },
-      { id: "EXEC-20260728-002", connectorId: "CONN-H000001-LIS", environmentId: "ENV-PROD", jobType: "增量连通校验", idempotencyKeyHash: "sha256:d791…2fe0", idempotencyHits: 0, payloadDigest: "sha256:89ad…00c4", status: "等待回执", attempts: 1, progress: 75, queuedAt: "2026-07-28 09:40", startedAt: "2026-07-28 09:41", completedAt: "", receiptId: "", errorCode: "" },
+      { id: "EXEC-20260728-001", connectorId: "CONN-H000001-EMR", environmentId: "ENV-PROD", jobType: "全量基线校验", idempotencyKeyHash: "sha256:05ba…cc12", idempotencyHits: 0, payloadDigest: "sha256:19b2…f810", status: "成功", attempts: 1, maxAttempts: 3, retryBaseSeconds: 30, retryMaxSeconds: 900, nextAttemptAt: "", progress: 100, queuedAt: "2026-07-28 09:35", startedAt: "2026-07-28 09:36", completedAt: "2026-07-28 09:38", receiptId: "RCPT-20260728-001", errorCode: "", leaseOwner: "", leaseExpiresAt: "", lastHeartbeatAt: "", deadLetterId: "", generation: 1 },
+      { id: "EXEC-20260728-002", connectorId: "CONN-H000001-LIS", environmentId: "ENV-PROD", jobType: "增量连通校验", idempotencyKeyHash: "sha256:d791…2fe0", idempotencyHits: 0, payloadDigest: "sha256:89ad…00c4", status: "等待回执", attempts: 1, maxAttempts: 3, retryBaseSeconds: 30, retryMaxSeconds: 900, nextAttemptAt: "", progress: 85, queuedAt: "2026-07-28 09:40", startedAt: "2026-07-28 09:41", completedAt: "", receiptId: "", errorCode: "", leaseOwner: "", leaseExpiresAt: "", lastHeartbeatAt: "", deadLetterId: "", generation: 1 },
+      { id: "EXEC-20260728-003", connectorId: "CONN-H000002-HIS", environmentId: "ENV-UAT", jobType: "接入认证执行", idempotencyKeyHash: "sha256:b928…7f10", idempotencyHits: 0, payloadDigest: "sha256:f830…66d1", status: "等待重试", attempts: 1, maxAttempts: 3, retryBaseSeconds: 30, retryMaxSeconds: 900, nextAttemptAt: "2026-07-28 22:00", progress: 0, queuedAt: "2026-07-28 21:55", startedAt: "2026-07-28 21:56", completedAt: "", receiptId: "", errorCode: "GATEWAY_TIMEOUT", leaseOwner: "", leaseExpiresAt: "", lastHeartbeatAt: "", deadLetterId: "", generation: 1 },
+      { id: "EXEC-20260728-004", connectorId: "CONN-H000003-EMR", environmentId: "ENV-UAT", jobType: "字段映射抽样", idempotencyKeyHash: "sha256:8fd0…9c23", idempotencyHits: 0, payloadDigest: "sha256:1a20…ef41", status: "死信", attempts: 3, maxAttempts: 3, retryBaseSeconds: 30, retryMaxSeconds: 900, nextAttemptAt: "", progress: 0, queuedAt: "2026-07-28 21:10", startedAt: "2026-07-28 21:26", completedAt: "", receiptId: "", errorCode: "PRIVACY_POLICY_REJECTED", leaseOwner: "", leaseExpiresAt: "", lastHeartbeatAt: "", deadLetterId: "DLQ-20260728-001", generation: 1 },
+    ],
+    integrationExecutionWorkers: [
+      { id: "WORKER-CERT-01", node: "worker-cert-a", pool: "接入认证池", capabilities: ["接入认证执行", "全量基线校验", "增量连通校验"], status: "就绪", activeJobId: "", registeredAt: "2026-07-28 21:30", lastHeartbeatAt: "2026-07-28 21:58", completedJobs: 18, failedJobs: 1 },
+      { id: "WORKER-MAP-01", node: "worker-map-a", pool: "数据校验池", capabilities: ["字段映射抽样", "脱敏抽样"], status: "失联", activeJobId: "", registeredAt: "2026-07-28 20:30", lastHeartbeatAt: "2026-07-28 21:20", completedJobs: 11, failedJobs: 2 },
+    ],
+    integrationDeadLetters: [
+      { id: "DLQ-20260728-001", jobId: "EXEC-20260728-004", connectorId: "CONN-H000003-EMR", environmentId: "ENV-UAT", jobType: "字段映射抽样", payloadDigest: "sha256:1a20…ef41", errorCode: "PRIVACY_POLICY_REJECTED", attempts: 3, generation: 1, status: "待复核", createdAt: "2026-07-28 21:28", reviewedBy: "", reviewNote: "", redrivenAt: "" },
+    ],
+    integrationExecutionEvents: [
+      { id: "EVENT-20260728-006", jobId: "EXEC-20260728-004", workerId: "WORKER-MAP-01", type: "进入死信", status: "死信", detail: "PRIVACY_POLICY_REJECTED · 第3次失败", occurredAt: "2026-07-28 21:28" },
+      { id: "EVENT-20260728-005", jobId: "EXEC-20260728-003", workerId: "WORKER-CERT-01", type: "安排重试", status: "等待重试", detail: "GATEWAY_TIMEOUT · 30秒后重试", occurredAt: "2026-07-28 21:56" },
+      { id: "EVENT-20260728-004", jobId: "EXEC-20260728-002", workerId: "WORKER-CERT-01", type: "执行完成", status: "等待回执", detail: "已释放租约，等待签名回执", occurredAt: "2026-07-28 09:42" },
     ],
     integrationCallbackReceipts: [
       { id: "RCPT-20260728-001", jobId: "EXEC-20260728-001", connectorId: "CONN-H000001-EMR", source: "emr-gateway", eventType: "EXECUTION_COMPLETED", signatureStatus: "已验证", timestampStatus: "已验证", nonceStatus: "已验证", nonceHash: "sha256:8b19…05ce", payloadDigest: "sha256:19b2…f810", digestStatus: "已验证", status: "已验证", decision: "接收", receivedAt: "2026-07-28 09:38" },
@@ -609,6 +623,9 @@
     if (!Array.isArray(next.integrationEnvironments)) next.integrationEnvironments = JSON.parse(JSON.stringify(seedState.integrationEnvironments));
     if (!Array.isArray(next.credentialVaultEntries)) next.credentialVaultEntries = JSON.parse(JSON.stringify(seedState.credentialVaultEntries));
     if (!Array.isArray(next.integrationExecutionJobs)) next.integrationExecutionJobs = JSON.parse(JSON.stringify(seedState.integrationExecutionJobs));
+    if (!Array.isArray(next.integrationExecutionWorkers)) next.integrationExecutionWorkers = JSON.parse(JSON.stringify(seedState.integrationExecutionWorkers));
+    if (!Array.isArray(next.integrationDeadLetters)) next.integrationDeadLetters = JSON.parse(JSON.stringify(seedState.integrationDeadLetters));
+    if (!Array.isArray(next.integrationExecutionEvents)) next.integrationExecutionEvents = JSON.parse(JSON.stringify(seedState.integrationExecutionEvents));
     if (!Array.isArray(next.integrationCallbackReceipts)) next.integrationCallbackReceipts = JSON.parse(JSON.stringify(seedState.integrationCallbackReceipts));
     if (!Array.isArray(next.integrationReplayEvents)) next.integrationReplayEvents = JSON.parse(JSON.stringify(seedState.integrationReplayEvents));
     if (!Array.isArray(next.integrationQuarantines)) next.integrationQuarantines = JSON.parse(JSON.stringify(seedState.integrationQuarantines));
@@ -953,14 +970,19 @@
   }
 
   function executionSummary() {
-    const pendingJobs = state.integrationExecutionJobs.filter((item) => !["成功", "阻断"].includes(item.status));
+    const pendingJobs = state.integrationExecutionJobs.filter((item) => !["成功", "阻断", "死信"].includes(item.status));
     const activeQuarantines = state.integrationQuarantines.filter((item) => item.status === "隔离中");
     const blockedReceipts = state.integrationCallbackReceipts.filter((item) => item.status === "已阻断");
     return {
       healthyEnvironments: state.integrationEnvironments.filter((item) => item.status === "健康").length,
       activeVaultEntries: state.credentialVaultEntries.filter((item) => item.status === "有效").length,
+      readyWorkers: state.integrationExecutionWorkers.filter((item) => item.status === "就绪").length,
+      busyWorkers: state.integrationExecutionWorkers.filter((item) => item.status === "忙碌").length,
+      staleWorkers: state.integrationExecutionWorkers.filter((item) => item.status === "失联").length,
       pendingJobs: pendingJobs.length,
+      retryScheduledJobs: state.integrationExecutionJobs.filter((item) => item.status === "等待重试").length,
       successfulJobs: state.integrationExecutionJobs.filter((item) => item.status === "成功").length,
+      openDeadLetters: state.integrationDeadLetters.filter((item) => item.status === "待复核").length,
       verifiedReceipts: state.integrationCallbackReceipts.filter((item) => item.status === "已验证").length,
       blockedReceipts: blockedReceipts.length,
       activeQuarantines: activeQuarantines.length,
@@ -1111,7 +1133,7 @@
       standardVersion: state.task.standard,
       hospitalCode: hospital.code,
       hospitalName: hospital.name,
-      prototypeVersion: "mvp-0.16",
+      prototypeVersion: "mvp-0.17",
     };
     if (kind === "submission") {
       return {
@@ -1284,6 +1306,9 @@
         integrationEnvironments: state.integrationEnvironments,
         credentialVaultEntries: state.credentialVaultEntries,
         integrationExecutionJobs: state.integrationExecutionJobs,
+        integrationExecutionWorkers: state.integrationExecutionWorkers,
+        integrationDeadLetters: state.integrationDeadLetters,
+        integrationExecutionEvents: state.integrationExecutionEvents,
         integrationCallbackReceipts: state.integrationCallbackReceipts,
         integrationReplayEvents: state.integrationReplayEvents,
         integrationQuarantines: state.integrationQuarantines,
@@ -1378,6 +1403,9 @@
       integrationEnvironments: state.integrationEnvironments,
       credentialVaultEntries: state.credentialVaultEntries,
       integrationExecutionJobs: state.integrationExecutionJobs,
+      integrationExecutionWorkers: state.integrationExecutionWorkers,
+      integrationDeadLetters: state.integrationDeadLetters,
+      integrationExecutionEvents: state.integrationExecutionEvents,
       integrationCallbackReceipts: state.integrationCallbackReceipts,
       integrationReplayEvents: state.integrationReplayEvents,
       integrationQuarantines: state.integrationQuarantines,
@@ -2593,22 +2621,177 @@
     return {
       排队中: "开始执行",
       执行中: "等待回执",
+      等待重试: "到期重试",
       等待回执: "核验回执",
       成功: "已完成",
       阻断: "已阻断",
+      死信: "待复核",
     }[status] || "推进";
   }
 
   function renderExecution() {
     header("接入执行");
-    const tab = workspace.dataset.executionTab || "environment";
+    const tab = workspace.dataset.executionTab || "runtime";
     const summary = executionSummary();
     const tabs = [
+      { id: "runtime", label: "任务运行中心" },
       { id: "environment", label: "环境与凭据" },
       { id: "jobs", label: "任务与回执" },
       { id: "cutover", label: "隔离与切换" },
     ];
     let content = "";
+
+    if (tab === "runtime") {
+      content = `
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">Worker运行池</h3>
+              <p class="panel-subtitle">Worker按能力领取任务并持有短租约；心跳中断后任务自动回收，租约令牌只在领取时返回，平台状态仅保留摘要。</p>
+            </div>
+            <div class="toolbar inline">
+              <button class="button secondary" type="button" data-action="dispatch-execution-job">调度下一任务</button>
+              <button class="button ghost" type="button" data-action="recover-execution-leases">回收超时租约</button>
+            </div>
+          </div>
+          <div class="grid-4 compact-metrics">
+            ${metric("可用Worker", summary.readyWorkers, `${summary.busyWorkers}个忙碌`)}
+            ${metric("等待调度", state.integrationExecutionJobs.filter((item) => ["排队中", "等待重试"].includes(item.status)).length, `${summary.retryScheduledJobs}个等待重试`, summary.retryScheduledJobs ? "warn" : "")}
+            ${metric("运行任务", state.integrationExecutionJobs.filter((item) => item.status === "执行中").length, "60秒租约与心跳续期")}
+            ${metric("失联Worker", summary.staleWorkers, "自动回收关联租约", summary.staleWorkers ? "danger" : "")}
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Worker</th><th>运行池</th><th>能力</th><th>状态</th><th>当前任务</th><th>最近心跳</th><th>完成/失败</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.integrationExecutionWorkers
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.id}</strong><br /><span class="muted-text">${item.node}</span></td>
+                        <td>${item.pool}</td>
+                        <td>${item.capabilities.join("<br />")}</td>
+                        <td>${item.status ? `<span class="status-pill ${statusClass(item.status)}">${item.status}</span>` : "-"}</td>
+                        <td>${item.activeJobId || "-"}</td>
+                        <td>${item.lastHeartbeatAt}</td>
+                        <td>${item.completedJobs}/${item.failedJobs}</td>
+                        <td><button class="button ghost" type="button" data-action="restore-execution-worker" data-id="${item.id}" ${item.status !== "失联" ? "disabled" : ""}>重新注册</button></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">队列、重试与租约</h3>
+              <p class="panel-subtitle">瞬时故障按30秒、60秒、120秒指数退避；永久失败或重试耗尽后进入死信，避免任务无限循环。</p>
+            </div>
+            <span class="tag">${summary.pendingJobs}个任务待完成</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>任务</th><th>连接器/环境</th><th>类型</th><th>状态</th><th>尝试</th><th>下次执行/租约</th><th>Worker</th><th>失败代码</th><th>代次</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.integrationExecutionJobs
+                  .filter((item) => item.status !== "成功")
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.id}</strong><br /><span class="muted-text">${item.queuedAt}</span></td>
+                        <td>${item.connectorId}<br /><span class="muted-text">${item.environmentId}</span></td>
+                        <td>${item.jobType}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td>${item.attempts}/${item.maxAttempts || 3}</td>
+                        <td>${item.status === "执行中" ? item.leaseExpiresAt || "-" : item.nextAttemptAt || "-"}</td>
+                        <td>${item.leaseOwner || "-"}</td>
+                        <td>${item.errorCode || "-"}</td>
+                        <td>G${item.generation || 1}</td>
+                        <td>
+                          <div class="toolbar inline">
+                            ${item.status === "排队中" ? `<button class="button secondary" type="button" data-action="dispatch-execution-job" data-id="${item.id}">领取</button>` : ""}
+                            ${item.status === "等待重试" ? `<button class="button secondary" type="button" data-action="activate-execution-retry" data-id="${item.id}">到期重试</button>` : ""}
+                            ${item.status === "执行中" ? `<button class="button ghost" type="button" data-action="heartbeat-execution-job" data-id="${item.id}">心跳</button><button class="button secondary" type="button" data-action="fail-execution-job" data-id="${item.id}">模拟瞬时失败</button>` : ""}
+                            ${item.status === "等待回执" ? `<button class="button secondary" type="button" data-action="verify-callback-receipt" data-id="${item.id}">核验回执</button>` : ""}
+                            ${["死信", "阻断"].includes(item.status) ? `<span class="muted-text">等待人工处置</span>` : ""}
+                          </div>
+                        </td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">死信复核与人工重放</h3>
+              <p class="panel-subtitle">死信仅保留任务元数据和载荷摘要；重放必须记录审批角色、复核结论并开启新的执行代次。</p>
+            </div>
+            <span class="status-pill ${summary.openDeadLetters ? "danger" : ""}">${summary.openDeadLetters}项待复核</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>死信</th><th>任务/连接器</th><th>失败代码</th><th>尝试</th><th>载荷摘要</th><th>状态</th><th>复核记录</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.integrationDeadLetters
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.id}</strong><br /><span class="muted-text">${item.createdAt}</span></td>
+                        <td>${item.jobId}<br /><span class="muted-text">${item.connectorId}</span></td>
+                        <td>${item.errorCode}</td>
+                        <td>${item.attempts}次 · G${item.generation}</td>
+                        <td>${item.payloadDigest}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td>${item.reviewedBy || "-"}<br /><span class="muted-text">${item.reviewNote || item.redrivenAt || ""}</span></td>
+                        <td><button class="button secondary" type="button" data-action="redrive-execution-dead-letter" data-id="${item.id}" ${item.status !== "待复核" ? "disabled" : ""}>审批并重放</button></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">最近运行事件</h3>
+              <p class="panel-subtitle">任务领取、心跳、重试、死信和人工重放形成统一审计时间线。</p>
+            </div>
+            <span class="tag">${state.integrationExecutionEvents.length}条事件</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>时间</th><th>事件</th><th>任务</th><th>Worker</th><th>状态</th><th>说明</th></tr></thead>
+              <tbody>
+                ${state.integrationExecutionEvents
+                  .slice(0, 10)
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td>${item.occurredAt}</td>
+                        <td><strong>${item.type}</strong></td>
+                        <td>${item.jobId || "-"}</td>
+                        <td>${item.workerId || "-"}</td>
+                        <td>${item.status ? `<span class="status-pill ${statusClass(item.status)}">${item.status}</span>` : "-"}</td>
+                        <td>${item.detail}</td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
 
     if (tab === "environment") {
       content = `
@@ -2710,7 +2893,7 @@
                         <td>${item.progress}%</td>
                         <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
                         <td>${item.receiptId || "-"}</td>
-                        <td><button class="button ${item.status === "等待回执" ? "secondary" : "ghost"}" type="button" data-action="${item.status === "等待回执" ? "verify-callback-receipt" : "advance-execution-job"}" data-id="${item.id}" ${["成功", "阻断"].includes(item.status) ? "disabled" : ""}>${executionJobActionLabel(item.status)}</button></td>
+                        <td><button class="button ${["等待回执", "等待重试"].includes(item.status) ? "secondary" : "ghost"}" type="button" data-action="${item.status === "等待回执" ? "verify-callback-receipt" : item.status === "等待重试" ? "activate-execution-retry" : "advance-execution-job"}" data-id="${item.id}" ${["成功", "阻断", "死信"].includes(item.status) ? "disabled" : ""}>${executionJobActionLabel(item.status)}</button></td>
                       </tr>
                     `,
                   )
@@ -2860,9 +3043,9 @@
 
     workspace.innerHTML = `
       <div class="grid-4">
-        ${metric("健康执行环境", summary.healthyEnvironments, `${state.integrationEnvironments.length}个环境已登记`)}
-        ${metric("执行任务", summary.successfulJobs, `${summary.pendingJobs}个任务待完成`, summary.pendingJobs ? "warn" : "")}
-        ${metric("签名回执", summary.verifiedReceipts, `${summary.blockedReceipts}次回调被阻断`, summary.blockedReceipts ? "danger" : "")}
+        ${metric("运行Worker", `${summary.readyWorkers + summary.busyWorkers}/${state.integrationExecutionWorkers.length}`, `${summary.staleWorkers}个失联`, summary.staleWorkers ? "warn" : "")}
+        ${metric("执行任务", summary.successfulJobs, `${summary.pendingJobs}个待完成 · ${summary.retryScheduledJobs}个重试`, summary.pendingJobs ? "warn" : "")}
+        ${metric("死信队列", summary.openDeadLetters, `${summary.verifiedReceipts}份回执已验证`, summary.openDeadLetters ? "danger" : "")}
         ${metric("生产切换", summary.readyCutovers, `${summary.activeQuarantines}个连接器隔离中`, summary.activeQuarantines ? "danger" : "")}
       </div>
       <div class="segmented execution-tabs" role="tablist" aria-label="接入执行功能">
@@ -6331,6 +6514,248 @@
     render();
   }
 
+  function addExecutionEvent(type, job, workerId, detail) {
+    state.integrationExecutionEvents.unshift({
+      id: `EVENT-${Date.now()}-${state.integrationExecutionEvents.length + 1}`,
+      jobId: job?.id || "",
+      workerId: workerId || "",
+      type,
+      status: job?.status || "",
+      detail,
+      occurredAt: nowText(),
+    });
+  }
+
+  function requireExecutionRuntimeRole() {
+    const allowedRoles = ["国家级管理员", "省级管理员", "运维安全员"];
+    if (allowedRoles.includes(state.activeRole)) return true;
+    showNotice("当前角色无任务运行操作权限，请切换国家级、省级或运维安全角色。");
+    return false;
+  }
+
+  function releaseExecutionWorker(job, workerStatus = "就绪") {
+    const worker = state.integrationExecutionWorkers.find((item) => item.id === job.leaseOwner);
+    if (worker) {
+      worker.status = workerStatus;
+      worker.activeJobId = "";
+      if (workerStatus !== "失联") worker.lastHeartbeatAt = nowText();
+    }
+    job.leaseOwner = "";
+    job.leaseTokenHash = "";
+    job.leaseExpiresAt = "";
+    job.lastHeartbeatAt = "";
+  }
+
+  function restoreExecutionWorker(id) {
+    if (!requireExecutionRuntimeRole()) return;
+    const worker = state.integrationExecutionWorkers.find((item) => item.id === id);
+    if (!worker) return;
+    worker.status = "就绪";
+    worker.activeJobId = "";
+    worker.lastHeartbeatAt = nowText();
+    addExecutionEvent("Worker重新注册", null, worker.id, `${worker.node}已通过健康检查并重新加入${worker.pool}`);
+    addAudit("重新注册执行Worker", worker.id, `${worker.node} · ${worker.pool} · 就绪`);
+    saveState();
+    showNotice(`${worker.id}已重新注册并恢复任务领取。`);
+    render();
+  }
+
+  function dispatchExecutionJob(requestedJobId = "") {
+    if (!requireExecutionRuntimeRole()) return;
+    const now = Date.now();
+    const candidates = state.integrationExecutionJobs
+      .filter((item) => !requestedJobId || item.id === requestedJobId)
+      .filter((item) => item.status === "排队中" || (item.status === "等待重试" && (!item.nextAttemptAt || Date.parse(item.nextAttemptAt) <= now)));
+    const activeQuarantines = new Set(
+      state.integrationQuarantines.filter((item) => item.status === "隔离中").map((item) => item.connectorId),
+    );
+    const job = candidates.find((item) => {
+      const environment = state.integrationEnvironments.find((candidate) => candidate.id === item.environmentId);
+      return environment?.status === "健康" && !activeQuarantines.has(item.connectorId);
+    });
+    if (!job) {
+      showNotice("当前没有达到执行时间且通过环境、隔离门禁的任务。");
+      return;
+    }
+    const worker = state.integrationExecutionWorkers.find(
+      (item) => item.status === "就绪" && (!item.capabilities.length || item.capabilities.includes(job.jobType)),
+    );
+    if (!worker) {
+      showNotice(`没有可领取“${job.jobType}”任务的就绪Worker，请先恢复或扩充运行池。`);
+      return;
+    }
+    job.status = "执行中";
+    job.attempts = Number(job.attempts || 0) + 1;
+    job.maxAttempts = Number(job.maxAttempts || 3);
+    job.retryBaseSeconds = Number(job.retryBaseSeconds || 30);
+    job.retryMaxSeconds = Number(job.retryMaxSeconds || 900);
+    job.progress = 20;
+    job.startedAt = job.startedAt || nowText();
+    job.nextAttemptAt = "";
+    job.leaseOwner = worker.id;
+    job.leaseTokenHash = digestText(`${job.id}|${worker.id}|${Date.now()}|lease`);
+    job.leaseExpiresAt = new Date(Date.now() + 60 * 1000).toLocaleString("zh-CN", { hour12: false });
+    job.lastHeartbeatAt = nowText();
+    job.errorCode = "";
+    worker.status = "忙碌";
+    worker.activeJobId = job.id;
+    worker.lastHeartbeatAt = job.lastHeartbeatAt;
+    addExecutionEvent("领取任务", job, worker.id, `第${job.attempts}次尝试 · 60秒租约 · 仅保存令牌摘要`);
+    addAudit("Worker领取执行任务", job.id, `${worker.id} · 第${job.attempts}次尝试`);
+    saveState();
+    showNotice(`${worker.id}已领取${job.id}，60秒租约开始计时。`);
+    render();
+  }
+
+  function heartbeatExecutionJob(id) {
+    if (!requireExecutionRuntimeRole()) return;
+    const job = state.integrationExecutionJobs.find((item) => item.id === id);
+    if (!job || job.status !== "执行中" || !job.leaseOwner) return;
+    const worker = state.integrationExecutionWorkers.find((item) => item.id === job.leaseOwner);
+    job.progress = Math.min(80, Number(job.progress || 0) + 20);
+    job.lastHeartbeatAt = nowText();
+    job.leaseExpiresAt = new Date(Date.now() + 60 * 1000).toLocaleString("zh-CN", { hour12: false });
+    if (worker) worker.lastHeartbeatAt = job.lastHeartbeatAt;
+    addExecutionEvent("任务心跳", job, worker?.id, `进度${job.progress}% · 租约延长60秒`);
+    addAudit("续期执行任务租约", job.id, `${worker?.id || "-"} · ${job.progress}%`);
+    saveState();
+    showNotice(`${job.id}心跳正常，租约已延长60秒。`);
+    render();
+  }
+
+  function failExecutionJob(id) {
+    if (!requireExecutionRuntimeRole()) return;
+    const job = state.integrationExecutionJobs.find((item) => item.id === id);
+    if (!job || job.status !== "执行中") return;
+    const workerId = job.leaseOwner;
+    const worker = state.integrationExecutionWorkers.find((item) => item.id === workerId);
+    releaseExecutionWorker(job);
+    if (worker) worker.failedJobs = Number(worker.failedJobs || 0) + 1;
+    job.errorCode = "GATEWAY_TIMEOUT";
+    job.progress = 0;
+    if (Number(job.attempts || 0) < Number(job.maxAttempts || 3)) {
+      const delaySeconds = Math.min(
+        Number(job.retryMaxSeconds || 900),
+        Number(job.retryBaseSeconds || 30) * (2 ** Math.max(0, Number(job.attempts || 1) - 1)),
+      );
+      job.status = "等待重试";
+      job.nextAttemptAt = new Date(Date.now() + delaySeconds * 1000).toLocaleString("zh-CN", { hour12: false });
+      addExecutionEvent("安排重试", job, workerId, `GATEWAY_TIMEOUT · ${delaySeconds}秒后重试`);
+      addAudit("安排执行任务重试", job.id, `第${job.attempts}次失败 · ${delaySeconds}秒指数退避`);
+      saveState();
+      showNotice(`${job.id}发生瞬时故障，已按指数退避安排重试。`);
+      render();
+      return;
+    }
+    const deadLetter = {
+      id: `DLQ-${Date.now()}`,
+      jobId: job.id,
+      connectorId: job.connectorId,
+      environmentId: job.environmentId,
+      jobType: job.jobType,
+      payloadDigest: job.payloadDigest,
+      errorCode: job.errorCode,
+      attempts: job.attempts,
+      generation: Number(job.generation || 1),
+      status: "待复核",
+      createdAt: nowText(),
+      reviewedBy: "",
+      reviewNote: "",
+      redrivenAt: "",
+    };
+    state.integrationDeadLetters.unshift(deadLetter);
+    job.status = "死信";
+    job.deadLetterId = deadLetter.id;
+    job.nextAttemptAt = "";
+    addExecutionEvent("进入死信", job, workerId, `${job.errorCode} · 第${job.attempts}次失败`);
+    addAudit("执行任务进入死信", job.id, `${deadLetter.id} · ${job.errorCode}`);
+    saveState();
+    showNotice(`${job.id}已耗尽重试并进入死信队列，等待人工复核。`);
+    render();
+  }
+
+  function activateExecutionRetry(id) {
+    if (!requireExecutionRuntimeRole()) return;
+    const job = state.integrationExecutionJobs.find((item) => item.id === id);
+    if (!job || job.status !== "等待重试") return;
+    if (job.nextAttemptAt && Date.parse(job.nextAttemptAt) > Date.now()) {
+      showNotice(`${job.id}尚未到达重试时间：${job.nextAttemptAt}。`);
+      return;
+    }
+    job.status = "排队中";
+    job.nextAttemptAt = nowText();
+    addExecutionEvent("重试到期", job, "", "任务重新进入可领取队列");
+    addAudit("激活执行任务重试", job.id, `第${Number(job.attempts || 0) + 1}次尝试待领取`);
+    saveState();
+    showNotice(`${job.id}已到达重试时间并重新进入队列。`);
+    render();
+  }
+
+  function recoverExecutionLeases() {
+    if (!requireExecutionRuntimeRole()) return;
+    const now = Date.now();
+    const expiredJobs = state.integrationExecutionJobs.filter(
+      (item) => item.status === "执行中" && item.leaseExpiresAt && Date.parse(item.leaseExpiresAt) <= now,
+    );
+    expiredJobs.forEach((job) => {
+      const workerId = job.leaseOwner;
+      releaseExecutionWorker(job, "失联");
+      job.errorCode = "WORKER_LEASE_EXPIRED";
+      job.status = Number(job.attempts || 0) < Number(job.maxAttempts || 3) ? "等待重试" : "死信";
+      job.nextAttemptAt = job.status === "等待重试"
+        ? new Date(Date.now() + Number(job.retryBaseSeconds || 30) * 1000).toLocaleString("zh-CN", { hour12: false })
+        : "";
+      if (job.status === "死信") {
+        const deadLetter = {
+          id: `DLQ-${Date.now()}-${state.integrationDeadLetters.length + 1}`,
+          jobId: job.id,
+          connectorId: job.connectorId,
+          environmentId: job.environmentId,
+          jobType: job.jobType,
+          payloadDigest: job.payloadDigest,
+          errorCode: job.errorCode,
+          attempts: job.attempts,
+          generation: Number(job.generation || 1),
+          status: "待复核",
+          createdAt: nowText(),
+          reviewedBy: "",
+          reviewNote: "",
+          redrivenAt: "",
+        };
+        state.integrationDeadLetters.unshift(deadLetter);
+        job.deadLetterId = deadLetter.id;
+      }
+      addExecutionEvent("回收超时租约", job, workerId, `${workerId}心跳超时 · ${job.status}`);
+    });
+    addAudit("扫描执行任务租约", `${expiredJobs.length}个过期任务`, expiredJobs.length ? "已回收并安排重试" : "无过期租约");
+    saveState();
+    showNotice(expiredJobs.length ? `已回收${expiredJobs.length}个超时租约。` : "当前没有需要回收的超时租约。");
+    render();
+  }
+
+  function redriveExecutionDeadLetter(id) {
+    if (!requireExecutionRuntimeRole()) return;
+    const deadLetter = state.integrationDeadLetters.find((item) => item.id === id);
+    const job = state.integrationExecutionJobs.find((item) => item.id === deadLetter?.jobId);
+    if (!deadLetter || !job || deadLetter.status !== "待复核") return;
+    deadLetter.status = "已重放";
+    deadLetter.reviewedBy = state.activeRole;
+    deadLetter.reviewNote = "已完成失败原因复核、连接器配置修正和安全边界确认，同意开启新执行代次。";
+    deadLetter.redrivenAt = nowText();
+    job.status = "排队中";
+    job.attempts = 0;
+    job.progress = 0;
+    job.nextAttemptAt = nowText();
+    job.errorCode = "";
+    job.deadLetterId = "";
+    job.generation = Number(job.generation || 1) + 1;
+    addExecutionEvent("死信人工重放", job, "", `${deadLetter.id} · ${state.activeRole}批准 · G${job.generation}`);
+    addAudit("审批并重放死信任务", deadLetter.id, `${state.activeRole} · ${job.id} · G${job.generation}`);
+    saveState();
+    showNotice(`${deadLetter.id}已完成复核，${job.id}进入G${job.generation}执行代次。`);
+    render();
+  }
+
   function enqueueExecutionJob() {
     const connector = state.pilotConnectors.find((item) => item.hospitalCode === state.selectedHospital);
     const environment = state.integrationEnvironments.find((item) => item.type === "PROD") || state.integrationEnvironments[0];
@@ -6363,14 +6788,25 @@
       payloadDigest: digestText(`${connector.id}|${environment.configVersion}|${state.task.standard}`),
       status: "排队中",
       attempts: 0,
+      maxAttempts: 3,
+      retryBaseSeconds: 30,
+      retryMaxSeconds: 900,
+      nextAttemptAt: nowText(),
       progress: 0,
       queuedAt: nowText(),
       startedAt: "",
       completedAt: "",
       receiptId: "",
       errorCode: "",
+      leaseOwner: "",
+      leaseTokenHash: "",
+      leaseExpiresAt: "",
+      lastHeartbeatAt: "",
+      deadLetterId: "",
+      generation: 1,
     };
     state.integrationExecutionJobs.unshift(job);
+    addExecutionEvent("任务入队", job, "", `${connector.id} · 幂等键与载荷仅保存摘要`);
     addAudit("创建接入执行任务", job.id, `${connector.id} · ${environment.id} · 幂等防重`);
     saveState();
     showNotice(`${job.id}已进入异步执行队列。`);
@@ -6381,13 +6817,16 @@
     const job = state.integrationExecutionJobs.find((item) => item.id === id);
     if (!job || ["成功", "阻断", "等待回执"].includes(job.status)) return;
     if (job.status === "排队中") {
-      job.status = "执行中";
-      job.progress = 40;
-      job.attempts = Number(job.attempts || 0) + 1;
-      job.startedAt = nowText();
+      dispatchExecutionJob(id);
+      return;
     } else {
+      const workerId = job.leaseOwner;
+      const worker = state.integrationExecutionWorkers.find((item) => item.id === workerId);
+      if (worker) worker.completedJobs = Number(worker.completedJobs || 0) + 1;
+      if (workerId) releaseExecutionWorker(job);
       job.status = "等待回执";
-      job.progress = 75;
+      job.progress = 85;
+      addExecutionEvent("执行完成", job, workerId, "Worker已释放租约，等待签名回执");
     }
     addAudit("推进接入执行任务", job.id, `${job.status} · ${job.progress}%`);
     saveState();
@@ -8576,6 +9015,13 @@
     if (name === "verify-execution-environment") verifyExecutionEnvironment(action.dataset.id);
     if (name === "rotate-vault-reference") rotateVaultReference(action.dataset.id);
     if (name === "enqueue-execution-job") enqueueExecutionJob();
+    if (name === "dispatch-execution-job") dispatchExecutionJob(action.dataset.id);
+    if (name === "heartbeat-execution-job") heartbeatExecutionJob(action.dataset.id);
+    if (name === "fail-execution-job") failExecutionJob(action.dataset.id);
+    if (name === "activate-execution-retry") activateExecutionRetry(action.dataset.id);
+    if (name === "recover-execution-leases") recoverExecutionLeases();
+    if (name === "restore-execution-worker") restoreExecutionWorker(action.dataset.id);
+    if (name === "redrive-execution-dead-letter") redriveExecutionDeadLetter(action.dataset.id);
     if (name === "advance-execution-job") advanceExecutionJob(action.dataset.id);
     if (name === "verify-callback-receipt") verifyCallbackReceipt(action.dataset.id);
     if (name === "simulate-replay-callback") simulateReplayCallback();

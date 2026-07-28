@@ -63,6 +63,8 @@ jobs:
         run: npm run digital-hospital:standards-readiness
       - name: Generate digital hospital pilot readiness report
         run: npm run digital-hospital:pilot-readiness
+      - name: Verify digital hospital execution runtime
+        run: npm run digital-hospital:execution-check
       - name: Generate six platform standards ledgers
         run: npm run platform:standards-ledgers
       - name: Generate phase 2 proposal readiness report

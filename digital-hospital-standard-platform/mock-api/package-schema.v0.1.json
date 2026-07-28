@@ -495,7 +495,119 @@
     "integrationExecutionJobs": {
       "type": "array",
       "items": {
-        "type": "object"
+        "type": "object",
+        "required": ["id", "connectorId", "environmentId", "jobType", "idempotencyKeyHash", "payloadDigest", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "connectorId": { "type": "string" },
+          "environmentId": { "type": "string" },
+          "jobType": { "type": "string" },
+          "idempotencyKeyHash": { "type": "string" },
+          "payloadDigest": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["排队中", "执行中", "等待重试", "等待回执", "成功", "阻断", "死信"]
+          },
+          "attempts": { "type": "integer", "minimum": 0 },
+          "maxAttempts": { "type": "integer", "minimum": 1 },
+          "retryBaseSeconds": { "type": "integer", "minimum": 1 },
+          "retryMaxSeconds": { "type": "integer", "minimum": 1 },
+          "nextAttemptAt": { "type": "string" },
+          "leaseOwner": { "type": "string" },
+          "leaseTokenHash": { "type": "string" },
+          "leaseExpiresAt": { "type": "string" },
+          "lastHeartbeatAt": { "type": "string" },
+          "deadLetterId": { "type": "string" },
+          "generation": { "type": "integer", "minimum": 1 }
+        },
+        "not": {
+          "anyOf": [
+            { "required": ["leaseToken"] },
+            { "required": ["payload"] }
+          ]
+        }
+      }
+    },
+    "integrationExecutionWorkers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "node", "pool", "capabilities", "status", "lastHeartbeatAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "node": { "type": "string" },
+          "pool": { "type": "string" },
+          "capabilities": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "status": {
+            "type": "string",
+            "enum": ["就绪", "忙碌", "失联"]
+          },
+          "activeJobId": { "type": "string" },
+          "registeredAt": { "type": "string" },
+          "lastHeartbeatAt": { "type": "string" },
+          "completedJobs": { "type": "integer", "minimum": 0 },
+          "failedJobs": { "type": "integer", "minimum": 0 }
+        },
+        "not": {
+          "anyOf": [
+            { "required": ["secret"] },
+            { "required": ["token"] },
+            { "required": ["apiKey"] },
+            { "required": ["credential"] },
+            { "required": ["privateKey"] }
+          ]
+        }
+      }
+    },
+    "integrationDeadLetters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "jobId", "connectorId", "environmentId", "jobType", "payloadDigest", "errorCode", "attempts", "generation", "status", "createdAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "jobId": { "type": "string" },
+          "connectorId": { "type": "string" },
+          "environmentId": { "type": "string" },
+          "jobType": { "type": "string" },
+          "payloadDigest": { "type": "string" },
+          "errorCode": { "type": "string" },
+          "attempts": { "type": "integer", "minimum": 1 },
+          "generation": { "type": "integer", "minimum": 1 },
+          "status": {
+            "type": "string",
+            "enum": ["待复核", "已重放"]
+          },
+          "createdAt": { "type": "string" },
+          "reviewedBy": { "type": "string" },
+          "reviewNote": { "type": "string" },
+          "redrivenAt": { "type": "string" }
+        },
+        "not": {
+          "anyOf": [
+            { "required": ["payload"] },
+            { "required": ["leaseToken"] }
+          ]
+        }
+      }
+    },
+    "integrationExecutionEvents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "status", "detail", "occurredAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "jobId": { "type": "string" },
+          "workerId": { "type": "string" },
+          "type": { "type": "string" },
+          "status": { "type": "string" },
+          "detail": { "type": "string" },
+          "occurredAt": { "type": "string" }
+        }
       }
     },
     "integrationCallbackReceipts": {

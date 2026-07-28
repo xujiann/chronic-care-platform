@@ -1,9 +1,9 @@
 openapi: 3.0.3
 info:
-  title: 数智医院新标准平台MVP接口
-  version: 0.1.0
+  title: 数智医院新标准平台 v0.17 接口
+  version: 0.17.0
   description: >
-    面向MVP原型的接口契约草案，覆盖评价任务、试点运营、试点协同、接入联调、接入执行与安全控制、试点评估、评价助手、推广准备、运营监控、医院申报、证据材料、数据校验、省级审核、专家复核、评分规则、评分结果、整改闭环、统计分析、国家抽查、规则沙箱、智能核验、消息提醒、批量导入、系统权限和运行管理。
+    面向数智医院新标准平台的接口契约，覆盖评价任务、试点运营、试点协同、接入联调、Worker租约、重试死信、接入执行与安全控制、试点评估、评价助手、推广准备、运营监控、医院申报、证据材料、数据校验、省级审核、专家复核、评分规则、评分结果、整改闭环、统计分析、国家抽查、规则沙箱、智能核验、消息提醒、批量导入、系统权限和运行管理。
 servers:
   - url: https://example.local
     description: 示例服务地址，正式环境由部署方案确定
@@ -41,7 +41,7 @@ tags:
   - name: PilotIntegration
     description: 医院接入申请、源系统连接器、凭据、数据映射、认证测试、问题处置和上线准入
   - name: IntegrationExecution
-    description: 执行环境、保险库引用、异步任务、签名回执、重放隔离和生产切换
+    description: 执行环境、保险库引用、Worker租约、异步任务、重试死信、签名回执、重放隔离和生产切换
   - name: PilotAssessment
     description: 试点成效、问题复盘、优化计划、推广准备和评估报告
   - name: EvaluationAssistant
@@ -828,6 +828,223 @@ paths:
           required: true
           schema:
             type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/integration-execution-workers:
+    get:
+      tags: [IntegrationExecution]
+      summary: 获取执行Worker运行池
+      responses:
+        "200":
+          description: Worker运行状态
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/IntegrationExecutionWorker"
+    post:
+      tags: [IntegrationExecution]
+      summary: 注册或恢复执行Worker
+      description: Worker凭据不得进入请求留存或平台状态。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntegrationExecutionWorker"
+      responses:
+        "200":
+          description: 已登记的Worker
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntegrationExecutionWorker"
+  /api/v1/integration-execution-jobs/{jobId}:claim:
+    post:
+      tags: [IntegrationExecution]
+      summary: Worker领取任务并获取一次性租约令牌
+      description: 平台仅保存租约令牌摘要；环境异常、能力不匹配或连接器隔离时默认拒绝。
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [workerId]
+              properties:
+                workerId:
+                  type: string
+                leaseSeconds:
+                  type: integer
+                  minimum: 10
+                  maximum: 300
+      responses:
+        "200":
+          description: 已领取任务和仅返回一次的租约令牌
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [job, leaseToken]
+                properties:
+                  job:
+                    $ref: "#/components/schemas/IntegrationExecutionJob"
+                  leaseToken:
+                    type: string
+                    writeOnly: true
+  /api/v1/integration-execution-jobs/{jobId}:heartbeat:
+    post:
+      tags: [IntegrationExecution]
+      summary: 续期Worker任务租约
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [workerId, leaseToken]
+              properties:
+                workerId:
+                  type: string
+                leaseToken:
+                  type: string
+                  writeOnly: true
+                progress:
+                  type: integer
+                  minimum: 0
+                  maximum: 80
+      responses:
+        "200":
+          description: 已续期任务
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntegrationExecutionJob"
+  /api/v1/integration-execution-jobs/{jobId}:complete-attempt:
+    post:
+      tags: [IntegrationExecution]
+      summary: 完成本次执行并等待签名回执
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [workerId, leaseToken]
+              properties:
+                workerId:
+                  type: string
+                leaseToken:
+                  type: string
+                  writeOnly: true
+      responses:
+        "200":
+          description: 等待回执的执行任务
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntegrationExecutionJob"
+  /api/v1/integration-execution-jobs/{jobId}:fail:
+    post:
+      tags: [IntegrationExecution]
+      summary: 记录执行失败并安排退避重试或进入死信
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [workerId, leaseToken, errorCode, failureClass]
+              properties:
+                workerId:
+                  type: string
+                leaseToken:
+                  type: string
+                  writeOnly: true
+                errorCode:
+                  type: string
+                  maxLength: 80
+                failureClass:
+                  type: string
+                  enum: [transient, permanent]
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/integration-execution-leases:recover-expired:
+    post:
+      tags: [IntegrationExecution]
+      summary: 回收过期Worker租约并恢复任务
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/integration-dead-letters:
+    get:
+      tags: [IntegrationExecution]
+      summary: 获取执行死信队列
+      responses:
+        "200":
+          description: 死信清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/IntegrationDeadLetter"
+  /api/v1/integration-dead-letters/{deadLetterId}:redrive:
+    post:
+      tags: [IntegrationExecution]
+      summary: 经人工复核后重放死信任务
+      parameters:
+        - name: deadLetterId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reviewedBy, reviewNote]
+              properties:
+                reviewedBy:
+                  type: string
+                reviewNote:
+                  type: string
+                  minLength: 8
       responses:
         "200":
           $ref: "#/components/responses/Ok"
@@ -2902,10 +3119,21 @@ components:
           type: string
         status:
           type: string
-          enum: [排队中, 执行中, 等待回执, 成功, 阻断]
+          enum: [排队中, 执行中, 等待重试, 等待回执, 成功, 阻断, 死信]
         attempts:
           type: integer
           minimum: 0
+        maxAttempts:
+          type: integer
+          minimum: 1
+        retryBaseSeconds:
+          type: integer
+          minimum: 1
+        retryMaxSeconds:
+          type: integer
+          minimum: 1
+        nextAttemptAt:
+          type: string
         progress:
           type: integer
           minimum: 0
@@ -2919,6 +3147,118 @@ components:
         receiptId:
           type: string
         errorCode:
+          type: string
+        leaseOwner:
+          type: string
+        leaseTokenHash:
+          type: string
+          readOnly: true
+          description: 一次性租约令牌的不可逆摘要。
+        leaseExpiresAt:
+          type: string
+        lastHeartbeatAt:
+          type: string
+        deadLetterId:
+          type: string
+        generation:
+          type: integer
+          minimum: 1
+      not:
+        anyOf:
+          - required: [leaseToken]
+          - required: [payload]
+    IntegrationExecutionWorker:
+      type: object
+      required: [id, node, pool, capabilities, status, lastHeartbeatAt]
+      properties:
+        id:
+          type: string
+        node:
+          type: string
+        pool:
+          type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [就绪, 忙碌, 失联]
+        activeJobId:
+          type: string
+        registeredAt:
+          type: string
+        lastHeartbeatAt:
+          type: string
+        completedJobs:
+          type: integer
+          minimum: 0
+        failedJobs:
+          type: integer
+          minimum: 0
+      not:
+        anyOf:
+          - required: [secret]
+          - required: [token]
+          - required: [apiKey]
+          - required: [credential]
+          - required: [privateKey]
+    IntegrationDeadLetter:
+      type: object
+      required: [id, jobId, connectorId, environmentId, jobType, payloadDigest, errorCode, attempts, generation, status, createdAt]
+      properties:
+        id:
+          type: string
+        jobId:
+          type: string
+        connectorId:
+          type: string
+        environmentId:
+          type: string
+        jobType:
+          type: string
+        payloadDigest:
+          type: string
+        errorCode:
+          type: string
+        attempts:
+          type: integer
+          minimum: 1
+        generation:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum: [待复核, 已重放]
+        createdAt:
+          type: string
+        reviewedBy:
+          type: string
+        reviewNote:
+          type: string
+        redrivenAt:
+          type: string
+      not:
+        anyOf:
+          - required: [payload]
+          - required: [leaseToken]
+    IntegrationExecutionEvent:
+      type: object
+      required: [id, type, status, detail, occurredAt]
+      properties:
+        id:
+          type: string
+        jobId:
+          type: string
+        workerId:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+        detail:
+          type: string
+        occurredAt:
           type: string
     IntegrationCallbackReceipt:
       type: object
@@ -3057,7 +3397,7 @@ components:
           type: string
     ExecutionPackage:
       type: object
-      required: [meta, executionSummary, integrationEnvironments, credentialVaultEntries, integrationExecutionJobs, integrationCallbackReceipts, integrationReplayEvents, integrationQuarantines, integrationCutoverWindows]
+      required: [meta, executionSummary, integrationEnvironments, credentialVaultEntries, integrationExecutionJobs, integrationExecutionWorkers, integrationDeadLetters, integrationExecutionEvents, integrationCallbackReceipts, integrationReplayEvents, integrationQuarantines, integrationCutoverWindows]
       properties:
         meta:
           $ref: "#/components/schemas/PackageMeta"
@@ -3076,6 +3416,18 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/IntegrationExecutionJob"
+        integrationExecutionWorkers:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntegrationExecutionWorker"
+        integrationDeadLetters:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntegrationDeadLetter"
+        integrationExecutionEvents:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntegrationExecutionEvent"
         integrationCallbackReceipts:
           type: array
           items:
