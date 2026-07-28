@@ -689,6 +689,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
     check("modernization:data-source-operations", modernizationReadiness.summary.freshSources === 1 && modernizationReadiness.summary.noDataSources === 7 && modernizationReadiness.dataSourceOperations.productionReady === false, "source operations distinguishes observed freshness from registered sources without data", "modernization"),
     check("modernization:multi-source-surveillance", modernizationReadiness.summary.rules === 8 && modernizationReadiness.summary.closedAlerts === 1, "8 versioned rules and one human-verified alert closure prove the surveillance workflow", "modernization"),
     check("modernization:trusted-rule-governance", modernizationReadiness.summary.ruleVersions === 9 && modernizationReadiness.summary.trustedRuleActivations === 1 && modernizationReadiness.ruleGovernance.productionReady === false, "independent review and server receipt activation advances one rule without promoting production readiness", "modernization"),
+    check("modernization:managed-rule-keyring", modernizationReadiness.summary.managedRuleKeyringReady === true && modernizationReadiness.ruleGovernance.keyring.activeKeyId === "readiness-rule-key-b" && modernizationReadiness.ruleGovernance.keyring.keys.some((item) => item.status === "grace"), "managed active/grace key rotation verifies historical rule activations and signs new versions with the current active key", "modernization"),
     check("modernization:medical-prevention-collaboration", modernizationReadiness.summary.collaborationTasks === 2 && modernizationReadiness.summary.closedCollaborationTasks === 2 && modernizationReadiness.productionReady === false, "medical public-health and primary-care tasks close without asserting production readiness", "modernization"),
     check("runtime:eight-handoffs", runtime.handoffs.length === 8 && runtime.functionalState === "eight-lane-coordination-persistence-ready", `${runtime.handoffs.length}/8 runtime handoffs`, "runtime"),
     check("runtime:persisted-write-model", runtimeAcceptance.first.nextData.publicHealthCoordinationHandoffs.length === 8, "immutable state patch contains all handoffs", "runtime"),
@@ -759,6 +760,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
       modernizationRules: modernizationReadiness.summary.rules,
       modernizationRuleVersions: modernizationReadiness.summary.ruleVersions,
       modernizationTrustedRuleActivations: modernizationReadiness.summary.trustedRuleActivations,
+      modernizationManagedRuleKeyringReady: modernizationReadiness.summary.managedRuleKeyringReady,
       modernizationFreshSources: modernizationReadiness.summary.freshSources,
       modernizationNoDataSources: modernizationReadiness.summary.noDataSources,
       modernizationClosedAlerts: modernizationReadiness.summary.closedAlerts,
@@ -851,8 +853,8 @@ function buildPublicHealthFinalReadiness(options = {}) {
     remainingT00Integration: [
       "Wire the minimized data-source operations summary and freshness panel through T00-owned routes and page files.",
       "Wire rule-change submit, independent review and trusted server activation routes without accepting client-supplied trust metadata.",
-      "Persist rule changes with optimistic versions and provision the activation secret through server-only managed configuration.",
-      "Extend release and deploy gates while preserving productionReady=false until managed keys, approved production thresholds and site evidence are verified."
+      "Persist rule changes with optimistic versions and resolve the purpose-bound active/grace/revoked activation keyring through server-only managed configuration.",
+      "Extend release and deploy gates with rotation checks and redacted key status while preserving productionReady=false until approved production thresholds and site evidence are verified."
     ]
   };
 }
@@ -873,6 +875,7 @@ function renderMarkdown(report) {
     `- Modernization surveillance rules: ${report.summary.modernizationRules}/8`,
     `- Modernization surveillance rule versions: ${report.summary.modernizationRuleVersions}`,
     `- Modernization trusted rule activations: ${report.summary.modernizationTrustedRuleActivations}`,
+    `- Modernization managed rule keyring ready: ${report.summary.modernizationManagedRuleKeyringReady ? "yes" : "no"}`,
     `- Modernization fresh/no-data sources: ${report.summary.modernizationFreshSources}/${report.summary.modernizationNoDataSources}`,
     `- Modernization closed alerts: ${report.summary.modernizationClosedAlerts}/1`,
     `- Modernization closed collaboration tasks: ${report.summary.modernizationClosedCollaborationTasks}/2`,
