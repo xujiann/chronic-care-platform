@@ -14,6 +14,13 @@ const {
   evaluatePublicHealthSurveillanceSignalToState,
   verifyPublicHealthSurveillanceSignalToState
 } = require("../public-health-surveillance-workflow-service");
+const {
+  activatePublicHealthSurveillanceRuleChangeToState,
+  proposePublicHealthSurveillanceRuleChangeToState,
+  reviewPublicHealthSurveillanceRuleChangeToState
+} = require("../public-health-surveillance-rule-governance-service");
+
+const RULE_GOVERNANCE_SECRET = "public-health-workflow-rule-governance-secret-2026";
 
 function signalPayload(value = 8, overrides = {}) {
   return {
@@ -395,5 +402,150 @@ test("surveillance workflow rejects persisted rule and source-verification tampe
     },
     { name: "疾控研判员", role: "cdc-surveillance" }
   ), /alert integrity invalid: alert-source-signal-integrity-invalid/);
+  assert.equal(center.productionReady, false);
+});
+
+test("signal evaluation rejects ungoverned thresholds and adopts only trusted activated versions", () => {
+  const intake = ingestPublicHealthSurveillanceSignalToState(
+    {},
+    signalPayload(8, {
+      externalSignalId: "EMR-SYNDROME-RULE-GOVERNANCE-001",
+      idempotencyKey: "rule-governance-signal-intake-001"
+    }),
+    { name: "医院公卫科", role: "medical-public-health" }
+  );
+  const verified = verifyPublicHealthSurveillanceSignalToState(
+    intake.nextData,
+    intake.signal.id,
+    {
+      decision: "confirmed",
+      note: "来源与口径已人工核实",
+      evidenceRefs: ["RULE-GOVERNANCE-MANUAL-VERIFY-001"],
+      idempotencyKey: "rule-governance-signal-verify-001",
+      expectedVersion: 1
+    },
+    { name: "疾控监测员", role: "cdc-surveillance" }
+  );
+  const forgedData = {
+    ...verified.nextData,
+    publicHealthSurveillanceRules: [{
+      id: "ph-rule-clinical-syndrome",
+      version: 99,
+      signalType: "clinical-syndrome",
+      metricCode: "fever-respiratory-count",
+      operator: ">=",
+      threshold: 999,
+      severity: "low",
+      status: "active",
+      owner: "客户端伪造"
+    }]
+  };
+  assert.throws(() => evaluatePublicHealthSurveillanceSignalToState(
+    forgedData,
+    verified.signal.id,
+    { idempotencyKey: "forged-rule-evaluation", expectedVersion: 2 },
+    { name: "规则执行器", role: "system" }
+  ), /rule registry integrity invalid: ungoverned-rule-materialization/);
+
+  let governed = proposePublicHealthSurveillanceRuleChangeToState(
+    verified.nextData,
+    {
+      ruleId: "ph-rule-clinical-syndrome",
+      expectedCurrentVersion: 1,
+      threshold: 10,
+      severity: "high",
+      status: "active",
+      reason: "提高技术验收阈值以验证受控变更",
+      evidenceRefs: ["RULE-GOVERNANCE-PROPOSAL-001"],
+      idempotencyKey: "workflow-rule-submit-001"
+    },
+    { name: "疾控规则管理员", role: "cdc-surveillance" }
+  );
+  governed = reviewPublicHealthSurveillanceRuleChangeToState(
+    governed.nextData,
+    governed.change.id,
+    {
+      decision: "approved",
+      note: "独立复核通过",
+      evidenceRefs: ["RULE-GOVERNANCE-REVIEW-001"],
+      idempotencyKey: "workflow-rule-review-001",
+      expectedVersion: 1
+    },
+    { name: "委级复核员", role: "commission" }
+  );
+  governed = activatePublicHealthSurveillanceRuleChangeToState(
+    governed.nextData,
+    governed.change.id,
+    {
+      note: "服务端受控激活",
+      evidenceRefs: ["RULE-GOVERNANCE-ACTIVATION-001"],
+      idempotencyKey: "workflow-rule-activate-001",
+      expectedVersion: 2
+    },
+    { name: "规则配置服务", role: "system" },
+    { verificationSecret: RULE_GOVERNANCE_SECRET }
+  );
+  const evaluated = evaluatePublicHealthSurveillanceSignalToState(
+    governed.nextData,
+    verified.signal.id,
+    { idempotencyKey: "trusted-rule-evaluation", expectedVersion: 2 },
+    { name: "规则执行器", role: "system" },
+    { verificationSecret: RULE_GOVERNANCE_SECRET }
+  );
+  assert.equal(evaluated.matched, false);
+  assert.equal(evaluated.signal.lastRuleEvaluation.ruleVersion, 2);
+  assert.equal(evaluated.signal.lastRuleEvaluation.threshold, 10);
+  assert.equal(evaluated.productionReady, false);
+});
+
+test("historical alerts remain bound to their original trusted rule version", () => {
+  const evaluated = prepareAlert();
+  let governed = proposePublicHealthSurveillanceRuleChangeToState(
+    evaluated.nextData,
+    {
+      ruleId: "ph-rule-clinical-syndrome",
+      expectedCurrentVersion: 1,
+      threshold: 10,
+      severity: "high",
+      status: "active",
+      reason: "验证历史预警规则版本保留",
+      evidenceRefs: ["HISTORICAL-RULE-PROPOSAL"],
+      idempotencyKey: "historical-rule-submit"
+    },
+    { name: "疾控规则管理员", role: "cdc-surveillance" }
+  );
+  governed = reviewPublicHealthSurveillanceRuleChangeToState(
+    governed.nextData,
+    governed.change.id,
+    {
+      decision: "approved",
+      note: "独立复核历史版本兼容性",
+      evidenceRefs: ["HISTORICAL-RULE-REVIEW"],
+      idempotencyKey: "historical-rule-review",
+      expectedVersion: 1
+    },
+    { name: "委级复核员", role: "commission" }
+  );
+  governed = activatePublicHealthSurveillanceRuleChangeToState(
+    governed.nextData,
+    governed.change.id,
+    {
+      note: "服务端激活第二版规则",
+      evidenceRefs: ["HISTORICAL-RULE-ACTIVATION"],
+      idempotencyKey: "historical-rule-activate",
+      expectedVersion: 2
+    },
+    { name: "规则配置服务", role: "system" },
+    { verificationSecret: RULE_GOVERNANCE_SECRET }
+  );
+  const center = buildPublicHealthSurveillanceCenter({
+    data: governed.nextData,
+    ruleVerificationSecret: RULE_GOVERNANCE_SECRET
+  });
+  assert.equal(center.ok, true);
+  assert.equal(center.alertIntegrityFindings.length, 0);
+  assert.equal(center.alerts[0].version, 1);
+  assert.equal(center.ruleGovernance.summary.ruleVersions, 9);
+  assert.equal(center.ruleGovernance.rules.find((item) => item.id === "ph-rule-clinical-syndrome").version, 2);
   assert.equal(center.productionReady, false);
 });

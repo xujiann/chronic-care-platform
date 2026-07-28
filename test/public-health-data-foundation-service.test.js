@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const {
   buildPublicHealthDataFoundation,
+  buildPublicHealthDataSourceOperations,
   ingestPublicHealthSurveillanceSignalToState,
   normalizePublicHealthSurveillanceSignal
 } = require("../public-health-data-foundation-service");
@@ -158,4 +159,56 @@ test("data foundation rejects persisted signal content or human-verification tam
   assert.equal(foundation.ok, false);
   assert.equal(foundation.qualityFindings.some((item) => item.code === "human-verification-integrity-invalid"), true);
   assert.equal(foundation.productionReady, false);
+});
+
+test("source operations distinguishes fresh no-data delayed stale and clock-skew states", () => {
+  const first = ingestPublicHealthSurveillanceSignalToState(
+    {},
+    syndromePayload(),
+    { name: "医院公卫科", role: "medical-public-health" },
+    { at: "2026-07-28T08:01:00.000Z" }
+  );
+  let operations = buildPublicHealthDataSourceOperations({
+    data: first.nextData,
+    now: "2026-07-28T08:10:00.000Z"
+  });
+  assert.equal(operations.ok, true);
+  assert.equal(operations.summary.fresh, 1);
+  assert.equal(operations.summary.noData, 7);
+  assert.equal(operations.sources.find((item) => item.id === "ph-source-clinical-syndrome").operationalState, "fresh");
+  assert.equal(operations.productionReady, false);
+
+  operations = buildPublicHealthDataSourceOperations({
+    data: first.nextData,
+    now: "2026-07-28T09:01:00.000Z"
+  });
+  assert.equal(operations.ok, false);
+  assert.equal(operations.summary.stale, 1);
+  assert.equal(operations.alerts.some((item) => item.sourceId === "ph-source-clinical-syndrome" && item.code === "stale"), true);
+
+  const futureSignal = JSON.parse(JSON.stringify(first.signal));
+  futureSignal.observedAt = "2026-07-28T10:00:00.000Z";
+  operations = buildPublicHealthDataSourceOperations({
+    data: {
+      ...first.nextData,
+      publicHealthSurveillanceSignals: [futureSignal]
+    },
+    now: "2026-07-28T08:10:00.000Z"
+  });
+  assert.equal(operations.ok, false);
+  assert.equal(operations.summary.clockSkew, 1);
+  assert.equal(operations.summary.qualityReview, 0);
+
+  const qualityTampered = JSON.parse(JSON.stringify(first.signal));
+  qualityTampered.metrics[0].value = 999;
+  operations = buildPublicHealthDataSourceOperations({
+    data: {
+      ...first.nextData,
+      publicHealthSurveillanceSignals: [qualityTampered]
+    },
+    now: "2026-07-28T08:10:00.000Z"
+  });
+  assert.equal(operations.ok, false);
+  assert.equal(operations.summary.qualityReview, 1);
+  assert.equal(operations.alerts.some((item) => item.code === "quality-review"), true);
 });

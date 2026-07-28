@@ -396,6 +396,99 @@ function buildPublicHealthDataFoundation({ data = {} } = {}) {
   };
 }
 
+function buildPublicHealthDataSourceOperations({ data = {}, now = new Date().toISOString() } = {}) {
+  const nowValue = new Date(now).getTime();
+  if (!Number.isFinite(nowValue)) throw new Error("public health data source operations now must be a valid date-time");
+  const sources = sourceRegistry(data);
+  const signals = Array.isArray(data.publicHealthSurveillanceSignals)
+    ? clone(data.publicHealthSurveillanceSignals)
+    : [];
+  const foundation = buildPublicHealthDataFoundation({ data });
+  const rows = sources.map((source) => {
+    const sourceSignals = signals.filter((signal) => clean(signal.sourceId) === source.id);
+    const observedValues = sourceSignals
+      .map((signal) => new Date(signal.observedAt).getTime())
+      .filter(Number.isFinite)
+      .sort((left, right) => right - left);
+    const lastObservedValue = observedValues[0];
+    const lastObservedAt = Number.isFinite(lastObservedValue)
+      ? new Date(lastObservedValue).toISOString()
+      : "";
+    const ageMinutes = Number.isFinite(lastObservedValue)
+      ? Math.round(((nowValue - lastObservedValue) / 60000) * 10) / 10
+      : null;
+    const sourceFindings = foundation.qualityFindings.filter((item) => clean(item.sourceId) === source.id);
+    let operationalState;
+    if (source.status !== "registered") operationalState = source.status;
+    else if (lastObservedValue > nowValue + 5 * 60000) operationalState = "clock-skew";
+    else if (sourceFindings.length) operationalState = "quality-review";
+    else if (!Number.isFinite(lastObservedValue)) operationalState = "no-data";
+    else if (ageMinutes <= source.expectedRefreshMinutes * 2) operationalState = "fresh";
+    else if (ageMinutes <= source.expectedRefreshMinutes * 4) operationalState = "delayed";
+    else operationalState = "stale";
+    return {
+      id: source.id,
+      name: source.name,
+      owner: source.owner,
+      stewardRole: source.stewardRole,
+      expectedRefreshMinutes: source.expectedRefreshMinutes,
+      status: source.status,
+      lastObservedAt,
+      ageMinutes,
+      signalCount: sourceSignals.length,
+      qualityFindings: sourceFindings.length,
+      operationalState,
+      productionReady: false
+    };
+  });
+  const alerts = rows.filter((item) => !["fresh", "paused", "retired"].includes(item.operationalState))
+    .map((item) => {
+      const detailByState = {
+        "no-data": "No minimized signal has been observed for the registered source.",
+        delayed: `The latest signal is older than twice the ${item.expectedRefreshMinutes}-minute refresh objective.`,
+        stale: `The latest signal is older than four times the ${item.expectedRefreshMinutes}-minute refresh objective.`,
+        "clock-skew": "The latest signal observation time is more than five minutes in the future.",
+        "quality-review": "One or more persisted signal quality findings require source-owner review."
+      };
+      return {
+        id: `ph-source-alert-${item.id}-${item.operationalState}`,
+        sourceId: item.id,
+        code: item.operationalState,
+        severity: ["stale", "clock-skew", "quality-review"].includes(item.operationalState) ? "error" : "warning",
+        owner: item.owner,
+        requiredAction: detailByState[item.operationalState],
+        productionReady: false
+      };
+    });
+  const blockingStates = new Set(["stale", "clock-skew", "quality-review"]);
+  return {
+    ok: foundation.ok && !rows.some((item) => blockingStates.has(item.operationalState)),
+    functionalState: rows.some((item) => blockingStates.has(item.operationalState))
+      ? "public-health-source-operations-review-required"
+      : "public-health-source-observability-runnable",
+    formalGoLiveState: "blocked-until-production-source-cadence-and-quality-observation-window-verified",
+    observedAt: new Date(nowValue).toISOString(),
+    summary: {
+      sources: rows.length,
+      fresh: rows.filter((item) => item.operationalState === "fresh").length,
+      delayed: rows.filter((item) => item.operationalState === "delayed").length,
+      stale: rows.filter((item) => item.operationalState === "stale").length,
+      noData: rows.filter((item) => item.operationalState === "no-data").length,
+      clockSkew: rows.filter((item) => item.operationalState === "clock-skew").length,
+      qualityReview: rows.filter((item) => item.operationalState === "quality-review").length,
+      pausedOrRetired: rows.filter((item) => ["paused", "retired"].includes(item.operationalState)).length,
+      alerts: alerts.length
+    },
+    sources: rows,
+    alerts,
+    productionReady: false,
+    blockers: [
+      "Production refresh objectives and source-owner escalation paths require joint confirmation.",
+      "A sustained production data-quality observation window remains required."
+    ]
+  };
+}
+
 function ingestPublicHealthSurveillanceSignalToState(data = {}, payload = {}, user = {}, options = {}) {
   const role = actorRole(user);
   if (!INGEST_ROLES.has(role)) throw new Error(`role ${role || "missing"} is not allowed to ingest public health signals`);
@@ -463,6 +556,7 @@ module.exports = {
   PUBLIC_HEALTH_DATA_SOURCES,
   PUBLIC_HEALTH_SIGNAL_TYPES,
   buildPublicHealthDataFoundation,
+  buildPublicHealthDataSourceOperations,
   ingestPublicHealthSurveillanceSignalToState,
   normalizePublicHealthSurveillanceSignal
 };

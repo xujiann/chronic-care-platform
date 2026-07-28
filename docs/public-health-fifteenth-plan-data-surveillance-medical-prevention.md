@@ -45,6 +45,19 @@
 
 相同来源记录重复接入且内容一致时幂等返回；同一来源记录哈希对应不同内容时直接拒绝。数据底座持续检查未登记来源、非法类型、时间错误、指标或证据缺失、重复记录和直接标识泄露，并复算信号标识绑定与内容指纹；持久化后的业务字段或人工核验字段被改写时，质量看板必须显式失败。
 
+### 数据源运行观测
+
+数据源登记完成不等同于稳定供数。运行看板按各来源的刷新目标计算：
+
+- `fresh`：最近信号不超过两倍刷新周期；
+- `delayed`：超过两倍、未超过四倍刷新周期；
+- `stale`：超过四倍刷新周期；
+- `no-data`：已登记但尚未观察到最小化信号；
+- `clock-skew`：观察时间比平台时间超前五分钟以上；
+- `quality-review`：来源存在内容指纹、直接标识或其他质量问题。
+
+无数据和延迟形成告警但不伪造业务失败；陈旧、时钟异常和质量问题使运行看板失败关闭。看板仅展示来源编号、责任方、刷新目标、时间年龄、信号数量和问题摘要，不展示生产端点、凭据或原始来源记录编号。
+
 ## 二、多点触发监测预警
 
 ### 首批规则
@@ -63,6 +76,24 @@
 规则记录版本、指标、运算符、阈值、等级和责任部门。规则命中结果保存规则版本与规则摘要，保证后续可以解释“由哪个版本、哪个指标和哪个阈值形成预警”。
 
 阈值是技术验收样例，生产阈值必须由疾控业务部门审批后配置。
+
+### 规则变更治理
+
+持久化的 `publicHealthSurveillanceRules` 只是可信规则的物化视图，不能直接修改后参与评估。阈值、等级或状态变更必须依次完成：
+
+```text
+submitted 提交 → approved 委级独立复核 → activated 服务端可信激活
+                         └→ rejected 驳回
+```
+
+- 疾控监测或委级角色提出变更，提交理由、证据和目标版本；
+- 复核人与提交人必须不同；
+- 生效动作要求服务端专用密钥生成 HMAC-SHA256 激活回执；
+- 回执绑定规则编号、前后版本、阈值、等级、状态、提交人、复核人、激活人、可信来源、验签标志、密钥编号、时间线摘要和签署时间；
+- 未治理的规则物化、版本断链、签名缺失或签名后篡改均被拒绝；
+- 历史规则版本继续保留，用于验证既有预警的规则摘要，不以新版本重写历史判断。
+
+测试静态密钥只用于功能验收；生产必须使用服务端托管密钥和受控变更窗口。规则激活成功也不自动获得生产上线资格。
 
 ### 信号状态
 
@@ -138,6 +169,7 @@ pending → accepted → in-progress → receipt-confirmed → closed
 T08 自有文件：
 
 - `public-health-data-foundation-service.js`：数据目录、来源登记、最小化信号接入、质量和血缘。
+- `public-health-surveillance-rule-governance-service.js`：规则提案、独立复核、可信激活、版本历史和防篡改校验。
 - `public-health-surveillance-workflow-service.js`：人工核实、版本化规则、预警、研判、报告、反馈和关闭。
 - `public-health-medical-prevention-collaboration-service.js`：医院公卫科与基层公卫任务。
 - `scripts/public-health-modernization-readiness.js`：三项建设任务的可运行验收。
@@ -155,8 +187,12 @@ T00 只调用领域服务返回的 `nextData`，不得复制状态转换、授�
 ## 六、建议公共API
 
 - `GET /api/public-health/data-foundation`
+- `GET /api/public-health/data-source-operations`
 - `POST /api/public-health/surveillance-signals`
 - `POST /api/public-health/surveillance-signals/:id/actions`
+- `GET /api/public-health/surveillance-rule-governance`
+- `POST /api/public-health/surveillance-rule-changes`
+- `POST /api/public-health/surveillance-rule-changes/:id/actions`
 - `GET /api/public-health/surveillance-center`
 - `POST /api/public-health/surveillance-alerts/:id/actions`
 - `GET /api/public-health/medical-prevention-tasks`
@@ -169,10 +205,13 @@ T00 只调用领域服务返回的 `nextData`，不得复制状态转换、授�
 功能验收要求：
 
 - 八类数据源和七类目录完整；
+- 数据源运行看板能区分新鲜、延迟、陈旧、无数据、时钟异常和质量复核；
 - 信号接入具备来源授权、幂等、冲突检测、质量检查和血缘审计；
 - 信号内容指纹、人工核验、规则版本、预警时间线、任务归属或关闭证据被篡改时，动作入口和汇总看板均失败关闭；
 - 居民直接标识在入口拒绝；
 - 八条规则均版本化且规则命中可解释；
+- 未经独立复核和服务端可信激活的持久化阈值不能参与评估；
+- 规则激活回执签名后修改阈值、状态、可信来源或验签标志必须被拒绝，旧预警仍按其历史规则版本复核；
 - 未经人工确认的信号不能进入规则评估；
 - AI和居民角色不能确认信号或预警；
 - 预警完成研判、派单、调查、正式报告、反馈和关闭；
@@ -186,6 +225,8 @@ T00 只调用领域服务返回的 `nextData`，不得复制状态转换、授�
 - 国家/省级正式接口规范和属地标准映射确认；
 - 数据共享授权和安全评估完成；
 - 医疗机构、基层机构、疾控正式端点联调；
+- 生产阈值审批、受控变更窗口和服务端托管激活密钥完成；
+- 各来源完成连续数据质量与刷新时效观察窗；
 - 正式报告和业务回执验签通过；
 - 生产数据质量观察窗、灾备演练和现场签字完成；
 - T00 发布和多方上线审批通过。
