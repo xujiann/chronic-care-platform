@@ -63,7 +63,9 @@ function assessCitizenRecordsReadiness(options = {}) {
     { id: "quality-priority-queue", label: "档案质量问题分级处理", passed: /function qualityIssuePriority/.test(v3) && /隔离记录并核对居民归属/.test(v3) && /blockedCount/.test(ui) && /质量评估识别来源缺失/.test(nextStageUnit) },
     { id: "workspace-resident-firewall", label: "增强工作台居民范围纵深隔离", passed: /inputRecords\.filter/.test(v3) && /已隔离的跨居民记录/.test(v3) && /增强工作台在模型层再次裁剪/.test(nextStageUnit) && /另一居民敏感结果/.test(nextStageUnit) },
     { id: "quality-readonly-details", label: "档案质量问题只读明细", passed: /查看质量问题明细/.test(ui) && /qualityProblems\.slice\(0, 20\)/.test(ui) && /补齐溯源字段/.test(e2e) },
-    { id: "acceptance-documentation", label: "居民验收标准与外部依赖", passed: /第三十二增量/.test(documentation) && /## 外部依赖/.test(documentation) }
+    { id: "emergency-pack-resident-firewall", label: "紧急资料包居民范围防火墙", passed: /cleanText\(input\.consent\.residentId/.test(v3) && /紧急资料包独立拒绝跨居民疾病记录联系人和授权/.test(nextStageUnit) && /缺少居民标识疾病/.test(nextStageUnit) },
+    { id: "operations-resident-firewall", label: "居民运营计数范围防火墙", passed: /function buildOperationsSnapshot/.test(v3) && /residentId && cleanText\(item\?\.residentId/.test(v3) && /居民运营汇总拒绝跨居民和缺标识事件/.test(nextStageUnit) },
+    { id: "acceptance-documentation", label: "居民验收标准与外部依赖", passed: /第三十四增量/.test(documentation) && /## 外部依赖/.test(documentation) }
   ];
 
   const integrationChecks = [

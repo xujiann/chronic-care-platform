@@ -742,22 +742,30 @@
 
   function buildEmergencyHealthPack(input = {}) {
     const resident = input.resident || {};
-    const records = Array.isArray(input.records) ? input.records : [];
+    const residentId = cleanText(resident.id, 120);
+    const records = (Array.isArray(input.records) ? input.records : [])
+      .filter((item) => residentId && cleanText(item?.residentId, 120) === residentId);
     const allergies = records.filter((item) => item.category === "allergies").slice(0, 10)
       .map((item) => cleanText(item.name || item.result, 160));
     const medications = records.filter((item) => item.category === "medications").slice(0, 10)
       .map((item) => cleanText(item.name || item.medication, 160));
-    const diseases = (Array.isArray(input.diseases) ? input.diseases : []).slice(0, 10)
+    const diseases = (Array.isArray(input.diseases) ? input.diseases : [])
+      .filter((item) => residentId && cleanText(item?.residentId, 120) === residentId)
+      .slice(0, 10)
       .map((item) => cleanText(item.type || item.name, 160));
-    const contacts = (Array.isArray(input.contacts) ? input.contacts : []).slice(0, 3)
+    const contacts = (Array.isArray(input.contacts) ? input.contacts : [])
+      .filter((item) => !item?.residentId || residentId && cleanText(item.residentId, 120) === residentId)
+      .slice(0, 3)
       .map((item) => ({
         relation: cleanText(item.relation || "紧急联系人", 60),
         name: cleanText(item.name, 80),
         phone: cleanText(item.phone, 30).replace(/(\d{3})\d+(\d{2})$/, "$1****$2")
       }));
-    const consent = input.consent || {};
+    const consent = input.consent && residentId && cleanText(input.consent.residentId, 120) === residentId
+      ? input.consent
+      : {};
     const consentState = CitizenRecordsV1?.authorizationState(consent, input.now || new Date());
-    const ready = Boolean(consentState?.active && resident.id && contacts.length);
+    const ready = Boolean(consentState?.active && residentId && contacts.length);
     return {
       status: ready ? "可按授权生成" : "待补齐紧急授权或联系人",
       ready,
@@ -778,10 +786,14 @@
 
   function buildOperationsSnapshot(input = {}) {
     const now = toDate(input.now) || new Date();
+    const residentId = cleanText(input.residentId, 120);
     const integration = buildProductionIntegrationStatus(input.integrations || {}, now);
-    const accessLogs = Array.isArray(input.accessLogs) ? input.accessLogs : [];
-    const corrections = Array.isArray(input.corrections) ? input.corrections : [];
-    const complaints = Array.isArray(input.complaints) ? input.complaints : [];
+    const accessLogs = (Array.isArray(input.accessLogs) ? input.accessLogs : [])
+      .filter((item) => residentId && cleanText(item?.residentId, 120) === residentId);
+    const corrections = (Array.isArray(input.corrections) ? input.corrections : [])
+      .filter((item) => residentId && cleanText(item?.residentId, 120) === residentId);
+    const complaints = (Array.isArray(input.complaints) ? input.complaints : [])
+      .filter((item) => residentId && cleanText(item?.residentId, 120) === residentId);
     const deniedAccess = accessLogs.filter((item) => /denied|blocked|拒绝|拦截/i.test(cleanText(item.status || item.result, 80))).length;
     const openCorrections = corrections.filter((item) => !/corrected|rejected|withdrawn|更正|拒绝|撤回/i.test(cleanText(item.status, 60))).length;
     const openComplaints = complaints.filter((item) => !/closed|resolved|已关闭|已解决/i.test(cleanText(item.status, 60))).length;
@@ -847,6 +859,7 @@
         now: input.now
       }),
       operations: buildOperationsSnapshot({
+        residentId,
         integrations: input.integrations,
         accessLogs: input.accessLogs,
         corrections: input.corrections,

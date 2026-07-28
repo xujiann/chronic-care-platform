@@ -379,10 +379,10 @@ test("紧急资料包只生成最小摘要并要求有效授权和联系人", ()
   const pack = api.buildEmergencyHealthPack({
     resident: { id: "r1", name: "张某", gender: "女", age: 68, bloodType: "A" },
     records: [
-      { id: "allergy-secret", category: "allergies", name: "青霉素", objectPath: "must-not-export" },
-      { id: "med-secret", category: "medications", name: "氨氯地平", auditHash: "must-not-export" }
+      { id: "allergy-secret", residentId: "r1", category: "allergies", name: "青霉素", objectPath: "must-not-export" },
+      { id: "med-secret", residentId: "r1", category: "medications", name: "氨氯地平", auditHash: "must-not-export" }
     ],
-    diseases: [{ type: "高血压" }],
+    diseases: [{ residentId: "r1", type: "高血压" }],
     contacts: [{ name: "李某", relation: "女儿", phone: "13812345678" }],
     consent: activeAuthorization({ meta: { purpose: "紧急救治", scopes: ["health-record-summary"] } }),
     now
@@ -395,15 +395,67 @@ test("紧急资料包只生成最小摘要并要求有效授权和联系人", ()
 
 test("居民运营快照只汇总接入、授权拦截、纠错和投诉数量", () => {
   const snapshot = api.buildOperationsSnapshot({
-    accessLogs: [{ status: "denied", accessedAt: "2026-07-27T06:00:00.000Z", actorToken: "secret" }],
-    corrections: [{ status: "processing", createdAt: "2026-07-27T05:00:00.000Z" }],
-    complaints: [{ status: "submitted", createdAt: "2026-07-27T04:00:00.000Z" }],
+    residentId: "r1",
+    accessLogs: [{ residentId: "r1", status: "denied", accessedAt: "2026-07-27T06:00:00.000Z", actorToken: "secret" }],
+    corrections: [{ residentId: "r1", status: "processing", createdAt: "2026-07-27T05:00:00.000Z" }],
+    complaints: [{ residentId: "r1", status: "submitted", createdAt: "2026-07-27T04:00:00.000Z" }],
     now
   });
   assert.equal(snapshot.metrics.find((item) => item.label === "授权拦截").value, 1);
   assert.equal(snapshot.metrics.find((item) => item.label === "纠错处理中").value, 1);
   assert.equal(snapshot.metrics.find((item) => item.label === "投诉处理中").value, 1);
   assert.equal(JSON.stringify(snapshot).includes("secret"), false);
+});
+
+test("紧急资料包独立拒绝跨居民疾病记录联系人和授权且不泄露内容", () => {
+  const pack = api.buildEmergencyHealthPack({
+    resident: { id: "r1", name: "张某" },
+    records: [
+      { residentId: "r1", category: "allergies", name: "本人过敏" },
+      { residentId: "r2", category: "medications", name: "另一居民秘密药品" }
+    ],
+    diseases: [
+      { residentId: "r1", type: "本人慢病" },
+      { residentId: "r2", type: "另一居民秘密疾病" },
+      { type: "缺少居民标识疾病" }
+    ],
+    contacts: [
+      { residentId: "r1", name: "本人联系人", phone: "13812345678" },
+      { residentId: "r2", name: "另一居民秘密联系人", phone: "13987654321" }
+    ],
+    consent: activeAuthorization({ residentId: "r2", meta: { purpose: "紧急救治", scopes: ["health-record-summary"] } }),
+    now
+  });
+  assert.equal(pack.ready, false);
+  assert.deepEqual(pack.allergies, ["本人过敏"]);
+  assert.deepEqual(pack.diseases, ["本人慢病"]);
+  assert.equal(pack.contacts.length, 1);
+  assert.doesNotMatch(JSON.stringify(pack), /另一居民秘密|缺少居民标识疾病|13987654321/);
+});
+
+test("居民运营汇总拒绝跨居民和缺标识事件避免数量侧信道", () => {
+  const snapshot = api.buildOperationsSnapshot({
+    residentId: "r1",
+    accessLogs: [
+      { residentId: "r1", status: "denied", accessedAt: "2026-07-27T06:00:00.000Z" },
+      { residentId: "r2", status: "denied", accessedAt: "2026-07-27T07:00:00.000Z", secret: "other-access" },
+      { status: "denied", accessedAt: "2026-07-27T08:00:00.000Z" }
+    ],
+    corrections: [
+      { residentId: "r1", status: "processing", createdAt: "2026-07-27T05:00:00.000Z" },
+      { residentId: "r2", status: "processing", createdAt: "2026-07-27T06:00:00.000Z", secret: "other-correction" }
+    ],
+    complaints: [
+      { residentId: "r1", status: "submitted", createdAt: "2026-07-27T04:00:00.000Z" },
+      { residentId: "r2", status: "submitted", createdAt: "2026-07-27T05:00:00.000Z", secret: "other-complaint" }
+    ],
+    now
+  });
+  assert.equal(snapshot.metrics.find((item) => item.label === "授权拦截").value, 1);
+  assert.equal(snapshot.metrics.find((item) => item.label === "纠错处理中").value, 1);
+  assert.equal(snapshot.metrics.find((item) => item.label === "投诉处理中").value, 1);
+  assert.equal(snapshot.latestEventAt, "2026-07-27T06:00:00.000Z");
+  assert.doesNotMatch(JSON.stringify(snapshot), /other-access|other-correction|other-complaint/);
 });
 
 test("八项增强工作台一次生成全部居民可验收视图", () => {
@@ -453,16 +505,38 @@ test("增强工作台在模型层再次裁剪记录授权随访和取药且跨�
       { id: "r1-pickup", residentId: "r1", medication: "本人用药", nextPickup: "2026-07-28" },
       { id: "other-pickup", residentId: "r2", medication: "另一居民秘密用药", nextPickup: "2026-07-28" }
     ],
-    contacts: [{ name: "李某", relation: "女儿", phone: "13812345678" }],
+    diseases: [
+      { residentId: "r1", type: "本人慢病" },
+      { residentId: "r2", type: "另一居民秘密疾病" }
+    ],
+    contacts: [
+      { residentId: "r1", name: "李某", relation: "女儿", phone: "13812345678" },
+      { residentId: "r2", name: "另一居民秘密联系人", phone: "13987654321" }
+    ],
+    accessLogs: [
+      { residentId: "r1", status: "denied", accessedAt: "2026-07-27T06:00:00.000Z" },
+      { residentId: "r2", status: "denied", accessedAt: "2026-07-27T07:00:00.000Z", actor: "另一居民秘密访问" }
+    ],
+    corrections: [
+      { residentId: "r1", status: "processing", createdAt: "2026-07-27T05:00:00.000Z" },
+      { residentId: "r2", status: "processing", createdAt: "2026-07-27T06:00:00.000Z", reason: "另一居民秘密纠错" }
+    ],
+    complaints: [
+      { residentId: "r1", status: "submitted", createdAt: "2026-07-27T04:00:00.000Z" },
+      { residentId: "r2", status: "submitted", createdAt: "2026-07-27T05:00:00.000Z", reason: "另一居民秘密投诉" }
+    ],
     emergencyConsent: activeAuthorization({ id: "other-emergency", residentId: "r2", meta: { purpose: "紧急救治", scopes: ["health-record-summary"] } }),
     now
   });
   const serialized = JSON.stringify(workspace);
-  assert.match(serialized, /本人复诊|本人摘要|高血压|本人用药/);
-  assert.doesNotMatch(serialized, /另一居民敏感检验|另一居民敏感结果|乙医院秘密来源|other-source-secret|另一居民秘密授权|另一居民秘密随访|另一居民秘密用药|other-secret-id|other-auth-secret/);
+  assert.match(serialized, /本人复诊|本人摘要|高血压|本人用药|本人慢病/);
+  assert.doesNotMatch(serialized, /另一居民敏感检验|另一居民敏感结果|乙医院秘密来源|other-source-secret|另一居民秘密授权|另一居民秘密随访|另一居民秘密用药|另一居民秘密疾病|另一居民秘密联系人|另一居民秘密访问|另一居民秘密纠错|另一居民秘密投诉|other-secret-id|other-auth-secret/);
   assert.equal(workspace.governance.quality.blockedCount, 1);
   assert.equal(workspace.governance.quality.items[0].name, "已隔离的跨居民记录");
   assert.equal(workspace.emergencyPack.ready, false);
+  assert.equal(workspace.operations.metrics.find((item) => item.label === "授权拦截").value, 1);
+  assert.equal(workspace.operations.metrics.find((item) => item.label === "纠错处理中").value, 1);
+  assert.equal(workspace.operations.metrics.find((item) => item.label === "投诉处理中").value, 1);
 });
 
 test("八项安全操作只导航或预填且未知操作默认拒绝", () => {
