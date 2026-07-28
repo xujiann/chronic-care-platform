@@ -999,11 +999,17 @@ tbody tr:hover {
   .pilot-tabs button,
   .collaboration-tabs button,
   .assessment-tabs button,
-  .assistant-tabs button,
   .monitoring-tabs button {
     flex: 1 1 0;
     min-width: 0;
     padding-inline: 6px;
+    font-size: 12px;
+  }
+
+  .assistant-tabs button {
+    flex: 0 0 auto;
+    min-width: 72px;
+    padding-inline: 8px;
     font-size: 12px;
   }
 }

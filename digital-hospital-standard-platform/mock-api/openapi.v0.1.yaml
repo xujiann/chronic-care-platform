@@ -943,6 +943,127 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/online-guardrail:
+    get:
+      tags: [EvaluationAssistant]
+      summary: 获取评价助手在线质量护栏
+      responses:
+        "200":
+          description: 在线质量护栏配置
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssistantOnlineGuardrail"
+  /api/v1/evaluation-assistant/deployments:
+    get:
+      tags: [EvaluationAssistant]
+      summary: 获取评价助手部署与灰度流量
+      responses:
+        "200":
+          description: 部署清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AssistantDeployment"
+    post:
+      tags: [EvaluationAssistant]
+      summary: 为门禁通过的候选版本创建灰度部署
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssistantDeployment"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/deployments/{deploymentId}:advance:
+    post:
+      tags: [EvaluationAssistant]
+      summary: 在在线质量健康时扩量灰度部署
+      parameters:
+        - name: deploymentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/online-quality-windows:
+    get:
+      tags: [EvaluationAssistant]
+      summary: 获取评价助手在线质量窗口
+      responses:
+        "200":
+          description: 在线质量窗口清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AssistantOnlineQualityWindow"
+    post:
+      tags: [EvaluationAssistant]
+      summary: 采集并判定当前灰度部署的在线质量窗口
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssistantOnlineQualityWindow"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/quality-incidents:
+    get:
+      tags: [EvaluationAssistant]
+      summary: 获取评价助手在线质量事件
+      responses:
+        "200":
+          description: 在线质量事件清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AssistantQualityIncident"
+    post:
+      tags: [EvaluationAssistant]
+      summary: 登记在线质量越界事件并暂停扩量
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssistantQualityIncident"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/deployments/{deploymentId}:rollback:
+    post:
+      tags: [EvaluationAssistant]
+      summary: 回滚灰度部署并恢复稳定版本流量
+      parameters:
+        - name: deploymentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
   /api/v1/evaluation-assistant/anomaly-explanations:
     get:
       tags: [EvaluationAssistant]
@@ -1996,7 +2117,7 @@ components:
             $ref: "#/components/schemas/PilotAssessmentReport"
     AssistantPackage:
       type: object
-      required: [meta, assistantSummary, assistantKnowledgeSources, assistantKnowledgeVersions, standardQaRecords, assistantRetrievalTraces, assistantModelCalls, assistantQualityGate, assistantEvaluationSuites, assistantEvaluationRuns, assistantReleaseCandidates, anomalyExplanations, rectificationSuggestions, reviewRiskSignals]
+      required: [meta, assistantSummary, assistantKnowledgeSources, assistantKnowledgeVersions, standardQaRecords, assistantRetrievalTraces, assistantModelCalls, assistantQualityGate, assistantEvaluationSuites, assistantEvaluationRuns, assistantReleaseCandidates, assistantOnlineGuardrail, assistantDeployments, assistantOnlineQualityWindows, assistantQualityIncidents, anomalyExplanations, rectificationSuggestions, reviewRiskSignals]
       properties:
         meta:
           $ref: "#/components/schemas/PackageMeta"
@@ -2037,6 +2158,20 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AssistantReleaseCandidate"
+        assistantOnlineGuardrail:
+          $ref: "#/components/schemas/AssistantOnlineGuardrail"
+        assistantDeployments:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssistantDeployment"
+        assistantOnlineQualityWindows:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssistantOnlineQualityWindow"
+        assistantQualityIncidents:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssistantQualityIncident"
         anomalyExplanations:
           type: array
           items:
@@ -3354,6 +3489,148 @@ components:
         publishedAt:
           type: string
         rollbackTarget:
+          type: string
+    AssistantOnlineGuardrail:
+      type: object
+      required: [citationCoverage, answerAcceptance, maxNoAnswerRate, maxEscalationRate, maxP95LatencyMs, maxSafetyEvents, maxDriftScore, owner, updatedAt]
+      properties:
+        citationCoverage:
+          type: number
+          minimum: 0
+          maximum: 100
+        answerAcceptance:
+          type: number
+          minimum: 0
+          maximum: 100
+        maxNoAnswerRate:
+          type: number
+          minimum: 0
+          maximum: 100
+        maxEscalationRate:
+          type: number
+          minimum: 0
+          maximum: 100
+        maxP95LatencyMs:
+          type: integer
+          minimum: 0
+        maxSafetyEvents:
+          type: integer
+          minimum: 0
+        maxDriftScore:
+          type: number
+          minimum: 0
+        owner:
+          type: string
+        updatedAt:
+          type: string
+    AssistantDeployment:
+      type: object
+      required: [id, releaseId, version, strategy, trafficPercent, cohorts, stableVersion, status, owner, startedAt, updatedAt]
+      properties:
+        id:
+          type: string
+        releaseId:
+          type: string
+        version:
+          type: string
+        strategy:
+          type: string
+          enum: [灰度, 全量]
+        trafficPercent:
+          type: integer
+          minimum: 0
+          maximum: 100
+        cohorts:
+          type: array
+          items:
+            type: string
+        stableVersion:
+          type: string
+        status:
+          type: string
+          enum: [稳定, 灰度中, 已暂停, 已完成, 历史版本, 已回滚]
+        owner:
+          type: string
+        startedAt:
+          type: string
+        updatedAt:
+          type: string
+        rollbackAt:
+          type: string
+    AssistantOnlineQualityWindow:
+      type: object
+      required: [id, deploymentId, version, period, sampleCount, citationCoverage, answerAcceptance, noAnswerRate, escalationRate, p95LatencyMs, safetyEvents, driftScore, status, collectedAt]
+      properties:
+        id:
+          type: string
+        deploymentId:
+          type: string
+        version:
+          type: string
+        period:
+          type: string
+        sampleCount:
+          type: integer
+          minimum: 0
+        citationCoverage:
+          type: number
+          minimum: 0
+          maximum: 100
+        answerAcceptance:
+          type: number
+          minimum: 0
+          maximum: 100
+        noAnswerRate:
+          type: number
+          minimum: 0
+          maximum: 100
+        escalationRate:
+          type: number
+          minimum: 0
+          maximum: 100
+        p95LatencyMs:
+          type: integer
+          minimum: 0
+        safetyEvents:
+          type: integer
+          minimum: 0
+        driftScore:
+          type: number
+          minimum: 0
+        status:
+          type: string
+          enum: [健康, 关注, 异常]
+        collectedAt:
+          type: string
+    AssistantQualityIncident:
+      type: object
+      required: [id, deploymentId, version, signal, level, threshold, actual, action, owner, status, createdAt]
+      properties:
+        id:
+          type: string
+        deploymentId:
+          type: string
+        version:
+          type: string
+        signal:
+          type: string
+        level:
+          type: string
+          enum: [中, 高, 紧急]
+        threshold:
+          type: string
+        actual:
+          type: string
+        action:
+          type: string
+        owner:
+          type: string
+        status:
+          type: string
+          enum: [开放, 处理中, 已解决]
+        createdAt:
+          type: string
+        resolvedAt:
           type: string
     StandardQaRecord:
       type: object

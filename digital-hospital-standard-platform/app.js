@@ -1,5 +1,5 @@
 (function () {
-  const storageKey = "digitalHospitalMvpState:v0.12";
+  const storageKey = "digitalHospitalMvpState:v0.13";
 
   const domains = [
     { code: "A", name: "基础设施与平台支撑", weight: 100 },
@@ -386,6 +386,24 @@
       { id: "REL-ASSIST-20260711", version: "ASSIST-2026.07.11", modelRoute: "规则检索+摘要模型", promptVersion: "QA-PROMPT-v2.1", knowledgeVersion: "STD-2026-TRIAL", evaluationRunId: "EVALRUN-20260728-001", gateStatus: "通过", status: "已发布", owner: "评价助手治理组", reviewer: "国家级标准管理员", createdAt: "2026-07-28 10:30", publishedAt: "2026-07-28 10:35", rollbackTarget: "ASSIST-2026.07.10" },
       { id: "REL-ASSIST-20260712", version: "ASSIST-2026.07.12", modelRoute: "规则检索+摘要模型", promptVersion: "QA-PROMPT-v2.2", knowledgeVersion: "STD-2026-TRIAL.2", evaluationRunId: "EVALRUN-20260728-002", gateStatus: "阻断", status: "候选", owner: "评价助手治理组", reviewer: "国家级标准管理员", createdAt: "2026-07-28 10:36", publishedAt: "", rollbackTarget: "ASSIST-2026.07.11" },
     ],
+    assistantOnlineGuardrail: {
+      citationCoverage: 99,
+      answerAcceptance: 90,
+      maxNoAnswerRate: 8,
+      maxEscalationRate: 12,
+      maxP95LatencyMs: 900,
+      maxSafetyEvents: 0,
+      maxDriftScore: 5,
+      owner: "评价助手运行保障组",
+      updatedAt: "2026-07-28 11:10",
+    },
+    assistantDeployments: [
+      { id: "DEP-ASSIST-20260711", releaseId: "REL-ASSIST-20260711", version: "ASSIST-2026.07.11", strategy: "全量", trafficPercent: 100, cohorts: ["全部试点医院"], stableVersion: "ASSIST-2026.07.11", status: "稳定", owner: "评价助手运行保障组", startedAt: "2026-07-28 10:35", updatedAt: "2026-07-28 11:05", rollbackAt: "" },
+    ],
+    assistantOnlineQualityWindows: [
+      { id: "QWIN-ASSIST-20260711-01", deploymentId: "DEP-ASSIST-20260711", version: "ASSIST-2026.07.11", period: "最近30分钟", sampleCount: 1268, citationCoverage: 100, answerAcceptance: 94, noAnswerRate: 3.2, escalationRate: 6.8, p95LatencyMs: 642, safetyEvents: 0, driftScore: 1.8, status: "健康", collectedAt: "2026-07-28 11:05" },
+    ],
+    assistantQualityIncidents: [],
     anomalyExplanations: [
       { id: "AEX-20260728-001", sourceId: "VAL-H000001-B3-RATE", hospitalCode: "H000001", indicatorCode: "B3", title: "接口成功率接近等级边界", summary: "当前接口成功率99.5%，接近优秀级规则阈值，微小口径差异可能影响等级判断。", possibleCause: "失败调用是否重试计数、计划停机是否纳入分母等统计口径尚未完全确认。", impact: "可能影响B3得分及专家复核结论。", recommendation: "核对接口调用日志、失败重试去重规则和统计周期，并补充数据质量说明。", status: "待确认", generatedAt: "2026-07-28 09:30", editable: true },
       { id: "AEX-20260728-002", sourceId: "VAL-H000002-D1-VOL", hospitalCode: "H000002", indicatorCode: "D1", title: "预约诊疗量较历史同期波动较大", summary: "本期线上预约量较历史同期上升42%，超过历史波动阈值。", possibleCause: "统计渠道扩展、口径调整或业务量真实增长均可能导致波动。", impact: "不会自动扣分，但需要医院说明并由审核员确认。", recommendation: "补充渠道范围、统计口径变更和同期业务量对比。", status: "已编辑", generatedAt: "2026-07-28 09:32", editable: true },
@@ -534,6 +552,10 @@
     if (!Array.isArray(next.assistantEvaluationSuites)) next.assistantEvaluationSuites = JSON.parse(JSON.stringify(seedState.assistantEvaluationSuites));
     if (!Array.isArray(next.assistantEvaluationRuns)) next.assistantEvaluationRuns = JSON.parse(JSON.stringify(seedState.assistantEvaluationRuns));
     if (!Array.isArray(next.assistantReleaseCandidates)) next.assistantReleaseCandidates = JSON.parse(JSON.stringify(seedState.assistantReleaseCandidates));
+    if (!next.assistantOnlineGuardrail) next.assistantOnlineGuardrail = JSON.parse(JSON.stringify(seedState.assistantOnlineGuardrail));
+    if (!Array.isArray(next.assistantDeployments)) next.assistantDeployments = JSON.parse(JSON.stringify(seedState.assistantDeployments));
+    if (!Array.isArray(next.assistantOnlineQualityWindows)) next.assistantOnlineQualityWindows = JSON.parse(JSON.stringify(seedState.assistantOnlineQualityWindows));
+    if (!Array.isArray(next.assistantQualityIncidents)) next.assistantQualityIncidents = JSON.parse(JSON.stringify(seedState.assistantQualityIncidents));
     if (!Array.isArray(next.anomalyExplanations)) next.anomalyExplanations = JSON.parse(JSON.stringify(seedState.anomalyExplanations));
     if (!Array.isArray(next.rectificationSuggestions)) next.rectificationSuggestions = JSON.parse(JSON.stringify(seedState.rectificationSuggestions));
     if (!Array.isArray(next.reviewRiskSignals)) next.reviewRiskSignals = JSON.parse(JSON.stringify(seedState.reviewRiskSignals));
@@ -852,6 +874,10 @@
     const sufficientTraces = state.assistantRetrievalTraces.filter((item) => item.status === "命中充分");
     const latestEvaluationRun = state.assistantEvaluationRuns.slice().sort((left, right) => String(right.finishedAt).localeCompare(String(left.finishedAt)))[0];
     const activeRelease = state.assistantReleaseCandidates.find((item) => item.status === "已发布");
+    const activeCanaryDeployments = state.assistantDeployments.filter((item) => item.strategy === "灰度" && ["灰度中", "已暂停"].includes(item.status));
+    const latestQualityWindow = state.assistantOnlineQualityWindows.slice().sort((left, right) => String(right.collectedAt).localeCompare(String(left.collectedAt)))[0];
+    const healthyWindows = state.assistantOnlineQualityWindows.filter((item) => item.status === "健康");
+    const openQualityIncidents = state.assistantQualityIncidents.filter((item) => item.status !== "已解决");
     return {
       activeSources: state.assistantKnowledgeSources.filter((item) => item.status === "已启用").length,
       knowledgeChunks: state.assistantKnowledgeSources.reduce((sum, item) => sum + Number(item.chunks || 0), 0),
@@ -867,6 +893,11 @@
       latestEvaluationScore: latestEvaluationRun?.score || 0,
       blockedReleases: state.assistantReleaseCandidates.filter((item) => item.gateStatus === "阻断" && item.status === "候选").length,
       activeReleaseVersion: activeRelease?.version || "未发布",
+      activeCanaryDeployments: activeCanaryDeployments.length,
+      currentCanaryTraffic: activeCanaryDeployments[0]?.trafficPercent || 0,
+      onlineHealthyRate: Math.round((healthyWindows.length / Math.max(1, state.assistantOnlineQualityWindows.length)) * 100),
+      latestOnlineStatus: latestQualityWindow?.status === "异常" && !openQualityIncidents.length ? "已恢复" : latestQualityWindow?.status || "未采集",
+      openQualityIncidents: openQualityIncidents.length,
       pendingExplanations: pendingExplanations.length,
       pendingSuggestions: pendingSuggestions.length,
       adoptedSuggestions: state.rectificationSuggestions.filter((item) => item.status === "已采纳").length,
@@ -895,8 +926,8 @@
   }
 
   function statusClass(status) {
-    if (status === "已完成" || status === "已通过" || status === "已发布" || status === "已批准" || status === "已归档" || status === "已关闭" || status === "已解决" || status === "已就绪" || status === "已闭环" || status === "已启动" || status === "可启动" || status === "可推广" || status === "达标" || status === "通过" || status === "历史版本" || status === "启用" || status === "已启用" || status === "已采纳" || status === "已回答" || status === "已编辑" || status === "已转复核" || status === "已排除" || status === "复核通过" || status === "已校验" || status === "命中充分" || status === "成功" || status === "已复核" || status === "正常") return "";
-    if (status === "进行中" || status === "处理中" || status === "推进中" || status === "关注" || status === "条件通过" || status === "分析完成" || status === "改进中" || status === "待验收" || status === "准备中" || status === "已确认" || status === "待确认" || status === "待采纳" || status === "待分派" || status === "待回复" || status === "待评估" || status === "待审批" || status === "待复核" || status === "需补充" || status === "人工复核" || status === "草稿" || status === "报名中" || status === "候选" || status === "已回滚" || status === "试运行" || status === "预归档" || status === "填报中" || status === "审核中" || status === "上传中" || status === "扫描中" || status === "排队中" || status === "预警" || status === "降级") return "warn";
+    if (status === "已完成" || status === "已通过" || status === "已发布" || status === "已批准" || status === "已归档" || status === "已关闭" || status === "已解决" || status === "已就绪" || status === "已闭环" || status === "已启动" || status === "可启动" || status === "可推广" || status === "达标" || status === "通过" || status === "历史版本" || status === "启用" || status === "已启用" || status === "已采纳" || status === "已回答" || status === "已编辑" || status === "已转复核" || status === "已排除" || status === "复核通过" || status === "已校验" || status === "命中充分" || status === "成功" || status === "已复核" || status === "正常" || status === "稳定" || status === "健康" || status === "已恢复") return "";
+    if (status === "进行中" || status === "处理中" || status === "推进中" || status === "关注" || status === "条件通过" || status === "分析完成" || status === "改进中" || status === "待验收" || status === "准备中" || status === "已确认" || status === "待确认" || status === "待采纳" || status === "待分派" || status === "待回复" || status === "待评估" || status === "待审批" || status === "待复核" || status === "需补充" || status === "人工复核" || status === "草稿" || status === "报名中" || status === "候选" || status === "已回滚" || status === "试运行" || status === "预归档" || status === "填报中" || status === "审核中" || status === "上传中" || status === "扫描中" || status === "排队中" || status === "预警" || status === "降级" || status === "灰度中" || status === "已暂停" || status === "开放") return "warn";
     if (status === "阻断" || status === "门禁阻断" || status === "有阻塞" || status === "有风险" || status === "需优化" || status === "未达标" || status === "逾期" || status === "高" || status === "紧急" || status === "异常" || status === "故障" || status === "失败" || status === "高负荷" || status === "高风险" || status === "拥堵") return "danger";
     return "warn";
   }
@@ -955,7 +986,7 @@
       standardVersion: state.task.standard,
       hospitalCode: hospital.code,
       hospitalName: hospital.name,
-      prototypeVersion: "mvp-0.12",
+      prototypeVersion: "mvp-0.13",
     };
     if (kind === "submission") {
       return {
@@ -1134,6 +1165,10 @@
         assistantEvaluationSuites: state.assistantEvaluationSuites,
         assistantEvaluationRuns: state.assistantEvaluationRuns,
         assistantReleaseCandidates: state.assistantReleaseCandidates,
+        assistantOnlineGuardrail: state.assistantOnlineGuardrail,
+        assistantDeployments: state.assistantDeployments,
+        assistantOnlineQualityWindows: state.assistantOnlineQualityWindows,
+        assistantQualityIncidents: state.assistantQualityIncidents,
         anomalyExplanations: state.anomalyExplanations,
         rectificationSuggestions: state.rectificationSuggestions,
         reviewRiskSignals: state.reviewRiskSignals,
@@ -1196,6 +1231,10 @@
       assistantEvaluationSuites: state.assistantEvaluationSuites,
       assistantEvaluationRuns: state.assistantEvaluationRuns,
       assistantReleaseCandidates: state.assistantReleaseCandidates,
+      assistantOnlineGuardrail: state.assistantOnlineGuardrail,
+      assistantDeployments: state.assistantDeployments,
+      assistantOnlineQualityWindows: state.assistantOnlineQualityWindows,
+      assistantQualityIncidents: state.assistantQualityIncidents,
       anomalyExplanations: state.anomalyExplanations,
       rectificationSuggestions: state.rectificationSuggestions,
       reviewRiskSignals: state.reviewRiskSignals,
@@ -2393,6 +2432,7 @@
       { id: "risks", label: "审核风险" },
       { id: "governance", label: "治理审计" },
       { id: "quality", label: "质量门禁" },
+      { id: "canary", label: "灰度" },
     ];
     let content = "";
 
@@ -2831,6 +2871,140 @@
                     `,
                   )
                   .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "canary") {
+      const guardrail = state.assistantOnlineGuardrail;
+      const activeCanary = state.assistantDeployments.find((item) => item.strategy === "灰度" && ["灰度中", "已暂停"].includes(item.status));
+      content = `
+        <div class="grid-4">
+          ${metric("活跃灰度", summary.activeCanaryDeployments, "同一时间仅运行一个灰度版本", summary.activeCanaryDeployments ? "warn" : "")}
+          ${metric("当前灰度流量", `${summary.currentCanaryTraffic}%`, activeCanary?.version || "暂无灰度版本")}
+          ${metric("最近在线状态", summary.latestOnlineStatus, `健康窗口占比${summary.onlineHealthyRate}%`, summary.latestOnlineStatus === "异常" ? "danger" : "")}
+          ${metric("开放质量事件", summary.openQualityIncidents, "异常自动暂停扩量", summary.openQualityIncidents ? "danger" : "")}
+        </div>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">在线质量护栏</h3>
+              <p class="panel-subtitle">每个灰度窗口持续校验引用、采纳、转人工、时延、安全事件与分布漂移，任一指标越界即暂停扩量。</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>引用覆盖率</th><th>回答采纳率</th><th>无答案率</th><th>转人工率</th><th>P95时延</th><th>安全事件</th><th>漂移分</th><th>责任组</th><th>更新时间</th></tr></thead>
+              <tbody><tr><td>≥${guardrail.citationCoverage}%</td><td>≥${guardrail.answerAcceptance}%</td><td>≤${guardrail.maxNoAnswerRate}%</td><td>≤${guardrail.maxEscalationRate}%</td><td>≤${guardrail.maxP95LatencyMs}ms</td><td>≤${guardrail.maxSafetyEvents}</td><td>≤${guardrail.maxDriftScore}</td><td>${guardrail.owner}</td><td>${guardrail.updatedAt}</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">灰度部署与流量扩量</h3>
+              <p class="panel-subtitle">离线门禁通过后先向试点医院投放10%流量；仅当最新在线窗口健康且无开放事件时，才可逐级扩量。</p>
+            </div>
+            <button class="button secondary" type="button" data-action="create-canary-deployment" ${activeCanary ? "disabled" : ""}>创建10%灰度</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>版本</th><th>策略/流量</th><th>试点范围</th><th>稳定基线</th><th>责任组</th><th>开始/更新</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.assistantDeployments
+                  .map((item) => {
+                    const latestWindow = state.assistantOnlineQualityWindows.find((windowItem) => windowItem.deploymentId === item.id);
+                    const hasOpenIncident = state.assistantQualityIncidents.some((incident) => incident.deploymentId === item.id && incident.status !== "已解决");
+                    const canAdvance = item.status === "灰度中" && latestWindow?.status === "健康" && !hasOpenIncident;
+                    return `
+                      <tr>
+                        <td><strong>${item.version}</strong><br /><span class="muted-text">${item.id} · ${item.releaseId}</span></td>
+                        <td>${item.strategy}<br /><strong>${item.trafficPercent}%</strong></td>
+                        <td>${item.cohorts.map((cohort) => `<span class="tag">${cohort}</span>`).join(" ")}</td>
+                        <td>${item.stableVersion}</td>
+                        <td>${item.owner}</td>
+                        <td>${item.startedAt}<br /><span class="muted-text">${item.updatedAt}</span></td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td><div class="toolbar inline"><button class="button ghost" type="button" data-action="advance-canary-deployment" data-id="${item.id}" ${canAdvance ? "" : "disabled"}>${item.trafficPercent >= 30 ? "转全量" : "扩量至30%"}</button><button class="button ghost" type="button" data-action="rollback-canary-deployment" data-id="${item.id}" ${item.strategy !== "灰度" || item.status === "已回滚" ? "disabled" : ""}>回滚</button></div></td>
+                      </tr>
+                    `;
+                  })
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">在线质量窗口</h3>
+              <p class="panel-subtitle">窗口指标与部署版本绑定，扩量决策使用最新窗口；可注入异常验证暂停和回滚机制。</p>
+            </div>
+            <div class="toolbar inline">
+              <button class="button secondary" type="button" data-action="run-online-quality-check" ${!activeCanary || activeCanary.status === "已暂停" ? "disabled" : ""}>采集健康窗口</button>
+              <button class="button ghost" type="button" data-action="simulate-online-degradation" ${!activeCanary || activeCanary.status === "已暂停" ? "disabled" : ""}>模拟指标异常</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>窗口/版本</th><th>样本量</th><th>引用覆盖</th><th>采纳率</th><th>无答案率</th><th>转人工率</th><th>P95时延</th><th>安全事件</th><th>漂移分</th><th>状态</th></tr></thead>
+              <tbody>
+                ${state.assistantOnlineQualityWindows
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.period}</strong><br /><span class="muted-text">${item.id} · ${item.version}<br />${item.collectedAt}</span></td>
+                        <td>${item.sampleCount}</td>
+                        <td>${item.citationCoverage}%</td>
+                        <td>${item.answerAcceptance}%</td>
+                        <td>${item.noAnswerRate}%</td>
+                        <td>${item.escalationRate}%</td>
+                        <td>${item.p95LatencyMs}ms</td>
+                        <td>${item.safetyEvents}</td>
+                        <td>${item.driftScore}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">在线质量事件</h3>
+              <p class="panel-subtitle">异常窗口自动生成事件，记录越界信号、阈值、实际值、处置动作和恢复结果。</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>事件</th><th>版本</th><th>越界信号</th><th>阈值/实际</th><th>处置动作</th><th>责任组</th><th>创建/解决</th><th>状态</th></tr></thead>
+              <tbody>
+                ${
+                  state.assistantQualityIncidents.length
+                    ? state.assistantQualityIncidents
+                        .map(
+                          (item) => `
+                            <tr>
+                              <td><strong>${item.id}</strong><br /><span class="status-pill ${statusClass(item.level)}">${item.level}</span></td>
+                              <td>${item.version}<br /><span class="muted-text">${item.deploymentId}</span></td>
+                              <td>${item.signal}</td>
+                              <td>${item.threshold}<br /><strong>${item.actual}</strong></td>
+                              <td>${item.action}</td>
+                              <td>${item.owner}</td>
+                              <td>${item.createdAt}<br /><span class="muted-text">${item.resolvedAt || "待解决"}</span></td>
+                              <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                            </tr>
+                          `,
+                        )
+                        .join("")
+                    : `<tr><td colspan="8"><span class="muted-text">暂无质量事件，当前线上指标处于护栏范围内。</span></td></tr>`
+                }
               </tbody>
             </table>
           </div>
@@ -5750,6 +5924,226 @@
     render();
   }
 
+  function assistantOnlineQualityStatus(metrics) {
+    const guardrail = state.assistantOnlineGuardrail;
+    return metrics.citationCoverage >= guardrail.citationCoverage
+      && metrics.answerAcceptance >= guardrail.answerAcceptance
+      && metrics.noAnswerRate <= guardrail.maxNoAnswerRate
+      && metrics.escalationRate <= guardrail.maxEscalationRate
+      && metrics.p95LatencyMs <= guardrail.maxP95LatencyMs
+      && metrics.safetyEvents <= guardrail.maxSafetyEvents
+      && metrics.driftScore <= guardrail.maxDriftScore
+      ? "健康"
+      : "异常";
+  }
+
+  function createCanaryDeployment() {
+    const existing = state.assistantDeployments.find((item) => item.strategy === "灰度" && ["灰度中", "已暂停"].includes(item.status));
+    if (existing) {
+      showNotice(`已有${existing.version}正在灰度，请先完成或回滚。`);
+      return;
+    }
+    const latestPassedRun = state.assistantEvaluationRuns.find((item) => item.gateStatus === "通过");
+    if (!latestPassedRun) {
+      showNotice("没有通过离线质量门禁的评测运行，请先完成全量评测。");
+      return;
+    }
+    const maxSequence = state.assistantReleaseCandidates.reduce((max, item) => {
+      const sequence = Number(String(item.version).split(".").pop());
+      return Number.isFinite(sequence) ? Math.max(max, sequence) : max;
+    }, 12);
+    const version = `ASSIST-2026.07.${String(maxSequence + 1).padStart(2, "0")}`;
+    const stableDeployment = state.assistantDeployments.find((item) => item.status === "稳定")
+      || state.assistantDeployments.find((item) => item.status === "已完成")
+      || state.assistantDeployments[0];
+    const release = {
+      id: `REL-ASSIST-${Date.now()}`,
+      version,
+      modelRoute: "规则检索+摘要模型",
+      promptVersion: latestPassedRun.promptVersion,
+      knowledgeVersion: latestPassedRun.knowledgeVersion,
+      evaluationRunId: latestPassedRun.id,
+      gateStatus: "通过",
+      status: "候选",
+      owner: "评价助手治理组",
+      reviewer: state.activeRole,
+      createdAt: nowText(),
+      publishedAt: "",
+      rollbackTarget: stableDeployment?.version || "",
+    };
+    const deployment = {
+      id: `DEP-ASSIST-${Date.now()}`,
+      releaseId: release.id,
+      version,
+      strategy: "灰度",
+      trafficPercent: 10,
+      cohorts: ["首批试点医院", "医院填报员"],
+      stableVersion: stableDeployment?.version || "ASSIST-2026.07.11",
+      status: "灰度中",
+      owner: "评价助手运行保障组",
+      startedAt: nowText(),
+      updatedAt: nowText(),
+      rollbackAt: "",
+    };
+    state.assistantReleaseCandidates.unshift(release);
+    state.assistantDeployments.unshift(deployment);
+    addAudit("创建评价助手灰度部署", deployment.id, `${version} · 10%流量 · 基线${deployment.stableVersion}`);
+    saveState();
+    showNotice(`${version}已开始10%灰度，请采集在线质量窗口后扩量。`);
+    render();
+  }
+
+  function runOnlineQualityCheck() {
+    const deployment = state.assistantDeployments.find((item) => item.strategy === "灰度" && item.status === "灰度中");
+    if (!deployment) {
+      showNotice("当前没有可采集的灰度部署。");
+      return;
+    }
+    const metrics = {
+      sampleCount: 680 + state.assistantOnlineQualityWindows.length * 73,
+      citationCoverage: 100,
+      answerAcceptance: 94,
+      noAnswerRate: 3.6,
+      escalationRate: 7.4,
+      p95LatencyMs: 688,
+      safetyEvents: 0,
+      driftScore: 2.1,
+    };
+    const windowRecord = {
+      id: `QWIN-ASSIST-${Date.now()}`,
+      deploymentId: deployment.id,
+      version: deployment.version,
+      period: "最近30分钟",
+      ...metrics,
+      status: assistantOnlineQualityStatus(metrics),
+      collectedAt: nowText(),
+    };
+    state.assistantOnlineQualityWindows.unshift(windowRecord);
+    deployment.updatedAt = nowText();
+    addAudit("采集评价助手在线质量窗口", windowRecord.id, `${deployment.version} · ${windowRecord.status}`);
+    saveState();
+    showNotice(`${deployment.version}在线质量窗口${windowRecord.status}，可继续扩量。`);
+    render();
+  }
+
+  function advanceCanaryDeployment(id) {
+    const deployment = state.assistantDeployments.find((item) => item.id === id);
+    if (!deployment || deployment.status !== "灰度中") return;
+    const latestWindow = state.assistantOnlineQualityWindows.find((item) => item.deploymentId === deployment.id);
+    const hasOpenIncident = state.assistantQualityIncidents.some((item) => item.deploymentId === deployment.id && item.status !== "已解决");
+    if (!latestWindow || latestWindow.status !== "健康" || hasOpenIncident) {
+      showNotice("最新在线质量窗口不健康或仍有开放事件，不能扩量。");
+      return;
+    }
+    if (deployment.trafficPercent < 30) {
+      deployment.trafficPercent = 30;
+      deployment.cohorts = ["首批试点医院", "医院填报员", "省级审核员"];
+      deployment.updatedAt = nowText();
+      addAudit("扩量评价助手灰度部署", deployment.id, `${deployment.version} · 30%流量`);
+      saveState();
+      showNotice(`${deployment.version}已扩量至30%，请继续观察在线质量。`);
+      render();
+      return;
+    }
+    deployment.trafficPercent = 100;
+    deployment.strategy = "全量";
+    deployment.cohorts = ["全部试点医院"];
+    deployment.status = "已完成";
+    deployment.updatedAt = nowText();
+    const previousStable = state.assistantDeployments.find((item) => item.id !== deployment.id && item.status === "稳定");
+    if (previousStable) previousStable.status = "历史版本";
+    const release = state.assistantReleaseCandidates.find((item) => item.id === deployment.releaseId);
+    const previousRelease = state.assistantReleaseCandidates.find((item) => item.status === "已发布");
+    if (previousRelease && previousRelease.id !== release?.id) previousRelease.status = "历史版本";
+    if (release) {
+      release.status = "已发布";
+      release.publishedAt = nowText();
+    }
+    addAudit("完成评价助手灰度转全量", deployment.id, `${deployment.version} · 100%流量`);
+    saveState();
+    showNotice(`${deployment.version}已通过灰度验证并转为全量版本。`);
+    render();
+  }
+
+  function simulateOnlineDegradation() {
+    const deployment = state.assistantDeployments.find((item) => item.strategy === "灰度" && item.status === "灰度中");
+    if (!deployment) {
+      showNotice("当前没有运行中的灰度部署。");
+      return;
+    }
+    const metrics = {
+      sampleCount: 412,
+      citationCoverage: 96.8,
+      answerAcceptance: 82,
+      noAnswerRate: 11.4,
+      escalationRate: 16.2,
+      p95LatencyMs: 1280,
+      safetyEvents: 0,
+      driftScore: 7.6,
+    };
+    const windowRecord = {
+      id: `QWIN-ASSIST-${Date.now()}`,
+      deploymentId: deployment.id,
+      version: deployment.version,
+      period: "最近15分钟",
+      ...metrics,
+      status: assistantOnlineQualityStatus(metrics),
+      collectedAt: nowText(),
+    };
+    const incident = {
+      id: `QINC-ASSIST-${Date.now()}`,
+      deploymentId: deployment.id,
+      version: deployment.version,
+      signal: "采纳率、转人工率、P95时延与分布漂移同时越界",
+      level: "高",
+      threshold: `采纳率≥${state.assistantOnlineGuardrail.answerAcceptance}% · P95≤${state.assistantOnlineGuardrail.maxP95LatencyMs}ms · 漂移≤${state.assistantOnlineGuardrail.maxDriftScore}`,
+      actual: `采纳率${metrics.answerAcceptance}% · P95 ${metrics.p95LatencyMs}ms · 漂移${metrics.driftScore}`,
+      action: "自动暂停扩量，保留稳定版本流量，等待人工回滚或问题修复",
+      owner: "评价助手运行保障组",
+      status: "开放",
+      createdAt: nowText(),
+      resolvedAt: "",
+    };
+    state.assistantOnlineQualityWindows.unshift(windowRecord);
+    state.assistantQualityIncidents.unshift(incident);
+    deployment.status = "已暂停";
+    deployment.updatedAt = nowText();
+    addAudit("触发评价助手在线质量事件", incident.id, `${deployment.version} · 已暂停扩量`);
+    saveState();
+    showNotice(`${deployment.version}指标越界，灰度已暂停并生成质量事件。`);
+    render();
+  }
+
+  function rollbackCanaryDeployment(id) {
+    const deployment = state.assistantDeployments.find((item) => item.id === id);
+    if (!deployment || deployment.status === "已回滚" || deployment.status === "稳定") return;
+    deployment.status = "已回滚";
+    deployment.trafficPercent = 0;
+    deployment.rollbackAt = nowText();
+    deployment.updatedAt = nowText();
+    state.assistantQualityIncidents
+      .filter((item) => item.deploymentId === deployment.id && item.status !== "已解决")
+      .forEach((item) => {
+        item.status = "已解决";
+        item.action = `${item.action}；已回滚至${deployment.stableVersion}`;
+        item.resolvedAt = nowText();
+      });
+    const stableDeployment = state.assistantDeployments.find((item) => item.version === deployment.stableVersion);
+    if (stableDeployment) {
+      stableDeployment.status = "稳定";
+      stableDeployment.trafficPercent = 100;
+      stableDeployment.updatedAt = nowText();
+    }
+    const release = state.assistantReleaseCandidates.find((item) => item.id === deployment.releaseId);
+    if (release && release.status !== "已发布") release.status = "已回滚";
+    const stableRelease = state.assistantReleaseCandidates.find((item) => item.version === deployment.stableVersion);
+    if (stableRelease) stableRelease.status = "已发布";
+    addAudit("回滚评价助手灰度部署", deployment.id, `${deployment.version} → ${deployment.stableVersion}`);
+    saveState();
+    showNotice(`${deployment.version}已回滚，稳定版本${deployment.stableVersion}恢复100%流量。`);
+    render();
+  }
+
   function answerTemplateForQuestion(question) {
     if (/H1|等保|安全/.test(question)) {
       return {
@@ -6635,6 +7029,11 @@
     if (name === "create-assistant-release") createAssistantRelease();
     if (name === "advance-assistant-release") advanceAssistantRelease(action.dataset.id);
     if (name === "rollback-assistant-release") rollbackAssistantRelease(action.dataset.id);
+    if (name === "create-canary-deployment") createCanaryDeployment();
+    if (name === "run-online-quality-check") runOnlineQualityCheck();
+    if (name === "advance-canary-deployment") advanceCanaryDeployment(action.dataset.id);
+    if (name === "simulate-online-degradation") simulateOnlineDegradation();
+    if (name === "rollback-canary-deployment") rollbackCanaryDeployment(action.dataset.id);
     if (name === "ask-standard-question") askStandardQuestion();
     if (name === "confirm-standard-answer") confirmStandardAnswer(action.dataset.id);
     if (name === "generate-anomaly-explanations") generateAnomalyExplanations();
