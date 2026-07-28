@@ -3,7 +3,7 @@ info:
   title: 数智医院新标准平台MVP接口
   version: 0.1.0
   description: >
-    面向MVP原型的接口契约草案，覆盖评价任务、试点运营、试点协同、接入联调、试点评估、评价助手、推广准备、运营监控、医院申报、证据材料、数据校验、省级审核、专家复核、评分规则、评分结果、整改闭环、统计分析、国家抽查、规则沙箱、智能核验、消息提醒、批量导入、系统权限和运行管理。
+    面向MVP原型的接口契约草案，覆盖评价任务、试点运营、试点协同、接入联调、接入执行与安全控制、试点评估、评价助手、推广准备、运营监控、医院申报、证据材料、数据校验、省级审核、专家复核、评分规则、评分结果、整改闭环、统计分析、国家抽查、规则沙箱、智能核验、消息提醒、批量导入、系统权限和运行管理。
 servers:
   - url: https://example.local
     description: 示例服务地址，正式环境由部署方案确定
@@ -40,6 +40,8 @@ tags:
     description: 医院准备度、问题工单、培训答疑、试点版本和反馈闭环
   - name: PilotIntegration
     description: 医院接入申请、源系统连接器、凭据、数据映射、认证测试、问题处置和上线准入
+  - name: IntegrationExecution
+    description: 执行环境、保险库引用、异步任务、签名回执、重放隔离和生产切换
   - name: PilotAssessment
     description: 试点成效、问题复盘、优化计划、推广准备和评估报告
   - name: EvaluationAssistant
@@ -693,6 +695,315 @@ paths:
       summary: 批准试点医院上线
       parameters:
         - name: hospitalCode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/integration-environments:
+    get:
+      tags: [IntegrationExecution]
+      summary: 获取接入执行环境清单
+      responses:
+        "200":
+          description: 执行环境清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/IntegrationEnvironment"
+    post:
+      tags: [IntegrationExecution]
+      summary: 登记接入执行环境
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntegrationEnvironment"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/integration-environments/{environmentId}:verify:
+    post:
+      tags: [IntegrationExecution]
+      summary: 核验网络、TLS和环境配置版本
+      parameters:
+        - name: environmentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/credential-vault-references:
+    get:
+      tags: [IntegrationExecution]
+      summary: 获取凭据保险库引用清单
+      responses:
+        "200":
+          description: 仅返回引用指纹和轮换元数据
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CredentialVaultReference"
+    post:
+      tags: [IntegrationExecution]
+      summary: 登记凭据保险库引用
+      description: 请求和响应均不得包含原始密钥、令牌或私钥。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CredentialVaultReference"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/credential-vault-references/{entryId}:rotate:
+    post:
+      tags: [IntegrationExecution]
+      summary: 轮换凭据保险库引用
+      parameters:
+        - name: entryId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/integration-execution-jobs:
+    get:
+      tags: [IntegrationExecution]
+      summary: 获取异步接入执行任务
+      responses:
+        "200":
+          description: 接入执行任务清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/IntegrationExecutionJob"
+    post:
+      tags: [IntegrationExecution]
+      summary: 创建幂等接入执行任务
+      description: 相同幂等键摘要返回既有任务，不重复入队。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntegrationExecutionJob"
+      responses:
+        "200":
+          description: 新建或复用的执行任务
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntegrationExecutionJob"
+  /api/v1/integration-execution-jobs/{jobId}:advance:
+    post:
+      tags: [IntegrationExecution]
+      summary: 推进接入执行任务状态
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/integration-callback-receipts:
+    get:
+      tags: [IntegrationExecution]
+      summary: 获取签名回调核验记录
+      responses:
+        "200":
+          description: 回调核验记录
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/IntegrationCallbackReceipt"
+  /api/v1/integration-callback-receipts/{receiptId}:verify:
+    post:
+      tags: [IntegrationExecution]
+      summary: 核验回调签名、时间窗、nonce和载荷摘要
+      parameters:
+        - name: receiptId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 回调核验决定
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntegrationCallbackReceipt"
+  /api/v1/integration-callback-receipts:simulate-replay:
+    post:
+      tags: [IntegrationExecution]
+      summary: 模拟重放回调并验证拒绝和隔离策略
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/integration-replay-events:
+    get:
+      tags: [IntegrationExecution]
+      summary: 获取回调重放事件
+      responses:
+        "200":
+          description: 重放事件清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/IntegrationReplayEvent"
+  /api/v1/integration-quarantines:
+    get:
+      tags: [IntegrationExecution]
+      summary: 获取连接器隔离记录
+      responses:
+        "200":
+          description: 连接器隔离清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/IntegrationQuarantine"
+  /api/v1/integration-quarantines/{quarantineId}:release:
+    post:
+      tags: [IntegrationExecution]
+      summary: 复核并解除连接器隔离
+      parameters:
+        - name: quarantineId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reviewNote]
+              properties:
+                reviewNote:
+                  type: string
+                  minLength: 10
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/integration-cutover-windows:
+    get:
+      tags: [IntegrationExecution]
+      summary: 获取生产切换窗口
+      responses:
+        "200":
+          description: 生产切换窗口清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/IntegrationCutoverWindow"
+    post:
+      tags: [IntegrationExecution]
+      summary: 创建生产切换窗口
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntegrationCutoverWindow"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/integration-cutover-windows/{windowId}:evaluate:
+    post:
+      tags: [IntegrationExecution]
+      summary: 评估生产切换六项门禁
+      parameters:
+        - name: windowId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 最新切换门禁状态
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntegrationCutoverWindow"
+  /api/v1/integration-cutover-windows/{windowId}:start:
+    post:
+      tags: [IntegrationExecution]
+      summary: 授权开始生产切换
+      parameters:
+        - name: windowId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/integration-cutover-windows/{windowId}:complete:
+    post:
+      tags: [IntegrationExecution]
+      summary: 完成生产切换
+      parameters:
+        - name: windowId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/integration-cutover-windows/{windowId}:rollback:
+    post:
+      tags: [IntegrationExecution]
+      summary: 按预案回滚生产切换
+      parameters:
+        - name: windowId
           in: path
           required: true
           schema:
@@ -2513,6 +2824,274 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PilotIntegrationGate"
+    IntegrationEnvironment:
+      type: object
+      required: [id, name, type, networkZone, endpointAlias, tlsMode, configVersion, status]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum: [UAT, PROD]
+        networkZone:
+          type: string
+        endpointAlias:
+          type: string
+          description: 业务端点别名，不返回实际内网地址。
+        tlsMode:
+          type: string
+        configVersion:
+          type: string
+        status:
+          type: string
+          enum: [健康, 待核验, 异常]
+        lastVerifiedAt:
+          type: string
+        owner:
+          type: string
+    CredentialVaultReference:
+      type: object
+      required: [id, connectorId, environmentId, provider, vaultRefFingerprint, keyVersion, accessPolicy, status]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        connectorId:
+          type: string
+        environmentId:
+          type: string
+        provider:
+          type: string
+        vaultRefFingerprint:
+          type: string
+          description: 保险库引用的不可逆摘要，不是原始引用或凭据。
+        keyVersion:
+          type: string
+        rotationDueAt:
+          type: string
+        lastRotatedAt:
+          type: string
+        accessPolicy:
+          type: string
+        status:
+          type: string
+          enum: [有效, 临期, 失效]
+        owner:
+          type: string
+    IntegrationExecutionJob:
+      type: object
+      required: [id, connectorId, environmentId, jobType, idempotencyKeyHash, payloadDigest, status]
+      properties:
+        id:
+          type: string
+        connectorId:
+          type: string
+        environmentId:
+          type: string
+        jobType:
+          type: string
+        idempotencyKeyHash:
+          type: string
+          description: 原始幂等键的不可逆摘要。
+        idempotencyHits:
+          type: integer
+          minimum: 0
+        payloadDigest:
+          type: string
+        status:
+          type: string
+          enum: [排队中, 执行中, 等待回执, 成功, 阻断]
+        attempts:
+          type: integer
+          minimum: 0
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        queuedAt:
+          type: string
+        startedAt:
+          type: string
+        completedAt:
+          type: string
+        receiptId:
+          type: string
+        errorCode:
+          type: string
+    IntegrationCallbackReceipt:
+      type: object
+      required: [id, jobId, connectorId, source, eventType, signatureStatus, timestampStatus, nonceStatus, nonceHash, payloadDigest, digestStatus, status, decision, receivedAt]
+      properties:
+        id:
+          type: string
+        jobId:
+          type: string
+        connectorId:
+          type: string
+        source:
+          type: string
+        eventType:
+          type: string
+        signatureStatus:
+          type: string
+          enum: [已验证, 无效]
+        timestampStatus:
+          type: string
+          enum: [已验证, 过期]
+        nonceStatus:
+          type: string
+          enum: [已验证, 重放]
+        nonceHash:
+          type: string
+          description: nonce的不可逆摘要，不保留原始值。
+        payloadDigest:
+          type: string
+        digestStatus:
+          type: string
+          enum: [已验证, 不一致]
+        status:
+          type: string
+          enum: [已验证, 已阻断]
+        decision:
+          type: string
+          enum: [接收, 拒绝]
+        receivedAt:
+          type: string
+    IntegrationReplayEvent:
+      type: object
+      required: [id, source, connectorId, nonceHash, firstSeenAt, lastSeenAt, hits, action, status]
+      properties:
+        id:
+          type: string
+        source:
+          type: string
+        connectorId:
+          type: string
+        nonceHash:
+          type: string
+        firstSeenAt:
+          type: string
+        lastSeenAt:
+          type: string
+        hits:
+          type: integer
+          minimum: 2
+        action:
+          type: string
+        status:
+          type: string
+          enum: [待处置, 已处置]
+    IntegrationQuarantine:
+      type: object
+      required: [id, connectorId, reason, trigger, hits, status, owner, openedAt]
+      properties:
+        id:
+          type: string
+        connectorId:
+          type: string
+        reason:
+          type: string
+        trigger:
+          type: string
+        hits:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum: [隔离中, 已解除]
+        owner:
+          type: string
+        openedAt:
+          type: string
+        updatedAt:
+          type: string
+        releasedAt:
+          type: string
+        reviewNote:
+          type: string
+    IntegrationCutoverWindow:
+      type: object
+      required: [id, hospitalCode, hospitalName, environmentId, connectorIds, plannedAt, windowMinutes, rollbackPlan, checks, status]
+      properties:
+        id:
+          type: string
+        hospitalCode:
+          type: string
+        hospitalName:
+          type: string
+        environmentId:
+          type: string
+        connectorIds:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        plannedAt:
+          type: string
+        windowMinutes:
+          type: integer
+          minimum: 15
+        integrationApproved:
+          type: boolean
+        rollbackPlan:
+          type: string
+          minLength: 10
+        checks:
+          type: object
+          additionalProperties:
+            type: boolean
+        status:
+          type: string
+          enum: [待评估, 阻断, 可切换, 切换中, 已切换, 已回滚]
+        evaluatedAt:
+          type: string
+        approvedBy:
+          type: string
+        startedAt:
+          type: string
+        completedAt:
+          type: string
+        rollbackAt:
+          type: string
+    ExecutionPackage:
+      type: object
+      required: [meta, executionSummary, integrationEnvironments, credentialVaultEntries, integrationExecutionJobs, integrationCallbackReceipts, integrationReplayEvents, integrationQuarantines, integrationCutoverWindows]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PackageMeta"
+        executionSummary:
+          type: object
+          additionalProperties: true
+        integrationEnvironments:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntegrationEnvironment"
+        credentialVaultEntries:
+          type: array
+          items:
+            $ref: "#/components/schemas/CredentialVaultReference"
+        integrationExecutionJobs:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntegrationExecutionJob"
+        integrationCallbackReceipts:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntegrationCallbackReceipt"
+        integrationReplayEvents:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntegrationReplayEvent"
+        integrationQuarantines:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntegrationQuarantine"
+        integrationCutoverWindows:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntegrationCutoverWindow"
     AssessmentPackage:
       type: object
       required: [meta, assessmentSummary, pilotOutcomeMetrics, pilotHospitalOutcomes, pilotIssueThemes, pilotImprovementPlans, rolloutRegions, pilotAssessmentReports]
@@ -2941,7 +3520,7 @@ components:
       properties:
         packageType:
           type: string
-          enum: [submission, review, expert, rectification, task, pilot, collaboration, integration, assessment, assistant, monitoring, evidence, analytics, intelligence, operations, system, full]
+          enum: [submission, review, expert, rectification, task, pilot, collaboration, integration, execution, assessment, assistant, monitoring, evidence, analytics, intelligence, operations, system, full]
         generatedAt:
           type: string
           format: date-time
