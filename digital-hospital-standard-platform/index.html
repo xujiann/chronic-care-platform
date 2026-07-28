@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>数智医院新标准平台功能原型</title>
+    <meta
+      name="description"
+      content="数智医院新标准平台MVP功能原型，覆盖试点运营、试点协同、试点评估、评价助手、推广准备、运营监控、标准指标、医院申报、分级审核、评分整改、国家抽查、规则沙箱、智能核验和运行管理。"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="side-nav" aria-label="主导航">
+        <div class="brand">
+          <div class="brand-mark">数智</div>
+          <div>
+            <h1>新标准平台</h1>
+            <p>医院数智化评价</p>
+          </div>
+        </div>
+        <nav class="nav-list">
+          <button class="nav-item active" type="button" data-view="dashboard">总览</button>
+          <button class="nav-item" type="button" data-view="tasks">任务管理</button>
+          <button class="nav-item" type="button" data-view="pilot">试点运营</button>
+          <button class="nav-item" type="button" data-view="collaboration">试点协同</button>
+          <button class="nav-item" type="button" data-view="assessment">试点评估</button>
+          <button class="nav-item" type="button" data-view="assistant">评价助手</button>
+          <button class="nav-item" type="button" data-view="monitoring">运营监控</button>
+          <button class="nav-item" type="button" data-view="standards">标准指标</button>
+          <button class="nav-item" type="button" data-view="submission">医院申报</button>
+          <button class="nav-item" type="button" data-view="evidence">证据材料</button>
+          <button class="nav-item" type="button" data-view="validation">数据校验</button>
+          <button class="nav-item" type="button" data-view="review">省级审核</button>
+          <button class="nav-item" type="button" data-view="expert">专家复核</button>
+          <button class="nav-item" type="button" data-view="score">评分整改</button>
+          <button class="nav-item" type="button" data-view="rules">评分规则</button>
+          <button class="nav-item" type="button" data-view="analytics">统计分析</button>
+          <button class="nav-item" type="button" data-view="intelligence">智能监管</button>
+          <button class="nav-item" type="button" data-view="exchange">接口数据</button>
+          <button class="nav-item" type="button" data-view="operations">运行管理</button>
+          <button class="nav-item" type="button" data-view="system">系统权限</button>
+        </nav>
+        <div class="side-summary">
+          <span>当前任务</span>
+          <strong id="sideTaskName">2026试点评价</strong>
+          <small id="sideTaskStatus">填报中</small>
+        </div>
+      </aside>
+
+      <main class="main-area">
+        <header class="top-bar">
+          <div>
+            <p class="eyebrow">MVP工作台</p>
+            <h2 id="viewTitle">总览</h2>
+          </div>
+          <div class="top-actions">
+            <label class="field compact">
+              <span>当前角色</span>
+              <select id="roleSelect" aria-label="选择当前角色"></select>
+            </label>
+            <label class="field compact">
+              <span>当前医院</span>
+              <select id="hospitalSelect" aria-label="选择当前医院"></select>
+            </label>
+            <button class="button ghost" type="button" id="resetState">重置样例</button>
+          </div>
+        </header>
+
+        <section id="notice" class="notice" aria-live="polite"></section>
+        <section id="workspace" class="workspace" tabindex="-1"></section>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
