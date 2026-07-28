@@ -1,5 +1,5 @@
 (function () {
-  const storageKey = "digitalHospitalMvpState:v0.11";
+  const storageKey = "digitalHospitalMvpState:v0.12";
 
   const domains = [
     { code: "A", name: "基础设施与平台支撑", weight: 100 },
@@ -363,6 +363,29 @@
       { id: "MC-QA-20260728-003", businessId: "QA-20260728-003", scene: "标准问答", modelRoute: "规则检索+摘要模型", promptVersion: "QA-PROMPT-v2.1", requestDigest: "fnv32-d3124b80", responseDigest: "fnv32-8a02519c", inputTokens: 536, outputTokens: 118, latencyMs: 401, fallback: false, risk: "低", callStatus: "成功", reviewStatus: "待复核", operator: "医院管理员", calledAt: "2026-07-28 09:20", reviewedBy: "", reviewedAt: "" },
       { id: "MC-AEX-20260728-001", businessId: "AEX-20260728-001", scene: "异常解释", modelRoute: "规则解释模型", promptVersion: "AEX-PROMPT-v1.3", requestDigest: "fnv32-9e2c7154", responseDigest: "fnv32-f6423ba1", inputTokens: 412, outputTokens: 164, latencyMs: 512, fallback: false, risk: "中", callStatus: "成功", reviewStatus: "已复核", operator: "省级审核组", calledAt: "2026-07-28 09:30", reviewedBy: "数据治理组", reviewedAt: "2026-07-28 09:45" },
     ],
+    assistantQualityGate: {
+      citationCoverage: 100,
+      answerAccuracy: 90,
+      retrievalRecall: 85,
+      safetyCompliance: 100,
+      maxLatencyMs: 800,
+      maxRegressionPoints: 2,
+      owner: "评价助手治理组",
+      updatedAt: "2026-07-28 10:35",
+    },
+    assistantEvaluationSuites: [
+      { id: "EVALSET-CORE-2026-01", name: "标准口径核心回归集", version: "v1.2", type: "业务准确性", domains: ["B3", "D6", "H1"], caseCount: 40, source: "标准规则与专家确认问答", owner: "标准规则组", status: "已发布", updatedAt: "2026-07-28 10:20" },
+      { id: "EVALSET-SAFETY-2026-01", name: "越权结论与安全拒答集", version: "v1.0", type: "安全边界", domains: ["评分结论", "敏感数据", "越权操作"], caseCount: 18, source: "安全策略与审核红线", owner: "安全合规组", status: "已发布", updatedAt: "2026-07-28 10:22" },
+      { id: "EVALSET-PILOT-2026-01", name: "首批试点长尾问题集", version: "v0.3", type: "试点泛化", domains: ["高频工单", "边界口径"], caseCount: 26, source: "试点工单和培训答疑", owner: "试点培训组", status: "草稿", updatedAt: "2026-07-28 10:24" },
+    ],
+    assistantEvaluationRuns: [
+      { id: "EVALRUN-20260728-001", candidateVersion: "ASSIST-2026.07.11", suiteVersion: "CORE-v1.2+SAFETY-v1.0", knowledgeVersion: "STD-2026-TRIAL", promptVersion: "QA-PROMPT-v2.1", citationCoverage: 100, answerAccuracy: 94, retrievalRecall: 91, safetyCompliance: 100, averageLatencyMs: 486, baselineDelta: 1.8, score: 96, gateStatus: "通过", status: "已完成", startedAt: "2026-07-28 10:25", finishedAt: "2026-07-28 10:29" },
+      { id: "EVALRUN-20260728-002", candidateVersion: "ASSIST-2026.07.12", suiteVersion: "CORE-v1.2+SAFETY-v1.0", knowledgeVersion: "STD-2026-TRIAL.2", promptVersion: "QA-PROMPT-v2.2", citationCoverage: 100, answerAccuracy: 88, retrievalRecall: 82, safetyCompliance: 100, averageLatencyMs: 612, baselineDelta: -3.4, score: 89, gateStatus: "阻断", status: "已完成", startedAt: "2026-07-28 10:30", finishedAt: "2026-07-28 10:34" },
+    ],
+    assistantReleaseCandidates: [
+      { id: "REL-ASSIST-20260711", version: "ASSIST-2026.07.11", modelRoute: "规则检索+摘要模型", promptVersion: "QA-PROMPT-v2.1", knowledgeVersion: "STD-2026-TRIAL", evaluationRunId: "EVALRUN-20260728-001", gateStatus: "通过", status: "已发布", owner: "评价助手治理组", reviewer: "国家级标准管理员", createdAt: "2026-07-28 10:30", publishedAt: "2026-07-28 10:35", rollbackTarget: "ASSIST-2026.07.10" },
+      { id: "REL-ASSIST-20260712", version: "ASSIST-2026.07.12", modelRoute: "规则检索+摘要模型", promptVersion: "QA-PROMPT-v2.2", knowledgeVersion: "STD-2026-TRIAL.2", evaluationRunId: "EVALRUN-20260728-002", gateStatus: "阻断", status: "候选", owner: "评价助手治理组", reviewer: "国家级标准管理员", createdAt: "2026-07-28 10:36", publishedAt: "", rollbackTarget: "ASSIST-2026.07.11" },
+    ],
     anomalyExplanations: [
       { id: "AEX-20260728-001", sourceId: "VAL-H000001-B3-RATE", hospitalCode: "H000001", indicatorCode: "B3", title: "接口成功率接近等级边界", summary: "当前接口成功率99.5%，接近优秀级规则阈值，微小口径差异可能影响等级判断。", possibleCause: "失败调用是否重试计数、计划停机是否纳入分母等统计口径尚未完全确认。", impact: "可能影响B3得分及专家复核结论。", recommendation: "核对接口调用日志、失败重试去重规则和统计周期，并补充数据质量说明。", status: "待确认", generatedAt: "2026-07-28 09:30", editable: true },
       { id: "AEX-20260728-002", sourceId: "VAL-H000002-D1-VOL", hospitalCode: "H000002", indicatorCode: "D1", title: "预约诊疗量较历史同期波动较大", summary: "本期线上预约量较历史同期上升42%，超过历史波动阈值。", possibleCause: "统计渠道扩展、口径调整或业务量真实增长均可能导致波动。", impact: "不会自动扣分，但需要医院说明并由审核员确认。", recommendation: "补充渠道范围、统计口径变更和同期业务量对比。", status: "已编辑", generatedAt: "2026-07-28 09:32", editable: true },
@@ -507,6 +530,10 @@
     if (!Array.isArray(next.standardQaRecords)) next.standardQaRecords = JSON.parse(JSON.stringify(seedState.standardQaRecords));
     if (!Array.isArray(next.assistantRetrievalTraces)) next.assistantRetrievalTraces = JSON.parse(JSON.stringify(seedState.assistantRetrievalTraces));
     if (!Array.isArray(next.assistantModelCalls)) next.assistantModelCalls = JSON.parse(JSON.stringify(seedState.assistantModelCalls));
+    if (!next.assistantQualityGate) next.assistantQualityGate = JSON.parse(JSON.stringify(seedState.assistantQualityGate));
+    if (!Array.isArray(next.assistantEvaluationSuites)) next.assistantEvaluationSuites = JSON.parse(JSON.stringify(seedState.assistantEvaluationSuites));
+    if (!Array.isArray(next.assistantEvaluationRuns)) next.assistantEvaluationRuns = JSON.parse(JSON.stringify(seedState.assistantEvaluationRuns));
+    if (!Array.isArray(next.assistantReleaseCandidates)) next.assistantReleaseCandidates = JSON.parse(JSON.stringify(seedState.assistantReleaseCandidates));
     if (!Array.isArray(next.anomalyExplanations)) next.anomalyExplanations = JSON.parse(JSON.stringify(seedState.anomalyExplanations));
     if (!Array.isArray(next.rectificationSuggestions)) next.rectificationSuggestions = JSON.parse(JSON.stringify(seedState.rectificationSuggestions));
     if (!Array.isArray(next.reviewRiskSignals)) next.reviewRiskSignals = JSON.parse(JSON.stringify(seedState.reviewRiskSignals));
@@ -823,6 +850,8 @@
     const pendingSuggestions = state.rectificationSuggestions.filter((item) => item.status === "待采纳");
     const openRisks = state.reviewRiskSignals.filter((item) => item.status === "待确认" || item.status === "已确认");
     const sufficientTraces = state.assistantRetrievalTraces.filter((item) => item.status === "命中充分");
+    const latestEvaluationRun = state.assistantEvaluationRuns.slice().sort((left, right) => String(right.finishedAt).localeCompare(String(left.finishedAt)))[0];
+    const activeRelease = state.assistantReleaseCandidates.find((item) => item.status === "已发布");
     return {
       activeSources: state.assistantKnowledgeSources.filter((item) => item.status === "已启用").length,
       knowledgeChunks: state.assistantKnowledgeSources.reduce((sum, item) => sum + Number(item.chunks || 0), 0),
@@ -833,6 +862,11 @@
       retrievalPassRate: Math.round((sufficientTraces.length / Math.max(1, state.assistantRetrievalTraces.length)) * 100),
       unreviewedModelCalls: state.assistantModelCalls.filter((item) => item.reviewStatus !== "已复核").length,
       degradedModelCalls: state.assistantModelCalls.filter((item) => item.callStatus === "降级").length,
+      publishedEvaluationSuites: state.assistantEvaluationSuites.filter((item) => item.status === "已发布").length,
+      evaluationCaseCount: state.assistantEvaluationSuites.filter((item) => item.status === "已发布").reduce((sum, item) => sum + Number(item.caseCount || 0), 0),
+      latestEvaluationScore: latestEvaluationRun?.score || 0,
+      blockedReleases: state.assistantReleaseCandidates.filter((item) => item.gateStatus === "阻断" && item.status === "候选").length,
+      activeReleaseVersion: activeRelease?.version || "未发布",
       pendingExplanations: pendingExplanations.length,
       pendingSuggestions: pendingSuggestions.length,
       adoptedSuggestions: state.rectificationSuggestions.filter((item) => item.status === "已采纳").length,
@@ -849,10 +883,21 @@
     }[status] || "已生效";
   }
 
+  function assistantReleaseActionLabel(status, gateStatus) {
+    if (gateStatus !== "通过") return "门禁阻断";
+    return {
+      候选: "提交审批",
+      待审批: "发布上线",
+      已发布: "已上线",
+      历史版本: "历史版本",
+      已回滚: "已回滚",
+    }[status] || status;
+  }
+
   function statusClass(status) {
-    if (status === "已完成" || status === "已通过" || status === "已发布" || status === "已批准" || status === "已归档" || status === "已关闭" || status === "已解决" || status === "已就绪" || status === "已闭环" || status === "已启动" || status === "可启动" || status === "可推广" || status === "达标" || status === "启用" || status === "已启用" || status === "已采纳" || status === "已回答" || status === "已编辑" || status === "已转复核" || status === "已排除" || status === "复核通过" || status === "已校验" || status === "命中充分" || status === "成功" || status === "已复核" || status === "正常") return "";
-    if (status === "进行中" || status === "处理中" || status === "推进中" || status === "关注" || status === "条件通过" || status === "分析完成" || status === "改进中" || status === "待验收" || status === "准备中" || status === "已确认" || status === "待确认" || status === "待采纳" || status === "待分派" || status === "待回复" || status === "待评估" || status === "待审批" || status === "待复核" || status === "需补充" || status === "人工复核" || status === "草稿" || status === "报名中" || status === "候选" || status === "试运行" || status === "预归档" || status === "填报中" || status === "审核中" || status === "上传中" || status === "扫描中" || status === "排队中" || status === "预警" || status === "降级") return "warn";
-    if (status === "阻断" || status === "有阻塞" || status === "有风险" || status === "需优化" || status === "未达标" || status === "逾期" || status === "高" || status === "紧急" || status === "异常" || status === "故障" || status === "失败" || status === "高负荷" || status === "高风险" || status === "拥堵") return "danger";
+    if (status === "已完成" || status === "已通过" || status === "已发布" || status === "已批准" || status === "已归档" || status === "已关闭" || status === "已解决" || status === "已就绪" || status === "已闭环" || status === "已启动" || status === "可启动" || status === "可推广" || status === "达标" || status === "通过" || status === "历史版本" || status === "启用" || status === "已启用" || status === "已采纳" || status === "已回答" || status === "已编辑" || status === "已转复核" || status === "已排除" || status === "复核通过" || status === "已校验" || status === "命中充分" || status === "成功" || status === "已复核" || status === "正常") return "";
+    if (status === "进行中" || status === "处理中" || status === "推进中" || status === "关注" || status === "条件通过" || status === "分析完成" || status === "改进中" || status === "待验收" || status === "准备中" || status === "已确认" || status === "待确认" || status === "待采纳" || status === "待分派" || status === "待回复" || status === "待评估" || status === "待审批" || status === "待复核" || status === "需补充" || status === "人工复核" || status === "草稿" || status === "报名中" || status === "候选" || status === "已回滚" || status === "试运行" || status === "预归档" || status === "填报中" || status === "审核中" || status === "上传中" || status === "扫描中" || status === "排队中" || status === "预警" || status === "降级") return "warn";
+    if (status === "阻断" || status === "门禁阻断" || status === "有阻塞" || status === "有风险" || status === "需优化" || status === "未达标" || status === "逾期" || status === "高" || status === "紧急" || status === "异常" || status === "故障" || status === "失败" || status === "高负荷" || status === "高风险" || status === "拥堵") return "danger";
     return "warn";
   }
 
@@ -910,7 +955,7 @@
       standardVersion: state.task.standard,
       hospitalCode: hospital.code,
       hospitalName: hospital.name,
-      prototypeVersion: "mvp-0.11",
+      prototypeVersion: "mvp-0.12",
     };
     if (kind === "submission") {
       return {
@@ -1085,6 +1130,10 @@
         standardQaRecords: state.standardQaRecords,
         assistantRetrievalTraces: state.assistantRetrievalTraces,
         assistantModelCalls: state.assistantModelCalls,
+        assistantQualityGate: state.assistantQualityGate,
+        assistantEvaluationSuites: state.assistantEvaluationSuites,
+        assistantEvaluationRuns: state.assistantEvaluationRuns,
+        assistantReleaseCandidates: state.assistantReleaseCandidates,
         anomalyExplanations: state.anomalyExplanations,
         rectificationSuggestions: state.rectificationSuggestions,
         reviewRiskSignals: state.reviewRiskSignals,
@@ -1143,6 +1192,10 @@
       standardQaRecords: state.standardQaRecords,
       assistantRetrievalTraces: state.assistantRetrievalTraces,
       assistantModelCalls: state.assistantModelCalls,
+      assistantQualityGate: state.assistantQualityGate,
+      assistantEvaluationSuites: state.assistantEvaluationSuites,
+      assistantEvaluationRuns: state.assistantEvaluationRuns,
+      assistantReleaseCandidates: state.assistantReleaseCandidates,
       anomalyExplanations: state.anomalyExplanations,
       rectificationSuggestions: state.rectificationSuggestions,
       reviewRiskSignals: state.reviewRiskSignals,
@@ -2339,6 +2392,7 @@
       { id: "suggestions", label: "整改建议" },
       { id: "risks", label: "审核风险" },
       { id: "governance", label: "治理审计" },
+      { id: "quality", label: "质量门禁" },
     ];
     let content = "";
 
@@ -2643,6 +2697,136 @@
                         <td><span class="status-pill ${statusClass(item.callStatus)}">${item.callStatus}</span><br /><span class="muted-text">风险${item.risk}${item.fallback ? " · 已降级" : ""}</span></td>
                         <td><span class="status-pill ${statusClass(item.reviewStatus)}">${item.reviewStatus}</span><br /><span class="muted-text">${item.reviewedBy || "待指派"}</span></td>
                         <td><button class="button ghost" type="button" data-action="review-model-call" data-id="${item.id}" ${item.reviewStatus === "已复核" ? "disabled" : ""}>人工复核</button></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "quality") {
+      const gate = state.assistantQualityGate;
+      content = `
+        <div class="grid-4">
+          ${metric("已发布评测集", summary.publishedEvaluationSuites, `${summary.evaluationCaseCount}个门禁样本`)}
+          ${metric("最近评测得分", summary.latestEvaluationScore, `${state.assistantEvaluationRuns.length}次运行记录`, summary.latestEvaluationScore < 90 ? "danger" : "")}
+          ${metric("门禁阻断候选", summary.blockedReleases, "不允许提交审批或上线", summary.blockedReleases ? "danger" : "")}
+          ${metric("当前线上版本", summary.activeReleaseVersion, "支持一键恢复历史版本")}
+        </div>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">质量门禁阈值</h3>
+              <p class="panel-subtitle">候选版本必须同时满足业务准确性、检索质量、安全边界、性能和基线回归要求。</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>引用覆盖率</th><th>回答准确率</th><th>检索召回率</th><th>安全合规率</th><th>平均时延</th><th>允许基线回退</th><th>责任组</th><th>更新时间</th></tr></thead>
+              <tbody><tr><td>≥${gate.citationCoverage}%</td><td>≥${gate.answerAccuracy}%</td><td>≥${gate.retrievalRecall}%</td><td>≥${gate.safetyCompliance}%</td><td>≤${gate.maxLatencyMs}ms</td><td>≤${gate.maxRegressionPoints}个百分点</td><td>${gate.owner}</td><td>${gate.updatedAt}</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">评价助手评测集</h3>
+              <p class="panel-subtitle">业务口径、安全边界和试点长尾样本分别维护版本，草稿样本不进入正式发布门禁。</p>
+            </div>
+            <button class="button secondary" type="button" data-action="create-evaluation-suite">新建评测集</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>评测集</th><th>类型</th><th>覆盖范围</th><th>样本数</th><th>来源</th><th>责任组</th><th>更新时间</th><th>状态</th></tr></thead>
+              <tbody>
+                ${state.assistantEvaluationSuites
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.name}</strong><br /><span class="muted-text">${item.id} · ${item.version}</span></td>
+                        <td>${item.type}</td>
+                        <td>${item.domains.map((domain) => `<span class="tag">${domain}</span>`).join(" ")}</td>
+                        <td>${item.caseCount}</td>
+                        <td>${item.source}</td>
+                        <td>${item.owner}</td>
+                        <td>${item.updatedAt}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">回归评测运行</h3>
+              <p class="panel-subtitle">同一候选在固定评测集上执行，记录质量、性能和相对线上基线的变化。</p>
+            </div>
+            <button class="button secondary" type="button" data-action="run-assistant-evaluation">运行全量评测</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>运行/候选</th><th>评测集</th><th>知识/提示版本</th><th>引用覆盖</th><th>回答准确</th><th>检索召回</th><th>安全合规</th><th>平均时延</th><th>基线变化</th><th>得分</th><th>门禁</th></tr></thead>
+              <tbody>
+                ${state.assistantEvaluationRuns
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.id}</strong><br /><span class="muted-text">${item.candidateVersion} · ${item.finishedAt}</span></td>
+                        <td>${item.suiteVersion}</td>
+                        <td>${item.knowledgeVersion}<br /><span class="muted-text">${item.promptVersion}</span></td>
+                        <td>${item.citationCoverage}%</td>
+                        <td>${item.answerAccuracy}%</td>
+                        <td>${item.retrievalRecall}%</td>
+                        <td>${item.safetyCompliance}%</td>
+                        <td>${item.averageLatencyMs}ms</td>
+                        <td>${item.baselineDelta > 0 ? "+" : ""}${item.baselineDelta}</td>
+                        <td><strong>${item.score}</strong></td>
+                        <td><span class="status-pill ${statusClass(item.gateStatus)}">${item.gateStatus}</span></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">候选版本发布与回滚</h3>
+              <p class="panel-subtitle">候选版本关联唯一评测运行；门禁通过后才能提交审批和发布，线上异常可恢复最近历史版本。</p>
+            </div>
+            <button class="button secondary" type="button" data-action="create-assistant-release">创建候选版本</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>版本</th><th>路由/提示版本</th><th>知识版本</th><th>评测证据</th><th>回滚目标</th><th>责任与审批</th><th>门禁</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.assistantReleaseCandidates
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.version}</strong><br /><span class="muted-text">${item.id} · ${item.publishedAt || item.createdAt}</span></td>
+                        <td>${item.modelRoute}<br /><span class="muted-text">${item.promptVersion}</span></td>
+                        <td>${item.knowledgeVersion}</td>
+                        <td>${item.evaluationRunId}</td>
+                        <td>${item.rollbackTarget || "无"}</td>
+                        <td>${item.owner}<br /><span class="muted-text">${item.reviewer}</span></td>
+                        <td><span class="status-pill ${statusClass(item.gateStatus)}">${item.gateStatus}</span></td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td>${
+                          item.status === "已发布"
+                            ? `<button class="button ghost" type="button" data-action="rollback-assistant-release" data-id="${item.id}">回滚版本</button>`
+                            : `<button class="button ghost" type="button" data-action="advance-assistant-release" data-id="${item.id}" ${item.gateStatus !== "通过" || item.status === "历史版本" || item.status === "已回滚" ? "disabled" : ""}>${assistantReleaseActionLabel(item.status, item.gateStatus)}</button>`
+                        }</td>
                       </tr>
                     `,
                   )
@@ -3989,7 +4173,7 @@
         </article>
         <article class="package-card">
           <strong>评价助手包</strong>
-          <span>知识版本、标准问答、检索轨迹、模型审计、异常说明、整改建议和审核风险线索</span>
+          <span>知识版本、标准问答、检索轨迹、模型审计、质量评测、发布门禁、异常说明、整改建议和审核风险线索</span>
         </article>
         <article class="package-card">
           <strong>运营监控包</strong>
@@ -4064,6 +4248,9 @@
               <tr><td>知识版本审批</td><td>GET/POST/PUT</td><td>/api/v1/evaluation-assistant/knowledge-versions</td><td>知识变更、审批发布、生效版本与摘要指纹</td><td><span class="priority">P2</span></td></tr>
               <tr><td>检索命中追踪</td><td>GET/POST</td><td>/api/v1/evaluation-assistant/retrieval-traces</td><td>问答命中片段、相似度阈值、耗时与复核状态</td><td><span class="priority">P2</span></td></tr>
               <tr><td>模型调用审计</td><td>GET/POST</td><td>/api/v1/evaluation-assistant/model-calls</td><td>提示版本、摘要指纹、令牌、耗时、降级和人工复核</td><td><span class="priority">P2</span></td></tr>
+              <tr><td>评价助手评测集</td><td>GET/POST</td><td>/api/v1/evaluation-assistant/evaluation-suites</td><td>业务准确性、安全边界和试点长尾样本版本</td><td><span class="priority">P2</span></td></tr>
+              <tr><td>回归评测运行</td><td>GET/POST</td><td>/api/v1/evaluation-assistant/evaluation-runs</td><td>引用、准确率、召回率、安全、性能和基线变化</td><td><span class="priority">P2</span></td></tr>
+              <tr><td>质量发布门禁</td><td>GET/POST/PUT</td><td>/api/v1/evaluation-assistant/release-candidates</td><td>候选版本、评测证据、审批发布和历史版本回滚</td><td><span class="priority">P2</span></td></tr>
               <tr><td>异常说明</td><td>GET/POST</td><td>/api/v1/evaluation-assistant/anomaly-explanations</td><td>校验异常解释、可能原因和可编辑说明</td><td><span class="priority">P2</span></td></tr>
               <tr><td>整改建议</td><td>GET/POST</td><td>/api/v1/evaluation-assistant/rectification-suggestions</td><td>辅助建议、执行步骤与整改任务转化</td><td><span class="priority">P2</span></td></tr>
               <tr><td>审核风险</td><td>GET/POST</td><td>/api/v1/evaluation-assistant/review-risks</td><td>风险线索、依据、人工研判和专家复核</td><td><span class="priority">P2</span></td></tr>
@@ -5422,6 +5609,147 @@
     render();
   }
 
+  function assistantQualityGateStatus(metrics) {
+    const gate = state.assistantQualityGate;
+    return metrics.citationCoverage >= gate.citationCoverage
+      && metrics.answerAccuracy >= gate.answerAccuracy
+      && metrics.retrievalRecall >= gate.retrievalRecall
+      && metrics.safetyCompliance >= gate.safetyCompliance
+      && metrics.averageLatencyMs <= gate.maxLatencyMs
+      && metrics.baselineDelta >= -gate.maxRegressionPoints
+      ? "通过"
+      : "阻断";
+  }
+
+  function createEvaluationSuite() {
+    const sequence = state.assistantEvaluationSuites.length + 1;
+    const suite = {
+      id: `EVALSET-PILOT-${Date.now()}`,
+      name: `试点问题增量评测集${sequence}`,
+      version: "v0.1",
+      type: "试点泛化",
+      domains: ["口径变更", "长尾问题", "拒答边界"],
+      caseCount: 12,
+      source: "本轮试点工单、问答确认和风险复核记录",
+      owner: "试点培训组",
+      status: "草稿",
+      updatedAt: nowText(),
+    };
+    state.assistantEvaluationSuites.unshift(suite);
+    addAudit("新建评价助手评测集", suite.id, `${suite.caseCount}个样本`);
+    saveState();
+    showNotice(`${suite.name}已创建，完成专家复核后可发布进入门禁。`);
+    render();
+  }
+
+  function runAssistantEvaluation() {
+    const candidate = state.assistantReleaseCandidates.find((item) => item.status === "候选" && item.gateStatus === "阻断")
+      || state.assistantReleaseCandidates.find((item) => item.status === "候选")
+      || state.assistantReleaseCandidates[0];
+    const metrics = {
+      citationCoverage: 100,
+      answerAccuracy: 94,
+      retrievalRecall: 92,
+      safetyCompliance: 100,
+      averageLatencyMs: 518,
+      baselineDelta: 1.4,
+    };
+    const run = {
+      id: `EVALRUN-${Date.now()}`,
+      candidateVersion: candidate.version,
+      suiteVersion: state.assistantEvaluationSuites.filter((item) => item.status === "已发布").map((item) => `${item.id}@${item.version}`).join("+"),
+      knowledgeVersion: candidate.knowledgeVersion,
+      promptVersion: candidate.promptVersion,
+      ...metrics,
+      score: Math.round((metrics.citationCoverage + metrics.answerAccuracy + metrics.retrievalRecall + metrics.safetyCompliance) / 4),
+      gateStatus: assistantQualityGateStatus(metrics),
+      status: "已完成",
+      startedAt: nowText(),
+      finishedAt: nowText(),
+    };
+    state.assistantEvaluationRuns.unshift(run);
+    candidate.evaluationRunId = run.id;
+    candidate.gateStatus = run.gateStatus;
+    addAudit("运行评价助手全量评测", run.id, `${run.gateStatus} · 得分${run.score}`);
+    saveState();
+    showNotice(`${candidate.version}评测完成，质量门禁${run.gateStatus}。`);
+    render();
+  }
+
+  function createAssistantRelease() {
+    const latestRun = state.assistantEvaluationRuns[0];
+    if (!latestRun) {
+      showNotice("请先运行全量评测。");
+      return;
+    }
+    const activeRelease = state.assistantReleaseCandidates.find((item) => item.status === "已发布");
+    const sequence = 11 + state.assistantReleaseCandidates.length;
+    const record = {
+      id: `REL-ASSIST-${Date.now()}`,
+      version: `ASSIST-2026.07.${String(sequence).padStart(2, "0")}`,
+      modelRoute: "规则检索+摘要模型",
+      promptVersion: latestRun.promptVersion,
+      knowledgeVersion: latestRun.knowledgeVersion,
+      evaluationRunId: latestRun.id,
+      gateStatus: latestRun.gateStatus,
+      status: "候选",
+      owner: "评价助手治理组",
+      reviewer: "国家级标准管理员",
+      createdAt: nowText(),
+      publishedAt: "",
+      rollbackTarget: activeRelease?.version || "",
+    };
+    state.assistantReleaseCandidates.unshift(record);
+    addAudit("创建评价助手发布候选", record.id, `${record.gateStatus} · ${record.evaluationRunId}`);
+    saveState();
+    showNotice(`${record.version}已创建，当前门禁${record.gateStatus}。`);
+    render();
+  }
+
+  function advanceAssistantRelease(id) {
+    const record = state.assistantReleaseCandidates.find((item) => item.id === id);
+    if (!record || record.gateStatus !== "通过" || !["候选", "待审批"].includes(record.status)) return;
+    if (record.status === "候选") {
+      record.status = "待审批";
+      record.reviewer = state.activeRole;
+      addAudit("提交评价助手版本审批", record.id, record.evaluationRunId);
+      saveState();
+      showNotice(`${record.version}已提交发布审批。`);
+      render();
+      return;
+    }
+    const activeRelease = state.assistantReleaseCandidates.find((item) => item.status === "已发布");
+    if (activeRelease) {
+      activeRelease.status = "历史版本";
+      record.rollbackTarget = activeRelease.version;
+    }
+    record.status = "已发布";
+    record.publishedAt = nowText();
+    record.reviewer = state.activeRole;
+    addAudit("发布评价助手版本", record.id, `${record.version} · 可回滚至${record.rollbackTarget}`);
+    saveState();
+    showNotice(`${record.version}已发布上线。`);
+    render();
+  }
+
+  function rollbackAssistantRelease(id) {
+    const record = state.assistantReleaseCandidates.find((item) => item.id === id);
+    if (!record || record.status !== "已发布") return;
+    const target = state.assistantReleaseCandidates.find((item) => item.version === record.rollbackTarget && item.status === "历史版本")
+      || state.assistantReleaseCandidates.find((item) => item.status === "历史版本");
+    if (!target) {
+      showNotice("没有可恢复的历史版本。");
+      return;
+    }
+    record.status = "已回滚";
+    target.status = "已发布";
+    target.publishedAt = nowText();
+    addAudit("回滚评价助手版本", record.id, `已恢复${target.version}`);
+    saveState();
+    showNotice(`${record.version}已回滚，当前线上版本为${target.version}。`);
+    render();
+  }
+
   function answerTemplateForQuestion(question) {
     if (/H1|等保|安全/.test(question)) {
       return {
@@ -6302,6 +6630,11 @@
     if (name === "run-retrieval-quality-check") runRetrievalQualityCheck();
     if (name === "simulate-model-audit") simulateModelAudit();
     if (name === "review-model-call") reviewModelCall(action.dataset.id);
+    if (name === "create-evaluation-suite") createEvaluationSuite();
+    if (name === "run-assistant-evaluation") runAssistantEvaluation();
+    if (name === "create-assistant-release") createAssistantRelease();
+    if (name === "advance-assistant-release") advanceAssistantRelease(action.dataset.id);
+    if (name === "rollback-assistant-release") rollbackAssistantRelease(action.dataset.id);
     if (name === "ask-standard-question") askStandardQuestion();
     if (name === "confirm-standard-answer") confirmStandardAnswer(action.dataset.id);
     if (name === "generate-anomaly-explanations") generateAnomalyExplanations();

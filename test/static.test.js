@@ -2377,7 +2377,7 @@ test("data governance foundation exposes platform cards API and release evidence
   assert.match(read("scripts/release-artifact-manifest.js"), /data-governance-readiness-report\.md/);
 });
 
-test("digital hospital v0.11 prototype is publishable from GitHub Pages", () => {
+test("digital hospital v0.12 prototype is publishable from GitHub Pages", () => {
   const standardsEntry = read("digital-hospital-standards.html");
   const index = read("digital-hospital-standard-platform/index.html");
   const app = read("digital-hospital-standard-platform/app.js");
@@ -2385,28 +2385,39 @@ test("digital hospital v0.11 prototype is publishable from GitHub Pages", () => 
   const openapi = read("digital-hospital-standard-platform/mock-api/openapi.v0.1.yaml");
   const schema = JSON.parse(read("digital-hospital-standard-platform/mock-api/package-schema.v0.1.json"));
 
-  assert.match(standardsEntry, /href="\.\/digital-hospital-standard-platform\/">新标准平台 v0\.11/);
+  assert.match(standardsEntry, /href="\.\/digital-hospital-standard-platform\/">新标准平台 v0\.12/);
   assert.match(index, /data-view="assistant">评价助手/);
   assert.match(index, /data-view="assessment">试点评估/);
   assert.match(index, /data-view="monitoring">运营监控/);
-  assert.match(app, /digitalHospitalMvpState:v0\.11/);
+  assert.match(app, /digitalHospitalMvpState:v0\.12/);
   assert.match(app, /function renderAssistant\(\)/);
   assert.match(app, /assistant: "评价助手包"/);
   assert.match(app, /\{ id: "governance", label: "治理审计" \}/);
+  assert.match(app, /\{ id: "quality", label: "质量门禁" \}/);
   assert.match(app, /data-action="advance-knowledge-version"/);
   assert.match(app, /data-action="run-retrieval-quality-check"/);
   assert.match(app, /data-action="review-model-call"/);
+  assert.match(app, /data-action="run-assistant-evaluation"/);
+  assert.match(app, /data-action="advance-assistant-release"/);
+  assert.match(app, /data-action="rollback-assistant-release"/);
   assert.match(styles, /\.assistant-tabs button/);
   assert.match(openapi, /name: EvaluationAssistant/);
   assert.match(openapi, /\/api\/v1\/evaluation-assistant\/review-risks:scan/);
   assert.match(openapi, /\/api\/v1\/evaluation-assistant\/knowledge-versions/);
   assert.match(openapi, /\/api\/v1\/evaluation-assistant\/retrieval-traces:quality-check/);
   assert.match(openapi, /\/api\/v1\/evaluation-assistant\/model-calls\/\{callId\}:review/);
+  assert.match(openapi, /\/api\/v1\/evaluation-assistant\/evaluation-runs/);
+  assert.match(openapi, /\/api\/v1\/evaluation-assistant\/quality-gate/);
+  assert.match(openapi, /\/api\/v1\/evaluation-assistant\/release-candidates\/\{releaseId\}:rollback/);
   assert.ok(schema.properties.assistantKnowledgeSources);
   assert.ok(schema.properties.assistantKnowledgeVersions);
   assert.ok(schema.properties.standardQaRecords);
   assert.ok(schema.properties.assistantRetrievalTraces);
   assert.ok(schema.properties.assistantModelCalls);
+  assert.ok(schema.properties.assistantQualityGate);
+  assert.ok(schema.properties.assistantEvaluationSuites);
+  assert.ok(schema.properties.assistantEvaluationRuns);
+  assert.ok(schema.properties.assistantReleaseCandidates);
   assert.ok(schema.properties.anomalyExplanations);
   assert.ok(schema.properties.rectificationSuggestions);
   assert.ok(schema.properties.reviewRiskSignals);
