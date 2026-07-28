@@ -1,5 +1,5 @@
 (function () {
-  const storageKey = "digitalHospitalMvpState:v0.17";
+  const storageKey = "digitalHospitalMvpState:v0.18";
 
   const domains = [
     { code: "A", name: "基础设施与平台支撑", weight: 100 },
@@ -354,6 +354,39 @@
     integrationCutoverWindows: [
       { id: "CUT-H000001-001", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", environmentId: "ENV-PROD", connectorIds: ["CONN-H000001-EMR", "CONN-H000001-LIS"], plannedAt: "2026-08-05 21:00", windowMinutes: 90, integrationApproved: false, rollbackPlan: "切回模板上传通道并恢复上一配置版本", checks: { environment: false, vault: true, jobs: false, quarantine: true, gate: false, rollback: true }, status: "待评估", evaluatedAt: "", approvedBy: "", startedAt: "", completedAt: "", rollbackAt: "" },
     ],
+    productionRuntimeControls: [
+      { id: "RUNTIME-SQLITE-WAL", name: "持久化任务仓库", control: "SQLite WAL + BEGIN IMMEDIATE原子事务", owner: "平台技术组", evidence: "digital-hospital-execution-service.js", status: "已实现", verifiedAt: "2026-07-29 10:10" },
+      { id: "RUNTIME-LEASE-BOUNDARY", name: "租约与秘密边界", control: "原始租约、幂等键、载荷、凭据不落库", owner: "平台安全组", evidence: "24项生产运行聚焦测试", status: "已实现", verifiedAt: "2026-07-29 10:12" },
+      { id: "RUNTIME-MANAGED-KEY", name: "托管回调密钥", control: "外部保险库引用与临时取钥Loader", owner: "平台安全组", evidence: "待登记生产Key Ref与取钥回执", status: "待配置", verifiedAt: "" },
+      { id: "RUNTIME-CALLBACK-MTLS", name: "回调网关mTLS", control: "受信客户端证书指纹、HMAC、时间窗与nonce", owner: "网关运维组", evidence: "待登记生产证书指纹", status: "待配置", verifiedAt: "" },
+      { id: "RUNTIME-WORKER-MTLS", name: "Worker服务身份", control: "生产Worker仅通过受信mTLS身份领取任务", owner: "平台技术组", evidence: "待登记Worker证书指纹", status: "待配置", verifiedAt: "" },
+    ],
+    cutoverEvidenceRequirements: [
+      { id: "EVD-MANAGED-VAULT", requirementId: "managed-vault-attestation", name: "托管保险库取钥证明", ownerRole: "安全责任人", siteRequired: false, artifactName: "managed-vault-attestation.json", artifactDigest: "sha256:8fe1…a019", submittedBy: "运维安全员", verifiedBy: "国家级管理员", status: "已核验", updatedAt: "2026-07-29 10:30" },
+      { id: "EVD-SIGNED-CALLBACK", requirementId: "signed-callback-receipt", name: "签名回调与mTLS回执", ownerRole: "安全责任人", siteRequired: true, artifactName: "", artifactDigest: "", submittedBy: "", verifiedBy: "", status: "待上传", updatedAt: "" },
+      { id: "EVD-JOINT-SUCCESS", requirementId: "joint-test-success", name: "联调成功场景", ownerRole: "接口责任人", siteRequired: true, artifactName: "joint-test-success.json", artifactDigest: "sha256:029a…8c10", submittedBy: "医院填报员", verifiedBy: "省级管理员", status: "已核验", updatedAt: "2026-07-29 10:35" },
+      { id: "EVD-JOINT-FAILURE", requirementId: "joint-test-failure", name: "联调失败场景", ownerRole: "接口责任人", siteRequired: true, artifactName: "", artifactDigest: "", submittedBy: "", verifiedBy: "", status: "待上传", updatedAt: "" },
+      { id: "EVD-JOINT-RETRY", requirementId: "joint-test-retry", name: "重试与幂等场景", ownerRole: "接口责任人", siteRequired: true, artifactName: "joint-test-retry.json", artifactDigest: "sha256:c930…7d22", submittedBy: "运维安全员", verifiedBy: "", status: "待复核", updatedAt: "2026-07-29 10:38" },
+      { id: "EVD-JOINT-RECONCILE", requirementId: "joint-test-reconciliation", name: "对账补偿场景", ownerRole: "接口责任人", siteRequired: true, artifactName: "", artifactDigest: "", submittedBy: "", verifiedBy: "", status: "待上传", updatedAt: "" },
+      { id: "EVD-DUTY-ROSTER", requirementId: "duty-roster", name: "切换值守表", ownerRole: "运行责任人", siteRequired: true, artifactName: "", artifactDigest: "", submittedBy: "", verifiedBy: "", status: "待上传", updatedAt: "" },
+      { id: "EVD-ROLLBACK", requirementId: "rollback-rehearsal", name: "回滚演练记录", ownerRole: "运行责任人", siteRequired: true, artifactName: "", artifactDigest: "", submittedBy: "", verifiedBy: "", status: "待上传", updatedAt: "" },
+      { id: "EVD-CHANGE", requirementId: "change-ticket", name: "生产变更单", ownerRole: "运行责任人", siteRequired: true, artifactName: "", artifactDigest: "", submittedBy: "", verifiedBy: "", status: "待上传", updatedAt: "" },
+      { id: "EVD-HOSPITAL-SIGNOFF", requirementId: "hospital-signoff", name: "试点医院现场签字", ownerRole: "医院责任人", siteRequired: true, artifactName: "", artifactDigest: "", submittedBy: "", verifiedBy: "", status: "待上传", updatedAt: "" },
+    ],
+    productionCutoverApprovals: [
+      { id: "APP-INTEGRATION", role: "接口责任人", approver: "", decision: "待签批", note: "", approvalDigest: "", approvedAt: "" },
+      { id: "APP-SECURITY", role: "安全责任人", approver: "", decision: "待签批", note: "", approvalDigest: "", approvedAt: "" },
+      { id: "APP-OPERATIONS", role: "运行责任人", approver: "", decision: "待签批", note: "", approvalDigest: "", approvedAt: "" },
+      { id: "APP-HOSPITAL", role: "医院责任人", approver: "", decision: "待签批", note: "", approvalDigest: "", approvedAt: "" },
+    ],
+    productionGoNoGo: {
+      decision: "NO-GO",
+      status: "外部激活待完成",
+      checks: { runtime: false, evidence: false, approvals: false, queue: false, quarantine: false, cutoverWindow: false },
+      blockers: ["3项外部运行配置待登记", "7项切换证据待核验", "4方责任人待签批"],
+      evaluatedAt: "2026-07-29 10:40",
+      evaluatedBy: "系统门禁",
+    },
     pilotTickets: [
       { id: "TKT-20260727-001", title: "接口统计模板机构代码校验失败", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", category: "数据口径", priority: "高", status: "处理中", owner: "数据治理组", createdAt: "2026-07-27 10:20", dueAt: "2026-07-27 18:20", slaHours: 8, elapsedHours: 6.5, channel: "试点群", description: "导入模板中的机构代码与平台主数据不一致。" },
       { id: "TKT-20260727-002", title: "材料分片上传在弱网环境中断", hospitalCode: "H000003", hospitalName: "区县示例人民医院", category: "材料上传", priority: "紧急", status: "待分派", owner: "未分派", createdAt: "2026-07-27 13:05", dueAt: "2026-07-27 17:05", slaHours: 4, elapsedHours: 3.2, channel: "服务热线", description: "大文件上传至42%后中断，需核验断点续传。" },
@@ -630,6 +663,10 @@
     if (!Array.isArray(next.integrationReplayEvents)) next.integrationReplayEvents = JSON.parse(JSON.stringify(seedState.integrationReplayEvents));
     if (!Array.isArray(next.integrationQuarantines)) next.integrationQuarantines = JSON.parse(JSON.stringify(seedState.integrationQuarantines));
     if (!Array.isArray(next.integrationCutoverWindows)) next.integrationCutoverWindows = JSON.parse(JSON.stringify(seedState.integrationCutoverWindows));
+    if (!Array.isArray(next.productionRuntimeControls)) next.productionRuntimeControls = JSON.parse(JSON.stringify(seedState.productionRuntimeControls));
+    if (!Array.isArray(next.cutoverEvidenceRequirements)) next.cutoverEvidenceRequirements = JSON.parse(JSON.stringify(seedState.cutoverEvidenceRequirements));
+    if (!Array.isArray(next.productionCutoverApprovals)) next.productionCutoverApprovals = JSON.parse(JSON.stringify(seedState.productionCutoverApprovals));
+    if (!next.productionGoNoGo) next.productionGoNoGo = JSON.parse(JSON.stringify(seedState.productionGoNoGo));
     if (!Array.isArray(next.pilotTickets)) next.pilotTickets = JSON.parse(JSON.stringify(seedState.pilotTickets));
     if (!Array.isArray(next.trainingSessions)) next.trainingSessions = JSON.parse(JSON.stringify(seedState.trainingSessions));
     if (!Array.isArray(next.pilotReleases)) next.pilotReleases = JSON.parse(JSON.stringify(seedState.pilotReleases));
@@ -987,6 +1024,10 @@
       blockedReceipts: blockedReceipts.length,
       activeQuarantines: activeQuarantines.length,
       readyCutovers: state.integrationCutoverWindows.filter((item) => item.status === "可切换" || item.status === "已切换").length,
+      runtimeControlsReady: state.productionRuntimeControls.filter((item) => ["已实现", "已配置"].includes(item.status)).length,
+      verifiedCutoverEvidence: state.cutoverEvidenceRequirements.filter((item) => item.status === "已核验").length,
+      approvedCutoverRoles: state.productionCutoverApprovals.filter((item) => item.decision === "同意").length,
+      productionDecision: state.productionGoNoGo.decision,
     };
   }
 
@@ -1073,9 +1114,9 @@
   }
 
   function statusClass(status) {
-    if (status === "已完成" || status === "已通过" || status === "已发布" || status === "已批准" || status === "已归档" || status === "已关闭" || status === "已解决" || status === "已就绪" || status === "已闭环" || status === "已启动" || status === "可启动" || status === "可推广" || status === "达标" || status === "通过" || status === "历史版本" || status === "启用" || status === "已启用" || status === "已采纳" || status === "已回答" || status === "已编辑" || status === "已转复核" || status === "已排除" || status === "复核通过" || status === "已校验" || status === "命中充分" || status === "成功" || status === "已复核" || status === "正常" || status === "稳定" || status === "健康" || status === "已恢复" || status === "已转样本" || status === "已入集" || status === "已验证" || status === "正向" || status === "已受理" || status === "联调完成" || status === "在线" || status === "有效" || status === "契约通过" || status === "映射就绪" || status === "脱敏通过" || status === "可上线" || status === "已准入" || status === "接收" || status === "可切换" || status === "已切换" || status === "已解除") return "";
-    if (status === "进行中" || status === "处理中" || status === "推进中" || status === "关注" || status === "条件通过" || status === "分析完成" || status === "改进中" || status === "待验收" || status === "准备中" || status === "已确认" || status === "待确认" || status === "待采纳" || status === "待分派" || status === "待回复" || status === "待评估" || status === "待审批" || status === "待复核" || status === "需补充" || status === "人工复核" || status === "草稿" || status === "报名中" || status === "候选" || status === "已回滚" || status === "试运行" || status === "预归档" || status === "填报中" || status === "审核中" || status === "上传中" || status === "扫描中" || status === "排队中" || status === "预警" || status === "降级" || status === "灰度中" || status === "已暂停" || status === "开放" || status === "待研判" || status === "已研判" || status === "待标注" || status === "已标注" || status === "待回归" || status === "资料待补" || status === "联调中" || status === "待探测" || status === "待认证" || status === "待抽样" || status === "待完善" || status === "待处理" || status === "临期" || status === "待整改" || status === "执行中" || status === "等待回执" || status === "待核验" || status === "待处置" || status === "切换中") return "warn";
-    if (status === "阻断" || status === "门禁阻断" || status === "有阻塞" || status === "有风险" || status === "需优化" || status === "未达标" || status === "逾期" || status === "高" || status === "紧急" || status === "异常" || status === "故障" || status === "失败" || status === "高负荷" || status === "高风险" || status === "拥堵" || status === "负向" || status === "失效" || status === "不通过" || status === "发现风险" || status === "已阻断" || status === "隔离中" || status === "拒绝") return "danger";
+    if (status === "已完成" || status === "已通过" || status === "已发布" || status === "已批准" || status === "已归档" || status === "已关闭" || status === "已解决" || status === "已就绪" || status === "已闭环" || status === "已启动" || status === "可启动" || status === "可推广" || status === "达标" || status === "通过" || status === "历史版本" || status === "启用" || status === "已启用" || status === "已采纳" || status === "已回答" || status === "已编辑" || status === "已转复核" || status === "已排除" || status === "复核通过" || status === "已校验" || status === "命中充分" || status === "成功" || status === "已复核" || status === "正常" || status === "稳定" || status === "健康" || status === "已恢复" || status === "已转样本" || status === "已入集" || status === "已验证" || status === "正向" || status === "已受理" || status === "联调完成" || status === "在线" || status === "有效" || status === "契约通过" || status === "映射就绪" || status === "脱敏通过" || status === "可上线" || status === "已准入" || status === "接收" || status === "可切换" || status === "已切换" || status === "已解除" || status === "已实现" || status === "已配置" || status === "已核验" || status === "同意" || status === "GO") return "";
+    if (status === "进行中" || status === "处理中" || status === "推进中" || status === "关注" || status === "条件通过" || status === "分析完成" || status === "改进中" || status === "待验收" || status === "准备中" || status === "已确认" || status === "待确认" || status === "待采纳" || status === "待分派" || status === "待回复" || status === "待评估" || status === "待审批" || status === "待复核" || status === "需补充" || status === "人工复核" || status === "草稿" || status === "报名中" || status === "候选" || status === "已回滚" || status === "试运行" || status === "预归档" || status === "填报中" || status === "审核中" || status === "上传中" || status === "扫描中" || status === "排队中" || status === "预警" || status === "降级" || status === "灰度中" || status === "已暂停" || status === "开放" || status === "待研判" || status === "已研判" || status === "待标注" || status === "已标注" || status === "待回归" || status === "资料待补" || status === "联调中" || status === "待探测" || status === "待认证" || status === "待抽样" || status === "待完善" || status === "待处理" || status === "临期" || status === "待整改" || status === "执行中" || status === "等待回执" || status === "待核验" || status === "待处置" || status === "切换中" || status === "待配置" || status === "待上传" || status === "待签批") return "warn";
+    if (status === "阻断" || status === "门禁阻断" || status === "有阻塞" || status === "有风险" || status === "需优化" || status === "未达标" || status === "逾期" || status === "高" || status === "紧急" || status === "异常" || status === "故障" || status === "失败" || status === "高负荷" || status === "高风险" || status === "拥堵" || status === "负向" || status === "失效" || status === "不通过" || status === "发现风险" || status === "已阻断" || status === "隔离中" || status === "拒绝" || status === "NO-GO") return "danger";
     return "warn";
   }
 
@@ -1133,7 +1174,7 @@
       standardVersion: state.task.standard,
       hospitalCode: hospital.code,
       hospitalName: hospital.name,
-      prototypeVersion: "mvp-0.17",
+      prototypeVersion: "mvp-0.18",
     };
     if (kind === "submission") {
       return {
@@ -1313,6 +1354,10 @@
         integrationReplayEvents: state.integrationReplayEvents,
         integrationQuarantines: state.integrationQuarantines,
         integrationCutoverWindows: state.integrationCutoverWindows,
+        productionRuntimeControls: state.productionRuntimeControls,
+        cutoverEvidenceRequirements: state.cutoverEvidenceRequirements,
+        productionCutoverApprovals: state.productionCutoverApprovals,
+        productionGoNoGo: state.productionGoNoGo,
       };
     }
     if (kind === "assessment") {
@@ -1410,6 +1455,10 @@
       integrationReplayEvents: state.integrationReplayEvents,
       integrationQuarantines: state.integrationQuarantines,
       integrationCutoverWindows: state.integrationCutoverWindows,
+      productionRuntimeControls: state.productionRuntimeControls,
+      cutoverEvidenceRequirements: state.cutoverEvidenceRequirements,
+      productionCutoverApprovals: state.productionCutoverApprovals,
+      productionGoNoGo: state.productionGoNoGo,
       pilotOutcomeMetrics: state.pilotOutcomeMetrics,
       pilotHospitalOutcomes: state.pilotHospitalOutcomes,
       pilotIssueThemes: state.pilotIssueThemes,
@@ -2638,6 +2687,7 @@
       { id: "environment", label: "环境与凭据" },
       { id: "jobs", label: "任务与回执" },
       { id: "cutover", label: "隔离与切换" },
+      { id: "production", label: "投产证据" },
     ];
     let content = "";
 
@@ -3034,6 +3084,121 @@
                     },
                   )
                   .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "production") {
+      const decision = state.productionGoNoGo;
+      const decisionPassed = Object.values(decision.checks || {}).filter(Boolean).length;
+      const decisionTotal = Object.keys(decision.checks || {}).length;
+      content = `
+        <section class="panel production-decision">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">生产 Go/No-Go 决策</h3>
+              <p class="panel-subtitle">软件能力、外部运行配置、现场证据、四方签批、队列清空和切换窗口共同决定是否允许生产切换。</p>
+            </div>
+            <div class="toolbar inline">
+              <span class="status-pill ${decision.decision === "GO" ? "" : "danger"}">${decision.decision}</span>
+              <button class="button secondary" type="button" data-action="evaluate-production-go-no-go">重新评估</button>
+            </div>
+          </div>
+          <div class="grid-4 compact-metrics">
+            ${metric("软件与外部配置", `${summary.runtimeControlsReady}/${state.productionRuntimeControls.length}`, "持久化、密钥、回调与Worker身份", summary.runtimeControlsReady < state.productionRuntimeControls.length ? "warn" : "")}
+            ${metric("切换证据", `${summary.verifiedCutoverEvidence}/${state.cutoverEvidenceRequirements.length}`, "摘要入册并独立复核", summary.verifiedCutoverEvidence < state.cutoverEvidenceRequirements.length ? "warn" : "")}
+            ${metric("责任人签批", `${summary.approvedCutoverRoles}/${state.productionCutoverApprovals.length}`, "接口、安全、运行、医院", summary.approvedCutoverRoles < state.productionCutoverApprovals.length ? "warn" : "")}
+            ${metric("门禁通过", `${decisionPassed}/${decisionTotal}`, decision.status, decision.decision === "GO" ? "" : "danger")}
+          </div>
+          <div class="callout ${decision.decision === "GO" ? "" : "danger"}">
+            <strong>${decision.decision === "GO" ? "已满足生产切换条件" : "当前禁止生产切换"}</strong>
+            <span>${(decision.blockers || []).join("；") || "全部门禁通过，可在已批准窗口内执行切换。"}</span>
+            <small>${decision.evaluatedAt} · ${decision.evaluatedBy}</small>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">生产运行控制</h3>
+              <p class="panel-subtitle">代码实现与外部激活分别登记；托管密钥、证书指纹和现场回执未配置时始终保持NO-GO。</p>
+            </div>
+            <button class="button ghost" type="button" data-action="download-package" data-kind="execution">导出投产包</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>控制项</th><th>实现与门禁</th><th>责任组</th><th>证据</th><th>状态</th><th>核验时间</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.productionRuntimeControls.map((item) => `
+                  <tr>
+                    <td><strong>${item.name}</strong><br /><span class="muted-text">${item.id}</span></td>
+                    <td>${item.control}</td>
+                    <td>${item.owner}</td>
+                    <td>${item.evidence}</td>
+                    <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                    <td>${item.verifiedAt || "-"}</td>
+                    <td><button class="button secondary" type="button" data-action="configure-production-runtime" data-id="${item.id}" ${item.status !== "待配置" ? "disabled" : ""}>登记配置</button></td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">切换证据包</h3>
+              <p class="panel-subtitle">只保存文件名、SHA-256摘要、来源和核验身份；提交人与复核人必须独立，原文、签名、nonce和密钥不进入页面状态。</p>
+            </div>
+            <span class="tag">${summary.verifiedCutoverEvidence}/${state.cutoverEvidenceRequirements.length}项已核验</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>证据要求</th><th>责任角色</th><th>现场必需</th><th>文件与摘要</th><th>提交/复核</th><th>状态</th><th>更新时间</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.cutoverEvidenceRequirements.map((item) => `
+                  <tr>
+                    <td><strong>${item.name}</strong><br /><span class="muted-text">${item.requirementId}</span></td>
+                    <td>${item.ownerRole}</td>
+                    <td>${item.siteRequired ? "是" : "否"}</td>
+                    <td>${item.artifactName || "-"}<br /><span class="muted-text">${item.artifactDigest || "待生成SHA-256摘要"}</span></td>
+                    <td>${item.submittedBy || "-"}<br /><span class="muted-text">${item.verifiedBy ? `复核：${item.verifiedBy}` : "待独立复核"}</span></td>
+                    <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                    <td>${item.updatedAt || "-"}</td>
+                    <td>
+                      <button class="button ${item.status === "待复核" ? "secondary" : "ghost"}" type="button" data-action="${item.status === "待复核" ? "verify-cutover-evidence" : "record-cutover-evidence"}" data-id="${item.id}" ${item.status === "已核验" ? "disabled" : ""}>${item.status === "待复核" ? "独立复核" : item.status === "待上传" ? "登记证据" : "已完成"}</button>
+                    </td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">四方责任人签批</h3>
+              <p class="panel-subtitle">接口、安全、运行和医院责任人使用不同身份签批；证据提交人不能审批自己的证据包。</p>
+            </div>
+            <span class="tag">${summary.approvedCutoverRoles}/4方已同意</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>责任角色</th><th>签批人</th><th>决定</th><th>意见</th><th>签批摘要</th><th>时间</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.productionCutoverApprovals.map((item) => `
+                  <tr>
+                    <td><strong>${item.role}</strong><br /><span class="muted-text">${item.id}</span></td>
+                    <td>${item.approver || "-"}</td>
+                    <td><span class="status-pill ${statusClass(item.decision)}">${item.decision}</span></td>
+                    <td>${item.note || "-"}</td>
+                    <td>${item.approvalDigest || "-"}</td>
+                    <td>${item.approvedAt || "-"}</td>
+                    <td><button class="button secondary" type="button" data-action="approve-production-cutover" data-id="${item.id}" ${item.decision === "同意" ? "disabled" : ""}>签批同意</button></td>
+                  </tr>
+                `).join("")}
               </tbody>
             </table>
           </div>
@@ -7065,6 +7230,120 @@
     render();
   }
 
+  async function productionSha256(value) {
+    const bytes = new TextEncoder().encode(String(value));
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    return `sha256:${Array.from(new Uint8Array(digest), (item) => item.toString(16).padStart(2, "0")).join("")}`;
+  }
+
+  async function configureProductionRuntime(id) {
+    if (!requireExecutionRuntimeRole()) return;
+    const control = state.productionRuntimeControls.find((item) => item.id === id);
+    if (!control || control.status !== "待配置") return;
+    control.status = "已配置";
+    control.verifiedAt = nowText();
+    control.evidence = await productionSha256(`${control.id}|${control.owner}|${control.verifiedAt}|external-activation`);
+    addAudit("登记生产运行外部配置", control.id, `${control.name} · 仅保存配置证明摘要`);
+    saveState();
+    showNotice(`${control.name}已登记外部配置证明，未保存密钥或证书原文。`);
+    render();
+  }
+
+  async function recordCutoverEvidence(id) {
+    const evidence = state.cutoverEvidenceRequirements.find((item) => item.id === id);
+    if (!evidence || evidence.status !== "待上传") return;
+    evidence.artifactName = `${evidence.requirementId}-${Date.now()}.json`;
+    evidence.artifactDigest = await productionSha256(`${evidence.requirementId}|${state.selectedHospital}|${Date.now()}`);
+    evidence.submittedBy = state.activeRole;
+    evidence.verifiedBy = "";
+    evidence.status = "待复核";
+    evidence.updatedAt = nowText();
+    addAudit("登记生产切换证据", evidence.requirementId, `${evidence.artifactName} · 摘要入册`);
+    saveState();
+    showNotice(`${evidence.name}已登记，需由不同角色独立复核。`);
+    render();
+  }
+
+  function verifyCutoverEvidence(id) {
+    const evidence = state.cutoverEvidenceRequirements.find((item) => item.id === id);
+    if (!evidence || evidence.status !== "待复核") return;
+    if (evidence.submittedBy === state.activeRole) {
+      showNotice("提交人不能复核自己的切换证据，请切换独立复核角色。");
+      return;
+    }
+    evidence.verifiedBy = state.activeRole;
+    evidence.status = "已核验";
+    evidence.updatedAt = nowText();
+    addAudit("独立复核生产切换证据", evidence.requirementId, `${evidence.submittedBy}提交 · ${evidence.verifiedBy}复核`);
+    saveState();
+    showNotice(`${evidence.name}已完成独立复核。`);
+    render();
+  }
+
+  async function approveProductionCutover(id) {
+    const approval = state.productionCutoverApprovals.find((item) => item.id === id);
+    if (!approval || approval.decision === "同意") return;
+    const evidenceSubmitters = new Set(state.cutoverEvidenceRequirements.map((item) => item.submittedBy).filter(Boolean));
+    const existingApprovers = new Set(state.productionCutoverApprovals.map((item) => item.approver).filter(Boolean));
+    if (evidenceSubmitters.has(state.activeRole)) {
+      showNotice("证据提交人不能签批同一投产包，请切换独立责任人。");
+      return;
+    }
+    if (existingApprovers.has(state.activeRole)) {
+      showNotice("同一签批人不能承担两个投产责任角色。");
+      return;
+    }
+    approval.approver = state.activeRole;
+    approval.decision = "同意";
+    approval.note = "已复核软件门禁、外部配置与现场证据，同意进入Go/No-Go综合评估。";
+    approval.approvedAt = nowText();
+    approval.approvalDigest = await productionSha256(`${approval.id}|${approval.approver}|${approval.approvedAt}|approve`);
+    addAudit("签批生产切换责任", approval.role, `${approval.approver} · 同意`);
+    saveState();
+    showNotice(`${approval.role}已由${approval.approver}签批。`);
+    render();
+  }
+
+  function evaluateProductionGoNoGo() {
+    const runtimeReady = state.productionRuntimeControls.every((item) => ["已实现", "已配置"].includes(item.status));
+    const evidenceReady = state.cutoverEvidenceRequirements.every((item) => item.status === "已核验" && item.submittedBy !== item.verifiedBy);
+    const approvalsReady = state.productionCutoverApprovals.every((item) => item.decision === "同意")
+      && new Set(state.productionCutoverApprovals.map((item) => item.approver)).size === state.productionCutoverApprovals.length;
+    const queueReady = !state.integrationExecutionJobs.some((item) => ["执行中", "等待回执", "等待重试"].includes(item.status))
+      && !state.integrationDeadLetters.some((item) => item.status === "待复核");
+    const quarantineReady = !state.integrationQuarantines.some((item) => item.status === "隔离中");
+    const cutoverReady = state.integrationCutoverWindows.some((item) => item.status === "可切换");
+    const checks = {
+      runtime: runtimeReady,
+      evidence: evidenceReady,
+      approvals: approvalsReady,
+      queue: queueReady,
+      quarantine: quarantineReady,
+      cutoverWindow: cutoverReady,
+    };
+    const blockers = [
+      ...(!runtimeReady ? [`${state.productionRuntimeControls.filter((item) => !["已实现", "已配置"].includes(item.status)).length}项外部运行配置待登记`] : []),
+      ...(!evidenceReady ? [`${state.cutoverEvidenceRequirements.filter((item) => item.status !== "已核验").length}项切换证据待核验`] : []),
+      ...(!approvalsReady ? [`${state.productionCutoverApprovals.filter((item) => item.decision !== "同意").length}方责任人待签批`] : []),
+      ...(!queueReady ? ["执行队列或死信尚未清空"] : []),
+      ...(!quarantineReady ? ["存在连接器隔离记录"] : []),
+      ...(!cutoverReady ? ["尚无通过门禁的生产切换窗口"] : []),
+    ];
+    const go = Object.values(checks).every(Boolean);
+    state.productionGoNoGo = {
+      decision: go ? "GO" : "NO-GO",
+      status: go ? "具备切换条件" : "生产切换已阻断",
+      checks,
+      blockers,
+      evaluatedAt: nowText(),
+      evaluatedBy: state.activeRole,
+    };
+    addAudit("执行生产Go/No-Go评估", "数智医院生产切换", `${state.productionGoNoGo.decision} · ${blockers.length}项阻断`);
+    saveState();
+    showNotice(go ? "全部门禁通过，已形成GO决定。" : `当前为NO-GO：${blockers.join("；")}。`);
+    render();
+  }
+
   function createPilotTicket() {
     const hospital = activeHospital();
     const ticket = {
@@ -9032,6 +9311,11 @@
     if (name === "start-cutover-window") startCutoverWindow(action.dataset.id);
     if (name === "complete-cutover-window") completeCutoverWindow(action.dataset.id);
     if (name === "rollback-cutover-window") rollbackCutoverWindow(action.dataset.id);
+    if (name === "configure-production-runtime") configureProductionRuntime(action.dataset.id);
+    if (name === "record-cutover-evidence") recordCutoverEvidence(action.dataset.id);
+    if (name === "verify-cutover-evidence") verifyCutoverEvidence(action.dataset.id);
+    if (name === "approve-production-cutover") approveProductionCutover(action.dataset.id);
+    if (name === "evaluate-production-go-no-go") evaluateProductionGoNoGo();
     if (name === "create-pilot-ticket") createPilotTicket();
     if (name === "assign-pilot-tickets") assignPilotTickets();
     if (name === "advance-pilot-ticket") advancePilotTicket(action.dataset.id);
