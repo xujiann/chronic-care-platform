@@ -248,6 +248,92 @@ function buildInstitutionDeploymentManifest(moduleCatalog, options = {}) {
   };
 }
 
+function validateInstitutionDeploymentManifest(manifest, moduleCatalog) {
+  const manifestModules = Array.isArray(manifest.enabledModules) ? manifest.enabledModules : [];
+  const enabledCatalogModules = moduleCatalog.modules.filter((item) => item.selected);
+  const disabledCatalogModules = moduleCatalog.modules.filter((item) => !item.selected);
+  const expectedEnabledIds = enabledCatalogModules.map((item) => item.id);
+  const expectedDisabledIds = disabledCatalogModules.map((item) => item.id);
+  const expectedPages = enabledCatalogModules.map((item) => item.page);
+  const expectedApis = enabledCatalogModules.map((item) => item.api);
+  const disabledPages = new Set(disabledCatalogModules.map((item) => item.page));
+  const disabledApis = new Set(disabledCatalogModules.map((item) => item.api));
+  const sameMembers = (actual, expected) => Array.isArray(actual)
+    && actual.length === expected.length
+    && expected.every((item) => actual.includes(item));
+  const unique = (items) => Array.isArray(items) && new Set(items).size === items.length;
+  const checks = [
+    {
+      id: "activation-policy",
+      passed: manifest.activationPolicy === "deny-by-default",
+      detail: `activation policy is ${manifest.activationPolicy || "missing"}`
+    },
+    {
+      id: "enabled-module-set",
+      passed: sameMembers(manifest.enabledModuleIds, expectedEnabledIds),
+      detail: `${manifest.enabledModuleIds?.length || 0}/${expectedEnabledIds.length} enabled module IDs match the catalog`
+    },
+    {
+      id: "disabled-module-set",
+      passed: sameMembers(manifest.disabledModuleIds, expectedDisabledIds),
+      detail: `${manifest.disabledModuleIds?.length || 0}/${expectedDisabledIds.length} disabled module IDs match the catalog`
+    },
+    {
+      id: "page-allowlist",
+      passed: sameMembers(manifest.routeAllowlist, expectedPages)
+        && manifest.routeAllowlist.every((item) => !disabledPages.has(item)),
+      detail: `${manifest.routeAllowlist?.length || 0}/${expectedPages.length} selected pages exposed`
+    },
+    {
+      id: "api-allowlist",
+      passed: sameMembers(manifest.apiAllowlist, expectedApis)
+        && manifest.apiAllowlist.every((item) => !disabledApis.has(item)),
+      detail: `${manifest.apiAllowlist?.length || 0}/${expectedApis.length} selected APIs exposed`
+    },
+    {
+      id: "data-namespace-isolation",
+      passed: manifest.dataNamespaces?.length === expectedEnabledIds.length
+        && unique(manifest.dataNamespaces)
+        && manifest.dataNamespaces.every((item) => /^t10\.[a-z0-9_]+$/.test(item)),
+      detail: `${new Set(manifest.dataNamespaces || []).size}/${expectedEnabledIds.length} unique data namespaces`
+    },
+    {
+      id: "rollback-unit-isolation",
+      passed: manifest.rollbackUnits?.length === expectedEnabledIds.length
+        && unique(manifest.rollbackUnits)
+        && manifestModules.length === expectedEnabledIds.length
+        && manifestModules.every((item) => item.rollbackUnit === item.deploymentUnit),
+      detail: `${new Set(manifest.rollbackUnits || []).size}/${expectedEnabledIds.length} independent rollback units`
+    },
+    {
+      id: "peer-module-independence",
+      passed: moduleCatalog.peerModuleDependencyCount === 0
+        && enabledCatalogModules.every((item) => item.requiredPeerModules.length === 0),
+      detail: `${moduleCatalog.peerModuleDependencyCount} peer specialty dependencies`
+    },
+    {
+      id: "production-traffic-boundary",
+      passed: manifest.productionTrafficState === "blocked-until-site-evidence-signed"
+        && manifestModules.length === expectedEnabledIds.length
+        && manifestModules.every((item) => item.productionTrafficState === "blocked-until-site-evidence-signed"),
+      detail: manifest.productionTrafficState || "missing production traffic state"
+    }
+  ];
+  const failed = checks.filter((item) => !item.passed);
+  return {
+    status: failed.length === 0 ? "deployment-contract-valid" : "deployment-contract-blocked",
+    ok: failed.length === 0,
+    institutionId: manifest.institutionId,
+    checks,
+    hardStops: failed.map((item) => item.id),
+    summary: {
+      total: checks.length,
+      passed: checks.length - failed.length,
+      failed: failed.length
+    }
+  };
+}
+
 function sha256(value) {
   return crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
@@ -336,6 +422,7 @@ function buildSpecialtyCutoverPack(options = {}) {
   const institutionDeploymentManifest = buildInstitutionDeploymentManifest(moduleCatalog, {
     institutionId: options.institutionId
   });
+  const institutionDeploymentGate = validateInstitutionDeploymentManifest(institutionDeploymentManifest, moduleCatalog);
   const firstIncrement = selectFirstIncrement(tracks);
   const evidenceDossier = buildEvidenceDossier(tracks, firstIncrement);
   const pilotBatchPlan = buildPilotBatchPlan(tracks, firstIncrement);
@@ -361,6 +448,7 @@ function buildSpecialtyCutoverPack(options = {}) {
     stages: CUTOVER_STAGES,
     moduleCatalog,
     institutionDeploymentManifest,
+    institutionDeploymentGate,
     tracks,
     firstIncrement,
     crossTrackControls: buildCrossTrackControls(tracks),
@@ -378,7 +466,7 @@ function buildSpecialtyCutoverPack(options = {}) {
   };
   pack.integrity = {
     algorithm: "sha256",
-    digest: `sha256:${sha256({ summary, moduleCatalog, institutionDeploymentManifest, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision, evidenceDossier, pilotBatchPlan, siteEvidenceWorkflow, acceptanceScenarioSuite, scenarioEvidenceMatrix, cutoverCommandCenter, observationSignalBoard, runtimeSmokePlan })}`
+    digest: `sha256:${sha256({ summary, moduleCatalog, institutionDeploymentManifest, institutionDeploymentGate, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision, evidenceDossier, pilotBatchPlan, siteEvidenceWorkflow, acceptanceScenarioSuite, scenarioEvidenceMatrix, cutoverCommandCenter, observationSignalBoard, runtimeSmokePlan })}`
   };
   return pack;
 }
@@ -1248,6 +1336,7 @@ function renderMarkdown(pack) {
     `- Institution: ${pack.institutionDeploymentManifest?.institutionId || "institution-template"}`,
     `- Activation policy: ${pack.institutionDeploymentManifest?.activationPolicy || "deny-by-default"}`,
     `- Production traffic: ${pack.institutionDeploymentManifest?.productionTrafficState || "blocked-until-site-evidence-signed"}`,
+    `- Deployment gate: ${pack.institutionDeploymentGate?.status || "deployment-contract-blocked"} (${pack.institutionDeploymentGate?.summary?.passed || 0}/${pack.institutionDeploymentGate?.summary?.total || 0})`,
     `- Disabled modules: ${(pack.institutionDeploymentManifest?.disabledModuleIds || []).join(", ") || "none"}`,
     "",
     "| Module | Deployment unit | Page allowlist | API allowlist | Data namespace | Rollback unit |",
@@ -1472,6 +1561,7 @@ module.exports = {
   buildSpecialtyCutoverPack,
   buildModuleCatalog,
   buildInstitutionDeploymentManifest,
+  validateInstitutionDeploymentManifest,
   resolveEnabledTracks,
   parseCliOptions,
   renderMarkdown,

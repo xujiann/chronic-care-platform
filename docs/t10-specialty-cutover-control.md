@@ -94,6 +94,8 @@ The default command still generates the four-module T10 integration pack. `modul
 
 `institutionDeploymentManifest` turns that selection into a fail-closed deployment contract. It records the institution ID, enabled and disabled modules, page/API allowlists, per-module data namespaces, external systems and independent rollback units. Disabled modules must remain unreachable and receive no production traffic. Enabling a module does not waive site evidence or formal Go/No-Go approval; production traffic remains `blocked-until-site-evidence-signed`.
 
+`institutionDeploymentGate` executes nine contract checks during pack generation and runtime smoke: deny-by-default activation, exact enabled/disabled sets, page and API allowlists, unique data namespaces, unique rollback units, zero peer-module dependencies and the production-traffic boundary. Any failed check emits a hard-stop ID and blocks the deployment contract before an institution-specific package can enter controlled rehearsal.
+
 ## Site evidence dossier
 
 The cutover pack now emits an `evidenceDossier` section. It converts every site blocker into a reviewable evidence entry with:

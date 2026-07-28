@@ -33,6 +33,7 @@ function withCutoverDefaults(pack) {
     firstIncrement: { ...fallback.firstIncrement, ...(pack.firstIncrement || {}) },
     tracks: pack.tracks || fallback.tracks,
     institutionDeploymentManifest: pack.institutionDeploymentManifest || fallback.institutionDeploymentManifest,
+    institutionDeploymentGate: pack.institutionDeploymentGate || fallback.institutionDeploymentGate,
     crossTrackControls: pack.crossTrackControls || fallback.crossTrackControls,
     rehearsalPlan: pack.rehearsalPlan || fallback.rehearsalPlan,
     goNoGoDecision: pack.goNoGoDecision || fallback.goNoGoDecision,
@@ -52,7 +53,7 @@ function renderCutoverPack(pack) {
   renderKpis(pack);
   renderFirstIncrement(pack.firstIncrement || {});
   renderTracks(pack.tracks || [], pack.stages || []);
-  renderInstitutionDeploymentManifest(pack.institutionDeploymentManifest || {});
+  renderInstitutionDeploymentManifest(pack.institutionDeploymentManifest || {}, pack.institutionDeploymentGate || {});
   renderControls(pack.crossTrackControls || []);
   renderRehearsalPlan(pack.rehearsalPlan || {});
   renderDecisionMatrix(pack.goNoGoDecision || {});
@@ -111,7 +112,7 @@ function renderTracks(tracks, stages) {
   `).join("");
 }
 
-function renderInstitutionDeploymentManifest(manifest) {
+function renderInstitutionDeploymentManifest(manifest, gate) {
   const modules = manifest.enabledModules || [];
   const rows = modules.map((item) => `
     <tr>
@@ -128,6 +129,7 @@ function renderInstitutionDeploymentManifest(manifest) {
         <span class="badge">${escapeHtml(manifest.institutionId || "institution-template")}</span>
         <span class="badge ok">${escapeHtml(manifest.activationPolicy || "deny-by-default")}</span>
         <span class="badge warn">${escapeHtml(manifest.productionTrafficState || "blocked-until-site-evidence-signed")}</span>
+        <span class="badge ${gate.ok ? "ok" : "warn"}">${escapeHtml(gate.status || "deployment-contract-blocked")} · ${gate.summary?.passed || 0}/${gate.summary?.total || 0}</span>
       </div>
       <p class="muted">启用模块：${(manifest.enabledModuleIds || []).map(escapeHtml).join(" / ") || "无"}；禁用模块：${(manifest.disabledModuleIds || []).map(escapeHtml).join(" / ") || "无"}。</p>
       <p class="muted">页面白名单：${(manifest.routeAllowlist || []).map(escapeHtml).join(" / ") || "无"}；API 白名单：${(manifest.apiAllowlist || []).map(escapeHtml).join(" / ") || "无"}。</p>
@@ -140,7 +142,8 @@ function renderInstitutionDeploymentManifest(manifest) {
     </div>
     <div class="cutover-card">
       <h3>部署校验规则</h3>
-      <ul class="evidence-list">${(manifest.validationRules || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+      <ul class="evidence-list">${(gate.checks || []).map((item) => `<li><span class="badge ${item.passed ? "ok" : "warn"}">${item.passed ? "PASS" : "BLOCK"}</span> <strong>${escapeHtml(item.id)}</strong> · ${escapeHtml(item.detail)}</li>`).join("")}</ul>
+      <p class="muted">硬阻断：${(gate.hardStops || []).map(escapeHtml).join(" / ") || "无"}。</p>
     </div>
   `;
 }
@@ -687,6 +690,24 @@ function fallbackCutoverPack() {
         "启用模块后仍须完成现场证据和正式 Go/No-Go 审批。"
       ]
     },
+    institutionDeploymentGate: {
+      status: "deployment-contract-valid",
+      ok: true,
+      institutionId: "institution-template",
+      hardStops: [],
+      summary: { total: 9, passed: 9, failed: 0 },
+      checks: [
+        deploymentCheck("activation-policy", "activation policy is deny-by-default"),
+        deploymentCheck("enabled-module-set", "4/4 enabled module IDs match the catalog"),
+        deploymentCheck("disabled-module-set", "0/0 disabled module IDs match the catalog"),
+        deploymentCheck("page-allowlist", "4/4 selected pages exposed"),
+        deploymentCheck("api-allowlist", "4/4 selected APIs exposed"),
+        deploymentCheck("data-namespace-isolation", "4/4 unique data namespaces"),
+        deploymentCheck("rollback-unit-isolation", "4/4 independent rollback units"),
+        deploymentCheck("peer-module-independence", "0 peer specialty dependencies"),
+        deploymentCheck("production-traffic-boundary", "blocked-until-site-evidence-signed")
+      ]
+    },
     crossTrackControls: [
       control("identity-and-role-scope", "统一身份与最小权限", "平台账号管理员/机构管理员", "每个专项均使用现场实名账号、机构编码和角色授权；演示账号不得进入生产灰度。"),
       control("signed-interface-and-idempotency", "签名接口、时钟窗口和幂等", "平台互联互通组/外部系统厂商", "外部报文必须具备签名、时间窗、nonce或幂等键、回执和死信补偿证据。"),
@@ -1086,6 +1107,10 @@ function deploymentModule(id, name, page, api) {
     rollbackUnit: deploymentUnit,
     productionTrafficState: "blocked-until-site-evidence-signed"
   };
+}
+
+function deploymentCheck(id, detail) {
+  return { id, passed: true, detail };
 }
 
 function control(id, name, owner, acceptance) {

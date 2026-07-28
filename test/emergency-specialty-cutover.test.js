@@ -16,6 +16,7 @@ const {
   buildRuntimeSmokePlan,
   buildModuleCatalog,
   buildInstitutionDeploymentManifest,
+  validateInstitutionDeploymentManifest,
   normalizeTrack,
   parseCliOptions,
   renderMarkdown,
@@ -191,6 +192,27 @@ test("institution deployment manifest exposes only selected module routes and da
   assert.deepEqual(manifest.rollbackUnits, ["t10-clinical-blood"]);
   assert.equal(manifest.enabledModules[0].externalSystems.includes("BIS or BTIS"), true);
   assert.ok(manifest.validationRules.some((item) => /disabled specialty modules/.test(item)));
+});
+
+test("institution deployment gate blocks route exposure, namespace collision and traffic bypass", () => {
+  const catalog = buildModuleCatalog(tracks, tracks);
+  const manifest = buildInstitutionDeploymentManifest(catalog, { institutionId: "hospital-a" });
+  const validGate = validateInstitutionDeploymentManifest(manifest, catalog);
+  assert.equal(validGate.ok, true);
+  assert.equal(validGate.summary.passed, 9);
+  assert.deepEqual(validGate.hardStops, []);
+
+  const invalidGate = validateInstitutionDeploymentManifest({
+    ...manifest,
+    routeAllowlist: [...manifest.routeAllowlist, "disabled-module.html"],
+    dataNamespaces: ["t10.shared", "t10.shared"],
+    productionTrafficState: "enabled"
+  }, catalog);
+  assert.equal(invalidGate.ok, false);
+  assert.equal(invalidGate.status, "deployment-contract-blocked");
+  assert.ok(invalidGate.hardStops.includes("page-allowlist"));
+  assert.ok(invalidGate.hardStops.includes("data-namespace-isolation"));
+  assert.ok(invalidGate.hardStops.includes("production-traffic-boundary"));
 });
 
 test("CLI selection supports standalone output profiles and environment configuration", () => {
@@ -465,7 +487,7 @@ test("static cutover preview page exposes T10 tracks and release-artifact fallba
   assert.match(html, /institution-deployment-manifest/);
   assert.match(html, /observation-signal-board/);
   assert.match(html, /runtime-smoke-plan/);
-  assert.match(html, /t10-specialty-cutover\.js\?v=institution-deployment-manifest/);
+  assert.match(html, /t10-specialty-cutover\.js\?v=institution-deployment-gate/);
   assert.match(html, /emergency\.html/);
   assert.match(html, /blood\.html/);
   assert.match(html, /imaging-cloud\.html/);
@@ -485,6 +507,7 @@ test("static cutover preview page exposes T10 tracks and release-artifact fallba
   assert.match(client, /renderRuntimeSmokePlan/);
   assert.match(client, /renderInstitutionDeploymentManifest/);
   assert.match(client, /deny-by-default/);
+  assert.match(client, /deployment-contract-valid/);
   assert.match(client, /evidence-id-present/);
   assert.match(client, /batch-1-single-chain/);
   assert.match(client, /submit-evidence/);
