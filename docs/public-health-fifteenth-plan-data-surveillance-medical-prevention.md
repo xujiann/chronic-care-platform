@@ -2,7 +2,7 @@
 
 ## 建设依据与范围
 
-本增量落实《疾病预防控制“十五五”规划》中“数智疾控”“一处采集、多级共享应用”“多点触发、反应灵敏的传染病监测预警体系”和“医防协同、医防融合”要求，优先建设：
+本增量落实《疾病预防控制“十五五”规划》中“数智疾控”“一处采集、多级共享应用”“多点触发、反应灵敏的传染病监测预警体系”“监测预警数据库、规则库和模型库”以及“医防协同、医防融合”要求，优先建设：
 
 1. 公共卫生数据底座；
 2. 多点触发监测预警中心；
@@ -103,6 +103,26 @@ submitted 提交 → approved 委级独立复核 → activated 服务端可信�
 
 单一静态字符串仅保留测试和兼容能力，不能通过托管密钥生产门禁。规则激活成功也不自动获得生产上线资格。
 
+### 监测模型库与影子评估
+
+首批模型库登记三类版本化模型卡：
+
+- 多病种基线偏离模型；
+- 跨病例、症候群、实验室等来源的异常一致性模型；
+- 同一观察窗内的时空聚集模型。
+
+模型当前统一为 `shadow` 状态，只对已经人工确认且通过数据质量检查的最小化信号运行。每次影子运行绑定模型版本与摘要、信号快照摘要、观察窗、输入证据、可解释结果、执行角色和幂等摘要。输出必须同时标记 `modelAdviceOnly=true`、`humanDecisionRequired=true` 和 `alertCreated=false`，不得直接创建、确认、发布或关闭预警。
+
+模型效能验证依次执行：
+
+```text
+submitted 疾控模型责任人提交 → commission 委级独立复核
+                                  ├→ validated-shadow 限期影子使用
+                                  └→ remediation-required 整改
+```
+
+验证证据至少记录样本观察窗、样本量、灵敏度、阳性预测值、假阴性率和证据引用。提交人与复核人必须不同；即使复核通过，也仅获得 `validated-shadow`，不获得自动决策或生产上线资格。验证结论超过90天后进入 `review-due`，停止计为已验证影子模型，等待新的漂移复核。模型输入、输出、验证指标、版本或物化模型被篡改时，模型治理看板失败关闭。
+
 ### 信号状态
 
 ```mermaid
@@ -178,6 +198,7 @@ T08 自有文件：
 
 - `public-health-data-foundation-service.js`：数据目录、来源登记、最小化信号接入、质量和血缘。
 - `public-health-surveillance-rule-governance-service.js`：规则提案、独立复核、可信激活、版本历史和防篡改校验。
+- `public-health-surveillance-model-governance-service.js`：模型卡、影子运行、独立效能复核、漂移窗口和防篡改校验。
 - `public-health-surveillance-workflow-service.js`：人工核实、版本化规则、预警、研判、报告、反馈和关闭。
 - `public-health-medical-prevention-collaboration-service.js`：医院公卫科与基层公卫任务。
 - `scripts/public-health-modernization-readiness.js`：三项建设任务的可运行验收。
@@ -192,6 +213,7 @@ T00 负责公共文件和集成：
 
 T00 只调用领域服务返回的 `nextData`，不得复制状态转换、授权、幂等、版本和关闭判断。
 规则激活密钥环由 T00 从服务端环境或密钥管理服务解析，分别传入写动作和只读治理/监测服务；浏览器载荷、SQLite 业务表、日志和公共响应均不得包含密钥材料。T00 可在迁移期兼容旧静态配置，但最终发布门禁只接受用途正确、当前有效且恰有一个活动密钥的托管密钥环。
+T00 对模型接口只负责身份传递和领域服务 `nextData` 的原子持久化，不得根据模型分值直接改变信号、预警、报告或协同任务状态；模型公共响应只展示模型编号、版本、影子状态、分值区间、复核状态和漂移状态。
 
 ## 六、建议公共API
 
@@ -202,6 +224,10 @@ T00 只调用领域服务返回的 `nextData`，不得复制状态转换、授�
 - `GET /api/public-health/surveillance-rule-governance`
 - `POST /api/public-health/surveillance-rule-changes`
 - `POST /api/public-health/surveillance-rule-changes/:id/actions`
+- `GET /api/public-health/surveillance-model-governance`
+- `POST /api/public-health/surveillance-models/:id/shadow-runs`
+- `POST /api/public-health/surveillance-models/:id/validations`
+- `POST /api/public-health/surveillance-model-validations/:id/actions`
 - `GET /api/public-health/surveillance-center`
 - `POST /api/public-health/surveillance-alerts/:id/actions`
 - `GET /api/public-health/medical-prevention-tasks`
@@ -223,6 +249,10 @@ T00 只调用领域服务返回的 `nextData`，不得复制状态转换、授�
 - 规则激活回执签名后修改阈值、状态、可信来源或验签标志必须被拒绝，旧预警仍按其历史规则版本复核；
 - 活动密钥轮换后，宽限密钥可以验证历史回执但不能签署新回执，新规则版本必须使用新活动密钥；
 - 历史密钥被撤销、回执 `keyId` 被篡改或使用错误 purpose 的密钥环时，规则链必须失败关闭；
+- 三类模型卡均版本化并保持 `shadow`，模型输出不得改变信号或预警状态；
+- 模型只接收已人工确认、质量合格且位于声明观察窗内的最小化信号；
+- 模型运行绑定输入摘要、可解释输出和审计；输入、分值、建议边界或模型物化被篡改时失败关闭；
+- 模型验证必须由委级角色独立复核，低于效能阈值转入整改，超过90天自动进入漂移复核到期；
 - 未经人工确认的信号不能进入规则评估；
 - AI和居民角色不能确认信号或预警；
 - 预警完成研判、派单、调查、正式报告、反馈和关闭；
@@ -237,6 +267,7 @@ T00 只调用领域服务返回的 `nextData`，不得复制状态转换、授�
 - 数据共享授权和安全评估完成；
 - 医疗机构、基层机构、疾控正式端点联调；
 - 生产阈值审批、受控变更窗口、服务端托管激活密钥环和轮换/撤销作业完成；
+- 高质量模型数据集、独立外部验证、持续漂移观察和模型风险审批完成；
 - 各来源完成连续数据质量与刷新时效观察窗；
 - 正式报告和业务回执验签通过；
 - 生产数据质量观察窗、灾备演练和现场签字完成；

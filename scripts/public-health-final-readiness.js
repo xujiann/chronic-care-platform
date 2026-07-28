@@ -677,6 +677,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
   const endpointProbeDoc = options.endpointProbeDoc ?? fs.readFileSync(path.join(ROOT, "docs", "public-health-external-endpoint-verification.md"), "utf8");
   const activeProbeDoc = options.activeProbeDoc ?? fs.readFileSync(path.join(ROOT, "docs", "public-health-external-active-probing.md"), "utf8");
   const endpointCampaignDoc = options.endpointCampaignDoc ?? fs.readFileSync(path.join(ROOT, "docs", "public-health-external-endpoint-probe-campaigns.md"), "utf8");
+  const modernizationDoc = options.modernizationDoc ?? fs.readFileSync(path.join(ROOT, "docs", "public-health-fifteenth-plan-data-surveillance-medical-prevention.md"), "utf8");
   const serializedDeliveries = JSON.stringify(deliveries);
   const managedKeyringSummary = summarizeKeyring({
     purpose: "t08-readiness-request",
@@ -697,6 +698,9 @@ function buildPublicHealthFinalReadiness(options = {}) {
     check("modernization:multi-source-surveillance", modernizationReadiness.summary.rules === 8 && modernizationReadiness.summary.closedAlerts === 1, "8 versioned rules and one human-verified alert closure prove the surveillance workflow", "modernization"),
     check("modernization:trusted-rule-governance", modernizationReadiness.summary.ruleVersions === 9 && modernizationReadiness.summary.trustedRuleActivations === 1 && modernizationReadiness.ruleGovernance.productionReady === false, "independent review and server receipt activation advances one rule without promoting production readiness", "modernization"),
     check("modernization:managed-rule-keyring", modernizationReadiness.summary.managedRuleKeyringReady === true && modernizationReadiness.ruleGovernance.keyring.activeKeyId === "readiness-rule-key-b" && modernizationReadiness.ruleGovernance.keyring.keys.some((item) => item.status === "grace"), "managed active/grace key rotation verifies historical rule activations and signs new versions with the current active key", "modernization"),
+    check("modernization:model-library", modernizationReadiness.summary.models === 3 && modernizationReadiness.modelGovernance.summary.shadowModels === 3, "three versioned surveillance models form an advisory-only model library", "modernization"),
+    check("modernization:model-shadow-observation", modernizationReadiness.summary.modelRuns === 1 && modernizationReadiness.modelGovernance.summary.manualReviewRecommendations >= 0 && modernizationReadiness.modelGovernance.productionReady === false, "one explainable shadow observation is persisted without creating a public health alert", "modernization"),
+    check("modernization:model-validation-drift", modernizationReadiness.summary.validatedShadowModels === 1 && modernizationReadiness.summary.modelDriftReviewsDue === 0 && modernizationReadiness.modelGovernance.models.every((item) => item.productionReady === false), "independent performance validation and the 90-day drift window retain the human decision boundary", "modernization"),
     check("modernization:medical-prevention-collaboration", modernizationReadiness.summary.collaborationTasks === 2 && modernizationReadiness.summary.closedCollaborationTasks === 2 && modernizationReadiness.productionReady === false, "medical public-health and primary-care tasks close without asserting production readiness", "modernization"),
     check("runtime:eight-handoffs", runtime.handoffs.length === 8 && runtime.functionalState === "eight-lane-coordination-persistence-ready", `${runtime.handoffs.length}/8 runtime handoffs`, "runtime"),
     check("runtime:persisted-write-model", runtimeAcceptance.first.nextData.publicHealthCoordinationHandoffs.length === 8, "immutable state patch contains all handoffs", "runtime"),
@@ -742,7 +746,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
     check("operations:healthy-reconciliation", operationsBoard.ok === true && operationsBoard.operationallyHealthy === true && operationsBoard.summary.signatureVerified === 2 && operationsBoard.summary.issues === 0, "recovered predecessor, successor, signatures, audit and coordination states reconcile", "operations"),
     check("operations:risk-queue-contract", ["audit-dispatch-missing", "coordination-handoff-missing", "coordination-state-mismatch", "worker-lease-expired", "retry-due-unclaimed", "pending-dispatch-overdue", "dead-letter-unrecovered", "lane-control-audit-orphan", "lane-control-integrity-invalid", "lane-circuit-open", "campaign-chain-link-missing", "campaign-chain-link-mismatch"].every((token) => operationsSource.includes(token)), "integrity, orphan audit/task/control, mismatch, lease, retry, SLA, dead-letter, lane resilience and signed campaign-chain risks have explicit codes", "operations"),
     check("frontend:action-route-contract", pageSource.includes("/api/public-health/coordination/") && pageSource.includes("idempotencyKey") && pageSource.includes("expectedVersion"), "T00 route boundary has a stable client contract", "integration"),
-    check("integration:documented-boundary", ["public-health-coordination-runtime.js", "public-health-external-adapter-service.js", "T00", "server.js", "productionReady"].every((token) => doc.includes(token)) && ["requestKeyring", "receiptKeyring", "receiptReplayKeyHash", "legacy-static"].every((token) => keyringDoc.includes(token)) && ["expectedLaneControlVersion", "maxPending", "lane-circuit-open"].every((token) => resilienceDoc.includes(token)) && ["runtimeReleaseDigest", "contract-transition-conflict", "contract-governance-mismatch"].every((token) => contractDoc.includes(token)) && ["server-generated", "platform-observability", "endpointConnectivityReady", "productionReady"].every((token) => endpointProbeDoc.includes(token)) && ["只接受 `laneId`", "DNS rebinding", "certificatePins", "requireMutualTls", "productionReady=false"].every((token) => activeProbeDoc.includes(token)) && ["continuousConnectivityReady", "receiptDigest", "policyDigest", "campaign nonce", "productionReady=false"].every((token) => endpointCampaignDoc.includes(token)), "runtime, adapter, key lifecycle, resilience, contract, endpoint verification, active probing, campaign continuity and T00 boundaries are documented", "integration"),
+    check("integration:documented-boundary", ["public-health-coordination-runtime.js", "public-health-external-adapter-service.js", "T00", "server.js", "productionReady"].every((token) => doc.includes(token)) && ["requestKeyring", "receiptKeyring", "receiptReplayKeyHash", "legacy-static"].every((token) => keyringDoc.includes(token)) && ["expectedLaneControlVersion", "maxPending", "lane-circuit-open"].every((token) => resilienceDoc.includes(token)) && ["runtimeReleaseDigest", "contract-transition-conflict", "contract-governance-mismatch"].every((token) => contractDoc.includes(token)) && ["server-generated", "platform-observability", "endpointConnectivityReady", "productionReady"].every((token) => endpointProbeDoc.includes(token)) && ["只接受 `laneId`", "DNS rebinding", "certificatePins", "requireMutualTls", "productionReady=false"].every((token) => activeProbeDoc.includes(token)) && ["continuousConnectivityReady", "receiptDigest", "policyDigest", "campaign nonce", "productionReady=false"].every((token) => endpointCampaignDoc.includes(token)) && ["public-health-surveillance-model-governance-service.js", "validated-shadow", "review-due", "modelAdviceOnly=true"].every((token) => modernizationDoc.includes(token)), "runtime, adapter, key lifecycle, resilience, contract, endpoint verification, active probing, campaign continuity, model governance and T00 boundaries are documented", "integration"),
     check("integration:t00-public-routes", [
       "/api/public-health/coordination-runtime",
       "publicHealthExternalEnqueueMatch",
@@ -992,6 +996,10 @@ function buildPublicHealthFinalReadiness(options = {}) {
       modernizationRuleVersions: modernizationReadiness.summary.ruleVersions,
       modernizationTrustedRuleActivations: modernizationReadiness.summary.trustedRuleActivations,
       modernizationManagedRuleKeyringReady: modernizationReadiness.summary.managedRuleKeyringReady,
+      modernizationModels: modernizationReadiness.summary.models,
+      modernizationModelRuns: modernizationReadiness.summary.modelRuns,
+      modernizationValidatedShadowModels: modernizationReadiness.summary.validatedShadowModels,
+      modernizationModelDriftReviewsDue: modernizationReadiness.summary.modelDriftReviewsDue,
       modernizationFreshSources: modernizationReadiness.summary.freshSources,
       modernizationNoDataSources: modernizationReadiness.summary.noDataSources,
       modernizationClosedAlerts: modernizationReadiness.summary.closedAlerts,
@@ -1072,6 +1080,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
       externalEndpointProbeCampaigns: "public-health-external-endpoint-probe-campaign-service.js",
       publicHealthDataFoundation: "public-health-data-foundation-service.js",
       publicHealthSurveillanceRuleGovernance: "public-health-surveillance-rule-governance-service.js",
+      publicHealthSurveillanceModelGovernance: "public-health-surveillance-model-governance-service.js",
       publicHealthSurveillanceWorkflow: "public-health-surveillance-workflow-service.js",
       publicHealthMedicalPreventionCollaboration: "public-health-medical-prevention-collaboration-service.js",
       externalOperations: "public-health-external-operations-service.js",
@@ -1109,6 +1118,10 @@ function renderMarkdown(report) {
     `- Modernization surveillance rule versions: ${report.summary.modernizationRuleVersions}`,
     `- Modernization trusted rule activations: ${report.summary.modernizationTrustedRuleActivations}`,
     `- Modernization managed rule keyring ready: ${report.summary.modernizationManagedRuleKeyringReady ? "yes" : "no"}`,
+    `- Modernization surveillance models: ${report.summary.modernizationModels}/3`,
+    `- Modernization shadow model runs: ${report.summary.modernizationModelRuns}`,
+    `- Modernization validated shadow models: ${report.summary.modernizationValidatedShadowModels}`,
+    `- Modernization model drift reviews due: ${report.summary.modernizationModelDriftReviewsDue}`,
     `- Modernization fresh/no-data sources: ${report.summary.modernizationFreshSources}/${report.summary.modernizationNoDataSources}`,
     `- Modernization closed alerts: ${report.summary.modernizationClosedAlerts}/1`,
     `- Modernization closed collaboration tasks: ${report.summary.modernizationClosedCollaborationTasks}/2`,
