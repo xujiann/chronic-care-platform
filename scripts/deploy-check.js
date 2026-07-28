@@ -182,6 +182,9 @@ function buildDeployCheckReport(options = {}) {
   const pilotAlertingTemplate = fs.readFileSync(path.join(ROOT, "deploy", "pilot-alerting.env.template"), "utf8");
   const citizenSource = fs.readFileSync(path.join(ROOT, "citizen.js"), "utf8");
   const citizenHtml = fs.readFileSync(path.join(ROOT, "citizen.html"), "utf8");
+  const citizenRecordsV3Source = fs.readFileSync(path.join(ROOT, "citizen-records-v3.js"), "utf8");
+  const citizenRecordsReadinessSource = fs.readFileSync(path.join(ROOT, "scripts", "citizen-records-readiness.js"), "utf8");
+  const serviceWorkerSource = fs.readFileSync(path.join(ROOT, "service-worker.js"), "utf8");
   const immunizationHtml = fs.readFileSync(path.join(ROOT, "immunization.html"), "utf8");
   const immunizationSource = fs.readFileSync(path.join(ROOT, "immunization.js"), "utf8");
   const immunizationScheduleSource = fs.readFileSync(path.join(ROOT, "immunization-schedule.js"), "utf8");
@@ -733,7 +736,20 @@ function buildDeployCheckReport(options = {}) {
     { name: "manifest:onsiteLaunchRequirements", ok: manifestSource.includes("onsite-launch-requirements.md") && manifestSource.includes("onsite:launch-requirements"), detail: "on-site launch requirements artifact is indexed" },
     { name: "manifest:priorityApplicationTemplates", ok: manifestSource.includes("priority-application-templates.md") && manifestSource.includes("priority-apps:templates"), detail: "priority application template artifact is indexed" },
     { name: "manifest:citizenLaunchFoundation", ok: manifestSource.includes("citizen-launch-foundation-readiness.md") && manifestSource.includes("citizen:launch-foundation") && manifestSource.includes("citizen-pipeline-panel"), detail: "citizen launch foundation artifact links to the resident pipeline acceptance panel" },
-    { name: "manifest:citizenRecordsReadiness", ok: manifestSource.includes("citizen-records-readiness-report.md") && manifestSource.includes("citizen-records:readiness") && manifestSource.includes("citizen-care-workspace") && serverSource.includes("/api/record-care-workspace") && serverSource.includes("evaluateCitizenRecordAccess"), detail: "T04 resident record readiness, public policy and care workspace routes are indexed" },
+    {
+      name: "manifest:citizenRecordsReadiness",
+      ok: manifestSource.includes("citizen-records-readiness-report.md")
+        && manifestSource.includes("citizen-records:readiness")
+        && manifestSource.includes("citizen-care-workspace")
+        && serverSource.includes("/api/record-care-workspace")
+        && serverSource.includes("evaluateCitizenRecordAccess")
+        && citizenRecordsV3Source.includes("buildCareTaskActionIntent")
+        && citizenSource.includes("handleCitizenRecordsV3CareTaskAction")
+        && citizenRecordsReadinessSource.includes("proactive-care-task-routing")
+        && serviceWorkerSource.includes("citizen-records-v3.js?v=20260728next4")
+        && serviceWorkerSource.includes("citizen.js?v=20260728next3"),
+      detail: "T04 resident record policy, care workspace, proactive task routing and current PWA cache are release indexed"
+    },
     { name: "manifest:registrationReferralAcceptance", ok: manifestSource.includes("registration-referral-acceptance-report.md") && manifestSource.includes("registration-referral:acceptance") && manifestSource.includes("/api/registration-referral/operations") && serverSource.includes("/api/registration-referral/commands") && serverSource.includes("applyClosureCommand"), detail: "T05 command, operations, acceptance and release wiring are indexed" },
     { name: "manifest:policyCoverage", ok: manifestSource.includes("policy-coverage-report.md") && manifestSource.includes("policy:coverage"), detail: "policy coverage artifact is indexed" },
     { name: "manifest:maternalChildReadiness", ok: manifestSource.includes("maternal-child-readiness-report.md") && manifestSource.includes("maternal-child:readiness"), detail: "maternal-child readiness artifact is indexed" },

@@ -133,9 +133,13 @@
     },
     {
       "lineId": "T04",
-      "candidateHead": "6107efb7bde3dfe21bfe9284dcddb087d19ef738",
+      "candidateHead": "a76538c1e5b088b8eb59f062c3c9b676fa8a1983",
       "decision": "accepted",
-      "reviewedAt": "2026-07-27T14:41:38.030Z",
+      "acceptedCandidateHeads": [
+        "6107efb7bde3dfe21bfe9284dcddb087d19ef738",
+        "a76538c1e5b088b8eb59f062c3c9b676fa8a1983"
+      ],
+      "reviewedAt": "2026-07-28T03:35:00.000Z",
       "reviewer": "T00",
       "checks": [
         "git diff --check",
@@ -150,7 +154,14 @@
         "authorization renewal creates a new explicit consent linked only by the previous authorization reference",
         "resident privacy review exports minimized fields and keeps trusted authorization and directory evidence production-blocked",
         "record search remains resident-scoped and rejects inverted date ranges without returning results",
-        "authorization create and revoke responses preserve immutable resident, grantee, purpose, scope and expiry fields"
+        "authorization create and revoke responses preserve immutable resident, grantee, purpose, scope and expiry fields",
+        "T00 exactly received a76538c1 proactive care routing on top of the accepted 6107efb7 baseline",
+        "follow-up and revisit tasks navigate to registration, medication pickup focuses resident medication review, and authorization expiry reuses explicit renewal without writing success state",
+        "task type plus controlled identifier prefix fail closed on mismatch, empty identifiers and unknown task types",
+        "resident record policy, projection, localization, proactive routing and readiness regression passed 78 of 78",
+        "T04 readiness passed 20 of 20 software and 3 of 3 T00 integration checks while all 8 production dependencies remain blocked",
+        "shared static resources passed 72 of 72 and deploy checks passed 395 of 395",
+        "T00 Service Worker v57 caches citizen-records-v3.js?v=20260728next4 and citizen.js?v=20260728next3"
       ],
       "blockers": []
     },
