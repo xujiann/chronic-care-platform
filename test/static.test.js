@@ -2377,7 +2377,7 @@ test("data governance foundation exposes platform cards API and release evidence
   assert.match(read("scripts/release-artifact-manifest.js"), /data-governance-readiness-report\.md/);
 });
 
-test("digital hospital v0.13 prototype is publishable from GitHub Pages", () => {
+test("digital hospital v0.14 prototype is publishable from GitHub Pages", () => {
   const standardsEntry = read("digital-hospital-standards.html");
   const index = read("digital-hospital-standard-platform/index.html");
   const app = read("digital-hospital-standard-platform/app.js");
@@ -2385,16 +2385,17 @@ test("digital hospital v0.13 prototype is publishable from GitHub Pages", () => 
   const openapi = read("digital-hospital-standard-platform/mock-api/openapi.v0.1.yaml");
   const schema = JSON.parse(read("digital-hospital-standard-platform/mock-api/package-schema.v0.1.json"));
 
-  assert.match(standardsEntry, /href="\.\/digital-hospital-standard-platform\/">新标准平台 v0\.13/);
+  assert.match(standardsEntry, /href="\.\/digital-hospital-standard-platform\/">新标准平台 v0\.14/);
   assert.match(index, /data-view="assistant">评价助手/);
   assert.match(index, /data-view="assessment">试点评估/);
   assert.match(index, /data-view="monitoring">运营监控/);
-  assert.match(app, /digitalHospitalMvpState:v0\.13/);
+  assert.match(app, /digitalHospitalMvpState:v0\.14/);
   assert.match(app, /function renderAssistant\(\)/);
   assert.match(app, /assistant: "评价助手包"/);
   assert.match(app, /\{ id: "governance", label: "治理审计" \}/);
   assert.match(app, /\{ id: "quality", label: "质量门禁" \}/);
   assert.match(app, /\{ id: "canary", label: "灰度" \}/);
+  assert.match(app, /\{ id: "feedback", label: "反馈" \}/);
   assert.match(app, /data-action="advance-knowledge-version"/);
   assert.match(app, /data-action="run-retrieval-quality-check"/);
   assert.match(app, /data-action="review-model-call"/);
@@ -2406,6 +2407,12 @@ test("digital hospital v0.13 prototype is publishable from GitHub Pages", () => 
   assert.match(app, /data-action="advance-canary-deployment"/);
   assert.match(app, /data-action="simulate-online-degradation"/);
   assert.match(app, /data-action="rollback-canary-deployment"/);
+  assert.match(app, /data-action="collect-assistant-feedback"/);
+  assert.match(app, /data-action="review-assistant-feedback"/);
+  assert.match(app, /data-action="convert-feedback-sample"/);
+  assert.match(app, /data-action="annotate-improvement-sample"/);
+  assert.match(app, /data-action="include-improvement-sample"/);
+  assert.match(app, /data-action="run-improvement-regression"/);
   assert.match(styles, /\.assistant-tabs button/);
   assert.match(openapi, /name: EvaluationAssistant/);
   assert.match(openapi, /\/api\/v1\/evaluation-assistant\/review-risks:scan/);
@@ -2420,6 +2427,10 @@ test("digital hospital v0.13 prototype is publishable from GitHub Pages", () => 
   assert.match(openapi, /\/api\/v1\/evaluation-assistant\/online-quality-windows/);
   assert.match(openapi, /\/api\/v1\/evaluation-assistant\/quality-incidents/);
   assert.match(openapi, /\/api\/v1\/evaluation-assistant\/deployments\/\{deploymentId\}:rollback/);
+  assert.match(openapi, /\/api\/v1\/evaluation-assistant\/feedback-records\/\{feedbackId\}:review/);
+  assert.match(openapi, /\/api\/v1\/evaluation-assistant\/feedback-records\/\{feedbackId\}:convert-sample/);
+  assert.match(openapi, /\/api\/v1\/evaluation-assistant\/improvement-samples\/\{sampleId\}/);
+  assert.match(openapi, /\/api\/v1\/evaluation-assistant\/improvement-cycles\/\{cycleId\}:regression/);
   assert.ok(schema.properties.assistantKnowledgeSources);
   assert.ok(schema.properties.assistantKnowledgeVersions);
   assert.ok(schema.properties.standardQaRecords);
@@ -2433,6 +2444,9 @@ test("digital hospital v0.13 prototype is publishable from GitHub Pages", () => 
   assert.ok(schema.properties.assistantDeployments);
   assert.ok(schema.properties.assistantOnlineQualityWindows);
   assert.ok(schema.properties.assistantQualityIncidents);
+  assert.ok(schema.properties.assistantFeedbackRecords);
+  assert.ok(schema.properties.assistantImprovementSamples);
+  assert.ok(schema.properties.assistantImprovementCycles);
   assert.ok(schema.properties.anomalyExplanations);
   assert.ok(schema.properties.rectificationSuggestions);
   assert.ok(schema.properties.reviewRiskSignals);

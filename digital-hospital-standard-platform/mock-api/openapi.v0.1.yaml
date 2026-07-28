@@ -1064,6 +1064,136 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/feedback-records:
+    get:
+      tags: [EvaluationAssistant]
+      summary: 获取评价助手线上反馈
+      responses:
+        "200":
+          description: 线上反馈清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AssistantFeedbackRecord"
+    post:
+      tags: [EvaluationAssistant]
+      summary: 采集回答评价或试点工单反馈
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssistantFeedbackRecord"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/feedback-records/{feedbackId}:review:
+    post:
+      tags: [EvaluationAssistant]
+      summary: 人工研判评价助手线上反馈
+      parameters:
+        - name: feedbackId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/feedback-records/{feedbackId}:convert-sample:
+    post:
+      tags: [EvaluationAssistant]
+      summary: 将已研判负向反馈转为改进样本
+      parameters:
+        - name: feedbackId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/improvement-samples:
+    get:
+      tags: [EvaluationAssistant]
+      summary: 获取评价助手改进样本
+      responses:
+        "200":
+          description: 改进样本清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AssistantImprovementSample"
+  /api/v1/evaluation-assistant/improvement-samples/{sampleId}:
+    put:
+      tags: [EvaluationAssistant]
+      summary: 标注改进样本或纳入正式评测集
+      parameters:
+        - name: sampleId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssistantImprovementSample"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/improvement-cycles:
+    get:
+      tags: [EvaluationAssistant]
+      summary: 获取评价助手持续改进周期
+      responses:
+        "200":
+          description: 持续改进周期清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AssistantImprovementCycle"
+    post:
+      tags: [EvaluationAssistant]
+      summary: 创建绑定反馈、样本和评测集的改进周期
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssistantImprovementCycle"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/improvement-cycles/{cycleId}:regression:
+    post:
+      tags: [EvaluationAssistant]
+      summary: 运行持续改进回归并关闭通过的问题
+      parameters:
+        - name: cycleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
   /api/v1/evaluation-assistant/anomaly-explanations:
     get:
       tags: [EvaluationAssistant]
@@ -2117,7 +2247,7 @@ components:
             $ref: "#/components/schemas/PilotAssessmentReport"
     AssistantPackage:
       type: object
-      required: [meta, assistantSummary, assistantKnowledgeSources, assistantKnowledgeVersions, standardQaRecords, assistantRetrievalTraces, assistantModelCalls, assistantQualityGate, assistantEvaluationSuites, assistantEvaluationRuns, assistantReleaseCandidates, assistantOnlineGuardrail, assistantDeployments, assistantOnlineQualityWindows, assistantQualityIncidents, anomalyExplanations, rectificationSuggestions, reviewRiskSignals]
+      required: [meta, assistantSummary, assistantKnowledgeSources, assistantKnowledgeVersions, standardQaRecords, assistantRetrievalTraces, assistantModelCalls, assistantQualityGate, assistantEvaluationSuites, assistantEvaluationRuns, assistantReleaseCandidates, assistantOnlineGuardrail, assistantDeployments, assistantOnlineQualityWindows, assistantQualityIncidents, assistantFeedbackRecords, assistantImprovementSamples, assistantImprovementCycles, anomalyExplanations, rectificationSuggestions, reviewRiskSignals]
       properties:
         meta:
           $ref: "#/components/schemas/PackageMeta"
@@ -2172,6 +2302,18 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AssistantQualityIncident"
+        assistantFeedbackRecords:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssistantFeedbackRecord"
+        assistantImprovementSamples:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssistantImprovementSample"
+        assistantImprovementCycles:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssistantImprovementCycle"
         anomalyExplanations:
           type: array
           items:
@@ -3631,6 +3773,110 @@ components:
         createdAt:
           type: string
         resolvedAt:
+          type: string
+    AssistantFeedbackRecord:
+      type: object
+      required: [id, deploymentId, version, questionId, channel, rating, sentiment, reason, comment, citationUseful, userRole, status, createdAt]
+      properties:
+        id:
+          type: string
+        deploymentId:
+          type: string
+        version:
+          type: string
+        questionId:
+          type: string
+        channel:
+          type: string
+          enum: [回答评价, 试点工单, 审核反馈]
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        sentiment:
+          type: string
+          enum: [正向, 负向]
+        reason:
+          type: string
+        comment:
+          type: string
+        citationUseful:
+          type: boolean
+        userRole:
+          type: string
+        status:
+          type: string
+          enum: [待研判, 已研判, 已转样本, 已关闭]
+        createdAt:
+          type: string
+        reviewedBy:
+          type: string
+        reviewedAt:
+          type: string
+    AssistantImprovementSample:
+      type: object
+      required: [id, feedbackId, sourceVersion, domain, question, expectedAnswer, sourceEvidence, riskLevel, targetSuiteId, status, owner, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        feedbackId:
+          type: string
+        sourceVersion:
+          type: string
+        domain:
+          type: string
+        question:
+          type: string
+        expectedAnswer:
+          type: string
+        sourceEvidence:
+          type: array
+          items:
+            type: string
+        riskLevel:
+          type: string
+          enum: [低, 中, 高]
+        targetSuiteId:
+          type: string
+        status:
+          type: string
+          enum: [待标注, 已标注, 已入集, 已验证, 已排除]
+        owner:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    AssistantImprovementCycle:
+      type: object
+      required: [id, name, sourceFeedbackIds, sampleIds, targetSuiteId, targetVersion, evaluationRunId, status, owner, startedAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        sourceFeedbackIds:
+          type: array
+          items:
+            type: string
+        sampleIds:
+          type: array
+          items:
+            type: string
+        targetSuiteId:
+          type: string
+        targetVersion:
+          type: string
+        evaluationRunId:
+          type: string
+        status:
+          type: string
+          enum: [待回归, 已完成]
+        owner:
+          type: string
+        startedAt:
+          type: string
+        completedAt:
           type: string
     StandardQaRecord:
       type: object
