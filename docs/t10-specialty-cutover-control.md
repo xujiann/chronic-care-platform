@@ -125,7 +125,7 @@ Generate the institution operations templates with:
 node scripts\t10-institution-operations.js --institution-id=hospital-a --tracks=emergency-life-chain,clinical-blood
 ```
 
-The output includes configuration, evidence import, rehearsal result, observation, upgrade/rollback and T00 integration templates plus a SHA-256 artifact index. Templates intentionally contain placeholders and `pending`/`not-run` states; they cannot be counted as real site evidence.
+The output includes configuration, evidence import, rehearsal result, observation, upgrade/rollback, selected-specialty plan review and T00 integration templates plus a SHA-256 artifact index. Templates intentionally contain placeholders and `pending`/`not-run` states; they cannot be counted as real site evidence.
 
 ## T00 integration contract
 
@@ -236,6 +236,23 @@ Run it after generating the cutover pack:
 
 ```powershell
 node scripts\t10-runtime-smoke.js
+```
+
+## Specialty plan coverage review
+
+`t10-specialty-plan-review.js` reviews the complete planned capability scope for emergency, clinical blood, imaging cloud and physical examination. Every capability must have a stable specialty-scoped identifier, P0/P1 priority, accountable department, existing source evidence and at least one executable acceptance test. Remaining work is listed separately as a `site` or `t00` action.
+
+The catalog contains 32 code capability groups: eight for each specialty. The review fails closed when a source or test artifact is missing, when identifiers collide, or when code completion is allowed to imply formal production readiness.
+
+The imaging review closed two prior code-side P1 gaps:
+
+- `imaging-cloud-planning.js#evaluateViewerPerformance` defines DICOMweb/WADO-RS, lossless diagnostic source, first-pixel, series-load, interaction P95, failed-object-rate, viewer-tool, audit and terminal-storage gates;
+- `imaging-cloud-planning.js#buildRegulatoryStatistics` produces day/month/year institution and city aggregates, rankings and anomaly lists without emitting patient, accession or StudyInstanceUID identifiers.
+
+Real DICOMweb performance runs and production regulatory event feeds remain site dependencies. Generate the JSON/Markdown review, external-action register and SHA-256 artifact index with:
+
+```powershell
+node scripts\t10-specialty-plan-review.js
 ```
 
 ## Verification

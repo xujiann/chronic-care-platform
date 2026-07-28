@@ -100,6 +100,12 @@ test("buildSpecialtyCutoverPack aggregates site blockers and cross-track control
   assert.equal(pack.institutionOperationsCapabilityPlan.status, "institution-operations-code-ready");
   assert.equal(pack.institutionOperationsCapabilityPlan.summary.implemented, 6);
   assert.equal(pack.institutionOperationsCapabilityPlan.summary.blocked, 0);
+  assert.equal(pack.specialtyPlanReview.ok, true);
+  assert.equal(pack.specialtyPlanReview.summary.plannedCapabilities, 16);
+  assert.equal(pack.specialtyPlanReview.summary.implementedCapabilities, 16);
+  assert.equal(pack.specialtyPlanReview.summary.missingCapabilities, 0);
+  assert.equal(pack.specialtyPlanReview.summary.externalActions, 6);
+  assert.equal(pack.summary.plannedCapabilities, 16);
   assert.equal(pack.crossTrackControls.length, 4);
   assert.ok(pack.crossTrackControls.some((item) => item.id === "four-eyes-site-evidence"));
   assert.equal(pack.rehearsalPlan.scope.primaryTrackId, "emergency-life-chain");
@@ -495,11 +501,13 @@ test("static cutover preview page exposes T10 tracks and release-artifact fallba
   assert.match(html, /切换指挥台与值守责任/);
   assert.match(html, /机构模块启用与隔离清单/);
   assert.match(html, /机构配置、签名、证据与演练运营/);
+  assert.match(html, /四专项规划功能覆盖审阅/);
   assert.match(html, /institution-deployment-manifest/);
   assert.match(html, /institution-operations/);
+  assert.match(html, /specialty-plan-review/);
   assert.match(html, /observation-signal-board/);
   assert.match(html, /runtime-smoke-plan/);
-  assert.match(html, /t10-specialty-cutover\.js\?v=institution-operations/);
+  assert.match(html, /t10-specialty-cutover\.js\?v=specialty-plan-review/);
   assert.match(html, /overflow-wrap:\s*anywhere/);
   assert.match(html, /scroll-margin-top:\s*200px/);
   assert.match(html, /emergency\.html/);
@@ -527,6 +535,8 @@ test("static cutover preview page exposes T10 tracks and release-artifact fallba
   assert.match(client, /ready-to-build-institution-package/);
   assert.match(client, /artifact-index\.json/);
   assert.match(client, /renderInstitutionOperations/);
+  assert.match(client, /renderSpecialtyPlanReview/);
+  assert.match(client, /all-planned-code-capabilities-reviewed/);
   assert.match(client, /ed25519-signed-package/);
   assert.match(client, /t00-integration-contract\.json/);
   assert.match(client, /evidence-id-present/);

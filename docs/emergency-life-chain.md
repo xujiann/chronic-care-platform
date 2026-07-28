@@ -57,3 +57,5 @@ flowchart LR
 ## Verification
 
 `npm run emergency:test` verifies authorization denial, signal threshold, automatic SOS, responder/AED coordination, family task, weak-network fallback, hospital confirmation, citizen scope, and quality projection. `npm run emergency:readiness`, `npm run deploy:check`, and `npm run release:report` retain the functional-versus-formal-go-live boundary.
+
+The 2026-07-28 T10 plan review records all eight emergency code capability groups as implemented. Remaining work is deliberately external: live CTI/location/vehicle/hospital integration, T00 route and transaction binding, and site SLO/disaster-recovery acceptance. None of those actions can be closed by the static preview or seeded emergency data.

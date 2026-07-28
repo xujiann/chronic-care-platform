@@ -389,7 +389,17 @@ function renderDevelopmentPlan(payload) {
   const featuresTarget = document.querySelector("#imaging-current-capabilities");
   const planTarget = document.querySelector("#imaging-development-plan");
   const features = payload.implementedFeatures || [];
-  const plan = payload.developmentPlan || [];
+  const planStatus = {
+    "imaging-plan-p0-joint-test": "代码闭环已实现，现场联调待补",
+    "imaging-plan-p0-security": "代码门禁已实现，现场合规证据待补",
+    "imaging-plan-p1-viewer-performance": "性能验收模型已实现，真实DICOMweb运行待补",
+    "imaging-plan-p1-statistics-screen": "统计聚合已实现，生产事件流待补",
+    "imaging-plan-p2-cross-region": "演示闭环已实现，真实会诊联调待补"
+  };
+  const plan = (payload.developmentPlan || []).map((item) => ({
+    ...item,
+    status: planStatus[item.id] || item.status
+  }));
   if (featuresTarget) {
     featuresTarget.innerHTML = features.map((item) => `<article class="capability-card">
       <strong>${escapeHtml(item.name)}</strong>
@@ -410,6 +420,47 @@ function renderDevelopmentPlan(payload) {
       </tr>`).join("") || `<tr><td colspan="6">暂无下一步开发计划。</td></tr>`}</tbody>
     </table>`;
   }
+  renderImagingPlanCompletion(payload);
+}
+
+function renderImagingPlanCompletion(payload) {
+  const planning = window.ImagingCloudPlanning;
+  const capabilityTarget = document.querySelector("#imaging-plan-completion");
+  const statisticsTarget = document.querySelector("#imaging-regulatory-statistics");
+  if (!planning || !capabilityTarget || !statisticsTarget) return;
+  const review = planning.buildImagingDevelopmentPlanReview(payload);
+  const statistics = planning.buildRegulatoryStatistics(payload, { granularity: "month" });
+  capabilityTarget.innerHTML = review.capabilities.map((item) => `<article class="capability-card">
+    <strong>${escapeHtml(item.id)}</strong>
+    <span>${escapeHtml(item.status)}</span>
+    <small>${escapeHtml(item.acceptance)}</small>
+  </article>`).join("");
+  const rankingRows = statistics.institutionRanking.slice(0, 10);
+  statisticsTarget.innerHTML = `<h3>监管统计与异常机构定位</h3>
+    <p><small>${escapeHtml(statistics.privacyBoundary)}</small></p>
+    <div class="metric-grid">
+      ${[
+        ["上传检查", statistics.totals.uploads],
+        ["影像对象", statistics.totals.images],
+        ["授权调阅", statistics.totals.views],
+        ["质控复核", statistics.totals.qualityReviews],
+        ["会诊/互认", statistics.totals.consultations],
+        ["数据质量问题", statistics.totals.dataQualityIssues]
+      ].map(([label, value]) => `<article class="metric-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>按月机构聚合</small></article>`).join("")}
+    </div>
+    <table>
+      <thead><tr><th>机构</th><th>上传</th><th>调阅</th><th>分享</th><th>质控</th><th>会诊/互认</th><th>上传成功率</th><th>风险</th></tr></thead>
+      <tbody>${rankingRows.map((item) => `<tr>
+        <td><strong>${escapeHtml(item.institutionCode)}</strong></td>
+        <td>${escapeHtml(item.uploads)}</td>
+        <td>${escapeHtml(item.views)}</td>
+        <td>${escapeHtml(item.shares)}</td>
+        <td>${escapeHtml(item.qualityReviews)}</td>
+        <td>${escapeHtml(item.consultations)}</td>
+        <td>${escapeHtml(`${Math.round(item.uploadSuccessRate * 10000) / 100}%`)}</td>
+        <td><span class="badge ${item.dataQualityIssues ? "warn" : "ok"}">${item.dataQualityIssues ? `${item.dataQualityIssues}项待复核` : "正常"}</span></td>
+      </tr>`).join("") || `<tr><td colspan="8">代码能力已就绪；等待生产事件流后生成机构和地市排名。</td></tr>`}</tbody>
+    </table>`;
 }
 
 function renderMobileViewer(study, payload) {

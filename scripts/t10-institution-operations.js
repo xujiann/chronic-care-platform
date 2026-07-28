@@ -114,6 +114,7 @@ function buildOperationsArtifacts(options = {}) {
       "rehearsal-results-template.json": `${JSON.stringify(rehearsalResultsTemplate, null, 2)}\n`,
       "observation-template.json": `${JSON.stringify(observationTemplate, null, 2)}\n`,
       "upgrade-rollback-template.json": `${JSON.stringify(upgradeRollbackTemplate, null, 2)}\n`,
+      "specialty-plan-review.json": `${JSON.stringify(cutoverPack.specialtyPlanReview, null, 2)}\n`,
       "t00-integration-contract.json": `${JSON.stringify(buildT00IntegrationContract(), null, 2)}\n`
     }
   };

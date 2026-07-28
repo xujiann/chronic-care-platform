@@ -4,6 +4,7 @@ const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const { buildInstitutionOperationsCapabilityPlan } = require("./t10-institution-operations");
+const { buildSpecialtyPlanReview } = require("./t10-specialty-plan-review");
 
 const DEFAULT_TRACKS = [
   {
@@ -520,6 +521,11 @@ function buildSpecialtyCutoverPack(options = {}) {
     observationSignalBoard
   });
   const runtimeSmokePlan = buildRuntimeSmokePlan(tracks, firstIncrement, observationSignalBoard);
+  const specialtyPlanReview = buildSpecialtyPlanReview({
+    selectedTrackIds: tracks.map((item) => item.id),
+    tracks,
+    generatedAt
+  });
   const summary = {
     tracks: tracks.length,
     codeReady: tracks.filter((item) => item.codeReady).length,
@@ -527,7 +533,10 @@ function buildSpecialtyCutoverPack(options = {}) {
     siteBlockers: tracks.reduce((sum, item) => sum + item.blockers.length, 0),
     totalChecks: tracks.reduce((sum, item) => sum + item.readiness.checks, 0),
     passedChecks: tracks.reduce((sum, item) => sum + item.readiness.passed, 0),
-    formalGoLiveState: tracks.every((item) => item.productionReady) ? "ready-for-production-go-no-go" : "blocked-until-site-evidence-signed"
+    formalGoLiveState: tracks.every((item) => item.productionReady) ? "ready-for-production-go-no-go" : "blocked-until-site-evidence-signed",
+    plannedCapabilities: specialtyPlanReview.summary.plannedCapabilities,
+    implementedPlannedCapabilities: specialtyPlanReview.summary.implementedCapabilities,
+    openExternalActions: specialtyPlanReview.summary.externalActions
   };
   const pack = {
     module: "t10-emergency-blood-imaging-physical-exam-cutover",
@@ -553,11 +562,12 @@ function buildSpecialtyCutoverPack(options = {}) {
     cutoverCommandCenter,
     observationSignalBoard,
     institutionOperationsCapabilityPlan,
+    specialtyPlanReview,
     runtimeSmokePlan
   };
   pack.integrity = {
     algorithm: "sha256",
-    digest: `sha256:${sha256({ summary, moduleCatalog, institutionDeploymentManifest, institutionDeploymentGate, specialtyCompatibilityMatrix, institutionPackagePlan, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision, evidenceDossier, pilotBatchPlan, siteEvidenceWorkflow, acceptanceScenarioSuite, scenarioEvidenceMatrix, cutoverCommandCenter, observationSignalBoard, institutionOperationsCapabilityPlan, runtimeSmokePlan })}`
+    digest: `sha256:${sha256({ summary, moduleCatalog, institutionDeploymentManifest, institutionDeploymentGate, specialtyCompatibilityMatrix, institutionPackagePlan, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision, evidenceDossier, pilotBatchPlan, siteEvidenceWorkflow, acceptanceScenarioSuite, scenarioEvidenceMatrix, cutoverCommandCenter, observationSignalBoard, institutionOperationsCapabilityPlan, specialtyPlanReview, runtimeSmokePlan })}`
   };
   return pack;
 }
@@ -1317,7 +1327,8 @@ function buildRuntimeSmokePlan(tracks, firstIncrement, observationSignalBoard) {
         "integrity digest is sha256-addressed",
         "formalGoLiveState remains blocked until site evidence is accepted",
         "institution package plan and all 15 non-empty specialty combinations are valid",
-        "institution operations lifecycle implements configuration, signing, evidence, rehearsal, observation and rollback"
+        "institution operations lifecycle implements configuration, signing, evidence, rehearsal, observation and rollback",
+        "specialty plan review has complete source and acceptance-test evidence for every selected capability"
       ],
       failureAction: "stop release packaging and keep batch-1 closed"
     },
@@ -1405,6 +1416,8 @@ function renderMarkdown(pack) {
   const observationLaneRows = (pack.observationSignalBoard?.lanes || []).map((item) => `| ${item.id} | ${item.ownerSeat} | ${item.signals.length} | ${item.noGoRule} | ${item.evidenceArtifact} |`);
   const runtimeSmokeRows = (pack.runtimeSmokePlan?.suites || []).map((item) => `| ${item.id} | ${item.automation} | ${item.command} | ${item.checks.length} | ${item.failureAction} |`);
   const operationsRows = (pack.institutionOperationsCapabilityPlan?.capabilities || []).map((item) => `| ${item.id} | ${item.status} | ${item.acceptance} |`);
+  const planCoverageRows = (pack.specialtyPlanReview?.trackReviews || []).map((item) => `| ${item.trackName} | ${item.summary.implemented}/${item.summary.planned} | ${item.summary.missing} | ${item.summary.externalActions} | ${item.formalState} |`);
+  const externalActionRows = (pack.specialtyPlanReview?.externalActions || []).map((item) => `| ${item.priority} | ${item.trackName} | ${item.dependencyType} | ${item.owner} | ${item.action} |`);
   return [
     "# T10 急救、用血、影像与体检专项上线割接包",
     "",
@@ -1456,6 +1469,23 @@ function renderMarkdown(pack) {
     "| Capability | Status | Acceptance |",
     "|---|---|---|",
     ...operationsRows,
+    "",
+    "## Specialty plan coverage review",
+    "",
+    `- Status: ${pack.specialtyPlanReview?.status || "specialty-plan-review-missing"}`,
+    `- Code coverage: ${pack.specialtyPlanReview?.summary?.implementedCapabilities || 0}/${pack.specialtyPlanReview?.summary?.plannedCapabilities || 0}`,
+    `- Open external actions: ${pack.specialtyPlanReview?.summary?.externalActions || 0}`,
+    `- Boundary: ${pack.specialtyPlanReview?.productionBoundary || "formal production still requires site evidence"}`,
+    "",
+    "| Specialty | Implemented/planned | Missing | External actions | Formal state |",
+    "|---|---:|---:|---:|---|",
+    ...planCoverageRows,
+    "",
+    "### Remaining external actions",
+    "",
+    "| Priority | Specialty | Dependency | Owner | Action |",
+    "|---|---|---|---|---|",
+    ...externalActionRows,
     "",
     "## 专项状态",
     "",
