@@ -21,6 +21,9 @@ const {
 const {
   signPublicHealthExternalContractAttestation
 } = require("../public-health-external-contract-governance-service");
+const {
+  endpointProbeCampaignAttestationDigest
+} = require("../public-health-external-endpoint-probe-campaign-service");
 
 const CONTRACT_SECRET = "storage-contract-secret-1234567890-123456";
 const digest = (value) => crypto.createHash("sha256").update(value).digest("hex");
@@ -371,12 +374,14 @@ test("SQLite endpoint probe receipts persist with receiptId and nonce uniqueness
   assert.equal(unchanged.publicHealthExternalEndpointProbeAudit.length, 1);
 });
 
-function campaignRecord(campaignId, campaignNonce, prefix) {
+function campaignRecord(campaignId, campaignNonce, prefix, previousCampaignDigest = "") {
   return {
     attestation: {
+      schemaVersion: "public-health-external-endpoint-probe-campaign/v2",
       campaignId,
       nonce: campaignNonce,
       status: "completed",
+      previousCampaignDigest,
       signature: digest(`campaign-signature:${campaignId}`)
     },
     receiptReferences: CAMPAIGN_LANES.map((laneId) => ({
@@ -454,7 +459,46 @@ test("SQLite atomically persists campaign attestations and rejects every cross-c
     }), patterns[index]);
   });
 
+  const headDigest = endpointProbeCampaignAttestationDigest(campaign.attestation);
+  const successor = campaignRecord(
+    "ph-storage-campaign-005",
+    "ph-storage-campaign-nonce-005",
+    "ph-storage-campaign-005",
+    headDigest
+  );
+  const chained = structuredClone(persisted);
+  chained.publicHealthExternalEndpointProbeCampaigns.push(successor);
+  writeDatabase(chained, {
+    event: "public-health-endpoint-probe-campaign-chain-successor",
+    publicHealthEndpointProbeCampaignInsert: {
+      campaign: successor,
+      expectedCampaignCount: 1,
+      expectedChainHeadDigest: headDigest
+    }
+  });
+
+  const fork = campaignRecord(
+    "ph-storage-campaign-006",
+    "ph-storage-campaign-nonce-006",
+    "ph-storage-campaign-006",
+    headDigest
+  );
+  const forked = structuredClone(readDatabase());
+  forked.publicHealthExternalEndpointProbeCampaigns.push(fork);
+  assert.throws(() => writeDatabase(forked, {
+    event: "public-health-endpoint-probe-campaign-chain-fork",
+    publicHealthEndpointProbeCampaignInsert: {
+      campaign: fork,
+      expectedCampaignCount: 1,
+      expectedChainHeadDigest: headDigest
+    }
+  }), (error) => error?.code === "ENDPOINT_PROBE_CAMPAIGN_CHAIN_CAS_CONFLICT");
+
   const unchanged = readDatabase();
-  assert.equal(unchanged.publicHealthExternalEndpointProbeCampaigns.length, 1);
+  assert.equal(unchanged.publicHealthExternalEndpointProbeCampaigns.length, 2);
   assert.equal(unchanged.publicHealthExternalEndpointProbeCampaignAudit.length, 1);
+  assert.equal(
+    unchanged.publicHealthExternalEndpointProbeCampaigns[1].attestation.previousCampaignDigest,
+    headDigest
+  );
 });

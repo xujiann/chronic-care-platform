@@ -52,6 +52,35 @@ function issue(severity, code, dispatch, detail, action) {
   };
 }
 
+const ENDPOINT_PROBE_CAMPAIGN_CHAIN_CODES = new Set([
+  "ENDPOINT_PROBE_CAMPAIGN_CHAIN_LINK_MISSING",
+  "ENDPOINT_PROBE_CAMPAIGN_CHAIN_LINK_MISMATCH",
+  "campaign-chain-link-missing",
+  "campaign-chain-link-mismatch"
+]);
+
+function endpointProbeCampaignChainIssue(continuityBreak) {
+  const sourceCode = clean(continuityBreak?.code);
+  if (!ENDPOINT_PROBE_CAMPAIGN_CHAIN_CODES.has(sourceCode)) return null;
+  const code = sourceCode.toLowerCase().includes("missing")
+    ? "campaign-chain-link-missing"
+    : "campaign-chain-link-mismatch";
+  const campaignId = /^[a-z0-9][a-z0-9._:-]{7,127}$/i.test(clean(continuityBreak?.campaignId))
+    ? clean(continuityBreak.campaignId)
+    : "";
+  return {
+    severity: "P0",
+    code,
+    dispatchId: "",
+    laneId: "",
+    campaignId,
+    detail: code === "campaign-chain-link-missing"
+      ? "The signed endpoint campaign predecessor link is missing."
+      : "The signed endpoint campaign predecessor link does not match the trusted chain.",
+    action: "Stop continuity promotion and reconcile the trusted signed campaign chain."
+  };
+}
+
 function expectedCoordinationStates(dispatch) {
   if (dispatch.deliveryState === "delivered") return ["receipt-confirmed", "closed"];
   if (dispatch.deliveryState === "dead-letter" && !dispatch.recovery) return ["exception-open"];
@@ -144,6 +173,7 @@ function buildPublicHealthExternalOperationsBoard({
   coordinationCenter = {},
   secretResolver = null,
   contractGovernance = null,
+  endpointProbeContinuity = null,
   now = new Date().toISOString(),
   pendingSlaMinutes = 15
 } = {}) {
@@ -165,6 +195,10 @@ function buildPublicHealthExternalOperationsBoard({
       summary: { transitionLanes: 0, transitionTracks: 0, outstanding: 0, staleSuccessors: 0 }
     };
   issues.push(...contractCutover.issues);
+  const endpointCampaignChainIssue = endpointProbeCampaignChainIssue(
+    endpointProbeContinuity?.continuityBreak
+  );
+  if (endpointCampaignChainIssue) issues.push(endpointCampaignChainIssue);
   rows(data, "publicHealthExternalDispatchAudit")
     .filter((item) => !dispatchIds.has(item.dispatchId))
     .forEach((item) => issues.push(issue(
@@ -457,14 +491,23 @@ function buildPublicHealthExternalOperationsBoard({
       contractCutoverLanes: contractCutover.summary.transitionLanes,
       contractCutoverTracks: contractCutover.summary.transitionTracks,
       contractCutoverBacklog: contractCutover.summary.outstanding,
-      contractCutoverStaleSuccessors: contractCutover.summary.staleSuccessors
+      contractCutoverStaleSuccessors: contractCutover.summary.staleSuccessors,
+      campaignChainLinksVerified: Number(
+        endpointProbeContinuity?.summary?.campaignChainLinksVerified || 0
+      ),
+      campaignChainBreaks: issues.filter((item) => [
+        "campaign-chain-link-missing",
+        "campaign-chain-link-mismatch"
+      ].includes(item.code)).length
     },
     contractCutover,
     lanes: [...laneSummary.values()].sort((left, right) => left.laneId.localeCompare(right.laneId)),
     issues,
     productionReady: false,
     blockers: [
-      ...issues.filter((item) => item.severity === "P0").map((item) => `${item.code}:${item.dispatchId}`),
+      ...issues.filter((item) => item.severity === "P0").map((item) => (
+        `${item.code}:${item.campaignId || item.dispatchId}`
+      )),
       "Production connectivity and trusted site evidence require independent verification."
     ]
   };

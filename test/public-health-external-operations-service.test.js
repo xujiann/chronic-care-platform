@@ -375,3 +375,32 @@ test("external operations board warns during contract deprecation and blocks ret
   assert.equal(historicalBoard.summary.contractMismatches, 0);
   assert.equal(historicalBoard.summary.contractCutoverBacklog, 0);
 });
+
+test("external operations board raises only redacted P0 campaign chain blockers", () => {
+  const scenario = buildScenario();
+  const campaignId = "ph-endpoint-probe-campaign-chain-gap-001";
+  const chainBoard = board(scenario.data, scenario.dependencies, {
+    endpointProbeContinuity: {
+      summary: { campaignChainLinksVerified: 1 },
+      continuityBreak: {
+        campaignId,
+        code: "ENDPOINT_PROBE_CAMPAIGN_CHAIN_LINK_MISSING",
+        previousCampaignDigest: contractDigest("must-not-leak"),
+        reason: "raw verification reason must not leak"
+      },
+      productionReady: false
+    }
+  });
+  const issue = chainBoard.issues.find((item) => item.code === "campaign-chain-link-missing");
+  assert.equal(chainBoard.ok, false);
+  assert.equal(chainBoard.productionReady, false);
+  assert.equal(chainBoard.summary.campaignChainLinksVerified, 1);
+  assert.equal(chainBoard.summary.campaignChainBreaks, 1);
+  assert.equal(issue.severity, "P0");
+  assert.equal(issue.campaignId, campaignId);
+  assert.match(chainBoard.blockers.join("\n"), /campaign-chain-link-missing/);
+  assert.doesNotMatch(
+    JSON.stringify(chainBoard),
+    /previousCampaignDigest|raw verification reason|must-not-leak/i
+  );
+});

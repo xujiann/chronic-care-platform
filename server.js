@@ -104,6 +104,7 @@ const {
 const {
   buildPublicHealthExternalEndpointProbeCampaignRegistry,
   createPublicHealthExternalEndpointProbeCampaign,
+  endpointProbeCampaignAttestationDigest,
   endpointProbeReceiptDigest,
   verifyPublicHealthExternalEndpointProbeCampaign
 } = require("./public-health-external-endpoint-probe-campaign-service");
@@ -6741,6 +6742,29 @@ function assertPublicHealthEndpointProbeCampaignInsert(data = {}, constraint = {
   const persisted = Array.isArray(data.publicHealthExternalEndpointProbeCampaigns)
     ? data.publicHealthExternalEndpointProbeCampaigns
     : [];
+  const expectedCampaignCount = Number(constraint.expectedCampaignCount);
+  if (Number.isInteger(expectedCampaignCount) && expectedCampaignCount >= 0
+    && persisted.length !== expectedCampaignCount) {
+    const error = new Error("public health endpoint probe campaign chain changed before commit");
+    error.code = "ENDPOINT_PROBE_CAMPAIGN_CHAIN_CAS_CONFLICT";
+    throw error;
+  }
+  if (Object.prototype.hasOwnProperty.call(constraint, "expectedChainHeadDigest")) {
+    const expectedChainHeadDigest = String(constraint.expectedChainHeadDigest || "").trim().toLowerCase();
+    const currentHead = publicHealthEndpointProbeCampaignChainHead(persisted);
+    const currentChainHeadDigest = currentHead
+      ? endpointProbeCampaignAttestationDigest(currentHead.attestation)
+      : "";
+    const incomingPreviousCampaignDigest = String(
+      campaign?.attestation?.previousCampaignDigest || ""
+    ).trim().toLowerCase();
+    if (currentChainHeadDigest !== expectedChainHeadDigest
+      || incomingPreviousCampaignDigest !== currentChainHeadDigest) {
+      const error = new Error("public health endpoint probe campaign predecessor changed before commit");
+      error.code = "ENDPOINT_PROBE_CAMPAIGN_CHAIN_CAS_CONFLICT";
+      throw error;
+    }
+  }
   assertUniquePublicHealthEndpointProbeCampaigns([...persisted, campaign]);
 }
 
@@ -23819,6 +23843,7 @@ function publicHealthEndpointProbeCampaignSafeCode(error) {
 
 function publicHealthEndpointProbeCampaignHttpStatus(code) {
   if (code === "ENDPOINT_PROBE_CAMPAIGN_CONCURRENCY_LIMIT") return 429;
+  if (code === "ENDPOINT_PROBE_CAMPAIGN_CHAIN_CAS_CONFLICT") return 409;
   if (["ENDPOINT_PROBE_CAMPAIGN_COMMAND_INVALID", "ENDPOINT_PROBE_CAMPAIGN_COMMAND_OVERRIDE_FORBIDDEN"].includes(code)) {
     return 400;
   }
@@ -24053,10 +24078,63 @@ function materializePublicHealthEndpointProbeCampaigns(data = {}) {
   }));
 }
 
+function publicHealthEndpointProbeCampaignChainHead(campaigns = []) {
+  return [...(Array.isArray(campaigns) ? campaigns : [])]
+    .sort((left, right) => {
+      const leftTime = Date.parse(left?.attestation?.completedAt || "") || 0;
+      const rightTime = Date.parse(right?.attestation?.completedAt || "") || 0;
+      return leftTime - rightTime
+        || String(left?.attestation?.campaignId || "").localeCompare(
+          String(right?.attestation?.campaignId || "")
+        );
+    })
+    .at(-1) || null;
+}
+
+function trustedPublicHealthEndpointProbeCampaignChainHead(data, context, at) {
+  const persistedCampaigns = Array.isArray(data.publicHealthExternalEndpointProbeCampaigns)
+    ? data.publicHealthExternalEndpointProbeCampaigns
+    : [];
+  if (!persistedCampaigns.length) {
+    return { campaignCount: 0, headDigest: "" };
+  }
+  const verificationOptions = publicHealthEndpointProbeCampaignVerificationOptions(context, at);
+  const registry = buildPublicHealthExternalEndpointProbeCampaignRegistry({
+    campaigns: materializePublicHealthEndpointProbeCampaigns(data),
+    ...verificationOptions
+  });
+  if (["campaign-verification-failed", "campaign-chain-link-missing", "campaign-chain-link-mismatch"]
+    .includes(String(registry.continuityBreak?.code || ""))) {
+    const error = new Error("endpoint probe campaign trusted chain is not continuous");
+    error.code = "ENDPOINT_PROBE_CAMPAIGN_CHAIN_CAS_CONFLICT";
+    throw error;
+  }
+  const head = publicHealthEndpointProbeCampaignChainHead(persistedCampaigns);
+  const materializedHead = materializePublicHealthEndpointProbeCampaigns({
+    publicHealthExternalEndpointProbeReceipts: data.publicHealthExternalEndpointProbeReceipts,
+    publicHealthExternalEndpointProbeCampaigns: [head]
+  })[0];
+  const verification = verifyPublicHealthExternalEndpointProbeCampaign(
+    materializedHead,
+    verificationOptions
+  );
+  if (!verification.ok) {
+    const error = new Error("endpoint probe campaign chain head failed trusted verification");
+    error.code = "ENDPOINT_PROBE_CAMPAIGN_CHAIN_CAS_CONFLICT";
+    throw error;
+  }
+  return {
+    campaignCount: persistedCampaigns.length,
+    headDigest: endpointProbeCampaignAttestationDigest(head.attestation)
+  };
+}
+
 const PUBLIC_HEALTH_ENDPOINT_PROBE_CONTINUITY_CODES = Object.freeze({
   "campaign-verification-failed": "ENDPOINT_PROBE_CAMPAIGN_VERIFICATION_FAILED",
   "campaign-window-overlap": "ENDPOINT_PROBE_CAMPAIGN_WINDOW_OVERLAP",
-  "campaign-gap-exceeded": "ENDPOINT_PROBE_CAMPAIGN_GAP_EXCEEDED"
+  "campaign-gap-exceeded": "ENDPOINT_PROBE_CAMPAIGN_GAP_EXCEEDED",
+  "campaign-chain-link-missing": "ENDPOINT_PROBE_CAMPAIGN_CHAIN_LINK_MISSING",
+  "campaign-chain-link-mismatch": "ENDPOINT_PROBE_CAMPAIGN_CHAIN_LINK_MISMATCH"
 });
 
 function publicHealthEndpointProbeContinuityBreakView(value = null) {
@@ -24080,6 +24158,7 @@ function publicHealthEndpointProbeCampaignSummaryView(registry = {}, audit = [])
       campaignsVerified: Number(registry.summary?.campaignsVerified || 0),
       campaignsRejected: Number(registry.summary?.campaignsRejected || 0),
       consecutiveCampaigns: Number(registry.summary?.consecutiveCampaigns || 0),
+      campaignChainLinksVerified: Number(registry.summary?.campaignChainLinksVerified || 0),
       continuityBreaks: continuityBreak ? 1 : 0,
       requiredConsecutiveCampaigns: Number(registry.summary?.requiredConsecutiveCampaigns || 3),
       maxCampaignGapSeconds: Number(registry.summary?.maxCampaignGapSeconds || 900)
@@ -24297,6 +24376,11 @@ async function runControlledPublicHealthEndpointProbeCampaign(command, user) {
       at: startedAt,
       tlsLoader: publicHealthEndpointProbeRuntime.tlsLoader
     });
+    const initialChainHead = trustedPublicHealthEndpointProbeCampaignChainHead(
+      initialData,
+      initialContext,
+      startedAt
+    );
     const receipts = [];
     for (const profile of EXTERNAL_ADAPTER_PROFILES) {
       const result = await runControlledPublicHealthEndpointProbe(
@@ -24316,6 +24400,7 @@ async function runControlledPublicHealthEndpointProbeCampaign(command, user) {
       ...publicHealthEndpointProbeCampaignVerificationOptions(finalContext, completedAt),
       startedAt,
       ttlSeconds: finalContext.ttlSeconds,
+      previousCampaignDigest: initialChainHead.headDigest,
       randomUUID: publicHealthEndpointProbeRuntime.randomUUID || randomUUID
     };
     const campaign = createPublicHealthExternalEndpointProbeCampaign(receipts, campaignOptions);
@@ -24374,7 +24459,11 @@ async function runControlledPublicHealthEndpointProbeCampaign(command, user) {
     ));
     writeDatabase(nextData, {
       event: "public-health-endpoint-probe-campaign-succeeded",
-      publicHealthEndpointProbeCampaignInsert: { campaign: storedCampaign }
+      publicHealthEndpointProbeCampaignInsert: {
+        campaign: storedCampaign,
+        expectedCampaignCount: initialChainHead.campaignCount,
+        expectedChainHeadDigest: initialChainHead.headDigest
+      }
     });
     return buildPublicHealthEndpointProbeCampaignSummary(
       nextData,
@@ -25429,13 +25518,6 @@ async function handleApi(req, res) {
     const contractContext = await publicHealthContractGovernanceContext(data, at);
     const loaded = await loadAvailablePublicHealthCredentialMap(data, at, contractContext.governance);
     const coordinationCenter = buildPublicHealthCoordinationRuntime({ data });
-    const operations = buildPublicHealthExternalOperationsBoard({
-      data,
-      coordinationCenter,
-      secretResolver: (laneId) => loaded.credentials[laneId]?.requestKeyring,
-      contractGovernance: contractContext.governance,
-      now: at
-    });
     const keySafety = buildPublicHealthKeySafetyBoard(data, loaded.credentials);
     const endpointVerification = await buildPublicHealthEndpointVerificationSummary(data, at);
     const endpointProbeContinuitySummary = await buildPublicHealthEndpointProbeCampaignSummary(data, at);
@@ -25445,6 +25527,14 @@ async function handleApi(req, res) {
       continuousConnectivityReady: endpointProbeContinuitySummary.continuousConnectivityReady,
       productionReady: false
     };
+    const operations = buildPublicHealthExternalOperationsBoard({
+      data,
+      coordinationCenter,
+      secretResolver: (laneId) => loaded.credentials[laneId]?.requestKeyring,
+      contractGovernance: contractContext.governance,
+      endpointProbeContinuity,
+      now: at
+    });
     sendJson(res, 200, publicHealthExternalPublicView({
       ...operations,
       contractGovernance: contractContext.governance,

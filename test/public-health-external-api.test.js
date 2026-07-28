@@ -602,6 +602,7 @@ test("public health external routes use server time full keyrings and secret-fre
   assert.equal(acceptedCampaign.body.productionReady, false);
   assert.equal(acceptedCampaign.body.summary.campaignsVerified, 1);
   assert.equal(acceptedCampaign.body.summary.consecutiveCampaigns, 1);
+  assert.equal(acceptedCampaign.body.summary.campaignChainLinksVerified, 0);
   assert.equal(acceptedCampaign.body.summary.requiredConsecutiveCampaigns, 3);
   assert.equal(probeTransportCalls, 9);
   const serializedCampaign = JSON.stringify(acceptedCampaign.body);
@@ -611,7 +612,7 @@ test("public health external routes use server time full keyrings and secret-fre
   assert.doesNotMatch(serializedCampaign, new RegExp(ENDPOINT_CERTIFICATE_FINGERPRINT));
   assert.doesNotMatch(
     serializedCampaign,
-    /"receiptId"|"nonce"|"signingKeyId"|"signature"|"certificatePins"|"network"|"verification"/i
+    /"receiptId"|"nonce"|"signingKeyId"|"signature"|"certificatePins"|"network"|"verification"|previousCampaignDigest|campaignDigest/i
   );
 
   const campaignSummary = await request(
@@ -624,9 +625,13 @@ test("public health external routes use server time full keyrings and secret-fre
   assert.equal(campaignSummary.body.continuousConnectivityReady, false);
   assert.equal(campaignSummary.body.productionReady, false);
   assert.equal(campaignSummary.body.summary.campaignsVerified, 1);
+  assert.equal(campaignSummary.body.summary.campaignChainLinksVerified, 0);
   assert.equal(campaignSummary.body.summary.continuityBreaks, 0);
   assert.equal(campaignSummary.body.continuityBreak, null);
-  assert.doesNotMatch(JSON.stringify(campaignSummary.body), /https:\/\/|8\.8\.8\.8|"receiptId"|"nonce"|"signature"/i);
+  assert.doesNotMatch(
+    JSON.stringify(campaignSummary.body),
+    /https:\/\/|8\.8\.8\.8|"receiptId"|"nonce"|"signature"|previousCampaignDigest|campaignDigest/i
+  );
 
   const endpointReceipt = signedEndpointProbe();
   const acceptedEndpointReceipt = await post(
@@ -988,6 +993,43 @@ test("public health external routes use server time full keyrings and secret-fre
       String(left.attestation.completedAt).localeCompare(String(right.attestation.completedAt))
     );
   assert.equal(campaignsOldestFirst.length, 4);
+  const chainedSummary = await request(
+    baseUrl,
+    "/api/public-health/external/endpoints/campaigns/summary",
+    token
+  );
+  assert.equal(chainedSummary.body.summary.campaignChainLinksVerified, 2);
+  assert.equal(chainedSummary.body.continuousConnectivityReady, true);
+  assert.equal(chainedSummary.body.productionReady, false);
+  assert.doesNotMatch(
+    JSON.stringify(chainedSummary.body),
+    /previousCampaignDigest|campaignDigest|"signature"|"receiptId"|"nonce"/i
+  );
+
+  const missingMiddleState = structuredClone(fourCampaignState);
+  missingMiddleState.publicHealthExternalEndpointProbeCampaigns =
+    missingMiddleState.publicHealthExternalEndpointProbeCampaigns.filter(
+      (item) => item.attestation.campaignId !== campaignsOldestFirst[1].attestation.campaignId
+    );
+  writeDatabase(missingMiddleState, {
+    event: "public-health-endpoint-probe-campaign-delete-middle-test"
+  });
+  const deletedMiddleSummary = await request(
+    baseUrl,
+    "/api/public-health/external/endpoints/campaigns/summary",
+    token
+  );
+  assert.equal(deletedMiddleSummary.body.summary.campaignChainLinksVerified, 1);
+  assert.equal(deletedMiddleSummary.body.continuityBreak.code, "ENDPOINT_PROBE_CAMPAIGN_CHAIN_LINK_MISMATCH");
+  assert.equal(deletedMiddleSummary.body.continuousConnectivityReady, false);
+  assert.equal(deletedMiddleSummary.body.productionReady, false);
+  assert.doesNotMatch(
+    JSON.stringify(deletedMiddleSummary.body),
+    /previousCampaignDigest|campaignDigest|"signature"|"receiptId"|"nonce"|raw reason/i
+  );
+  writeDatabase(fourCampaignState, {
+    event: "public-health-endpoint-probe-campaign-restore-chain-test"
+  });
 
   const middleTamperedState = structuredClone(fourCampaignState);
   const middleCampaignId = campaignsOldestFirst[1].attestation.campaignId;

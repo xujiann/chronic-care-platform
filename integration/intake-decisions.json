@@ -47,16 +47,17 @@
     },
     {
       "lineId": "T08",
-      "candidateHead": "4527485a6f8990abd3cc29c1203dbcb5134c21b3",
+      "candidateHead": "44df575d554bae6c892e664dd959f2ede95326be",
       "decision": "accepted",
       "acceptedCandidateHeads": [
         "771c727b8abe7c722248d40656d6b91dfb67f3cf",
         "09a88c7c6ce98789e559dcd8a18bd9b5a51a99a2",
         "d4bfdbaf2ab3ea2317a2a2778fabdd22221b2117",
         "4f9f22b92b47ad50d36dccf0ad01437451019179",
-        "4527485a6f8990abd3cc29c1203dbcb5134c21b3"
+        "4527485a6f8990abd3cc29c1203dbcb5134c21b3",
+        "44df575d554bae6c892e664dd959f2ede95326be"
       ],
-      "reviewedAt": "2026-07-28T04:40:35.476Z",
+      "reviewedAt": "2026-07-28T07:52:24.585Z",
       "reviewer": "T00",
       "checks": [
         "git diff --check",
@@ -101,7 +102,15 @@
         "current public-health resilience, API, storage and connectivity UI regression passed 95 of 95; UI contract passed 5 of 5 and final-readiness report passed 64 of 64",
         "UI plus shared static resources passed 77 of 77; the public API suite passed its complete single end-to-end route scenario with all endpoint and campaign assertions",
         "clean isolated release report passed 426 of 428 with 0 failures and 2 expected site warnings; deploy check passed 396 of 396",
-        "the pre-existing uncommitted data/db.json was hash-preserved and excluded; its unrelated nursing and escort readiness drift was not added to this candidate"
+        "the pre-existing uncommitted data/db.json was hash-preserved and excluded; its unrelated nursing and escort readiness drift was not added to this candidate",
+        "T00 exactly received 44df575d and upgraded endpoint probe campaign attestations to public-health-external-endpoint-probe-campaign/v2",
+        "the controlled worker captures the current trusted predecessor before probing and SQLite atomically compares campaign count plus chain-head digest before insert; concurrent forks fail with ENDPOINT_PROBE_CAMPAIGN_CHAIN_CAS_CONFLICT",
+        "commission summaries expose only campaignChainLinksVerified and allowlisted missing/mismatch campaign ID/code projections; predecessor digests, campaign digests, signatures, endpoints, IPs, certificates, keys and raw reasons remain private",
+        "operations, release and deploy gates include P0 campaign-chain-link-missing and campaign-chain-link-mismatch while productionReady remains false",
+        "the commission panel renders signed predecessor progress such as 2/2 or a stable safe blocker while endpoint, continuity and production gates remain separate",
+        "focused public-health resilience, API, storage, operations and UI regression passed 99 of 99; static/UI/final report tests passed 81 of 81; final-readiness passed 65 of 65",
+        "clean committed-data release evaluation passed 426 of 428 with 0 failures and 2 expected production warnings; the direct dirty-data report correctly retained 2 unrelated nursing/escort failures",
+        "deploy check passed 396 of 396 and the pre-existing data/db.json SHA-256 remained C0DC947F0EEEE1F9F161D48B8B9D6B6EFFA48DFDCFE3D50A258EBEBBD4A30F55"
       ],
       "blockers": []
     },

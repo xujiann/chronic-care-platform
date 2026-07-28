@@ -60,6 +60,10 @@ test("external endpoint panel is accessible and wired only to commission summary
   assert.match(source, /\/api\/public-health\/external\/endpoints\/campaigns/);
   assert.match(source, /endpointConnectivityReady/);
   assert.match(source, /continuousConnectivityReady/);
+  assert.match(source, /campaignChainLinksVerified/);
+  assert.match(source, /签名前序链/);
+  assert.match(source, /ENDPOINT_PROBE_CAMPAIGN_CHAIN_LINK_MISSING/);
+  assert.match(source, /ENDPOINT_PROBE_CAMPAIGN_CHAIN_LINK_MISMATCH/);
   assert.match(source, /productionReady 仅由服务端和现场门禁决定/);
   assert.match(css, /\.connectivity-metric-grid/);
   assert.match(css, /\.connectivity-action-controls/);
@@ -88,6 +92,7 @@ test("external endpoint panel renders only allowlisted summary fields", () => {
     summary: {
       campaignsVerified: 2,
       consecutiveCampaigns: 1,
+      campaignChainLinksVerified: 1,
       requiredConsecutiveCampaigns: 3
     },
     continuityBreak: {
@@ -117,10 +122,54 @@ test("external endpoint panel renders only allowlisted summary fields", () => {
   assert.match(rendered, /7\/8/);
   assert.match(rendered, /campaign-safe-001/);
   assert.match(rendered, /ENDPOINT_PROBE_CAMPAIGN_VERIFICATION_FAILED/);
+  assert.match(rendered, /签名前序链/);
+  assert.match(rendered, /1\/2/);
   assert.match(rendered, /单通道探测：成功 <strong>11<\/strong>，拒绝 <strong>2<\/strong>/);
   assert.match(rendered, /生产上线/);
   assert.match(rendered, /未授权/);
   assert.doesNotMatch(rendered, /private\.example|secret-|raw-signature-reason|certificateFingerprint/i);
+});
+
+test("external endpoint panel renders a stable campaign chain blocker without evidence", () => {
+  const { context, node } = loadUiContext();
+  context.endpointFixture = {
+    summary: { lanes: 8, endpointsConfigured: 8, endpointProbesVerified: 8 },
+    endpointConnectivityReady: true,
+    productionReady: false,
+    worker: {}
+  };
+  context.campaignFixture = {
+    summary: {
+      campaignsVerified: 3,
+      consecutiveCampaigns: 1,
+      campaignChainLinksVerified: 0,
+      requiredConsecutiveCampaigns: 3
+    },
+    continuityBreak: {
+      campaignId: "campaign-safe-chain-001",
+      code: "ENDPOINT_PROBE_CAMPAIGN_CHAIN_LINK_MISMATCH",
+      previousCampaignDigest: "secret-predecessor-digest",
+      signature: "secret-campaign-signature",
+      reason: "raw mismatch reason"
+    },
+    continuousConnectivityReady: false,
+    productionReady: false,
+    worker: {}
+  };
+  vm.runInContext(
+    "renderPublicHealthConnectivitySummaries({ endpoint: endpointFixture, campaign: campaignFixture })",
+    context
+  );
+
+  const rendered = [
+    node("#public-health-connectivity-metrics").innerHTML,
+    node("#public-health-connectivity-break").innerHTML
+  ].join("\n");
+  assert.match(rendered, /签名前序链/);
+  assert.match(rendered, /阻断/);
+  assert.match(rendered, /campaign-safe-chain-001/);
+  assert.match(rendered, /ENDPOINT_PROBE_CAMPAIGN_CHAIN_LINK_MISMATCH/);
+  assert.doesNotMatch(rendered, /secret-|previousCampaignDigest|signature|raw mismatch reason/i);
 });
 
 test("external endpoint panel fails closed on forbidden, missing and network summaries", () => {

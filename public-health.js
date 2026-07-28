@@ -108,9 +108,13 @@ const PUBLIC_HEALTH_CONTINUITY_BREAK_LABELS = Object.freeze({
   "campaign-verification-failed": "活动签名或完整性验证失败",
   "campaign-window-overlap": "活动窗口重叠",
   "campaign-gap-exceeded": "活动间隔超过门限",
+  "campaign-chain-link-missing": "签名前序链缺失",
+  "campaign-chain-link-mismatch": "签名前序链不匹配",
   ENDPOINT_PROBE_CAMPAIGN_VERIFICATION_FAILED: "活动签名或完整性验证失败",
   ENDPOINT_PROBE_CAMPAIGN_WINDOW_OVERLAP: "活动窗口重叠",
-  ENDPOINT_PROBE_CAMPAIGN_GAP_EXCEEDED: "活动间隔超过门限"
+  ENDPOINT_PROBE_CAMPAIGN_GAP_EXCEEDED: "活动间隔超过门限",
+  ENDPOINT_PROBE_CAMPAIGN_CHAIN_LINK_MISSING: "签名前序链缺失",
+  ENDPOINT_PROBE_CAMPAIGN_CHAIN_LINK_MISMATCH: "签名前序链不匹配"
 });
 
 const PUBLIC_HEALTH_CONNECTIVITY_LANES = new Set([
@@ -131,6 +135,7 @@ const PUBLIC_HEALTH_CONNECTIVITY_ACTION_ERRORS = Object.freeze({
   ENDPOINT_PROBE_COMMAND_OVERRIDE_FORBIDDEN: "探测命令包含不允许的覆盖字段。",
   ENDPOINT_PROBE_CAMPAIGN_CONCURRENCY_LIMIT: "当前已有八通道活动运行，请稍后重试。",
   ENDPOINT_PROBE_CAMPAIGN_FREQUENCY_LIMIT: "八通道活动仍在服务端频率窗口内。",
+  ENDPOINT_PROBE_CAMPAIGN_CHAIN_CAS_CONFLICT: "可信活动链头已变化或不完整，请刷新摘要并完成安全复核后重试。",
   ENDPOINT_PROBE_CAMPAIGN_FAILED: "八通道活动配置不完整或可信探测失败。",
   ENDPOINT_PROBE_CAMPAIGN_COMMAND_OVERRIDE_FORBIDDEN: "活动命令包含不允许的覆盖字段。"
 });
@@ -262,6 +267,15 @@ function renderPublicHealthConnectivitySummaries({ endpoint, campaign, endpointE
   const campaignsVerified = boundedConnectivityCount(campaignSummary.campaignsVerified);
   const consecutive = boundedConnectivityCount(campaignSummary.consecutiveCampaigns);
   const required = Math.max(1, boundedConnectivityCount(campaignSummary.requiredConsecutiveCampaigns) || 3);
+  const chainLinksVerified = boundedConnectivityCount(campaignSummary.campaignChainLinksVerified);
+  const requiredChainLinks = Math.max(0, required - 1);
+  const chainBreakCode = String(campaign?.continuityBreak?.code || "");
+  const chainBlocked = [
+    "campaign-chain-link-missing",
+    "campaign-chain-link-mismatch",
+    "ENDPOINT_PROBE_CAMPAIGN_CHAIN_LINK_MISSING",
+    "ENDPOINT_PROBE_CAMPAIGN_CHAIN_LINK_MISMATCH"
+  ].includes(chainBreakCode);
 
   metrics.innerHTML = [
     connectivityMetric("通道配置", endpointAvailable ? `${configured}/${lanes || 8}` : "未确认", endpointReady ? "ok" : "warn", "服务端配置的八领域通道"),
@@ -269,6 +283,14 @@ function renderPublicHealthConnectivitySummaries({ endpoint, campaign, endpointE
     connectivityMetric("端点门禁", endpointReady ? "已就绪" : "未就绪", endpointReady ? "ok" : "danger", "endpointConnectivityReady"),
     connectivityMetric("活动验签", campaignAvailable ? String(campaignsVerified) : "未确认", continuousReady ? "ok" : "warn", "服务端验签通过的探测活动"),
     connectivityMetric("连续活动", campaignAvailable ? `${consecutive}/${required}` : "未确认", continuousReady ? "ok" : "warn", "新鲜、不重叠且满足间隔要求"),
+    connectivityMetric(
+      "签名前序链",
+      campaignAvailable ? (chainBlocked ? "阻断" : `${chainLinksVerified}/${requiredChainLinks}`) : "未确认",
+      chainBlocked ? "danger" : (chainLinksVerified >= requiredChainLinks ? "ok" : "warn"),
+      chainBlocked
+        ? `${PUBLIC_HEALTH_CONTINUITY_BREAK_LABELS[chainBreakCode]} (${chainBreakCode})`
+        : "相邻活动签名前序链"
+    ),
     connectivityMetric("连续门禁", continuousReady ? "已就绪" : "未就绪", continuousReady ? "ok" : "danger", "continuousConnectivityReady"),
     connectivityMetric("生产上线", productionDenied ? "未授权" : "状态不可确认", "danger", "productionReady 仅由服务端和现场门禁决定")
   ].join("");

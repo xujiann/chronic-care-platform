@@ -109,16 +109,18 @@
 - `formalGoLiveState=blocked-until-trusted-site-evidence-and-launch-approval`；
 - `productionReady=false`。
 
-## T00 集成边界
+## T00 公共集成与生产边界
 
-T00 后续需要：
+T00 公共集成已经完成：
 
-1. 在受控 worker 完成八领域同批主动探测后创建 campaign；
-2. 使用 purpose 固定为 `public-health-endpoint-probe-campaign` 的独立 campaign keyring 签名，不复用业务请求、业务回执或单条探测密钥；服务会比较签名材料并拒绝与单条探测回执相同的密钥；
-3. 在 SQLite 中对 campaignId、campaign nonce、receiptId 和 receipt nonce 建立跨活动唯一约束，并持久化 `previousCampaignDigest`；创建下一活动时必须引用当前受信链头，写入时以事务/CAS 防止并发分叉；
-4. 从服务端当前配置解析端点、活动契约和完整探测策略；
-5. 只向 commission 返回脱敏连续性摘要；
-6. 把连续性阻断及 `campaign-chain-link-missing`、`campaign-chain-link-mismatch` 纳入 operations board、release 和 deploy 门禁；
-7. 保持 `continuousConnectivityReady`、`endpointConnectivityReady` 与 `productionReady` 三者分离。
+1. 受控 worker 在八领域同批主动探测后创建 campaign；
+2. purpose 固定为 `public-health-endpoint-probe-campaign` 的独立 campaign keyring 不复用业务请求、业务回执或单条探测密钥；
+3. SQLite 在同一事务中校验 campaignId、campaign nonce、receiptId、receipt nonce、当前活动数和受信链头，防止并发分叉；
+4. 端点、活动契约、完整探测策略、时间和 keyring 只从服务端当前配置解析；
+5. commission API 和页面只返回链路计数、活动标识与稳定原因码，不返回 digest、签名或原始证据；
+6. `campaign-chain-link-missing` 与 `campaign-chain-link-mismatch` 已纳入 operations board、release 和 deploy 门禁；
+7. `continuousConnectivityReady`、`endpointConnectivityReady` 与 `productionReady` 保持三层分离。
 
-T08 不修改公共 `server.js`、`package.json`、`portal.css`、README 或发布总表。
+剩余事项属于现场和生产边界：必须提供真实独立托管密钥、生产 HTTPS 端点、证书 pin 或 mTLS 策略、受限 worker 身份、正式探测节奏、P0/P1 关闭、生产移交、现场证据和上线审批。上述证据未齐前 `productionReady=false`。
+
+T08 候选本身不修改公共 `server.js`、`package.json`、`portal.css`、README 或发布总表；这些接线由 T00 完成。

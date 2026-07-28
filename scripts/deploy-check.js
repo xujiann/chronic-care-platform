@@ -616,7 +616,12 @@ function buildDeployCheckReport(options = {}) {
         "publicHealthEndpointProbeCampaignInsert",
         "endpointProbeContinuity",
         "continuityBreaks",
-        "publicHealthEndpointProbeContinuityBreakView"
+        "publicHealthEndpointProbeContinuityBreakView",
+        "campaignChainLinksVerified",
+        "expectedChainHeadDigest",
+        "ENDPOINT_PROBE_CAMPAIGN_CHAIN_CAS_CONFLICT",
+        "ENDPOINT_PROBE_CAMPAIGN_CHAIN_LINK_MISSING",
+        "ENDPOINT_PROBE_CAMPAIGN_CHAIN_LINK_MISMATCH"
       ].every((marker) => serverSource.includes(marker))
         && [
           "public-health-endpoint-probe-campaign",
@@ -625,6 +630,9 @@ function buildDeployCheckReport(options = {}) {
           "continuousConnectivityReady",
           "continuityBreak",
           "campaign-verification-failed",
+          "previousCampaignDigest",
+          "campaign-chain-link-missing",
+          "campaign-chain-link-mismatch",
           "requiredConsecutiveCampaigns",
           "productionReady: false"
         ].every((marker) => publicHealthEndpointProbeCampaignSource.includes(marker))
@@ -638,7 +646,7 @@ function buildDeployCheckReport(options = {}) {
         )
         && pkg.scripts?.["public-health:resilience-check"]?.includes("public-health-external-endpoint-probe-campaign-service.js")
         && pkg.scripts?.["public-health:resilience-test"]?.includes("test/public-health-external-endpoint-probe-campaign-service.test.js"),
-      detail: "commission-only eight-lane endpoint campaigns use independent managed signing, atomic replay-safe persistence and redacted fail-closed continuity gaps while connectivity and production readiness remain separate"
+      detail: "commission-only eight-lane endpoint campaigns use independent managed signing, transactional chain-head CAS, atomic replay-safe persistence and redacted fail-closed predecessor gaps while connectivity and production readiness remain separate"
     },
     {
       name: "static:publicHealthExternalConnectivityPanel",
@@ -658,6 +666,10 @@ function buildDeployCheckReport(options = {}) {
           "/api/public-health/external/endpoints/campaigns/summary",
           "endpointConnectivityReady",
           "continuousConnectivityReady",
+          "campaignChainLinksVerified",
+          "签名前序链",
+          "ENDPOINT_PROBE_CAMPAIGN_CHAIN_LINK_MISSING",
+          "ENDPOINT_PROBE_CAMPAIGN_CHAIN_LINK_MISMATCH",
           "safeConnectivityCampaignId",
           "connectivityFailureMessage",
           "handlePublicHealthConnectivityAction",
