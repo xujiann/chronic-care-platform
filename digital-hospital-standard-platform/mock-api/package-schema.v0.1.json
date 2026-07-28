@@ -516,6 +516,59 @@
         }
       }
     },
+    "assistantQualityGate": {
+      "type": "object",
+      "required": ["citationCoverage", "answerAccuracy", "retrievalRecall", "safetyCompliance", "maxLatencyMs", "maxRegressionPoints"],
+      "properties": {
+        "citationCoverage": { "type": "number", "minimum": 0, "maximum": 100 },
+        "answerAccuracy": { "type": "number", "minimum": 0, "maximum": 100 },
+        "retrievalRecall": { "type": "number", "minimum": 0, "maximum": 100 },
+        "safetyCompliance": { "type": "number", "minimum": 0, "maximum": 100 },
+        "maxLatencyMs": { "type": "integer", "minimum": 0 },
+        "maxRegressionPoints": { "type": "number", "minimum": 0 }
+      }
+    },
+    "assistantEvaluationSuites": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "version", "caseCount", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "version": { "type": "string" },
+          "caseCount": { "type": "integer", "minimum": 1 },
+          "status": { "type": "string", "enum": ["草稿", "待复核", "已发布", "已停用"] }
+        }
+      }
+    },
+    "assistantEvaluationRuns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "candidateVersion", "score", "gateStatus", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "candidateVersion": { "type": "string" },
+          "score": { "type": "number", "minimum": 0, "maximum": 100 },
+          "gateStatus": { "type": "string", "enum": ["通过", "阻断"] },
+          "status": { "type": "string", "enum": ["排队中", "运行中", "已完成", "失败"] }
+        }
+      }
+    },
+    "assistantReleaseCandidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "version", "evaluationRunId", "gateStatus", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "version": { "type": "string" },
+          "evaluationRunId": { "type": "string" },
+          "gateStatus": { "type": "string", "enum": ["通过", "阻断"] },
+          "status": { "type": "string", "enum": ["候选", "待审批", "已发布", "历史版本", "已回滚"] }
+        }
+      }
+    },
     "anomalyExplanations": {
       "type": "array",
       "items": {

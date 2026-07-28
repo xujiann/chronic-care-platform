@@ -816,6 +816,133 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/evaluation-suites:
+    get:
+      tags: [EvaluationAssistant]
+      summary: 获取评价助手评测集
+      responses:
+        "200":
+          description: 评测集清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AssistantEvaluationSuite"
+    post:
+      tags: [EvaluationAssistant]
+      summary: 创建版本化评测集
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssistantEvaluationSuite"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/evaluation-runs:
+    get:
+      tags: [EvaluationAssistant]
+      summary: 获取评价助手回归评测运行
+      responses:
+        "200":
+          description: 评测运行清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AssistantEvaluationRun"
+    post:
+      tags: [EvaluationAssistant]
+      summary: 对候选版本运行全量质量评测
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssistantEvaluationRun"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/quality-gate:
+    get:
+      tags: [EvaluationAssistant]
+      summary: 获取评价助手发布门禁阈值
+      responses:
+        "200":
+          description: 质量门禁配置
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssistantQualityGate"
+  /api/v1/evaluation-assistant/release-candidates:
+    get:
+      tags: [EvaluationAssistant]
+      summary: 获取评价助手发布候选
+      responses:
+        "200":
+          description: 发布候选清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AssistantReleaseCandidate"
+    post:
+      tags: [EvaluationAssistant]
+      summary: 创建关联评测证据的发布候选
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssistantReleaseCandidate"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/release-candidates/{releaseId}:
+    put:
+      tags: [EvaluationAssistant]
+      summary: 提交审批或发布门禁通过的候选版本
+      parameters:
+        - name: releaseId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssistantReleaseCandidate"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/release-candidates/{releaseId}:rollback:
+    post:
+      tags: [EvaluationAssistant]
+      summary: 回滚线上评价助手并恢复历史版本
+      parameters:
+        - name: releaseId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
   /api/v1/evaluation-assistant/anomaly-explanations:
     get:
       tags: [EvaluationAssistant]
@@ -1869,7 +1996,7 @@ components:
             $ref: "#/components/schemas/PilotAssessmentReport"
     AssistantPackage:
       type: object
-      required: [meta, assistantSummary, assistantKnowledgeSources, assistantKnowledgeVersions, standardQaRecords, assistantRetrievalTraces, assistantModelCalls, anomalyExplanations, rectificationSuggestions, reviewRiskSignals]
+      required: [meta, assistantSummary, assistantKnowledgeSources, assistantKnowledgeVersions, standardQaRecords, assistantRetrievalTraces, assistantModelCalls, assistantQualityGate, assistantEvaluationSuites, assistantEvaluationRuns, assistantReleaseCandidates, anomalyExplanations, rectificationSuggestions, reviewRiskSignals]
       properties:
         meta:
           $ref: "#/components/schemas/PackageMeta"
@@ -1896,6 +2023,20 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AssistantModelCall"
+        assistantQualityGate:
+          $ref: "#/components/schemas/AssistantQualityGate"
+        assistantEvaluationSuites:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssistantEvaluationSuite"
+        assistantEvaluationRuns:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssistantEvaluationRun"
+        assistantReleaseCandidates:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssistantReleaseCandidate"
         anomalyExplanations:
           type: array
           items:
@@ -3074,6 +3215,145 @@ components:
         reviewedBy:
           type: string
         reviewedAt:
+          type: string
+    AssistantQualityGate:
+      type: object
+      required: [citationCoverage, answerAccuracy, retrievalRecall, safetyCompliance, maxLatencyMs, maxRegressionPoints, owner, updatedAt]
+      properties:
+        citationCoverage:
+          type: number
+          minimum: 0
+          maximum: 100
+        answerAccuracy:
+          type: number
+          minimum: 0
+          maximum: 100
+        retrievalRecall:
+          type: number
+          minimum: 0
+          maximum: 100
+        safetyCompliance:
+          type: number
+          minimum: 0
+          maximum: 100
+        maxLatencyMs:
+          type: integer
+          minimum: 0
+        maxRegressionPoints:
+          type: number
+          minimum: 0
+        owner:
+          type: string
+        updatedAt:
+          type: string
+    AssistantEvaluationSuite:
+      type: object
+      required: [id, name, version, type, domains, caseCount, source, owner, status, updatedAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        version:
+          type: string
+        type:
+          type: string
+        domains:
+          type: array
+          items:
+            type: string
+        caseCount:
+          type: integer
+          minimum: 1
+        source:
+          type: string
+        owner:
+          type: string
+        status:
+          type: string
+          enum: [草稿, 待复核, 已发布, 已停用]
+        updatedAt:
+          type: string
+    AssistantEvaluationRun:
+      type: object
+      required: [id, candidateVersion, suiteVersion, knowledgeVersion, promptVersion, citationCoverage, answerAccuracy, retrievalRecall, safetyCompliance, averageLatencyMs, baselineDelta, score, gateStatus, status, startedAt, finishedAt]
+      properties:
+        id:
+          type: string
+        candidateVersion:
+          type: string
+        suiteVersion:
+          type: string
+        knowledgeVersion:
+          type: string
+        promptVersion:
+          type: string
+        citationCoverage:
+          type: number
+          minimum: 0
+          maximum: 100
+        answerAccuracy:
+          type: number
+          minimum: 0
+          maximum: 100
+        retrievalRecall:
+          type: number
+          minimum: 0
+          maximum: 100
+        safetyCompliance:
+          type: number
+          minimum: 0
+          maximum: 100
+        averageLatencyMs:
+          type: integer
+          minimum: 0
+        baselineDelta:
+          type: number
+        score:
+          type: number
+          minimum: 0
+          maximum: 100
+        gateStatus:
+          type: string
+          enum: [通过, 阻断]
+        status:
+          type: string
+          enum: [排队中, 运行中, 已完成, 失败]
+        startedAt:
+          type: string
+        finishedAt:
+          type: string
+    AssistantReleaseCandidate:
+      type: object
+      required: [id, version, modelRoute, promptVersion, knowledgeVersion, evaluationRunId, gateStatus, status, owner, reviewer, createdAt]
+      properties:
+        id:
+          type: string
+        version:
+          type: string
+        modelRoute:
+          type: string
+        promptVersion:
+          type: string
+        knowledgeVersion:
+          type: string
+        evaluationRunId:
+          type: string
+        gateStatus:
+          type: string
+          enum: [通过, 阻断]
+        status:
+          type: string
+          enum: [候选, 待审批, 已发布, 历史版本, 已回滚]
+        owner:
+          type: string
+        reviewer:
+          type: string
+        createdAt:
+          type: string
+        publishedAt:
+          type: string
+        rollbackTarget:
           type: string
     StandardQaRecord:
       type: object
