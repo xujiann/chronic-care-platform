@@ -752,11 +752,17 @@ function buildDeployCheckReport(options = {}) {
         "/api/public-health/surveillance-rule-governance",
         "/api/public-health/surveillance-rule-changes",
         "/api/public-health/surveillance-rule-changes/:id/actions",
+        "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_JSON",
         "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_SECRET",
+        "RULE_ACTIVATION_KEYRING_PURPOSE",
+        "activationKeyring",
+        "ruleActivationKeyring",
+        "publicHealthSafeRuleActivationKeyStatus",
         "publicHealthSurveillanceRuleActivationOptions",
         "publicHealthSurveillanceRuleChanges",
         "PUBLIC_HEALTH_SURVEILLANCE_RULE_REVIEWER_NOT_INDEPENDENT",
-        "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_SECRET_UNAVAILABLE"
+        "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_UNAVAILABLE",
+        "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_INVALID"
       ].every((marker) => serverSource.includes(marker))
         && fs.existsSync(path.join(ROOT, "public-health-surveillance-rule-governance-service.js"))
         && pkg.scripts?.["public-health:resilience-test"]?.includes("test/public-health-surveillance-rule-governance-api.test.js"),
@@ -775,7 +781,11 @@ function buildDeployCheckReport(options = {}) {
           "handlePublicHealthRuleChangeSubmit",
           "review-rule-change",
           "activate-rule-change",
-          "activationConfigured"
+          "activationConfigured",
+          "managedKeyringReady",
+          "activationKeys",
+          "legacy compatibility / No-Go",
+          "blockerCode"
         ].every((marker) => publicHealthUiSource.includes(marker))
         && pkg.scripts?.["public-health:resilience-check"]?.includes("public-health-surveillance-rule-governance-service.js")
         && pkg.scripts?.["public-health:resilience-test"]?.includes("test/public-health-surveillance-rule-governance-service.test.js"),

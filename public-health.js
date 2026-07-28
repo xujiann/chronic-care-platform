@@ -294,7 +294,14 @@ function renderPublicHealthRuleGovernance(governance) {
           modernizationMetric("活动规则", `${governance.summary?.activeRules || 0}/${governance.summary?.rules || 0}`),
           modernizationMetric("历史版本", governance.summary?.ruleVersions || 0),
           modernizationMetric("待复核/待激活", `${governance.summary?.submitted || 0}/${governance.summary?.approved || 0}`),
-          modernizationMetric("托管激活密钥", governance.summary?.activationConfigured ? "已配置" : "未配置")
+          modernizationMetric(
+            "托管激活密钥",
+            governance.summary?.managedKeyringReady
+              ? `active ${governance.summary?.activationKeys?.active || 0} / grace ${governance.summary?.activationKeys?.grace || 0} / revoked ${governance.summary?.activationKeys?.revoked || 0}`
+              : governance.summary?.activationKeys?.legacyCompatibility
+                ? "legacy compatibility / No-Go"
+                : governance.summary?.activationKeys?.blockerCode || "fail-closed"
+          )
         ].join("")
       : modernizationMetric("规则治理", "不可用");
   }

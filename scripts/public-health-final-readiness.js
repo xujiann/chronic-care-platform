@@ -917,7 +917,12 @@ function buildPublicHealthFinalReadiness(options = {}) {
       "/api/public-health/surveillance-rule-governance",
       "/api/public-health/surveillance-rule-changes",
       "/api/public-health/surveillance-rule-changes/:id/actions",
+      "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_JSON",
       "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_SECRET",
+      "RULE_ACTIVATION_KEYRING_PURPOSE",
+      "activationKeyring",
+      "ruleActivationKeyring",
+      "publicHealthSafeRuleActivationKeyStatus",
       "publicHealthSurveillanceRuleActivationOptions",
       "publicHealthSafeRuleGovernance",
       "proposePublicHealthSurveillanceRuleChangeToState",
@@ -925,8 +930,9 @@ function buildPublicHealthFinalReadiness(options = {}) {
       "activatePublicHealthSurveillanceRuleChangeToState",
       "publicHealthSurveillanceRuleChanges",
       "PUBLIC_HEALTH_SURVEILLANCE_RULE_REVIEWER_NOT_INDEPENDENT",
-      "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_SECRET_UNAVAILABLE"
-    ].every((token) => serverSource.includes(token)), "rule submit, independent review and server-key activation persist changes and materialized rules in one CAS transaction without client trust overrides", "integration"),
+      "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_UNAVAILABLE",
+      "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_INVALID"
+    ].every((token) => serverSource.includes(token)), "rule submit, independent review and purpose-bound active/grace/revoked activation key rotation persist changes and materialized rules in one CAS transaction without client trust overrides", "integration"),
     check("integration:t00-surveillance-rule-governance-ui-release", [
       "public-health-rule-governance-title",
       "public-health-rule-governance-status",
@@ -938,7 +944,11 @@ function buildPublicHealthFinalReadiness(options = {}) {
       "handlePublicHealthRuleChangeSubmit",
       "review-rule-change",
       "activate-rule-change",
-      "activationConfigured"
+      "activationConfigured",
+      "managedKeyringReady",
+      "activationKeys",
+      "legacy compatibility / No-Go",
+      "blockerCode"
     ].every((token) => pageSource.includes(token)) && [
       "public-health-surveillance-rule-governance-service.js",
       "test/public-health-surveillance-rule-governance-service.test.js",

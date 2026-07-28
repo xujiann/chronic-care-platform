@@ -114,11 +114,15 @@ const {
   ingestPublicHealthSurveillanceSignalToState
 } = require("./public-health-data-foundation-service");
 const {
+  RULE_ACTIVATION_KEYRING_PURPOSE,
   activatePublicHealthSurveillanceRuleChangeToState,
   buildPublicHealthSurveillanceRuleGovernance,
   proposePublicHealthSurveillanceRuleChangeToState,
   reviewPublicHealthSurveillanceRuleChangeToState
 } = require("./public-health-surveillance-rule-governance-service");
+const {
+  summarizeKeyring
+} = require("./public-health-external-keyring-service");
 const {
   applyPublicHealthSurveillanceAlertActionToState,
   buildPublicHealthSurveillanceCenter,
@@ -24776,6 +24780,9 @@ const PUBLIC_HEALTH_MODERNIZATION_SERVER_FIELDS = new Set([
   "productionReady",
   "secret",
   "verificationSecret",
+  "activationKeyring",
+  "ruleActivationKeyring",
+  "keyring",
   "verificationSource",
   "signatureVerified",
   "signature",
@@ -24859,8 +24866,8 @@ function publicHealthModernizationSafeCode(error) {
     return "PUBLIC_HEALTH_MODERNIZATION_RECORD_NOT_FOUND";
   }
   if (/role .*not allowed/i.test(message)) return "PUBLIC_HEALTH_MODERNIZATION_FORBIDDEN";
-  if (/activation verification secret is required|activation verification secret must contain/i.test(message)) {
-    return "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_SECRET_UNAVAILABLE";
+  if (/activation (?:verification secret|signing keyring) is required|activation verification secret must contain|rule activation keyring purpose/i.test(message)) {
+    return "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_UNAVAILABLE";
   }
   if (/reviewer must be independent/i.test(message)) {
     return "PUBLIC_HEALTH_SURVEILLANCE_RULE_REVIEWER_NOT_INDEPENDENT";
@@ -24882,7 +24889,11 @@ function publicHealthModernizationSafeCode(error) {
 function publicHealthModernizationHttpStatus(code) {
   if (code === "PUBLIC_HEALTH_MODERNIZATION_RECORD_NOT_FOUND") return 404;
   if (code === "PUBLIC_HEALTH_MODERNIZATION_FORBIDDEN") return 403;
-  if (code === "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_SECRET_UNAVAILABLE") return 503;
+  if ([
+    "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_SECRET_UNAVAILABLE",
+    "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_UNAVAILABLE",
+    "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_INVALID"
+  ].includes(code)) return 503;
   if (/CONFLICT|INTEGRITY_INVALID/.test(code)) return 409;
   return 400;
 }
@@ -24903,20 +24914,73 @@ function publicHealthSafeSignal(data, signalId) {
 }
 
 function publicHealthSurveillanceRuleActivationOptions({ required = false } = {}) {
+  const at = new Date().toISOString();
+  const keyringJson = String(
+    process.env.PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_JSON || ""
+  ).trim();
   const verificationSecret = String(
     process.env.PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_SECRET || ""
   ).trim();
-  if (required && verificationSecret.length < 32) {
-    const error = new Error("trusted server rule activation verification secret is required");
-    error.code = "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_SECRET_UNAVAILABLE";
+  let activationKeyring = null;
+  let managed = false;
+  let configurationCode = "";
+
+  if (keyringJson) {
+    try {
+      const parsed = JSON.parse(keyringJson);
+      const summary = summarizeKeyring(parsed, at);
+      if (!summary.ok
+        || summary.purpose !== RULE_ACTIVATION_KEYRING_PURPOSE
+        || summary.productionReady !== true) {
+        throw new Error("managed rule activation keyring is invalid");
+      }
+      activationKeyring = parsed;
+      managed = true;
+    } catch {
+      configurationCode = "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_INVALID";
+    }
+  } else if (verificationSecret.length >= 32 && process.env.NODE_ENV !== "production") {
+    activationKeyring = {
+      secret: verificationSecret,
+      keyId: String(
+        process.env.PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEY_ID
+        || "public-health-surveillance-rule-managed"
+      ).trim().slice(0, 64)
+    };
+    configurationCode = "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_LEGACY_COMPATIBILITY_ONLY";
+  } else {
+    configurationCode = "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_UNAVAILABLE";
+  }
+
+  if (required && !activationKeyring) {
+    const error = new Error("trusted server rule activation signing keyring is required");
+    error.code = configurationCode === "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_INVALID"
+      ? configurationCode
+      : "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_UNAVAILABLE";
     throw error;
   }
+
   return {
-    verificationSecret: verificationSecret.length >= 32 ? verificationSecret : "",
-    keyId: String(
-      process.env.PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEY_ID
-      || "public-health-surveillance-rule-managed"
-    ).trim().slice(0, 120)
+    activationKeyring,
+    at,
+    managed,
+    configurationCode
+  };
+}
+
+function publicHealthSafeRuleActivationKeyStatus(keyring = {}, activation = {}) {
+  const keys = Array.isArray(keyring.keys) ? keyring.keys : [];
+  return {
+    configured: Boolean(activation.activationKeyring),
+    managed: activation.managed === true,
+    purposeValid: keyring.purpose === RULE_ACTIVATION_KEYRING_PURPOSE,
+    legacyCompatibility: Boolean(activation.activationKeyring) && activation.managed !== true,
+    active: keys.filter((item) => item.status === "active" && item.validNow === true).length,
+    grace: keys.filter((item) => item.status === "grace" && item.validNow === true).length,
+    revoked: keys.filter((item) => item.status === "revoked").length,
+    blockerCode: activation.managed === true
+      ? ""
+      : activation.configurationCode || "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_UNAVAILABLE"
   };
 }
 
@@ -24924,15 +24988,20 @@ function publicHealthSafeRuleGovernance(data) {
   const activation = publicHealthSurveillanceRuleActivationOptions();
   const governance = buildPublicHealthSurveillanceRuleGovernance({
     data,
-    verificationSecret: activation.verificationSecret
+    activationKeyring: activation.activationKeyring,
+    at: activation.at
   });
+  const activationKeys = publicHealthSafeRuleActivationKeyStatus(governance.keyring, activation);
   return {
     ok: governance.ok,
     functionalState: governance.functionalState,
     formalGoLiveState: governance.formalGoLiveState,
     summary: {
       ...governance.summary,
-      activationConfigured: activation.verificationSecret.length >= 32
+      activationConfigured: activationKeys.configured,
+      managedKeyringReady: activation.managed === true
+        && governance.summary.managedKeyringReady === true,
+      activationKeys
     },
     rules: (governance.rules || []).map((rule) => ({
       id: rule.id,
@@ -25018,7 +25087,7 @@ function publicHealthSafeSurveillanceCenter(data) {
   const activation = publicHealthSurveillanceRuleActivationOptions();
   const center = buildPublicHealthSurveillanceCenter({
     data,
-    ruleVerificationSecret: activation.verificationSecret
+    ruleActivationKeyring: activation.activationKeyring
   });
   return {
     ...center,
@@ -25488,7 +25557,7 @@ async function handleApi(req, res) {
         ...payload,
         expectedCurrentVersion: payload.expectedVersion
       }, user, {
-        verificationSecret: activation.verificationSecret
+        activationKeyring: activation.activationKeyring
       });
       if (!result.idempotent) {
         writeDatabase(result.nextData, {

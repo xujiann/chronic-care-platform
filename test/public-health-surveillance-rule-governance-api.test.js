@@ -9,6 +9,35 @@ const test = require("node:test");
 
 const ROOT = path.resolve(__dirname, "..");
 const ACTIVATION_SECRET = "public-health-rule-activation-api-secret-2026";
+const NEXT_ACTIVATION_SECRET = "public-health-rule-activation-api-next-secret-2026";
+const RULE_ACTIVATION_PURPOSE = "public-health-surveillance-rule-activation";
+const RULE_KEYRING_A = {
+  purpose: RULE_ACTIVATION_PURPOSE,
+  activeKeyId: "api-rule-key-a",
+  keys: [{
+    keyId: "api-rule-key-a",
+    secret: ACTIVATION_SECRET,
+    status: "active",
+    notBefore: "2026-01-01T00:00:00.000Z",
+    expiresAt: "2028-01-01T00:00:00.000Z",
+    revokedAt: ""
+  }]
+};
+const RULE_KEYRING_ROTATED = {
+  purpose: RULE_ACTIVATION_PURPOSE,
+  activeKeyId: "api-rule-key-b",
+  keys: [
+    { ...RULE_KEYRING_A.keys[0], status: "grace" },
+    {
+      keyId: "api-rule-key-b",
+      secret: NEXT_ACTIVATION_SECRET,
+      status: "active",
+      notBefore: "2026-01-01T00:00:00.000Z",
+      expiresAt: "2028-01-01T00:00:00.000Z",
+      revokedAt: ""
+    }
+  ]
+};
 
 async function request(baseUrl, pathname, token = "", options = {}) {
   const response = await fetch(`${baseUrl}${pathname}`, {
@@ -48,6 +77,7 @@ test("rule governance API binds independent actors and server-only activation tr
     "STORAGE_ENGINE",
     "SESSION_SECRETS",
     "SESSION_STORE",
+    "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_JSON",
     "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_SECRET",
     "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEY_ID"
   ];
@@ -58,8 +88,9 @@ test("rule governance API binds independent actors and server-only activation tr
     STORAGE_ENGINE: "sqlite",
     SESSION_SECRETS: "public-health-rule-governance-api-session-secret-2026",
     SESSION_STORE: "memory",
-    PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_SECRET: ACTIVATION_SECRET,
-    PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEY_ID: "api-managed-rule-key"
+    PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_JSON: JSON.stringify(RULE_KEYRING_A),
+    PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_SECRET: "",
+    PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEY_ID: ""
   });
 
   const { readDatabase, server, startServer, stopServer } = require("../server");
@@ -150,6 +181,24 @@ test("rule governance API binds independent actors and server-only activation tr
     }
   );
   assert.equal(verified.response.status, 200, JSON.stringify(verified.body));
+  const forgedEvaluationContext = await post(
+    baseUrl,
+    `/api/public-health/surveillance-signals/${encodeURIComponent(signalId)}/actions`,
+    healthToken,
+    "rule-governance-history-evaluate-forged-context",
+    {
+      action: "evaluate-signal",
+      expectedVersion: 2,
+      activationKeyring: RULE_KEYRING_A,
+      verificationSource: "client",
+      signatureVerified: true
+    }
+  );
+  assert.equal(forgedEvaluationContext.response.status, 400);
+  assert.equal(
+    forgedEvaluationContext.body.code,
+    "PUBLIC_HEALTH_MODERNIZATION_SERVER_CONTEXT_FORBIDDEN"
+  );
   const evaluated = await post(
     baseUrl,
     `/api/public-health/surveillance-signals/${encodeURIComponent(signalId)}/actions`,
@@ -264,7 +313,8 @@ test("rule governance API binds independent actors and server-only activation tr
       verificationSource: "client",
       signatureVerified: true,
       receipt: { signature: "forged" },
-      keyId: "client-key"
+      keyId: "client-key",
+      activationKeyring: RULE_KEYRING_A
     }
   );
   assert.equal(forgedActivation.response.status, 400);
@@ -273,8 +323,8 @@ test("rule governance API binds independent actors and server-only activation tr
     "PUBLIC_HEALTH_MODERNIZATION_SERVER_CONTEXT_FORBIDDEN"
   );
 
-  delete process.env.PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_SECRET;
-  const missingSecret = await post(
+  delete process.env.PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_JSON;
+  const missingKeyring = await post(
     baseUrl,
     `/api/public-health/surveillance-rule-changes/${encodeURIComponent(changeId)}/actions`,
     healthToken,
@@ -282,16 +332,37 @@ test("rule governance API binds independent actors and server-only activation tr
     {
       action: "activate-rule-change",
       expectedVersion: 2,
-      note: "must fail closed without managed secret",
+      note: "must fail closed without managed keyring",
       evidenceRefs: ["RULE-GOVERNANCE-ACTIVATION"]
     }
   );
-  assert.equal(missingSecret.response.status, 503);
+  assert.equal(missingKeyring.response.status, 503);
   assert.equal(
-    missingSecret.body.code,
-    "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_SECRET_UNAVAILABLE"
+    missingKeyring.body.code,
+    "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_UNAVAILABLE"
   );
-  process.env.PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_SECRET = ACTIVATION_SECRET;
+  process.env.PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_JSON = JSON.stringify({
+    ...RULE_KEYRING_A,
+    purpose: "public-health-wrong-purpose"
+  });
+  const wrongPurpose = await post(
+    baseUrl,
+    `/api/public-health/surveillance-rule-changes/${encodeURIComponent(changeId)}/actions`,
+    healthToken,
+    "rule-governance-wrong-purpose",
+    {
+      action: "activate-rule-change",
+      expectedVersion: 2,
+      note: "wrong-purpose keyring must fail closed",
+      evidenceRefs: ["RULE-GOVERNANCE-ACTIVATION"]
+    }
+  );
+  assert.equal(wrongPurpose.response.status, 503);
+  assert.equal(
+    wrongPurpose.body.code,
+    "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_INVALID"
+  );
+  process.env.PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_JSON = JSON.stringify(RULE_KEYRING_A);
 
   const activated = await post(
     baseUrl,
@@ -312,6 +383,7 @@ test("rule governance API binds independent actors and server-only activation tr
   assert.equal(activated.body.summary.trustedActivations, 1);
   assert.equal(activated.body.productionReady, false);
 
+  process.env.PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_JSON = JSON.stringify(RULE_KEYRING_ROTATED);
   const governance = await request(
     baseUrl,
     "/api/public-health/surveillance-rule-governance",
@@ -319,6 +391,17 @@ test("rule governance API binds independent actors and server-only activation tr
   );
   assert.equal(governance.response.status, 200);
   assert.equal(governance.body.summary.activationConfigured, true);
+  assert.equal(governance.body.summary.managedKeyringReady, true);
+  assert.deepEqual(governance.body.summary.activationKeys, {
+    configured: true,
+    managed: true,
+    purposeValid: true,
+    legacyCompatibility: false,
+    active: 1,
+    grace: 1,
+    revoked: 0,
+    blockerCode: ""
+  });
   assert.equal(governance.body.summary.activated, 1);
   assert.equal(governance.body.rules.find((item) => item.id === proposal.ruleId).version, 2);
   assert.doesNotMatch(
@@ -326,16 +409,121 @@ test("rule governance API binds independent actors and server-only activation tr
     /submittedBy|submittedActorId|reviewedBy|reviewedActorId|activatedBy|activatedActorId|verificationSource|signatureVerified|signatureAlgorithm|keyId|receipt|secret/i
   );
 
+  const rotatedSubmitted = await post(
+    baseUrl,
+    "/api/public-health/surveillance-rule-changes",
+    healthToken,
+    "rule-governance-rotated-submit",
+    {
+      expectedVersion: 1,
+      ruleId: "ph-rule-case-report",
+      threshold: 2,
+      severity: "high",
+      status: "active",
+      reason: "prove new activations use the current key",
+      evidenceRefs: ["RULE-GOVERNANCE-ROTATED-PROPOSAL"]
+    }
+  );
+  assert.equal(rotatedSubmitted.response.status, 201, JSON.stringify(rotatedSubmitted.body));
+  const rotatedChangeId = rotatedSubmitted.body.change.id;
+  const rotatedReviewed = await post(
+    baseUrl,
+    `/api/public-health/surveillance-rule-changes/${encodeURIComponent(rotatedChangeId)}/actions`,
+    cityToken,
+    "rule-governance-rotated-review",
+    {
+      action: "review-rule-change",
+      expectedVersion: 1,
+      decision: "approved",
+      note: "independent review of rotated activation",
+      evidenceRefs: ["RULE-GOVERNANCE-ROTATED-REVIEW"]
+    }
+  );
+  assert.equal(rotatedReviewed.response.status, 200, JSON.stringify(rotatedReviewed.body));
+  const rotatedActivated = await post(
+    baseUrl,
+    `/api/public-health/surveillance-rule-changes/${encodeURIComponent(rotatedChangeId)}/actions`,
+    healthToken,
+    "rule-governance-rotated-activate",
+    {
+      action: "activate-rule-change",
+      expectedVersion: 2,
+      note: "activate with the new current key",
+      evidenceRefs: ["RULE-GOVERNANCE-ROTATED-ACTIVATION"]
+    }
+  );
+  assert.equal(rotatedActivated.response.status, 200, JSON.stringify(rotatedActivated.body));
+
+  const rotatedPersisted = readDatabase();
+  const firstChange = rotatedPersisted.publicHealthSurveillanceRuleChanges
+    .find((item) => item.id === changeId);
+  const secondChange = rotatedPersisted.publicHealthSurveillanceRuleChanges
+    .find((item) => item.id === rotatedChangeId);
+  assert.equal(firstChange.activation.receipt.keyId, "api-rule-key-a");
+  assert.equal(secondChange.activation.receipt.keyId, "api-rule-key-b");
+  assert.doesNotMatch(JSON.stringify(rotatedPersisted), new RegExp(`${ACTIVATION_SECRET}|${NEXT_ACTIVATION_SECRET}`));
+
+  process.env.PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_JSON = JSON.stringify({
+    ...RULE_KEYRING_ROTATED,
+    keys: [
+      {
+        ...RULE_KEYRING_ROTATED.keys[0],
+        status: "revoked",
+        revokedAt: "2026-07-28T12:00:00.000Z"
+      },
+      RULE_KEYRING_ROTATED.keys[1]
+    ]
+  });
+  const revokedHistory = await request(
+    baseUrl,
+    "/api/public-health/surveillance-rule-governance",
+    healthToken
+  );
+  assert.equal(revokedHistory.response.status, 200);
+  assert.equal(revokedHistory.body.ok, false);
+  assert.equal(revokedHistory.body.summary.activationKeys.revoked, 1);
+  assert.equal(
+    revokedHistory.body.findings.some((item) => item.code === "trusted-rule-activation-receipt-invalid"),
+    true
+  );
+  assert.doesNotMatch(
+    JSON.stringify(revokedHistory.body),
+    /"keyId"\s*:|"signature"\s*:|"receipt"\s*:|api-rule-key-|public-health-rule-activation-api/i
+  );
+
+  process.env.PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_JSON = JSON.stringify(RULE_KEYRING_ROTATED);
+  const tamperedData = readDatabase();
+  const tamperedChange = tamperedData.publicHealthSurveillanceRuleChanges.find((item) => item.id === changeId);
+  tamperedChange.activation.receipt.keyId = "attacker-key";
+  const { writeDatabase } = require("../server");
+  writeDatabase(tamperedData, { event: "test-rule-activation-key-id-tamper" });
+  const tamperedHistory = await request(
+    baseUrl,
+    "/api/public-health/surveillance-rule-governance",
+    healthToken
+  );
+  assert.equal(tamperedHistory.response.status, 200);
+  assert.equal(tamperedHistory.body.ok, false);
+  assert.equal(
+    tamperedHistory.body.findings.some((item) => item.code === "trusted-rule-activation-receipt-invalid"),
+    true
+  );
+  const restoredData = readDatabase();
+  restoredData.publicHealthSurveillanceRuleChanges
+    .find((item) => item.id === changeId)
+    .activation.receipt.keyId = "api-rule-key-a";
+  writeDatabase(restoredData, { event: "test-rule-activation-key-id-restore" });
+
   const center = await request(baseUrl, "/api/public-health/surveillance-center", healthToken);
   assert.equal(center.response.status, 200);
   assert.equal(center.body.ok, true, JSON.stringify(center.body.alertIntegrityFindings));
-  assert.equal(center.body.summary.trustedRuleActivations, 1);
+  assert.equal(center.body.summary.trustedRuleActivations, 2);
   assert.equal(center.body.alerts.find((item) => item.id === evaluated.body.alert.id).version, 1);
   assert.equal(center.body.rules.find((item) => item.id === proposal.ruleId).version, 2);
   assert.equal(center.body.productionReady, false);
 
   const persisted = readDatabase();
-  assert.equal(persisted.publicHealthSurveillanceRuleChanges.length, 1);
+  assert.equal(persisted.publicHealthSurveillanceRuleChanges.length, 2);
   assert.equal(persisted.publicHealthSurveillanceRuleChanges[0].status, "activated");
   assert.equal(persisted.publicHealthSurveillanceRules.find((item) => item.id === proposal.ruleId).version, 2);
 
@@ -349,6 +537,6 @@ test("rule governance API binds independent actors and server-only activation tr
   `).all();
   sqlite.close();
   assert.equal(rows.length, 2);
-  assert.equal(JSON.parse(rows[0].payload).length, 1);
+  assert.equal(JSON.parse(rows[0].payload).length, 2);
   assert.equal(JSON.parse(rows[1].payload).find((item) => item.id === proposal.ruleId).version, 2);
 });

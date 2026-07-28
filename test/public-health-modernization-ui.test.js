@@ -114,7 +114,18 @@ test("modernization rendering uses only safe summary fields and fails closed whe
         ruleVersions: 9,
         submitted: 1,
         approved: 0,
-        activationConfigured: true
+        activationConfigured: true,
+        managedKeyringReady: true,
+        activationKeys: {
+          configured: true,
+          managed: true,
+          purposeValid: true,
+          legacyCompatibility: false,
+          active: 1,
+          grace: 1,
+          revoked: 0,
+          blockerCode: ""
+        }
       },
       changes: [{
         id: "safe-rule-change",
@@ -160,9 +171,13 @@ test("modernization rendering uses only safe summary fields and fails closed whe
   assert.match(rendered, /临床症候群/);
   assert.match(rendered, /人工核实/);
   assert.match(rendered, /托管激活密钥/);
+  assert.match(rendered, /active 1 \/ grace 1 \/ revoked 0/);
   assert.match(rendered, /独立批准/);
   assert.match(rendered, /暂无预警/);
   assert.doesNotMatch(rendered, /externalSignalId|externalSignalKeyHash|idempotencyKeyHash|contentFingerprint|endpoint|secret|signature/i);
+  assert.match(read("public-health.js"), /managedKeyringReady/);
+  assert.match(read("public-health.js"), /legacy compatibility \/ No-Go/);
+  assert.match(read("public-health.js"), /blockerCode/);
 
   vm.runInContext(
     "renderPublicHealthModernizationWorkbenches({ foundation: null, sourceOperations: null, ruleGovernance: null, surveillance: null, collaboration: null })",
