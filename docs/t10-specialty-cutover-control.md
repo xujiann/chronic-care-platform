@@ -106,6 +106,31 @@ node scripts\t10-institution-package.js --institution-id=hospital-a --tracks=cli
 
 The package contains `deployment-package.json`, `deployment-package.md`, `activation.env.example`, `rollback-plan.md` and `artifact-index.json`. The SHA-256 index covers the four payload artifacts. Package generation immediately re-reads the directory and verifies every indexed digest and byte count, the deployment-package digest, the deployment gate, all 15 compatibility combinations and the fail-closed production boundary. The rollback plan removes only the selected module's deployment unit, page and API from service while preserving data and evidence; it must not disable or mutate another specialty.
 
+## Institution operations lifecycle
+
+`t10-institution-operations.js` completes the code-side institution lifecycle:
+
+- immutable semantic configuration versions with draft, review, approval, activation, deactivation, rollback and supersede transitions;
+- four-eyes approval and append-only digest-chained configuration audit;
+- Ed25519 package signatures bound to an authorized signer, institution, selected modules, package integrity, validity window, trusted public-key fingerprint and anti-replay nonce;
+- evidence imports require unique evidence IDs plus ordered submit/review timestamps, original references, SHA-256 digests and four-eyes separation;
+- site-evidence import bound to the verified package digest, original evidence references, SHA-256 digests, real interface version and independent submitter/reviewer identities;
+- controlled scenario execution with hard-stop patient-safety, scope, idempotency, audit and evidence replay checks;
+- T+1 signal evaluation that returns `stay-no-go`, `repeat-batch-1` or `open-watch-only-batch-2`;
+- package upgrade diff and one-module rollback verification that preserve peer pages, APIs, data namespaces and evidence.
+
+Generate the institution operations templates with:
+
+```powershell
+node scripts\t10-institution-operations.js --institution-id=hospital-a --tracks=emergency-life-chain,clinical-blood
+```
+
+The output includes configuration, evidence import, rehearsal result, observation, upgrade/rollback and T00 integration templates plus a SHA-256 artifact index. Templates intentionally contain placeholders and `pending`/`not-run` states; they cannot be counted as real site evidence.
+
+## T00 integration contract
+
+The generated `t00-integration-contract.json` keeps ownership explicit. T00 owns `server.js`, `portal.css`, `package.json`, `README.md` and the public release summary. T10 requests read-only exposure of the cutover pack, institution package and verification result. T00 must not infer site acceptance or production Go-Live from code readiness.
+
 ## Site evidence dossier
 
 The cutover pack now emits an `evidenceDossier` section. It converts every site blocker into a reviewable evidence entry with:

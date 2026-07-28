@@ -6,7 +6,14 @@ const cutoverState = {
 document.addEventListener("DOMContentLoaded", async () => {
   cutoverState.pack = await loadCutoverPack();
   renderCutoverPack(cutoverState.pack);
+  restoreLocationAnchor();
 });
+
+function restoreLocationAnchor() {
+  if (!location.hash) return;
+  const target = document.querySelector(location.hash);
+  if (target) requestAnimationFrame(() => target.scrollIntoView({ block: "start" }));
+}
 
 async function loadCutoverPack() {
   if (location.protocol !== "file:") {
@@ -36,6 +43,7 @@ function withCutoverDefaults(pack) {
     institutionDeploymentGate: pack.institutionDeploymentGate || fallback.institutionDeploymentGate,
     specialtyCompatibilityMatrix: pack.specialtyCompatibilityMatrix || fallback.specialtyCompatibilityMatrix,
     institutionPackagePlan: pack.institutionPackagePlan || fallback.institutionPackagePlan,
+    institutionOperationsCapabilityPlan: pack.institutionOperationsCapabilityPlan || fallback.institutionOperationsCapabilityPlan,
     crossTrackControls: pack.crossTrackControls || fallback.crossTrackControls,
     rehearsalPlan: pack.rehearsalPlan || fallback.rehearsalPlan,
     goNoGoDecision: pack.goNoGoDecision || fallback.goNoGoDecision,
@@ -61,6 +69,7 @@ function renderCutoverPack(pack) {
     pack.specialtyCompatibilityMatrix || {},
     pack.institutionPackagePlan || {}
   );
+  renderInstitutionOperations(pack.institutionOperationsCapabilityPlan || {});
   renderControls(pack.crossTrackControls || []);
   renderRehearsalPlan(pack.rehearsalPlan || {});
   renderDecisionMatrix(pack.goNoGoDecision || {});
@@ -163,6 +172,40 @@ function renderInstitutionDeploymentManifest(manifest, gate, compatibility, pack
         <h3>安装与回退</h3>
         <ol class="evidence-list">${(packagePlan.installOrder || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ol>
         <p class="muted">${escapeHtml(packagePlan.rollbackPolicy || "")}</p>
+      </article>
+    </div>
+  `;
+}
+
+function renderInstitutionOperations(plan) {
+  const contract = plan.t00IntegrationContract || {};
+  document.querySelector("#institution-operations").innerHTML = `
+    <div class="cutover-card">
+      <div class="badge-row">
+        <span class="badge ${plan.status === "institution-operations-code-ready" ? "ok" : "warn"}">${escapeHtml(plan.status || "institution-operations-blocked")}</span>
+        <span class="badge">${plan.summary?.implemented || 0}/${plan.summary?.capabilities || 0} 代码能力</span>
+        <span class="badge warn">${escapeHtml(plan.productionTrafficState || "blocked-until-site-evidence-signed")}</span>
+      </div>
+      <p class="muted">${escapeHtml(plan.formalGoLiveBoundary || "")}</p>
+    </div>
+    <div class="track-grid">
+      ${(plan.capabilities || []).map((item) => `
+        <article class="cutover-card">
+          <span class="badge ${item.status === "implemented" ? "ok" : "warn"}">${escapeHtml(item.status)}</span>
+          <h3>${escapeHtml(item.id)}</h3>
+          <p>${escapeHtml(item.acceptance)}</p>
+        </article>
+      `).join("")}
+    </div>
+    <div class="control-grid">
+      <article class="cutover-card">
+        <h3>运营交付模板</h3>
+        <ul class="evidence-list">${(plan.generatedArtifacts || []).map((item) => `<li><code>${escapeHtml(item)}</code></li>`).join("")}</ul>
+      </article>
+      <article class="cutover-card">
+        <h3>T00 集成契约</h3>
+        <p class="muted">${escapeHtml(contract.integrationRule || "")}</p>
+        <ul class="evidence-list">${(contract.requestedRoutes || []).map((item) => `<li><strong>${escapeHtml(item.method)}</strong> <code>${escapeHtml(item.path)}</code></li>`).join("")}</ul>
       </article>
     </div>
   `;
@@ -751,6 +794,31 @@ function fallbackCutoverPack() {
       rollbackPolicy: "单独停用一个部署单元、页面和 API，不修改其他专项，也不删除证据。",
       hardStops: []
     },
+    institutionOperationsCapabilityPlan: {
+      status: "institution-operations-code-ready",
+      institutionId: "institution-template",
+      productionTrafficState: "blocked-until-site-evidence-signed",
+      enabledModuleIds: ["emergency-life-chain", "clinical-blood", "regional-imaging-cloud", "physical-examination"],
+      capabilities: [
+        operationsCapability("configuration-version-lifecycle", "不可变语义版本、四眼审批、验签激活和追加式审计链"),
+        operationsCapability("ed25519-signed-package", "绑定机构、模块、摘要、有效期、证书指纹、nonce 和签名"),
+        operationsCapability("site-evidence-import", "真实原始回执按 SHA-256 绑定已验签机构包"),
+        operationsCapability("controlled-rehearsal-runner", "验收场景核对证据、审计、幂等、患者安全、范围和摘要"),
+        operationsCapability("t-plus-1-observation-gate", "观察信号决定保持 No-Go、重复演练或开放下一专项观察"),
+        operationsCapability("upgrade-and-independent-rollback", "升级阻断边界漂移，单模块回退保留其他专项和证据")
+      ],
+      t00IntegrationContract: {
+        requestedRoutes: [
+          { method: "GET", path: "/api/t10-specialty/cutover-pack" },
+          { method: "GET", path: "/api/t10-specialty/institution-packages/:institutionId" },
+          { method: "GET", path: "/api/t10-specialty/institution-packages/:institutionId/verification" }
+        ],
+        integrationRule: "T00 只暴露已验证只读产物，不得从代码就绪推断现场验收或生产上线。"
+      },
+      generatedArtifacts: ["operations-plan.json", "operations-plan.md", "configuration-template.json", "evidence-import-template.json", "rehearsal-results-template.json", "observation-template.json", "upgrade-rollback-template.json", "t00-integration-contract.json", "artifact-index.json"],
+      summary: { capabilities: 6, implemented: 6, blocked: 0 },
+      formalGoLiveBoundary: "代码就绪不替代真实凭据、接口回执、现场演练、T+1观察或正式签字。"
+    },
     crossTrackControls: [
       control("identity-and-role-scope", "统一身份与最小权限", "平台账号管理员/机构管理员", "每个专项均使用现场实名账号、机构编码和角色授权；演示账号不得进入生产灰度。"),
       control("signed-interface-and-idempotency", "签名接口、时钟窗口和幂等", "平台互联互通组/外部系统厂商", "外部报文必须具备签名、时间窗、nonce或幂等键、回执和死信补偿证据。"),
@@ -1158,6 +1226,10 @@ function deploymentCheck(id, detail) {
 
 function packageArtifact(file, purpose) {
   return { file, purpose };
+}
+
+function operationsCapability(id, acceptance) {
+  return { id, status: "implemented", acceptance };
 }
 
 function control(id, name, owner, acceptance) {

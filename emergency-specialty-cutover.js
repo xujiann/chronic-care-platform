@@ -3,6 +3,7 @@
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
+const { buildInstitutionOperationsCapabilityPlan } = require("./t10-institution-operations");
 
 const DEFAULT_TRACKS = [
   {
@@ -511,6 +512,13 @@ function buildSpecialtyCutoverPack(options = {}) {
   const scenarioEvidenceMatrix = buildScenarioEvidenceMatrix(acceptanceScenarioSuite, evidenceDossier, siteEvidenceWorkflow);
   const cutoverCommandCenter = buildCutoverCommandCenter(tracks, firstIncrement, pilotBatchPlan, siteEvidenceWorkflow, scenarioEvidenceMatrix);
   const observationSignalBoard = buildObservationSignalBoard(tracks, firstIncrement, cutoverCommandCenter, scenarioEvidenceMatrix);
+  const institutionOperationsCapabilityPlan = buildInstitutionOperationsCapabilityPlan({
+    institutionDeploymentManifest,
+    institutionDeploymentGate,
+    evidenceDossier,
+    acceptanceScenarioSuite,
+    observationSignalBoard
+  });
   const runtimeSmokePlan = buildRuntimeSmokePlan(tracks, firstIncrement, observationSignalBoard);
   const summary = {
     tracks: tracks.length,
@@ -544,11 +552,12 @@ function buildSpecialtyCutoverPack(options = {}) {
     scenarioEvidenceMatrix,
     cutoverCommandCenter,
     observationSignalBoard,
+    institutionOperationsCapabilityPlan,
     runtimeSmokePlan
   };
   pack.integrity = {
     algorithm: "sha256",
-    digest: `sha256:${sha256({ summary, moduleCatalog, institutionDeploymentManifest, institutionDeploymentGate, specialtyCompatibilityMatrix, institutionPackagePlan, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision, evidenceDossier, pilotBatchPlan, siteEvidenceWorkflow, acceptanceScenarioSuite, scenarioEvidenceMatrix, cutoverCommandCenter, observationSignalBoard, runtimeSmokePlan })}`
+    digest: `sha256:${sha256({ summary, moduleCatalog, institutionDeploymentManifest, institutionDeploymentGate, specialtyCompatibilityMatrix, institutionPackagePlan, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision, evidenceDossier, pilotBatchPlan, siteEvidenceWorkflow, acceptanceScenarioSuite, scenarioEvidenceMatrix, cutoverCommandCenter, observationSignalBoard, institutionOperationsCapabilityPlan, runtimeSmokePlan })}`
   };
   return pack;
 }
@@ -1307,7 +1316,8 @@ function buildRuntimeSmokePlan(tracks, firstIncrement, observationSignalBoard) {
         "release/t10-specialty-cutover-pack.md exists",
         "integrity digest is sha256-addressed",
         "formalGoLiveState remains blocked until site evidence is accepted",
-        "institution package plan and all 15 non-empty specialty combinations are valid"
+        "institution package plan and all 15 non-empty specialty combinations are valid",
+        "institution operations lifecycle implements configuration, signing, evidence, rehearsal, observation and rollback"
       ],
       failureAction: "stop release packaging and keep batch-1 closed"
     },
@@ -1394,6 +1404,7 @@ function renderMarkdown(pack) {
   const commandRosterRows = (pack.cutoverCommandCenter?.roster || []).map((item) => `| ${item.seat} | ${item.owner} | ${item.decisionRight} |`);
   const observationLaneRows = (pack.observationSignalBoard?.lanes || []).map((item) => `| ${item.id} | ${item.ownerSeat} | ${item.signals.length} | ${item.noGoRule} | ${item.evidenceArtifact} |`);
   const runtimeSmokeRows = (pack.runtimeSmokePlan?.suites || []).map((item) => `| ${item.id} | ${item.automation} | ${item.command} | ${item.checks.length} | ${item.failureAction} |`);
+  const operationsRows = (pack.institutionOperationsCapabilityPlan?.capabilities || []).map((item) => `| ${item.id} | ${item.status} | ${item.acceptance} |`);
   return [
     "# T10 急救、用血、影像与体检专项上线割接包",
     "",
@@ -1435,6 +1446,16 @@ function renderMarkdown(pack) {
     "### Institution package artifacts",
     "",
     ...(pack.institutionPackagePlan?.artifacts || []).map((item) => `- ${item.file}: ${item.purpose}`),
+    "",
+    "## Institution operations capability",
+    "",
+    `- Status: ${pack.institutionOperationsCapabilityPlan?.status || "institution-operations-blocked"}`,
+    `- Code readiness: ${pack.institutionOperationsCapabilityPlan?.summary?.implemented || 0}/${pack.institutionOperationsCapabilityPlan?.summary?.capabilities || 0}`,
+    `- Formal boundary: ${pack.institutionOperationsCapabilityPlan?.formalGoLiveBoundary || "site evidence and formal approval remain required"}`,
+    "",
+    "| Capability | Status | Acceptance |",
+    "|---|---|---|",
+    ...operationsRows,
     "",
     "## 专项状态",
     "",

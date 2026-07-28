@@ -97,6 +97,9 @@ test("buildSpecialtyCutoverPack aggregates site blockers and cross-track control
   assert.equal(pack.specialtyCompatibilityMatrix.passedCombinations, 3);
   assert.equal(pack.institutionPackagePlan.status, "ready-to-build-institution-package");
   assert.equal(pack.institutionPackagePlan.artifacts.length, 5);
+  assert.equal(pack.institutionOperationsCapabilityPlan.status, "institution-operations-code-ready");
+  assert.equal(pack.institutionOperationsCapabilityPlan.summary.implemented, 6);
+  assert.equal(pack.institutionOperationsCapabilityPlan.summary.blocked, 0);
   assert.equal(pack.crossTrackControls.length, 4);
   assert.ok(pack.crossTrackControls.some((item) => item.id === "four-eyes-site-evidence"));
   assert.equal(pack.rehearsalPlan.scope.primaryTrackId, "emergency-life-chain");
@@ -264,6 +267,8 @@ test("renderMarkdown exposes the digest, departments, blockers and first grey in
   assert.match(markdown, /Institution deployment manifest/);
   assert.match(markdown, /deny-by-default/);
   assert.match(markdown, /Data namespace/);
+  assert.match(markdown, /Institution operations capability/);
+  assert.match(markdown, /configuration-version-lifecycle/);
   assert.match(markdown, /composable-module-suite/);
   assert.match(markdown, /Peer specialty dependencies: 0/);
   assert.match(markdown, /sha256:[a-f0-9]{64}/);
@@ -489,10 +494,14 @@ test("static cutover preview page exposes T10 tracks and release-artifact fallba
   assert.match(html, /场景-证据判定矩阵/);
   assert.match(html, /切换指挥台与值守责任/);
   assert.match(html, /机构模块启用与隔离清单/);
+  assert.match(html, /机构配置、签名、证据与演练运营/);
   assert.match(html, /institution-deployment-manifest/);
+  assert.match(html, /institution-operations/);
   assert.match(html, /observation-signal-board/);
   assert.match(html, /runtime-smoke-plan/);
-  assert.match(html, /t10-specialty-cutover\.js\?v=institution-package-plan/);
+  assert.match(html, /t10-specialty-cutover\.js\?v=institution-operations/);
+  assert.match(html, /overflow-wrap:\s*anywhere/);
+  assert.match(html, /scroll-margin-top:\s*200px/);
   assert.match(html, /emergency\.html/);
   assert.match(html, /blood\.html/);
   assert.match(html, /imaging-cloud\.html/);
@@ -500,6 +509,7 @@ test("static cutover preview page exposes T10 tracks and release-artifact fallba
   assert.match(client, /release\/t10-specialty-cutover-pack\.json/);
   assert.match(client, /fallbackCutoverPack/);
   assert.match(client, /withCutoverDefaults/);
+  assert.match(client, /restoreLocationAnchor/);
   assert.match(client, /renderRehearsalPlan/);
   assert.match(client, /renderDecisionMatrix/);
   assert.match(client, /renderEvidenceDossier/);
@@ -516,6 +526,9 @@ test("static cutover preview page exposes T10 tracks and release-artifact fallba
   assert.match(client, /all-combinations-compatible/);
   assert.match(client, /ready-to-build-institution-package/);
   assert.match(client, /artifact-index\.json/);
+  assert.match(client, /renderInstitutionOperations/);
+  assert.match(client, /ed25519-signed-package/);
+  assert.match(client, /t00-integration-contract\.json/);
   assert.match(client, /evidence-id-present/);
   assert.match(client, /batch-1-single-chain/);
   assert.match(client, /submit-evidence/);
