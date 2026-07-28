@@ -3,7 +3,7 @@ info:
   title: 数智医院新标准平台MVP接口
   version: 0.1.0
   description: >
-    面向MVP原型的接口契约草案，覆盖评价任务、试点运营、试点协同、试点评估、评价助手、推广准备、运营监控、医院申报、证据材料、数据校验、省级审核、专家复核、评分规则、评分结果、整改闭环、统计分析、国家抽查、规则沙箱、智能核验、消息提醒、批量导入、系统权限和运行管理。
+    面向MVP原型的接口契约草案，覆盖评价任务、试点运营、试点协同、接入联调、试点评估、评价助手、推广准备、运营监控、医院申报、证据材料、数据校验、省级审核、专家复核、评分规则、评分结果、整改闭环、统计分析、国家抽查、规则沙箱、智能核验、消息提醒、批量导入、系统权限和运行管理。
 servers:
   - url: https://example.local
     description: 示例服务地址，正式环境由部署方案确定
@@ -38,6 +38,8 @@ tags:
     description: 申报批次、材料上传队列、审核负荷和运行日报
   - name: PilotCollaboration
     description: 医院准备度、问题工单、培训答疑、试点版本和反馈闭环
+  - name: PilotIntegration
+    description: 医院接入申请、源系统连接器、凭据、数据映射、认证测试、问题处置和上线准入
   - name: PilotAssessment
     description: 试点成效、问题复盘、优化计划、推广准备和评估报告
   - name: EvaluationAssistant
@@ -429,6 +431,272 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/PilotFeedback"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/pilot-access-applications:
+    get:
+      tags: [PilotIntegration]
+      summary: 获取试点医院接入申请
+      responses:
+        "200":
+          description: 接入申请清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PilotAccessApplication"
+    post:
+      tags: [PilotIntegration]
+      summary: 提交医院接入申请
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PilotAccessApplication"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/pilot-access-applications/{applicationId}:
+    put:
+      tags: [PilotIntegration]
+      summary: 受理并推进医院接入申请
+      parameters:
+        - name: applicationId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PilotAccessApplication"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/pilot-connectors:
+    get:
+      tags: [PilotIntegration]
+      summary: 获取医院源系统连接器
+      responses:
+        "200":
+          description: 连接器清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PilotConnector"
+    post:
+      tags: [PilotIntegration]
+      summary: 登记源系统连接器
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PilotConnector"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/pilot-connectors/{connectorId}:probe:
+    post:
+      tags: [PilotIntegration]
+      summary: 执行连接器连通探测
+      parameters:
+        - name: connectorId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/pilot-connectors/{connectorId}:rotate-credential:
+    post:
+      tags: [PilotIntegration]
+      summary: 轮换连接器接入凭据
+      parameters:
+        - name: connectorId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/pilot-connectors/{connectorId}:certify:
+    post:
+      tags: [PilotIntegration]
+      summary: 执行OpenAPI接口契约认证
+      parameters:
+        - name: connectorId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 认证测试记录
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PilotIntegrationTest"
+  /api/v1/pilot-data-mappings:
+    get:
+      tags: [PilotIntegration]
+      summary: 获取试点数据映射清单
+      responses:
+        "200":
+          description: 数据映射清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PilotDataMapping"
+    post:
+      tags: [PilotIntegration]
+      summary: 登记或更新数据映射
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PilotDataMapping"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/pilot-data-mappings/{mappingId}:sample-check:
+    post:
+      tags: [PilotIntegration]
+      summary: 执行字段映射与脱敏抽样
+      parameters:
+        - name: mappingId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 抽样测试记录
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PilotIntegrationTest"
+  /api/v1/pilot-integration-tests:
+    get:
+      tags: [PilotIntegration]
+      summary: 获取联调认证测试记录
+      responses:
+        "200":
+          description: 联调认证测试记录
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PilotIntegrationTest"
+  /api/v1/pilot-integration-issues:
+    get:
+      tags: [PilotIntegration]
+      summary: 获取联调问题清单
+      responses:
+        "200":
+          description: 联调问题清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PilotIntegrationIssue"
+    post:
+      tags: [PilotIntegration]
+      summary: 登记联调问题
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PilotIntegrationIssue"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/pilot-integration-issues/{issueId}:resolve:
+    post:
+      tags: [PilotIntegration]
+      summary: 关闭联调问题并登记处置结论
+      parameters:
+        - name: issueId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/pilot-integration-gates:
+    get:
+      tags: [PilotIntegration]
+      summary: 获取医院上线准入状态
+      responses:
+        "200":
+          description: 上线准入清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PilotIntegrationGate"
+  /api/v1/pilot-integration-gates/{hospitalCode}:evaluate:
+    post:
+      tags: [PilotIntegration]
+      summary: 评估医院上线准入门禁
+      parameters:
+        - name: hospitalCode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 最新上线准入状态
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PilotIntegrationGate"
+  /api/v1/pilot-integration-gates/{hospitalCode}:approve:
+    post:
+      tags: [PilotIntegration]
+      summary: 批准试点医院上线
+      parameters:
+        - name: hospitalCode
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           $ref: "#/components/responses/Ok"
@@ -2212,6 +2480,39 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PilotFeedback"
+    IntegrationPackage:
+      type: object
+      required: [meta, integrationSummary, pilotAccessApplications, pilotConnectors, pilotDataMappings, pilotIntegrationTests, pilotIntegrationIssues, pilotIntegrationGates]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PackageMeta"
+        integrationSummary:
+          type: object
+          additionalProperties: true
+        pilotAccessApplications:
+          type: array
+          items:
+            $ref: "#/components/schemas/PilotAccessApplication"
+        pilotConnectors:
+          type: array
+          items:
+            $ref: "#/components/schemas/PilotConnector"
+        pilotDataMappings:
+          type: array
+          items:
+            $ref: "#/components/schemas/PilotDataMapping"
+        pilotIntegrationTests:
+          type: array
+          items:
+            $ref: "#/components/schemas/PilotIntegrationTest"
+        pilotIntegrationIssues:
+          type: array
+          items:
+            $ref: "#/components/schemas/PilotIntegrationIssue"
+        pilotIntegrationGates:
+          type: array
+          items:
+            $ref: "#/components/schemas/PilotIntegrationGate"
     AssessmentPackage:
       type: object
       required: [meta, assessmentSummary, pilotOutcomeMetrics, pilotHospitalOutcomes, pilotIssueThemes, pilotImprovementPlans, rolloutRegions, pilotAssessmentReports]
@@ -2640,7 +2941,7 @@ components:
       properties:
         packageType:
           type: string
-          enum: [submission, review, expert, rectification, task, pilot, collaboration, assessment, assistant, monitoring, evidence, analytics, intelligence, operations, system, full]
+          enum: [submission, review, expert, rectification, task, pilot, collaboration, integration, assessment, assistant, monitoring, evidence, analytics, intelligence, operations, system, full]
         generatedAt:
           type: string
           format: date-time
@@ -3148,6 +3449,211 @@ components:
         createdAt:
           type: string
         resolution:
+          type: string
+    PilotAccessApplication:
+      type: object
+      required: [id, hospitalCode, hospitalName, coordinator, sourceMode, networkZone, targetWindow, materials, requiredMaterials, status]
+      properties:
+        id:
+          type: string
+        hospitalCode:
+          type: string
+        hospitalName:
+          type: string
+        coordinator:
+          type: string
+        sourceMode:
+          type: string
+        networkZone:
+          type: string
+        targetWindow:
+          type: string
+          format: date
+        materials:
+          type: integer
+          minimum: 0
+        requiredMaterials:
+          type: integer
+          minimum: 0
+        status:
+          type: string
+          enum: [资料待补, 已受理, 联调中, 联调完成]
+        lastUpdated:
+          type: string
+    PilotConnector:
+      type: object
+      required: [id, hospitalCode, hospitalName, sourceSystem, profile, transport, endpointAlias, authMode, credentialStatus, connectivityStatus, contractStatus, owner]
+      properties:
+        id:
+          type: string
+        hospitalCode:
+          type: string
+        hospitalName:
+          type: string
+        sourceSystem:
+          type: string
+        profile:
+          type: string
+        transport:
+          type: string
+        endpointAlias:
+          type: string
+        authMode:
+          type: string
+        credentialStatus:
+          type: string
+          enum: [有效, 临期, 失效]
+        credentialExpireAt:
+          type: string
+          format: date
+        connectivityStatus:
+          type: string
+          enum: [待探测, 在线, 阻断]
+        contractStatus:
+          type: string
+          enum: [待认证, 契约通过, 阻断]
+        latencyMs:
+          type: integer
+          minimum: 0
+        lastProbeAt:
+          type: string
+        owner:
+          type: string
+    PilotDataMapping:
+      type: object
+      required: [id, hospitalCode, connectorId, dataset, sourceFields, mappedFields, requiredFields, transformRules, coverage, privacyCheck, status, owner]
+      properties:
+        id:
+          type: string
+        hospitalCode:
+          type: string
+        connectorId:
+          type: string
+        dataset:
+          type: string
+        sourceFields:
+          type: integer
+          minimum: 0
+        mappedFields:
+          type: integer
+          minimum: 0
+        requiredFields:
+          type: integer
+          minimum: 0
+        transformRules:
+          type: integer
+          minimum: 0
+        coverage:
+          type: number
+          minimum: 0
+          maximum: 100
+        privacyCheck:
+          type: string
+          enum: [待抽样, 脱敏通过, 发现风险]
+        status:
+          type: string
+          enum: [待完善, 映射就绪, 阻断]
+        owner:
+          type: string
+        updatedAt:
+          type: string
+    PilotIntegrationTest:
+      type: object
+      required: [id, hospitalCode, connectorId, suite, cases, passed, failed, privacyFindings, evidenceId, status, runAt]
+      properties:
+        id:
+          type: string
+        hospitalCode:
+          type: string
+        connectorId:
+          type: string
+        suite:
+          type: string
+        cases:
+          type: integer
+          minimum: 0
+        passed:
+          type: integer
+          minimum: 0
+        failed:
+          type: integer
+          minimum: 0
+        privacyFindings:
+          type: integer
+          minimum: 0
+        evidenceId:
+          type: string
+        status:
+          type: string
+          enum: [通过, 不通过, 阻断]
+        runAt:
+          type: string
+    PilotIntegrationIssue:
+      type: object
+      required: [id, hospitalCode, connectorId, category, severity, summary, owner, status, dueAt]
+      properties:
+        id:
+          type: string
+        hospitalCode:
+          type: string
+        connectorId:
+          type: string
+        category:
+          type: string
+        severity:
+          type: string
+          enum: [中, 高, 阻断]
+        summary:
+          type: string
+        owner:
+          type: string
+        status:
+          type: string
+          enum: [待处理, 处理中, 已关闭]
+        dueAt:
+          type: string
+          format: date
+        resolution:
+          type: string
+        updatedAt:
+          type: string
+    PilotIntegrationGate:
+      type: object
+      required: [hospitalCode, hospitalName, requiredConnectors, readyConnectors, requiredMappings, readyMappings, openCriticalIssues, securityReview, businessReview, status]
+      properties:
+        hospitalCode:
+          type: string
+        hospitalName:
+          type: string
+        requiredConnectors:
+          type: integer
+          minimum: 0
+        readyConnectors:
+          type: integer
+          minimum: 0
+        requiredMappings:
+          type: integer
+          minimum: 0
+        readyMappings:
+          type: integer
+          minimum: 0
+        openCriticalIssues:
+          type: integer
+          minimum: 0
+        securityReview:
+          type: string
+          enum: [待复核, 通过, 不通过]
+        businessReview:
+          type: string
+          enum: [待复核, 通过, 不通过]
+        status:
+          type: string
+          enum: [待评估, 待整改, 阻断, 可上线, 已准入]
+        evaluatedAt:
+          type: string
+        approvedBy:
+          type: string
+        approvedAt:
           type: string
     PilotOutcomeMetric:
       type: object
