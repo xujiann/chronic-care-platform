@@ -268,6 +268,22 @@ The review and institution operations generators include:
 - `external-action-board.json`
 - `external-action-command-template.json`
 - `external-action-audit-export.json`
+- `t10-external-action-workflow.js`
+- `scripts/t10-external-action.js`
+
+Use the checked-in executor to verify or inspect a board without mutation:
+
+```powershell
+node scripts\t10-external-action.js verify --board=release\t10-specialty-plan-review\external-action-board.json
+node scripts\t10-external-action.js status --board=release\t10-specialty-plan-review\external-action-board.json --track=emergency-life-chain
+```
+
+Before applying a command, copy the current board digest into `expectedBoardDigest`. This optimistic concurrency token prevents a stale reviewer or owner command from overwriting a newer decision. Use `--dry-run` first; the real apply acquires an exclusive board lock, verifies integrity, writes the board atomically and refreshes the audit export:
+
+```powershell
+node scripts\t10-external-action.js apply --board=release\t10-specialty-plan-review\external-action-board.json --command=command.json --dry-run
+node scripts\t10-external-action.js apply --board=release\t10-specialty-plan-review\external-action-board.json --command=command.json
+```
 
 ## Verification
 

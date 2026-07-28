@@ -44,6 +44,9 @@ function buildOfflineChecks(pack, options = {}) {
     : exists("scripts/release-report.js")
     ? readText("scripts/release-report.js")
     : "";
+  const externalActionCli = options.externalActionCli !== undefined
+    ? options.externalActionCli
+    : readText("scripts/t10-external-action.js");
 
   const runtimeSuites = pack.runtimeSmokePlan?.suites || [];
   const routeRows = pack.runtimeSmokePlan?.trackRoutes || [];
@@ -58,6 +61,7 @@ function buildOfflineChecks(pack, options = {}) {
     check("t10:institution-operations", pack.institutionOperationsCapabilityPlan?.status === "institution-operations-code-ready" && pack.institutionOperationsCapabilityPlan?.summary?.implemented === 6 && pack.institutionOperationsCapabilityPlan?.summary?.blocked === 0, `${pack.institutionOperationsCapabilityPlan?.summary?.implemented || 0}/${pack.institutionOperationsCapabilityPlan?.summary?.capabilities || 0} institution operations capabilities implemented`),
     check("t10:specialty-plan-coverage", pack.specialtyPlanReview?.ok === true && pack.specialtyPlanReview?.summary?.implementedCapabilities === pack.specialtyPlanReview?.summary?.plannedCapabilities && pack.specialtyPlanReview?.summary?.missingCapabilities === 0, `${pack.specialtyPlanReview?.summary?.implementedCapabilities || 0}/${pack.specialtyPlanReview?.summary?.plannedCapabilities || 0} planned capabilities have code and test evidence`),
     check("t10:external-action-workflow", pack.externalActionWorkflowPlan?.status === "external-action-workflow-code-ready" && pack.externalActionWorkflowPlan?.summary?.actions === pack.specialtyPlanReview?.summary?.externalActions && pack.externalActionWorkflowPlan?.trackGates?.every((item) => item.productionReady === false), `${pack.externalActionWorkflowPlan?.summary?.actions || 0} external actions are governed without auto-opening production`),
+    check("t10:external-action-cli", ["inspectExternalActionBoard", "executeExternalActionCommand", "expectedBoardDigest", "atomicWriteJson", "external action board is locked"].every((marker) => externalActionCli.includes(marker)), "external action CLI enforces verification, optimistic concurrency, exclusive locking and atomic persistence"),
     check("t10:runtime-smoke-plan", pack.runtimeSmokePlan?.status === "ready-for-runtime-smoke" && pack.runtimeSmokePlan?.launchMode === "controlled-rehearsal-only" && runtimeSuites.length === 5, `${runtimeSuites.length} smoke suites / ${pack.runtimeSmokePlan?.launchMode || "unknown"}`),
     check("t10:runtime-smoke-suites", ["smoke-artifact-generation", "smoke-static-preview", "smoke-server-api", "smoke-release-gates", "smoke-observation-artifacts"].every((id) => runtimeSuites.some((suite) => suite.id === id)), "artifact, preview, API, release gates and observation artifact suites are declared"),
     check(

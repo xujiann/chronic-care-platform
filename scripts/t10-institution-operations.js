@@ -118,8 +118,9 @@ function buildOperationsArtifacts(options = {}) {
       "external-action-board.json": `${JSON.stringify(cutoverPack.externalActionWorkflowPlan.board, null, 2)}\n`,
       "external-action-command-template.json": `${JSON.stringify({
         actionId: "<external-action-id>",
-        action: "assign | submit-evidence | start-review | accept | return | escalate | resolve-escalation | reopen",
+        action: "assign | submit-evidence | resubmit-evidence | start-review | accept | return | escalate | resolve-escalation | reopen",
         actorId: "<real-account-id>",
+        expectedBoardDigest: cutoverPack.externalActionWorkflowPlan.board.integrity.digest,
         assigneeId: "<required-for-assign>",
         evidenceRef: "<required-for-submit>",
         originalReference: "<required-for-submit>",
@@ -135,6 +136,8 @@ function buildOperationsArtifacts(options = {}) {
         boardDigest: cutoverPack.externalActionWorkflowPlan.board.integrity.digest,
         audit: cutoverPack.externalActionWorkflowPlan.board.audit
       }, null, 2)}\n`,
+      "t10-external-action-workflow.js": fs.readFileSync(path.join(ROOT, "t10-external-action-workflow.js"), "utf8"),
+      "scripts/t10-external-action.js": fs.readFileSync(path.join(ROOT, "scripts", "t10-external-action.js"), "utf8"),
       "t00-integration-contract.json": `${JSON.stringify(buildT00IntegrationContract(), null, 2)}\n`
     }
   };
@@ -179,7 +182,9 @@ function writeOperationsArtifacts(artifacts, options = {}) {
   ));
   fs.mkdirSync(outputDir, { recursive: true });
   const indexed = Object.entries(artifacts.documents).map(([file, content]) => {
-    fs.writeFileSync(path.join(outputDir, file), content, "utf8");
+    const target = resolveArtifactPath(outputDir, file);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, content, "utf8");
     return {
       file,
       bytes: Buffer.byteLength(content, "utf8"),
@@ -203,7 +208,12 @@ function verifyOperationsArtifacts(outputDir) {
   }
   const index = JSON.parse(fs.readFileSync(indexPath, "utf8"));
   const checks = (index.payloadArtifacts || []).map((item) => {
-    const target = path.resolve(outputDir, item.file);
+    let target;
+    try {
+      target = resolveArtifactPath(outputDir, item.file);
+    } catch (error) {
+      return { id: `artifact:${item.file}`, passed: false, detail: error.message };
+    }
     const exists = fs.existsSync(target);
     const content = exists ? fs.readFileSync(target, "utf8") : "";
     return {
@@ -220,6 +230,15 @@ function verifyOperationsArtifacts(outputDir) {
     checks,
     summary: { total: checks.length, passed: checks.length - failed.length, failed: failed.length }
   };
+}
+
+function resolveArtifactPath(outputDir, file) {
+  const root = path.resolve(outputDir);
+  const target = path.resolve(root, String(file || ""));
+  if (!String(file || "").trim() || target === root || !target.startsWith(`${root}${path.sep}`)) {
+    throw new Error(`artifact path escapes output directory: ${file}`);
+  }
+  return target;
 }
 
 function runCli() {
@@ -245,5 +264,6 @@ module.exports = {
   buildOperationsArtifacts,
   renderOperationsMarkdown,
   writeOperationsArtifacts,
-  verifyOperationsArtifacts
+  verifyOperationsArtifacts,
+  resolveArtifactPath
 };

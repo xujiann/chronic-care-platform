@@ -545,6 +545,8 @@ function buildInstitutionOperationsCapabilityPlan(options = {}) {
       "external-action-board.json",
       "external-action-command-template.json",
       "external-action-audit-export.json",
+      "t10-external-action-workflow.js",
+      "scripts/t10-external-action.js",
       "t00-integration-contract.json",
       "artifact-index.json"
     ],

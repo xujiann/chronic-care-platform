@@ -185,7 +185,13 @@ function buildExternalActionWorkflowPlan(planReview) {
     acceptanceConfirmation: ACCEPT_CONFIRMATION,
     board,
     trackGates: (planReview.trackReviews || []).map((track) => evaluateExternalActionGate(board, track.trackId, { now: board.generatedAt })),
-    generatedArtifacts: ["external-action-board.json", "external-action-command-template.json", "external-action-audit-export.json"],
+    generatedArtifacts: [
+      "external-action-board.json",
+      "external-action-command-template.json",
+      "external-action-audit-export.json",
+      "t10-external-action-workflow.js",
+      "scripts/t10-external-action.js"
+    ],
     summary: {
       actions: board.actions.length,
       p0: board.actions.filter((item) => item.priority === "P0").length,

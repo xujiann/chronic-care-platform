@@ -29,6 +29,7 @@ function writeSpecialtyPlanReview(review, options = {}) {
       actionId: "<external-action-id>",
       action: "assign | submit-evidence | resubmit-evidence | start-review | accept | return | escalate | resolve-escalation | reopen",
       actorId: "<real-account-id>",
+      expectedBoardDigest: workflow.board.integrity.digest,
       assigneeId: "<required-for-assign-or-resolution>",
       evidenceRef: "<required-for-submit>",
       originalReference: "<required-for-submit>",
@@ -42,10 +43,14 @@ function writeSpecialtyPlanReview(review, options = {}) {
       generatedAt: review.generatedAt,
       boardDigest: workflow.board.integrity.digest,
       audit: workflow.board.audit
-    }, null, 2)}\n`
+    }, null, 2)}\n`,
+    "t10-external-action-workflow.js": fs.readFileSync(path.join(ROOT, "t10-external-action-workflow.js"), "utf8"),
+    "scripts/t10-external-action.js": fs.readFileSync(path.join(ROOT, "scripts", "t10-external-action.js"), "utf8")
   };
   const payloadArtifacts = Object.entries(documents).map(([file, content]) => {
-    fs.writeFileSync(path.join(outputDir, file), content, "utf8");
+    const target = resolveArtifactPath(outputDir, file);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, content, "utf8");
     return { file, bytes: Buffer.byteLength(content, "utf8"), digest: digest(content) };
   });
   const index = {
@@ -63,7 +68,12 @@ function verifySpecialtyPlanReview(outputDir) {
   if (!fs.existsSync(indexPath)) return invalid([{ id: "artifact-index", passed: false, detail: "missing" }]);
   const index = JSON.parse(fs.readFileSync(indexPath, "utf8"));
   const checks = (index.payloadArtifacts || []).map((item) => {
-    const target = path.resolve(outputDir, item.file);
+    let target;
+    try {
+      target = resolveArtifactPath(outputDir, item.file);
+    } catch (error) {
+      return { id: `artifact:${item.file}`, passed: false, detail: error.message };
+    }
     const exists = fs.existsSync(target);
     const content = exists ? fs.readFileSync(target, "utf8") : "";
     return {
@@ -79,6 +89,15 @@ function verifySpecialtyPlanReview(outputDir) {
 
 function invalid(checks) {
   return { ok: false, status: "specialty-plan-review-artifacts-invalid", checks, summary: summarize(checks) };
+}
+
+function resolveArtifactPath(outputDir, file) {
+  const root = path.resolve(outputDir);
+  const target = path.resolve(root, String(file || ""));
+  if (!String(file || "").trim() || target === root || !target.startsWith(`${root}${path.sep}`)) {
+    throw new Error(`artifact path escapes output directory: ${file}`);
+  }
+  return target;
 }
 
 function summarize(checks) {
@@ -114,5 +133,6 @@ if (require.main === module) runCli();
 module.exports = {
   writeSpecialtyPlanReview,
   verifySpecialtyPlanReview,
+  resolveArtifactPath,
   parseArgs
 };

@@ -1332,7 +1332,8 @@ function buildRuntimeSmokePlan(tracks, firstIncrement, observationSignalBoard) {
         "institution package plan and all 15 non-empty specialty combinations are valid",
         "institution operations lifecycle implements configuration, signing, evidence, rehearsal, observation and rollback",
         "specialty plan review has complete source and acceptance-test evidence for every selected capability",
-        "external site and T00 actions use assignment, digest evidence, independent review, escalation and reopen controls"
+        "external site and T00 actions use assignment, digest evidence, independent review, escalation and reopen controls",
+        "portable external action executor enforces optimistic concurrency, exclusive locking and atomic persistence"
       ],
       failureAction: "stop release packaging and keep batch-1 closed"
     },

@@ -44,6 +44,7 @@ test("T10 runtime smoke report validates code-side launch gates without closing 
   assert.ok(report.checks.some((item) => item.id === "t10:institution-operations" && item.passed));
   assert.ok(report.checks.some((item) => item.id === "t10:specialty-plan-coverage" && item.passed));
   assert.ok(report.checks.some((item) => item.id === "t10:external-action-workflow" && item.passed));
+  assert.ok(report.checks.some((item) => item.id === "t10:external-action-cli" && item.passed));
   assert.ok(report.checks.some((item) => item.id === "t10:route-contracts" && item.passed));
   assert.match(markdown, /T10 runtime smoke report/);
   assert.match(markdown, /smoke-server-api/);

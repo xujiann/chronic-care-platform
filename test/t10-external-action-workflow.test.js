@@ -167,6 +167,10 @@ test("workflow capability plan covers all twelve reviewed external actions", () 
   assert.equal(plan.summary.t00, 3);
   assert.equal(plan.trackGates.length, 4);
   assert.equal(plan.trackGates.every((item) => item.productionReady === false), true);
+  assert.deepEqual(plan.generatedArtifacts.slice(-2), [
+    "t10-external-action-workflow.js",
+    "scripts/t10-external-action.js"
+  ]);
 });
 
 test("tampering with an audit event invalidates the board", () => {

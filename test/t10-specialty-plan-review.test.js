@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { spawnSync } = require("node:child_process");
 const test = require("node:test");
 
 const {
@@ -78,11 +79,26 @@ test("plan review artifacts are digest indexed and tamper evident", (t) => {
   writeSpecialtyPlanReview(review, { outputDir });
   const verified = verifySpecialtyPlanReview(outputDir);
   assert.equal(verified.ok, true);
-  assert.equal(verified.summary.total, 6);
+  assert.equal(verified.summary.total, 8);
   assert.ok(fs.existsSync(path.join(outputDir, "external-action-board.json")));
   assert.ok(fs.existsSync(path.join(outputDir, "external-action-command-template.json")));
   assert.ok(fs.existsSync(path.join(outputDir, "external-action-audit-export.json")));
+  assert.ok(fs.existsSync(path.join(outputDir, "t10-external-action-workflow.js")));
+  assert.ok(fs.existsSync(path.join(outputDir, "scripts", "t10-external-action.js")));
+  const packagedCli = spawnSync(process.execPath, [
+    path.join(outputDir, "scripts", "t10-external-action.js"),
+    "verify",
+    `--board=${path.join(outputDir, "external-action-board.json")}`
+  ], { encoding: "utf8" });
+  assert.equal(packagedCli.status, 0, packagedCli.stderr);
+  assert.equal(JSON.parse(packagedCli.stdout).ok, true);
   fs.appendFileSync(path.join(outputDir, "specialty-plan-review.md"), "\ntampered\n", "utf8");
+  assert.equal(verifySpecialtyPlanReview(outputDir).ok, false);
+  writeSpecialtyPlanReview(review, { outputDir });
+  const indexPath = path.join(outputDir, "artifact-index.json");
+  const index = JSON.parse(fs.readFileSync(indexPath, "utf8"));
+  index.payloadArtifacts[0].file = path.join("..", "..", "outside.json");
+  fs.writeFileSync(indexPath, `${JSON.stringify(index, null, 2)}\n`, "utf8");
   assert.equal(verifySpecialtyPlanReview(outputDir).ok, false);
 });
 

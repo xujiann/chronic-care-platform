@@ -878,7 +878,7 @@ function fallbackCutoverPack() {
         ],
         integrationRule: "T00 只暴露已验证只读产物，不得从代码就绪推断现场验收或生产上线。"
       },
-      generatedArtifacts: ["operations-plan.json", "operations-plan.md", "configuration-template.json", "evidence-import-template.json", "rehearsal-results-template.json", "observation-template.json", "upgrade-rollback-template.json", "specialty-plan-review.json", "external-action-board.json", "external-action-command-template.json", "external-action-audit-export.json", "t00-integration-contract.json", "artifact-index.json"],
+      generatedArtifacts: ["operations-plan.json", "operations-plan.md", "configuration-template.json", "evidence-import-template.json", "rehearsal-results-template.json", "observation-template.json", "upgrade-rollback-template.json", "specialty-plan-review.json", "external-action-board.json", "external-action-command-template.json", "external-action-audit-export.json", "t10-external-action-workflow.js", "scripts/t10-external-action.js", "t00-integration-contract.json", "artifact-index.json"],
       summary: { capabilities: 6, implemented: 6, blocked: 0 },
       formalGoLiveBoundary: "代码就绪不替代真实凭据、接口回执、现场演练、T+1观察或正式签字。"
     },
@@ -919,7 +919,7 @@ function fallbackCutoverPack() {
         externalActionFallbackGate("regional-imaging-cloud"),
         externalActionFallbackGate("physical-examination")
       ],
-      generatedArtifacts: ["external-action-board.json", "external-action-command-template.json", "external-action-audit-export.json"],
+      generatedArtifacts: ["external-action-board.json", "external-action-command-template.json", "external-action-audit-export.json", "t10-external-action-workflow.js", "scripts/t10-external-action.js"],
       formalBoundary: "Accepted external actions only open formal Go/No-Go review; they never set productionReady by themselves."
     },
     crossTrackControls: [
