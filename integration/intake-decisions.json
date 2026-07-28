@@ -56,7 +56,7 @@
         "4f9f22b92b47ad50d36dccf0ad01437451019179",
         "4527485a6f8990abd3cc29c1203dbcb5134c21b3"
       ],
-      "reviewedAt": "2026-07-28T08:30:00.000Z",
+      "reviewedAt": "2026-07-28T04:40:35.476Z",
       "reviewer": "T00",
       "checks": [
         "git diff --check",
@@ -95,10 +95,11 @@
         "commission-only continuity projections expose only summary.continuityBreaks plus continuityBreak campaignId and stable safe code, without raw verification reasons, endpoint or cryptographic material",
         "T08 functional readiness remains 49 checks; T00 now adds 15 public integration and safety-boundary checks for an aggregate 64 of 64",
         "commission public-health UI loads the endpoint and campaign summary routes and displays only eight-lane counts, independent readiness gates, safe continuity-break campaign ID/code, worker counts and normalized blockers",
-        "UI configuration, 403 and network failures remain fail closed without interrupting existing boards; URL, IP, certificate, key, signature and raw verification reason fields are never rendered",
+        "the same commission panel submits only one allowlisted laneId for a lane probe or an empty command for a campaign; endpoint, contract, policy, TLS, time, thresholds and keyrings remain server-owned",
+        "UI configuration, permission, concurrency, frequency and network failures remain fail closed without interrupting existing boards; URL, IP, certificate, key, signature, raw server message and raw verification reason fields are never rendered",
         "endpointConnectivityReady, continuousConnectivityReady and productionReady remain three separate server-owned states; the UI never derives or grants production authorization",
-        "current public-health resilience, API, storage and connectivity UI regression passed 93 of 93; UI contract passed 3 of 3 and final-readiness report passed 64 of 64",
-        "shared static resources passed 72 of 72; the public API suite passed its complete single end-to-end route scenario with all endpoint and campaign assertions",
+        "current public-health resilience, API, storage and connectivity UI regression passed 95 of 95; UI contract passed 5 of 5 and final-readiness report passed 64 of 64",
+        "UI plus shared static resources passed 77 of 77; the public API suite passed its complete single end-to-end route scenario with all endpoint and campaign assertions",
         "clean isolated release report passed 426 of 428 with 0 failures and 2 expected site warnings; deploy check passed 396 of 396",
         "the pre-existing uncommitted data/db.json was hash-preserved and excluded; its unrelated nursing and escort readiness drift was not added to this candidate"
       ],
