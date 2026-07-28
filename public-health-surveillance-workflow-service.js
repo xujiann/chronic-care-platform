@@ -9,17 +9,11 @@ const {
   ensurePublicHealthMedicalPreventionTasks,
   isValidClosedPublicHealthMedicalPreventionTask
 } = require("./public-health-medical-prevention-collaboration-service");
-
-const PUBLIC_HEALTH_SURVEILLANCE_RULES = Object.freeze([
-  { id: "ph-rule-case-report", version: 1, signalType: "case-report", metricCode: "reportable-case-count", operator: ">=", threshold: 1, severity: "high", status: "active", owner: "传染病监测部门" },
-  { id: "ph-rule-clinical-syndrome", version: 1, signalType: "clinical-syndrome", metricCode: "fever-respiratory-count", operator: ">=", threshold: 5, severity: "high", status: "active", owner: "传染病监测部门" },
-  { id: "ph-rule-laboratory-pathogen", version: 1, signalType: "laboratory-pathogen", metricCode: "pathogen-positive-count", operator: ">=", threshold: 3, severity: "critical", status: "active", owner: "疾控实验室" },
-  { id: "ph-rule-public-health-event", version: 1, signalType: "public-health-event", metricCode: "event-severity-score", operator: ">=", threshold: 3, severity: "critical", status: "active", owner: "疾控应急管理部门" },
-  { id: "ph-rule-immunization-aefi", version: 1, signalType: "immunization-aefi", metricCode: "aefi-cluster-count", operator: ">=", threshold: 2, severity: "high", status: "active", owner: "免疫规划部门" },
-  { id: "ph-rule-vector-environment", version: 1, signalType: "vector-environment", metricCode: "vector-density-index", operator: ">=", threshold: 1, severity: "high", status: "active", owner: "环境与病媒部门" },
-  { id: "ph-rule-department-collaboration", version: 1, signalType: "department-collaboration", metricCode: "coordinated-risk-score", operator: ">=", threshold: 3, severity: "high", status: "active", owner: "联防联控专班" },
-  { id: "ph-rule-social-sensing", version: 1, signalType: "social-sensing", metricCode: "verified-report-count", operator: ">=", threshold: 2, severity: "medium", status: "active", owner: "风险沟通部门" }
-]);
+const {
+  PUBLIC_HEALTH_SURVEILLANCE_RULES,
+  buildPublicHealthSurveillanceRuleGovernance,
+  buildTrustedPublicHealthSurveillanceRuleRegistry
+} = require("./public-health-surveillance-rule-governance-service");
 
 const ALERT_ACTIONS = Object.freeze({
   "verify-alert": { from: ["open"], to: "verified" },
@@ -79,29 +73,6 @@ function evidenceRefs(payload = {}) {
   return Array.isArray(payload.evidenceRefs)
     ? [...new Set(payload.evidenceRefs.map(clean).filter(Boolean))]
     : [];
-}
-
-function ruleRegistry(data = {}) {
-  const persisted = Array.isArray(data.publicHealthSurveillanceRules)
-    ? data.publicHealthSurveillanceRules
-    : [];
-  const persistedById = new Map(persisted.map((item) => [clean(item.id), item]));
-  return PUBLIC_HEALTH_SURVEILLANCE_RULES.map((definition) => {
-    const current = persistedById.get(definition.id) || {};
-    const enabledStatus = ["active", "paused", "retired"].includes(clean(current.status))
-      ? clean(current.status)
-      : definition.status;
-    return {
-      ...clone(definition),
-      status: enabledStatus,
-      version: Number.isInteger(Number(current.version)) && Number(current.version) >= definition.version
-        ? Number(current.version)
-        : definition.version,
-      threshold: Number.isFinite(Number(current.threshold)) && Number(current.threshold) >= 0
-        ? Number(current.threshold)
-        : definition.threshold
-    };
-  });
 }
 
 function authorizeSignal(roleSet, user, action) {
@@ -208,7 +179,7 @@ function assertHumanVerifiedSignalIntegrity(data, signal) {
   if (!verificationAudit) throw new Error("public health signal verification audit is missing");
 }
 
-function evaluatePublicHealthSurveillanceSignalToState(data = {}, signalId, payload = {}, user = {}) {
+function evaluatePublicHealthSurveillanceSignalToState(data = {}, signalId, payload = {}, user = {}, options = {}) {
   const role = authorizeSignal(SIGNAL_EVALUATE_ROLES, user, "evaluate public health signal");
   const { signals, index, signal } = findSignal(data, signalId);
   const idempotencyKey = clean(payload.idempotencyKey);
@@ -220,7 +191,11 @@ function evaluatePublicHealthSurveillanceSignalToState(data = {}, signalId, payl
   if (payload.expectedVersion !== undefined && Number(payload.expectedVersion) !== Number(signal.version)) {
     throw new Error(`public health signal version conflict: expected ${payload.expectedVersion}, current ${signal.version}`);
   }
-  const rules = ruleRegistry(data);
+  const ruleGovernance = buildTrustedPublicHealthSurveillanceRuleRegistry(data, options);
+  if (ruleGovernance.findings.length) {
+    throw new Error(`public health rule registry integrity invalid: ${ruleGovernance.findings[0].code}`);
+  }
+  const rules = ruleGovernance.rules;
   const rule = rules.find((item) => item.status === "active" && item.signalType === signal.signalType);
   if (!rule) throw new Error("no active surveillance rule is available for the signal type");
   const alerts = Array.isArray(data.publicHealthSurveillanceAlerts)
@@ -327,10 +302,12 @@ function authorizeAlertAction(action, user) {
   return role;
 }
 
-function validatePublicHealthSurveillanceAlert(alert = {}, data = {}) {
+function validatePublicHealthSurveillanceAlert(alert = {}, data = {}, options = {}) {
   const findings = [];
-  const rules = ruleRegistry(data);
+  const ruleGovernance = buildTrustedPublicHealthSurveillanceRuleRegistry(data, options);
+  const rules = ruleGovernance.ruleVersions;
   const foundation = buildPublicHealthDataFoundation({ data });
+  if (ruleGovernance.findings.length) findings.push("alert-rule-governance-invalid");
   const rule = rules.find((item) => item.id === clean(alert.ruleId) && item.version === Number(alert.ruleVersion));
   if (!rule || clean(alert.ruleDigest) !== sha256(stableStringify(rule))) findings.push("alert-rule-binding-invalid");
   const signals = Array.isArray(data.publicHealthSurveillanceSignals) ? data.publicHealthSurveillanceSignals : [];
@@ -371,9 +348,9 @@ function validatePublicHealthSurveillanceAlert(alert = {}, data = {}) {
   return [...new Set(findings)];
 }
 
-function applyAlertAction(alert, payload, user, data) {
+function applyAlertAction(alert, payload, user, data, options = {}) {
   const next = clone(alert);
-  const integrityFindings = validatePublicHealthSurveillanceAlert(next, data);
+  const integrityFindings = validatePublicHealthSurveillanceAlert(next, data, options);
   if (integrityFindings.length) {
     throw new Error(`public health alert integrity invalid: ${integrityFindings[0]}`);
   }
@@ -505,13 +482,13 @@ function applyAlertAction(alert, payload, user, data) {
   return { alert: next, history, idempotent: false, riskAssessment };
 }
 
-function applyPublicHealthSurveillanceAlertActionToState(data = {}, alertId, payload = {}, user = {}) {
+function applyPublicHealthSurveillanceAlertActionToState(data = {}, alertId, payload = {}, user = {}, options = {}) {
   const alerts = Array.isArray(data.publicHealthSurveillanceAlerts)
     ? clone(data.publicHealthSurveillanceAlerts)
     : [];
   const index = alerts.findIndex((item) => clean(item.id) === clean(alertId));
   if (index < 0) throw new Error(`unknown public health surveillance alert: ${clean(alertId) || "missing"}`);
-  const result = applyAlertAction(alerts[index], payload, user, data);
+  const result = applyAlertAction(alerts[index], payload, user, data, options);
   alerts[index] = result.alert;
   let nextData = { ...data, publicHealthSurveillanceAlerts: alerts };
   if (result.riskAssessment) {
@@ -552,13 +529,20 @@ function applyPublicHealthSurveillanceAlertActionToState(data = {}, alertId, pay
     riskAssessment: clone(result.riskAssessment),
     createdCollaborationTasks: clone(createdCollaborationTasks),
     nextData,
-    surveillance: buildPublicHealthSurveillanceCenter({ data: nextData }),
+    surveillance: buildPublicHealthSurveillanceCenter({
+      data: nextData,
+      ruleVerificationSecret: options.verificationSecret
+    }),
     productionReady: false
   };
 }
 
-function buildPublicHealthSurveillanceCenter({ data = {} } = {}) {
-  const rules = ruleRegistry(data);
+function buildPublicHealthSurveillanceCenter({ data = {}, ruleVerificationSecret = "" } = {}) {
+  const ruleGovernance = buildPublicHealthSurveillanceRuleGovernance({
+    data,
+    verificationSecret: ruleVerificationSecret
+  });
+  const rules = ruleGovernance.rules;
   const signals = Array.isArray(data.publicHealthSurveillanceSignals)
     ? clone(data.publicHealthSurveillanceSignals)
     : [];
@@ -570,14 +554,18 @@ function buildPublicHealthSurveillanceCenter({ data = {} } = {}) {
     : [];
   const dataFoundation = buildPublicHealthDataFoundation({ data });
   const collaboration = buildPublicHealthMedicalPreventionBoard({ data, alerts });
-  const alertIntegrityFindings = alerts.flatMap((alert) => validatePublicHealthSurveillanceAlert(alert, data)
+  const alertIntegrityFindings = alerts.flatMap((alert) => validatePublicHealthSurveillanceAlert(alert, data, {
+    verificationSecret: ruleVerificationSecret
+  })
     .map((code) => ({ alertId: clean(alert.id), code })));
   const openAlerts = alerts.filter((item) => item.status !== "closed");
   return {
-    ok: dataFoundation.ok && collaboration.ok && alertIntegrityFindings.length === 0,
-    functionalState: alertIntegrityFindings.length
-      ? "multi-source-surveillance-integrity-review-required"
-      : "multi-source-surveillance-warning-workflow-runnable",
+    ok: dataFoundation.ok && collaboration.ok && ruleGovernance.ok && alertIntegrityFindings.length === 0,
+    functionalState: !ruleGovernance.ok
+      ? "multi-source-surveillance-rule-governance-review-required"
+      : alertIntegrityFindings.length
+        ? "multi-source-surveillance-integrity-review-required"
+        : "multi-source-surveillance-warning-workflow-runnable",
     formalGoLiveState: "blocked-until-production-source-interfaces-official-receipts-and-site-evidence-verified",
     summary: {
       rules: rules.length,
@@ -591,7 +579,9 @@ function buildPublicHealthSurveillanceCenter({ data = {} } = {}) {
       humanRiskAssessments: assessments.filter((item) => item.humanDecision === true).length,
       collaborationTasks: collaboration.summary.tasks,
       closedCollaborationTasks: collaboration.summary.closedTasks,
-      alertIntegrityFindings: alertIntegrityFindings.length
+      alertIntegrityFindings: alertIntegrityFindings.length,
+      trustedRuleActivations: ruleGovernance.summary.trustedActivations,
+      ruleGovernanceFindings: ruleGovernance.summary.findings
     },
     rules: rules.map((item) => ({
       id: item.id,
@@ -617,6 +607,7 @@ function buildPublicHealthSurveillanceCenter({ data = {} } = {}) {
     })),
     dataFoundation,
     collaboration,
+    ruleGovernance,
     alertIntegrityFindings,
     productionReady: false,
     blockers: [

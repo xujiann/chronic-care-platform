@@ -14,10 +14,10 @@ test("final readiness accepts every planned T08 functional increment", () => {
   const report = buildPublicHealthFinalReadiness();
   assert.equal(report.ok, true);
   assert.equal(report.functionalState, "t08-public-health-planned-functions-complete");
-  assert.equal(report.summary.checks, 71);
-  assert.equal(report.summary.passed, 71);
-  assert.equal(report.summary.t08FunctionalChecks, 53);
-  assert.equal(report.summary.t08FunctionalPassed, 53);
+  assert.equal(report.summary.checks, 73);
+  assert.equal(report.summary.passed, 73);
+  assert.equal(report.summary.t08FunctionalChecks, 55);
+  assert.equal(report.summary.t08FunctionalPassed, 55);
   assert.equal(report.summary.t00BoundaryChecks, 18);
   assert.equal(report.summary.t00BoundaryPassed, 18);
   assert.equal(report.summary.lanes, 8);
@@ -30,6 +30,10 @@ test("final readiness accepts every planned T08 functional increment", () => {
   assert.equal(report.summary.modernizationSources, 8);
   assert.equal(report.summary.modernizationCatalogEntries, 7);
   assert.equal(report.summary.modernizationRules, 8);
+  assert.equal(report.summary.modernizationRuleVersions, 9);
+  assert.equal(report.summary.modernizationTrustedRuleActivations, 1);
+  assert.equal(report.summary.modernizationFreshSources, 1);
+  assert.equal(report.summary.modernizationNoDataSources, 7);
   assert.equal(report.summary.modernizationClosedAlerts, 1);
   assert.equal(report.summary.modernizationClosedCollaborationTasks, 2);
   assert.equal(report.summary.persistedOutboxDispatches, 1);
@@ -92,6 +96,8 @@ test("final readiness renders and writes machine and human reports", () => {
   assert.match(fs.readFileSync(markdown, "utf8"), /T08 functional checks: 53\/53/);
   assert.match(fs.readFileSync(markdown, "utf8"), /T00 public boundary checks: 18\/18/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Modernization data sources: 8\/8/);
+  assert.match(fs.readFileSync(markdown, "utf8"), /Modernization trusted rule activations: 1/);
+  assert.match(fs.readFileSync(markdown, "utf8"), /Modernization fresh\/no-data sources: 1\/7/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Modernization closed collaboration tasks: 2\/2/);
   assert.match(renderMarkdown(report), /Remaining production integration/);
 });
