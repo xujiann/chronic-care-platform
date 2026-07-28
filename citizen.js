@@ -2987,14 +2987,22 @@ function renderCitizenRecordsNextStage(resident, diseases = [], records = [], ca
   </div>`).join("") + `<small>${escapeHtml(workspace.family.boundary)}</small><footer><button type="button" class="small-button" data-v3-action="manage-family-authorization">管理家庭授权</button></footer>`;
 
   const carePlanTarget = document.querySelector("#citizen-care-plan-v3");
-  if (carePlanTarget) carePlanTarget.innerHTML = workspace.carePlan.tasks.slice(0, 6).map((item) => {
-    const intent = api.buildCareTaskActionIntent(item);
-    return `<div class="citizen-care-row ${["逾期", "紧急"].includes(item.priority) ? "warning" : ""}">
-      <div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.type)}</span><em>${escapeHtml(item.priority)}</em></div>
-      <p>${escapeHtml(item.action)}${item.dueAt ? ` · ${escapeHtml(item.dueAt)}` : ""}</p>
-      <footer><button type="button" class="small-button" data-v3-care-task="${escapeHtml(intent.taskId)}" data-v3-care-task-type="${escapeHtml(intent.type)}">${escapeHtml(intent.buttonLabel)}</button></footer>
-    </div>`;
-  }).join("") + `<small>${escapeHtml(workspace.carePlan.boundary)}</small>` || citizenCareEmpty("当前没有需要处理的主动健康任务。");
+  if (carePlanTarget) {
+    const taskRows = workspace.carePlan.tasks.slice(0, 6).map((item) => {
+      const intent = api.buildCareTaskActionIntent(item);
+      return `<div class="citizen-care-row ${["逾期", "今日", "紧急"].includes(item.priority) ? "warning" : ""}">
+        <div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.type)}</span><em>${escapeHtml(item.priority)}</em></div>
+        <p>${escapeHtml(item.action)} · ${escapeHtml(item.dueLabel)}${item.dueAt ? `（${escapeHtml(item.dueAt)}）` : ""}</p>
+        <footer><button type="button" class="small-button" data-v3-care-task="${escapeHtml(intent.taskId)}" data-v3-care-task-type="${escapeHtml(intent.type)}">${escapeHtml(intent.buttonLabel)}</button></footer>
+      </div>`;
+    }).join("");
+    carePlanTarget.innerHTML = workspace.carePlan.tasks.length
+      ? `<div class="citizen-care-row">
+          <div><strong>${workspace.carePlan.tasks.length} 项主动任务</strong><span>逾期 ${workspace.carePlan.overdueCount} 项</span><em>今日 ${workspace.carePlan.todayCount} 项</em></div>
+          <p>未来 7 天 ${workspace.carePlan.nextSevenDaysCount} 项需要处理</p>
+        </div>${taskRows}<small>${escapeHtml(workspace.carePlan.boundary)}</small>`
+      : citizenCareEmpty("当前没有需要处理的主动健康任务。");
+  }
 
   const explanationTarget = document.querySelector("#citizen-report-explain-v3");
   if (explanationTarget) explanationTarget.innerHTML = workspace.explanations.reports.slice(0, 4).map((item) => `<div class="citizen-care-row ${["critical", "abnormal"].includes(item.severity) ? "warning" : ""}">

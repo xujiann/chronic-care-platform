@@ -242,3 +242,35 @@ test("主动健康任务标识与类型不匹配或未知时默认拒绝", () =>
   assert.throws(() => api.buildCareTaskActionIntent({ id: "authorization:", type: "授权" }), /无效/);
   assert.throws(() => api.buildCareTaskActionIntent({ id: "report:r1", type: "报告" }), /无效/);
 });
+
+test("主动任务按东八区自然日判断今日到期而不受小时差影响", () => {
+  const afterMidnightInChina = new Date("2026-07-27T16:30:00.000Z");
+  assert.deepEqual(api.taskDueState("2026-07-28", afterMidnightInChina), {
+    dueAt: "2026-07-28",
+    daysRemaining: 0,
+    priority: "今日",
+    dueLabel: "今日到期"
+  });
+  assert.equal(api.taskDueState("2026-07-27", afterMidnightInChina).dueLabel, "已逾期 1 天");
+  assert.equal(api.taskDueState("2026-07-29", afterMidnightInChina).dueLabel, "1 天后到期");
+});
+
+test("主动健康计划汇总逾期今日和未来七天且授权提醒严格按自然日窗口", () => {
+  const plan = api.buildProactiveCarePlan({
+    followups: [
+      { id: "overdue", diseaseType: "高血压", plannedAt: "2026-07-27", status: "待随访" },
+      { id: "today", diseaseType: "糖尿病", plannedAt: "2026-07-28", status: "待随访" },
+      { id: "soon", diseaseType: "冠心病", plannedAt: "2026-08-04", status: "待随访" }
+    ],
+    authorizations: [
+      activeAuthorization({ id: "day-30", meta: { expiresAt: "2026-08-27T23:59:59.999Z" } }),
+      activeAuthorization({ id: "day-31", meta: { expiresAt: "2026-08-28T23:59:59.999Z" } })
+    ],
+    now: new Date("2026-07-27T16:30:00.000Z")
+  });
+  assert.equal(plan.overdueCount, 1);
+  assert.equal(plan.todayCount, 1);
+  assert.equal(plan.nextSevenDaysCount, 1);
+  assert.ok(plan.tasks.some((item) => item.id === "authorization:day-30"));
+  assert.equal(plan.tasks.some((item) => item.id === "authorization:day-31"), false);
+});

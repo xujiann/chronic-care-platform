@@ -416,6 +416,9 @@ test("resident reviews all eight next-stage health record capabilities", async (
   await expect(page.locator("#citizen-governance-v3")).toContainText("原始记录");
   await expect(page.locator("#citizen-family-v3")).toContainText("本人访问");
   await expect(page.locator("#citizen-care-plan-v3")).toContainText("不自动生成诊断、处方或治疗决定");
+  await expect(page.locator("#citizen-care-plan-v3")).toContainText("项主动任务");
+  await expect(page.locator("#citizen-care-plan-v3")).toContainText("未来 7 天");
+  await expect(page.locator("#citizen-care-plan-v3")).not.toContainText("undefined");
   await expect(page.locator("#citizen-report-explain-v3")).toContainText("不替代医生解释");
   await expect(page.locator("#citizen-medication-safety-v3")).toContainText("不得据此自行停药");
   await expect(page.locator("#citizen-emergency-pack-v3")).toContainText("待补齐紧急授权或联系人");

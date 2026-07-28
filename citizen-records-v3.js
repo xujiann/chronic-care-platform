@@ -67,6 +67,32 @@
     return Math.floor((to.getTime() - from.getTime()) / 86400000);
   }
 
+  function taskDateOnly(value) {
+    const raw = cleanText(value, 80);
+    const explicitDate = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (explicitDate) return explicitDate[1];
+    const date = toDate(value);
+    if (!date) return "";
+    const parts = Object.fromEntries(new Intl.DateTimeFormat("en", {
+      timeZone: "Asia/Shanghai",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(date).filter((item) => item.type !== "literal").map((item) => [item.type, item.value]));
+    return `${parts.year}-${parts.month}-${parts.day}`;
+  }
+
+  function calendarDayDistance(from, to) {
+    const fromDate = taskDateOnly(from);
+    const toDateValue = taskDateOnly(to);
+    if (!fromDate || !toDateValue) return Number.POSITIVE_INFINITY;
+    const dayNumber = (value) => {
+      const [year, month, day] = value.split("-").map(Number);
+      return Date.UTC(year, month - 1, day) / 86400000;
+    };
+    return dayNumber(toDateValue) - dayNumber(fromDate);
+  }
+
   function unique(values) {
     return [...new Set(values.filter(Boolean))];
   }
@@ -221,14 +247,19 @@
     };
   }
 
-  function taskPriority(dueAt, now) {
-    const due = toDate(dueAt);
-    if (!due) return "普通";
-    const days = daysBetween(now, due);
-    if (days < 0) return "逾期";
-    if (days <= 3) return "紧急";
-    if (days <= 14) return "近期";
-    return "计划";
+  function taskDueState(dueAt, now) {
+    const dueDate = taskDateOnly(dueAt);
+    const daysRemaining = calendarDayDistance(now, dueAt);
+    if (!dueDate || !Number.isFinite(daysRemaining)) {
+      return { dueAt: "", daysRemaining: null, priority: "普通", dueLabel: "日期待核验" };
+    }
+    if (daysRemaining < 0) {
+      return { dueAt: dueDate, daysRemaining, priority: "逾期", dueLabel: `已逾期 ${Math.abs(daysRemaining)} 天` };
+    }
+    if (daysRemaining === 0) return { dueAt: dueDate, daysRemaining, priority: "今日", dueLabel: "今日到期" };
+    if (daysRemaining <= 3) return { dueAt: dueDate, daysRemaining, priority: "紧急", dueLabel: `${daysRemaining} 天后到期` };
+    if (daysRemaining <= 14) return { dueAt: dueDate, daysRemaining, priority: "近期", dueLabel: `${daysRemaining} 天后到期` };
+    return { dueAt: dueDate, daysRemaining, priority: "计划", dueLabel: `${daysRemaining} 天后到期` };
   }
 
   function buildProactiveCarePlan(input = {}) {
@@ -240,8 +271,7 @@
         id: `followup:${cleanText(item.id, 120)}`,
         type: "随访",
         title: `${cleanText(item.diseaseType || item.title || "慢病")}随访`,
-        dueAt: dateOnly(item.plannedAt || item.dueAt),
-        priority: taskPriority(item.plannedAt || item.dueAt, now),
+        ...taskDueState(item.plannedAt || item.dueAt, now),
         action: "完成自测并联系家庭医生"
       });
     }
@@ -251,8 +281,7 @@
         id: `pickup:${cleanText(item.id, 120)}`,
         type: "取药",
         title: `${cleanText(item.medication || "长期用药")}取药`,
-        dueAt: dateOnly(item.nextPickup || item.dueAt),
-        priority: taskPriority(item.nextPickup || item.dueAt, now),
+        ...taskDueState(item.nextPickup || item.dueAt, now),
         action: "核对处方状态并按预约取药"
       });
     }
@@ -264,30 +293,32 @@
         id: `revisit:${cleanText(record.id, 120)}`,
         type: "复诊",
         title: followupPlan,
-        dueAt: dateOnly(dueAt),
-        priority: taskPriority(dueAt, now),
+        ...taskDueState(dueAt, now),
         action: "查看报告并预约复诊"
       });
     }
     for (const authorization of Array.isArray(input.authorizations) ? input.authorizations : []) {
       const state = CitizenRecordsV1?.authorizationState(authorization, now);
       const expiresAt = authorization.meta?.expiresAt;
-      const remaining = daysBetween(now, toDate(expiresAt));
+      const remaining = calendarDayDistance(now, expiresAt);
       if (!state?.active || remaining > 30) continue;
       tasks.push({
         id: `authorization:${cleanText(authorization.id, 120)}`,
         type: "授权",
         title: `${cleanText(authorization.name || "健康资料授权")}即将到期`,
-        dueAt: dateOnly(expiresAt),
-        priority: taskPriority(expiresAt, now),
+        ...taskDueState(expiresAt, now),
         action: "核对受权人和用途后决定是否续授权"
       });
     }
-    const order = { 逾期: 0, 紧急: 1, 近期: 2, 计划: 3, 普通: 4 };
+    const order = { 逾期: 0, 今日: 1, 紧急: 2, 近期: 3, 计划: 4, 普通: 5 };
     tasks.sort((a, b) => (order[a.priority] ?? 9) - (order[b.priority] ?? 9) || a.dueAt.localeCompare(b.dueAt));
+    const uniqueTasks = [...new Map(tasks.map((item) => [item.id, item])).values()];
     return {
-      tasks: [...new Map(tasks.map((item) => [item.id, item])).values()],
-      urgentCount: tasks.filter((item) => ["逾期", "紧急"].includes(item.priority)).length,
+      tasks: uniqueTasks,
+      urgentCount: uniqueTasks.filter((item) => ["逾期", "今日", "紧急"].includes(item.priority)).length,
+      overdueCount: uniqueTasks.filter((item) => item.priority === "逾期").length,
+      todayCount: uniqueTasks.filter((item) => item.priority === "今日").length,
+      nextSevenDaysCount: uniqueTasks.filter((item) => item.daysRemaining >= 1 && item.daysRemaining <= 7).length,
       boundary: "健康任务用于提醒和服务衔接，不自动生成诊断、处方或治疗决定。"
     };
   }
@@ -529,6 +560,8 @@
     governCrossInstitutionRecords,
     buildFamilyDelegationCenter,
     buildProactiveCarePlan,
+    taskDueState,
+    calendarDayDistance,
     explainResidentReports,
     assessMedicationSafety,
     buildEmergencyHealthPack,

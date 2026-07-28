@@ -2770,7 +2770,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
   assert.match(citizenHtml, /citizen-records-v1\.js\?v=20260724auth3/);
   assert.match(citizenHtml, /citizen-records-v2\.js\?v=20260725care16/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260728next3/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260728next4/);
   assert.match(citizenHtml, /mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-title/);
@@ -3126,7 +3126,7 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   assert.match(citizenJs, /setEscortAppointmentAvailability/);
   assert.match(citizenJs, /escortProviderReady/);
   assert.match(citizenJs, /暂无可预约服务主体/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260728next3/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260728next4/);
   assert.match(citizenJs, /\/escort-services\/orders/);
   assert.match(citizenJs, /getEscortRegistrationOptions/);
   assert.match(citizenJs, /applyLinkedRegistrationToEscortForm/);
@@ -3343,7 +3343,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenHtml, /service-mobile-pagebar/);
   assert.match(citizenHtml, /citizen-action-dock/);
   assert.match(citizenHtml, /citizen\.css\?v=20260727next2/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260728next3/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260728next4/);
   assert.match(citizenHtml, /当前服务常用操作/);
   assert.match(citizenHtml, /service-health-record/);
   assert.match(citizenHtml, /service-emr/);
@@ -3630,7 +3630,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /longterm-care-form/);
   assert.match(citizenCss, /registration-form/);
   assert.match(citizenHtml, /registration-summary/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260728next3/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260728next4/);
   assert.match(citizenJs, /registration-summary/);
   assert.match(citizenJs, /hisOrders/);
   assert.match(citizenJs, /insuranceReady/);
@@ -4704,7 +4704,7 @@ test("citizen record V2 exposes twelve governed care capabilities", () => {
   assert.match(html, /vault-search-status/);
   assert.match(html, /auth-scope-preview/);
   assert.match(html, /citizen-records-v2\.js\?v=20260725care16/);
-  assert.match(html, /citizen\.js\?v=20260728next3/);
+  assert.match(html, /citizen\.js\?v=20260728next4/);
   assert.match(html, /citizen-ui-zh\.js\?v=20260725zh4/);
   assert.match(html, /citizen\.css\?v=20260727next2/);
   assert.match(css, /\[data-internal-launch-panel\]\[hidden\]\s*\{\s*display:\s*none\s*!important;/);
@@ -4719,7 +4719,7 @@ test("citizen record V3 exposes eight governed next-stage capabilities", () => {
   const documentation = read("docs/citizen-records-first-increment.md");
 
   assert.match(html, /居民健康档案八项增强服务/);
-  assert.match(html, /citizen-records-v3\.js\?v=20260728next4/);
+  assert.match(html, /citizen-records-v3\.js\?v=20260728next5/);
   for (const id of [
     "citizen-integration-v3",
     "citizen-governance-v3",
@@ -4747,5 +4747,7 @@ test("citizen record V3 exposes eight governed next-stage capabilities", () => {
   assert.match(ui, /data-v3-action="prepare-emergency-authorization"/);
   assert.match(ui, /data-v3-care-task=/);
   assert.match(ui, /renderCitizenRecordsNextStage/);
-  assert.match(documentation, /第二十四增量/);
+  assert.match(v3, /function taskDueState/);
+  assert.match(v3, /function calendarDayDistance/);
+  assert.match(documentation, /第二十五增量/);
 });
