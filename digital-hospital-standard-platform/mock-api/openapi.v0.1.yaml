@@ -1,9 +1,9 @@
 openapi: 3.0.3
 info:
-  title: 数智医院新标准平台 v0.17 接口
-  version: 0.17.0
+  title: 数智医院新标准平台 v0.18 接口
+  version: 0.18.0
   description: >
-    面向数智医院新标准平台的接口契约，覆盖评价任务、试点运营、试点协同、接入联调、Worker租约、重试死信、接入执行与安全控制、试点评估、评价助手、推广准备、运营监控、医院申报、证据材料、数据校验、省级审核、专家复核、评分规则、评分结果、整改闭环、统计分析、国家抽查、规则沙箱、智能核验、消息提醒、批量导入、系统权限和运行管理。
+    面向数智医院新标准平台的接口契约，覆盖评价任务、试点运营、试点协同、接入联调、持久化任务服务、Worker租约、托管密钥、签名回调、重试死信、投产证据、Go/No-Go、试点评估、评价助手、推广准备、运营监控、医院申报、分级审核和运行管理。
 servers:
   - url: https://example.local
     description: 示例服务地址，正式环境由部署方案确定
@@ -41,7 +41,7 @@ tags:
   - name: PilotIntegration
     description: 医院接入申请、源系统连接器、凭据、数据映射、认证测试、问题处置和上线准入
   - name: IntegrationExecution
-    description: 执行环境、保险库引用、Worker租约、异步任务、重试死信、签名回执、重放隔离和生产切换
+    description: 持久化执行仓库、保险库引用、Worker mTLS身份、租约、重试死信、签名回执、投产证据和Go/No-Go
   - name: PilotAssessment
     description: 试点成效、问题复盘、优化计划、推广准备和评估报告
   - name: EvaluationAssistant
@@ -695,6 +695,272 @@ paths:
       summary: 批准试点医院上线
       parameters:
         - name: hospitalCode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/digital-hospital/execution/runtime:
+    get:
+      tags: [IntegrationExecution]
+      summary: 获取持久化任务运行中心
+      description: 需要卫生管理角色；返回SQLite事务仓库、队列、Worker、死信、回执和切换证据的脱敏状态。
+      responses:
+        "200":
+          description: 生产任务运行中心
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductionExecutionRuntime"
+  /api/digital-hospital/execution/security:
+    get:
+      tags: [IntegrationExecution]
+      summary: 获取外部安全适配器状态
+      responses:
+        "200":
+          description: 托管密钥、回调mTLS和Worker服务身份配置状态
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductionExecutionSecurity"
+  /api/digital-hospital/execution/workers:
+    post:
+      tags: [IntegrationExecution]
+      summary: 注册或恢复生产Worker
+      description: 生产环境仅接受受信mTLS服务身份；开发环境允许卫生管理角色兼容调用。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, capabilities]
+              properties:
+                id:
+                  type: string
+                node:
+                  type: string
+                pool:
+                  type: string
+                capabilities:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "201":
+          $ref: "#/components/responses/Ok"
+  /api/digital-hospital/execution/vault-references:
+    post:
+      tags: [IntegrationExecution]
+      summary: 登记托管保险库引用
+      description: 原始vault引用仅在请求事务内用于生成不可逆指纹，不进入运行状态、日志或导出包。
+      responses:
+        "201":
+          $ref: "#/components/responses/Ok"
+  /api/digital-hospital/execution/jobs:
+    post:
+      tags: [IntegrationExecution]
+      summary: 持久化创建幂等执行任务
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [connectorId, environmentId, jobType, payload]
+              properties:
+                connectorId:
+                  type: string
+                environmentId:
+                  type: string
+                jobType:
+                  type: string
+                payload:
+                  type: object
+                  writeOnly: true
+                  additionalProperties: true
+                maxAttempts:
+                  type: integer
+                  minimum: 1
+      responses:
+        "201":
+          $ref: "#/components/responses/Ok"
+  /api/digital-hospital/execution/jobs/{jobId}/actions:
+    post:
+      tags: [IntegrationExecution]
+      summary: 原子领取、心跳、完成或失败执行任务
+      description: 生产环境仅接受受信Worker mTLS服务身份；原始租约令牌只在领取响应中返回一次。
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action, workerId]
+              properties:
+                action:
+                  type: string
+                  enum: [claim, heartbeat, complete-attempt, fail]
+                workerId:
+                  type: string
+                leaseToken:
+                  type: string
+                  writeOnly: true
+                leaseSeconds:
+                  type: integer
+                progress:
+                  type: integer
+                errorCode:
+                  type: string
+                failureClass:
+                  type: string
+                  enum: [transient, permanent, worker-lost]
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/digital-hospital/execution/leases/recover-expired:
+    post:
+      tags: [IntegrationExecution]
+      summary: 原子回收过期租约
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/digital-hospital/execution/dead-letters/{deadLetterId}/actions:
+    post:
+      tags: [IntegrationExecution]
+      summary: 独立复核并重放死信
+      parameters:
+        - name: deadLetterId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/digital-hospital/execution/quarantines/{quarantineId}/actions:
+    post:
+      tags: [IntegrationExecution]
+      summary: 安全复核并解除连接器隔离
+      parameters:
+        - name: quarantineId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/digital-hospital/execution/callbacks:
+    post:
+      tags: [IntegrationExecution]
+      summary: 验证外部签名回调
+      description: 无用户会话；使用托管密钥HMAC、服务端时间窗、nonce账本、载荷摘要和mTLS客户端证书验证。
+      parameters:
+        - name: X-Execution-Timestamp
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-Execution-Nonce
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-Execution-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignedExecutionCallback"
+      responses:
+        "202":
+          $ref: "#/components/responses/Ok"
+        "401":
+          description: 签名、时间窗或mTLS验证失败
+  /api/digital-hospital/execution/cutover-windows/{windowId}/actions:
+    post:
+      tags: [IntegrationExecution]
+      summary: 评估基础生产切换窗口
+      parameters:
+        - name: windowId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/digital-hospital/execution/cutover-evidence-packs:
+    post:
+      tags: [IntegrationExecution]
+      summary: 创建试点生产切换证据包
+      responses:
+        "201":
+          $ref: "#/components/responses/Ok"
+  /api/digital-hospital/execution/cutover-evidence-packs/{packId}/actions:
+    post:
+      tags: [IntegrationExecution]
+      summary: 登记证据、签批、评估Go/No-Go、执行切换或回滚
+      parameters:
+        - name: packId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [record-evidence, approve, evaluate, start, complete, rollback]
+                artifactDigest:
+                  type: string
+                  pattern: "^[a-f0-9]{64}$"
+                role:
+                  type: string
+                decision:
+                  type: string
+                reason:
+                  type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/digital-hospital/execution/cutover-evidence-packs/{packId}/evidence/{evidenceId}/actions:
+    post:
+      tags: [IntegrationExecution]
+      summary: 由独立角色核验切换证据
+      parameters:
+        - name: packId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: evidenceId
           in: path
           required: true
           schema:
@@ -3119,7 +3385,7 @@ components:
           type: string
         status:
           type: string
-          enum: [排队中, 执行中, 等待重试, 等待回执, 成功, 阻断, 死信]
+          enum: [排队中, 执行中, 等待重试, 等待回执, 成功, 阻断, 死信, queued, running, retry-scheduled, awaiting-receipt, succeeded, blocked, dead-lettered]
         attempts:
           type: integer
           minimum: 0
@@ -3183,7 +3449,7 @@ components:
             type: string
         status:
           type: string
-          enum: [就绪, 忙碌, 失联]
+          enum: [就绪, 忙碌, 失联, ready, busy, stale]
         activeJobId:
           type: string
         registeredAt:
@@ -3229,7 +3495,7 @@ components:
           minimum: 1
         status:
           type: string
-          enum: [待复核, 已重放]
+          enum: [待复核, 已重放, open, redriven]
         createdAt:
           type: string
         reviewedBy:
@@ -3276,13 +3542,13 @@ components:
           type: string
         signatureStatus:
           type: string
-          enum: [已验证, 无效]
+          enum: [已验证, 无效, valid, invalid]
         timestampStatus:
           type: string
-          enum: [已验证, 过期]
+          enum: [已验证, 过期, valid, expired]
         nonceStatus:
           type: string
-          enum: [已验证, 重放]
+          enum: [已验证, 重放, fresh, replayed]
         nonceHash:
           type: string
           description: nonce的不可逆摘要，不保留原始值。
@@ -3290,18 +3556,18 @@ components:
           type: string
         digestStatus:
           type: string
-          enum: [已验证, 不一致]
+          enum: [已验证, 不一致, matched, mismatched]
         status:
           type: string
-          enum: [已验证, 已阻断]
+          enum: [已验证, 已阻断, accepted, blocked]
         decision:
           type: string
-          enum: [接收, 拒绝]
+          enum: [接收, 拒绝, verified, replay-blocked, verification-failed]
         receivedAt:
           type: string
     IntegrationReplayEvent:
       type: object
-      required: [id, source, connectorId, nonceHash, firstSeenAt, lastSeenAt, hits, action, status]
+      required: [id, source, nonceHash, firstSeenAt, lastSeenAt, hits, action, status]
       properties:
         id:
           type: string
@@ -3322,10 +3588,10 @@ components:
           type: string
         status:
           type: string
-          enum: [待处置, 已处置]
+          enum: [待处置, 已处置, blocked]
     IntegrationQuarantine:
       type: object
-      required: [id, connectorId, reason, trigger, hits, status, owner, openedAt]
+      required: [id, connectorId, reason, hits, status, openedAt]
       properties:
         id:
           type: string
@@ -3340,7 +3606,7 @@ components:
           minimum: 1
         status:
           type: string
-          enum: [隔离中, 已解除]
+          enum: [隔离中, 已解除, active, released]
         owner:
           type: string
         openedAt:
@@ -3353,7 +3619,7 @@ components:
           type: string
     IntegrationCutoverWindow:
       type: object
-      required: [id, hospitalCode, hospitalName, environmentId, connectorIds, plannedAt, windowMinutes, rollbackPlan, checks, status]
+      required: [id, environmentId, connectorIds, plannedAt, rollbackPlan, checks, status]
       properties:
         id:
           type: string
@@ -3384,7 +3650,7 @@ components:
             type: boolean
         status:
           type: string
-          enum: [待评估, 阻断, 可切换, 切换中, 已切换, 已回滚]
+          enum: [待评估, 阻断, 可切换, 切换中, 已切换, 已回滚, blocked, ready]
         evaluatedAt:
           type: string
         approvedBy:
@@ -3395,9 +3661,201 @@ components:
           type: string
         rollbackAt:
           type: string
+    SignedExecutionCallback:
+      type: object
+      additionalProperties: false
+      required: [jobId, connectorId, source, environmentId, eventType, payloadDigest]
+      properties:
+        jobId:
+          type: string
+        connectorId:
+          type: string
+        source:
+          type: string
+        environmentId:
+          type: string
+        eventType:
+          type: string
+        payloadDigest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+      description: 签名、nonce与客户端证书通过请求头和TLS通道提供，不进入回调业务体或持久化状态。
+    ProductionExecutionSecurity:
+      type: object
+      required: [productionReady, callbackSigning, replayProtection, managedKey, mtls, persistenceBoundary, blockers]
+      properties:
+        productionReady:
+          type: boolean
+        callbackSigning:
+          type: string
+          enum: [HMAC-SHA256]
+        replayProtection:
+          type: string
+        managedKey:
+          type: object
+          additionalProperties: true
+        mtls:
+          type: object
+          additionalProperties: true
+        persistenceBoundary:
+          type: object
+          additionalProperties:
+            type: boolean
+        blockers:
+          type: array
+          items:
+            type: string
+    ProductionRuntimeControl:
+      type: object
+      required: [id, name, control, owner, evidence, status]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        control:
+          type: string
+        owner:
+          type: string
+        evidence:
+          type: string
+        status:
+          type: string
+          enum: [已实现, 待配置, 已配置]
+        verifiedAt:
+          type: string
+    CutoverEvidence:
+      type: object
+      required: [id, requirementId, name, ownerRole, siteRequired, status]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        requirementId:
+          type: string
+        name:
+          type: string
+        ownerRole:
+          type: string
+        siteRequired:
+          type: boolean
+        artifactName:
+          type: string
+        artifactDigest:
+          type: string
+        signatureDigest:
+          type: string
+        sourceSystem:
+          type: string
+        submittedBy:
+          type: string
+        verifiedBy:
+          type: string
+        verificationNote:
+          type: string
+        status:
+          type: string
+          enum: [待上传, 待复核, 已核验, rejected]
+        updatedAt:
+          type: string
+      not:
+        anyOf:
+          - required: [payload]
+          - required: [rawPayload]
+          - required: [content]
+          - required: [signature]
+          - required: [nonce]
+          - required: [secret]
+    ProductionCutoverApproval:
+      type: object
+      required: [id, role, decision]
+      properties:
+        id:
+          type: string
+        role:
+          type: string
+          enum: [接口责任人, 安全责任人, 运行责任人, 医院责任人]
+        approver:
+          type: string
+        decision:
+          type: string
+          enum: [待签批, 同意, 拒绝]
+        note:
+          type: string
+        approvalDigest:
+          type: string
+        approvedAt:
+          type: string
+    ProductionGoNoGo:
+      type: object
+      required: [decision, status, checks, blockers, evaluatedAt, evaluatedBy]
+      properties:
+        decision:
+          type: string
+          enum: [GO, NO-GO]
+        status:
+          type: string
+        checks:
+          type: object
+          additionalProperties:
+            type: boolean
+        blockers:
+          type: array
+          items:
+            type: string
+        evaluatedAt:
+          type: string
+        evaluatedBy:
+          type: string
+    ProductionExecutionRuntime:
+      type: object
+      required: [ok, repository, summary, jobs, workers, deadLetters, receipts, quarantines, cutoverGovernance]
+      properties:
+        ok:
+          type: boolean
+        repository:
+          type: object
+          required: [storage, version, atomicClaims, durableLeases]
+          properties:
+            storage:
+              type: string
+              enum: [sqlite-wal, memory]
+            version:
+              type: integer
+            atomicClaims:
+              type: boolean
+            durableLeases:
+              type: boolean
+        summary:
+          type: object
+          additionalProperties:
+            type: integer
+        jobs:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntegrationExecutionJob"
+        workers:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntegrationExecutionWorker"
+        deadLetters:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntegrationDeadLetter"
+        receipts:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntegrationCallbackReceipt"
+        quarantines:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntegrationQuarantine"
+        cutoverGovernance:
+          type: object
+          additionalProperties: true
     ExecutionPackage:
       type: object
-      required: [meta, executionSummary, integrationEnvironments, credentialVaultEntries, integrationExecutionJobs, integrationExecutionWorkers, integrationDeadLetters, integrationExecutionEvents, integrationCallbackReceipts, integrationReplayEvents, integrationQuarantines, integrationCutoverWindows]
+      required: [meta, executionSummary, integrationEnvironments, credentialVaultEntries, integrationExecutionJobs, integrationExecutionWorkers, integrationDeadLetters, integrationExecutionEvents, integrationCallbackReceipts, integrationReplayEvents, integrationQuarantines, integrationCutoverWindows, productionRuntimeControls, cutoverEvidenceRequirements, productionCutoverApprovals, productionGoNoGo]
       properties:
         meta:
           $ref: "#/components/schemas/PackageMeta"
@@ -3444,6 +3902,20 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/IntegrationCutoverWindow"
+        productionRuntimeControls:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductionRuntimeControl"
+        cutoverEvidenceRequirements:
+          type: array
+          items:
+            $ref: "#/components/schemas/CutoverEvidence"
+        productionCutoverApprovals:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductionCutoverApproval"
+        productionGoNoGo:
+          $ref: "#/components/schemas/ProductionGoNoGo"
     AssessmentPackage:
       type: object
       required: [meta, assessmentSummary, pilotOutcomeMetrics, pilotHospitalOutcomes, pilotIssueThemes, pilotImprovementPlans, rolloutRegions, pilotAssessmentReports]

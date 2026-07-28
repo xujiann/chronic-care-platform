@@ -209,6 +209,32 @@ textarea {
   font-size: 12px;
 }
 
+.compact-metrics {
+  margin-bottom: 12px;
+}
+
+.callout {
+  display: grid;
+  grid-template-columns: minmax(140px, auto) minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-left: 4px solid var(--green);
+  background: var(--green-soft);
+  color: #244134;
+  font-size: 13px;
+}
+
+.callout.danger {
+  border-left-color: var(--red);
+  background: var(--red-soft);
+  color: #6f1d16;
+}
+
+.callout small {
+  color: var(--muted);
+}
+
 .notice {
   display: none;
   margin-bottom: 14px;
@@ -951,6 +977,10 @@ tbody tr:hover {
   .panel-header {
     flex-wrap: wrap;
     align-items: flex-start;
+  }
+
+  .callout {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .toolbar.inline {

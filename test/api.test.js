@@ -11,6 +11,7 @@ const ROOT = path.resolve(__dirname, "..");
 const { signHospitalRequest, stableStringify: stableHospitalStringify } = require("../hospital-connectors");
 const { signFinancialCallback, signFinancialRequest, stableStringify: stableFinancialStringify } = require("../financial-gateways");
 const { signAlertRequest, stableStringify: stableAlertStringify } = require("../observability-alerting");
+const { signExecutionCallback } = require("../digital-hospital-execution-security");
 const NursingEscortDomain = require("../nursing-escort-domain");
 
 async function waitForHealth(baseUrl) {
@@ -167,11 +168,72 @@ test("API authentication, scoping and governance regression suite", async (t) =>
   process.env.DATA_DIR = dataDir;
   process.env.STORAGE_ENGINE = "json";
   process.env.SMS_DELIVERY_CALLBACK_SECRET = "sms-callback-secret-with-at-least-32-characters";
+  process.env.DIGITAL_HOSPITAL_CALLBACK_SECRET = "coverage-digital-hospital-callback-secret-32-plus";
   delete process.env.CARE_CUTOVER_EVIDENCE_FILE;
   delete process.env.CARE_CUTOVER_EVIDENCE_SHA256;
   delete process.env.CARE_DEPENDENCY_EVIDENCE_FILE;
   delete process.env.CARE_DEPENDENCY_EVIDENCE_SHA256;
-  const { server, startServer, stopServer } = require(path.join(ROOT, "server.js"));
+  const {
+    configureDigitalHospitalExecutionRuntime,
+    digitalHospitalClientCertificate,
+    digitalHospitalWorkerFingerprints,
+    requireDigitalHospitalExecutionWorker,
+    server,
+    startServer,
+    stopServer
+  } = require(path.join(ROOT, "server.js"));
+  configureDigitalHospitalExecutionRuntime({ managedSecretLoader: null });
+  const previousNodeEnv = process.env.NODE_ENV;
+  try {
+    process.env.NODE_ENV = "production";
+    process.env.DIGITAL_HOSPITAL_TRUST_PROXY_MTLS = "true";
+    process.env.DIGITAL_HOSPITAL_WORKER_MTLS_FINGERPRINTS = "AA:BB:CC:DD";
+    const transportCertificate = digitalHospitalClientCertificate({
+      headers: {},
+      socket: {
+        authorized: true,
+        getPeerCertificate: () => ({ fingerprint256: "11:22:33:44" })
+      }
+    });
+    assert.deepEqual(transportCertificate, {
+      fingerprint: "11:22:33:44",
+      authorized: true,
+      source: "tls-transport"
+    });
+    assert.deepEqual(digitalHospitalWorkerFingerprints(), ["aabbccdd"]);
+    const workerActor = requireDigitalHospitalExecutionWorker({
+      headers: { "x-client-cert-fingerprint": "aa:bb:cc:dd" },
+      socket: {
+        authorized: false,
+        getPeerCertificate: () => ({})
+      }
+    }, null, "coverage-worker-identity");
+    assert.equal(workerActor.username, "execution-worker:aabbccdd");
+    assert.equal(workerActor.role, "system");
+    const rejectedResponse = { status: 0, body: "" };
+    const rejectedActor = requireDigitalHospitalExecutionWorker({
+      headers: {},
+      socket: {
+        authorized: false,
+        getPeerCertificate: () => ({})
+      }
+    }, {
+      writeHead(status) {
+        rejectedResponse.status = status;
+      },
+      end(body) {
+        rejectedResponse.body = body;
+      }
+    }, "coverage-worker-identity");
+    assert.equal(rejectedActor, null);
+    assert.equal(rejectedResponse.status, 401);
+    assert.equal(JSON.parse(rejectedResponse.body).code, "DIGITAL_HOSPITAL_WORKER_MTLS_REQUIRED");
+  } finally {
+    if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousNodeEnv;
+    delete process.env.DIGITAL_HOSPITAL_TRUST_PROXY_MTLS;
+    delete process.env.DIGITAL_HOSPITAL_WORKER_MTLS_FINGERPRINTS;
+  }
   startServer(0);
   await once(server, "listening");
   const { port } = server.address();
@@ -179,6 +241,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
 
   t.after(async () => {
     await stopServer();
+    delete process.env.DIGITAL_HOSPITAL_CALLBACK_SECRET;
     fs.rmSync(dataDir, { recursive: true, force: true });
   });
 
@@ -2784,6 +2847,525 @@ test("API authentication, scoping and governance regression suite", async (t) =>
   const commissionLogin = await login(baseUrl, "health");
   assert.equal(commissionLogin.response.status, 200);
   const commissionToken = commissionLogin.body.token;
+
+  await t.test("operates the durable digital hospital execution and cutover API", async () => {
+    const anonymousRuntime = await api(baseUrl, "/api/digital-hospital/execution/runtime");
+    assert.equal(anonymousRuntime.response.status, 401);
+    const anonymousSecurity = await api(baseUrl, "/api/digital-hospital/execution/security");
+    assert.equal(anonymousSecurity.response.status, 401);
+
+    const runtime = await api(baseUrl, "/api/digital-hospital/execution/runtime", authorized(commissionToken));
+    assert.equal(runtime.response.status, 200);
+    assert.equal(runtime.body.repository.storage, "sqlite-wal");
+    assert.equal(runtime.body.repository.atomicClaims, true);
+    const dataGovernance = await api(baseUrl, "/api/data-governance", authorized(commissionToken));
+    assert.equal(dataGovernance.response.status, 200);
+    assert.equal(dataGovernance.body.ok, true);
+
+    const security = await api(baseUrl, "/api/digital-hospital/execution/security", authorized(commissionToken));
+    assert.equal(security.response.status, 200);
+    assert.equal(security.body.security.productionReady, false);
+
+    const workerId = "WORKER-COVERAGE-001";
+    const worker = await api(baseUrl, "/api/digital-hospital/execution/workers", authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({
+        id: workerId,
+        node: "coverage-node",
+        pool: "coverage",
+        capabilities: ["coverage-probe"]
+      })
+    }));
+    assert.equal(worker.response.status, 201);
+
+    const rejectedWorker = await api(baseUrl, "/api/digital-hospital/execution/workers", authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({
+        id: "",
+        capabilities: []
+      })
+    }));
+    assert.equal(rejectedWorker.response.status, 400);
+
+    const vault = await api(baseUrl, "/api/digital-hospital/execution/vault-references", authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({
+        id: "VAULT-COVERAGE-001",
+        connectorId: "CONN-COVERAGE-001",
+        environmentId: "ENV-PILOT-UAT",
+        provider: "managed-vault",
+        vaultRef: "vault://coverage/connector-001",
+        keyVersion: 1,
+        rotationDueAt: "2026-12-31T00:00:00.000Z"
+      })
+    }));
+    assert.equal(vault.response.status, 201);
+    const rejectedVault = await api(baseUrl, "/api/digital-hospital/execution/vault-references", authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({
+        id: "VAULT-COVERAGE-REJECTED",
+        connectorId: "CONN-COVERAGE-REJECTED",
+        environmentId: "ENV-PILOT-UAT",
+        provider: "managed-vault",
+        vaultRef: "vault://coverage/rejected",
+        secret: "must-not-be-persisted"
+      })
+    }));
+    assert.equal(rejectedVault.response.status, 400);
+
+    const missingIdempotency = await api(baseUrl, "/api/digital-hospital/execution/jobs", authorized(commissionToken, {
+      method: "POST",
+      headers: { "Idempotency-Key": "" },
+      body: JSON.stringify({
+        connectorId: "CONN-COVERAGE-001",
+        environmentId: "ENV-PILOT-UAT",
+        jobType: "coverage-probe",
+        payload: { scenario: "missing-idempotency" }
+      })
+    }));
+    assert.equal(missingIdempotency.response.status, 400);
+    assert.equal(missingIdempotency.body.code, "IDEMPOTENCY_KEY_REQUIRED");
+    const rejectedJob = await api(baseUrl, "/api/digital-hospital/execution/jobs", authorized(commissionToken, {
+      method: "POST",
+      headers: { "Idempotency-Key": "coverage-rejected-job" },
+      body: JSON.stringify({
+        connectorId: "",
+        environmentId: "ENV-PILOT-UAT",
+        jobType: "",
+        payload: {}
+      })
+    }));
+    assert.equal(rejectedJob.response.status, 400);
+
+    const createJob = async (idempotencyKey, payload = {}, maxAttempts = 3) => api(
+      baseUrl,
+      "/api/digital-hospital/execution/jobs",
+      authorized(commissionToken, {
+        method: "POST",
+        headers: { "Idempotency-Key": idempotencyKey },
+        body: JSON.stringify({
+          connectorId: "CONN-COVERAGE-001",
+          environmentId: "ENV-PILOT-UAT",
+          jobType: "coverage-probe",
+          payload,
+          maxAttempts
+        })
+      })
+    );
+    const runJobAction = async (jobId, payload) => api(
+      baseUrl,
+      `/api/digital-hospital/execution/jobs/${encodeURIComponent(jobId)}/actions`,
+      authorized(commissionToken, {
+        method: "POST",
+        body: JSON.stringify(payload)
+      })
+    );
+
+    const enqueue = await createJob("coverage-success-001", { scenario: "success" });
+    assert.equal(enqueue.response.status, 201);
+    const successfulJob = enqueue.body.result.job;
+    const duplicate = await createJob("coverage-success-001", { scenario: "success" });
+    assert.equal(duplicate.response.status, 200);
+    assert.equal(duplicate.body.result.duplicate, true);
+
+    const invalidAction = await runJobAction(successfulJob.id, { action: "unsupported" });
+    assert.equal(invalidAction.response.status, 400);
+    assert.equal(invalidAction.body.code, "EXECUTION_JOB_ACTION_INVALID");
+
+    const claimed = await runJobAction(successfulJob.id, {
+      action: "claim",
+      workerId,
+      leaseSeconds: 60
+    });
+    assert.equal(claimed.response.status, 200);
+    const leaseToken = claimed.body.result.leaseToken;
+
+    const invalidHeartbeat = await runJobAction(successfulJob.id, {
+      action: "heartbeat",
+      workerId,
+      leaseToken: "invalid-lease-token",
+      leaseSeconds: 60,
+      progress: 40
+    });
+    assert.equal(invalidHeartbeat.response.status, 403);
+    const heartbeat = await runJobAction(successfulJob.id, {
+      action: "heartbeat",
+      workerId,
+      leaseToken,
+      leaseSeconds: 60,
+      progress: 55
+    });
+    assert.equal(heartbeat.response.status, 200);
+
+    const completed = await runJobAction(successfulJob.id, {
+      action: "complete-attempt",
+      workerId,
+      leaseToken
+    });
+    assert.equal(completed.response.status, 200);
+    assert.equal(completed.body.result.status, "awaiting-receipt");
+
+    const callbackTimestamp = String(Date.now());
+    const callbackNonce = "coverage-callback-success-001";
+    const callbackPayload = {
+      jobId: successfulJob.id,
+      connectorId: "CONN-COVERAGE-001",
+      source: "CONN-COVERAGE-001",
+      environmentId: "ENV-PILOT-UAT",
+      eventType: "integration-job.completed",
+      payloadDigest: successfulJob.payloadDigest
+    };
+    const callbackSignature = signExecutionCallback(callbackPayload, {
+      secret: process.env.DIGITAL_HOSPITAL_CALLBACK_SECRET,
+      timestamp: callbackTimestamp,
+      nonce: callbackNonce
+    });
+    const callback = await api(baseUrl, "/api/digital-hospital/execution/callbacks", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Execution-Timestamp": callbackTimestamp,
+        "X-Execution-Nonce": callbackNonce,
+        "X-Execution-Signature": callbackSignature
+      },
+      body: JSON.stringify(callbackPayload)
+    });
+    assert.equal(callback.response.status, 202);
+    assert.equal(callback.body.result.accepted, true);
+    const invalidCallback = await api(baseUrl, "/api/digital-hospital/execution/callbacks", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Execution-Timestamp": callbackTimestamp,
+        "X-Execution-Nonce": "coverage-callback-invalid-signature",
+        "X-Execution-Signature": "0".repeat(64)
+      },
+      body: JSON.stringify(callbackPayload)
+    });
+    assert.equal(invalidCallback.response.status, 401);
+
+    const deadLetterJobResponse = await createJob("coverage-dead-letter-001", { scenario: "dead-letter" }, 1);
+    const deadLetterJob = deadLetterJobResponse.body.result.job;
+    const deadLetterClaim = await runJobAction(deadLetterJob.id, {
+      action: "claim",
+      workerId,
+      leaseSeconds: 60
+    });
+    const deadLetterFailure = await runJobAction(deadLetterJob.id, {
+      action: "fail",
+      workerId,
+      leaseToken: deadLetterClaim.body.result.leaseToken,
+      errorCode: "COVERAGE_PERMANENT_FAILURE",
+      failureClass: "permanent"
+    });
+    assert.equal(deadLetterFailure.response.status, 200);
+
+    const afterFailure = await api(baseUrl, "/api/digital-hospital/execution/runtime", authorized(commissionToken));
+    const deadLetter = afterFailure.body.deadLetters.find((item) => item.jobId === deadLetterJob.id);
+    assert.ok(deadLetter);
+
+    const invalidRedrive = await api(
+      baseUrl,
+      `/api/digital-hospital/execution/dead-letters/${encodeURIComponent(deadLetter.id)}/actions`,
+      authorized(commissionToken, {
+        method: "POST",
+        body: JSON.stringify({ action: "unsupported" })
+      })
+    );
+    assert.equal(invalidRedrive.response.status, 400);
+    const redrive = await api(
+      baseUrl,
+      `/api/digital-hospital/execution/dead-letters/${encodeURIComponent(deadLetter.id)}/actions`,
+      authorized(commissionToken, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "redrive",
+          reviewNote: "coverage review approved for controlled redrive"
+        })
+      })
+    );
+    assert.equal(redrive.response.status, 200);
+    const missingDeadLetter = await api(
+      baseUrl,
+      "/api/digital-hospital/execution/dead-letters/missing/actions",
+      authorized(commissionToken, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "redrive",
+          reviewNote: "missing dead letter coverage review"
+        })
+      })
+    );
+    assert.equal(missingDeadLetter.response.status, 404);
+
+    const mismatchJobResponse = await createJob("coverage-mismatch-001", { scenario: "mismatch" });
+    const mismatchJob = mismatchJobResponse.body.result.job;
+    const mismatchClaim = await runJobAction(mismatchJob.id, {
+      action: "claim",
+      workerId,
+      leaseSeconds: 60
+    });
+    await runJobAction(mismatchJob.id, {
+      action: "complete-attempt",
+      workerId,
+      leaseToken: mismatchClaim.body.result.leaseToken
+    });
+    const mismatchTimestamp = String(Date.now());
+    const mismatchNonce = "coverage-callback-mismatch-001";
+    const mismatchPayload = {
+      jobId: mismatchJob.id,
+      connectorId: "CONN-COVERAGE-001",
+      source: "CONN-COVERAGE-001",
+      environmentId: "ENV-PILOT-UAT",
+      eventType: "integration-job.completed",
+      payloadDigest: "c".repeat(64)
+    };
+    const mismatchSignature = signExecutionCallback(mismatchPayload, {
+      secret: process.env.DIGITAL_HOSPITAL_CALLBACK_SECRET,
+      timestamp: mismatchTimestamp,
+      nonce: mismatchNonce
+    });
+    const mismatchCallback = await api(baseUrl, "/api/digital-hospital/execution/callbacks", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Execution-Timestamp": mismatchTimestamp,
+        "X-Execution-Nonce": mismatchNonce,
+        "X-Execution-Signature": mismatchSignature
+      },
+      body: JSON.stringify(mismatchPayload)
+    });
+    assert.equal(mismatchCallback.response.status, 409);
+
+    const quarantinedRuntime = await api(baseUrl, "/api/digital-hospital/execution/runtime", authorized(commissionToken));
+    const quarantine = quarantinedRuntime.body.quarantines.find((item) => item.connectorId === "CONN-COVERAGE-001");
+    assert.ok(quarantine);
+    const invalidRelease = await api(
+      baseUrl,
+      `/api/digital-hospital/execution/quarantines/${encodeURIComponent(quarantine.id)}/actions`,
+      authorized(commissionToken, {
+        method: "POST",
+        body: JSON.stringify({ action: "unsupported" })
+      })
+    );
+    assert.equal(invalidRelease.response.status, 400);
+    const released = await api(
+      baseUrl,
+      `/api/digital-hospital/execution/quarantines/${encodeURIComponent(quarantine.id)}/actions`,
+      authorized(commissionToken, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "release",
+          reviewNote: "coverage mismatch reviewed and connector remediated"
+        })
+      })
+    );
+    assert.equal(released.response.status, 200);
+    const missingQuarantine = await api(
+      baseUrl,
+      "/api/digital-hospital/execution/quarantines/missing/actions",
+      authorized(commissionToken, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "release",
+          reviewNote: "missing quarantine coverage review"
+        })
+      })
+    );
+    assert.equal(missingQuarantine.response.status, 404);
+
+    const recovered = await api(
+      baseUrl,
+      "/api/digital-hospital/execution/leases/recover-expired",
+      authorized(commissionToken, {
+        method: "POST",
+        body: JSON.stringify({})
+      })
+    );
+    assert.equal(recovered.response.status, 200);
+
+    const invalidWindowAction = await api(
+      baseUrl,
+      "/api/digital-hospital/execution/cutover-windows/CUTOVER-PILOT-001/actions",
+      authorized(commissionToken, {
+        method: "POST",
+        body: JSON.stringify({ action: "unsupported" })
+      })
+    );
+    assert.equal(invalidWindowAction.response.status, 400);
+    const evaluatedWindow = await api(
+      baseUrl,
+      "/api/digital-hospital/execution/cutover-windows/CUTOVER-PILOT-001/actions",
+      authorized(commissionToken, {
+        method: "POST",
+        body: JSON.stringify({ action: "evaluate" })
+      })
+    );
+    assert.equal(evaluatedWindow.response.status, 200);
+    assert.equal(evaluatedWindow.body.result.status, "ready");
+    const missingWindow = await api(
+      baseUrl,
+      "/api/digital-hospital/execution/cutover-windows/missing/actions",
+      authorized(commissionToken, {
+        method: "POST",
+        body: JSON.stringify({ action: "evaluate" })
+      })
+    );
+    assert.equal(missingWindow.response.status, 404);
+
+    const missingWindowPack = await api(
+      baseUrl,
+      "/api/digital-hospital/execution/cutover-evidence-packs",
+      authorized(commissionToken, {
+        method: "POST",
+        body: JSON.stringify({
+          windowId: "CUTOVER-MISSING",
+          institutionId: "MR-COVERAGE",
+          institutionName: "覆盖率试点医院",
+          releaseVersion: "v0.18"
+        })
+      })
+    );
+    assert.equal(missingWindowPack.response.status, 404);
+    const packResponse = await api(
+      baseUrl,
+      "/api/digital-hospital/execution/cutover-evidence-packs",
+      authorized(commissionToken, {
+        method: "POST",
+        body: JSON.stringify({
+          windowId: "CUTOVER-PILOT-001",
+          institutionId: "MR-COVERAGE",
+          institutionName: "覆盖率试点医院",
+          releaseVersion: "v0.18"
+        })
+      })
+    );
+    assert.equal(packResponse.response.status, 201);
+    const packId = packResponse.body.result.id;
+
+    const evidenceResponse = await api(
+      baseUrl,
+      `/api/digital-hospital/execution/cutover-evidence-packs/${encodeURIComponent(packId)}/actions`,
+      authorized(commissionToken, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "record-evidence",
+          requirementId: "joint-test-success",
+          artifactName: "coverage-joint-test.json",
+          artifactDigest: "d".repeat(64),
+          sourceSystem: "coverage-evidence-vault",
+          role: "integration-owner"
+        })
+      })
+    );
+    assert.equal(evidenceResponse.response.status, 200);
+    const evidenceId = evidenceResponse.body.result.id;
+
+    const cityLogin = await login(baseUrl, "city");
+    assert.equal(cityLogin.response.status, 200);
+    const invalidEvidenceAction = await api(
+      baseUrl,
+      `/api/digital-hospital/execution/cutover-evidence-packs/${encodeURIComponent(packId)}/evidence/${encodeURIComponent(evidenceId)}/actions`,
+      authorized(cityLogin.body.token, {
+        method: "POST",
+        body: JSON.stringify({ action: "unsupported" })
+      })
+    );
+    assert.equal(invalidEvidenceAction.response.status, 400);
+    const missingEvidence = await api(
+      baseUrl,
+      `/api/digital-hospital/execution/cutover-evidence-packs/${encodeURIComponent(packId)}/evidence/missing/actions`,
+      authorized(cityLogin.body.token, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "verify",
+          verificationNote: "missing evidence coverage verification",
+          accepted: true
+        })
+      })
+    );
+    assert.equal(missingEvidence.response.status, 404);
+    const verifiedEvidence = await api(
+      baseUrl,
+      `/api/digital-hospital/execution/cutover-evidence-packs/${encodeURIComponent(packId)}/evidence/${encodeURIComponent(evidenceId)}/actions`,
+      authorized(cityLogin.body.token, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "verify",
+          verificationNote: "independent coverage verification completed",
+          accepted: true,
+          role: "integration-owner"
+        })
+      })
+    );
+    assert.equal(verifiedEvidence.response.status, 200);
+
+    const approval = await api(
+      baseUrl,
+      `/api/digital-hospital/execution/cutover-evidence-packs/${encodeURIComponent(packId)}/actions`,
+      authorized(cityLogin.body.token, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "approve",
+          role: "integration-owner",
+          decision: "approve",
+          note: "coverage approval"
+        })
+      })
+    );
+    assert.equal(approval.response.status, 200);
+
+    for (const action of ["evaluate", "start", "complete", "rollback", "unsupported"]) {
+      const actionResponse = await api(
+        baseUrl,
+        `/api/digital-hospital/execution/cutover-evidence-packs/${encodeURIComponent(packId)}/actions`,
+        authorized(cityLogin.body.token, {
+          method: "POST",
+          body: JSON.stringify({
+            action,
+            changeTicket: "CHG-COVERAGE-001",
+            receiptDigest: "e".repeat(64),
+            reason: "coverage rollback rehearsal reason"
+          })
+        })
+      );
+      assert.equal([200, 400, 409].includes(actionResponse.response.status), true);
+    }
+
+    const failingService = {
+      close() {},
+      recoverExpiredLeases() {
+        const error = new Error("coverage recovery failure");
+        error.code = "COVERAGE_RECOVERY_FAILURE";
+        error.status = 503;
+        throw error;
+      },
+      runtimeBoard() {
+        const error = new Error("coverage runtime failure");
+        error.code = "COVERAGE_RUNTIME_FAILURE";
+        error.status = 503;
+        throw error;
+      }
+    };
+    configureDigitalHospitalExecutionRuntime({ executionService: failingService });
+    try {
+      const failedRuntime = await api(baseUrl, "/api/digital-hospital/execution/runtime", authorized(commissionToken));
+      assert.equal(failedRuntime.response.status, 503);
+      assert.equal(failedRuntime.body.code, "COVERAGE_RUNTIME_FAILURE");
+      const failedRecovery = await api(
+        baseUrl,
+        "/api/digital-hospital/execution/leases/recover-expired",
+        authorized(commissionToken, {
+          method: "POST",
+          body: JSON.stringify({})
+        })
+      );
+      assert.equal(failedRecovery.response.status, 503);
+      assert.equal(failedRecovery.body.code, "COVERAGE_RECOVERY_FAILURE");
+    } finally {
+      configureDigitalHospitalExecutionRuntime({ executionService: null });
+    }
+  });
 
   await t.test("exposes only a commission-scoped redacted care-service readiness summary", async () => {
     const anonymous = await api(baseUrl, "/api/care-services/readiness");

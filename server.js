@@ -111,6 +111,12 @@ const CareServicePlatform = require("./care-service-platform-adapter");
 const CareServiceRuntime = require("./care-service-runtime");
 const { createCareServiceDeliveryAdapters } = require("./care-service-delivery-adapters");
 const { createCareServiceStateRepository } = require("./care-service-state-repository");
+const { createDigitalHospitalExecutionService } = require("./digital-hospital-execution-service");
+const {
+  buildDigitalHospitalSecurityCenter,
+  configureDigitalHospitalManagedSecretLoader,
+  verifySignedExecutionCallback
+} = require("./digital-hospital-execution-security");
 const { buildCareServiceProductionReadiness } = require("./scripts/care-service-production-readiness");
 const {
   DEFAULT_EVIDENCE_DIR: DEFAULT_PRODUCTION_RELEASE_EVIDENCE_DIR,
@@ -390,6 +396,7 @@ const runtimeMetrics = {
 };
 let runtimeSessionStoreInstance = null;
 let runtimeSessionStoreKey = "";
+let digitalHospitalExecutionServiceInstance = null;
 let sessionCleanupTimer = null;
 let sessionCleanupState = {
   status: "not-run",
@@ -402,6 +409,96 @@ let sessionCleanupState = {
   errorCode: "",
   error: ""
 };
+
+function digitalHospitalExecutionDatabaseFile() {
+  return path.resolve(
+    process.env.DIGITAL_HOSPITAL_EXECUTION_DATABASE_FILE
+      || path.join(DATA_DIR, "digital-hospital-execution.sqlite")
+  );
+}
+
+function digitalHospitalExecutionRuntime() {
+  if (!digitalHospitalExecutionServiceInstance) {
+    digitalHospitalExecutionServiceInstance = createDigitalHospitalExecutionService({
+      databaseFile: digitalHospitalExecutionDatabaseFile(),
+      busyTimeoutMs: SQLITE_BUSY_TIMEOUT_MS
+    });
+  }
+  return digitalHospitalExecutionServiceInstance;
+}
+
+function configureDigitalHospitalExecutionRuntime(options = {}) {
+  if (Object.prototype.hasOwnProperty.call(options, "managedSecretLoader")) {
+    configureDigitalHospitalManagedSecretLoader(options.managedSecretLoader);
+  }
+  if (Object.prototype.hasOwnProperty.call(options, "executionService")) {
+    if (digitalHospitalExecutionServiceInstance
+      && digitalHospitalExecutionServiceInstance !== options.executionService
+      && typeof digitalHospitalExecutionServiceInstance.close === "function") {
+      digitalHospitalExecutionServiceInstance.close();
+    }
+    digitalHospitalExecutionServiceInstance = options.executionService || null;
+  }
+}
+
+function digitalHospitalClientCertificate(req, proxyHeaderName = "") {
+  const certificate = typeof req.socket?.getPeerCertificate === "function"
+    ? req.socket.getPeerCertificate()
+    : null;
+  const transportFingerprint = certificate?.fingerprint256 || "";
+  if (req.socket?.authorized && transportFingerprint) {
+    return { fingerprint: transportFingerprint, authorized: true, source: "tls-transport" };
+  }
+  const proxyFingerprint = proxyHeaderName ? String(req.headers[proxyHeaderName] || "").trim() : "";
+  return {
+    fingerprint: proxyFingerprint,
+    authorized: false,
+    source: proxyFingerprint ? "trusted-proxy-assertion" : "missing"
+  };
+}
+
+function digitalHospitalWorkerFingerprints() {
+  return String(process.env.DIGITAL_HOSPITAL_WORKER_MTLS_FINGERPRINTS || "")
+    .split(/[,;\n]/)
+    .map((item) => item.replace(/[^a-f0-9]/gi, "").toLowerCase())
+    .filter(Boolean);
+}
+
+function requireDigitalHospitalExecutionWorker(req, res, target) {
+  if (!isProductionRuntime()) return requireApiRole(req, res, ["commission"], target);
+  const certificate = digitalHospitalClientCertificate(
+    req,
+    String(process.env.DIGITAL_HOSPITAL_TRUST_PROXY_MTLS || "").toLowerCase() === "true"
+      ? "x-client-cert-fingerprint"
+      : ""
+  );
+  const fingerprint = certificate.fingerprint.replace(/[^a-f0-9]/gi, "").toLowerCase();
+  if (!fingerprint || !digitalHospitalWorkerFingerprints().includes(fingerprint)
+    || (!certificate.authorized && certificate.source !== "trusted-proxy-assertion")) {
+    sendJson(res, 401, {
+      error: "Unauthorized",
+      code: "DIGITAL_HOSPITAL_WORKER_MTLS_REQUIRED",
+      message: "trusted execution Worker mTLS identity is required"
+    });
+    return null;
+  }
+  return {
+    username: `execution-worker:${fingerprint.slice(0, 12)}`,
+    name: "数智医院执行Worker",
+    role: "system"
+  };
+}
+
+function sendDigitalHospitalExecutionError(res, error) {
+  const status = Math.min(599, Math.max(400, Number(error?.status || error?.statusCode || 400)));
+  sendJson(res, status, {
+    ok: false,
+    error: status === 404 ? "Not Found" : status === 409 ? "Conflict" : status === 401 ? "Unauthorized" : status >= 500 ? "Service Unavailable" : "Bad Request",
+    code: error?.code || "DIGITAL_HOSPITAL_EXECUTION_ERROR",
+    message: error?.message || "digital hospital execution request failed"
+  });
+}
+
 const DEMO_SMS_CODE = process.env.DEMO_SMS_CODE || "888888";
 const PHONE_CODE_TTL_MS = 5 * 60 * 1000;
 const PHONE_CODE_COOLDOWN_MS = 60 * 1000;
@@ -32322,6 +32419,398 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/digital-hospital/execution/runtime") {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/execution/runtime");
+    if (!user) return;
+    try {
+      const board = digitalHospitalExecutionRuntime().runtimeBoard();
+      sendJson(res, 200, {
+        ...board,
+        security: buildDigitalHospitalSecurityCenter(),
+        workerIdentity: {
+          mode: isProductionRuntime() ? "mTLS-service-identity" : "commission-session-compatibility",
+          trustedFingerprintCount: digitalHospitalWorkerFingerprints().length,
+          productionReady: digitalHospitalWorkerFingerprints().length > 0
+        }
+      });
+    } catch (error) {
+      sendDigitalHospitalExecutionError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/digital-hospital/execution/security") {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/execution/security");
+    if (!user) return;
+    sendJson(res, 200, {
+      ok: true,
+      generatedAt: new Date().toISOString(),
+      security: buildDigitalHospitalSecurityCenter(),
+      workerIdentity: {
+        mode: isProductionRuntime() ? "mTLS-service-identity" : "commission-session-compatibility",
+        trustedFingerprintCount: digitalHospitalWorkerFingerprints().length,
+        productionReady: digitalHospitalWorkerFingerprints().length > 0
+      }
+    });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/digital-hospital/execution/workers") {
+    const actor = requireDigitalHospitalExecutionWorker(req, res, "/api/digital-hospital/execution/workers");
+    if (!actor) return;
+    try {
+      const payload = await collectJson(req, 100_000);
+      const result = digitalHospitalExecutionRuntime().registerWorker({
+        id: payload.id,
+        node: payload.node,
+        pool: payload.pool,
+        capabilities: payload.capabilities,
+        now: new Date().toISOString()
+      });
+      sendJson(res, 201, result);
+    } catch (error) {
+      sendDigitalHospitalExecutionError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/digital-hospital/execution/vault-references") {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/execution/vault-references");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req, 100_000);
+      const result = digitalHospitalExecutionRuntime().registerVaultReference({
+        ...payload,
+        owner: user.name,
+        updatedAt: new Date().toISOString()
+      });
+      sendJson(res, 201, result);
+    } catch (error) {
+      sendDigitalHospitalExecutionError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/digital-hospital/execution/jobs") {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/execution/jobs");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req, 200_000);
+      const idempotencyKey = String(req.headers["idempotency-key"] || "").trim();
+      if (!idempotencyKey) {
+        sendJson(res, 400, {
+          ok: false,
+          code: "IDEMPOTENCY_KEY_REQUIRED",
+          message: "Idempotency-Key header is required"
+        });
+        return;
+      }
+      const result = digitalHospitalExecutionRuntime().enqueue({
+        connectorId: payload.connectorId,
+        environmentId: payload.environmentId,
+        jobType: payload.jobType,
+        payload: payload.payload,
+        maxAttempts: payload.maxAttempts,
+        retryBaseSeconds: payload.retryBaseSeconds,
+        retryMaxSeconds: payload.retryMaxSeconds,
+        idempotencyKey,
+        now: new Date().toISOString()
+      });
+      sendJson(res, result.result.duplicate ? 200 : 201, result);
+    } catch (error) {
+      sendDigitalHospitalExecutionError(res, error);
+    }
+    return;
+  }
+
+  const digitalHospitalExecutionJobActionMatch = url.pathname.match(/^\/api\/digital-hospital\/execution\/jobs\/([^/]+)\/actions$/);
+  if (req.method === "POST" && digitalHospitalExecutionJobActionMatch) {
+    const actor = requireDigitalHospitalExecutionWorker(req, res, "/api/digital-hospital/execution/jobs/:id/actions");
+    if (!actor) return;
+    const jobId = decodeURIComponent(digitalHospitalExecutionJobActionMatch[1]);
+    try {
+      const payload = await collectJson(req, 100_000);
+      const now = new Date().toISOString();
+      let result;
+      if (payload.action === "claim") {
+        result = digitalHospitalExecutionRuntime().claim({
+          jobId,
+          workerId: payload.workerId,
+          leaseSeconds: payload.leaseSeconds,
+          now
+        });
+      } else if (payload.action === "heartbeat") {
+        result = digitalHospitalExecutionRuntime().heartbeat(jobId, {
+          workerId: payload.workerId,
+          leaseToken: payload.leaseToken,
+          leaseSeconds: payload.leaseSeconds,
+          progress: payload.progress,
+          now
+        });
+      } else if (payload.action === "complete-attempt") {
+        result = digitalHospitalExecutionRuntime().completeAttempt(jobId, {
+          workerId: payload.workerId,
+          leaseToken: payload.leaseToken,
+          now
+        });
+      } else if (payload.action === "fail") {
+        result = digitalHospitalExecutionRuntime().failAttempt(jobId, {
+          workerId: payload.workerId,
+          leaseToken: payload.leaseToken,
+          errorCode: payload.errorCode,
+          failureClass: payload.failureClass,
+          now
+        });
+      } else {
+        sendJson(res, 400, {
+          ok: false,
+          code: "EXECUTION_JOB_ACTION_INVALID",
+          message: "action must be claim, heartbeat, complete-attempt or fail"
+        });
+        return;
+      }
+      sendJson(res, 200, result);
+    } catch (error) {
+      sendDigitalHospitalExecutionError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/digital-hospital/execution/leases/recover-expired") {
+    const actor = requireDigitalHospitalExecutionWorker(req, res, "/api/digital-hospital/execution/leases/recover-expired");
+    if (!actor) return;
+    try {
+      const result = digitalHospitalExecutionRuntime().recoverExpiredLeases({
+        now: new Date().toISOString()
+      });
+      sendJson(res, 200, result);
+    } catch (error) {
+      sendDigitalHospitalExecutionError(res, error);
+    }
+    return;
+  }
+
+  const digitalHospitalDeadLetterActionMatch = url.pathname.match(/^\/api\/digital-hospital\/execution\/dead-letters\/([^/]+)\/actions$/);
+  if (req.method === "POST" && digitalHospitalDeadLetterActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/execution/dead-letters/:id/actions");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req, 100_000);
+      if (payload.action !== "redrive") {
+        sendJson(res, 400, { ok: false, code: "DEAD_LETTER_ACTION_INVALID", message: "only redrive is accepted" });
+        return;
+      }
+      const result = digitalHospitalExecutionRuntime().redrive(
+        decodeURIComponent(digitalHospitalDeadLetterActionMatch[1]),
+        {
+          reviewedBy: user.username || user.name,
+          reviewNote: payload.reviewNote,
+          now: new Date().toISOString()
+        }
+      );
+      sendJson(res, 200, result);
+    } catch (error) {
+      sendDigitalHospitalExecutionError(res, error);
+    }
+    return;
+  }
+
+  const digitalHospitalQuarantineActionMatch = url.pathname.match(/^\/api\/digital-hospital\/execution\/quarantines\/([^/]+)\/actions$/);
+  if (req.method === "POST" && digitalHospitalQuarantineActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/execution/quarantines/:id/actions");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req, 100_000);
+      if (payload.action !== "release") {
+        sendJson(res, 400, { ok: false, code: "QUARANTINE_ACTION_INVALID", message: "only release is accepted" });
+        return;
+      }
+      const result = digitalHospitalExecutionRuntime().releaseQuarantine(
+        decodeURIComponent(digitalHospitalQuarantineActionMatch[1]),
+        {
+          releasedBy: user.username || user.name,
+          reviewNote: payload.reviewNote,
+          now: new Date().toISOString()
+        }
+      );
+      sendJson(res, 200, result);
+    } catch (error) {
+      sendDigitalHospitalExecutionError(res, error);
+    }
+    return;
+  }
+
+  const digitalHospitalCutoverWindowActionMatch = url.pathname.match(/^\/api\/digital-hospital\/execution\/cutover-windows\/([^/]+)\/actions$/);
+  if (req.method === "POST" && digitalHospitalCutoverWindowActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/execution/cutover-windows/:id/actions");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req, 100_000);
+      if (payload.action !== "evaluate") {
+        sendJson(res, 400, { ok: false, code: "CUTOVER_WINDOW_ACTION_INVALID", message: "only evaluate is accepted" });
+        return;
+      }
+      const result = digitalHospitalExecutionRuntime().evaluateCutover(
+        decodeURIComponent(digitalHospitalCutoverWindowActionMatch[1]),
+        new Date().toISOString()
+      );
+      sendJson(res, 200, result);
+    } catch (error) {
+      sendDigitalHospitalExecutionError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/digital-hospital/execution/cutover-evidence-packs") {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/execution/cutover-evidence-packs");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req, 100_000);
+      const result = digitalHospitalExecutionRuntime().createCutoverEvidencePack({
+        windowId: payload.windowId,
+        institutionId: payload.institutionId,
+        institutionName: payload.institutionName,
+        releaseVersion: payload.releaseVersion,
+        createdBy: user.username || user.name,
+        role: user.role,
+        now: new Date().toISOString()
+      });
+      sendJson(res, 201, result);
+    } catch (error) {
+      sendDigitalHospitalExecutionError(res, error);
+    }
+    return;
+  }
+
+  const digitalHospitalCutoverEvidenceActionMatch = url.pathname.match(/^\/api\/digital-hospital\/execution\/cutover-evidence-packs\/([^/]+)\/evidence\/([^/]+)\/actions$/);
+  if (req.method === "POST" && digitalHospitalCutoverEvidenceActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/execution/cutover-evidence-packs/:id/evidence/:evidenceId/actions");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req, 100_000);
+      if (payload.action !== "verify") {
+        sendJson(res, 400, { ok: false, code: "CUTOVER_EVIDENCE_ACTION_INVALID", message: "only verify is accepted" });
+        return;
+      }
+      const result = digitalHospitalExecutionRuntime().verifyCutoverEvidence(
+        decodeURIComponent(digitalHospitalCutoverEvidenceActionMatch[1]),
+        decodeURIComponent(digitalHospitalCutoverEvidenceActionMatch[2]),
+        {
+          verifiedBy: user.username || user.name,
+          verificationNote: payload.verificationNote,
+          accepted: payload.accepted,
+          role: payload.role || user.role,
+          now: new Date().toISOString()
+        }
+      );
+      sendJson(res, 200, result);
+    } catch (error) {
+      sendDigitalHospitalExecutionError(res, error);
+    }
+    return;
+  }
+
+  const digitalHospitalCutoverPackActionMatch = url.pathname.match(/^\/api\/digital-hospital\/execution\/cutover-evidence-packs\/([^/]+)\/actions$/);
+  if (req.method === "POST" && digitalHospitalCutoverPackActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/execution/cutover-evidence-packs/:id/actions");
+    if (!user) return;
+    const packId = decodeURIComponent(digitalHospitalCutoverPackActionMatch[1]);
+    try {
+      const payload = await collectJson(req, 100_000);
+      const now = new Date().toISOString();
+      const runtime = digitalHospitalExecutionRuntime();
+      let result;
+      if (payload.action === "record-evidence") {
+        result = runtime.recordCutoverEvidence(packId, {
+          requirementId: payload.requirementId,
+          artifactName: payload.artifactName,
+          artifactDigest: payload.artifactDigest,
+          signatureDigest: payload.signatureDigest,
+          sourceSystem: payload.sourceSystem,
+          submittedBy: user.username || user.name,
+          role: payload.role || user.role,
+          now
+        });
+      } else if (payload.action === "approve") {
+        result = runtime.approveCutover(packId, {
+          role: payload.role,
+          approver: user.username || user.name,
+          decision: payload.decision,
+          note: payload.note,
+          now
+        });
+      } else if (payload.action === "evaluate") {
+        const board = runtime.runtimeBoard(now);
+        result = runtime.evaluateProductionCutover(packId, {
+          now,
+          actor: user.username || user.name,
+          role: user.role,
+          security: buildDigitalHospitalSecurityCenter(),
+          repository: board.repository
+        });
+      } else if (payload.action === "start") {
+        result = runtime.startProductionCutover(packId, {
+          actor: user.username || user.name,
+          role: user.role,
+          changeTicket: payload.changeTicket,
+          now
+        });
+      } else if (payload.action === "complete") {
+        result = runtime.completeProductionCutover(packId, {
+          actor: user.username || user.name,
+          role: user.role,
+          receiptDigest: payload.receiptDigest,
+          now
+        });
+      } else if (payload.action === "rollback") {
+        result = runtime.rollbackProductionCutover(packId, {
+          actor: user.username || user.name,
+          role: user.role,
+          reason: payload.reason,
+          now
+        });
+      } else {
+        sendJson(res, 400, {
+          ok: false,
+          code: "CUTOVER_PACK_ACTION_INVALID",
+          message: "unsupported cutover evidence pack action"
+        });
+        return;
+      }
+      sendJson(res, 200, result);
+    } catch (error) {
+      sendDigitalHospitalExecutionError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/digital-hospital/execution/callbacks") {
+    try {
+      const payload = await collectJson(req, 200_000);
+      const certificate = digitalHospitalClientCertificate(
+        req,
+        String(process.env.DIGITAL_HOSPITAL_TRUST_PROXY_MTLS || "").toLowerCase() === "true"
+          ? "x-client-cert-fingerprint"
+          : ""
+      );
+      const verified = await verifySignedExecutionCallback(payload, {
+        timestamp: req.headers["x-execution-timestamp"],
+        nonce: req.headers["x-execution-nonce"],
+        signature: req.headers["x-execution-signature"],
+        clientCertificateFingerprint: certificate.fingerprint,
+        clientCertificateAuthorized: certificate.authorized,
+        nowMs: Date.now()
+      });
+      const result = digitalHospitalExecutionRuntime().verifyCallback(verified, {
+        maxSkewSeconds: buildDigitalHospitalSecurityCenter().maxSkewSeconds
+      });
+      sendJson(res, result.result.accepted ? 202 : 409, result);
+    } catch (error) {
+      sendDigitalHospitalExecutionError(res, error);
+    }
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/digital-hospital/evaluation-catalog") {
     const user = requireApiRole(req, res, ["commission", "institution"], "/api/digital-hospital/evaluation-catalog");
     if (!user) return;
@@ -38239,6 +38728,10 @@ async function startServerAsync(port = PORT) {
 async function stopServer() {
   clearSessionCleanupSchedule();
   if (server.listening) await new Promise((resolve) => server.close(resolve));
+  if (digitalHospitalExecutionServiceInstance) {
+    digitalHospitalExecutionServiceInstance.close();
+    digitalHospitalExecutionServiceInstance = null;
+  }
   if (runtimeSessionStoreInstance && typeof runtimeSessionStoreInstance.close === "function") {
     await runtimeSessionStoreInstance.close();
   }
@@ -38263,15 +38756,19 @@ if (require.main === module) {
 module.exports = {
   assertProductionRuntimeSecurity,
   careServiceReadinessPublicSummary,
+  configureDigitalHospitalExecutionRuntime,
   configurePublicHealthEndpointProbeRuntime,
   createCareServiceRuntimeDependencies,
   cleanupRuntimeSessions,
+  digitalHospitalClientCertificate,
+  digitalHospitalWorkerFingerprints,
   ensureDatabase,
   openSqliteDatabase,
   productionSessionSecretErrors,
   productionSessionRetentionErrors,
   productionSessionStoreErrors,
   readDatabase,
+  requireDigitalHospitalExecutionWorker,
   server,
   sessionStoreMode,
   sessionTopology,

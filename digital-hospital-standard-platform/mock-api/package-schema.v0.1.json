@@ -640,6 +640,86 @@
         "type": "object"
       }
     },
+    "productionRuntimeControls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "control", "owner", "evidence", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "control": { "type": "string" },
+          "owner": { "type": "string" },
+          "evidence": { "type": "string" },
+          "status": { "type": "string", "enum": ["已实现", "待配置", "已配置"] },
+          "verifiedAt": { "type": "string" }
+        }
+      }
+    },
+    "cutoverEvidenceRequirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "requirementId", "name", "ownerRole", "siteRequired", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "requirementId": { "type": "string" },
+          "name": { "type": "string" },
+          "ownerRole": { "type": "string" },
+          "siteRequired": { "type": "boolean" },
+          "artifactName": { "type": "string" },
+          "artifactDigest": { "type": "string" },
+          "submittedBy": { "type": "string" },
+          "verifiedBy": { "type": "string" },
+          "status": { "type": "string", "enum": ["待上传", "待复核", "已核验", "rejected"] },
+          "updatedAt": { "type": "string" }
+        },
+        "not": {
+          "anyOf": [
+            { "required": ["payload"] },
+            { "required": ["rawPayload"] },
+            { "required": ["content"] },
+            { "required": ["signature"] },
+            { "required": ["nonce"] },
+            { "required": ["secret"] }
+          ]
+        }
+      }
+    },
+    "productionCutoverApprovals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "role", "decision"],
+        "properties": {
+          "id": { "type": "string" },
+          "role": { "type": "string", "enum": ["接口责任人", "安全责任人", "运行责任人", "医院责任人"] },
+          "approver": { "type": "string" },
+          "decision": { "type": "string", "enum": ["待签批", "同意", "拒绝"] },
+          "note": { "type": "string" },
+          "approvalDigest": { "type": "string" },
+          "approvedAt": { "type": "string" }
+        }
+      }
+    },
+    "productionGoNoGo": {
+      "type": "object",
+      "required": ["decision", "status", "checks", "blockers", "evaluatedAt", "evaluatedBy"],
+      "properties": {
+        "decision": { "type": "string", "enum": ["GO", "NO-GO"] },
+        "status": { "type": "string" },
+        "checks": {
+          "type": "object",
+          "additionalProperties": { "type": "boolean" }
+        },
+        "blockers": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "evaluatedAt": { "type": "string" },
+        "evaluatedBy": { "type": "string" }
+      }
+    },
     "assessmentSummary": {
       "type": "object",
       "additionalProperties": true

@@ -2377,7 +2377,7 @@ test("data governance foundation exposes platform cards API and release evidence
   assert.match(read("scripts/release-artifact-manifest.js"), /data-governance-readiness-report\.md/);
 });
 
-test("digital hospital v0.17 task runtime is publishable from GitHub Pages", () => {
+test("digital hospital v0.18 production runtime is publishable from GitHub Pages", () => {
   const standardsEntry = read("digital-hospital-standards.html");
   const index = read("digital-hospital-standard-platform/index.html");
   const app = read("digital-hospital-standard-platform/app.js");
@@ -2386,15 +2386,21 @@ test("digital hospital v0.17 task runtime is publishable from GitHub Pages", () 
   const schema = JSON.parse(read("digital-hospital-standard-platform/mock-api/package-schema.v0.1.json"));
 
   const executionDomain = read("digital-hospital-integration-execution.js");
+  const executionService = read("digital-hospital-execution-service.js");
+  const executionSecurity = read("digital-hospital-execution-security.js");
+  const cutoverGovernance = read("digital-hospital-cutover-governance.js");
+  const runtimeReadiness = read("scripts/digital-hospital-production-runtime-readiness.js");
+  const server = read("server.js");
 
-  assert.match(standardsEntry, /href="\.\/digital-hospital-standard-platform\/">新标准平台 v0\.17/);
+  assert.match(standardsEntry, /href="\.\/digital-hospital-standard-platform\/">新标准平台 v0\.18/);
+  assert.match(index, /v0\.18/);
   assert.match(index, /data-view="assistant">评价助手/);
   assert.match(index, /data-view="integration">接入联调/);
   assert.match(index, /data-view="execution">接入执行/);
   assert.match(index, /data-view="assessment">试点评估/);
   assert.match(index, /data-view="monitoring">运营监控/);
-  assert.match(app, /digitalHospitalMvpState:v0\.17/);
-  assert.match(app, /prototypeVersion: "mvp-0\.17"/);
+  assert.match(app, /digitalHospitalMvpState:v0\.18/);
+  assert.match(app, /prototypeVersion: "mvp-0\.18"/);
   assert.match(app, /function renderAssistant\(\)/);
   assert.match(app, /function renderIntegration\(\)/);
   assert.match(app, /function renderExecution\(\)/);
@@ -2425,6 +2431,12 @@ test("digital hospital v0.17 task runtime is publishable from GitHub Pages", () 
   assert.match(app, /data-action="evaluate-cutover-window"/);
   assert.match(app, /function startCutoverWindow\(id\)/);
   assert.match(app, /data-action="rollback-cutover-window"/);
+  assert.match(app, /\{ id: "production", label: "投产证据" \}/);
+  assert.match(app, /data-action="configure-production-runtime"/);
+  assert.match(app, /"record-cutover-evidence"/);
+  assert.match(app, /"verify-cutover-evidence"/);
+  assert.match(app, /data-action="approve-production-cutover"/);
+  assert.match(app, /data-action="evaluate-production-go-no-go"/);
   assert.match(app, /\{ id: "governance", label: "治理审计" \}/);
   assert.match(app, /\{ id: "quality", label: "质量门禁" \}/);
   assert.match(app, /\{ id: "canary", label: "灰度" \}/);
@@ -2472,6 +2484,11 @@ test("digital hospital v0.17 task runtime is publishable from GitHub Pages", () 
   assert.match(openapi, /\/api\/v1\/integration-callback-receipts\/\{receiptId\}:verify/);
   assert.match(openapi, /\/api\/v1\/integration-quarantines\/\{quarantineId\}:release/);
   assert.match(openapi, /\/api\/v1\/integration-cutover-windows\/\{windowId\}:rollback/);
+  assert.match(openapi, /\/api\/digital-hospital\/execution\/runtime/);
+  assert.match(openapi, /\/api\/digital-hospital\/execution\/security/);
+  assert.match(openapi, /\/api\/digital-hospital\/execution\/callbacks/);
+  assert.match(openapi, /\/api\/digital-hospital\/execution\/cutover-evidence-packs/);
+  assert.match(openapi, /\/api\/digital-hospital\/execution\/cutover-windows\/\{windowId\}\/actions/);
   assert.match(openapi, /enum: \[submission, review, expert, rectification, task, pilot, collaboration, integration, execution,/);
   assert.match(openapi, /name: EvaluationAssistant/);
   assert.match(openapi, /\/api\/v1\/evaluation-assistant\/review-risks:scan/);
@@ -2527,6 +2544,10 @@ test("digital hospital v0.17 task runtime is publishable from GitHub Pages", () 
   assert.ok(schema.properties.integrationReplayEvents);
   assert.ok(schema.properties.integrationQuarantines);
   assert.ok(schema.properties.integrationCutoverWindows);
+  assert.ok(schema.properties.productionRuntimeControls);
+  assert.ok(schema.properties.cutoverEvidenceRequirements);
+  assert.ok(schema.properties.productionCutoverApprovals);
+  assert.ok(schema.properties.productionGoNoGo);
   assert.ok(schema.properties.meta.properties.packageType.enum.includes("assistant"));
   assert.ok(schema.properties.meta.properties.packageType.enum.includes("integration"));
   assert.ok(schema.properties.meta.properties.packageType.enum.includes("execution"));
@@ -2539,6 +2560,18 @@ test("digital hospital v0.17 task runtime is publishable from GitHub Pages", () 
   assert.match(executionDomain, /vaultRefFingerprint/);
   assert.match(executionDomain, /leaseTokenHash/);
   assert.doesNotMatch(executionDomain, /state\.vaultEntries.*vaultRef:/);
+  assert.match(executionService, /class SqliteExecutionRepository/);
+  assert.match(executionService, /BEGIN IMMEDIATE/);
+  assert.match(executionService, /journal_mode = WAL/);
+  assert.match(executionSecurity, /createHmac\("sha256"/);
+  assert.match(executionSecurity, /timingSafeEqual/);
+  assert.match(executionSecurity, /DIGITAL_HOSPITAL_CALLBACK_KEY_REF/);
+  assert.match(cutoverGovernance, /managed-vault-attestation/);
+  assert.match(cutoverGovernance, /hospital-signoff/);
+  assert.match(cutoverGovernance, /function evaluateProductionCutover/);
+  assert.match(runtimeReadiness, /software-complete-external-activation-required/);
+  assert.match(server, /\/api\/digital-hospital\/execution\/runtime/);
+  assert.match(server, /\/api\/digital-hospital\/execution\/callbacks/);
 });
 
 test("digital hospital standards platform exposes standards center workflow and release evidence", () => {

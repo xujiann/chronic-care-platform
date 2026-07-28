@@ -39,7 +39,10 @@ function createExecutionState(seed = {}) {
     receipts: clone(seed.receipts || []),
     replayEvents: clone(seed.replayEvents || []),
     quarantines: clone(seed.quarantines || []),
-    cutoverWindows: clone(seed.cutoverWindows || [])
+    cutoverWindows: clone(seed.cutoverWindows || []),
+    cutoverEvidencePacks: clone(seed.cutoverEvidencePacks || []),
+    cutoverApprovals: clone(seed.cutoverApprovals || []),
+    cutoverEvents: clone(seed.cutoverEvents || [])
   };
 }
 
