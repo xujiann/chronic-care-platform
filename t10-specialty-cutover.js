@@ -32,6 +32,7 @@ function withCutoverDefaults(pack) {
     stages: pack.stages || fallback.stages,
     firstIncrement: { ...fallback.firstIncrement, ...(pack.firstIncrement || {}) },
     tracks: pack.tracks || fallback.tracks,
+    institutionDeploymentManifest: pack.institutionDeploymentManifest || fallback.institutionDeploymentManifest,
     crossTrackControls: pack.crossTrackControls || fallback.crossTrackControls,
     rehearsalPlan: pack.rehearsalPlan || fallback.rehearsalPlan,
     goNoGoDecision: pack.goNoGoDecision || fallback.goNoGoDecision,
@@ -51,6 +52,7 @@ function renderCutoverPack(pack) {
   renderKpis(pack);
   renderFirstIncrement(pack.firstIncrement || {});
   renderTracks(pack.tracks || [], pack.stages || []);
+  renderInstitutionDeploymentManifest(pack.institutionDeploymentManifest || {});
   renderControls(pack.crossTrackControls || []);
   renderRehearsalPlan(pack.rehearsalPlan || {});
   renderDecisionMatrix(pack.goNoGoDecision || {});
@@ -107,6 +109,40 @@ function renderTracks(tracks, stages) {
       <p class="muted">Readiness digest：${escapeHtml(track.readiness?.digest || "")}</p>
     </article>
   `).join("");
+}
+
+function renderInstitutionDeploymentManifest(manifest) {
+  const modules = manifest.enabledModules || [];
+  const rows = modules.map((item) => `
+    <tr>
+      <td><strong>${escapeHtml(item.name)}</strong><br><span class="muted">${escapeHtml(item.deploymentUnit)}</span></td>
+      <td><a href="./${encodeURIComponent(item.page)}">${escapeHtml(item.page)}</a><br><code>${escapeHtml(item.api)}</code></td>
+      <td><code>${escapeHtml(item.dataNamespace)}</code></td>
+      <td>${escapeHtml(item.rollbackUnit)}</td>
+      <td><span class="badge warn">${escapeHtml(item.productionTrafficState)}</span></td>
+    </tr>
+  `).join("");
+  document.querySelector("#institution-deployment-manifest").innerHTML = `
+    <div class="cutover-card">
+      <div class="badge-row">
+        <span class="badge">${escapeHtml(manifest.institutionId || "institution-template")}</span>
+        <span class="badge ok">${escapeHtml(manifest.activationPolicy || "deny-by-default")}</span>
+        <span class="badge warn">${escapeHtml(manifest.productionTrafficState || "blocked-until-site-evidence-signed")}</span>
+      </div>
+      <p class="muted">启用模块：${(manifest.enabledModuleIds || []).map(escapeHtml).join(" / ") || "无"}；禁用模块：${(manifest.disabledModuleIds || []).map(escapeHtml).join(" / ") || "无"}。</p>
+      <p class="muted">页面白名单：${(manifest.routeAllowlist || []).map(escapeHtml).join(" / ") || "无"}；API 白名单：${(manifest.apiAllowlist || []).map(escapeHtml).join(" / ") || "无"}。</p>
+    </div>
+    <div class="table-wrap">
+      <table class="cutover-table">
+        <thead><tr><th>模块/部署单元</th><th>页面与 API</th><th>数据命名空间</th><th>独立回退单元</th><th>生产流量</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="5">未选择任何专项模块</td></tr>'}</tbody>
+      </table>
+    </div>
+    <div class="cutover-card">
+      <h3>部署校验规则</h3>
+      <ul class="evidence-list">${(manifest.validationRules || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+    </div>
+  `;
 }
 
 function renderControls(controls) {
@@ -629,6 +665,28 @@ function fallbackCutoverPack() {
       track("regional-imaging-cloud", "区域影像云", "放射科/医院信息科/区域平台互联互通组", "imaging-cloud.html", "/api/imaging-cloud/production-center", 5, "PACS/RIS/DICOM TLS联通回执"),
       track("physical-examination", "健康体检", "体检中心/基层公卫/慢病管理团队", "physical-examination.html", "/api/physical-exams", 7, "体检中心源系统字段映射和签名报文")
     ],
+    institutionDeploymentManifest: {
+      contractVersion: "1.0.0",
+      institutionId: "institution-template",
+      activationPolicy: "deny-by-default",
+      productionTrafficState: "blocked-until-site-evidence-signed",
+      enabledModuleIds: ["emergency-life-chain", "clinical-blood", "regional-imaging-cloud", "physical-examination"],
+      disabledModuleIds: [],
+      routeAllowlist: ["emergency.html", "blood.html", "imaging-cloud.html", "physical-examination.html"],
+      apiAllowlist: ["/api/emergency/production-center", "/api/blood-system/go-live", "/api/imaging-cloud/production-center", "/api/physical-exams"],
+      enabledModules: [
+        deploymentModule("emergency-life-chain", "120急救生命链", "emergency.html", "/api/emergency/production-center"),
+        deploymentModule("clinical-blood", "临床用血", "blood.html", "/api/blood-system/go-live"),
+        deploymentModule("regional-imaging-cloud", "区域影像云", "imaging-cloud.html", "/api/imaging-cloud/production-center"),
+        deploymentModule("physical-examination", "健康体检", "physical-examination.html", "/api/physical-exams")
+      ],
+      validationRules: [
+        "仅允许暴露机构已选择的专项页面和 API。",
+        "每个模块使用独立数据命名空间和独立回退单元。",
+        "禁用模块必须不可达且不得接收生产流量。",
+        "启用模块后仍须完成现场证据和正式 Go/No-Go 审批。"
+      ]
+    },
     crossTrackControls: [
       control("identity-and-role-scope", "统一身份与最小权限", "平台账号管理员/机构管理员", "每个专项均使用现场实名账号、机构编码和角色授权；演示账号不得进入生产灰度。"),
       control("signed-interface-and-idempotency", "签名接口、时钟窗口和幂等", "平台互联互通组/外部系统厂商", "外部报文必须具备签名、时间窗、nonce或幂等键、回执和死信补偿证据。"),
@@ -1013,6 +1071,20 @@ function track(id, name, department, page, api, blockerCount, blockerTitle) {
       owner: department,
       status: "site-pending"
     }))
+  };
+}
+
+function deploymentModule(id, name, page, api) {
+  const deploymentUnit = `t10-${id}`;
+  return {
+    id,
+    name,
+    deploymentUnit,
+    page,
+    api,
+    dataNamespace: `t10.${id.replace(/-/g, "_")}`,
+    rollbackUnit: deploymentUnit,
+    productionTrafficState: "blocked-until-site-evidence-signed"
   };
 }
 

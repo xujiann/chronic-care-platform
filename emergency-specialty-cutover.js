@@ -211,6 +211,43 @@ function buildModuleCatalog(allTracks, enabledTracks) {
   };
 }
 
+function buildInstitutionDeploymentManifest(moduleCatalog, options = {}) {
+  const institutionId = options.institutionId || "institution-template";
+  const enabledModules = moduleCatalog.modules.filter((item) => item.selected).map((item) => ({
+    id: item.id,
+    name: item.name,
+    deploymentUnit: item.deploymentUnit,
+    page: item.page,
+    api: item.api,
+    dataNamespace: `t10.${item.id.replace(/-/g, "_")}`,
+    dataBoundary: item.dataBoundary,
+    externalSystems: item.externalSystems,
+    sharedPlatformCapabilities: item.sharedPlatformCapabilities,
+    rollbackUnit: item.deploymentUnit,
+    productionTrafficState: "blocked-until-site-evidence-signed"
+  }));
+  return {
+    contractVersion: "1.0.0",
+    institutionId,
+    activationPolicy: "deny-by-default",
+    productionTrafficState: "blocked-until-site-evidence-signed",
+    enabledModuleIds: enabledModules.map((item) => item.id),
+    disabledModuleIds: moduleCatalog.disabledModuleIds.slice(),
+    routeAllowlist: enabledModules.map((item) => item.page),
+    apiAllowlist: enabledModules.map((item) => item.api),
+    dataNamespaces: enabledModules.map((item) => item.dataNamespace),
+    rollbackUnits: enabledModules.map((item) => item.rollbackUnit),
+    enabledModules,
+    validationRules: [
+      "only selected specialty pages and APIs may be exposed for the institution",
+      "each enabled module must use its own data namespace and rollback unit",
+      "disabled specialty modules must remain unreachable and receive no production traffic",
+      "shared platform capabilities do not activate a peer specialty module",
+      "site evidence and formal Go/No-Go approval remain mandatory after module activation"
+    ]
+  };
+}
+
 function sha256(value) {
   return crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
@@ -296,6 +333,9 @@ function buildSpecialtyCutoverPack(options = {}) {
     return normalizeTrack(track, report);
   });
   const moduleCatalog = buildModuleCatalog(allTracks, enabledTracks);
+  const institutionDeploymentManifest = buildInstitutionDeploymentManifest(moduleCatalog, {
+    institutionId: options.institutionId
+  });
   const firstIncrement = selectFirstIncrement(tracks);
   const evidenceDossier = buildEvidenceDossier(tracks, firstIncrement);
   const pilotBatchPlan = buildPilotBatchPlan(tracks, firstIncrement);
@@ -320,6 +360,7 @@ function buildSpecialtyCutoverPack(options = {}) {
     summary,
     stages: CUTOVER_STAGES,
     moduleCatalog,
+    institutionDeploymentManifest,
     tracks,
     firstIncrement,
     crossTrackControls: buildCrossTrackControls(tracks),
@@ -337,7 +378,7 @@ function buildSpecialtyCutoverPack(options = {}) {
   };
   pack.integrity = {
     algorithm: "sha256",
-    digest: `sha256:${sha256({ summary, moduleCatalog, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision, evidenceDossier, pilotBatchPlan, siteEvidenceWorkflow, acceptanceScenarioSuite, scenarioEvidenceMatrix, cutoverCommandCenter, observationSignalBoard, runtimeSmokePlan })}`
+    digest: `sha256:${sha256({ summary, moduleCatalog, institutionDeploymentManifest, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision, evidenceDossier, pilotBatchPlan, siteEvidenceWorkflow, acceptanceScenarioSuite, scenarioEvidenceMatrix, cutoverCommandCenter, observationSignalBoard, runtimeSmokePlan })}`
   };
   return pack;
 }
@@ -1171,6 +1212,7 @@ function buildRuntimeSmokePlan(tracks, firstIncrement, observationSignalBoard) {
 function renderMarkdown(pack) {
   const rows = pack.tracks.map((item) => `| ${item.name} | ${item.department} | ${item.codeReady ? "是" : "否"} | ${item.productionReady ? "是" : "否"} | ${item.blockers.length} | ${item.page} |`);
   const moduleRows = (pack.moduleCatalog?.modules || []).map((item) => `| ${item.name} | ${item.deploymentUnit} | ${item.selected ? "yes" : "no"} | ${item.requiredPeerModules.length} | ${item.page} | ${item.api} |`);
+  const deploymentRows = (pack.institutionDeploymentManifest?.enabledModules || []).map((item) => `| ${item.name} | ${item.deploymentUnit} | ${item.page} | ${item.api} | ${item.dataNamespace} | ${item.rollbackUnit} |`);
   const blockers = pack.tracks.flatMap((track) => track.blockers.map((item) => `| ${track.name} | ${item.id} | ${item.title} | ${item.owner} | ${item.status} |`));
   const evidenceRows = (pack.evidenceDossier?.entries || []).map((item) => `| ${item.trackName} | ${item.evidenceId} | ${item.severity} | ${item.requiredForFirstIncrement ? "yes" : "no"} | ${item.hardStopIfMissing ? "yes" : "no"} | ${item.status} |`);
   const batchRows = (pack.pilotBatchPlan?.batches || []).map((item) => `| ${item.id} | ${item.name} | ${item.scope} | ${item.promotionDecision} |`);
@@ -1200,6 +1242,21 @@ function renderMarkdown(pack) {
     "| Module | Deployment unit | Enabled | Peer dependencies | Page | API |",
     "|---|---|---:|---:|---|---|",
     ...moduleRows,
+    "",
+    "## Institution deployment manifest",
+    "",
+    `- Institution: ${pack.institutionDeploymentManifest?.institutionId || "institution-template"}`,
+    `- Activation policy: ${pack.institutionDeploymentManifest?.activationPolicy || "deny-by-default"}`,
+    `- Production traffic: ${pack.institutionDeploymentManifest?.productionTrafficState || "blocked-until-site-evidence-signed"}`,
+    `- Disabled modules: ${(pack.institutionDeploymentManifest?.disabledModuleIds || []).join(", ") || "none"}`,
+    "",
+    "| Module | Deployment unit | Page allowlist | API allowlist | Data namespace | Rollback unit |",
+    "|---|---|---|---|---|---|",
+    ...deploymentRows,
+    "",
+    "### Deployment validation rules",
+    "",
+    ...(pack.institutionDeploymentManifest?.validationRules || []).map((item) => `- ${item}`),
     "",
     "## 专项状态",
     "",
@@ -1372,6 +1429,9 @@ function parseCliOptions(argv = process.argv.slice(2), env = process.env) {
     } else if (argument === "--output-prefix") {
       options.outputPrefix = String(argv[index + 1] || "").trim();
       index += 1;
+    } else if (argument === "--institution-id") {
+      options.institutionId = String(argv[index + 1] || "").trim();
+      index += 1;
     } else {
       throw new Error(`unknown argument: ${argument}`);
     }
@@ -1382,12 +1442,18 @@ function parseCliOptions(argv = process.argv.slice(2), env = process.env) {
   if (options.outputPrefix && !/^[a-z0-9][a-z0-9-]*$/i.test(options.outputPrefix)) {
     throw new Error("output prefix may contain only letters, numbers and hyphens");
   }
+  if (options.institutionId && !/^[a-z0-9][a-z0-9._-]*$/i.test(options.institutionId)) {
+    throw new Error("institution id may contain only letters, numbers, dots, underscores and hyphens");
+  }
   return options;
 }
 
 function runCli() {
   const cli = parseCliOptions();
-  const pack = buildSpecialtyCutoverPack({ enabledTrackIds: cli.enabledTrackIds });
+  const pack = buildSpecialtyCutoverPack({
+    enabledTrackIds: cli.enabledTrackIds,
+    institutionId: cli.institutionId
+  });
   const output = writeCutoverPack(pack, cli.outputPrefix ? {
     jsonName: `${cli.outputPrefix}.json`,
     markdownName: `${cli.outputPrefix}.md`
@@ -1405,6 +1471,7 @@ module.exports = {
   TRACK_SCENARIO_PROFILES,
   buildSpecialtyCutoverPack,
   buildModuleCatalog,
+  buildInstitutionDeploymentManifest,
   resolveEnabledTracks,
   parseCliOptions,
   renderMarkdown,

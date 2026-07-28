@@ -55,7 +55,13 @@ function buildOfflineChecks(pack, options = {}) {
     check("t10:independent-module-selection", pack.moduleCatalog?.enabledModuleIds?.length === pack.tracks?.length && pack.moduleCatalog?.peerModuleDependencyCount === 0 && pack.moduleCatalog?.modules?.every((item) => item.independentlySelectable), `${pack.moduleCatalog?.enabledModuleIds?.length || 0} enabled modules; ${pack.moduleCatalog?.peerModuleDependencyCount ?? "unknown"} peer dependencies`),
     check("t10:runtime-smoke-plan", pack.runtimeSmokePlan?.status === "ready-for-runtime-smoke" && pack.runtimeSmokePlan?.launchMode === "controlled-rehearsal-only" && runtimeSuites.length === 5, `${runtimeSuites.length} smoke suites / ${pack.runtimeSmokePlan?.launchMode || "unknown"}`),
     check("t10:runtime-smoke-suites", ["smoke-artifact-generation", "smoke-static-preview", "smoke-server-api", "smoke-release-gates", "smoke-observation-artifacts"].every((id) => runtimeSuites.some((suite) => suite.id === id)), "artifact, preview, API, release gates and observation artifact suites are declared"),
-    check("t10:static-preview", html.includes("runtime-smoke-plan") && html.includes("t10-specialty-cutover.js?v=runtime-smoke-plan") && client.includes("renderRuntimeSmokePlan"), "runtime smoke panel and renderer are wired"),
+    check(
+      "t10:static-preview",
+      html.includes('id="runtime-smoke-plan"')
+        && /t10-specialty-cutover\.js\?v=[a-z0-9-]+/i.test(html)
+        && client.includes("renderRuntimeSmokePlan"),
+      "runtime smoke panel, versioned client and renderer are wired"
+    ),
     check("t10:route-contracts", routeRows.length === pack.tracks?.length && routeRows.every((route) => pack.tracks.some((track) => track.id === route.trackId && track.page === route.page && track.api === route.api)), `${routeRows.length}/${pack.tracks?.length || 0} route contracts match tracks`),
     check("t10:site-evidence-boundary", pack.evidenceDossier?.status === "site-evidence-pending" && pack.evidenceDossier?.hardStopOpen > 0 && pack.evidenceDossier?.reviewPolicy?.submitterMustDifferFromReviewer, `${pack.evidenceDossier?.hardStopOpen || 0} open hard stops; four-eyes ${pack.evidenceDossier?.reviewPolicy?.submitterMustDifferFromReviewer ? "on" : "off"}`),
     check("t10:command-and-observation", pack.cutoverCommandCenter?.roster?.some((item) => item.seat === "release-commander") && pack.observationSignalBoard?.summary?.lanes === 4 && observationArtifacts.includes("t-plus-1-observation-memo"), `${pack.observationSignalBoard?.summary?.lanes || 0} observation lanes; ${observationArtifacts.length} artifacts`),

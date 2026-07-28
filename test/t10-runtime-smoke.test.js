@@ -22,7 +22,7 @@ function smokeFixture() {
     pack,
     writeCutoverArtifacts: false,
     exists: (relativePath) => ["release/t10-specialty-cutover-pack.json", "release/t10-specialty-cutover-pack.md"].includes(relativePath),
-    html: '<div id="runtime-smoke-plan"></div><script src="./t10-specialty-cutover.js?v=runtime-smoke-plan"></script>',
+    html: '<div id="runtime-smoke-plan"></div><script src="./t10-specialty-cutover.js?v=institution-deployment-manifest"></script>',
     client: 'fetch("./release/t10-specialty-cutover-pack.json"); function renderRuntimeSmokePlan() {}',
     releaseReportSource: "function specialtyCutoverChecks() { return ['specialtyCutover:runtimeSmokePlan']; }"
   };

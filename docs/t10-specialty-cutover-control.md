@@ -87,10 +87,12 @@ Generate a standalone or institution-specific pack with:
 
 ```powershell
 node emergency-specialty-cutover.js --tracks clinical-blood --output-prefix t10-clinical-blood
-node emergency-specialty-cutover.js --tracks regional-imaging-cloud,physical-examination --output-prefix institution-a-specialties
+node emergency-specialty-cutover.js --tracks regional-imaging-cloud,physical-examination --institution-id institution-a --output-prefix institution-a-specialties
 ```
 
 The default command still generates the four-module T10 integration pack. `moduleCatalog` records enabled and disabled module IDs, deployment units, external systems, data boundaries, shared platform capabilities and peer-module dependencies. The peer dependency count must remain zero so an institution can adopt any one module without installing the other three.
+
+`institutionDeploymentManifest` turns that selection into a fail-closed deployment contract. It records the institution ID, enabled and disabled modules, page/API allowlists, per-module data namespaces, external systems and independent rollback units. Disabled modules must remain unreachable and receive no production traffic. Enabling a module does not waive site evidence or formal Go/No-Go approval; production traffic remains `blocked-until-site-evidence-signed`.
 
 ## Site evidence dossier
 
