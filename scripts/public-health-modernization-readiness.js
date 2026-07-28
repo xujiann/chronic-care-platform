@@ -27,6 +27,34 @@ const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "public-health-modernization-readiness-report.json");
 const DEFAULT_MARKDOWN = path.join(ROOT, "release", "public-health-modernization-readiness-report.md");
 const RULE_GOVERNANCE_SECRET = "public-health-modernization-readiness-rule-secret-2026";
+const RULE_GOVERNANCE_NEXT_SECRET = "public-health-modernization-readiness-next-secret-2026";
+const RULE_GOVERNANCE_OLD_KEYRING = {
+  purpose: "public-health-surveillance-rule-activation",
+  activeKeyId: "readiness-rule-key-a",
+  keys: [{
+    keyId: "readiness-rule-key-a",
+    secret: RULE_GOVERNANCE_SECRET,
+    status: "active",
+    notBefore: "2026-01-01T00:00:00.000Z",
+    expiresAt: "2027-01-01T00:00:00.000Z",
+    revokedAt: ""
+  }]
+};
+const RULE_GOVERNANCE_ROTATED_KEYRING = {
+  purpose: "public-health-surveillance-rule-activation",
+  activeKeyId: "readiness-rule-key-b",
+  keys: [
+    { ...RULE_GOVERNANCE_OLD_KEYRING.keys[0], status: "grace" },
+    {
+      keyId: "readiness-rule-key-b",
+      secret: RULE_GOVERNANCE_NEXT_SECRET,
+      status: "active",
+      notBefore: "2026-07-28T09:41:00.000Z",
+      expiresAt: "2027-07-28T00:00:00.000Z",
+      revokedAt: ""
+    }
+  ]
+};
 
 function check(id, passed, detail, category) {
   return { id, passed: Boolean(passed), detail, category };
@@ -94,8 +122,7 @@ function runRuleGovernanceAcceptance(data) {
     expectedVersion: 2,
     at: "2026-07-28T09:45:00.000Z"
   }, { name: "readiness-rule-service", role: "system" }, {
-    verificationSecret: RULE_GOVERNANCE_SECRET,
-    keyId: "readiness-rule-key"
+    activationKeyring: RULE_GOVERNANCE_OLD_KEYRING
   });
 }
 
@@ -201,7 +228,8 @@ function runPublicHealthModernizationAcceptance() {
   const ruleGovernanceAcceptance = runRuleGovernanceAcceptance(alertResult.nextData);
   const ruleGovernance = buildPublicHealthSurveillanceRuleGovernance({
     data: ruleGovernanceAcceptance.nextData,
-    verificationSecret: RULE_GOVERNANCE_SECRET
+    activationKeyring: RULE_GOVERNANCE_ROTATED_KEYRING,
+    at: "2026-07-28T09:50:00.000Z"
   });
   return {
     intake,
@@ -217,7 +245,7 @@ function runPublicHealthModernizationAcceptance() {
     }),
     surveillance: buildPublicHealthSurveillanceCenter({
       data: ruleGovernanceAcceptance.nextData,
-      ruleVerificationSecret: RULE_GOVERNANCE_SECRET
+      ruleActivationKeyring: RULE_GOVERNANCE_ROTATED_KEYRING
     })
   };
 }
@@ -249,6 +277,7 @@ function buildPublicHealthModernizationReadiness(options = {}) {
     check("collaboration:closure-gate", acceptance.surveillance.collaboration.summary.closedTasks === 2 && workflowSource.includes("collaboration tasks must be closed before the alert"), "2/2 collaboration tasks closed before alert closure", "collaboration"),
     check("security:role-version-idempotency", ["expectedVersion", "idempotencyKeyHash", "payloadFingerprint", "validatePublicHealthSurveillanceAlert", "cdc-surveillance", "modelAdviceOnly"].every((token) => workflowSource.includes(token)) && ["ownerRole", "expectedVersion", "idempotencyKeyHash", "payloadFingerprint", "validatePublicHealthMedicalPreventionTask"].every((token) => collaborationSource.includes(token)), "roles, versions, payload-bound hashed idempotency, persisted-state integrity and AI advisory boundary are enforced", "security"),
     check("security:trusted-rule-activation", ["createHmac", "timingSafeEqual", "verificationSource", "signatureVerified", "signPublicHealthSurveillanceRuleActivationReceipt", "verifyPublicHealthSurveillanceRuleActivationReceipt", "ungoverned-rule-materialization"].every((token) => ruleGovernanceSource.includes(token)), "rule activation binds trust fields to a server receipt and rejects ungoverned materialization", "security"),
+    check("security:managed-rule-keyring", acceptance.ruleGovernance.summary.managedKeyringReady === true && acceptance.ruleGovernance.keyring.activeKeyId === "readiness-rule-key-b" && acceptance.ruleGovernance.keyring.keys.some((item) => item.keyId === "readiness-rule-key-a" && item.status === "grace") && !JSON.stringify(acceptance.ruleGovernance).includes(RULE_GOVERNANCE_SECRET) && !JSON.stringify(acceptance.ruleGovernance).includes(RULE_GOVERNANCE_NEXT_SECRET) && ["selectSigningKey", "resolveVerificationKey", "summarizeKeyring"].every((token) => ruleGovernanceSource.includes(token)), "managed active/grace key rotation verifies history without exposing signing secrets", "security"),
     check("integration:documented-t00-boundary", ["server.js", "SQLite", "T00", "productionReady=false", "/api/public-health/surveillance-signals", "/api/public-health/medical-prevention-tasks"].every((token) => documentation.includes(token)), "T00 API, durable writer and production boundary are documented", "integration"),
     check("safety:functional-not-production", acceptance.dataFoundation.productionReady === false && acceptance.surveillance.productionReady === false && acceptance.final.productionReady === false, "functional closure cannot self-assert production readiness", "safety")
   ];
@@ -265,6 +294,7 @@ function buildPublicHealthModernizationReadiness(options = {}) {
       rules: acceptance.surveillance.summary.rules,
       ruleVersions: acceptance.ruleGovernance.summary.ruleVersions,
       trustedRuleActivations: acceptance.ruleGovernance.summary.trustedActivations,
+      managedRuleKeyringReady: acceptance.ruleGovernance.summary.managedKeyringReady,
       freshSources: acceptance.sourceOperations.summary.fresh,
       noDataSources: acceptance.sourceOperations.summary.noData,
       signals: acceptance.surveillance.summary.signals,
@@ -312,6 +342,7 @@ function renderMarkdown(report) {
     `- Surveillance rules: ${report.summary.rules}/8`,
     `- Surveillance rule versions: ${report.summary.ruleVersions}`,
     `- Trusted rule activations: ${report.summary.trustedRuleActivations}`,
+    `- Managed rule keyring ready: ${report.summary.managedRuleKeyringReady ? "yes" : "no"}`,
     `- Fresh/no-data sources: ${report.summary.freshSources}/${report.summary.noDataSources}`,
     `- Closed alerts: ${report.summary.closedAlerts}/${report.summary.alerts}`,
     `- Closed medical-prevention tasks: ${report.summary.closedCollaborationTasks}/${report.summary.collaborationTasks}`,

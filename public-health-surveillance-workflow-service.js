@@ -531,16 +531,22 @@ function applyPublicHealthSurveillanceAlertActionToState(data = {}, alertId, pay
     nextData,
     surveillance: buildPublicHealthSurveillanceCenter({
       data: nextData,
-      ruleVerificationSecret: options.verificationSecret
+      ruleVerificationSecret: options.verificationSecret,
+      ruleActivationKeyring: options.activationKeyring
     }),
     productionReady: false
   };
 }
 
-function buildPublicHealthSurveillanceCenter({ data = {}, ruleVerificationSecret = "" } = {}) {
+function buildPublicHealthSurveillanceCenter({
+  data = {},
+  ruleVerificationSecret = "",
+  ruleActivationKeyring = null
+} = {}) {
   const ruleGovernance = buildPublicHealthSurveillanceRuleGovernance({
     data,
-    verificationSecret: ruleVerificationSecret
+    verificationSecret: ruleVerificationSecret,
+    activationKeyring: ruleActivationKeyring
   });
   const rules = ruleGovernance.rules;
   const signals = Array.isArray(data.publicHealthSurveillanceSignals)
@@ -555,7 +561,8 @@ function buildPublicHealthSurveillanceCenter({ data = {}, ruleVerificationSecret
   const dataFoundation = buildPublicHealthDataFoundation({ data });
   const collaboration = buildPublicHealthMedicalPreventionBoard({ data, alerts });
   const alertIntegrityFindings = alerts.flatMap((alert) => validatePublicHealthSurveillanceAlert(alert, data, {
-    verificationSecret: ruleVerificationSecret
+    verificationSecret: ruleVerificationSecret,
+    activationKeyring: ruleActivationKeyring
   })
     .map((code) => ({ alertId: clean(alert.id), code })));
   const openAlerts = alerts.filter((item) => item.status !== "closed");

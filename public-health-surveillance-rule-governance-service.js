@@ -1,7 +1,13 @@
 "use strict";
 
 const crypto = require("node:crypto");
+const {
+  resolveVerificationKey,
+  selectSigningKey,
+  summarizeKeyring
+} = require("./public-health-external-keyring-service");
 
+const RULE_ACTIVATION_KEYRING_PURPOSE = "public-health-surveillance-rule-activation";
 const PUBLIC_HEALTH_SURVEILLANCE_RULES = Object.freeze([
   { id: "ph-rule-case-report", version: 1, signalType: "case-report", metricCode: "reportable-case-count", operator: ">=", threshold: 1, severity: "high", status: "active", owner: "传染病监测部门" },
   { id: "ph-rule-clinical-syndrome", version: 1, signalType: "clinical-syndrome", metricCode: "fever-respiratory-count", operator: ">=", threshold: 5, severity: "high", status: "active", owner: "传染病监测部门" },
@@ -126,10 +132,38 @@ function activationReceiptPayload(change = {}) {
   ].join("\n");
 }
 
-function signPublicHealthSurveillanceRuleActivationReceipt(change = {}, verificationSecret = "") {
-  const secret = clean(verificationSecret);
-  if (secret.length < 32) throw new Error("rule activation verification secret must contain at least 32 characters");
-  return crypto.createHmac("sha256", secret).update(activationReceiptPayload(change)).digest("hex");
+function materialForLegacyReceipt(material, receipt = {}) {
+  if (typeof material === "string") {
+    return { secret: material, keyId: clean(receipt.keyId || "rule-governance-static") };
+  }
+  if (material && typeof material === "object" && clean(material.secret) && !clean(material.keyId)) {
+    return { ...material, keyId: clean(receipt.keyId || "rule-governance-static") };
+  }
+  return material;
+}
+
+function ruleActivationMaterial(options = {}) {
+  if (options.activationKeyring) return options.activationKeyring;
+  if (options.verificationMaterial) return options.verificationMaterial;
+  if (clean(options.verificationSecret)) {
+    return clean(options.keyId)
+      ? { secret: clean(options.verificationSecret), keyId: clean(options.keyId) }
+      : clean(options.verificationSecret);
+  }
+  return "";
+}
+
+function signPublicHealthSurveillanceRuleActivationReceipt(change = {}, signingMaterial = "") {
+  const receipt = change.activation?.receipt || {};
+  const material = materialForLegacyReceipt(signingMaterial, receipt);
+  const key = selectSigningKey(material, clean(receipt.signedAt || change.activation?.at));
+  if (!key.legacy && key.purpose !== RULE_ACTIVATION_KEYRING_PURPOSE) {
+    throw new Error(`rule activation keyring purpose must be ${RULE_ACTIVATION_KEYRING_PURPOSE}`);
+  }
+  if (clean(key.keyId) !== clean(receipt.keyId)) {
+    throw new Error("rule activation receipt keyId must identify the active signing key");
+  }
+  return crypto.createHmac("sha256", key.secret).update(activationReceiptPayload(change)).digest("hex");
 }
 
 function timingSafeHexEqual(left, right) {
@@ -137,20 +171,25 @@ function timingSafeHexEqual(left, right) {
   return crypto.timingSafeEqual(Buffer.from(clean(left), "hex"), Buffer.from(clean(right), "hex"));
 }
 
-function verifyPublicHealthSurveillanceRuleActivationReceipt(change = {}, verificationSecret = "") {
+function verifyPublicHealthSurveillanceRuleActivationReceipt(change = {}, verificationMaterial = "") {
   const receipt = change.activation?.receipt || {};
   if (clean(change.status) !== "activated"
     || clean(receipt.version) !== RECEIPT_VERSION
     || clean(receipt.verificationSource) !== RECEIPT_SOURCE
     || receipt.signatureVerified !== true
     || clean(receipt.signatureAlgorithm) !== "HMAC-SHA256"
-    || !clean(receipt.keyId)
-    || clean(verificationSecret).length < 32) {
+    || !clean(receipt.keyId)) {
     return false;
   }
+  const material = materialForLegacyReceipt(verificationMaterial, receipt);
+  const resolution = resolveVerificationKey(material, receipt.keyId, receipt.signedAt);
+  if (!resolution.ok) return false;
+  if (!resolution.key.legacy && resolution.key.purpose !== RULE_ACTIVATION_KEYRING_PURPOSE) return false;
   let expected;
   try {
-    expected = signPublicHealthSurveillanceRuleActivationReceipt(change, verificationSecret);
+    expected = crypto.createHmac("sha256", resolution.key.secret)
+      .update(activationReceiptPayload(change))
+      .digest("hex");
   } catch {
     return false;
   }
@@ -249,6 +288,7 @@ function validatePublicHealthSurveillanceRuleChange(change = {}) {
 }
 
 function buildTrustedPublicHealthSurveillanceRuleRegistry(data = {}, options = {}) {
+  const verificationMaterial = ruleActivationMaterial(options);
   const rules = PUBLIC_HEALTH_SURVEILLANCE_RULES.map((item) => clone(item));
   const ruleVersions = PUBLIC_HEALTH_SURVEILLANCE_RULES.map((item) => clone(item));
   const changes = Array.isArray(data.publicHealthSurveillanceRuleChanges)
@@ -270,7 +310,7 @@ function buildTrustedPublicHealthSurveillanceRuleRegistry(data = {}, options = {
       findings.push({ changeId: clean(change.id), ruleId: clean(change.ruleId), code: "rule-change-chain-invalid" });
       return;
     }
-    if (!verifyPublicHealthSurveillanceRuleActivationReceipt(change, options.verificationSecret)) {
+    if (!verifyPublicHealthSurveillanceRuleActivationReceipt(change, verificationMaterial)) {
       findings.push({ changeId: clean(change.id), ruleId: clean(change.ruleId), code: "trusted-rule-activation-receipt-invalid" });
       return;
     }
@@ -458,8 +498,16 @@ function reviewPublicHealthSurveillanceRuleChangeToState(data = {}, changeIdValu
 function activatePublicHealthSurveillanceRuleChangeToState(data = {}, changeIdValue, payload = {}, user = {}, options = {}) {
   const role = actorRole(user);
   if (!["commission", "system"].includes(role)) throw new Error(`role ${role || "missing"} is not allowed to activate a rule change`);
-  const secret = clean(options.verificationSecret);
-  if (secret.length < 32) throw new Error("trusted server rule activation verification secret is required");
+  const signingMaterial = ruleActivationMaterial(options);
+  let signingKey;
+  try {
+    signingKey = selectSigningKey(signingMaterial, clean(payload.at || new Date().toISOString()));
+  } catch {
+    throw new Error("trusted server rule activation signing keyring is required");
+  }
+  if (!signingKey.legacy && signingKey.purpose !== RULE_ACTIVATION_KEYRING_PURPOSE) {
+    throw new Error(`rule activation keyring purpose must be ${RULE_ACTIVATION_KEYRING_PURPOSE}`);
+  }
   const changes = ruleChangeCollection(data);
   const index = changes.findIndex((item) => clean(item.id) === clean(changeIdValue));
   if (index < 0) throw new Error("unknown public health rule change");
@@ -501,7 +549,7 @@ function activatePublicHealthSurveillanceRuleChangeToState(data = {}, changeIdVa
     version: RECEIPT_VERSION,
     verificationSource: RECEIPT_SOURCE,
     signatureVerified: true,
-    keyId: clean(options.keyId || "rule-governance-static"),
+    keyId: signingKey.keyId,
     signedAt: at,
     signatureAlgorithm: "HMAC-SHA256",
     signature: ""
@@ -521,13 +569,13 @@ function activatePublicHealthSurveillanceRuleChangeToState(data = {}, changeIdVa
     },
     timeline: [...change.timeline, event]
   };
-  next.activation.receipt.signature = signPublicHealthSurveillanceRuleActivationReceipt(next, secret);
+  next.activation.receipt.signature = signPublicHealthSurveillanceRuleActivationReceipt(next, signingMaterial);
   changes[index] = next;
   const interimData = { ...data, publicHealthSurveillanceRuleChanges: changes };
   const registry = buildTrustedPublicHealthSurveillanceRuleRegistry({
     ...interimData,
     publicHealthSurveillanceRules: []
-  }, { verificationSecret: secret });
+  }, { verificationMaterial: signingMaterial });
   if (registry.findings.length) throw new Error(`trusted public health rule activation failed: ${registry.findings[0].code}`);
   const nextData = {
     ...interimData,
@@ -543,8 +591,23 @@ function activatePublicHealthSurveillanceRuleChangeToState(data = {}, changeIdVa
   };
 }
 
-function buildPublicHealthSurveillanceRuleGovernance({ data = {}, verificationSecret = "" } = {}) {
-  const registry = buildTrustedPublicHealthSurveillanceRuleRegistry(data, { verificationSecret });
+function buildPublicHealthSurveillanceRuleGovernance({
+  data = {},
+  verificationSecret = "",
+  activationKeyring = null,
+  at = new Date().toISOString()
+} = {}) {
+  const verificationMaterial = activationKeyring || verificationSecret;
+  const registry = buildTrustedPublicHealthSurveillanceRuleRegistry(data, { verificationMaterial });
+  const keyring = verificationMaterial
+    ? summarizeKeyring(verificationMaterial, at)
+    : {
+        ok: false,
+        productionReady: false,
+        activeKeyId: "",
+        keys: [],
+        blockers: ["Rule activation verification keyring is unavailable."]
+      };
   return {
     ok: registry.ok,
     functionalState: registry.findings.length
@@ -560,6 +623,8 @@ function buildPublicHealthSurveillanceRuleGovernance({ data = {}, verificationSe
       approved: registry.changes.filter((item) => item.status === "approved").length,
       activated: registry.changes.filter((item) => item.status === "activated").length,
       trustedActivations: registry.trustedChanges.length,
+      managedKeyringReady: keyring.productionReady === true
+        && keyring.purpose === RULE_ACTIVATION_KEYRING_PURPOSE,
       findings: registry.findings.length
     },
     rules: registry.rules.map(canonicalRule),
@@ -578,6 +643,7 @@ function buildPublicHealthSurveillanceRuleGovernance({ data = {}, verificationSe
       activatedBy: clean(item.activation?.activatedBy)
     })),
     findings: registry.findings,
+    keyring,
     productionReady: false,
     blockers: [
       "Production thresholds require disease-control approval and controlled change windows.",
@@ -587,6 +653,7 @@ function buildPublicHealthSurveillanceRuleGovernance({ data = {}, verificationSe
 }
 
 module.exports = {
+  RULE_ACTIVATION_KEYRING_PURPOSE,
   PUBLIC_HEALTH_SURVEILLANCE_RULES,
   RULE_CHANGE_ACTIONS,
   activatePublicHealthSurveillanceRuleChangeToState,
