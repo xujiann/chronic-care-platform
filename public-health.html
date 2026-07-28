@@ -136,6 +136,68 @@
           </form>
         </article>
 
+        <article class="panel public-health-modernization-panel" aria-labelledby="public-health-data-source-operations-title">
+          <div class="panel-title">
+            <div>
+              <h2 id="public-health-data-source-operations-title">数据源运行状态</h2>
+              <span>按服务端时钟观测刷新时效、质量复核和无数据告警</span>
+            </div>
+            <span id="public-health-data-source-operations-status" class="badge warn">加载前未就绪</span>
+          </div>
+          <div id="public-health-data-source-operations-metrics" class="modernization-metrics"></div>
+          <div id="public-health-data-source-operations-list" class="modernization-list" aria-live="polite"></div>
+          <p class="modernization-boundary-note">登记来源不代表稳定供数；本面板不显示端点、凭据或原始外部记录编号。</p>
+        </article>
+
+        <article class="panel public-health-modernization-panel" aria-labelledby="public-health-rule-governance-title">
+          <div class="panel-title">
+            <div>
+              <h2 id="public-health-rule-governance-title">规则治理</h2>
+              <span>提交、独立复核、服务端可信激活与历史版本留存</span>
+            </div>
+            <span id="public-health-rule-governance-status" class="badge warn">加载前未就绪</span>
+          </div>
+          <div id="public-health-rule-governance-metrics" class="modernization-metrics"></div>
+          <div id="public-health-rule-governance-list" class="modernization-list" aria-live="polite"></div>
+          <form id="public-health-rule-change-form" class="modernization-form">
+            <h3>提交规则变更</h3>
+            <label>规则
+              <select name="ruleId" required>
+                <option value="ph-rule-case-report">传染病病例报告</option>
+                <option value="ph-rule-clinical-syndrome">临床症候群</option>
+                <option value="ph-rule-laboratory-pathogen">实验室病原</option>
+                <option value="ph-rule-public-health-event">突发公共卫生事件</option>
+                <option value="ph-rule-immunization-aefi">免疫接种与 AEFI</option>
+                <option value="ph-rule-vector-environment">病媒与环境</option>
+                <option value="ph-rule-department-collaboration">跨部门协同</option>
+                <option value="ph-rule-social-sensing">社会感知</option>
+              </select>
+            </label>
+            <label>当前版本<input name="expectedVersion" type="number" min="1" value="1" required></label>
+            <label>新阈值<input name="threshold" type="number" min="0" step="any" required></label>
+            <label>风险等级
+              <select name="severity" required>
+                <option value="medium">medium</option>
+                <option value="high" selected>high</option>
+                <option value="critical">critical</option>
+                <option value="low">low</option>
+              </select>
+            </label>
+            <label>目标状态
+              <select name="status" required>
+                <option value="active">active</option>
+                <option value="paused">paused</option>
+                <option value="retired">retired</option>
+              </select>
+            </label>
+            <label class="wide-field">变更理由<input name="reason" required></label>
+            <label class="wide-field">证据引用<input name="evidenceRef" required></label>
+            <button type="submit" class="inline-action">提交待独立复核</button>
+            <p id="public-health-rule-change-status" role="status" aria-live="polite"></p>
+          </form>
+          <p class="modernization-boundary-note">复核人与提交人必须不同；客户端不能提供密钥、可信来源、验签标志或签名回执。</p>
+        </article>
+
         <article class="panel public-health-modernization-panel" aria-labelledby="public-health-surveillance-title">
           <div class="panel-title">
             <div>

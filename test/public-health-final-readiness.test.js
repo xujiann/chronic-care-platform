@@ -14,12 +14,12 @@ test("final readiness accepts every planned T08 functional increment", () => {
   const report = buildPublicHealthFinalReadiness();
   assert.equal(report.ok, true);
   assert.equal(report.functionalState, "t08-public-health-planned-functions-complete");
-  assert.equal(report.summary.checks, 73);
-  assert.equal(report.summary.passed, 73);
+  assert.equal(report.summary.checks, 76);
+  assert.equal(report.summary.passed, 76);
   assert.equal(report.summary.t08FunctionalChecks, 55);
   assert.equal(report.summary.t08FunctionalPassed, 55);
-  assert.equal(report.summary.t00BoundaryChecks, 18);
-  assert.equal(report.summary.t00BoundaryPassed, 18);
+  assert.equal(report.summary.t00BoundaryChecks, 21);
+  assert.equal(report.summary.t00BoundaryPassed, 21);
   assert.equal(report.summary.lanes, 8);
   assert.equal(report.summary.handoffs, 8);
   assert.equal(report.summary.adapterProfiles, 8);
@@ -71,6 +71,9 @@ test("final readiness accepts every planned T08 functional increment", () => {
   assert.equal(report.checks.find((item) => item.id === "integration:t00-modernization-routes").passed, true);
   assert.equal(report.checks.find((item) => item.id === "integration:t00-modernization-persistence").passed, true);
   assert.equal(report.checks.find((item) => item.id === "integration:t00-modernization-ui-release").passed, true);
+  assert.equal(report.checks.find((item) => item.id === "integration:t00-modernization-source-operations").passed, true);
+  assert.equal(report.checks.find((item) => item.id === "integration:t00-surveillance-rule-governance").passed, true);
+  assert.equal(report.checks.find((item) => item.id === "integration:t00-surveillance-rule-governance-ui-release").passed, true);
   assert.equal(report.checks.find((item) => item.id === "safety:emergency-revocation-quarantine").passed, true);
 });
 
@@ -93,8 +96,8 @@ test("final readiness renders and writes machine and human reports", () => {
   assert.match(fs.readFileSync(markdown, "utf8"), /Verified endpoint probes: 8\/8/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Verified endpoint probe campaigns: 3\/3/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Verified endpoint probe campaign links: 2\/2/);
-  assert.match(fs.readFileSync(markdown, "utf8"), /T08 functional checks: 53\/53/);
-  assert.match(fs.readFileSync(markdown, "utf8"), /T00 public boundary checks: 18\/18/);
+  assert.match(fs.readFileSync(markdown, "utf8"), /T08 functional checks: 55\/55/);
+  assert.match(fs.readFileSync(markdown, "utf8"), /T00 public boundary checks: 21\/21/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Modernization data sources: 8\/8/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Modernization trusted rule activations: 1/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Modernization fresh\/no-data sources: 1\/7/);

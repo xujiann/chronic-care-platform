@@ -92,6 +92,7 @@ document.addEventListener("click", handlePublicHealthStandardImplementationActio
 document.addEventListener("click", handlePublicHealthLaunchGateAction);
 document.addEventListener("click", handlePublicHealthModernizationAction);
 document.addEventListener("submit", handlePublicHealthSignalIntake);
+document.addEventListener("submit", handlePublicHealthRuleChangeSubmit);
 
 async function loadPublicHealthSystem() {
   if (PUBLIC_HEALTH_API_BASE) {
@@ -114,6 +115,8 @@ const PUBLIC_HEALTH_CONNECTIVITY_ENDPOINTS = Object.freeze({
 
 const PUBLIC_HEALTH_MODERNIZATION_ENDPOINTS = Object.freeze({
   foundation: "/api/public-health/data-foundation",
+  sourceOperations: "/api/public-health/data-source-operations",
+  ruleGovernance: "/api/public-health/surveillance-rule-governance",
   surveillance: "/api/public-health/surveillance-center",
   collaboration: "/api/public-health/medical-prevention-tasks"
 });
@@ -142,8 +145,10 @@ async function loadPublicHealthModernizationWorkbenches() {
     .map((endpoint) => request(endpoint).then(readPublicHealthModernizationResponse)));
   currentPublicHealthModernization = {
     foundation: results[0].status === "fulfilled" ? results[0].value : null,
-    surveillance: results[1].status === "fulfilled" ? results[1].value : null,
-    collaboration: results[2].status === "fulfilled" ? results[2].value : null
+    sourceOperations: results[1].status === "fulfilled" ? results[1].value : null,
+    ruleGovernance: results[2].status === "fulfilled" ? results[2].value : null,
+    surveillance: results[3].status === "fulfilled" ? results[3].value : null,
+    collaboration: results[4].status === "fulfilled" ? results[4].value : null
   };
   renderPublicHealthModernizationWorkbenches(currentPublicHealthModernization, results);
 }
@@ -151,6 +156,8 @@ async function loadPublicHealthModernizationWorkbenches() {
 function renderPublicHealthModernizationLoading() {
   [
     "#public-health-data-foundation-status",
+    "#public-health-data-source-operations-status",
+    "#public-health-rule-governance-status",
     "#public-health-surveillance-status",
     "#public-health-medical-prevention-status"
   ].forEach((selector) => {
@@ -175,9 +182,21 @@ function renderModernizationStatus(selector, value, available) {
 
 function renderPublicHealthModernizationWorkbenches(state, results = []) {
   const foundation = state.foundation;
+  const sourceOperations = state.sourceOperations;
+  const ruleGovernance = state.ruleGovernance;
   const surveillance = state.surveillance;
   const collaboration = state.collaboration;
   renderModernizationStatus("#public-health-data-foundation-status", foundation, Boolean(foundation));
+  renderModernizationStatus(
+    "#public-health-data-source-operations-status",
+    sourceOperations,
+    Boolean(sourceOperations)
+  );
+  renderModernizationStatus(
+    "#public-health-rule-governance-status",
+    ruleGovernance,
+    Boolean(ruleGovernance)
+  );
   renderModernizationStatus("#public-health-surveillance-status", surveillance, Boolean(surveillance));
   renderModernizationStatus("#public-health-medical-prevention-status", collaboration, Boolean(collaboration));
 
@@ -201,6 +220,9 @@ function renderPublicHealthModernizationWorkbenches(state, results = []) {
         </article>`).join("")
       : "<p class=\"modernization-empty\">服务不可用或无 commission 权限；数据底座按未就绪处理。</p>";
   }
+
+  renderPublicHealthDataSourceOperations(sourceOperations);
+  renderPublicHealthRuleGovernance(ruleGovernance);
 
   const surveillanceMetrics = document.querySelector("#public-health-surveillance-metrics");
   if (surveillanceMetrics) {
@@ -235,6 +257,69 @@ function renderPublicHealthModernizationWorkbenches(state, results = []) {
         .forEach((button) => { button.disabled = true; });
     }
   });
+}
+
+function renderPublicHealthDataSourceOperations(operations) {
+  const metrics = document.querySelector("#public-health-data-source-operations-metrics");
+  if (metrics) {
+    metrics.innerHTML = operations
+      ? [
+          modernizationMetric("新鲜", operations.summary?.fresh || 0),
+          modernizationMetric("延迟/陈旧", `${operations.summary?.delayed || 0}/${operations.summary?.stale || 0}`),
+          modernizationMetric("无数据", operations.summary?.noData || 0),
+          modernizationMetric("时钟/质量", `${operations.summary?.clockSkew || 0}/${operations.summary?.qualityReview || 0}`)
+        ].join("")
+      : modernizationMetric("来源运行", "不可用");
+  }
+  const target = document.querySelector("#public-health-data-source-operations-list");
+  if (!target) return;
+  if (!operations) {
+    target.innerHTML = "<p class=\"modernization-empty\">运行观测不可用，所有来源按未就绪处理。</p>";
+    return;
+  }
+  target.innerHTML = (operations.sources || []).map((source) => `<article class="modernization-item">
+    <div>
+      <strong>${escapeHtml(source.name || source.id)}</strong>
+      <small>刷新目标 ${escapeHtml(source.expectedRefreshMinutes || 0)} 分钟 / 信号 ${escapeHtml(source.signalCount || 0)} / 质量问题 ${escapeHtml(source.qualityFindings || 0)}</small>
+    </div>
+    <span class="badge ${source.operationalState === "fresh" ? "ok" : "warn"}">${escapeHtml(source.operationalState || "unknown")}</span>
+  </article>`).join("") || "<p class=\"modernization-empty\">尚无已登记来源。</p>";
+}
+
+function renderPublicHealthRuleGovernance(governance) {
+  const metrics = document.querySelector("#public-health-rule-governance-metrics");
+  if (metrics) {
+    metrics.innerHTML = governance
+      ? [
+          modernizationMetric("活动规则", `${governance.summary?.activeRules || 0}/${governance.summary?.rules || 0}`),
+          modernizationMetric("历史版本", governance.summary?.ruleVersions || 0),
+          modernizationMetric("待复核/待激活", `${governance.summary?.submitted || 0}/${governance.summary?.approved || 0}`),
+          modernizationMetric("托管激活密钥", governance.summary?.activationConfigured ? "已配置" : "未配置")
+        ].join("")
+      : modernizationMetric("规则治理", "不可用");
+  }
+  const target = document.querySelector("#public-health-rule-governance-list");
+  if (!target) return;
+  if (!governance) {
+    target.innerHTML = "<p class=\"modernization-empty\">规则治理不可用，持久化阈值不得参与评估。</p>";
+    return;
+  }
+  target.innerHTML = (governance.changes || []).map((change) => {
+    let actions = "";
+    if (change.status === "submitted") {
+      actions = `<button class="inline-action" data-modernization-kind="rule-change" data-modernization-id="${escapeHtml(change.id)}" data-modernization-version="${escapeHtml(change.version)}" data-modernization-action="review-rule-change" data-modernization-decision="approved">独立批准</button>
+        <button class="inline-action" data-modernization-kind="rule-change" data-modernization-id="${escapeHtml(change.id)}" data-modernization-version="${escapeHtml(change.version)}" data-modernization-action="review-rule-change" data-modernization-decision="rejected">驳回</button>`;
+    } else if (change.status === "approved") {
+      actions = `<button class="inline-action" data-modernization-kind="rule-change" data-modernization-id="${escapeHtml(change.id)}" data-modernization-version="${escapeHtml(change.version)}" data-modernization-action="activate-rule-change" ${governance.summary?.activationConfigured ? "" : "disabled"}>服务端可信激活</button>`;
+    }
+    return `<article class="modernization-item">
+      <div>
+        <strong>${escapeHtml(change.ruleId)} v${escapeHtml(change.fromVersion)}→v${escapeHtml(change.toVersion)}</strong>
+        <small>阈值 ${escapeHtml(change.threshold)} / ${escapeHtml(change.severity)} / ${escapeHtml(change.status)}</small>
+      </div>
+      <div class="action-row">${actions}</div>
+    </article>`;
+  }).join("") || "<p class=\"modernization-empty\">暂无规则变更；当前仅使用可信基线规则。</p>";
 }
 
 function renderPublicHealthModernizationSignals(signals) {
@@ -365,6 +450,36 @@ async function handlePublicHealthSignalIntake(event) {
   }
 }
 
+async function handlePublicHealthRuleChangeSubmit(event) {
+  const form = event.target.closest("#public-health-rule-change-form");
+  if (!form) return;
+  event.preventDefault();
+  const status = form.querySelector("#public-health-rule-change-status");
+  const values = new FormData(form);
+  const payload = {
+    expectedVersion: Number(values.get("expectedVersion")),
+    ruleId: String(values.get("ruleId") || ""),
+    threshold: Number(values.get("threshold")),
+    severity: String(values.get("severity") || ""),
+    status: String(values.get("status") || ""),
+    reason: String(values.get("reason") || ""),
+    evidenceRefs: [String(values.get("evidenceRef") || "")]
+  };
+  try {
+    status.textContent = "正在提交；操作者、时间和可信激活材料均由服务端绑定。";
+    await postPublicHealthModernization(
+      "/api/public-health/surveillance-rule-changes",
+      "public-health-rule-change-submit",
+      payload
+    );
+    status.textContent = "规则变更已提交，须由不同的 commission 操作者独立复核。";
+    form.reset();
+    await loadPublicHealthModernizationWorkbenches();
+  } catch (error) {
+    status.textContent = `提交失败关闭：${escapeHtml(error.code || error.message || "服务不可用")}`;
+  }
+}
+
 function promptRequired(label, fallback = "") {
   const value = window.prompt(label, fallback);
   if (value === null) throw new Error("操作已取消");
@@ -380,6 +495,13 @@ function publicHealthModernizationActionBody(button) {
     body.decision = button.dataset.modernizationDecision;
     body.note = promptRequired("人工核实说明");
     body.evidenceRefs = [promptRequired("核实证据引用")];
+  } else if (action === "review-rule-change") {
+    body.decision = button.dataset.modernizationDecision;
+    body.note = promptRequired("独立复核意见");
+    body.evidenceRefs = [promptRequired("独立复核证据引用")];
+  } else if (action === "activate-rule-change") {
+    body.note = promptRequired("受控激活说明");
+    body.evidenceRefs = [promptRequired("受控变更窗口证据引用")];
   } else if (action === "verify-alert") {
     body.riskLevel = promptRequired("风险等级：low / medium / high / critical", "medium");
     body.conclusion = promptRequired("人工研判结论");
@@ -435,7 +557,8 @@ async function handlePublicHealthModernizationAction(event) {
   const routes = {
     signal: `/api/public-health/surveillance-signals/${encodeURIComponent(id)}/actions`,
     alert: `/api/public-health/surveillance-alerts/${encodeURIComponent(id)}/actions`,
-    task: `/api/public-health/medical-prevention-tasks/${encodeURIComponent(id)}/actions`
+    task: `/api/public-health/medical-prevention-tasks/${encodeURIComponent(id)}/actions`,
+    "rule-change": `/api/public-health/surveillance-rule-changes/${encodeURIComponent(id)}/actions`
   };
   if (!routes[kind]) return;
   button.disabled = true;

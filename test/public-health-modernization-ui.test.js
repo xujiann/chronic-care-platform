@@ -38,19 +38,25 @@ function loadUiContext() {
   return { context, node };
 }
 
-test("modernization page exposes three accessible commission workbenches and controlled routes", () => {
+test("modernization page exposes five accessible commission workbenches and controlled routes", () => {
   const html = read("public-health.html");
   const source = read("public-health.js");
   const css = read("portal.css");
   assert.match(html, /aria-label="公共卫生现代化工作台"/);
   assert.match(html, /数据底座/);
+  assert.match(html, /数据源运行状态/);
+  assert.match(html, /规则治理/);
   assert.match(html, /监测预警/);
   assert.match(html, /医防协同/);
   assert.match(html, /id="public-health-signal-intake-form"/);
+  assert.match(html, /id="public-health-rule-change-form"/);
   assert.match(html, /role="status" aria-live="polite"/);
   assert.match(html, /人工责任/);
   assert.match(html, /productionReady 始终为 false/);
   assert.match(source, /\/api\/public-health\/data-foundation/);
+  assert.match(source, /\/api\/public-health\/data-source-operations/);
+  assert.match(source, /\/api\/public-health\/surveillance-rule-governance/);
+  assert.match(source, /\/api\/public-health\/surveillance-rule-changes/);
   assert.match(source, /\/api\/public-health\/surveillance-center/);
   assert.match(source, /\/api\/public-health\/medical-prevention-tasks/);
   assert.match(source, /\/api\/public-health\/surveillance-signals\/\$\{encodeURIComponent\(id\)\}\/actions/);
@@ -87,6 +93,41 @@ test("modernization rendering uses only safe summary fields and fails closed whe
       }],
       productionReady: false
     },
+    sourceOperations: {
+      ok: true,
+      summary: { fresh: 1, delayed: 1, stale: 0, noData: 6, clockSkew: 0, qualityReview: 0 },
+      sources: [{
+        id: "safe-source",
+        name: "临床症候群",
+        expectedRefreshMinutes: 15,
+        signalCount: 1,
+        qualityFindings: 0,
+        operationalState: "fresh"
+      }],
+      productionReady: false
+    },
+    ruleGovernance: {
+      ok: true,
+      summary: {
+        rules: 8,
+        activeRules: 8,
+        ruleVersions: 9,
+        submitted: 1,
+        approved: 0,
+        activationConfigured: true
+      },
+      changes: [{
+        id: "safe-rule-change",
+        version: 1,
+        ruleId: "ph-rule-clinical-syndrome",
+        fromVersion: 1,
+        toVersion: 2,
+        status: "submitted",
+        threshold: 10,
+        severity: "high"
+      }],
+      productionReady: false
+    },
     surveillance: {
       ok: true,
       summary: { rules: 8, activeRules: 8, humanVerifiedSignals: 0, openAlerts: 0, humanRiskAssessments: 0 },
@@ -105,6 +146,10 @@ test("modernization rendering uses only safe summary fields and fails closed whe
   const rendered = [
     node("#public-health-data-foundation-metrics").innerHTML,
     node("#public-health-data-foundation-sources").innerHTML,
+    node("#public-health-data-source-operations-metrics").innerHTML,
+    node("#public-health-data-source-operations-list").innerHTML,
+    node("#public-health-rule-governance-metrics").innerHTML,
+    node("#public-health-rule-governance-list").innerHTML,
     node("#public-health-surveillance-metrics").innerHTML,
     node("#public-health-surveillance-signals").innerHTML,
     node("#public-health-surveillance-alerts").innerHTML,
@@ -114,15 +159,21 @@ test("modernization rendering uses only safe summary fields and fails closed whe
   assert.match(rendered, /8\/8/);
   assert.match(rendered, /临床症候群/);
   assert.match(rendered, /人工核实/);
+  assert.match(rendered, /托管激活密钥/);
+  assert.match(rendered, /独立批准/);
   assert.match(rendered, /暂无预警/);
   assert.doesNotMatch(rendered, /externalSignalId|externalSignalKeyHash|idempotencyKeyHash|contentFingerprint|endpoint|secret|signature/i);
 
   vm.runInContext(
-    "renderPublicHealthModernizationWorkbenches({ foundation: null, surveillance: null, collaboration: null })",
+    "renderPublicHealthModernizationWorkbenches({ foundation: null, sourceOperations: null, ruleGovernance: null, surveillance: null, collaboration: null })",
     context
   );
   assert.match(node("#public-health-data-foundation-status").textContent, /失败关闭/);
+  assert.match(node("#public-health-data-source-operations-status").textContent, /失败关闭/);
+  assert.match(node("#public-health-rule-governance-status").textContent, /失败关闭/);
   assert.match(node("#public-health-surveillance-status").textContent, /失败关闭/);
   assert.match(node("#public-health-medical-prevention-status").textContent, /失败关闭/);
   assert.match(node("#public-health-data-foundation-sources").innerHTML, /按未就绪处理/);
+  assert.match(node("#public-health-data-source-operations-list").innerHTML, /按未就绪处理/);
+  assert.match(node("#public-health-rule-governance-list").innerHTML, /不得参与评估/);
 });

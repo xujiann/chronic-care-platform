@@ -285,10 +285,10 @@ function buildPublicHealthModernizationReadiness(options = {}) {
       alertVersion: acceptance.final.alert.version
     },
     remainingProductionBoundaries: [
-      "Verify authoritative national/provincial source interfaces, data-sharing authorizations, official receipts, staffed review, medical-prevention handoffs, site evidence and launch approval."
+      "Verify authoritative national/provincial source interfaces, data-sharing authorizations, official receipts, staffed review, medical-prevention handoffs, managed activation keys, approved production thresholds, controlled change windows, sustained source-quality observation, site evidence and launch approval."
     ],
     remainingT00Integration: [
-      "Verify authoritative national/provincial source interfaces, data-sharing authorizations, official receipts, staffed review, medical-prevention handoffs, managed activation keys, approved production thresholds, site evidence and launch approval."
+      "Verify authoritative national/provincial source interfaces, data-sharing authorizations, official receipts, staffed review, medical-prevention handoffs, managed activation keys, approved production thresholds, controlled change windows, sustained source-quality observation, site evidence and launch approval."
     ],
     productionReady: false
   };

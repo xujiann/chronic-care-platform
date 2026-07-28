@@ -110,8 +110,15 @@ const {
 } = require("./public-health-external-endpoint-probe-campaign-service");
 const {
   buildPublicHealthDataFoundation,
+  buildPublicHealthDataSourceOperations,
   ingestPublicHealthSurveillanceSignalToState
 } = require("./public-health-data-foundation-service");
+const {
+  activatePublicHealthSurveillanceRuleChangeToState,
+  buildPublicHealthSurveillanceRuleGovernance,
+  proposePublicHealthSurveillanceRuleChangeToState,
+  reviewPublicHealthSurveillanceRuleChangeToState
+} = require("./public-health-surveillance-rule-governance-service");
 const {
   applyPublicHealthSurveillanceAlertActionToState,
   buildPublicHealthSurveillanceCenter,
@@ -6806,6 +6813,7 @@ const PUBLIC_HEALTH_MODERNIZATION_COLLECTIONS = Object.freeze([
   "publicHealthDataLineageAudit",
   "publicHealthSurveillanceAudit",
   "publicHealthSurveillanceRules",
+  "publicHealthSurveillanceRuleChanges",
   "publicHealthSurveillanceAlerts",
   "publicHealthRiskAssessments",
   "publicHealthMedicalPreventionTasks",
@@ -6844,6 +6852,10 @@ function assertUniquePublicHealthModernizationState(data = {}) {
   uniqueValues(data.publicHealthDataLineageAudit, "id", "public health lineage audit id");
   uniqueValues(data.publicHealthSurveillanceAudit, "id", "public health surveillance audit id");
   uniqueValues(data.publicHealthSurveillanceRules, "id", "public health surveillance rule id");
+  const ruleChanges = Array.isArray(data.publicHealthSurveillanceRuleChanges)
+    ? data.publicHealthSurveillanceRuleChanges
+    : [];
+  uniqueValues(ruleChanges, "id", "public health surveillance rule change id");
   uniqueValues(alerts, "id", "public health surveillance alert id");
   uniqueValues(data.publicHealthRiskAssessments, "id", "public health risk assessment id");
   uniqueValues(tasks, "id", "public health medical-prevention task id");
@@ -6872,6 +6884,17 @@ function assertUniquePublicHealthModernizationState(data = {}) {
     if (new Set(hashes).size !== hashes.length) {
       throw publicHealthModernizationConflict("public health task idempotency key unique conflict");
     }
+  });
+  const ruleChangeIdempotencyKeys = new Set();
+  ruleChanges.forEach((change) => {
+    (Array.isArray(change.timeline) ? change.timeline : []).forEach((event) => {
+      const hash = String(event?.idempotencyKeyHash || "").trim();
+      if (!hash) return;
+      if (ruleChangeIdempotencyKeys.has(hash)) {
+        throw publicHealthModernizationConflict("public health rule change idempotency key unique conflict");
+      }
+      ruleChangeIdempotencyKeys.add(hash);
+    });
   });
 }
 
@@ -10540,6 +10563,9 @@ function normalizeState(data) {
       : [],
     publicHealthSurveillanceRules: Array.isArray(data.publicHealthSurveillanceRules)
       ? data.publicHealthSurveillanceRules.slice(-100)
+      : [],
+    publicHealthSurveillanceRuleChanges: Array.isArray(data.publicHealthSurveillanceRuleChanges)
+      ? data.publicHealthSurveillanceRuleChanges.slice(-1000)
       : [],
     publicHealthSurveillanceAlerts: Array.isArray(data.publicHealthSurveillanceAlerts)
       ? data.publicHealthSurveillanceAlerts.slice(-5000)
@@ -24747,7 +24773,22 @@ const PUBLIC_HEALTH_MODERNIZATION_SERVER_FIELDS = new Set([
   "orgCode",
   "institutionScope",
   "nextData",
-  "productionReady"
+  "productionReady",
+  "secret",
+  "verificationSecret",
+  "verificationSource",
+  "signatureVerified",
+  "signature",
+  "receipt",
+  "keyId",
+  "signedAt",
+  "submittedBy",
+  "submittedActorId",
+  "reviewedBy",
+  "reviewedActorId",
+  "reviewer",
+  "activatedBy",
+  "activatedActorId"
 ]);
 
 function publicHealthModernizationCommand(req, url, payload = {}, { insert = false } = {}) {
@@ -24788,14 +24829,45 @@ function publicHealthModernizationCommand(req, url, payload = {}, { insert = fal
   };
 }
 
+function assertPublicHealthRuleChangePayload(payload = {}, mode = "") {
+  const allowedByMode = {
+    submit: new Set([
+      "expectedVersion", "ruleId", "threshold", "severity", "status", "reason", "evidenceRefs",
+      "idempotencyKey", "at"
+    ]),
+    review: new Set([
+      "action", "expectedVersion", "decision", "note", "evidenceRefs", "idempotencyKey", "at"
+    ]),
+    activate: new Set([
+      "action", "expectedVersion", "note", "evidenceRefs", "idempotencyKey", "at"
+    ])
+  };
+  const allowed = allowedByMode[mode];
+  const unexpected = Object.keys(payload).find((key) => !allowed?.has(key));
+  if (unexpected) {
+    const error = new Error("public health rule change client override is forbidden");
+    error.code = "PUBLIC_HEALTH_MODERNIZATION_SERVER_CONTEXT_FORBIDDEN";
+    throw error;
+  }
+}
+
 function publicHealthModernizationSafeCode(error) {
   const explicit = String(error?.code || "").trim();
-  if (/^PUBLIC_HEALTH_MODERNIZATION_[A-Z0-9_]+$/.test(explicit)) return explicit;
+  if (/^PUBLIC_HEALTH_(?:MODERNIZATION|SURVEILLANCE_RULE)_[A-Z0-9_]+$/.test(explicit)) return explicit;
   const message = String(error?.message || "");
-  if (/unknown public health surveillance signal|unknown public health surveillance alert|unknown medical-prevention task/i.test(message)) {
+  if (/unknown public health surveillance signal|unknown public health surveillance alert|unknown medical-prevention task|unknown public health rule change/i.test(message)) {
     return "PUBLIC_HEALTH_MODERNIZATION_RECORD_NOT_FOUND";
   }
   if (/role .*not allowed/i.test(message)) return "PUBLIC_HEALTH_MODERNIZATION_FORBIDDEN";
+  if (/activation verification secret is required|activation verification secret must contain/i.test(message)) {
+    return "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_SECRET_UNAVAILABLE";
+  }
+  if (/reviewer must be independent/i.test(message)) {
+    return "PUBLIC_HEALTH_SURVEILLANCE_RULE_REVIEWER_NOT_INDEPENDENT";
+  }
+  if (/rule registry integrity invalid|rule change integrity invalid|trusted public health rule activation failed/i.test(message)) {
+    return "PUBLIC_HEALTH_SURVEILLANCE_RULE_INTEGRITY_INVALID";
+  }
   if (/version conflict|CAS conflict/i.test(message)) return "PUBLIC_HEALTH_MODERNIZATION_VERSION_CONFLICT";
   if (/idempotency|conflict detected|unique conflict/i.test(message)) return "PUBLIC_HEALTH_MODERNIZATION_CONFLICT";
   if (/integrity invalid|integrity is invalid|audit is missing/i.test(message)) {
@@ -24810,6 +24882,7 @@ function publicHealthModernizationSafeCode(error) {
 function publicHealthModernizationHttpStatus(code) {
   if (code === "PUBLIC_HEALTH_MODERNIZATION_RECORD_NOT_FOUND") return 404;
   if (code === "PUBLIC_HEALTH_MODERNIZATION_FORBIDDEN") return 403;
+  if (code === "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_SECRET_UNAVAILABLE") return 503;
   if (/CONFLICT|INTEGRITY_INVALID/.test(code)) return 409;
   return 400;
 }
@@ -24829,8 +24902,133 @@ function publicHealthSafeSignal(data, signalId) {
     .find((item) => item.id === signalId) || null;
 }
 
+function publicHealthSurveillanceRuleActivationOptions({ required = false } = {}) {
+  const verificationSecret = String(
+    process.env.PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_SECRET || ""
+  ).trim();
+  if (required && verificationSecret.length < 32) {
+    const error = new Error("trusted server rule activation verification secret is required");
+    error.code = "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_SECRET_UNAVAILABLE";
+    throw error;
+  }
+  return {
+    verificationSecret: verificationSecret.length >= 32 ? verificationSecret : "",
+    keyId: String(
+      process.env.PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEY_ID
+      || "public-health-surveillance-rule-managed"
+    ).trim().slice(0, 120)
+  };
+}
+
+function publicHealthSafeRuleGovernance(data) {
+  const activation = publicHealthSurveillanceRuleActivationOptions();
+  const governance = buildPublicHealthSurveillanceRuleGovernance({
+    data,
+    verificationSecret: activation.verificationSecret
+  });
+  return {
+    ok: governance.ok,
+    functionalState: governance.functionalState,
+    formalGoLiveState: governance.formalGoLiveState,
+    summary: {
+      ...governance.summary,
+      activationConfigured: activation.verificationSecret.length >= 32
+    },
+    rules: (governance.rules || []).map((rule) => ({
+      id: rule.id,
+      version: rule.version,
+      signalType: rule.signalType,
+      metricCode: rule.metricCode,
+      threshold: rule.threshold,
+      severity: rule.severity,
+      status: rule.status,
+      owner: rule.owner
+    })),
+    ruleVersions: (governance.ruleVersions || []).map((rule) => ({
+      id: rule.id,
+      version: rule.version,
+      signalType: rule.signalType,
+      metricCode: rule.metricCode,
+      threshold: rule.threshold,
+      severity: rule.severity,
+      status: rule.status
+    })),
+    changes: (governance.changes || []).map((change) => ({
+      id: change.id,
+      version: change.version,
+      ruleId: change.ruleId,
+      fromVersion: change.fromVersion,
+      toVersion: change.toVersion,
+      status: change.status,
+      threshold: change.threshold,
+      severity: change.severity,
+      allowedActions: change.status === "submitted"
+        ? ["review-rule-change"]
+        : change.status === "approved"
+          ? ["activate-rule-change"]
+          : []
+    })),
+    findings: (governance.findings || []).map((finding) => ({
+      changeId: finding.changeId,
+      ruleId: finding.ruleId,
+      code: finding.code
+    })),
+    blockers: governance.blockers,
+    productionReady: false
+  };
+}
+
+function publicHealthSafeDataSourceOperations(data) {
+  const operations = buildPublicHealthDataSourceOperations({
+    data,
+    now: new Date().toISOString()
+  });
+  return {
+    ok: operations.ok,
+    functionalState: operations.functionalState,
+    formalGoLiveState: operations.formalGoLiveState,
+    observedAt: operations.observedAt,
+    summary: operations.summary,
+    sources: (operations.sources || []).map((source) => ({
+      id: source.id,
+      name: source.name,
+      owner: source.owner,
+      expectedRefreshMinutes: source.expectedRefreshMinutes,
+      status: source.status,
+      lastObservedAt: source.lastObservedAt,
+      ageMinutes: source.ageMinutes,
+      signalCount: source.signalCount,
+      qualityFindings: source.qualityFindings,
+      operationalState: source.operationalState,
+      productionReady: false
+    })),
+    alerts: (operations.alerts || []).map((alert) => ({
+      id: alert.id,
+      sourceId: alert.sourceId,
+      code: alert.code,
+      severity: alert.severity,
+      productionReady: false
+    })),
+    blockers: operations.blockers,
+    productionReady: false
+  };
+}
+
+function publicHealthSafeSurveillanceCenter(data) {
+  const activation = publicHealthSurveillanceRuleActivationOptions();
+  const center = buildPublicHealthSurveillanceCenter({
+    data,
+    ruleVerificationSecret: activation.verificationSecret
+  });
+  return {
+    ...center,
+    ruleGovernance: publicHealthSafeRuleGovernance(data),
+    productionReady: false
+  };
+}
+
 function publicHealthSafeAlert(data, alertId) {
-  return buildPublicHealthSurveillanceCenter({ data }).alerts
+  return publicHealthSafeSurveillanceCenter(data).alerts
     .find((item) => item.id === alertId) || null;
 }
 
@@ -25246,6 +25444,124 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/public-health/data-source-operations") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    try {
+      if ([...url.searchParams.keys()].length) {
+        const error = new Error("public health data source operations query overrides are forbidden");
+        error.code = "PUBLIC_HEALTH_MODERNIZATION_SERVER_CONTEXT_FORBIDDEN";
+        throw error;
+      }
+      sendJson(res, 200, publicHealthSafeDataSourceOperations(readDatabase()));
+    } catch (error) {
+      publicHealthModernizationError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/surveillance-rule-governance") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    try {
+      if ([...url.searchParams.keys()].length) {
+        const error = new Error("public health rule governance query overrides are forbidden");
+        error.code = "PUBLIC_HEALTH_MODERNIZATION_SERVER_CONTEXT_FORBIDDEN";
+        throw error;
+      }
+      sendJson(res, 200, publicHealthSafeRuleGovernance(readDatabase()));
+    } catch (error) {
+      publicHealthModernizationError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/public-health/surveillance-rule-changes") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    try {
+      const payload = publicHealthModernizationCommand(req, url, await collectJson(req));
+      assertPublicHealthRuleChangePayload(payload, "submit");
+      const activation = publicHealthSurveillanceRuleActivationOptions();
+      const data = readDatabase();
+      const result = proposePublicHealthSurveillanceRuleChangeToState(data, {
+        ...payload,
+        expectedCurrentVersion: payload.expectedVersion
+      }, user, {
+        verificationSecret: activation.verificationSecret
+      });
+      if (!result.idempotent) {
+        writeDatabase(result.nextData, {
+          event: "public-health-surveillance-rule-change-submitted",
+          publicHealthModernizationWrite: {
+            collection: "publicHealthSurveillanceRuleChanges",
+            entityId: result.change.id,
+            expectedVersion: 0
+          }
+        });
+      }
+      const governance = publicHealthSafeRuleGovernance(result.nextData);
+      sendJson(res, result.idempotent ? 200 : 201, {
+        ok: true,
+        idempotent: Boolean(result.idempotent),
+        change: governance.changes.find((item) => item.id === result.change.id) || null,
+        summary: governance.summary,
+        productionReady: false
+      });
+    } catch (error) {
+      publicHealthModernizationError(res, error);
+    }
+    return;
+  }
+
+  const publicHealthRuleChangeActionMatch = url.pathname.match(/^\/api\/public-health\/surveillance-rule-changes\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthRuleChangeActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/surveillance-rule-changes/:id/actions");
+    if (!user) return;
+    try {
+      const changeId = decodeURIComponent(publicHealthRuleChangeActionMatch[1]);
+      const payload = publicHealthModernizationCommand(req, url, await collectJson(req));
+      const action = String(payload.action || "").trim();
+      if (!["review-rule-change", "activate-rule-change"].includes(action)) {
+        const error = new Error("unsupported public health rule change action");
+        error.code = "PUBLIC_HEALTH_MODERNIZATION_COMMAND_INVALID";
+        throw error;
+      }
+      assertPublicHealthRuleChangePayload(payload, action === "review-rule-change" ? "review" : "activate");
+      const data = readDatabase();
+      const result = action === "review-rule-change"
+        ? reviewPublicHealthSurveillanceRuleChangeToState(data, changeId, payload, user)
+        : activatePublicHealthSurveillanceRuleChangeToState(
+            data,
+            changeId,
+            payload,
+            user,
+            publicHealthSurveillanceRuleActivationOptions({ required: true })
+          );
+      if (!result.idempotent) {
+        writeDatabase(result.nextData, {
+          event: `public-health-surveillance-${action}`,
+          publicHealthModernizationWrite: {
+            collection: "publicHealthSurveillanceRuleChanges",
+            entityId: changeId,
+            expectedVersion: payload.expectedVersion
+          }
+        });
+      }
+      const governance = publicHealthSafeRuleGovernance(result.nextData);
+      sendJson(res, 200, {
+        ok: true,
+        idempotent: Boolean(result.idempotent),
+        change: governance.changes.find((item) => item.id === changeId) || null,
+        summary: governance.summary,
+        productionReady: false
+      });
+    } catch (error) {
+      publicHealthModernizationError(res, error);
+    }
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/public-health/surveillance-signals") {
     const user = requireApiRole(req, res, ["commission"], url.pathname);
     if (!user) return;
@@ -25291,7 +25607,13 @@ async function handleApi(req, res) {
       const result = action === "verify-signal"
         ? verifyPublicHealthSurveillanceSignalToState(data, signalId, payload, user)
         : action === "evaluate-signal"
-          ? evaluatePublicHealthSurveillanceSignalToState(data, signalId, payload, user)
+          ? evaluatePublicHealthSurveillanceSignalToState(
+              data,
+              signalId,
+              payload,
+              user,
+              publicHealthSurveillanceRuleActivationOptions()
+            )
           : (() => {
               const error = new Error("unsupported public health signal action");
               error.code = "PUBLIC_HEALTH_MODERNIZATION_COMMAND_INVALID";
@@ -25324,7 +25646,7 @@ async function handleApi(req, res) {
   if (req.method === "GET" && url.pathname === "/api/public-health/surveillance-center") {
     const user = requireApiRole(req, res, ["commission"], url.pathname);
     if (!user) return;
-    sendJson(res, 200, buildPublicHealthSurveillanceCenter({ data: readDatabase() }));
+    sendJson(res, 200, publicHealthSafeSurveillanceCenter(readDatabase()));
     return;
   }
 
@@ -25336,7 +25658,13 @@ async function handleApi(req, res) {
       const alertId = decodeURIComponent(publicHealthAlertActionMatch[1]);
       const payload = publicHealthModernizationCommand(req, url, await collectJson(req));
       const data = readDatabase();
-      const result = applyPublicHealthSurveillanceAlertActionToState(data, alertId, payload, user);
+      const result = applyPublicHealthSurveillanceAlertActionToState(
+        data,
+        alertId,
+        payload,
+        user,
+        publicHealthSurveillanceRuleActivationOptions()
+      );
       if (!result.idempotent) {
         writeDatabase(result.nextData, {
           event: `public-health-surveillance-alert-${String(payload.action || "action")}`,

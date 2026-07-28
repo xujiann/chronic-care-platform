@@ -876,7 +876,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
       "sourceRecordHash",
       "expectedVersion",
       "PUBLIC_HEALTH_MODERNIZATION_CAS_CONFLICT"
-    ].every((token) => serverSource.includes(token)), "all nine modernization collections persist nextData with SQLite transaction CAS and unique source-record/idempotency hashes", "integration"),
+    ].every((token) => serverSource.includes(token)), "all ten modernization collections persist nextData with SQLite transaction CAS and unique source-record/idempotency hashes", "integration"),
     check("integration:t00-modernization-ui-release", [
       "public-health-data-foundation-title",
       "public-health-surveillance-title",
@@ -897,7 +897,52 @@ function buildPublicHealthFinalReadiness(options = {}) {
       "\"public-health:modernization-readiness\"",
       "test/public-health-modernization-ui.test.js",
       "test/public-health-modernization-api.test.js"
-    ].every((token) => packageSource.includes(token)), "three responsive workbenches expose only minimized summaries and executable governed actions while release scripts preserve productionReady=false", "integration"),
+    ].every((token) => packageSource.includes(token)), "five responsive workbenches expose only minimized summaries and executable governed actions while release scripts preserve productionReady=false", "integration"),
+    check("integration:t00-modernization-source-operations", [
+      "/api/public-health/data-source-operations",
+      "buildPublicHealthDataSourceOperations",
+      "publicHealthSafeDataSourceOperations",
+      "public health data source operations query overrides are forbidden"
+    ].every((token) => serverSource.includes(token)) && [
+      "public-health-data-source-operations-title",
+      "public-health-data-source-operations-status",
+      "public-health-data-source-operations-list"
+    ].every((token) => pageHtml.includes(token)) && [
+      "/api/public-health/data-source-operations",
+      "renderPublicHealthDataSourceOperations",
+      "operationalState"
+    ].every((token) => pageSource.includes(token)), "commission-only source operations uses server time and returns only minimized freshness, quality and no-data states", "integration"),
+    check("integration:t00-surveillance-rule-governance", [
+      "/api/public-health/surveillance-rule-governance",
+      "/api/public-health/surveillance-rule-changes",
+      "/api/public-health/surveillance-rule-changes/:id/actions",
+      "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_SECRET",
+      "publicHealthSurveillanceRuleActivationOptions",
+      "publicHealthSafeRuleGovernance",
+      "proposePublicHealthSurveillanceRuleChangeToState",
+      "reviewPublicHealthSurveillanceRuleChangeToState",
+      "activatePublicHealthSurveillanceRuleChangeToState",
+      "publicHealthSurveillanceRuleChanges",
+      "PUBLIC_HEALTH_SURVEILLANCE_RULE_REVIEWER_NOT_INDEPENDENT",
+      "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_SECRET_UNAVAILABLE"
+    ].every((token) => serverSource.includes(token)), "rule submit, independent review and server-key activation persist changes and materialized rules in one CAS transaction without client trust overrides", "integration"),
+    check("integration:t00-surveillance-rule-governance-ui-release", [
+      "public-health-rule-governance-title",
+      "public-health-rule-governance-status",
+      "public-health-rule-change-form",
+      "public-health-rule-change-status"
+    ].every((token) => pageHtml.includes(token)) && [
+      "/api/public-health/surveillance-rule-governance",
+      "/api/public-health/surveillance-rule-changes",
+      "handlePublicHealthRuleChangeSubmit",
+      "review-rule-change",
+      "activate-rule-change",
+      "activationConfigured"
+    ].every((token) => pageSource.includes(token)) && [
+      "public-health-surveillance-rule-governance-service.js",
+      "test/public-health-surveillance-rule-governance-service.test.js",
+      "test/public-health-surveillance-rule-governance-api.test.js"
+    ].every((token) => packageSource.includes(token)), "rule governance UI exposes only safe versions, thresholds, states and allowed actions while server trust material remains hidden", "integration"),
     check("safety:functional-not-production", runtime.productionReady === false && registry.productionReady === false && deliveries.every((item) => item.productionReady === false), "functional acceptance cannot self-assert production readiness", "safety"),
     check("safety:endpoint-connectivity-not-production", endpointProbeAcceptance.endpointConnectivityReady === true && endpointProbeAcceptance.productionReady === false && endpointProbeAcceptance.entries.every((item) => item.blockerCode === "trusted-site-evidence-still-required"), "verified connectivity never replaces trusted site evidence or launch approval", "safety"),
     check("safety:continuous-connectivity-not-production", endpointProbeCampaignAcceptance.continuousConnectivityReady === true && endpointProbeCampaignAcceptance.productionReady === false && endpointProbeCampaignAcceptance.blockers.every((item) => /site evidence|handoff|P0\/P1|approval/i.test(item)), "three consecutive campaigns still retain site evidence, blocker, handoff and approval boundaries", "safety"),
@@ -910,7 +955,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
   );
   const t08FunctionalChecks = checks.filter((item) => !t00BoundaryChecks.includes(item));
   const remainingProductionBoundaries = [
-    "Production remains blocked until real independent managed campaign and lane keyrings, verified HTTPS endpoints, certificate pins or mTLS policy, restricted probe workers, worker identity, approved campaign cadence, authoritative multi-source data feeds, sharing authorization, validated surveillance rules, staffed human review, verified medical-prevention handoffs, externally approved per-lane resilience policies, contract cutover and backlog-drain evidence, load evidence, cross-key audit/callback smoke, trusted site evidence and formal operations acceptance are available."
+    "Production remains blocked until real independent managed campaign and lane keyrings, a managed surveillance-rule activation key, approved production thresholds and change windows, verified HTTPS endpoints, certificate pins or mTLS policy, restricted probe workers, worker identity, approved campaign cadence, authoritative multi-source data feeds, sustained source-quality observation, sharing authorization, validated surveillance rules, staffed human review, verified medical-prevention handoffs, externally approved per-lane resilience policies, contract cutover and backlog-drain evidence, load evidence, cross-key audit/callback smoke, trusted site evidence and formal operations acceptance are available."
   ];
   return {
     generatedAt: new Date().toISOString(),

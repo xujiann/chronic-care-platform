@@ -712,7 +712,7 @@ function buildDeployCheckReport(options = {}) {
       ].every((marker) => serverSource.includes(marker))
         && pkg.scripts?.["public-health:resilience-test"]?.includes("test/public-health-modernization-api.test.js")
         && pkg.scripts?.["public-health:modernization-readiness"] === "node scripts/public-health-modernization-readiness.js",
-      detail: "nine modernization collections use nextData-only SQLite transaction CAS and unique source-record/idempotency constraints"
+      detail: "ten modernization collections use nextData-only SQLite transaction CAS and unique source-record/idempotency constraints"
     },
     {
       name: "static:publicHealthModernizationWorkbenches",
@@ -732,7 +732,54 @@ function buildDeployCheckReport(options = {}) {
         ].every((marker) => publicHealthUiSource.includes(marker))
         && ["public-health-modernization-grid", "modernization-form", "@media (max-width: 1100px)"].every((marker) => portalCss.includes(marker))
         && pkg.scripts?.["public-health:resilience-test"]?.includes("test/public-health-modernization-ui.test.js"),
-      detail: "responsive data, surveillance and medical-prevention workbenches expose redacted summaries, human actions and a production-false boundary"
+      detail: "five responsive data, source-operations, rule-governance, surveillance and medical-prevention workbenches expose redacted summaries, human actions and a production-false boundary"
+    },
+    {
+      name: "api:publicHealthDataSourceOperations",
+      ok: [
+        "/api/public-health/data-source-operations",
+        "buildPublicHealthDataSourceOperations",
+        "publicHealthSafeDataSourceOperations",
+        "public health data source operations query overrides are forbidden"
+      ].every((marker) => serverSource.includes(marker))
+        && ["public-health-data-source-operations-title", "public-health-data-source-operations-list"].every((marker) => publicHealthHtml.includes(marker))
+        && ["/api/public-health/data-source-operations", "renderPublicHealthDataSourceOperations", "operationalState"].every((marker) => publicHealthUiSource.includes(marker)),
+      detail: "commission-only source operations uses server time and exposes no endpoint, raw external record or credential material"
+    },
+    {
+      name: "api:publicHealthSurveillanceRuleGovernance",
+      ok: [
+        "/api/public-health/surveillance-rule-governance",
+        "/api/public-health/surveillance-rule-changes",
+        "/api/public-health/surveillance-rule-changes/:id/actions",
+        "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_SECRET",
+        "publicHealthSurveillanceRuleActivationOptions",
+        "publicHealthSurveillanceRuleChanges",
+        "PUBLIC_HEALTH_SURVEILLANCE_RULE_REVIEWER_NOT_INDEPENDENT",
+        "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_SECRET_UNAVAILABLE"
+      ].every((marker) => serverSource.includes(marker))
+        && fs.existsSync(path.join(ROOT, "public-health-surveillance-rule-governance-service.js"))
+        && pkg.scripts?.["public-health:resilience-test"]?.includes("test/public-health-surveillance-rule-governance-api.test.js"),
+      detail: "rule changes require independent review, server-only managed activation trust and atomic rule/change CAS persistence"
+    },
+    {
+      name: "static:publicHealthSurveillanceRuleGovernance",
+      ok: [
+        "public-health-rule-governance-title",
+        "public-health-rule-governance-status",
+        "public-health-rule-change-form",
+        "public-health-rule-change-status"
+      ].every((marker) => publicHealthHtml.includes(marker))
+        && [
+          "renderPublicHealthRuleGovernance",
+          "handlePublicHealthRuleChangeSubmit",
+          "review-rule-change",
+          "activate-rule-change",
+          "activationConfigured"
+        ].every((marker) => publicHealthUiSource.includes(marker))
+        && pkg.scripts?.["public-health:resilience-check"]?.includes("public-health-surveillance-rule-governance-service.js")
+        && pkg.scripts?.["public-health:resilience-test"]?.includes("test/public-health-surveillance-rule-governance-service.test.js"),
+      detail: "rule governance workbench exposes only safe versions, thresholds, states and allowed actions while production remains blocked"
     },
     { name: "api:publicHealthHighlights", ok: ["/api/public-health/highlights", "/api/public-health/highlights/signals", "/api/public-health/highlights/alerts/:id/actions", "/api/public-health/highlights/command-tasks/:id/actions", "/api/public-health/highlights/ai-reviews/:id/actions", "/api/public-health/highlights/evidence/:id/actions"].every((marker) => serverSource.includes(marker)) && fs.readFileSync(path.join(ROOT, "public-health.html"), "utf8").includes("public-health-highlight-center") && fs.readFileSync(path.join(ROOT, "public-health.js"), "utf8").includes("renderPublicHealthHighlights"), detail: "public health five-suite trigger, map, AI, command and evidence center is wired" },
     { name: "api:publicHealthHighlightsStandalone", ok: fs.existsSync(path.join(ROOT, "public-health-highlights.html")) && fs.existsSync(path.join(ROOT, "public-health-highlights.js")) && fs.existsSync(path.join(ROOT, "scripts", "public-health-highlights-readiness.js")) && serverSource.includes("buildPublicHealthHighlights") && fs.readFileSync(path.join(ROOT, "scripts", "public-health-highlights-readiness.js"), "utf8").includes("functionalState"), detail: "standalone public health five-suite command center and readiness report are present" },
