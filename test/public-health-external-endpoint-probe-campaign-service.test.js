@@ -351,6 +351,90 @@ test("cross-campaign receipt replay does not count as another stability campaign
   assert.equal(registry.productionReady, false);
 });
 
+test("a rejected campaign inside the current continuity window cannot be skipped", () => {
+  const first = createCampaign(1, "2026-07-27T08:00:00.000Z");
+  const second = createCampaign(2, "2026-07-27T08:10:00.000Z");
+  const third = createCampaign(3, "2026-07-27T08:20:00.000Z");
+  const failedLatest = createCampaign(4, "2026-07-27T08:30:00.000Z");
+  failedLatest.attestation.signature = "f".repeat(64);
+  const latestFailure = buildPublicHealthExternalEndpointProbeCampaignRegistry({
+    campaigns: [first, second, third, failedLatest],
+    ...campaignOptions("2026-07-27T08:31:30.000Z")
+  });
+
+  assert.equal(latestFailure.summary.campaignsVerified, 3);
+  assert.equal(latestFailure.summary.campaignsRejected, 1);
+  assert.equal(latestFailure.summary.consecutiveCampaigns, 0);
+  assert.equal(latestFailure.summary.continuityBreaks, 1);
+  assert.equal(latestFailure.continuityBreak.campaignId, failedLatest.attestation.campaignId);
+  assert.equal(latestFailure.continuityBreak.code, "campaign-verification-failed");
+  assert.equal(latestFailure.functionalState, "endpoint-probe-campaign-continuity-broken");
+  assert.equal(latestFailure.continuousConnectivityReady, false);
+  assert.equal(latestFailure.productionReady, false);
+
+  const failedMiddle = createCampaign(5, "2026-07-27T08:20:00.000Z");
+  failedMiddle.attestation.verification = {
+    ...failedMiddle.attestation.verification,
+    verificationSource: "untrusted-client"
+  };
+  const middleFailure = buildPublicHealthExternalEndpointProbeCampaignRegistry({
+    campaigns: [
+      first,
+      second,
+      failedMiddle,
+      createCampaign(6, "2026-07-27T08:30:00.000Z")
+    ],
+    ...campaignOptions("2026-07-27T08:31:30.000Z")
+  });
+
+  assert.equal(middleFailure.summary.campaignsVerified, 3);
+  assert.equal(middleFailure.summary.campaignsRejected, 1);
+  assert.equal(middleFailure.summary.consecutiveCampaigns, 1);
+  assert.equal(middleFailure.continuityBreak.campaignId, failedMiddle.attestation.campaignId);
+  assert.equal(middleFailure.continuousConnectivityReady, false);
+});
+
+test("a rejected campaign older than the required current window remains visible without erasing fresh continuity", () => {
+  const rejectedHistory = createCampaign(1, "2026-07-27T08:00:00.000Z");
+  rejectedHistory.attestation.signature = "e".repeat(64);
+  const registry = buildPublicHealthExternalEndpointProbeCampaignRegistry({
+    campaigns: [
+      rejectedHistory,
+      createCampaign(2, "2026-07-27T08:10:00.000Z"),
+      createCampaign(3, "2026-07-27T08:20:00.000Z"),
+      createCampaign(4, "2026-07-27T08:30:00.000Z")
+    ],
+    ...campaignOptions("2026-07-27T08:31:30.000Z")
+  });
+
+  assert.equal(registry.summary.campaignsRejected, 1);
+  assert.equal(registry.summary.consecutiveCampaigns, 3);
+  assert.equal(registry.summary.continuityBreaks, 0);
+  assert.equal(registry.continuityBreak, null);
+  assert.equal(registry.continuousConnectivityReady, true);
+  assert.equal(registry.productionReady, false);
+});
+
+test("an unparseable campaign completion time is evaluated first and breaks continuity closed", () => {
+  const malformed = createCampaign(4, "2026-07-27T08:30:00.000Z");
+  malformed.attestation.completedAt = "not-a-server-time";
+  const registry = buildPublicHealthExternalEndpointProbeCampaignRegistry({
+    campaigns: [
+      createCampaign(1, "2026-07-27T08:00:00.000Z"),
+      createCampaign(2, "2026-07-27T08:10:00.000Z"),
+      createCampaign(3, "2026-07-27T08:20:00.000Z"),
+      malformed
+    ],
+    ...campaignOptions("2026-07-27T08:31:30.000Z")
+  });
+
+  assert.equal(registry.summary.campaignsVerified, 3);
+  assert.equal(registry.summary.campaignsRejected, 1);
+  assert.equal(registry.summary.consecutiveCampaigns, 0);
+  assert.equal(registry.continuityBreak.code, "campaign-verification-failed");
+  assert.equal(registry.continuousConnectivityReady, false);
+});
+
 test("overlapping distant stale and insufficient campaigns keep continuity pending", () => {
   const first = createCampaign(1, "2026-07-27T08:00:00.000Z");
   const overlapping = createCampaign(2, "2026-07-27T08:00:30.000Z");
@@ -361,6 +445,8 @@ test("overlapping distant stale and insufficient campaigns keep continuity pendi
   });
   assert.equal(registry.summary.campaignsVerified, 3);
   assert.equal(registry.summary.consecutiveCampaigns, 1);
+  assert.equal(registry.summary.continuityBreaks, 1);
+  assert.equal(registry.continuityBreak.code, "campaign-gap-exceeded");
   assert.equal(registry.continuousConnectivityReady, false);
   assert.equal(registry.productionReady, false);
 
