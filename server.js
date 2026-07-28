@@ -431,6 +431,14 @@ function configureDigitalHospitalExecutionRuntime(options = {}) {
   if (Object.prototype.hasOwnProperty.call(options, "managedSecretLoader")) {
     configureDigitalHospitalManagedSecretLoader(options.managedSecretLoader);
   }
+  if (Object.prototype.hasOwnProperty.call(options, "executionService")) {
+    if (digitalHospitalExecutionServiceInstance
+      && digitalHospitalExecutionServiceInstance !== options.executionService
+      && typeof digitalHospitalExecutionServiceInstance.close === "function") {
+      digitalHospitalExecutionServiceInstance.close();
+    }
+    digitalHospitalExecutionServiceInstance = options.executionService || null;
+  }
 }
 
 function digitalHospitalClientCertificate(req, proxyHeaderName = "") {
@@ -38752,12 +38760,15 @@ module.exports = {
   configurePublicHealthEndpointProbeRuntime,
   createCareServiceRuntimeDependencies,
   cleanupRuntimeSessions,
+  digitalHospitalClientCertificate,
+  digitalHospitalWorkerFingerprints,
   ensureDatabase,
   openSqliteDatabase,
   productionSessionSecretErrors,
   productionSessionRetentionErrors,
   productionSessionStoreErrors,
   readDatabase,
+  requireDigitalHospitalExecutionWorker,
   server,
   sessionStoreMode,
   sessionTopology,
