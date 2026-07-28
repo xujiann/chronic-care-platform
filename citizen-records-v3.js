@@ -62,11 +62,6 @@
     return toDate(value)?.toISOString().slice(0, 10) || "";
   }
 
-  function daysBetween(from, to) {
-    if (!from || !to) return Number.POSITIVE_INFINITY;
-    return Math.floor((to.getTime() - from.getTime()) / 86400000);
-  }
-
   function taskDateOnly(value) {
     const raw = cleanText(value, 80);
     const explicitDate = raw.match(/^(\d{4}-\d{2}-\d{2})/);
@@ -111,13 +106,36 @@
     const items = REQUIRED_INTEGRATIONS.map((definition) => {
       const input = integrations[definition.key] || {};
       const lastSuccessAt = toDate(input.lastSuccessAt || input.verifiedAt);
-      const fresh = Boolean(lastSuccessAt) && daysBetween(lastSuccessAt, referenceTime) <= Number(input.maximumAgeDays || 7);
+      const requestedMaximumAgeDays = Number(input.maximumAgeDays);
+      const maximumAgeDays = Number.isFinite(requestedMaximumAgeDays) && requestedMaximumAgeDays > 0
+        ? Math.min(requestedMaximumAgeDays, 30)
+        : 7;
+      const requestedClockSkewMinutes = Number(input.clockSkewMinutes);
+      const clockSkewMinutes = Number.isFinite(requestedClockSkewMinutes) && requestedClockSkewMinutes >= 0
+        ? Math.min(requestedClockSkewMinutes, 15)
+        : 5;
+      const ageMilliseconds = lastSuccessAt ? referenceTime.getTime() - lastSuccessAt.getTime() : Number.POSITIVE_INFINITY;
+      const futureTimestamp = ageMilliseconds < -clockSkewMinutes * 60000;
+      const fresh = Boolean(lastSuccessAt)
+        && !futureTimestamp
+        && ageMilliseconds <= maximumAgeDays * 86400000;
       const evidenceReady = nonPlaceholderEvidence(input);
       const connected = ACTIVE_INTEGRATION_STATES.has(cleanText(input.status, 40).toLowerCase());
       const ready = connected && fresh && evidenceReady;
+      const status = ready
+        ? "已核验"
+        : !connected
+          ? "待现场接入"
+          : !evidenceReady
+            ? "缺少正式证据"
+            : !lastSuccessAt
+              ? "缺少有效成功时间"
+              : futureTimestamp
+                ? "成功时间异常"
+                : "连接证据已过期";
       return {
         ...definition,
-        status: ready ? "已核验" : connected ? evidenceReady ? "连接证据已过期" : "缺少正式证据" : "待现场接入",
+        status,
         ready,
         lastSuccessAt: lastSuccessAt?.toISOString() || "",
         evidenceRef: evidenceReady ? cleanText(input.evidenceRef || input.evidence || input.receiptId || input.auditRef, 160) : ""
@@ -130,7 +148,7 @@
       summary: items.every((item) => item.ready)
         ? "六类生产接入均已具备有效证据"
         : `${items.filter((item) => !item.ready).length} 类生产接入仍需现场核验`,
-      boundary: "页面状态只反映带正式证据的连接结果；演示数据、环境变量或占位回执不能开启生产门禁。"
+      boundary: "页面状态只反映带正式证据且成功时间有效的连接结果；演示数据、占位回执、过期或异常未来时间不能开启生产门禁。"
     };
   }
 

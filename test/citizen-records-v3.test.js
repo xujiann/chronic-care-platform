@@ -42,6 +42,29 @@ test("生产接入状态只接受新鲜且非占位的正式证据", () => {
   assert.equal(blocked.items.find((item) => item.key === "audit").status, "缺少正式证据");
 });
 
+test("生产接入证据拒绝异常未来时间无效时间和刚过精确有效期", () => {
+  const integrations = Object.fromEntries(api.REQUIRED_INTEGRATIONS.map((item) => [item.key, {
+    status: "connected",
+    lastSuccessAt: "2026-07-20T08:00:00.000Z",
+    maximumAgeDays: 7,
+    evidenceRef: `receipt-${item.key}-boundary`
+  }]));
+  assert.equal(api.buildProductionIntegrationStatus(integrations, now).productionReady, true);
+
+  integrations.identity.lastSuccessAt = "2026-07-20T07:59:59.999Z";
+  let blocked = api.buildProductionIntegrationStatus(integrations, now);
+  assert.equal(blocked.items.find((item) => item.key === "identity").status, "连接证据已过期");
+
+  integrations.identity.lastSuccessAt = "2026-07-27T08:05:00.001Z";
+  blocked = api.buildProductionIntegrationStatus(integrations, now);
+  assert.equal(blocked.items.find((item) => item.key === "identity").status, "成功时间异常");
+
+  integrations.identity.lastSuccessAt = "not-a-time";
+  blocked = api.buildProductionIntegrationStatus(integrations, now);
+  assert.equal(blocked.items.find((item) => item.key === "identity").status, "缺少有效成功时间");
+  assert.equal(blocked.productionReady, false);
+});
+
 test("跨院档案治理识别重复来源与互相冲突的结果并保留原始版本", () => {
   const result = api.governCrossInstitutionRecords([
     {

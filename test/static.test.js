@@ -4719,7 +4719,7 @@ test("citizen record V3 exposes eight governed next-stage capabilities", () => {
   const documentation = read("docs/citizen-records-first-increment.md");
 
   assert.match(html, /居民健康档案八项增强服务/);
-  assert.match(html, /citizen-records-v3\.js\?v=20260728next5/);
+  assert.match(html, /citizen-records-v3\.js\?v=20260728next6/);
   for (const id of [
     "citizen-integration-v3",
     "citizen-governance-v3",
@@ -4749,5 +4749,5 @@ test("citizen record V3 exposes eight governed next-stage capabilities", () => {
   assert.match(ui, /renderCitizenRecordsNextStage/);
   assert.match(v3, /function taskDueState/);
   assert.match(v3, /function calendarDayDistance/);
-  assert.match(documentation, /第二十五增量/);
+  assert.match(documentation, /第二十六增量/);
 });

@@ -391,6 +391,15 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
 });
 
 test("resident reviews all eight next-stage health record capabilities", async ({ page }) => {
+  await page.addInitScript(() => {
+    globalThis.__CITIZEN_PRODUCTION_EVIDENCE__ = {
+      identity: {
+        status: "connected",
+        lastSuccessAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        evidenceRef: "receipt-identity-future-clock"
+      }
+    };
+  });
   await page.goto("/login.html");
   await page.locator("#login-user").selectOption("citizen");
   await page.locator("input[name='password']").fill("123456");
@@ -413,6 +422,7 @@ test("resident reviews all eight next-stage health record capabilities", async (
   ]) await expect(page.getByRole("heading", { name: heading })).toBeVisible();
 
   await expect(page.locator("#citizen-integration-v3")).toContainText("待现场接入");
+  await expect(page.locator("#citizen-integration-v3")).toContainText("成功时间异常");
   await expect(page.locator("#citizen-governance-v3")).toContainText("原始记录");
   await expect(page.locator("#citizen-family-v3")).toContainText("本人访问");
   await expect(page.locator("#citizen-care-plan-v3")).toContainText("不自动生成诊断、处方或治疗决定");

@@ -56,7 +56,8 @@ function assessCitizenRecordsReadiness(options = {}) {
     { id: "next-stage-action-intents", label: "八项增强服务安全操作闭环", passed: /buildSafeActionIntent/.test(v3) && /handleCitizenRecordsV3Action/.test(ui) && /紧急和家庭授权草稿保持最小范围/.test(nextStageUnit) && /准备紧急授权/.test(e2e) },
     { id: "proactive-care-task-routing", label: "主动健康任务逐项安全分流", passed: /buildCareTaskActionIntent/.test(v3) && /handleCitizenRecordsV3CareTaskAction/.test(ui) && /主动健康任务标识与类型不匹配/.test(nextStageUnit) && /data-v3-care-task/.test(e2e) },
     { id: "proactive-care-calendar-day", label: "主动任务东八区自然日到期计算", passed: /taskDueState/.test(v3) && /calendarDayDistance/.test(v3) && /东八区自然日判断今日到期/.test(nextStageUnit) && /未来 7 天/.test(e2e) },
-    { id: "acceptance-documentation", label: "居民验收标准与外部依赖", passed: /第二十五增量/.test(documentation) && /## 外部依赖/.test(documentation) }
+    { id: "integration-evidence-time-window", label: "生产接入证据精确时间窗", passed: /futureTimestamp/.test(v3) && /clockSkewMinutes/.test(v3) && /拒绝异常未来时间无效时间/.test(nextStageUnit) && /成功时间异常/.test(e2e) },
+    { id: "acceptance-documentation", label: "居民验收标准与外部依赖", passed: /第二十六增量/.test(documentation) && /## 外部依赖/.test(documentation) }
   ];
 
   const integrationChecks = [
@@ -73,7 +74,7 @@ function assessCitizenRecordsReadiness(options = {}) {
     {
       id: "t00-pwa-cache",
       label: "T00 Service Worker 缓存当前居民脚本版本",
-      passed: /citizen-records-v2\.js\?v=20260725care16/.test(serviceWorker) && /citizen-records-v3\.js\?v=20260728next5/.test(serviceWorker) && /citizen\.js\?v=20260728next4/.test(serviceWorker)
+      passed: /citizen-records-v2\.js\?v=20260725care16/.test(serviceWorker) && /citizen-records-v3\.js\?v=20260728next6/.test(serviceWorker) && /citizen\.js\?v=20260728next4/.test(serviceWorker)
     }
   ];
 
