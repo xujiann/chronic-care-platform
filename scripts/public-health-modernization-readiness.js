@@ -28,6 +28,14 @@ const {
   runPublicHealthSurveillanceModelToState,
   submitPublicHealthSurveillanceModelValidationToState
 } = require("../public-health-surveillance-model-governance-service");
+const {
+  RESPIRATORY_PANEL,
+  RESPIRATORY_PATHOGENS,
+  buildPublicHealthRespiratoryPathogenSurveillance,
+  ingestPublicHealthRespiratoryPathogenBatchToState,
+  publishPublicHealthRespiratoryPathogenSignalsToState,
+  verifyPublicHealthRespiratoryPathogenBatchToState
+} = require("../public-health-respiratory-pathogen-surveillance-service");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "public-health-modernization-readiness-report.json");
@@ -130,6 +138,87 @@ function runRuleGovernanceAcceptance(data) {
   }, { name: "readiness-rule-service", role: "system" }, {
     activationKeyring: RULE_GOVERNANCE_OLD_KEYRING
   });
+}
+
+function readinessRespiratoryResults(specimenCount) {
+  const positives = new Map([
+    ["influenza-a", 4],
+    ["rsv", 3],
+    ["mycoplasma-pneumoniae", 2]
+  ]);
+  return RESPIRATORY_PATHOGENS.map((item) => ({
+    pathogenCode: item.code,
+    testedSpecimens: specimenCount,
+    positiveSpecimens: positives.get(item.code) || 0
+  }));
+}
+
+function runRespiratoryPathogenAcceptance(data) {
+  const basePayload = {
+    sourceId: "ph-source-laboratory-pathogen",
+    panelId: RESPIRATORY_PANEL.id,
+    panelVersion: RESPIRATORY_PANEL.version,
+    regionCode: "210202",
+    specimenCount: 20,
+    results: readinessRespiratoryResults(20)
+  };
+  const child = ingestPublicHealthRespiratoryPathogenBatchToState(data, {
+    ...basePayload,
+    externalBatchId: "READINESS-RESPIRATORY-CHILD-BATCH-001",
+    institutionId: "readiness-respiratory-laboratory-child",
+    observedAt: "2026-07-28T07:50:00.000Z",
+    receivedAt: "2026-07-28T07:51:00.000Z",
+    ageGroup: "child",
+    placeType: "school",
+    evidenceRefs: ["READINESS-RESPIRATORY-CHILD-PANEL", "READINESS-RESPIRATORY-CHILD-QC"],
+    idempotencyKey: "readiness-respiratory-child-intake"
+  }, { name: "readiness-respiratory-laboratory-child", role: "laboratory" });
+  const olderAdult = ingestPublicHealthRespiratoryPathogenBatchToState(child.nextData, {
+    ...basePayload,
+    externalBatchId: "READINESS-RESPIRATORY-OLDER-BATCH-001",
+    institutionId: "readiness-respiratory-laboratory-older",
+    observedAt: "2026-07-28T07:55:00.000Z",
+    receivedAt: "2026-07-28T07:56:00.000Z",
+    ageGroup: "older-adult",
+    placeType: "elderly-care",
+    evidenceRefs: ["READINESS-RESPIRATORY-OLDER-PANEL", "READINESS-RESPIRATORY-OLDER-QC"],
+    idempotencyKey: "readiness-respiratory-older-intake"
+  }, { name: "readiness-respiratory-laboratory-older", role: "laboratory" });
+  const verified = verifyPublicHealthRespiratoryPathogenBatchToState(
+    olderAdult.nextData,
+    child.batch.id,
+    {
+      decision: "confirmed",
+      note: "readiness panel, aggregate counts and quality evidence verified",
+      evidenceRefs: ["READINESS-RESPIRATORY-HUMAN-VERIFICATION"],
+      idempotencyKey: "readiness-respiratory-child-verify",
+      expectedVersion: 1,
+      at: "2026-07-28T09:33:30.000Z"
+    },
+    { name: "readiness-respiratory-cdc-reviewer", role: "cdc-surveillance" }
+  );
+  const published = publishPublicHealthRespiratoryPathogenSignalsToState(
+    verified.nextData,
+    child.batch.id,
+    {
+      note: "readiness positive pathogens published as minimized signals",
+      evidenceRefs: ["READINESS-RESPIRATORY-SIGNAL-PUBLICATION"],
+      idempotencyKey: "readiness-respiratory-child-publish",
+      expectedVersion: 2,
+      at: "2026-07-28T09:34:00.000Z"
+    },
+    { name: "readiness-respiratory-signal-service", role: "system" }
+  );
+  return {
+    child,
+    olderAdult,
+    verified,
+    published,
+    board: buildPublicHealthRespiratoryPathogenSurveillance({
+      data: published.nextData,
+      at: "2026-07-28T09:34:30.000Z"
+    })
+  };
 }
 
 function runPublicHealthModernizationAcceptance() {
@@ -280,7 +369,8 @@ function runPublicHealthModernizationAcceptance() {
     data: reviewedModelValidation.nextData,
     at: "2026-07-28T09:34:00.000Z"
   });
-  const ruleGovernanceAcceptance = runRuleGovernanceAcceptance(reviewedModelValidation.nextData);
+  const respiratoryAcceptance = runRespiratoryPathogenAcceptance(reviewedModelValidation.nextData);
+  const ruleGovernanceAcceptance = runRuleGovernanceAcceptance(respiratoryAcceptance.published.nextData);
   const ruleGovernance = buildPublicHealthSurveillanceRuleGovernance({
     data: ruleGovernanceAcceptance.nextData,
     activationKeyring: RULE_GOVERNANCE_ROTATED_KEYRING,
@@ -295,6 +385,7 @@ function runPublicHealthModernizationAcceptance() {
     submittedModelValidation,
     reviewedModelValidation,
     modelGovernance,
+    respiratoryAcceptance,
     ruleGovernanceAcceptance,
     ruleGovernance,
     dataFoundation: buildPublicHealthDataFoundation({ data: ruleGovernanceAcceptance.nextData }),
@@ -305,7 +396,8 @@ function runPublicHealthModernizationAcceptance() {
     surveillance: buildPublicHealthSurveillanceCenter({
       data: ruleGovernanceAcceptance.nextData,
       ruleActivationKeyring: RULE_GOVERNANCE_ROTATED_KEYRING,
-      modelGovernanceAt: "2026-07-28T09:50:00.000Z"
+      modelGovernanceAt: "2026-07-28T09:50:00.000Z",
+      respiratorySurveillanceAt: "2026-07-28T09:50:00.000Z"
     })
   };
 }
@@ -316,21 +408,26 @@ function buildPublicHealthModernizationReadiness(options = {}) {
   const workflowSource = options.workflowSource ?? fs.readFileSync(path.join(ROOT, "public-health-surveillance-workflow-service.js"), "utf8");
   const ruleGovernanceSource = options.ruleGovernanceSource ?? fs.readFileSync(path.join(ROOT, "public-health-surveillance-rule-governance-service.js"), "utf8");
   const modelGovernanceSource = options.modelGovernanceSource ?? fs.readFileSync(path.join(ROOT, "public-health-surveillance-model-governance-service.js"), "utf8");
+  const respiratorySource = options.respiratorySource ?? fs.readFileSync(path.join(ROOT, "public-health-respiratory-pathogen-surveillance-service.js"), "utf8");
   const collaborationSource = options.collaborationSource ?? fs.readFileSync(path.join(ROOT, "public-health-medical-prevention-collaboration-service.js"), "utf8");
   const documentation = options.documentation ?? fs.readFileSync(path.join(ROOT, "docs", "public-health-fifteenth-plan-data-surveillance-medical-prevention.md"), "utf8");
   const serialized = JSON.stringify(acceptance.final.nextData);
   const checks = [
     check("data:source-registry", acceptance.dataFoundation.summary.sources === 8 && acceptance.dataFoundation.summary.registeredSources === 8, "8/8 planning data sources registered", "data"),
     check("data:catalog", acceptance.dataFoundation.summary.catalogEntries === 7, "7/7 public health data catalog entities available", "data"),
-    check("data:lineage", acceptance.dataFoundation.summary.lineageAuditEntries === 1 && acceptance.dataFoundation.summary.qualityFindings === 0, "one minimized lineage record with zero quality findings", "data"),
+    check("data:lineage", acceptance.dataFoundation.summary.lineageAuditEntries === 4 && acceptance.dataFoundation.summary.qualityFindings === 0, "four minimized lineage records with zero quality findings", "data"),
     check("data:privacy-minimized", !serialized.includes("residentId") && !serialized.includes("READINESS-SYNDROME-20260728-001") && !serialized.includes("readiness-signal-intake-001"), "direct identifiers and raw source/idempotency keys are absent", "data"),
     check("data:quality-controls", ["unregistered-source", "invalid-observed-at", "duplicate-source-record", "direct-identifier-present"].every((token) => dataSource.includes(token)), "source, time, duplicate and direct-identifier controls are explicit", "data"),
-    check("data:source-operations", acceptance.sourceOperations.summary.fresh === 1 && acceptance.sourceOperations.summary.noData === 7 && acceptance.sourceOperations.productionReady === false, "source operations distinguishes one fresh source from seven registered sources without observed data", "data"),
+    check("data:source-operations", acceptance.sourceOperations.summary.fresh === 2 && acceptance.sourceOperations.summary.noData === 6 && acceptance.sourceOperations.productionReady === false, "source operations distinguishes two fresh sources from six registered sources without observed data", "data"),
     check("surveillance:rule-registry", acceptance.surveillance.summary.rules === 8 && acceptance.surveillance.summary.activeRules === 8, "8/8 versioned multi-source rules active", "surveillance"),
     check("surveillance:trusted-rule-governance", acceptance.ruleGovernance.summary.trustedActivations === 1 && acceptance.ruleGovernance.summary.ruleVersions === 9 && acceptance.ruleGovernance.rules.find((item) => item.id === "ph-rule-clinical-syndrome")?.version === 2, "independent review and trusted server activation advances one rule while preserving version history", "surveillance"),
     check("surveillance:model-registry", acceptance.modelGovernance.summary.models === 3 && acceptance.modelGovernance.summary.shadowModels === 3, "3/3 versioned surveillance models are registered for shadow-only use", "surveillance"),
     check("surveillance:model-shadow-run", acceptance.modelGovernance.summary.modelRuns === 1 && acceptance.modelRun.run.output.modelAdviceOnly === true && acceptance.modelRun.run.output.humanDecisionRequired === true && acceptance.modelRun.run.output.alertCreated === false, "one explainable model observation remains advisory and creates no alert", "surveillance"),
     check("surveillance:model-independent-validation", acceptance.modelGovernance.summary.validatedShadowModels === 1 && acceptance.modelGovernance.summary.driftReviewsDue === 0 && acceptance.reviewedModelValidation.validation.status === "validated-shadow", "independent performance review validates one model only for time-bounded shadow use", "surveillance"),
+    check("surveillance:respiratory-pathogen-catalog", acceptance.respiratoryAcceptance.board.summary.catalogPathogens === 18 && acceptance.respiratoryAcceptance.board.summary.planningMinimumPathogens === 15, "18 respiratory pathogens exceed the planning target of more than 15 pathogens", "surveillance"),
+    check("surveillance:one-sample-multi-test", acceptance.respiratoryAcceptance.board.summary.observedPathogens === 18 && acceptance.respiratoryAcceptance.board.summary.oneSampleMultiTestBatches === 2 && acceptance.respiratoryAcceptance.board.summary.planningCoverageReady === true, "two aggregate sentinel batches prove one-sample multi-pathogen planning coverage", "surveillance"),
+    check("surveillance:old-young-priority-places", acceptance.respiratoryAcceptance.board.summary.childBatches === 1 && acceptance.respiratoryAcceptance.board.summary.olderAdultBatches === 1 && acceptance.respiratoryAcceptance.board.summary.priorityPlaceBatches === 2, "child and older-adult surveillance covers school and elderly-care priority places", "surveillance"),
+    check("surveillance:respiratory-minimized-signal-publication", acceptance.respiratoryAcceptance.board.summary.publishedSignals === 3 && acceptance.respiratoryAcceptance.published.nextData.publicHealthSurveillanceSignals.filter((item) => item.sourceId === "ph-source-laboratory-pathogen").every((item) => item.workflowState === "received" && item.verification === null), "three positive pathogen results publish minimized signals that still require human verification", "surveillance"),
     check("surveillance:historical-rule-binding", acceptance.surveillance.summary.closedAlerts === 1 && acceptance.surveillance.summary.alertIntegrityFindings === 0 && acceptance.final.alert.ruleVersion === 1, "the version-1 closed alert remains verifiable after version 2 becomes active", "surveillance"),
     check("surveillance:human-verification", acceptance.verifiedSignal.signal.workflowState === "human-verified" && acceptance.evaluated.signal.workflowState === "alert-created", "human verification precedes rule evaluation", "surveillance"),
     check("surveillance:explainable-alert", acceptance.evaluated.alert.ruleVersion === 1 && acceptance.evaluated.alert.ruleDigest && acceptance.evaluated.alert.observedValue === 8 && acceptance.evaluated.alert.threshold === 5, "alert binds rule version, digest, observed value and threshold", "surveillance"),
@@ -343,7 +440,8 @@ function buildPublicHealthModernizationReadiness(options = {}) {
     check("security:trusted-rule-activation", ["createHmac", "timingSafeEqual", "verificationSource", "signatureVerified", "signPublicHealthSurveillanceRuleActivationReceipt", "verifyPublicHealthSurveillanceRuleActivationReceipt", "ungoverned-rule-materialization"].every((token) => ruleGovernanceSource.includes(token)), "rule activation binds trust fields to a server receipt and rejects ungoverned materialization", "security"),
     check("security:managed-rule-keyring", acceptance.ruleGovernance.summary.managedKeyringReady === true && acceptance.ruleGovernance.keyring.activeKeyId === "readiness-rule-key-b" && acceptance.ruleGovernance.keyring.keys.some((item) => item.keyId === "readiness-rule-key-a" && item.status === "grace") && !JSON.stringify(acceptance.ruleGovernance).includes(RULE_GOVERNANCE_SECRET) && !JSON.stringify(acceptance.ruleGovernance).includes(RULE_GOVERNANCE_NEXT_SECRET) && ["selectSigningKey", "resolveVerificationKey", "summarizeKeyring"].every((token) => ruleGovernanceSource.includes(token)), "managed active/grace key rotation verifies history without exposing signing secrets", "security"),
     check("security:model-governance-boundary", ["assertNoDirectIdentifiers", "model-run-input-digest-invalid", "model-run-output-invalid", "model-validation-integrity-invalid", "ungoverned-model-materialization", "modelAdviceOnly", "humanDecisionRequired", "driftReviewsDue"].every((token) => modelGovernanceSource.includes(token)), "model inputs, outputs, validation evidence, drift window and advisory-only boundary fail closed", "security"),
-    check("integration:documented-t00-boundary", ["server.js", "SQLite", "T00", "productionReady=false", "/api/public-health/surveillance-signals", "/api/public-health/surveillance-model-governance", "/api/public-health/surveillance-models/:id/shadow-runs", "/api/public-health/medical-prevention-tasks"].every((token) => documentation.includes(token)), "T00 API, durable writer, model advisory boundary and production boundary are documented", "integration"),
+    check("security:respiratory-privacy-integrity-boundary", ["assertNoDirectIdentifiers", "sourceRecordHash", "one-sample-multi-test-incomplete", "respiratory-batch-content-fingerprint-invalid", "respiratory-batch-signal-binding-invalid", "respiratory-batch-audit-orphan"].every((token) => respiratorySource.includes(token)), "aggregate respiratory batches exclude direct identifiers and fail closed on incomplete, tampered, duplicate or orphaned state", "security"),
+    check("integration:documented-t00-boundary", ["server.js", "SQLite", "T00", "productionReady=false", "/api/public-health/surveillance-signals", "/api/public-health/surveillance-model-governance", "/api/public-health/surveillance-models/:id/shadow-runs", "/api/public-health/respiratory-pathogen-surveillance", "/api/public-health/respiratory-pathogen-batches/:id/actions", "/api/public-health/medical-prevention-tasks"].every((token) => documentation.includes(token)), "T00 API, durable writer, model advisory, aggregate respiratory privacy and production boundaries are documented", "integration"),
     check("safety:functional-not-production", acceptance.dataFoundation.productionReady === false && acceptance.surveillance.productionReady === false && acceptance.final.productionReady === false, "functional closure cannot self-assert production readiness", "safety")
   ];
   return {
@@ -364,6 +462,12 @@ function buildPublicHealthModernizationReadiness(options = {}) {
       modelRuns: acceptance.modelGovernance.summary.modelRuns,
       validatedShadowModels: acceptance.modelGovernance.summary.validatedShadowModels,
       modelDriftReviewsDue: acceptance.modelGovernance.summary.driftReviewsDue,
+      respiratoryCatalogPathogens: acceptance.respiratoryAcceptance.board.summary.catalogPathogens,
+      respiratoryObservedPathogens: acceptance.respiratoryAcceptance.board.summary.observedPathogens,
+      respiratoryBatches: acceptance.respiratoryAcceptance.board.summary.batches,
+      respiratoryOneSampleMultiTestBatches: acceptance.respiratoryAcceptance.board.summary.oneSampleMultiTestBatches,
+      respiratoryPublishedSignals: acceptance.respiratoryAcceptance.board.summary.publishedSignals,
+      respiratoryPlanningCoverageReady: acceptance.respiratoryAcceptance.board.summary.planningCoverageReady,
       freshSources: acceptance.sourceOperations.summary.fresh,
       noDataSources: acceptance.sourceOperations.summary.noData,
       signals: acceptance.surveillance.summary.signals,
@@ -377,6 +481,7 @@ function buildPublicHealthModernizationReadiness(options = {}) {
     dataSourceOperations: acceptance.sourceOperations,
     ruleGovernance: acceptance.ruleGovernance,
     modelGovernance: acceptance.modelGovernance,
+    respiratoryPathogenSurveillance: acceptance.respiratoryAcceptance.board,
     surveillanceCenter: acceptance.surveillance,
     acceptance: {
       signalId: acceptance.intake.signal.id,
@@ -388,6 +493,7 @@ function buildPublicHealthModernizationReadiness(options = {}) {
       "Wire a minimized data-source operations route and freshness panel without exposing endpoints or raw source identifiers.",
       "Wire rule-change submit, independent review and trusted server activation routes without accepting client-supplied trust metadata.",
       "Wire shadow model run and independent validation routes without allowing model output to create, verify, publish or close alerts.",
+      "Wire aggregate respiratory batch intake, human verification, minimized signal publication and coverage routes without accepting person- or specimen-level identifiers.",
       "Persist model runs, validation evidence and audit records with optimistic versions and integrity checks.",
       "Add readiness, release and deploy gates while preserving productionReady=false until managed keys, production thresholds, model drift windows and site evidence are verified."
     ],
@@ -418,6 +524,10 @@ function renderMarkdown(report) {
     `- Shadow model runs: ${report.summary.modelRuns}`,
     `- Validated shadow models: ${report.summary.validatedShadowModels}`,
     `- Model drift reviews due: ${report.summary.modelDriftReviewsDue}`,
+    `- Respiratory pathogens catalogued/observed: ${report.summary.respiratoryCatalogPathogens}/${report.summary.respiratoryObservedPathogens}`,
+    `- One-sample multi-test batches: ${report.summary.respiratoryOneSampleMultiTestBatches}`,
+    `- Respiratory minimized signals published: ${report.summary.respiratoryPublishedSignals}`,
+    `- Respiratory planning coverage ready: ${report.summary.respiratoryPlanningCoverageReady ? "yes" : "no"}`,
     `- Fresh/no-data sources: ${report.summary.freshSources}/${report.summary.noDataSources}`,
     `- Closed alerts: ${report.summary.closedAlerts}/${report.summary.alerts}`,
     `- Closed medical-prevention tasks: ${report.summary.closedCollaborationTasks}/${report.summary.collaborationTasks}`,

@@ -17,6 +17,9 @@ const {
 const {
   buildPublicHealthSurveillanceModelGovernance
 } = require("./public-health-surveillance-model-governance-service");
+const {
+  buildPublicHealthRespiratoryPathogenSurveillance
+} = require("./public-health-respiratory-pathogen-surveillance-service");
 
 const ALERT_ACTIONS = Object.freeze({
   "verify-alert": { from: ["open"], to: "verified" },
@@ -545,7 +548,8 @@ function buildPublicHealthSurveillanceCenter({
   data = {},
   ruleVerificationSecret = "",
   ruleActivationKeyring = null,
-  modelGovernanceAt = new Date().toISOString()
+  modelGovernanceAt = new Date().toISOString(),
+  respiratorySurveillanceAt = new Date().toISOString()
 } = {}) {
   const ruleGovernance = buildPublicHealthSurveillanceRuleGovernance({
     data,
@@ -568,6 +572,10 @@ function buildPublicHealthSurveillanceCenter({
     data,
     at: modelGovernanceAt
   });
+  const respiratorySurveillance = buildPublicHealthRespiratoryPathogenSurveillance({
+    data,
+    at: respiratorySurveillanceAt
+  });
   const alertIntegrityFindings = alerts.flatMap((alert) => validatePublicHealthSurveillanceAlert(alert, data, {
     verificationSecret: ruleVerificationSecret,
     activationKeyring: ruleActivationKeyring
@@ -579,11 +587,14 @@ function buildPublicHealthSurveillanceCenter({
       && collaboration.ok
       && ruleGovernance.ok
       && modelGovernance.ok
+      && respiratorySurveillance.ok
       && alertIntegrityFindings.length === 0,
     functionalState: !ruleGovernance.ok
       ? "multi-source-surveillance-rule-governance-review-required"
       : !modelGovernance.ok
         ? "multi-source-surveillance-model-governance-review-required"
+        : !respiratorySurveillance.ok
+          ? "multi-source-respiratory-pathogen-quality-review-required"
       : alertIntegrityFindings.length
         ? "multi-source-surveillance-integrity-review-required"
         : "multi-source-surveillance-warning-workflow-runnable",
@@ -606,7 +617,13 @@ function buildPublicHealthSurveillanceCenter({
       models: modelGovernance.summary.models,
       validatedShadowModels: modelGovernance.summary.validatedShadowModels,
       modelRuns: modelGovernance.summary.modelRuns,
-      modelGovernanceFindings: modelGovernance.summary.findings
+      modelGovernanceFindings: modelGovernance.summary.findings,
+      respiratoryCatalogPathogens: respiratorySurveillance.summary.catalogPathogens,
+      respiratoryObservedPathogens: respiratorySurveillance.summary.observedPathogens,
+      respiratoryBatches: respiratorySurveillance.summary.batches,
+      respiratoryPublishedSignals: respiratorySurveillance.summary.publishedSignals,
+      respiratoryPlanningCoverageReady: respiratorySurveillance.summary.planningCoverageReady,
+      respiratoryFindings: respiratorySurveillance.summary.findings
     },
     rules: rules.map((item) => ({
       id: item.id,
@@ -634,6 +651,7 @@ function buildPublicHealthSurveillanceCenter({
     collaboration,
     ruleGovernance,
     modelGovernance,
+    respiratorySurveillance,
     alertIntegrityFindings,
     productionReady: false,
     blockers: [
