@@ -1,5 +1,5 @@
 (function () {
-  const storageKey = "digitalHospitalMvpState:v0.10";
+  const storageKey = "digitalHospitalMvpState:v0.11";
 
   const domains = [
     { code: "A", name: "基础设施与平台支撑", weight: 100 },
@@ -342,10 +342,26 @@
       { id: "KS-DATA", name: "数据采集目录与字段口径", version: "DATA-2026-01", type: "数据目录", status: "已启用", chunks: 134, owner: "标准与数据组", lastSyncedAt: "2026-07-28 08:30", scope: "统计模板、代码集与校验规则" },
       { id: "KS-FAQ", name: "首批试点高频问题案例库", version: "FAQ-2026-07", type: "试点案例", status: "待复核", chunks: 30, owner: "试点培训组", lastSyncedAt: "2026-07-28 08:20", scope: "培训答疑、工单和版本反馈" },
     ],
+    assistantKnowledgeVersions: [
+      { id: "KV-STANDARD-20260728-01", sourceId: "KS-STANDARD", sourceName: "数智医院新标准试点评价规则", version: "STD-2026-TRIAL", previousVersion: "STD-2025-BASE", changeSummary: "完成新标准57项指标、评分边界和底线项映射。", addedChunks: 186, removedChunks: 0, checksum: "fnv32-74c8e5a1", status: "已发布", owner: "标准规则组", reviewer: "国家级标准管理员", createdAt: "2026-07-27 17:30", effectiveAt: "2026-07-28 08:30" },
+      { id: "KV-STANDARD-20260728-02", sourceId: "KS-STANDARD", sourceName: "数智医院新标准试点评价规则", version: "STD-2026-TRIAL.2", previousVersion: "STD-2026-TRIAL", changeSummary: "补充B3重试去重、H1有效期和D6持续运行判定案例。", addedChunks: 12, removedChunks: 3, checksum: "fnv32-0f4bc912", status: "待审批", owner: "标准规则组", reviewer: "国家级标准管理员", createdAt: "2026-07-28 09:35", effectiveAt: "" },
+      { id: "KV-FAQ-20260728-01", sourceId: "KS-FAQ", sourceName: "首批试点高频问题案例库", version: "FAQ-2026-07.1", previousVersion: "FAQ-2026-07", changeSummary: "归并首批试点工单中的8个高频口径问题。", addedChunks: 8, removedChunks: 1, checksum: "fnv32-c62ad534", status: "草稿", owner: "试点培训组", reviewer: "评价审核组", createdAt: "2026-07-28 09:50", effectiveAt: "" },
+    ],
     standardQaRecords: [
-      { id: "QA-20260728-001", hospitalCode: "H000001", question: "H1等保测评报告跨评价年度时如何认定有效期？", answer: "以评价任务提交截止日为基准，报告应处于有效期内；临近失效时需同时提交整改计划或复测安排，最终由审核员确认。", citations: ["H1评价细则第3.2条", "证据材料目录EVD-H1-01"], confidence: 96, askedBy: "医院填报员", askedAt: "2026-07-28 08:42", status: "已确认", scope: "H1 网络安全等级保护" },
-      { id: "QA-20260728-002", hospitalCode: "H000001", question: "B3接口成功率统计是否包含计划内停机？", answer: "接口成功率应按评价期内实际调用统计，计划内停机可在数据质量说明中单列，但不得直接从分母剔除，除非任务规则另有明确配置。", citations: ["B3指标口径第2.4条", "数据采集目录API-STAT-03"], confidence: 91, askedBy: "接口管理员", askedAt: "2026-07-28 09:05", status: "待确认", scope: "B3 院内系统集成和接口治理" },
-      { id: "QA-20260728-003", hospitalCode: "H000002", question: "D6适老化服务需要提供哪些证据？", answer: "建议至少提供适老化页面或终端截图、人工辅助流程、无障碍服务说明及实际服务记录；材料应能证明服务已上线并持续运行。", citations: ["D6指标证据要求", "证据材料目录EVD-D6-01至03"], confidence: 94, askedBy: "医院管理员", askedAt: "2026-07-28 09:20", status: "已回答", scope: "D6 老年人和特殊人群适老化服务" },
+      { id: "QA-20260728-001", hospitalCode: "H000001", question: "H1等保测评报告跨评价年度时如何认定有效期？", answer: "以评价任务提交截止日为基准，报告应处于有效期内；临近失效时需同时提交整改计划或复测安排，最终由审核员确认。", citations: ["H1评价细则第3.2条", "证据材料目录EVD-H1-01"], confidence: 96, askedBy: "医院填报员", askedAt: "2026-07-28 08:42", status: "已确认", scope: "H1 网络安全等级保护", retrievalTraceId: "RTR-QA-20260728-001", modelCallId: "MC-QA-20260728-001" },
+      { id: "QA-20260728-002", hospitalCode: "H000001", question: "B3接口成功率统计是否包含计划内停机？", answer: "接口成功率应按评价期内实际调用统计，计划内停机可在数据质量说明中单列，但不得直接从分母剔除，除非任务规则另有明确配置。", citations: ["B3指标口径第2.4条", "数据采集目录API-STAT-03"], confidence: 91, askedBy: "接口管理员", askedAt: "2026-07-28 09:05", status: "待确认", scope: "B3 院内系统集成和接口治理", retrievalTraceId: "RTR-QA-20260728-002", modelCallId: "MC-QA-20260728-002" },
+      { id: "QA-20260728-003", hospitalCode: "H000002", question: "D6适老化服务需要提供哪些证据？", answer: "建议至少提供适老化页面或终端截图、人工辅助流程、无障碍服务说明及实际服务记录；材料应能证明服务已上线并持续运行。", citations: ["D6指标证据要求", "证据材料目录EVD-D6-01至03"], confidence: 94, askedBy: "医院管理员", askedAt: "2026-07-28 09:20", status: "已回答", scope: "D6 老年人和特殊人群适老化服务", retrievalTraceId: "RTR-QA-20260728-003", modelCallId: "MC-QA-20260728-003" },
+    ],
+    assistantRetrievalTraces: [
+      { id: "RTR-QA-20260728-001", questionId: "QA-20260728-001", hospitalCode: "H000001", query: "H1等保测评报告跨评价年度时如何认定有效期？", topMatches: [{ sourceId: "KS-STANDARD", chunkId: "H1-3.2", citation: "H1评价细则第3.2条", score: 0.97 }, { sourceId: "KS-EVIDENCE", chunkId: "EVD-H1-01", citation: "证据材料目录EVD-H1-01", score: 0.94 }], hitCount: 2, threshold: 0.8, status: "命中充分", durationMs: 86, createdAt: "2026-07-28 08:42" },
+      { id: "RTR-QA-20260728-002", questionId: "QA-20260728-002", hospitalCode: "H000001", query: "B3接口成功率统计是否包含计划内停机？", topMatches: [{ sourceId: "KS-STANDARD", chunkId: "B3-2.4", citation: "B3指标口径第2.4条", score: 0.93 }, { sourceId: "KS-DATA", chunkId: "API-STAT-03", citation: "数据采集目录API-STAT-03", score: 0.89 }], hitCount: 2, threshold: 0.8, status: "命中充分", durationMs: 102, createdAt: "2026-07-28 09:05" },
+      { id: "RTR-QA-20260728-003", questionId: "QA-20260728-003", hospitalCode: "H000002", query: "D6适老化服务需要提供哪些证据？", topMatches: [{ sourceId: "KS-STANDARD", chunkId: "D6-EVIDENCE", citation: "D6指标证据要求", score: 0.95 }, { sourceId: "KS-EVIDENCE", chunkId: "EVD-D6-01-03", citation: "证据材料目录EVD-D6-01至03", score: 0.92 }], hitCount: 2, threshold: 0.8, status: "命中充分", durationMs: 91, createdAt: "2026-07-28 09:20" },
+    ],
+    assistantModelCalls: [
+      { id: "MC-QA-20260728-001", businessId: "QA-20260728-001", scene: "标准问答", modelRoute: "规则检索+摘要模型", promptVersion: "QA-PROMPT-v2.1", requestDigest: "fnv32-b8647931", responseDigest: "fnv32-490b3f28", inputTokens: 618, outputTokens: 126, latencyMs: 428, fallback: false, risk: "低", callStatus: "成功", reviewStatus: "已复核", operator: "医院填报员", calledAt: "2026-07-28 08:42", reviewedBy: "评价审核组", reviewedAt: "2026-07-28 08:55" },
+      { id: "MC-QA-20260728-002", businessId: "QA-20260728-002", scene: "标准问答", modelRoute: "规则检索+摘要模型", promptVersion: "QA-PROMPT-v2.1", requestDigest: "fnv32-3b7ca094", responseDigest: "fnv32-1d9528c6", inputTokens: 574, outputTokens: 142, latencyMs: 466, fallback: false, risk: "中", callStatus: "成功", reviewStatus: "待复核", operator: "接口管理员", calledAt: "2026-07-28 09:05", reviewedBy: "", reviewedAt: "" },
+      { id: "MC-QA-20260728-003", businessId: "QA-20260728-003", scene: "标准问答", modelRoute: "规则检索+摘要模型", promptVersion: "QA-PROMPT-v2.1", requestDigest: "fnv32-d3124b80", responseDigest: "fnv32-8a02519c", inputTokens: 536, outputTokens: 118, latencyMs: 401, fallback: false, risk: "低", callStatus: "成功", reviewStatus: "待复核", operator: "医院管理员", calledAt: "2026-07-28 09:20", reviewedBy: "", reviewedAt: "" },
+      { id: "MC-AEX-20260728-001", businessId: "AEX-20260728-001", scene: "异常解释", modelRoute: "规则解释模型", promptVersion: "AEX-PROMPT-v1.3", requestDigest: "fnv32-9e2c7154", responseDigest: "fnv32-f6423ba1", inputTokens: 412, outputTokens: 164, latencyMs: 512, fallback: false, risk: "中", callStatus: "成功", reviewStatus: "已复核", operator: "省级审核组", calledAt: "2026-07-28 09:30", reviewedBy: "数据治理组", reviewedAt: "2026-07-28 09:45" },
     ],
     anomalyExplanations: [
       { id: "AEX-20260728-001", sourceId: "VAL-H000001-B3-RATE", hospitalCode: "H000001", indicatorCode: "B3", title: "接口成功率接近等级边界", summary: "当前接口成功率99.5%，接近优秀级规则阈值，微小口径差异可能影响等级判断。", possibleCause: "失败调用是否重试计数、计划停机是否纳入分母等统计口径尚未完全确认。", impact: "可能影响B3得分及专家复核结论。", recommendation: "核对接口调用日志、失败重试去重规则和统计周期，并补充数据质量说明。", status: "待确认", generatedAt: "2026-07-28 09:30", editable: true },
@@ -487,7 +503,10 @@
     if (!Array.isArray(next.rolloutRegions)) next.rolloutRegions = JSON.parse(JSON.stringify(seedState.rolloutRegions));
     if (!Array.isArray(next.pilotAssessmentReports)) next.pilotAssessmentReports = JSON.parse(JSON.stringify(seedState.pilotAssessmentReports));
     if (!Array.isArray(next.assistantKnowledgeSources)) next.assistantKnowledgeSources = JSON.parse(JSON.stringify(seedState.assistantKnowledgeSources));
+    if (!Array.isArray(next.assistantKnowledgeVersions)) next.assistantKnowledgeVersions = JSON.parse(JSON.stringify(seedState.assistantKnowledgeVersions));
     if (!Array.isArray(next.standardQaRecords)) next.standardQaRecords = JSON.parse(JSON.stringify(seedState.standardQaRecords));
+    if (!Array.isArray(next.assistantRetrievalTraces)) next.assistantRetrievalTraces = JSON.parse(JSON.stringify(seedState.assistantRetrievalTraces));
+    if (!Array.isArray(next.assistantModelCalls)) next.assistantModelCalls = JSON.parse(JSON.stringify(seedState.assistantModelCalls));
     if (!Array.isArray(next.anomalyExplanations)) next.anomalyExplanations = JSON.parse(JSON.stringify(seedState.anomalyExplanations));
     if (!Array.isArray(next.rectificationSuggestions)) next.rectificationSuggestions = JSON.parse(JSON.stringify(seedState.rectificationSuggestions));
     if (!Array.isArray(next.reviewRiskSignals)) next.reviewRiskSignals = JSON.parse(JSON.stringify(seedState.reviewRiskSignals));
@@ -604,6 +623,16 @@
 
   function nowText() {
     return new Date().toLocaleString("zh-CN", { hour12: false });
+  }
+
+  function digestText(value) {
+    let hash = 2166136261;
+    const text = String(value);
+    for (let index = 0; index < text.length; index += 1) {
+      hash ^= text.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return `fnv32-${(hash >>> 0).toString(16).padStart(8, "0")}`;
   }
 
   function addOperationLog(action, result, actor = "运行管理员") {
@@ -793,11 +822,17 @@
     const pendingExplanations = state.anomalyExplanations.filter((item) => item.status === "待确认");
     const pendingSuggestions = state.rectificationSuggestions.filter((item) => item.status === "待采纳");
     const openRisks = state.reviewRiskSignals.filter((item) => item.status === "待确认" || item.status === "已确认");
+    const sufficientTraces = state.assistantRetrievalTraces.filter((item) => item.status === "命中充分");
     return {
       activeSources: state.assistantKnowledgeSources.filter((item) => item.status === "已启用").length,
       knowledgeChunks: state.assistantKnowledgeSources.reduce((sum, item) => sum + Number(item.chunks || 0), 0),
+      pendingKnowledgeVersions: state.assistantKnowledgeVersions.filter((item) => item.status !== "已发布").length,
+      publishedKnowledgeVersions: state.assistantKnowledgeVersions.filter((item) => item.status === "已发布").length,
       pendingQuestions: pendingQuestions.length,
       averageConfidence: Math.round(state.standardQaRecords.reduce((sum, item) => sum + Number(item.confidence || 0), 0) / Math.max(1, state.standardQaRecords.length)),
+      retrievalPassRate: Math.round((sufficientTraces.length / Math.max(1, state.assistantRetrievalTraces.length)) * 100),
+      unreviewedModelCalls: state.assistantModelCalls.filter((item) => item.reviewStatus !== "已复核").length,
+      degradedModelCalls: state.assistantModelCalls.filter((item) => item.callStatus === "降级").length,
       pendingExplanations: pendingExplanations.length,
       pendingSuggestions: pendingSuggestions.length,
       adoptedSuggestions: state.rectificationSuggestions.filter((item) => item.status === "已采纳").length,
@@ -806,9 +841,17 @@
     };
   }
 
+  function knowledgeVersionActionLabel(status) {
+    return {
+      草稿: "提交审批",
+      待审批: "审批通过",
+      已批准: "发布生效",
+    }[status] || "已生效";
+  }
+
   function statusClass(status) {
-    if (status === "已完成" || status === "已通过" || status === "已发布" || status === "已归档" || status === "已关闭" || status === "已解决" || status === "已就绪" || status === "已闭环" || status === "已启动" || status === "可启动" || status === "可推广" || status === "达标" || status === "启用" || status === "已启用" || status === "已采纳" || status === "已回答" || status === "已编辑" || status === "已转复核" || status === "已排除" || status === "复核通过" || status === "已校验" || status === "正常") return "";
-    if (status === "进行中" || status === "处理中" || status === "推进中" || status === "关注" || status === "条件通过" || status === "分析完成" || status === "改进中" || status === "待验收" || status === "准备中" || status === "已确认" || status === "待确认" || status === "待采纳" || status === "待分派" || status === "待回复" || status === "待评估" || status === "报名中" || status === "候选" || status === "试运行" || status === "预归档" || status === "填报中" || status === "审核中" || status === "上传中" || status === "扫描中" || status === "排队中" || status === "预警" || status === "降级") return "warn";
+    if (status === "已完成" || status === "已通过" || status === "已发布" || status === "已批准" || status === "已归档" || status === "已关闭" || status === "已解决" || status === "已就绪" || status === "已闭环" || status === "已启动" || status === "可启动" || status === "可推广" || status === "达标" || status === "启用" || status === "已启用" || status === "已采纳" || status === "已回答" || status === "已编辑" || status === "已转复核" || status === "已排除" || status === "复核通过" || status === "已校验" || status === "命中充分" || status === "成功" || status === "已复核" || status === "正常") return "";
+    if (status === "进行中" || status === "处理中" || status === "推进中" || status === "关注" || status === "条件通过" || status === "分析完成" || status === "改进中" || status === "待验收" || status === "准备中" || status === "已确认" || status === "待确认" || status === "待采纳" || status === "待分派" || status === "待回复" || status === "待评估" || status === "待审批" || status === "待复核" || status === "需补充" || status === "人工复核" || status === "草稿" || status === "报名中" || status === "候选" || status === "试运行" || status === "预归档" || status === "填报中" || status === "审核中" || status === "上传中" || status === "扫描中" || status === "排队中" || status === "预警" || status === "降级") return "warn";
     if (status === "阻断" || status === "有阻塞" || status === "有风险" || status === "需优化" || status === "未达标" || status === "逾期" || status === "高" || status === "紧急" || status === "异常" || status === "故障" || status === "失败" || status === "高负荷" || status === "高风险" || status === "拥堵") return "danger";
     return "warn";
   }
@@ -867,7 +910,7 @@
       standardVersion: state.task.standard,
       hospitalCode: hospital.code,
       hospitalName: hospital.name,
-      prototypeVersion: "mvp-0.10",
+      prototypeVersion: "mvp-0.11",
     };
     if (kind === "submission") {
       return {
@@ -1038,7 +1081,10 @@
         meta,
         assistantSummary: assistantSummary(),
         assistantKnowledgeSources: state.assistantKnowledgeSources,
+        assistantKnowledgeVersions: state.assistantKnowledgeVersions,
         standardQaRecords: state.standardQaRecords,
+        assistantRetrievalTraces: state.assistantRetrievalTraces,
+        assistantModelCalls: state.assistantModelCalls,
         anomalyExplanations: state.anomalyExplanations,
         rectificationSuggestions: state.rectificationSuggestions,
         reviewRiskSignals: state.reviewRiskSignals,
@@ -1093,7 +1139,10 @@
       rolloutRegions: state.rolloutRegions,
       pilotAssessmentReports: state.pilotAssessmentReports,
       assistantKnowledgeSources: state.assistantKnowledgeSources,
+      assistantKnowledgeVersions: state.assistantKnowledgeVersions,
       standardQaRecords: state.standardQaRecords,
+      assistantRetrievalTraces: state.assistantRetrievalTraces,
+      assistantModelCalls: state.assistantModelCalls,
       anomalyExplanations: state.anomalyExplanations,
       rectificationSuggestions: state.rectificationSuggestions,
       reviewRiskSignals: state.reviewRiskSignals,
@@ -2289,6 +2338,7 @@
       { id: "explanations", label: "异常解释" },
       { id: "suggestions", label: "整改建议" },
       { id: "risks", label: "审核风险" },
+      { id: "governance", label: "治理审计" },
     ];
     let content = "";
 
@@ -2342,15 +2392,16 @@
           </div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>问题</th><th>回答</th><th>引用来源</th><th>置信度</th><th>提问人/时间</th><th>状态</th><th>操作</th></tr></thead>
+              <thead><tr><th>问题</th><th>回答</th><th>引用来源</th><th>治理链路</th><th>置信度</th><th>提问人/时间</th><th>状态</th><th>操作</th></tr></thead>
               <tbody>
                 ${state.standardQaRecords
                   .map(
                     (item) => `
                       <tr>
-                        <td><strong>${item.question}</strong><br /><span class="muted-text">${item.id} · ${item.scope}</span></td>
-                        <td>${item.answer}</td>
+                        <td><strong>${escapeHtml(item.question)}</strong><br /><span class="muted-text">${item.id} · ${item.scope}</span></td>
+                        <td>${escapeHtml(item.answer)}</td>
                         <td>${item.citations.map((citation) => `<span class="tag">${citation}</span>`).join(" ")}</td>
+                        <td><strong>${item.retrievalTraceId || "待生成"}</strong><br /><span class="muted-text">${item.modelCallId || "待记录"}</span></td>
                         <td>${item.confidence}%</td>
                         <td>${item.askedBy}<br /><span class="muted-text">${item.askedAt}</span></td>
                         <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
@@ -2486,6 +2537,112 @@
                         <td>${item.owner}</td>
                         <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
                         <td><div class="toolbar inline"><button class="button ghost" type="button" data-action="confirm-review-risk" data-id="${item.id}" ${item.status !== "待确认" ? "disabled" : ""}>确认</button><button class="button ghost" type="button" data-action="dismiss-review-risk" data-id="${item.id}" ${item.status === "已排除" || item.status === "已转复核" ? "disabled" : ""}>排除</button><button class="button ghost" type="button" data-action="review-risk-to-expert" data-id="${item.id}" ${item.status === "已转复核" || item.status === "已排除" ? "disabled" : ""}>转专家</button></div></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "governance") {
+      content = `
+        <div class="grid-4">
+          ${metric("待处理知识版本", summary.pendingKnowledgeVersions, `${summary.publishedKnowledgeVersions}个版本已发布`, summary.pendingKnowledgeVersions ? "warn" : "")}
+          ${metric("检索命中通过率", `${summary.retrievalPassRate}%`, `${state.assistantRetrievalTraces.length}次检索已追踪`, summary.retrievalPassRate < 90 ? "warn" : "")}
+          ${metric("模型调用记录", state.assistantModelCalls.length, `${summary.unreviewedModelCalls}次待人工复核`, summary.unreviewedModelCalls ? "warn" : "")}
+          ${metric("降级调用", summary.degradedModelCalls, "仅保留辅助结果并触发复核", summary.degradedModelCalls ? "danger" : "")}
+        </div>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">知识版本审批</h3>
+              <p class="panel-subtitle">知识变更依次经过提交、审批和发布，只有已发布版本进入正式检索范围。</p>
+            </div>
+            <button class="button secondary" type="button" data-action="create-knowledge-version">新建版本</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>知识版本</th><th>变更摘要</th><th>片段变化</th><th>摘要指纹</th><th>责任与审批</th><th>生效时间</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.assistantKnowledgeVersions
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.sourceName}</strong><br /><span class="muted-text">${item.version} · 前序${item.previousVersion || "无"}</span></td>
+                        <td>${item.changeSummary}</td>
+                        <td>+${item.addedChunks} / -${item.removedChunks}</td>
+                        <td>${item.checksum}</td>
+                        <td>${item.owner}<br /><span class="muted-text">${item.reviewer}</span></td>
+                        <td>${item.effectiveAt || "尚未生效"}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td><button class="button ghost" type="button" data-action="advance-knowledge-version" data-id="${item.id}" ${item.status === "已发布" ? "disabled" : ""}>${knowledgeVersionActionLabel(item.status)}</button></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">检索命中追踪</h3>
+              <p class="panel-subtitle">记录每次问答的命中片段、相似度阈值和检索耗时，低于阈值时转人工补充。</p>
+            </div>
+            <button class="button secondary" type="button" data-action="run-retrieval-quality-check">检索质量复核</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>检索请求</th><th>关联问答</th><th>Top命中</th><th>阈值</th><th>耗时</th><th>状态</th></tr></thead>
+              <tbody>
+                ${state.assistantRetrievalTraces
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${escapeHtml(item.query)}</strong><br /><span class="muted-text">${item.id}</span></td>
+                        <td>${item.questionId}<br /><span class="muted-text">${item.hospitalCode}</span></td>
+                        <td>${item.topMatches.map((match) => `<strong>${match.sourceId}/${match.chunkId}</strong> ${Math.round(match.score * 100)}%<br /><span class="muted-text">${match.citation}</span>`).join("<br />")}</td>
+                        <td>${Math.round(item.threshold * 100)}%</td>
+                        <td>${item.durationMs}ms</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">模型调用审计</h3>
+              <p class="panel-subtitle">保留业务对象、提示版本、摘要指纹、令牌、耗时与降级状态，人工复核形成闭环。</p>
+            </div>
+            <button class="button secondary" type="button" data-action="simulate-model-audit">发起降级演练</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>调用与场景</th><th>业务对象</th><th>路由/提示版本</th><th>请求/响应摘要</th><th>令牌</th><th>耗时</th><th>调用状态</th><th>复核</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.assistantModelCalls
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.scene}</strong><br /><span class="muted-text">${item.id} · ${item.calledAt}</span></td>
+                        <td>${item.businessId}<br /><span class="muted-text">${item.operator}</span></td>
+                        <td>${item.modelRoute}<br /><span class="muted-text">${item.promptVersion}</span></td>
+                        <td>${item.requestDigest}<br /><span class="muted-text">${item.responseDigest}</span></td>
+                        <td>${item.inputTokens}/${item.outputTokens}</td>
+                        <td>${item.latencyMs}ms</td>
+                        <td><span class="status-pill ${statusClass(item.callStatus)}">${item.callStatus}</span><br /><span class="muted-text">风险${item.risk}${item.fallback ? " · 已降级" : ""}</span></td>
+                        <td><span class="status-pill ${statusClass(item.reviewStatus)}">${item.reviewStatus}</span><br /><span class="muted-text">${item.reviewedBy || "待指派"}</span></td>
+                        <td><button class="button ghost" type="button" data-action="review-model-call" data-id="${item.id}" ${item.reviewStatus === "已复核" ? "disabled" : ""}>人工复核</button></td>
                       </tr>
                     `,
                   )
@@ -3832,7 +3989,7 @@
         </article>
         <article class="package-card">
           <strong>评价助手包</strong>
-          <span>知识源、标准问答、异常说明、整改建议和审核风险线索</span>
+          <span>知识版本、标准问答、检索轨迹、模型审计、异常说明、整改建议和审核风险线索</span>
         </article>
         <article class="package-card">
           <strong>运营监控包</strong>
@@ -3904,6 +4061,9 @@
               <tr><td>评价助手知识源</td><td>GET/POST</td><td>/api/v1/evaluation-assistant/knowledge-sources</td><td>标准原文、评价细则、问答口径与规则说明</td><td><span class="priority">P2</span></td></tr>
               <tr><td>标准问答</td><td>GET/POST</td><td>/api/v1/evaluation-assistant/questions</td><td>带引用回答、置信度与人工确认状态</td><td><span class="priority">P2</span></td></tr>
               <tr><td>问答确认</td><td>POST</td><td>/api/v1/evaluation-assistant/questions/{questionId}:confirm</td><td>问答人工确认与审计留痕</td><td><span class="priority">P2</span></td></tr>
+              <tr><td>知识版本审批</td><td>GET/POST/PUT</td><td>/api/v1/evaluation-assistant/knowledge-versions</td><td>知识变更、审批发布、生效版本与摘要指纹</td><td><span class="priority">P2</span></td></tr>
+              <tr><td>检索命中追踪</td><td>GET/POST</td><td>/api/v1/evaluation-assistant/retrieval-traces</td><td>问答命中片段、相似度阈值、耗时与复核状态</td><td><span class="priority">P2</span></td></tr>
+              <tr><td>模型调用审计</td><td>GET/POST</td><td>/api/v1/evaluation-assistant/model-calls</td><td>提示版本、摘要指纹、令牌、耗时、降级和人工复核</td><td><span class="priority">P2</span></td></tr>
               <tr><td>异常说明</td><td>GET/POST</td><td>/api/v1/evaluation-assistant/anomaly-explanations</td><td>校验异常解释、可能原因和可编辑说明</td><td><span class="priority">P2</span></td></tr>
               <tr><td>整改建议</td><td>GET/POST</td><td>/api/v1/evaluation-assistant/rectification-suggestions</td><td>辅助建议、执行步骤与整改任务转化</td><td><span class="priority">P2</span></td></tr>
               <tr><td>审核风险</td><td>GET/POST</td><td>/api/v1/evaluation-assistant/review-risks</td><td>风险线索、依据、人工研判和专家复核</td><td><span class="priority">P2</span></td></tr>
@@ -5114,6 +5274,154 @@
     render();
   }
 
+  function sourceMatchForCitation(citation) {
+    if (/证据材料/.test(citation)) return { sourceId: "KS-EVIDENCE", chunkId: citation.match(/EVD-[A-Z0-9-]+/)?.[0] || "EVIDENCE-RULE" };
+    if (/数据采集/.test(citation)) return { sourceId: "KS-DATA", chunkId: citation.match(/[A-Z]+-[A-Z]+-[0-9]+/)?.[0] || "DATA-RULE" };
+    return { sourceId: "KS-STANDARD", chunkId: citation.match(/[A-Z][0-9][A-Z0-9.-]*/)?.[0] || "STANDARD-RULE" };
+  }
+
+  function createRetrievalTrace(record) {
+    const threshold = 0.8;
+    const topMatches = record.citations.map((citation, index) => {
+      const source = sourceMatchForCitation(citation);
+      return {
+        ...source,
+        citation,
+        score: Math.max(0.82, (record.confidence - index * 4) / 100),
+      };
+    });
+    const trace = {
+      id: `RTR-${record.id}-${Date.now()}`,
+      questionId: record.id,
+      hospitalCode: record.hospitalCode,
+      query: record.question,
+      topMatches,
+      hitCount: topMatches.length,
+      threshold,
+      status: topMatches.length >= 2 && topMatches.every((item) => item.score >= threshold) ? "命中充分" : "需补充",
+      durationMs: 72 + Math.round(record.question.length * 1.7),
+      createdAt: nowText(),
+    };
+    state.assistantRetrievalTraces.unshift(trace);
+    return trace;
+  }
+
+  function recordAssistantModelCall({ businessId, scene, modelRoute, promptVersion, requestText, responseText, risk = "低", fallback = false }) {
+    const call = {
+      id: `MC-${businessId}-${Date.now()}`,
+      businessId,
+      scene,
+      modelRoute,
+      promptVersion,
+      requestDigest: digestText(requestText),
+      responseDigest: digestText(responseText),
+      inputTokens: 420 + String(requestText).length * 2,
+      outputTokens: 72 + String(responseText).length,
+      latencyMs: fallback ? 780 : 360 + String(responseText).length,
+      fallback,
+      risk,
+      callStatus: fallback ? "降级" : "成功",
+      reviewStatus: "待复核",
+      operator: state.activeRole,
+      calledAt: nowText(),
+      reviewedBy: "",
+      reviewedAt: "",
+    };
+    state.assistantModelCalls.unshift(call);
+    return call;
+  }
+
+  function createKnowledgeVersion() {
+    const source = state.assistantKnowledgeSources.find((item) => item.id === "KS-FAQ") || state.assistantKnowledgeSources[0];
+    const sequence = state.assistantKnowledgeVersions.filter((item) => item.sourceId === source.id).length + 1;
+    const version = `${source.version}.${sequence}`;
+    const record = {
+      id: `KV-${source.id}-${Date.now()}`,
+      sourceId: source.id,
+      sourceName: source.name,
+      version,
+      previousVersion: source.version,
+      changeSummary: "归并本轮试点问答、审核复核意见和规则校验案例。",
+      addedChunks: 6,
+      removedChunks: 1,
+      checksum: digestText(`${source.id}:${version}:${nowText()}`),
+      status: "草稿",
+      owner: source.owner,
+      reviewer: "评价审核组",
+      createdAt: nowText(),
+      effectiveAt: "",
+    };
+    state.assistantKnowledgeVersions.unshift(record);
+    addAudit("新建评价助手知识版本", record.id, record.version);
+    saveState();
+    showNotice(`${record.version}已创建，等待提交审批。`);
+    render();
+  }
+
+  function advanceKnowledgeVersion(id) {
+    const record = state.assistantKnowledgeVersions.find((item) => item.id === id);
+    if (!record || record.status === "已发布") return;
+    const nextStatus = { 草稿: "待审批", 待审批: "已批准", 已批准: "已发布" }[record.status];
+    if (!nextStatus) return;
+    record.status = nextStatus;
+    record.reviewer = state.activeRole;
+    if (nextStatus === "已发布") {
+      record.effectiveAt = nowText();
+      const source = state.assistantKnowledgeSources.find((item) => item.id === record.sourceId);
+      if (source) {
+        source.version = record.version;
+        source.status = "已启用";
+        source.chunks = Math.max(0, Number(source.chunks || 0) + record.addedChunks - record.removedChunks);
+        source.lastSyncedAt = record.effectiveAt;
+      }
+    }
+    addAudit("推进知识版本审批", record.id, nextStatus);
+    saveState();
+    showNotice(`${record.version}已更新为${nextStatus}。`);
+    render();
+  }
+
+  function runRetrievalQualityCheck() {
+    state.assistantRetrievalTraces.forEach((trace) => {
+      trace.hitCount = trace.topMatches.length;
+      trace.status = trace.topMatches.length >= 2 && trace.topMatches.every((item) => item.score >= trace.threshold) ? "命中充分" : "需补充";
+      trace.durationMs = Math.max(40, trace.durationMs - 3);
+    });
+    addAudit("复核评价助手检索质量", `${state.assistantRetrievalTraces.length}次检索`, `通过率${assistantSummary().retrievalPassRate}%`);
+    saveState();
+    showNotice(`检索质量复核完成，通过率${assistantSummary().retrievalPassRate}%。`);
+    render();
+  }
+
+  function simulateModelAudit() {
+    const call = recordAssistantModelCall({
+      businessId: `DRILL-${Date.now()}`,
+      scene: "标准问答降级演练",
+      modelRoute: "规则检索兜底",
+      promptVersion: "QA-PROMPT-v2.1",
+      requestText: "知识检索服务超时后的只读规则兜底演练",
+      responseText: "返回已发布规则原文，不生成评价结论，并转人工复核。",
+      risk: "中",
+      fallback: true,
+    });
+    addAudit("发起模型调用降级演练", call.id, "已触发人工复核");
+    saveState();
+    showNotice("降级演练已完成，调用记录进入人工复核队列。");
+    render();
+  }
+
+  function reviewModelCall(id) {
+    const call = state.assistantModelCalls.find((item) => item.id === id);
+    if (!call || call.reviewStatus === "已复核") return;
+    call.reviewStatus = "已复核";
+    call.reviewedBy = state.activeRole;
+    call.reviewedAt = nowText();
+    addAudit("人工复核模型调用", call.id, call.callStatus);
+    saveState();
+    showNotice(`${call.id}已完成人工复核。`);
+    render();
+  }
+
   function answerTemplateForQuestion(question) {
     if (/H1|等保|安全/.test(question)) {
       return {
@@ -5155,8 +5463,20 @@
       status: "已回答",
       scope: template.scope,
     };
+    const trace = createRetrievalTrace(record);
+    const call = recordAssistantModelCall({
+      businessId: record.id,
+      scene: "标准问答",
+      modelRoute: "规则检索+摘要模型",
+      promptVersion: "QA-PROMPT-v2.1",
+      requestText: record.question,
+      responseText: `${record.answer}|${record.citations.join("|")}`,
+      risk: record.confidence < 93 ? "中" : "低",
+    });
+    record.retrievalTraceId = trace.id;
+    record.modelCallId = call.id;
     state.standardQaRecords.unshift(record);
-    addAudit("提交标准口径问题", record.id, `${record.confidence}%置信度`);
+    addAudit("提交标准口径问题", record.id, `${record.confidence}%置信度 · 已关联检索与调用审计`);
     saveState();
     showNotice("已生成带引用来源的辅助回答，请人工确认。");
     render();
@@ -5190,6 +5510,15 @@
       editable: true,
     };
     state.anomalyExplanations.unshift(explanation);
+    recordAssistantModelCall({
+      businessId: explanation.id,
+      scene: "异常解释",
+      modelRoute: "规则解释模型",
+      promptVersion: "AEX-PROMPT-v1.3",
+      requestText: explanation.sourceId,
+      responseText: `${explanation.summary}|${explanation.recommendation}`,
+      risk: explanation.impact.includes("阻断") ? "高" : "中",
+    });
     addAudit("生成异常可读说明", explanation.id, explanation.sourceId);
     saveState();
     showNotice("已根据当前校验问题生成异常说明。");
@@ -5238,6 +5567,15 @@
       createdAt: nowText(),
     };
     state.rectificationSuggestions.unshift(suggestion);
+    recordAssistantModelCall({
+      businessId: suggestion.id,
+      scene: "整改建议",
+      modelRoute: "整改知识模板模型",
+      promptVersion: "RSG-PROMPT-v1.2",
+      requestText: `${suggestion.sourceId}|${suggestion.problem}`,
+      responseText: `${suggestion.suggestion}|${suggestion.steps.join("|")}`,
+      risk: suggestion.priority === "紧急" ? "高" : "中",
+    });
     addAudit("生成智能整改建议", suggestion.id, explanation.id);
     saveState();
     showNotice("已生成整改建议模板，请责任部门确认。");
@@ -5290,6 +5628,15 @@
       createdAt: nowText(),
     };
     state.reviewRiskSignals.unshift(signal);
+    recordAssistantModelCall({
+      businessId: signal.id,
+      scene: "审核风险",
+      modelRoute: "规则风险引擎+辅助模型",
+      promptVersion: "RSK-PROMPT-v1.1",
+      requestText: `${signal.hospitalCode}|${signal.indicatorCode}|${signal.source}`,
+      responseText: `${signal.signal}|${signal.recommendation}`,
+      risk: signal.level,
+    });
     addAudit("扫描审核风险线索", signal.id, `${signal.level}风险`);
     saveState();
     showNotice("已完成多源风险扫描，新增1条待确认线索。");
@@ -5950,6 +6297,11 @@
     if (name === "generate-assessment-report") generateAssessmentReport();
     if (name === "publish-assessment-report") publishAssessmentReport();
     if (name === "sync-assistant-knowledge") syncAssistantKnowledge();
+    if (name === "create-knowledge-version") createKnowledgeVersion();
+    if (name === "advance-knowledge-version") advanceKnowledgeVersion(action.dataset.id);
+    if (name === "run-retrieval-quality-check") runRetrievalQualityCheck();
+    if (name === "simulate-model-audit") simulateModelAudit();
+    if (name === "review-model-call") reviewModelCall(action.dataset.id);
     if (name === "ask-standard-question") askStandardQuestion();
     if (name === "confirm-standard-answer") confirmStandardAnswer(action.dataset.id);
     if (name === "generate-anomaly-explanations") generateAnomalyExplanations();

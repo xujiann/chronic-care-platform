@@ -466,10 +466,54 @@
         "type": "object"
       }
     },
+    "assistantKnowledgeVersions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "sourceId", "version", "checksum", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "sourceId": { "type": "string" },
+          "version": { "type": "string" },
+          "checksum": { "type": "string" },
+          "status": { "type": "string", "enum": ["草稿", "待审批", "已批准", "已发布"] }
+        }
+      }
+    },
     "standardQaRecords": {
       "type": "array",
       "items": {
         "type": "object"
+      }
+    },
+    "assistantRetrievalTraces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "questionId", "topMatches", "threshold", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "questionId": { "type": "string" },
+          "topMatches": { "type": "array", "items": { "type": "object" } },
+          "threshold": { "type": "number", "minimum": 0, "maximum": 1 },
+          "status": { "type": "string", "enum": ["命中充分", "需补充", "人工复核"] }
+        }
+      }
+    },
+    "assistantModelCalls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "businessId", "promptVersion", "requestDigest", "responseDigest", "callStatus", "reviewStatus"],
+        "properties": {
+          "id": { "type": "string" },
+          "businessId": { "type": "string" },
+          "promptVersion": { "type": "string" },
+          "requestDigest": { "type": "string" },
+          "responseDigest": { "type": "string" },
+          "callStatus": { "type": "string", "enum": ["成功", "降级", "失败"] },
+          "reviewStatus": { "type": "string", "enum": ["待复核", "已复核"] }
+        }
       }
     },
     "anomalyExplanations": {
