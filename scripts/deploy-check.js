@@ -696,15 +696,21 @@ function buildDeployCheckReport(options = {}) {
         "/api/public-health/surveillance-models/:id/shadow-runs",
         "/api/public-health/surveillance-models/:id/validations",
         "/api/public-health/surveillance-model-validations/:id/actions",
+        "/api/public-health/respiratory-pathogen-surveillance",
+        "/api/public-health/respiratory-pathogen-batches",
+        "/api/public-health/respiratory-pathogen-batches/:id/actions",
+        "assertPublicHealthRespiratoryPayload",
+        "publishPublicHealthRespiratoryPathogenSignalsToState",
         "assertPublicHealthSurveillanceModelPayload",
         "publicHealthModernizationCommand",
         "PUBLIC_HEALTH_MODERNIZATION_SERVER_CONTEXT_FORBIDDEN"
       ].every((marker) => serverSource.includes(marker))
         && fs.existsSync(path.join(ROOT, "public-health-data-foundation-service.js"))
         && fs.existsSync(path.join(ROOT, "public-health-surveillance-model-governance-service.js"))
+        && fs.existsSync(path.join(ROOT, "public-health-respiratory-pathogen-surveillance-service.js"))
         && fs.existsSync(path.join(ROOT, "public-health-surveillance-workflow-service.js"))
         && fs.existsSync(path.join(ROOT, "public-health-medical-prevention-collaboration-service.js")),
-      detail: "commission-only modernization routes delegate data, model and workflow transitions and bind actor, server time, idempotency and expectedVersion"
+      detail: "commission-only modernization routes delegate data, model, aggregate respiratory-pathogen and workflow transitions and bind actor, server time, idempotency and expectedVersion"
     },
     {
       name: "storage:publicHealthModernization",
@@ -717,12 +723,17 @@ function buildDeployCheckReport(options = {}) {
         "publicHealthSurveillanceModelRuns",
         "publicHealthSurveillanceModelAudit",
         "publicHealthSurveillanceModelValidations",
+        "publicHealthRespiratoryPathogenBatches",
+        "publicHealthRespiratoryPathogenAudit",
+        "publish-respiratory-pathogen-signals",
+        "requiredCollections",
         "PUBLIC_HEALTH_MODERNIZATION_CAS_CONFLICT"
       ].every((marker) => serverSource.includes(marker))
         && pkg.scripts?.["public-health:resilience-test"]?.includes("test/public-health-modernization-api.test.js")
         && pkg.scripts?.["public-health:model-governance-test"]?.includes("test/public-health-surveillance-model-governance-api.test.js")
+        && pkg.scripts?.["public-health:respiratory-pathogen-test"]?.includes("test/public-health-respiratory-pathogen-api.test.js")
         && pkg.scripts?.["public-health:modernization-readiness"] === "node scripts/public-health-modernization-readiness.js",
-      detail: "thirteen modernization collections use nextData-only SQLite transaction CAS and unique source-record/idempotency constraints"
+      detail: "fifteen modernization collections use nextData-only SQLite transaction CAS, including atomic respiratory batch, audit, signal and lineage publication"
     },
     {
       name: "static:publicHealthModernizationWorkbenches",
@@ -730,9 +741,11 @@ function buildDeployCheckReport(options = {}) {
         "public-health-data-foundation-title",
           "public-health-surveillance-title",
           "public-health-surveillance-model-governance-title",
+          "public-health-respiratory-pathogen-title",
           "public-health-medical-prevention-title",
           "public-health-signal-intake-form",
           "public-health-model-validation-form",
+          "public-health-respiratory-pathogen-form",
           "modelAdviceOnly=true",
           "humanDecisionRequired=true",
           "alertCreated=false",
@@ -742,15 +755,18 @@ function buildDeployCheckReport(options = {}) {
           "loadPublicHealthModernizationWorkbenches",
           "handlePublicHealthModernizationAction",
           "renderPublicHealthSurveillanceModelGovernance",
+          "renderPublicHealthRespiratoryPathogenSurveillance",
           "run-shadow-model",
           "review-model-validation",
+          "verify-respiratory-pathogen-batch",
+          "publish-respiratory-pathogen-signals",
           "Idempotency-Key",
           "expectedVersion",
           "人工核实"
         ].every((marker) => publicHealthUiSource.includes(marker))
         && ["public-health-modernization-grid", "modernization-form", "@media (max-width: 1100px)"].every((marker) => portalCss.includes(marker))
         && pkg.scripts?.["public-health:resilience-test"]?.includes("test/public-health-modernization-ui.test.js"),
-      detail: "six responsive data, source-operations, rule-governance, shadow-model, surveillance and medical-prevention workbenches expose redacted summaries, human actions and a production-false boundary"
+      detail: "seven responsive data, source-operations, rule-governance, shadow-model, respiratory-pathogen, surveillance and medical-prevention workbenches expose redacted summaries, aggregate actions and a production-false boundary"
     },
     {
       name: "api:publicHealthDataSourceOperations",

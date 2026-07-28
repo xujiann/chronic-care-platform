@@ -237,6 +237,53 @@
           <p class="modernization-boundary-note">影子输出仅供建议，modelAdviceOnly=true、humanDecisionRequired=true、alertCreated=false；validated-shadow 不等于生产授权，productionReady 始终为 false。</p>
         </article>
 
+        <article class="panel public-health-modernization-panel" aria-labelledby="public-health-respiratory-pathogen-title">
+          <div class="panel-title">
+            <div>
+              <h2 id="public-health-respiratory-pathogen-title">呼吸道多病原监测</h2>
+              <span>18种病原目录、一样本多检测、重点人群场所与最小化信号发布</span>
+            </div>
+            <span id="public-health-respiratory-pathogen-status" class="badge warn">加载前未就绪</span>
+          </div>
+          <div id="public-health-respiratory-pathogen-metrics" class="modernization-metrics"></div>
+          <div id="public-health-respiratory-pathogen-catalog" class="modernization-list" aria-live="polite"></div>
+          <h3>聚合哨点批次</h3>
+          <div id="public-health-respiratory-pathogen-batches" class="modernization-list" aria-live="polite"></div>
+          <div id="public-health-respiratory-pathogen-findings" class="modernization-list" aria-live="polite"></div>
+          <form id="public-health-respiratory-pathogen-form" class="modernization-form">
+            <h3>接入聚合18联检批次</h3>
+            <label>聚合批次号<input name="externalBatchId" minlength="8" maxlength="128" required autocomplete="off"></label>
+            <label>哨点机构编号<input name="institutionId" minlength="3" maxlength="64" required></label>
+            <label>区划编号<input name="regionCode" minlength="3" maxlength="32" required></label>
+            <label>观察时间<input name="observedAt" type="datetime-local" required></label>
+            <label>年龄组
+              <select name="ageGroup" required>
+                <option value="child">儿童</option>
+                <option value="older-adult">老年人</option>
+                <option value="general">一般人群</option>
+                <option value="mixed">混合人群</option>
+              </select>
+            </label>
+            <label>重点场所
+              <select name="placeType" required>
+                <option value="school">学校</option>
+                <option value="childcare">托幼机构</option>
+                <option value="elderly-care">养老机构</option>
+                <option value="medical-institution">医疗机构</option>
+                <option value="community">社区</option>
+                <option value="port">口岸</option>
+                <option value="other">其他</option>
+              </select>
+            </label>
+            <label>聚合标本数<input name="specimenCount" type="number" min="1" max="100000" required></label>
+            <label class="wide-field">阳性聚合计数<input name="positiveCounts" placeholder="influenza-a=3, rsv=2；未列病原按0" autocomplete="off"></label>
+            <label class="wide-field">证据引用<input name="evidenceRef" required></label>
+            <button type="submit" class="inline-action">提交聚合联检批次</button>
+            <p id="public-health-respiratory-pathogen-form-status" role="status" aria-live="polite"></p>
+          </form>
+          <p class="modernization-boundary-note">仅接收聚合计数与证据，不接收居民、患者或样本标识。批次确认不会替代信号级人工确认、规则评估或生成预警；productionReady 始终为 false。</p>
+        </article>
+
         <article class="panel public-health-modernization-panel" aria-labelledby="public-health-surveillance-title">
           <div class="panel-title">
             <div>

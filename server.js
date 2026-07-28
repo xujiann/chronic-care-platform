@@ -139,6 +139,13 @@ const {
   runPublicHealthSurveillanceModelToState,
   submitPublicHealthSurveillanceModelValidationToState
 } = require("./public-health-surveillance-model-governance-service");
+const {
+  RESPIRATORY_PANEL,
+  buildPublicHealthRespiratoryPathogenSurveillance,
+  ingestPublicHealthRespiratoryPathogenBatchToState,
+  publishPublicHealthRespiratoryPathogenSignalsToState,
+  verifyPublicHealthRespiratoryPathogenBatchToState
+} = require("./public-health-respiratory-pathogen-surveillance-service");
 const CareServicePlatform = require("./care-service-platform-adapter");
 const CareServiceRuntime = require("./care-service-runtime");
 const { createCareServiceDeliveryAdapters } = require("./care-service-delivery-adapters");
@@ -6830,7 +6837,9 @@ const PUBLIC_HEALTH_MODERNIZATION_COLLECTIONS = Object.freeze([
   "publicHealthMedicalPreventionAudit",
   "publicHealthSurveillanceModelRuns",
   "publicHealthSurveillanceModelAudit",
-  "publicHealthSurveillanceModelValidations"
+  "publicHealthSurveillanceModelValidations",
+  "publicHealthRespiratoryPathogenBatches",
+  "publicHealthRespiratoryPathogenAudit"
 ]);
 
 function publicHealthModernizationConflict(message) {
@@ -6867,6 +6876,12 @@ function assertUniquePublicHealthModernizationState(data = {}) {
   const modelValidations = Array.isArray(data.publicHealthSurveillanceModelValidations)
     ? data.publicHealthSurveillanceModelValidations
     : [];
+  const respiratoryBatches = Array.isArray(data.publicHealthRespiratoryPathogenBatches)
+    ? data.publicHealthRespiratoryPathogenBatches
+    : [];
+  const respiratoryAudit = Array.isArray(data.publicHealthRespiratoryPathogenAudit)
+    ? data.publicHealthRespiratoryPathogenAudit
+    : [];
   uniqueValues(data.publicHealthDataSources, "id", "public health data source id");
   uniqueValues(signals, "id", "public health surveillance signal id");
   uniqueValues(signals, "externalSignalKeyHash", "public health source record hash");
@@ -6885,6 +6900,10 @@ function assertUniquePublicHealthModernizationState(data = {}) {
   uniqueValues(modelRuns, "id", "public health surveillance model run id");
   uniqueValues(modelAudit, "id", "public health surveillance model audit id");
   uniqueValues(modelValidations, "id", "public health surveillance model validation id");
+  uniqueValues(respiratoryBatches, "id", "public health respiratory pathogen batch id");
+  uniqueValues(respiratoryBatches, "sourceRecordHash", "public health respiratory batch source hash");
+  uniqueValues(respiratoryBatches, "idempotencyKeyHash", "public health respiratory batch idempotency hash");
+  uniqueValues(respiratoryAudit, "id", "public health respiratory pathogen audit id");
   signals.forEach((signal) => {
     const hashes = [
       signal.verification?.idempotencyKeyHash,
@@ -6947,6 +6966,14 @@ function assertUniquePublicHealthModernizationState(data = {}) {
     }
     modelValidationIdempotencyKeys.add(key);
   });
+  const respiratoryAuditStages = new Set();
+  respiratoryAudit.forEach((entry) => {
+    const key = `${String(entry?.batchId || "").trim()}:${String(entry?.action || "").trim()}:${Number(entry?.version || 0)}`;
+    if (!String(entry?.batchId || "").trim() || respiratoryAuditStages.has(key)) {
+      throw publicHealthModernizationConflict("public health respiratory pathogen audit stage unique conflict");
+    }
+    respiratoryAuditStages.add(key);
+  });
 }
 
 function assertPublicHealthModernizationWrite(data = {}, constraint = {}, incoming = {}) {
@@ -6979,6 +7006,42 @@ function assertPublicHealthModernizationWrite(data = {}, constraint = {}, incomi
     if (signals.some((item) => String(item?.externalSignalKeyHash || "").trim() === sourceRecordHash)
       || signals.some((item) => String(item?.idempotencyKeyHash || "").trim() === idempotencyKeyHash)) {
       throw publicHealthModernizationConflict("public health signal source record or idempotency key conflict");
+    }
+  }
+  const requiredCollections = Array.isArray(constraint.requiredCollections)
+    ? [...new Set(constraint.requiredCollections.map((item) => String(item || "").trim()).filter(Boolean))]
+    : [];
+  if (requiredCollections.some((item) => !PUBLIC_HEALTH_MODERNIZATION_COLLECTIONS.includes(item))
+    || requiredCollections.some((item) => !Array.isArray(incoming[item]))) {
+    throw new Error("public health modernization atomic collection boundary is invalid");
+  }
+  if (constraint.operation === "publish-respiratory-pathogen-signals") {
+    const incomingBatch = (incoming.publicHealthRespiratoryPathogenBatches || [])
+      .find((item) => String(item?.id || "").trim() === entityId);
+    const signalIds = Array.isArray(incomingBatch?.publication?.signalIds)
+      ? incomingBatch.publication.signalIds.map((item) => String(item || "").trim()).filter(Boolean)
+      : [];
+    const persistedSignalIds = new Set((data.publicHealthSurveillanceSignals || [])
+      .map((item) => String(item?.id || "").trim()).filter(Boolean));
+    const incomingSignals = incoming.publicHealthSurveillanceSignals || [];
+    const incomingLineage = incoming.publicHealthDataLineageAudit || [];
+    const publicationAudit = (incoming.publicHealthRespiratoryPathogenAudit || [])
+      .filter((item) => String(item?.batchId || "").trim() === entityId
+        && item?.action === "publish-respiratory-pathogen-signals"
+        && Number(item?.version) === expectedVersion + 1);
+    if (!incomingBatch
+      || Number(incomingBatch.version) !== expectedVersion + 1
+      || !["published", "published-no-positive"].includes(String(incomingBatch.status || "").trim())
+      || publicationAudit.length !== 1
+      || signalIds.some((signalId) => persistedSignalIds.has(signalId))
+      || signalIds.some((signalId) => !incomingSignals.some((signal) =>
+        String(signal?.id || "").trim() === signalId
+        && signal.workflowState === "received"
+        && signal.verification === null))
+      || signalIds.some((signalId) => !incomingLineage.some((entry) =>
+        String(entry?.signalId || "").trim() === signalId
+        && entry.action === "ingest-signal"))) {
+      throw publicHealthModernizationConflict("public health respiratory publication atomic boundary conflict");
     }
   }
   assertUniquePublicHealthModernizationState(incoming);
@@ -10638,6 +10701,12 @@ function normalizeState(data) {
       : [],
     publicHealthSurveillanceModelValidations: Array.isArray(data.publicHealthSurveillanceModelValidations)
       ? data.publicHealthSurveillanceModelValidations.slice(-2000)
+      : [],
+    publicHealthRespiratoryPathogenBatches: Array.isArray(data.publicHealthRespiratoryPathogenBatches)
+      ? data.publicHealthRespiratoryPathogenBatches.slice(-5000)
+      : [],
+    publicHealthRespiratoryPathogenAudit: Array.isArray(data.publicHealthRespiratoryPathogenAudit)
+      ? data.publicHealthRespiratoryPathogenAudit.slice(-15000)
       : [],
     publicHealthSignals: mergeByKey(seedPublicHealthSignals(), data.publicHealthSignals, "id"),
     publicHealthAlerts: mergeByKey(seedPublicHealthAlerts(), data.publicHealthAlerts, "id"),
@@ -24946,6 +25015,98 @@ function assertPublicHealthSurveillanceModelPayload(payload = {}, mode = "") {
   }
 }
 
+const PUBLIC_HEALTH_RESPIRATORY_DIRECT_IDENTIFIER_FIELDS = new Set([
+  "residentid",
+  "resident",
+  "residentname",
+  "patientid",
+  "patient",
+  "patientname",
+  "name",
+  "idcard",
+  "idnumber",
+  "identitynumber",
+  "phone",
+  "mobile",
+  "address",
+  "medicalrecord",
+  "medicalrecordid",
+  "medicalrecordnumber",
+  "specimenid",
+  "sampleid"
+]);
+
+function assertPublicHealthRespiratoryPayload(payload = {}, mode = "") {
+  const allowedByMode = {
+    intake: new Set([
+      "expectedVersion", "externalBatchId", "institutionId", "regionCode", "observedAt",
+      "ageGroup", "placeType", "specimenCount", "results", "evidenceRefs",
+      "idempotencyKey", "receivedAt", "sourceId", "panelId", "panelVersion"
+    ]),
+    verify: new Set([
+      "action", "expectedVersion", "decision", "note", "evidenceRefs", "idempotencyKey", "at"
+    ]),
+    publish: new Set([
+      "action", "expectedVersion", "note", "evidenceRefs", "idempotencyKey", "at"
+    ])
+  };
+  const allowed = allowedByMode[mode];
+  const inspect = (value) => {
+    if (Array.isArray(value)) {
+      value.forEach(inspect);
+      return;
+    }
+    if (!value || typeof value !== "object") return;
+    Object.entries(value).forEach(([key, item]) => {
+      const normalized = key.toLowerCase();
+      if (PUBLIC_HEALTH_RESPIRATORY_DIRECT_IDENTIFIER_FIELDS.has(normalized)
+        || ["id", "version", "status", "sourcerecordhash", "idempotencykeyhash",
+          "contentfingerprint", "verification", "publication", "integritydigest",
+          "positivityrate", "signalids"].includes(normalized)) {
+        const error = new Error("public health respiratory pathogen client override is forbidden");
+        error.code = "PUBLIC_HEALTH_RESPIRATORY_PATHOGEN_PAYLOAD_FORBIDDEN";
+        throw error;
+      }
+      inspect(item);
+    });
+  };
+  const unexpected = Object.keys(payload).find((key) => !allowed?.has(key));
+  if (unexpected) {
+    const error = new Error("public health respiratory pathogen client override is forbidden");
+    error.code = "PUBLIC_HEALTH_RESPIRATORY_PATHOGEN_PAYLOAD_FORBIDDEN";
+    throw error;
+  }
+  (payload.results || []).forEach((result) => {
+    const unexpectedResult = Object.keys(result || {})
+      .find((key) => !["pathogenCode", "testedSpecimens", "positiveSpecimens"].includes(key));
+    if (unexpectedResult) {
+      const error = new Error("public health respiratory pathogen result override is forbidden");
+      error.code = "PUBLIC_HEALTH_RESPIRATORY_PATHOGEN_PAYLOAD_FORBIDDEN";
+      throw error;
+    }
+  });
+  inspect(payload);
+}
+
+function publicHealthRespiratoryPathogenActor(user = {}, purpose = "verify") {
+  const actorId = String(user.username || user.id || "").trim();
+  if (!actorId) {
+    const error = new Error("public health respiratory pathogen actor identity is required");
+    error.code = "PUBLIC_HEALTH_MODERNIZATION_FORBIDDEN";
+    throw error;
+  }
+  return {
+    id: actorId,
+    username: actorId,
+    name: actorId,
+    role: purpose === "intake" && user.role === "institution"
+      ? "laboratory"
+      : purpose === "intake"
+        ? "cdc-surveillance"
+        : "commission"
+  };
+}
+
 function publicHealthSurveillanceModelActor(user = {}, purpose = "run") {
   const actorId = String(user.username || user.id || "").trim();
   if (!actorId) {
@@ -24969,9 +25130,9 @@ function publicHealthSurveillanceModelActor(user = {}, purpose = "run") {
 
 function publicHealthModernizationSafeCode(error) {
   const explicit = String(error?.code || "").trim();
-  if (/^PUBLIC_HEALTH_(?:MODERNIZATION|SURVEILLANCE_(?:RULE|MODEL))_[A-Z0-9_]+$/.test(explicit)) return explicit;
+  if (/^PUBLIC_HEALTH_(?:MODERNIZATION|SURVEILLANCE_(?:RULE|MODEL)|RESPIRATORY_PATHOGEN)_[A-Z0-9_]+$/.test(explicit)) return explicit;
   const message = String(error?.message || "");
-  if (/unknown public health surveillance signal|unknown public health surveillance alert|unknown medical-prevention task|unknown public health rule change|unknown public health surveillance model|unknown public health model validation/i.test(message)) {
+  if (/unknown public health surveillance signal|unknown public health surveillance alert|unknown medical-prevention task|unknown public health rule change|unknown public health surveillance model|unknown public health model validation|unknown public health respiratory pathogen batch/i.test(message)) {
     return "PUBLIC_HEALTH_MODERNIZATION_RECORD_NOT_FOUND";
   }
   if (/role .*not allowed/i.test(message)) return "PUBLIC_HEALTH_MODERNIZATION_FORBIDDEN";
@@ -24986,6 +25147,9 @@ function publicHealthModernizationSafeCode(error) {
   }
   if (/model run integrity invalid|model validation integrity invalid|ungoverned-model-materialization/i.test(message)) {
     return "PUBLIC_HEALTH_SURVEILLANCE_MODEL_INTEGRITY_INVALID";
+  }
+  if (/respiratory pathogen batch integrity invalid|respiratory pathogen publication idempotency or signal binding conflict/i.test(message)) {
+    return "PUBLIC_HEALTH_RESPIRATORY_PATHOGEN_INTEGRITY_INVALID";
   }
   if (/rule registry integrity invalid|rule change integrity invalid|trusted public health rule activation failed/i.test(message)) {
     return "PUBLIC_HEALTH_SURVEILLANCE_RULE_INTEGRITY_INVALID";
@@ -25026,6 +25190,69 @@ function publicHealthModernizationError(res, error) {
 function publicHealthSafeSignal(data, signalId) {
   return buildPublicHealthDataFoundation({ data }).signals
     .find((item) => item.id === signalId) || null;
+}
+
+function publicHealthSafeRespiratoryPathogenBatch(item = {}) {
+  return {
+    id: item.id,
+    version: item.version,
+    institutionId: item.institutionId,
+    regionCode: item.regionCode,
+    observedAt: item.observedAt,
+    ageGroup: item.ageGroup,
+    placeType: item.placeType,
+    specimenCount: item.specimenCount,
+    pathogenCoverage: item.pathogenCoverage ?? item.results?.length ?? 0,
+    positivePathogens: item.positivePathogens
+      ?? item.results?.filter((result) => Number(result.positiveSpecimens) > 0).length
+      ?? 0,
+    status: item.status,
+    publishedSignals: item.publishedSignals ?? item.publication?.signalIds?.length ?? 0,
+    oneSampleMultiTest: item.oneSampleMultiTest
+      ?? (Array.isArray(item.results)
+        && item.results.length >= 15
+        && item.results.every((result) => Number(result.testedSpecimens) === Number(item.specimenCount))),
+    allowedActions: item.status === "received"
+      ? ["verify-respiratory-pathogen-batch"]
+      : item.status === "human-verified"
+        ? ["publish-respiratory-pathogen-signals"]
+        : [],
+    productionReady: false
+  };
+}
+
+function publicHealthSafeRespiratoryPathogenSurveillance(data) {
+  const board = buildPublicHealthRespiratoryPathogenSurveillance({
+    data,
+    at: new Date().toISOString()
+  });
+  return {
+    ok: board.ok,
+    functionalState: board.functionalState,
+    formalGoLiveState: board.formalGoLiveState,
+    generatedAt: board.generatedAt,
+    summary: board.summary,
+    panel: {
+      id: board.panel.id,
+      version: board.panel.version,
+      name: board.panel.name,
+      pathogenCount: board.panel.pathogenCodes.length,
+      planningMinimumPathogens: board.panel.planningMinimumPathogens
+    },
+    pathogens: (board.pathogens || []).map((item) => ({
+      code: item.code,
+      name: item.name,
+      group: item.group,
+      observed: item.observed
+    })),
+    batches: (board.batches || []).map(publicHealthSafeRespiratoryPathogenBatch),
+    findings: (board.findings || []).map((item) => ({
+      batchId: item.batchId,
+      code: item.code
+    })),
+    blockers: board.blockers,
+    productionReady: false
+  };
 }
 
 function publicHealthSurveillanceRuleActivationOptions({ required = false } = {}) {
@@ -25740,6 +25967,177 @@ async function handleApi(req, res) {
         throw error;
       }
       sendJson(res, 200, publicHealthSafeSurveillanceModelGovernance(readDatabase()));
+    } catch (error) {
+      publicHealthModernizationError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/respiratory-pathogen-surveillance") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    try {
+      if ([...url.searchParams.keys()].length) {
+        const error = new Error("public health respiratory pathogen query overrides are forbidden");
+        error.code = "PUBLIC_HEALTH_RESPIRATORY_PATHOGEN_PAYLOAD_FORBIDDEN";
+        throw error;
+      }
+      sendJson(res, 200, publicHealthSafeRespiratoryPathogenSurveillance(readDatabase()));
+    } catch (error) {
+      publicHealthModernizationError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/public-health/respiratory-pathogen-batches") {
+    const user = requireApiRole(
+      req,
+      res,
+      ["commission", "institution"],
+      "/api/public-health/respiratory-pathogen-batches"
+    );
+    if (!user) return;
+    try {
+      const clientBody = await collectJson(req);
+      if (["sourceId", "panelId", "panelVersion"].some((key) =>
+        Object.prototype.hasOwnProperty.call(clientBody || {}, key))) {
+        const error = new Error("public health respiratory panel configuration is server-owned");
+        error.code = "PUBLIC_HEALTH_RESPIRATORY_PATHOGEN_PAYLOAD_FORBIDDEN";
+        throw error;
+      }
+      const command = publicHealthModernizationCommand(req, url, clientBody, { insert: true });
+      const payload = {
+        ...command,
+        sourceId: "ph-source-laboratory-pathogen",
+        panelId: RESPIRATORY_PANEL.id,
+        panelVersion: RESPIRATORY_PANEL.version
+      };
+      assertPublicHealthRespiratoryPayload(payload, "intake");
+      if (user.role === "institution"
+        && String(payload.institutionId || "").trim() !== String(user.orgCode || "").trim()) {
+        const error = new Error("respiratory pathogen institution scope mismatch");
+        error.code = "PUBLIC_HEALTH_MODERNIZATION_FORBIDDEN";
+        throw error;
+      }
+      const data = readDatabase();
+      const result = ingestPublicHealthRespiratoryPathogenBatchToState(
+        data,
+        payload,
+        publicHealthRespiratoryPathogenActor(user, "intake"),
+        { at: command.receivedAt }
+      );
+      if (!result.idempotent) {
+        writeDatabase(result.nextData, {
+          event: "public-health-respiratory-pathogen-batch-ingested",
+          publicHealthModernizationWrite: {
+            collection: "publicHealthRespiratoryPathogenBatches",
+            entityId: result.batch.id,
+            expectedVersion: 0,
+            operation: "insert-respiratory-pathogen-batch",
+            requiredCollections: [
+              "publicHealthRespiratoryPathogenBatches",
+              "publicHealthRespiratoryPathogenAudit"
+            ]
+          }
+        });
+      }
+      const board = publicHealthSafeRespiratoryPathogenSurveillance(result.nextData);
+      sendJson(res, result.idempotent ? 200 : 201, {
+        ok: true,
+        idempotent: Boolean(result.idempotent),
+        batch: board.batches.find((item) => item.id === result.batch.id)
+          || publicHealthSafeRespiratoryPathogenBatch(result.batch),
+        summary: board.summary,
+        productionReady: false
+      });
+    } catch (error) {
+      publicHealthModernizationError(res, error);
+    }
+    return;
+  }
+
+  const publicHealthRespiratoryPathogenActionMatch = url.pathname
+    .match(/^\/api\/public-health\/respiratory-pathogen-batches\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthRespiratoryPathogenActionMatch) {
+    const user = requireApiRole(
+      req,
+      res,
+      ["commission"],
+      "/api/public-health/respiratory-pathogen-batches/:id/actions"
+    );
+    if (!user) return;
+    try {
+      const batchId = decodeURIComponent(publicHealthRespiratoryPathogenActionMatch[1]);
+      const payload = publicHealthModernizationCommand(req, url, await collectJson(req));
+      const action = String(payload.action || "").trim();
+      const data = readDatabase();
+      let result;
+      let operation;
+      if (action === "verify-respiratory-pathogen-batch") {
+        assertPublicHealthRespiratoryPayload(payload, "verify");
+        result = verifyPublicHealthRespiratoryPathogenBatchToState(
+          data,
+          batchId,
+          payload,
+          publicHealthRespiratoryPathogenActor(user, "verify")
+        );
+        operation = "verify-respiratory-pathogen-batch";
+      } else if (action === "publish-respiratory-pathogen-signals") {
+        assertPublicHealthRespiratoryPayload(payload, "publish");
+        const alertsBefore = JSON.stringify(data.publicHealthSurveillanceAlerts || []);
+        result = publishPublicHealthRespiratoryPathogenSignalsToState(
+          data,
+          batchId,
+          payload,
+          publicHealthRespiratoryPathogenActor(user, "publish")
+        );
+        if (JSON.stringify(result.nextData.publicHealthSurveillanceAlerts || []) !== alertsBefore
+          || (result.signalIds || []).some((signalId) => {
+            const signal = (result.nextData.publicHealthSurveillanceSignals || [])
+              .find((item) => item.id === signalId);
+            return !signal || signal.workflowState !== "received" || signal.verification !== null;
+          })) {
+          const error = new Error("respiratory publication bypassed the signal-level human decision boundary");
+          error.code = "PUBLIC_HEALTH_RESPIRATORY_PATHOGEN_INTEGRITY_INVALID";
+          throw error;
+        }
+        operation = "publish-respiratory-pathogen-signals";
+      } else {
+        const error = new Error("unsupported public health respiratory pathogen action");
+        error.code = "PUBLIC_HEALTH_MODERNIZATION_COMMAND_INVALID";
+        throw error;
+      }
+      if (!result.idempotent) {
+        writeDatabase(result.nextData, {
+          event: operation,
+          publicHealthModernizationWrite: {
+            collection: "publicHealthRespiratoryPathogenBatches",
+            entityId: batchId,
+            expectedVersion: payload.expectedVersion,
+            operation,
+            requiredCollections: operation === "publish-respiratory-pathogen-signals"
+              ? [
+                  "publicHealthRespiratoryPathogenBatches",
+                  "publicHealthRespiratoryPathogenAudit",
+                  "publicHealthSurveillanceSignals",
+                  "publicHealthDataLineageAudit"
+                ]
+              : [
+                  "publicHealthRespiratoryPathogenBatches",
+                  "publicHealthRespiratoryPathogenAudit"
+                ]
+          }
+        });
+      }
+      const board = publicHealthSafeRespiratoryPathogenSurveillance(result.nextData);
+      sendJson(res, 200, {
+        ok: true,
+        idempotent: Boolean(result.idempotent),
+        batch: board.batches.find((item) => item.id === batchId)
+          || publicHealthSafeRespiratoryPathogenBatch(result.batch),
+        summary: board.summary,
+        productionReady: false
+      });
     } catch (error) {
       publicHealthModernizationError(res, error);
     }

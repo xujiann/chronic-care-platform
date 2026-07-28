@@ -38,7 +38,7 @@ function loadUiContext() {
   return { context, node };
 }
 
-test("modernization page exposes six accessible commission workbenches and controlled routes", () => {
+test("modernization page exposes seven accessible commission workbenches and controlled routes", () => {
   const html = read("public-health.html");
   const source = read("public-health.js");
   const css = read("portal.css");
@@ -52,6 +52,10 @@ test("modernization page exposes six accessible commission workbenches and contr
   assert.match(html, /id="public-health-rule-change-form"/);
   assert.match(html, /id="public-health-surveillance-model-governance-title"/);
   assert.match(html, /id="public-health-model-validation-form"/);
+  assert.match(html, /id="public-health-respiratory-pathogen-title"/);
+  assert.match(html, /id="public-health-respiratory-pathogen-form"/);
+  assert.match(html, /18种病原目录/);
+  assert.match(html, /仅接收聚合计数与证据/);
   assert.match(html, /modelAdviceOnly=true/);
   assert.match(html, /humanDecisionRequired=true/);
   assert.match(html, /alertCreated=false/);
@@ -65,6 +69,10 @@ test("modernization page exposes six accessible commission workbenches and contr
   assert.match(source, /\/api\/public-health\/surveillance-model-governance/);
   assert.match(source, /\/api\/public-health\/surveillance-models\/\$\{encodeURIComponent\(id\)\}\/shadow-runs/);
   assert.match(source, /\/api\/public-health\/surveillance-model-validations\/\$\{encodeURIComponent\(id\)\}\/actions/);
+  assert.match(source, /\/api\/public-health\/respiratory-pathogen-surveillance/);
+  assert.match(source, /\/api\/public-health\/respiratory-pathogen-batches/);
+  assert.match(source, /PUBLIC_HEALTH_RESPIRATORY_PATHOGEN_CODES/);
+  assert.match(source, /testedSpecimens:\s*specimenCount/);
   assert.match(source, /\/api\/public-health\/surveillance-center/);
   assert.match(source, /\/api\/public-health\/medical-prevention-tasks/);
   assert.match(source, /\/api\/public-health\/surveillance-signals\/\$\{encodeURIComponent\(id\)\}\/actions/);
@@ -189,6 +197,45 @@ test("modernization rendering uses only safe summary fields and fails closed whe
       }],
       productionReady: false
     },
+    respiratoryPathogen: {
+      ok: true,
+      summary: {
+        catalogPathogens: 18,
+        planningMinimumPathogens: 15,
+        observedPathogens: 18,
+        batches: 2,
+        oneSampleMultiTestBatches: 2,
+        childBatches: 1,
+        olderAdultBatches: 1,
+        priorityPlaceBatches: 2,
+        publishedSignals: 3,
+        findings: 0,
+        planningCoverageReady: true
+      },
+      panel: {
+        id: "ph-respiratory-panel-18-v1",
+        version: 1,
+        name: "respiratory-18-panel",
+        pathogenCount: 18,
+        planningMinimumPathogens: 15
+      },
+      batches: [{
+        id: "safe-respiratory-batch",
+        version: 1,
+        regionCode: "210202",
+        ageGroup: "child",
+        placeType: "school",
+        specimenCount: 20,
+        pathogenCoverage: 18,
+        positivePathogens: 3,
+        publishedSignals: 0,
+        status: "received",
+        oneSampleMultiTest: true,
+        allowedActions: ["verify-respiratory-pathogen-batch"]
+      }],
+      findings: [],
+      productionReady: false
+    },
     surveillance: {
       ok: true,
       summary: { rules: 8, activeRules: 8, humanVerifiedSignals: 0, openAlerts: 0, humanRiskAssessments: 0 },
@@ -215,6 +262,10 @@ test("modernization rendering uses only safe summary fields and fails closed whe
     node("#public-health-surveillance-model-governance-list").innerHTML,
     node("#public-health-surveillance-model-runs").innerHTML,
     node("#public-health-surveillance-model-validations").innerHTML,
+    node("#public-health-respiratory-pathogen-metrics").innerHTML,
+    node("#public-health-respiratory-pathogen-catalog").innerHTML,
+    node("#public-health-respiratory-pathogen-batches").innerHTML,
+    node("#public-health-respiratory-pathogen-findings").innerHTML,
     node("#public-health-surveillance-metrics").innerHTML,
     node("#public-health-surveillance-signals").innerHTML,
     node("#public-health-surveillance-alerts").innerHTML,
@@ -229,6 +280,9 @@ test("modernization rendering uses only safe summary fields and fails closed whe
   assert.match(rendered, /validated-shadow/);
   assert.match(rendered, /advisory-only/);
   assert.match(rendered, /alertCreated=false/);
+  assert.match(rendered, /18\/18/);
+  assert.match(rendered, /respiratory-18-panel/);
+  assert.match(rendered, /人工确认/);
   assert.match(rendered, /独立批准/);
   assert.match(rendered, /暂无预警/);
   assert.doesNotMatch(rendered, /externalSignalId|externalSignalKeyHash|idempotencyKeyHash|contentFingerprint|endpoint|secret|signature/i);
@@ -237,17 +291,19 @@ test("modernization rendering uses only safe summary fields and fails closed whe
   assert.match(read("public-health.js"), /blockerCode/);
 
   vm.runInContext(
-    "renderPublicHealthModernizationWorkbenches({ foundation: null, sourceOperations: null, ruleGovernance: null, modelGovernance: null, surveillance: null, collaboration: null })",
+    "renderPublicHealthModernizationWorkbenches({ foundation: null, sourceOperations: null, ruleGovernance: null, modelGovernance: null, respiratoryPathogen: null, surveillance: null, collaboration: null })",
     context
   );
   assert.match(node("#public-health-data-foundation-status").textContent, /失败关闭/);
   assert.match(node("#public-health-data-source-operations-status").textContent, /失败关闭/);
   assert.match(node("#public-health-rule-governance-status").textContent, /失败关闭/);
   assert.match(node("#public-health-surveillance-model-governance-status").textContent, /失败关闭/);
+  assert.match(node("#public-health-respiratory-pathogen-status").textContent, /失败关闭/);
   assert.match(node("#public-health-surveillance-status").textContent, /失败关闭/);
   assert.match(node("#public-health-medical-prevention-status").textContent, /失败关闭/);
   assert.match(node("#public-health-data-foundation-sources").innerHTML, /按未就绪处理/);
   assert.match(node("#public-health-data-source-operations-list").innerHTML, /按未就绪处理/);
   assert.match(node("#public-health-rule-governance-list").innerHTML, /不得参与评估/);
   assert.match(node("#public-health-surveillance-model-governance-list").innerHTML, /影子建议按未验证处理/);
+  assert.match(node("#public-health-respiratory-pathogen-batches").innerHTML, /禁止确认或发布/);
 });

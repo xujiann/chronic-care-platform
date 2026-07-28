@@ -7,6 +7,7 @@ let currentPublicHealthModernization = {
   sourceOperations: null,
   ruleGovernance: null,
   modelGovernance: null,
+  respiratoryPathogen: null,
   surveillance: null,
   collaboration: null
 };
@@ -97,6 +98,7 @@ document.addEventListener("click", handlePublicHealthModernizationAction);
 document.addEventListener("submit", handlePublicHealthSignalIntake);
 document.addEventListener("submit", handlePublicHealthRuleChangeSubmit);
 document.addEventListener("submit", handlePublicHealthModelValidationSubmit);
+document.addEventListener("submit", handlePublicHealthRespiratoryPathogenSubmit);
 
 async function loadPublicHealthSystem() {
   if (PUBLIC_HEALTH_API_BASE) {
@@ -122,6 +124,7 @@ const PUBLIC_HEALTH_MODERNIZATION_ENDPOINTS = Object.freeze({
   sourceOperations: "/api/public-health/data-source-operations",
   ruleGovernance: "/api/public-health/surveillance-rule-governance",
   modelGovernance: "/api/public-health/surveillance-model-governance",
+  respiratoryPathogen: "/api/public-health/respiratory-pathogen-surveillance",
   surveillance: "/api/public-health/surveillance-center",
   collaboration: "/api/public-health/medical-prevention-tasks"
 });
@@ -153,8 +156,9 @@ async function loadPublicHealthModernizationWorkbenches() {
     sourceOperations: results[1].status === "fulfilled" ? results[1].value : null,
     ruleGovernance: results[2].status === "fulfilled" ? results[2].value : null,
     modelGovernance: results[3].status === "fulfilled" ? results[3].value : null,
-    surveillance: results[4].status === "fulfilled" ? results[4].value : null,
-    collaboration: results[5].status === "fulfilled" ? results[5].value : null
+    respiratoryPathogen: results[4].status === "fulfilled" ? results[4].value : null,
+    surveillance: results[5].status === "fulfilled" ? results[5].value : null,
+    collaboration: results[6].status === "fulfilled" ? results[6].value : null
   };
   renderPublicHealthModernizationWorkbenches(currentPublicHealthModernization, results);
 }
@@ -165,6 +169,7 @@ function renderPublicHealthModernizationLoading() {
     "#public-health-data-source-operations-status",
     "#public-health-rule-governance-status",
     "#public-health-surveillance-model-governance-status",
+    "#public-health-respiratory-pathogen-status",
     "#public-health-surveillance-status",
     "#public-health-medical-prevention-status"
   ].forEach((selector) => {
@@ -192,6 +197,7 @@ function renderPublicHealthModernizationWorkbenches(state, results = []) {
   const sourceOperations = state.sourceOperations;
   const ruleGovernance = state.ruleGovernance;
   const modelGovernance = state.modelGovernance;
+  const respiratoryPathogen = state.respiratoryPathogen;
   const surveillance = state.surveillance;
   const collaboration = state.collaboration;
   renderModernizationStatus("#public-health-data-foundation-status", foundation, Boolean(foundation));
@@ -209,6 +215,11 @@ function renderPublicHealthModernizationWorkbenches(state, results = []) {
     "#public-health-surveillance-model-governance-status",
     modelGovernance,
     Boolean(modelGovernance)
+  );
+  renderModernizationStatus(
+    "#public-health-respiratory-pathogen-status",
+    respiratoryPathogen,
+    Boolean(respiratoryPathogen)
   );
   renderModernizationStatus("#public-health-surveillance-status", surveillance, Boolean(surveillance));
   renderModernizationStatus("#public-health-medical-prevention-status", collaboration, Boolean(collaboration));
@@ -237,6 +248,7 @@ function renderPublicHealthModernizationWorkbenches(state, results = []) {
   renderPublicHealthDataSourceOperations(sourceOperations);
   renderPublicHealthRuleGovernance(ruleGovernance);
   renderPublicHealthSurveillanceModelGovernance(modelGovernance);
+  renderPublicHealthRespiratoryPathogenSurveillance(respiratoryPathogen);
 
   const surveillanceMetrics = document.querySelector("#public-health-surveillance-metrics");
   if (surveillanceMetrics) {
@@ -402,6 +414,88 @@ function renderPublicHealthSurveillanceModelGovernance(governance) {
         <div class="action-row">${actions}</div>
       </article>`;
     }).join("") || "<p class=\"modernization-empty\">暂无可信效能验证。</p>";
+  }
+}
+
+const PUBLIC_HEALTH_RESPIRATORY_PATHOGEN_CODES = Object.freeze([
+  "sars-cov-2",
+  "influenza-a",
+  "influenza-b",
+  "rsv",
+  "adenovirus",
+  "human-metapneumovirus",
+  "parainfluenza-1",
+  "parainfluenza-2",
+  "parainfluenza-3",
+  "parainfluenza-4",
+  "rhinovirus",
+  "coronavirus-229e",
+  "coronavirus-nl63",
+  "coronavirus-oc43",
+  "coronavirus-hku1",
+  "mycoplasma-pneumoniae",
+  "chlamydia-pneumoniae",
+  "bordetella-pertussis"
+]);
+
+function renderPublicHealthRespiratoryPathogenSurveillance(board) {
+  const metrics = document.querySelector("#public-health-respiratory-pathogen-metrics");
+  if (metrics) {
+    metrics.innerHTML = board
+      ? [
+          modernizationMetric("目录/已观察", `${board.summary?.catalogPathogens || 0}/${board.summary?.observedPathogens || 0}`),
+          modernizationMetric("一样本多检测", board.summary?.oneSampleMultiTestBatches || 0),
+          modernizationMetric("儿童/老年", `${board.summary?.childBatches || 0}/${board.summary?.olderAdultBatches || 0}`),
+          modernizationMetric("重点场所", board.summary?.priorityPlaceBatches || 0),
+          modernizationMetric("已发布信号", board.summary?.publishedSignals || 0),
+          modernizationMetric("完整性问题", board.summary?.findings || 0)
+        ].join("")
+      : modernizationMetric("呼吸道多病原监测", "不可用");
+  }
+  const catalog = document.querySelector("#public-health-respiratory-pathogen-catalog");
+  const batches = document.querySelector("#public-health-respiratory-pathogen-batches");
+  const findings = document.querySelector("#public-health-respiratory-pathogen-findings");
+  if (!board) {
+    if (catalog) catalog.innerHTML = "<p class=\"modernization-empty\">病原目录不可用，按未覆盖处理。</p>";
+    if (batches) batches.innerHTML = "<p class=\"modernization-empty\">聚合批次不可用，禁止确认或发布。</p>";
+    if (findings) findings.innerHTML = "<p class=\"modernization-empty\">完整性状态不可用，失败关闭。</p>";
+    return;
+  }
+  if (catalog) {
+    catalog.innerHTML = `<article class="modernization-item">
+      <div>
+        <strong>${escapeHtml(board.panel?.name || "呼吸道多病原联检面板")}</strong>
+        <small>目录 ${escapeHtml(board.summary?.catalogPathogens || 0)} / 已观察 ${escapeHtml(board.summary?.observedPathogens || 0)} / 规划最低 ${escapeHtml(board.summary?.planningMinimumPathogens || 15)}</small>
+      </div>
+      <span class="badge ${board.summary?.planningCoverageReady ? "ok" : "warn"}">${escapeHtml(board.summary?.planningCoverageReady ? "规划覆盖可运行" : "覆盖建设中")}</span>
+    </article>`;
+  }
+  if (batches) {
+    batches.innerHTML = (board.batches || []).map((batch) => {
+      let actions = "";
+      if ((batch.allowedActions || []).includes("verify-respiratory-pathogen-batch")) {
+        actions = `<button class="inline-action" data-modernization-kind="respiratory-batch" data-modernization-id="${escapeHtml(batch.id)}" data-modernization-version="${escapeHtml(batch.version)}" data-modernization-action="verify-respiratory-pathogen-batch" data-modernization-decision="confirmed">人工确认</button>
+          <button class="inline-action" data-modernization-kind="respiratory-batch" data-modernization-id="${escapeHtml(batch.id)}" data-modernization-version="${escapeHtml(batch.version)}" data-modernization-action="verify-respiratory-pathogen-batch" data-modernization-decision="dismissed">排除批次</button>`;
+      } else if ((batch.allowedActions || []).includes("publish-respiratory-pathogen-signals")) {
+        actions = `<button class="inline-action" data-modernization-kind="respiratory-batch" data-modernization-id="${escapeHtml(batch.id)}" data-modernization-version="${escapeHtml(batch.version)}" data-modernization-action="publish-respiratory-pathogen-signals">发布最小化信号</button>`;
+      }
+      return `<article class="modernization-item">
+        <div>
+          <strong>${escapeHtml(batch.ageGroup)} / ${escapeHtml(batch.placeType)} / ${escapeHtml(batch.regionCode)}</strong>
+          <small>聚合标本 ${escapeHtml(batch.specimenCount)} / 病原 ${escapeHtml(batch.pathogenCoverage)} / 阳性病原 ${escapeHtml(batch.positivePathogens)} / 信号 ${escapeHtml(batch.publishedSignals)}</small>
+        </div>
+        <div class="action-row">
+          <span class="badge ${batch.oneSampleMultiTest ? "ok" : "warn"}">${escapeHtml(batch.status || "received")}</span>
+          ${actions}
+        </div>
+      </article>`;
+    }).join("") || "<p class=\"modernization-empty\">暂无聚合哨点批次。</p>";
+  }
+  if (findings) {
+    findings.innerHTML = (board.findings || []).map((item) => `<article class="modernization-item">
+      <div><strong>${escapeHtml(item.code || "respiratory-quality-finding")}</strong><small>${escapeHtml(item.batchId || "批次未绑定")}</small></div>
+      <span class="badge warn">失败关闭</span>
+    </article>`).join("") || "<p class=\"modernization-empty\">未发现批次、审计或信号绑定完整性问题。</p>";
   }
 }
 
@@ -597,6 +691,66 @@ async function handlePublicHealthModelValidationSubmit(event) {
   }
 }
 
+function publicHealthRespiratoryPositiveCounts(value, specimenCount) {
+  const counts = new Map();
+  String(value || "").split(/[,，;；\n]+/).map((item) => item.trim()).filter(Boolean)
+    .forEach((entry) => {
+      const [rawCode, rawCount, ...rest] = entry.split("=").map((item) => item.trim());
+      const count = Number(rawCount);
+      if (rest.length || !PUBLIC_HEALTH_RESPIRATORY_PATHOGEN_CODES.includes(rawCode)
+        || !Number.isInteger(count) || count < 0 || count > specimenCount || counts.has(rawCode)) {
+        throw new Error("阳性聚合计数须使用唯一的 pathogen-code=非负整数，且不能超过标本数");
+      }
+      counts.set(rawCode, count);
+    });
+  return counts;
+}
+
+async function handlePublicHealthRespiratoryPathogenSubmit(event) {
+  const form = event.target.closest("#public-health-respiratory-pathogen-form");
+  if (!form) return;
+  event.preventDefault();
+  const status = form.querySelector("#public-health-respiratory-pathogen-form-status");
+  const values = new FormData(form);
+  try {
+    const specimenCount = Number(values.get("specimenCount"));
+    if (!Number.isInteger(specimenCount) || specimenCount < 1 || specimenCount > 100000) {
+      throw new Error("聚合标本数必须为1至100000之间的整数");
+    }
+    const positiveCounts = publicHealthRespiratoryPositiveCounts(
+      values.get("positiveCounts"),
+      specimenCount
+    );
+    const payload = {
+      expectedVersion: 0,
+      externalBatchId: String(values.get("externalBatchId") || ""),
+      institutionId: String(values.get("institutionId") || ""),
+      regionCode: String(values.get("regionCode") || ""),
+      observedAt: new Date(String(values.get("observedAt") || "")).toISOString(),
+      ageGroup: String(values.get("ageGroup") || ""),
+      placeType: String(values.get("placeType") || ""),
+      specimenCount,
+      results: PUBLIC_HEALTH_RESPIRATORY_PATHOGEN_CODES.map((pathogenCode) => ({
+        pathogenCode,
+        testedSpecimens: specimenCount,
+        positiveSpecimens: positiveCounts.get(pathogenCode) || 0
+      })),
+      evidenceRefs: [String(values.get("evidenceRef") || "")]
+    };
+    status.textContent = "正在提交聚合18联检批次；服务端将绑定身份、时间、面板和幂等键。";
+    await postPublicHealthModernization(
+      "/api/public-health/respiratory-pathogen-batches",
+      "public-health-respiratory-pathogen-intake",
+      payload
+    );
+    status.textContent = "聚合批次已接入；须人工确认后才能发布最小化信号。";
+    form.reset();
+    await loadPublicHealthModernizationWorkbenches();
+  } catch (error) {
+    status.textContent = `提交失败关闭：${escapeHtml(error.code || error.message || "服务不可用")}`;
+  }
+}
+
 function promptRequired(label, fallback = "") {
   const value = window.prompt(label, fallback);
   if (value === null) throw new Error("操作已取消");
@@ -631,6 +785,13 @@ function publicHealthModernizationActionBody(button) {
     body.decision = button.dataset.modernizationDecision;
     body.note = promptRequired("独立复核意见");
     body.evidenceRefs = [promptRequired("独立复核证据引用")];
+  } else if (action === "verify-respiratory-pathogen-batch") {
+    body.decision = button.dataset.modernizationDecision;
+    body.note = promptRequired("聚合批次人工复核意见");
+    body.evidenceRefs = [promptRequired("聚合批次复核证据引用")];
+  } else if (action === "publish-respiratory-pathogen-signals") {
+    body.note = promptRequired("最小化病原信号发布说明");
+    body.evidenceRefs = [promptRequired("信号发布批准证据引用")];
   } else if (action === "verify-alert") {
     body.riskLevel = promptRequired("风险等级：low / medium / high / critical", "medium");
     body.conclusion = promptRequired("人工研判结论");
@@ -689,7 +850,8 @@ async function handlePublicHealthModernizationAction(event) {
     task: `/api/public-health/medical-prevention-tasks/${encodeURIComponent(id)}/actions`,
     "rule-change": `/api/public-health/surveillance-rule-changes/${encodeURIComponent(id)}/actions`,
     model: `/api/public-health/surveillance-models/${encodeURIComponent(id)}/shadow-runs`,
-    "model-validation": `/api/public-health/surveillance-model-validations/${encodeURIComponent(id)}/actions`
+    "model-validation": `/api/public-health/surveillance-model-validations/${encodeURIComponent(id)}/actions`,
+    "respiratory-batch": `/api/public-health/respiratory-pathogen-batches/${encodeURIComponent(id)}/actions`
   };
   if (!routes[kind]) return;
   button.disabled = true;
