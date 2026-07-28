@@ -14,6 +14,7 @@ const {
   buildPublicHealthExternalEndpointProbeCampaignRegistry,
   campaignSignaturePayload,
   createPublicHealthExternalEndpointProbeCampaign,
+  endpointProbeCampaignAttestationDigest,
   probePolicyDigest,
   verifyPublicHealthExternalEndpointProbeCampaign
 } = require("../public-health-external-endpoint-probe-campaign-service");
@@ -161,12 +162,27 @@ function createCampaign(campaignIndex, startedAt, overrides = {}) {
   );
 }
 
+function createCampaignChain(definitions) {
+  let previousCampaign = null;
+  return definitions.map(([campaignIndex, startedAt, overrides = {}]) => {
+    const campaign = createCampaign(campaignIndex, startedAt, {
+      ...overrides,
+      options: {
+        ...(overrides.options || {}),
+        ...(previousCampaign ? { previousCampaign } : {})
+      }
+    });
+    previousCampaign = campaign;
+    return campaign;
+  });
+}
+
 test("three fresh non-overlapping eight-lane campaigns prove continuous connectivity without production readiness", () => {
-  const campaigns = [
-    createCampaign(1, "2026-07-27T08:00:00.000Z"),
-    createCampaign(2, "2026-07-27T08:10:00.000Z"),
-    createCampaign(3, "2026-07-27T08:20:00.000Z")
-  ];
+  const campaigns = createCampaignChain([
+    [1, "2026-07-27T08:00:00.000Z"],
+    [2, "2026-07-27T08:10:00.000Z"],
+    [3, "2026-07-27T08:20:00.000Z"]
+  ]);
   const registry = buildPublicHealthExternalEndpointProbeCampaignRegistry({
     campaigns,
     ...campaignOptions("2026-07-27T08:21:30.000Z")
@@ -176,6 +192,7 @@ test("three fresh non-overlapping eight-lane campaigns prove continuous connecti
   assert.equal(registry.functionalState, "consecutive-endpoint-probe-campaigns-verified");
   assert.equal(registry.summary.campaignsVerified, 3);
   assert.equal(registry.summary.consecutiveCampaigns, 3);
+  assert.equal(registry.summary.campaignChainLinksVerified, 2);
   assert.equal(registry.continuousConnectivityReady, true);
   assert.equal(registry.productionReady, false);
   assert.equal(registry.campaigns.every((item) => item.verifiedReceipts === 8), true);
@@ -200,6 +217,7 @@ test("campaign attestation signature binds trust policy receipts lane coverage a
     { ...attestation, completedAt: iso(attestation.completedAt, 1) },
     { ...attestation, expiresAt: iso(attestation.expiresAt, 1) },
     { ...attestation, nonce: `${attestation.nonce}-forged` },
+    { ...attestation, previousCampaignDigest: "d".repeat(64) },
     {
       ...attestation,
       verification: { ...attestation.verification, attestationOrigin: "client-generated" }
@@ -352,10 +370,12 @@ test("cross-campaign receipt replay does not count as another stability campaign
 });
 
 test("a rejected campaign inside the current continuity window cannot be skipped", () => {
-  const first = createCampaign(1, "2026-07-27T08:00:00.000Z");
-  const second = createCampaign(2, "2026-07-27T08:10:00.000Z");
-  const third = createCampaign(3, "2026-07-27T08:20:00.000Z");
-  const failedLatest = createCampaign(4, "2026-07-27T08:30:00.000Z");
+  const [first, second, third, failedLatest] = createCampaignChain([
+    [1, "2026-07-27T08:00:00.000Z"],
+    [2, "2026-07-27T08:10:00.000Z"],
+    [3, "2026-07-27T08:20:00.000Z"],
+    [4, "2026-07-27T08:30:00.000Z"]
+  ]);
   failedLatest.attestation.signature = "f".repeat(64);
   const latestFailure = buildPublicHealthExternalEndpointProbeCampaignRegistry({
     campaigns: [first, second, third, failedLatest],
@@ -372,17 +392,22 @@ test("a rejected campaign inside the current continuity window cannot be skipped
   assert.equal(latestFailure.continuousConnectivityReady, false);
   assert.equal(latestFailure.productionReady, false);
 
-  const failedMiddle = createCampaign(5, "2026-07-27T08:20:00.000Z");
+  const [middleFirst, middleSecond, failedMiddle, middleLatest] = createCampaignChain([
+    [7, "2026-07-27T08:00:00.000Z"],
+    [8, "2026-07-27T08:10:00.000Z"],
+    [5, "2026-07-27T08:20:00.000Z"],
+    [6, "2026-07-27T08:30:00.000Z"]
+  ]);
   failedMiddle.attestation.verification = {
     ...failedMiddle.attestation.verification,
     verificationSource: "untrusted-client"
   };
   const middleFailure = buildPublicHealthExternalEndpointProbeCampaignRegistry({
     campaigns: [
-      first,
-      second,
+      middleFirst,
+      middleSecond,
       failedMiddle,
-      createCampaign(6, "2026-07-27T08:30:00.000Z")
+      middleLatest
     ],
     ...campaignOptions("2026-07-27T08:31:30.000Z")
   });
@@ -395,14 +420,19 @@ test("a rejected campaign inside the current continuity window cannot be skipped
 });
 
 test("a rejected campaign older than the required current window remains visible without erasing fresh continuity", () => {
-  const rejectedHistory = createCampaign(1, "2026-07-27T08:00:00.000Z");
+  const [rejectedHistory, second, third, fourth] = createCampaignChain([
+    [1, "2026-07-27T08:00:00.000Z"],
+    [2, "2026-07-27T08:10:00.000Z"],
+    [3, "2026-07-27T08:20:00.000Z"],
+    [4, "2026-07-27T08:30:00.000Z"]
+  ]);
   rejectedHistory.attestation.signature = "e".repeat(64);
   const registry = buildPublicHealthExternalEndpointProbeCampaignRegistry({
     campaigns: [
       rejectedHistory,
-      createCampaign(2, "2026-07-27T08:10:00.000Z"),
-      createCampaign(3, "2026-07-27T08:20:00.000Z"),
-      createCampaign(4, "2026-07-27T08:30:00.000Z")
+      second,
+      third,
+      fourth
     ],
     ...campaignOptions("2026-07-27T08:31:30.000Z")
   });
@@ -415,14 +445,79 @@ test("a rejected campaign older than the required current window remains visible
   assert.equal(registry.productionReady, false);
 });
 
+test("deleting a signed middle campaign breaks the current continuity chain closed", () => {
+  const [first, second, third, fourth] = createCampaignChain([
+    [1, "2026-07-27T08:00:00.000Z"],
+    [2, "2026-07-27T08:10:00.000Z"],
+    [3, "2026-07-27T08:20:00.000Z"],
+    [4, "2026-07-27T08:30:00.000Z"]
+  ]);
+  const registry = buildPublicHealthExternalEndpointProbeCampaignRegistry({
+    campaigns: [first, third, fourth],
+    ...campaignOptions("2026-07-27T08:31:30.000Z")
+  });
+
+  assert.equal(endpointProbeCampaignAttestationDigest(second), third.attestation.previousCampaignDigest);
+  assert.equal(registry.summary.campaignsVerified, 3);
+  assert.equal(registry.summary.consecutiveCampaigns, 2);
+  assert.equal(registry.summary.campaignChainLinksVerified, 1);
+  assert.equal(registry.continuityBreak.campaignId, third.attestation.campaignId);
+  assert.equal(registry.continuityBreak.code, "campaign-chain-link-mismatch");
+  assert.equal(registry.continuousConnectivityReady, false);
+  assert.equal(registry.productionReady, false);
+});
+
+test("missing links forks and signed-link tampering cannot prove continuity", () => {
+  const first = createCampaign(1, "2026-07-27T08:00:00.000Z");
+  const unlinkedSecond = createCampaign(2, "2026-07-27T08:10:00.000Z");
+  const unlinkedRegistry = buildPublicHealthExternalEndpointProbeCampaignRegistry({
+    campaigns: [first, unlinkedSecond],
+    ...campaignOptions("2026-07-27T08:11:30.000Z"),
+    requiredConsecutiveCampaigns: 2
+  });
+  assert.equal(unlinkedRegistry.continuityBreak.code, "campaign-chain-link-missing");
+  assert.equal(unlinkedRegistry.continuousConnectivityReady, false);
+
+  const forkLeft = createCampaign(3, "2026-07-27T08:10:00.000Z", {
+    options: { previousCampaign: first }
+  });
+  const forkRight = createCampaign(4, "2026-07-27T08:20:00.000Z", {
+    options: { previousCampaign: first }
+  });
+  const forkRegistry = buildPublicHealthExternalEndpointProbeCampaignRegistry({
+    campaigns: [first, forkLeft, forkRight],
+    ...campaignOptions("2026-07-27T08:21:30.000Z")
+  });
+  assert.equal(forkRegistry.continuityBreak.code, "campaign-chain-link-mismatch");
+  assert.equal(forkRegistry.continuousConnectivityReady, false);
+
+  const [chainFirst, chainSecond] = createCampaignChain([
+    [5, "2026-07-27T08:00:00.000Z"],
+    [6, "2026-07-27T08:10:00.000Z"]
+  ]);
+  chainSecond.attestation.previousCampaignDigest = "a".repeat(64);
+  const tampered = verifyPublicHealthExternalEndpointProbeCampaign(
+    chainSecond,
+    campaignOptions("2026-07-27T08:11:30.000Z")
+  );
+  assert.equal(tampered.ok, false);
+  assert.match(tampered.reason, /signature is invalid/);
+  assert.equal(endpointProbeCampaignAttestationDigest(chainFirst).length, 64);
+});
+
 test("an unparseable campaign completion time is evaluated first and breaks continuity closed", () => {
-  const malformed = createCampaign(4, "2026-07-27T08:30:00.000Z");
+  const [first, second, third, malformed] = createCampaignChain([
+    [1, "2026-07-27T08:00:00.000Z"],
+    [2, "2026-07-27T08:10:00.000Z"],
+    [3, "2026-07-27T08:20:00.000Z"],
+    [4, "2026-07-27T08:30:00.000Z"]
+  ]);
   malformed.attestation.completedAt = "not-a-server-time";
   const registry = buildPublicHealthExternalEndpointProbeCampaignRegistry({
     campaigns: [
-      createCampaign(1, "2026-07-27T08:00:00.000Z"),
-      createCampaign(2, "2026-07-27T08:10:00.000Z"),
-      createCampaign(3, "2026-07-27T08:20:00.000Z"),
+      first,
+      second,
+      third,
       malformed
     ],
     ...campaignOptions("2026-07-27T08:31:30.000Z")
@@ -436,9 +531,11 @@ test("an unparseable campaign completion time is evaluated first and breaks cont
 });
 
 test("overlapping distant stale and insufficient campaigns keep continuity pending", () => {
-  const first = createCampaign(1, "2026-07-27T08:00:00.000Z");
-  const overlapping = createCampaign(2, "2026-07-27T08:00:30.000Z");
-  const distant = createCampaign(3, "2026-07-27T08:40:00.000Z");
+  const [first, overlapping, distant] = createCampaignChain([
+    [1, "2026-07-27T08:00:00.000Z"],
+    [2, "2026-07-27T08:00:30.000Z"],
+    [3, "2026-07-27T08:40:00.000Z"]
+  ]);
   const registry = buildPublicHealthExternalEndpointProbeCampaignRegistry({
     campaigns: [first, overlapping, distant],
     ...campaignOptions("2026-07-27T08:41:30.000Z")

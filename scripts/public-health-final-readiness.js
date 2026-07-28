@@ -181,6 +181,7 @@ function runExternalEndpointProbeCampaignAcceptance({ rejectLatest = false } = {
     "2026-07-25T08:10:00.000Z",
     "2026-07-25T08:20:00.000Z"
   ];
+  let previousCampaign = null;
   const campaigns = starts.map((startedAt, campaignIndex) => {
     const receipts = EXTERNAL_ADAPTER_PROFILES.map((profile, index) => {
       const issuedAt = acceptanceTime(startedAt, index);
@@ -214,15 +215,18 @@ function runExternalEndpointProbeCampaignAcceptance({ rejectLatest = false } = {
       }, receiptKeyring);
     });
     let sequence = 0;
-    return createPublicHealthExternalEndpointProbeCampaign(receipts, {
+    const campaign = createPublicHealthExternalEndpointProbeCampaign(receipts, {
       env,
       at: acceptanceTime(startedAt, 60),
       ttlSeconds: 3600,
       randomUUID: () => `acceptance-campaign-${campaignIndex + 1}-${++sequence}`,
       keyringResolver: () => receiptKeyring,
       campaignKeyring: campaignSigningKeyring,
-      policyResolver: (laneId) => endpointCampaignAcceptancePolicy(laneId)
+      policyResolver: (laneId) => endpointCampaignAcceptancePolicy(laneId),
+      ...(previousCampaign ? { previousCampaign } : {})
     });
+    previousCampaign = campaign;
+    return campaign;
   });
   if (rejectLatest) {
     campaigns[campaigns.length - 1].attestation.signature = "f".repeat(64);
@@ -696,6 +700,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
     check("active-probe:tls-policy", ["certificatePins", "requireMutualTls", "TLSv1.2", "TLSv1.3", "ENDPOINT_PROBE_CERTIFICATE_PIN_MISMATCH", "ENDPOINT_PROBE_MTLS_REQUIRED"].every((token) => activeProbeSource.includes(token)), "HTTP, latency, TLS authorization, protocol, certificate pin and mTLS policy fail closed before signing", "active-probe"),
     check("active-probe:signed-self-verification", ["TRUSTED_ATTESTATION_ORIGIN", "TRUSTED_VERIFICATION_SOURCE", "signPublicHealthExternalEndpointProbeReceipt", "verifyPublicHealthExternalEndpointProbeReceipt", "productionReady: false"].every((token) => activeProbeSource.includes(token)), "the runner fixes trust metadata, signs, self-verifies and never asserts production readiness", "active-probe"),
     check("probe-campaign:three-consecutive-campaigns", endpointProbeCampaignAcceptance.continuousConnectivityReady === true && endpointProbeCampaignAcceptance.summary.campaignsVerified === 3 && endpointProbeCampaignAcceptance.summary.consecutiveCampaigns === 3, `${endpointProbeCampaignAcceptance.summary.consecutiveCampaigns}/3 fresh eight-lane campaigns verified`, "probe-campaign"),
+    check("probe-campaign:signed-continuity-chain", endpointProbeCampaignAcceptance.summary.campaignChainLinksVerified === 2 && ["previousCampaignDigest", "endpointProbeCampaignAttestationDigest", "campaign-chain-link-missing", "campaign-chain-link-mismatch"].every((token) => endpointCampaignSource.includes(token)), `${endpointProbeCampaignAcceptance.summary.campaignChainLinksVerified}/2 signed predecessor links verified`, "probe-campaign"),
     check("probe-campaign:signed-receipt-policy-binding", ["receiptDigest", "policyDigest", "campaignSignaturePayload", "endpoint probe campaign signature is invalid", "campaign receipt binding", "campaign policy snapshot"].every((token) => endpointCampaignSource.includes(token)), "campaign signatures bind all eight receipts, contracts, endpoints, policy snapshots, trust metadata and time windows", "probe-campaign"),
     check("probe-campaign:continuity-and-replay", ["requiredConsecutiveCampaigns", "maxCampaignGapSeconds", "seenCampaignIds", "seenCampaignNonces", "seenReceiptIds", "seenNonces", "gap < 0"].every((token) => endpointCampaignSource.includes(token)), "campaign, receipt and nonce replay plus overlap, reverse time and excessive gaps fail closed", "probe-campaign"),
     check("probe-campaign:rejected-window-fails-closed", endpointProbeCampaignFailureAcceptance.continuousConnectivityReady === false && endpointProbeCampaignFailureAcceptance.summary.campaignsVerified === 2 && endpointProbeCampaignFailureAcceptance.summary.consecutiveCampaigns === 0 && endpointProbeCampaignFailureAcceptance.continuityBreak?.code === "campaign-verification-failed", "a rejected latest campaign cannot be skipped to join older successful campaigns", "probe-campaign"),
@@ -739,6 +744,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
       adapterProfiles: registry.summary.adapters,
       verifiedEndpointProbes: endpointProbeAcceptance.summary.endpointProbesVerified,
       verifiedEndpointProbeCampaigns: endpointProbeCampaignAcceptance.summary.campaignsVerified,
+      verifiedEndpointProbeCampaignLinks: endpointProbeCampaignAcceptance.summary.campaignChainLinksVerified,
       verifiedAcceptanceDeliveries: deliveries.filter((item) => item.deliveryState === "delivered").length,
       persistedAuditEntries: runtimeAcceptance.first.nextData.publicHealthCoordinationAudit.length,
       persistedOutboxDispatches: outboxAcceptance.delivered.externalRuntime.summary.dispatches,
@@ -837,6 +843,7 @@ function renderMarkdown(report) {
     `- Signed acceptance deliveries: ${report.summary.verifiedAcceptanceDeliveries}/8`,
     `- Verified endpoint probes: ${report.summary.verifiedEndpointProbes}/8`,
     `- Verified endpoint probe campaigns: ${report.summary.verifiedEndpointProbeCampaigns}/3`,
+    `- Verified endpoint probe campaign links: ${report.summary.verifiedEndpointProbeCampaignLinks}/2`,
     `- Production ready: ${report.productionReady ? "yes" : "no"}`,
     "",
     "## Checks",

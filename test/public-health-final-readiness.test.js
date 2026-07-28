@@ -14,14 +14,15 @@ test("final readiness accepts every planned T08 functional increment", () => {
   const report = buildPublicHealthFinalReadiness();
   assert.equal(report.ok, true);
   assert.equal(report.functionalState, "t08-public-health-planned-functions-complete");
-  assert.equal(report.summary.checks, 49);
-  assert.equal(report.summary.passed, 49);
+  assert.equal(report.summary.checks, 50);
+  assert.equal(report.summary.passed, 50);
   assert.equal(report.summary.lanes, 8);
   assert.equal(report.summary.handoffs, 8);
   assert.equal(report.summary.adapterProfiles, 8);
   assert.equal(report.summary.verifiedAcceptanceDeliveries, 8);
   assert.equal(report.summary.verifiedEndpointProbes, 8);
   assert.equal(report.summary.verifiedEndpointProbeCampaigns, 3);
+  assert.equal(report.summary.verifiedEndpointProbeCampaignLinks, 2);
   assert.equal(report.summary.persistedOutboxDispatches, 1);
   assert.equal(report.summary.persistedOutboxAuditEntries, 3);
   assert.equal(report.summary.recoveredDeadLetters, 1);
@@ -61,5 +62,6 @@ test("final readiness renders and writes machine and human reports", () => {
   assert.match(fs.readFileSync(markdown, "utf8"), /Signed acceptance deliveries: 8\/8/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Verified endpoint probes: 8\/8/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Verified endpoint probe campaigns: 3\/3/);
+  assert.match(fs.readFileSync(markdown, "utf8"), /Verified endpoint probe campaign links: 2\/2/);
   assert.match(renderMarkdown(report), /Remaining T00 and site integration/);
 });

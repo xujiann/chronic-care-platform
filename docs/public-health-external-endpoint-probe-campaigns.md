@@ -10,9 +10,10 @@
 
 ## 活动签名载荷
 
-活动使用 `public-health-external-endpoint-probe-campaign/v1`，签名完整绑定：
+活动使用 `public-health-external-endpoint-probe-campaign/v2`，签名完整绑定：
 
 - `campaignId`、`status=completed`；
+- 前一活动完整签名证明的 `previousCampaignDigest`；首个活动为空；
 - 八个领域各自的 `laneId`、`adapterId`、活动契约和 receiptId；
 - 规范化回执及其签名的 `receiptDigest`；
 - 配置端点的 `endpointDigest`；
@@ -55,6 +56,7 @@
 默认连续性门禁要求：
 
 - 三次已验证活动；
+- 相邻活动通过签名内的 `previousCampaignDigest` 形成不可跳过的前序链；
 - 活动之间不重叠；
 - 相邻活动的空档不超过 900 秒；
 - 每次都使用全新的八领域回执；
@@ -67,6 +69,7 @@
 - 成功活动之间出现失败、重放或篡改活动时，只保留失败之前更新的连续段，禁止跨过失败记录拼接较旧成功记录；
 - 完成时间不可解析的记录优先按不可信记录处理，不能通过排序落到成功窗口之后；
 - 重叠活动或超过允许空档会在该处终止连续链；
+- 前序摘要缺失、不匹配、删除中间活动或提交分叉活动会分别以稳定链路原因码失败关闭；
 - 已经位于所需新鲜成功窗口之外的历史拒绝记录继续在 `rejected` 中可见，但不抹掉已经由当前窗口证明的连续性。
 
 登记输出 `continuityBreak` 和 `summary.continuityBreaks`，只包含 campaignId 和稳定原因码，不回显签名、密钥、端点或原始验签原因。默认阈值可由服务端在 1 至 12 次活动、60 至 3600 秒间隔范围内配置。
@@ -112,10 +115,10 @@ T00 后续需要：
 
 1. 在受控 worker 完成八领域同批主动探测后创建 campaign；
 2. 使用 purpose 固定为 `public-health-endpoint-probe-campaign` 的独立 campaign keyring 签名，不复用业务请求、业务回执或单条探测密钥；服务会比较签名材料并拒绝与单条探测回执相同的密钥；
-3. 在 SQLite 中对 campaignId、campaign nonce、receiptId 和 receipt nonce 建立跨活动唯一约束；
+3. 在 SQLite 中对 campaignId、campaign nonce、receiptId 和 receipt nonce 建立跨活动唯一约束，并持久化 `previousCampaignDigest`；创建下一活动时必须引用当前受信链头，写入时以事务/CAS 防止并发分叉；
 4. 从服务端当前配置解析端点、活动契约和完整探测策略；
 5. 只向 commission 返回脱敏连续性摘要；
-6. 把连续性阻断纳入 operations board、release 和 deploy 门禁；
+6. 把连续性阻断及 `campaign-chain-link-missing`、`campaign-chain-link-mismatch` 纳入 operations board、release 和 deploy 门禁；
 7. 保持 `continuousConnectivityReady`、`endpointConnectivityReady` 与 `productionReady` 三者分离。
 
 T08 不修改公共 `server.js`、`package.json`、`portal.css`、README 或发布总表。
