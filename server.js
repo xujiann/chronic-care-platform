@@ -133,6 +133,12 @@ const {
   applyPublicHealthMedicalPreventionTaskActionToState,
   buildPublicHealthMedicalPreventionBoard
 } = require("./public-health-medical-prevention-collaboration-service");
+const {
+  buildPublicHealthSurveillanceModelGovernance,
+  reviewPublicHealthSurveillanceModelValidationToState,
+  runPublicHealthSurveillanceModelToState,
+  submitPublicHealthSurveillanceModelValidationToState
+} = require("./public-health-surveillance-model-governance-service");
 const CareServicePlatform = require("./care-service-platform-adapter");
 const CareServiceRuntime = require("./care-service-runtime");
 const { createCareServiceDeliveryAdapters } = require("./care-service-delivery-adapters");
@@ -6821,7 +6827,10 @@ const PUBLIC_HEALTH_MODERNIZATION_COLLECTIONS = Object.freeze([
   "publicHealthSurveillanceAlerts",
   "publicHealthRiskAssessments",
   "publicHealthMedicalPreventionTasks",
-  "publicHealthMedicalPreventionAudit"
+  "publicHealthMedicalPreventionAudit",
+  "publicHealthSurveillanceModelRuns",
+  "publicHealthSurveillanceModelAudit",
+  "publicHealthSurveillanceModelValidations"
 ]);
 
 function publicHealthModernizationConflict(message) {
@@ -6849,6 +6858,15 @@ function assertUniquePublicHealthModernizationState(data = {}) {
   const tasks = Array.isArray(data.publicHealthMedicalPreventionTasks)
     ? data.publicHealthMedicalPreventionTasks
     : [];
+  const modelRuns = Array.isArray(data.publicHealthSurveillanceModelRuns)
+    ? data.publicHealthSurveillanceModelRuns
+    : [];
+  const modelAudit = Array.isArray(data.publicHealthSurveillanceModelAudit)
+    ? data.publicHealthSurveillanceModelAudit
+    : [];
+  const modelValidations = Array.isArray(data.publicHealthSurveillanceModelValidations)
+    ? data.publicHealthSurveillanceModelValidations
+    : [];
   uniqueValues(data.publicHealthDataSources, "id", "public health data source id");
   uniqueValues(signals, "id", "public health surveillance signal id");
   uniqueValues(signals, "externalSignalKeyHash", "public health source record hash");
@@ -6864,6 +6882,9 @@ function assertUniquePublicHealthModernizationState(data = {}) {
   uniqueValues(data.publicHealthRiskAssessments, "id", "public health risk assessment id");
   uniqueValues(tasks, "id", "public health medical-prevention task id");
   uniqueValues(data.publicHealthMedicalPreventionAudit, "id", "public health medical-prevention audit id");
+  uniqueValues(modelRuns, "id", "public health surveillance model run id");
+  uniqueValues(modelAudit, "id", "public health surveillance model audit id");
+  uniqueValues(modelValidations, "id", "public health surveillance model validation id");
   signals.forEach((signal) => {
     const hashes = [
       signal.verification?.idempotencyKeyHash,
@@ -6899,6 +6920,32 @@ function assertUniquePublicHealthModernizationState(data = {}) {
       }
       ruleChangeIdempotencyKeys.add(hash);
     });
+  });
+  const modelRunIdempotencyKeys = new Set();
+  modelRuns.forEach((run) => {
+    const hash = String(run?.idempotencyKeyHash || "").trim();
+    const key = `${String(run?.modelId || "").trim()}:${hash}`;
+    if (!hash || modelRunIdempotencyKeys.has(key)) {
+      throw publicHealthModernizationConflict("public health model run idempotency key unique conflict");
+    }
+    modelRunIdempotencyKeys.add(key);
+  });
+  const modelAuditRunIds = new Set();
+  modelAudit.forEach((entry) => {
+    const modelRunId = String(entry?.modelRunId || "").trim();
+    if (!modelRunId || modelAuditRunIds.has(modelRunId)) {
+      throw publicHealthModernizationConflict("public health model run audit unique conflict");
+    }
+    modelAuditRunIds.add(modelRunId);
+  });
+  const modelValidationIdempotencyKeys = new Set();
+  modelValidations.forEach((validation) => {
+    const hash = String(validation?.idempotencyKeyHash || "").trim();
+    const key = `${String(validation?.modelId || "").trim()}:${hash}`;
+    if (!hash || modelValidationIdempotencyKeys.has(key)) {
+      throw publicHealthModernizationConflict("public health model validation idempotency key unique conflict");
+    }
+    modelValidationIdempotencyKeys.add(key);
   });
 }
 
@@ -10582,6 +10629,15 @@ function normalizeState(data) {
       : [],
     publicHealthMedicalPreventionAudit: Array.isArray(data.publicHealthMedicalPreventionAudit)
       ? data.publicHealthMedicalPreventionAudit.slice(-20000)
+      : [],
+    publicHealthSurveillanceModelRuns: Array.isArray(data.publicHealthSurveillanceModelRuns)
+      ? data.publicHealthSurveillanceModelRuns.slice(-5000)
+      : [],
+    publicHealthSurveillanceModelAudit: Array.isArray(data.publicHealthSurveillanceModelAudit)
+      ? data.publicHealthSurveillanceModelAudit.slice(-10000)
+      : [],
+    publicHealthSurveillanceModelValidations: Array.isArray(data.publicHealthSurveillanceModelValidations)
+      ? data.publicHealthSurveillanceModelValidations.slice(-2000)
       : [],
     publicHealthSignals: mergeByKey(seedPublicHealthSignals(), data.publicHealthSignals, "id"),
     publicHealthAlerts: mergeByKey(seedPublicHealthAlerts(), data.publicHealthAlerts, "id"),
@@ -24789,6 +24845,14 @@ const PUBLIC_HEALTH_MODERNIZATION_SERVER_FIELDS = new Set([
   "receipt",
   "keyId",
   "signedAt",
+  "output",
+  "score",
+  "riskBand",
+  "modelAdviceOnly",
+  "humanDecisionRequired",
+  "alertCreated",
+  "integrityDigest",
+  "trustMetadata",
   "submittedBy",
   "submittedActorId",
   "reviewedBy",
@@ -24858,11 +24922,56 @@ function assertPublicHealthRuleChangePayload(payload = {}, mode = "") {
   }
 }
 
+function assertPublicHealthSurveillanceModelPayload(payload = {}, mode = "") {
+  const allowedByMode = {
+    run: new Set([
+      "expectedVersion", "expectedModelVersion", "signalIds", "windowStart", "windowEnd",
+      "evidenceRefs", "idempotencyKey", "at", "receivedAt"
+    ]),
+    validate: new Set([
+      "expectedVersion", "expectedModelVersion", "sampleWindowStart", "sampleWindowEnd",
+      "sampleSize", "sensitivity", "positivePredictiveValue", "falseNegativeRate",
+      "note", "evidenceRefs", "idempotencyKey", "at", "receivedAt"
+    ]),
+    review: new Set([
+      "action", "expectedVersion", "decision", "note", "evidenceRefs", "idempotencyKey", "at"
+    ])
+  };
+  const allowed = allowedByMode[mode];
+  const unexpected = Object.keys(payload).find((key) => !allowed?.has(key));
+  if (unexpected) {
+    const error = new Error("public health surveillance model client override is forbidden");
+    error.code = "PUBLIC_HEALTH_MODERNIZATION_SERVER_CONTEXT_FORBIDDEN";
+    throw error;
+  }
+}
+
+function publicHealthSurveillanceModelActor(user = {}, purpose = "run") {
+  const actorId = String(user.username || user.id || "").trim();
+  if (!actorId) {
+    const error = new Error("public health surveillance model actor identity is required");
+    error.code = "PUBLIC_HEALTH_MODERNIZATION_FORBIDDEN";
+    throw error;
+  }
+  if (purpose === "submit-validation"
+    && String(user.orgType || "").trim() !== "health_admin") {
+    const error = new Error("only the designated public health owner may submit model validation");
+    error.code = "PUBLIC_HEALTH_MODERNIZATION_FORBIDDEN";
+    throw error;
+  }
+  return {
+    id: actorId,
+    username: actorId,
+    name: actorId,
+    role: purpose === "submit-validation" ? "cdc-surveillance" : "commission"
+  };
+}
+
 function publicHealthModernizationSafeCode(error) {
   const explicit = String(error?.code || "").trim();
-  if (/^PUBLIC_HEALTH_(?:MODERNIZATION|SURVEILLANCE_RULE)_[A-Z0-9_]+$/.test(explicit)) return explicit;
+  if (/^PUBLIC_HEALTH_(?:MODERNIZATION|SURVEILLANCE_(?:RULE|MODEL))_[A-Z0-9_]+$/.test(explicit)) return explicit;
   const message = String(error?.message || "");
-  if (/unknown public health surveillance signal|unknown public health surveillance alert|unknown medical-prevention task|unknown public health rule change/i.test(message)) {
+  if (/unknown public health surveillance signal|unknown public health surveillance alert|unknown medical-prevention task|unknown public health rule change|unknown public health surveillance model|unknown public health model validation/i.test(message)) {
     return "PUBLIC_HEALTH_MODERNIZATION_RECORD_NOT_FOUND";
   }
   if (/role .*not allowed/i.test(message)) return "PUBLIC_HEALTH_MODERNIZATION_FORBIDDEN";
@@ -24871,6 +24980,12 @@ function publicHealthModernizationSafeCode(error) {
   }
   if (/reviewer must be independent/i.test(message)) {
     return "PUBLIC_HEALTH_SURVEILLANCE_RULE_REVIEWER_NOT_INDEPENDENT";
+  }
+  if (/model validation requires an independent reviewer/i.test(message)) {
+    return "PUBLIC_HEALTH_SURVEILLANCE_MODEL_REVIEWER_NOT_INDEPENDENT";
+  }
+  if (/model run integrity invalid|model validation integrity invalid|ungoverned-model-materialization/i.test(message)) {
+    return "PUBLIC_HEALTH_SURVEILLANCE_MODEL_INTEGRITY_INVALID";
   }
   if (/rule registry integrity invalid|rule change integrity invalid|trusted public health rule activation failed/i.test(message)) {
     return "PUBLIC_HEALTH_SURVEILLANCE_RULE_INTEGRITY_INVALID";
@@ -25079,6 +25194,76 @@ function publicHealthSafeDataSourceOperations(data) {
       productionReady: false
     })),
     blockers: operations.blockers,
+    productionReady: false
+  };
+}
+
+function publicHealthSafeSurveillanceModelGovernance(data) {
+  const governance = buildPublicHealthSurveillanceModelGovernance({
+    data,
+    at: new Date().toISOString()
+  });
+  return {
+    ok: governance.ok,
+    functionalState: governance.functionalState,
+    formalGoLiveState: governance.formalGoLiveState,
+    generatedAt: governance.generatedAt,
+    summary: governance.summary,
+    models: (governance.models || []).map((model) => ({
+      id: model.id,
+      version: model.version,
+      name: model.name,
+      algorithm: model.algorithm,
+      owner: model.owner,
+      status: model.status,
+      minSignals: model.minSignals,
+      minDistinctSources: model.minDistinctSources,
+      minDistinctRegions: model.minDistinctRegions,
+      runs: model.runs,
+      latestRunAt: model.latestRunAt,
+      validationState: model.validationState,
+      latestValidationAt: model.latestValidationAt,
+      validationAgeDays: model.validationAgeDays,
+      driftState: model.driftState,
+      validatedForShadowUse: model.validatedForShadowUse,
+      productionReady: false
+    })),
+    runs: (governance.runs || []).map((run) => ({
+      id: run.id,
+      modelId: run.modelId,
+      modelVersion: run.modelVersion,
+      status: run.status,
+      signalCount: run.signalCount,
+      score: run.score,
+      riskBand: run.riskBand,
+      modelAdviceOnly: true,
+      humanDecisionRequired: true,
+      alertCreated: false,
+      executedAt: run.executedAt,
+      productionReady: false
+    })),
+    validations: (governance.validations || []).map((validation) => ({
+      id: validation.id,
+      modelId: validation.modelId,
+      modelVersion: validation.modelVersion,
+      version: validation.version,
+      status: validation.status,
+      performanceGatePassed: validation.performanceGatePassed,
+      submittedAt: validation.submittedAt,
+      reviewedAt: validation.reviewedAt,
+      allowedActions: validation.status === "submitted"
+        ? ["review-model-validation"]
+        : [],
+      productionReady: false
+    })),
+    findings: (governance.findings || []).map((finding) => ({
+      modelId: finding.modelId,
+      modelRunId: finding.modelRunId,
+      validationId: finding.validationId,
+      auditId: finding.auditId,
+      code: finding.code
+    })),
+    blockers: governance.blockers,
     productionReady: false
   };
 }
@@ -25539,6 +25724,184 @@ async function handleApi(req, res) {
         throw error;
       }
       sendJson(res, 200, publicHealthSafeRuleGovernance(readDatabase()));
+    } catch (error) {
+      publicHealthModernizationError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/surveillance-model-governance") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    try {
+      if ([...url.searchParams.keys()].length) {
+        const error = new Error("public health surveillance model governance query overrides are forbidden");
+        error.code = "PUBLIC_HEALTH_MODERNIZATION_SERVER_CONTEXT_FORBIDDEN";
+        throw error;
+      }
+      sendJson(res, 200, publicHealthSafeSurveillanceModelGovernance(readDatabase()));
+    } catch (error) {
+      publicHealthModernizationError(res, error);
+    }
+    return;
+  }
+
+  const publicHealthSurveillanceModelRunMatch = url.pathname
+    .match(/^\/api\/public-health\/surveillance-models\/([^/]+)\/shadow-runs$/);
+  if (req.method === "POST" && publicHealthSurveillanceModelRunMatch) {
+    const user = requireApiRole(
+      req,
+      res,
+      ["commission"],
+      "/api/public-health/surveillance-models/:id/shadow-runs"
+    );
+    if (!user) return;
+    try {
+      const modelId = decodeURIComponent(publicHealthSurveillanceModelRunMatch[1]);
+      const command = publicHealthModernizationCommand(
+        req,
+        url,
+        await collectJson(req),
+        { insert: true }
+      );
+      const payload = { ...command, at: command.receivedAt };
+      assertPublicHealthSurveillanceModelPayload(payload, "run");
+      const data = readDatabase();
+      const signalsBefore = JSON.stringify(data.publicHealthSurveillanceSignals || []);
+      const alertsBefore = JSON.stringify(data.publicHealthSurveillanceAlerts || []);
+      const result = runPublicHealthSurveillanceModelToState(
+        data,
+        modelId,
+        payload,
+        publicHealthSurveillanceModelActor(user, "run")
+      );
+      if (JSON.stringify(result.nextData.publicHealthSurveillanceSignals || []) !== signalsBefore
+        || JSON.stringify(result.nextData.publicHealthSurveillanceAlerts || []) !== alertsBefore) {
+        const error = new Error("shadow model run changed public health signal or alert state");
+        error.code = "PUBLIC_HEALTH_SURVEILLANCE_MODEL_INTEGRITY_INVALID";
+        throw error;
+      }
+      if (!result.idempotent) {
+        writeDatabase(result.nextData, {
+          event: "public-health-surveillance-model-shadow-run",
+          publicHealthModernizationWrite: {
+            collection: "publicHealthSurveillanceModelRuns",
+            entityId: result.run.id,
+            expectedVersion: 0
+          }
+        });
+      }
+      const governance = publicHealthSafeSurveillanceModelGovernance(result.nextData);
+      sendJson(res, result.idempotent ? 200 : 201, {
+        ok: true,
+        idempotent: Boolean(result.idempotent),
+        run: governance.runs.find((item) => item.id === result.run.id) || null,
+        summary: governance.summary,
+        productionReady: false
+      });
+    } catch (error) {
+      publicHealthModernizationError(res, error);
+    }
+    return;
+  }
+
+  const publicHealthSurveillanceModelValidationMatch = url.pathname
+    .match(/^\/api\/public-health\/surveillance-models\/([^/]+)\/validations$/);
+  if (req.method === "POST" && publicHealthSurveillanceModelValidationMatch) {
+    const user = requireApiRole(
+      req,
+      res,
+      ["commission"],
+      "/api/public-health/surveillance-models/:id/validations"
+    );
+    if (!user) return;
+    try {
+      const modelId = decodeURIComponent(publicHealthSurveillanceModelValidationMatch[1]);
+      const command = publicHealthModernizationCommand(
+        req,
+        url,
+        await collectJson(req),
+        { insert: true }
+      );
+      const payload = { ...command, at: command.receivedAt };
+      assertPublicHealthSurveillanceModelPayload(payload, "validate");
+      const data = readDatabase();
+      const result = submitPublicHealthSurveillanceModelValidationToState(
+        data,
+        modelId,
+        payload,
+        publicHealthSurveillanceModelActor(user, "submit-validation")
+      );
+      if (!result.idempotent) {
+        writeDatabase(result.nextData, {
+          event: "public-health-surveillance-model-validation-submitted",
+          publicHealthModernizationWrite: {
+            collection: "publicHealthSurveillanceModelValidations",
+            entityId: result.validation.id,
+            expectedVersion: 0
+          }
+        });
+      }
+      const governance = publicHealthSafeSurveillanceModelGovernance(result.nextData);
+      sendJson(res, result.idempotent ? 200 : 201, {
+        ok: true,
+        idempotent: Boolean(result.idempotent),
+        validation: governance.validations
+          .find((item) => item.id === result.validation.id) || null,
+        summary: governance.summary,
+        productionReady: false
+      });
+    } catch (error) {
+      publicHealthModernizationError(res, error);
+    }
+    return;
+  }
+
+  const publicHealthSurveillanceModelValidationActionMatch = url.pathname
+    .match(/^\/api\/public-health\/surveillance-model-validations\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthSurveillanceModelValidationActionMatch) {
+    const user = requireApiRole(
+      req,
+      res,
+      ["commission"],
+      "/api/public-health/surveillance-model-validations/:id/actions"
+    );
+    if (!user) return;
+    try {
+      const validationId = decodeURIComponent(publicHealthSurveillanceModelValidationActionMatch[1]);
+      const payload = publicHealthModernizationCommand(req, url, await collectJson(req));
+      if (String(payload.action || "").trim() !== "review-model-validation") {
+        const error = new Error("unsupported public health model validation action");
+        error.code = "PUBLIC_HEALTH_MODERNIZATION_COMMAND_INVALID";
+        throw error;
+      }
+      assertPublicHealthSurveillanceModelPayload(payload, "review");
+      const data = readDatabase();
+      const result = reviewPublicHealthSurveillanceModelValidationToState(
+        data,
+        validationId,
+        payload,
+        publicHealthSurveillanceModelActor(user, "review-validation")
+      );
+      if (!result.idempotent) {
+        writeDatabase(result.nextData, {
+          event: "public-health-surveillance-model-validation-reviewed",
+          publicHealthModernizationWrite: {
+            collection: "publicHealthSurveillanceModelValidations",
+            entityId: validationId,
+            expectedVersion: payload.expectedVersion
+          }
+        });
+      }
+      const governance = publicHealthSafeSurveillanceModelGovernance(result.nextData);
+      sendJson(res, 200, {
+        ok: true,
+        idempotent: Boolean(result.idempotent),
+        validation: governance.validations
+          .find((item) => item.id === validationId) || null,
+        summary: governance.summary,
+        productionReady: false
+      });
     } catch (error) {
       publicHealthModernizationError(res, error);
     }

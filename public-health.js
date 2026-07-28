@@ -4,6 +4,9 @@ const PUBLIC_HEALTH_PATH = PUBLIC_HEALTH_ROUTE.replace(/^\/api/, "");
 let currentPublicHealthSystem = null;
 let currentPublicHealthModernization = {
   foundation: null,
+  sourceOperations: null,
+  ruleGovernance: null,
+  modelGovernance: null,
   surveillance: null,
   collaboration: null
 };
@@ -93,6 +96,7 @@ document.addEventListener("click", handlePublicHealthLaunchGateAction);
 document.addEventListener("click", handlePublicHealthModernizationAction);
 document.addEventListener("submit", handlePublicHealthSignalIntake);
 document.addEventListener("submit", handlePublicHealthRuleChangeSubmit);
+document.addEventListener("submit", handlePublicHealthModelValidationSubmit);
 
 async function loadPublicHealthSystem() {
   if (PUBLIC_HEALTH_API_BASE) {
@@ -117,6 +121,7 @@ const PUBLIC_HEALTH_MODERNIZATION_ENDPOINTS = Object.freeze({
   foundation: "/api/public-health/data-foundation",
   sourceOperations: "/api/public-health/data-source-operations",
   ruleGovernance: "/api/public-health/surveillance-rule-governance",
+  modelGovernance: "/api/public-health/surveillance-model-governance",
   surveillance: "/api/public-health/surveillance-center",
   collaboration: "/api/public-health/medical-prevention-tasks"
 });
@@ -147,8 +152,9 @@ async function loadPublicHealthModernizationWorkbenches() {
     foundation: results[0].status === "fulfilled" ? results[0].value : null,
     sourceOperations: results[1].status === "fulfilled" ? results[1].value : null,
     ruleGovernance: results[2].status === "fulfilled" ? results[2].value : null,
-    surveillance: results[3].status === "fulfilled" ? results[3].value : null,
-    collaboration: results[4].status === "fulfilled" ? results[4].value : null
+    modelGovernance: results[3].status === "fulfilled" ? results[3].value : null,
+    surveillance: results[4].status === "fulfilled" ? results[4].value : null,
+    collaboration: results[5].status === "fulfilled" ? results[5].value : null
   };
   renderPublicHealthModernizationWorkbenches(currentPublicHealthModernization, results);
 }
@@ -158,6 +164,7 @@ function renderPublicHealthModernizationLoading() {
     "#public-health-data-foundation-status",
     "#public-health-data-source-operations-status",
     "#public-health-rule-governance-status",
+    "#public-health-surveillance-model-governance-status",
     "#public-health-surveillance-status",
     "#public-health-medical-prevention-status"
   ].forEach((selector) => {
@@ -184,6 +191,7 @@ function renderPublicHealthModernizationWorkbenches(state, results = []) {
   const foundation = state.foundation;
   const sourceOperations = state.sourceOperations;
   const ruleGovernance = state.ruleGovernance;
+  const modelGovernance = state.modelGovernance;
   const surveillance = state.surveillance;
   const collaboration = state.collaboration;
   renderModernizationStatus("#public-health-data-foundation-status", foundation, Boolean(foundation));
@@ -196,6 +204,11 @@ function renderPublicHealthModernizationWorkbenches(state, results = []) {
     "#public-health-rule-governance-status",
     ruleGovernance,
     Boolean(ruleGovernance)
+  );
+  renderModernizationStatus(
+    "#public-health-surveillance-model-governance-status",
+    modelGovernance,
+    Boolean(modelGovernance)
   );
   renderModernizationStatus("#public-health-surveillance-status", surveillance, Boolean(surveillance));
   renderModernizationStatus("#public-health-medical-prevention-status", collaboration, Boolean(collaboration));
@@ -223,6 +236,7 @@ function renderPublicHealthModernizationWorkbenches(state, results = []) {
 
   renderPublicHealthDataSourceOperations(sourceOperations);
   renderPublicHealthRuleGovernance(ruleGovernance);
+  renderPublicHealthSurveillanceModelGovernance(modelGovernance);
 
   const surveillanceMetrics = document.querySelector("#public-health-surveillance-metrics");
   if (surveillanceMetrics) {
@@ -327,6 +341,68 @@ function renderPublicHealthRuleGovernance(governance) {
       <div class="action-row">${actions}</div>
     </article>`;
   }).join("") || "<p class=\"modernization-empty\">暂无规则变更；当前仅使用可信基线规则。</p>";
+}
+
+function renderPublicHealthSurveillanceModelGovernance(governance) {
+  const metrics = document.querySelector("#public-health-surveillance-model-governance-metrics");
+  if (metrics) {
+    metrics.innerHTML = governance
+      ? [
+          modernizationMetric("影子模型", `${governance.summary?.shadowModels || 0}/${governance.summary?.models || 0}`),
+          modernizationMetric("已验证影子", governance.summary?.validatedShadowModels || 0),
+          modernizationMetric("影子运行", governance.summary?.modelRuns || 0),
+          modernizationMetric(
+            "整改/复审到期",
+            `${governance.summary?.remediationRequired || 0}/${governance.summary?.driftReviewsDue || 0}`
+          )
+        ].join("")
+      : modernizationMetric("模型治理", "不可用");
+  }
+  const models = document.querySelector("#public-health-surveillance-model-governance-list");
+  const runs = document.querySelector("#public-health-surveillance-model-runs");
+  const validations = document.querySelector("#public-health-surveillance-model-validations");
+  if (!governance) {
+    if (models) models.innerHTML = "<p class=\"modernization-empty\">模型治理不可用；影子建议按未验证处理。</p>";
+    if (runs) runs.innerHTML = "<p class=\"modernization-empty\">暂无可信影子运行。</p>";
+    if (validations) validations.innerHTML = "<p class=\"modernization-empty\">暂无可信效能验证。</p>";
+    return;
+  }
+  if (models) {
+    models.innerHTML = (governance.models || []).map((model) => `<article class="modernization-item">
+      <div>
+        <strong>${escapeHtml(model.name || model.id)} v${escapeHtml(model.version)}</strong>
+        <small>${escapeHtml(model.algorithm || "shadow")} / ${escapeHtml(model.validationState || "not-submitted")} / ${escapeHtml(model.driftState || "not-validated")}</small>
+      </div>
+      <div class="action-row">
+        <span class="badge ${model.validatedForShadowUse ? "ok" : "warn"}">${escapeHtml(model.validatedForShadowUse ? "validated-shadow" : model.validationState || "shadow")}</span>
+        <button class="inline-action" data-modernization-kind="model" data-modernization-id="${escapeHtml(model.id)}" data-modernization-version="${escapeHtml(model.version)}" data-modernization-action="run-shadow-model">运行影子评估</button>
+      </div>
+    </article>`).join("") || "<p class=\"modernization-empty\">未登记影子模型。</p>";
+  }
+  if (runs) {
+    runs.innerHTML = (governance.runs || []).map((run) => `<article class="modernization-item">
+      <div>
+        <strong>${escapeHtml(run.modelId)} / ${escapeHtml(run.riskBand || "advisory")}</strong>
+        <small>分值 ${escapeHtml(run.score)} / 信号 ${escapeHtml(run.signalCount || 0)} / advisory-only / human-decision-required / alertCreated=false</small>
+      </div>
+      <span class="badge warn">${escapeHtml(run.status || "shadow-observation")}</span>
+    </article>`).join("") || "<p class=\"modernization-empty\">暂无可信影子运行。</p>";
+  }
+  if (validations) {
+    validations.innerHTML = (governance.validations || []).map((validation) => {
+      const actions = (validation.allowedActions || []).includes("review-model-validation")
+        ? `<button class="inline-action" data-modernization-kind="model-validation" data-modernization-id="${escapeHtml(validation.id)}" data-modernization-version="${escapeHtml(validation.version)}" data-modernization-action="review-model-validation" data-modernization-decision="approved">独立批准</button>
+          <button class="inline-action" data-modernization-kind="model-validation" data-modernization-id="${escapeHtml(validation.id)}" data-modernization-version="${escapeHtml(validation.version)}" data-modernization-action="review-model-validation" data-modernization-decision="rejected">驳回</button>`
+        : "";
+      return `<article class="modernization-item">
+        <div>
+          <strong>${escapeHtml(validation.modelId)} v${escapeHtml(validation.modelVersion)}</strong>
+          <small>${escapeHtml(validation.status || "submitted")} / performance gate ${escapeHtml(validation.performanceGatePassed ? "passed" : "not-passed")}</small>
+        </div>
+        <div class="action-row">${actions}</div>
+      </article>`;
+    }).join("") || "<p class=\"modernization-empty\">暂无可信效能验证。</p>";
+  }
 }
 
 function renderPublicHealthModernizationSignals(signals) {
@@ -487,6 +563,40 @@ async function handlePublicHealthRuleChangeSubmit(event) {
   }
 }
 
+async function handlePublicHealthModelValidationSubmit(event) {
+  const form = event.target.closest("#public-health-model-validation-form");
+  if (!form) return;
+  event.preventDefault();
+  const status = form.querySelector("#public-health-model-validation-status");
+  const values = new FormData(form);
+  const modelId = String(values.get("modelId") || "");
+  const payload = {
+    expectedModelVersion: Number(values.get("expectedModelVersion")),
+    expectedVersion: 0,
+    sampleWindowStart: new Date(String(values.get("sampleWindowStart") || "")).toISOString(),
+    sampleWindowEnd: new Date(String(values.get("sampleWindowEnd") || "")).toISOString(),
+    sampleSize: Number(values.get("sampleSize")),
+    sensitivity: Number(values.get("sensitivity")),
+    positivePredictiveValue: Number(values.get("positivePredictiveValue")),
+    falseNegativeRate: Number(values.get("falseNegativeRate")),
+    note: String(values.get("note") || ""),
+    evidenceRefs: [String(values.get("evidenceRef") || "")]
+  };
+  try {
+    status.textContent = "正在提交；身份、时间与完整性材料由服务端绑定。";
+    await postPublicHealthModernization(
+      `/api/public-health/surveillance-models/${encodeURIComponent(modelId)}/validations`,
+      "public-health-model-validation-submit",
+      payload
+    );
+    status.textContent = "效能验证已提交，须由不同的 commission 操作者独立复核。";
+    form.reset();
+    await loadPublicHealthModernizationWorkbenches();
+  } catch (error) {
+    status.textContent = `提交失败关闭：${escapeHtml(error.code || error.message || "服务不可用")}`;
+  }
+}
+
 function promptRequired(label, fallback = "") {
   const value = window.prompt(label, fallback);
   if (value === null) throw new Error("操作已取消");
@@ -509,6 +619,18 @@ function publicHealthModernizationActionBody(button) {
   } else if (action === "activate-rule-change") {
     body.note = promptRequired("受控激活说明");
     body.evidenceRefs = [promptRequired("受控变更窗口证据引用")];
+  } else if (action === "run-shadow-model") {
+    body.expectedModelVersion = expectedVersion;
+    body.expectedVersion = 0;
+    body.signalIds = promptRequired("人工确认且质量合格的信号编号（逗号分隔）")
+      .split(",").map((item) => item.trim()).filter(Boolean);
+    body.windowStart = promptRequired("观察窗起点（ISO 日期时间）", new Date(Date.now() - 3600000).toISOString());
+    body.windowEnd = promptRequired("观察窗终点（ISO 日期时间）", new Date().toISOString());
+    body.evidenceRefs = [promptRequired("影子评估证据引用")];
+  } else if (action === "review-model-validation") {
+    body.decision = button.dataset.modernizationDecision;
+    body.note = promptRequired("独立复核意见");
+    body.evidenceRefs = [promptRequired("独立复核证据引用")];
   } else if (action === "verify-alert") {
     body.riskLevel = promptRequired("风险等级：low / medium / high / critical", "medium");
     body.conclusion = promptRequired("人工研判结论");
@@ -565,7 +687,9 @@ async function handlePublicHealthModernizationAction(event) {
     signal: `/api/public-health/surveillance-signals/${encodeURIComponent(id)}/actions`,
     alert: `/api/public-health/surveillance-alerts/${encodeURIComponent(id)}/actions`,
     task: `/api/public-health/medical-prevention-tasks/${encodeURIComponent(id)}/actions`,
-    "rule-change": `/api/public-health/surveillance-rule-changes/${encodeURIComponent(id)}/actions`
+    "rule-change": `/api/public-health/surveillance-rule-changes/${encodeURIComponent(id)}/actions`,
+    model: `/api/public-health/surveillance-models/${encodeURIComponent(id)}/shadow-runs`,
+    "model-validation": `/api/public-health/surveillance-model-validations/${encodeURIComponent(id)}/actions`
   };
   if (!routes[kind]) return;
   button.disabled = true;

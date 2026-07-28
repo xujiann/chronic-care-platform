@@ -38,7 +38,7 @@ function loadUiContext() {
   return { context, node };
 }
 
-test("modernization page exposes five accessible commission workbenches and controlled routes", () => {
+test("modernization page exposes six accessible commission workbenches and controlled routes", () => {
   const html = read("public-health.html");
   const source = read("public-health.js");
   const css = read("portal.css");
@@ -50,6 +50,11 @@ test("modernization page exposes five accessible commission workbenches and cont
   assert.match(html, /医防协同/);
   assert.match(html, /id="public-health-signal-intake-form"/);
   assert.match(html, /id="public-health-rule-change-form"/);
+  assert.match(html, /id="public-health-surveillance-model-governance-title"/);
+  assert.match(html, /id="public-health-model-validation-form"/);
+  assert.match(html, /modelAdviceOnly=true/);
+  assert.match(html, /humanDecisionRequired=true/);
+  assert.match(html, /alertCreated=false/);
   assert.match(html, /role="status" aria-live="polite"/);
   assert.match(html, /人工责任/);
   assert.match(html, /productionReady 始终为 false/);
@@ -57,6 +62,9 @@ test("modernization page exposes five accessible commission workbenches and cont
   assert.match(source, /\/api\/public-health\/data-source-operations/);
   assert.match(source, /\/api\/public-health\/surveillance-rule-governance/);
   assert.match(source, /\/api\/public-health\/surveillance-rule-changes/);
+  assert.match(source, /\/api\/public-health\/surveillance-model-governance/);
+  assert.match(source, /\/api\/public-health\/surveillance-models\/\$\{encodeURIComponent\(id\)\}\/shadow-runs/);
+  assert.match(source, /\/api\/public-health\/surveillance-model-validations\/\$\{encodeURIComponent\(id\)\}\/actions/);
   assert.match(source, /\/api\/public-health\/surveillance-center/);
   assert.match(source, /\/api\/public-health\/medical-prevention-tasks/);
   assert.match(source, /\/api\/public-health\/surveillance-signals\/\$\{encodeURIComponent\(id\)\}\/actions/);
@@ -139,6 +147,48 @@ test("modernization rendering uses only safe summary fields and fails closed whe
       }],
       productionReady: false
     },
+    modelGovernance: {
+      ok: true,
+      summary: {
+        models: 3,
+        shadowModels: 3,
+        validatedShadowModels: 1,
+        modelRuns: 1,
+        remediationRequired: 1,
+        driftReviewsDue: 1
+      },
+      models: [{
+        id: "ph-model-baseline-deviation",
+        version: 1,
+        name: "baseline-shadow",
+        algorithm: "relative-baseline-uplift-v1",
+        validationState: "validated-shadow",
+        driftState: "within-window",
+        validatedForShadowUse: true
+      }],
+      runs: [{
+        id: "safe-model-run",
+        modelId: "ph-model-baseline-deviation",
+        modelVersion: 1,
+        status: "shadow-observation",
+        signalCount: 1,
+        score: 0.7,
+        riskBand: "manual-review-recommended",
+        modelAdviceOnly: true,
+        humanDecisionRequired: true,
+        alertCreated: false
+      }],
+      validations: [{
+        id: "safe-validation",
+        modelId: "ph-model-baseline-deviation",
+        modelVersion: 1,
+        version: 1,
+        status: "submitted",
+        performanceGatePassed: true,
+        allowedActions: ["review-model-validation"]
+      }],
+      productionReady: false
+    },
     surveillance: {
       ok: true,
       summary: { rules: 8, activeRules: 8, humanVerifiedSignals: 0, openAlerts: 0, humanRiskAssessments: 0 },
@@ -161,6 +211,10 @@ test("modernization rendering uses only safe summary fields and fails closed whe
     node("#public-health-data-source-operations-list").innerHTML,
     node("#public-health-rule-governance-metrics").innerHTML,
     node("#public-health-rule-governance-list").innerHTML,
+    node("#public-health-surveillance-model-governance-metrics").innerHTML,
+    node("#public-health-surveillance-model-governance-list").innerHTML,
+    node("#public-health-surveillance-model-runs").innerHTML,
+    node("#public-health-surveillance-model-validations").innerHTML,
     node("#public-health-surveillance-metrics").innerHTML,
     node("#public-health-surveillance-signals").innerHTML,
     node("#public-health-surveillance-alerts").innerHTML,
@@ -172,6 +226,9 @@ test("modernization rendering uses only safe summary fields and fails closed whe
   assert.match(rendered, /人工核实/);
   assert.match(rendered, /托管激活密钥/);
   assert.match(rendered, /active 1 \/ grace 1 \/ revoked 0/);
+  assert.match(rendered, /validated-shadow/);
+  assert.match(rendered, /advisory-only/);
+  assert.match(rendered, /alertCreated=false/);
   assert.match(rendered, /独立批准/);
   assert.match(rendered, /暂无预警/);
   assert.doesNotMatch(rendered, /externalSignalId|externalSignalKeyHash|idempotencyKeyHash|contentFingerprint|endpoint|secret|signature/i);
@@ -180,15 +237,17 @@ test("modernization rendering uses only safe summary fields and fails closed whe
   assert.match(read("public-health.js"), /blockerCode/);
 
   vm.runInContext(
-    "renderPublicHealthModernizationWorkbenches({ foundation: null, sourceOperations: null, ruleGovernance: null, surveillance: null, collaboration: null })",
+    "renderPublicHealthModernizationWorkbenches({ foundation: null, sourceOperations: null, ruleGovernance: null, modelGovernance: null, surveillance: null, collaboration: null })",
     context
   );
   assert.match(node("#public-health-data-foundation-status").textContent, /失败关闭/);
   assert.match(node("#public-health-data-source-operations-status").textContent, /失败关闭/);
   assert.match(node("#public-health-rule-governance-status").textContent, /失败关闭/);
+  assert.match(node("#public-health-surveillance-model-governance-status").textContent, /失败关闭/);
   assert.match(node("#public-health-surveillance-status").textContent, /失败关闭/);
   assert.match(node("#public-health-medical-prevention-status").textContent, /失败关闭/);
   assert.match(node("#public-health-data-foundation-sources").innerHTML, /按未就绪处理/);
   assert.match(node("#public-health-data-source-operations-list").innerHTML, /按未就绪处理/);
   assert.match(node("#public-health-rule-governance-list").innerHTML, /不得参与评估/);
+  assert.match(node("#public-health-surveillance-model-governance-list").innerHTML, /影子建议按未验证处理/);
 });

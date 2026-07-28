@@ -198,6 +198,45 @@
           <p class="modernization-boundary-note">复核人与提交人必须不同；客户端不能提供密钥、可信来源、验签标志或签名回执。</p>
         </article>
 
+        <article class="panel public-health-modernization-panel" aria-labelledby="public-health-surveillance-model-governance-title">
+          <div class="panel-title">
+            <div>
+              <h2 id="public-health-surveillance-model-governance-title">监测模型库与影子评估</h2>
+              <span>版本化模型、建议性影子运行、独立效能复核与漂移复审</span>
+            </div>
+            <span id="public-health-surveillance-model-governance-status" class="badge warn">加载前未就绪</span>
+          </div>
+          <div id="public-health-surveillance-model-governance-metrics" class="modernization-metrics"></div>
+          <h3>影子模型</h3>
+          <div id="public-health-surveillance-model-governance-list" class="modernization-list" aria-live="polite"></div>
+          <h3>最近影子运行</h3>
+          <div id="public-health-surveillance-model-runs" class="modernization-list" aria-live="polite"></div>
+          <h3>效能验证</h3>
+          <div id="public-health-surveillance-model-validations" class="modernization-list" aria-live="polite"></div>
+          <form id="public-health-model-validation-form" class="modernization-form">
+            <h3>提交影子模型效能验证</h3>
+            <label>模型
+              <select name="modelId" required>
+                <option value="ph-model-baseline-deviation">基线偏离</option>
+                <option value="ph-model-cross-source-concordance">跨源一致性</option>
+                <option value="ph-model-spatiotemporal-cluster">时空聚集</option>
+              </select>
+            </label>
+            <label>模型版本<input name="expectedModelVersion" type="number" min="1" value="1" required></label>
+            <label>样本窗起点<input name="sampleWindowStart" type="datetime-local" required></label>
+            <label>样本窗终点<input name="sampleWindowEnd" type="datetime-local" required></label>
+            <label>样本量<input name="sampleSize" type="number" min="1" required></label>
+            <label>敏感度<input name="sensitivity" type="number" min="0" max="1" step="0.001" required></label>
+            <label>阳性预测值<input name="positivePredictiveValue" type="number" min="0" max="1" step="0.001" required></label>
+            <label>假阴性率<input name="falseNegativeRate" type="number" min="0" max="1" step="0.001" required></label>
+            <label class="wide-field">验证说明<input name="note" required></label>
+            <label class="wide-field">证据引用<input name="evidenceRef" required></label>
+            <button type="submit" class="inline-action">提交待独立复核</button>
+            <p id="public-health-model-validation-status" role="status" aria-live="polite"></p>
+          </form>
+          <p class="modernization-boundary-note">影子输出仅供建议，modelAdviceOnly=true、humanDecisionRequired=true、alertCreated=false；validated-shadow 不等于生产授权，productionReady 始终为 false。</p>
+        </article>
+
         <article class="panel public-health-modernization-panel" aria-labelledby="public-health-surveillance-title">
           <div class="panel-title">
             <div>

@@ -870,27 +870,46 @@ function buildPublicHealthFinalReadiness(options = {}) {
       "/api/public-health/surveillance-alerts/:id/actions",
       "/api/public-health/medical-prevention-tasks",
       "/api/public-health/medical-prevention-tasks/:id/actions",
+      "/api/public-health/surveillance-model-governance",
+      "/api/public-health/surveillance-models/:id/shadow-runs",
+      "/api/public-health/surveillance-models/:id/validations",
+      "/api/public-health/surveillance-model-validations/:id/actions",
+      "runPublicHealthSurveillanceModelToState",
+      "submitPublicHealthSurveillanceModelValidationToState",
+      "reviewPublicHealthSurveillanceModelValidationToState",
+      "assertPublicHealthSurveillanceModelPayload",
       "publicHealthModernizationCommand",
       "PUBLIC_HEALTH_MODERNIZATION_SERVER_CONTEXT_FORBIDDEN"
-    ].every((token) => serverSource.includes(token)), "commission-only data, surveillance and medical-prevention routes inject server actor, time and idempotency context and reject client overrides", "integration"),
+    ].every((token) => serverSource.includes(token)), "commission-only data, surveillance, shadow-model governance and medical-prevention routes inject server actor, time and idempotency context and reject client overrides", "integration"),
     check("integration:t00-modernization-persistence", [
       "PUBLIC_HEALTH_MODERNIZATION_COLLECTIONS",
       "assertUniquePublicHealthModernizationState",
       "assertPublicHealthModernizationWrite",
       "publicHealthModernizationWrite",
       "sourceRecordHash",
+      "publicHealthSurveillanceModelRuns",
+      "publicHealthSurveillanceModelAudit",
+      "publicHealthSurveillanceModelValidations",
       "expectedVersion",
       "PUBLIC_HEALTH_MODERNIZATION_CAS_CONFLICT"
-    ].every((token) => serverSource.includes(token)), "all ten modernization collections persist nextData with SQLite transaction CAS and unique source-record/idempotency hashes", "integration"),
+    ].every((token) => serverSource.includes(token)), "all thirteen modernization collections persist nextData with SQLite transaction CAS and unique source-record/idempotency hashes", "integration"),
     check("integration:t00-modernization-ui-release", [
       "public-health-data-foundation-title",
       "public-health-surveillance-title",
+      "public-health-surveillance-model-governance-title",
       "public-health-medical-prevention-title",
       "public-health-signal-intake-form",
+      "public-health-model-validation-form",
+      "modelAdviceOnly=true",
+      "humanDecisionRequired=true",
+      "alertCreated=false",
       "aria-live=\"polite\""
     ].every((token) => pageHtml.includes(token)) && [
       "loadPublicHealthModernizationWorkbenches",
       "handlePublicHealthModernizationAction",
+      "renderPublicHealthSurveillanceModelGovernance",
+      "run-shadow-model",
+      "review-model-validation",
       "Idempotency-Key",
       "expectedVersion",
       "人工核实"
@@ -901,8 +920,9 @@ function buildPublicHealthFinalReadiness(options = {}) {
     ].every((token) => portalCss.includes(token)) && [
       "\"public-health:modernization-readiness\"",
       "test/public-health-modernization-ui.test.js",
-      "test/public-health-modernization-api.test.js"
-    ].every((token) => packageSource.includes(token)), "five responsive workbenches expose only minimized summaries and executable governed actions while release scripts preserve productionReady=false", "integration"),
+      "test/public-health-modernization-api.test.js",
+      "test/public-health-surveillance-model-governance-api.test.js"
+    ].every((token) => packageSource.includes(token)), "six responsive workbenches expose only minimized summaries, advisory shadow output and executable governed actions while release scripts preserve productionReady=false", "integration"),
     check("integration:t00-modernization-source-operations", [
       "/api/public-health/data-source-operations",
       "buildPublicHealthDataSourceOperations",

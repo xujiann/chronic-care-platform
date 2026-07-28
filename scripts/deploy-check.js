@@ -692,13 +692,19 @@ function buildDeployCheckReport(options = {}) {
         "/api/public-health/surveillance-alerts/:id/actions",
         "/api/public-health/medical-prevention-tasks",
         "/api/public-health/medical-prevention-tasks/:id/actions",
+        "/api/public-health/surveillance-model-governance",
+        "/api/public-health/surveillance-models/:id/shadow-runs",
+        "/api/public-health/surveillance-models/:id/validations",
+        "/api/public-health/surveillance-model-validations/:id/actions",
+        "assertPublicHealthSurveillanceModelPayload",
         "publicHealthModernizationCommand",
         "PUBLIC_HEALTH_MODERNIZATION_SERVER_CONTEXT_FORBIDDEN"
       ].every((marker) => serverSource.includes(marker))
         && fs.existsSync(path.join(ROOT, "public-health-data-foundation-service.js"))
+        && fs.existsSync(path.join(ROOT, "public-health-surveillance-model-governance-service.js"))
         && fs.existsSync(path.join(ROOT, "public-health-surveillance-workflow-service.js"))
         && fs.existsSync(path.join(ROOT, "public-health-medical-prevention-collaboration-service.js")),
-      detail: "commission-only modernization routes delegate domain transitions and bind actor, server time, idempotency and expectedVersion"
+      detail: "commission-only modernization routes delegate data, model and workflow transitions and bind actor, server time, idempotency and expectedVersion"
     },
     {
       name: "storage:publicHealthModernization",
@@ -708,31 +714,43 @@ function buildDeployCheckReport(options = {}) {
         "assertPublicHealthModernizationWrite",
         "publicHealthModernizationWrite",
         "sourceRecordHash",
+        "publicHealthSurveillanceModelRuns",
+        "publicHealthSurveillanceModelAudit",
+        "publicHealthSurveillanceModelValidations",
         "PUBLIC_HEALTH_MODERNIZATION_CAS_CONFLICT"
       ].every((marker) => serverSource.includes(marker))
         && pkg.scripts?.["public-health:resilience-test"]?.includes("test/public-health-modernization-api.test.js")
+        && pkg.scripts?.["public-health:model-governance-test"]?.includes("test/public-health-surveillance-model-governance-api.test.js")
         && pkg.scripts?.["public-health:modernization-readiness"] === "node scripts/public-health-modernization-readiness.js",
-      detail: "ten modernization collections use nextData-only SQLite transaction CAS and unique source-record/idempotency constraints"
+      detail: "thirteen modernization collections use nextData-only SQLite transaction CAS and unique source-record/idempotency constraints"
     },
     {
       name: "static:publicHealthModernizationWorkbenches",
       ok: [
         "public-health-data-foundation-title",
-        "public-health-surveillance-title",
-        "public-health-medical-prevention-title",
-        "public-health-signal-intake-form",
+          "public-health-surveillance-title",
+          "public-health-surveillance-model-governance-title",
+          "public-health-medical-prevention-title",
+          "public-health-signal-intake-form",
+          "public-health-model-validation-form",
+          "modelAdviceOnly=true",
+          "humanDecisionRequired=true",
+          "alertCreated=false",
         "aria-live=\"polite\""
       ].every((marker) => publicHealthHtml.includes(marker))
         && [
           "loadPublicHealthModernizationWorkbenches",
           "handlePublicHealthModernizationAction",
+          "renderPublicHealthSurveillanceModelGovernance",
+          "run-shadow-model",
+          "review-model-validation",
           "Idempotency-Key",
           "expectedVersion",
           "人工核实"
         ].every((marker) => publicHealthUiSource.includes(marker))
         && ["public-health-modernization-grid", "modernization-form", "@media (max-width: 1100px)"].every((marker) => portalCss.includes(marker))
         && pkg.scripts?.["public-health:resilience-test"]?.includes("test/public-health-modernization-ui.test.js"),
-      detail: "five responsive data, source-operations, rule-governance, surveillance and medical-prevention workbenches expose redacted summaries, human actions and a production-false boundary"
+      detail: "six responsive data, source-operations, rule-governance, shadow-model, surveillance and medical-prevention workbenches expose redacted summaries, human actions and a production-false boundary"
     },
     {
       name: "api:publicHealthDataSourceOperations",
