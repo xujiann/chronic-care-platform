@@ -693,6 +693,129 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/knowledge-versions:
+    get:
+      tags: [EvaluationAssistant]
+      summary: 获取知识版本及审批状态
+      responses:
+        "200":
+          description: 知识版本清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AssistantKnowledgeVersion"
+    post:
+      tags: [EvaluationAssistant]
+      summary: 创建评价助手知识版本
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssistantKnowledgeVersion"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/knowledge-versions/{versionId}:
+    put:
+      tags: [EvaluationAssistant]
+      summary: 提交、审批或发布知识版本
+      parameters:
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssistantKnowledgeVersion"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/retrieval-traces:
+    get:
+      tags: [EvaluationAssistant]
+      summary: 获取标准问答检索命中轨迹
+      responses:
+        "200":
+          description: 检索轨迹清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AssistantRetrievalTrace"
+    post:
+      tags: [EvaluationAssistant]
+      summary: 登记一次检索命中轨迹
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssistantRetrievalTrace"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/retrieval-traces:quality-check:
+    post:
+      tags: [EvaluationAssistant]
+      summary: 按阈值复核检索命中质量
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/model-calls:
+    get:
+      tags: [EvaluationAssistant]
+      summary: 获取脱敏后的模型调用审计记录
+      responses:
+        "200":
+          description: 模型调用审计清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AssistantModelCall"
+    post:
+      tags: [EvaluationAssistant]
+      summary: 登记模型调用与降级状态
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssistantModelCall"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/model-calls/{callId}:review:
+    post:
+      tags: [EvaluationAssistant]
+      summary: 人工复核模型调用记录
+      parameters:
+        - name: callId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
   /api/v1/evaluation-assistant/anomaly-explanations:
     get:
       tags: [EvaluationAssistant]
@@ -1746,7 +1869,7 @@ components:
             $ref: "#/components/schemas/PilotAssessmentReport"
     AssistantPackage:
       type: object
-      required: [meta, assistantSummary, assistantKnowledgeSources, standardQaRecords, anomalyExplanations, rectificationSuggestions, reviewRiskSignals]
+      required: [meta, assistantSummary, assistantKnowledgeSources, assistantKnowledgeVersions, standardQaRecords, assistantRetrievalTraces, assistantModelCalls, anomalyExplanations, rectificationSuggestions, reviewRiskSignals]
       properties:
         meta:
           $ref: "#/components/schemas/PackageMeta"
@@ -1757,10 +1880,22 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AssistantKnowledgeSource"
+        assistantKnowledgeVersions:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssistantKnowledgeVersion"
         standardQaRecords:
           type: array
           items:
             $ref: "#/components/schemas/StandardQaRecord"
+        assistantRetrievalTraces:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssistantRetrievalTrace"
+        assistantModelCalls:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssistantModelCall"
         anomalyExplanations:
           type: array
           items:
@@ -2803,7 +2938,7 @@ components:
           type: string
         status:
           type: string
-          enum: [已启用, 待更新, 已停用]
+          enum: [已启用, 待更新, 待复核, 已停用]
         chunks:
           type: integer
           minimum: 0
@@ -2812,6 +2947,133 @@ components:
         lastSyncedAt:
           type: string
         scope:
+          type: string
+    AssistantKnowledgeVersion:
+      type: object
+      required: [id, sourceId, sourceName, version, changeSummary, addedChunks, removedChunks, checksum, status, owner, reviewer, createdAt]
+      properties:
+        id:
+          type: string
+        sourceId:
+          type: string
+        sourceName:
+          type: string
+        version:
+          type: string
+        previousVersion:
+          type: string
+        changeSummary:
+          type: string
+        addedChunks:
+          type: integer
+          minimum: 0
+        removedChunks:
+          type: integer
+          minimum: 0
+        checksum:
+          type: string
+          description: 脱敏后的内容摘要指纹
+        status:
+          type: string
+          enum: [草稿, 待审批, 已批准, 已发布]
+        owner:
+          type: string
+        reviewer:
+          type: string
+        createdAt:
+          type: string
+        effectiveAt:
+          type: string
+    AssistantRetrievalMatch:
+      type: object
+      required: [sourceId, chunkId, citation, score]
+      properties:
+        sourceId:
+          type: string
+        chunkId:
+          type: string
+        citation:
+          type: string
+        score:
+          type: number
+          minimum: 0
+          maximum: 1
+    AssistantRetrievalTrace:
+      type: object
+      required: [id, questionId, hospitalCode, query, topMatches, hitCount, threshold, status, durationMs, createdAt]
+      properties:
+        id:
+          type: string
+        questionId:
+          type: string
+        hospitalCode:
+          type: string
+        query:
+          type: string
+        topMatches:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssistantRetrievalMatch"
+        hitCount:
+          type: integer
+          minimum: 0
+        threshold:
+          type: number
+          minimum: 0
+          maximum: 1
+        status:
+          type: string
+          enum: [命中充分, 需补充, 人工复核]
+        durationMs:
+          type: integer
+          minimum: 0
+        createdAt:
+          type: string
+    AssistantModelCall:
+      type: object
+      required: [id, businessId, scene, modelRoute, promptVersion, requestDigest, responseDigest, inputTokens, outputTokens, latencyMs, fallback, risk, callStatus, reviewStatus, operator, calledAt]
+      properties:
+        id:
+          type: string
+        businessId:
+          type: string
+        scene:
+          type: string
+        modelRoute:
+          type: string
+        promptVersion:
+          type: string
+        requestDigest:
+          type: string
+        responseDigest:
+          type: string
+        inputTokens:
+          type: integer
+          minimum: 0
+        outputTokens:
+          type: integer
+          minimum: 0
+        latencyMs:
+          type: integer
+          minimum: 0
+        fallback:
+          type: boolean
+        risk:
+          type: string
+          enum: [低, 中, 高]
+        callStatus:
+          type: string
+          enum: [成功, 降级, 失败]
+        reviewStatus:
+          type: string
+          enum: [待复核, 已复核]
+        operator:
+          type: string
+        calledAt:
+          type: string
+        reviewedBy:
+          type: string
+        reviewedAt:
           type: string
     StandardQaRecord:
       type: object
@@ -2832,7 +3094,7 @@ components:
         confidence:
           type: number
           minimum: 0
-          maximum: 1
+          maximum: 100
         askedBy:
           type: string
         askedAt:
@@ -2841,6 +3103,10 @@ components:
           type: string
           enum: [待确认, 已确认, 已回答]
         scope:
+          type: string
+        retrievalTraceId:
+          type: string
+        modelCallId:
           type: string
     AnomalyExplanation:
       type: object
