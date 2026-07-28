@@ -50,12 +50,19 @@ test("external endpoint panel is accessible and wired only to commission summary
   assert.match(html, /public-health-connectivity-break/);
   assert.match(html, /public-health-connectivity-worker/);
   assert.match(html, /public-health-connectivity-blockers/);
+  assert.match(html, /public-health-connectivity-lane/);
+  assert.match(html, /data-public-health-connectivity-action="probe-lane"/);
+  assert.match(html, /data-public-health-connectivity-action="probe-campaign"/);
+  assert.match(html, /public-health-connectivity-action-status/);
   assert.match(source, /\/api\/public-health\/external\/endpoints\/summary/);
   assert.match(source, /\/api\/public-health\/external\/endpoints\/campaigns\/summary/);
+  assert.match(source, /\/api\/public-health\/external\/endpoints\/probes/);
+  assert.match(source, /\/api\/public-health\/external\/endpoints\/campaigns/);
   assert.match(source, /endpointConnectivityReady/);
   assert.match(source, /continuousConnectivityReady/);
   assert.match(source, /productionReady 仅由服务端和现场门禁决定/);
   assert.match(css, /\.connectivity-metric-grid/);
+  assert.match(css, /\.connectivity-action-controls/);
   assert.match(css, /@media \(max-width: 720px\)/);
 });
 
@@ -128,4 +135,87 @@ test("external endpoint panel fails closed on forbidden, missing and network sum
   assert.match(node("#public-health-connectivity-metrics").innerHTML, /连续门禁[\s\S]*未就绪/);
   assert.match(node("#public-health-connectivity-metrics").innerHTML, /生产上线[\s\S]*状态不可确认/);
   assert.match(node("#public-health-connectivity-blockers").innerHTML, /现场证据/);
+});
+
+test("single-lane action submits only an allowlisted lane and refreshes summaries", async () => {
+  const { context, node } = loadUiContext();
+  const calls = [];
+  node("#public-health-connectivity-lane").value = "immunization";
+  context.window.HealthCityAuth = {
+    authFetch: async (url, options = {}) => {
+      calls.push({ url, options });
+      if (options.method === "POST") {
+        return {
+          ok: true,
+          status: 201,
+          json: async () => ({ ok: true, endpointConnectivityReady: false, productionReady: false })
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => url.endsWith("/campaigns/summary")
+          ? {
+              summary: { campaignsVerified: 0, consecutiveCampaigns: 0, requiredConsecutiveCampaigns: 3 },
+              continuousConnectivityReady: false,
+              productionReady: false,
+              worker: {}
+            }
+          : {
+              summary: { lanes: 8, endpointsConfigured: 1, endpointProbesVerified: 1 },
+              endpointConnectivityReady: false,
+              productionReady: false,
+              worker: {}
+            }
+      };
+    }
+  };
+  context.actionButton = {
+    dataset: { publicHealthConnectivityAction: "probe-lane" },
+    disabled: false,
+    textContent: "运行单通道探测"
+  };
+
+  await vm.runInContext("handlePublicHealthConnectivityAction(actionButton)", context);
+
+  const postCall = calls.find((item) => item.options.method === "POST");
+  assert.equal(postCall.url, "/api/public-health/external/endpoints/probes");
+  assert.deepEqual(JSON.parse(postCall.options.body), { laneId: "immunization" });
+  assert.match(postCall.options.headers["Idempotency-Key"], /^public-health-connectivity:immunization:/);
+  assert.deepEqual(Object.keys(JSON.parse(postCall.options.body)), ["laneId"]);
+  assert.equal(calls.filter((item) => item.options.method !== "POST").length, 2);
+  assert.match(node("#public-health-connectivity-action-status").textContent, /写入审计/);
+  assert.equal(context.actionButton.disabled, false);
+  assert.equal(context.actionButton.textContent, "运行单通道探测");
+});
+
+test("campaign action sends an empty command and maps rejection to a safe message", async () => {
+  const { context, node } = loadUiContext();
+  let captured;
+  context.window.HealthCityAuth = {
+    authFetch: async (url, options = {}) => {
+      captured = { url, options };
+      return {
+        ok: false,
+        status: 503,
+        json: async () => ({
+          code: "ENDPOINT_PROBE_CAMPAIGN_FAILED",
+          message: "https://secret.example raw certificate and signing reason"
+        })
+      };
+    }
+  };
+  context.actionButton = {
+    dataset: { publicHealthConnectivityAction: "probe-campaign" },
+    disabled: false,
+    textContent: "运行八通道活动"
+  };
+
+  await vm.runInContext("handlePublicHealthConnectivityAction(actionButton)", context);
+
+  assert.equal(captured.url, "/api/public-health/external/endpoints/campaigns");
+  assert.deepEqual(JSON.parse(captured.options.body), {});
+  assert.match(captured.options.headers["Idempotency-Key"], /^public-health-connectivity:campaign:/);
+  assert.match(node("#public-health-connectivity-action-status").textContent, /配置不完整或可信探测失败/);
+  assert.doesNotMatch(node("#public-health-connectivity-action-status").textContent, /secret|certificate|https:/i);
 });

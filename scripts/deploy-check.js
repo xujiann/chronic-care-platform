@@ -648,6 +648,9 @@ function buildDeployCheckReport(options = {}) {
         "public-health-connectivity-break",
         "public-health-connectivity-worker",
         "public-health-connectivity-blockers",
+        "data-public-health-connectivity-action=\"probe-lane\"",
+        "data-public-health-connectivity-action=\"probe-campaign\"",
+        "public-health-connectivity-action-status",
         "aria-live=\"polite\""
       ].every((marker) => publicHealthHtml.includes(marker))
         && [
@@ -657,11 +660,15 @@ function buildDeployCheckReport(options = {}) {
           "continuousConnectivityReady",
           "safeConnectivityCampaignId",
           "connectivityFailureMessage",
+          "handlePublicHealthConnectivityAction",
+          "PUBLIC_HEALTH_CONNECTIVITY_LANES",
+          "ENDPOINT_PROBE_COMMAND_OVERRIDE_FORBIDDEN",
+          "ENDPOINT_PROBE_CAMPAIGN_COMMAND_OVERRIDE_FORBIDDEN",
           "productionReady 仅由服务端和现场门禁决定"
         ].every((marker) => publicHealthUiSource.includes(marker))
-        && ["connectivity-metric-grid", "connectivity-detail-grid", "@media (max-width: 720px)"].every((marker) => portalCss.includes(marker))
+        && ["connectivity-metric-grid", "connectivity-action-controls", "connectivity-detail-grid", "@media (max-width: 720px)"].every((marker) => portalCss.includes(marker))
         && pkg.scripts?.posttest?.includes("test/public-health-connectivity-ui.test.js"),
-      detail: "commission public-health panel loads redacted endpoint and campaign summaries, fails closed without blocking the page, and keeps endpoint, continuity and production gates separate"
+      detail: "commission public-health panel loads redacted summaries and submits only allowlisted lane or empty campaign commands; failures stay safe and endpoint, continuity and production gates remain separate"
     },
     { name: "api:publicHealthHighlights", ok: ["/api/public-health/highlights", "/api/public-health/highlights/signals", "/api/public-health/highlights/alerts/:id/actions", "/api/public-health/highlights/command-tasks/:id/actions", "/api/public-health/highlights/ai-reviews/:id/actions", "/api/public-health/highlights/evidence/:id/actions"].every((marker) => serverSource.includes(marker)) && fs.readFileSync(path.join(ROOT, "public-health.html"), "utf8").includes("public-health-highlight-center") && fs.readFileSync(path.join(ROOT, "public-health.js"), "utf8").includes("renderPublicHealthHighlights"), detail: "public health five-suite trigger, map, AI, command and evidence center is wired" },
     { name: "api:publicHealthHighlightsStandalone", ok: fs.existsSync(path.join(ROOT, "public-health-highlights.html")) && fs.existsSync(path.join(ROOT, "public-health-highlights.js")) && fs.existsSync(path.join(ROOT, "scripts", "public-health-highlights-readiness.js")) && serverSource.includes("buildPublicHealthHighlights") && fs.readFileSync(path.join(ROOT, "scripts", "public-health-highlights-readiness.js"), "utf8").includes("functionalState"), detail: "standalone public health five-suite command center and readiness report are present" },

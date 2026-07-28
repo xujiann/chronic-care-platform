@@ -340,12 +340,18 @@ test("public health informatization system is reachable and source-standard alig
   assert.match(html, /public-health-connectivity-break/);
   assert.match(html, /public-health-connectivity-worker/);
   assert.match(html, /public-health-connectivity-blockers/);
+  assert.match(html, /data-public-health-connectivity-action="probe-lane"/);
+  assert.match(html, /data-public-health-connectivity-action="probe-campaign"/);
+  assert.match(html, /public-health-connectivity-action-status/);
   assert.match(js, /FALLBACK_STANDARD_DOMAINS/);
   assert.match(js, /renderPublicHealthSystem/);
   assert.match(js, /loadPublicHealthConnectivitySummaries/);
   assert.match(js, /\/api\/public-health\/external\/endpoints\/summary/);
   assert.match(js, /\/api\/public-health\/external\/endpoints\/campaigns\/summary/);
   assert.match(js, /safeConnectivityCampaignId/);
+  assert.match(js, /handlePublicHealthConnectivityAction/);
+  assert.match(js, /PUBLIC_HEALTH_CONNECTIVITY_LANES/);
+  assert.match(js, /ENDPOINT_PROBE_CAMPAIGN_COMMAND_OVERRIDE_FORBIDDEN/);
   assert.match(js, /productionReady 仅由服务端和现场门禁决定/);
   assert.match(js, /data-public-health-action/);
   assert.match(js, /data-public-health-latest-action/);

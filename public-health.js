@@ -59,6 +59,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 document.addEventListener("click", (event) => {
   if (event.target.closest("#public-health-connectivity-refresh")) {
     void loadPublicHealthConnectivitySummaries();
+    return;
+  }
+  const actionButton = event.target.closest("[data-public-health-connectivity-action]");
+  if (actionButton) {
+    void handlePublicHealthConnectivityAction(actionButton);
   }
 });
 document.addEventListener("click", handlePublicHealthEventAction);
@@ -108,6 +113,28 @@ const PUBLIC_HEALTH_CONTINUITY_BREAK_LABELS = Object.freeze({
   ENDPOINT_PROBE_CAMPAIGN_GAP_EXCEEDED: "活动间隔超过门限"
 });
 
+const PUBLIC_HEALTH_CONNECTIVITY_LANES = new Set([
+  "infectious-reporting",
+  "immunization",
+  "maternal-child",
+  "senior-health",
+  "chronic-management",
+  "public-health-followup",
+  "health-education",
+  "family-doctor"
+]);
+
+const PUBLIC_HEALTH_CONNECTIVITY_ACTION_ERRORS = Object.freeze({
+  ENDPOINT_PROBE_CONCURRENCY_LIMIT: "当前已有探测任务运行，请稍后重试。",
+  ENDPOINT_PROBE_FREQUENCY_LIMIT: "该通道刚完成探测，请等待服务端频率窗口后重试。",
+  ENDPOINT_PROBE_FAILED: "服务端探测配置不完整或可信探测失败。",
+  ENDPOINT_PROBE_COMMAND_OVERRIDE_FORBIDDEN: "探测命令包含不允许的覆盖字段。",
+  ENDPOINT_PROBE_CAMPAIGN_CONCURRENCY_LIMIT: "当前已有八通道活动运行，请稍后重试。",
+  ENDPOINT_PROBE_CAMPAIGN_FREQUENCY_LIMIT: "八通道活动仍在服务端频率窗口内。",
+  ENDPOINT_PROBE_CAMPAIGN_FAILED: "八通道活动配置不完整或可信探测失败。",
+  ENDPOINT_PROBE_CAMPAIGN_COMMAND_OVERRIDE_FORBIDDEN: "活动命令包含不允许的覆盖字段。"
+});
+
 async function loadPublicHealthConnectivitySummaries() {
   renderPublicHealthConnectivityLoading();
   const request = window.HealthCityAuth?.authFetch || fetch;
@@ -123,6 +150,81 @@ async function loadPublicHealthConnectivitySummaries() {
     endpointError: endpointResult.status === "rejected" ? endpointResult.reason : null,
     campaignError: campaignResult.status === "rejected" ? campaignResult.reason : null
   });
+}
+
+async function handlePublicHealthConnectivityAction(button) {
+  const status = document.querySelector("#public-health-connectivity-action-status");
+  const action = String(button?.dataset?.publicHealthConnectivityAction || "");
+  const request = window.HealthCityAuth?.authFetch;
+  if (!status || !button || !request) {
+    if (status) status.textContent = "当前预览未建立 commission 服务端会话，未执行探测。";
+    return;
+  }
+  const laneSelect = document.querySelector("#public-health-connectivity-lane");
+  const laneId = String(laneSelect?.value || "").trim();
+  if (action === "probe-lane" && !PUBLIC_HEALTH_CONNECTIVITY_LANES.has(laneId)) {
+    status.className = "connectivity-action-status danger";
+    status.textContent = "请选择八个受控通道之一；未执行探测。";
+    return;
+  }
+  if (action !== "probe-lane" && action !== "probe-campaign") return;
+
+  const isCampaign = action === "probe-campaign";
+  const route = isCampaign
+    ? "/api/public-health/external/endpoints/campaigns"
+    : "/api/public-health/external/endpoints/probes";
+  const headers = {
+    "Content-Type": "application/json",
+    "Idempotency-Key": publicHealthConnectivityActionKey(isCampaign ? "campaign" : laneId)
+  };
+  const body = isCampaign ? "{}" : JSON.stringify({ laneId });
+  const previousLabel = button.textContent;
+  button.disabled = true;
+  button.textContent = "运行中";
+  status.className = "connectivity-action-status warn";
+  status.textContent = isCampaign
+    ? "正在执行服务端八通道活动；端点、策略、TLS、时间和密钥不可由页面覆盖。"
+    : `正在执行 ${connectivityLaneLabel(laneId)} 服务端探测；安全配置不可由页面覆盖。`;
+  try {
+    const response = await request(route, { method: "POST", headers, body });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error("public-health-connectivity-action-rejected");
+      error.status = Number(response.status || 0);
+      error.publicCode = String(result.code || "");
+      throw error;
+    }
+    status.className = "connectivity-action-status ok";
+    status.textContent = isCampaign
+      ? "八通道活动已由服务端完成并写入审计；正在刷新脱敏摘要。"
+      : `${connectivityLaneLabel(laneId)} 探测已由服务端完成并写入审计；正在刷新脱敏摘要。`;
+    await loadPublicHealthConnectivitySummaries();
+  } catch (error) {
+    status.className = "connectivity-action-status danger";
+    status.textContent = publicHealthConnectivityActionFailure(error);
+  } finally {
+    button.disabled = false;
+    button.textContent = previousLabel;
+  }
+}
+
+function publicHealthConnectivityActionKey(scope) {
+  const randomPart = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `public-health-connectivity:${scope}:${randomPart}`.slice(0, 160);
+}
+
+function connectivityLaneLabel(laneId) {
+  const option = document.querySelector(`#public-health-connectivity-lane option[value="${laneId}"]`);
+  return option?.textContent?.trim() || "所选通道";
+}
+
+function publicHealthConnectivityActionFailure(error) {
+  const code = String(error?.publicCode || "");
+  if (PUBLIC_HEALTH_CONNECTIVITY_ACTION_ERRORS[code]) return PUBLIC_HEALTH_CONNECTIVITY_ACTION_ERRORS[code];
+  if (Number(error?.status || 0) === 403) return "当前账号无权执行 commission 探测操作。";
+  if (Number(error?.status || 0) === 401) return "commission 会话已失效，请重新登录后再试。";
+  if (Number(error?.status || 0) >= 500) return "服务端可信配置或探测运行时暂不可用；本次操作失败关闭。";
+  return "探测请求未完成；本次操作失败关闭，现有页面不受影响。";
 }
 
 async function readPublicHealthConnectivityResponse(response) {

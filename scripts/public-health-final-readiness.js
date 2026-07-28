@@ -812,6 +812,9 @@ function buildPublicHealthFinalReadiness(options = {}) {
       "public-health-connectivity-break",
       "public-health-connectivity-worker",
       "public-health-connectivity-blockers",
+      "data-public-health-connectivity-action=\"probe-lane\"",
+      "data-public-health-connectivity-action=\"probe-campaign\"",
+      "public-health-connectivity-action-status",
       "aria-live=\"polite\""
     ].every((token) => pageHtml.includes(token)) && [
       "/api/public-health/external/endpoints/summary",
@@ -820,12 +823,17 @@ function buildPublicHealthFinalReadiness(options = {}) {
       "continuousConnectivityReady",
       "productionReady 仅由服务端和现场门禁决定",
       "safeConnectivityCampaignId",
-      "connectivityFailureMessage"
+      "connectivityFailureMessage",
+      "handlePublicHealthConnectivityAction",
+      "PUBLIC_HEALTH_CONNECTIVITY_LANES",
+      "ENDPOINT_PROBE_COMMAND_OVERRIDE_FORBIDDEN",
+      "ENDPOINT_PROBE_CAMPAIGN_COMMAND_OVERRIDE_FORBIDDEN"
     ].every((token) => pageSource.includes(token)) && [
       "connectivity-metric-grid",
+      "connectivity-action-controls",
       "connectivity-detail-grid",
       "@media (max-width: 720px)"
-    ].every((token) => portalCss.includes(token)) && packageSource.includes("test/public-health-connectivity-ui.test.js"), "commission UI renders only fail-closed redacted endpoint and continuity summaries while keeping production authorization server-owned", "integration"),
+    ].every((token) => portalCss.includes(token)) && packageSource.includes("test/public-health-connectivity-ui.test.js"), "commission UI renders fail-closed redacted summaries and submits only allowlisted lane or empty campaign commands while keeping every security input and production authorization server-owned", "integration"),
     check("safety:functional-not-production", runtime.productionReady === false && registry.productionReady === false && deliveries.every((item) => item.productionReady === false), "functional acceptance cannot self-assert production readiness", "safety"),
     check("safety:endpoint-connectivity-not-production", endpointProbeAcceptance.endpointConnectivityReady === true && endpointProbeAcceptance.productionReady === false && endpointProbeAcceptance.entries.every((item) => item.blockerCode === "trusted-site-evidence-still-required"), "verified connectivity never replaces trusted site evidence or launch approval", "safety"),
     check("safety:continuous-connectivity-not-production", endpointProbeCampaignAcceptance.continuousConnectivityReady === true && endpointProbeCampaignAcceptance.productionReady === false && endpointProbeCampaignAcceptance.blockers.every((item) => /site evidence|handoff|P0\/P1|approval/i.test(item)), "three consecutive campaigns still retain site evidence, blocker, handoff and approval boundaries", "safety"),

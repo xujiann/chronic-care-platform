@@ -43,6 +43,28 @@
             正在从服务端加载可信摘要；加载完成前按未就绪处理。
           </p>
           <div id="public-health-connectivity-metrics" class="connectivity-metric-grid" aria-label="外部端点与连续探测门禁"></div>
+          <section class="connectivity-actions" aria-labelledby="public-health-connectivity-actions-title">
+            <div>
+              <h3 id="public-health-connectivity-actions-title">受控探测操作</h3>
+              <p>单通道操作只提交 laneId；八通道活动提交空命令。所有安全配置均由服务端解析。</p>
+            </div>
+            <div class="connectivity-action-controls">
+              <label for="public-health-connectivity-lane">探测通道</label>
+              <select id="public-health-connectivity-lane">
+                <option value="infectious-reporting">传染病直报</option>
+                <option value="immunization">免疫规划</option>
+                <option value="maternal-child">妇幼连续服务</option>
+                <option value="senior-health">老年健康</option>
+                <option value="chronic-management">慢病管理</option>
+                <option value="public-health-followup">公共卫生随访</option>
+                <option value="health-education">健康教育</option>
+                <option value="family-doctor">家庭医生</option>
+              </select>
+              <button type="button" class="inline-action" data-public-health-connectivity-action="probe-lane">运行单通道探测</button>
+              <button type="button" class="inline-action" data-public-health-connectivity-action="probe-campaign">运行八通道活动</button>
+            </div>
+            <p id="public-health-connectivity-action-status" class="connectivity-action-status" role="status" aria-live="polite"></p>
+          </section>
           <div class="connectivity-detail-grid">
             <section aria-labelledby="public-health-connectivity-break-title">
               <h3 id="public-health-connectivity-break-title">连续性断点</h3>
