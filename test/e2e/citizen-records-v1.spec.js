@@ -306,7 +306,9 @@ test("resident uses the V2 care workspace for correction, one-time sharing and a
   await expect(page.locator("#citizen-authorization-lifecycle-list")).toContainText("即将到期");
   await expect(page.locator("#data-governance-grid")).toContainText("1/4 条有效授权");
   await expect(page.locator("#citizen-highlight-grid")).toContainText("1/4 有效授权");
-  await page.locator("[data-renew-authorization='auth-renew-e2e']").click();
+  const carePlanRenewal = page.locator("[data-v3-care-task='authorization:auth-renew-e2e']");
+  await expect(carePlanRenewal).toHaveText("重新授权");
+  await carePlanRenewal.click();
   const renewalForm = page.locator("#auth-form");
   await expect(page.locator("#auth-dialog-title")).toHaveText("续授权");
   await expect(renewalForm.locator("input[name='granteeId']")).toHaveValue("team-renew-e2e");
@@ -418,6 +420,7 @@ test("resident reviews all eight next-stage health record capabilities", async (
   await expect(page.locator("#citizen-medication-safety-v3")).toContainText("不得据此自行停药");
   await expect(page.locator("#citizen-emergency-pack-v3")).toContainText("待补齐紧急授权或联系人");
   await expect(page.locator("#citizen-operations-v3")).toContainText("居民范围汇总");
+  await expect(page.locator("#citizen-care-plan-v3 [data-v3-care-task]")).not.toHaveCount(0);
 
   await page.getByRole("button", { name: "管理家庭授权" }).click();
   await expect(page.locator("#auth-dialog")).toBeVisible();

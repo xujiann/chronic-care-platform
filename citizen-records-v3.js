@@ -496,6 +496,32 @@
     };
   }
 
+  function buildCareTaskActionIntent(task = {}) {
+    const type = cleanText(task.type, 20);
+    const id = cleanText(task.id, 160);
+    const definitions = {
+      随访: { prefix: "followup:", page: "registration", buttonLabel: "安排随访", announcement: "正在前往挂号服务安排随访。" },
+      复诊: { prefix: "revisit:", page: "registration", buttonLabel: "预约复诊", announcement: "正在前往挂号服务预约复诊。" },
+      取药: { prefix: "pickup:", targetSelector: "#citizen-medication-review", buttonLabel: "核对用药", announcement: "已定位用药核对，请先确认药品和来源记录。" },
+      授权: { prefix: "authorization:", buttonLabel: "重新授权", announcement: "已准备续授权，请重新核对范围、有效期并确认同意。" }
+    };
+    const definition = definitions[type];
+    if (!definition || !id.startsWith(definition.prefix) || id.length <= definition.prefix.length) {
+      throw new Error("主动健康任务类型或标识无效");
+    }
+    return {
+      action: `care-task-${type}`,
+      taskId: id,
+      type,
+      page: definition.page || "",
+      targetSelector: definition.targetSelector || "",
+      authorizationId: type === "授权" ? id.slice(definition.prefix.length) : "",
+      buttonLabel: definition.buttonLabel,
+      announcement: definition.announcement,
+      writes: false
+    };
+  }
+
   return {
     REQUIRED_INTEGRATIONS,
     SAFE_ACTION_INTENTS,
@@ -508,6 +534,7 @@
     buildEmergencyHealthPack,
     buildOperationsSnapshot,
     buildNextStageWorkspace,
-    buildSafeActionIntent
+    buildSafeActionIntent,
+    buildCareTaskActionIntent
   };
 });
