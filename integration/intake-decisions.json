@@ -97,8 +97,9 @@
         "commission public-health UI loads the endpoint and campaign summary routes and displays only eight-lane counts, independent readiness gates, safe continuity-break campaign ID/code, worker counts and normalized blockers",
         "UI configuration, 403 and network failures remain fail closed without interrupting existing boards; URL, IP, certificate, key, signature and raw verification reason fields are never rendered",
         "endpointConnectivityReady, continuousConnectivityReady and productionReady remain three separate server-owned states; the UI never derives or grants production authorization",
-        "full public-health resilience regression passed 90 of 90; candidate service and final-readiness focus passed 14 of 14; public API and storage focus passed 5 of 5; static resources passed 72 of 72",
-        "clean isolated release report passed 425 of 427 with 0 failures and 2 expected site warnings; deploy check passed 395 of 395",
+        "current public-health resilience, API, storage and connectivity UI regression passed 93 of 93; UI contract passed 3 of 3 and final-readiness report passed 64 of 64",
+        "shared static resources passed 72 of 72; the public API suite passed its complete single end-to-end route scenario with all endpoint and campaign assertions",
+        "clean isolated release report passed 426 of 428 with 0 failures and 2 expected site warnings; deploy check passed 396 of 396",
         "the pre-existing uncommitted data/db.json was hash-preserved and excluded; its unrelated nursing and escort readiness drift was not added to this candidate"
       ],
       "blockers": []
