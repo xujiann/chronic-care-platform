@@ -287,9 +287,13 @@ test("档案质量评估识别来源缺失、超期、个人补充和跨居民�
   assert.equal(quality.crossResidentCount, 1);
   assert.equal(quality.blockedCount, 1);
   assert.equal(quality.highPriorityCount, 1);
-  assert.equal(quality.items[0].id, "other");
+  assert.equal(quality.items[0].id, "");
+  assert.equal(quality.items[0].name, "已隔离的跨居民记录");
+  assert.equal(quality.items[0].sourceOrganization, "");
+  assert.equal(quality.items[0].category, "");
   assert.equal(quality.items[0].priority, "阻断");
   assert.match(quality.items[0].action, /隔离记录/);
+  assert.doesNotMatch(JSON.stringify(quality.items[0]), /跨居民影像|乙医院|p1|PACS|r2/);
   assert.equal(quality.items.find((item) => item.id === "self").priority, "常规复核");
   assert.match(quality.items.find((item) => item.id === "self").action, /保留个人补充标识/);
   assert.equal(quality.items.find((item) => item.id === "missing").priority, "优先复核");
@@ -413,6 +417,52 @@ test("八项增强工作台一次生成全部居民可验收视图", () => {
     Object.keys(workspace),
     ["integration", "governance", "family", "carePlan", "explanations", "medicationSafety", "emergencyPack", "operations"]
   );
+});
+
+test("增强工作台在模型层再次裁剪记录授权随访和取药且跨居民阻断保持匿名", () => {
+  const workspace = api.buildNextStageWorkspace({
+    resident: { id: "r1", name: "张某" },
+    records: [
+      {
+        id: "r1-emr",
+        residentId: "r1",
+        category: "emr",
+        name: "本人复诊",
+        result: "本人摘要",
+        meta: { sourceSystem: "EMR", sourceOrganization: "甲医院", sourceRecordId: "r1-v1", sourceTrust: "clinical" }
+      },
+      {
+        id: "other-secret-id",
+        residentId: "r2",
+        category: "labs",
+        name: "另一居民敏感检验",
+        result: "另一居民敏感结果",
+        source: "乙医院秘密来源",
+        meta: { sourceSystem: "LIS", sourceRecordId: "other-source-secret", sourceTrust: "clinical" }
+      }
+    ],
+    authorizations: [
+      activeAuthorization(),
+      activeAuthorization({ id: "other-auth-secret", residentId: "r2", name: "另一居民秘密授权" })
+    ],
+    followups: [
+      { id: "r1-followup", residentId: "r1", diseaseType: "高血压", plannedAt: "2026-07-28" },
+      { id: "other-followup", residentId: "r2", diseaseType: "另一居民秘密随访", plannedAt: "2026-07-28" }
+    ],
+    pickups: [
+      { id: "r1-pickup", residentId: "r1", medication: "本人用药", nextPickup: "2026-07-28" },
+      { id: "other-pickup", residentId: "r2", medication: "另一居民秘密用药", nextPickup: "2026-07-28" }
+    ],
+    contacts: [{ name: "李某", relation: "女儿", phone: "13812345678" }],
+    emergencyConsent: activeAuthorization({ id: "other-emergency", residentId: "r2", meta: { purpose: "紧急救治", scopes: ["health-record-summary"] } }),
+    now
+  });
+  const serialized = JSON.stringify(workspace);
+  assert.match(serialized, /本人复诊|本人摘要|高血压|本人用药/);
+  assert.doesNotMatch(serialized, /另一居民敏感检验|另一居民敏感结果|乙医院秘密来源|other-source-secret|另一居民秘密授权|另一居民秘密随访|另一居民秘密用药|other-secret-id|other-auth-secret/);
+  assert.equal(workspace.governance.quality.blockedCount, 1);
+  assert.equal(workspace.governance.quality.items[0].name, "已隔离的跨居民记录");
+  assert.equal(workspace.emergencyPack.ready, false);
 });
 
 test("八项安全操作只导航或预填且未知操作默认拒绝", () => {

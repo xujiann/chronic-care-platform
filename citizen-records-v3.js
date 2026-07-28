@@ -345,6 +345,26 @@
     const items = (Array.isArray(records) ? records : [])
       .filter((record) => record && record.category !== "authorizations")
       .map((record) => {
+        const crossResident = Boolean(
+          expectedResidentId
+          && cleanText(record.residentId, 120) !== cleanText(expectedResidentId, 120)
+        );
+        if (crossResident) {
+          const issues = ["居民范围不一致"];
+          return {
+            id: "",
+            name: "已隔离的跨居民记录",
+            category: "",
+            sourceOrganization: "",
+            updatedAt: "",
+            ageDays: null,
+            complete: false,
+            issues,
+            status: issues[0],
+            priority: qualityIssuePriority(issues),
+            action: qualityIssueAction(issues)
+          };
+        }
         const sourceOrganization = cleanText(record.provenance?.sourceOrganization || record.meta?.sourceOrganization || record.source, 200);
         const sourceSystem = cleanText(record.provenance?.sourceSystem || record.meta?.sourceSystem, 120);
         const sourceRecordId = cleanText(record.provenance?.sourceRecordId || record.meta?.sourceRecordId, 160);
@@ -353,7 +373,6 @@
         const trust = recordTrust(record);
         const selfReported = trust === "self-reported";
         const issues = [];
-        if (expectedResidentId && cleanText(record.residentId, 120) !== cleanText(expectedResidentId, 120)) issues.push("居民范围不一致");
         if (!sourceOrganization || /待核验|未知|未提供/.test(sourceOrganization)) issues.push("来源机构待补");
         if (!selfReported && (!sourceSystem || /待核验|未知|未提供/.test(sourceSystem))) issues.push("来源系统待补");
         if (!selfReported && !sourceRecordId) issues.push("来源记录号待补");
@@ -784,20 +803,33 @@
   }
 
   function buildNextStageWorkspace(input = {}) {
-    const records = Array.isArray(input.records) ? input.records : [];
+    const residentId = cleanText(input.resident?.id, 120);
+    const inputRecords = Array.isArray(input.records) ? input.records : [];
+    const records = residentId
+      ? inputRecords.filter((record) => cleanText(record?.residentId, 120) === residentId)
+      : [];
     const authorizations = Array.isArray(input.authorizations)
-      ? input.authorizations
+      ? input.authorizations.filter((record) => residentId && cleanText(record?.residentId, 120) === residentId)
       : records.filter((record) => record.category === "authorizations");
+    const followups = (Array.isArray(input.followups) ? input.followups : [])
+      .filter((item) => residentId && cleanText(item?.residentId, 120) === residentId);
+    const pickups = (Array.isArray(input.pickups) ? input.pickups : [])
+      .filter((item) => residentId && cleanText(item?.residentId, 120) === residentId);
+    const emergencyConsent = input.emergencyConsent
+      && residentId
+      && cleanText(input.emergencyConsent.residentId, 120) === residentId
+      ? input.emergencyConsent
+      : null;
     const governance = governCrossInstitutionRecords(records);
-    governance.quality = assessResidentRecordQuality(records, input.now, input.resident?.id);
+    governance.quality = assessResidentRecordQuality(inputRecords, input.now, residentId);
     return {
       integration: buildProductionIntegrationStatus(input.integrations || {}, input.now),
       governance,
       family: buildFamilyDelegationCenter({ members: input.members, authorizations, now: input.now }),
       carePlan: buildProactiveCarePlan({
         records,
-        followups: input.followups,
-        pickups: input.pickups,
+        followups,
+        pickups,
         authorizations,
         now: input.now
       }),
@@ -811,7 +843,7 @@
         records,
         diseases: input.diseases,
         contacts: input.contacts,
-        consent: input.emergencyConsent,
+        consent: emergencyConsent,
         now: input.now
       }),
       operations: buildOperationsSnapshot({

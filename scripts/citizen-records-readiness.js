@@ -61,7 +61,9 @@ function assessCitizenRecordsReadiness(options = {}) {
     { id: "record-quality-assessment", label: "档案来源完整性与时效质量评估", passed: /function assessResidentRecordQuality/.test(v3) && /超过十八个月待复核/.test(v3) && /质量完整/.test(ui) && /档案质量评估识别来源缺失/.test(nextStageUnit) },
     { id: "clinical-batch-acceptance", label: "临床样例批量验收安全报告", passed: /function buildClinicalSourceAcceptanceReport/.test(v3) && /slice\(0, 500\)/.test(v3) && /批量临床样例验收汇总/.test(nextStageUnit) && /productionReady, false/.test(nextStageUnit) },
     { id: "quality-priority-queue", label: "档案质量问题分级处理", passed: /function qualityIssuePriority/.test(v3) && /隔离记录并核对居民归属/.test(v3) && /blockedCount/.test(ui) && /质量评估识别来源缺失/.test(nextStageUnit) },
-    { id: "acceptance-documentation", label: "居民验收标准与外部依赖", passed: /第三十增量/.test(documentation) && /## 外部依赖/.test(documentation) }
+    { id: "workspace-resident-firewall", label: "增强工作台居民范围纵深隔离", passed: /inputRecords\.filter/.test(v3) && /已隔离的跨居民记录/.test(v3) && /增强工作台在模型层再次裁剪/.test(nextStageUnit) && /另一居民敏感结果/.test(nextStageUnit) },
+    { id: "quality-readonly-details", label: "档案质量问题只读明细", passed: /查看质量问题明细/.test(ui) && /qualityProblems\.slice\(0, 20\)/.test(ui) && /补齐溯源字段/.test(e2e) },
+    { id: "acceptance-documentation", label: "居民验收标准与外部依赖", passed: /第三十二增量/.test(documentation) && /## 外部依赖/.test(documentation) }
   ];
 
   const integrationChecks = [
