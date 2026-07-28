@@ -1,5 +1,5 @@
 (function () {
-  const storageKey = "digitalHospitalMvpState:v0.14";
+  const storageKey = "digitalHospitalMvpState:v0.15";
 
   const domains = [
     { code: "A", name: "基础设施与平台支撑", weight: 100 },
@@ -284,6 +284,37 @@
       { id: "READY-H000002", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", coordinator: "李主任", organization: 100, accounts: 85, network: 82, dataMapping: 68, training: 75, readiness: 82, blockers: 2, status: "推进中", lastUpdated: "2026-07-27 16:10" },
       { id: "READY-H000003", hospitalCode: "H000003", hospitalName: "区县示例人民医院", coordinator: "赵科长", organization: 80, accounts: 72, network: 55, dataMapping: 48, training: 60, readiness: 63, blockers: 4, status: "有阻塞", lastUpdated: "2026-07-27 15:55" },
     ],
+    pilotAccessApplications: [
+      { id: "ACC-H000001", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", coordinator: "王主任", sourceMode: "接口+模板", networkZone: "政务外网/VPN", targetWindow: "2026-08-05", materials: 6, requiredMaterials: 6, status: "联调中", lastUpdated: "2026-07-28 09:10" },
+      { id: "ACC-H000002", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", coordinator: "李主任", sourceMode: "接口", networkZone: "专线", targetWindow: "2026-08-12", materials: 5, requiredMaterials: 6, status: "资料待补", lastUpdated: "2026-07-28 09:00" },
+      { id: "ACC-H000003", hospitalCode: "H000003", hospitalName: "区县示例人民医院", coordinator: "赵科长", sourceMode: "模板+接口", networkZone: "政务外网", targetWindow: "2026-08-18", materials: 6, requiredMaterials: 6, status: "已受理", lastUpdated: "2026-07-28 08:50" },
+    ],
+    pilotConnectors: [
+      { id: "CONN-H000001-EMR", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", sourceSystem: "电子病历EMR", profile: "患者、就诊、病历摘要", transport: "HTTPS/JSON", endpointAlias: "emr-gateway", authMode: "mTLS+签名", credentialStatus: "有效", credentialExpireAt: "2027-07-31", connectivityStatus: "在线", contractStatus: "契约通过", latencyMs: 168, lastProbeAt: "2026-07-28 09:12", owner: "接口管理组" },
+      { id: "CONN-H000001-LIS", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", sourceSystem: "检验系统LIS", profile: "检验申请、检验结果", transport: "HTTPS/JSON", endpointAlias: "lis-gateway", authMode: "mTLS+签名", credentialStatus: "有效", credentialExpireAt: "2027-07-31", connectivityStatus: "待探测", contractStatus: "待认证", latencyMs: 0, lastProbeAt: "-", owner: "检验接口组" },
+      { id: "CONN-H000002-HIS", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", sourceSystem: "医院信息系统HIS", profile: "患者、挂号、费用", transport: "HTTPS/JSON", endpointAlias: "his-adapter", authMode: "OAuth2+签名", credentialStatus: "临期", credentialExpireAt: "2026-08-05", connectivityStatus: "待探测", contractStatus: "待认证", latencyMs: 0, lastProbeAt: "-", owner: "医院信息中心" },
+      { id: "CONN-H000003-EMR", hospitalCode: "H000003", hospitalName: "区县示例人民医院", sourceSystem: "电子病历EMR", profile: "患者、就诊、病历摘要", transport: "SFTP/CSV", endpointAlias: "county-emr", authMode: "密钥+白名单", credentialStatus: "失效", credentialExpireAt: "2026-07-20", connectivityStatus: "阻断", contractStatus: "待认证", latencyMs: 0, lastProbeAt: "2026-07-28 08:40", owner: "信息科" },
+    ],
+    pilotDataMappings: [
+      { id: "MAP-H000001-EMR", hospitalCode: "H000001", connectorId: "CONN-H000001-EMR", dataset: "住院病案首页", sourceFields: 126, mappedFields: 126, requiredFields: 118, transformRules: 18, coverage: 100, privacyCheck: "脱敏通过", status: "映射就绪", owner: "数据治理组", updatedAt: "2026-07-28 09:18" },
+      { id: "MAP-H000001-LIS", hospitalCode: "H000001", connectorId: "CONN-H000001-LIS", dataset: "检验结果", sourceFields: 64, mappedFields: 58, requiredFields: 60, transformRules: 12, coverage: 91, privacyCheck: "待抽样", status: "待完善", owner: "检验接口组", updatedAt: "2026-07-28 09:05" },
+      { id: "MAP-H000002-HIS", hospitalCode: "H000002", connectorId: "CONN-H000002-HIS", dataset: "门诊服务统计", sourceFields: 82, mappedFields: 72, requiredFields: 78, transformRules: 9, coverage: 88, privacyCheck: "待抽样", status: "待完善", owner: "医院信息中心", updatedAt: "2026-07-28 08:55" },
+      { id: "MAP-H000003-EMR", hospitalCode: "H000003", connectorId: "CONN-H000003-EMR", dataset: "电子病历应用统计", sourceFields: 74, mappedFields: 51, requiredFields: 68, transformRules: 6, coverage: 69, privacyCheck: "发现风险", status: "阻断", owner: "信息科", updatedAt: "2026-07-28 08:42" },
+    ],
+    pilotIntegrationTests: [
+      { id: "TEST-CONN-H000001-EMR-001", hospitalCode: "H000001", connectorId: "CONN-H000001-EMR", suite: "OpenAPI契约认证", cases: 24, passed: 24, failed: 0, privacyFindings: 0, evidenceId: "EV-B3-001", status: "通过", runAt: "2026-07-28 09:15" },
+      { id: "TEST-MAP-H000001-EMR-001", hospitalCode: "H000001", connectorId: "CONN-H000001-EMR", suite: "字段映射与脱敏抽样", cases: 30, passed: 30, failed: 0, privacyFindings: 0, evidenceId: "EV-B3-001", status: "通过", runAt: "2026-07-28 09:20" },
+    ],
+    pilotIntegrationIssues: [
+      { id: "INT-ISSUE-001", hospitalCode: "H000002", connectorId: "CONN-H000002-HIS", category: "凭据安全", severity: "高", summary: "接入凭据将在8日内到期，需轮换后重新探测。", owner: "医院信息中心", status: "待处理", dueAt: "2026-08-02", resolution: "", updatedAt: "2026-07-28 09:00" },
+      { id: "INT-ISSUE-002", hospitalCode: "H000003", connectorId: "CONN-H000003-EMR", category: "连通性", severity: "阻断", summary: "接入密钥已失效，白名单探测失败。", owner: "平台接入组", status: "处理中", dueAt: "2026-07-30", resolution: "", updatedAt: "2026-07-28 08:45" },
+      { id: "INT-ISSUE-003", hospitalCode: "H000003", connectorId: "CONN-H000003-EMR", category: "隐私保护", severity: "阻断", summary: "抽样数据中发现未脱敏的患者联系方式。", owner: "数据安全组", status: "待处理", dueAt: "2026-07-30", resolution: "", updatedAt: "2026-07-28 08:43" },
+    ],
+    pilotIntegrationGates: [
+      { hospitalCode: "H000001", hospitalName: "大连市示例中心医院", requiredConnectors: 2, readyConnectors: 1, requiredMappings: 2, readyMappings: 1, openCriticalIssues: 0, securityReview: "待复核", businessReview: "待复核", status: "待评估", evaluatedAt: "", approvedBy: "", approvedAt: "" },
+      { hospitalCode: "H000002", hospitalName: "大连市示例专科医院", requiredConnectors: 1, readyConnectors: 0, requiredMappings: 1, readyMappings: 0, openCriticalIssues: 1, securityReview: "待复核", businessReview: "待复核", status: "待整改", evaluatedAt: "2026-07-28 09:05", approvedBy: "", approvedAt: "" },
+      { hospitalCode: "H000003", hospitalName: "区县示例人民医院", requiredConnectors: 1, readyConnectors: 0, requiredMappings: 1, readyMappings: 0, openCriticalIssues: 2, securityReview: "不通过", businessReview: "不通过", status: "阻断", evaluatedAt: "2026-07-28 08:48", approvedBy: "", approvedAt: "" },
+    ],
     pilotTickets: [
       { id: "TKT-20260727-001", title: "接口统计模板机构代码校验失败", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", category: "数据口径", priority: "高", status: "处理中", owner: "数据治理组", createdAt: "2026-07-27 10:20", dueAt: "2026-07-27 18:20", slaHours: 8, elapsedHours: 6.5, channel: "试点群", description: "导入模板中的机构代码与平台主数据不一致。" },
       { id: "TKT-20260727-002", title: "材料分片上传在弱网环境中断", hospitalCode: "H000003", hospitalName: "区县示例人民医院", category: "材料上传", priority: "紧急", status: "待分派", owner: "未分派", createdAt: "2026-07-27 13:05", dueAt: "2026-07-27 17:05", slaHours: 4, elapsedHours: 3.2, channel: "服务热线", description: "大文件上传至42%后中断，需核验断点续传。" },
@@ -544,6 +575,12 @@
     if (!Array.isArray(next.storagePools)) next.storagePools = JSON.parse(JSON.stringify(seedState.storagePools));
     if (!Array.isArray(next.monitoringAlerts)) next.monitoringAlerts = JSON.parse(JSON.stringify(seedState.monitoringAlerts));
     if (!Array.isArray(next.hospitalReadiness)) next.hospitalReadiness = JSON.parse(JSON.stringify(seedState.hospitalReadiness));
+    if (!Array.isArray(next.pilotAccessApplications)) next.pilotAccessApplications = JSON.parse(JSON.stringify(seedState.pilotAccessApplications));
+    if (!Array.isArray(next.pilotConnectors)) next.pilotConnectors = JSON.parse(JSON.stringify(seedState.pilotConnectors));
+    if (!Array.isArray(next.pilotDataMappings)) next.pilotDataMappings = JSON.parse(JSON.stringify(seedState.pilotDataMappings));
+    if (!Array.isArray(next.pilotIntegrationTests)) next.pilotIntegrationTests = JSON.parse(JSON.stringify(seedState.pilotIntegrationTests));
+    if (!Array.isArray(next.pilotIntegrationIssues)) next.pilotIntegrationIssues = JSON.parse(JSON.stringify(seedState.pilotIntegrationIssues));
+    if (!Array.isArray(next.pilotIntegrationGates)) next.pilotIntegrationGates = JSON.parse(JSON.stringify(seedState.pilotIntegrationGates));
     if (!Array.isArray(next.pilotTickets)) next.pilotTickets = JSON.parse(JSON.stringify(seedState.pilotTickets));
     if (!Array.isArray(next.trainingSessions)) next.trainingSessions = JSON.parse(JSON.stringify(seedState.trainingSessions));
     if (!Array.isArray(next.pilotReleases)) next.pilotReleases = JSON.parse(JSON.stringify(seedState.pilotReleases));
@@ -863,6 +900,26 @@
     };
   }
 
+  function integrationSummary() {
+    const readyConnectors = state.pilotConnectors.filter(
+      (item) => item.connectivityStatus === "在线" && item.credentialStatus === "有效" && item.contractStatus === "契约通过",
+    );
+    const readyMappings = state.pilotDataMappings.filter((item) => item.status === "映射就绪" && item.privacyCheck === "脱敏通过");
+    const openIssues = state.pilotIntegrationIssues.filter((item) => item.status !== "已关闭");
+    return {
+      activeApplications: state.pilotAccessApplications.filter((item) => item.status === "已受理" || item.status === "联调中").length,
+      completedApplications: state.pilotAccessApplications.filter((item) => item.status === "联调完成").length,
+      readyConnectors: readyConnectors.length,
+      connectorPassRate: readyConnectors.length / Math.max(1, state.pilotConnectors.length),
+      readyMappings: readyMappings.length,
+      mappingPassRate: readyMappings.length / Math.max(1, state.pilotDataMappings.length),
+      openIssues: openIssues.length,
+      criticalIssues: openIssues.filter((item) => item.severity === "阻断" || item.severity === "高").length,
+      approvedHospitals: state.pilotIntegrationGates.filter((item) => item.status === "已准入").length,
+      launchReadyHospitals: state.pilotIntegrationGates.filter((item) => item.status === "可上线" || item.status === "已准入").length,
+    };
+  }
+
   function assessmentSummary() {
     const totalWeight = state.pilotOutcomeMetrics.reduce((sum, item) => sum + Number(item.weight || 0), 0);
     const weightedScore = state.pilotOutcomeMetrics.reduce((sum, item) => sum + Number(item.current || 0) * Number(item.weight || 0), 0) / Math.max(1, totalWeight);
@@ -946,9 +1003,9 @@
   }
 
   function statusClass(status) {
-    if (status === "已完成" || status === "已通过" || status === "已发布" || status === "已批准" || status === "已归档" || status === "已关闭" || status === "已解决" || status === "已就绪" || status === "已闭环" || status === "已启动" || status === "可启动" || status === "可推广" || status === "达标" || status === "通过" || status === "历史版本" || status === "启用" || status === "已启用" || status === "已采纳" || status === "已回答" || status === "已编辑" || status === "已转复核" || status === "已排除" || status === "复核通过" || status === "已校验" || status === "命中充分" || status === "成功" || status === "已复核" || status === "正常" || status === "稳定" || status === "健康" || status === "已恢复" || status === "已转样本" || status === "已入集" || status === "已验证" || status === "正向") return "";
-    if (status === "进行中" || status === "处理中" || status === "推进中" || status === "关注" || status === "条件通过" || status === "分析完成" || status === "改进中" || status === "待验收" || status === "准备中" || status === "已确认" || status === "待确认" || status === "待采纳" || status === "待分派" || status === "待回复" || status === "待评估" || status === "待审批" || status === "待复核" || status === "需补充" || status === "人工复核" || status === "草稿" || status === "报名中" || status === "候选" || status === "已回滚" || status === "试运行" || status === "预归档" || status === "填报中" || status === "审核中" || status === "上传中" || status === "扫描中" || status === "排队中" || status === "预警" || status === "降级" || status === "灰度中" || status === "已暂停" || status === "开放" || status === "待研判" || status === "已研判" || status === "待标注" || status === "已标注" || status === "待回归") return "warn";
-    if (status === "阻断" || status === "门禁阻断" || status === "有阻塞" || status === "有风险" || status === "需优化" || status === "未达标" || status === "逾期" || status === "高" || status === "紧急" || status === "异常" || status === "故障" || status === "失败" || status === "高负荷" || status === "高风险" || status === "拥堵" || status === "负向") return "danger";
+    if (status === "已完成" || status === "已通过" || status === "已发布" || status === "已批准" || status === "已归档" || status === "已关闭" || status === "已解决" || status === "已就绪" || status === "已闭环" || status === "已启动" || status === "可启动" || status === "可推广" || status === "达标" || status === "通过" || status === "历史版本" || status === "启用" || status === "已启用" || status === "已采纳" || status === "已回答" || status === "已编辑" || status === "已转复核" || status === "已排除" || status === "复核通过" || status === "已校验" || status === "命中充分" || status === "成功" || status === "已复核" || status === "正常" || status === "稳定" || status === "健康" || status === "已恢复" || status === "已转样本" || status === "已入集" || status === "已验证" || status === "正向" || status === "已受理" || status === "联调完成" || status === "在线" || status === "有效" || status === "契约通过" || status === "映射就绪" || status === "脱敏通过" || status === "可上线" || status === "已准入") return "";
+    if (status === "进行中" || status === "处理中" || status === "推进中" || status === "关注" || status === "条件通过" || status === "分析完成" || status === "改进中" || status === "待验收" || status === "准备中" || status === "已确认" || status === "待确认" || status === "待采纳" || status === "待分派" || status === "待回复" || status === "待评估" || status === "待审批" || status === "待复核" || status === "需补充" || status === "人工复核" || status === "草稿" || status === "报名中" || status === "候选" || status === "已回滚" || status === "试运行" || status === "预归档" || status === "填报中" || status === "审核中" || status === "上传中" || status === "扫描中" || status === "排队中" || status === "预警" || status === "降级" || status === "灰度中" || status === "已暂停" || status === "开放" || status === "待研判" || status === "已研判" || status === "待标注" || status === "已标注" || status === "待回归" || status === "资料待补" || status === "联调中" || status === "待探测" || status === "待认证" || status === "待抽样" || status === "待完善" || status === "待处理" || status === "临期" || status === "待整改") return "warn";
+    if (status === "阻断" || status === "门禁阻断" || status === "有阻塞" || status === "有风险" || status === "需优化" || status === "未达标" || status === "逾期" || status === "高" || status === "紧急" || status === "异常" || status === "故障" || status === "失败" || status === "高负荷" || status === "高风险" || status === "拥堵" || status === "负向" || status === "失效" || status === "不通过" || status === "发现风险") return "danger";
     return "warn";
   }
 
@@ -1006,7 +1063,7 @@
       standardVersion: state.task.standard,
       hospitalCode: hospital.code,
       hospitalName: hospital.name,
-      prototypeVersion: "mvp-0.14",
+      prototypeVersion: "mvp-0.15",
     };
     if (kind === "submission") {
       return {
@@ -1160,6 +1217,18 @@
         pilotFeedback: state.pilotFeedback,
       };
     }
+    if (kind === "integration") {
+      return {
+        meta,
+        integrationSummary: integrationSummary(),
+        pilotAccessApplications: state.pilotAccessApplications,
+        pilotConnectors: state.pilotConnectors,
+        pilotDataMappings: state.pilotDataMappings,
+        pilotIntegrationTests: state.pilotIntegrationTests,
+        pilotIntegrationIssues: state.pilotIntegrationIssues,
+        pilotIntegrationGates: state.pilotIntegrationGates,
+      };
+    }
     if (kind === "assessment") {
       return {
         meta,
@@ -1239,6 +1308,12 @@
       trainingSessions: state.trainingSessions,
       pilotReleases: state.pilotReleases,
       pilotFeedback: state.pilotFeedback,
+      pilotAccessApplications: state.pilotAccessApplications,
+      pilotConnectors: state.pilotConnectors,
+      pilotDataMappings: state.pilotDataMappings,
+      pilotIntegrationTests: state.pilotIntegrationTests,
+      pilotIntegrationIssues: state.pilotIntegrationIssues,
+      pilotIntegrationGates: state.pilotIntegrationGates,
       pilotOutcomeMetrics: state.pilotOutcomeMetrics,
       pilotHospitalOutcomes: state.pilotHospitalOutcomes,
       pilotIssueThemes: state.pilotIssueThemes,
@@ -1293,6 +1368,7 @@
       intelligence: "智能监管包",
       pilot: "试点运营包",
       collaboration: "试点协同包",
+      integration: "接入联调包",
       assessment: "试点评估包",
       assistant: "评价助手包",
       monitoring: "运营监控包",
@@ -2179,6 +2255,266 @@
       </div>
       <div class="segmented collaboration-tabs" role="tablist" aria-label="试点协同功能">
         ${tabs.map((item) => `<button type="button" role="tab" aria-selected="${item.id === tab}" class="${item.id === tab ? "active" : ""}" data-collaboration-tab="${item.id}">${item.label}</button>`).join("")}
+      </div>
+      ${content}
+    `;
+  }
+
+  function accessApplicationActionLabel(status) {
+    return {
+      资料待补: "补齐并受理",
+      已受理: "启动联调",
+      联调中: "确认联调完成",
+      联调完成: "已完成",
+    }[status] || "推进";
+  }
+
+  function renderIntegration() {
+    header("接入联调");
+    const tab = workspace.dataset.integrationTab || "access";
+    const summary = integrationSummary();
+    const tabs = [
+      { id: "access", label: "接入与认证" },
+      { id: "mapping", label: "数据与测试" },
+      { id: "gate", label: "问题与准入" },
+    ];
+    let content = "";
+
+    if (tab === "access") {
+      content = `
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">医院接入申请</h3>
+              <p class="panel-subtitle">统一受理接入范围、网络区域、资料完整性与计划联调窗口。</p>
+            </div>
+            <button class="button ghost" type="button" data-action="download-package" data-kind="integration">下载联调包</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>医院</th><th>协调人</th><th>接入方式</th><th>网络区域</th><th>资料</th><th>联调窗口</th><th>状态</th><th>更新时间</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.pilotAccessApplications
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.hospitalName}</strong><br /><span class="muted-text">${item.hospitalCode}</span></td>
+                        <td>${item.coordinator}</td>
+                        <td>${item.sourceMode}</td>
+                        <td>${item.networkZone}</td>
+                        <td>${item.materials}/${item.requiredMaterials}</td>
+                        <td>${item.targetWindow}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td>${item.lastUpdated}</td>
+                        <td><button class="button ghost" type="button" data-action="advance-access-application" data-id="${item.id}" ${item.status === "联调完成" ? "disabled" : ""}>${accessApplicationActionLabel(item.status)}</button></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">源系统连接器与凭据</h3>
+              <p class="panel-subtitle">凭据只展示状态和到期日；连通探测、契约认证与轮换操作全部留痕。</p>
+            </div>
+            <span class="tag">${summary.readyConnectors}/${state.pilotConnectors.length}个连接器就绪</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>连接器</th><th>医院/源系统</th><th>传输与认证</th><th>凭据</th><th>连通性</th><th>契约</th><th>最近探测</th><th>责任组</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.pilotConnectors
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.id}</strong><br /><span class="muted-text">${item.endpointAlias}</span></td>
+                        <td>${item.hospitalName}<br /><span class="muted-text">${item.sourceSystem} · ${item.profile}</span></td>
+                        <td>${item.transport}<br /><span class="muted-text">${item.authMode}</span></td>
+                        <td><span class="status-pill ${statusClass(item.credentialStatus)}">${item.credentialStatus}</span><br /><span class="muted-text">${item.credentialExpireAt}</span></td>
+                        <td><span class="status-pill ${statusClass(item.connectivityStatus)}">${item.connectivityStatus}</span>${item.latencyMs ? `<br /><span class="muted-text">${item.latencyMs}ms</span>` : ""}</td>
+                        <td><span class="status-pill ${statusClass(item.contractStatus)}">${item.contractStatus}</span></td>
+                        <td>${item.lastProbeAt}</td>
+                        <td>${item.owner}</td>
+                        <td>
+                          <div class="toolbar inline">
+                            <button class="button ghost" type="button" data-action="probe-pilot-connector" data-id="${item.id}">探测</button>
+                            <button class="button ghost" type="button" data-action="rotate-pilot-credential" data-id="${item.id}">轮换</button>
+                            <button class="button secondary" type="button" data-action="run-contract-certification" data-id="${item.id}">认证</button>
+                          </div>
+                        </td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "mapping") {
+      content = `
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">数据映射与脱敏抽样</h3>
+              <p class="panel-subtitle">按数据集核对必填字段、转换规则、覆盖率和个人信息去标识化结果。</p>
+            </div>
+            <span class="tag">${summary.readyMappings}/${state.pilotDataMappings.length}个数据集就绪</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>数据集</th><th>医院/连接器</th><th>源字段</th><th>已映射/必填</th><th>转换规则</th><th>覆盖率</th><th>隐私抽样</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.pilotDataMappings
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.dataset}</strong><br /><span class="muted-text">${item.id}</span></td>
+                        <td>${item.hospitalCode}<br /><span class="muted-text">${item.connectorId}</span></td>
+                        <td>${item.sourceFields}</td>
+                        <td>${item.mappedFields}/${item.requiredFields}</td>
+                        <td>${item.transformRules}</td>
+                        <td><strong>${item.coverage}%</strong></td>
+                        <td><span class="status-pill ${statusClass(item.privacyCheck)}">${item.privacyCheck}</span></td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td><button class="button secondary" type="button" data-action="run-sample-validation" data-id="${item.id}">映射校验</button></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">认证测试记录</h3>
+              <p class="panel-subtitle">保存契约、字段映射与脱敏抽样的用例结果，并关联证据材料。</p>
+            </div>
+            <span class="tag">${state.pilotIntegrationTests.length}次执行</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>测试编号</th><th>医院/连接器</th><th>测试套件</th><th>用例</th><th>通过</th><th>失败</th><th>隐私发现</th><th>证据</th><th>状态</th><th>执行时间</th></tr></thead>
+              <tbody>
+                ${state.pilotIntegrationTests
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.id}</strong></td>
+                        <td>${item.hospitalCode}<br /><span class="muted-text">${item.connectorId}</span></td>
+                        <td>${item.suite}</td>
+                        <td>${item.cases}</td>
+                        <td>${item.passed}</td>
+                        <td>${item.failed}</td>
+                        <td>${item.privacyFindings}</td>
+                        <td>${item.evidenceId}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td>${item.runAt}</td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "gate") {
+      content = `
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">联调问题处置</h3>
+              <p class="panel-subtitle">阻断和高风险问题必须关闭后，医院才能进入上线准入评估。</p>
+            </div>
+            <span class="status-pill ${summary.criticalIssues ? "danger" : ""}">${summary.criticalIssues}项关键问题</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>问题</th><th>医院/连接器</th><th>类别</th><th>级别</th><th>责任组</th><th>期限</th><th>状态</th><th>处置结论</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.pilotIntegrationIssues
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.summary}</strong><br /><span class="muted-text">${item.id}</span></td>
+                        <td>${item.hospitalCode}<br /><span class="muted-text">${item.connectorId}</span></td>
+                        <td>${item.category}</td>
+                        <td><span class="status-pill ${statusClass(item.severity)}">${item.severity}</span></td>
+                        <td>${item.owner}</td>
+                        <td>${item.dueAt}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td>${item.resolution || "-"}</td>
+                        <td><button class="button ghost" type="button" data-action="resolve-integration-issue" data-id="${item.id}" ${item.status === "已关闭" ? "disabled" : ""}>关闭问题</button></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">上线准入门禁</h3>
+              <p class="panel-subtitle">自动汇总连接器、映射、关键问题和双重审核，满足条件后由授权角色批准上线。</p>
+            </div>
+            <span class="tag">${summary.launchReadyHospitals}/${state.pilotIntegrationGates.length}家可上线或已准入</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>医院</th><th>连接器</th><th>数据映射</th><th>关键问题</th><th>安全复核</th><th>业务复核</th><th>门禁状态</th><th>评估时间</th><th>批准记录</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.pilotIntegrationGates
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.hospitalName}</strong><br /><span class="muted-text">${item.hospitalCode}</span></td>
+                        <td>${item.readyConnectors}/${item.requiredConnectors}</td>
+                        <td>${item.readyMappings}/${item.requiredMappings}</td>
+                        <td>${item.openCriticalIssues}</td>
+                        <td><span class="status-pill ${statusClass(item.securityReview)}">${item.securityReview}</span></td>
+                        <td><span class="status-pill ${statusClass(item.businessReview)}">${item.businessReview}</span></td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td>${item.evaluatedAt || "-"}</td>
+                        <td>${item.approvedBy ? `${item.approvedBy}<br /><span class="muted-text">${item.approvedAt}</span>` : "-"}</td>
+                        <td>
+                          <div class="toolbar inline">
+                            <button class="button ghost" type="button" data-action="evaluate-integration-gate" data-id="${item.hospitalCode}">评估</button>
+                            <button class="button secondary" type="button" data-action="approve-integration-gate" data-id="${item.hospitalCode}" ${item.status === "已准入" ? "disabled" : ""}>批准上线</button>
+                          </div>
+                        </td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    workspace.innerHTML = `
+      <div class="grid-4">
+        ${metric("接入申请", summary.activeApplications, `${summary.completedApplications}家已完成联调`)}
+        ${metric("连接器就绪率", pct(summary.connectorPassRate), `${summary.readyConnectors}/${state.pilotConnectors.length}个通过认证`, summary.connectorPassRate < 0.75 ? "warn" : "")}
+        ${metric("数据映射通过率", pct(summary.mappingPassRate), `${summary.readyMappings}/${state.pilotDataMappings.length}个完成脱敏抽样`, summary.mappingPassRate < 0.75 ? "warn" : "")}
+        ${metric("关键联调问题", summary.criticalIssues, `${summary.openIssues}项问题开放`, summary.criticalIssues ? "danger" : "")}
+      </div>
+      <div class="segmented integration-tabs" role="tablist" aria-label="接入联调功能">
+        ${tabs.map((item) => `<button type="button" role="tab" aria-selected="${item.id === tab}" class="${item.id === tab ? "active" : ""}" data-integration-tab="${item.id}">${item.label}</button>`).join("")}
       </div>
       ${content}
     `;
@@ -4479,6 +4815,10 @@
           <span>医院准备度、问题工单、培训答疑、版本发布与试点反馈</span>
         </article>
         <article class="package-card">
+          <strong>接入联调包</strong>
+          <span>接入申请、连接器凭据、字段映射、认证测试、联调问题与上线准入</span>
+        </article>
+        <article class="package-card">
           <strong>试点评估包</strong>
           <span>成效指标、医院评分、问题复盘、优化计划、推广准备与评估报告</span>
         </article>
@@ -4515,7 +4855,7 @@
           <label class="field">
             <span>数据包类型</span>
             <select data-package-kind>
-              ${["task", "pilot", "collaboration", "assessment", "assistant", "monitoring", "evidence", "submission", "review", "expert", "rectification", "analytics", "intelligence", "system", "operations", "full"]
+              ${["task", "pilot", "collaboration", "integration", "assessment", "assistant", "monitoring", "evidence", "submission", "review", "expert", "rectification", "analytics", "intelligence", "system", "operations", "full"]
                 .map((item) => `<option value="${item}" ${item === kind ? "selected" : ""}>${packageKindLabel(item)}</option>`)
                 .join("")}
             </select>
@@ -4548,6 +4888,12 @@
               <tr><td>培训场次</td><td>GET/POST</td><td>/api/v1/pilot-training-sessions</td><td>培训发布、签到、问题与材料</td><td><span class="priority">P1</span></td></tr>
               <tr><td>试点版本</td><td>GET/POST</td><td>/api/v1/pilot-releases</td><td>候选版本、验证范围与发布记录</td><td><span class="priority">P1</span></td></tr>
               <tr><td>版本反馈</td><td>GET/PUT</td><td>/api/v1/pilot-feedback/{feedbackId}</td><td>反馈收集、评估、解决与版本关联</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>医院接入申请</td><td>GET/POST/PUT</td><td>/api/v1/pilot-access-applications</td><td>医院资料、接入方式、网络区域与联调窗口</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>源系统连接器</td><td>GET/POST</td><td>/api/v1/pilot-connectors</td><td>源系统、传输配置、凭据状态与责任组</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>连通与契约认证</td><td>POST</td><td>/api/v1/pilot-connectors/{connectorId}:certify</td><td>连通探测、凭据轮换和OpenAPI契约测试</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>数据映射抽样</td><td>GET/POST</td><td>/api/v1/pilot-data-mappings/{mappingId}:sample-check</td><td>字段覆盖、转换规则与个人信息去标识化抽样</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>联调问题</td><td>GET/POST/PUT</td><td>/api/v1/pilot-integration-issues</td><td>阻断、高风险问题与处置结论</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>上线准入</td><td>GET/POST</td><td>/api/v1/pilot-integration-gates/{hospitalCode}:evaluate</td><td>连接器、映射、关键问题与双重复核门禁</td><td><span class="priority">P1</span></td></tr>
               <tr><td>试点成效</td><td>GET/POST</td><td>/api/v1/pilot-assessment/outcomes</td><td>成效指标、医院评分与推广结论</td><td><span class="priority">P1</span></td></tr>
               <tr><td>问题复盘</td><td>GET/POST</td><td>/api/v1/pilot-assessment/issue-themes</td><td>跨工单、反馈、校验和告警归并</td><td><span class="priority">P1</span></td></tr>
               <tr><td>优化计划</td><td>GET/PUT</td><td>/api/v1/pilot-assessment/improvement-plans/{planId}</td><td>责任组、目标版本、进度和验收标准</td><td><span class="priority">P1</span></td></tr>
@@ -4768,6 +5114,7 @@
       tasks: "任务管理",
       pilot: "试点运营",
       collaboration: "试点协同",
+      integration: "接入联调",
       assessment: "试点评估",
       assistant: "评价助手",
       monitoring: "运营监控",
@@ -4789,6 +5136,7 @@
     if (state.activeView === "tasks") renderTasks();
     else if (state.activeView === "pilot") renderPilot();
     else if (state.activeView === "collaboration") renderCollaboration();
+    else if (state.activeView === "integration") renderIntegration();
     else if (state.activeView === "assessment") renderAssessment();
     else if (state.activeView === "assistant") renderAssistant();
     else if (state.activeView === "monitoring") renderMonitoring();
@@ -5370,6 +5718,230 @@
     addAudit("推进试点准备阻塞项", readiness.hospitalName, `${readiness.readiness}% · ${readiness.status}`);
     saveState();
     showNotice(`${readiness.hospitalName}已完成一项准备工作。`);
+    render();
+  }
+
+  function advancePilotAccessApplication(id) {
+    const application = state.pilotAccessApplications.find((item) => item.id === id);
+    if (!application || application.status === "联调完成") return;
+    const nextStatus = {
+      资料待补: "已受理",
+      已受理: "联调中",
+      联调中: "联调完成",
+    }[application.status] || "已受理";
+    if (application.status === "资料待补") application.materials = application.requiredMaterials;
+    application.status = nextStatus;
+    application.lastUpdated = nowText();
+    addAudit("推进医院接入申请", application.hospitalName, nextStatus);
+    saveState();
+    showNotice(`${application.hospitalName}接入申请已更新为“${nextStatus}”。`);
+    render();
+  }
+
+  function ensureIntegrationIssue(connector, category, severity, summary) {
+    const existing = state.pilotIntegrationIssues.find(
+      (item) => item.connectorId === connector.id && item.category === category && item.status !== "已关闭",
+    );
+    if (existing) {
+      existing.severity = severity;
+      existing.summary = summary;
+      existing.updatedAt = nowText();
+      return existing;
+    }
+    const issue = {
+      id: `INT-ISSUE-${Date.now()}`,
+      hospitalCode: connector.hospitalCode,
+      connectorId: connector.id,
+      category,
+      severity,
+      summary,
+      owner: connector.owner,
+      status: "待处理",
+      dueAt: "2026-08-05",
+      resolution: "",
+      updatedAt: nowText(),
+    };
+    state.pilotIntegrationIssues.unshift(issue);
+    return issue;
+  }
+
+  function probePilotConnector(id) {
+    const connector = state.pilotConnectors.find((item) => item.id === id);
+    if (!connector) return;
+    connector.lastProbeAt = nowText();
+    if (connector.credentialStatus !== "有效") {
+      connector.connectivityStatus = "阻断";
+      connector.latencyMs = 0;
+      ensureIntegrationIssue(connector, "连通性", "阻断", "接入凭据未处于有效状态，连通探测被安全策略阻断。");
+      addAudit("执行连接器探测", connector.id, "凭据无效，探测阻断");
+      saveState();
+      showNotice(`${connector.sourceSystem}探测被阻断，请先轮换接入凭据。`);
+      render();
+      return;
+    }
+    connector.connectivityStatus = "在线";
+    connector.latencyMs = 120 + (connector.id.length * 17) % 180;
+    if (connector.contractStatus === "阻断") connector.contractStatus = "待认证";
+    addAudit("执行连接器探测", connector.id, `在线 · ${connector.latencyMs}ms`);
+    saveState();
+    showNotice(`${connector.sourceSystem}连通探测通过，往返时延${connector.latencyMs}ms。`);
+    render();
+  }
+
+  function rotatePilotCredential(id) {
+    const connector = state.pilotConnectors.find((item) => item.id === id);
+    if (!connector) return;
+    connector.credentialStatus = "有效";
+    connector.credentialExpireAt = "2027-07-31";
+    connector.connectivityStatus = "待探测";
+    connector.contractStatus = "待认证";
+    connector.latencyMs = 0;
+    connector.lastProbeAt = nowText();
+    addAudit("轮换接入凭据", connector.id, "新凭据已激活，待重新探测");
+    saveState();
+    showNotice(`${connector.sourceSystem}凭据已轮换，敏感值未在页面展示。`);
+    render();
+  }
+
+  function runContractCertification(id) {
+    const connector = state.pilotConnectors.find((item) => item.id === id);
+    if (!connector) return;
+    if (connector.credentialStatus !== "有效" || connector.connectivityStatus !== "在线") {
+      connector.contractStatus = "阻断";
+      ensureIntegrationIssue(connector, "契约认证", "阻断", "契约认证前置条件不满足：凭据须有效且连接器须在线。");
+      addAudit("执行接口契约认证", connector.id, "前置条件不满足");
+      saveState();
+      showNotice("契约认证未执行，请先完成凭据轮换和连通探测。");
+      render();
+      return;
+    }
+    connector.contractStatus = "契约通过";
+    const test = {
+      id: `TEST-${connector.id}-${Date.now()}`,
+      hospitalCode: connector.hospitalCode,
+      connectorId: connector.id,
+      suite: "OpenAPI契约认证",
+      cases: 24,
+      passed: 24,
+      failed: 0,
+      privacyFindings: 0,
+      evidenceId: `CERT-${connector.id}`,
+      status: "通过",
+      runAt: nowText(),
+    };
+    state.pilotIntegrationTests.unshift(test);
+    addAudit("执行接口契约认证", connector.id, "24/24用例通过");
+    saveState();
+    showNotice(`${connector.sourceSystem}契约认证通过，测试证据已归档。`);
+    render();
+  }
+
+  function runSampleValidation(id) {
+    const mapping = state.pilotDataMappings.find((item) => item.id === id);
+    if (!mapping) return;
+    const connector = state.pilotConnectors.find((item) => item.id === mapping.connectorId);
+    if (!connector || connector.contractStatus !== "契约通过") {
+      if (connector) ensureIntegrationIssue(connector, "数据映射", "高", `${mapping.dataset}映射校验前需先完成连接器契约认证。`);
+      saveState();
+      showNotice("映射校验未执行，请先完成对应连接器的契约认证。");
+      render();
+      return;
+    }
+    mapping.mappedFields = Math.max(mapping.sourceFields, mapping.requiredFields);
+    mapping.coverage = 100;
+    mapping.privacyCheck = "脱敏通过";
+    mapping.status = "映射就绪";
+    mapping.updatedAt = nowText();
+    state.pilotIntegrationTests.unshift({
+      id: `TEST-${mapping.id}-${Date.now()}`,
+      hospitalCode: mapping.hospitalCode,
+      connectorId: mapping.connectorId,
+      suite: "字段映射与脱敏抽样",
+      cases: 30,
+      passed: 30,
+      failed: 0,
+      privacyFindings: 0,
+      evidenceId: `SAMPLE-${mapping.id}`,
+      status: "通过",
+      runAt: nowText(),
+    });
+    addAudit("执行映射与脱敏抽样", mapping.id, "30/30样本通过");
+    saveState();
+    showNotice(`${mapping.dataset}映射和脱敏抽样通过。`);
+    render();
+  }
+
+  function resolveIntegrationIssue(id) {
+    const issue = state.pilotIntegrationIssues.find((item) => item.id === id);
+    if (!issue || issue.status === "已关闭") return;
+    issue.status = "已关闭";
+    issue.resolution = "已完成配置修正并复测，相关证据已归档。";
+    issue.updatedAt = nowText();
+    addAudit("关闭联调问题", issue.id, issue.resolution);
+    saveState();
+    showNotice(`${issue.id}已关闭，可重新执行上线准入评估。`);
+    render();
+  }
+
+  function evaluateIntegrationGate(hospitalCode) {
+    const gate = state.pilotIntegrationGates.find((item) => item.hospitalCode === hospitalCode);
+    if (!gate) return;
+    const connectors = state.pilotConnectors.filter((item) => item.hospitalCode === hospitalCode);
+    const mappings = state.pilotDataMappings.filter((item) => item.hospitalCode === hospitalCode);
+    const openCriticalIssues = state.pilotIntegrationIssues.filter(
+      (item) => item.hospitalCode === hospitalCode && item.status !== "已关闭" && (item.severity === "阻断" || item.severity === "高"),
+    );
+    gate.requiredConnectors = connectors.length;
+    gate.readyConnectors = connectors.filter(
+      (item) => item.credentialStatus === "有效" && item.connectivityStatus === "在线" && item.contractStatus === "契约通过",
+    ).length;
+    gate.requiredMappings = mappings.length;
+    gate.readyMappings = mappings.filter((item) => item.status === "映射就绪" && item.privacyCheck === "脱敏通过").length;
+    gate.openCriticalIssues = openCriticalIssues.length;
+    const connectorsReady = gate.requiredConnectors > 0 && gate.readyConnectors === gate.requiredConnectors;
+    const mappingsReady = gate.requiredMappings > 0 && gate.readyMappings === gate.requiredMappings;
+    gate.securityReview = connectorsReady && !gate.openCriticalIssues ? "通过" : "不通过";
+    gate.businessReview = mappingsReady ? "通过" : "不通过";
+    gate.status = gate.securityReview === "通过" && gate.businessReview === "通过" ? "可上线" : gate.openCriticalIssues ? "阻断" : "待整改";
+    gate.evaluatedAt = nowText();
+    if (gate.status === "可上线") {
+      const application = state.pilotAccessApplications.find((item) => item.hospitalCode === hospitalCode);
+      if (application) {
+        application.status = "联调完成";
+        application.lastUpdated = gate.evaluatedAt;
+      }
+      const readiness = state.hospitalReadiness.find((item) => item.hospitalCode === hospitalCode);
+      if (readiness) {
+        readiness.network = 100;
+        readiness.dataMapping = 100;
+        readiness.blockers = Math.max(0, readiness.blockers - 2);
+        recalculateReadiness(readiness);
+      }
+    }
+    addAudit("评估上线准入门禁", gate.hospitalName, `${gate.status} · 关键问题${gate.openCriticalIssues}项`);
+    saveState();
+    showNotice(`${gate.hospitalName}上线准入评估结果：${gate.status}。`);
+    render();
+  }
+
+  function approveIntegrationGate(hospitalCode) {
+    const gate = state.pilotIntegrationGates.find((item) => item.hospitalCode === hospitalCode);
+    if (!gate) return;
+    if (gate.status !== "可上线") {
+      showNotice("当前门禁尚未达到“可上线”，请先完成联调并重新评估。");
+      return;
+    }
+    const allowedRoles = ["国家级管理员", "省级管理员", "运维安全员"];
+    if (!allowedRoles.includes(state.activeRole)) {
+      showNotice("当前角色无上线批准权限，请切换国家级、省级或运维安全角色。");
+      return;
+    }
+    gate.status = "已准入";
+    gate.approvedBy = state.activeRole;
+    gate.approvedAt = nowText();
+    addAudit("批准试点医院上线", gate.hospitalName, `已准入 · ${gate.approvedBy}`);
+    saveState();
+    showNotice(`${gate.hospitalName}已通过上线准入，批准记录已写入审计日志。`);
     render();
   }
 
@@ -7250,6 +7822,12 @@
       renderCollaboration();
       return;
     }
+    const integrationTab = event.target.closest("button[data-integration-tab]");
+    if (integrationTab) {
+      workspace.dataset.integrationTab = integrationTab.dataset.integrationTab;
+      renderIntegration();
+      return;
+    }
     const assessmentTab = event.target.closest("button[data-assessment-tab]");
     if (assessmentTab) {
       workspace.dataset.assessmentTab = assessmentTab.dataset.assessmentTab;
@@ -7300,6 +7878,14 @@
     if (name === "publish-daily-report") publishDailyReport();
     if (name === "refresh-readiness") refreshReadiness();
     if (name === "resolve-readiness-blocker") resolveReadinessBlocker(action.dataset.id);
+    if (name === "advance-access-application") advancePilotAccessApplication(action.dataset.id);
+    if (name === "probe-pilot-connector") probePilotConnector(action.dataset.id);
+    if (name === "rotate-pilot-credential") rotatePilotCredential(action.dataset.id);
+    if (name === "run-contract-certification") runContractCertification(action.dataset.id);
+    if (name === "run-sample-validation") runSampleValidation(action.dataset.id);
+    if (name === "resolve-integration-issue") resolveIntegrationIssue(action.dataset.id);
+    if (name === "evaluate-integration-gate") evaluateIntegrationGate(action.dataset.id);
+    if (name === "approve-integration-gate") approveIntegrationGate(action.dataset.id);
     if (name === "create-pilot-ticket") createPilotTicket();
     if (name === "assign-pilot-tickets") assignPilotTickets();
     if (name === "advance-pilot-ticket") advancePilotTicket(action.dataset.id);

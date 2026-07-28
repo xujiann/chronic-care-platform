@@ -11,7 +11,7 @@
       "properties": {
         "packageType": {
           "type": "string",
-          "enum": ["submission", "review", "expert", "rectification", "task", "pilot", "collaboration", "assessment", "assistant", "monitoring", "evidence", "analytics", "intelligence", "operations", "system", "full"]
+          "enum": ["submission", "review", "expert", "rectification", "task", "pilot", "collaboration", "integration", "assessment", "assistant", "monitoring", "evidence", "analytics", "intelligence", "operations", "system", "full"]
         },
         "generatedAt": {
           "type": "string",
@@ -411,6 +411,46 @@
       }
     },
     "pilotFeedback": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "integrationSummary": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "pilotAccessApplications": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pilotConnectors": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pilotDataMappings": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pilotIntegrationTests": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pilotIntegrationIssues": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pilotIntegrationGates": {
       "type": "array",
       "items": {
         "type": "object"
