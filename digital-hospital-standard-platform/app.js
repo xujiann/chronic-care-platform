@@ -1,0 +1,6099 @@
+(function () {
+  const storageKey = "digitalHospitalMvpState:v0.10";
+
+  const domains = [
+    { code: "A", name: "基础设施与平台支撑", weight: 100 },
+    { code: "B", name: "数据治理与互联互通", weight: 150 },
+    { code: "C", name: "智慧医疗与电子病历", weight: 180 },
+    { code: "D", name: "智慧服务与患者体验", weight: 130 },
+    { code: "E", name: "智慧管理与运营决策", weight: 130 },
+    { code: "F", name: "质量安全与闭环管理", weight: 120 },
+    { code: "G", name: "创新应用与智能化能力", weight: 90 },
+    { code: "H", name: "安全合规与长效运行", weight: 100 },
+  ];
+
+  const indicators = [
+    { code: "A1", domain: "A", name: "云网与计算资源支撑能力", max: 20, method: "混合评分", source: "模板/材料", evidence: "资源清单、架构图、部署说明", key: true, priority: "P0" },
+    { code: "A2", domain: "A", name: "核心系统架构规范性", max: 15, method: "人工评分", source: "材料", evidence: "系统架构图、系统清单", key: true, priority: "P0" },
+    { code: "A3", domain: "A", name: "统一身份认证与账号管理", max: 15, method: "混合评分", source: "模板/材料", evidence: "统一认证说明、账号管理制度", key: true, priority: "P0" },
+    { code: "A4", domain: "A", name: "数据备份与灾备能力", max: 20, method: "人工评分", source: "材料", evidence: "备份策略、恢复演练记录", key: true, priority: "P0" },
+    { code: "A5", domain: "A", name: "运维监控与告警处置", max: 15, method: "混合评分", source: "材料/模板", evidence: "监控截图、告警处置记录", key: false, priority: "P1" },
+    { code: "A6", domain: "A", name: "终端、网络和设备资产管理", max: 15, method: "人工评分", source: "模板/材料", evidence: "资产台账、管理制度", key: false, priority: "P1" },
+    { code: "B1", domain: "B", name: "数据标准和代码集应用", max: 25, method: "混合评分", source: "模板/材料", evidence: "数据标准清单、代码集映射表", key: true, priority: "P0" },
+    { code: "B2", domain: "B", name: "主数据管理能力", max: 20, method: "人工评分", source: "模板/材料", evidence: "患者、人员、科室等主数据说明", key: true, priority: "P0" },
+    { code: "B3", domain: "B", name: "院内系统集成和接口治理", max: 25, method: "自动/混合评分", source: "模板/API", evidence: "接口清单、调用统计", key: true, priority: "P0" },
+    { code: "B4", domain: "B", name: "区域平台接入和数据共享", max: 25, method: "自动/混合评分", source: "模板/API/材料", evidence: "接入证明、共享清单、成功率统计", key: true, priority: "P0" },
+    { code: "B5", domain: "B", name: "数据质量管理", max: 25, method: "自动/混合评分", source: "模板/API", evidence: "缺失率、重复率、规范率、整改记录", key: true, priority: "P0" },
+    { code: "B6", domain: "B", name: "数据目录和数据资产管理", max: 15, method: "人工评分", source: "材料", evidence: "数据目录、数据责任清单", key: false, priority: "P1" },
+    { code: "B7", domain: "B", name: "数据使用审批与授权管理", max: 15, method: "人工评分", source: "材料", evidence: "审批流程、授权记录", key: true, priority: "P1" },
+    { code: "C1", domain: "C", name: "电子病历应用水平", max: 30, method: "混合评分", source: "导入/材料", evidence: "既有评级结果、系统覆盖说明", key: true, priority: "P0" },
+    { code: "C2", domain: "C", name: "临床诊疗闭环管理", max: 30, method: "混合评分", source: "模板/材料", evidence: "医嘱、检查、检验、手术等闭环截图和统计", key: true, priority: "P0" },
+    { code: "C3", domain: "C", name: "移动医疗和移动护理应用", max: 20, method: "人工评分", source: "模板/材料", evidence: "移动查房、移动护理应用说明", key: false, priority: "P1" },
+    { code: "C4", domain: "C", name: "临床决策支持", max: 25, method: "自动/混合评分", source: "模板/API/材料", evidence: "规则清单、提醒统计、采纳率", key: true, priority: "P0" },
+    { code: "C5", domain: "C", name: "医疗质量智能质控", max: 25, method: "自动/混合评分", source: "模板/API/材料", evidence: "质控规则、问题统计、整改记录", key: true, priority: "P0" },
+    { code: "C6", domain: "C", name: "多学科协同和远程会诊", max: 15, method: "混合评分", source: "模板/材料", evidence: "会诊记录统计、系统说明", key: false, priority: "P1" },
+    { code: "C7", domain: "C", name: "检查检验结果共享应用", max: 20, method: "自动/混合评分", source: "模板/API", evidence: "共享项目、调用量、互认情况", key: false, priority: "P1" },
+    { code: "C8", domain: "C", name: "药事和用药安全智能管理", max: 15, method: "混合评分", source: "模板/材料", evidence: "合理用药、审方、预警记录", key: false, priority: "P1" },
+    { code: "D1", domain: "D", name: "预约诊疗和分时段服务", max: 20, method: "自动/混合评分", source: "模板/API", evidence: "预约量、可预约号源、截图", key: true, priority: "P0" },
+    { code: "D2", domain: "D", name: "线上缴费和电子票据", max: 15, method: "自动/混合评分", source: "模板/API/材料", evidence: "支付场景、电子票据说明", key: false, priority: "P1" },
+    { code: "D3", domain: "D", name: "检查检验报告线上查询", max: 15, method: "自动/混合评分", source: "模板/API", evidence: "查询量、可查项目、截图", key: true, priority: "P0" },
+    { code: "D4", domain: "D", name: "互联网诊疗和复诊服务", max: 20, method: "混合评分", source: "模板/API/材料", evidence: "互联网诊疗量、处方、药品配送", key: false, priority: "P1" },
+    { code: "D5", domain: "D", name: "院内导航和就医流程优化", max: 15, method: "人工评分", source: "材料", evidence: "导航、排队、候诊、叫号说明", key: false, priority: "P1" },
+    { code: "D6", domain: "D", name: "老年人和特殊人群适老化服务", max: 15, method: "人工评分", source: "材料", evidence: "适老化页面、人工辅助流程", key: true, priority: "P1" },
+    { code: "D7", domain: "D", name: "患者反馈与投诉闭环", max: 15, method: "混合评分", source: "模板/材料", evidence: "满意度、投诉处理和闭环记录", key: false, priority: "P1" },
+    { code: "D8", domain: "D", name: "多渠道服务一致性", max: 15, method: "人工评分", source: "材料", evidence: "APP、小程序、自助机、窗口流程说明", key: false, priority: "P1" },
+    { code: "E1", domain: "E", name: "医院运营分析平台", max: 20, method: "人工评分", source: "材料", evidence: "运营看板、指标清单", key: true, priority: "P0" },
+    { code: "E2", domain: "E", name: "财务预算和成本管理", max: 20, method: "人工评分", source: "材料", evidence: "预算、成本核算、分析报表", key: false, priority: "P1" },
+    { code: "E3", domain: "E", name: "药品耗材闭环监管", max: 20, method: "混合评分", source: "模板/材料", evidence: "采购、库存、使用、追溯记录", key: true, priority: "P0" },
+    { code: "E4", domain: "E", name: "人力资源和绩效管理", max: 15, method: "人工评分", source: "材料", evidence: "排班、绩效、培训系统说明", key: false, priority: "P1" },
+    { code: "E5", domain: "E", name: "设备资产和后勤管理", max: 15, method: "混合评分", source: "模板/材料", evidence: "设备台账、维修、能耗、安防", key: false, priority: "P1" },
+    { code: "E6", domain: "E", name: "医保和支付管理支撑", max: 15, method: "人工评分", source: "材料", evidence: "医保审核、支付方式改革支撑", key: false, priority: "P1" },
+    { code: "E7", domain: "E", name: "领导驾驶舱和专题分析", max: 15, method: "人工评分", source: "材料", evidence: "驾驶舱截图、专题报告", key: false, priority: "P1" },
+    { code: "E8", domain: "E", name: "管理流程线上化", max: 10, method: "混合评分", source: "模板/材料", evidence: "OA、审批、流程统计", key: false, priority: "P1" },
+    { code: "F1", domain: "F", name: "医疗质量指标在线监测", max: 20, method: "自动/混合评分", source: "模板/API/材料", evidence: "质量指标看板、统计报表", key: true, priority: "P0" },
+    { code: "F2", domain: "F", name: "核心制度信息化闭环", max: 20, method: "人工评分", source: "材料", evidence: "核心制度流程截图、闭环记录", key: true, priority: "P0" },
+    { code: "F3", domain: "F", name: "不良事件上报与处置", max: 15, method: "混合评分", source: "模板/材料", evidence: "上报量、处理率、整改记录", key: false, priority: "P1" },
+    { code: "F4", domain: "F", name: "患者安全风险预警", max: 15, method: "混合评分", source: "模板/API/材料", evidence: "预警规则和处置记录", key: true, priority: "P0" },
+    { code: "F5", domain: "F", name: "院感和公共卫生事件支撑", max: 15, method: "混合评分", source: "模板/材料", evidence: "院感监测、预警和上报记录", key: false, priority: "P1" },
+    { code: "F6", domain: "F", name: "问题整改闭环", max: 20, method: "混合评分", source: "模板/材料", evidence: "问题台账、整改率、复核记录", key: true, priority: "P0" },
+    { code: "F7", domain: "F", name: "质量改进知识库和案例库", max: 15, method: "人工评分", source: "材料", evidence: "典型案例、改进报告", key: false, priority: "P2" },
+    { code: "G1", domain: "G", name: "AI辅助诊疗规范应用", max: 20, method: "人工评分", source: "材料/模板", evidence: "场景说明、审批制度、人工复核机制", key: true, priority: "P1" },
+    { code: "G2", domain: "G", name: "AI辅助管理和服务应用", max: 15, method: "人工评分", source: "材料", evidence: "应用说明、成效分析", key: false, priority: "P2" },
+    { code: "G3", domain: "G", name: "物联网和智能设备应用", max: 15, method: "混合评分", source: "模板/材料", evidence: "设备清单、场景说明", key: false, priority: "P2" },
+    { code: "G4", domain: "G", name: "远程医疗和协同服务", max: 15, method: "混合评分", source: "模板/API/材料", evidence: "远程会诊、远程影像、远程心电统计", key: false, priority: "P1" },
+    { code: "G5", domain: "G", name: "科研数据平台和真实世界数据应用", max: 10, method: "人工评分", source: "材料", evidence: "数据平台、伦理和脱敏制度", key: false, priority: "P2" },
+    { code: "G6", domain: "G", name: "创新应用成效评价", max: 15, method: "人工评分", source: "材料", evidence: "效率、质量、体验、安全成效报告", key: false, priority: "P2" },
+    { code: "H1", domain: "H", name: "网络安全等级保护", max: 20, method: "人工评分", source: "材料", evidence: "定级备案、测评报告、整改记录", key: true, priority: "P0" },
+    { code: "H2", domain: "H", name: "数据安全分类分级", max: 15, method: "人工评分", source: "材料", evidence: "分类分级制度、数据目录", key: true, priority: "P0" },
+    { code: "H3", domain: "H", name: "个人信息保护", max: 15, method: "人工评分", source: "材料", evidence: "告知同意、授权、脱敏、审计制度", key: true, priority: "P0" },
+    { code: "H4", domain: "H", name: "权限管理和账号审计", max: 15, method: "混合评分", source: "模板/材料", evidence: "权限复核、账号停用、审计记录", key: true, priority: "P0" },
+    { code: "H5", domain: "H", name: "日志审计和安全监测", max: 15, method: "混合评分", source: "材料/模板", evidence: "日志留存、监测告警、处置记录", key: true, priority: "P0" },
+    { code: "H6", domain: "H", name: "应急预案和演练", max: 10, method: "人工评分", source: "材料", evidence: "应急预案、演练记录", key: false, priority: "P1" },
+    { code: "H7", domain: "H", name: "长效运行制度", max: 10, method: "人工评分", source: "材料", evidence: "运维制度、数据治理制度、评价整改制度", key: false, priority: "P1" },
+  ];
+
+  const seedState = {
+    activeView: "dashboard",
+    activeRole: "国家级管理员",
+    selectedHospital: "H000001",
+    task: {
+      id: "TASK-2026-001",
+      name: "2026数智医院试点评价",
+      standard: "STD-2026-TRIAL",
+      status: "填报中",
+      deadline: "2026-09-30",
+    },
+    tasks: [
+      { id: "TASK-2026-001", name: "2026数智医院试点评价", type: "试点评价", standard: "STD-2026-TRIAL", scope: "大连市二级及以上公立医院", status: "填报中", start: "2026-08-01", submitDue: "2026-09-30", reviewDue: "2026-11-15", resultAt: "2026-12-20", hospitals: ["H000001", "H000002", "H000003"], reminders: 2, extensionRequests: 1 },
+      { id: "TASK-2026-002", name: "安全合规专项抽查", type: "专项评价", standard: "STD-2026-TRIAL", scope: "三级医院安全合规域", status: "未开始", start: "2026-10-10", submitDue: "2026-10-30", reviewDue: "2026-11-30", resultAt: "2026-12-15", hospitals: ["H000001", "H000002"], reminders: 0, extensionRequests: 0 },
+    ],
+    roles: [
+      { name: "国家级管理员", org: "国家级平台", dataScope: "全国", permissions: ["标准发布", "全国任务", "抽查复核", "结果发布", "运行归档", "统计分析"] },
+      { name: "省级管理员", org: "省级平台", dataScope: "本省", permissions: ["任务承接", "医院范围", "审核分派", "催办延期", "省域统计"] },
+      { name: "省级审核员", org: "省级审核组", dataScope: "分派任务", permissions: ["指标审核", "退回补正", "专家复核", "整改复核"] },
+      { name: "专家复核员", org: "专家组", dataScope: "复核任务", permissions: ["专家结论", "调整扣分", "要求补证"] },
+      { name: "医院管理员", org: "医疗机构", dataScope: "本院", permissions: ["医院画像", "院内分工", "申报提交", "整改提交"] },
+      { name: "医院填报员", org: "医疗机构", dataScope: "本人分工", permissions: ["指标填报", "材料上传", "问题补正"] },
+      { name: "运维安全员", org: "平台技术组", dataScope: "系统运行", permissions: ["用户权限", "日志审计", "导出审批", "运维监控"] },
+    ],
+    users: [
+      { id: "U001", name: "国家管理员", role: "国家级管理员", org: "国家级平台", status: "启用", lastLogin: "2026-07-27 09:10" },
+      { id: "U102", name: "省级管理员", role: "省级管理员", org: "辽宁省", status: "启用", lastLogin: "2026-07-27 10:15" },
+      { id: "U203", name: "审核员A", role: "省级审核员", org: "辽宁省审核组", status: "启用", lastLogin: "2026-07-27 11:02" },
+      { id: "U301", name: "专家B", role: "专家复核员", org: "数据互联互通专家组", status: "启用", lastLogin: "2026-07-27 12:20" },
+      { id: "U401", name: "医院填报员", role: "医院填报员", org: "大连市示例中心医院", status: "启用", lastLogin: "2026-07-27 13:10" },
+    ],
+    hospitals: [
+      { code: "H000001", name: "大连市示例中心医院", level: "三级", type: "综合", city: "大连市", owner: "信息中心", contact: "王主任", systems: 18, regionConnected: "已接入", emrGrade: "5级", smartService: "3级" },
+      { code: "H000002", name: "大连市示例专科医院", level: "三级", type: "专科", city: "大连市", owner: "医务部", contact: "李主任", systems: 12, regionConnected: "部分接入", emrGrade: "4级", smartService: "2级" },
+      { code: "H000003", name: "区县示例人民医院", level: "二级", type: "综合", city: "大连市", owner: "信息科", contact: "赵科长", systems: 9, regionConnected: "待完善", emrGrade: "3级", smartService: "1级" },
+    ],
+    metrics: {
+      outpatientTotal: 450000,
+      onlineAppointments: 220000,
+      interfaceCalls: 10000,
+      interfaceSuccess: 9950,
+      dataTotal: 100000,
+      missingRecords: 300,
+      duplicateRecords: 80,
+      invalidCodeRecords: 120,
+    },
+    submissions: {},
+    assignments: [
+      { hospitalCode: "H000001", indicatorCode: "B3", department: "信息中心", assignee: "接口管理员", due: "2026-09-10", status: "已分派" },
+      { hospitalCode: "H000001", indicatorCode: "H1", department: "网络安全办", assignee: "安全专员", due: "2026-09-12", status: "待提交" },
+      { hospitalCode: "H000002", indicatorCode: "C1", department: "医务部", assignee: "病案管理员", due: "2026-09-18", status: "已分派" },
+    ],
+    evidenceMaterials: [
+      { id: "EV-B3-001", hospitalCode: "H000001", indicatorCode: "B3", name: "接口清单与调用统计.xlsx", type: "Excel", version: 2, sensitivity: "S3", status: "已校验", uploadedBy: "接口管理员", uploadedAt: "2026-07-27 10:30", expireAt: "2026-12-31", watermark: "已加水印" },
+      { id: "EV-C1-001", hospitalCode: "H000001", indicatorCode: "C1", name: "电子病历评级证明.pdf", type: "PDF", version: 1, sensitivity: "S2", status: "已校验", uploadedBy: "病案室", uploadedAt: "2026-07-26 16:10", expireAt: "2027-06-30", watermark: "已加水印" },
+      { id: "EV-H1-001", hospitalCode: "H000001", indicatorCode: "H1", name: "等保测评报告.pdf", type: "PDF", version: 1, sensitivity: "S4", status: "待复核", uploadedBy: "安全专员", uploadedAt: "2026-07-27 11:40", expireAt: "2026-09-01", watermark: "审批后水印" },
+      { id: "EV-D1-001", hospitalCode: "H000002", indicatorCode: "D1", name: "预约诊疗统计.csv", type: "CSV", version: 1, sensitivity: "S3", status: "缺少说明", uploadedBy: "门诊部", uploadedAt: "2026-07-25 09:20", expireAt: "2026-12-31", watermark: "已加水印" },
+    ],
+    validationIssues: [],
+    reviewNotes: [
+      {
+        id: "NOTE-SEED-EXP-B3",
+        hospitalCode: "H000001",
+        indicatorCode: "B3",
+        status: "专家复核",
+        text: "B3 院内系统集成和接口治理：因接口成功率口径接近边界，提交专家复核。",
+        at: "2026-07-27 10:20",
+      },
+    ],
+    expertReviews: [
+      {
+        id: "EXP-H000001-B3-SEED",
+        hospitalCode: "H000001",
+        indicatorCode: "B3",
+        submittedBy: "省级审核组",
+        expertGroup: "数据互联互通专家组",
+        priority: "高",
+        status: "待复核",
+        reason: "接口调用成功率接近优秀级边界，需核验统计口径和接口清单完整性。",
+        suggestedScore: null,
+        conclusion: "",
+        submittedAt: "2026-07-27 10:20",
+        completedAt: "",
+      },
+    ],
+    rectifications: [],
+    reviewAssignments: [
+      { id: "RA-H000001", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", reviewer: "审核员A", status: "待审核", risk: "高", submittedAt: "2026-09-28 15:20", issueCount: 2, materialMissing: 1 },
+      { id: "RA-H000002", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", reviewer: "未分派", status: "待分派", risk: "中", submittedAt: "2026-09-29 10:40", issueCount: 1, materialMissing: 2 },
+      { id: "RA-H000003", hospitalCode: "H000003", hospitalName: "区县示例人民医院", reviewer: "审核员B", status: "审核中", risk: "中", submittedAt: "2026-09-26 11:15", issueCount: 3, materialMissing: 1 },
+    ],
+    scoringRules: [
+      { id: "SR-DOMAIN", name: "八大指标域加权计分", type: "权重", status: "启用", owner: "标准规则组", description: "按指标样本得分折算至指标域权重，总分1000分。" },
+      { id: "SR-BOTTOM", name: "底线项等级限制", type: "底线", status: "启用", owner: "安全合规组", description: "重大安全、数据造假、个人信息违规触发后限制高等级。" },
+      { id: "SR-MAPPING", name: "既有评价映射继承", type: "映射", status: "试运行", owner: "标准规则组", description: "电子病历、互联互通、智慧服务既有等级可映射为参考分。" },
+      { id: "SR-APPEAL", name: "复议更正规则", type: "流程", status: "待审批", owner: "评价管理组", description: "结果发布后允许在限定期限内发起申诉复议。" },
+    ],
+    bottomLineRules: [
+      { id: "BL-01", name: "重大网络安全事件", triggered: false, effect: "限制高等级评价" },
+      { id: "BL-02", name: "重大数据安全事件", triggered: false, effect: "限制高等级评价" },
+      { id: "BL-04", name: "数据造假", triggered: false, effect: "取消当期资格或降级" },
+      { id: "BL-06", name: "AI应用无人工复核", triggered: true, effect: "不得作为创新加分依据" },
+    ],
+    appeals: [
+      { id: "AP-H000002-D1", hospitalCode: "H000002", indicatorCode: "D1", reason: "预约诊疗统计周期口径已补充说明", status: "待处理", submittedAt: "2026-12-22 09:30", conclusion: "" },
+    ],
+    exportApprovals: [
+      { id: "EX-001", requester: "省级管理员", packageType: "专家复核包", scope: "H000001", sensitivity: "S3", status: "待审批", requestedAt: "2026-07-27 14:00" },
+      { id: "EX-002", requester: "运维安全员", packageType: "运行监管包", scope: "2026年度", sensitivity: "S2", status: "已通过", requestedAt: "2026-07-27 13:10" },
+    ],
+    systemParams: [
+      { key: "单文件大小上限", value: "200MB", owner: "运维安全员", updatedAt: "2026-07-27 10:00" },
+      { key: "临期催办提前量", value: "7天", owner: "省级管理员", updatedAt: "2026-07-27 10:20" },
+      { key: "导出链接有效期", value: "24小时", owner: "运维安全员", updatedAt: "2026-07-27 11:00" },
+    ],
+    auditLogs: [
+      { at: "2026-07-27 14:00", user: "省级管理员", action: "申请导出专家复核包", target: "H000001", result: "待审批" },
+      { at: "2026-07-27 13:30", user: "审核员A", action: "提交专家复核", target: "B3", result: "已留痕" },
+      { at: "2026-07-27 12:40", user: "医院填报员", action: "上传证据材料", target: "H1", result: "待复核" },
+    ],
+    spotChecks: [
+      { id: "SC-2026-001", batch: "2026第一批国家抽查", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", source: "高风险自动入池", reason: "H1安全合规材料临期且存在底线项提示", sampleRate: "20%", reviewer: "国家抽查组A", status: "待复核", due: "2026-11-20", findings: 0 },
+      { id: "SC-2026-002", batch: "2026第一批国家抽查", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", source: "分层随机抽样", reason: "三级专科医院分层样本", sampleRate: "15%", reviewer: "未分派", status: "待分派", due: "2026-11-22", findings: 0 },
+    ],
+    sandboxConfig: {
+      successRateThreshold: 98,
+      evidenceMinimum: 1,
+      anomalyMultiplier: 1.5,
+    },
+    sandboxRuns: [
+      { id: "SB-20260727-001", ruleName: "接口成功率优秀阈值", version: "候选v2", population: 126, affected: 18, avgDelta: -6.4, gradeChanges: 3, bottomLineHits: 0, status: "待审批", runAt: "2026-07-27 14:20", approvedBy: "" },
+    ],
+    materialClassifications: [
+      { id: "MC-EV-B3-001", materialId: "EV-B3-001", materialName: "接口清单与调用统计.xlsx", suggestedIndicator: "B3", category: "接口与共享统计", confidence: 96, risk: "低", status: "待确认" },
+      { id: "MC-EV-H1-001", materialId: "EV-H1-001", materialName: "等保测评报告.pdf", suggestedIndicator: "H1", category: "安全合规证明", confidence: 98, risk: "高", status: "待确认" },
+    ],
+    peerAnomalies: [
+      { id: "AN-2026-001", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", metric: "接口调用成功率", value: "99.5%", peerMedian: "97.8%", deviation: "+1.7个百分点", level: "中", reason: "显著高于同级综合医院中位数，需核验统计口径", status: "待核验" },
+      { id: "AN-2026-002", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", metric: "线上预约占比", value: "71.2%", peerMedian: "43.5%", deviation: "+27.7个百分点", level: "高", reason: "高于同类专科医院四分位上限", status: "待核验" },
+      { id: "AN-2026-003", hospitalCode: "H000003", hospitalName: "区县示例人民医院", metric: "数据缺失率", value: "2.8%", peerMedian: "0.9%", deviation: "+1.9个百分点", level: "高", reason: "缺失率高于同级医院预警阈值", status: "已转抽查" },
+    ],
+    notifications: [
+      { id: "MSG-001", title: "申报截止前7天提醒", recipient: "大连市示例中心医院", role: "医院管理员", channel: "移动端", priority: "紧急", status: "已送达", createdAt: "2026-09-23 09:00", read: false },
+      { id: "MSG-002", title: "H1安全合规材料即将到期", recipient: "安全专员", role: "医院填报员", channel: "站内信", priority: "高", status: "已读", createdAt: "2026-07-27 13:40", read: true },
+      { id: "MSG-003", title: "省级审核任务已分派", recipient: "审核员A", role: "省级审核员", channel: "短信", priority: "普通", status: "已送达", createdAt: "2026-07-27 12:20", read: false },
+    ],
+    notificationChannels: [
+      { channel: "站内信", enabled: true, scope: "全部业务事件" },
+      { channel: "移动端", enabled: true, scope: "截止、退回、抽查、整改" },
+      { channel: "短信", enabled: true, scope: "紧急与逾期事件" },
+      { channel: "邮件", enabled: false, scope: "日报与周报" },
+    ],
+    importJobs: [
+      { id: "IMP-20260727-001", fileName: "接口共享统计_2026Q2.xlsx", template: "接口共享统计模板v1.2", rows: 1260, accepted: 1248, rejected: 12, status: "部分成功", submittedBy: "接口管理员", submittedAt: "2026-07-27 11:10", report: "12行机构代码或统计周期不符合要求" },
+      { id: "IMP-20260727-002", fileName: "线上服务统计_2026Q2.csv", template: "线上服务统计模板v1.1", rows: 328, accepted: 328, rejected: 0, status: "已入库", submittedBy: "门诊部", submittedAt: "2026-07-27 10:30", report: "校验通过" },
+    ],
+    submissionBatches: [
+      { id: "BATCH-2026-01", name: "2026首批综合试点", region: "辽宁省大连市", standard: "STD-2026-TRIAL", hospitalLevel: "二级及以上公立医院", hospitalCount: 38, status: "填报中", start: "2026-08-01", submitDue: "2026-09-30", reviewDue: "2026-11-15", reportAt: "2026-12-20", submitted: 21, reviewed: 8, owner: "省级评价管理组" },
+      { id: "BATCH-2026-02", name: "安全合规专项试点", region: "辽宁省", standard: "STD-2026-TRIAL", hospitalLevel: "三级公立医院", hospitalCount: 16, status: "待发布", start: "2026-10-10", submitDue: "2026-10-30", reviewDue: "2026-11-30", reportAt: "2026-12-15", submitted: 0, reviewed: 0, owner: "安全合规组" },
+      { id: "BATCH-2026-03", name: "区县医院验证批次", region: "大连市区县", standard: "STD-2026-TRIAL", hospitalLevel: "二级公立医院", hospitalCount: 12, status: "草稿", start: "2026-11-01", submitDue: "2026-11-25", reviewDue: "2026-12-10", reportAt: "2026-12-28", submitted: 0, reviewed: 0, owner: "市级试点专班" },
+    ],
+    uploadQueue: [
+      { id: "UP-20260727-001", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", fileName: "数据治理制度汇编.pdf", materialType: "制度材料", size: "18.4MB", progress: 100, status: "已完成", scanStatus: "病毒扫描通过", classification: "B1/B2/B6", submittedAt: "2026-07-27 14:22", retries: 0 },
+      { id: "UP-20260727-002", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", fileName: "线上服务统计附件.zip", materialType: "统计附件", size: "86.2MB", progress: 80, status: "扫描中", scanStatus: "敏感内容识别中", classification: "待识别", submittedAt: "2026-07-27 14:28", retries: 0 },
+      { id: "UP-20260727-003", hospitalCode: "H000003", hospitalName: "区县示例人民医院", fileName: "电子病历评级证明.pdf", materialType: "评级证明", size: "6.8MB", progress: 35, status: "上传中", scanStatus: "等待扫描", classification: "C1", submittedAt: "2026-07-27 14:31", retries: 0 },
+      { id: "UP-20260727-004", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", fileName: "脱敏日志样本.7z", materialType: "日志样本", size: "142.6MB", progress: 42, status: "失败", scanStatus: "分片校验失败", classification: "H3", submittedAt: "2026-07-27 14:35", retries: 1 },
+    ],
+    reviewerWorkloads: [
+      { id: "WL-001", reviewer: "审核员A", group: "省级综合审核组", capacity: 18, assigned: 16, inProgress: 7, overdue: 2, highRisk: 4, avgHours: 5.6, status: "高负荷" },
+      { id: "WL-002", reviewer: "审核员B", group: "省级综合审核组", capacity: 18, assigned: 11, inProgress: 5, overdue: 0, highRisk: 2, avgHours: 4.2, status: "正常" },
+      { id: "WL-003", reviewer: "专家B", group: "数据互联互通专家组", capacity: 10, assigned: 6, inProgress: 3, overdue: 0, highRisk: 3, avgHours: 7.1, status: "正常" },
+      { id: "WL-004", reviewer: "专家C", group: "安全合规专家组", capacity: 10, assigned: 9, inProgress: 6, overdue: 1, highRisk: 5, avgHours: 8.4, status: "高负荷" },
+    ],
+    dailyReports: [
+      { id: "DR-20260727", date: "2026-07-27", batchId: "BATCH-2026-01", coverage: 38, submitted: 21, submissionRate: 55.3, materials: 1842, uploadPending: 3, validationBlockers: 17, pendingReviews: 30, spotChecks: 2, rectifications: 6, incidents: 1, status: "草稿", generatedAt: "2026-07-27 17:00", publishedAt: "", summary: "申报进度总体正常，材料上传队列存在1项失败，省级综合审核组负荷偏高。" },
+      { id: "DR-20260726", date: "2026-07-26", batchId: "BATCH-2026-01", coverage: 38, submitted: 19, submissionRate: 50.0, materials: 1766, uploadPending: 5, validationBlockers: 22, pendingReviews: 27, spotChecks: 2, rectifications: 4, incidents: 0, status: "已发布", generatedAt: "2026-07-26 17:00", publishedAt: "2026-07-26 17:15", summary: "试点运行平稳，阻断问题较前一日下降，需持续跟踪材料补正。" },
+    ],
+    serviceHealth: [
+      { id: "SVC-GATEWAY", name: "统一业务网关", component: "接入层", availability: 99.98, latency: 86, status: "正常", lastCheck: "2026-07-27 15:20", incidents: 0, sla: 99.9 },
+      { id: "SVC-SUBMISSION", name: "医院申报服务", component: "业务层", availability: 99.96, latency: 128, status: "正常", lastCheck: "2026-07-27 15:20", incidents: 0, sla: 99.9 },
+      { id: "SVC-VALIDATION", name: "规则校验引擎", component: "能力层", availability: 99.72, latency: 642, status: "降级", lastCheck: "2026-07-27 15:19", incidents: 2, sla: 99.9 },
+      { id: "SVC-EVIDENCE", name: "证据材料服务", component: "业务层", availability: 99.91, latency: 214, status: "正常", lastCheck: "2026-07-27 15:20", incidents: 1, sla: 99.9 },
+      { id: "SVC-NOTIFY", name: "消息通知服务", component: "支撑层", availability: 99.84, latency: 356, status: "预警", lastCheck: "2026-07-27 15:18", incidents: 1, sla: 99.8 },
+    ],
+    interfaceHealth: [
+      { id: "API-INSTITUTION", name: "机构基础信息同步", path: "/api/v1/hospitals", consumer: "省级平台", successRate: 99.9, p95: 142, throughput: 126, status: "正常", lastError: "", lastCheck: "2026-07-27 15:20" },
+      { id: "API-SUBMISSION", name: "医院申报数据上报", path: "/api/v1/submissions", consumer: "医疗机构", successRate: 99.4, p95: 486, throughput: 84, status: "预警", lastError: "2项请求因版本号不一致被拒绝", lastCheck: "2026-07-27 15:19" },
+      { id: "API-EVIDENCE", name: "证据材料元数据登记", path: "/api/v1/evidence-materials", consumer: "医疗机构", successRate: 98.8, p95: 920, throughput: 38, status: "异常", lastError: "对象存储签名超时", lastCheck: "2026-07-27 15:18" },
+      { id: "API-RESULT", name: "评价结果下发", path: "/api/v1/evaluation-results", consumer: "省级平台", successRate: 100, p95: 118, throughput: 22, status: "正常", lastError: "", lastCheck: "2026-07-27 15:20" },
+    ],
+    jobQueues: [
+      { id: "QUEUE-UPLOAD", name: "材料上传处理", pending: 18, running: 6, failed: 1, oldestWait: 7, workers: 6, capacity: 120, status: "正常" },
+      { id: "QUEUE-VALIDATION", name: "规则校验任务", pending: 286, running: 12, failed: 4, oldestWait: 34, workers: 12, capacity: 240, status: "拥堵" },
+      { id: "QUEUE-REPORT", name: "日报生成任务", pending: 3, running: 1, failed: 0, oldestWait: 2, workers: 2, capacity: 30, status: "正常" },
+      { id: "QUEUE-NOTIFY", name: "消息发送任务", pending: 96, running: 8, failed: 3, oldestWait: 16, workers: 8, capacity: 180, status: "预警" },
+    ],
+    storagePools: [
+      { id: "STORE-EVIDENCE", name: "证据材料对象存储", purpose: "原始材料与版本", used: 7.6, total: 10, unit: "TB", usage: 76, status: "预警", retention: "评价结束后10年", growthDaily: 86 },
+      { id: "STORE-DATA", name: "业务数据存储", purpose: "申报、审核与结果", used: 3.2, total: 8, unit: "TB", usage: 40, status: "正常", retention: "长期", growthDaily: 24 },
+      { id: "STORE-LOG", name: "审计日志存储", purpose: "操作与安全审计", used: 1.82, total: 2, unit: "TB", usage: 91, status: "高风险", retention: "不少于6个月", growthDaily: 38 },
+      { id: "STORE-BACKUP", name: "备份与容灾存储", purpose: "数据库与配置备份", used: 4.1, total: 12, unit: "TB", usage: 34, status: "正常", retention: "日备30天/月备1年", growthDaily: 18 },
+    ],
+    monitoringAlerts: [
+      { id: "ALT-20260727-001", source: "SVC-VALIDATION", level: "高", title: "规则校验引擎响应时间持续升高", status: "待确认", createdAt: "2026-07-27 15:05", owner: "平台技术组", handledAt: "" },
+      { id: "ALT-20260727-002", source: "QUEUE-VALIDATION", level: "高", title: "规则校验队列积压超过容量阈值", status: "处理中", createdAt: "2026-07-27 15:08", owner: "运维值班组", handledAt: "" },
+      { id: "ALT-20260727-003", source: "STORE-LOG", level: "紧急", title: "审计日志存储使用率超过90%", status: "待确认", createdAt: "2026-07-27 15:12", owner: "安全管理组", handledAt: "" },
+    ],
+    hospitalReadiness: [
+      { id: "READY-H000001", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", coordinator: "王主任", organization: 100, accounts: 100, network: 95, dataMapping: 88, training: 92, readiness: 95, blockers: 0, status: "已就绪", lastUpdated: "2026-07-27 16:20" },
+      { id: "READY-H000002", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", coordinator: "李主任", organization: 100, accounts: 85, network: 82, dataMapping: 68, training: 75, readiness: 82, blockers: 2, status: "推进中", lastUpdated: "2026-07-27 16:10" },
+      { id: "READY-H000003", hospitalCode: "H000003", hospitalName: "区县示例人民医院", coordinator: "赵科长", organization: 80, accounts: 72, network: 55, dataMapping: 48, training: 60, readiness: 63, blockers: 4, status: "有阻塞", lastUpdated: "2026-07-27 15:55" },
+    ],
+    pilotTickets: [
+      { id: "TKT-20260727-001", title: "接口统计模板机构代码校验失败", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", category: "数据口径", priority: "高", status: "处理中", owner: "数据治理组", createdAt: "2026-07-27 10:20", dueAt: "2026-07-27 18:20", slaHours: 8, elapsedHours: 6.5, channel: "试点群", description: "导入模板中的机构代码与平台主数据不一致。" },
+      { id: "TKT-20260727-002", title: "材料分片上传在弱网环境中断", hospitalCode: "H000003", hospitalName: "区县示例人民医院", category: "材料上传", priority: "紧急", status: "待分派", owner: "未分派", createdAt: "2026-07-27 13:05", dueAt: "2026-07-27 17:05", slaHours: 4, elapsedHours: 3.2, channel: "服务热线", description: "大文件上传至42%后中断，需核验断点续传。" },
+      { id: "TKT-20260727-003", title: "H1材料有效期口径需要确认", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", category: "指标口径", priority: "中", status: "待回复", owner: "标准规则组", createdAt: "2026-07-27 14:10", dueAt: "2026-07-28 14:10", slaHours: 24, elapsedHours: 2.1, channel: "在线答疑", description: "等保测评报告跨评价年度时的有效期计算口径待确认。" },
+      { id: "TKT-20260726-004", title: "医院管理员账号权限范围异常", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", category: "账号权限", priority: "高", status: "已解决", owner: "平台技术组", createdAt: "2026-07-26 09:30", dueAt: "2026-07-26 17:30", slaHours: 8, elapsedHours: 3.8, channel: "工单中心", description: "已重建医院管理员数据权限并完成复核。" },
+    ],
+    trainingSessions: [
+      { id: "TRN-20260728-01", title: "医院申报与证据材料实操培训", audience: "医院管理员、填报员", startAt: "2026-07-28 14:00", mode: "线上直播", capacity: 120, enrolled: 96, attended: 0, questions: 8, status: "已发布", owner: "试点培训组", materials: 4 },
+      { id: "TRN-20260730-02", title: "数据模板与接口联调专场", audience: "信息中心、接口管理员", startAt: "2026-07-30 09:30", mode: "线上会议", capacity: 80, enrolled: 52, attended: 0, questions: 5, status: "报名中", owner: "数据治理组", materials: 3 },
+      { id: "TRN-20260725-03", title: "省级审核与问题退回规则培训", audience: "省级管理员、审核员", startAt: "2026-07-25 14:00", mode: "现场+线上", capacity: 60, enrolled: 48, attended: 46, questions: 12, status: "已完成", owner: "评价审核组", materials: 5 },
+    ],
+    pilotReleases: [
+      { id: "REL-0.7.0", version: "v0.7.0", title: "运营监控与告警闭环", scope: "全体试点机构", status: "已发布", plannedAt: "2026-07-27 21:30", publishedAt: "2026-07-27 22:12", owner: "平台技术组", changes: 18, feedbackCount: 3, openFeedback: 2 },
+      { id: "REL-0.8.0-RC1", version: "v0.8.0-rc1", title: "试点协同工作台", scope: "首批3家验证医院", status: "候选", plannedAt: "2026-07-28 18:00", publishedAt: "", owner: "产品与试点组", changes: 15, feedbackCount: 0, openFeedback: 0 },
+    ],
+    pilotFeedback: [
+      { id: "FB-20260727-001", releaseId: "REL-0.7.0", hospitalCode: "H000003", hospitalName: "区县示例人民医院", title: "移动端监控标签希望一屏展示", type: "体验建议", priority: "中", status: "已解决", owner: "产品组", createdAt: "2026-07-27 21:50", resolution: "已调整为移动端四栏等分布局。" },
+      { id: "FB-20260727-002", releaseId: "REL-0.7.0", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", title: "接口告警希望直接关联责任人", type: "功能建议", priority: "高", status: "处理中", owner: "平台技术组", createdAt: "2026-07-27 22:05", resolution: "" },
+      { id: "FB-20260727-003", releaseId: "REL-0.7.0", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", title: "建议增加巡检结果导出", type: "功能建议", priority: "中", status: "待评估", owner: "产品组", createdAt: "2026-07-27 22:08", resolution: "" },
+    ],
+    pilotOutcomeMetrics: [
+      { id: "OUTCOME-PROCESS", name: "试点流程完成率", baseline: 0, current: 85, target: 90, unit: "%", weight: 20, status: "关注", source: "医院申报与审核流程" },
+      { id: "OUTCOME-DATA", name: "数据质量通过率", baseline: 72, current: 91, target: 90, unit: "%", weight: 25, status: "达标", source: "数据校验与补正结果" },
+      { id: "OUTCOME-REVIEW", name: "审核一次通过率", baseline: 0, current: 84, target: 88, unit: "%", weight: 20, status: "关注", source: "省级审核与专家复核" },
+      { id: "OUTCOME-UPTIME", name: "平台运行可用率", baseline: 99, current: 99.92, target: 99.9, unit: "%", weight: 20, status: "达标", source: "运营监控服务健康" },
+      { id: "OUTCOME-SAT", name: "试点用户满意度", baseline: 0, current: 89, target: 90, unit: "%", weight: 15, status: "关注", source: "培训答疑与版本反馈" },
+    ],
+    pilotHospitalOutcomes: [
+      { id: "PHO-H000001", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", processCompletion: 96, dataQuality: 94, auditPassRate: 92, satisfaction: 95, score: 94, status: "可推广", majorIssues: 0, evaluatedAt: "2026-07-27 22:30" },
+      { id: "PHO-H000002", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", processCompletion: 86, dataQuality: 82, auditPassRate: 84, satisfaction: 88, score: 85, status: "条件通过", majorIssues: 2, evaluatedAt: "2026-07-27 22:30" },
+      { id: "PHO-H000003", hospitalCode: "H000003", hospitalName: "区县示例人民医院", processCompletion: 72, dataQuality: 68, auditPassRate: 75, satisfaction: 81, score: 74, status: "需优化", majorIssues: 4, evaluatedAt: "2026-07-27 22:30" },
+    ],
+    pilotIssueThemes: [
+      { id: "THEME-DATA-MAP", category: "数据映射", title: "历史代码与新标准映射不一致", count: 8, impact: "高", rootCause: "医院历史代码体系差异较大，缺少统一映射模板。", owner: "标准与数据组", status: "分析完成", sourceCount: 11, reviewedAt: "2026-07-27 22:35" },
+      { id: "THEME-UPLOAD", category: "材料上传", title: "弱网环境下大文件上传不稳定", count: 5, impact: "高", rootCause: "部分医院出口带宽受限，断点续传参数需优化。", owner: "平台技术组", status: "改进中", sourceCount: 7, reviewedAt: "2026-07-27 22:35" },
+      { id: "THEME-STANDARD", category: "指标口径", title: "复杂指标缺少边界案例说明", count: 7, impact: "中", rootCause: "新标准释义以原则性描述为主，典型案例不足。", owner: "标准规则组", status: "待确认", sourceCount: 9, reviewedAt: "2026-07-27 22:35" },
+      { id: "THEME-ACCESS", category: "账号权限", title: "医院初始角色权限配置偏差", count: 3, impact: "中", rootCause: "初始化角色模板未充分区分医院组织层级。", owner: "系统管理组", status: "已闭环", sourceCount: 4, reviewedAt: "2026-07-27 22:35" },
+    ],
+    pilotImprovementPlans: [
+      { id: "PLAN-DATA-MAP", sourceId: "THEME-DATA-MAP", title: "发布医院代码映射模板与校验工具", source: "数据映射问题复盘", priority: "高", owner: "标准与数据组", targetVersion: "v0.9.1", dueAt: "2026-08-05", status: "进行中", progress: 65, acceptance: "三类医院样例映射通过率达到95%" },
+      { id: "PLAN-UPLOAD", sourceId: "THEME-UPLOAD", title: "优化弱网分片上传与失败重试策略", source: "材料上传问题复盘", priority: "紧急", owner: "平台技术组", targetVersion: "v0.9.1", dueAt: "2026-08-02", status: "待验收", progress: 88, acceptance: "2Mbps网络下500MB文件可稳定续传" },
+      { id: "PLAN-STANDARD", sourceId: "THEME-STANDARD", title: "建设新标准口径案例库", source: "指标口径问题复盘", priority: "高", owner: "标准规则组", targetVersion: "v0.10.0", dueAt: "2026-08-15", status: "待开始", progress: 20, acceptance: "首批30个高频问题形成可检索案例" },
+      { id: "PLAN-ACCESS", sourceId: "THEME-ACCESS", title: "固化医院角色权限初始化模板", source: "账号权限问题复盘", priority: "中", owner: "系统管理组", targetVersion: "v0.9.0", dueAt: "2026-07-28", status: "已完成", progress: 100, acceptance: "三类试点医院权限回归测试通过" },
+    ],
+    rolloutRegions: [
+      { id: "REGION-LN", province: "辽宁省示范区", coordinator: "省级试点办公室", hospitalCount: 12, organization: 92, platform: 90, security: 88, training: 82, dataMigration: 75, readiness: 85, status: "准备中", plannedAt: "2026-08-20", startedAt: "" },
+      { id: "REGION-EAST", province: "华东示范省", coordinator: "省级卫生信息中心", hospitalCount: 20, organization: 85, platform: 88, security: 90, training: 72, dataMigration: 68, readiness: 81, status: "准备中", plannedAt: "2026-09-01", startedAt: "" },
+      { id: "REGION-WEST", province: "西部示范省", coordinator: "省级项目专班", hospitalCount: 18, organization: 78, platform: 70, security: 82, training: 65, dataMigration: 60, readiness: 71, status: "有风险", plannedAt: "2026-09-15", startedAt: "" },
+    ],
+    pilotAssessmentReports: [
+      { id: "ASSESS-2026-PILOT-01", period: "2026年首批试点", version: "v0.8.0", coverage: 3, score: 84, conclusion: "核心评价闭环运行稳定，基本具备扩大试点条件。", recommendation: "优先完成数据映射、弱网传输和指标案例库三项优化后分区域推广。", status: "草稿", generatedAt: "2026-07-27 22:40", publishedAt: "" },
+    ],
+    assistantKnowledgeSources: [
+      { id: "KS-STANDARD", name: "数智医院新标准试点评价规则", version: "STD-2026-TRIAL", type: "标准规则", status: "已启用", chunks: 186, owner: "标准规则组", lastSyncedAt: "2026-07-28 08:30", scope: "57项指标及评分边界" },
+      { id: "KS-EVIDENCE", name: "证据材料目录与有效期规则", version: "EVD-2026-01", type: "材料目录", status: "已启用", chunks: 92, owner: "评价审核组", lastSyncedAt: "2026-07-28 08:30", scope: "材料类型、数量、格式与有效期" },
+      { id: "KS-DATA", name: "数据采集目录与字段口径", version: "DATA-2026-01", type: "数据目录", status: "已启用", chunks: 134, owner: "标准与数据组", lastSyncedAt: "2026-07-28 08:30", scope: "统计模板、代码集与校验规则" },
+      { id: "KS-FAQ", name: "首批试点高频问题案例库", version: "FAQ-2026-07", type: "试点案例", status: "待复核", chunks: 30, owner: "试点培训组", lastSyncedAt: "2026-07-28 08:20", scope: "培训答疑、工单和版本反馈" },
+    ],
+    standardQaRecords: [
+      { id: "QA-20260728-001", hospitalCode: "H000001", question: "H1等保测评报告跨评价年度时如何认定有效期？", answer: "以评价任务提交截止日为基准，报告应处于有效期内；临近失效时需同时提交整改计划或复测安排，最终由审核员确认。", citations: ["H1评价细则第3.2条", "证据材料目录EVD-H1-01"], confidence: 96, askedBy: "医院填报员", askedAt: "2026-07-28 08:42", status: "已确认", scope: "H1 网络安全等级保护" },
+      { id: "QA-20260728-002", hospitalCode: "H000001", question: "B3接口成功率统计是否包含计划内停机？", answer: "接口成功率应按评价期内实际调用统计，计划内停机可在数据质量说明中单列，但不得直接从分母剔除，除非任务规则另有明确配置。", citations: ["B3指标口径第2.4条", "数据采集目录API-STAT-03"], confidence: 91, askedBy: "接口管理员", askedAt: "2026-07-28 09:05", status: "待确认", scope: "B3 院内系统集成和接口治理" },
+      { id: "QA-20260728-003", hospitalCode: "H000002", question: "D6适老化服务需要提供哪些证据？", answer: "建议至少提供适老化页面或终端截图、人工辅助流程、无障碍服务说明及实际服务记录；材料应能证明服务已上线并持续运行。", citations: ["D6指标证据要求", "证据材料目录EVD-D6-01至03"], confidence: 94, askedBy: "医院管理员", askedAt: "2026-07-28 09:20", status: "已回答", scope: "D6 老年人和特殊人群适老化服务" },
+    ],
+    anomalyExplanations: [
+      { id: "AEX-20260728-001", sourceId: "VAL-H000001-B3-RATE", hospitalCode: "H000001", indicatorCode: "B3", title: "接口成功率接近等级边界", summary: "当前接口成功率99.5%，接近优秀级规则阈值，微小口径差异可能影响等级判断。", possibleCause: "失败调用是否重试计数、计划停机是否纳入分母等统计口径尚未完全确认。", impact: "可能影响B3得分及专家复核结论。", recommendation: "核对接口调用日志、失败重试去重规则和统计周期，并补充数据质量说明。", status: "待确认", generatedAt: "2026-07-28 09:30", editable: true },
+      { id: "AEX-20260728-002", sourceId: "VAL-H000002-D1-VOL", hospitalCode: "H000002", indicatorCode: "D1", title: "预约诊疗量较历史同期波动较大", summary: "本期线上预约量较历史同期上升42%，超过历史波动阈值。", possibleCause: "统计渠道扩展、口径调整或业务量真实增长均可能导致波动。", impact: "不会自动扣分，但需要医院说明并由审核员确认。", recommendation: "补充渠道范围、统计口径变更和同期业务量对比。", status: "已编辑", generatedAt: "2026-07-28 09:32", editable: true },
+      { id: "AEX-20260728-003", sourceId: "VAL-H000003-H1-MISSING", hospitalCode: "H000003", indicatorCode: "H1", title: "安全合规证据材料缺失", summary: "H1自评已填写，但未找到有效等保测评报告或复测材料。", possibleCause: "材料尚未上传、材料关联指标错误或报告已过有效期。", impact: "属于提交前阻断项，未处理时无法完成正式申报。", recommendation: "上传有效报告并关联H1；如处于复测期，补充备案证明、整改计划和复测安排。", status: "已采纳", generatedAt: "2026-07-28 09:34", editable: true },
+    ],
+    rectificationSuggestions: [
+      { id: "RSG-20260728-001", sourceId: "AEX-20260728-003", hospitalCode: "H000003", indicatorCode: "H1", problem: "安全合规证据材料缺失", suggestion: "建立等保材料专项补正任务，明确安全管理部门责任人并在提交截止前完成材料复核。", steps: ["核验等保报告有效期", "上传并正确关联H1", "补充整改或复测安排", "提交院内安全负责人复核"], priority: "紧急", owner: "网络安全办", dueDays: 5, disclaimer: "智能建议仅供参考，采纳后仍需医院和审核人员确认。", status: "待采纳", createdAt: "2026-07-28 09:40" },
+      { id: "RSG-20260728-002", sourceId: "AEX-20260728-001", hospitalCode: "H000001", indicatorCode: "B3", problem: "接口成功率统计口径存在边界风险", suggestion: "形成接口统计口径说明，固化失败重试去重规则，并附原始调用汇总供审核复核。", steps: ["导出评价期接口调用汇总", "核验失败重试去重逻辑", "说明计划停机统计方式", "提交专家复核材料"], priority: "高", owner: "信息中心", dueDays: 7, disclaimer: "智能建议仅供参考，不直接改变评分或审核结论。", status: "已采纳", createdAt: "2026-07-28 09:42" },
+      { id: "RSG-20260728-003", sourceId: "AEX-20260728-002", hospitalCode: "H000002", indicatorCode: "D1", problem: "预约诊疗量历史波动异常", suggestion: "补充统计渠道变化和同期业务量对比，区分真实业务增长与口径扩展影响。", steps: ["核对历史统计渠道", "拆分新增渠道预约量", "补充同期业务量趋势", "提交异常波动说明"], priority: "中", owner: "门诊部", dueDays: 10, disclaimer: "智能建议仅供参考，异常说明可由医院编辑。", status: "待采纳", createdAt: "2026-07-28 09:44" },
+    ],
+    reviewRiskSignals: [
+      { id: "RSK-20260728-001", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", indicatorCode: "B3", level: "高", signal: "得分接近规则边界且统计口径待确认", basis: "接口成功率99.5%，距候选优秀阈值不足0.5个百分点。", recommendation: "核验原始调用汇总并提交专家复核。", source: "规则边界与异常解释", status: "已转复核", owner: "数据互联互通专家组", createdAt: "2026-07-28 09:50" },
+      { id: "RSK-20260728-002", hospitalCode: "H000002", hospitalName: "大连市示例专科医院", indicatorCode: "D1", level: "中", signal: "本期数据较历史同期异常增长", basis: "线上预约量同比上升42%，超过历史波动规则阈值。", recommendation: "要求医院补充统计口径和渠道变化说明。", source: "历史波动校验", status: "待确认", owner: "省级审核组", createdAt: "2026-07-28 09:52" },
+      { id: "RSK-20260728-003", hospitalCode: "H000003", hospitalName: "区县示例人民医院", indicatorCode: "H1", level: "高", signal: "关键安全材料缺失", basis: "H1已自评但未检索到有效等保测评报告。", recommendation: "阻断提交并要求补充有效材料。", source: "证据完整性校验", status: "已确认", owner: "安全合规审核组", createdAt: "2026-07-28 09:54" },
+      { id: "RSK-20260728-004", hospitalCode: "H000001", hospitalName: "大连市示例中心医院", indicatorCode: "C1", level: "中", signal: "同一材料可能重复关联多个指标", basis: "材料摘要指纹与另一指标附件高度相似。", recommendation: "人工核验材料是否能够分别支撑对应指标。", source: "材料相似性辅助识别", status: "待确认", owner: "省级审核组", createdAt: "2026-07-28 09:56" },
+    ],
+    confirmed: false,
+    lastValidatedAt: null,
+    operations: {
+      cycle: {
+        year: 2026,
+        name: "2026数智医院新标准试点运行",
+        currentStage: "hospital",
+        archiveStatus: "未归档",
+        publishedAt: "",
+        securityCheckedAt: "",
+      },
+      stages: [
+        { id: "standard", name: "标准发布", owner: "国家级平台", due: "2026-08-10", status: "已完成", description: "发布评价任务、指标版本、评分规则和材料目录。" },
+        { id: "province", name: "省级配置", owner: "省级平台", due: "2026-08-25", status: "已完成", description: "完成地方扩展规则、试点机构范围和审核专家组配置。" },
+        { id: "hospital", name: "医院自评", owner: "医疗机构", due: "2026-09-30", status: "进行中", description: "医院填报指标、上传证据、提交数据质量说明。" },
+        { id: "review", name: "分级审核", owner: "省级/国家级", due: "2026-11-15", status: "待开始", description: "开展数据核验、省级审核、专家复核和国家抽查。" },
+        { id: "feedback", name: "结果反馈", owner: "省级平台", due: "2026-12-20", status: "待开始", description: "发布评价结果、问题清单、整改期限和结果应用建议。" },
+        { id: "archive", name: "年度归档", owner: "国家级平台", due: "2027-01-15", status: "待开始", description: "固化版本、归档证据链、沉淀规则变更和试点报告。" },
+      ],
+      standardVersions: [
+        { id: "STD-2026-TRIAL", name: "数智医院新标准试点评价规则", status: "试运行", effectiveDate: "2026-08-01", owner: "国家级平台", changeCount: 12 },
+        { id: "STD-2025-BASE", name: "既有智慧医院评价映射基线", status: "历史参照", effectiveDate: "2025-01-01", owner: "标准管理组", changeCount: 0 },
+      ],
+      ruleSets: [
+        { id: "RULE-DATA", name: "数据完整性与口径一致性", owner: "数据治理组", enabled: true, violations: 0, lastRun: "" },
+        { id: "RULE-EVIDENCE", name: "证据材料有效期与可追溯", owner: "评价审核组", enabled: true, violations: 0, lastRun: "" },
+        { id: "RULE-SCORE", name: "评分边界与底线项联动", owner: "标准规则组", enabled: true, violations: 0, lastRun: "" },
+        { id: "RULE-SECURITY", name: "安全合规与最小权限", owner: "安全管理组", enabled: true, violations: 0, lastRun: "" },
+      ],
+      securityItems: [
+        { id: "SEC-CLASS", name: "等保与系统定级材料", owner: "安全管理组", status: "待复核", lastCheck: "", risk: "中" },
+        { id: "SEC-PRIVACY", name: "个人信息与脱敏策略", owner: "数据治理组", status: "待复核", lastCheck: "", risk: "中" },
+        { id: "SEC-AUDIT", name: "审计留痕与日志留存", owner: "平台技术组", status: "已通过", lastCheck: "2026-07-27 09:30", risk: "低" },
+        { id: "SEC-BACKUP", name: "备份恢复与容灾演练", owner: "平台技术组", status: "待复核", lastCheck: "", risk: "中" },
+      ],
+      operationLogs: [
+        { at: "2026-07-27 09:30", action: "初始化试点运行任务", actor: "系统管理员", result: "已生成年度周期、标准版本和审核流程。" },
+        { at: "2026-07-27 10:00", action: "导入指标样例", actor: "标准管理组", result: "已载入8个指标域、18个代表性指标。" },
+      ],
+    },
+  };
+
+  function buildDefaultSubmission() {
+    return indicators.reduce((acc, indicator, index) => {
+      const ratio = [0.9, 0.82, 0.76, 0.68, 0.55][index % 5];
+      acc[indicator.code] = {
+        selfScore: Math.round(indicator.max * ratio),
+        reviewedScore: null,
+        evidenceCount: indicator.code === "H1" ? 0 : index % 4 === 0 ? 0 : 1,
+        comment: index % 4 === 0 ? "材料待补充，已安排责任部门整理。" : "已完成自评，材料可支撑审核。",
+        status: "草稿",
+      };
+      return acc;
+    }, {});
+  }
+
+  function cloneSeed() {
+    const next = JSON.parse(JSON.stringify(seedState));
+    next.hospitals.forEach((hospital, hospitalIndex) => {
+      next.submissions[hospital.code] = buildDefaultSubmission();
+      Object.values(next.submissions[hospital.code]).forEach((item, index) => {
+        if (hospitalIndex === 1) item.selfScore = Math.max(1, item.selfScore - (index % 3));
+        if (hospitalIndex === 2) item.selfScore = Math.max(1, item.selfScore - 4);
+      });
+    });
+    if (next.submissions.H000001?.B3) next.submissions.H000001.B3.status = "专家复核";
+    return next;
+  }
+
+  function defaultOperations() {
+    return JSON.parse(JSON.stringify(seedState.operations));
+  }
+
+  function ensureStateShape(next) {
+    if (!next.operations) next.operations = defaultOperations();
+    const baseOperations = defaultOperations();
+    next.operations.cycle = { ...baseOperations.cycle, ...(next.operations.cycle || {}) };
+    next.operations.stages = Array.isArray(next.operations.stages) ? next.operations.stages : baseOperations.stages;
+    next.operations.standardVersions = Array.isArray(next.operations.standardVersions) ? next.operations.standardVersions : baseOperations.standardVersions;
+    next.operations.ruleSets = Array.isArray(next.operations.ruleSets) ? next.operations.ruleSets : baseOperations.ruleSets;
+    next.operations.securityItems = Array.isArray(next.operations.securityItems) ? next.operations.securityItems : baseOperations.securityItems;
+    next.operations.operationLogs = Array.isArray(next.operations.operationLogs) ? next.operations.operationLogs : baseOperations.operationLogs;
+    if (!next.activeRole) next.activeRole = seedState.activeRole;
+    if (!Array.isArray(next.tasks)) next.tasks = JSON.parse(JSON.stringify(seedState.tasks));
+    if (!Array.isArray(next.roles)) next.roles = JSON.parse(JSON.stringify(seedState.roles));
+    if (!Array.isArray(next.users)) next.users = JSON.parse(JSON.stringify(seedState.users));
+    if (!Array.isArray(next.assignments)) next.assignments = JSON.parse(JSON.stringify(seedState.assignments));
+    if (!Array.isArray(next.evidenceMaterials)) next.evidenceMaterials = JSON.parse(JSON.stringify(seedState.evidenceMaterials));
+    if (!Array.isArray(next.reviewAssignments)) next.reviewAssignments = JSON.parse(JSON.stringify(seedState.reviewAssignments));
+    if (!Array.isArray(next.scoringRules)) next.scoringRules = JSON.parse(JSON.stringify(seedState.scoringRules));
+    if (!Array.isArray(next.bottomLineRules)) next.bottomLineRules = JSON.parse(JSON.stringify(seedState.bottomLineRules));
+    if (!Array.isArray(next.appeals)) next.appeals = JSON.parse(JSON.stringify(seedState.appeals));
+    if (!Array.isArray(next.exportApprovals)) next.exportApprovals = JSON.parse(JSON.stringify(seedState.exportApprovals));
+    if (!Array.isArray(next.systemParams)) next.systemParams = JSON.parse(JSON.stringify(seedState.systemParams));
+    if (!Array.isArray(next.auditLogs)) next.auditLogs = JSON.parse(JSON.stringify(seedState.auditLogs));
+    if (!Array.isArray(next.spotChecks)) next.spotChecks = JSON.parse(JSON.stringify(seedState.spotChecks));
+    if (!next.sandboxConfig) next.sandboxConfig = JSON.parse(JSON.stringify(seedState.sandboxConfig));
+    if (!Array.isArray(next.sandboxRuns)) next.sandboxRuns = JSON.parse(JSON.stringify(seedState.sandboxRuns));
+    if (!Array.isArray(next.materialClassifications)) next.materialClassifications = JSON.parse(JSON.stringify(seedState.materialClassifications));
+    if (!Array.isArray(next.peerAnomalies)) next.peerAnomalies = JSON.parse(JSON.stringify(seedState.peerAnomalies));
+    if (!Array.isArray(next.notifications)) next.notifications = JSON.parse(JSON.stringify(seedState.notifications));
+    if (!Array.isArray(next.notificationChannels)) next.notificationChannels = JSON.parse(JSON.stringify(seedState.notificationChannels));
+    if (!Array.isArray(next.importJobs)) next.importJobs = JSON.parse(JSON.stringify(seedState.importJobs));
+    if (!Array.isArray(next.submissionBatches)) next.submissionBatches = JSON.parse(JSON.stringify(seedState.submissionBatches));
+    if (!Array.isArray(next.uploadQueue)) next.uploadQueue = JSON.parse(JSON.stringify(seedState.uploadQueue));
+    if (!Array.isArray(next.reviewerWorkloads)) next.reviewerWorkloads = JSON.parse(JSON.stringify(seedState.reviewerWorkloads));
+    if (!Array.isArray(next.dailyReports)) next.dailyReports = JSON.parse(JSON.stringify(seedState.dailyReports));
+    if (!Array.isArray(next.serviceHealth)) next.serviceHealth = JSON.parse(JSON.stringify(seedState.serviceHealth));
+    if (!Array.isArray(next.interfaceHealth)) next.interfaceHealth = JSON.parse(JSON.stringify(seedState.interfaceHealth));
+    if (!Array.isArray(next.jobQueues)) next.jobQueues = JSON.parse(JSON.stringify(seedState.jobQueues));
+    if (!Array.isArray(next.storagePools)) next.storagePools = JSON.parse(JSON.stringify(seedState.storagePools));
+    if (!Array.isArray(next.monitoringAlerts)) next.monitoringAlerts = JSON.parse(JSON.stringify(seedState.monitoringAlerts));
+    if (!Array.isArray(next.hospitalReadiness)) next.hospitalReadiness = JSON.parse(JSON.stringify(seedState.hospitalReadiness));
+    if (!Array.isArray(next.pilotTickets)) next.pilotTickets = JSON.parse(JSON.stringify(seedState.pilotTickets));
+    if (!Array.isArray(next.trainingSessions)) next.trainingSessions = JSON.parse(JSON.stringify(seedState.trainingSessions));
+    if (!Array.isArray(next.pilotReleases)) next.pilotReleases = JSON.parse(JSON.stringify(seedState.pilotReleases));
+    if (!Array.isArray(next.pilotFeedback)) next.pilotFeedback = JSON.parse(JSON.stringify(seedState.pilotFeedback));
+    if (!Array.isArray(next.pilotOutcomeMetrics)) next.pilotOutcomeMetrics = JSON.parse(JSON.stringify(seedState.pilotOutcomeMetrics));
+    if (!Array.isArray(next.pilotHospitalOutcomes)) next.pilotHospitalOutcomes = JSON.parse(JSON.stringify(seedState.pilotHospitalOutcomes));
+    if (!Array.isArray(next.pilotIssueThemes)) next.pilotIssueThemes = JSON.parse(JSON.stringify(seedState.pilotIssueThemes));
+    if (!Array.isArray(next.pilotImprovementPlans)) next.pilotImprovementPlans = JSON.parse(JSON.stringify(seedState.pilotImprovementPlans));
+    if (!Array.isArray(next.rolloutRegions)) next.rolloutRegions = JSON.parse(JSON.stringify(seedState.rolloutRegions));
+    if (!Array.isArray(next.pilotAssessmentReports)) next.pilotAssessmentReports = JSON.parse(JSON.stringify(seedState.pilotAssessmentReports));
+    if (!Array.isArray(next.assistantKnowledgeSources)) next.assistantKnowledgeSources = JSON.parse(JSON.stringify(seedState.assistantKnowledgeSources));
+    if (!Array.isArray(next.standardQaRecords)) next.standardQaRecords = JSON.parse(JSON.stringify(seedState.standardQaRecords));
+    if (!Array.isArray(next.anomalyExplanations)) next.anomalyExplanations = JSON.parse(JSON.stringify(seedState.anomalyExplanations));
+    if (!Array.isArray(next.rectificationSuggestions)) next.rectificationSuggestions = JSON.parse(JSON.stringify(seedState.rectificationSuggestions));
+    if (!Array.isArray(next.reviewRiskSignals)) next.reviewRiskSignals = JSON.parse(JSON.stringify(seedState.reviewRiskSignals));
+    if (!next.metrics) next.metrics = cloneSeed().metrics;
+    if (!next.submissions) next.submissions = {};
+    if (!Array.isArray(next.validationIssues)) next.validationIssues = [];
+    if (!Array.isArray(next.reviewNotes)) next.reviewNotes = [];
+    if (!Array.isArray(next.expertReviews)) next.expertReviews = [];
+    backfillExpertReviews(next);
+    if (!next.expertReviews.length) {
+      next.expertReviews = JSON.parse(JSON.stringify(seedState.expertReviews));
+      if (!next.reviewNotes.some((note) => note.id === "NOTE-SEED-EXP-B3")) {
+        next.reviewNotes.unshift(JSON.parse(JSON.stringify(seedState.reviewNotes[0])));
+      }
+      if (next.submissions.H000001?.B3) next.submissions.H000001.B3.status = "专家复核";
+    }
+    if (!Array.isArray(next.rectifications)) next.rectifications = [];
+    return next;
+  }
+
+  function backfillExpertReviews(next) {
+    const existing = new Set(next.expertReviews.map((item) => `${item.hospitalCode}-${item.indicatorCode}`));
+    next.reviewNotes
+      .filter((note) => note.status === "专家复核")
+      .forEach((note) => {
+        const key = `${note.hospitalCode}-${note.indicatorCode}`;
+        if (existing.has(key) || note.indicatorCode === "批量") return;
+        next.expertReviews.unshift({
+          id: `EXP-${note.hospitalCode}-${note.indicatorCode}-${Date.now()}`,
+          hospitalCode: note.hospitalCode,
+          indicatorCode: note.indicatorCode,
+          submittedBy: "省级审核组",
+          expertGroup: "专家复核组",
+          priority: "中",
+          status: "待复核",
+          reason: note.text || "省级审核提交专家复核。",
+          suggestedScore: null,
+          conclusion: "",
+          submittedAt: note.at || "",
+          completedAt: "",
+        });
+      });
+  }
+
+  let state = loadState();
+
+  const workspace = document.getElementById("workspace");
+  const viewTitle = document.getElementById("viewTitle");
+  const hospitalSelect = document.getElementById("hospitalSelect");
+  const roleSelect = document.getElementById("roleSelect");
+  const notice = document.getElementById("notice");
+  const sideTaskName = document.getElementById("sideTaskName");
+  const sideTaskStatus = document.getElementById("sideTaskStatus");
+
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return cloneSeed();
+      const parsed = JSON.parse(raw);
+      if (!parsed.submissions || !parsed.metrics) return cloneSeed();
+      return ensureStateShape(parsed);
+    } catch {
+      return cloneSeed();
+    }
+  }
+
+  function saveState() {
+    localStorage.setItem(storageKey, JSON.stringify(state));
+  }
+
+  function activeHospital() {
+    return state.hospitals.find((hospital) => hospital.code === state.selectedHospital) || state.hospitals[0];
+  }
+
+  function activeRole() {
+    return state.roles.find((role) => role.name === state.activeRole) || state.roles[0];
+  }
+
+  function addAudit(action, target, result = "已完成") {
+    state.auditLogs.unshift({
+      at: nowText(),
+      user: state.activeRole,
+      action,
+      target,
+      result,
+    });
+    state.auditLogs = state.auditLogs.slice(0, 40);
+  }
+
+  function submissionForActive() {
+    return submissionForHospital(state.selectedHospital);
+  }
+
+  function submissionForHospital(hospitalCode) {
+    if (!state.submissions[hospitalCode]) state.submissions[hospitalCode] = buildDefaultSubmission();
+    return state.submissions[hospitalCode];
+  }
+
+  function domainName(code) {
+    return domains.find((domain) => domain.code === code)?.name || code;
+  }
+
+  function indicatorByCode(code) {
+    return indicators.find((indicator) => indicator.code === code);
+  }
+
+  function fmt(num) {
+    return new Intl.NumberFormat("zh-CN").format(num);
+  }
+
+  function pct(num, digits = 1) {
+    return `${(num * 100).toFixed(digits)}%`;
+  }
+
+  function nowText() {
+    return new Date().toLocaleString("zh-CN", { hour12: false });
+  }
+
+  function addOperationLog(action, result, actor = "运行管理员") {
+    state.operations.operationLogs.unshift({
+      at: nowText(),
+      action,
+      actor,
+      result,
+    });
+    state.operations.operationLogs = state.operations.operationLogs.slice(0, 20);
+  }
+
+  function operationSummary() {
+    const operations = state.operations;
+    const activeStage = operations.stages.find((stage) => stage.id === operations.cycle.currentStage) || operations.stages[0];
+    const completedStages = operations.stages.filter((stage) => stage.status === "已完成").length;
+    const enabledRules = operations.ruleSets.filter((rule) => rule.enabled).length;
+    const ruleViolations = operations.ruleSets.reduce((sum, rule) => sum + Number(rule.violations || 0), 0);
+    const securityPending = operations.securityItems.filter((item) => item.status !== "已通过").length;
+    return {
+      activeStage,
+      completedStages,
+      enabledRules,
+      ruleViolations,
+      securityPending,
+      progress: operations.stages.length ? completedStages / operations.stages.length : 0,
+    };
+  }
+
+  function expertReviewsForActive(includeDone = true) {
+    return state.expertReviews.filter(
+      (item) => item.hospitalCode === state.selectedHospital && (includeDone || item.status !== "已复核"),
+    );
+  }
+
+  function expertSummary() {
+    const reviews = expertReviewsForActive();
+    return {
+      total: reviews.length,
+      pending: reviews.filter((item) => item.status === "待复核").length,
+      completed: reviews.filter((item) => item.status === "已复核").length,
+      supplement: reviews.filter((item) => item.status === "需补证").length,
+      adjusted: reviews.filter((item) => item.resultType === "调整扣分").length,
+      highPriority: reviews.filter((item) => item.priority === "高" && item.status !== "已复核").length,
+    };
+  }
+
+  function evidenceForActive() {
+    return state.evidenceMaterials.filter((item) => item.hospitalCode === state.selectedHospital);
+  }
+
+  function evidenceSummary() {
+    const materials = evidenceForActive();
+    const indicatorCodes = new Set(materials.map((item) => item.indicatorCode));
+    return {
+      total: materials.length,
+      covered: indicatorCodes.size,
+      pending: materials.filter((item) => item.status !== "已校验").length,
+      sensitive: materials.filter((item) => ["S3", "S4", "S5"].includes(item.sensitivity)).length,
+      expiring: materials.filter((item) => item.expireAt <= "2026-10-01").length,
+    };
+  }
+
+  function taskSummary() {
+    const activeTask = state.tasks.find((task) => task.id === state.task.id) || state.tasks[0];
+    const submitted = state.hospitals.filter((hospital) => {
+      const submission = state.submissions[hospital.code] || {};
+      return Object.values(submission).some((entry) => entry.status === "已提交" || entry.status === "审核通过");
+    }).length;
+    return {
+      activeTask,
+      totalHospitals: activeTask.hospitals.length,
+      submitted,
+      reviewAssigned: state.reviewAssignments.filter((item) => item.reviewer !== "未分派").length,
+      reminders: state.tasks.reduce((sum, task) => sum + Number(task.reminders || 0), 0),
+      extensions: state.tasks.reduce((sum, task) => sum + Number(task.extensionRequests || 0), 0),
+    };
+  }
+
+  function analyticsSummary() {
+    const hospitalScores = state.hospitals.map((hospital) => {
+      const previous = state.selectedHospital;
+      state.selectedHospital = hospital.code;
+      const score = scoreSnapshot();
+      state.selectedHospital = previous;
+      return { ...hospital, score: score.total, grade: score.grade };
+    });
+    const avg = Math.round(hospitalScores.reduce((sum, item) => sum + item.score, 0) / Math.max(1, hospitalScores.length));
+    return {
+      hospitalScores,
+      avg,
+      top: [...hospitalScores].sort((a, b) => b.score - a.score)[0],
+      riskHospitals: state.reviewAssignments.filter((item) => item.risk === "高").length,
+      rectificationOverdue: state.rectifications.filter((item) => item.status !== "复核通过" && item.due && item.due < "2026-12-31").length,
+    };
+  }
+
+  function intelligenceSummary() {
+    return {
+      spotChecksOpen: state.spotChecks.filter((item) => item.status !== "已完成").length,
+      sandboxPending: state.sandboxRuns.filter((item) => item.status === "待审批").length,
+      classificationsPending: state.materialClassifications.filter((item) => item.status !== "已确认").length,
+      anomaliesOpen: state.peerAnomalies.filter((item) => item.status === "待核验").length,
+      unreadMessages: state.notifications.filter((item) => !item.read).length,
+      importRejected: state.importJobs.reduce((sum, item) => sum + Number(item.rejected || 0), 0),
+    };
+  }
+
+  function pilotSummary() {
+    const activeBatch = state.submissionBatches.find((item) => item.status === "填报中") || state.submissionBatches[0];
+    const activeUploads = state.uploadQueue.filter((item) => item.status !== "已完成");
+    const failedUploads = state.uploadQueue.filter((item) => item.status === "失败");
+    const highLoadReviewers = state.reviewerWorkloads.filter((item) => item.status === "高负荷");
+    const latestReport = state.dailyReports[0];
+    return {
+      activeBatch,
+      batchCount: state.submissionBatches.length,
+      submitted: activeBatch?.submitted || 0,
+      submissionRate: activeBatch ? activeBatch.submitted / Math.max(1, activeBatch.hospitalCount) : 0,
+      activeUploads: activeUploads.length,
+      failedUploads: failedUploads.length,
+      highLoadReviewers: highLoadReviewers.length,
+      overdueReviews: state.reviewerWorkloads.reduce((sum, item) => sum + Number(item.overdue || 0), 0),
+      latestReport,
+    };
+  }
+
+  function monitoringSummary() {
+    const degradedServices = state.serviceHealth.filter((item) => item.status !== "正常");
+    const unhealthyInterfaces = state.interfaceHealth.filter((item) => item.status !== "正常");
+    const activeAlerts = state.monitoringAlerts.filter((item) => item.status !== "已关闭");
+    const queueBacklog = state.jobQueues.reduce((sum, item) => sum + Number(item.pending || 0), 0);
+    const storageRisks = state.storagePools.filter((item) => item.status !== "正常");
+    const availability = state.serviceHealth.reduce((sum, item) => sum + Number(item.availability || 0), 0) / Math.max(1, state.serviceHealth.length);
+    return {
+      availability,
+      degradedServices: degradedServices.length,
+      unhealthyInterfaces: unhealthyInterfaces.length,
+      activeAlerts: activeAlerts.length,
+      urgentAlerts: activeAlerts.filter((item) => item.level === "紧急" || item.level === "高").length,
+      queueBacklog,
+      storageRisks: storageRisks.length,
+    };
+  }
+
+  function collaborationSummary() {
+    const averageReadiness = Math.round(
+      state.hospitalReadiness.reduce((sum, item) => sum + Number(item.readiness || 0), 0) / Math.max(1, state.hospitalReadiness.length),
+    );
+    const openTickets = state.pilotTickets.filter((item) => item.status !== "已解决");
+    const upcomingTraining = state.trainingSessions.filter((item) => item.status !== "已完成");
+    const openFeedback = state.pilotFeedback.filter((item) => item.status !== "已解决");
+    return {
+      averageReadiness,
+      readyHospitals: state.hospitalReadiness.filter((item) => item.status === "已就绪").length,
+      blockedHospitals: state.hospitalReadiness.filter((item) => item.status === "有阻塞").length,
+      totalBlockers: state.hospitalReadiness.reduce((sum, item) => sum + Number(item.blockers || 0), 0),
+      openTickets: openTickets.length,
+      urgentTickets: openTickets.filter((item) => item.priority === "紧急" || item.priority === "高").length,
+      unassignedTickets: openTickets.filter((item) => item.owner === "未分派").length,
+      upcomingTraining: upcomingTraining.length,
+      enrolled: upcomingTraining.reduce((sum, item) => sum + Number(item.enrolled || 0), 0),
+      openFeedback: openFeedback.length,
+      latestRelease: state.pilotReleases[0],
+    };
+  }
+
+  function assessmentSummary() {
+    const totalWeight = state.pilotOutcomeMetrics.reduce((sum, item) => sum + Number(item.weight || 0), 0);
+    const weightedScore = state.pilotOutcomeMetrics.reduce((sum, item) => sum + Number(item.current || 0) * Number(item.weight || 0), 0) / Math.max(1, totalWeight);
+    const averageRolloutReadiness = state.rolloutRegions.reduce((sum, item) => sum + Number(item.readiness || 0), 0) / Math.max(1, state.rolloutRegions.length);
+    return {
+      weightedScore: Number(weightedScore.toFixed(1)),
+      metricsMet: state.pilotOutcomeMetrics.filter((item) => item.status === "达标").length,
+      qualifiedHospitals: state.pilotHospitalOutcomes.filter((item) => item.status === "可推广").length,
+      openThemes: state.pilotIssueThemes.filter((item) => item.status !== "已闭环").length,
+      openPlans: state.pilotImprovementPlans.filter((item) => item.status !== "已完成").length,
+      completedPlans: state.pilotImprovementPlans.filter((item) => item.status === "已完成").length,
+      averageRolloutReadiness: Math.round(averageRolloutReadiness),
+      readyRegions: state.rolloutRegions.filter((item) => item.status === "可启动" || item.status === "已启动").length,
+      latestReport: state.pilotAssessmentReports[0],
+    };
+  }
+
+  function assistantSummary() {
+    const pendingQuestions = state.standardQaRecords.filter((item) => item.status !== "已确认");
+    const pendingExplanations = state.anomalyExplanations.filter((item) => item.status === "待确认");
+    const pendingSuggestions = state.rectificationSuggestions.filter((item) => item.status === "待采纳");
+    const openRisks = state.reviewRiskSignals.filter((item) => item.status === "待确认" || item.status === "已确认");
+    return {
+      activeSources: state.assistantKnowledgeSources.filter((item) => item.status === "已启用").length,
+      knowledgeChunks: state.assistantKnowledgeSources.reduce((sum, item) => sum + Number(item.chunks || 0), 0),
+      pendingQuestions: pendingQuestions.length,
+      averageConfidence: Math.round(state.standardQaRecords.reduce((sum, item) => sum + Number(item.confidence || 0), 0) / Math.max(1, state.standardQaRecords.length)),
+      pendingExplanations: pendingExplanations.length,
+      pendingSuggestions: pendingSuggestions.length,
+      adoptedSuggestions: state.rectificationSuggestions.filter((item) => item.status === "已采纳").length,
+      openRisks: openRisks.length,
+      highRisks: openRisks.filter((item) => item.level === "高").length,
+    };
+  }
+
+  function statusClass(status) {
+    if (status === "已完成" || status === "已通过" || status === "已发布" || status === "已归档" || status === "已关闭" || status === "已解决" || status === "已就绪" || status === "已闭环" || status === "已启动" || status === "可启动" || status === "可推广" || status === "达标" || status === "启用" || status === "已启用" || status === "已采纳" || status === "已回答" || status === "已编辑" || status === "已转复核" || status === "已排除" || status === "复核通过" || status === "已校验" || status === "正常") return "";
+    if (status === "进行中" || status === "处理中" || status === "推进中" || status === "关注" || status === "条件通过" || status === "分析完成" || status === "改进中" || status === "待验收" || status === "准备中" || status === "已确认" || status === "待确认" || status === "待采纳" || status === "待分派" || status === "待回复" || status === "待评估" || status === "报名中" || status === "候选" || status === "试运行" || status === "预归档" || status === "填报中" || status === "审核中" || status === "上传中" || status === "扫描中" || status === "排队中" || status === "预警" || status === "降级") return "warn";
+    if (status === "阻断" || status === "有阻塞" || status === "有风险" || status === "需优化" || status === "未达标" || status === "逾期" || status === "高" || status === "紧急" || status === "异常" || status === "故障" || status === "失败" || status === "高负荷" || status === "高风险" || status === "拥堵") return "danger";
+    return "warn";
+  }
+
+  function scoreSnapshot() {
+    const submission = submissionForActive();
+    const byDomain = domains.map((domain) => {
+      const items = indicators.filter((indicator) => indicator.domain === domain.code);
+      const sampleMax = items.reduce((sum, item) => sum + item.max, 0) || 1;
+      const sampleScore = items.reduce((sum, item) => {
+        const entry = submission[item.code];
+        return sum + Number(entry?.reviewedScore ?? entry?.selfScore ?? 0);
+      }, 0);
+      const weightedScore = Math.round((sampleScore / sampleMax) * domain.weight);
+      return {
+        ...domain,
+        sampleMax,
+        sampleScore,
+        weightedScore,
+        ratio: weightedScore / domain.weight,
+      };
+    });
+    const total = byDomain.reduce((sum, domain) => sum + domain.weightedScore, 0);
+    const grade = total >= 900 ? "引领级" : total >= 800 ? "优秀级" : total >= 650 ? "提升级" : total >= 500 ? "基础级" : "整改级";
+    return { byDomain, total, grade };
+  }
+
+  function buildDataPackage(kind) {
+    const hospital = activeHospital();
+    const submission = submissionForActive();
+    const score = scoreSnapshot();
+    const hospitalIssues = state.validationIssues.filter((issue) => issue.hospitalCode === state.selectedHospital);
+    const hospitalReviewNotes = state.reviewNotes.filter((note) => note.hospitalCode === state.selectedHospital);
+    const hospitalExpertReviews = state.expertReviews.filter((item) => item.hospitalCode === state.selectedHospital);
+    const hospitalRectifications = state.rectifications.filter((item) => item.hospitalCode === state.selectedHospital);
+    const hospitalEvidence = state.evidenceMaterials.filter((item) => item.hospitalCode === state.selectedHospital);
+    const indicatorItems = indicators.map((indicator) => {
+      const entry = submission[indicator.code] || {};
+      return {
+        indicatorCode: indicator.code,
+        indicatorName: indicator.name,
+        domain: indicator.domain,
+        maxScore: indicator.max,
+        selfScore: Number(entry.selfScore || 0),
+        reviewedScore: entry.reviewedScore,
+        evidenceCount: Number(entry.evidenceCount || 0),
+        status: entry.status || "草稿",
+        comment: entry.comment || "",
+      };
+    });
+    const meta = {
+      packageType: kind,
+      generatedAt: new Date().toISOString(),
+      taskId: state.task.id,
+      taskName: state.task.name,
+      standardVersion: state.task.standard,
+      hospitalCode: hospital.code,
+      hospitalName: hospital.name,
+      prototypeVersion: "mvp-0.10",
+    };
+    if (kind === "submission") {
+      return {
+        meta,
+        task: state.task,
+        hospitalProfile: hospital,
+        metrics: state.metrics,
+        indicators: indicatorItems,
+        assignments: state.assignments.filter((item) => item.hospitalCode === state.selectedHospital),
+        evidenceMaterials: hospitalEvidence,
+        validationSummary: summarizeIssues(hospitalIssues),
+      };
+    }
+    if (kind === "task") {
+      return {
+        meta,
+        tasks: state.tasks,
+        hospitals: state.hospitals,
+        reviewAssignments: state.reviewAssignments,
+        reminders: state.tasks.map((task) => ({ taskId: task.id, reminders: task.reminders, extensionRequests: task.extensionRequests })),
+      };
+    }
+    if (kind === "evidence") {
+      return {
+        meta,
+        evidenceSummary: evidenceSummary(),
+        evidenceMaterials: hospitalEvidence,
+        missingIndicators: indicators.filter((indicator) => !hospitalEvidence.some((item) => item.indicatorCode === indicator.code)).map((indicator) => indicator.code),
+        exportApprovals: state.exportApprovals.filter((item) => item.scope === state.selectedHospital || item.scope === hospital.code),
+      };
+    }
+    if (kind === "review") {
+      return {
+        meta,
+        reviewStatus: {
+          confirmed: state.confirmed,
+          reviewedCount: indicatorItems.filter((item) => item.reviewedScore !== null).length,
+          totalIndicators: indicatorItems.length,
+        },
+        reviewNotes: hospitalReviewNotes,
+        expertReviews: hospitalExpertReviews,
+        reviewedIndicators: indicatorItems.filter((item) => item.reviewedScore !== null),
+        openIssues: hospitalIssues.filter((issue) => issue.status !== "resolved"),
+      };
+    }
+    if (kind === "expert") {
+      const expertCodes = new Set(hospitalExpertReviews.map((item) => item.indicatorCode));
+      return {
+        meta,
+        expertReviewStatus: expertSummary(),
+        expertReviews: hospitalExpertReviews,
+        relatedReviewNotes: hospitalReviewNotes.filter((note) => expertCodes.has(note.indicatorCode)),
+        relatedIndicators: indicatorItems.filter((item) => expertCodes.has(item.indicatorCode)),
+        openIssues: hospitalIssues.filter((issue) => expertCodes.has(issue.indicatorCode) && issue.status !== "resolved"),
+      };
+    }
+    if (kind === "rectification") {
+      return {
+        meta,
+        scoreResult: {
+          totalScore: score.total,
+          grade: score.grade,
+          domainScores: score.byDomain.map((domain) => ({
+            domainCode: domain.code,
+            domainName: domain.name,
+            weightedScore: domain.weightedScore,
+            weight: domain.weight,
+          })),
+        },
+        rectifications: hospitalRectifications,
+      };
+    }
+    if (kind === "operations") {
+      return {
+        meta,
+        operationSummary: operationSummary(),
+        operations: state.operations,
+        openIssueSummary: summarizeIssues(hospitalIssues),
+        hospitalScope: state.hospitals.map((item) => ({
+          code: item.code,
+          name: item.name,
+          level: item.level,
+          type: item.type,
+          city: item.city,
+        })),
+      };
+    }
+    if (kind === "system") {
+      return {
+        meta,
+        activeRole: activeRole(),
+        roles: state.roles,
+        users: state.users,
+        exportApprovals: state.exportApprovals,
+        systemParams: state.systemParams,
+        auditLogs: state.auditLogs,
+      };
+    }
+    if (kind === "analytics") {
+      return {
+        meta,
+        analyticsSummary: analyticsSummary(),
+        scoringRules: state.scoringRules,
+        bottomLineRules: state.bottomLineRules,
+        appeals: state.appeals,
+      };
+    }
+    if (kind === "intelligence") {
+      return {
+        meta,
+        intelligenceSummary: intelligenceSummary(),
+        spotChecks: state.spotChecks,
+        sandboxConfig: state.sandboxConfig,
+        sandboxRuns: state.sandboxRuns,
+        materialClassifications: state.materialClassifications,
+        peerAnomalies: state.peerAnomalies,
+        notifications: state.notifications,
+        notificationChannels: state.notificationChannels,
+        importJobs: state.importJobs,
+      };
+    }
+    if (kind === "pilot") {
+      return {
+        meta,
+        pilotSummary: pilotSummary(),
+        submissionBatches: state.submissionBatches,
+        uploadQueue: state.uploadQueue,
+        reviewerWorkloads: state.reviewerWorkloads,
+        dailyReports: state.dailyReports,
+      };
+    }
+    if (kind === "monitoring") {
+      return {
+        meta,
+        monitoringSummary: monitoringSummary(),
+        serviceHealth: state.serviceHealth,
+        interfaceHealth: state.interfaceHealth,
+        jobQueues: state.jobQueues,
+        storagePools: state.storagePools,
+        alerts: state.monitoringAlerts,
+      };
+    }
+    if (kind === "collaboration") {
+      return {
+        meta,
+        collaborationSummary: collaborationSummary(),
+        hospitalReadiness: state.hospitalReadiness,
+        pilotTickets: state.pilotTickets,
+        trainingSessions: state.trainingSessions,
+        pilotReleases: state.pilotReleases,
+        pilotFeedback: state.pilotFeedback,
+      };
+    }
+    if (kind === "assessment") {
+      return {
+        meta,
+        assessmentSummary: assessmentSummary(),
+        pilotOutcomeMetrics: state.pilotOutcomeMetrics,
+        pilotHospitalOutcomes: state.pilotHospitalOutcomes,
+        pilotIssueThemes: state.pilotIssueThemes,
+        pilotImprovementPlans: state.pilotImprovementPlans,
+        rolloutRegions: state.rolloutRegions,
+        pilotAssessmentReports: state.pilotAssessmentReports,
+      };
+    }
+    if (kind === "assistant") {
+      return {
+        meta,
+        assistantSummary: assistantSummary(),
+        assistantKnowledgeSources: state.assistantKnowledgeSources,
+        standardQaRecords: state.standardQaRecords,
+        anomalyExplanations: state.anomalyExplanations,
+        rectificationSuggestions: state.rectificationSuggestions,
+        reviewRiskSignals: state.reviewRiskSignals,
+      };
+    }
+    return {
+      meta,
+      task: state.task,
+      tasks: state.tasks,
+      domains,
+      indicators,
+      hospitalProfile: hospital,
+      metrics: state.metrics,
+      assignments: state.assignments,
+      evidenceMaterials: hospitalEvidence,
+      submission: indicatorItems,
+      validationIssues: hospitalIssues,
+      reviewNotes: hospitalReviewNotes,
+      expertReviews: hospitalExpertReviews,
+      scoreResult: score,
+      rectifications: hospitalRectifications,
+      reviewAssignments: state.reviewAssignments,
+      scoringRules: state.scoringRules,
+      bottomLineRules: state.bottomLineRules,
+      appeals: state.appeals,
+      spotChecks: state.spotChecks,
+      sandboxConfig: state.sandboxConfig,
+      sandboxRuns: state.sandboxRuns,
+      materialClassifications: state.materialClassifications,
+      peerAnomalies: state.peerAnomalies,
+      notifications: state.notifications,
+      notificationChannels: state.notificationChannels,
+      importJobs: state.importJobs,
+      submissionBatches: state.submissionBatches,
+      uploadQueue: state.uploadQueue,
+      reviewerWorkloads: state.reviewerWorkloads,
+      dailyReports: state.dailyReports,
+      serviceHealth: state.serviceHealth,
+      interfaceHealth: state.interfaceHealth,
+      jobQueues: state.jobQueues,
+      storagePools: state.storagePools,
+      monitoringAlerts: state.monitoringAlerts,
+      hospitalReadiness: state.hospitalReadiness,
+      pilotTickets: state.pilotTickets,
+      trainingSessions: state.trainingSessions,
+      pilotReleases: state.pilotReleases,
+      pilotFeedback: state.pilotFeedback,
+      pilotOutcomeMetrics: state.pilotOutcomeMetrics,
+      pilotHospitalOutcomes: state.pilotHospitalOutcomes,
+      pilotIssueThemes: state.pilotIssueThemes,
+      pilotImprovementPlans: state.pilotImprovementPlans,
+      rolloutRegions: state.rolloutRegions,
+      pilotAssessmentReports: state.pilotAssessmentReports,
+      assistantKnowledgeSources: state.assistantKnowledgeSources,
+      standardQaRecords: state.standardQaRecords,
+      anomalyExplanations: state.anomalyExplanations,
+      rectificationSuggestions: state.rectificationSuggestions,
+      reviewRiskSignals: state.reviewRiskSignals,
+      roles: state.roles,
+      users: state.users,
+      exportApprovals: state.exportApprovals,
+      auditLogs: state.auditLogs,
+      operations: state.operations,
+    };
+  }
+
+  function summarizeIssues(issues) {
+    return {
+      total: issues.length,
+      open: issues.filter((issue) => issue.status !== "resolved").length,
+      blockers: issues.filter((issue) => issue.severity === "blocker" && issue.status !== "resolved").length,
+      warnings: issues.filter((issue) => issue.severity !== "blocker" && issue.status !== "resolved").length,
+    };
+  }
+
+  function packageKindLabel(kind) {
+    return {
+      submission: "医院申报包",
+      task: "评价任务包",
+      evidence: "证据材料包",
+      review: "省级审核包",
+      expert: "专家复核包",
+      rectification: "整改闭环包",
+      analytics: "统计分析包",
+      intelligence: "智能监管包",
+      pilot: "试点运营包",
+      collaboration: "试点协同包",
+      assessment: "试点评估包",
+      assistant: "评价助手包",
+      monitoring: "运营监控包",
+      system: "系统权限包",
+      operations: "运行监管包",
+      full: "全量状态包",
+    }[kind] || "数据包";
+  }
+
+  function escapeHtml(value) {
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function downloadJsonPackage(kind) {
+    const payload = buildDataPackage(kind);
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${state.selectedHospital}-${state.task.id}-${kind}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    showNotice(`${packageKindLabel(kind)}已生成下载。`);
+  }
+
+  function runValidationRules() {
+    const submission = submissionForActive();
+    const issues = [];
+    indicators.forEach((indicator) => {
+      const entry = submission[indicator.code];
+      const score = Number(entry?.selfScore ?? 0);
+      const evidenceCount = Number(entry?.evidenceCount ?? 0);
+      if (score > indicator.max) {
+        issues.push({
+          id: `VAL-${indicator.code}-SCORE`,
+          hospitalCode: state.selectedHospital,
+          indicatorCode: indicator.code,
+          type: "格式",
+          severity: "blocker",
+          status: "open",
+          description: `自评分${score}超过指标满分${indicator.max}，需修正。`,
+          suggestion: "将自评分调整到指标分值范围内。",
+        });
+      }
+      if (score >= indicator.max * 0.6 && evidenceCount < 1) {
+        issues.push({
+          id: `VAL-${indicator.code}-EVIDENCE`,
+          hospitalCode: state.selectedHospital,
+          indicatorCode: indicator.code,
+          type: "材料",
+          severity: indicator.priority === "P0" ? "blocker" : "warning",
+          status: "open",
+          description: `${indicator.name}已申报得分，但缺少证据材料。`,
+          suggestion: `补充${indicator.evidence}。`,
+        });
+      }
+    });
+
+    if (state.metrics.onlineAppointments > state.metrics.outpatientTotal) {
+      issues.push({
+        id: "VAL-D1-LOGIC",
+        hospitalCode: state.selectedHospital,
+        indicatorCode: "D1",
+        type: "逻辑",
+        severity: "blocker",
+        status: "open",
+        description: "线上预约量大于门诊总量，请核实统计周期和口径。",
+        suggestion: "统一门诊总量和线上预约量统计周期。",
+      });
+    }
+
+    const missingRate = state.metrics.dataTotal > 0 ? state.metrics.missingRecords / state.metrics.dataTotal : 0;
+    if (missingRate > 0.01) {
+      issues.push({
+        id: "VAL-B5-MISSING",
+        hospitalCode: state.selectedHospital,
+        indicatorCode: "B5",
+        type: "数据质量",
+        severity: missingRate > 0.05 ? "blocker" : "warning",
+        status: "open",
+        description: `数据缺失率为${pct(missingRate, 2)}，超过试点建议阈值。`,
+        suggestion: "提交数据质量整改说明，并补充月度质量报告。",
+      });
+    }
+
+    const successRate = state.metrics.interfaceCalls > 0 ? state.metrics.interfaceSuccess / state.metrics.interfaceCalls : 0;
+    if (successRate < 0.98) {
+      issues.push({
+        id: "VAL-B3-SUCCESS",
+        hospitalCode: state.selectedHospital,
+        indicatorCode: "B3",
+        type: "接口",
+        severity: "warning",
+        status: "open",
+        description: `接口成功率为${pct(successRate, 2)}，低于98%。`,
+        suggestion: "核查接口失败原因，并提交稳定性改进说明。",
+      });
+    }
+
+    state.validationIssues = state.validationIssues.filter((issue) => issue.hospitalCode !== state.selectedHospital).concat(issues);
+    state.lastValidatedAt = new Date().toLocaleString("zh-CN", { hour12: false });
+    saveState();
+    showNotice(`已完成校验，发现${issues.length}个问题。`);
+    render();
+  }
+
+  function activeIssues(includeResolved = false) {
+    return state.validationIssues.filter((issue) => issue.hospitalCode === state.selectedHospital && (includeResolved || issue.status !== "resolved"));
+  }
+
+  function progressSnapshot() {
+    const submission = submissionForActive();
+    const total = indicators.length;
+    const filled = indicators.filter((indicator) => Number(submission[indicator.code]?.selfScore ?? 0) > 0).length;
+    const evidenceReady = indicators.filter((indicator) => Number(submission[indicator.code]?.evidenceCount ?? 0) > 0).length;
+    const blockers = activeIssues().filter((issue) => issue.severity === "blocker").length;
+    const reviewed = indicators.filter((indicator) => submission[indicator.code]?.reviewedScore !== null).length;
+    return { total, filled, evidenceReady, blockers, reviewed };
+  }
+
+  function expertGroupForIndicator(indicator) {
+    return (
+      {
+        B: "数据互联互通专家组",
+        C: "智慧医疗专家组",
+        D: "智慧服务专家组",
+        F: "质量安全专家组",
+        G: "创新应用专家组",
+        H: "安全合规专家组",
+      }[indicator.domain] || "综合评价专家组"
+    );
+  }
+
+  function createExpertReview(code, reason = "") {
+    const indicator = indicatorByCode(code);
+    if (!indicator) return null;
+    const existing = state.expertReviews.find(
+      (item) => item.hospitalCode === state.selectedHospital && item.indicatorCode === code && item.status !== "已复核",
+    );
+    if (existing) return existing;
+    const issueCount = activeIssues().filter((issue) => issue.indicatorCode === code).length;
+    const review = {
+      id: `EXP-${state.selectedHospital}-${code}-${Date.now()}`,
+      hospitalCode: state.selectedHospital,
+      indicatorCode: code,
+      submittedBy: "省级审核组",
+      expertGroup: expertGroupForIndicator(indicator),
+      priority: indicator.priority === "P0" || issueCount ? "高" : "中",
+      status: "待复核",
+      reason: reason || `${indicator.name}涉及关键指标或争议口径，需专家确认。`,
+      suggestedScore: null,
+      conclusion: "",
+      submittedAt: nowText(),
+      completedAt: "",
+    };
+    state.expertReviews.unshift(review);
+    return review;
+  }
+
+  function autoCreateExpertReviews() {
+    const submission = submissionForActive();
+    const issueCodes = new Set(activeIssues().map((issue) => issue.indicatorCode));
+    let created = 0;
+    indicators.forEach((indicator) => {
+      const entry = submission[indicator.code];
+      const highScore = Number(entry?.selfScore || 0) >= indicator.max * 0.85;
+      const needsReview = issueCodes.has(indicator.code) || entry?.status === "专家复核" || (indicator.priority === "P0" && highScore);
+      if (!needsReview) return;
+      const before = state.expertReviews.length;
+      createExpertReview(indicator.code, issueCodes.has(indicator.code) ? "关联开放校验或审核问题，需专家复核。" : "关键指标高分申报，需抽样复核口径和证据。");
+      if (state.expertReviews.length > before) created += 1;
+    });
+    saveState();
+    showNotice(created ? `已生成${created}项专家复核任务。` : "暂无新的专家复核任务。");
+    render();
+  }
+
+  function resolveExpertReview(id, resultType) {
+    const review = state.expertReviews.find((item) => item.id === id);
+    if (!review) return;
+    const submission = submissionForHospital(review.hospitalCode);
+    const entry = submission[review.indicatorCode];
+    const indicator = indicatorByCode(review.indicatorCode);
+    if (!entry || !indicator) return;
+    const baseScore = Number(entry.reviewedScore ?? entry.selfScore ?? 0);
+    let finalScore = baseScore;
+    let noteStatus = "专家复核通过";
+    if (resultType === "adjust") {
+      const deduction = Math.max(1, Math.round(indicator.max * 0.12));
+      finalScore = Math.max(0, baseScore - deduction);
+      entry.reviewedScore = finalScore;
+      entry.status = "专家调整";
+      review.status = "已复核";
+      review.resultType = "调整扣分";
+      review.conclusion = `专家确认${indicator.name}证据支撑不足，建议由${baseScore}分调整为${finalScore}分。`;
+      noteStatus = "专家调整";
+    } else if (resultType === "supplement") {
+      entry.reviewedScore = null;
+      entry.status = "专家退回补证";
+      review.status = "需补证";
+      review.resultType = "要求补证";
+      review.conclusion = `专家要求补充${indicator.evidence}，补证后重新提交复核。`;
+      const issueId = `EXP-${review.id}-EVIDENCE`;
+      if (!state.validationIssues.some((issue) => issue.id === issueId)) {
+        state.validationIssues.push({
+          id: issueId,
+          hospitalCode: review.hospitalCode,
+          indicatorCode: review.indicatorCode,
+          type: "专家复核",
+          severity: "warning",
+          status: "open",
+          description: `${indicator.name}经专家复核要求补充证据。`,
+          suggestion: `补充${indicator.evidence}，并说明数据统计口径。`,
+        });
+      }
+      noteStatus = "专家要求补证";
+    } else {
+      entry.reviewedScore = finalScore;
+      entry.status = "专家复核通过";
+      review.status = "已复核";
+      review.resultType = "同意省审";
+      review.conclusion = `专家同意当前审核意见，确认复核分${finalScore}分。`;
+    }
+    review.suggestedScore = resultType === "supplement" ? null : finalScore;
+    review.completedAt = nowText();
+    state.reviewNotes.unshift({
+      id: `NOTE-${Date.now()}`,
+      hospitalCode: review.hospitalCode,
+      indicatorCode: review.indicatorCode,
+      status: noteStatus,
+      text: `${indicator.name}：${review.conclusion}`,
+      at: nowText(),
+    });
+    state.confirmed = false;
+    saveState();
+    showNotice(`${review.indicatorCode} ${noteStatus}。`);
+    render();
+  }
+
+  function showNotice(message) {
+    notice.textContent = message;
+    notice.classList.add("show");
+    window.clearTimeout(showNotice.timer);
+    showNotice.timer = window.setTimeout(() => notice.classList.remove("show"), 3600);
+  }
+
+  function setView(view) {
+    state.activeView = view;
+    saveState();
+    render();
+  }
+
+  function header(title) {
+    viewTitle.textContent = title;
+    sideTaskName.textContent = state.task.name;
+    sideTaskStatus.textContent = state.task.status;
+  }
+
+  function renderHospitalSelect() {
+    hospitalSelect.innerHTML = state.hospitals.map((hospital) => `<option value="${hospital.code}">${hospital.name}</option>`).join("");
+    hospitalSelect.value = state.selectedHospital;
+  }
+
+  function renderRoleSelect() {
+    roleSelect.innerHTML = state.roles.map((role) => `<option value="${role.name}">${role.name}</option>`).join("");
+    roleSelect.value = state.activeRole;
+  }
+
+  function renderNav() {
+    document.querySelectorAll(".nav-item").forEach((button) => {
+      button.classList.toggle("active", button.dataset.view === state.activeView);
+    });
+  }
+
+  function metric(label, value, helper, modifier = "") {
+    return `<article class="metric ${modifier}"><span>${label}</span><strong>${value}</strong><small>${helper}</small></article>`;
+  }
+
+  function renderDashboard() {
+    header("总览");
+    const score = scoreSnapshot();
+    const progress = progressSnapshot();
+    const issues = activeIssues();
+    const expert = expertSummary();
+    const reviewedRate = progress.total ? progress.reviewed / progress.total : 0;
+    workspace.innerHTML = `
+      <div class="grid-4">
+        ${metric("综合预判", `${score.total}分`, `等级：${score.grade}`)}
+        ${metric("申报进度", `${progress.filled}/${progress.total}`, `材料覆盖：${progress.evidenceReady}/${progress.total}`)}
+        ${metric("阻断问题", progress.blockers, issues.length ? `总问题：${issues.length}` : "暂无待处理问题", progress.blockers ? "danger" : "")}
+        ${metric("审核完成", pct(reviewedRate, 0), `已审核指标：${progress.reviewed}`)}
+      </div>
+
+      <section class="panel chart-band">
+        <div>
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">八大指标域得分</h3>
+              <p class="panel-subtitle">按样例指标映射到1000分权重，实时反映填报和审核状态。</p>
+            </div>
+            <span class="status-pill">${activeHospital().level} ${activeHospital().type}</span>
+          </div>
+          <div class="bar-stack">
+            ${score.byDomain
+              .map(
+                (domain) => `
+              <div class="bar-row">
+                <span>${domain.code} ${domain.name}</span>
+                <div class="bar-track" aria-label="${domain.name}得分进度">
+                  <div class="bar-fill" style="width:${Math.min(100, Math.round(domain.ratio * 100))}%"></div>
+                </div>
+                <strong>${domain.weightedScore}</strong>
+              </div>
+            `,
+              )
+              .join("")}
+          </div>
+        </div>
+        <div class="ring" style="--scoreDeg:${Math.min(360, score.total * 0.36)}deg">
+          <div>
+            <strong>${score.total}</strong>
+            <span>综合分</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">评价闭环</h3>
+            <p class="panel-subtitle">当前任务从医院申报推进到专家复核、评分整改和归档运行的主流程状态。</p>
+          </div>
+          <button class="button secondary" type="button" data-action="run-validation">运行校验</button>
+        </div>
+        <div class="flow">
+          ${flowStep("医院画像", true, `${activeHospital().city} ${activeHospital().owner}`)}
+          ${flowStep("指标自评", progress.filled === progress.total, `${progress.filled}/${progress.total}已填`)}
+          ${flowStep("数据校验", !!state.lastValidatedAt, state.lastValidatedAt || "未运行")}
+          ${flowStep("省级审核", progress.reviewed > 0, `${progress.reviewed}/${progress.total}已审`)}
+          ${flowStep("专家复核", expert.pending === 0 && expert.total > 0, expert.total ? `${expert.pending}待复核/${expert.total}项` : "未提交复核")}
+          ${flowStep("结果确认", state.confirmed, state.confirmed ? "已确认" : "待确认")}
+          ${flowStep("整改闭环", state.rectifications.length > 0, `${state.rectifications.length}项整改`)}
+        </div>
+      </section>
+    `;
+  }
+
+  function flowStep(label, done, helper) {
+    const active = !done && (label === "数据校验" || label === "省级审核" || label === "专家复核");
+    return `<div class="flow-step ${done ? "done" : active ? "active" : ""}"><strong>${label}</strong><span>${helper}</span></div>`;
+  }
+
+  function renderTasks() {
+    header("任务管理");
+    const summary = taskSummary();
+    workspace.innerHTML = `
+      <div class="grid-4">
+        ${metric("当前任务", summary.activeTask.name, summary.activeTask.status)}
+        ${metric("参评医院", summary.totalHospitals, summary.activeTask.scope)}
+        ${metric("审核分派", summary.reviewAssigned, "已分派审核任务")}
+        ${metric("催办/延期", `${summary.reminders}/${summary.extensions}`, "催办记录/延期申请")}
+      </div>
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">评价任务台账</h3>
+            <p class="panel-subtitle">支持年度评价、专项评价、试点评价的创建、范围配置、节点管理和催办延期。</p>
+          </div>
+          <div class="toolbar inline">
+            <button class="button secondary" type="button" data-action="create-task">创建专项任务</button>
+            <button class="button ghost" type="button" data-action="send-reminder">发送催办</button>
+            <button class="button ghost" type="button" data-action="approve-extension">审批延期</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>任务</th><th>类型</th><th>范围</th><th>状态</th><th>提交截止</th><th>审核截止</th><th>提醒</th></tr></thead>
+            <tbody>
+              ${state.tasks
+                .map(
+                  (task) => `
+                    <tr>
+                      <td><strong>${task.name}</strong><br><span class="muted-text">${task.id} | ${task.standard}</span></td>
+                      <td>${task.type}</td>
+                      <td>${task.scope}<br>${task.hospitals.length}家机构</td>
+                      <td><span class="status-pill ${statusClass(task.status)}">${task.status}</span></td>
+                      <td>${task.submitDue}</td>
+                      <td>${task.reviewDue}</td>
+                      <td>${task.reminders}次催办 / ${task.extensionRequests}个延期</td>
+                    </tr>
+                  `,
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">医院范围与进度</h3>
+            <p class="panel-subtitle">按医院等级、类别和任务状态查看省级承接范围。</p>
+          </div>
+          <span class="tag">${activeRole().dataScope}</span>
+        </div>
+        <div class="detail-list compact-list">
+          ${state.hospitals
+            .map((hospital) => {
+              const assignment = state.reviewAssignments.find((item) => item.hospitalCode === hospital.code);
+              return `
+                <article class="detail-item">
+                  <header>
+                    <div>
+                      <h4>${hospital.name}</h4>
+                      <p>${hospital.level} ${hospital.type} | ${hospital.city} | 联系人：${hospital.contact}</p>
+                    </div>
+                    <span class="risk ${assignment?.risk === "高" ? "blocker" : "warn"}">${assignment?.risk || "低"}风险</span>
+                  </header>
+                  <p>任务状态：${assignment?.status || "待填报"}；审核员：${assignment?.reviewer || "未分派"}；材料缺失：${assignment?.materialMissing || 0}</p>
+                </article>
+              `;
+            })
+            .join("")}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderPilot() {
+    header("试点运营");
+    const tab = workspace.dataset.pilotTab || "batches";
+    const summary = pilotSummary();
+    const latest = summary.latestReport;
+    const tabs = [
+      { id: "batches", label: "申报批次" },
+      { id: "uploads", label: "上传队列" },
+      { id: "workload", label: "审核负荷" },
+      { id: "reports", label: "运行日报" },
+    ];
+    let content = "";
+
+    if (tab === "batches") {
+      content = `
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">申报批次配置</h3>
+              <p class="panel-subtitle">按地区、医院等级、标准版本和业务节点配置试点申报批次。</p>
+            </div>
+            <div class="toolbar inline">
+              <button class="button secondary" type="button" data-action="create-pilot-batch">新建验证批次</button>
+              <button class="button ghost" type="button" data-action="publish-pilot-batch">发布待办批次</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>批次</th><th>范围</th><th>标准版本</th><th>医院数</th><th>申报进度</th><th>状态</th><th>提交截止</th><th>审核截止</th><th>责任组</th></tr></thead>
+              <tbody>
+                ${state.submissionBatches
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.name}</strong><br /><span class="muted-text">${item.id}</span></td>
+                        <td>${item.region}<br /><span class="muted-text">${item.hospitalLevel}</span></td>
+                        <td>${item.standard}</td>
+                        <td>${item.hospitalCount}</td>
+                        <td>
+                          <div class="queue-progress"><span style="width:${Math.round((item.submitted / Math.max(1, item.hospitalCount)) * 100)}%"></span></div>
+                          <small>${item.submitted}/${item.hospitalCount}已提交 · ${item.reviewed}已审核</small>
+                        </td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td>${item.submitDue}</td>
+                        <td>${item.reviewDue}</td>
+                        <td>${item.owner}</td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "uploads") {
+      content = `
+        <div class="grid-4">
+          ${metric("队列总数", state.uploadQueue.length, "材料上传任务")}
+          ${metric("处理中", summary.activeUploads, "上传、扫描或失败")}
+          ${metric("失败任务", summary.failedUploads, "支持断点续传", summary.failedUploads ? "danger" : "")}
+          ${metric("完成率", pct(state.uploadQueue.filter((item) => item.status === "已完成").length / Math.max(1, state.uploadQueue.length)), "扫描与分类完成")}
+        </div>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">材料上传队列</h3>
+              <p class="panel-subtitle">跟踪分片上传、病毒扫描、敏感内容识别和材料分类。</p>
+            </div>
+            <div class="toolbar inline">
+              <button class="button secondary" type="button" data-action="enqueue-upload">加入上传任务</button>
+              <button class="button ghost" type="button" data-action="advance-upload">推进队列</button>
+              <button class="button ghost" type="button" data-action="retry-upload">重试失败任务</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>任务</th><th>医院</th><th>文件</th><th>类型/大小</th><th>进度</th><th>安全扫描</th><th>材料分类</th><th>状态</th><th>重试</th></tr></thead>
+              <tbody>
+                ${state.uploadQueue
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td>${item.id}<br /><span class="muted-text">${item.submittedAt}</span></td>
+                        <td>${item.hospitalName}</td>
+                        <td><strong>${item.fileName}</strong></td>
+                        <td>${item.materialType}<br /><span class="muted-text">${item.size}</span></td>
+                        <td><div class="queue-progress"><span style="width:${item.progress}%"></span></div><small>${item.progress}%</small></td>
+                        <td>${item.scanStatus}</td>
+                        <td>${item.classification}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td>${item.retries}</td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "workload") {
+      const totalAssigned = state.reviewerWorkloads.reduce((sum, item) => sum + item.assigned, 0);
+      const totalCapacity = state.reviewerWorkloads.reduce((sum, item) => sum + item.capacity, 0);
+      content = `
+        <div class="grid-4">
+          ${metric("审核任务", totalAssigned, `总容量 ${totalCapacity}`)}
+          ${metric("整体负荷", pct(totalAssigned / Math.max(1, totalCapacity)), "按当前分派任务")}
+          ${metric("高负荷人员", summary.highLoadReviewers, "建议自动均衡", summary.highLoadReviewers ? "danger" : "")}
+          ${metric("逾期任务", summary.overdueReviews, "需优先处理", summary.overdueReviews ? "danger" : "")}
+        </div>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">审核负荷监控</h3>
+              <p class="panel-subtitle">综合容量、在审、逾期和高风险任务监控审核组负荷。</p>
+            </div>
+            <div class="toolbar inline">
+              <button class="button secondary" type="button" data-action="balance-workload">自动均衡负荷</button>
+              <button class="button ghost" type="button" data-action="assign-urgent-review">分派紧急任务</button>
+            </div>
+          </div>
+          <div class="workload-grid">
+            ${state.reviewerWorkloads
+              .map((item) => {
+                const utilization = Math.round((item.assigned / Math.max(1, item.capacity)) * 100);
+                return `
+                  <article class="workload-card">
+                    <header><div><strong>${item.reviewer}</strong><span>${item.group}</span></div><span class="status-pill ${item.status === "高负荷" ? "danger" : ""}">${item.status}</span></header>
+                    <div class="queue-progress"><span style="width:${Math.min(100, utilization)}%"></span></div>
+                    <p>${item.assigned}/${item.capacity}项 · 在审${item.inProgress} · 逾期${item.overdue} · 高风险${item.highRisk}</p>
+                    <small>平均处理 ${item.avgHours}小时</small>
+                  </article>
+                `;
+              })
+              .join("")}
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "reports") {
+      content = `
+        <div class="grid-4">
+          ${metric("参评覆盖", `${latest.coverage}家`, latest.batchId)}
+          ${metric("医院提交", `${latest.submitted}家`, `提交率 ${latest.submissionRate}%`)}
+          ${metric("阻断问题", latest.validationBlockers, "待医院补正", latest.validationBlockers ? "danger" : "")}
+          ${metric("待审任务", latest.pendingReviews, `抽查${latest.spotChecks} · 整改${latest.rectifications}`)}
+        </div>
+        <section class="panel report-band">
+          <div>
+            <span class="tag">${latest.date} · ${latest.status}</span>
+            <h3>试点运行日报</h3>
+            <p>${latest.summary}</p>
+          </div>
+          <div class="report-actions">
+            <button class="button secondary" type="button" data-action="generate-daily-report">生成今日日报</button>
+            <button class="button ghost" type="button" data-action="publish-daily-report">发布最新日报</button>
+          </div>
+        </section>
+        <div class="grid-3">
+          <article class="panel"><h3 class="panel-title">材料运行</h3><p class="report-number">${fmt(latest.materials)}</p><span class="muted-text">材料总量 · ${latest.uploadPending}项队列待处理</span></article>
+          <article class="panel"><h3 class="panel-title">审核运行</h3><p class="report-number">${latest.pendingReviews}</p><span class="muted-text">待审核 · ${summary.overdueReviews}项逾期</span></article>
+          <article class="panel"><h3 class="panel-title">运行事件</h3><p class="report-number">${latest.incidents}</p><span class="muted-text">上传失败、高负荷或服务异常</span></article>
+        </div>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">日报历史</h3>
+              <p class="panel-subtitle">日报生成、发布和关键指标变化均进入运行审计。</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>日期</th><th>批次</th><th>提交率</th><th>材料</th><th>阻断</th><th>待审核</th><th>抽查/整改</th><th>事件</th><th>状态</th><th>生成时间</th></tr></thead>
+              <tbody>
+                ${state.dailyReports
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.date}</strong></td>
+                        <td>${item.batchId}</td>
+                        <td>${item.submissionRate}%</td>
+                        <td>${item.materials}</td>
+                        <td>${item.validationBlockers}</td>
+                        <td>${item.pendingReviews}</td>
+                        <td>${item.spotChecks}/${item.rectifications}</td>
+                        <td>${item.incidents}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td>${item.generatedAt}</td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    workspace.innerHTML = `
+      <div class="grid-4">
+        ${metric("当前批次", summary.activeBatch?.name || "-", summary.activeBatch?.status || "未配置")}
+        ${metric("申报进度", pct(summary.submissionRate), `${summary.submitted}/${summary.activeBatch?.hospitalCount || 0}家已提交`)}
+        ${metric("材料队列", summary.activeUploads, `${summary.failedUploads}项失败`, summary.failedUploads ? "danger" : "")}
+        ${metric("审核风险", summary.highLoadReviewers + summary.overdueReviews, "高负荷人员与逾期任务", summary.highLoadReviewers + summary.overdueReviews ? "danger" : "")}
+      </div>
+      <div class="segmented pilot-tabs" role="tablist" aria-label="试点运营功能">
+        ${tabs.map((item) => `<button type="button" role="tab" aria-selected="${item.id === tab}" class="${item.id === tab ? "active" : ""}" data-pilot-tab="${item.id}">${item.label}</button>`).join("")}
+      </div>
+      ${content}
+    `;
+  }
+
+  function renderCollaboration() {
+    header("试点协同");
+    const tab = workspace.dataset.collaborationTab || "readiness";
+    const summary = collaborationSummary();
+    const tabs = [
+      { id: "readiness", label: "医院准备度" },
+      { id: "tickets", label: "问题工单" },
+      { id: "training", label: "培训答疑" },
+      { id: "releases", label: "版本反馈" },
+    ];
+    let content = "";
+
+    if (tab === "readiness") {
+      content = `
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">试点医院准备度</h3>
+              <p class="panel-subtitle">按组织、账号、网络、数据映射和培训五个维度跟踪上线准备情况。</p>
+            </div>
+            <button class="button secondary" type="button" data-action="refresh-readiness">重新评估</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>医院</th><th>协调人</th><th>组织</th><th>账号</th><th>网络</th><th>数据映射</th><th>培训</th><th>综合准备度</th><th>阻塞项</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.hospitalReadiness
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.hospitalName}</strong><br /><span class="muted-text">${item.hospitalCode}</span></td>
+                        <td>${item.coordinator}</td>
+                        <td>${item.organization}%</td>
+                        <td>${item.accounts}%</td>
+                        <td>${item.network}%</td>
+                        <td>${item.dataMapping}%</td>
+                        <td>${item.training}%</td>
+                        <td><div class="queue-progress"><span style="width:${item.readiness}%"></span></div><small>${item.readiness}%</small></td>
+                        <td>${item.blockers}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td><button class="button ghost" type="button" data-action="resolve-readiness-blocker" data-id="${item.id}" ${item.blockers ? "" : "disabled"}>推进阻塞项</button></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "tickets") {
+      content = `
+        <div class="grid-4">
+          ${metric("开放工单", summary.openTickets, "待分派、处理中或待回复")}
+          ${metric("高优先级", summary.urgentTickets, "紧急与高优先级", summary.urgentTickets ? "danger" : "")}
+          ${metric("待分派", summary.unassignedTickets, "需明确责任组", summary.unassignedTickets ? "danger" : "")}
+          ${metric("解决率", pct(state.pilotTickets.filter((item) => item.status === "已解决").length / Math.max(1, state.pilotTickets.length)), "全部试点问题")}
+        </div>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">试点问题工单</h3>
+              <p class="panel-subtitle">统一受理指标口径、数据模板、材料上传、账号权限和接口联调问题。</p>
+            </div>
+            <div class="toolbar inline">
+              <button class="button secondary" type="button" data-action="create-pilot-ticket">登记问题</button>
+              <button class="button ghost" type="button" data-action="assign-pilot-tickets">自动分派</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>工单</th><th>医院</th><th>分类</th><th>优先级</th><th>责任组</th><th>SLA</th><th>渠道</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.pilotTickets
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.title}</strong><br /><span class="muted-text">${item.id} · ${item.createdAt}</span><br /><small>${item.description}</small></td>
+                        <td>${item.hospitalName}</td>
+                        <td>${item.category}</td>
+                        <td><span class="status-pill ${statusClass(item.priority)}">${item.priority}</span></td>
+                        <td>${item.owner}</td>
+                        <td>${item.elapsedHours}/${item.slaHours}小时<br /><span class="muted-text">截止 ${item.dueAt}</span></td>
+                        <td>${item.channel}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td><div class="toolbar inline"><button class="button ghost" type="button" data-action="advance-pilot-ticket" data-id="${item.id}" ${item.status === "已解决" ? "disabled" : ""}>推进</button><button class="button ghost" type="button" data-action="escalate-pilot-ticket" data-id="${item.id}" ${item.status === "已解决" ? "disabled" : ""}>升级</button></div></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "training") {
+      content = `
+        <div class="grid-4">
+          ${metric("待办场次", summary.upcomingTraining, "已发布、报名中或待发布")}
+          ${metric("报名人数", summary.enrolled, "待办培训累计")}
+          ${metric("已完成场次", state.trainingSessions.filter((item) => item.status === "已完成").length, "签到和问答已归档")}
+          ${metric("开放问题", state.trainingSessions.filter((item) => item.status !== "已完成").reduce((sum, item) => sum + item.questions, 0), "培训前收集")}
+        </div>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">培训与集中答疑</h3>
+              <p class="panel-subtitle">面向医院管理员、填报员、接口管理员和审核人员组织分角色培训。</p>
+            </div>
+            <div class="toolbar inline">
+              <button class="button secondary" type="button" data-action="create-training-session">新建场次</button>
+              <button class="button ghost" type="button" data-action="publish-training-session">发布待办场次</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>培训主题</th><th>对象</th><th>时间/方式</th><th>容量</th><th>报名</th><th>签到</th><th>问题</th><th>材料</th><th>责任组</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.trainingSessions
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.title}</strong><br /><span class="muted-text">${item.id}</span></td>
+                        <td>${item.audience}</td>
+                        <td>${item.startAt}<br /><span class="muted-text">${item.mode}</span></td>
+                        <td>${item.capacity}</td>
+                        <td>${item.enrolled}</td>
+                        <td>${item.attended}</td>
+                        <td>${item.questions}</td>
+                        <td>${item.materials}份</td>
+                        <td>${item.owner}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td><div class="toolbar inline"><button class="button ghost" type="button" data-action="record-training-attendance" data-id="${item.id}" ${item.status === "已完成" ? "disabled" : ""}>签到</button><button class="button ghost" type="button" data-action="complete-training-session" data-id="${item.id}" ${item.status === "已完成" ? "disabled" : ""}>完成</button></div></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "releases") {
+      content = `
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">试点版本发布</h3>
+              <p class="panel-subtitle">管理候选版本、验证范围、变更数量和发布反馈。</p>
+            </div>
+            <div class="toolbar inline">
+              <button class="button secondary" type="button" data-action="create-pilot-release">新建候选版本</button>
+              <button class="button ghost" type="button" data-action="publish-pilot-release">发布候选版本</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>版本</th><th>主题</th><th>验证范围</th><th>变更数</th><th>反馈</th><th>开放反馈</th><th>计划时间</th><th>发布时间</th><th>责任组</th><th>状态</th></tr></thead>
+              <tbody>
+                ${state.pilotReleases
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.version}</strong><br /><span class="muted-text">${item.id}</span></td>
+                        <td>${item.title}</td>
+                        <td>${item.scope}</td>
+                        <td>${item.changes}</td>
+                        <td>${item.feedbackCount}</td>
+                        <td>${item.openFeedback}</td>
+                        <td>${item.plannedAt}</td>
+                        <td>${item.publishedAt || "-"}</td>
+                        <td>${item.owner}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">试点反馈台账</h3>
+              <p class="panel-subtitle">将医院反馈关联到具体版本，跟踪评估、处理和解决结论。</p>
+            </div>
+            <button class="button secondary" type="button" data-action="collect-pilot-feedback">模拟收集反馈</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>反馈</th><th>版本</th><th>医院</th><th>类型</th><th>优先级</th><th>责任组</th><th>状态</th><th>处理结论</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.pilotFeedback
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.title}</strong><br /><span class="muted-text">${item.id} · ${item.createdAt}</span></td>
+                        <td>${item.releaseId}</td>
+                        <td>${item.hospitalName}</td>
+                        <td>${item.type}</td>
+                        <td><span class="status-pill ${statusClass(item.priority)}">${item.priority}</span></td>
+                        <td>${item.owner}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td>${item.resolution || "-"}</td>
+                        <td><button class="button ghost" type="button" data-action="resolve-pilot-feedback" data-id="${item.id}" ${item.status === "已解决" ? "disabled" : ""}>解决</button></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    workspace.innerHTML = `
+      <div class="grid-4">
+        ${metric("平均准备度", `${summary.averageReadiness}%`, `${summary.readyHospitals}/${state.hospitalReadiness.length}家已就绪`)}
+        ${metric("医院阻塞", summary.totalBlockers, `${summary.blockedHospitals}家存在阻塞`, summary.blockedHospitals ? "danger" : "")}
+        ${metric("开放工单", summary.openTickets, `${summary.urgentTickets}项高优先级`, summary.urgentTickets ? "danger" : "")}
+        ${metric("版本反馈", summary.openFeedback, `最新 ${summary.latestRelease?.version || "-"}`, summary.openFeedback ? "danger" : "")}
+      </div>
+      <div class="segmented collaboration-tabs" role="tablist" aria-label="试点协同功能">
+        ${tabs.map((item) => `<button type="button" role="tab" aria-selected="${item.id === tab}" class="${item.id === tab ? "active" : ""}" data-collaboration-tab="${item.id}">${item.label}</button>`).join("")}
+      </div>
+      ${content}
+    `;
+  }
+
+  function renderAssessment() {
+    header("试点评估");
+    const tab = workspace.dataset.assessmentTab || "outcomes";
+    const summary = assessmentSummary();
+    const tabs = [
+      { id: "outcomes", label: "成效评估" },
+      { id: "issues", label: "问题复盘" },
+      { id: "plans", label: "优化计划" },
+      { id: "rollout", label: "推广准备" },
+    ];
+    let content = "";
+
+    if (tab === "outcomes") {
+      content = `
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">试点成效指标</h3>
+              <p class="panel-subtitle">汇总流程完成、数据质量、审核效率、平台稳定性和用户满意度。</p>
+            </div>
+            <button class="button secondary" type="button" data-action="recalculate-pilot-outcomes">重新计算成效</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>指标</th><th>数据来源</th><th>基线</th><th>当前值</th><th>目标值</th><th>权重</th><th>完成度</th><th>状态</th></tr></thead>
+              <tbody>
+                ${state.pilotOutcomeMetrics
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.name}</strong><br /><span class="muted-text">${item.id}</span></td>
+                        <td>${item.source}</td>
+                        <td>${item.baseline}${item.unit}</td>
+                        <td><strong>${Number(item.current).toFixed(item.id === "OUTCOME-UPTIME" ? 2 : 0)}${item.unit}</strong></td>
+                        <td>${item.target}${item.unit}</td>
+                        <td>${item.weight}%</td>
+                        <td><div class="queue-progress"><span style="width:${Math.min(100, (item.current / Math.max(1, item.target)) * 100)}%"></span></div><small>${Math.round((item.current / Math.max(1, item.target)) * 100)}%</small></td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">试点医院成效评分</h3>
+              <p class="panel-subtitle">按医院形成流程、数据、审核和满意度综合评分，识别可推广样板。</p>
+            </div>
+            <span class="status-pill">${summary.qualifiedHospitals}/${state.pilotHospitalOutcomes.length}家可推广</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>医院</th><th>流程完成</th><th>数据质量</th><th>审核通过</th><th>满意度</th><th>综合评分</th><th>重大问题</th><th>结论</th><th>评估时间</th></tr></thead>
+              <tbody>
+                ${state.pilotHospitalOutcomes
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.hospitalName}</strong><br /><span class="muted-text">${item.hospitalCode}</span></td>
+                        <td>${item.processCompletion}%</td>
+                        <td>${item.dataQuality}%</td>
+                        <td>${item.auditPassRate}%</td>
+                        <td>${item.satisfaction}%</td>
+                        <td><strong>${item.score}</strong></td>
+                        <td>${item.majorIssues}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td>${item.evaluatedAt}</td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "issues") {
+      content = `
+        <div class="grid-4">
+          ${metric("问题主题", state.pilotIssueThemes.length, "跨工单、反馈与监控归并")}
+          ${metric("开放主题", summary.openThemes, "待确认、分析或改进", summary.openThemes ? "danger" : "")}
+          ${metric("高影响主题", state.pilotIssueThemes.filter((item) => item.impact === "高" && item.status !== "已闭环").length, "优先进入优化计划")}
+          ${metric("来源线索", state.pilotIssueThemes.reduce((sum, item) => sum + item.sourceCount, 0), "已归并问题记录")}
+        </div>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">试点问题主题复盘</h3>
+              <p class="panel-subtitle">将工单、反馈、校验异常和运营告警归并为可治理的问题主题。</p>
+            </div>
+            <button class="button secondary" type="button" data-action="generate-issue-review">重新生成复盘</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>主题</th><th>分类</th><th>问题数</th><th>来源线索</th><th>影响</th><th>根因分析</th><th>责任组</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.pilotIssueThemes
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.title}</strong><br /><span class="muted-text">${item.id} · ${item.reviewedAt}</span></td>
+                        <td>${item.category}</td>
+                        <td>${item.count}</td>
+                        <td>${item.sourceCount}</td>
+                        <td><span class="status-pill ${statusClass(item.impact)}">${item.impact}</span></td>
+                        <td>${item.rootCause}</td>
+                        <td>${item.owner}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td><button class="button ghost" type="button" data-action="close-issue-theme" data-id="${item.id}" ${item.status === "已闭环" ? "disabled" : ""}>确认闭环</button></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "plans") {
+      content = `
+        <div class="grid-4">
+          ${metric("优化事项", state.pilotImprovementPlans.length, "问题主题转行动计划")}
+          ${metric("开放计划", summary.openPlans, "待开始、进行中或待验收", summary.openPlans ? "warn" : "")}
+          ${metric("待验收", state.pilotImprovementPlans.filter((item) => item.status === "待验收").length, "需按验收标准验证")}
+          ${metric("完成率", pct(summary.completedPlans / Math.max(1, state.pilotImprovementPlans.length)), `${summary.completedPlans}项已完成`)}
+        </div>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">试点优化计划</h3>
+              <p class="panel-subtitle">把问题根因转化为有版本、有责任人、有期限和验收标准的改进事项。</p>
+            </div>
+            <button class="button secondary" type="button" data-action="create-improvement-plan">生成优化事项</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>优化事项</th><th>来源</th><th>优先级</th><th>责任组</th><th>目标版本</th><th>截止时间</th><th>验收标准</th><th>进度</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.pilotImprovementPlans
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.title}</strong><br /><span class="muted-text">${item.id}</span></td>
+                        <td>${item.source}</td>
+                        <td><span class="status-pill ${statusClass(item.priority)}">${item.priority}</span></td>
+                        <td>${item.owner}</td>
+                        <td>${item.targetVersion}</td>
+                        <td>${item.dueAt}</td>
+                        <td>${item.acceptance}</td>
+                        <td><div class="queue-progress"><span style="width:${item.progress}%"></span></div><small>${item.progress}%</small></td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td><button class="button ghost" type="button" data-action="advance-improvement-plan" data-id="${item.id}" ${item.status === "已完成" ? "disabled" : ""}>推进</button></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "rollout") {
+      content = `
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">区域推广准备度</h3>
+              <p class="panel-subtitle">按组织、平台、安全、培训和数据迁移五个维度评估推广准入条件。</p>
+            </div>
+            <button class="button secondary" type="button" data-action="assess-rollout-readiness">重新评估准备度</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>推广区域</th><th>协调单位</th><th>医院数</th><th>组织</th><th>平台</th><th>安全</th><th>培训</th><th>数据迁移</th><th>综合准备度</th><th>计划时间</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.rolloutRegions
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.province}</strong><br /><span class="muted-text">${item.id}</span></td>
+                        <td>${item.coordinator}</td>
+                        <td>${item.hospitalCount}</td>
+                        <td>${item.organization}%</td>
+                        <td>${item.platform}%</td>
+                        <td>${item.security}%</td>
+                        <td>${item.training}%</td>
+                        <td>${item.dataMigration}%</td>
+                        <td><div class="queue-progress"><span style="width:${item.readiness}%"></span></div><small>${item.readiness}%</small></td>
+                        <td>${item.plannedAt}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td><div class="toolbar inline"><button class="button ghost" type="button" data-action="advance-rollout-region" data-id="${item.id}" ${item.status === "已启动" ? "disabled" : ""}>推进准备</button><button class="button ghost" type="button" data-action="launch-rollout-region" data-id="${item.id}" ${item.readiness < 85 || item.status === "已启动" ? "disabled" : ""}>启动推广</button></div></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">试点评估报告</h3>
+              <p class="panel-subtitle">固化试点范围、综合得分、评估结论和推广建议，形成管理决策依据。</p>
+            </div>
+            <div class="toolbar inline">
+              <button class="button secondary" type="button" data-action="generate-assessment-report">生成报告</button>
+              <button class="button ghost" type="button" data-action="publish-assessment-report">发布报告</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>报告</th><th>试点周期</th><th>平台版本</th><th>覆盖医院</th><th>综合得分</th><th>评估结论</th><th>推广建议</th><th>生成时间</th><th>发布时间</th><th>状态</th></tr></thead>
+              <tbody>
+                ${state.pilotAssessmentReports
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.id}</strong></td>
+                        <td>${item.period}</td>
+                        <td>${item.version}</td>
+                        <td>${item.coverage}家</td>
+                        <td><strong>${item.score}</strong></td>
+                        <td>${item.conclusion}</td>
+                        <td>${item.recommendation}</td>
+                        <td>${item.generatedAt}</td>
+                        <td>${item.publishedAt || "-"}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    workspace.innerHTML = `
+      <div class="grid-4">
+        ${metric("综合成效", summary.weightedScore, `${summary.metricsMet}/${state.pilotOutcomeMetrics.length}项指标达标`)}
+        ${metric("开放问题主题", summary.openThemes, "复盘后进入优化计划", summary.openThemes ? "danger" : "")}
+        ${metric("开放优化计划", summary.openPlans, `${summary.completedPlans}项已完成`, summary.openPlans ? "warn" : "")}
+        ${metric("推广准备度", `${summary.averageRolloutReadiness}%`, `${summary.readyRegions}/${state.rolloutRegions.length}个区域可启动`)}
+      </div>
+      <div class="segmented assessment-tabs" role="tablist" aria-label="试点评估功能">
+        ${tabs.map((item) => `<button type="button" role="tab" aria-selected="${item.id === tab}" class="${item.id === tab ? "active" : ""}" data-assessment-tab="${item.id}">${item.label}</button>`).join("")}
+      </div>
+      ${content}
+    `;
+  }
+
+  function renderAssistant() {
+    header("评价助手");
+    const tab = workspace.dataset.assistantTab || "qa";
+    const summary = assistantSummary();
+    const tabs = [
+      { id: "qa", label: "标准问答" },
+      { id: "explanations", label: "异常解释" },
+      { id: "suggestions", label: "整改建议" },
+      { id: "risks", label: "审核风险" },
+    ];
+    let content = "";
+
+    if (tab === "qa") {
+      content = `
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">标准知识源</h3>
+              <p class="panel-subtitle">仅使用已登记的标准、材料目录、数据目录和经复核试点案例生成回答。</p>
+            </div>
+            <button class="button secondary" type="button" data-action="sync-assistant-knowledge">同步知识源</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>知识源</th><th>类型</th><th>版本</th><th>覆盖范围</th><th>知识片段</th><th>责任组</th><th>最近同步</th><th>状态</th></tr></thead>
+              <tbody>
+                ${state.assistantKnowledgeSources
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.name}</strong><br /><span class="muted-text">${item.id}</span></td>
+                        <td>${item.type}</td>
+                        <td>${item.version}</td>
+                        <td>${item.scope}</td>
+                        <td>${item.chunks}</td>
+                        <td>${item.owner}</td>
+                        <td>${item.lastSyncedAt}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">标准口径问答</h3>
+              <p class="panel-subtitle">回答必须引用来源，未确认内容不得直接作为填报或审核结论。</p>
+            </div>
+          </div>
+          <div class="toolbar">
+            <label class="field assistant-question-field">
+              <span>问题</span>
+              <input type="text" data-assistant-question value="B3接口成功率统计时，失败重试应如何去重？" />
+            </label>
+            <button class="button secondary" type="button" data-action="ask-standard-question">提交问题</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>问题</th><th>回答</th><th>引用来源</th><th>置信度</th><th>提问人/时间</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.standardQaRecords
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.question}</strong><br /><span class="muted-text">${item.id} · ${item.scope}</span></td>
+                        <td>${item.answer}</td>
+                        <td>${item.citations.map((citation) => `<span class="tag">${citation}</span>`).join(" ")}</td>
+                        <td>${item.confidence}%</td>
+                        <td>${item.askedBy}<br /><span class="muted-text">${item.askedAt}</span></td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td><button class="button ghost" type="button" data-action="confirm-standard-answer" data-id="${item.id}" ${item.status === "已确认" ? "disabled" : ""}>人工确认</button></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "explanations") {
+      content = `
+        <div class="grid-4">
+          ${metric("异常说明", state.anomalyExplanations.length, "关联校验、波动和材料问题")}
+          ${metric("待人工确认", summary.pendingExplanations, "生成结果不可直接提交", summary.pendingExplanations ? "warn" : "")}
+          ${metric("医院可编辑", state.anomalyExplanations.filter((item) => item.editable).length, "编辑后保留原始版本")}
+          ${metric("已采纳", state.anomalyExplanations.filter((item) => item.status === "已采纳").length, "已进入问题处理")}
+        </div>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">异常说明生成</h3>
+              <p class="panel-subtitle">把校验结果转为可读说明，展示可能原因、业务影响和建议核验动作。</p>
+            </div>
+            <button class="button secondary" type="button" data-action="generate-anomaly-explanations">生成异常说明</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>异常</th><th>医院/指标</th><th>说明摘要</th><th>可能原因</th><th>影响</th><th>建议核验</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.anomalyExplanations
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.title}</strong><br /><span class="muted-text">${item.id} · ${item.sourceId}</span></td>
+                        <td>${item.hospitalCode}<br /><strong>${item.indicatorCode}</strong></td>
+                        <td>${item.summary}</td>
+                        <td>${item.possibleCause}</td>
+                        <td>${item.impact}</td>
+                        <td>${item.recommendation}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td><div class="toolbar inline"><button class="button ghost" type="button" data-action="edit-anomaly-explanation" data-id="${item.id}" ${item.status === "已采纳" ? "disabled" : ""}>编辑说明</button><button class="button ghost" type="button" data-action="adopt-anomaly-explanation" data-id="${item.id}" ${item.status === "已采纳" ? "disabled" : ""}>采纳</button></div></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "suggestions") {
+      content = `
+        <div class="grid-4">
+          ${metric("建议模板", state.rectificationSuggestions.length, "从异常和问题生成")}
+          ${metric("待采纳", summary.pendingSuggestions, "需医院责任人确认", summary.pendingSuggestions ? "warn" : "")}
+          ${metric("已采纳", summary.adoptedSuggestions, "已转整改任务")}
+          ${metric("紧急建议", state.rectificationSuggestions.filter((item) => item.priority === "紧急" && item.status !== "已采纳").length, "优先处理")}
+        </div>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">智能整改建议</h3>
+              <p class="panel-subtitle">建议仅供参考，采纳后生成正式整改任务，仍由医院和审核人员确认。</p>
+            </div>
+            <button class="button secondary" type="button" data-action="generate-rectification-suggestion">生成建议</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>问题</th><th>医院/指标</th><th>整改建议</th><th>建议步骤</th><th>优先级</th><th>责任部门</th><th>建议时限</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.rectificationSuggestions
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.problem}</strong><br /><span class="muted-text">${item.id} · ${item.sourceId}</span></td>
+                        <td>${item.hospitalCode}<br /><strong>${item.indicatorCode}</strong></td>
+                        <td>${item.suggestion}<br /><small>${item.disclaimer}</small></td>
+                        <td>${item.steps.map((step, index) => `${index + 1}. ${step}`).join("<br />")}</td>
+                        <td><span class="status-pill ${statusClass(item.priority)}">${item.priority}</span></td>
+                        <td>${item.owner}</td>
+                        <td>${item.dueDays}天</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td><button class="button ghost" type="button" data-action="adopt-rectification-suggestion" data-id="${item.id}" ${item.status === "已采纳" ? "disabled" : ""}>采纳并转任务</button></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "risks") {
+      content = `
+        <div class="grid-4">
+          ${metric("风险线索", state.reviewRiskSignals.length, "规则、材料与历史波动")}
+          ${metric("开放风险", summary.openRisks, "待确认或已确认", summary.openRisks ? "danger" : "")}
+          ${metric("高风险", summary.highRisks, "建议转专家或专项复核", summary.highRisks ? "danger" : "")}
+          ${metric("已排除", state.reviewRiskSignals.filter((item) => item.status === "已排除").length, "人工核验后排除")}
+        </div>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">审核风险提示</h3>
+              <p class="panel-subtitle">风险线索不直接形成审核结论，必须由审核员确认、排除或转专家复核。</p>
+            </div>
+            <button class="button secondary" type="button" data-action="scan-review-risks">重新扫描风险</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>风险信号</th><th>医院/指标</th><th>级别</th><th>识别依据</th><th>建议动作</th><th>来源</th><th>责任组</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.reviewRiskSignals
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.signal}</strong><br /><span class="muted-text">${item.id} · ${item.createdAt}</span></td>
+                        <td>${item.hospitalName}<br /><strong>${item.indicatorCode}</strong></td>
+                        <td><span class="status-pill ${statusClass(item.level)}">${item.level}</span></td>
+                        <td>${item.basis}</td>
+                        <td>${item.recommendation}</td>
+                        <td>${item.source}</td>
+                        <td>${item.owner}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td><div class="toolbar inline"><button class="button ghost" type="button" data-action="confirm-review-risk" data-id="${item.id}" ${item.status !== "待确认" ? "disabled" : ""}>确认</button><button class="button ghost" type="button" data-action="dismiss-review-risk" data-id="${item.id}" ${item.status === "已排除" || item.status === "已转复核" ? "disabled" : ""}>排除</button><button class="button ghost" type="button" data-action="review-risk-to-expert" data-id="${item.id}" ${item.status === "已转复核" || item.status === "已排除" ? "disabled" : ""}>转专家</button></div></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    workspace.innerHTML = `
+      <div class="grid-4">
+        ${metric("知识源", `${summary.activeSources}/${state.assistantKnowledgeSources.length}`, `${summary.knowledgeChunks}个知识片段`)}
+        ${metric("待确认问答", summary.pendingQuestions, `平均置信度${summary.averageConfidence}%`, summary.pendingQuestions ? "warn" : "")}
+        ${metric("待采纳建议", summary.pendingSuggestions, `${summary.adoptedSuggestions}项已转整改`, summary.pendingSuggestions ? "warn" : "")}
+        ${metric("开放审核风险", summary.openRisks, `${summary.highRisks}项高风险`, summary.highRisks ? "danger" : "")}
+      </div>
+      <div class="segmented assistant-tabs" role="tablist" aria-label="评价助手功能">
+        ${tabs.map((item) => `<button type="button" role="tab" aria-selected="${item.id === tab}" class="${item.id === tab ? "active" : ""}" data-assistant-tab="${item.id}">${item.label}</button>`).join("")}
+      </div>
+      ${content}
+    `;
+  }
+
+  function renderMonitoring() {
+    header("运营监控");
+    const tab = workspace.dataset.monitoringTab || "services";
+    const summary = monitoringSummary();
+    const tabs = [
+      { id: "services", label: "服务监控" },
+      { id: "interfaces", label: "接口健康" },
+      { id: "queues", label: "任务队列" },
+      { id: "storage", label: "存储容量" },
+    ];
+    let content = "";
+
+    if (tab === "services") {
+      content = `
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">核心服务可用性</h3>
+              <p class="panel-subtitle">监控服务可用率、响应时延、SLA和当日事件，并支持快速恢复。</p>
+            </div>
+            <button class="button secondary" type="button" data-action="run-monitoring-check">立即巡检</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>服务</th><th>组件</th><th>可用率</th><th>SLA</th><th>响应时延</th><th>当日事件</th><th>状态</th><th>最近检测</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.serviceHealth
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.name}</strong><br /><span class="muted-text">${item.id}</span></td>
+                        <td>${item.component}</td>
+                        <td>${item.availability.toFixed(2)}%</td>
+                        <td>${item.sla}%</td>
+                        <td>${item.latency}ms</td>
+                        <td>${item.incidents}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td>${item.lastCheck}</td>
+                        <td><button class="button ghost" type="button" data-action="recover-service" data-id="${item.id}" ${item.status === "正常" ? "disabled" : ""}>恢复</button></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "interfaces") {
+      content = `
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">接口健康度</h3>
+              <p class="panel-subtitle">按调用方监测成功率、P95时延、吞吐和最近错误。</p>
+            </div>
+            <button class="button secondary" type="button" data-action="probe-interfaces">批量探测</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>接口</th><th>路径</th><th>调用方</th><th>成功率</th><th>P95</th><th>吞吐/分钟</th><th>最近错误</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.interfaceHealth
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.name}</strong><br /><span class="muted-text">${item.id}</span></td>
+                        <td><code>${item.path}</code></td>
+                        <td>${item.consumer}</td>
+                        <td>${item.successRate.toFixed(1)}%</td>
+                        <td>${item.p95}ms</td>
+                        <td>${item.throughput}</td>
+                        <td>${item.lastError || "无"}<br /><span class="muted-text">${item.lastCheck}</span></td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td><button class="button ghost" type="button" data-action="retry-interface" data-id="${item.id}" ${item.status === "正常" ? "disabled" : ""}>重试</button></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "queues") {
+      content = `
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">异步任务队列</h3>
+              <p class="panel-subtitle">监控积压、失败、最长等待和工作进程容量。</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>队列</th><th>待处理</th><th>运行中</th><th>失败</th><th>最长等待</th><th>工作进程</th><th>容量</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.jobQueues
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.name}</strong><br /><span class="muted-text">${item.id}</span></td>
+                        <td>${item.pending}</td>
+                        <td>${item.running}</td>
+                        <td>${item.failed}</td>
+                        <td>${item.oldestWait}分钟</td>
+                        <td>${item.workers}</td>
+                        <td><div class="queue-progress"><span style="width:${Math.min(100, Math.round((item.pending / Math.max(1, item.capacity)) * 100))}%"></span></div><small>${item.pending}/${item.capacity}</small></td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td><div class="toolbar inline"><button class="button ghost" type="button" data-action="scale-queue" data-id="${item.id}">扩容</button><button class="button ghost" type="button" data-action="prioritize-queue" data-id="${item.id}" ${item.pending === 0 ? "disabled" : ""}>提速</button></div></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "storage") {
+      content = `
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">存储容量与留存</h3>
+              <p class="panel-subtitle">跟踪业务、证据、审计与备份存储的容量、增长和留存策略。</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>存储池</th><th>用途</th><th>已用/总量</th><th>使用率</th><th>日增长</th><th>留存策略</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.storagePools
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.name}</strong><br /><span class="muted-text">${item.id}</span></td>
+                        <td>${item.purpose}</td>
+                        <td>${item.used}/${item.total}${item.unit}</td>
+                        <td><div class="queue-progress"><span style="width:${item.usage}%"></span></div><small>${item.usage}%</small></td>
+                        <td>${item.growthDaily}GB</td>
+                        <td>${item.retention}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td><div class="toolbar inline"><button class="button ghost" type="button" data-action="expand-storage" data-id="${item.id}">扩容</button><button class="button ghost" type="button" data-action="clean-storage" data-id="${item.id}">清理</button></div></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    workspace.innerHTML = `
+      <div class="grid-4">
+        ${metric("服务可用率", `${summary.availability.toFixed(2)}%`, `${summary.degradedServices}项服务需关注`, summary.degradedServices ? "danger" : "")}
+        ${metric("接口异常", summary.unhealthyInterfaces, "预警与异常接口", summary.unhealthyInterfaces ? "danger" : "")}
+        ${metric("队列积压", summary.queueBacklog, "全部异步任务")}
+        ${metric("开放告警", summary.activeAlerts, `${summary.urgentAlerts}项高优先级`, summary.urgentAlerts ? "danger" : "")}
+      </div>
+      <div class="segmented monitoring-tabs" role="tablist" aria-label="运营监控功能">
+        ${tabs.map((item) => `<button type="button" role="tab" aria-selected="${item.id === tab}" class="${item.id === tab ? "active" : ""}" data-monitoring-tab="${item.id}">${item.label}</button>`).join("")}
+      </div>
+      ${content}
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">统一告警处置</h3>
+            <p class="panel-subtitle">告警确认、处置和关闭过程进入审计留痕。</p>
+          </div>
+          <span class="status-pill ${summary.urgentAlerts ? "danger" : ""}">${summary.activeAlerts}项开放</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>告警</th><th>来源</th><th>级别</th><th>责任组</th><th>发生时间</th><th>状态</th><th>处置时间</th><th>操作</th></tr></thead>
+            <tbody>
+              ${state.monitoringAlerts
+                .map(
+                  (item) => `
+                    <tr>
+                      <td><strong>${item.title}</strong><br /><span class="muted-text">${item.id}</span></td>
+                      <td>${item.source}</td>
+                      <td><span class="status-pill ${statusClass(item.level)}">${item.level}</span></td>
+                      <td>${item.owner}</td>
+                      <td>${item.createdAt}</td>
+                      <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                      <td>${item.handledAt || "-"}</td>
+                      <td><button class="button ghost" type="button" data-action="ack-monitoring-alert" data-id="${item.id}" ${item.status === "已关闭" || item.status === "已确认" ? "disabled" : ""}>确认</button></td>
+                    </tr>
+                  `,
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderStandards() {
+    header("标准指标");
+    const selectedDomain = workspace.dataset.domain || "全部";
+    const selectedPriority = workspace.dataset.priority || "全部";
+    const search = workspace.dataset.search || "";
+    const rows = indicators.filter((indicator) => {
+      const matchDomain = selectedDomain === "全部" || indicator.domain === selectedDomain;
+      const matchPriority = selectedPriority === "全部" || indicator.priority === selectedPriority;
+      const matchSearch = !search || `${indicator.code}${indicator.name}${indicator.evidence}`.includes(search);
+      return matchDomain && matchPriority && matchSearch;
+    });
+    workspace.innerHTML = `
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">指标库样例</h3>
+            <p class="panel-subtitle">当前发布版已载入完整${indicators.length}项试点指标，覆盖八大指标域、权重、采集方式和证据要求。</p>
+          </div>
+          <span class="tag">标准版本 ${state.task.standard}</span>
+        </div>
+        <div class="toolbar">
+          <label class="field">
+            <span>指标域</span>
+            <select data-filter="domain">
+              <option>全部</option>
+              ${domains.map((domain) => `<option value="${domain.code}" ${selectedDomain === domain.code ? "selected" : ""}>${domain.code} ${domain.name}</option>`).join("")}
+            </select>
+          </label>
+          <label class="field">
+            <span>优先级</span>
+            <select data-filter="priority">
+              ${["全部", "P0", "P1", "P2"].map((p) => `<option ${selectedPriority === p ? "selected" : ""}>${p}</option>`).join("")}
+            </select>
+          </label>
+          <label class="field">
+            <span>关键词</span>
+            <input data-filter="search" value="${search}" placeholder="指标名称、编码、证据" />
+          </label>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>编码</th><th>一级指标域</th><th>指标名称</th><th>分值</th><th>评分</th><th>采集</th><th>证据要求</th><th>优先级</th></tr>
+            </thead>
+            <tbody>
+              ${rows
+                .map(
+                  (indicator) => `
+                <tr>
+                  <td><strong>${indicator.code}</strong></td>
+                  <td>${domainName(indicator.domain)}</td>
+                  <td>${indicator.name}</td>
+                  <td>${indicator.max}</td>
+                  <td>${indicator.method}</td>
+                  <td>${indicator.source}</td>
+                  <td>${indicator.evidence}</td>
+                  <td><span class="priority">${indicator.priority}</span></td>
+                </tr>
+              `,
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderSubmission() {
+    header("医院申报");
+    const hospital = activeHospital();
+    const submission = submissionForActive();
+    const progress = progressSnapshot();
+    workspace.innerHTML = `
+      <div class="grid-3">
+        ${metric("当前医院", hospital.name, `${hospital.level} ${hospital.type} | ${hospital.city}`)}
+        ${metric("已填指标", `${progress.filled}/${progress.total}`, "自评分大于0视为已填")}
+        ${metric("证据覆盖", `${progress.evidenceReady}/${progress.total}`, "至少1份材料视为已覆盖")}
+      </div>
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">指标自评填报</h3>
+            <p class="panel-subtitle">黄色字段为可编辑区，调整后自动保存到浏览器本地。</p>
+          </div>
+          <button class="button secondary" type="button" data-action="mark-submitted">提交申报</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>指标</th><th>名称</th><th>满分</th><th>自评分</th><th>材料数</th><th>说明</th><th>状态</th></tr>
+            </thead>
+            <tbody>
+              ${indicators
+                .map((indicator) => {
+                  const entry = submission[indicator.code];
+                  return `
+                    <tr>
+                      <td><strong>${indicator.code}</strong></td>
+                      <td>${indicator.name}<br /><small>${domainName(indicator.domain)}</small></td>
+                      <td>${indicator.max}</td>
+                      <td><input class="input-zone score-input" type="number" min="0" max="${indicator.max}" value="${entry.selfScore}" data-update-score="${indicator.code}" /></td>
+                      <td><input class="input-zone score-input" type="number" min="0" max="20" value="${entry.evidenceCount}" data-update-evidence="${indicator.code}" /></td>
+                      <td><textarea class="input-zone" data-update-comment="${indicator.code}">${entry.comment}</textarea></td>
+                      <td><span class="status-pill ${entry.status === "已提交" ? "" : "warn"}">${entry.status}</span></td>
+                    </tr>
+                  `;
+                })
+                .join("")}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderEvidence() {
+    header("证据材料");
+    const summary = evidenceSummary();
+    const materials = evidenceForActive();
+    workspace.innerHTML = `
+      <div class="grid-4">
+        ${metric("材料总数", summary.total, "当前医院已上传")}
+        ${metric("指标覆盖", `${summary.covered}/${indicators.length}`, "至少1份材料")}
+        ${metric("待复核", summary.pending, "格式、版本或敏感审批")}
+        ${metric("高敏材料", summary.sensitive, `${summary.expiring}份临近过期`)}
+      </div>
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">材料台账</h3>
+            <p class="panel-subtitle">材料按任务、医院、指标关联，支持版本、敏感级别、水印和导出审批。</p>
+          </div>
+          <div class="toolbar inline">
+            <button class="button secondary" type="button" data-action="add-evidence">模拟上传材料</button>
+            <button class="button ghost" type="button" data-action="approve-export">审批敏感导出</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>材料</th><th>关联指标</th><th>类型/版本</th><th>敏感级别</th><th>状态</th><th>有效期</th><th>操作</th></tr></thead>
+            <tbody>
+              ${materials
+                .map(
+                  (item) => `
+                    <tr>
+                      <td><strong>${item.name}</strong><br><span class="muted-text">${item.uploadedBy} | ${item.uploadedAt}</span></td>
+                      <td>${item.indicatorCode} ${indicatorByCode(item.indicatorCode)?.name || ""}</td>
+                      <td>${item.type} / v${item.version}</td>
+                      <td><span class="risk ${["S4", "S5"].includes(item.sensitivity) ? "blocker" : "warn"}">${item.sensitivity}</span></td>
+                      <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                      <td>${item.expireAt}</td>
+                      <td>
+                        <div class="toolbar inline">
+                          <button class="button ghost" type="button" data-action="verify-evidence" data-id="${item.id}">校验</button>
+                          <button class="button ghost" type="button" data-action="version-evidence" data-id="${item.id}">新版本</button>
+                        </div>
+                      </td>
+                    </tr>
+                  `,
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">指标材料缺口</h3>
+            <p class="panel-subtitle">按证据目录自动识别缺材料指标，支持提交前自查。</p>
+          </div>
+          <span class="tag">缺口 ${Math.max(0, indicators.length - summary.covered)} 项</span>
+        </div>
+        <div class="detail-list compact-list">
+          ${indicators
+            .filter((indicator) => !materials.some((item) => item.indicatorCode === indicator.code))
+            .slice(0, 8)
+            .map(
+              (indicator) => `
+                <article class="detail-item">
+                  <header>
+                    <div>
+                      <h4>${indicator.code} ${indicator.name}</h4>
+                      <p>${indicator.evidence}</p>
+                    </div>
+                    <span class="priority">${indicator.priority}</span>
+                  </header>
+                </article>
+              `,
+            )
+            .join("")}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderValidation() {
+    header("数据校验");
+    const issues = activeIssues(true);
+    const openIssues = activeIssues();
+    const missingRate = state.metrics.dataTotal > 0 ? state.metrics.missingRecords / state.metrics.dataTotal : 0;
+    const successRate = state.metrics.interfaceCalls > 0 ? state.metrics.interfaceSuccess / state.metrics.interfaceCalls : 0;
+    workspace.innerHTML = `
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">统计数据与规则校验</h3>
+            <p class="panel-subtitle">修改数据后运行校验，可生成阻断、警告和提示问题。</p>
+          </div>
+          <button class="button secondary" type="button" data-action="run-validation">运行校验</button>
+        </div>
+        <div class="form-grid">
+          ${metricInput("门诊总量", "outpatientTotal", state.metrics.outpatientTotal)}
+          ${metricInput("线上预约量", "onlineAppointments", state.metrics.onlineAppointments)}
+          ${metricInput("接口调用次数", "interfaceCalls", state.metrics.interfaceCalls)}
+          ${metricInput("接口成功次数", "interfaceSuccess", state.metrics.interfaceSuccess)}
+          ${metricInput("数据总记录数", "dataTotal", state.metrics.dataTotal)}
+          ${metricInput("缺失记录数", "missingRecords", state.metrics.missingRecords)}
+        </div>
+      </section>
+      <div class="grid-3">
+        ${metric("开放问题", openIssues.length, state.lastValidatedAt ? `最近校验：${state.lastValidatedAt}` : "尚未运行校验")}
+        ${metric("接口成功率", pct(successRate, 2), "低于98%触发警告")}
+        ${metric("数据缺失率", pct(missingRate, 2), "超过1%触发警告")}
+      </div>
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">校验问题</h3>
+            <p class="panel-subtitle">阻断问题未处理时不建议提交正式申报。</p>
+          </div>
+        </div>
+        ${issues.length ? issueTable(issues, true) : `<div class="empty-state">暂无校验问题。点击“运行校验”生成结果。</div>`}
+      </section>
+    `;
+  }
+
+  function metricInput(label, key, value) {
+    return `<label class="field"><span>${label}</span><input class="input-zone" type="number" min="0" value="${value}" data-metric="${key}" /></label>`;
+  }
+
+  function issueTable(issues, showResolve) {
+    return `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>问题</th><th>指标</th><th>类型</th><th>级别</th><th>建议处理</th><th>状态</th>${showResolve ? "<th>操作</th>" : ""}</tr></thead>
+          <tbody>
+            ${issues
+              .map(
+                (issue) => `
+              <tr>
+                <td>${issue.description}</td>
+                <td>${issue.indicatorCode} ${indicatorByCode(issue.indicatorCode)?.name || ""}</td>
+                <td>${issue.type}</td>
+                <td><span class="risk ${issue.severity === "blocker" ? "blocker" : "warn"}">${issue.severity === "blocker" ? "阻断" : "警告"}</span></td>
+                <td>${issue.suggestion}</td>
+                <td>${issue.status === "resolved" ? "已处理" : "待处理"}</td>
+                ${showResolve ? `<td><button class="button ghost" type="button" data-action="resolve-issue" data-id="${issue.id}">标记处理</button></td>` : ""}
+              </tr>
+            `,
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  function renderReview() {
+    header("省级审核");
+    const submission = submissionForActive();
+    const issues = activeIssues();
+    const unreviewed = indicators.filter((indicator) => submission[indicator.code]?.reviewedScore === null);
+    workspace.innerHTML = `
+      <div class="grid-4">
+        ${metric("待审核指标", unreviewed.length, "未写入审核分")}
+        ${metric("待处理问题", issues.length, "来自校验和退回补正")}
+        ${metric("专家复核", state.reviewNotes.filter((note) => note.status === "专家复核").length, "已提交复核项")}
+        ${metric("审核意见", state.reviewNotes.length, "全部留痕")}
+      </div>
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">省级审核任务池</h3>
+            <p class="panel-subtitle">按医院、风险、提交时间和材料缺失分派审核任务，支持国家抽查和申诉复议。</p>
+          </div>
+          <div class="toolbar inline">
+            <button class="button secondary" type="button" data-action="assign-review">自动分派</button>
+            <button class="button ghost" type="button" data-action="national-spot-check">国家抽查</button>
+            <button class="button ghost" type="button" data-action="create-appeal">登记申诉</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>医院</th><th>提交时间</th><th>风险</th><th>问题/材料</th><th>审核员</th><th>状态</th></tr></thead>
+            <tbody>
+              ${state.reviewAssignments
+                .map(
+                  (item) => `
+                    <tr>
+                      <td><strong>${item.hospitalName}</strong><br>${item.hospitalCode}</td>
+                      <td>${item.submittedAt}</td>
+                      <td><span class="risk ${item.risk === "高" ? "blocker" : "warn"}">${item.risk}</span></td>
+                      <td>${item.issueCount}个问题 / ${item.materialMissing}项缺材料</td>
+                      <td>${item.reviewer}</td>
+                      <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                    </tr>
+                  `,
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">审核任务池</h3>
+            <p class="panel-subtitle">可逐项通过、退回补正或提交专家复核。审核分默认等于医院自评分。</p>
+          </div>
+          <button class="button secondary" type="button" data-action="bulk-approve">批量通过无问题指标</button>
+        </div>
+        <div class="detail-list">
+          ${indicators
+            .map((indicator) => {
+              const entry = submission[indicator.code];
+              const relatedIssues = issues.filter((issue) => issue.indicatorCode === indicator.code);
+              return `
+                <article class="detail-item">
+                  <header>
+                    <div>
+                      <h4>${indicator.code} ${indicator.name}</h4>
+                      <p>${domainName(indicator.domain)} | 自评分 ${entry.selfScore}/${indicator.max} | 材料 ${entry.evidenceCount} 份</p>
+                    </div>
+                    <span class="status-pill ${entry.reviewedScore === null ? "warn" : ""}">${entry.reviewedScore === null ? "待审核" : `审核分 ${entry.reviewedScore}`}</span>
+                  </header>
+                  ${relatedIssues.length ? `<p>关联问题：${relatedIssues.map((issue) => issue.description).join("；")}</p>` : `<p>未发现开放校验问题。</p>`}
+                  <div class="toolbar">
+                    <button class="button" type="button" data-action="approve-indicator" data-code="${indicator.code}">通过</button>
+                    <button class="button warn" type="button" data-action="return-indicator" data-code="${indicator.code}">退回补正</button>
+                    <button class="button secondary" type="button" data-action="escalate-indicator" data-code="${indicator.code}">专家复核</button>
+                  </div>
+                </article>
+              `;
+            })
+            .join("")}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderExpert() {
+    header("专家复核");
+    const reviews = expertReviewsForActive();
+    const summary = expertSummary();
+    const history = reviews.filter((item) => item.status === "已复核");
+    const activeReviews = reviews.filter((item) => item.status !== "已复核");
+    workspace.innerHTML = `
+      <div class="grid-4">
+        ${metric("待复核", summary.pending, "专家尚未给出结论")}
+        ${metric("高优先级", summary.highPriority, "关键指标或开放问题")}
+        ${metric("需补证", summary.supplement, "退回医院补充材料")}
+        ${metric("已完成", summary.completed, `调整扣分：${summary.adjusted}`)}
+      </div>
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">专家复核任务池</h3>
+            <p class="panel-subtitle">承接省级审核提交的争议指标、高风险指标和抽查复核事项。</p>
+          </div>
+          <div class="toolbar inline">
+            <button class="button secondary" type="button" data-action="auto-expert-review">生成高风险复核任务</button>
+            <button class="button ghost" type="button" data-action="download-package" data-kind="expert">下载复核包</button>
+          </div>
+        </div>
+        ${
+          activeReviews.length
+            ? `<div class="detail-list expert-list">${activeReviews
+                .map((review) => {
+                  const indicator = indicatorByCode(review.indicatorCode);
+                  const entry = submissionForHospital(review.hospitalCode)[review.indicatorCode] || {};
+                  const issues = state.validationIssues.filter(
+                    (issue) => issue.hospitalCode === review.hospitalCode && issue.indicatorCode === review.indicatorCode && issue.status !== "resolved",
+                  );
+                  const baseScore = Number(entry.reviewedScore ?? entry.selfScore ?? 0);
+                  return `
+                    <article class="detail-item expert-case">
+                      <header>
+                        <div>
+                          <h4>${review.indicatorCode} ${indicator?.name || ""}</h4>
+                          <p>${indicator ? domainName(indicator.domain) : "未匹配指标"} | ${review.expertGroup} | 提交人：${review.submittedBy}</p>
+                        </div>
+                        <div class="case-badges">
+                          <span class="risk ${review.priority === "高" ? "blocker" : "warn"}">${review.priority}优先级</span>
+                          <span class="status-pill ${statusClass(review.status)}">${review.status}</span>
+                        </div>
+                      </header>
+                      <div class="expert-grid">
+                        <div>
+                          <p><strong>复核原因：</strong>${review.reason}</p>
+                          <p><strong>关联问题：</strong>${issues.length ? issues.map((issue) => issue.description).join("；") : "暂无开放问题"}</p>
+                          <p><strong>材料要求：</strong>${indicator?.evidence || "按指标证据目录补充"}</p>
+                        </div>
+                        <div class="score-box">
+                          <span>当前建议分</span>
+                          <strong>${baseScore}</strong>
+                          <small>满分 ${indicator?.max || "-"} | 自评分 ${entry.selfScore ?? "-"}</small>
+                        </div>
+                      </div>
+                      <div class="toolbar">
+                        <button class="button" type="button" data-action="expert-agree" data-id="${review.id}">同意省审</button>
+                        <button class="button secondary" type="button" data-action="expert-adjust" data-id="${review.id}">调整扣分</button>
+                        <button class="button warn" type="button" data-action="expert-supplement" data-id="${review.id}">要求补证</button>
+                      </div>
+                    </article>
+                  `;
+                })
+                .join("")}</div>`
+            : `<div class="empty-state">暂无待处理专家复核任务。可从省级审核页提交复核，或生成高风险复核任务。</div>`
+        }
+      </section>
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">复核结论留痕</h3>
+            <p class="panel-subtitle">专家结论会回写审核分，并纳入评分、整改和数据包。</p>
+          </div>
+          <span class="tag">已完成 ${history.length} 项</span>
+        </div>
+        ${
+          reviews.length
+            ? `<div class="timeline-list">${reviews
+                .map(
+                  (item) => `
+                    <article class="timeline-item">
+                      <time>${item.completedAt || item.submittedAt}</time>
+                      <span>${item.expertGroup}</span>
+                      <strong>${item.indicatorCode} ${item.resultType || item.status}</strong>
+                      <p>${item.conclusion || item.reason}</p>
+                    </article>
+                  `,
+                )
+                .join("")}</div>`
+            : `<div class="empty-state">暂无复核记录。</div>`
+        }
+      </section>
+    `;
+  }
+
+  function renderScore() {
+    header("评分整改");
+    const score = scoreSnapshot();
+    const openIssues = activeIssues();
+    const rectifications = state.rectifications.filter((item) => item.hospitalCode === state.selectedHospital);
+    workspace.innerHTML = `
+      <section class="panel chart-band">
+        <div>
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">评分结果</h3>
+              <p class="panel-subtitle">综合分按八大指标域权重计算。底线问题和阻断问题应单独复核。</p>
+            </div>
+            <button class="button secondary" type="button" data-action="confirm-score">确认结果</button>
+          </div>
+          <div class="bar-stack">
+            ${score.byDomain
+              .map(
+                (domain) => `
+                <div class="bar-row">
+                  <span>${domain.code} ${domain.name}</span>
+                  <div class="bar-track"><div class="bar-fill" style="width:${Math.round(domain.ratio * 100)}%"></div></div>
+                  <strong>${domain.weightedScore}</strong>
+                </div>
+              `,
+              )
+              .join("")}
+          </div>
+        </div>
+        <div class="ring" style="--scoreDeg:${Math.min(360, score.total * 0.36)}deg">
+          <div>
+            <strong>${score.total}</strong>
+            <span>${score.grade}</span>
+          </div>
+        </div>
+      </section>
+      <div class="grid-4">
+        ${metric("结果状态", state.confirmed ? "已确认" : "待确认", "确认后生成正式问题清单")}
+        ${metric("开放问题", openIssues.length, "来自校验或审核退回")}
+        ${metric("整改事项", rectifications.length, "由问题清单生成")}
+        ${metric("申诉复议", state.appeals.filter((item) => item.hospitalCode === state.selectedHospital && item.status !== "已处理").length, "结果发布后处理")}
+      </div>
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">整改闭环</h3>
+            <p class="panel-subtitle">确认结果后，可将开放问题转成整改任务并跟踪状态。</p>
+          </div>
+            <div class="toolbar inline">
+              <button class="button" type="button" data-action="make-rectifications">生成整改任务</button>
+              <button class="button ghost" type="button" data-action="remind-rectification">逾期催办</button>
+              <button class="button ghost" type="button" data-action="resolve-appeal">处理申诉</button>
+            </div>
+        </div>
+        ${
+          rectifications.length
+            ? `<div class="detail-list">${rectifications
+                .map(
+                  (item) => `
+              <article class="detail-item">
+                <header>
+                  <div>
+                    <h4>${item.indicatorCode} ${indicatorByCode(item.indicatorCode)?.name || ""}</h4>
+                    <p>${item.problem}</p>
+                  </div>
+                  <span class="status-pill ${item.status === "复核通过" ? "" : "warn"}">${item.status}</span>
+                </header>
+                <p>整改措施：${item.action}</p>
+                <p>责任部门：${item.department || "信息中心"}；责任人：${item.owner || "待指定"}；期限：${item.due || "2026-12-31"}；材料：${item.materials || 0}份；复核人：${item.reviewer || "省级审核员"}</p>
+                <div class="toolbar">
+                  <button class="button ghost" type="button" data-action="advance-rectification" data-id="${item.id}">推进状态</button>
+                  <button class="button ghost" type="button" data-action="submit-rectification-material" data-id="${item.id}">提交材料</button>
+                </div>
+              </article>
+            `,
+                )
+                .join("")}</div>`
+            : `<div class="empty-state">暂无整改事项。可先运行校验、完成审核，再生成整改任务。</div>`
+        }
+      </section>
+    `;
+  }
+
+  function renderRules() {
+    header("评分规则");
+    const enabled = state.scoringRules.filter((rule) => rule.status === "启用").length;
+    const triggered = state.bottomLineRules.filter((rule) => rule.triggered).length;
+    workspace.innerHTML = `
+      <div class="grid-4">
+        ${metric("规则集", state.scoringRules.length, "评分、底线、映射、流程")}
+        ${metric("已启用", enabled, "当前参与判定")}
+        ${metric("待审批", state.scoringRules.filter((rule) => rule.status === "待审批").length, "规则变更审批")}
+        ${metric("底线触发", triggered, "影响等级判定", triggered ? "danger" : "")}
+      </div>
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">评分规则配置</h3>
+            <p class="panel-subtitle">规则变更审批通过后才可启用，评分结果可追溯到规则版本。</p>
+          </div>
+          <button class="button secondary" type="button" data-action="approve-rule">审批规则变更</button>
+        </div>
+        <div class="detail-list">
+          ${state.scoringRules
+            .map(
+              (rule) => `
+                <article class="detail-item">
+                  <header>
+                    <div>
+                      <h4>${rule.name}</h4>
+                      <p>${rule.description}</p>
+                    </div>
+                    <span class="status-pill ${statusClass(rule.status)}">${rule.status}</span>
+                  </header>
+                  <p>类型：${rule.type}；责任组：${rule.owner}</p>
+                  <div class="toolbar">
+                    <button class="button ghost" type="button" data-action="toggle-score-rule" data-id="${rule.id}">${rule.status === "启用" ? "停用" : "启用"}</button>
+                  </div>
+                </article>
+              `,
+            )
+            .join("")}
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">底线项与等级限制</h3>
+            <p class="panel-subtitle">安全事故、数据造假、重大违规等底线项会进入重点复核和等级限制。</p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>编号</th><th>底线项</th><th>触发</th><th>影响</th><th>操作</th></tr></thead>
+            <tbody>
+              ${state.bottomLineRules
+                .map(
+                  (rule) => `
+                    <tr>
+                      <td>${rule.id}</td>
+                      <td>${rule.name}</td>
+                      <td><span class="status-pill ${rule.triggered ? "danger" : ""}">${rule.triggered ? "已触发" : "未触发"}</span></td>
+                      <td>${rule.effect}</td>
+                      <td><button class="button ghost" type="button" data-action="toggle-bottom-line" data-id="${rule.id}">${rule.triggered ? "解除" : "触发"}</button></td>
+                    </tr>
+                  `,
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderAnalytics() {
+    header("统计分析");
+    const data = analyticsSummary();
+    workspace.innerHTML = `
+      <div class="grid-4">
+        ${metric("省域均分", `${data.avg}分`, "样例医院均值")}
+        ${metric("领先医院", data.top?.name || "-", data.top ? `${data.top.score}分 ${data.top.grade}` : "-")}
+        ${metric("高风险医院", data.riskHospitals, "审核任务风险")}
+        ${metric("逾期整改", data.rectificationOverdue, "需催办事项", data.rectificationOverdue ? "danger" : "")}
+      </div>
+      <section class="panel chart-band">
+        <div>
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">分域能力看板</h3>
+              <p class="panel-subtitle">按当前医院得分展示八大指标域，可用于医院自评报告和省域汇总报告。</p>
+            </div>
+            <button class="button ghost" type="button" data-action="export-analytics">导出统计摘要</button>
+          </div>
+          <div class="bar-stack">
+            ${scoreSnapshot().byDomain
+              .map(
+                (domain) => `
+                  <div class="bar-row">
+                    <span>${domain.code} ${domain.name}</span>
+                    <div class="bar-track"><div class="bar-fill" style="width:${Math.min(100, Math.round(domain.ratio * 100))}%"></div></div>
+                    <strong>${domain.weightedScore}</strong>
+                  </div>
+                `,
+              )
+              .join("")}
+          </div>
+        </div>
+        <div class="score-box">
+          <span>当前医院等级</span>
+          <strong>${scoreSnapshot().grade}</strong>
+          <small>总分 ${scoreSnapshot().total}</small>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">医院排行与风险定位</h3>
+            <p class="panel-subtitle">支持按等级、地区、风险、审核状态定位医院。</p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>医院</th><th>等级类别</th><th>得分</th><th>预判等级</th><th>审核风险</th><th>整改</th></tr></thead>
+            <tbody>
+              ${data.hospitalScores
+                .map((hospital) => {
+                  const review = state.reviewAssignments.find((item) => item.hospitalCode === hospital.code);
+                  const recCount = state.rectifications.filter((item) => item.hospitalCode === hospital.code).length;
+                  return `<tr><td>${hospital.name}</td><td>${hospital.level} ${hospital.type}</td><td>${hospital.score}</td><td>${hospital.grade}</td><td>${review?.risk || "低"}</td><td>${recCount}项</td></tr>`;
+                })
+                .join("")}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderIntelligence() {
+    header("智能监管");
+    const tab = workspace.dataset.intelligenceTab || "spotchecks";
+    const summary = intelligenceSummary();
+    const tabs = [
+      { id: "spotchecks", label: "国家抽查" },
+      { id: "sandbox", label: "规则沙箱" },
+      { id: "assistance", label: "智能核验" },
+      { id: "messages", label: "消息提醒" },
+      { id: "imports", label: "批量导入" },
+    ];
+    let content = "";
+
+    if (tab === "spotchecks") {
+      content = `
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">国家抽查任务池</h3>
+              <p class="panel-subtitle">按风险入池、分层随机抽样和国家专项要求形成抽查批次。</p>
+            </div>
+            <div class="toolbar inline">
+              <button class="button secondary" type="button" data-action="generate-spot-check">生成抽查批次</button>
+              <button class="button ghost" type="button" data-action="assign-spot-check">分派抽查任务</button>
+              <button class="button ghost" type="button" data-action="complete-spot-check">完成一项复核</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>抽查编号</th><th>医疗机构</th><th>入池来源</th><th>抽查原因</th><th>抽样比例</th><th>复核组</th><th>状态</th><th>截止日期</th></tr></thead>
+              <tbody>
+                ${state.spotChecks
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td>${item.id}</td>
+                        <td><strong>${item.hospitalName}</strong><br /><span class="muted-text">${item.batch}</span></td>
+                        <td>${item.source}</td>
+                        <td>${item.reason}</td>
+                        <td>${item.sampleRate}</td>
+                        <td>${item.reviewer}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td>${item.due}</td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "sandbox") {
+      content = `
+        <div class="grid-3">
+          ${metric("试算范围", "126家", "同级同类样本")}
+          ${metric("受影响医院", state.sandboxRuns[0]?.affected || 0, "最近一次试算")}
+          ${metric("待审批方案", summary.sandboxPending, "人工审批后发布", summary.sandboxPending ? "warn" : "")}
+        </div>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">候选规则参数</h3>
+              <p class="panel-subtitle">在历史脱敏样本上试算，不直接修改正式评分规则。</p>
+            </div>
+            <div class="toolbar inline">
+              <button class="button secondary" type="button" data-action="run-sandbox">运行试算</button>
+              <button class="button ghost" type="button" data-action="approve-sandbox">审批并发布</button>
+            </div>
+          </div>
+          <div class="form-grid">
+            <label class="field">
+              <span>接口成功率优秀阈值（%）</span>
+              <input type="number" min="90" max="100" step="0.1" value="${state.sandboxConfig.successRateThreshold}" data-sandbox-config="successRateThreshold" />
+            </label>
+            <label class="field">
+              <span>最低材料数量</span>
+              <input type="number" min="0" max="10" value="${state.sandboxConfig.evidenceMinimum}" data-sandbox-config="evidenceMinimum" />
+            </label>
+            <label class="field">
+              <span>异常识别倍数</span>
+              <input type="number" min="1" max="5" step="0.1" value="${state.sandboxConfig.anomalyMultiplier}" data-sandbox-config="anomalyMultiplier" />
+            </label>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">试算结果与版本审批</h3>
+              <p class="panel-subtitle">展示得分影响、等级变化和底线项命中情况。</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>试算编号</th><th>候选规则</th><th>样本数</th><th>受影响</th><th>平均分变化</th><th>等级变化</th><th>底线命中</th><th>状态</th><th>运行时间</th></tr></thead>
+              <tbody>
+                ${state.sandboxRuns
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td>${item.id}</td>
+                        <td><strong>${item.ruleName}</strong><br /><span class="muted-text">${item.version}</span></td>
+                        <td>${item.population}</td>
+                        <td>${item.affected}</td>
+                        <td>${item.avgDelta > 0 ? "+" : ""}${item.avgDelta}</td>
+                        <td>${item.gradeChanges}</td>
+                        <td>${item.bottomLineHits}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td>${item.runAt}</td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "assistance") {
+      content = `
+        <div class="grid-4">
+          ${metric("待确认分类", summary.classificationsPending, "材料辅助分类")}
+          ${metric("开放异常", summary.anomaliesOpen, "同类医院对比", summary.anomaliesOpen ? "warn" : "")}
+          ${metric("高风险异常", state.peerAnomalies.filter((item) => item.level === "高" && item.status === "待核验").length, "建议纳入抽查")}
+          ${metric("人工确认率", pct(state.materialClassifications.filter((item) => item.status === "已确认").length / Math.max(1, state.materialClassifications.length)), "智能结果需人工确认")}
+        </div>
+        <div class="grid-2">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h3 class="panel-title">材料智能辅助分类</h3>
+                <p class="panel-subtitle">原型模拟结果，仅用于材料归类建议，确认后才进入正式台账。</p>
+              </div>
+              <button class="button secondary" type="button" data-action="classify-materials">运行分类</button>
+            </div>
+            <div class="detail-list compact-list">
+              ${state.materialClassifications
+                .map(
+                  (item) => `
+                    <article class="detail-item">
+                      <div><strong>${item.materialName}</strong><p>${item.category} · 建议关联 ${item.suggestedIndicator} · 置信度 ${item.confidence}%</p></div>
+                      <div class="toolbar inline">
+                        <span class="status-pill ${item.risk === "高" ? "danger" : ""}">${item.risk}风险</span>
+                        <button class="button ghost" type="button" data-action="confirm-classification" data-id="${item.id}" ${item.status === "已确认" ? "disabled" : ""}>${item.status}</button>
+                      </div>
+                    </article>
+                  `,
+                )
+                .join("")}
+            </div>
+          </section>
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h3 class="panel-title">同类医院异常识别</h3>
+                <p class="panel-subtitle">按医院级别、类别和区域分层比较，异常只作为核验线索。</p>
+              </div>
+              <button class="button secondary" type="button" data-action="scan-anomalies">重新识别</button>
+            </div>
+            <div class="detail-list compact-list">
+              ${state.peerAnomalies
+                .map(
+                  (item) => `
+                    <article class="detail-item">
+                      <div><strong>${item.hospitalName} · ${item.metric}</strong><p>${item.value}，同类中位数 ${item.peerMedian}，偏离 ${item.deviation}</p><p>${item.reason}</p></div>
+                      <div class="toolbar inline">
+                        <span class="status-pill ${item.level === "高" ? "danger" : "warn"}">${item.level}风险</span>
+                        <button class="button ghost" type="button" data-action="anomaly-to-spot-check" data-id="${item.id}" ${item.status === "已转抽查" ? "disabled" : ""}>${item.status}</button>
+                      </div>
+                    </article>
+                  `,
+                )
+                .join("")}
+            </div>
+          </section>
+        </div>
+      `;
+    }
+
+    if (tab === "messages") {
+      content = `
+        <div class="grid-4">
+          ${metric("未读消息", summary.unreadMessages, "当前消息队列", summary.unreadMessages ? "warn" : "")}
+          ${metric("紧急提醒", state.notifications.filter((item) => item.priority === "紧急").length, "截止与逾期")}
+          ${metric("移动端送达", state.notifications.filter((item) => item.channel === "移动端" && item.status === "已送达").length, "App/小程序消息")}
+          ${metric("启用渠道", state.notificationChannels.filter((item) => item.enabled).length, "共4种渠道")}
+        </div>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">提醒渠道</h3>
+              <p class="panel-subtitle">按事件级别配置站内信、移动端、短信和邮件。</p>
+            </div>
+            <div class="toolbar inline">
+              <button class="button secondary" type="button" data-action="send-mobile-reminder">发送移动端提醒</button>
+              <button class="button ghost" type="button" data-action="read-all-messages">全部标记已读</button>
+            </div>
+          </div>
+          <div class="channel-grid">
+            ${state.notificationChannels
+              .map(
+                (item) => `
+                  <button class="channel-toggle ${item.enabled ? "active" : ""}" type="button" data-action="toggle-channel" data-channel="${item.channel}" aria-pressed="${item.enabled}">
+                    <strong>${item.channel}</strong>
+                    <span>${item.scope}</span>
+                    <small>${item.enabled ? "已启用" : "已停用"}</small>
+                  </button>
+                `,
+              )
+              .join("")}
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">消息队列与送达状态</h3>
+              <p class="panel-subtitle">覆盖任务催办、退回补正、国家抽查、材料临期和整改逾期。</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>消息</th><th>接收人</th><th>角色</th><th>渠道</th><th>优先级</th><th>送达状态</th><th>时间</th></tr></thead>
+              <tbody>
+                ${state.notifications
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${item.title}</strong>${item.read ? "" : '<br /><span class="tag">未读</span>'}</td>
+                        <td>${item.recipient}</td>
+                        <td>${item.role}</td>
+                        <td>${item.channel}</td>
+                        <td><span class="status-pill ${item.priority === "紧急" ? "danger" : item.priority === "高" ? "warn" : ""}">${item.priority}</span></td>
+                        <td>${item.status}</td>
+                        <td>${item.createdAt}</td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "imports") {
+      const rows = state.importJobs.reduce((sum, item) => sum + Number(item.rows || 0), 0);
+      const accepted = state.importJobs.reduce((sum, item) => sum + Number(item.accepted || 0), 0);
+      content = `
+        <div class="grid-4">
+          ${metric("导入任务", state.importJobs.length, "模板与接口数据")}
+          ${metric("数据行数", fmt(rows), "累计读取")}
+          ${metric("成功入库", fmt(accepted), pct(accepted / Math.max(1, rows)))}
+          ${metric("拒绝行数", summary.importRejected, "可下载问题报告", summary.importRejected ? "danger" : "")}
+        </div>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">批量数据导入任务</h3>
+              <p class="panel-subtitle">模拟Excel/CSV模板上传、字段校验、幂等入库和问题报告。</p>
+            </div>
+            <button class="button secondary" type="button" data-action="simulate-import">导入样例数据</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>任务编号</th><th>文件</th><th>模板</th><th>总行数</th><th>成功</th><th>拒绝</th><th>状态</th><th>问题报告</th><th>操作</th></tr></thead>
+              <tbody>
+                ${state.importJobs
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td>${item.id}</td>
+                        <td><strong>${item.fileName}</strong><br /><span class="muted-text">${item.submittedBy} · ${item.submittedAt}</span></td>
+                        <td>${item.template}</td>
+                        <td>${item.rows}</td>
+                        <td>${item.accepted}</td>
+                        <td>${item.rejected}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                        <td>${item.report}</td>
+                        <td><button class="button ghost" type="button" data-action="rerun-import" data-id="${item.id}" ${item.rejected ? "" : "disabled"}>补正重跑</button></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    workspace.innerHTML = `
+      <div class="grid-4">
+        ${metric("国家抽查", summary.spotChecksOpen, "开放任务")}
+        ${metric("规则试算", summary.sandboxPending, "待审批方案")}
+        ${metric("智能线索", summary.classificationsPending + summary.anomaliesOpen, "待人工确认")}
+        ${metric("消息与导入", summary.unreadMessages + summary.importRejected, "未读或待补正")}
+      </div>
+      <div class="segmented" role="tablist" aria-label="智能监管功能">
+        ${tabs.map((item) => `<button type="button" role="tab" aria-selected="${item.id === tab}" class="${item.id === tab ? "active" : ""}" data-intelligence-tab="${item.id}">${item.label}</button>`).join("")}
+      </div>
+      ${content}
+    `;
+  }
+
+  function renderSystem() {
+    header("系统权限");
+    const role = activeRole();
+    workspace.innerHTML = `
+      <div class="grid-4">
+        ${metric("当前角色", role.name, `${role.org} | ${role.dataScope}`)}
+        ${metric("用户数", state.users.length, "启用账号")}
+        ${metric("导出审批", state.exportApprovals.filter((item) => item.status === "待审批").length, "敏感数据审批")}
+        ${metric("审计日志", state.auditLogs.length, "最近操作留痕")}
+      </div>
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">角色权限矩阵</h3>
+            <p class="panel-subtitle">按角色、组织、任务和数据范围授权，当前选择会影响演示上下文。</p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>角色</th><th>组织</th><th>数据范围</th><th>核心权限</th></tr></thead>
+            <tbody>
+              ${state.roles.map((item) => `<tr><td><strong>${item.name}</strong></td><td>${item.org}</td><td>${item.dataScope}</td><td>${item.permissions.join("、")}</td></tr>`).join("")}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <div class="grid-2">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">用户管理</h3>
+              <p class="panel-subtitle">用户创建、禁用、角色分配和最后登录。</p>
+            </div>
+            <button class="button secondary" type="button" data-action="toggle-user-status">切换账号状态</button>
+          </div>
+          <div class="detail-list compact-list">
+            ${state.users
+              .map(
+                (user) => `
+                  <article class="detail-item">
+                    <header>
+                      <div><h4>${user.name}</h4><p>${user.role} | ${user.org}</p></div>
+                      <span class="status-pill ${user.status === "启用" ? "" : "danger"}">${user.status}</span>
+                    </header>
+                    <p>最后登录：${user.lastLogin}</p>
+                  </article>
+                `,
+              )
+              .join("")}
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">导出审批与系统参数</h3>
+              <p class="panel-subtitle">敏感数据导出需审批，参数变更进入日志。</p>
+            </div>
+            <button class="button ghost" type="button" data-action="approve-export">审批导出</button>
+          </div>
+          <div class="timeline-list">
+            ${state.exportApprovals
+              .map((item) => `<article class="timeline-item"><time>${item.requestedAt}</time><span>${item.requester} | ${item.sensitivity}</span><strong>${item.packageType} ${item.status}</strong><p>范围：${item.scope}</p></article>`)
+              .join("")}
+          </div>
+        </section>
+      </div>
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">操作日志</h3>
+            <p class="panel-subtitle">记录登录、查看、下载、提交、审核、发布和归档。</p>
+          </div>
+        </div>
+        <div class="timeline-list">
+          ${state.auditLogs
+            .map((item) => `<article class="timeline-item"><time>${item.at}</time><span>${item.user}</span><strong>${item.action}</strong><p>${item.target}：${item.result}</p></article>`)
+            .join("")}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderExchange() {
+    header("接口数据");
+    const kind = workspace.dataset.packageKind || "submission";
+    const payload = buildDataPackage(kind);
+    const payloadText = JSON.stringify(payload, null, 2);
+    const issueSummary = summarizeIssues(state.validationIssues.filter((issue) => issue.hospitalCode === state.selectedHospital));
+    workspace.innerHTML = `
+      <div class="package-grid">
+        <article class="package-card">
+          <strong>任务包</strong>
+          <span>评价任务、医院范围、节点、催办延期和审核分派</span>
+        </article>
+        <article class="package-card">
+          <strong>证据包</strong>
+          <span>材料台账、版本、水印、敏感级别和缺口清单</span>
+        </article>
+        <article class="package-card">
+          <strong>申报包</strong>
+          <span>医院画像、统计数据、指标自评、材料数量、校验摘要</span>
+        </article>
+        <article class="package-card">
+          <strong>审核包</strong>
+          <span>审核进度、审核意见、已审核指标和开放问题</span>
+        </article>
+        <article class="package-card">
+          <strong>专家包</strong>
+          <span>复核任务、专家组、结论、建议分和关联问题</span>
+        </article>
+        <article class="package-card">
+          <strong>整改包</strong>
+          <span>评分结果、分域得分、整改事项和整改状态</span>
+        </article>
+        <article class="package-card">
+          <strong>统计包</strong>
+          <span>省域看板、分域能力、风险定位和规则状态</span>
+        </article>
+        <article class="package-card">
+          <strong>智能监管包</strong>
+          <span>国家抽查、规则试算、智能线索、消息渠道和导入任务</span>
+        </article>
+        <article class="package-card">
+          <strong>试点运营包</strong>
+          <span>申报批次、上传队列、审核负荷和运行日报</span>
+        </article>
+        <article class="package-card">
+          <strong>试点协同包</strong>
+          <span>医院准备度、问题工单、培训答疑、版本发布与试点反馈</span>
+        </article>
+        <article class="package-card">
+          <strong>试点评估包</strong>
+          <span>成效指标、医院评分、问题复盘、优化计划、推广准备与评估报告</span>
+        </article>
+        <article class="package-card">
+          <strong>评价助手包</strong>
+          <span>知识源、标准问答、异常说明、整改建议和审核风险线索</span>
+        </article>
+        <article class="package-card">
+          <strong>运营监控包</strong>
+          <span>服务可用性、接口健康、任务队列、存储容量和告警处置</span>
+        </article>
+        <article class="package-card">
+          <strong>系统包</strong>
+          <span>角色权限、用户、导出审批、系统参数和审计日志</span>
+        </article>
+        <article class="package-card">
+          <strong>运行包</strong>
+          <span>年度周期、标准版本、规则核验、安全复核和运行日志</span>
+        </article>
+        <article class="package-card">
+          <strong>全量包</strong>
+          <span>当前原型内完整任务、指标、申报、审核、整改状态</span>
+        </article>
+      </div>
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">数据包生成</h3>
+            <p class="panel-subtitle">用于模拟医院端、省级端和后端接口之间的数据交换。JSON可直接用于联调样例。</p>
+          </div>
+          <span class="status-pill ${issueSummary.blockers ? "danger" : ""}">开放问题 ${issueSummary.open}</span>
+        </div>
+        <div class="toolbar">
+          <label class="field">
+            <span>数据包类型</span>
+            <select data-package-kind>
+              ${["task", "pilot", "collaboration", "assessment", "assistant", "monitoring", "evidence", "submission", "review", "expert", "rectification", "analytics", "intelligence", "system", "operations", "full"]
+                .map((item) => `<option value="${item}" ${item === kind ? "selected" : ""}>${packageKindLabel(item)}</option>`)
+                .join("")}
+            </select>
+          </label>
+          <button class="button secondary" type="button" data-action="download-package" data-kind="${kind}">下载当前JSON</button>
+          <button class="button ghost" type="button" data-action="copy-package" data-kind="${kind}">复制到剪贴板</button>
+        </div>
+        <pre class="code-block" aria-label="JSON数据包预览">${escapeHtml(payloadText)}</pre>
+      </section>
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">MVP接口资源映射</h3>
+            <p class="panel-subtitle">当前原型数据包与接口规范v0.1的资源关系。</p>
+          </div>
+          <span class="tag">OpenAPI草案见 mock-api/openapi.v0.1.yaml</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>资源</th><th>方法</th><th>路径</th><th>原型数据来源</th><th>优先级</th></tr></thead>
+            <tbody>
+              <tr><td>评价任务</td><td>POST/PUT</td><td>/api/v1/evaluation-tasks</td><td>任务管理页、医院范围</td><td><span class="priority">P0</span></td></tr>
+              <tr><td>申报批次</td><td>POST/PUT</td><td>/api/v1/pilot-batches</td><td>试点运营页、批次节点与范围</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>上传队列</td><td>POST/GET</td><td>/api/v1/material-upload-jobs</td><td>分片上传、扫描、分类状态</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>审核负荷</td><td>GET/POST</td><td>/api/v1/reviewer-workloads:balance</td><td>审核容量、逾期和自动均衡</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>运行日报</td><td>POST/GET</td><td>/api/v1/pilot-daily-reports</td><td>试点运行指标、风险和发布状态</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>试点准备度</td><td>GET/POST</td><td>/api/v1/pilot-readiness</td><td>组织、账号、网络、数据映射与培训准备度</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>问题工单</td><td>GET/POST</td><td>/api/v1/pilot-tickets</td><td>问题登记、分类、责任组和SLA</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>工单流转</td><td>PUT</td><td>/api/v1/pilot-tickets/{ticketId}</td><td>分派、推进、升级和解决</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>培训场次</td><td>GET/POST</td><td>/api/v1/pilot-training-sessions</td><td>培训发布、签到、问题与材料</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>试点版本</td><td>GET/POST</td><td>/api/v1/pilot-releases</td><td>候选版本、验证范围与发布记录</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>版本反馈</td><td>GET/PUT</td><td>/api/v1/pilot-feedback/{feedbackId}</td><td>反馈收集、评估、解决与版本关联</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>试点成效</td><td>GET/POST</td><td>/api/v1/pilot-assessment/outcomes</td><td>成效指标、医院评分与推广结论</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>问题复盘</td><td>GET/POST</td><td>/api/v1/pilot-assessment/issue-themes</td><td>跨工单、反馈、校验和告警归并</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>优化计划</td><td>GET/PUT</td><td>/api/v1/pilot-assessment/improvement-plans/{planId}</td><td>责任组、目标版本、进度和验收标准</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>推广准备</td><td>GET/POST</td><td>/api/v1/rollout-regions</td><td>区域准入维度、准备度和推广启动</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>评估报告</td><td>GET/POST</td><td>/api/v1/pilot-assessment/reports</td><td>试点评估结论、推广建议和发布状态</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>评价助手知识源</td><td>GET/POST</td><td>/api/v1/evaluation-assistant/knowledge-sources</td><td>标准原文、评价细则、问答口径与规则说明</td><td><span class="priority">P2</span></td></tr>
+              <tr><td>标准问答</td><td>GET/POST</td><td>/api/v1/evaluation-assistant/questions</td><td>带引用回答、置信度与人工确认状态</td><td><span class="priority">P2</span></td></tr>
+              <tr><td>问答确认</td><td>POST</td><td>/api/v1/evaluation-assistant/questions/{questionId}:confirm</td><td>问答人工确认与审计留痕</td><td><span class="priority">P2</span></td></tr>
+              <tr><td>异常说明</td><td>GET/POST</td><td>/api/v1/evaluation-assistant/anomaly-explanations</td><td>校验异常解释、可能原因和可编辑说明</td><td><span class="priority">P2</span></td></tr>
+              <tr><td>整改建议</td><td>GET/POST</td><td>/api/v1/evaluation-assistant/rectification-suggestions</td><td>辅助建议、执行步骤与整改任务转化</td><td><span class="priority">P2</span></td></tr>
+              <tr><td>审核风险</td><td>GET/POST</td><td>/api/v1/evaluation-assistant/review-risks</td><td>风险线索、依据、人工研判和专家复核</td><td><span class="priority">P2</span></td></tr>
+              <tr><td>服务健康</td><td>GET/POST</td><td>/api/v1/monitoring/services</td><td>服务可用率、时延、SLA和巡检</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>接口健康</td><td>GET/POST</td><td>/api/v1/monitoring/interfaces</td><td>接口成功率、P95、吞吐和探测</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>任务队列</td><td>GET/POST</td><td>/api/v1/monitoring/job-queues</td><td>任务积压、失败、扩容和优先级</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>存储容量</td><td>GET/POST</td><td>/api/v1/monitoring/storage-pools</td><td>容量、增长、留存、扩容和清理</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>运营告警</td><td>GET/PUT</td><td>/api/v1/monitoring/alerts/{alertId}</td><td>告警确认、处置、关闭和审计</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>证据材料</td><td>POST/PUT</td><td>/api/v1/evidence-materials/{materialId}</td><td>证据材料页、材料台账</td><td><span class="priority">P0</span></td></tr>
+              <tr><td>医院申报</td><td>PUT</td><td>/api/v1/submissions/{submissionId}</td><td>医院申报页、指标自评数据</td><td><span class="priority">P0</span></td></tr>
+              <tr><td>运行校验</td><td>POST</td><td>/api/v1/submissions/{submissionId}/validations:run</td><td>数据校验页、校验规则</td><td><span class="priority">P0</span></td></tr>
+              <tr><td>审核意见</td><td>PUT</td><td>/api/v1/review-tasks/{reviewId}/indicators/{indicatorCode}</td><td>省级审核页、审核动作</td><td><span class="priority">P0</span></td></tr>
+              <tr><td>专家复核</td><td>PUT</td><td>/api/v1/expert-reviews/{expertReviewId}</td><td>专家复核页、复核结论</td><td><span class="priority">P0</span></td></tr>
+              <tr><td>评分结果</td><td>POST</td><td>/api/v1/submissions/{submissionId}/score:calculate</td><td>评分整改页、分域权重</td><td><span class="priority">P0</span></td></tr>
+              <tr><td>整改任务</td><td>POST</td><td>/api/v1/submissions/{submissionId}/rectifications</td><td>整改闭环页、开放问题</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>评分规则</td><td>GET/PUT</td><td>/api/v1/scoring-rules</td><td>评分规则页、底线项</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>统计分析</td><td>GET</td><td>/api/v1/analytics/province-summary</td><td>统计分析页、省域看板</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>国家抽查</td><td>POST/PUT</td><td>/api/v1/national-spot-checks</td><td>智能监管页、抽查任务池</td><td><span class="priority">P2</span></td></tr>
+              <tr><td>规则沙箱</td><td>POST</td><td>/api/v1/rule-sandbox/runs</td><td>智能监管页、候选规则试算</td><td><span class="priority">P2</span></td></tr>
+              <tr><td>智能核验</td><td>POST</td><td>/api/v1/intelligence/materials:classify</td><td>材料分类、同类医院异常线索</td><td><span class="priority">P2</span></td></tr>
+              <tr><td>消息提醒</td><td>POST</td><td>/api/v1/notifications:send</td><td>消息渠道、移动端送达状态</td><td><span class="priority">P2</span></td></tr>
+              <tr><td>批量导入</td><td>POST</td><td>/api/v1/import-jobs</td><td>模板上传、校验报告、补正重跑</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>系统权限</td><td>PUT</td><td>/api/v1/system/users/{userId}</td><td>系统权限页、角色矩阵</td><td><span class="priority">P0</span></td></tr>
+              <tr><td>运行周期</td><td>GET</td><td>/api/v1/operation-cycles/{cycleYear}</td><td>运行管理页、年度归档</td><td><span class="priority">P0</span></td></tr>
+              <tr><td>规则核验</td><td>POST</td><td>/api/v1/operation-cycles/{cycleYear}/rules:run</td><td>运行管理页、规则状态</td><td><span class="priority">P0</span></td></tr>
+              <tr><td>安全复核</td><td>POST</td><td>/api/v1/operation-cycles/{cycleYear}/security-checks:run</td><td>运行管理页、安全核验</td><td><span class="priority">P0</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderOperations() {
+    header("运行管理");
+    const operations = state.operations;
+    const summary = operationSummary();
+    const activeStage = summary.activeStage;
+    workspace.innerHTML = `
+      <div class="grid-4">
+        ${metric("当前阶段", activeStage.name, `${activeStage.owner} | 截止 ${activeStage.due}`)}
+        ${metric("阶段完成", `${summary.completedStages}/${operations.stages.length}`, `进度 ${pct(summary.progress, 0)}`)}
+        ${metric("规则异常", summary.ruleViolations, `${summary.enabledRules}组规则启用`, summary.ruleViolations ? "danger" : "")}
+        ${metric("安全待复核", summary.securityPending, `归档：${operations.cycle.archiveStatus}`, summary.securityPending ? "danger" : "")}
+      </div>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3 class="panel-title">年度运行周期</h3>
+            <p class="panel-subtitle">覆盖国家标准发布、省级配置、医院自评、分级审核、结果反馈和年度归档。</p>
+          </div>
+          <div class="toolbar inline">
+            <button class="button secondary" type="button" data-action="advance-stage">推进阶段</button>
+            <button class="button ghost" type="button" data-action="archive-cycle">生成归档状态</button>
+            <button class="button ghost" type="button" data-action="download-package" data-kind="operations">下载运行包</button>
+          </div>
+        </div>
+        <div class="stage-timeline">
+          ${operations.stages
+            .map(
+              (stage) => `
+            <article class="stage-card ${stage.id === operations.cycle.currentStage ? "active" : ""}">
+              <header>
+                <strong>${stage.name}</strong>
+                <span class="status-pill ${statusClass(stage.status)}">${stage.status}</span>
+              </header>
+              <p>${stage.description}</p>
+              <small>${stage.owner} | ${stage.due}</small>
+            </article>
+          `,
+            )
+            .join("")}
+        </div>
+      </section>
+
+      <div class="grid-2">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">标准版本与规则发布</h3>
+              <p class="panel-subtitle">管理新标准版本、历史映射基线和规则生效状态。</p>
+            </div>
+            <button class="button" type="button" data-action="publish-standard">发布当前标准</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>版本</th><th>名称</th><th>状态</th><th>生效日期</th><th>变更数</th></tr></thead>
+              <tbody>
+                ${operations.standardVersions
+                  .map(
+                    (version) => `
+                  <tr>
+                    <td><strong>${version.id}</strong></td>
+                    <td>${version.name}</td>
+                    <td><span class="status-pill ${statusClass(version.status)}">${version.status}</span></td>
+                    <td>${version.effectiveDate}</td>
+                    <td>${version.changeCount}</td>
+                  </tr>
+                `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">规则核验</h3>
+              <p class="panel-subtitle">把数据口径、证据链、评分边界和安全权限转化为可运行规则。</p>
+            </div>
+            <button class="button secondary" type="button" data-action="run-rule-audit">运行规则核验</button>
+          </div>
+          <div class="detail-list compact-list">
+            ${operations.ruleSets
+              .map(
+                (rule) => `
+              <article class="detail-item">
+                <header>
+                  <div>
+                    <h4>${rule.name}</h4>
+                    <p>${rule.owner} | 最近运行：${rule.lastRun || "未运行"}</p>
+                  </div>
+                  <span class="status-pill ${rule.violations ? "danger" : ""}">${rule.violations}项异常</span>
+                </header>
+                <div class="toolbar">
+                  <button class="button ghost" type="button" data-action="toggle-rule" data-id="${rule.id}">${rule.enabled ? "停用" : "启用"}</button>
+                </div>
+              </article>
+            `,
+              )
+              .join("")}
+          </div>
+        </section>
+      </div>
+
+      <div class="grid-2">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">安全与数据核验</h3>
+              <p class="panel-subtitle">跟踪上线评价判定、数据核验、安全管理需要的关键前置检查。</p>
+            </div>
+            <button class="button secondary" type="button" data-action="run-security-check">一键安全复核</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>检查项</th><th>责任组</th><th>风险</th><th>状态</th><th>最近复核</th><th>操作</th></tr></thead>
+              <tbody>
+                ${operations.securityItems
+                  .map(
+                    (item) => `
+                  <tr>
+                    <td>${item.name}</td>
+                    <td>${item.owner}</td>
+                    <td><span class="risk ${item.risk === "高" ? "blocker" : item.risk === "中" ? "warn" : ""}">${item.risk}</span></td>
+                    <td><span class="status-pill ${statusClass(item.status)}">${item.status}</span></td>
+                    <td>${item.lastCheck || "未复核"}</td>
+                    <td><button class="button ghost" type="button" data-action="pass-security" data-id="${item.id}">标记通过</button></td>
+                  </tr>
+                `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">运行日志</h3>
+              <p class="panel-subtitle">记录关键操作，支持年度归档和问题追溯。</p>
+            </div>
+            <span class="tag">${operations.operationLogs.length}条记录</span>
+          </div>
+          <div class="timeline-list">
+            ${operations.operationLogs
+              .map(
+                (log) => `
+              <article class="timeline-item">
+                <time>${log.at}</time>
+                <strong>${log.action}</strong>
+                <span>${log.actor}</span>
+                <p>${log.result}</p>
+              </article>
+            `,
+              )
+              .join("")}
+          </div>
+        </section>
+      </div>
+    `;
+  }
+
+  function render() {
+    renderHospitalSelect();
+    renderRoleSelect();
+    renderNav();
+    const titles = {
+      dashboard: "总览",
+      tasks: "任务管理",
+      pilot: "试点运营",
+      collaboration: "试点协同",
+      assessment: "试点评估",
+      assistant: "评价助手",
+      monitoring: "运营监控",
+      standards: "标准指标",
+      submission: "医院申报",
+      evidence: "证据材料",
+      validation: "数据校验",
+      review: "省级审核",
+      expert: "专家复核",
+      score: "评分整改",
+      rules: "评分规则",
+      analytics: "统计分析",
+      intelligence: "智能监管",
+      exchange: "接口数据",
+      operations: "运行管理",
+      system: "系统权限",
+    };
+    viewTitle.textContent = titles[state.activeView] || "总览";
+    if (state.activeView === "tasks") renderTasks();
+    else if (state.activeView === "pilot") renderPilot();
+    else if (state.activeView === "collaboration") renderCollaboration();
+    else if (state.activeView === "assessment") renderAssessment();
+    else if (state.activeView === "assistant") renderAssistant();
+    else if (state.activeView === "monitoring") renderMonitoring();
+    else if (state.activeView === "standards") renderStandards();
+    else if (state.activeView === "submission") renderSubmission();
+    else if (state.activeView === "evidence") renderEvidence();
+    else if (state.activeView === "validation") renderValidation();
+    else if (state.activeView === "review") renderReview();
+    else if (state.activeView === "expert") renderExpert();
+    else if (state.activeView === "score") renderScore();
+    else if (state.activeView === "rules") renderRules();
+    else if (state.activeView === "analytics") renderAnalytics();
+    else if (state.activeView === "intelligence") renderIntelligence();
+    else if (state.activeView === "exchange") renderExchange();
+    else if (state.activeView === "operations") renderOperations();
+    else if (state.activeView === "system") renderSystem();
+    else renderDashboard();
+  }
+
+  function updateSubmissionField(code, field, value) {
+    const submission = submissionForActive();
+    if (!submission[code]) submission[code] = { selfScore: 0, reviewedScore: null, evidenceCount: 0, comment: "", status: "草稿" };
+    submission[code][field] = value;
+    submission[code].status = "草稿";
+    state.confirmed = false;
+    saveState();
+  }
+
+  function addReviewNote(code, status) {
+    const submission = submissionForActive();
+    const indicator = indicatorByCode(code);
+    const entry = submission[code];
+    if (status === "通过") {
+      entry.reviewedScore = Number(entry.selfScore);
+      entry.status = "审核通过";
+    }
+    if (status === "退回补正") {
+      entry.reviewedScore = null;
+      entry.status = "退回补正";
+      state.validationIssues.push({
+        id: `REV-${code}-${Date.now()}`,
+        hospitalCode: state.selectedHospital,
+        indicatorCode: code,
+        type: "审核",
+        severity: "warning",
+        status: "open",
+        description: `${indicator.name}被省级审核退回补正。`,
+        suggestion: "补充审核意见要求的材料或说明。",
+      });
+    }
+    if (status === "专家复核") {
+      entry.status = "专家复核";
+      createExpertReview(code, `${indicator.name}由省级审核提交专家复核。`);
+    }
+    state.reviewNotes.unshift({
+      id: `NOTE-${Date.now()}`,
+      hospitalCode: state.selectedHospital,
+      indicatorCode: code,
+      status,
+      text: `${indicator.name}：${status}`,
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+    });
+    state.confirmed = false;
+    saveState();
+    showNotice(`${code} 已处理为：${status}`);
+    render();
+  }
+
+  function bulkApprove() {
+    const submission = submissionForActive();
+    const issueCodes = new Set(activeIssues().map((issue) => issue.indicatorCode));
+    indicators.forEach((indicator) => {
+      if (!issueCodes.has(indicator.code)) {
+        submission[indicator.code].reviewedScore = Number(submission[indicator.code].selfScore);
+        submission[indicator.code].status = "审核通过";
+      }
+    });
+    state.reviewNotes.unshift({
+      id: `NOTE-${Date.now()}`,
+      hospitalCode: state.selectedHospital,
+      indicatorCode: "批量",
+      status: "批量通过",
+      text: "无开放问题指标已批量通过。",
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+    });
+    saveState();
+    showNotice("已批量通过无开放问题指标。");
+    render();
+  }
+
+  function makeRectifications() {
+    const issues = activeIssues();
+    const existing = new Set(state.rectifications.filter((item) => item.hospitalCode === state.selectedHospital).map((item) => item.sourceIssueId));
+    issues.forEach((issue) => {
+      if (!existing.has(issue.id)) {
+        state.rectifications.push({
+          id: `REC-${Date.now()}-${issue.indicatorCode}`,
+          sourceIssueId: issue.id,
+          hospitalCode: state.selectedHospital,
+          indicatorCode: issue.indicatorCode,
+          problem: issue.description,
+          action: issue.suggestion,
+          department: indicatorByCode(issue.indicatorCode)?.domain === "H" ? "网络安全办" : "信息中心",
+          owner: indicatorByCode(issue.indicatorCode)?.domain === "D" ? "门诊部负责人" : "责任部门管理员",
+          due: "2026-12-31",
+          reviewer: "省级审核员",
+          materials: 0,
+          status: "未开始",
+        });
+      }
+    });
+    saveState();
+    showNotice(`已生成${issues.length}项整改任务。`);
+    render();
+  }
+
+  function advanceRectification(id) {
+    const item = state.rectifications.find((entry) => entry.id === id);
+    if (!item) return;
+    const flow = ["未开始", "整改中", "已提交", "复核通过"];
+    const index = flow.indexOf(item.status);
+    item.status = flow[Math.min(flow.length - 1, index + 1)];
+    if (item.status === "复核通过") {
+      const issue = state.validationIssues.find((entry) => entry.id === item.sourceIssueId);
+      if (issue) issue.status = "resolved";
+    }
+    saveState();
+    showNotice(`整改状态已更新为：${item.status}`);
+    render();
+  }
+
+  function createTask() {
+    const id = `TASK-2026-${String(state.tasks.length + 1).padStart(3, "0")}`;
+    state.tasks.push({
+      id,
+      name: "区域能力提升专项评价",
+      type: "专项评价",
+      standard: state.task.standard,
+      scope: "二级医院重点指标补短板",
+      status: "未开始",
+      start: "2026-10-15",
+      submitDue: "2026-11-15",
+      reviewDue: "2026-12-10",
+      resultAt: "2026-12-25",
+      hospitals: state.hospitals.map((item) => item.code),
+      reminders: 0,
+      extensionRequests: 0,
+    });
+    addAudit("创建评价任务", id, "已创建");
+    saveState();
+    showNotice("已创建一项专项评价任务。");
+    render();
+  }
+
+  function sendReminder() {
+    state.tasks[0].reminders += 1;
+    addAudit("发送任务催办", state.tasks[0].name, `累计${state.tasks[0].reminders}次`);
+    saveState();
+    showNotice("已发送催办提醒。");
+    render();
+  }
+
+  function approveExtension() {
+    const task = state.tasks.find((item) => item.extensionRequests > 0) || state.tasks[0];
+    task.extensionRequests = Math.max(0, task.extensionRequests - 1);
+    task.submitDue = "2026-10-10";
+    addAudit("审批延期申请", task.name, "已同意延期至2026-10-10");
+    saveState();
+    showNotice("延期申请已审批。");
+    render();
+  }
+
+  function addEvidence() {
+    const indicator = indicators.find((item) => !evidenceForActive().some((mat) => mat.indicatorCode === item.code)) || indicators[0];
+    state.evidenceMaterials.unshift({
+      id: `EV-${indicator.code}-${Date.now()}`,
+      hospitalCode: state.selectedHospital,
+      indicatorCode: indicator.code,
+      name: `${indicator.code}-${indicator.name}-补充材料.pdf`,
+      type: "PDF",
+      version: 1,
+      sensitivity: indicator.domain === "H" ? "S4" : "S2",
+      status: "待复核",
+      uploadedBy: state.activeRole,
+      uploadedAt: nowText(),
+      expireAt: "2027-06-30",
+      watermark: "审批后水印",
+    });
+    const submission = submissionForActive();
+    submission[indicator.code].evidenceCount = Number(submission[indicator.code].evidenceCount || 0) + 1;
+    addAudit("上传证据材料", indicator.code, "待复核");
+    saveState();
+    showNotice(`已上传${indicator.code}补充材料。`);
+    render();
+  }
+
+  function verifyEvidence(id) {
+    const item = state.evidenceMaterials.find((entry) => entry.id === id);
+    if (!item) return;
+    item.status = "已校验";
+    item.watermark = "已加水印";
+    addAudit("校验证据材料", item.name, "已校验");
+    saveState();
+    showNotice("材料已校验通过。");
+    render();
+  }
+
+  function versionEvidence(id) {
+    const item = state.evidenceMaterials.find((entry) => entry.id === id);
+    if (!item) return;
+    item.version += 1;
+    item.status = "待复核";
+    item.uploadedAt = nowText();
+    addAudit("上传材料新版本", item.name, `v${item.version}`);
+    saveState();
+    showNotice("已生成材料新版本。");
+    render();
+  }
+
+  function approveExport() {
+    const pending = state.exportApprovals.find((item) => item.status === "待审批");
+    if (pending) {
+      pending.status = "已通过";
+      addAudit("审批敏感数据导出", pending.packageType, "已通过");
+    } else {
+      state.exportApprovals.unshift({
+        id: `EX-${Date.now()}`,
+        requester: state.activeRole,
+        packageType: "全量状态包",
+        scope: state.selectedHospital,
+        sensitivity: "S3",
+        status: "待审批",
+        requestedAt: nowText(),
+      });
+      addAudit("申请敏感数据导出", state.selectedHospital, "待审批");
+    }
+    saveState();
+    showNotice("导出审批状态已更新。");
+    render();
+  }
+
+  function assignReview() {
+    state.reviewAssignments.forEach((item, index) => {
+      if (item.reviewer === "未分派") item.reviewer = index % 2 ? "审核员B" : "审核员A";
+      if (item.status === "待分派") item.status = "待审核";
+    });
+    addAudit("自动分派审核任务", "省级审核任务池", "已分派");
+    saveState();
+    showNotice("审核任务已自动分派。");
+    render();
+  }
+
+  function nationalSpotCheck() {
+    const target = state.reviewAssignments.find((item) => item.risk === "高") || state.reviewAssignments[0];
+    createExpertReview("H1", `${target.hospitalName}进入国家级抽查，需复核安全合规底线项。`);
+    target.status = "国家抽查";
+    addAudit("发起国家抽查", target.hospitalName, "已进入专家复核");
+    saveState();
+    showNotice("已发起国家级抽查复核。");
+    render();
+  }
+
+  function createAppeal() {
+    state.appeals.unshift({
+      id: `AP-${state.selectedHospital}-${Date.now()}`,
+      hospitalCode: state.selectedHospital,
+      indicatorCode: "D1",
+      reason: "医院对结果口径提出复议并补充佐证。",
+      status: "待处理",
+      submittedAt: nowText(),
+      conclusion: "",
+    });
+    addAudit("登记申诉复议", state.selectedHospital, "待处理");
+    saveState();
+    showNotice("已登记一项申诉复议。");
+    render();
+  }
+
+  function resolveAppeal() {
+    const appeal = state.appeals.find((item) => item.hospitalCode === state.selectedHospital && item.status !== "已处理");
+    if (!appeal) {
+      showNotice("当前医院暂无待处理申诉。");
+      return;
+    }
+    appeal.status = "已处理";
+    appeal.conclusion = "维持原判，补充说明纳入归档。";
+    addAudit("处理申诉复议", appeal.id, appeal.conclusion);
+    saveState();
+    showNotice("申诉复议已处理。");
+    render();
+  }
+
+  function submitRectificationMaterial(id) {
+    const item = state.rectifications.find((entry) => entry.id === id);
+    if (!item) return;
+    item.materials = Number(item.materials || 0) + 1;
+    item.status = "已提交";
+    addAudit("提交整改材料", item.indicatorCode, `${item.materials}份材料`);
+    saveState();
+    showNotice("整改材料已提交。");
+    render();
+  }
+
+  function remindRectification() {
+    const open = state.rectifications.filter((item) => item.status !== "复核通过");
+    addAudit("整改逾期催办", state.selectedHospital, `${open.length}项待办`);
+    showNotice(`已催办${open.length}项整改任务。`);
+    saveState();
+    render();
+  }
+
+  function toggleScoreRule(id) {
+    const rule = state.scoringRules.find((item) => item.id === id);
+    if (!rule) return;
+    rule.status = rule.status === "启用" ? "停用" : "启用";
+    addAudit("调整评分规则状态", rule.name, rule.status);
+    saveState();
+    showNotice(`${rule.name}已${rule.status}。`);
+    render();
+  }
+
+  function approveRule() {
+    const rule = state.scoringRules.find((item) => item.status === "待审批");
+    if (!rule) {
+      showNotice("暂无待审批规则。");
+      return;
+    }
+    rule.status = "启用";
+    addAudit("审批规则变更", rule.name, "启用");
+    saveState();
+    showNotice("规则变更已审批启用。");
+    render();
+  }
+
+  function toggleBottomLine(id) {
+    const rule = state.bottomLineRules.find((item) => item.id === id);
+    if (!rule) return;
+    rule.triggered = !rule.triggered;
+    addAudit("调整底线项状态", rule.name, rule.triggered ? "已触发" : "已解除");
+    saveState();
+    showNotice(`${rule.name}状态已更新。`);
+    render();
+  }
+
+  function exportAnalytics() {
+    state.exportApprovals.unshift({
+      id: `EX-${Date.now()}`,
+      requester: state.activeRole,
+      packageType: "省域统计摘要",
+      scope: "大连市",
+      sensitivity: "S2",
+      status: "已通过",
+      requestedAt: nowText(),
+    });
+    addAudit("导出统计摘要", "省域统计看板", "已生成");
+    saveState();
+    showNotice("统计摘要已生成导出记录。");
+    render();
+  }
+
+  function toggleUserStatus() {
+    const user = state.users[state.users.length - 1];
+    user.status = user.status === "启用" ? "禁用" : "启用";
+    addAudit("切换账号状态", user.name, user.status);
+    saveState();
+    showNotice(`${user.name}已${user.status}。`);
+    render();
+  }
+
+  function createPilotBatch() {
+    const index = state.submissionBatches.length + 1;
+    state.submissionBatches.unshift({
+      id: `BATCH-2026-${String(index).padStart(2, "0")}`,
+      name: `2026第${index}批口径验证`,
+      region: "辽宁省试点地区",
+      standard: state.task.standard,
+      hospitalLevel: "二级及以上公立医院",
+      hospitalCount: 10 + index * 2,
+      status: "草稿",
+      start: "2026-11-15",
+      submitDue: "2026-12-05",
+      reviewDue: "2026-12-20",
+      reportAt: "2026-12-30",
+      submitted: 0,
+      reviewed: 0,
+      owner: state.activeRole,
+    });
+    addAudit("创建试点申报批次", state.submissionBatches[0].name, "草稿");
+    saveState();
+    showNotice(`已创建${state.submissionBatches[0].name}。`);
+    render();
+  }
+
+  function publishPilotBatch() {
+    const item = state.submissionBatches.find((entry) => entry.status === "待发布" || entry.status === "草稿");
+    if (!item) {
+      showNotice("暂无待发布的试点批次。");
+      return;
+    }
+    item.status = "已发布";
+    addAudit("发布试点申报批次", item.name, `${item.hospitalCount}家机构`);
+    state.notifications.unshift({
+      id: `MSG-${Date.now()}`,
+      title: `${item.name}已发布`,
+      recipient: `${item.region}参评医院`,
+      role: "医院管理员",
+      channel: "站内信",
+      priority: "普通",
+      status: "已送达",
+      createdAt: nowText(),
+      read: false,
+    });
+    saveState();
+    showNotice(`${item.name}已发布并通知参评机构。`);
+    render();
+  }
+
+  function enqueueUpload() {
+    const hospital = activeHospital();
+    state.uploadQueue.unshift({
+      id: `UP-${Date.now()}`,
+      hospitalCode: hospital.code,
+      hospitalName: hospital.name,
+      fileName: `${hospital.code}-试点补充材料.pdf`,
+      materialType: "补充证明",
+      size: "12.6MB",
+      progress: 0,
+      status: "排队中",
+      scanStatus: "等待上传",
+      classification: "待识别",
+      submittedAt: nowText(),
+      retries: 0,
+    });
+    addAudit("加入材料上传队列", hospital.name, state.uploadQueue[0].id);
+    saveState();
+    showNotice("材料已加入上传队列。");
+    render();
+  }
+
+  function advanceUpload() {
+    const item = state.uploadQueue.find((entry) => entry.status !== "已完成" && entry.status !== "失败");
+    if (!item) {
+      showNotice("暂无可推进的上传任务。");
+      return;
+    }
+    if (item.status === "排队中") {
+      item.status = "上传中";
+      item.progress = 35;
+      item.scanStatus = "等待扫描";
+    } else if (item.status === "上传中") {
+      item.status = "扫描中";
+      item.progress = 80;
+      item.scanStatus = "病毒与敏感内容扫描中";
+    } else {
+      item.status = "已完成";
+      item.progress = 100;
+      item.scanStatus = "扫描通过";
+      item.classification = item.classification === "待识别" ? "辅助分类待确认" : item.classification;
+    }
+    addAudit("推进材料上传任务", item.fileName, item.status);
+    saveState();
+    showNotice(`${item.fileName}已推进至${item.status}。`);
+    render();
+  }
+
+  function retryUpload() {
+    const item = state.uploadQueue.find((entry) => entry.status === "失败");
+    if (!item) {
+      showNotice("暂无失败的上传任务。");
+      return;
+    }
+    item.status = "上传中";
+    item.progress = Math.max(45, item.progress);
+    item.scanStatus = "断点续传中";
+    item.retries += 1;
+    addAudit("重试材料上传任务", item.fileName, `第${item.retries}次`);
+    saveState();
+    showNotice(`${item.fileName}已从断点继续上传。`);
+    render();
+  }
+
+  function balanceWorkload() {
+    const totalAssigned = state.reviewerWorkloads.reduce((sum, item) => sum + item.assigned, 0);
+    const totalCapacity = state.reviewerWorkloads.reduce((sum, item) => sum + item.capacity, 0);
+    let distributed = 0;
+    state.reviewerWorkloads.forEach((item, index) => {
+      const target = index === state.reviewerWorkloads.length - 1 ? totalAssigned - distributed : Math.round((totalAssigned * item.capacity) / Math.max(1, totalCapacity));
+      item.assigned = target;
+      item.inProgress = Math.min(item.inProgress, target);
+      item.overdue = Math.min(item.overdue, target > item.capacity * 0.8 ? 1 : 0);
+      item.status = target / Math.max(1, item.capacity) >= 0.85 ? "高负荷" : "正常";
+      distributed += target;
+    });
+    addAudit("自动均衡审核负荷", "省级与专家审核组", `${totalAssigned}项任务`);
+    saveState();
+    showNotice("审核任务已按人员容量自动均衡。");
+    render();
+  }
+
+  function assignUrgentReview() {
+    const reviewer = [...state.reviewerWorkloads].sort((a, b) => a.assigned / a.capacity - b.assigned / b.capacity)[0];
+    reviewer.assigned += 1;
+    reviewer.inProgress += 1;
+    reviewer.highRisk += 1;
+    reviewer.status = reviewer.assigned / reviewer.capacity >= 0.85 ? "高负荷" : "正常";
+    addAudit("分派紧急审核任务", reviewer.reviewer, "高风险任务");
+    saveState();
+    showNotice(`紧急审核任务已分派给${reviewer.reviewer}。`);
+    render();
+  }
+
+  function generateDailyReport() {
+    const pilot = pilotSummary();
+    const batch = pilot.activeBatch;
+    const pendingReviews = state.reviewerWorkloads.reduce((sum, item) => sum + item.assigned, 0);
+    const report = {
+      id: `DR-${Date.now()}`,
+      date: "2026-07-27",
+      batchId: batch.id,
+      coverage: batch.hospitalCount,
+      submitted: batch.submitted,
+      submissionRate: Number(((batch.submitted / Math.max(1, batch.hospitalCount)) * 100).toFixed(1)),
+      materials: 1842 + state.uploadQueue.filter((item) => item.status === "已完成").length,
+      uploadPending: state.uploadQueue.filter((item) => item.status !== "已完成").length,
+      validationBlockers: activeIssues().filter((item) => item.severity === "blocker").length + 17,
+      pendingReviews,
+      spotChecks: state.spotChecks.filter((item) => item.status !== "已完成").length,
+      rectifications: state.rectifications.filter((item) => item.status !== "复核通过").length,
+      incidents: pilot.failedUploads + pilot.highLoadReviewers,
+      status: "草稿",
+      generatedAt: nowText(),
+      publishedAt: "",
+      summary: `当前${batch.submitted}/${batch.hospitalCount}家医院已提交，${pilot.activeUploads}项材料任务待处理，${pilot.highLoadReviewers}名审核人员处于高负荷。`,
+    };
+    state.dailyReports.unshift(report);
+    addAudit("生成试点运行日报", report.date, "草稿");
+    saveState();
+    showNotice("今日日报已生成，请复核后发布。");
+    render();
+  }
+
+  function publishDailyReport() {
+    const report = state.dailyReports.find((item) => item.status === "草稿");
+    if (!report) {
+      showNotice("暂无待发布的运行日报。");
+      return;
+    }
+    report.status = "已发布";
+    report.publishedAt = nowText();
+    addAudit("发布试点运行日报", report.date, "已发布");
+    saveState();
+    showNotice(`${report.date}试点运行日报已发布。`);
+    render();
+  }
+
+  function recalculateReadiness(item) {
+    const dimensions = ["organization", "accounts", "network", "dataMapping", "training"];
+    item.readiness = Math.round(dimensions.reduce((sum, field) => sum + Number(item[field] || 0), 0) / dimensions.length);
+    item.status = item.blockers > 2 || item.readiness < 70 ? "有阻塞" : item.blockers > 0 || item.readiness < 90 ? "推进中" : "已就绪";
+    item.lastUpdated = nowText();
+  }
+
+  function refreshReadiness() {
+    state.hospitalReadiness.forEach(recalculateReadiness);
+    addAudit("重新评估试点医院准备度", `${state.hospitalReadiness.length}家医院`, `平均${collaborationSummary().averageReadiness}%`);
+    saveState();
+    showNotice("医院准备度已按五个维度重新评估。");
+    render();
+  }
+
+  function resolveReadinessBlocker(id) {
+    const readiness = state.hospitalReadiness.find((item) => item.id === id);
+    if (!readiness || !readiness.blockers) return;
+    const dimensions = ["organization", "accounts", "network", "dataMapping", "training"];
+    const weakest = dimensions.reduce((result, field) => (readiness[field] < readiness[result] ? field : result), dimensions[0]);
+    readiness[weakest] = Math.min(100, readiness[weakest] + 12);
+    readiness.blockers = Math.max(0, readiness.blockers - 1);
+    recalculateReadiness(readiness);
+    addAudit("推进试点准备阻塞项", readiness.hospitalName, `${readiness.readiness}% · ${readiness.status}`);
+    saveState();
+    showNotice(`${readiness.hospitalName}已完成一项准备工作。`);
+    render();
+  }
+
+  function createPilotTicket() {
+    const hospital = activeHospital();
+    const ticket = {
+      id: `TKT-${Date.now()}`,
+      title: "试点联调新增问题",
+      hospitalCode: hospital.code,
+      hospitalName: hospital.name,
+      category: "接口联调",
+      priority: "中",
+      status: "待分派",
+      owner: "未分派",
+      createdAt: nowText(),
+      dueAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toLocaleString("zh-CN", { hour12: false }),
+      slaHours: 24,
+      elapsedHours: 0,
+      channel: "工单中心",
+      description: "试点医院提交的联调问题，待责任组确认和处理。",
+    };
+    state.pilotTickets.unshift(ticket);
+    addAudit("登记试点问题工单", ticket.id, hospital.name);
+    saveState();
+    showNotice(`${ticket.id}已登记，等待分派。`);
+    render();
+  }
+
+  function assignPilotTickets() {
+    const owners = {
+      数据口径: "标准与数据组",
+      指标口径: "标准与数据组",
+      材料上传: "平台技术组",
+      接口联调: "平台技术组",
+      账号权限: "系统管理组",
+    };
+    const pending = state.pilotTickets.filter((item) => item.status === "待分派" || item.owner === "未分派");
+    pending.forEach((item) => {
+      item.owner = owners[item.category] || "试点联合专班";
+      if (item.status === "待分派") item.status = "处理中";
+    });
+    addAudit("自动分派试点工单", `${pending.length}项工单`, pending.length ? "已分派" : "无待分派工单");
+    saveState();
+    showNotice(pending.length ? `${pending.length}项工单已自动分派。` : "当前没有待分派工单。");
+    render();
+  }
+
+  function advancePilotTicket(id) {
+    const ticket = state.pilotTickets.find((item) => item.id === id);
+    if (!ticket || ticket.status === "已解决") return;
+    const flow = { 待分派: "处理中", 处理中: "待回复", 待回复: "已解决" };
+    if (ticket.owner === "未分派") ticket.owner = "试点联合专班";
+    ticket.status = flow[ticket.status] || "处理中";
+    ticket.elapsedHours = ticket.status === "已解决" ? Math.min(ticket.elapsedHours, ticket.slaHours) : Number((ticket.elapsedHours + 1).toFixed(1));
+    addAudit("推进试点问题工单", ticket.id, ticket.status);
+    saveState();
+    showNotice(`${ticket.id}已推进至“${ticket.status}”。`);
+    render();
+  }
+
+  function escalatePilotTicket(id) {
+    const ticket = state.pilotTickets.find((item) => item.id === id);
+    if (!ticket || ticket.status === "已解决") return;
+    const priorityFlow = { 低: "中", 中: "高", 高: "紧急", 紧急: "紧急" };
+    ticket.priority = priorityFlow[ticket.priority] || "高";
+    ticket.owner = "试点联合专班";
+    ticket.status = "处理中";
+    ticket.slaHours = Math.max(4, Math.round(ticket.slaHours / 2));
+    addAudit("升级试点问题工单", ticket.id, `${ticket.priority} · ${ticket.owner}`);
+    saveState();
+    showNotice(`${ticket.id}已升级为${ticket.priority}优先级。`);
+    render();
+  }
+
+  function createTrainingSession() {
+    const session = {
+      id: `TRN-${Date.now()}`,
+      title: "试点问题集中答疑",
+      audience: "医院管理员、接口管理员",
+      startAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toLocaleString("zh-CN", { hour12: false }),
+      mode: "线上会议",
+      capacity: 100,
+      enrolled: 0,
+      attended: 0,
+      questions: collaborationSummary().openTickets,
+      status: "待发布",
+      owner: "试点培训组",
+      materials: 2,
+    };
+    state.trainingSessions.unshift(session);
+    addAudit("新建试点培训场次", session.id, "待发布");
+    saveState();
+    showNotice("集中答疑场次已创建。");
+    render();
+  }
+
+  function publishTrainingSession() {
+    const session = state.trainingSessions.find((item) => item.status === "待发布");
+    if (!session) {
+      showNotice("当前没有待发布的培训场次。");
+      return;
+    }
+    session.status = "已发布";
+    addAudit("发布试点培训场次", session.id, session.startAt);
+    saveState();
+    showNotice(`${session.title}已发布。`);
+    render();
+  }
+
+  function recordTrainingAttendance(id) {
+    const session = state.trainingSessions.find((item) => item.id === id);
+    if (!session || session.status === "已完成") return;
+    session.attended = Math.max(session.attended, Math.round(session.enrolled * 0.9));
+    session.status = "进行中";
+    addAudit("记录试点培训签到", session.id, `${session.attended}人`);
+    saveState();
+    showNotice(`${session.title}已记录${session.attended}人签到。`);
+    render();
+  }
+
+  function completeTrainingSession(id) {
+    const session = state.trainingSessions.find((item) => item.id === id);
+    if (!session || session.status === "已完成") return;
+    session.attended = session.attended || Math.round(session.enrolled * 0.9);
+    session.questions = 0;
+    session.status = "已完成";
+    addAudit("完成试点培训场次", session.id, `${session.attended}人参训`);
+    saveState();
+    showNotice(`${session.title}已完成并归档。`);
+    render();
+  }
+
+  function createPilotRelease() {
+    const sequence = state.pilotReleases.filter((item) => item.status === "候选").length + 1;
+    const release = {
+      id: `REL-0.8.0-RC${sequence}-${Date.now()}`,
+      version: `v0.8.${sequence}-rc${sequence}`,
+      title: "试点协同体验优化",
+      scope: "首批3家验证医院",
+      status: "候选",
+      plannedAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toLocaleString("zh-CN", { hour12: false }),
+      publishedAt: "",
+      owner: "产品与试点组",
+      changes: 8,
+      feedbackCount: 0,
+      openFeedback: 0,
+    };
+    state.pilotReleases.unshift(release);
+    addAudit("新建试点候选版本", release.version, release.scope);
+    saveState();
+    showNotice(`${release.version}候选版本已创建。`);
+    render();
+  }
+
+  function publishPilotRelease() {
+    const release = state.pilotReleases.find((item) => item.status === "候选");
+    if (!release) {
+      showNotice("当前没有待发布的候选版本。");
+      return;
+    }
+    release.status = "已发布";
+    release.publishedAt = nowText();
+    addAudit("发布试点版本", release.version, release.scope);
+    saveState();
+    showNotice(`${release.version}已发布至试点范围。`);
+    render();
+  }
+
+  function collectPilotFeedback() {
+    const hospital = activeHospital();
+    const release = state.pilotReleases.find((item) => item.status === "已发布") || state.pilotReleases[0];
+    const feedback = {
+      id: `FB-${Date.now()}`,
+      releaseId: release.id,
+      hospitalCode: hospital.code,
+      hospitalName: hospital.name,
+      title: "试点操作流程优化建议",
+      type: "体验建议",
+      priority: "中",
+      status: "待评估",
+      owner: "产品组",
+      createdAt: nowText(),
+      resolution: "",
+    };
+    state.pilotFeedback.unshift(feedback);
+    release.feedbackCount += 1;
+    release.openFeedback += 1;
+    addAudit("收集试点版本反馈", feedback.id, release.version);
+    saveState();
+    showNotice(`${hospital.name}的版本反馈已登记。`);
+    render();
+  }
+
+  function resolvePilotFeedback(id) {
+    const feedback = state.pilotFeedback.find((item) => item.id === id);
+    if (!feedback || feedback.status === "已解决") return;
+    feedback.status = "已解决";
+    feedback.resolution = "已纳入试点优化清单并完成验证。";
+    const release = state.pilotReleases.find((item) => item.id === feedback.releaseId);
+    if (release) release.openFeedback = Math.max(0, release.openFeedback - 1);
+    addAudit("解决试点版本反馈", feedback.id, feedback.resolution);
+    saveState();
+    showNotice(`${feedback.id}已解决。`);
+    render();
+  }
+
+  function recalculatePilotOutcomes() {
+    state.pilotHospitalOutcomes.forEach((item) => {
+      const readiness = state.hospitalReadiness.find((entry) => entry.hospitalCode === item.hospitalCode);
+      const openTickets = state.pilotTickets.filter((entry) => entry.hospitalCode === item.hospitalCode && entry.status !== "已解决").length;
+      const openFeedback = state.pilotFeedback.filter((entry) => entry.hospitalCode === item.hospitalCode && entry.status !== "已解决").length;
+      item.majorIssues = openTickets + openFeedback + Number(readiness?.blockers || 0);
+      item.processCompletion = Math.round((Number(item.processCompletion || 0) + Number(readiness?.readiness || 0)) / 2);
+      item.score = Math.round(item.processCompletion * 0.3 + item.dataQuality * 0.3 + item.auditPassRate * 0.2 + item.satisfaction * 0.2);
+      item.status = item.score >= 90 && item.majorIssues <= 1 ? "可推广" : item.score >= 80 && item.majorIssues <= 4 ? "条件通过" : "需优化";
+      item.evaluatedAt = nowText();
+    });
+    const averages = {
+      "OUTCOME-PROCESS": state.pilotHospitalOutcomes.reduce((sum, item) => sum + item.processCompletion, 0) / Math.max(1, state.pilotHospitalOutcomes.length),
+      "OUTCOME-DATA": state.pilotHospitalOutcomes.reduce((sum, item) => sum + item.dataQuality, 0) / Math.max(1, state.pilotHospitalOutcomes.length),
+      "OUTCOME-REVIEW": state.pilotHospitalOutcomes.reduce((sum, item) => sum + item.auditPassRate, 0) / Math.max(1, state.pilotHospitalOutcomes.length),
+      "OUTCOME-UPTIME": state.serviceHealth.reduce((sum, item) => sum + Number(item.availability || 0), 0) / Math.max(1, state.serviceHealth.length),
+      "OUTCOME-SAT": state.pilotHospitalOutcomes.reduce((sum, item) => sum + item.satisfaction, 0) / Math.max(1, state.pilotHospitalOutcomes.length),
+    };
+    state.pilotOutcomeMetrics.forEach((item) => {
+      item.current = Number(averages[item.id].toFixed(item.id === "OUTCOME-UPTIME" ? 2 : 0));
+      item.status = item.current >= item.target ? "达标" : item.current < item.target - 10 ? "未达标" : "关注";
+    });
+    addAudit("重新计算试点成效", "成效指标与医院评分", `综合${assessmentSummary().weightedScore}`);
+    saveState();
+    showNotice("试点成效指标和医院评分已重新计算。");
+    render();
+  }
+
+  function generateIssueReview() {
+    const openValidation = state.validationIssues.filter((item) => item.status !== "resolved").length;
+    const failedUploads = state.uploadQueue.filter((item) => item.status === "失败").length;
+    const unhealthyInterfaces = state.interfaceHealth.filter((item) => item.status !== "正常").length;
+    const openFeedback = state.pilotFeedback.filter((item) => item.status !== "已解决").length;
+    const counts = {
+      "THEME-DATA-MAP": state.pilotTickets.filter((item) => item.category === "数据口径" && item.status !== "已解决").length + openValidation,
+      "THEME-UPLOAD": state.pilotTickets.filter((item) => item.category === "材料上传" && item.status !== "已解决").length + failedUploads + unhealthyInterfaces,
+      "THEME-STANDARD": state.pilotTickets.filter((item) => item.category === "指标口径" && item.status !== "已解决").length + openFeedback,
+      "THEME-ACCESS": state.pilotTickets.filter((item) => item.category === "账号权限" && item.status !== "已解决").length,
+    };
+    state.pilotIssueThemes.forEach((item) => {
+      const count = counts[item.id];
+      if (typeof count === "number") {
+        item.count = count;
+        item.sourceCount = Math.max(count, count + Math.ceil(openFeedback / 2));
+      }
+      if (item.status !== "已闭环") item.status = item.count > 4 ? "改进中" : "分析完成";
+      item.reviewedAt = nowText();
+    });
+    addAudit("生成试点问题复盘", `${state.pilotIssueThemes.length}个问题主题`, `${assessmentSummary().openThemes}个开放主题`);
+    saveState();
+    showNotice("问题工单、反馈、校验和监控线索已重新归并。");
+    render();
+  }
+
+  function closeIssueTheme(id) {
+    const theme = state.pilotIssueThemes.find((item) => item.id === id);
+    if (!theme || theme.status === "已闭环") return;
+    theme.status = "已闭环";
+    theme.reviewedAt = nowText();
+    addAudit("确认试点问题主题闭环", theme.id, theme.title);
+    saveState();
+    showNotice(`${theme.title}已确认闭环。`);
+    render();
+  }
+
+  function createImprovementPlan() {
+    const theme = state.pilotIssueThemes.find((item) => item.status !== "已闭环") || state.pilotIssueThemes[0];
+    const plan = {
+      id: `PLAN-${Date.now()}`,
+      sourceId: theme.id,
+      title: `补充${theme.category}试点优化措施`,
+      source: `${theme.title}复盘`,
+      priority: theme.impact === "高" ? "高" : "中",
+      owner: theme.owner,
+      targetVersion: "v0.9.2",
+      dueAt: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toLocaleDateString("zh-CN"),
+      status: "待开始",
+      progress: 0,
+      acceptance: "完成三类试点医院回归验证并形成验收记录",
+    };
+    state.pilotImprovementPlans.unshift(plan);
+    addAudit("生成试点优化事项", plan.id, theme.id);
+    saveState();
+    showNotice(`${plan.title}已加入优化计划。`);
+    render();
+  }
+
+  function advanceImprovementPlan(id) {
+    const plan = state.pilotImprovementPlans.find((item) => item.id === id);
+    if (!plan || plan.status === "已完成") return;
+    const flow = {
+      待开始: { status: "进行中", progress: 40 },
+      进行中: { status: "待验收", progress: 90 },
+      待验收: { status: "已完成", progress: 100 },
+    };
+    const next = flow[plan.status] || flow.待开始;
+    plan.status = next.status;
+    plan.progress = Math.max(plan.progress, next.progress);
+    if (plan.status === "已完成") {
+      const theme = state.pilotIssueThemes.find((item) => item.id === plan.sourceId);
+      if (theme) theme.status = "已闭环";
+    }
+    addAudit("推进试点优化事项", plan.id, `${plan.status} · ${plan.progress}%`);
+    saveState();
+    showNotice(`${plan.title}已推进至“${plan.status}”。`);
+    render();
+  }
+
+  function recalculateRolloutRegion(item) {
+    const dimensions = ["organization", "platform", "security", "training", "dataMigration"];
+    item.readiness = Math.round(dimensions.reduce((sum, field) => sum + Number(item[field] || 0), 0) / dimensions.length);
+    if (item.status !== "已启动") item.status = item.readiness >= 90 ? "可启动" : item.readiness >= 75 ? "准备中" : "有风险";
+  }
+
+  function assessRolloutReadiness() {
+    state.rolloutRegions.forEach(recalculateRolloutRegion);
+    addAudit("评估区域推广准备度", `${state.rolloutRegions.length}个区域`, `平均${assessmentSummary().averageRolloutReadiness}%`);
+    saveState();
+    showNotice("推广区域已按五个准入维度重新评估。");
+    render();
+  }
+
+  function advanceRolloutRegion(id) {
+    const region = state.rolloutRegions.find((item) => item.id === id);
+    if (!region || region.status === "已启动") return;
+    const dimensions = ["organization", "platform", "security", "training", "dataMigration"];
+    const weakest = dimensions.reduce((result, field) => (region[field] < region[result] ? field : result), dimensions[0]);
+    region[weakest] = Math.min(100, region[weakest] + 10);
+    recalculateRolloutRegion(region);
+    addAudit("推进区域推广准备", region.province, `${region.readiness}% · ${region.status}`);
+    saveState();
+    showNotice(`${region.province}已完成一项推广准备工作。`);
+    render();
+  }
+
+  function launchRolloutRegion(id) {
+    const region = state.rolloutRegions.find((item) => item.id === id);
+    if (!region || region.status === "已启动") return;
+    if (region.readiness < 85) {
+      showNotice(`${region.province}准备度不足85%，暂不能启动推广。`);
+      return;
+    }
+    region.status = "已启动";
+    region.startedAt = nowText();
+    addAudit("启动区域推广", region.province, `${region.hospitalCount}家医院`);
+    saveState();
+    showNotice(`${region.province}已启动推广。`);
+    render();
+  }
+
+  function generateAssessmentReport() {
+    const summary = assessmentSummary();
+    const report = {
+      id: `ASSESS-${Date.now()}`,
+      period: "2026年首批试点",
+      version: state.pilotReleases.find((item) => item.status === "已发布")?.version || "v0.9.0",
+      coverage: state.pilotHospitalOutcomes.length,
+      score: Math.round(summary.weightedScore),
+      conclusion: summary.weightedScore >= 85 ? "核心评价闭环运行稳定，具备扩大试点条件。" : "核心流程已验证，需完成重点优化后扩大试点。",
+      recommendation: `优先完成${summary.openPlans}项开放优化计划，按区域准备度分批启动推广。`,
+      status: "草稿",
+      generatedAt: nowText(),
+      publishedAt: "",
+    };
+    state.pilotAssessmentReports.unshift(report);
+    addAudit("生成试点评估报告", report.id, `${report.score}分`);
+    saveState();
+    showNotice("试点评估报告已生成，请复核后发布。");
+    render();
+  }
+
+  function publishAssessmentReport() {
+    const report = state.pilotAssessmentReports.find((item) => item.status === "草稿");
+    if (!report) {
+      showNotice("当前没有待发布的试点评估报告。");
+      return;
+    }
+    report.status = "已发布";
+    report.publishedAt = nowText();
+    addAudit("发布试点评估报告", report.id, report.conclusion);
+    saveState();
+    showNotice(`${report.id}已发布。`);
+    render();
+  }
+
+  function syncAssistantKnowledge() {
+    const syncedAt = nowText();
+    state.assistantKnowledgeSources.forEach((item) => {
+      item.lastSyncedAt = syncedAt;
+    });
+    addAudit("同步评价助手知识源", `${state.assistantKnowledgeSources.length}个知识源`, `${assistantSummary().knowledgeChunks}个知识片段`);
+    saveState();
+    showNotice("标准、材料、数据目录和试点案例知识源已同步。");
+    render();
+  }
+
+  function answerTemplateForQuestion(question) {
+    if (/H1|等保|安全/.test(question)) {
+      return {
+        scope: "H1 网络安全等级保护",
+        answer: "等保材料应能证明评价任务截止日前处于有效状态；处于整改或复测阶段时，应补充备案、整改计划和复测安排，并由审核员确认。",
+        citations: ["H1评价细则第3.2条", "证据材料目录EVD-H1-01"],
+        confidence: 95,
+      };
+    }
+    if (/D6|适老|无障碍/.test(question)) {
+      return {
+        scope: "D6 老年人和特殊人群适老化服务",
+        answer: "应同时提供已上线的适老化功能证据、人工辅助流程和实际服务记录，仅有建设方案不能证明持续运行。",
+        citations: ["D6指标证据要求", "证据材料目录EVD-D6-01至03"],
+        confidence: 93,
+      };
+    }
+    return {
+      scope: "B3 院内系统集成和接口治理",
+      answer: "失败重试应按同一业务请求标识去重，保留最终调用结果和原始失败记录；统计说明需明确请求标识、重试窗口和计划停机处理方式。",
+      citations: ["B3指标口径第2.4条", "数据采集目录API-STAT-03"],
+      confidence: 92,
+    };
+  }
+
+  function askStandardQuestion() {
+    const input = document.querySelector("[data-assistant-question]");
+    const question = input?.value.trim() || "B3接口成功率统计时，失败重试应如何去重？";
+    const template = answerTemplateForQuestion(question);
+    const record = {
+      id: `QA-${Date.now()}`,
+      hospitalCode: state.selectedHospital,
+      question,
+      answer: template.answer,
+      citations: template.citations,
+      confidence: template.confidence,
+      askedBy: state.activeRole,
+      askedAt: nowText(),
+      status: "已回答",
+      scope: template.scope,
+    };
+    state.standardQaRecords.unshift(record);
+    addAudit("提交标准口径问题", record.id, `${record.confidence}%置信度`);
+    saveState();
+    showNotice("已生成带引用来源的辅助回答，请人工确认。");
+    render();
+  }
+
+  function confirmStandardAnswer(id) {
+    const record = state.standardQaRecords.find((item) => item.id === id);
+    if (!record || record.status === "已确认") return;
+    record.status = "已确认";
+    addAudit("人工确认标准问答", record.id, record.scope);
+    saveState();
+    showNotice(`${record.id}已由人工确认。`);
+    render();
+  }
+
+  function generateAnomalyExplanations() {
+    const issue = activeIssues()[0];
+    const indicator = indicatorByCode(issue?.indicatorCode || "B5");
+    const explanation = {
+      id: `AEX-${Date.now()}`,
+      sourceId: issue?.id || `ASSIST-${state.selectedHospital}-VOLATILITY`,
+      hospitalCode: state.selectedHospital,
+      indicatorCode: issue?.indicatorCode || "B5",
+      title: issue?.description || "数据质量指标较历史基线存在波动",
+      summary: issue ? `校验规则识别到：${issue.description}` : "当前数据质量结果与历史基线存在明显差异，需要核验统计口径和数据处理过程。",
+      possibleCause: issue?.type === "材料" ? "材料未上传、关联指标错误或材料有效期不满足要求。" : "统计周期、字段口径、数据抽取范围或源系统处理逻辑发生变化。",
+      impact: issue?.severity === "blocker" ? "属于阻断问题，未处理时影响正式提交。" : "作为人工核验线索，不自动改变评分。",
+      recommendation: issue?.suggestion || `核验${indicator?.name || "相关指标"}的数据来源、统计周期和历史变化说明。`,
+      status: "待确认",
+      generatedAt: nowText(),
+      editable: true,
+    };
+    state.anomalyExplanations.unshift(explanation);
+    addAudit("生成异常可读说明", explanation.id, explanation.sourceId);
+    saveState();
+    showNotice("已根据当前校验问题生成异常说明。");
+    render();
+  }
+
+  function editAnomalyExplanation(id) {
+    const explanation = state.anomalyExplanations.find((item) => item.id === id);
+    if (!explanation || explanation.status === "已采纳") return;
+    explanation.recommendation = `${explanation.recommendation} 医院补充：已安排责任部门核对原始数据并提交说明。`;
+    explanation.status = "已编辑";
+    addAudit("编辑异常说明", explanation.id, "保留原始生成版本");
+    saveState();
+    showNotice(`${explanation.id}已补充医院说明。`);
+    render();
+  }
+
+  function adoptAnomalyExplanation(id) {
+    const explanation = state.anomalyExplanations.find((item) => item.id === id);
+    if (!explanation || explanation.status === "已采纳") return;
+    explanation.status = "已采纳";
+    addAudit("采纳异常说明", explanation.id, explanation.indicatorCode);
+    saveState();
+    showNotice(`${explanation.id}已采纳并进入问题处理。`);
+    render();
+  }
+
+  function generateRectificationSuggestion() {
+    const explanation = state.anomalyExplanations.find(
+      (item) => !state.rectificationSuggestions.some((suggestion) => suggestion.sourceId === item.id),
+    ) || state.anomalyExplanations.find((item) => item.status !== "已采纳") || state.anomalyExplanations[0];
+    const indicator = indicatorByCode(explanation.indicatorCode);
+    const suggestion = {
+      id: `RSG-${Date.now()}`,
+      sourceId: explanation.id,
+      hospitalCode: explanation.hospitalCode,
+      indicatorCode: explanation.indicatorCode,
+      problem: explanation.title,
+      suggestion: `围绕${indicator?.name || explanation.indicatorCode}建立专项补正任务，核验原始数据、补充支撑材料并完成院内复核。`,
+      steps: ["确认问题责任部门", "核验数据与材料来源", "完成补正并记录版本", "提交院内负责人复核"],
+      priority: /阻断|缺失|安全/.test(`${explanation.impact}${explanation.title}`) ? "紧急" : "高",
+      owner: indicator?.domain === "H" ? "网络安全办" : indicator?.domain === "D" ? "门诊部" : "信息中心",
+      dueDays: 7,
+      disclaimer: "智能建议仅供参考，采纳后仍需医院和审核人员确认。",
+      status: "待采纳",
+      createdAt: nowText(),
+    };
+    state.rectificationSuggestions.unshift(suggestion);
+    addAudit("生成智能整改建议", suggestion.id, explanation.id);
+    saveState();
+    showNotice("已生成整改建议模板，请责任部门确认。");
+    render();
+  }
+
+  function adoptRectificationSuggestion(id) {
+    const suggestion = state.rectificationSuggestions.find((item) => item.id === id);
+    if (!suggestion || suggestion.status === "已采纳") return;
+    suggestion.status = "已采纳";
+    const exists = state.rectifications.some((item) => item.sourceIssueId === suggestion.id);
+    if (!exists) {
+      const due = new Date(Date.now() + suggestion.dueDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      state.rectifications.push({
+        id: `REC-${Date.now()}-${suggestion.indicatorCode}`,
+        sourceIssueId: suggestion.id,
+        hospitalCode: suggestion.hospitalCode,
+        indicatorCode: suggestion.indicatorCode,
+        problem: suggestion.problem,
+        action: suggestion.suggestion,
+        department: suggestion.owner,
+        owner: "责任部门管理员",
+        due,
+        reviewer: "省级审核员",
+        materials: 0,
+        status: "未开始",
+      });
+    }
+    addAudit("采纳智能整改建议", suggestion.id, "已生成正式整改任务");
+    saveState();
+    showNotice(`${suggestion.id}已采纳并转为整改任务。`);
+    render();
+  }
+
+  function scanReviewRisks() {
+    const hospital = activeHospital();
+    const code = activeIssues()[0]?.indicatorCode || "B5";
+    const signal = {
+      id: `RSK-${Date.now()}`,
+      hospitalCode: hospital.code,
+      hospitalName: hospital.name,
+      indicatorCode: code,
+      level: activeIssues().some((item) => item.severity === "blocker") ? "高" : "中",
+      signal: "申报数据、证据材料与历史结果存在待核验差异",
+      basis: "辅助扫描发现当前申报状态与材料完整性、历史波动或规则边界存在组合风险。",
+      recommendation: "由审核员核验原始数据、材料版本和口径说明，必要时提交专家复核。",
+      source: "多源风险辅助扫描",
+      status: "待确认",
+      owner: "省级审核组",
+      createdAt: nowText(),
+    };
+    state.reviewRiskSignals.unshift(signal);
+    addAudit("扫描审核风险线索", signal.id, `${signal.level}风险`);
+    saveState();
+    showNotice("已完成多源风险扫描，新增1条待确认线索。");
+    render();
+  }
+
+  function confirmReviewRisk(id) {
+    const risk = state.reviewRiskSignals.find((item) => item.id === id);
+    if (!risk || risk.status !== "待确认") return;
+    risk.status = "已确认";
+    addAudit("确认审核风险线索", risk.id, risk.signal);
+    saveState();
+    showNotice(`${risk.id}已确认，等待后续处置。`);
+    render();
+  }
+
+  function dismissReviewRisk(id) {
+    const risk = state.reviewRiskSignals.find((item) => item.id === id);
+    if (!risk || risk.status === "已排除" || risk.status === "已转复核") return;
+    risk.status = "已排除";
+    addAudit("排除审核风险线索", risk.id, "人工核验后排除");
+    saveState();
+    showNotice(`${risk.id}已由人工排除。`);
+    render();
+  }
+
+  function reviewRiskToExpert(id) {
+    const risk = state.reviewRiskSignals.find((item) => item.id === id);
+    if (!risk || risk.status === "已排除" || risk.status === "已转复核") return;
+    const previousHospital = state.selectedHospital;
+    state.selectedHospital = risk.hospitalCode;
+    const review = createExpertReview(risk.indicatorCode, risk.signal);
+    state.selectedHospital = previousHospital;
+    risk.status = "已转复核";
+    risk.owner = review?.expertGroup || expertGroupForIndicator(indicatorByCode(risk.indicatorCode));
+    addAudit("风险线索转专家复核", risk.id, risk.owner);
+    saveState();
+    showNotice(`${risk.id}已转专家复核。`);
+    render();
+  }
+
+  function closeMonitoringAlerts(source) {
+    state.monitoringAlerts
+      .filter((item) => item.source === source && item.status !== "已关闭")
+      .forEach((item) => {
+        item.status = "已关闭";
+        item.handledAt = nowText();
+      });
+  }
+
+  function createMonitoringAlert(source, level, title, owner) {
+    const exists = state.monitoringAlerts.some((item) => item.source === source && item.title === title && item.status !== "已关闭");
+    if (exists) return;
+    state.monitoringAlerts.unshift({
+      id: `ALT-${Date.now()}-${state.monitoringAlerts.length + 1}`,
+      source,
+      level,
+      title,
+      status: "待确认",
+      createdAt: nowText(),
+      owner,
+      handledAt: "",
+    });
+  }
+
+  function runMonitoringCheck() {
+    const checkedAt = nowText();
+    state.serviceHealth.forEach((item) => {
+      item.lastCheck = checkedAt;
+      if (item.status !== "正常") createMonitoringAlert(item.id, item.status === "降级" ? "高" : "中", `${item.name}巡检发现${item.status}`, "平台技术组");
+    });
+    state.jobQueues.filter((item) => item.status !== "正常").forEach((item) => createMonitoringAlert(item.id, item.status === "拥堵" ? "高" : "中", `${item.name}存在${item.pending}项积压`, "运维值班组"));
+    state.storagePools.filter((item) => item.status !== "正常").forEach((item) => createMonitoringAlert(item.id, item.status === "高风险" ? "紧急" : "高", `${item.name}使用率达到${item.usage}%`, "安全管理组"));
+    addAudit("执行平台运营巡检", "核心服务、任务队列与存储", `${monitoringSummary().activeAlerts}项开放告警`);
+    saveState();
+    showNotice("运营巡检已完成，异常项已进入统一告警台账。");
+    render();
+  }
+
+  function acknowledgeMonitoringAlert(id) {
+    const alert = state.monitoringAlerts.find((item) => item.id === id);
+    if (!alert || alert.status === "已关闭") return;
+    alert.status = "已确认";
+    alert.handledAt = nowText();
+    addAudit("确认运营告警", alert.id, alert.title);
+    saveState();
+    showNotice(`${alert.id}已确认并纳入处置跟踪。`);
+    render();
+  }
+
+  function recoverService(id) {
+    const service = state.serviceHealth.find((item) => item.id === id);
+    if (!service) return;
+    service.status = "正常";
+    service.availability = Math.max(service.availability, service.sla);
+    service.latency = Math.min(service.latency, 180);
+    service.lastCheck = nowText();
+    closeMonitoringAlerts(service.id);
+    addAudit("恢复平台服务", service.name, "服务恢复并关闭关联告警");
+    saveState();
+    showNotice(`${service.name}已恢复，关联告警已关闭。`);
+    render();
+  }
+
+  function probeInterfaces() {
+    const checkedAt = nowText();
+    state.interfaceHealth.forEach((item) => {
+      item.lastCheck = checkedAt;
+      if (item.status !== "正常") createMonitoringAlert(item.id, item.status === "异常" ? "高" : "中", `${item.name}探测${item.status}`, "接口管理组");
+    });
+    addAudit("批量探测平台接口", `${state.interfaceHealth.length}个接口`, `${monitoringSummary().unhealthyInterfaces}项异常`);
+    saveState();
+    showNotice("接口探测已完成，异常结果已生成告警。");
+    render();
+  }
+
+  function retryInterface(id) {
+    const item = state.interfaceHealth.find((entry) => entry.id === id);
+    if (!item) return;
+    item.successRate = Math.max(99.8, item.successRate);
+    item.p95 = Math.min(220, item.p95);
+    item.status = "正常";
+    item.lastError = "";
+    item.lastCheck = nowText();
+    closeMonitoringAlerts(item.id);
+    addAudit("重试异常接口", item.name, "探测通过");
+    saveState();
+    showNotice(`${item.name}重试通过，接口状态已恢复。`);
+    render();
+  }
+
+  function scaleQueue(id) {
+    const queue = state.jobQueues.find((item) => item.id === id);
+    if (!queue) return;
+    queue.workers += 4;
+    queue.capacity += 120;
+    queue.status = queue.pending > queue.capacity ? "拥堵" : queue.pending > queue.capacity * 0.6 ? "预警" : "正常";
+    if (queue.status === "正常") closeMonitoringAlerts(queue.id);
+    addAudit("扩容异步任务队列", queue.name, `${queue.workers}个工作进程`);
+    saveState();
+    showNotice(`${queue.name}已扩容至${queue.workers}个工作进程。`);
+    render();
+  }
+
+  function prioritizeQueue(id) {
+    const queue = state.jobQueues.find((item) => item.id === id);
+    if (!queue) return;
+    queue.pending = Math.max(0, queue.pending - Math.max(12, Math.round(queue.capacity * 0.35)));
+    queue.failed = Math.max(0, queue.failed - 1);
+    queue.oldestWait = Math.max(1, Math.round(queue.oldestWait * 0.45));
+    queue.status = queue.pending > queue.capacity ? "拥堵" : queue.pending > queue.capacity * 0.6 ? "预警" : "正常";
+    if (queue.status === "正常") closeMonitoringAlerts(queue.id);
+    addAudit("提升队列处理优先级", queue.name, `剩余${queue.pending}项`);
+    saveState();
+    showNotice(`${queue.name}已提速，当前积压${queue.pending}项。`);
+    render();
+  }
+
+  function expandStorage(id) {
+    const pool = state.storagePools.find((item) => item.id === id);
+    if (!pool) return;
+    pool.total = Number((pool.total + Math.max(2, Math.ceil(pool.total * 0.25))).toFixed(2));
+    pool.usage = Math.round((pool.used / pool.total) * 100);
+    pool.status = pool.usage >= 90 ? "高风险" : pool.usage >= 75 ? "预警" : "正常";
+    if (pool.status === "正常") closeMonitoringAlerts(pool.id);
+    addAudit("扩容平台存储", pool.name, `${pool.total}${pool.unit}`);
+    saveState();
+    showNotice(`${pool.name}已扩容至${pool.total}${pool.unit}。`);
+    render();
+  }
+
+  function cleanStorage(id) {
+    const pool = state.storagePools.find((item) => item.id === id);
+    if (!pool) return;
+    pool.used = Number(Math.max(0.1, pool.used - Math.max(0.2, pool.used * 0.12)).toFixed(2));
+    pool.usage = Math.round((pool.used / pool.total) * 100);
+    pool.growthDaily = Math.max(4, Math.round(pool.growthDaily * 0.8));
+    pool.status = pool.usage >= 90 ? "高风险" : pool.usage >= 75 ? "预警" : "正常";
+    if (pool.status === "正常") closeMonitoringAlerts(pool.id);
+    addAudit("执行存储生命周期清理", pool.name, `使用率${pool.usage}%`);
+    saveState();
+    showNotice(`${pool.name}清理完成，使用率降至${pool.usage}%。`);
+    render();
+  }
+
+  function generateSpotCheck() {
+    const anomaly = state.peerAnomalies.find((item) => item.status === "待核验" && !state.spotChecks.some((check) => check.hospitalCode === item.hospitalCode && check.status !== "已完成"));
+    const hospital = anomaly ? state.hospitals.find((item) => item.code === anomaly.hospitalCode) : activeHospital();
+    const id = `SC-2026-${String(state.spotChecks.length + 1).padStart(3, "0")}`;
+    state.spotChecks.unshift({
+      id,
+      batch: "2026智能风险专项抽查",
+      hospitalCode: hospital.code,
+      hospitalName: hospital.name,
+      source: anomaly ? "异常线索入池" : "分层随机抽样",
+      reason: anomaly?.reason || "按医院等级与类别执行分层随机抽样",
+      sampleRate: anomaly?.level === "高" ? "30%" : "15%",
+      reviewer: "未分派",
+      status: "待分派",
+      due: "2026-11-30",
+      findings: 0,
+    });
+    if (anomaly) anomaly.status = "已转抽查";
+    addAudit("生成国家抽查批次", hospital.name, id);
+    saveState();
+    showNotice(`已生成国家抽查任务 ${id}。`);
+    render();
+  }
+
+  function assignSpotCheck() {
+    const item = state.spotChecks.find((entry) => entry.reviewer === "未分派" || entry.status === "待分派");
+    if (!item) {
+      showNotice("暂无待分派的国家抽查任务。");
+      return;
+    }
+    item.reviewer = `国家抽查组${state.spotChecks.indexOf(item) % 2 ? "B" : "A"}`;
+    item.status = "待复核";
+    addAudit("分派国家抽查任务", item.id, item.reviewer);
+    saveState();
+    showNotice(`${item.id}已分派至${item.reviewer}。`);
+    render();
+  }
+
+  function completeSpotCheck() {
+    const item = state.spotChecks.find((entry) => entry.status === "待复核" || entry.status === "复核中");
+    if (!item) {
+      showNotice("暂无可完成的国家抽查任务。");
+      return;
+    }
+    item.status = "已完成";
+    item.findings = item.reason.includes("安全") || item.reason.includes("异常") ? 1 : 0;
+    addAudit("完成国家抽查复核", item.id, `发现${item.findings}项问题`);
+    saveState();
+    showNotice(`${item.id}已完成复核，发现${item.findings}项问题。`);
+    render();
+  }
+
+  function runSandbox() {
+    const config = state.sandboxConfig;
+    const strictness = Math.max(0, Number(config.successRateThreshold) - 95) + Number(config.evidenceMinimum) * 2 + Number(config.anomalyMultiplier);
+    const affected = Math.min(126, Math.max(4, Math.round(strictness * 3.2)));
+    state.sandboxRuns.unshift({
+      id: `SB-${Date.now()}`,
+      ruleName: "评分与异常阈值组合方案",
+      version: `候选v${state.sandboxRuns.length + 2}`,
+      population: 126,
+      affected,
+      avgDelta: Number((-strictness / 2.1).toFixed(1)),
+      gradeChanges: Math.max(1, Math.round(affected / 7)),
+      bottomLineHits: Number(config.evidenceMinimum > 2),
+      status: "待审批",
+      runAt: nowText(),
+      approvedBy: "",
+    });
+    addAudit("运行规则沙箱", "候选规则组合", `影响${affected}家医院`);
+    saveState();
+    showNotice(`规则试算完成，${affected}家样本医院受到影响。`);
+    render();
+  }
+
+  function approveSandbox() {
+    const item = state.sandboxRuns.find((entry) => entry.status === "待审批");
+    if (!item) {
+      showNotice("暂无待审批的规则试算方案。");
+      return;
+    }
+    item.status = "已发布";
+    item.approvedBy = state.activeRole;
+    state.scoringRules.unshift({
+      id: `SR-SANDBOX-${Date.now()}`,
+      name: item.ruleName,
+      type: "沙箱发布",
+      status: "启用",
+      owner: "标准规则组",
+      description: `${item.version}经脱敏样本试算和人工审批后发布。`,
+    });
+    addAudit("审批规则沙箱方案", item.id, "已发布");
+    saveState();
+    showNotice(`${item.version}已审批发布并同步至评分规则。`);
+    render();
+  }
+
+  function classifyMaterials() {
+    const domainCategories = {
+      A: "基础设施与平台材料",
+      B: "数据治理与共享材料",
+      C: "智慧医疗证明",
+      D: "智慧服务统计",
+      E: "运营管理材料",
+      F: "质量安全闭环材料",
+      G: "创新应用材料",
+      H: "安全合规证明",
+    };
+    evidenceForActive().forEach((material, index) => {
+      const indicator = indicatorByCode(material.indicatorCode);
+      const existing = state.materialClassifications.find((item) => item.materialId === material.id);
+      const next = {
+        id: existing?.id || `MC-${material.id}`,
+        materialId: material.id,
+        materialName: material.name,
+        suggestedIndicator: material.indicatorCode,
+        category: domainCategories[indicator?.domain] || "其他评价材料",
+        confidence: Math.max(82, 98 - index * 3),
+        risk: material.sensitivity === "S4" ? "高" : material.status === "缺少说明" ? "中" : "低",
+        status: existing?.status === "已确认" ? "已确认" : "待确认",
+      };
+      if (existing) Object.assign(existing, next);
+      else state.materialClassifications.unshift(next);
+    });
+    addAudit("运行材料智能辅助分类", state.selectedHospital, `${evidenceForActive().length}份材料`);
+    saveState();
+    showNotice("材料辅助分类已完成，请人工确认建议结果。");
+    render();
+  }
+
+  function confirmClassification(id) {
+    const item = state.materialClassifications.find((entry) => entry.id === id);
+    if (!item) return;
+    item.status = "已确认";
+    addAudit("确认材料分类", item.materialName, item.suggestedIndicator);
+    saveState();
+    showNotice(`${item.materialName}的分类建议已确认。`);
+    render();
+  }
+
+  function scanAnomalies() {
+    const hospital = activeHospital();
+    const score = scoreSnapshot();
+    const existing = state.peerAnomalies.find((item) => item.hospitalCode === hospital.code && item.metric === "综合评价得分");
+    const item = {
+      id: existing?.id || `AN-${Date.now()}`,
+      hospitalCode: hospital.code,
+      hospitalName: hospital.name,
+      metric: "综合评价得分",
+      value: `${score.total}分`,
+      peerMedian: hospital.level === "三级" ? "742分" : "668分",
+      deviation: `${score.total >= 742 ? "+" : ""}${score.total - (hospital.level === "三级" ? 742 : 668)}分`,
+      level: Math.abs(score.total - (hospital.level === "三级" ? 742 : 668)) >= 80 ? "高" : "中",
+      reason: "综合得分偏离同级同类医院中位数，建议核验高贡献指标及材料一致性",
+      status: existing?.status === "已转抽查" ? "已转抽查" : "待核验",
+    };
+    if (existing) Object.assign(existing, item);
+    else state.peerAnomalies.unshift(item);
+    addAudit("运行同类医院异常识别", hospital.name, item.level);
+    saveState();
+    showNotice(`异常识别完成，当前医院形成1条${item.level}风险线索。`);
+    render();
+  }
+
+  function anomalyToSpotCheck(id) {
+    const anomaly = state.peerAnomalies.find((entry) => entry.id === id);
+    if (!anomaly || anomaly.status === "已转抽查") return;
+    const hospital = state.hospitals.find((entry) => entry.code === anomaly.hospitalCode);
+    state.spotChecks.unshift({
+      id: `SC-2026-${String(state.spotChecks.length + 1).padStart(3, "0")}`,
+      batch: "2026同类医院异常专项抽查",
+      hospitalCode: anomaly.hospitalCode,
+      hospitalName: anomaly.hospitalName,
+      source: "异常线索入池",
+      reason: `${anomaly.metric}：${anomaly.reason}`,
+      sampleRate: anomaly.level === "高" ? "30%" : "20%",
+      reviewer: "未分派",
+      status: "待分派",
+      due: "2026-11-30",
+      findings: 0,
+    });
+    anomaly.status = "已转抽查";
+    addAudit("异常线索转国家抽查", hospital?.name || anomaly.hospitalName, anomaly.metric);
+    saveState();
+    showNotice("异常线索已转为国家抽查任务。");
+    render();
+  }
+
+  function sendMobileReminder() {
+    const hospital = activeHospital();
+    state.notifications.unshift({
+      id: `MSG-${Date.now()}`,
+      title: `${state.task.name}待办提醒`,
+      recipient: hospital.name,
+      role: "医院管理员",
+      channel: "移动端",
+      priority: "高",
+      status: state.notificationChannels.find((item) => item.channel === "移动端")?.enabled ? "已送达" : "渠道停用",
+      createdAt: nowText(),
+      read: false,
+    });
+    addAudit("发送移动端提醒", hospital.name, "已进入消息队列");
+    saveState();
+    showNotice(`已向${hospital.name}发送移动端待办提醒。`);
+    render();
+  }
+
+  function readAllMessages() {
+    state.notifications.forEach((item) => {
+      item.read = true;
+      if (item.status === "已送达") item.status = "已读";
+    });
+    addAudit("批量标记消息已读", "消息中心", `${state.notifications.length}条`);
+    saveState();
+    showNotice("全部消息已标记为已读。");
+    render();
+  }
+
+  function toggleChannel(channel) {
+    const item = state.notificationChannels.find((entry) => entry.channel === channel);
+    if (!item) return;
+    item.enabled = !item.enabled;
+    addAudit("调整提醒渠道", channel, item.enabled ? "启用" : "停用");
+    saveState();
+    showNotice(`${channel}渠道已${item.enabled ? "启用" : "停用"}。`);
+    render();
+  }
+
+  function simulateImport() {
+    const rejected = state.importJobs.length % 2 ? 0 : 6;
+    state.importJobs.unshift({
+      id: `IMP-${Date.now()}`,
+      fileName: `数据质量统计_${nowText().slice(0, 10).replaceAll("-", "")}.xlsx`,
+      template: "数据质量统计模板v1.1",
+      rows: 520,
+      accepted: 520 - rejected,
+      rejected,
+      status: rejected ? "部分成功" : "已入库",
+      submittedBy: state.activeRole,
+      submittedAt: nowText(),
+      report: rejected ? "6行指标代码或数值范围不符合要求" : "校验通过",
+    });
+    addAudit("批量导入统计数据", state.selectedHospital, rejected ? `${rejected}行待补正` : "全部入库");
+    saveState();
+    showNotice(rejected ? `导入完成，${rejected}行数据待补正。` : "导入完成，全部数据已入库。");
+    render();
+  }
+
+  function rerunImport(id) {
+    const item = state.importJobs.find((entry) => entry.id === id);
+    if (!item) return;
+    item.accepted = item.rows;
+    item.rejected = 0;
+    item.status = "已入库";
+    item.report = "补正后校验通过";
+    addAudit("补正重跑导入任务", item.id, "全部入库");
+    saveState();
+    showNotice(`${item.id}补正重跑完成，全部数据已入库。`);
+    render();
+  }
+
+  function advanceOperationStage() {
+    const operations = state.operations;
+    const index = operations.stages.findIndex((stage) => stage.id === operations.cycle.currentStage);
+    if (index < 0) return;
+    operations.stages[index].status = "已完成";
+    if (index < operations.stages.length - 1) {
+      const nextStage = operations.stages[index + 1];
+      nextStage.status = "进行中";
+      operations.cycle.currentStage = nextStage.id;
+      state.task.status = nextStage.name;
+      addOperationLog("推进年度运行阶段", `已从${operations.stages[index].name}推进到${nextStage.name}。`);
+      showNotice(`运行阶段已推进到：${nextStage.name}`);
+    } else {
+      operations.cycle.archiveStatus = "预归档";
+      addOperationLog("推进年度运行阶段", "全部阶段已完成，进入年度预归档。");
+      showNotice("全部阶段已完成，进入年度预归档。");
+    }
+    saveState();
+    render();
+  }
+
+  function publishStandardVersion() {
+    const operations = state.operations;
+    const activeVersion = operations.standardVersions[0];
+    activeVersion.status = "已发布";
+    operations.cycle.publishedAt = nowText();
+    const standardStage = operations.stages.find((stage) => stage.id === "standard");
+    if (standardStage) standardStage.status = "已完成";
+    addOperationLog("发布标准版本", `${activeVersion.id} ${activeVersion.name}已发布，规则变更${activeVersion.changeCount}项。`, "标准管理组");
+    saveState();
+    showNotice("当前标准版本已发布。");
+    render();
+  }
+
+  function runRuleAudit() {
+    const submission = submissionForActive();
+    const now = nowText();
+    const missingRate = state.metrics.dataTotal > 0 ? state.metrics.missingRecords / state.metrics.dataTotal : 0;
+    const openIssues = activeIssues();
+    state.operations.ruleSets.forEach((rule) => {
+      if (!rule.enabled) {
+        rule.violations = 0;
+        rule.lastRun = now;
+        return;
+      }
+      if (rule.id === "RULE-DATA") {
+        rule.violations = Number(missingRate > 0.01) + Number(state.metrics.invalidCodeRecords > 100) + Number(state.metrics.duplicateRecords > 100);
+      }
+      if (rule.id === "RULE-EVIDENCE") {
+        rule.violations = indicators.filter((indicator) => {
+          const entry = submission[indicator.code];
+          return Number(entry?.selfScore || 0) >= indicator.max * 0.6 && Number(entry?.evidenceCount || 0) < 1;
+        }).length;
+      }
+      if (rule.id === "RULE-SCORE") {
+        rule.violations = indicators.filter((indicator) => Number(submission[indicator.code]?.selfScore || 0) > indicator.max).length + Number(state.confirmed && openIssues.length > 0);
+      }
+      if (rule.id === "RULE-SECURITY") {
+        rule.violations = state.operations.securityItems.filter((item) => item.status !== "已通过").length;
+      }
+      rule.lastRun = now;
+    });
+    const total = state.operations.ruleSets.reduce((sum, rule) => sum + Number(rule.violations || 0), 0);
+    addOperationLog("运行规则核验", `已运行${state.operations.ruleSets.filter((rule) => rule.enabled).length}组规则，发现${total}项异常。`, "规则引擎");
+    saveState();
+    showNotice(`规则核验完成，发现${total}项异常。`);
+    render();
+  }
+
+  function toggleRule(ruleId) {
+    const rule = state.operations.ruleSets.find((item) => item.id === ruleId);
+    if (!rule) return;
+    rule.enabled = !rule.enabled;
+    if (!rule.enabled) rule.violations = 0;
+    addOperationLog(rule.enabled ? "启用规则组" : "停用规则组", `${rule.name}已${rule.enabled ? "启用" : "停用"}。`, rule.owner);
+    saveState();
+    showNotice(`${rule.name}已${rule.enabled ? "启用" : "停用"}。`);
+    render();
+  }
+
+  function passSecurityItem(itemId) {
+    const item = state.operations.securityItems.find((entry) => entry.id === itemId);
+    if (!item) return;
+    item.status = "已通过";
+    item.lastCheck = nowText();
+    item.risk = "低";
+    addOperationLog("安全复核通过", `${item.name}已标记通过。`, item.owner);
+    saveState();
+    showNotice(`${item.name}已通过。`);
+    render();
+  }
+
+  function runSecurityCheck() {
+    const now = nowText();
+    state.operations.securityItems.forEach((item) => {
+      item.lastCheck = now;
+      if (item.status !== "已通过") item.status = "需补证";
+    });
+    state.operations.cycle.securityCheckedAt = now;
+    addOperationLog("执行安全复核", "已更新全部安全检查项，未通过项标记为需补证。", "安全管理组");
+    saveState();
+    showNotice("安全复核已执行，未通过项已标记为需补证。");
+    render();
+  }
+
+  function archiveCycle() {
+    const summary = operationSummary();
+    const openIssues = activeIssues().length;
+    const pendingSecurity = summary.securityPending;
+    const allStagesDone = summary.completedStages === state.operations.stages.length;
+    state.operations.cycle.archiveStatus = allStagesDone && !openIssues && !pendingSecurity ? "已归档" : "预归档";
+    addOperationLog("生成归档状态", `当前状态：${state.operations.cycle.archiveStatus}；开放问题${openIssues}项，安全待复核${pendingSecurity}项。`, "国家级平台");
+    saveState();
+    showNotice(`归档状态已更新为：${state.operations.cycle.archiveStatus}`);
+    render();
+  }
+
+  document.addEventListener("click", (event) => {
+    const nav = event.target.closest(".nav-item");
+    if (nav) {
+      setView(nav.dataset.view);
+      return;
+    }
+    const intelligenceTab = event.target.closest("button[data-intelligence-tab]");
+    if (intelligenceTab) {
+      workspace.dataset.intelligenceTab = intelligenceTab.dataset.intelligenceTab;
+      renderIntelligence();
+      return;
+    }
+    const pilotTab = event.target.closest("button[data-pilot-tab]");
+    if (pilotTab) {
+      workspace.dataset.pilotTab = pilotTab.dataset.pilotTab;
+      renderPilot();
+      return;
+    }
+    const collaborationTab = event.target.closest("button[data-collaboration-tab]");
+    if (collaborationTab) {
+      workspace.dataset.collaborationTab = collaborationTab.dataset.collaborationTab;
+      renderCollaboration();
+      return;
+    }
+    const assessmentTab = event.target.closest("button[data-assessment-tab]");
+    if (assessmentTab) {
+      workspace.dataset.assessmentTab = assessmentTab.dataset.assessmentTab;
+      renderAssessment();
+      return;
+    }
+    const assistantTab = event.target.closest("button[data-assistant-tab]");
+    if (assistantTab) {
+      workspace.dataset.assistantTab = assistantTab.dataset.assistantTab;
+      renderAssistant();
+      return;
+    }
+    const monitoringTab = event.target.closest("button[data-monitoring-tab]");
+    if (monitoringTab) {
+      workspace.dataset.monitoringTab = monitoringTab.dataset.monitoringTab;
+      renderMonitoring();
+      return;
+    }
+    const action = event.target.closest("[data-action]");
+    if (!action) return;
+    const name = action.dataset.action;
+    if (name === "create-task") createTask();
+    if (name === "send-reminder") sendReminder();
+    if (name === "approve-extension") approveExtension();
+    if (name === "add-evidence") addEvidence();
+    if (name === "verify-evidence") verifyEvidence(action.dataset.id);
+    if (name === "version-evidence") versionEvidence(action.dataset.id);
+    if (name === "approve-export") approveExport();
+    if (name === "assign-review") assignReview();
+    if (name === "national-spot-check") nationalSpotCheck();
+    if (name === "create-appeal") createAppeal();
+    if (name === "resolve-appeal") resolveAppeal();
+    if (name === "submit-rectification-material") submitRectificationMaterial(action.dataset.id);
+    if (name === "remind-rectification") remindRectification();
+    if (name === "toggle-score-rule") toggleScoreRule(action.dataset.id);
+    if (name === "approve-rule") approveRule();
+    if (name === "toggle-bottom-line") toggleBottomLine(action.dataset.id);
+    if (name === "export-analytics") exportAnalytics();
+    if (name === "toggle-user-status") toggleUserStatus();
+    if (name === "create-pilot-batch") createPilotBatch();
+    if (name === "publish-pilot-batch") publishPilotBatch();
+    if (name === "enqueue-upload") enqueueUpload();
+    if (name === "advance-upload") advanceUpload();
+    if (name === "retry-upload") retryUpload();
+    if (name === "balance-workload") balanceWorkload();
+    if (name === "assign-urgent-review") assignUrgentReview();
+    if (name === "generate-daily-report") generateDailyReport();
+    if (name === "publish-daily-report") publishDailyReport();
+    if (name === "refresh-readiness") refreshReadiness();
+    if (name === "resolve-readiness-blocker") resolveReadinessBlocker(action.dataset.id);
+    if (name === "create-pilot-ticket") createPilotTicket();
+    if (name === "assign-pilot-tickets") assignPilotTickets();
+    if (name === "advance-pilot-ticket") advancePilotTicket(action.dataset.id);
+    if (name === "escalate-pilot-ticket") escalatePilotTicket(action.dataset.id);
+    if (name === "create-training-session") createTrainingSession();
+    if (name === "publish-training-session") publishTrainingSession();
+    if (name === "record-training-attendance") recordTrainingAttendance(action.dataset.id);
+    if (name === "complete-training-session") completeTrainingSession(action.dataset.id);
+    if (name === "create-pilot-release") createPilotRelease();
+    if (name === "publish-pilot-release") publishPilotRelease();
+    if (name === "collect-pilot-feedback") collectPilotFeedback();
+    if (name === "resolve-pilot-feedback") resolvePilotFeedback(action.dataset.id);
+    if (name === "recalculate-pilot-outcomes") recalculatePilotOutcomes();
+    if (name === "generate-issue-review") generateIssueReview();
+    if (name === "close-issue-theme") closeIssueTheme(action.dataset.id);
+    if (name === "create-improvement-plan") createImprovementPlan();
+    if (name === "advance-improvement-plan") advanceImprovementPlan(action.dataset.id);
+    if (name === "assess-rollout-readiness") assessRolloutReadiness();
+    if (name === "advance-rollout-region") advanceRolloutRegion(action.dataset.id);
+    if (name === "launch-rollout-region") launchRolloutRegion(action.dataset.id);
+    if (name === "generate-assessment-report") generateAssessmentReport();
+    if (name === "publish-assessment-report") publishAssessmentReport();
+    if (name === "sync-assistant-knowledge") syncAssistantKnowledge();
+    if (name === "ask-standard-question") askStandardQuestion();
+    if (name === "confirm-standard-answer") confirmStandardAnswer(action.dataset.id);
+    if (name === "generate-anomaly-explanations") generateAnomalyExplanations();
+    if (name === "edit-anomaly-explanation") editAnomalyExplanation(action.dataset.id);
+    if (name === "adopt-anomaly-explanation") adoptAnomalyExplanation(action.dataset.id);
+    if (name === "generate-rectification-suggestion") generateRectificationSuggestion();
+    if (name === "adopt-rectification-suggestion") adoptRectificationSuggestion(action.dataset.id);
+    if (name === "scan-review-risks") scanReviewRisks();
+    if (name === "confirm-review-risk") confirmReviewRisk(action.dataset.id);
+    if (name === "dismiss-review-risk") dismissReviewRisk(action.dataset.id);
+    if (name === "review-risk-to-expert") reviewRiskToExpert(action.dataset.id);
+    if (name === "run-monitoring-check") runMonitoringCheck();
+    if (name === "ack-monitoring-alert") acknowledgeMonitoringAlert(action.dataset.id);
+    if (name === "recover-service") recoverService(action.dataset.id);
+    if (name === "probe-interfaces") probeInterfaces();
+    if (name === "retry-interface") retryInterface(action.dataset.id);
+    if (name === "scale-queue") scaleQueue(action.dataset.id);
+    if (name === "prioritize-queue") prioritizeQueue(action.dataset.id);
+    if (name === "expand-storage") expandStorage(action.dataset.id);
+    if (name === "clean-storage") cleanStorage(action.dataset.id);
+    if (name === "generate-spot-check") generateSpotCheck();
+    if (name === "assign-spot-check") assignSpotCheck();
+    if (name === "complete-spot-check") completeSpotCheck();
+    if (name === "run-sandbox") runSandbox();
+    if (name === "approve-sandbox") approveSandbox();
+    if (name === "classify-materials") classifyMaterials();
+    if (name === "confirm-classification") confirmClassification(action.dataset.id);
+    if (name === "scan-anomalies") scanAnomalies();
+    if (name === "anomaly-to-spot-check") anomalyToSpotCheck(action.dataset.id);
+    if (name === "send-mobile-reminder") sendMobileReminder();
+    if (name === "read-all-messages") readAllMessages();
+    if (name === "toggle-channel") toggleChannel(action.dataset.channel);
+    if (name === "simulate-import") simulateImport();
+    if (name === "rerun-import") rerunImport(action.dataset.id);
+    if (name === "run-validation") runValidationRules();
+    if (name === "mark-submitted") {
+      Object.values(submissionForActive()).forEach((entry) => {
+        entry.status = "已提交";
+      });
+      state.task.status = "审核中";
+      saveState();
+      showNotice("医院申报已提交，进入省级审核。");
+      render();
+    }
+    if (name === "resolve-issue") {
+      const issue = state.validationIssues.find((item) => item.id === action.dataset.id);
+      if (issue) issue.status = "resolved";
+      saveState();
+      showNotice("问题已标记处理。");
+      render();
+    }
+    if (name === "approve-indicator") addReviewNote(action.dataset.code, "通过");
+    if (name === "return-indicator") addReviewNote(action.dataset.code, "退回补正");
+    if (name === "escalate-indicator") addReviewNote(action.dataset.code, "专家复核");
+    if (name === "bulk-approve") bulkApprove();
+    if (name === "auto-expert-review") autoCreateExpertReviews();
+    if (name === "expert-agree") resolveExpertReview(action.dataset.id, "agree");
+    if (name === "expert-adjust") resolveExpertReview(action.dataset.id, "adjust");
+    if (name === "expert-supplement") resolveExpertReview(action.dataset.id, "supplement");
+    if (name === "confirm-score") {
+      state.confirmed = true;
+      state.task.status = "结果确认";
+      saveState();
+      showNotice("评价结果已确认。");
+      render();
+    }
+    if (name === "make-rectifications") makeRectifications();
+    if (name === "advance-rectification") advanceRectification(action.dataset.id);
+    if (name === "advance-stage") advanceOperationStage();
+    if (name === "publish-standard") publishStandardVersion();
+    if (name === "run-rule-audit") runRuleAudit();
+    if (name === "toggle-rule") toggleRule(action.dataset.id);
+    if (name === "pass-security") passSecurityItem(action.dataset.id);
+    if (name === "run-security-check") runSecurityCheck();
+    if (name === "archive-cycle") archiveCycle();
+    if (name === "download-package") downloadJsonPackage(action.dataset.kind);
+    if (name === "copy-package") {
+      const text = JSON.stringify(buildDataPackage(action.dataset.kind), null, 2);
+      navigator.clipboard?.writeText(text).then(
+        () => showNotice(`${packageKindLabel(action.dataset.kind)}已复制。`),
+        () => showNotice("当前浏览器不允许直接写入剪贴板，可从预览区手动复制。"),
+      );
+    }
+  });
+
+  document.addEventListener("input", (event) => {
+    const score = event.target.closest("[data-update-score]");
+    if (score) {
+      updateSubmissionField(score.dataset.updateScore, "selfScore", Number(score.value || 0));
+      return;
+    }
+    const evidence = event.target.closest("[data-update-evidence]");
+    if (evidence) {
+      updateSubmissionField(evidence.dataset.updateEvidence, "evidenceCount", Number(evidence.value || 0));
+      return;
+    }
+    const comment = event.target.closest("[data-update-comment]");
+    if (comment) {
+      updateSubmissionField(comment.dataset.updateComment, "comment", comment.value);
+      return;
+    }
+    const metric = event.target.closest("[data-metric]");
+    if (metric) {
+      state.metrics[metric.dataset.metric] = Number(metric.value || 0);
+      saveState();
+    }
+    const filter = event.target.closest("[data-filter]");
+    if (filter) {
+      workspace.dataset[filter.dataset.filter] = filter.value;
+      renderStandards();
+    }
+    const packageKind = event.target.closest("[data-package-kind]");
+    if (packageKind) {
+      workspace.dataset.packageKind = packageKind.value;
+      renderExchange();
+    }
+    const sandboxConfig = event.target.closest("[data-sandbox-config]");
+    if (sandboxConfig) {
+      state.sandboxConfig[sandboxConfig.dataset.sandboxConfig] = Number(sandboxConfig.value || 0);
+      saveState();
+    }
+  });
+
+  hospitalSelect.addEventListener("change", () => {
+    state.selectedHospital = hospitalSelect.value;
+    saveState();
+    showNotice(`已切换到：${activeHospital().name}`);
+    render();
+  });
+
+  roleSelect.addEventListener("change", () => {
+    state.activeRole = roleSelect.value;
+    addAudit("切换演示角色", state.activeRole, "已切换");
+    saveState();
+    showNotice(`已切换到角色：${state.activeRole}`);
+    render();
+  });
+
+  document.getElementById("resetState").addEventListener("click", () => {
+    localStorage.removeItem(storageKey);
+    state = cloneSeed();
+    showNotice("样例数据已重置。");
+    render();
+  });
+
+  render();
+})();

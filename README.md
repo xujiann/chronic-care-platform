@@ -441,6 +441,8 @@ The hospital interface development handoff is `docs/escort-hospital-interface.md
 
 `digital-hospital-standards.html` is the runnable management entry for the digital hospital standards and evaluation platform. It models the standards center, official policy mapping, indicator inheritance, data/evidence collection, automatic validation, tiered review, pilot blockers, and security boundary for a national/provincial/hospital evaluation workflow.
 
+`digital-hospital-standard-platform/` is the public GitHub Pages entry for the v0.10 new-standard prototype. It adds pilot operations, pilot collaboration, pilot assessment, the evaluation assistant, rollout readiness, operational monitoring, 57 trial indicators, tiered review, scoring and rectification, and downloadable interface packages. The evaluation assistant keeps cited standard answers, anomaly explanations, rectification suggestions, and review-risk signals subject to human confirmation.
+
 `GET /api/digital-hospital/standards` is the commission-only runtime summary for standards, evaluation tasks, evidence packets, review queues, risk blockers, and the no-patient-PII evidence boundary. The page uses `HealthCityAuth.authFetch` against this API and keeps a static fallback for offline preview.
 
 `GET /api/digital-hospital/launch-readiness` returns the pilot launch gate, formal production signoff blockers, owner approvals, P0 requirements, production evidence packet coverage, and action audit state. `POST /api/digital-hospital/launch-readiness/:id/actions` records site evidence or signoff actions into the digital hospital launch ledger and security event chain.

@@ -1,0 +1,561 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schemas/digital-hospital-package.v0.1.json",
+  "title": "数智医院新标准平台数据包",
+  "type": "object",
+  "required": ["meta"],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["packageType", "generatedAt", "taskId", "standardVersion", "hospitalCode"],
+      "properties": {
+        "packageType": {
+          "type": "string",
+          "enum": ["submission", "review", "expert", "rectification", "task", "pilot", "collaboration", "assessment", "assistant", "monitoring", "evidence", "analytics", "intelligence", "operations", "system", "full"]
+        },
+        "generatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "taskId": {
+          "type": "string"
+        },
+        "taskName": {
+          "type": "string"
+        },
+        "standardVersion": {
+          "type": "string"
+        },
+        "hospitalCode": {
+          "type": "string"
+        },
+        "hospitalName": {
+          "type": "string"
+        },
+        "prototypeVersion": {
+          "type": "string"
+        }
+      }
+    },
+    "hospitalProfile": {
+      "type": "object"
+    },
+    "metrics": {
+      "type": "object"
+    },
+    "indicators": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["indicatorCode", "selfScore", "evidenceCount", "status"],
+        "properties": {
+          "indicatorCode": {
+            "type": "string"
+          },
+          "indicatorName": {
+            "type": "string"
+          },
+          "domain": {
+            "type": "string"
+          },
+          "maxScore": {
+            "type": "number"
+          },
+          "selfScore": {
+            "type": "number"
+          },
+          "reviewedScore": {
+            "type": ["number", "null"]
+          },
+          "evidenceCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "status": {
+            "type": "string"
+          },
+          "comment": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "validationIssues": {
+      "type": "array"
+    },
+    "reviewNotes": {
+      "type": "array"
+    },
+    "expertReviewStatus": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pending": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "completed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "supplement": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "adjusted": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "expertReviews": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "relatedReviewNotes": {
+      "type": "array"
+    },
+    "relatedIndicators": {
+      "type": "array"
+    },
+    "openIssues": {
+      "type": "array"
+    },
+    "rectifications": {
+      "type": "array"
+    },
+    "scoreResult": {
+      "type": "object"
+    },
+    "operationSummary": {
+      "type": "object",
+      "properties": {
+        "currentStage": {
+          "type": "string"
+        },
+        "completedStages": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "totalStages": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "openRules": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pendingSecurity": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "archiveStatus": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "operations": {
+      "type": "object",
+      "properties": {
+        "cycle": {
+          "type": "object"
+        },
+        "stages": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "standardVersions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "ruleSets": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "securityItems": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "operationLogs": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "openIssueSummary": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "hospitalScope": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "taskSummary": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "tasks": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "assignments": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "evidenceSummary": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "evidenceMaterials": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "hospitalCode", "indicatorCode", "name", "status"],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "hospitalCode": {
+            "type": "string"
+          },
+          "indicatorCode": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "version": {
+            "type": ["integer", "string"]
+          },
+          "sensitivity": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "uploadedAt": {
+            "type": "string"
+          },
+          "watermark": {
+            "type": ["boolean", "string"]
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "missingIndicators": {
+      "type": "array",
+      "items": {
+        "type": ["object", "string"]
+      }
+    },
+    "reviewAssignments": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "scoringRules": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "bottomLineRules": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "analyticsSummary": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "appeals": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "intelligenceSummary": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "spotChecks": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "sandboxConfig": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "sandboxRuns": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "materialClassifications": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "peerAnomalies": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "notifications": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "notificationChannels": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "importJobs": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pilotSummary": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "submissionBatches": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "uploadQueue": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "reviewerWorkloads": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "dailyReports": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "collaborationSummary": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "hospitalReadiness": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pilotTickets": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "trainingSessions": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pilotReleases": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pilotFeedback": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "assessmentSummary": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "pilotOutcomeMetrics": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pilotHospitalOutcomes": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pilotIssueThemes": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pilotImprovementPlans": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "rolloutRegions": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pilotAssessmentReports": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "assistantSummary": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "assistantKnowledgeSources": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "standardQaRecords": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "anomalyExplanations": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "rectificationSuggestions": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "reviewRiskSignals": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "monitoringSummary": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "serviceHealth": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "interfaceHealth": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "jobQueues": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "storagePools": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "monitoringAlerts": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "alerts": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "users": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "exportApprovals": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "systemParams": {
+      "type": ["array", "object"]
+    },
+    "auditLogs": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    }
+  }
+}

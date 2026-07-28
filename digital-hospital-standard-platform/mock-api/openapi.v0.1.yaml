@@ -1,0 +1,3371 @@
+openapi: 3.0.3
+info:
+  title: 数智医院新标准平台MVP接口
+  version: 0.1.0
+  description: >
+    面向MVP原型的接口契约草案，覆盖评价任务、试点运营、试点协同、试点评估、评价助手、推广准备、运营监控、医院申报、证据材料、数据校验、省级审核、专家复核、评分规则、评分结果、整改闭环、统计分析、国家抽查、规则沙箱、智能核验、消息提醒、批量导入、系统权限和运行管理。
+servers:
+  - url: https://example.local
+    description: 示例服务地址，正式环境由部署方案确定
+tags:
+  - name: Tasks
+    description: 评价任务与范围管理
+  - name: Standards
+    description: 标准与指标
+  - name: Submissions
+    description: 医院申报
+  - name: Evidence
+    description: 证据材料与敏感数据审批
+  - name: Validations
+    description: 数据校验
+  - name: Reviews
+    description: 省级审核
+  - name: ExpertReviews
+    description: 专家复核
+  - name: Rules
+    description: 评分规则与底线项
+  - name: Results
+    description: 评分结果与整改
+  - name: Analytics
+    description: 统计分析与风险看板
+  - name: Intelligence
+    description: 国家抽查、规则沙箱、材料辅助分类与异常识别
+  - name: Notifications
+    description: 站内信、移动端、短信与邮件提醒
+  - name: Imports
+    description: 模板批量导入、校验报告与补正重跑
+  - name: PilotOperations
+    description: 申报批次、材料上传队列、审核负荷和运行日报
+  - name: PilotCollaboration
+    description: 医院准备度、问题工单、培训答疑、试点版本和反馈闭环
+  - name: PilotAssessment
+    description: 试点成效、问题复盘、优化计划、推广准备和评估报告
+  - name: EvaluationAssistant
+    description: 标准问答、异常说明、整改建议和审核风险辅助研判
+  - name: Monitoring
+    description: 服务、接口、任务队列、存储容量和统一告警监控
+  - name: Operations
+    description: 年度运行、规则核验与安全复核
+  - name: System
+    description: 角色权限、用户、导出审批与审计日志
+paths:
+  /api/v1/evaluation-tasks:
+    get:
+      tags: [Tasks]
+      summary: 获取评价任务清单
+      responses:
+        "200":
+          description: 评价任务包
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskPackage"
+    post:
+      tags: [Tasks]
+      summary: 创建评价任务
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvaluationTask"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-tasks/{taskId}/reminders:send:
+    post:
+      tags: [Tasks]
+      summary: 发送任务催办提醒
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/pilot-batches:
+    get:
+      tags: [PilotOperations]
+      summary: 获取试点申报批次
+      responses:
+        "200":
+          description: 试点运营包
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PilotPackage"
+    post:
+      tags: [PilotOperations]
+      summary: 创建试点申报批次
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmissionBatch"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/pilot-batches/{batchId}/publish:
+    post:
+      tags: [PilotOperations]
+      summary: 发布试点申报批次并通知参评机构
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/material-upload-jobs:
+    get:
+      tags: [PilotOperations]
+      summary: 获取材料上传与安全扫描队列
+      responses:
+        "200":
+          description: 材料上传队列
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MaterialUploadJob"
+    post:
+      tags: [PilotOperations]
+      summary: 创建材料上传任务
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaterialUploadJob"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/reviewer-workloads:
+    get:
+      tags: [PilotOperations]
+      summary: 获取审核人员负荷
+      responses:
+        "200":
+          description: 审核负荷
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ReviewerWorkload"
+  /api/v1/reviewer-workloads:balance:
+    post:
+      tags: [PilotOperations]
+      summary: 按人员容量和风险等级自动均衡审核任务
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/pilot-daily-reports:
+    get:
+      tags: [PilotOperations]
+      summary: 获取试点运行日报
+      responses:
+        "200":
+          description: 运行日报
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PilotDailyReport"
+    post:
+      tags: [PilotOperations]
+      summary: 生成试点运行日报
+      responses:
+        "200":
+          description: 新生成日报
+          content:
+            application/json:
+                schema:
+                  $ref: "#/components/schemas/PilotDailyReport"
+  /api/v1/pilot-readiness:
+    get:
+      tags: [PilotCollaboration]
+      summary: 获取试点医院准备度
+      responses:
+        "200":
+          description: 医院准备度清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/HospitalReadiness"
+    post:
+      tags: [PilotCollaboration]
+      summary: 重新评估全部试点医院准备度
+      responses:
+        "200":
+          description: 试点协同包
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollaborationPackage"
+  /api/v1/pilot-readiness/{hospitalCode}/blockers:resolve:
+    post:
+      tags: [PilotCollaboration]
+      summary: 推进医院准备阻塞项
+      parameters:
+        - name: hospitalCode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/pilot-tickets:
+    get:
+      tags: [PilotCollaboration]
+      summary: 获取试点问题工单
+      responses:
+        "200":
+          description: 问题工单清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PilotTicket"
+    post:
+      tags: [PilotCollaboration]
+      summary: 登记试点问题工单
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PilotTicket"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/pilot-tickets/{ticketId}:
+    put:
+      tags: [PilotCollaboration]
+      summary: 更新、推进或升级问题工单
+      parameters:
+        - name: ticketId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PilotTicket"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/pilot-tickets:assign:
+    post:
+      tags: [PilotCollaboration]
+      summary: 按问题分类自动分派工单
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/pilot-training-sessions:
+    get:
+      tags: [PilotCollaboration]
+      summary: 获取试点培训与答疑场次
+      responses:
+        "200":
+          description: 培训场次清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TrainingSession"
+    post:
+      tags: [PilotCollaboration]
+      summary: 新建或发布培训场次
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrainingSession"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/pilot-training-sessions/{sessionId}/attendance:
+    post:
+      tags: [PilotCollaboration]
+      summary: 记录培训签到并更新场次状态
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/pilot-releases:
+    get:
+      tags: [PilotCollaboration]
+      summary: 获取试点版本清单
+      responses:
+        "200":
+          description: 试点版本清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PilotRelease"
+    post:
+      tags: [PilotCollaboration]
+      summary: 创建试点候选版本
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PilotRelease"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/pilot-releases/{releaseId}/publish:
+    post:
+      tags: [PilotCollaboration]
+      summary: 发布试点候选版本
+      parameters:
+        - name: releaseId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/pilot-feedback:
+    get:
+      tags: [PilotCollaboration]
+      summary: 获取试点版本反馈
+      responses:
+        "200":
+          description: 版本反馈清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PilotFeedback"
+    post:
+      tags: [PilotCollaboration]
+      summary: 收集试点版本反馈
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PilotFeedback"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/pilot-feedback/{feedbackId}:
+    get:
+      tags: [PilotCollaboration]
+      summary: 获取单条试点反馈
+      parameters:
+        - name: feedbackId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 单条版本反馈
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PilotFeedback"
+    put:
+      tags: [PilotCollaboration]
+      summary: 更新评估状态并解决试点反馈
+      parameters:
+        - name: feedbackId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PilotFeedback"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/pilot-assessment/outcomes:
+    get:
+      tags: [PilotAssessment]
+      summary: 获取试点成效指标与医院评分
+      responses:
+        "200":
+          description: 试点评估包
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssessmentPackage"
+    post:
+      tags: [PilotAssessment]
+      summary: 重新计算试点成效指标与医院评分
+      responses:
+        "200":
+          description: 重新计算后的试点评估包
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssessmentPackage"
+  /api/v1/pilot-assessment/issue-themes:
+    get:
+      tags: [PilotAssessment]
+      summary: 获取试点问题主题
+      responses:
+        "200":
+          description: 问题主题清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PilotIssueTheme"
+    post:
+      tags: [PilotAssessment]
+      summary: 归并工单、反馈、校验和告警生成问题复盘
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/pilot-assessment/issue-themes/{themeId}:close:
+    post:
+      tags: [PilotAssessment]
+      summary: 确认试点问题主题闭环
+      parameters:
+        - name: themeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/pilot-assessment/improvement-plans:
+    get:
+      tags: [PilotAssessment]
+      summary: 获取试点优化计划
+      responses:
+        "200":
+          description: 优化计划清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PilotImprovementPlan"
+    post:
+      tags: [PilotAssessment]
+      summary: 从问题主题生成优化事项
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PilotImprovementPlan"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/pilot-assessment/improvement-plans/{planId}:
+    put:
+      tags: [PilotAssessment]
+      summary: 推进优化事项并记录验收状态
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PilotImprovementPlan"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/rollout-regions:
+    get:
+      tags: [PilotAssessment]
+      summary: 获取区域推广准备度
+      responses:
+        "200":
+          description: 推广区域清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RolloutRegion"
+  /api/v1/rollout-regions:assess:
+    post:
+      tags: [PilotAssessment]
+      summary: 重新评估全部区域推广准备度
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/rollout-regions/{regionId}:
+    put:
+      tags: [PilotAssessment]
+      summary: 推进区域推广准备事项
+      parameters:
+        - name: regionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RolloutRegion"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/rollout-regions/{regionId}:launch:
+    post:
+      tags: [PilotAssessment]
+      summary: 启动达到准入条件的区域推广
+      parameters:
+        - name: regionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/pilot-assessment/reports:
+    get:
+      tags: [PilotAssessment]
+      summary: 获取试点评估报告
+      responses:
+        "200":
+          description: 评估报告清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PilotAssessmentReport"
+    post:
+      tags: [PilotAssessment]
+      summary: 生成试点评估报告
+      responses:
+        "200":
+          description: 新生成评估报告
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PilotAssessmentReport"
+  /api/v1/pilot-assessment/reports/{reportId}:publish:
+    post:
+      tags: [PilotAssessment]
+      summary: 发布试点评估报告
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/knowledge-sources:
+    get:
+      tags: [EvaluationAssistant]
+      summary: 获取评价助手知识源
+      responses:
+        "200":
+          description: 评价助手数据包
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssistantPackage"
+    post:
+      tags: [EvaluationAssistant]
+      summary: 同步并登记知识源
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssistantKnowledgeSource"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/questions:
+    get:
+      tags: [EvaluationAssistant]
+      summary: 获取标准问答记录
+      responses:
+        "200":
+          description: 标准问答清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/StandardQaRecord"
+    post:
+      tags: [EvaluationAssistant]
+      summary: 基于知识源生成带引用的辅助回答
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StandardQaRecord"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/questions/{questionId}:confirm:
+    post:
+      tags: [EvaluationAssistant]
+      summary: 人工确认标准问答
+      parameters:
+        - name: questionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/anomaly-explanations:
+    get:
+      tags: [EvaluationAssistant]
+      summary: 获取异常说明记录
+      responses:
+        "200":
+          description: 异常说明清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AnomalyExplanation"
+    post:
+      tags: [EvaluationAssistant]
+      summary: 根据校验问题生成可编辑异常说明
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnomalyExplanation"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/anomaly-explanations/{explanationId}:
+    put:
+      tags: [EvaluationAssistant]
+      summary: 编辑或采纳异常说明
+      parameters:
+        - name: explanationId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnomalyExplanation"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/rectification-suggestions:
+    get:
+      tags: [EvaluationAssistant]
+      summary: 获取整改建议
+      responses:
+        "200":
+          description: 整改建议清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RectificationSuggestion"
+    post:
+      tags: [EvaluationAssistant]
+      summary: 从异常说明生成辅助整改建议
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RectificationSuggestion"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/rectification-suggestions/{suggestionId}:adopt:
+    post:
+      tags: [EvaluationAssistant]
+      summary: 人工采纳建议并转为整改任务
+      parameters:
+        - name: suggestionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/review-risks:
+    get:
+      tags: [EvaluationAssistant]
+      summary: 获取审核风险线索
+      responses:
+        "200":
+          description: 审核风险线索清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ReviewRiskSignal"
+  /api/v1/evaluation-assistant/review-risks:scan:
+    post:
+      tags: [EvaluationAssistant]
+      summary: 扫描申报、证据和校验记录生成风险线索
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evaluation-assistant/review-risks/{riskId}:
+    put:
+      tags: [EvaluationAssistant]
+      summary: 确认、排除或转专家复核风险线索
+      parameters:
+        - name: riskId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewRiskSignal"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/monitoring/services:
+    get:
+      tags: [Monitoring]
+      summary: 获取核心服务健康状态
+      responses:
+        "200":
+          description: 服务健康清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ServiceHealth"
+  /api/v1/monitoring/checks:run:
+    post:
+      tags: [Monitoring]
+      summary: 执行平台运营巡检并生成告警
+      responses:
+        "200":
+          description: 运营监控包
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MonitoringPackage"
+  /api/v1/monitoring/services/{serviceId}:recover:
+    post:
+      tags: [Monitoring]
+      summary: 恢复异常服务并关闭关联告警
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/monitoring/interfaces:
+    get:
+      tags: [Monitoring]
+      summary: 获取接口健康状态
+      responses:
+        "200":
+          description: 接口健康清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/InterfaceHealth"
+  /api/v1/monitoring/interfaces:probe:
+    post:
+      tags: [Monitoring]
+      summary: 批量探测接口并生成异常告警
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/monitoring/interfaces/{interfaceId}:retry:
+    post:
+      tags: [Monitoring]
+      summary: 重试异常接口
+      parameters:
+        - name: interfaceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/monitoring/job-queues:
+    get:
+      tags: [Monitoring]
+      summary: 获取异步任务队列状态
+      responses:
+        "200":
+          description: 任务队列清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/JobQueue"
+  /api/v1/monitoring/job-queues/{queueId}:scale:
+    post:
+      tags: [Monitoring]
+      summary: 扩容任务队列工作进程
+      parameters:
+        - name: queueId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/monitoring/job-queues/{queueId}:prioritize:
+    post:
+      tags: [Monitoring]
+      summary: 提升任务队列处理优先级
+      parameters:
+        - name: queueId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/monitoring/storage-pools:
+    get:
+      tags: [Monitoring]
+      summary: 获取存储容量和留存策略
+      responses:
+        "200":
+          description: 存储池清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/StoragePool"
+  /api/v1/monitoring/storage-pools/{poolId}:expand:
+    post:
+      tags: [Monitoring]
+      summary: 扩容存储池
+      parameters:
+        - name: poolId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/monitoring/storage-pools/{poolId}:clean:
+    post:
+      tags: [Monitoring]
+      summary: 执行存储生命周期清理
+      parameters:
+        - name: poolId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/monitoring/alerts:
+    get:
+      tags: [Monitoring]
+      summary: 获取统一运营告警
+      responses:
+        "200":
+          description: 告警清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MonitoringAlert"
+  /api/v1/monitoring/alerts/{alertId}:
+    put:
+      tags: [Monitoring]
+      summary: 确认或更新运营告警状态
+      parameters:
+        - name: alertId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [已确认, 处理中, 已关闭]
+                owner:
+                  type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/standards/{standardVersion}/indicators:
+    get:
+      tags: [Standards]
+      summary: 获取指标库
+      parameters:
+        - $ref: "#/components/parameters/StandardVersion"
+      responses:
+        "200":
+          description: 指标清单
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Indicator"
+  /api/v1/submissions/{submissionId}:
+    get:
+      tags: [Submissions]
+      summary: 获取申报包
+      parameters:
+        - $ref: "#/components/parameters/SubmissionId"
+      responses:
+        "200":
+          description: 医院申报包
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmissionPackage"
+    put:
+      tags: [Submissions]
+      summary: 保存申报包
+      parameters:
+        - $ref: "#/components/parameters/SubmissionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmissionPackage"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/submissions/{submissionId}/validations:run:
+    post:
+      tags: [Validations]
+      summary: 运行申报校验
+      parameters:
+        - $ref: "#/components/parameters/SubmissionId"
+      responses:
+        "200":
+          description: 校验问题列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ValidationIssue"
+  /api/v1/evidence-materials:
+    get:
+      tags: [Evidence]
+      summary: 获取证据材料台账
+      parameters:
+        - name: hospitalCode
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: indicatorCode
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 证据材料包
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvidencePackage"
+    post:
+      tags: [Evidence]
+      summary: 新增证据材料元数据
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvidenceMaterial"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/evidence-materials/{materialId}/verify:
+    post:
+      tags: [Evidence]
+      summary: 校验证据材料版本、水印与敏感级别
+      parameters:
+        - $ref: "#/components/parameters/MaterialId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/review-tasks/{reviewId}/indicators/{indicatorCode}:
+    put:
+      tags: [Reviews]
+      summary: 保存指标审核意见
+      parameters:
+        - name: reviewId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: indicatorCode
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewNote"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/review-tasks:assign:
+    post:
+      tags: [Reviews]
+      summary: 根据任务池和风险等级自动分派省级审核任务
+      responses:
+        "200":
+          description: 审核任务池
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ReviewAssignment"
+  /api/v1/expert-reviews/{expertReviewId}:
+    put:
+      tags: [ExpertReviews]
+      summary: 保存专家复核结论
+      parameters:
+        - $ref: "#/components/parameters/ExpertReviewId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExpertReview"
+      responses:
+        "200":
+          description: 专家复核结论
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpertReview"
+  /api/v1/submissions/{submissionId}/score:calculate:
+    post:
+      tags: [Results]
+      summary: 计算评价结果
+      parameters:
+        - $ref: "#/components/parameters/SubmissionId"
+      responses:
+        "200":
+          description: 评分结果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScoreResult"
+  /api/v1/submissions/{submissionId}/rectifications:
+    post:
+      tags: [Results]
+      summary: 根据开放问题生成整改任务
+      parameters:
+        - $ref: "#/components/parameters/SubmissionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                issueIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: 整改任务列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Rectification"
+  /api/v1/scoring-rules:
+    get:
+      tags: [Rules]
+      summary: 获取评分规则与底线项配置
+      responses:
+        "200":
+          description: 评分规则包
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scoringRules:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ScoringRule"
+                  bottomLineRules:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BottomLineRule"
+  /api/v1/scoring-rules/{ruleId}:
+    put:
+      tags: [Rules]
+      summary: 更新评分规则状态或审批状态
+      parameters:
+        - $ref: "#/components/parameters/RuleId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScoringRule"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/analytics/province-summary:
+    get:
+      tags: [Analytics]
+      summary: 获取省域统计分析与风险看板
+      responses:
+        "200":
+          description: 统计分析包
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsPackage"
+  /api/v1/national-spot-checks:
+    get:
+      tags: [Intelligence]
+      summary: 获取国家抽查任务池
+      responses:
+        "200":
+          description: 国家抽查任务
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SpotCheck"
+    post:
+      tags: [Intelligence]
+      summary: 根据风险线索或分层抽样生成国家抽查任务
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpotCheck"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/rule-sandbox/runs:
+    post:
+      tags: [Intelligence]
+      summary: 在脱敏历史样本上运行候选规则试算
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: 规则试算结果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SandboxRun"
+  /api/v1/intelligence/materials:classify:
+    post:
+      tags: [Intelligence]
+      summary: 生成证据材料辅助分类建议
+      responses:
+        "200":
+          description: 材料分类建议
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MaterialClassification"
+  /api/v1/intelligence/peer-anomalies:scan:
+    post:
+      tags: [Intelligence]
+      summary: 运行同级同类医院异常识别
+      responses:
+        "200":
+          description: 异常核验线索
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PeerAnomaly"
+  /api/v1/notifications:
+    get:
+      tags: [Notifications]
+      summary: 获取消息队列与送达状态
+      responses:
+        "200":
+          description: 消息队列
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Notification"
+  /api/v1/notifications:send:
+    post:
+      tags: [Notifications]
+      summary: 发送站内信、移动端、短信或邮件提醒
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Notification"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/import-jobs:
+    post:
+      tags: [Imports]
+      summary: 创建模板批量导入任务
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportJob"
+      responses:
+        "200":
+          description: 导入任务与校验摘要
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportJob"
+  /api/v1/import-jobs/{importJobId}:rerun:
+    post:
+      tags: [Imports]
+      summary: 对已补正的拒绝数据执行幂等重跑
+      parameters:
+        - name: importJobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/system/users/{userId}:
+    put:
+      tags: [System]
+      summary: 更新用户状态或角色
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/system/export-approvals/{approvalId}/approve:
+    post:
+      tags: [System]
+      summary: 审批敏感数据导出申请
+      parameters:
+        - $ref: "#/components/parameters/ApprovalId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/v1/system/audit-logs:
+    get:
+      tags: [System]
+      summary: 获取操作审计日志
+      responses:
+        "200":
+          description: 审计日志
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuditLog"
+  /api/v1/operation-cycles/{cycleYear}:
+    get:
+      tags: [Operations]
+      summary: 获取年度运行管理状态
+      parameters:
+        - $ref: "#/components/parameters/CycleYear"
+      responses:
+        "200":
+          description: 年度运行管理包
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationPackage"
+  /api/v1/operation-cycles/{cycleYear}/rules:run:
+    post:
+      tags: [Operations]
+      summary: 运行标准规则核验
+      parameters:
+        - $ref: "#/components/parameters/CycleYear"
+      responses:
+        "200":
+          description: 规则核验结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RuleSet"
+  /api/v1/operation-cycles/{cycleYear}/security-checks:run:
+    post:
+      tags: [Operations]
+      summary: 运行安全与数据核验
+      parameters:
+        - $ref: "#/components/parameters/CycleYear"
+      responses:
+        "200":
+          description: 安全核验结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SecurityCheckItem"
+  /api/v1/operation-cycles/{cycleYear}/archive:
+    post:
+      tags: [Operations]
+      summary: 生成年度预归档
+      parameters:
+        - $ref: "#/components/parameters/CycleYear"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+components:
+  parameters:
+    StandardVersion:
+      name: standardVersion
+      in: path
+      required: true
+      schema:
+        type: string
+      example: STD-2026-TRIAL
+    SubmissionId:
+      name: submissionId
+      in: path
+      required: true
+      schema:
+        type: string
+      example: SUB-TASK2026001-H000001-V1
+    TaskId:
+      name: taskId
+      in: path
+      required: true
+      schema:
+        type: string
+      example: TASK-2026-001
+    MaterialId:
+      name: materialId
+      in: path
+      required: true
+      schema:
+        type: string
+      example: MAT-A1-SEED
+    RuleId:
+      name: ruleId
+      in: path
+      required: true
+      schema:
+        type: string
+      example: RULE-AUTO-001
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+      example: U-NATIONAL-001
+    ApprovalId:
+      name: approvalId
+      in: path
+      required: true
+      schema:
+        type: string
+      example: EXP-APP-001
+    ExpertReviewId:
+      name: expertReviewId
+      in: path
+      required: true
+      schema:
+        type: string
+      example: EXP-H000001-B3-SEED
+    CycleYear:
+      name: cycleYear
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 2026
+  responses:
+    Ok:
+      description: 处理成功
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: true
+              code:
+                type: string
+                example: OK
+              message:
+                type: string
+                example: 处理成功
+  schemas:
+    Indicator:
+      type: object
+      required: [code, domain, name, max]
+      properties:
+        code:
+          type: string
+          example: B3
+        domain:
+          type: string
+          example: B
+        name:
+          type: string
+          example: 院内系统集成和接口治理
+        max:
+          type: number
+          example: 25
+        method:
+          type: string
+          example: 自动/混合评分
+        source:
+          type: string
+          example: 模板/API
+        evidence:
+          type: string
+          example: 接口清单、调用统计
+        priority:
+          type: string
+          enum: [P0, P1, P2]
+    SubmissionPackage:
+      type: object
+      required: [meta, hospitalProfile, metrics, indicators]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PackageMeta"
+        hospitalProfile:
+          $ref: "#/components/schemas/HospitalProfile"
+        metrics:
+          type: object
+          additionalProperties: true
+        indicators:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubmissionIndicator"
+        validationSummary:
+          type: object
+          additionalProperties: true
+    TaskPackage:
+      type: object
+      required: [meta, taskSummary, tasks]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PackageMeta"
+        taskSummary:
+          type: object
+          additionalProperties: true
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/EvaluationTask"
+        assignments:
+          type: array
+          items:
+            $ref: "#/components/schemas/HospitalAssignment"
+        hospitalScope:
+          type: array
+          items:
+            $ref: "#/components/schemas/HospitalProfile"
+    PilotPackage:
+      type: object
+      required: [meta, pilotSummary, submissionBatches, uploadQueue, reviewerWorkloads, dailyReports]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PackageMeta"
+        pilotSummary:
+          type: object
+          additionalProperties: true
+        submissionBatches:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubmissionBatch"
+        uploadQueue:
+          type: array
+          items:
+            $ref: "#/components/schemas/MaterialUploadJob"
+        reviewerWorkloads:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewerWorkload"
+        dailyReports:
+          type: array
+          items:
+            $ref: "#/components/schemas/PilotDailyReport"
+    CollaborationPackage:
+      type: object
+      required: [meta, collaborationSummary, hospitalReadiness, pilotTickets, trainingSessions, pilotReleases, pilotFeedback]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PackageMeta"
+        collaborationSummary:
+          type: object
+          additionalProperties: true
+        hospitalReadiness:
+          type: array
+          items:
+            $ref: "#/components/schemas/HospitalReadiness"
+        pilotTickets:
+          type: array
+          items:
+            $ref: "#/components/schemas/PilotTicket"
+        trainingSessions:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrainingSession"
+        pilotReleases:
+          type: array
+          items:
+            $ref: "#/components/schemas/PilotRelease"
+        pilotFeedback:
+          type: array
+          items:
+            $ref: "#/components/schemas/PilotFeedback"
+    AssessmentPackage:
+      type: object
+      required: [meta, assessmentSummary, pilotOutcomeMetrics, pilotHospitalOutcomes, pilotIssueThemes, pilotImprovementPlans, rolloutRegions, pilotAssessmentReports]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PackageMeta"
+        assessmentSummary:
+          type: object
+          additionalProperties: true
+        pilotOutcomeMetrics:
+          type: array
+          items:
+            $ref: "#/components/schemas/PilotOutcomeMetric"
+        pilotHospitalOutcomes:
+          type: array
+          items:
+            $ref: "#/components/schemas/PilotHospitalOutcome"
+        pilotIssueThemes:
+          type: array
+          items:
+            $ref: "#/components/schemas/PilotIssueTheme"
+        pilotImprovementPlans:
+          type: array
+          items:
+            $ref: "#/components/schemas/PilotImprovementPlan"
+        rolloutRegions:
+          type: array
+          items:
+            $ref: "#/components/schemas/RolloutRegion"
+        pilotAssessmentReports:
+          type: array
+          items:
+            $ref: "#/components/schemas/PilotAssessmentReport"
+    AssistantPackage:
+      type: object
+      required: [meta, assistantSummary, assistantKnowledgeSources, standardQaRecords, anomalyExplanations, rectificationSuggestions, reviewRiskSignals]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PackageMeta"
+        assistantSummary:
+          type: object
+          additionalProperties: true
+        assistantKnowledgeSources:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssistantKnowledgeSource"
+        standardQaRecords:
+          type: array
+          items:
+            $ref: "#/components/schemas/StandardQaRecord"
+        anomalyExplanations:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnomalyExplanation"
+        rectificationSuggestions:
+          type: array
+          items:
+            $ref: "#/components/schemas/RectificationSuggestion"
+        reviewRiskSignals:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewRiskSignal"
+    MonitoringPackage:
+      type: object
+      required: [meta, monitoringSummary, serviceHealth, interfaceHealth, jobQueues, storagePools, alerts]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PackageMeta"
+        monitoringSummary:
+          type: object
+          additionalProperties: true
+        serviceHealth:
+          type: array
+          items:
+            $ref: "#/components/schemas/ServiceHealth"
+        interfaceHealth:
+          type: array
+          items:
+            $ref: "#/components/schemas/InterfaceHealth"
+        jobQueues:
+          type: array
+          items:
+            $ref: "#/components/schemas/JobQueue"
+        storagePools:
+          type: array
+          items:
+            $ref: "#/components/schemas/StoragePool"
+        alerts:
+          type: array
+          items:
+            $ref: "#/components/schemas/MonitoringAlert"
+    EvidencePackage:
+      type: object
+      required: [meta, evidenceSummary, evidenceMaterials]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PackageMeta"
+        evidenceSummary:
+          type: object
+          additionalProperties: true
+        evidenceMaterials:
+          type: array
+          items:
+            $ref: "#/components/schemas/EvidenceMaterial"
+        missingIndicators:
+          type: array
+          items:
+            $ref: "#/components/schemas/Indicator"
+    AnalyticsPackage:
+      type: object
+      required: [meta, analyticsSummary]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PackageMeta"
+        analyticsSummary:
+          type: object
+          additionalProperties: true
+        ranking:
+          type: array
+          items:
+            type: object
+        riskHospitals:
+          type: array
+          items:
+            type: object
+        domainAverages:
+          type: array
+          items:
+            type: object
+    IntelligencePackage:
+      type: object
+      required: [meta, intelligenceSummary, spotChecks, sandboxRuns, materialClassifications, peerAnomalies, notifications, importJobs]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PackageMeta"
+        intelligenceSummary:
+          type: object
+          additionalProperties: true
+        spotChecks:
+          type: array
+          items:
+            $ref: "#/components/schemas/SpotCheck"
+        sandboxConfig:
+          type: object
+          additionalProperties: true
+        sandboxRuns:
+          type: array
+          items:
+            $ref: "#/components/schemas/SandboxRun"
+        materialClassifications:
+          type: array
+          items:
+            $ref: "#/components/schemas/MaterialClassification"
+        peerAnomalies:
+          type: array
+          items:
+            $ref: "#/components/schemas/PeerAnomaly"
+        notifications:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notification"
+        notificationChannels:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationChannel"
+        importJobs:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImportJob"
+    SystemPackage:
+      type: object
+      required: [meta, roles, users, auditLogs]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PackageMeta"
+        roles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Role"
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        exportApprovals:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExportApproval"
+        auditLogs:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLog"
+        systemParams:
+          type: object
+          additionalProperties: true
+    ExpertReviewPackage:
+      type: object
+      required: [meta, expertReviewStatus, expertReviews]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PackageMeta"
+        expertReviewStatus:
+          type: object
+          additionalProperties: true
+        expertReviews:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExpertReview"
+        relatedReviewNotes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewNote"
+        relatedIndicators:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubmissionIndicator"
+        openIssues:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidationIssue"
+    OperationPackage:
+      type: object
+      required: [meta, operationSummary, operations]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PackageMeta"
+        operationSummary:
+          $ref: "#/components/schemas/OperationSummary"
+        operations:
+          $ref: "#/components/schemas/OperationState"
+        openIssueSummary:
+          type: object
+          additionalProperties: true
+        hospitalScope:
+          type: array
+          items:
+            $ref: "#/components/schemas/HospitalProfile"
+    OperationSummary:
+      type: object
+      properties:
+        currentStage:
+          type: string
+          example: 省级承接
+        completedStages:
+          type: integer
+          example: 1
+        totalStages:
+          type: integer
+          example: 6
+        openRules:
+          type: integer
+          example: 2
+        pendingSecurity:
+          type: integer
+          example: 1
+        archiveStatus:
+          type: string
+          example: 未归档
+    OperationState:
+      type: object
+      properties:
+        cycle:
+          $ref: "#/components/schemas/OperationCycle"
+        stages:
+          type: array
+          items:
+            $ref: "#/components/schemas/OperationStage"
+        standardVersions:
+          type: array
+          items:
+            $ref: "#/components/schemas/StandardVersionState"
+        ruleSets:
+          type: array
+          items:
+            $ref: "#/components/schemas/RuleSet"
+        securityItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/SecurityCheckItem"
+        operationLogs:
+          type: array
+          items:
+            $ref: "#/components/schemas/OperationLog"
+    OperationCycle:
+      type: object
+      properties:
+        year:
+          type: integer
+        name:
+          type: string
+        currentStage:
+          type: string
+        archiveStatus:
+          type: string
+        publishedAt:
+          type: string
+        securityCheckedAt:
+          type: string
+    OperationStage:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        owner:
+          type: string
+        status:
+          type: string
+        due:
+          type: string
+        summary:
+          type: string
+    StandardVersionState:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+        effectiveDate:
+          type: string
+        owner:
+          type: string
+        changeCount:
+          type: integer
+    RuleSet:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        owner:
+          type: string
+        status:
+          type: string
+        issueCount:
+          type: integer
+        lastRun:
+          type: string
+        scope:
+          type: string
+    SecurityCheckItem:
+      type: object
+      properties:
+        id:
+          type: string
+        item:
+          type: string
+        status:
+          type: string
+        risk:
+          type: string
+        owner:
+          type: string
+        due:
+          type: string
+    OperationLog:
+      type: object
+      properties:
+        at:
+          type: string
+        action:
+          type: string
+        actor:
+          type: string
+        result:
+          type: string
+    PackageMeta:
+      type: object
+      required: [packageType, taskId, standardVersion, hospitalCode, generatedAt]
+      properties:
+        packageType:
+          type: string
+          enum: [submission, review, expert, rectification, task, pilot, collaboration, assessment, assistant, monitoring, evidence, analytics, intelligence, operations, system, full]
+        generatedAt:
+          type: string
+          format: date-time
+        taskId:
+          type: string
+        taskName:
+          type: string
+        standardVersion:
+          type: string
+        hospitalCode:
+          type: string
+        hospitalName:
+          type: string
+        prototypeVersion:
+          type: string
+    HospitalProfile:
+      type: object
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        level:
+          type: string
+        type:
+          type: string
+        city:
+          type: string
+        owner:
+          type: string
+        contact:
+          type: string
+        regionConnected:
+          type: boolean
+    EvaluationTask:
+      type: object
+      properties:
+        id:
+          type: string
+        standardVersion:
+          type: string
+        name:
+          type: string
+        taskType:
+          type: string
+        scope:
+          type: string
+        status:
+          type: string
+        submitDue:
+          type: string
+        reviewDue:
+          type: string
+        reminders:
+          type: integer
+        extensions:
+          type: integer
+    HospitalAssignment:
+      type: object
+      properties:
+        taskId:
+          type: string
+        hospitalCode:
+          type: string
+        reviewer:
+          type: string
+        status:
+          type: string
+        risk:
+          type: string
+        missingEvidence:
+          type: integer
+    EvidenceMaterial:
+      type: object
+      required: [id, hospitalCode, indicatorCode, name, status]
+      properties:
+        id:
+          type: string
+        hospitalCode:
+          type: string
+        indicatorCode:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        version:
+          type: string
+        sensitivity:
+          type: string
+        status:
+          type: string
+        uploadedBy:
+          type: string
+        uploadedAt:
+          type: string
+        expireAt:
+          type: string
+        watermark:
+          type: boolean
+    ReviewAssignment:
+      type: object
+      properties:
+        id:
+          type: string
+        hospitalCode:
+          type: string
+        reviewer:
+          type: string
+        risk:
+          type: string
+        status:
+          type: string
+        due:
+          type: string
+    ScoringRule:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+        approvalStatus:
+          type: string
+        expression:
+          type: string
+        owner:
+          type: string
+        updatedAt:
+          type: string
+    BottomLineRule:
+      type: object
+      properties:
+        id:
+          type: string
+        item:
+          type: string
+        trigger:
+          type: string
+        effect:
+          type: string
+        status:
+          type: string
+    Role:
+      type: object
+      properties:
+        name:
+          type: string
+        org:
+          type: string
+        dataScope:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+        org:
+          type: string
+        status:
+          type: string
+        lastLogin:
+          type: string
+    ExportApproval:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        applicant:
+          type: string
+        sensitivity:
+          type: string
+        status:
+          type: string
+        scope:
+          type: string
+    AuditLog:
+      type: object
+      properties:
+        at:
+          type: string
+        actor:
+          type: string
+        action:
+          type: string
+        target:
+          type: string
+        result:
+          type: string
+    SubmissionBatch:
+      type: object
+      required: [id, name, region, standard, hospitalCount, status, submitDue, reviewDue]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        region:
+          type: string
+        standard:
+          type: string
+        hospitalLevel:
+          type: string
+        hospitalCount:
+          type: integer
+        status:
+          type: string
+          enum: [草稿, 待发布, 已发布, 填报中, 审核中, 已完成]
+        start:
+          type: string
+          format: date
+        submitDue:
+          type: string
+          format: date
+        reviewDue:
+          type: string
+          format: date
+        reportAt:
+          type: string
+          format: date
+        submitted:
+          type: integer
+        reviewed:
+          type: integer
+        owner:
+          type: string
+    MaterialUploadJob:
+      type: object
+      required: [id, hospitalCode, fileName, progress, status, scanStatus]
+      properties:
+        id:
+          type: string
+        hospitalCode:
+          type: string
+        hospitalName:
+          type: string
+        fileName:
+          type: string
+        materialType:
+          type: string
+        size:
+          type: string
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        status:
+          type: string
+          enum: [排队中, 上传中, 扫描中, 已完成, 失败]
+        scanStatus:
+          type: string
+        classification:
+          type: string
+        submittedAt:
+          type: string
+        retries:
+          type: integer
+    ReviewerWorkload:
+      type: object
+      required: [id, reviewer, group, capacity, assigned, status]
+      properties:
+        id:
+          type: string
+        reviewer:
+          type: string
+        group:
+          type: string
+        capacity:
+          type: integer
+        assigned:
+          type: integer
+        inProgress:
+          type: integer
+        overdue:
+          type: integer
+        highRisk:
+          type: integer
+        avgHours:
+          type: number
+        status:
+          type: string
+          enum: [正常, 高负荷]
+    PilotDailyReport:
+      type: object
+      required: [id, date, batchId, coverage, submitted, submissionRate, status]
+      properties:
+        id:
+          type: string
+        date:
+          type: string
+          format: date
+        batchId:
+          type: string
+        coverage:
+          type: integer
+        submitted:
+          type: integer
+        submissionRate:
+          type: number
+        materials:
+          type: integer
+        uploadPending:
+          type: integer
+        validationBlockers:
+          type: integer
+        pendingReviews:
+          type: integer
+        spotChecks:
+          type: integer
+        rectifications:
+          type: integer
+        incidents:
+          type: integer
+        status:
+          type: string
+          enum: [草稿, 已发布]
+        generatedAt:
+          type: string
+        publishedAt:
+          type: string
+        summary:
+          type: string
+    HospitalReadiness:
+      type: object
+      required: [id, hospitalCode, hospitalName, organization, accounts, network, dataMapping, training, readiness, blockers, status]
+      properties:
+        id:
+          type: string
+        hospitalCode:
+          type: string
+        hospitalName:
+          type: string
+        coordinator:
+          type: string
+        organization:
+          type: integer
+          minimum: 0
+          maximum: 100
+        accounts:
+          type: integer
+          minimum: 0
+          maximum: 100
+        network:
+          type: integer
+          minimum: 0
+          maximum: 100
+        dataMapping:
+          type: integer
+          minimum: 0
+          maximum: 100
+        training:
+          type: integer
+          minimum: 0
+          maximum: 100
+        readiness:
+          type: integer
+          minimum: 0
+          maximum: 100
+        blockers:
+          type: integer
+          minimum: 0
+        status:
+          type: string
+          enum: [已就绪, 推进中, 有阻塞]
+        lastUpdated:
+          type: string
+    PilotTicket:
+      type: object
+      required: [id, title, hospitalCode, hospitalName, category, priority, status, owner, slaHours]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        hospitalCode:
+          type: string
+        hospitalName:
+          type: string
+        category:
+          type: string
+        priority:
+          type: string
+          enum: [低, 中, 高, 紧急]
+        status:
+          type: string
+          enum: [待分派, 处理中, 待回复, 已解决]
+        owner:
+          type: string
+        createdAt:
+          type: string
+        dueAt:
+          type: string
+        slaHours:
+          type: integer
+          minimum: 1
+        elapsedHours:
+          type: number
+          minimum: 0
+        channel:
+          type: string
+        description:
+          type: string
+    TrainingSession:
+      type: object
+      required: [id, title, audience, startAt, mode, capacity, enrolled, attended, questions, status, owner]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        audience:
+          type: string
+        startAt:
+          type: string
+        mode:
+          type: string
+        capacity:
+          type: integer
+          minimum: 1
+        enrolled:
+          type: integer
+          minimum: 0
+        attended:
+          type: integer
+          minimum: 0
+        questions:
+          type: integer
+          minimum: 0
+        status:
+          type: string
+          enum: [待发布, 已发布, 报名中, 进行中, 已完成]
+        owner:
+          type: string
+        materials:
+          type: integer
+          minimum: 0
+    PilotRelease:
+      type: object
+      required: [id, version, title, scope, status, owner, changes, feedbackCount, openFeedback]
+      properties:
+        id:
+          type: string
+        version:
+          type: string
+        title:
+          type: string
+        scope:
+          type: string
+        status:
+          type: string
+          enum: [候选, 已发布]
+        plannedAt:
+          type: string
+        publishedAt:
+          type: string
+        owner:
+          type: string
+        changes:
+          type: integer
+          minimum: 0
+        feedbackCount:
+          type: integer
+          minimum: 0
+        openFeedback:
+          type: integer
+          minimum: 0
+    PilotFeedback:
+      type: object
+      required: [id, releaseId, hospitalCode, hospitalName, title, type, priority, status, owner]
+      properties:
+        id:
+          type: string
+        releaseId:
+          type: string
+        hospitalCode:
+          type: string
+        hospitalName:
+          type: string
+        title:
+          type: string
+        type:
+          type: string
+        priority:
+          type: string
+          enum: [低, 中, 高, 紧急]
+        status:
+          type: string
+          enum: [待评估, 处理中, 已解决]
+        owner:
+          type: string
+        createdAt:
+          type: string
+        resolution:
+          type: string
+    PilotOutcomeMetric:
+      type: object
+      required: [id, name, current, target, unit, weight, status, source]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        baseline:
+          type: number
+        current:
+          type: number
+        target:
+          type: number
+        unit:
+          type: string
+        weight:
+          type: number
+          minimum: 0
+          maximum: 100
+        status:
+          type: string
+          enum: [达标, 关注, 未达标]
+        source:
+          type: string
+    PilotHospitalOutcome:
+      type: object
+      required: [id, hospitalCode, hospitalName, processCompletion, dataQuality, auditPassRate, satisfaction, score, status, majorIssues]
+      properties:
+        id:
+          type: string
+        hospitalCode:
+          type: string
+        hospitalName:
+          type: string
+        processCompletion:
+          type: number
+          minimum: 0
+          maximum: 100
+        dataQuality:
+          type: number
+          minimum: 0
+          maximum: 100
+        auditPassRate:
+          type: number
+          minimum: 0
+          maximum: 100
+        satisfaction:
+          type: number
+          minimum: 0
+          maximum: 100
+        score:
+          type: number
+          minimum: 0
+          maximum: 100
+        status:
+          type: string
+          enum: [可推广, 条件通过, 需优化]
+        majorIssues:
+          type: integer
+          minimum: 0
+        evaluatedAt:
+          type: string
+    PilotIssueTheme:
+      type: object
+      required: [id, category, title, count, impact, rootCause, owner, status, sourceCount]
+      properties:
+        id:
+          type: string
+        category:
+          type: string
+        title:
+          type: string
+        count:
+          type: integer
+          minimum: 0
+        impact:
+          type: string
+          enum: [低, 中, 高]
+        rootCause:
+          type: string
+        owner:
+          type: string
+        status:
+          type: string
+          enum: [待确认, 分析完成, 改进中, 已闭环]
+        sourceCount:
+          type: integer
+          minimum: 0
+        reviewedAt:
+          type: string
+    PilotImprovementPlan:
+      type: object
+      required: [id, sourceId, title, source, priority, owner, targetVersion, dueAt, status, progress, acceptance]
+      properties:
+        id:
+          type: string
+        sourceId:
+          type: string
+        title:
+          type: string
+        source:
+          type: string
+        priority:
+          type: string
+          enum: [低, 中, 高, 紧急]
+        owner:
+          type: string
+        targetVersion:
+          type: string
+        dueAt:
+          type: string
+        status:
+          type: string
+          enum: [待开始, 进行中, 待验收, 已完成]
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        acceptance:
+          type: string
+    RolloutRegion:
+      type: object
+      required: [id, province, coordinator, hospitalCount, organization, platform, security, training, dataMigration, readiness, status, plannedAt]
+      properties:
+        id:
+          type: string
+        province:
+          type: string
+        coordinator:
+          type: string
+        hospitalCount:
+          type: integer
+          minimum: 0
+        organization:
+          type: integer
+          minimum: 0
+          maximum: 100
+        platform:
+          type: integer
+          minimum: 0
+          maximum: 100
+        security:
+          type: integer
+          minimum: 0
+          maximum: 100
+        training:
+          type: integer
+          minimum: 0
+          maximum: 100
+        dataMigration:
+          type: integer
+          minimum: 0
+          maximum: 100
+        readiness:
+          type: integer
+          minimum: 0
+          maximum: 100
+        status:
+          type: string
+          enum: [有风险, 准备中, 可启动, 已启动]
+        plannedAt:
+          type: string
+        startedAt:
+          type: string
+    PilotAssessmentReport:
+      type: object
+      required: [id, period, version, coverage, score, conclusion, recommendation, status, generatedAt]
+      properties:
+        id:
+          type: string
+        period:
+          type: string
+        version:
+          type: string
+        coverage:
+          type: integer
+          minimum: 0
+        score:
+          type: number
+          minimum: 0
+          maximum: 100
+        conclusion:
+          type: string
+        recommendation:
+          type: string
+        status:
+          type: string
+          enum: [草稿, 已发布]
+        generatedAt:
+          type: string
+        publishedAt:
+          type: string
+    AssistantKnowledgeSource:
+      type: object
+      required: [id, name, version, type, status, chunks, owner, scope]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        version:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+          enum: [已启用, 待更新, 已停用]
+        chunks:
+          type: integer
+          minimum: 0
+        owner:
+          type: string
+        lastSyncedAt:
+          type: string
+        scope:
+          type: string
+    StandardQaRecord:
+      type: object
+      required: [id, hospitalCode, question, answer, citations, confidence, askedBy, askedAt, status]
+      properties:
+        id:
+          type: string
+        hospitalCode:
+          type: string
+        question:
+          type: string
+        answer:
+          type: string
+        citations:
+          type: array
+          items:
+            type: string
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        askedBy:
+          type: string
+        askedAt:
+          type: string
+        status:
+          type: string
+          enum: [待确认, 已确认, 已回答]
+        scope:
+          type: string
+    AnomalyExplanation:
+      type: object
+      required: [id, sourceId, hospitalCode, indicatorCode, title, summary, possibleCause, impact, recommendation, status, generatedAt, editable]
+      properties:
+        id:
+          type: string
+        sourceId:
+          type: string
+        hospitalCode:
+          type: string
+        indicatorCode:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        possibleCause:
+          type: string
+        impact:
+          type: string
+        recommendation:
+          type: string
+        status:
+          type: string
+          enum: [待确认, 已编辑, 已采纳]
+        generatedAt:
+          type: string
+        editable:
+          type: boolean
+    RectificationSuggestion:
+      type: object
+      required: [id, sourceId, hospitalCode, indicatorCode, problem, suggestion, steps, priority, owner, dueDays, disclaimer, status, createdAt]
+      properties:
+        id:
+          type: string
+        sourceId:
+          type: string
+        hospitalCode:
+          type: string
+        indicatorCode:
+          type: string
+        problem:
+          type: string
+        suggestion:
+          type: string
+        steps:
+          type: array
+          items:
+            type: string
+        priority:
+          type: string
+          enum: [低, 中, 高, 紧急]
+        owner:
+          type: string
+        dueDays:
+          type: integer
+          minimum: 1
+        disclaimer:
+          type: string
+        status:
+          type: string
+          enum: [待采纳, 已采纳, 已转任务]
+        createdAt:
+          type: string
+    ReviewRiskSignal:
+      type: object
+      required: [id, hospitalCode, hospitalName, indicatorCode, level, signal, basis, recommendation, source, status, owner, createdAt]
+      properties:
+        id:
+          type: string
+        hospitalCode:
+          type: string
+        hospitalName:
+          type: string
+        indicatorCode:
+          type: string
+        level:
+          type: string
+          enum: [低, 中, 高, 紧急]
+        signal:
+          type: string
+        basis:
+          type: string
+        recommendation:
+          type: string
+        source:
+          type: string
+        status:
+          type: string
+          enum: [待研判, 已确认, 已排除, 已转复核]
+        owner:
+          type: string
+        createdAt:
+          type: string
+    ServiceHealth:
+      type: object
+      required: [id, name, component, availability, latency, status, lastCheck, sla]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        component:
+          type: string
+        availability:
+          type: number
+          minimum: 0
+          maximum: 100
+        latency:
+          type: integer
+          minimum: 0
+        status:
+          type: string
+          enum: [正常, 预警, 降级, 故障]
+        lastCheck:
+          type: string
+        incidents:
+          type: integer
+          minimum: 0
+        sla:
+          type: number
+          minimum: 0
+          maximum: 100
+    InterfaceHealth:
+      type: object
+      required: [id, name, path, consumer, successRate, p95, throughput, status, lastCheck]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        path:
+          type: string
+        consumer:
+          type: string
+        successRate:
+          type: number
+          minimum: 0
+          maximum: 100
+        p95:
+          type: integer
+          minimum: 0
+        throughput:
+          type: integer
+          minimum: 0
+        status:
+          type: string
+          enum: [正常, 预警, 异常]
+        lastError:
+          type: string
+        lastCheck:
+          type: string
+    JobQueue:
+      type: object
+      required: [id, name, pending, running, failed, oldestWait, workers, capacity, status]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        pending:
+          type: integer
+          minimum: 0
+        running:
+          type: integer
+          minimum: 0
+        failed:
+          type: integer
+          minimum: 0
+        oldestWait:
+          type: integer
+          minimum: 0
+        workers:
+          type: integer
+          minimum: 0
+        capacity:
+          type: integer
+          minimum: 0
+        status:
+          type: string
+          enum: [正常, 预警, 拥堵]
+    StoragePool:
+      type: object
+      required: [id, name, purpose, used, total, unit, usage, status, retention, growthDaily]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        purpose:
+          type: string
+        used:
+          type: number
+          minimum: 0
+        total:
+          type: number
+          minimum: 0
+        unit:
+          type: string
+        usage:
+          type: integer
+          minimum: 0
+          maximum: 100
+        status:
+          type: string
+          enum: [正常, 预警, 高风险]
+        retention:
+          type: string
+        growthDaily:
+          type: integer
+          minimum: 0
+    MonitoringAlert:
+      type: object
+      required: [id, source, level, title, status, createdAt, owner]
+      properties:
+        id:
+          type: string
+        source:
+          type: string
+        level:
+          type: string
+          enum: [中, 高, 紧急]
+        title:
+          type: string
+        status:
+          type: string
+          enum: [待确认, 已确认, 处理中, 已关闭]
+        createdAt:
+          type: string
+        owner:
+          type: string
+        handledAt:
+          type: string
+    SpotCheck:
+      type: object
+      required: [id, hospitalCode, hospitalName, source, reason, status]
+      properties:
+        id:
+          type: string
+        batch:
+          type: string
+        hospitalCode:
+          type: string
+        hospitalName:
+          type: string
+        source:
+          type: string
+        reason:
+          type: string
+        sampleRate:
+          type: string
+        reviewer:
+          type: string
+        status:
+          type: string
+          enum: [待分派, 待复核, 复核中, 已完成]
+        due:
+          type: string
+          format: date
+        findings:
+          type: integer
+    SandboxRun:
+      type: object
+      required: [id, ruleName, population, affected, status, runAt]
+      properties:
+        id:
+          type: string
+        ruleName:
+          type: string
+        version:
+          type: string
+        population:
+          type: integer
+        affected:
+          type: integer
+        avgDelta:
+          type: number
+        gradeChanges:
+          type: integer
+        bottomLineHits:
+          type: integer
+        status:
+          type: string
+          enum: [待审批, 已发布]
+        runAt:
+          type: string
+        approvedBy:
+          type: string
+    MaterialClassification:
+      type: object
+      required: [id, materialId, suggestedIndicator, category, confidence, status]
+      properties:
+        id:
+          type: string
+        materialId:
+          type: string
+        materialName:
+          type: string
+        suggestedIndicator:
+          type: string
+        category:
+          type: string
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 100
+        risk:
+          type: string
+          enum: [高, 中, 低]
+        status:
+          type: string
+          enum: [待确认, 已确认]
+    PeerAnomaly:
+      type: object
+      required: [id, hospitalCode, metric, level, reason, status]
+      properties:
+        id:
+          type: string
+        hospitalCode:
+          type: string
+        hospitalName:
+          type: string
+        metric:
+          type: string
+        value:
+          type: string
+        peerMedian:
+          type: string
+        deviation:
+          type: string
+        level:
+          type: string
+          enum: [高, 中, 低]
+        reason:
+          type: string
+        status:
+          type: string
+          enum: [待核验, 已转抽查, 已关闭]
+    Notification:
+      type: object
+      required: [id, title, recipient, channel, priority, status]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        recipient:
+          type: string
+        role:
+          type: string
+        channel:
+          type: string
+          enum: [站内信, 移动端, 短信, 邮件]
+        priority:
+          type: string
+          enum: [紧急, 高, 普通]
+        status:
+          type: string
+        createdAt:
+          type: string
+        read:
+          type: boolean
+    NotificationChannel:
+      type: object
+      required: [channel, enabled, scope]
+      properties:
+        channel:
+          type: string
+        enabled:
+          type: boolean
+        scope:
+          type: string
+    ImportJob:
+      type: object
+      required: [id, fileName, template, rows, accepted, rejected, status]
+      properties:
+        id:
+          type: string
+        fileName:
+          type: string
+        template:
+          type: string
+        rows:
+          type: integer
+        accepted:
+          type: integer
+        rejected:
+          type: integer
+        status:
+          type: string
+          enum: [校验中, 部分成功, 已入库, 失败]
+        submittedBy:
+          type: string
+        submittedAt:
+          type: string
+        report:
+          type: string
+    SubmissionIndicator:
+      type: object
+      required: [indicatorCode, selfScore, evidenceCount, status]
+      properties:
+        indicatorCode:
+          type: string
+        indicatorName:
+          type: string
+        domain:
+          type: string
+        maxScore:
+          type: number
+        selfScore:
+          type: number
+        reviewedScore:
+          type: number
+          nullable: true
+        evidenceCount:
+          type: integer
+        status:
+          type: string
+        comment:
+          type: string
+    ValidationIssue:
+      type: object
+      properties:
+        id:
+          type: string
+        hospitalCode:
+          type: string
+        indicatorCode:
+          type: string
+        type:
+          type: string
+        severity:
+          type: string
+          enum: [blocker, warning]
+        status:
+          type: string
+          enum: [open, resolved]
+        description:
+          type: string
+        suggestion:
+          type: string
+    ReviewNote:
+      type: object
+      properties:
+        id:
+          type: string
+        hospitalCode:
+          type: string
+        indicatorCode:
+          type: string
+        status:
+          type: string
+        text:
+          type: string
+        at:
+          type: string
+    ExpertReview:
+      type: object
+      properties:
+        id:
+          type: string
+        hospitalCode:
+          type: string
+        indicatorCode:
+          type: string
+        submittedBy:
+          type: string
+        expertGroup:
+          type: string
+        priority:
+          type: string
+          enum: [高, 中, 低]
+        status:
+          type: string
+          enum: [待复核, 已复核, 需补证]
+        reason:
+          type: string
+        resultType:
+          type: string
+          enum: [同意省审, 调整扣分, 要求补证]
+        suggestedScore:
+          type: number
+          nullable: true
+        conclusion:
+          type: string
+        submittedAt:
+          type: string
+        completedAt:
+          type: string
+    ScoreResult:
+      type: object
+      properties:
+        totalScore:
+          type: number
+        grade:
+          type: string
+        domainScores:
+          type: array
+          items:
+            type: object
+            properties:
+              domainCode:
+                type: string
+              domainName:
+                type: string
+              weightedScore:
+                type: number
+              weight:
+                type: number
+    Rectification:
+      type: object
+      properties:
+        id:
+          type: string
+        sourceIssueId:
+          type: string
+        hospitalCode:
+          type: string
+        indicatorCode:
+          type: string
+        problem:
+          type: string
+        action:
+          type: string
+        status:
+          type: string
+          enum: [未开始, 整改中, 已提交, 已完成]
