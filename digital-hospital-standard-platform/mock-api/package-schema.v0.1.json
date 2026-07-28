@@ -569,6 +569,78 @@
         }
       }
     },
+    "assistantOnlineGuardrail": {
+      "type": "object",
+      "required": ["citationCoverage", "answerAcceptance", "maxNoAnswerRate", "maxEscalationRate", "maxP95LatencyMs", "maxSafetyEvents", "maxDriftScore"],
+      "properties": {
+        "citationCoverage": { "type": "number", "minimum": 0, "maximum": 100 },
+        "answerAcceptance": { "type": "number", "minimum": 0, "maximum": 100 },
+        "maxNoAnswerRate": { "type": "number", "minimum": 0, "maximum": 100 },
+        "maxEscalationRate": { "type": "number", "minimum": 0, "maximum": 100 },
+        "maxP95LatencyMs": { "type": "integer", "minimum": 0 },
+        "maxSafetyEvents": { "type": "integer", "minimum": 0 },
+        "maxDriftScore": { "type": "number", "minimum": 0 }
+      }
+    },
+    "assistantDeployments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "releaseId", "version", "strategy", "trafficPercent", "cohorts", "stableVersion", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "releaseId": { "type": "string" },
+          "version": { "type": "string" },
+          "strategy": { "type": "string", "enum": ["灰度", "全量"] },
+          "trafficPercent": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "cohorts": { "type": "array", "items": { "type": "string" } },
+          "stableVersion": { "type": "string" },
+          "status": { "type": "string", "enum": ["稳定", "灰度中", "已暂停", "已完成", "历史版本", "已回滚"] }
+        }
+      }
+    },
+    "assistantOnlineQualityWindows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "deploymentId", "version", "sampleCount", "citationCoverage", "answerAcceptance", "noAnswerRate", "escalationRate", "p95LatencyMs", "safetyEvents", "driftScore", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "deploymentId": { "type": "string" },
+          "version": { "type": "string" },
+          "sampleCount": { "type": "integer", "minimum": 0 },
+          "citationCoverage": { "type": "number", "minimum": 0, "maximum": 100 },
+          "answerAcceptance": { "type": "number", "minimum": 0, "maximum": 100 },
+          "noAnswerRate": { "type": "number", "minimum": 0, "maximum": 100 },
+          "escalationRate": { "type": "number", "minimum": 0, "maximum": 100 },
+          "p95LatencyMs": { "type": "integer", "minimum": 0 },
+          "safetyEvents": { "type": "integer", "minimum": 0 },
+          "driftScore": { "type": "number", "minimum": 0 },
+          "status": { "type": "string", "enum": ["健康", "关注", "异常"] }
+        }
+      }
+    },
+    "assistantQualityIncidents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "deploymentId", "version", "signal", "level", "threshold", "actual", "action", "owner", "status", "createdAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "deploymentId": { "type": "string" },
+          "version": { "type": "string" },
+          "signal": { "type": "string" },
+          "level": { "type": "string", "enum": ["中", "高", "紧急"] },
+          "threshold": { "type": "string" },
+          "actual": { "type": "string" },
+          "action": { "type": "string" },
+          "owner": { "type": "string" },
+          "status": { "type": "string", "enum": ["开放", "处理中", "已解决"] },
+          "createdAt": { "type": "string" },
+          "resolvedAt": { "type": "string" }
+        }
+      }
+    },
     "anomalyExplanations": {
       "type": "array",
       "items": {
