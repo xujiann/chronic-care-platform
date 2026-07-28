@@ -334,6 +334,80 @@ function validateInstitutionDeploymentManifest(manifest, moduleCatalog) {
   };
 }
 
+function enumerateSpecialtySelections(tracks) {
+  const selections = [];
+  const count = tracks.length;
+  for (let mask = 1; mask < 2 ** count; mask += 1) {
+    selections.push(tracks.filter((_, index) => (mask & (1 << index)) !== 0));
+  }
+  return selections;
+}
+
+function buildSpecialtyCompatibilityMatrix(allTracks = DEFAULT_TRACKS) {
+  const combinations = enumerateSpecialtySelections(allTracks).map((selectedTracks) => {
+    const catalog = buildModuleCatalog(allTracks, selectedTracks);
+    const manifest = buildInstitutionDeploymentManifest(catalog, {
+      institutionId: `compatibility-${selectedTracks.map((item) => item.id).join("--")}`
+    });
+    const gate = validateInstitutionDeploymentManifest(manifest, catalog);
+    return {
+      id: selectedTracks.map((item) => item.id).join("+"),
+      moduleIds: selectedTracks.map((item) => item.id),
+      selectionMode: catalog.selectionMode,
+      peerModuleDependencyCount: catalog.peerModuleDependencyCount,
+      routeCount: manifest.routeAllowlist.length,
+      apiCount: manifest.apiAllowlist.length,
+      dataNamespaceCount: manifest.dataNamespaces.length,
+      rollbackUnitCount: manifest.rollbackUnits.length,
+      gateStatus: gate.status,
+      passed: gate.ok
+    };
+  });
+  return {
+    status: combinations.every((item) => item.passed) ? "all-combinations-compatible" : "combination-conflict-detected",
+    totalCombinations: combinations.length,
+    passedCombinations: combinations.filter((item) => item.passed).length,
+    failedCombinations: combinations.filter((item) => !item.passed).length,
+    combinations
+  };
+}
+
+function buildInstitutionPackagePlan(manifest, gate, compatibilityMatrix) {
+  const artifacts = [
+    { id: "deployment-package", file: "deployment-package.json", purpose: "machine-readable module, route, API, data and gate contract" },
+    { id: "deployment-summary", file: "deployment-package.md", purpose: "human-readable institution implementation and acceptance summary" },
+    { id: "environment-example", file: "activation.env.example", purpose: "fail-closed institution and selected-module environment example" },
+    { id: "rollback-plan", file: "rollback-plan.md", purpose: "per-module independent disable and rollback procedure" },
+    { id: "artifact-index", file: "artifact-index.json", purpose: "SHA-256 index for every generated payload artifact" }
+  ];
+  const ready = gate.ok && compatibilityMatrix.failedCombinations === 0;
+  return {
+    status: ready ? "ready-to-build-institution-package" : "institution-package-blocked",
+    institutionId: manifest.institutionId,
+    enabledModuleIds: manifest.enabledModuleIds,
+    buildCommand: `node scripts/t10-institution-package.js --institution-id=${manifest.institutionId} --tracks=${manifest.enabledModuleIds.join(",")}`,
+    artifacts,
+    installOrder: [
+      "verify institution identity, selected modules and deny-by-default policy",
+      "provision shared platform capabilities without enabling peer specialty modules",
+      "apply page and API allowlists for selected modules only",
+      "provision isolated data namespaces and external-system credentials",
+      "run deployment gate, module readiness and controlled rehearsal",
+      "retain production traffic block until site evidence and formal Go/No-Go approval"
+    ],
+    rollbackPolicy: "disable one deployment unit, route allowlist and API allowlist without changing peer modules or deleting evidence",
+    compatibility: {
+      status: compatibilityMatrix.status,
+      totalCombinations: compatibilityMatrix.totalCombinations,
+      passedCombinations: compatibilityMatrix.passedCombinations
+    },
+    hardStops: [
+      ...gate.hardStops,
+      ...(compatibilityMatrix.failedCombinations > 0 ? ["specialty-combination-conflict"] : [])
+    ]
+  };
+}
+
 function sha256(value) {
   return crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
@@ -423,6 +497,12 @@ function buildSpecialtyCutoverPack(options = {}) {
     institutionId: options.institutionId
   });
   const institutionDeploymentGate = validateInstitutionDeploymentManifest(institutionDeploymentManifest, moduleCatalog);
+  const specialtyCompatibilityMatrix = buildSpecialtyCompatibilityMatrix(allTracks);
+  const institutionPackagePlan = buildInstitutionPackagePlan(
+    institutionDeploymentManifest,
+    institutionDeploymentGate,
+    specialtyCompatibilityMatrix
+  );
   const firstIncrement = selectFirstIncrement(tracks);
   const evidenceDossier = buildEvidenceDossier(tracks, firstIncrement);
   const pilotBatchPlan = buildPilotBatchPlan(tracks, firstIncrement);
@@ -449,6 +529,8 @@ function buildSpecialtyCutoverPack(options = {}) {
     moduleCatalog,
     institutionDeploymentManifest,
     institutionDeploymentGate,
+    specialtyCompatibilityMatrix,
+    institutionPackagePlan,
     tracks,
     firstIncrement,
     crossTrackControls: buildCrossTrackControls(tracks),
@@ -466,7 +548,7 @@ function buildSpecialtyCutoverPack(options = {}) {
   };
   pack.integrity = {
     algorithm: "sha256",
-    digest: `sha256:${sha256({ summary, moduleCatalog, institutionDeploymentManifest, institutionDeploymentGate, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision, evidenceDossier, pilotBatchPlan, siteEvidenceWorkflow, acceptanceScenarioSuite, scenarioEvidenceMatrix, cutoverCommandCenter, observationSignalBoard, runtimeSmokePlan })}`
+    digest: `sha256:${sha256({ summary, moduleCatalog, institutionDeploymentManifest, institutionDeploymentGate, specialtyCompatibilityMatrix, institutionPackagePlan, tracks, firstIncrement, crossTrackControls: pack.crossTrackControls, acceptanceChecklist: pack.acceptanceChecklist, rehearsalPlan: pack.rehearsalPlan, goNoGoDecision: pack.goNoGoDecision, evidenceDossier, pilotBatchPlan, siteEvidenceWorkflow, acceptanceScenarioSuite, scenarioEvidenceMatrix, cutoverCommandCenter, observationSignalBoard, runtimeSmokePlan })}`
   };
   return pack;
 }
@@ -1224,7 +1306,8 @@ function buildRuntimeSmokePlan(tracks, firstIncrement, observationSignalBoard) {
         "release/t10-specialty-cutover-pack.json exists",
         "release/t10-specialty-cutover-pack.md exists",
         "integrity digest is sha256-addressed",
-        "formalGoLiveState remains blocked until site evidence is accepted"
+        "formalGoLiveState remains blocked until site evidence is accepted",
+        "institution package plan and all 15 non-empty specialty combinations are valid"
       ],
       failureAction: "stop release packaging and keep batch-1 closed"
     },
@@ -1337,6 +1420,8 @@ function renderMarkdown(pack) {
     `- Activation policy: ${pack.institutionDeploymentManifest?.activationPolicy || "deny-by-default"}`,
     `- Production traffic: ${pack.institutionDeploymentManifest?.productionTrafficState || "blocked-until-site-evidence-signed"}`,
     `- Deployment gate: ${pack.institutionDeploymentGate?.status || "deployment-contract-blocked"} (${pack.institutionDeploymentGate?.summary?.passed || 0}/${pack.institutionDeploymentGate?.summary?.total || 0})`,
+    `- Compatibility matrix: ${pack.specialtyCompatibilityMatrix?.passedCombinations || 0}/${pack.specialtyCompatibilityMatrix?.totalCombinations || 0}`,
+    `- Institution package: ${pack.institutionPackagePlan?.status || "institution-package-blocked"}`,
     `- Disabled modules: ${(pack.institutionDeploymentManifest?.disabledModuleIds || []).join(", ") || "none"}`,
     "",
     "| Module | Deployment unit | Page allowlist | API allowlist | Data namespace | Rollback unit |",
@@ -1346,6 +1431,10 @@ function renderMarkdown(pack) {
     "### Deployment validation rules",
     "",
     ...(pack.institutionDeploymentManifest?.validationRules || []).map((item) => `- ${item}`),
+    "",
+    "### Institution package artifacts",
+    "",
+    ...(pack.institutionPackagePlan?.artifacts || []).map((item) => `- ${item.file}: ${item.purpose}`),
     "",
     "## 专项状态",
     "",
@@ -1562,6 +1651,9 @@ module.exports = {
   buildModuleCatalog,
   buildInstitutionDeploymentManifest,
   validateInstitutionDeploymentManifest,
+  enumerateSpecialtySelections,
+  buildSpecialtyCompatibilityMatrix,
+  buildInstitutionPackagePlan,
   resolveEnabledTracks,
   parseCliOptions,
   renderMarkdown,

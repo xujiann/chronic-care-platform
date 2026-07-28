@@ -92,6 +92,11 @@ test("buildSpecialtyCutoverPack aggregates site blockers and cross-track control
   assert.deepEqual(pack.moduleCatalog.enabledModuleIds, ["emergency-life-chain", "clinical-blood"]);
   assert.equal(pack.moduleCatalog.peerModuleDependencyCount, 0);
   assert.ok(pack.moduleCatalog.modules.every((item) => item.independentlySelectable));
+  assert.equal(pack.institutionDeploymentGate.ok, true);
+  assert.equal(pack.specialtyCompatibilityMatrix.totalCombinations, 3);
+  assert.equal(pack.specialtyCompatibilityMatrix.passedCombinations, 3);
+  assert.equal(pack.institutionPackagePlan.status, "ready-to-build-institution-package");
+  assert.equal(pack.institutionPackagePlan.artifacts.length, 5);
   assert.equal(pack.crossTrackControls.length, 4);
   assert.ok(pack.crossTrackControls.some((item) => item.id === "four-eyes-site-evidence"));
   assert.equal(pack.rehearsalPlan.scope.primaryTrackId, "emergency-life-chain");
@@ -487,7 +492,7 @@ test("static cutover preview page exposes T10 tracks and release-artifact fallba
   assert.match(html, /institution-deployment-manifest/);
   assert.match(html, /observation-signal-board/);
   assert.match(html, /runtime-smoke-plan/);
-  assert.match(html, /t10-specialty-cutover\.js\?v=institution-deployment-gate/);
+  assert.match(html, /t10-specialty-cutover\.js\?v=institution-package-plan/);
   assert.match(html, /emergency\.html/);
   assert.match(html, /blood\.html/);
   assert.match(html, /imaging-cloud\.html/);
@@ -508,6 +513,9 @@ test("static cutover preview page exposes T10 tracks and release-artifact fallba
   assert.match(client, /renderInstitutionDeploymentManifest/);
   assert.match(client, /deny-by-default/);
   assert.match(client, /deployment-contract-valid/);
+  assert.match(client, /all-combinations-compatible/);
+  assert.match(client, /ready-to-build-institution-package/);
+  assert.match(client, /artifact-index\.json/);
   assert.match(client, /evidence-id-present/);
   assert.match(client, /batch-1-single-chain/);
   assert.match(client, /submit-evidence/);

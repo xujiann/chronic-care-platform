@@ -96,6 +96,16 @@ The default command still generates the four-module T10 integration pack. `modul
 
 `institutionDeploymentGate` executes nine contract checks during pack generation and runtime smoke: deny-by-default activation, exact enabled/disabled sets, page and API allowlists, unique data namespaces, unique rollback units, zero peer-module dependencies and the production-traffic boundary. Any failed check emits a hard-stop ID and blocks the deployment contract before an institution-specific package can enter controlled rehearsal.
 
+`specialtyCompatibilityMatrix` executes the deployment contract against all 15 non-empty combinations of the four specialties. Every combination must retain exact page/API allowlists, unique data namespaces, independent rollback units and zero peer-specialty dependencies.
+
+Build a deliverable institution package with:
+
+```powershell
+node scripts\t10-institution-package.js --institution-id=hospital-a --tracks=clinical-blood,physical-examination
+```
+
+The package contains `deployment-package.json`, `deployment-package.md`, `activation.env.example`, `rollback-plan.md` and `artifact-index.json`. The SHA-256 index covers the four payload artifacts. Package generation immediately re-reads the directory and verifies every indexed digest and byte count, the deployment-package digest, the deployment gate, all 15 compatibility combinations and the fail-closed production boundary. The rollback plan removes only the selected module's deployment unit, page and API from service while preserving data and evidence; it must not disable or mutate another specialty.
+
 ## Site evidence dossier
 
 The cutover pack now emits an `evidenceDossier` section. It converts every site blocker into a reviewable evidence entry with:

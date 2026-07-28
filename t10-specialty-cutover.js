@@ -34,6 +34,8 @@ function withCutoverDefaults(pack) {
     tracks: pack.tracks || fallback.tracks,
     institutionDeploymentManifest: pack.institutionDeploymentManifest || fallback.institutionDeploymentManifest,
     institutionDeploymentGate: pack.institutionDeploymentGate || fallback.institutionDeploymentGate,
+    specialtyCompatibilityMatrix: pack.specialtyCompatibilityMatrix || fallback.specialtyCompatibilityMatrix,
+    institutionPackagePlan: pack.institutionPackagePlan || fallback.institutionPackagePlan,
     crossTrackControls: pack.crossTrackControls || fallback.crossTrackControls,
     rehearsalPlan: pack.rehearsalPlan || fallback.rehearsalPlan,
     goNoGoDecision: pack.goNoGoDecision || fallback.goNoGoDecision,
@@ -53,7 +55,12 @@ function renderCutoverPack(pack) {
   renderKpis(pack);
   renderFirstIncrement(pack.firstIncrement || {});
   renderTracks(pack.tracks || [], pack.stages || []);
-  renderInstitutionDeploymentManifest(pack.institutionDeploymentManifest || {}, pack.institutionDeploymentGate || {});
+  renderInstitutionDeploymentManifest(
+    pack.institutionDeploymentManifest || {},
+    pack.institutionDeploymentGate || {},
+    pack.specialtyCompatibilityMatrix || {},
+    pack.institutionPackagePlan || {}
+  );
   renderControls(pack.crossTrackControls || []);
   renderRehearsalPlan(pack.rehearsalPlan || {});
   renderDecisionMatrix(pack.goNoGoDecision || {});
@@ -112,7 +119,7 @@ function renderTracks(tracks, stages) {
   `).join("");
 }
 
-function renderInstitutionDeploymentManifest(manifest, gate) {
+function renderInstitutionDeploymentManifest(manifest, gate, compatibility, packagePlan) {
   const modules = manifest.enabledModules || [];
   const rows = modules.map((item) => `
     <tr>
@@ -130,6 +137,7 @@ function renderInstitutionDeploymentManifest(manifest, gate) {
         <span class="badge ok">${escapeHtml(manifest.activationPolicy || "deny-by-default")}</span>
         <span class="badge warn">${escapeHtml(manifest.productionTrafficState || "blocked-until-site-evidence-signed")}</span>
         <span class="badge ${gate.ok ? "ok" : "warn"}">${escapeHtml(gate.status || "deployment-contract-blocked")} · ${gate.summary?.passed || 0}/${gate.summary?.total || 0}</span>
+        <span class="badge ${compatibility.failedCombinations ? "warn" : "ok"}">组合兼容 ${compatibility.passedCombinations || 0}/${compatibility.totalCombinations || 0}</span>
       </div>
       <p class="muted">启用模块：${(manifest.enabledModuleIds || []).map(escapeHtml).join(" / ") || "无"}；禁用模块：${(manifest.disabledModuleIds || []).map(escapeHtml).join(" / ") || "无"}。</p>
       <p class="muted">页面白名单：${(manifest.routeAllowlist || []).map(escapeHtml).join(" / ") || "无"}；API 白名单：${(manifest.apiAllowlist || []).map(escapeHtml).join(" / ") || "无"}。</p>
@@ -144,6 +152,18 @@ function renderInstitutionDeploymentManifest(manifest, gate) {
       <h3>部署校验规则</h3>
       <ul class="evidence-list">${(gate.checks || []).map((item) => `<li><span class="badge ${item.passed ? "ok" : "warn"}">${item.passed ? "PASS" : "BLOCK"}</span> <strong>${escapeHtml(item.id)}</strong> · ${escapeHtml(item.detail)}</li>`).join("")}</ul>
       <p class="muted">硬阻断：${(gate.hardStops || []).map(escapeHtml).join(" / ") || "无"}。</p>
+    </div>
+    <div class="control-grid">
+      <article class="cutover-card">
+        <h3>机构交付产物</h3>
+        <span class="badge ${packagePlan.status === "ready-to-build-institution-package" ? "ok" : "warn"}">${escapeHtml(packagePlan.status || "institution-package-blocked")}</span>
+        <ul class="evidence-list">${(packagePlan.artifacts || []).map((item) => `<li><code>${escapeHtml(item.file)}</code> · ${escapeHtml(item.purpose)}</li>`).join("")}</ul>
+      </article>
+      <article class="cutover-card">
+        <h3>安装与回退</h3>
+        <ol class="evidence-list">${(packagePlan.installOrder || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ol>
+        <p class="muted">${escapeHtml(packagePlan.rollbackPolicy || "")}</p>
+      </article>
     </div>
   `;
 }
@@ -708,6 +728,29 @@ function fallbackCutoverPack() {
         deploymentCheck("production-traffic-boundary", "blocked-until-site-evidence-signed")
       ]
     },
+    specialtyCompatibilityMatrix: {
+      status: "all-combinations-compatible",
+      totalCombinations: 15,
+      passedCombinations: 15,
+      failedCombinations: 0,
+      combinations: []
+    },
+    institutionPackagePlan: {
+      status: "ready-to-build-institution-package",
+      institutionId: "institution-template",
+      enabledModuleIds: ["emergency-life-chain", "clinical-blood", "regional-imaging-cloud", "physical-examination"],
+      buildCommand: "node scripts/t10-institution-package.js --institution-id=institution-template --tracks=emergency-life-chain,clinical-blood,regional-imaging-cloud,physical-examination",
+      artifacts: [
+        packageArtifact("deployment-package.json", "机器可读部署契约"),
+        packageArtifact("deployment-package.md", "机构实施与验收摘要"),
+        packageArtifact("activation.env.example", "默认拒绝的环境变量示例"),
+        packageArtifact("rollback-plan.md", "专项独立回退说明"),
+        packageArtifact("artifact-index.json", "SHA-256 产物索引")
+      ],
+      installOrder: ["核验机构和选配范围", "应用页面/API白名单", "准备独立数据命名空间", "执行门禁与受控演练", "现场证据签收后进入正式决策"],
+      rollbackPolicy: "单独停用一个部署单元、页面和 API，不修改其他专项，也不删除证据。",
+      hardStops: []
+    },
     crossTrackControls: [
       control("identity-and-role-scope", "统一身份与最小权限", "平台账号管理员/机构管理员", "每个专项均使用现场实名账号、机构编码和角色授权；演示账号不得进入生产灰度。"),
       control("signed-interface-and-idempotency", "签名接口、时钟窗口和幂等", "平台互联互通组/外部系统厂商", "外部报文必须具备签名、时间窗、nonce或幂等键、回执和死信补偿证据。"),
@@ -1111,6 +1154,10 @@ function deploymentModule(id, name, page, api) {
 
 function deploymentCheck(id, detail) {
   return { id, passed: true, detail };
+}
+
+function packageArtifact(file, purpose) {
+  return { file, purpose };
 }
 
 function control(id, name, owner, acceptance) {
