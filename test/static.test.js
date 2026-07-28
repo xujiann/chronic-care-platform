@@ -4734,6 +4734,7 @@ test("citizen record V3 exposes eight governed next-stage capabilities", () => {
     "buildProductionIntegrationStatus",
     "validateClinicalSourceSample",
     "projectClinicalSourceSample",
+    "buildClinicalSourceAcceptanceReport",
     "assessResidentRecordQuality",
     "governCrossInstitutionRecords",
     "buildFamilyDelegationCenter",
@@ -4752,5 +4753,5 @@ test("citizen record V3 exposes eight governed next-stage capabilities", () => {
   assert.match(ui, /renderCitizenRecordsNextStage/);
   assert.match(v3, /function taskDueState/);
   assert.match(v3, /function calendarDayDistance/);
-  assert.match(documentation, /第二十八增量/);
+  assert.match(documentation, /第三十增量/);
 });

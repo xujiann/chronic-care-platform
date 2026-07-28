@@ -268,6 +268,67 @@
     });
   }
 
+  function buildClinicalSourceAcceptanceReport(samples = [], expectedResidentId = "") {
+    const entries = (Array.isArray(samples) ? samples : []).slice(0, 500).map((sample, index) => {
+      const validation = validateClinicalSourceSample(sample, expectedResidentId);
+      let projected = null;
+      if (validation.valid) projected = projectClinicalSourceSample(sample, expectedResidentId);
+      return {
+        sampleNumber: index + 1,
+        system: validation.system || "UNKNOWN",
+        systemLabel: validation.systemLabel,
+        status: validation.valid ? "通过" : "拒绝",
+        errors: [...validation.errors],
+        ignoredSensitiveFieldCount: validation.ignoredSensitiveFields.length,
+        projected
+      };
+    });
+    const acceptedRecords = CitizenRecordsV2?.mergeInstitutionRecords(
+      entries.map((item) => item.projected).filter(Boolean)
+    ) || entries.map((item) => item.projected).filter(Boolean);
+    const systems = Object.keys(CLINICAL_SOURCE_SYSTEMS).map((system) => {
+      const scoped = entries.filter((item) => item.system === system);
+      return {
+        system,
+        label: CLINICAL_SOURCE_SYSTEMS[system].label,
+        total: scoped.length,
+        accepted: scoped.filter((item) => item.status === "通过").length,
+        rejected: scoped.filter((item) => item.status === "拒绝").length
+      };
+    });
+    const rejectedCount = entries.filter((item) => item.status === "拒绝").length;
+    return {
+      total: entries.length,
+      acceptedCount: entries.length - rejectedCount,
+      rejectedCount,
+      acceptedRecordCount: acceptedRecords.length,
+      ignoredSensitiveFieldCount: entries.reduce((sum, item) => sum + item.ignoredSensitiveFieldCount, 0),
+      contractReady: entries.length > 0 && rejectedCount === 0,
+      systems,
+      entries: entries.map(({ projected, ...item }) => item),
+      acceptedRecords,
+      productionReady: false,
+      boundary: "批量报告只证明脱敏样例满足字段契约并可生成居民安全摘要；不包含被拒绝报文原文，也不代表正式连接、数据真实性或生产上线签字。"
+    };
+  }
+
+  function qualityIssuePriority(issues = []) {
+    if (issues.includes("居民范围不一致")) return "阻断";
+    if (issues.some((issue) => ["来源机构待补", "来源系统待补", "来源记录号待补", "更新时间待补"].includes(issue))) return "优先复核";
+    if (issues.length) return "常规复核";
+    return "完整";
+  }
+
+  function qualityIssueAction(issues = []) {
+    if (issues.includes("居民范围不一致")) return "隔离记录并核对居民归属";
+    if (issues.some((issue) => ["来源机构待补", "来源系统待补", "来源记录号待补"].includes(issue))) return "联系来源机构补齐溯源字段";
+    if (issues.includes("更新时间待补")) return "联系来源机构补齐更新时间";
+    if (issues.includes("超过十八个月待复核")) return "申请来源机构复核更新时间";
+    if (issues.includes("个人补充待机构核验")) return "提交机构核验并保留个人补充标识";
+    if (issues.includes("来源可信度待核验")) return "核验来源可信度";
+    return "无需处理";
+  }
+
   function assessResidentRecordQuality(records = [], now = new Date(), expectedResidentId = "") {
     const referenceTime = toDate(now) || new Date();
     const categoryLabels = {
@@ -289,15 +350,16 @@
         const sourceRecordId = cleanText(record.provenance?.sourceRecordId || record.meta?.sourceRecordId, 160);
         const updatedAt = record.provenance?.lastSynchronizedAt || record.updatedAt || record.createdAt || record.date;
         const ageDays = calendarDayDistance(updatedAt, referenceTime);
+        const trust = recordTrust(record);
+        const selfReported = trust === "self-reported";
         const issues = [];
         if (expectedResidentId && cleanText(record.residentId, 120) !== cleanText(expectedResidentId, 120)) issues.push("居民范围不一致");
         if (!sourceOrganization || /待核验|未知|未提供/.test(sourceOrganization)) issues.push("来源机构待补");
-        if (!sourceSystem || /待核验|未知|未提供/.test(sourceSystem)) issues.push("来源系统待补");
-        if (!sourceRecordId) issues.push("来源记录号待补");
+        if (!selfReported && (!sourceSystem || /待核验|未知|未提供/.test(sourceSystem))) issues.push("来源系统待补");
+        if (!selfReported && !sourceRecordId) issues.push("来源记录号待补");
         if (!toDate(updatedAt)) issues.push("更新时间待补");
         else if (ageDays > 548) issues.push("超过十八个月待复核");
-        const trust = recordTrust(record);
-        if (!TRUSTED_SOURCES.has(trust)) issues.push(trust === "self-reported" ? "个人补充待机构核验" : "来源可信度待核验");
+        if (!TRUSTED_SOURCES.has(trust)) issues.push(selfReported ? "个人补充待机构核验" : "来源可信度待核验");
         const rawName = cleanText(record.name || record.title, 160);
         const displayName = !rawName || /^(已核验|已确认|待核验|已通过|verified|approved|confirmed)$/i.test(rawName)
           ? categoryLabels[record.category] || "健康资料"
@@ -311,8 +373,14 @@
           ageDays: Number.isFinite(ageDays) ? ageDays : null,
           complete: issues.length === 0,
           issues,
-          status: issues.length ? issues[0] : "来源与时效完整"
+          status: issues.length ? issues[0] : "来源与时效完整",
+          priority: qualityIssuePriority(issues),
+          action: qualityIssueAction(issues)
         };
+      })
+      .sort((a, b) => {
+        const order = { 阻断: 0, 优先复核: 1, 常规复核: 2, 完整: 3 };
+        return (order[a.priority] ?? 9) - (order[b.priority] ?? 9) || a.name.localeCompare(b.name, "zh-CN");
       });
     return {
       items,
@@ -320,6 +388,8 @@
       reviewCount: items.filter((item) => !item.complete).length,
       staleCount: items.filter((item) => item.issues.includes("超过十八个月待复核")).length,
       crossResidentCount: items.filter((item) => item.issues.includes("居民范围不一致")).length,
+      blockedCount: items.filter((item) => item.priority === "阻断").length,
+      highPriorityCount: items.filter((item) => item.priority === "优先复核").length,
       boundary: "质量状态用于提示来源、字段和更新时间是否齐全，不改变医疗机构原始内容，也不把个人补充资料提升为临床权威记录。"
     };
   }
@@ -808,6 +878,7 @@
     buildProductionIntegrationStatus,
     validateClinicalSourceSample,
     projectClinicalSourceSample,
+    buildClinicalSourceAcceptanceReport,
     assessResidentRecordQuality,
     governCrossInstitutionRecords,
     buildFamilyDelegationCenter,

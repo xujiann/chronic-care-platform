@@ -169,6 +169,73 @@ test("临床样例居民投影按系统白名单保留摘要并清除内部敏�
   assert.doesNotMatch(JSON.stringify(projected), /private\/lab|storage\.example|must-not-leak|nested-secret|mpi-secret/);
 });
 
+test("批量临床样例验收汇总通过拒绝去重和敏感字段剔除且不回显拒绝原文", () => {
+  const lis = {
+    sourceSystem: "LIS",
+    residentId: "r1",
+    sourceOrganization: "甲医院",
+    sourceRecordId: "lab-batch-1",
+    version: "1",
+    reportedAt: "2026-07-27T07:00:00.000Z",
+    reportNo: "BATCH-1",
+    results: [{ name: "血糖", value: "6.1", unit: "mmol/L" }],
+    accessToken: "accepted-secret"
+  };
+  const report = api.buildClinicalSourceAcceptanceReport([
+    lis,
+    { ...lis, version: "2", reportedAt: "2026-07-27T08:00:00.000Z" },
+    {
+      sourceSystem: "EMR",
+      residentId: "r1",
+      sourceOrganization: "甲医院",
+      sourceRecordId: "visit-batch-1",
+      version: "1",
+      visitAt: "2026-07-27T07:00:00.000Z",
+      visitType: "门诊",
+      diagnoses: ["高血压"],
+      summary: "复诊"
+    },
+    {
+      sourceSystem: "PACS",
+      residentId: "r2",
+      sourceOrganization: "乙医院",
+      sourceRecordId: "pacs-rejected",
+      version: "1",
+      reportedAt: "2026-07-27T07:00:00.000Z",
+      reportNo: "P-1",
+      modality: "CT",
+      conclusion: "拒绝样例中的敏感结论",
+      signedUrl: "https://private.example/rejected"
+    }
+  ], "r1");
+  assert.equal(report.total, 4);
+  assert.equal(report.acceptedCount, 3);
+  assert.equal(report.rejectedCount, 1);
+  assert.equal(report.acceptedRecordCount, 2);
+  assert.equal(report.contractReady, false);
+  assert.equal(report.productionReady, false);
+  assert.equal(report.systems.find((item) => item.system === "LIS").accepted, 2);
+  assert.doesNotMatch(JSON.stringify(report.entries), /敏感结论|private\.example|accepted-secret|lab-batch-1|visit-batch-1/);
+  assert.doesNotMatch(JSON.stringify(report.acceptedRecords), /accepted-secret/);
+  assert.match(report.boundary, /不代表正式连接/);
+});
+
+test("全部批量样例通过只开启字段契约状态而不打开生产状态", () => {
+  const report = api.buildClinicalSourceAcceptanceReport([{
+    sourceSystem: "PACS",
+    residentId: "r1",
+    sourceOrganization: "甲医院",
+    sourceRecordId: "pacs-ready",
+    version: "1",
+    reportedAt: "2026-07-27T07:00:00.000Z",
+    reportNo: "P-READY",
+    modality: "MR",
+    conclusion: "未见明显异常"
+  }], "r1");
+  assert.equal(report.contractReady, true);
+  assert.equal(report.productionReady, false);
+});
+
 test("档案质量评估识别来源缺失、超期、个人补充和跨居民记录", () => {
   const quality = api.assessResidentRecordQuality([
     {
@@ -197,6 +264,15 @@ test("档案质量评估识别来源缺失、超期、个人补充和跨居民�
       meta: { sourceTrust: "self-reported" }
     },
     {
+      id: "missing",
+      residentId: "r1",
+      category: "labs",
+      name: "待补溯源检验",
+      updatedAt: "2026-07-20",
+      source: "甲医院",
+      meta: { sourceTrust: "clinical" }
+    },
+    {
       id: "other",
       residentId: "r2",
       category: "imaging",
@@ -206,9 +282,17 @@ test("档案质量评估识别来源缺失、超期、个人补充和跨居民�
     }
   ], now, "r1");
   assert.equal(quality.completeCount, 1);
-  assert.equal(quality.reviewCount, 3);
+  assert.equal(quality.reviewCount, 4);
   assert.equal(quality.staleCount, 1);
   assert.equal(quality.crossResidentCount, 1);
+  assert.equal(quality.blockedCount, 1);
+  assert.equal(quality.highPriorityCount, 1);
+  assert.equal(quality.items[0].id, "other");
+  assert.equal(quality.items[0].priority, "阻断");
+  assert.match(quality.items[0].action, /隔离记录/);
+  assert.equal(quality.items.find((item) => item.id === "self").priority, "常规复核");
+  assert.match(quality.items.find((item) => item.id === "self").action, /保留个人补充标识/);
+  assert.equal(quality.items.find((item) => item.id === "missing").priority, "优先复核");
   assert.equal(quality.items.find((item) => item.id === "complete").name, "电子病历");
   assert.match(quality.items.find((item) => item.id === "self").issues.join("；"), /个人补充待机构核验/);
   assert.match(quality.boundary, /不改变医疗机构原始内容/);
