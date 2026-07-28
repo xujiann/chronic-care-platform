@@ -18,7 +18,7 @@ const {
   selectSigningKey
 } = require("./public-health-external-keyring-service");
 
-const ENDPOINT_PROBE_CAMPAIGN_SCHEMA_VERSION = "public-health-external-endpoint-probe-campaign/v1";
+const ENDPOINT_PROBE_CAMPAIGN_SCHEMA_VERSION = "public-health-external-endpoint-probe-campaign/v2";
 const DEFAULT_CAMPAIGN_TTL_SECONDS = 3600;
 const MAX_CAMPAIGN_TTL_SECONDS = 3600;
 const MAX_CAMPAIGN_DURATION_SECONDS = 300;
@@ -122,6 +122,7 @@ function normalizedEndpointProbeCampaignPayload(value = {}) {
     schemaVersion: ENDPOINT_PROBE_CAMPAIGN_SCHEMA_VERSION,
     campaignId: clean(value.campaignId),
     status: clean(value.status).toLowerCase(),
+    previousCampaignDigest: clean(value.previousCampaignDigest).toLowerCase(),
     entries: (Array.isArray(value.entries) ? value.entries : [])
       .map(canonicalCampaignEntry)
       .sort((left, right) => left.laneId.localeCompare(right.laneId)),
@@ -138,6 +139,18 @@ function campaignSignaturePayload(value = {}) {
   return normalizedEndpointProbeCampaignPayload(value);
 }
 
+function endpointProbeCampaignAttestationDigest(value = {}) {
+  const attestation = value.attestation || value;
+  if (clean(attestation.schemaVersion) !== ENDPOINT_PROBE_CAMPAIGN_SCHEMA_VERSION) {
+    throw new Error("endpoint probe campaign schema version is invalid");
+  }
+  const signature = digest(attestation.signature, "endpoint probe campaign signature");
+  return sha256(stableStringify({
+    ...campaignSignaturePayload(attestation),
+    signature
+  }));
+}
+
 function validateCampaignEnvelope(payload, options = {}) {
   if (!/^[a-z0-9][a-z0-9._:-]{7,127}$/i.test(payload.campaignId)) {
     throw new Error("endpoint probe campaignId is invalid");
@@ -146,6 +159,9 @@ function validateCampaignEnvelope(payload, options = {}) {
     throw new Error("endpoint probe campaign nonce is invalid");
   }
   if (payload.status !== "completed") throw new Error("endpoint probe campaign status must be completed");
+  if (payload.previousCampaignDigest) {
+    digest(payload.previousCampaignDigest, "endpoint probe campaign previousCampaignDigest");
+  }
   if (payload.verification.attestationOrigin !== TRUSTED_ATTESTATION_ORIGIN
     || payload.verification.verificationSource !== TRUSTED_VERIFICATION_SOURCE
     || payload.verification.signatureVerified !== true) {
@@ -331,9 +347,16 @@ function createPublicHealthExternalEndpointProbeCampaign(receipts, options = {})
     throw new Error(`endpoint probe campaign ttlSeconds must be an integer from 60 to ${MAX_CAMPAIGN_TTL_SECONDS}`);
   }
   const randomUUID = options.randomUUID || crypto.randomUUID;
+  const previousCampaignDigest = options.previousCampaign
+    ? endpointProbeCampaignAttestationDigest(options.previousCampaign)
+    : clean(options.previousCampaignDigest).toLowerCase();
+  if (previousCampaignDigest) {
+    digest(previousCampaignDigest, "endpoint probe campaign previousCampaignDigest");
+  }
   const unsigned = normalizedEndpointProbeCampaignPayload({
     campaignId: `ph-endpoint-probe-campaign-${randomUUID()}`,
     status: "completed",
+    previousCampaignDigest,
     entries: receipts.map((receipt) => {
       const profile = profileForLane(receipt?.laneId);
       if (!profile) throw new Error("endpoint probe campaign receipt lane is invalid");
@@ -434,6 +457,8 @@ function verifyPublicHealthExternalEndpointProbeCampaign(value = {}, options = {
     startedAt: payload.startedAt,
     completedAt: payload.completedAt,
     expiresAt: payload.expiresAt,
+    previousCampaignDigest: payload.previousCampaignDigest,
+    campaignDigest: endpointProbeCampaignAttestationDigest(attestation),
     summary: {
       lanes: entries.length,
       verifiedReceipts: entries.length
@@ -530,6 +555,7 @@ function buildPublicHealthExternalEndpointProbeCampaignRegistry(options = {}) {
     }
   });
   const consecutive = [];
+  let campaignChainLinksVerified = 0;
   let continuityBreak = null;
   for (const evaluation of evaluations) {
     if (consecutive.length >= requiredConsecutiveCampaigns) break;
@@ -546,6 +572,21 @@ function buildPublicHealthExternalEndpointProbeCampaignRegistry(options = {}) {
       continue;
     }
     const newer = consecutive[consecutive.length - 1];
+    if (!newer.previousCampaignDigest) {
+      continuityBreak = {
+        campaignId: newer.campaignId,
+        code: "campaign-chain-link-missing"
+      };
+      break;
+    }
+    if (!timingSafeHexEqual(newer.previousCampaignDigest, campaign.campaignDigest)) {
+      continuityBreak = {
+        campaignId: newer.campaignId,
+        code: "campaign-chain-link-mismatch"
+      };
+      break;
+    }
+    campaignChainLinksVerified += 1;
     const gap = timeValue(newer.startedAt, "newer campaign startedAt")
       - timeValue(campaign.completedAt, "older campaign completedAt");
     if (gap < 0) {
@@ -578,6 +619,7 @@ function buildPublicHealthExternalEndpointProbeCampaignRegistry(options = {}) {
       campaignsVerified: verified.length,
       campaignsRejected: rejected.length,
       consecutiveCampaigns: consecutive.length,
+      campaignChainLinksVerified,
       continuityBreaks: continuityBreak ? 1 : 0,
       requiredConsecutiveCampaigns,
       maxCampaignGapSeconds
@@ -621,6 +663,7 @@ module.exports = {
   campaignSignaturePayload,
   canonicalProbePolicy,
   createPublicHealthExternalEndpointProbeCampaign,
+  endpointProbeCampaignAttestationDigest,
   endpointProbeReceiptDigest,
   normalizedEndpointProbeCampaignPayload,
   probePolicyDigest,
