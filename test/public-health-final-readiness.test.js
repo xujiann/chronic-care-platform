@@ -14,8 +14,8 @@ test("final readiness accepts every planned T08 functional increment", () => {
   const report = buildPublicHealthFinalReadiness();
   assert.equal(report.ok, true);
   assert.equal(report.functionalState, "t08-public-health-planned-functions-complete");
-  assert.equal(report.summary.checks, 50);
-  assert.equal(report.summary.passed, 50);
+  assert.equal(report.summary.checks, 53);
+  assert.equal(report.summary.passed, 53);
   assert.equal(report.summary.lanes, 8);
   assert.equal(report.summary.handoffs, 8);
   assert.equal(report.summary.adapterProfiles, 8);
@@ -23,6 +23,11 @@ test("final readiness accepts every planned T08 functional increment", () => {
   assert.equal(report.summary.verifiedEndpointProbes, 8);
   assert.equal(report.summary.verifiedEndpointProbeCampaigns, 3);
   assert.equal(report.summary.verifiedEndpointProbeCampaignLinks, 2);
+  assert.equal(report.summary.modernizationSources, 8);
+  assert.equal(report.summary.modernizationCatalogEntries, 7);
+  assert.equal(report.summary.modernizationRules, 8);
+  assert.equal(report.summary.modernizationClosedAlerts, 1);
+  assert.equal(report.summary.modernizationClosedCollaborationTasks, 2);
   assert.equal(report.summary.persistedOutboxDispatches, 1);
   assert.equal(report.summary.persistedOutboxAuditEntries, 3);
   assert.equal(report.summary.recoveredDeadLetters, 1);
@@ -41,7 +46,7 @@ test("final readiness accepts every planned T08 functional increment", () => {
   assert.equal(report.endpointProbeCampaignFailureRegistry.continuityBreak.code, "campaign-verification-failed");
   assert.equal(report.endpointProbeCampaignFailureRegistry.productionReady, false);
   assert.equal(report.productionReady, false);
-  assert.equal(report.remainingT00Integration.length, 3);
+  assert.equal(report.remainingT00Integration.length, 4);
 });
 
 test("final readiness fails closed when the T00 route contract is absent", () => {
@@ -63,5 +68,7 @@ test("final readiness renders and writes machine and human reports", () => {
   assert.match(fs.readFileSync(markdown, "utf8"), /Verified endpoint probes: 8\/8/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Verified endpoint probe campaigns: 3\/3/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Verified endpoint probe campaign links: 2\/2/);
+  assert.match(fs.readFileSync(markdown, "utf8"), /Modernization data sources: 8\/8/);
+  assert.match(fs.readFileSync(markdown, "utf8"), /Modernization closed collaboration tasks: 2\/2/);
   assert.match(renderMarkdown(report), /Remaining T00 and site integration/);
 });

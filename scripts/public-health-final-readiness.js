@@ -53,6 +53,9 @@ const {
   buildPublicHealthExternalContractCutoverBoard
 } = require("../public-health-external-contract-cutover-service");
 const { buildPublicHealthSystem } = require("./public-health-readiness");
+const {
+  buildPublicHealthModernizationReadiness
+} = require("./public-health-modernization-readiness");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "public-health-final-readiness-report.json");
@@ -612,6 +615,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
   const endpointProbeCampaignFailureAcceptance = runExternalEndpointProbeCampaignAcceptance({
     rejectLatest: true
   });
+  const modernizationReadiness = buildPublicHealthModernizationReadiness();
   const deliveries = runExternalAdapterAcceptance(system.coordinationCenter);
   const outboxAcceptance = runExternalOutboxAcceptance(sourceData, system);
   const recoveryAcceptance = runDeadLetterRecoveryAcceptance(sourceData, system);
@@ -681,6 +685,9 @@ function buildPublicHealthFinalReadiness(options = {}) {
   }, "2026-07-23T09:31:00.000Z");
   const checks = [
     check("scope:eight-domain-center", system.coordinationCenter?.summary?.lanes === 8 && system.coordinationCenter?.ok, "8/8 coordination lanes are structurally runnable", "scope"),
+    check("modernization:data-foundation", modernizationReadiness.ok === true && modernizationReadiness.summary.sources === 8 && modernizationReadiness.summary.catalogEntries === 7, "8 registered sources and 7 catalog entities form the minimized data foundation", "modernization"),
+    check("modernization:multi-source-surveillance", modernizationReadiness.summary.rules === 8 && modernizationReadiness.summary.closedAlerts === 1, "8 versioned rules and one human-verified alert closure prove the surveillance workflow", "modernization"),
+    check("modernization:medical-prevention-collaboration", modernizationReadiness.summary.collaborationTasks === 2 && modernizationReadiness.summary.closedCollaborationTasks === 2 && modernizationReadiness.productionReady === false, "medical public-health and primary-care tasks close without asserting production readiness", "modernization"),
     check("runtime:eight-handoffs", runtime.handoffs.length === 8 && runtime.functionalState === "eight-lane-coordination-persistence-ready", `${runtime.handoffs.length}/8 runtime handoffs`, "runtime"),
     check("runtime:persisted-write-model", runtimeAcceptance.first.nextData.publicHealthCoordinationHandoffs.length === 8, "immutable state patch contains all handoffs", "runtime"),
     check("runtime:minimized-audit", runtimeAcceptance.first.nextData.publicHealthCoordinationAudit.length === 1 && !Object.hasOwn(runtimeAcceptance.first.nextData.publicHealthCoordinationAudit[0], "residentId"), "audit is append-only and excludes residentId", "runtime"),
@@ -745,6 +752,11 @@ function buildPublicHealthFinalReadiness(options = {}) {
       verifiedEndpointProbes: endpointProbeAcceptance.summary.endpointProbesVerified,
       verifiedEndpointProbeCampaigns: endpointProbeCampaignAcceptance.summary.campaignsVerified,
       verifiedEndpointProbeCampaignLinks: endpointProbeCampaignAcceptance.summary.campaignChainLinksVerified,
+      modernizationSources: modernizationReadiness.summary.sources,
+      modernizationCatalogEntries: modernizationReadiness.summary.catalogEntries,
+      modernizationRules: modernizationReadiness.summary.rules,
+      modernizationClosedAlerts: modernizationReadiness.summary.closedAlerts,
+      modernizationClosedCollaborationTasks: modernizationReadiness.summary.closedCollaborationTasks,
       verifiedAcceptanceDeliveries: deliveries.filter((item) => item.deliveryState === "delivered").length,
       persistedAuditEntries: runtimeAcceptance.first.nextData.publicHealthCoordinationAudit.length,
       persistedOutboxDispatches: outboxAcceptance.delivered.externalRuntime.summary.dispatches,
@@ -769,6 +781,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
     endpointProbeRegistry: endpointProbeAcceptance,
     endpointProbeCampaignRegistry: endpointProbeCampaignAcceptance,
     endpointProbeCampaignFailureRegistry: endpointProbeCampaignFailureAcceptance,
+    modernizationReadiness,
     acceptanceDeliveries: deliveries,
     outboxAcceptance: {
       dispatch: outboxAcceptance.delivered.dispatch,
@@ -815,6 +828,9 @@ function buildPublicHealthFinalReadiness(options = {}) {
       externalEndpointVerification: "public-health-external-endpoint-verification-service.js",
       externalActiveProbeRunner: "public-health-external-endpoint-probe-runner.js",
       externalEndpointProbeCampaigns: "public-health-external-endpoint-probe-campaign-service.js",
+      publicHealthDataFoundation: "public-health-data-foundation-service.js",
+      publicHealthSurveillanceWorkflow: "public-health-surveillance-workflow-service.js",
+      publicHealthMedicalPreventionCollaboration: "public-health-medical-prevention-collaboration-service.js",
       externalOperations: "public-health-external-operations-service.js",
       documentation: "docs/public-health-eight-domain-coordination.md",
       keyRotationDocumentation: "docs/public-health-external-key-rotation.md",
@@ -822,12 +838,14 @@ function buildPublicHealthFinalReadiness(options = {}) {
       contractGovernanceDocumentation: "docs/public-health-external-contract-governance.md",
       endpointVerificationDocumentation: "docs/public-health-external-endpoint-verification.md",
       activeProbeDocumentation: "docs/public-health-external-active-probing.md",
-      endpointProbeCampaignDocumentation: "docs/public-health-external-endpoint-probe-campaigns.md"
+      endpointProbeCampaignDocumentation: "docs/public-health-external-endpoint-probe-campaigns.md",
+      modernizationDocumentation: "docs/public-health-fifteenth-plan-data-surveillance-medical-prevention.md"
     },
     remainingT00Integration: [
-      "Create an eight-lane signed campaign after each controlled probe batch, using a campaign keyring independent from request, receipt and single-probe keys.",
-      "Persist campaignId, campaign nonce, receiptId and receipt nonce with cross-campaign uniqueness, then expose a commission-only redacted continuity summary through T00-owned public routes.",
-      "Register shared server, package, README, operations, release and deploy entries; provision production cadence and policies without promoting endpoint or continuous connectivity to production readiness."
+      "Wire data-foundation and surveillance signal routes to the T08 controllers without duplicating validation, authorization or state transitions.",
+      "Persist source-record hashes, signals, alerts, assessments and medical-prevention tasks through SQLite transactions with unique and optimistic-version constraints.",
+      "Add the minimized surveillance and medical-prevention workbench panels through T00-owned public files.",
+      "Register package, README, release and deploy gates while preserving productionReady=false until production interfaces, sharing authorization and trusted site evidence are verified."
     ]
   };
 }
@@ -844,6 +862,10 @@ function renderMarkdown(report) {
     `- Verified endpoint probes: ${report.summary.verifiedEndpointProbes}/8`,
     `- Verified endpoint probe campaigns: ${report.summary.verifiedEndpointProbeCampaigns}/3`,
     `- Verified endpoint probe campaign links: ${report.summary.verifiedEndpointProbeCampaignLinks}/2`,
+    `- Modernization data sources: ${report.summary.modernizationSources}/8`,
+    `- Modernization surveillance rules: ${report.summary.modernizationRules}/8`,
+    `- Modernization closed alerts: ${report.summary.modernizationClosedAlerts}/1`,
+    `- Modernization closed collaboration tasks: ${report.summary.modernizationClosedCollaborationTasks}/2`,
     `- Production ready: ${report.productionReady ? "yes" : "no"}`,
     "",
     "## Checks",
