@@ -16,14 +16,18 @@ test("modernization readiness accepts data surveillance and medical-prevention f
   const report = buildPublicHealthModernizationReadiness();
   assert.equal(report.ok, true);
   assert.equal(report.functionalState, "public-health-data-surveillance-medical-prevention-foundation-complete");
-  assert.equal(report.summary.checks, 21);
-  assert.equal(report.summary.passed, 21);
+  assert.equal(report.summary.checks, 25);
+  assert.equal(report.summary.passed, 25);
   assert.equal(report.summary.sources, 8);
   assert.equal(report.summary.catalogEntries, 7);
   assert.equal(report.summary.rules, 8);
   assert.equal(report.summary.ruleVersions, 9);
   assert.equal(report.summary.trustedRuleActivations, 1);
   assert.equal(report.summary.managedRuleKeyringReady, true);
+  assert.equal(report.summary.models, 3);
+  assert.equal(report.summary.modelRuns, 1);
+  assert.equal(report.summary.validatedShadowModels, 1);
+  assert.equal(report.summary.modelDriftReviewsDue, 0);
   assert.equal(report.summary.freshSources, 1);
   assert.equal(report.summary.noDataSources, 7);
   assert.equal(report.summary.signals, 1);
@@ -33,7 +37,7 @@ test("modernization readiness accepts data surveillance and medical-prevention f
   assert.equal(report.summary.closedCollaborationTasks, 2);
   assert.equal(report.acceptance.alertState, "closed");
   assert.equal(report.productionReady, false);
-  assert.equal(report.remainingT00Integration.length, 4);
+  assert.equal(report.remainingT00Integration.length, 5);
 });
 
 test("modernization readiness fails when the privacy control contract is absent", () => {
@@ -54,6 +58,8 @@ test("modernization readiness renders and writes machine and human reports", () 
   assert.match(fs.readFileSync(markdown, "utf8"), /Data sources: 8\/8/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Trusted rule activations: 1/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Managed rule keyring ready: yes/);
+  assert.match(fs.readFileSync(markdown, "utf8"), /Surveillance models: 3\/3/);
+  assert.match(fs.readFileSync(markdown, "utf8"), /Validated shadow models: 1/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Fresh\/no-data sources: 1\/7/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Closed medical-prevention tasks: 2\/2/);
   assert.match(renderMarkdown(report), /Remaining T00 integration/);

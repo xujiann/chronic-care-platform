@@ -14,6 +14,9 @@ const {
   buildPublicHealthSurveillanceRuleGovernance,
   buildTrustedPublicHealthSurveillanceRuleRegistry
 } = require("./public-health-surveillance-rule-governance-service");
+const {
+  buildPublicHealthSurveillanceModelGovernance
+} = require("./public-health-surveillance-model-governance-service");
 
 const ALERT_ACTIONS = Object.freeze({
   "verify-alert": { from: ["open"], to: "verified" },
@@ -541,7 +544,8 @@ function applyPublicHealthSurveillanceAlertActionToState(data = {}, alertId, pay
 function buildPublicHealthSurveillanceCenter({
   data = {},
   ruleVerificationSecret = "",
-  ruleActivationKeyring = null
+  ruleActivationKeyring = null,
+  modelGovernanceAt = new Date().toISOString()
 } = {}) {
   const ruleGovernance = buildPublicHealthSurveillanceRuleGovernance({
     data,
@@ -560,6 +564,10 @@ function buildPublicHealthSurveillanceCenter({
     : [];
   const dataFoundation = buildPublicHealthDataFoundation({ data });
   const collaboration = buildPublicHealthMedicalPreventionBoard({ data, alerts });
+  const modelGovernance = buildPublicHealthSurveillanceModelGovernance({
+    data,
+    at: modelGovernanceAt
+  });
   const alertIntegrityFindings = alerts.flatMap((alert) => validatePublicHealthSurveillanceAlert(alert, data, {
     verificationSecret: ruleVerificationSecret,
     activationKeyring: ruleActivationKeyring
@@ -567,9 +575,15 @@ function buildPublicHealthSurveillanceCenter({
     .map((code) => ({ alertId: clean(alert.id), code })));
   const openAlerts = alerts.filter((item) => item.status !== "closed");
   return {
-    ok: dataFoundation.ok && collaboration.ok && ruleGovernance.ok && alertIntegrityFindings.length === 0,
+    ok: dataFoundation.ok
+      && collaboration.ok
+      && ruleGovernance.ok
+      && modelGovernance.ok
+      && alertIntegrityFindings.length === 0,
     functionalState: !ruleGovernance.ok
       ? "multi-source-surveillance-rule-governance-review-required"
+      : !modelGovernance.ok
+        ? "multi-source-surveillance-model-governance-review-required"
       : alertIntegrityFindings.length
         ? "multi-source-surveillance-integrity-review-required"
         : "multi-source-surveillance-warning-workflow-runnable",
@@ -588,7 +602,11 @@ function buildPublicHealthSurveillanceCenter({
       closedCollaborationTasks: collaboration.summary.closedTasks,
       alertIntegrityFindings: alertIntegrityFindings.length,
       trustedRuleActivations: ruleGovernance.summary.trustedActivations,
-      ruleGovernanceFindings: ruleGovernance.summary.findings
+      ruleGovernanceFindings: ruleGovernance.summary.findings,
+      models: modelGovernance.summary.models,
+      validatedShadowModels: modelGovernance.summary.validatedShadowModels,
+      modelRuns: modelGovernance.summary.modelRuns,
+      modelGovernanceFindings: modelGovernance.summary.findings
     },
     rules: rules.map((item) => ({
       id: item.id,
@@ -615,6 +633,7 @@ function buildPublicHealthSurveillanceCenter({
     dataFoundation,
     collaboration,
     ruleGovernance,
+    modelGovernance,
     alertIntegrityFindings,
     productionReady: false,
     blockers: [

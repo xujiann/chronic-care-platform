@@ -22,6 +22,12 @@ const {
   proposePublicHealthSurveillanceRuleChangeToState,
   reviewPublicHealthSurveillanceRuleChangeToState
 } = require("../public-health-surveillance-rule-governance-service");
+const {
+  buildPublicHealthSurveillanceModelGovernance,
+  reviewPublicHealthSurveillanceModelValidationToState,
+  runPublicHealthSurveillanceModelToState,
+  submitPublicHealthSurveillanceModelValidationToState
+} = require("../public-health-surveillance-model-governance-service");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "public-health-modernization-readiness-report.json");
@@ -225,7 +231,56 @@ function runPublicHealthModernizationAcceptance() {
     evidenceRefs: ["READINESS-ALERT-CLOSURE"],
     at: "2026-07-28T09:30:00.000Z"
   }, { name: "readiness-cdc-owner", role: "cdc-surveillance" });
-  const ruleGovernanceAcceptance = runRuleGovernanceAcceptance(alertResult.nextData);
+  const modelRun = runPublicHealthSurveillanceModelToState(
+    alertResult.nextData,
+    "ph-model-baseline-deviation",
+    {
+      expectedModelVersion: 1,
+      signalIds: [evaluated.signal.id],
+      windowStart: "2026-07-28T08:00:00.000Z",
+      windowEnd: "2026-07-28T09:31:00.000Z",
+      evidenceRefs: ["READINESS-MODEL-DATASET-SNAPSHOT"],
+      idempotencyKey: "readiness-model-run-001",
+      at: "2026-07-28T09:31:00.000Z"
+    },
+    { name: "readiness-shadow-model-runner", role: "system" }
+  );
+  const submittedModelValidation = submitPublicHealthSurveillanceModelValidationToState(
+    modelRun.nextData,
+    "ph-model-baseline-deviation",
+    {
+      expectedModelVersion: 1,
+      sampleWindowStart: "2026-07-01T00:00:00.000Z",
+      sampleWindowEnd: "2026-07-27T23:59:59.000Z",
+      sampleSize: 120,
+      sensitivity: 0.91,
+      positivePredictiveValue: 0.72,
+      falseNegativeRate: 0.07,
+      note: "readiness retrospective model performance validation",
+      evidenceRefs: ["READINESS-MODEL-VALIDATION-DATASET", "READINESS-MODEL-VALIDATION-REPORT"],
+      idempotencyKey: "readiness-model-validation-submit-001",
+      at: "2026-07-28T09:32:00.000Z"
+    },
+    { name: "readiness-model-owner", role: "cdc-surveillance" }
+  );
+  const reviewedModelValidation = reviewPublicHealthSurveillanceModelValidationToState(
+    submittedModelValidation.nextData,
+    submittedModelValidation.validation.id,
+    {
+      decision: "approved",
+      note: "independent review approves continued shadow-only use",
+      evidenceRefs: ["READINESS-MODEL-INDEPENDENT-REVIEW"],
+      idempotencyKey: "readiness-model-validation-review-001",
+      expectedVersion: 1,
+      at: "2026-07-28T09:33:00.000Z"
+    },
+    { name: "readiness-commission-model-reviewer", role: "commission" }
+  );
+  const modelGovernance = buildPublicHealthSurveillanceModelGovernance({
+    data: reviewedModelValidation.nextData,
+    at: "2026-07-28T09:34:00.000Z"
+  });
+  const ruleGovernanceAcceptance = runRuleGovernanceAcceptance(reviewedModelValidation.nextData);
   const ruleGovernance = buildPublicHealthSurveillanceRuleGovernance({
     data: ruleGovernanceAcceptance.nextData,
     activationKeyring: RULE_GOVERNANCE_ROTATED_KEYRING,
@@ -236,6 +291,10 @@ function runPublicHealthModernizationAcceptance() {
     verifiedSignal,
     evaluated,
     final: alertResult,
+    modelRun,
+    submittedModelValidation,
+    reviewedModelValidation,
+    modelGovernance,
     ruleGovernanceAcceptance,
     ruleGovernance,
     dataFoundation: buildPublicHealthDataFoundation({ data: ruleGovernanceAcceptance.nextData }),
@@ -245,7 +304,8 @@ function runPublicHealthModernizationAcceptance() {
     }),
     surveillance: buildPublicHealthSurveillanceCenter({
       data: ruleGovernanceAcceptance.nextData,
-      ruleActivationKeyring: RULE_GOVERNANCE_ROTATED_KEYRING
+      ruleActivationKeyring: RULE_GOVERNANCE_ROTATED_KEYRING,
+      modelGovernanceAt: "2026-07-28T09:50:00.000Z"
     })
   };
 }
@@ -255,6 +315,7 @@ function buildPublicHealthModernizationReadiness(options = {}) {
   const dataSource = options.dataSource ?? fs.readFileSync(path.join(ROOT, "public-health-data-foundation-service.js"), "utf8");
   const workflowSource = options.workflowSource ?? fs.readFileSync(path.join(ROOT, "public-health-surveillance-workflow-service.js"), "utf8");
   const ruleGovernanceSource = options.ruleGovernanceSource ?? fs.readFileSync(path.join(ROOT, "public-health-surveillance-rule-governance-service.js"), "utf8");
+  const modelGovernanceSource = options.modelGovernanceSource ?? fs.readFileSync(path.join(ROOT, "public-health-surveillance-model-governance-service.js"), "utf8");
   const collaborationSource = options.collaborationSource ?? fs.readFileSync(path.join(ROOT, "public-health-medical-prevention-collaboration-service.js"), "utf8");
   const documentation = options.documentation ?? fs.readFileSync(path.join(ROOT, "docs", "public-health-fifteenth-plan-data-surveillance-medical-prevention.md"), "utf8");
   const serialized = JSON.stringify(acceptance.final.nextData);
@@ -267,6 +328,9 @@ function buildPublicHealthModernizationReadiness(options = {}) {
     check("data:source-operations", acceptance.sourceOperations.summary.fresh === 1 && acceptance.sourceOperations.summary.noData === 7 && acceptance.sourceOperations.productionReady === false, "source operations distinguishes one fresh source from seven registered sources without observed data", "data"),
     check("surveillance:rule-registry", acceptance.surveillance.summary.rules === 8 && acceptance.surveillance.summary.activeRules === 8, "8/8 versioned multi-source rules active", "surveillance"),
     check("surveillance:trusted-rule-governance", acceptance.ruleGovernance.summary.trustedActivations === 1 && acceptance.ruleGovernance.summary.ruleVersions === 9 && acceptance.ruleGovernance.rules.find((item) => item.id === "ph-rule-clinical-syndrome")?.version === 2, "independent review and trusted server activation advances one rule while preserving version history", "surveillance"),
+    check("surveillance:model-registry", acceptance.modelGovernance.summary.models === 3 && acceptance.modelGovernance.summary.shadowModels === 3, "3/3 versioned surveillance models are registered for shadow-only use", "surveillance"),
+    check("surveillance:model-shadow-run", acceptance.modelGovernance.summary.modelRuns === 1 && acceptance.modelRun.run.output.modelAdviceOnly === true && acceptance.modelRun.run.output.humanDecisionRequired === true && acceptance.modelRun.run.output.alertCreated === false, "one explainable model observation remains advisory and creates no alert", "surveillance"),
+    check("surveillance:model-independent-validation", acceptance.modelGovernance.summary.validatedShadowModels === 1 && acceptance.modelGovernance.summary.driftReviewsDue === 0 && acceptance.reviewedModelValidation.validation.status === "validated-shadow", "independent performance review validates one model only for time-bounded shadow use", "surveillance"),
     check("surveillance:historical-rule-binding", acceptance.surveillance.summary.closedAlerts === 1 && acceptance.surveillance.summary.alertIntegrityFindings === 0 && acceptance.final.alert.ruleVersion === 1, "the version-1 closed alert remains verifiable after version 2 becomes active", "surveillance"),
     check("surveillance:human-verification", acceptance.verifiedSignal.signal.workflowState === "human-verified" && acceptance.evaluated.signal.workflowState === "alert-created", "human verification precedes rule evaluation", "surveillance"),
     check("surveillance:explainable-alert", acceptance.evaluated.alert.ruleVersion === 1 && acceptance.evaluated.alert.ruleDigest && acceptance.evaluated.alert.observedValue === 8 && acceptance.evaluated.alert.threshold === 5, "alert binds rule version, digest, observed value and threshold", "surveillance"),
@@ -278,7 +342,8 @@ function buildPublicHealthModernizationReadiness(options = {}) {
     check("security:role-version-idempotency", ["expectedVersion", "idempotencyKeyHash", "payloadFingerprint", "validatePublicHealthSurveillanceAlert", "cdc-surveillance", "modelAdviceOnly"].every((token) => workflowSource.includes(token)) && ["ownerRole", "expectedVersion", "idempotencyKeyHash", "payloadFingerprint", "validatePublicHealthMedicalPreventionTask"].every((token) => collaborationSource.includes(token)), "roles, versions, payload-bound hashed idempotency, persisted-state integrity and AI advisory boundary are enforced", "security"),
     check("security:trusted-rule-activation", ["createHmac", "timingSafeEqual", "verificationSource", "signatureVerified", "signPublicHealthSurveillanceRuleActivationReceipt", "verifyPublicHealthSurveillanceRuleActivationReceipt", "ungoverned-rule-materialization"].every((token) => ruleGovernanceSource.includes(token)), "rule activation binds trust fields to a server receipt and rejects ungoverned materialization", "security"),
     check("security:managed-rule-keyring", acceptance.ruleGovernance.summary.managedKeyringReady === true && acceptance.ruleGovernance.keyring.activeKeyId === "readiness-rule-key-b" && acceptance.ruleGovernance.keyring.keys.some((item) => item.keyId === "readiness-rule-key-a" && item.status === "grace") && !JSON.stringify(acceptance.ruleGovernance).includes(RULE_GOVERNANCE_SECRET) && !JSON.stringify(acceptance.ruleGovernance).includes(RULE_GOVERNANCE_NEXT_SECRET) && ["selectSigningKey", "resolveVerificationKey", "summarizeKeyring"].every((token) => ruleGovernanceSource.includes(token)), "managed active/grace key rotation verifies history without exposing signing secrets", "security"),
-    check("integration:documented-t00-boundary", ["server.js", "SQLite", "T00", "productionReady=false", "/api/public-health/surveillance-signals", "/api/public-health/medical-prevention-tasks"].every((token) => documentation.includes(token)), "T00 API, durable writer and production boundary are documented", "integration"),
+    check("security:model-governance-boundary", ["assertNoDirectIdentifiers", "model-run-input-digest-invalid", "model-run-output-invalid", "model-validation-integrity-invalid", "ungoverned-model-materialization", "modelAdviceOnly", "humanDecisionRequired", "driftReviewsDue"].every((token) => modelGovernanceSource.includes(token)), "model inputs, outputs, validation evidence, drift window and advisory-only boundary fail closed", "security"),
+    check("integration:documented-t00-boundary", ["server.js", "SQLite", "T00", "productionReady=false", "/api/public-health/surveillance-signals", "/api/public-health/surveillance-model-governance", "/api/public-health/surveillance-models/:id/shadow-runs", "/api/public-health/medical-prevention-tasks"].every((token) => documentation.includes(token)), "T00 API, durable writer, model advisory boundary and production boundary are documented", "integration"),
     check("safety:functional-not-production", acceptance.dataFoundation.productionReady === false && acceptance.surveillance.productionReady === false && acceptance.final.productionReady === false, "functional closure cannot self-assert production readiness", "safety")
   ];
   return {
@@ -295,6 +360,10 @@ function buildPublicHealthModernizationReadiness(options = {}) {
       ruleVersions: acceptance.ruleGovernance.summary.ruleVersions,
       trustedRuleActivations: acceptance.ruleGovernance.summary.trustedActivations,
       managedRuleKeyringReady: acceptance.ruleGovernance.summary.managedKeyringReady,
+      models: acceptance.modelGovernance.summary.models,
+      modelRuns: acceptance.modelGovernance.summary.modelRuns,
+      validatedShadowModels: acceptance.modelGovernance.summary.validatedShadowModels,
+      modelDriftReviewsDue: acceptance.modelGovernance.summary.driftReviewsDue,
       freshSources: acceptance.sourceOperations.summary.fresh,
       noDataSources: acceptance.sourceOperations.summary.noData,
       signals: acceptance.surveillance.summary.signals,
@@ -307,6 +376,7 @@ function buildPublicHealthModernizationReadiness(options = {}) {
     dataFoundation: acceptance.dataFoundation,
     dataSourceOperations: acceptance.sourceOperations,
     ruleGovernance: acceptance.ruleGovernance,
+    modelGovernance: acceptance.modelGovernance,
     surveillanceCenter: acceptance.surveillance,
     acceptance: {
       signalId: acceptance.intake.signal.id,
@@ -317,8 +387,9 @@ function buildPublicHealthModernizationReadiness(options = {}) {
     remainingT00Integration: [
       "Wire a minimized data-source operations route and freshness panel without exposing endpoints or raw source identifiers.",
       "Wire rule-change submit, independent review and trusted server activation routes without accepting client-supplied trust metadata.",
-      "Persist publicHealthSurveillanceRuleChanges with optimistic versions and provision the activation secret through server-only configuration.",
-      "Add readiness, release and deploy gates while preserving productionReady=false until managed keys, production thresholds and site evidence are verified."
+      "Wire shadow model run and independent validation routes without allowing model output to create, verify, publish or close alerts.",
+      "Persist model runs, validation evidence and audit records with optimistic versions and integrity checks.",
+      "Add readiness, release and deploy gates while preserving productionReady=false until managed keys, production thresholds, model drift windows and site evidence are verified."
     ],
     productionReady: false
   };
@@ -343,6 +414,10 @@ function renderMarkdown(report) {
     `- Surveillance rule versions: ${report.summary.ruleVersions}`,
     `- Trusted rule activations: ${report.summary.trustedRuleActivations}`,
     `- Managed rule keyring ready: ${report.summary.managedRuleKeyringReady ? "yes" : "no"}`,
+    `- Surveillance models: ${report.summary.models}/3`,
+    `- Shadow model runs: ${report.summary.modelRuns}`,
+    `- Validated shadow models: ${report.summary.validatedShadowModels}`,
+    `- Model drift reviews due: ${report.summary.modelDriftReviewsDue}`,
     `- Fresh/no-data sources: ${report.summary.freshSources}/${report.summary.noDataSources}`,
     `- Closed alerts: ${report.summary.closedAlerts}/${report.summary.alerts}`,
     `- Closed medical-prevention tasks: ${report.summary.closedCollaborationTasks}/${report.summary.collaborationTasks}`,
