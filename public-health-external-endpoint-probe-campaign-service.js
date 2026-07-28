@@ -462,6 +462,23 @@ function integerOption(value, defaultValue, minimum, maximum, label) {
   return normalized;
 }
 
+function compareCampaignsNewestFirst(left, right) {
+  const leftCompletedAt = new Date(clean(
+    left?.attestation?.completedAt || left?.completedAt
+  )).getTime();
+  const rightCompletedAt = new Date(clean(
+    right?.attestation?.completedAt || right?.completedAt
+  )).getTime();
+  const leftValid = Number.isFinite(leftCompletedAt);
+  const rightValid = Number.isFinite(rightCompletedAt);
+  if (leftValid && rightValid && leftCompletedAt !== rightCompletedAt) {
+    return rightCompletedAt - leftCompletedAt;
+  }
+  if (leftValid !== rightValid) return leftValid ? 1 : -1;
+  return clean(right?.attestation?.campaignId || right?.campaignId)
+    .localeCompare(clean(left?.attestation?.campaignId || left?.campaignId));
+}
+
 function buildPublicHealthExternalEndpointProbeCampaignRegistry(options = {}) {
   const requiredConsecutiveCampaigns = integerOption(
     options.requiredConsecutiveCampaigns,
@@ -479,14 +496,14 @@ function buildPublicHealthExternalEndpointProbeCampaignRegistry(options = {}) {
   );
   const campaigns = (Array.isArray(options.campaigns) ? options.campaigns : [])
     .slice()
-    .sort((left, right) => clean(right?.attestation?.completedAt || right?.completedAt)
-      .localeCompare(clean(left?.attestation?.completedAt || left?.completedAt)));
+    .sort(compareCampaignsNewestFirst);
   const seenCampaignIds = new Set();
   const seenCampaignNonces = new Set();
   const seenReceiptIds = new Set();
   const seenNonces = new Set();
   const verified = [];
   const rejected = [];
+  const evaluations = [];
   campaigns.forEach((campaign) => {
     const result = verifyPublicHealthExternalEndpointProbeCampaign(campaign, {
       ...options,
@@ -500,17 +517,30 @@ function buildPublicHealthExternalEndpointProbeCampaignRegistry(options = {}) {
       seenCampaignIds.add(clean(attestation.campaignId));
       seenCampaignNonces.add(clean(attestation.nonce));
       verified.push(result);
+      evaluations.push({ ok: true, result });
     } else {
-      rejected.push({
+      const rejection = {
         campaignId: /^[a-z0-9][a-z0-9._:-]{7,127}$/i.test(clean(campaign?.attestation?.campaignId || campaign?.campaignId))
           ? clean(campaign?.attestation?.campaignId || campaign?.campaignId)
           : "",
         reason: result.reason
-      });
+      };
+      rejected.push(rejection);
+      evaluations.push({ ok: false, rejection });
     }
   });
   const consecutive = [];
-  for (const campaign of verified) {
+  let continuityBreak = null;
+  for (const evaluation of evaluations) {
+    if (consecutive.length >= requiredConsecutiveCampaigns) break;
+    if (!evaluation.ok) {
+      continuityBreak = {
+        campaignId: evaluation.rejection.campaignId,
+        code: "campaign-verification-failed"
+      };
+      break;
+    }
+    const campaign = evaluation.result;
     if (!consecutive.length) {
       consecutive.push(campaign);
       continue;
@@ -518,7 +548,20 @@ function buildPublicHealthExternalEndpointProbeCampaignRegistry(options = {}) {
     const newer = consecutive[consecutive.length - 1];
     const gap = timeValue(newer.startedAt, "newer campaign startedAt")
       - timeValue(campaign.completedAt, "older campaign completedAt");
-    if (gap < 0 || gap > maxCampaignGapSeconds * 1000) break;
+    if (gap < 0) {
+      continuityBreak = {
+        campaignId: campaign.campaignId,
+        code: "campaign-window-overlap"
+      };
+      break;
+    }
+    if (gap > maxCampaignGapSeconds * 1000) {
+      continuityBreak = {
+        campaignId: campaign.campaignId,
+        code: "campaign-gap-exceeded"
+      };
+      break;
+    }
     consecutive.push(campaign);
   }
   const continuousConnectivityReady = consecutive.length >= requiredConsecutiveCampaigns;
@@ -526,13 +569,16 @@ function buildPublicHealthExternalEndpointProbeCampaignRegistry(options = {}) {
     ok: true,
     functionalState: continuousConnectivityReady
       ? "consecutive-endpoint-probe-campaigns-verified"
-      : "endpoint-probe-campaign-continuity-pending",
+      : continuityBreak
+        ? "endpoint-probe-campaign-continuity-broken"
+        : "endpoint-probe-campaign-continuity-pending",
     formalGoLiveState: "blocked-until-trusted-site-evidence-and-launch-approval",
     summary: {
       campaignsSubmitted: campaigns.length,
       campaignsVerified: verified.length,
       campaignsRejected: rejected.length,
       consecutiveCampaigns: consecutive.length,
+      continuityBreaks: continuityBreak ? 1 : 0,
       requiredConsecutiveCampaigns,
       maxCampaignGapSeconds
     },
@@ -545,6 +591,7 @@ function buildPublicHealthExternalEndpointProbeCampaignRegistry(options = {}) {
       campaignConnectivityReady: item.campaignConnectivityReady
     })),
     rejected,
+    continuityBreak,
     continuousConnectivityReady,
     productionReady: false,
     blockers: continuousConnectivityReady
@@ -554,6 +601,9 @@ function buildPublicHealthExternalEndpointProbeCampaignRegistry(options = {}) {
         ]
       : [
           `${requiredConsecutiveCampaigns} fresh non-overlapping endpoint probe campaigns are required.`,
+          ...(continuityBreak
+            ? [`Current endpoint probe campaign continuity is broken by ${continuityBreak.code}.`]
+            : []),
           "Trusted site evidence, production handoffs, P0/P1 closure and launch approval remain required."
         ]
   };

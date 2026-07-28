@@ -169,7 +169,7 @@ function acceptanceTime(base, seconds) {
   return new Date(new Date(base).getTime() + seconds * 1000).toISOString();
 }
 
-function runExternalEndpointProbeCampaignAcceptance() {
+function runExternalEndpointProbeCampaignAcceptance({ rejectLatest = false } = {}) {
   const receiptKeyring = buildEndpointProbeAcceptanceKeyring();
   const campaignSigningKeyring = buildEndpointCampaignAcceptanceKeyring();
   const env = Object.fromEntries(EXTERNAL_ADAPTER_PROFILES.map((profile) => [
@@ -224,6 +224,9 @@ function runExternalEndpointProbeCampaignAcceptance() {
       policyResolver: (laneId) => endpointCampaignAcceptancePolicy(laneId)
     });
   });
+  if (rejectLatest) {
+    campaigns[campaigns.length - 1].attestation.signature = "f".repeat(64);
+  }
   return buildPublicHealthExternalEndpointProbeCampaignRegistry({
     campaigns,
     env,
@@ -602,6 +605,9 @@ function buildPublicHealthFinalReadiness(options = {}) {
   const registry = buildPublicHealthExternalAdapterRegistry(buildConfiguredAcceptanceEnvironment());
   const endpointProbeAcceptance = runExternalEndpointProbeAcceptance();
   const endpointProbeCampaignAcceptance = runExternalEndpointProbeCampaignAcceptance();
+  const endpointProbeCampaignFailureAcceptance = runExternalEndpointProbeCampaignAcceptance({
+    rejectLatest: true
+  });
   const deliveries = runExternalAdapterAcceptance(system.coordinationCenter);
   const outboxAcceptance = runExternalOutboxAcceptance(sourceData, system);
   const recoveryAcceptance = runDeadLetterRecoveryAcceptance(sourceData, system);
@@ -692,6 +698,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
     check("probe-campaign:three-consecutive-campaigns", endpointProbeCampaignAcceptance.continuousConnectivityReady === true && endpointProbeCampaignAcceptance.summary.campaignsVerified === 3 && endpointProbeCampaignAcceptance.summary.consecutiveCampaigns === 3, `${endpointProbeCampaignAcceptance.summary.consecutiveCampaigns}/3 fresh eight-lane campaigns verified`, "probe-campaign"),
     check("probe-campaign:signed-receipt-policy-binding", ["receiptDigest", "policyDigest", "campaignSignaturePayload", "endpoint probe campaign signature is invalid", "campaign receipt binding", "campaign policy snapshot"].every((token) => endpointCampaignSource.includes(token)), "campaign signatures bind all eight receipts, contracts, endpoints, policy snapshots, trust metadata and time windows", "probe-campaign"),
     check("probe-campaign:continuity-and-replay", ["requiredConsecutiveCampaigns", "maxCampaignGapSeconds", "seenCampaignIds", "seenCampaignNonces", "seenReceiptIds", "seenNonces", "gap < 0"].every((token) => endpointCampaignSource.includes(token)), "campaign, receipt and nonce replay plus overlap, reverse time and excessive gaps fail closed", "probe-campaign"),
+    check("probe-campaign:rejected-window-fails-closed", endpointProbeCampaignFailureAcceptance.continuousConnectivityReady === false && endpointProbeCampaignFailureAcceptance.summary.campaignsVerified === 2 && endpointProbeCampaignFailureAcceptance.summary.consecutiveCampaigns === 0 && endpointProbeCampaignFailureAcceptance.continuityBreak?.code === "campaign-verification-failed", "a rejected latest campaign cannot be skipped to join older successful campaigns", "probe-campaign"),
     check("resilience:signed-circuit-recovery", resilienceAcceptance.failed.control.circuitState === "open" && resilienceAcceptance.probe.control.circuitState === "half-open" && resilienceAcceptance.recovered.control.circuitState === "closed" && verifyPublicHealthExternalLaneControlAuditChain(resilienceAcceptance.recovered.nextData, "family-doctor", ACCEPTANCE_REQUEST_SECRET).entries === 4, "signed failure, open gate, half-open probe and recovery form a four-entry lane-control audit chain", "resilience"),
     check("resilience:runtime-enforcement", ["assertPublicHealthExternalBackpressure", "reservePublicHealthExternalLaneCapacityToState", "recordPublicHealthExternalLaneOutcomeToState", "expectedLaneControlVersion"].every((token) => adapterRuntimeSource.includes(token)) && ["rateLimitPerMinute", "maxPending", "halfOpenMaxProbes", "lane-control-signature-invalid"].every((token) => resilienceSource.includes(token)), "enqueue backpressure, claim rate/circuit admission and claimed-attempt outcomes use signed CAS controls", "resilience"),
     check("contract:signed-version-lifecycle", contractAcceptance.scheduled.summary.scheduled === 1 && contractAcceptance.active.summary.deprecated === 1 && contractAcceptance.retired.summary.retired === 1 && authorizePublicHealthExternalContract(contractAcceptance.retired, "family-doctor", "family-doctor-fulfillment-v1", "public-health-external-dispatch/v1", "public-health-external-receipt/v1").reason === "contract-version-retired", "signed dual approval advances scheduled, active/deprecated and retired contract states", "contract"),
@@ -755,6 +762,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
     adapterRegistry: registry,
     endpointProbeRegistry: endpointProbeAcceptance,
     endpointProbeCampaignRegistry: endpointProbeCampaignAcceptance,
+    endpointProbeCampaignFailureRegistry: endpointProbeCampaignFailureAcceptance,
     acceptanceDeliveries: deliveries,
     outboxAcceptance: {
       dispatch: outboxAcceptance.delivered.dispatch,

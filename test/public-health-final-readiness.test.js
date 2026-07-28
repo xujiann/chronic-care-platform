@@ -14,8 +14,8 @@ test("final readiness accepts every planned T08 functional increment", () => {
   const report = buildPublicHealthFinalReadiness();
   assert.equal(report.ok, true);
   assert.equal(report.functionalState, "t08-public-health-planned-functions-complete");
-  assert.equal(report.summary.checks, 48);
-  assert.equal(report.summary.passed, 48);
+  assert.equal(report.summary.checks, 49);
+  assert.equal(report.summary.passed, 49);
   assert.equal(report.summary.lanes, 8);
   assert.equal(report.summary.handoffs, 8);
   assert.equal(report.summary.adapterProfiles, 8);
@@ -35,6 +35,10 @@ test("final readiness accepts every planned T08 functional increment", () => {
   assert.equal(report.endpointProbeRegistry.productionReady, false);
   assert.equal(report.endpointProbeCampaignRegistry.continuousConnectivityReady, true);
   assert.equal(report.endpointProbeCampaignRegistry.productionReady, false);
+  assert.equal(report.endpointProbeCampaignFailureRegistry.continuousConnectivityReady, false);
+  assert.equal(report.endpointProbeCampaignFailureRegistry.summary.consecutiveCampaigns, 0);
+  assert.equal(report.endpointProbeCampaignFailureRegistry.continuityBreak.code, "campaign-verification-failed");
+  assert.equal(report.endpointProbeCampaignFailureRegistry.productionReady, false);
   assert.equal(report.productionReady, false);
   assert.equal(report.remainingT00Integration.length, 3);
 });
