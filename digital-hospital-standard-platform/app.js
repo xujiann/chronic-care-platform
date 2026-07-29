@@ -1,5 +1,5 @@
 (function () {
-  const storageKey = "digitalHospitalMvpState:v0.20";
+  const storageKey = "digitalHospitalMvpState:v0.21";
 
   const domains = [
     { code: "A", name: "基础设施与平台支撑", weight: 100 },
@@ -119,7 +119,7 @@
       invalidCodeRecords: 120,
     },
     publicHealth: {
-      schemaVersion: 2,
+      schemaVersion: 3,
       migrationSource: {
         taskTitle: "开发数智医院标准平台",
         sourceCommit: "4142402e0c79fd8457c00c370b5d163e88cca0e7",
@@ -149,10 +149,23 @@
         { id: "PHC-20260728-003", completedAt: "2026-07-28 09:50", receipts: 8, status: "已验证", chain: "verified" },
       ],
       incidents: [
-        { id: "PHE-20260728-003", revision: 1, laneId: "infectious-reporting", title: "传染病直报回执超时", level: "P0", source: "连续探测", hospitalCode: "H000001", owner: "疾控与医政联络组", status: "待核查", discoveredAt: "2026-07-28 09:52", dueAt: "2026-07-28 10:22", lastUpdatedAt: "2026-07-28 09:52", latestAction: "等待核对上报端与接收端回执" },
-        { id: "PHE-20260728-002", revision: 2, laneId: "public-health-followup", title: "重点人群随访数据延迟", level: "P1", source: "时效规则", hospitalCode: "H000003", owner: "基层卫生处协同组", status: "处置中", discoveredAt: "2026-07-28 08:40", dueAt: "2026-07-28 12:00", lastUpdatedAt: "2026-07-28 09:35", latestAction: "医院已补传，等待平台侧重算" },
-        { id: "PHE-20260727-006", revision: 3, laneId: "immunization", title: "免疫规划代码映射差异", level: "P1", source: "数据校验", hospitalCode: "H000002", owner: "疾控免疫科", status: "待复核", discoveredAt: "2026-07-27 15:10", dueAt: "2026-07-28 15:10", lastUpdatedAt: "2026-07-28 09:10", latestAction: "映射表已修订，等待业务复核", submittedForReviewBy: "市级管理员" },
-        { id: "PHE-20260727-004", revision: 4, laneId: "maternal-child", title: "妇幼健康批次完整性告警", level: "P1", source: "完整性规则", hospitalCode: "H000001", owner: "妇幼健康处", status: "已关闭", discoveredAt: "2026-07-27 10:20", dueAt: "2026-07-27 14:20", lastUpdatedAt: "2026-07-27 13:05", closedAt: "2026-07-27 13:05", latestAction: "补传完成，完整性复核通过", submittedForReviewBy: "市级管理员" },
+        { id: "PHE-20260728-003", revision: 1, laneId: "infectious-reporting", title: "传染病直报回执超时", level: "P0", source: "连续探测", hospitalCode: "H000001", owner: "疾控与医政联络组", status: "待核查", discoveredAt: "2026-07-28 09:52", dueAt: "2026-07-28 10:22", lastUpdatedAt: "2026-07-28 09:52", latestAction: "等待核对上报端与接收端回执", evidenceIds: [] },
+        { id: "PHE-20260728-002", revision: 2, laneId: "public-health-followup", title: "重点人群随访数据延迟", level: "P1", source: "时效规则", hospitalCode: "H000003", owner: "基层卫生处协同组", status: "处置中", discoveredAt: "2026-07-28 08:40", dueAt: "2026-07-28 12:00", lastUpdatedAt: "2026-07-28 09:35", latestAction: "医院已补传，等待平台侧重算", evidenceIds: [] },
+        { id: "PHE-20260727-006", revision: 3, laneId: "immunization", title: "免疫规划代码映射差异", level: "P1", source: "数据校验", hospitalCode: "H000002", owner: "疾控免疫科", status: "待复核", discoveredAt: "2026-07-27 15:10", dueAt: "2026-07-28 15:10", lastUpdatedAt: "2026-07-28 09:10", latestAction: "映射表已修订，等待业务复核", submittedForReviewBy: "省级管理员", evidenceIds: ["PHEV-IMM-RECEIPT", "PHEV-IMM-JOINT", "PHEV-IMM-APPROVAL"] },
+        { id: "PHE-20260727-004", revision: 4, laneId: "maternal-child", title: "妇幼健康批次完整性告警", level: "P1", source: "完整性规则", hospitalCode: "H000001", owner: "妇幼健康处", status: "已关闭", discoveredAt: "2026-07-27 10:20", dueAt: "2026-07-27 14:20", lastUpdatedAt: "2026-07-27 13:05", closedAt: "2026-07-27 13:05", latestAction: "补传完成，完整性复核通过", submittedForReviewBy: "省级管理员", evidenceIds: ["PHEV-MCH-RECEIPT", "PHEV-MCH-JOINT", "PHEV-MCH-APPROVAL"] },
+      ],
+      incidentEvidence: [
+        { id: "PHEV-IMM-APPROVAL", revision: 1, incidentId: "PHE-20260727-006", hospitalCode: "H000002", evidenceType: "production-approval", referenceNo: "APPROVAL-IMM-20260728-01", summary: "免疫规划映射修订生产审批摘要，等待独立签收。", digest: "sha256:9f52d954e6f7c124a2aa0ba85e855e41660ad58444ff59aca58b57a4d8a85cc8", status: "submitted", submittedBy: "省级管理员", submittedAt: "2026-07-28 09:08", productionEvidence: false },
+        { id: "PHEV-IMM-JOINT", revision: 2, incidentId: "PHE-20260727-006", hospitalCode: "H000002", evidenceType: "site-joint-test", referenceNo: "JOINT-IMM-20260728-01", summary: "免疫规划代码映射双向联调记录已完成独立核验。", digest: "sha256:301a1796fd9661bdb02e71518ccb4e6348295b99237f48bb106693e74ab9ce8d", status: "accepted", submittedBy: "省级管理员", submittedAt: "2026-07-28 08:42", reviewedBy: "国家级管理员", reviewedAt: "2026-07-28 08:55", reviewNote: "联调编号、摘要与事件引用一致。", productionEvidence: false },
+        { id: "PHEV-IMM-RECEIPT", revision: 2, incidentId: "PHE-20260727-006", hospitalCode: "H000002", evidenceType: "business-receipt", referenceNo: "RECEIPT-IMM-20260728-01", summary: "免疫规划接收端确认代码映射修订后的业务回执摘要。", digest: "sha256:7c7e799af6a6314648370d2970b89245b10f37dba6fd291f34ea0c6ef6c34d1a", status: "accepted", submittedBy: "省级管理员", submittedAt: "2026-07-28 08:40", reviewedBy: "国家级管理员", reviewedAt: "2026-07-28 08:54", reviewNote: "回执编号和最小化摘要核验通过。", productionEvidence: false },
+        { id: "PHEV-MCH-APPROVAL", revision: 2, incidentId: "PHE-20260727-004", hospitalCode: "H000001", evidenceType: "production-approval", referenceNo: "APPROVAL-MCH-20260727-01", summary: "妇幼健康批次补传生产审批编号已完成独立签收。", digest: "sha256:8427f7328d6ca1d36e701da40aa7590bc68d08fb8fd9b3c619498d73363a9f40", status: "accepted", submittedBy: "省级管理员", submittedAt: "2026-07-27 12:35", reviewedBy: "国家级管理员", reviewedAt: "2026-07-27 12:55", reviewNote: "生产审批编号与事件范围一致。", productionEvidence: false },
+        { id: "PHEV-MCH-JOINT", revision: 2, incidentId: "PHE-20260727-004", hospitalCode: "H000001", evidenceType: "site-joint-test", referenceNo: "JOINT-MCH-20260727-01", summary: "妇幼健康批次完整性现场联调记录已完成独立签收。", digest: "sha256:b820f605619501772187262a069278232ce6f791048f1de0de91dfe7d3bb1ea8", status: "accepted", submittedBy: "省级管理员", submittedAt: "2026-07-27 12:20", reviewedBy: "国家级管理员", reviewedAt: "2026-07-27 12:50", reviewNote: "现场联调范围、批次和结果摘要核验通过。", productionEvidence: false },
+        { id: "PHEV-MCH-RECEIPT", revision: 2, incidentId: "PHE-20260727-004", hospitalCode: "H000001", evidenceType: "business-receipt", referenceNo: "RECEIPT-MCH-20260727-01", summary: "妇幼健康批次补传完成后的接收端业务回执摘要。", digest: "sha256:0240e42f4fd02344ad81f58aebdc8e109595e10a00d18e055e6dbb495c0af77c", status: "accepted", submittedBy: "省级管理员", submittedAt: "2026-07-27 12:18", reviewedBy: "国家级管理员", reviewedAt: "2026-07-27 12:48", reviewNote: "业务回执编号、摘要和证据摘要一致。", productionEvidence: false },
+      ],
+      evidenceActions: [
+        { id: "PHEVA-003", evidenceId: "PHEV-IMM-APPROVAL", incidentId: "PHE-20260727-006", action: "登记现场证据", actor: "省级管理员", at: "2026-07-28 09:08", result: "登记生产审批编号，等待独立签收", revision: 1 },
+        { id: "PHEVA-002", evidenceId: "PHEV-IMM-JOINT", incidentId: "PHE-20260727-006", action: "独立签收证据", actor: "国家级管理员", at: "2026-07-28 08:55", result: "联调编号、摘要与事件引用一致", revision: 2 },
+        { id: "PHEVA-001", evidenceId: "PHEV-IMM-RECEIPT", incidentId: "PHE-20260727-006", action: "独立签收证据", actor: "国家级管理员", at: "2026-07-28 08:54", result: "回执编号和最小化摘要核验通过", revision: 2 },
       ],
       incidentActions: [
         { id: "PHA-004", incidentId: "PHE-20260727-004", action: "复核关闭", actor: "妇幼健康处", at: "2026-07-27 13:05", result: "补传完成，完整性复核通过", revision: 4 },
@@ -750,8 +763,11 @@
     if (!Array.isArray(next.publicHealth.lanes)) next.publicHealth.lanes = JSON.parse(JSON.stringify(seedState.publicHealth.lanes));
     if (!Array.isArray(next.publicHealth.campaigns)) next.publicHealth.campaigns = JSON.parse(JSON.stringify(seedState.publicHealth.campaigns));
     if (!Array.isArray(next.publicHealth.incidents)) next.publicHealth.incidents = JSON.parse(JSON.stringify(seedState.publicHealth.incidents));
+    if (!Array.isArray(next.publicHealth.incidentEvidence)) next.publicHealth.incidentEvidence = JSON.parse(JSON.stringify(seedState.publicHealth.incidentEvidence));
+    if (!Array.isArray(next.publicHealth.evidenceActions)) next.publicHealth.evidenceActions = JSON.parse(JSON.stringify(seedState.publicHealth.evidenceActions));
     if (!Array.isArray(next.publicHealth.incidentActions)) next.publicHealth.incidentActions = JSON.parse(JSON.stringify(seedState.publicHealth.incidentActions));
     if (!Array.isArray(next.publicHealth.blockers)) next.publicHealth.blockers = JSON.parse(JSON.stringify(seedState.publicHealth.blockers));
+    next.publicHealth.schemaVersion = 3;
     next.publicHealth.productionReady = false;
     if (!next.submissions) next.submissions = {};
     if (!Array.isArray(next.validationIssues)) next.validationIssues = [];
@@ -1086,6 +1102,45 @@
     };
   }
 
+  const publicHealthEvidenceLabels = {
+    "business-receipt": "真实业务回执摘要",
+    "site-joint-test": "现场接口联调记录",
+    "production-approval": "生产审批编号",
+    "dr-rehearsal": "灾备与回退演练编号",
+  };
+
+  const publicHealthEvidenceRequirements = {
+    P0: ["business-receipt", "site-joint-test", "production-approval", "dr-rehearsal"],
+    P1: ["business-receipt", "site-joint-test", "production-approval"],
+    P2: ["business-receipt", "site-joint-test"],
+  };
+
+  function publicHealthClosureGate(incident) {
+    const requiredTypes = publicHealthEvidenceRequirements[incident.level] || publicHealthEvidenceRequirements.P2;
+    const linked = state.publicHealth.incidentEvidence.filter((item) => item.incidentId === incident.id);
+    const items = requiredTypes.map((evidenceType) => {
+      const candidates = linked.filter((item) => item.evidenceType === evidenceType);
+      const accepted = candidates.find((item) => item.status === "accepted");
+      const latest = accepted || candidates[0] || null;
+      return {
+        evidenceType,
+        label: publicHealthEvidenceLabels[evidenceType],
+        status: accepted ? "accepted" : latest?.status || "missing",
+        evidenceId: latest?.id || "",
+        referenceNo: latest?.referenceNo || "",
+      };
+    });
+    const missingTypes = items.filter((item) => item.status !== "accepted").map((item) => item.evidenceType);
+    return {
+      ready: missingTypes.length === 0,
+      required: items.length,
+      accepted: items.filter((item) => item.status === "accepted").length,
+      missingTypes,
+      items,
+      productionReady: false,
+    };
+  }
+
   function filteredPublicHealthIncidents() {
     const hospital = workspace.dataset.publicHealthHospital || "全部";
     const status = workspace.dataset.publicHealthStatus || "全部";
@@ -1113,6 +1168,7 @@
       closedIncidents: incidents.filter((item) => item.status === "已关闭").length,
       overdueIncidents: openIncidents.filter((item) => publicHealthIncidentSla(item).overdue).length,
       escalatedIncidents: incidents.filter((item) => item.escalation?.escalatedAt).length,
+      closureReady: openIncidents.filter((item) => item.status === "待复核" && publicHealthClosureGate(item).ready).length,
       continuityReady: state.publicHealth.continuousConnectivityReady,
       productionReady: false,
     };
@@ -1328,7 +1384,7 @@
       standardVersion: state.task.standard,
       hospitalCode: hospital.code,
       hospitalName: hospital.name,
-      prototypeVersion: "mvp-0.20",
+      prototypeVersion: "mvp-0.21",
     };
     if (kind === "submission") {
       return {
@@ -1487,12 +1543,16 @@
         publicHealthLanes: state.publicHealth.lanes,
         publicHealthCampaigns: state.publicHealth.campaigns,
         publicHealthIncidents: publicHealthExportRows(),
+        publicHealthIncidentEvidence: state.publicHealth.incidentEvidence,
+        publicHealthEvidenceActions: state.publicHealth.evidenceActions,
         publicHealthIncidentActions: state.publicHealth.incidentActions,
         productionBlockers: state.publicHealth.blockers,
         runtimeRoutes: {
           coordination: "/api/digital-hospital/public-health/coordination",
           incidents: "/api/digital-hospital/public-health/incidents",
           incidentActions: "/api/digital-hospital/public-health/incidents/:id/actions",
+          incidentEvidence: "/api/digital-hospital/public-health/incidents/:id/evidence",
+          evidenceActions: "/api/digital-hospital/public-health/evidence/:id/actions",
           incidentExport: "/api/digital-hospital/public-health/incidents/export",
         },
       };
@@ -1745,6 +1805,21 @@
       discoveredAt: item.discoveredAt,
       dueAt: item.dueAt,
       professionalAssociation: publicHealthProfessionalAssociation(item),
+      closureGate: publicHealthClosureGate(item),
+      evidence: state.publicHealth.incidentEvidence
+        .filter((evidence) => evidence.incidentId === item.id)
+        .map((evidence) => ({
+          id: evidence.id,
+          evidenceType: evidence.evidenceType,
+          referenceNo: evidence.referenceNo,
+          summary: evidence.summary,
+          digest: evidence.digest,
+          status: evidence.status,
+          submittedBy: evidence.submittedBy,
+          submittedAt: evidence.submittedAt,
+          reviewedBy: evidence.reviewedBy || "",
+          reviewedAt: evidence.reviewedAt || "",
+        })),
       latestAction: item.latestAction,
       submittedForReviewBy: item.submittedForReviewBy || "",
     }));
@@ -1763,7 +1838,8 @@
     if (format === "csv") {
       const headers = [
         "事件编号", "事件标题", "业务通道", "医院代码", "级别", "状态", "SLA状态", "升级级别",
-        "责任组", "发现时间", "处置时限", "专业事件编号", "交换运行编号", "回执状态", "可信探测", "证据包", "最新处置",
+        "责任组", "发现时间", "处置时限", "专业事件编号", "交换运行编号", "回执状态", "可信探测", "专业证据包",
+        "关闭证据状态", "关闭证据完成度", "最新处置",
       ];
       const values = rows.map((item) => [
         item.id,
@@ -1782,6 +1858,8 @@
         item.professionalAssociation.receiptStatus || "",
         item.professionalAssociation.probeStatus,
         item.professionalAssociation.evidencePacketId || "",
+        item.closureGate.ready ? "可关闭" : "待补证",
+        `${item.closureGate.accepted}/${item.closureGate.required}`,
         item.latestAction,
       ]);
       content = `\uFEFF${[headers, ...values].map((row) => row.map(safeCsvCell).join(",")).join("\r\n")}`;
@@ -4680,6 +4758,7 @@
     const tab = workspace.dataset.publicHealthTab || "incidents";
     const tabs = [
       { id: "incidents", label: "事件处置" },
+      { id: "evidence", label: "证据签收" },
       { id: "analytics", label: "处置统计" },
       { id: "continuity", label: "通道连续性" },
       { id: "readiness", label: "上线边界" },
@@ -4745,13 +4824,14 @@
           </div>
           <div class="table-wrap">
             <table class="public-health-incident-table">
-              <thead><tr><th>事件</th><th>业务通道</th><th>机构</th><th>级别</th><th>SLA/升级</th><th>专业系统关联</th><th>责任组</th><th>状态/版本</th><th>当前处置</th><th>操作</th></tr></thead>
+              <thead><tr><th>事件</th><th>业务通道</th><th>机构</th><th>级别</th><th>SLA/升级</th><th>专业系统关联</th><th>关闭证据</th><th>责任组</th><th>状态/版本</th><th>当前处置</th><th>操作</th></tr></thead>
               <tbody>
                 ${incidents
                   .map(
                     (item) => {
                       const sla = publicHealthIncidentSla(item);
                       const association = publicHealthProfessionalAssociation(item);
+                      const closureGate = publicHealthClosureGate(item);
                       return `
                       <tr>
                         <td><strong>${escapeHtml(item.title)}</strong><br /><span class="muted-text">${escapeHtml(item.id)} · ${escapeHtml(item.source)}</span></td>
@@ -4767,12 +4847,19 @@
                           <br /><span class="muted-text">${escapeHtml(association.exchangeRunId || "无交换运行")} · ${escapeHtml(association.receiptStatus || "无回执")}</span>
                           <br /><span class="muted-text">${escapeHtml(association.probeStatus)} · 生产可信探测待现场</span>
                         </td>
+                        <td>
+                          <span class="status-pill ${closureGate.ready ? "" : "warn"}">${closureGate.ready ? "可关闭" : "待补证"}</span>
+                          <br /><span class="muted-text">${closureGate.accepted}/${closureGate.required} 已独立签收</span>
+                        </td>
                         <td>${escapeHtml(item.owner)}</td>
                         <td><span class="status-pill ${statusClass(item.status)}">${escapeHtml(item.status)}</span><br /><span class="muted-text">r${Number(item.revision || 1)}</span></td>
                         <td>${escapeHtml(item.latestAction)}</td>
                         <td>
                           <div class="toolbar inline">
                             <button class="button ghost" type="button" data-action="advance-public-health-incident" data-id="${escapeHtml(item.id)}" ${item.status === "已关闭" ? "disabled" : ""}>${nextActionLabel(item.status)}</button>
+                            ${item.status !== "已关闭" && !closureGate.ready
+                              ? `<button class="button ghost" type="button" data-action="record-public-health-evidence" data-id="${escapeHtml(item.id)}">登记证据</button>`
+                              : ""}
                             ${sla.overdue && item.status !== "已关闭" && !item.escalation?.escalatedAt
                               ? `<button class="button secondary" type="button" data-action="escalate-public-health-incident" data-id="${escapeHtml(item.id)}">超时升级</button>`
                               : ""}
@@ -4814,6 +4901,78 @@
       `;
     }
 
+    if (tab === "evidence") {
+      const evidenceRows = publicHealth.incidentEvidence
+        .filter((item) => incidents.some((incident) => incident.id === item.incidentId))
+        .sort((left, right) => String(right.submittedAt).localeCompare(String(left.submittedAt)));
+      const pendingEvidence = evidenceRows.filter((item) => item.status === "submitted").length;
+      const acceptedEvidence = evidenceRows.filter((item) => item.status === "accepted").length;
+      content = `
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">现场证据签收台账</h3>
+              <p class="panel-subtitle">仅登记证据编号、最小化摘要和SHA-256摘要；提交人与签收人必须分离，原始附件留在受控证据库。</p>
+            </div>
+            <span class="tag">${pendingEvidence}待签收 · ${acceptedEvidence}已签收</span>
+          </div>
+          <div class="table-wrap">
+            <table class="public-health-evidence-table">
+              <thead><tr><th>证据</th><th>关联事件</th><th>机构</th><th>类型</th><th>提交</th><th>独立复核</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                ${evidenceRows.length
+                  ? evidenceRows.map((item) => {
+                    const incident = publicHealth.incidents.find((row) => row.id === item.incidentId);
+                    const canReview = item.status === "submitted" && item.submittedBy !== state.activeRole;
+                    return `
+                      <tr>
+                        <td><strong>${escapeHtml(item.referenceNo)}</strong><br /><span class="muted-text">${escapeHtml(item.id)} · r${Number(item.revision || 1)}</span></td>
+                        <td>${escapeHtml(incident?.title || item.incidentId)}<br /><span class="muted-text">${escapeHtml(item.incidentId)}</span></td>
+                        <td>${escapeHtml(item.hospitalCode)}</td>
+                        <td>${escapeHtml(publicHealthEvidenceLabels[item.evidenceType] || item.evidenceType)}</td>
+                        <td>${escapeHtml(item.submittedBy)}<br /><span class="muted-text">${escapeHtml(item.submittedAt)}</span></td>
+                        <td>${escapeHtml(item.reviewedBy || "待独立签收")}<br /><span class="muted-text">${escapeHtml(item.reviewedAt || item.summary)}</span></td>
+                        <td><span class="status-pill ${item.status === "rejected" ? "danger" : item.status === "submitted" ? "warn" : ""}">${item.status === "accepted" ? "已签收" : item.status === "rejected" ? "已驳回" : "待签收"}</span></td>
+                        <td>
+                          <div class="toolbar inline">
+                            <button class="button ghost" type="button" data-action="review-public-health-evidence" data-id="${escapeHtml(item.id)}" data-decision="accept" ${canReview ? "" : "disabled"}>签收</button>
+                            <button class="button ghost" type="button" data-action="review-public-health-evidence" data-id="${escapeHtml(item.id)}" data-decision="reject" ${canReview ? "" : "disabled"}>驳回</button>
+                          </div>
+                        </td>
+                      </tr>
+                    `;
+                  }).join("")
+                  : `<tr><td colspan="8" class="empty-cell">当前筛选范围暂无证据记录。</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">关闭门禁</h3>
+              <p class="panel-subtitle">P2要求业务回执和现场联调；P1增加生产审批；P0再增加灾备与回退演练。</p>
+            </div>
+            <span class="status-pill danger">productionReady=false</span>
+          </div>
+          <div class="detail-list compact-list">
+            ${incidents.filter((item) => item.status !== "已关闭").map((item) => {
+              const gate = publicHealthClosureGate(item);
+              return `
+                <article class="detail-item">
+                  <header>
+                    <div><h4>${escapeHtml(item.title)}</h4><p>${escapeHtml(item.id)} · ${escapeHtml(item.level)} · ${gate.accepted}/${gate.required}已签收</p></div>
+                    <span class="status-pill ${gate.ready ? "" : "warn"}">${gate.ready ? "可提交关闭" : "待补证"}</span>
+                  </header>
+                  <p>${gate.missingTypes.length ? `缺少：${gate.missingTypes.map((type) => publicHealthEvidenceLabels[type]).join("、")}` : "关闭前置证据已齐备，仍需独立业务复核。"}</p>
+                </article>
+              `;
+            }).join("")}
+          </div>
+        </section>
+      `;
+    }
+
     if (tab === "analytics") {
       const allIncidents = state.publicHealth.incidents;
       const countBy = (selector) => Object.entries(allIncidents.reduce((counts, item) => {
@@ -4837,7 +4996,7 @@
             ${metric("开放事件", publicHealthSummary(allIncidents).openIncidents, "未进入关闭终态")}
             ${metric("SLA超时", publicHealthSummary(allIncidents).overdueIncidents, "需按级别升级", publicHealthSummary(allIncidents).overdueIncidents ? "danger" : "")}
             ${metric("已升级", publicHealthSummary(allIncidents).escalatedIncidents, "升级动作独立留痕")}
-            ${metric("已关闭", publicHealthSummary(allIncidents).closedIncidents, "完成独立复核")}
+            ${metric("证据可关闭", publicHealthSummary(allIncidents).closureReady, "证据齐备且待复核")}
           </div>
           <div class="table-wrap">
             <table>
@@ -4959,7 +5118,7 @@
               <h3 class="panel-title">正式运行接口</h3>
               <p class="panel-subtitle">正式事件账本使用平台鉴权、乐观锁和独立复核；演示按钮不连接生产端点。</p>
             </div>
-            <span class="tag">GitHub v0.20</span>
+            <span class="tag">GitHub v0.21</span>
           </div>
           <div class="table-wrap">
             <table>
@@ -4968,6 +5127,8 @@
                 <tr><td>协同总览</td><td>GET</td><td>/api/digital-hospital/public-health/coordination</td><td>卫健委角色与审计</td></tr>
                 <tr><td>登记事件</td><td>POST</td><td>/api/digital-hospital/public-health/incidents</td><td>敏感字段拒绝</td></tr>
                 <tr><td>推进/升级</td><td>POST</td><td>/api/digital-hospital/public-health/incidents/{id}/actions</td><td>修订号、独立复核、SLA超时升级</td></tr>
+                <tr><td>登记关闭证据</td><td>POST</td><td>/api/digital-hospital/public-health/incidents/{id}/evidence</td><td>证据编号、最小化摘要、SHA-256摘要</td></tr>
+                <tr><td>证据签收/驳回</td><td>POST</td><td>/api/digital-hospital/public-health/evidence/{id}/actions</td><td>双修订号、提交签收分离、审计留痕</td></tr>
                 <tr><td>事件导出</td><td>GET</td><td>/api/digital-hospital/public-health/incidents/export</td><td>医院筛选、安全摘要、JSON/CSV</td></tr>
               </tbody>
             </table>
@@ -6211,9 +6372,11 @@
               <tr><td>任务队列</td><td>GET/POST</td><td>/api/v1/monitoring/job-queues</td><td>任务积压、失败、扩容和优先级</td><td><span class="priority">P1</span></td></tr>
               <tr><td>存储容量</td><td>GET/POST</td><td>/api/v1/monitoring/storage-pools</td><td>容量、增长、留存、扩容和清理</td><td><span class="priority">P1</span></td></tr>
               <tr><td>运营告警</td><td>GET/PUT</td><td>/api/v1/monitoring/alerts/{alertId}</td><td>告警确认、处置、关闭和审计</td><td><span class="priority">P1</span></td></tr>
-              <tr><td>公共卫生协同</td><td>GET</td><td>/api/digital-hospital/public-health/coordination</td><td>八通道、医院筛选、SLA统计、专业系统只读关联与生产阻断</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>公共卫生协同</td><td>GET</td><td>/api/digital-hospital/public-health/coordination</td><td>八通道、机构授权范围、SLA统计、关闭门禁与专业系统只读关联</td><td><span class="priority">P1</span></td></tr>
               <tr><td>公共卫生事件</td><td>POST</td><td>/api/digital-hospital/public-health/incidents</td><td>最小化事件登记与敏感字段拒绝</td><td><span class="priority">P1</span></td></tr>
-              <tr><td>事件状态推进</td><td>POST</td><td>/api/digital-hospital/public-health/incidents/{incidentId}/actions</td><td>修订号、状态机、独立复核、SLA超时升级和安全审计</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>事件状态推进</td><td>POST</td><td>/api/digital-hospital/public-health/incidents/{incidentId}/actions</td><td>修订号、状态机、关闭证据门禁、独立复核、SLA升级和安全审计</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>公共卫生关闭证据</td><td>POST</td><td>/api/digital-hospital/public-health/incidents/{incidentId}/evidence</td><td>编号、最小化摘要、SHA-256摘要和事件双向引用</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>公共卫生证据签收</td><td>POST</td><td>/api/digital-hospital/public-health/evidence/{evidenceId}/actions</td><td>双修订号、提交签收分离、签收或驳回留痕</td><td><span class="priority">P1</span></td></tr>
               <tr><td>公共卫生事件导出</td><td>GET</td><td>/api/digital-hospital/public-health/incidents/export</td><td>JSON/CSV批量导出与最小必要专业摘要</td><td><span class="priority">P1</span></td></tr>
               <tr><td>证据材料</td><td>POST/PUT</td><td>/api/v1/evidence-materials/{materialId}</td><td>证据材料页、材料台账</td><td><span class="priority">P0</span></td></tr>
               <tr><td>医院申报</td><td>PUT</td><td>/api/v1/submissions/{submissionId}</td><td>医院申报页、指标自评数据</td><td><span class="priority">P0</span></td></tr>
@@ -9428,6 +9591,22 @@
     });
   }
 
+  function addPublicHealthEvidenceAction(evidence, incident, action, result) {
+    const at = nowText();
+    state.publicHealth.evidenceActions.unshift({
+      id: `PHEVA-${Date.now()}`,
+      evidenceId: evidence.id,
+      incidentId: incident.id,
+      action,
+      actor: state.activeRole,
+      at,
+      result,
+      revision: Number(evidence.revision || 1),
+      incidentRevision: Number(incident.revision || 1),
+    });
+    addPublicHealthIncidentAction(incident, action, result);
+  }
+
   function createPublicHealthIncident() {
     const incident = {
       id: `PHE-${Date.now()}`,
@@ -9444,6 +9623,7 @@
       lastUpdatedAt: nowText(),
       latestAction: "已登记，等待责任组核查",
       submittedForReviewBy: "",
+      evidenceIds: [],
     };
     state.publicHealth.incidents.unshift(incident);
     addPublicHealthIncidentAction(incident, "登记事件", "已登记，等待责任组核查");
@@ -9467,6 +9647,13 @@
       showNotice("提交处置结果的角色不能复核自己的事件，请切换独立复核角色。");
       return;
     }
+    if (incident.status === "待复核") {
+      const closureGate = publicHealthClosureGate(incident);
+      if (!closureGate.ready) {
+        showNotice(`关闭证据未齐：还需${closureGate.missingTypes.map((type) => publicHealthEvidenceLabels[type]).join("、")}。`);
+        return;
+      }
+    }
     incident.revision = Number(incident.revision || 1) + 1;
     incident.status = next.status;
     if (next.status === "待复核") incident.submittedForReviewBy = state.activeRole;
@@ -9479,6 +9666,92 @@
     saveState();
     showNotice(`${incident.id}已更新为：${incident.status}（r${incident.revision}）`);
     render();
+  }
+
+  function recordPublicHealthEvidence(id) {
+    const incident = state.publicHealth.incidents.find((item) => item.id === id);
+    if (!incident || incident.status === "已关闭") return;
+    const gate = publicHealthClosureGate(incident);
+    const evidenceType = gate.missingTypes[0];
+    if (!evidenceType) {
+      showNotice("该事件的关闭前置证据已经齐备。");
+      return;
+    }
+    const activeDuplicate = state.publicHealth.incidentEvidence.find((item) =>
+      item.incidentId === incident.id &&
+      item.evidenceType === evidenceType &&
+      ["submitted", "accepted"].includes(item.status)
+    );
+    if (activeDuplicate) {
+      showNotice(`${publicHealthEvidenceLabels[evidenceType]}已经登记，需由其他角色独立签收。`);
+      workspace.dataset.publicHealthTab = "evidence";
+      renderPublicHealth();
+      return;
+    }
+    const evidence = {
+      id: `PHEV-${Date.now()}`,
+      revision: 1,
+      incidentId: incident.id,
+      hospitalCode: incident.hospitalCode,
+      evidenceType,
+      referenceNo: `${evidenceType.toUpperCase()}-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${String(Date.now()).slice(-4)}`,
+      summary: `${publicHealthEvidenceLabels[evidenceType]}受控样例摘要，原始附件留在现场证据库。`,
+      digest: `sha256:${String(Date.now()).padEnd(64, "0").slice(0, 64)}`,
+      status: "submitted",
+      submittedBy: state.activeRole,
+      submittedAt: nowText(),
+      reviewedBy: "",
+      reviewedAt: "",
+      reviewNote: "",
+      productionEvidence: false,
+    };
+    incident.revision = Number(incident.revision || 1) + 1;
+    incident.evidenceIds = [...new Set([...(incident.evidenceIds || []), evidence.id])];
+    state.publicHealth.incidentEvidence.unshift(evidence);
+    addPublicHealthEvidenceAction(
+      evidence,
+      incident,
+      "登记现场证据",
+      `${publicHealthEvidenceLabels[evidenceType]}已登记，等待独立签收`,
+    );
+    addAudit("登记公共卫生关闭证据", evidence.id, `${incident.id} · ${evidence.evidenceType} · productionEvidence=false`);
+    saveState();
+    workspace.dataset.publicHealthTab = "evidence";
+    showNotice(`${publicHealthEvidenceLabels[evidenceType]}已登记，请切换其他角色完成独立签收。`);
+    renderPublicHealth();
+  }
+
+  function reviewPublicHealthEvidence(id, decision) {
+    const evidence = state.publicHealth.incidentEvidence.find((item) => item.id === id);
+    if (!evidence || evidence.status !== "submitted") return;
+    const incident = state.publicHealth.incidents.find((item) => item.id === evidence.incidentId);
+    if (!incident || incident.status === "已关闭") return;
+    if (evidence.submittedBy === state.activeRole) {
+      showNotice("证据提交人不能签收或驳回自己的证据，请切换独立复核角色。");
+      return;
+    }
+    const accepted = decision === "accept";
+    evidence.revision = Number(evidence.revision || 1) + 1;
+    evidence.status = accepted ? "accepted" : "rejected";
+    evidence.reviewedBy = state.activeRole;
+    evidence.reviewedAt = nowText();
+    evidence.reviewNote = accepted ? "证据编号、摘要和事件范围核验通过" : "证据摘要与事件范围不一致，退回补正";
+    evidence.productionEvidence = false;
+    incident.revision = Number(incident.revision || 1) + 1;
+    addPublicHealthEvidenceAction(
+      evidence,
+      incident,
+      accepted ? "独立签收证据" : "驳回证据",
+      evidence.reviewNote,
+    );
+    addAudit(
+      accepted ? "独立签收公共卫生证据" : "驳回公共卫生证据",
+      evidence.id,
+      `${incident.id} · ${evidence.evidenceType} · productionEvidence=false`,
+    );
+    saveState();
+    showNotice(`${evidence.referenceNo}已${accepted ? "签收" : "驳回"}，事件修订号更新为r${incident.revision}。`);
+    renderPublicHealth();
   }
 
   function escalatePublicHealthIncident(id) {
@@ -10146,6 +10419,8 @@
     if (name === "clean-storage") cleanStorage(action.dataset.id);
     if (name === "create-public-health-incident") createPublicHealthIncident();
     if (name === "advance-public-health-incident") advancePublicHealthIncident(action.dataset.id);
+    if (name === "record-public-health-evidence") recordPublicHealthEvidence(action.dataset.id);
+    if (name === "review-public-health-evidence") reviewPublicHealthEvidence(action.dataset.id, action.dataset.decision);
     if (name === "escalate-public-health-incident") escalatePublicHealthIncident(action.dataset.id);
     if (name === "export-public-health-incidents") downloadPublicHealthIncidentExport(action.dataset.format || "json");
     if (name === "reset-public-health-filters") resetPublicHealthFilters();

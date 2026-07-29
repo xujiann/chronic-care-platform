@@ -1,9 +1,9 @@
 openapi: 3.0.3
 info:
-  title: 数智医院新标准平台 v0.20 接口
-  version: 0.20.0
+  title: 数智医院新标准平台 v0.21 接口
+  version: 0.21.0
   description: >
-    面向数智医院新标准平台的接口契约，覆盖评价任务、试点运营、试点协同、接入联调、持久化任务服务、Worker租约、托管密钥、签名回调、重试死信、投产证据、Go/No-Go、试点评估、评价助手、推广准备、运营监控、公共卫生协同、医院申报、分级审核和运行管理。
+    面向数智医院新标准平台的接口契约，覆盖评价任务、试点运营、试点协同、接入联调、持久化任务服务、Worker租约、托管密钥、签名回调、重试死信、投产证据、Go/No-Go、试点评估、评价助手、推广准备、运营监控、公共卫生证据闭环、医院申报、分级审核和运行管理。
 servers:
   - url: https://example.local
     description: 示例服务地址，正式环境由部署方案确定
@@ -974,7 +974,7 @@ paths:
     get:
       tags: [PublicHealthCoordination]
       summary: 获取公共卫生协同工作台
-      description: 返回八类业务通道、专业系统只读关联、SLA统计、连续活动、异常事件、动作留痕及始终关闭的生产边界。
+      description: 返回用户机构授权医院范围内的八类业务通道、专业系统只读关联、SLA统计、关闭证据门禁、连续活动、异常事件、动作留痕及始终关闭的生产边界。
       security:
         - bearerAuth: []
       parameters:
@@ -1010,7 +1010,7 @@ paths:
         "401":
           description: 未登录
         "403":
-          description: 非卫健委角色
+          description: 非卫健委角色或请求医院超出机构授权范围
   /api/digital-hospital/public-health/incidents:
     post:
       tags: [PublicHealthCoordination]
@@ -1043,7 +1043,7 @@ paths:
     post:
       tags: [PublicHealthCoordination]
       summary: 推进公共卫生协同事件
-      description: 使用乐观修订号执行开始处置、提交复核、独立复核关闭或SLA超时升级；升级不改变原处置状态。
+      description: 使用乐观修订号执行开始处置、提交复核、独立复核关闭或SLA超时升级；关闭前必须按事件级别满足已独立签收的证据门禁，升级不改变原处置状态。
       security:
         - bearerAuth: []
       parameters:
@@ -1074,7 +1074,79 @@ paths:
         "404":
           description: 事件不存在
         "409":
-          description: 修订冲突、动作不合法或未满足独立复核
+          description: 修订冲突、动作不合法、关闭证据缺失或未满足独立复核
+  /api/digital-hospital/public-health/incidents/{incidentId}/evidence:
+    post:
+      tags: [PublicHealthCoordination]
+      summary: 登记公共卫生事件关闭证据
+      description: 仅登记证据类型、外部编号、最小化摘要和SHA-256摘要；原始附件、凭据、签名及载荷不得进入协同账本。
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: incidentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublicHealthEvidenceSubmit"
+      responses:
+        "201":
+          description: 证据已登记并与事件双向关联
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicHealthEvidenceMutation"
+        "400":
+          description: 字段、证据类型或摘要格式无效
+        "401":
+          description: 未登录
+        "403":
+          description: 非卫健委角色或医院超出机构授权范围
+        "404":
+          description: 授权范围内不存在该事件
+        "409":
+          description: 事件修订冲突、事件已关闭或存在有效同类证据
+  /api/digital-hospital/public-health/evidence/{evidenceId}/actions:
+    post:
+      tags: [PublicHealthCoordination]
+      summary: 独立签收或驳回公共卫生关闭证据
+      description: 同时校验证据修订号和事件修订号；证据提交人不得签收或驳回自己的证据。
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: evidenceId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublicHealthEvidenceAction"
+      responses:
+        "200":
+          description: 证据复核动作已留痕并推进事件修订号
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicHealthEvidenceMutation"
+        "400":
+          description: 动作或字段校验失败
+        "401":
+          description: 未登录
+        "403":
+          description: 非卫健委角色
+        "404":
+          description: 授权范围内不存在证据或关联事件
+        "409":
+          description: 修订冲突、非待签收状态或未满足提交签收分离
   /api/digital-hospital/public-health/incidents/export:
     get:
       tags: [PublicHealthCoordination]
@@ -3353,6 +3425,10 @@ components:
           type: string
         submittedForReviewBy:
           type: string
+        evidenceIds:
+          type: array
+          items:
+            type: string
         professionalRefs:
           $ref: "#/components/schemas/PublicHealthProfessionalReferences"
         sla:
@@ -3363,6 +3439,8 @@ components:
           nullable: true
         professionalAssociation:
           $ref: "#/components/schemas/PublicHealthProfessionalAssociation"
+        closureGate:
+          $ref: "#/components/schemas/PublicHealthClosureGate"
     PublicHealthProfessionalReferences:
       type: object
       additionalProperties: false
@@ -3483,6 +3561,112 @@ components:
           type: string
         dueAt:
           type: string
+    PublicHealthEvidence:
+      type: object
+      required: [id, revision, incidentId, hospitalCode, evidenceType, referenceNo, summary, digest, status, submittedBy, submittedAt, productionEvidence]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        revision:
+          type: integer
+          minimum: 1
+        incidentId:
+          type: string
+        hospitalCode:
+          type: string
+        evidenceType:
+          type: string
+          enum: [business-receipt, site-joint-test, production-approval, dr-rehearsal]
+        referenceNo:
+          type: string
+        summary:
+          type: string
+        digest:
+          type: string
+          pattern: "^sha256:[a-f0-9]{64}$"
+        status:
+          type: string
+          enum: [submitted, accepted, rejected]
+        submittedBy:
+          type: string
+        submittedByName:
+          type: string
+        submittedAt:
+          type: string
+        reviewedBy:
+          type: string
+        reviewedByName:
+          type: string
+        reviewedAt:
+          type: string
+        reviewNote:
+          type: string
+        productionEvidence:
+          type: boolean
+          const: false
+    PublicHealthEvidenceSubmit:
+      type: object
+      required: [expectedRevision, evidenceType, referenceNo, summary, digest]
+      additionalProperties: false
+      properties:
+        expectedRevision:
+          type: integer
+          minimum: 1
+        evidenceType:
+          type: string
+          enum: [business-receipt, site-joint-test, production-approval, dr-rehearsal]
+        referenceNo:
+          type: string
+          minLength: 4
+        summary:
+          type: string
+          minLength: 8
+        digest:
+          type: string
+          pattern: "^sha256:[a-f0-9]{64}$"
+    PublicHealthEvidenceAction:
+      type: object
+      required: [action, expectedEvidenceRevision, expectedIncidentRevision, note]
+      additionalProperties: false
+      properties:
+        action:
+          type: string
+          enum: [accept-evidence, reject-evidence]
+        expectedEvidenceRevision:
+          type: integer
+          minimum: 1
+        expectedIncidentRevision:
+          type: integer
+          minimum: 1
+        note:
+          type: string
+          minLength: 4
+    PublicHealthClosureGate:
+      type: object
+      required: [ready, status, required, accepted, missingTypes, items, productionReady]
+      properties:
+        ready:
+          type: boolean
+        status:
+          type: string
+          enum: [ready-to-close, evidence-required]
+        required:
+          type: integer
+        accepted:
+          type: integer
+        missingTypes:
+          type: array
+          items:
+            type: string
+            enum: [business-receipt, site-joint-test, production-approval, dr-rehearsal]
+        items:
+          type: array
+          items:
+            type: object
+        productionReady:
+          type: boolean
+          const: false
     PublicHealthIncidentMutation:
       type: object
       required: [ok, incident, board]
@@ -3494,9 +3678,26 @@ components:
           $ref: "#/components/schemas/PublicHealthIncident"
         board:
           $ref: "#/components/schemas/PublicHealthCoordinationBoard"
+    PublicHealthEvidenceMutation:
+      type: object
+      required: [ok, incident, evidence, action, closureGate, board]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        incident:
+          $ref: "#/components/schemas/PublicHealthIncident"
+        evidence:
+          $ref: "#/components/schemas/PublicHealthEvidence"
+        action:
+          type: object
+        closureGate:
+          $ref: "#/components/schemas/PublicHealthClosureGate"
+        board:
+          $ref: "#/components/schemas/PublicHealthCoordinationBoard"
     PublicHealthCoordinationBoard:
       type: object
-      required: [ok, generatedAt, filters, summary, portfolioSummary, statistics, coordination, runtimeRoutes, productionBoundary]
+      required: [ok, generatedAt, filters, accessScope, summary, portfolioSummary, statistics, coordination, runtimeRoutes, productionBoundary]
       properties:
         ok:
           type: boolean
@@ -3513,16 +3714,32 @@ components:
         filters:
           type: object
           additionalProperties: true
+        accessScope:
+          type: object
+          required: [mode, authorizedHospitalCodes, scopedIncidents, productionReady]
+          properties:
+            mode:
+              type: string
+              enum: [unrestricted-domain-call, organization-hospital-scope]
+            authorizedHospitalCodes:
+              type: array
+              items:
+                type: string
+            scopedIncidents:
+              type: integer
+            productionReady:
+              type: boolean
+              const: false
         statistics:
           type: object
           additionalProperties: true
         coordination:
           type: object
-          required: [schemaVersion, productionReady, lanes, campaigns, incidents, incidentActions, blockers]
+          required: [schemaVersion, productionReady, lanes, campaigns, incidents, incidentEvidence, evidenceActions, incidentActions, blockers]
           properties:
             schemaVersion:
               type: integer
-              const: 2
+              const: 3
             productionReady:
               type: boolean
               const: false
@@ -3538,6 +3755,14 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/PublicHealthIncident"
+            incidentEvidence:
+              type: array
+              items:
+                $ref: "#/components/schemas/PublicHealthEvidence"
+            evidenceActions:
+              type: array
+              items:
+                type: object
             incidentActions:
               type: array
               items:

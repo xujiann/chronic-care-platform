@@ -1116,12 +1116,65 @@
           "dueAt": { "type": "string" },
           "latestAction": { "type": "string" },
           "submittedForReviewBy": { "type": "string" },
+          "evidenceIds": { "type": "array", "items": { "type": "string" } },
           "sla": { "type": "object" },
           "escalation": { "type": ["object", "null"] },
-          "professionalAssociation": { "type": "object" }
+          "professionalAssociation": { "type": "object" },
+          "closureGate": {
+            "type": "object",
+            "properties": {
+              "ready": { "type": "boolean" },
+              "required": { "type": "integer", "minimum": 2, "maximum": 4 },
+              "accepted": { "type": "integer", "minimum": 0, "maximum": 4 },
+              "missingTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": ["business-receipt", "site-joint-test", "production-approval", "dr-rehearsal"]
+                }
+              },
+              "productionReady": { "const": false }
+            },
+            "additionalProperties": true
+          },
+          "evidence": {
+            "type": "array",
+            "items": { "$ref": "#/properties/publicHealthIncidentEvidence/items" }
+          }
         },
         "additionalProperties": true
       }
+    },
+    "publicHealthIncidentEvidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "revision", "incidentId", "hospitalCode", "evidenceType", "referenceNo", "summary", "digest", "status", "submittedBy", "submittedAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "revision": { "type": "integer", "minimum": 1 },
+          "incidentId": { "type": "string" },
+          "hospitalCode": { "type": "string" },
+          "evidenceType": {
+            "type": "string",
+            "enum": ["business-receipt", "site-joint-test", "production-approval", "dr-rehearsal"]
+          },
+          "referenceNo": { "type": "string" },
+          "summary": { "type": "string" },
+          "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+          "status": { "type": "string", "enum": ["submitted", "accepted", "rejected"] },
+          "submittedBy": { "type": "string" },
+          "submittedAt": { "type": "string" },
+          "reviewedBy": { "type": "string" },
+          "reviewedAt": { "type": "string" },
+          "productionEvidence": { "const": false }
+        },
+        "additionalProperties": false
+      }
+    },
+    "publicHealthEvidenceActions": {
+      "type": "array",
+      "items": { "type": "object" }
     },
     "publicHealthIncidentActions": {
       "type": "array",
@@ -1138,11 +1191,13 @@
     "publicHealth": {
       "type": "object",
       "properties": {
-        "schemaVersion": { "const": 2 },
+        "schemaVersion": { "const": 3 },
         "productionReady": { "const": false },
         "lanes": { "type": "array", "items": { "type": "object" } },
         "campaigns": { "type": "array", "items": { "type": "object" } },
         "incidents": { "type": "array", "items": { "type": "object" } },
+        "incidentEvidence": { "type": "array", "items": { "$ref": "#/properties/publicHealthIncidentEvidence/items" } },
+        "evidenceActions": { "type": "array", "items": { "type": "object" } },
         "incidentActions": { "type": "array", "items": { "type": "object" } },
         "blockers": { "type": "array", "items": { "type": "string" } }
       },
