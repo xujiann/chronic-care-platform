@@ -6,6 +6,7 @@ const path = require("node:path");
 const { buildDiseasePaymentReadiness } = require("./disease-payment-readiness");
 const { buildFinancialGatewayReadiness } = require("./financial-gateway-readiness");
 const OperatingModel = require("../insurance-payment-operating-model");
+const Persistence = require("../insurance-payment-persistence");
 
 const ROOT = path.resolve(__dirname, "..");
 const FINANCIAL_GATEWAY_EVIDENCE_POLICY = Object.freeze([
@@ -69,11 +70,32 @@ function buildAcceptanceProductionGate(report = {}) {
   };
 }
 
+function buildPersistenceAcceptance() {
+  const contract = Persistence.persistenceContract();
+  const checks = [
+    { id: "optimistic-concurrency", passed: contract.invariants.some((item) => item.includes("expectedVersion")) },
+    { id: "command-idempotency", passed: contract.invariants.some((item) => item.includes("commandId")) },
+    { id: "transactional-outbox", passed: contract.invariants.some((item) => item.includes("同一数据库事务")) },
+    { id: "leased-delivery", passed: contract.invariants.some((item) => item.includes("至少一次投递")) },
+    { id: "dead-letter", passed: contract.invariants.some((item) => item.includes("dead-letter")) },
+    { id: "checkpoint-integrity", passed: typeof Persistence.verifyPersistenceRecord === "function" }
+  ];
+  return {
+    contractId: contract.id,
+    ready: checks.every((item) => item.passed),
+    checks,
+    productionAdapterRequired: true,
+    productionAdapterConfigured: false,
+    boundary: contract.productionBoundary
+  };
+}
+
 function buildInsurancePaymentAcceptance(options = {}) {
   const diseasePayment = options.diseasePayment || buildDiseasePaymentReadiness();
   const financialGateway = options.financialGateway || buildFinancialGatewayReadiness();
   const serverSource = options.serverSource ?? fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
   const operatingModel = OperatingModel.validateOperatingModel();
+  const persistence = options.persistence || buildPersistenceAcceptance();
   const integrationHandoff = OperatingModel.buildT00IntegrationHandoff(serverSource);
   const workflows = [
     { id: "online-payment-refund", label: "在线支付退费", ready: capabilityById(financialGateway, "online-refund-closed-loop") && capabilityById(financialGateway, "online-refund-sla-operations"), evidence: ["dual-domain-review", "decision-bound-resubmission", "fresh-correction-evidence", "immutable-review-history", "ledger-guarded-transitions", "ledger-state-projection-cross-check", "trusted-callback", "provider-reversal", "phase-sla", "redacted-exception-queue", "daily-reconciliation", "voucher-close"] },
@@ -85,14 +107,15 @@ function buildInsurancePaymentAcceptance(options = {}) {
   ];
   const externalBlockers = [...diseasePaymentExternalEvidence(diseasePayment.externalBlockers), ...financialGatewayExternalEvidence(financialGateway.blockers)];
   const externalEvidenceGoverned = externalBlockers.every((item) => item.owner && EXTERNAL_REVIEWER_ROLES.has(item.reviewerRole));
-  const localReady = diseasePayment.ready && financialGateway.ok && operatingModel.ok && workflows.every((item) => item.ready) && externalEvidenceGoverned;
+  const localReady = diseasePayment.ready && financialGateway.ok && operatingModel.ok && persistence.ready && workflows.every((item) => item.ready) && externalEvidenceGoverned;
   const report = {
     generatedAt: new Date().toISOString(),
     status: localReady ? "domain-ready-public-wiring-and-site-acceptance-pending" : "domain-incomplete",
     localReady,
     productionReady: false,
-    summary: { workflows: workflows.length, workflowsReady: workflows.filter((item) => item.ready).length, t00RoutesPending: integrationHandoff.pending, externalBlockers: externalBlockers.length, externalEvidenceGoverned },
+    summary: { workflows: workflows.length, workflowsReady: workflows.filter((item) => item.ready).length, persistenceContractReady: persistence.ready, t00RoutesPending: integrationHandoff.pending, externalBlockers: externalBlockers.length, externalEvidenceGoverned },
     workflows,
+    persistence,
     operatingModel,
     integrationHandoff,
     externalBlockers
@@ -136,4 +159,4 @@ if (require.main === module) {
   if (shouldFailAcceptance(report, args)) process.exitCode = 1;
 }
 
-module.exports = { FINANCIAL_GATEWAY_EVIDENCE_POLICY, buildAcceptanceProductionGate, buildInsurancePaymentAcceptance, diseasePaymentExternalEvidence, financialGatewayExternalEvidence, parseArgs, renderMarkdown, shouldFailAcceptance };
+module.exports = { FINANCIAL_GATEWAY_EVIDENCE_POLICY, buildAcceptanceProductionGate, buildInsurancePaymentAcceptance, buildPersistenceAcceptance, diseasePaymentExternalEvidence, financialGatewayExternalEvidence, parseArgs, renderMarkdown, shouldFailAcceptance };
