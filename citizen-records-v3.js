@@ -25,6 +25,10 @@
   });
   const SENSITIVE_SOURCE_FIELD = /(?:token|secret|password|credential|object(?:key|path)|storage(?:key|path)|signedurl|downloadurl|sourceurl|audit(?:hash|payload)|personindex|masterpatientindex|studyinstanceuid)/i;
   const TERMINAL_TASK_STATES = new Set(["completed", "closed", "cancelled", "已完成", "已关闭", "已取消", "已取药"]);
+  const DENIED_ACCESS_STATES = new Set(["denied", "blocked", "rejected", "拒绝", "已拒绝", "拦截", "已拦截"]);
+  const OPEN_CORRECTION_STATES = new Set(["submitted", "pending", "processing", "under-review", "已提交", "待处理", "处理中", "审核中"]);
+  const OPEN_COMPLAINT_STATES = new Set(["submitted", "pending", "processing", "under-review", "已提交", "待处理", "处理中", "审核中"]);
+  const OPERATIONS_EVENT_LIMIT = 1000;
   const GLOSSARY = Object.freeze([
     { pattern: /窦性心律/, explanation: "心脏节律由正常起搏点发出" },
     { pattern: /纹理增多/, explanation: "影像上肺部纹理较明显，需要结合症状和医生判断" },
@@ -96,6 +100,22 @@
 
   function unique(values) {
     return [...new Set(values.filter(Boolean))];
+  }
+
+  function boundedObjects(value, limit) {
+    return (Array.isArray(value) ? value : [])
+      .filter((item) => item && typeof item === "object")
+      .slice(0, limit);
+  }
+
+  function normalizedState(value) {
+    return cleanText(value, 80).toLowerCase();
+  }
+
+  function validOperationsEventTime(item, now) {
+    const timestamp = toDate(item?.updatedAt || item?.createdAt || item?.accessedAt);
+    if (!timestamp) return null;
+    return timestamp.getTime() <= now.getTime() + 5 * 60 * 1000 ? timestamp : null;
   }
 
   function recordTrust(record = {}) {
@@ -550,8 +570,8 @@
 
   function buildFamilyDelegationCenter(input = {}) {
     const now = toDate(input.now) || new Date();
-    const authorizations = Array.isArray(input.authorizations) ? input.authorizations : [];
-    const items = (Array.isArray(input.members) ? input.members : []).map((member) => {
+    const authorizations = boundedObjects(input.authorizations, 1000);
+    const items = boundedObjects(input.members, 100).map((member) => {
       const self = /本人|self/i.test(cleanText(member.relation, 60));
       const relationship = self
         ? { active: true, label: "本人", reason: "self" }
@@ -600,7 +620,7 @@
   function buildProactiveCarePlan(input = {}) {
     const now = toDate(input.now) || new Date();
     const tasks = [];
-    for (const item of Array.isArray(input.followups) ? input.followups : []) {
+    for (const item of boundedObjects(input.followups, 1000)) {
       if (TERMINAL_TASK_STATES.has(cleanText(item.status, 40))) continue;
       tasks.push({
         id: `followup:${cleanText(item.id, 120)}`,
@@ -610,7 +630,7 @@
         action: "完成自测并联系家庭医生"
       });
     }
-    for (const item of Array.isArray(input.pickups) ? input.pickups : []) {
+    for (const item of boundedObjects(input.pickups, 1000)) {
       if (TERMINAL_TASK_STATES.has(cleanText(item.status, 40))) continue;
       tasks.push({
         id: `pickup:${cleanText(item.id, 120)}`,
@@ -620,7 +640,7 @@
         action: "核对处方状态并按预约取药"
       });
     }
-    for (const record of Array.isArray(input.records) ? input.records : []) {
+    for (const record of boundedObjects(input.records, 2000)) {
       const followupPlan = cleanText(record.meta?.followupPlan || record.followupPlan, 200);
       const dueAt = record.meta?.followupAt || record.followupAt;
       if (!followupPlan || !dueAt) continue;
@@ -632,7 +652,7 @@
         action: "查看报告并预约复诊"
       });
     }
-    for (const authorization of Array.isArray(input.authorizations) ? input.authorizations : []) {
+    for (const authorization of boundedObjects(input.authorizations, 1000)) {
       const state = CitizenRecordsV1?.authorizationState(authorization, now);
       const expiresAt = authorization.meta?.expiresAt;
       const remaining = calendarDayDistance(now, expiresAt);
@@ -647,7 +667,7 @@
     }
     const order = { 逾期: 0, 今日: 1, 紧急: 2, 近期: 3, 计划: 4, 普通: 5 };
     tasks.sort((a, b) => (order[a.priority] ?? 9) - (order[b.priority] ?? 9) || a.dueAt.localeCompare(b.dueAt));
-    const uniqueTasks = [...new Map(tasks.map((item) => [item.id, item])).values()];
+    const uniqueTasks = [...new Map(tasks.map((item) => [item.id, item])).values()].slice(0, 200);
     return {
       tasks: uniqueTasks,
       urgentCount: uniqueTasks.filter((item) => ["逾期", "今日", "紧急"].includes(item.priority)).length,
@@ -659,7 +679,7 @@
   }
 
   function explainResidentReports(records = []) {
-    const reports = (Array.isArray(records) ? records : [])
+    const reports = boundedObjects(records, 2000)
       .filter((record) => ["labs", "imaging"].includes(cleanText(record.category, 60)))
       .filter((record) => !/^(已核验|已确认|待核验|verified|approved|confirmed)$/i.test(cleanText(record.name || record.title, 80)))
       .filter((record) => !/^(已核验|已确认|待核验|verified|approved|confirmed)$/i.test(cleanText(record.result || record.summary, 80)))
@@ -683,7 +703,8 @@
               ? "结合症状联系医生，确认是否需要复查或复诊"
               : "继续按医生安排保存并观察后续结果"
         };
-      });
+      })
+      .slice(0, 100);
     return {
       reports,
       abnormalCount: reports.filter((item) => ["critical", "abnormal"].includes(item.severity)).length,
@@ -699,7 +720,7 @@
   }
 
   function assessMedicationSafety(input = {}) {
-    const medications = (Array.isArray(input.medications) ? input.medications : [])
+    const medications = boundedObjects(input.medications, 500)
       .map((item) => ({
         id: cleanText(item.id, 120),
         name: cleanText(item.name || item.medication || item.drugName || "", 160),
@@ -708,7 +729,7 @@
         status: cleanText(item.status || "状态待核验", 60)
       }))
       .filter((item) => item.name && !/^(已核验|已确认|待核验|verified|approved|confirmed|matched)$/i.test(item.name));
-    const allergyText = (Array.isArray(input.allergies) ? input.allergies : [])
+    const allergyText = boundedObjects(input.allergies, 100)
       .map((item) => cleanText(item.name || item.allergen || item.result, 160).toLowerCase())
       .join("|");
     const medicationGroups = new Map();
@@ -743,17 +764,17 @@
   function buildEmergencyHealthPack(input = {}) {
     const resident = input.resident || {};
     const residentId = cleanText(resident.id, 120);
-    const records = (Array.isArray(input.records) ? input.records : [])
+    const records = boundedObjects(input.records, 2000)
       .filter((item) => residentId && cleanText(item?.residentId, 120) === residentId);
     const allergies = records.filter((item) => item.category === "allergies").slice(0, 10)
       .map((item) => cleanText(item.name || item.result, 160));
     const medications = records.filter((item) => item.category === "medications").slice(0, 10)
       .map((item) => cleanText(item.name || item.medication, 160));
-    const diseases = (Array.isArray(input.diseases) ? input.diseases : [])
+    const diseases = boundedObjects(input.diseases, 500)
       .filter((item) => residentId && cleanText(item?.residentId, 120) === residentId)
       .slice(0, 10)
       .map((item) => cleanText(item.type || item.name, 160));
-    const contacts = (Array.isArray(input.contacts) ? input.contacts : [])
+    const contacts = boundedObjects(input.contacts, 100)
       .filter((item) => !item?.residentId || residentId && cleanText(item.residentId, 120) === residentId)
       .slice(0, 3)
       .map((item) => ({
@@ -788,17 +809,17 @@
     const now = toDate(input.now) || new Date();
     const residentId = cleanText(input.residentId, 120);
     const integration = buildProductionIntegrationStatus(input.integrations || {}, now);
-    const accessLogs = (Array.isArray(input.accessLogs) ? input.accessLogs : [])
-      .filter((item) => residentId && cleanText(item?.residentId, 120) === residentId);
-    const corrections = (Array.isArray(input.corrections) ? input.corrections : [])
-      .filter((item) => residentId && cleanText(item?.residentId, 120) === residentId);
-    const complaints = (Array.isArray(input.complaints) ? input.complaints : [])
-      .filter((item) => residentId && cleanText(item?.residentId, 120) === residentId);
-    const deniedAccess = accessLogs.filter((item) => /denied|blocked|拒绝|拦截/i.test(cleanText(item.status || item.result, 80))).length;
-    const openCorrections = corrections.filter((item) => !/corrected|rejected|withdrawn|更正|拒绝|撤回/i.test(cleanText(item.status, 60))).length;
-    const openComplaints = complaints.filter((item) => !/closed|resolved|已关闭|已解决/i.test(cleanText(item.status, 60))).length;
+    const accessLogs = boundedObjects(input.accessLogs, OPERATIONS_EVENT_LIMIT)
+      .filter((item) => residentId && cleanText(item.residentId, 120) === residentId);
+    const corrections = boundedObjects(input.corrections, OPERATIONS_EVENT_LIMIT)
+      .filter((item) => residentId && cleanText(item.residentId, 120) === residentId);
+    const complaints = boundedObjects(input.complaints, OPERATIONS_EVENT_LIMIT)
+      .filter((item) => residentId && cleanText(item.residentId, 120) === residentId);
+    const deniedAccess = accessLogs.filter((item) => DENIED_ACCESS_STATES.has(normalizedState(item.status || item.result))).length;
+    const openCorrections = corrections.filter((item) => OPEN_CORRECTION_STATES.has(normalizedState(item.status))).length;
+    const openComplaints = complaints.filter((item) => OPEN_COMPLAINT_STATES.has(normalizedState(item.status))).length;
     const latestEvents = [...accessLogs, ...corrections, ...complaints]
-      .map((item) => toDate(item.updatedAt || item.createdAt || item.accessedAt))
+      .map((item) => validOperationsEventTime(item, now))
       .filter(Boolean)
       .sort((a, b) => b - a);
     return {

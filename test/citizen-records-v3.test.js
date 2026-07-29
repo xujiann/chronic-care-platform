@@ -458,6 +458,67 @@ test("居民运营汇总拒绝跨居民和缺标识事件避免数量侧信道",
   assert.doesNotMatch(JSON.stringify(snapshot), /other-access|other-correction|other-complaint/);
 });
 
+test("居民运营汇总只接受精确状态白名单避免子串伪造计数", () => {
+  const snapshot = api.buildOperationsSnapshot({
+    residentId: "r1",
+    accessLogs: [
+      { residentId: "r1", status: "denied", accessedAt: "2026-07-27T06:00:00.000Z" },
+      { residentId: "r1", status: "not-denied", accessedAt: "2026-07-27T06:10:00.000Z" },
+      { residentId: "r1", status: "unblocked", accessedAt: "2026-07-27T06:20:00.000Z" }
+    ],
+    corrections: [
+      { residentId: "r1", status: "processing", createdAt: "2026-07-27T05:00:00.000Z" },
+      { residentId: "r1", status: "corrected-but-processing", createdAt: "2026-07-27T05:10:00.000Z" },
+      { residentId: "r1", status: "unknown", createdAt: "2026-07-27T05:20:00.000Z" }
+    ],
+    complaints: [
+      { residentId: "r1", status: "submitted", createdAt: "2026-07-27T04:00:00.000Z" },
+      { residentId: "r1", status: "unresolved", createdAt: "2026-07-27T04:10:00.000Z" }
+    ],
+    now
+  });
+  assert.equal(snapshot.metrics.find((item) => item.label === "授权拦截").value, 1);
+  assert.equal(snapshot.metrics.find((item) => item.label === "纠错处理中").value, 1);
+  assert.equal(snapshot.metrics.find((item) => item.label === "投诉处理中").value, 1);
+});
+
+test("居民运营汇总限制单类事件数量并拒绝异常未来和无效时间", () => {
+  const accessLogs = Array.from({ length: 1001 }, (_, index) => ({
+    residentId: "r1",
+    status: "denied",
+    accessedAt: `2026-07-27T${String(index % 8).padStart(2, "0")}:00:00.000Z`
+  }));
+  accessLogs[999].accessedAt = "2099-01-01T00:00:00.000Z";
+  accessLogs.push({ residentId: "r1", status: "denied", accessedAt: "not-a-date" });
+  const snapshot = api.buildOperationsSnapshot({ residentId: "r1", accessLogs, now });
+  assert.equal(snapshot.metrics.find((item) => item.label === "授权拦截").value, 1000);
+  assert.equal(snapshot.latestEventAt, "2026-07-27T07:00:00.000Z");
+});
+
+test("居民增强聚合输出设置确定性上限避免海量输入拖垮页面", () => {
+  const family = api.buildFamilyDelegationCenter({
+    members: Array.from({ length: 101 }, (_, index) => ({ residentId: `r${index}`, relation: "本人" })),
+    now
+  });
+  const plan = api.buildProactiveCarePlan({
+    followups: Array.from({ length: 205 }, (_, index) => ({ id: `f${index}`, diseaseType: "高血压", plannedAt: "2026-07-28" })),
+    now
+  });
+  const explanations = api.explainResidentReports(Array.from({ length: 101 }, (_, index) => ({
+    id: `report-${index}`,
+    category: "labs",
+    name: `检验报告${index}`,
+    result: "阴性"
+  })));
+  const medicationSafety = api.assessMedicationSafety({
+    medications: Array.from({ length: 501 }, (_, index) => ({ id: `m${index}`, name: `药品${index}` }))
+  });
+  assert.equal(family.items.length, 100);
+  assert.equal(plan.tasks.length, 200);
+  assert.equal(explanations.reports.length, 100);
+  assert.equal(medicationSafety.medications.length, 500);
+});
+
 test("八项增强工作台一次生成全部居民可验收视图", () => {
   const workspace = api.buildNextStageWorkspace({
     resident: { id: "r1", name: "张某" },
