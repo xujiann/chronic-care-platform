@@ -313,6 +313,7 @@ test("家庭代办必须同时具备权威关系和有效最小范围授权", ()
     expiresAt: "2027-07-20T23:59:59.999Z"
   };
   const allowed = api.buildFamilyDelegationCenter({
+    currentResidentId: "r1",
     members: [verifiedMember],
     authorizations: [activeAuthorization()],
     now
@@ -321,11 +322,28 @@ test("家庭代办必须同时具备权威关系和有效最小范围授权", ()
   assert.deepEqual(allowed.items[0].scopes, ["health-record-summary", "medications"]);
 
   const denied = api.buildFamilyDelegationCenter({
+    currentResidentId: "r1",
     members: [verifiedMember],
     authorizations: [activeAuthorization({ status: "pending", meta: { status: "pending" } })],
     now
   });
   assert.equal(denied.items[0].canAct, false);
+});
+
+test("家庭代办仅将当前居民的精确本人关系识别为本人", () => {
+  const center = api.buildFamilyDelegationCenter({
+    currentResidentId: "r1",
+    members: [
+      { residentId: "r1", relation: "本人", name: "当前居民" },
+      { residentId: "r1", relation: "非本人", name: "关系文本伪造" },
+      { residentId: "r2", relation: "本人", name: "跨居民本人伪造" }
+    ],
+    now
+  });
+  assert.equal(center.items[0].canAct, true);
+  assert.equal(center.items[0].action, "本人访问");
+  assert.equal(center.items[1].canAct, false);
+  assert.equal(center.items[2].canAct, false);
 });
 
 test("主动健康计划汇总随访取药复诊与授权到期并按紧迫度排序", () => {
@@ -339,6 +357,18 @@ test("主动健康计划汇总随访取药复诊与授权到期并按紧迫度�
   assert.equal(plan.tasks.length, 4);
   assert.equal(plan.tasks[0].priority, "逾期");
   assert.ok(plan.tasks.some((item) => item.type === "授权"));
+});
+
+test("主动健康计划在展示前丢弃缺少稳定来源标识的任务", () => {
+  const plan = api.buildProactiveCarePlan({
+    followups: [{ diseaseType: "缺标识随访", plannedAt: "2026-07-28" }],
+    pickups: [{ medication: "缺标识用药", nextPickup: "2026-07-28" }],
+    records: [{ meta: { followupPlan: "缺标识复诊", followupAt: "2026-07-28" } }],
+    authorizations: [activeAuthorization({ id: "" })],
+    now
+  });
+  assert.deepEqual(plan.tasks, []);
+  assert.equal(plan.urgentCount, 0);
 });
 
 test("报告通俗解读解释术语并保留非诊断边界", () => {

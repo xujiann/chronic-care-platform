@@ -67,7 +67,9 @@ function assessCitizenRecordsReadiness(options = {}) {
     { id: "operations-resident-firewall", label: "居民运营计数范围防火墙", passed: /function buildOperationsSnapshot/.test(v3) && /residentId && cleanText\(item\?\.residentId/.test(v3) && /居民运营汇总拒绝跨居民和缺标识事件/.test(nextStageUnit) },
     { id: "bounded-resident-aggregations", label: "居民增强聚合资源上限", passed: /function boundedObjects/.test(v3) && /OPERATIONS_EVENT_LIMIT = 1000/.test(v3) && /居民增强聚合输出设置确定性上限/.test(nextStageUnit) },
     { id: "operations-state-time-hardening", label: "运营状态与事件时间加固", passed: /DENIED_ACCESS_STATES/.test(v3) && /validOperationsEventTime/.test(v3) && /只接受精确状态白名单/.test(nextStageUnit) && /异常未来和无效时间/.test(nextStageUnit) },
-    { id: "acceptance-documentation", label: "居民验收标准与外部依赖", passed: /第三十六增量/.test(documentation) && /## 外部依赖/.test(documentation) }
+    { id: "family-self-identity", label: "家庭本人身份精确判定", passed: /currentResidentId/.test(v3) && /\["本人", "self"\]\.includes/.test(v3) && /仅将当前居民的精确本人关系/.test(nextStageUnit) },
+    { id: "care-task-stable-identifiers", label: "主动任务稳定标识前置校验", passed: /if \(!sourceId\) continue/.test(v3) && /展示前丢弃缺少稳定来源标识/.test(nextStageUnit) },
+    { id: "acceptance-documentation", label: "居民验收标准与外部依赖", passed: /第三十八增量/.test(documentation) && /## 外部依赖/.test(documentation) }
   ];
 
   const integrationChecks = [

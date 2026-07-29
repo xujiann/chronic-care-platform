@@ -570,9 +570,15 @@
 
   function buildFamilyDelegationCenter(input = {}) {
     const now = toDate(input.now) || new Date();
+    const currentResidentId = cleanText(input.currentResidentId, 120);
     const authorizations = boundedObjects(input.authorizations, 1000);
     const items = boundedObjects(input.members, 100).map((member) => {
-      const self = /本人|self/i.test(cleanText(member.relation, 60));
+      const relation = cleanText(member.relation, 60).toLowerCase();
+      const self = Boolean(
+        currentResidentId
+        && cleanText(member.residentId, 120) === currentResidentId
+        && ["本人", "self"].includes(relation)
+      );
       const relationship = self
         ? { active: true, label: "本人", reason: "self" }
         : CitizenRecordsV2?.relationshipAccessState(member, now) || { active: false, label: "关系待核验" };
@@ -622,8 +628,10 @@
     const tasks = [];
     for (const item of boundedObjects(input.followups, 1000)) {
       if (TERMINAL_TASK_STATES.has(cleanText(item.status, 40))) continue;
+      const sourceId = cleanText(item.id, 120);
+      if (!sourceId) continue;
       tasks.push({
-        id: `followup:${cleanText(item.id, 120)}`,
+        id: `followup:${sourceId}`,
         type: "随访",
         title: `${cleanText(item.diseaseType || item.title || "慢病")}随访`,
         ...taskDueState(item.plannedAt || item.dueAt, now),
@@ -632,8 +640,10 @@
     }
     for (const item of boundedObjects(input.pickups, 1000)) {
       if (TERMINAL_TASK_STATES.has(cleanText(item.status, 40))) continue;
+      const sourceId = cleanText(item.id, 120);
+      if (!sourceId) continue;
       tasks.push({
-        id: `pickup:${cleanText(item.id, 120)}`,
+        id: `pickup:${sourceId}`,
         type: "取药",
         title: `${cleanText(item.medication || "长期用药")}取药`,
         ...taskDueState(item.nextPickup || item.dueAt, now),
@@ -643,9 +653,10 @@
     for (const record of boundedObjects(input.records, 2000)) {
       const followupPlan = cleanText(record.meta?.followupPlan || record.followupPlan, 200);
       const dueAt = record.meta?.followupAt || record.followupAt;
-      if (!followupPlan || !dueAt) continue;
+      const sourceId = cleanText(record.id, 120);
+      if (!sourceId || !followupPlan || !dueAt) continue;
       tasks.push({
-        id: `revisit:${cleanText(record.id, 120)}`,
+        id: `revisit:${sourceId}`,
         type: "复诊",
         title: followupPlan,
         ...taskDueState(dueAt, now),
@@ -656,9 +667,10 @@
       const state = CitizenRecordsV1?.authorizationState(authorization, now);
       const expiresAt = authorization.meta?.expiresAt;
       const remaining = calendarDayDistance(now, expiresAt);
-      if (!state?.active || remaining > 30) continue;
+      const sourceId = cleanText(authorization.id, 120);
+      if (!sourceId || !state?.active || remaining > 30) continue;
       tasks.push({
-        id: `authorization:${cleanText(authorization.id, 120)}`,
+        id: `authorization:${sourceId}`,
         type: "授权",
         title: `${cleanText(authorization.name || "健康资料授权")}即将到期`,
         ...taskDueState(expiresAt, now),
@@ -858,7 +870,7 @@
     return {
       integration: buildProductionIntegrationStatus(input.integrations || {}, input.now),
       governance,
-      family: buildFamilyDelegationCenter({ members: input.members, authorizations, now: input.now }),
+      family: buildFamilyDelegationCenter({ currentResidentId: residentId, members: input.members, authorizations, now: input.now }),
       carePlan: buildProactiveCarePlan({
         records,
         followups,
