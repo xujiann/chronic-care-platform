@@ -20,7 +20,57 @@ const PUBLIC_HEALTH_INCIDENT_TRANSITIONS = Object.freeze({
   })
 });
 
+const PUBLIC_HEALTH_SLA_ESCALATION_ROUTES = Object.freeze({
+  P0: Object.freeze({ level: "red", route: "卫健委值班负责人 -> 疾控业务负责人 -> 项目总指挥" }),
+  P1: Object.freeze({ level: "amber", route: "业务处室负责人 -> 平台运营负责人" }),
+  P2: Object.freeze({ level: "yellow", route: "责任组负责人 -> 平台运营值班" })
+});
+
+const PUBLIC_HEALTH_LANE_PROFESSIONAL_REFS = Object.freeze({
+  "infectious-reporting": Object.freeze({
+    eventId: "phe-infectious-001",
+    exchangeTaskId: "phx-national-direct-report",
+    exchangeRunId: "phxr-direct-report-001",
+    evidencePacketId: "phcep-direct-report-endpoint",
+    probeLaneId: "infectious-reporting"
+  }),
+  immunization: Object.freeze({
+    eventId: "phe-immunization-001",
+    exchangeTaskId: "phx-immunization",
+    exchangeRunId: "phxr-immunization-001",
+    evidencePacketId: "phcep-immunization-registry",
+    probeLaneId: "immunization"
+  }),
+  "maternal-child": Object.freeze({
+    exchangeTaskId: "phx-maternal-child",
+    exchangeRunId: "phxr-maternal-child-001",
+    evidencePacketId: "phcep-lis-emr-credentials",
+    probeLaneId: "maternal-child"
+  }),
+  "senior-health": Object.freeze({ probeLaneId: "senior-health" }),
+  "chronic-disease": Object.freeze({
+    eventId: "phe-chronic-001",
+    probeLaneId: "chronic-disease"
+  }),
+  "public-health-followup": Object.freeze({
+    eventId: "phe-chronic-001",
+    probeLaneId: "public-health-followup"
+  }),
+  "health-education": Object.freeze({ probeLaneId: "health-education" }),
+  "family-doctor": Object.freeze({
+    eventId: "phe-chronic-001",
+    probeLaneId: "family-doctor"
+  })
+});
+
 const SENSITIVE_FIELD_PATTERN = /(secret|password|token|signature|nonce|credential|certificate|private.?key|payload)/i;
+const PROFESSIONAL_REFERENCE_KEYS = Object.freeze([
+  "eventId",
+  "exchangeTaskId",
+  "exchangeRunId",
+  "evidencePacketId",
+  "probeLaneId"
+]);
 
 class PublicHealthCoordinationError extends Error {
   constructor(message, options = {}) {
@@ -52,9 +102,17 @@ function assertNoSensitiveFields(value, path = "payload") {
   }
 }
 
+function normalizeProfessionalRefs(laneId, value = {}) {
+  const defaults = PUBLIC_HEALTH_LANE_PROFESSIONAL_REFS[laneId] || {};
+  const supplied = value && typeof value === "object" ? value : {};
+  return Object.fromEntries(PROFESSIONAL_REFERENCE_KEYS
+    .map((key) => [key, String(supplied[key] || defaults[key] || "").trim()])
+    .filter(([, reference]) => reference));
+}
+
 function seedPublicHealthCoordination() {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     migrationSource: {
       taskTitle: "开发数智医院标准平台",
       sourceCommit: "4142402e0c79fd8457c00c370b5d163e88cca0e7",
@@ -98,7 +156,8 @@ function seedPublicHealthCoordination() {
         dueAt: "2026-07-28 10:22",
         lastUpdatedAt: "2026-07-28 09:52",
         latestAction: "等待核对上报端与接收端回执",
-        submittedForReviewBy: ""
+        submittedForReviewBy: "",
+        professionalRefs: normalizeProfessionalRefs("infectious-reporting")
       },
       {
         id: "PHE-20260728-002",
@@ -114,7 +173,8 @@ function seedPublicHealthCoordination() {
         dueAt: "2026-07-28 12:00",
         lastUpdatedAt: "2026-07-28 09:35",
         latestAction: "医院已补传，等待平台侧重算",
-        submittedForReviewBy: ""
+        submittedForReviewBy: "",
+        professionalRefs: normalizeProfessionalRefs("public-health-followup")
       },
       {
         id: "PHE-20260727-006",
@@ -130,7 +190,8 @@ function seedPublicHealthCoordination() {
         dueAt: "2026-07-28 15:10",
         lastUpdatedAt: "2026-07-28 09:10",
         latestAction: "映射表已修订，等待业务复核",
-        submittedForReviewBy: "u-city"
+        submittedForReviewBy: "u-city",
+        professionalRefs: normalizeProfessionalRefs("immunization")
       },
       {
         id: "PHE-20260727-004",
@@ -147,7 +208,8 @@ function seedPublicHealthCoordination() {
         lastUpdatedAt: "2026-07-27 13:05",
         closedAt: "2026-07-27 13:05",
         latestAction: "补传完成，完整性复核通过",
-        submittedForReviewBy: "u-city"
+        submittedForReviewBy: "u-city",
+        professionalRefs: normalizeProfessionalRefs("maternal-child")
       }
     ],
     incidentActions: [
@@ -181,7 +243,7 @@ function normalizePublicHealthCoordination(value = {}) {
   return {
     ...seed,
     ...clone(current),
-    schemaVersion: 1,
+    schemaVersion: 2,
     migrationSource: seed.migrationSource,
     productionReady: false,
     lanes: mergeById(seed.lanes, current.lanes),
@@ -189,7 +251,11 @@ function normalizePublicHealthCoordination(value = {}) {
     incidents: mergeById(seed.incidents, current.incidents).map((item) => ({
       ...item,
       revision: Math.max(1, Number(item.revision || 1)),
-      submittedForReviewBy: String(item.submittedForReviewBy || "")
+      submittedForReviewBy: String(item.submittedForReviewBy || ""),
+      professionalRefs: normalizeProfessionalRefs(item.laneId, item.professionalRefs),
+      escalation: item.escalation && typeof item.escalation === "object"
+        ? clone(item.escalation)
+        : null
     })),
     incidentActions: mergeById(seed.incidentActions, current.incidentActions).slice(0, 500),
     blockers: Array.isArray(current.blockers) && current.blockers.length ? current.blockers.map(String) : seed.blockers
@@ -249,7 +315,9 @@ function createPublicHealthIncident(currentState, payload = {}, actor = {}, opti
     lastUpdatedAt: now,
     latestAction: note,
     createdBy: principal.id,
-    submittedForReviewBy: ""
+    submittedForReviewBy: "",
+    professionalRefs: normalizeProfessionalRefs(laneId, payload.professionalRefs),
+    escalation: null
   };
   const action = {
     id: `PHA-${randomUUID()}`,
@@ -270,6 +338,51 @@ function createPublicHealthIncident(currentState, payload = {}, actor = {}, opti
   return { state, incident, action };
 }
 
+function parseCoordinationTime(value) {
+  const text = String(value || "").trim();
+  if (!text) return Number.NaN;
+  const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(?::\d{2})?$/.test(text)
+    ? `${text.replace(" ", "T")}${text.length === 16 ? ":00" : ""}+08:00`
+    : text;
+  return Date.parse(normalized);
+}
+
+function evaluatePublicHealthIncidentSla(incident, now = new Date().toISOString()) {
+  const dueAtMs = parseCoordinationTime(incident?.dueAt);
+  const nowMs = parseCoordinationTime(now);
+  const closedAtMs = parseCoordinationTime(incident?.closedAt);
+  const terminal = incident?.status === "已关闭";
+  const referenceMs = terminal && Number.isFinite(closedAtMs) ? closedAtMs : nowMs;
+  const remainingMinutes = Number.isFinite(dueAtMs) && Number.isFinite(referenceMs)
+    ? Math.round((dueAtMs - referenceMs) / 60000)
+    : null;
+  const overdue = Number.isFinite(remainingMinutes) && remainingMinutes < 0;
+  const dueSoon = !terminal && Number.isFinite(remainingMinutes) && remainingMinutes >= 0 && remainingMinutes <= 60;
+  const route = PUBLIC_HEALTH_SLA_ESCALATION_ROUTES[String(incident?.level || "P2")] ||
+    PUBLIC_HEALTH_SLA_ESCALATION_ROUTES.P2;
+  return {
+    status: terminal
+      ? overdue ? "closed-overdue" : "closed-within-sla"
+      : overdue ? "overdue" : dueSoon ? "due-soon" : "within-sla",
+    overdue,
+    dueSoon,
+    remainingMinutes,
+    escalationRequired: !terminal && overdue && !incident?.escalation?.escalatedAt,
+    escalationLevel: route.level,
+    escalationRoute: route.route
+  };
+}
+
+function validateExpectedRevision(current, payload) {
+  const expectedRevision = Number(payload.expectedRevision);
+  if (!Number.isInteger(expectedRevision) || expectedRevision < 1) {
+    coordinationError("expectedRevision is required", "PUBLIC_HEALTH_EXPECTED_REVISION_REQUIRED");
+  }
+  if (expectedRevision !== current.revision) {
+    coordinationError("public health incident revision conflict", "PUBLIC_HEALTH_INCIDENT_REVISION_CONFLICT", 409);
+  }
+}
+
 function advancePublicHealthIncident(currentState, incidentId, payload = {}, actor = {}, options = {}) {
   assertNoSensitiveFields(payload);
   const state = normalizePublicHealthCoordination(currentState);
@@ -282,13 +395,7 @@ function advancePublicHealthIncident(currentState, incidentId, payload = {}, act
   if (!transition) {
     coordinationError("public health incident is already terminal", "PUBLIC_HEALTH_INCIDENT_TERMINAL", 409);
   }
-  const expectedRevision = Number(payload.expectedRevision);
-  if (!Number.isInteger(expectedRevision) || expectedRevision < 1) {
-    coordinationError("expectedRevision is required", "PUBLIC_HEALTH_EXPECTED_REVISION_REQUIRED");
-  }
-  if (expectedRevision !== current.revision) {
-    coordinationError("public health incident revision conflict", "PUBLIC_HEALTH_INCIDENT_REVISION_CONFLICT", 409);
-  }
+  validateExpectedRevision(current, payload);
   const requestedAction = String(payload.action || transition.action).trim();
   if (requestedAction !== transition.action) {
     coordinationError(
@@ -340,33 +447,250 @@ function advancePublicHealthIncident(currentState, incidentId, payload = {}, act
   return { state, incident, action };
 }
 
-function summarizePublicHealthCoordination(currentState) {
+function escalatePublicHealthIncident(currentState, incidentId, payload = {}, actor = {}, options = {}) {
+  assertNoSensitiveFields(payload);
   const state = normalizePublicHealthCoordination(currentState);
-  const openIncidents = state.incidents.filter((item) => item.status !== "已关闭");
+  const index = state.incidents.findIndex((item) => item.id === incidentId);
+  if (index < 0) {
+    coordinationError("public health incident not found", "PUBLIC_HEALTH_INCIDENT_NOT_FOUND", 404);
+  }
+  const current = state.incidents[index];
+  if (current.status === "已关闭") {
+    coordinationError("closed public health incidents cannot be escalated", "PUBLIC_HEALTH_INCIDENT_TERMINAL", 409);
+  }
+  validateExpectedRevision(current, payload);
+  if (String(payload.action || "") !== "escalate-overdue") {
+    coordinationError("action must be escalate-overdue", "PUBLIC_HEALTH_ESCALATION_ACTION_INVALID", 409);
+  }
+  if (current.escalation?.escalatedAt) {
+    coordinationError("public health incident is already escalated", "PUBLIC_HEALTH_INCIDENT_ALREADY_ESCALATED", 409);
+  }
+  const now = String(options.now || new Date().toISOString());
+  const sla = evaluatePublicHealthIncidentSla(current, now);
+  if (!sla.overdue) {
+    coordinationError("public health incident is not overdue", "PUBLIC_HEALTH_INCIDENT_NOT_OVERDUE", 409);
+  }
+  const principal = actorIdentity(actor);
+  const note = requiredText(payload.note, "note", 4);
+  const revision = current.revision + 1;
+  const escalation = {
+    status: "已升级",
+    level: sla.escalationLevel,
+    route: sla.escalationRoute,
+    escalatedAt: now,
+    escalatedBy: principal.id,
+    escalatedByName: principal.name,
+    note
+  };
+  const incident = {
+    ...current,
+    revision,
+    escalation,
+    lastUpdatedAt: now,
+    latestAction: note
+  };
+  const action = {
+    id: `PHA-${randomUUID()}`,
+    incidentId: incident.id,
+    action: "escalate-overdue",
+    label: "SLA超时升级",
+    actorId: principal.id,
+    actor: principal.name,
+    actorRole: principal.role,
+    at: now,
+    result: note,
+    revision
+  };
+  state.incidents[index] = incident;
+  state.incidentActions = [action, ...state.incidentActions].slice(0, 500);
+  state.updatedAt = now;
+  state.productionReady = false;
+  return { state, incident, action };
+}
+
+function groupCount(items, keySelector) {
+  const counts = {};
+  for (const item of items) {
+    const key = String(keySelector(item) || "未指定");
+    counts[key] = Number(counts[key] || 0) + 1;
+  }
+  return counts;
+}
+
+function resolveProfessionalAssociation(incident, context = {}) {
+  const refs = normalizeProfessionalRefs(incident.laneId, incident.professionalRefs);
+  const event = (context.events || []).find((item) => item.id === refs.eventId);
+  const exchangeTask = (context.exchangeTasks || []).find((item) => item.id === refs.exchangeTaskId);
+  const exchangeRun = (context.exchangeRuns || []).find((item) => item.id === refs.exchangeRunId);
+  const evidencePacket = (context.evidencePackets || []).find((item) => item.id === refs.evidencePacketId);
+  const evidenceBridgeLinks = (context.evidenceBridgeLinks || [])
+    .filter((item) => item.packetId === refs.evidencePacketId);
+  const endpointProbe = (context.endpointProbeEntries || [])
+    .find((item) => item.laneId === (refs.probeLaneId || incident.laneId));
+  const requiredItems = Array.isArray(evidencePacket?.requiredItems) ? evidencePacket.requiredItems : [];
+  const verifiedItems = requiredItems.filter((item) =>
+    /verified|accepted|signed|complete|已验证|已签收|已完成/i.test(String(item.status || ""))
+  ).length;
+  const referenceEntries = Object.entries(refs).filter(([, value]) => value);
+  const resolved = [
+    event && "eventId",
+    exchangeTask && "exchangeTaskId",
+    exchangeRun && "exchangeRunId",
+    evidencePacket && "evidencePacketId",
+    endpointProbe && "probeLaneId"
+  ].filter(Boolean);
+  const unresolved = referenceEntries.map(([key]) => key).filter((key) => !resolved.includes(key));
+  return {
+    references: refs,
+    event: event ? {
+      id: String(event.id || ""),
+      domain: String(event.domain || ""),
+      status: String(event.status || ""),
+      level: String(event.level || event.priority || "")
+    } : null,
+    exchange: exchangeTask || exchangeRun ? {
+      taskId: String(exchangeTask?.id || refs.exchangeTaskId || ""),
+      taskName: String(exchangeTask?.name || ""),
+      taskStatus: String(exchangeTask?.status || ""),
+      runId: String(exchangeRun?.id || refs.exchangeRunId || ""),
+      runStatus: String(exchangeRun?.status || ""),
+      receiptStatus: String(exchangeRun?.receiptStatus || ""),
+      compensationStatus: String(exchangeRun?.compensationStatus || "")
+    } : null,
+    endpointProbe: endpointProbe ? {
+      laneId: String(endpointProbe.laneId || ""),
+      connectivityVerified: endpointProbe.connectivityVerified === true,
+      issuedAt: String(endpointProbe.issuedAt || ""),
+      expiresAt: String(endpointProbe.expiresAt || ""),
+      latencyMs: Number.isFinite(endpointProbe.latencyMs) ? Number(endpointProbe.latencyMs) : null,
+      mutualTlsVerified: endpointProbe.mutualTlsVerified === true,
+      blockerCode: String(endpointProbe.blockerCode || "")
+    } : {
+      laneId: String(refs.probeLaneId || incident.laneId || ""),
+      connectivityVerified: false,
+      blockerCode: "trusted-endpoint-probe-required"
+    },
+    evidence: evidencePacket ? {
+      packetId: String(evidencePacket.id || ""),
+      status: String(evidencePacket.status || ""),
+      requiredItems: requiredItems.length,
+      verifiedItems,
+      bridgeLinks: evidenceBridgeLinks.length,
+      verifiedBridgeLinks: evidenceBridgeLinks.filter((item) =>
+        /verified|accepted|signed|complete|已验证|已签收|已完成/i.test(String(item.status || ""))
+      ).length
+    } : null,
+    integrity: {
+      linkedReferences: referenceEntries.length,
+      resolvedReferences: resolved.length,
+      unresolvedReferences: unresolved,
+      status: referenceEntries.length === 0
+        ? "unlinked"
+        : unresolved.length === 0 ? "resolved" : "partial"
+    }
+  };
+}
+
+function normalizePublicHealthFilters(filters = {}) {
+  return {
+    hospitalCode: String(filters.hospitalCode || "").trim(),
+    laneId: String(filters.laneId || "").trim(),
+    level: String(filters.level || "").trim().toUpperCase(),
+    status: String(filters.status || "").trim(),
+    overdueOnly: ["1", "true", "yes"].includes(String(filters.overdueOnly || "").trim().toLowerCase())
+  };
+}
+
+function filterPublicHealthIncidents(incidents, filters = {}, now = new Date().toISOString()) {
+  const normalized = normalizePublicHealthFilters(filters);
+  return (Array.isArray(incidents) ? incidents : []).filter((item) => {
+    if (normalized.hospitalCode && item.hospitalCode !== normalized.hospitalCode) return false;
+    if (normalized.laneId && item.laneId !== normalized.laneId) return false;
+    if (normalized.level && item.level !== normalized.level) return false;
+    if (normalized.status && item.status !== normalized.status) return false;
+    if (normalized.overdueOnly && !evaluatePublicHealthIncidentSla(item, now).overdue) return false;
+    return true;
+  });
+}
+
+function buildPublicHealthIncidentStatistics(incidents, now = new Date().toISOString()) {
+  const rows = Array.isArray(incidents) ? incidents : [];
+  const open = rows.filter((item) => item.status !== "已关闭");
+  const slaRows = rows.map((item) => ({ item, sla: evaluatePublicHealthIncidentSla(item, now) }));
+  return {
+    total: rows.length,
+    open: open.length,
+    closed: rows.length - open.length,
+    overdue: slaRows.filter(({ item, sla }) => item.status !== "已关闭" && sla.overdue).length,
+    dueSoon: slaRows.filter(({ item, sla }) => item.status !== "已关闭" && sla.dueSoon).length,
+    escalated: rows.filter((item) => Boolean(item.escalation?.escalatedAt)).length,
+    professionallyLinked: rows.filter((item) =>
+      Object.keys(normalizeProfessionalRefs(item.laneId, item.professionalRefs)).length > 1
+    ).length,
+    byHospital: groupCount(rows, (item) => item.hospitalCode),
+    byLane: groupCount(rows, (item) => item.laneId),
+    byLevel: groupCount(rows, (item) => item.level),
+    byStatus: groupCount(rows, (item) => item.status)
+  };
+}
+
+function summarizePublicHealthCoordination(currentState, options = {}) {
+  const state = normalizePublicHealthCoordination(currentState);
+  const now = String(options.now || new Date().toISOString());
+  const incidents = filterPublicHealthIncidents(state.incidents, options.filters, now);
+  const openIncidents = incidents.filter((item) => item.status !== "已关闭");
+  const statistics = buildPublicHealthIncidentStatistics(incidents, now);
   return {
     verifiedLanes: state.lanes.filter((item) => item.probe === "已验证").length,
     totalLanes: state.lanes.length,
     openIncidents: openIncidents.length,
     p0Incidents: openIncidents.filter((item) => item.level === "P0").length,
     pendingVerification: openIncidents.filter((item) => item.status === "待复核").length,
-    closedIncidents: state.incidents.filter((item) => item.status === "已关闭").length,
+    closedIncidents: incidents.filter((item) => item.status === "已关闭").length,
+    filteredIncidents: incidents.length,
+    overdueIncidents: statistics.overdue,
+    escalatedIncidents: statistics.escalated,
+    professionalLinkedIncidents: statistics.professionallyLinked,
     continuityReady: state.continuousConnectivityReady,
     productionReady: false
   };
 }
 
-function buildPublicHealthCoordinationBoard(currentState) {
+function buildPublicHealthCoordinationBoard(currentState, options = {}) {
   const state = normalizePublicHealthCoordination(currentState);
+  const now = String(options.now || new Date().toISOString());
+  const filters = normalizePublicHealthFilters(options.filters);
+  const filteredIncidents = filterPublicHealthIncidents(state.incidents, filters, now)
+    .map((item) => ({
+      ...item,
+      sla: evaluatePublicHealthIncidentSla(item, now),
+      professionalAssociation: resolveProfessionalAssociation(item, options.professionalContext)
+    }));
+  const incidentIds = new Set(filteredIncidents.map((item) => item.id));
+  const statistics = buildPublicHealthIncidentStatistics(filteredIncidents, now);
   return {
     ok: true,
-    generatedAt: new Date().toISOString(),
-    summary: summarizePublicHealthCoordination(state),
-    coordination: state,
+    generatedAt: now,
+    filters: {
+      ...filters,
+      availableHospitals: Array.from(new Set(state.incidents.map((item) => item.hospitalCode))).sort(),
+      availableStatuses: Array.from(new Set(state.incidents.map((item) => item.status))),
+      availableLevels: ["P0", "P1", "P2"]
+    },
+    summary: summarizePublicHealthCoordination(state, { now, filters }),
+    portfolioSummary: summarizePublicHealthCoordination(state, { now }),
+    statistics,
+    coordination: {
+      ...state,
+      incidents: filteredIncidents,
+      incidentActions: state.incidentActions.filter((item) => incidentIds.has(item.incidentId))
+    },
     runtimeRoutes: {
       system: "/api/public-health/system",
       coordination: "/api/digital-hospital/public-health/coordination",
       incidents: "/api/digital-hospital/public-health/incidents",
-      incidentActions: "/api/digital-hospital/public-health/incidents/:id/actions"
+      incidentActions: "/api/digital-hospital/public-health/incidents/:id/actions",
+      incidentExport: "/api/digital-hospital/public-health/incidents/export"
     },
     productionBoundary: {
       productionReady: false,
@@ -376,14 +700,64 @@ function buildPublicHealthCoordinationBoard(currentState) {
   };
 }
 
+function csvCell(value) {
+  const text = String(value ?? "");
+  const protectedValue = /^[=+\-@]/.test(text) ? `'${text}` : text;
+  return `"${protectedValue.replace(/"/g, "\"\"")}"`;
+}
+
+function renderPublicHealthIncidentCsv(board) {
+  const headers = [
+    "事件编号", "事件标题", "业务通道", "医院代码", "级别", "状态", "SLA状态", "是否超时",
+    "升级级别", "责任组", "发现时间", "处置时限", "专业事件编号", "交换运行编号", "回执状态",
+    "可信探测", "证据包", "证据完成度", "最新处置"
+  ];
+  const rows = (board?.coordination?.incidents || []).map((item) => {
+    const association = item.professionalAssociation || {};
+    return [
+      item.id,
+      item.title,
+      item.laneId,
+      item.hospitalCode,
+      item.level,
+      item.status,
+      item.sla?.status,
+      item.sla?.overdue ? "是" : "否",
+      item.escalation?.level || "",
+      item.owner,
+      item.discoveredAt,
+      item.dueAt,
+      association.event?.id || "",
+      association.exchange?.runId || "",
+      association.exchange?.receiptStatus || "",
+      association.endpointProbe?.connectivityVerified ? "已验证" : "待可信探测",
+      association.evidence?.packetId || "",
+      association.evidence
+        ? `${association.evidence.verifiedItems}/${association.evidence.requiredItems}`
+        : "",
+      item.latestAction
+    ].map(csvCell).join(",");
+  });
+  return `\uFEFF${[headers.map(csvCell).join(","), ...rows].join("\r\n")}`;
+}
+
 module.exports = {
   PUBLIC_HEALTH_INCIDENT_TRANSITIONS,
+  PUBLIC_HEALTH_LANE_PROFESSIONAL_REFS,
+  PUBLIC_HEALTH_SLA_ESCALATION_ROUTES,
   PublicHealthCoordinationError,
   advancePublicHealthIncident,
   assertNoSensitiveFields,
+  buildPublicHealthIncidentStatistics,
   buildPublicHealthCoordinationBoard,
   createPublicHealthIncident,
+  escalatePublicHealthIncident,
+  evaluatePublicHealthIncidentSla,
+  filterPublicHealthIncidents,
   normalizePublicHealthCoordination,
+  normalizePublicHealthFilters,
+  renderPublicHealthIncidentCsv,
+  resolveProfessionalAssociation,
   seedPublicHealthCoordination,
   summarizePublicHealthCoordination
 };

@@ -67,7 +67,61 @@ test("digital hospital public health coordination API persists an independently 
   );
   assert.equal(initial.response.status, 200);
   assert.equal(initial.body.summary.totalLanes, 8);
+  assert.equal(initial.body.summary.filteredIncidents >= 4, true);
+  assert.equal(initial.body.summary.overdueIncidents >= 1, true);
   assert.equal(initial.body.productionBoundary.productionReady, false);
+  const linkedSeed = initial.body.coordination.incidents.find((item) => item.id === "PHE-20260728-003");
+  assert.equal(linkedSeed.professionalAssociation.event.id, "phe-infectious-001");
+  assert.equal(linkedSeed.professionalAssociation.exchange.runId, "phxr-direct-report-001");
+  assert.equal(linkedSeed.professionalAssociation.endpointProbe.connectivityVerified, false);
+  assert.match(linkedSeed.professionalAssociation.endpointProbe.blockerCode, /endpoint|probe/);
+
+  const filtered = await api(
+    baseUrl,
+    "/api/digital-hospital/public-health/coordination?hospitalCode=H000003&status=%E5%A4%84%E7%BD%AE%E4%B8%AD",
+    authorized(cityToken)
+  );
+  assert.equal(filtered.response.status, 200);
+  assert.equal(filtered.body.summary.filteredIncidents, 1);
+  assert.equal(filtered.body.coordination.incidents[0].hospitalCode, "H000003");
+  assert.equal(filtered.body.statistics.byStatus["处置中"], 1);
+
+  const escalated = await api(
+    baseUrl,
+    "/api/digital-hospital/public-health/incidents/PHE-20260728-003/actions",
+    authorized(cityToken, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "escalate-overdue",
+        expectedRevision: 1,
+        note: "P0事件已超时并升级到联合指挥"
+      })
+    })
+  );
+  assert.equal(escalated.response.status, 200);
+  assert.equal(escalated.body.incident.status, "待核查");
+  assert.equal(escalated.body.incident.revision, 2);
+  assert.equal(escalated.body.incident.escalation.level, "red");
+  assert.equal(escalated.body.action.action, "escalate-overdue");
+
+  const csvResponse = await fetch(
+    `${baseUrl}/api/digital-hospital/public-health/incidents/export?format=csv&hospitalCode=H000001`,
+    authorized(cityToken)
+  );
+  const csv = await csvResponse.text();
+  assert.equal(csvResponse.status, 200);
+  assert.match(csvResponse.headers.get("content-type"), /text\/csv/);
+  assert.match(csv, /事件编号/);
+  assert.match(csv, /PHE-20260728-003/);
+  assert.doesNotMatch(csv, /must-not-be-persisted|privateKey|rawPayload/i);
+
+  const invalidExport = await api(
+    baseUrl,
+    "/api/digital-hospital/public-health/incidents/export?format=xlsx",
+    authorized(cityToken)
+  );
+  assert.equal(invalidExport.response.status, 400);
+  assert.equal(invalidExport.body.code, "PUBLIC_HEALTH_EXPORT_FORMAT_INVALID");
 
   const rejected = await api(
     baseUrl,

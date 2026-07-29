@@ -7,7 +7,9 @@ const {
   advancePublicHealthIncident,
   buildPublicHealthCoordinationBoard,
   createPublicHealthIncident,
+  escalatePublicHealthIncident,
   normalizePublicHealthCoordination,
+  renderPublicHealthIncidentCsv,
   seedPublicHealthCoordination
 } = require("../digital-hospital-public-health-coordination");
 
@@ -162,5 +164,91 @@ test("terminal incidents and invalid transition actions fail closed", () => {
       note: "终态不得重复关闭"
     }, reviewer),
     (error) => error.code === "PUBLIC_HEALTH_INCIDENT_TERMINAL"
+  );
+});
+
+test("operations board filters hospitals and resolves safe professional summaries", () => {
+  const state = seedPublicHealthCoordination();
+  const board = buildPublicHealthCoordinationBoard(state, {
+    now: "2026-07-29T08:00:00.000Z",
+    filters: { hospitalCode: "H000001", overdueOnly: "true" },
+    professionalContext: {
+      events: [{ id: "phe-infectious-001", domain: "传染病防控", status: "待疾控复核", level: "P0" }],
+      exchangeTasks: [{ id: "phx-national-direct-report", name: "国家直报交换", status: "演示契约就绪" }],
+      exchangeRuns: [{
+        id: "phxr-direct-report-001",
+        taskId: "phx-national-direct-report",
+        status: "receipt-confirmed",
+        receiptStatus: "accepted"
+      }],
+      evidencePackets: [{
+        id: "phcep-direct-report-endpoint",
+        status: "evidence-recorded",
+        requiredItems: [{ id: "e1", status: "verified" }, { id: "e2", status: "pending" }]
+      }],
+      evidenceBridgeLinks: [{ id: "bridge-1", packetId: "phcep-direct-report-endpoint", status: "verified" }],
+      endpointProbeEntries: [{
+        laneId: "infectious-reporting",
+        connectivityVerified: true,
+        issuedAt: "2026-07-29T07:55:00.000Z",
+        latencyMs: 85,
+        mutualTlsVerified: true
+      }]
+    }
+  });
+
+  assert.equal(board.summary.filteredIncidents, 1);
+  assert.equal(board.summary.overdueIncidents, 1);
+  assert.equal(board.statistics.byHospital.H000001, 1);
+  assert.equal(board.coordination.incidents[0].id, "PHE-20260728-003");
+  assert.equal(board.coordination.incidents[0].sla.status, "overdue");
+  assert.equal(board.coordination.incidents[0].professionalAssociation.event.id, "phe-infectious-001");
+  assert.equal(board.coordination.incidents[0].professionalAssociation.exchange.receiptStatus, "accepted");
+  assert.equal(board.coordination.incidents[0].professionalAssociation.endpointProbe.connectivityVerified, true);
+  assert.equal(board.coordination.incidents[0].professionalAssociation.evidence.verifiedItems, 1);
+  assert.equal(board.coordination.incidents[0].professionalAssociation.integrity.status, "resolved");
+  assert.doesNotMatch(JSON.stringify(board), /secret|password|token|signature|nonce|credential|privateKey/i);
+
+  const csv = renderPublicHealthIncidentCsv(board);
+  assert.match(csv, /事件编号/);
+  assert.match(csv, /PHE-20260728-003/);
+  assert.match(csv, /phe-infectious-001/);
+});
+
+test("overdue escalation is revision-checked, audited and separate from lifecycle status", () => {
+  const state = seedPublicHealthCoordination();
+  const result = escalatePublicHealthIncident(state, "PHE-20260728-003", {
+    action: "escalate-overdue",
+    expectedRevision: 1,
+    note: "P0事件已超时，升级至总指挥协调"
+  }, creator, { now: "2026-07-29T08:00:00.000Z" });
+
+  assert.equal(result.incident.status, "待核查");
+  assert.equal(result.incident.revision, 2);
+  assert.equal(result.incident.escalation.status, "已升级");
+  assert.equal(result.incident.escalation.level, "red");
+  assert.equal(result.action.action, "escalate-overdue");
+  assert.equal(result.state.productionReady, false);
+
+  assert.throws(
+    () => escalatePublicHealthIncident(result.state, result.incident.id, {
+      action: "escalate-overdue",
+      expectedRevision: 2,
+      note: "不得重复升级"
+    }, reviewer, { now: "2026-07-29T08:10:00.000Z" }),
+    (error) => error.code === "PUBLIC_HEALTH_INCIDENT_ALREADY_ESCALATED"
+  );
+
+  const future = createPublicHealthIncident(state, validIncident({
+    id: "PHE-FUTURE",
+    dueAt: "2026-07-30T12:00:00.000Z"
+  }), creator, { now: "2026-07-29T08:00:00.000Z" }).state;
+  assert.throws(
+    () => escalatePublicHealthIncident(future, "PHE-FUTURE", {
+      action: "escalate-overdue",
+      expectedRevision: 1,
+      note: "未超时不得升级"
+    }, creator, { now: "2026-07-29T09:00:00.000Z" }),
+    (error) => error.code === "PUBLIC_HEALTH_INCIDENT_NOT_OVERDUE"
   );
 });

@@ -3387,7 +3387,61 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     );
     assert.equal(initial.response.status, 200);
     assert.equal(initial.body.summary.totalLanes, 8);
+    assert.equal(initial.body.summary.overdueIncidents >= 1, true);
+    assert.equal(
+      initial.body.coordination.incidents.some((item) =>
+        item.professionalAssociation?.event?.id === "phe-infectious-001" &&
+        item.professionalAssociation?.exchange?.runId === "phxr-direct-report-001"
+      ),
+      true
+    );
     assert.equal(initial.body.productionBoundary.productionReady, false);
+
+    const filtered = await api(
+      baseUrl,
+      "/api/digital-hospital/public-health/coordination?hospitalCode=H000003&overdueOnly=true",
+      authorized(cityLogin.body.token)
+    );
+    assert.equal(filtered.response.status, 200);
+    assert.equal(filtered.body.summary.filteredIncidents, 1);
+    assert.equal(filtered.body.statistics.byHospital.H000003, 1);
+
+    const seededOverdue = initial.body.coordination.incidents.find((item) =>
+      item.id === "PHE-20260728-003" && item.sla?.overdue && !item.escalation?.escalatedAt
+    );
+    assert.ok(seededOverdue);
+    const escalation = await api(
+      baseUrl,
+      `/api/digital-hospital/public-health/incidents/${seededOverdue.id}/actions`,
+      authorized(cityLogin.body.token, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "escalate-overdue",
+          expectedRevision: seededOverdue.revision,
+          note: "覆盖率场景执行P0超时升级"
+        })
+      })
+    );
+    assert.equal(escalation.response.status, 200);
+    assert.equal(escalation.body.incident.status, seededOverdue.status);
+    assert.equal(escalation.body.incident.escalation.level, "red");
+
+    const csvResponse = await fetch(
+      `${baseUrl}/api/digital-hospital/public-health/incidents/export?format=csv&hospitalCode=H000001`,
+      authorized(cityLogin.body.token)
+    );
+    const csv = await csvResponse.text();
+    assert.equal(csvResponse.status, 200);
+    assert.match(csv, /PHE-20260728-003/);
+    assert.match(csvResponse.headers.get("content-disposition"), /digital-hospital-public-health-incidents/);
+
+    const invalidExport = await api(
+      baseUrl,
+      "/api/digital-hospital/public-health/incidents/export?format=xlsx",
+      authorized(cityLogin.body.token)
+    );
+    assert.equal(invalidExport.response.status, 400);
+    assert.equal(invalidExport.body.code, "PUBLIC_HEALTH_EXPORT_FORMAT_INVALID");
 
     const rejected = await api(
       baseUrl,

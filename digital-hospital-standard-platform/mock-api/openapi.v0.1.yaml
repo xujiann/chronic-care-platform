@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
-  title: 数智医院新标准平台 v0.19 接口
-  version: 0.19.0
+  title: 数智医院新标准平台 v0.20 接口
+  version: 0.20.0
   description: >
     面向数智医院新标准平台的接口契约，覆盖评价任务、试点运营、试点协同、接入联调、持久化任务服务、Worker租约、托管密钥、签名回调、重试死信、投产证据、Go/No-Go、试点评估、评价助手、推广准备、运营监控、公共卫生协同、医院申报、分级审核和运行管理。
 servers:
@@ -974,9 +974,32 @@ paths:
     get:
       tags: [PublicHealthCoordination]
       summary: 获取公共卫生协同工作台
-      description: 返回八类业务通道、连续活动、异常事件、动作留痕及始终关闭的生产边界。
+      description: 返回八类业务通道、专业系统只读关联、SLA统计、连续活动、异常事件、动作留痕及始终关闭的生产边界。
       security:
         - bearerAuth: []
+      parameters:
+        - name: hospitalCode
+          in: query
+          schema:
+            type: string
+        - name: laneId
+          in: query
+          schema:
+            type: string
+        - name: level
+          in: query
+          schema:
+            type: string
+            enum: [P0, P1, P2]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [待核查, 处置中, 待复核, 已关闭]
+        - name: overdueOnly
+          in: query
+          schema:
+            type: boolean
       responses:
         "200":
           description: 公共卫生协同工作台
@@ -1020,7 +1043,7 @@ paths:
     post:
       tags: [PublicHealthCoordination]
       summary: 推进公共卫生协同事件
-      description: 使用乐观修订号执行开始处置、提交复核和独立复核关闭。
+      description: 使用乐观修订号执行开始处置、提交复核、独立复核关闭或SLA超时升级；升级不改变原处置状态。
       security:
         - bearerAuth: []
       parameters:
@@ -1052,6 +1075,59 @@ paths:
           description: 事件不存在
         "409":
           description: 修订冲突、动作不合法或未满足独立复核
+  /api/digital-hospital/public-health/incidents/export:
+    get:
+      tags: [PublicHealthCoordination]
+      summary: 批量导出公共卫生协同事件
+      description: 按医院、通道、级别、状态和SLA筛选导出最小必要事件及专业系统摘要，不返回密钥、签名、nonce、凭据或原始载荷。
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, csv]
+            default: json
+        - name: hospitalCode
+          in: query
+          schema:
+            type: string
+        - name: laneId
+          in: query
+          schema:
+            type: string
+        - name: level
+          in: query
+          schema:
+            type: string
+            enum: [P0, P1, P2]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [待核查, 处置中, 待复核, 已关闭]
+        - name: overdueOnly
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: JSON或CSV事件清单
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+            text/csv:
+              schema:
+                type: string
+        "400":
+          description: 导出格式无效
+        "401":
+          description: 未登录
+        "403":
+          description: 非卫健委角色
   /api/v1/integration-environments:
     get:
       tags: [IntegrationExecution]
@@ -3277,6 +3353,90 @@ components:
           type: string
         submittedForReviewBy:
           type: string
+        professionalRefs:
+          $ref: "#/components/schemas/PublicHealthProfessionalReferences"
+        sla:
+          $ref: "#/components/schemas/PublicHealthIncidentSla"
+        escalation:
+          allOf:
+            - $ref: "#/components/schemas/PublicHealthIncidentEscalation"
+          nullable: true
+        professionalAssociation:
+          $ref: "#/components/schemas/PublicHealthProfessionalAssociation"
+    PublicHealthProfessionalReferences:
+      type: object
+      additionalProperties: false
+      properties:
+        eventId:
+          type: string
+        exchangeTaskId:
+          type: string
+        exchangeRunId:
+          type: string
+        evidencePacketId:
+          type: string
+        probeLaneId:
+          type: string
+    PublicHealthIncidentSla:
+      type: object
+      required: [status, overdue, dueSoon, escalationRequired, escalationLevel, escalationRoute]
+      properties:
+        status:
+          type: string
+          enum: [overdue, due-soon, within-sla, closed-overdue, closed-within-sla]
+        overdue:
+          type: boolean
+        dueSoon:
+          type: boolean
+        remainingMinutes:
+          type: integer
+          nullable: true
+        escalationRequired:
+          type: boolean
+        escalationLevel:
+          type: string
+          enum: [red, amber, yellow]
+        escalationRoute:
+          type: string
+    PublicHealthIncidentEscalation:
+      type: object
+      required: [status, level, route, escalatedAt, escalatedBy, note]
+      properties:
+        status:
+          type: string
+          enum: [已升级]
+        level:
+          type: string
+          enum: [red, amber, yellow]
+        route:
+          type: string
+        escalatedAt:
+          type: string
+        escalatedBy:
+          type: string
+        escalatedByName:
+          type: string
+        note:
+          type: string
+    PublicHealthProfessionalAssociation:
+      type: object
+      required: [references, endpointProbe, integrity]
+      properties:
+        references:
+          $ref: "#/components/schemas/PublicHealthProfessionalReferences"
+        event:
+          type: object
+          nullable: true
+        exchange:
+          type: object
+          nullable: true
+        endpointProbe:
+          type: object
+        evidence:
+          type: object
+          nullable: true
+        integrity:
+          type: object
     PublicHealthIncidentCreate:
       type: object
       required: [laneId, title, hospitalCode, owner, dueAt, note]
@@ -3303,6 +3463,8 @@ components:
         note:
           type: string
           minLength: 4
+        professionalRefs:
+          $ref: "#/components/schemas/PublicHealthProfessionalReferences"
     PublicHealthIncidentAction:
       type: object
       required: [action, expectedRevision, note]
@@ -3310,7 +3472,7 @@ components:
       properties:
         action:
           type: string
-          enum: [start-handling, submit-review, verify-close]
+          enum: [start-handling, submit-review, verify-close, escalate-overdue]
         expectedRevision:
           type: integer
           minimum: 1
@@ -3334,7 +3496,7 @@ components:
           $ref: "#/components/schemas/PublicHealthCoordinationBoard"
     PublicHealthCoordinationBoard:
       type: object
-      required: [ok, generatedAt, summary, coordination, runtimeRoutes, productionBoundary]
+      required: [ok, generatedAt, filters, summary, portfolioSummary, statistics, coordination, runtimeRoutes, productionBoundary]
       properties:
         ok:
           type: boolean
@@ -3345,13 +3507,22 @@ components:
         summary:
           type: object
           additionalProperties: true
+        portfolioSummary:
+          type: object
+          additionalProperties: true
+        filters:
+          type: object
+          additionalProperties: true
+        statistics:
+          type: object
+          additionalProperties: true
         coordination:
           type: object
           required: [schemaVersion, productionReady, lanes, campaigns, incidents, incidentActions, blockers]
           properties:
             schemaVersion:
               type: integer
-              const: 1
+              const: 2
             productionReady:
               type: boolean
               const: false

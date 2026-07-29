@@ -1,5 +1,5 @@
 (function () {
-  const storageKey = "digitalHospitalMvpState:v0.19";
+  const storageKey = "digitalHospitalMvpState:v0.20";
 
   const domains = [
     { code: "A", name: "基础设施与平台支撑", weight: 100 },
@@ -119,6 +119,7 @@
       invalidCodeRecords: 120,
     },
     publicHealth: {
+      schemaVersion: 2,
       migrationSource: {
         taskTitle: "开发数智医院标准平台",
         sourceCommit: "4142402e0c79fd8457c00c370b5d163e88cca0e7",
@@ -1019,15 +1020,99 @@
     };
   }
 
-  function publicHealthSummary() {
-    const openIncidents = state.publicHealth.incidents.filter((item) => item.status !== "已关闭");
+  const publicHealthProfessionalReferences = {
+    "infectious-reporting": {
+      eventId: "phe-infectious-001",
+      eventStatus: "待疾控复核",
+      exchangeRunId: "phxr-direct-report-001",
+      receiptStatus: "accepted",
+      evidencePacketId: "phcep-direct-report-endpoint",
+      evidenceProgress: "0/3",
+    },
+    immunization: {
+      eventId: "phe-immunization-001",
+      eventStatus: "处置中",
+      exchangeRunId: "phxr-immunization-001",
+      receiptStatus: "accepted",
+      evidencePacketId: "phcep-immunization-registry",
+      evidenceProgress: "0/3",
+    },
+    "maternal-child": {
+      eventId: "",
+      eventStatus: "",
+      exchangeRunId: "phxr-maternal-child-001",
+      receiptStatus: "pending-manual-signoff",
+      evidencePacketId: "phcep-lis-emr-credentials",
+      evidenceProgress: "0/3",
+    },
+    "chronic-disease": { eventId: "phe-chronic-001", eventStatus: "待家庭医生补访" },
+    "public-health-followup": { eventId: "phe-chronic-001", eventStatus: "待家庭医生补访" },
+    "family-doctor": { eventId: "phe-chronic-001", eventStatus: "待家庭医生补访" },
+  };
+
+  function parsePublicHealthTime(value) {
+    const text = String(value || "").trim();
+    if (!text) return Number.NaN;
+    const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(?::\d{2})?$/.test(text)
+      ? `${text.replace(" ", "T")}${text.length === 16 ? ":00" : ""}+08:00`
+      : text;
+    return Date.parse(normalized);
+  }
+
+  function publicHealthIncidentSla(incident, now = Date.now()) {
+    const dueAt = parsePublicHealthTime(incident.dueAt);
+    const closedAt = parsePublicHealthTime(incident.closedAt);
+    const reference = incident.status === "已关闭" && Number.isFinite(closedAt) ? closedAt : now;
+    const remainingMinutes = Number.isFinite(dueAt) ? Math.round((dueAt - reference) / 60000) : null;
+    const overdue = Number.isFinite(remainingMinutes) && remainingMinutes < 0;
+    const dueSoon = incident.status !== "已关闭" && Number.isFinite(remainingMinutes) && remainingMinutes >= 0 && remainingMinutes <= 60;
+    return {
+      overdue,
+      dueSoon,
+      remainingMinutes,
+      status: incident.status === "已关闭"
+        ? overdue ? "逾期关闭" : "按时关闭"
+        : overdue ? "已超时" : dueSoon ? "即将超时" : "时限内",
+    };
+  }
+
+  function publicHealthProfessionalAssociation(incident) {
+    const reference = publicHealthProfessionalReferences[incident.laneId] || {};
+    const lane = state.publicHealth.lanes.find((item) => item.id === incident.laneId);
+    return {
+      ...reference,
+      probeStatus: lane?.probe === "已验证" ? "受控样例已验证" : "待可信探测",
+      trustedProbe: false,
+    };
+  }
+
+  function filteredPublicHealthIncidents() {
+    const hospital = workspace.dataset.publicHealthHospital || "全部";
+    const status = workspace.dataset.publicHealthStatus || "全部";
+    const level = workspace.dataset.publicHealthLevel || "全部";
+    const sla = workspace.dataset.publicHealthSla || "全部";
+    return state.publicHealth.incidents.filter((item) => {
+      if (hospital !== "全部" && item.hospitalCode !== hospital) return false;
+      if (status !== "全部" && item.status !== status) return false;
+      if (level !== "全部" && item.level !== level) return false;
+      const slaState = publicHealthIncidentSla(item);
+      if (sla === "已超时" && !(item.status !== "已关闭" && slaState.overdue)) return false;
+      if (sla === "已升级" && !item.escalation?.escalatedAt) return false;
+      return true;
+    });
+  }
+
+  function publicHealthSummary(incidents = state.publicHealth.incidents) {
+    const openIncidents = incidents.filter((item) => item.status !== "已关闭");
     return {
       verifiedLanes: state.publicHealth.lanes.filter((item) => item.probe === "已验证").length,
       totalLanes: state.publicHealth.lanes.length,
       openIncidents: openIncidents.length,
       p0Incidents: openIncidents.filter((item) => item.level === "P0").length,
       pendingVerification: openIncidents.filter((item) => item.status === "待复核").length,
-      closedIncidents: state.publicHealth.incidents.filter((item) => item.status === "已关闭").length,
+      closedIncidents: incidents.filter((item) => item.status === "已关闭").length,
+      overdueIncidents: openIncidents.filter((item) => publicHealthIncidentSla(item).overdue).length,
+      escalatedIncidents: incidents.filter((item) => item.escalation?.escalatedAt).length,
       continuityReady: state.publicHealth.continuousConnectivityReady,
       productionReady: false,
     };
@@ -1243,7 +1328,7 @@
       standardVersion: state.task.standard,
       hospitalCode: hospital.code,
       hospitalName: hospital.name,
-      prototypeVersion: "mvp-0.19",
+      prototypeVersion: "mvp-0.20",
     };
     if (kind === "submission") {
       return {
@@ -1401,13 +1486,14 @@
         },
         publicHealthLanes: state.publicHealth.lanes,
         publicHealthCampaigns: state.publicHealth.campaigns,
-        publicHealthIncidents: state.publicHealth.incidents,
+        publicHealthIncidents: publicHealthExportRows(),
         publicHealthIncidentActions: state.publicHealth.incidentActions,
         productionBlockers: state.publicHealth.blockers,
         runtimeRoutes: {
           coordination: "/api/digital-hospital/public-health/coordination",
           incidents: "/api/digital-hospital/public-health/incidents",
           incidentActions: "/api/digital-hospital/public-health/incidents/:id/actions",
+          incidentExport: "/api/digital-hospital/public-health/incidents/export",
         },
       };
     }
@@ -1641,6 +1727,90 @@
     link.remove();
     URL.revokeObjectURL(url);
     showNotice(`${packageKindLabel(kind)}已生成下载。`);
+  }
+
+  function publicHealthExportRows() {
+    return filteredPublicHealthIncidents().map((item) => ({
+      id: item.id,
+      revision: Number(item.revision || 1),
+      title: item.title,
+      laneId: item.laneId,
+      hospitalCode: item.hospitalCode,
+      level: item.level,
+      status: item.status,
+      sla: publicHealthIncidentSla(item),
+      escalation: item.escalation || null,
+      owner: item.owner,
+      source: item.source,
+      discoveredAt: item.discoveredAt,
+      dueAt: item.dueAt,
+      professionalAssociation: publicHealthProfessionalAssociation(item),
+      latestAction: item.latestAction,
+      submittedForReviewBy: item.submittedForReviewBy || "",
+    }));
+  }
+
+  function safeCsvCell(value) {
+    const raw = String(value ?? "");
+    const protectedValue = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
+    return `"${protectedValue.replace(/"/g, '""')}"`;
+  }
+
+  function downloadPublicHealthIncidentExport(format) {
+    const rows = publicHealthExportRows();
+    let content;
+    let type;
+    if (format === "csv") {
+      const headers = [
+        "事件编号", "事件标题", "业务通道", "医院代码", "级别", "状态", "SLA状态", "升级级别",
+        "责任组", "发现时间", "处置时限", "专业事件编号", "交换运行编号", "回执状态", "可信探测", "证据包", "最新处置",
+      ];
+      const values = rows.map((item) => [
+        item.id,
+        item.title,
+        item.laneId,
+        item.hospitalCode,
+        item.level,
+        item.status,
+        item.sla.status,
+        item.escalation?.level || "",
+        item.owner,
+        item.discoveredAt,
+        item.dueAt,
+        item.professionalAssociation.eventId || "",
+        item.professionalAssociation.exchangeRunId || "",
+        item.professionalAssociation.receiptStatus || "",
+        item.professionalAssociation.probeStatus,
+        item.professionalAssociation.evidencePacketId || "",
+        item.latestAction,
+      ]);
+      content = `\uFEFF${[headers, ...values].map((row) => row.map(safeCsvCell).join(",")).join("\r\n")}`;
+      type = "text/csv;charset=utf-8";
+    } else {
+      content = JSON.stringify({
+        generatedAt: new Date().toISOString(),
+        productionReady: false,
+        filters: {
+          hospitalCode: workspace.dataset.publicHealthHospital || "全部",
+          status: workspace.dataset.publicHealthStatus || "全部",
+          level: workspace.dataset.publicHealthLevel || "全部",
+          sla: workspace.dataset.publicHealthSla || "全部",
+        },
+        summary: publicHealthSummary(rows.map((row) => state.publicHealth.incidents.find((item) => item.id === row.id))),
+        incidents: rows,
+      }, null, 2);
+      type = "application/json;charset=utf-8";
+    }
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `digital-hospital-public-health-incidents.${format}`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    showNotice(`已导出${rows.length}条公共卫生事件${format.toUpperCase()}清单。`);
   }
 
   function runValidationRules() {
@@ -4505,13 +4675,19 @@
   function renderPublicHealth() {
     header("公共卫生");
     const publicHealth = state.publicHealth;
-    const summary = publicHealthSummary();
+    const incidents = filteredPublicHealthIncidents();
+    const summary = publicHealthSummary(incidents);
     const tab = workspace.dataset.publicHealthTab || "incidents";
     const tabs = [
       { id: "incidents", label: "事件处置" },
+      { id: "analytics", label: "处置统计" },
       { id: "continuity", label: "通道连续性" },
       { id: "readiness", label: "上线边界" },
     ];
+    const hospitalFilter = workspace.dataset.publicHealthHospital || "全部";
+    const statusFilter = workspace.dataset.publicHealthStatus || "全部";
+    const levelFilter = workspace.dataset.publicHealthLevel || "全部";
+    const slaFilter = workspace.dataset.publicHealthSla || "全部";
     const requiredChainLinks = Math.max(0, publicHealth.requiredConsecutiveCampaigns - 1);
     const continuityLabel = publicHealth.continuousConnectivityReady ? "连续已验证" : "连续性中断";
     const laneName = (laneId) => publicHealth.lanes.find((item) => item.id === laneId)?.name || laneId;
@@ -4534,28 +4710,77 @@
             </div>
             <div class="toolbar inline">
               <button class="button secondary" type="button" data-action="create-public-health-incident">登记异常事件</button>
-              <button class="button ghost" type="button" data-action="download-package" data-kind="publicHealth">下载协同包</button>
+              <button class="button ghost" type="button" data-action="export-public-health-incidents" data-format="json">导出JSON</button>
+              <button class="button ghost" type="button" data-action="export-public-health-incidents" data-format="csv">导出CSV</button>
             </div>
           </div>
+          <div class="toolbar">
+            <label class="field">
+              <span>医院范围</span>
+              <select data-public-health-filter="publicHealthHospital">
+                <option>全部</option>
+                ${state.hospitals.map((item) => `<option value="${escapeHtml(item.code)}" ${hospitalFilter === item.code ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}
+              </select>
+            </label>
+            <label class="field">
+              <span>事件状态</span>
+              <select data-public-health-filter="publicHealthStatus">
+                ${["全部", "待核查", "处置中", "待复核", "已关闭"].map((item) => `<option ${statusFilter === item ? "selected" : ""}>${item}</option>`).join("")}
+              </select>
+            </label>
+            <label class="field">
+              <span>事件级别</span>
+              <select data-public-health-filter="publicHealthLevel">
+                ${["全部", "P0", "P1", "P2"].map((item) => `<option ${levelFilter === item ? "selected" : ""}>${item}</option>`).join("")}
+              </select>
+            </label>
+            <label class="field">
+              <span>SLA</span>
+              <select data-public-health-filter="publicHealthSla">
+                ${["全部", "已超时", "已升级"].map((item) => `<option ${slaFilter === item ? "selected" : ""}>${item}</option>`).join("")}
+              </select>
+            </label>
+            <button class="button ghost" type="button" data-action="reset-public-health-filters">重置</button>
+            <span class="tag">当前${incidents.length}条</span>
+          </div>
           <div class="table-wrap">
-            <table>
-              <thead><tr><th>事件</th><th>业务通道</th><th>机构</th><th>级别</th><th>责任组</th><th>时限</th><th>状态/版本</th><th>当前处置</th><th>操作</th></tr></thead>
+            <table class="public-health-incident-table">
+              <thead><tr><th>事件</th><th>业务通道</th><th>机构</th><th>级别</th><th>SLA/升级</th><th>专业系统关联</th><th>责任组</th><th>状态/版本</th><th>当前处置</th><th>操作</th></tr></thead>
               <tbody>
-                ${publicHealth.incidents
+                ${incidents
                   .map(
-                    (item) => `
+                    (item) => {
+                      const sla = publicHealthIncidentSla(item);
+                      const association = publicHealthProfessionalAssociation(item);
+                      return `
                       <tr>
                         <td><strong>${escapeHtml(item.title)}</strong><br /><span class="muted-text">${escapeHtml(item.id)} · ${escapeHtml(item.source)}</span></td>
                         <td>${escapeHtml(laneName(item.laneId))}</td>
                         <td>${escapeHtml(item.hospitalCode)}</td>
                         <td><span class="status-pill ${item.level === "P0" ? "danger" : "warn"}">${escapeHtml(item.level)}</span></td>
+                        <td>
+                          <span class="status-pill ${sla.overdue && item.status !== "已关闭" ? "danger" : sla.dueSoon ? "warn" : ""}">${escapeHtml(sla.status)}</span>
+                          <br /><span class="muted-text">${item.escalation?.escalatedAt ? `${escapeHtml(item.escalation.level)} · 已升级` : escapeHtml(item.dueAt)}</span>
+                        </td>
+                        <td>
+                          <strong>${escapeHtml(association.eventId || "未关联专业事件")}</strong>
+                          <br /><span class="muted-text">${escapeHtml(association.exchangeRunId || "无交换运行")} · ${escapeHtml(association.receiptStatus || "无回执")}</span>
+                          <br /><span class="muted-text">${escapeHtml(association.probeStatus)} · 生产可信探测待现场</span>
+                        </td>
                         <td>${escapeHtml(item.owner)}</td>
-                        <td>${escapeHtml(item.dueAt)}</td>
                         <td><span class="status-pill ${statusClass(item.status)}">${escapeHtml(item.status)}</span><br /><span class="muted-text">r${Number(item.revision || 1)}</span></td>
                         <td>${escapeHtml(item.latestAction)}</td>
-                        <td><button class="button ghost" type="button" data-action="advance-public-health-incident" data-id="${escapeHtml(item.id)}" ${item.status === "已关闭" ? "disabled" : ""}>${nextActionLabel(item.status)}</button></td>
+                        <td>
+                          <div class="toolbar inline">
+                            <button class="button ghost" type="button" data-action="advance-public-health-incident" data-id="${escapeHtml(item.id)}" ${item.status === "已关闭" ? "disabled" : ""}>${nextActionLabel(item.status)}</button>
+                            ${sla.overdue && item.status !== "已关闭" && !item.escalation?.escalatedAt
+                              ? `<button class="button secondary" type="button" data-action="escalate-public-health-incident" data-id="${escapeHtml(item.id)}">超时升级</button>`
+                              : ""}
+                          </div>
+                        </td>
                       </tr>
-                    `,
+                    `;
+                    },
                   )
                   .join("")}
               </tbody>
@@ -4584,6 +4809,45 @@
                 `,
               )
               .join("")}
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "analytics") {
+      const allIncidents = state.publicHealth.incidents;
+      const countBy = (selector) => Object.entries(allIncidents.reduce((counts, item) => {
+        const key = selector(item);
+        counts[key] = Number(counts[key] || 0) + 1;
+        return counts;
+      }, {}));
+      const hospitalCounts = countBy((item) => item.hospitalCode);
+      const laneCounts = countBy((item) => laneName(item.laneId));
+      const statusCounts = countBy((item) => item.status);
+      content = `
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">事件处置统计</h3>
+              <p class="panel-subtitle">按医院、业务通道和状态汇总协同事件，SLA超时与升级动作独立计数。</p>
+            </div>
+            <span class="tag">${allIncidents.length}条事件</span>
+          </div>
+          <div class="grid-4">
+            ${metric("开放事件", publicHealthSummary(allIncidents).openIncidents, "未进入关闭终态")}
+            ${metric("SLA超时", publicHealthSummary(allIncidents).overdueIncidents, "需按级别升级", publicHealthSummary(allIncidents).overdueIncidents ? "danger" : "")}
+            ${metric("已升级", publicHealthSummary(allIncidents).escalatedIncidents, "升级动作独立留痕")}
+            ${metric("已关闭", publicHealthSummary(allIncidents).closedIncidents, "完成独立复核")}
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>统计维度</th><th>对象</th><th>事件数</th><th>运营动作</th></tr></thead>
+              <tbody>
+                ${hospitalCounts.map(([key, count]) => `<tr><td>医院</td><td>${escapeHtml(state.hospitals.find((item) => item.code === key)?.name || key)}</td><td>${count}</td><td>按医院筛选、导出和催办</td></tr>`).join("")}
+                ${laneCounts.map(([key, count]) => `<tr><td>业务通道</td><td>${escapeHtml(key)}</td><td>${count}</td><td>核对专业事件、交换回执和证据包</td></tr>`).join("")}
+                ${statusCounts.map(([key, count]) => `<tr><td>处置状态</td><td>${escapeHtml(key)}</td><td>${count}</td><td>执行状态推进或独立复核</td></tr>`).join("")}
+              </tbody>
+            </table>
           </div>
         </section>
       `;
@@ -4695,7 +4959,7 @@
               <h3 class="panel-title">正式运行接口</h3>
               <p class="panel-subtitle">正式事件账本使用平台鉴权、乐观锁和独立复核；演示按钮不连接生产端点。</p>
             </div>
-            <span class="tag">GitHub v0.19</span>
+            <span class="tag">GitHub v0.20</span>
           </div>
           <div class="table-wrap">
             <table>
@@ -4703,7 +4967,8 @@
               <tbody>
                 <tr><td>协同总览</td><td>GET</td><td>/api/digital-hospital/public-health/coordination</td><td>卫健委角色与审计</td></tr>
                 <tr><td>登记事件</td><td>POST</td><td>/api/digital-hospital/public-health/incidents</td><td>敏感字段拒绝</td></tr>
-                <tr><td>推进闭环</td><td>POST</td><td>/api/digital-hospital/public-health/incidents/{id}/actions</td><td>修订号与独立复核</td></tr>
+                <tr><td>推进/升级</td><td>POST</td><td>/api/digital-hospital/public-health/incidents/{id}/actions</td><td>修订号、独立复核、SLA超时升级</td></tr>
+                <tr><td>事件导出</td><td>GET</td><td>/api/digital-hospital/public-health/incidents/export</td><td>医院筛选、安全摘要、JSON/CSV</td></tr>
               </tbody>
             </table>
           </div>
@@ -4714,8 +4979,8 @@
     workspace.innerHTML = `
       <div class="grid-4">
         ${metric("业务通道", `${summary.verifiedLanes}/${summary.totalLanes}`, "本批受控探测已验证")}
-        ${metric("开放事件", summary.openIncidents, `${summary.pendingVerification}项待复核`, summary.openIncidents ? "danger" : "")}
-        ${metric("P0事件", summary.p0Incidents, "优先核查与处置", summary.p0Incidents ? "danger" : "")}
+        ${metric("开放事件", summary.openIncidents, `${summary.overdueIncidents}项SLA超时`, summary.overdueIncidents ? "danger" : "")}
+        ${metric("P0事件", summary.p0Incidents, `${summary.escalatedIncidents}项已升级`, summary.p0Incidents ? "danger" : "")}
         ${metric("连续活动", `${publicHealth.consecutiveCampaigns}/${publicHealth.requiredConsecutiveCampaigns}`, continuityLabel, summary.continuityReady ? "" : "danger")}
       </div>
       <div class="segmented monitoring-tabs" role="tablist" aria-label="公共卫生协同功能">
@@ -5946,9 +6211,10 @@
               <tr><td>任务队列</td><td>GET/POST</td><td>/api/v1/monitoring/job-queues</td><td>任务积压、失败、扩容和优先级</td><td><span class="priority">P1</span></td></tr>
               <tr><td>存储容量</td><td>GET/POST</td><td>/api/v1/monitoring/storage-pools</td><td>容量、增长、留存、扩容和清理</td><td><span class="priority">P1</span></td></tr>
               <tr><td>运营告警</td><td>GET/PUT</td><td>/api/v1/monitoring/alerts/{alertId}</td><td>告警确认、处置、关闭和审计</td><td><span class="priority">P1</span></td></tr>
-              <tr><td>公共卫生协同</td><td>GET</td><td>/api/digital-hospital/public-health/coordination</td><td>八通道、连续活动、异常事件与生产阻断</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>公共卫生协同</td><td>GET</td><td>/api/digital-hospital/public-health/coordination</td><td>八通道、医院筛选、SLA统计、专业系统只读关联与生产阻断</td><td><span class="priority">P1</span></td></tr>
               <tr><td>公共卫生事件</td><td>POST</td><td>/api/digital-hospital/public-health/incidents</td><td>最小化事件登记与敏感字段拒绝</td><td><span class="priority">P1</span></td></tr>
-              <tr><td>事件状态推进</td><td>POST</td><td>/api/digital-hospital/public-health/incidents/{incidentId}/actions</td><td>修订号、状态机、独立复核和安全审计</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>事件状态推进</td><td>POST</td><td>/api/digital-hospital/public-health/incidents/{incidentId}/actions</td><td>修订号、状态机、独立复核、SLA超时升级和安全审计</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>公共卫生事件导出</td><td>GET</td><td>/api/digital-hospital/public-health/incidents/export</td><td>JSON/CSV批量导出与最小必要专业摘要</td><td><span class="priority">P1</span></td></tr>
               <tr><td>证据材料</td><td>POST/PUT</td><td>/api/v1/evidence-materials/{materialId}</td><td>证据材料页、材料台账</td><td><span class="priority">P0</span></td></tr>
               <tr><td>医院申报</td><td>PUT</td><td>/api/v1/submissions/{submissionId}</td><td>医院申报页、指标自评数据</td><td><span class="priority">P0</span></td></tr>
               <tr><td>运行校验</td><td>POST</td><td>/api/v1/submissions/{submissionId}/validations:run</td><td>数据校验页、校验规则</td><td><span class="priority">P0</span></td></tr>
@@ -9215,6 +9481,48 @@
     render();
   }
 
+  function escalatePublicHealthIncident(id) {
+    const incident = state.publicHealth.incidents.find((item) => item.id === id);
+    if (!incident || incident.status === "已关闭") return;
+    const sla = publicHealthIncidentSla(incident);
+    if (!sla.overdue) {
+      showNotice("该事件尚未超过SLA时限，不能执行超时升级。");
+      return;
+    }
+    if (incident.escalation?.escalatedAt) {
+      showNotice("该事件已经完成超时升级，不重复发送。");
+      return;
+    }
+    const routes = {
+      P0: { level: "red", route: "卫健委值班负责人 -> 疾控业务负责人 -> 项目总指挥" },
+      P1: { level: "amber", route: "业务处室负责人 -> 平台运营负责人" },
+      P2: { level: "yellow", route: "责任组负责人 -> 平台运营值班" },
+    };
+    const escalation = routes[incident.level] || routes.P2;
+    incident.revision = Number(incident.revision || 1) + 1;
+    incident.escalation = {
+      status: "已升级",
+      level: escalation.level,
+      route: escalation.route,
+      escalatedAt: nowText(),
+      escalatedBy: state.activeRole,
+      note: `${incident.level}事件超过SLA，已按预案升级`,
+    };
+    addPublicHealthIncidentAction(incident, "SLA超时升级", incident.escalation.note);
+    addAudit("公共卫生事件SLA超时升级", incident.id, `${incident.escalation.level} · ${incident.escalation.route}`);
+    saveState();
+    showNotice(`${incident.id}已按${incident.level}路径升级，原处置状态保持${incident.status}。`);
+    render();
+  }
+
+  function resetPublicHealthFilters() {
+    delete workspace.dataset.publicHealthHospital;
+    delete workspace.dataset.publicHealthStatus;
+    delete workspace.dataset.publicHealthLevel;
+    delete workspace.dataset.publicHealthSla;
+    renderPublicHealth();
+  }
+
   function simulatePublicHealthBreak() {
     const publicHealth = state.publicHealth;
     const latest = publicHealth.campaigns.at(-1);
@@ -9838,6 +10146,9 @@
     if (name === "clean-storage") cleanStorage(action.dataset.id);
     if (name === "create-public-health-incident") createPublicHealthIncident();
     if (name === "advance-public-health-incident") advancePublicHealthIncident(action.dataset.id);
+    if (name === "escalate-public-health-incident") escalatePublicHealthIncident(action.dataset.id);
+    if (name === "export-public-health-incidents") downloadPublicHealthIncidentExport(action.dataset.format || "json");
+    if (name === "reset-public-health-filters") resetPublicHealthFilters();
     if (name === "simulate-public-health-break") simulatePublicHealthBreak();
     if (name === "simulate-public-health-chain-break") simulatePublicHealthChainBreak();
     if (name === "restore-public-health-continuity") restorePublicHealthContinuity();
@@ -9931,6 +10242,13 @@
     if (filter) {
       workspace.dataset[filter.dataset.filter] = filter.value;
       renderStandards();
+      return;
+    }
+    const publicHealthFilter = event.target.closest("[data-public-health-filter]");
+    if (publicHealthFilter) {
+      workspace.dataset[publicHealthFilter.dataset.publicHealthFilter] = publicHealthFilter.value;
+      renderPublicHealth();
+      return;
     }
     const packageKind = event.target.closest("[data-package-kind]");
     if (packageKind) {
