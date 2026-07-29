@@ -125,9 +125,46 @@ function verifyInsurancePaymentEvidencePacket(packet = {}, options = {}) {
     && packet.packetDigest === `sha256:${sha256(stableStringify(packetPayload(packet)))}`;
   const signatureValid = options.requireSignature !== true || Signature.verifyEvidencePacketSignature(packet, {
     now: options.now,
-    trustedSignerFingerprints: options.trustedSignerFingerprints
+    trustedSignerFingerprints: options.trustedSignerFingerprints,
+    revokedSignerFingerprints: options.revokedSignerFingerprints
   }).ok;
   return digestValid && verifyArtifactManifest(packet.artifacts, options.artifactRoot || ROOT) && signatureValid;
+}
+
+function buildEvidencePacketVerificationReport(packet = {}, options = {}) {
+  const packetDigestValid = /^sha256:[a-f0-9]{64}$/.test(String(packet.packetDigest || ""))
+    && packet.packetDigest === `sha256:${sha256(stableStringify(packetPayload(packet)))}`;
+  const artifactManifestValid = verifyArtifactManifest(packet.artifacts, options.artifactRoot || ROOT);
+  const signatureVerification = Signature.verifyEvidencePacketSignature(packet, {
+    now: options.now,
+    trustedSignerFingerprints: options.trustedSignerFingerprints,
+    revokedSignerFingerprints: options.revokedSignerFingerprints
+  });
+  const signatureRequired = options.requireSignature !== false;
+  const productionRequired = options.requireProduction === true;
+  const checks = [
+    { id: "packet-digest-valid", passed: packetDigestValid },
+    { id: "artifact-manifest-valid", passed: artifactManifestValid },
+    { id: "trusted-signature-valid", passed: !signatureRequired || signatureVerification.ok },
+    { id: "production-gate-passed", passed: !productionRequired || packet.productionGate?.passed === true }
+  ];
+  return {
+    schema: "insurance-payment-evidence-verification/v1",
+    checkedAt: signatureVerification.checkedAt,
+    packetDigest: String(packet.packetDigest || ""),
+    signerId: signatureVerification.signerId,
+    signerOrganization: signatureVerification.signerOrganization,
+    signerFingerprint: signatureVerification.keyFingerprint,
+    signatureValidUntil: signatureVerification.validUntil,
+    signatureTrusted: signatureVerification.trusted,
+    signatureRevoked: signatureVerification.revoked,
+    signatureErrors: signatureVerification.errors,
+    productionReady: packet.productionReady === true,
+    productionGateBlockers: packet.productionGate?.blockers || [],
+    checks,
+    blockers: checks.filter((item) => !item.passed).map((item) => item.id),
+    ok: checks.every((item) => item.passed)
+  };
 }
 
 function renderMarkdown(packet) {
@@ -172,6 +209,7 @@ function shouldFailEvidencePacket(packet = {}, args = {}) {
     || !verifyInsurancePaymentEvidencePacket(packet, {
       requireSignature,
       trustedSignerFingerprints: trustedFingerprints(args["trusted-fingerprints"]),
+      revokedSignerFingerprints: trustedFingerprints(args["revoked-fingerprints"]),
       now: args.now
     })
     || (args["require-production"] === true && packet.productionGate?.passed !== true);
@@ -179,18 +217,39 @@ function shouldFailEvidencePacket(packet = {}, args = {}) {
 
 if (require.main === module) {
   const args = parseArgs();
-  const signingKeyPath = args["signing-key"] ? path.resolve(args["signing-key"]) : "";
-  const packet = buildInsurancePaymentEvidencePacket({
-    signingPrivateKeyPem: signingKeyPath ? fs.readFileSync(signingKeyPath, "utf8") : "",
-    signerId: args["signer-id"],
-    signerOrganization: args["signer-organization"],
-    signedAt: args["signed-at"],
-    signatureValidUntil: args["signature-valid-until"]
-  });
-  if (args.output) fs.writeFileSync(path.resolve(ROOT, args.output), `${JSON.stringify(packet, null, 2)}\n`, "utf8");
-  if (args.markdown) fs.writeFileSync(path.resolve(ROOT, args.markdown), renderMarkdown(packet), "utf8");
-  process.stdout.write(`${JSON.stringify({ packetDigest: packet.packetDigest, signed: Boolean(packet.signatureEnvelope), signerFingerprint: packet.signatureEnvelope?.keyFingerprint || "", localReady: packet.localReady, productionReady: packet.productionReady, workflows: packet.workflows.length, t00PendingRoutes: packet.t00PendingRoutes.length, externalBlockers: packet.externalBlockers.length }, null, 2)}\n`);
-  if (shouldFailEvidencePacket(packet, args)) process.exitCode = 1;
+  try {
+    if (args.input) {
+      const inputPath = path.resolve(args.input);
+      const packet = JSON.parse(fs.readFileSync(inputPath, "utf8"));
+      const report = buildEvidencePacketVerificationReport(packet, {
+        artifactRoot: args["artifact-root"] ? path.resolve(args["artifact-root"]) : ROOT,
+        trustedSignerFingerprints: trustedFingerprints(args["trusted-fingerprints"]),
+        revokedSignerFingerprints: trustedFingerprints(args["revoked-fingerprints"]),
+        requireSignature: args["allow-unsigned"] !== true,
+        requireProduction: args["require-production"] === true,
+        now: args.now
+      });
+      if (args["verification-output"]) fs.writeFileSync(path.resolve(args["verification-output"]), `${JSON.stringify(report, null, 2)}\n`, "utf8");
+      process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+      if (!report.ok) process.exitCode = 1;
+    } else {
+      const signingKeyPath = args["signing-key"] ? path.resolve(args["signing-key"]) : "";
+      const packet = buildInsurancePaymentEvidencePacket({
+        signingPrivateKeyPem: signingKeyPath ? fs.readFileSync(signingKeyPath, "utf8") : "",
+        signerId: args["signer-id"],
+        signerOrganization: args["signer-organization"],
+        signedAt: args["signed-at"],
+        signatureValidUntil: args["signature-valid-until"]
+      });
+      if (args.output) fs.writeFileSync(path.resolve(ROOT, args.output), `${JSON.stringify(packet, null, 2)}\n`, "utf8");
+      if (args.markdown) fs.writeFileSync(path.resolve(ROOT, args.markdown), renderMarkdown(packet), "utf8");
+      process.stdout.write(`${JSON.stringify({ packetDigest: packet.packetDigest, signed: Boolean(packet.signatureEnvelope), signerFingerprint: packet.signatureEnvelope?.keyFingerprint || "", localReady: packet.localReady, productionReady: packet.productionReady, workflows: packet.workflows.length, t00PendingRoutes: packet.t00PendingRoutes.length, externalBlockers: packet.externalBlockers.length }, null, 2)}\n`);
+      if (shouldFailEvidencePacket(packet, args)) process.exitCode = 1;
+    }
+  } catch (error) {
+    process.stderr.write(`${JSON.stringify({ schema: "insurance-payment-evidence-verification/v1", ok: false, blockers: ["verification-input-invalid"], error: String(error.message || error) }, null, 2)}\n`);
+    process.exitCode = 1;
+  }
 }
 
-module.exports = { EVIDENCE_FILES, buildEvidenceProductionGate, buildInsurancePaymentEvidencePacket, packetPayload, parseArgs, renderMarkdown, sha256, shouldFailEvidencePacket, stableStringify, trustedFingerprints, verifyArtifactManifest, verifyInsurancePaymentEvidencePacket };
+module.exports = { EVIDENCE_FILES, buildEvidencePacketVerificationReport, buildEvidenceProductionGate, buildInsurancePaymentEvidencePacket, packetPayload, parseArgs, renderMarkdown, sha256, shouldFailEvidencePacket, stableStringify, trustedFingerprints, verifyArtifactManifest, verifyInsurancePaymentEvidencePacket };

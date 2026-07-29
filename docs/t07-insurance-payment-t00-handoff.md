@@ -109,5 +109,7 @@ node .\scripts\insurance-payment-evidence-packet.js --require-production
 
 ```powershell
 node .\scripts\insurance-payment-evidence-packet.js --signing-key=<外部私钥.pem> --signer-id=<发布主体> --signer-organization=<签发机构> --signed-at=<UTC时间> --signature-valid-until=<不超过31天的UTC时间> --output=<证据包.json>
-node .\scripts\insurance-payment-evidence-packet.js --require-signature --trusted-fingerprints=<可信公钥SHA-256指纹>
+node .\scripts\insurance-payment-evidence-packet.js --input=<证据包.json> --artifact-root=<对应T07工作树> --trusted-fingerprints=<可信公钥SHA-256指纹> --revoked-fingerprints=<已吊销指纹> --now=<UTC核验时间> --verification-output=<验真报告.json>
 ```
+
+`--input` 只读验证既有包，不重新生成或覆盖证据。验真报告仅输出签名主体、机构、指纹、有效期、信任/吊销状态、生产阻断和检查结果，不输出公钥正文、签名值或证据附件。缺少可信签名、指纹已吊销、包摘要或工件不一致、签名过期及生产门禁未通过均返回非零退出码。

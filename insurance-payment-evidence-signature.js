@@ -87,6 +87,7 @@ function verifyEvidencePacketSignature(packet = {}, options = {}) {
   const errors = [];
   const now = new Date(options.now || new Date());
   const trusted = new Set((options.trustedSignerFingerprints || []).map(normalizeFingerprint).filter(Boolean));
+  const revoked = new Set((options.revokedSignerFingerprints || []).map(normalizeFingerprint).filter(Boolean));
   if (envelope.schemaVersion !== SIGNATURE_SCHEMA) errors.push("证据包签名信封版本无效");
   if (!SIGNATURE_ALGORITHMS.has(envelope.algorithm)) errors.push("证据包签名算法必须为RSA-SHA256或ECDSA-SHA256");
   if (!String(envelope.signerId || "").trim()) errors.push("证据包签名人标识不能为空");
@@ -110,6 +111,7 @@ function verifyEvidencePacketSignature(packet = {}, options = {}) {
     if (normalizeFingerprint(envelope.keyFingerprint) !== fingerprint) errors.push("证据包签名公钥指纹不一致");
     if (!trusted.size) errors.push("未配置可信证据包签名公钥指纹");
     else if (!trusted.has(fingerprint)) errors.push("证据包签名公钥不在可信清单中");
+    if (revoked.has(fingerprint)) errors.push("证据包签名公钥已吊销");
     if (!/^[A-Za-z\d+/]+={0,2}$/.test(String(envelope.signature || ""))) errors.push("证据包签名值格式无效");
     else cryptographicallyValid = crypto.verify("sha256", Buffer.from(stableStringify(claims), "utf8"), envelope.publicKeyPem, Buffer.from(envelope.signature, "base64"));
     if (!cryptographicallyValid) errors.push("证据包数字签名验证失败");
@@ -120,6 +122,7 @@ function verifyEvidencePacketSignature(packet = {}, options = {}) {
     ok: errors.length === 0,
     cryptographicallyValid,
     trusted: Boolean(fingerprint && trusted.has(fingerprint)),
+    revoked: Boolean(fingerprint && revoked.has(fingerprint)),
     keyFingerprint: fingerprint || normalizeFingerprint(envelope.keyFingerprint),
     signerId: String(envelope.signerId || ""),
     signerOrganization: String(envelope.signerOrganization || ""),
