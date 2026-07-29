@@ -1,9 +1,9 @@
 openapi: 3.0.3
 info:
-  title: 数智医院新标准平台 v0.18 接口
-  version: 0.18.0
+  title: 数智医院新标准平台 v0.19 接口
+  version: 0.19.0
   description: >
-    面向数智医院新标准平台的接口契约，覆盖评价任务、试点运营、试点协同、接入联调、持久化任务服务、Worker租约、托管密钥、签名回调、重试死信、投产证据、Go/No-Go、试点评估、评价助手、推广准备、运营监控、医院申报、分级审核和运行管理。
+    面向数智医院新标准平台的接口契约，覆盖评价任务、试点运营、试点协同、接入联调、持久化任务服务、Worker租约、托管密钥、签名回调、重试死信、投产证据、Go/No-Go、试点评估、评价助手、推广准备、运营监控、公共卫生协同、医院申报、分级审核和运行管理。
 servers:
   - url: https://example.local
     description: 示例服务地址，正式环境由部署方案确定
@@ -48,6 +48,8 @@ tags:
     description: 标准问答、异常说明、整改建议和审核风险辅助研判
   - name: Monitoring
     description: 服务、接口、任务队列、存储容量和统一告警监控
+  - name: PublicHealthCoordination
+    description: 公共卫生八通道连续活动、异常事件、独立复核和生产边界
   - name: Operations
     description: 年度运行、规则核验与安全复核
   - name: System
@@ -968,6 +970,88 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
+  /api/digital-hospital/public-health/coordination:
+    get:
+      tags: [PublicHealthCoordination]
+      summary: 获取公共卫生协同工作台
+      description: 返回八类业务通道、连续活动、异常事件、动作留痕及始终关闭的生产边界。
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 公共卫生协同工作台
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicHealthCoordinationBoard"
+        "401":
+          description: 未登录
+        "403":
+          description: 非卫健委角色
+  /api/digital-hospital/public-health/incidents:
+    post:
+      tags: [PublicHealthCoordination]
+      summary: 登记公共卫生协同事件
+      description: 仅接收最小化事件元数据，拒绝密钥、令牌、签名、nonce、凭据和原始载荷字段。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublicHealthIncidentCreate"
+      responses:
+        "201":
+          description: 事件已登记并写入审计链
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicHealthIncidentMutation"
+        "400":
+          description: 字段校验失败或包含禁止的敏感字段
+        "401":
+          description: 未登录
+        "403":
+          description: 非卫健委角色
+        "409":
+          description: 事件编号重复
+  /api/digital-hospital/public-health/incidents/{incidentId}/actions:
+    post:
+      tags: [PublicHealthCoordination]
+      summary: 推进公共卫生协同事件
+      description: 使用乐观修订号执行开始处置、提交复核和独立复核关闭。
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: incidentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublicHealthIncidentAction"
+      responses:
+        "200":
+          description: 事件已推进并写入审计链
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicHealthIncidentMutation"
+        "400":
+          description: 字段校验失败
+        "401":
+          description: 未登录
+        "403":
+          description: 非卫健委角色
+        "404":
+          description: 事件不存在
+        "409":
+          description: 修订冲突、动作不合法或未满足独立复核
   /api/v1/integration-environments:
     get:
       tags: [IntegrationExecution]
@@ -3071,6 +3155,11 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque-session-token
   parameters:
     StandardVersion:
       name: standardVersion
@@ -3153,6 +3242,158 @@ components:
                 type: string
                 example: 处理成功
   schemas:
+    PublicHealthIncident:
+      type: object
+      required: [id, revision, laneId, title, level, source, hospitalCode, owner, status, dueAt, latestAction]
+      properties:
+        id:
+          type: string
+        revision:
+          type: integer
+          minimum: 1
+        laneId:
+          type: string
+        title:
+          type: string
+        level:
+          type: string
+          enum: [P0, P1, P2]
+        source:
+          type: string
+        hospitalCode:
+          type: string
+        owner:
+          type: string
+        status:
+          type: string
+          enum: [待核查, 处置中, 待复核, 已关闭]
+        discoveredAt:
+          type: string
+        dueAt:
+          type: string
+        lastUpdatedAt:
+          type: string
+        latestAction:
+          type: string
+        submittedForReviewBy:
+          type: string
+    PublicHealthIncidentCreate:
+      type: object
+      required: [laneId, title, hospitalCode, owner, dueAt, note]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        laneId:
+          type: string
+        title:
+          type: string
+          minLength: 4
+        level:
+          type: string
+          enum: [P0, P1, P2]
+        source:
+          type: string
+        hospitalCode:
+          type: string
+        owner:
+          type: string
+        dueAt:
+          type: string
+        note:
+          type: string
+          minLength: 4
+    PublicHealthIncidentAction:
+      type: object
+      required: [action, expectedRevision, note]
+      additionalProperties: false
+      properties:
+        action:
+          type: string
+          enum: [start-handling, submit-review, verify-close]
+        expectedRevision:
+          type: integer
+          minimum: 1
+        note:
+          type: string
+          minLength: 4
+        owner:
+          type: string
+        dueAt:
+          type: string
+    PublicHealthIncidentMutation:
+      type: object
+      required: [ok, incident, board]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        incident:
+          $ref: "#/components/schemas/PublicHealthIncident"
+        board:
+          $ref: "#/components/schemas/PublicHealthCoordinationBoard"
+    PublicHealthCoordinationBoard:
+      type: object
+      required: [ok, generatedAt, summary, coordination, runtimeRoutes, productionBoundary]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        generatedAt:
+          type: string
+          format: date-time
+        summary:
+          type: object
+          additionalProperties: true
+        coordination:
+          type: object
+          required: [schemaVersion, productionReady, lanes, campaigns, incidents, incidentActions, blockers]
+          properties:
+            schemaVersion:
+              type: integer
+              const: 1
+            productionReady:
+              type: boolean
+              const: false
+            lanes:
+              type: array
+              items:
+                type: object
+            campaigns:
+              type: array
+              items:
+                type: object
+            incidents:
+              type: array
+              items:
+                $ref: "#/components/schemas/PublicHealthIncident"
+            incidentActions:
+              type: array
+              items:
+                type: object
+            blockers:
+              type: array
+              items:
+                type: string
+          additionalProperties: true
+        runtimeRoutes:
+          type: object
+          additionalProperties:
+            type: string
+        productionBoundary:
+          type: object
+          required: [productionReady, releaseGate, blockers]
+          properties:
+            productionReady:
+              type: boolean
+              const: false
+            releaseGate:
+              type: string
+              enum: [site-evidence-and-approval-required]
+            blockers:
+              type: array
+              items:
+                type: string
     Indicator:
       type: object
       required: [code, domain, name, max]

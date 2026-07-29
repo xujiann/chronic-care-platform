@@ -1,5 +1,5 @@
 (function () {
-  const storageKey = "digitalHospitalMvpState:v0.18";
+  const storageKey = "digitalHospitalMvpState:v0.19";
 
   const domains = [
     { code: "A", name: "基础设施与平台支撑", weight: 100 },
@@ -117,6 +117,54 @@
       missingRecords: 300,
       duplicateRecords: 80,
       invalidCodeRecords: 120,
+    },
+    publicHealth: {
+      migrationSource: {
+        taskTitle: "开发数智医院标准平台",
+        sourceCommit: "4142402e0c79fd8457c00c370b5d163e88cca0e7",
+        sourceVersion: "v0.17",
+        mergedInto: "github-v0.19",
+      },
+      endpointConnectivityReady: true,
+      continuousConnectivityReady: true,
+      productionReady: false,
+      consecutiveCampaigns: 3,
+      requiredConsecutiveCampaigns: 3,
+      campaignChainLinksVerified: 2,
+      continuityBreak: null,
+      lanes: [
+        { id: "infectious-reporting", name: "传染病直报", owner: "疾控与医政", endpoint: "已配置", probe: "已验证", campaign: "PHC-20260728-003" },
+        { id: "immunization", name: "免疫规划", owner: "疾控免疫科", endpoint: "已配置", probe: "已验证", campaign: "PHC-20260728-003" },
+        { id: "maternal-child", name: "妇幼健康", owner: "妇幼健康处", endpoint: "已配置", probe: "已验证", campaign: "PHC-20260728-003" },
+        { id: "senior-health", name: "老年健康", owner: "基层卫生处", endpoint: "已配置", probe: "已验证", campaign: "PHC-20260728-003" },
+        { id: "chronic-disease", name: "慢病管理", owner: "疾控慢病科", endpoint: "已配置", probe: "已验证", campaign: "PHC-20260728-003" },
+        { id: "public-health-followup", name: "公卫随访", owner: "基层卫生处", endpoint: "已配置", probe: "已验证", campaign: "PHC-20260728-003" },
+        { id: "health-education", name: "健康教育", owner: "宣传与健康促进", endpoint: "已配置", probe: "已验证", campaign: "PHC-20260728-003" },
+        { id: "family-doctor", name: "家庭医生", owner: "基层卫生处", endpoint: "已配置", probe: "已验证", campaign: "PHC-20260728-003" },
+      ],
+      campaigns: [
+        { id: "PHC-20260728-001", completedAt: "2026-07-28 09:20", receipts: 8, status: "已验证", chain: "genesis" },
+        { id: "PHC-20260728-002", completedAt: "2026-07-28 09:35", receipts: 8, status: "已验证", chain: "verified" },
+        { id: "PHC-20260728-003", completedAt: "2026-07-28 09:50", receipts: 8, status: "已验证", chain: "verified" },
+      ],
+      incidents: [
+        { id: "PHE-20260728-003", revision: 1, laneId: "infectious-reporting", title: "传染病直报回执超时", level: "P0", source: "连续探测", hospitalCode: "H000001", owner: "疾控与医政联络组", status: "待核查", discoveredAt: "2026-07-28 09:52", dueAt: "2026-07-28 10:22", lastUpdatedAt: "2026-07-28 09:52", latestAction: "等待核对上报端与接收端回执" },
+        { id: "PHE-20260728-002", revision: 2, laneId: "public-health-followup", title: "重点人群随访数据延迟", level: "P1", source: "时效规则", hospitalCode: "H000003", owner: "基层卫生处协同组", status: "处置中", discoveredAt: "2026-07-28 08:40", dueAt: "2026-07-28 12:00", lastUpdatedAt: "2026-07-28 09:35", latestAction: "医院已补传，等待平台侧重算" },
+        { id: "PHE-20260727-006", revision: 3, laneId: "immunization", title: "免疫规划代码映射差异", level: "P1", source: "数据校验", hospitalCode: "H000002", owner: "疾控免疫科", status: "待复核", discoveredAt: "2026-07-27 15:10", dueAt: "2026-07-28 15:10", lastUpdatedAt: "2026-07-28 09:10", latestAction: "映射表已修订，等待业务复核", submittedForReviewBy: "市级管理员" },
+        { id: "PHE-20260727-004", revision: 4, laneId: "maternal-child", title: "妇幼健康批次完整性告警", level: "P1", source: "完整性规则", hospitalCode: "H000001", owner: "妇幼健康处", status: "已关闭", discoveredAt: "2026-07-27 10:20", dueAt: "2026-07-27 14:20", lastUpdatedAt: "2026-07-27 13:05", closedAt: "2026-07-27 13:05", latestAction: "补传完成，完整性复核通过", submittedForReviewBy: "市级管理员" },
+      ],
+      incidentActions: [
+        { id: "PHA-004", incidentId: "PHE-20260727-004", action: "复核关闭", actor: "妇幼健康处", at: "2026-07-27 13:05", result: "补传完成，完整性复核通过", revision: 4 },
+        { id: "PHA-003", incidentId: "PHE-20260727-006", action: "提交复核", actor: "疾控免疫科", at: "2026-07-28 09:10", result: "代码映射表已修订", revision: 3 },
+        { id: "PHA-002", incidentId: "PHE-20260728-002", action: "开始处置", actor: "基层卫生处协同组", at: "2026-07-28 09:35", result: "医院已补传，等待平台侧重算", revision: 2 },
+        { id: "PHA-001", incidentId: "PHE-20260728-003", action: "登记事件", actor: "连续探测服务", at: "2026-07-28 09:52", result: "回执超时，进入人工核查", revision: 1 },
+      ],
+      blockers: [
+        "可信现场证据尚未签收",
+        "正式业务回执与生产交接尚未完成",
+        "P0/P1阻断需由责任部门关闭",
+        "灾备、回退演练及多方上线审批待完成",
+      ],
     },
     submissions: {},
     assignments: [
@@ -697,6 +745,13 @@
     if (!Array.isArray(next.rectificationSuggestions)) next.rectificationSuggestions = JSON.parse(JSON.stringify(seedState.rectificationSuggestions));
     if (!Array.isArray(next.reviewRiskSignals)) next.reviewRiskSignals = JSON.parse(JSON.stringify(seedState.reviewRiskSignals));
     if (!next.metrics) next.metrics = cloneSeed().metrics;
+    if (!next.publicHealth) next.publicHealth = JSON.parse(JSON.stringify(seedState.publicHealth));
+    if (!Array.isArray(next.publicHealth.lanes)) next.publicHealth.lanes = JSON.parse(JSON.stringify(seedState.publicHealth.lanes));
+    if (!Array.isArray(next.publicHealth.campaigns)) next.publicHealth.campaigns = JSON.parse(JSON.stringify(seedState.publicHealth.campaigns));
+    if (!Array.isArray(next.publicHealth.incidents)) next.publicHealth.incidents = JSON.parse(JSON.stringify(seedState.publicHealth.incidents));
+    if (!Array.isArray(next.publicHealth.incidentActions)) next.publicHealth.incidentActions = JSON.parse(JSON.stringify(seedState.publicHealth.incidentActions));
+    if (!Array.isArray(next.publicHealth.blockers)) next.publicHealth.blockers = JSON.parse(JSON.stringify(seedState.publicHealth.blockers));
+    next.publicHealth.productionReady = false;
     if (!next.submissions) next.submissions = {};
     if (!Array.isArray(next.validationIssues)) next.validationIssues = [];
     if (!Array.isArray(next.reviewNotes)) next.reviewNotes = [];
@@ -964,6 +1019,20 @@
     };
   }
 
+  function publicHealthSummary() {
+    const openIncidents = state.publicHealth.incidents.filter((item) => item.status !== "已关闭");
+    return {
+      verifiedLanes: state.publicHealth.lanes.filter((item) => item.probe === "已验证").length,
+      totalLanes: state.publicHealth.lanes.length,
+      openIncidents: openIncidents.length,
+      p0Incidents: openIncidents.filter((item) => item.level === "P0").length,
+      pendingVerification: openIncidents.filter((item) => item.status === "待复核").length,
+      closedIncidents: state.publicHealth.incidents.filter((item) => item.status === "已关闭").length,
+      continuityReady: state.publicHealth.continuousConnectivityReady,
+      productionReady: false,
+    };
+  }
+
   function collaborationSummary() {
     const averageReadiness = Math.round(
       state.hospitalReadiness.reduce((sum, item) => sum + Number(item.readiness || 0), 0) / Math.max(1, state.hospitalReadiness.length),
@@ -1174,7 +1243,7 @@
       standardVersion: state.task.standard,
       hospitalCode: hospital.code,
       hospitalName: hospital.name,
-      prototypeVersion: "mvp-0.18",
+      prototypeVersion: "mvp-0.19",
     };
     if (kind === "submission") {
       return {
@@ -1317,6 +1386,31 @@
         alerts: state.monitoringAlerts,
       };
     }
+    if (kind === "publicHealth") {
+      return {
+        meta,
+        publicHealthSummary: publicHealthSummary(),
+        publicHealthStatus: {
+          endpointConnectivityReady: state.publicHealth.endpointConnectivityReady,
+          continuousConnectivityReady: state.publicHealth.continuousConnectivityReady,
+          productionReady: false,
+          consecutiveCampaigns: state.publicHealth.consecutiveCampaigns,
+          requiredConsecutiveCampaigns: state.publicHealth.requiredConsecutiveCampaigns,
+          campaignChainLinksVerified: state.publicHealth.campaignChainLinksVerified,
+          continuityBreak: state.publicHealth.continuityBreak,
+        },
+        publicHealthLanes: state.publicHealth.lanes,
+        publicHealthCampaigns: state.publicHealth.campaigns,
+        publicHealthIncidents: state.publicHealth.incidents,
+        publicHealthIncidentActions: state.publicHealth.incidentActions,
+        productionBlockers: state.publicHealth.blockers,
+        runtimeRoutes: {
+          coordination: "/api/digital-hospital/public-health/coordination",
+          incidents: "/api/digital-hospital/public-health/incidents",
+          incidentActions: "/api/digital-hospital/public-health/incidents/:id/actions",
+        },
+      };
+    }
     if (kind === "collaboration") {
       return {
         meta,
@@ -1434,6 +1528,7 @@
       jobQueues: state.jobQueues,
       storagePools: state.storagePools,
       monitoringAlerts: state.monitoringAlerts,
+      publicHealth: state.publicHealth,
       hospitalReadiness: state.hospitalReadiness,
       pilotTickets: state.pilotTickets,
       trainingSessions: state.trainingSessions,
@@ -1518,6 +1613,7 @@
       assessment: "试点评估包",
       assistant: "评价助手包",
       monitoring: "运营监控包",
+      publicHealth: "公共卫生协同包",
       system: "系统权限包",
       operations: "运行监管包",
       full: "全量状态包",
@@ -4406,6 +4502,229 @@
     `;
   }
 
+  function renderPublicHealth() {
+    header("公共卫生");
+    const publicHealth = state.publicHealth;
+    const summary = publicHealthSummary();
+    const tab = workspace.dataset.publicHealthTab || "incidents";
+    const tabs = [
+      { id: "incidents", label: "事件处置" },
+      { id: "continuity", label: "通道连续性" },
+      { id: "readiness", label: "上线边界" },
+    ];
+    const requiredChainLinks = Math.max(0, publicHealth.requiredConsecutiveCampaigns - 1);
+    const continuityLabel = publicHealth.continuousConnectivityReady ? "连续已验证" : "连续性中断";
+    const laneName = (laneId) => publicHealth.lanes.find((item) => item.id === laneId)?.name || laneId;
+    const nextActionLabel = (status) =>
+      ({
+        待核查: "开始处置",
+        处置中: "提交复核",
+        待复核: "复核关闭",
+        已关闭: "已闭环",
+      })[status] || "推进处置";
+    let content = "";
+
+    if (tab === "incidents") {
+      content = `
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">公共卫生异常事件台账</h3>
+              <p class="panel-subtitle">统一承接规则监测、数据校验和业务反馈，按核查、处置、独立复核、关闭形成责任闭环。</p>
+            </div>
+            <div class="toolbar inline">
+              <button class="button secondary" type="button" data-action="create-public-health-incident">登记异常事件</button>
+              <button class="button ghost" type="button" data-action="download-package" data-kind="publicHealth">下载协同包</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>事件</th><th>业务通道</th><th>机构</th><th>级别</th><th>责任组</th><th>时限</th><th>状态/版本</th><th>当前处置</th><th>操作</th></tr></thead>
+              <tbody>
+                ${publicHealth.incidents
+                  .map(
+                    (item) => `
+                      <tr>
+                        <td><strong>${escapeHtml(item.title)}</strong><br /><span class="muted-text">${escapeHtml(item.id)} · ${escapeHtml(item.source)}</span></td>
+                        <td>${escapeHtml(laneName(item.laneId))}</td>
+                        <td>${escapeHtml(item.hospitalCode)}</td>
+                        <td><span class="status-pill ${item.level === "P0" ? "danger" : "warn"}">${escapeHtml(item.level)}</span></td>
+                        <td>${escapeHtml(item.owner)}</td>
+                        <td>${escapeHtml(item.dueAt)}</td>
+                        <td><span class="status-pill ${statusClass(item.status)}">${escapeHtml(item.status)}</span><br /><span class="muted-text">r${Number(item.revision || 1)}</span></td>
+                        <td>${escapeHtml(item.latestAction)}</td>
+                        <td><button class="button ghost" type="button" data-action="advance-public-health-incident" data-id="${escapeHtml(item.id)}" ${item.status === "已关闭" ? "disabled" : ""}>${nextActionLabel(item.status)}</button></td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">处置留痕</h3>
+              <p class="panel-subtitle">状态推进绑定动作、责任人、时间、结果和修订号，可随协同包导出审计。</p>
+            </div>
+            <span class="tag">${publicHealth.incidentActions.length}条记录</span>
+          </div>
+          <div class="timeline-list">
+            ${publicHealth.incidentActions
+              .slice(0, 8)
+              .map(
+                (item) => `
+                  <article class="timeline-item">
+                    <time>${escapeHtml(item.at)}</time>
+                    <strong>${escapeHtml(item.action)} · ${escapeHtml(item.incidentId)}</strong>
+                    <span>${escapeHtml(item.actor)} · r${Number(item.revision || 1)}</span>
+                    <p>${escapeHtml(item.result)}</p>
+                  </article>
+                `,
+              )
+              .join("")}
+          </div>
+        </section>
+      `;
+    }
+
+    if (tab === "continuity") {
+      const breakLabel = publicHealth.continuityBreak
+        ? `${escapeHtml(publicHealth.continuityBreak.campaignId)} · ${escapeHtml(publicHealth.continuityBreak.code)}`
+        : "当前窗口无中断";
+      content = `
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">端点与连续探测总览</h3>
+              <p class="panel-subtitle">传染病、免疫规划、妇幼、老年健康、慢病、公卫随访、健康教育和家庭医生八通道统一核验。</p>
+            </div>
+            <span class="status-pill ${publicHealth.continuousConnectivityReady ? "" : "danger"}">${continuityLabel}</span>
+          </div>
+          <div class="toolbar">
+            <button class="button secondary" type="button" data-action="simulate-public-health-break">演示最新活动失败</button>
+            <button class="button secondary" type="button" data-action="simulate-public-health-chain-break">演示前序链缺口</button>
+            <button class="button ghost" type="button" data-action="restore-public-health-continuity">恢复受控连续窗口</button>
+            <span class="tag">受控验收样例</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>业务通道</th><th>责任部门</th><th>端点</th><th>单次探测</th><th>当前活动</th></tr></thead>
+              <tbody>
+                ${publicHealth.lanes
+                  .map(
+                    (lane) => `
+                      <tr>
+                        <td><strong>${escapeHtml(lane.name)}</strong><br /><span class="muted-text">${escapeHtml(lane.id)}</span></td>
+                        <td>${escapeHtml(lane.owner)}</td>
+                        <td><span class="status-pill">${escapeHtml(lane.endpoint)}</span></td>
+                        <td><span class="status-pill ${lane.probe === "已验证" ? "" : "danger"}">${escapeHtml(lane.probe)}</span></td>
+                        <td>${escapeHtml(lane.campaign)}</td>
+                      </tr>
+                    `,
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">当前连续窗口</h3>
+              <p class="panel-subtitle">按服务端完成时间倒序计算，失败记录或签名前序缺口均不得被跳过。</p>
+            </div>
+            <span class="tag">${publicHealth.campaigns.length}次活动 · 前序链${publicHealth.campaignChainLinksVerified}/${requiredChainLinks}</span>
+          </div>
+          <div class="timeline-list">
+            ${publicHealth.campaigns
+              .slice()
+              .reverse()
+              .map(
+                (campaign) => `
+                  <article class="timeline-item">
+                    <time>${escapeHtml(campaign.completedAt)}</time>
+                    <strong>${escapeHtml(campaign.id)}</strong>
+                    <span>${campaign.receipts}/8 回执 · ${campaign.chain === "verified" ? "前序链已验证" : campaign.chain === "mismatch" ? "前序链不匹配" : "链起点"}</span>
+                    <p><span class="status-pill ${campaign.status === "已验证" ? "" : "danger"}">${escapeHtml(campaign.status)}</span></p>
+                  </article>
+                `,
+              )
+              .join("")}
+          </div>
+          <article class="detail-item">
+            <header>
+              <div><h4>连续性判定</h4><p>活动编号与稳定原因码</p></div>
+              <span class="status-pill ${publicHealth.continuityBreak ? "danger" : ""}">${publicHealth.continuityBreak ? "失败关闭" : "窗口完整"}</span>
+            </header>
+            <p>${breakLabel}</p>
+          </article>
+        </section>
+      `;
+    }
+
+    if (tab === "readiness") {
+      content = `
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">生产上线边界</h3>
+              <p class="panel-subtitle">通道连通和事件清零不自动授予生产权限，现场证据、回退演练和多方审批仍需独立完成。</p>
+            </div>
+            <span class="status-pill danger">productionReady=false</span>
+          </div>
+          <div class="detail-list compact-list">
+            ${publicHealth.blockers
+              .map(
+                (blocker, index) => `
+                  <article class="detail-item">
+                    <header>
+                      <div><h4>${index === 0 ? "P0" : "P1"} 上线阻断</h4><p>${escapeHtml(blocker)}</p></div>
+                      <span class="status-pill danger">待外部验收</span>
+                    </header>
+                  </article>
+                `,
+              )
+              .join("")}
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3 class="panel-title">正式运行接口</h3>
+              <p class="panel-subtitle">正式事件账本使用平台鉴权、乐观锁和独立复核；演示按钮不连接生产端点。</p>
+            </div>
+            <span class="tag">GitHub v0.19</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>用途</th><th>方法</th><th>路由</th><th>控制</th></tr></thead>
+              <tbody>
+                <tr><td>协同总览</td><td>GET</td><td>/api/digital-hospital/public-health/coordination</td><td>卫健委角色与审计</td></tr>
+                <tr><td>登记事件</td><td>POST</td><td>/api/digital-hospital/public-health/incidents</td><td>敏感字段拒绝</td></tr>
+                <tr><td>推进闭环</td><td>POST</td><td>/api/digital-hospital/public-health/incidents/{id}/actions</td><td>修订号与独立复核</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    workspace.innerHTML = `
+      <div class="grid-4">
+        ${metric("业务通道", `${summary.verifiedLanes}/${summary.totalLanes}`, "本批受控探测已验证")}
+        ${metric("开放事件", summary.openIncidents, `${summary.pendingVerification}项待复核`, summary.openIncidents ? "danger" : "")}
+        ${metric("P0事件", summary.p0Incidents, "优先核查与处置", summary.p0Incidents ? "danger" : "")}
+        ${metric("连续活动", `${publicHealth.consecutiveCampaigns}/${publicHealth.requiredConsecutiveCampaigns}`, continuityLabel, summary.continuityReady ? "" : "danger")}
+      </div>
+      <div class="segmented monitoring-tabs" role="tablist" aria-label="公共卫生协同功能">
+        ${tabs.map((item) => `<button type="button" role="tab" aria-selected="${item.id === tab}" class="${item.id === tab ? "active" : ""}" data-public-health-tab="${item.id}">${item.label}</button>`).join("")}
+      </div>
+      ${content}
+    `;
+  }
+
   function renderStandards() {
     header("标准指标");
     const selectedDomain = workspace.dataset.domain || "全部";
@@ -5535,6 +5854,10 @@
           <span>服务可用性、接口健康、任务队列、存储容量和告警处置</span>
         </article>
         <article class="package-card">
+          <strong>公共卫生协同包</strong>
+          <span>八通道状态、连续活动、异常事件、处置留痕和生产阻断</span>
+        </article>
+        <article class="package-card">
           <strong>系统包</strong>
           <span>角色权限、用户、导出审批、系统参数和审计日志</span>
         </article>
@@ -5559,7 +5882,7 @@
           <label class="field">
             <span>数据包类型</span>
             <select data-package-kind>
-              ${["task", "pilot", "collaboration", "integration", "execution", "assessment", "assistant", "monitoring", "evidence", "submission", "review", "expert", "rectification", "analytics", "intelligence", "system", "operations", "full"]
+              ${["task", "pilot", "collaboration", "integration", "execution", "assessment", "assistant", "monitoring", "publicHealth", "evidence", "submission", "review", "expert", "rectification", "analytics", "intelligence", "system", "operations", "full"]
                 .map((item) => `<option value="${item}" ${item === kind ? "selected" : ""}>${packageKindLabel(item)}</option>`)
                 .join("")}
             </select>
@@ -5623,6 +5946,9 @@
               <tr><td>任务队列</td><td>GET/POST</td><td>/api/v1/monitoring/job-queues</td><td>任务积压、失败、扩容和优先级</td><td><span class="priority">P1</span></td></tr>
               <tr><td>存储容量</td><td>GET/POST</td><td>/api/v1/monitoring/storage-pools</td><td>容量、增长、留存、扩容和清理</td><td><span class="priority">P1</span></td></tr>
               <tr><td>运营告警</td><td>GET/PUT</td><td>/api/v1/monitoring/alerts/{alertId}</td><td>告警确认、处置、关闭和审计</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>公共卫生协同</td><td>GET</td><td>/api/digital-hospital/public-health/coordination</td><td>八通道、连续活动、异常事件与生产阻断</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>公共卫生事件</td><td>POST</td><td>/api/digital-hospital/public-health/incidents</td><td>最小化事件登记与敏感字段拒绝</td><td><span class="priority">P1</span></td></tr>
+              <tr><td>事件状态推进</td><td>POST</td><td>/api/digital-hospital/public-health/incidents/{incidentId}/actions</td><td>修订号、状态机、独立复核和安全审计</td><td><span class="priority">P1</span></td></tr>
               <tr><td>证据材料</td><td>POST/PUT</td><td>/api/v1/evidence-materials/{materialId}</td><td>证据材料页、材料台账</td><td><span class="priority">P0</span></td></tr>
               <tr><td>医院申报</td><td>PUT</td><td>/api/v1/submissions/{submissionId}</td><td>医院申报页、指标自评数据</td><td><span class="priority">P0</span></td></tr>
               <tr><td>运行校验</td><td>POST</td><td>/api/v1/submissions/{submissionId}/validations:run</td><td>数据校验页、校验规则</td><td><span class="priority">P0</span></td></tr>
@@ -5826,6 +6152,7 @@
       assessment: "试点评估",
       assistant: "评价助手",
       monitoring: "运营监控",
+      "public-health": "公共卫生",
       standards: "标准指标",
       submission: "医院申报",
       evidence: "证据材料",
@@ -5849,6 +6176,7 @@
     else if (state.activeView === "assessment") renderAssessment();
     else if (state.activeView === "assistant") renderAssistant();
     else if (state.activeView === "monitoring") renderMonitoring();
+    else if (state.activeView === "public-health") renderPublicHealth();
     else if (state.activeView === "standards") renderStandards();
     else if (state.activeView === "submission") renderSubmission();
     else if (state.activeView === "evidence") renderEvidence();
@@ -8819,6 +9147,128 @@
     render();
   }
 
+  function addPublicHealthIncidentAction(incident, action, result) {
+    const at = nowText();
+    incident.lastUpdatedAt = at;
+    incident.latestAction = result;
+    state.publicHealth.incidentActions.unshift({
+      id: `PHA-${Date.now()}`,
+      incidentId: incident.id,
+      action,
+      actor: state.activeRole,
+      at,
+      result,
+      revision: Number(incident.revision || 1),
+    });
+  }
+
+  function createPublicHealthIncident() {
+    const incident = {
+      id: `PHE-${Date.now()}`,
+      revision: 1,
+      laneId: "health-education",
+      title: "健康教育内容发布时效异常",
+      level: "P1",
+      source: "人工登记",
+      hospitalCode: state.selectedHospital,
+      owner: "宣传与健康促进协同组",
+      status: "待核查",
+      discoveredAt: nowText(),
+      dueAt: new Date(Date.now() + 4 * 60 * 60 * 1000).toLocaleString("zh-CN", { hour12: false }),
+      lastUpdatedAt: nowText(),
+      latestAction: "已登记，等待责任组核查",
+      submittedForReviewBy: "",
+    };
+    state.publicHealth.incidents.unshift(incident);
+    addPublicHealthIncidentAction(incident, "登记事件", "已登记，等待责任组核查");
+    addAudit("登记公共卫生异常事件", incident.id, `${incident.level} · ${incident.owner}`);
+    saveState();
+    showNotice("公共卫生异常事件已登记并进入核查队列。");
+    render();
+  }
+
+  function advancePublicHealthIncident(id) {
+    const incident = state.publicHealth.incidents.find((item) => item.id === id);
+    if (!incident || incident.status === "已关闭") return;
+    const transitions = {
+      待核查: { status: "处置中", action: "开始处置", result: "核查确认异常，责任组已开始处置" },
+      处置中: { status: "待复核", action: "提交复核", result: "处置措施已完成，等待独立业务复核" },
+      待复核: { status: "已关闭", action: "复核关闭", result: "独立复核通过，事件闭环" },
+    };
+    const next = transitions[incident.status];
+    if (!next) return;
+    if (incident.status === "待复核" && incident.submittedForReviewBy === state.activeRole) {
+      showNotice("提交处置结果的角色不能复核自己的事件，请切换独立复核角色。");
+      return;
+    }
+    incident.revision = Number(incident.revision || 1) + 1;
+    incident.status = next.status;
+    if (next.status === "待复核") incident.submittedForReviewBy = state.activeRole;
+    if (next.status === "已关闭") {
+      incident.closedAt = nowText();
+      incident.verifiedBy = state.activeRole;
+    }
+    addPublicHealthIncidentAction(incident, next.action, next.result);
+    addAudit(next.action, incident.id, `${next.result} · r${incident.revision}`);
+    saveState();
+    showNotice(`${incident.id}已更新为：${incident.status}（r${incident.revision}）`);
+    render();
+  }
+
+  function simulatePublicHealthBreak() {
+    const publicHealth = state.publicHealth;
+    const latest = publicHealth.campaigns.at(-1);
+    if (!latest) return;
+    latest.status = "验签失败";
+    publicHealth.consecutiveCampaigns = 0;
+    publicHealth.continuousConnectivityReady = false;
+    publicHealth.productionReady = false;
+    publicHealth.continuityBreak = {
+      campaignId: latest.id,
+      code: "ENDPOINT_PROBE_CAMPAIGN_VERIFICATION_FAILED",
+    };
+    addAudit("演示公共卫生连续性失败关闭", latest.id, "连续计数归零，生产状态保持未授权");
+    saveState();
+    showNotice("最新活动已模拟为验签失败；连续计数归零，生产状态保持未授权。");
+    render();
+  }
+
+  function restorePublicHealthContinuity() {
+    const publicHealth = state.publicHealth;
+    publicHealth.campaigns.forEach((campaign, index) => {
+      campaign.status = "已验证";
+      campaign.chain = index === 0 ? "genesis" : "verified";
+    });
+    publicHealth.consecutiveCampaigns = publicHealth.requiredConsecutiveCampaigns;
+    publicHealth.campaignChainLinksVerified = Math.max(0, publicHealth.requiredConsecutiveCampaigns - 1);
+    publicHealth.continuousConnectivityReady = true;
+    publicHealth.productionReady = false;
+    publicHealth.continuityBreak = null;
+    addAudit("恢复公共卫生受控连续窗口", "八通道活动", "连续验证恢复，生产状态保持未授权");
+    saveState();
+    showNotice("受控连续窗口已恢复；现场证据和上线审批仍然阻断生产状态。");
+    render();
+  }
+
+  function simulatePublicHealthChainBreak() {
+    const publicHealth = state.publicHealth;
+    const latest = publicHealth.campaigns.at(-1);
+    if (!latest) return;
+    latest.chain = "mismatch";
+    publicHealth.campaignChainLinksVerified = 0;
+    publicHealth.consecutiveCampaigns = 1;
+    publicHealth.continuousConnectivityReady = false;
+    publicHealth.productionReady = false;
+    publicHealth.continuityBreak = {
+      campaignId: latest.id,
+      code: "campaign-chain-link-mismatch",
+    };
+    addAudit("演示公共卫生签名前序链失败关闭", latest.id, "中间活动缺失，连续状态保持阻断");
+    saveState();
+    showNotice("已模拟前序链缺口；摘要不匹配，系统拒绝跨缺口拼接连续活动。");
+    render();
+  }
+
   function generateSpotCheck() {
     const anomaly = state.peerAnomalies.find((item) => item.status === "待核验" && !state.spotChecks.some((check) => check.hospitalCode === item.hospitalCode && check.status !== "已完成"));
     const hospital = anomaly ? state.hospitals.find((item) => item.code === anomaly.hospitalCode) : activeHospital();
@@ -9251,6 +9701,12 @@
       renderMonitoring();
       return;
     }
+    const publicHealthTab = event.target.closest("button[data-public-health-tab]");
+    if (publicHealthTab) {
+      workspace.dataset.publicHealthTab = publicHealthTab.dataset.publicHealthTab;
+      renderPublicHealth();
+      return;
+    }
     const action = event.target.closest("[data-action]");
     if (!action) return;
     const name = action.dataset.action;
@@ -9380,6 +9836,11 @@
     if (name === "prioritize-queue") prioritizeQueue(action.dataset.id);
     if (name === "expand-storage") expandStorage(action.dataset.id);
     if (name === "clean-storage") cleanStorage(action.dataset.id);
+    if (name === "create-public-health-incident") createPublicHealthIncident();
+    if (name === "advance-public-health-incident") advancePublicHealthIncident(action.dataset.id);
+    if (name === "simulate-public-health-break") simulatePublicHealthBreak();
+    if (name === "simulate-public-health-chain-break") simulatePublicHealthChainBreak();
+    if (name === "restore-public-health-continuity") restorePublicHealthContinuity();
     if (name === "generate-spot-check") generateSpotCheck();
     if (name === "assign-spot-check") assignSpotCheck();
     if (name === "complete-spot-check") completeSpotCheck();

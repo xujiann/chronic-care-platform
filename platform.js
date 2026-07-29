@@ -429,17 +429,23 @@ const defaultCommercialCryptoCapabilities = [
 
 document.addEventListener("DOMContentLoaded", async () => {
   platformState = await loadPlatformState(fallbackPlatformState);
-  await loadPlatformCapabilityMap();
-  await loadPlatformGoLiveSlices();
-  await loadPlatformStandardsLedgers();
-  await loadPlatformCapabilityOperationsCenter();
-  await loadCommercialCryptoCenter();
-  await loadPostgresReconciliationCenter();
-  await loadPostgresProductionAdapterCenter();
-  await loadIdentityLifecycleCenter();
-  await loadFinancialGatewayOperationsCenter();
   ensureEditablePlatformData(platformState);
   bindPlatformEditor();
+  renderPlatform();
+  refreshResearchSandboxSummary();
+
+  await loadIdentityLifecycleCenter();
+  renderIdentityLifecycleCenter();
+  await Promise.all([
+    loadPlatformCapabilityMap(),
+    loadPlatformGoLiveSlices(),
+    loadPlatformStandardsLedgers(),
+    loadPlatformCapabilityOperationsCenter(),
+    loadCommercialCryptoCenter(),
+    loadPostgresReconciliationCenter(),
+    loadPostgresProductionAdapterCenter(),
+    loadFinancialGatewayOperationsCenter()
+  ]);
   renderPlatform();
   refreshResearchSandboxSummary();
 });

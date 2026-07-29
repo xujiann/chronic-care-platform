@@ -2377,7 +2377,7 @@ test("data governance foundation exposes platform cards API and release evidence
   assert.match(read("scripts/release-artifact-manifest.js"), /data-governance-readiness-report\.md/);
 });
 
-test("digital hospital v0.18 production runtime is publishable from GitHub Pages", () => {
+test("digital hospital v0.19 merged runtime is publishable from GitHub Pages", () => {
   const standardsEntry = read("digital-hospital-standards.html");
   const index = read("digital-hospital-standard-platform/index.html");
   const app = read("digital-hospital-standard-platform/app.js");
@@ -2389,24 +2389,29 @@ test("digital hospital v0.18 production runtime is publishable from GitHub Pages
   const executionService = read("digital-hospital-execution-service.js");
   const executionSecurity = read("digital-hospital-execution-security.js");
   const cutoverGovernance = read("digital-hospital-cutover-governance.js");
+  const publicHealthCoordination = read("digital-hospital-public-health-coordination.js");
+  const mergeRecord = read("docs/数智医院标准平台v0.19任务与代码合并记录.md");
   const runtimeReadiness = read("scripts/digital-hospital-production-runtime-readiness.js");
   const server = read("server.js");
 
-  assert.match(standardsEntry, /href="\.\/digital-hospital-standard-platform\/">新标准平台 v0\.18/);
-  assert.match(index, /v0\.18/);
+  assert.match(standardsEntry, /href="\.\/digital-hospital-standard-platform\/">新标准平台 v0\.19/);
+  assert.match(index, /v0\.19/);
   assert.match(index, /data-view="assistant">评价助手/);
   assert.match(index, /data-view="integration">接入联调/);
   assert.match(index, /data-view="execution">接入执行/);
   assert.match(index, /data-view="assessment">试点评估/);
   assert.match(index, /data-view="monitoring">运营监控/);
-  assert.match(app, /digitalHospitalMvpState:v0\.18/);
-  assert.match(app, /prototypeVersion: "mvp-0\.18"/);
+  assert.match(index, /data-view="public-health">公共卫生/);
+  assert.match(app, /digitalHospitalMvpState:v0\.19/);
+  assert.match(app, /prototypeVersion: "mvp-0\.19"/);
   assert.match(app, /function renderAssistant\(\)/);
   assert.match(app, /function renderIntegration\(\)/);
   assert.match(app, /function renderExecution\(\)/);
+  assert.match(app, /function renderPublicHealth\(\)/);
   assert.match(app, /assistant: "评价助手包"/);
   assert.match(app, /integration: "接入联调包"/);
   assert.match(app, /execution: "接入执行包"/);
+  assert.match(app, /publicHealth: "公共卫生协同包"/);
   assert.match(app, /data-action="advance-access-application"/);
   assert.match(app, /data-action="probe-pilot-connector"/);
   assert.match(app, /data-action="rotate-pilot-credential"/);
@@ -2458,6 +2463,10 @@ test("digital hospital v0.18 production runtime is publishable from GitHub Pages
   assert.match(app, /data-action="annotate-improvement-sample"/);
   assert.match(app, /data-action="include-improvement-sample"/);
   assert.match(app, /data-action="run-improvement-regression"/);
+  assert.match(app, /data-action="create-public-health-incident"/);
+  assert.match(app, /data-action="advance-public-health-incident"/);
+  assert.match(app, /data-action="simulate-public-health-break"/);
+  assert.match(app, /data-action="restore-public-health-continuity"/);
   assert.match(styles, /\.assistant-tabs button/);
   assert.match(styles, /\.integration-tabs button/);
   assert.match(styles, /\.execution-tabs button/);
@@ -2489,6 +2498,9 @@ test("digital hospital v0.18 production runtime is publishable from GitHub Pages
   assert.match(openapi, /\/api\/digital-hospital\/execution\/callbacks/);
   assert.match(openapi, /\/api\/digital-hospital\/execution\/cutover-evidence-packs/);
   assert.match(openapi, /\/api\/digital-hospital\/execution\/cutover-windows\/\{windowId\}\/actions/);
+  assert.match(openapi, /name: PublicHealthCoordination/);
+  assert.match(openapi, /\/api\/digital-hospital\/public-health\/coordination/);
+  assert.match(openapi, /\/api\/digital-hospital\/public-health\/incidents\/\{incidentId\}\/actions/);
   assert.match(openapi, /enum: \[submission, review, expert, rectification, task, pilot, collaboration, integration, execution,/);
   assert.match(openapi, /name: EvaluationAssistant/);
   assert.match(openapi, /\/api\/v1\/evaluation-assistant\/review-risks:scan/);
@@ -2551,6 +2563,11 @@ test("digital hospital v0.18 production runtime is publishable from GitHub Pages
   assert.ok(schema.properties.meta.properties.packageType.enum.includes("assistant"));
   assert.ok(schema.properties.meta.properties.packageType.enum.includes("integration"));
   assert.ok(schema.properties.meta.properties.packageType.enum.includes("execution"));
+  assert.ok(schema.properties.meta.properties.packageType.enum.includes("publicHealth"));
+  assert.ok(schema.properties.publicHealthSummary);
+  assert.ok(schema.properties.publicHealthIncidents);
+  assert.ok(schema.properties.publicHealthIncidentActions);
+  assert.ok(schema.properties.publicHealth);
   assert.match(executionDomain, /function verifyExecutionCallback/);
   assert.match(executionDomain, /function evaluateCutoverWindow/);
   assert.match(executionDomain, /function claimExecutionJob/);
@@ -2569,9 +2586,18 @@ test("digital hospital v0.18 production runtime is publishable from GitHub Pages
   assert.match(cutoverGovernance, /managed-vault-attestation/);
   assert.match(cutoverGovernance, /hospital-signoff/);
   assert.match(cutoverGovernance, /function evaluateProductionCutover/);
+  assert.match(publicHealthCoordination, /PUBLIC_HEALTH_INCIDENT_TRANSITIONS/);
+  assert.match(publicHealthCoordination, /function assertNoSensitiveFields/);
+  assert.match(publicHealthCoordination, /function buildPublicHealthCoordinationBoard/);
+  assert.match(publicHealthCoordination, /productionReady: false/);
+  assert.match(mergeRecord, /main.*唯一代码主线.*GitHub Pages/);
+  assert.match(mergeRecord, /4142402e0c79fd8457c00c370b5d163e88cca0e7/);
+  assert.match(mergeRecord, /不再从旧 Sites 提交反向覆盖主线/);
   assert.match(runtimeReadiness, /software-complete-external-activation-required/);
   assert.match(server, /\/api\/digital-hospital\/execution\/runtime/);
   assert.match(server, /\/api\/digital-hospital\/execution\/callbacks/);
+  assert.match(server, /\/api\/digital-hospital\/public-health\/coordination/);
+  assert.match(server, /\/api\/digital-hospital\/public-health\/incidents\/:id\/actions/);
 });
 
 test("digital hospital standards platform exposes standards center workflow and release evidence", () => {
