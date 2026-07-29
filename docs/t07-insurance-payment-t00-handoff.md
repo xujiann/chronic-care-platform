@@ -104,3 +104,10 @@ node .\scripts\insurance-payment-evidence-packet.js --require-production
 前两条命令用于验证T07本地领域能力，当前应成功；后两条是发布流水线严格门禁，在公共接线和现场证据未齐备时必须以非零状态退出。不得用本地验收命令的成功退出替代生产门禁。
 
 统一验收报告和证据包均输出 `productionGate`，包含稳定检查编号、布尔结果、明细及 `blockers` 数组。当前严格门禁应明确报告 `t00-public-wiring-complete`、`handoff-evidence-complete` 和 `live-site-acceptance-confirmed` 等未通过项，便于CI直接生成阻断清单。
+
+正式交付的证据包必须使用外部受控RSA或ECDSA私钥生成短期签名信封，签名有效期最长31天。签名绑定整个证据包内容摘要、包摘要、生成时间、领域/集成责任方和生产就绪结论；包内只携带公钥和SHA-256指纹，不得携带私钥。接收方必须配置可信指纹并使用 `--require-signature` 验证，生产严格模式也会强制要求可信签名。
+
+```powershell
+node .\scripts\insurance-payment-evidence-packet.js --signing-key=<外部私钥.pem> --signer-id=<发布主体> --signer-organization=<签发机构> --signed-at=<UTC时间> --signature-valid-until=<不超过31天的UTC时间> --output=<证据包.json>
+node .\scripts\insurance-payment-evidence-packet.js --require-signature --trusted-fingerprints=<可信公钥SHA-256指纹>
+```

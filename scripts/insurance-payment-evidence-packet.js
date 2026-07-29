@@ -6,6 +6,7 @@ const path = require("node:path");
 const { createHash } = require("node:crypto");
 const { buildInsurancePaymentAcceptance } = require("./insurance-payment-acceptance");
 const Handoff = require("../insurance-payment-production-handoff");
+const Signature = require("../insurance-payment-evidence-signature");
 
 const ROOT = path.resolve(__dirname, "..");
 const EVIDENCE_FILES = Object.freeze([
@@ -16,11 +17,13 @@ const EVIDENCE_FILES = Object.freeze([
   "online-payment-refunds.js",
   "insurance-payment-operating-model.js",
   "insurance-payment-production-handoff.js",
+  "insurance-payment-evidence-signature.js",
   "docs/t07-insurance-payment-t00-handoff.md",
   "scripts/insurance-payment-acceptance.js",
   "scripts/insurance-payment-evidence-packet.js",
   "test/insurance-payment-production-handoff.test.js",
   "test/insurance-payment-evidence-packet.test.js",
+  "test/insurance-payment-evidence-signature.test.js",
   "test/insurance-payment-acceptance.test.js"
 ]);
 
@@ -35,7 +38,7 @@ function sha256(value) {
 }
 
 function packetPayload(packet = {}) {
-  const { packetDigest: _packetDigest, ...payload } = packet;
+  const { packetDigest: _packetDigest, signatureEnvelope: _signatureEnvelope, signatureVerification: _signatureVerification, ...payload } = packet;
   return payload;
 }
 
@@ -87,7 +90,16 @@ function buildInsurancePaymentEvidencePacket(options = {}) {
     boundary: "The packet proves local domain behavior and handoff completeness only. Production readiness requires real provider credentials, callbacks, statements, security assessment and signed site acceptance."
   };
   packet.productionGate = buildEvidenceProductionGate(packet);
-  return { ...packet, packetDigest: `sha256:${sha256(stableStringify(packet))}` };
+  const sealed = { ...packet, packetDigest: `sha256:${sha256(stableStringify(packet))}` };
+  if (options.signingPrivateKeyPem) {
+    sealed.signatureEnvelope = Signature.createEvidencePacketSignature(sealed, options.signingPrivateKeyPem, {
+      signerId: options.signerId,
+      signerOrganization: options.signerOrganization,
+      signedAt: options.signedAt,
+      validUntil: options.signatureValidUntil
+    });
+  }
+  return sealed;
 }
 
 function verifyArtifactManifest(artifacts = [], artifactRoot = ROOT) {
@@ -111,7 +123,11 @@ function verifyArtifactManifest(artifacts = [], artifactRoot = ROOT) {
 function verifyInsurancePaymentEvidencePacket(packet = {}, options = {}) {
   const digestValid = /^sha256:[a-f0-9]{64}$/.test(String(packet.packetDigest || ""))
     && packet.packetDigest === `sha256:${sha256(stableStringify(packetPayload(packet)))}`;
-  return digestValid && verifyArtifactManifest(packet.artifacts, options.artifactRoot || ROOT);
+  const signatureValid = options.requireSignature !== true || Signature.verifyEvidencePacketSignature(packet, {
+    now: options.now,
+    trustedSignerFingerprints: options.trustedSignerFingerprints
+  }).ok;
+  return digestValid && verifyArtifactManifest(packet.artifacts, options.artifactRoot || ROOT) && signatureValid;
 }
 
 function renderMarkdown(packet) {
@@ -146,19 +162,35 @@ function parseArgs(argv = process.argv.slice(2)) {
   }));
 }
 
+function trustedFingerprints(value) {
+  return String(value || "").split(/[;,\s]+/).map(Signature.normalizeFingerprint).filter(Boolean);
+}
+
 function shouldFailEvidencePacket(packet = {}, args = {}) {
+  const requireSignature = args["require-signature"] === true || args["require-production"] === true;
   return packet.localReady !== true
-    || !verifyInsurancePaymentEvidencePacket(packet)
+    || !verifyInsurancePaymentEvidencePacket(packet, {
+      requireSignature,
+      trustedSignerFingerprints: trustedFingerprints(args["trusted-fingerprints"]),
+      now: args.now
+    })
     || (args["require-production"] === true && packet.productionGate?.passed !== true);
 }
 
 if (require.main === module) {
   const args = parseArgs();
-  const packet = buildInsurancePaymentEvidencePacket();
+  const signingKeyPath = args["signing-key"] ? path.resolve(args["signing-key"]) : "";
+  const packet = buildInsurancePaymentEvidencePacket({
+    signingPrivateKeyPem: signingKeyPath ? fs.readFileSync(signingKeyPath, "utf8") : "",
+    signerId: args["signer-id"],
+    signerOrganization: args["signer-organization"],
+    signedAt: args["signed-at"],
+    signatureValidUntil: args["signature-valid-until"]
+  });
   if (args.output) fs.writeFileSync(path.resolve(ROOT, args.output), `${JSON.stringify(packet, null, 2)}\n`, "utf8");
   if (args.markdown) fs.writeFileSync(path.resolve(ROOT, args.markdown), renderMarkdown(packet), "utf8");
-  process.stdout.write(`${JSON.stringify({ packetDigest: packet.packetDigest, localReady: packet.localReady, productionReady: packet.productionReady, workflows: packet.workflows.length, t00PendingRoutes: packet.t00PendingRoutes.length, externalBlockers: packet.externalBlockers.length }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ packetDigest: packet.packetDigest, signed: Boolean(packet.signatureEnvelope), signerFingerprint: packet.signatureEnvelope?.keyFingerprint || "", localReady: packet.localReady, productionReady: packet.productionReady, workflows: packet.workflows.length, t00PendingRoutes: packet.t00PendingRoutes.length, externalBlockers: packet.externalBlockers.length }, null, 2)}\n`);
   if (shouldFailEvidencePacket(packet, args)) process.exitCode = 1;
 }
 
-module.exports = { EVIDENCE_FILES, buildEvidenceProductionGate, buildInsurancePaymentEvidencePacket, packetPayload, parseArgs, renderMarkdown, sha256, shouldFailEvidencePacket, stableStringify, verifyArtifactManifest, verifyInsurancePaymentEvidencePacket };
+module.exports = { EVIDENCE_FILES, buildEvidenceProductionGate, buildInsurancePaymentEvidencePacket, packetPayload, parseArgs, renderMarkdown, sha256, shouldFailEvidencePacket, stableStringify, trustedFingerprints, verifyArtifactManifest, verifyInsurancePaymentEvidencePacket };
