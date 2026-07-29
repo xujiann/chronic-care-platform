@@ -5,12 +5,15 @@ const assert = require("node:assert/strict");
 
 const {
   advancePublicHealthIncident,
+  buildPublicHealthIncidentClosureGate,
   buildPublicHealthCoordinationBoard,
   createPublicHealthIncident,
   escalatePublicHealthIncident,
   normalizePublicHealthCoordination,
+  reviewPublicHealthIncidentEvidence,
   renderPublicHealthIncidentCsv,
-  seedPublicHealthCoordination
+  seedPublicHealthCoordination,
+  submitPublicHealthIncidentEvidence
 } = require("../digital-hospital-public-health-coordination");
 
 const creator = {
@@ -40,6 +43,36 @@ function validIncident(overrides = {}) {
     note: "已登记并等待责任组核查",
     ...overrides
   };
+}
+
+function acceptRequiredEvidence(state, incidentId, level = "P0") {
+  const requirements = {
+    P0: ["business-receipt", "site-joint-test", "production-approval", "dr-rehearsal"],
+    P1: ["business-receipt", "site-joint-test", "production-approval"],
+    P2: ["business-receipt", "site-joint-test"]
+  }[level];
+  let nextState = state;
+  let incident = nextState.incidents.find((item) => item.id === incidentId);
+  for (const [index, evidenceType] of requirements.entries()) {
+    let result = submitPublicHealthIncidentEvidence(nextState, incidentId, {
+      expectedRevision: incident.revision,
+      evidenceType,
+      referenceNo: `REF-${evidenceType}-${index + 1}`,
+      summary: `${evidenceType} closure evidence summary`,
+      digest: `sha256:${String(index + 1).repeat(64)}`
+    }, creator, { now: `2026-07-30T08:${String(31 + index * 2).padStart(2, "0")}:00.000Z` });
+    nextState = result.state;
+    incident = result.incident;
+    result = reviewPublicHealthIncidentEvidence(nextState, result.evidence.id, {
+      action: "accept-evidence",
+      expectedEvidenceRevision: 1,
+      expectedIncidentRevision: incident.revision,
+      note: "independent evidence review accepted"
+    }, reviewer, { now: `2026-07-30T08:${String(32 + index * 2).padStart(2, "0")}:00.000Z` });
+    nextState = result.state;
+    incident = result.incident;
+  }
+  return { state: nextState, incident };
 }
 
 test("migrated public health coordination keeps eight lanes and a closed production gate", () => {
@@ -132,16 +165,123 @@ test("incident lifecycle enforces optimistic revisions and independent close rev
     (error) => error.code === "PUBLIC_HEALTH_INDEPENDENT_REVIEW_REQUIRED"
   );
 
+  assert.throws(
+    () => advancePublicHealthIncident(state, "PHE-TEST-001", {
+      action: "verify-close",
+      expectedRevision: 3,
+      note: "缺少证据不得关闭"
+    }, reviewer),
+    (error) => error.code === "PUBLIC_HEALTH_CLOSURE_EVIDENCE_REQUIRED"
+  );
+
+  const accepted = acceptRequiredEvidence(state, "PHE-TEST-001");
+  state = accepted.state;
   result = advancePublicHealthIncident(state, "PHE-TEST-001", {
     action: "verify-close",
-    expectedRevision: 3,
+    expectedRevision: accepted.incident.revision,
     note: "卫健委独立复核通过并关闭"
-  }, reviewer, { now: "2026-07-30T08:30:00.000Z" });
+  }, reviewer, { now: "2026-07-30T08:45:00.000Z" });
 
   assert.equal(result.incident.status, "已关闭");
-  assert.equal(result.incident.revision, 4);
+  assert.equal(result.incident.revision, 12);
   assert.equal(result.incident.closedBy, "u-health");
   assert.equal(result.state.productionReady, false);
+});
+
+test("evidence submission is minimized, revision checked and independently reviewed", () => {
+  const created = createPublicHealthIncident(
+    seedPublicHealthCoordination(),
+    validIncident({ id: "PHE-EVIDENCE-001", level: "P2" }),
+    creator,
+    { now: "2026-07-30T08:00:00.000Z" }
+  );
+  const submitted = submitPublicHealthIncidentEvidence(created.state, created.incident.id, {
+    expectedRevision: 1,
+    evidenceType: "business-receipt",
+    referenceNo: "RECEIPT-20260730-01",
+    summary: "接收端返回成功状态的最小化业务回执摘要。",
+    digest: `sha256:${"a".repeat(64)}`
+  }, creator, { now: "2026-07-30T08:05:00.000Z" });
+
+  assert.equal(submitted.evidence.status, "submitted");
+  assert.equal(submitted.incident.revision, 2);
+  assert.equal(submitted.incident.evidenceIds.includes(submitted.evidence.id), true);
+  assert.equal(submitted.closureGate.accepted, 0);
+  assert.deepEqual(submitted.closureGate.missingTypes, ["business-receipt", "site-joint-test"]);
+
+  assert.throws(
+    () => reviewPublicHealthIncidentEvidence(submitted.state, submitted.evidence.id, {
+      action: "accept-evidence",
+      expectedEvidenceRevision: 1,
+      expectedIncidentRevision: 2,
+      note: "提交人不能签收自己的证据",
+      attachmentUrl: "https://unapproved.example/evidence"
+    }, reviewer),
+    (error) => error.code === "PUBLIC_HEALTH_EVIDENCE_FIELD_INVALID"
+  );
+
+  assert.throws(
+    () => reviewPublicHealthIncidentEvidence(submitted.state, submitted.evidence.id, {
+      action: "accept-evidence",
+      expectedEvidenceRevision: 1,
+      expectedIncidentRevision: 2,
+      note: "提交人不能签收自己的证据"
+    }, creator),
+    (error) => error.code === "PUBLIC_HEALTH_INDEPENDENT_EVIDENCE_REVIEW_REQUIRED"
+  );
+
+  const reviewed = reviewPublicHealthIncidentEvidence(submitted.state, submitted.evidence.id, {
+    action: "accept-evidence",
+    expectedEvidenceRevision: 1,
+    expectedIncidentRevision: 2,
+    note: "业务回执编号与当前事件一致"
+  }, reviewer, { now: "2026-07-30T08:08:00.000Z" });
+  assert.equal(reviewed.evidence.status, "accepted");
+  assert.equal(reviewed.evidence.reviewedBy, "u-health");
+  assert.equal(reviewed.incident.revision, 3);
+  assert.equal(reviewed.closureGate.accepted, 1);
+  assert.equal(reviewed.state.productionReady, false);
+
+  assert.throws(
+    () => submitPublicHealthIncidentEvidence(reviewed.state, created.incident.id, {
+      expectedRevision: 3,
+      evidenceType: "business-receipt",
+      referenceNo: "RECEIPT-DUPLICATE",
+      summary: "不得重复登记仍有效的同类证据。",
+      digest: `sha256:${"b".repeat(64)}`
+    }, creator),
+    (error) => error.code === "PUBLIC_HEALTH_EVIDENCE_DUPLICATE"
+  );
+});
+
+test("hospital authorization scopes board rows and all incident writes", () => {
+  const state = seedPublicHealthCoordination();
+  const board = buildPublicHealthCoordinationBoard(state, {
+    authorizedHospitalCodes: ["H000003"]
+  });
+  assert.deepEqual(board.filters.availableHospitals, ["H000003"]);
+  assert.equal(board.coordination.incidents.length, 1);
+  assert.equal(board.coordination.incidents[0].hospitalCode, "H000003");
+  assert.equal(board.accessScope.mode, "organization-hospital-scope");
+
+  assert.throws(
+    () => createPublicHealthIncident(state, validIncident({
+      id: "PHE-OUT-OF-SCOPE",
+      hospitalCode: "H000001"
+    }), creator, { authorizedHospitalCodes: ["H000003"] }),
+    (error) => error.code === "PUBLIC_HEALTH_HOSPITAL_SCOPE_FORBIDDEN" && error.status === 403
+  );
+  assert.throws(
+    () => advancePublicHealthIncident(state, "PHE-20260728-003", {
+      action: "start-handling",
+      expectedRevision: 1,
+      note: "越权事件不得推进"
+    }, creator, { authorizedHospitalCodes: ["H000003"] }),
+    (error) => error.code === "PUBLIC_HEALTH_INCIDENT_NOT_FOUND" && error.status === 404
+  );
+
+  const closed = state.incidents.find((item) => item.id === "PHE-20260727-004");
+  assert.equal(buildPublicHealthIncidentClosureGate(closed, state.incidentEvidence).ready, true);
 });
 
 test("terminal incidents and invalid transition actions fail closed", () => {

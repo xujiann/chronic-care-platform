@@ -123,8 +123,10 @@ const {
   createPublicHealthIncident: createDigitalHospitalPublicHealthIncident,
   escalatePublicHealthIncident: escalateDigitalHospitalPublicHealthIncident,
   normalizePublicHealthCoordination: normalizeDigitalHospitalPublicHealthCoordination,
+  reviewPublicHealthIncidentEvidence: reviewDigitalHospitalPublicHealthIncidentEvidence,
   renderPublicHealthIncidentCsv: renderDigitalHospitalPublicHealthIncidentCsv,
-  seedPublicHealthCoordination: seedDigitalHospitalPublicHealthCoordination
+  seedPublicHealthCoordination: seedDigitalHospitalPublicHealthCoordination,
+  submitPublicHealthIncidentEvidence: submitDigitalHospitalPublicHealthIncidentEvidence
 } = require("./digital-hospital-public-health-coordination");
 const { buildCareServiceProductionReadiness } = require("./scripts/care-service-production-readiness");
 const {
@@ -2393,13 +2395,13 @@ function seedAuthUsers() {
     { id: "u-blood-quality", username: "blood_quality", password: "123456", name: "血液中心质控审核员", role: "commission", roleName: "血液中心冷链质控", orgCode: "BLOOD-DL", orgName: "大连市血液中心", orgType: "blood_center", orgLevel: "市级", dataScope: "冷链异常、质量处置与血液放行", home: "blood.html", accountType: "blood_quality", bloodPermissions: ["cold_chain_quality_review"], status: "启用" },
     { id: "u-blood-tech-1", username: "blood_tech_1", password: "123456", name: "输血科配血复核员甲", role: "institution", roleName: "输血科检验技师", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构交叉配血与发血复核", home: "blood.html", accountType: "blood_technologist", bloodPermissions: ["compatibility_review"], status: "启用" },
     { id: "u-blood-tech-2", username: "blood_tech_2", password: "123456", name: "输血科配血复核员乙", role: "institution", roleName: "输血科检验技师", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构交叉配血与发血复核", home: "blood.html", accountType: "blood_technologist", bloodPermissions: ["compatibility_review"], status: "启用" },
-    { id: "u-city", username: "city", name: "市级管理员", role: "commission", roleName: "市级健康城市管理", orgCode: "ORG-CITY-DL", orgName: "大连市健康城市平台", orgType: "city", orgLevel: "市级", dataScope: "全市", home: "workbench.html", status: "启用" },
-    { id: "u-district", username: "district", name: "区市县管理员", role: "commission", roleName: "区市县管理端", orgCode: "ORG-DIST-ZS", orgName: "中山区健康城市平台", orgType: "district", orgLevel: "区市县", dataScope: "中山区", home: "workbench.html", status: "启用" },
-    { id: "u-health", username: "health", name: "大连市卫生健康委管理员", role: "commission", roleName: "大连市卫生健康委", orgCode: "ORG-HEALTH-DL", orgName: "大连市卫生健康委", orgType: "health_admin", orgLevel: "市级", dataScope: "医疗资源、统计直报、公共卫生、分级诊疗和数据质量监管", home: "index.html", status: "启用" },
+    { id: "u-city", username: "city", name: "市级管理员", role: "commission", roleName: "市级健康城市管理", orgCode: "ORG-CITY-DL", orgName: "大连市健康城市平台", orgType: "city", orgLevel: "市级", dataScope: "全市", publicHealthHospitalCodes: ["H000001", "H000002", "H000003"], home: "workbench.html", status: "启用" },
+    { id: "u-district", username: "district", name: "区市县管理员", role: "commission", roleName: "区市县管理端", orgCode: "ORG-DIST-ZS", orgName: "中山区健康城市平台", orgType: "district", orgLevel: "区市县", dataScope: "中山区", publicHealthHospitalCodes: ["H000003"], home: "workbench.html", status: "启用" },
+    { id: "u-health", username: "health", name: "大连市卫生健康委管理员", role: "commission", roleName: "大连市卫生健康委", orgCode: "ORG-HEALTH-DL", orgName: "大连市卫生健康委", orgType: "health_admin", orgLevel: "市级", dataScope: "医疗资源、统计直报、公共卫生、分级诊疗和数据质量监管", publicHealthHospitalCodes: ["H000001", "H000002", "H000003"], home: "index.html", status: "启用" },
     { id: "u-mi", username: "mi", name: "大连市医保局管理员", role: "insurance", roleName: "大连市医保局管理端", orgCode: "ORG-MI-DL", orgName: "大连市医保局", orgType: "insurance_bureau", orgLevel: "市级", dataScope: "医保政策、基金监管、待遇管理和跨区县监督", home: "insurance.html", status: "启用" },
-    { id: "u-hospital", username: "hospital", name: "医疗机构管理员", role: "institution", roleName: "医疗机构端", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构", home: "institution.html", status: "启用" },
-    { id: "u-community", username: "community", name: "基层机构管理员", role: "institution", roleName: "基层医疗机构端", orgCode: "MR3", orgName: "青泥洼桥社区卫生服务中心", orgType: "medical_institution", orgLevel: "基层医疗机构", dataScope: "本机构与签约居民", home: "institution.html", status: "启用" },
-    { id: "u1", username: "whjw", name: "大连市卫生健康委管理员", role: "commission", roleName: "大连市卫生健康委", orgCode: "ORG-HEALTH-DL", orgName: "大连市卫生健康委", orgType: "health_admin", orgLevel: "市级", dataScope: "医疗资源、统计直报、公共卫生、分级诊疗和数据质量监管", home: "index.html", status: "启用" },
+    { id: "u-hospital", username: "hospital", name: "医疗机构管理员", role: "institution", roleName: "医疗机构端", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构", publicHealthHospitalCodes: ["H000001"], home: "institution.html", status: "启用" },
+    { id: "u-community", username: "community", name: "基层机构管理员", role: "institution", roleName: "基层医疗机构端", orgCode: "MR3", orgName: "青泥洼桥社区卫生服务中心", orgType: "medical_institution", orgLevel: "基层医疗机构", dataScope: "本机构与签约居民", publicHealthHospitalCodes: ["H000003"], home: "institution.html", status: "启用" },
+    { id: "u1", username: "whjw", name: "大连市卫生健康委管理员", role: "commission", roleName: "大连市卫生健康委", orgCode: "ORG-HEALTH-DL", orgName: "大连市卫生健康委", orgType: "health_admin", orgLevel: "市级", dataScope: "医疗资源、统计直报、公共卫生、分级诊疗和数据质量监管", publicHealthHospitalCodes: ["H000001", "H000002", "H000003"], home: "index.html", status: "启用" },
     { id: "u2", username: "doctor", name: "刘医生", role: "institution", roleName: "医生账户", orgCode: "MR3", orgName: "青泥洼桥社区卫生服务中心", orgType: "medical_institution", orgLevel: "基层医疗机构", dataScope: "签约居民、随访、长期处方、多点执业申请", home: "doctor.html", doctorId: "doc-liu", accountType: "doctor", status: "启用" },
     { id: "u-doctor-wang", username: "doctor_wang", name: "王医生", role: "institution", roleName: "医生账户", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构诊疗、转诊接诊、多点执业备案", home: "doctor.html", doctorId: "doc-wang", accountType: "doctor", status: "启用" },
     { id: "u3", username: "insurance", name: "大连市医保中心审核员", role: "insurance", roleName: "大连市医保中心经办端", orgCode: "ORG-MI-CENTER-DL", orgName: "大连市医保中心", orgType: "insurance_center", orgLevel: "市级", dataScope: "医保结算经办、凭证核验、固定取药审核和经办留痕", home: "insurance.html", status: "启用" },
@@ -24160,6 +24162,40 @@ async function buildDigitalHospitalPublicHealthProfessionalContext(data, at) {
   };
 }
 
+function digitalHospitalPublicHealthHospitalScope(user = {}, data = {}) {
+  const explicit = Array.isArray(user.publicHealthHospitalCodes)
+    ? user.publicHealthHospitalCodes.map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
+  if (explicit.length) return [...new Set(explicit)];
+  const allHospitalCodes = Array.from(new Set(
+    normalizeDigitalHospitalPublicHealthCoordination(data.digitalHospitalPublicHealthCoordination)
+      .incidents
+      .map((item) => String(item.hospitalCode || "").trim())
+      .filter(Boolean)
+  ));
+  if (["city", "health_admin"].includes(String(user.orgType || ""))) return allHospitalCodes;
+  return [];
+}
+
+function authorizeDigitalHospitalPublicHealthHospital(user, hospitalCode, authorizedHospitalCodes, res, target) {
+  const requestedHospitalCode = String(hospitalCode || "").trim();
+  if (!requestedHospitalCode || authorizedHospitalCodes.includes(requestedHospitalCode)) return true;
+  appendSecurityEvent({
+    actor: user?.name || user?.username || "unknown",
+    role: user?.role || "unknown",
+    action: "digital-hospital-public-health-hospital-scope",
+    target,
+    result: "denied",
+    detail: "requested hospital is outside the current organization scope"
+  });
+  sendJson(res, 403, {
+    error: "Forbidden",
+    code: "PUBLIC_HEALTH_HOSPITAL_SCOPE_FORBIDDEN",
+    message: "requested hospital is outside the current organization scope"
+  });
+  return false;
+}
+
 async function buildDigitalHospitalPublicHealthBoard(data, options = {}) {
   const now = String(options.now || new Date().toISOString());
   const professionalContext = await buildDigitalHospitalPublicHealthProfessionalContext(data, now);
@@ -24168,7 +24204,8 @@ async function buildDigitalHospitalPublicHealthBoard(data, options = {}) {
     {
       now,
       filters: options.filters,
-      professionalContext
+      professionalContext,
+      authorizedHospitalCodes: options.authorizedHospitalCodes
     }
   );
 }
@@ -25933,14 +25970,25 @@ async function handleApi(req, res) {
     if (!user) return;
     const data = readDatabase();
     const filters = Object.fromEntries(url.searchParams.entries());
-    const board = await buildDigitalHospitalPublicHealthBoard(data, { filters });
+    const authorizedHospitalCodes = digitalHospitalPublicHealthHospitalScope(user, data);
+    if (!authorizeDigitalHospitalPublicHealthHospital(
+      user,
+      filters.hospitalCode,
+      authorizedHospitalCodes,
+      res,
+      "/api/digital-hospital/public-health/coordination"
+    )) return;
+    const board = await buildDigitalHospitalPublicHealthBoard(data, {
+      filters,
+      authorizedHospitalCodes
+    });
     appendSecurityEvent({
       actor: user.name,
       role: user.role,
       action: "digital-hospital-public-health-coordination-read",
       target: "/api/digital-hospital/public-health/coordination",
       result: "allowed",
-      detail: `${board.summary.totalLanes} lanes / ${board.summary.filteredIncidents} filtered incidents / ${board.summary.overdueIncidents} overdue / productionReady=false`
+      detail: `${authorizedHospitalCodes.length} hospitals / ${board.summary.totalLanes} lanes / ${board.summary.filteredIncidents} filtered incidents / ${board.summary.overdueIncidents} overdue / productionReady=false`
     });
     sendJson(res, 200, board);
     return;
@@ -25951,6 +25999,14 @@ async function handleApi(req, res) {
     if (!user) return;
     const data = readDatabase();
     const query = Object.fromEntries(url.searchParams.entries());
+    const authorizedHospitalCodes = digitalHospitalPublicHealthHospitalScope(user, data);
+    if (!authorizeDigitalHospitalPublicHealthHospital(
+      user,
+      query.hospitalCode,
+      authorizedHospitalCodes,
+      res,
+      "/api/digital-hospital/public-health/incidents/export"
+    )) return;
     const format = String(query.format || "json").trim().toLowerCase();
     if (!["json", "csv"].includes(format)) {
       sendJson(res, 400, {
@@ -25960,7 +26016,10 @@ async function handleApi(req, res) {
       });
       return;
     }
-    const board = await buildDigitalHospitalPublicHealthBoard(data, { filters: query });
+    const board = await buildDigitalHospitalPublicHealthBoard(data, {
+      filters: query,
+      authorizedHospitalCodes
+    });
     appendSecurityEvent({
       actor: user.name,
       role: user.role,
@@ -26003,11 +26062,20 @@ async function handleApi(req, res) {
     if (!user) return;
     const payload = await collectJson(req);
     const data = readDatabase();
+    const authorizedHospitalCodes = digitalHospitalPublicHealthHospitalScope(user, data);
+    if (!authorizeDigitalHospitalPublicHealthHospital(
+      user,
+      payload.hospitalCode,
+      authorizedHospitalCodes,
+      res,
+      "/api/digital-hospital/public-health/incidents"
+    )) return;
     try {
       const result = createDigitalHospitalPublicHealthIncident(
         data.digitalHospitalPublicHealthCoordination,
         payload,
-        user
+        user,
+        { authorizedHospitalCodes }
       );
       data.digitalHospitalPublicHealthCoordination = result.state;
       data.securityEvents = sealAuditTrail([
@@ -26028,11 +26096,127 @@ async function handleApi(req, res) {
         ok: true,
         incident: result.incident,
         action: result.action,
-        board: await buildDigitalHospitalPublicHealthBoard(data)
+        board: await buildDigitalHospitalPublicHealthBoard(data, { authorizedHospitalCodes })
       });
     } catch (error) {
       sendJson(res, Number(error.status || 400), {
         error: Number(error.status || 400) === 409 ? "Conflict" : "Bad Request",
+        code: error.code || "PUBLIC_HEALTH_COORDINATION_INVALID",
+        message: error.message
+      });
+    }
+    return;
+  }
+
+  const digitalHospitalPublicHealthIncidentEvidenceMatch = url.pathname.match(
+    /^\/api\/digital-hospital\/public-health\/incidents\/([^/]+)\/evidence$/
+  );
+  if (req.method === "POST" && digitalHospitalPublicHealthIncidentEvidenceMatch) {
+    const user = requireApiRole(
+      req,
+      res,
+      ["commission"],
+      "/api/digital-hospital/public-health/incidents/:id/evidence"
+    );
+    if (!user) return;
+    const incidentId = decodeURIComponent(digitalHospitalPublicHealthIncidentEvidenceMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const authorizedHospitalCodes = digitalHospitalPublicHealthHospitalScope(user, data);
+    try {
+      const result = submitDigitalHospitalPublicHealthIncidentEvidence(
+        data.digitalHospitalPublicHealthCoordination,
+        incidentId,
+        payload,
+        user,
+        { authorizedHospitalCodes }
+      );
+      data.digitalHospitalPublicHealthCoordination = result.state;
+      data.securityEvents = sealAuditTrail([
+        {
+          id: randomUUID(),
+          at: new Date().toISOString(),
+          actor: user.name,
+          role: user.role,
+          action: "digital-hospital-public-health-evidence-submit",
+          target: result.evidence.id,
+          result: "allowed",
+          detail: `${result.incident.id} / ${result.evidence.evidenceType} / incident revision ${result.incident.revision} / productionEvidence=false`
+        },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120), { recompute: true });
+      writeDatabase(data);
+      sendJson(res, 201, {
+        ok: true,
+        incident: result.incident,
+        evidence: result.evidence,
+        action: result.action,
+        closureGate: result.closureGate,
+        board: await buildDigitalHospitalPublicHealthBoard(data, { authorizedHospitalCodes })
+      });
+    } catch (error) {
+      sendJson(res, Number(error.status || 400), {
+        error: Number(error.status || 400) === 409
+          ? "Conflict"
+          : Number(error.status || 400) === 404 ? "Not Found" : "Bad Request",
+        code: error.code || "PUBLIC_HEALTH_COORDINATION_INVALID",
+        message: error.message
+      });
+    }
+    return;
+  }
+
+  const digitalHospitalPublicHealthEvidenceActionMatch = url.pathname.match(
+    /^\/api\/digital-hospital\/public-health\/evidence\/([^/]+)\/actions$/
+  );
+  if (req.method === "POST" && digitalHospitalPublicHealthEvidenceActionMatch) {
+    const user = requireApiRole(
+      req,
+      res,
+      ["commission"],
+      "/api/digital-hospital/public-health/evidence/:id/actions"
+    );
+    if (!user) return;
+    const evidenceId = decodeURIComponent(digitalHospitalPublicHealthEvidenceActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const authorizedHospitalCodes = digitalHospitalPublicHealthHospitalScope(user, data);
+    try {
+      const result = reviewDigitalHospitalPublicHealthIncidentEvidence(
+        data.digitalHospitalPublicHealthCoordination,
+        evidenceId,
+        payload,
+        user,
+        { authorizedHospitalCodes }
+      );
+      data.digitalHospitalPublicHealthCoordination = result.state;
+      data.securityEvents = sealAuditTrail([
+        {
+          id: randomUUID(),
+          at: new Date().toISOString(),
+          actor: user.name,
+          role: user.role,
+          action: "digital-hospital-public-health-evidence-review",
+          target: result.evidence.id,
+          result: "allowed",
+          detail: `${result.action.action} / ${result.incident.id} / incident revision ${result.incident.revision} / productionEvidence=false`
+        },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120), { recompute: true });
+      writeDatabase(data);
+      sendJson(res, 200, {
+        ok: true,
+        incident: result.incident,
+        evidence: result.evidence,
+        action: result.action,
+        closureGate: result.closureGate,
+        board: await buildDigitalHospitalPublicHealthBoard(data, { authorizedHospitalCodes })
+      });
+    } catch (error) {
+      sendJson(res, Number(error.status || 400), {
+        error: Number(error.status || 400) === 409
+          ? "Conflict"
+          : Number(error.status || 400) === 404 ? "Not Found" : "Bad Request",
         code: error.code || "PUBLIC_HEALTH_COORDINATION_INVALID",
         message: error.message
       });
@@ -26054,19 +26238,22 @@ async function handleApi(req, res) {
     const incidentId = decodeURIComponent(digitalHospitalPublicHealthIncidentActionMatch[1]);
     const payload = await collectJson(req);
     const data = readDatabase();
+    const authorizedHospitalCodes = digitalHospitalPublicHealthHospitalScope(user, data);
     try {
       const result = String(payload.action || "") === "escalate-overdue"
         ? escalateDigitalHospitalPublicHealthIncident(
           data.digitalHospitalPublicHealthCoordination,
           incidentId,
           payload,
-          user
+          user,
+          { authorizedHospitalCodes }
         )
         : advanceDigitalHospitalPublicHealthIncident(
           data.digitalHospitalPublicHealthCoordination,
           incidentId,
           payload,
-          user
+          user,
+          { authorizedHospitalCodes }
         );
       data.digitalHospitalPublicHealthCoordination = result.state;
       data.securityEvents = sealAuditTrail([
@@ -26087,7 +26274,7 @@ async function handleApi(req, res) {
         ok: true,
         incident: result.incident,
         action: result.action,
-        board: await buildDigitalHospitalPublicHealthBoard(data)
+        board: await buildDigitalHospitalPublicHealthBoard(data, { authorizedHospitalCodes })
       });
     } catch (error) {
       sendJson(res, Number(error.status || 400), {

@@ -55,10 +55,13 @@ test("digital hospital public health coordination API persists an independently 
 
   const cityLogin = await login(baseUrl, "city");
   const healthLogin = await login(baseUrl, "health");
+  const districtLogin = await login(baseUrl, "district");
   assert.equal(cityLogin.response.status, 200);
   assert.equal(healthLogin.response.status, 200);
+  assert.equal(districtLogin.response.status, 200);
   const cityToken = cityLogin.body.token;
   const healthToken = healthLogin.body.token;
+  const districtToken = districtLogin.body.token;
 
   const initial = await api(
     baseUrl,
@@ -70,6 +73,7 @@ test("digital hospital public health coordination API persists an independently 
   assert.equal(initial.body.summary.filteredIncidents >= 4, true);
   assert.equal(initial.body.summary.overdueIncidents >= 1, true);
   assert.equal(initial.body.productionBoundary.productionReady, false);
+  assert.deepEqual(initial.body.accessScope.authorizedHospitalCodes, ["H000001", "H000002", "H000003"]);
   const linkedSeed = initial.body.coordination.incidents.find((item) => item.id === "PHE-20260728-003");
   assert.equal(linkedSeed.professionalAssociation.event.id, "phe-infectious-001");
   assert.equal(linkedSeed.professionalAssociation.exchange.runId, "phxr-direct-report-001");
@@ -85,6 +89,24 @@ test("digital hospital public health coordination API persists an independently 
   assert.equal(filtered.body.summary.filteredIncidents, 1);
   assert.equal(filtered.body.coordination.incidents[0].hospitalCode, "H000003");
   assert.equal(filtered.body.statistics.byStatus["处置中"], 1);
+
+  const districtScoped = await api(
+    baseUrl,
+    "/api/digital-hospital/public-health/coordination",
+    authorized(districtToken)
+  );
+  assert.equal(districtScoped.response.status, 200);
+  assert.deepEqual(districtScoped.body.accessScope.authorizedHospitalCodes, ["H000003"]);
+  assert.equal(districtScoped.body.coordination.incidents.length, 1);
+  assert.equal(districtScoped.body.coordination.incidents[0].hospitalCode, "H000003");
+
+  const districtDenied = await api(
+    baseUrl,
+    "/api/digital-hospital/public-health/coordination?hospitalCode=H000001",
+    authorized(districtToken)
+  );
+  assert.equal(districtDenied.response.status, 403);
+  assert.equal(districtDenied.body.code, "PUBLIC_HEALTH_HOSPITAL_SCOPE_FORBIDDEN");
 
   const escalated = await api(
     baseUrl,
@@ -186,10 +208,86 @@ test("digital hospital public health coordination API persists an independently 
   assert.equal(selfReview.response.status, 409);
   assert.equal(selfReview.body.code, "PUBLIC_HEALTH_INDEPENDENT_REVIEW_REQUIRED");
 
-  const closed = await advance(healthToken, 3, "verify-close", "卫健委独立复核通过并关闭");
+  const missingEvidence = await advance(healthToken, 3, "verify-close", "无证据不得关闭");
+  assert.equal(missingEvidence.response.status, 409);
+  assert.equal(missingEvidence.body.code, "PUBLIC_HEALTH_CLOSURE_EVIDENCE_REQUIRED");
+
+  let incidentRevision = 3;
+  const evidenceTypes = [
+    "business-receipt",
+    "site-joint-test",
+    "production-approval",
+    "dr-rehearsal"
+  ];
+  for (const [index, evidenceType] of evidenceTypes.entries()) {
+    const evidence = await api(
+      baseUrl,
+      "/api/digital-hospital/public-health/incidents/PHE-API-001/evidence",
+      authorized(cityToken, {
+        method: "POST",
+        body: JSON.stringify({
+          expectedRevision: incidentRevision,
+          evidenceType,
+          referenceNo: `API-${evidenceType}-${index + 1}`,
+          summary: `${evidenceType} API closure evidence summary`,
+          digest: `sha256:${String(index + 1).repeat(64)}`
+        })
+      })
+    );
+    assert.equal(evidence.response.status, 201);
+    assert.equal(evidence.body.evidence.status, "submitted");
+    incidentRevision = evidence.body.incident.revision;
+
+    if (index === 0) {
+      const selfEvidenceReview = await api(
+        baseUrl,
+        `/api/digital-hospital/public-health/evidence/${evidence.body.evidence.id}/actions`,
+        authorized(cityToken, {
+          method: "POST",
+          body: JSON.stringify({
+            action: "accept-evidence",
+            expectedEvidenceRevision: 1,
+            expectedIncidentRevision: incidentRevision,
+            note: "提交人不得签收自己的证据"
+          })
+        })
+      );
+      assert.equal(selfEvidenceReview.response.status, 409);
+      assert.equal(
+        selfEvidenceReview.body.code,
+        "PUBLIC_HEALTH_INDEPENDENT_EVIDENCE_REVIEW_REQUIRED"
+      );
+    }
+
+    const evidenceReview = await api(
+      baseUrl,
+      `/api/digital-hospital/public-health/evidence/${evidence.body.evidence.id}/actions`,
+      authorized(healthToken, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "accept-evidence",
+          expectedEvidenceRevision: 1,
+          expectedIncidentRevision: incidentRevision,
+          note: "独立复核证据编号、摘要和事件范围一致"
+        })
+      })
+    );
+    assert.equal(evidenceReview.response.status, 200);
+    assert.equal(evidenceReview.body.evidence.status, "accepted");
+    incidentRevision = evidenceReview.body.incident.revision;
+  }
+
+  const closed = await advance(
+    healthToken,
+    incidentRevision,
+    "verify-close",
+    "卫健委独立复核通过并关闭"
+  );
   assert.equal(closed.response.status, 200);
   assert.equal(closed.body.incident.status, "已关闭");
-  assert.equal(closed.body.incident.revision, 4);
+  assert.equal(closed.body.incident.revision, 12);
+  assert.equal(closed.body.incident.evidenceIds.length, 4);
+  assert.equal(closed.body.board.statistics.closureReady, 0);
   assert.equal(closed.body.board.productionBoundary.productionReady, false);
 
   const persisted = await api(
@@ -203,7 +301,15 @@ test("digital hospital public health coordination API persists an independently 
   );
   assert.equal(
     persisted.body.coordination.incidentActions.filter((item) => item.incidentId === "PHE-API-001").length,
+    12
+  );
+  assert.equal(
+    persisted.body.coordination.incidentEvidence.filter((item) => item.incidentId === "PHE-API-001").length,
     4
+  );
+  assert.equal(
+    persisted.body.coordination.evidenceActions.filter((item) => item.incidentId === "PHE-API-001").length,
+    8
   );
   assert.equal(JSON.stringify(JSON.parse(fs.readFileSync(databaseFile, "utf8"))).includes("must-not-be-persisted"), false);
 });

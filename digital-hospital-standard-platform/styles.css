@@ -434,7 +434,7 @@ textarea {
 }
 
 .public-health-incident-table {
-  min-width: 1120px;
+  min-width: 1320px;
 }
 
 .public-health-incident-table th:nth-child(1),
@@ -445,6 +445,15 @@ textarea {
 .public-health-incident-table th:nth-child(6),
 .public-health-incident-table td:nth-child(6) {
   min-width: 210px;
+}
+
+.public-health-incident-table th:nth-child(7),
+.public-health-incident-table td:nth-child(7) {
+  min-width: 120px;
+}
+
+.public-health-evidence-table {
+  min-width: 980px;
 }
 
 table {

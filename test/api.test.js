@@ -3503,10 +3503,61 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(selfReview.response.status, 409);
     assert.equal(selfReview.body.code, "PUBLIC_HEALTH_INDEPENDENT_REVIEW_REQUIRED");
 
-    const closed = await advance(commissionToken, 3, "verify-close", "卫健委独立复核通过并关闭");
+    const missingEvidence = await advance(commissionToken, 3, "verify-close", "缺少证据不得关闭事件");
+    assert.equal(missingEvidence.response.status, 409);
+    assert.equal(missingEvidence.body.code, "PUBLIC_HEALTH_CLOSURE_EVIDENCE_REQUIRED");
+
+    let incidentRevision = 3;
+    for (const [index, evidenceType] of [
+      "business-receipt",
+      "site-joint-test",
+      "production-approval",
+      "dr-rehearsal"
+    ].entries()) {
+      const evidence = await api(
+        baseUrl,
+        "/api/digital-hospital/public-health/incidents/PHE-COVERAGE-001/evidence",
+        authorized(cityLogin.body.token, {
+          method: "POST",
+          body: JSON.stringify({
+            expectedRevision: incidentRevision,
+            evidenceType,
+            referenceNo: `COVERAGE-${evidenceType}-${index + 1}`,
+            summary: `${evidenceType} coverage evidence summary`,
+            digest: `sha256:${String(index + 5).repeat(64)}`
+          })
+        })
+      );
+      assert.equal(evidence.response.status, 201);
+      incidentRevision = evidence.body.incident.revision;
+
+      const evidenceReview = await api(
+        baseUrl,
+        `/api/digital-hospital/public-health/evidence/${evidence.body.evidence.id}/actions`,
+        authorized(commissionToken, {
+          method: "POST",
+          body: JSON.stringify({
+            action: "accept-evidence",
+            expectedEvidenceRevision: 1,
+            expectedIncidentRevision: incidentRevision,
+            note: "覆盖率场景独立签收证据"
+          })
+        })
+      );
+      assert.equal(evidenceReview.response.status, 200);
+      incidentRevision = evidenceReview.body.incident.revision;
+    }
+
+    const closed = await advance(
+      commissionToken,
+      incidentRevision,
+      "verify-close",
+      "卫健委独立复核通过并关闭"
+    );
     assert.equal(closed.response.status, 200);
     assert.equal(closed.body.incident.status, "已关闭");
-    assert.equal(closed.body.incident.revision, 4);
+    assert.equal(closed.body.incident.revision, 12);
+    assert.equal(closed.body.incident.evidenceIds.length, 4);
     assert.equal(closed.body.board.productionBoundary.productionReady, false);
   });
 
