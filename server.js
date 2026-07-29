@@ -121,7 +121,9 @@ const {
   advancePublicHealthIncident: advanceDigitalHospitalPublicHealthIncident,
   buildPublicHealthCoordinationBoard: buildDigitalHospitalPublicHealthCoordinationBoard,
   createPublicHealthIncident: createDigitalHospitalPublicHealthIncident,
+  escalatePublicHealthIncident: escalateDigitalHospitalPublicHealthIncident,
   normalizePublicHealthCoordination: normalizeDigitalHospitalPublicHealthCoordination,
+  renderPublicHealthIncidentCsv: renderDigitalHospitalPublicHealthIncidentCsv,
   seedPublicHealthCoordination: seedDigitalHospitalPublicHealthCoordination
 } = require("./digital-hospital-public-health-coordination");
 const { buildCareServiceProductionReadiness } = require("./scripts/care-service-production-readiness");
@@ -24137,6 +24139,40 @@ async function buildPublicHealthEndpointVerificationSummary(data, at) {
   };
 }
 
+async function buildDigitalHospitalPublicHealthProfessionalContext(data, at) {
+  const system = buildPublicHealthSystem({ data, now: at });
+  const endpointVerification = await buildPublicHealthEndpointVerificationSummary(data, at);
+  const endpointContinuity = await buildPublicHealthEndpointProbeCampaignSummary(data, at);
+  return {
+    events: system.events,
+    exchangeTasks: system.exchangeTasks,
+    exchangeRuns: system.exchangeRuns,
+    evidencePackets: system.cutoverEvidencePackets,
+    evidenceBridgeLinks: system.siteEvidenceBridge?.links || [],
+    endpointProbeEntries: endpointVerification.entries,
+    endpointContinuity: {
+      status: endpointContinuity.functionalState,
+      consecutiveCampaigns: Number(endpointContinuity.summary?.consecutiveCampaigns || 0),
+      requiredConsecutiveCampaigns: Number(endpointContinuity.summary?.requiredConsecutiveCampaigns || 0),
+      continuousConnectivityReady: endpointContinuity.continuousConnectivityReady === true,
+      productionReady: false
+    }
+  };
+}
+
+async function buildDigitalHospitalPublicHealthBoard(data, options = {}) {
+  const now = String(options.now || new Date().toISOString());
+  const professionalContext = await buildDigitalHospitalPublicHealthProfessionalContext(data, now);
+  return buildDigitalHospitalPublicHealthCoordinationBoard(
+    data.digitalHospitalPublicHealthCoordination,
+    {
+      now,
+      filters: options.filters,
+      professionalContext
+    }
+  );
+}
+
 function publicHealthEndpointProbeCampaignVerificationOptions(context, at) {
   return {
     env: process.env,
@@ -25896,16 +25932,69 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/public-health/coordination");
     if (!user) return;
     const data = readDatabase();
-    const board = buildDigitalHospitalPublicHealthCoordinationBoard(data.digitalHospitalPublicHealthCoordination);
+    const filters = Object.fromEntries(url.searchParams.entries());
+    const board = await buildDigitalHospitalPublicHealthBoard(data, { filters });
     appendSecurityEvent({
       actor: user.name,
       role: user.role,
       action: "digital-hospital-public-health-coordination-read",
       target: "/api/digital-hospital/public-health/coordination",
       result: "allowed",
-      detail: `${board.summary.totalLanes} lanes / ${board.summary.openIncidents} open incidents / productionReady=false`
+      detail: `${board.summary.totalLanes} lanes / ${board.summary.filteredIncidents} filtered incidents / ${board.summary.overdueIncidents} overdue / productionReady=false`
     });
     sendJson(res, 200, board);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/digital-hospital/public-health/incidents/export") {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/public-health/incidents/export");
+    if (!user) return;
+    const data = readDatabase();
+    const query = Object.fromEntries(url.searchParams.entries());
+    const format = String(query.format || "json").trim().toLowerCase();
+    if (!["json", "csv"].includes(format)) {
+      sendJson(res, 400, {
+        error: "Bad Request",
+        code: "PUBLIC_HEALTH_EXPORT_FORMAT_INVALID",
+        message: "format must be json or csv"
+      });
+      return;
+    }
+    const board = await buildDigitalHospitalPublicHealthBoard(data, { filters: query });
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "digital-hospital-public-health-incident-export",
+      target: "/api/digital-hospital/public-health/incidents/export",
+      result: "allowed",
+      detail: `${format} / ${board.summary.filteredIncidents} incidents / productionReady=false`
+    });
+    const filename = `digital-hospital-public-health-incidents-${new Date().toISOString().slice(0, 10)}.${format}`;
+    if (format === "csv") {
+      sendDownload(
+        res,
+        200,
+        renderDigitalHospitalPublicHealthIncidentCsv(board),
+        "text/csv; charset=utf-8",
+        filename
+      );
+      return;
+    }
+    sendDownload(
+      res,
+      200,
+      JSON.stringify({
+        ok: true,
+        generatedAt: board.generatedAt,
+        filters: board.filters,
+        summary: board.summary,
+        statistics: board.statistics,
+        incidents: board.coordination.incidents,
+        productionBoundary: board.productionBoundary
+      }, null, 2),
+      "application/json; charset=utf-8",
+      filename
+    );
     return;
   }
 
@@ -25939,7 +26028,7 @@ async function handleApi(req, res) {
         ok: true,
         incident: result.incident,
         action: result.action,
-        board: buildDigitalHospitalPublicHealthCoordinationBoard(result.state)
+        board: await buildDigitalHospitalPublicHealthBoard(data)
       });
     } catch (error) {
       sendJson(res, Number(error.status || 400), {
@@ -25966,12 +26055,19 @@ async function handleApi(req, res) {
     const payload = await collectJson(req);
     const data = readDatabase();
     try {
-      const result = advanceDigitalHospitalPublicHealthIncident(
-        data.digitalHospitalPublicHealthCoordination,
-        incidentId,
-        payload,
-        user
-      );
+      const result = String(payload.action || "") === "escalate-overdue"
+        ? escalateDigitalHospitalPublicHealthIncident(
+          data.digitalHospitalPublicHealthCoordination,
+          incidentId,
+          payload,
+          user
+        )
+        : advanceDigitalHospitalPublicHealthIncident(
+          data.digitalHospitalPublicHealthCoordination,
+          incidentId,
+          payload,
+          user
+        );
       data.digitalHospitalPublicHealthCoordination = result.state;
       data.securityEvents = sealAuditTrail([
         {
@@ -25991,7 +26087,7 @@ async function handleApi(req, res) {
         ok: true,
         incident: result.incident,
         action: result.action,
-        board: buildDigitalHospitalPublicHealthCoordinationBoard(result.state)
+        board: await buildDigitalHospitalPublicHealthBoard(data)
       });
     } catch (error) {
       sendJson(res, Number(error.status || 400), {

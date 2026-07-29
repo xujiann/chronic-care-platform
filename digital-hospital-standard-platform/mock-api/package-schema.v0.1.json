@@ -1070,6 +1070,8 @@
         "p0Incidents": { "type": "integer", "minimum": 0 },
         "pendingVerification": { "type": "integer", "minimum": 0 },
         "closedIncidents": { "type": "integer", "minimum": 0 },
+        "overdueIncidents": { "type": "integer", "minimum": 0 },
+        "escalatedIncidents": { "type": "integer", "minimum": 0 },
         "continuityReady": { "type": "boolean" },
         "productionReady": { "const": false }
       },
@@ -1113,7 +1115,10 @@
           "status": { "type": "string", "enum": ["待核查", "处置中", "待复核", "已关闭"] },
           "dueAt": { "type": "string" },
           "latestAction": { "type": "string" },
-          "submittedForReviewBy": { "type": "string" }
+          "submittedForReviewBy": { "type": "string" },
+          "sla": { "type": "object" },
+          "escalation": { "type": ["object", "null"] },
+          "professionalAssociation": { "type": "object" }
         },
         "additionalProperties": true
       }
@@ -1133,7 +1138,7 @@
     "publicHealth": {
       "type": "object",
       "properties": {
-        "schemaVersion": { "const": 1 },
+        "schemaVersion": { "const": 2 },
         "productionReady": { "const": false },
         "lanes": { "type": "array", "items": { "type": "object" } },
         "campaigns": { "type": "array", "items": { "type": "object" } },

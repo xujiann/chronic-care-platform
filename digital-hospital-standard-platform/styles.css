@@ -433,6 +433,20 @@ textarea {
   background: #ffffff;
 }
 
+.public-health-incident-table {
+  min-width: 1120px;
+}
+
+.public-health-incident-table th:nth-child(1),
+.public-health-incident-table td:nth-child(1) {
+  min-width: 150px;
+}
+
+.public-health-incident-table th:nth-child(6),
+.public-health-incident-table td:nth-child(6) {
+  min-width: 210px;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
