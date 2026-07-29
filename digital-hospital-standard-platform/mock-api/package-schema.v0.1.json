@@ -11,7 +11,7 @@
       "properties": {
         "packageType": {
           "type": "string",
-          "enum": ["submission", "review", "expert", "rectification", "task", "pilot", "collaboration", "integration", "execution", "assessment", "assistant", "monitoring", "evidence", "analytics", "intelligence", "operations", "system", "full"]
+          "enum": ["submission", "review", "expert", "rectification", "task", "pilot", "collaboration", "integration", "execution", "assessment", "assistant", "monitoring", "publicHealth", "evidence", "analytics", "intelligence", "operations", "system", "full"]
         },
         "generatedAt": {
           "type": "string",
@@ -1060,6 +1060,88 @@
       "items": {
         "type": "object"
       }
+    },
+    "publicHealthSummary": {
+      "type": "object",
+      "properties": {
+        "verifiedLanes": { "type": "integer", "minimum": 0 },
+        "totalLanes": { "type": "integer", "minimum": 0 },
+        "openIncidents": { "type": "integer", "minimum": 0 },
+        "p0Incidents": { "type": "integer", "minimum": 0 },
+        "pendingVerification": { "type": "integer", "minimum": 0 },
+        "closedIncidents": { "type": "integer", "minimum": 0 },
+        "continuityReady": { "type": "boolean" },
+        "productionReady": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "publicHealthStatus": {
+      "type": "object",
+      "properties": {
+        "endpointConnectivityReady": { "type": "boolean" },
+        "continuousConnectivityReady": { "type": "boolean" },
+        "productionReady": { "const": false },
+        "consecutiveCampaigns": { "type": "integer", "minimum": 0 },
+        "requiredConsecutiveCampaigns": { "type": "integer", "minimum": 1 },
+        "campaignChainLinksVerified": { "type": "integer", "minimum": 0 },
+        "continuityBreak": { "type": ["object", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "publicHealthLanes": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "publicHealthCampaigns": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "publicHealthIncidents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "revision", "laneId", "title", "level", "hospitalCode", "owner", "status", "dueAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "revision": { "type": "integer", "minimum": 1 },
+          "laneId": { "type": "string" },
+          "title": { "type": "string" },
+          "level": { "type": "string", "enum": ["P0", "P1", "P2"] },
+          "source": { "type": "string" },
+          "hospitalCode": { "type": "string" },
+          "owner": { "type": "string" },
+          "status": { "type": "string", "enum": ["待核查", "处置中", "待复核", "已关闭"] },
+          "dueAt": { "type": "string" },
+          "latestAction": { "type": "string" },
+          "submittedForReviewBy": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "publicHealthIncidentActions": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "productionBlockers": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "runtimeRoutes": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "publicHealth": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "productionReady": { "const": false },
+        "lanes": { "type": "array", "items": { "type": "object" } },
+        "campaigns": { "type": "array", "items": { "type": "object" } },
+        "incidents": { "type": "array", "items": { "type": "object" } },
+        "incidentActions": { "type": "array", "items": { "type": "object" } },
+        "blockers": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
     },
     "alerts": {
       "type": "array",

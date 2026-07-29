@@ -117,6 +117,13 @@ const {
   configureDigitalHospitalManagedSecretLoader,
   verifySignedExecutionCallback
 } = require("./digital-hospital-execution-security");
+const {
+  advancePublicHealthIncident: advanceDigitalHospitalPublicHealthIncident,
+  buildPublicHealthCoordinationBoard: buildDigitalHospitalPublicHealthCoordinationBoard,
+  createPublicHealthIncident: createDigitalHospitalPublicHealthIncident,
+  normalizePublicHealthCoordination: normalizeDigitalHospitalPublicHealthCoordination,
+  seedPublicHealthCoordination: seedDigitalHospitalPublicHealthCoordination
+} = require("./digital-hospital-public-health-coordination");
 const { buildCareServiceProductionReadiness } = require("./scripts/care-service-production-readiness");
 const {
   DEFAULT_EVIDENCE_DIR: DEFAULT_PRODUCTION_RELEASE_EVIDENCE_DIR,
@@ -1142,6 +1149,7 @@ function seedState() {
     publicHealthStandardImplementationLedger: seedPublicHealthStandardImplementationLedger(),
     publicHealthInstitutionScopes: seedPublicHealthInstitutionScopes(),
     publicHealthEvents: seedPublicHealthEvents(),
+    digitalHospitalPublicHealthCoordination: seedDigitalHospitalPublicHealthCoordination(),
     publicHealthTriggerRules: seedPublicHealthTriggerRules(),
     publicHealthSignals: seedPublicHealthSignals(),
     publicHealthAlerts: seedPublicHealthAlerts(),
@@ -10373,6 +10381,7 @@ function normalizeState(data) {
     publicHealthStandardImplementationLedger: mergeByKey(seedPublicHealthStandardImplementationLedger(), data.publicHealthStandardImplementationLedger, "id"),
     publicHealthInstitutionScopes: mergeByKey(seedPublicHealthInstitutionScopes(), data.publicHealthInstitutionScopes, "id"),
     publicHealthEvents: mergeByKey(seedPublicHealthEvents(), data.publicHealthEvents, "id"),
+    digitalHospitalPublicHealthCoordination: normalizeDigitalHospitalPublicHealthCoordination(data.digitalHospitalPublicHealthCoordination),
     publicHealthTriggerRules: mergeByKey(seedPublicHealthTriggerRules(), data.publicHealthTriggerRules, "id"),
     publicHealthCoordinationHandoffs: Array.isArray(data.publicHealthCoordinationHandoffs)
       ? data.publicHealthCoordinationHandoffs.slice(0, 100)
@@ -10996,6 +11005,7 @@ function completeSystemTargets(state) {
   state.publicHealthStandards = mergeByKey(seedPublicHealthStandards(), state.publicHealthStandards, "id");
   state.publicHealthInstitutionScopes = mergeByKey(seedPublicHealthInstitutionScopes(), state.publicHealthInstitutionScopes, "id");
   state.publicHealthEvents = mergeByKey(seedPublicHealthEvents(), state.publicHealthEvents, "id");
+  state.digitalHospitalPublicHealthCoordination = normalizeDigitalHospitalPublicHealthCoordination(state.digitalHospitalPublicHealthCoordination);
   state.publicHealthTriggerRules = mergeByKey(seedPublicHealthTriggerRules(), state.publicHealthTriggerRules, "id");
   state.publicHealthSignals = mergeByKey(seedPublicHealthSignals(), state.publicHealthSignals, "id");
   state.publicHealthAlerts = mergeByKey(seedPublicHealthAlerts(), state.publicHealthAlerts, "id");
@@ -25879,6 +25889,117 @@ async function handleApi(req, res) {
       releaseEvidence: indicatorCenter.releaseEvidence,
       boundary: indicatorCenter.boundary
     });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/digital-hospital/public-health/coordination") {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/public-health/coordination");
+    if (!user) return;
+    const data = readDatabase();
+    const board = buildDigitalHospitalPublicHealthCoordinationBoard(data.digitalHospitalPublicHealthCoordination);
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "digital-hospital-public-health-coordination-read",
+      target: "/api/digital-hospital/public-health/coordination",
+      result: "allowed",
+      detail: `${board.summary.totalLanes} lanes / ${board.summary.openIncidents} open incidents / productionReady=false`
+    });
+    sendJson(res, 200, board);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/digital-hospital/public-health/incidents") {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/public-health/incidents");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      const result = createDigitalHospitalPublicHealthIncident(
+        data.digitalHospitalPublicHealthCoordination,
+        payload,
+        user
+      );
+      data.digitalHospitalPublicHealthCoordination = result.state;
+      data.securityEvents = sealAuditTrail([
+        {
+          id: randomUUID(),
+          at: new Date().toISOString(),
+          actor: user.name,
+          role: user.role,
+          action: "digital-hospital-public-health-incident-create",
+          target: result.incident.id,
+          result: "allowed",
+          detail: `${result.incident.level} / ${result.incident.laneId} / revision ${result.incident.revision}`
+        },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120), { recompute: true });
+      writeDatabase(data);
+      sendJson(res, 201, {
+        ok: true,
+        incident: result.incident,
+        action: result.action,
+        board: buildDigitalHospitalPublicHealthCoordinationBoard(result.state)
+      });
+    } catch (error) {
+      sendJson(res, Number(error.status || 400), {
+        error: Number(error.status || 400) === 409 ? "Conflict" : "Bad Request",
+        code: error.code || "PUBLIC_HEALTH_COORDINATION_INVALID",
+        message: error.message
+      });
+    }
+    return;
+  }
+
+  const digitalHospitalPublicHealthIncidentActionMatch = url.pathname.match(
+    /^\/api\/digital-hospital\/public-health\/incidents\/([^/]+)\/actions$/
+  );
+  if (req.method === "POST" && digitalHospitalPublicHealthIncidentActionMatch) {
+    const user = requireApiRole(
+      req,
+      res,
+      ["commission"],
+      "/api/digital-hospital/public-health/incidents/:id/actions"
+    );
+    if (!user) return;
+    const incidentId = decodeURIComponent(digitalHospitalPublicHealthIncidentActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    try {
+      const result = advanceDigitalHospitalPublicHealthIncident(
+        data.digitalHospitalPublicHealthCoordination,
+        incidentId,
+        payload,
+        user
+      );
+      data.digitalHospitalPublicHealthCoordination = result.state;
+      data.securityEvents = sealAuditTrail([
+        {
+          id: randomUUID(),
+          at: new Date().toISOString(),
+          actor: user.name,
+          role: user.role,
+          action: "digital-hospital-public-health-incident-action",
+          target: result.incident.id,
+          result: "allowed",
+          detail: `${result.action.action} / ${result.incident.status} / revision ${result.incident.revision}`
+        },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120), { recompute: true });
+      writeDatabase(data);
+      sendJson(res, 200, {
+        ok: true,
+        incident: result.incident,
+        action: result.action,
+        board: buildDigitalHospitalPublicHealthCoordinationBoard(result.state)
+      });
+    } catch (error) {
+      sendJson(res, Number(error.status || 400), {
+        error: Number(error.status || 400) === 409 ? "Conflict" : "Bad Request",
+        code: error.code || "PUBLIC_HEALTH_COORDINATION_INVALID",
+        message: error.message
+      });
+    }
     return;
   }
 

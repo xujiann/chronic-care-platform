@@ -3367,6 +3367,95 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     }
   });
 
+  await t.test("operates the merged digital hospital public health coordination loop", async () => {
+    const anonymous = await api(baseUrl, "/api/digital-hospital/public-health/coordination");
+    assert.equal(anonymous.response.status, 401);
+
+    const institutionLogin = await login(baseUrl, "hospital");
+    const forbidden = await api(
+      baseUrl,
+      "/api/digital-hospital/public-health/coordination",
+      authorized(institutionLogin.body.token)
+    );
+    assert.equal(forbidden.response.status, 403);
+
+    const cityLogin = await login(baseUrl, "city");
+    const initial = await api(
+      baseUrl,
+      "/api/digital-hospital/public-health/coordination",
+      authorized(cityLogin.body.token)
+    );
+    assert.equal(initial.response.status, 200);
+    assert.equal(initial.body.summary.totalLanes, 8);
+    assert.equal(initial.body.productionBoundary.productionReady, false);
+
+    const rejected = await api(
+      baseUrl,
+      "/api/digital-hospital/public-health/incidents",
+      authorized(cityLogin.body.token, {
+        method: "POST",
+        body: JSON.stringify({
+          laneId: "infectious-reporting",
+          title: "覆盖率敏感字段拒绝",
+          hospitalCode: "H000001",
+          owner: "疾控与医政联络组",
+          dueAt: "2026-07-30T12:00:00.000Z",
+          note: "拒绝任何原始凭据",
+          token: "must-not-be-persisted"
+        })
+      })
+    );
+    assert.equal(rejected.response.status, 400);
+    assert.equal(rejected.body.code, "PUBLIC_HEALTH_SENSITIVE_FIELD_REJECTED");
+
+    const created = await api(
+      baseUrl,
+      "/api/digital-hospital/public-health/incidents",
+      authorized(cityLogin.body.token, {
+        method: "POST",
+        body: JSON.stringify({
+          id: "PHE-COVERAGE-001",
+          laneId: "infectious-reporting",
+          title: "覆盖率回执超时事件",
+          level: "P0",
+          source: "连续探测",
+          hospitalCode: "H000001",
+          owner: "疾控与医政联络组",
+          dueAt: "2026-07-30T12:00:00.000Z",
+          note: "事件已登记并等待责任组核查"
+        })
+      })
+    );
+    assert.equal(created.response.status, 201);
+    assert.equal(created.body.incident.revision, 1);
+
+    const advance = (token, expectedRevision, action, note) => api(
+      baseUrl,
+      "/api/digital-hospital/public-health/incidents/PHE-COVERAGE-001/actions",
+      authorized(token, {
+        method: "POST",
+        body: JSON.stringify({ expectedRevision, action, note })
+      })
+    );
+    const conflict = await advance(cityLogin.body.token, 9, "start-handling", "制造修订号冲突");
+    assert.equal(conflict.response.status, 409);
+    assert.equal(conflict.body.code, "PUBLIC_HEALTH_INCIDENT_REVISION_CONFLICT");
+
+    const started = await advance(cityLogin.body.token, 1, "start-handling", "核查确认异常并开始处置");
+    assert.equal(started.response.status, 200);
+    const submitted = await advance(cityLogin.body.token, 2, "submit-review", "回执补齐并提交独立复核");
+    assert.equal(submitted.response.status, 200);
+    const selfReview = await advance(cityLogin.body.token, 3, "verify-close", "提交人不得自行关闭事件");
+    assert.equal(selfReview.response.status, 409);
+    assert.equal(selfReview.body.code, "PUBLIC_HEALTH_INDEPENDENT_REVIEW_REQUIRED");
+
+    const closed = await advance(commissionToken, 3, "verify-close", "卫健委独立复核通过并关闭");
+    assert.equal(closed.response.status, 200);
+    assert.equal(closed.body.incident.status, "已关闭");
+    assert.equal(closed.body.incident.revision, 4);
+    assert.equal(closed.body.board.productionBoundary.productionReady, false);
+  });
+
   await t.test("exposes only a commission-scoped redacted care-service readiness summary", async () => {
     const anonymous = await api(baseUrl, "/api/care-services/readiness");
     assert.equal(anonymous.response.status, 401);
