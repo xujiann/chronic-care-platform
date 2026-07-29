@@ -7,6 +7,7 @@ const { buildDiseasePaymentReadiness } = require("./disease-payment-readiness");
 const { buildFinancialGatewayReadiness } = require("./financial-gateway-readiness");
 const OperatingModel = require("../insurance-payment-operating-model");
 const Persistence = require("../insurance-payment-persistence");
+const PostgresPersistence = require("../insurance-payment-postgres-repository");
 
 const ROOT = path.resolve(__dirname, "..");
 const FINANCIAL_GATEWAY_EVIDENCE_POLICY = Object.freeze([
@@ -60,6 +61,7 @@ function buildAcceptanceProductionGate(report = {}) {
   const checks = [
     { id: "local-domain-ready", passed: report.localReady === true, detail: `${report.summary?.workflowsReady || 0}/${report.summary?.workflows || 0} workflows ready` },
     { id: "external-evidence-governed", passed: report.summary?.externalEvidenceGoverned === true, detail: `${report.summary?.externalBlockers || 0} external requirements assigned` },
+    { id: "persistence-production-cutover-complete", passed: report.persistence?.productionPrimary === true, detail: report.persistence?.productionPrimary === true ? "production persistence cutover confirmed" : "database migration, restore drill and T00 cutover pending" },
     { id: "t00-public-wiring-complete", passed: report.summary?.t00RoutesPending === 0, detail: `${report.summary?.t00RoutesPending || 0} routes pending` },
     { id: "live-site-acceptance-confirmed", passed: report.productionReady === true, detail: report.productionReady === true ? "live acceptance confirmed" : "live access and signed site acceptance pending" }
   ];
@@ -70,22 +72,36 @@ function buildAcceptanceProductionGate(report = {}) {
   };
 }
 
-function buildPersistenceAcceptance() {
+function buildPersistenceAcceptance(env = process.env) {
   const contract = Persistence.persistenceContract();
+  const postgres = PostgresPersistence.buildPostgresInsurancePaymentConfig(env);
   const checks = [
     { id: "optimistic-concurrency", passed: contract.invariants.some((item) => item.includes("expectedVersion")) },
     { id: "command-idempotency", passed: contract.invariants.some((item) => item.includes("commandId")) },
     { id: "transactional-outbox", passed: contract.invariants.some((item) => item.includes("同一数据库事务")) },
     { id: "leased-delivery", passed: contract.invariants.some((item) => item.includes("至少一次投递")) },
     { id: "dead-letter", passed: contract.invariants.some((item) => item.includes("dead-letter")) },
-    { id: "checkpoint-integrity", passed: typeof Persistence.verifyPersistenceRecord === "function" }
+    { id: "checkpoint-integrity", passed: typeof Persistence.verifyPersistenceRecord === "function" },
+    { id: "postgres-adapter", passed: typeof PostgresPersistence.createPostgresInsurancePaymentRepository === "function" },
+    { id: "postgres-migration", passed: /^sha256:[a-f0-9]{64}$/.test(postgres.migration.sha256) }
   ];
   return {
     contractId: contract.id,
     ready: checks.every((item) => item.passed),
     checks,
     productionAdapterRequired: true,
-    productionAdapterConfigured: false,
+    productionAdapterConfigured: postgres.writeEnabled,
+    productionPrimary: false,
+    postgres: {
+      adapter: postgres.adapter,
+      mode: postgres.mode,
+      configured: postgres.configured,
+      evidenceReady: postgres.evidenceReady,
+      writeEnabled: postgres.writeEnabled,
+      requirements: postgres.requirements,
+      migration: postgres.migration,
+      credentialsPersisted: false
+    },
     boundary: contract.productionBoundary
   };
 }

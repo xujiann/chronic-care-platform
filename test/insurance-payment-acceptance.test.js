@@ -14,6 +14,9 @@ test("T07 unified acceptance covers all six workflows without claiming productio
   assert.equal(report.persistence.contractId, "insurance-payment-persistence-v1");
   assert.equal(report.persistence.productionAdapterRequired, true);
   assert.equal(report.persistence.productionAdapterConfigured, false);
+  assert.equal(report.persistence.productionPrimary, false);
+  assert.equal(report.persistence.postgres.adapter, "insurance-payment-postgres-v1");
+  assert.equal(report.persistence.postgres.credentialsPersisted, false);
   assert.equal(report.persistence.checks.every((item) => item.passed), true);
   assert.ok(report.summary.t00RoutesPending > 0);
   assert.ok(report.externalBlockers.length > 0);
@@ -21,7 +24,7 @@ test("T07 unified acceptance covers all six workflows without claiming productio
   assert.equal(report.externalBlockers.filter((item) => item.source === "disease-payment").length, 14);
   assert.equal(report.summary.externalEvidenceGoverned, true);
   assert.equal(report.productionGate.passed, false);
-  assert.deepEqual(report.productionGate.blockers, ["t00-public-wiring-complete", "live-site-acceptance-confirmed"]);
+  assert.deepEqual(report.productionGate.blockers, ["persistence-production-cutover-complete", "t00-public-wiring-complete", "live-site-acceptance-confirmed"]);
   assert.equal(report.productionGate.checks.find((item) => item.id === "local-domain-ready").passed, true);
   assert.ok(report.externalBlockers.every((item) => item.owner && ["acceptance-reviewer", "security-reviewer", "finance-auditor"].includes(item.reviewerRole)));
   assert.ok(report.externalBlockers.some((item) => item.id === "official-grouper:trusted-callback" && item.reviewerRole === "security-reviewer"));
