@@ -224,6 +224,7 @@ T08 自有文件：
 - `public-health-surveillance-rule-governance-service.js`：规则提案、独立复核、可信激活、版本历史和防篡改校验。
 - `public-health-surveillance-model-governance-service.js`：模型卡、影子运行、独立效能复核、漂移窗口和防篡改校验。
 - `public-health-respiratory-pathogen-surveillance-service.js`：18病原体面板、聚合批次、人工复核、一样本多检测和最小化信号发布。
+- `public-health-respiratory-network-readiness-service.js`：逐哨点的面板标准映射、网络授权、实验室质控、数据共享、安全评审、连续观察六类可信证据，以及受管密钥验签和软件发布就绪判定。
 - `public-health-surveillance-workflow-service.js`：人工核实、版本化规则、预警、研判、报告、反馈和关闭。
 - `public-health-medical-prevention-collaboration-service.js`：医院公卫科与基层公卫任务。
 - `scripts/public-health-modernization-readiness.js`：三项建设任务的可运行验收。
@@ -240,6 +241,7 @@ T00 只调用领域服务返回的 `nextData`，不得复制状态转换、授�
 规则激活密钥环由 T00 从服务端环境或密钥管理服务解析，分别传入写动作和只读治理/监测服务；浏览器载荷、SQLite 业务表、日志和公共响应均不得包含密钥材料。T00 可在迁移期兼容旧静态配置，但最终发布门禁只接受用途正确、当前有效且恰有一个活动密钥的托管密钥环。
 T00 对模型接口只负责身份传递和领域服务 `nextData` 的原子持久化，不得根据模型分值直接改变信号、预警、报告或协同任务状态；模型公共响应只展示模型编号、版本、影子状态、分值区间、复核状态和漂移状态。
 T00 对呼吸道接口只持久化聚合批次、审计和领域服务生成的最小化信号，不得接收或保存人员、患者、样本级标识；客户端不能自报批次已核实、覆盖达标或信号已确认。
+呼吸道网络证据回执必须由 T00 的服务器证据仓签发，密钥环 purpose 固定为 `public-health-respiratory-network-evidence`。回执同时绑定机构、证据类型、面板版本、状态、材料摘要、有效期、签署人、核验人、核验来源、验签布尔值、密钥编号和回执编号；任一字段在签发后变更均拒绝。达到 `technicalLaunchReady=true` 仅表示软件发布候选通过，不得把 `productionReady` 提升为 true；中央现场证据、P0/P1 关闭、生产交接和正式上线审批仍是独立门禁。
 
 ## 六、建议公共API
 
@@ -257,6 +259,8 @@ T00 对呼吸道接口只持久化聚合批次、审计和领域服务生成的�
 - `GET /api/public-health/respiratory-pathogen-surveillance`
 - `POST /api/public-health/respiratory-pathogen-batches`
 - `POST /api/public-health/respiratory-pathogen-batches/:id/actions`
+- `GET /api/public-health/respiratory-network-readiness`
+- `POST /api/public-health/respiratory-network-evidence/:id/actions`（仅服务器证据仓或受控管理通道可签发可信回执）
 - `GET /api/public-health/surveillance-center`
 - `POST /api/public-health/surveillance-alerts/:id/actions`
 - `GET /api/public-health/medical-prevention-tasks`
@@ -288,6 +292,11 @@ T00 对呼吸道接口只持久化聚合批次、审计和领域服务生成的�
 - 批次经人工复核后只发布阳性病原的最小化信号，不能直接生成预警或跳过信号人工确认；
 - 外部批次号、幂等键不明文持久化，居民和样本直接标识在入口拒绝；
 - 批次结果、验证、发布信号绑定、重复记录或孤立审计被篡改时失败关闭；
+- 每个纳入呼吸道哨点网络的机构都必须具备六类有效可信证据和至少三个连续人工复核质量日，任何局部通过不得提升为全网软件发布就绪；
+- 客户端伪造 `verified`、`signedBy`、`attestationOrigin`、`verificationSource` 或 `signatureVerified`，以及签发后篡改上述字段、材料摘要、状态、面板版本或有效期时必须拒绝；
+- 未知、过期或撤销的呼吸道证据签名密钥必须失败关闭，报告和公共响应不得暴露密钥材料；
+- 重复证据编号或服务器回执编号视为重放攻击，必须阻断网络软件发布就绪；
+- `technicalLaunchReady=true` 时仍必须保持 `productionReady=false`，并显式列出中央现场证据与正式审批阻断；
 - 未经人工确认的信号不能进入规则评估；
 - AI和居民角色不能确认信号或预警；
 - 预警完成研判、派单、调查、正式报告、反馈和关闭；

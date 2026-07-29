@@ -16,8 +16,8 @@ test("modernization readiness accepts data surveillance and medical-prevention f
   const report = buildPublicHealthModernizationReadiness();
   assert.equal(report.ok, true);
   assert.equal(report.functionalState, "public-health-data-surveillance-medical-prevention-foundation-complete");
-  assert.equal(report.summary.checks, 30);
-  assert.equal(report.summary.passed, 30);
+  assert.equal(report.summary.checks, 33);
+  assert.equal(report.summary.passed, 33);
   assert.equal(report.summary.sources, 8);
   assert.equal(report.summary.catalogEntries, 7);
   assert.equal(report.summary.rules, 8);
@@ -34,6 +34,9 @@ test("modernization readiness accepts data surveillance and medical-prevention f
   assert.equal(report.summary.respiratoryOneSampleMultiTestBatches, 2);
   assert.equal(report.summary.respiratoryPublishedSignals, 3);
   assert.equal(report.summary.respiratoryPlanningCoverageReady, true);
+  assert.equal(report.summary.respiratoryNetworkTechnicalLaunchReady, true);
+  assert.equal(report.summary.respiratoryNetworkTrustedEvidence, 12);
+  assert.equal(report.summary.respiratoryNetworkConsecutiveQualityDays, 3);
   assert.equal(report.summary.freshSources, 2);
   assert.equal(report.summary.noDataSources, 6);
   assert.equal(report.summary.signals, 4);
@@ -69,6 +72,8 @@ test("modernization readiness renders and writes machine and human reports", () 
   assert.match(fs.readFileSync(markdown, "utf8"), /Validated shadow models: 1/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Respiratory pathogens catalogued\/observed: 18\/18/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Respiratory planning coverage ready: yes/);
+  assert.match(fs.readFileSync(markdown, "utf8"), /Respiratory network technical launch ready: yes/);
+  assert.match(fs.readFileSync(markdown, "utf8"), /Respiratory network trusted evidence: 12/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Fresh\/no-data sources: 2\/6/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Closed medical-prevention tasks: 2\/2/);
   assert.match(renderMarkdown(report), /Remaining production boundaries/);
