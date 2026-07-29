@@ -67,6 +67,7 @@ T00 负责公共路由、统一认证鉴权、请求体与错误响应映射、�
 21. 公共 API 应将 `PERSISTENCE_VERSION_CONFLICT` 和 `PERSISTENCE_COMMAND_CONFLICT` 映射为 HTTP 409，将仓储不可用映射为 503；不得捕获后以 200 返回旧状态。响应应携带提交后的聚合版本，便于下一次命令显式并发控制。
 22. T00 应在批准的数据库变更窗口应用 `deploy/insurance-payment-postgres.sql`，配置 `INSURANCE_PAYMENT_POSTGRES_MODE=evidence-gated`、强校验 TLS 和四类证据引用，然后执行 `insurance-payment-postgres-readiness.js --verify-schema --require-write-ready --require-schema`。迁移前备份、恢复演练、切换批准和只读结构报告必须分别留存，不能用配置布尔值替代。
 23. `insurance-payment-postgres-repository.js` 的 `productionPrimary=false` 是有意的失败关闭标志。只有 T00 完成双写/影子核对、路由切换、回滚验证和现场签字后，集成层才能提交生产主库证据；T07 本地代码或测试不得自行把该值改为 `true`。
+24. T00 运行时应周期调用 `runInsurancePaymentOutboxBatch`，发布适配器须返回稳定回执编号并按事件编号实现下游幂等。`published-acknowledgement-pending` 必须告警但不能立即标记发布失败；租约过期后的重复投递属于至少一次语义。任何 dead-letter 必须触发 critical 告警和受控人工处置。
 
 ## 生产证据交接
 

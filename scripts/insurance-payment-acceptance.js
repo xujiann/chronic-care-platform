@@ -8,6 +8,7 @@ const { buildFinancialGatewayReadiness } = require("./financial-gateway-readines
 const OperatingModel = require("../insurance-payment-operating-model");
 const Persistence = require("../insurance-payment-persistence");
 const PostgresPersistence = require("../insurance-payment-postgres-repository");
+const OutboxWorker = require("../insurance-payment-outbox-worker");
 
 const ROOT = path.resolve(__dirname, "..");
 const FINANCIAL_GATEWAY_EVIDENCE_POLICY = Object.freeze([
@@ -83,7 +84,8 @@ function buildPersistenceAcceptance(env = process.env) {
     { id: "dead-letter", passed: contract.invariants.some((item) => item.includes("dead-letter")) },
     { id: "checkpoint-integrity", passed: typeof Persistence.verifyPersistenceRecord === "function" },
     { id: "postgres-adapter", passed: typeof PostgresPersistence.createPostgresInsurancePaymentRepository === "function" },
-    { id: "postgres-migration", passed: /^sha256:[a-f0-9]{64}$/.test(postgres.migration.sha256) }
+    { id: "postgres-migration", passed: /^sha256:[a-f0-9]{64}$/.test(postgres.migration.sha256) },
+    { id: "outbox-delivery-worker", passed: typeof OutboxWorker.runInsurancePaymentOutboxBatch === "function" && typeof OutboxWorker.buildOutboxHealth === "function" }
   ];
   return {
     contractId: contract.id,
