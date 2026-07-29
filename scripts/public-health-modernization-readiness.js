@@ -2,6 +2,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const { createHash } = require("node:crypto");
 const {
   buildPublicHealthDataFoundation,
   buildPublicHealthDataSourceOperations,
@@ -36,6 +37,12 @@ const {
   publishPublicHealthRespiratoryPathogenSignalsToState,
   verifyPublicHealthRespiratoryPathogenBatchToState
 } = require("../public-health-respiratory-pathogen-surveillance-service");
+const {
+  REQUIRED_RESPIRATORY_NETWORK_EVIDENCE,
+  RESPIRATORY_NETWORK_EVIDENCE_PURPOSE,
+  buildPublicHealthRespiratoryNetworkReadiness,
+  issueTrustedRespiratoryNetworkEvidenceReceipt
+} = require("../public-health-respiratory-network-readiness-service");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "public-health-modernization-readiness-report.json");
@@ -68,6 +75,18 @@ const RULE_GOVERNANCE_ROTATED_KEYRING = {
       revokedAt: ""
     }
   ]
+};
+const RESPIRATORY_EVIDENCE_KEYRING = {
+  purpose: RESPIRATORY_NETWORK_EVIDENCE_PURPOSE,
+  activeKeyId: "readiness-respiratory-evidence-2026-07",
+  keys: [{
+    keyId: "readiness-respiratory-evidence-2026-07",
+    secret: "readiness-respiratory-network-evidence-secret-2026-07",
+    status: "active",
+    notBefore: "2026-07-01T00:00:00.000Z",
+    expiresAt: "2027-01-01T00:00:00.000Z",
+    revokedAt: ""
+  }]
 };
 
 function check(id, passed, detail, category) {
@@ -221,6 +240,87 @@ function runRespiratoryPathogenAcceptance(data) {
   };
 }
 
+function runRespiratoryNetworkReadinessAcceptance(data) {
+  let nextData = data;
+  const institutions = [
+    { id: "readiness-respiratory-laboratory-child", ageGroup: "child", placeType: "school", minute: "50" },
+    { id: "readiness-respiratory-laboratory-older", ageGroup: "older-adult", placeType: "elderly-care", minute: "55" }
+  ];
+  for (const institution of institutions) {
+    for (const day of [27, 29]) {
+      const intake = ingestPublicHealthRespiratoryPathogenBatchToState(nextData, {
+        sourceId: "ph-source-laboratory-pathogen",
+        externalBatchId: `READINESS-RESPIRATORY-CONTINUITY-${institution.ageGroup}-202607${day}`,
+        panelId: RESPIRATORY_PANEL.id,
+        panelVersion: RESPIRATORY_PANEL.version,
+        institutionId: institution.id,
+        regionCode: "210202",
+        observedAt: `2026-07-${day}T07:${institution.minute}:00.000Z`,
+        receivedAt: `2026-07-${day}T08:01:00.000Z`,
+        specimenCount: 20,
+        ageGroup: institution.ageGroup,
+        placeType: institution.placeType,
+        results: readinessRespiratoryResults(20),
+        evidenceRefs: [`READINESS-RESPIRATORY-CONTINUITY-QC-${institution.ageGroup}-${day}`],
+        idempotencyKey: `readiness-respiratory-continuity-intake-${institution.ageGroup}-${day}`
+      }, { name: institution.id, role: "laboratory" });
+      const verified = verifyPublicHealthRespiratoryPathogenBatchToState(intake.nextData, intake.batch.id, {
+        decision: "confirmed",
+        note: "readiness continuity window panel and quality evidence verified",
+        evidenceRefs: [`READINESS-RESPIRATORY-CONTINUITY-VERIFY-${institution.ageGroup}-${day}`],
+        idempotencyKey: `readiness-respiratory-continuity-verify-${institution.ageGroup}-${day}`,
+        expectedVersion: 1,
+        at: `2026-07-${day}T08:20:00.000Z`
+      }, { name: "readiness-respiratory-cdc-reviewer", role: "cdc-surveillance" });
+      nextData = verified.nextData;
+    }
+  }
+  const olderBaseline = (nextData.publicHealthRespiratoryPathogenBatches || []).find((item) =>
+    item.institutionId === "readiness-respiratory-laboratory-older" && item.observedAt === "2026-07-28T07:55:00.000Z"
+  );
+  const olderBaselineVerified = verifyPublicHealthRespiratoryPathogenBatchToState(nextData, olderBaseline.id, {
+    decision: "confirmed",
+    note: "readiness baseline older-adult panel and quality evidence verified",
+    evidenceRefs: ["READINESS-RESPIRATORY-OLDER-BASELINE-VERIFY"],
+    idempotencyKey: "readiness-respiratory-older-baseline-verify",
+    expectedVersion: 1,
+    at: "2026-07-28T09:36:00.000Z"
+  }, { name: "readiness-respiratory-cdc-reviewer", role: "cdc-surveillance" });
+  nextData = olderBaselineVerified.nextData;
+  const evidenceRecords = institutions.flatMap((institution, institutionIndex) => REQUIRED_RESPIRATORY_NETWORK_EVIDENCE.map((requirement, requirementIndex) => {
+    const evidenceIndex = institutionIndex * REQUIRED_RESPIRATORY_NETWORK_EVIDENCE.length + requirementIndex + 1;
+    const digest = createHash("sha256").update(`readiness-respiratory-artifact:${institution.id}:${requirement.type}`).digest("hex");
+    return issueTrustedRespiratoryNetworkEvidenceReceipt({
+      id: `readiness-respiratory-network-evidence-${String(evidenceIndex).padStart(2, "0")}`,
+      institutionId: institution.id,
+      evidenceType: requirement.type,
+      panelId: RESPIRATORY_PANEL.id,
+      panelVersion: RESPIRATORY_PANEL.version,
+      status: "verified",
+      artifactName: `${institution.ageGroup}-${requirement.type}.pdf`,
+      artifactDigest: digest,
+      validFrom: "2026-07-01T00:00:00.000Z",
+      expiresAt: "2026-12-31T23:59:59.999Z"
+    }, {
+      signedBy: `readiness-external-owner:${institution.id}:${requirement.type}`,
+      verifiedBy: "readiness-server-evidence-verifier",
+      verifiedAt: "2026-07-29T10:00:00.000Z",
+      signatureVerified: true,
+      receiptId: `readiness-respiratory-network-receipt-${String(evidenceIndex).padStart(2, "0")}`
+    }, RESPIRATORY_EVIDENCE_KEYRING);
+  }));
+  return {
+    nextData,
+    evidenceRecords,
+    board: buildPublicHealthRespiratoryNetworkReadiness({
+      data: nextData,
+      evidenceRecords,
+      keyring: RESPIRATORY_EVIDENCE_KEYRING,
+      at: "2026-07-29T12:00:00.000Z"
+    })
+  };
+}
+
 function runPublicHealthModernizationAcceptance() {
   const intake = ingestPublicHealthSurveillanceSignalToState({}, {
     sourceId: "ph-source-clinical-syndrome",
@@ -370,6 +470,7 @@ function runPublicHealthModernizationAcceptance() {
     at: "2026-07-28T09:34:00.000Z"
   });
   const respiratoryAcceptance = runRespiratoryPathogenAcceptance(reviewedModelValidation.nextData);
+  const respiratoryNetworkReadinessAcceptance = runRespiratoryNetworkReadinessAcceptance(respiratoryAcceptance.published.nextData);
   const ruleGovernanceAcceptance = runRuleGovernanceAcceptance(respiratoryAcceptance.published.nextData);
   const ruleGovernance = buildPublicHealthSurveillanceRuleGovernance({
     data: ruleGovernanceAcceptance.nextData,
@@ -386,6 +487,7 @@ function runPublicHealthModernizationAcceptance() {
     reviewedModelValidation,
     modelGovernance,
     respiratoryAcceptance,
+    respiratoryNetworkReadinessAcceptance,
     ruleGovernanceAcceptance,
     ruleGovernance,
     dataFoundation: buildPublicHealthDataFoundation({ data: ruleGovernanceAcceptance.nextData }),
@@ -409,6 +511,7 @@ function buildPublicHealthModernizationReadiness(options = {}) {
   const ruleGovernanceSource = options.ruleGovernanceSource ?? fs.readFileSync(path.join(ROOT, "public-health-surveillance-rule-governance-service.js"), "utf8");
   const modelGovernanceSource = options.modelGovernanceSource ?? fs.readFileSync(path.join(ROOT, "public-health-surveillance-model-governance-service.js"), "utf8");
   const respiratorySource = options.respiratorySource ?? fs.readFileSync(path.join(ROOT, "public-health-respiratory-pathogen-surveillance-service.js"), "utf8");
+  const respiratoryNetworkReadinessSource = options.respiratoryNetworkReadinessSource ?? fs.readFileSync(path.join(ROOT, "public-health-respiratory-network-readiness-service.js"), "utf8");
   const collaborationSource = options.collaborationSource ?? fs.readFileSync(path.join(ROOT, "public-health-medical-prevention-collaboration-service.js"), "utf8");
   const documentation = options.documentation ?? fs.readFileSync(path.join(ROOT, "docs", "public-health-fifteenth-plan-data-surveillance-medical-prevention.md"), "utf8");
   const serialized = JSON.stringify(acceptance.final.nextData);
@@ -428,6 +531,9 @@ function buildPublicHealthModernizationReadiness(options = {}) {
     check("surveillance:one-sample-multi-test", acceptance.respiratoryAcceptance.board.summary.observedPathogens === 18 && acceptance.respiratoryAcceptance.board.summary.oneSampleMultiTestBatches === 2 && acceptance.respiratoryAcceptance.board.summary.planningCoverageReady === true, "two aggregate sentinel batches prove one-sample multi-pathogen planning coverage", "surveillance"),
     check("surveillance:old-young-priority-places", acceptance.respiratoryAcceptance.board.summary.childBatches === 1 && acceptance.respiratoryAcceptance.board.summary.olderAdultBatches === 1 && acceptance.respiratoryAcceptance.board.summary.priorityPlaceBatches === 2, "child and older-adult surveillance covers school and elderly-care priority places", "surveillance"),
     check("surveillance:respiratory-minimized-signal-publication", acceptance.respiratoryAcceptance.board.summary.publishedSignals === 3 && acceptance.respiratoryAcceptance.published.nextData.publicHealthSurveillanceSignals.filter((item) => item.sourceId === "ph-source-laboratory-pathogen").every((item) => item.workflowState === "received" && item.verification === null), "three positive pathogen results publish minimized signals that still require human verification", "surveillance"),
+    check("surveillance:respiratory-network-release-readiness", acceptance.respiratoryNetworkReadinessAcceptance.board.technicalLaunchReady === true && acceptance.respiratoryNetworkReadinessAcceptance.board.summary.trustedEvidence === 12 && acceptance.respiratoryNetworkReadinessAcceptance.board.institutions.every((item) => item.consecutiveQualityDays === 3), "six trusted evidence tracks per institution and three consecutive human-verified quality days prove network software release readiness", "surveillance"),
+    check("security:respiratory-network-trusted-evidence", ["attestationOrigin", "verificationSource", "signatureVerified", "receiptSignature", "resolveVerificationKey", "timingSafeEqual", "receipt signature mismatch"].every((token) => respiratoryNetworkReadinessSource.includes(token)), "server receipt binds every trust field and managed key lifecycle fails closed on forgery, tampering, expiry or revocation", "security"),
+    check("safety:respiratory-network-formal-launch-boundary", acceptance.respiratoryNetworkReadinessAcceptance.board.functionalState === "software-release-ready" && acceptance.respiratoryNetworkReadinessAcceptance.board.productionReady === false && acceptance.respiratoryNetworkReadinessAcceptance.board.externalProductionBlockers.length === 2, "software release readiness never substitutes for central site evidence and authorized formal launch approval", "safety"),
     check("surveillance:historical-rule-binding", acceptance.surveillance.summary.closedAlerts === 1 && acceptance.surveillance.summary.alertIntegrityFindings === 0 && acceptance.final.alert.ruleVersion === 1, "the version-1 closed alert remains verifiable after version 2 becomes active", "surveillance"),
     check("surveillance:human-verification", acceptance.verifiedSignal.signal.workflowState === "human-verified" && acceptance.evaluated.signal.workflowState === "alert-created", "human verification precedes rule evaluation", "surveillance"),
     check("surveillance:explainable-alert", acceptance.evaluated.alert.ruleVersion === 1 && acceptance.evaluated.alert.ruleDigest && acceptance.evaluated.alert.observedValue === 8 && acceptance.evaluated.alert.threshold === 5, "alert binds rule version, digest, observed value and threshold", "surveillance"),
@@ -468,6 +574,9 @@ function buildPublicHealthModernizationReadiness(options = {}) {
       respiratoryOneSampleMultiTestBatches: acceptance.respiratoryAcceptance.board.summary.oneSampleMultiTestBatches,
       respiratoryPublishedSignals: acceptance.respiratoryAcceptance.board.summary.publishedSignals,
       respiratoryPlanningCoverageReady: acceptance.respiratoryAcceptance.board.summary.planningCoverageReady,
+      respiratoryNetworkTechnicalLaunchReady: acceptance.respiratoryNetworkReadinessAcceptance.board.technicalLaunchReady,
+      respiratoryNetworkTrustedEvidence: acceptance.respiratoryNetworkReadinessAcceptance.board.summary.trustedEvidence,
+      respiratoryNetworkConsecutiveQualityDays: Math.min(...acceptance.respiratoryNetworkReadinessAcceptance.board.institutions.map((item) => item.consecutiveQualityDays)),
       freshSources: acceptance.sourceOperations.summary.fresh,
       noDataSources: acceptance.sourceOperations.summary.noData,
       signals: acceptance.surveillance.summary.signals,
@@ -482,6 +591,7 @@ function buildPublicHealthModernizationReadiness(options = {}) {
     ruleGovernance: acceptance.ruleGovernance,
     modelGovernance: acceptance.modelGovernance,
     respiratoryPathogenSurveillance: acceptance.respiratoryAcceptance.board,
+    respiratoryNetworkReadiness: acceptance.respiratoryNetworkReadinessAcceptance.board,
     surveillanceCenter: acceptance.surveillance,
     acceptance: {
       signalId: acceptance.intake.signal.id,
@@ -494,8 +604,9 @@ function buildPublicHealthModernizationReadiness(options = {}) {
       "Wire rule-change submit, independent review and trusted server activation routes without accepting client-supplied trust metadata.",
       "Wire shadow model run and independent validation routes without allowing model output to create, verify, publish or close alerts.",
       "Wire aggregate respiratory batch intake, human verification, minimized signal publication and coverage routes without accepting person- or specimen-level identifiers.",
+      "Wire respiratory network readiness and server-only evidence receipt routes; resolve the purpose-bound evidence keyring from managed configuration and reject all client trust claims.",
       "Persist model runs, validation evidence and audit records with optimistic versions and integrity checks.",
-      "Add readiness, release and deploy gates while preserving productionReady=false until managed keys, production thresholds, model drift windows and site evidence are verified."
+      "Add readiness, release and deploy gates while preserving productionReady=false until central site evidence, P0/P1 closure, production handoff and formal launch approval are verified."
     ],
     productionReady: false
   };
@@ -528,6 +639,9 @@ function renderMarkdown(report) {
     `- One-sample multi-test batches: ${report.summary.respiratoryOneSampleMultiTestBatches}`,
     `- Respiratory minimized signals published: ${report.summary.respiratoryPublishedSignals}`,
     `- Respiratory planning coverage ready: ${report.summary.respiratoryPlanningCoverageReady ? "yes" : "no"}`,
+    `- Respiratory network technical launch ready: ${report.summary.respiratoryNetworkTechnicalLaunchReady ? "yes" : "no"}`,
+    `- Respiratory network trusted evidence: ${report.summary.respiratoryNetworkTrustedEvidence}`,
+    `- Respiratory network consecutive quality days: ${report.summary.respiratoryNetworkConsecutiveQualityDays}`,
     `- Fresh/no-data sources: ${report.summary.freshSources}/${report.summary.noDataSources}`,
     `- Closed alerts: ${report.summary.closedAlerts}/${report.summary.alerts}`,
     `- Closed medical-prevention tasks: ${report.summary.closedCollaborationTasks}/${report.summary.collaborationTasks}`,

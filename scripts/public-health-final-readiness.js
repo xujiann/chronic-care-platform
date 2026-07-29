@@ -698,6 +698,8 @@ function buildPublicHealthFinalReadiness(options = {}) {
     check("modernization:respiratory-one-sample-multi-test", modernizationReadiness.summary.respiratoryOneSampleMultiTestBatches === 2 && modernizationReadiness.summary.respiratoryPlanningCoverageReady === true, "two aggregate batches prove one-sample multi-pathogen planning coverage", "modernization"),
     check("modernization:respiratory-priority-populations", modernizationReadiness.respiratoryPathogenSurveillance.summary.childBatches === 1 && modernizationReadiness.respiratoryPathogenSurveillance.summary.olderAdultBatches === 1 && modernizationReadiness.respiratoryPathogenSurveillance.summary.priorityPlaceBatches === 2, "child and older-adult monitoring covers school and elderly-care priority places", "modernization"),
     check("modernization:respiratory-signal-boundary", modernizationReadiness.summary.respiratoryPublishedSignals === 3 && modernizationReadiness.respiratoryPathogenSurveillance.productionReady === false, "positive aggregate results publish three minimized signals without bypassing human verification or production gates", "modernization"),
+    check("modernization:respiratory-network-software-release", modernizationReadiness.summary.respiratoryNetworkTechnicalLaunchReady === true && modernizationReadiness.summary.respiratoryNetworkTrustedEvidence === 12 && modernizationReadiness.summary.respiratoryNetworkConsecutiveQualityDays === 3, "two sentinel laboratories each have six trusted evidence tracks and three consecutive human-verified quality days", "modernization"),
+    check("modernization:respiratory-network-production-boundary", modernizationReadiness.respiratoryNetworkReadiness.functionalState === "software-release-ready" && modernizationReadiness.respiratoryNetworkReadiness.productionReady === false && modernizationReadiness.respiratoryNetworkReadiness.externalProductionBlockers.length === 2, "network software release readiness retains central site evidence and formal approval blockers", "modernization"),
     check("modernization:medical-prevention-collaboration", modernizationReadiness.summary.collaborationTasks === 2 && modernizationReadiness.summary.closedCollaborationTasks === 2 && modernizationReadiness.productionReady === false, "medical public-health and primary-care tasks close without asserting production readiness", "modernization"),
     check("runtime:eight-handoffs", runtime.handoffs.length === 8 && runtime.functionalState === "eight-lane-coordination-persistence-ready", `${runtime.handoffs.length}/8 runtime handoffs`, "runtime"),
     check("runtime:persisted-write-model", runtimeAcceptance.first.nextData.publicHealthCoordinationHandoffs.length === 8, "immutable state patch contains all handoffs", "runtime"),
@@ -744,6 +746,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
     check("operations:risk-queue-contract", ["audit-dispatch-missing", "coordination-handoff-missing", "coordination-state-mismatch", "worker-lease-expired", "retry-due-unclaimed", "pending-dispatch-overdue", "dead-letter-unrecovered", "lane-control-audit-orphan", "lane-control-integrity-invalid", "lane-circuit-open"].every((token) => operationsSource.includes(token)), "integrity, orphan audit/task/control, mismatch, lease, retry, SLA, dead-letter and lane resilience risks have explicit codes", "operations"),
     check("frontend:action-route-contract", pageSource.includes("/api/public-health/coordination/") && pageSource.includes("idempotencyKey") && pageSource.includes("expectedVersion"), "T00 route boundary has a stable client contract", "integration"),
     check("integration:documented-boundary", ["public-health-coordination-runtime.js", "public-health-external-adapter-service.js", "T00", "server.js", "productionReady"].every((token) => doc.includes(token)) && ["requestKeyring", "receiptKeyring", "receiptReplayKeyHash", "legacy-static"].every((token) => keyringDoc.includes(token)) && ["expectedLaneControlVersion", "maxPending", "lane-circuit-open"].every((token) => resilienceDoc.includes(token)) && ["runtimeReleaseDigest", "contract-transition-conflict", "contract-governance-mismatch"].every((token) => contractDoc.includes(token)) && ["server-generated", "platform-observability", "endpointConnectivityReady", "productionReady"].every((token) => endpointProbeDoc.includes(token)) && ["只接受 `laneId`", "DNS rebinding", "certificatePins", "requireMutualTls", "productionReady=false"].every((token) => activeProbeDoc.includes(token)) && ["continuousConnectivityReady", "receiptDigest", "policyDigest", "campaign nonce", "productionReady=false"].every((token) => endpointCampaignDoc.includes(token)) && ["public-health-surveillance-model-governance-service.js", "validated-shadow", "review-due", "modelAdviceOnly=true", "public-health-respiratory-pathogen-surveillance-service.js", "18种病原体", "一样本多检测", "不得因实验室批次已复核而跳过信号级人工确认"].every((token) => modernizationDoc.includes(token)), "runtime, adapter, key lifecycle, resilience, contract, endpoint verification, active probing, campaign continuity, model governance, respiratory pathogen surveillance and T00 boundaries are documented", "integration"),
+    check("integration:respiratory-network-evidence-documented", ["public-health-respiratory-network-readiness-service.js", "technicalLaunchReady=true", "public-health-respiratory-network-evidence", "/api/public-health/respiratory-network-readiness"].every((token) => modernizationDoc.includes(token)), "respiratory network evidence service, purpose-bound keyring, public read route and production boundary are documented", "integration"),
     check("safety:functional-not-production", runtime.productionReady === false && registry.productionReady === false && deliveries.every((item) => item.productionReady === false), "functional acceptance cannot self-assert production readiness", "safety"),
     check("safety:endpoint-connectivity-not-production", endpointProbeAcceptance.endpointConnectivityReady === true && endpointProbeAcceptance.productionReady === false && endpointProbeAcceptance.entries.every((item) => item.blockerCode === "trusted-site-evidence-still-required"), "verified connectivity never replaces trusted site evidence or launch approval", "safety"),
     check("safety:continuous-connectivity-not-production", endpointProbeCampaignAcceptance.continuousConnectivityReady === true && endpointProbeCampaignAcceptance.productionReady === false && endpointProbeCampaignAcceptance.blockers.every((item) => /site evidence|handoff|P0\/P1|approval/i.test(item)), "three consecutive campaigns still retain site evidence, blocker, handoff and approval boundaries", "safety"),
@@ -779,6 +782,9 @@ function buildPublicHealthFinalReadiness(options = {}) {
       modernizationRespiratoryOneSampleMultiTestBatches: modernizationReadiness.summary.respiratoryOneSampleMultiTestBatches,
       modernizationRespiratoryPublishedSignals: modernizationReadiness.summary.respiratoryPublishedSignals,
       modernizationRespiratoryPlanningCoverageReady: modernizationReadiness.summary.respiratoryPlanningCoverageReady,
+      modernizationRespiratoryNetworkTechnicalLaunchReady: modernizationReadiness.summary.respiratoryNetworkTechnicalLaunchReady,
+      modernizationRespiratoryNetworkTrustedEvidence: modernizationReadiness.summary.respiratoryNetworkTrustedEvidence,
+      modernizationRespiratoryNetworkConsecutiveQualityDays: modernizationReadiness.summary.respiratoryNetworkConsecutiveQualityDays,
       modernizationFreshSources: modernizationReadiness.summary.freshSources,
       modernizationNoDataSources: modernizationReadiness.summary.noDataSources,
       modernizationClosedAlerts: modernizationReadiness.summary.closedAlerts,
@@ -858,6 +864,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
       publicHealthSurveillanceRuleGovernance: "public-health-surveillance-rule-governance-service.js",
       publicHealthSurveillanceModelGovernance: "public-health-surveillance-model-governance-service.js",
       publicHealthRespiratoryPathogenSurveillance: "public-health-respiratory-pathogen-surveillance-service.js",
+      publicHealthRespiratoryNetworkReadiness: "public-health-respiratory-network-readiness-service.js",
       publicHealthSurveillanceWorkflow: "public-health-surveillance-workflow-service.js",
       publicHealthMedicalPreventionCollaboration: "public-health-medical-prevention-collaboration-service.js",
       externalOperations: "public-health-external-operations-service.js",
@@ -872,9 +879,9 @@ function buildPublicHealthFinalReadiness(options = {}) {
     },
     remainingT00Integration: [
       "Wire the minimized data-source operations summary and freshness panel through T00-owned routes and page files.",
-      "Wire rule, model and respiratory pathogen routes without accepting client trust claims, person-level identifiers or model-driven alert state.",
-      "Persist rule changes, model evidence, aggregate respiratory batches and audits; resolve the purpose-bound active/grace/revoked rule keyring through server-only managed configuration.",
-      "Extend release and deploy gates with key rotation, model drift and respiratory panel coverage checks while preserving productionReady=false until approved thresholds and site evidence are verified."
+      "Wire rule, model, respiratory pathogen and respiratory network readiness routes without accepting client trust claims, person-level identifiers or model-driven alert state.",
+      "Persist rule changes, model evidence, aggregate respiratory batches, network evidence and audits; resolve purpose-bound active/grace/revoked keyrings through server-only managed configuration.",
+      "Extend release and deploy gates with key rotation, model drift, respiratory panel coverage and per-institution evidence checks while preserving productionReady=false until central site evidence and formal approval are verified."
     ]
   };
 }
@@ -904,6 +911,9 @@ function renderMarkdown(report) {
     `- Modernization respiratory one-sample multi-test batches: ${report.summary.modernizationRespiratoryOneSampleMultiTestBatches}`,
     `- Modernization respiratory minimized signals: ${report.summary.modernizationRespiratoryPublishedSignals}`,
     `- Modernization respiratory planning coverage ready: ${report.summary.modernizationRespiratoryPlanningCoverageReady ? "yes" : "no"}`,
+    `- Modernization respiratory network technical launch ready: ${report.summary.modernizationRespiratoryNetworkTechnicalLaunchReady ? "yes" : "no"}`,
+    `- Modernization respiratory network trusted evidence: ${report.summary.modernizationRespiratoryNetworkTrustedEvidence}`,
+    `- Modernization respiratory network consecutive quality days: ${report.summary.modernizationRespiratoryNetworkConsecutiveQualityDays}`,
     `- Modernization fresh/no-data sources: ${report.summary.modernizationFreshSources}/${report.summary.modernizationNoDataSources}`,
     `- Modernization closed alerts: ${report.summary.modernizationClosedAlerts}/1`,
     `- Modernization closed collaboration tasks: ${report.summary.modernizationClosedCollaborationTasks}/2`,
