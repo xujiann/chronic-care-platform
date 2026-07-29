@@ -8,6 +8,7 @@ let currentPublicHealthModernization = {
   ruleGovernance: null,
   modelGovernance: null,
   respiratoryPathogen: null,
+  respiratoryNetwork: null,
   surveillance: null,
   collaboration: null
 };
@@ -125,6 +126,7 @@ const PUBLIC_HEALTH_MODERNIZATION_ENDPOINTS = Object.freeze({
   ruleGovernance: "/api/public-health/surveillance-rule-governance",
   modelGovernance: "/api/public-health/surveillance-model-governance",
   respiratoryPathogen: "/api/public-health/respiratory-pathogen-surveillance",
+  respiratoryNetwork: "/api/public-health/respiratory-network-readiness",
   surveillance: "/api/public-health/surveillance-center",
   collaboration: "/api/public-health/medical-prevention-tasks"
 });
@@ -157,8 +159,9 @@ async function loadPublicHealthModernizationWorkbenches() {
     ruleGovernance: results[2].status === "fulfilled" ? results[2].value : null,
     modelGovernance: results[3].status === "fulfilled" ? results[3].value : null,
     respiratoryPathogen: results[4].status === "fulfilled" ? results[4].value : null,
-    surveillance: results[5].status === "fulfilled" ? results[5].value : null,
-    collaboration: results[6].status === "fulfilled" ? results[6].value : null
+    respiratoryNetwork: results[5].status === "fulfilled" ? results[5].value : null,
+    surveillance: results[6].status === "fulfilled" ? results[6].value : null,
+    collaboration: results[7].status === "fulfilled" ? results[7].value : null
   };
   renderPublicHealthModernizationWorkbenches(currentPublicHealthModernization, results);
 }
@@ -170,6 +173,7 @@ function renderPublicHealthModernizationLoading() {
     "#public-health-rule-governance-status",
     "#public-health-surveillance-model-governance-status",
     "#public-health-respiratory-pathogen-status",
+    "#public-health-respiratory-network-status",
     "#public-health-surveillance-status",
     "#public-health-medical-prevention-status"
   ].forEach((selector) => {
@@ -198,6 +202,7 @@ function renderPublicHealthModernizationWorkbenches(state, results = []) {
   const ruleGovernance = state.ruleGovernance;
   const modelGovernance = state.modelGovernance;
   const respiratoryPathogen = state.respiratoryPathogen;
+  const respiratoryNetwork = state.respiratoryNetwork;
   const surveillance = state.surveillance;
   const collaboration = state.collaboration;
   renderModernizationStatus("#public-health-data-foundation-status", foundation, Boolean(foundation));
@@ -220,6 +225,11 @@ function renderPublicHealthModernizationWorkbenches(state, results = []) {
     "#public-health-respiratory-pathogen-status",
     respiratoryPathogen,
     Boolean(respiratoryPathogen)
+  );
+  renderModernizationStatus(
+    "#public-health-respiratory-network-status",
+    respiratoryNetwork,
+    Boolean(respiratoryNetwork)
   );
   renderModernizationStatus("#public-health-surveillance-status", surveillance, Boolean(surveillance));
   renderModernizationStatus("#public-health-medical-prevention-status", collaboration, Boolean(collaboration));
@@ -249,6 +259,7 @@ function renderPublicHealthModernizationWorkbenches(state, results = []) {
   renderPublicHealthRuleGovernance(ruleGovernance);
   renderPublicHealthSurveillanceModelGovernance(modelGovernance);
   renderPublicHealthRespiratoryPathogenSurveillance(respiratoryPathogen);
+  renderPublicHealthRespiratoryNetworkReadiness(respiratoryNetwork);
 
   const surveillanceMetrics = document.querySelector("#public-health-surveillance-metrics");
   if (surveillanceMetrics) {
@@ -496,6 +507,79 @@ function renderPublicHealthRespiratoryPathogenSurveillance(board) {
       <div><strong>${escapeHtml(item.code || "respiratory-quality-finding")}</strong><small>${escapeHtml(item.batchId || "批次未绑定")}</small></div>
       <span class="badge warn">失败关闭</span>
     </article>`).join("") || "<p class=\"modernization-empty\">未发现批次、审计或信号绑定完整性问题。</p>";
+  }
+}
+
+function renderPublicHealthRespiratoryNetworkReadiness(board) {
+  const metrics = document.querySelector("#public-health-respiratory-network-metrics");
+  const institutions = document.querySelector("#public-health-respiratory-network-institutions");
+  const blockers = document.querySelector("#public-health-respiratory-network-blockers");
+  if (metrics) {
+    metrics.innerHTML = board
+      ? [
+          modernizationMetric(
+            "技术就绪机构",
+            `${board.summary?.technicalLaunchReadyInstitutions || 0}/${board.summary?.institutions || 0}`
+          ),
+          modernizationMetric(
+            "可信证据",
+            `${board.summary?.trustedEvidence || 0}/${(board.summary?.institutions || 0) * (board.summary?.requiredEvidenceTypes || 6)}`
+          ),
+          modernizationMetric("证据轨道", board.summary?.requiredEvidenceTypes || 6),
+          modernizationMetric(
+            "签名密钥",
+            board.summary?.keyring?.managed ? "受管有效" : "缺失/无效"
+          ),
+          modernizationMetric(
+            "技术上线",
+            board.technicalLaunchReady ? "候选通过" : "失败关闭"
+          ),
+          modernizationMetric("生产授权", "始终未授权")
+        ].join("")
+      : modernizationMetric("呼吸道网络就绪", "不可用");
+  }
+  if (!board) {
+    if (institutions) {
+      institutions.innerHTML = "<p class=\"modernization-empty\">网络证据摘要不可用，所有机构按未就绪处理。</p>";
+    }
+    if (blockers) {
+      blockers.innerHTML = "<p class=\"modernization-empty\">服务不可用或无 commission 权限；productionReady 保持 false。</p>";
+    }
+    return;
+  }
+  const requirements = Array.isArray(board.evidenceRequirements)
+    ? board.evidenceRequirements
+    : [];
+  if (institutions) {
+    institutions.innerHTML = (board.institutions || []).map((institution) => {
+      const completed = new Set(institution.completedEvidenceTypes || []);
+      const tracks = requirements.map((requirement) => `
+        <span class="respiratory-network-track ${completed.has(requirement.type) ? "ready" : "missing"}">
+          ${escapeHtml(requirement.label || requirement.type)}
+          <strong>${completed.has(requirement.type) ? "已验证" : "缺失"}</strong>
+        </span>`).join("");
+      return `<article class="modernization-item respiratory-network-institution">
+        <div>
+          <strong>${escapeHtml(institution.institutionId || "机构未登记")}</strong>
+          <small>六轨证据 ${escapeHtml(institution.trustedEvidence || 0)}/${escapeHtml(board.summary?.requiredEvidenceTypes || 6)}
+            · 连续人工质控 ${escapeHtml(institution.consecutiveQualityDays || 0)}/${escapeHtml(board.summary?.minimumConsecutiveQualityDays || 3)} 天</small>
+          <div class="respiratory-network-tracks">${tracks}</div>
+        </div>
+        <span class="badge ${institution.technicalLaunchReady ? "ok" : "warn"}">${escapeHtml(
+          institution.technicalLaunchReady ? "technicalLaunchReady" : "技术门禁未通过"
+        )}</span>
+      </article>`;
+    }).join("") || "<p class=\"modernization-empty\">尚无验收哨点机构；技术上线按未就绪处理。</p>";
+  }
+  if (blockers) {
+    const safeBlockers = [
+      ...(board.blockers || []),
+      ...(board.externalProductionBlockers || [])
+    ];
+    blockers.innerHTML = [...new Set(safeBlockers)].map((item) => `<article class="modernization-item">
+      <div><strong>${escapeHtml(item)}</strong><small>外部生产门禁，不得由客户端覆盖</small></div>
+      <span class="badge warn">productionReady=false</span>
+    </article>`).join("") || "<p class=\"modernization-empty\">技术候选可用；中央现场证据、P0/P1、生产交接与正式审批仍独立阻断。</p>";
   }
 }
 

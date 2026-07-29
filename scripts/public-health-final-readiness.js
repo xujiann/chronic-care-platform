@@ -773,7 +773,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
     ].every((token) => serverSource.includes(token)), "coordination, enqueue, worker, callback, recovery, endpoint verification, controlled active probe, operations and rotation routes are registered", "integration"),
     check("integration:t00-managed-key-provider", ["loadPublicHealthLaneCredentials", "managed-key-service", "REQUEST_KEYRING_REF", "RECEIPT_KEYRING_REF", "privateCredentials"].every((token) => keyProviderSource.includes(token)), "lane keyrings load through a non-enumerable managed-key provider contract", "integration"),
     check("integration:t00-server-time", serverSource.includes("publicHealthExternalCallbackMatch") && serverSource.includes("const at = new Date().toISOString()") && serverSource.includes("requestKeyring: credentials.requestKeyring") && serverSource.includes("receiptKeyring: credentials.receiptKeyring") && ["serverTime", "requestKeyring: credentials.requestKeyring", "receiptKeyring: credentials.receiptKeyring", "writeState(claimed.nextData"].every((token) => workerSource.includes(token)), "enqueue, worker and callback controllers inject server time and complete keyrings; worker persists its lease before transport", "integration"),
-    check("integration:t00-release-script", packageSource.includes("\"public-health:final-readiness\"") && packageSource.includes("test/public-health-external-api.test.js") && packageSource.includes("test/public-health-external-endpoint-verification-service.test.js") && packageSource.includes("test/public-health-external-endpoint-probe-runner.test.js") && packageSource.includes("test/public-health-external-endpoint-probe-campaign-service.test.js"), "package scripts register final readiness, endpoint verification, active probe, campaign and public API regressions", "integration"),
+    check("integration:t00-release-script", packageSource.includes("\"public-health:final-readiness\"") && packageSource.includes("test/public-health-external-api.test.js") && packageSource.includes("test/public-health-external-endpoint-verification-service.test.js") && packageSource.includes("test/public-health-external-endpoint-probe-runner.test.js") && packageSource.includes("test/public-health-external-endpoint-probe-campaign-service.test.js") && packageSource.includes("test/public-health-respiratory-network-api.test.js"), "package scripts register final readiness, endpoint verification, active probe, campaign, respiratory-network evidence and public API regressions", "integration"),
     check("integration:t00-resilience-policy", ["PUBLIC_HEALTH_EXTERNAL_RESILIENCE_POLICIES", "loadPublicHealthResiliencePolicies", "resiliencePolicies"].every((token) => keyProviderSource.includes(token)) && serverSource.includes("credentials.resiliencePolicies"), "eight-lane resilience policies are injected from non-enumerable server configuration", "integration"),
     check("integration:t00-dual-cas", ["assertPublicHealthExternalCas", "publicHealthExternalCas", "expectedOutboxVersion", "expectedLaneControlVersion"].every((token) => serverSource.includes(token)) && ["laneControlVersionFor", "claimed.laneControl?.version", "publicHealthExternalCas"].every((token) => workerSource.includes(token)), "worker and durable writer bind dispatch and lane-control versions", "integration"),
     check("integration:t00-resilience-alerts", ["lane-control-audit-orphan", "lane-control-signature-secret-unavailable", "lane-control-integrity-invalid", "lane-circuit-open", "lane-circuit-half-open"].every((token) => operationsSource.includes(token)) && serverSource.includes("/api/public-health/external/operations-board"), "P0 and P1 lane-control risks are registered on the operations board", "integration"),
@@ -883,7 +883,13 @@ function buildPublicHealthFinalReadiness(options = {}) {
       "/api/public-health/respiratory-pathogen-surveillance",
       "/api/public-health/respiratory-pathogen-batches",
       "/api/public-health/respiratory-pathogen-batches/:id/actions",
+      "/api/public-health/respiratory-network-readiness",
+      "/api/public-health/respiratory-network-evidence/:id/actions",
       "assertPublicHealthRespiratoryPayload",
+      "assertPublicHealthRespiratoryNetworkEvidencePayload",
+      "publicHealthSafeRespiratoryNetworkReadiness",
+      "issueTrustedRespiratoryNetworkEvidenceReceipt",
+      "PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_KEYRING_JSON",
       "publishPublicHealthRespiratoryPathogenSignalsToState",
       "runPublicHealthSurveillanceModelToState",
       "submitPublicHealthSurveillanceModelValidationToState",
@@ -891,7 +897,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
       "assertPublicHealthSurveillanceModelPayload",
       "publicHealthModernizationCommand",
       "PUBLIC_HEALTH_MODERNIZATION_SERVER_CONTEXT_FORBIDDEN"
-    ].every((token) => serverSource.includes(token)), "commission-only data, surveillance, shadow-model, aggregate respiratory-pathogen and medical-prevention routes inject server actor, time and idempotency context and reject client overrides", "integration"),
+    ].every((token) => serverSource.includes(token)), "commission-only data, surveillance, shadow-model, aggregate respiratory-pathogen, respiratory-network evidence and medical-prevention routes inject server actor, time and idempotency context and reject client overrides", "integration"),
     check("integration:t00-modernization-persistence", [
       "PUBLIC_HEALTH_MODERNIZATION_COLLECTIONS",
       "assertUniquePublicHealthModernizationState",
@@ -903,16 +909,22 @@ function buildPublicHealthFinalReadiness(options = {}) {
       "publicHealthSurveillanceModelValidations",
       "publicHealthRespiratoryPathogenBatches",
       "publicHealthRespiratoryPathogenAudit",
+      "publicHealthRespiratoryNetworkEvidence",
+      "publicHealthRespiratoryNetworkEvidenceAudit",
       "publish-respiratory-pathogen-signals",
+      "issue-respiratory-network-evidence",
+      "public health respiratory network evidence receipt id",
       "requiredCollections",
       "expectedVersion",
       "PUBLIC_HEALTH_MODERNIZATION_CAS_CONFLICT"
-    ].every((token) => serverSource.includes(token)), "all fifteen modernization collections persist nextData with SQLite transaction CAS; respiratory publication atomically commits batch, audit, signals and lineage", "integration"),
+    ].every((token) => serverSource.includes(token)), "all seventeen modernization collections use SQLite transaction CAS; respiratory publication and signed network evidence each commit their complete audit boundary atomically", "integration"),
     check("integration:t00-modernization-ui-release", [
       "public-health-data-foundation-title",
       "public-health-surveillance-title",
       "public-health-surveillance-model-governance-title",
       "public-health-respiratory-pathogen-title",
+      "public-health-respiratory-network-title",
+      "public-health-respiratory-network-institutions",
       "public-health-medical-prevention-title",
       "public-health-signal-intake-form",
       "public-health-model-validation-form",
@@ -926,6 +938,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
       "handlePublicHealthModernizationAction",
       "renderPublicHealthSurveillanceModelGovernance",
       "renderPublicHealthRespiratoryPathogenSurveillance",
+      "renderPublicHealthRespiratoryNetworkReadiness",
       "run-shadow-model",
       "review-model-validation",
       "verify-respiratory-pathogen-batch",
@@ -942,8 +955,9 @@ function buildPublicHealthFinalReadiness(options = {}) {
       "test/public-health-modernization-ui.test.js",
       "test/public-health-modernization-api.test.js",
       "test/public-health-surveillance-model-governance-api.test.js",
-      "test/public-health-respiratory-pathogen-api.test.js"
-    ].every((token) => packageSource.includes(token)), "seven responsive workbenches expose only minimized summaries, advisory shadow output, aggregate respiratory counts and executable governed actions while release scripts preserve productionReady=false", "integration"),
+      "test/public-health-respiratory-pathogen-api.test.js",
+      "test/public-health-respiratory-network-api.test.js"
+    ].every((token) => packageSource.includes(token)), "eight responsive workbenches expose only minimized summaries, advisory shadow output, aggregate respiratory counts, six-track network readiness and governed actions while release scripts preserve productionReady=false", "integration"),
     check("integration:t00-modernization-source-operations", [
       "/api/public-health/data-source-operations",
       "buildPublicHealthDataSourceOperations",
@@ -1012,7 +1026,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
   );
   const t08FunctionalChecks = checks.filter((item) => !t00BoundaryChecks.includes(item));
   const remainingProductionBoundaries = [
-    "Production remains blocked until real independent managed campaign and lane keyrings, a managed surveillance-rule activation key, approved production thresholds and change windows, verified HTTPS endpoints, certificate pins or mTLS policy, restricted probe workers, worker identity, approved campaign cadence, authoritative multi-source and respiratory sentinel/laboratory feeds, sustained source-quality observation, sharing authorization, validated surveillance rules and models, staffed human review, verified medical-prevention handoffs, externally approved per-lane resilience policies, contract cutover and backlog-drain evidence, load evidence, cross-key audit/callback smoke, trusted site evidence and formal operations acceptance are available."
+    "Production remains blocked until real independent managed campaign, lane and respiratory-network evidence keyrings, a managed surveillance-rule activation key, approved production thresholds and change windows, verified HTTPS endpoints, certificate pins or mTLS policy, restricted probe workers, worker identity, approved campaign cadence, authoritative multi-source and respiratory sentinel/laboratory feeds, six trusted evidence tracks per acceptance sentinel, sustained source-quality observation, sharing authorization, validated surveillance rules and models, staffed human review, verified medical-prevention handoffs, externally approved per-lane resilience policies, contract cutover and backlog-drain evidence, load evidence, cross-key audit/callback smoke, central trusted site evidence, P0/P1 closure, production handoff and formal operations acceptance are available."
   ];
   return {
     generatedAt: new Date().toISOString(),

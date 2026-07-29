@@ -284,6 +284,22 @@
           <p class="modernization-boundary-note">仅接收聚合计数与证据，不接收居民、患者或样本标识。批次确认不会替代信号级人工确认、规则评估或生成预警；productionReady 始终为 false。</p>
         </article>
 
+        <article class="panel public-health-modernization-panel" aria-labelledby="public-health-respiratory-network-title">
+          <div class="panel-title">
+            <div>
+              <h2 id="public-health-respiratory-network-title">呼吸道哨点网络上线证据</h2>
+              <span>逐机构六轨可信证据、连续人工质控日与技术上线候选门禁</span>
+            </div>
+            <span id="public-health-respiratory-network-status" class="badge warn">加载前未就绪</span>
+          </div>
+          <div id="public-health-respiratory-network-metrics" class="modernization-metrics"></div>
+          <h3>哨点机构六轨证据</h3>
+          <div id="public-health-respiratory-network-institutions" class="modernization-list" aria-live="polite"></div>
+          <h3>外部生产阻断</h3>
+          <div id="public-health-respiratory-network-blockers" class="modernization-list" aria-live="polite"></div>
+          <p class="modernization-boundary-note">technicalLaunchReady 只代表软件发布候选通过；中央现场证据、P0/P1 关闭、生产交接和正式上线审批仍独立阻断，productionReady 始终为 false。页面不展示材料摘要、签名、receiptId、keyId 或密钥。</p>
+        </article>
+
         <article class="panel public-health-modernization-panel" aria-labelledby="public-health-surveillance-title">
           <div class="panel-title">
             <div>

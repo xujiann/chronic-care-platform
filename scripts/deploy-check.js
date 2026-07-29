@@ -699,7 +699,11 @@ function buildDeployCheckReport(options = {}) {
         "/api/public-health/respiratory-pathogen-surveillance",
         "/api/public-health/respiratory-pathogen-batches",
         "/api/public-health/respiratory-pathogen-batches/:id/actions",
+        "/api/public-health/respiratory-network-readiness",
+        "/api/public-health/respiratory-network-evidence/:id/actions",
         "assertPublicHealthRespiratoryPayload",
+        "assertPublicHealthRespiratoryNetworkEvidencePayload",
+        "PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_KEYRING_JSON",
         "publishPublicHealthRespiratoryPathogenSignalsToState",
         "assertPublicHealthSurveillanceModelPayload",
         "publicHealthModernizationCommand",
@@ -708,9 +712,10 @@ function buildDeployCheckReport(options = {}) {
         && fs.existsSync(path.join(ROOT, "public-health-data-foundation-service.js"))
         && fs.existsSync(path.join(ROOT, "public-health-surveillance-model-governance-service.js"))
         && fs.existsSync(path.join(ROOT, "public-health-respiratory-pathogen-surveillance-service.js"))
+        && fs.existsSync(path.join(ROOT, "public-health-respiratory-network-readiness-service.js"))
         && fs.existsSync(path.join(ROOT, "public-health-surveillance-workflow-service.js"))
         && fs.existsSync(path.join(ROOT, "public-health-medical-prevention-collaboration-service.js")),
-      detail: "commission-only modernization routes delegate data, model, aggregate respiratory-pathogen and workflow transitions and bind actor, server time, idempotency and expectedVersion"
+      detail: "commission-only modernization routes delegate data, model, aggregate respiratory-pathogen, signed network evidence and workflow transitions and bind actor, server time, idempotency and expectedVersion"
     },
     {
       name: "storage:publicHealthModernization",
@@ -725,15 +730,20 @@ function buildDeployCheckReport(options = {}) {
         "publicHealthSurveillanceModelValidations",
         "publicHealthRespiratoryPathogenBatches",
         "publicHealthRespiratoryPathogenAudit",
+        "publicHealthRespiratoryNetworkEvidence",
+        "publicHealthRespiratoryNetworkEvidenceAudit",
         "publish-respiratory-pathogen-signals",
+        "issue-respiratory-network-evidence",
+        "public health respiratory network evidence receipt id",
         "requiredCollections",
         "PUBLIC_HEALTH_MODERNIZATION_CAS_CONFLICT"
       ].every((marker) => serverSource.includes(marker))
         && pkg.scripts?.["public-health:resilience-test"]?.includes("test/public-health-modernization-api.test.js")
         && pkg.scripts?.["public-health:model-governance-test"]?.includes("test/public-health-surveillance-model-governance-api.test.js")
         && pkg.scripts?.["public-health:respiratory-pathogen-test"]?.includes("test/public-health-respiratory-pathogen-api.test.js")
+        && pkg.scripts?.["public-health:respiratory-network-test"]?.includes("test/public-health-respiratory-network-api.test.js")
         && pkg.scripts?.["public-health:modernization-readiness"] === "node scripts/public-health-modernization-readiness.js",
-      detail: "fifteen modernization collections use nextData-only SQLite transaction CAS, including atomic respiratory batch, audit, signal and lineage publication"
+      detail: "seventeen modernization collections use SQLite transaction CAS, including atomic respiratory publication and signed network-evidence audit"
     },
     {
       name: "static:publicHealthModernizationWorkbenches",
@@ -742,6 +752,8 @@ function buildDeployCheckReport(options = {}) {
           "public-health-surveillance-title",
           "public-health-surveillance-model-governance-title",
           "public-health-respiratory-pathogen-title",
+          "public-health-respiratory-network-title",
+          "public-health-respiratory-network-institutions",
           "public-health-medical-prevention-title",
           "public-health-signal-intake-form",
           "public-health-model-validation-form",
@@ -756,6 +768,7 @@ function buildDeployCheckReport(options = {}) {
           "handlePublicHealthModernizationAction",
           "renderPublicHealthSurveillanceModelGovernance",
           "renderPublicHealthRespiratoryPathogenSurveillance",
+          "renderPublicHealthRespiratoryNetworkReadiness",
           "run-shadow-model",
           "review-model-validation",
           "verify-respiratory-pathogen-batch",
@@ -764,9 +777,27 @@ function buildDeployCheckReport(options = {}) {
           "expectedVersion",
           "人工核实"
         ].every((marker) => publicHealthUiSource.includes(marker))
-        && ["public-health-modernization-grid", "modernization-form", "@media (max-width: 1100px)"].every((marker) => portalCss.includes(marker))
+        && ["public-health-modernization-grid", "modernization-form", "respiratory-network-tracks", "@media (max-width: 1100px)"].every((marker) => portalCss.includes(marker))
         && pkg.scripts?.["public-health:resilience-test"]?.includes("test/public-health-modernization-ui.test.js"),
-      detail: "seven responsive data, source-operations, rule-governance, shadow-model, respiratory-pathogen, surveillance and medical-prevention workbenches expose redacted summaries, aggregate actions and a production-false boundary"
+      detail: "eight responsive data, source-operations, rule-governance, shadow-model, respiratory-pathogen, respiratory-network, surveillance and medical-prevention workbenches expose redacted summaries and a production-false boundary"
+    },
+    {
+      name: "api:publicHealthRespiratoryNetworkReadiness",
+      ok: [
+        "publicHealthSafeRespiratoryNetworkReadiness",
+        "issueTrustedRespiratoryNetworkEvidenceReceipt",
+        "verifyTrustedRespiratoryNetworkEvidence",
+        "RESPIRATORY_NETWORK_EVIDENCE_PURPOSE",
+        "PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_KEYRING_JSON",
+        "PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_PAYLOAD_FORBIDDEN",
+        "technicalLaunchReady",
+        "productionReady: false"
+      ].every((marker) => serverSource.includes(marker))
+        && pkg.scripts?.["public-health:respiratory-network-check"]?.includes("public-health-respiratory-network-readiness-service.js")
+        && pkg.scripts?.["public-health:respiratory-network-test"]?.includes("test/public-health-respiratory-network-api.test.js")
+        && publicHealthHtml.includes("technicalLaunchReady")
+        && publicHealthUiSource.includes("productionReady=false"),
+      detail: "managed purpose-bound evidence receipts, redacted six-track summaries and technical-versus-production launch boundaries are wired fail-closed"
     },
     {
       name: "api:publicHealthDataSourceOperations",

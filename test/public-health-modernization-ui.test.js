@@ -38,7 +38,7 @@ function loadUiContext() {
   return { context, node };
 }
 
-test("modernization page exposes seven accessible commission workbenches and controlled routes", () => {
+test("modernization page exposes eight accessible commission workbenches and controlled routes", () => {
   const html = read("public-health.html");
   const source = read("public-health.js");
   const css = read("portal.css");
@@ -54,6 +54,10 @@ test("modernization page exposes seven accessible commission workbenches and con
   assert.match(html, /id="public-health-model-validation-form"/);
   assert.match(html, /id="public-health-respiratory-pathogen-title"/);
   assert.match(html, /id="public-health-respiratory-pathogen-form"/);
+  assert.match(html, /id="public-health-respiratory-network-title"/);
+  assert.match(html, /id="public-health-respiratory-network-institutions"/);
+  assert.match(html, /technicalLaunchReady/);
+  assert.match(html, /中央现场证据、P0\/P1 关闭、生产交接和正式上线审批/);
   assert.match(html, /18种病原目录/);
   assert.match(html, /仅接收聚合计数与证据/);
   assert.match(html, /modelAdviceOnly=true/);
@@ -71,6 +75,8 @@ test("modernization page exposes seven accessible commission workbenches and con
   assert.match(source, /\/api\/public-health\/surveillance-model-validations\/\$\{encodeURIComponent\(id\)\}\/actions/);
   assert.match(source, /\/api\/public-health\/respiratory-pathogen-surveillance/);
   assert.match(source, /\/api\/public-health\/respiratory-pathogen-batches/);
+  assert.match(source, /\/api\/public-health\/respiratory-network-readiness/);
+  assert.match(source, /renderPublicHealthRespiratoryNetworkReadiness/);
   assert.match(source, /PUBLIC_HEALTH_RESPIRATORY_PATHOGEN_CODES/);
   assert.match(source, /testedSpecimens:\s*specimenCount/);
   assert.match(source, /\/api\/public-health\/surveillance-center/);
@@ -83,6 +89,7 @@ test("modernization page exposes seven accessible commission workbenches and con
   assert.doesNotMatch(source, /productionReady\s*=\s*true/);
   assert.match(css, /\.public-health-modernization-grid/);
   assert.match(css, /\.modernization-form/);
+  assert.match(css, /\.respiratory-network-tracks/);
   assert.match(css, /@media \(max-width: 1100px\)/);
 });
 
@@ -236,6 +243,54 @@ test("modernization rendering uses only safe summary fields and fails closed whe
       findings: [],
       productionReady: false
     },
+    respiratoryNetwork: {
+      ok: true,
+      technicalLaunchReady: true,
+      summary: {
+        requiredEvidenceTypes: 6,
+        institutions: 1,
+        technicalLaunchReadyInstitutions: 1,
+        trustedEvidence: 6,
+        minimumConsecutiveQualityDays: 3,
+        keyring: {
+          managed: true,
+          active: 1,
+          grace: 1,
+          revoked: 0
+        }
+      },
+      evidenceRequirements: [
+        "panel-standard-mapping",
+        "sentinel-network-authorization",
+        "laboratory-quality-qualification",
+        "data-sharing-authorization",
+        "privacy-security-review",
+        "continuity-observation-acceptance"
+      ].map((type) => ({ type, label: `safe-${type}` })),
+      institutions: [{
+        institutionId: "sentinel-respiratory-laboratory-001",
+        technicalLaunchReady: true,
+        trustedEvidence: 6,
+        consecutiveQualityDays: 3,
+        completedEvidenceTypes: [
+          "panel-standard-mapping",
+          "sentinel-network-authorization",
+          "laboratory-quality-qualification",
+          "data-sharing-authorization",
+          "privacy-security-review",
+          "continuity-observation-acceptance"
+        ],
+        missingEvidenceTypes: [],
+        blockerCodes: [],
+        productionReady: false
+      }],
+      blockers: [],
+      externalProductionBlockers: [
+        "central-site-evidence-required",
+        "p0-p1-handoff-and-launch-approval-required"
+      ],
+      productionReady: false
+    },
     surveillance: {
       ok: true,
       summary: { rules: 8, activeRules: 8, humanVerifiedSignals: 0, openAlerts: 0, humanRiskAssessments: 0 },
@@ -266,6 +321,9 @@ test("modernization rendering uses only safe summary fields and fails closed whe
     node("#public-health-respiratory-pathogen-catalog").innerHTML,
     node("#public-health-respiratory-pathogen-batches").innerHTML,
     node("#public-health-respiratory-pathogen-findings").innerHTML,
+    node("#public-health-respiratory-network-metrics").innerHTML,
+    node("#public-health-respiratory-network-institutions").innerHTML,
+    node("#public-health-respiratory-network-blockers").innerHTML,
     node("#public-health-surveillance-metrics").innerHTML,
     node("#public-health-surveillance-signals").innerHTML,
     node("#public-health-surveillance-alerts").innerHTML,
@@ -282,16 +340,21 @@ test("modernization rendering uses only safe summary fields and fails closed whe
   assert.match(rendered, /alertCreated=false/);
   assert.match(rendered, /18\/18/);
   assert.match(rendered, /respiratory-18-panel/);
+  assert.match(rendered, /6\/6/);
+  assert.match(rendered, /3\/3/);
+  assert.match(rendered, /safe-panel-standard-mapping/);
+  assert.match(rendered, /technicalLaunchReady/);
+  assert.match(rendered, /productionReady=false/);
   assert.match(rendered, /人工确认/);
   assert.match(rendered, /独立批准/);
   assert.match(rendered, /暂无预警/);
-  assert.doesNotMatch(rendered, /externalSignalId|externalSignalKeyHash|idempotencyKeyHash|contentFingerprint|endpoint|secret|signature/i);
+  assert.doesNotMatch(rendered, /externalSignalId|externalSignalKeyHash|idempotencyKeyHash|contentFingerprint|endpoint|secret|signature|receiptId|keyId|artifactDigest/i);
   assert.match(read("public-health.js"), /managedKeyringReady/);
   assert.match(read("public-health.js"), /legacy compatibility \/ No-Go/);
   assert.match(read("public-health.js"), /blockerCode/);
 
   vm.runInContext(
-    "renderPublicHealthModernizationWorkbenches({ foundation: null, sourceOperations: null, ruleGovernance: null, modelGovernance: null, respiratoryPathogen: null, surveillance: null, collaboration: null })",
+    "renderPublicHealthModernizationWorkbenches({ foundation: null, sourceOperations: null, ruleGovernance: null, modelGovernance: null, respiratoryPathogen: null, respiratoryNetwork: null, surveillance: null, collaboration: null })",
     context
   );
   assert.match(node("#public-health-data-foundation-status").textContent, /失败关闭/);
@@ -299,6 +362,7 @@ test("modernization rendering uses only safe summary fields and fails closed whe
   assert.match(node("#public-health-rule-governance-status").textContent, /失败关闭/);
   assert.match(node("#public-health-surveillance-model-governance-status").textContent, /失败关闭/);
   assert.match(node("#public-health-respiratory-pathogen-status").textContent, /失败关闭/);
+  assert.match(node("#public-health-respiratory-network-status").textContent, /失败关闭/);
   assert.match(node("#public-health-surveillance-status").textContent, /失败关闭/);
   assert.match(node("#public-health-medical-prevention-status").textContent, /失败关闭/);
   assert.match(node("#public-health-data-foundation-sources").innerHTML, /按未就绪处理/);
@@ -306,4 +370,5 @@ test("modernization rendering uses only safe summary fields and fails closed whe
   assert.match(node("#public-health-rule-governance-list").innerHTML, /不得参与评估/);
   assert.match(node("#public-health-surveillance-model-governance-list").innerHTML, /影子建议按未验证处理/);
   assert.match(node("#public-health-respiratory-pathogen-batches").innerHTML, /禁止确认或发布/);
+  assert.match(node("#public-health-respiratory-network-institutions").innerHTML, /按未就绪处理/);
 });

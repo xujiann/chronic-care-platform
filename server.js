@@ -146,6 +146,13 @@ const {
   publishPublicHealthRespiratoryPathogenSignalsToState,
   verifyPublicHealthRespiratoryPathogenBatchToState
 } = require("./public-health-respiratory-pathogen-surveillance-service");
+const {
+  REQUIRED_RESPIRATORY_NETWORK_EVIDENCE,
+  RESPIRATORY_NETWORK_EVIDENCE_PURPOSE,
+  buildPublicHealthRespiratoryNetworkReadiness,
+  issueTrustedRespiratoryNetworkEvidenceReceipt,
+  verifyTrustedRespiratoryNetworkEvidence
+} = require("./public-health-respiratory-network-readiness-service");
 const CareServicePlatform = require("./care-service-platform-adapter");
 const CareServiceRuntime = require("./care-service-runtime");
 const { createCareServiceDeliveryAdapters } = require("./care-service-delivery-adapters");
@@ -6839,7 +6846,9 @@ const PUBLIC_HEALTH_MODERNIZATION_COLLECTIONS = Object.freeze([
   "publicHealthSurveillanceModelAudit",
   "publicHealthSurveillanceModelValidations",
   "publicHealthRespiratoryPathogenBatches",
-  "publicHealthRespiratoryPathogenAudit"
+  "publicHealthRespiratoryPathogenAudit",
+  "publicHealthRespiratoryNetworkEvidence",
+  "publicHealthRespiratoryNetworkEvidenceAudit"
 ]);
 
 function publicHealthModernizationConflict(message) {
@@ -6882,6 +6891,12 @@ function assertUniquePublicHealthModernizationState(data = {}) {
   const respiratoryAudit = Array.isArray(data.publicHealthRespiratoryPathogenAudit)
     ? data.publicHealthRespiratoryPathogenAudit
     : [];
+  const respiratoryNetworkEvidence = Array.isArray(data.publicHealthRespiratoryNetworkEvidence)
+    ? data.publicHealthRespiratoryNetworkEvidence
+    : [];
+  const respiratoryNetworkEvidenceAudit = Array.isArray(data.publicHealthRespiratoryNetworkEvidenceAudit)
+    ? data.publicHealthRespiratoryNetworkEvidenceAudit
+    : [];
   uniqueValues(data.publicHealthDataSources, "id", "public health data source id");
   uniqueValues(signals, "id", "public health surveillance signal id");
   uniqueValues(signals, "externalSignalKeyHash", "public health source record hash");
@@ -6904,6 +6919,15 @@ function assertUniquePublicHealthModernizationState(data = {}) {
   uniqueValues(respiratoryBatches, "sourceRecordHash", "public health respiratory batch source hash");
   uniqueValues(respiratoryBatches, "idempotencyKeyHash", "public health respiratory batch idempotency hash");
   uniqueValues(respiratoryAudit, "id", "public health respiratory pathogen audit id");
+  uniqueValues(respiratoryNetworkEvidence, "id", "public health respiratory network evidence id");
+  uniqueValues(
+    respiratoryNetworkEvidence.map((item) => ({
+      receiptId: item?.trustedVerification?.receiptId
+    })),
+    "receiptId",
+    "public health respiratory network evidence receipt id"
+  );
+  uniqueValues(respiratoryNetworkEvidenceAudit, "id", "public health respiratory network evidence audit id");
   signals.forEach((signal) => {
     const hashes = [
       signal.verification?.idempotencyKeyHash,
@@ -6974,6 +6998,23 @@ function assertUniquePublicHealthModernizationState(data = {}) {
     }
     respiratoryAuditStages.add(key);
   });
+  const respiratoryNetworkAuditEvidenceIds = new Set();
+  respiratoryNetworkEvidenceAudit.forEach((entry) => {
+    const evidenceId = String(entry?.evidenceId || "").trim();
+    if (!evidenceId || respiratoryNetworkAuditEvidenceIds.has(evidenceId)) {
+      throw publicHealthModernizationConflict("public health respiratory network evidence audit unique conflict");
+    }
+    if (String(entry?.integrityDigest || "").trim()
+      !== publicHealthRespiratoryNetworkEvidenceAuditDigest(entry)) {
+      throw publicHealthModernizationConflict("public health respiratory network evidence audit integrity invalid");
+    }
+    respiratoryNetworkAuditEvidenceIds.add(evidenceId);
+  });
+  respiratoryNetworkEvidence.forEach((record) => {
+    if (!respiratoryNetworkAuditEvidenceIds.has(String(record?.id || "").trim())) {
+      throw publicHealthModernizationConflict("public health respiratory network evidence audit is missing");
+    }
+  });
 }
 
 function assertPublicHealthModernizationWrite(data = {}, constraint = {}, incoming = {}) {
@@ -7042,6 +7083,20 @@ function assertPublicHealthModernizationWrite(data = {}, constraint = {}, incomi
         String(entry?.signalId || "").trim() === signalId
         && entry.action === "ingest-signal"))) {
       throw publicHealthModernizationConflict("public health respiratory publication atomic boundary conflict");
+    }
+  }
+  if (constraint.operation === "issue-respiratory-network-evidence") {
+    const incomingEvidence = (incoming.publicHealthRespiratoryNetworkEvidence || [])
+      .find((item) => String(item?.id || "").trim() === entityId);
+    const incomingAudit = (incoming.publicHealthRespiratoryNetworkEvidenceAudit || [])
+      .filter((item) => String(item?.evidenceId || "").trim() === entityId);
+    if (!incomingEvidence
+      || Number(incomingEvidence.version) !== expectedVersion + 1
+      || incomingAudit.length !== 1
+      || Number(incomingAudit[0].version) !== expectedVersion + 1
+      || String(incomingAudit[0].receiptId || "").trim()
+        !== String(incomingEvidence.trustedVerification?.receiptId || "").trim()) {
+      throw publicHealthModernizationConflict("public health respiratory network evidence atomic boundary conflict");
     }
   }
   assertUniquePublicHealthModernizationState(incoming);
@@ -10707,6 +10762,12 @@ function normalizeState(data) {
       : [],
     publicHealthRespiratoryPathogenAudit: Array.isArray(data.publicHealthRespiratoryPathogenAudit)
       ? data.publicHealthRespiratoryPathogenAudit.slice(-15000)
+      : [],
+    publicHealthRespiratoryNetworkEvidence: Array.isArray(data.publicHealthRespiratoryNetworkEvidence)
+      ? data.publicHealthRespiratoryNetworkEvidence.slice(-5000)
+      : [],
+    publicHealthRespiratoryNetworkEvidenceAudit: Array.isArray(data.publicHealthRespiratoryNetworkEvidenceAudit)
+      ? data.publicHealthRespiratoryNetworkEvidenceAudit.slice(-10000)
       : [],
     publicHealthSignals: mergeByKey(seedPublicHealthSignals(), data.publicHealthSignals, "id"),
     publicHealthAlerts: mergeByKey(seedPublicHealthAlerts(), data.publicHealthAlerts, "id"),
@@ -25130,7 +25191,7 @@ function publicHealthSurveillanceModelActor(user = {}, purpose = "run") {
 
 function publicHealthModernizationSafeCode(error) {
   const explicit = String(error?.code || "").trim();
-  if (/^PUBLIC_HEALTH_(?:MODERNIZATION|SURVEILLANCE_(?:RULE|MODEL)|RESPIRATORY_PATHOGEN)_[A-Z0-9_]+$/.test(explicit)) return explicit;
+  if (/^PUBLIC_HEALTH_(?:MODERNIZATION|SURVEILLANCE_(?:RULE|MODEL)|RESPIRATORY_(?:PATHOGEN|NETWORK))_[A-Z0-9_]+$/.test(explicit)) return explicit;
   const message = String(error?.message || "");
   if (/unknown public health surveillance signal|unknown public health surveillance alert|unknown medical-prevention task|unknown public health rule change|unknown public health surveillance model|unknown public health model validation|unknown public health respiratory pathogen batch/i.test(message)) {
     return "PUBLIC_HEALTH_MODERNIZATION_RECORD_NOT_FOUND";
@@ -25150,6 +25211,9 @@ function publicHealthModernizationSafeCode(error) {
   }
   if (/respiratory pathogen batch integrity invalid|respiratory pathogen publication idempotency or signal binding conflict/i.test(message)) {
     return "PUBLIC_HEALTH_RESPIRATORY_PATHOGEN_INTEGRITY_INVALID";
+  }
+  if (/respiratory network evidence.*(?:signature|integrity|audit|untrusted)|receipt signature mismatch/i.test(message)) {
+    return "PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_INTEGRITY_INVALID";
   }
   if (/rule registry integrity invalid|rule change integrity invalid|trusted public health rule activation failed/i.test(message)) {
     return "PUBLIC_HEALTH_SURVEILLANCE_RULE_INTEGRITY_INVALID";
@@ -25171,7 +25235,9 @@ function publicHealthModernizationHttpStatus(code) {
   if ([
     "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_SECRET_UNAVAILABLE",
     "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_UNAVAILABLE",
-    "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_INVALID"
+    "PUBLIC_HEALTH_SURVEILLANCE_RULE_ACTIVATION_KEYRING_INVALID",
+    "PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_KEYRING_UNAVAILABLE",
+    "PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_KEYRING_INVALID"
   ].includes(code)) return 503;
   if (/CONFLICT|INTEGRITY_INVALID/.test(code)) return 409;
   return 400;
@@ -25252,6 +25318,228 @@ function publicHealthSafeRespiratoryPathogenSurveillance(data) {
     })),
     blockers: board.blockers,
     productionReady: false
+  };
+}
+
+const PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_FIELDS = new Set([
+  "action",
+  "expectedVersion",
+  "institutionId",
+  "evidenceType",
+  "artifactName",
+  "artifactDigest",
+  "validFrom",
+  "expiresAt",
+  "idempotencyKey",
+  "at"
+]);
+const PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_CLIENT_FIELDS = new Set([
+  "action",
+  "expectedVersion",
+  "institutionId",
+  "evidenceType",
+  "artifactName",
+  "artifactDigest",
+  "validFrom",
+  "expiresAt"
+]);
+
+function publicHealthRespiratoryNetworkEvidenceAuditDigest(entry = {}) {
+  return createHash("sha256").update(JSON.stringify({
+    id: String(entry.id || "").trim(),
+    evidenceId: String(entry.evidenceId || "").trim(),
+    receiptId: String(entry.receiptId || "").trim(),
+    action: String(entry.action || "").trim(),
+    version: Number(entry.version || 0),
+    actorId: String(entry.actorId || "").trim(),
+    actorRole: String(entry.actorRole || "").trim(),
+    organizationScope: String(entry.organizationScope || "").trim(),
+    at: String(entry.at || "").trim(),
+    idempotencyKeyHash: String(entry.idempotencyKeyHash || "").trim(),
+    requestFingerprint: String(entry.requestFingerprint || "").trim()
+  })).digest("hex");
+}
+
+function publicHealthRespiratoryNetworkEvidenceRequestFingerprint(id, payload = {}) {
+  return createHash("sha256").update(JSON.stringify({
+    id: String(id || "").trim(),
+    institutionId: String(payload.institutionId || "").trim(),
+    evidenceType: String(payload.evidenceType || "").trim().toLowerCase(),
+    artifactName: String(payload.artifactName || "").trim(),
+    artifactDigest: String(payload.artifactDigest || "").trim().toLowerCase().replace(/^sha256:/, ""),
+    validFrom: String(payload.validFrom || "").trim(),
+    expiresAt: String(payload.expiresAt || "").trim()
+  })).digest("hex");
+}
+
+function publicHealthRespiratoryNetworkEvidenceOptions({ required = false } = {}) {
+  const at = new Date().toISOString();
+  const serialized = String(
+    process.env.PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_KEYRING_JSON || ""
+  ).trim();
+  let keyring = null;
+  let summary = null;
+  let configurationCode = "PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_KEYRING_UNAVAILABLE";
+  if (serialized) {
+    try {
+      const parsed = JSON.parse(serialized);
+      summary = summarizeKeyring(parsed, at);
+      if (!summary.ok
+        || summary.purpose !== RESPIRATORY_NETWORK_EVIDENCE_PURPOSE
+        || summary.productionReady !== true) {
+        throw new Error("managed respiratory network evidence keyring is invalid");
+      }
+      keyring = parsed;
+      configurationCode = "";
+    } catch {
+      configurationCode = "PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_KEYRING_INVALID";
+    }
+  }
+  if (required && !keyring) {
+    const error = new Error("managed respiratory network evidence signing keyring is required");
+    error.code = configurationCode;
+    throw error;
+  }
+  return {
+    at,
+    keyring,
+    summary,
+    managed: Boolean(keyring),
+    signerId: String(
+      process.env.PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_SIGNER_ID
+      || "public-health-respiratory-network-evidence-service"
+    ).trim().slice(0, 96) || "public-health-respiratory-network-evidence-service",
+    configurationCode
+  };
+}
+
+function publicHealthSafeRespiratoryNetworkEvidenceKeyStatus(options = {}) {
+  const keys = Array.isArray(options.summary?.keys) ? options.summary.keys : [];
+  return {
+    configured: Boolean(options.keyring),
+    managed: options.managed === true,
+    purposeValid: options.summary?.purpose === RESPIRATORY_NETWORK_EVIDENCE_PURPOSE,
+    active: keys.filter((item) => item.status === "active" && item.validNow === true).length,
+    grace: keys.filter((item) => item.status === "grace" && item.validNow === true).length,
+    revoked: keys.filter((item) => item.status === "revoked").length,
+    blockerCode: options.configurationCode || ""
+  };
+}
+
+function publicHealthSafeRespiratoryNetworkReadiness(data) {
+  const options = publicHealthRespiratoryNetworkEvidenceOptions();
+  const keyring = options.keyring || {
+    purpose: RESPIRATORY_NETWORK_EVIDENCE_PURPOSE,
+    activeKeyId: "",
+    keys: []
+  };
+  const board = buildPublicHealthRespiratoryNetworkReadiness({
+    data,
+    evidenceRecords: data.publicHealthRespiratoryNetworkEvidence || [],
+    keyring,
+    at: options.at
+  });
+  const keyringStatus = publicHealthSafeRespiratoryNetworkEvidenceKeyStatus(options);
+  const evidenceTypes = REQUIRED_RESPIRATORY_NETWORK_EVIDENCE.map((item) => item.type);
+  const technicalLaunchReady = board.technicalLaunchReady === true && options.managed === true;
+  return {
+    ok: board.ok === true && options.managed === true,
+    functionalState: technicalLaunchReady
+      ? board.functionalState
+      : "respiratory-network-readiness-evidence-incomplete",
+    formalGoLiveState: technicalLaunchReady
+      ? board.formalGoLiveState
+      : "blocked-until-respiratory-network-evidence-complete",
+    generatedAt: board.generatedAt,
+    technicalLaunchReady,
+    productionReady: false,
+    summary: {
+      ...board.summary,
+      keyringReady: options.managed === true,
+      keyring: keyringStatus
+    },
+    evidenceRequirements: REQUIRED_RESPIRATORY_NETWORK_EVIDENCE.map((item) => ({
+      type: item.type,
+      owner: item.owner,
+      label: item.label
+    })),
+    institutions: (board.institutions || []).map((item) => {
+      const missingEvidenceTypes = (item.missingEvidenceTypes || [])
+        .filter((type) => evidenceTypes.includes(type));
+      return {
+        institutionId: item.institutionId,
+        evidenceReady: item.evidenceReady === true,
+        continuityReady: item.continuityReady === true,
+        technicalLaunchReady: item.technicalLaunchReady === true && options.managed === true,
+        productionReady: false,
+        trustedEvidence: item.trustedEvidence,
+        completedEvidenceTypes: evidenceTypes.filter((type) => !missingEvidenceTypes.includes(type)),
+        missingEvidenceTypes,
+        duplicateEvidenceTypes: (item.duplicateEvidenceTypes || [])
+          .filter((type) => evidenceTypes.includes(type)),
+        replayDetected: item.replayDetected === true,
+        observedQualityDays: item.observedQualityDays,
+        consecutiveQualityDays: item.consecutiveQualityDays,
+        blockerCodes: [
+          ...missingEvidenceTypes.map((type) => `RESPIRATORY_NETWORK_EVIDENCE_MISSING:${type}`),
+          ...(item.duplicateEvidenceTypes?.length
+            ? ["RESPIRATORY_NETWORK_EVIDENCE_TYPE_DUPLICATE"]
+            : []),
+          ...(item.replayDetected ? ["RESPIRATORY_NETWORK_EVIDENCE_REPLAY"] : []),
+          ...(item.continuityReady ? [] : ["RESPIRATORY_NETWORK_CONTINUITY_INCOMPLETE"]),
+          ...(options.managed ? [] : [options.configurationCode])
+        ].filter(Boolean)
+      };
+    }),
+    integrity: {
+      rejectedEvidence: board.summary?.rejectedEvidence || 0,
+      findings: board.summary?.integrityFindings || 0
+    },
+    externalProductionBlockers: board.externalProductionBlockers,
+    blockers: technicalLaunchReady
+      ? board.externalProductionBlockers
+      : [
+          ...(options.configurationCode ? [options.configurationCode] : []),
+          ...(board.summary?.rejectedEvidence ? ["RESPIRATORY_NETWORK_EVIDENCE_UNTRUSTED"] : []),
+          ...(board.summary?.integrityFindings ? ["RESPIRATORY_NETWORK_EVIDENCE_INTEGRITY_INVALID"] : []),
+          ...((board.institutions || []).length
+            ? []
+            : ["RESPIRATORY_NETWORK_ACCEPTANCE_INSTITUTION_MISSING"])
+        ],
+    productionBoundary: {
+      technicalLaunchReady,
+      productionReady: false,
+      centralSiteEvidenceRequired: true,
+      p0P1ClosureRequired: true,
+      productionHandoffRequired: true,
+      formalLaunchApprovalRequired: true
+    }
+  };
+}
+
+function assertPublicHealthRespiratoryNetworkEvidencePayload(payload = {}) {
+  const unexpected = Object.keys(payload)
+    .find((key) => !PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_FIELDS.has(key));
+  if (unexpected
+    || payload.action !== "issue-trusted-evidence"
+    || Number(payload.expectedVersion) !== 0) {
+    const error = new Error("public health respiratory network evidence client override is forbidden");
+    error.code = "PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_PAYLOAD_FORBIDDEN";
+    throw error;
+  }
+}
+
+function publicHealthRespiratoryNetworkEvidenceActor(user = {}) {
+  const actorId = String(user.username || user.id || "").trim();
+  if (!actorId || !["city", "health_admin"].includes(String(user.orgType || "").trim())) {
+    const error = new Error("respiratory network evidence requires a controlled health administration actor");
+    error.code = "PUBLIC_HEALTH_MODERNIZATION_FORBIDDEN";
+    throw error;
+  }
+  return {
+    id: actorId,
+    role: "commission",
+    organizationScope: String(user.orgCode || user.orgType || "").trim()
   };
 }
 
@@ -25967,6 +26255,206 @@ async function handleApi(req, res) {
         throw error;
       }
       sendJson(res, 200, publicHealthSafeSurveillanceModelGovernance(readDatabase()));
+    } catch (error) {
+      publicHealthModernizationError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/respiratory-network-readiness") {
+    const user = requireApiRole(req, res, ["commission"], url.pathname);
+    if (!user) return;
+    try {
+      if ([...url.searchParams.keys()].length) {
+        const error = new Error("public health respiratory network readiness query overrides are forbidden");
+        error.code = "PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_PAYLOAD_FORBIDDEN";
+        throw error;
+      }
+      sendJson(res, 200, publicHealthSafeRespiratoryNetworkReadiness(readDatabase()));
+    } catch (error) {
+      publicHealthModernizationError(res, error);
+    }
+    return;
+  }
+
+  const publicHealthRespiratoryNetworkEvidenceActionMatch = url.pathname
+    .match(/^\/api\/public-health\/respiratory-network-evidence\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthRespiratoryNetworkEvidenceActionMatch) {
+    const user = requireApiRole(
+      req,
+      res,
+      ["commission"],
+      "/api/public-health/respiratory-network-evidence/:id/actions"
+    );
+    if (!user) return;
+    try {
+      if ([...url.searchParams.keys()].length) {
+        const error = new Error("public health respiratory network evidence query overrides are forbidden");
+        error.code = "PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_PAYLOAD_FORBIDDEN";
+        throw error;
+      }
+      const evidenceId = decodeURIComponent(publicHealthRespiratoryNetworkEvidenceActionMatch[1]);
+      if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{2,159}$/.test(evidenceId)) {
+        const error = new Error("public health respiratory network evidence id is invalid");
+        error.code = "PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_PAYLOAD_FORBIDDEN";
+        throw error;
+      }
+      const clientBody = await collectJson(req);
+      if (!clientBody
+        || typeof clientBody !== "object"
+        || Array.isArray(clientBody)
+        || Object.keys(clientBody).some((key) =>
+          !PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_CLIENT_FIELDS.has(key))) {
+        const error = new Error("public health respiratory network evidence client override is forbidden");
+        error.code = "PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_PAYLOAD_FORBIDDEN";
+        throw error;
+      }
+      const rawCommand = publicHealthModernizationCommand(
+        req,
+        url,
+        clientBody,
+        { insert: true }
+      );
+      const command = {
+        ...rawCommand,
+        at: rawCommand.receivedAt
+      };
+      delete command.receivedAt;
+      assertPublicHealthRespiratoryNetworkEvidencePayload(command);
+      const actor = publicHealthRespiratoryNetworkEvidenceActor(user);
+      const signing = publicHealthRespiratoryNetworkEvidenceOptions({ required: true });
+      const data = readDatabase();
+      const idempotencyKeyHash = createHash("sha256")
+        .update(command.idempotencyKey)
+        .digest("hex");
+      const requestFingerprint = publicHealthRespiratoryNetworkEvidenceRequestFingerprint(
+        evidenceId,
+        command
+      );
+      const existing = (data.publicHealthRespiratoryNetworkEvidence || [])
+        .find((item) => String(item?.id || "").trim() === evidenceId);
+      const existingAudit = (data.publicHealthRespiratoryNetworkEvidenceAudit || [])
+        .find((item) => String(item?.evidenceId || "").trim() === evidenceId);
+      if (existing) {
+        const verified = verifyTrustedRespiratoryNetworkEvidence(
+          existing,
+          signing.keyring,
+          signing.at
+        );
+        if (!verified.ok) {
+          const error = new Error("respiratory network evidence signature or integrity is untrusted");
+          error.code = "PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_INTEGRITY_INVALID";
+          throw error;
+        }
+        if (existingAudit?.idempotencyKeyHash !== idempotencyKeyHash
+          || existingAudit?.requestFingerprint !== requestFingerprint) {
+          throw publicHealthModernizationConflict(
+            "public health respiratory network evidence idempotency conflict"
+          );
+        }
+        const board = publicHealthSafeRespiratoryNetworkReadiness(data);
+        sendJson(res, 200, {
+          ok: true,
+          idempotent: true,
+          evidence: {
+            id: existing.id,
+            version: existing.version,
+            institutionId: existing.institutionId,
+            evidenceType: existing.evidenceType,
+            status: existing.status,
+            productionReady: false
+          },
+          institution: board.institutions.find((item) =>
+            item.institutionId === existing.institutionId) || null,
+          summary: board.summary,
+          technicalLaunchReady: board.technicalLaunchReady,
+          productionReady: false
+        });
+        return;
+      }
+      const receiptId = `ph-respiratory-network-receipt-${randomUUID()}`;
+      const issued = issueTrustedRespiratoryNetworkEvidenceReceipt({
+        id: evidenceId,
+        institutionId: String(command.institutionId || "").trim(),
+        evidenceType: String(command.evidenceType || "").trim(),
+        panelId: RESPIRATORY_PANEL.id,
+        panelVersion: RESPIRATORY_PANEL.version,
+        status: "verified",
+        artifactName: String(command.artifactName || "").trim(),
+        artifactDigest: String(command.artifactDigest || "").trim(),
+        validFrom: String(command.validFrom || "").trim(),
+        expiresAt: String(command.expiresAt || "").trim(),
+        productionReady: false
+      }, {
+        signedBy: signing.signerId,
+        verifiedBy: actor.id,
+        verifiedAt: signing.at,
+        signatureVerified: true,
+        receiptId
+      }, signing.keyring);
+      const evidence = {
+        ...issued,
+        version: 1
+      };
+      const auditBase = {
+        id: `ph-respiratory-network-audit-${randomUUID()}`,
+        evidenceId,
+        receiptId,
+        action: "issue-trusted-evidence",
+        version: 1,
+        actorId: actor.id,
+        actorRole: actor.role,
+        organizationScope: actor.organizationScope,
+        at: signing.at,
+        idempotencyKeyHash,
+        requestFingerprint
+      };
+      const audit = {
+        ...auditBase,
+        integrityDigest: publicHealthRespiratoryNetworkEvidenceAuditDigest(auditBase)
+      };
+      const nextData = {
+        ...data,
+        publicHealthRespiratoryNetworkEvidence: [
+          ...(data.publicHealthRespiratoryNetworkEvidence || []),
+          evidence
+        ],
+        publicHealthRespiratoryNetworkEvidenceAudit: [
+          ...(data.publicHealthRespiratoryNetworkEvidenceAudit || []),
+          audit
+        ]
+      };
+      writeDatabase(nextData, {
+        event: "public-health-respiratory-network-evidence-issued",
+        publicHealthModernizationWrite: {
+          collection: "publicHealthRespiratoryNetworkEvidence",
+          entityId: evidenceId,
+          expectedVersion: 0,
+          operation: "issue-respiratory-network-evidence",
+          requiredCollections: [
+            "publicHealthRespiratoryNetworkEvidence",
+            "publicHealthRespiratoryNetworkEvidenceAudit"
+          ]
+        }
+      });
+      const board = publicHealthSafeRespiratoryNetworkReadiness(nextData);
+      sendJson(res, 201, {
+        ok: true,
+        idempotent: false,
+        evidence: {
+          id: evidence.id,
+          version: evidence.version,
+          institutionId: evidence.institutionId,
+          evidenceType: evidence.evidenceType,
+          status: evidence.status,
+          productionReady: false
+        },
+        institution: board.institutions.find((item) =>
+          item.institutionId === evidence.institutionId) || null,
+        summary: board.summary,
+        technicalLaunchReady: board.technicalLaunchReady,
+        productionReady: false
+      });
     } catch (error) {
       publicHealthModernizationError(res, error);
     }
