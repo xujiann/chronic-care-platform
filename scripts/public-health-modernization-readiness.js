@@ -44,6 +44,10 @@ const {
   issueTrustedRespiratoryNetworkEvidenceReceipt,
   issueTrustedRespiratoryNetworkLifecycleEvent
 } = require("../public-health-respiratory-network-readiness-service");
+const {
+  PUBLIC_HEALTH_OFFICIAL_EXCHANGE_RECEIPT_PURPOSE,
+  issueTrustedPublicHealthOfficialExchangeReceipt
+} = require("../public-health-official-exchange-receipt-service");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "public-health-modernization-readiness-report.json");
@@ -88,6 +92,22 @@ const RESPIRATORY_EVIDENCE_KEYRING = {
     expiresAt: "2027-01-01T00:00:00.000Z",
     revokedAt: ""
   }]
+};
+const OFFICIAL_EXCHANGE_RECEIPT_KEYRING = {
+  purpose: PUBLIC_HEALTH_OFFICIAL_EXCHANGE_RECEIPT_PURPOSE,
+  activeKeyId: "readiness-official-exchange-2026-07",
+  keys: [{
+    keyId: "readiness-official-exchange-2026-07",
+    secret: "readiness-official-exchange-receipt-secret-2026-07",
+    status: "active",
+    notBefore: "2026-07-01T00:00:00.000Z",
+    expiresAt: "2027-01-01T00:00:00.000Z",
+    revokedAt: ""
+  }]
+};
+const OFFICIAL_EXCHANGE_RECEIPT_OPTIONS = {
+  officialExchangeReceiptKeyring: OFFICIAL_EXCHANGE_RECEIPT_KEYRING,
+  officialExchangeReceiptAt: "2026-07-28T09:30:00.000Z"
 };
 
 function check(id, passed, detail, category) {
@@ -427,24 +447,64 @@ function runPublicHealthModernizationAcceptance() {
     role: "primary-care-public-health"
   }, "readiness-primary");
 
-  alertResult = applyPublicHealthSurveillanceAlertActionToState(taskResult.nextData, evaluated.alert.id, {
+  const officialReportReceipt = issueTrustedPublicHealthOfficialExchangeReceipt({
+    id: "readiness-official-report-receipt-001",
+    stage: "official-report",
+    alertId: evaluated.alert.id,
+    reportId: "READINESS-REPORT-001",
+    externalReceiptCode: "READINESS-REPORT-RECEIPT-001",
+    status: "accepted",
+    evidenceRefs: ["READINESS-OFFICIAL-REPORT"],
+    issuedAt: "2026-07-28T09:00:00.000Z"
+  }, {
+    signedBy: "provincial-reporting-platform",
+    verifiedBy: "readiness-official-report-adapter",
+    verifiedAt: "2026-07-28T09:00:30.000Z",
+    signatureVerified: true,
+    receiptId: "readiness-server-report-receipt-001"
+  }, OFFICIAL_EXCHANGE_RECEIPT_KEYRING);
+  const reportReceiptData = {
+    ...taskResult.nextData,
+    publicHealthOfficialExchangeReceipts: [officialReportReceipt]
+  };
+  alertResult = applyPublicHealthSurveillanceAlertActionToState(reportReceiptData, evaluated.alert.id, {
     action: "record-official-report",
     idempotencyKey: "readiness-alert-report-001",
     expectedVersion: 4,
-    reportId: "READINESS-REPORT-001",
-    receiptCode: "READINESS-REPORT-RECEIPT-001",
-    evidenceRefs: ["READINESS-OFFICIAL-REPORT"],
+    trustedReceiptId: officialReportReceipt.id,
     at: "2026-07-28T09:00:00.000Z"
-  }, { name: "readiness-medical-public-health", role: "medical-public-health" });
-  alertResult = applyPublicHealthSurveillanceAlertActionToState(alertResult.nextData, evaluated.alert.id, {
+  }, { name: "readiness-medical-public-health", role: "medical-public-health" }, OFFICIAL_EXCHANGE_RECEIPT_OPTIONS);
+  const officialFeedbackReceipt = issueTrustedPublicHealthOfficialExchangeReceipt({
+    id: "readiness-official-feedback-receipt-001",
+    stage: "feedback",
+    alertId: evaluated.alert.id,
+    reportId: officialReportReceipt.reportId,
+    externalReceiptCode: "READINESS-FEEDBACK-001",
+    conclusion: "disease-control feedback received",
+    status: "accepted",
+    evidenceRefs: ["READINESS-FEEDBACK-EVIDENCE"],
+    issuedAt: "2026-07-28T09:20:00.000Z"
+  }, {
+    signedBy: "provincial-reporting-platform",
+    verifiedBy: "readiness-official-feedback-adapter",
+    verifiedAt: "2026-07-28T09:20:30.000Z",
+    signatureVerified: true,
+    receiptId: "readiness-server-feedback-receipt-001"
+  }, OFFICIAL_EXCHANGE_RECEIPT_KEYRING, officialReportReceipt);
+  const feedbackReceiptData = {
+    ...alertResult.nextData,
+    publicHealthOfficialExchangeReceipts: [
+      ...alertResult.nextData.publicHealthOfficialExchangeReceipts,
+      officialFeedbackReceipt
+    ]
+  };
+  alertResult = applyPublicHealthSurveillanceAlertActionToState(feedbackReceiptData, evaluated.alert.id, {
     action: "record-feedback",
     idempotencyKey: "readiness-alert-feedback-001",
     expectedVersion: 5,
-    feedbackCode: "READINESS-FEEDBACK-001",
-    conclusion: "disease-control feedback received",
-    evidenceRefs: ["READINESS-FEEDBACK-EVIDENCE"],
+    trustedReceiptId: officialFeedbackReceipt.id,
     at: "2026-07-28T09:20:00.000Z"
-  }, { name: "readiness-feedback-adapter", role: "system" });
+  }, { name: "readiness-feedback-adapter", role: "system" }, OFFICIAL_EXCHANGE_RECEIPT_OPTIONS);
   alertResult = applyPublicHealthSurveillanceAlertActionToState(alertResult.nextData, evaluated.alert.id, {
     action: "close-alert",
     idempotencyKey: "readiness-alert-close-001",
@@ -452,7 +512,7 @@ function runPublicHealthModernizationAcceptance() {
     conclusion: "signal, alert, report, feedback and medical-prevention collaboration closed",
     evidenceRefs: ["READINESS-ALERT-CLOSURE"],
     at: "2026-07-28T09:30:00.000Z"
-  }, { name: "readiness-cdc-owner", role: "cdc-surveillance" });
+  }, { name: "readiness-cdc-owner", role: "cdc-surveillance" }, OFFICIAL_EXCHANGE_RECEIPT_OPTIONS);
   const modelRun = runPublicHealthSurveillanceModelToState(
     alertResult.nextData,
     "ph-model-baseline-deviation",
@@ -531,6 +591,8 @@ function runPublicHealthModernizationAcceptance() {
     surveillance: buildPublicHealthSurveillanceCenter({
       data: ruleGovernanceAcceptance.nextData,
       ruleActivationKeyring: RULE_GOVERNANCE_ROTATED_KEYRING,
+      officialExchangeReceiptKeyring: OFFICIAL_EXCHANGE_RECEIPT_KEYRING,
+      officialExchangeReceiptAt: "2026-07-28T09:50:00.000Z",
       modelGovernanceAt: "2026-07-28T09:50:00.000Z",
       respiratorySurveillanceAt: "2026-07-28T09:50:00.000Z"
     })
@@ -545,6 +607,7 @@ function buildPublicHealthModernizationReadiness(options = {}) {
   const modelGovernanceSource = options.modelGovernanceSource ?? fs.readFileSync(path.join(ROOT, "public-health-surveillance-model-governance-service.js"), "utf8");
   const respiratorySource = options.respiratorySource ?? fs.readFileSync(path.join(ROOT, "public-health-respiratory-pathogen-surveillance-service.js"), "utf8");
   const respiratoryNetworkReadinessSource = options.respiratoryNetworkReadinessSource ?? fs.readFileSync(path.join(ROOT, "public-health-respiratory-network-readiness-service.js"), "utf8");
+  const officialExchangeReceiptSource = options.officialExchangeReceiptSource ?? fs.readFileSync(path.join(ROOT, "public-health-official-exchange-receipt-service.js"), "utf8");
   const collaborationSource = options.collaborationSource ?? fs.readFileSync(path.join(ROOT, "public-health-medical-prevention-collaboration-service.js"), "utf8");
   const documentation = options.documentation ?? fs.readFileSync(path.join(ROOT, "docs", "public-health-fifteenth-plan-data-surveillance-medical-prevention.md"), "utf8");
   const serialized = JSON.stringify(acceptance.final.nextData);
@@ -575,15 +638,18 @@ function buildPublicHealthModernizationReadiness(options = {}) {
     check("surveillance:explainable-alert", acceptance.evaluated.alert.ruleVersion === 1 && acceptance.evaluated.alert.ruleDigest && acceptance.evaluated.alert.observedValue === 8 && acceptance.evaluated.alert.threshold === 5, "alert binds rule version, digest, observed value and threshold", "surveillance"),
     check("surveillance:human-risk-assessment", acceptance.surveillance.summary.humanRiskAssessments === 1 && acceptance.final.alert.assessment?.humanDecision === true, "one human risk assessment recorded", "surveillance"),
     check("surveillance:complete-workflow", acceptance.final.alert.status === "closed" && acceptance.final.alert.report?.receiptCode && acceptance.final.alert.feedback?.feedbackCode && acceptance.final.alert.closure, "alert completed investigation, official report, feedback and closure", "surveillance"),
+    check("surveillance:trusted-official-report-feedback", acceptance.surveillance.summary.trustedOfficialReports === 1 && acceptance.surveillance.summary.trustedOfficialFeedbacks === 1 && acceptance.surveillance.summary.officialExchangeReceiptFindings === 0, "one trusted official report and one trusted feedback receipt form a verified predecessor chain", "surveillance"),
     check("collaboration:medical-task", acceptance.surveillance.collaboration.summary.medicalPublicHealthTasks === 1, "one medical public-health task dispatched", "collaboration"),
     check("collaboration:primary-care-task", acceptance.surveillance.collaboration.summary.primaryCareTasks === 1, "one primary-care public-health task dispatched", "collaboration"),
     check("collaboration:closure-gate", acceptance.surveillance.collaboration.summary.closedTasks === 2 && workflowSource.includes("collaboration tasks must be closed before the alert"), "2/2 collaboration tasks closed before alert closure", "collaboration"),
     check("security:role-version-idempotency", ["expectedVersion", "idempotencyKeyHash", "payloadFingerprint", "validatePublicHealthSurveillanceAlert", "cdc-surveillance", "modelAdviceOnly"].every((token) => workflowSource.includes(token)) && ["ownerRole", "expectedVersion", "idempotencyKeyHash", "payloadFingerprint", "validatePublicHealthMedicalPreventionTask"].every((token) => collaborationSource.includes(token)), "roles, versions, payload-bound hashed idempotency, persisted-state integrity and AI advisory boundary are enforced", "security"),
     check("security:trusted-rule-activation", ["createHmac", "timingSafeEqual", "verificationSource", "signatureVerified", "signPublicHealthSurveillanceRuleActivationReceipt", "verifyPublicHealthSurveillanceRuleActivationReceipt", "ungoverned-rule-materialization"].every((token) => ruleGovernanceSource.includes(token)), "rule activation binds trust fields to a server receipt and rejects ungoverned materialization", "security"),
     check("security:managed-rule-keyring", acceptance.ruleGovernance.summary.managedKeyringReady === true && acceptance.ruleGovernance.keyring.activeKeyId === "readiness-rule-key-b" && acceptance.ruleGovernance.keyring.keys.some((item) => item.keyId === "readiness-rule-key-a" && item.status === "grace") && !JSON.stringify(acceptance.ruleGovernance).includes(RULE_GOVERNANCE_SECRET) && !JSON.stringify(acceptance.ruleGovernance).includes(RULE_GOVERNANCE_NEXT_SECRET) && ["selectSigningKey", "resolveVerificationKey", "summarizeKeyring"].every((token) => ruleGovernanceSource.includes(token)), "managed active/grace key rotation verifies history without exposing signing secrets", "security"),
+    check("security:official-exchange-receipt-chain", ["publicHealthOfficialExchangeReceiptPayload", "predecessorBindingDigest", "official exchange receipt signature mismatch", "official exchange server receipt replay detected", "feedback predecessor binding mismatch"].every((token) => officialExchangeReceiptSource.includes(token)) && ["trustedReceiptId", "must come from a trusted server receipt", "receiptBindingDigest"].every((token) => workflowSource.includes(token)), "purpose-bound server receipts bind report, feedback, trust metadata, evidence, predecessor and replay identities", "security"),
     check("security:model-governance-boundary", ["assertNoDirectIdentifiers", "model-run-input-digest-invalid", "model-run-output-invalid", "model-validation-integrity-invalid", "ungoverned-model-materialization", "modelAdviceOnly", "humanDecisionRequired", "driftReviewsDue"].every((token) => modelGovernanceSource.includes(token)), "model inputs, outputs, validation evidence, drift window and advisory-only boundary fail closed", "security"),
     check("security:respiratory-privacy-integrity-boundary", ["assertNoDirectIdentifiers", "sourceRecordHash", "one-sample-multi-test-incomplete", "respiratory-batch-content-fingerprint-invalid", "respiratory-batch-signal-binding-invalid", "respiratory-batch-audit-orphan"].every((token) => respiratorySource.includes(token)), "aggregate respiratory batches exclude direct identifiers and fail closed on incomplete, tampered, duplicate or orphaned state", "security"),
-    check("integration:documented-t00-boundary", ["server.js", "SQLite", "T00", "productionReady=false", "/api/public-health/surveillance-signals", "/api/public-health/surveillance-model-governance", "/api/public-health/surveillance-models/:id/shadow-runs", "/api/public-health/respiratory-pathogen-surveillance", "/api/public-health/respiratory-pathogen-batches/:id/actions", "/api/public-health/medical-prevention-tasks"].every((token) => documentation.includes(token)), "T00 API, durable writer, model advisory, aggregate respiratory privacy and production boundaries are documented", "integration"),
+    check("integration:documented-t00-boundary", ["server.js", "SQLite", "T00", "productionReady=false", "/api/public-health/surveillance-signals", "/api/public-health/surveillance-model-governance", "/api/public-health/surveillance-models/:id/shadow-runs", "/api/public-health/respiratory-pathogen-surveillance", "/api/public-health/respiratory-pathogen-batches/:id/actions", "/api/public-health/official-exchange/official-report-receipts", "trustedReceiptId", "/api/public-health/medical-prevention-tasks"].every((token) => documentation.includes(token)), "T00 API, durable writer, model advisory, aggregate respiratory privacy, trusted official exchange and production boundaries are documented", "integration"),
+    check("safety:official-receipts-not-production", acceptance.surveillance.officialExchangeReceipts.productionReady === false && acceptance.surveillance.officialExchangeReceipts.blockers.length === 2 && acceptance.final.alert.report?.productionReady === false && acceptance.final.alert.feedback?.productionReady === false, "trusted reporting receipts prove business exchange only and retain production endpoint, continuous-delivery and formal-approval blockers", "safety"),
     check("safety:functional-not-production", acceptance.dataFoundation.productionReady === false && acceptance.surveillance.productionReady === false && acceptance.final.productionReady === false, "functional closure cannot self-assert production readiness", "safety")
   ];
   return {
@@ -621,6 +687,10 @@ function buildPublicHealthModernizationReadiness(options = {}) {
       signals: acceptance.surveillance.summary.signals,
       alerts: acceptance.surveillance.summary.alerts,
       closedAlerts: acceptance.surveillance.summary.closedAlerts,
+      trustedOfficialReports: acceptance.surveillance.summary.trustedOfficialReports,
+      trustedOfficialFeedbacks: acceptance.surveillance.summary.trustedOfficialFeedbacks,
+      officialExchangeReceiptFindings: acceptance.surveillance.summary.officialExchangeReceiptFindings,
+      officialExchangeReceiptKeyringReady: acceptance.surveillance.officialExchangeReceipts.summary.keyringReady,
       collaborationTasks: acceptance.surveillance.summary.collaborationTasks,
       closedCollaborationTasks: acceptance.surveillance.summary.closedCollaborationTasks
     },
@@ -644,6 +714,7 @@ function buildPublicHealthModernizationReadiness(options = {}) {
       "Wire shadow model run and independent validation routes without allowing model output to create, verify, publish or close alerts.",
       "Wire aggregate respiratory batch intake, human verification, minimized signal publication and coverage routes without accepting person- or specimen-level identifiers.",
       "Wire respiratory network readiness and server-only evidence receipt routes; resolve the purpose-bound evidence keyring from managed configuration and reject all client trust claims.",
+      "Wire server-only official report and feedback callbacks, persist signed immutable receipts with unique replay identities, and let alert actions reference only trusted receipt IDs.",
       "Persist model runs, validation evidence and audit records with optimistic versions and integrity checks.",
       "Add readiness, release and deploy gates while preserving productionReady=false until central site evidence, P0/P1 closure, production handoff and formal launch approval are verified."
     ],
@@ -685,6 +756,9 @@ function renderMarkdown(report) {
     `- Respiratory network superseded/renewal due evidence: ${report.summary.respiratoryNetworkSupersededEvidence}/${report.summary.respiratoryNetworkRenewalDueEvidence}`,
     `- Fresh/no-data sources: ${report.summary.freshSources}/${report.summary.noDataSources}`,
     `- Closed alerts: ${report.summary.closedAlerts}/${report.summary.alerts}`,
+    `- Trusted official report/feedback receipts: ${report.summary.trustedOfficialReports}/${report.summary.trustedOfficialFeedbacks}`,
+    `- Official exchange receipt findings: ${report.summary.officialExchangeReceiptFindings}`,
+    `- Official exchange receipt keyring ready: ${report.summary.officialExchangeReceiptKeyringReady ? "yes" : "no"}`,
     `- Closed medical-prevention tasks: ${report.summary.closedCollaborationTasks}/${report.summary.collaborationTasks}`,
     "",
     "## Checks",
