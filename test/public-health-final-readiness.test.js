@@ -113,7 +113,7 @@ test("final readiness renders and writes machine and human reports", () => {
   assert.match(fs.readFileSync(markdown, "utf8"), /Verified endpoint probes: 8\/8/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Verified endpoint probe campaigns: 3\/3/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Verified endpoint probe campaign links: 2\/2/);
-  assert.match(fs.readFileSync(markdown, "utf8"), /T08 functional checks: 66\/66/);
+  assert.match(fs.readFileSync(markdown, "utf8"), /T08 functional checks: 68\/68/);
   assert.match(fs.readFileSync(markdown, "utf8"), /T00 public boundary checks: 21\/21/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Modernization data sources: 8\/8/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Modernization trusted rule activations: 1/);
@@ -124,6 +124,8 @@ test("final readiness renders and writes machine and human reports", () => {
   assert.match(fs.readFileSync(markdown, "utf8"), /Modernization respiratory planning coverage ready: yes/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Modernization respiratory network technical launch ready: yes/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Modernization respiratory network trusted evidence: 12/);
+  assert.match(fs.readFileSync(markdown, "utf8"), /Modernization respiratory network lifecycle events: 1/);
+  assert.match(fs.readFileSync(markdown, "utf8"), /Modernization respiratory network superseded\/renewal due evidence: 1\/0/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Modernization fresh\/no-data sources: 2\/6/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Modernization closed collaboration tasks: 2\/2/);
   assert.match(renderMarkdown(report), /Remaining production integration/);

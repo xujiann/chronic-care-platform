@@ -78,6 +78,43 @@ async function issue(baseUrl, token, evidenceId, idempotencyKey, overrides = {})
   );
 }
 
+async function lifecycleRequest(baseUrl, token, evidenceId, idempotencyKey, action, expectedVersion, overrides = {}) {
+  return request(
+    baseUrl,
+    `/api/public-health/respiratory-network-evidence/${encodeURIComponent(evidenceId)}/actions`,
+    token,
+    {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify({
+        action,
+        expectedVersion,
+        reasonCode: "scheduled-evidence-governance",
+        ...overrides
+      })
+    }
+  );
+}
+
+async function lifecycleReview(baseUrl, token, evidenceId, idempotencyKey, lifecycleRequestId, action, overrides = {}) {
+  return request(
+    baseUrl,
+    `/api/public-health/respiratory-network-evidence/${encodeURIComponent(evidenceId)}/actions`,
+    token,
+    {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify({
+        action,
+        expectedVersion: 1,
+        lifecycleRequestId,
+        ...(action === "reject-lifecycle" ? { reviewReasonCode: "insufficient-evidence" } : {}),
+        ...overrides
+      })
+    }
+  );
+}
+
 test("respiratory network API signs only server-controlled evidence and exposes a redacted readiness view", async (t) => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "public-health-respiratory-network-api-"));
   fs.copyFileSync(path.join(ROOT, "data", "db.json"), path.join(dataDir, "db.json"));
@@ -121,6 +158,7 @@ test("respiratory network API signs only server-controlled evidence and exposes 
   });
 
   const healthToken = await login(baseUrl, "health");
+  const reviewerToken = await login(baseUrl, "whjw");
   const hospitalToken = await login(baseUrl, "hospital");
   const anonymous = await request(baseUrl, "/api/public-health/respiratory-network-readiness");
   assert.equal(anonymous.response.status, 401);
@@ -262,6 +300,252 @@ test("respiratory network API signs only server-controlled evidence and exposes 
     ),
     false
   );
+  for (const collection of [
+    "publicHealthRespiratoryNetworkLifecycleRequests",
+    "publicHealthRespiratoryNetworkLifecycleEvents",
+    "publicHealthRespiratoryNetworkLifecycleAudit"
+  ]) {
+    assert.equal(Object.prototype.hasOwnProperty.call(scopedState.body, collection), false);
+  }
+
+  assert.equal(summary.body.lifecycle.summary.active, 1);
+  assert.equal(summary.body.lifecycle.summary.renewalDue, 1);
+  assert.equal(summary.body.evidence[0].state, "active");
+  assert.equal(summary.body.evidence[0].lifecycleVersion, 1);
+  const forgedLifecycle = await lifecycleRequest(
+    baseUrl,
+    healthToken,
+    evidenceId,
+    "respiratory-network-lifecycle-forged",
+    "request-suspend",
+    1,
+    { attestationOrigin: "client-generated", signatureVerified: true }
+  );
+  assert.equal(forgedLifecycle.response.status, 400);
+  assert.equal(
+    forgedLifecycle.body.code,
+    "PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_PAYLOAD_FORBIDDEN"
+  );
+  const staleLifecycleRequest = await lifecycleRequest(
+    baseUrl,
+    healthToken,
+    evidenceId,
+    "respiratory-network-lifecycle-stale-request",
+    "request-suspend",
+    2
+  );
+  assert.equal(staleLifecycleRequest.response.status, 409);
+  assert.equal(
+    staleLifecycleRequest.body.code,
+    "PUBLIC_HEALTH_MODERNIZATION_CAS_CONFLICT"
+  );
+
+  const longExpiresAt = new Date(Date.now() + 120 * 86400000).toISOString();
+  const crossTrackId = "respiratory-network-api-evidence-cross-track";
+  const crossTrack = await issue(
+    baseUrl,
+    healthToken,
+    crossTrackId,
+    "respiratory-network-api-evidence-cross-track",
+    {
+      evidenceType: "privacy-security-review",
+      artifactName: "privacy-security-review.pdf",
+      artifactDigest: createHash("sha256").update("privacy-security-review-api").digest("hex"),
+      expiresAt: longExpiresAt
+    }
+  );
+  assert.equal(crossTrack.response.status, 201, JSON.stringify(crossTrack.body));
+  const crossTrackSuccessor = await lifecycleRequest(
+    baseUrl,
+    healthToken,
+    evidenceId,
+    "respiratory-network-lifecycle-cross-track",
+    "request-supersede",
+    1,
+    { successorEvidenceId: crossTrackId }
+  );
+  assert.equal(crossTrackSuccessor.response.status, 400);
+  assert.equal(
+    crossTrackSuccessor.body.code,
+    "PUBLIC_HEALTH_RESPIRATORY_NETWORK_LIFECYCLE_SUCCESSOR_INVALID"
+  );
+
+  const successorId = "respiratory-network-api-evidence-successor";
+  const successor = await issue(
+    baseUrl,
+    healthToken,
+    successorId,
+    "respiratory-network-api-evidence-successor",
+    {
+      artifactName: "panel-standard-mapping-renewal.pdf",
+      artifactDigest: createHash("sha256").update("panel-standard-mapping-renewal-api").digest("hex"),
+      expiresAt: longExpiresAt
+    }
+  );
+  assert.equal(successor.response.status, 201, JSON.stringify(successor.body));
+  const requested = await lifecycleRequest(
+    baseUrl,
+    healthToken,
+    evidenceId,
+    "respiratory-network-lifecycle-supersede-request",
+    "request-supersede",
+    1,
+    { successorEvidenceId: successorId }
+  );
+  assert.equal(requested.response.status, 201, JSON.stringify(requested.body));
+  assert.equal(requested.body.lifecycleRequest.status, "pending");
+  assert.equal(requested.body.lifecycleRequest.requestedBySelf, true);
+  assert.equal(requested.body.lifecycleRequest.canReview, false);
+  const lifecycleRequestId = requested.body.lifecycleRequest.id;
+
+  const staleApproval = await lifecycleReview(
+    baseUrl,
+    reviewerToken,
+    evidenceId,
+    "respiratory-network-lifecycle-stale-approval",
+    lifecycleRequestId,
+    "approve-lifecycle",
+    { expectedVersion: 2 }
+  );
+  assert.equal(staleApproval.response.status, 409);
+  const selfApproval = await lifecycleReview(
+    baseUrl,
+    healthToken,
+    evidenceId,
+    "respiratory-network-lifecycle-self-approval",
+    lifecycleRequestId,
+    "approve-lifecycle"
+  );
+  assert.equal(selfApproval.response.status, 400);
+  assert.equal(
+    selfApproval.body.code,
+    "PUBLIC_HEALTH_RESPIRATORY_NETWORK_REVIEWER_NOT_INDEPENDENT"
+  );
+  const forgedApproval = await lifecycleReview(
+    baseUrl,
+    reviewerToken,
+    evidenceId,
+    "respiratory-network-lifecycle-forged-approval",
+    lifecycleRequestId,
+    "approve-lifecycle",
+    { keyId: "client-key", receiptId: "client-receipt", approvedAt: new Date().toISOString() }
+  );
+  assert.equal(forgedApproval.response.status, 400);
+  assert.equal(
+    forgedApproval.body.code,
+    "PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_PAYLOAD_FORBIDDEN"
+  );
+  const approved = await lifecycleReview(
+    baseUrl,
+    reviewerToken,
+    evidenceId,
+    "respiratory-network-lifecycle-approve",
+    lifecycleRequestId,
+    "approve-lifecycle"
+  );
+  assert.equal(approved.response.status, 200, JSON.stringify(approved.body));
+  assert.equal(approved.body.lifecycleRequest.status, "approved");
+  assert.equal(approved.body.evidence.state, "superseded");
+  assert.equal(approved.body.productionReady, false);
+  assert.doesNotMatch(
+    JSON.stringify(approved.body),
+    /receipt(?:Id|Signature)|attestationOrigin|verificationSource|signatureVerified|keyId|secret|"requestedBy":|"approvedBy":/i
+  );
+  const approvalReplay = await lifecycleReview(
+    baseUrl,
+    reviewerToken,
+    evidenceId,
+    "respiratory-network-lifecycle-approve",
+    lifecycleRequestId,
+    "approve-lifecycle"
+  );
+  assert.equal(approvalReplay.response.status, 200, JSON.stringify(approvalReplay.body));
+  assert.equal(approvalReplay.body.idempotent, true);
+
+  const afterSupersede = await request(
+    baseUrl,
+    "/api/public-health/respiratory-network-readiness",
+    healthToken
+  );
+  assert.equal(afterSupersede.response.status, 200);
+  assert.equal(afterSupersede.body.lifecycle.summary.active, 2);
+  assert.equal(afterSupersede.body.lifecycle.summary.superseded, 1);
+  assert.equal(afterSupersede.body.lifecycle.summary.renewalDue, 0);
+  assert.equal(afterSupersede.body.lifecycle.requestSummary.approved, 1);
+  assert.equal(
+    afterSupersede.body.evidence.find((item) => item.id === successorId).state,
+    "active"
+  );
+
+  const revokeRequest = await lifecycleRequest(
+    baseUrl,
+    healthToken,
+    crossTrackId,
+    "respiratory-network-lifecycle-revoke-request",
+    "request-revoke",
+    1
+  );
+  assert.equal(revokeRequest.response.status, 201, JSON.stringify(revokeRequest.body));
+  const revokeApproval = await lifecycleReview(
+    baseUrl,
+    reviewerToken,
+    crossTrackId,
+    "respiratory-network-lifecycle-revoke-approve",
+    revokeRequest.body.lifecycleRequest.id,
+    "approve-lifecycle"
+  );
+  assert.equal(revokeApproval.response.status, 200, JSON.stringify(revokeApproval.body));
+  assert.equal(revokeApproval.body.evidence.state, "revoked");
+  const terminalReinstate = await lifecycleRequest(
+    baseUrl,
+    healthToken,
+    crossTrackId,
+    "respiratory-network-lifecycle-terminal-reinstate",
+    "request-reinstate",
+    2
+  );
+  assert.equal(terminalReinstate.response.status, 409);
+  assert.equal(
+    terminalReinstate.body.code,
+    "PUBLIC_HEALTH_RESPIRATORY_NETWORK_LIFECYCLE_STATE_CONFLICT"
+  );
+
+  const rejectRequest = await lifecycleRequest(
+    baseUrl,
+    healthToken,
+    successorId,
+    "respiratory-network-lifecycle-reject-request",
+    "request-suspend",
+    1
+  );
+  assert.equal(rejectRequest.response.status, 201);
+  const rejected = await lifecycleReview(
+    baseUrl,
+    reviewerToken,
+    successorId,
+    "respiratory-network-lifecycle-reject",
+    rejectRequest.body.lifecycleRequest.id,
+    "reject-lifecycle"
+  );
+  assert.equal(rejected.response.status, 200, JSON.stringify(rejected.body));
+  assert.equal(rejected.body.lifecycleRequest.status, "rejected");
+  assert.equal(rejected.body.evidence.state, "active");
+
+  const lifecyclePersisted = readDatabase();
+  assert.equal(lifecyclePersisted.publicHealthRespiratoryNetworkLifecycleRequests.length, 3);
+  assert.equal(lifecyclePersisted.publicHealthRespiratoryNetworkLifecycleEvents.length, 2);
+  assert.equal(lifecyclePersisted.publicHealthRespiratoryNetworkLifecycleAudit.length, 6);
+  assert.doesNotMatch(JSON.stringify(lifecyclePersisted), new RegExp(ACTIVE_SECRET));
+  const duplicateLifecycleState = structuredClone(lifecyclePersisted);
+  duplicateLifecycleState.publicHealthRespiratoryNetworkLifecycleEvents.push({
+    ...duplicateLifecycleState.publicHealthRespiratoryNetworkLifecycleEvents[0],
+    id: "respiratory-network-lifecycle-duplicate-receipt"
+  });
+  assert.throws(
+    () => writeDatabase(duplicateLifecycleState),
+    /lifecycle event receipt id unique conflict|lifecycle replay conflict/
+  );
+  assert.equal(readDatabase().publicHealthRespiratoryNetworkLifecycleEvents.length, 2);
 
   const duplicateReceiptState = readDatabase();
   duplicateReceiptState.publicHealthRespiratoryNetworkEvidence.push({
@@ -297,7 +581,7 @@ test("respiratory network API signs only server-controlled evidence and exposes 
     healthToken
   );
   assert.equal(revokedSummary.response.status, 200);
-  assert.equal(revokedSummary.body.summary.rejectedEvidence, 1);
+  assert.equal(revokedSummary.body.summary.rejectedEvidence, 3);
   assert.equal(revokedSummary.body.technicalLaunchReady, false);
   assert.equal(revokedSummary.body.productionReady, false);
   assert.equal(revokedSummary.body.summary.keyring.revoked, 1);

@@ -891,6 +891,9 @@ function buildPublicHealthFinalReadiness(options = {}) {
       "assertPublicHealthRespiratoryNetworkEvidencePayload",
       "publicHealthSafeRespiratoryNetworkReadiness",
       "issueTrustedRespiratoryNetworkEvidenceReceipt",
+      "issueTrustedRespiratoryNetworkLifecycleEvent",
+      "requestPublicHealthRespiratoryNetworkLifecycle",
+      "reviewPublicHealthRespiratoryNetworkLifecycle",
       "PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_KEYRING_JSON",
       "publishPublicHealthRespiratoryPathogenSignalsToState",
       "runPublicHealthSurveillanceModelToState",
@@ -913,13 +916,19 @@ function buildPublicHealthFinalReadiness(options = {}) {
       "publicHealthRespiratoryPathogenAudit",
       "publicHealthRespiratoryNetworkEvidence",
       "publicHealthRespiratoryNetworkEvidenceAudit",
+      "publicHealthRespiratoryNetworkLifecycleRequests",
+      "publicHealthRespiratoryNetworkLifecycleEvents",
+      "publicHealthRespiratoryNetworkLifecycleAudit",
       "publish-respiratory-pathogen-signals",
       "issue-respiratory-network-evidence",
+      "request-respiratory-network-lifecycle",
+      "approve-respiratory-network-lifecycle",
+      "syncPublicHealthRespiratoryLifecycleUniqueKeys",
       "public health respiratory network evidence receipt id",
       "requiredCollections",
       "expectedVersion",
       "PUBLIC_HEALTH_MODERNIZATION_CAS_CONFLICT"
-    ].every((token) => serverSource.includes(token)), "all seventeen modernization collections use SQLite transaction CAS; respiratory publication and signed network evidence each commit their complete audit boundary atomically", "integration"),
+    ].every((token) => serverSource.includes(token)), "all twenty modernization collections use SQLite transaction CAS; respiratory publication, signed network evidence and dual-control lifecycle events each commit their complete audit boundary atomically", "integration"),
     check("integration:t00-modernization-ui-release", [
       "public-health-data-foundation-title",
       "public-health-surveillance-title",
@@ -927,6 +936,8 @@ function buildPublicHealthFinalReadiness(options = {}) {
       "public-health-respiratory-pathogen-title",
       "public-health-respiratory-network-title",
       "public-health-respiratory-network-institutions",
+      "public-health-respiratory-network-lifecycle-evidence",
+      "public-health-respiratory-network-lifecycle-requests",
       "public-health-medical-prevention-title",
       "public-health-signal-intake-form",
       "public-health-model-validation-form",
@@ -945,12 +956,16 @@ function buildPublicHealthFinalReadiness(options = {}) {
       "review-model-validation",
       "verify-respiratory-pathogen-batch",
       "publish-respiratory-pathogen-signals",
+      "request-supersede",
+      "approve-lifecycle",
+      "reject-lifecycle",
       "Idempotency-Key",
       "expectedVersion",
       "人工核实"
     ].every((token) => pageSource.includes(token)) && [
       "public-health-modernization-grid",
       "modernization-form",
+      "respiratory-network-lifecycle-request",
       "@media (max-width: 1100px)"
     ].every((token) => portalCss.includes(token)) && [
       "\"public-health:modernization-readiness\"",
@@ -959,7 +974,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
       "test/public-health-surveillance-model-governance-api.test.js",
       "test/public-health-respiratory-pathogen-api.test.js",
       "test/public-health-respiratory-network-api.test.js"
-    ].every((token) => packageSource.includes(token)), "eight responsive workbenches expose only minimized summaries, advisory shadow output, aggregate respiratory counts, six-track network readiness and governed actions while release scripts preserve productionReady=false", "integration"),
+    ].every((token) => packageSource.includes(token)), "eight responsive workbenches expose only minimized summaries, advisory shadow output, aggregate respiratory counts, six-track network readiness and dual-control lifecycle actions while release scripts preserve productionReady=false", "integration"),
     check("integration:t00-modernization-source-operations", [
       "/api/public-health/data-source-operations",
       "buildPublicHealthDataSourceOperations",

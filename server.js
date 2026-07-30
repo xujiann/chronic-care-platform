@@ -149,8 +149,11 @@ const {
 const {
   REQUIRED_RESPIRATORY_NETWORK_EVIDENCE,
   RESPIRATORY_NETWORK_EVIDENCE_PURPOSE,
+  RESPIRATORY_NETWORK_LIFECYCLE_EVENT_TYPES,
   buildPublicHealthRespiratoryNetworkReadiness,
+  issueTrustedRespiratoryNetworkLifecycleEvent,
   issueTrustedRespiratoryNetworkEvidenceReceipt,
+  verifyTrustedRespiratoryNetworkLifecycleEvent,
   verifyTrustedRespiratoryNetworkEvidence
 } = require("./public-health-respiratory-network-readiness-service");
 const CareServicePlatform = require("./care-service-platform-adapter");
@@ -954,6 +957,31 @@ const SQLITE_MIGRATIONS = [
           ON public_health_modernization_signal_keys(source_record_hash);
         CREATE UNIQUE INDEX IF NOT EXISTS idx_public_health_modernization_idempotency_key_hash
           ON public_health_modernization_signal_keys(idempotency_key_hash);
+      `);
+    }
+  },
+  {
+    version: 13,
+    name: "add respiratory network lifecycle replay keys",
+    apply(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS public_health_respiratory_lifecycle_request_keys (
+          request_id TEXT PRIMARY KEY,
+          idempotency_key_hash TEXT NOT NULL UNIQUE,
+          updated_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS public_health_respiratory_lifecycle_event_keys (
+          event_id TEXT PRIMARY KEY,
+          receipt_id TEXT NOT NULL UNIQUE,
+          request_id TEXT NOT NULL UNIQUE,
+          updated_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS public_health_respiratory_lifecycle_audit_keys (
+          audit_id TEXT PRIMARY KEY,
+          idempotency_key_hash TEXT NOT NULL UNIQUE,
+          request_stage_key TEXT NOT NULL UNIQUE,
+          updated_at TEXT NOT NULL
+        );
       `);
     }
   }
@@ -6848,7 +6876,10 @@ const PUBLIC_HEALTH_MODERNIZATION_COLLECTIONS = Object.freeze([
   "publicHealthRespiratoryPathogenBatches",
   "publicHealthRespiratoryPathogenAudit",
   "publicHealthRespiratoryNetworkEvidence",
-  "publicHealthRespiratoryNetworkEvidenceAudit"
+  "publicHealthRespiratoryNetworkEvidenceAudit",
+  "publicHealthRespiratoryNetworkLifecycleRequests",
+  "publicHealthRespiratoryNetworkLifecycleEvents",
+  "publicHealthRespiratoryNetworkLifecycleAudit"
 ]);
 
 function publicHealthModernizationConflict(message) {
@@ -6897,6 +6928,15 @@ function assertUniquePublicHealthModernizationState(data = {}) {
   const respiratoryNetworkEvidenceAudit = Array.isArray(data.publicHealthRespiratoryNetworkEvidenceAudit)
     ? data.publicHealthRespiratoryNetworkEvidenceAudit
     : [];
+  const respiratoryNetworkLifecycleRequests = Array.isArray(data.publicHealthRespiratoryNetworkLifecycleRequests)
+    ? data.publicHealthRespiratoryNetworkLifecycleRequests
+    : [];
+  const respiratoryNetworkLifecycleEvents = Array.isArray(data.publicHealthRespiratoryNetworkLifecycleEvents)
+    ? data.publicHealthRespiratoryNetworkLifecycleEvents
+    : [];
+  const respiratoryNetworkLifecycleAudit = Array.isArray(data.publicHealthRespiratoryNetworkLifecycleAudit)
+    ? data.publicHealthRespiratoryNetworkLifecycleAudit
+    : [];
   uniqueValues(data.publicHealthDataSources, "id", "public health data source id");
   uniqueValues(signals, "id", "public health surveillance signal id");
   uniqueValues(signals, "externalSignalKeyHash", "public health source record hash");
@@ -6928,6 +6968,26 @@ function assertUniquePublicHealthModernizationState(data = {}) {
     "public health respiratory network evidence receipt id"
   );
   uniqueValues(respiratoryNetworkEvidenceAudit, "id", "public health respiratory network evidence audit id");
+  uniqueValues(respiratoryNetworkLifecycleRequests, "id", "public health respiratory network lifecycle request id");
+  uniqueValues(
+    respiratoryNetworkLifecycleRequests,
+    "idempotencyKeyHash",
+    "public health respiratory network lifecycle request idempotency key"
+  );
+  uniqueValues(respiratoryNetworkLifecycleEvents, "id", "public health respiratory network lifecycle event id");
+  uniqueValues(
+    respiratoryNetworkLifecycleEvents.map((item) => ({
+      receiptId: item?.trustedVerification?.receiptId
+    })),
+    "receiptId",
+    "public health respiratory network lifecycle event receipt id"
+  );
+  uniqueValues(respiratoryNetworkLifecycleAudit, "id", "public health respiratory network lifecycle audit id");
+  uniqueValues(
+    respiratoryNetworkLifecycleAudit,
+    "idempotencyKeyHash",
+    "public health respiratory network lifecycle audit idempotency key"
+  );
   signals.forEach((signal) => {
     const hashes = [
       signal.verification?.idempotencyKeyHash,
@@ -7015,6 +7075,89 @@ function assertUniquePublicHealthModernizationState(data = {}) {
       throw publicHealthModernizationConflict("public health respiratory network evidence audit is missing");
     }
   });
+  const evidenceIds = new Set(respiratoryNetworkEvidence
+    .map((item) => String(item?.id || "").trim()).filter(Boolean));
+  const evidenceReceiptIds = new Set(respiratoryNetworkEvidence
+    .map((item) => String(item?.trustedVerification?.receiptId || "").trim()).filter(Boolean));
+  const lifecycleRequestById = new Map(respiratoryNetworkLifecycleRequests
+    .map((item) => [String(item?.id || "").trim(), item]));
+  const lifecycleEventById = new Map(respiratoryNetworkLifecycleEvents
+    .map((item) => [String(item?.id || "").trim(), item]));
+  respiratoryNetworkLifecycleEvents.forEach((event) => {
+    const eventId = String(event?.id || "").trim();
+    const receiptId = String(event?.trustedVerification?.receiptId || "").trim();
+    if (evidenceIds.has(eventId) || evidenceReceiptIds.has(receiptId)) {
+      throw publicHealthModernizationConflict("public health respiratory network evidence and lifecycle replay conflict");
+    }
+  });
+  const pendingTargets = new Set();
+  respiratoryNetworkLifecycleRequests.forEach((request) => {
+    const requestId = String(request?.id || "").trim();
+    const targetEvidenceId = String(request?.targetEvidenceId || "").trim();
+    const successorEvidenceId = String(request?.successorEvidenceId || "").trim();
+    const eventType = String(request?.eventType || "").trim();
+    const status = String(request?.status || "").trim();
+    if (!RESPIRATORY_NETWORK_LIFECYCLE_EVENT_TYPES.includes(eventType)
+      || !evidenceIds.has(targetEvidenceId)
+      || (eventType === "supersede" && !evidenceIds.has(successorEvidenceId))
+      || (eventType !== "supersede" && successorEvidenceId)
+      || !["pending", "approved", "rejected"].includes(status)
+      || !Number.isInteger(Number(request?.version))
+      || Number(request.version) !== (status === "pending" ? 1 : 2)) {
+      throw publicHealthModernizationConflict("public health respiratory network lifecycle request integrity invalid");
+    }
+    if (status === "pending") {
+      if (pendingTargets.has(targetEvidenceId)) {
+        throw publicHealthModernizationConflict("public health respiratory network lifecycle pending target conflict");
+      }
+      pendingTargets.add(targetEvidenceId);
+    }
+    const eventId = String(request?.eventId || "").trim();
+    if ((status === "approved") !== Boolean(eventId)
+      || (eventId && !lifecycleEventById.has(eventId))) {
+      throw publicHealthModernizationConflict("public health respiratory network lifecycle request event binding invalid");
+    }
+    if (!requestId) {
+      throw publicHealthModernizationConflict("public health respiratory network lifecycle request id is missing");
+    }
+  });
+  const auditStages = new Set();
+  const auditByRequest = new Map();
+  respiratoryNetworkLifecycleAudit.forEach((entry) => {
+    const requestId = String(entry?.requestId || "").trim();
+    const stageKey = `${requestId}:${String(entry?.action || "").trim()}:${Number(entry?.version || 0)}`;
+    if (!lifecycleRequestById.has(requestId)
+      || auditStages.has(stageKey)
+      || String(entry?.integrityDigest || "").trim() !== publicHealthRespiratoryNetworkLifecycleAuditDigest(entry)) {
+      throw publicHealthModernizationConflict("public health respiratory network lifecycle audit integrity invalid");
+    }
+    auditStages.add(stageKey);
+    if (!auditByRequest.has(requestId)) auditByRequest.set(requestId, []);
+    auditByRequest.get(requestId).push(entry);
+  });
+  respiratoryNetworkLifecycleRequests.forEach((request) => {
+    const requestId = String(request?.id || "").trim();
+    const audits = auditByRequest.get(requestId) || [];
+    const requestedAction = `request-${String(request?.eventType || "").trim()}`;
+    if (audits.filter((entry) => entry.action === requestedAction && Number(entry.version) === 1).length !== 1) {
+      throw publicHealthModernizationConflict("public health respiratory network lifecycle request audit is missing");
+    }
+    if (request.status !== "pending") {
+      const reviewAction = request.status === "approved" ? "approve-lifecycle" : "reject-lifecycle";
+      const reviews = audits.filter((entry) => entry.action === reviewAction && Number(entry.version) === 2);
+      if (reviews.length !== 1
+        || String(reviews[0]?.eventId || "").trim() !== String(request?.eventId || "").trim()) {
+        throw publicHealthModernizationConflict("public health respiratory network lifecycle review audit is missing");
+      }
+    }
+  });
+  respiratoryNetworkLifecycleEvents.forEach((event) => {
+    const matchingRequests = respiratoryNetworkLifecycleRequests.filter((request) =>
+      request.status === "approved" && String(request?.eventId || "").trim() === String(event?.id || "").trim());
+    if (matchingRequests.length !== 1) {
+      throw publicHealthModernizationConflict("public health respiratory network lifecycle event request binding invalid");
+    }
+  });
 }
 
 function assertPublicHealthModernizationWrite(data = {}, constraint = {}, incoming = {}) {
@@ -7099,6 +7242,68 @@ function assertPublicHealthModernizationWrite(data = {}, constraint = {}, incomi
       throw publicHealthModernizationConflict("public health respiratory network evidence atomic boundary conflict");
     }
   }
+  if (constraint.operation === "request-respiratory-network-lifecycle") {
+    const incomingRequest = (incoming.publicHealthRespiratoryNetworkLifecycleRequests || [])
+      .find((item) => String(item?.id || "").trim() === entityId);
+    const incomingAudit = (incoming.publicHealthRespiratoryNetworkLifecycleAudit || [])
+      .filter((item) => String(item?.requestId || "").trim() === entityId);
+    const targetEvidenceId = String(constraint.targetEvidenceId || "").trim();
+    const targetLifecycleVersion = Number(constraint.targetLifecycleVersion);
+    const persistedTargetVersion = 1 + (data.publicHealthRespiratoryNetworkLifecycleEvents || [])
+      .filter((item) => String(item?.targetEvidenceId || "").trim() === targetEvidenceId).length;
+    const pendingForTarget = (data.publicHealthRespiratoryNetworkLifecycleRequests || [])
+      .some((item) => String(item?.targetEvidenceId || "").trim() === targetEvidenceId
+        && item?.status === "pending");
+    if (!incomingRequest
+      || incomingRequest.status !== "pending"
+      || Number(incomingRequest.version) !== 1
+      || String(incomingRequest.targetEvidenceId || "").trim() !== targetEvidenceId
+      || incomingAudit.length !== 1
+      || Number(incomingAudit[0].version) !== 1
+      || pendingForTarget
+      || persistedTargetVersion !== targetLifecycleVersion) {
+      throw publicHealthModernizationConflict("public health respiratory network lifecycle request atomic boundary conflict");
+    }
+  }
+  if (["approve-respiratory-network-lifecycle", "reject-respiratory-network-lifecycle"]
+    .includes(constraint.operation)) {
+    const incomingRequest = (incoming.publicHealthRespiratoryNetworkLifecycleRequests || [])
+      .find((item) => String(item?.id || "").trim() === entityId);
+    const targetEvidenceId = String(constraint.targetEvidenceId || "").trim();
+    const targetLifecycleVersion = Number(constraint.targetLifecycleVersion);
+    const persistedTargetVersion = 1 + (data.publicHealthRespiratoryNetworkLifecycleEvents || [])
+      .filter((item) => String(item?.targetEvidenceId || "").trim() === targetEvidenceId).length;
+    const expectedStatus = constraint.operation.startsWith("approve") ? "approved" : "rejected";
+    const reviewAudit = (incoming.publicHealthRespiratoryNetworkLifecycleAudit || [])
+      .filter((item) => String(item?.requestId || "").trim() === entityId
+        && Number(item?.version) === expectedVersion + 1
+        && item?.action === `${expectedStatus === "approved" ? "approve" : "reject"}-lifecycle`);
+    const incomingEvent = expectedStatus === "approved"
+      ? (incoming.publicHealthRespiratoryNetworkLifecycleEvents || [])
+        .find((item) => String(item?.id || "").trim() === String(incomingRequest?.eventId || "").trim())
+      : null;
+    const lifecycleIntegrity = expectedStatus === "approved"
+      ? buildPublicHealthRespiratoryNetworkReadiness({
+          data: incoming,
+          evidenceRecords: incoming.publicHealthRespiratoryNetworkEvidence || [],
+          lifecycleEvents: incoming.publicHealthRespiratoryNetworkLifecycleEvents || [],
+          keyring: constraint.lifecycleKeyring || {},
+          at: constraint.lifecycleAt
+        }).evidenceLifecycle
+      : { ok: true };
+    if (!incomingRequest
+      || incomingRequest.status !== expectedStatus
+      || Number(incomingRequest.version) !== expectedVersion + 1
+      || String(incomingRequest.targetEvidenceId || "").trim() !== targetEvidenceId
+      || reviewAudit.length !== 1
+      || persistedTargetVersion !== targetLifecycleVersion
+      || (expectedStatus === "approved" && (!incomingEvent
+        || String(reviewAudit[0]?.eventId || "").trim() !== String(incomingEvent.id || "").trim()
+        || lifecycleIntegrity?.ok !== true))
+      || (expectedStatus === "rejected" && String(incomingRequest.eventId || "").trim())) {
+      throw publicHealthModernizationConflict("public health respiratory network lifecycle review atomic boundary conflict");
+    }
+  }
   assertUniquePublicHealthModernizationState(incoming);
 }
 
@@ -7124,6 +7329,63 @@ function syncPublicHealthModernizationUniqueKeys(db, data, at) {
   } catch (error) {
     if (/unique constraint/i.test(String(error?.message || ""))) {
       throw publicHealthModernizationConflict("public health source record or idempotency key unique conflict");
+    }
+    throw error;
+  }
+}
+
+function syncPublicHealthRespiratoryLifecycleUniqueKeys(db, data, at) {
+  const requests = Array.isArray(data.publicHealthRespiratoryNetworkLifecycleRequests)
+    ? data.publicHealthRespiratoryNetworkLifecycleRequests
+    : [];
+  const events = Array.isArray(data.publicHealthRespiratoryNetworkLifecycleEvents)
+    ? data.publicHealthRespiratoryNetworkLifecycleEvents
+    : [];
+  const audit = Array.isArray(data.publicHealthRespiratoryNetworkLifecycleAudit)
+    ? data.publicHealthRespiratoryNetworkLifecycleAudit
+    : [];
+  const eventRequestIds = new Map(requests
+    .filter((item) => String(item?.eventId || "").trim())
+    .map((item) => [String(item.eventId).trim(), String(item.id || "").trim()]));
+  db.prepare("DELETE FROM public_health_respiratory_lifecycle_request_keys").run();
+  db.prepare("DELETE FROM public_health_respiratory_lifecycle_event_keys").run();
+  db.prepare("DELETE FROM public_health_respiratory_lifecycle_audit_keys").run();
+  const insertRequest = db.prepare(`
+    INSERT INTO public_health_respiratory_lifecycle_request_keys (
+      request_id, idempotency_key_hash, updated_at
+    ) VALUES (?, ?, ?)
+  `);
+  const insertEvent = db.prepare(`
+    INSERT INTO public_health_respiratory_lifecycle_event_keys (
+      event_id, receipt_id, request_id, updated_at
+    ) VALUES (?, ?, ?, ?)
+  `);
+  const insertAudit = db.prepare(`
+    INSERT INTO public_health_respiratory_lifecycle_audit_keys (
+      audit_id, idempotency_key_hash, request_stage_key, updated_at
+    ) VALUES (?, ?, ?, ?)
+  `);
+  try {
+    requests.forEach((item) => insertRequest.run(
+      String(item?.id || "").trim(),
+      String(item?.idempotencyKeyHash || "").trim(),
+      at
+    ));
+    events.forEach((item) => insertEvent.run(
+      String(item?.id || "").trim(),
+      String(item?.trustedVerification?.receiptId || "").trim(),
+      eventRequestIds.get(String(item?.id || "").trim()) || "",
+      at
+    ));
+    audit.forEach((item) => insertAudit.run(
+      String(item?.id || "").trim(),
+      String(item?.idempotencyKeyHash || "").trim(),
+      `${String(item?.requestId || "").trim()}:${String(item?.action || "").trim()}:${Number(item?.version || 0)}`,
+      at
+    ));
+  } catch (error) {
+    if (/unique constraint/i.test(String(error?.message || ""))) {
+      throw publicHealthModernizationConflict("public health respiratory network lifecycle replay conflict");
     }
     throw error;
   }
@@ -7413,6 +7675,7 @@ function writeSqliteState(
     }
     const normalized = normalizeState(data);
     syncPublicHealthModernizationUniqueKeys(db, normalized, now);
+    syncPublicHealthRespiratoryLifecycleUniqueKeys(db, normalized, now);
     const entries = Object.entries(normalized).filter(([key]) => key !== "storageMeta");
     verifySqliteCollectionVersions(db, entries.map(([key]) => key), expectedVersions);
     const incomingKeys = new Set(entries.map(([key]) => key));
@@ -10768,6 +11031,15 @@ function normalizeState(data) {
       : [],
     publicHealthRespiratoryNetworkEvidenceAudit: Array.isArray(data.publicHealthRespiratoryNetworkEvidenceAudit)
       ? data.publicHealthRespiratoryNetworkEvidenceAudit.slice(-10000)
+      : [],
+    publicHealthRespiratoryNetworkLifecycleRequests: Array.isArray(data.publicHealthRespiratoryNetworkLifecycleRequests)
+      ? data.publicHealthRespiratoryNetworkLifecycleRequests.slice(-10000)
+      : [],
+    publicHealthRespiratoryNetworkLifecycleEvents: Array.isArray(data.publicHealthRespiratoryNetworkLifecycleEvents)
+      ? data.publicHealthRespiratoryNetworkLifecycleEvents.slice(-10000)
+      : [],
+    publicHealthRespiratoryNetworkLifecycleAudit: Array.isArray(data.publicHealthRespiratoryNetworkLifecycleAudit)
+      ? data.publicHealthRespiratoryNetworkLifecycleAudit.slice(-20000)
       : [],
     publicHealthSignals: mergeByKey(seedPublicHealthSignals(), data.publicHealthSignals, "id"),
     publicHealthAlerts: mergeByKey(seedPublicHealthAlerts(), data.publicHealthAlerts, "id"),
@@ -25341,7 +25613,11 @@ const PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_CLIENT_FIELDS = new Set([
   "artifactName",
   "artifactDigest",
   "validFrom",
-  "expiresAt"
+  "expiresAt",
+  "reasonCode",
+  "successorEvidenceId",
+  "lifecycleRequestId",
+  "reviewReasonCode"
 ]);
 
 function publicHealthRespiratoryNetworkEvidenceAuditDigest(entry = {}) {
@@ -25369,6 +25645,45 @@ function publicHealthRespiratoryNetworkEvidenceRequestFingerprint(id, payload = 
     artifactDigest: String(payload.artifactDigest || "").trim().toLowerCase().replace(/^sha256:/, ""),
     validFrom: String(payload.validFrom || "").trim(),
     expiresAt: String(payload.expiresAt || "").trim()
+  })).digest("hex");
+}
+
+function publicHealthRespiratoryNetworkLifecycleRequestFingerprint(targetEvidenceId, payload = {}) {
+  return createHash("sha256").update(JSON.stringify({
+    targetEvidenceId: String(targetEvidenceId || "").trim(),
+    action: String(payload.action || "").trim(),
+    expectedVersion: Number(payload.expectedVersion || 0),
+    reasonCode: String(payload.reasonCode || "").trim().toLowerCase(),
+    successorEvidenceId: String(payload.successorEvidenceId || "").trim()
+  })).digest("hex");
+}
+
+function publicHealthRespiratoryNetworkLifecycleReviewFingerprint(targetEvidenceId, payload = {}) {
+  return createHash("sha256").update(JSON.stringify({
+    targetEvidenceId: String(targetEvidenceId || "").trim(),
+    action: String(payload.action || "").trim(),
+    expectedVersion: Number(payload.expectedVersion || 0),
+    lifecycleRequestId: String(payload.lifecycleRequestId || "").trim(),
+    reviewReasonCode: String(payload.reviewReasonCode || "").trim().toLowerCase()
+  })).digest("hex");
+}
+
+function publicHealthRespiratoryNetworkLifecycleAuditDigest(entry = {}) {
+  return createHash("sha256").update(JSON.stringify({
+    id: String(entry.id || "").trim(),
+    requestId: String(entry.requestId || "").trim(),
+    targetEvidenceId: String(entry.targetEvidenceId || "").trim(),
+    eventId: String(entry.eventId || "").trim(),
+    eventReceiptId: String(entry.eventReceiptId || "").trim(),
+    action: String(entry.action || "").trim(),
+    reasonCode: String(entry.reasonCode || "").trim().toLowerCase(),
+    version: Number(entry.version || 0),
+    actorId: String(entry.actorId || "").trim(),
+    actorRole: String(entry.actorRole || "").trim(),
+    organizationScope: String(entry.organizationScope || "").trim(),
+    at: String(entry.at || "").trim(),
+    idempotencyKeyHash: String(entry.idempotencyKeyHash || "").trim(),
+    requestFingerprint: String(entry.requestFingerprint || "").trim()
   })).digest("hex");
 }
 
@@ -25426,7 +25741,7 @@ function publicHealthSafeRespiratoryNetworkEvidenceKeyStatus(options = {}) {
   };
 }
 
-function publicHealthSafeRespiratoryNetworkReadiness(data) {
+function publicHealthSafeRespiratoryNetworkReadiness(data, user = {}) {
   const options = publicHealthRespiratoryNetworkEvidenceOptions();
   const keyring = options.keyring || {
     purpose: RESPIRATORY_NETWORK_EVIDENCE_PURPOSE,
@@ -25436,12 +25751,71 @@ function publicHealthSafeRespiratoryNetworkReadiness(data) {
   const board = buildPublicHealthRespiratoryNetworkReadiness({
     data,
     evidenceRecords: data.publicHealthRespiratoryNetworkEvidence || [],
+    lifecycleEvents: data.publicHealthRespiratoryNetworkLifecycleEvents || [],
     keyring,
     at: options.at
   });
   const keyringStatus = publicHealthSafeRespiratoryNetworkEvidenceKeyStatus(options);
   const evidenceTypes = REQUIRED_RESPIRATORY_NETWORK_EVIDENCE.map((item) => item.type);
   const technicalLaunchReady = board.technicalLaunchReady === true && options.managed === true;
+  const actorId = String(user.username || user.id || "").trim();
+  const lifecycleStates = new Map((board.evidenceLifecycle?.states || [])
+    .map((item) => [String(item.id || "").trim(), String(item.state || "").trim()]));
+  const renewalDueIds = new Set((board.evidenceLifecycle?.renewalDueEvidence || [])
+    .map((item) => String(item.id || "").trim()));
+  const lifecycleEvents = Array.isArray(data.publicHealthRespiratoryNetworkLifecycleEvents)
+    ? data.publicHealthRespiratoryNetworkLifecycleEvents
+    : [];
+  const lifecycleRequests = Array.isArray(data.publicHealthRespiratoryNetworkLifecycleRequests)
+    ? data.publicHealthRespiratoryNetworkLifecycleRequests
+    : [];
+  const lifecycleRequestSummary = {
+    total: lifecycleRequests.length,
+    pending: lifecycleRequests.filter((item) => item.status === "pending").length,
+    approved: lifecycleRequests.filter((item) => item.status === "approved").length,
+    rejected: lifecycleRequests.filter((item) => item.status === "rejected").length
+  };
+  const safeEvidence = (data.publicHealthRespiratoryNetworkEvidence || []).map((record) => {
+    const evidenceId = String(record?.id || "").trim();
+    const state = lifecycleStates.get(evidenceId) || "invalid";
+    const expiresAt = String(record?.expiresAt || "").trim();
+    const remainingMs = new Date(expiresAt).getTime() - new Date(options.at).getTime();
+    const allowedRequestActions = {
+      active: ["request-suspend", "request-revoke", "request-supersede"],
+      suspended: ["request-reinstate", "request-revoke"],
+      revoked: [],
+      superseded: []
+    }[state] || [];
+    return {
+      id: evidenceId,
+      institutionId: String(record?.institutionId || "").trim(),
+      evidenceType: String(record?.evidenceType || "").trim(),
+      state,
+      lifecycleVersion: 1 + lifecycleEvents
+        .filter((event) => String(event?.targetEvidenceId || "").trim() === evidenceId).length,
+      expiresAt,
+      daysUntilExpiration: Number.isFinite(remainingMs) ? Math.floor(remainingMs / 86400000) : null,
+      renewalDue: renewalDueIds.has(evidenceId),
+      allowedRequestActions,
+      productionReady: false
+    };
+  });
+  const safeLifecycleRequests = lifecycleRequests.slice(-200).map((request) => ({
+    id: String(request?.id || "").trim(),
+    targetEvidenceId: String(request?.targetEvidenceId || "").trim(),
+    successorEvidenceId: String(request?.successorEvidenceId || "").trim(),
+    eventType: String(request?.eventType || "").trim(),
+    reasonCode: String(request?.reasonCode || "").trim(),
+    status: String(request?.status || "").trim(),
+    version: Number(request?.version || 0),
+    requestedAt: String(request?.requestedAt || "").trim(),
+    reviewedAt: String(request?.reviewedAt || "").trim(),
+    requestedBySelf: Boolean(actorId) && String(request?.requestedBy || "").trim() === actorId,
+    canReview: request?.status === "pending"
+      && Boolean(actorId)
+      && String(request?.requestedBy || "").trim() !== actorId,
+    productionReady: false
+  }));
   return {
     ok: board.ok === true && options.managed === true,
     functionalState: technicalLaunchReady
@@ -25455,6 +25829,10 @@ function publicHealthSafeRespiratoryNetworkReadiness(data) {
     productionReady: false,
     summary: {
       ...board.summary,
+      lifecycleRequests: lifecycleRequestSummary.total,
+      pendingLifecycleRequests: lifecycleRequestSummary.pending,
+      approvedLifecycleRequests: lifecycleRequestSummary.approved,
+      rejectedLifecycleRequests: lifecycleRequestSummary.rejected,
       keyringReady: options.managed === true,
       keyring: keyringStatus
     },
@@ -25480,17 +25858,50 @@ function publicHealthSafeRespiratoryNetworkReadiness(data) {
         replayDetected: item.replayDetected === true,
         observedQualityDays: item.observedQualityDays,
         consecutiveQualityDays: item.consecutiveQualityDays,
+        activeEvidence: safeEvidence.filter((record) =>
+          record.institutionId === item.institutionId && record.state === "active").length,
+        suspendedEvidence: safeEvidence.filter((record) =>
+          record.institutionId === item.institutionId && record.state === "suspended").length,
+        revokedEvidence: safeEvidence.filter((record) =>
+          record.institutionId === item.institutionId && record.state === "revoked").length,
+        supersededEvidence: safeEvidence.filter((record) =>
+          record.institutionId === item.institutionId && record.state === "superseded").length,
+        renewalDueEvidence: safeEvidence.filter((record) =>
+          record.institutionId === item.institutionId && record.renewalDue).length,
         blockerCodes: [
           ...missingEvidenceTypes.map((type) => `RESPIRATORY_NETWORK_EVIDENCE_MISSING:${type}`),
           ...(item.duplicateEvidenceTypes?.length
             ? ["RESPIRATORY_NETWORK_EVIDENCE_TYPE_DUPLICATE"]
             : []),
           ...(item.replayDetected ? ["RESPIRATORY_NETWORK_EVIDENCE_REPLAY"] : []),
+          ...((item.lifecycleBlockedEvidence || []).length
+            ? ["RESPIRATORY_NETWORK_EVIDENCE_LIFECYCLE_BLOCKED"]
+            : []),
+          ...(item.renewalDueEvidenceTypes?.length
+            ? ["RESPIRATORY_NETWORK_EVIDENCE_RENEWAL_DUE"]
+            : []),
           ...(item.continuityReady ? [] : ["RESPIRATORY_NETWORK_CONTINUITY_INCOMPLETE"]),
           ...(options.managed ? [] : [options.configurationCode])
         ].filter(Boolean)
       };
     }),
+    evidence: safeEvidence,
+    lifecycleRequests: safeLifecycleRequests,
+    lifecycle: {
+      ok: board.evidenceLifecycle?.ok === true,
+      summary: {
+        active: board.evidenceLifecycle?.summary?.active || 0,
+        suspended: board.evidenceLifecycle?.summary?.suspended || 0,
+        revoked: board.evidenceLifecycle?.summary?.revoked || 0,
+        superseded: board.evidenceLifecycle?.summary?.superseded || 0,
+        renewalDue: board.evidenceLifecycle?.summary?.renewalDue || 0,
+        events: board.evidenceLifecycle?.summary?.lifecycleEvents || 0,
+        findings: board.evidenceLifecycle?.summary?.findings || 0
+      },
+      requestSummary: lifecycleRequestSummary,
+      blockerCodes: (board.evidenceLifecycle?.findings || []).map((item) =>
+        String(item?.code || "respiratory-network-lifecycle-integrity-invalid"))
+    },
     integrity: {
       rejectedEvidence: board.summary?.rejectedEvidence || 0,
       findings: board.summary?.integrityFindings || 0
@@ -25501,8 +25912,12 @@ function publicHealthSafeRespiratoryNetworkReadiness(data) {
       : [
           ...(options.configurationCode ? [options.configurationCode] : []),
           ...(board.summary?.rejectedEvidence ? ["RESPIRATORY_NETWORK_EVIDENCE_UNTRUSTED"] : []),
-          ...(board.summary?.integrityFindings ? ["RESPIRATORY_NETWORK_EVIDENCE_INTEGRITY_INVALID"] : []),
-          ...((board.institutions || []).length
+           ...(board.summary?.integrityFindings ? ["RESPIRATORY_NETWORK_EVIDENCE_INTEGRITY_INVALID"] : []),
+           ...(board.summary?.renewalDueEvidence ? ["RESPIRATORY_NETWORK_EVIDENCE_RENEWAL_DUE"] : []),
+           ...(board.evidenceLifecycle?.ok === false
+             ? ["RESPIRATORY_NETWORK_EVIDENCE_LIFECYCLE_INTEGRITY_INVALID"]
+             : []),
+           ...((board.institutions || []).length
             ? []
             : ["RESPIRATORY_NETWORK_ACCEPTANCE_INSTITUTION_MISSING"])
         ],
@@ -25518,11 +25933,51 @@ function publicHealthSafeRespiratoryNetworkReadiness(data) {
 }
 
 function assertPublicHealthRespiratoryNetworkEvidencePayload(payload = {}) {
-  const unexpected = Object.keys(payload)
-    .find((key) => !PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_FIELDS.has(key));
+  const action = String(payload.action || "").trim();
+  const requestEventType = action.startsWith("request-") ? action.slice("request-".length) : "";
+  const issueFields = PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_FIELDS;
+  const lifecycleRequestFields = new Set([
+    "action",
+    "expectedVersion",
+    "reasonCode",
+    "successorEvidenceId",
+    "idempotencyKey",
+    "at"
+  ]);
+  const lifecycleReviewFields = new Set([
+    "action",
+    "expectedVersion",
+    "lifecycleRequestId",
+    "reviewReasonCode",
+    "idempotencyKey",
+    "at"
+  ]);
+  const allowedFields = action === "issue-trusted-evidence"
+    ? issueFields
+    : (RESPIRATORY_NETWORK_LIFECYCLE_EVENT_TYPES.includes(requestEventType)
+        ? lifecycleRequestFields
+        : lifecycleReviewFields);
+  const unexpected = Object.keys(payload).find((key) => !allowedFields.has(key));
+  const invalidIssue = action === "issue-trusted-evidence"
+    && Number(payload.expectedVersion) !== 0;
+  const invalidRequest = RESPIRATORY_NETWORK_LIFECYCLE_EVENT_TYPES.includes(requestEventType)
+    && (!String(payload.reasonCode || "").trim()
+      || (requestEventType === "supersede") !== Boolean(String(payload.successorEvidenceId || "").trim())
+      || !Number.isInteger(Number(payload.expectedVersion))
+      || Number(payload.expectedVersion) < 1);
+  const invalidReview = ["approve-lifecycle", "reject-lifecycle"].includes(action)
+    && (!String(payload.lifecycleRequestId || "").trim()
+      || !Number.isInteger(Number(payload.expectedVersion))
+      || Number(payload.expectedVersion) < 1
+      || (action === "reject-lifecycle" && !String(payload.reviewReasonCode || "").trim()));
   if (unexpected
-    || payload.action !== "issue-trusted-evidence"
-    || Number(payload.expectedVersion) !== 0) {
+    || (!invalidIssue && !invalidRequest && !invalidReview
+      && action !== "issue-trusted-evidence"
+      && !RESPIRATORY_NETWORK_LIFECYCLE_EVENT_TYPES.includes(requestEventType)
+      && !["approve-lifecycle", "reject-lifecycle"].includes(action))
+    || invalidIssue
+    || (RESPIRATORY_NETWORK_LIFECYCLE_EVENT_TYPES.includes(requestEventType) && invalidRequest)
+    || (["approve-lifecycle", "reject-lifecycle"].includes(action) && invalidReview)) {
     const error = new Error("public health respiratory network evidence client override is forbidden");
     error.code = "PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_PAYLOAD_FORBIDDEN";
     throw error;
@@ -25541,6 +25996,340 @@ function publicHealthRespiratoryNetworkEvidenceActor(user = {}) {
     role: "commission",
     organizationScope: String(user.orgCode || user.orgType || "").trim()
   };
+}
+
+function publicHealthRespiratoryNetworkLifecycleVersion(data, evidenceId) {
+  return 1 + (data.publicHealthRespiratoryNetworkLifecycleEvents || [])
+    .filter((event) => String(event?.targetEvidenceId || "").trim() === String(evidenceId || "").trim())
+    .length;
+}
+
+function publicHealthRespiratoryNetworkLifecycleAuditEntry({
+  requestId,
+  targetEvidenceId,
+  eventId = "",
+  eventReceiptId = "",
+  action,
+  reasonCode,
+  version,
+  actor,
+  at,
+  idempotencyKeyHash,
+  requestFingerprint
+}) {
+  const base = {
+    id: `ph-respiratory-network-lifecycle-audit-${randomUUID()}`,
+    requestId,
+    targetEvidenceId,
+    eventId,
+    eventReceiptId,
+    action,
+    reasonCode: String(reasonCode || "").trim().toLowerCase(),
+    version,
+    actorId: actor.id,
+    actorRole: actor.role,
+    organizationScope: actor.organizationScope,
+    at,
+    idempotencyKeyHash,
+    requestFingerprint
+  };
+  return {
+    ...base,
+    integrityDigest: publicHealthRespiratoryNetworkLifecycleAuditDigest(base)
+  };
+}
+
+function publicHealthRespiratoryNetworkLifecycleResponse(data, user, request, idempotent, statusCode = 200) {
+  const board = publicHealthSafeRespiratoryNetworkReadiness(data, user);
+  return {
+    statusCode,
+    body: {
+      ok: true,
+      idempotent,
+      lifecycleRequest: board.lifecycleRequests.find((item) => item.id === request.id) || null,
+      evidence: board.evidence.find((item) => item.id === request.targetEvidenceId) || null,
+      lifecycle: board.lifecycle,
+      summary: board.summary,
+      technicalLaunchReady: board.technicalLaunchReady,
+      productionReady: false
+    }
+  };
+}
+
+function requestPublicHealthRespiratoryNetworkLifecycle({
+  data,
+  evidenceId,
+  command,
+  actor,
+  user
+}) {
+  const eventType = String(command.action || "").slice("request-".length);
+  const signing = publicHealthRespiratoryNetworkEvidenceOptions({ required: true });
+  const targetEvidence = (data.publicHealthRespiratoryNetworkEvidence || [])
+    .find((item) => String(item?.id || "").trim() === evidenceId);
+  if (!targetEvidence) {
+    const error = new Error("unknown public health respiratory network evidence");
+    error.code = "PUBLIC_HEALTH_MODERNIZATION_RECORD_NOT_FOUND";
+    throw error;
+  }
+  const lifecycle = buildPublicHealthRespiratoryNetworkReadiness({
+    data,
+    evidenceRecords: data.publicHealthRespiratoryNetworkEvidence || [],
+    lifecycleEvents: data.publicHealthRespiratoryNetworkLifecycleEvents || [],
+    keyring: signing.keyring,
+    at: signing.at
+  }).evidenceLifecycle;
+  if (!lifecycle?.ok) {
+    const error = new Error("respiratory network evidence lifecycle integrity is untrusted");
+    error.code = "PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_INTEGRITY_INVALID";
+    throw error;
+  }
+  const currentState = lifecycle.states.find((item) => item.id === evidenceId)?.state || "invalid";
+  const allowedByState = {
+    active: ["suspend", "revoke", "supersede"],
+    suspended: ["reinstate", "revoke"],
+    revoked: [],
+    superseded: []
+  };
+  if (!(allowedByState[currentState] || []).includes(eventType)) {
+    const error = new Error(`respiratory network lifecycle request is not allowed from ${currentState}`);
+    error.code = "PUBLIC_HEALTH_RESPIRATORY_NETWORK_LIFECYCLE_STATE_CONFLICT";
+    throw error;
+  }
+  const targetLifecycleVersion = publicHealthRespiratoryNetworkLifecycleVersion(data, evidenceId);
+  if (Number(command.expectedVersion) !== targetLifecycleVersion) {
+    throw publicHealthModernizationConflict(
+      `public health respiratory network lifecycle version conflict: expected ${command.expectedVersion}, current ${targetLifecycleVersion}`
+    );
+  }
+  const successorEvidenceId = String(command.successorEvidenceId || "").trim();
+  if (eventType === "supersede") {
+    const successor = (data.publicHealthRespiratoryNetworkEvidence || [])
+      .find((item) => String(item?.id || "").trim() === successorEvidenceId);
+    if (!successor
+      || successorEvidenceId === evidenceId
+      || successor.institutionId !== targetEvidence.institutionId
+      || successor.evidenceType !== targetEvidence.evidenceType
+      || successor.panelId !== targetEvidence.panelId
+      || Number(successor.panelVersion) !== Number(targetEvidence.panelVersion)) {
+      const error = new Error("respiratory network lifecycle successor must be a different evidence record on the same track");
+      error.code = "PUBLIC_HEALTH_RESPIRATORY_NETWORK_LIFECYCLE_SUCCESSOR_INVALID";
+      throw error;
+    }
+  }
+  const idempotencyKeyHash = createHash("sha256").update(command.idempotencyKey).digest("hex");
+  const requestFingerprint = publicHealthRespiratoryNetworkLifecycleRequestFingerprint(evidenceId, command);
+  const existing = (data.publicHealthRespiratoryNetworkLifecycleRequests || [])
+    .find((item) => item?.idempotencyKeyHash === idempotencyKeyHash);
+  if (existing) {
+    if (existing.requestFingerprint !== requestFingerprint) {
+      throw publicHealthModernizationConflict("public health respiratory network lifecycle request idempotency conflict");
+    }
+    return publicHealthRespiratoryNetworkLifecycleResponse(data, user, existing, true);
+  }
+  if ((data.publicHealthRespiratoryNetworkLifecycleRequests || []).some((item) =>
+    item?.status === "pending" && item?.targetEvidenceId === evidenceId)) {
+    throw publicHealthModernizationConflict("public health respiratory network lifecycle target already has a pending request");
+  }
+  const request = {
+    id: `ph-respiratory-network-lifecycle-request-${randomUUID()}`,
+    version: 1,
+    status: "pending",
+    eventType,
+    targetEvidenceId: evidenceId,
+    successorEvidenceId,
+    reasonCode: String(command.reasonCode || "").trim().toLowerCase(),
+    requestedBy: actor.id,
+    requestedAt: signing.at,
+    organizationScope: actor.organizationScope,
+    targetLifecycleVersion,
+    idempotencyKeyHash,
+    requestFingerprint,
+    eventId: "",
+    reviewedBy: "",
+    reviewedAt: "",
+    reviewReasonCode: "",
+    productionReady: false
+  };
+  const audit = publicHealthRespiratoryNetworkLifecycleAuditEntry({
+    requestId: request.id,
+    targetEvidenceId: evidenceId,
+    action: command.action,
+    reasonCode: request.reasonCode,
+    version: 1,
+    actor,
+    at: signing.at,
+    idempotencyKeyHash,
+    requestFingerprint
+  });
+  const nextData = {
+    ...data,
+    publicHealthRespiratoryNetworkLifecycleRequests: [
+      ...(data.publicHealthRespiratoryNetworkLifecycleRequests || []),
+      request
+    ],
+    publicHealthRespiratoryNetworkLifecycleAudit: [
+      ...(data.publicHealthRespiratoryNetworkLifecycleAudit || []),
+      audit
+    ]
+  };
+  writeDatabase(nextData, {
+    event: "public-health-respiratory-network-lifecycle-requested",
+    publicHealthModernizationWrite: {
+      collection: "publicHealthRespiratoryNetworkLifecycleRequests",
+      entityId: request.id,
+      expectedVersion: 0,
+      operation: "request-respiratory-network-lifecycle",
+      targetEvidenceId: evidenceId,
+      targetLifecycleVersion,
+      requiredCollections: [
+        "publicHealthRespiratoryNetworkLifecycleRequests",
+        "publicHealthRespiratoryNetworkLifecycleAudit"
+      ]
+    }
+  });
+  return publicHealthRespiratoryNetworkLifecycleResponse(nextData, user, request, false, 201);
+}
+
+function reviewPublicHealthRespiratoryNetworkLifecycle({
+  data,
+  evidenceId,
+  command,
+  actor,
+  user
+}) {
+  const requestId = String(command.lifecycleRequestId || "").trim();
+  const request = (data.publicHealthRespiratoryNetworkLifecycleRequests || [])
+    .find((item) => String(item?.id || "").trim() === requestId);
+  if (!request || request.targetEvidenceId !== evidenceId) {
+    const error = new Error("unknown public health respiratory network lifecycle request");
+    error.code = "PUBLIC_HEALTH_MODERNIZATION_RECORD_NOT_FOUND";
+    throw error;
+  }
+  const idempotencyKeyHash = createHash("sha256").update(command.idempotencyKey).digest("hex");
+  const requestFingerprint = publicHealthRespiratoryNetworkLifecycleReviewFingerprint(evidenceId, command);
+  const replayAudit = (data.publicHealthRespiratoryNetworkLifecycleAudit || [])
+    .find((item) => item?.idempotencyKeyHash === idempotencyKeyHash);
+  const expectedStatus = command.action === "approve-lifecycle" ? "approved" : "rejected";
+  if (replayAudit) {
+    if (replayAudit.requestFingerprint !== requestFingerprint
+      || request.status !== expectedStatus
+      || replayAudit.action !== command.action) {
+      throw publicHealthModernizationConflict("public health respiratory network lifecycle review idempotency conflict");
+    }
+    return publicHealthRespiratoryNetworkLifecycleResponse(data, user, request, true);
+  }
+  if (request.status !== "pending" || Number(command.expectedVersion) !== Number(request.version)) {
+    throw publicHealthModernizationConflict("public health respiratory network lifecycle review version conflict");
+  }
+  if (String(request.requestedBy || "").trim() === actor.id) {
+    const error = new Error("respiratory network lifecycle reviewer must be independent");
+    error.code = "PUBLIC_HEALTH_RESPIRATORY_NETWORK_REVIEWER_NOT_INDEPENDENT";
+    throw error;
+  }
+  const targetLifecycleVersion = publicHealthRespiratoryNetworkLifecycleVersion(data, evidenceId);
+  if (targetLifecycleVersion !== Number(request.targetLifecycleVersion)) {
+    throw publicHealthModernizationConflict("public health respiratory network lifecycle request is stale");
+  }
+  const reviewedAt = new Date().toISOString();
+  let event = null;
+  let lifecycleKeyring = null;
+  let lifecycleAt = reviewedAt;
+  if (expectedStatus === "approved") {
+    const signing = publicHealthRespiratoryNetworkEvidenceOptions({ required: true });
+    lifecycleKeyring = signing.keyring;
+    lifecycleAt = signing.at;
+    const targetEvidence = (data.publicHealthRespiratoryNetworkEvidence || [])
+      .find((item) => item?.id === evidenceId);
+    const successorEvidence = request.eventType === "supersede"
+      ? (data.publicHealthRespiratoryNetworkEvidence || [])
+        .find((item) => item?.id === request.successorEvidenceId)
+      : null;
+    event = issueTrustedRespiratoryNetworkLifecycleEvent({
+      id: `ph-respiratory-network-lifecycle-event-${randomUUID()}`,
+      eventType: request.eventType,
+      reasonCode: request.reasonCode
+    }, targetEvidence, successorEvidence, {
+      requestedBy: request.requestedBy,
+      approvedBy: actor.id,
+      approvedAt: signing.at,
+      receiptId: `ph-respiratory-network-lifecycle-receipt-${randomUUID()}`
+    }, signing.keyring);
+    const verification = verifyTrustedRespiratoryNetworkLifecycleEvent(event, signing.keyring, signing.at);
+    const nextLifecycle = buildPublicHealthRespiratoryNetworkReadiness({
+      data,
+      evidenceRecords: data.publicHealthRespiratoryNetworkEvidence || [],
+      lifecycleEvents: [...(data.publicHealthRespiratoryNetworkLifecycleEvents || []), event],
+      keyring: signing.keyring,
+      at: signing.at
+    }).evidenceLifecycle;
+    if (!verification.ok || !nextLifecycle?.ok
+      || !nextLifecycle.states.some((item) =>
+        item.id === evidenceId
+        && item.state === ({
+          suspend: "suspended",
+          reinstate: "active",
+          revoke: "revoked",
+          supersede: "superseded"
+        })[request.eventType])) {
+      const error = new Error("respiratory network lifecycle signed event integrity invalid");
+      error.code = "PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_INTEGRITY_INVALID";
+      throw error;
+    }
+  }
+  const nextRequest = {
+    ...request,
+    version: 2,
+    status: expectedStatus,
+    reviewedBy: actor.id,
+    reviewedAt,
+    reviewReasonCode: String(command.reviewReasonCode || "").trim().toLowerCase(),
+    eventId: event?.id || ""
+  };
+  const audit = publicHealthRespiratoryNetworkLifecycleAuditEntry({
+    requestId,
+    targetEvidenceId: evidenceId,
+    eventId: event?.id || "",
+    eventReceiptId: event?.trustedVerification?.receiptId || "",
+    action: command.action,
+    reasonCode: command.reviewReasonCode || request.reasonCode,
+    version: 2,
+    actor,
+    at: reviewedAt,
+    idempotencyKeyHash,
+    requestFingerprint
+  });
+  const nextData = {
+    ...data,
+    publicHealthRespiratoryNetworkLifecycleRequests: (data.publicHealthRespiratoryNetworkLifecycleRequests || [])
+      .map((item) => item.id === requestId ? nextRequest : item),
+    publicHealthRespiratoryNetworkLifecycleEvents: event
+      ? [...(data.publicHealthRespiratoryNetworkLifecycleEvents || []), event]
+      : [...(data.publicHealthRespiratoryNetworkLifecycleEvents || [])],
+    publicHealthRespiratoryNetworkLifecycleAudit: [
+      ...(data.publicHealthRespiratoryNetworkLifecycleAudit || []),
+      audit
+    ]
+  };
+  writeDatabase(nextData, {
+    event: `public-health-respiratory-network-lifecycle-${expectedStatus}`,
+    publicHealthModernizationWrite: {
+      collection: "publicHealthRespiratoryNetworkLifecycleRequests",
+      entityId: requestId,
+      expectedVersion: Number(command.expectedVersion),
+      operation: `${expectedStatus === "approved" ? "approve" : "reject"}-respiratory-network-lifecycle`,
+      targetEvidenceId: evidenceId,
+      targetLifecycleVersion,
+      lifecycleKeyring,
+      lifecycleAt,
+      requiredCollections: [
+        "publicHealthRespiratoryNetworkLifecycleRequests",
+        "publicHealthRespiratoryNetworkLifecycleEvents",
+        "publicHealthRespiratoryNetworkLifecycleAudit"
+      ]
+    }
+  });
+  return publicHealthRespiratoryNetworkLifecycleResponse(nextData, user, nextRequest, false);
 }
 
 function publicHealthSurveillanceRuleActivationOptions({ required = false } = {}) {
@@ -26270,7 +27059,7 @@ async function handleApi(req, res) {
         error.code = "PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_PAYLOAD_FORBIDDEN";
         throw error;
       }
-      sendJson(res, 200, publicHealthSafeRespiratoryNetworkReadiness(readDatabase()));
+      sendJson(res, 200, publicHealthSafeRespiratoryNetworkReadiness(readDatabase(), user));
     } catch (error) {
       publicHealthModernizationError(res, error);
     }
@@ -26313,17 +27102,39 @@ async function handleApi(req, res) {
         req,
         url,
         clientBody,
-        { insert: true }
+        { insert: clientBody.action === "issue-trusted-evidence" }
       );
       const command = {
         ...rawCommand,
-        at: rawCommand.receivedAt
+        ...(rawCommand.receivedAt ? { at: rawCommand.receivedAt } : {})
       };
       delete command.receivedAt;
       assertPublicHealthRespiratoryNetworkEvidencePayload(command);
       const actor = publicHealthRespiratoryNetworkEvidenceActor(user);
-      const signing = publicHealthRespiratoryNetworkEvidenceOptions({ required: true });
       const data = readDatabase();
+      if (String(command.action || "").startsWith("request-")) {
+        const result = requestPublicHealthRespiratoryNetworkLifecycle({
+          data,
+          evidenceId,
+          command,
+          actor,
+          user
+        });
+        sendJson(res, result.statusCode, result.body);
+        return;
+      }
+      if (["approve-lifecycle", "reject-lifecycle"].includes(command.action)) {
+        const result = reviewPublicHealthRespiratoryNetworkLifecycle({
+          data,
+          evidenceId,
+          command,
+          actor,
+          user
+        });
+        sendJson(res, result.statusCode, result.body);
+        return;
+      }
+      const signing = publicHealthRespiratoryNetworkEvidenceOptions({ required: true });
       const idempotencyKeyHash = createHash("sha256")
         .update(command.idempotencyKey)
         .digest("hex");
@@ -26352,7 +27163,7 @@ async function handleApi(req, res) {
             "public health respiratory network evidence idempotency conflict"
           );
         }
-        const board = publicHealthSafeRespiratoryNetworkReadiness(data);
+        const board = publicHealthSafeRespiratoryNetworkReadiness(data, user);
         sendJson(res, 200, {
           ok: true,
           idempotent: true,
@@ -26437,7 +27248,7 @@ async function handleApi(req, res) {
           ]
         }
       });
-      const board = publicHealthSafeRespiratoryNetworkReadiness(nextData);
+      const board = publicHealthSafeRespiratoryNetworkReadiness(nextData, user);
       sendJson(res, 201, {
         ok: true,
         idempotent: false,

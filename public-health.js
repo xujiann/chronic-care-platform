@@ -513,6 +513,8 @@ function renderPublicHealthRespiratoryPathogenSurveillance(board) {
 function renderPublicHealthRespiratoryNetworkReadiness(board) {
   const metrics = document.querySelector("#public-health-respiratory-network-metrics");
   const institutions = document.querySelector("#public-health-respiratory-network-institutions");
+  const lifecycleEvidence = document.querySelector("#public-health-respiratory-network-lifecycle-evidence");
+  const lifecycleRequests = document.querySelector("#public-health-respiratory-network-lifecycle-requests");
   const blockers = document.querySelector("#public-health-respiratory-network-blockers");
   if (metrics) {
     metrics.innerHTML = board
@@ -534,6 +536,12 @@ function renderPublicHealthRespiratoryNetworkReadiness(board) {
             "技术上线",
             board.technicalLaunchReady ? "候选通过" : "失败关闭"
           ),
+          modernizationMetric(
+            "活动/暂停/撤销/替换",
+            `${board.lifecycle?.summary?.active || 0}/${board.lifecycle?.summary?.suspended || 0}/${board.lifecycle?.summary?.revoked || 0}/${board.lifecycle?.summary?.superseded || 0}`
+          ),
+          modernizationMetric("30 天临期", board.lifecycle?.summary?.renewalDue || 0),
+          modernizationMetric("待独立审批", board.lifecycle?.requestSummary?.pending || 0),
           modernizationMetric("生产授权", "始终未授权")
         ].join("")
       : modernizationMetric("呼吸道网络就绪", "不可用");
@@ -544,6 +552,12 @@ function renderPublicHealthRespiratoryNetworkReadiness(board) {
     }
     if (blockers) {
       blockers.innerHTML = "<p class=\"modernization-empty\">服务不可用或无 commission 权限；productionReady 保持 false。</p>";
+    }
+    if (lifecycleEvidence) {
+      lifecycleEvidence.innerHTML = "<p class=\"modernization-empty\">证据生命周期摘要不可用；全部状态按失败关闭处理。</p>";
+    }
+    if (lifecycleRequests) {
+      lifecycleRequests.innerHTML = "<p class=\"modernization-empty\">双人申请与审批摘要不可用，不允许客户端替代可信状态。</p>";
     }
     return;
   }
@@ -560,9 +574,11 @@ function renderPublicHealthRespiratoryNetworkReadiness(board) {
         </span>`).join("");
       return `<article class="modernization-item respiratory-network-institution">
         <div>
-          <strong>${escapeHtml(institution.institutionId || "机构未登记")}</strong>
-          <small>六轨证据 ${escapeHtml(institution.trustedEvidence || 0)}/${escapeHtml(board.summary?.requiredEvidenceTypes || 6)}
-            · 连续人工质控 ${escapeHtml(institution.consecutiveQualityDays || 0)}/${escapeHtml(board.summary?.minimumConsecutiveQualityDays || 3)} 天</small>
+           <strong>${escapeHtml(institution.institutionId || "机构未登记")}</strong>
+           <small>六轨证据 ${escapeHtml(institution.trustedEvidence || 0)}/${escapeHtml(board.summary?.requiredEvidenceTypes || 6)}
+             · 连续人工质控 ${escapeHtml(institution.consecutiveQualityDays || 0)}/${escapeHtml(board.summary?.minimumConsecutiveQualityDays || 3)} 天
+             · 活动/暂停/撤销/替换 ${escapeHtml(institution.activeEvidence || 0)}/${escapeHtml(institution.suspendedEvidence || 0)}/${escapeHtml(institution.revokedEvidence || 0)}/${escapeHtml(institution.supersededEvidence || 0)}
+             · 30 天临期 ${escapeHtml(institution.renewalDueEvidence || 0)}</small>
           <div class="respiratory-network-tracks">${tracks}</div>
         </div>
         <span class="badge ${institution.technicalLaunchReady ? "ok" : "warn"}">${escapeHtml(
@@ -570,6 +586,64 @@ function renderPublicHealthRespiratoryNetworkReadiness(board) {
         )}</span>
       </article>`;
     }).join("") || "<p class=\"modernization-empty\">尚无验收哨点机构；技术上线按未就绪处理。</p>";
+  }
+  const lifecycleActionLabels = {
+    "request-suspend": "申请暂停",
+    "request-reinstate": "申请恢复",
+    "request-revoke": "申请撤销",
+    "request-supersede": "申请同轨替换"
+  };
+  const lifecycleStateLabels = {
+    active: "活动",
+    suspended: "已暂停",
+    revoked: "已撤销（终态）",
+    superseded: "已替换",
+    invalid: "完整性无效"
+  };
+  if (lifecycleEvidence) {
+    lifecycleEvidence.innerHTML = (board.evidence || []).map((evidence) => {
+      const actions = (evidence.allowedRequestActions || []).map((action) =>
+        `<button class="inline-action" data-modernization-kind="respiratory-evidence-lifecycle" data-modernization-id="${escapeHtml(evidence.id)}" data-modernization-version="${escapeHtml(evidence.lifecycleVersion)}" data-modernization-action="${escapeHtml(action)}">${escapeHtml(lifecycleActionLabels[action] || action)}</button>`
+      ).join("");
+      const expiry = evidence.daysUntilExpiration === null
+        ? "到期时间无效"
+        : `距到期 ${escapeHtml(evidence.daysUntilExpiration)} 天`;
+      return `<article class="modernization-item respiratory-network-lifecycle-item">
+        <div>
+          <strong>${escapeHtml(evidence.institutionId || "机构未登记")} · ${escapeHtml(evidence.evidenceType || "证据轨道未登记")}</strong>
+          <small>${escapeHtml(lifecycleStateLabels[evidence.state] || evidence.state)} · ${expiry} · 生命周期 v${escapeHtml(evidence.lifecycleVersion || 0)}</small>
+        </div>
+        <div class="action-row">
+          <span class="badge ${evidence.renewalDue || evidence.state !== "active" ? "warn" : "ok"}">${escapeHtml(evidence.renewalDue ? "30 天临期阻断" : (lifecycleStateLabels[evidence.state] || evidence.state))}</span>
+          ${actions}
+        </div>
+      </article>`;
+    }).join("") || "<p class=\"modernization-empty\">尚无可治理的可信证据。</p>";
+  }
+  if (lifecycleRequests) {
+    const eventLabels = {
+      suspend: "暂停",
+      reinstate: "恢复",
+      revoke: "撤销",
+      supersede: "同轨替换"
+    };
+    lifecycleRequests.innerHTML = (board.lifecycleRequests || []).map((request) => {
+      const reviewActions = request.canReview
+        ? `<button class="inline-action" data-modernization-kind="respiratory-evidence-lifecycle" data-modernization-id="${escapeHtml(request.targetEvidenceId)}" data-modernization-request-id="${escapeHtml(request.id)}" data-modernization-version="${escapeHtml(request.version)}" data-modernization-action="approve-lifecycle">独立批准</button>
+          <button class="inline-action" data-modernization-kind="respiratory-evidence-lifecycle" data-modernization-id="${escapeHtml(request.targetEvidenceId)}" data-modernization-request-id="${escapeHtml(request.id)}" data-modernization-version="${escapeHtml(request.version)}" data-modernization-action="reject-lifecycle">驳回</button>`
+        : "";
+      const requester = request.requestedBySelf ? "本人申请，须他人审批" : "其他有权用户申请";
+      return `<article class="modernization-item respiratory-network-lifecycle-request">
+        <div>
+          <strong>${escapeHtml(eventLabels[request.eventType] || request.eventType)} · ${escapeHtml(request.targetEvidenceId)}</strong>
+          <small>${escapeHtml(request.status)} · ${escapeHtml(requester)} · 原因码 ${escapeHtml(request.reasonCode || "未登记")}</small>
+        </div>
+        <div class="action-row">
+          <span class="badge ${request.status === "approved" ? "ok" : "warn"}">${escapeHtml(request.status)}</span>
+          ${reviewActions}
+        </div>
+      </article>`;
+    }).join("") || "<p class=\"modernization-empty\">暂无生命周期申请。</p>";
   }
   if (blockers) {
     const safeBlockers = [
@@ -876,6 +950,16 @@ function publicHealthModernizationActionBody(button) {
   } else if (action === "publish-respiratory-pathogen-signals") {
     body.note = promptRequired("最小化病原信号发布说明");
     body.evidenceRefs = [promptRequired("信号发布批准证据引用")];
+  } else if (["request-suspend", "request-reinstate", "request-revoke", "request-supersede"].includes(action)) {
+    body.reasonCode = promptRequired("生命周期申请原因码（不填写居民或材料正文）", "scheduled-evidence-governance");
+    if (action === "request-supersede") {
+      body.successorEvidenceId = promptRequired("同机构、同证据轨道的新证据编号");
+    }
+  } else if (action === "approve-lifecycle") {
+    body.lifecycleRequestId = button.dataset.modernizationRequestId;
+  } else if (action === "reject-lifecycle") {
+    body.lifecycleRequestId = button.dataset.modernizationRequestId;
+    body.reviewReasonCode = promptRequired("驳回原因码（不填写证据正文）", "insufficient-evidence");
   } else if (action === "verify-alert") {
     body.riskLevel = promptRequired("风险等级：low / medium / high / critical", "medium");
     body.conclusion = promptRequired("人工研判结论");
@@ -935,7 +1019,8 @@ async function handlePublicHealthModernizationAction(event) {
     "rule-change": `/api/public-health/surveillance-rule-changes/${encodeURIComponent(id)}/actions`,
     model: `/api/public-health/surveillance-models/${encodeURIComponent(id)}/shadow-runs`,
     "model-validation": `/api/public-health/surveillance-model-validations/${encodeURIComponent(id)}/actions`,
-    "respiratory-batch": `/api/public-health/respiratory-pathogen-batches/${encodeURIComponent(id)}/actions`
+    "respiratory-batch": `/api/public-health/respiratory-pathogen-batches/${encodeURIComponent(id)}/actions`,
+    "respiratory-evidence-lifecycle": `/api/public-health/respiratory-network-evidence/${encodeURIComponent(id)}/actions`
   };
   if (!routes[kind]) return;
   button.disabled = true;
