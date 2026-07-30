@@ -14,8 +14,8 @@ test("final readiness accepts every planned T08 functional increment", () => {
   const report = buildPublicHealthFinalReadiness();
   assert.equal(report.ok, true);
   assert.equal(report.functionalState, "t08-public-health-planned-functions-complete");
-  assert.equal(report.summary.checks, 66);
-  assert.equal(report.summary.passed, 66);
+  assert.equal(report.summary.checks, 68);
+  assert.equal(report.summary.passed, 68);
   assert.equal(report.summary.lanes, 8);
   assert.equal(report.summary.handoffs, 8);
   assert.equal(report.summary.adapterProfiles, 8);
@@ -42,6 +42,9 @@ test("final readiness accepts every planned T08 functional increment", () => {
   assert.equal(report.summary.modernizationRespiratoryNetworkTechnicalLaunchReady, true);
   assert.equal(report.summary.modernizationRespiratoryNetworkTrustedEvidence, 12);
   assert.equal(report.summary.modernizationRespiratoryNetworkConsecutiveQualityDays, 3);
+  assert.equal(report.summary.modernizationRespiratoryNetworkLifecycleEvents, 1);
+  assert.equal(report.summary.modernizationRespiratoryNetworkSupersededEvidence, 1);
+  assert.equal(report.summary.modernizationRespiratoryNetworkRenewalDueEvidence, 0);
   assert.equal(report.summary.modernizationFreshSources, 2);
   assert.equal(report.summary.modernizationNoDataSources, 6);
   assert.equal(report.summary.modernizationClosedAlerts, 1);

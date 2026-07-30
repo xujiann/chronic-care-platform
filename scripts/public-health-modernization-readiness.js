@@ -41,7 +41,8 @@ const {
   REQUIRED_RESPIRATORY_NETWORK_EVIDENCE,
   RESPIRATORY_NETWORK_EVIDENCE_PURPOSE,
   buildPublicHealthRespiratoryNetworkReadiness,
-  issueTrustedRespiratoryNetworkEvidenceReceipt
+  issueTrustedRespiratoryNetworkEvidenceReceipt,
+  issueTrustedRespiratoryNetworkLifecycleEvent
 } = require("../public-health-respiratory-network-readiness-service");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -309,12 +310,44 @@ function runRespiratoryNetworkReadinessAcceptance(data) {
       receiptId: `readiness-respiratory-network-receipt-${String(evidenceIndex).padStart(2, "0")}`
     }, RESPIRATORY_EVIDENCE_KEYRING);
   }));
+  const predecessor = evidenceRecords[0];
+  const successor = issueTrustedRespiratoryNetworkEvidenceReceipt({
+    id: "readiness-respiratory-network-evidence-renewal-01",
+    institutionId: predecessor.institutionId,
+    evidenceType: predecessor.evidenceType,
+    panelId: RESPIRATORY_PANEL.id,
+    panelVersion: RESPIRATORY_PANEL.version,
+    status: "verified",
+    artifactName: "child-panel-standard-mapping-renewal.pdf",
+    artifactDigest: createHash("sha256").update("readiness-respiratory-artifact:child:panel-standard-mapping:renewal").digest("hex"),
+    validFrom: "2026-07-29T00:00:00.000Z",
+    expiresAt: "2027-06-30T23:59:59.999Z"
+  }, {
+    signedBy: `readiness-external-owner:${predecessor.institutionId}:${predecessor.evidenceType}:renewal`,
+    verifiedBy: "readiness-server-evidence-verifier",
+    verifiedAt: "2026-07-29T10:30:00.000Z",
+    signatureVerified: true,
+    receiptId: "readiness-respiratory-network-receipt-renewal-01"
+  }, RESPIRATORY_EVIDENCE_KEYRING);
+  evidenceRecords.push(successor);
+  const lifecycleEvents = [issueTrustedRespiratoryNetworkLifecycleEvent({
+    id: "readiness-respiratory-network-lifecycle-supersede-01",
+    eventType: "supersede",
+    reasonCode: "scheduled-renewal"
+  }, predecessor, successor, {
+    requestedBy: "readiness-respiratory-evidence-owner",
+    approvedBy: "readiness-respiratory-commission-reviewer",
+    approvedAt: "2026-07-29T11:00:00.000Z",
+    receiptId: "readiness-respiratory-network-lifecycle-receipt-01"
+  }, RESPIRATORY_EVIDENCE_KEYRING)];
   return {
     nextData,
     evidenceRecords,
+    lifecycleEvents,
     board: buildPublicHealthRespiratoryNetworkReadiness({
       data: nextData,
       evidenceRecords,
+      lifecycleEvents,
       keyring: RESPIRATORY_EVIDENCE_KEYRING,
       at: "2026-07-29T12:00:00.000Z"
     })
@@ -532,7 +565,10 @@ function buildPublicHealthModernizationReadiness(options = {}) {
     check("surveillance:old-young-priority-places", acceptance.respiratoryAcceptance.board.summary.childBatches === 1 && acceptance.respiratoryAcceptance.board.summary.olderAdultBatches === 1 && acceptance.respiratoryAcceptance.board.summary.priorityPlaceBatches === 2, "child and older-adult surveillance covers school and elderly-care priority places", "surveillance"),
     check("surveillance:respiratory-minimized-signal-publication", acceptance.respiratoryAcceptance.board.summary.publishedSignals === 3 && acceptance.respiratoryAcceptance.published.nextData.publicHealthSurveillanceSignals.filter((item) => item.sourceId === "ph-source-laboratory-pathogen").every((item) => item.workflowState === "received" && item.verification === null), "three positive pathogen results publish minimized signals that still require human verification", "surveillance"),
     check("surveillance:respiratory-network-release-readiness", acceptance.respiratoryNetworkReadinessAcceptance.board.technicalLaunchReady === true && acceptance.respiratoryNetworkReadinessAcceptance.board.summary.trustedEvidence === 12 && acceptance.respiratoryNetworkReadinessAcceptance.board.institutions.every((item) => item.consecutiveQualityDays === 3), "six trusted evidence tracks per institution and three consecutive human-verified quality days prove network software release readiness", "surveillance"),
+    check("surveillance:respiratory-network-evidence-renewal", acceptance.respiratoryNetworkReadinessAcceptance.board.summary.lifecycleEvents === 1 && acceptance.respiratoryNetworkReadinessAcceptance.board.summary.supersededEvidence === 1 && acceptance.respiratoryNetworkReadinessAcceptance.board.summary.renewalDueEvidence === 0, "independently approved renewal supersedes the predecessor without duplicating an active evidence track", "surveillance"),
     check("security:respiratory-network-trusted-evidence", ["attestationOrigin", "verificationSource", "signatureVerified", "receiptSignature", "resolveVerificationKey", "timingSafeEqual", "receipt signature mismatch"].every((token) => respiratoryNetworkReadinessSource.includes(token)), "server receipt binds every trust field and managed key lifecycle fails closed on forgery, tampering, expiry or revocation", "security"),
+    check("security:respiratory-network-lifecycle-receipt", ["respiratoryNetworkLifecycleEventPayload", "independent lifecycle requester and approver", "lifecycle receipt signature mismatch", "lifecycle event id replay detected", "lifecycle receipt replay detected"].every((token) => respiratoryNetworkReadinessSource.includes(token)), "append-only lifecycle receipts bind the transition, evidence, independent approvers and replay identity", "security"),
+    check("safety:respiratory-network-validity-window", acceptance.respiratoryNetworkReadinessAcceptance.board.summary.minimumEvidenceValidityDaysAtLaunch === 30 && acceptance.respiratoryNetworkReadinessAcceptance.board.summary.renewalDueEvidence === 0 && respiratoryNetworkReadinessSource.includes("MINIMUM_EVIDENCE_VALIDITY_DAYS_AT_LAUNCH"), "technical launch requires every active evidence receipt to remain valid for at least 30 days", "safety"),
     check("safety:respiratory-network-formal-launch-boundary", acceptance.respiratoryNetworkReadinessAcceptance.board.functionalState === "software-release-ready" && acceptance.respiratoryNetworkReadinessAcceptance.board.productionReady === false && acceptance.respiratoryNetworkReadinessAcceptance.board.externalProductionBlockers.length === 2, "software release readiness never substitutes for central site evidence and authorized formal launch approval", "safety"),
     check("surveillance:historical-rule-binding", acceptance.surveillance.summary.closedAlerts === 1 && acceptance.surveillance.summary.alertIntegrityFindings === 0 && acceptance.final.alert.ruleVersion === 1, "the version-1 closed alert remains verifiable after version 2 becomes active", "surveillance"),
     check("surveillance:human-verification", acceptance.verifiedSignal.signal.workflowState === "human-verified" && acceptance.evaluated.signal.workflowState === "alert-created", "human verification precedes rule evaluation", "surveillance"),
@@ -577,6 +613,9 @@ function buildPublicHealthModernizationReadiness(options = {}) {
       respiratoryNetworkTechnicalLaunchReady: acceptance.respiratoryNetworkReadinessAcceptance.board.technicalLaunchReady,
       respiratoryNetworkTrustedEvidence: acceptance.respiratoryNetworkReadinessAcceptance.board.summary.trustedEvidence,
       respiratoryNetworkConsecutiveQualityDays: Math.min(...acceptance.respiratoryNetworkReadinessAcceptance.board.institutions.map((item) => item.consecutiveQualityDays)),
+      respiratoryNetworkLifecycleEvents: acceptance.respiratoryNetworkReadinessAcceptance.board.summary.lifecycleEvents,
+      respiratoryNetworkSupersededEvidence: acceptance.respiratoryNetworkReadinessAcceptance.board.summary.supersededEvidence,
+      respiratoryNetworkRenewalDueEvidence: acceptance.respiratoryNetworkReadinessAcceptance.board.summary.renewalDueEvidence,
       freshSources: acceptance.sourceOperations.summary.fresh,
       noDataSources: acceptance.sourceOperations.summary.noData,
       signals: acceptance.surveillance.summary.signals,
@@ -642,6 +681,8 @@ function renderMarkdown(report) {
     `- Respiratory network technical launch ready: ${report.summary.respiratoryNetworkTechnicalLaunchReady ? "yes" : "no"}`,
     `- Respiratory network trusted evidence: ${report.summary.respiratoryNetworkTrustedEvidence}`,
     `- Respiratory network consecutive quality days: ${report.summary.respiratoryNetworkConsecutiveQualityDays}`,
+    `- Respiratory network lifecycle events: ${report.summary.respiratoryNetworkLifecycleEvents}`,
+    `- Respiratory network superseded/renewal due evidence: ${report.summary.respiratoryNetworkSupersededEvidence}/${report.summary.respiratoryNetworkRenewalDueEvidence}`,
     `- Fresh/no-data sources: ${report.summary.freshSources}/${report.summary.noDataSources}`,
     `- Closed alerts: ${report.summary.closedAlerts}/${report.summary.alerts}`,
     `- Closed medical-prevention tasks: ${report.summary.closedCollaborationTasks}/${report.summary.collaborationTasks}`,
