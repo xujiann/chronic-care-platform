@@ -707,6 +707,12 @@ function buildDeployCheckReport(options = {}) {
         "reviewPublicHealthRespiratoryNetworkLifecycle",
         "issueTrustedRespiratoryNetworkLifecycleEvent",
         "PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_KEYRING_JSON",
+        "/api/public-health/official-exchange/official-report-receipts",
+        "/api/public-health/official-exchange/feedback-receipts",
+        "PUBLIC_HEALTH_OFFICIAL_EXCHANGE_RECEIPT_KEYRING_JSON",
+        "PUBLIC_HEALTH_OFFICIAL_EXCHANGE_CALLBACK_TOKEN",
+        "issueTrustedPublicHealthOfficialExchangeReceipt",
+        "recordPublicHealthOfficialExchangeCallback",
         "publishPublicHealthRespiratoryPathogenSignalsToState",
         "assertPublicHealthSurveillanceModelPayload",
         "publicHealthModernizationCommand",
@@ -716,9 +722,10 @@ function buildDeployCheckReport(options = {}) {
         && fs.existsSync(path.join(ROOT, "public-health-surveillance-model-governance-service.js"))
         && fs.existsSync(path.join(ROOT, "public-health-respiratory-pathogen-surveillance-service.js"))
         && fs.existsSync(path.join(ROOT, "public-health-respiratory-network-readiness-service.js"))
+        && fs.existsSync(path.join(ROOT, "public-health-official-exchange-receipt-service.js"))
         && fs.existsSync(path.join(ROOT, "public-health-surveillance-workflow-service.js"))
         && fs.existsSync(path.join(ROOT, "public-health-medical-prevention-collaboration-service.js")),
-      detail: "commission-only modernization routes delegate data, model, aggregate respiratory-pathogen, signed network evidence and workflow transitions and bind actor, server time, idempotency and expectedVersion"
+      detail: "commission workbenches and authenticated server-only official exchange callbacks delegate domain transitions and bind actor, server time, managed trust, idempotency and expectedVersion"
     },
     {
       name: "storage:publicHealthModernization",
@@ -738,11 +745,16 @@ function buildDeployCheckReport(options = {}) {
         "publicHealthRespiratoryNetworkLifecycleRequests",
         "publicHealthRespiratoryNetworkLifecycleEvents",
         "publicHealthRespiratoryNetworkLifecycleAudit",
+        "publicHealthOfficialExchangeReceipts",
+        "publicHealthOfficialExchangeReceiptAudit",
         "publish-respiratory-pathogen-signals",
         "issue-respiratory-network-evidence",
         "request-respiratory-network-lifecycle",
         "approve-respiratory-network-lifecycle",
         "syncPublicHealthRespiratoryLifecycleUniqueKeys",
+        "syncPublicHealthOfficialExchangeUniqueKeys",
+        "public_health_official_exchange_receipt_keys",
+        "issue-official-exchange-receipt",
         "public health respiratory network evidence receipt id",
         "requiredCollections",
         "PUBLIC_HEALTH_MODERNIZATION_CAS_CONFLICT"
@@ -751,8 +763,10 @@ function buildDeployCheckReport(options = {}) {
         && pkg.scripts?.["public-health:model-governance-test"]?.includes("test/public-health-surveillance-model-governance-api.test.js")
         && pkg.scripts?.["public-health:respiratory-pathogen-test"]?.includes("test/public-health-respiratory-pathogen-api.test.js")
         && pkg.scripts?.["public-health:respiratory-network-test"]?.includes("test/public-health-respiratory-network-api.test.js")
+        && pkg.scripts?.["public-health:resilience-test"]?.includes("test/public-health-official-exchange-api.test.js")
+        && pkg.scripts?.["public-health:resilience-test"]?.includes("test/public-health-official-exchange-receipt-service.test.js")
         && pkg.scripts?.["public-health:modernization-readiness"] === "node scripts/public-health-modernization-readiness.js",
-      detail: "twenty modernization collections use SQLite transaction CAS, including atomic respiratory publication, signed network evidence and dual-control lifecycle audit"
+      detail: "twenty-two modernization collections use SQLite transaction CAS, including atomic respiratory and official exchange receipt-alert-audit boundaries"
     },
     {
       name: "static:publicHealthModernizationWorkbenches",
@@ -765,6 +779,9 @@ function buildDeployCheckReport(options = {}) {
           "public-health-respiratory-network-institutions",
           "public-health-respiratory-network-lifecycle-evidence",
           "public-health-respiratory-network-lifecycle-requests",
+          "public-health-official-exchange-chain-title",
+          "public-health-official-exchange-chain-metrics",
+          "public-health-official-exchange-chain-blockers",
           "public-health-medical-prevention-title",
           "public-health-signal-intake-form",
           "public-health-model-validation-form",
@@ -780,6 +797,7 @@ function buildDeployCheckReport(options = {}) {
           "renderPublicHealthSurveillanceModelGovernance",
           "renderPublicHealthRespiratoryPathogenSurveillance",
           "renderPublicHealthRespiratoryNetworkReadiness",
+          "renderPublicHealthOfficialExchangeReceipts",
           "run-shadow-model",
           "review-model-validation",
           "verify-respiratory-pathogen-batch",
@@ -789,11 +807,12 @@ function buildDeployCheckReport(options = {}) {
           "reject-lifecycle",
           "Idempotency-Key",
           "expectedVersion",
+          "trustedReceiptId",
           "人工核实"
         ].every((marker) => publicHealthUiSource.includes(marker))
-        && ["public-health-modernization-grid", "modernization-form", "respiratory-network-tracks", "respiratory-network-lifecycle-request", "@media (max-width: 1100px)"].every((marker) => portalCss.includes(marker))
+        && ["public-health-modernization-grid", "modernization-form", "respiratory-network-tracks", "respiratory-network-lifecycle-request", "official-exchange-chain", "@media (max-width: 1100px)"].every((marker) => portalCss.includes(marker))
         && pkg.scripts?.["public-health:resilience-test"]?.includes("test/public-health-modernization-ui.test.js"),
-      detail: "eight responsive data, source-operations, rule-governance, shadow-model, respiratory-pathogen, respiratory-network, surveillance and medical-prevention workbenches expose redacted summaries and a production-false boundary"
+      detail: "responsive public-health workbenches include a redacted trusted official report-feedback chain and preserve the production-false boundary"
     },
     {
       name: "api:publicHealthRespiratoryNetworkReadiness",

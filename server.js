@@ -130,6 +130,13 @@ const {
   verifyPublicHealthSurveillanceSignalToState
 } = require("./public-health-surveillance-workflow-service");
 const {
+  PUBLIC_HEALTH_OFFICIAL_EXCHANGE_RECEIPT_PURPOSE,
+  buildPublicHealthOfficialExchangeReceiptRegistry,
+  issueTrustedPublicHealthOfficialExchangeReceipt,
+  publicHealthOfficialExchangeReceiptBindingDigest,
+  verifyTrustedPublicHealthOfficialExchangeReceipt
+} = require("./public-health-official-exchange-receipt-service");
+const {
   applyPublicHealthMedicalPreventionTaskActionToState,
   buildPublicHealthMedicalPreventionBoard
 } = require("./public-health-medical-prevention-collaboration-service");
@@ -980,6 +987,26 @@ const SQLITE_MIGRATIONS = [
           audit_id TEXT PRIMARY KEY,
           idempotency_key_hash TEXT NOT NULL UNIQUE,
           request_stage_key TEXT NOT NULL UNIQUE,
+          updated_at TEXT NOT NULL
+        );
+      `);
+    }
+  },
+  {
+    version: 14,
+    name: "add public health official exchange receipt replay keys",
+    apply(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS public_health_official_exchange_receipt_keys (
+          record_id TEXT PRIMARY KEY,
+          server_receipt_id TEXT NOT NULL UNIQUE,
+          external_receipt_code TEXT NOT NULL UNIQUE,
+          updated_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS public_health_official_exchange_audit_keys (
+          audit_id TEXT PRIMARY KEY,
+          idempotency_key_hash TEXT NOT NULL UNIQUE,
+          record_id TEXT NOT NULL UNIQUE,
           updated_at TEXT NOT NULL
         );
       `);
@@ -6879,7 +6906,9 @@ const PUBLIC_HEALTH_MODERNIZATION_COLLECTIONS = Object.freeze([
   "publicHealthRespiratoryNetworkEvidenceAudit",
   "publicHealthRespiratoryNetworkLifecycleRequests",
   "publicHealthRespiratoryNetworkLifecycleEvents",
-  "publicHealthRespiratoryNetworkLifecycleAudit"
+  "publicHealthRespiratoryNetworkLifecycleAudit",
+  "publicHealthOfficialExchangeReceipts",
+  "publicHealthOfficialExchangeReceiptAudit"
 ]);
 
 function publicHealthModernizationConflict(message) {
@@ -6937,6 +6966,12 @@ function assertUniquePublicHealthModernizationState(data = {}) {
   const respiratoryNetworkLifecycleAudit = Array.isArray(data.publicHealthRespiratoryNetworkLifecycleAudit)
     ? data.publicHealthRespiratoryNetworkLifecycleAudit
     : [];
+  const officialExchangeReceipts = Array.isArray(data.publicHealthOfficialExchangeReceipts)
+    ? data.publicHealthOfficialExchangeReceipts
+    : [];
+  const officialExchangeReceiptAudit = Array.isArray(data.publicHealthOfficialExchangeReceiptAudit)
+    ? data.publicHealthOfficialExchangeReceiptAudit
+    : [];
   uniqueValues(data.publicHealthDataSources, "id", "public health data source id");
   uniqueValues(signals, "id", "public health surveillance signal id");
   uniqueValues(signals, "externalSignalKeyHash", "public health source record hash");
@@ -6988,6 +7023,34 @@ function assertUniquePublicHealthModernizationState(data = {}) {
     "idempotencyKeyHash",
     "public health respiratory network lifecycle audit idempotency key"
   );
+  uniqueValues(officialExchangeReceipts, "id", "public health official exchange record id");
+  uniqueValues(
+    officialExchangeReceipts.map((item) => ({
+      receiptId: item?.trustedVerification?.receiptId
+    })),
+    "receiptId",
+    "public health official exchange server receipt id"
+  );
+  uniqueValues(
+    officialExchangeReceipts,
+    "externalReceiptCode",
+    "public health official exchange external receipt code"
+  );
+  uniqueValues(officialExchangeReceiptAudit, "id", "public health official exchange audit id");
+  uniqueValues(
+    officialExchangeReceiptAudit,
+    "idempotencyKeyHash",
+    "public health official exchange audit idempotency key"
+  );
+  const officialReceiptIds = new Set(officialExchangeReceipts
+    .map((item) => String(item?.id || "").trim()));
+  officialExchangeReceiptAudit.forEach((entry) => {
+    if (!officialReceiptIds.has(String(entry?.recordId || "").trim())
+      || String(entry?.integrityDigest || "").trim()
+        !== publicHealthOfficialExchangeReceiptAuditDigest(entry)) {
+      throw publicHealthModernizationConflict("public health official exchange audit record binding invalid");
+    }
+  });
   signals.forEach((signal) => {
     const hashes = [
       signal.verification?.idempotencyKeyHash,
@@ -7304,6 +7367,66 @@ function assertPublicHealthModernizationWrite(data = {}, constraint = {}, incomi
       throw publicHealthModernizationConflict("public health respiratory network lifecycle review atomic boundary conflict");
     }
   }
+  if (constraint.operation === "issue-official-exchange-receipt") {
+    const receiptRecordId = String(constraint.receiptRecordId || "").trim();
+    const persistedReceipts = data.publicHealthOfficialExchangeReceipts || [];
+    const incomingReceipts = incoming.publicHealthOfficialExchangeReceipts || [];
+    const persistedAudit = data.publicHealthOfficialExchangeReceiptAudit || [];
+    const incomingAudit = incoming.publicHealthOfficialExchangeReceiptAudit || [];
+    const incomingReceipt = incomingReceipts
+      .find((item) => String(item?.id || "").trim() === receiptRecordId);
+    const auditRows = incomingAudit
+      .filter((item) => String(item?.recordId || "").trim() === receiptRecordId);
+    const alertId = String(constraint.alertId || "").trim();
+    const persistedAlert = (data.publicHealthSurveillanceAlerts || [])
+      .find((item) => String(item?.id || "").trim() === alertId);
+    const incomingAlert = (incoming.publicHealthSurveillanceAlerts || [])
+      .find((item) => String(item?.id || "").trim() === alertId);
+    const persistedSurveillanceAudit = data.publicHealthSurveillanceAudit || [];
+    const incomingSurveillanceAudit = incoming.publicHealthSurveillanceAudit || [];
+    const expectedAction = String(incomingReceipt?.stage || "").trim() === "feedback"
+      ? "record-feedback"
+      : "record-official-report";
+    const lastTimeline = Array.isArray(incomingAlert?.timeline)
+      ? incomingAlert.timeline[incomingAlert.timeline.length - 1]
+      : null;
+    const appendedSurveillanceAudit = incomingSurveillanceAudit
+      .filter((item) => String(item?.alertId || "").trim() === alertId
+        && String(item?.action || "").trim() === expectedAction
+        && Number(item?.version) === expectedVersion + 1);
+    const registry = buildPublicHealthOfficialExchangeReceiptRegistry({
+      receipts: incomingReceipts,
+      keyring: constraint.officialExchangeReceiptKeyring || {},
+      at: constraint.officialExchangeReceiptAt
+    });
+    const persistedPrefixUnchanged = persistedReceipts.every((item) =>
+      JSON.stringify(incomingReceipts.find((candidate) =>
+        String(candidate?.id || "").trim() === String(item?.id || "").trim())) === JSON.stringify(item));
+    const auditPrefixUnchanged = persistedAudit.every((item) =>
+      JSON.stringify(incomingAudit.find((candidate) =>
+        String(candidate?.id || "").trim() === String(item?.id || "").trim())) === JSON.stringify(item));
+    if (!receiptRecordId
+      || !incomingReceipt
+      || Number(incomingReceipt.version) !== 1
+      || incomingReceipts.length !== persistedReceipts.length + 1
+      || incomingAudit.length !== persistedAudit.length + 1
+      || auditRows.length !== 1
+      || Number(auditRows[0].version) !== 1
+      || !persistedPrefixUnchanged
+      || !auditPrefixUnchanged
+      || registry.ok !== true
+      || !persistedAlert
+      || !incomingAlert
+      || Number(persistedAlert.version) !== expectedVersion
+      || Number(incomingAlert.version) !== expectedVersion + 1
+      || String(lastTimeline?.action || "").trim() !== expectedAction
+      || String(lastTimeline?.trustedReceiptId || "").trim() !== receiptRecordId
+      || incomingSurveillanceAudit.length !== persistedSurveillanceAudit.length + 1
+      || appendedSurveillanceAudit.length !== 1
+      || String(auditRows[0].alertId || "").trim() !== alertId) {
+      throw publicHealthModernizationConflict("public health official exchange receipt atomic boundary conflict");
+    }
+  }
   assertUniquePublicHealthModernizationState(incoming);
 }
 
@@ -7386,6 +7509,46 @@ function syncPublicHealthRespiratoryLifecycleUniqueKeys(db, data, at) {
   } catch (error) {
     if (/unique constraint/i.test(String(error?.message || ""))) {
       throw publicHealthModernizationConflict("public health respiratory network lifecycle replay conflict");
+    }
+    throw error;
+  }
+}
+
+function syncPublicHealthOfficialExchangeUniqueKeys(db, data, at) {
+  const receipts = Array.isArray(data.publicHealthOfficialExchangeReceipts)
+    ? data.publicHealthOfficialExchangeReceipts
+    : [];
+  const audit = Array.isArray(data.publicHealthOfficialExchangeReceiptAudit)
+    ? data.publicHealthOfficialExchangeReceiptAudit
+    : [];
+  db.prepare("DELETE FROM public_health_official_exchange_receipt_keys").run();
+  db.prepare("DELETE FROM public_health_official_exchange_audit_keys").run();
+  const insertReceipt = db.prepare(`
+    INSERT INTO public_health_official_exchange_receipt_keys (
+      record_id, server_receipt_id, external_receipt_code, updated_at
+    ) VALUES (?, ?, ?, ?)
+  `);
+  const insertAudit = db.prepare(`
+    INSERT INTO public_health_official_exchange_audit_keys (
+      audit_id, idempotency_key_hash, record_id, updated_at
+    ) VALUES (?, ?, ?, ?)
+  `);
+  try {
+    receipts.forEach((item) => insertReceipt.run(
+      String(item?.id || "").trim(),
+      String(item?.trustedVerification?.receiptId || "").trim(),
+      String(item?.externalReceiptCode || "").trim(),
+      at
+    ));
+    audit.forEach((item) => insertAudit.run(
+      String(item?.id || "").trim(),
+      String(item?.idempotencyKeyHash || "").trim(),
+      String(item?.recordId || "").trim(),
+      at
+    ));
+  } catch (error) {
+    if (/unique constraint/i.test(String(error?.message || ""))) {
+      throw publicHealthModernizationConflict("public health official exchange receipt replay conflict");
     }
     throw error;
   }
@@ -7676,6 +7839,7 @@ function writeSqliteState(
     const normalized = normalizeState(data);
     syncPublicHealthModernizationUniqueKeys(db, normalized, now);
     syncPublicHealthRespiratoryLifecycleUniqueKeys(db, normalized, now);
+    syncPublicHealthOfficialExchangeUniqueKeys(db, normalized, now);
     const entries = Object.entries(normalized).filter(([key]) => key !== "storageMeta");
     verifySqliteCollectionVersions(db, entries.map(([key]) => key), expectedVersions);
     const incomingKeys = new Set(entries.map(([key]) => key));
@@ -11040,6 +11204,12 @@ function normalizeState(data) {
       : [],
     publicHealthRespiratoryNetworkLifecycleAudit: Array.isArray(data.publicHealthRespiratoryNetworkLifecycleAudit)
       ? data.publicHealthRespiratoryNetworkLifecycleAudit.slice(-20000)
+      : [],
+    publicHealthOfficialExchangeReceipts: Array.isArray(data.publicHealthOfficialExchangeReceipts)
+      ? data.publicHealthOfficialExchangeReceipts.slice(-20000)
+      : [],
+    publicHealthOfficialExchangeReceiptAudit: Array.isArray(data.publicHealthOfficialExchangeReceiptAudit)
+      ? data.publicHealthOfficialExchangeReceiptAudit.slice(-40000)
       : [],
     publicHealthSignals: mergeByKey(seedPublicHealthSignals(), data.publicHealthSignals, "id"),
     publicHealthAlerts: mergeByKey(seedPublicHealthAlerts(), data.publicHealthAlerts, "id"),
@@ -26572,14 +26742,105 @@ function publicHealthSafeSurveillanceModelGovernance(data) {
   };
 }
 
+function publicHealthOfficialExchangeReceiptOptions({ required = false } = {}) {
+  const at = new Date().toISOString();
+  const serialized = String(
+    process.env.PUBLIC_HEALTH_OFFICIAL_EXCHANGE_RECEIPT_KEYRING_JSON || ""
+  ).trim();
+  let keyring = null;
+  let summary = null;
+  let configurationCode = "PUBLIC_HEALTH_OFFICIAL_EXCHANGE_RECEIPT_KEYRING_UNAVAILABLE";
+  if (serialized) {
+    try {
+      const parsed = JSON.parse(serialized);
+      summary = summarizeKeyring(parsed, at);
+      const activeNow = (summary.keys || [])
+        .filter((item) => item.status === "active" && item.validNow === true);
+      if (!summary.ok
+        || summary.purpose !== PUBLIC_HEALTH_OFFICIAL_EXCHANGE_RECEIPT_PURPOSE
+        || activeNow.length !== 1
+        || summary.productionReady !== true) {
+        throw new Error("managed official exchange receipt keyring is invalid");
+      }
+      keyring = parsed;
+      configurationCode = "";
+    } catch {
+      configurationCode = "PUBLIC_HEALTH_OFFICIAL_EXCHANGE_RECEIPT_KEYRING_INVALID";
+    }
+  }
+  if (required && !keyring) {
+    const error = new Error("managed official exchange receipt keyring is required");
+    error.code = configurationCode;
+    throw error;
+  }
+  return {
+    at,
+    keyring,
+    summary,
+    configurationCode,
+    signerId: String(
+      process.env.PUBLIC_HEALTH_OFFICIAL_EXCHANGE_SIGNER_ID
+      || "official-exchange-upstream-platform"
+    ).trim().slice(0, 96) || "official-exchange-upstream-platform",
+    verifierId: String(
+      process.env.PUBLIC_HEALTH_OFFICIAL_EXCHANGE_VERIFIER_ID
+      || "public-health-official-exchange-callback-adapter"
+    ).trim().slice(0, 96) || "public-health-official-exchange-callback-adapter"
+  };
+}
+
+function publicHealthSafeOfficialExchangeReceiptRegistry(data, options) {
+  const keyring = options.keyring || {
+    purpose: PUBLIC_HEALTH_OFFICIAL_EXCHANGE_RECEIPT_PURPOSE,
+    activeKeyId: "",
+    keys: []
+  };
+  const registry = buildPublicHealthOfficialExchangeReceiptRegistry({
+    receipts: data.publicHealthOfficialExchangeReceipts || [],
+    keyring,
+    at: options.at
+  });
+  return {
+    ok: registry.ok === true && Boolean(options.keyring),
+    generatedAt: registry.generatedAt,
+    summary: {
+      ...registry.summary,
+      keyringReady: Boolean(options.keyring)
+    },
+    receipts: (registry.trustedReceipts || []).map((item) => ({
+      trustedReceiptId: String(item.id || "").trim(),
+      alertId: String(item.alertId || "").trim(),
+      stage: String(item.stage || "").trim(),
+      businessStatus: String(item.status || "").trim(),
+      externalBusinessCode: String(item.externalReceiptCode || "").trim(),
+      issuedAt: String(item.issuedAt || "").trim(),
+      productionReady: false
+    })),
+    findings: (registry.findings || []).map((item) => ({
+      trustedReceiptId: String(item.receiptId || "").trim(),
+      code: String(item.code || "").trim()
+    })),
+    blockers: registry.blockers,
+    configurationCode: options.configurationCode || "",
+    productionReady: false
+  };
+}
+
 function publicHealthSafeSurveillanceCenter(data) {
   const activation = publicHealthSurveillanceRuleActivationOptions();
+  const officialExchange = publicHealthOfficialExchangeReceiptOptions();
   const center = buildPublicHealthSurveillanceCenter({
     data,
-    ruleActivationKeyring: activation.activationKeyring
+    ruleActivationKeyring: activation.activationKeyring,
+    officialExchangeReceiptKeyring: officialExchange.keyring,
+    officialExchangeReceiptAt: officialExchange.at
   });
   return {
     ...center,
+    officialExchangeReceipts: publicHealthSafeOfficialExchangeReceiptRegistry(
+      data,
+      officialExchange
+    ),
     ruleGovernance: publicHealthSafeRuleGovernance(data),
     productionReady: false
   };
@@ -26588,6 +26849,270 @@ function publicHealthSafeSurveillanceCenter(data) {
 function publicHealthSafeAlert(data, alertId) {
   return publicHealthSafeSurveillanceCenter(data).alerts
     .find((item) => item.id === alertId) || null;
+}
+
+const PUBLIC_HEALTH_OFFICIAL_EXCHANGE_CALLBACK_FIELDS = new Set([
+  "alertId",
+  "reportId",
+  "externalReceiptCode",
+  "conclusion",
+  "evidenceRefs",
+  "expectedVersion"
+]);
+
+function requirePublicHealthOfficialExchangeCallback(req, res, target) {
+  const expected = String(
+    process.env.PUBLIC_HEALTH_OFFICIAL_EXCHANGE_CALLBACK_TOKEN || ""
+  ).trim();
+  if (expected.length < 32) {
+    sendJson(res, 503, {
+      ok: false,
+      error: "Public health official exchange callback unavailable",
+      code: "PUBLIC_HEALTH_OFFICIAL_EXCHANGE_CALLBACK_AUTH_UNAVAILABLE",
+      productionReady: false
+    });
+    return false;
+  }
+  const supplied = String(
+    req.headers["x-public-health-official-exchange-callback-token"] || ""
+  ).trim();
+  const matches = supplied.length === expected.length
+    && timingSafeEqual(Buffer.from(supplied), Buffer.from(expected));
+  if (!matches) {
+    appendSecurityEvent({
+      actor: "official-exchange-callback",
+      role: "service",
+      action: "访问接口",
+      target,
+      result: "拒绝",
+      detail: "可信回调适配器认证失败",
+      transient: true
+    });
+    sendJson(res, 401, {
+      ok: false,
+      error: "Unauthorized official exchange callback",
+      code: "PUBLIC_HEALTH_OFFICIAL_EXCHANGE_CALLBACK_AUTH_INVALID",
+      productionReady: false
+    });
+    return false;
+  }
+  return true;
+}
+
+function assertPublicHealthOfficialExchangeCallbackPayload(url, payload = {}, stage) {
+  if ([...url.searchParams.keys()].length) {
+    const error = new Error("official exchange callback query overrides are forbidden");
+    error.code = "PUBLIC_HEALTH_OFFICIAL_EXCHANGE_CALLBACK_OVERRIDE_FORBIDDEN";
+    throw error;
+  }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    const error = new Error("official exchange callback body must be an object");
+    error.code = "PUBLIC_HEALTH_OFFICIAL_EXCHANGE_CALLBACK_INVALID";
+    throw error;
+  }
+  const unexpected = Object.keys(payload)
+    .find((key) => !PUBLIC_HEALTH_OFFICIAL_EXCHANGE_CALLBACK_FIELDS.has(key));
+  if (unexpected) {
+    const error = new Error("official exchange callback trust or server fields are forbidden");
+    error.code = "PUBLIC_HEALTH_OFFICIAL_EXCHANGE_CALLBACK_OVERRIDE_FORBIDDEN";
+    throw error;
+  }
+  if (!String(payload.alertId || "").trim()
+    || !String(payload.reportId || "").trim()
+    || !String(payload.externalReceiptCode || "").trim()
+    || !Array.isArray(payload.evidenceRefs)
+    || !payload.evidenceRefs.length
+    || payload.evidenceRefs.some((item) => !String(item || "").trim())
+    || !Number.isInteger(Number(payload.expectedVersion))
+    || Number(payload.expectedVersion) < 1
+    || (stage === "feedback") !== Boolean(String(payload.conclusion || "").trim())) {
+    const error = new Error("official exchange callback business payload is invalid");
+    error.code = "PUBLIC_HEALTH_OFFICIAL_EXCHANGE_CALLBACK_INVALID";
+    throw error;
+  }
+}
+
+function publicHealthOfficialExchangeReceiptAuditDigest(entry = {}) {
+  return createHash("sha256").update(JSON.stringify({
+    id: String(entry.id || "").trim(),
+    recordId: String(entry.recordId || "").trim(),
+    alertId: String(entry.alertId || "").trim(),
+    stage: String(entry.stage || "").trim(),
+    action: String(entry.action || "").trim(),
+    version: Number(entry.version || 0),
+    actorRole: String(entry.actorRole || "").trim(),
+    at: String(entry.at || "").trim(),
+    idempotencyKeyHash: String(entry.idempotencyKeyHash || "").trim(),
+    requestFingerprint: String(entry.requestFingerprint || "").trim(),
+    receiptBindingDigest: String(entry.receiptBindingDigest || "").trim()
+  })).digest("hex");
+}
+
+function publicHealthSafeOfficialExchangeReceipt(record = {}) {
+  return {
+    trustedReceiptId: String(record.id || "").trim(),
+    alertId: String(record.alertId || "").trim(),
+    stage: String(record.stage || "").trim(),
+    businessStatus: String(record.status || "").trim(),
+    externalBusinessCode: String(record.externalReceiptCode || "").trim(),
+    issuedAt: String(record.issuedAt || "").trim(),
+    productionReady: false
+  };
+}
+
+function publicHealthOfficialExchangeCallbackError(res, error) {
+  const code = String(
+    error?.code
+    || error?.publicCode
+    || "PUBLIC_HEALTH_OFFICIAL_EXCHANGE_CALLBACK_REJECTED"
+  ).trim();
+  const status = /UNAVAILABLE|KEYRING/.test(code)
+    ? 503
+    : /CONFLICT|REPLAY/.test(code)
+      ? 409
+      : 400;
+  sendJson(res, status, {
+    ok: false,
+    error: "Public health official exchange callback rejected",
+    code,
+    productionReady: false
+  });
+}
+
+function recordPublicHealthOfficialExchangeCallback(data, payload, stage, idempotencyKey) {
+  const options = publicHealthOfficialExchangeReceiptOptions({ required: true });
+  const alertId = String(payload.alertId || "").trim();
+  const alert = (data.publicHealthSurveillanceAlerts || [])
+    .find((item) => String(item?.id || "").trim() === alertId);
+  if (!alert) {
+    const error = new Error("unknown public health alert");
+    error.code = "PUBLIC_HEALTH_MODERNIZATION_RECORD_NOT_FOUND";
+    throw error;
+  }
+  const idempotencyKeyHash = createHash("sha256").update(idempotencyKey).digest("hex");
+  const requestFingerprint = createHash("sha256").update(JSON.stringify({
+    stage,
+    alertId,
+    reportId: String(payload.reportId || "").trim(),
+    externalReceiptCode: String(payload.externalReceiptCode || "").trim(),
+    conclusion: String(payload.conclusion || "").trim(),
+    evidenceRefs: [...new Set(payload.evidenceRefs.map((item) => String(item).trim()))].sort(),
+    expectedVersion: Number(payload.expectedVersion)
+  })).digest("hex");
+  const replay = (data.publicHealthOfficialExchangeReceiptAudit || [])
+    .find((item) => String(item?.idempotencyKeyHash || "").trim() === idempotencyKeyHash);
+  if (replay) {
+    if (String(replay.requestFingerprint || "").trim() !== requestFingerprint) {
+      throw publicHealthModernizationConflict("public health official exchange idempotency conflict");
+    }
+    const receipt = (data.publicHealthOfficialExchangeReceipts || [])
+      .find((item) => String(item?.id || "").trim() === String(replay.recordId || "").trim());
+    return {
+      ok: true,
+      idempotent: true,
+      receipt,
+      alert,
+      nextData: data,
+      options
+    };
+  }
+  const predecessor = stage === "feedback"
+    ? (data.publicHealthOfficialExchangeReceipts || [])
+      .find((item) => String(item?.id || "").trim() === String(alert.report?.trustedReceiptId || "").trim())
+    : null;
+  if (stage === "feedback"
+    && (!predecessor
+      || String(predecessor.reportId || "").trim() !== String(payload.reportId || "").trim())) {
+    const error = new Error("trusted official report predecessor is required");
+    error.code = "PUBLIC_HEALTH_OFFICIAL_EXCHANGE_PREDECESSOR_REQUIRED";
+    throw error;
+  }
+  const recordId = `ph-official-${stage}-${randomUUID()}`;
+  const serverReceiptId = `ph-official-server-${randomUUID()}`;
+  const receipt = issueTrustedPublicHealthOfficialExchangeReceipt({
+    id: recordId,
+    version: 1,
+    stage,
+    alertId,
+    reportId: String(payload.reportId || "").trim(),
+    externalReceiptCode: String(payload.externalReceiptCode || "").trim(),
+    conclusion: String(payload.conclusion || "").trim(),
+    evidenceRefs: payload.evidenceRefs,
+    issuedAt: options.at
+  }, {
+    signedBy: options.signerId,
+    verifiedBy: options.verifierId,
+    verifiedAt: options.at,
+    signatureVerified: true,
+    receiptId: serverReceiptId
+  }, options.keyring, predecessor);
+  const selfVerification = verifyTrustedPublicHealthOfficialExchangeReceipt(
+    receipt,
+    options.keyring,
+    options.at
+  );
+  if (!selfVerification.ok) {
+    const error = new Error("official exchange server receipt self-verification failed");
+    error.code = "PUBLIC_HEALTH_OFFICIAL_EXCHANGE_SELF_VERIFICATION_FAILED";
+    throw error;
+  }
+  const receiptData = {
+    ...data,
+    publicHealthOfficialExchangeReceipts: [
+      ...(data.publicHealthOfficialExchangeReceipts || []),
+      receipt
+    ]
+  };
+  const action = stage === "official-report" ? "record-official-report" : "record-feedback";
+  const actionResult = applyPublicHealthSurveillanceAlertActionToState(
+    receiptData,
+    alertId,
+    {
+      action,
+      trustedReceiptId: recordId,
+      expectedVersion: Number(payload.expectedVersion),
+      idempotencyKey: `official-exchange:${idempotencyKey}`,
+      at: options.at
+    },
+    stage === "official-report"
+      ? { name: options.verifierId, role: "medical-public-health" }
+      : { name: options.verifierId, role: "system" },
+    {
+      ...publicHealthSurveillanceRuleActivationOptions(),
+      officialExchangeReceiptKeyring: options.keyring,
+      officialExchangeReceiptAt: options.at
+    }
+  );
+  const audit = {
+    id: `ph-official-audit-${randomUUID()}`,
+    recordId,
+    alertId,
+    stage,
+    action,
+    version: 1,
+    actorRole: "service",
+    at: options.at,
+    idempotencyKeyHash,
+    requestFingerprint,
+    receiptBindingDigest: publicHealthOfficialExchangeReceiptBindingDigest(receipt),
+    productionReady: false
+  };
+  audit.integrityDigest = publicHealthOfficialExchangeReceiptAuditDigest(audit);
+  const nextData = {
+    ...actionResult.nextData,
+    publicHealthOfficialExchangeReceiptAudit: [
+      ...(data.publicHealthOfficialExchangeReceiptAudit || []),
+      audit
+    ]
+  };
+  return {
+    ok: true,
+    idempotent: false,
+    receipt,
+    alert: actionResult.alert,
+    nextData,
+    options
+  };
 }
 
 function publicHealthSafeMedicalPreventionTask(data, taskId) {
@@ -27772,6 +28297,71 @@ async function handleApi(req, res) {
     return;
   }
 
+  const publicHealthOfficialExchangeCallbackRoutes = {
+    "/api/public-health/official-exchange/official-report-receipts": "official-report",
+    "/api/public-health/official-exchange/feedback-receipts": "feedback"
+  };
+  const publicHealthOfficialExchangeStage = publicHealthOfficialExchangeCallbackRoutes[url.pathname];
+  if (req.method === "POST" && publicHealthOfficialExchangeStage) {
+    if (!requirePublicHealthOfficialExchangeCallback(req, res, url.pathname)) return;
+    try {
+      const payload = await collectJson(req);
+      assertPublicHealthOfficialExchangeCallbackPayload(
+        url,
+        payload,
+        publicHealthOfficialExchangeStage
+      );
+      const idempotencyKey = String(req.headers["idempotency-key"] || "").trim();
+      if (!idempotencyKey) {
+        const error = new Error("official exchange callback Idempotency-Key is required");
+        error.code = "PUBLIC_HEALTH_MODERNIZATION_IDEMPOTENCY_REQUIRED";
+        throw error;
+      }
+      const data = readDatabase();
+      const result = recordPublicHealthOfficialExchangeCallback(
+        data,
+        payload,
+        publicHealthOfficialExchangeStage,
+        idempotencyKey
+      );
+      if (!result.idempotent) {
+        writeDatabase(result.nextData, {
+          event: `public-health-official-exchange-${publicHealthOfficialExchangeStage}`,
+          publicHealthModernizationWrite: {
+            collection: "publicHealthSurveillanceAlerts",
+            entityId: String(payload.alertId || "").trim(),
+            receiptRecordId: result.receipt.id,
+            alertId: String(payload.alertId || "").trim(),
+            expectedVersion: Number(payload.expectedVersion),
+            operation: "issue-official-exchange-receipt",
+            requiredCollections: [
+              "publicHealthOfficialExchangeReceipts",
+              "publicHealthOfficialExchangeReceiptAudit",
+              "publicHealthSurveillanceAlerts",
+              "publicHealthSurveillanceAudit"
+            ],
+            officialExchangeReceiptKeyring: result.options.keyring,
+            officialExchangeReceiptAt: result.options.at
+          }
+        });
+      }
+      sendJson(res, result.idempotent ? 200 : 201, {
+        ok: true,
+        idempotent: Boolean(result.idempotent),
+        receipt: publicHealthSafeOfficialExchangeReceipt(result.receipt),
+        alert: publicHealthSafeAlert(result.nextData, String(payload.alertId || "").trim()),
+        productionReady: false,
+        blockers: [
+          "Production endpoint acceptance and continuous official receipt delivery evidence are required.",
+          "Trusted site evidence, P0/P1 closure, production handoff and formal launch approval remain blocking."
+        ]
+      });
+    } catch (error) {
+      publicHealthOfficialExchangeCallbackError(res, error);
+    }
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/public-health/surveillance-center") {
     const user = requireApiRole(req, res, ["commission"], url.pathname);
     if (!user) return;
@@ -27787,12 +28377,31 @@ async function handleApi(req, res) {
       const alertId = decodeURIComponent(publicHealthAlertActionMatch[1]);
       const payload = publicHealthModernizationCommand(req, url, await collectJson(req));
       const data = readDatabase();
+      const action = String(payload.action || "").trim();
+      if (["record-official-report", "record-feedback"].includes(action)) {
+        const allowed = new Set(["action", "expectedVersion", "trustedReceiptId", "idempotencyKey", "at"]);
+        if (Object.keys(payload).some((key) => !allowed.has(key))
+          || !String(payload.trustedReceiptId || "").trim()) {
+          const error = new Error("official exchange alert actions accept only trustedReceiptId");
+          error.code = "PUBLIC_HEALTH_MODERNIZATION_SERVER_CONTEXT_FORBIDDEN";
+          throw error;
+        }
+      }
+      const officialExchange = publicHealthOfficialExchangeReceiptOptions({
+        required: ["record-official-report", "record-feedback", "close-alert", "reopen-alert"]
+          .includes(action)
+          || Boolean((data.publicHealthOfficialExchangeReceipts || []).length)
+      });
       const result = applyPublicHealthSurveillanceAlertActionToState(
         data,
         alertId,
         payload,
         user,
-        publicHealthSurveillanceRuleActivationOptions()
+        {
+          ...publicHealthSurveillanceRuleActivationOptions(),
+          officialExchangeReceiptKeyring: officialExchange.keyring,
+          officialExchangeReceiptAt: officialExchange.at
+        }
       );
       if (!result.idempotent) {
         writeDatabase(result.nextData, {

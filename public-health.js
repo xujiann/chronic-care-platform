@@ -175,6 +175,7 @@ function renderPublicHealthModernizationLoading() {
     "#public-health-respiratory-pathogen-status",
     "#public-health-respiratory-network-status",
     "#public-health-surveillance-status",
+    "#public-health-official-exchange-chain-status",
     "#public-health-medical-prevention-status"
   ].forEach((selector) => {
     const target = document.querySelector(selector);
@@ -274,6 +275,7 @@ function renderPublicHealthModernizationWorkbenches(state, results = []) {
   }
   renderPublicHealthModernizationSignals(surveillance?.dataFoundation?.signals || foundation?.signals || []);
   renderPublicHealthModernizationAlerts(surveillance?.alerts || []);
+  renderPublicHealthOfficialExchangeReceipts(surveillance?.officialExchangeReceipts || null);
 
   const collaborationMetrics = document.querySelector("#public-health-medical-prevention-metrics");
   if (collaborationMetrics) {
@@ -679,6 +681,49 @@ function renderPublicHealthModernizationSignals(signals) {
   }).join("");
 }
 
+function renderPublicHealthOfficialExchangeReceipts(registry) {
+  const status = document.querySelector("#public-health-official-exchange-chain-status");
+  const metrics = document.querySelector("#public-health-official-exchange-chain-metrics");
+  const list = document.querySelector("#public-health-official-exchange-chain-list");
+  const blockers = document.querySelector("#public-health-official-exchange-chain-blockers");
+  const ready = registry?.ok === true && registry?.summary?.findings === 0;
+  if (status) {
+    status.className = `badge ${ready ? "ok" : "warn"}`;
+    status.textContent = ready ? "可信链可用 / 未获生产授权" : "失败关闭 / 未就绪";
+  }
+  if (metrics) {
+    metrics.innerHTML = registry
+      ? [
+          modernizationMetric("可信报告", registry.summary?.officialReports || 0),
+          modernizationMetric("可信反馈", registry.summary?.feedbacks || 0),
+          modernizationMetric("可信回执", `${registry.summary?.trustedReceipts || 0}/${registry.summary?.receipts || 0}`),
+          modernizationMetric("完整性发现", registry.summary?.findings || 0)
+        ].join("")
+      : modernizationMetric("可信回执链", "不可用");
+  }
+  if (list) {
+    list.innerHTML = registry
+      ? (registry.receipts || []).map((item) => `<article class="modernization-item">
+          <div>
+            <strong>${escapeHtml(item.stage === "feedback" ? "反馈回执" : "正式上报回执")}</strong>
+            <small>${escapeHtml(item.externalBusinessCode || "业务码已最小化")} / ${escapeHtml(item.businessStatus || "unknown")} / ${escapeHtml(item.issuedAt || "")}</small>
+          </div>
+          <span class="badge ok">已验真</span>
+        </article>`).join("") || "<p class=\"modernization-empty\">尚无可信回执；浏览器不能自报业务完成。</p>"
+      : "<p class=\"modernization-empty\">回执密钥环或服务端摘要不可用，正式上报和反馈按未完成处理。</p>";
+  }
+  if (blockers) {
+    const safeBlockers = [
+      ...(registry?.blockers || []),
+      ...(registry?.configurationCode ? [registry.configurationCode] : [])
+    ];
+    blockers.innerHTML = safeBlockers.map((item) => `<article class="modernization-item">
+      <div><strong>${escapeHtml(item)}</strong><small>外部生产门禁，不得由客户端覆盖</small></div>
+      <span class="badge warn">productionReady=false</span>
+    </article>`).join("") || "<p class=\"modernization-empty\">现场与正式审批门禁仍独立保留。</p>";
+  }
+}
+
 function renderPublicHealthModernizationAlerts(alerts) {
   const target = document.querySelector("#public-health-surveillance-alerts");
   if (!target) return;
@@ -973,13 +1018,9 @@ function publicHealthModernizationActionBody(button) {
     body.investigationOwner = promptRequired("调查责任人");
     body.note = promptRequired("调查说明");
   } else if (action === "record-official-report") {
-    body.reportId = promptRequired("正式报告编号");
-    body.receiptCode = promptRequired("正式报告回执编号");
-    body.evidenceRefs = [promptRequired("正式报告证据引用")];
+    body.trustedReceiptId = promptRequired("服务器已验真的正式上报 trustedReceiptId");
   } else if (action === "record-feedback") {
-    body.feedbackCode = promptRequired("反馈编号");
-    body.conclusion = promptRequired("反馈结论");
-    body.evidenceRefs = [promptRequired("反馈证据引用")];
+    body.trustedReceiptId = promptRequired("服务器已验真且绑定当前上报前序的反馈 trustedReceiptId");
   } else if (action === "close-alert") {
     body.conclusion = promptRequired("关闭结论");
     body.evidenceRefs = [promptRequired("关闭证据引用")];

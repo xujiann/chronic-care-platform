@@ -70,6 +70,9 @@ test("modernization page exposes eight accessible commission workbenches and con
   assert.match(html, /role="status" aria-live="polite"/);
   assert.match(html, /人工责任/);
   assert.match(html, /productionReady 始终为 false/);
+  assert.match(html, /id="public-health-official-exchange-chain-title"/);
+  assert.match(html, /浏览器只能引用 trustedReceiptId/);
+  assert.match(html, /连续回执、现场证据、P0\/P1 关闭、生产交接与正式审批/);
   assert.match(source, /\/api\/public-health\/data-foundation/);
   assert.match(source, /\/api\/public-health\/data-source-operations/);
   assert.match(source, /\/api\/public-health\/surveillance-rule-governance/);
@@ -94,6 +97,10 @@ test("modernization page exposes eight accessible commission workbenches and con
   assert.match(source, /\/api\/public-health\/medical-prevention-tasks\/\$\{encodeURIComponent\(id\)\}\/actions/);
   assert.match(source, /"Idempotency-Key"/);
   assert.match(source, /expectedVersion/);
+  assert.match(source, /renderPublicHealthOfficialExchangeReceipts/);
+  assert.match(source, /服务器已验真的正式上报 trustedReceiptId/);
+  assert.doesNotMatch(source, /body\.reportId\s*=\s*promptRequired/);
+  assert.doesNotMatch(source, /body\.feedbackCode\s*=\s*promptRequired/);
   assert.doesNotMatch(source, /productionReady\s*=\s*true/);
   assert.match(css, /\.public-health-modernization-grid/);
   assert.match(css, /\.modernization-form/);
@@ -351,9 +358,40 @@ test("modernization rendering uses only safe summary fields and fails closed whe
     },
     surveillance: {
       ok: true,
-      summary: { rules: 8, activeRules: 8, humanVerifiedSignals: 0, openAlerts: 0, humanRiskAssessments: 0 },
+      summary: {
+        rules: 8,
+        activeRules: 8,
+        humanVerifiedSignals: 0,
+        openAlerts: 0,
+        humanRiskAssessments: 0,
+        trustedOfficialReports: 1,
+        trustedOfficialFeedbacks: 1
+      },
       dataFoundation: { signals: [] },
       alerts: [],
+      officialExchangeReceipts: {
+        ok: true,
+        summary: {
+          receipts: 2,
+          trustedReceipts: 2,
+          officialReports: 1,
+          feedbacks: 1,
+          findings: 0
+        },
+        receipts: [{
+          trustedReceiptId: "safe-official-report-record",
+          alertId: "safe-alert",
+          stage: "official-report",
+          businessStatus: "accepted",
+          externalBusinessCode: "SAFE-REPORT-ACCEPTED",
+          issuedAt: "2026-07-30T10:00:00.000Z",
+          productionReady: false
+        }],
+        findings: [],
+        blockers: ["continuous-official-receipt-evidence-required"],
+        configurationCode: "",
+        productionReady: false
+      },
       productionReady: false
     },
     collaboration: {
@@ -387,6 +425,9 @@ test("modernization rendering uses only safe summary fields and fails closed whe
     node("#public-health-surveillance-metrics").innerHTML,
     node("#public-health-surveillance-signals").innerHTML,
     node("#public-health-surveillance-alerts").innerHTML,
+    node("#public-health-official-exchange-chain-metrics").innerHTML,
+    node("#public-health-official-exchange-chain-list").innerHTML,
+    node("#public-health-official-exchange-chain-blockers").innerHTML,
     node("#public-health-medical-prevention-metrics").innerHTML,
     node("#public-health-medical-prevention-tasks").innerHTML
   ].join("\n");
@@ -411,6 +452,8 @@ test("modernization rendering uses only safe summary fields and fails closed whe
   assert.match(rendered, /人工确认/);
   assert.match(rendered, /独立批准/);
   assert.match(rendered, /暂无预警/);
+  assert.match(rendered, /SAFE-REPORT-ACCEPTED/);
+  assert.match(rendered, /可信回执/);
   assert.doesNotMatch(rendered, /externalSignalId|externalSignalKeyHash|idempotencyKeyHash|contentFingerprint|endpoint|secret|signature|receiptId|keyId|artifactDigest/i);
   assert.match(read("public-health.js"), /managedKeyringReady/);
   assert.match(read("public-health.js"), /legacy compatibility \/ No-Go/);
@@ -427,6 +470,8 @@ test("modernization rendering uses only safe summary fields and fails closed whe
   assert.match(node("#public-health-respiratory-pathogen-status").textContent, /失败关闭/);
   assert.match(node("#public-health-respiratory-network-status").textContent, /失败关闭/);
   assert.match(node("#public-health-surveillance-status").textContent, /失败关闭/);
+  assert.match(node("#public-health-official-exchange-chain-status").textContent, /失败关闭/);
+  assert.match(node("#public-health-official-exchange-chain-list").innerHTML, /按未完成处理/);
   assert.match(node("#public-health-medical-prevention-status").textContent, /失败关闭/);
   assert.match(node("#public-health-data-foundation-sources").innerHTML, /按未就绪处理/);
   assert.match(node("#public-health-data-source-operations-list").innerHTML, /按未就绪处理/);

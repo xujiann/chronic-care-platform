@@ -933,6 +933,25 @@ h1 { margin-top: 4px; font-size: 28px; }
   font-size: 0.88rem;
 }
 
+.official-exchange-chain {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid rgba(33, 95, 90, 0.18);
+  border-radius: 14px;
+  background: rgba(236, 249, 246, 0.58);
+}
+
+.official-exchange-chain .panel-title.compact {
+  margin-bottom: 0;
+  align-items: flex-start;
+}
+
+.official-exchange-chain .panel-title.compact h3 {
+  margin: 0;
+}
+
 @media (max-width: 1100px) {
   .public-health-modernization-grid {
     grid-template-columns: 1fr;

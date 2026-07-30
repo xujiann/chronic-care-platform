@@ -117,7 +117,7 @@ test("final readiness renders and writes machine and human reports", () => {
   assert.match(fs.readFileSync(markdown, "utf8"), /Verified endpoint probes: 8\/8/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Verified endpoint probe campaigns: 3\/3/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Verified endpoint probe campaign links: 2\/2/);
-  assert.match(fs.readFileSync(markdown, "utf8"), /T08 functional checks: 68\/68/);
+  assert.match(fs.readFileSync(markdown, "utf8"), /T08 functional checks: 70\/70/);
   assert.match(fs.readFileSync(markdown, "utf8"), /T00 public boundary checks: 21\/21/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Modernization data sources: 8\/8/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Modernization trusted rule activations: 1/);

@@ -314,6 +314,19 @@
           </div>
           <p class="modernization-boundary-note">规则与模型仅提供建议；确认、研判、正式报告和关闭均保留人工责任。</p>
           <div id="public-health-surveillance-metrics" class="modernization-metrics"></div>
+          <section class="official-exchange-chain" aria-labelledby="public-health-official-exchange-chain-title">
+            <div class="panel-title compact">
+              <div>
+                <h3 id="public-health-official-exchange-chain-title">可信正式上报—反馈回执链</h3>
+                <span>服务器回调签发、自验、前序绑定与防重放</span>
+              </div>
+              <span id="public-health-official-exchange-chain-status" class="badge warn">加载前未就绪</span>
+            </div>
+            <div id="public-health-official-exchange-chain-metrics" class="modernization-metrics"></div>
+            <div id="public-health-official-exchange-chain-list" class="modernization-list" aria-live="polite"></div>
+            <div id="public-health-official-exchange-chain-blockers" class="modernization-list" aria-live="polite"></div>
+            <p class="modernization-boundary-note">浏览器只能引用 trustedReceiptId；报告号、外部业务码、结论、证据、签名来源和密钥均由服务器回调适配器处理。可信回执仅证明业务交换闭环，真实生产端点验收、连续回执、现场证据、P0/P1 关闭、生产交接与正式审批仍阻断，productionReady=false。</p>
+          </section>
           <h3>待处理信号</h3>
           <div id="public-health-surveillance-signals" class="modernization-list" aria-live="polite"></div>
           <h3>预警队列</h3>
