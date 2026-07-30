@@ -20,6 +20,10 @@ const {
 const {
   buildPublicHealthRespiratoryPathogenSurveillance
 } = require("./public-health-respiratory-pathogen-surveillance-service");
+const {
+  buildPublicHealthOfficialExchangeReceiptRegistry,
+  publicHealthOfficialExchangeReceiptBindingDigest
+} = require("./public-health-official-exchange-receipt-service");
 
 const ALERT_ACTIONS = Object.freeze({
   "verify-alert": { from: ["open"], to: "verified" },
@@ -79,6 +83,36 @@ function evidenceRefs(payload = {}) {
   return Array.isArray(payload.evidenceRefs)
     ? [...new Set(payload.evidenceRefs.map(clean).filter(Boolean))]
     : [];
+}
+
+function normalizedReceiptEvidenceRefs(receipt = {}) {
+  return Array.isArray(receipt.evidenceRefs)
+    ? [...new Set(receipt.evidenceRefs.map(clean).filter(Boolean))].sort()
+    : [];
+}
+
+function officialExchangeReceiptRegistry(data = {}, options = {}, at = new Date().toISOString()) {
+  return buildPublicHealthOfficialExchangeReceiptRegistry({
+    receipts: Array.isArray(data.publicHealthOfficialExchangeReceipts)
+      ? data.publicHealthOfficialExchangeReceipts
+      : [],
+    keyring: options.officialExchangeReceiptKeyring || {},
+    at: options.officialExchangeReceiptAt || at
+  });
+}
+
+function trustedOfficialExchangeReceipt(data, receiptId, stage, alertId, options, at) {
+  const registry = officialExchangeReceiptRegistry(data, options, at);
+  if (!registry.ok) {
+    throw new Error(`public health official exchange receipt registry invalid: ${registry.findings[0]?.code || "keyring-unavailable"}`);
+  }
+  const receipt = registry.trustedReceipts.find((item) => clean(item.id) === clean(receiptId));
+  if (!receipt
+    || clean(receipt.stage) !== stage
+    || clean(receipt.alertId) !== clean(alertId)) {
+    throw new Error(`trusted ${stage} receipt bound to this alert is required`);
+  }
+  return receipt;
 }
 
 function authorizeSignal(roleSet, user, action) {
@@ -313,7 +347,11 @@ function validatePublicHealthSurveillanceAlert(alert = {}, data = {}, options = 
   const ruleGovernance = buildTrustedPublicHealthSurveillanceRuleRegistry(data, options);
   const rules = ruleGovernance.ruleVersions;
   const foundation = buildPublicHealthDataFoundation({ data });
+  const officialReceipts = officialExchangeReceiptRegistry(data, options);
   if (ruleGovernance.findings.length) findings.push("alert-rule-governance-invalid");
+  if (!officialReceipts.ok && (data.publicHealthOfficialExchangeReceipts || []).length) {
+    findings.push("alert-official-exchange-receipt-registry-invalid");
+  }
   const rule = rules.find((item) => item.id === clean(alert.ruleId) && item.version === Number(alert.ruleVersion));
   if (!rule || clean(alert.ruleDigest) !== sha256(stableStringify(rule))) findings.push("alert-rule-binding-invalid");
   const signals = Array.isArray(data.publicHealthSurveillanceSignals) ? data.publicHealthSurveillanceSignals : [];
@@ -334,6 +372,8 @@ function validatePublicHealthSurveillanceAlert(alert = {}, data = {}, options = 
   }
   const timeline = Array.isArray(alert.timeline) ? alert.timeline : [];
   if (Number(alert.version) !== timeline.length + 1) findings.push("alert-version-timeline-invalid");
+  const timelineReceiptIds = new Set();
+  let latestTimelineReport = null;
   timeline.forEach((item, index) => {
     const definition = ALERT_ACTIONS[clean(item.action)];
     const expectedFrom = index ? clean(timeline[index - 1].to) : "open";
@@ -344,9 +384,61 @@ function validatePublicHealthSurveillanceAlert(alert = {}, data = {}, options = 
       || !/^[a-f0-9]{64}$/.test(clean(item.payloadFingerprint))) {
       findings.push("alert-timeline-integrity-fields-invalid");
     }
+    if (["record-official-report", "record-feedback"].includes(clean(item.action))) {
+      const expectedStage = clean(item.action) === "record-official-report"
+        ? "official-report"
+        : "feedback";
+      const receiptId = clean(item.trustedReceiptId);
+      const receipt = officialReceipts.trustedReceipts
+        .find((candidate) => clean(candidate.id) === receiptId);
+      if (!receiptId
+        || timelineReceiptIds.has(receiptId)
+        || !receipt
+        || clean(receipt.stage) !== expectedStage
+        || clean(receipt.alertId) !== clean(alert.id)
+        || publicHealthOfficialExchangeReceiptBindingDigest(receipt)
+          !== clean(item.receiptBindingDigest)) {
+        findings.push("alert-timeline-official-receipt-binding-invalid");
+      }
+      if (expectedStage === "feedback" && (!latestTimelineReport
+        || clean(receipt?.predecessorRecordId) !== clean(latestTimelineReport.id)
+        || clean(receipt?.reportId) !== clean(latestTimelineReport.reportId))) {
+        findings.push("alert-timeline-official-receipt-chain-invalid");
+      }
+      if (expectedStage === "official-report" && receipt) latestTimelineReport = receipt;
+      timelineReceiptIds.add(receiptId);
+    }
   });
   if (timeline.length && clean(alert.status) !== clean(timeline[timeline.length - 1].to)) {
     findings.push("alert-state-history-mismatch");
+  }
+  const reportRequired = ["reported", "feedback-confirmed", "closed"].includes(clean(alert.status));
+  const feedbackRequired = ["feedback-confirmed", "closed"].includes(clean(alert.status));
+  const reportReceipt = officialReceipts.trustedReceipts
+    .find((item) => clean(item.id) === clean(alert.report?.trustedReceiptId));
+  if (reportRequired && !alert.report) findings.push("alert-official-report-missing");
+  if (alert.report && (!reportReceipt
+    || clean(reportReceipt.stage) !== "official-report"
+    || clean(reportReceipt.alertId) !== clean(alert.id)
+    || clean(reportReceipt.reportId) !== clean(alert.report.reportId)
+    || clean(reportReceipt.externalReceiptCode) !== clean(alert.report.receiptCode)
+    || publicHealthOfficialExchangeReceiptBindingDigest(reportReceipt)
+      !== clean(alert.report.receiptBindingDigest))) {
+    findings.push("alert-official-report-receipt-binding-invalid");
+  }
+  const feedbackReceipt = officialReceipts.trustedReceipts
+    .find((item) => clean(item.id) === clean(alert.feedback?.trustedReceiptId));
+  if (feedbackRequired && !alert.feedback) findings.push("alert-official-feedback-missing");
+  if (alert.feedback && (!feedbackReceipt
+    || clean(feedbackReceipt.stage) !== "feedback"
+    || clean(feedbackReceipt.alertId) !== clean(alert.id)
+    || clean(feedbackReceipt.reportId) !== clean(alert.report?.reportId)
+    || clean(feedbackReceipt.externalReceiptCode) !== clean(alert.feedback.feedbackCode)
+    || clean(feedbackReceipt.conclusion) !== clean(alert.feedback.conclusion)
+    || clean(feedbackReceipt.predecessorRecordId) !== clean(alert.report?.trustedReceiptId)
+    || publicHealthOfficialExchangeReceiptBindingDigest(feedbackReceipt)
+      !== clean(alert.feedback.receiptBindingDigest))) {
+    findings.push("alert-official-feedback-receipt-binding-invalid");
   }
   if (clean(alert.status) === "closed" && (!clean(alert.closure?.conclusion) || !Array.isArray(alert.closure?.evidenceRefs))) {
     findings.push("alert-closure-invalid");
@@ -425,26 +517,66 @@ function applyAlertAction(alert, payload, user, data, options = {}) {
   }
   if (action === "start-investigation") next.investigationOwner = clean(payload.investigationOwner);
   if (action === "record-official-report") {
-    if (!clean(payload.reportId) || !clean(payload.receiptCode) || !refs.length) {
-      throw new Error("reportId, receiptCode and evidenceRefs are required to record an official report");
+    if (["reportId", "receiptCode", "evidenceRefs"].some((key) => Object.hasOwn(payload, key))) {
+      throw new Error("official report identity, status and evidence must come from a trusted server receipt");
+    }
+    const receipt = trustedOfficialExchangeReceipt(
+      data,
+      payload.trustedReceiptId,
+      "official-report",
+      next.id,
+      options,
+      at
+    );
+    if ((next.timeline || []).some((item) => clean(item.trustedReceiptId) === clean(receipt.id))) {
+      throw new Error("trusted official exchange receipt was already used by this alert");
+    }
+    const investigationStartedAt = [...(next.timeline || [])]
+      .reverse()
+      .find((item) => clean(item.to) === "investigating")?.at;
+    if (investigationStartedAt
+      && new Date(receipt.issuedAt).getTime() < new Date(investigationStartedAt).getTime()) {
+      throw new Error("trusted official-report receipt predates the current investigation cycle");
     }
     next.report = {
-      reportId: clean(payload.reportId),
-      receiptCode: clean(payload.receiptCode),
-      evidenceRefs: refs,
-      reportedAt: at,
-      recordedBy: actorName(user)
+      trustedReceiptId: clean(receipt.id),
+      receiptBindingDigest: publicHealthOfficialExchangeReceiptBindingDigest(receipt),
+      reportId: clean(receipt.reportId),
+      receiptCode: clean(receipt.externalReceiptCode),
+      evidenceRefs: normalizedReceiptEvidenceRefs(receipt),
+      reportedAt: clean(receipt.issuedAt),
+      recordedBy: actorName(user),
+      productionReady: false
     };
+    next.feedback = null;
   }
   if (action === "record-feedback") {
-    if (!clean(payload.feedbackCode) || !clean(payload.conclusion) || !refs.length) {
-      throw new Error("feedbackCode, conclusion and evidenceRefs are required to record feedback");
+    if (["feedbackCode", "conclusion", "evidenceRefs"].some((key) => Object.hasOwn(payload, key))) {
+      throw new Error("official feedback identity, conclusion and evidence must come from a trusted server receipt");
+    }
+    const receipt = trustedOfficialExchangeReceipt(
+      data,
+      payload.trustedReceiptId,
+      "feedback",
+      next.id,
+      options,
+      at
+    );
+    if ((next.timeline || []).some((item) => clean(item.trustedReceiptId) === clean(receipt.id))) {
+      throw new Error("trusted official exchange receipt was already used by this alert");
+    }
+    if (clean(receipt.predecessorRecordId) !== clean(next.report?.trustedReceiptId)
+      || clean(receipt.reportId) !== clean(next.report?.reportId)) {
+      throw new Error("trusted feedback receipt must bind the alert official-report receipt");
     }
     next.feedback = {
-      feedbackCode: clean(payload.feedbackCode),
-      conclusion: clean(payload.conclusion),
-      evidenceRefs: refs,
-      receivedAt: at
+      trustedReceiptId: clean(receipt.id),
+      receiptBindingDigest: publicHealthOfficialExchangeReceiptBindingDigest(receipt),
+      feedbackCode: clean(receipt.externalReceiptCode),
+      conclusion: clean(receipt.conclusion),
+      evidenceRefs: normalizedReceiptEvidenceRefs(receipt),
+      receivedAt: clean(receipt.issuedAt),
+      productionReady: false
     };
   }
   if (action === "close-alert") {
@@ -481,6 +613,14 @@ function applyAlertAction(alert, payload, user, data, options = {}) {
     payloadFingerprint,
     note: clean(payload.note || payload.conclusion)
   };
+  if (action === "record-official-report") {
+    history.trustedReceiptId = clean(next.report?.trustedReceiptId);
+    history.receiptBindingDigest = clean(next.report?.receiptBindingDigest);
+  }
+  if (action === "record-feedback") {
+    history.trustedReceiptId = clean(next.feedback?.trustedReceiptId);
+    history.receiptBindingDigest = clean(next.feedback?.receiptBindingDigest);
+  }
   next.status = definition.to;
   next.version = Number(next.version || 0) + 1;
   next.timeline = [...(next.timeline || []), history].slice(-50);
@@ -538,7 +678,9 @@ function applyPublicHealthSurveillanceAlertActionToState(data = {}, alertId, pay
     surveillance: buildPublicHealthSurveillanceCenter({
       data: nextData,
       ruleVerificationSecret: options.verificationSecret,
-      ruleActivationKeyring: options.activationKeyring
+      ruleActivationKeyring: options.activationKeyring,
+      officialExchangeReceiptKeyring: options.officialExchangeReceiptKeyring,
+      officialExchangeReceiptAt: options.officialExchangeReceiptAt || result.history.at
     }),
     productionReady: false
   };
@@ -548,6 +690,8 @@ function buildPublicHealthSurveillanceCenter({
   data = {},
   ruleVerificationSecret = "",
   ruleActivationKeyring = null,
+  officialExchangeReceiptKeyring = null,
+  officialExchangeReceiptAt = new Date().toISOString(),
   modelGovernanceAt = new Date().toISOString(),
   respiratorySurveillanceAt = new Date().toISOString()
 } = {}) {
@@ -576,9 +720,15 @@ function buildPublicHealthSurveillanceCenter({
     data,
     at: respiratorySurveillanceAt
   });
+  const officialExchangeReceipts = officialExchangeReceiptRegistry(data, {
+    officialExchangeReceiptKeyring,
+    officialExchangeReceiptAt
+  }, officialExchangeReceiptAt);
   const alertIntegrityFindings = alerts.flatMap((alert) => validatePublicHealthSurveillanceAlert(alert, data, {
     verificationSecret: ruleVerificationSecret,
-    activationKeyring: ruleActivationKeyring
+    activationKeyring: ruleActivationKeyring,
+    officialExchangeReceiptKeyring,
+    officialExchangeReceiptAt
   })
     .map((code) => ({ alertId: clean(alert.id), code })));
   const openAlerts = alerts.filter((item) => item.status !== "closed");
@@ -588,6 +738,7 @@ function buildPublicHealthSurveillanceCenter({
       && ruleGovernance.ok
       && modelGovernance.ok
       && respiratorySurveillance.ok
+      && officialExchangeReceipts.ok
       && alertIntegrityFindings.length === 0,
     functionalState: !ruleGovernance.ok
       ? "multi-source-surveillance-rule-governance-review-required"
@@ -595,9 +746,11 @@ function buildPublicHealthSurveillanceCenter({
         ? "multi-source-surveillance-model-governance-review-required"
         : !respiratorySurveillance.ok
           ? "multi-source-respiratory-pathogen-quality-review-required"
-      : alertIntegrityFindings.length
-        ? "multi-source-surveillance-integrity-review-required"
-        : "multi-source-surveillance-warning-workflow-runnable",
+          : !officialExchangeReceipts.ok
+            ? "multi-source-official-exchange-receipt-review-required"
+            : alertIntegrityFindings.length
+              ? "multi-source-surveillance-integrity-review-required"
+              : "multi-source-surveillance-warning-workflow-runnable",
     formalGoLiveState: "blocked-until-production-source-interfaces-official-receipts-and-site-evidence-verified",
     summary: {
       rules: rules.length,
@@ -623,7 +776,12 @@ function buildPublicHealthSurveillanceCenter({
       respiratoryBatches: respiratorySurveillance.summary.batches,
       respiratoryPublishedSignals: respiratorySurveillance.summary.publishedSignals,
       respiratoryPlanningCoverageReady: respiratorySurveillance.summary.planningCoverageReady,
-      respiratoryFindings: respiratorySurveillance.summary.findings
+      respiratoryFindings: respiratorySurveillance.summary.findings,
+      officialExchangeReceipts: officialExchangeReceipts.summary.receipts,
+      trustedOfficialExchangeReceipts: officialExchangeReceipts.summary.trustedReceipts,
+      trustedOfficialReports: officialExchangeReceipts.summary.officialReports,
+      trustedOfficialFeedbacks: officialExchangeReceipts.summary.feedbacks,
+      officialExchangeReceiptFindings: officialExchangeReceipts.summary.findings
     },
     rules: rules.map((item) => ({
       id: item.id,
@@ -652,10 +810,11 @@ function buildPublicHealthSurveillanceCenter({
     ruleGovernance,
     modelGovernance,
     respiratorySurveillance,
+    officialExchangeReceipts,
     alertIntegrityFindings,
     productionReady: false,
     blockers: [
-      "Real national/provincial surveillance interfaces and official report receipts are not yet verified.",
+      "Real national/provincial surveillance interfaces and continuous official receipt delivery are not yet verified.",
       "AI/model output remains advisory and cannot replace manual disease-control decisions.",
       "Trusted site evidence and launch approval remain required."
     ]

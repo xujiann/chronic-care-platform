@@ -177,6 +177,19 @@ flowchart LR
 
 正式报告必须关联报告编号、回执编号和证据；反馈必须关联反馈编号、结论和证据。
 
+### 正式上报与反馈可信回执链
+
+`public-health-official-exchange-receipt-service.js` 把“客户端登记了报告材料”和“上级平台已正式接收并反馈”拆开。预警动作不能提交 `reportId`、`receiptCode`、`feedbackCode`、`conclusion` 或 `evidenceRefs` 来自报完成，只能引用服务器适配器已签发并验真的 `trustedReceiptId`。
+
+- 专用密钥环 purpose 固定为 `public-health-official-exchange-receipt`，必须由服务器环境或密钥管理服务解析；
+- 正式上报回执绑定预警、报告编号、外部回执码、业务状态、证据摘要、签发/核验时间及全部可信来源字段；
+- 反馈回执除绑定同一预警和报告外，还必须绑定正式上报记录编号、服务器回执编号和上报回执摘要，形成不可跳跃的前序链；
+- 记录编号、服务器回执编号和外部回执码均执行重放检测；重复或冲突记录使相关可信记录失败关闭；
+- 每次报告和反馈引用均把回执编号与绑定摘要写入预警时间线；同一回执不能在重开后的新调查轮次复用，报告签发时间不能早于当前调查轮次；
+- 签发后修改业务状态、证据、结论、可信来源、验签布尔值、密钥编号、时间或前序关系，签名和预警完整性复核均失败；
+- 回执集合采用追加式持久化，不能原位改写；告警中仅保存可信回执引用、绑定摘要和用于业务展示的最小化字段；
+- 可信上报和反馈只证明业务交换闭环，回执、告警和看板始终保持 `productionReady=false`，不能替代正式接口联调、现场证据和上线审批。
+
 ## 三、医防融合与基层协同
 
 预警派单时必须指定：
@@ -225,6 +238,7 @@ T08 自有文件：
 - `public-health-surveillance-model-governance-service.js`：模型卡、影子运行、独立效能复核、漂移窗口和防篡改校验。
 - `public-health-respiratory-pathogen-surveillance-service.js`：18病原体面板、聚合批次、人工复核、一样本多检测和最小化信号发布。
 - `public-health-respiratory-network-readiness-service.js`：逐哨点的面板标准映射、网络授权、实验室质控、数据共享、安全评审、连续观察六类可信证据，以及受管密钥验签和软件发布就绪判定。
+- `public-health-official-exchange-receipt-service.js`：正式上报和反馈的服务器可信回执、前序绑定、用途密钥、验签与防重放。
 - `public-health-surveillance-workflow-service.js`：人工核实、版本化规则、预警、研判、报告、反馈和关闭。
 - `public-health-medical-prevention-collaboration-service.js`：医院公卫科与基层公卫任务。
 - `scripts/public-health-modernization-readiness.js`：三项建设任务的可运行验收。
@@ -242,6 +256,7 @@ T00 只调用领域服务返回的 `nextData`，不得复制状态转换、授�
 T00 对模型接口只负责身份传递和领域服务 `nextData` 的原子持久化，不得根据模型分值直接改变信号、预警、报告或协同任务状态；模型公共响应只展示模型编号、版本、影子状态、分值区间、复核状态和漂移状态。
 T00 对呼吸道接口只持久化聚合批次、审计和领域服务生成的最小化信号，不得接收或保存人员、患者、样本级标识；客户端不能自报批次已核实、覆盖达标或信号已确认。
 呼吸道网络证据回执必须由 T00 的服务器证据仓签发，密钥环 purpose 固定为 `public-health-respiratory-network-evidence`。回执同时绑定机构、证据类型、面板版本、状态、材料摘要、有效期、签署人、核验人、核验来源、验签布尔值、密钥编号和回执编号；任一字段在签发后变更均拒绝。达到 `technicalLaunchReady=true` 仅表示软件发布候选通过，不得把 `productionReady` 提升为 true；中央现场证据、P0/P1 关闭、生产交接和正式上线审批仍是独立门禁。
+正式上报和反馈回执只能由 T00 服务器回调适配器接收、规范化、签发并自验，使用 purpose 为 `public-health-official-exchange-receipt` 的独立托管密钥环。SQLite 应对记录编号、服务器回执编号和外部回执码建立唯一约束，并将回执追加、最小化审计和告警动作放在同一事务中。浏览器动作只能提交 `trustedReceiptId`，不能提交业务结论、证据、可信元数据、密钥、签名或服务器时间；公共响应不得返回签名、密钥编号、服务器回执编号和原始证据内容。
 
 ## 呼吸道哨点网络证据全生命周期
 
@@ -275,6 +290,8 @@ T00 公共接口应采用两阶段受控动作，并原子持久化申请、审�
 - `POST /api/public-health/respiratory-pathogen-batches/:id/actions`
 - `GET /api/public-health/respiratory-network-readiness`
 - `POST /api/public-health/respiratory-network-evidence/:id/actions`（仅服务器证据仓或受控管理通道可签发可信回执）
+- `POST /api/public-health/official-exchange/official-report-receipts`（仅服务器回调适配器）
+- `POST /api/public-health/official-exchange/feedback-receipts`（仅服务器回调适配器，必须绑定上报前序）
 - `GET /api/public-health/surveillance-center`
 - `POST /api/public-health/surveillance-alerts/:id/actions`
 - `GET /api/public-health/medical-prevention-tasks`
@@ -311,6 +328,12 @@ T00 公共接口应采用两阶段受控动作，并原子持久化申请、审�
 - 未知、过期或撤销的呼吸道证据签名密钥必须失败关闭，报告和公共响应不得暴露密钥材料；
 - 重复证据编号或服务器回执编号视为重放攻击，必须阻断网络软件发布就绪；
 - `technicalLaunchReady=true` 时仍必须保持 `productionReady=false`，并显式列出中央现场证据与正式审批阻断；
+- 客户端自报报告号、回执码、反馈结论、证据或可信字段不能推进预警；告警动作只接受服务器已验真的 `trustedReceiptId`；
+- 正式上报回执和反馈回执必须由用途正确、当前有效的密钥签发，反馈必须绑定同一预警和报告的上报前序；
+- 签发后篡改业务状态、结论、证据、来源类型、核验来源、验签布尔值、时间或前序摘要必须拒绝；
+- 重复记录编号、服务器回执编号或外部回执码必须按重放失败关闭；删除或篡改前序回执必须使反馈链失效；
+- 预警重开后不能复用历史回执，早于本轮调查启动时间的报告回执必须拒绝，新报告必须等待新的反馈前序链；
+- 可信上报和反馈完成后仍保持 `productionReady=false`，并保留真实生产接口、持续供数、现场证据和正式上线审批阻断；
 - 未经人工确认的信号不能进入规则评估；
 - AI和居民角色不能确认信号或预警；
 - 预警完成研判、派单、调查、正式报告、反馈和关闭；

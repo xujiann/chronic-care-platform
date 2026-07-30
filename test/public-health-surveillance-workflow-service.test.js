@@ -19,8 +19,78 @@ const {
   proposePublicHealthSurveillanceRuleChangeToState,
   reviewPublicHealthSurveillanceRuleChangeToState
 } = require("../public-health-surveillance-rule-governance-service");
+const {
+  PUBLIC_HEALTH_OFFICIAL_EXCHANGE_RECEIPT_PURPOSE,
+  issueTrustedPublicHealthOfficialExchangeReceipt
+} = require("../public-health-official-exchange-receipt-service");
 
 const RULE_GOVERNANCE_SECRET = "public-health-workflow-rule-governance-secret-2026";
+const OFFICIAL_EXCHANGE_KEYRING = {
+  purpose: PUBLIC_HEALTH_OFFICIAL_EXCHANGE_RECEIPT_PURPOSE,
+  activeKeyId: "workflow-official-exchange-2026-07",
+  keys: [{
+    keyId: "workflow-official-exchange-2026-07",
+    secret: "public-health-workflow-official-exchange-secret-2026-07",
+    status: "active",
+    notBefore: "2026-07-01T00:00:00.000Z",
+    expiresAt: "2027-01-01T00:00:00.000Z",
+    revokedAt: ""
+  }]
+};
+
+function attachOfficialReceipt(data, receipt) {
+  return {
+    ...data,
+    publicHealthOfficialExchangeReceipts: [
+      ...(data.publicHealthOfficialExchangeReceipts || []),
+      receipt
+    ]
+  };
+}
+
+function trustedOfficialReport(alertId, suffix = "001", times = {}) {
+  return issueTrustedPublicHealthOfficialExchangeReceipt({
+    id: `workflow-official-report-receipt-${suffix}`,
+    stage: "official-report",
+    alertId,
+    reportId: `REPORT-${suffix}`,
+    externalReceiptCode: `CDC-ACCEPTED-${suffix}`,
+    status: "accepted",
+    evidenceRefs: [`OFFICIAL-REPORT-RECEIPT-${suffix}`],
+    issuedAt: times.issuedAt || "2026-07-28T09:00:00.000Z"
+  }, {
+    signedBy: "provincial-reporting-platform",
+    verifiedBy: "workflow-official-report-adapter",
+    verifiedAt: times.verifiedAt || "2026-07-28T09:00:30.000Z",
+    signatureVerified: true,
+    receiptId: `workflow-server-report-receipt-${suffix}`
+  }, OFFICIAL_EXCHANGE_KEYRING);
+}
+
+function trustedOfficialFeedback(report, suffix = "001", times = {}) {
+  return issueTrustedPublicHealthOfficialExchangeReceipt({
+    id: `workflow-official-feedback-receipt-${suffix}`,
+    stage: "feedback",
+    alertId: report.alertId,
+    reportId: report.reportId,
+    externalReceiptCode: `CDC-FEEDBACK-${suffix}`,
+    conclusion: "疾控复核确认纳入持续监测",
+    status: "accepted",
+    evidenceRefs: [`CDC-FEEDBACK-EVIDENCE-${suffix}`],
+    issuedAt: times.issuedAt || "2026-07-28T09:30:00.000Z"
+  }, {
+    signedBy: "provincial-reporting-platform",
+    verifiedBy: "workflow-official-feedback-adapter",
+    verifiedAt: times.verifiedAt || "2026-07-28T09:30:30.000Z",
+    signatureVerified: true,
+    receiptId: `workflow-server-feedback-receipt-${suffix}`
+  }, OFFICIAL_EXCHANGE_KEYRING, report);
+}
+
+const OFFICIAL_EXCHANGE_OPTIONS = {
+  officialExchangeReceiptKeyring: OFFICIAL_EXCHANGE_KEYRING,
+  officialExchangeReceiptAt: "2026-07-28T11:00:00.000Z"
+};
 
 function signalPayload(value = 8, overrides = {}) {
   return {
@@ -105,6 +175,38 @@ function closeCollaborationTask(data, task, user, prefix) {
   }, user);
 }
 
+function prepareInvestigatingAlert() {
+  const evaluated = prepareAlert();
+  const alertId = evaluated.alert.id;
+  let result = applyPublicHealthSurveillanceAlertActionToState(evaluated.nextData, alertId, {
+    action: "verify-alert",
+    idempotencyKey: "trusted-receipt-alert-verify",
+    expectedVersion: 1,
+    riskLevel: "high",
+    conclusion: "人工研判需要正式上报",
+    evidenceRefs: ["trusted-receipt-risk-evidence"],
+    at: "2026-07-28T08:10:00.000Z"
+  }, { name: "疾控研判员", role: "cdc-surveillance" });
+  result = applyPublicHealthSurveillanceAlertActionToState(result.nextData, alertId, {
+    action: "dispatch-alert",
+    idempotencyKey: "trusted-receipt-alert-dispatch",
+    expectedVersion: 2,
+    medicalInstitutionId: "medical-institution-001",
+    primaryCareOrganizationId: "primary-care-organization-001",
+    dueAt: "2026-07-29T08:00:00.000Z",
+    note: "派发正式上报前核查",
+    at: "2026-07-28T08:12:00.000Z"
+  }, { name: "疾控值班员", role: "cdc-surveillance" });
+  return applyPublicHealthSurveillanceAlertActionToState(result.nextData, alertId, {
+    action: "start-investigation",
+    idempotencyKey: "trusted-receipt-alert-investigate",
+    expectedVersion: 3,
+    investigationOwner: "市疾控流调组",
+    note: "启动正式报告核查",
+    at: "2026-07-28T08:15:00.000Z"
+  }, { name: "疾控值班员", role: "cdc-surveillance" });
+}
+
 test("human verified multi-source signal creates an explainable versioned alert", () => {
   const evaluated = prepareAlert();
   assert.equal(evaluated.ok, true);
@@ -173,24 +275,24 @@ test("alert completes manual assessment dispatch investigation report feedback a
     role: "primary-care-public-health"
   }, "workflow-primary");
 
-  result = applyPublicHealthSurveillanceAlertActionToState(taskResult.nextData, alertId, {
+  const reportReceipt = trustedOfficialReport(alertId);
+  const reportData = attachOfficialReceipt(taskResult.nextData, reportReceipt);
+  result = applyPublicHealthSurveillanceAlertActionToState(reportData, alertId, {
     action: "record-official-report",
     idempotencyKey: "workflow-alert-report-001",
     expectedVersion: 4,
-    reportId: "REPORT-20260728-001",
-    receiptCode: "CDC-ACCEPTED-20260728-001",
-    evidenceRefs: ["OFFICIAL-REPORT-RECEIPT-001"],
+    trustedReceiptId: reportReceipt.id,
     at: "2026-07-28T09:00:00.000Z"
-  }, { name: "医院公共卫生科", role: "medical-public-health" });
-  result = applyPublicHealthSurveillanceAlertActionToState(result.nextData, alertId, {
+  }, { name: "医院公共卫生科", role: "medical-public-health" }, OFFICIAL_EXCHANGE_OPTIONS);
+  const feedbackReceipt = trustedOfficialFeedback(reportReceipt);
+  const feedbackData = attachOfficialReceipt(result.nextData, feedbackReceipt);
+  result = applyPublicHealthSurveillanceAlertActionToState(feedbackData, alertId, {
     action: "record-feedback",
     idempotencyKey: "workflow-alert-feedback-001",
     expectedVersion: 5,
-    feedbackCode: "CDC-FEEDBACK-20260728-001",
-    conclusion: "疾控复核确认纳入持续监测",
-    evidenceRefs: ["CDC-FEEDBACK-EVIDENCE-001"],
+    trustedReceiptId: feedbackReceipt.id,
     at: "2026-07-28T09:30:00.000Z"
-  }, { name: "疾控反馈适配器", role: "system" });
+  }, { name: "疾控反馈适配器", role: "system" }, OFFICIAL_EXCHANGE_OPTIONS);
   result = applyPublicHealthSurveillanceAlertActionToState(result.nextData, alertId, {
     action: "close-alert",
     idempotencyKey: "workflow-alert-close-001",
@@ -198,12 +300,78 @@ test("alert completes manual assessment dispatch investigation report feedback a
     conclusion: "医防协同核查、正式报告和反馈均已完成",
     evidenceRefs: ["ALERT-CLOSURE-EVIDENCE-001"],
     at: "2026-07-28T10:00:00.000Z"
-  }, { name: "疾控监测负责人", role: "cdc-surveillance" });
+  }, { name: "疾控监测负责人", role: "cdc-surveillance" }, OFFICIAL_EXCHANGE_OPTIONS);
   assert.equal(result.alert.status, "closed");
   assert.equal(result.alert.version, 7);
   assert.equal(result.surveillance.summary.closedAlerts, 1);
   assert.equal(result.surveillance.summary.closedCollaborationTasks, 2);
+  assert.equal(result.surveillance.summary.trustedOfficialReports, 1);
+  assert.equal(result.surveillance.summary.trustedOfficialFeedbacks, 1);
   assert.equal(result.surveillance.productionReady, false);
+
+  result = applyPublicHealthSurveillanceAlertActionToState(result.nextData, alertId, {
+    action: "reopen-alert",
+    idempotencyKey: "workflow-alert-reopen-001",
+    expectedVersion: 7,
+    note: "new evidence requires another investigation cycle",
+    at: "2026-07-28T10:10:00.000Z"
+  }, { name: "cdc owner", role: "cdc-surveillance" }, OFFICIAL_EXCHANGE_OPTIONS);
+  assert.throws(() => applyPublicHealthSurveillanceAlertActionToState(result.nextData, alertId, {
+    action: "record-official-report",
+    idempotencyKey: "workflow-alert-reuse-report",
+    expectedVersion: 8,
+    trustedReceiptId: reportReceipt.id
+  }, { name: "medical public health", role: "medical-public-health" }, OFFICIAL_EXCHANGE_OPTIONS), /already used by this alert/);
+  const staleCycleReceipt = trustedOfficialReport(alertId, "STALE-CYCLE");
+  assert.throws(() => applyPublicHealthSurveillanceAlertActionToState(
+    attachOfficialReceipt(result.nextData, staleCycleReceipt),
+    alertId,
+    {
+      action: "record-official-report",
+      idempotencyKey: "workflow-alert-stale-cycle-report",
+      expectedVersion: 8,
+      trustedReceiptId: staleCycleReceipt.id
+    },
+    { name: "medical public health", role: "medical-public-health" },
+    OFFICIAL_EXCHANGE_OPTIONS
+  ), /predates the current investigation cycle/);
+  const secondReportReceipt = trustedOfficialReport(alertId, "REOPEN-002", {
+    issuedAt: "2026-07-28T10:20:00.000Z",
+    verifiedAt: "2026-07-28T10:20:30.000Z"
+  });
+  result = applyPublicHealthSurveillanceAlertActionToState(
+    attachOfficialReceipt(result.nextData, secondReportReceipt),
+    alertId,
+    {
+      action: "record-official-report",
+      idempotencyKey: "workflow-alert-report-002",
+      expectedVersion: 8,
+      trustedReceiptId: secondReportReceipt.id
+    },
+    { name: "medical public health", role: "medical-public-health" },
+    OFFICIAL_EXCHANGE_OPTIONS
+  );
+  assert.equal(result.alert.feedback, null);
+  const secondFeedbackReceipt = trustedOfficialFeedback(secondReportReceipt, "REOPEN-002", {
+    issuedAt: "2026-07-28T10:30:00.000Z",
+    verifiedAt: "2026-07-28T10:30:30.000Z"
+  });
+  result = applyPublicHealthSurveillanceAlertActionToState(
+    attachOfficialReceipt(result.nextData, secondFeedbackReceipt),
+    alertId,
+    {
+      action: "record-feedback",
+      idempotencyKey: "workflow-alert-feedback-002",
+      expectedVersion: 9,
+      trustedReceiptId: secondFeedbackReceipt.id
+    },
+    { name: "trusted feedback adapter", role: "system" },
+    OFFICIAL_EXCHANGE_OPTIONS
+  );
+  assert.equal(result.alert.status, "feedback-confirmed");
+  assert.equal(result.surveillance.summary.trustedOfficialReports, 2);
+  assert.equal(result.surveillance.summary.trustedOfficialFeedbacks, 2);
+  assert.equal(result.surveillance.summary.alertIntegrityFindings, 0);
 });
 
 test("alert cannot close before both medical-prevention tasks are complete", () => {
@@ -214,7 +382,8 @@ test("alert cannot close before both medical-prevention tasks are complete", () 
     idempotencyKey: "blocked-alert-verify",
     riskLevel: "high",
     conclusion: "人工确认需要核查",
-    evidenceRefs: ["risk-evidence"]
+    evidenceRefs: ["risk-evidence"],
+    at: "2026-07-28T08:10:00.000Z"
   }, { name: "疾控研判员", role: "cdc-surveillance" });
   result = applyPublicHealthSurveillanceAlertActionToState(result.nextData, alertId, {
     action: "dispatch-alert",
@@ -222,34 +391,134 @@ test("alert cannot close before both medical-prevention tasks are complete", () 
     medicalInstitutionId: "medical-institution-001",
     primaryCareOrganizationId: "primary-care-organization-001",
     dueAt: "2026-07-29T08:00:00.000Z",
-    note: "派发核查"
+    note: "派发核查",
+    at: "2026-07-28T08:12:00.000Z"
   }, { name: "疾控值班员", role: "cdc-surveillance" });
   result = applyPublicHealthSurveillanceAlertActionToState(result.nextData, alertId, {
     action: "start-investigation",
     idempotencyKey: "blocked-alert-investigate",
     investigationOwner: "流调一组",
-    note: "启动流调"
+    note: "启动流调",
+    at: "2026-07-28T08:15:00.000Z"
   }, { name: "疾控值班员", role: "cdc-surveillance" });
-  result = applyPublicHealthSurveillanceAlertActionToState(result.nextData, alertId, {
+  const blockedReportReceipt = trustedOfficialReport(alertId, "BLOCKED-001");
+  result = applyPublicHealthSurveillanceAlertActionToState(
+    attachOfficialReceipt(result.nextData, blockedReportReceipt),
+    alertId,
+    {
     action: "record-official-report",
     idempotencyKey: "blocked-alert-report",
-    reportId: "REPORT-BLOCKED-001",
-    receiptCode: "CDC-ACCEPTED-BLOCKED-001",
-    evidenceRefs: ["report-evidence"]
-  }, { name: "医院公共卫生科", role: "medical-public-health" });
-  result = applyPublicHealthSurveillanceAlertActionToState(result.nextData, alertId, {
+    trustedReceiptId: blockedReportReceipt.id
+  }, { name: "医院公共卫生科", role: "medical-public-health" }, OFFICIAL_EXCHANGE_OPTIONS);
+  const blockedFeedbackReceipt = trustedOfficialFeedback(blockedReportReceipt, "BLOCKED-001");
+  result = applyPublicHealthSurveillanceAlertActionToState(
+    attachOfficialReceipt(result.nextData, blockedFeedbackReceipt),
+    alertId,
+    {
     action: "record-feedback",
     idempotencyKey: "blocked-alert-feedback",
-    feedbackCode: "CDC-FEEDBACK-BLOCKED-001",
-    conclusion: "等待协同任务",
-    evidenceRefs: ["feedback-evidence"]
-  }, { name: "疾控反馈适配器", role: "system" });
+    trustedReceiptId: blockedFeedbackReceipt.id
+  }, { name: "疾控反馈适配器", role: "system" }, OFFICIAL_EXCHANGE_OPTIONS);
   assert.throws(() => applyPublicHealthSurveillanceAlertActionToState(result.nextData, alertId, {
     action: "close-alert",
     idempotencyKey: "blocked-alert-close",
     conclusion: "尝试提前关闭",
     evidenceRefs: ["closure-evidence"]
-  }, { name: "疾控监测负责人", role: "cdc-surveillance" }), /collaboration tasks must be closed/);
+  }, { name: "疾控监测负责人", role: "cdc-surveillance" }, OFFICIAL_EXCHANGE_OPTIONS), /collaboration tasks must be closed/);
+});
+
+test("client supplied report and feedback claims cannot advance the alert", () => {
+  const investigated = prepareInvestigatingAlert();
+  const alertId = investigated.alert.id;
+  assert.throws(() => applyPublicHealthSurveillanceAlertActionToState(investigated.nextData, alertId, {
+    action: "record-official-report",
+    idempotencyKey: "forged-client-report",
+    expectedVersion: 4,
+    reportId: "FORGED-REPORT",
+    receiptCode: "FORGED-ACCEPTED",
+    evidenceRefs: ["FORGED-EVIDENCE"]
+  }, { name: "medical public health", role: "medical-public-health" }, OFFICIAL_EXCHANGE_OPTIONS), /must come from a trusted server receipt/);
+
+  const reportReceipt = trustedOfficialReport(alertId, "CLIENT-BOUNDARY");
+  const reported = applyPublicHealthSurveillanceAlertActionToState(
+    attachOfficialReceipt(investigated.nextData, reportReceipt),
+    alertId,
+    {
+      action: "record-official-report",
+      idempotencyKey: "trusted-client-boundary-report",
+      expectedVersion: 4,
+      trustedReceiptId: reportReceipt.id
+    },
+    { name: "medical public health", role: "medical-public-health" },
+    OFFICIAL_EXCHANGE_OPTIONS
+  );
+  assert.throws(() => applyPublicHealthSurveillanceAlertActionToState(reported.nextData, alertId, {
+    action: "record-feedback",
+    idempotencyKey: "forged-client-feedback",
+    expectedVersion: 5,
+    feedbackCode: "FORGED-FEEDBACK",
+    conclusion: "FORGED-CONCLUSION",
+    evidenceRefs: ["FORGED-EVIDENCE"]
+  }, { name: "trusted feedback adapter", role: "system" }, OFFICIAL_EXCHANGE_OPTIONS), /must come from a trusted server receipt/);
+});
+
+test("official receipt must be trusted by the managed keyring and bound to the alert", () => {
+  const investigated = prepareInvestigatingAlert();
+  const alertId = investigated.alert.id;
+  const crossAlertReceipt = trustedOfficialReport("another-alert", "CROSS-ALERT");
+  const receiptData = attachOfficialReceipt(investigated.nextData, crossAlertReceipt);
+  assert.throws(() => applyPublicHealthSurveillanceAlertActionToState(receiptData, alertId, {
+    action: "record-official-report",
+    idempotencyKey: "cross-alert-report",
+    expectedVersion: 4,
+    trustedReceiptId: crossAlertReceipt.id
+  }, { name: "medical public health", role: "medical-public-health" }, OFFICIAL_EXCHANGE_OPTIONS), /bound to this alert is required/);
+
+  const ownReceipt = trustedOfficialReport(alertId, "NO-KEYRING");
+  assert.throws(() => applyPublicHealthSurveillanceAlertActionToState(
+    attachOfficialReceipt(investigated.nextData, ownReceipt),
+    alertId,
+    {
+      action: "record-official-report",
+      idempotencyKey: "missing-keyring-report",
+      expectedVersion: 4,
+      trustedReceiptId: ownReceipt.id
+    },
+    { name: "medical public health", role: "medical-public-health" }
+  ), /official-exchange-receipt-registry-invalid/);
+});
+
+test("tampering a persisted official receipt invalidates the alert chain", () => {
+  const investigated = prepareInvestigatingAlert();
+  const alertId = investigated.alert.id;
+  const reportReceipt = trustedOfficialReport(alertId, "TAMPER");
+  const reported = applyPublicHealthSurveillanceAlertActionToState(
+    attachOfficialReceipt(investigated.nextData, reportReceipt),
+    alertId,
+    {
+      action: "record-official-report",
+      idempotencyKey: "tamper-report",
+      expectedVersion: 4,
+      trustedReceiptId: reportReceipt.id
+    },
+    { name: "medical public health", role: "medical-public-health" },
+    OFFICIAL_EXCHANGE_OPTIONS
+  );
+  const feedbackReceipt = trustedOfficialFeedback(reportReceipt, "TAMPER");
+  const tamperedData = attachOfficialReceipt({
+    ...reported.nextData,
+    publicHealthOfficialExchangeReceipts: reported.nextData.publicHealthOfficialExchangeReceipts.map((receipt) => (
+      receipt.id === reportReceipt.id
+        ? { ...receipt, evidenceRefs: [...receipt.evidenceRefs, "CLIENT-INJECTED-EVIDENCE"] }
+        : receipt
+    ))
+  }, feedbackReceipt);
+  assert.throws(() => applyPublicHealthSurveillanceAlertActionToState(tamperedData, alertId, {
+    action: "record-feedback",
+    idempotencyKey: "tamper-feedback",
+    expectedVersion: 5,
+    trustedReceiptId: feedbackReceipt.id
+  }, { name: "trusted feedback adapter", role: "system" }, OFFICIAL_EXCHANGE_OPTIONS), /official-exchange-receipt-registry-invalid/);
 });
 
 test("below-threshold signal records an explainable no-alert decision", () => {

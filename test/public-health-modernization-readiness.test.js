@@ -16,8 +16,8 @@ test("modernization readiness accepts data surveillance and medical-prevention f
   const report = buildPublicHealthModernizationReadiness();
   assert.equal(report.ok, true);
   assert.equal(report.functionalState, "public-health-data-surveillance-medical-prevention-foundation-complete");
-  assert.equal(report.summary.checks, 36);
-  assert.equal(report.summary.passed, 36);
+  assert.equal(report.summary.checks, 39);
+  assert.equal(report.summary.passed, 39);
   assert.equal(report.summary.sources, 8);
   assert.equal(report.summary.catalogEntries, 7);
   assert.equal(report.summary.rules, 8);
@@ -45,6 +45,10 @@ test("modernization readiness accepts data surveillance and medical-prevention f
   assert.equal(report.summary.signals, 4);
   assert.equal(report.summary.alerts, 1);
   assert.equal(report.summary.closedAlerts, 1);
+  assert.equal(report.summary.trustedOfficialReports, 1);
+  assert.equal(report.summary.trustedOfficialFeedbacks, 1);
+  assert.equal(report.summary.officialExchangeReceiptFindings, 0);
+  assert.equal(report.summary.officialExchangeReceiptKeyringReady, true);
   assert.equal(report.summary.collaborationTasks, 2);
   assert.equal(report.summary.closedCollaborationTasks, 2);
   assert.equal(report.acceptance.alertState, "closed");
@@ -78,6 +82,8 @@ test("modernization readiness renders and writes machine and human reports", () 
   assert.match(fs.readFileSync(markdown, "utf8"), /Respiratory network technical launch ready: yes/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Respiratory network trusted evidence: 12/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Fresh\/no-data sources: 2\/6/);
+  assert.match(fs.readFileSync(markdown, "utf8"), /Trusted official report\/feedback receipts: 1\/1/);
+  assert.match(fs.readFileSync(markdown, "utf8"), /Official exchange receipt keyring ready: yes/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Closed medical-prevention tasks: 2\/2/);
   assert.match(renderMarkdown(report), /Remaining production boundaries/);
 });

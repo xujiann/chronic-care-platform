@@ -14,10 +14,10 @@ test("final readiness accepts every planned T08 functional increment", () => {
   const report = buildPublicHealthFinalReadiness();
   assert.equal(report.ok, true);
   assert.equal(report.functionalState, "t08-public-health-planned-functions-complete");
-  assert.equal(report.summary.checks, 89);
-  assert.equal(report.summary.passed, 89);
-  assert.equal(report.summary.t08FunctionalChecks, 68);
-  assert.equal(report.summary.t08FunctionalPassed, 68);
+  assert.equal(report.summary.checks, 91);
+  assert.equal(report.summary.passed, 91);
+  assert.equal(report.summary.t08FunctionalChecks, 70);
+  assert.equal(report.summary.t08FunctionalPassed, 70);
   assert.equal(report.summary.t00BoundaryChecks, 21);
   assert.equal(report.summary.t00BoundaryPassed, 21);
   assert.equal(report.summary.lanes, 8);
@@ -52,6 +52,10 @@ test("final readiness accepts every planned T08 functional increment", () => {
   assert.equal(report.summary.modernizationFreshSources, 2);
   assert.equal(report.summary.modernizationNoDataSources, 6);
   assert.equal(report.summary.modernizationClosedAlerts, 1);
+  assert.equal(report.summary.modernizationTrustedOfficialReports, 1);
+  assert.equal(report.summary.modernizationTrustedOfficialFeedbacks, 1);
+  assert.equal(report.summary.modernizationOfficialExchangeReceiptFindings, 0);
+  assert.equal(report.summary.modernizationOfficialExchangeReceiptKeyringReady, true);
   assert.equal(report.summary.modernizationClosedCollaborationTasks, 2);
   assert.equal(report.summary.persistedOutboxDispatches, 1);
   assert.equal(report.summary.persistedOutboxAuditEntries, 3);
@@ -119,6 +123,7 @@ test("final readiness renders and writes machine and human reports", () => {
   assert.match(fs.readFileSync(markdown, "utf8"), /Modernization trusted rule activations: 1/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Modernization managed rule keyring ready: yes/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Modernization surveillance models: 3\/3/);
+  assert.match(fs.readFileSync(markdown, "utf8"), /Modernization trusted official report\/feedback receipts: 1\/1/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Modernization validated shadow models: 1/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Modernization respiratory pathogens catalogued\/observed: 18\/18/);
   assert.match(fs.readFileSync(markdown, "utf8"), /Modernization respiratory planning coverage ready: yes/);
