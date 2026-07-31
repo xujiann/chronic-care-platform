@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b7a68">
+  <meta name="description" content="居民健康服务小程序，提供健康档案、电子病历、挂号、护理、陪诊、家医和急救服务入口。">
+  <title>健康大连居民端</title>
+  <link rel="stylesheet" href="./resident-mini-program.css">
+</head>
+<body>
+  <a class="skip-link" href="#app-main">跳到主要内容</a>
+  <div class="mini-app" id="resident-mini-app" aria-busy="true">
+    <header class="mini-header">
+      <div>
+        <span class="mini-brand-kicker" id="platform-label">居民健康服务</span>
+        <h1>健康大连</h1>
+      </div>
+      <button class="icon-button" id="accessibility-shortcut" type="button" aria-label="打开适老化设置">
+        <span aria-hidden="true">大字</span>
+      </button>
+    </header>
+
+    <section class="session-gate" id="session-gate" aria-live="assertive">
+      <div class="gate-card">
+        <div class="gate-mark" aria-hidden="true">安</div>
+        <h2 id="gate-title">正在核验安全登录</h2>
+        <p id="gate-message">正在向服务端确认居民身份与访问范围，请稍候。</p>
+        <a class="primary-action gate-login" id="gate-login" href="./login.html?redirect=resident-mini-program.html" hidden>前往安全登录</a>
+      </div>
+    </section>
+
+    <div class="app-content" id="app-content" hidden>
+      <section class="member-strip" aria-label="当前居民">
+        <button class="member-button" id="member-switcher" type="button" aria-haspopup="dialog" aria-controls="member-dialog">
+          <span class="member-avatar" id="member-avatar" aria-hidden="true">居</span>
+          <span>
+            <small>当前服务对象</small>
+            <strong id="current-member-name">居民</strong>
+          </span>
+          <span class="member-change">切换<span aria-hidden="true"> ›</span></span>
+        </button>
+      </section>
+
+      <main id="app-main" tabindex="-1">
+        <section class="app-page" id="page-home" data-page="home" aria-labelledby="home-title">
+          <div class="hero-card">
+            <div>
+              <p class="eyebrow" id="today-label">今天</p>
+              <h2 id="home-title">您好，<span id="home-member-name">居民</span></h2>
+              <p id="home-summary">已按当前居民范围加载健康服务。</p>
+            </div>
+            <span class="shield-badge">隐私保护中</span>
+          </div>
+
+          <section class="health-overview" aria-labelledby="overview-title">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">健康概览</p>
+                <h3 id="overview-title">我的健康</h3>
+              </div>
+              <button class="text-button" type="button" data-route="health-record">查看档案</button>
+            </div>
+            <div class="metric-grid" id="metric-grid"></div>
+            <p class="care-note" id="care-note">健康数据仅供本人健康管理参考，不替代医生诊断。</p>
+          </section>
+
+          <section aria-labelledby="service-title">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">便民服务</p>
+                <h3 id="service-title">常用服务</h3>
+              </div>
+            </div>
+            <div class="service-grid" id="service-grid"></div>
+          </section>
+
+          <section aria-labelledby="todo-title">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">健康提醒</p>
+                <h3 id="todo-title">近期待办</h3>
+              </div>
+              <button class="text-button" type="button" data-route="tasks">全部待办</button>
+            </div>
+            <div class="stack-list" id="home-task-list"></div>
+          </section>
+        </section>
+
+        <section class="app-page" id="page-messages" data-page="messages" aria-labelledby="messages-title" hidden>
+          <div class="page-title">
+            <p class="eyebrow">通知中心</p>
+            <h2 id="messages-title">消息与待办</h2>
+            <p>已读状态以服务端回执为准，未收到回执不会显示为已读。</p>
+          </div>
+          <div class="segmented-control" role="group" aria-label="消息筛选">
+            <button type="button" data-message-filter="all" aria-pressed="true">全部</button>
+            <button type="button" data-message-filter="unread" aria-pressed="false">未读</button>
+          </div>
+          <div class="stack-list" id="message-list" aria-live="polite"></div>
+        </section>
+
+        <section class="app-page" id="page-profile" data-page="profile" aria-labelledby="profile-title" hidden>
+          <div class="page-title">
+            <p class="eyebrow">账号与设置</p>
+            <h2 id="profile-title">我的</h2>
+            <p id="profile-session">居民身份已由服务端核验。</p>
+          </div>
+          <section class="settings-card" aria-labelledby="accessibility-title">
+            <h3 id="accessibility-title">适老化与无障碍</h3>
+            <label class="setting-row">
+              <span><strong>大字模式</strong><small>放大主要文字和操作提示</small></span>
+              <input type="checkbox" id="large-text-toggle" role="switch">
+            </label>
+            <label class="setting-row">
+              <span><strong>高对比度</strong><small>增强文字、边框与背景对比</small></span>
+              <input type="checkbox" id="contrast-toggle" role="switch">
+            </label>
+          </section>
+          <section class="settings-card privacy-card" aria-labelledby="privacy-title">
+            <h3 id="privacy-title">隐私保护</h3>
+            <p>只展示当前会话可访问的居民资料。切换家庭成员时会清除上一居民的筛选、详情和临时敏感状态。</p>
+          </section>
+          <button class="danger-action" id="logout-button" type="button">安全退出登录</button>
+        </section>
+
+        <section class="app-page detail-page" id="page-detail" data-page="detail" aria-labelledby="detail-title" hidden>
+          <button class="back-button" id="detail-back" type="button"><span aria-hidden="true">‹</span> 返回</button>
+          <div class="page-title">
+            <p class="eyebrow" id="detail-kicker">居民健康服务</p>
+            <h2 id="detail-title">服务详情</h2>
+            <p id="detail-description"></p>
+          </div>
+          <div class="detail-summary" id="detail-summary"></div>
+          <div class="stack-list" id="detail-list"></div>
+          <div class="safe-boundary" id="detail-boundary"></div>
+        </section>
+      </main>
+
+      <nav class="bottom-nav" aria-label="主导航">
+        <button type="button" data-route="home" aria-current="page"><span aria-hidden="true">首页</span><strong>首页</strong></button>
+        <button type="button" data-route="messages"><span aria-hidden="true">消息</span><strong>消息</strong><em id="message-badge" hidden>0</em></button>
+        <button type="button" data-route="profile"><span aria-hidden="true">我的</span><strong>我的</strong></button>
+      </nav>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  </div>
+
+  <dialog class="member-dialog" id="member-dialog" aria-labelledby="member-dialog-title">
+    <form method="dialog">
+      <div class="dialog-handle" aria-hidden="true"></div>
+      <div class="dialog-heading">
+        <div>
+          <p class="eyebrow">家庭健康管理</p>
+          <h2 id="member-dialog-title">切换服务对象</h2>
+        </div>
+        <button class="icon-button dialog-close" value="cancel" aria-label="关闭家庭成员选择">关闭</button>
+      </div>
+      <p class="dialog-note">仅可切换本次会话已核验关系且具备有效授权的家庭成员。</p>
+      <div class="member-list" id="member-list"></div>
+    </form>
+  </dialog>
+
+  <script src="./auth.js"></script>
+  <script src="./citizen-records-v1.js"></script>
+  <script src="./citizen-records-v2.js"></script>
+  <script src="./resident-mini-program-policy.js"></script>
+  <script src="./resident-mini-program-core.js"></script>
+  <script src="./resident-mini-program-adapter.js"></script>
+  <script src="./resident-mini-program.js"></script>
+</body>
+</html>
