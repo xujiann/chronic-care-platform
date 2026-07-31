@@ -41,7 +41,7 @@ function assess() {
     decision: Object.values(checks).every(Boolean) ? "首个可运行增量已具备集成条件，生产上线仍受外部依赖约束" : "未通过本模块就绪门禁",
     checks,
     missing,
-    preview: "http://127.0.0.1:5200/resident-mini-program.html",
+    preview: "http://127.0.0.1:5173/resident-mini-program.html",
     externalDependencies
   };
 }
