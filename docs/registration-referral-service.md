@@ -35,12 +35,13 @@ Business terminal states are also enforced independently of `commandId`: one pri
 
 ## Standalone T05 operations
 
-The complete catalog contains 40 commands. In addition to the 14 closure commands above, T05 implements these operations without changing a public route or shared page:
+The complete catalog contains 42 commands. In addition to the 14 closure commands above, T05 implements these operations without changing a public route or shared page:
 
 - Referral exceptions: `reject-referral-request`, `withdraw-referral`, `reassign-referral`, `reschedule-teleconsultation`, `cancel-teleconsultation` and `record-teleconsultation-no-show`.
 - Clinical package and consent: `attach-referral-materials`, `grant-referral-authorization`, `revoke-referral-authorization` and `resume-referral-authorization`. Resident or guardian grants must specify covered institutions, expiry and the minimum permitted data scopes.
 - SLA and messaging reliability: `run-closure-sla`, `acknowledge-escalation`, `record-notification-provider-result` and `resolve-notification-dead-letter`.
 - Family doctor lifecycle: `submit-family-doctor-application`, `review-family-doctor-application`, `activate-family-doctor-contract`, `record-family-doctor-fulfillment`, `request-family-doctor-renewal`, `review-family-doctor-renewal` and `terminate-family-doctor-contract`.
+- Family doctor transfer: `request-family-doctor-transfer` opens a resident-scoped transfer, while two `review-family-doctor-transfer` decisions require the current team to release responsibility before the target team can accept it. Completion moves the contract, synchronizes both team capacities, cancels obsolete open service tasks and retains transfer history.
 - Advanced continuity: `create-down-referral` creates a hospital-to-primary-care handoff, while `request-referral-supplement`, `submit-referral-supplement` and `review-referral-supplement` provide a versioned two-party material correction loop.
 - Family doctor operations: `run-family-doctor-scheduler` creates scoped service, renewal and expiry tasks. A later `record-family-doctor-fulfillment` may reference `serviceTaskId` and closes the task atomically with the fulfillment record.
 

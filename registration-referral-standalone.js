@@ -31,6 +31,8 @@ const STANDALONE_COMMAND_CONTRACTS = Object.freeze([
   { action: "record-family-doctor-fulfillment", roles: ["institution", "commission"], requiredFields: ["caseId", "payload.serviceType", "payload.serviceItem", "payload.serviceDate", "payload.evidenceCollection", "payload.evidenceId", "payload.note"], suggestedEndpoint: "POST /api/registration-referral/commands/record-family-doctor-fulfillment" },
   { action: "request-family-doctor-renewal", roles: ["citizen", "commission"], requiredFields: ["caseId", "payload.desiredStartDate", "payload.note"], suggestedEndpoint: "POST /api/registration-referral/commands/request-family-doctor-renewal" },
   { action: "review-family-doctor-renewal", roles: ["institution", "commission"], requiredFields: ["caseId", "payload.decision", "payload.note"], suggestedEndpoint: "POST /api/registration-referral/commands/review-family-doctor-renewal" },
+  { action: "request-family-doctor-transfer", roles: ["citizen", "commission"], requiredFields: ["caseId", "payload.teamId", "payload.packageId", "payload.reason", "payload.note"], suggestedEndpoint: "POST /api/registration-referral/commands/request-family-doctor-transfer" },
+  { action: "review-family-doctor-transfer", roles: ["institution", "commission"], requiredFields: ["caseId", "payload.decision", "payload.note"], suggestedEndpoint: "POST /api/registration-referral/commands/review-family-doctor-transfer" },
   { action: "terminate-family-doctor-contract", roles: ["citizen", "institution", "commission"], requiredFields: ["caseId", "payload.reason", "payload.note"], suggestedEndpoint: "POST /api/registration-referral/commands/terminate-family-doctor-contract" }
 ]);
 
@@ -1041,6 +1043,162 @@ function reviewFamilyRenewal(data, command, actor) {
   return { contract, application, message };
 }
 
+function requestFamilyTransfer(data, command, actor) {
+  const contract = rows(data.phase2FamilyDoctorContracts).find((item) => item.id === command.caseId);
+  if (!contract) throw new Error("family doctor contract not found");
+  requireResident(actor, contract.residentId);
+  if (contract.status !== "active") throw new Error("only an active family doctor contract may be transferred");
+  if (rows(data.phase2FamilyDoctorApplications).some((item) =>
+    item.applicationType === "team-transfer"
+    && item.existingContractId === contract.id
+    && !["completed", "rejected", "cancelled"].includes(text(item.status).toLowerCase()))) {
+    throw new Error("family doctor transfer is already pending");
+  }
+  const sourceTeam = teamFor(data, contract.teamId);
+  if (!sourceTeam) throw new Error("current family doctor team not found");
+  const targetTeam = teamFor(data, requireText(command.payload.teamId, "payload.teamId"));
+  const servicePackage = packageFor(data, requireText(command.payload.packageId, "payload.packageId"));
+  if (!targetTeam || targetTeam.status !== "active") throw new Error("active target family doctor team not found");
+  if (targetTeam.id === sourceTeam.id) throw new Error("target family doctor team must differ from current team");
+  if (!servicePackage || servicePackage.status !== "active") throw new Error("active family doctor package not found");
+  if (rows(servicePackage.availableInstitutionCodes).length && !servicePackage.availableInstitutionCodes.includes(targetTeam.institutionCode)) {
+    throw new Error("family doctor package is unavailable for target team");
+  }
+  if (Number(targetTeam.capacity || 0) > 0 && Number(targetTeam.signedResidents || 0) >= Number(targetTeam.capacity)) {
+    throw new Error("target family doctor team has no signing capacity");
+  }
+  const reason = requireText(command.payload.reason, "payload.reason");
+  const note = requireText(command.payload.note, "payload.note");
+  const application = {
+    id: text(command.payload.applicationId || `p2fda-transfer-${command.commandId}`),
+    residentId: contract.residentId,
+    residentName: contract.residentName,
+    packageId: servicePackage.id,
+    teamId: targetTeam.id,
+    templateId: servicePackage.templateId,
+    applicationType: "team-transfer",
+    existingContractId: contract.id,
+    sourceTeamId: sourceTeam.id,
+    sourceInstitutionCode: contract.institutionCode || sourceTeam.institutionCode,
+    targetInstitutionCode: targetTeam.institutionCode,
+    submittedAt: command.at,
+    status: "submitted",
+    reviewStatus: "pending",
+    reviewStage: "source",
+    reviewInstitutionCode: contract.institutionCode || sourceTeam.institutionCode,
+    transferReason: reason,
+    lastAction: note,
+    workflowVersion: 1,
+    productionEvidence: false
+  };
+  data.phase2FamilyDoctorApplications = appendById(data.phase2FamilyDoctorApplications, application);
+  contract.transferStatus = "pending-source";
+  contract.transferApplicationId = application.id;
+  const message = familyMessage(data, command, actor, application, "institution", application.reviewInstitutionCode, "Family doctor transfer awaiting source review", `${reason}: ${note}`, "transfer-source-requested");
+  return { contract, application, message };
+}
+
+function reviewFamilyTransfer(data, command, actor) {
+  const application = rows(data.phase2FamilyDoctorApplications).find((item) => item.id === command.caseId);
+  if (!application || application.applicationType !== "team-transfer") throw new Error("family doctor transfer application not found");
+  if (application.reviewStatus !== "pending" || !["source", "target"].includes(application.reviewStage)) {
+    throw new Error("family doctor transfer is not pending review");
+  }
+  requireInstitution(actor, application.reviewInstitutionCode);
+  const contract = rows(data.phase2FamilyDoctorContracts).find((item) => item.id === application.existingContractId);
+  if (!contract || contract.residentId !== application.residentId) throw new Error("family doctor transfer contract mismatch");
+  if (contract.status !== "active") throw new Error("family doctor contract is not active");
+  const sourceTeam = teamFor(data, application.sourceTeamId);
+  const targetTeam = teamFor(data, application.teamId);
+  const servicePackage = packageFor(data, application.packageId);
+  if (!sourceTeam || !targetTeam || !servicePackage) throw new Error("family doctor transfer target is incomplete");
+  const decision = requireText(command.payload.decision, "payload.decision").toLowerCase();
+  if (!["approved", "rejected"].includes(decision)) throw new Error("family doctor transfer decision must be approved or rejected");
+  const note = requireText(command.payload.note, "payload.note");
+  const stage = application.reviewStage;
+  const messages = [];
+
+  if (decision === "rejected") {
+    application.reviewStatus = "rejected";
+    application.status = "rejected";
+    application.reviewedAt = command.at;
+    application.reviewer = actorName(actor);
+    application.reviewNote = note;
+    application.rejectionStage = stage;
+    application.rejectionReason = text(command.payload.reason || note);
+    contract.transferStatus = "rejected";
+    contract.transferRejectionReason = application.rejectionReason;
+    messages.push(familyMessage(data, command, actor, application, "citizen", "", "Family doctor transfer rejected", note, `transfer-${stage}-rejected`));
+    if (stage === "target") {
+      messages.push(familyMessage(data, command, actor, application, "institution", application.sourceInstitutionCode, "Family doctor transfer rejected by target team", note, "transfer-target-rejected-source"));
+    }
+    return { contract, application, messages };
+  }
+
+  if (stage === "source") {
+    application.sourceApprovedAt = command.at;
+    application.sourceApprovedBy = actorName(actor);
+    application.sourceReviewNote = note;
+    application.status = "source-approved";
+    application.reviewStage = "target";
+    application.reviewInstitutionCode = application.targetInstitutionCode;
+    contract.transferStatus = "pending-target";
+    messages.push(familyMessage(data, command, actor, application, "institution", application.targetInstitutionCode, "Family doctor transfer awaiting target review", note, "transfer-target-requested"));
+    messages.push(familyMessage(data, command, actor, application, "citizen", "", "Family doctor transfer released by current team", note, "transfer-source-approved"));
+    return { contract, application, messages };
+  }
+
+  if (targetTeam.status !== "active") throw new Error("active target family doctor team not found");
+  if (rows(servicePackage.availableInstitutionCodes).length && !servicePackage.availableInstitutionCodes.includes(targetTeam.institutionCode)) {
+    throw new Error("family doctor package is unavailable for target team");
+  }
+  if (Number(targetTeam.capacity || 0) > 0 && Number(targetTeam.signedResidents || 0) >= Number(targetTeam.capacity)) {
+    throw new Error("target family doctor team has no signing capacity");
+  }
+  const prior = {
+    at: command.at,
+    applicationId: application.id,
+    fromTeamId: contract.teamId,
+    fromInstitutionCode: contract.institutionCode || sourceTeam.institutionCode,
+    fromPackageId: contract.packageId,
+    toTeamId: targetTeam.id,
+    toInstitutionCode: targetTeam.institutionCode,
+    toPackageId: servicePackage.id,
+    reason: application.transferReason,
+    reviewedBy: actorName(actor)
+  };
+  if (Number(sourceTeam.signedResidents || 0) > 0) sourceTeam.signedResidents = Number(sourceTeam.signedResidents) - 1;
+  targetTeam.signedResidents = Number(targetTeam.signedResidents || 0) + 1;
+  rows(data.phase2FamilyDoctorServiceTasks)
+    .filter((task) => task.contractId === contract.id && !["completed", "cancelled"].includes(task.status))
+    .forEach((task) => {
+      task.status = "cancelled";
+      task.cancelledAt = command.at;
+      task.cancelledBy = actorName(actor);
+      task.cancellationReason = "family-doctor-team-transferred";
+    });
+  contract.teamId = targetTeam.id;
+  contract.packageId = servicePackage.id;
+  contract.templateId = servicePackage.templateId;
+  contract.institutionCode = targetTeam.institutionCode;
+  contract.transferStatus = "completed";
+  contract.lastTransferApplicationId = application.id;
+  contract.transferredAt = command.at;
+  contract.transferredBy = actorName(actor);
+  contract.transferHistory = [prior, ...rows(contract.transferHistory)].slice(0, 20);
+  contract.nextServiceAt = text(command.payload.nextServiceAt);
+  application.reviewStatus = "approved";
+  application.status = "completed";
+  application.reviewStage = "completed";
+  application.reviewedAt = command.at;
+  application.reviewer = actorName(actor);
+  application.reviewNote = note;
+  application.completedAt = command.at;
+  messages.push(familyMessage(data, command, actor, application, "citizen", "", "Family doctor transfer completed", note, "transfer-completed"));
+  messages.push(familyMessage(data, command, actor, application, "institution", application.sourceInstitutionCode, "Family doctor transfer completed", note, "transfer-completed-source"));
+  return { contract, application, messages };
+}
+
 function terminateFamilyContract(data, command, actor) {
   const contract = rows(data.phase2FamilyDoctorContracts).find((item) => item.id === command.caseId);
   if (!contract) throw new Error("family doctor contract not found");
@@ -1151,6 +1309,8 @@ const HANDLERS = Object.freeze({
   "record-family-doctor-fulfillment": recordFamilyFulfillment,
   "request-family-doctor-renewal": requestFamilyRenewal,
   "review-family-doctor-renewal": reviewFamilyRenewal,
+  "request-family-doctor-transfer": requestFamilyTransfer,
+  "review-family-doctor-transfer": reviewFamilyTransfer,
   "terminate-family-doctor-contract": terminateFamilyContract
 });
 

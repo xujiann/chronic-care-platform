@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const seed = require("../data/db.json");
-const { normalizeReferralCase, validateClosureReferences } = require("../registration-referral-domain");
+const { normalizeFamilyDoctorCase, normalizeReferralCase, validateClosureReferences } = require("../registration-referral-domain");
 const {
   CLOSURE_COMMAND_CONTRACTS,
   applyClosureCommand,
@@ -111,9 +111,11 @@ test("standalone command catalog covers all locally implementable increments", (
     "record-family-doctor-fulfillment",
     "request-family-doctor-renewal",
     "review-family-doctor-renewal",
+    "request-family-doctor-transfer",
+    "review-family-doctor-transfer",
     "terminate-family-doctor-contract"
   ].forEach((action) => assert.ok(actions.has(action), action));
-  assert.equal(CLOSURE_COMMAND_CONTRACTS.length, 40);
+  assert.equal(CLOSURE_COMMAND_CONTRACTS.length, 42);
 });
 
 test("referral exception path rejects reassigns packages reschedules no-show and cancels", () => {
@@ -463,6 +465,126 @@ test("family doctor commands cover application contract fulfillment renewal and 
     payload: { reason: "Resident moved away.", note: "Terminate after handoff." }
   });
   assert.equal(current.result.contract.status, "terminated");
+});
+
+test("family doctor transfer requires source release and target acceptance", () => {
+  const source = data();
+  source.phase2FamilyDoctorServiceTasks = [{
+    id: "p2fdst-transfer-open",
+    contractId: "p2fdc-r1",
+    residentId: "r1",
+    institutionCode: "MR3",
+    kind: "service-due",
+    status: "open"
+  }];
+  assert.throws(() => run(source, "family-transfer-wrong-resident", "request-family-doctor-transfer", citizenR2, {
+    caseId: "p2fdc-r1",
+    payload: {
+      teamId: "p2fdtm-central",
+      packageId: "p2fdp-hypertension",
+      reason: "Resident requests a new care team.",
+      note: "Must remain resident scoped."
+    }
+  }), /resident scope denied/);
+
+  let current = run(source, "family-transfer-request", "request-family-doctor-transfer", citizenR1, {
+    caseId: "p2fdc-r1",
+    payload: {
+      teamId: "p2fdtm-central",
+      packageId: "p2fdp-hypertension",
+      reason: "Resident relocated closer to the target team.",
+      note: "Request an audited responsibility transfer."
+    }
+  });
+  const applicationId = current.result.application.id;
+  const sourceCount = source.phase2FamilyDoctorTeams.find((item) => item.id === "p2fdtm-qnw").signedResidents;
+  const targetCount = source.phase2FamilyDoctorTeams.find((item) => item.id === "p2fdtm-central").signedResidents;
+  assert.equal(current.result.contract.teamId, "p2fdtm-qnw");
+  assert.equal(current.result.contract.transferStatus, "pending-source");
+  assert.equal(normalizeFamilyDoctorCase(current.result.application).responsibleOrg, "MR3");
+  assert.throws(() => run(current.data, "family-transfer-source-no-org", "review-family-doctor-transfer", {
+    role: "institution",
+    username: "unscoped"
+  }, {
+    caseId: applicationId,
+    payload: { decision: "approved", note: "Must fail closed." }
+  }), /institution actor orgCode is required/);
+  assert.throws(() => run(current.data, "family-transfer-wrong-source", "review-family-doctor-transfer", mr1, {
+    caseId: applicationId,
+    payload: { decision: "approved", note: "Target cannot release the source contract." }
+  }), /institution scope denied/);
+
+  current = run(current.data, "family-transfer-source-approve", "review-family-doctor-transfer", mr3, {
+    caseId: applicationId,
+    payload: { decision: "approved", note: "Current team releases responsibility." }
+  });
+  assert.equal(current.result.application.reviewStage, "target");
+  assert.equal(current.result.contract.transferStatus, "pending-target");
+  assert.equal(normalizeFamilyDoctorCase(current.result.application).responsibleOrg, "MR1");
+  assert.throws(() => run(current.data, "family-transfer-source-replay-as-target", "review-family-doctor-transfer", mr3, {
+    caseId: applicationId,
+    payload: { decision: "approved", note: "Source team cannot accept for target." }
+  }), /institution scope denied/);
+
+  const fullCapacity = data();
+  Object.assign(fullCapacity, current.data);
+  fullCapacity.phase2FamilyDoctorTeams = current.data.phase2FamilyDoctorTeams.map((item) =>
+    item.id === "p2fdtm-central" ? { ...item, signedResidents: item.capacity } : { ...item });
+  assert.throws(() => run(fullCapacity, "family-transfer-full-target", "review-family-doctor-transfer", mr1, {
+    caseId: applicationId,
+    payload: { decision: "approved", note: "Target capacity must be checked again." }
+  }), /no signing capacity/);
+
+  current = run(current.data, "family-transfer-target-approve", "review-family-doctor-transfer", mr1, {
+    caseId: applicationId,
+    payload: {
+      decision: "approved",
+      nextServiceAt: "2026-08-15T09:00:00.000Z",
+      note: "Target team accepts continuing responsibility."
+    }
+  });
+  const contract = current.result.contract;
+  assert.equal(contract.teamId, "p2fdtm-central");
+  assert.equal(contract.institutionCode, "MR1");
+  assert.equal(contract.transferStatus, "completed");
+  assert.equal(contract.transferHistory[0].fromInstitutionCode, "MR3");
+  assert.equal(current.result.application.status, "completed");
+  assert.equal(normalizeFamilyDoctorCase(current.result.application).unifiedPhase, "closed");
+  assert.equal(current.data.phase2FamilyDoctorTeams.find((item) => item.id === "p2fdtm-qnw").signedResidents, sourceCount - 1);
+  assert.equal(current.data.phase2FamilyDoctorTeams.find((item) => item.id === "p2fdtm-central").signedResidents, targetCount + 1);
+  assert.equal(current.data.phase2FamilyDoctorServiceTasks.find((item) => item.id === "p2fdst-transfer-open").status, "cancelled");
+  assert.equal(current.consistency.summary.P0, 0);
+});
+
+test("family doctor transfer rejection preserves the existing team and capacity", () => {
+  const source = data();
+  const sourceCount = source.phase2FamilyDoctorTeams.find((item) => item.id === "p2fdtm-qnw").signedResidents;
+  const targetCount = source.phase2FamilyDoctorTeams.find((item) => item.id === "p2fdtm-central").signedResidents;
+  let current = run(source, "family-transfer-reject-request", "request-family-doctor-transfer", citizenR1, {
+    caseId: "p2fdc-r1",
+    payload: {
+      teamId: "p2fdtm-central",
+      packageId: "p2fdp-hypertension",
+      reason: "Resident requests a target capacity review.",
+      note: "Open transfer for rejection-path evidence."
+    }
+  });
+  const applicationId = current.result.application.id;
+  current = run(current.data, "family-transfer-reject-source", "review-family-doctor-transfer", mr3, {
+    caseId: applicationId,
+    payload: { decision: "approved", note: "Current team releases responsibility if accepted." }
+  });
+  current = run(current.data, "family-transfer-reject-target", "review-family-doctor-transfer", mr1, {
+    caseId: applicationId,
+    payload: { decision: "rejected", reason: "Target service district does not cover the resident.", note: "Keep the current team active." }
+  });
+  assert.equal(current.result.application.status, "rejected");
+  assert.equal(current.result.application.rejectionStage, "target");
+  assert.equal(current.result.contract.teamId, "p2fdtm-qnw");
+  assert.equal(current.result.contract.transferStatus, "rejected");
+  assert.equal(current.data.phase2FamilyDoctorTeams.find((item) => item.id === "p2fdtm-qnw").signedResidents, sourceCount);
+  assert.equal(current.data.phase2FamilyDoctorTeams.find((item) => item.id === "p2fdtm-central").signedResidents, targetCount);
+  assert.equal(current.consistency.summary.P0, 0);
 });
 
 test("expected versions and replay provide optimistic concurrency and recovery evidence", () => {

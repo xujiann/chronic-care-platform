@@ -304,6 +304,24 @@ function normalizeFamilyDoctorCase(item = {}, context = {}) {
   const isApplication = Boolean(item.reviewStatus || /^p2fda-/i.test(text(item.id)));
 
   if (isApplication) {
+    if (item.applicationType === "team-transfer") {
+      if (item.status === "completed") {
+        envelope.unifiedPhase = "closed";
+        Object.assign(envelope, responsibility("", "", "", "none"));
+      } else if (["rejected", "cancelled"].includes(item.reviewStatus || item.status)) {
+        envelope.unifiedPhase = "cancelled";
+        Object.assign(envelope, responsibility("", "", "", "none"));
+      } else {
+        envelope.unifiedPhase = "requested";
+        Object.assign(envelope, responsibility(
+          item.reviewInstitutionCode,
+          item.reviewStage === "target" ? "family-doctor-target-team" : "family-doctor-source-team",
+          item.reviewDueAt,
+          item.reviewStage === "target" ? "accept or reject family doctor transfer" : "release or reject family doctor transfer"
+        ));
+      }
+      return envelope;
+    }
     if (["rejected", "cancelled"].includes(item.reviewStatus || item.status)) {
       envelope.unifiedPhase = "cancelled";
       Object.assign(envelope, responsibility("resident", "citizen", item.supplementDueAt, "supplement application or stop contracting"));
@@ -538,7 +556,21 @@ function validateClosureReferences(data = {}) {
     const servicePackage = familyPackages.get(application.packageId);
     if (familyTeams.size && !team) addIssue("P0", "family-application-team-missing", "familyDoctorApplication", application.id, "application references a missing family doctor team", { teamId: application.teamId });
     if (familyPackages.size && !servicePackage) addIssue("P0", "family-application-package-missing", "familyDoctorApplication", application.id, "application references a missing family doctor package", { packageId: application.packageId });
-    if (team && application.reviewInstitutionCode && team.institutionCode !== application.reviewInstitutionCode) addIssue("P0", "family-application-review-org-mismatch", "familyDoctorApplication", application.id, "application review institution differs from its team institution", { reviewInstitutionCode: application.reviewInstitutionCode, teamInstitutionCode: team.institutionCode });
+    if (application.applicationType === "team-transfer") {
+      const contract = contracts.get(application.existingContractId);
+      const sourceTeam = familyTeams.get(application.sourceTeamId);
+      if (!contract) addIssue("P0", "family-transfer-contract-missing", "familyDoctorApplication", application.id, "transfer application references a missing family doctor contract", { existingContractId: application.existingContractId });
+      if (contract && contract.residentId !== application.residentId) addIssue("P0", "family-transfer-contract-resident-mismatch", "familyDoctorApplication", application.id, "transfer application and contract residents differ", { existingContractId: application.existingContractId });
+      if (!sourceTeam) addIssue("P0", "family-transfer-source-team-missing", "familyDoctorApplication", application.id, "transfer application references a missing source team", { sourceTeamId: application.sourceTeamId });
+      const expectedReviewOrg = application.reviewStage === "source" ? application.sourceInstitutionCode : application.reviewStage === "target" ? application.targetInstitutionCode : "";
+      if (expectedReviewOrg && application.reviewInstitutionCode !== expectedReviewOrg) addIssue("P0", "family-transfer-review-org-mismatch", "familyDoctorApplication", application.id, "transfer review institution does not match its current review stage", { reviewStage: application.reviewStage, reviewInstitutionCode: application.reviewInstitutionCode, expectedReviewOrg });
+      if (team && application.targetInstitutionCode !== team.institutionCode) addIssue("P0", "family-transfer-target-org-mismatch", "familyDoctorApplication", application.id, "transfer target institution differs from its target team", { targetInstitutionCode: application.targetInstitutionCode, teamInstitutionCode: team.institutionCode });
+      if (application.status === "completed" && contract && (contract.teamId !== application.teamId || contract.packageId !== application.packageId || contract.institutionCode !== application.targetInstitutionCode)) {
+        addIssue("P0", "family-transfer-contract-target-mismatch", "familyDoctorApplication", application.id, "completed transfer did not move the contract to the approved team, package, and institution", { existingContractId: application.existingContractId });
+      }
+    } else if (team && application.reviewInstitutionCode && team.institutionCode !== application.reviewInstitutionCode) {
+      addIssue("P0", "family-application-review-org-mismatch", "familyDoctorApplication", application.id, "application review institution differs from its team institution", { reviewInstitutionCode: application.reviewInstitutionCode, teamInstitutionCode: team.institutionCode });
+    }
   });
 
   rows(data.phase2FamilyDoctorContracts).forEach((contract) => {
@@ -558,7 +590,21 @@ function validateClosureReferences(data = {}) {
   rows(data.phase2FamilyDoctorFulfillments).forEach((fulfillment) => {
     const contract = contracts.get(fulfillment.contractId);
     if (!contract) addIssue("P0", "family-fulfillment-contract-missing", "familyDoctorFulfillment", fulfillment.id, "fulfillment references a missing contract", { contractId: fulfillment.contractId });
-    if (contract && (contract.residentId !== fulfillment.residentId || contract.teamId !== fulfillment.teamId || (fulfillment.packageId && contract.packageId !== fulfillment.packageId))) addIssue("P0", "family-fulfillment-contract-scope-mismatch", "familyDoctorFulfillment", fulfillment.id, "fulfillment resident, team, or package differs from its contract", { contractId: fulfillment.contractId });
+    if (contract) {
+      const currentScope = contract.teamId === fulfillment.teamId && (!fulfillment.packageId || contract.packageId === fulfillment.packageId);
+      const fulfilledAt = Date.parse(fulfillment.completedAt || fulfillment.serviceDate || "");
+      const historicalScope = rows(contract.transferHistory).some((transfer) => {
+        const transferredAt = Date.parse(transfer.at || "");
+        return transfer.fromTeamId === fulfillment.teamId
+          && (!fulfillment.packageId || transfer.fromPackageId === fulfillment.packageId)
+          && Number.isFinite(fulfilledAt)
+          && Number.isFinite(transferredAt)
+          && fulfilledAt <= transferredAt;
+      });
+      if (contract.residentId !== fulfillment.residentId || (!currentScope && !historicalScope)) {
+        addIssue("P0", "family-fulfillment-contract-scope-mismatch", "familyDoctorFulfillment", fulfillment.id, "fulfillment resident, team, or package differs from the current or historically transferred contract scope", { contractId: fulfillment.contractId });
+      }
+    }
     if (fulfillment.serviceTaskId) {
       const task = serviceTasks.get(fulfillment.serviceTaskId);
       if (!task) addIssue("P0", "family-fulfillment-service-task-missing", "familyDoctorFulfillment", fulfillment.id, "fulfillment references a missing family doctor service task", { serviceTaskId: fulfillment.serviceTaskId });
