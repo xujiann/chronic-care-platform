@@ -6,6 +6,7 @@ const {
   classifyMessageReceipt,
   normalizeChronicFollowupCase,
   normalizeFamilyDoctorCase,
+  normalizeFamilyDoctorServiceDisputeCase,
   normalizePrimaryCareCase,
   normalizeReferralCase,
   normalizeRegistrationCase,
@@ -846,6 +847,10 @@ function findCaseEnvelope(data, caseType, caseId) {
     const item = [...rows(data.phase2FamilyDoctorApplications), ...rows(data.phase2FamilyDoctorContracts)].find((row) => row.id === caseId);
     return item ? normalizeFamilyDoctorCase(item, { messages, fulfillments: data.phase2FamilyDoctorFulfillments }) : null;
   }
+  if (caseType === "family-doctor-service-dispute") {
+    const item = rows(data.phase2FamilyDoctorServiceDisputes).find((row) => row.id === caseId);
+    return item ? normalizeFamilyDoctorServiceDisputeCase(item, { messages }) : null;
+  }
   if (caseType === "chronic-followup") {
     const item = rows(data.followups).find((row) => row.id === caseId);
     return item ? normalizeChronicFollowupCase(item, { messages }) : null;
@@ -1006,6 +1011,7 @@ function findVersionedAggregate(data, command) {
     ...rows(data.phase2FamilyDoctorApplications),
     ...rows(data.phase2FamilyDoctorContracts),
     ...rows(data.phase2FamilyDoctorFulfillments),
+    ...rows(data.phase2FamilyDoctorServiceDisputes),
     ...rows(data.registrationReferralEscalations)
   ].find((item) => item.id === command.caseId) || null;
 }
@@ -1031,7 +1037,7 @@ function advanceAggregateVersion(data, command, priorVersion, result) {
       return aggregate.workflowVersion;
     }
   }
-  const created = result?.assessment || result?.application || result?.contract || result?.teleconsultation || result?.referral || result?.followup || result?.authorization || null;
+  const created = result?.assessment || result?.application || result?.contract || result?.teleconsultation || result?.referral || result?.followup || result?.authorization || result?.dispute || null;
   if (created && created.workflowVersion === undefined) {
     created.workflowVersion = 1;
     created.workflowUpdatedAt = command.at;
@@ -1048,8 +1054,8 @@ function appendClosureEvent(data, command, actor, result, fingerprint, aggregate
     commandFingerprint: fingerprint,
     action: command.action,
     caseType: command.caseType,
-    caseId: command.caseId || result?.assessment?.id || result?.order?.id || result?.teleconsultation?.id || result?.referral?.id || result?.followup?.id || result?.application?.id || result?.contract?.id || result?.fulfillment?.id || result?.authorization?.id || result?.escalation?.id || result?.deadLetter?.id || result?.message?.id || "",
-    residentId: command.residentId || result?.assessment?.residentId || result?.order?.residentId || result?.teleconsultation?.residentId || result?.referral?.residentId || result?.followup?.residentId || result?.application?.residentId || result?.contract?.residentId || result?.fulfillment?.residentId || result?.authorization?.residentId || result?.escalation?.residentId || result?.deadLetter?.residentId || result?.message?.residentId || "",
+    caseId: command.caseId || result?.assessment?.id || result?.order?.id || result?.teleconsultation?.id || result?.referral?.id || result?.followup?.id || result?.application?.id || result?.contract?.id || result?.fulfillment?.id || result?.authorization?.id || result?.dispute?.id || result?.escalation?.id || result?.deadLetter?.id || result?.message?.id || "",
+    residentId: command.residentId || result?.assessment?.residentId || result?.order?.residentId || result?.teleconsultation?.residentId || result?.referral?.residentId || result?.followup?.residentId || result?.application?.residentId || result?.contract?.residentId || result?.fulfillment?.residentId || result?.authorization?.residentId || result?.dispute?.residentId || result?.escalation?.residentId || result?.deadLetter?.residentId || result?.message?.residentId || "",
     at: command.at,
     actor: actorName(actor),
     actorRole: actor.role,

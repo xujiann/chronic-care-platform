@@ -5,6 +5,7 @@ const { createHash } = require("node:crypto");
 const {
   normalizeChronicFollowupCase,
   normalizeFamilyDoctorCase,
+  normalizeFamilyDoctorServiceDisputeCase,
   normalizePrimaryCareCase,
   normalizeReferralCase,
   normalizeRegistrationCase
@@ -33,6 +34,9 @@ const STANDALONE_COMMAND_CONTRACTS = Object.freeze([
   { action: "review-family-doctor-renewal", roles: ["institution", "commission"], requiredFields: ["caseId", "payload.decision", "payload.note"], suggestedEndpoint: "POST /api/registration-referral/commands/review-family-doctor-renewal" },
   { action: "request-family-doctor-transfer", roles: ["citizen", "commission"], requiredFields: ["caseId", "payload.teamId", "payload.packageId", "payload.reason", "payload.note"], suggestedEndpoint: "POST /api/registration-referral/commands/request-family-doctor-transfer" },
   { action: "review-family-doctor-transfer", roles: ["institution", "commission"], requiredFields: ["caseId", "payload.decision", "payload.note"], suggestedEndpoint: "POST /api/registration-referral/commands/review-family-doctor-transfer" },
+  { action: "raise-family-doctor-service-dispute", roles: ["citizen", "commission"], requiredFields: ["caseId", "payload.fulfillmentId", "payload.category", "payload.description", "payload.requestedResolution", "payload.note"], suggestedEndpoint: "POST /api/registration-referral/commands/raise-family-doctor-service-dispute" },
+  { action: "respond-family-doctor-service-dispute", roles: ["institution", "commission"], requiredFields: ["caseId", "payload.resolution", "payload.note"], suggestedEndpoint: "POST /api/registration-referral/commands/respond-family-doctor-service-dispute" },
+  { action: "acknowledge-family-doctor-service-dispute", roles: ["citizen", "commission"], requiredFields: ["caseId", "payload.decision", "payload.note"], suggestedEndpoint: "POST /api/registration-referral/commands/acknowledge-family-doctor-service-dispute" },
   { action: "terminate-family-doctor-contract", roles: ["citizen", "institution", "commission"], requiredFields: ["caseId", "payload.reason", "payload.note"], suggestedEndpoint: "POST /api/registration-referral/commands/terminate-family-doctor-contract" }
 ]);
 
@@ -569,7 +573,8 @@ function allCaseEnvelopes(data) {
     ...rows(data.phase2FamilyDoctorApplications).map((item) => normalizeFamilyDoctorCase(item, { messages, fulfillments: data.phase2FamilyDoctorFulfillments })),
     ...rows(data.phase2FamilyDoctorContracts).map((item) => normalizeFamilyDoctorCase(item, { messages, fulfillments: data.phase2FamilyDoctorFulfillments })),
     ...rows(data.followups).map((item) => normalizeChronicFollowupCase(item, { messages })),
-    ...rows(data.phase2FamilyDoctorServiceTasks).map(normalizeFamilyServiceTask)
+    ...rows(data.phase2FamilyDoctorServiceTasks).map(normalizeFamilyServiceTask),
+    ...rows(data.phase2FamilyDoctorServiceDisputes).map((item) => normalizeFamilyDoctorServiceDisputeCase(item, { messages }))
   ];
 }
 
@@ -773,7 +778,13 @@ function packageFor(data, packageId) {
 function familyMessage(data, command, actor, source, targetRole, targetOrgCode, title, body, stage) {
   return appendMessage(data, command, actor, {
     suffix: `${stage}-${targetRole}`,
-    collection: source.id.startsWith("p2fdf") ? "phase2FamilyDoctorFulfillments" : source.id.startsWith("p2fdc") ? "phase2FamilyDoctorContracts" : "phase2FamilyDoctorApplications",
+    collection: source.id.startsWith("p2fdf")
+      ? "phase2FamilyDoctorFulfillments"
+      : source.id.startsWith("p2fdc")
+        ? "phase2FamilyDoctorContracts"
+        : source.id.startsWith("p2fdd")
+          ? "phase2FamilyDoctorServiceDisputes"
+          : "phase2FamilyDoctorApplications",
     sourceId: source.id,
     residentId: source.residentId,
     targetRole,
@@ -1199,6 +1210,153 @@ function reviewFamilyTransfer(data, command, actor) {
   return { contract, application, messages };
 }
 
+function addHours(at, hours) {
+  return new Date(Date.parse(at) + hours * 3_600_000).toISOString();
+}
+
+function raiseFamilyServiceDispute(data, command, actor) {
+  const disputeId = requireText(command.caseId, "caseId");
+  if (rows(data.phase2FamilyDoctorServiceDisputes).some((item) => item.id === disputeId)) {
+    throw new Error("family doctor service dispute id already exists");
+  }
+  const fulfillment = rows(data.phase2FamilyDoctorFulfillments).find((item) => item.id === requireText(command.payload.fulfillmentId, "payload.fulfillmentId"));
+  if (!fulfillment) throw new Error("family doctor fulfillment not found");
+  requireResident(actor, fulfillment.residentId);
+  if (text(fulfillment.status).toLowerCase() !== "completed") throw new Error("only a completed family doctor fulfillment may be disputed");
+  const contract = rows(data.phase2FamilyDoctorContracts).find((item) => item.id === fulfillment.contractId);
+  if (!contract || contract.residentId !== fulfillment.residentId) throw new Error("family doctor dispute contract mismatch");
+  if (rows(data.phase2FamilyDoctorServiceDisputes).some((item) =>
+    item.fulfillmentId === fulfillment.id && !["resolved", "cancelled"].includes(text(item.status).toLowerCase()))) {
+    throw new Error("open family doctor service dispute already exists");
+  }
+  const serviceTeam = teamFor(data, fulfillment.teamId);
+  const institutionCode = text(serviceTeam?.institutionCode || contract.institutionCode);
+  if (!institutionCode) throw new Error("family doctor service institution is required");
+  const category = requireText(command.payload.category, "payload.category").toLowerCase();
+  if (!["service-quality", "communication", "record-accuracy", "accessibility", "billing", "other"].includes(category)) {
+    throw new Error("unsupported family doctor service dispute category");
+  }
+  const responseDueAt = text(command.payload.responseDueAt || addHours(command.at, 72));
+  if (!Number.isFinite(Date.parse(responseDueAt)) || Date.parse(responseDueAt) <= Date.parse(command.at)) {
+    throw new Error("family doctor dispute responseDueAt must be after command time");
+  }
+  const dispute = {
+    id: disputeId,
+    fulfillmentId: fulfillment.id,
+    contractId: contract.id,
+    residentId: fulfillment.residentId,
+    teamId: fulfillment.teamId,
+    institutionCode,
+    category,
+    description: requireText(command.payload.description, "payload.description"),
+    requestedResolution: requireText(command.payload.requestedResolution, "payload.requestedResolution"),
+    status: "open",
+    responseDueAt,
+    raisedAt: command.at,
+    raisedBy: actorName(actor),
+    lastAction: requireText(command.payload.note, "payload.note"),
+    responseHistory: [],
+    residentDecisionHistory: [],
+    reopenCount: 0,
+    workflowVersion: 1,
+    productionEvidence: false
+  };
+  data.phase2FamilyDoctorServiceDisputes = appendById(data.phase2FamilyDoctorServiceDisputes, dispute);
+  const message = familyMessage(data, command, actor, dispute, "institution", institutionCode, "Family doctor service dispute awaiting response", dispute.lastAction, "dispute-raised");
+  return { dispute, fulfillment, contract, message };
+}
+
+function respondFamilyServiceDispute(data, command, actor) {
+  const dispute = rows(data.phase2FamilyDoctorServiceDisputes).find((item) => item.id === command.caseId);
+  if (!dispute) throw new Error("family doctor service dispute not found");
+  requireInstitution(actor, dispute.institutionCode);
+  if (!["open", "reopened"].includes(text(dispute.status).toLowerCase())) {
+    throw new Error("family doctor service dispute is not awaiting institution response");
+  }
+  const resolution = requireText(command.payload.resolution, "payload.resolution");
+  const note = requireText(command.payload.note, "payload.note");
+  const evidenceCollection = text(command.payload.evidenceCollection);
+  const evidenceId = text(command.payload.evidenceId);
+  if (Boolean(evidenceCollection) !== Boolean(evidenceId)) {
+    throw new Error("family doctor dispute resolution evidence requires both collection and id");
+  }
+  const residentDueAt = text(command.payload.residentDueAt || addHours(command.at, 72));
+  if (!Number.isFinite(Date.parse(residentDueAt)) || Date.parse(residentDueAt) <= Date.parse(command.at)) {
+    throw new Error("family doctor dispute residentDueAt must be after command time");
+  }
+  const response = {
+    at: command.at,
+    by: actorName(actor),
+    institutionCode: dispute.institutionCode,
+    resolution,
+    note,
+    evidenceCollection,
+    evidenceId,
+    cycle: Number(dispute.reopenCount || 0) + 1
+  };
+  dispute.responseHistory = [response, ...rows(dispute.responseHistory)].slice(0, 20);
+  dispute.status = "responded";
+  dispute.latestResolution = resolution;
+  dispute.latestResponseAt = command.at;
+  dispute.latestResponder = actorName(actor);
+  dispute.residentDueAt = residentDueAt;
+  const message = familyMessage(data, command, actor, dispute, "citizen", "", "Family doctor service dispute response ready", `${resolution}: ${note}`, `dispute-responded-${response.cycle}`);
+  return { dispute, response, message };
+}
+
+function acknowledgeFamilyServiceDispute(data, command, actor) {
+  const dispute = rows(data.phase2FamilyDoctorServiceDisputes).find((item) => item.id === command.caseId);
+  if (!dispute) throw new Error("family doctor service dispute not found");
+  requireResident(actor, dispute.residentId);
+  if (dispute.status !== "responded") throw new Error("family doctor service dispute is not awaiting resident acknowledgement");
+  const decision = requireText(command.payload.decision, "payload.decision").toLowerCase();
+  if (!["accepted", "reopen"].includes(decision)) throw new Error("family doctor service dispute decision must be accepted or reopen");
+  const note = requireText(command.payload.note, "payload.note");
+  const decisionRecord = {
+    at: command.at,
+    by: actorName(actor),
+    decision,
+    note,
+    cycle: Number(dispute.reopenCount || 0) + 1
+  };
+  dispute.residentDecisionHistory = [decisionRecord, ...rows(dispute.residentDecisionHistory)].slice(0, 20);
+  dispute.residentDecision = decision;
+  dispute.residentDecisionAt = command.at;
+  const escalations = [];
+  let title;
+  if (decision === "accepted") {
+    dispute.status = "resolved";
+    dispute.resolvedAt = command.at;
+    dispute.resolvedBy = actorName(actor);
+    dispute.resolutionStatus = "resident-accepted";
+    rows(data.registrationReferralEscalations)
+      .filter((item) => item.caseType === "family-doctor-service-dispute"
+        && item.caseId === dispute.id
+        && !["resolved", "closed"].includes(text(item.status).toLowerCase()))
+      .forEach((item) => {
+        item.status = "resolved";
+        item.resolvedAt = command.at;
+        item.resolvedBy = actorName(actor);
+        item.resolution = "resident-accepted-remediation";
+        escalations.push(item);
+      });
+    title = "Family doctor service dispute resolved";
+  } else {
+    const responseDueAt = text(command.payload.responseDueAt || addHours(command.at, 48));
+    if (!Number.isFinite(Date.parse(responseDueAt)) || Date.parse(responseDueAt) <= Date.parse(command.at)) {
+      throw new Error("family doctor dispute responseDueAt must be after command time");
+    }
+    dispute.status = "reopened";
+    dispute.reopenCount = Number(dispute.reopenCount || 0) + 1;
+    dispute.responseDueAt = responseDueAt;
+    dispute.reopenReason = note;
+    dispute.resolutionStatus = "resident-reopened";
+    title = "Family doctor service dispute reopened";
+  }
+  const message = familyMessage(data, command, actor, dispute, "institution", dispute.institutionCode, title, note, `dispute-${decision}-${decisionRecord.cycle}`);
+  return { dispute, decision: decisionRecord, escalations, message };
+}
+
 function terminateFamilyContract(data, command, actor) {
   const contract = rows(data.phase2FamilyDoctorContracts).find((item) => item.id === command.caseId);
   if (!contract) throw new Error("family doctor contract not found");
@@ -1266,6 +1424,7 @@ function buildClosureQualityMetrics(data = {}, options = {}) {
   const repeatExamReuse = allReferrals.filter((item) => /recognized|reused|mutual-recognition/i.test(text(item.performance?.repeatExamControl)));
   const familyContracts = rows(data.phase2FamilyDoctorContracts);
   const familyFulfillments = rows(data.phase2FamilyDoctorFulfillments);
+  const familyDisputes = rows(data.phase2FamilyDoctorServiceDisputes);
   const pct = (numerator, denominator) => denominator ? Math.round((numerator / denominator) * 10_000) / 100 : 0;
   return {
     asOf: text(options.asOf || new Date().toISOString()),
@@ -1282,6 +1441,9 @@ function buildClosureQualityMetrics(data = {}, options = {}) {
     activeFamilyContracts: familyContracts.filter((item) => item.status === "active").length,
     familyFulfillments: familyFulfillments.length,
     acknowledgedFamilyFulfillments: familyFulfillments.filter((item) => item.residentAcknowledgement?.status === "acknowledged").length,
+    familyServiceDisputes: familyDisputes.length,
+    openFamilyServiceDisputes: familyDisputes.filter((item) => !["resolved", "cancelled"].includes(text(item.status).toLowerCase())).length,
+    resolvedFamilyServiceDisputes: familyDisputes.filter((item) => text(item.status).toLowerCase() === "resolved").length,
     notificationReliability: buildNotificationReliability(data),
     openWorkItems: buildClosureWorkQueue(data, { asOf: options.asOf, actor: { role: "commission" } }).length,
     productionReady: false
@@ -1311,6 +1473,9 @@ const HANDLERS = Object.freeze({
   "review-family-doctor-renewal": reviewFamilyRenewal,
   "request-family-doctor-transfer": requestFamilyTransfer,
   "review-family-doctor-transfer": reviewFamilyTransfer,
+  "raise-family-doctor-service-dispute": raiseFamilyServiceDispute,
+  "respond-family-doctor-service-dispute": respondFamilyServiceDispute,
+  "acknowledge-family-doctor-service-dispute": acknowledgeFamilyServiceDispute,
   "terminate-family-doctor-contract": terminateFamilyContract
 });
 

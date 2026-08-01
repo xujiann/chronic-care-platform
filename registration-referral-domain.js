@@ -351,6 +351,25 @@ function normalizeFamilyDoctorCase(item = {}, context = {}) {
   return envelope;
 }
 
+function normalizeFamilyDoctorServiceDisputeCase(item = {}, context = {}) {
+  const notification = summarizeNotificationReceipts(context.messages, item.id);
+  const envelope = baseEnvelope("family-doctor-service-dispute", item, notification);
+  const status = lower(item.status);
+  const terminal = ["resolved", "cancelled"].includes(status);
+  const awaitingResident = status === "responded";
+  envelope.sourceOrg = text(item.institutionCode);
+  envelope.upstreamRefs = [text(item.fulfillmentId), text(item.contractId)].filter(Boolean);
+  envelope.unifiedPhase = terminal ? "closed" : awaitingResident ? "result-returned" : "exception";
+  envelope.exceptionState = terminal ? "none" : awaitingResident ? "resident-resolution-review-pending" : "family-doctor-service-dispute-open";
+  Object.assign(envelope, responsibility(
+    terminal ? "" : awaitingResident ? "resident" : item.institutionCode,
+    terminal ? "" : awaitingResident ? "citizen" : "family-doctor-quality",
+    terminal ? "" : awaitingResident ? item.residentDueAt : item.responseDueAt,
+    terminal ? "none" : awaitingResident ? "accept resolution or reopen dispute" : "respond with remediation evidence"
+  ));
+  return envelope;
+}
+
 function normalizeChronicFollowupCase(item = {}, context = {}) {
   const notification = summarizeNotificationReceipts(context.messages, item.id);
   const envelope = baseEnvelope("chronic-followup", item, notification);
@@ -383,6 +402,7 @@ function normalizeDomainCase(caseType, item = {}, context = {}) {
     referral: normalizeReferralCase,
     "referral-teleconsultation": normalizeReferralCase,
     "family-doctor": normalizeFamilyDoctorCase,
+    "family-doctor-service-dispute": normalizeFamilyDoctorServiceDisputeCase,
     "chronic-followup": normalizeChronicFollowupCase
   };
   const normalize = normalizers[caseType];
@@ -466,6 +486,7 @@ function validateClosureReferences(data = {}) {
   const applications = rows(data.phase2FamilyDoctorApplications);
   const contracts = index(data.phase2FamilyDoctorContracts);
   const serviceTasks = index(data.phase2FamilyDoctorServiceTasks);
+  const serviceDisputes = index(data.phase2FamilyDoctorServiceDisputes);
   const familyTeams = index(data.phase2FamilyDoctorTeams);
   const familyPackages = index(data.phase2FamilyDoctorServicePackages);
   const taskMessages = index(data.taskMessages);
@@ -478,7 +499,8 @@ function validateClosureReferences(data = {}) {
     phase2FamilyDoctorApplications: index(data.phase2FamilyDoctorApplications),
     phase2FamilyDoctorContracts: index(data.phase2FamilyDoctorContracts),
     phase2FamilyDoctorFulfillments: index(data.phase2FamilyDoctorFulfillments),
-    phase2FamilyDoctorServiceTasks: serviceTasks
+    phase2FamilyDoctorServiceTasks: serviceTasks,
+    phase2FamilyDoctorServiceDisputes: serviceDisputes
   };
 
   rows(data.registrationOrders).forEach((order) => {
@@ -612,6 +634,31 @@ function validateClosureReferences(data = {}) {
     }
   });
 
+  rows(data.phase2FamilyDoctorServiceDisputes).forEach((dispute) => {
+    const disputeStatus = lower(dispute.status);
+    const fulfillment = rows(data.phase2FamilyDoctorFulfillments).find((item) => item.id === dispute.fulfillmentId);
+    const contract = contracts.get(dispute.contractId);
+    const team = familyTeams.get(dispute.teamId);
+    if (!fulfillment) addIssue("P0", "family-dispute-fulfillment-missing", "familyDoctorServiceDispute", dispute.id, "service dispute references a missing fulfillment", { fulfillmentId: dispute.fulfillmentId });
+    if (!contract) addIssue("P0", "family-dispute-contract-missing", "familyDoctorServiceDispute", dispute.id, "service dispute references a missing contract", { contractId: dispute.contractId });
+    if (familyTeams.size && !team) addIssue("P0", "family-dispute-team-missing", "familyDoctorServiceDispute", dispute.id, "service dispute references a missing fulfillment team", { teamId: dispute.teamId });
+    if (fulfillment && (fulfillment.contractId !== dispute.contractId || fulfillment.residentId !== dispute.residentId || fulfillment.teamId !== dispute.teamId)) {
+      addIssue("P0", "family-dispute-fulfillment-scope-mismatch", "familyDoctorServiceDispute", dispute.id, "service dispute resident, contract, or team differs from its fulfillment", { fulfillmentId: dispute.fulfillmentId });
+    }
+    if (contract && contract.residentId !== dispute.residentId) {
+      addIssue("P0", "family-dispute-contract-resident-mismatch", "familyDoctorServiceDispute", dispute.id, "service dispute and contract residents differ", { contractId: dispute.contractId });
+    }
+    if (team && team.institutionCode !== dispute.institutionCode) {
+      addIssue("P0", "family-dispute-institution-mismatch", "familyDoctorServiceDispute", dispute.id, "service dispute institution differs from the fulfillment team institution", { teamId: dispute.teamId, institutionCode: dispute.institutionCode, teamInstitutionCode: team.institutionCode });
+    }
+    if (["responded", "resolved"].includes(disputeStatus) && !rows(dispute.responseHistory).length) {
+      addIssue("P0", "family-dispute-response-missing", "familyDoctorServiceDispute", dispute.id, "responded or resolved service dispute requires institution response evidence", {});
+    }
+    if (disputeStatus === "resolved" && lower(dispute.residentDecision) !== "accepted") {
+      addIssue("P0", "family-dispute-resident-acceptance-missing", "familyDoctorServiceDispute", dispute.id, "resolved service dispute requires resident acceptance", { residentDecision: dispute.residentDecision || "" });
+    }
+  });
+
   rows(data.phase2FamilyDoctorServiceTasks).forEach((task) => {
     const contract = contracts.get(task.contractId);
     if (!contract) addIssue("P0", "family-service-task-contract-missing", "familyDoctorServiceTask", task.id, "service task references a missing family doctor contract", { contractId: task.contractId });
@@ -720,7 +767,8 @@ function planClosureReferenceRepairs(data = {}) {
     followups: new Map(rows(data.followups).filter((item) => item?.id).map((item) => [item.id, item])),
     phase2FamilyDoctorApplications: new Map(rows(data.phase2FamilyDoctorApplications).filter((item) => item?.id).map((item) => [item.id, item])),
     phase2FamilyDoctorContracts: new Map(rows(data.phase2FamilyDoctorContracts).filter((item) => item?.id).map((item) => [item.id, item])),
-    phase2FamilyDoctorFulfillments: new Map(rows(data.phase2FamilyDoctorFulfillments).filter((item) => item?.id).map((item) => [item.id, item]))
+    phase2FamilyDoctorFulfillments: new Map(rows(data.phase2FamilyDoctorFulfillments).filter((item) => item?.id).map((item) => [item.id, item])),
+    phase2FamilyDoctorServiceDisputes: new Map(rows(data.phase2FamilyDoctorServiceDisputes).filter((item) => item?.id).map((item) => [item.id, item]))
   };
   rows(data.taskMessages).forEach((message) => {
     const source = messageSources[message.collection]?.get(message.sourceId);
@@ -778,7 +826,8 @@ function applyClosureReferenceRepairs(data = {}, repairsOrPlan = []) {
     followups: new Map(rows(next.followups).filter((item) => item?.id).map((item) => [item.id, item])),
     phase2FamilyDoctorApplications: new Map(rows(next.phase2FamilyDoctorApplications).filter((item) => item?.id).map((item) => [item.id, item])),
     phase2FamilyDoctorContracts: new Map(rows(next.phase2FamilyDoctorContracts).filter((item) => item?.id).map((item) => [item.id, item])),
-    phase2FamilyDoctorFulfillments: new Map(rows(next.phase2FamilyDoctorFulfillments).filter((item) => item?.id).map((item) => [item.id, item]))
+    phase2FamilyDoctorFulfillments: new Map(rows(next.phase2FamilyDoctorFulfillments).filter((item) => item?.id).map((item) => [item.id, item])),
+    phase2FamilyDoctorServiceDisputes: new Map(rows(next.phase2FamilyDoctorServiceDisputes).filter((item) => item?.id).map((item) => [item.id, item]))
   };
   const applied = [];
 
@@ -835,6 +884,7 @@ module.exports = {
   normalizeChronicFollowupCase,
   normalizeDomainCase,
   normalizeFamilyDoctorCase,
+  normalizeFamilyDoctorServiceDisputeCase,
   normalizePrimaryCareCase,
   normalizeReferralCase,
   normalizeRegistrationCase,

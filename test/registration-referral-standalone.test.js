@@ -113,9 +113,12 @@ test("standalone command catalog covers all locally implementable increments", (
     "review-family-doctor-renewal",
     "request-family-doctor-transfer",
     "review-family-doctor-transfer",
+    "raise-family-doctor-service-dispute",
+    "respond-family-doctor-service-dispute",
+    "acknowledge-family-doctor-service-dispute",
     "terminate-family-doctor-contract"
   ].forEach((action) => assert.ok(actions.has(action), action));
-  assert.equal(CLOSURE_COMMAND_CONTRACTS.length, 42);
+  assert.equal(CLOSURE_COMMAND_CONTRACTS.length, 45);
 });
 
 test("referral exception path rejects reassigns packages reschedules no-show and cancels", () => {
@@ -585,6 +588,152 @@ test("family doctor transfer rejection preserves the existing team and capacity"
   assert.equal(current.data.phase2FamilyDoctorTeams.find((item) => item.id === "p2fdtm-qnw").signedResidents, sourceCount);
   assert.equal(current.data.phase2FamilyDoctorTeams.find((item) => item.id === "p2fdtm-central").signedResidents, targetCount);
   assert.equal(current.consistency.summary.P0, 0);
+});
+
+test("family doctor service dispute closes after remediation and resident acceptance", () => {
+  const source = data();
+  assert.throws(() => run(source, "p2fdd-wrong-resident", "raise-family-doctor-service-dispute", citizenR2, {
+    caseId: "p2fdd-wrong-resident",
+    payload: {
+      fulfillmentId: "p2fdf-r1-bp",
+      category: "service-quality",
+      description: "The recorded follow-up does not match the delivered service.",
+      requestedResolution: "Review and correct the service record.",
+      note: "Must remain resident scoped."
+    }
+  }), /resident scope denied/);
+  assert.throws(() => run(source, "p2fdd-invalid-category", "raise-family-doctor-service-dispute", citizenR1, {
+    caseId: "p2fdd-invalid-category",
+    payload: {
+      fulfillmentId: "p2fdf-r1-bp",
+      category: "unsupported",
+      description: "Invalid category.",
+      requestedResolution: "No action.",
+      note: "Reject unsupported category."
+    }
+  }), /unsupported family doctor service dispute category/);
+
+  let current = run(source, "family-dispute-raise", "raise-family-doctor-service-dispute", citizenR1, {
+    caseId: "p2fdd-r1-bp",
+    at: "2026-07-23T08:00:00.000Z",
+    payload: {
+      fulfillmentId: "p2fdf-r1-bp",
+      category: "record-accuracy",
+      description: "The blood-pressure follow-up record omits the resident-reported home readings.",
+      requestedResolution: "Correct the record and explain the updated care advice.",
+      responseDueAt: "2026-07-25T08:00:00.000Z",
+      note: "Resident requests a traceable correction."
+    }
+  });
+  assert.equal(current.result.dispute.status, "open");
+  assert.equal(current.result.dispute.institutionCode, "MR3");
+  assert.ok(buildClosureWorkQueue(current.data, { asOf: "2026-07-24T08:00:00.000Z", actor: mr3 })
+    .some((item) => item.caseId === "p2fdd-r1-bp" && item.responsibleRole === "family-doctor-quality"));
+  assert.throws(() => run(current.data, "family-dispute-wrong-escalation", "escalate-case", mr1, {
+    caseType: "family-doctor-service-dispute",
+    caseId: "p2fdd-r1-bp",
+    payload: { note: "Wrong institution cannot escalate the dispute." }
+  }), /institution scope denied/);
+  current = run(current.data, "family-dispute-escalation", "escalate-case", mr3, {
+    caseType: "family-doctor-service-dispute",
+    caseId: "p2fdd-r1-bp",
+    payload: { severity: "high", note: "Escalate the disputed record correction." }
+  });
+  const escalationId = current.result.escalation.id;
+  assert.throws(() => run(current.data, "family-dispute-duplicate", "raise-family-doctor-service-dispute", citizenR1, {
+    caseId: "p2fdd-r1-bp-duplicate",
+    payload: {
+      fulfillmentId: "p2fdf-r1-bp",
+      category: "record-accuracy",
+      description: "Duplicate dispute.",
+      requestedResolution: "Duplicate correction.",
+      note: "Must reject duplicate open dispute."
+    }
+  }), /open family doctor service dispute already exists/);
+  assert.throws(() => run(current.data, "family-dispute-no-org", "respond-family-doctor-service-dispute", {
+    role: "institution",
+    username: "unscoped"
+  }, {
+    caseId: "p2fdd-r1-bp",
+    payload: { resolution: "Attempted response.", note: "Must fail closed." }
+  }), /institution actor orgCode is required/);
+  assert.throws(() => run(current.data, "family-dispute-wrong-org", "respond-family-doctor-service-dispute", mr1, {
+    caseId: "p2fdd-r1-bp",
+    payload: { resolution: "Attempted response.", note: "Wrong institution." }
+  }), /institution scope denied/);
+  assert.throws(() => run(current.data, "family-dispute-broken-evidence", "respond-family-doctor-service-dispute", mr3, {
+    caseId: "p2fdd-r1-bp",
+    payload: {
+      resolution: "Correct the record.",
+      evidenceCollection: "followups",
+      note: "Evidence reference must be complete."
+    }
+  }), /requires both collection and id/);
+
+  current = run(current.data, "family-dispute-respond-1", "respond-family-doctor-service-dispute", mr3, {
+    caseId: "p2fdd-r1-bp",
+    at: "2026-07-23T10:00:00.000Z",
+    payload: {
+      resolution: "Home readings were added and medication advice was reviewed.",
+      evidenceCollection: "followups",
+      evidenceId: "f1",
+      residentDueAt: "2026-07-26T10:00:00.000Z",
+      note: "First remediation response."
+    }
+  });
+  assert.equal(current.result.dispute.status, "responded");
+  assert.ok(buildClosureWorkQueue(current.data, { asOf: "2026-07-24T08:00:00.000Z", actor: citizenR1 })
+    .some((item) => item.caseId === "p2fdd-r1-bp" && item.responsibleRole === "citizen"));
+  assert.throws(() => run(current.data, "family-dispute-wrong-ack", "acknowledge-family-doctor-service-dispute", citizenR2, {
+    caseId: "p2fdd-r1-bp",
+    payload: { decision: "accepted", note: "Must remain resident scoped." }
+  }), /resident scope denied/);
+
+  current = run(current.data, "family-dispute-reopen", "acknowledge-family-doctor-service-dispute", citizenR1, {
+    caseId: "p2fdd-r1-bp",
+    at: "2026-07-23T12:00:00.000Z",
+    payload: {
+      decision: "reopen",
+      responseDueAt: "2026-07-25T12:00:00.000Z",
+      note: "The corrected record still lacks the agreed follow-up date."
+    }
+  });
+  assert.equal(current.result.dispute.status, "reopened");
+  assert.equal(current.result.dispute.reopenCount, 1);
+  current = run(current.data, "family-dispute-respond-2", "respond-family-doctor-service-dispute", mr3, {
+    caseId: "p2fdd-r1-bp",
+    at: "2026-07-23T14:00:00.000Z",
+    payload: {
+      resolution: "The follow-up date and responsible doctor were added.",
+      evidenceCollection: "followups",
+      evidenceId: "f1",
+      note: "Second remediation response."
+    }
+  });
+  current = run(current.data, "family-dispute-accept", "acknowledge-family-doctor-service-dispute", citizenR1, {
+    caseId: "p2fdd-r1-bp",
+    at: "2026-07-23T16:00:00.000Z",
+    payload: { decision: "accepted", note: "The correction now matches the agreed plan." }
+  });
+  assert.equal(current.result.dispute.status, "resolved");
+  assert.equal(current.result.dispute.residentDecision, "accepted");
+  assert.equal(current.result.dispute.responseHistory.length, 2);
+  assert.equal(current.result.dispute.residentDecisionHistory.length, 2);
+  assert.equal(buildClosureWorkQueue(current.data, { asOf: "2026-07-24T08:00:00.000Z", actor: commission })
+    .some((item) => item.caseId === "p2fdd-r1-bp"), false);
+  const metrics = buildClosureQualityMetrics(current.data, { asOf: "2026-07-24T08:00:00.000Z" });
+  assert.equal(metrics.familyServiceDisputes, 1);
+  assert.equal(metrics.openFamilyServiceDisputes, 0);
+  assert.equal(metrics.resolvedFamilyServiceDisputes, 1);
+  assert.equal(current.data.registrationReferralEscalations.find((item) => item.id === escalationId).status, "resolved");
+  assert.ok(current.data.taskMessages
+    .filter((item) => item.sourceId === "p2fdd-r1-bp")
+    .every((item) => item.collection === "phase2FamilyDoctorServiceDisputes"));
+  assert.equal(current.consistency.summary.P0, 0);
+  assert.throws(() => run(current.data, "family-dispute-terminal-ack", "acknowledge-family-doctor-service-dispute", citizenR1, {
+    caseId: "p2fdd-r1-bp",
+    payload: { decision: "accepted", note: "Resolved dispute is terminal." }
+  }), /not awaiting resident acknowledgement/);
 });
 
 test("expected versions and replay provide optimistic concurrency and recovery evidence", () => {

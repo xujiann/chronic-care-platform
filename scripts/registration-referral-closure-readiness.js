@@ -7,6 +7,7 @@ const path = require("node:path");
 const {
   normalizeChronicFollowupCase,
   normalizeFamilyDoctorCase,
+  normalizeFamilyDoctorServiceDisputeCase,
   normalizePrimaryCareCase,
   normalizeReferralCase,
   normalizeRegistrationCase,
@@ -55,6 +56,7 @@ function buildNormalizedCases(data, options = {}) {
     ...rows(data.referralTeleconsultations).map((item) => normalizeReferralCase(item, { messages })),
     ...rows(data.phase2FamilyDoctorApplications).map((item) => normalizeFamilyDoctorCase(item, { messages, fulfillments })),
     ...rows(data.phase2FamilyDoctorContracts).map((item) => normalizeFamilyDoctorCase(item, { messages, fulfillments })),
+    ...rows(data.phase2FamilyDoctorServiceDisputes).map((item) => normalizeFamilyDoctorServiceDisputeCase(item, { messages })),
     ...rows(data.followups).map((item) => normalizeChronicFollowupCase(item, { messages }))
   ];
 }
