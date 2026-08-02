@@ -54,7 +54,7 @@ test("mobile layout has no fixed wide surface and primary targets are at least 4
 test("client writes wait for authenticated server responses and never create download links", () => {
   const app = read("resident-mini-program.js");
   assert.match(app, /\/api\/auth\/me/);
-  assert.match(app, /\/api\/messages\/\$\{encodeURIComponent\(messageId\)\}\/receipt/);
+  assert.match(app, /\/api\/messages\/\$\{encodeURIComponent\(intent\.messageId\)\}\/receipt/);
   assert.match(app, /Core\.confirmMessageReceipt/);
   assert.match(app, /未收到有效回执，消息仍保持未读/);
   assert.doesNotMatch(app, /URL\.createObjectURL|download\s*=|auditHash|objectKey|permanentUrl/);

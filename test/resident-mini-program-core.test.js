@@ -180,7 +180,7 @@ test("platform adapter stores only accessibility preferences and uses allowliste
   assert.equal(adapter.runtime, "web");
   assert.equal(adapter.setPreference("largeText", true), true);
   assert.equal(adapter.setPreference("residentId", "r1"), false);
-  assert.deepEqual(adapter.getPreferences(), { largeText: true });
-  adapter.navigate("home");
+  assert.deepEqual(adapter.getPreferences(), { largeText: true, highContrast: false });
+  void adapter.navigate("home");
   assert.equal(history[0], "/resident-mini-program.html?page=home");
 });

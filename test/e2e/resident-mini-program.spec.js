@@ -1,6 +1,19 @@
 const { test, expect } = require("@playwright/test");
 
+async function resetResidentFixture(page) {
+  const loginResponse = await page.request.post("/api/auth/login", {
+    data: { username: "city", password: "123456" }
+  });
+  expect(loginResponse.ok()).toBeTruthy();
+  const login = await loginResponse.json();
+  const resetResponse = await page.request.post("/api/reset", {
+    headers: { Authorization: `Bearer ${login.token}` }
+  });
+  expect(resetResponse.ok()).toBeTruthy();
+}
+
 async function loginAsResident(page) {
+  await resetResidentFixture(page);
   await page.goto("/login.html");
   await page.locator("#login-user").selectOption("citizen");
   await page.locator("input[name='password']").fill("123456");
@@ -88,4 +101,145 @@ test("expired or locally forged session is blocked before resident data loads", 
   await expect(page.locator("#gate-title")).toHaveText("需要安全登录");
   await expect(page.locator("#app-content")).toBeHidden();
   await expect(page.locator("#gate-login")).toBeVisible();
+});
+
+test("background and offline transitions clear resident state before secure recovery", async ({ page }) => {
+  await loginAsResident(page);
+  await page.goto("/resident-mini-program.html?page=health-record&recordId=record-1");
+  await expect(page.locator("#page-detail")).toBeVisible();
+
+  await page.evaluate(() => window.dispatchEvent(new Event("offline")));
+  await expect(page.locator("#gate-title")).toHaveText("网络连接已断开");
+  await expect(page.locator("#app-content")).toBeHidden();
+  expect(await page.evaluate(() => window.ResidentMiniProgramApp.getState())).toMatchObject({
+    suspended: true,
+    residentId: "",
+    route: "home"
+  });
+
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await expect(page.locator("#app-content")).toBeVisible();
+  await expect(page.locator("#page-home")).toBeVisible();
+  expect(await page.evaluate(() => window.ResidentMiniProgramApp.getState())).toMatchObject({
+    suspended: false,
+    residentId: "r1",
+    route: "home"
+  });
+});
+
+test("unsafe start and message links fail closed to the current resident home", async ({ page }) => {
+  await loginAsResident(page);
+  await page.goto("/resident-mini-program.html?page=emr&residentId=r4");
+  await expect(page.locator("#app-content")).toBeVisible();
+  await expect(page.locator("#page-home")).toBeVisible();
+  await expect(page.locator("#toast")).toContainText("已阻止不安全或越权的页面链接");
+  expect(await page.evaluate(() => window.ResidentMiniProgramApp.getState())).toMatchObject({
+    residentId: "r1",
+    route: "home"
+  });
+
+  await page.getByRole("button", { name: "消息" }).click();
+  const messageLink = page.locator("[data-message-link]").first();
+  if (await messageLink.count()) {
+    await messageLink.evaluate((element) => element.setAttribute("data-message-link", "missing-message"));
+    await messageLink.click();
+    await expect(page.locator("#toast")).toContainText("已过期或不属于当前居民");
+    expect((await page.evaluate(() => window.ResidentMiniProgramApp.getState())).route).toBe("messages");
+  }
+});
+
+test("message receipt failures roll back without claiming local success", async ({ page }) => {
+  await loginAsResident(page);
+  await page.route("**/api/messages", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        messages: [{
+          id: "e2e-unread-message",
+          residentId: "r1",
+          targetRole: "citizen",
+          status: "unread",
+          title: "健康档案更新提醒",
+          body: "请查看最新健康档案摘要。",
+          route: "health-record",
+          createdAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          receipts: []
+        }]
+      })
+    });
+  });
+  await page.route("**/api/messages/*/receipt", async (route) => {
+    await route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ message: "service unavailable" })
+    });
+  });
+  await page.goto("/resident-mini-program.html?page=messages");
+  const unread = page.locator("[data-mark-read]").first();
+  await expect(unread).toHaveCount(1);
+  const messageId = await unread.getAttribute("data-mark-read");
+  const card = page.locator(`[data-message-id="${messageId}"]`);
+
+  await unread.click();
+  await expect(page.locator("#toast")).toContainText("未收到有效回执，消息仍保持未读");
+  await expect(card).toContainText("未读");
+  await expect(card.locator("[data-mark-read]")).toHaveCount(1);
+});
+
+test("slow service shows a Chinese timeout gate and retry restores the app", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__RESIDENT_MINI_PROGRAM_TIMEOUT_MS__ = 200;
+  });
+  await loginAsResident(page);
+  let stateRequestCount = 0;
+  let finishFirstStateRequest;
+  const firstStateRequestFinished = new Promise((resolve) => {
+    finishFirstStateRequest = resolve;
+  });
+  await page.route("**/api/state", async (route) => {
+    stateRequestCount += 1;
+    const isFirstRequest = stateRequestCount === 1;
+    try {
+      if (isFirstRequest) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+      await route.continue();
+    } finally {
+      if (isFirstRequest) finishFirstStateRequest();
+    }
+  });
+  await page.goto("/resident-mini-program.html");
+
+  await expect(page.locator("#gate-title")).toHaveText("安全连接超时");
+  await expect(page.locator("#app-content")).toBeHidden();
+  await firstStateRequestFinished;
+  await page.locator("#gate-retry").click();
+  await expect(page.locator("#app-content")).toBeVisible();
+  await expect(page.locator("#page-home")).toBeVisible();
+});
+
+test("a changed local subject is blocked on foreground recovery", async ({ page }) => {
+  await loginAsResident(page);
+  await page.goto("/resident-mini-program.html");
+  await expect(page.locator("#app-content")).toBeVisible();
+
+  await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
+  await page.evaluate(() => {
+    const session = JSON.parse(localStorage.getItem("health-city-auth-session"));
+    localStorage.setItem("health-city-auth-session", JSON.stringify({
+      ...session,
+      id: "different-user",
+      accountId: "different-account",
+      residentId: "r4"
+    }));
+    window.dispatchEvent(new Event("pageshow"));
+  });
+
+  await expect(page.locator("#gate-title")).toHaveText("登录主体发生变化");
+  await expect(page.locator("#gate-login")).toBeVisible();
+  await expect(page.locator("#app-content")).toBeHidden();
+  expect((await page.evaluate(() => window.ResidentMiniProgramApp.getState())).residentId).toBe("");
 });

@@ -23,6 +23,24 @@
     "tasks"
   ]);
 
+  const ROUTE_PARAMETER_ALLOWLIST = Object.freeze({
+    home: new Set(),
+    messages: new Set(["messageId"]),
+    profile: new Set(),
+    "health-record": new Set(["recordId"]),
+    emr: new Set(["recordId", "sourceId"]),
+    registration: new Set(["sourceId"]),
+    nursing: new Set(["sourceId"]),
+    escort: new Set(["sourceId"]),
+    "family-doctor": new Set(["sourceId"]),
+    emergency: new Set(),
+    tasks: new Set(["sourceId"])
+  });
+  const MAX_MESSAGE_BATCH = 100;
+  const DEFAULT_MESSAGE_PAGE_SIZE = 10;
+  const MAX_MESSAGE_PAGE_SIZE = 30;
+  const MAX_MESSAGE_AGE_DAYS = 180;
+
   const RESIDENT_COLLECTIONS = Object.freeze([
     "diseases",
     "followups",
@@ -112,6 +130,12 @@
     return Number.isNaN(date.getTime()) ? null : date;
   }
 
+  function sessionSubjectKey(session = {}) {
+    const fields = ["id", "accountId", "residentId", "role"];
+    if (fields.some((field) => !cleanText(session[field], 160))) return "";
+    return fields.map((field) => safeId(session[field], 160)).join("::");
+  }
+
   function statusLabel(value, fallback = "待核验") {
     const key = cleanText(value, 80).toLowerCase();
     if (STATUS_LABELS[key]) return STATUS_LABELS[key];
@@ -127,6 +151,17 @@
     });
     if (/[A-Za-z]{2,}/.test(text)) return fallback;
     return text;
+  }
+
+  function findEnglishBusinessCopy(values = []) {
+    return (Array.isArray(values) ? values : [])
+      .map((value) => cleanText(value, 1000))
+      .filter(Boolean)
+      .filter((value) => /[A-Za-z]{2,}/.test(
+        value
+          .replace(/https?:\/\/\S+/gi, "")
+          .replace(/\b(?=[A-Za-z0-9._:-]*\d)[A-Za-z][A-Za-z0-9._:-]*\b/g, "")
+      ));
   }
 
   function isProductionSession(session, now = new Date()) {
@@ -311,7 +346,7 @@
         serviceItems: (Array.isArray(item.serviceItems) ? item.serviceItems : []).slice(0, 12).map((value) => chineseBusinessText(value, "健康服务"))
       }))
     };
-    RESIDENT_COLLECTIONS.forEach((collection) => {
+    RESIDENT_COLLECTIONS.filter((collection) => collection !== "taskMessages").forEach((collection) => {
       const rows = Array.isArray(data[collection]) ? data[collection] : [];
       projected[collection] = rows.flatMap((row) => {
         const residentId = safeId(row?.residentId || row?.maternalResidentId, 120);
@@ -320,14 +355,15 @@
           const record = projectPersonalRecord(row, residentId);
           return record ? [record] : [];
         }
-        if (collection === "taskMessages") {
-          const message = projectMessage(row, residentId);
-          return message ? [message] : [];
-        }
         const item = projectRow(row, residentId);
         return item ? [item] : [];
       });
     });
+    projected.taskMessages = scope.allowed
+      .flatMap(({ residentId }) => buildMessageBatch(data.taskMessages, residentId, {
+        limit: MAX_MESSAGE_BATCH
+      }).items)
+      .slice(0, MAX_MESSAGE_BATCH);
     return projected;
   }
 
@@ -351,29 +387,86 @@
     return routes[collection] || "messages";
   }
 
-  function projectMessage(message = {}, residentId = "") {
+  function projectMessage(message = {}, residentId = "", options = {}) {
     if (!message?.id || !rowBelongsToResident(message, residentId)) return null;
     if (cleanText(message.targetRole, 80) && message.targetRole !== "citizen") return null;
     const status = cleanText(message.status, 80).toLowerCase();
+    const now = toDate(options.now || new Date()) || new Date();
+    const createdAt = toDate(message.createdAt);
+    const expiresAt = toDate(message.expiresAt);
+    const explicitExpiry = Boolean(message.expiresAt);
+    const staleAt = createdAt ? new Date(createdAt.getTime() + MAX_MESSAGE_AGE_DAYS * 24 * 60 * 60 * 1000) : null;
+    const expired = Boolean(
+      (explicitExpiry && (!expiresAt || expiresAt.getTime() <= now.getTime()))
+      || (staleAt && staleAt.getTime() <= now.getTime())
+    );
+    const isRead = ["read", "acknowledged", "已读"].includes(status);
     return {
       id: safeId(message.id, 220),
       residentId,
       title: chineseBusinessText(message.title, "居民服务通知"),
       body: chineseBusinessText(message.body || message.message, "消息内容待核验"),
-      status: statusLabel(status, "未读"),
-      isRead: ["read", "acknowledged", "已读"].includes(status),
+      status: expired ? "已过期" : statusLabel(status, "未读"),
+      isRead,
+      isUnread: !expired && !isRead,
+      expired,
       createdAt: cleanText(message.createdAt, 60),
+      expiresAt: expiresAt?.toISOString() || "",
       route: routeForMessage(message),
       collection: safeId(message.collection, 100),
       sourceId: safeId(message.sourceId, 180)
     };
   }
 
-  function projectMessages(messages = [], residentId = "") {
-    return (Array.isArray(messages) ? messages : [])
-      .map((message) => projectMessage(message, residentId))
-      .filter(Boolean)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  function stableMessageRows(messages = [], residentId = "", options = {}) {
+    const byId = new Map();
+    (Array.isArray(messages) ? messages : []).slice(0, 500).forEach((message) => {
+      const projected = projectMessage(message, residentId, options);
+      if (!projected?.id) return;
+      const previous = byId.get(projected.id);
+      if (!previous || `${projected.createdAt}::${projected.id}` > `${previous.createdAt}::${previous.id}`) {
+        byId.set(projected.id, projected);
+      }
+    });
+    return [...byId.values()].sort((a, b) => (
+      `${b.createdAt}::${b.id}`.localeCompare(`${a.createdAt}::${a.id}`)
+    ));
+  }
+
+  function buildMessageBatch(messages = [], residentId = "", options = {}) {
+    const requestedLimit = Number(options.limit || DEFAULT_MESSAGE_PAGE_SIZE);
+    const limit = Math.max(1, Math.min(Number.isFinite(requestedLimit) ? Math.floor(requestedLimit) : DEFAULT_MESSAGE_PAGE_SIZE, MAX_MESSAGE_BATCH));
+    const requestedOffset = Number(options.cursor || 0);
+    const offset = Math.max(0, Number.isFinite(requestedOffset) ? Math.floor(requestedOffset) : 0);
+    const rows = stableMessageRows(messages, residentId, options).slice(0, MAX_MESSAGE_BATCH);
+    const items = rows.slice(offset, offset + limit);
+    const nextOffset = offset + items.length;
+    return {
+      items,
+      total: rows.length,
+      unreadCount: rows.filter((item) => item.isUnread).length,
+      expiredCount: rows.filter((item) => item.expired).length,
+      nextCursor: nextOffset < rows.length ? String(nextOffset) : ""
+    };
+  }
+
+  function projectMessages(messages = [], residentId = "", options = {}) {
+    return buildMessageBatch(messages, residentId, {
+      ...options,
+      limit: options.limit || MAX_MESSAGE_BATCH
+    }).items;
+  }
+
+  function countUnreadMessages(messages = [], residentId = "", options = {}) {
+    const unique = new Map();
+    (Array.isArray(messages) ? messages : []).forEach((message) => {
+      if (message?.residentId !== residentId || !message?.id) return;
+      unique.set(message.id, message);
+    });
+    return [...unique.values()].filter((message) => (
+      message.isUnread === true
+      || (!message.expired && message.isRead === false)
+    )).length;
   }
 
   function createSensitiveState(residentId = "") {
@@ -402,9 +495,90 @@
     return APP_ROUTES.has(route) ? route : "home";
   }
 
-  function confirmMessageReceipt(payload = {}, expectedMessageId = "") {
+  function normalizeDeepLinkInput(input) {
+    if (typeof input === "string") {
+      const text = cleanText(input, 1000);
+      if (!text || /(?:^[a-z][a-z0-9+.-]*:|[\\/]{2}|\\|%5c|%2f)/i.test(text)) return null;
+      const query = text.startsWith("?") ? text.slice(1) : text;
+      return Object.fromEntries(new URLSearchParams(query));
+    }
+    if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+    return Object.fromEntries(Object.entries(input).map(([key, value]) => [cleanText(key, 80), cleanText(value, 240)]));
+  }
+
+  function validateDeepLink(input, context = {}) {
+    const candidate = normalizeDeepLinkInput(input);
+    if (!candidate) return { ok: false, route: "home", params: {}, reason: "unsafe-link" };
+    const route = cleanText(candidate.page || candidate.route || "home", 80);
+    if (!APP_ROUTES.has(route)) return { ok: false, route: "home", params: {}, reason: "unknown-page" };
+    const allowedKeys = ROUTE_PARAMETER_ALLOWLIST[route] || new Set();
+    const inputKeys = Object.keys(candidate).filter((key) => !["page", "route", "residentId"].includes(key));
+    if (inputKeys.some((key) => !allowedKeys.has(key))) {
+      return { ok: false, route: "home", params: {}, reason: "unknown-parameter" };
+    }
+    const currentResidentId = safeId(context.residentId, 120);
+    const requestedResidentId = safeId(candidate.residentId, 120);
+    if (requestedResidentId && requestedResidentId !== currentResidentId) {
+      return { ok: false, route: "home", params: {}, reason: "cross-resident-parameter" };
+    }
+    if (requestedResidentId && (!(context.allowedResidentIds instanceof Set) || !context.allowedResidentIds.has(requestedResidentId))) {
+      return { ok: false, route: "home", params: {}, reason: "resident-scope-denied" };
+    }
+    const params = {};
+    for (const key of inputKeys) {
+      const value = safeId(candidate[key], 220);
+      if (!value || value !== candidate[key]) return { ok: false, route: "home", params: {}, reason: "unsafe-parameter" };
+      params[key] = value;
+    }
+    if (params.messageId) {
+      const message = (Array.isArray(context.messages) ? context.messages : []).find((item) => item.id === params.messageId);
+      if (!message || message.residentId !== currentResidentId || message.expired) {
+        return { ok: false, route: "home", params: {}, reason: "message-scope-denied" };
+      }
+      if (!["messages", message.route].includes(route)) {
+        return { ok: false, route: "home", params: {}, reason: "message-route-mismatch" };
+      }
+    }
+    return { ok: true, route, params, reason: "allowed" };
+  }
+
+  function messageDeepLink(message = {}, context = {}) {
+    if (!message?.id || message.expired) return { ok: false, route: "messages", params: {}, reason: "message-unavailable" };
+    const input = {
+      page: message.route,
+      residentId: message.residentId
+    };
+    if (message.route === "messages") input.messageId = message.id;
+    else if (["health-record", "emr"].includes(message.route) && message.sourceId) input.recordId = message.sourceId;
+    else if (message.sourceId && ROUTE_PARAMETER_ALLOWLIST[message.route]?.has("sourceId")) input.sourceId = message.sourceId;
+    return validateDeepLink(input, {
+      ...context,
+      residentId: context.residentId || message.residentId,
+      messages: context.messages || [message]
+    });
+  }
+
+  function messageReadIntent(message = {}, residentId = "") {
+    const messageId = safeId(message.id, 220);
+    const owner = safeId(residentId, 120);
+    if (!messageId || message.residentId !== owner || message.expired) {
+      return { ok: false, reason: "message-read-denied" };
+    }
+    return {
+      ok: true,
+      messageId,
+      residentId: owner,
+      status: "read",
+      idempotencyKey: `resident-message-read-${messageId}`.slice(0, 240)
+    };
+  }
+
+  function confirmMessageReceipt(payload = {}, expectedMessageId = "", options = {}) {
     if (safeId(payload.id, 220) !== safeId(expectedMessageId, 220)) {
       return { ok: false, reason: "receipt-subject-mismatch" };
+    }
+    if (options.residentId && safeId(payload.residentId, 120) !== safeId(options.residentId, 120)) {
+      return { ok: false, reason: "receipt-resident-mismatch" };
     }
     const status = cleanText(payload.status, 80).toLowerCase();
     const receipts = Array.isArray(payload.receipts) ? payload.receipts : [];
@@ -414,7 +588,8 @@
     }
     return {
       ok: true,
-      message: projectMessage({ ...payload, targetRole: payload.targetRole || "citizen" }, payload.residentId)
+      idempotent: Boolean(options.currentMessage?.isRead),
+      message: projectMessage({ ...payload, targetRole: payload.targetRole || "citizen" }, payload.residentId, options)
     };
   }
 
@@ -429,7 +604,7 @@
     return {
       recordCount: records.length,
       emrCount: records.filter((item) => item.category === "emr").length,
-      unreadCount: messages.filter((item) => !item.isRead).length,
+      unreadCount: countUnreadMessages(messages, residentId),
       taskCount: tasks.length,
       registrationCount: count("registrationOrders"),
       nursingCount: count("internetNursingOrders"),
@@ -440,14 +615,23 @@
 
   return {
     APP_ROUTES,
+    DEFAULT_MESSAGE_PAGE_SIZE,
+    MAX_MESSAGE_BATCH,
+    MAX_MESSAGE_PAGE_SIZE,
+    ROUTE_PARAMETER_ALLOWLIST,
     RESIDENT_COLLECTIONS,
     STATUS_LABELS,
+    buildMessageBatch,
     chineseBusinessText,
     cleanText,
     confirmMessageReceipt,
+    countUnreadMessages,
     createSensitiveState,
     deriveResidentScope,
+    findEnglishBusinessCopy,
     isProductionSession,
+    messageDeepLink,
+    messageReadIntent,
     minimalResident,
     projectDataForAllowedResidents,
     projectMessage,
@@ -456,9 +640,11 @@
     routeForMessage,
     routeName,
     safeId,
+    sessionSubjectKey,
     statusLabel,
     summarizeResident,
     switchResident,
+    validateDeepLink,
     validateServerIdentity
   };
 });

@@ -24,13 +24,23 @@
     <section class="session-gate" id="session-gate" aria-live="assertive">
       <div class="gate-card">
         <div class="gate-mark" aria-hidden="true">安</div>
+        <p class="gate-state-label" id="gate-state-label">安全连接</p>
         <h2 id="gate-title">正在核验安全登录</h2>
         <p id="gate-message">正在向服务端确认居民身份与访问范围，请稍候。</p>
-        <a class="primary-action gate-login" id="gate-login" href="./login.html?redirect=resident-mini-program.html" hidden>前往安全登录</a>
+        <div class="loading-skeleton" id="loading-skeleton" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="gate-actions">
+          <button class="primary-action" id="gate-retry" type="button" hidden>重新加载</button>
+          <a class="primary-action gate-login" id="gate-login" href="./login.html?redirect=resident-mini-program.html" hidden>前往安全登录</a>
+        </div>
       </div>
     </section>
 
     <div class="app-content" id="app-content" hidden>
+      <div class="connection-banner" id="connection-banner" role="status" aria-live="polite" hidden>
+        <span id="connection-message">正在重新核验安全连接</span>
+      </div>
       <section class="member-strip" aria-label="当前居民">
         <button class="member-button" id="member-switcher" type="button" aria-haspopup="dialog" aria-controls="member-dialog">
           <span class="member-avatar" id="member-avatar" aria-hidden="true">居</span>
@@ -97,7 +107,9 @@
             <button type="button" data-message-filter="all" aria-pressed="true">全部</button>
             <button type="button" data-message-filter="unread" aria-pressed="false">未读</button>
           </div>
+          <p class="message-summary" id="message-summary">正在整理当前居民消息。</p>
           <div class="stack-list" id="message-list" aria-live="polite"></div>
+          <button class="secondary-action" id="message-load-more" type="button" hidden>加载更多消息</button>
         </section>
 
         <section class="app-page" id="page-profile" data-page="profile" aria-labelledby="profile-title" hidden>
@@ -120,6 +132,10 @@
           <section class="settings-card privacy-card" aria-labelledby="privacy-title">
             <h3 id="privacy-title">隐私保护</h3>
             <p>只展示当前会话可访问的居民资料。切换家庭成员时会清除上一居民的筛选、详情和临时敏感状态。</p>
+          </section>
+          <section class="settings-card" aria-labelledby="platform-capability-title">
+            <h3 id="platform-capability-title">小程序能力状态</h3>
+            <p id="platform-capability-status">正在检测当前平台可用能力。</p>
           </section>
           <button class="danger-action" id="logout-button" type="button">安全退出登录</button>
         </section>
@@ -145,6 +161,7 @@
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+    <div class="sr-only" id="screen-reader-announcer" role="status" aria-live="polite" aria-atomic="true"></div>
   </div>
 
   <dialog class="member-dialog" id="member-dialog" aria-labelledby="member-dialog-title">
