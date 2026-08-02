@@ -49,7 +49,8 @@ function assessChineseCopy() {
     shell: Core.findEnglishBusinessCopy([shellText]),
     statuses: Core.findEnglishBusinessCopy(statusText),
     reasons: Core.findEnglishBusinessCopy(reasonText),
-    platformFailures: Core.findEnglishBusinessCopy(bridgeText)
+    platformFailures: Core.findEnglishBusinessCopy(bridgeText),
+    platformCapabilities: Core.findEnglishBusinessCopy(Object.values(Adapter.CAPABILITY_MESSAGES))
   };
   const violations = Object.entries(groups).flatMap(([group, rows]) => rows.map((text) => ({ group, text })));
   return {

@@ -2,12 +2,27 @@
   "use strict";
 
   const Core = window.ResidentMiniProgramCore;
+  const RuntimePolicy = window.ResidentMiniProgramRuntimePolicy;
   const adapter = window.ResidentMiniProgramAdapter.createAdapter(window);
   const auth = window.HealthCityAuth;
   const SESSION_KEY = "health-city-auth-session";
   const SESSION_CHECK_INTERVAL = 30 * 1000;
   const configuredTimeout = Number(window.__RESIDENT_MINI_PROGRAM_TIMEOUT_MS__ || 8000);
   const REQUEST_TIMEOUT_MS = Math.max(200, Math.min(Number.isFinite(configuredTimeout) ? configuredTimeout : 8000, 15000));
+  const MESSAGE_RESPONSE_KEYS = new Set([
+    "id",
+    "residentId",
+    "maternalResidentId",
+    "targetRole",
+    "status",
+    "title",
+    "body",
+    "message",
+    "createdAt",
+    "expiresAt",
+    "collection",
+    "sourceId"
+  ]);
 
   const services = Object.freeze([
     { route: "health-record", label: "健康档案", icon: "档案", description: "查看健康指标、检查检验与健康资料来源。", collections: ["personalRecords"], boundary: "仅展示当前居民的最小化健康资料；原文与影像需另行受控调阅。" },
@@ -37,7 +52,10 @@
     suspended: false,
     initialized: false,
     networkState: "idle",
-    toastTimer: null
+    toastTimer: null,
+    recoveryPromise: null,
+    queuedRetryPromise: null,
+    deepLinkReplayGuard: RuntimePolicy.createReplayGuard({ maximum: 100 })
   };
 
   const elements = {
@@ -170,6 +188,7 @@
   function lockApp(kind, title, message, options = {}) {
     clearResidentRuntime();
     if (options.clearSession) {
+      adapter.clearResidentCache();
       clearLocalSession();
       state.session = null;
       state.subjectKey = "";
@@ -186,6 +205,15 @@
 
   async function fetchJson(url, options = {}) {
     if (navigator.onLine === false) throw requestError("offline", "当前网络不可用");
+    const headers = new Headers(options.headers || {});
+    const requestDecision = RuntimePolicy.validateApiRequest({
+      url,
+      method: options.method || "GET",
+      idempotencyKey: headers.get("Idempotency-Key") || ""
+    }, {
+      origin: location.origin
+    });
+    if (!requestDecision.ok) throw requestError("security", "请求未通过安全策略校验");
     const request = auth?.authFetch || window.fetch.bind(window);
     const controller = new AbortController();
     const parentSignal = options.signal;
@@ -197,7 +225,7 @@
       controller.abort();
     }, REQUEST_TIMEOUT_MS);
     try {
-      const response = await request(url, { ...options, signal: controller.signal });
+      const response = await request(requestDecision.url, { ...options, headers, signal: controller.signal });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
         const message = Core.chineseBusinessText(payload.message, response.status === 401 ? "登录已失效" : "服务暂不可用，请稍后重试");
@@ -241,7 +269,7 @@
     };
   }
 
-  async function recover(reason = "startup") {
+  async function performRecover(reason = "startup") {
     const generation = ++state.recoveryGeneration;
     const previousSubjectKey = state.subjectKey;
     const wasInitialized = state.initialized;
@@ -290,6 +318,20 @@
         lockApp("auth", "居民范围核验失败", "服务端未返回当前居民的可访问范围，已阻断健康数据展示。", { login: true, clearSession: true });
         return;
       }
+      const messageDecision = RuntimePolicy.validateResidentRows(
+        Array.isArray(messagePayload.messages) ? messagePayload.messages : [],
+        scope.allowedIds,
+        {
+          maximum: Core.MAX_MESSAGE_BATCH,
+          rejectEntireBatch: false,
+          allowedKeys: MESSAGE_RESPONSE_KEYS
+        }
+      );
+      if (!messageDecision.ok) {
+        lockApp("error", "居民消息范围校验失败", "服务端返回了不属于当前会话居民范围的消息，已停止展示。", { retry: true });
+        return;
+      }
+      rawState.taskMessages = messageDecision.rows;
       state.identity = identityDecision;
       state.subjectKey = serverSubjectKey;
       state.scope = scope;
@@ -302,12 +344,14 @@
       elements.content.hidden = false;
       elements.app.setAttribute("aria-busy", "false");
       renderAll();
-      const requested = wasInitialized
-        ? { page: "home" }
-        : Object.fromEntries(new URLSearchParams(location.search));
-      const decision = Core.validateDeepLink(requested, currentNavigationContext());
+      const hasRequestedLink = !wasInitialized && location.search.length > 1;
+      const requested = hasRequestedLink ? location.search : { page: "home" };
+      const decision = await RuntimePolicy.validateSignedDeepLink(requested, currentNavigationContext(), {
+        replayGuard: state.deepLinkReplayGuard,
+        verifier: window.__RESIDENT_DEEP_LINK_VERIFIER__
+      });
       navigateDecision(decision.ok ? decision : { ok: true, route: "home", params: {} }, { replace: true });
-      if (!decision.ok && Object.keys(requested).length) showToast("已阻止不安全或越权的页面链接");
+      if (!decision.ok && hasRequestedLink) showToast("已阻止不安全或越权的页面链接");
       announce(`${currentResident()?.name || "当前居民"}的健康服务已安全加载`);
     } catch (error) {
       if (generation !== state.recoveryGeneration) return;
@@ -315,10 +359,30 @@
     }
   }
 
+  function recover(reason = "startup") {
+    if (state.recoveryPromise) {
+      if (reason !== "retry") return state.recoveryPromise;
+      if (!state.queuedRetryPromise) {
+        state.queuedRetryPromise = state.recoveryPromise.finally(() => {
+          state.queuedRetryPromise = null;
+          return recover("retry");
+        });
+      }
+      return state.queuedRetryPromise;
+    }
+    const current = performRecover(reason).finally(() => {
+      if (state.recoveryPromise === current) state.recoveryPromise = null;
+    });
+    state.recoveryPromise = current;
+    return current;
+  }
+
   function suspend(reason = "background") {
     if (state.suspended) return;
     state.suspended = true;
     ++state.recoveryGeneration;
+    state.recoveryPromise = null;
+    adapter.clearResidentCache();
     clearResidentRuntime();
     renderGate("paused", reason === "offline" ? "网络连接已断开" : "应用已进入后台", "已清空当前居民的详情、筛选和临时状态；返回应用时将重新核验。", {
       retry: reason === "offline"
@@ -459,9 +523,12 @@
     const capabilities = adapter.probeCapabilities();
     elements.platformCapabilityStatus.textContent = [
       `当前环境：${adapter.platformLabel()}`,
+      `最低版本：${capabilities.minimumVersion}`,
+      `版本校验：${capabilities.versionSupported ? "通过" : "未通过"}`,
       `页面导航：${capabilities.navigation ? "可用" : "不可用"}`,
       `平台拨号：${capabilities.phoneCall ? "可用" : "使用设备拨号"}`,
-      `前后台恢复：${capabilities.lifecycle ? "可用" : "使用页面恢复"}`
+      `前后台恢复：${capabilities.lifecycle ? "可用" : "使用页面恢复"}`,
+      capabilities.message
     ].join("；");
   }
 
@@ -583,6 +650,7 @@
       lockApp("auth", "居民范围已阻断", "所选家庭成员不在本次会话可访问范围内，请重新登录或核验家庭关系与授权。", { login: true });
       return;
     }
+    adapter.clearResidentCache();
     state.sensitive = decision.state;
     state.messageFilter = "all";
     state.messageVisibleLimit = Core.DEFAULT_MESSAGE_PAGE_SIZE;
@@ -661,8 +729,17 @@
   async function logout() {
     ++state.recoveryGeneration;
     clearResidentRuntime();
+    adapter.clearResidentCache();
     try {
-      await fetchJson("/api/auth/logout", { method: "POST" });
+      const logoutKey = RuntimePolicy.createIdempotencyKey("logout", {
+        accountId: state.session?.accountId,
+        residentId: state.session?.residentId,
+        resourceId: state.session?.id
+      });
+      await fetchJson("/api/auth/logout", {
+        method: "POST",
+        headers: { "Idempotency-Key": logoutKey }
+      });
     } catch (error) {
       // Local credentials are removed even when remote logout is unavailable.
     } finally {
@@ -734,6 +811,16 @@
       if (phase === "background") suspend("background");
       else if (state.initialized && state.suspended) void recover("foreground");
     });
+    if (window.visualViewport) {
+      const updateKeyboardState = () => {
+        const keyboardInset = Math.max(0, window.innerHeight - window.visualViewport.height);
+        document.documentElement.style.setProperty("--keyboard-inset", `${keyboardInset}px`);
+        document.body.classList.toggle("soft-keyboard-open", keyboardInset > 140);
+      };
+      window.visualViewport.addEventListener("resize", updateKeyboardState);
+      window.visualViewport.addEventListener("scroll", updateKeyboardState);
+      updateKeyboardState();
+    }
   }
 
   function verifySessionStillValid() {
@@ -762,6 +849,8 @@
       residentId: state.sensitive.residentId,
       allowedResidentIds: [...(state.scope?.allowedIds || [])],
       unreadCount: state.data ? Core.countUnreadMessages(state.data.taskMessages, state.sensitive.residentId) : 0,
+      recovering: Boolean(state.recoveryPromise),
+      retryQueued: Boolean(state.queuedRetryPromise),
       sensitive: { ...state.sensitive }
     }),
     navigate,

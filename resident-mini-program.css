@@ -16,6 +16,7 @@
   --radius-xl: 26px;
   --radius-lg: 20px;
   --text-scale: 1;
+  --keyboard-inset: 0px;
   font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 }
 
@@ -26,7 +27,7 @@
 html,
 body {
   margin: 0;
-  min-width: 320px;
+  min-width: 0;
   min-height: 100%;
   background: #dfe8e4;
   color: var(--ink);
@@ -83,7 +84,11 @@ input:focus-visible {
 
 .mini-header {
   min-height: calc(74px + env(safe-area-inset-top));
-  padding: calc(14px + env(safe-area-inset-top)) 20px 12px;
+  padding:
+    calc(14px + env(safe-area-inset-top))
+    calc(20px + env(safe-area-inset-right))
+    12px
+    calc(20px + env(safe-area-inset-left));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -148,7 +153,7 @@ input:focus-visible {
 }
 
 .app-content {
-  padding-bottom: calc(88px + env(safe-area-inset-bottom));
+  padding-bottom: calc(88px + env(safe-area-inset-bottom) + var(--keyboard-inset));
 }
 
 .connection-banner {
@@ -554,13 +559,25 @@ main {
   bottom: 0;
   width: min(100%, 520px);
   min-height: calc(70px + env(safe-area-inset-bottom));
-  padding: 5px 24px env(safe-area-inset-bottom);
+  padding:
+    5px
+    calc(24px + env(safe-area-inset-right))
+    env(safe-area-inset-bottom)
+    calc(24px + env(safe-area-inset-left));
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   transform: translateX(-50%);
   border-top: 1px solid rgba(211, 223, 218, 0.9);
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(16px);
+}
+
+.soft-keyboard-open .bottom-nav {
+  display: none;
+}
+
+.soft-keyboard-open .app-content {
+  padding-bottom: 24px;
 }
 
 .bottom-nav button {
@@ -847,5 +864,28 @@ body.high-contrast {
     scroll-behavior: auto !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+  }
+}
+
+@media (max-width: 340px) {
+  .mini-header,
+  .member-strip,
+  .page-section {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .service-grid {
+    gap: 8px;
+  }
+
+  .service-card {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .bottom-nav {
+    padding-left: calc(12px + env(safe-area-inset-left));
+    padding-right: calc(12px + env(safe-area-inset-right));
   }
 }

@@ -1,8 +1,12 @@
 (function (root, factory) {
-  const api = factory();
+  const api = factory(
+    typeof module === "object" && module.exports
+      ? require("./resident-mini-program-runtime-policy")
+      : root.ResidentMiniProgramRuntimePolicy
+  );
   if (typeof module === "object" && module.exports) module.exports = api;
   if (root) root.ResidentMiniProgramAdapter = api;
-})(typeof window !== "undefined" ? window : globalThis, function () {
+})(typeof window !== "undefined" ? window : globalThis, function (RuntimePolicy) {
   "use strict";
 
   const PREFERENCE_KEYS = new Set(["largeText", "highContrast"]);
@@ -19,6 +23,12 @@
     unsupported: "当前环境不支持此项能力",
     invalid: "平台操作参数不安全",
     failed: "平台操作失败，请重试"
+  });
+  const CAPABILITY_MESSAGES = Object.freeze({
+    ready: "平台能力可用",
+    "version-too-low": "平台版本过低，已停止调用相关能力",
+    "capability-missing": "平台必要能力缺失，已安全降级",
+    "permission-denied": "平台权限未获允许，已停止调用相关能力"
   });
 
   function createResult(runtime, status, capability) {
@@ -60,6 +70,25 @@
   function createAdapter(environment = globalThis) {
     const runtime = environment.wx ? "wechat" : environment.my ? "alipay" : "web";
     const storageKey = "resident-mini-program-preferences";
+    const loginReplayGuard = RuntimePolicy.createReplayGuard({ maximum: 50 });
+    const residentStorage = {
+      getItem(key) {
+        if (runtime === "wechat") return environment.wx?.getStorageSync?.(key) || null;
+        if (runtime === "alipay") return environment.my?.getStorageSync?.({ key })?.data || null;
+        return environment.localStorage?.getItem?.(key) || null;
+      },
+      setItem(key, value) {
+        if (runtime === "wechat") environment.wx?.setStorageSync?.(key, value);
+        else if (runtime === "alipay") environment.my?.setStorageSync?.({ key, data: value });
+        else environment.localStorage?.setItem?.(key, value);
+      },
+      removeItem(key) {
+        if (runtime === "wechat") environment.wx?.removeStorageSync?.(key);
+        else if (runtime === "alipay") environment.my?.removeStorageSync?.({ key });
+        else environment.localStorage?.removeItem?.(key);
+      }
+    };
+    const residentCache = RuntimePolicy.createBoundCache(residentStorage);
 
     function getPreferenceStore() {
       try {
@@ -105,9 +134,105 @@
       });
     }
 
+    function currentPlatformVersion() {
+      try {
+        if (runtime === "wechat") return String(environment.wx?.getSystemInfoSync?.()?.SDKVersion || "");
+        if (runtime === "alipay") return String(environment.my?.getSystemInfoSync?.()?.version || environment.my?.SDKVersion || "");
+      } catch (error) {
+        return "";
+      }
+      return "1.0.0";
+    }
+
+    function rawCapabilities() {
+      const platform = environment.wx || environment.my;
+      return {
+        navigation: runtime === "web" ? Boolean(environment.history?.pushState) : Boolean(platform?.navigateTo),
+        phoneCall: Boolean(platform?.makePhoneCall),
+        lifecycle: runtime === "web"
+          ? Boolean(environment.document?.addEventListener)
+          : Boolean(platform?.onAppShow && platform?.onAppHide),
+        loginCode: runtime === "wechat" ? Boolean(environment.wx?.login) : runtime === "alipay" ? Boolean(environment.my?.getAuthCode) : false
+      };
+    }
+
+    function permissionState() {
+      try {
+        if (runtime === "wechat" && environment.wx?.getSetting) return "unknown";
+        if (runtime === "alipay" && environment.my?.getSetting) return "unknown";
+      } catch (error) {
+        return "denied";
+      }
+      return runtime === "web" ? "granted" : "unknown";
+    }
+
+    function capabilityMatrix() {
+      return RuntimePolicy.platformCapabilityDecision({
+        runtime,
+        currentVersion: currentPlatformVersion(),
+        capabilities: rawCapabilities(),
+        permission: permissionState()
+      });
+    }
+
+    async function exchangeLoginCode(options = {}) {
+      if (!["wechat", "alipay"].includes(runtime) || typeof options.exchange !== "function") {
+        return createResult(runtime, "unsupported", "login-code");
+      }
+      const matrix = capabilityMatrix();
+      if (!matrix.versionSupported || !matrix.capabilities.loginCode || matrix.permission === "denied") {
+        return createResult(runtime, matrix.permission === "denied" ? "denied" : "unsupported", "login-code");
+      }
+      const requestedTimeout = Number(options.timeoutMs || 5000);
+      const timeoutMs = Math.max(200, Math.min(Number.isFinite(requestedTimeout) ? requestedTimeout : 5000, 10000));
+      let rawCode = "";
+      try {
+        rawCode = await new Promise((resolve, reject) => {
+          let settled = false;
+          const finish = (handler, value) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            handler(value);
+          };
+          const timer = setTimeout(() => finish(reject, new Error("timeout")), timeoutMs);
+          const callbacks = {
+            success: (value) => {
+              const candidate = runtime === "wechat" ? value?.code : value?.authCode;
+              if (!RuntimePolicy.validOneTimeCode(candidate)) finish(reject, new Error("invalid"));
+              else finish(resolve, String(candidate));
+            },
+            fail: (error) => finish(reject, new Error(classifyFailure(error?.errMsg || error?.errorMessage || error?.message)))
+          };
+          try {
+            if (runtime === "wechat") environment.wx.login(callbacks);
+            else environment.my.getAuthCode({ scopes: "auth_base", ...callbacks });
+          } catch (error) {
+            finish(reject, new Error(classifyFailure(error?.message)));
+          }
+        });
+        const receipt = await options.exchange(Object.freeze({ platform: runtime, code: rawCode }));
+        rawCode = "";
+        return RuntimePolicy.validateLoginExchangeReceipt(receipt, {
+          platform: runtime,
+          subjectKey: options.subjectKey
+        }, {
+          now: options.now,
+          replayGuard: options.replayGuard || loginReplayGuard
+        });
+      } catch (error) {
+        rawCode = "";
+        return createResult(runtime, error?.message === "invalid" ? "invalid" : classifyFailure(error?.message), "login-code");
+      }
+    }
+
     async function navigate(route, params = {}, options = {}) {
       const target = sanitizeNavigation(route, params);
       if (!target) return createResult(runtime, "invalid", "navigation");
+      const matrix = capabilityMatrix();
+      if (!matrix.versionSupported || !matrix.capabilities.navigation || matrix.permission === "denied") {
+        return createResult(runtime, matrix.permission === "denied" ? "denied" : "unsupported", "navigation");
+      }
       const query = new URLSearchParams({ page: target.route, ...target.params }).toString();
       if (runtime === "wechat") {
         if (!environment.wx?.navigateTo) return createResult(runtime, "unsupported", "navigation");
@@ -136,6 +261,10 @@
     }
 
     async function makeEmergencyCall(options = {}) {
+      const matrix = capabilityMatrix();
+      if (!matrix.versionSupported || !matrix.capabilities.phoneCall || matrix.permission === "denied") {
+        return createResult(runtime, matrix.permission === "denied" ? "denied" : "unsupported", "phone-call");
+      }
       if (runtime === "wechat") {
         if (!environment.wx?.makePhoneCall) return createResult(runtime, "unsupported", "phone-call");
         return bridgeCall("phone-call", (callbacks) => environment.wx.makePhoneCall({ phoneNumber: "120", ...callbacks }), options);
@@ -148,13 +277,19 @@
     }
 
     function probeCapabilities() {
+      const matrix = capabilityMatrix();
       return Object.freeze({
         runtime,
-        navigation: runtime === "web" ? Boolean(environment.history?.pushState) : Boolean((environment.wx || environment.my)?.navigateTo),
-        phoneCall: Boolean((environment.wx || environment.my)?.makePhoneCall),
-        lifecycle: runtime === "web"
-          ? Boolean(environment.document?.addEventListener)
-          : Boolean((environment.wx || environment.my)?.onAppShow)
+        navigation: matrix.capabilities.navigation,
+        phoneCall: matrix.capabilities.phoneCall,
+        lifecycle: matrix.capabilities.lifecycle,
+        loginCode: matrix.capabilities.loginCode,
+        currentVersion: matrix.currentVersion,
+        minimumVersion: matrix.minimumVersion,
+        versionSupported: matrix.versionSupported,
+        supported: matrix.supported,
+        status: matrix.status,
+        message: CAPABILITY_MESSAGES[matrix.status] || CAPABILITY_MESSAGES["capability-missing"]
       });
     }
 
@@ -194,6 +329,8 @@
 
     return {
       runtime,
+      clearResidentCache: () => residentCache.clearAll(),
+      exchangeLoginCode,
       getPreferences: getPreferenceStore,
       makeEmergencyCall,
       navigate,
@@ -205,6 +342,7 @@
   }
 
   return {
+    CAPABILITY_MESSAGES,
     NAVIGATION_PARAMETER_KEYS,
     NAVIGATION_ROUTES,
     PREFERENCE_KEYS,

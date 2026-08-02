@@ -15,6 +15,7 @@ test("resident mini program shell loads the strict policy and dedicated assets",
     "citizen-records-v2.js",
     "resident-mini-program-policy.js",
     "resident-mini-program-core.js",
+    "resident-mini-program-runtime-policy.js",
     "resident-mini-program-adapter.js",
     "resident-mini-program.js"
   ]) assert.match(html, new RegExp(asset.replace(/\./g, "\\.")));
@@ -49,6 +50,10 @@ test("mobile layout has no fixed wide surface and primary targets are at least 4
   assert.match(css, /body\.large-text/);
   assert.match(css, /body\.high-contrast/);
   assert.match(css, /prefers-reduced-motion/);
+  assert.match(css, /safe-area-inset-top/);
+  assert.match(css, /safe-area-inset-bottom/);
+  assert.match(css, /soft-keyboard-open/);
+  assert.match(css, /@media \(max-width:\s*340px\)/);
 });
 
 test("client writes wait for authenticated server responses and never create download links", () => {
@@ -59,4 +64,23 @@ test("client writes wait for authenticated server responses and never create dow
   assert.match(app, /未收到有效回执，消息仍保持未读/);
   assert.doesNotMatch(app, /URL\.createObjectURL|download\s*=|auditHash|objectKey|permanentUrl/);
   assert.doesNotMatch(app, /localStorage\.setItem\([^)]*(?:resident|token|record|message)/i);
+});
+
+test("runtime hardening requires bound login, signed links, safe requests and minimized cache", () => {
+  const runtime = read("resident-mini-program-runtime-policy.js");
+  const adapter = read("resident-mini-program-adapter.js");
+  const app = read("resident-mini-program.js");
+  assert.match(runtime, /LOGIN_CODE_TTL_MS/);
+  assert.match(runtime, /validateLoginExchangeReceipt/);
+  assert.match(runtime, /validateSignedDeepLink/);
+  assert.match(runtime, /https-required/);
+  assert.match(runtime, /idempotency-key-required/);
+  assert.match(runtime, /cross-resident-response/);
+  assert.match(runtime, /SENSITIVE_CACHE_KEYS/);
+  assert.match(runtime, /notification-consent-required/);
+  assert.match(adapter, /exchangeLoginCode/);
+  assert.match(app, /RuntimePolicy\.validateApiRequest/);
+  assert.match(app, /RuntimePolicy\.validateResidentRows/);
+  assert.match(app, /RuntimePolicy\.validateSignedDeepLink/);
+  assert.doesNotMatch(adapter, /console\.(?:log|info|warn|error)/);
 });

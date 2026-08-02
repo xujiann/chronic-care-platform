@@ -137,7 +137,10 @@ test("platform navigation rejects unknown routes and unsafe parameters", async (
 
 test("platform bridge maps cancel, deny and timeout without exposing raw returns", async () => {
   const cancelled = Adapter.createAdapter({
-    wx: { navigateTo: ({ fail }) => fail({ errMsg: "navigateTo:fail cancel", privateData: "不得返回" }) }
+    wx: {
+      getSystemInfoSync: () => ({ SDKVersion: "2.27.1" }),
+      navigateTo: ({ fail }) => fail({ errMsg: "navigateTo:fail cancel", privateData: "不得返回" })
+    }
   });
   const cancelResult = await cancelled.navigate("home");
   assert.deepEqual(Object.keys(cancelResult).sort(), ["capability", "message", "ok", "runtime", "status"]);
@@ -145,12 +148,18 @@ test("platform bridge maps cancel, deny and timeout without exposing raw returns
   assert.equal(JSON.stringify(cancelResult).includes("不得返回"), false);
 
   const denied = Adapter.createAdapter({
-    my: { makePhoneCall: ({ fail }) => fail({ errorMessage: "permission denied", phone: "13800000000" }) }
+    my: {
+      getSystemInfoSync: () => ({ version: "2.9.1" }),
+      makePhoneCall: ({ fail }) => fail({ errorMessage: "permission denied", phone: "13800000000" })
+    }
   });
   assert.equal((await denied.makeEmergencyCall()).status, "denied");
 
   const timeout = Adapter.createAdapter({
-    wx: { navigateTo: () => {} }
+    wx: {
+      getSystemInfoSync: () => ({ SDKVersion: "2.27.1" }),
+      navigateTo: () => {}
+    }
   });
   assert.equal((await timeout.navigate("home", {}, { timeoutMs: 200 })).status, "timeout");
 });
@@ -161,7 +170,10 @@ test("platform capability probes expose booleans only and persist no platform da
     wx: {
       navigateTo: () => {},
       makePhoneCall: () => {},
-      onAppShow: () => {}
+      onAppShow: () => {},
+      onAppHide: () => {},
+      login: () => {},
+      getSystemInfoSync: () => ({ SDKVersion: "2.27.1" })
     },
     localStorage: { setItem: (...args) => writes.push(args), getItem: () => null }
   });
@@ -169,7 +181,14 @@ test("platform capability probes expose booleans only and persist no platform da
     runtime: "wechat",
     navigation: true,
     phoneCall: true,
-    lifecycle: true
+    lifecycle: true,
+    loginCode: true,
+    currentVersion: "2.27.1",
+    minimumVersion: "2.27.0",
+    versionSupported: true,
+    supported: true,
+    status: "ready",
+    message: "平台能力可用"
   });
   assert.deepEqual(writes, []);
 });

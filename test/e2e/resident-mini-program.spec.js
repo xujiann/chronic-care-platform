@@ -92,7 +92,12 @@ test("expired or locally forged session is blocked before resident data loads", 
 
 test("background and offline transitions clear resident state before secure recovery", async ({ page }) => {
   await loginAsResident(page);
-  await page.goto("/resident-mini-program.html?page=health-record&recordId=record-1");
+  await page.goto("/resident-mini-program.html");
+  await expect(page.locator("#app-content")).toBeVisible();
+  await page.evaluate(() => window.ResidentMiniProgramApp.navigate({
+    page: "health-record",
+    recordId: "record-1"
+  }));
   await expect(page.locator("#page-detail")).toBeVisible();
 
   await page.evaluate(() => window.dispatchEvent(new Event("offline")));
@@ -178,11 +183,15 @@ test("message receipt failures roll back without claiming local success", async 
 
 test("slow service shows a Chinese timeout gate and retry restores the app", async ({ page }) => {
   await page.addInitScript(() => {
-    window.__RESIDENT_MINI_PROGRAM_TIMEOUT_MS__ = 200;
+    window.__RESIDENT_MINI_PROGRAM_TIMEOUT_MS__ = 500;
   });
   await loginAsResident(page);
   let stateRequestCount = 0;
+  let releaseFirstStateRequest;
   let finishFirstStateRequest;
+  const firstStateRequestBlocked = new Promise((resolve) => {
+    releaseFirstStateRequest = resolve;
+  });
   const firstStateRequestFinished = new Promise((resolve) => {
     finishFirstStateRequest = resolve;
   });
@@ -191,7 +200,7 @@ test("slow service shows a Chinese timeout gate and retry restores the app", asy
     const isFirstRequest = stateRequestCount === 1;
     try {
       if (isFirstRequest) {
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        await firstStateRequestBlocked;
       }
       await route.continue();
     } finally {
@@ -202,10 +211,16 @@ test("slow service shows a Chinese timeout gate and retry restores the app", asy
 
   await expect(page.locator("#gate-title")).toHaveText("安全连接超时");
   await expect(page.locator("#app-content")).toBeHidden();
+  releaseFirstStateRequest();
   await firstStateRequestFinished;
   await page.locator("#gate-retry").click();
+  await expect.poll(() => stateRequestCount).toBe(2);
   await expect(page.locator("#app-content")).toBeVisible();
   await expect(page.locator("#page-home")).toBeVisible();
+  expect(await page.evaluate(() => window.ResidentMiniProgramApp.getState())).toMatchObject({
+    recovering: false,
+    retryQueued: false
+  });
 });
 
 test("a changed local subject is blocked on foreground recovery", async ({ page }) => {
@@ -229,4 +244,116 @@ test("a changed local subject is blocked on foreground recovery", async ({ page 
   await expect(page.locator("#gate-login")).toBeVisible();
   await expect(page.locator("#app-content")).toBeHidden();
   expect((await page.evaluate(() => window.ResidentMiniProgramApp.getState())).residentId).toBe("");
+});
+
+test("forged signed links and cross-resident message responses fail closed", async ({ page }) => {
+  await loginAsResident(page);
+  await page.goto("/resident-mini-program.html?page=home&page=messages");
+  await expect(page.locator("#page-home")).toBeVisible();
+  await expect(page.locator("#toast")).toContainText("已阻止不安全或越权的页面链接");
+
+  const issuedAt = encodeURIComponent(new Date(Date.now() - 30_000).toISOString());
+  const expiresAt = encodeURIComponent(new Date(Date.now() + 60_000).toISOString());
+  await page.goto(`/resident-mini-program.html?page=health-record&residentId=r1&recordId=record-1&issuedAt=${issuedAt}&expiresAt=${expiresAt}&nonce=nonce-0123456789&signature=abcdefghijklmnopqrstuvwxyz_0123456789-ABCD`);
+  await expect(page.locator("#page-home")).toBeVisible();
+  await expect(page.locator("#toast")).toContainText("已阻止不安全或越权的页面链接");
+
+  await page.route("**/api/messages", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        messages: [{
+          id: "cross-resident-message",
+          residentId: "r4",
+          targetRole: "citizen",
+          status: "unread",
+          title: "不应展示",
+          createdAt: new Date().toISOString()
+        }]
+      })
+    });
+  });
+  await page.reload();
+  await expect(page.locator("#app-content")).toBeVisible();
+  await expect(page.locator("#page-home")).toBeVisible();
+  expect((await page.evaluate(() => window.ResidentMiniProgramApp.getState())).unreadCount).toBe(0);
+  await page.getByRole("button", { name: "消息" }).click();
+  await expect(page.locator("#message-list")).not.toContainText("不应展示");
+});
+
+test("duplicate read clicks produce one idempotent server write", async ({ page }) => {
+  await loginAsResident(page);
+  const createdAt = new Date().toISOString();
+  let receiptRequests = 0;
+  await page.route("**/api/messages", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        messages: [{
+          id: "duplicate-write-message",
+          residentId: "r1",
+          targetRole: "citizen",
+          status: "unread",
+          title: "健康服务提醒",
+          body: "请打开应用查看服务状态。",
+          createdAt,
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          receipts: []
+        }]
+      })
+    });
+  });
+  await page.route("**/api/messages/duplicate-write-message/receipt", async (route) => {
+    receiptRequests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: "duplicate-write-message",
+        residentId: "r1",
+        targetRole: "citizen",
+        status: "read",
+        title: "健康服务提醒",
+        body: "请打开应用查看服务状态。",
+        createdAt,
+        receipts: [{ status: "read", at: new Date().toISOString() }]
+      })
+    });
+  });
+  await page.goto("/resident-mini-program.html?page=messages");
+  await expect(page.locator("[data-mark-read='duplicate-write-message']")).toBeVisible();
+  await page.evaluate(() => {
+    const button = document.querySelector("[data-mark-read='duplicate-write-message']");
+    button.click();
+    button.click();
+  });
+  await expect(page.locator("[data-message-id='duplicate-write-message']")).toContainText("已读");
+  expect(receiptRequests).toBe(1);
+});
+
+test("resident shell is mobile safe at 320, 375, 390 and 430 widths", async ({ page }) => {
+  await loginAsResident(page);
+  for (const width of [320, 375, 390, 430]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("/resident-mini-program.html");
+    await expect(page.locator("#app-content")).toBeVisible();
+    const result = await page.evaluate(() => {
+      const targets = Array.from(document.querySelectorAll("button, a")).filter((element) => {
+        const style = getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
+      });
+      return {
+        clientWidth: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        minimumHeight: Math.min(...targets.map((element) => element.getBoundingClientRect().height)),
+        english: (document.querySelector("#app-main")?.innerText || "").match(/[A-Za-z]{2,}/g) || []
+      };
+    });
+    expect(result.scrollWidth).toBe(result.clientWidth);
+    expect(result.minimumHeight).toBeGreaterThanOrEqual(44);
+    expect(result.english).toEqual([]);
+  }
 });
