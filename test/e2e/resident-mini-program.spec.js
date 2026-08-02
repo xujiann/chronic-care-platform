@@ -1,19 +1,6 @@
 const { test, expect } = require("@playwright/test");
 
-async function resetResidentFixture(page) {
-  const loginResponse = await page.request.post("/api/auth/login", {
-    data: { username: "city", password: "123456" }
-  });
-  expect(loginResponse.ok()).toBeTruthy();
-  const login = await loginResponse.json();
-  const resetResponse = await page.request.post("/api/reset", {
-    headers: { Authorization: `Bearer ${login.token}` }
-  });
-  expect(resetResponse.ok()).toBeTruthy();
-}
-
 async function loginAsResident(page) {
-  await resetResidentFixture(page);
   await page.goto("/login.html");
   await page.locator("#login-user").selectOption("citizen");
   await page.locator("input[name='password']").fill("123456");
