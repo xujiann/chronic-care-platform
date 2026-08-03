@@ -1,5 +1,11 @@
 "use strict";
 
+const {
+  buildFollowupEventHealth,
+  dispatchPendingFollowupEventsToState,
+  updateFollowupToState
+} = require("../../../citizen-chronic-followup-event-service");
+
 function createRouteSegments(runtime) {
   const { CitizenRecordsPolicy, CitizenRecordsV1, CitizenRecordsV2, PERSONAL_RECORD_PROTECTED_FIELDS, appendDataAccessLog, appendSecurityEvent, applyCitizenLifecycleAction, applyCitizenOperationsAction, buildChronicAcceptanceLedger, buildChronicArchiveStandardization, buildChronicFollowupSummary, buildChronicInstitutionInterfaceReport, buildChronicInteroperabilityProfiles, buildChronicLaunchCoreReport, buildChronicPathwayQualityReport, buildChronicPharmacyInsuranceClosure, buildChronicProductionSafetyEvidenceBridge, buildChronicProductionSafetyReport, buildChronicPublicHealthLoop, buildChronicReferralContinuity, buildChronicRiskStratification, buildCitizenLifecycleActionMessage, buildCitizenLifecycleActions, buildCitizenOperationsCenter, buildCitizenOperationsPublic, canAccessResident, canManageResidentProfile, citizenCareIdempotencyKey, citizenCareReceipt, citizenCareReplay, citizenCareRequestDigest, citizenCareWorkspace, cleanResidentPatch, closeFamilyDoctorChronicAction, collectJson, createHash, dispatchChronicFollowupAction, escalateChronicFollowupAction, ingestChronicDeviceMeasurement, mergeByKey, normalizePersonalRecord, normalizeState, patchBusinessCollectionItem, personIndexForResident, prependAuditTrailEntry, randomUUID, readDatabase, recordChronicLaunchCoreAction, recordChronicPharmacyCallback, recordChronicReferralContinuity, redactSensitiveResponse, requireApiRole, scheduleChronicReminderOutreach, scopeStateForUser, sealAuditTrail, seedCitizenHospitalServiceConfigs, seedCitizenIdentityReviewCases, seedCitizenOperationContents, seedCitizenServiceBlacklist, sendJson, upsertChronicFeedback, upsertResidentExperienceCheckin, validateChronicInteroperabilityMessage, writeDatabase } = runtime;
   return [
@@ -534,18 +540,91 @@ function createRouteSegments(runtime) {
       id: "citizen-chronic-06",
       domain: "citizen-chronic",
       async handle(req, res, url) {
+    if (req.method === "GET" && url.pathname === "/api/chronic/followup-events/health") {
+        const user = requireApiRole(req, res, ["commission", "institution"], url.pathname);
+        if (!user) return true;
+        sendJson(res, 200, buildFollowupEventHealth(readDatabase()));
+        return true;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/chronic/followup-events/dispatch") {
+        const user = requireApiRole(req, res, ["commission", "institution"], url.pathname);
+        if (!user) return true;
+        try {
+          const result = await dispatchPendingFollowupEventsToState(readDatabase());
+          writeDatabase(result.nextData);
+          sendJson(res, 200, {
+            ok: result.health.ok,
+            processed: result.processed,
+            health: result.health,
+            productionReady: false
+          });
+        } catch (error) {
+          sendJson(res, 400, {
+            error: "Bad Request",
+            message: "followup domain event dispatch failed",
+            productionReady: false
+          });
+        }
+        return true;
+      }
+
     if (req.method === "PATCH" && url.pathname.startsWith("/api/followups/")) {
         const user = requireApiRole(req, res, ["institution", "commission"], "/api/followups/:id");
         if (!user) return true;
-        const result = patchBusinessCollectionItem({
-          data: readDatabase(),
-          collection: "followups",
-          id: decodeURIComponent(url.pathname.replace("/api/followups/", "")),
-          patch: await collectJson(req),
-          user,
-          action: "更新随访记录"
+        const id = decodeURIComponent(url.pathname.replace("/api/followups/", ""));
+        const patch = await collectJson(req);
+        const data = readDatabase();
+        const followup = (data.followups || []).find((item) => item.id === id);
+        if (!followup) {
+          sendJson(res, 404, { error: "Not Found", message: "followup not found" });
+          return true;
+        }
+        if (!canAccessResident(user, followup.residentId, data)) {
+          appendSecurityEvent({
+            actor: user.name,
+            role: user.role,
+            action: "update chronic followup",
+            target: id,
+            result: "denied",
+            detail: "resident scope denied"
+          });
+          sendJson(res, 403, { error: "Forbidden", message: "resident scope denied" });
+          return true;
+        }
+        let result;
+        try {
+          result = await updateFollowupToState(data, {
+            id,
+            patch,
+            expectedVersion: patch.expectedDomainVersion,
+            idempotencyKey: req.headers["idempotency-key"] || patch.idempotencyKey,
+            correlationId: req.correlationId,
+            user
+          });
+        } catch (error) {
+          const conflict = ["FOLLOWUP_VERSION_CONFLICT", "FOLLOWUP_IDEMPOTENCY_CONFLICT"].includes(error.code);
+          sendJson(res, conflict ? 409 : 400, {
+            error: conflict ? "Conflict" : "Bad Request",
+            message: error.message,
+            productionReady: false
+          });
+          return true;
+        }
+        if (!result.idempotent) {
+          if (Object.hasOwn(patch, "expectedVersion")) {
+            result.nextData.storageMeta = {
+              ...(result.nextData.storageMeta || {}),
+              collectionVersions: { followups: Number(patch.expectedVersion) }
+            };
+          }
+          writeDatabase(result.nextData);
+        }
+        sendJson(res, 200, {
+          ...result.followup,
+          idempotent: result.idempotent,
+          productionReady: false
         });
-        sendJson(res, result.status, result.body);
         return true;
       }
 
