@@ -446,7 +446,7 @@ function replayClinicalResultDelivery(data, eventId, input = {}, actor = {}, opt
     actor: String(actor.username || actor.name || actor.role).slice(0, 160),
     at,
     fromGeneration: outbox.generation
-  }].slice(-20);
+  }];
   outbox.status = "pending";
   outbox.attempts = 0;
   outbox.generation += 1;

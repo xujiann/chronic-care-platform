@@ -241,6 +241,51 @@ test("retry backs off, exhausts into dead letter, and commission replay is idemp
   );
 });
 
+test("replay idempotency evidence is retained across more than twenty recovery generations", async () => {
+  const { data } = await acceptedState();
+  const event = data.integrationGatewayEvents[0];
+  event.outbox = delivery.createDeliveryOutbox(
+    event.domainEvent,
+    event.contractReceipt.canonicalDigest,
+    "2030-08-03T11:30:00.000Z",
+    { maxAttempts: 1 }
+  );
+  const actor = { role: "commission", username: "operator" };
+
+  for (let index = 0; index < 25; index += 1) {
+    const claimedAt = new Date(Date.parse("2030-08-03T11:30:00.000Z") + index * 10_000);
+    const [claim] = delivery.claimClinicalResultDeliveries(data, {
+      workerId: "worker-replay-retention",
+      now: claimedAt.toISOString()
+    });
+    delivery.failClinicalResultDelivery(
+      data,
+      claim,
+      { errorCode: "UPSTREAM_UNAVAILABLE", message: `failure-${index}` },
+      { now: new Date(claimedAt.getTime() + 1_000).toISOString() }
+    );
+    delivery.replayClinicalResultDelivery(
+      data,
+      event.domainEvent.id,
+      { idempotencyKey: `retained-replay-${index}`, reason: `approved recovery ${index}` },
+      actor,
+      { now: new Date(claimedAt.getTime() + 2_000).toISOString() }
+    );
+  }
+
+  assert.equal(event.outbox.replayHistory.length, 25);
+  assert.deepEqual(
+    delivery.replayClinicalResultDelivery(
+      data,
+      event.domainEvent.id,
+      { idempotencyKey: "retained-replay-0", reason: "approved recovery 0" },
+      actor,
+      { now: "2030-08-03T12:00:00.000Z" }
+    ),
+    { duplicate: true, status: "pending", generation: 26 }
+  );
+});
+
 test("operations query exposes delivery metadata only and replay route never claims production readiness", async () => {
   const { data } = await acceptedState();
   const event = data.integrationGatewayEvents[0];
