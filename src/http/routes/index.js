@@ -337,7 +337,8 @@ function createPlatformApiRouter(runtimeContexts) {
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }
-  for (const segment of platform_governance.createRouteSegments(runtimeContexts.forDomain("platform-governance"))) {
+  for (const rawSegment of platform_governance.createRouteSegments(runtimeContexts.forDomain("platform-governance"))) {
+    const segment = attachRouteSubdomain(rawSegment);
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }

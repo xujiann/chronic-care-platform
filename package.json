@@ -7,6 +7,7 @@
     "dev": "node server.js",
     "routes:check": "node scripts/check-http-modules.js",
     "routes:test": "node --test test/http-route-modularization.test.js test/http-runtime-contexts.test.js test/cross-domain-foundation-contract.test.js",
+    "architecture:test": "node --test test/platform-architecture-foundation.test.js test/frontend-platform-shell.test.js test/service-extraction-governance.test.js",
     "process:list": "node scripts/process-worktree.js list",
     "process:plan": "node scripts/process-worktree.js plan",
     "process:create": "node scripts/process-worktree.js create",

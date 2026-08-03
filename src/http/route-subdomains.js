@@ -1,6 +1,16 @@
 "use strict";
 
 const ROUTE_SUBDOMAINS = Object.freeze({
+  "platform-governance-01": "governance-catalog",
+  "platform-governance-02": "public-health-coordination",
+  "platform-governance-03": "site-launch-evidence",
+  "platform-governance-04": "digital-hospital-pilot",
+  "platform-governance-05": "digital-hospital-readiness",
+  "platform-governance-06": "production-operations",
+  "platform-governance-07": "digital-hospital-governance",
+  "platform-governance-08": "phase2-operations",
+  "platform-governance-09": "mutual-recognition-overview",
+  "platform-governance-10": "mutual-recognition-decision",
   "public-health-01": "surveillance-foundation",
   "public-health-02": "public-health-operations",
   "public-health-03": "vital-records",

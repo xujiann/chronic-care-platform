@@ -1,0 +1,119 @@
+{
+  "schemaVersion": "1.0.0",
+  "storagePolicy": {
+    "development": {
+      "authoritative": "json-or-sqlite",
+      "purpose": "local-demo-only"
+    },
+    "test": {
+      "authoritative": "isolated-test-adapter",
+      "purpose": "deterministic-automation"
+    },
+    "production": {
+      "authoritative": "postgresql",
+      "purpose": "system-of-record",
+      "fallbackWrite": false
+    }
+  },
+  "nonOwningDomains": [
+    "shared",
+    "state-data"
+  ],
+  "collections": {
+    "residents": {
+      "owner": "identity-security",
+      "classification": "restricted",
+      "readers": ["citizen-chronic", "care-coordination", "clinical-specialties", "public-health"]
+    },
+    "personalRecords": {
+      "owner": "citizen-chronic",
+      "classification": "restricted",
+      "readers": ["care-coordination", "clinical-specialties"]
+    },
+    "followups": {
+      "owner": "citizen-chronic",
+      "classification": "restricted",
+      "readers": ["care-coordination", "public-health"]
+    },
+    "chronicScreeningTasks": {
+      "owner": "citizen-chronic",
+      "classification": "restricted",
+      "readers": ["care-coordination", "public-health"]
+    },
+    "chronicEducationPushes": {
+      "owner": "citizen-chronic",
+      "classification": "restricted",
+      "readers": ["care-coordination"]
+    },
+    "chronicManagementPlans": {
+      "owner": "citizen-chronic",
+      "classification": "restricted",
+      "readers": ["care-coordination"]
+    },
+    "chronicFollowupStatusPolicy": {
+      "owner": "citizen-chronic",
+      "classification": "internal",
+      "readers": ["care-coordination"]
+    },
+    "careOrders": {
+      "owner": "care-coordination",
+      "classification": "restricted",
+      "readers": ["citizen-chronic", "insurance-payment"]
+    },
+    "medicationPickups": {
+      "owner": "care-coordination",
+      "classification": "restricted",
+      "readers": ["citizen-chronic", "insurance-payment"]
+    },
+    "referrals": {
+      "owner": "care-coordination",
+      "classification": "restricted",
+      "readers": ["citizen-chronic", "clinical-specialties"]
+    },
+    "insuranceClaims": {
+      "owner": "insurance-payment",
+      "classification": "restricted",
+      "readers": ["care-coordination"]
+    },
+    "emergencySignals": {
+      "owner": "clinical-specialties",
+      "classification": "restricted",
+      "readers": ["public-health", "care-coordination"]
+    },
+    "diagnosticReports": {
+      "owner": "clinical-specialties",
+      "classification": "restricted",
+      "readers": ["citizen-chronic", "care-coordination"]
+    },
+    "publicHealthIncidents": {
+      "owner": "public-health",
+      "classification": "restricted",
+      "readers": ["platform-governance", "clinical-specialties"]
+    },
+    "birthCertificates": {
+      "owner": "public-health",
+      "classification": "restricted",
+      "readers": ["citizen-chronic", "identity-security"]
+    },
+    "deathCertificates": {
+      "owner": "public-health",
+      "classification": "restricted",
+      "readers": ["citizen-chronic", "identity-security"]
+    },
+    "governanceRecords": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": ["research"]
+    },
+    "integrationGatewayEvents": {
+      "owner": "integration",
+      "classification": "internal",
+      "readers": ["platform-governance"]
+    },
+    "researchProjects": {
+      "owner": "research",
+      "classification": "de-identified",
+      "readers": []
+    }
+  }
+}

@@ -13,6 +13,7 @@ const runtime = require("./runtime");
 const shared = require("./shared");
 const stateData = require("./state-data");
 const { defineRuntimeContext } = require("./context-factory");
+const { createDomainCapabilityProviders } = require("../../platform/composition/domain-capability-providers");
 
 const CONTEXT_DEFINITIONS = Object.freeze(Object.fromEntries(
   [
@@ -41,7 +42,12 @@ const CONTEXT_DEFINITIONS = Object.freeze(Object.fromEntries(
 
 function createPlatformRuntimeContexts(source) {
   const contexts = Object.freeze(Object.fromEntries(
-    Object.entries(CONTEXT_DEFINITIONS).map(([domain, definition]) => [domain, definition.create(source)])
+    Object.entries(CONTEXT_DEFINITIONS).map(([domain, definition]) => {
+      const domainSource = source?.kind === "domain-capability-providers"
+        ? source.forDomain(domain).resolve()
+        : source;
+      return [domain, definition.create(domainSource)];
+    })
   ));
   return Object.freeze({
     contexts,
@@ -52,4 +58,12 @@ function createPlatformRuntimeContexts(source) {
   });
 }
 
-module.exports = { CONTEXT_DEFINITIONS, createPlatformRuntimeContexts };
+function createPlatformCapabilityProviders(source) {
+  return createDomainCapabilityProviders({ definitions: CONTEXT_DEFINITIONS, source });
+}
+
+module.exports = {
+  CONTEXT_DEFINITIONS,
+  createPlatformCapabilityProviders,
+  createPlatformRuntimeContexts
+};

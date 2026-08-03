@@ -30,6 +30,7 @@ test("process manifest assigns every domain route exactly once", () => {
   assert.equal(routeOwners.size, 12);
   assert.equal(resolveProtectedOwner("src/http/routes/index.js", manifest), "T00");
   assert.equal(resolveProtectedOwner(".github/workflows/ci.yml", manifest), "T00");
+  assert.equal(resolveProtectedOwner("src/http/routes/platform-governance/phase2-operations.js", manifest), "T02");
 });
 
 test("process branch and topic formats are deterministic", () => {
