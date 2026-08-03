@@ -168,6 +168,7 @@
     "security:commercial-crypto-readiness": "node scripts/commercial-crypto-readiness.js",
     "security:production-readiness": "node scripts/production-security-readiness.js",
     "production:go-no-go-readiness": "node scripts/production-go-no-go-readiness.js",
+    "production:actions:check": "node scripts/production-cutover-action-register.js",
     "production-release:evidence:check": "node --check scripts/production-release-evidence-readiness.js",
     "production-release:evidence:test": "node --test test/production-release-evidence-readiness.test.js",
     "production-release:evidence:readiness": "node scripts/production-release-evidence-readiness.js",

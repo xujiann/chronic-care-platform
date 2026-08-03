@@ -1,7 +1,7 @@
 {
   "schemaVersion": "process-workstreams-v1",
   "integrationBranch": "codex/governance-integration-20260803",
-  "baselineTag": "baseline/governance-20260803-iteration2-v2",
+  "baselineTag": "baseline/governance-20260803-four-class-closure-v1",
   "branchPattern": "process/tNN-<topic>-YYYYMMDD",
   "processes": {
     "T00": {
@@ -82,6 +82,10 @@
     { "pattern": "scripts/process-worktree.js", "owner": "T00" },
     { "pattern": "scripts/test-all.js", "owner": "T00" },
     { "pattern": "scripts/check-http-modules.js", "owner": "T00" },
+    { "pattern": "scripts/production-cutover-action-register.js", "owner": "T00" },
+    { "pattern": "config/production-cutover-actions.json", "owner": "T00" },
+    { "pattern": "docs/生产切换外部事项台账-2026-08-03.md", "owner": "T00" },
+    { "pattern": "test/production-cutover-action-register.test.js", "owner": "T00" },
     { "pattern": "config/process-workstreams.json", "owner": "T00" },
     { "pattern": "package.json", "owner": "T00" },
     { "pattern": ".github/**", "owner": "T00" },
