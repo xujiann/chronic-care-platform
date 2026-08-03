@@ -1,0 +1,97 @@
+{
+  "schemaVersion": "process-workstreams-v1",
+  "integrationBranch": "codex/governance-integration-20260803",
+  "baselineTag": "baseline/governance-20260803-process-v1",
+  "branchPattern": "process/tNN-<topic>-YYYYMMDD",
+  "processes": {
+    "T00": {
+      "name": "集成治理",
+      "slug": "integration-governance",
+      "ownedRoutes": [],
+      "responsibilities": ["运行时装配", "全局路由顺序", "CI与部署门禁", "唯一基线"]
+    },
+    "T01": {
+      "name": "运行与身份安全",
+      "slug": "runtime-identity",
+      "ownedRoutes": ["src/http/routes/runtime.js", "src/http/routes/identity-security.js"],
+      "responsibilities": ["健康与指标", "认证授权", "会话与安全边界"]
+    },
+    "T02": {
+      "name": "平台与状态治理",
+      "slug": "platform-state",
+      "ownedRoutes": ["src/http/routes/platform-governance.js", "src/http/routes/state-data.js"],
+      "responsibilities": ["平台治理", "审计与发布状态", "通用状态读写"]
+    },
+    "T03": {
+      "name": "公共卫生",
+      "slug": "public-health",
+      "ownedRoutes": ["src/http/routes/public-health.js"],
+      "responsibilities": ["公卫协同", "监测与报送", "外部交换"]
+    },
+    "T04": {
+      "name": "居民与慢病",
+      "slug": "citizen-chronic",
+      "ownedRoutes": ["src/http/routes/citizen-chronic.js"],
+      "responsibilities": ["居民档案", "家庭授权", "慢病管理"]
+    },
+    "T05": {
+      "name": "服务协同",
+      "slug": "care-coordination",
+      "ownedRoutes": ["src/http/routes/care-coordination.js"],
+      "responsibilities": ["预约转诊", "护理陪诊", "协同工单"]
+    },
+    "T06": {
+      "name": "临床专科",
+      "slug": "clinical-specialties",
+      "ownedRoutes": ["src/http/routes/clinical-specialties.js"],
+      "responsibilities": ["急救", "临床用血", "影像与体检"]
+    },
+    "T07": {
+      "name": "医保支付",
+      "slug": "insurance-payment",
+      "ownedRoutes": ["src/http/routes/insurance-payment.js"],
+      "responsibilities": ["医保", "支付与退款", "证照回调"]
+    },
+    "T08": {
+      "name": "外部集成",
+      "slug": "external-integration",
+      "ownedRoutes": ["src/http/routes/integration.js"],
+      "responsibilities": ["HIS/EMR/LIS/PACS", "网关事件", "互认交换"]
+    },
+    "T09": {
+      "name": "科研与共享",
+      "slug": "research-shared",
+      "ownedRoutes": ["src/http/routes/research.js", "src/http/routes/shared.js"],
+      "responsibilities": ["科研沙箱", "经T00审核的跨领域共享路由"]
+    }
+  },
+  "protectedPaths": [
+    { "pattern": "server.js", "owner": "T00" },
+    { "pattern": "src/http/api-router.js", "owner": "T00" },
+    { "pattern": "src/http/runtime-source.js", "owner": "T00" },
+    { "pattern": "src/http/routes/index.js", "owner": "T00" },
+    { "pattern": "scripts/production-deployment-package.js", "owner": "T00" },
+    { "pattern": "scripts/process-worktree.js", "owner": "T00" },
+    { "pattern": "scripts/test-all.js", "owner": "T00" },
+    { "pattern": "config/process-workstreams.json", "owner": "T00" },
+    { "pattern": "package.json", "owner": "T00" },
+    { "pattern": ".github/**", "owner": "T00" },
+    { "pattern": "AGENTS.md", "owner": "T00" },
+    { "pattern": "docs/治理集成基线-2026-08-03.md", "owner": "T00" },
+    { "pattern": "docs/路由模块化与并行开发边界-2026-08-03.md", "owner": "T00" },
+    { "pattern": "test/http-route-modularization.test.js", "owner": "T00" },
+    { "pattern": "test/process-worktree.test.js", "owner": "T00" },
+    { "pattern": "src/http/routes/runtime.js", "owner": "T01" },
+    { "pattern": "src/http/routes/identity-security.js", "owner": "T01" },
+    { "pattern": "src/http/routes/platform-governance.js", "owner": "T02" },
+    { "pattern": "src/http/routes/state-data.js", "owner": "T02" },
+    { "pattern": "src/http/routes/public-health.js", "owner": "T03" },
+    { "pattern": "src/http/routes/citizen-chronic.js", "owner": "T04" },
+    { "pattern": "src/http/routes/care-coordination.js", "owner": "T05" },
+    { "pattern": "src/http/routes/clinical-specialties.js", "owner": "T06" },
+    { "pattern": "src/http/routes/insurance-payment.js", "owner": "T07" },
+    { "pattern": "src/http/routes/integration.js", "owner": "T08" },
+    { "pattern": "src/http/routes/research.js", "owner": "T09" },
+    { "pattern": "src/http/routes/shared.js", "owner": "T09" }
+  ]
+}

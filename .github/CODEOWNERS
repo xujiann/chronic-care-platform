@@ -1,0 +1,33 @@
+# Repository approval owner. Logical T00-T09 ownership is enforced by
+# config/process-workstreams.json and scripts/process-worktree.js.
+* @xujiann
+
+# T00 integration boundary
+/server.js @xujiann
+/src/http/api-router.js @xujiann
+/src/http/runtime-source.js @xujiann
+/src/http/routes/index.js @xujiann
+/scripts/production-deployment-package.js @xujiann
+/scripts/test-all.js @xujiann
+/package.json @xujiann
+/.github/ @xujiann
+/config/process-workstreams.json @xujiann
+/scripts/process-worktree.js @xujiann
+/docs/治理集成基线-2026-08-03.md @xujiann
+/docs/路由模块化与并行开发边界-2026-08-03.md @xujiann
+/test/http-route-modularization.test.js @xujiann
+/test/process-worktree.test.js @xujiann
+
+# Domain route modules remain independently reviewable.
+/src/http/routes/runtime.js @xujiann
+/src/http/routes/identity-security.js @xujiann
+/src/http/routes/platform-governance.js @xujiann
+/src/http/routes/state-data.js @xujiann
+/src/http/routes/public-health.js @xujiann
+/src/http/routes/citizen-chronic.js @xujiann
+/src/http/routes/care-coordination.js @xujiann
+/src/http/routes/clinical-specialties.js @xujiann
+/src/http/routes/insurance-payment.js @xujiann
+/src/http/routes/integration.js @xujiann
+/src/http/routes/research.js @xujiann
+/src/http/routes/shared.js @xujiann
