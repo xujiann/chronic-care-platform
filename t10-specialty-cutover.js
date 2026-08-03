@@ -6,7 +6,14 @@ const cutoverState = {
 document.addEventListener("DOMContentLoaded", async () => {
   cutoverState.pack = await loadCutoverPack();
   renderCutoverPack(cutoverState.pack);
+  restoreLocationAnchor();
 });
+
+function restoreLocationAnchor() {
+  if (!location.hash) return;
+  const target = document.querySelector(location.hash);
+  if (target) requestAnimationFrame(() => target.scrollIntoView({ block: "start" }));
+}
 
 async function loadCutoverPack() {
   if (location.protocol !== "file:") {
@@ -42,6 +49,13 @@ function withCutoverDefaults(pack) {
     stages: pack.stages || fallback.stages,
     firstIncrement: { ...fallback.firstIncrement, ...(pack.firstIncrement || {}) },
     tracks: pack.tracks || fallback.tracks,
+    institutionDeploymentManifest: pack.institutionDeploymentManifest || fallback.institutionDeploymentManifest,
+    institutionDeploymentGate: pack.institutionDeploymentGate || fallback.institutionDeploymentGate,
+    specialtyCompatibilityMatrix: pack.specialtyCompatibilityMatrix || fallback.specialtyCompatibilityMatrix,
+    institutionPackagePlan: pack.institutionPackagePlan || fallback.institutionPackagePlan,
+    institutionOperationsCapabilityPlan: pack.institutionOperationsCapabilityPlan || fallback.institutionOperationsCapabilityPlan,
+    specialtyPlanReview: pack.specialtyPlanReview || fallback.specialtyPlanReview,
+    externalActionWorkflowPlan: pack.externalActionWorkflowPlan || fallback.externalActionWorkflowPlan,
     crossTrackControls: pack.crossTrackControls || fallback.crossTrackControls,
     rehearsalPlan: pack.rehearsalPlan || fallback.rehearsalPlan,
     goNoGoDecision: pack.goNoGoDecision || fallback.goNoGoDecision,
@@ -61,6 +75,14 @@ function renderCutoverPack(pack) {
   renderKpis(pack);
   renderFirstIncrement(pack.firstIncrement || {});
   renderTracks(pack.tracks || [], pack.stages || []);
+  renderInstitutionDeploymentManifest(
+    pack.institutionDeploymentManifest || {},
+    pack.institutionDeploymentGate || {},
+    pack.specialtyCompatibilityMatrix || {},
+    pack.institutionPackagePlan || {}
+  );
+  renderInstitutionOperations(pack.institutionOperationsCapabilityPlan || {});
+  renderSpecialtyPlanReview(pack.specialtyPlanReview || {}, pack.externalActionWorkflowPlan || {});
   renderControls(pack.crossTrackControls || []);
   renderRehearsalPlan(pack.rehearsalPlan || {});
   renderDecisionMatrix(pack.goNoGoDecision || {});
@@ -121,6 +143,149 @@ function renderTracks(tracks, stages) {
       <p class="muted">Readiness digest：${escapeHtml(track.readiness?.digest || "")}</p>
     </article>
   `).join("");
+}
+
+function renderInstitutionDeploymentManifest(manifest, gate, compatibility, packagePlan) {
+  const modules = manifest.enabledModules || [];
+  const rows = modules.map((item) => `
+    <tr>
+      <td><strong>${escapeHtml(item.name)}</strong><br><span class="muted">${escapeHtml(item.deploymentUnit)}</span></td>
+      <td><a href="./${encodeURIComponent(item.page)}">${escapeHtml(item.page)}</a><br><code>${escapeHtml(item.api)}</code></td>
+      <td><code>${escapeHtml(item.dataNamespace)}</code></td>
+      <td>${escapeHtml(item.rollbackUnit)}</td>
+      <td><span class="badge warn">${escapeHtml(item.productionTrafficState)}</span></td>
+    </tr>
+  `).join("");
+  document.querySelector("#institution-deployment-manifest").innerHTML = `
+    <div class="cutover-card">
+      <div class="badge-row">
+        <span class="badge">${escapeHtml(manifest.institutionId || "institution-template")}</span>
+        <span class="badge ok">${escapeHtml(manifest.activationPolicy || "deny-by-default")}</span>
+        <span class="badge warn">${escapeHtml(manifest.productionTrafficState || "blocked-until-site-evidence-signed")}</span>
+        <span class="badge ${gate.ok ? "ok" : "warn"}">${escapeHtml(gate.status || "deployment-contract-blocked")} · ${gate.summary?.passed || 0}/${gate.summary?.total || 0}</span>
+        <span class="badge ${compatibility.failedCombinations ? "warn" : "ok"}">组合兼容 ${compatibility.passedCombinations || 0}/${compatibility.totalCombinations || 0}</span>
+      </div>
+      <p class="muted">启用模块：${(manifest.enabledModuleIds || []).map(escapeHtml).join(" / ") || "无"}；禁用模块：${(manifest.disabledModuleIds || []).map(escapeHtml).join(" / ") || "无"}。</p>
+      <p class="muted">页面白名单：${(manifest.routeAllowlist || []).map(escapeHtml).join(" / ") || "无"}；API 白名单：${(manifest.apiAllowlist || []).map(escapeHtml).join(" / ") || "无"}。</p>
+    </div>
+    <div class="table-wrap">
+      <table class="cutover-table">
+        <thead><tr><th>模块/部署单元</th><th>页面与 API</th><th>数据命名空间</th><th>独立回退单元</th><th>生产流量</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="5">未选择任何专项模块</td></tr>'}</tbody>
+      </table>
+    </div>
+    <div class="cutover-card">
+      <h3>部署校验规则</h3>
+      <ul class="evidence-list">${(gate.checks || []).map((item) => `<li><span class="badge ${item.passed ? "ok" : "warn"}">${item.passed ? "PASS" : "BLOCK"}</span> <strong>${escapeHtml(item.id)}</strong> · ${escapeHtml(item.detail)}</li>`).join("")}</ul>
+      <p class="muted">硬阻断：${(gate.hardStops || []).map(escapeHtml).join(" / ") || "无"}。</p>
+    </div>
+    <div class="control-grid">
+      <article class="cutover-card">
+        <h3>机构交付产物</h3>
+        <span class="badge ${packagePlan.status === "ready-to-build-institution-package" ? "ok" : "warn"}">${escapeHtml(packagePlan.status || "institution-package-blocked")}</span>
+        <ul class="evidence-list">${(packagePlan.artifacts || []).map((item) => `<li><code>${escapeHtml(item.file)}</code> · ${escapeHtml(item.purpose)}</li>`).join("")}</ul>
+      </article>
+      <article class="cutover-card">
+        <h3>安装与回退</h3>
+        <ol class="evidence-list">${(packagePlan.installOrder || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ol>
+        <p class="muted">${escapeHtml(packagePlan.rollbackPolicy || "")}</p>
+      </article>
+    </div>
+  `;
+}
+
+function renderInstitutionOperations(plan) {
+  const contract = plan.t00IntegrationContract || {};
+  document.querySelector("#institution-operations").innerHTML = `
+    <div class="cutover-card">
+      <div class="badge-row">
+        <span class="badge ${plan.status === "institution-operations-code-ready" ? "ok" : "warn"}">${escapeHtml(plan.status || "institution-operations-blocked")}</span>
+        <span class="badge">${plan.summary?.implemented || 0}/${plan.summary?.capabilities || 0} 代码能力</span>
+        <span class="badge warn">${escapeHtml(plan.productionTrafficState || "blocked-until-site-evidence-signed")}</span>
+      </div>
+      <p class="muted">${escapeHtml(plan.formalGoLiveBoundary || "")}</p>
+    </div>
+    <div class="track-grid">
+      ${(plan.capabilities || []).map((item) => `
+        <article class="cutover-card">
+          <span class="badge ${item.status === "implemented" ? "ok" : "warn"}">${escapeHtml(item.status)}</span>
+          <h3>${escapeHtml(item.id)}</h3>
+          <p>${escapeHtml(item.acceptance)}</p>
+        </article>
+      `).join("")}
+    </div>
+    <div class="control-grid">
+      <article class="cutover-card">
+        <h3>运营交付模板</h3>
+        <ul class="evidence-list">${(plan.generatedArtifacts || []).map((item) => `<li><code>${escapeHtml(item)}</code></li>`).join("")}</ul>
+      </article>
+      <article class="cutover-card">
+        <h3>T00 集成契约</h3>
+        <p class="muted">${escapeHtml(contract.integrationRule || "")}</p>
+        <ul class="evidence-list">${(contract.requestedRoutes || []).map((item) => `<li><strong>${escapeHtml(item.method)}</strong> <code>${escapeHtml(item.path)}</code></li>`).join("")}</ul>
+      </article>
+    </div>
+  `;
+}
+
+function renderSpecialtyPlanReview(review, workflow) {
+  const target = document.querySelector("#specialty-plan-review");
+  if (!target) return;
+  const summary = review.summary || {};
+  target.innerHTML = `
+    <div class="cutover-card">
+      <div class="badge-row">
+        <span class="badge ${review.ok ? "ok" : "warn"}">${escapeHtml(review.status || "specialty-plan-review-missing")}</span>
+        <span class="badge">${summary.implementedCapabilities || 0}/${summary.plannedCapabilities || 0} 规划代码能力</span>
+        <span class="badge ${summary.missingCapabilities ? "warn" : "ok"}">${summary.missingCapabilities || 0} 项代码缺口</span>
+        <span class="badge warn">${summary.externalActions || 0} 项外部行动</span>
+      </div>
+      <p class="muted">${escapeHtml(review.productionBoundary || "")}</p>
+    </div>
+    <div class="track-grid">
+      ${(review.trackReviews || []).map((item) => `
+        <article class="cutover-card">
+          <span class="badge ${item.summary?.missing ? "warn" : "ok"}">${item.summary?.implemented || 0}/${item.summary?.planned || 0}</span>
+          <h3>${escapeHtml(item.trackName)}</h3>
+          <p class="muted">${escapeHtml(item.owner)}</p>
+          <p>代码缺口 ${item.summary?.missing || 0}；外部行动 ${item.summary?.externalActions || 0}；现场阻断 ${item.siteBlockers || 0}。</p>
+          <ul class="evidence-list">${(item.capabilities || []).map((capability) => `<li><strong>${escapeHtml(capability.priority)}</strong> · ${escapeHtml(capability.name)} · <span class="badge ${capability.status === "implemented" ? "ok" : "warn"}">${escapeHtml(capability.status)}</span></li>`).join("")}</ul>
+        </article>
+      `).join("")}
+    </div>
+    <div class="table-wrap">
+      <table class="cutover-table">
+        <thead><tr><th>优先级</th><th>专项</th><th>依赖</th><th>责任方</th><th>剩余行动</th></tr></thead>
+        <tbody>${(review.externalActions || []).map((item) => `<tr>
+          <td><span class="badge ${item.priority === "P0" ? "warn" : ""}">${escapeHtml(item.priority)}</span></td>
+          <td>${escapeHtml(item.trackName)}</td>
+          <td>${escapeHtml(item.dependencyType)}</td>
+          <td>${escapeHtml(item.owner)}</td>
+          <td>${escapeHtml(item.action)}</td>
+        </tr>`).join("") || `<tr><td colspan="5">没有开放的外部行动。</td></tr>`}</tbody>
+      </table>
+    </div>
+    <div class="cutover-card">
+      <div class="badge-row">
+        <span class="badge ${workflow.status === "external-action-workflow-code-ready" ? "ok" : "warn"}">${escapeHtml(workflow.status || "external-action-workflow-missing")}</span>
+        <span class="badge">${workflow.summary?.actions || 0} 项受控行动</span>
+        <span class="badge warn">${workflow.summary?.p0 || 0} 项 P0</span>
+        <span class="badge">${workflow.summary?.t00 || 0} 项 T00</span>
+      </div>
+      <p class="muted">${escapeHtml(workflow.formalBoundary || "")}</p>
+      <p><strong>状态机：</strong>${(workflow.states || []).map(escapeHtml).join(" → ")}</p>
+    </div>
+    <div class="track-grid">
+      ${(workflow.trackGates || []).map((gate) => `
+        <article class="cutover-card">
+          <span class="badge warn">${escapeHtml(gate.status)}</span>
+          <h3>${escapeHtml(gate.trackId)}</h3>
+          <p>已接受 ${gate.summary?.accepted || 0}/${gate.summary?.total || 0}；开放 P0 ${gate.summary?.openP0 || 0}；逾期 ${gate.summary?.overdue || 0}。</p>
+          <p class="muted">下一决策：${escapeHtml(gate.nextDecision)}</p>
+        </article>
+      `).join("")}
+    </div>
+  `;
 }
 
 function renderControls(controls) {
@@ -620,8 +785,8 @@ function fallbackCutoverPack() {
       codeReady: 4,
       productionReady: 0,
       siteBlockers: 28,
-      totalChecks: 160,
-      passedChecks: 160,
+      totalChecks: 169,
+      passedChecks: 169,
       formalGoLiveState: "blocked-until-site-evidence-signed"
     },
     stages: ["code-readiness", "synthetic-acceptance", "joint-test", "site-evidence", "go-no-go", "grey-release"],
@@ -643,6 +808,134 @@ function fallbackCutoverPack() {
       track("regional-imaging-cloud", "区域影像云", "放射科/医院信息科/区域平台互联互通组", "imaging-cloud.html", "/api/imaging-cloud/production-center", 5, "PACS/RIS/DICOM TLS联通回执"),
       track("physical-examination", "健康体检", "体检中心/基层公卫/慢病管理团队", "physical-examination.html", "/api/physical-exams", 7, "体检中心源系统字段映射和签名报文")
     ],
+    institutionDeploymentManifest: {
+      contractVersion: "1.0.0",
+      institutionId: "institution-template",
+      activationPolicy: "deny-by-default",
+      productionTrafficState: "blocked-until-site-evidence-signed",
+      enabledModuleIds: ["emergency-life-chain", "clinical-blood", "regional-imaging-cloud", "physical-examination"],
+      disabledModuleIds: [],
+      routeAllowlist: ["emergency.html", "blood.html", "imaging-cloud.html", "physical-examination.html"],
+      apiAllowlist: ["/api/emergency/production-center", "/api/blood-system/go-live", "/api/imaging-cloud/production-center", "/api/physical-exams"],
+      enabledModules: [
+        deploymentModule("emergency-life-chain", "120急救生命链", "emergency.html", "/api/emergency/production-center"),
+        deploymentModule("clinical-blood", "临床用血", "blood.html", "/api/blood-system/go-live"),
+        deploymentModule("regional-imaging-cloud", "区域影像云", "imaging-cloud.html", "/api/imaging-cloud/production-center"),
+        deploymentModule("physical-examination", "健康体检", "physical-examination.html", "/api/physical-exams")
+      ],
+      validationRules: [
+        "仅允许暴露机构已选择的专项页面和 API。",
+        "每个模块使用独立数据命名空间和独立回退单元。",
+        "禁用模块必须不可达且不得接收生产流量。",
+        "启用模块后仍须完成现场证据和正式 Go/No-Go 审批。"
+      ]
+    },
+    institutionDeploymentGate: {
+      status: "deployment-contract-valid",
+      ok: true,
+      institutionId: "institution-template",
+      hardStops: [],
+      summary: { total: 9, passed: 9, failed: 0 },
+      checks: [
+        deploymentCheck("activation-policy", "activation policy is deny-by-default"),
+        deploymentCheck("enabled-module-set", "4/4 enabled module IDs match the catalog"),
+        deploymentCheck("disabled-module-set", "0/0 disabled module IDs match the catalog"),
+        deploymentCheck("page-allowlist", "4/4 selected pages exposed"),
+        deploymentCheck("api-allowlist", "4/4 selected APIs exposed"),
+        deploymentCheck("data-namespace-isolation", "4/4 unique data namespaces"),
+        deploymentCheck("rollback-unit-isolation", "4/4 independent rollback units"),
+        deploymentCheck("peer-module-independence", "0 peer specialty dependencies"),
+        deploymentCheck("production-traffic-boundary", "blocked-until-site-evidence-signed")
+      ]
+    },
+    specialtyCompatibilityMatrix: {
+      status: "all-combinations-compatible",
+      totalCombinations: 15,
+      passedCombinations: 15,
+      failedCombinations: 0,
+      combinations: []
+    },
+    institutionPackagePlan: {
+      status: "ready-to-build-institution-package",
+      institutionId: "institution-template",
+      enabledModuleIds: ["emergency-life-chain", "clinical-blood", "regional-imaging-cloud", "physical-examination"],
+      buildCommand: "node scripts/t10-institution-package.js --institution-id=institution-template --tracks=emergency-life-chain,clinical-blood,regional-imaging-cloud,physical-examination",
+      artifacts: [
+        packageArtifact("deployment-package.json", "机器可读部署契约"),
+        packageArtifact("deployment-package.md", "机构实施与验收摘要"),
+        packageArtifact("activation.env.example", "默认拒绝的环境变量示例"),
+        packageArtifact("rollback-plan.md", "专项独立回退说明"),
+        packageArtifact("artifact-index.json", "SHA-256 产物索引")
+      ],
+      installOrder: ["核验机构和选配范围", "应用页面/API白名单", "准备独立数据命名空间", "执行门禁与受控演练", "现场证据签收后进入正式决策"],
+      rollbackPolicy: "单独停用一个部署单元、页面和 API，不修改其他专项，也不删除证据。",
+      hardStops: []
+    },
+    institutionOperationsCapabilityPlan: {
+      status: "institution-operations-code-ready",
+      institutionId: "institution-template",
+      productionTrafficState: "blocked-until-site-evidence-signed",
+      enabledModuleIds: ["emergency-life-chain", "clinical-blood", "regional-imaging-cloud", "physical-examination"],
+      capabilities: [
+        operationsCapability("configuration-version-lifecycle", "不可变语义版本、四眼审批、验签激活和追加式审计链"),
+        operationsCapability("ed25519-signed-package", "绑定机构、模块、摘要、有效期、证书指纹、nonce 和签名"),
+        operationsCapability("site-evidence-import", "真实原始回执按 SHA-256 绑定已验签机构包"),
+        operationsCapability("controlled-rehearsal-runner", "验收场景核对证据、审计、幂等、患者安全、范围和摘要"),
+        operationsCapability("t-plus-1-observation-gate", "观察信号决定保持 No-Go、重复演练或开放下一专项观察"),
+        operationsCapability("upgrade-and-independent-rollback", "升级阻断边界漂移，单模块回退保留其他专项和证据")
+      ],
+      t00IntegrationContract: {
+        requestedRoutes: [
+          { method: "GET", path: "/api/t10-specialty/cutover-pack" },
+          { method: "GET", path: "/api/t10-specialty/institution-packages/:institutionId" },
+          { method: "GET", path: "/api/t10-specialty/institution-packages/:institutionId/verification" }
+        ],
+        integrationRule: "T00 只暴露已验证只读产物，不得从代码就绪推断现场验收或生产上线。"
+      },
+      generatedArtifacts: ["operations-plan.json", "operations-plan.md", "configuration-template.json", "evidence-import-template.json", "rehearsal-results-template.json", "observation-template.json", "upgrade-rollback-template.json", "specialty-plan-review.json", "external-action-board.json", "external-action-command-template.json", "external-action-audit-export.json", "t10-external-action-workflow.js", "scripts/t10-external-action.js", "t00-integration-contract.json", "artifact-index.json"],
+      summary: { capabilities: 6, implemented: 6, blocked: 0 },
+      formalGoLiveBoundary: "代码就绪不替代真实凭据、接口回执、现场演练、T+1观察或正式签字。"
+    },
+    specialtyPlanReview: {
+      status: "all-planned-code-capabilities-reviewed",
+      ok: true,
+      productionBoundary: "全部规划代码能力完成后，正式生产仍受T00集成和现场签署证据约束。",
+      trackReviews: [
+        planTrack("emergency-life-chain", "120急救生命链", "市急救中心/卫健应急办", ["辅助呼救与分级", "调度临床状态机", "院前院内交接", "SOS/AED响应链", "可信设备网关", "绿色通道与弱网降级", "证据导出与质控", "生产控制与回退"], 6),
+        planTrack("clinical-blood", "临床用血", "血液中心/医院输血科/医务部", ["BIS/BTIS十二业务域", "血袋主数据与追溯", "一袋血事务闭环", "临床安全硬阻断", "召回反应与应急", "集成幂等与死信", "事件投影与补偿", "生产证据与隔离"], 8),
+        planTrack("regional-imaging-cloud", "区域影像云", "放射科/医院信息科/区域平台互联互通组", ["DICOM/RIS/PACS接入", "移动调阅与分享", "EMR主索引回写", "互认申诉复核", "合成与现场门禁", "诊断浏览性能", "监管统计", "独立冒烟与回退"], 7),
+        planTrack("physical-examination", "健康体检", "体检中心/基层公卫/慢病管理团队", ["来源接入与幂等", "规范与生产签名", "字段映射与回执", "原件安全归档", "异常与照护闭环", "专项体检隔离", "居民健康亮点", "独立门禁与回退"], 9)
+      ],
+      externalActions: [
+        planAction("P0", "120急救生命链", "site", "市急救中心/卫健应急办", "完成真实120、设备和医院接口联调与四眼签收"),
+        planAction("P0", "120急救生命链", "t00", "市急救中心/卫健应急办", "绑定领域路由并完成生产持久化"),
+        planAction("P1", "120急救生命链", "site", "市急救中心/卫健应急办", "完成容量、可用性和灾备目标验收"),
+        planAction("P0", "临床用血", "site", "血液中心/医院输血科/医务部", "接入真实BIS/BTIS/PDA/冷链IoT并签收"),
+        planAction("P0", "临床用血", "t00", "血液中心/医院输血科/医务部", "接入生产关系数据库、库存锁和灾备"),
+        planAction("P1", "临床用血", "site", "血液中心/医院输血科/医务部", "用真实区域数据校准预测和质量指标"),
+        planAction("P0", "区域影像云", "site", "放射科/医院信息科/区域平台互联互通组", "完成PACS/RIS/DICOM TLS/FHIR现场联调"),
+        planAction("P0", "区域影像云", "t00", "放射科/医院信息科/区域平台互联互通组", "接入生产路由和公共缓存清单"),
+        planAction("P1", "区域影像云", "site", "放射科/医院信息科/区域平台互联互通组", "执行诊断浏览性能验收并接入监管事件流"),
+        planAction("P0", "健康体检", "site", "体检中心/基层公卫/慢病管理团队", "完成真实签名、资质、映射和密钥交换"),
+        planAction("P0", "健康体检", "site", "体检中心/基层公卫/慢病管理团队", "接入对象存储、恶意文件扫描和不可变留存"),
+        planAction("P1", "健康体检", "site", "体检中心/基层公卫/慢病管理团队", "用真实回执完成异常闭环和质控指标验收")
+      ],
+      summary: { tracks: 4, plannedCapabilities: 32, implementedCapabilities: 32, missingCapabilities: 0, externalActions: 12, p0ExternalActions: 8, coveragePercent: 100 }
+    },
+    externalActionWorkflowPlan: {
+      status: "external-action-workflow-code-ready",
+      states: ["open", "assigned", "evidence-submitted", "under-review", "returned", "escalated", "accepted"],
+      acceptanceConfirmation: "ACCEPT T10 EXTERNAL ACTION EVIDENCE",
+      summary: { actions: 12, p0: 8, site: 9, t00: 3, accepted: 0 },
+      trackGates: [
+        externalActionFallbackGate("emergency-life-chain"),
+        externalActionFallbackGate("clinical-blood"),
+        externalActionFallbackGate("regional-imaging-cloud"),
+        externalActionFallbackGate("physical-examination")
+      ],
+      generatedArtifacts: ["external-action-board.json", "external-action-command-template.json", "external-action-audit-export.json", "t10-external-action-workflow.js", "scripts/t10-external-action.js"],
+      formalBoundary: "Accepted external actions only open formal Go/No-Go review; they never set productionReady by themselves."
+    },
     crossTrackControls: [
       control("identity-and-role-scope", "统一身份与最小权限", "平台账号管理员/机构管理员", "每个专项均使用现场实名账号、机构编码和角色授权；演示账号不得进入生产灰度。"),
       control("signed-interface-and-idempotency", "签名接口、时钟窗口和幂等", "平台互联互通组/外部系统厂商", "外部报文必须具备签名、时间窗、nonce或幂等键、回执和死信补偿证据。"),
@@ -1028,6 +1321,68 @@ function track(id, name, department, page, api, blockerCount, blockerTitle) {
       status: "site-pending"
     }))
   };
+}
+
+function deploymentModule(id, name, page, api) {
+  const deploymentUnit = `t10-${id}`;
+  return {
+    id,
+    name,
+    deploymentUnit,
+    page,
+    api,
+    dataNamespace: `t10.${id.replace(/-/g, "_")}`,
+    rollbackUnit: deploymentUnit,
+    productionTrafficState: "blocked-until-site-evidence-signed"
+  };
+}
+
+function deploymentCheck(id, detail) {
+  return { id, passed: true, detail };
+}
+
+function packageArtifact(file, purpose) {
+  return { file, purpose };
+}
+
+function operationsCapability(id, acceptance) {
+  return { id, status: "implemented", acceptance };
+}
+
+function externalActionFallbackGate(trackId) {
+  return {
+    trackId,
+    status: "external-actions-open",
+    ok: false,
+    productionReady: false,
+    formalDecisionRequired: true,
+    summary: { total: 3, accepted: 0, open: 3, openP0: 2, overdue: 0, escalated: 0 },
+    hardStops: [],
+    nextDecision: "keep-production-blocked"
+  };
+}
+
+function planTrack(trackId, trackName, owner, capabilityNames, siteBlockers) {
+  return {
+    trackId,
+    trackName,
+    owner,
+    codeReady: true,
+    productionReady: false,
+    formalState: "blocked-until-site-evidence-signed",
+    siteBlockers,
+    capabilities: capabilityNames.map((name, index) => ({
+      id: `${trackId}-plan-${index + 1}`,
+      priority: index === 5 || index === 6 ? "P1" : "P0",
+      name,
+      status: "implemented"
+    })),
+    summary: { planned: capabilityNames.length, implemented: capabilityNames.length, missing: 0, externalActions: 3 }
+  };
+}
+
+function planAction(priority, trackName, dependencyType, owner, action) {
+  return { priority, trackName, dependencyType, owner, action, status: "open-external-action" };
 }
 
 function control(id, name, owner, acceptance) {

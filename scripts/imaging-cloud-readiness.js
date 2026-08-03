@@ -2,6 +2,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const ImagingCloudProduction = require("../imaging-cloud-production");
+const ImagingCloudPlanning = require("../imaging-cloud-planning");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "imaging-cloud-readiness-report.json");
@@ -39,11 +40,13 @@ function buildImagingCloudReadinessReport(options = {}) {
     docs: read(IMAGE_CLOUD_DOC),
     packageSource: read("package.json"),
     production: read("imaging-cloud-production.js"),
+    planning: read("imaging-cloud-planning.js"),
     solutionA: read("solution-a-connectors.js"),
     solutionAAcceptance: read("scripts/solution-a-acceptance.js")
   };
   const productionCenter = ImagingCloudProduction.center({});
   const standaloneSmoke = ImagingCloudProduction.runStandaloneSmoke({});
+  const planningReview = ImagingCloudPlanning.buildImagingDevelopmentPlanReview({});
   const t00RouteMarkers = [
     "/api/imaging-cloud/production-center",
     "imagingProductionEndpointMatch",
@@ -81,7 +84,9 @@ function buildImagingCloudReadinessReport(options = {}) {
     check("ui:production-operations", ["data-production-action=\"endpoint\"", "data-production-action=\"synthetic\"", "data-production-action=\"requirement\"", "data-production-action=\"drill\"", "data-production-action=\"approval\"", "静态预览不写入生产证据"].every((marker)=>sources.pageJs.includes(marker)), "endpoint, synthetic, evidence, drill and approval operations are available while static preview stays read-only", "ui"),
     check("production:standalone-smoke", standaloneSmoke.codeReady && standaloneSmoke.releaseDecision === "no-go" && standaloneSmoke.checks.some((item) => item.id === "rollback-gate" && item.passed), "standalone module smoke verifies rollback controls while incomplete site evidence remains No-Go", "release"),
     check("production:route-contract", ImagingCloudProduction.ROUTE_CONTRACTS.length === 9 && ImagingCloudProduction.ROUTE_CONTRACTS.every((item)=>item.roles?.length && item.handler?.startsWith("ImagingCloudProduction.")) && sources.docs.includes("/api/imaging-cloud/production-center"), "nine role-guarded T00 integration route contracts are documented", "integration"),
-    check("production:t00-public-wiring", t00Integrated, "nine imaging production routes are wired while the T00 platform launch gate remains closed", "integration")
+    check("production:t00-public-wiring", t00Integrated, "nine imaging production routes are wired while the T00 platform launch gate remains closed", "integration"),
+    check("plan:diagnostic-viewer-performance", planningReview.capabilities.some((item)=>item.id === "diagnostic-viewer-performance-acceptance" && item.status === "implemented-awaiting-site-run") && sources.planning.includes("VIEWER_ACCEPTANCE_THRESHOLDS") && sources.pageJs.includes("renderImagingPlanCompletion"), "diagnostic DICOMweb viewer performance has executable thresholds, audit checks and a visible site-run boundary", "plan"),
+    check("plan:regulatory-statistics", planningReview.capabilities.some((item)=>item.id === "regulatory-statistics-and-ranking" && item.status === "implemented-awaiting-production-data") && sources.planning.includes("buildRegulatoryStatistics") && sources.html.includes("imaging-regulatory-statistics"), "institution/city regulatory statistics, rankings and anomaly detection are implemented without patient identifiers", "plan")
   ];
   const codeReady = checks.every((item) => item.passed);
   return {
@@ -96,7 +101,8 @@ function buildImagingCloudReadinessReport(options = {}) {
       checks: checks.length,
       passed: checks.filter((item) => item.passed).length,
       requiredCapabilities: ["hospital ingest", "patient mobile viewing", "EMR compatibility", "authorization sharing", "quality control", "mutual-recognition appeal", "security baseline", "development plan", "synthetic acceptance", "formal production gate"],
-      production: productionCenter.summary
+      production: productionCenter.summary,
+      plannedCodeCapabilities: planningReview.summary
     },
     artifacts: {
       page: "imaging-cloud.html",
@@ -105,6 +111,8 @@ function buildImagingCloudReadinessReport(options = {}) {
       doc: IMAGE_CLOUD_DOC,
       productionService: "imaging-cloud-production.js",
       productionTest: "test/imaging-cloud-production.test.js",
+      planningService: "imaging-cloud-planning.js",
+      planningTest: "test/imaging-cloud-planning.test.js",
       report: "release/imaging-cloud-readiness-report.md"
     },
     siteBlockers: productionCenter.requirements,
@@ -115,6 +123,7 @@ function buildImagingCloudReadinessReport(options = {}) {
       routeContracts: productionCenter.routeContracts,
       standaloneSmoke
     },
+    planningReview,
     t00Integration: {
       status: t00Integrated ? "integrated-platform-gate-still-blocked" : "pending-shared-file-integration",
       sharedFiles: ["server.js", "package.json", "service-worker.js", "README.md", "release summary"],
@@ -159,6 +168,7 @@ function renderMarkdown(report) {
     `- Approvals signed: ${report.productionCenter.summary.approvalsSigned}/${report.productionCenter.summary.approvals}`,
     `- Typed site receipts verified: ${report.productionCenter.summary.siteReceiptsVerified}/${report.productionCenter.summary.siteReceipts}`,
     `- Standalone smoke: ${report.productionCenter.standaloneSmoke.codeReady ? "PASS" : "FAIL"}; release decision: ${report.productionCenter.standaloneSmoke.releaseDecision.toUpperCase()}`,
+    `- Planned code capabilities: ${report.planningReview.summary.implementedCodeCapabilities}/${report.planningReview.summary.plannedCodeCapabilities}; site runs accepted: ${report.planningReview.summary.siteRunsAccepted}`,
     "",
     "Formal production go-live remains blocked until runtime synthetic acceptance, production endpoint probes, site evidence, drills and dual approvals are actually recorded.",
     ""

@@ -34,6 +34,19 @@
         border-radius: 14px;
         padding: 14px;
         background: #fff;
+        min-width: 0;
+      }
+      .panel {
+        min-width: 0;
+      }
+      .cutover-card p,
+      .cutover-card code {
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
+      #institution-operations,
+      #specialty-plan-review {
+        scroll-margin-top: 200px;
       }
       .cutover-card h3,
       .cutover-card h4 {
@@ -147,6 +160,30 @@
 
       <section class="panel">
         <div class="section-heading">
+          <p class="eyebrow">Institution deployment</p>
+          <h2>机构模块启用与隔离清单</h2>
+        </div>
+        <div id="institution-deployment-manifest"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <p class="eyebrow">Institution operations</p>
+          <h2>机构配置、签名、证据与演练运营</h2>
+        </div>
+        <div id="institution-operations"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <p class="eyebrow">Plan coverage</p>
+          <h2>四专项规划功能覆盖审阅</h2>
+        </div>
+        <div id="specialty-plan-review"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
           <p class="eyebrow">Controls</p>
           <h2>跨专项上线控制</h2>
         </div>
@@ -254,6 +291,6 @@
       </section>
     </main>
 
-    <script src="./t10-specialty-cutover.js?v=runtime-smoke-plan"></script>
+    <script src="./t10-specialty-cutover.js?v=external-action-workflow"></script>
   </body>
 </html>

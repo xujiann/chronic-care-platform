@@ -44,6 +44,9 @@ function buildOfflineChecks(pack, options = {}) {
     : exists("scripts/release-report.js")
     ? readText("scripts/release-report.js")
     : "";
+  const externalActionCli = options.externalActionCli !== undefined
+    ? options.externalActionCli
+    : readText("scripts/t10-external-action.js");
 
   const runtimeSuites = pack.runtimeSmokePlan?.suites || [];
   const routeRows = pack.runtimeSmokePlan?.trackRoutes || [];
@@ -53,9 +56,21 @@ function buildOfflineChecks(pack, options = {}) {
     check("t10:artifact-generation", exists("release/t10-specialty-cutover-pack.json") && exists("release/t10-specialty-cutover-pack.md"), "cutover JSON and Markdown artifacts exist"),
     check("t10:production-boundary", pack.summary?.productionReady === 0 && pack.summary?.formalGoLiveState === "blocked-until-site-evidence-signed", `${pack.summary?.productionReady || 0}/${pack.summary?.tracks || 0} production-ready; formal state ${pack.summary?.formalGoLiveState || "unknown"}`),
     check("t10:independent-module-selection", pack.moduleCatalog?.enabledModuleIds?.length === pack.tracks?.length && pack.moduleCatalog?.peerModuleDependencyCount === 0 && pack.moduleCatalog?.modules?.every((item) => item.independentlySelectable), `${pack.moduleCatalog?.enabledModuleIds?.length || 0} enabled modules; ${pack.moduleCatalog?.peerModuleDependencyCount ?? "unknown"} peer dependencies`),
+    check("t10:institution-deployment-gate", pack.institutionDeploymentGate?.ok === true && pack.institutionDeploymentGate?.summary?.failed === 0, `${pack.institutionDeploymentGate?.summary?.passed || 0}/${pack.institutionDeploymentGate?.summary?.total || 0} deployment contract checks passed`),
+    check("t10:institution-package-plan", pack.institutionPackagePlan?.status === "ready-to-build-institution-package" && pack.specialtyCompatibilityMatrix?.passedCombinations === 15 && pack.specialtyCompatibilityMatrix?.failedCombinations === 0, `${pack.specialtyCompatibilityMatrix?.passedCombinations || 0}/${pack.specialtyCompatibilityMatrix?.totalCombinations || 0} specialty combinations compatible`),
+    check("t10:institution-operations", pack.institutionOperationsCapabilityPlan?.status === "institution-operations-code-ready" && pack.institutionOperationsCapabilityPlan?.summary?.implemented === 6 && pack.institutionOperationsCapabilityPlan?.summary?.blocked === 0, `${pack.institutionOperationsCapabilityPlan?.summary?.implemented || 0}/${pack.institutionOperationsCapabilityPlan?.summary?.capabilities || 0} institution operations capabilities implemented`),
+    check("t10:specialty-plan-coverage", pack.specialtyPlanReview?.ok === true && pack.specialtyPlanReview?.summary?.implementedCapabilities === pack.specialtyPlanReview?.summary?.plannedCapabilities && pack.specialtyPlanReview?.summary?.missingCapabilities === 0, `${pack.specialtyPlanReview?.summary?.implementedCapabilities || 0}/${pack.specialtyPlanReview?.summary?.plannedCapabilities || 0} planned capabilities have code and test evidence`),
+    check("t10:external-action-workflow", pack.externalActionWorkflowPlan?.status === "external-action-workflow-code-ready" && pack.externalActionWorkflowPlan?.summary?.actions === pack.specialtyPlanReview?.summary?.externalActions && pack.externalActionWorkflowPlan?.trackGates?.every((item) => item.productionReady === false), `${pack.externalActionWorkflowPlan?.summary?.actions || 0} external actions are governed without auto-opening production`),
+    check("t10:external-action-cli", ["inspectExternalActionBoard", "executeExternalActionCommand", "expectedBoardDigest", "atomicWriteJson", "external action board is locked"].every((marker) => externalActionCli.includes(marker)), "external action CLI enforces verification, optimistic concurrency, exclusive locking and atomic persistence"),
     check("t10:runtime-smoke-plan", pack.runtimeSmokePlan?.status === "ready-for-runtime-smoke" && pack.runtimeSmokePlan?.launchMode === "controlled-rehearsal-only" && runtimeSuites.length === 5, `${runtimeSuites.length} smoke suites / ${pack.runtimeSmokePlan?.launchMode || "unknown"}`),
     check("t10:runtime-smoke-suites", ["smoke-artifact-generation", "smoke-static-preview", "smoke-server-api", "smoke-release-gates", "smoke-observation-artifacts"].every((id) => runtimeSuites.some((suite) => suite.id === id)), "artifact, preview, API, release gates and observation artifact suites are declared"),
-    check("t10:static-preview", html.includes("runtime-smoke-plan") && html.includes("t10-specialty-cutover.js?v=runtime-smoke-plan") && client.includes("renderRuntimeSmokePlan"), "runtime smoke panel and renderer are wired"),
+    check(
+      "t10:static-preview",
+      html.includes('id="runtime-smoke-plan"')
+        && /t10-specialty-cutover\.js\?v=[a-z0-9-]+/i.test(html)
+        && client.includes("renderRuntimeSmokePlan"),
+      "runtime smoke panel, versioned client and renderer are wired"
+    ),
     check("t10:route-contracts", routeRows.length === pack.tracks?.length && routeRows.every((route) => pack.tracks.some((track) => track.id === route.trackId && track.page === route.page && track.api === route.api)), `${routeRows.length}/${pack.tracks?.length || 0} route contracts match tracks`),
     check("t10:site-evidence-boundary", pack.evidenceDossier?.status === "site-evidence-pending" && pack.evidenceDossier?.hardStopOpen > 0 && pack.evidenceDossier?.reviewPolicy?.submitterMustDifferFromReviewer, `${pack.evidenceDossier?.hardStopOpen || 0} open hard stops; four-eyes ${pack.evidenceDossier?.reviewPolicy?.submitterMustDifferFromReviewer ? "on" : "off"}`),
     check("t10:command-and-observation", pack.cutoverCommandCenter?.roster?.some((item) => item.seat === "release-commander") && pack.observationSignalBoard?.summary?.lanes === 4 && observationArtifacts.includes("t-plus-1-observation-memo"), `${pack.observationSignalBoard?.summary?.lanes || 0} observation lanes; ${observationArtifacts.length} artifacts`),

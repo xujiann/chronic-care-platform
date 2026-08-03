@@ -87,10 +87,49 @@ Generate a standalone or institution-specific pack with:
 
 ```powershell
 node emergency-specialty-cutover.js --tracks clinical-blood --output-prefix t10-clinical-blood
-node emergency-specialty-cutover.js --tracks regional-imaging-cloud,physical-examination --output-prefix institution-a-specialties
+node emergency-specialty-cutover.js --tracks regional-imaging-cloud,physical-examination --institution-id institution-a --output-prefix institution-a-specialties
 ```
 
 The default command still generates the four-module T10 integration pack. `moduleCatalog` records enabled and disabled module IDs, deployment units, external systems, data boundaries, shared platform capabilities and peer-module dependencies. The peer dependency count must remain zero so an institution can adopt any one module without installing the other three.
+
+`institutionDeploymentManifest` turns that selection into a fail-closed deployment contract. It records the institution ID, enabled and disabled modules, page/API allowlists, per-module data namespaces, external systems and independent rollback units. Disabled modules must remain unreachable and receive no production traffic. Enabling a module does not waive site evidence or formal Go/No-Go approval; production traffic remains `blocked-until-site-evidence-signed`.
+
+`institutionDeploymentGate` executes nine contract checks during pack generation and runtime smoke: deny-by-default activation, exact enabled/disabled sets, page and API allowlists, unique data namespaces, unique rollback units, zero peer-module dependencies and the production-traffic boundary. Any failed check emits a hard-stop ID and blocks the deployment contract before an institution-specific package can enter controlled rehearsal.
+
+`specialtyCompatibilityMatrix` executes the deployment contract against all 15 non-empty combinations of the four specialties. Every combination must retain exact page/API allowlists, unique data namespaces, independent rollback units and zero peer-specialty dependencies.
+
+Build a deliverable institution package with:
+
+```powershell
+node scripts\t10-institution-package.js --institution-id=hospital-a --tracks=clinical-blood,physical-examination
+```
+
+The package contains `deployment-package.json`, `deployment-package.md`, `activation.env.example`, `rollback-plan.md` and `artifact-index.json`. The SHA-256 index covers the four payload artifacts. Package generation immediately re-reads the directory and verifies every indexed digest and byte count, the deployment-package digest, the deployment gate, all 15 compatibility combinations and the fail-closed production boundary. The rollback plan removes only the selected module's deployment unit, page and API from service while preserving data and evidence; it must not disable or mutate another specialty.
+
+## Institution operations lifecycle
+
+`t10-institution-operations.js` completes the code-side institution lifecycle:
+
+- immutable semantic configuration versions with draft, review, approval, activation, deactivation, rollback and supersede transitions;
+- four-eyes approval and append-only digest-chained configuration audit;
+- Ed25519 package signatures bound to an authorized signer, institution, selected modules, package integrity, validity window, trusted public-key fingerprint and anti-replay nonce;
+- evidence imports require unique evidence IDs plus ordered submit/review timestamps, original references, SHA-256 digests and four-eyes separation;
+- site-evidence import bound to the verified package digest, original evidence references, SHA-256 digests, real interface version and independent submitter/reviewer identities;
+- controlled scenario execution with hard-stop patient-safety, scope, idempotency, audit and evidence replay checks;
+- T+1 signal evaluation that returns `stay-no-go`, `repeat-batch-1` or `open-watch-only-batch-2`;
+- package upgrade diff and one-module rollback verification that preserve peer pages, APIs, data namespaces and evidence.
+
+Generate the institution operations templates with:
+
+```powershell
+node scripts\t10-institution-operations.js --institution-id=hospital-a --tracks=emergency-life-chain,clinical-blood
+```
+
+The output includes configuration, evidence import, rehearsal result, observation, upgrade/rollback, selected-specialty plan review and T00 integration templates plus a SHA-256 artifact index. Templates intentionally contain placeholders and `pending`/`not-run` states; they cannot be counted as real site evidence.
+
+## T00 integration contract
+
+The generated `t00-integration-contract.json` keeps ownership explicit. T00 owns `server.js`, `portal.css`, `package.json`, `README.md` and the public release summary. T10 requests read-only exposure of the cutover pack, institution package and verification result. T00 must not infer site acceptance or production Go-Live from code readiness.
 
 ## Site evidence dossier
 
@@ -197,6 +236,53 @@ Run it after generating the cutover pack:
 
 ```powershell
 node scripts\t10-runtime-smoke.js
+```
+
+## Specialty plan coverage review
+
+`t10-specialty-plan-review.js` reviews the complete planned capability scope for emergency, clinical blood, imaging cloud and physical examination. Every capability must have a stable specialty-scoped identifier, P0/P1 priority, accountable department, existing source evidence and at least one executable acceptance test. Remaining work is listed separately as a `site` or `t00` action.
+
+The catalog contains 32 code capability groups: eight for each specialty. The review fails closed when a source or test artifact is missing, when identifiers collide, or when code completion is allowed to imply formal production readiness.
+
+The imaging review closed two prior code-side P1 gaps:
+
+- `imaging-cloud-planning.js#evaluateViewerPerformance` defines DICOMweb/WADO-RS, lossless diagnostic source, first-pixel, series-load, interaction P95, failed-object-rate, viewer-tool, audit and terminal-storage gates;
+- `imaging-cloud-planning.js#buildRegulatoryStatistics` produces day/month/year institution and city aggregates, rankings and anomaly lists without emitting patient, accession or StudyInstanceUID identifiers.
+
+Real DICOMweb performance runs and production regulatory event feeds remain site dependencies. Generate the JSON/Markdown review, external-action register and SHA-256 artifact index with:
+
+```powershell
+node scripts\t10-specialty-plan-review.js
+```
+
+### External action closure workflow
+
+The 12 remaining `site` and `t00` actions are executable workflow records, not production-readiness assertions. Each action starts at `open`, receives a priority deadline (P0 seven days, P1 21 days, P2 45 days), and moves through assignment, evidence submission and independent review. Returned evidence increments its revision; overdue or escalated P0 actions remain hard stops.
+
+Evidence submission requires the original receipt reference, interface or drill version and a SHA-256 digest. The acceptor must differ from the submitter, confirm the exact submitted digest, provide an independent verification reference and use the exact acceptance confirmation. Every state change is appended to a digest-chained audit.
+
+An accepted action is reopened when its endpoint, interface version or other verified boundary changes. Even when every action for a specialty is accepted, the workflow only opens formal Go/No-Go review: `productionReady` remains false until the authorized decision and site evidence process complete.
+
+The review and institution operations generators include:
+
+- `external-action-board.json`
+- `external-action-command-template.json`
+- `external-action-audit-export.json`
+- `t10-external-action-workflow.js`
+- `scripts/t10-external-action.js`
+
+Use the checked-in executor to verify or inspect a board without mutation:
+
+```powershell
+node scripts\t10-external-action.js verify --board=release\t10-specialty-plan-review\external-action-board.json
+node scripts\t10-external-action.js status --board=release\t10-specialty-plan-review\external-action-board.json --track=emergency-life-chain
+```
+
+Before applying a command, copy the current board digest into `expectedBoardDigest`. This optimistic concurrency token prevents a stale reviewer or owner command from overwriting a newer decision. Use `--dry-run` first; the real apply acquires an exclusive board lock, verifies integrity, writes the board atomically and refreshes the audit export:
+
+```powershell
+node scripts\t10-external-action.js apply --board=release\t10-specialty-plan-review\external-action-board.json --command=command.json --dry-run
+node scripts\t10-external-action.js apply --board=release\t10-specialty-plan-review\external-action-board.json --command=command.json
 ```
 
 ## Verification

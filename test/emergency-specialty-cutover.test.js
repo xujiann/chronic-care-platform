@@ -15,6 +15,8 @@ const {
   buildObservationSignalBoard,
   buildRuntimeSmokePlan,
   buildModuleCatalog,
+  buildInstitutionDeploymentManifest,
+  validateInstitutionDeploymentManifest,
   normalizeTrack,
   parseCliOptions,
   renderMarkdown,
@@ -90,6 +92,24 @@ test("buildSpecialtyCutoverPack aggregates site blockers and cross-track control
   assert.deepEqual(pack.moduleCatalog.enabledModuleIds, ["emergency-life-chain", "clinical-blood"]);
   assert.equal(pack.moduleCatalog.peerModuleDependencyCount, 0);
   assert.ok(pack.moduleCatalog.modules.every((item) => item.independentlySelectable));
+  assert.equal(pack.institutionDeploymentGate.ok, true);
+  assert.equal(pack.specialtyCompatibilityMatrix.totalCombinations, 3);
+  assert.equal(pack.specialtyCompatibilityMatrix.passedCombinations, 3);
+  assert.equal(pack.institutionPackagePlan.status, "ready-to-build-institution-package");
+  assert.equal(pack.institutionPackagePlan.artifacts.length, 5);
+  assert.equal(pack.institutionOperationsCapabilityPlan.status, "institution-operations-code-ready");
+  assert.equal(pack.institutionOperationsCapabilityPlan.summary.implemented, 6);
+  assert.equal(pack.institutionOperationsCapabilityPlan.summary.blocked, 0);
+  assert.equal(pack.specialtyPlanReview.ok, true);
+  assert.equal(pack.specialtyPlanReview.summary.plannedCapabilities, 16);
+  assert.equal(pack.specialtyPlanReview.summary.implementedCapabilities, 16);
+  assert.equal(pack.specialtyPlanReview.summary.missingCapabilities, 0);
+  assert.equal(pack.specialtyPlanReview.summary.externalActions, 6);
+  assert.equal(pack.externalActionWorkflowPlan.status, "external-action-workflow-code-ready");
+  assert.equal(pack.externalActionWorkflowPlan.summary.actions, 6);
+  assert.equal(pack.externalActionWorkflowPlan.trackGates.length, 2);
+  assert.equal(pack.externalActionWorkflowPlan.trackGates.every((item) => item.productionReady === false), true);
+  assert.equal(pack.summary.plannedCapabilities, 16);
   assert.equal(pack.crossTrackControls.length, 4);
   assert.ok(pack.crossTrackControls.some((item) => item.id === "four-eyes-site-evidence"));
   assert.equal(pack.rehearsalPlan.scope.primaryTrackId, "emergency-life-chain");
@@ -175,15 +195,55 @@ test("module catalog keeps platform contracts separate from peer specialty depen
   assert.equal(catalog.peerModuleDependencyCount, 0);
 });
 
+test("institution deployment manifest exposes only selected module routes and data boundaries", () => {
+  const catalog = buildModuleCatalog(tracks, [tracks[1]]);
+  const manifest = buildInstitutionDeploymentManifest(catalog, { institutionId: "hospital-a" });
+
+  assert.equal(manifest.institutionId, "hospital-a");
+  assert.equal(manifest.activationPolicy, "deny-by-default");
+  assert.equal(manifest.productionTrafficState, "blocked-until-site-evidence-signed");
+  assert.deepEqual(manifest.enabledModuleIds, ["clinical-blood"]);
+  assert.deepEqual(manifest.disabledModuleIds, ["emergency-life-chain"]);
+  assert.deepEqual(manifest.routeAllowlist, ["blood.html"]);
+  assert.deepEqual(manifest.apiAllowlist, ["/api/blood-system/go-live"]);
+  assert.deepEqual(manifest.dataNamespaces, ["t10.clinical_blood"]);
+  assert.deepEqual(manifest.rollbackUnits, ["t10-clinical-blood"]);
+  assert.equal(manifest.enabledModules[0].externalSystems.includes("BIS or BTIS"), true);
+  assert.ok(manifest.validationRules.some((item) => /disabled specialty modules/.test(item)));
+});
+
+test("institution deployment gate blocks route exposure, namespace collision and traffic bypass", () => {
+  const catalog = buildModuleCatalog(tracks, tracks);
+  const manifest = buildInstitutionDeploymentManifest(catalog, { institutionId: "hospital-a" });
+  const validGate = validateInstitutionDeploymentManifest(manifest, catalog);
+  assert.equal(validGate.ok, true);
+  assert.equal(validGate.summary.passed, 9);
+  assert.deepEqual(validGate.hardStops, []);
+
+  const invalidGate = validateInstitutionDeploymentManifest({
+    ...manifest,
+    routeAllowlist: [...manifest.routeAllowlist, "disabled-module.html"],
+    dataNamespaces: ["t10.shared", "t10.shared"],
+    productionTrafficState: "enabled"
+  }, catalog);
+  assert.equal(invalidGate.ok, false);
+  assert.equal(invalidGate.status, "deployment-contract-blocked");
+  assert.ok(invalidGate.hardStops.includes("page-allowlist"));
+  assert.ok(invalidGate.hardStops.includes("data-namespace-isolation"));
+  assert.ok(invalidGate.hardStops.includes("production-traffic-boundary"));
+});
+
 test("CLI selection supports standalone output profiles and environment configuration", () => {
-  assert.deepEqual(parseCliOptions(["--tracks", "clinical-blood,physical-examination", "--output-prefix", "institution-a"]), {
+  assert.deepEqual(parseCliOptions(["--tracks", "clinical-blood,physical-examination", "--output-prefix", "institution-a", "--institution-id", "hospital.a_01"]), {
     enabledTrackIds: ["clinical-blood", "physical-examination"],
-    outputPrefix: "institution-a"
+    outputPrefix: "institution-a",
+    institutionId: "hospital.a_01"
   });
   assert.deepEqual(parseCliOptions([], { T10_ENABLED_TRACKS: "regional-imaging-cloud" }), {
     enabledTrackIds: ["regional-imaging-cloud"]
   });
   assert.throws(() => parseCliOptions(["--output-prefix", "../escape"], {}), /only letters/);
+  assert.throws(() => parseCliOptions(["--institution-id", "../escape"], {}), /institution id/);
 });
 
 test("selectFirstIncrement prioritizes emergency life chain when code is ready but site evidence is pending", () => {
@@ -214,6 +274,11 @@ test("renderMarkdown exposes the digest, departments, blockers and first grey in
   assert.match(markdown, /临床用血/);
   assert.match(markdown, /Site blockers: 4/);
   assert.match(markdown, /Institution module selection/);
+  assert.match(markdown, /Institution deployment manifest/);
+  assert.match(markdown, /deny-by-default/);
+  assert.match(markdown, /Data namespace/);
+  assert.match(markdown, /Institution operations capability/);
+  assert.match(markdown, /configuration-version-lifecycle/);
   assert.match(markdown, /composable-module-suite/);
   assert.match(markdown, /Peer specialty dependencies: 0/);
   assert.match(markdown, /sha256:[a-f0-9]{64}/);
@@ -438,9 +503,17 @@ test("static cutover preview page exposes T10 tracks and release-artifact fallba
   assert.match(html, /首增量验收场景脚本/);
   assert.match(html, /场景-证据判定矩阵/);
   assert.match(html, /切换指挥台与值守责任/);
+  assert.match(html, /机构模块启用与隔离清单/);
+  assert.match(html, /机构配置、签名、证据与演练运营/);
+  assert.match(html, /四专项规划功能覆盖审阅/);
+  assert.match(html, /institution-deployment-manifest/);
+  assert.match(html, /institution-operations/);
+  assert.match(html, /specialty-plan-review/);
   assert.match(html, /observation-signal-board/);
   assert.match(html, /runtime-smoke-plan/);
-  assert.match(html, /t10-specialty-cutover\.js\?v=runtime-smoke-plan/);
+  assert.match(html, /t10-specialty-cutover\.js\?v=external-action-workflow/);
+  assert.match(html, /overflow-wrap:\s*anywhere/);
+  assert.match(html, /scroll-margin-top:\s*200px/);
   assert.match(html, /emergency\.html/);
   assert.match(html, /blood\.html/);
   assert.match(html, /imaging-cloud\.html/);
@@ -448,7 +521,10 @@ test("static cutover preview page exposes T10 tracks and release-artifact fallba
   assert.match(client, /release\/t10-specialty-cutover-pack\.json/);
   assert.match(client, /fallbackCutoverPack/);
   assert.match(client, /withCutoverDefaults/);
+  assert.match(client, /restoreLocationAnchor/);
   assert.match(client, /renderRehearsalPlan/);
+  assert.match(client, /renderSpecialtyPlanReview/);
+  assert.match(client, /external-action-workflow-code-ready/);
   assert.match(client, /renderDecisionMatrix/);
   assert.match(client, /renderEvidenceDossier/);
   assert.match(client, /renderPilotBatchPlan/);
@@ -458,6 +534,17 @@ test("static cutover preview page exposes T10 tracks and release-artifact fallba
   assert.match(client, /renderCutoverCommandCenter/);
   assert.match(client, /renderObservationSignalBoard/);
   assert.match(client, /renderRuntimeSmokePlan/);
+  assert.match(client, /renderInstitutionDeploymentManifest/);
+  assert.match(client, /deny-by-default/);
+  assert.match(client, /deployment-contract-valid/);
+  assert.match(client, /all-combinations-compatible/);
+  assert.match(client, /ready-to-build-institution-package/);
+  assert.match(client, /artifact-index\.json/);
+  assert.match(client, /renderInstitutionOperations/);
+  assert.match(client, /renderSpecialtyPlanReview/);
+  assert.match(client, /all-planned-code-capabilities-reviewed/);
+  assert.match(client, /ed25519-signed-package/);
+  assert.match(client, /t00-integration-contract\.json/);
   assert.match(client, /evidence-id-present/);
   assert.match(client, /batch-1-single-chain/);
   assert.match(client, /submit-evidence/);
