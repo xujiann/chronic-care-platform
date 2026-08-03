@@ -304,6 +304,24 @@ function normalizeFamilyDoctorCase(item = {}, context = {}) {
   const isApplication = Boolean(item.reviewStatus || /^p2fda-/i.test(text(item.id)));
 
   if (isApplication) {
+    if (item.applicationType === "team-transfer") {
+      if (item.status === "completed") {
+        envelope.unifiedPhase = "closed";
+        Object.assign(envelope, responsibility("", "", "", "none"));
+      } else if (["rejected", "cancelled"].includes(item.reviewStatus || item.status)) {
+        envelope.unifiedPhase = "cancelled";
+        Object.assign(envelope, responsibility("", "", "", "none"));
+      } else {
+        envelope.unifiedPhase = "requested";
+        Object.assign(envelope, responsibility(
+          item.reviewInstitutionCode,
+          item.reviewStage === "target" ? "family-doctor-target-team" : "family-doctor-source-team",
+          item.reviewDueAt,
+          item.reviewStage === "target" ? "accept or reject family doctor transfer" : "release or reject family doctor transfer"
+        ));
+      }
+      return envelope;
+    }
     if (["rejected", "cancelled"].includes(item.reviewStatus || item.status)) {
       envelope.unifiedPhase = "cancelled";
       Object.assign(envelope, responsibility("resident", "citizen", item.supplementDueAt, "supplement application or stop contracting"));
@@ -330,6 +348,25 @@ function normalizeFamilyDoctorCase(item = {}, context = {}) {
     envelope.unifiedPhase = "service-in-progress";
     Object.assign(envelope, responsibility(item.institutionCode || item.reviewInstitutionCode, "family-doctor-team", item.nextServiceAt, "deliver next contracted service"));
   }
+  return envelope;
+}
+
+function normalizeFamilyDoctorServiceDisputeCase(item = {}, context = {}) {
+  const notification = summarizeNotificationReceipts(context.messages, item.id);
+  const envelope = baseEnvelope("family-doctor-service-dispute", item, notification);
+  const status = lower(item.status);
+  const terminal = ["resolved", "cancelled"].includes(status);
+  const awaitingResident = status === "responded";
+  envelope.sourceOrg = text(item.institutionCode);
+  envelope.upstreamRefs = [text(item.fulfillmentId), text(item.contractId)].filter(Boolean);
+  envelope.unifiedPhase = terminal ? "closed" : awaitingResident ? "result-returned" : "exception";
+  envelope.exceptionState = terminal ? "none" : awaitingResident ? "resident-resolution-review-pending" : "family-doctor-service-dispute-open";
+  Object.assign(envelope, responsibility(
+    terminal ? "" : awaitingResident ? "resident" : item.institutionCode,
+    terminal ? "" : awaitingResident ? "citizen" : "family-doctor-quality",
+    terminal ? "" : awaitingResident ? item.residentDueAt : item.responseDueAt,
+    terminal ? "none" : awaitingResident ? "accept resolution or reopen dispute" : "respond with remediation evidence"
+  ));
   return envelope;
 }
 
@@ -365,6 +402,7 @@ function normalizeDomainCase(caseType, item = {}, context = {}) {
     referral: normalizeReferralCase,
     "referral-teleconsultation": normalizeReferralCase,
     "family-doctor": normalizeFamilyDoctorCase,
+    "family-doctor-service-dispute": normalizeFamilyDoctorServiceDisputeCase,
     "chronic-followup": normalizeChronicFollowupCase
   };
   const normalize = normalizers[caseType];
@@ -448,6 +486,7 @@ function validateClosureReferences(data = {}) {
   const applications = rows(data.phase2FamilyDoctorApplications);
   const contracts = index(data.phase2FamilyDoctorContracts);
   const serviceTasks = index(data.phase2FamilyDoctorServiceTasks);
+  const serviceDisputes = index(data.phase2FamilyDoctorServiceDisputes);
   const familyTeams = index(data.phase2FamilyDoctorTeams);
   const familyPackages = index(data.phase2FamilyDoctorServicePackages);
   const taskMessages = index(data.taskMessages);
@@ -460,7 +499,8 @@ function validateClosureReferences(data = {}) {
     phase2FamilyDoctorApplications: index(data.phase2FamilyDoctorApplications),
     phase2FamilyDoctorContracts: index(data.phase2FamilyDoctorContracts),
     phase2FamilyDoctorFulfillments: index(data.phase2FamilyDoctorFulfillments),
-    phase2FamilyDoctorServiceTasks: serviceTasks
+    phase2FamilyDoctorServiceTasks: serviceTasks,
+    phase2FamilyDoctorServiceDisputes: serviceDisputes
   };
 
   rows(data.registrationOrders).forEach((order) => {
@@ -538,7 +578,21 @@ function validateClosureReferences(data = {}) {
     const servicePackage = familyPackages.get(application.packageId);
     if (familyTeams.size && !team) addIssue("P0", "family-application-team-missing", "familyDoctorApplication", application.id, "application references a missing family doctor team", { teamId: application.teamId });
     if (familyPackages.size && !servicePackage) addIssue("P0", "family-application-package-missing", "familyDoctorApplication", application.id, "application references a missing family doctor package", { packageId: application.packageId });
-    if (team && application.reviewInstitutionCode && team.institutionCode !== application.reviewInstitutionCode) addIssue("P0", "family-application-review-org-mismatch", "familyDoctorApplication", application.id, "application review institution differs from its team institution", { reviewInstitutionCode: application.reviewInstitutionCode, teamInstitutionCode: team.institutionCode });
+    if (application.applicationType === "team-transfer") {
+      const contract = contracts.get(application.existingContractId);
+      const sourceTeam = familyTeams.get(application.sourceTeamId);
+      if (!contract) addIssue("P0", "family-transfer-contract-missing", "familyDoctorApplication", application.id, "transfer application references a missing family doctor contract", { existingContractId: application.existingContractId });
+      if (contract && contract.residentId !== application.residentId) addIssue("P0", "family-transfer-contract-resident-mismatch", "familyDoctorApplication", application.id, "transfer application and contract residents differ", { existingContractId: application.existingContractId });
+      if (!sourceTeam) addIssue("P0", "family-transfer-source-team-missing", "familyDoctorApplication", application.id, "transfer application references a missing source team", { sourceTeamId: application.sourceTeamId });
+      const expectedReviewOrg = application.reviewStage === "source" ? application.sourceInstitutionCode : application.reviewStage === "target" ? application.targetInstitutionCode : "";
+      if (expectedReviewOrg && application.reviewInstitutionCode !== expectedReviewOrg) addIssue("P0", "family-transfer-review-org-mismatch", "familyDoctorApplication", application.id, "transfer review institution does not match its current review stage", { reviewStage: application.reviewStage, reviewInstitutionCode: application.reviewInstitutionCode, expectedReviewOrg });
+      if (team && application.targetInstitutionCode !== team.institutionCode) addIssue("P0", "family-transfer-target-org-mismatch", "familyDoctorApplication", application.id, "transfer target institution differs from its target team", { targetInstitutionCode: application.targetInstitutionCode, teamInstitutionCode: team.institutionCode });
+      if (application.status === "completed" && contract && (contract.teamId !== application.teamId || contract.packageId !== application.packageId || contract.institutionCode !== application.targetInstitutionCode)) {
+        addIssue("P0", "family-transfer-contract-target-mismatch", "familyDoctorApplication", application.id, "completed transfer did not move the contract to the approved team, package, and institution", { existingContractId: application.existingContractId });
+      }
+    } else if (team && application.reviewInstitutionCode && team.institutionCode !== application.reviewInstitutionCode) {
+      addIssue("P0", "family-application-review-org-mismatch", "familyDoctorApplication", application.id, "application review institution differs from its team institution", { reviewInstitutionCode: application.reviewInstitutionCode, teamInstitutionCode: team.institutionCode });
+    }
   });
 
   rows(data.phase2FamilyDoctorContracts).forEach((contract) => {
@@ -558,11 +612,50 @@ function validateClosureReferences(data = {}) {
   rows(data.phase2FamilyDoctorFulfillments).forEach((fulfillment) => {
     const contract = contracts.get(fulfillment.contractId);
     if (!contract) addIssue("P0", "family-fulfillment-contract-missing", "familyDoctorFulfillment", fulfillment.id, "fulfillment references a missing contract", { contractId: fulfillment.contractId });
-    if (contract && (contract.residentId !== fulfillment.residentId || contract.teamId !== fulfillment.teamId || (fulfillment.packageId && contract.packageId !== fulfillment.packageId))) addIssue("P0", "family-fulfillment-contract-scope-mismatch", "familyDoctorFulfillment", fulfillment.id, "fulfillment resident, team, or package differs from its contract", { contractId: fulfillment.contractId });
+    if (contract) {
+      const currentScope = contract.teamId === fulfillment.teamId && (!fulfillment.packageId || contract.packageId === fulfillment.packageId);
+      const fulfilledAt = Date.parse(fulfillment.completedAt || fulfillment.serviceDate || "");
+      const historicalScope = rows(contract.transferHistory).some((transfer) => {
+        const transferredAt = Date.parse(transfer.at || "");
+        return transfer.fromTeamId === fulfillment.teamId
+          && (!fulfillment.packageId || transfer.fromPackageId === fulfillment.packageId)
+          && Number.isFinite(fulfilledAt)
+          && Number.isFinite(transferredAt)
+          && fulfilledAt <= transferredAt;
+      });
+      if (contract.residentId !== fulfillment.residentId || (!currentScope && !historicalScope)) {
+        addIssue("P0", "family-fulfillment-contract-scope-mismatch", "familyDoctorFulfillment", fulfillment.id, "fulfillment resident, team, or package differs from the current or historically transferred contract scope", { contractId: fulfillment.contractId });
+      }
+    }
     if (fulfillment.serviceTaskId) {
       const task = serviceTasks.get(fulfillment.serviceTaskId);
       if (!task) addIssue("P0", "family-fulfillment-service-task-missing", "familyDoctorFulfillment", fulfillment.id, "fulfillment references a missing family doctor service task", { serviceTaskId: fulfillment.serviceTaskId });
       if (task && (task.contractId !== fulfillment.contractId || task.residentId !== fulfillment.residentId)) addIssue("P0", "family-fulfillment-service-task-mismatch", "familyDoctorFulfillment", fulfillment.id, "fulfillment and service task contract or resident differ", { serviceTaskId: fulfillment.serviceTaskId });
+    }
+  });
+
+  rows(data.phase2FamilyDoctorServiceDisputes).forEach((dispute) => {
+    const disputeStatus = lower(dispute.status);
+    const fulfillment = rows(data.phase2FamilyDoctorFulfillments).find((item) => item.id === dispute.fulfillmentId);
+    const contract = contracts.get(dispute.contractId);
+    const team = familyTeams.get(dispute.teamId);
+    if (!fulfillment) addIssue("P0", "family-dispute-fulfillment-missing", "familyDoctorServiceDispute", dispute.id, "service dispute references a missing fulfillment", { fulfillmentId: dispute.fulfillmentId });
+    if (!contract) addIssue("P0", "family-dispute-contract-missing", "familyDoctorServiceDispute", dispute.id, "service dispute references a missing contract", { contractId: dispute.contractId });
+    if (familyTeams.size && !team) addIssue("P0", "family-dispute-team-missing", "familyDoctorServiceDispute", dispute.id, "service dispute references a missing fulfillment team", { teamId: dispute.teamId });
+    if (fulfillment && (fulfillment.contractId !== dispute.contractId || fulfillment.residentId !== dispute.residentId || fulfillment.teamId !== dispute.teamId)) {
+      addIssue("P0", "family-dispute-fulfillment-scope-mismatch", "familyDoctorServiceDispute", dispute.id, "service dispute resident, contract, or team differs from its fulfillment", { fulfillmentId: dispute.fulfillmentId });
+    }
+    if (contract && contract.residentId !== dispute.residentId) {
+      addIssue("P0", "family-dispute-contract-resident-mismatch", "familyDoctorServiceDispute", dispute.id, "service dispute and contract residents differ", { contractId: dispute.contractId });
+    }
+    if (team && team.institutionCode !== dispute.institutionCode) {
+      addIssue("P0", "family-dispute-institution-mismatch", "familyDoctorServiceDispute", dispute.id, "service dispute institution differs from the fulfillment team institution", { teamId: dispute.teamId, institutionCode: dispute.institutionCode, teamInstitutionCode: team.institutionCode });
+    }
+    if (["responded", "resolved"].includes(disputeStatus) && !rows(dispute.responseHistory).length) {
+      addIssue("P0", "family-dispute-response-missing", "familyDoctorServiceDispute", dispute.id, "responded or resolved service dispute requires institution response evidence", {});
+    }
+    if (disputeStatus === "resolved" && lower(dispute.residentDecision) !== "accepted") {
+      addIssue("P0", "family-dispute-resident-acceptance-missing", "familyDoctorServiceDispute", dispute.id, "resolved service dispute requires resident acceptance", { residentDecision: dispute.residentDecision || "" });
     }
   });
 
@@ -674,7 +767,8 @@ function planClosureReferenceRepairs(data = {}) {
     followups: new Map(rows(data.followups).filter((item) => item?.id).map((item) => [item.id, item])),
     phase2FamilyDoctorApplications: new Map(rows(data.phase2FamilyDoctorApplications).filter((item) => item?.id).map((item) => [item.id, item])),
     phase2FamilyDoctorContracts: new Map(rows(data.phase2FamilyDoctorContracts).filter((item) => item?.id).map((item) => [item.id, item])),
-    phase2FamilyDoctorFulfillments: new Map(rows(data.phase2FamilyDoctorFulfillments).filter((item) => item?.id).map((item) => [item.id, item]))
+    phase2FamilyDoctorFulfillments: new Map(rows(data.phase2FamilyDoctorFulfillments).filter((item) => item?.id).map((item) => [item.id, item])),
+    phase2FamilyDoctorServiceDisputes: new Map(rows(data.phase2FamilyDoctorServiceDisputes).filter((item) => item?.id).map((item) => [item.id, item]))
   };
   rows(data.taskMessages).forEach((message) => {
     const source = messageSources[message.collection]?.get(message.sourceId);
@@ -732,7 +826,8 @@ function applyClosureReferenceRepairs(data = {}, repairsOrPlan = []) {
     followups: new Map(rows(next.followups).filter((item) => item?.id).map((item) => [item.id, item])),
     phase2FamilyDoctorApplications: new Map(rows(next.phase2FamilyDoctorApplications).filter((item) => item?.id).map((item) => [item.id, item])),
     phase2FamilyDoctorContracts: new Map(rows(next.phase2FamilyDoctorContracts).filter((item) => item?.id).map((item) => [item.id, item])),
-    phase2FamilyDoctorFulfillments: new Map(rows(next.phase2FamilyDoctorFulfillments).filter((item) => item?.id).map((item) => [item.id, item]))
+    phase2FamilyDoctorFulfillments: new Map(rows(next.phase2FamilyDoctorFulfillments).filter((item) => item?.id).map((item) => [item.id, item])),
+    phase2FamilyDoctorServiceDisputes: new Map(rows(next.phase2FamilyDoctorServiceDisputes).filter((item) => item?.id).map((item) => [item.id, item]))
   };
   const applied = [];
 
@@ -789,6 +884,7 @@ module.exports = {
   normalizeChronicFollowupCase,
   normalizeDomainCase,
   normalizeFamilyDoctorCase,
+  normalizeFamilyDoctorServiceDisputeCase,
   normalizePrimaryCareCase,
   normalizeReferralCase,
   normalizeRegistrationCase,

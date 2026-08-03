@@ -61,6 +61,32 @@ test("closure readiness keeps empty and delivery-only receipts out of business a
   assert.notEqual(referral.receiptState, "acknowledged");
 });
 
+test("closure readiness includes open family doctor service disputes", () => {
+  const fixture = JSON.parse(JSON.stringify(data));
+  fixture.phase2FamilyDoctorServiceDisputes = [{
+    id: "p2fdd-readiness",
+    fulfillmentId: "p2fdf-r1-bp",
+    contractId: "p2fdc-r1",
+    residentId: "r1",
+    teamId: "p2fdtm-qnw",
+    institutionCode: "MR3",
+    category: "record-accuracy",
+    status: "open",
+    responseDueAt: "2026-07-23T08:00:00.000Z",
+    responseHistory: [],
+    residentDecisionHistory: [],
+    productionEvidence: false
+  }];
+  const report = buildRegistrationReferralClosureReadiness({ data: fixture, asOf: "2026-07-22T00:00:00.000Z" });
+  assert.equal(report.functionalOk, true);
+  assert.equal(report.dataReady, true);
+  assert.equal(report.summary.caseTypes["family-doctor-service-dispute"], 1);
+  assert.ok(report.exceptionQueue.some((item) =>
+    item.caseId === "p2fdd-readiness"
+    && item.responsibleOrg === "MR3"
+    && item.responsibleRole === "family-doctor-quality"));
+});
+
 test("a consistent minimal four-domain dataset passes local data readiness only", () => {
   const fixture = {
     registrationSchedules: [{ id: "s1", hospitalCode: "H1", departmentCode: "D1" }],

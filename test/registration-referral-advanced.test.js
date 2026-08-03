@@ -41,7 +41,7 @@ test("advanced catalog adds down-referral supplement and family scheduler comman
     "review-referral-supplement",
     "run-family-doctor-scheduler"
   ].forEach((action) => assert.ok(actions.has(action), action));
-  assert.equal(CLOSURE_COMMAND_CONTRACTS.length, 40);
+  assert.equal(CLOSURE_COMMAND_CONTRACTS.length, 45);
 });
 
 test("down-referral completes two-round material supplementation and primary-care continuity", () => {

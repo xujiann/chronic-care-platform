@@ -20,7 +20,7 @@ test("T05 acceptance passes after T00 public integration while production stays 
   assert.equal(report.status, "integrated-local-ready-production-blocked");
   assert.equal(report.summary.threadPassed, report.summary.threadChecks);
   assert.equal(report.summary.p0ConsistencyIssues, 0);
-  assert.equal(report.summary.commands, 40);
+  assert.equal(report.summary.commands, 45);
   assert.ok(report.integrationChecks.some((item) => item.id.endsWith("serverReferralSeed") && item.passed));
   assert.ok(report.integrationChecks.some((item) => item.id.endsWith("serverMessageSeed") && item.passed));
 });
