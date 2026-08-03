@@ -1,21 +1,35 @@
 "use strict";
 
 const {
+  SESSION_SECURITY_AUDIT_PERSISTENCE_CONTRACT,
+  SessionSecurityAuditError,
   appendSessionSecurityAudit,
+  createSessionSecurityAuditRepository,
+  executeSecurityControlAction,
+  normalizeSessionSecurityAuditQuery,
   querySessionSecurityAudits,
   summarizeSessionSecurityAudits
 } = require("../../identity-security/session-security-audit");
 
 function createRouteSegments(runtime) {
   const { SmsDeliveryCallbackError, appendDataAccessLog, appendSecurityEvent, applyIdentityDirectoryBinding, applyIdentityDirectoryDeactivations, applySmsDeliveryCallback, buildComplianceReport, buildIdentityDirectorySyncPlan, buildSmsDeliveryCenter, canAccessResident, cleanupRuntimeSessions, collectJson, createSession, currentSession, fetchIdentityDirectory, fetchOidcUserInfo, findAuthUser, findCitizenAuthUserByPhone, highRiskSecurityEvents, isProductionRuntime, issuePhoneVerificationCode, mapExternalIdentityClaims, maskPhone, normalizePhone, normalizeState, phoneLoginLockStatus, prependAuditTrailEntry, productionAdapterCenter, randomUUID, readDatabase, recordPhoneLoginFailure, redactSensitiveResponse, refreshOidcAccessToken, refreshSessionStoreStatus, requireApiRole, resealAuditTrail, revokeOidcToken, revokeSession, sendJson, sessionStoreStatus, verifyAuditTrail, verifyPassword, verifyPhoneCode, verifySmsDeliveryCallback, writeDatabase } = runtime;
-  const recordSessionAudit = (req, event, session) => appendSessionSecurityAudit({
+  let auditRepository;
+  const sessionSecurityAuditRepository = () => {
+    auditRepository ||= createSessionSecurityAuditRepository({
+      readDatabase,
+      writeDatabase,
+      prependAuditTrailEntry,
+      randomUUID
+    });
+    return auditRepository;
+  };
+  const recordSessionAudit = (req, event, session, legacyEvent) => appendSessionSecurityAudit({
     req,
     session,
     event,
-    readDatabase,
-    writeDatabase,
-    prependAuditTrailEntry,
-    randomUUID
+    legacyEvent,
+    randomUUID,
+    repository: sessionSecurityAuditRepository()
   });
   return [
     {
@@ -83,13 +97,14 @@ function createRouteSegments(runtime) {
       if (req.method === "GET" && url.pathname === "/api/security/session-audit") {
         const user = requireApiRole(req, res, ["commission"], "/api/security/session-audit");
         if (!user) return true;
-        const items = querySessionSecurityAudits(readDatabase().securityEvents, {
+        const query = normalizeSessionSecurityAuditQuery({
           correlationId: url.searchParams.get("correlationId"),
           action: url.searchParams.get("action"),
           result: url.searchParams.get("result"),
           limit: url.searchParams.get("limit")
         });
-        appendSecurityEvent({
+        const items = querySessionSecurityAudits(readDatabase().securityEvents, query);
+        await recordSessionAudit(req, {
           actor: user.name,
           role: user.role,
           action: "session-security-audit-read",
@@ -100,13 +115,15 @@ function createRouteSegments(runtime) {
         sendJson(res, 200, {
           ok: true,
           correlationId: req.correlationId,
-          filters: {
-            correlationId: url.searchParams.get("correlationId") || "",
-            action: url.searchParams.get("action") || "",
-            result: url.searchParams.get("result") || ""
+          filterApplied: {
+            correlationId: Boolean(query.correlationId),
+            action: Boolean(query.action),
+            result: Boolean(query.result),
+            limit: query.limit
           },
           summary: summarizeSessionSecurityAudits(items),
-          events: items
+          events: items,
+          persistence: SESSION_SECURITY_AUDIT_PERSISTENCE_CONTRACT
         });
         return true;
       }
@@ -173,56 +190,61 @@ function createRouteSegments(runtime) {
       if (req.method === "POST" && securityControlActionMatch) {
         const user = requireApiRole(req, res, ["commission"], "/api/security/controls/:id/actions");
         if (!user) return true;
-        const data = readDatabase();
         const id = decodeURIComponent(securityControlActionMatch[1]);
-        const index = (data.securityAcceptanceLedger || []).findIndex((item) => item.id === id);
-        if (index < 0) {
-          sendJson(res, 404, { error: "Not Found", message: "未找到安全合规控制项" });
-          return true;
-        }
         const payload = await collectJson(req);
-        data.securityAcceptanceLedger[index] = {
-          ...data.securityAcceptanceLedger[index],
-          status: String(payload.status || data.securityAcceptanceLedger[index].status || "").trim(),
-          evidence: String(payload.evidence || data.securityAcceptanceLedger[index].evidence || "").trim(),
-          next: String(payload.next || data.securityAcceptanceLedger[index].next || "").trim(),
-          lastAction: String(payload.action || "update-evidence").trim(),
-          updatedAt: new Date().toISOString(),
-          updatedBy: user.username || user.role
-        };
-        data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
-          id: randomUUID(),
-          at: new Date().toLocaleString("zh-CN", { hour12: false }),
-          actor: user.name,
-          role: user.role,
-          action: "update security compliance evidence",
-          target: id,
-          result: "allowed",
-          detail: data.securityAcceptanceLedger[index].status
-        });
-        writeDatabase(data);
-        sendJson(res, 200, data.securityAcceptanceLedger[index]);
+        try {
+          const outcome = await executeSecurityControlAction({
+            repository: sessionSecurityAuditRepository(),
+            commandId: req.headers?.["idempotency-key"],
+            req,
+            user,
+            controlId: id,
+            payload
+          });
+          sendJson(res, 200, {
+            ...outcome.result,
+            idempotentReplay: outcome.idempotentReplay,
+            auditCorrelationId: outcome.entry.correlationId,
+            productionReady: SESSION_SECURITY_AUDIT_PERSISTENCE_CONTRACT.productionReady
+          });
+        } catch (error) {
+          const known = error instanceof SessionSecurityAuditError;
+          sendJson(res, known ? error.statusCode : 500, {
+            ok: false,
+            code: known ? error.code : "SECURITY_CONTROL_ACTION_FAILED",
+            message: known ? error.message : "security control action failed"
+          });
+        }
         return true;
       }
 
       if (req.method === "POST" && url.pathname === "/api/auth/login") {
         if (isProductionRuntime()) {
-          recordSessionAudit(req, { actor: "anonymous", role: "anonymous", action: "local-password-login", target: "production", result: "denied", detail: "local password login is disabled in production" });
-          appendSecurityEvent({ actor: "anonymous", role: "anonymous", action: "local-password-login", target: "production", result: "denied", detail: "local password login is disabled in production" });
+          await recordSessionAudit(req,
+            { actor: "anonymous", role: "anonymous", action: "local-password-login", target: "production", result: "denied", detail: "local password login is disabled in production" },
+            undefined,
+            { actor: "anonymous", role: "anonymous", action: "local-password-login", target: "production", result: "denied", detail: "local password login is disabled in production" }
+          );
           sendJson(res, 403, { ok: false, code: "LOCAL_PASSWORD_LOGIN_DISABLED", message: "local password login is disabled in production" });
           return true;
         }
         const credentials = await collectJson(req);
         const user = findAuthUser(String(credentials.username || "").trim());
         if (!user || !verifyPassword(user, credentials.password)) {
-          recordSessionAudit(req, { actor: credentials.username || "unknown", role: "unknown", action: "local-password-login", target: "unified-auth", result: "denied", detail: "invalid account credentials" });
-          appendSecurityEvent({ actor: credentials.username || "unknown", role: "unknown", action: "登录", target: "统一认证", result: "拒绝", detail: "账号或密码错误" });
+          await recordSessionAudit(req,
+            { actor: credentials.username || "unknown", role: "unknown", action: "local-password-login", target: "unified-auth", result: "denied", detail: "invalid account credentials" },
+            undefined,
+            { actor: credentials.username || "unknown", role: "unknown", action: "登录", target: "统一认证", result: "拒绝", detail: "账号或密码错误" }
+          );
           sendJson(res, 401, { ok: false, message: "账号或密码不正确" });
           return true;
         }
         const session = await createSession(user);
-        recordSessionAudit(req, { actor: user.name, role: user.role, action: "local-password-login", target: user.home, result: "allowed", detail: "signed local session issued" }, session);
-        appendSecurityEvent({ actor: user.name, role: user.role, action: "登录", target: user.home, result: "允许", detail: "签名会话已签发，支持密钥轮换校验" });
+        await recordSessionAudit(req,
+          { actor: user.name, role: user.role, action: "local-password-login", target: user.home, result: "allowed", detail: "signed local session issued" },
+          session,
+          { actor: user.name, role: user.role, action: "登录", target: user.home, result: "允许", detail: "签名会话已签发，支持密钥轮换校验" }
+        );
         sendJson(res, 200, { ok: true, token: session.token, expiresAt: session.expiresAt, user: session.user });
         return true;
       }
@@ -301,21 +323,20 @@ function createRouteSegments(runtime) {
           });
           return true;
         }
-        appendSecurityEvent({
-          actor: user.name,
-          role: user.role,
-          action: "session retention cleanup",
-          target: "unified-auth",
-          result: "allowed",
-          detail: `${result.deletedTotal} retained sessions removed (${result.deletedExpired} expired, ${result.deletedRevoked} revoked)`
-        });
-        recordSessionAudit(req, {
+        await recordSessionAudit(req, {
           actor: user.name,
           role: user.role,
           action: "session-retention-cleanup",
           target: "unified-auth",
           result: "allowed",
           detail: `${result.deletedTotal} retained sessions removed`
+        }, undefined, {
+          actor: user.name,
+          role: user.role,
+          action: "session retention cleanup",
+          target: "unified-auth",
+          result: "allowed",
+          detail: `${result.deletedTotal} retained sessions removed (${result.deletedExpired} expired, ${result.deletedRevoked} revoked)`
         });
         sendJson(res, 200, { ok: true, result, sessionStore: sessionStoreStatus() });
         return true;
@@ -328,21 +349,30 @@ function createRouteSegments(runtime) {
           const data = readDatabase();
           const mapping = mapExternalIdentityClaims(upstream.claims, data);
           if (mapping.status !== "matched-existing-user") {
-            recordSessionAudit(req, { actor: upstream.claims.sub || "external", role: "external", action: "oidc-login", target: "unified-auth", result: "denied", detail: "external identity requires controlled account binding" });
-            appendSecurityEvent({ actor: upstream.claims.sub || "external", role: "external", action: "OIDC login", target: "unified-auth", result: "denied", detail: "external identity requires controlled account binding" });
+            await recordSessionAudit(req,
+              { actor: upstream.claims.sub || "external", role: "external", action: "oidc-login", target: "unified-auth", result: "denied", detail: "external identity requires controlled account binding" },
+              undefined,
+              { actor: upstream.claims.sub || "external", role: "external", action: "OIDC login", target: "unified-auth", result: "denied", detail: "external identity requires controlled account binding" }
+            );
             sendJson(res, 403, { ok: false, message: "external identity requires account binding", mapping: { status: mapping.status, warnings: mapping.warnings } });
             return true;
           }
           const user = (data.authUsers || []).find((item) => item.id === mapping.user.id && item.status !== "停用");
           if (!user) {
-            recordSessionAudit(req, { actor: upstream.claims.sub || "external", role: "external", action: "oidc-login", target: "unified-auth", result: "denied", detail: "bound local account is disabled or missing" });
-            appendSecurityEvent({ actor: upstream.claims.sub || "external", role: "external", action: "OIDC login", target: "unified-auth", result: "denied", detail: "bound local account is disabled or missing" });
+            await recordSessionAudit(req,
+              { actor: upstream.claims.sub || "external", role: "external", action: "oidc-login", target: "unified-auth", result: "denied", detail: "bound local account is disabled or missing" },
+              undefined,
+              { actor: upstream.claims.sub || "external", role: "external", action: "OIDC login", target: "unified-auth", result: "denied", detail: "bound local account is disabled or missing" }
+            );
             sendJson(res, 403, { ok: false, message: "bound local account is disabled or missing" });
             return true;
           }
           const session = await createSession(user);
-          recordSessionAudit(req, { actor: user.name, role: user.role, action: "oidc-login", target: user.home, result: "allowed", detail: `verified by ${upstream.adapter}` }, session);
-          appendSecurityEvent({ actor: user.name, role: user.role, action: "OIDC login", target: user.home, result: "allowed", detail: `verified by ${upstream.adapter}` });
+          await recordSessionAudit(req,
+            { actor: user.name, role: user.role, action: "oidc-login", target: user.home, result: "allowed", detail: `verified by ${upstream.adapter}` },
+            session,
+            { actor: user.name, role: user.role, action: "OIDC login", target: user.home, result: "allowed", detail: `verified by ${upstream.adapter}` }
+          );
           sendJson(res, 200, {
             ok: true,
             token: session.token,
@@ -352,8 +382,11 @@ function createRouteSegments(runtime) {
             mappedAt: upstream.fetchedAt
           });
         } catch (error) {
-          recordSessionAudit(req, { actor: "external", role: "external", action: "oidc-login", target: "unified-auth", result: "denied", detail: "identity provider verification failed" });
-          appendSecurityEvent({ actor: "external", role: "external", action: "OIDC login", target: "unified-auth", result: "denied", detail: error.message });
+          await recordSessionAudit(req,
+            { actor: "external", role: "external", action: "oidc-login", target: "unified-auth", result: "denied", detail: "identity provider verification failed" },
+            undefined,
+            { actor: "external", role: "external", action: "OIDC login", target: "unified-auth", result: "denied", detail: "identity provider verification failed" }
+          );
           sendJson(res, 502, { ok: false, message: "identity provider verification failed" });
         }
         return true;
@@ -370,14 +403,20 @@ function createRouteSegments(runtime) {
             ? (data.authUsers || []).find((item) => item.id === mapping.user.id && item.status !== "停用")
             : null;
           if (!user) {
-            recordSessionAudit(req, { actor: upstream.claims.sub || "external", role: "external", action: "oidc-refresh", target: "unified-auth", result: "denied", detail: "refreshed identity is unbound, disabled or missing" });
-            appendSecurityEvent({ actor: upstream.claims.sub || "external", role: "external", action: "OIDC refresh", target: "unified-auth", result: "denied", detail: "refreshed identity is unbound, disabled or missing" });
+            await recordSessionAudit(req,
+              { actor: upstream.claims.sub || "external", role: "external", action: "oidc-refresh", target: "unified-auth", result: "denied", detail: "refreshed identity is unbound, disabled or missing" },
+              undefined,
+              { actor: upstream.claims.sub || "external", role: "external", action: "OIDC refresh", target: "unified-auth", result: "denied", detail: "refreshed identity is unbound, disabled or missing" }
+            );
             sendJson(res, 403, { ok: false, message: "refreshed identity is unbound, disabled or missing" });
             return true;
           }
           const session = await createSession(user);
-          recordSessionAudit(req, { actor: user.name, role: user.role, action: "oidc-refresh", target: user.home, result: "allowed", detail: "upstream refresh verified and signed local session issued" }, session);
-          appendSecurityEvent({ actor: user.name, role: user.role, action: "OIDC refresh", target: user.home, result: "allowed", detail: "upstream refresh verified and a new signed local session was issued" });
+          await recordSessionAudit(req,
+            { actor: user.name, role: user.role, action: "oidc-refresh", target: user.home, result: "allowed", detail: "upstream refresh verified and signed local session issued" },
+            session,
+            { actor: user.name, role: user.role, action: "OIDC refresh", target: user.home, result: "allowed", detail: "upstream refresh verified and a new signed local session was issued" }
+          );
           sendJson(res, 200, {
             ok: true,
             token: session.token,
@@ -388,8 +427,11 @@ function createRouteSegments(runtime) {
             ...(refreshed.refreshRotated ? { upstreamRefreshToken: refreshed.refreshToken } : {})
           });
         } catch (error) {
-          recordSessionAudit(req, { actor: "external", role: "external", action: "oidc-refresh", target: "unified-auth", result: "denied", detail: "upstream refresh or identity verification failed" });
-          appendSecurityEvent({ actor: "external", role: "external", action: "OIDC refresh", target: "unified-auth", result: "denied", detail: "upstream refresh or identity verification failed" });
+          await recordSessionAudit(req,
+            { actor: "external", role: "external", action: "oidc-refresh", target: "unified-auth", result: "denied", detail: "upstream refresh or identity verification failed" },
+            undefined,
+            { actor: "external", role: "external", action: "OIDC refresh", target: "unified-auth", result: "denied", detail: "upstream refresh or identity verification failed" }
+          );
           sendJson(res, 502, { ok: false, message: "identity provider refresh failed" });
         }
         return true;
@@ -405,13 +447,19 @@ function createRouteSegments(runtime) {
         try {
           const receipt = await revokeOidcToken(payload.upstreamToken, { tokenTypeHint: payload.tokenTypeHint });
           await revokeSession(session, { reason: "oidc-revoke", actor: session.user.username || session.user.id });
-          recordSessionAudit(req, { actor: session.user.name, role: session.user.role, action: "oidc-revoke-logout", target: "unified-auth", result: "allowed", detail: "upstream and local sessions revoked" }, session);
-          appendSecurityEvent({ actor: session.user.name, role: session.user.role, action: "OIDC revoke logout", target: "unified-auth", result: "allowed", detail: "upstream token revoked and local session retained as revoked audit evidence" });
+          await recordSessionAudit(req,
+            { actor: session.user.name, role: session.user.role, action: "oidc-revoke-logout", target: "unified-auth", result: "allowed", detail: "upstream and local sessions revoked" },
+            session,
+            { actor: session.user.name, role: session.user.role, action: "OIDC revoke logout", target: "unified-auth", result: "allowed", detail: "upstream token revoked and local session retained as revoked audit evidence" }
+          );
           sendJson(res, 200, { ok: true, receipt, localSessionRevoked: true, productionReady: false });
         } catch (error) {
           await revokeSession(session, { reason: "oidc-revoke-upstream-failed", actor: session.user.username || session.user.id });
-          recordSessionAudit(req, { actor: session.user.name, role: session.user.role, action: "oidc-revoke-logout", target: "unified-auth", result: "partial", detail: "local session revoked; upstream reconciliation required" }, session);
-          appendSecurityEvent({ actor: session.user.name, role: session.user.role, action: "OIDC revoke logout", target: "unified-auth", result: "partial", detail: "local session revoked; upstream revocation requires reconciliation" });
+          await recordSessionAudit(req,
+            { actor: session.user.name, role: session.user.role, action: "oidc-revoke-logout", target: "unified-auth", result: "partial", detail: "local session revoked; upstream reconciliation required" },
+            session,
+            { actor: session.user.name, role: session.user.role, action: "OIDC revoke logout", target: "unified-auth", result: "partial", detail: "local session revoked; upstream revocation requires reconciliation" }
+          );
           sendJson(res, 502, { ok: false, message: "upstream token revocation failed", localSessionRevoked: true, upstreamRevoked: false });
         }
         return true;
@@ -521,15 +569,21 @@ function createRouteSegments(runtime) {
         const user = findCitizenAuthUserByPhone(phone);
         const lock = phoneLoginLockStatus(phone);
         if (lock.locked) {
-          recordSessionAudit(req, { actor: maskPhone(phone) || "unknown", role: "citizen", action: "phone-code-login", target: "unified-auth", result: "denied", detail: `login locked; retry after ${lock.retryAfterSeconds} seconds` });
-          appendSecurityEvent({ actor: phone || "unknown", role: "citizen", action: "phone-code login", target: "unified-auth", result: "denied", detail: `phone-code login locked, retry after ${lock.retryAfterSeconds} seconds` });
+          await recordSessionAudit(req,
+            { actor: maskPhone(phone) || "unknown", role: "citizen", action: "phone-code-login", target: "unified-auth", result: "denied", detail: `login locked; retry after ${lock.retryAfterSeconds} seconds` },
+            undefined,
+            { actor: maskPhone(phone) || "unknown", role: "citizen", action: "phone-code login", target: "unified-auth", result: "denied", detail: `phone-code login locked, retry after ${lock.retryAfterSeconds} seconds` }
+          );
           sendJson(res, 423, { ok: false, message: "phone-code login locked after repeated failures", retryAfterSeconds: lock.retryAfterSeconds, failedAttempts: lock.failedAttempts });
           return true;
         }
         if (!user || !verifyPhoneCode(phone, code, user)) {
           const failure = recordPhoneLoginFailure(phone);
-          recordSessionAudit(req, { actor: maskPhone(phone) || "unknown", role: "citizen", action: "phone-code-login", target: "unified-auth", result: "denied", detail: failure.locked ? "login locked after repeated failures" : "invalid phone or verification code" });
-          appendSecurityEvent({ actor: phone || "unknown", role: "citizen", action: "phone-code login", target: "unified-auth", result: "denied", detail: failure.locked ? "phone-code login locked after repeated failures" : "invalid phone or verification code" });
+          await recordSessionAudit(req,
+            { actor: maskPhone(phone) || "unknown", role: "citizen", action: "phone-code-login", target: "unified-auth", result: "denied", detail: failure.locked ? "login locked after repeated failures" : "invalid phone or verification code" },
+            undefined,
+            { actor: maskPhone(phone) || "unknown", role: "citizen", action: "phone-code login", target: "unified-auth", result: "denied", detail: failure.locked ? "login locked after repeated failures" : "invalid phone or verification code" }
+          );
           if (failure.locked) {
             sendJson(res, 423, { ok: false, message: "phone-code login locked after repeated failures", retryAfterSeconds: failure.retryAfterSeconds, failedAttempts: failure.failedAttempts });
             return true;
@@ -538,8 +592,11 @@ function createRouteSegments(runtime) {
           return true;
         }
         const session = await createSession({ ...user, phone });
-        recordSessionAudit(req, { actor: user.name, role: user.role, action: "phone-code-login", target: user.home, result: "allowed", detail: "resident signed session issued" }, session);
-        appendSecurityEvent({ actor: user.name, role: user.role, action: "phone-code login", target: user.home, result: "allowed", detail: "resident phone-code session issued" });
+        await recordSessionAudit(req,
+          { actor: user.name, role: user.role, action: "phone-code-login", target: user.home, result: "allowed", detail: "resident signed session issued" },
+          session,
+          { actor: user.name, role: user.role, action: "phone-code login", target: user.home, result: "allowed", detail: "resident phone-code session issued" }
+        );
         sendJson(res, 200, { ok: true, token: session.token, expiresAt: session.expiresAt, user: session.user });
         return true;
       }
@@ -558,8 +615,11 @@ function createRouteSegments(runtime) {
         const session = currentSession(req);
         if (session) {
           await revokeSession(session, { reason: "logout", actor: session.user.username || session.user.id });
-          recordSessionAudit(req, { actor: session.user.name, role: session.user.role, action: "logout", target: "unified-auth", result: "allowed", detail: "local session revoked" }, session);
-          appendSecurityEvent({ actor: session.user.name, role: session.user.role, action: "退出登录", target: "统一认证", result: "允许", detail: "后端会话已注销" });
+          await recordSessionAudit(req,
+            { actor: session.user.name, role: session.user.role, action: "logout", target: "unified-auth", result: "allowed", detail: "local session revoked" },
+            session,
+            { actor: session.user.name, role: session.user.role, action: "退出登录", target: "统一认证", result: "允许", detail: "后端会话已注销" }
+          );
         }
         sendJson(res, 200, { ok: true });
         return true;
