@@ -3285,7 +3285,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.equal(manifest.shortcuts.some((item) => item.url === "./citizen.html?client=app&page=escort#service-escort"), true);
   assert.equal(manifest.shortcuts.some((item) => item.url === "./mobile-preview.html?client=app"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v57-proactive-care/);
+  assert.match(serviceWorker, /chronic-care-citizen-v58-records-next6/);
   assert.match(serviceWorker, /physical-examination-standards\.js/);
   assert.match(serviceWorker, /physical-examination-highlights\.js/);
   assert.match(citizenHtml, /physical-examination-standards\.js[\s\S]*physical-examination-highlights\.js[\s\S]*physical-examination-service\.js/);

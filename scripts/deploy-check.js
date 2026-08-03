@@ -1000,8 +1000,8 @@ function buildDeployCheckReport(options = {}) {
         && citizenRecordsV3Source.includes("buildCareTaskActionIntent")
         && citizenSource.includes("handleCitizenRecordsV3CareTaskAction")
         && citizenRecordsReadinessSource.includes("proactive-care-task-routing")
-        && serviceWorkerSource.includes("citizen-records-v3.js?v=20260728next4")
-        && serviceWorkerSource.includes("citizen.js?v=20260728next3"),
+        && serviceWorkerSource.includes("citizen-records-v3.js?v=20260728next6")
+        && serviceWorkerSource.includes("citizen.js?v=20260728next4"),
       detail: "T04 resident record policy, care workspace, proactive task routing and current PWA cache are release indexed"
     },
     { name: "manifest:registrationReferralAcceptance", ok: manifestSource.includes("registration-referral-acceptance-report.md") && manifestSource.includes("registration-referral:acceptance") && manifestSource.includes("/api/registration-referral/operations") && serverSource.includes("/api/registration-referral/commands") && serverSource.includes("applyClosureCommand"), detail: "T05 command, operations, acceptance and release wiring are indexed" },
