@@ -1,6 +1,6 @@
 "use strict";
 
-const { createHash } = require("node:crypto");
+const { createHash, randomUUID } = require("node:crypto");
 
 const { ContractRegistry } = require("../platform/contracts/contract-registry");
 const { DomainRepository } = require("../platform/data/domain-repository");
@@ -11,7 +11,9 @@ const CONTRACT_ID = "referral-order.v1";
 const EVENT_TYPE = "care-coordination.referral-updated.v1";
 const OUTBOX_COLLECTION = "referralOutbox";
 const INBOX_COLLECTION = "referralCommandInbox";
-let referralCommandQueue = Promise.resolve();
+const REPLAY_COLLECTION = "referralDeliveryReplays";
+const DEAD_LETTER_COLLECTION = "referralDeliveryDeadLetters";
+let referralStateQueue = Promise.resolve();
 
 class ReferralCommandError extends Error {
   constructor(code, message, statusCode = 400) {
@@ -34,8 +36,32 @@ function digest(value) {
   return createHash("sha256").update(stableStringify(value)).digest("hex");
 }
 
+function serializeReferralState(operation) {
+  const execution = referralStateQueue.then(operation);
+  referralStateQueue = execution.catch(() => undefined);
+  return execution;
+}
+
 function text(value, max = 300) {
   return String(value || "").trim().slice(0, max);
+}
+
+function dateValue(value, label = "timestamp") {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) {
+    throw new ReferralCommandError("REFERRAL_DELIVERY_TIME_INVALID", `${label} is invalid`, 500);
+  }
+  return date;
+}
+
+function normalizeDeliveryState(state) {
+  state.referralSystem = state.referralSystem || {};
+  for (const collection of [OUTBOX_COLLECTION, INBOX_COLLECTION, REPLAY_COLLECTION, DEAD_LETTER_COLLECTION]) {
+    state.referralSystem[collection] = Array.isArray(state.referralSystem[collection])
+      ? state.referralSystem[collection]
+      : [];
+  }
+  return state.referralSystem;
 }
 
 function referralRows(state) {
@@ -192,10 +218,12 @@ function createStateRepositoryAdapter({ readState, writeState }) {
               contractId: CONTRACT_ID,
               status: "pending",
               attempts: 0,
+              nextAttemptAt: event.occurredAt,
+              deliveryVersion: 0,
               createdAt: event.occurredAt
             },
             ...working.referralSystem[OUTBOX_COLLECTION]
-          ].slice(0, 1000);
+          ];
           working.referralSystem[INBOX_COLLECTION] = [
             {
               commandId: event.payload.commandId,
@@ -208,7 +236,7 @@ function createStateRepositoryAdapter({ readState, writeState }) {
               completedAt: event.occurredAt
             },
             ...working.referralSystem[INBOX_COLLECTION]
-          ].slice(0, 1000);
+          ];
           changed = true;
         }
       };
@@ -342,21 +370,337 @@ function createReferralCommandService({ readState, writeState, now = () => new D
   }
 
   function update(input) {
-    const execution = referralCommandQueue.then(() => executeUpdate(input));
-    referralCommandQueue = execution.catch(() => undefined);
-    return execution;
+    return serializeReferralState(() => executeUpdate(input));
   }
 
   return Object.freeze({ update });
 }
 
+function deliveryError(code, message, statusCode = 409) {
+  return new ReferralCommandError(code, message, statusCode);
+}
+
+function leaseDigest(token) {
+  return digest({ leaseToken: String(token || "") });
+}
+
+function publicDeliveryItem(event) {
+  return Object.freeze({
+    id: event.id,
+    type: event.type,
+    status: event.status || "pending",
+    attempts: Number(event.attempts || 0),
+    deliveryVersion: Number(event.deliveryVersion || 0),
+    createdAt: event.createdAt || event.occurredAt,
+    nextAttemptAt: event.nextAttemptAt || null,
+    leaseExpiresAt: event.lease?.expiresAt || null,
+    deliveredAt: event.deliveredAt || null,
+    deadLetteredAt: event.deadLetteredAt || null,
+    lastErrorCode: event.lastError?.code || null,
+    replayCount: Number(event.replayCount || 0)
+  });
+}
+
+function buildReferralDeliveryOperations(state, options = {}) {
+  const rows = Array.isArray(state?.referralSystem?.[OUTBOX_COLLECTION])
+    ? state.referralSystem[OUTBOX_COLLECTION]
+    : [];
+  const limit = Math.min(500, Math.max(1, Number(options.limit) || 100));
+  const statuses = ["pending", "retry_wait", "leased", "delivered", "dead_letter"];
+  const summary = Object.fromEntries(statuses.map((status) => [
+    status,
+    rows.filter((event) => (event.status || "pending") === status).length
+  ]));
+  const now = dateValue(options.now || new Date().toISOString()).toISOString();
+  return Object.freeze({
+    generatedAt: now,
+    summary: Object.freeze({ total: rows.length, ...summary }),
+    events: rows.slice(0, limit).map(publicDeliveryItem),
+    returnedEvents: Math.min(rows.length, limit),
+    replayEvidenceCount: Array.isArray(state?.referralSystem?.[REPLAY_COLLECTION])
+      ? state.referralSystem[REPLAY_COLLECTION].length
+      : 0,
+    transportConfigured: false,
+    signingConfigured: false,
+    productionReady: false,
+    blockers: Object.freeze([
+      "external referral transport is not configured",
+      "transport signing credentials are not configured",
+      "claim serialization is process-local; cross-process database CAS is not implemented",
+      "production referral delivery worker is not configured"
+    ])
+  });
+}
+
+function createReferralDeliveryService({
+  readState,
+  writeState,
+  now = () => new Date().toISOString(),
+  maxAttempts = 5,
+  retryBaseMs = 1000,
+  retryMaxMs = 15 * 60 * 1000
+}) {
+  if (typeof readState !== "function" || typeof writeState !== "function") {
+    throw new TypeError("referral delivery service requires readState and writeState");
+  }
+  const attemptLimit = Math.min(100, Math.max(1, Number(maxAttempts) || 5));
+  const retryBase = Math.max(1, Number(retryBaseMs) || 1000);
+  const retryCap = Math.max(retryBase, Number(retryMaxMs) || 15 * 60 * 1000);
+
+  function transact(mutate) {
+    return serializeReferralState(async () => {
+      const working = structuredClone(readState());
+      normalizeDeliveryState(working);
+      const result = await mutate(working);
+      if (result.changed) await writeState(working);
+      return result.value;
+    });
+  }
+
+  function claim({ workerId, limit = 10, leaseSeconds = 60 } = {}) {
+    const normalizedWorkerId = text(workerId, 160);
+    if (!normalizedWorkerId) {
+      return Promise.reject(deliveryError("REFERRAL_DELIVERY_WORKER_REQUIRED", "workerId is required", 400));
+    }
+    const claimLimit = Math.min(100, Math.max(1, Number(limit) || 10));
+    const leaseMs = Math.min(15 * 60 * 1000, Math.max(1000, (Number(leaseSeconds) || 60) * 1000));
+    return transact((working) => {
+      const claimedAt = dateValue(now()).toISOString();
+      const claimedAtMs = Date.parse(claimedAt);
+      let expiredToDeadLetter = false;
+      for (const event of working.referralSystem[OUTBOX_COLLECTION]) {
+        if (event.status !== "leased"
+          || Date.parse(event.lease?.expiresAt || 0) > claimedAtMs
+          || Number(event.attempts || 0) < attemptLimit) continue;
+        event.status = "dead_letter";
+        event.deadLetteredAt = claimedAt;
+        event.nextAttemptAt = null;
+        event.lastError = {
+          code: "DELIVERY_LEASE_EXPIRED",
+          messageDigest: digest("delivery lease expired at the maximum attempt limit"),
+          failedAt: claimedAt
+        };
+        event.lease = null;
+        const evidence = {
+          id: `referral-dead-letter-${event.id}-${event.attempts}`,
+          eventId: event.id,
+          attempt: event.attempts,
+          errorCode: event.lastError.code,
+          errorDigest: digest(event.lastError),
+          payloadDigest: digest(event.payload),
+          recordedAt: claimedAt
+        };
+        if (!working.referralSystem[DEAD_LETTER_COLLECTION].some((item) => item.id === evidence.id)) {
+          working.referralSystem[DEAD_LETTER_COLLECTION].push(evidence);
+        }
+        expiredToDeadLetter = true;
+      }
+      const candidates = working.referralSystem[OUTBOX_COLLECTION]
+        .filter((event) => {
+          const status = event.status || "pending";
+          if (status === "leased") return Date.parse(event.lease?.expiresAt || 0) <= claimedAtMs;
+          if (!new Set(["pending", "retry_wait"]).has(status)) return false;
+          return Date.parse(event.nextAttemptAt || event.createdAt || event.occurredAt || 0) <= claimedAtMs;
+        })
+        .sort((left, right) => Date.parse(left.createdAt || left.occurredAt || 0) - Date.parse(right.createdAt || right.occurredAt || 0))
+        .slice(0, claimLimit);
+      const claims = candidates.map((event) => {
+        const leaseToken = randomUUID();
+        event.status = "leased";
+        event.attempts = Number(event.attempts || 0) + 1;
+        event.deliveryVersion = Number(event.deliveryVersion || 0) + 1;
+        event.lease = {
+          token: leaseToken,
+          workerId: normalizedWorkerId,
+          claimedAt,
+          expiresAt: new Date(claimedAtMs + leaseMs).toISOString(),
+          deliveryVersion: event.deliveryVersion
+        };
+        event.nextAttemptAt = null;
+        return Object.freeze({
+          id: event.id,
+          type: event.type,
+          payload: structuredClone(event.payload),
+          contractId: event.contractId,
+          aggregateVersion: event.aggregateVersion,
+          correlationId: event.correlationId,
+          leaseToken,
+          leaseExpiresAt: event.lease.expiresAt,
+          deliveryVersion: event.deliveryVersion,
+          attempt: event.attempts
+        });
+      });
+      return { changed: expiredToDeadLetter || claims.length > 0, value: Object.freeze(claims) };
+    });
+  }
+
+  function validateActiveLease(event, token, workerId, at) {
+    if (!event) throw deliveryError("REFERRAL_DELIVERY_EVENT_NOT_FOUND", "referral delivery event was not found", 404);
+    const digestValue = leaseDigest(token);
+    if (event.status === "delivered" && event.deliveryReceipt?.leaseDigest === digestValue) {
+      return { replayed: true, digestValue };
+    }
+    if (event.status !== "leased"
+      || !event.lease
+      || event.lease.token !== String(token || "")
+      || (workerId && event.lease.workerId !== text(workerId, 160))
+      || Date.parse(event.lease.expiresAt) <= Date.parse(at)
+      || Number(event.lease.deliveryVersion) !== Number(event.deliveryVersion)) {
+      throw deliveryError("REFERRAL_DELIVERY_LEASE_STALE", "referral delivery lease is stale or invalid");
+    }
+    return { replayed: false, digestValue };
+  }
+
+  function acknowledge({ eventId, leaseToken, workerId, receipt = {} } = {}) {
+    return transact((working) => {
+      const acknowledgedAt = dateValue(now()).toISOString();
+      const event = working.referralSystem[OUTBOX_COLLECTION].find((item) => item.id === text(eventId, 240));
+      const lease = validateActiveLease(event, leaseToken, workerId, acknowledgedAt);
+      const receiptDigest = digest(receipt);
+      if (lease.replayed) {
+        if (event.deliveryReceipt?.receiptDigest !== receiptDigest) {
+          throw deliveryError(
+            "REFERRAL_DELIVERY_ACK_CONFLICT",
+            "acknowledgement receipt differs from the persisted receipt"
+          );
+        }
+        return { changed: false, value: Object.freeze({ replayed: true, event: publicDeliveryItem(event) }) };
+      }
+      event.status = "delivered";
+      event.deliveredAt = acknowledgedAt;
+      event.deliveryReceipt = {
+        leaseDigest: lease.digestValue,
+        receiptDigest,
+        transportMessageId: text(receipt.transportMessageId, 240),
+        statusCode: Number(receipt.statusCode || 0),
+        acceptedAt: text(receipt.acceptedAt || acknowledgedAt, 80)
+      };
+      event.lease = null;
+      event.lastError = null;
+      return { changed: true, value: Object.freeze({ replayed: false, event: publicDeliveryItem(event) }) };
+    });
+  }
+
+  function fail({ eventId, leaseToken, workerId, error = {} } = {}) {
+    return transact((working) => {
+      const failedAt = dateValue(now()).toISOString();
+      const event = working.referralSystem[OUTBOX_COLLECTION].find((item) => item.id === text(eventId, 240));
+      const lease = validateActiveLease(event, leaseToken, workerId, failedAt);
+      if (lease.replayed) {
+        throw deliveryError("REFERRAL_DELIVERY_LEASE_STALE", "delivered referral event cannot be failed");
+      }
+      event.lastError = {
+        code: text(error.code || "DELIVERY_FAILED", 120),
+        messageDigest: digest(text(error.message || "referral delivery failed", 500)),
+        failedAt
+      };
+      event.lease = null;
+      if (Number(event.attempts || 0) >= attemptLimit) {
+        event.status = "dead_letter";
+        event.deadLetteredAt = failedAt;
+        event.nextAttemptAt = null;
+        const evidence = {
+          id: `referral-dead-letter-${event.id}-${event.attempts}`,
+          eventId: event.id,
+          attempt: event.attempts,
+          errorCode: event.lastError.code,
+          errorDigest: digest(event.lastError),
+          payloadDigest: digest(event.payload),
+          recordedAt: failedAt
+        };
+        if (!working.referralSystem[DEAD_LETTER_COLLECTION].some((item) => item.id === evidence.id)) {
+          working.referralSystem[DEAD_LETTER_COLLECTION].push(evidence);
+        }
+      } else {
+        const backoffMs = Math.min(retryCap, retryBase * (2 ** Math.max(0, event.attempts - 1)));
+        event.status = "retry_wait";
+        event.nextAttemptAt = new Date(Date.parse(failedAt) + backoffMs).toISOString();
+      }
+      return { changed: true, value: Object.freeze({ event: publicDeliveryItem(event) }) };
+    });
+  }
+
+  function replayDeadLetter({ eventId, replayId, actor = {}, reason } = {}) {
+    const normalizedReplayId = text(replayId, 160);
+    const normalizedEventId = text(eventId, 240);
+    const normalizedReason = text(reason, 500);
+    if (!normalizedReplayId) {
+      return Promise.reject(deliveryError("REFERRAL_DELIVERY_REPLAY_ID_REQUIRED", "Idempotency-Key is required", 400));
+    }
+    if (normalizedReason.length < 12) {
+      return Promise.reject(deliveryError("REFERRAL_DELIVERY_REPLAY_REASON_REQUIRED", "replay reason must contain at least 12 characters", 400));
+    }
+    return transact((working) => {
+      const requestedAt = dateValue(now()).toISOString();
+      const intentDigest = digest({ eventId: normalizedEventId, reason: normalizedReason });
+      const replayKeyDigest = digest({ replayId: normalizedReplayId });
+      let migratedReplayEvidence = false;
+      for (const item of working.referralSystem[REPLAY_COLLECTION]) {
+        if (!item.replayId) continue;
+        item.replayKeyDigest = item.replayKeyDigest || digest({ replayId: text(item.replayId, 160) });
+        delete item.replayId;
+        migratedReplayEvidence = true;
+      }
+      const existing = working.referralSystem[REPLAY_COLLECTION]
+        .find((item) => item.replayKeyDigest === replayKeyDigest);
+      if (existing) {
+        if (existing.intentDigest !== intentDigest) {
+          throw deliveryError("REFERRAL_DELIVERY_REPLAY_CONFLICT", "replay id was already used for another intent");
+        }
+        const event = working.referralSystem[OUTBOX_COLLECTION].find((item) => item.id === existing.eventId);
+        if (!event || !existing.result) {
+          throw deliveryError("REFERRAL_DELIVERY_REPLAY_INTEGRITY_FAILED", "replay evidence is incomplete", 500);
+        }
+        return {
+          changed: migratedReplayEvidence,
+          value: Object.freeze({ replayed: true, event: structuredClone(existing.result), evidenceId: existing.id })
+        };
+      }
+      const event = working.referralSystem[OUTBOX_COLLECTION].find((item) => item.id === normalizedEventId);
+      if (!event) throw deliveryError("REFERRAL_DELIVERY_EVENT_NOT_FOUND", "referral delivery event was not found", 404);
+      if (event.status !== "dead_letter") {
+        throw deliveryError("REFERRAL_DELIVERY_NOT_DEAD_LETTER", "only dead-letter referral events can be replayed");
+      }
+      const evidence = {
+        id: `referral-replay-${replayKeyDigest.slice(0, 32)}`,
+        replayKeyDigest,
+        eventId: normalizedEventId,
+        intentDigest,
+        reasonDigest: digest(normalizedReason),
+        requestedBy: text(actor.username || actor.id || actor.role, 160),
+        requestedAt
+      };
+      working.referralSystem[REPLAY_COLLECTION].push(evidence);
+      event.status = "retry_wait";
+      event.attempts = 0;
+      event.nextAttemptAt = requestedAt;
+      event.deadLetteredAt = null;
+      event.lastError = null;
+      event.lease = null;
+      event.replayCount = Number(event.replayCount || 0) + 1;
+      event.lastReplayEvidenceId = evidence.id;
+      evidence.result = structuredClone(publicDeliveryItem(event));
+      return {
+        changed: true,
+        value: Object.freeze({ replayed: false, event: structuredClone(evidence.result), evidenceId: evidence.id })
+      };
+    });
+  }
+
+  return Object.freeze({ acknowledge, claim, fail, replayDeadLetter });
+}
+
 module.exports = {
   CONTRACT_ID,
+  DEAD_LETTER_COLLECTION,
   EVENT_TYPE,
   INBOX_COLLECTION,
   OUTBOX_COLLECTION,
+  REPLAY_COLLECTION,
   ReferralCommandError,
   buildReferralOrderContract,
+  buildReferralDeliveryOperations,
   createReferralCommandService,
+  createReferralDeliveryService,
   createReferralOrderAntiCorruptionAdapter
 };

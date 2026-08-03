@@ -2,7 +2,9 @@
 
 const {
   ReferralCommandError,
-  createReferralCommandService
+  buildReferralDeliveryOperations,
+  createReferralCommandService,
+  createReferralDeliveryService
 } = require("../../care-coordination/referral-command-service");
 
 function createRouteSegments(runtime) {
@@ -1829,6 +1831,71 @@ function createRouteSegments(runtime) {
       id: "care-coordination-10",
       domain: "care-coordination",
       async handle(req, res, url) {
+    if (req.method === "GET" && url.pathname === "/api/referrals/outbox/delivery") {
+        const user = requireApiRole(req, res, ["commission"], "/api/referrals/outbox/delivery");
+        if (!user) return true;
+        sendJson(res, 200, buildReferralDeliveryOperations(readDatabase(), {
+          limit: url.searchParams.get("limit")
+        }));
+        return true;
+      }
+
+    const referralDeliveryReplayMatch = url.pathname.match(/^\/api\/referrals\/outbox\/delivery\/([^/]+)\/replay$/);
+      if (req.method === "POST" && referralDeliveryReplayMatch) {
+        const user = requireApiRole(req, res, ["commission"], "/api/referrals/outbox/delivery/:eventId/replay");
+        if (!user) return true;
+        const payload = await collectJson(req);
+        const replayId = String(req.headers["idempotency-key"] || "").trim();
+        const bodyReplayId = String(payload.replayId || payload.idempotencyKey || "").trim();
+        if (bodyReplayId && bodyReplayId !== replayId) {
+          sendJson(res, 400, {
+            ok: false,
+            code: "REFERRAL_DELIVERY_REPLAY_ID_CONFLICT",
+            message: "body replay id must match Idempotency-Key",
+            productionReady: false
+          });
+          return true;
+        }
+        const eventId = decodeURIComponent(referralDeliveryReplayMatch[1]);
+        try {
+          const result = await createReferralDeliveryService({
+            readState: readDatabase,
+            writeState: writeDatabase
+          }).replayDeadLetter({
+            eventId,
+            replayId,
+            actor: user,
+            reason: payload.reason
+          });
+          appendSecurityEvent({
+            actor: user.name,
+            role: user.role,
+            action: "replay-referral-delivery-dead-letter",
+            target: eventId,
+            result: result.replayed ? "idempotent" : "allowed",
+            detail: `${result.evidenceId}; productionReady=false`
+          });
+          sendJson(res, result.replayed ? 200 : 202, {
+            ok: true,
+            idempotentReplay: result.replayed,
+            event: result.event,
+            evidenceId: result.evidenceId,
+            transportConfigured: false,
+            signingConfigured: false,
+            productionReady: false
+          });
+        } catch (error) {
+          const known = error instanceof ReferralCommandError;
+          sendJson(res, known ? error.statusCode : 500, {
+            ok: false,
+            code: known ? error.code : "REFERRAL_DELIVERY_REPLAY_FAILED",
+            message: known ? error.message : "referral delivery replay failed",
+            productionReady: false
+          });
+        }
+        return true;
+      }
+
     const referralActionMatch = url.pathname.match(/^\/api\/referrals\/([^/]+)\/actions$/);
       if (req.method === "POST" && referralActionMatch) {
         const user = requireApiRole(req, res, ["institution", "county", "commission"], "/api/referrals/:id/actions");
