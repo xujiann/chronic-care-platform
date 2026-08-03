@@ -1,5 +1,7 @@
 "use strict";
 
+const clinicalResultExchange = require("./t08-clinical-result-exchange");
+
 function createRouteSegments(runtime) {
   const { APPOINTMENT_CONTRACT_ID, PHYSICAL_EXAM_CONTRACT_ID, appendDataAccessLog, appendSecurityEvent, applyObjectLifecycle, buildIntegrationSample, canAccessResident, canAccessSecureAttachment, collectJson, createObjectDownloadIntent, createObjectUploadIntent, dispatchFinancialRequest, dispatchHospitalRequest, finalizeObjectUpload, hospitalConnectorCenter, landAppointmentIntegrationEvent, landPhysicalExamIntegrationEvent, normalizeHospitalConnectorDomain, normalizeIntegrationEvent, objectStorageCenter, prependAuditTrailEntry, randomUUID, readDatabase, requireApiRole, sendJson, summarizeIntegrationGateway, updateIntegrationEvent, validateAttachmentMetadata, verifyIntegrationSignature, writeDatabase } = runtime;
   return [
@@ -440,6 +442,35 @@ function createRouteSegments(runtime) {
         const missingFields = (contract.requiredFields || []).filter((field) => payload[field] === undefined && payload.payload?.[field] === undefined);
         if (missingFields.length) {
           sendJson(res, 400, { error: "Bad Request", message: "集成事件缺少必填字段", missingFields });
+          return true;
+        }
+        if (clinicalResultExchange.supportsExternalContract(contract.id)) {
+          try {
+            const exchange = await clinicalResultExchange.receiveClinicalResult({
+              data,
+              payload,
+              contract,
+              user,
+              correlationId: req.correlationId || req.headers["x-correlation-id"],
+              normalizeIntegrationEvent,
+              prependAuditTrailEntry,
+              writeDatabase
+            });
+            res.setHeader("X-Platform-Contract", clinicalResultExchange.PLATFORM_CONTRACT_ID);
+            if (exchange.receipt?.id) res.setHeader("X-Integration-Receipt-Id", exchange.receipt.id);
+            sendJson(res, exchange.duplicate ? 200 : 202, exchange.event);
+          } catch (error) {
+            if (
+              !(error instanceof TypeError)
+              && !(error instanceof clinicalResultExchange.ClinicalResultExchangeError)
+            ) throw error;
+            const conflict = error instanceof clinicalResultExchange.ClinicalResultExchangeError;
+            sendJson(res, conflict ? error.statusCode : 400, {
+              error: conflict ? "Conflict" : "Bad Request",
+              code: conflict ? error.code : "CLINICAL_RESULT_CONTRACT_REJECTED",
+              message: String(error.message || "clinical result contract rejected")
+            });
+          }
           return true;
         }
         const duplicate = (data.integrationGatewayEvents || []).find((item) => item.idempotencyKey === payload.idempotencyKey);
