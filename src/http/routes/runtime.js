@@ -55,6 +55,40 @@ function createRouteSegments(runtime) {
         return true;
       }
 
+      if (req.method === "GET" && url.pathname === "/api/runtime/dependencies") {
+        const user = requireApiRole(req, res, ["commission"], "/api/runtime/dependencies");
+        if (!user) return true;
+        const dependencies = buildRuntimeMetrics(readDatabase()).dependencies || {};
+        const checks = Object.entries(dependencies).map(([name, status]) => ({
+          name,
+          ok: status?.ok === true,
+          latencyMs: Number(status?.latencyMs || 0),
+          checkedAt: status?.checkedAt || "",
+          detail: String(status?.detail || "")
+        }));
+        const unavailable = checks.filter((item) => !item.ok);
+        appendSecurityEvent({
+          actor: user.name,
+          role: user.role,
+          action: "runtime-dependency-health-read",
+          target: "/api/runtime/dependencies",
+          result: "allowed",
+          detail: `${checks.length} dependencies; ${unavailable.length} unavailable; correlation ${req.correlationId}`
+        });
+        sendJson(res, unavailable.length ? 503 : 200, {
+          ok: unavailable.length === 0,
+          correlationId: req.correlationId,
+          generatedAt: new Date().toISOString(),
+          summary: {
+            total: checks.length,
+            available: checks.length - unavailable.length,
+            unavailable: unavailable.length
+          },
+          dependencies: checks
+        });
+        return true;
+      }
+
       if (req.method === "GET" && url.pathname === "/api/metrics") {
         const user = requireApiRole(req, res, ["commission"], "/api/metrics");
         if (!user) return true;
