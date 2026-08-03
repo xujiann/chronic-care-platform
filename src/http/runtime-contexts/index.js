@@ -33,7 +33,8 @@ const CONTEXT_DEFINITIONS = Object.freeze(Object.fromEntries(
     defineRuntimeContext({
       domain: definition.DOMAIN,
       process: definition.PROCESS,
-      dependencies: definition.DEPENDENCIES
+      dependencies: definition.DEPENDENCIES,
+      subdomains: definition.SUBDOMAIN_DEPENDENCIES
     })
   ])
 ));
