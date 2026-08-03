@@ -3,6 +3,7 @@
 const { createHash } = require("node:crypto");
 const { DomainRepository } = require("../../platform/data/domain-repository");
 const { createDomainEvent } = require("../../platform/events/domain-event-runtime");
+const { createEmergencySignalDelivery } = require("./t06-emergency-signal-delivery");
 
 const DOMAIN = "clinical-specialties";
 const COLLECTION = "emergencySignals";
@@ -136,10 +137,11 @@ function createRuntimeAdapter({
           ...event,
           action: "domain-event-outbox",
           owner: DOMAIN,
-          outboxStatus: "pending"
+          outboxStatus: "pending",
+          delivery: createEmergencySignalDelivery(event, { now: event.occurredAt })
         })),
         ...(Array.isArray(data[OUTBOX_COLLECTION]) ? data[OUTBOX_COLLECTION] : [])
-      ].slice(0, 1000);
+      ];
       if (command?.id) {
         data[INBOX_COLLECTION] = [
           {
