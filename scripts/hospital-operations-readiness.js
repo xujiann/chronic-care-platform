@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -80,7 +81,7 @@ function routePresent(route, serverSource) {
 function buildHospitalOperationsReadinessReport(options = {}) {
   const data = options.data ?? readJson("data/db.json");
   const pkg = options.pkg ?? readJson("package.json");
-  const serverSource = options.serverSource ?? readText("server.js");
+  const serverSource = options.serverSource ?? readRuntimeSource(ROOT);
   const operationsHtml = options.operationsHtml ?? readText("operations.html");
   const operationsJs = options.operationsJs ?? readText("operations.js");
   const snapshots = arrayOf(data, "hospitalOperationSnapshots");

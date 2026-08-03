@@ -1,3 +1,4 @@
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -6,7 +7,7 @@ const ROOT = path.resolve(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(ROOT, file), "utf8");
 
 test("solution A is wired into the authenticated imaging cloud API", () => {
-  const server = read("server.js");
+  const server = readRuntimeSource(ROOT);
   assert.match(server, /solutionAHealth/);
   assert.match(server, /\/api\/imaging-cloud\/solution-a\/health/);
   assert.match(server, /\/api\/imaging-cloud\/solution-a\/studies/);

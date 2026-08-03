@@ -1,3 +1,4 @@
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -65,14 +66,14 @@ test("operations readiness fails when an operation route is not documented", () 
   const report = buildOperationsReadinessReport({
     readme: "",
     deployment: "",
-    serverSource: fs.readFileSync(path.join(ROOT, "server.js"), "utf8")
+    serverSource: readRuntimeSource(ROOT)
   });
   assert.equal(report.ok, false);
   assert.equal(report.checks.some((item) => item.id === "operations:routes" && !item.passed), true);
 });
 
 test("operations readiness fails when external dependency risk markers are missing", () => {
-  const serverSource = fs.readFileSync(path.join(ROOT, "server.js"), "utf8").replace(/identity-source/g, "identity_source_missing");
+  const serverSource = readRuntimeSource(ROOT).replace(/identity-source/g, "identity_source_missing");
   const report = buildOperationsReadinessReport({ serverSource });
   assert.equal(report.ok, false);
   assert.equal(report.checks.some((item) => item.id === "operations:externalDependencies" && !item.passed), true);

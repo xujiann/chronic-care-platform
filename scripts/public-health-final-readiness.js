@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -658,7 +659,7 @@ function buildPublicHealthFinalReadiness(options = {}) {
   const operationsSource = options.operationsSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-operations-service.js"), "utf8");
   const keyringSource = options.keyringSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-keyring-service.js"), "utf8");
   const keyProviderSource = options.keyProviderSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-key-provider.js"), "utf8");
-  const serverSource = options.serverSource ?? fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
+  const serverSource = options.serverSource ?? readRuntimeSource(ROOT);
   const packageSource = options.packageSource ?? fs.readFileSync(path.join(ROOT, "package.json"), "utf8");
   const resilienceSource = options.resilienceSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-resilience-service.js"), "utf8");
   const contractSource = options.contractSource ?? fs.readFileSync(path.join(ROOT, "public-health-external-contract-governance-service.js"), "utf8");

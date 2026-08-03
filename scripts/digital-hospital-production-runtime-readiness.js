@@ -1,5 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const { readRuntimeSource } = require("../src/http/runtime-source");
 
 const { buildDigitalHospitalSecurityCenter } = require("../digital-hospital-execution-security");
 const {
@@ -20,7 +21,7 @@ function source(file) {
 }
 
 function buildDigitalHospitalProductionRuntimeReadiness(options = {}) {
-  const server = source("server.js");
+  const server = readRuntimeSource(ROOT);
   const service = source("digital-hospital-execution-service.js");
   const securitySource = source("digital-hospital-execution-security.js");
   const cutover = source("digital-hospital-cutover-governance.js");

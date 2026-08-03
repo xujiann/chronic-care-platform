@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -143,7 +144,7 @@ function buildDigitalHospitalStandardsReadiness(options = {}) {
   const manifest = options.manifest || read("scripts/release-artifact-manifest.js");
   const deployCheck = options.deployCheck || read("scripts/deploy-check.js");
   const releaseReport = options.releaseReport || read("scripts/release-report.js");
-  const server = options.server || read("server.js");
+  const server = options.server || readRuntimeSource(ROOT);
   const ci = options.ci || read(".github/workflows/ci.yml");
   const auth = options.auth || read("auth.js");
 

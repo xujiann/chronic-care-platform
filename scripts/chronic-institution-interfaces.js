@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -215,7 +216,7 @@ function buildChronicInstitutionInterfaceReport(options = {}) {
   const pkg = options.pkg || readJson("package.json");
   const doc = options.doc || readText(DOC_PATH);
   const readinessDoc = options.readinessDoc || readText("docs/chronic-followup-readiness.md");
-  const server = options.server || readText("server.js");
+  const server = options.server || readRuntimeSource(ROOT);
   const apiTest = options.apiTest || readText("test/api.test.js");
   const staticTest = options.staticTest || readText("test/static.test.js");
   const readinessScript = options.readinessScript || readText("scripts/chronic-followup-readiness.js");

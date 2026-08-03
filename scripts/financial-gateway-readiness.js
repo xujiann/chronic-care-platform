@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -18,7 +19,7 @@ function buildFinancialGatewayReadiness(options = {}) {
   const pkg = options.pkg || readJson("package.json");
   const adapterSource = options.adapterSource ?? read("financial-gateways.js");
   const refundSource = options.refundSource ?? read("online-payment-refunds.js");
-  const serverSource = options.serverSource ?? read("server.js");
+  const serverSource = options.serverSource ?? readRuntimeSource(ROOT);
   const platformHtml = options.platformHtml ?? read("platform.html");
   const platformSource = options.platformSource ?? read("platform.js");
   const documentation = options.documentation ?? read("docs/production-financial-certificate-gateways.md");

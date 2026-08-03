@@ -1,3 +1,4 @@
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -25,14 +26,14 @@ test("monitoring readiness fails when metrics route documentation is missing", (
   const report = buildMonitoringReadinessReport({
     readme: "",
     deployment: "",
-    serverSource: fs.readFileSync(path.join(ROOT, "server.js"), "utf8")
+    serverSource: readRuntimeSource(ROOT)
   });
   assert.equal(report.ok, false);
   assert.equal(report.checks.some((item) => item.id === "monitoring:routes" && !item.passed), true);
 });
 
 test("monitoring readiness fails when runtime alert signals are missing", () => {
-  const serverSource = fs.readFileSync(path.join(ROOT, "server.js"), "utf8")
+  const serverSource = readRuntimeSource(ROOT)
     .replace(/deadLetters/g, "dead_letter_marker_missing")
     .replace(/slowRequests/g, "slow_request_marker_missing");
   const report = buildMonitoringReadinessReport({ serverSource });

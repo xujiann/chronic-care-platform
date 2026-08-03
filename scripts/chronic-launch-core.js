@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -158,7 +159,7 @@ function buildCrossEvidence(data, server, docs, item) {
 function buildChronicLaunchCoreReport(options = {}) {
   const data = options.data || readJson("data/db.json");
   const pkg = options.pkg || readJson("package.json");
-  const server = options.server || readText("server.js");
+  const server = options.server || readRuntimeSource(ROOT);
   const docs = options.docs || [
     readText("docs/chronic-institution-interfaces.md"),
     readText("docs/chronic-followup-readiness.md"),

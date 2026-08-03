@@ -1,4 +1,5 @@
 "use strict";
+const { readRuntimeSource } = require("../src/http/runtime-source");
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -32,7 +33,7 @@ test("responsibility authorization requires both role and organization boundary"
 });
 
 test("T00 handoff confirms public and trusted callback wiring without claiming production readiness", () => {
-  const serverSource = fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
+  const serverSource = readRuntimeSource(ROOT);
   const handoff = OperatingModel.buildT00IntegrationHandoff(serverSource);
   assert.equal(handoff.readyForIntegration, true);
   assert.equal(handoff.pending, 0);

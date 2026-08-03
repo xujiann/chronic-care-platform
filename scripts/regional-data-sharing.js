@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -117,7 +118,7 @@ function buildRegionalReportHandoff(packageItem, data, reviews) {
 function buildRegionalDataSharingReport(options = {}) {
   const data = options.data ?? readJson("data/db.json");
   const pkg = options.pkg ?? readJson("package.json");
-  const server = options.server ?? readText("server.js");
+  const server = options.server ?? readRuntimeSource(ROOT);
   const html = options.html ?? readText("regional-data-sharing.html");
   const about = options.about ?? readText("regional-data-sharing-about.html");
   const client = options.client ?? readText("regional-data-sharing.js");

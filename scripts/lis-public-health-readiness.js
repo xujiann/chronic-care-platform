@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -17,7 +18,7 @@ function buildLisPublicHealthReadiness(options = {}) {
   const connectorTestSource = options.connectorTestSource ?? read("test/public-health-connectors.test.js");
   const integrationTestSource = options.integrationTestSource ?? read("test/medical-public-health-integration.test.js");
   const documentation = options.documentation ?? read("docs/lis-public-health-first-increment.md");
-  const serverSource = options.serverSource ?? read("server.js");
+  const serverSource = options.serverSource ?? readRuntimeSource(ROOT);
   const checks = [
     {
       id: "lisPublicHealth:connector",

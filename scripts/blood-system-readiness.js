@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -15,7 +16,7 @@ function readJson(relativePath) {
 function buildBloodSystemReadinessReport(options = {}) {
   const html = options.html ?? readText("blood.html");
   const js = options.js ?? readText("blood.js");
-  const server = options.server ?? readText("server.js");
+  const server = options.server ?? readRuntimeSource(ROOT);
   const transaction = options.transaction ?? readText("blood-transaction-service.js");
   const service = options.service ?? readText("blood-service.js");
   const domain = options.domain ?? require(path.join(ROOT, "blood-domain.js"));

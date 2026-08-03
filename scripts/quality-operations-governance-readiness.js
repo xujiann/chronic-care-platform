@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -25,7 +26,7 @@ function check(id, passed, detail) {
 function buildQualityOperationsGovernanceReadiness(options = {}) {
   const data = options.data || readJson(path.join(ROOT, "data", "db.json"));
   const pkg = options.pkg || readJson(path.join(ROOT, "package.json"));
-  const serverSource = options.serverSource ?? fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
+  const serverSource = options.serverSource ?? readRuntimeSource(ROOT);
   const catalog = buildGovernanceCatalog(data);
   const routeChecks = REQUIRED_ROUTES.map(({ route, marker }) => ({
     route,

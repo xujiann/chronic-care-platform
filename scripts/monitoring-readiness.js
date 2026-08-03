@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -126,7 +127,7 @@ function buildEvidenceMap(sources) {
 
 function buildMonitoringReadinessReport(options = {}) {
   const pkg = options.pkg ?? readJson("package.json");
-  const serverSource = options.serverSource ?? readText("server.js");
+  const serverSource = options.serverSource ?? readRuntimeSource(ROOT);
   const readme = options.readme ?? readText("README.md");
   const deployment = options.deployment ?? readText("DEPLOYMENT.md");
   const sources = {

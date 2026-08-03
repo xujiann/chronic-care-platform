@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 const { buildInterfaceMappingReport } = require("./interface-mapping");
@@ -78,7 +79,7 @@ function buildDataGovernanceReadiness(options = {}) {
   const pkg = options.pkg ?? readJson("package.json");
   const readme = options.readme ?? readText("README.md");
   const deployment = options.deployment ?? readText("DEPLOYMENT.md");
-  const serverSource = options.serverSource ?? readText("server.js");
+  const serverSource = options.serverSource ?? readRuntimeSource(ROOT);
   const platformSource = options.platformSource ?? readText("platform.js");
   const assets = options.assets ?? (Array.isArray(data.dataGovernanceAssets) && data.dataGovernanceAssets.length ? data.dataGovernanceAssets : defaultAssets());
   const dictionaries = options.dictionaries ?? (Array.isArray(data.standardDataDictionaries) && data.standardDataDictionaries.length ? data.standardDataDictionaries : defaultDictionaries());

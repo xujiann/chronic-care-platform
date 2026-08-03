@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -32,7 +33,7 @@ function buildCitizenLaunchFoundationReadiness(options = {}) {
   const phaseDoc = options.phaseDoc ?? "";
   const productionRequirements = options.productionRequirements ?? readText("docs/citizen-production-launch-requirements.md");
   const productionAdapters = options.productionAdapters ?? readText("production-adapters.js");
-  const server = options.server ?? readText("server.js");
+  const server = options.server ?? readRuntimeSource(ROOT);
   const platformHtml = options.platformHtml ?? readText("platform.html");
   const platformJs = options.platformJs ?? readText("platform.js");
   const manifestUrls = new Set((manifest.shortcuts || []).map((item) => item.url));
@@ -40,7 +41,7 @@ function buildCitizenLaunchFoundationReadiness(options = {}) {
     {
       id: "citizen-foundation:phone-login",
       passed: hasAll(auth + login, [/loginByPhone/, /sendPhoneCode/, /phone-login-form/, /data-send-phone-code/, /phone-code-hint/, /DEMO-MOBILE-R1/, /888888/]) &&
-        hasAll(readText("server.js"), [/\/api\/auth\/phone-code/, /PHONE_CODE_TTL_MS/, /PHONE_CODE_COOLDOWN_MS/, /PHONE_LOGIN_MAX_FAILED_ATTEMPTS/, /PHONE_LOGIN_LOCK_MS/, /maskPhone/, /\/api\/auth\/phone-login/]),
+        hasAll(readRuntimeSource(ROOT), [/\/api\/auth\/phone-code/, /PHONE_CODE_TTL_MS/, /PHONE_CODE_COOLDOWN_MS/, /PHONE_LOGIN_MAX_FAILED_ATTEMPTS/, /PHONE_LOGIN_LOCK_MS/, /maskPhone/, /\/api\/auth\/phone-login/]),
       detail: "phone verification code issuing, cooldown, expiry, failed-attempt lockout, masked response, and login are wired to resident auth"
     },
     {
@@ -58,7 +59,7 @@ function buildCitizenLaunchFoundationReadiness(options = {}) {
     {
       id: "citizen-foundation:account-provisioning-boundary",
       passed: hasAll(login, [/data-account-provisioning/, /data-provisioning-step="resident"/, /data-provisioning-step="doctor"/, /data-provisioning-step="nurse"/, /data-provisioning-step="audit"/, /data-provisioning-owner/, /居民端暂不开放自助注册/, /实名建档/, /手机号绑定/, /第一执业机构确认/, /电子化注册核验/, /doctorId 绑定/, /账号审计留痕/, /居民主索引管理员/, /平台账号管理员/, /authUsers/]) &&
-        !/id="register-form"|\/api\/auth\/register/.test(login + auth + readText("server.js")),
+        !/id="register-form"|\/api\/auth\/register/.test(login + auth + readRuntimeSource(ROOT)),
       detail: "resident login states account provisioning workflow and does not expose public self-registration"
     },
     {

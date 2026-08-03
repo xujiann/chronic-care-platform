@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 const { createHash, randomUUID } = require("node:crypto");
@@ -191,7 +192,7 @@ function applyProductionOperationsAction(resource, item, payload = {}, user = {}
 function buildOperationsReadinessReport(options = {}) {
   const data = options.data ?? readJson("data/db.json");
   const pkg = options.pkg ?? readJson("package.json");
-  const serverSource = options.serverSource ?? readText("server.js");
+  const serverSource = options.serverSource ?? readRuntimeSource(ROOT);
   const readme = options.readme ?? readText("README.md");
   const deployment = options.deployment ?? readText("DEPLOYMENT.md");
   const operationsSource = options.operationsSource ?? readText("operations.js");

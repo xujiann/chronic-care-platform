@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const fs = require("node:fs");
 const path = require("node:path");
+const { readRuntimeSource } = require("../src/http/runtime-source");
 
 const ROOT = path.resolve(__dirname, "..");
 const SIBLING_REFERRAL_ROOT = path.resolve(ROOT, "..", "02-referral-teleconsultation");
@@ -26,7 +27,7 @@ function unique(values) {
 function collectReferralSignals(data = {}, root = ROOT) {
   const referralSystem = data.referralSystem || {};
   const referralTeleconsultations = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
-  const server = readText(root, "server.js");
+  const server = readRuntimeSource(root);
   const packageJson = readJson(root, "package.json", {});
   return {
     root,

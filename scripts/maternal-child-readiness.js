@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -195,7 +196,7 @@ function defaultSources() {
     institution: `${read("institution.html")}\n${read("institution.js")}`,
     citizen: `${read("citizen.html")}\n${read("citizen.js")}`,
     commission: `${read("index.html")}\n${read("app.js")}`,
-    server: read("server.js"),
+    server: readRuntimeSource(ROOT),
     packageSource: read("package.json")
   };
 }

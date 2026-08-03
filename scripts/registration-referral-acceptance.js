@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 "use strict";
 
+const { readRuntimeSource } = require("../src/http/runtime-source");
+
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -43,7 +45,7 @@ function extractSeedObject(source, id) {
 
 function buildRegistrationReferralAcceptance(options = {}) {
   const data = options.data || readJson(path.join("data", "db.json"));
-  const serverSource = options.serverSource ?? readText("server.js");
+  const serverSource = options.serverSource ?? readRuntimeSource(ROOT);
   const pkg = options.pkg || readJson("package.json");
   const serviceSource = options.serviceSource ?? readText("registration-referral-service.js");
   const domainSource = options.domainSource ?? readText("registration-referral-domain.js");

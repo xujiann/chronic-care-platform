@@ -1,5 +1,7 @@
 "use strict";
 
+const { readRuntimeSource } = require("../src/http/runtime-source");
+
 const fs = require("fs");
 const path = require("path");
 const { generateKeyPairSync } = require("crypto");
@@ -37,7 +39,7 @@ function buildDiseasePaymentReadiness() {
   ];
   const supervision = Service.buildDiseaseSupervisionProfiles(supervisionState);
   const requiredFiles = ["disease-payment-service.js", "disease-payment-intake.js", "disease-payment-grouper-contract.js", "disease-payment-special-case.js", "disease-payment-settlement.js", "insurance-payment-operating-model.js", "disease-payment-local-package.js", "disease-payment.html", "disease-payment.js", "disease-payment.css", "scripts/disease-payment-package-builder.js", "config/disease-payment/templates/local-drg-package.template.json", "config/disease-payment/templates/local-dip-package.template.json"];
-  const serverSource = fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
+  const serverSource = readRuntimeSource(ROOT);
   const operatingModel = OperatingModel.validateOperatingModel();
   const integrationHandoff = OperatingModel.buildT00IntegrationHandoff(serverSource);
   const sample = { settlementListNo: "READINESS-001", institutionCode: "HOSP-001", institution: "测试医院", admissionDate: "2026-07-01", dischargeDate: "2026-07-02", principalDiagnosis: "I10", totalAmount: 1000, declaredFundAmount: 800, costItems: [{ itemCode: "P001", itemName: "项目", amount: 1000 }] };
@@ -206,7 +208,7 @@ function buildDiseasePaymentReadiness() {
     { id: "local-package-release", label: "当地医保规则包双人复核、原子发布和版本冻结", ok: localPackagePublished.row.status === "已发布" && localPackagePublished.scheme.authority === "official-local" && localPackagePublished.parameter.rate === 11900 && localPackagePublished.state.groupCatalog.some((item) => item.localPackageId === localPackagePayload.id) },
     { id: "local-package-scheduling", label: "未来规则包发布排期与生效日自动激活", ok: scheduledPublished.scheduled && scheduledActivated.activated.length === 1 && scheduledActivated.activated[0].id === scheduledPayload.id && scheduledActivated.state.localPaymentPackageActivationSnapshots.length >= 2 },
     { id: "local-package-rollback", label: "生效前快照验真与无财务入账安全回退", ok: scheduledRolledBack.row.status === "已回退" && Boolean(scheduledRolledBack.snapshot.snapshotDigest) && scheduledRolledBack.state.parameterVersions.some((item) => item.id === localPackagePublished.parameter.id && item.status === "已发布") },
-    { id: "local-package-pagination", label: "大目录摘要响应、分页检索与30MB规则包导入", ok: localPackageView.packages.every((item) => item.catalog === undefined) && localCatalogPage.total === 1 && localCatalogPage.items[0].code === "BR23" && fs.readFileSync(path.join(ROOT, "server.js"), "utf8").includes("collectJson(req, 30_000_000)") },
+    { id: "local-package-pagination", label: "大目录摘要响应、分页检索与30MB规则包导入", ok: localPackageView.packages.every((item) => item.catalog === undefined) && localCatalogPage.total === 1 && localCatalogPage.items[0].code === "BR23" && readRuntimeSource(ROOT).includes("collectJson(req, 30_000_000)") },
     { id: "catalog-prefix-index", label: "DRG/DIP诊断前缀索引支持9520组规模目录", ok: catalogIndexStats.DIP.groupCount >= 9520 && catalogIndexStats.DIP.strategy === "diagnosis-prefix-trie" && catalogIndexStats.DIP.nodeCount > 1 },
     { id: "local-package-batch-simulation", label: "规则包影响试算幂等作业、分批推进与断点状态", ok: batchJobDuplicate.idempotent && batchJobFirstProcessed === 2 && batchJobCompleted.job.status === "completed" && batchJobCompleted.report.caseCount === 3 && batchJobCompleted.report.processingErrorCount === 0 },
     { id: "local-package-builder", label: "当地医保CSV目录与来源文件摘要构建工具", ok: fs.readFileSync(path.join(ROOT, "scripts", "disease-payment-package-builder.js"), "utf8").includes("buildPackage") && fs.readFileSync(path.join(ROOT, "package.json"), "utf8").includes("disease-payment:package") },
@@ -220,14 +222,14 @@ function buildDiseasePaymentReadiness() {
     { id: "cost-detail-linkage", label: "清单与费用明细唯一关联", ok: imported.state.medicalCostItems.every((item) => item.settlementListNo === "READINESS-001") },
     { id: "formal-simulation-isolation", label: "正式与模拟分组隔离", ok: grouped.run.environment === "simulation" && grouped.state.cases.at(-1).formalGrouping === undefined },
     { id: "immutable-ledger", label: "分组与测算哈希链账本", ok: intakeSummary.ledgerValid && intakeSummary.ledgerRecords >= 1 },
-    { id: "batch-retry-api", label: "批量导入、错误下载与补正重试API", ok: ["/api/disease-payment/intake/imports", "diseasePaymentImportRetryMatch", "/api/disease-payment/intake/errors", "/api/disease-payment/grouping-runs"].every((marker) => fs.readFileSync(path.join(ROOT, "server.js"), "utf8").includes(marker)) },
+    { id: "batch-retry-api", label: "批量导入、错误下载与补正重试API", ok: ["/api/disease-payment/intake/imports", "diseasePaymentImportRetryMatch", "/api/disease-payment/intake/errors", "/api/disease-payment/grouping-runs"].every((marker) => readRuntimeSource(ROOT).includes(marker)) },
     { id: "runnable-ui", label: "可运行医保工作台", ok: requiredFiles.every((file) => fs.existsSync(path.join(ROOT, file))) },
-    { id: "api-routes", label: "按病种付费API路由", ok: ["/api/disease-payment", "/api/disease-payment/calculate", "/api/disease-payment/special-cases", "/api/disease-payment/settlements"].every((marker) => fs.readFileSync(path.join(ROOT, "server.js"), "utf8").includes(marker)) },
-    { id: "drg-api-routes", label: "DRG目录、试分组与分析API", ok: ["/api/disease-payment/drg/catalog", "/api/disease-payment/drg/simulate", "/api/disease-payment/drg/analytics"].every((marker) => fs.readFileSync(path.join(ROOT, "server.js"), "utf8").includes(marker)) },
-    { id: "supervision-api-route", label: "病种监管档案查询与机构数据范围API", ok: ["/api/disease-payment/supervision/profiles", "user.role === \"institution\" ? user.orgName", "buildDiseaseSupervisionProfiles"].every((marker) => fs.readFileSync(path.join(ROOT, "server.js"), "utf8").includes(marker)) },
-    { id: "parameter-api-routes", label: "支付参数草案、试算、复核与发布API", ok: ["/api/disease-payment/parameters", "simulate|submit|review|publish", "createPaymentParameter", "publishPaymentParameter"].every((marker) => fs.readFileSync(path.join(ROOT, "server.js"), "utf8").includes(marker)) },
-    { id: "formal-grouping-api-routes", label: "正式分组作业、派发、回执、重试与死信对账API", ok: ["/api/disease-payment/formal-grouping/operations", "/api/disease-payment/formal-grouping/jobs", "dispatch|receipts|fail|retry|reconcile", "buildFormalGroupingOperations"].every((marker) => fs.readFileSync(path.join(ROOT, "server.js"), "utf8").includes(marker)) },
-    { id: "local-package-api-routes", label: "当地医保规则包导入、分页、分批试算、排期、复核与发布API", ok: ["/api/disease-payment/local-packages", "/api/disease-payment/local-packages/simulation-jobs", "catalog|diff-report|impact-report", "compare|simulate|submit|review|publish|activate|rollback", "process|retry|cancel", "activate-due", "importLocalPaymentPackage", "publishLocalPaymentPackage"].every((marker) => fs.readFileSync(path.join(ROOT, "server.js"), "utf8").includes(marker)) },
+    { id: "api-routes", label: "按病种付费API路由", ok: ["/api/disease-payment", "/api/disease-payment/calculate", "/api/disease-payment/special-cases", "/api/disease-payment/settlements"].every((marker) => readRuntimeSource(ROOT).includes(marker)) },
+    { id: "drg-api-routes", label: "DRG目录、试分组与分析API", ok: ["/api/disease-payment/drg/catalog", "/api/disease-payment/drg/simulate", "/api/disease-payment/drg/analytics"].every((marker) => readRuntimeSource(ROOT).includes(marker)) },
+    { id: "supervision-api-route", label: "病种监管档案查询与机构数据范围API", ok: ["/api/disease-payment/supervision/profiles", "user.role === \"institution\" ? user.orgName", "buildDiseaseSupervisionProfiles"].every((marker) => readRuntimeSource(ROOT).includes(marker)) },
+    { id: "parameter-api-routes", label: "支付参数草案、试算、复核与发布API", ok: ["/api/disease-payment/parameters", "simulate|submit|review|publish", "createPaymentParameter", "publishPaymentParameter"].every((marker) => readRuntimeSource(ROOT).includes(marker)) },
+    { id: "formal-grouping-api-routes", label: "正式分组作业、派发、回执、重试与死信对账API", ok: ["/api/disease-payment/formal-grouping/operations", "/api/disease-payment/formal-grouping/jobs", "dispatch|receipts|fail|retry|reconcile", "buildFormalGroupingOperations"].every((marker) => readRuntimeSource(ROOT).includes(marker)) },
+    { id: "local-package-api-routes", label: "当地医保规则包导入、分页、分批试算、排期、复核与发布API", ok: ["/api/disease-payment/local-packages", "/api/disease-payment/local-packages/simulation-jobs", "catalog|diff-report|impact-report", "compare|simulate|submit|review|publish|activate|rollback", "process|retry|cancel", "activate-due", "importLocalPaymentPackage", "publishLocalPaymentPackage"].every((marker) => readRuntimeSource(ROOT).includes(marker)) },
     { id: "drg-ui", label: "DRG 2.0分组与绩效工作台", ok: ["data-drg-section=\"workbench\"", "drg-profile", "drg-hierarchy", "drg-analytics"].every((marker) => fs.readFileSync(path.join(ROOT, "disease-payment.html"), "utf8").includes(marker)) },
     { id: "parameter-ui", label: "支付参数版本治理工作台", ok: ["data-payment-section=\"parameter-governance\"", "parameter-version-list", "parameter-impact-list"].every((marker) => fs.readFileSync(path.join(ROOT, "disease-payment.html"), "utf8").includes(marker)) },
     { id: "formal-grouping-ui", label: "正式分组异步联调与死信工作台", ok: ["data-payment-section=\"formal-grouping-operations\"", "formal-grouping-job-list", "formal-grouping-dead-letter-list"].every((marker) => fs.readFileSync(path.join(ROOT, "disease-payment.html"), "utf8").includes(marker)) },

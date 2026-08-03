@@ -6,12 +6,13 @@ const path = require("node:path");
 const test = require("node:test");
 
 const { buildSpecialtyCutoverPack } = require("../emergency-specialty-cutover");
+const { readRuntimeSource } = require("../src/http/runtime-source");
 
 const ROOT = path.resolve(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(ROOT, file), "utf8");
 
 test("T00 exposes the T10 specialty cutover pack through public integration contracts", () => {
-  const server = read("server.js");
+  const server = readRuntimeSource(ROOT);
   const client = read("t10-specialty-cutover.js");
   const workbench = read("workbench.html");
   const readme = read("README.md");

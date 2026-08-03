@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -79,7 +80,7 @@ function buildDrugConsumableReadinessReport(options = {}) {
   const readme = options.readme ?? readText("README.md");
   const deployment = options.deployment ?? readText("DEPLOYMENT.md");
   const aboutPage = options.aboutPage ?? readText("about.html");
-  const server = options.server ?? readText("server.js");
+  const server = options.server ?? readRuntimeSource(ROOT);
   const insurancePage = options.insurancePage ?? readText("insurance.html");
   const insuranceJs = options.insuranceJs ?? readText("insurance.js");
   const institutionPage = options.institutionPage ?? readText("institution.html");

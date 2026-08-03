@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -29,7 +30,7 @@ function contractReady(contract) {
 function buildIntegrationReadinessReport(options = {}) {
   const data = options.data || readJson("data/db.json");
   const connectorSource = options.connectorSource ?? readText("hospital-connectors.js");
-  const serverSource = options.serverSource ?? readText("server.js");
+  const serverSource = options.serverSource ?? readRuntimeSource(ROOT);
   const connectorDocument = options.connectorDocument ?? readText("docs/production-hospital-connectors.md");
   const envTemplate = options.envTemplate ?? readText(".env.example");
   const interfaces = Array.isArray(data.platformInterfaces) ? data.platformInterfaces : [];

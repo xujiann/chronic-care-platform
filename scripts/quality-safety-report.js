@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -774,7 +775,7 @@ function buildNationalGoalCadencePlan(nationalQualityGoals) {
 
 function buildQualitySafetyReport(options = {}) {
   const data = options.data || readJson("data/db.json");
-  const server = options.serverSource || read("server.js");
+  const server = options.serverSource || readRuntimeSource(ROOT);
   const aboutSource = options.aboutSource || read("quality-safety-about.html");
   const qualityEvents = arrayOf(data, "qualitySafetyEvents");
   const criticalRows = arrayOf(data, "criticalValueAlerts").map((item) => ({

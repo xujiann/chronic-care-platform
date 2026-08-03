@@ -1,3 +1,4 @@
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -23,7 +24,7 @@ function baseSources() {
     institution: `${fs.readFileSync(path.join(ROOT, "institution.html"), "utf8")}\n${fs.readFileSync(path.join(ROOT, "institution.js"), "utf8")}`,
     citizen: `${fs.readFileSync(path.join(ROOT, "citizen.html"), "utf8")}\n${fs.readFileSync(path.join(ROOT, "citizen.js"), "utf8")}`,
     commission: `${fs.readFileSync(path.join(ROOT, "index.html"), "utf8")}\n${fs.readFileSync(path.join(ROOT, "app.js"), "utf8")}`,
-    server: fs.readFileSync(path.join(ROOT, "server.js"), "utf8"),
+    server: readRuntimeSource(ROOT),
     packageSource: fs.readFileSync(path.join(ROOT, "package.json"), "utf8")
   };
 }

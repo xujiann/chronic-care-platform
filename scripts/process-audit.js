@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -54,7 +55,7 @@ function buildProcessAuditReport(options = {}) {
   const pkg = options.pkg || readJson("package.json");
   const readme = options.readme ?? fs.readFileSync(path.join(ROOT, "README.md"), "utf8");
   const deployment = options.deployment ?? fs.readFileSync(path.join(ROOT, "DEPLOYMENT.md"), "utf8");
-  const serverSource = options.serverSource ?? fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
+  const serverSource = options.serverSource ?? readRuntimeSource(ROOT);
   const workbenchSource = options.workbenchSource ?? fs.readFileSync(path.join(ROOT, "workbench.js"), "utf8");
   const processRows = Array.isArray(data.platformProcessAudit) ? data.platformProcessAudit : [];
   const chronic = summarizeLedger(data.chronicAcceptanceLedger, 5);

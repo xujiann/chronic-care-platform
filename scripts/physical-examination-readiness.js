@@ -1,3 +1,4 @@
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("fs");
 const path = require("path");
 const PhysicalExaminationService = require("../physical-examination-service");
@@ -18,7 +19,7 @@ function buildReport(options = {}) {
   PhysicalExaminationService.synchronizeCareLinks(data, { notify: false, actor: "readiness" });
   const overview = PhysicalExaminationService.buildOverview(data);
   const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
-  const server = read("server.js");
+  const server = readRuntimeSource(ROOT);
   const page = read("physical-examination.html");
   const client = read("physical-examination.js");
   const service = read("physical-examination-service.js");

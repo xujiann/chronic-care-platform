@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -32,7 +33,7 @@ function buildFullInterfaceIntegrationReadiness(options = {}) {
     read("test/interface-joint-test-package.test.js")
   ].join("\n");
   const documentation = options.documentation ?? read("docs/full-interface-integration-handoff.md");
-  const serverSource = options.serverSource ?? read("server.js");
+  const serverSource = options.serverSource ?? readRuntimeSource(ROOT);
   const jointTestPackage = options.jointTestPackage ?? buildJointTestPackage();
   const checks = [
     {

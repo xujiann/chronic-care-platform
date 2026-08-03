@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -280,7 +281,7 @@ function buildRegistrationIntegrationCenter(data = {}, user = {}) {
 function buildRegistrationIntegrationReadiness(options = {}) {
   const data = options.data || readJson(path.join("data", "db.json"));
   const pkg = options.pkg || readJson("package.json");
-  const serverSource = options.serverSource ?? readText("server.js");
+  const serverSource = options.serverSource ?? readRuntimeSource(ROOT);
   const interfaceMappingSource = options.interfaceMappingSource ?? readText(path.join("scripts", "interface-mapping.js"));
   const institutionSource = options.institutionSource ?? readText("institution.js");
   const institutionHtml = options.institutionHtml ?? readText("institution.html");

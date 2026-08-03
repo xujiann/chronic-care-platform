@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -303,7 +304,7 @@ function buildReferralConsortiumClosedLoopEvidence(data, countySource) {
 function buildReferralTeleconsultationReadinessReport(options = {}) {
   const data = options.data ?? readJson("data/db.json");
   const pkg = options.pkg ?? readJson("package.json");
-  const server = options.server ?? readText("server.js");
+  const server = options.server ?? readRuntimeSource(ROOT);
   const institution = options.institution ?? readText("institution.html") + readText("institution.js");
   const county = options.county ?? readText("county.html") + readText("county.js");
   const teleconsultations = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];

@@ -3,11 +3,20 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 const test = require("node:test");
+const { readRuntimeSource } = require("../src/http/runtime-source");
 
 const ROOT = path.resolve(__dirname, "..");
 
 function read(file) {
   return fs.readFileSync(path.join(ROOT, file), "utf8");
+}
+
+let serverRuntimeSource;
+
+function readServerRuntime() {
+  if (serverRuntimeSource) return serverRuntimeSource;
+  serverRuntimeSource = readRuntimeSource(ROOT);
+  return serverRuntimeSource;
 }
 
 test("role pages keep explicit page guards", () => {
@@ -229,9 +238,9 @@ test("about page documents doctor multi-practice policy boundaries", () => {
   assert.match(read("institution.js"), /riskFlags/);
   assert.match(read("institution.js"), /退回补正/);
   assert.match(read("institution.js"), /终止备案/);
-  assert.match(read("server.js"), /\/api\/public\/multi-practice-ledger/);
-  assert.match(read("server.js"), /detectMultiPracticeScheduleConflicts/);
-  assert.match(read("server.js"), /buildMultiPracticeExternalSync/);
+  assert.match(readServerRuntime(), /\/api\/public\/multi-practice-ledger/);
+  assert.match(readServerRuntime(), /detectMultiPracticeScheduleConflicts/);
+  assert.match(readServerRuntime(), /buildMultiPracticeExternalSync/);
   assert.match(doc, /国卫医发〔2014〕86号/);
   assert.match(doc, /适用边界/);
   assert.match(doc, /政策到系统字段映射/);
@@ -313,7 +322,7 @@ test("public health informatization system is reachable and source-standard alig
   const data = JSON.parse(read("data/db.json"));
   const html = read("public-health.html");
   const js = read("public-health.js");
-  const server = read("server.js");
+  const server = readServerRuntime();
   const doc = read("docs/公共卫生信息化系统建设报告.md");
   const plan = read("docs/公共卫生信息化下一步开发计划.md");
 
@@ -582,7 +591,7 @@ test("public health informatization system is reachable and source-standard alig
 test("health dashboard exposes the aggregate application entry and API contract", () => {
   const html = read("health-dashboard.html");
   const js = read("health-dashboard.js");
-  const server = read("server.js");
+  const server = readServerRuntime();
   const release = read("scripts/release-report.js");
   const deploy = read("scripts/deploy-check.js");
 
@@ -805,14 +814,14 @@ test("chronic follow-up launch core is wired through docs api and portals", () =
   assert.match(read("docs/chronic-launch-core.md"), /HIS\/EMR\/LIS\/PACS/);
   assert.match(read("docs/chronic-launch-core.md"), /\/api\/chronic\/launch-core/);
   assert.match(read("docs/chronic-institution-interfaces.md"), /chronic-device-measurement-v1/);
-  assert.match(read("server.js"), /\/api\/chronic\/institution-interfaces/);
-  assert.match(read("server.js"), /\/api\/chronic\/launch-core\/actions/);
-  assert.match(read("server.js"), /\/api\/chronic\/resident-checkins/);
-  assert.match(read("server.js"), /\/api\/chronic\/device-measurements/);
-  assert.match(read("server.js"), /\/api\/chronic\/pharmacy-callbacks/);
-  assert.match(read("server.js"), /\/api\/chronic\/family-doctor-actions/);
-  assert.match(read("server.js"), /\/api\/chronic\/reminder-outreach/);
-  assert.match(read("server.js"), /\/api\/chronic\/public-health-loop/);
+  assert.match(readServerRuntime(), /\/api\/chronic\/institution-interfaces/);
+  assert.match(readServerRuntime(), /\/api\/chronic\/launch-core\/actions/);
+  assert.match(readServerRuntime(), /\/api\/chronic\/resident-checkins/);
+  assert.match(readServerRuntime(), /\/api\/chronic\/device-measurements/);
+  assert.match(readServerRuntime(), /\/api\/chronic\/pharmacy-callbacks/);
+  assert.match(readServerRuntime(), /\/api\/chronic\/family-doctor-actions/);
+  assert.match(readServerRuntime(), /\/api\/chronic\/reminder-outreach/);
+  assert.match(readServerRuntime(), /\/api\/chronic\/public-health-loop/);
   assert.match(institutionHtml, /chronic-launch-core/);
   assert.match(institutionHtml, /慢病上线核心联调/);
   assert.match(institutionHtml, /疾控和公卫闭环/);
@@ -845,7 +854,7 @@ test("chronic follow-up launch core is wired through docs api and portals", () =
 test("institution chronic follow-up workbench exposes escalation closure", () => {
   const institutionHtml = read("institution.html");
   const institutionJs = read("institution.js");
-  const serverJs = read("server.js");
+  const serverJs = readServerRuntime();
   assert.match(institutionHtml, /chronic-followup-workbench/);
   assert.match(institutionJs, /chronicEscalationButton/);
   assert.match(institutionJs, /data-chronic-escalation/);
@@ -936,7 +945,7 @@ test("chronic disease policy module exposes 2025 service capacity workflow", () 
   const data = JSON.parse(read("data/db.json"));
   const html = read("index.html");
   const app = read("app.js");
-  const server = read("server.js");
+  const server = readServerRuntime();
   ["chronicServiceRoles", "chronicCapabilityConditions", "chronicServicePathways", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "chronicAcceptanceLedger"].forEach((key) => {
     assert.equal(Array.isArray(data[key]), true, `${key} should be seeded`);
     assert.equal(data[key].length > 0, true, `${key} should not be empty`);
@@ -973,7 +982,7 @@ test("insurance portal exposes actionable drug consumable supervision workflow",
   const js = read("insurance.js");
   const institutionHtml = read("institution.html");
   const institutionJs = read("institution.js");
-  const server = read("server.js");
+  const server = readServerRuntime();
   assert.match(html, /drug-consumable-panel/);
   assert.match(js, /renderDrugConsumableSupervision/);
   assert.match(js, /renderTraceabilityPolicySources/);
@@ -1071,12 +1080,12 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("platform.js"), /loadPostgresProductionAdapterCenter/);
   assert.match(read("platform.js"), /renderPostgresProductionAdapterCenter/);
   assert.match(read("platform.js"), /runPostgresPrimaryReadRehearsal/);
-  assert.match(read("server.js"), /\/api\/production-database\/cutover-center/);
-  assert.match(read("server.js"), /production-database-cutover-rehearsal/);
-  assert.match(read("server.js"), /delete scoped\.productionDatabaseCutoverRuns/);
-  assert.match(read("server.js"), /configureSqliteConnection/);
-  assert.match(read("server.js"), /sqliteRuntimeProfile/);
-  assert.match(read("server.js"), /PRAGMA quick_check/);
+  assert.match(readServerRuntime(), /\/api\/production-database\/cutover-center/);
+  assert.match(readServerRuntime(), /production-database-cutover-rehearsal/);
+  assert.match(readServerRuntime(), /delete scoped\.productionDatabaseCutoverRuns/);
+  assert.match(readServerRuntime(), /configureSqliteConnection/);
+  assert.match(readServerRuntime(), /sqliteRuntimeProfile/);
+  assert.match(readServerRuntime(), /PRAGMA quick_check/);
   assert.match(read("docs/production-database-cutover-center.md"), /rollback checkpoint/);
   assert.match(read("docs/production-database-cutover-center.md"), /does not prove that a production database is connected/);
   assert.match(read(".env.example"), /SESSION_SECRETS=/);
@@ -1361,34 +1370,34 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("county.js"), /督办/);
   assert.match(read("county.js"), /runReferralEscalation/);
   assert.match(read("county.js"), /hasReferralEscalationReminder/);
-  assert.match(read("server.js"), /buildReferralTeleconsultationEscalations/);
-  assert.match(read("server.js"), /referral-teleconsultations\/escalations\/run/);
-  assert.match(read("server.js"), /referral-teleconsultations\/joint-test-pack/);
-  assert.match(read("server.js"), /taskReceipts/);
-  assert.match(read("server.js"), /exportSummary/);
-  assert.match(read("server.js"), /cutoverReadiness/);
-  assert.match(read("server.js"), /nextDevelopmentPlan/);
-  assert.match(read("server.js"), /referral-teleconsultations\/joint-test-ledger/);
-  assert.match(read("server.js"), /joint-test-ledger\/tasks/);
-  assert.match(read("server.js"), /joint-test-ledger\/tasks\/:role\/complete/);
-  assert.match(read("server.js"), /buildReferralTeleconsultationJointTestLedger/);
-  assert.match(read("server.js"), /createReferralTeleconsultationJointTestTasks/);
-  assert.match(read("server.js"), /completeReferralTeleconsultationJointTestTask/);
-  assert.match(read("server.js"), /referral-teleconsultations\/signoff-summary/);
-  assert.match(read("server.js"), /signoff-summary\/:role\/evidence/);
-  assert.match(read("server.js"), /upsertReferralTeleconsultationSignoff/);
-  assert.match(read("server.js"), /canSubmitReferralSignoff/);
-  assert.match(read("server.js"), /buildReferralTeleconsultationSignoffSummary/);
-  assert.match(read("server.js"), /mergeByKeyWithDefaultFields\(seedReferralTeleconsultations\(\), data\.referralTeleconsultations, "id"\)/);
-  assert.match(read("server.js"), /function mergeByKeyWithDefaultFields/);
-  assert.match(read("server.js"), /function mergeDefaultFields/);
-  assert.match(read("server.js"), /referral-teleconsultations\/performance-policy/);
-  assert.match(read("server.js"), /referral-teleconsultations\/consortium-metrics/);
-  assert.match(read("server.js"), /buildReferralConsortiumClosedLoopMetrics/);
-  assert.match(read("server.js"), /blocked-until-onsite-integration/);
-  assert.match(read("server.js"), /escalations\/ack/);
-  assert.match(read("server.js"), /createReferralTeleconsultationEscalationMessage/);
-  assert.match(read("server.js"), /highRisk/);
+  assert.match(readServerRuntime(), /buildReferralTeleconsultationEscalations/);
+  assert.match(readServerRuntime(), /referral-teleconsultations\/escalations\/run/);
+  assert.match(readServerRuntime(), /referral-teleconsultations\/joint-test-pack/);
+  assert.match(readServerRuntime(), /taskReceipts/);
+  assert.match(readServerRuntime(), /exportSummary/);
+  assert.match(readServerRuntime(), /cutoverReadiness/);
+  assert.match(readServerRuntime(), /nextDevelopmentPlan/);
+  assert.match(readServerRuntime(), /referral-teleconsultations\/joint-test-ledger/);
+  assert.match(readServerRuntime(), /joint-test-ledger\/tasks/);
+  assert.match(readServerRuntime(), /joint-test-ledger\/tasks\/:role\/complete/);
+  assert.match(readServerRuntime(), /buildReferralTeleconsultationJointTestLedger/);
+  assert.match(readServerRuntime(), /createReferralTeleconsultationJointTestTasks/);
+  assert.match(readServerRuntime(), /completeReferralTeleconsultationJointTestTask/);
+  assert.match(readServerRuntime(), /referral-teleconsultations\/signoff-summary/);
+  assert.match(readServerRuntime(), /signoff-summary\/:role\/evidence/);
+  assert.match(readServerRuntime(), /upsertReferralTeleconsultationSignoff/);
+  assert.match(readServerRuntime(), /canSubmitReferralSignoff/);
+  assert.match(readServerRuntime(), /buildReferralTeleconsultationSignoffSummary/);
+  assert.match(readServerRuntime(), /mergeByKeyWithDefaultFields\(seedReferralTeleconsultations\(\), data\.referralTeleconsultations, "id"\)/);
+  assert.match(readServerRuntime(), /function mergeByKeyWithDefaultFields/);
+  assert.match(readServerRuntime(), /function mergeDefaultFields/);
+  assert.match(readServerRuntime(), /referral-teleconsultations\/performance-policy/);
+  assert.match(readServerRuntime(), /referral-teleconsultations\/consortium-metrics/);
+  assert.match(readServerRuntime(), /buildReferralConsortiumClosedLoopMetrics/);
+  assert.match(readServerRuntime(), /blocked-until-onsite-integration/);
+  assert.match(readServerRuntime(), /escalations\/ack/);
+  assert.match(readServerRuntime(), /createReferralTeleconsultationEscalationMessage/);
+  assert.match(readServerRuntime(), /highRisk/);
   assert.match(read("scripts/referral-teleconsultation-readiness.js"), /buildReferralConsortiumClosedLoopEvidence/);
   assert.match(read("scripts/referral-teleconsultation-readiness.js"), /referral:consortiumClosedLoop/);
   assert.match(read("scripts/referral-teleconsultation-readiness.js"), /referral:consortiumMetrics/);
@@ -1398,9 +1407,9 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/release-report.js"), /referralTeleconsultation:closedLoop/);
   assert.match(read("scripts/release-report.js"), /referralTeleconsultation:closedLoopMetrics/);
   assert.match(read("scripts/release-report.js"), /referralTeleconsultation:closedLoopMetricsApi/);
-  assert.match(read("server.js"), /schedule-callback/);
-  assert.match(read("server.js"), /feedback-callback/);
-  assert.match(read("server.js"), /appendReferralTeleconsultationNotifications/);
+  assert.match(readServerRuntime(), /schedule-callback/);
+  assert.match(readServerRuntime(), /feedback-callback/);
+  assert.match(readServerRuntime(), /appendReferralTeleconsultationNotifications/);
   assert.match(read("README.md"), /referral-teleconsultations\/:id\/report-callback/);
   assert.match(read("README.md"), /referral-feedback-callback-v1/);
   assert.match(read("README.md"), /referral-schedule-callback-v1/);
@@ -1550,7 +1559,7 @@ test("regional data sharing application has runnable entry, API and evidence scr
   const html = read("regional-data-sharing.html");
   const about = read("regional-data-sharing-about.html");
   const client = read("regional-data-sharing.js");
-  const server = read("server.js");
+  const server = readServerRuntime();
   const script = read("scripts/regional-data-sharing.js");
   const auth = read("auth.js");
   const data = JSON.parse(read("data/db.json"));
@@ -1732,8 +1741,8 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("portal.css"), /research-governance-board/);
   assert.match(read("portal.css"), /research-audit-feed/);
   assert.match(platformJs, /outcome-return/);
-  assert.match(read("server.js"), /\/api\/research\/datasets\/:id\/compliant-exports/);
-  assert.match(read("server.js"), /\/api\/research\/compliant-exports/);
+  assert.match(readServerRuntime(), /\/api\/research\/datasets\/:id\/compliant-exports/);
+  assert.match(readServerRuntime(), /\/api\/research\/compliant-exports/);
   assert.match(platformHtml, /mobile-accessibility-governance/);
   assert.match(platformHtml, /production-deployment-plan/);
   assert.match(platformJs, /renderResearchGovernance/);
@@ -1782,7 +1791,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(workbenchJs, /release:manifest/);
   assert.match(workbenchJs, /production:cutover/);
   assert.match(workbenchJs, /evaluation:evidence/);
-  assert.match(read("server.js"), /release-artifact-manifest/);
+  assert.match(readServerRuntime(), /release-artifact-manifest/);
   assert.match(workbenchJs, /\/api\/metrics/);
   assert.match(workbenchJs, /\/api\/system\/readiness/);
   assert.match(workbenchJs, /\/api\/process-audit/);
@@ -1799,19 +1808,19 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(workbenchJs, /status \$/);
   assert.match(workbenchJs, /\/api\/chronic\/acceptance-ledger/);
   assert.match(workbenchJs, /\/api\/county\/acceptance-ledger/);
-  assert.match(read("server.js"), /\/api\/process-audit/);
-  assert.match(read("server.js"), /\/api\/service-acceptance-summary/);
-  assert.match(read("server.js"), /\/api\/site-launch-evidence/);
-  assert.match(read("server.js"), /verified evidence requires jointTestNo or attachmentNames/);
-  assert.match(read("server.js"), /missingVerifiedTemplates/);
-  assert.match(read("server.js"), /\/api\/site-readiness-pack/);
-  assert.match(read("server.js"), /SERVICE_DOMAIN_BY_COLLECTION/);
-  assert.match(read("server.js"), /drugConsumableSupervisions: "drugConsumable"/);
-  assert.match(read("server.js"), /priorityLevel/);
-  assert.match(read("server.js"), /\/api\/site-template-readmes/);
-  assert.match(read("server.js"), /\/api\/release-report/);
-  assert.match(read("server.js"), /\/api\/production-cutover-checklist/);
-  assert.match(read("server.js"), /\/api\/release-artifact-manifest/);
+  assert.match(readServerRuntime(), /\/api\/process-audit/);
+  assert.match(readServerRuntime(), /\/api\/service-acceptance-summary/);
+  assert.match(readServerRuntime(), /\/api\/site-launch-evidence/);
+  assert.match(readServerRuntime(), /verified evidence requires jointTestNo or attachmentNames/);
+  assert.match(readServerRuntime(), /missingVerifiedTemplates/);
+  assert.match(readServerRuntime(), /\/api\/site-readiness-pack/);
+  assert.match(readServerRuntime(), /SERVICE_DOMAIN_BY_COLLECTION/);
+  assert.match(readServerRuntime(), /drugConsumableSupervisions: "drugConsumable"/);
+  assert.match(readServerRuntime(), /priorityLevel/);
+  assert.match(readServerRuntime(), /\/api\/site-template-readmes/);
+  assert.match(readServerRuntime(), /\/api\/release-report/);
+  assert.match(readServerRuntime(), /\/api\/production-cutover-checklist/);
+  assert.match(readServerRuntime(), /\/api\/release-artifact-manifest/);
   assert.match(operationsHtml, /operations-snapshots/);
   assert.match(operationsHtml, /operations-about\.html/);
   assert.match(operationsHtml, /政策依据与监测边界/);
@@ -2041,53 +2050,53 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.doesNotMatch(operationsHtml, />pending</);
   assert.doesNotMatch(operationsHtml, /Qingniwaqiao Community Health Service Center/);
   assert.doesNotMatch(operationsHtml, /step-down-bed/);
-  assert.match(read("server.js"), /\/api\/operations\/dashboard/);
-  assert.match(read("server.js"), /\/api\/operations\/performance-monitoring/);
-  assert.match(read("server.js"), /\/api\/operations\/command-chains/);
-  assert.match(read("server.js"), /\/api\/operations\/playbooks/);
-  assert.match(read("server.js"), /\/api\/operations\/handover/);
-  assert.match(read("server.js"), /\/api\/operations\/handover\/owners/);
-  assert.match(read("server.js"), /\/api\/operations\/handover\/signoff/);
-  assert.match(read("server.js"), /\/api\/operations\/interface-mapping/);
-  assert.match(read("server.js"), /\/api\/operations\/site-joint-tests/);
-  assert.match(read("server.js"), /\/api\/operations\/site-joint-patrol/);
-  assert.match(read("server.js"), /\/api\/operations\/production-hardening/);
-  assert.match(read("server.js"), /\/api\/operations\/cutover-command/);
-  assert.match(read("server.js"), /\/api\/operations\/post-cutover-observation/);
-  assert.match(read("server.js"), /\/api\/operations\/go-live-gates/);
-  assert.match(read("server.js"), /\/api\/operations\/go-live-gates\/actions/);
-  assert.match(read("server.js"), /operations-go-live-gate-review/);
-  assert.match(read("server.js"), /\/api\/operations\/intelligence/);
-  assert.match(read("server.js"), /\/api\/operations\/resource-pool/);
-  assert.match(read("server.js"), /\/api\/operations\/mobile-duty/);
-  assert.match(read("server.js"), /operations-mobile-duty-reminder/);
-  assert.match(read("server.js"), /\/api\/operations\/governance-report/);
-  assert.match(read("server.js"), /\/api\/operations\/governance-export-package/);
-  assert.match(read("server.js"), /\/api\/operations\/next-development-research/);
-  assert.match(read("server.js"), /\/api\/operations\/dispatch\/:id\/status/);
-  assert.match(read("server.js"), /buildPerformanceMonitoringEvidence/);
-  assert.match(read("server.js"), /buildOperationsInterfaceMappingEvidence/);
-  assert.match(read("server.js"), /buildOperationsSiteJointPatrol/);
-  assert.match(read("server.js"), /buildOperationsCutoverCommand/);
-  assert.match(read("server.js"), /buildOperationsPostCutoverObservation/);
-  assert.match(read("server.js"), /buildOperationsGoLiveGates/);
-  assert.match(read("server.js"), /buildCommandSla/);
-  assert.match(read("server.js"), /buildOperationsPlaybooks/);
-  assert.match(read("server.js"), /buildOperationsHandover/);
-  assert.match(read("server.js"), /buildOperationsHandoverOwnerMatrix/);
-  assert.match(read("server.js"), /buildOperationsMobileDuty/);
-  assert.match(read("server.js"), /normalizeHandoverSignoff/);
-  assert.match(read("server.js"), /operations-handover-signoff/);
-  assert.match(read("server.js"), /buildOperationsCommandChains/);
-  assert.match(read("server.js"), /indicatorDetails/);
-  assert.match(read("server.js"), /review-status-change/);
+  assert.match(readServerRuntime(), /\/api\/operations\/dashboard/);
+  assert.match(readServerRuntime(), /\/api\/operations\/performance-monitoring/);
+  assert.match(readServerRuntime(), /\/api\/operations\/command-chains/);
+  assert.match(readServerRuntime(), /\/api\/operations\/playbooks/);
+  assert.match(readServerRuntime(), /\/api\/operations\/handover/);
+  assert.match(readServerRuntime(), /\/api\/operations\/handover\/owners/);
+  assert.match(readServerRuntime(), /\/api\/operations\/handover\/signoff/);
+  assert.match(readServerRuntime(), /\/api\/operations\/interface-mapping/);
+  assert.match(readServerRuntime(), /\/api\/operations\/site-joint-tests/);
+  assert.match(readServerRuntime(), /\/api\/operations\/site-joint-patrol/);
+  assert.match(readServerRuntime(), /\/api\/operations\/production-hardening/);
+  assert.match(readServerRuntime(), /\/api\/operations\/cutover-command/);
+  assert.match(readServerRuntime(), /\/api\/operations\/post-cutover-observation/);
+  assert.match(readServerRuntime(), /\/api\/operations\/go-live-gates/);
+  assert.match(readServerRuntime(), /\/api\/operations\/go-live-gates\/actions/);
+  assert.match(readServerRuntime(), /operations-go-live-gate-review/);
+  assert.match(readServerRuntime(), /\/api\/operations\/intelligence/);
+  assert.match(readServerRuntime(), /\/api\/operations\/resource-pool/);
+  assert.match(readServerRuntime(), /\/api\/operations\/mobile-duty/);
+  assert.match(readServerRuntime(), /operations-mobile-duty-reminder/);
+  assert.match(readServerRuntime(), /\/api\/operations\/governance-report/);
+  assert.match(readServerRuntime(), /\/api\/operations\/governance-export-package/);
+  assert.match(readServerRuntime(), /\/api\/operations\/next-development-research/);
+  assert.match(readServerRuntime(), /\/api\/operations\/dispatch\/:id\/status/);
+  assert.match(readServerRuntime(), /buildPerformanceMonitoringEvidence/);
+  assert.match(readServerRuntime(), /buildOperationsInterfaceMappingEvidence/);
+  assert.match(readServerRuntime(), /buildOperationsSiteJointPatrol/);
+  assert.match(readServerRuntime(), /buildOperationsCutoverCommand/);
+  assert.match(readServerRuntime(), /buildOperationsPostCutoverObservation/);
+  assert.match(readServerRuntime(), /buildOperationsGoLiveGates/);
+  assert.match(readServerRuntime(), /buildCommandSla/);
+  assert.match(readServerRuntime(), /buildOperationsPlaybooks/);
+  assert.match(readServerRuntime(), /buildOperationsHandover/);
+  assert.match(readServerRuntime(), /buildOperationsHandoverOwnerMatrix/);
+  assert.match(readServerRuntime(), /buildOperationsMobileDuty/);
+  assert.match(readServerRuntime(), /normalizeHandoverSignoff/);
+  assert.match(readServerRuntime(), /operations-handover-signoff/);
+  assert.match(readServerRuntime(), /buildOperationsCommandChains/);
+  assert.match(readServerRuntime(), /indicatorDetails/);
+  assert.match(readServerRuntime(), /review-status-change/);
   assert.match(read("auth.js"), /\["operations\.html", "运行监测"\]/);
   assert.match(read("auth.js"), /\["operations-about\.html", "运行说明"\]/);
-  assert.match(read("server.js"), /applyDispatchStatusUpdate/);
-  assert.match(read("server.js"), /performanceReadinessMatrix/);
-  assert.match(read("server.js"), /PERFORMANCE_MONITORING_MANUALS/);
-  assert.match(read("server.js"), /operations-dispatch/);
-  assert.match(read("server.js"), /statistics-reconciliation-review/);
+  assert.match(readServerRuntime(), /applyDispatchStatusUpdate/);
+  assert.match(readServerRuntime(), /performanceReadinessMatrix/);
+  assert.match(readServerRuntime(), /PERFORMANCE_MONITORING_MANUALS/);
+  assert.match(readServerRuntime(), /operations-dispatch/);
+  assert.match(readServerRuntime(), /statistics-reconciliation-review/);
 });
 
 test("quality safety supervision app exposes runnable portal, API and release evidence", () => {
@@ -2096,7 +2105,7 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   const about = read("quality-safety-about.html");
   const login = read("login.html");
   const js = read("quality-safety.js");
-  const server = read("server.js");
+  const server = readServerRuntime();
   const portalCss = read("portal.css");
   ["qualitySafetyEvents", "criticalValueAlerts", "clinicalPathwayCases", "medicalRecordQualityReviews", "mutualRecognitionQualityReviews", "qualityRectificationOrders", "qualitySafetySiteSignoffs"].forEach((key) => {
     assert.equal(Array.isArray(data[key]), true, `${key} should be seeded`);
@@ -2304,17 +2313,17 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(read("platform.html"), /quality-safety\.html/);
   assert.match(read("workbench.html"), /quality-safety\.html/);
   assert.match(read("auth.js"), /quality-safety\.html/);
-  assert.match(read("server.js"), /\/api\/chronic\/followup-summary/);
-  assert.match(read("server.js"), /\/api\/chronic\/followup-feedback/);
-  assert.match(read("server.js"), /\/api\/chronic\/followup-escalations/);
-  assert.match(read("server.js"), /\/api\/chronic\/followup-dispatch/);
-  assert.match(read("server.js"), /appendChronicFollowupMessage/);
-  assert.match(read("server.js"), /closeChronicFollowupMessages/);
-  assert.match(read("server.js"), /upsertResidentExperienceCheckin/);
-  assert.match(read("server.js"), /recordChronicPharmacyCallback/);
-  assert.match(read("server.js"), /closeFamilyDoctorChronicAction/);
-  assert.match(read("server.js"), /buildChronicFollowupAlertQueue/);
-  assert.match(read("server.js"), /recordChronicLaunchCoreAction/);
+  assert.match(readServerRuntime(), /\/api\/chronic\/followup-summary/);
+  assert.match(readServerRuntime(), /\/api\/chronic\/followup-feedback/);
+  assert.match(readServerRuntime(), /\/api\/chronic\/followup-escalations/);
+  assert.match(readServerRuntime(), /\/api\/chronic\/followup-dispatch/);
+  assert.match(readServerRuntime(), /appendChronicFollowupMessage/);
+  assert.match(readServerRuntime(), /closeChronicFollowupMessages/);
+  assert.match(readServerRuntime(), /upsertResidentExperienceCheckin/);
+  assert.match(readServerRuntime(), /recordChronicPharmacyCallback/);
+  assert.match(readServerRuntime(), /closeFamilyDoctorChronicAction/);
+  assert.match(readServerRuntime(), /buildChronicFollowupAlertQueue/);
+  assert.match(readServerRuntime(), /recordChronicLaunchCoreAction/);
   assert.match(read("data/db.json"), /"chronicFollowup": true/);
   assert.match(read("data/db.json"), /"chronicLaunchCoreSignoffs"/);
   assert.match(read("docs/chronic-followup-readiness.md"), /\/api\/messages/);
@@ -2355,11 +2364,11 @@ test("quality safety supervision app exposes runnable portal, API and release ev
 });
 
 test("chronic pharmacy insurance closure is exposed through the institution workbench", () => {
-  assert.match(read("server.js"), /\/api\/chronic\/pharmacy-insurance-closure/);
-  assert.match(read("server.js"), /\/api\/chronic\/production-safety/);
-  assert.match(read("server.js"), /\/api\/chronic\/production-safety-evidence/);
-  assert.match(read("server.js"), /\/api\/chronic\/interoperability-profiles/);
-  assert.match(read("server.js"), /\/api\/chronic\/interoperability-validation/);
+  assert.match(readServerRuntime(), /\/api\/chronic\/pharmacy-insurance-closure/);
+  assert.match(readServerRuntime(), /\/api\/chronic\/production-safety/);
+  assert.match(readServerRuntime(), /\/api\/chronic\/production-safety-evidence/);
+  assert.match(readServerRuntime(), /\/api\/chronic\/interoperability-profiles/);
+  assert.match(readServerRuntime(), /\/api\/chronic\/interoperability-validation/);
   assert.match(read("institution.html"), /chronic-pharmacy-insurance-summary/);
   assert.match(read("institution.html"), /chronic-production-safety-summary/);
   assert.match(read("institution.html"), /chronic-production-safety-evidence/);
@@ -2378,7 +2387,7 @@ test("chronic pharmacy insurance closure is exposed through the institution work
 });
 
 test("data governance foundation exposes platform cards API and release evidence", () => {
-  const server = read("server.js");
+  const server = readServerRuntime();
   assert.match(server, /seedDataGovernanceAssets/);
   assert.match(server, /seedStandardDataDictionaries/);
   assert.match(server, /seedDataLineageControls/);
@@ -2410,7 +2419,7 @@ test("digital hospital v0.21 public health evidence runtime is publishable from 
   const operationsRecord = read("docs/数智医院标准平台v0.20公共卫生运营增强记录.md");
   const evidenceRecord = read("docs/数智医院标准平台v0.21公共卫生证据与双人复核闭环.md");
   const runtimeReadiness = read("scripts/digital-hospital-production-runtime-readiness.js");
-  const server = read("server.js");
+  const server = readServerRuntime();
 
   assert.match(standardsEntry, /href="\.\/digital-hospital-standard-platform\/">新标准平台 v0\.21/);
   assert.match(index, /v0\.21/);
@@ -2665,7 +2674,7 @@ test("digital hospital standards platform exposes standards center workflow and 
   const portalCss = read("portal.css");
   const doc = read("docs/数智医院标准平台研发报告.md");
   const readiness = read("scripts/digital-hospital-standards-readiness.js");
-  const server = read("server.js");
+  const server = readServerRuntime();
   assert.match(html, /数智医院标准平台/);
   assert.match(html, /requireRole\(\["commission"\]\)/);
   assert.match(html, /data-digital-hospital-section="standard-center"/);
@@ -2817,9 +2826,9 @@ test("phase 2 proposal readiness links the feasibility gap plan into release evi
 });
 
 test("phase 2 catalog module exposes API platform UI and release evidence", () => {
-  assert.match(read("server.js"), /seedPhase2DataCatalogs/);
-  assert.match(read("server.js"), /buildPhase2CatalogOverview/);
-  assert.match(read("server.js"), /\/api\/phase2\/catalog/);
+  assert.match(readServerRuntime(), /seedPhase2DataCatalogs/);
+  assert.match(readServerRuntime(), /buildPhase2CatalogOverview/);
+  assert.match(readServerRuntime(), /\/api\/phase2\/catalog/);
   assert.match(read("platform.html"), /phase2-catalog/);
   assert.match(read("platform.js"), /renderPhase2Catalog/);
   assert.match(read("scripts/phase2-catalog-readiness.js"), /Phase 2 catalog readiness report/);
@@ -2829,7 +2838,7 @@ test("phase 2 catalog module exposes API platform UI and release evidence", () =
 });
 
 test("phase 2 joint-test pilot exposes API platform UI gateway traces and release evidence", () => {
-  const server = read("server.js");
+  const server = readServerRuntime();
   assert.match(server, /seedPhase2PilotInstitutions/);
   assert.match(server, /seedPhase2JointTestLinks/);
   assert.match(server, /seedPhase2SamplePayloads/);
@@ -2845,7 +2854,7 @@ test("phase 2 joint-test pilot exposes API platform UI gateway traces and releas
 });
 
 test("phase 2 mutual recognition MVP exposes catalog API county UI citation chain and release evidence", () => {
-  const server = read("server.js");
+  const server = readServerRuntime();
   assert.match(server, /seedPhase2MutualRecognitionCatalog/);
   assert.match(server, /seedPhase2MutualRecognitionCitations/);
   assert.match(server, /buildPhase2MutualRecognitionOverview/);
@@ -2860,7 +2869,7 @@ test("phase 2 mutual recognition MVP exposes catalog API county UI citation chai
 });
 
 test("phase 2 disease reporting MVP exposes trigger rules queue receipts patient center and release evidence", () => {
-  const server = read("server.js");
+  const server = readServerRuntime();
   assert.match(server, /seedPhase2DiseaseReportingRules/);
   assert.match(server, /seedPhase2DiseaseReportQueue/);
   assert.match(server, /seedPhase2DiseaseReportReceipts/);
@@ -2876,7 +2885,7 @@ test("phase 2 disease reporting MVP exposes trigger rules queue receipts patient
 });
 
 test("phase 2 clinical assist MVP exposes doctor workstation alerts receipts plugins and release evidence", () => {
-  const server = read("server.js");
+  const server = readServerRuntime();
   assert.match(server, /seedPhase2ClinicalAssistRules/);
   assert.match(server, /seedPhase2ClinicalAssistAlerts/);
   assert.match(server, /seedPhase2ClinicalAssistReceipts/);
@@ -2899,7 +2908,7 @@ test("phase 2 clinical assist MVP exposes doctor workstation alerts receipts plu
 });
 
 test("phase 2 family doctor MVP exposes contract lifecycle citizen institution platform and release evidence", () => {
-  const server = read("server.js");
+  const server = readServerRuntime();
   assert.match(server, /seedPhase2FamilyDoctorTemplates/);
   assert.match(server, /seedPhase2FamilyDoctorTeams/);
   assert.match(server, /seedPhase2FamilyDoctorServicePackages/);
@@ -2928,7 +2937,7 @@ test("phase 2 family doctor MVP exposes contract lifecycle citizen institution p
 });
 
 test("citizen service operations center exposes governance actions public feed and release evidence", () => {
-  const server = read("server.js");
+  const server = readServerRuntime();
   const platformHtml = read("platform.html");
   const platformJs = read("platform.js");
   const citizenHtml = read("citizen.html");
@@ -2957,7 +2966,7 @@ test("citizen service operations center exposes governance actions public feed a
 });
 
 test("commercial crypto adapter center exposes runtime probes evidence actions and a closed production gate", () => {
-  const server = read("server.js");
+  const server = readServerRuntime();
   const platformHtml = read("platform.html");
   const platformJs = read("platform.js");
   const readiness = read("scripts/commercial-crypto-readiness.js");
@@ -3027,11 +3036,11 @@ test("citizen portal exposes eight-stage lifecycle health management", () => {
   assert.match(citizenJs, /citizenLifecycleActions/);
   assert.match(citizenJs, /deathCertificates/);
   assert.match(citizenJs, /authorizations/);
-  assert.match(read("server.js"), /\/api\/citizen\/lifecycle-actions/);
-  assert.match(read("server.js"), /buildCitizenLifecycleActions/);
-  assert.match(read("server.js"), /buildCitizenLifecycleTaskRows/);
-  assert.match(read("server.js"), /buildLifecycleActionClosureMessage/);
-  assert.match(read("server.js"), /citizenLifecycleActions/);
+  assert.match(readServerRuntime(), /\/api\/citizen\/lifecycle-actions/);
+  assert.match(readServerRuntime(), /buildCitizenLifecycleActions/);
+  assert.match(readServerRuntime(), /buildCitizenLifecycleTaskRows/);
+  assert.match(readServerRuntime(), /buildLifecycleActionClosureMessage/);
+  assert.match(readServerRuntime(), /citizenLifecycleActions/);
   assert.match(citizenCss, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
   assert.match(citizenCss, /lifecycle-action-grid/);
   assert.match(citizenCss, /lifecycle-card small\.warn/);
@@ -3350,7 +3359,7 @@ test("citizen portal exposes P2 imaging and attachment archive categories", () =
 test("imaging cloud module exposes hospital ingest, mobile viewing and EMR compatibility", () => {
   const page = read("imaging-cloud.html");
   const pageJs = read("imaging-cloud.js");
-  const server = read("server.js");
+  const server = readServerRuntime();
   const auth = read("auth.js");
   const doc = read("docs/医学影像云功能说明.md");
   const pkg = JSON.parse(read("package.json"));
@@ -3490,9 +3499,9 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   assert.match(escortJs, /data-escort-hospital/);
   assert.match(escortJs, /hospital-handoff/);
   assert.match(escortJs, /updateEscortHospitalHandoff/);
-  assert.match(read("server.js"), /provider is not published/);
-  assert.match(read("server.js"), /department is required/);
-  assert.match(read("server.js"), /serviceItems is required/);
+  assert.match(readServerRuntime(), /provider is not published/);
+  assert.match(readServerRuntime(), /department is required/);
+  assert.match(readServerRuntime(), /serviceItems is required/);
 });
 
 test("citizen portal aggregates cross-service resident tasks", () => {
@@ -3547,11 +3556,11 @@ test("citizen portal aggregates cross-service resident tasks", () => {
   assert.match(citizenJs, /助医陪诊/);
   assert.match(citizenJs, /转诊号源/);
   assert.match(citizenJs, /citizenPageHref\(item\.page\)/);
-  assert.match(read("server.js"), /applyCitizenTaskAction/);
-  assert.match(read("server.js"), /buildCitizenTaskActionMessage/);
-  assert.match(read("server.js"), /SERVICE_ORDER_SOURCE_COLLECTIONS/);
-  assert.match(read("server.js"), /normalizeServiceOrders/);
-  assert.match(read("server.js"), /url\.pathname === "\/api\/service-orders"/);
+  assert.match(readServerRuntime(), /applyCitizenTaskAction/);
+  assert.match(readServerRuntime(), /buildCitizenTaskActionMessage/);
+  assert.match(readServerRuntime(), /SERVICE_ORDER_SOURCE_COLLECTIONS/);
+  assert.match(readServerRuntime(), /normalizeServiceOrders/);
+  assert.match(readServerRuntime(), /url\.pathname === "\/api\/service-orders"/);
   assert.match(citizenCss, /service-task-card/);
   assert.match(citizenCss, /service-order-center-panel/);
   assert.match(citizenCss, /service-order-metrics/);
@@ -3571,7 +3580,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   const citizenHtml = read("citizen.html");
   const citizenJs = read("citizen.js");
   const citizenCss = read("citizen.css");
-  const server = read("server.js");
+  const server = readServerRuntime();
   assert.match(loginHtml, /phone-login-form/);
   assert.match(loginHtml, /data-account-provisioning/);
   assert.match(loginHtml, /data-provisioning-step="resident"/);
@@ -4030,7 +4039,7 @@ test("internet nursing module exposes appointment, management and nurse workflow
   const highlightDoc = read("docs/internet-nursing-highlight-center.md");
   const css = read("portal.css");
   const mobilePreviewHtml = read("mobile-preview.html");
-  const server = read("server.js");
+  const server = readServerRuntime();
   assert.match(html, /nursing-appointment-form/);
   assert.match(html, /nursing-orders/);
   assert.match(html, /nursing-nurse-queue/);
@@ -4189,9 +4198,9 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(read("auth.js"), /护士工作站/);
   assert.match(read("auth.js"), /互联网护理/);
   assert.match(read("auth.js"), /displayAuthText/);
-  assert.match(read("server.js"), /username: "nurse"/);
-  assert.match(read("server.js"), /password: "123456"/);
-  assert.match(read("server.js"), /护士工作站/);
+  assert.match(readServerRuntime(), /username: "nurse"/);
+  assert.match(readServerRuntime(), /password: "123456"/);
+  assert.match(readServerRuntime(), /护士工作站/);
   assert.match(read("package.json"), /internet-nursing:readiness/);
   assert.match(read("scripts/internet-nursing-readiness.js"), /nursing:serviceRecordClosure/);
   assert.match(read("scripts/internet-nursing-readiness.js"), /nursing:productionIntegration/);
@@ -4242,7 +4251,7 @@ test("internet nursing module exposes appointment, management and nurse workflow
 });
 
 test("production operations run center exposes duty incidents recovery drills and release evidence", () => {
-  const server = read("server.js");
+  const server = readServerRuntime();
   const html = read("operations.html");
   const js = read("operations.js");
   const css = read("portal.css");
@@ -4276,7 +4285,7 @@ test("production operations run center exposes duty incidents recovery drills an
 
 test("production observability routes minimized alerts with receipts retry and explicit site boundaries", () => {
   const adapter = read("observability-alerting.js");
-  const server = read("server.js");
+  const server = readServerRuntime();
   const html = read("operations.html");
   const js = read("operations.js");
   const readiness = read("scripts/monitoring-readiness.js");
@@ -4307,7 +4316,7 @@ test("production observability routes minimized alerts with receipts retry and e
 });
 
 test("appointment registration journey closes resident institution insurance and refund actions", () => {
-  const server = read("server.js");
+  const server = readServerRuntime();
   const citizenHtml = read("citizen.html");
   const citizenJs = read("citizen.js");
   const institutionHtml = read("institution.html");
@@ -4366,7 +4375,7 @@ test("appointment registration journey closes resident institution insurance and
 });
 
 test("appointment callbacks land through signed gateway reconciliation", () => {
-  const server = read("server.js");
+  const server = readServerRuntime();
   const institutionHtml = read("institution.html");
   const institutionJs = read("institution.js");
   const readiness = read("scripts/registration-integration-readiness.js");
@@ -4438,7 +4447,7 @@ test("platform production audit separates runnable capabilities from formal cuto
 
 test("production identity and message adapters keep runtime and site boundaries explicit", () => {
   const adapters = read("production-adapters.js");
-  const server = read("server.js");
+  const server = readServerRuntime();
   const documentation = read("docs/production-identity-message-adapters.md");
   const environment = read(".env.example");
 
@@ -4503,7 +4512,7 @@ test("production identity and message adapters keep runtime and site boundaries 
 
 test("production hospital connectors reuse integration contracts and preserve site boundaries", () => {
   const connectors = read("hospital-connectors.js");
-  const server = read("server.js");
+  const server = readServerRuntime();
   const readiness = read("scripts/integration-readiness.js");
   const documentation = read("docs/production-hospital-connectors.md");
   const environment = read(".env.example");
@@ -4523,7 +4532,7 @@ test("production hospital connectors reuse integration contracts and preserve si
 
 test("secure object storage enforces integrity scan authorization and retention boundaries", () => {
   const adapter = read("secure-object-storage.js");
-  const server = read("server.js");
+  const server = readServerRuntime();
   const readiness = read("scripts/object-storage-readiness.js");
   const documentation = read("docs/production-object-storage.md");
   const environment = read(".env.example");
@@ -4549,7 +4558,7 @@ test("secure object storage enforces integrity scan authorization and retention 
 
 test("financial gateways enforce signed callbacks digest reconciliation and production boundaries", () => {
   const adapter = read("financial-gateways.js");
-  const server = read("server.js");
+  const server = readServerRuntime();
   const platformHtml = read("platform.html");
   const platformSource = read("platform.js");
   const readiness = read("scripts/financial-gateway-readiness.js");
@@ -4636,17 +4645,17 @@ test("PostgreSQL migration package keeps CI payload-free and full exports contro
   assert.match(read("postgres-runtime-sync.js"), /buildPostgresSyncBatch/);
   assert.match(read("postgres-runtime-sync.js"), /ON CONFLICT \(batch_id\) DO NOTHING/);
   assert.match(read("postgres-runtime-sync.js"), /source_version <= EXCLUDED\.source_version/);
-  assert.match(read("server.js"), /postgres_sync_outbox/);
-  assert.match(read("server.js"), /STORAGE_SCHEMA_VERSION = 11/);
-  assert.match(read("server.js"), /postgres_sync_reconciliations/);
-  assert.match(read("server.js"), /postgres_sync_reconciliation_cases/);
-  assert.match(read("server.js"), /postgres_sync_reconciliation_case_actions/);
-  assert.match(read("server.js"), /\/api\/production-database\/shadow-reconciliation/);
-  assert.match(read("server.js"), /\/api\/production-database\/shadow-reconciliations/);
-  assert.match(read("server.js"), /\/api\/production-database\/reconciliation-cases/);
-  assert.match(read("server.js"), /\/api\/metrics\/prometheus/);
-  assert.match(read("server.js"), /buildPostgresSyncSlo/);
-  assert.match(read("server.js"), /health_platform_postgres_sync_slo_breaches/);
+  assert.match(readServerRuntime(), /postgres_sync_outbox/);
+  assert.match(readServerRuntime(), /STORAGE_SCHEMA_VERSION = 11/);
+  assert.match(readServerRuntime(), /postgres_sync_reconciliations/);
+  assert.match(readServerRuntime(), /postgres_sync_reconciliation_cases/);
+  assert.match(readServerRuntime(), /postgres_sync_reconciliation_case_actions/);
+  assert.match(readServerRuntime(), /\/api\/production-database\/shadow-reconciliation/);
+  assert.match(readServerRuntime(), /\/api\/production-database\/shadow-reconciliations/);
+  assert.match(readServerRuntime(), /\/api\/production-database\/reconciliation-cases/);
+  assert.match(readServerRuntime(), /\/api\/metrics\/prometheus/);
+  assert.match(readServerRuntime(), /buildPostgresSyncSlo/);
+  assert.match(readServerRuntime(), /health_platform_postgres_sync_slo_breaches/);
   assert.match(read(".env.example"), /POSTGRES_SYNC_BACKLOG_SLO_MAX=20/);
   assert.match(read(".env.example"), /POSTGRES_RECONCILIATION_AGE_SLO_SECONDS=600/);
   assert.match(read("postgres-runtime-sync.js"), /applyPostgresReconciliationCaseAction/);
@@ -4687,7 +4696,7 @@ test("citizen launch review exposes ten audited service pipelines without affect
 });
 
 test("platform capability map exposes API page card and export wiring", () => {
-  const server = read("server.js");
+  const server = readServerRuntime();
   const html = read("platform.html");
   const js = read("platform.js");
   const builder = read("platform-capability-map.js");
@@ -4710,7 +4719,7 @@ test("platform capability map exposes API page card and export wiring", () => {
 });
 
 test("platform go-live slices expose APIs page card and release wiring", () => {
-  const server = read("server.js");
+  const server = readServerRuntime();
   const html = read("platform.html");
   const js = read("platform.js");
   const builder = read("platform-go-live-slices.js");
@@ -4745,7 +4754,7 @@ test("platform go-live slices expose APIs page card and release wiring", () => {
 });
 
 test("six platform standards ledgers expose API page export and release gates", () => {
-  const server = read("server.js");
+  const server = readServerRuntime();
   const html = read("platform.html");
   const js = read("platform.js");
   const builder = read("platform-standards-ledgers.js");
@@ -4803,7 +4812,7 @@ test("digital hospital P0-P1 pilot evaluation workbench is wired", () => {
   const html = read("digital-hospital-evaluation.html");
   const ui = read("digital-hospital-evaluation-ui.js");
   const model = read("digital-hospital-evaluation.js");
-  const server = read("server.js");
+  const server = readServerRuntime();
   const readiness = read("scripts/digital-hospital-pilot-readiness.js");
   ["pilot-operations", "catalog", "collection", "evidence", "preassessment", "rectification", "boundary"].forEach((section) => {
     assert.match(html, new RegExp(`data-digital-evaluation-section="${section}"`));
@@ -4831,7 +4840,7 @@ test("digital hospital P0-P1 pilot evaluation workbench is wired", () => {
 });
 
 test("priority application pilot acceptance control center is release wired", () => {
-  const server = read("server.js");
+  const server = readServerRuntime();
   const html = read("platform.html");
   const ui = read("pilot-acceptance-ui.js");
   const model = read("pilot-acceptance.js");

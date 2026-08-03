@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -282,7 +283,7 @@ function buildPlatformProductionAudit(options = {}) {
   };
   const runtimeSources = options.runtimeSources || {
     domain: read("platform-capability-operations.js"),
-    server: read("server.js"),
+    server: readRuntimeSource(ROOT),
     html: read("platform.html"),
     client: read("platform.js"),
     documentation: read("docs/platform-capability-operations-center.md"),

@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 "use strict";
 
+const { readRuntimeSource } = require("../src/http/runtime-source");
+
 const fs = require("node:fs");
 const path = require("node:path");
 const Runtime = require("../care-service-runtime");
@@ -373,7 +375,7 @@ function buildCareServiceProductionReadiness(options = {}) {
     stateRepository: readText("care-service-state-repository.js"),
     deliveryAdapters: readText("care-service-delivery-adapters.js"),
     productionRuntime: readText("care-service-production-runtime.js"),
-    server: readText("server.js"),
+    server: readRuntimeSource(ROOT),
     worker: readText("scripts/care-service-outbox-worker.js"),
     workerService: readText("deploy/care-service-outbox-worker.service.template"),
     workerTimer: readText("deploy/care-service-outbox-worker.timer.template"),

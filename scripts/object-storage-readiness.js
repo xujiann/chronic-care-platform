@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -18,7 +19,7 @@ function buildObjectStorageReadiness(options = {}) {
   const data = options.data || readJson("data/db.json");
   const pkg = options.pkg || readJson("package.json");
   const adapterSource = options.adapterSource ?? read("secure-object-storage.js");
-  const serverSource = options.serverSource ?? read("server.js");
+  const serverSource = options.serverSource ?? readRuntimeSource(ROOT);
   const documentation = options.documentation ?? read("docs/production-object-storage.md");
   const environment = options.environment ?? read(".env.example");
   const releaseSource = options.releaseSource ?? read("scripts/release-report.js");

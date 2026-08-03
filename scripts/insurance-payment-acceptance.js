@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 "use strict";
 
+const { readRuntimeSource } = require("../src/http/runtime-source");
+
 const fs = require("node:fs");
 const path = require("node:path");
 const { buildDiseasePaymentReadiness } = require("./disease-payment-readiness");
@@ -111,7 +113,7 @@ function buildPersistenceAcceptance(env = process.env) {
 function buildInsurancePaymentAcceptance(options = {}) {
   const diseasePayment = options.diseasePayment || buildDiseasePaymentReadiness();
   const financialGateway = options.financialGateway || buildFinancialGatewayReadiness();
-  const serverSource = options.serverSource ?? fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
+  const serverSource = options.serverSource ?? readRuntimeSource(ROOT);
   const operatingModel = OperatingModel.validateOperatingModel();
   const persistence = options.persistence || buildPersistenceAcceptance();
   const integrationHandoff = OperatingModel.buildT00IntegrationHandoff(serverSource);

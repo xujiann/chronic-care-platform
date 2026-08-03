@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 const EmergencyService = require("../emergency-service");
@@ -10,7 +11,7 @@ function read(file) { return fs.readFileSync(path.join(ROOT, file), "utf8"); }
 function check(id, passed, detail, category = "emergency") { return { id, category, passed: Boolean(passed), detail }; }
 
 function buildEmergencyReadinessReport(options = {}) {
-  const sources = options.sources || { html:read("emergency.html"), js:read("emergency.js"), lifeUi:read("emergency-lifechain-ui.js"), service:read("emergency-service.js"), lifeService:read("emergency-lifechain.js"), production:read("emergency-production.js"), deviceGateway:read("emergency-device-gateway.js"), deviceGatewayTest:read("test/emergency-device-gateway.test.js"), server:read("server.js"), apiTest:read("test/emergency-api.test.js"), lifeTest:read("test/emergency-lifechain.test.js"), docs:`${read("docs/院前急救协同信息系统立项与标准基线-2026-07-15.md")}\n${read("docs/院前急救生产前上线控制说明.md")}\n${read("docs/emergency-sos-aed.md")}\n${read("docs/emergency-life-chain.md")}\n${read("docs/emergency-life-chain-release-review.md")}`, diagrams:read("docs/院前急救系统拓扑与流程图集.md"), package:read("package.json") };
+  const sources = options.sources || { html:read("emergency.html"), js:read("emergency.js"), lifeUi:read("emergency-lifechain-ui.js"), service:read("emergency-service.js"), lifeService:read("emergency-lifechain.js"), production:read("emergency-production.js"), deviceGateway:read("emergency-device-gateway.js"), deviceGatewayTest:read("test/emergency-device-gateway.test.js"), server:readRuntimeSource(ROOT), apiTest:read("test/emergency-api.test.js"), lifeTest:read("test/emergency-lifechain.test.js"), docs:`${read("docs/院前急救协同信息系统立项与标准基线-2026-07-15.md")}\n${read("docs/院前急救生产前上线控制说明.md")}\n${read("docs/emergency-sos-aed.md")}\n${read("docs/emergency-life-chain.md")}\n${read("docs/emergency-life-chain-release-review.md")}`, diagrams:read("docs/院前急救系统拓扑与流程图集.md"), package:read("package.json") };
   const state = EmergencyService.seed();
   const dashboard = EmergencyService.buildDashboard(state, { role:"commission", name:"readiness" });
   const evidencePackage = EmergencyService.buildEvidencePackage(state, { role:"commission", name:"readiness" }, state.emergencyEvents[0].id);

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -34,7 +35,7 @@ function check(id, passed, detail, category = "hybrid-deployment") {
 function buildHybridDeploymentReadinessReport(options = {}) {
   const pkg = options.pkg ?? readJson("package.json");
   const data = options.data ?? readJson("data/db.json");
-  const serverSource = options.serverSource ?? readText("server.js");
+  const serverSource = options.serverSource ?? readRuntimeSource(ROOT);
   const sharedSource = options.sharedSource ?? readText("shared.js");
   const authSource = options.authSource ?? readText("auth.js");
   const readme = options.readme ?? readText("README.md");

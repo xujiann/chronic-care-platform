@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 const { HIGHLIGHT_FEATURE_IDS, buildInternetNursingInnovationCenter } = require("../internet-nursing-highlights");
@@ -475,7 +476,7 @@ function hasCutoverPackEvidence(cutoverPack, moduleDoc, launchPlan) {
 function buildInternetNursingReadinessReport(options = {}) {
   const data = options.data ?? readJson("data/db.json");
   const pkg = options.pkg ?? readJson("package.json");
-  const server = options.server ?? readText("server.js");
+  const server = options.server ?? readRuntimeSource(ROOT);
   const auth = options.auth ?? readText("auth.js");
   const login = options.login ?? readText("login.html");
   const frontend = options.frontend ?? readText("internet-nursing.html") + readText("internet-nursing.js");

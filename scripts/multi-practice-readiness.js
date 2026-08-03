@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -29,7 +30,7 @@ function hasAll(source, needles) {
 function buildMultiPracticeReadinessReport(options = {}) {
   const data = options.data ?? readJson("data/db.json");
   const pkg = options.pkg ?? readJson("package.json");
-  const server = options.server ?? readText("server.js");
+  const server = options.server ?? readRuntimeSource(ROOT);
   const institution = options.institution ?? `${readText("institution.html")}\n${readText("institution.js")}`;
   const doctorPortal = options.doctorPortal ?? `${readText("doctor.html")}\n${readText("doctor.js")}`;
   const commission = options.commission ?? `${readText("index.html")}\n${readText("app.js")}`;

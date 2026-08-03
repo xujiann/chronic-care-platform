@@ -10,6 +10,8 @@ const DEFAULT_MARKDOWN = path.join(ROOT, "release", "production-deployment-packa
 const ALLOWED_RUNTIME_EXTENSIONS = new Set([".js", ".html", ".css", ".svg", ".webmanifest"]);
 const REQUIRED_RUNTIME_FILES = [
   "server.js",
+  "src/http/api-router.js",
+  "src/http/routes/index.js",
   "session-store.js",
   "package.json",
   "package-lock.json",
@@ -19,6 +21,7 @@ const REQUIRED_RUNTIME_FILES = [
   "scripts/postgres-shadow-reconcile.js"
 ];
 const ADDITIONAL_RUNTIME_FILES = ["scripts/postgres-sync-worker.js", "scripts/postgres-shadow-reconcile.js"];
+const RUNTIME_DIRECTORIES = ["src/http"];
 const EXCLUDED_RUNTIME_FILES = new Set(["playwright.config.js"]);
 
 const SECRET_CONTRACT = [
@@ -50,6 +53,17 @@ function normalizePath(value) {
   return String(value || "").replaceAll("\\", "/");
 }
 
+function collectRuntimeDirectoryFiles(root, relativeDirectory) {
+  const absoluteDirectory = path.join(root, relativeDirectory);
+  if (!fs.existsSync(absoluteDirectory)) return [];
+  return fs.readdirSync(absoluteDirectory, { withFileTypes: true }).flatMap((entry) => {
+    const relativePath = path.join(relativeDirectory, entry.name);
+    if (entry.isDirectory()) return collectRuntimeDirectoryFiles(root, relativePath);
+    if (!entry.isFile() || !ALLOWED_RUNTIME_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) return [];
+    return [normalizePath(relativePath)];
+  });
+}
+
 function collectRuntimeFiles(root = ROOT) {
   const rootFiles = fs.readdirSync(root, { withFileTypes: true })
     .filter((entry) => entry.isFile())
@@ -59,7 +73,8 @@ function collectRuntimeFiles(root = ROOT) {
       if (["package.json", "package-lock.json"].includes(name)) return true;
       return ALLOWED_RUNTIME_EXTENSIONS.has(path.extname(name).toLowerCase());
     })
-  return [...rootFiles, ...ADDITIONAL_RUNTIME_FILES.filter((name) => fs.existsSync(path.join(root, name)))].sort();
+  const directoryFiles = RUNTIME_DIRECTORIES.flatMap((directory) => collectRuntimeDirectoryFiles(root, directory));
+  return [...rootFiles, ...directoryFiles, ...ADDITIONAL_RUNTIME_FILES.filter((name) => fs.existsSync(path.join(root, name)))].sort();
 }
 
 function fileEvidence(root, relativePath) {

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -69,7 +70,7 @@ function mergeRows(defaultRows, currentRows, key = "id") {
 function buildPhase2ClinicalAssistReadiness(options = {}) {
   const data = options.data ?? readJson("data/db.json");
   const pkg = options.pkg ?? readJson("package.json");
-  const serverSource = options.serverSource ?? readText("server.js");
+  const serverSource = options.serverSource ?? readRuntimeSource(ROOT);
   const platformSource = options.platformSource ?? readText("platform.js");
   const platformHtml = options.platformHtml ?? readText("platform.html");
   const doctorSource = options.doctorSource ?? readText("doctor.js");

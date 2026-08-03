@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 const ImagingCloudProduction = require("../imaging-cloud-production");
@@ -34,7 +35,7 @@ function buildImagingCloudReadinessReport(options = {}) {
   const sources = options.sources || {
     html: read("imaging-cloud.html"),
     pageJs: read("imaging-cloud.js"),
-    server: read("server.js"),
+    server: readRuntimeSource(ROOT),
     auth: read("auth.js"),
     serviceWorker: read("service-worker.js"),
     docs: read(IMAGE_CLOUD_DOC),

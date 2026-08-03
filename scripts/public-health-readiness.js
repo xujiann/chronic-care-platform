@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const fs = require("node:fs");
 const path = require("node:path");
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const { buildPublicHealthHighlights } = require("../public-health-highlights-service");
 const {
   DEFAULT_INFECTIOUS_EVENT_LINK,
@@ -2576,7 +2577,7 @@ function check(id, passed, detail, category = "public-health") {
 
 function defaultSources() {
   return {
-    server: readIfExists("server.js"),
+    server: readRuntimeSource(ROOT),
     html: readIfExists("public-health.html"),
     js: readIfExists("public-health.js"),
     packageSource: readIfExists("package.json"),

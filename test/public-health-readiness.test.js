@@ -1,3 +1,4 @@
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -255,7 +256,7 @@ test("public health readiness exposes institution scopes, event loop, and exchan
 });
 
 test("public health page, API, docs and release manifest are wired", () => {
-  const server = fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
+  const server = readRuntimeSource(ROOT);
   const html = fs.readFileSync(path.join(ROOT, "public-health.html"), "utf8");
   const js = fs.readFileSync(path.join(ROOT, "public-health.js"), "utf8");
   const auth = fs.readFileSync(path.join(ROOT, "auth.js"), "utf8");

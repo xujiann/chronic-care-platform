@@ -1,5 +1,7 @@
 "use strict";
 
+const { readRuntimeSource } = require("./src/http/runtime-source");
+
 const fs = require("node:fs");
 const path = require("node:path");
 const { alertRoutingCenter, ROUTE_DEFINITIONS } = require("./observability-alerting");
@@ -356,7 +358,7 @@ function buildPilotAcceptanceCenter(options = {}) {
   const data = options.data || JSON.parse(fs.readFileSync(path.join(root, "data", "db.json"), "utf8"));
   const pkg = options.pkg || JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
   const env = options.env || process.env;
-  const serverSource = options.serverSource || fs.readFileSync(path.join(root, "server.js"), "utf8");
+  const serverSource = options.serverSource || readRuntimeSource(root);
   const manifestSource = options.manifestSource || fs.readFileSync(path.join(root, "scripts", "release-artifact-manifest.js"), "utf8");
   const applications = buildApplicationRegression(data, pkg, root, serverSource, manifestSource);
   const alerting = buildAlertingPreflight(env, data);

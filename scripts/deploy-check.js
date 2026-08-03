@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
@@ -120,7 +121,7 @@ function buildDeployCheckReport(options = {}) {
   const traceabilityPolicySources = Array.isArray(data.drugTraceabilityPolicySources) ? data.drugTraceabilityPolicySources : [];
   const traceabilityEvidenceRequirements = Array.isArray(data.drugTraceabilityEvidenceRequirements) ? data.drugTraceabilityEvidenceRequirements : [];
   const drugConsumableSupervisions = Array.isArray(data.drugConsumableSupervisions) ? data.drugConsumableSupervisions : [];
-  const serverSource = fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
+  const serverSource = readRuntimeSource(ROOT);
   const t10SpecialtyModuleGovernanceSource = fs.readFileSync(path.join(ROOT, "t10-specialty-module-governance.js"), "utf8");
   const bloodClinicalProductionSource = fs.readFileSync(path.join(ROOT, "blood-clinical-production.js"), "utf8");
   const emergencyModuleGateSource = fs.readFileSync(path.join(ROOT, "emergency-module-gate.js"), "utf8");

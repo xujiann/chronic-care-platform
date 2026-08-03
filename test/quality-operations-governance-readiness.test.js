@@ -1,3 +1,4 @@
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -11,7 +12,7 @@ const {
 const ROOT = path.resolve(__dirname, "..");
 const data = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "db.json"), "utf8"));
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
-const serverSource = fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
+const serverSource = readRuntimeSource(ROOT);
 
 test("governance readiness requires three mapped collections routes and production blockers", () => {
   const report = buildQualityOperationsGovernanceReadiness({

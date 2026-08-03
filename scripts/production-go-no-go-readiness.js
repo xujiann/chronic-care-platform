@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 "use strict";
 
+const { readRuntimeSource } = require("../src/http/runtime-source");
+
 const fs = require("node:fs");
 const path = require("node:path");
 const { buildProductionGoNoGoCenter, seedProductionGoNoGoApprovals } = require("../production-go-no-go");
@@ -17,7 +19,7 @@ function check(id, passed, detail) { return { id, passed: Boolean(passed), detai
 function buildProductionGoNoGoReadiness(options = {}) {
   const data = options.data || readJson("data/db.json");
   const pkg = options.pkg || readJson("package.json");
-  const server = options.server || readText("server.js");
+  const server = options.server || readRuntimeSource(ROOT);
   const html = options.html || readText("platform.html");
   const ui = options.ui || readText("production-go-no-go-ui.js");
   const model = options.model || readText("production-go-no-go.js");

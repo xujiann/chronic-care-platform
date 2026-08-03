@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -32,7 +33,7 @@ function assessCitizenRecordsReadiness(options = {}) {
   const nextStageUnit = file("test/citizen-records-v3.test.js");
   const policyTest = file("test/citizen-records-policy.test.js");
   const e2e = file("test/e2e/citizen-records-v1.spec.js");
-  const server = file("server.js");
+  const server = readRuntimeSource(ROOT);
   const serviceWorker = file("service-worker.js");
 
   const softwareChecks = [

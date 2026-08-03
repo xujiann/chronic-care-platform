@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 const {
@@ -29,7 +30,7 @@ function buildDigitalHospitalPilotReadiness(options = {}) {
   const model = options.model || read("digital-hospital-evaluation.js");
   const html = options.html || read("digital-hospital-evaluation.html");
   const ui = options.ui || read("digital-hospital-evaluation-ui.js");
-  const server = options.server || read("server.js");
+  const server = options.server || readRuntimeSource(ROOT);
   const auth = options.auth || read("auth.js");
   const doc = options.doc || read("docs/数智医院评价试点上线说明-2026.md");
   const pkg = options.pkg || readJson("package.json");

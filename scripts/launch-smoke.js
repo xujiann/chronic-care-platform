@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -61,7 +62,7 @@ function parseArgs(argv = process.argv.slice(2)) {
 
 function buildOfflineChecks(options = {}) {
   const pkg = readJson("package.json");
-  const serverSource = fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
+  const serverSource = readRuntimeSource(ROOT);
   const manifestSource = fs.readFileSync(path.join(ROOT, "scripts", "release-artifact-manifest.js"), "utf8");
   const citizenHtml = fs.readFileSync(path.join(ROOT, "citizen.html"), "utf8");
   const citizenJs = fs.readFileSync(path.join(ROOT, "citizen.js"), "utf8");

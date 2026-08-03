@@ -1,3 +1,4 @@
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -29,7 +30,7 @@ test("hybrid deployment readiness validates static and dynamic deployment bounda
 });
 
 test("hybrid deployment readiness fails when a required backend route is absent", () => {
-  const serverSource = fs.readFileSync(path.join(ROOT, "server.js"), "utf8").replaceAll("/api/health", "/api/health-missing");
+  const serverSource = readRuntimeSource(ROOT).replaceAll("/api/health", "/api/health-missing");
   const report = buildHybridDeploymentReadinessReport({ serverSource });
   assert.equal(report.ok, false);
   assert.equal(report.checks.some((item) => item.id === "hybrid:dynamicBackendRoutes" && !item.passed), true);

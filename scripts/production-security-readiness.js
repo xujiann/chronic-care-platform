@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 "use strict";
 
+const { readRuntimeSource } = require("../src/http/runtime-source");
+
 const fs = require("node:fs");
 const path = require("node:path");
 const {
@@ -31,7 +33,7 @@ function buildProductionSecurityReadiness(options = {}) {
   const findings = Array.isArray(data.productionSecurityFindings) ? data.productionSecurityFindings : seedProductionSecurityFindings();
   const approvals = Array.isArray(data.productionSecurityReleaseApprovals) ? data.productionSecurityReleaseApprovals : seedProductionSecurityReleaseApprovals();
   const center = buildProductionSecurityAcceptanceCenter(findings, approvals, { now: options.now });
-  const server = options.server || readText("server.js");
+  const server = options.server || readRuntimeSource(ROOT);
   const html = options.html || readText("platform.html");
   const ui = options.ui || readText("production-security.js");
   const tests = options.tests || readText("test/production-security-acceptance.test.js");

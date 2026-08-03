@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 const {
@@ -33,7 +34,7 @@ function check(id, passed, detail, evidence) {
 
 function buildPublicHealthHighlightsReadiness({ data = readJson("data/db.json"), pkg = readJson("package.json") } = {}) {
   const board = buildPublicHealthHighlights({ data });
-  const server = readText("server.js");
+  const server = readRuntimeSource(ROOT);
   const html = readText("public-health-highlights.html");
   const frontend = readText("public-health-highlights.js");
   const doc = readText("docs/公共卫生五件套功能说明与验收.md");

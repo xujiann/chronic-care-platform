@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { readRuntimeSource } = require("../src/http/runtime-source");
 const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
@@ -386,7 +387,7 @@ function snapshotChecks(data) {
   const traceabilityPolicySources = Array.isArray(data.drugTraceabilityPolicySources) ? data.drugTraceabilityPolicySources : [];
   const traceabilityEvidenceRequirements = Array.isArray(data.drugTraceabilityEvidenceRequirements) ? data.drugTraceabilityEvidenceRequirements : [];
   const p0Interfaces = (Array.isArray(data.platformInterfaces) ? data.platformInterfaces : []).filter((item) => item.priority === "P0");
-  const serverSource = fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
+  const serverSource = readRuntimeSource(ROOT);
   const externalDependencyRiskIds = [
     "identity-source",
     "institution-systems",
@@ -1550,7 +1551,7 @@ function buildReleaseReport(options = {}) {
     ...productionSecurityChecks(productionSecurity),
     ...productionGoNoGoChecks(productionGoNoGo),
     check("productionReleaseEvidence:contract", productionReleaseEvidenceReadiness.summary?.documents === 5 && productionReleaseEvidenceReadiness.gates?.length === 5 && productionReleaseEvidenceReadiness.checks?.length >= 5, `${productionReleaseEvidenceReadiness.summary?.present || 0}/5 controlled evidence documents present`, "error", "production-release-evidence"),
-    check("productionReleaseEvidence:publicSummary", fs.readFileSync(path.join(ROOT, "server.js"), "utf8").includes("/api/production-release/evidence-readiness") && fs.readFileSync(path.join(ROOT, "server.js"), "utf8").includes("buildProductionReleaseEvidencePublicSummary"), "commission-only redacted readiness summary is wired", "error", "production-release-evidence"),
+    check("productionReleaseEvidence:publicSummary", readRuntimeSource(ROOT).includes("/api/production-release/evidence-readiness") && readRuntimeSource(ROOT).includes("buildProductionReleaseEvidencePublicSummary"), "commission-only redacted readiness summary is wired", "error", "production-release-evidence"),
     check("productionReleaseEvidence:formalGate", productionReleaseEvidenceReadiness.ok === true, `${productionReleaseEvidenceReadiness.status}; external evidence validation does not itself authorize production`, "warn", "production-release-evidence"),
     ...pilotAcceptanceChecks(pilotAcceptance),
     ...phase2ProposalChecks(phase2Proposal),
