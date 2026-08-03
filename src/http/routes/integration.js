@@ -406,6 +406,82 @@ function createRouteSegments(runtime) {
       id: "integration-02",
       domain: "integration",
       async handle(req, res, url) {
+    if (req.method === "GET" && url.pathname === "/api/integration/clinical-results/deliveries") {
+        const user = requireApiRole(req, res, ["commission"], "/api/integration/clinical-results/deliveries");
+        if (!user) return true;
+        try {
+          sendJson(res, 200, clinicalResultExchange.listClinicalResultDeliveries(readDatabase(), {
+            status: url.searchParams.get("status"),
+            limit: url.searchParams.get("limit")
+          }));
+        } catch (error) {
+          if (!(error instanceof clinicalResultExchange.ClinicalResultExchangeError)) throw error;
+          sendJson(res, error.statusCode, {
+            error: error.statusCode === 404 ? "Not Found" : "Conflict",
+            code: error.code,
+            message: error.message
+          });
+        }
+        return true;
+      }
+
+      const clinicalResultReplayMatch = url.pathname.match(
+        /^\/api\/integration\/clinical-results\/deliveries\/([^/]+)\/replay$/
+      );
+      if (req.method === "POST" && clinicalResultReplayMatch) {
+        const user = requireApiRole(
+          req,
+          res,
+          ["commission"],
+          "/api/integration/clinical-results/deliveries/:eventId/replay"
+        );
+        if (!user) return true;
+        const payload = await collectJson(req);
+        const eventId = decodeURIComponent(clinicalResultReplayMatch[1]);
+        try {
+          const replay = await clinicalResultExchange.transactClinicalResultDelivery({
+            readDatabase,
+            writeDatabase,
+            event: "integration.clinical-result-delivery-replay.v1"
+          }, (data) => {
+            const result = clinicalResultExchange.replayClinicalResultDelivery(
+              data,
+              eventId,
+              payload,
+              user
+            );
+            if (!result.duplicate) {
+              data.securityEvents = prependAuditTrailEntry(data.securityEvents, {
+                id: randomUUID(),
+                at: new Date().toLocaleString("zh-CN", { hour12: false }),
+                actor: user.name || user.username || user.role,
+                role: user.role,
+                action: "重放临床结果死信交付",
+                target: eventId,
+                result: "允许",
+                detail: `${payload.idempotencyKey} · generation=${result.generation} · productionReady=false`
+              });
+            }
+            return result;
+          });
+          sendJson(res, 200, {
+            ...replay,
+            eventId,
+            productionReady: false
+          });
+        } catch (error) {
+          if (!(error instanceof clinicalResultExchange.ClinicalResultExchangeError)) throw error;
+          sendJson(res, error.statusCode, {
+            error: error.statusCode === 403 ? "Forbidden"
+              : error.statusCode === 404 ? "Not Found"
+                : "Conflict",
+            code: error.code,
+            message: error.message
+          });
+        }
+        return true;
+      }
+
     if (req.method === "GET" && url.pathname === "/api/integration/samples") {
         const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/integration/samples");
         if (!user) return true;
