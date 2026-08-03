@@ -47,7 +47,7 @@
     },
     {
       "lineId": "T08",
-      "candidateHead": "affb8b4f34ea43883f11971247c4e84db3516d7",
+      "candidateHead": "affb8b4f34ea43883f11971247c4e84db3516d7b",
       "decision": "accepted",
       "acceptedCandidateHeads": [
         "771c727b8abe7c722248d40656d6b91dfb67f3cf",
@@ -57,7 +57,7 @@
         "4527485a6f8990abd3cc29c1203dbcb5134c21b3",
         "44df575d554bae6c892e664dd959f2ede95326be",
         "7b59ec1fa227aef6e513e6977b3f160e03fd30d5",
-        "affb8b4f34ea43883f11971247c4e84db3516d7"
+        "affb8b4f34ea43883f11971247c4e84db3516d7b"
       ],
       "reviewedAt": "2026-07-28T14:23:37.975Z",
       "reviewer": "T00",
