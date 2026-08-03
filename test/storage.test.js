@@ -34,7 +34,7 @@ test("SQLite migrations are idempotent and collection versions change only on wr
 
     withDatabase(storage, (db) => {
       const migrations = db.prepare("SELECT version, name, checksum FROM schema_migrations ORDER BY version").all();
-      assert.deepEqual(migrations.map((item) => Number(item.version)), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+      assert.deepEqual(migrations.map((item) => Number(item.version)), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
       assert.ok(migrations.every((item) => item.name && /^[a-f0-9]{64}$/.test(item.checksum)));
 
       const columns = db.prepare("PRAGMA table_info(state_collections)").all().map((item) => item.name);

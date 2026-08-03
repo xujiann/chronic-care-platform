@@ -1,12 +1,17 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 
 const { buildCapabilityMap, renderCapabilityMapMarkdown } = require("../platform-capability-map");
 const { buildPlatformCapabilityMapReport, parseArgs, writeOutput } = require("../scripts/platform-capability-map");
 
-test("platform capability map summarizes release artifacts scripts and data collections", () => {
+test("platform capability map summarizes release artifacts scripts and data collections", (t) => {
+  const evidenceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "platform-capability-map-"));
+  t.after(() => fs.rmSync(evidenceRoot, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(evidenceRoot, "release"), { recursive: true });
+  fs.writeFileSync(path.join(evidenceRoot, "release", "release-report.json"), JSON.stringify({ ok: true }));
   const manifest = {
     ok: true,
     summary: { artifacts: 3, templateReadmes: 1 },
@@ -35,7 +40,7 @@ test("platform capability map summarizes release artifacts scripts and data coll
     platformProductionBlockerReviews: [{ id: "ppbr-1", blockerId: "P0-01", workflowStatus: "open", owner: "platform-ops", productionReady: false }],
     publicHealthCutoverBlockers: [{ id: "phcb-1", severity: "P0", name: "Direct report endpoint", status: "open", owner: "cdc", resolutionAction: "Upload receipt sample." }]
   };
-  const report = buildCapabilityMap({ manifest, pkg, data });
+  const report = buildCapabilityMap({ manifest, pkg, data, root: evidenceRoot });
   assert.equal(report.ok, true);
   assert.equal(report.summary.releaseArtifacts, 3);
   assert.equal(report.summary.packageScripts, 5);

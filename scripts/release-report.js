@@ -1580,7 +1580,17 @@ function buildReleaseReport(options = {}) {
     check("specialtyCutover:clinicalBloodIndependentGate", t10ClinicalBloodReadiness.standalone === true && t10ClinicalBloodReadiness.productionReady === false && (t10ClinicalBloodReadiness.blockers?.length || 0) === 6, `${t10ClinicalBloodReadiness.blockers?.length || 0} clinical-blood site evidence blockers; platform gate closed`, "error", "cutover"),
     check("specialtyCutover:emergencyIndependentGate", t10EmergencyModuleReadiness.deployment === "independent-emergency-module" && t10EmergencyModuleReadiness.productionReady === false && t10EmergencyModuleReadiness.rollback?.formalGoLiveState, `${t10EmergencyModuleReadiness.rollback?.triggers?.length || 0} emergency rollback triggers; platform gate closed`, "error", "cutover"),
     check("specialtyCutover:imagingSiteReceiptGate", t10ImagingProductionReadiness.summary?.siteReceipts === 5 && t10ImagingProductionReadiness.routeContracts?.length === 9 && t10ImagingProductionReadiness.productionReady === false, `${t10ImagingProductionReadiness.summary?.siteReceiptsVerified || 0}/5 imaging receipts verified; platform gate closed`, "error", "cutover"),
-    check("specialtyCutover:physicalExaminationIndependentGate", t10PhysicalExaminationReadiness.codeReady === true && t10PhysicalExaminationReadiness.decision === "NO-GO" && t10PhysicalExaminationReadiness.summary?.checks === 13 && t10PhysicalExaminationReadiness.productionReady === false, `${t10PhysicalExaminationReadiness.summary?.passed || 0}/13 physical-examination checks; platform gate closed`, "error", "cutover"),
+    check(
+      "specialtyCutover:physicalExaminationIndependentGate",
+      t10PhysicalExaminationReadiness.codeReady === true
+        && t10PhysicalExaminationReadiness.decision === "NO-GO"
+        && (t10PhysicalExaminationReadiness.summary?.checks || 0) >= 13
+        && t10PhysicalExaminationReadiness.summary?.passed === t10PhysicalExaminationReadiness.summary?.checks
+        && t10PhysicalExaminationReadiness.productionReady === false,
+      `${t10PhysicalExaminationReadiness.summary?.passed || 0}/${t10PhysicalExaminationReadiness.summary?.checks || 0} physical-examination checks; platform gate closed`,
+      "error",
+      "cutover"
+    ),
     ...citizenLaunchFoundationChecks(citizenLaunchFoundation),
     ...citizenRecordsChecks(citizenRecords),
     ...registrationReferralAcceptanceChecks(registrationReferralAcceptance),
