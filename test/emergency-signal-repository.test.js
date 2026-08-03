@@ -83,6 +83,9 @@ test("emergency signal update commits owned aggregate and versioned event in one
   assert.equal(state[OUTBOX_COLLECTION][0].id, result.event.id);
   assert.equal(state[OUTBOX_COLLECTION][0].outboxStatus, "pending");
   assert.equal(state[OUTBOX_COLLECTION][0].owner, DOMAIN);
+  assert.equal(state[OUTBOX_COLLECTION][0].delivery.schema, "emergency-signal-delivery.v1");
+  assert.equal(state[OUTBOX_COLLECTION][0].delivery.status, "pending");
+  assert.equal(state[OUTBOX_COLLECTION][0].delivery.productionReady, false);
   assert.equal(state[INBOX_COLLECTION].length, 1);
   assert.equal(state[INBOX_COLLECTION][0].commandId, "command-emergency-001");
   assert.equal(state[INBOX_COLLECTION][0].eventId, result.event.id);
@@ -100,6 +103,34 @@ test("emergency signal update commits owned aggregate and versioned event in one
       unitOfWork: true
     }
   });
+});
+
+test("emergency signal outbox retains existing delivery evidence without a count-based eviction", async () => {
+  const existingEvents = Array.from({ length: 1005 }, (_, index) => ({
+    id: `existing-event-${index}`,
+    outboxStatus: "published"
+  }));
+  let state = {
+    ...runtimeState(),
+    emergencyAuditEvents: existingEvents
+  };
+
+  await updateEmergencySignal({
+    id: "signal-1",
+    payload: { expectedVersion: 7, status: "acknowledged" },
+    user: { username: "county-duty", name: "County Duty", role: "county" },
+    correlationId: "correlation-retention",
+    causationId: "command-retention",
+    readDatabase: () => structuredClone(state),
+    prependAuditTrailEntry: (rows, entry) => [entry, ...(rows || [])],
+    writeDatabase(data) {
+      state = structuredClone(data);
+    }
+  });
+
+  assert.equal(state[OUTBOX_COLLECTION].length, 1006);
+  assert.equal(state[OUTBOX_COLLECTION][0].delivery.status, "pending");
+  assert.equal(state[OUTBOX_COLLECTION].at(-1).id, "existing-event-1004");
 });
 
 test("emergency signal command replays once and rejects idempotency payload drift", async () => {
