@@ -153,6 +153,73 @@ test("configuration is TLS verify-full and external-evidence gated without claim
   assert.equal(Postgres.readinessProjection(blocked).blockers.includes("tls-verify-full-required"), true);
 });
 
+test("injected pools require explicit TLS verification evidence outside test bypass", async () => {
+  const unverifiedPool = fakePool(() => {
+    throw new Error("unverified pool must not be connected");
+  });
+  const unverified = Postgres.createPostgresSessionSecurityAuditRepository({
+    pool: unverifiedPool.pool,
+    env: readyConfigEnv()
+  });
+  await assert.rejects(
+    unverified.verifySchema(),
+    (error) => error.code === "SESSION_SECURITY_AUDIT_POOL_TLS_VERIFICATION_REQUIRED"
+      && error.statusCode === 503
+  );
+  assert.equal(unverifiedPool.queries.length, 0);
+
+  const verifiedPool = fakePool((sql) => {
+    if (sql.includes("to_regclass('health_platform.identity_security_audit_streams')")) {
+      return {
+        rowCount: 1,
+        rows: [{
+          streams: "health_platform.identity_security_audit_streams",
+          controls: "health_platform.identity_security_controls",
+          commands: "health_platform.identity_security_audit_commands",
+          events: "health_platform.identity_security_audit_events"
+        }]
+      };
+    }
+    throw new Error(`unexpected query: ${sql}`);
+  });
+  const verified = Postgres.createPostgresSessionSecurityAuditRepository({
+    pool: verifiedPool.pool,
+    poolTlsVerification: {
+      verified: true,
+      evidenceId: "tls-probe-evidence-001",
+      checkedAt: OCCURRED_AT
+    },
+    env: readyConfigEnv()
+  });
+  const report = await verified.verifySchema();
+  assert.equal(report.ok, true);
+  assert.equal(report.productionReady, false);
+  assert.equal(verifiedPool.queries[0].sql, "BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE");
+});
+
+test("custom poolConfig cannot weaken TLS certificate verification", async () => {
+  let constructed = false;
+  class PoolMustNotConstruct {
+    constructor() {
+      constructed = true;
+    }
+  }
+  const repositoryWithInsecureConfig = Postgres.createPostgresSessionSecurityAuditRepository({
+    env: readyConfigEnv(),
+    PoolClass: PoolMustNotConstruct,
+    poolConfig: {
+      connectionString: "postgresql://db.example/health",
+      ssl: { rejectUnauthorized: false }
+    }
+  });
+  await assert.rejects(
+    repositoryWithInsecureConfig.verifySchema(),
+    (error) => error.code === "SESSION_SECURITY_AUDIT_TLS_VERIFY_FULL_REQUIRED"
+      && error.statusCode === 503
+  );
+  assert.equal(constructed, false);
+});
+
 test("migration is additive and constrains stream CAS, digest receipts and event linkage", () => {
   const sql = fs.readFileSync(Postgres.MIGRATION_FILE, "utf8");
   assert.match(sql, /identity_security_audit_streams/);

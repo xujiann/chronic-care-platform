@@ -41,6 +41,28 @@ function safeEvidenceReference(value) {
   return reference.length >= 4 && !/[\r\n]/.test(reference) ? reference : "";
 }
 
+function normalizePoolTlsVerification(value = {}) {
+  const evidenceId = safeEvidenceReference(value.evidenceId);
+  const checkedAt = bounded(value.checkedAt, 80);
+  if (
+    value.verified !== true
+    || !evidenceId
+    || !checkedAt
+    || !Number.isFinite(Date.parse(checkedAt))
+  ) {
+    throw new SessionSecurityAuditError(
+      "SESSION_SECURITY_AUDIT_POOL_TLS_VERIFICATION_REQUIRED",
+      "injected PostgreSQL pools require verified TLS evidence",
+      503
+    );
+  }
+  return Object.freeze({
+    verified: true,
+    evidenceId,
+    checkedAt: new Date(checkedAt).toISOString()
+  });
+}
+
 function safeIdentifier(value, label) {
   const identifier = bounded(value, 200);
   if (identifier.length < 4 || !/^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(identifier)) {
@@ -356,10 +378,14 @@ function createPostgresSessionSecurityAuditRepository(options = {}) {
   const streamId = safeIdentifier(options.streamId || DEFAULT_STREAM_ID, "streamId");
   const idFactory = options.randomUUID || randomUUID;
   const now = options.now || (() => new Date());
+  const testBypass = options.testBypassEvidenceGate === true;
   let ownedPool;
 
   function pool() {
-    if (options.pool) return options.pool;
+    if (options.pool) {
+      if (!testBypass) normalizePoolTlsVerification(options.poolTlsVerification);
+      return options.pool;
+    }
     if (!config.configured) {
       throw new SessionSecurityAuditError(
         "SESSION_SECURITY_AUDIT_POSTGRES_NOT_CONFIGURED",
@@ -382,7 +408,7 @@ function createPostgresSessionSecurityAuditRepository(options = {}) {
   }
 
   function assertWriteEnabled() {
-    if (options.testBypassEvidenceGate === true) return;
+    if (testBypass) return;
     if (!config.writeEnabled) {
       throw new SessionSecurityAuditError(
         "SESSION_SECURITY_AUDIT_POSTGRES_WRITE_BLOCKED",
@@ -664,6 +690,7 @@ module.exports = {
   buildPostgresSessionSecurityAuditConfig,
   controlFromRow,
   createPostgresSessionSecurityAuditRepository,
+  normalizePoolTlsVerification,
   readinessProjection,
   safeDatabaseError,
   sha256,
