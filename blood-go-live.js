@@ -1,9 +1,5 @@
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#39;"
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
 })[character]);
 
 const table = (headers, rows) => `
@@ -11,6 +7,15 @@ const table = (headers, rows) => `
     <thead><tr>${headers.map((item) => `<th>${escapeHtml(item)}</th>`).join("")}</tr></thead>
     <tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join("")}</tr>`).join("")}</tbody>
   </table>`;
+
+const clinicalGateLabels = {
+  receiptsValid: "现场证据回执双签",
+  mastersValid: "BIS/BTIS 主数据契约",
+  coldChainValid: "冷链校准与告警证据",
+  scenariosValid: "配血、床旁与召回验收",
+  smokePassed: "独立运行冒烟",
+  rollbackPassed: "回退恢复演练"
+};
 
 async function load() {
   const request = window.HealthCityAuth?.authFetch || fetch;
@@ -34,6 +39,29 @@ function render(data) {
       <small>${escapeHtml(label)}</small>
       <strong class="${data.productionReady ? "ready" : "blocked"}">${escapeHtml(value)}</strong>
     </article>`).join("");
+
+  const gates = data.clinicalProduction?.gates || {};
+  document.querySelector("#gl-clinical-gates").innerHTML = table(
+    ["生产门禁", "状态", "上线判定"],
+    Object.entries(clinicalGateLabels).map(([key, label]) => [
+      escapeHtml(label),
+      `<span class="${gates[key] ? "ready" : "blocked"}">${gates[key] ? "已签收" : "待现场签收"}</span>`,
+      gates[key] ? "通过" : "No-Go"
+    ])
+  );
+
+  const registry = window.BloodStandardRegistry;
+  const coverage = registry.coverage();
+  document.querySelector("#gl-standard-registry").innerHTML = table(
+    ["标准", "数据子集", "登记数据元", "状态"],
+    [[
+      `${escapeHtml(coverage.standard.number)}<br><small>${escapeHtml(coverage.standard.datasetId)} · ${escapeHtml(coverage.standard.effectiveAt)} 生效</small>`,
+      `${coverage.representedSubsets}/${coverage.subsets}`,
+      String(coverage.registeredElements),
+      `<span class="${coverage.completeSubsetCoverage ? "ready" : "blocked"}">${coverage.completeSubsetCoverage ? "十二类子集已建档" : "存在缺失"}</span>`
+    ]]
+  );
+
   document.querySelector("#gl-endpoints").innerHTML = table(
     ["接口/设备", "责任方", "状态"],
     data.endpoints.map((item) => [escapeHtml(item.name), escapeHtml(item.owner), escapeHtml(item.status)])
