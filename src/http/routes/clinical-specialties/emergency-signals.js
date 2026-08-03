@@ -1,7 +1,9 @@
 "use strict";
 
+const emergencySignalWrite = require("../t06-emergency-signal-write");
+
 function createRouteSegment(runtime) {
-  const { collectJson, patchCollectionItem, readDatabase, requireApiRole, sendJson } = runtime;
+  const { collectJson, prependAuditTrailEntry, readDatabase, requireApiRole, sendJson, writeDatabase } = runtime;
   return {
       id: "clinical-specialties-09",
       domain: "clinical-specialties",
@@ -9,14 +11,21 @@ function createRouteSegment(runtime) {
     if (req.method === "PATCH" && url.pathname.startsWith("/api/emergency-signals/")) {
         const user = requireApiRole(req, res, ["institution", "county", "commission"], "/api/emergency-signals/:id");
         if (!user) return true;
-        const result = patchCollectionItem({
-          data: readDatabase(),
-          collection: "emergencySignals",
+        const result = await emergencySignalWrite.updateEmergencySignal({
           id: decodeURIComponent(url.pathname.replace("/api/emergency-signals/", "")),
-          patch: await collectJson(req),
+          payload: await collectJson(req),
           user,
-          action: "更新公卫预警"
+          correlationId: req.correlationId || req.headers["x-correlation-id"],
+          causationId: req.headers["idempotency-key"],
+          readDatabase,
+          writeDatabase,
+          prependAuditTrailEntry
         });
+        if (result.event) {
+          res.setHeader("X-Data-Owner", emergencySignalWrite.DOMAIN);
+          res.setHeader("X-Domain-Event-Id", result.event.id);
+          res.setHeader("X-Domain-Event-Type", result.event.type);
+        }
         sendJson(res, result.status, result.body);
         return true;
       }
