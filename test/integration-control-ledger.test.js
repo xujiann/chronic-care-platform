@@ -107,14 +107,19 @@ test("publication receipts preserve static preview evidence without opening prod
   assert.equal(unacceptedValidation.invalid[0].reasons.includes("source-candidate-not-accepted"), true);
 });
 
-test("integration control ledger inspects registered worktrees without changing them", () => {
+test("integration control ledger reports registered worktree availability without changing them", () => {
   const report = buildIntegrationControlLedger({ generatedAt: "2026-07-22T00:00:00.000Z" });
   const markdown = renderMarkdown(report);
 
-  assert.equal(report.ok, true);
+  assert.equal(report.ok, report.summary.worktreesPresent === 11);
   assert.equal(report.acceptedBaseline, ACCEPTED_BASELINE);
   assert.equal(report.lines.length, 11);
-  assert.equal(report.summary.worktreesPresent, 11);
+  assert.equal(report.summary.worktreesPresent, report.lines.filter((line) => line.worktree).length);
+  assert.equal(report.summary.worktreesPresent >= 0 && report.summary.worktreesPresent <= 11, true);
+  assert.equal(
+    report.checks.find((item) => item.id === "control:worktrees").passed,
+    report.summary.worktreesPresent === 11
+  );
   assert.equal(typeof report.summary.mergeReady, "number");
   assert.equal(typeof report.summary.reviewPending, "number");
   assert.equal(typeof report.summary.reviewBlocked, "number");
@@ -133,6 +138,19 @@ test("integration control ledger inspects registered worktrees without changing 
   assert.match(markdown, /Recorded static publication receipts/);
   assert.match(markdown, /github-pages-legacy/);
   assert.match(markdown, /server\.js/);
+});
+
+test("integration control ledger fails closed in a clean clone without professional worktrees", () => {
+  const report = buildIntegrationControlLedger({
+    generatedAt: "2026-07-22T00:00:00.000Z",
+    worktrees: []
+  });
+
+  assert.equal(report.ok, false);
+  assert.equal(report.releaseCandidateReady, false);
+  assert.equal(report.summary.worktreesPresent, 0);
+  assert.equal(report.lines.every((line) => line.state === "missing-worktree"), true);
+  assert.equal(report.checks.find((item) => item.id === "control:worktrees").passed, false);
 });
 
 test("integration control report writes deterministic artifact shape", (t) => {

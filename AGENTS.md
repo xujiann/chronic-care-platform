@@ -3,7 +3,7 @@
 This repository uses one integration line:
 
 - integration branch: `codex/governance-integration-20260803`
-- process baseline: `baseline/governance-20260803-iteration2-v1`
+- process baseline: `baseline/governance-20260803-iteration2-v2`
 - ownership manifest: `config/process-workstreams.json`
 
 Before changing a protected runtime file, identify the process from the current
