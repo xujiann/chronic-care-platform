@@ -1,5 +1,10 @@
 "use strict";
 
+const {
+  ReferralCommandError,
+  createReferralCommandService
+} = require("../../care-coordination/referral-command-service");
+
 function createRouteSegments(runtime) {
   const { APPOINTMENT_CONTRACT_ID, CareServiceRuntime, RegistrationReferralService, WORKFLOW_COLLECTIONS, WORKFLOW_ROLE_COLLECTIONS, acknowledgeReferralTeleconsultationEscalation, appendDataAccessLog, appendDrugConsumableAuditTrail, appendReferralTeleconsultationNotifications, appendSecurityEvent, applyAppointmentIntegrationReconciliationAction, applyCitizenTaskAction, applyInternetNursingOrderAction, applyReferralTeleconsultationAction, applyRegistrationCancel, applyRegistrationDisruptionAction, applyRegistrationJourneyAction, applyRegistrationWaitlistAction, assertReferralCallbackResident, buildCareServiceProductionReadiness, buildCitizenTaskActionMessage, buildCountyAcceptanceLedger, buildEscortServiceDashboard, buildInternetNursingActionMessage, buildInternetNursingDashboard, buildLifecycleActionClosureMessage, buildMultiPracticeRegistry, buildMultiPracticeTaskMessage, buildPrimaryPracticeConfirmation, buildReferralConsortiumClosedLoopMetrics, buildReferralInsurancePerformancePolicy, buildReferralTeleconsultationEscalations, buildReferralTeleconsultationJointTestLedger, buildReferralTeleconsultationJointTestPack, buildReferralTeleconsultationPersonalRecord, buildReferralTeleconsultationSignoffSummary, buildRegistrationDashboard, buildRegistrationIntegrationCenter, buildRegistrationJourneyTaskMessage, buildRegistrationNotificationDeliveries, buildRegistrationTaskMessage, buildRegistrationWaitlistCenter, buildRegistrationWaitlistDeliveries, buildRegistrationWaitlistTaskMessage, buildUnifiedTasks, canAccessEscortOrder, canAccessInternetNursingOrder, canAccessMultiPracticeApplication, canAccessReferralTeleconsultation, canAccessRegistrationOrder, canAccessRegistrationSchedule, canAccessRegistrationWaitlistEntry, canAccessResident, canAccessTaskMessage, canManageAppointmentIntegrationEvent, careServiceActor, careServiceCommandId, careServiceCreatePayload, careServicePlatformAdapter, careServiceReadinessPublicSummary, careServiceTransitionInput, cleanMultiPracticePatch, cleanWorkflowUpdates, collectJson, completeReferralTeleconsultationJointTestTask, createReferralTeleconsultationEscalationMessage, createReferralTeleconsultationJointTestTasks, createTaskMessage, findWorkflowCollection, isClosedTaskStatus, landAppointmentIntegrationEvent, normalizeInternetNursingOrder, normalizeMultiPracticeApplication, normalizeReferralTeleconsultation, normalizeReferralTeleconsultationCallback, normalizeReferralTeleconsultationFeedbackCallback, normalizeReferralTeleconsultationScheduleCallback, normalizeReferralTeleconsultationStatus, normalizeRegistrationOrder, normalizeRegistrationWaitlistEntry, normalizeState, patchBusinessCollectionItem, prependAuditTrailEntry, promoteNextRegistrationWaitlist, randomUUID, readDatabase, redactSensitiveResponse, refreshBirthStatistics, refreshMultiPracticeReviewState, requireApiRole, resealAuditTrail, resolveMultiPracticeLifecyclePatch, sealAuditTrail, seedRegistrationSchedules, sendCareServiceError, sendJson, updateIntegrationEvent, upsertReferralTeleconsultationSignoff, verifyDoctorElectronicRegistration, verifyIntegrationSignature, workflowStateCollectionKey, writeDatabase } = runtime;
   return [
@@ -1824,6 +1829,85 @@ function createRouteSegments(runtime) {
       id: "care-coordination-10",
       domain: "care-coordination",
       async handle(req, res, url) {
+    const referralActionMatch = url.pathname.match(/^\/api\/referrals\/([^/]+)\/actions$/);
+      if (req.method === "POST" && referralActionMatch) {
+        const user = requireApiRole(req, res, ["institution", "county", "commission"], "/api/referrals/:id/actions");
+        if (!user) return true;
+        const payload = await collectJson(req);
+        const headerCommandId = String(req.headers["idempotency-key"] || "").trim();
+        const bodyCommandId = String(payload.commandId || payload.idempotencyKey || "").trim();
+        if (bodyCommandId && bodyCommandId !== headerCommandId) {
+          sendJson(res, 400, {
+            ok: false,
+            code: "REFERRAL_COMMAND_ID_CONFLICT",
+            message: "body command id must match Idempotency-Key"
+          });
+          return true;
+        }
+        const referralId = decodeURIComponent(referralActionMatch[1]);
+        const currentData = readDatabase();
+        const current = (currentData.referralSystem?.referrals || []).find((item) => item.id === referralId);
+        if (!current) {
+          sendJson(res, 404, { ok: false, code: "REFERRAL_NOT_FOUND", message: "referral was not found" });
+          return true;
+        }
+        if (!canAccessResident(user, current.residentId, currentData)) {
+          appendSecurityEvent({
+            actor: user.name,
+            role: user.role,
+            action: "versioned-referral-command",
+            target: referralId,
+            result: "denied",
+            detail: "resident scope denied"
+          });
+          sendJson(res, 403, { ok: false, code: "REFERRAL_SCOPE_DENIED", message: "resident scope denied" });
+          return true;
+        }
+        try {
+          const result = await createReferralCommandService({
+            readState: readDatabase,
+            writeState: writeDatabase
+          }).update({
+            referralId,
+            commandId: headerCommandId,
+            expectedVersion: payload.expectedVersion,
+            correlationId: req.correlationId,
+            actor: user,
+            input: payload
+          });
+          appendSecurityEvent({
+            actor: user.name,
+            role: user.role,
+            action: "versioned-referral-command",
+            target: referralId,
+            result: result.replayed ? "idempotent" : "allowed",
+            detail: `${result.contract.contractId}@${result.contract.contractVersion} aggregate version ${result.referral.version}`
+          });
+          sendJson(res, 200, {
+            ok: true,
+            idempotentReplay: result.replayed,
+            correlationId: req.correlationId,
+            referral: result.referral,
+            contract: result.contract,
+            event: {
+              id: result.event.id,
+              type: result.event.type,
+              aggregateVersion: result.event.aggregateVersion,
+              causationId: result.event.causationId,
+              status: result.event.status || "pending"
+            }
+          });
+        } catch (error) {
+          const known = error instanceof ReferralCommandError;
+          sendJson(res, known ? error.statusCode : 500, {
+            ok: false,
+            code: known ? error.code : "REFERRAL_COMMAND_FAILED",
+            message: known ? error.message : "referral command failed"
+          });
+        }
+        return true;
+      }
+
     if (req.method === "POST" && url.pathname === "/api/workflow-actions") {
         const user = requireApiRole(req, res, ["institution", "insurance", "county", "commission"], "/api/workflow-actions");
         if (!user) return true;
