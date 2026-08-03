@@ -32,9 +32,11 @@
 /src/http/routes/platform-governance.js @xujiann
 /src/http/routes/state-data.js @xujiann
 /src/http/routes/public-health.js @xujiann
+/src/http/routes/public-health/ @xujiann
 /src/http/routes/citizen-chronic.js @xujiann
 /src/http/routes/care-coordination.js @xujiann
 /src/http/routes/clinical-specialties.js @xujiann
+/src/http/routes/clinical-specialties/ @xujiann
 /src/http/routes/insurance-payment.js @xujiann
 /src/http/routes/integration.js @xujiann
 /src/http/routes/research.js @xujiann
@@ -47,3 +49,9 @@
 /src/http/runtime-contexts/care-coordination.js @xujiann
 /src/http/runtime-contexts/insurance-payment.js @xujiann
 /src/http/runtime-contexts/integration.js @xujiann
+/src/http/runtime-contexts/platform-governance.js @xujiann
+/src/http/runtime-contexts/state-data.js @xujiann
+/src/http/runtime-contexts/public-health.js @xujiann
+/src/http/runtime-contexts/clinical-specialties.js @xujiann
+/src/http/runtime-contexts/research.js @xujiann
+/src/http/runtime-contexts/shared.js @xujiann

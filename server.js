@@ -2,6 +2,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { createPlatformApiRouter } = require("./src/http/routes");
+const { createPlatformRuntimeContexts } = require("./src/http/runtime-contexts");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
 const { MemorySessionStore, PostgresSessionStore, SqliteSessionStore, createSqliteSessionSchema } = require("./session-store");
 const {
@@ -27575,7 +27576,7 @@ function buildProductionReleaseEvidencePublicSummary() {
 }
 
 function createRequestApiRouter() {
-  return createPlatformApiRouter({
+  return createPlatformApiRouter(createPlatformRuntimeContexts({
     APPOINTMENT_CONTRACT_ID,
   BloodBusinessService,
   BloodClinicalProduction,
@@ -28184,7 +28185,7 @@ function createRequestApiRouter() {
   verifyTrustedRespiratoryNetworkEvidence,
     workflowStateCollectionKey,
     writeDatabase,
-  });
+  }));
 }
 
 async function handleApi(req, res) {

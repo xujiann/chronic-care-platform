@@ -1,10 +1,12 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 
 const { createApiRouter } = require("../src/http/api-router");
+const { ROUTE_SUBDOMAINS } = require("../src/http/route-subdomains");
 const { readRuntimeSource, runtimeSourceFiles } = require("../src/http/runtime-source");
 const { ROUTE_ORDER } = require("../src/http/routes");
 
@@ -35,6 +37,25 @@ test("platform routes have one explicit ordered manifest across domain modules",
   EXPECTED_DOMAINS.forEach((domain) => {
     assert.equal(files.includes(`src/http/routes/${domain}.js`), true);
   });
+});
+
+test("public-health and clinical-specialty route segments are physically split by subdomain", () => {
+  const files = runtimeSourceFiles(ROOT).map((file) => path.relative(ROOT, file).replaceAll("\\", "/"));
+  const splitEntries = Object.entries(ROUTE_SUBDOMAINS);
+  assert.equal(splitEntries.length, 13);
+  for (const [id, subdomain] of splitEntries) {
+    const domain = id.startsWith("public-health-") ? "public-health" : "clinical-specialties";
+    const modulePath = `src/http/routes/${domain}/${subdomain}.js`;
+    assert.equal(files.includes(modulePath), true, modulePath);
+    const routeModule = require(path.join(ROOT, modulePath));
+    assert.equal(routeModule.ROUTE_SEGMENT_ID, id);
+    assert.equal(routeModule.SUBDOMAIN, subdomain);
+    assert.equal(typeof routeModule.createRouteSegment, "function");
+  }
+  for (const domain of ["public-health", "clinical-specialties"]) {
+    const facade = fs.readFileSync(path.join(ROOT, "src", "http", "routes", `${domain}.js`), "utf8");
+    assert.equal(facade.split(/\r?\n/).length < 40, true);
+  }
 });
 
 test("runtime source combines the server shell and all route domains", () => {
