@@ -133,7 +133,7 @@ test("emergency signal command replays once and rejects idempotency payload drif
   });
   assert.equal(first.replayed, false);
   assert.equal(replay.replayed, true);
-  assert.equal(replay.event.id, first.event.id);
+  assert.deepEqual(replay.event, first.event);
   assert.deepEqual(replay.body, first.body);
   assert.equal(writes, 1);
   assert.equal(state[COLLECTION][0].aggregateVersion, 1);
@@ -179,7 +179,7 @@ test("concurrent emergency signal retries commit one aggregate version and one o
     updateEmergencySignal(options)
   ]);
   assert.deepEqual([left.replayed, right.replayed].sort(), [false, true]);
-  assert.equal(left.event.id, right.event.id);
+  assert.deepEqual(left.event, right.event);
   assert.equal(writes, 1);
   assert.equal(state[COLLECTION][0].aggregateVersion, 1);
   assert.equal(state[OUTBOX_COLLECTION].length, 1);

@@ -40,6 +40,20 @@ function digest(value) {
   return createHash("sha256").update(JSON.stringify(stableValue(value))).digest("hex");
 }
 
+function domainEventFromOutboxRow(row) {
+  return createDomainEvent({
+    id: row.id,
+    domain: row.domain,
+    type: row.type,
+    aggregateId: row.aggregateId,
+    aggregateVersion: row.aggregateVersion,
+    correlationId: row.correlationId,
+    causationId: row.causationId,
+    occurredAt: row.occurredAt,
+    payload: row.payload
+  });
+}
+
 function safePatch(payload) {
   return Object.entries(payload && typeof payload === "object" ? payload : {})
     .reduce((result, [key, value]) => {
@@ -212,7 +226,13 @@ async function executeEmergencySignalUpdate({
       }
       const event = (Array.isArray(state[OUTBOX_COLLECTION]) ? state[OUTBOX_COLLECTION] : [])
         .find((item) => item.id === receipt.eventId);
-      if (!event || !receipt.result || receipt.status !== "completed") {
+      let replayEvent = null;
+      try {
+        replayEvent = event ? domainEventFromOutboxRow(event) : null;
+      } catch {
+        replayEvent = null;
+      }
+      if (!replayEvent || !receipt.result || receipt.status !== "completed") {
         throw new EmergencySignalCommandError(
           "EMERGENCY_SIGNAL_REPLAY_INTEGRITY_FAILED",
           "idempotent emergency signal receipt is incomplete",
@@ -222,7 +242,7 @@ async function executeEmergencySignalUpdate({
       return Object.freeze({
         status: 200,
         body: Object.freeze(structuredClone(receipt.result)),
-        event: Object.freeze(structuredClone(event)),
+        event: replayEvent,
         replayed: true
       });
     }
@@ -292,6 +312,7 @@ module.exports = {
   EmergencySignalCommandError,
   createRuntimeAdapter,
   digest,
+  domainEventFromOutboxRow,
   safePatch,
   updateEmergencySignal
 };
