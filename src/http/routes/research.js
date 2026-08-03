@@ -1,5 +1,13 @@
 "use strict";
 
+const {
+  CONTRACT_ID,
+  CONTRACT_VERSION,
+  buildResearchSandboxReadModel,
+  canReadResearchDataset,
+  normalizeResearchPurpose
+} = require("../research/sandbox-read-model");
+
 function createRouteSegments(runtime) {
   const { appendResearchAudit, buildResearchSandboxSummary, collectJson, normalizeCompliantDataExport, normalizeResearchApproval, normalizeResearchDatasetApplication, normalizeResearchEvidenceDocument, readDatabase, requireApiRole, requireDatasetSandboxAccess, sendJson, writeDatabase } = runtime;
   return [
@@ -180,6 +188,12 @@ function createRouteSegments(runtime) {
           sendJson(res, 404, { error: "Not Found", message: "Research dataset not found" });
           return true;
         }
+        if (!canReadResearchDataset(user, data.researchDatasets[index])) {
+          appendResearchAudit(data, user, data.researchDatasets[index], "sandbox-access", "dataset scope denied", "denied");
+          writeDatabase(data);
+          sendJson(res, 403, { error: "Forbidden", code: "RESEARCH_DATASET_SCOPE_DENIED", message: "Dataset is outside the caller research scope" });
+          return true;
+        }
         if (!requireDatasetSandboxAccess(data.researchDatasets[index])) {
           appendResearchAudit(data, user, data.researchDatasets[index], "sandbox-access", "blocked by ethics/de-identification/authorization/governance/evidence status", "denied");
           writeDatabase(data);
@@ -187,7 +201,15 @@ function createRouteSegments(runtime) {
           return true;
         }
         const payload = await collectJson(req);
-        const purpose = String(payload.purpose || "approved sandbox analysis").trim();
+        let purpose;
+        try {
+          purpose = normalizeResearchPurpose(payload.purpose);
+        } catch (error) {
+          appendResearchAudit(data, user, data.researchDatasets[index], "sandbox-access", error.code || "invalid purpose", "denied");
+          writeDatabase(data);
+          sendJson(res, 400, { error: "Bad Request", code: error.code || "RESEARCH_PURPOSE_INVALID", message: error.message });
+          return true;
+        }
         data.researchDatasets[index].sandbox = {
           ...(data.researchDatasets[index].sandbox || {}),
           status: "active",
@@ -198,12 +220,64 @@ function createRouteSegments(runtime) {
         writeDatabase(data);
         sendJson(res, 200, {
           datasetId: id,
-          sandboxToken: `sandbox-${id}-${Date.now()}`,
           deidentified: true,
-          governance: data.researchDatasets[index].governance || {},
-          records: data.researchDatasets[index].records || 0,
-          sourceCollections: data.researchDatasets[index].sourceCollections || [],
-          expiresInMinutes: 120
+          access: {
+            mode: "read-only",
+            contractId: CONTRACT_ID,
+            contractVersion: CONTRACT_VERSION,
+            endpoint: `/api/research/datasets/${encodeURIComponent(id)}/read-model`,
+            expiresInMinutes: 120
+          },
+          controls: {
+            minimumNecessary: data.researchDatasets[index].governance?.minimumNecessary === true,
+            reidentificationProhibited: data.researchDatasets[index].governance?.reidentificationProhibited === true,
+            exportReviewRequired: data.researchDatasets[index].governance?.exportReviewRequired !== false
+          }
+        });
+        return true;
+      }
+
+      const researchReadModelMatch = url.pathname.match(/^\/api\/research\/datasets\/([^/]+)\/read-model$/);
+      if (req.method === "GET" && researchReadModelMatch) {
+        const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/datasets/:id/read-model");
+        if (!user) return true;
+        const data = readDatabase();
+        const id = decodeURIComponent(researchReadModelMatch[1]);
+        const index = (data.researchDatasets || []).findIndex((item) => item.id === id);
+        if (index < 0) {
+          sendJson(res, 404, { error: "Not Found", code: "RESEARCH_DATASET_NOT_FOUND", message: "Research dataset not found" });
+          return true;
+        }
+        const dataset = data.researchDatasets[index];
+        if (!canReadResearchDataset(user, dataset)) {
+          appendResearchAudit(data, user, dataset, "read-model-query", "dataset scope denied", "denied");
+          writeDatabase(data);
+          sendJson(res, 403, { error: "Forbidden", code: "RESEARCH_DATASET_SCOPE_DENIED", message: "Dataset is outside the caller research scope" });
+          return true;
+        }
+        if (!requireDatasetSandboxAccess(dataset)) {
+          appendResearchAudit(data, user, dataset, "read-model-query", "dataset governance denied", "denied");
+          writeDatabase(data);
+          sendJson(res, 403, { error: "Forbidden", code: "RESEARCH_DATASET_NOT_RELEASED", message: "Dataset is not released for de-identified read-model access" });
+          return true;
+        }
+        let purpose;
+        try {
+          purpose = normalizeResearchPurpose(url.searchParams.get("purpose"));
+        } catch (error) {
+          appendResearchAudit(data, user, dataset, "read-model-query", error.code || "invalid purpose", "denied");
+          writeDatabase(data);
+          sendJson(res, 400, { error: "Bad Request", code: error.code || "RESEARCH_PURPOSE_INVALID", message: error.message });
+          return true;
+        }
+        const readModel = buildResearchSandboxReadModel(dataset);
+        appendResearchAudit(data, user, dataset, "read-model-query", `${CONTRACT_ID}:${purpose}`);
+        writeDatabase(data);
+        sendJson(res, 200, {
+          ok: true,
+          generatedAt: new Date().toISOString(),
+          correlationId: String(req.correlationId || ""),
+          readModel
         });
         return true;
       }
