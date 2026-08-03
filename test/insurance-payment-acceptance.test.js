@@ -2,7 +2,7 @@
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { buildInsurancePaymentAcceptance, parseArgs, renderMarkdown, shouldFailAcceptance } = require("../scripts/insurance-payment-acceptance");
+const { buildInsurancePaymentAcceptance, buildPersistenceAcceptance, parseArgs, renderMarkdown, shouldFailAcceptance } = require("../scripts/insurance-payment-acceptance");
 
 test("T07 unified acceptance covers all six workflows without claiming production readiness", () => {
   const report = buildInsurancePaymentAcceptance();
@@ -11,12 +11,20 @@ test("T07 unified acceptance covers all six workflows without claiming productio
   assert.equal(report.summary.workflows, 6);
   assert.equal(report.summary.workflowsReady, 6);
   assert.equal(report.summary.t00RoutesPending, 0);
+  assert.equal(report.summary.persistenceContractReady, true);
+  assert.equal(report.persistence.contractId, "insurance-payment-persistence-v1");
+  assert.equal(report.persistence.productionAdapterRequired, true);
+  assert.equal(report.persistence.productionAdapterConfigured, false);
+  assert.equal(report.persistence.productionPrimary, false);
+  assert.equal(report.persistence.postgres.adapter, "insurance-payment-postgres-v1");
+  assert.equal(report.persistence.postgres.credentialsPersisted, false);
+  assert.equal(report.persistence.checks.every((item) => item.passed), true);
   assert.ok(report.externalBlockers.length > 0);
   assert.equal(report.summary.externalBlockers, 20);
   assert.equal(report.externalBlockers.filter((item) => item.source === "disease-payment").length, 14);
   assert.equal(report.summary.externalEvidenceGoverned, true);
   assert.equal(report.productionGate.passed, false);
-  assert.deepEqual(report.productionGate.blockers, ["live-site-acceptance-confirmed"]);
+  assert.deepEqual(report.productionGate.blockers, ["persistence-production-cutover-complete", "live-site-acceptance-confirmed"]);
   assert.equal(report.productionGate.checks.find((item) => item.id === "local-domain-ready").passed, true);
   assert.ok(report.externalBlockers.every((item) => item.owner && ["acceptance-reviewer", "security-reviewer", "finance-auditor"].includes(item.reviewerRole)));
   assert.ok(report.externalBlockers.some((item) => item.id === "official-grouper:trusted-callback" && item.reviewerRole === "security-reviewer"));
@@ -29,6 +37,14 @@ test("T07 unified acceptance covers all six workflows without claiming productio
   assert.equal(shouldFailAcceptance(report), false);
   assert.equal(shouldFailAcceptance(report, { "require-production": true }), true);
   assert.deepEqual(parseArgs(["--require-production", "--output=acceptance.json"]), { "require-production": true, output: "acceptance.json" });
+});
+
+test("T07 unified acceptance fails closed when the persistence contract is incomplete", () => {
+  const persistence = buildPersistenceAcceptance();
+  const report = buildInsurancePaymentAcceptance({ persistence: { ...persistence, ready: false } });
+  assert.equal(report.localReady, false);
+  assert.equal(report.summary.persistenceContractReady, false);
+  assert.ok(report.productionGate.blockers.includes("local-domain-ready"));
 });
 
 test("T07 unified acceptance fails closed for an unmapped financial evidence requirement", () => {

@@ -16,10 +16,12 @@ test("insurance payment evidence packet is complete digest-bound and privacy-saf
   assert.equal(packet.productionHandoff.evidenceComplete, false);
   assert.equal(packet.productionHandoff.productionReady, false);
   assert.equal(packet.productionGate.passed, false);
-  assert.deepEqual(packet.productionGate.blockers, ["handoff-evidence-complete", "live-site-acceptance-confirmed"]);
+  assert.deepEqual(packet.productionGate.blockers, ["persistence-production-cutover-complete", "handoff-evidence-complete", "live-site-acceptance-confirmed"]);
+  assert.equal(packet.persistence.productionPrimary, false);
   assert.equal(packet.productionGate.checks.find((item) => item.id === "evidence-artifact-manifest-valid").passed, true);
   assert.equal(Evidence.verifyInsurancePaymentEvidencePacket(packet), true);
   assert.equal(Evidence.shouldFailEvidencePacket(packet), false);
+  assert.equal(Evidence.shouldFailEvidencePacket(packet, { "require-signature": true, "trusted-fingerprints": "f".repeat(64) }), true);
   assert.equal(Evidence.shouldFailEvidencePacket(packet, { "require-production": true }), true);
   assert.doesNotMatch(JSON.stringify(packet), /residentId|patientName|FINANCIAL_GATEWAY_SECRET|PRIVATE KEY/);
   assert.match(Evidence.renderMarkdown(packet), /医保支付与按病种付费验收证据包/);
@@ -45,4 +47,5 @@ test("insurance payment evidence packet detects acceptance or artifact tampering
   assert.equal(Evidence.verifyInsurancePaymentEvidencePacket(wrongRoot, { artifactRoot: __dirname }), false);
   assert.equal(Evidence.shouldFailEvidencePacket(tampered), true);
   assert.deepEqual(Evidence.parseArgs(["--output=tmp/evidence.json", "--markdown=tmp/evidence.md", "--require-production"]), { output: "tmp/evidence.json", markdown: "tmp/evidence.md", "require-production": true });
+  assert.deepEqual(Evidence.trustedFingerprints([`sha256:${"a".repeat(64)}`, "B".repeat(64)].join(";")), ["a".repeat(64), "b".repeat(64)]);
 });

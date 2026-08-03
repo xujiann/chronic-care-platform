@@ -62,6 +62,12 @@ T00 负责公共路由、统一认证鉴权、请求体与错误响应映射、�
 16. 正式分组作业的幂等返回、派发、回执、失败、重试和死信重开前必须通过 `verifyFormalGroupingJobLedger`；完成态幂等返回还必须通过 `verifyFormalGroupingResultProjection`，死信重开还必须通过 `verifyFormalGroupingDeadLetter`。正式分组运行和支付测算账本必须与作业编号、关联号、方案版本、病例输入摘要及回执集合一一对应。完整性失败只能进入人工安全审计。公共运维路由必须使用 `buildFormalGroupingOperations` 的脱敏摘要，不得从领域状态直接返回 `caseSnapshots`、病例输入、适配器内部端点、错误详情或死信处置结论。
 17. 正式回执和派发受理结果只能由 `system / official_grouper_adapter` 主体写入，且回执入口必须先执行 `verifyTrustedGrouperCallback` 的来源白名单、时间窗、防重放和传输层签名校验，再执行逐病例官方回执验签。人工 `insurance/commission` 会话不得直接提交 `accepted=true` 或正式回执正文；死信对账仅允许医保经办机构完成。
 18. T00 部署前必须调用 `buildGrouperProductionConfiguration` 校验正式分组器 HTTPS 端点、凭据引用、回执签名证书指纹、回调密钥强度、来源白名单和时间窗。报告只能保存布尔检查及白名单/证书数量，不得输出端点、凭据引用、密钥或来源值。配置通过不能替代真实联调与现场证据。
+19. 所有 T07 写路由必须通过 `insurance-payment-persistence-v1` 仓储事务执行，传入调用方生成的稳定 `commandId` 和客户端读取到的 `expectedVersion`。T00 不得继续以进程内共享对象作为生产事务边界，也不得在领域函数成功后分两次保存状态和事件。
+20. 生产仓储必须在同一数据库事务内完成聚合 CAS 更新、命令回执去重和 outbox 插入。outbox 工作者使用 `claimOutbox`、`acknowledgeOutbox`、`failOutbox` 租约语义；下游按事件编号幂等，死信进入受控人工处置并接入告警。
+21. 公共 API 应将 `PERSISTENCE_VERSION_CONFLICT` 和 `PERSISTENCE_COMMAND_CONFLICT` 映射为 HTTP 409，将仓储不可用映射为 503；不得捕获后以 200 返回旧状态。响应应携带提交后的聚合版本，便于下一次命令显式并发控制。
+22. T00 应在批准的数据库变更窗口应用 `deploy/insurance-payment-postgres.sql`，配置 `INSURANCE_PAYMENT_POSTGRES_MODE=evidence-gated`、强校验 TLS 和四类证据引用，然后执行 `insurance-payment-postgres-readiness.js --verify-schema --require-write-ready --require-schema`。迁移前备份、恢复演练、切换批准和只读结构报告必须分别留存，不能用配置布尔值替代。
+23. `insurance-payment-postgres-repository.js` 的 `productionPrimary=false` 是有意的失败关闭标志。只有 T00 完成双写/影子核对、路由切换、回滚验证和现场签字后，集成层才能提交生产主库证据；T07 本地代码或测试不得自行把该值改为 `true`。
+24. T00 运行时应周期调用 `runInsurancePaymentOutboxBatch`，发布适配器须返回稳定回执编号并按事件编号实现下游幂等。`published-acknowledgement-pending` 必须告警但不能立即标记发布失败；租约过期后的重复投递属于至少一次语义。任何 dead-letter 必须触发 critical 告警和受控人工处置。
 
 ## 生产证据交接
 
@@ -89,6 +95,8 @@ T00 负责公共路由、统一认证鉴权、请求体与错误响应映射、�
 
 任何本地测试、模拟回调或自签名证据都不能关闭这些阻断项。每项证据必须由其指定的 `security-reviewer`、`acceptance-reviewer` 或 `finance-auditor` 核验，不能用一份笼统“已联调”材料批量关闭。`productionReady` 必须保持 `false`，直至真实公共接线、可信外部访问和现场证据全部完成。
 
+此外，PostgreSQL 生产持久化切换是独立严格门禁 `persistence-production-cutover-complete`。本地迁移文件、适配器单测或环境变量齐备只能证明实现和配置基础，不能证明生产库已迁移、恢复方案已演练或公共写流量已切换。该门禁只能由 T00 数据库变更证据和现场切换验收关闭。
+
 金融网关6项证据同样采用确定性职责映射：生产凭据、可信回调和安全评估由 `security-reviewer` 核验；账单传输及日终对账由 `finance-auditor` 核验；字段字典及错误码、现场联合签收由 `acceptance-reviewer` 核验。新增但尚未配置责任映射的外部要求会使 `externalEvidenceGoverned=false`，且交接账本失败关闭，不允许退化为任意审核角色。
 
 ## T00 集成后的验收
@@ -97,10 +105,20 @@ T00 负责公共路由、统一认证鉴权、请求体与错误响应映射、�
 node --test .\test\disease-payment*.test.js .\test\financial*.test.js .\test\insurance-payment*.test.js
 node .\scripts\insurance-payment-acceptance.js
 node .\scripts\insurance-payment-evidence-packet.js
+node .\scripts\insurance-payment-postgres-readiness.js
 node .\scripts\insurance-payment-acceptance.js --require-production
 node .\scripts\insurance-payment-evidence-packet.js --require-production
 ```
 
 前两条命令用于验证T07本地领域能力，当前应成功；后两条是发布流水线严格门禁，在公共接线和现场证据未齐备时必须以非零状态退出。不得用本地验收命令的成功退出替代生产门禁。
 
-统一验收报告和证据包均输出 `productionGate`，包含稳定检查编号、布尔结果、明细及 `blockers` 数组。当前严格门禁应明确报告 `t00-public-wiring-complete`、`handoff-evidence-complete` 和 `live-site-acceptance-confirmed` 等未通过项，便于CI直接生成阻断清单。
+统一验收报告和证据包均输出 `productionGate`，包含稳定检查编号、布尔结果、明细及 `blockers` 数组。当前严格门禁应明确报告 `persistence-production-cutover-complete`、`t00-public-wiring-complete`、`handoff-evidence-complete` 和 `live-site-acceptance-confirmed` 等未通过项，便于CI直接生成阻断清单。
+
+正式交付的证据包必须使用外部受控RSA或ECDSA私钥生成短期签名信封，签名有效期最长31天。签名绑定整个证据包内容摘要、包摘要、生成时间、领域/集成责任方和生产就绪结论；包内只携带公钥和SHA-256指纹，不得携带私钥。接收方必须配置可信指纹并使用 `--require-signature` 验证，生产严格模式也会强制要求可信签名。
+
+```powershell
+node .\scripts\insurance-payment-evidence-packet.js --signing-key=<外部私钥.pem> --signer-id=<发布主体> --signer-organization=<签发机构> --signed-at=<UTC时间> --signature-valid-until=<不超过31天的UTC时间> --output=<证据包.json>
+node .\scripts\insurance-payment-evidence-packet.js --input=<证据包.json> --artifact-root=<对应T07工作树> --trusted-fingerprints=<可信公钥SHA-256指纹> --revoked-fingerprints=<已吊销指纹> --now=<UTC核验时间> --verification-output=<验真报告.json>
+```
+
+`--input` 只读验证既有包，不重新生成或覆盖证据。验真报告仅输出签名主体、机构、指纹、有效期、信任/吊销状态、生产阻断和检查结果，不输出公钥正文、签名值或证据附件。缺少可信签名、指纹已吊销、包摘要或工件不一致、签名过期及生产门禁未通过均返回非零退出码。
