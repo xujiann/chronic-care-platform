@@ -3,7 +3,7 @@
 This repository uses one integration line:
 
 - integration branch: `codex/governance-integration-20260803`
-- process baseline: `baseline/governance-20260803-iteration2-v2`
+- process baseline: `baseline/governance-20260803-four-class-closure-v1`
 - ownership manifest: `config/process-workstreams.json`
 
 Before changing a protected runtime file, identify the process from the current
@@ -22,6 +22,13 @@ Before changing a protected runtime file, identify the process from the current
 6. Do not remove or relax tests to resolve integration conflicts.
 7. Production Go/No-Go remains dependent on real environment and signed site
    evidence; repository changes cannot manufacture that evidence.
+8. This is currently a single-maintainer repository. Both protected baselines
+   require pull requests and strict CI, but do not require an impossible
+   self-approval. Re-enable one approval and CODEOWNER review when a second
+   eligible reviewer is added.
+9. `main` is the protected release/default branch. Feature and process work
+   targets `codex/governance-integration-20260803`; release synchronization to
+   `main` is performed only after the integration baseline is green.
 
 The detailed Chinese workflow is in
 `docs/路由模块化与并行开发边界-2026-08-03.md`.

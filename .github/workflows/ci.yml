@@ -19,11 +19,11 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -37,11 +37,11 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -119,6 +119,8 @@ jobs:
         run: npm run security:production-readiness
       - name: Generate production global Go/No-Go readiness report
         run: npm run production:go-no-go-readiness
+      - name: Verify production external action register
+        run: npm run production:actions:check
       - name: Generate medical quality and safety report
         run: npm run quality-safety:report
       - name: Generate drug consumable readiness report
@@ -182,7 +184,7 @@ jobs:
       - name: Verify immutable production deployment package
         run: npm run deployment:verify
       - name: Upload release readiness report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-readiness-report
           path: release/
