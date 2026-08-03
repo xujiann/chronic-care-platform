@@ -1441,7 +1441,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read(".github/workflows/ci.yml"), /npm run priority-apps:templates/);
   assert.match(read(".github/workflows/ci.yml"), /npm run maternal-child:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run release:report/);
-  assert.match(read(".github/workflows/ci.yml"), /actions\/upload-artifact@v4/);
+  assert.match(read(".github/workflows/ci.yml"), /actions\/upload-artifact@v7/);
   assert.match(read(".github/workflows/ci.yml"), /release-readiness-report/);
   assert.match(read(".github/workflows/ci.yml"), /npm audit --omit=dev/);
 });
