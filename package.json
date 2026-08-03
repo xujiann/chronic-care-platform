@@ -5,8 +5,8 @@
   "description": "慢病医防融合管理平台本地 MVP",
   "scripts": {
     "dev": "node server.js",
-    "routes:check": "node --check src/http/api-router.js && node --check src/http/runtime-source.js && node --check src/http/routes/index.js && node --check src/http/routes/runtime.js && node --check src/http/routes/platform-governance.js && node --check src/http/routes/public-health.js && node --check src/http/routes/shared.js && node --check src/http/routes/clinical-specialties.js && node --check src/http/routes/identity-security.js && node --check src/http/routes/state-data.js && node --check src/http/routes/citizen-chronic.js && node --check src/http/routes/care-coordination.js && node --check src/http/routes/research.js && node --check src/http/routes/integration.js && node --check src/http/routes/insurance-payment.js",
-    "routes:test": "node --test test/http-route-modularization.test.js",
+    "routes:check": "node --check src/http/api-router.js && node --check src/http/runtime-source.js && node --check src/http/runtime-contexts/context-factory.js && node --check src/http/runtime-contexts/index.js && node --check src/http/routes/index.js && node --check src/http/routes/runtime.js && node --check src/http/routes/platform-governance.js && node --check src/http/routes/public-health.js && node --check src/http/routes/shared.js && node --check src/http/routes/clinical-specialties.js && node --check src/http/routes/identity-security.js && node --check src/http/routes/state-data.js && node --check src/http/routes/citizen-chronic.js && node --check src/http/routes/care-coordination.js && node --check src/http/routes/research.js && node --check src/http/routes/integration.js && node --check src/http/routes/insurance-payment.js",
+    "routes:test": "node --test test/http-route-modularization.test.js test/http-runtime-contexts.test.js",
     "process:list": "node scripts/process-worktree.js list",
     "process:plan": "node scripts/process-worktree.js plan",
     "process:create": "node scripts/process-worktree.js create",

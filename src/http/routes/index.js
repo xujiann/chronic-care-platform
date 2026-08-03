@@ -1,6 +1,7 @@
 "use strict";
 
 const { createApiRouter } = require("../api-router");
+const { createPlatformRuntimeContexts } = require("../runtime-contexts");
 const care_coordination = require("./care-coordination");
 const citizen_chronic = require("./citizen-chronic");
 const clinical_specialties = require("./clinical-specialties");
@@ -302,12 +303,13 @@ const ROUTE_ORDER = Object.freeze([
 ]);
 
 function createPlatformApiRouter(runtime) {
+  const runtimeContexts = createPlatformRuntimeContexts(runtime);
   const segmentsById = new Map();
-  for (const segment of care_coordination.createRouteSegments(runtime)) {
+  for (const segment of care_coordination.createRouteSegments(runtimeContexts.forDomain("care-coordination"))) {
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }
-  for (const segment of citizen_chronic.createRouteSegments(runtime)) {
+  for (const segment of citizen_chronic.createRouteSegments(runtimeContexts.forDomain("citizen-chronic"))) {
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }
