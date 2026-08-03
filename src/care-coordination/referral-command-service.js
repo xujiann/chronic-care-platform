@@ -425,7 +425,9 @@ function buildReferralDeliveryOperations(state, options = {}) {
     productionReady: false,
     blockers: Object.freeze([
       "external referral transport is not configured",
-      "transport signing credentials are not configured"
+      "transport signing credentials are not configured",
+      "claim serialization is process-local; cross-process database CAS is not implemented",
+      "production referral delivery worker is not configured"
     ])
   });
 }
@@ -475,7 +477,7 @@ function createReferralDeliveryService({
         event.nextAttemptAt = null;
         event.lastError = {
           code: "DELIVERY_LEASE_EXPIRED",
-          message: "delivery lease expired at the maximum attempt limit",
+          messageDigest: digest("delivery lease expired at the maximum attempt limit"),
           failedAt: claimedAt
         };
         event.lease = null;
@@ -554,14 +556,21 @@ function createReferralDeliveryService({
       const acknowledgedAt = dateValue(now()).toISOString();
       const event = working.referralSystem[OUTBOX_COLLECTION].find((item) => item.id === text(eventId, 240));
       const lease = validateActiveLease(event, leaseToken, workerId, acknowledgedAt);
+      const receiptDigest = digest(receipt);
       if (lease.replayed) {
+        if (event.deliveryReceipt?.receiptDigest !== receiptDigest) {
+          throw deliveryError(
+            "REFERRAL_DELIVERY_ACK_CONFLICT",
+            "acknowledgement receipt differs from the persisted receipt"
+          );
+        }
         return { changed: false, value: Object.freeze({ replayed: true, event: publicDeliveryItem(event) }) };
       }
       event.status = "delivered";
       event.deliveredAt = acknowledgedAt;
       event.deliveryReceipt = {
         leaseDigest: lease.digestValue,
-        receiptDigest: digest(receipt),
+        receiptDigest,
         transportMessageId: text(receipt.transportMessageId, 240),
         statusCode: Number(receipt.statusCode || 0),
         acceptedAt: text(receipt.acceptedAt || acknowledgedAt, 80)
@@ -582,7 +591,7 @@ function createReferralDeliveryService({
       }
       event.lastError = {
         code: text(error.code || "DELIVERY_FAILED", 120),
-        message: text(error.message || "referral delivery failed", 500),
+        messageDigest: digest(text(error.message || "referral delivery failed", 500)),
         failedAt
       };
       event.lease = null;
@@ -624,7 +633,16 @@ function createReferralDeliveryService({
     return transact((working) => {
       const requestedAt = dateValue(now()).toISOString();
       const intentDigest = digest({ eventId: normalizedEventId, reason: normalizedReason });
-      const existing = working.referralSystem[REPLAY_COLLECTION].find((item) => item.replayId === normalizedReplayId);
+      const replayKeyDigest = digest({ replayId: normalizedReplayId });
+      let migratedReplayEvidence = false;
+      for (const item of working.referralSystem[REPLAY_COLLECTION]) {
+        if (!item.replayId) continue;
+        item.replayKeyDigest = item.replayKeyDigest || digest({ replayId: text(item.replayId, 160) });
+        delete item.replayId;
+        migratedReplayEvidence = true;
+      }
+      const existing = working.referralSystem[REPLAY_COLLECTION]
+        .find((item) => item.replayKeyDigest === replayKeyDigest);
       if (existing) {
         if (existing.intentDigest !== intentDigest) {
           throw deliveryError("REFERRAL_DELIVERY_REPLAY_CONFLICT", "replay id was already used for another intent");
@@ -634,7 +652,7 @@ function createReferralDeliveryService({
           throw deliveryError("REFERRAL_DELIVERY_REPLAY_INTEGRITY_FAILED", "replay evidence is incomplete", 500);
         }
         return {
-          changed: false,
+          changed: migratedReplayEvidence,
           value: Object.freeze({ replayed: true, event: structuredClone(existing.result), evidenceId: existing.id })
         };
       }
@@ -644,8 +662,8 @@ function createReferralDeliveryService({
         throw deliveryError("REFERRAL_DELIVERY_NOT_DEAD_LETTER", "only dead-letter referral events can be replayed");
       }
       const evidence = {
-        id: `referral-replay-${digest({ replayId: normalizedReplayId }).slice(0, 32)}`,
-        replayId: normalizedReplayId,
+        id: `referral-replay-${replayKeyDigest.slice(0, 32)}`,
+        replayKeyDigest,
         eventId: normalizedEventId,
         intentDigest,
         reasonDigest: digest(normalizedReason),

@@ -81,6 +81,8 @@ test("claim is atomic across workers and the operations projection exposes no pa
   assert.equal(operations.productionReady, false);
   assert.equal(operations.transportConfigured, false);
   assert.equal(operations.signingConfigured, false);
+  assert.equal(operations.blockers.some((item) => /cross-process database CAS/.test(item)), true);
+  assert.equal(operations.blockers.some((item) => /production referral delivery worker/.test(item)), true);
   assert.equal(operations.events[0].id, holder.eventId);
   assert.equal("payload" in operations.events[0], false);
   assert.equal("lease" in operations.events[0], false);
@@ -123,10 +125,19 @@ test("expired workers cannot overwrite a newer lease and acknowledge is idempote
     eventId: holder.eventId,
     leaseToken: second.leaseToken,
     workerId: "worker-new",
-    receipt: { transportMessageId: "ignored-retry" }
+    receipt: { transportMessageId: "transport-001", statusCode: 202 }
   });
   assert.equal(replayedAck.replayed, true);
   assert.equal(holder.get().referralSystem[OUTBOX_COLLECTION][0].deliveryReceipt.transportMessageId, "transport-001");
+  await assert.rejects(
+    () => service.acknowledge({
+      eventId: holder.eventId,
+      leaseToken: second.leaseToken,
+      workerId: "worker-new",
+      receipt: { transportMessageId: "drifted-receipt", statusCode: 202 }
+    }),
+    (error) => error.code === "REFERRAL_DELIVERY_ACK_CONFLICT" && error.statusCode === 409
+  );
   await assert.rejects(
     () => service.fail({
       eventId: holder.eventId,
@@ -159,6 +170,10 @@ test("failure applies exponential retry, reaches dead letter, and commission rep
   });
   assert.equal(firstFailure.event.status, "retry_wait");
   assert.equal(firstFailure.event.nextAttemptAt, "2026-08-03T09:01:01.000Z");
+  const persistedFailure = holder.get().referralSystem[OUTBOX_COLLECTION][0].lastError;
+  assert.deepEqual(Object.keys(persistedFailure).sort(), ["code", "failedAt", "messageDigest"]);
+  assert.match(persistedFailure.messageDigest, /^[a-f0-9]{64}$/);
+  assert.doesNotMatch(JSON.stringify(holder.get()), /external transport timed out/);
   assert.equal((await service.claim({ workerId: "worker-early" })).length, 0);
 
   clock = "2026-08-03T09:01:01.000Z";
@@ -182,6 +197,9 @@ test("failure applies exponential retry, reaches dead letter, and commission rep
   assert.equal(replay.event.status, "retry_wait");
   assert.equal(replay.event.attempts, 0);
   assert.equal(holder.get().referralSystem[REPLAY_COLLECTION].length, 1);
+  assert.equal("replayId" in holder.get().referralSystem[REPLAY_COLLECTION][0], false);
+  assert.match(holder.get().referralSystem[REPLAY_COLLECTION][0].replayKeyDigest, /^[a-f0-9]{64}$/);
+  assert.doesNotMatch(JSON.stringify(holder.get().referralSystem[REPLAY_COLLECTION]), /commission-replay-001/);
 
   const replayClaim = (await service.claim({ workerId: "worker-after-replay" }))[0];
   assert.equal(replayClaim.id, holder.eventId);
@@ -221,6 +239,7 @@ test("expired leases at the attempt limit move to dead letter without another cl
   assert.equal((await service.claim({ workerId: "replacement-worker" })).length, 0);
   assert.equal(holder.get().referralSystem[OUTBOX_COLLECTION][0].status, "dead_letter");
   assert.equal(holder.get().referralSystem[DEAD_LETTER_COLLECTION][0].errorCode, "DELIVERY_LEASE_EXPIRED");
+  assert.equal("message" in holder.get().referralSystem[OUTBOX_COLLECTION][0].lastError, false);
 });
 
 test("command and replay evidence collections are not truncated at a fixed capacity", async () => {
