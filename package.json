@@ -163,7 +163,9 @@
     "production-release:evidence:check": "node --check scripts/production-release-evidence-readiness.js",
     "production-release:evidence:test": "node --test test/production-release-evidence-readiness.test.js",
     "production-release:evidence:readiness": "node scripts/production-release-evidence-readiness.js",
-    "platform:standards-ledgers": "node scripts/platform-standards-ledgers.js"
+    "platform:standards-ledgers": "node scripts/platform-standards-ledgers.js",
+    "digital-hospital:execution-check": "node --check digital-hospital-integration-execution.js && node --check digital-hospital-execution-service.js && node --check digital-hospital-execution-security.js && node --check digital-hospital-cutover-governance.js && node --check digital-hospital-public-health-coordination.js && node --check scripts/digital-hospital-production-runtime-readiness.js && node --check digital-hospital-standard-platform/app.js && node --check test/digital-hospital-integration-execution.test.js && node --check test/digital-hospital-execution-service.test.js && node --check test/digital-hospital-execution-security.test.js && node --check test/digital-hospital-cutover-governance.test.js && node --check test/digital-hospital-execution-api.test.js && node --check test/digital-hospital-production-runtime-readiness.test.js && node --check test/digital-hospital-public-health-coordination.test.js && node --check test/digital-hospital-public-health-api.test.js && node --test test/digital-hospital-integration-execution.test.js test/digital-hospital-execution-service.test.js test/digital-hospital-execution-security.test.js test/digital-hospital-cutover-governance.test.js test/digital-hospital-execution-api.test.js test/digital-hospital-production-runtime-readiness.test.js test/digital-hospital-public-health-coordination.test.js test/digital-hospital-public-health-api.test.js",
+    "digital-hospital:production-runtime-readiness": "node scripts/digital-hospital-production-runtime-readiness.js"
   },
   "engines": {
     "node": ">=22.5"

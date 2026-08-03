@@ -1090,6 +1090,14 @@ function buildDeployCheckReport(options = {}) {
     { name: "snapshot:storageMeta", ok: Boolean(data.storageMeta?.engine && data.storageMeta?.mode), detail: data.storageMeta ? `${data.storageMeta.engine}/${data.storageMeta.mode}` : "missing" }
   ];
 
+  checks.push({
+    name: "api:pilotAcceptanceInterfaceGovernance",
+    ok: ["/api/pilot-acceptance/interfaces/:id/actions", "pilot-interface-joint-test-action"].every((marker) => serverSource.includes(marker))
+      && ["reviewer must be independent from recorder", "acceptedProductionReceipts"].every((marker) => pilotAcceptanceSource.includes(marker))
+      && pilotAcceptanceUi.includes("data-pilot-interface-action"),
+    detail: "pilot interface evidence requires commission control, independent review and auditable production receipts"
+  });
+
   const runCommands = options.runCommands === true;
   const npm = process.platform === "win32" ? "npm.cmd" : "npm";
   const commandResults = runCommands ? [

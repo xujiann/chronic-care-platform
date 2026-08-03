@@ -1,0 +1,1240 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schemas/digital-hospital-package.v0.1.json",
+  "title": "数智医院新标准平台数据包",
+  "type": "object",
+  "required": ["meta"],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["packageType", "generatedAt", "taskId", "standardVersion", "hospitalCode"],
+      "properties": {
+        "packageType": {
+          "type": "string",
+          "enum": ["submission", "review", "expert", "rectification", "task", "pilot", "collaboration", "integration", "execution", "assessment", "assistant", "monitoring", "publicHealth", "evidence", "analytics", "intelligence", "operations", "system", "full"]
+        },
+        "generatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "taskId": {
+          "type": "string"
+        },
+        "taskName": {
+          "type": "string"
+        },
+        "standardVersion": {
+          "type": "string"
+        },
+        "hospitalCode": {
+          "type": "string"
+        },
+        "hospitalName": {
+          "type": "string"
+        },
+        "prototypeVersion": {
+          "type": "string"
+        }
+      }
+    },
+    "hospitalProfile": {
+      "type": "object"
+    },
+    "metrics": {
+      "type": "object"
+    },
+    "indicators": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["indicatorCode", "selfScore", "evidenceCount", "status"],
+        "properties": {
+          "indicatorCode": {
+            "type": "string"
+          },
+          "indicatorName": {
+            "type": "string"
+          },
+          "domain": {
+            "type": "string"
+          },
+          "maxScore": {
+            "type": "number"
+          },
+          "selfScore": {
+            "type": "number"
+          },
+          "reviewedScore": {
+            "type": ["number", "null"]
+          },
+          "evidenceCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "status": {
+            "type": "string"
+          },
+          "comment": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "validationIssues": {
+      "type": "array"
+    },
+    "reviewNotes": {
+      "type": "array"
+    },
+    "expertReviewStatus": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pending": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "completed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "supplement": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "adjusted": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "expertReviews": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "relatedReviewNotes": {
+      "type": "array"
+    },
+    "relatedIndicators": {
+      "type": "array"
+    },
+    "openIssues": {
+      "type": "array"
+    },
+    "rectifications": {
+      "type": "array"
+    },
+    "scoreResult": {
+      "type": "object"
+    },
+    "operationSummary": {
+      "type": "object",
+      "properties": {
+        "currentStage": {
+          "type": "string"
+        },
+        "completedStages": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "totalStages": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "openRules": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pendingSecurity": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "archiveStatus": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "operations": {
+      "type": "object",
+      "properties": {
+        "cycle": {
+          "type": "object"
+        },
+        "stages": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "standardVersions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "ruleSets": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "securityItems": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "operationLogs": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "openIssueSummary": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "hospitalScope": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "taskSummary": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "tasks": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "assignments": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "evidenceSummary": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "evidenceMaterials": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "hospitalCode", "indicatorCode", "name", "status"],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "hospitalCode": {
+            "type": "string"
+          },
+          "indicatorCode": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "version": {
+            "type": ["integer", "string"]
+          },
+          "sensitivity": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "uploadedAt": {
+            "type": "string"
+          },
+          "watermark": {
+            "type": ["boolean", "string"]
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "missingIndicators": {
+      "type": "array",
+      "items": {
+        "type": ["object", "string"]
+      }
+    },
+    "reviewAssignments": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "scoringRules": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "bottomLineRules": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "analyticsSummary": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "appeals": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "intelligenceSummary": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "spotChecks": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "sandboxConfig": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "sandboxRuns": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "materialClassifications": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "peerAnomalies": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "notifications": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "notificationChannels": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "importJobs": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pilotSummary": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "submissionBatches": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "uploadQueue": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "reviewerWorkloads": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "dailyReports": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "collaborationSummary": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "hospitalReadiness": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pilotTickets": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "trainingSessions": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pilotReleases": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pilotFeedback": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "integrationSummary": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "pilotAccessApplications": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pilotConnectors": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pilotDataMappings": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pilotIntegrationTests": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pilotIntegrationIssues": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pilotIntegrationGates": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "executionSummary": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "integrationEnvironments": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "credentialVaultEntries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["vaultRefFingerprint", "keyVersion", "status"],
+        "properties": {
+          "vaultRefFingerprint": {
+            "type": "string"
+          },
+          "keyVersion": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "not": {
+          "anyOf": [
+            { "required": ["secret"] },
+            { "required": ["token"] },
+            { "required": ["privateKey"] },
+            { "required": ["credential"] }
+          ]
+        }
+      }
+    },
+    "integrationExecutionJobs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "connectorId", "environmentId", "jobType", "idempotencyKeyHash", "payloadDigest", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "connectorId": { "type": "string" },
+          "environmentId": { "type": "string" },
+          "jobType": { "type": "string" },
+          "idempotencyKeyHash": { "type": "string" },
+          "payloadDigest": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["排队中", "执行中", "等待重试", "等待回执", "成功", "阻断", "死信"]
+          },
+          "attempts": { "type": "integer", "minimum": 0 },
+          "maxAttempts": { "type": "integer", "minimum": 1 },
+          "retryBaseSeconds": { "type": "integer", "minimum": 1 },
+          "retryMaxSeconds": { "type": "integer", "minimum": 1 },
+          "nextAttemptAt": { "type": "string" },
+          "leaseOwner": { "type": "string" },
+          "leaseTokenHash": { "type": "string" },
+          "leaseExpiresAt": { "type": "string" },
+          "lastHeartbeatAt": { "type": "string" },
+          "deadLetterId": { "type": "string" },
+          "generation": { "type": "integer", "minimum": 1 }
+        },
+        "not": {
+          "anyOf": [
+            { "required": ["leaseToken"] },
+            { "required": ["payload"] }
+          ]
+        }
+      }
+    },
+    "integrationExecutionWorkers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "node", "pool", "capabilities", "status", "lastHeartbeatAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "node": { "type": "string" },
+          "pool": { "type": "string" },
+          "capabilities": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "status": {
+            "type": "string",
+            "enum": ["就绪", "忙碌", "失联"]
+          },
+          "activeJobId": { "type": "string" },
+          "registeredAt": { "type": "string" },
+          "lastHeartbeatAt": { "type": "string" },
+          "completedJobs": { "type": "integer", "minimum": 0 },
+          "failedJobs": { "type": "integer", "minimum": 0 }
+        },
+        "not": {
+          "anyOf": [
+            { "required": ["secret"] },
+            { "required": ["token"] },
+            { "required": ["apiKey"] },
+            { "required": ["credential"] },
+            { "required": ["privateKey"] }
+          ]
+        }
+      }
+    },
+    "integrationDeadLetters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "jobId", "connectorId", "environmentId", "jobType", "payloadDigest", "errorCode", "attempts", "generation", "status", "createdAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "jobId": { "type": "string" },
+          "connectorId": { "type": "string" },
+          "environmentId": { "type": "string" },
+          "jobType": { "type": "string" },
+          "payloadDigest": { "type": "string" },
+          "errorCode": { "type": "string" },
+          "attempts": { "type": "integer", "minimum": 1 },
+          "generation": { "type": "integer", "minimum": 1 },
+          "status": {
+            "type": "string",
+            "enum": ["待复核", "已重放"]
+          },
+          "createdAt": { "type": "string" },
+          "reviewedBy": { "type": "string" },
+          "reviewNote": { "type": "string" },
+          "redrivenAt": { "type": "string" }
+        },
+        "not": {
+          "anyOf": [
+            { "required": ["payload"] },
+            { "required": ["leaseToken"] }
+          ]
+        }
+      }
+    },
+    "integrationExecutionEvents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "status", "detail", "occurredAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "jobId": { "type": "string" },
+          "workerId": { "type": "string" },
+          "type": { "type": "string" },
+          "status": { "type": "string" },
+          "detail": { "type": "string" },
+          "occurredAt": { "type": "string" }
+        }
+      }
+    },
+    "integrationCallbackReceipts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "not": {
+          "anyOf": [
+            { "required": ["signature"] },
+            { "required": ["nonce"] }
+          ]
+        }
+      }
+    },
+    "integrationReplayEvents": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "integrationQuarantines": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "integrationCutoverWindows": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "productionRuntimeControls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "control", "owner", "evidence", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "control": { "type": "string" },
+          "owner": { "type": "string" },
+          "evidence": { "type": "string" },
+          "status": { "type": "string", "enum": ["已实现", "待配置", "已配置"] },
+          "verifiedAt": { "type": "string" }
+        }
+      }
+    },
+    "cutoverEvidenceRequirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "requirementId", "name", "ownerRole", "siteRequired", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "requirementId": { "type": "string" },
+          "name": { "type": "string" },
+          "ownerRole": { "type": "string" },
+          "siteRequired": { "type": "boolean" },
+          "artifactName": { "type": "string" },
+          "artifactDigest": { "type": "string" },
+          "submittedBy": { "type": "string" },
+          "verifiedBy": { "type": "string" },
+          "status": { "type": "string", "enum": ["待上传", "待复核", "已核验", "rejected"] },
+          "updatedAt": { "type": "string" }
+        },
+        "not": {
+          "anyOf": [
+            { "required": ["payload"] },
+            { "required": ["rawPayload"] },
+            { "required": ["content"] },
+            { "required": ["signature"] },
+            { "required": ["nonce"] },
+            { "required": ["secret"] }
+          ]
+        }
+      }
+    },
+    "productionCutoverApprovals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "role", "decision"],
+        "properties": {
+          "id": { "type": "string" },
+          "role": { "type": "string", "enum": ["接口责任人", "安全责任人", "运行责任人", "医院责任人"] },
+          "approver": { "type": "string" },
+          "decision": { "type": "string", "enum": ["待签批", "同意", "拒绝"] },
+          "note": { "type": "string" },
+          "approvalDigest": { "type": "string" },
+          "approvedAt": { "type": "string" }
+        }
+      }
+    },
+    "productionGoNoGo": {
+      "type": "object",
+      "required": ["decision", "status", "checks", "blockers", "evaluatedAt", "evaluatedBy"],
+      "properties": {
+        "decision": { "type": "string", "enum": ["GO", "NO-GO"] },
+        "status": { "type": "string" },
+        "checks": {
+          "type": "object",
+          "additionalProperties": { "type": "boolean" }
+        },
+        "blockers": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "evaluatedAt": { "type": "string" },
+        "evaluatedBy": { "type": "string" }
+      }
+    },
+    "assessmentSummary": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "pilotOutcomeMetrics": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pilotHospitalOutcomes": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pilotIssueThemes": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pilotImprovementPlans": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "rolloutRegions": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "pilotAssessmentReports": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "assistantSummary": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "assistantKnowledgeSources": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "assistantKnowledgeVersions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "sourceId", "version", "checksum", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "sourceId": { "type": "string" },
+          "version": { "type": "string" },
+          "checksum": { "type": "string" },
+          "status": { "type": "string", "enum": ["草稿", "待审批", "已批准", "已发布"] }
+        }
+      }
+    },
+    "standardQaRecords": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "assistantRetrievalTraces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "questionId", "topMatches", "threshold", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "questionId": { "type": "string" },
+          "topMatches": { "type": "array", "items": { "type": "object" } },
+          "threshold": { "type": "number", "minimum": 0, "maximum": 1 },
+          "status": { "type": "string", "enum": ["命中充分", "需补充", "人工复核"] }
+        }
+      }
+    },
+    "assistantModelCalls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "businessId", "promptVersion", "requestDigest", "responseDigest", "callStatus", "reviewStatus"],
+        "properties": {
+          "id": { "type": "string" },
+          "businessId": { "type": "string" },
+          "promptVersion": { "type": "string" },
+          "requestDigest": { "type": "string" },
+          "responseDigest": { "type": "string" },
+          "callStatus": { "type": "string", "enum": ["成功", "降级", "失败"] },
+          "reviewStatus": { "type": "string", "enum": ["待复核", "已复核"] }
+        }
+      }
+    },
+    "assistantQualityGate": {
+      "type": "object",
+      "required": ["citationCoverage", "answerAccuracy", "retrievalRecall", "safetyCompliance", "maxLatencyMs", "maxRegressionPoints"],
+      "properties": {
+        "citationCoverage": { "type": "number", "minimum": 0, "maximum": 100 },
+        "answerAccuracy": { "type": "number", "minimum": 0, "maximum": 100 },
+        "retrievalRecall": { "type": "number", "minimum": 0, "maximum": 100 },
+        "safetyCompliance": { "type": "number", "minimum": 0, "maximum": 100 },
+        "maxLatencyMs": { "type": "integer", "minimum": 0 },
+        "maxRegressionPoints": { "type": "number", "minimum": 0 }
+      }
+    },
+    "assistantEvaluationSuites": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "version", "caseCount", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "version": { "type": "string" },
+          "caseCount": { "type": "integer", "minimum": 1 },
+          "status": { "type": "string", "enum": ["草稿", "待复核", "已发布", "已停用"] }
+        }
+      }
+    },
+    "assistantEvaluationRuns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "candidateVersion", "score", "gateStatus", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "candidateVersion": { "type": "string" },
+          "score": { "type": "number", "minimum": 0, "maximum": 100 },
+          "gateStatus": { "type": "string", "enum": ["通过", "阻断"] },
+          "status": { "type": "string", "enum": ["排队中", "运行中", "已完成", "失败"] }
+        }
+      }
+    },
+    "assistantReleaseCandidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "version", "evaluationRunId", "gateStatus", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "version": { "type": "string" },
+          "evaluationRunId": { "type": "string" },
+          "gateStatus": { "type": "string", "enum": ["通过", "阻断"] },
+          "status": { "type": "string", "enum": ["候选", "待审批", "已发布", "历史版本", "已回滚"] }
+        }
+      }
+    },
+    "assistantOnlineGuardrail": {
+      "type": "object",
+      "required": ["citationCoverage", "answerAcceptance", "maxNoAnswerRate", "maxEscalationRate", "maxP95LatencyMs", "maxSafetyEvents", "maxDriftScore"],
+      "properties": {
+        "citationCoverage": { "type": "number", "minimum": 0, "maximum": 100 },
+        "answerAcceptance": { "type": "number", "minimum": 0, "maximum": 100 },
+        "maxNoAnswerRate": { "type": "number", "minimum": 0, "maximum": 100 },
+        "maxEscalationRate": { "type": "number", "minimum": 0, "maximum": 100 },
+        "maxP95LatencyMs": { "type": "integer", "minimum": 0 },
+        "maxSafetyEvents": { "type": "integer", "minimum": 0 },
+        "maxDriftScore": { "type": "number", "minimum": 0 }
+      }
+    },
+    "assistantDeployments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "releaseId", "version", "strategy", "trafficPercent", "cohorts", "stableVersion", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "releaseId": { "type": "string" },
+          "version": { "type": "string" },
+          "strategy": { "type": "string", "enum": ["灰度", "全量"] },
+          "trafficPercent": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "cohorts": { "type": "array", "items": { "type": "string" } },
+          "stableVersion": { "type": "string" },
+          "status": { "type": "string", "enum": ["稳定", "灰度中", "已暂停", "已完成", "历史版本", "已回滚"] }
+        }
+      }
+    },
+    "assistantOnlineQualityWindows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "deploymentId", "version", "sampleCount", "citationCoverage", "answerAcceptance", "noAnswerRate", "escalationRate", "p95LatencyMs", "safetyEvents", "driftScore", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "deploymentId": { "type": "string" },
+          "version": { "type": "string" },
+          "sampleCount": { "type": "integer", "minimum": 0 },
+          "citationCoverage": { "type": "number", "minimum": 0, "maximum": 100 },
+          "answerAcceptance": { "type": "number", "minimum": 0, "maximum": 100 },
+          "noAnswerRate": { "type": "number", "minimum": 0, "maximum": 100 },
+          "escalationRate": { "type": "number", "minimum": 0, "maximum": 100 },
+          "p95LatencyMs": { "type": "integer", "minimum": 0 },
+          "safetyEvents": { "type": "integer", "minimum": 0 },
+          "driftScore": { "type": "number", "minimum": 0 },
+          "status": { "type": "string", "enum": ["健康", "关注", "异常"] }
+        }
+      }
+    },
+    "assistantQualityIncidents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "deploymentId", "version", "signal", "level", "threshold", "actual", "action", "owner", "status", "createdAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "deploymentId": { "type": "string" },
+          "version": { "type": "string" },
+          "signal": { "type": "string" },
+          "level": { "type": "string", "enum": ["中", "高", "紧急"] },
+          "threshold": { "type": "string" },
+          "actual": { "type": "string" },
+          "action": { "type": "string" },
+          "owner": { "type": "string" },
+          "status": { "type": "string", "enum": ["开放", "处理中", "已解决"] },
+          "createdAt": { "type": "string" },
+          "resolvedAt": { "type": "string" }
+        }
+      }
+    },
+    "assistantFeedbackRecords": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "deploymentId", "version", "questionId", "channel", "rating", "sentiment", "reason", "comment", "citationUseful", "userRole", "status", "createdAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "deploymentId": { "type": "string" },
+          "version": { "type": "string" },
+          "questionId": { "type": "string" },
+          "channel": { "type": "string", "enum": ["回答评价", "试点工单", "审核反馈"] },
+          "rating": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "sentiment": { "type": "string", "enum": ["正向", "负向"] },
+          "reason": { "type": "string" },
+          "comment": { "type": "string" },
+          "citationUseful": { "type": "boolean" },
+          "userRole": { "type": "string" },
+          "status": { "type": "string", "enum": ["待研判", "已研判", "已转样本", "已关闭"] },
+          "createdAt": { "type": "string" }
+        }
+      }
+    },
+    "assistantImprovementSamples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "feedbackId", "sourceVersion", "domain", "question", "expectedAnswer", "sourceEvidence", "riskLevel", "targetSuiteId", "status", "owner", "createdAt", "updatedAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "feedbackId": { "type": "string" },
+          "sourceVersion": { "type": "string" },
+          "domain": { "type": "string" },
+          "question": { "type": "string" },
+          "expectedAnswer": { "type": "string" },
+          "sourceEvidence": { "type": "array", "items": { "type": "string" } },
+          "riskLevel": { "type": "string", "enum": ["低", "中", "高"] },
+          "targetSuiteId": { "type": "string" },
+          "status": { "type": "string", "enum": ["待标注", "已标注", "已入集", "已验证", "已排除"] },
+          "owner": { "type": "string" },
+          "createdAt": { "type": "string" },
+          "updatedAt": { "type": "string" }
+        }
+      }
+    },
+    "assistantImprovementCycles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "sourceFeedbackIds", "sampleIds", "targetSuiteId", "targetVersion", "evaluationRunId", "status", "owner", "startedAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "sourceFeedbackIds": { "type": "array", "items": { "type": "string" } },
+          "sampleIds": { "type": "array", "items": { "type": "string" } },
+          "targetSuiteId": { "type": "string" },
+          "targetVersion": { "type": "string" },
+          "evaluationRunId": { "type": "string" },
+          "status": { "type": "string", "enum": ["待回归", "已完成"] },
+          "owner": { "type": "string" },
+          "startedAt": { "type": "string" },
+          "completedAt": { "type": "string" }
+        }
+      }
+    },
+    "anomalyExplanations": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "rectificationSuggestions": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "reviewRiskSignals": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "monitoringSummary": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "serviceHealth": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "interfaceHealth": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "jobQueues": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "storagePools": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "monitoringAlerts": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "publicHealthSummary": {
+      "type": "object",
+      "properties": {
+        "verifiedLanes": { "type": "integer", "minimum": 0 },
+        "totalLanes": { "type": "integer", "minimum": 0 },
+        "openIncidents": { "type": "integer", "minimum": 0 },
+        "p0Incidents": { "type": "integer", "minimum": 0 },
+        "pendingVerification": { "type": "integer", "minimum": 0 },
+        "closedIncidents": { "type": "integer", "minimum": 0 },
+        "overdueIncidents": { "type": "integer", "minimum": 0 },
+        "escalatedIncidents": { "type": "integer", "minimum": 0 },
+        "continuityReady": { "type": "boolean" },
+        "productionReady": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "publicHealthStatus": {
+      "type": "object",
+      "properties": {
+        "endpointConnectivityReady": { "type": "boolean" },
+        "continuousConnectivityReady": { "type": "boolean" },
+        "productionReady": { "const": false },
+        "consecutiveCampaigns": { "type": "integer", "minimum": 0 },
+        "requiredConsecutiveCampaigns": { "type": "integer", "minimum": 1 },
+        "campaignChainLinksVerified": { "type": "integer", "minimum": 0 },
+        "continuityBreak": { "type": ["object", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "publicHealthLanes": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "publicHealthCampaigns": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "publicHealthIncidents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "revision", "laneId", "title", "level", "hospitalCode", "owner", "status", "dueAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "revision": { "type": "integer", "minimum": 1 },
+          "laneId": { "type": "string" },
+          "title": { "type": "string" },
+          "level": { "type": "string", "enum": ["P0", "P1", "P2"] },
+          "source": { "type": "string" },
+          "hospitalCode": { "type": "string" },
+          "owner": { "type": "string" },
+          "status": { "type": "string", "enum": ["待核查", "处置中", "待复核", "已关闭"] },
+          "dueAt": { "type": "string" },
+          "latestAction": { "type": "string" },
+          "submittedForReviewBy": { "type": "string" },
+          "evidenceIds": { "type": "array", "items": { "type": "string" } },
+          "sla": { "type": "object" },
+          "escalation": { "type": ["object", "null"] },
+          "professionalAssociation": { "type": "object" },
+          "closureGate": {
+            "type": "object",
+            "properties": {
+              "ready": { "type": "boolean" },
+              "required": { "type": "integer", "minimum": 2, "maximum": 4 },
+              "accepted": { "type": "integer", "minimum": 0, "maximum": 4 },
+              "missingTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": ["business-receipt", "site-joint-test", "production-approval", "dr-rehearsal"]
+                }
+              },
+              "productionReady": { "const": false }
+            },
+            "additionalProperties": true
+          },
+          "evidence": {
+            "type": "array",
+            "items": { "$ref": "#/properties/publicHealthIncidentEvidence/items" }
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "publicHealthIncidentEvidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "revision", "incidentId", "hospitalCode", "evidenceType", "referenceNo", "summary", "digest", "status", "submittedBy", "submittedAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "revision": { "type": "integer", "minimum": 1 },
+          "incidentId": { "type": "string" },
+          "hospitalCode": { "type": "string" },
+          "evidenceType": {
+            "type": "string",
+            "enum": ["business-receipt", "site-joint-test", "production-approval", "dr-rehearsal"]
+          },
+          "referenceNo": { "type": "string" },
+          "summary": { "type": "string" },
+          "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+          "status": { "type": "string", "enum": ["submitted", "accepted", "rejected"] },
+          "submittedBy": { "type": "string" },
+          "submittedAt": { "type": "string" },
+          "reviewedBy": { "type": "string" },
+          "reviewedAt": { "type": "string" },
+          "productionEvidence": { "const": false }
+        },
+        "additionalProperties": false
+      }
+    },
+    "publicHealthEvidenceActions": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "publicHealthIncidentActions": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "productionBlockers": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "runtimeRoutes": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "publicHealth": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": 3 },
+        "productionReady": { "const": false },
+        "lanes": { "type": "array", "items": { "type": "object" } },
+        "campaigns": { "type": "array", "items": { "type": "object" } },
+        "incidents": { "type": "array", "items": { "type": "object" } },
+        "incidentEvidence": { "type": "array", "items": { "$ref": "#/properties/publicHealthIncidentEvidence/items" } },
+        "evidenceActions": { "type": "array", "items": { "type": "object" } },
+        "incidentActions": { "type": "array", "items": { "type": "object" } },
+        "blockers": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    "alerts": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "users": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "exportApprovals": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "systemParams": {
+      "type": ["array", "object"]
+    },
+    "auditLogs": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    }
+  }
+}

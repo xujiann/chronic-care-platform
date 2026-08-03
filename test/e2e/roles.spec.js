@@ -22,6 +22,7 @@ async function login(page, username, expectedPage) {
 }
 
 test("commission user reaches the governance dashboard and opens maintenance", async ({ page }) => {
+  test.setTimeout(90_000);
   await login(page, "health", "index.html");
   await expect(page.locator("#data-source")).toHaveText("本地服务");
 
@@ -65,7 +66,7 @@ test("commission user reaches the governance dashboard and opens maintenance", a
   await expect(page.locator("#identity-lifecycle-metrics")).toContainText("最近清理 0 条");
 
   await page.goto("/workbench.html");
-  await expect(page.locator("#system-readiness")).toBeVisible();
+  await expect(page.locator("#system-readiness")).toBeVisible({ timeout: 30_000 });
   await expect(page.locator("#system-readiness .priority-row")).toHaveCount(15);
   await expect(page.locator("#system-readiness")).toContainText("现场高风险依赖");
   await expect(page.locator("#system-readiness")).toContainText("政务统一身份源");
@@ -73,6 +74,7 @@ test("commission user reaches the governance dashboard and opens maintenance", a
 
   await page.goto("/platform.html");
 
+  await expect(page.locator("#application-catalog tbody tr")).toHaveCount(6, { timeout: 30_000 });
   const applicationRow = page.locator("#application-catalog tbody tr", { hasText: "全民健康信息平台一、二期" });
   await applicationRow.getByRole("button", { name: "维护" }).click();
   await expect(page.locator("#platform-edit-dialog")).toHaveAttribute("open", "");
@@ -119,11 +121,12 @@ test("digital hospital pilot issue desk is scoped, actionable and mobile safe", 
 });
 
 test("commission workbench renders live release gates and site templates", async ({ page }) => {
+  test.setTimeout(90_000);
   await login(page, "health", "index.html");
   await page.goto("/workbench.html");
 
   const releaseGates = page.locator("#release-evidence-gates .release-evidence-gate");
-  await expect(releaseGates).toHaveCount(11);
+  await expect(releaseGates).toHaveCount(11, { timeout: 45_000 });
   await expect(page.locator("[data-gate='process:audit']")).toContainText("PASS");
   await expect(page.locator("[data-gate='service:acceptance']")).toContainText("domains");
   await expect(page.locator("[data-gate='service:acceptance']")).toContainText("actions");

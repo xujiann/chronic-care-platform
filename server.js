@@ -167,6 +167,23 @@ const CareServicePlatform = require("./care-service-platform-adapter");
 const CareServiceRuntime = require("./care-service-runtime");
 const { createCareServiceDeliveryAdapters } = require("./care-service-delivery-adapters");
 const { createCareServiceStateRepository } = require("./care-service-state-repository");
+const { createDigitalHospitalExecutionService } = require("./digital-hospital-execution-service");
+const {
+  buildDigitalHospitalSecurityCenter,
+  configureDigitalHospitalManagedSecretLoader,
+  verifySignedExecutionCallback
+} = require("./digital-hospital-execution-security");
+const {
+  advancePublicHealthIncident: advanceDigitalHospitalPublicHealthIncident,
+  buildPublicHealthCoordinationBoard: buildDigitalHospitalPublicHealthCoordinationBoard,
+  createPublicHealthIncident: createDigitalHospitalPublicHealthIncident,
+  escalatePublicHealthIncident: escalateDigitalHospitalPublicHealthIncident,
+  normalizePublicHealthCoordination: normalizeDigitalHospitalPublicHealthCoordination,
+  reviewPublicHealthIncidentEvidence: reviewDigitalHospitalPublicHealthIncidentEvidence,
+  renderPublicHealthIncidentCsv: renderDigitalHospitalPublicHealthIncidentCsv,
+  seedPublicHealthCoordination: seedDigitalHospitalPublicHealthCoordination,
+  submitPublicHealthIncidentEvidence: submitDigitalHospitalPublicHealthIncidentEvidence
+} = require("./digital-hospital-public-health-coordination");
 const { buildCareServiceProductionReadiness } = require("./scripts/care-service-production-readiness");
 const {
   DEFAULT_EVIDENCE_DIR: DEFAULT_PRODUCTION_RELEASE_EVIDENCE_DIR,
@@ -231,7 +248,7 @@ const {
 const { buildProcessAuditReport } = require("./scripts/process-audit");
 const { buildSiteReadinessPack, renderTemplateReadmes } = require("./scripts/site-readiness-pack");
 const { buildHealthDashboardSummary, buildPriorityApplicationTemplates } = require("./scripts/health-dashboard-summary");
-const { buildPilotAcceptanceCenter } = require("./pilot-acceptance");
+const { applyPilotInterfaceReviewAction, buildInterfaceReviews, buildPilotAcceptanceCenter } = require("./pilot-acceptance");
 const { buildReleaseReport, buildServiceAcceptanceSummary } = require("./scripts/release-report");
 const { buildReleaseArtifactManifest } = require("./scripts/release-artifact-manifest");
 const { buildCapabilityMap, renderCapabilityMapMarkdown } = require("./platform-capability-map");
@@ -446,6 +463,7 @@ const runtimeMetrics = {
 };
 let runtimeSessionStoreInstance = null;
 let runtimeSessionStoreKey = "";
+let digitalHospitalExecutionServiceInstance = null;
 let sessionCleanupTimer = null;
 let sessionCleanupState = {
   status: "not-run",
@@ -458,6 +476,96 @@ let sessionCleanupState = {
   errorCode: "",
   error: ""
 };
+
+function digitalHospitalExecutionDatabaseFile() {
+  return path.resolve(
+    process.env.DIGITAL_HOSPITAL_EXECUTION_DATABASE_FILE
+      || path.join(DATA_DIR, "digital-hospital-execution.sqlite")
+  );
+}
+
+function digitalHospitalExecutionRuntime() {
+  if (!digitalHospitalExecutionServiceInstance) {
+    digitalHospitalExecutionServiceInstance = createDigitalHospitalExecutionService({
+      databaseFile: digitalHospitalExecutionDatabaseFile(),
+      busyTimeoutMs: SQLITE_BUSY_TIMEOUT_MS
+    });
+  }
+  return digitalHospitalExecutionServiceInstance;
+}
+
+function configureDigitalHospitalExecutionRuntime(options = {}) {
+  if (Object.prototype.hasOwnProperty.call(options, "managedSecretLoader")) {
+    configureDigitalHospitalManagedSecretLoader(options.managedSecretLoader);
+  }
+  if (Object.prototype.hasOwnProperty.call(options, "executionService")) {
+    if (digitalHospitalExecutionServiceInstance
+      && digitalHospitalExecutionServiceInstance !== options.executionService
+      && typeof digitalHospitalExecutionServiceInstance.close === "function") {
+      digitalHospitalExecutionServiceInstance.close();
+    }
+    digitalHospitalExecutionServiceInstance = options.executionService || null;
+  }
+}
+
+function digitalHospitalClientCertificate(req, proxyHeaderName = "") {
+  const certificate = typeof req.socket?.getPeerCertificate === "function"
+    ? req.socket.getPeerCertificate()
+    : null;
+  const transportFingerprint = certificate?.fingerprint256 || "";
+  if (req.socket?.authorized && transportFingerprint) {
+    return { fingerprint: transportFingerprint, authorized: true, source: "tls-transport" };
+  }
+  const proxyFingerprint = proxyHeaderName ? String(req.headers[proxyHeaderName] || "").trim() : "";
+  return {
+    fingerprint: proxyFingerprint,
+    authorized: false,
+    source: proxyFingerprint ? "trusted-proxy-assertion" : "missing"
+  };
+}
+
+function digitalHospitalWorkerFingerprints() {
+  return String(process.env.DIGITAL_HOSPITAL_WORKER_MTLS_FINGERPRINTS || "")
+    .split(/[,;\n]/)
+    .map((item) => item.replace(/[^a-f0-9]/gi, "").toLowerCase())
+    .filter(Boolean);
+}
+
+function requireDigitalHospitalExecutionWorker(req, res, target) {
+  if (!isProductionRuntime()) return requireApiRole(req, res, ["commission"], target);
+  const certificate = digitalHospitalClientCertificate(
+    req,
+    String(process.env.DIGITAL_HOSPITAL_TRUST_PROXY_MTLS || "").toLowerCase() === "true"
+      ? "x-client-cert-fingerprint"
+      : ""
+  );
+  const fingerprint = certificate.fingerprint.replace(/[^a-f0-9]/gi, "").toLowerCase();
+  if (!fingerprint || !digitalHospitalWorkerFingerprints().includes(fingerprint)
+    || (!certificate.authorized && certificate.source !== "trusted-proxy-assertion")) {
+    sendJson(res, 401, {
+      error: "Unauthorized",
+      code: "DIGITAL_HOSPITAL_WORKER_MTLS_REQUIRED",
+      message: "trusted execution Worker mTLS identity is required"
+    });
+    return null;
+  }
+  return {
+    username: `execution-worker:${fingerprint.slice(0, 12)}`,
+    name: "数智医院执行Worker",
+    role: "system"
+  };
+}
+
+function sendDigitalHospitalExecutionError(res, error) {
+  const status = Math.min(599, Math.max(400, Number(error?.status || error?.statusCode || 400)));
+  sendJson(res, status, {
+    ok: false,
+    error: status === 404 ? "Not Found" : status === 409 ? "Conflict" : status === 401 ? "Unauthorized" : status >= 500 ? "Service Unavailable" : "Bad Request",
+    code: error?.code || "DIGITAL_HOSPITAL_EXECUTION_ERROR",
+    message: error?.message || "digital hospital execution request failed"
+  });
+}
+
 const DEMO_SMS_CODE = process.env.DEMO_SMS_CODE || "888888";
 const PHONE_CODE_TTL_MS = 5 * 60 * 1000;
 const PHONE_CODE_COOLDOWN_MS = 60 * 1000;
@@ -1164,6 +1272,7 @@ function seedState() {
     publicHealthStandardImplementationLedger: seedPublicHealthStandardImplementationLedger(),
     publicHealthInstitutionScopes: seedPublicHealthInstitutionScopes(),
     publicHealthEvents: seedPublicHealthEvents(),
+    digitalHospitalPublicHealthCoordination: seedDigitalHospitalPublicHealthCoordination(),
     publicHealthTriggerRules: seedPublicHealthTriggerRules(),
     publicHealthSignals: seedPublicHealthSignals(),
     publicHealthAlerts: seedPublicHealthAlerts(),
@@ -1331,6 +1440,7 @@ function seedState() {
     platformEvidence: seedPlatformEvidence(),
     platformCapabilityReviews: seedPlatformCapabilityReviews(),
     platformProductionBlockerReviews: seedPlatformProductionBlockerReviews(),
+    pilotAcceptanceInterfaceReviews: [],
     productionDeploymentPlan: seedProductionDeploymentPlan(),
     productionDatabaseMigrationBatches: seedProductionDatabaseMigrationBatches(),
     productionDatabaseCutoverRuns: seedProductionDatabaseCutoverRuns(),
@@ -2404,13 +2514,13 @@ function seedAuthUsers() {
     { id: "u-blood-quality", username: "blood_quality", password: "123456", name: "血液中心质控审核员", role: "commission", roleName: "血液中心冷链质控", orgCode: "BLOOD-DL", orgName: "大连市血液中心", orgType: "blood_center", orgLevel: "市级", dataScope: "冷链异常、质量处置与血液放行", home: "blood.html", accountType: "blood_quality", bloodPermissions: ["cold_chain_quality_review"], status: "启用" },
     { id: "u-blood-tech-1", username: "blood_tech_1", password: "123456", name: "输血科配血复核员甲", role: "institution", roleName: "输血科检验技师", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构交叉配血与发血复核", home: "blood.html", accountType: "blood_technologist", bloodPermissions: ["compatibility_review"], status: "启用" },
     { id: "u-blood-tech-2", username: "blood_tech_2", password: "123456", name: "输血科配血复核员乙", role: "institution", roleName: "输血科检验技师", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构交叉配血与发血复核", home: "blood.html", accountType: "blood_technologist", bloodPermissions: ["compatibility_review"], status: "启用" },
-    { id: "u-city", username: "city", name: "市级管理员", role: "commission", roleName: "市级健康城市管理", orgCode: "ORG-CITY-DL", orgName: "大连市健康城市平台", orgType: "city", orgLevel: "市级", dataScope: "全市", home: "workbench.html", status: "启用" },
-    { id: "u-district", username: "district", name: "区市县管理员", role: "commission", roleName: "区市县管理端", orgCode: "ORG-DIST-ZS", orgName: "中山区健康城市平台", orgType: "district", orgLevel: "区市县", dataScope: "中山区", home: "workbench.html", status: "启用" },
-    { id: "u-health", username: "health", name: "大连市卫生健康委管理员", role: "commission", roleName: "大连市卫生健康委", orgCode: "ORG-HEALTH-DL", orgName: "大连市卫生健康委", orgType: "health_admin", orgLevel: "市级", dataScope: "医疗资源、统计直报、公共卫生、分级诊疗和数据质量监管", home: "index.html", status: "启用" },
+    { id: "u-city", username: "city", name: "市级管理员", role: "commission", roleName: "市级健康城市管理", orgCode: "ORG-CITY-DL", orgName: "大连市健康城市平台", orgType: "city", orgLevel: "市级", dataScope: "全市", publicHealthHospitalCodes: ["H000001", "H000002", "H000003"], home: "workbench.html", status: "启用" },
+    { id: "u-district", username: "district", name: "区市县管理员", role: "commission", roleName: "区市县管理端", orgCode: "ORG-DIST-ZS", orgName: "中山区健康城市平台", orgType: "district", orgLevel: "区市县", dataScope: "中山区", publicHealthHospitalCodes: ["H000003"], home: "workbench.html", status: "启用" },
+    { id: "u-health", username: "health", name: "大连市卫生健康委管理员", role: "commission", roleName: "大连市卫生健康委", orgCode: "ORG-HEALTH-DL", orgName: "大连市卫生健康委", orgType: "health_admin", orgLevel: "市级", dataScope: "医疗资源、统计直报、公共卫生、分级诊疗和数据质量监管", publicHealthHospitalCodes: ["H000001", "H000002", "H000003"], home: "index.html", status: "启用" },
     { id: "u-mi", username: "mi", name: "大连市医保局管理员", role: "insurance", roleName: "大连市医保局管理端", orgCode: "ORG-MI-DL", orgName: "大连市医保局", orgType: "insurance_bureau", orgLevel: "市级", dataScope: "医保政策、基金监管、待遇管理和跨区县监督", home: "insurance.html", status: "启用" },
-    { id: "u-hospital", username: "hospital", name: "医疗机构管理员", role: "institution", roleName: "医疗机构端", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构", home: "institution.html", status: "启用" },
-    { id: "u-community", username: "community", name: "基层机构管理员", role: "institution", roleName: "基层医疗机构端", orgCode: "MR3", orgName: "青泥洼桥社区卫生服务中心", orgType: "medical_institution", orgLevel: "基层医疗机构", dataScope: "本机构与签约居民", home: "institution.html", status: "启用" },
-    { id: "u1", username: "whjw", name: "大连市卫生健康委管理员", role: "commission", roleName: "大连市卫生健康委", orgCode: "ORG-HEALTH-DL", orgName: "大连市卫生健康委", orgType: "health_admin", orgLevel: "市级", dataScope: "医疗资源、统计直报、公共卫生、分级诊疗和数据质量监管", home: "index.html", status: "启用" },
+    { id: "u-hospital", username: "hospital", name: "医疗机构管理员", role: "institution", roleName: "医疗机构端", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构", publicHealthHospitalCodes: ["H000001"], home: "institution.html", status: "启用" },
+    { id: "u-community", username: "community", name: "基层机构管理员", role: "institution", roleName: "基层医疗机构端", orgCode: "MR3", orgName: "青泥洼桥社区卫生服务中心", orgType: "medical_institution", orgLevel: "基层医疗机构", dataScope: "本机构与签约居民", publicHealthHospitalCodes: ["H000003"], home: "institution.html", status: "启用" },
+    { id: "u1", username: "whjw", name: "大连市卫生健康委管理员", role: "commission", roleName: "大连市卫生健康委", orgCode: "ORG-HEALTH-DL", orgName: "大连市卫生健康委", orgType: "health_admin", orgLevel: "市级", dataScope: "医疗资源、统计直报、公共卫生、分级诊疗和数据质量监管", publicHealthHospitalCodes: ["H000001", "H000002", "H000003"], home: "index.html", status: "启用" },
     { id: "u2", username: "doctor", name: "刘医生", role: "institution", roleName: "医生账户", orgCode: "MR3", orgName: "青泥洼桥社区卫生服务中心", orgType: "medical_institution", orgLevel: "基层医疗机构", dataScope: "签约居民、随访、长期处方、多点执业申请", home: "doctor.html", doctorId: "doc-liu", accountType: "doctor", status: "启用" },
     { id: "u-doctor-wang", username: "doctor_wang", name: "王医生", role: "institution", roleName: "医生账户", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构诊疗、转诊接诊、多点执业备案", home: "doctor.html", doctorId: "doc-wang", accountType: "doctor", status: "启用" },
     { id: "u3", username: "insurance", name: "大连市医保中心审核员", role: "insurance", roleName: "大连市医保中心经办端", orgCode: "ORG-MI-CENTER-DL", orgName: "大连市医保中心", orgType: "insurance_center", orgLevel: "市级", dataScope: "医保结算经办、凭证核验、固定取药审核和经办留痕", home: "insurance.html", status: "启用" },
@@ -11105,6 +11215,7 @@ function normalizeState(data) {
     publicHealthStandardImplementationLedger: mergeByKey(seedPublicHealthStandardImplementationLedger(), data.publicHealthStandardImplementationLedger, "id"),
     publicHealthInstitutionScopes: mergeByKey(seedPublicHealthInstitutionScopes(), data.publicHealthInstitutionScopes, "id"),
     publicHealthEvents: mergeByKey(seedPublicHealthEvents(), data.publicHealthEvents, "id"),
+    digitalHospitalPublicHealthCoordination: normalizeDigitalHospitalPublicHealthCoordination(data.digitalHospitalPublicHealthCoordination),
     publicHealthTriggerRules: mergeByKey(seedPublicHealthTriggerRules(), data.publicHealthTriggerRules, "id"),
     publicHealthCoordinationHandoffs: Array.isArray(data.publicHealthCoordinationHandoffs)
       ? data.publicHealthCoordinationHandoffs.slice(0, 100)
@@ -11444,6 +11555,7 @@ function normalizeState(data) {
     platformEvidence: cleanPlatformEvidenceText(mergeByKey(seedPlatformEvidence(), data.platformEvidence, "id")),
     platformCapabilityReviews: normalizePlatformCapabilityReviews(data.platformCapabilityReviews),
     platformProductionBlockerReviews: normalizePlatformProductionBlockerReviews(data.platformProductionBlockerReviews),
+    pilotAcceptanceInterfaceReviews: buildInterfaceReviews(data),
     productionDeploymentPlan: mergeByKey(seedProductionDeploymentPlan(), data.productionDeploymentPlan, "id"),
     productionDatabaseMigrationBatches: mergeByKey(seedProductionDatabaseMigrationBatches(), data.productionDatabaseMigrationBatches, "id"),
     productionDatabaseCutoverRuns: mergeByKey(seedProductionDatabaseCutoverRuns(), data.productionDatabaseCutoverRuns, "id"),
@@ -11666,6 +11778,7 @@ function completeSystemTargets(state) {
   }));
   state.platformCapabilityReviews = normalizePlatformCapabilityReviews(state.platformCapabilityReviews);
   state.platformProductionBlockerReviews = normalizePlatformProductionBlockerReviews(state.platformProductionBlockerReviews);
+  state.pilotAcceptanceInterfaceReviews = buildInterfaceReviews(state);
   state.productionDeploymentPlan = mergeByKey(seedProductionDeploymentPlan(), state.productionDeploymentPlan, "id").map((item) => ({
     ...item,
     requiredConfig: Array.isArray(item.requiredConfig) ? item.requiredConfig : [],
@@ -11792,6 +11905,7 @@ function completeSystemTargets(state) {
   state.publicHealthStandards = mergeByKey(seedPublicHealthStandards(), state.publicHealthStandards, "id");
   state.publicHealthInstitutionScopes = mergeByKey(seedPublicHealthInstitutionScopes(), state.publicHealthInstitutionScopes, "id");
   state.publicHealthEvents = mergeByKey(seedPublicHealthEvents(), state.publicHealthEvents, "id");
+  state.digitalHospitalPublicHealthCoordination = normalizeDigitalHospitalPublicHealthCoordination(state.digitalHospitalPublicHealthCoordination);
   state.publicHealthTriggerRules = mergeByKey(seedPublicHealthTriggerRules(), state.publicHealthTriggerRules, "id");
   state.publicHealthSignals = mergeByKey(seedPublicHealthSignals(), state.publicHealthSignals, "id");
   state.publicHealthAlerts = mergeByKey(seedPublicHealthAlerts(), state.publicHealthAlerts, "id");
@@ -17372,6 +17486,7 @@ function scopeStateForUser(data, user) {
   delete scoped.platformEvidence;
   delete scoped.platformCapabilityReviews;
   delete scoped.platformProductionBlockerReviews;
+  delete scoped.pilotAcceptanceInterfaceReviews;
   delete scoped.productionDeploymentPlan;
   delete scoped.productionDatabaseMigrationBatches;
   delete scoped.productionDatabaseCutoverRuns;
@@ -24926,6 +25041,75 @@ async function buildPublicHealthEndpointVerificationSummary(data, at) {
   };
 }
 
+async function buildDigitalHospitalPublicHealthProfessionalContext(data, at) {
+  const system = buildPublicHealthSystem({ data, now: at });
+  const endpointVerification = await buildPublicHealthEndpointVerificationSummary(data, at);
+  const endpointContinuity = await buildPublicHealthEndpointProbeCampaignSummary(data, at);
+  return {
+    events: system.events,
+    exchangeTasks: system.exchangeTasks,
+    exchangeRuns: system.exchangeRuns,
+    evidencePackets: system.cutoverEvidencePackets,
+    evidenceBridgeLinks: system.siteEvidenceBridge?.links || [],
+    endpointProbeEntries: endpointVerification.entries,
+    endpointContinuity: {
+      status: endpointContinuity.functionalState,
+      consecutiveCampaigns: Number(endpointContinuity.summary?.consecutiveCampaigns || 0),
+      requiredConsecutiveCampaigns: Number(endpointContinuity.summary?.requiredConsecutiveCampaigns || 0),
+      continuousConnectivityReady: endpointContinuity.continuousConnectivityReady === true,
+      productionReady: false
+    }
+  };
+}
+
+function digitalHospitalPublicHealthHospitalScope(user = {}, data = {}) {
+  const explicit = Array.isArray(user.publicHealthHospitalCodes)
+    ? user.publicHealthHospitalCodes.map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
+  if (explicit.length) return [...new Set(explicit)];
+  const allHospitalCodes = Array.from(new Set(
+    normalizeDigitalHospitalPublicHealthCoordination(data.digitalHospitalPublicHealthCoordination)
+      .incidents
+      .map((item) => String(item.hospitalCode || "").trim())
+      .filter(Boolean)
+  ));
+  if (["city", "health_admin"].includes(String(user.orgType || ""))) return allHospitalCodes;
+  return [];
+}
+
+function authorizeDigitalHospitalPublicHealthHospital(user, hospitalCode, authorizedHospitalCodes, res, target) {
+  const requestedHospitalCode = String(hospitalCode || "").trim();
+  if (!requestedHospitalCode || authorizedHospitalCodes.includes(requestedHospitalCode)) return true;
+  appendSecurityEvent({
+    actor: user?.name || user?.username || "unknown",
+    role: user?.role || "unknown",
+    action: "digital-hospital-public-health-hospital-scope",
+    target,
+    result: "denied",
+    detail: "requested hospital is outside the current organization scope"
+  });
+  sendJson(res, 403, {
+    error: "Forbidden",
+    code: "PUBLIC_HEALTH_HOSPITAL_SCOPE_FORBIDDEN",
+    message: "requested hospital is outside the current organization scope"
+  });
+  return false;
+}
+
+async function buildDigitalHospitalPublicHealthBoard(data, options = {}) {
+  const now = String(options.now || new Date().toISOString());
+  const professionalContext = await buildDigitalHospitalPublicHealthProfessionalContext(data, now);
+  return buildDigitalHospitalPublicHealthCoordinationBoard(
+    data.digitalHospitalPublicHealthCoordination,
+    {
+      now,
+      filters: options.filters,
+      professionalContext,
+      authorizedHospitalCodes: options.authorizedHospitalCodes
+    }
+  );
+}
+
 function publicHealthEndpointProbeCampaignVerificationOptions(context, at) {
   return {
     env: process.env,
@@ -29443,6 +29627,327 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/digital-hospital/public-health/coordination") {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/public-health/coordination");
+    if (!user) return;
+    const data = readDatabase();
+    const filters = Object.fromEntries(url.searchParams.entries());
+    const authorizedHospitalCodes = digitalHospitalPublicHealthHospitalScope(user, data);
+    if (!authorizeDigitalHospitalPublicHealthHospital(
+      user,
+      filters.hospitalCode,
+      authorizedHospitalCodes,
+      res,
+      "/api/digital-hospital/public-health/coordination"
+    )) return;
+    const board = await buildDigitalHospitalPublicHealthBoard(data, {
+      filters,
+      authorizedHospitalCodes
+    });
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "digital-hospital-public-health-coordination-read",
+      target: "/api/digital-hospital/public-health/coordination",
+      result: "allowed",
+      detail: `${authorizedHospitalCodes.length} hospitals / ${board.summary.totalLanes} lanes / ${board.summary.filteredIncidents} filtered incidents / ${board.summary.overdueIncidents} overdue / productionReady=false`
+    });
+    sendJson(res, 200, board);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/digital-hospital/public-health/incidents/export") {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/public-health/incidents/export");
+    if (!user) return;
+    const data = readDatabase();
+    const query = Object.fromEntries(url.searchParams.entries());
+    const authorizedHospitalCodes = digitalHospitalPublicHealthHospitalScope(user, data);
+    if (!authorizeDigitalHospitalPublicHealthHospital(
+      user,
+      query.hospitalCode,
+      authorizedHospitalCodes,
+      res,
+      "/api/digital-hospital/public-health/incidents/export"
+    )) return;
+    const format = String(query.format || "json").trim().toLowerCase();
+    if (!["json", "csv"].includes(format)) {
+      sendJson(res, 400, {
+        error: "Bad Request",
+        code: "PUBLIC_HEALTH_EXPORT_FORMAT_INVALID",
+        message: "format must be json or csv"
+      });
+      return;
+    }
+    const board = await buildDigitalHospitalPublicHealthBoard(data, {
+      filters: query,
+      authorizedHospitalCodes
+    });
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "digital-hospital-public-health-incident-export",
+      target: "/api/digital-hospital/public-health/incidents/export",
+      result: "allowed",
+      detail: `${format} / ${board.summary.filteredIncidents} incidents / productionReady=false`
+    });
+    const filename = `digital-hospital-public-health-incidents-${new Date().toISOString().slice(0, 10)}.${format}`;
+    if (format === "csv") {
+      sendDownload(
+        res,
+        200,
+        renderDigitalHospitalPublicHealthIncidentCsv(board),
+        "text/csv; charset=utf-8",
+        filename
+      );
+      return;
+    }
+    sendDownload(
+      res,
+      200,
+      JSON.stringify({
+        ok: true,
+        generatedAt: board.generatedAt,
+        filters: board.filters,
+        summary: board.summary,
+        statistics: board.statistics,
+        incidents: board.coordination.incidents,
+        productionBoundary: board.productionBoundary
+      }, null, 2),
+      "application/json; charset=utf-8",
+      filename
+    );
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/digital-hospital/public-health/incidents") {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/public-health/incidents");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const authorizedHospitalCodes = digitalHospitalPublicHealthHospitalScope(user, data);
+    if (!authorizeDigitalHospitalPublicHealthHospital(
+      user,
+      payload.hospitalCode,
+      authorizedHospitalCodes,
+      res,
+      "/api/digital-hospital/public-health/incidents"
+    )) return;
+    try {
+      const result = createDigitalHospitalPublicHealthIncident(
+        data.digitalHospitalPublicHealthCoordination,
+        payload,
+        user,
+        { authorizedHospitalCodes }
+      );
+      data.digitalHospitalPublicHealthCoordination = result.state;
+      data.securityEvents = sealAuditTrail([
+        {
+          id: randomUUID(),
+          at: new Date().toISOString(),
+          actor: user.name,
+          role: user.role,
+          action: "digital-hospital-public-health-incident-create",
+          target: result.incident.id,
+          result: "allowed",
+          detail: `${result.incident.level} / ${result.incident.laneId} / revision ${result.incident.revision}`
+        },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120), { recompute: true });
+      writeDatabase(data);
+      sendJson(res, 201, {
+        ok: true,
+        incident: result.incident,
+        action: result.action,
+        board: await buildDigitalHospitalPublicHealthBoard(data, { authorizedHospitalCodes })
+      });
+    } catch (error) {
+      sendJson(res, Number(error.status || 400), {
+        error: Number(error.status || 400) === 409 ? "Conflict" : "Bad Request",
+        code: error.code || "PUBLIC_HEALTH_COORDINATION_INVALID",
+        message: error.message
+      });
+    }
+    return;
+  }
+
+  const digitalHospitalPublicHealthIncidentEvidenceMatch = url.pathname.match(
+    /^\/api\/digital-hospital\/public-health\/incidents\/([^/]+)\/evidence$/
+  );
+  if (req.method === "POST" && digitalHospitalPublicHealthIncidentEvidenceMatch) {
+    const user = requireApiRole(
+      req,
+      res,
+      ["commission"],
+      "/api/digital-hospital/public-health/incidents/:id/evidence"
+    );
+    if (!user) return;
+    const incidentId = decodeURIComponent(digitalHospitalPublicHealthIncidentEvidenceMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const authorizedHospitalCodes = digitalHospitalPublicHealthHospitalScope(user, data);
+    try {
+      const result = submitDigitalHospitalPublicHealthIncidentEvidence(
+        data.digitalHospitalPublicHealthCoordination,
+        incidentId,
+        payload,
+        user,
+        { authorizedHospitalCodes }
+      );
+      data.digitalHospitalPublicHealthCoordination = result.state;
+      data.securityEvents = sealAuditTrail([
+        {
+          id: randomUUID(),
+          at: new Date().toISOString(),
+          actor: user.name,
+          role: user.role,
+          action: "digital-hospital-public-health-evidence-submit",
+          target: result.evidence.id,
+          result: "allowed",
+          detail: `${result.incident.id} / ${result.evidence.evidenceType} / incident revision ${result.incident.revision} / productionEvidence=false`
+        },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120), { recompute: true });
+      writeDatabase(data);
+      sendJson(res, 201, {
+        ok: true,
+        incident: result.incident,
+        evidence: result.evidence,
+        action: result.action,
+        closureGate: result.closureGate,
+        board: await buildDigitalHospitalPublicHealthBoard(data, { authorizedHospitalCodes })
+      });
+    } catch (error) {
+      sendJson(res, Number(error.status || 400), {
+        error: Number(error.status || 400) === 409
+          ? "Conflict"
+          : Number(error.status || 400) === 404 ? "Not Found" : "Bad Request",
+        code: error.code || "PUBLIC_HEALTH_COORDINATION_INVALID",
+        message: error.message
+      });
+    }
+    return;
+  }
+
+  const digitalHospitalPublicHealthEvidenceActionMatch = url.pathname.match(
+    /^\/api\/digital-hospital\/public-health\/evidence\/([^/]+)\/actions$/
+  );
+  if (req.method === "POST" && digitalHospitalPublicHealthEvidenceActionMatch) {
+    const user = requireApiRole(
+      req,
+      res,
+      ["commission"],
+      "/api/digital-hospital/public-health/evidence/:id/actions"
+    );
+    if (!user) return;
+    const evidenceId = decodeURIComponent(digitalHospitalPublicHealthEvidenceActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const authorizedHospitalCodes = digitalHospitalPublicHealthHospitalScope(user, data);
+    try {
+      const result = reviewDigitalHospitalPublicHealthIncidentEvidence(
+        data.digitalHospitalPublicHealthCoordination,
+        evidenceId,
+        payload,
+        user,
+        { authorizedHospitalCodes }
+      );
+      data.digitalHospitalPublicHealthCoordination = result.state;
+      data.securityEvents = sealAuditTrail([
+        {
+          id: randomUUID(),
+          at: new Date().toISOString(),
+          actor: user.name,
+          role: user.role,
+          action: "digital-hospital-public-health-evidence-review",
+          target: result.evidence.id,
+          result: "allowed",
+          detail: `${result.action.action} / ${result.incident.id} / incident revision ${result.incident.revision} / productionEvidence=false`
+        },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120), { recompute: true });
+      writeDatabase(data);
+      sendJson(res, 200, {
+        ok: true,
+        incident: result.incident,
+        evidence: result.evidence,
+        action: result.action,
+        closureGate: result.closureGate,
+        board: await buildDigitalHospitalPublicHealthBoard(data, { authorizedHospitalCodes })
+      });
+    } catch (error) {
+      sendJson(res, Number(error.status || 400), {
+        error: Number(error.status || 400) === 409
+          ? "Conflict"
+          : Number(error.status || 400) === 404 ? "Not Found" : "Bad Request",
+        code: error.code || "PUBLIC_HEALTH_COORDINATION_INVALID",
+        message: error.message
+      });
+    }
+    return;
+  }
+
+  const digitalHospitalPublicHealthIncidentActionMatch = url.pathname.match(
+    /^\/api\/digital-hospital\/public-health\/incidents\/([^/]+)\/actions$/
+  );
+  if (req.method === "POST" && digitalHospitalPublicHealthIncidentActionMatch) {
+    const user = requireApiRole(
+      req,
+      res,
+      ["commission"],
+      "/api/digital-hospital/public-health/incidents/:id/actions"
+    );
+    if (!user) return;
+    const incidentId = decodeURIComponent(digitalHospitalPublicHealthIncidentActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const authorizedHospitalCodes = digitalHospitalPublicHealthHospitalScope(user, data);
+    try {
+      const result = String(payload.action || "") === "escalate-overdue"
+        ? escalateDigitalHospitalPublicHealthIncident(
+          data.digitalHospitalPublicHealthCoordination,
+          incidentId,
+          payload,
+          user,
+          { authorizedHospitalCodes }
+        )
+        : advanceDigitalHospitalPublicHealthIncident(
+          data.digitalHospitalPublicHealthCoordination,
+          incidentId,
+          payload,
+          user,
+          { authorizedHospitalCodes }
+        );
+      data.digitalHospitalPublicHealthCoordination = result.state;
+      data.securityEvents = sealAuditTrail([
+        {
+          id: randomUUID(),
+          at: new Date().toISOString(),
+          actor: user.name,
+          role: user.role,
+          action: "digital-hospital-public-health-incident-action",
+          target: result.incident.id,
+          result: "allowed",
+          detail: `${result.action.action} / ${result.incident.status} / revision ${result.incident.revision}`
+        },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120), { recompute: true });
+      writeDatabase(data);
+      sendJson(res, 200, {
+        ok: true,
+        incident: result.incident,
+        action: result.action,
+        board: await buildDigitalHospitalPublicHealthBoard(data, { authorizedHospitalCodes })
+      });
+    } catch (error) {
+      sendJson(res, Number(error.status || 400), {
+        error: Number(error.status || 400) === 409 ? "Conflict" : "Bad Request",
+        code: error.code || "PUBLIC_HEALTH_COORDINATION_INVALID",
+        message: error.message
+      });
+    }
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/public-health/system") {
     const user = requireApiRole(req, res, ["commission"], "/api/public-health/system");
     if (!user) return;
@@ -31082,6 +31587,43 @@ async function handleApi(req, res) {
       detail: `${center.summary.regressionReady}/8 applications regression-ready; ${center.summary.openIssues} pilot issues visible.`
     });
     sendJson(res, 200, center);
+    return;
+  }
+
+  const pilotAcceptanceInterfaceActionMatch = url.pathname.match(/^\/api\/pilot-acceptance\/interfaces\/([^/]+)\/actions$/);
+  if (req.method === "POST" && pilotAcceptanceInterfaceActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/pilot-acceptance/interfaces/:id/actions");
+    if (!user) return;
+    const interfaceId = decodeURIComponent(pilotAcceptanceInterfaceActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    let result;
+    try {
+      result = applyPilotInterfaceReviewAction(data, interfaceId, payload, user);
+    } catch (error) {
+      sendJson(res, /not found/.test(error.message) ? 404 : 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    data.pilotAcceptanceInterfaceReviews = result.reviews;
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "pilot-interface-joint-test-action",
+        target: interfaceId,
+        result: "allowed",
+        detail: `${payload.action} / ${result.item.workflowStatus} / ${result.item.evidenceRef || "no-evidence"}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, {
+      ok: true,
+      interfaceReview: result.item,
+      center: buildPilotAcceptanceCenter({ data, env: process.env })
+    });
     return;
   }
 
@@ -35943,6 +36485,398 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/digital-hospital/execution/runtime") {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/execution/runtime");
+    if (!user) return;
+    try {
+      const board = digitalHospitalExecutionRuntime().runtimeBoard();
+      sendJson(res, 200, {
+        ...board,
+        security: buildDigitalHospitalSecurityCenter(),
+        workerIdentity: {
+          mode: isProductionRuntime() ? "mTLS-service-identity" : "commission-session-compatibility",
+          trustedFingerprintCount: digitalHospitalWorkerFingerprints().length,
+          productionReady: digitalHospitalWorkerFingerprints().length > 0
+        }
+      });
+    } catch (error) {
+      sendDigitalHospitalExecutionError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/digital-hospital/execution/security") {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/execution/security");
+    if (!user) return;
+    sendJson(res, 200, {
+      ok: true,
+      generatedAt: new Date().toISOString(),
+      security: buildDigitalHospitalSecurityCenter(),
+      workerIdentity: {
+        mode: isProductionRuntime() ? "mTLS-service-identity" : "commission-session-compatibility",
+        trustedFingerprintCount: digitalHospitalWorkerFingerprints().length,
+        productionReady: digitalHospitalWorkerFingerprints().length > 0
+      }
+    });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/digital-hospital/execution/workers") {
+    const actor = requireDigitalHospitalExecutionWorker(req, res, "/api/digital-hospital/execution/workers");
+    if (!actor) return;
+    try {
+      const payload = await collectJson(req, 100_000);
+      const result = digitalHospitalExecutionRuntime().registerWorker({
+        id: payload.id,
+        node: payload.node,
+        pool: payload.pool,
+        capabilities: payload.capabilities,
+        now: new Date().toISOString()
+      });
+      sendJson(res, 201, result);
+    } catch (error) {
+      sendDigitalHospitalExecutionError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/digital-hospital/execution/vault-references") {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/execution/vault-references");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req, 100_000);
+      const result = digitalHospitalExecutionRuntime().registerVaultReference({
+        ...payload,
+        owner: user.name,
+        updatedAt: new Date().toISOString()
+      });
+      sendJson(res, 201, result);
+    } catch (error) {
+      sendDigitalHospitalExecutionError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/digital-hospital/execution/jobs") {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/execution/jobs");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req, 200_000);
+      const idempotencyKey = String(req.headers["idempotency-key"] || "").trim();
+      if (!idempotencyKey) {
+        sendJson(res, 400, {
+          ok: false,
+          code: "IDEMPOTENCY_KEY_REQUIRED",
+          message: "Idempotency-Key header is required"
+        });
+        return;
+      }
+      const result = digitalHospitalExecutionRuntime().enqueue({
+        connectorId: payload.connectorId,
+        environmentId: payload.environmentId,
+        jobType: payload.jobType,
+        payload: payload.payload,
+        maxAttempts: payload.maxAttempts,
+        retryBaseSeconds: payload.retryBaseSeconds,
+        retryMaxSeconds: payload.retryMaxSeconds,
+        idempotencyKey,
+        now: new Date().toISOString()
+      });
+      sendJson(res, result.result.duplicate ? 200 : 201, result);
+    } catch (error) {
+      sendDigitalHospitalExecutionError(res, error);
+    }
+    return;
+  }
+
+  const digitalHospitalExecutionJobActionMatch = url.pathname.match(/^\/api\/digital-hospital\/execution\/jobs\/([^/]+)\/actions$/);
+  if (req.method === "POST" && digitalHospitalExecutionJobActionMatch) {
+    const actor = requireDigitalHospitalExecutionWorker(req, res, "/api/digital-hospital/execution/jobs/:id/actions");
+    if (!actor) return;
+    const jobId = decodeURIComponent(digitalHospitalExecutionJobActionMatch[1]);
+    try {
+      const payload = await collectJson(req, 100_000);
+      const now = new Date().toISOString();
+      let result;
+      if (payload.action === "claim") {
+        result = digitalHospitalExecutionRuntime().claim({
+          jobId,
+          workerId: payload.workerId,
+          leaseSeconds: payload.leaseSeconds,
+          now
+        });
+      } else if (payload.action === "heartbeat") {
+        result = digitalHospitalExecutionRuntime().heartbeat(jobId, {
+          workerId: payload.workerId,
+          leaseToken: payload.leaseToken,
+          leaseSeconds: payload.leaseSeconds,
+          progress: payload.progress,
+          now
+        });
+      } else if (payload.action === "complete-attempt") {
+        result = digitalHospitalExecutionRuntime().completeAttempt(jobId, {
+          workerId: payload.workerId,
+          leaseToken: payload.leaseToken,
+          now
+        });
+      } else if (payload.action === "fail") {
+        result = digitalHospitalExecutionRuntime().failAttempt(jobId, {
+          workerId: payload.workerId,
+          leaseToken: payload.leaseToken,
+          errorCode: payload.errorCode,
+          failureClass: payload.failureClass,
+          now
+        });
+      } else {
+        sendJson(res, 400, {
+          ok: false,
+          code: "EXECUTION_JOB_ACTION_INVALID",
+          message: "action must be claim, heartbeat, complete-attempt or fail"
+        });
+        return;
+      }
+      sendJson(res, 200, result);
+    } catch (error) {
+      sendDigitalHospitalExecutionError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/digital-hospital/execution/leases/recover-expired") {
+    const actor = requireDigitalHospitalExecutionWorker(req, res, "/api/digital-hospital/execution/leases/recover-expired");
+    if (!actor) return;
+    try {
+      const result = digitalHospitalExecutionRuntime().recoverExpiredLeases({
+        now: new Date().toISOString()
+      });
+      sendJson(res, 200, result);
+    } catch (error) {
+      sendDigitalHospitalExecutionError(res, error);
+    }
+    return;
+  }
+
+  const digitalHospitalDeadLetterActionMatch = url.pathname.match(/^\/api\/digital-hospital\/execution\/dead-letters\/([^/]+)\/actions$/);
+  if (req.method === "POST" && digitalHospitalDeadLetterActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/execution/dead-letters/:id/actions");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req, 100_000);
+      if (payload.action !== "redrive") {
+        sendJson(res, 400, { ok: false, code: "DEAD_LETTER_ACTION_INVALID", message: "only redrive is accepted" });
+        return;
+      }
+      const result = digitalHospitalExecutionRuntime().redrive(
+        decodeURIComponent(digitalHospitalDeadLetterActionMatch[1]),
+        {
+          reviewedBy: user.username || user.name,
+          reviewNote: payload.reviewNote,
+          now: new Date().toISOString()
+        }
+      );
+      sendJson(res, 200, result);
+    } catch (error) {
+      sendDigitalHospitalExecutionError(res, error);
+    }
+    return;
+  }
+
+  const digitalHospitalQuarantineActionMatch = url.pathname.match(/^\/api\/digital-hospital\/execution\/quarantines\/([^/]+)\/actions$/);
+  if (req.method === "POST" && digitalHospitalQuarantineActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/execution/quarantines/:id/actions");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req, 100_000);
+      if (payload.action !== "release") {
+        sendJson(res, 400, { ok: false, code: "QUARANTINE_ACTION_INVALID", message: "only release is accepted" });
+        return;
+      }
+      const result = digitalHospitalExecutionRuntime().releaseQuarantine(
+        decodeURIComponent(digitalHospitalQuarantineActionMatch[1]),
+        {
+          releasedBy: user.username || user.name,
+          reviewNote: payload.reviewNote,
+          now: new Date().toISOString()
+        }
+      );
+      sendJson(res, 200, result);
+    } catch (error) {
+      sendDigitalHospitalExecutionError(res, error);
+    }
+    return;
+  }
+
+  const digitalHospitalCutoverWindowActionMatch = url.pathname.match(/^\/api\/digital-hospital\/execution\/cutover-windows\/([^/]+)\/actions$/);
+  if (req.method === "POST" && digitalHospitalCutoverWindowActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/execution/cutover-windows/:id/actions");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req, 100_000);
+      if (payload.action !== "evaluate") {
+        sendJson(res, 400, { ok: false, code: "CUTOVER_WINDOW_ACTION_INVALID", message: "only evaluate is accepted" });
+        return;
+      }
+      const result = digitalHospitalExecutionRuntime().evaluateCutover(
+        decodeURIComponent(digitalHospitalCutoverWindowActionMatch[1]),
+        new Date().toISOString()
+      );
+      sendJson(res, 200, result);
+    } catch (error) {
+      sendDigitalHospitalExecutionError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/digital-hospital/execution/cutover-evidence-packs") {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/execution/cutover-evidence-packs");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req, 100_000);
+      const result = digitalHospitalExecutionRuntime().createCutoverEvidencePack({
+        windowId: payload.windowId,
+        institutionId: payload.institutionId,
+        institutionName: payload.institutionName,
+        releaseVersion: payload.releaseVersion,
+        createdBy: user.username || user.name,
+        role: user.role,
+        now: new Date().toISOString()
+      });
+      sendJson(res, 201, result);
+    } catch (error) {
+      sendDigitalHospitalExecutionError(res, error);
+    }
+    return;
+  }
+
+  const digitalHospitalCutoverEvidenceActionMatch = url.pathname.match(/^\/api\/digital-hospital\/execution\/cutover-evidence-packs\/([^/]+)\/evidence\/([^/]+)\/actions$/);
+  if (req.method === "POST" && digitalHospitalCutoverEvidenceActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/execution/cutover-evidence-packs/:id/evidence/:evidenceId/actions");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req, 100_000);
+      if (payload.action !== "verify") {
+        sendJson(res, 400, { ok: false, code: "CUTOVER_EVIDENCE_ACTION_INVALID", message: "only verify is accepted" });
+        return;
+      }
+      const result = digitalHospitalExecutionRuntime().verifyCutoverEvidence(
+        decodeURIComponent(digitalHospitalCutoverEvidenceActionMatch[1]),
+        decodeURIComponent(digitalHospitalCutoverEvidenceActionMatch[2]),
+        {
+          verifiedBy: user.username || user.name,
+          verificationNote: payload.verificationNote,
+          accepted: payload.accepted,
+          role: payload.role || user.role,
+          now: new Date().toISOString()
+        }
+      );
+      sendJson(res, 200, result);
+    } catch (error) {
+      sendDigitalHospitalExecutionError(res, error);
+    }
+    return;
+  }
+
+  const digitalHospitalCutoverPackActionMatch = url.pathname.match(/^\/api\/digital-hospital\/execution\/cutover-evidence-packs\/([^/]+)\/actions$/);
+  if (req.method === "POST" && digitalHospitalCutoverPackActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/execution/cutover-evidence-packs/:id/actions");
+    if (!user) return;
+    const packId = decodeURIComponent(digitalHospitalCutoverPackActionMatch[1]);
+    try {
+      const payload = await collectJson(req, 100_000);
+      const now = new Date().toISOString();
+      const runtime = digitalHospitalExecutionRuntime();
+      let result;
+      if (payload.action === "record-evidence") {
+        result = runtime.recordCutoverEvidence(packId, {
+          requirementId: payload.requirementId,
+          artifactName: payload.artifactName,
+          artifactDigest: payload.artifactDigest,
+          signatureDigest: payload.signatureDigest,
+          sourceSystem: payload.sourceSystem,
+          submittedBy: user.username || user.name,
+          role: payload.role || user.role,
+          now
+        });
+      } else if (payload.action === "approve") {
+        result = runtime.approveCutover(packId, {
+          role: payload.role,
+          approver: user.username || user.name,
+          decision: payload.decision,
+          note: payload.note,
+          now
+        });
+      } else if (payload.action === "evaluate") {
+        const board = runtime.runtimeBoard(now);
+        result = runtime.evaluateProductionCutover(packId, {
+          now,
+          actor: user.username || user.name,
+          role: user.role,
+          security: buildDigitalHospitalSecurityCenter(),
+          repository: board.repository
+        });
+      } else if (payload.action === "start") {
+        result = runtime.startProductionCutover(packId, {
+          actor: user.username || user.name,
+          role: user.role,
+          changeTicket: payload.changeTicket,
+          now
+        });
+      } else if (payload.action === "complete") {
+        result = runtime.completeProductionCutover(packId, {
+          actor: user.username || user.name,
+          role: user.role,
+          receiptDigest: payload.receiptDigest,
+          now
+        });
+      } else if (payload.action === "rollback") {
+        result = runtime.rollbackProductionCutover(packId, {
+          actor: user.username || user.name,
+          role: user.role,
+          reason: payload.reason,
+          now
+        });
+      } else {
+        sendJson(res, 400, {
+          ok: false,
+          code: "CUTOVER_PACK_ACTION_INVALID",
+          message: "unsupported cutover evidence pack action"
+        });
+        return;
+      }
+      sendJson(res, 200, result);
+    } catch (error) {
+      sendDigitalHospitalExecutionError(res, error);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/digital-hospital/execution/callbacks") {
+    try {
+      const payload = await collectJson(req, 200_000);
+      const certificate = digitalHospitalClientCertificate(
+        req,
+        String(process.env.DIGITAL_HOSPITAL_TRUST_PROXY_MTLS || "").toLowerCase() === "true"
+          ? "x-client-cert-fingerprint"
+          : ""
+      );
+      const verified = await verifySignedExecutionCallback(payload, {
+        timestamp: req.headers["x-execution-timestamp"],
+        nonce: req.headers["x-execution-nonce"],
+        signature: req.headers["x-execution-signature"],
+        clientCertificateFingerprint: certificate.fingerprint,
+        clientCertificateAuthorized: certificate.authorized,
+        nowMs: Date.now()
+      });
+      const result = digitalHospitalExecutionRuntime().verifyCallback(verified, {
+        maxSkewSeconds: buildDigitalHospitalSecurityCenter().maxSkewSeconds
+      });
+      sendJson(res, result.result.accepted ? 202 : 409, result);
+    } catch (error) {
+      sendDigitalHospitalExecutionError(res, error);
+    }
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/digital-hospital/evaluation-catalog") {
     const user = requireApiRole(req, res, ["commission", "institution"], "/api/digital-hospital/evaluation-catalog");
     if (!user) return;
@@ -39673,7 +40607,27 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
     if (!user) return;
     const data = readDatabase();
-    sendJson(res, 200, DiseasePaymentService.buildOverview(data.diseasePayment));
+    const overview = DiseasePaymentService.buildOverview(data.diseasePayment);
+    if (user.role === "institution") {
+      overview.supervision = DiseasePaymentService.buildDiseaseSupervisionProfiles(data.diseasePayment, { institution: user.orgName });
+      overview.summary.supervision = overview.supervision.summary;
+    }
+    sendJson(res, 200, overview);
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/supervision/profiles" && req.method === "GET") {
+    const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    sendJson(res, 200, DiseasePaymentService.buildDiseaseSupervisionProfiles(data.diseasePayment, {
+      institution: user.role === "institution" ? user.orgName : url.searchParams.get("institution"),
+      residentId: url.searchParams.get("residentId"),
+      diseaseCode: url.searchParams.get("diseaseCode"),
+      riskCode: url.searchParams.get("riskCode"),
+      repeatWindowDays: url.searchParams.get("repeatWindowDays"),
+      limit: url.searchParams.get("limit")
+    }));
     return;
   }
 
@@ -40122,7 +41076,12 @@ async function handleApi(req, res) {
     if (["DRG", "DIP"].includes(payload.mode)) current.mode = payload.mode;
     data.diseasePayment = DiseasePaymentService.calculateAll(current, user.name);
     writeDatabase(data);
-    sendJson(res, 200, DiseasePaymentService.buildOverview(data.diseasePayment));
+    const overview = DiseasePaymentService.buildOverview(data.diseasePayment);
+    if (user.role === "institution") {
+      overview.supervision = DiseasePaymentService.buildDiseaseSupervisionProfiles(data.diseasePayment, { institution: user.orgName });
+      overview.summary.supervision = overview.supervision.summary;
+    }
+    sendJson(res, 200, overview);
     return;
   }
 
@@ -41835,6 +42794,10 @@ async function startServerAsync(port = PORT) {
 async function stopServer() {
   clearSessionCleanupSchedule();
   if (server.listening) await new Promise((resolve) => server.close(resolve));
+  if (digitalHospitalExecutionServiceInstance) {
+    digitalHospitalExecutionServiceInstance.close();
+    digitalHospitalExecutionServiceInstance = null;
+  }
   if (runtimeSessionStoreInstance && typeof runtimeSessionStoreInstance.close === "function") {
     await runtimeSessionStoreInstance.close();
   }
@@ -41859,15 +42822,19 @@ if (require.main === module) {
 module.exports = {
   assertProductionRuntimeSecurity,
   careServiceReadinessPublicSummary,
+  configureDigitalHospitalExecutionRuntime,
   configurePublicHealthEndpointProbeRuntime,
   createCareServiceRuntimeDependencies,
   cleanupRuntimeSessions,
+  digitalHospitalClientCertificate,
+  digitalHospitalWorkerFingerprints,
   ensureDatabase,
   openSqliteDatabase,
   productionSessionSecretErrors,
   productionSessionRetentionErrors,
   productionSessionStoreErrors,
   readDatabase,
+  requireDigitalHospitalExecutionWorker,
   server,
   sessionStoreMode,
   sessionTopology,

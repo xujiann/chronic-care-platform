@@ -285,6 +285,26 @@ test("DRG preview handles MCC, excluded principal diagnoses and performance anal
   assert.equal(analytics.groupDistribution.length, 3);
 });
 
+test("one-disease-one-profile links repeat admissions and estimates review exposure", () => {
+  const state = Service.seedDiseasePaymentState();
+  const first = { ...state.cases[2], id: "profile-first", residentId: "resident-profile", institution: "甲医院", admissionDate: "2026-05-01", dischargeDate: "2026-05-03", otherDiagnoses: [] };
+  const second = { ...state.cases[2], id: "profile-second", residentId: "resident-profile", institution: "乙医院", admissionDate: "2026-05-08", dischargeDate: "2026-05-11", otherDiagnoses: ["J96.0", "N17.9", "E11.9"] };
+  state.cases = [first, second];
+  const report = Service.buildDiseaseSupervisionProfiles(state);
+  assert.equal(report.summary.profiles, 1);
+  assert.equal(report.summary.monitoredCases, 2);
+  assert.equal(report.summary.crossInstitutionAdmissions, 1);
+  assert.equal(report.summary.codingEscalations, 1);
+  assert.ok(report.summary.estimatedFundImpact > 0);
+  assert.match(report.policyBoundary, /不直接认定违规/);
+  assert.deepEqual(report.profiles[0].signals.find((item) => item.code === "CROSS_INSTITUTION_REPEAT_ADMISSION").linkedCaseIds, ["profile-first", "profile-second"]);
+  assert.equal(report.profiles[0].admissions[1].complicationLevel, "MCC");
+
+  const institutionScoped = Service.buildDiseaseSupervisionProfiles(state, { institution: "甲医院" });
+  assert.equal(institutionScoped.summary.monitoredCases, 1);
+  assert.equal(institutionScoped.summary.crossInstitutionAdmissions, 0);
+});
+
 test("payment parameter workflow requires impact simulation and two distinct reviewers", () => {
   const created = Service.createPaymentParameter(Service.seedDiseasePaymentState(), { id: "param-drg-2027", mode: "DRG", schemeId: "drg-demo-2026", name: "2027年度DRG参数", rate: 11000, effectiveFrom: "2027-01-01" }, "drafter");
   assert.equal(created.row.status, "草案");

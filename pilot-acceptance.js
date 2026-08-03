@@ -97,6 +97,109 @@ const TRIAL_SCENARIOS = Object.freeze([
   ["trial-go-no-go-boundary", "上线决策边界", "没有现场证据和四方审批时不得形成正式GO", "Go/No-Go中心与证据指纹" ]
 ]);
 
+const INTERFACE_RESULT_KEYS = Object.freeze(["success", "failure", "retry", "reconciliation"]);
+const INTERFACE_REVIEW_STATUSES = new Set(["not-started", "joint-test-failed", "evidence-recorded", "site-reviewed", "revoked"]);
+
+function cleanRequired(value, field) {
+  const result = String(value || "").trim();
+  if (!result) throw new Error(`${field} is required`);
+  return result;
+}
+
+function normalizeInterfaceReview(sample, stored = {}) {
+  const results = Object.fromEntries(INTERFACE_RESULT_KEYS.map((key) => [key, stored.results?.[key] === true]));
+  const workflowStatus = INTERFACE_REVIEW_STATUSES.has(stored.workflowStatus) ? stored.workflowStatus : "not-started";
+  return {
+    id: stored.id || `pilot-interface-${sample.id}`,
+    interfaceId: sample.id,
+    workflowStatus,
+    executionId: String(stored.executionId || ""),
+    evidenceRef: String(stored.evidenceRef || ""),
+    results,
+    note: String(stored.note || ""),
+    recordedBy: String(stored.recordedBy || ""),
+    recordedAt: String(stored.recordedAt || ""),
+    reviewedBy: String(stored.reviewedBy || ""),
+    reviewedAt: String(stored.reviewedAt || ""),
+    reviewNote: String(stored.reviewNote || ""),
+    revokedBy: String(stored.revokedBy || ""),
+    revokedAt: String(stored.revokedAt || ""),
+    revokeNote: String(stored.revokeNote || ""),
+    history: Array.isArray(stored.history) ? stored.history.slice(0, 30) : []
+  };
+}
+
+function buildInterfaceReviews(data = {}) {
+  const stored = Array.isArray(data.pilotAcceptanceInterfaceReviews) ? data.pilotAcceptanceInterfaceReviews : [];
+  return INTERFACE_SAMPLES.map((sample) => normalizeInterfaceReview(sample, stored.find((item) => item.interfaceId === sample.id)));
+}
+
+function applyPilotInterfaceReviewAction(data, interfaceId, payload = {}, user = {}, now = new Date()) {
+  const sample = INTERFACE_SAMPLES.find((item) => item.id === interfaceId);
+  if (!sample) throw new Error("pilot interface not found");
+  const actor = cleanRequired(user.name || user.username, "actor");
+  const action = cleanRequired(payload.action, "action");
+  const reviews = buildInterfaceReviews(data);
+  const index = reviews.findIndex((item) => item.interfaceId === interfaceId);
+  const current = reviews[index];
+  const at = now.toISOString();
+  let next;
+
+  if (action === "record-joint-test") {
+    const executionId = cleanRequired(payload.executionId, "executionId");
+    const evidenceRef = cleanRequired(payload.evidenceRef, "evidenceRef");
+    const note = cleanRequired(payload.note, "note");
+    const results = {};
+    INTERFACE_RESULT_KEYS.forEach((key) => {
+      if (typeof payload.results?.[key] !== "boolean") throw new Error(`results.${key} must be boolean`);
+      results[key] = payload.results[key];
+    });
+    const passed = INTERFACE_RESULT_KEYS.every((key) => results[key]);
+    next = {
+      ...current,
+      workflowStatus: passed ? "evidence-recorded" : "joint-test-failed",
+      executionId,
+      evidenceRef,
+      results,
+      note,
+      recordedBy: actor,
+      recordedAt: at,
+      reviewedBy: "",
+      reviewedAt: "",
+      reviewNote: "",
+      revokedBy: "",
+      revokedAt: "",
+      revokeNote: ""
+    };
+  } else if (action === "review-joint-test") {
+    if (current.workflowStatus !== "evidence-recorded") throw new Error("joint-test evidence must pass all four scenarios before review");
+    if (!INTERFACE_RESULT_KEYS.every((key) => current.results[key])) throw new Error("joint-test results are incomplete");
+    if (actor === current.recordedBy) throw new Error("reviewer must be independent from recorder");
+    next = {
+      ...current,
+      workflowStatus: "site-reviewed",
+      reviewedBy: actor,
+      reviewedAt: at,
+      reviewNote: cleanRequired(payload.note, "note")
+    };
+  } else if (action === "revoke-joint-test") {
+    if (current.workflowStatus !== "site-reviewed") throw new Error("only a reviewed joint-test can be revoked");
+    next = {
+      ...current,
+      workflowStatus: "revoked",
+      revokedBy: actor,
+      revokedAt: at,
+      revokeNote: cleanRequired(payload.note, "note")
+    };
+  } else {
+    throw new Error("unsupported pilot interface action");
+  }
+
+  next.history = [{ action, actor, role: String(user.role || ""), at, fromStatus: current.workflowStatus, toStatus: next.workflowStatus }, ...current.history].slice(0, 30);
+  reviews[index] = next;
+  return { reviews, item: next, sample };
+}
+
 function fileExists(root, relativePath) {
   return fs.existsSync(path.join(root, relativePath));
 }
@@ -139,8 +242,18 @@ function buildApplicationRegression(data, pkg, root, serverSource, manifestSourc
   });
 }
 
-function buildAlertingPreflight(env) {
+function buildAlertingPreflight(env, data = {}) {
   const center = alertRoutingCenter(env);
+  const deliveries = Array.isArray(data.observabilityAlertDeliveries) ? data.observabilityAlertDeliveries : [];
+  const acceptedDeliveries = deliveries.filter((item) => (
+    !item.deadLetter
+    && /accepted|delivered|completed/i.test(String(item.status || ""))
+    && item.adapterReceipt?.receiptId
+    && String(item.alert?.labels?.environment || "").toLowerCase() === "production"
+  ));
+  const latestReceipt = acceptedDeliveries.slice().sort((left, right) => (
+    String(right.deliveredAt || right.createdAt || "").localeCompare(String(left.deliveredAt || left.createdAt || ""))
+  ))[0];
   const routes = Object.entries(ROUTE_DEFINITIONS).map(([route, definition]) => {
     const current = center.routes.find((item) => item.route === route) || {};
     return {
@@ -153,13 +266,23 @@ function buildAlertingPreflight(env) {
       status: current.configured && current.productionHttps ? "configured" : "configuration-pending"
     };
   });
+  const signoffRecorded = /^(1|true|yes|ready|signed|approved)$/i.test(String(env.CUTOVER_MONITORING_SIGNOFF || ""));
+  const drillReceiptRecorded = acceptedDeliveries.length > 0;
   return {
     contractReady: routes.length === 2 && routes.every((item) => item.endpointEnv && item.secretEnv),
     adapterReady: center.adapterReady,
     productionReady: center.productionReady,
     routes,
     requiredSignoff: "CUTOVER_MONITORING_SIGNOFF",
-    signoffRecorded: /^(1|true|yes|ready|signed|approved)$/i.test(String(env.CUTOVER_MONITORING_SIGNOFF || "")),
+    signoffRecorded,
+    drillReceiptRecorded,
+    acceptanceReady: center.adapterReady && drillReceiptRecorded && signoffRecorded,
+    receiptEvidence: {
+      acceptedProductionReceipts: acceptedDeliveries.length,
+      routes: [...new Set(acceptedDeliveries.map((item) => item.route).filter(Boolean))],
+      latestReceiptId: latestReceipt?.adapterReceipt?.receiptId || "",
+      latestAcceptedAt: latestReceipt?.deliveredAt || latestReceipt?.adapterReceipt?.acceptedAt || ""
+    },
     blockers: center.blockers,
     boundary: "Configuration validation never fabricates a receiver URL, signing secret, rehearsal receipt, on-call ownership, or hospital signoff."
   };
@@ -202,19 +325,29 @@ function buildIssueLedger(context) {
   const issues = [];
   if (!context.alerting.adapterReady) {
     issues.push({ id: "PILOT-ISSUE-ALERTING", priority: "P0", owner: "platform-ops", status: "open", title: "生产告警接收端尚未配置", nextAction: "配置SIEM_ENDPOINT或ALERT_WEBHOOK_URL及独立签名密钥，完成演练回执和现场签字。" });
+  } else if (!context.alerting.drillReceiptRecorded) {
+    issues.push({ id: "PILOT-ISSUE-ALERTING", priority: "P0", owner: "platform-ops", status: "open", title: "生产告警演练回执尚未归档", nextAction: "通过告警派发接口向真实接收端发送去标识化测试告警，归档生产环境接收回执后再申请签字。" });
+  } else if (!context.alerting.signoffRecorded) {
+    issues.push({ id: "PILOT-ISSUE-ALERTING", priority: "P0", owner: "platform-ops", status: "open", title: "生产告警演练已通过但监控签字待完成", nextAction: "核对值班升级、失败重试和接收回执，完成四方确认后设置CUTOVER_MONITORING_SIGNOFF。" });
   }
   const pendingTasks = context.onsiteTasks.filter((item) => item.acceptanceStatus !== "site-accepted");
   if (pendingTasks.length) {
     issues.push({ id: "PILOT-ISSUE-ONSITE", priority: "P0", owner: "project-office", status: "open", title: `${pendingTasks.length}/10项现场验收仍待证据`, nextAction: "按P0任务包收集附件、复测结论和四方签字。" });
   }
-  context.interfaceSamples.forEach((item, index) => issues.push({
-    id: `PILOT-ISSUE-INT-${String(index + 1).padStart(2, "0")}`,
-    priority: "P1",
-    owner: item.owner,
-    status: "open",
-    title: `${item.name}现场联调待完成`,
-    nextAction: `使用${item.id}合成样例完成成功、失败、重试和对账验证，并归档接收端回执。`
-  }));
+  context.interfaceSamples.forEach((item, index) => {
+    const review = context.interfaceReviews.find((row) => row.interfaceId === item.id);
+    const resolved = review?.workflowStatus === "site-reviewed";
+    issues.push({
+      id: `PILOT-ISSUE-INT-${String(index + 1).padStart(2, "0")}`,
+      priority: "P1",
+      owner: item.owner,
+      status: resolved ? "resolved" : "open",
+      title: resolved ? `${item.name}现场联调已独立复核` : `${item.name}现场联调待完成`,
+      evidenceRef: review?.evidenceRef || "",
+      reviewedBy: review?.reviewedBy || "",
+      nextAction: resolved ? "保持接收端配置和证据指纹稳定；发生变更时撤销并重新联调。" : `使用${item.id}合成样例完成成功、失败、重试和对账验证，并归档接收端回执。`
+    });
+  });
   return issues;
 }
 
@@ -226,22 +359,27 @@ function buildPilotAcceptanceCenter(options = {}) {
   const serverSource = options.serverSource || fs.readFileSync(path.join(root, "server.js"), "utf8");
   const manifestSource = options.manifestSource || fs.readFileSync(path.join(root, "scripts", "release-artifact-manifest.js"), "utf8");
   const applications = buildApplicationRegression(data, pkg, root, serverSource, manifestSource);
-  const alerting = buildAlertingPreflight(env);
+  const alerting = buildAlertingPreflight(env, data);
   const onsiteTasks = buildOnsiteTasks(data);
-  const interfaceSamples = INTERFACE_SAMPLES.map((item) => ({ ...item, containsPatientData: false }));
+  const interfaceReviews = buildInterfaceReviews(data);
+  const interfaceSamples = INTERFACE_SAMPLES.map((item) => {
+    const review = interfaceReviews.find((row) => row.interfaceId === item.id);
+    return { ...item, containsPatientData: false, status: review.workflowStatus, review };
+  });
   const scenarios = buildTrialScenarios({ applications, alerting, onsiteTasks, interfaceSamples });
-  const issues = buildIssueLedger({ alerting, onsiteTasks, interfaceSamples });
+  const issues = buildIssueLedger({ alerting, onsiteTasks, interfaceSamples, interfaceReviews });
   const checks = [
     { id: "pilotAcceptance:applications", passed: applications.length === 8, detail: `${applications.length}/8 applications` },
     { id: "pilotAcceptance:regression", passed: applications.every((item) => item.status === "regression-ready"), detail: `${applications.filter((item) => item.status === "regression-ready").length}/8 regression-ready` },
     { id: "pilotAcceptance:alerting-contract", passed: alerting.contractReady, detail: `${alerting.routes.length} alert route contracts` },
     { id: "pilotAcceptance:onsite-pack", passed: onsiteTasks.length === 10 && onsiteTasks.every((item) => item.owner && item.evidence && item.doneWhen && item.targetWindow), detail: `${onsiteTasks.length}/10 P0 tasks` },
     { id: "pilotAcceptance:interface-samples", passed: interfaceSamples.length === 4 && interfaceSamples.every((item) => item.containsPatientData === false && item.idempotencyKey && item.retryPolicy), detail: `${interfaceSamples.length} synthetic joint-test samples` },
+    { id: "pilotAcceptance:interface-governance", passed: interfaceReviews.length === 4 && interfaceReviews.every((item) => item.interfaceId && INTERFACE_REVIEW_STATUSES.has(item.workflowStatus)), detail: `${interfaceReviews.length}/4 interface review ledgers` },
     { id: "pilotAcceptance:trial-run", passed: scenarios.every((item) => item.passed), detail: `${scenarios.filter((item) => item.passed).length}/${scenarios.length} simulated scenarios` },
     { id: "pilotAcceptance:formal-boundary", passed: true, detail: "formal go-live remains blocked until site evidence and approvals are signed" }
   ];
   const acceptedTasks = onsiteTasks.filter((item) => item.acceptanceStatus === "site-accepted").length;
-  const formalReady = acceptedTasks === 10 && alerting.adapterReady && alerting.signoffRecorded && issues.every((item) => item.status === "resolved");
+  const formalReady = acceptedTasks === 10 && alerting.acceptanceReady && issues.every((item) => item.status === "resolved");
   return {
     ok: checks.every((item) => item.passed),
     generatedAt: new Date().toISOString(),
@@ -252,9 +390,11 @@ function buildPilotAcceptanceCenter(options = {}) {
       regressionReady: applications.filter((item) => item.status === "regression-ready").length,
       alertRoutesConfigured: alerting.routes.filter((item) => item.configured).length,
       alertRoutes: alerting.routes.length,
+      alertDrillReceipts: alerting.receiptEvidence.acceptedProductionReceipts,
       onsiteTasks: onsiteTasks.length,
       onsiteAccepted: acceptedTasks,
       interfaceSamples: interfaceSamples.length,
+      interfaceReviewed: interfaceReviews.filter((item) => item.workflowStatus === "site-reviewed").length,
       trialScenarios: scenarios.length,
       trialPassed: scenarios.filter((item) => item.passed).length,
       openIssues: issues.filter((item) => item.status !== "resolved").length
@@ -263,6 +403,7 @@ function buildPilotAcceptanceCenter(options = {}) {
     alerting,
     onsiteTasks,
     interfaceSamples,
+    interfaceReviews,
     trialRun: {
       mode: "synthetic-no-patient-data",
       status: scenarios.every((item) => item.passed) ? "simulation-passed" : "simulation-failed",
@@ -276,7 +417,10 @@ function buildPilotAcceptanceCenter(options = {}) {
 
 module.exports = {
   INTERFACE_SAMPLES,
+  INTERFACE_RESULT_KEYS,
   TRIAL_SCENARIOS,
+  applyPilotInterfaceReviewAction,
   buildAlertingPreflight,
+  buildInterfaceReviews,
   buildPilotAcceptanceCenter
 };

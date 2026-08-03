@@ -112,6 +112,16 @@ test("disease payment API runs an authenticated end-to-end workflow", async (t) 
   const overview = await json(baseUrl, "/api/disease-payment", { headers });
   assert.equal(overview.response.status, 200);
   assert.equal(overview.body.state.policy.id, "nhsa-2025-18");
+  assert.equal(overview.body.supervision.ruleVersion, "disease-supervision-profile-v1");
+  const supervision = await json(baseUrl, "/api/disease-payment/supervision/profiles?diseaseCode=I10&limit=20", { headers });
+  assert.equal(supervision.response.status, 200);
+  assert.ok(Array.isArray(supervision.body.profiles));
+  assert.match(supervision.body.policyBoundary, /人工复核/);
+  const hospitalLogin = await json(baseUrl, "/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: "hospital", password: "123456" }) });
+  const hospitalHeaders = { Authorization: `Bearer ${hospitalLogin.body.token}`, "Content-Type": "application/json" };
+  const hospitalSupervision = await json(baseUrl, "/api/disease-payment/supervision/profiles?institution=大连市普兰店区中心医院", { headers: hospitalHeaders });
+  assert.equal(hospitalSupervision.response.status, 200);
+  assert.ok(hospitalSupervision.body.profiles.every((item) => item.institutions.every((name) => name === "大连市中心医院")));
   const catalog = await json(baseUrl, "/api/disease-payment/drg/catalog", { headers });
   assert.equal(catalog.response.status, 200);
   assert.equal(catalog.body.profile.mdcCount, 26);
@@ -203,9 +213,6 @@ test("disease payment API runs an authenticated end-to-end workflow", async (t) 
   const rollback = await json(baseUrl, "/api/disease-payment/local-packages/api-local-drg-2028/rollback", { method: "POST", headers: secondHeaders, body: JSON.stringify({ reason: "API测试回退" }) });
   assert.equal(rollback.body.package.status, "已回退");
   assert.ok(rollback.body.snapshot.snapshotDigest);
-  const hospitalLogin = await json(baseUrl, "/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: "hospital", password: "123456" }) });
-  assert.equal(hospitalLogin.response.status, 200);
-  const hospitalHeaders = { Authorization: `Bearer ${hospitalLogin.body.token}`, "Content-Type": "application/json" };
   const special = await json(baseUrl, "/api/disease-payment/special-cases", { method: "POST", headers: hospitalHeaders, body: JSON.stringify({ caseId: "dp-case-001", reason: "复杂危重症", requestedPaymentFen: 3200000, evidence: [{ type: "medical-record-summary", digest: `sha256:${"e".repeat(64)}`, issuedBy: "hospital-medical-records" }] }) });
   assert.equal(special.response.status, 201);
   const firstSpecialReview = await json(baseUrl, `/api/disease-payment/special-cases/${special.body.id}/review`, { method: "POST", headers, body: JSON.stringify({ approved: true, adjustedPaymentFen: 3200000, role: "医保业务复核" }) });

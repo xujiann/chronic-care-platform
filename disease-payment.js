@@ -1,4 +1,4 @@
-const paymentFallback = { state: { policy: {}, cases: [], specialCases: [], settlementBatches: [], budgets: [], feedbacks: [], auditTrail: [], schemeVersions: [], parameterVersions: [], parameterImpactReports: [], localPaymentPackages: [], localPaymentPackageValidationReports: [], localPaymentPackageImpactReports: [], localPaymentPackageDiffReports: [], localPaymentPackageActivationSnapshots: [], localPaymentPackageSimulationJobs: [], formalGroupingJobs: [], formalGroupingDeadLetters: [], externalDependencies: [], groupCatalog: [], drg2LibraryProfile: {}, drgPreviewRules: {} }, summary: {}, institutions: [], localPackageView: { packages: [], validationReports: [], impactReports: [], diffReports: [], activationSnapshots: [], simulationJobs: [], checklist: [] } };
+const paymentFallback = { state: { policy: {}, cases: [], specialCases: [], settlementBatches: [], budgets: [], feedbacks: [], auditTrail: [], schemeVersions: [], parameterVersions: [], parameterImpactReports: [], localPaymentPackages: [], localPaymentPackageValidationReports: [], localPaymentPackageImpactReports: [], localPaymentPackageDiffReports: [], localPaymentPackageActivationSnapshots: [], localPaymentPackageSimulationJobs: [], formalGroupingJobs: [], formalGroupingDeadLetters: [], externalDependencies: [], groupCatalog: [], drg2LibraryProfile: {}, drgPreviewRules: {} }, summary: {}, institutions: [], supervision: { summary: {}, profiles: [], policyBoundary: "" }, localPackageView: { packages: [], validationReports: [], impactReports: [], diffReports: [], activationSnapshots: [], simulationJobs: [], checklist: [] } };
 let paymentView = paymentFallback;
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -144,7 +144,7 @@ function render() {
   const { state, summary, institutions } = paymentView;
   document.querySelector("#payment-mode").value = state.mode || "DRG";
   document.querySelector("#payment-metrics").innerHTML = [["住院病例", summary.caseCount, `已测算 ${summary.calculatedCount || 0}`],["支付标准", fmt(summary.paymentStandard), `总费用 ${fmt(summary.totalCost)}`],["预计结余", fmt(summary.projectedBalance), "负值表示费用超出标准"],["监管线索", summary.riskCount, `未入组 ${summary.ungroupedCount || 0}`],["特例待评", summary.specialPending, "支持复杂危重与新药新技术"],["待办批次", summary.settlementPending, "月结算与年度清算"]].map(([label,value,hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><small>${hint}</small></article>`).join("");
-  renderDrgWorkbench(state, summary.drg || {}); renderParameterGovernance(state); renderLocalPackageGovernance(paymentView.localPackageView || {}); renderFormalGroupingOperations(state); renderIntake(state, summary.intake || {}); renderCases(state); renderPolicy(state); renderVersions(state); renderSpecial(state); renderSettlements(state); renderMonitoring(state, institutions); renderGovernance(state); renderFeedback(state); renderAudit(state);
+  renderDrgWorkbench(state, summary.drg || {}); renderParameterGovernance(state); renderLocalPackageGovernance(paymentView.localPackageView || {}); renderFormalGroupingOperations(state); renderIntake(state, summary.intake || {}); renderCases(state); renderDiseaseSupervision(paymentView.supervision || {}); renderPolicy(state); renderVersions(state); renderSpecial(state); renderSettlements(state); renderMonitoring(state, institutions); renderGovernance(state); renderFeedback(state); renderAudit(state);
 }
 
 function renderDrgWorkbench(state, analytics) {
@@ -211,6 +211,21 @@ function renderIntake(state, summary) {
 function renderCases(state) {
   document.querySelector("#case-count").textContent = `${state.cases.length}例`;
   document.querySelector("#case-list").innerHTML = `<table class="payment-table"><thead><tr><th>病例/机构</th><th>诊断</th><th>费用</th><th>分组结果</th><th>支付测算</th><th>监管</th><th>操作</th></tr></thead><tbody>${state.cases.map((item) => { const c = item.calculation || {}; const g = c.grouping || {}; const risks = c.risks || []; const hierarchy = g.mode === "DRG" && g.mdcCode ? `${g.mdcCode} → ${g.adrgCode} → ${g.groupCode} · ${g.complicationLevel}` : g.groupCode || "待分组"; return `<tr><td><strong>${escapeHtml(item.patientName)}</strong><small>${escapeHtml(item.settlementListNo)} · ${escapeHtml(item.institution)}</small></td><td>${escapeHtml(item.principalDiagnosis)} ${escapeHtml(item.principalDiagnosisName)}<small>${item.admissionDate} 至 ${item.dischargeDate}</small></td><td>${fmt(item.totalAmount)}<small>申报基金 ${fmt(item.declaredFundAmount)}</small></td><td><strong>${escapeHtml(hierarchy)}</strong><small>${escapeHtml(g.groupName || item.qualityStatus)}</small></td><td>${c.paymentStandard == null ? "待测算" : fmt(c.paymentStandard)}<small>${escapeHtml(c.formula || "")}${c.costRatio ? ` · 倍率${Number(c.costRatio).toFixed(2)}` : ""}</small></td><td><div class="risk-list">${risks.length ? risks.map((risk) => `<span class="risk-pill">${escapeHtml(risk.name)}</span>`).join("") : `<span class="ok-pill">未发现线索</span>`}</div></td><td><div class="case-actions"><button class="secondary" data-payment-action="preview-drg" data-id="${item.id}">DRG试分组</button>${item.specialCaseStatus === "未申报" ? `<button data-payment-action="special" data-id="${item.id}">特例申报</button>` : `<span>${item.specialCaseStatus}</span>`}</div></td></tr>`; }).join("")}</tbody></table>`;
+}
+
+function renderDiseaseSupervision(view) {
+  const summary = view.summary || {};
+  const profiles = view.profiles || [];
+  document.querySelector("#supervision-boundary").textContent = view.policyBoundary || "风险线索须经人工复核";
+  document.querySelector("#supervision-summary").innerHTML = [
+    ["病种档案", summary.profiles || 0],
+    ["风险档案", summary.riskProfiles || 0],
+    ["短期重复住院", summary.repeatAdmissions || 0],
+    ["跨机构重复住院", summary.crossInstitutionAdmissions || 0],
+    ["编码复杂度跃升", summary.codingEscalations || 0],
+    ["疑似基金影响", fmt(summary.estimatedFundImpact || 0)]
+  ].map(([label, value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("");
+  document.querySelector("#supervision-profile-list").innerHTML = profiles.length ? `<table class="payment-table supervision-table"><thead><tr><th>居民/病种</th><th>住院轨迹</th><th>费用与支付</th><th>监管线索</th><th>疑似影响</th></tr></thead><tbody>${profiles.map((profile) => `<tr><td><strong>${escapeHtml(profile.patientName || profile.residentId)}</strong><small>${escapeHtml(profile.diseaseCode)} · ${escapeHtml(profile.diseaseName)}</small></td><td>${profile.admissionCount}次 / ${profile.institutionCount}家机构<small>${escapeHtml(profile.firstAdmissionDate)} 至 ${escapeHtml(profile.lastDischargeDate)}</small><small>${profile.institutions.map(escapeHtml).join("、")}</small></td><td>${fmt(profile.declaredFundAmount)}<small>支付标准 ${fmt(profile.paymentStandard)} · 总费用 ${fmt(profile.totalAmount)}</small></td><td><div class="risk-list">${profile.signals.length ? profile.signals.map((signal) => `<span class="risk-pill" title="${escapeHtml(signal.basis)}">${escapeHtml(signal.name)}</span>`).join("") : `<span class="ok-pill">未发现跨次线索</span>`}</div><small>${profile.signals.slice(0, 2).map((signal) => escapeHtml(signal.basis)).join("；")}</small></td><td><strong>${fmt(profile.estimatedFundImpact)}</strong><small>${escapeHtml(profile.riskLevel)}风险 · 仅供复核</small></td></tr>`).join("")}</tbody></table>` : `<p class="muted">当前筛选范围暂无病种档案。</p>`;
 }
 
 function renderPolicy(state) {

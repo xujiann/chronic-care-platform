@@ -35,6 +35,13 @@ test("local official package workbench exposes import validation simulation revi
   ["renderLocalPackageGovernance", "local-package-job-create", "local-package-job-process", "local-package-review", "local-package-publish", "local-package-activate", "local-package-rollback", "签名可信", "完整性与签名校验", "/local-packages"].forEach((marker) => assert.ok(script.includes(marker), marker));
 });
 
+test("disease supervision workbench exposes one-disease-one-profile risk evidence", () => {
+  const html = fs.readFileSync(path.join(ROOT, "disease-payment.html"), "utf8");
+  const script = fs.readFileSync(path.join(ROOT, "disease-payment.js"), "utf8");
+  ["data-payment-section=\"disease-supervision\"", "supervision-summary", "supervision-profile-list", "一病种一档案监管"].forEach((marker) => assert.ok(html.includes(marker), marker));
+  ["renderDiseaseSupervision", "跨机构重复住院", "编码复杂度跃升", "疑似基金影响", "仅供复核"].forEach((marker) => assert.ok(script.includes(marker), marker));
+});
+
 test("settlement workbench exposes core submission and callback waiting states without manual terminal receipts", () => {
   const script = fs.readFileSync(path.join(ROOT, "disease-payment.js"), "utf8");
   ["submit-core", "resubmit-core", "retry-payment", "补正后重报", "核验后重试拨付", "data-payment-action=\"settlement-${action[0]}", "开始对账", "发起拨付申请", "等待医保核心受理/退回回调", "等待医保核心拨付回调", "standardAmountFen"].forEach((marker) => assert.ok(script.includes(marker), marker));
