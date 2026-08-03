@@ -38,7 +38,10 @@ function canReadResearchDataset(user, dataset) {
   if (!actor) return false;
   if (String(dataset.createdBy || "").trim() === actor) return true;
   return (Array.isArray(dataset.accessRequests) ? dataset.accessRequests : [])
-    .some((request) => String(request.by || "").trim() === actor && request.status !== "rejected");
+    .some((request) => (
+      String(request.by || "").trim() === actor
+      && ["approved", "active"].includes(String(request.status || "").trim().toLowerCase())
+    ));
 }
 
 function buildSuppressedCount(value) {

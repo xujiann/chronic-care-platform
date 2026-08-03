@@ -78,6 +78,14 @@ test("research scope is commission-wide and institution-owner only", () => {
   assert.equal(canReadResearchDataset({ role: "commission", username: "health" }, dataset), true);
   assert.equal(canReadResearchDataset({ role: "institution", username: "hospital" }, dataset), true);
   assert.equal(canReadResearchDataset({ role: "institution", username: "community" }, dataset), false);
+  assert.equal(canReadResearchDataset(
+    { role: "institution", username: "community" },
+    approvedDataset({ accessRequests: [{ by: "community", status: "submitted" }] })
+  ), false);
+  assert.equal(canReadResearchDataset(
+    { role: "institution", username: "community" },
+    approvedDataset({ accessRequests: [{ by: "community", status: "approved" }] })
+  ), true);
   assert.equal(canReadResearchDataset({ role: "citizen", username: "citizen" }, dataset), false);
   assert.equal(normalizeResearchPurpose(" approved cohort validation "), "approved cohort validation");
   assert.throws(() => normalizeResearchPurpose("short"), /at least 8 characters/);
