@@ -126,7 +126,29 @@ test("T07 public routes enforce trusted actors organization scope and production
   assert.equal(created.response.status, 201);
   assert.equal(created.body.refund.requestedBy, "hospital");
   assert.equal(created.body.refund.organizationId, "MR1");
+  assert.equal(created.body.refund.refundTransactionRuntime, undefined);
+  assert.equal(created.body.refund.requestKeyHash, undefined);
+  assert.equal(created.body.eventContract.id, "insurance-payment.refund-request.v1");
+  assert.equal(created.body.eventContract.version, 1);
+  assert.match(created.body.eventContract.outboxEventId, /^ipe-/);
   assert.equal(created.body.productionReady, false);
+
+  const replayed = await request(baseUrl, "/api/online-payments/refunds", {
+    method: "POST",
+    headers: authenticated(hospital.body.token, refundInput),
+    body: JSON.stringify({ ...refundInput, id: "forged-second-refund-id" })
+  });
+  assert.equal(replayed.response.status, 200);
+  assert.equal(replayed.body.idempotent, true);
+  assert.equal(replayed.body.refund.id, created.body.refund.id);
+
+  const conflictingReplay = await request(baseUrl, "/api/online-payments/refunds", {
+    method: "POST",
+    headers: authenticated(hospital.body.token, refundInput),
+    body: JSON.stringify({ ...refundInput, refundAmountFen: 4000 })
+  });
+  assert.equal(conflictingReplay.response.status, 409);
+  assert.equal(conflictingReplay.body.code, "PERSISTENCE_COMMAND_CONFLICT");
 
   const crossOrganization = await request(baseUrl, `/api/online-payments/refunds/${created.body.refund.id}/reviews`, {
     method: "POST",

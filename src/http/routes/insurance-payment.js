@@ -1,5 +1,7 @@
 "use strict";
 
+const InsurancePaymentRefundTransaction = require("../../../insurance-payment-refund-transaction");
+
 function createRouteSegments(runtime) {
   const { DiseasePaymentGrouperContract, DiseasePaymentIntake, DiseasePaymentService, FinancialCallbackError, OnlinePaymentRefunds, appendSecurityEvent, applyFinancialCallback, authorizeInsurancePaymentAction, collectJson, createFinancialReconciliationRun, diseasePaymentPackageSignatureOptions, dispatchFinancialRequest, financialGatewayCenter, financialGatewayOperationsCenter, normalizeState, patchBusinessCollectionItem, randomUUID, readDatabase, requireApiRole, requireInsuranceSystemCommand, sendInsurancePaymentError, sendJson, validateFinancialRequest, verifyFinancialCallback, writeDatabase } = runtime;
   return [
@@ -510,17 +512,28 @@ function createRouteSegments(runtime) {
         const user = requireApiRole(req, res, ["institution", "commission"], url.pathname);
         if (!user) return true;
         if (!authorizeInsurancePaymentAction("refund.request", user, res, url.pathname)) return true;
-        const data = readDatabase();
         try {
           const payload = await collectJson(req);
           payload.idempotencyKey = String(req.headers["idempotency-key"] || payload.idempotencyKey || "").trim();
-          const result = OnlinePaymentRefunds.createRefundRequest(data, payload, user);
-          result.row.organizationId ||= String(user.orgCode || "");
-          result.row.organizationName ||= String(user.orgName || "");
-          writeDatabase(normalizeState(data));
+          const result = await InsurancePaymentRefundTransaction.withRefundRequestLock(payload, async () => {
+            const currentData = readDatabase();
+            const transaction = await InsurancePaymentRefundTransaction.createRefundRequestTransaction(
+              currentData,
+              payload,
+              user,
+              { correlationId: req.correlationId }
+            );
+            writeDatabase(normalizeState(transaction.data));
+            return transaction;
+          });
           sendJson(res, result.idempotent ? 200 : 201, {
             refund: result.row,
             idempotent: result.idempotent,
+            eventContract: {
+              id: result.contract.id,
+              version: result.contract.version,
+              outboxEventId: result.outboxEventId
+            },
             productionReady: false
           });
         } catch (error) {
@@ -628,7 +641,7 @@ function createRouteSegments(runtime) {
           }
           writeDatabase(normalizeState(data));
           sendJson(res, action === "dispatch" ? 202 : 200, {
-            refund: result.row,
+            refund: InsurancePaymentRefundTransaction.publicRefund(result.row),
             review: result.review,
             resubmission: result.resubmission,
             gatewayEventId: result.gatewayEventId,
