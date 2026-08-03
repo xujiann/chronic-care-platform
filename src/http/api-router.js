@@ -30,7 +30,11 @@ function createApiRouter(routeSegments) {
     return Object.freeze({ ...segment });
   });
 
-  const manifest = Object.freeze(segments.map(({ id, domain }) => Object.freeze({ id, domain })));
+  const manifest = Object.freeze(segments.map(({ id, domain, subdomain }) => Object.freeze({
+    id,
+    domain,
+    ...(subdomain ? { subdomain } : {})
+  })));
 
   return Object.freeze({
     manifest,

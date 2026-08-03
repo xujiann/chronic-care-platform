@@ -1,6 +1,7 @@
 "use strict";
 
 const { createApiRouter } = require("../api-router");
+const { attachRouteSubdomain } = require("../route-subdomains");
 const { createPlatformRuntimeContexts } = require("../runtime-contexts");
 const care_coordination = require("./care-coordination");
 const citizen_chronic = require("./citizen-chronic");
@@ -313,19 +314,20 @@ function createPlatformApiRouter(runtime) {
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }
-  for (const segment of clinical_specialties.createRouteSegments(runtime)) {
+  for (const rawSegment of clinical_specialties.createRouteSegments(runtime)) {
+    const segment = attachRouteSubdomain(rawSegment);
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }
-  for (const segment of identity_security.createRouteSegments(runtime)) {
+  for (const segment of identity_security.createRouteSegments(runtimeContexts.forDomain("identity-security"))) {
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }
-  for (const segment of insurance_payment.createRouteSegments(runtime)) {
+  for (const segment of insurance_payment.createRouteSegments(runtimeContexts.forDomain("insurance-payment"))) {
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }
-  for (const segment of integration.createRouteSegments(runtime)) {
+  for (const segment of integration.createRouteSegments(runtimeContexts.forDomain("integration"))) {
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }
@@ -333,7 +335,8 @@ function createPlatformApiRouter(runtime) {
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }
-  for (const segment of public_health.createRouteSegments(runtime)) {
+  for (const rawSegment of public_health.createRouteSegments(runtime)) {
+    const segment = attachRouteSubdomain(rawSegment);
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }
@@ -341,7 +344,7 @@ function createPlatformApiRouter(runtime) {
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }
-  for (const segment of runtime_routes.createRouteSegments(runtime)) {
+  for (const segment of runtime_routes.createRouteSegments(runtimeContexts.forDomain("runtime"))) {
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }

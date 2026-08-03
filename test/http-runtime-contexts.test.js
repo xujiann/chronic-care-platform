@@ -16,8 +16,10 @@ function runtimeDependencies(domain) {
   return match[1].split(",").map((value) => value.trim());
 }
 
-test("T04 and T05 contexts match their route dependencies exactly", () => {
-  assert.deepEqual(Object.keys(CONTEXT_DEFINITIONS).sort(), ["care-coordination", "citizen-chronic"]);
+test("iteration one and two contexts match their route dependencies exactly", () => {
+  assert.deepEqual(Object.keys(CONTEXT_DEFINITIONS).sort(), [
+    "care-coordination", "citizen-chronic", "identity-security", "insurance-payment", "integration", "runtime"
+  ]);
   for (const [domain, definition] of Object.entries(CONTEXT_DEFINITIONS)) {
     assert.deepEqual(definition.dependencies, runtimeDependencies(domain));
   }
