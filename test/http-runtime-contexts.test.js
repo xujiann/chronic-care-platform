@@ -10,15 +10,24 @@ const { CONTEXT_DEFINITIONS, createPlatformRuntimeContexts } = require("../src/h
 const ROOT = path.resolve(__dirname, "..");
 
 function runtimeDependencies(domain) {
-  const source = fs.readFileSync(path.join(ROOT, "src", "http", "routes", `${domain}.js`), "utf8");
-  const match = source.match(/const \{ ([^}]+) \} = runtime;/);
-  assert.ok(match, `route dependency declaration missing for ${domain}`);
-  return match[1].split(",").map((value) => value.trim());
+  const routeRoot = path.join(ROOT, "src", "http", "routes");
+  const facade = fs.readFileSync(path.join(routeRoot, `${domain}.js`), "utf8");
+  const sources = facade.includes("const { ")
+    ? [facade]
+    : fs.readdirSync(path.join(routeRoot, domain)).sort().map((file) => fs.readFileSync(path.join(routeRoot, domain, file), "utf8"));
+  const declarations = sources.map((source) => {
+    const match = source.match(/const \{ ([^}]+) \} = runtime;/);
+    assert.ok(match, `route dependency declaration missing for ${domain}`);
+    return match[1].split(",").map((value) => value.trim());
+  });
+  declarations.slice(1).forEach((dependencies) => assert.deepEqual(dependencies, declarations[0]));
+  return declarations[0];
 }
 
-test("iteration one and two contexts match their route dependencies exactly", () => {
+test("all route domain contexts match their dependencies exactly", () => {
   assert.deepEqual(Object.keys(CONTEXT_DEFINITIONS).sort(), [
-    "care-coordination", "citizen-chronic", "identity-security", "insurance-payment", "integration", "runtime"
+    "care-coordination", "citizen-chronic", "clinical-specialties", "identity-security", "insurance-payment",
+    "integration", "platform-governance", "public-health", "research", "runtime", "shared", "state-data"
   ]);
   for (const [domain, definition] of Object.entries(CONTEXT_DEFINITIONS)) {
     assert.deepEqual(definition.dependencies, runtimeDependencies(domain));
@@ -36,7 +45,7 @@ test("domain contexts are frozen projections and do not leak global dependencies
     assert.equal("globalSecret" in context, false);
     assert.deepEqual(Object.keys(context), CONTEXT_DEFINITIONS[domain].dependencies);
   }
-  assert.equal(platform.forDomain("research"), source);
+  assert.throws(() => platform.forDomain("unknown"), /unknown runtime context domain/);
 });
 
 test("context construction fails fast when an owned dependency is absent", () => {

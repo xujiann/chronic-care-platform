@@ -25,7 +25,7 @@ test("identity, payment and external integration contracts close across bounded 
 });
 
 test("runtime composition reaches the router manifest with public-health and clinical subdomains", () => {
-  const router = createPlatformApiRouter(completeRuntimeSource());
+  const router = createPlatformApiRouter(createPlatformRuntimeContexts(completeRuntimeSource()));
   const splitSegments = router.manifest.filter(({ subdomain }) => subdomain);
 
   assert.equal(splitSegments.length, 13);
@@ -34,6 +34,13 @@ test("runtime composition reaches the router manifest with public-health and cli
     ROUTE_SUBDOMAINS
   );
   assert.equal(router.manifest.length, 71);
+});
+
+test("router entry rejects the flat global runtime source", () => {
+  assert.throws(
+    () => createPlatformApiRouter(completeRuntimeSource()),
+    /requires projected runtime contexts/
+  );
 });
 
 test("contract validation fails when a participant loses a required capability", () => {

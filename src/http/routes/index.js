@@ -2,7 +2,7 @@
 
 const { createApiRouter } = require("../api-router");
 const { attachRouteSubdomain } = require("../route-subdomains");
-const { createPlatformRuntimeContexts } = require("../runtime-contexts");
+const { CONTEXT_DEFINITIONS } = require("../runtime-contexts");
 const care_coordination = require("./care-coordination");
 const citizen_chronic = require("./citizen-chronic");
 const clinical_specialties = require("./clinical-specialties");
@@ -303,8 +303,14 @@ const ROUTE_ORDER = Object.freeze([
   }
 ]);
 
-function createPlatformApiRouter(runtime) {
-  const runtimeContexts = createPlatformRuntimeContexts(runtime);
+function createPlatformApiRouter(runtimeContexts) {
+  if (!runtimeContexts || typeof runtimeContexts.forDomain !== "function" || !runtimeContexts.contexts) {
+    throw new TypeError("platform router requires projected runtime contexts");
+  }
+  const missingContexts = Object.keys(CONTEXT_DEFINITIONS).filter((domain) => !runtimeContexts.contexts[domain]);
+  if (missingContexts.length > 0) {
+    throw new TypeError(`platform router is missing runtime contexts: ${missingContexts.join(", ")}`);
+  }
   const segmentsById = new Map();
   for (const segment of care_coordination.createRouteSegments(runtimeContexts.forDomain("care-coordination"))) {
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
@@ -314,7 +320,7 @@ function createPlatformApiRouter(runtime) {
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }
-  for (const rawSegment of clinical_specialties.createRouteSegments(runtime)) {
+  for (const rawSegment of clinical_specialties.createRouteSegments(runtimeContexts.forDomain("clinical-specialties"))) {
     const segment = attachRouteSubdomain(rawSegment);
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
@@ -331,16 +337,16 @@ function createPlatformApiRouter(runtime) {
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }
-  for (const segment of platform_governance.createRouteSegments(runtime)) {
+  for (const segment of platform_governance.createRouteSegments(runtimeContexts.forDomain("platform-governance"))) {
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }
-  for (const rawSegment of public_health.createRouteSegments(runtime)) {
+  for (const rawSegment of public_health.createRouteSegments(runtimeContexts.forDomain("public-health"))) {
     const segment = attachRouteSubdomain(rawSegment);
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }
-  for (const segment of research.createRouteSegments(runtime)) {
+  for (const segment of research.createRouteSegments(runtimeContexts.forDomain("research"))) {
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }
@@ -348,11 +354,11 @@ function createPlatformApiRouter(runtime) {
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }
-  for (const segment of shared.createRouteSegments(runtime)) {
+  for (const segment of shared.createRouteSegments(runtimeContexts.forDomain("shared"))) {
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }
-  for (const segment of state_data.createRouteSegments(runtime)) {
+  for (const segment of state_data.createRouteSegments(runtimeContexts.forDomain("state-data"))) {
     if (segmentsById.has(segment.id)) throw new TypeError(`duplicate route segment id: ${segment.id}`);
     segmentsById.set(segment.id, segment);
   }

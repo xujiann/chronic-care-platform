@@ -8,10 +8,16 @@ const DEFAULT_ROOT = path.resolve(__dirname, "..", "..");
 function routeSourceFiles(root = DEFAULT_ROOT) {
   const routeDirectory = path.join(root, "src", "http", "routes");
   if (!fs.existsSync(routeDirectory)) return [];
-  return fs.readdirSync(routeDirectory)
-    .filter((file) => file.endsWith(".js"))
-    .sort()
-    .map((file) => path.join(routeDirectory, file));
+  const files = [];
+  const visit = (directory) => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const target = path.join(directory, entry.name);
+      if (entry.isDirectory()) visit(target);
+      else if (entry.isFile() && entry.name.endsWith(".js")) files.push(target);
+    }
+  };
+  visit(routeDirectory);
+  return files.sort();
 }
 
 function runtimeSourceFiles(root = DEFAULT_ROOT) {
