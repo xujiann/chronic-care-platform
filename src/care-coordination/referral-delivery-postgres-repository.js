@@ -8,6 +8,13 @@ const { postgresPoolConfig } = require("../../postgres-runtime-sync");
 const CONTRACT_ID = "referral-order.v1";
 const MIGRATION_FILE = path.resolve(__dirname, "..", "..", "deploy", "referral-delivery-postgres.sql");
 const MODES = new Set(["disabled", "rehearsal", "evidence-gated"]);
+const PAYLOAD_MAX_BYTES = 16 * 1024;
+const PAYLOAD_FIELDS = new Set(["commandId", "intentDigest", "contract"]);
+const CONTRACT_FIELDS = new Set([
+  "contractId", "contractVersion", "referralId", "residentId", "status", "version",
+  "type", "priority", "sourceInstitution", "targetInstitution", "updatedAt"
+]);
+const SENSITIVE_FIELD = /^(?:access[_-]?token|refresh[_-]?token|authorization|api[_-]?key|secret|password|credentials?|private[_-]?key|signing[_-]?key|lease[_-]?token|object[_-]?path)$/i;
 
 class ReferralDeliveryPostgresError extends Error {
   constructor(code, message, statusCode = 503) {
@@ -59,6 +66,84 @@ function safeEvidence(value) {
   return result.length >= 4 ? result : "";
 }
 
+function assertNoSensitiveFields(value, location = "payload") {
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => assertNoSensitiveFields(item, `${location}[${index}]`));
+    return;
+  }
+  if (!value || typeof value !== "object") return;
+  for (const [key, item] of Object.entries(value)) {
+    if (SENSITIVE_FIELD.test(key)) {
+      throw new ReferralDeliveryPostgresError(
+        "REFERRAL_DELIVERY_PAYLOAD_SENSITIVE_FIELD",
+        `${location}.${key} is not allowed`,
+        400
+      );
+    }
+    assertNoSensitiveFields(item, `${location}.${key}`);
+  }
+}
+
+function boundedString(value, field, max, required = false) {
+  if (value === undefined || value === null || value === "") {
+    if (required) {
+      throw new ReferralDeliveryPostgresError("REFERRAL_DELIVERY_PAYLOAD_INVALID", `${field} is required`, 400);
+    }
+    return "";
+  }
+  if (typeof value !== "string" || value.length > max || /[\r\n\t]/.test(value)) {
+    throw new ReferralDeliveryPostgresError("REFERRAL_DELIVERY_PAYLOAD_INVALID", `${field} is invalid`, 400);
+  }
+  return value;
+}
+
+function validateReferralPayload(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new ReferralDeliveryPostgresError("REFERRAL_DELIVERY_PAYLOAD_INVALID", "referral payload must be an object", 400);
+  }
+  assertNoSensitiveFields(input);
+  const unexpectedPayload = Object.keys(input).filter((key) => !PAYLOAD_FIELDS.has(key));
+  if (unexpectedPayload.length) {
+    throw new ReferralDeliveryPostgresError("REFERRAL_DELIVERY_PAYLOAD_FIELD_FORBIDDEN", `payload field is not allowed: ${unexpectedPayload[0]}`, 400);
+  }
+  const contract = input.contract;
+  if (!contract || typeof contract !== "object" || Array.isArray(contract)) {
+    throw new ReferralDeliveryPostgresError("REFERRAL_DELIVERY_PAYLOAD_INVALID", "referral contract is required", 400);
+  }
+  const unexpectedContract = Object.keys(contract).filter((key) => !CONTRACT_FIELDS.has(key));
+  if (unexpectedContract.length) {
+    throw new ReferralDeliveryPostgresError("REFERRAL_DELIVERY_CONTRACT_FIELD_FORBIDDEN", `contract field is not allowed: ${unexpectedContract[0]}`, 400);
+  }
+  const normalized = {
+    commandId: boundedString(input.commandId, "payload.commandId", 160, true),
+    intentDigest: boundedString(input.intentDigest, "payload.intentDigest", 80, true),
+    contract: {
+      contractId: boundedString(contract.contractId, "contract.contractId", 80, true),
+      contractVersion: boundedString(contract.contractVersion, "contract.contractVersion", 32, true),
+      referralId: boundedString(contract.referralId, "contract.referralId", 200, true),
+      residentId: boundedString(contract.residentId, "contract.residentId", 200, true),
+      status: boundedString(contract.status, "contract.status", 100, true),
+      version: Number(contract.version),
+      type: boundedString(contract.type, "contract.type", 100),
+      priority: boundedString(contract.priority, "contract.priority", 80),
+      sourceInstitution: boundedString(contract.sourceInstitution, "contract.sourceInstitution", 200),
+      targetInstitution: boundedString(contract.targetInstitution, "contract.targetInstitution", 200),
+      updatedAt: boundedString(contract.updatedAt, "contract.updatedAt", 80, true)
+    }
+  };
+  if (normalized.contract.contractId !== CONTRACT_ID
+    || !/^[a-f0-9]{64}$/i.test(normalized.intentDigest)
+    || !Number.isSafeInteger(normalized.contract.version)
+    || normalized.contract.version < 1
+    || !Number.isFinite(Date.parse(normalized.contract.updatedAt))) {
+    throw new ReferralDeliveryPostgresError("REFERRAL_DELIVERY_PAYLOAD_INVALID", "referral contract binding is invalid", 400);
+  }
+  if (Buffer.byteLength(stableStringify(normalized), "utf8") > PAYLOAD_MAX_BYTES) {
+    throw new ReferralDeliveryPostgresError("REFERRAL_DELIVERY_PAYLOAD_TOO_LARGE", "referral payload exceeds 16KB", 413);
+  }
+  return Object.freeze(normalized);
+}
+
 function buildReferralDeliveryPostgresConfig(env = process.env) {
   const mode = text(env.REFERRAL_DELIVERY_POSTGRES_MODE || "disabled", 40).toLowerCase();
   if (!MODES.has(mode)) {
@@ -70,7 +155,8 @@ function buildReferralDeliveryPostgresConfig(env = process.env) {
     migration: safeEvidence(env.REFERRAL_DELIVERY_MIGRATION_EVIDENCE_ID),
     backup: safeEvidence(env.REFERRAL_DELIVERY_BACKUP_EVIDENCE_ID),
     recovery: safeEvidence(env.REFERRAL_DELIVERY_RECOVERY_EVIDENCE_ID),
-    cutover: safeEvidence(env.REFERRAL_DELIVERY_CUTOVER_APPROVAL_ID)
+    cutover: safeEvidence(env.REFERRAL_DELIVERY_CUTOVER_APPROVAL_ID),
+    tlsProbe: safeEvidence(env.REFERRAL_DELIVERY_POSTGRES_TLS_PROBE_EVIDENCE_ID)
   };
   const requirements = {
     modeEnabled: mode !== "disabled",
@@ -79,12 +165,14 @@ function buildReferralDeliveryPostgresConfig(env = process.env) {
     migrationEvidence: Boolean(evidence.migration),
     backupEvidence: Boolean(evidence.backup),
     recoveryEvidence: Boolean(evidence.recovery),
-    cutoverEvidence: Boolean(evidence.cutover)
+    cutoverEvidence: Boolean(evidence.cutover),
+    tlsProbeEvidence: Boolean(evidence.tlsProbe)
   };
   const evidenceReady = requirements.migrationEvidence
     && requirements.backupEvidence
     && requirements.recoveryEvidence
-    && requirements.cutoverEvidence;
+    && requirements.cutoverEvidence
+    && requirements.tlsProbeEvidence;
   return Object.freeze({
     adapter: "referral-delivery-postgres-v1",
     mode,
@@ -100,6 +188,15 @@ function buildReferralDeliveryPostgresConfig(env = process.env) {
     credentialsPersisted: false,
     centralCutover: false,
     productionReady: false
+  });
+}
+
+function buildReferralDeliveryPoolConfig(env = process.env, override = {}) {
+  const base = { ...postgresPoolConfig(env), ...(override || {}) };
+  const ssl = base.ssl && typeof base.ssl === "object" ? { ...base.ssl } : {};
+  return Object.freeze({
+    ...base,
+    ssl: Object.freeze({ ...ssl, rejectUnauthorized: true })
   });
 }
 
@@ -131,14 +228,23 @@ async function withClient(pool, transaction, work) {
 }
 
 function rowToInternal(row = {}) {
+  const payload = validateReferralPayload(row.payload);
+  const payloadDigest = String(row.payload_sha256 || "");
+  if (!secureEqual(sha256(payload), payloadDigest)) {
+    throw new ReferralDeliveryPostgresError(
+      "REFERRAL_DELIVERY_PAYLOAD_INTEGRITY_FAILED",
+      "persisted referral delivery payload integrity failed",
+      500
+    );
+  }
   return {
     id: String(row.event_id || ""),
     type: String(row.event_type || ""),
     contractId: String(row.contract_id || ""),
     aggregateVersion: Number(row.aggregate_version || 0),
     correlationId: String(row.correlation_id || ""),
-    payload: structuredClone(row.payload || {}),
-    payloadDigest: String(row.payload_sha256 || ""),
+    payload,
+    payloadDigest,
     status: String(row.status || ""),
     attempts: Number(row.attempts || 0),
     maxAttempts: Number(row.max_attempts || 0),
@@ -158,6 +264,25 @@ function rowToInternal(row = {}) {
     createdAt: row.created_at ? iso(row.created_at) : null,
     updatedAt: row.updated_at ? iso(row.updated_at) : null
   };
+}
+
+function operationsRowToPublic(row = {}) {
+  return Object.freeze({
+    id: String(row.event_id || ""),
+    type: String(row.event_type || ""),
+    status: String(row.status || ""),
+    attempts: Number(row.attempts || 0),
+    maxAttempts: Number(row.max_attempts || 0),
+    leaseVersion: Number(row.lease_version || 0),
+    nextAttemptAt: row.next_attempt_at ? iso(row.next_attempt_at) : null,
+    leaseExpiresAt: row.lease_expires_at ? iso(row.lease_expires_at) : null,
+    deliveredAt: row.delivered_at ? iso(row.delivered_at) : null,
+    deadLetteredAt: row.dead_lettered_at ? iso(row.dead_lettered_at) : null,
+    lastErrorCode: String(row.last_error_code || "") || null,
+    replayCount: Number(row.replay_count || 0),
+    createdAt: row.created_at ? iso(row.created_at) : null,
+    updatedAt: row.updated_at ? iso(row.updated_at) : null
+  });
 }
 
 function publicEvent(event) {
@@ -181,11 +306,16 @@ function publicEvent(event) {
 
 function receiptProjection(receipt = {}) {
   return {
+    requestId: requiredText(receipt.requestId, "receipt.requestId", 240),
     eventId: requiredText(receipt.eventId, "receipt.eventId", 240),
     payloadDigest: requiredText(receipt.payloadDigest, "receipt.payloadDigest", 80),
     providerMessageId: requiredText(receipt.providerMessageId, "receipt.providerMessageId", 240),
     status: requiredText(receipt.status, "receipt.status", 40).toLowerCase(),
     occurredAt: iso(receipt.occurredAt, "receipt.occurredAt"),
+    attempt: Number(receipt.attempt),
+    leaseVersion: Number(receipt.leaseVersion),
+    sentAt: iso(receipt.sentAt, "receipt.sentAt"),
+    nonce: requiredText(receipt.nonce, "receipt.nonce", 128),
     signatureDigest: requiredText(receipt.signatureDigest, "receipt.signatureDigest", 80),
     signatureVerified: receipt.signatureVerified === true
   };
@@ -199,12 +329,35 @@ function createReferralDeliveryPostgresRepository(options = {}) {
   const retryMaxMs = Math.max(retryBaseMs, Number(options.retryMaxMs) || 15 * 60 * 1000);
   let ownedPool;
 
+  function assertExternalPoolTlsEvidence() {
+    if (!options.pool || options.testBypassEvidenceGate === true) return;
+    const probe = options.tlsProbeEvidence || {};
+    if (!config.requirements?.tlsProbeEvidence
+      || probe.verified !== true
+      || probe.rejectUnauthorized !== true
+      || probe.evidenceId !== config.evidence?.tlsProbe
+      || !Number.isFinite(Date.parse(probe.checkedAt || ""))) {
+      throw new ReferralDeliveryPostgresError(
+        "REFERRAL_DELIVERY_POSTGRES_TLS_PROBE_REQUIRED",
+        "verified PostgreSQL TLS probe evidence is required for an injected pool",
+        409
+      );
+    }
+  }
+
   function pool() {
-    if (options.pool) return options.pool;
+    if (options.pool) {
+      assertExternalPoolTlsEvidence();
+      return options.pool;
+    }
     if (!config.configured) {
       throw new ReferralDeliveryPostgresError("REFERRAL_DELIVERY_POSTGRES_NOT_CONFIGURED", "referral delivery PostgreSQL is not configured");
     }
-    if (!ownedPool) ownedPool = new (options.PoolClass || require("pg").Pool)(options.poolConfig || postgresPoolConfig(env));
+    if (!ownedPool) {
+      ownedPool = new (options.PoolClass || require("pg").Pool)(
+        buildReferralDeliveryPoolConfig(env, options.poolConfig)
+      );
+    }
     return ownedPool;
   }
 
@@ -224,7 +377,7 @@ function createReferralDeliveryPostgresRepository(options = {}) {
       contractId: requiredText(eventInput.contractId || CONTRACT_ID, "event.contractId", 80),
       aggregateVersion: Number(eventInput.aggregateVersion),
       correlationId: requiredText(eventInput.correlationId || "not-provided", "event.correlationId", 240),
-      payload: structuredClone(eventInput.payload || {}),
+      payload: validateReferralPayload(eventInput.payload),
       status: "pending",
       attempts: 0,
       maxAttempts: Math.min(100, Math.max(1, Number(eventInput.maxAttempts) || maxAttempts)),
@@ -381,8 +534,12 @@ function createReferralDeliveryPostgresRepository(options = {}) {
       assertActiveLease(event, input, acknowledgedAt);
       if (!normalizedReceipt.signatureVerified
         || !/^sha256:[a-f0-9]{64}$/.test(normalizedReceipt.signatureDigest)
+        || normalizedReceipt.requestId !== event.id
         || normalizedReceipt.eventId !== event.id
         || normalizedReceipt.payloadDigest !== event.payloadDigest
+        || normalizedReceipt.attempt !== event.attempts
+        || normalizedReceipt.leaseVersion !== event.leaseVersion
+        || !/^[a-f0-9]{64}$/.test(normalizedReceipt.nonce)
         || !new Set(["accepted", "delivered"]).has(normalizedReceipt.status)) {
         throw new ReferralDeliveryPostgresError("REFERRAL_DELIVERY_RECEIPT_INVALID", "verified receipt binding is required", 409);
       }
@@ -531,7 +688,7 @@ function createReferralDeliveryPostgresRepository(options = {}) {
       return Object.freeze({
         counts: Object.freeze(counts),
         total: Object.values(counts).reduce((sum, value) => sum + value, 0),
-        events: eventsResult.rows.map((row) => publicEvent(rowToInternal(row))),
+        events: eventsResult.rows.map(operationsRowToPublic),
         returnedEvents: eventsResult.rows.length,
         postgresConfigured: config.configured,
         postgresEvidenceReady: config.evidenceReady,
@@ -556,9 +713,13 @@ module.exports = {
   MIGRATION_FILE,
   ReferralDeliveryPostgresError,
   buildReferralDeliveryPostgresConfig,
+  buildReferralDeliveryPoolConfig,
   createReferralDeliveryPostgresRepository,
+  PAYLOAD_MAX_BYTES,
+  operationsRowToPublic,
   publicEvent,
   rowToInternal,
   sha256,
-  stableStringify
+  stableStringify,
+  validateReferralPayload
 };

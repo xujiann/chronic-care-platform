@@ -46,6 +46,14 @@ test("transport requires HTTPS, a strong secret, and evidence", () => {
     () => buildReferralTransportConfig({ ...ENV, REFERRAL_DELIVERY_SIGNING_EVIDENCE_ID: "" }),
     (error) => error.code === "REFERRAL_TRANSPORT_EVIDENCE_REQUIRED"
   );
+  assert.throws(
+    () => buildReferralTransportConfig({ ...ENV, REFERRAL_DELIVERY_URL: "https://gateway.test/events?token=secret" }),
+    (error) => error.code === "REFERRAL_TRANSPORT_ENDPOINT_COMPONENTS_FORBIDDEN"
+  );
+  assert.throws(
+    () => buildReferralTransportConfig({ ...ENV, REFERRAL_DELIVERY_URL: "https://gateway.test/events#signature" }),
+    (error) => error.code === "REFERRAL_TRANSPORT_ENDPOINT_COMPONENTS_FORBIDDEN"
+  );
   const config = buildReferralTransportConfig(ENV);
   assert.equal(config.productionReady, false);
   assert.equal(config.secret, SECRET);
@@ -61,11 +69,16 @@ test("transport signs the request and requires a signed receipt bound to all fiv
       captured = { url, options };
       const envelope = JSON.parse(options.body);
       const binding = {
+        requestId: envelope.requestId,
         eventId: envelope.eventId,
         payloadDigest: envelope.payloadDigest,
         providerMessageId: "provider-message-001",
         status: "accepted",
-        occurredAt: "2026-08-04T02:00:01.000Z"
+        occurredAt: "2026-08-04T02:00:01.000Z",
+        attempt: envelope.attempt,
+        leaseVersion: envelope.leaseVersion,
+        sentAt: envelope.sentAt,
+        nonce: envelope.nonce
       };
       return {
         ok: true,
@@ -81,6 +94,8 @@ test("transport signs the request and requires a signed receipt bound to all fiv
   assert.equal(captured.url, ENV.REFERRAL_DELIVERY_URL);
   assert.equal(captured.options.headers["x-referral-signature"], hmac(SECRET, captured.options.body));
   assert.equal(captured.options.headers["idempotency-key"], "referral-event-001");
+  assert.equal(JSON.parse(captured.options.body).requestId, "referral-event-001");
+  assert.match(JSON.parse(captured.options.body).nonce, /^[a-f0-9]{64}$/);
   assert.equal(captured.options.body.includes(SECRET), false);
   assert.equal(stableStringify(JSON.parse(captured.options.body)), captured.options.body);
 });
@@ -89,14 +104,20 @@ test("unsigned, forged or binding-drift receipts fail closed", async () => {
   async function rejectsReceipt(mutator, expectedCode) {
     const transport = createReferralDeliveryTransport({
       env: ENV,
+      now: () => "2026-08-04T02:00:00.000Z",
       fetchImpl: async (url, options) => {
         const envelope = JSON.parse(options.body);
         const binding = mutator({
+          requestId: envelope.requestId,
           eventId: envelope.eventId,
           payloadDigest: envelope.payloadDigest,
           providerMessageId: "provider-message-001",
           status: "accepted",
-          occurredAt: "2026-08-04T02:00:01.000Z"
+          occurredAt: "2026-08-04T02:00:01.000Z",
+          attempt: envelope.attempt,
+          leaseVersion: envelope.leaseVersion,
+          sentAt: envelope.sentAt,
+          nonce: envelope.nonce
         });
         return {
           ok: true,
@@ -116,21 +137,69 @@ test("unsigned, forged or binding-drift receipts fail closed", async () => {
 
   const forged = createReferralDeliveryTransport({
     env: ENV,
+    now: () => "2026-08-04T02:00:00.000Z",
     fetchImpl: async (url, options) => {
       const envelope = JSON.parse(options.body);
       return {
         ok: true,
         status: 200,
         text: async () => JSON.stringify({
+          requestId: envelope.requestId,
           eventId: envelope.eventId,
           payloadDigest: envelope.payloadDigest,
           providerMessageId: "provider-message-001",
           status: "accepted",
           occurredAt: "2026-08-04T02:00:01.000Z",
+          attempt: envelope.attempt,
+          leaseVersion: envelope.leaseVersion,
+          sentAt: envelope.sentAt,
+          nonce: envelope.nonce,
           signature: "0".repeat(64)
         })
       };
     }
   });
   await assert.rejects(() => forged(claim()), (error) => error.code === "REFERRAL_TRANSPORT_RECEIPT_SIGNATURE_INVALID");
+});
+
+test("receipt attempt, lease, nonce and time window drift are rejected even when signed", async () => {
+  function transportFor(mutator) {
+    return createReferralDeliveryTransport({
+      env: { ...ENV, REFERRAL_DELIVERY_RECEIPT_MAX_SKEW_SECONDS: "30" },
+      now: () => "2026-08-04T02:00:00.000Z",
+      fetchImpl: async (url, options) => {
+        const envelope = JSON.parse(options.body);
+        const binding = mutator({
+          requestId: envelope.requestId,
+          eventId: envelope.eventId,
+          payloadDigest: envelope.payloadDigest,
+          providerMessageId: "provider-window-001",
+          status: "accepted",
+          occurredAt: "2026-08-04T02:00:01.000Z",
+          attempt: envelope.attempt,
+          leaseVersion: envelope.leaseVersion,
+          sentAt: envelope.sentAt,
+          nonce: envelope.nonce
+        });
+        return {
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify({ ...binding, signature: hmac(SECRET, binding) })
+        };
+      }
+    });
+  }
+
+  await assert.rejects(
+    () => transportFor((binding) => ({ ...binding, attempt: binding.attempt + 1 }))(claim()),
+    (error) => error.code === "REFERRAL_TRANSPORT_RECEIPT_BINDING_INVALID"
+  );
+  await assert.rejects(
+    () => transportFor((binding) => ({ ...binding, nonce: "0".repeat(64) }))(claim()),
+    (error) => error.code === "REFERRAL_TRANSPORT_RECEIPT_BINDING_INVALID"
+  );
+  await assert.rejects(
+    () => transportFor((binding) => ({ ...binding, occurredAt: "2026-08-04T02:02:00.000Z" }))(claim()),
+    (error) => error.code === "REFERRAL_TRANSPORT_RECEIPT_TIME_WINDOW_INVALID"
+  );
 });

@@ -3,6 +3,15 @@
 const { randomUUID } = require("node:crypto");
 const { inspectReferralTransportReadiness } = require("./referral-delivery-transport");
 
+const MIN_WORKER_LEASE_MS = 60 * 1000;
+const ACK_RETRY_LIMIT = 3;
+const TRANSIENT_ACK_CODES = new Set([
+  "REFERRAL_DELIVERY_DATABASE_FAILED",
+  "REFERRAL_DELIVERY_SERIALIZATION_RETRY",
+  "ECONNRESET",
+  "ETIMEDOUT"
+]);
+
 function text(value, max = 200) {
   return String(value || "").trim().slice(0, max);
 }
@@ -11,7 +20,7 @@ function buildReferralWorkerReadiness(options = {}) {
   const env = options.env || process.env;
   const postgres = options.postgresConfig || {};
   const transport = options.transportReadiness || inspectReferralTransportReadiness(env);
-  const centralCutover = /^(?:1|true|yes)$/i.test(String(env.REFERRAL_DELIVERY_CENTRAL_CUTOVER_ENABLED || ""));
+  const centralCutoverRequested = /^(?:1|true|yes)$/i.test(String(env.REFERRAL_DELIVERY_CENTRAL_CUTOVER_ENABLED || ""));
   const workerEvidence = text(env.REFERRAL_DELIVERY_WORKER_EVIDENCE_ID, 160);
   const requirements = Object.freeze({
     postgresWriteEnabled: postgres.writeEnabled === true,
@@ -19,14 +28,32 @@ function buildReferralWorkerReadiness(options = {}) {
     signedHttpsTransport: transport.configured === true && transport.https === true,
     transportEvidenceReady: transport.evidenceReady === true,
     workerEvidence: workerEvidence.length >= 4,
-    centralCutover
+    centralCutoverRequested,
+    centralCutoverConnected: false
   });
   return Object.freeze({
     requirements,
     blockers: Object.freeze(Object.entries(requirements).filter(([, ready]) => !ready).map(([name]) => name)),
     credentialsPersisted: false,
-    productionReady: Object.values(requirements).every(Boolean)
+    productionReady: false
   });
+}
+
+async function acknowledgeWithRetry(repository, eventId, input, options = {}) {
+  const wait = typeof options.wait === "function"
+    ? options.wait
+    : (delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs));
+  let lastError;
+  for (let attempt = 1; attempt <= ACK_RETRY_LIMIT; attempt += 1) {
+    try {
+      return await repository.acknowledge(eventId, input);
+    } catch (error) {
+      lastError = error;
+      if (!TRANSIENT_ACK_CODES.has(String(error?.code || "")) || attempt === ACK_RETRY_LIMIT) throw error;
+      await wait(attempt * 25);
+    }
+  }
+  throw lastError;
 }
 
 async function runReferralDeliveryWorkerOnce(options = {}) {
@@ -43,10 +70,13 @@ async function runReferralDeliveryWorkerOnce(options = {}) {
   const now = typeof options.now === "function" ? options.now : () => new Date().toISOString();
   const claims = await repository.claim({
     workerId,
-    limit: Math.min(100, Math.max(1, Number(options.limit) || 10)),
-    leaseMs: Math.min(15 * 60 * 1000, Math.max(1000, Number(options.leaseMs) || 30 * 1000)),
+    limit: 1,
+    leaseMs: Math.min(15 * 60 * 1000, Math.max(MIN_WORKER_LEASE_MS, Number(options.leaseMs) || MIN_WORKER_LEASE_MS)),
     now: now()
   });
+  if (!Array.isArray(claims) || claims.length > 1) {
+    throw new TypeError("referral delivery repository must return at most one claim per worker run");
+  }
   const outcomes = [];
   for (const claim of claims) {
     let receipt;
@@ -77,13 +107,13 @@ async function runReferralDeliveryWorkerOnce(options = {}) {
       continue;
     }
     try {
-      const acknowledged = await repository.acknowledge(claim.id, {
+      const acknowledged = await acknowledgeWithRetry(repository, claim.id, {
         workerId,
         leaseToken: claim.leaseToken,
         leaseVersion: claim.leaseVersion,
         receipt,
         acknowledgedAt: now()
-      });
+      }, { wait: options.wait });
       outcomes.push(Object.freeze({
         eventId: claim.id,
         status: "delivered",
@@ -114,6 +144,9 @@ async function runReferralDeliveryWorkerOnce(options = {}) {
 }
 
 module.exports = {
+  ACK_RETRY_LIMIT,
+  acknowledgeWithRetry,
   buildReferralWorkerReadiness,
+  MIN_WORKER_LEASE_MS,
   runReferralDeliveryWorkerOnce
 };

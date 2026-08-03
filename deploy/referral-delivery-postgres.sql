@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS health_platform.referral_delivery_outbox (
   CHECK (ack_lease_token_sha256 IS NULL OR ack_lease_token_sha256 ~ '^sha256:[a-f0-9]{64}$'),
   CHECK (receipt_sha256 IS NULL OR receipt_sha256 ~ '^sha256:[a-f0-9]{64}$'),
   CHECK (last_error_sha256 IS NULL OR last_error_sha256 ~ '^sha256:[a-f0-9]{64}$'),
+  CHECK (octet_length(payload::text) <= 16384),
   CHECK (updated_at >= created_at)
 );
 

@@ -6,9 +6,13 @@ const test = require("node:test");
 
 const {
   MIGRATION_FILE,
+  PAYLOAD_MAX_BYTES,
   buildReferralDeliveryPostgresConfig,
+  buildReferralDeliveryPoolConfig,
   createReferralDeliveryPostgresRepository,
-  sha256
+  rowToInternal,
+  sha256,
+  validateReferralPayload
 } = require("../src/care-coordination/referral-delivery-postgres-repository");
 
 function createFakePool() {
@@ -138,7 +142,29 @@ function repository(fake, options = {}) {
   });
 }
 
-function event(payload = { contract: { referralId: "rf1", residentId: "r1", status: "accepted" } }) {
+function referralPayload(overrides = {}) {
+  return {
+    commandId: "delivery-command-001",
+    intentDigest: "a".repeat(64),
+    contract: {
+      contractId: "referral-order.v1",
+      contractVersion: "1.0.0",
+      referralId: "rf1",
+      residentId: "r1",
+      status: "accepted",
+      version: 2,
+      type: "upward",
+      priority: "high",
+      sourceInstitution: "primary",
+      targetInstitution: "hospital",
+      updatedAt: "2026-08-04T01:00:00.000Z",
+      ...(overrides.contract || {})
+    },
+    ...Object.fromEntries(Object.entries(overrides).filter(([key]) => key !== "contract"))
+  };
+}
+
+function event(payload = referralPayload()) {
   return {
     id: "referral-event-001",
     type: "care-coordination.referral-updated.v1",
@@ -156,6 +182,7 @@ test("additive migration and PostgreSQL configuration remain evidence gated and 
   assert.match(sql, /referral_delivery_replays/);
   assert.match(sql, /lease_version/);
   assert.match(sql, /payload_sha256/);
+  assert.match(sql, /octet_length\(payload::text\) <= 16384/);
   assert.doesNotMatch(sql, /\b(?:DROP|TRUNCATE|DELETE)\b/i);
 
   const config = buildReferralDeliveryPostgresConfig({
@@ -165,12 +192,18 @@ test("additive migration and PostgreSQL configuration remain evidence gated and 
     REFERRAL_DELIVERY_MIGRATION_EVIDENCE_ID: "migration-001",
     REFERRAL_DELIVERY_BACKUP_EVIDENCE_ID: "backup-001",
     REFERRAL_DELIVERY_RECOVERY_EVIDENCE_ID: "recovery-001",
-    REFERRAL_DELIVERY_CUTOVER_APPROVAL_ID: "cutover-001"
+    REFERRAL_DELIVERY_CUTOVER_APPROVAL_ID: "cutover-001",
+    REFERRAL_DELIVERY_POSTGRES_TLS_PROBE_EVIDENCE_ID: "tls-probe-001"
   });
   assert.equal(config.writeEnabled, true);
   assert.equal(config.productionReady, false);
   assert.equal(config.centralCutover, false);
   assert.doesNotMatch(JSON.stringify(config), /user:secret|DATABASE_URL/);
+  assert.equal(PAYLOAD_MAX_BYTES, 16384);
+  assert.equal(buildReferralDeliveryPoolConfig({
+    DATABASE_URL: "postgresql://db.example/referral",
+    POSTGRES_SSL_MODE: "require"
+  }, { ssl: { rejectUnauthorized: false } }).ssl.rejectUnauthorized, true);
 });
 
 test("enqueue is durable and idempotent while payload digest drift conflicts", async () => {
@@ -183,10 +216,104 @@ test("enqueue is durable and idempotent while payload digest drift conflicts", a
   assert.match(fake.events.get("referral-event-001").payload_sha256, /^sha256:[a-f0-9]{64}$/);
   assert.equal(fake.queries.some((item) => /ON CONFLICT \(event_id\) DO NOTHING/.test(item.sql)), true);
   await assert.rejects(
-    () => repo.enqueue(event({ contract: { referralId: "rf1", status: "cancelled" } })),
+    () => repo.enqueue(event(referralPayload({ contract: { status: "cancelled" } }))),
     (error) => error.code === "REFERRAL_DELIVERY_ENQUEUE_CONFLICT" && error.statusCode === 409
   );
   assert.equal(fake.queries.some((item) => /BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE/.test(item.sql)), true);
+});
+
+test("injected production pools require matching TLS probe evidence", async () => {
+  const fake = createFakePool();
+  const env = {
+    REFERRAL_DELIVERY_POSTGRES_MODE: "evidence-gated",
+    DATABASE_URL: "postgresql://db.example/referral",
+    POSTGRES_SSL_MODE: "verify-full",
+    REFERRAL_DELIVERY_MIGRATION_EVIDENCE_ID: "migration-001",
+    REFERRAL_DELIVERY_BACKUP_EVIDENCE_ID: "backup-001",
+    REFERRAL_DELIVERY_RECOVERY_EVIDENCE_ID: "recovery-001",
+    REFERRAL_DELIVERY_CUTOVER_APPROVAL_ID: "cutover-001",
+    REFERRAL_DELIVERY_POSTGRES_TLS_PROBE_EVIDENCE_ID: "tls-probe-001"
+  };
+  const blocked = createReferralDeliveryPostgresRepository({ pool: fake.pool, env });
+  await assert.rejects(
+    () => blocked.enqueue(event()),
+    (error) => error.code === "REFERRAL_DELIVERY_POSTGRES_TLS_PROBE_REQUIRED"
+  );
+  assert.equal(fake.queries.length, 0);
+
+  const ready = createReferralDeliveryPostgresRepository({
+    pool: fake.pool,
+    env,
+    tlsProbeEvidence: {
+      verified: true,
+      rejectUnauthorized: true,
+      evidenceId: "tls-probe-001",
+      checkedAt: "2026-08-04T00:50:00.000Z"
+    }
+  });
+  assert.equal((await ready.enqueue(event())).idempotentReplay, false);
+});
+
+test("owned PostgreSQL pool always receives rejectUnauthorized true", async () => {
+  const fake = createFakePool();
+  let capturedConfig;
+  class PoolClass {
+    constructor(config) {
+      capturedConfig = config;
+      return fake.pool;
+    }
+  }
+  const repo = createReferralDeliveryPostgresRepository({
+    env: {
+      REFERRAL_DELIVERY_POSTGRES_MODE: "evidence-gated",
+      DATABASE_URL: "postgresql://db.example/referral",
+      POSTGRES_SSL_MODE: "verify-full",
+      REFERRAL_DELIVERY_MIGRATION_EVIDENCE_ID: "migration-001",
+      REFERRAL_DELIVERY_BACKUP_EVIDENCE_ID: "backup-001",
+      REFERRAL_DELIVERY_RECOVERY_EVIDENCE_ID: "recovery-001",
+      REFERRAL_DELIVERY_CUTOVER_APPROVAL_ID: "cutover-001",
+      REFERRAL_DELIVERY_POSTGRES_TLS_PROBE_EVIDENCE_ID: "tls-probe-001"
+    },
+    poolConfig: { ssl: { rejectUnauthorized: false } },
+    PoolClass
+  });
+  await repo.enqueue(event());
+  assert.equal(capturedConfig.ssl.rejectUnauthorized, true);
+});
+
+test("referral payload enforces the versioned contract allowlist, lengths and sensitive-field rejection", () => {
+  assert.equal(validateReferralPayload(referralPayload()).contract.contractId, "referral-order.v1");
+  assert.throws(
+    () => validateReferralPayload(referralPayload({ password: "must-not-cross" })),
+    (error) => error.code === "REFERRAL_DELIVERY_PAYLOAD_SENSITIVE_FIELD"
+  );
+  assert.throws(
+    () => validateReferralPayload(referralPayload({ extraClinicalPayload: "not allowed" })),
+    (error) => error.code === "REFERRAL_DELIVERY_PAYLOAD_FIELD_FORBIDDEN"
+  );
+  assert.throws(
+    () => validateReferralPayload(referralPayload({ contract: { referralId: "r".repeat(201) } })),
+    (error) => error.code === "REFERRAL_DELIVERY_PAYLOAD_INVALID"
+  );
+});
+
+test("persisted rows are revalidated against the allowlist and payload digest before claim", async () => {
+  const fake = createFakePool();
+  await repository(fake).enqueue(event());
+  const digestTampered = structuredClone(fake.events.get("referral-event-001"));
+  digestTampered.payload.contract.status = "tampered";
+  assert.throws(
+    () => rowToInternal(digestTampered),
+    (error) => error.code === "REFERRAL_DELIVERY_PAYLOAD_INTEGRITY_FAILED"
+  );
+
+  const allowlistTampered = structuredClone(fake.events.get("referral-event-001"));
+  allowlistTampered.payload.contract.password = "database-injected-secret";
+  allowlistTampered.payload_sha256 = sha256(allowlistTampered.payload);
+  assert.throws(
+    () => rowToInternal(allowlistTampered),
+    (error) => error.code === "REFERRAL_DELIVERY_PAYLOAD_SENSITIVE_FIELD"
+  );
 });
 
 test("claim uses row locking and lease versions, stale workers cannot acknowledge, and exact ack is idempotent", async () => {
@@ -210,11 +337,16 @@ test("claim uses row locking and lease versions, stale workers cannot acknowledg
   });
   assert.equal(newClaim.leaseVersion, oldClaim.leaseVersion + 1);
   const receipt = {
+    requestId: newClaim.id,
     eventId: newClaim.id,
     payloadDigest: newClaim.payloadDigest,
     providerMessageId: "provider-001",
     status: "accepted",
     occurredAt: "2026-08-04T01:00:04.000Z",
+    attempt: newClaim.attempt,
+    leaseVersion: newClaim.leaseVersion,
+    sentAt: "2026-08-04T01:00:03.000Z",
+    nonce: "b".repeat(64),
     signatureDigest: sha256("provider-receipt-signature"),
     signatureVerified: true
   };

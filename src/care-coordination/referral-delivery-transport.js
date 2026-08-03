@@ -51,6 +51,9 @@ function buildReferralTransportConfig(env = process.env) {
   if (parsed.username || parsed.password) {
     throw new ReferralDeliveryTransportError("REFERRAL_TRANSPORT_ENDPOINT_CREDENTIALS_FORBIDDEN", "endpoint URL must not contain credentials");
   }
+  if (parsed.search || parsed.hash) {
+    throw new ReferralDeliveryTransportError("REFERRAL_TRANSPORT_ENDPOINT_COMPONENTS_FORBIDDEN", "endpoint URL must not contain query parameters or fragments");
+  }
   const secret = String(env.REFERRAL_DELIVERY_HMAC_SECRET || "").trim();
   if (secret.length < 32 || /replace-with|change-me|placeholder|example|demo[-_]/i.test(secret)) {
     throw new ReferralDeliveryTransportError("REFERRAL_TRANSPORT_SECRET_UNAVAILABLE", "referral delivery HMAC secret is unavailable");
@@ -66,6 +69,7 @@ function buildReferralTransportConfig(env = process.env) {
     endpoint: parsed.toString(),
     evidence: Object.freeze(evidence),
     timeoutMs: Math.min(30000, Math.max(1000, Number(env.REFERRAL_DELIVERY_TIMEOUT_MS) || 8000)),
+    receiptMaxSkewMs: Math.min(15 * 60 * 1000, Math.max(1000, (Number(env.REFERRAL_DELIVERY_RECEIPT_MAX_SKEW_SECONDS) || 300) * 1000)),
     credentialsPersisted: false,
     productionReady: false
   };
@@ -73,9 +77,21 @@ function buildReferralTransportConfig(env = process.env) {
   return Object.freeze(config);
 }
 
-function deliveryEnvelope(claim, sentAt) {
+function nonceBinding(envelope) {
+  return {
+    requestId: envelope.requestId,
+    eventId: envelope.eventId,
+    payloadDigest: envelope.payloadDigest,
+    attempt: envelope.attempt,
+    leaseVersion: envelope.leaseVersion,
+    sentAt: envelope.sentAt
+  };
+}
+
+function deliveryEnvelope(claim, sentAt, secret) {
   const envelope = {
     schema: "referral-order-delivery.v1",
+    requestId: requiredText(claim?.id, "requestId", 240),
     eventId: requiredText(claim?.id, "eventId", 240),
     eventType: requiredText(claim?.type, "eventType", 160),
     contractId: requiredText(claim?.contractId, "contractId", 80),
@@ -96,28 +112,55 @@ function deliveryEnvelope(claim, sentAt) {
     || envelope.leaseVersion < 1) {
     throw new ReferralDeliveryTransportError("REFERRAL_TRANSPORT_BINDING_INVALID", "referral delivery event binding is incomplete", 409);
   }
+  envelope.nonce = hmac(secret, nonceBinding(envelope));
   return Object.freeze(envelope);
 }
 
 function receiptBinding(receipt = {}) {
   const status = requiredText(receipt.status, "receipt.status", 40).toLowerCase();
   const occurredAt = requiredText(receipt.occurredAt, "receipt.occurredAt", 80);
-  if (!Number.isFinite(Date.parse(occurredAt)) || !new Set(["accepted", "delivered"]).has(status)) {
+  const sentAt = requiredText(receipt.sentAt, "receipt.sentAt", 80);
+  if (!Number.isFinite(Date.parse(occurredAt))
+    || !Number.isFinite(Date.parse(sentAt))
+    || !new Set(["accepted", "delivered"]).has(status)) {
     throw new ReferralDeliveryTransportError("REFERRAL_TRANSPORT_RECEIPT_INVALID", "receipt status or occurredAt is invalid", 502);
   }
   return Object.freeze({
+    requestId: requiredText(receipt.requestId, "receipt.requestId", 240),
     eventId: requiredText(receipt.eventId, "receipt.eventId", 240),
     payloadDigest: requiredText(receipt.payloadDigest, "receipt.payloadDigest", 80),
     providerMessageId: requiredText(receipt.providerMessageId, "receipt.providerMessageId", 240),
     status,
-    occurredAt: new Date(occurredAt).toISOString()
+    occurredAt: new Date(occurredAt).toISOString(),
+    attempt: Number(receipt.attempt),
+    leaseVersion: Number(receipt.leaseVersion),
+    sentAt: new Date(sentAt).toISOString(),
+    nonce: requiredText(receipt.nonce, "receipt.nonce", 128)
   });
 }
 
-function verifySignedReceipt(receipt, envelope, secret) {
+function verifySignedReceipt(receipt, envelope, secret, options = {}) {
   const binding = receiptBinding(receipt);
-  if (binding.eventId !== envelope.eventId || binding.payloadDigest !== envelope.payloadDigest) {
+  const verifiedAt = new Date(options.verifiedAt || new Date().toISOString()).getTime();
+  const maxSkewMs = Math.min(15 * 60 * 1000, Math.max(1000, Number(options.maxSkewMs) || 5 * 60 * 1000));
+  if (!Number.isSafeInteger(binding.attempt)
+    || !Number.isSafeInteger(binding.leaseVersion)
+    || binding.requestId !== envelope.requestId
+    || binding.eventId !== envelope.eventId
+    || binding.payloadDigest !== envelope.payloadDigest
+    || binding.attempt !== envelope.attempt
+    || binding.leaseVersion !== envelope.leaseVersion
+    || binding.sentAt !== envelope.sentAt
+    || binding.nonce !== envelope.nonce
+    || !secureEqual(envelope.nonce, hmac(secret, nonceBinding(envelope)))) {
     throw new ReferralDeliveryTransportError("REFERRAL_TRANSPORT_RECEIPT_BINDING_INVALID", "receipt event or payload binding is invalid", 502);
+  }
+  const sentAt = Date.parse(binding.sentAt);
+  const occurredAt = Date.parse(binding.occurredAt);
+  if (!Number.isFinite(verifiedAt)
+    || Math.abs(occurredAt - sentAt) > maxSkewMs
+    || Math.abs(verifiedAt - occurredAt) > maxSkewMs) {
+    throw new ReferralDeliveryTransportError("REFERRAL_TRANSPORT_RECEIPT_TIME_WINDOW_INVALID", "receipt is outside the accepted time window", 502);
   }
   if (!text(receipt?.signature, 256)) {
     throw new ReferralDeliveryTransportError("REFERRAL_TRANSPORT_RECEIPT_SIGNATURE_REQUIRED", "receipt HMAC signature is required", 502);
@@ -139,7 +182,7 @@ function createReferralDeliveryTransport(options = {}) {
       throw new ReferralDeliveryTransportError("REFERRAL_TRANSPORT_UNAVAILABLE", "HTTPS referral delivery transport is unavailable");
     }
     const config = buildReferralTransportConfig(env);
-    const envelope = deliveryEnvelope(claim, now());
+    const envelope = deliveryEnvelope(claim, now(), config.secret);
     const body = stableStringify(envelope);
     const signature = hmac(config.secret, body);
     const controller = new AbortController();
@@ -181,7 +224,10 @@ function createReferralDeliveryTransport(options = {}) {
     } catch {
       throw new ReferralDeliveryTransportError("REFERRAL_TRANSPORT_RECEIPT_INVALID", "referral receipt is not valid JSON", 502);
     }
-    return verifySignedReceipt(receipt, envelope, config.secret);
+    return verifySignedReceipt(receipt, envelope, config.secret, {
+      verifiedAt: now(),
+      maxSkewMs: config.receiptMaxSkewMs
+    });
   };
 }
 
@@ -216,6 +262,7 @@ module.exports = {
   deliveryEnvelope,
   hmac,
   inspectReferralTransportReadiness,
+  nonceBinding,
   receiptBinding,
   verifySignedReceipt
 };
