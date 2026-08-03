@@ -1,15 +1,26 @@
 "use strict";
 
+const runtimeContextFactory = require("../runtime-contexts/context-factory");
+const publicHealthContext = require("../runtime-contexts/public-health");
 const segment01 = require("./public-health/surveillance-foundation");
 const segment02 = require("./public-health/public-health-operations");
 const segment03 = require("./public-health/vital-records");
 
+const DOMAIN = "public-health";
+const SUBDOMAIN_SEGMENTS = Object.freeze([
+  ["surveillance-foundation", segment01],
+  ["public-health-operations", segment02],
+  ["vital-records", segment03]
+]);
+
 function createRouteSegments(runtime) {
-  return [
-    segment01.createRouteSegment(runtime),
-    segment02.createRouteSegment(runtime),
-    segment03.createRouteSegment(runtime)
-  ];
+  return SUBDOMAIN_SEGMENTS.map(([subdomain, routeModule]) => routeModule.createRouteSegment(
+    runtimeContextFactory.projectRuntimeSubcontext(runtime, {
+      domain: DOMAIN,
+      subdomain,
+      dependencies: publicHealthContext.SUBDOMAIN_DEPENDENCIES[subdomain]
+    })
+  ));
 }
 
-module.exports = { createRouteSegments };
+module.exports = { createRouteSegments, SUBDOMAIN_SEGMENTS };
