@@ -1,7 +1,17 @@
 "use strict";
 
+const {
+  projectImagingErrorResponse,
+  projectPublicImagingResponse
+} = require("./clinical-blood");
+
 function createRouteSegment(runtime) {
-  const { ImagingCloudProduction, appendSecurityEvent, buildImagingCloudProductionResponse, collectJson, readDatabase, requireApiRole, sendJson, sendT10ProductionControlError, writeDatabase } = runtime;
+  const { ImagingCloudProduction, appendSecurityEvent, buildImagingCloudProductionResponse, collectJson, readDatabase, requireApiRole, sendJson, writeDatabase } = runtime;
+  const sendImagingJson = (res, status, body) => sendJson(
+    res,
+    status,
+    status >= 400 ? projectImagingErrorResponse(body) : projectPublicImagingResponse(body)
+  );
   return {
       id: "clinical-specialties-01",
       domain: "clinical-specialties",
@@ -18,7 +28,7 @@ function createRouteSegment(runtime) {
           result: "allowed",
           detail: `${center.summary?.blockers || 0} module blockers; platform production gate closed`
         });
-        sendJson(res, 200, center);
+        sendImagingJson(res, 200, center);
         return true;
       }
 
@@ -26,7 +36,7 @@ function createRouteSegment(runtime) {
         const user = requireApiRole(req, res, ["commission", "institution"], url.pathname);
         if (!user) return true;
         const smoke = ImagingCloudProduction.runStandaloneSmoke(readDatabase());
-        sendJson(res, 200, {
+        sendImagingJson(res, 200, {
           ...smoke,
           moduleEvidenceReady: smoke.releaseDecision === "go",
           releaseDecision: "no-go-platform-approval-pending",
@@ -92,7 +102,7 @@ function createRouteSegment(runtime) {
             result: "allowed",
             detail: "module evidence updated; platform production gate remains closed"
           });
-          sendJson(res, 200, {
+          sendImagingJson(res, 200, {
             item,
             center: buildImagingCloudProductionResponse(data),
             productionReady: false
@@ -106,7 +116,13 @@ function createRouteSegment(runtime) {
             result: "denied",
             detail: String(error?.message || "control rejected").slice(0, 240)
           });
-          sendT10ProductionControlError(res, error);
+          const status = Number(error?.statusCode || error?.status || 400);
+          sendImagingJson(res, status >= 400 && status < 600 ? status : 400, {
+            error: String(error?.code || "Imaging Production Control Rejected"),
+            code: error?.code,
+            message: error?.message,
+            productionReady: false
+          });
         }
         return true;
       }

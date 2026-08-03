@@ -7594,7 +7594,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(share.response.status, 201);
     assert.equal(share.body.studyId, ingest.body.study.id);
     assert.equal(share.body.status, "active");
-    assert.match(share.body.token, /^IMG-/);
+    assert.equal(Object.prototype.hasOwnProperty.call(share.body, "token"), false);
+    assert.doesNotMatch(JSON.stringify(share.body), /objectPath|accessToken|signedUrl|credential/i);
 
     const recognition = await api(baseUrl, `/api/imaging-cloud/studies/${encodeURIComponent(ingest.body.study.id)}/mutual-recognition`, authorized(hospital.body.token, {
       method: "POST",
