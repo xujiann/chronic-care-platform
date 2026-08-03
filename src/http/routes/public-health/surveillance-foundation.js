@@ -1,11 +1,49 @@
 "use strict";
 
+const {
+  appendSignalIngestedEventToState,
+  buildPublicHealthDomainEventHealth,
+  dispatchPendingSignalEventsToState
+} = require("../../../../public-health-domain-event-service");
+
 function createRouteSegment(runtime) {
   const { PUBLIC_HEALTH_RESPIRATORY_NETWORK_EVIDENCE_CLIENT_FIELDS, RESPIRATORY_PANEL, activatePublicHealthSurveillanceRuleChangeToState, appendPublicHealthEndpointProbeCampaignAudit, appendSecurityEvent, applyPublicHealthCoordinationActionToState, applyPublicHealthMedicalPreventionTaskActionToState, applyPublicHealthSurveillanceAlertActionToState, assertPublicHealthOfficialExchangeCallbackPayload, assertPublicHealthRespiratoryNetworkEvidencePayload, assertPublicHealthRespiratoryPayload, assertPublicHealthRuleChangePayload, assertPublicHealthSurveillanceModelPayload, buildPublicHealthCoordinationRuntime, buildPublicHealthDataFoundation, buildPublicHealthEndpointProbeCampaignSummary, buildPublicHealthEndpointVerificationSummary, buildPublicHealthExternalContractCutoverBoard, buildPublicHealthExternalOperationsBoard, buildPublicHealthKeySafetyBoard, buildPublicHealthMedicalPreventionBoard, claimPublicHealthExternalDispatchToState, collectJson, contractAttestationUniqueKey, createHash, enqueuePublicHealthExternalDispatchToState, evaluatePublicHealthSurveillanceSignalToState, ingestPublicHealthRespiratoryPathogenBatchToState, ingestPublicHealthSurveillanceSignalToState, issueTrustedRespiratoryNetworkEvidenceReceipt, listDuePublicHealthExternalDispatches, loadAvailablePublicHealthCredentialMap, loadPublicHealthLaneCredentials, proposePublicHealthSurveillanceRuleChangeToState, publicHealthContractAttestationRequestDigest, publicHealthContractGovernanceAuditEvent, publicHealthContractGovernanceContext, publicHealthCredentialsForDispatch, publicHealthEndpointProbeCampaignAuditEntry, publicHealthEndpointProbeCampaignHttpStatus, publicHealthEndpointProbeCampaignSafeCode, publicHealthEndpointProbeHttpStatus, publicHealthEndpointProbeSafeCode, publicHealthEndpointVerificationContext, publicHealthExternalAttemptOptions, publicHealthExternalHttpStatus, publicHealthExternalLaneVersion, publicHealthExternalPublicView, publicHealthExternalResult, publicHealthExternalWorkerId, publicHealthModernizationCommand, publicHealthModernizationConflict, publicHealthModernizationError, publicHealthOfficialExchangeCallbackError, publicHealthOfficialExchangeReceiptOptions, publicHealthRespiratoryNetworkEvidenceActor, publicHealthRespiratoryNetworkEvidenceAuditDigest, publicHealthRespiratoryNetworkEvidenceOptions, publicHealthRespiratoryNetworkEvidenceRequestFingerprint, publicHealthRespiratoryPathogenActor, publicHealthSafeAlert, publicHealthSafeDataSourceOperations, publicHealthSafeMedicalPreventionTask, publicHealthSafeOfficialExchangeReceipt, publicHealthSafeRespiratoryNetworkReadiness, publicHealthSafeRespiratoryPathogenBatch, publicHealthSafeRespiratoryPathogenSurveillance, publicHealthSafeRuleGovernance, publicHealthSafeSignal, publicHealthSafeSurveillanceCenter, publicHealthSafeSurveillanceModelGovernance, publicHealthSurveillanceModelActor, publicHealthSurveillanceRuleActivationOptions, publishPublicHealthRespiratoryPathogenSignalsToState, randomUUID, readDatabase, recordClaimedPublicHealthExternalAttemptToState, recordPublicHealthExternalAttemptToState, recordPublicHealthOfficialExchangeCallback, requestPublicHealthRespiratoryNetworkLifecycle, requeuePublicHealthExternalDeadLetterToState, requireApiRole, requirePublicHealthOfficialExchangeCallback, reviewPublicHealthRespiratoryNetworkLifecycle, reviewPublicHealthSurveillanceModelValidationToState, reviewPublicHealthSurveillanceRuleChangeToState, runControlledPublicHealthEndpointProbe, runControlledPublicHealthEndpointProbeCampaign, runPublicHealthSurveillanceModelToState, sendJson, signTrustedPublicHealthContractAttestation, submitPublicHealthSurveillanceModelValidationToState, verifyPublicHealthExternalEndpointProbeReceipt, verifyPublicHealthRespiratoryPathogenBatchToState, verifyPublicHealthSurveillanceSignalToState, verifyTrustedRespiratoryNetworkEvidence, writeDatabase } = runtime;
   return {
       id: "public-health-01",
       domain: "public-health",
       async handle(req, res, url) {
+    if (req.method === "GET" && url.pathname === "/api/public-health/domain-events/health") {
+        const user = requireApiRole(req, res, ["commission"], url.pathname);
+        if (!user) return true;
+        sendJson(res, 200, buildPublicHealthDomainEventHealth(readDatabase()));
+        return true;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/public-health/domain-events/dispatch") {
+        const user = requireApiRole(req, res, ["commission"], url.pathname);
+        if (!user) return true;
+        try {
+          const result = await dispatchPendingSignalEventsToState(readDatabase());
+          writeDatabase(result.nextData, {
+            event: "public-health-domain-events-dispatched",
+            publicHealthDomainEventWrite: {
+              contractId: result.health.contractId,
+              processed: result.processed.length,
+              productionEvidence: false
+            }
+          });
+          sendJson(res, 200, {
+            ok: result.health.ok,
+            processed: result.processed,
+            health: result.health,
+            productionReady: false
+          });
+        } catch (error) {
+          publicHealthModernizationError(res, error);
+        }
+        return true;
+      }
+
     if (req.method === "GET" && url.pathname === "/api/public-health/data-foundation") {
         const user = requireApiRole(req, res, ["commission"], url.pathname);
         if (!user) return true;
@@ -710,7 +748,11 @@ function createRouteSegment(runtime) {
           const data = readDatabase();
           const result = ingestPublicHealthSurveillanceSignalToState(data, payload, user);
           if (!result.idempotent) {
-            writeDatabase(result.nextData, {
+            const eventResult = await appendSignalIngestedEventToState(result.nextData, result.signal, {
+              correlationId: req.correlationId,
+              causationId: result.signal.idempotencyKeyHash
+            });
+            writeDatabase(eventResult.nextData, {
               event: "public-health-surveillance-signal-ingested",
               publicHealthModernizationWrite: {
                 collection: "publicHealthSurveillanceSignals",
@@ -718,7 +760,9 @@ function createRouteSegment(runtime) {
                 expectedVersion: 0,
                 operation: "insert-signal",
                 sourceRecordHash: result.signal.externalSignalKeyHash,
-                idempotencyKeyHash: result.signal.idempotencyKeyHash
+                idempotencyKeyHash: result.signal.idempotencyKeyHash,
+                outboxEventId: eventResult.event.id,
+                outboxEventType: eventResult.event.type
               }
             });
           }
