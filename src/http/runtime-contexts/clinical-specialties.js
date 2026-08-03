@@ -2,28 +2,18 @@
 
 const DOMAIN = "clinical-specialties";
 const PROCESS = "T06";
-const DEPENDENCIES = Object.freeze([
-  "BloodBusinessService", "BloodEventHub", "BloodGoLiveService", "BloodInnovationService",
-  "BloodIntegrationGateway", "BloodMasterData", "BloodService", "BloodTransactionService",
-  "EmergencyLifeChain", "EmergencyProduction", "EmergencyService", "ImagingCloudProduction",
-  "PhysicalExaminationService", "allowedResidentIdsForUser", "appendDataAccessLog", "appendOperationsIntegrationAudit",
-  "appendQualitySafetyAudit", "appendSecurityEvent", "applyDispatchStatusUpdate", "assertSignedOperationsPayload",
-  "buildHospitalOperationsDashboard", "buildImageCloudDashboard", "buildImageCloudDerivedRecords", "buildImagingCloudProductionResponse",
-  "buildObservabilityAlertCenter", "buildOhifStudyUrl", "buildOperationsInterfaceMappingEvidence", "buildOperationsMobileDuty",
-  "buildOperationsSiteJointPatrol", "buildPerformanceMonitoringEvidence", "buildPhysicalExamProductionReadiness", "buildProductionOperationsCenter",
-  "buildQualitySafetyCoreSystemMatrix", "buildQualitySafetyDashboard", "buildQualitySafetyInterfaceJointTestPack", "buildQualitySafetyInterfaceStandard",
-  "buildQualitySafetyIssues", "buildRuntimeMetrics", "canAccessResident", "canAccessSecureAttachment",
-  "collectJson", "createHash", "createImageCloudMutualRecognitionChain", "createOperationsMobileDutyReminder",
-  "integrationGatewaySecret", "integrationPayloadAllowedForInstitution", "isProductionRuntime", "listOrthancStudySummaries",
-  "mergeByKey", "normalizeDiagnosticReport", "normalizeDispatchAction", "normalizeHandoverSignoff",
-  "normalizeImageCloudStudy", "normalizeOperationSnapshot", "normalizeQualitySafetyStatus", "normalizeReconciliationBatchItem",
-  "normalizeState", "patchCollectionItem", "personIndexForResident", "prependAuditTrailEntry",
-  "publishDiagnosticReportToFhir", "publishImagingStudyToFhir", "qualitySafetySlaState", "randomUUID",
-  "readDatabase", "redactSensitiveResponse", "requireApiRole", "reviewImageCloudRecognitionAppeal",
-  "reviewMutualRecognitionRecord", "rowMatchesOrganizationScope", "sendDownload", "sendJson",
-  "sendT10ProductionControlError", "solutionAHealth", "submitImageCloudRecognitionAppeal", "upsertPhase2MutualRecognitionCitation",
-  "validateQualitySafetyInterfaceMessage", "writeDatabase"
-]);
+const SUBDOMAIN_DEPENDENCIES = Object.freeze({
+  "imaging-cloud": Object.freeze(["ImagingCloudProduction","appendSecurityEvent","buildImagingCloudProductionResponse","collectJson","readDatabase","requireApiRole","sendJson","sendT10ProductionControlError","writeDatabase"]),
+  "operations-dashboard": Object.freeze(["BloodEventHub","buildHospitalOperationsDashboard","buildObservabilityAlertCenter","buildProductionOperationsCenter","buildRuntimeMetrics","readDatabase","requireApiRole","sendJson"]),
+  "operations-command": Object.freeze(["appendOperationsIntegrationAudit","applyDispatchStatusUpdate","assertSignedOperationsPayload","buildHospitalOperationsDashboard","buildOperationsInterfaceMappingEvidence","buildOperationsMobileDuty","buildOperationsSiteJointPatrol","buildPerformanceMonitoringEvidence","collectJson","createOperationsMobileDutyReminder","integrationPayloadAllowedForInstitution","normalizeDispatchAction","normalizeHandoverSignoff","normalizeOperationSnapshot","normalizeReconciliationBatchItem","randomUUID","readDatabase","requireApiRole","sendJson","writeDatabase"]),
+  "emergency-care": Object.freeze(["BloodEventHub","EmergencyLifeChain","EmergencyProduction","EmergencyService","collectJson","readDatabase","redactSensitiveResponse","requireApiRole","sendDownload","sendJson","writeDatabase"]),
+  "quality-safety": Object.freeze(["BloodEventHub","appendQualitySafetyAudit","appendSecurityEvent","buildQualitySafetyCoreSystemMatrix","buildQualitySafetyDashboard","buildQualitySafetyInterfaceJointTestPack","buildQualitySafetyInterfaceStandard","buildQualitySafetyIssues","collectJson","integrationGatewaySecret","normalizeQualitySafetyStatus","qualitySafetySlaState","randomUUID","readDatabase","requireApiRole","sendJson","validateQualitySafetyInterfaceMessage","writeDatabase"]),
+  "clinical-blood": Object.freeze(["BloodBusinessService","BloodIntegrationGateway","BloodMasterData","BloodService","BloodTransactionService","appendDataAccessLog","appendSecurityEvent","buildImageCloudDashboard","buildImageCloudDerivedRecords","buildOhifStudyUrl","canAccessResident","collectJson","createHash","createImageCloudMutualRecognitionChain","listOrthancStudySummaries","mergeByKey","normalizeImageCloudStudy","personIndexForResident","publishDiagnosticReportToFhir","publishImagingStudyToFhir","randomUUID","readDatabase","redactSensitiveResponse","requireApiRole","reviewImageCloudRecognitionAppeal","reviewMutualRecognitionRecord","sendJson","solutionAHealth","submitImageCloudRecognitionAppeal","upsertPhase2MutualRecognitionCitation","writeDatabase"]),
+  "mutual-recognition-ingest": Object.freeze(["appendSecurityEvent","collectJson","normalizeDiagnosticReport","prependAuditTrailEntry","randomUUID","readDatabase","requireApiRole","sendJson","writeDatabase"]),
+  "mutual-recognition-review": Object.freeze(["collectJson","prependAuditTrailEntry","randomUUID","readDatabase","requireApiRole","reviewMutualRecognitionRecord","sendJson","writeDatabase"]),
+  "emergency-signals": Object.freeze(["collectJson","patchCollectionItem","readDatabase","requireApiRole","sendJson"]),
+  "blood-innovation": Object.freeze(["BloodEventHub","BloodGoLiveService","BloodInnovationService","PhysicalExaminationService","allowedResidentIdsForUser","appendDataAccessLog","appendSecurityEvent","buildPhysicalExamProductionReadiness","canAccessResident","canAccessSecureAttachment","collectJson","isProductionRuntime","normalizeState","randomUUID","readDatabase","redactSensitiveResponse","requireApiRole","rowMatchesOrganizationScope","sendJson","writeDatabase"])
+});
+const DEPENDENCIES = Object.freeze(["BloodBusinessService","BloodEventHub","BloodGoLiveService","BloodInnovationService","BloodIntegrationGateway","BloodMasterData","BloodService","BloodTransactionService","EmergencyLifeChain","EmergencyProduction","EmergencyService","ImagingCloudProduction","PhysicalExaminationService","allowedResidentIdsForUser","appendDataAccessLog","appendOperationsIntegrationAudit","appendQualitySafetyAudit","appendSecurityEvent","applyDispatchStatusUpdate","assertSignedOperationsPayload","buildHospitalOperationsDashboard","buildImageCloudDashboard","buildImageCloudDerivedRecords","buildImagingCloudProductionResponse","buildObservabilityAlertCenter","buildOhifStudyUrl","buildOperationsInterfaceMappingEvidence","buildOperationsMobileDuty","buildOperationsSiteJointPatrol","buildPerformanceMonitoringEvidence","buildPhysicalExamProductionReadiness","buildProductionOperationsCenter","buildQualitySafetyCoreSystemMatrix","buildQualitySafetyDashboard","buildQualitySafetyInterfaceJointTestPack","buildQualitySafetyInterfaceStandard","buildQualitySafetyIssues","buildRuntimeMetrics","canAccessResident","canAccessSecureAttachment","collectJson","createHash","createImageCloudMutualRecognitionChain","createOperationsMobileDutyReminder","integrationGatewaySecret","integrationPayloadAllowedForInstitution","isProductionRuntime","listOrthancStudySummaries","mergeByKey","normalizeDiagnosticReport","normalizeDispatchAction","normalizeHandoverSignoff","normalizeImageCloudStudy","normalizeOperationSnapshot","normalizeQualitySafetyStatus","normalizeReconciliationBatchItem","normalizeState","patchCollectionItem","personIndexForResident","prependAuditTrailEntry","publishDiagnosticReportToFhir","publishImagingStudyToFhir","qualitySafetySlaState","randomUUID","readDatabase","redactSensitiveResponse","requireApiRole","reviewImageCloudRecognitionAppeal","reviewMutualRecognitionRecord","rowMatchesOrganizationScope","sendDownload","sendJson","sendT10ProductionControlError","solutionAHealth","submitImageCloudRecognitionAppeal","upsertPhase2MutualRecognitionCitation","validateQualitySafetyInterfaceMessage","writeDatabase"]);
 
-module.exports = { DEPENDENCIES, DOMAIN, PROCESS };
-
+module.exports = { DEPENDENCIES, DOMAIN, PROCESS, SUBDOMAIN_DEPENDENCIES };
