@@ -4130,6 +4130,13 @@ dialog::backdrop {
   color: var(--ink);
 }
 
+.citizen-next-stage-card details > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+}
+
 .citizen-next-stage-card .citizen-care-list > footer,
 .citizen-next-stage-card .citizen-care-row > footer {
   display: flex;

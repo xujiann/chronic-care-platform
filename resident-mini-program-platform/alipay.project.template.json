@@ -1,0 +1,21 @@
+{
+  "platform": "alipay",
+  "appId": "__ALIPAY_APP_ID__",
+  "configurationVerified": false,
+  "configurationEvidenceId": "__PLATFORM_CONFIG_EVIDENCE_ID__",
+  "minimumVersion": "2.9.0",
+  "apiOrigin": "https://__API_DOMAIN__",
+  "businessOrigin": "https://__BUSINESS_DOMAIN__",
+  "pages": "__PAGE_MANIFEST__",
+  "permissions": [
+    "makePhoneCall",
+    "subscribeMessage"
+  ],
+  "privacy": {
+    "makePhoneCall": "仅在居民主动确认急救拨号时调用，不读取通讯录或通话记录",
+    "subscribeMessage": "仅在居民明确同意后接收脱敏健康服务状态通知"
+  },
+  "debug": false,
+  "grayReleaseEnabled": false,
+  "grayReleaseRuleId": ""
+}

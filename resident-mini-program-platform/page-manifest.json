@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "pages": [
+    "home",
+    "messages",
+    "profile",
+    "health-record",
+    "emr",
+    "registration",
+    "nursing",
+    "escort",
+    "family-doctor",
+    "emergency",
+    "tasks"
+  ],
+  "navigation": [
+    "home",
+    "messages",
+    "profile"
+  ]
+}

@@ -2973,12 +2973,23 @@ function renderCitizenRecordsNextStage(resident, diseases = [], records = [], ca
   </div>`;
 
   const governanceTarget = document.querySelector("#citizen-governance-v3");
-  if (governanceTarget) governanceTarget.innerHTML = `<div class="citizen-care-row ${workspace.governance.conflicts.length ? "warning" : ""}">
-    <div><strong>${workspace.governance.sourceCount} 个可信来源</strong><span>${workspace.governance.duplicates.length} 组重复</span><em>${workspace.governance.conflicts.length} 组冲突</em></div>
-    <p>${workspace.governance.conflicts.slice(0, 3).map((item) => `${escapeHtml(item.label)}：${escapeHtml(item.action)}`).join("；") || "当前没有需要居民处理的跨院冲突。"}</p>
-    <small>${escapeHtml(workspace.governance.boundary)}</small>
-    <footer><button type="button" class="small-button" data-v3-action="${workspace.governance.conflicts.length ? "correct-conflict" : "review-provenance"}">${workspace.governance.conflicts.length ? "发起纠错复核" : "查看来源明细"}</button></footer>
-  </div>`;
+  if (governanceTarget) {
+    const qualityProblems = workspace.governance.quality.items.filter((item) => !item.complete);
+    const qualityDetail = qualityProblems.length
+      ? `<details><summary>查看质量问题明细（${qualityProblems.length} 条）</summary>
+          <ol>${qualityProblems.slice(0, 20).map((item) => `<li><strong>${escapeHtml(item.name)}</strong> · ${escapeHtml(item.priority)} · ${escapeHtml(item.status)} · ${escapeHtml(item.action)}</li>`).join("")}</ol>
+          ${qualityProblems.length > 20 ? `<small>当前仅展示前 20 条，请通过来源明细继续复核其余 ${qualityProblems.length - 20} 条。</small>` : ""}
+        </details>`
+      : "";
+    governanceTarget.innerHTML = `<div class="citizen-care-row ${workspace.governance.conflicts.length || qualityProblems.length ? "warning" : ""}">
+      <div><strong>${workspace.governance.sourceCount} 个来源机构</strong><span>${workspace.governance.duplicates.length} 组重复</span><em>${workspace.governance.conflicts.length} 组冲突</em></div>
+      <p>质量完整 ${workspace.governance.quality.completeCount} 条，待复核 ${workspace.governance.quality.reviewCount} 条${workspace.governance.quality.blockedCount ? `，阻断 ${workspace.governance.quality.blockedCount} 条` : ""}${workspace.governance.quality.highPriorityCount ? `，优先复核 ${workspace.governance.quality.highPriorityCount} 条` : ""}${workspace.governance.quality.staleCount ? `，超期 ${workspace.governance.quality.staleCount} 条` : ""}。</p>
+      <p>${workspace.governance.conflicts.slice(0, 3).map((item) => `${escapeHtml(item.label)}：${escapeHtml(item.action)}`).join("；") || qualityProblems.slice(0, 3).map((item) => `${escapeHtml(item.name)}（${escapeHtml(item.priority)}）：${escapeHtml(item.status)}，${escapeHtml(item.action)}`).join("；") || "当前没有需要居民处理的跨院冲突或质量问题。"}</p>
+      ${qualityDetail}
+      <small>${escapeHtml(workspace.governance.boundary)} ${escapeHtml(workspace.governance.quality.boundary)}</small>
+      <footer><button type="button" class="small-button" data-v3-action="${workspace.governance.conflicts.length ? "correct-conflict" : "review-provenance"}">${workspace.governance.conflicts.length ? "发起纠错复核" : "查看来源明细"}</button></footer>
+    </div>`;
+  }
 
   const familyTarget = document.querySelector("#citizen-family-v3");
   if (familyTarget) familyTarget.innerHTML = workspace.family.items.slice(0, 6).map((item) => `<div class="citizen-care-row ${item.canAct ? "" : "denied"}">
@@ -2987,14 +2998,22 @@ function renderCitizenRecordsNextStage(resident, diseases = [], records = [], ca
   </div>`).join("") + `<small>${escapeHtml(workspace.family.boundary)}</small><footer><button type="button" class="small-button" data-v3-action="manage-family-authorization">管理家庭授权</button></footer>`;
 
   const carePlanTarget = document.querySelector("#citizen-care-plan-v3");
-  if (carePlanTarget) carePlanTarget.innerHTML = workspace.carePlan.tasks.slice(0, 6).map((item) => {
-    const intent = api.buildCareTaskActionIntent(item);
-    return `<div class="citizen-care-row ${["逾期", "紧急"].includes(item.priority) ? "warning" : ""}">
-      <div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.type)}</span><em>${escapeHtml(item.priority)}</em></div>
-      <p>${escapeHtml(item.action)}${item.dueAt ? ` · ${escapeHtml(item.dueAt)}` : ""}</p>
-      <footer><button type="button" class="small-button" data-v3-care-task="${escapeHtml(intent.taskId)}" data-v3-care-task-type="${escapeHtml(intent.type)}">${escapeHtml(intent.buttonLabel)}</button></footer>
-    </div>`;
-  }).join("") + `<small>${escapeHtml(workspace.carePlan.boundary)}</small>` || citizenCareEmpty("当前没有需要处理的主动健康任务。");
+  if (carePlanTarget) {
+    const taskRows = workspace.carePlan.tasks.slice(0, 6).map((item) => {
+      const intent = api.buildCareTaskActionIntent(item);
+      return `<div class="citizen-care-row ${["逾期", "今日", "紧急"].includes(item.priority) ? "warning" : ""}">
+        <div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.type)}</span><em>${escapeHtml(item.priority)}</em></div>
+        <p>${escapeHtml(item.action)} · ${escapeHtml(item.dueLabel)}${item.dueAt ? `（${escapeHtml(item.dueAt)}）` : ""}</p>
+        <footer><button type="button" class="small-button" data-v3-care-task="${escapeHtml(intent.taskId)}" data-v3-care-task-type="${escapeHtml(intent.type)}">${escapeHtml(intent.buttonLabel)}</button></footer>
+      </div>`;
+    }).join("");
+    carePlanTarget.innerHTML = workspace.carePlan.tasks.length
+      ? `<div class="citizen-care-row">
+          <div><strong>${workspace.carePlan.tasks.length} 项主动任务</strong><span>逾期 ${workspace.carePlan.overdueCount} 项</span><em>今日 ${workspace.carePlan.todayCount} 项</em></div>
+          <p>未来 7 天 ${workspace.carePlan.nextSevenDaysCount} 项需要处理</p>
+        </div>${taskRows}<small>${escapeHtml(workspace.carePlan.boundary)}</small>`
+      : citizenCareEmpty("当前没有需要处理的主动健康任务。");
+  }
 
   const explanationTarget = document.querySelector("#citizen-report-explain-v3");
   if (explanationTarget) explanationTarget.innerHTML = workspace.explanations.reports.slice(0, 4).map((item) => `<div class="citizen-care-row ${["critical", "abnormal"].includes(item.severity) ? "warning" : ""}">

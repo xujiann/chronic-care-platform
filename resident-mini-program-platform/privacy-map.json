@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "dataMinimization": "居民数据只按当前账号与当前居民范围加载，平台无关隐私数据不读取、不持久化",
+  "permissions": {
+    "makePhoneCall": "仅在居民主动确认急救拨号时调用",
+    "subscribeMessage": "仅在居民明确同意后接收脱敏服务状态通知"
+  },
+  "lockScreenCopy": {
+    "title": "您有一条新的健康服务消息",
+    "body": "请打开居民健康服务安全查看"
+  }
+}

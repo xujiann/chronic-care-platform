@@ -55,7 +55,21 @@ function assessCitizenRecordsReadiness(options = {}) {
     { id: "next-stage-eight-capabilities", label: "居民健康档案八项增强服务", passed: /buildNextStageWorkspace/.test(v3) && /生产接入状态只接受/.test(nextStageUnit) && /citizen-operations-v3/.test(html) },
     { id: "next-stage-action-intents", label: "八项增强服务安全操作闭环", passed: /buildSafeActionIntent/.test(v3) && /handleCitizenRecordsV3Action/.test(ui) && /紧急和家庭授权草稿保持最小范围/.test(nextStageUnit) && /准备紧急授权/.test(e2e) },
     { id: "proactive-care-task-routing", label: "主动健康任务逐项安全分流", passed: /buildCareTaskActionIntent/.test(v3) && /handleCitizenRecordsV3CareTaskAction/.test(ui) && /主动健康任务标识与类型不匹配/.test(nextStageUnit) && /data-v3-care-task/.test(e2e) },
-    { id: "acceptance-documentation", label: "居民验收标准与外部依赖", passed: /第二十四增量/.test(documentation) && /## 外部依赖/.test(documentation) }
+    { id: "proactive-care-calendar-day", label: "主动任务东八区自然日到期计算", passed: /taskDueState/.test(v3) && /calendarDayDistance/.test(v3) && /东八区自然日判断今日到期/.test(nextStageUnit) && /未来 7 天/.test(e2e) },
+    { id: "integration-evidence-time-window", label: "生产接入证据精确时间窗", passed: /futureTimestamp/.test(v3) && /clockSkewMinutes/.test(v3) && /拒绝异常未来时间无效时间/.test(nextStageUnit) && /成功时间异常/.test(e2e) },
+    { id: "clinical-source-contracts", label: "EMR/LIS/PACS 样例契约与安全投影", passed: /function validateClinicalSourceSample/.test(v3) && /function projectClinicalSourceSample/.test(v3) && /LIS 与 PACS 样例缺少结构化结果/.test(nextStageUnit) && /清除内部敏感字段/.test(nextStageUnit) },
+    { id: "record-quality-assessment", label: "档案来源完整性与时效质量评估", passed: /function assessResidentRecordQuality/.test(v3) && /超过十八个月待复核/.test(v3) && /质量完整/.test(ui) && /档案质量评估识别来源缺失/.test(nextStageUnit) },
+    { id: "clinical-batch-acceptance", label: "临床样例批量验收安全报告", passed: /function buildClinicalSourceAcceptanceReport/.test(v3) && /slice\(0, 500\)/.test(v3) && /批量临床样例验收汇总/.test(nextStageUnit) && /productionReady, false/.test(nextStageUnit) },
+    { id: "quality-priority-queue", label: "档案质量问题分级处理", passed: /function qualityIssuePriority/.test(v3) && /隔离记录并核对居民归属/.test(v3) && /blockedCount/.test(ui) && /质量评估识别来源缺失/.test(nextStageUnit) },
+    { id: "workspace-resident-firewall", label: "增强工作台居民范围纵深隔离", passed: /inputRecords\.filter/.test(v3) && /已隔离的跨居民记录/.test(v3) && /增强工作台在模型层再次裁剪/.test(nextStageUnit) && /另一居民敏感结果/.test(nextStageUnit) },
+    { id: "quality-readonly-details", label: "档案质量问题只读明细", passed: /查看质量问题明细/.test(ui) && /qualityProblems\.slice\(0, 20\)/.test(ui) && /补齐溯源字段/.test(e2e) },
+    { id: "emergency-pack-resident-firewall", label: "紧急资料包居民范围防火墙", passed: /cleanText\(input\.consent\.residentId/.test(v3) && /紧急资料包独立拒绝跨居民疾病记录联系人和授权/.test(nextStageUnit) && /缺少居民标识疾病/.test(nextStageUnit) },
+    { id: "operations-resident-firewall", label: "居民运营计数范围防火墙", passed: /function buildOperationsSnapshot/.test(v3) && /residentId && cleanText\(item\?\.residentId/.test(v3) && /居民运营汇总拒绝跨居民和缺标识事件/.test(nextStageUnit) },
+    { id: "bounded-resident-aggregations", label: "居民增强聚合资源上限", passed: /function boundedObjects/.test(v3) && /OPERATIONS_EVENT_LIMIT = 1000/.test(v3) && /居民增强聚合输出设置确定性上限/.test(nextStageUnit) },
+    { id: "operations-state-time-hardening", label: "运营状态与事件时间加固", passed: /DENIED_ACCESS_STATES/.test(v3) && /validOperationsEventTime/.test(v3) && /只接受精确状态白名单/.test(nextStageUnit) && /异常未来和无效时间/.test(nextStageUnit) },
+    { id: "family-self-identity", label: "家庭本人身份精确判定", passed: /currentResidentId/.test(v3) && /\["本人", "self"\]\.includes/.test(v3) && /仅将当前居民的精确本人关系/.test(nextStageUnit) },
+    { id: "care-task-stable-identifiers", label: "主动任务稳定标识前置校验", passed: /if \(!sourceId\) continue/.test(v3) && /展示前丢弃缺少稳定来源标识/.test(nextStageUnit) },
+    { id: "acceptance-documentation", label: "居民验收标准与外部依赖", passed: /第三十八增量/.test(documentation) && /## 外部依赖/.test(documentation) }
   ];
 
   const integrationChecks = [
@@ -72,7 +86,7 @@ function assessCitizenRecordsReadiness(options = {}) {
     {
       id: "t00-pwa-cache",
       label: "T00 Service Worker 缓存当前居民脚本版本",
-      passed: /citizen-records-v2\.js\?v=20260725care16/.test(serviceWorker) && /citizen-records-v3\.js\?v=20260728next4/.test(serviceWorker) && /citizen\.js\?v=20260728next3/.test(serviceWorker)
+      passed: /citizen-records-v2\.js\?v=20260725care16/.test(serviceWorker) && /citizen-records-v3\.js\?v=20260728next6/.test(serviceWorker) && /citizen\.js\?v=20260728next4/.test(serviceWorker)
     }
   ];
 
