@@ -44,9 +44,14 @@ const actor = {
   orgName: "人民医院"
 };
 
-test("real refund request commits domain state command receipt and versioned outbox together", async () => {
+test("real refund request commits domain state command receipt and correlated versioned outbox together", async () => {
   const original = fixture();
-  const result = await RefundTransaction.createRefundRequestTransaction(original, request(), actor);
+  const result = await RefundTransaction.createRefundRequestTransaction(
+    original,
+    request(),
+    actor,
+    { correlationId: "refund-request-correlation-001" }
+  );
 
   assert.equal(original.onlinePaymentRefunds.length, 0);
   assert.equal(result.data.onlinePaymentRefunds.length, 1);
@@ -67,19 +72,34 @@ test("real refund request commits domain state command receipt and versioned out
   assert.equal(checkpoint.commands.length, 1);
   assert.equal(checkpoint.outbox.length, 1);
   assert.equal(checkpoint.outbox[0].eventType, "insurance-payment.refund-requested.v1");
+  assert.equal(checkpoint.outbox[0].traceId, "refund-request-correlation-001");
   assert.equal(checkpoint.outbox[0].payload.contractId, "insurance-payment.refund-request.v1");
   assert.equal(checkpoint.outbox[0].payload.productionEvidence, false);
 });
 
 test("same idempotency key replays once and conflicting reuse is rejected before another refund", async () => {
-  const first = await RefundTransaction.createRefundRequestTransaction(fixture(), request(), actor);
-  const replay = await RefundTransaction.createRefundRequestTransaction(first.data, request({ id: "ignored-replay-id" }), actor);
+  const first = await RefundTransaction.createRefundRequestTransaction(
+    fixture(),
+    request(),
+    actor,
+    { correlationId: "refund-first-correlation-001" }
+  );
+  const replay = await RefundTransaction.createRefundRequestTransaction(
+    first.data,
+    request({ id: "ignored-replay-id" }),
+    actor,
+    { correlationId: "refund-replay-correlation-002" }
+  );
 
   assert.equal(replay.idempotent, true);
   assert.equal(replay.row.id, "refund-001");
   assert.equal(replay.data.onlinePaymentRefunds.length, 1);
   assert.equal(replay.data.onlinePaymentRefunds[0].refundTransactionRuntime.checkpoint.commands.length, 1);
   assert.equal(replay.data.onlinePaymentRefunds[0].refundTransactionRuntime.checkpoint.outbox.length, 1);
+  assert.equal(
+    replay.data.onlinePaymentRefunds[0].refundTransactionRuntime.checkpoint.outbox[0].traceId,
+    "refund-first-correlation-001"
+  );
 
   await assert.rejects(
     RefundTransaction.createRefundRequestTransaction(first.data, request({ refundAmountFen: 4_000 }), actor),

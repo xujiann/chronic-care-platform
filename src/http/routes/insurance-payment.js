@@ -517,7 +517,12 @@ function createRouteSegments(runtime) {
           payload.idempotencyKey = String(req.headers["idempotency-key"] || payload.idempotencyKey || "").trim();
           const result = await InsurancePaymentRefundTransaction.withRefundRequestLock(payload, async () => {
             const currentData = readDatabase();
-            const transaction = await InsurancePaymentRefundTransaction.createRefundRequestTransaction(currentData, payload, user);
+            const transaction = await InsurancePaymentRefundTransaction.createRefundRequestTransaction(
+              currentData,
+              payload,
+              user,
+              { correlationId: req.correlationId }
+            );
             writeDatabase(normalizeState(transaction.data));
             return transaction;
           });

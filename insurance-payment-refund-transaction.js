@@ -131,7 +131,7 @@ function withRefundRequestLock(input = {}, work) {
   return pending;
 }
 
-async function createRefundRequestTransaction(data, input = {}, actor = {}) {
+async function createRefundRequestTransaction(data, input = {}, actor = {}, context = {}) {
   if (!data || typeof data !== "object" || Array.isArray(data)) {
     throw new RefundTransactionError("退款账本不可用", "REFUND_LEDGER_UNAVAILABLE", 503);
   }
@@ -152,7 +152,8 @@ async function createRefundRequestTransaction(data, input = {}, actor = {}) {
       payload: commandPayload(request),
       expectedVersion: snapshot.version,
       actor: request.requestedBy,
-      traceId: `refund-trace:${request.requestKeyHash.slice(7, 39)}`
+      traceId: String(context.correlationId || "").trim()
+        || `refund-trace:${request.requestKeyHash.slice(7, 39)}`
     }, (state) => {
       const result = OnlinePaymentRefunds.createRefundRequest(nextData, {
         id: input.id,
