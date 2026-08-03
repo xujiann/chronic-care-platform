@@ -74,7 +74,7 @@ function git(args, options = {}) {
 function defaultWorktreeRoot(root = ROOT) {
   const commonDir = git(["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd: root }).stdout.trim();
   const primaryRoot = path.dirname(commonDir);
-  return path.join(path.dirname(primaryRoot), ".codex-platform-worktrees", "process-v1");
+  return path.join(path.dirname(primaryRoot), ".codex-platform-worktrees", "process-v2");
 }
 
 function buildWorktreePlan(options, manifest = loadManifest()) {

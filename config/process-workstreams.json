@@ -1,7 +1,7 @@
 {
   "schemaVersion": "process-workstreams-v1",
   "integrationBranch": "codex/governance-integration-20260803",
-  "baselineTag": "baseline/governance-20260803-process-v1",
+  "baselineTag": "baseline/governance-20260803-iteration2-v1",
   "branchPattern": "process/tNN-<topic>-YYYYMMDD",
   "processes": {
     "T00": {
@@ -75,6 +75,7 @@
     { "pattern": "src/http/contracts/foundation-contracts.js", "owner": "T00" },
     { "pattern": "src/http/route-subdomains.js", "owner": "T00" },
     { "pattern": "docs/领域运行时上下文规范-2026-08-03.md", "owner": "T00" },
+    { "pattern": "docs/最近两个迭代交付-2026-08-03.md", "owner": "T00" },
     { "pattern": "test/http-runtime-contexts.test.js", "owner": "T00" },
     { "pattern": "test/cross-domain-foundation-contract.test.js", "owner": "T00" },
     { "pattern": "scripts/production-deployment-package.js", "owner": "T00" },

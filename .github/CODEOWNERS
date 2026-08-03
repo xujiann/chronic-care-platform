@@ -7,6 +7,10 @@
 /src/http/api-router.js @xujiann
 /src/http/runtime-source.js @xujiann
 /src/http/routes/index.js @xujiann
+/src/http/runtime-contexts/context-factory.js @xujiann
+/src/http/runtime-contexts/index.js @xujiann
+/src/http/contracts/foundation-contracts.js @xujiann
+/src/http/route-subdomains.js @xujiann
 /scripts/production-deployment-package.js @xujiann
 /scripts/test-all.js @xujiann
 /package.json @xujiann
@@ -17,6 +21,10 @@
 /docs/路由模块化与并行开发边界-2026-08-03.md @xujiann
 /test/http-route-modularization.test.js @xujiann
 /test/process-worktree.test.js @xujiann
+/test/http-runtime-contexts.test.js @xujiann
+/test/cross-domain-foundation-contract.test.js @xujiann
+/docs/领域运行时上下文规范-2026-08-03.md @xujiann
+/docs/最近两个迭代交付-2026-08-03.md @xujiann
 
 # Domain route modules remain independently reviewable.
 /src/http/routes/runtime.js @xujiann
@@ -31,3 +39,11 @@
 /src/http/routes/integration.js @xujiann
 /src/http/routes/research.js @xujiann
 /src/http/routes/shared.js @xujiann
+
+# Domain runtime context ownership mirrors the route ownership manifest.
+/src/http/runtime-contexts/runtime.js @xujiann
+/src/http/runtime-contexts/identity-security.js @xujiann
+/src/http/runtime-contexts/citizen-chronic.js @xujiann
+/src/http/runtime-contexts/care-coordination.js @xujiann
+/src/http/runtime-contexts/insurance-payment.js @xujiann
+/src/http/runtime-contexts/integration.js @xujiann
