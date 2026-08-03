@@ -1,7 +1,88 @@
 "use strict";
 
+const FORBIDDEN_PUBLIC_FIELD = /^(?:(?:object|physical|storage)[_-]?path|object[_-]?key|access[_-]?url|signed[_-]?url|(?:access|refresh)?[_-]?token|authorization|api[_-]?key|secrets?|passwords?|credentials?|credential[_-]?ref|private[_-]?key|signatures?|signing[_-]?keys?|signature[_-]?keys?|certificate[_-]?fingerprint|endpoint|base[_-]?url|bucket(?:Name)?|containerName)$/i;
+const SENSITIVE_QUERY_PARAMETER = /^(?:token|access_?token|refresh_?token|signature|sig|key|api_?key|secret|password|credential)$/i;
+const PHYSICAL_LOCATION = /(?:\b(?:s3|oss|cos|obs|file):\/\/|(?:^|[\s"'(])[A-Za-z]:\\|(?:^|[\s"'(])\/(?:var|srv|opt|run|mnt|data|tmp)\/)/i;
+const AUTHORIZATION_VALUE = /\b(?:bearer|basic)\s+[A-Za-z0-9+/=_\-.]+/i;
+const URL_VALUE = /https?:\/\/[^\s"'<>]+/gi;
+
+function sanitizeUrl(value, { allowViewerUrl = false } = {}) {
+  try {
+    const parsed = new URL(String(value));
+    if (!new Set(["http:", "https:"]).has(parsed.protocol)) return "";
+    parsed.username = "";
+    parsed.password = "";
+    for (const key of [...parsed.searchParams.keys()]) {
+      if (SENSITIVE_QUERY_PARAMETER.test(key)) parsed.searchParams.delete(key);
+    }
+    parsed.hash = "";
+    return allowViewerUrl ? parsed.toString() : "[redacted-url]";
+  } catch {
+    return "";
+  }
+}
+
+function sanitizePublicString(value, options = {}) {
+  const text = String(value);
+  if (AUTHORIZATION_VALUE.test(text) || PHYSICAL_LOCATION.test(text)) {
+    return "[redacted-sensitive-detail]";
+  }
+  return text.replace(URL_VALUE, (url) => sanitizeUrl(url, options) || "[redacted-url]");
+}
+
+function projectPublicImagingResponse(value, options = {}) {
+  if (Array.isArray(value)) return value.map((item) => projectPublicImagingResponse(item, options));
+  if (!value || typeof value !== "object") {
+    return typeof value === "string" ? sanitizePublicString(value, options) : value;
+  }
+  const output = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (FORBIDDEN_PUBLIC_FIELD.test(key)) continue;
+    if (key === "viewerUrl" && !options.allowViewerUrl) continue;
+    output[key] = projectPublicImagingResponse(item, options);
+  }
+  return output;
+}
+
+function projectImagingDashboardResponse(value) {
+  const dashboard = value && typeof value === "object" ? value : {};
+  return projectPublicImagingResponse({
+    ...dashboard,
+    studies: Array.isArray(dashboard.studies) ? dashboard.studies : [],
+    mutualRecognition: Array.isArray(dashboard.mutualRecognition) ? dashboard.mutualRecognition : [],
+    shares: Array.isArray(dashboard.shares) ? dashboard.shares : []
+  });
+}
+
+function projectImagingViewerResponse(value) {
+  const source = value && typeof value === "object" ? value : {};
+  return projectPublicImagingResponse({
+    studyId: source.studyId,
+    studyInstanceUID: source.studyInstanceUID,
+    viewerUrl: source.viewerUrl,
+    viewer: source.viewer,
+    archive: source.archive,
+    expiresAt: source.expiresAt ?? null
+  }, { allowViewerUrl: true });
+}
+
+function projectImagingErrorResponse(value) {
+  const source = value && typeof value === "object" ? value : {};
+  return projectPublicImagingResponse({
+    error: source.error || "Imaging Request Failed",
+    code: source.code,
+    message: source.message || "The imaging request could not be completed.",
+    productionReady: source.productionReady
+  });
+}
+
 function createRouteSegment(runtime) {
   const { BloodBusinessService, BloodIntegrationGateway, BloodMasterData, BloodService, BloodTransactionService, appendDataAccessLog, appendSecurityEvent, buildImageCloudDashboard, buildImageCloudDerivedRecords, buildOhifStudyUrl, canAccessResident, collectJson, createHash, createImageCloudMutualRecognitionChain, listOrthancStudySummaries, mergeByKey, normalizeImageCloudStudy, personIndexForResident, publishDiagnosticReportToFhir, publishImagingStudyToFhir, randomUUID, readDatabase, redactSensitiveResponse, requireApiRole, reviewImageCloudRecognitionAppeal, reviewMutualRecognitionRecord, sendJson, solutionAHealth, submitImageCloudRecognitionAppeal, upsertPhase2MutualRecognitionCitation, writeDatabase } = runtime;
+  const sendImagingJson = (res, status, body, projector) => sendJson(
+    res,
+    status,
+    (projector || (status >= 400 ? projectImagingErrorResponse : projectPublicImagingResponse))(body)
+  );
   return {
       id: "clinical-specialties-06",
       domain: "clinical-specialties",
@@ -202,7 +283,7 @@ function createRouteSegment(runtime) {
         const residentId = url.searchParams.get("residentId") || "";
         if (residentId && !canAccessResident(user, residentId, data)) {
           appendSecurityEvent({ actor: user.name, role: user.role, action: "access imaging cloud", target: residentId, result: "denied", detail: "resident scope denied" });
-          sendJson(res, 403, { error: "Forbidden", message: "无权调阅该居民影像云资料" });
+          sendImagingJson(res, 403, { error: "Forbidden", message: "无权调阅该居民影像云资料" });
           return true;
         }
         if (residentId) {
@@ -213,7 +294,7 @@ function createRouteSegment(runtime) {
           residentId,
           institutionCode: url.searchParams.get("institutionCode") || ""
         });
-        sendJson(res, 200, redactSensitiveResponse(dashboard, user));
+        sendImagingJson(res, 200, redactSensitiveResponse(dashboard, user), projectImagingDashboardResponse);
         return true;
       }
 
@@ -222,7 +303,7 @@ function createRouteSegment(runtime) {
         if (!user) return true;
         const health = await solutionAHealth();
         appendSecurityEvent({ actor: user.name, role: user.role, action: "probe solution A", target: url.pathname, result: health.ok ? "allowed" : "degraded", detail: `${health.services.filter((item) => item.ok).length}/${health.services.length} services ready` });
-        sendJson(res, health.ok ? 200 : 503, health);
+        sendImagingJson(res, health.ok ? 200 : 503, health, projectPublicImagingResponse);
         return true;
       }
 
@@ -231,7 +312,7 @@ function createRouteSegment(runtime) {
         if (!user) return true;
         const studies = await listOrthancStudySummaries();
         appendSecurityEvent({ actor: user.name, role: user.role, action: "list solution A studies", target: url.pathname, result: "allowed", detail: `${studies.length} normalized DICOMweb studies` });
-        sendJson(res, 200, { generatedAt: new Date().toISOString(), summary: { studies: studies.length, synthetic: studies.filter((item) => item.synthetic).length }, studies, boundary: "Non-synthetic patient identity is masked; resident linkage requires an explicit governed mapping workflow." });
+        sendImagingJson(res, 200, { generatedAt: new Date().toISOString(), summary: { studies: studies.length, synthetic: studies.filter((item) => item.synthetic).length }, studies, boundary: "Non-synthetic patient identity is masked; resident linkage requires an explicit governed mapping workflow." });
         return true;
       }
 
@@ -244,18 +325,18 @@ function createRouteSegment(runtime) {
         const approvalEvidence = String(payload.approvalEvidence || "").trim();
         const data = readDatabase();
         if (!residentId || !canAccessResident(user, residentId, data)) {
-          sendJson(res, residentId ? 403 : 400, { error: residentId ? "Forbidden" : "Bad Request", message: residentId ? "无权关联该居民" : "residentId不能为空" });
+          sendImagingJson(res, residentId ? 403 : 400, { error: residentId ? "Forbidden" : "Bad Request", message: residentId ? "无权关联该居民" : "residentId不能为空" });
           return true;
         }
         const studyInstanceUID = decodeURIComponent(solutionAStudyLinkMatch[1]);
         const externalStudy = (await listOrthancStudySummaries()).find((item) => item.studyInstanceUID === studyInstanceUID);
-        if (!externalStudy) { sendJson(res, 404, { error: "Not Found", message: "Orthanc中未找到该检查" }); return true; }
+        if (!externalStudy) { sendImagingJson(res, 404, { error: "Not Found", message: "Orthanc中未找到该检查" }); return true; }
         if (!externalStudy.synthetic && approvalEvidence.length < 12) {
-          sendJson(res, 409, { error: "Governance Evidence Required", message: "非合成检查必须提供经复核的主索引匹配证据" });
+          sendImagingJson(res, 409, { error: "Governance Evidence Required", message: "非合成检查必须提供经复核的主索引匹配证据" });
           return true;
         }
         const resident = (data.residents || []).find((item) => item.id === residentId);
-        if (!resident) { sendJson(res, 404, { error: "Not Found", message: "未找到居民" }); return true; }
+        if (!resident) { sendImagingJson(res, 404, { error: "Not Found", message: "未找到居民" }); return true; }
         const existingIndex = (data.imageCloudStudies || []).findIndex((item) => item.studyInstanceUID === studyInstanceUID);
         const now = new Date().toISOString();
         const study = {
@@ -276,7 +357,7 @@ function createRouteSegment(runtime) {
         try { fhirSync = await publishImagingStudyToFhir(study, resident); }
         catch (error) {
           appendSecurityEvent({ actor: user.name, role: user.role, action: "sync ImagingStudy to FHIR", target: studyInstanceUID, result: "failed", detail: error.message });
-          sendJson(res, 502, { error: "FHIR Sync Failed", message: error.message });
+          sendImagingJson(res, 502, { error: "FHIR Sync Failed", message: error.message });
           return true;
         }
         study.fhirPatientId = fhirSync.patient.id;
@@ -287,7 +368,7 @@ function createRouteSegment(runtime) {
         else data.imageCloudStudies = [study, ...(data.imageCloudStudies || [])].slice(0, 500);
         appendDataAccessLog(data, user, residentId, "医学影像云", `关联Orthanc检查 ${study.accessionNumber}`);
         writeDatabase(data);
-        sendJson(res, existingIndex >= 0 ? 200 : 201, { study, created: existingIndex < 0, governance: { synthetic: externalStudy.synthetic, evidence: study.approvalEvidence }, fhirSync });
+        sendImagingJson(res, existingIndex >= 0 ? 200 : 201, { study, created: existingIndex < 0, governance: { synthetic: externalStudy.synthetic, evidence: study.approvalEvidence }, fhirSync });
         return true;
       }
 
@@ -298,16 +379,16 @@ function createRouteSegment(runtime) {
         const data = readDatabase();
         const studyId = decodeURIComponent(imagingViewerMatch[1]);
         const study = (data.imageCloudStudies || []).find((item) => item.id === studyId);
-        if (!study) { sendJson(res, 404, { error: "Not Found", message: "未找到影像检查" }); return true; }
+        if (!study) { sendImagingJson(res, 404, { error: "Not Found", message: "未找到影像检查" }); return true; }
         if (!canAccessResident(user, study.residentId, data)) {
           appendSecurityEvent({ actor: user.name, role: user.role, action: "open OHIF viewer", target: studyId, result: "denied", detail: "resident scope denied" });
-          sendJson(res, 403, { error: "Forbidden", message: "无权调阅该居民影像" });
+          sendImagingJson(res, 403, { error: "Forbidden", message: "无权调阅该居民影像" });
           return true;
         }
         const viewerUrl = buildOhifStudyUrl(study.studyInstanceUID);
         appendDataAccessLog(data, user, study.residentId, "医学影像云", `通过OHIF调阅 ${study.accessionNumber}`);
         writeDatabase(data);
-        sendJson(res, 200, { studyId, studyInstanceUID: study.studyInstanceUID, viewerUrl, viewer: "OHIF", archive: "Orthanc DICOMweb", expiresAt: null });
+        sendImagingJson(res, 200, { studyId, studyInstanceUID: study.studyInstanceUID, viewerUrl, viewer: "OHIF", archive: "Orthanc DICOMweb", expiresAt: null }, projectImagingViewerResponse);
         return true;
       }
 
@@ -322,10 +403,10 @@ function createRouteSegment(runtime) {
         } catch (error) {
           if (error.message === "forbidden resident scope") {
             appendSecurityEvent({ actor: user.name, role: user.role, action: "ingest imaging study", target: payload.residentId || "", result: "denied", detail: "resident scope denied" });
-            sendJson(res, 403, { error: "Forbidden", message: "无权为该居民接入影像数据" });
+            sendImagingJson(res, 403, { error: "Forbidden", message: "无权为该居民接入影像数据" });
             return true;
           }
-          sendJson(res, 400, { error: "Bad Request", message: error.message });
+          sendImagingJson(res, 400, { error: "Bad Request", message: error.message });
           return true;
         }
         const derived = buildImageCloudDerivedRecords(study, user);
@@ -349,7 +430,7 @@ function createRouteSegment(runtime) {
           ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
         ].slice(0, 120);
         writeDatabase(data);
-        sendJson(res, existingStudyIndex >= 0 ? 200 : 201, { study, ...derived });
+        sendImagingJson(res, existingStudyIndex >= 0 ? 200 : 201, { study, ...derived });
         return true;
       }
 
@@ -361,12 +442,12 @@ function createRouteSegment(runtime) {
         const studyId = decodeURIComponent(imagingShareMatch[1]);
         const study = (data.imageCloudStudies || []).find((item) => item.id === studyId);
         if (!study) {
-          sendJson(res, 404, { error: "Not Found", message: "未找到影像云检查" });
+          sendImagingJson(res, 404, { error: "Not Found", message: "未找到影像云检查" });
           return true;
         }
         if (!canAccessResident(user, study.residentId, data)) {
           appendSecurityEvent({ actor: user.name, role: user.role, action: "share imaging study", target: studyId, result: "denied", detail: "resident scope denied" });
-          sendJson(res, 403, { error: "Forbidden", message: "无权分享该居民影像资料" });
+          sendImagingJson(res, 403, { error: "Forbidden", message: "无权分享该居民影像资料" });
           return true;
         }
         const payload = await collectJson(req);
@@ -387,7 +468,7 @@ function createRouteSegment(runtime) {
         data.imageCloudShares = [share, ...(Array.isArray(data.imageCloudShares) ? data.imageCloudShares : [])].slice(0, 300);
         appendDataAccessLog(data, user, study.residentId, "医学影像云", `分享影像 ${study.accessionNumber} 至 ${share.channel}`);
         writeDatabase(data);
-        sendJson(res, 201, share);
+        sendImagingJson(res, 201, share);
         return true;
       }
 
@@ -399,7 +480,7 @@ function createRouteSegment(runtime) {
         const studyId = decodeURIComponent(imagingQcMatch[1]);
         const index = (data.imageCloudStudies || []).findIndex((item) => item.id === studyId);
         if (index < 0) {
-          sendJson(res, 404, { error: "Not Found", message: "未找到影像云检查" });
+          sendImagingJson(res, 404, { error: "Not Found", message: "未找到影像云检查" });
           return true;
         }
         const payload = await collectJson(req);
@@ -424,7 +505,7 @@ function createRouteSegment(runtime) {
         try { fhirReportSync = await publishDiagnosticReportToFhir(updatedStudy, review); }
         catch (error) {
           appendSecurityEvent({ actor: user.name, role: user.role, action: "sync DiagnosticReport to FHIR", target: studyId, result: "failed", detail: error.message });
-          sendJson(res, 502, { error: "FHIR DiagnosticReport Sync Failed", message: error.message });
+          sendImagingJson(res, 502, { error: "FHIR DiagnosticReport Sync Failed", message: error.message });
           return true;
         }
         updatedStudy.fhirDiagnosticReportId = fhirReportSync.diagnosticReport.id;
@@ -433,7 +514,7 @@ function createRouteSegment(runtime) {
         data.imageCloudStudies[index] = updatedStudy;
         data.imageCloudQualityReviews = [review, ...(Array.isArray(data.imageCloudQualityReviews) ? data.imageCloudQualityReviews : [])].slice(0, 300);
         writeDatabase(data);
-        sendJson(res, 200, { study: data.imageCloudStudies[index], review, fhirReportSync });
+        sendImagingJson(res, 200, { study: data.imageCloudStudies[index], review, fhirReportSync });
         return true;
       }
 
@@ -445,13 +526,13 @@ function createRouteSegment(runtime) {
         const studyId = decodeURIComponent(imagingRecognitionMatch[1]);
         const studyIndex = (data.imageCloudStudies || []).findIndex((item) => item.id === studyId);
         if (studyIndex < 0) {
-          sendJson(res, 404, { error: "Not Found", message: "未找到影像云检查" });
+          sendImagingJson(res, 404, { error: "Not Found", message: "未找到影像云检查" });
           return true;
         }
         const study = data.imageCloudStudies[studyIndex];
         if (!canAccessResident(user, study.residentId, data)) {
           appendSecurityEvent({ actor: user.name, role: user.role, action: "start imaging mutual recognition", target: studyId, result: "denied", detail: "resident scope denied" });
-          sendJson(res, 403, { error: "Forbidden", message: "无权将该居民影像纳入跨机构互认" });
+          sendImagingJson(res, 403, { error: "Forbidden", message: "无权将该居民影像纳入跨机构互认" });
           return true;
         }
         const payload = await collectJson(req);
@@ -475,7 +556,7 @@ function createRouteSegment(runtime) {
           detail: `${chain.order.id} · ${chain.recognition.id} · ${study.mainIndex}`
         }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120);
         writeDatabase(data);
-        sendJson(res, chain.created ? 201 : 200, { ...chain, study: data.imageCloudStudies[studyIndex] });
+        sendImagingJson(res, chain.created ? 201 : 200, { ...chain, study: data.imageCloudStudies[studyIndex] });
         return true;
       }
 
@@ -487,18 +568,18 @@ function createRouteSegment(runtime) {
         const studyId = decodeURIComponent(imagingRecognitionDecisionMatch[1]);
         const studyIndex = (data.imageCloudStudies || []).findIndex((item) => item.id === studyId);
         if (studyIndex < 0) {
-          sendJson(res, 404, { error: "Not Found", message: "未找到影像云检查" });
+          sendImagingJson(res, 404, { error: "Not Found", message: "未找到影像云检查" });
           return true;
         }
         const study = data.imageCloudStudies[studyIndex];
         if (!canAccessResident(user, study.residentId, data)) {
           appendSecurityEvent({ actor: user.name, role: user.role, action: "decide imaging mutual recognition", target: studyId, result: "denied", detail: "resident scope denied" });
-          sendJson(res, 403, { error: "Forbidden", message: "无权确认该居民影像互认结果" });
+          sendImagingJson(res, 403, { error: "Forbidden", message: "无权确认该居民影像互认结果" });
           return true;
         }
         const record = (data.countyMutualRecognitionRecords || []).find((item) => item.imageCloudStudyId === studyId);
         if (!record) {
-          sendJson(res, 409, { error: "Conflict", message: "请先将影像检查纳入跨机构互认" });
+          sendImagingJson(res, 409, { error: "Conflict", message: "请先将影像检查纳入跨机构互认" });
           return true;
         }
         const payload = await collectJson(req);
@@ -506,7 +587,7 @@ function createRouteSegment(runtime) {
         try {
           reviewed = reviewMutualRecognitionRecord(data, record.id, payload, user);
         } catch (error) {
-          sendJson(res, 400, { error: "Bad Request", message: error.message });
+          sendImagingJson(res, 400, { error: "Bad Request", message: error.message });
           return true;
         }
         const recognized = reviewed.status === "recognized";
@@ -537,7 +618,7 @@ function createRouteSegment(runtime) {
           detail: `${reviewed.status} · ${reviewed.reviewReasonCode} · ${citation?.evidenceHash || "no-citation"}`
         }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120);
         writeDatabase(data);
-        sendJson(res, 200, { study: data.imageCloudStudies[studyIndex], record: reviewed, citation });
+        sendImagingJson(res, 200, { study: data.imageCloudStudies[studyIndex], record: reviewed, citation });
         return true;
       }
 
@@ -550,14 +631,14 @@ function createRouteSegment(runtime) {
         const studyIndex = (data.imageCloudStudies || []).findIndex((item) => item.id === studyId);
         const record = (data.countyMutualRecognitionRecords || []).find((item) => item.imageCloudStudyId === studyId);
         if (studyIndex < 0 || !record) {
-          sendJson(res, 404, { error: "Not Found", message: "影像检查或互认记录不存在" });
+          sendImagingJson(res, 404, { error: "Not Found", message: "影像检查或互认记录不存在" });
           return true;
         }
         let result;
         try {
           result = submitImageCloudRecognitionAppeal(data, data.imageCloudStudies[studyIndex], record, await collectJson(req), user);
         } catch (error) {
-          sendJson(res, 400, { error: "Bad Request", message: error.message });
+          sendImagingJson(res, 400, { error: "Bad Request", message: error.message });
           return true;
         }
         data.imageCloudStudies[studyIndex] = {
@@ -578,7 +659,7 @@ function createRouteSegment(runtime) {
           detail: `${result.appeal.id} / ${result.appeal.evidenceRefs.join(",")}`
         }, ...(data.securityEvents || [])].slice(0, 120);
         writeDatabase(data);
-        sendJson(res, 201, { study: data.imageCloudStudies[studyIndex], ...result });
+        sendImagingJson(res, 201, { study: data.imageCloudStudies[studyIndex], ...result });
         return true;
       }
 
@@ -591,14 +672,14 @@ function createRouteSegment(runtime) {
         const studyIndex = (data.imageCloudStudies || []).findIndex((item) => item.id === studyId);
         const record = (data.countyMutualRecognitionRecords || []).find((item) => item.imageCloudStudyId === studyId);
         if (studyIndex < 0 || !record) {
-          sendJson(res, 404, { error: "Not Found", message: "影像检查或互认记录不存在" });
+          sendImagingJson(res, 404, { error: "Not Found", message: "影像检查或互认记录不存在" });
           return true;
         }
         let result;
         try {
           result = reviewImageCloudRecognitionAppeal(data, record, await collectJson(req), user);
         } catch (error) {
-          sendJson(res, 400, { error: "Bad Request", message: error.message });
+          sendImagingJson(res, 400, { error: "Bad Request", message: error.message });
           return true;
         }
         const citation = upsertPhase2MutualRecognitionCitation(data, result.record, { reasonCode: result.record.reviewReasonCode }, user);
@@ -621,7 +702,7 @@ function createRouteSegment(runtime) {
           detail: `${result.appeal.status} / ${result.appeal.id} / ${citation?.evidenceHash || "no-citation"}`
         }, ...(data.securityEvents || [])].slice(0, 120);
         writeDatabase(data);
-        sendJson(res, 200, { study: data.imageCloudStudies[studyIndex], ...result, citation });
+        sendImagingJson(res, 200, { study: data.imageCloudStudies[studyIndex], ...result, citation });
         return true;
       }
 
@@ -637,4 +718,13 @@ function createRouteSegment(runtime) {
     };
 }
 
-module.exports = { createRouteSegment, ROUTE_SEGMENT_ID: "clinical-specialties-06", SUBDOMAIN: "clinical-blood" };
+module.exports = {
+  createRouteSegment,
+  projectImagingDashboardResponse,
+  projectImagingErrorResponse,
+  projectImagingViewerResponse,
+  projectPublicImagingResponse,
+  ROUTE_SEGMENT_ID: "clinical-specialties-06",
+  sanitizePublicString,
+  SUBDOMAIN: "clinical-blood"
+};
