@@ -133,10 +133,17 @@ test("modernization API binds server context, persists nextData with CAS and ret
 
   const persistedAfterCreate = readDatabase();
   const persistedSignal = persistedAfterCreate.publicHealthSurveillanceSignals.find((item) => item.id === signalId);
+  const persistedOutbox = persistedAfterCreate.publicHealthSurveillanceAudit
+    .filter((item) => item.recordKind === "domain-outbox-v1");
   assert.equal(persistedSignal.version, 1);
   assert.notEqual(persistedSignal.receivedAt, "2000-01-01T00:00:00.000Z");
   assert.match(persistedSignal.externalSignalKeyHash, /^[a-f0-9]{64}$/);
   assert.match(persistedSignal.idempotencyKeyHash, /^[a-f0-9]{64}$/);
+  assert.equal(persistedOutbox.length, 1);
+  assert.equal(persistedOutbox[0].type, "public-health.signal-ingested.v1");
+  assert.equal(persistedOutbox[0].contractId, "public-health-signal.v1");
+  assert.equal(persistedOutbox[0].aggregateId, signalId);
+  assert.equal(persistedOutbox[0].deliveryState, "pending");
   assert.equal(JSON.stringify(persistedAfterCreate).includes(externalSignalId), false);
   assert.equal(JSON.stringify(persistedAfterCreate).includes(intakeKey), false);
   const { DatabaseSync } = require("node:sqlite");
@@ -153,6 +160,28 @@ test("modernization API binds server context, persists nextData with CAS and ret
   assert.equal(keyRow.idempotency_key_hash, persistedSignal.idempotencyKeyHash);
   assert.equal(uniqueIndexes.filter((item) => Number(item.unique) === 1).length >= 3, true);
 
+  const pendingEvents = await request(baseUrl, "/api/public-health/domain-events/health", commissionToken);
+  assert.equal(pendingEvents.response.status, 200);
+  assert.equal(pendingEvents.body.ok, false);
+  assert.equal(pendingEvents.body.summary.pending, 1);
+  assert.equal(pendingEvents.body.productionReady, false);
+  const dispatchedEvents = await request(baseUrl, "/api/public-health/domain-events/dispatch", commissionToken, {
+    method: "POST"
+  });
+  assert.equal(dispatchedEvents.response.status, 200, JSON.stringify(dispatchedEvents.body));
+  assert.equal(dispatchedEvents.body.ok, true);
+  assert.equal(dispatchedEvents.body.processed.length, 1);
+  assert.equal(dispatchedEvents.body.processed[0].processed, true);
+  assert.equal(dispatchedEvents.body.health.summary.published, 1);
+  assert.equal(dispatchedEvents.body.health.summary.completedInbox, 1);
+  assert.equal(dispatchedEvents.body.health.summary.projections, 1);
+  assert.equal(dispatchedEvents.body.health.summary.receipts, 1);
+  const dispatchReplay = await request(baseUrl, "/api/public-health/domain-events/dispatch", commissionToken, {
+    method: "POST"
+  });
+  assert.equal(dispatchReplay.response.status, 200);
+  assert.equal(dispatchReplay.body.processed.length, 0);
+
   const replay = await post(
     baseUrl,
     "/api/public-health/surveillance-signals",
@@ -162,6 +191,10 @@ test("modernization API binds server context, persists nextData with CAS and ret
   );
   assert.equal(replay.response.status, 200);
   assert.equal(replay.body.idempotent, true);
+  assert.equal(
+    readDatabase().publicHealthSurveillanceAudit.filter((item) => item.recordKind === "domain-outbox-v1").length,
+    1
+  );
   const conflict = await post(
     baseUrl,
     "/api/public-health/surveillance-signals",
