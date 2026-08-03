@@ -2,6 +2,7 @@
 
 const runtimeContextFactory = require("../runtime-contexts/context-factory");
 const platformContext = require("../runtime-contexts/platform-governance");
+const ownershipContract = require("./t02-state-ownership-contract");
 
 const SEGMENTS = Object.freeze([
   { subdomain: "governance-catalog", route: require("./platform-governance/governance-catalog") },
@@ -17,13 +18,16 @@ const SEGMENTS = Object.freeze([
 ]);
 
 function createRouteSegments(runtime) {
-  return SEGMENTS.map(({ subdomain, route }) => route.createRouteSegment(
-    runtimeContextFactory.projectRuntimeSubcontext(runtime, {
+  return SEGMENTS.map(({ subdomain, route }) => {
+    const subcontext = runtimeContextFactory.projectRuntimeSubcontext(runtime, {
       domain: platformContext.DOMAIN,
       subdomain,
       dependencies: platformContext.SUBDOMAIN_DEPENDENCIES[subdomain]
-    })
-  ));
+    });
+    return route.createRouteSegment(
+      ownershipContract.createOwnershipEnforcedRuntime(subcontext, subdomain)
+    );
+  });
 }
 
 module.exports = { createRouteSegments };
