@@ -460,10 +460,14 @@ function createRouteSegments(runtime) {
             if (exchange.receipt?.id) res.setHeader("X-Integration-Receipt-Id", exchange.receipt.id);
             sendJson(res, exchange.duplicate ? 200 : 202, exchange.event);
           } catch (error) {
-            if (!(error instanceof TypeError)) throw error;
-            sendJson(res, 400, {
-              error: "Bad Request",
-              code: "CLINICAL_RESULT_CONTRACT_REJECTED",
+            if (
+              !(error instanceof TypeError)
+              && !(error instanceof clinicalResultExchange.ClinicalResultExchangeError)
+            ) throw error;
+            const conflict = error instanceof clinicalResultExchange.ClinicalResultExchangeError;
+            sendJson(res, conflict ? error.statusCode : 400, {
+              error: conflict ? "Conflict" : "Bad Request",
+              code: conflict ? error.code : "CLINICAL_RESULT_CONTRACT_REJECTED",
               message: String(error.message || "clinical result contract rejected")
             });
           }

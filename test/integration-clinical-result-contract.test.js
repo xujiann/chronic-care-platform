@@ -128,6 +128,23 @@ test("clinical result exchange persists inbox, receipt and pending outbox once",
   assert.equal(replay.receipt.id, accepted.receipt.id);
   assert.equal(writes, 1);
   assert.equal(data.integrationGatewayEvents.length, 1);
+
+  await assert.rejects(
+    receiveClinicalResult({
+      ...options,
+      payload: {
+        ...payload,
+        result: "7.4%"
+      }
+    }),
+    (error) => {
+      assert.equal(error.code, "CLINICAL_RESULT_IDEMPOTENCY_CONFLICT");
+      assert.equal(error.statusCode, 409);
+      return true;
+    }
+  );
+  assert.equal(writes, 1);
+  assert.equal(data.integrationGatewayEvents.length, 1);
 });
 
 test("signed LIS route returns deterministic receipt and suppresses replay", async () => {
@@ -183,4 +200,30 @@ test("signed LIS route returns deterministic receipt and suppresses replay", asy
   assert.equal(responseBody.id, acceptedId);
   assert.equal(responseBody.idempotentReplay, true);
   assert.equal(writes, 1);
+
+  const driftedPayload = {
+    ...payload,
+    result: "7.4%"
+  };
+  const driftSegments = integrationRoutes.createRouteSegments({
+    collectJson: async () => structuredClone(driftedPayload),
+    normalizeIntegrationEvent: gatewayEvent,
+    prependAuditTrailEntry: (rows, entry) => [entry, ...rows],
+    readDatabase: () => structuredClone(state),
+    requireApiRole: () => ({ username: "hospital", name: "Hospital Operator", role: "institution" }),
+    sendJson: (_res, status, body) => {
+      responseStatus = status;
+      responseBody = body;
+    },
+    verifyIntegrationSignature: () => true,
+    writeDatabase: (data) => {
+      writes += 1;
+      state = structuredClone(data);
+    }
+  });
+  await driftSegments[1].handle(request, response, new URL("http://local/api/integration/events"));
+  assert.equal(responseStatus, 409);
+  assert.equal(responseBody.code, "CLINICAL_RESULT_IDEMPOTENCY_CONFLICT");
+  assert.equal(writes, 1);
+  assert.equal(state.integrationGatewayEvents.length, 1);
 });

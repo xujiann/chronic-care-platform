@@ -12,6 +12,15 @@ const PLATFORM_CONTRACT_ID = "clinical-result.v1";
 const EVENT_TYPE = "integration.clinical-result-received.v1";
 const SUPPORTED_EXTERNAL_CONTRACTS = new Set(["lis-report-v1", "pacs-report-v1"]);
 
+class ClinicalResultExchangeError extends Error {
+  constructor(code, message, statusCode = 400) {
+    super(message);
+    this.name = "ClinicalResultExchangeError";
+    this.code = code;
+    this.statusCode = statusCode;
+  }
+}
+
 function externalBody(payload) {
   const nested = payload?.payload && typeof payload.payload === "object" && !Array.isArray(payload.payload)
     ? payload.payload
@@ -88,6 +97,7 @@ async function receiveClinicalResult({
   if (blankRequired.length) {
     throw new TypeError(`${PLATFORM_CONTRACT_ID} has blank fields: ${blankRequired.join(", ")}`);
   }
+  const intentDigest = canonicalDigest(canonical);
   const eventId = deterministicId("evt", contract.id, payload.idempotencyKey);
   const receiptId = deterministicId("rcpt", contract.id, payload.idempotencyKey);
   const domainEvent = createDomainEvent({
@@ -155,7 +165,7 @@ async function receiveClinicalResult({
           status: "accepted",
           contractId: PLATFORM_CONTRACT_ID,
           externalContractId: contract.id,
-          canonicalDigest: canonicalDigest(canonical),
+          canonicalDigest: intentDigest,
           receivedAt,
           productionEvidence: false
         }
@@ -172,6 +182,13 @@ async function receiveClinicalResult({
       item.domainEvent?.id === domainEvent.id
       || (item.contractId === contract.id && item.idempotencyKey === payload.idempotencyKey)
     );
+    if (!existing || existing.contractReceipt?.canonicalDigest !== intentDigest) {
+      throw new ClinicalResultExchangeError(
+        "CLINICAL_RESULT_IDEMPOTENCY_CONFLICT",
+        "Idempotency-Key was already used with a different clinical result payload",
+        409
+      );
+    }
     return Object.freeze({
       duplicate: true,
       event: Object.freeze({ ...existing, idempotentReplay: true }),
@@ -213,6 +230,7 @@ async function receiveClinicalResult({
 }
 
 module.exports = {
+  ClinicalResultExchangeError,
   CONSUMER,
   EVENT_TYPE,
   PLATFORM_CONTRACT_ID,
