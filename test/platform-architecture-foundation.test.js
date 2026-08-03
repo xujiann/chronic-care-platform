@@ -10,11 +10,21 @@ const {
   validateOwnershipManifest
 } = require("../src/platform/data/domain-repository");
 const {
+  PLATFORM_WRITE_CONTRACTS,
+  ownerForCollection
+} = require("../src/http/routes/t02-state-ownership-contract");
+const {
   IdempotentEventConsumer,
   createDomainEvent,
   publishPendingOutbox
 } = require("../src/platform/events/domain-event-runtime");
 const { PlatformObservability } = require("../src/platform/observability/request-context");
+
+const SYSTEM_COLLECTION_POLICIES = Object.freeze({
+  dataAccessLogs: "platform-governance",
+  platformProcessAudit: "platform-governance",
+  securityEvents: "platform-governance"
+});
 
 test("business collections have one domain owner and production has no fallback writes", () => {
   assert.equal(validateOwnershipManifest(), true);
@@ -23,10 +33,51 @@ test("business collections have one domain owner and production has no fallback 
   [
     "residents", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims",
     "followups", "deathCertificates", "birthCertificates", "chronicScreeningTasks",
-    "chronicEducationPushes", "chronicManagementPlans", "chronicFollowupStatusPolicy"
+    "chronicEducationPushes", "chronicManagementPlans", "chronicFollowupStatusPolicy",
+    "emergencySignalCommandInbox"
   ].forEach((collection) => assert.ok(ownershipManifest.collections[collection]?.owner, collection));
+  assert.deepEqual(ownershipManifest.collections.emergencySignalCommandInbox, {
+    owner: "clinical-specialties",
+    classification: "restricted",
+    readers: []
+  });
   assert.throws(() => assertWriteAccess("shared", "residents"), /cannot write/);
   assert.throws(() => assertWriteAccess("state-data", "followups"), /cannot write/);
+});
+
+test("platform write contracts are closed by the central business manifest or system policy", () => {
+  const contractedOwners = new Map();
+  for (const [subdomain, contract] of Object.entries(PLATFORM_WRITE_CONTRACTS)) {
+    for (const [collection, contractOwner] of Object.entries(contract.collections)) {
+      const earlierOwner = contractedOwners.get(collection);
+      assert.ok(!earlierOwner || earlierOwner === contractOwner, `${collection} has conflicting contract owners`);
+      contractedOwners.set(collection, contractOwner);
+
+      const policy = ownershipManifest.collections[collection];
+      if (policy) {
+        assert.equal(policy.owner, contractOwner, `${subdomain}:${collection}`);
+        assert.equal(Object.hasOwn(policy, "readers"), true, `${collection} must declare readers`);
+        assert.equal(Array.isArray(policy.readers), true, `${collection} readers must be an array`);
+        assert.ok(["restricted", "internal", "de-identified"].includes(policy.classification), collection);
+        continue;
+      }
+
+      assert.equal(
+        SYSTEM_COLLECTION_POLICIES[collection],
+        contractOwner,
+        `${subdomain}:${collection} is neither business-owned nor explicitly system-owned`
+      );
+      assert.deepEqual(ownerForCollection(collection), {
+        owner: contractOwner,
+        registered: true
+      });
+    }
+  }
+
+  for (const [collection, owner] of Object.entries(SYSTEM_COLLECTION_POLICIES)) {
+    assert.equal(ownershipManifest.collections[collection], undefined, `${collection} must not duplicate business ownership`);
+    assert.deepEqual(ownerForCollection(collection), { owner, registered: true });
+  }
 });
 
 test("repository commits owned writes and outbox events in one transaction", async () => {

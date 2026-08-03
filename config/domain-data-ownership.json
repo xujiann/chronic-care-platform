@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "1.1.0",
   "storagePolicy": {
     "development": {
       "authoritative": "json-or-sqlite",
@@ -70,20 +70,85 @@
       "classification": "restricted",
       "readers": ["citizen-chronic", "clinical-specialties"]
     },
+    "resourceDispatchRequests": {
+      "owner": "care-coordination",
+      "classification": "restricted",
+      "readers": ["platform-governance", "clinical-specialties"]
+    },
+    "phase2FamilyDoctorApplications": {
+      "owner": "care-coordination",
+      "classification": "restricted",
+      "readers": ["platform-governance", "citizen-chronic"]
+    },
+    "phase2FamilyDoctorContracts": {
+      "owner": "care-coordination",
+      "classification": "restricted",
+      "readers": ["platform-governance", "citizen-chronic"]
+    },
+    "phase2FamilyDoctorFulfillments": {
+      "owner": "care-coordination",
+      "classification": "restricted",
+      "readers": ["platform-governance", "citizen-chronic"]
+    },
+    "taskMessages": {
+      "owner": "care-coordination",
+      "classification": "restricted",
+      "readers": ["platform-governance", "citizen-chronic", "clinical-specialties", "public-health"]
+    },
     "insuranceClaims": {
       "owner": "insurance-payment",
       "classification": "restricted",
       "readers": ["care-coordination"]
+    },
+    "drugConsumableSupervisions": {
+      "owner": "insurance-payment",
+      "classification": "restricted",
+      "readers": ["platform-governance", "care-coordination"]
     },
     "emergencySignals": {
       "owner": "clinical-specialties",
       "classification": "restricted",
       "readers": ["public-health", "care-coordination"]
     },
+    "emergencySignalCommandInbox": {
+      "owner": "clinical-specialties",
+      "classification": "restricted",
+      "readers": []
+    },
     "diagnosticReports": {
       "owner": "clinical-specialties",
       "classification": "restricted",
       "readers": ["citizen-chronic", "care-coordination"]
+    },
+    "qualityRectificationOrders": {
+      "owner": "clinical-specialties",
+      "classification": "restricted",
+      "readers": ["platform-governance"]
+    },
+    "phase2ClinicalAssistAlerts": {
+      "owner": "clinical-specialties",
+      "classification": "restricted",
+      "readers": ["platform-governance", "care-coordination"]
+    },
+    "phase2ClinicalAssistReceipts": {
+      "owner": "clinical-specialties",
+      "classification": "restricted",
+      "readers": ["platform-governance"]
+    },
+    "phase2ClinicalAssistRules": {
+      "owner": "clinical-specialties",
+      "classification": "internal",
+      "readers": ["platform-governance", "care-coordination"]
+    },
+    "countyMutualRecognitionRecords": {
+      "owner": "clinical-specialties",
+      "classification": "restricted",
+      "readers": ["platform-governance", "care-coordination", "citizen-chronic"]
+    },
+    "phase2MutualRecognitionCitations": {
+      "owner": "clinical-specialties",
+      "classification": "restricted",
+      "readers": ["platform-governance", "care-coordination"]
     },
     "publicHealthIncidents": {
       "owner": "public-health",
@@ -100,10 +165,170 @@
       "classification": "restricted",
       "readers": ["citizen-chronic", "identity-security"]
     },
+    "digitalHospitalPublicHealthCoordination": {
+      "owner": "public-health",
+      "classification": "restricted",
+      "readers": ["platform-governance"]
+    },
+    "phase2DiseaseReportQueue": {
+      "owner": "public-health",
+      "classification": "restricted",
+      "readers": ["platform-governance", "care-coordination"]
+    },
+    "phase2DiseaseReportReceipts": {
+      "owner": "public-health",
+      "classification": "restricted",
+      "readers": ["platform-governance", "care-coordination"]
+    },
     "governanceRecords": {
       "owner": "platform-governance",
       "classification": "internal",
       "readers": ["research"]
+    },
+    "commercialCryptoCapabilities": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "commercialCryptoEvidencePackets": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "commercialCryptoProbeRuns": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "digitalHospitalCollectionJobs": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "digitalHospitalControlMatrix": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "digitalHospitalEvaluationEvidence": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "digitalHospitalFormalCutoverApprovals": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "digitalHospitalLaunchCommandBriefs": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "digitalHospitalLaunchRequirements": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "digitalHospitalPilotInstitutions": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "digitalHospitalPilotIssues": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "digitalHospitalPolicyRegister": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "digitalHospitalPreAssessments": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "digitalHospitalProductionEvidencePackets": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "digitalHospitalSelfAssessments": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "disasterRecoveryDrills": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "operationsDutyShifts": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "operationsEvidencePackets": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "operationsIncidents": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "platformCapabilityReviews": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "platformProductionBlockerReviews": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "productionDatabaseCutoverRuns": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "productionDatabaseMigrationBatches": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "productionGoNoGoApprovals": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "productionGoNoGoDecision": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "productionSecurityFindings": {
+      "owner": "platform-governance",
+      "classification": "restricted",
+      "readers": []
+    },
+    "productionSecurityReleaseApprovals": {
+      "owner": "platform-governance",
+      "classification": "restricted",
+      "readers": []
+    },
+    "qualityOperationsGovernanceAuditEvents": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
+    },
+    "qualityOperationsGovernanceCommandReceipts": {
+      "owner": "platform-governance",
+      "classification": "internal",
+      "readers": []
     },
     "integrationGatewayEvents": {
       "owner": "integration",
