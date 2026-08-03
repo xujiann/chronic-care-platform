@@ -39,12 +39,16 @@ test("platform routes have one explicit ordered manifest across domain modules",
   });
 });
 
-test("public-health and clinical-specialty route segments are physically split by subdomain", () => {
+test("large governance, public-health and clinical contexts are physically split by subdomain", () => {
   const files = runtimeSourceFiles(ROOT).map((file) => path.relative(ROOT, file).replaceAll("\\", "/"));
   const splitEntries = Object.entries(ROUTE_SUBDOMAINS);
-  assert.equal(splitEntries.length, 13);
+  assert.equal(splitEntries.length, 23);
   for (const [id, subdomain] of splitEntries) {
-    const domain = id.startsWith("public-health-") ? "public-health" : "clinical-specialties";
+    const domain = id.startsWith("platform-governance-")
+      ? "platform-governance"
+      : id.startsWith("public-health-")
+        ? "public-health"
+        : "clinical-specialties";
     const modulePath = `src/http/routes/${domain}/${subdomain}.js`;
     assert.equal(files.includes(modulePath), true, modulePath);
     const routeModule = require(path.join(ROOT, modulePath));
@@ -52,7 +56,7 @@ test("public-health and clinical-specialty route segments are physically split b
     assert.equal(routeModule.SUBDOMAIN, subdomain);
     assert.equal(typeof routeModule.createRouteSegment, "function");
   }
-  for (const domain of ["public-health", "clinical-specialties"]) {
+  for (const domain of ["platform-governance", "public-health", "clinical-specialties"]) {
     const facade = fs.readFileSync(path.join(ROOT, "src", "http", "routes", `${domain}.js`), "utf8");
     assert.equal(facade.split(/\r?\n/).length < 40, true);
   }

@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, "codex/**", "process/**"]
+    branches: [main]
   pull_request:
-    branches: [main, "codex/governance-integration-20260803"]
+    branches: [main]
 
 permissions:
   contents: read
@@ -51,6 +51,8 @@ jobs:
         run: node scripts/process-worktree.js verify --branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
       - name: Test process worktree governance
         run: node --test test/process-worktree.test.js
+      - name: Test modular-monolith architecture contracts
+        run: npm run architecture:test
       - name: Check JavaScript syntax
         run: npm run check
       - name: Run blood system readiness gate

@@ -2,7 +2,18 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { createPlatformApiRouter } = require("./src/http/routes");
-const { createPlatformRuntimeContexts } = require("./src/http/runtime-contexts");
+const {
+  createPlatformCapabilityProviders,
+  createPlatformRuntimeContexts
+} = require("./src/http/runtime-contexts");
+const { ContractRegistry } = require("./src/platform/contracts/contract-registry");
+const {
+  validateOwnershipManifest
+} = require("./src/platform/data/domain-repository");
+const {
+  validateScorecard
+} = require("./src/platform/governance/service-extraction");
+const { PlatformObservability } = require("./src/platform/observability/request-context");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
 const { MemorySessionStore, PostgresSessionStore, SqliteSessionStore, createSqliteSessionSchema } = require("./session-store");
 const {
@@ -463,6 +474,10 @@ const runtimeMetrics = {
   slowRequests: [],
   lastRequestAt: ""
 };
+const platformObservability = new PlatformObservability();
+const platformContractRegistry = new ContractRegistry();
+const serviceExtractionDecisions = validateScorecard();
+validateOwnershipManifest();
 let runtimeSessionStoreInstance = null;
 let runtimeSessionStoreKey = "";
 let digitalHospitalExecutionServiceInstance = null;
@@ -8591,7 +8606,15 @@ function buildRuntimeMetrics(data) {
     http: {
       ...runtimeMetrics,
       responses: { ...runtimeMetrics.responses },
-      slowRequests: [...runtimeMetrics.slowRequests]
+      slowRequests: [...runtimeMetrics.slowRequests],
+      domains: platformObservability.snapshot().http
+    },
+    dependencies: platformObservability.snapshot().dependencies,
+    architecture: {
+      boundedContexts: 12,
+      versionedContracts: platformContractRegistry.contracts.size,
+      serviceExtractionCandidates: serviceExtractionDecisions.length,
+      extractionReady: serviceExtractionDecisions.filter((item) => item.eligible).length
     },
     storage: storageMeta(),
     messaging: {
@@ -27575,8 +27598,8 @@ function buildProductionReleaseEvidencePublicSummary() {
   };
 }
 
-function createRequestApiRouter() {
-  return createPlatformApiRouter(createPlatformRuntimeContexts({
+function createRuntimeCapabilitySource() {
+  return Object.freeze({
     APPOINTMENT_CONTRACT_ID,
   BloodBusinessService,
   BloodClinicalProduction,
@@ -28185,7 +28208,14 @@ function createRequestApiRouter() {
   verifyTrustedRespiratoryNetworkEvidence,
     workflowStateCollectionKey,
     writeDatabase,
-  }));
+  });
+}
+
+const platformCapabilityProviders = createPlatformCapabilityProviders(createRuntimeCapabilitySource());
+const platformRuntimeContexts = createPlatformRuntimeContexts(platformCapabilityProviders);
+
+function createRequestApiRouter() {
+  return createPlatformApiRouter(platformRuntimeContexts);
 }
 
 async function handleApi(req, res) {
@@ -28194,14 +28224,19 @@ async function handleApi(req, res) {
   if (!handled) sendJson(res, 404, { error: "API not found" });
 }
 
-const server = http.createServer(async (req, res) => {
+const server = http.createServer((req, res) => platformObservability.run(req, res, async () => {
   const startedAt = Date.now();
   res.on("finish", () => recordRequestMetrics(req, res, startedAt));
   try {
     if (req.url.startsWith("/api/")) {
       try {
         await hydrateRequestSession(req);
+        platformObservability.recordDependency("session-store", { ok: true });
       } catch (error) {
+        platformObservability.recordDependency("session-store", {
+          ok: false,
+          detail: error.code || error.message
+        });
         console.error(`central session lookup failed: ${error.message}`);
         sendJson(res, 503, { ok: false, code: "SESSION_STORE_UNAVAILABLE", message: "authentication session service is temporarily unavailable" });
         return;
@@ -28221,7 +28256,7 @@ const server = http.createServer(async (req, res) => {
     }
     sendJson(res, 500, { error: error.message });
   }
-});
+}));
 
 function startServer(port = PORT) {
   assertProductionRuntimeSecurity();

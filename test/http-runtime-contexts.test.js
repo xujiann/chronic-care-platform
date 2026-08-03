@@ -5,7 +5,11 @@ const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 
-const { CONTEXT_DEFINITIONS, createPlatformRuntimeContexts } = require("../src/http/runtime-contexts");
+const {
+  CONTEXT_DEFINITIONS,
+  createPlatformCapabilityProviders,
+  createPlatformRuntimeContexts
+} = require("../src/http/runtime-contexts");
 
 const ROOT = path.resolve(__dirname, "..");
 
@@ -66,6 +70,22 @@ test("domain contexts are frozen projections and do not leak global dependencies
     assert.deepEqual(Object.keys(context), CONTEXT_DEFINITIONS[domain].dependencies);
   }
   assert.throws(() => platform.forDomain("unknown"), /unknown runtime context domain/);
+});
+
+test("composition root exposes one least-privilege capability provider per domain", () => {
+  const names = [...new Set(Object.values(CONTEXT_DEFINITIONS).flatMap(({ dependencies }) => dependencies))];
+  const source = Object.fromEntries(names.map((name) => [name, Symbol(name)]));
+  source.globalSecret = "must-not-leak";
+  const registry = createPlatformCapabilityProviders(source);
+  assert.equal(Object.keys(registry.providers).length, 12);
+  for (const [domain, provider] of Object.entries(registry.providers)) {
+    assert.equal(provider.domain, domain);
+    assert.equal(Object.isFrozen(provider.capabilities), true);
+    assert.equal("globalSecret" in provider.capabilities, false);
+    assert.deepEqual(Object.keys(provider.capabilities), CONTEXT_DEFINITIONS[domain].dependencies);
+  }
+  const platform = createPlatformRuntimeContexts(registry);
+  assert.deepEqual(Object.keys(platform.contexts), Object.keys(CONTEXT_DEFINITIONS));
 });
 
 test("subdomain contexts are independent frozen projections", () => {

@@ -41,7 +41,12 @@ function createApiRouter(routeSegments) {
     async handle(req, res, url) {
       for (const segment of segments) {
         const handled = await segment.handle(req, res, url);
-        if (handled === true || res.writableEnded || res.headersSent) return true;
+        if (handled === true || res.writableEnded || res.headersSent) {
+          req.routeDomain = segment.domain;
+          req.routeSubdomain = segment.subdomain || "";
+          req.routeSegmentId = segment.id;
+          return true;
+        }
       }
       return false;
     }

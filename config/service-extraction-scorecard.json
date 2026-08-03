@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "1.0.0",
+  "decisionThreshold": 18,
+  "minimumDimensions": {
+    "independentScaling": 3,
+    "faultIsolation": 3,
+    "dataAutonomy": 3
+  },
+  "dimensions": [
+    "independentScaling",
+    "faultIsolation",
+    "dataAutonomy",
+    "teamAutonomy",
+    "releaseCadence",
+    "operationalMaturity"
+  ],
+  "candidates": [
+    {
+      "domain": "integration",
+      "scores": {
+        "independentScaling": 3,
+        "faultIsolation": 4,
+        "dataAutonomy": 2,
+        "teamAutonomy": 2,
+        "releaseCadence": 3,
+        "operationalMaturity": 2
+      },
+      "decision": "modular-monolith",
+      "blockers": ["outbox-SLO-not-proven", "dedicated-data-store-not-approved"]
+    },
+    {
+      "domain": "public-health",
+      "scores": {
+        "independentScaling": 3,
+        "faultIsolation": 3,
+        "dataAutonomy": 2,
+        "teamAutonomy": 2,
+        "releaseCadence": 2,
+        "operationalMaturity": 2
+      },
+      "decision": "modular-monolith",
+      "blockers": ["site-connectivity-evidence-incomplete", "data-autonomy-not-proven"]
+    },
+    {
+      "domain": "clinical-specialties",
+      "scores": {
+        "independentScaling": 2,
+        "faultIsolation": 3,
+        "dataAutonomy": 2,
+        "teamAutonomy": 2,
+        "releaseCadence": 2,
+        "operationalMaturity": 2
+      },
+      "decision": "modular-monolith",
+      "blockers": ["shared-clinical-data-boundary", "operations-ownership-not-established"]
+    }
+  ]
+}

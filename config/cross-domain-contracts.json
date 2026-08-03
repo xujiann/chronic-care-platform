@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "1.0.0",
+  "contracts": [
+    {
+      "id": "resident-summary.v1",
+      "version": "1.0.0",
+      "owner": "identity-security",
+      "consumers": ["citizen-chronic", "care-coordination", "clinical-specialties", "public-health"],
+      "classification": "restricted",
+      "requiredFields": ["residentId", "identityIndex", "status"]
+    },
+    {
+      "id": "referral-order.v1",
+      "version": "1.0.0",
+      "owner": "care-coordination",
+      "consumers": ["citizen-chronic", "clinical-specialties", "integration"],
+      "classification": "restricted",
+      "requiredFields": ["referralId", "residentId", "status", "version"]
+    },
+    {
+      "id": "clinical-result.v1",
+      "version": "1.0.0",
+      "owner": "clinical-specialties",
+      "consumers": ["citizen-chronic", "care-coordination", "integration"],
+      "classification": "restricted",
+      "requiredFields": ["resultId", "residentId", "resultType", "status"]
+    },
+    {
+      "id": "public-health-signal.v1",
+      "version": "1.0.0",
+      "owner": "public-health",
+      "consumers": ["clinical-specialties", "platform-governance", "integration"],
+      "classification": "restricted",
+      "requiredFields": ["signalId", "occurredAt", "signalType", "status"]
+    }
+  ]
+}

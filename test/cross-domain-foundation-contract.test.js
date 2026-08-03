@@ -24,11 +24,11 @@ test("identity, payment and external integration contracts close across bounded 
   assert.equal(FOUNDATION_CONTRACTS.every(({ participants }) => Object.keys(participants).length >= 2), true);
 });
 
-test("runtime composition reaches the router manifest with public-health and clinical subdomains", () => {
+test("runtime composition reaches the router manifest with governance, public-health and clinical subdomains", () => {
   const router = createPlatformApiRouter(createPlatformRuntimeContexts(completeRuntimeSource()));
   const splitSegments = router.manifest.filter(({ subdomain }) => subdomain);
 
-  assert.equal(splitSegments.length, 13);
+  assert.equal(splitSegments.length, 23);
   assert.deepEqual(
     Object.fromEntries(splitSegments.map(({ id, subdomain }) => [id, subdomain])),
     ROUTE_SUBDOMAINS

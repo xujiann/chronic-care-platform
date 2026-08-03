@@ -1,6 +1,6 @@
 {
   "schemaVersion": "process-workstreams-v1",
-  "integrationBranch": "codex/governance-integration-20260803",
+  "integrationBranch": "main",
   "baselineTag": "baseline/governance-20260803-four-class-closure-v1",
   "branchPattern": "process/tNN-<topic>-YYYYMMDD",
   "processes": {
@@ -99,6 +99,7 @@
     { "pattern": "src/http/runtime-contexts/runtime.js", "owner": "T01" },
     { "pattern": "src/http/runtime-contexts/identity-security.js", "owner": "T01" },
     { "pattern": "src/http/routes/platform-governance.js", "owner": "T02" },
+    { "pattern": "src/http/routes/platform-governance/**", "owner": "T02" },
     { "pattern": "src/http/routes/state-data.js", "owner": "T02" },
     { "pattern": "src/http/runtime-contexts/platform-governance.js", "owner": "T02" },
     { "pattern": "src/http/runtime-contexts/state-data.js", "owner": "T02" },
