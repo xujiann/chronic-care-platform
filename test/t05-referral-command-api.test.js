@@ -80,6 +80,8 @@ test("referral command inbox and outbox survive the real JSON persistence bounda
   assert.equal(created.response.status, 200);
   assert.equal(created.body.idempotentReplay, false);
   assert.equal(created.body.referral.version, 2);
+  assert.equal(created.body.event.causationId, "t05-real-persistence-command-001");
+  const firstEvent = created.body.event;
   const eventId = created.body.event.id;
 
   await stopServer();
@@ -98,5 +100,7 @@ test("referral command inbox and outbox survive the real JSON persistence bounda
   assert.equal(replay.response.status, 200);
   assert.equal(replay.body.idempotentReplay, true);
   assert.equal(replay.body.event.id, eventId);
+  assert.deepEqual(replay.body.event, firstEvent);
+  assert.equal(replay.body.event.causationId, "t05-real-persistence-command-001");
   assert.equal(replay.body.referral.version, 2);
 });

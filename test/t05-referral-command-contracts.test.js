@@ -48,7 +48,7 @@ test("referral command commits aggregate, versioned contract, outbox and inbox i
 
   const result = await service.update({
     referralId: "rf1",
-    commandId: "referral-command-001",
+    commandId: " referral-command-001 ",
     expectedVersion: 1,
     correlationId: "trace-referral-12345678",
     actor: { username: "county", name: "County Operator", role: "county" },
@@ -62,6 +62,7 @@ test("referral command commits aggregate, versioned contract, outbox and inbox i
   assert.equal(result.contract.contractVersion, "1.0.0");
   assert.equal(result.event.type, EVENT_TYPE);
   assert.equal(result.event.correlationId, "trace-referral-12345678");
+  assert.equal(result.event.causationId, "referral-command-001");
   assert.equal(state.referralSystem.referrals[0].status, "已接诊");
   assert.equal(state.referralSystem[OUTBOX_COLLECTION].length, 1);
   assert.equal(state.referralSystem[OUTBOX_COLLECTION][0].status, "pending");
@@ -79,6 +80,8 @@ test("referral command commits aggregate, versioned contract, outbox and inbox i
   });
   assert.equal(replay.replayed, true);
   assert.equal(replay.event.id, result.event.id);
+  assert.deepEqual(replay.event, result.event);
+  assert.equal(replay.event.causationId, "referral-command-001");
   assert.equal(writes, 1);
 
   await service.update({

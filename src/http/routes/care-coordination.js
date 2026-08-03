@@ -1893,6 +1893,7 @@ function createRouteSegments(runtime) {
               id: result.event.id,
               type: result.event.type,
               aggregateVersion: result.event.aggregateVersion,
+              causationId: result.event.causationId,
               status: result.event.status || "pending"
             }
           });

@@ -50,6 +50,20 @@ function currentVersion(referral) {
   return version;
 }
 
+function domainEventFromOutbox(event) {
+  return createDomainEvent({
+    id: event.id,
+    domain: event.domain,
+    type: event.type,
+    aggregateId: event.aggregateId,
+    aggregateVersion: event.aggregateVersion,
+    correlationId: event.correlationId,
+    causationId: event.causationId,
+    occurredAt: event.occurredAt,
+    payload: structuredClone(event.payload)
+  });
+}
+
 function buildReferralOrderContract(referral) {
   const registry = new ContractRegistry();
   const contract = registry.get(CONTRACT_ID);
@@ -274,7 +288,7 @@ function createReferralCommandService({ readState, writeState, now = () => new D
         replayed: true,
         referral: structuredClone(receipt.result),
         contract: structuredClone(event.payload.contract),
-        event: structuredClone(event)
+        event: domainEventFromOutbox(event)
       });
     }
 
@@ -306,6 +320,7 @@ function createReferralCommandService({ readState, writeState, now = () => new D
       aggregateId: normalizedReferralId,
       aggregateVersion: next.version,
       correlationId,
+      causationId: normalizedCommandId,
       occurredAt,
       payload: {
         commandId: normalizedCommandId,
