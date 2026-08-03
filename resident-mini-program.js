@@ -3,12 +3,19 @@
 
   const Core = window.ResidentMiniProgramCore;
   const RuntimePolicy = window.ResidentMiniProgramRuntimePolicy;
+  const DeliveryPolicy = window.ResidentMiniProgramDeliveryPolicy;
   const adapter = window.ResidentMiniProgramAdapter.createAdapter(window);
   const auth = window.HealthCityAuth;
   const SESSION_KEY = "health-city-auth-session";
   const SESSION_CHECK_INTERVAL = 30 * 1000;
   const configuredTimeout = Number(window.__RESIDENT_MINI_PROGRAM_TIMEOUT_MS__ || 8000);
   const REQUEST_TIMEOUT_MS = Math.max(200, Math.min(Number.isFinite(configuredTimeout) ? configuredTimeout : 8000, 15000));
+  const observabilityMemory = new Map();
+  const observabilityQueue = DeliveryPolicy.createObservabilityQueue({
+    getItem: (key) => observabilityMemory.get(key) || null,
+    setItem: (key, value) => observabilityMemory.set(key, value),
+    removeItem: (key) => observabilityMemory.delete(key)
+  });
   const MESSAGE_RESPONSE_KEYS = new Set([
     "id",
     "residentId",
@@ -46,6 +53,13 @@
     messageFilter: "all",
     messageVisibleLimit: Core.DEFAULT_MESSAGE_PAGE_SIZE,
     pendingReadIds: new Set(),
+    pendingMemberId: "",
+    memberSwitching: false,
+    messagesRefreshing: false,
+    batchReading: false,
+    messageLoadState: "ready",
+    sessionRenewing: false,
+    observabilityBinding: "",
     abortController: null,
     recoveryGeneration: 0,
     locked: true,
@@ -85,8 +99,12 @@
     messageList: document.querySelector("#message-list"),
     messageSummary: document.querySelector("#message-summary"),
     messageLoadMore: document.querySelector("#message-load-more"),
+    messageRefresh: document.querySelector("#message-refresh"),
+    messageMarkAllRead: document.querySelector("#message-mark-all-read"),
     messageBadge: document.querySelector("#message-badge"),
     profileSession: document.querySelector("#profile-session"),
+    sessionRenew: document.querySelector("#session-renew"),
+    observabilityToggle: document.querySelector("#observability-toggle"),
     largeTextToggle: document.querySelector("#large-text-toggle"),
     contrastToggle: document.querySelector("#contrast-toggle"),
     detailTitle: document.querySelector("#detail-title"),
@@ -94,7 +112,13 @@
     detailDescription: document.querySelector("#detail-description"),
     detailSummary: document.querySelector("#detail-summary"),
     detailList: document.querySelector("#detail-list"),
+    detailState: document.querySelector("#detail-state"),
+    detailRetry: document.querySelector("#detail-retry"),
     detailBoundary: document.querySelector("#detail-boundary"),
+    memberConfirmation: document.querySelector("#member-confirmation"),
+    memberConfirmationText: document.querySelector("#member-confirmation-text"),
+    memberConfirm: document.querySelector("#member-confirm"),
+    memberCancel: document.querySelector("#member-cancel"),
     toast: document.querySelector("#toast"),
     announcer: document.querySelector("#screen-reader-announcer")
   };
@@ -137,6 +161,11 @@
     }, 2800);
   }
 
+  function observe(name, fields = {}) {
+    if (!state.observabilityBinding) return false;
+    return observabilityQueue.enqueue({ name, ...fields, occurredAt: new Date().toISOString() }, state.observabilityBinding);
+  }
+
   function focusElement(element) {
     if (!element) return;
     element.setAttribute("tabindex", "-1");
@@ -162,6 +191,11 @@
     state.messageFilter = "all";
     state.messageVisibleLimit = Core.DEFAULT_MESSAGE_PAGE_SIZE;
     state.pendingReadIds.clear();
+    state.pendingMemberId = "";
+    state.memberSwitching = false;
+    state.messagesRefreshing = false;
+    state.batchReading = false;
+    state.messageLoadState = "ready";
   }
 
   function renderGate(kind, title, message, options = {}) {
@@ -189,9 +223,13 @@
     clearResidentRuntime();
     if (options.clearSession) {
       adapter.clearResidentCache();
+      observabilityQueue.clear();
+      observabilityQueue.setConsent(false);
+      if (elements.observabilityToggle) elements.observabilityToggle.checked = false;
       clearLocalSession();
       state.session = null;
       state.subjectKey = "";
+      state.observabilityBinding = "";
     }
     renderGate(kind, title, message, options);
   }
@@ -269,6 +307,70 @@
     };
   }
 
+  function activeMessageRows(rows = [], now = new Date()) {
+    const currentTime = now.getTime();
+    return rows.filter((message) => {
+      const status = String(message?.status || "").trim().toLowerCase();
+      if (["withdrawn", "revoked", "cancelled", "已撤回"].includes(status)) return false;
+      if (!message?.expiresAt) return true;
+      const expiresAt = new Date(message.expiresAt);
+      return !Number.isNaN(expiresAt.getTime()) && expiresAt.getTime() > currentTime;
+    });
+  }
+
+  async function loadScopedSnapshot(identityDecision, signal) {
+    const [rawState, messagePayload] = await Promise.all([
+      fetchJson("/api/state", { signal }),
+      fetchJson("/api/messages", { signal })
+    ]);
+    const scope = Core.deriveResidentScope(rawState, identityDecision.user);
+    if (!scope.allowedIds.has(identityDecision.user.residentId)) {
+      throw requestError("auth", "服务端未返回当前居民的可访问范围");
+    }
+    const messageDecision = RuntimePolicy.validateResidentRows(
+      Array.isArray(messagePayload.messages) ? messagePayload.messages : [],
+      scope.allowedIds,
+      {
+        maximum: Core.MAX_MESSAGE_BATCH,
+        rejectEntireBatch: false,
+        allowedKeys: MESSAGE_RESPONSE_KEYS
+      }
+    );
+    if (!messageDecision.ok) throw requestError("security", "居民消息范围校验失败");
+    rawState.taskMessages = activeMessageRows(messageDecision.rows);
+    return {
+      scope,
+      data: Core.projectDataForAllowedResidents(rawState, scope)
+    };
+  }
+
+  async function requestSessionRenewal(session, expectedSubjectKey, signal) {
+    if (typeof window.__RESIDENT_SESSION_RENEWER__ !== "function") {
+      return { ok: false, reason: "当前环境未接入安全续期服务" };
+    }
+    try {
+      const idempotencyKey = RuntimePolicy.createIdempotencyKey("session-renew", {
+        accountId: session?.accountId,
+        residentId: session?.residentId,
+        resourceId: session?.id
+      });
+      if (!idempotencyKey) return { ok: false, reason: "续期请求缺少安全幂等标识" };
+      const result = await window.__RESIDENT_SESSION_RENEWER__({ signal, idempotencyKey });
+      const renewedSession = result?.session;
+      const decision = Core.validateServerIdentity(renewedSession, result?.identity);
+      if (
+        !decision.ok
+        || Core.sessionSubjectKey(renewedSession) !== expectedSubjectKey
+        || Core.sessionSubjectKey(decision.user) !== expectedSubjectKey
+      ) {
+        return { ok: false, reason: "续期回执主体不匹配" };
+      }
+      return { ok: true, session: renewedSession, identity: decision };
+    } catch (error) {
+      return { ok: false, reason: "未收到有效续期回执" };
+    }
+  }
+
   async function performRecover(reason = "startup") {
     const generation = ++state.recoveryGeneration;
     const previousSubjectKey = state.subjectKey;
@@ -297,7 +399,7 @@
     try {
       const identityPayload = await fetchJson("/api/auth/me", { signal: state.abortController.signal });
       if (generation !== state.recoveryGeneration) return;
-      const identityDecision = Core.validateServerIdentity(session, identityPayload);
+      let identityDecision = Core.validateServerIdentity(session, identityPayload);
       if (!identityDecision.ok) {
         lockApp("auth", "身份核验未通过", identityDecision.message, { login: true, clearSession: true });
         return;
@@ -307,35 +409,34 @@
         lockApp("auth", "登录主体发生变化", "为防止跨居民展示，已清空上一居民状态，请重新登录。", { login: true, clearSession: true });
         return;
       }
-      const [rawState, messagePayload] = await Promise.all([
-        fetchJson("/api/state", { signal: state.abortController.signal }),
-        fetchJson("/api/messages", { signal: state.abortController.signal })
-      ]);
-      if (generation !== state.recoveryGeneration) return;
-      rawState.taskMessages = Array.isArray(messagePayload.messages) ? messagePayload.messages : [];
-      const scope = Core.deriveResidentScope(rawState, identityDecision.user);
-      if (!scope.allowedIds.has(identityDecision.user.residentId)) {
-        lockApp("auth", "居民范围核验失败", "服务端未返回当前居民的可访问范围，已阻断健康数据展示。", { login: true, clearSession: true });
+      const lifecycle = DeliveryPolicy.sessionLifecycleDecision({
+        subjectKey: serverSubjectKey,
+        expiresAt: identityDecision.expiresAt
+      }, {
+        subjectKey: serverSubjectKey
+      });
+      if (lifecycle.action === "reauthenticate") {
+        lockApp("auth", "需要重新认证", lifecycle.reason, { login: true, clearSession: true });
         return;
       }
-      const messageDecision = RuntimePolicy.validateResidentRows(
-        Array.isArray(messagePayload.messages) ? messagePayload.messages : [],
-        scope.allowedIds,
-        {
-          maximum: Core.MAX_MESSAGE_BATCH,
-          rejectEntireBatch: false,
-          allowedKeys: MESSAGE_RESPONSE_KEYS
+      if (lifecycle.action === "renew") {
+        const renewed = await requestSessionRenewal(session, serverSubjectKey, state.abortController.signal);
+        if (!renewed.ok) {
+          lockApp("auth", "登录即将到期", `${renewed.reason}，请重新登录。`, { login: true, clearSession: true });
+          return;
         }
-      );
-      if (!messageDecision.ok) {
-        lockApp("error", "居民消息范围校验失败", "服务端返回了不属于当前会话居民范围的消息，已停止展示。", { retry: true });
-        return;
+        state.session = renewed.session;
+        identityDecision = renewed.identity;
       }
-      rawState.taskMessages = messageDecision.rows;
+      const snapshot = await loadScopedSnapshot(identityDecision, state.abortController.signal);
+      if (generation !== state.recoveryGeneration) return;
       state.identity = identityDecision;
       state.subjectKey = serverSubjectKey;
-      state.scope = scope;
-      state.data = Core.projectDataForAllowedResidents(rawState, scope);
+      if (!state.observabilityBinding) {
+        state.observabilityBinding = window.crypto?.randomUUID?.() || `session-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      }
+      state.scope = snapshot.scope;
+      state.data = snapshot.data;
       state.sensitive = Core.createSensitiveState(identityDecision.user.residentId);
       state.locked = false;
       state.initialized = true;
@@ -353,6 +454,7 @@
       navigateDecision(decision.ok ? decision : { ok: true, route: "home", params: {} }, { replace: true });
       if (!decision.ok && hasRequestedLink) showToast("已阻止不安全或越权的页面链接");
       announce(`${currentResident()?.name || "当前居民"}的健康服务已安全加载`);
+      observe("app_start", { platform: adapter.runtime, route: state.route });
     } catch (error) {
       if (generation !== state.recoveryGeneration) return;
       recoveryFailure(error);
@@ -491,7 +593,11 @@
 
   function renderMessages() {
     const batch = messageBatch();
-    elements.messageSummary.textContent = `共 ${batch.filtered.length} 条，未读 ${batch.unreadCount} 条，已过期 ${batch.expiredCount} 条。`;
+    elements.messageSummary.textContent = state.messageLoadState === "loading"
+      ? "正在刷新当前居民消息，请稍候。"
+      : state.messageLoadState === "error"
+        ? "消息刷新失败，已保留上次服务端确认的状态。"
+        : `共 ${batch.filtered.length} 条，未读 ${batch.unreadCount} 条。`;
     elements.messageList.innerHTML = batch.visible.length ? batch.visible.map((message) => `
       <article class="message-card ${message.isUnread ? "unread" : ""}" data-message-id="${escapeHtml(message.id)}">
         <header>
@@ -509,6 +615,10 @@
       </article>
     `).join("") : emptyState(state.messageFilter === "unread" ? "没有未读消息" : "暂无居民消息");
     elements.messageLoadMore.hidden = batch.visible.length >= batch.filtered.length;
+    elements.messageRefresh.disabled = state.messagesRefreshing || state.batchReading;
+    elements.messageRefresh.textContent = state.messagesRefreshing ? "正在刷新消息" : "刷新消息";
+    elements.messageMarkAllRead.disabled = state.messagesRefreshing || state.batchReading || !batch.visible.some((item) => item.isUnread);
+    elements.messageMarkAllRead.textContent = state.batchReading ? "正在等待批量回执" : "本页全部已读";
     updateMessageBadge(batch.unreadCount);
   }
 
@@ -520,6 +630,15 @@
   function renderProfile() {
     const resident = currentResident();
     elements.profileSession.textContent = `${resident?.name || "当前居民"}的身份已由服务端核验，本次登录有效期至 ${formatDate(state.identity?.expiresAt, true)}。`;
+    const lifecycle = DeliveryPolicy.sessionLifecycleDecision({
+      subjectKey: state.subjectKey,
+      expiresAt: state.identity?.expiresAt
+    }, {
+      subjectKey: state.subjectKey
+    });
+    elements.sessionRenew.hidden = lifecycle.action !== "renew";
+    elements.sessionRenew.disabled = state.sessionRenewing;
+    elements.sessionRenew.textContent = state.sessionRenewing ? "正在等待续期回执" : "延长安全登录";
     const capabilities = adapter.probeCapabilities();
     elements.platformCapabilityStatus.textContent = [
       `当前环境：${adapter.platformLabel()}`,
@@ -535,20 +654,27 @@
   function renderMemberDialog() {
     const currentId = state.sensitive.residentId;
     const allowed = (state.data?.relationships || []).map((item) => `
-      <button class="member-option" type="button" data-member-id="${escapeHtml(item.residentId)}" aria-current="${item.residentId === currentId}">
+      <button class="member-option" type="button" data-member-id="${escapeHtml(item.residentId)}" aria-current="${item.residentId === currentId}" ${state.memberSwitching ? "disabled" : ""}>
         <span class="member-avatar" aria-hidden="true">${escapeHtml(item.name.slice(-1) || "居")}</span>
         <span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.relation)} · ${escapeHtml(item.accessLabel)}</small></span>
-        <span>${item.residentId === currentId ? "当前" : "切换"}</span>
+        <span>${item.residentId === currentId ? "当前" : state.memberSwitching && item.residentId === state.pendingMemberId ? "处理中" : "切换"}</span>
       </button>
     `);
     const blocked = (state.data?.blockedRelationships || []).map((item) => `
-      <button class="member-option" type="button" disabled aria-disabled="true">
+      <div class="member-option" aria-disabled="true">
         <span class="member-avatar" aria-hidden="true">家</span>
-        <span><strong>${escapeHtml(item.relation)}</strong><small>${escapeHtml(item.accessLabel)}</small></span>
-        <span>不可访问</span>
-      </button>
+        <span><strong>${escapeHtml(item.relation)}</strong><small>${escapeHtml(item.accessLabel)}，授权可能未生效、已过期或已撤回</small></span>
+        <a class="message-action" href="./citizen.html#authorization">重新申请</a>
+      </div>
     `);
     elements.memberList.innerHTML = [...allowed, ...blocked].join("") || emptyState("当前没有可切换的家庭成员");
+    const target = (state.data?.relationships || []).find((item) => item.residentId === state.pendingMemberId);
+    elements.memberConfirmation.hidden = !target;
+    elements.memberConfirmationText.textContent = target
+      ? `确认切换到${target.name}？确认后将重新核验授权并原子刷新首页、消息和服务内容。`
+      : "请确认切换家庭成员。";
+    elements.memberConfirm.disabled = state.memberSwitching;
+    elements.memberCancel.disabled = state.memberSwitching;
   }
 
   function detailRows(service) {
@@ -564,6 +690,12 @@
   function renderDetail(route) {
     const service = services.find((item) => item.route === route) || services[0];
     const rows = detailRows(service);
+    const serviceState = DeliveryPolicy.serviceViewDecision({
+      permission: state.scope?.allowedIds?.has(state.sensitive.residentId) === true,
+      network: navigator.onLine === false ? "offline" : "online",
+      rows: route === "emergency" ? [{}] : rows,
+      error: state.networkState === "error"
+    });
     elements.detailKicker.textContent = "居民健康服务";
     elements.detailTitle.textContent = service.label;
     elements.detailDescription.textContent = service.description;
@@ -571,6 +703,8 @@
       <strong>${escapeHtml(currentResident()?.name || "当前居民")}</strong>
       <p>已按当前居民范围归集 ${rows.length} 条相关记录。</p>
     `;
+    elements.detailState.textContent = serviceState.message;
+    elements.detailRetry.hidden = !["offline", "error"].includes(serviceState.state);
     if (route === "emergency") {
       const callControl = adapter.runtime === "web"
         ? `<a class="message-action primary" href="tel:120" aria-label="拨打急救电话一二零">拨打 120</a>`
@@ -594,6 +728,7 @@
       elements.detailList.innerHTML = rows.length ? rows.map(taskCard).join("") : emptyState(`当前居民暂无${service.label}记录`);
     }
     elements.detailBoundary.textContent = service.boundary;
+    observe("page_ready", { route, platform: adapter.runtime });
   }
 
   function navigateDecision(decision, options = {}) {
@@ -641,24 +776,76 @@
     return navigateDecision(decision, options);
   }
 
-  function switchMember(residentId) {
-    state.abortController?.abort();
-    state.abortController = new AbortController();
-    const decision = Core.switchResident(state.sensitive, residentId, state.scope.allowedIds);
-    if (!decision.ok) {
-      elements.memberDialog.close();
-      lockApp("auth", "居民范围已阻断", "所选家庭成员不在本次会话可访问范围内，请重新登录或核验家庭关系与授权。", { login: true });
+  function requestMemberSwitch(residentId) {
+    if (state.memberSwitching || residentId === state.sensitive.residentId) return;
+    const begin = DeliveryPolicy.beginMemberSwitch({
+      currentResidentId: state.sensitive.residentId,
+      targetResidentId: residentId,
+      allowedResidentIds: state.scope?.allowedIds,
+      inProgress: state.memberSwitching
+    });
+    if (!begin.ok) {
+      showToast(begin.reason);
       return;
     }
-    adapter.clearResidentCache();
-    state.sensitive = decision.state;
-    state.messageFilter = "all";
-    state.messageVisibleLimit = Core.DEFAULT_MESSAGE_PAGE_SIZE;
-    state.pendingReadIds.clear();
-    renderAll();
-    navigate("home");
-    elements.memberDialog.close();
-    showToast("已切换服务对象，并清除上一居民的临时状态");
+    state.pendingMemberId = residentId;
+    renderMemberDialog();
+    focusElement(elements.memberConfirmationText);
+  }
+
+  async function confirmMemberSwitch() {
+    if (state.memberSwitching || !state.pendingMemberId) return;
+    const begin = DeliveryPolicy.beginMemberSwitch({
+      currentResidentId: state.sensitive.residentId,
+      targetResidentId: state.pendingMemberId,
+      allowedResidentIds: state.scope?.allowedIds,
+      inProgress: state.memberSwitching
+    });
+    if (!begin.ok) {
+      showToast(begin.reason);
+      return;
+    }
+    const previousResidentId = state.sensitive.residentId;
+    state.memberSwitching = true;
+    renderMemberDialog();
+    const controller = new AbortController();
+    state.abortController?.abort();
+    state.abortController = controller;
+    try {
+      const snapshot = await loadScopedSnapshot(state.identity, controller.signal);
+      const finish = DeliveryPolicy.finishMemberSwitch(begin.transaction, {
+        ok: true,
+        residentId: begin.transaction.targetResidentId,
+        allowedResidentIds: snapshot.scope.allowedIds
+      });
+      if (!finish.ok) throw requestError("auth", finish.reason);
+      const switched = Core.switchResident(state.sensitive, finish.residentId, snapshot.scope.allowedIds);
+      if (!switched.ok) throw requestError("auth", "最新授权未允许切换");
+      adapter.clearResidentCache();
+      observabilityQueue.clear();
+      state.scope = snapshot.scope;
+      state.data = snapshot.data;
+      state.sensitive = switched.state;
+      state.messageFilter = "all";
+      state.messageVisibleLimit = Core.DEFAULT_MESSAGE_PAGE_SIZE;
+      state.pendingReadIds.clear();
+      state.pendingMemberId = "";
+      state.memberSwitching = false;
+      renderAll();
+      navigate("home");
+      elements.memberDialog.close();
+      showToast("已切换服务对象，首页、消息和服务内容已安全刷新");
+    } catch (error) {
+      const rollback = DeliveryPolicy.finishMemberSwitch(begin.transaction, {
+        ok: false,
+        residentId: previousResidentId,
+        allowedResidentIds: state.scope?.allowedIds
+      });
+      state.pendingMemberId = "";
+      state.memberSwitching = false;
+      renderAll();
+      showToast(rollback.reason);
+    }
   }
 
   async function markMessageRead(messageId) {
@@ -707,6 +894,77 @@
     }
   }
 
+  async function refreshMessages() {
+    if (state.messagesRefreshing || state.batchReading || !state.scope) return;
+    state.messagesRefreshing = true;
+    state.messageLoadState = "loading";
+    renderMessages();
+    try {
+      const payload = await fetchJson("/api/messages", { signal: state.abortController?.signal });
+      const decision = RuntimePolicy.validateResidentRows(
+        Array.isArray(payload.messages) ? payload.messages : [],
+        state.scope.allowedIds,
+        {
+          maximum: Core.MAX_MESSAGE_BATCH,
+          rejectEntireBatch: false,
+          allowedKeys: MESSAGE_RESPONSE_KEYS
+        }
+      );
+      if (!decision.ok) throw requestError("security", "消息居民范围校验失败");
+      const activeRows = activeMessageRows(decision.rows);
+      state.data.taskMessages = state.scope.allowed
+        .flatMap(({ residentId }) => Core.projectMessages(activeRows, residentId, { limit: Core.MAX_MESSAGE_BATCH }))
+        .slice(0, Core.MAX_MESSAGE_BATCH);
+      state.messageVisibleLimit = Core.DEFAULT_MESSAGE_PAGE_SIZE;
+      state.messageLoadState = "ready";
+      showToast("当前居民消息已刷新");
+    } catch (error) {
+      state.messageLoadState = "error";
+      observe("request_failed", { errorKind: error.kind || "service", route: "messages", statusCode: error.status || 0 });
+      showToast("消息刷新失败，已保留上次服务端确认状态");
+    } finally {
+      state.messagesRefreshing = false;
+      renderMessages();
+    }
+  }
+
+  async function markVisibleMessagesRead() {
+    if (state.batchReading || state.messagesRefreshing) return;
+    const snapshot = state.data.taskMessages;
+    const intent = DeliveryPolicy.createBatchReadIntent(messageBatch().visible, state.sensitive.residentId);
+    if (!intent.ok) {
+      showToast(intent.reason);
+      return;
+    }
+    state.batchReading = true;
+    renderMessages();
+    try {
+      const payload = await fetchJson("/api/messages/receipts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": intent.idempotencyKey
+        },
+        body: JSON.stringify({ messageIds: intent.messageIds, status: "read" }),
+        signal: state.abortController?.signal
+      });
+      const reconciled = DeliveryPolicy.reconcileBatchRead(snapshot, intent, payload.receipts);
+      if (!reconciled.ok) throw requestError("service", reconciled.reason);
+      state.data.taskMessages = reconciled.messages;
+      showToast(reconciled.reason);
+    } catch (error) {
+      state.data.taskMessages = snapshot;
+      observe("operation_failed", { errorKind: error.kind || "service", route: "messages", statusCode: error.status || 0 });
+      showToast(error.message === "部分回执失败，全部保持未读"
+        ? error.message
+        : "未收到完整批量回执，全部消息仍保持未读");
+    } finally {
+      state.batchReading = false;
+      renderMessages();
+      renderHome();
+    }
+  }
+
   function openMessageLink(messageId) {
     const message = (state.data?.taskMessages || []).find((item) => item.id === messageId);
     const decision = Core.messageDeepLink(message, currentNavigationContext());
@@ -726,10 +984,33 @@
     elements.contrastToggle.checked = highContrast;
   }
 
+  async function renewSession() {
+    if (state.sessionRenewing || !state.session || !state.subjectKey) return;
+    state.sessionRenewing = true;
+    renderProfile();
+    try {
+      const renewed = await requestSessionRenewal(state.session, state.subjectKey, state.abortController?.signal);
+      if (!renewed.ok) throw requestError("auth", renewed.reason);
+      state.session = renewed.session;
+      state.identity = renewed.identity;
+      showToast("安全登录已由服务端续期");
+    } catch (error) {
+      lockApp("auth", "安全续期失败", `${error.message || "未收到有效续期回执"}，请重新登录。`, {
+        login: true,
+        clearSession: true
+      });
+    } finally {
+      state.sessionRenewing = false;
+      if (state.data) renderProfile();
+    }
+  }
+
   async function logout() {
     ++state.recoveryGeneration;
     clearResidentRuntime();
     adapter.clearResidentCache();
+    observabilityQueue.clear();
+    observabilityQueue.setConsent(false);
     try {
       const logoutKey = RuntimePolicy.createIdempotencyKey("logout", {
         accountId: state.session?.accountId,
@@ -756,7 +1037,7 @@
       const messageLink = event.target.closest("[data-message-link]");
       if (messageLink) openMessageLink(messageLink.dataset.messageLink);
       const memberButton = event.target.closest("[data-member-id]");
-      if (memberButton) switchMember(memberButton.dataset.memberId);
+      if (memberButton) requestMemberSwitch(memberButton.dataset.memberId);
       const readButton = event.target.closest("[data-mark-read]");
       if (readButton) void markMessageRead(readButton.dataset.markRead);
       const emergencyButton = event.target.closest("[data-emergency-call]");
@@ -772,7 +1053,25 @@
     document.querySelector("#detail-back").addEventListener("click", () => navigate("home"));
     document.querySelector("#accessibility-shortcut").addEventListener("click", () => navigate("profile"));
     document.querySelector("#logout-button").addEventListener("click", () => void logout());
+    elements.sessionRenew.addEventListener("click", () => void renewSession());
     elements.gateRetry.addEventListener("click", () => void recover("retry"));
+    elements.messageRefresh.addEventListener("click", () => void refreshMessages());
+    elements.messageMarkAllRead.addEventListener("click", () => void markVisibleMessagesRead());
+    elements.memberConfirm.addEventListener("click", () => void confirmMemberSwitch());
+    elements.memberCancel.addEventListener("click", () => {
+      if (state.memberSwitching) return;
+      state.pendingMemberId = "";
+      renderMemberDialog();
+    });
+    elements.detailRetry.addEventListener("click", async () => {
+      const route = state.route;
+      await recover("retry");
+      if (!state.locked) navigate(route);
+    });
+    elements.memberDialog.addEventListener("close", () => {
+      if (state.memberSwitching) return;
+      state.pendingMemberId = "";
+    });
     elements.messageLoadMore.addEventListener("click", () => {
       state.messageVisibleLimit = Math.min(state.messageVisibleLimit + Core.DEFAULT_MESSAGE_PAGE_SIZE, Core.MAX_MESSAGE_BATCH);
       renderMessages();
@@ -794,6 +1093,11 @@
       adapter.setPreference("highContrast", elements.contrastToggle.checked);
       applyPreferences(adapter.getPreferences());
       showToast(elements.contrastToggle.checked ? "高对比度已开启" : "高对比度已关闭");
+    });
+    elements.observabilityToggle.addEventListener("change", () => {
+      const enabled = observabilityQueue.setConsent(elements.observabilityToggle.checked);
+      elements.observabilityToggle.checked = enabled;
+      showToast(enabled ? "匿名运行观测已开启" : "匿名运行观测已关闭并清空");
     });
     window.addEventListener("popstate", () => {
       const decision = Core.validateDeepLink(Object.fromEntries(new URLSearchParams(location.search)), currentNavigationContext());
@@ -826,9 +1130,21 @@
   function verifySessionStillValid() {
     if (state.locked || state.suspended) return;
     const latest = auth?.getUser?.() || null;
-    const decision = Core.isProductionSession(latest);
-    if (!decision.ok || Core.sessionSubjectKey(latest) !== state.subjectKey || new Date(state.identity?.expiresAt || 0).getTime() <= Date.now()) {
+    const decision = Core.isProductionSession(state.session || latest);
+    const latestSubject = latest ? Core.sessionSubjectKey(latest) : state.subjectKey;
+    const lifecycle = DeliveryPolicy.sessionLifecycleDecision({
+      subjectKey: state.subjectKey,
+      expiresAt: state.identity?.expiresAt
+    }, {
+      subjectKey: state.subjectKey
+    });
+    if (!decision.ok || latestSubject !== state.subjectKey || lifecycle.action === "reauthenticate") {
       lockApp("auth", "登录已过期或主体变化", "为保护居民健康资料，已清空当前页面，请重新登录。", { login: true, clearSession: true });
+      return;
+    }
+    if (lifecycle.action === "renew" && !state.sessionRenewing) {
+      observe("session_expiring", { platform: adapter.runtime, route: state.route });
+      void renewSession();
     }
   }
 
@@ -851,6 +1167,11 @@
       unreadCount: state.data ? Core.countUnreadMessages(state.data.taskMessages, state.sensitive.residentId) : 0,
       recovering: Boolean(state.recoveryPromise),
       retryQueued: Boolean(state.queuedRetryPromise),
+      memberSwitching: state.memberSwitching,
+      pendingMemberId: state.pendingMemberId,
+      messagesRefreshing: state.messagesRefreshing,
+      batchReading: state.batchReading,
+      observabilityEnabled: observabilityQueue.isEnabled(),
       sensitive: { ...state.sensitive }
     }),
     navigate,

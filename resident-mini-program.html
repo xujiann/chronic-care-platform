@@ -107,6 +107,10 @@
             <button type="button" data-message-filter="all" aria-pressed="true">全部</button>
             <button type="button" data-message-filter="unread" aria-pressed="false">未读</button>
           </div>
+          <div class="page-actions" aria-label="消息操作">
+            <button class="secondary-action" id="message-refresh" type="button">刷新消息</button>
+            <button class="secondary-action" id="message-mark-all-read" type="button">本页全部已读</button>
+          </div>
           <p class="message-summary" id="message-summary">正在整理当前居民消息。</p>
           <div class="stack-list" id="message-list" aria-live="polite"></div>
           <button class="secondary-action" id="message-load-more" type="button" hidden>加载更多消息</button>
@@ -117,6 +121,7 @@
             <p class="eyebrow">账号与设置</p>
             <h2 id="profile-title">我的</h2>
             <p id="profile-session">居民身份已由服务端核验。</p>
+            <button class="secondary-action" id="session-renew" type="button" hidden>延长安全登录</button>
           </div>
           <section class="settings-card" aria-labelledby="accessibility-title">
             <h3 id="accessibility-title">适老化与无障碍</h3>
@@ -132,6 +137,10 @@
           <section class="settings-card privacy-card" aria-labelledby="privacy-title">
             <h3 id="privacy-title">隐私保护</h3>
             <p>只展示当前会话可访问的居民资料。切换家庭成员时会清除上一居民的筛选、详情和临时敏感状态。</p>
+            <label class="setting-row">
+              <span><strong>匿名运行观测</strong><small>仅在同意后记录最小化性能与错误事件，退出即清理</small></span>
+              <input type="checkbox" id="observability-toggle" role="switch">
+            </label>
           </section>
           <section class="settings-card" aria-labelledby="platform-capability-title">
             <h3 id="platform-capability-title">小程序能力状态</h3>
@@ -152,7 +161,9 @@
             <p id="detail-description"></p>
           </div>
           <div class="detail-summary" id="detail-summary"></div>
+          <p class="service-state" id="detail-state" role="status" aria-live="polite"></p>
           <div class="stack-list" id="detail-list"></div>
+          <button class="secondary-action" id="detail-retry" type="button" hidden>重新加载此项服务</button>
           <div class="safe-boundary" id="detail-boundary"></div>
         </section>
       </main>
@@ -180,6 +191,13 @@
       </div>
       <p class="dialog-note">仅可切换本次会话已核验关系且具备有效授权的家庭成员。</p>
       <div class="member-list" id="member-list"></div>
+      <div class="member-confirmation" id="member-confirmation" role="status" hidden>
+        <p id="member-confirmation-text">请确认切换家庭成员。</p>
+        <div class="page-actions">
+          <button class="primary-action" id="member-confirm" type="button">确认切换</button>
+          <button class="secondary-action" id="member-cancel" type="button">取消</button>
+        </div>
+      </div>
     </form>
   </dialog>
 
@@ -189,6 +207,7 @@
   <script src="./resident-mini-program-policy.js"></script>
   <script src="./resident-mini-program-core.js"></script>
   <script src="./resident-mini-program-runtime-policy.js"></script>
+  <script src="./resident-mini-program-delivery-policy.js"></script>
   <script src="./resident-mini-program-adapter.js"></script>
   <script src="./resident-mini-program.js"></script>
 </body>

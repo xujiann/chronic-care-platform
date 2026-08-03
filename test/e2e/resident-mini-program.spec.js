@@ -25,7 +25,8 @@ test("resident mini program validates session, isolates family scope and fits 39
   await page.locator("#member-switcher").click();
   await expect(page.locator("#member-dialog")).toBeVisible();
   await expect(page.locator("#member-list")).toContainText("家庭关系尚未完成核验");
-  await expect(page.locator("#member-list button:disabled")).toHaveCount(1);
+  await expect(page.locator("#member-list [aria-disabled='true']")).toHaveCount(1);
+  await expect(page.getByRole("link", { name: "重新申请" })).toBeVisible();
   await page.locator("#member-dialog .dialog-close").click();
 
   const layout = await page.evaluate(() => ({
@@ -333,6 +334,83 @@ test("duplicate read clicks produce one idempotent server write", async ({ page 
   expect(receiptRequests).toBe(1);
 });
 
+test("withdrawn and expired messages are suppressed while a partial batch receipt rolls back", async ({ page }) => {
+  await loginAsResident(page);
+  const createdAt = new Date().toISOString();
+  const activeExpiry = new Date(Date.now() + 60_000).toISOString();
+  await page.route("**/api/messages", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        messages: [
+          { id: "batch-1", residentId: "r1", targetRole: "citizen", status: "unread", title: "服务提醒一", createdAt, expiresAt: activeExpiry },
+          { id: "batch-2", residentId: "r1", targetRole: "citizen", status: "unread", title: "服务提醒二", createdAt, expiresAt: activeExpiry },
+          { id: "withdrawn-1", residentId: "r1", targetRole: "citizen", status: "withdrawn", title: "已撤回提醒", createdAt, expiresAt: activeExpiry },
+          { id: "expired-1", residentId: "r1", targetRole: "citizen", status: "unread", title: "过期提醒", createdAt, expiresAt: new Date(Date.now() - 1000).toISOString() }
+        ]
+      })
+    });
+  });
+  let batchRequests = 0;
+  await page.route("**/api/messages/receipts", async (route) => {
+    batchRequests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        receipts: [
+          { id: "batch-1", residentId: "r1", status: "read" },
+          { id: "batch-2", residentId: "r1", status: "failed" }
+        ]
+      })
+    });
+  });
+  await page.goto("/resident-mini-program.html?page=messages");
+  await expect(page.locator("#message-list")).toContainText("服务提醒一");
+  await expect(page.locator("#message-list")).toContainText("服务提醒二");
+  await expect(page.locator("#message-list")).not.toContainText("已撤回提醒");
+  await expect(page.locator("#message-list")).not.toContainText("过期提醒");
+  await page.getByRole("button", { name: "本页全部已读" }).click();
+  await expect(page.locator("#toast")).toContainText("部分回执失败，全部保持未读");
+  await expect(page.locator("[data-mark-read]")).toHaveCount(2);
+  expect(batchRequests).toBe(1);
+});
+
+test("message refresh is single-flight and all eight services keep a return path", async ({ page }) => {
+  await loginAsResident(page);
+  let messageRequests = 0;
+  let releaseRefresh;
+  const refreshBlocked = new Promise((resolve) => {
+    releaseRefresh = resolve;
+  });
+  await page.route("**/api/messages", async (route) => {
+    messageRequests += 1;
+    if (messageRequests === 2) await refreshBlocked;
+    await route.continue();
+  });
+  await page.goto("/resident-mini-program.html?page=messages");
+  await expect(page.locator("#app-content")).toBeVisible();
+  await page.evaluate(() => {
+    const button = document.querySelector("#message-refresh");
+    button.click();
+    button.click();
+  });
+  await expect.poll(() => messageRequests).toBe(2);
+  await expect(page.locator("#message-refresh")).toBeDisabled();
+  releaseRefresh();
+  await expect(page.locator("#message-refresh")).toBeEnabled();
+  await expect(page.locator("#toast")).toContainText("当前居民消息已刷新");
+
+  await page.getByRole("button", { name: "首页", exact: true }).click();
+  for (const label of ["健康档案", "电子病历", "预约挂号", "护理服务", "陪诊服务", "家庭医生", "急救服务", "健康待办"]) {
+    await page.getByRole("button", { name: `打开${label}` }).click();
+    await expect(page.locator("#detail-title")).toHaveText(label);
+    await expect(page.locator("#detail-state")).not.toBeEmpty();
+    await page.getByRole("button", { name: "返回" }).click();
+  }
+});
+
 test("resident shell is mobile safe at 320, 375, 390 and 430 widths", async ({ page }) => {
   await loginAsResident(page);
   for (const width of [320, 375, 390, 430]) {
@@ -356,4 +434,16 @@ test("resident shell is mobile safe at 320, 375, 390 and 430 widths", async ({ p
     expect(result.minimumHeight).toBeGreaterThanOrEqual(44);
     expect(result.english).toEqual([]);
   }
+  await page.setViewportSize({ width: 320, height: 844 });
+  const enlarged = await page.evaluate(() => {
+    document.body.style.fontSize = "200%";
+    document.body.classList.add("soft-keyboard-open");
+    return {
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      navigationHidden: getComputedStyle(document.querySelector(".bottom-nav")).display === "none"
+    };
+  });
+  expect(enlarged.scrollWidth).toBeLessThanOrEqual(enlarged.clientWidth);
+  expect(enlarged.navigationHidden).toBe(true);
 });

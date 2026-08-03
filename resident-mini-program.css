@@ -504,6 +504,38 @@ main {
   box-shadow: 0 3px 10px rgba(30, 68, 60, 0.08);
 }
 
+.page-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.service-state {
+  min-height: 44px;
+  margin: 0;
+  padding: 11px 14px;
+  border-radius: 14px;
+  color: var(--muted);
+  background: var(--surface-muted);
+}
+
+.member-confirmation {
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px solid rgba(11, 122, 104, 0.26);
+  border-radius: 18px;
+  background: var(--brand-soft);
+}
+
+.member-confirmation p {
+  margin: 0 0 12px;
+  line-height: 1.6;
+}
+
+.member-confirmation[hidden] {
+  display: none;
+}
+
 .setting-row {
   min-height: 64px;
   padding: 10px 0;
@@ -887,5 +919,9 @@ body.high-contrast {
   .bottom-nav {
     padding-left: calc(12px + env(safe-area-inset-left));
     padding-right: calc(12px + env(safe-area-inset-right));
+  }
+
+  .page-actions {
+    grid-template-columns: 1fr;
   }
 }

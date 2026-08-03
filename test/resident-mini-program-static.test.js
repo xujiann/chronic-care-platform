@@ -16,6 +16,7 @@ test("resident mini program shell loads the strict policy and dedicated assets",
     "resident-mini-program-policy.js",
     "resident-mini-program-core.js",
     "resident-mini-program-runtime-policy.js",
+    "resident-mini-program-delivery-policy.js",
     "resident-mini-program-adapter.js",
     "resident-mini-program.js"
   ]) assert.match(html, new RegExp(asset.replace(/\./g, "\\.")));
@@ -83,4 +84,29 @@ test("runtime hardening requires bound login, signed links, safe requests and mi
   assert.match(app, /RuntimePolicy\.validateResidentRows/);
   assert.match(app, /RuntimePolicy\.validateSignedDeepLink/);
   assert.doesNotMatch(adapter, /console\.(?:log|info|warn|error)/);
+});
+
+test("delivery candidate requires platform shells, transactional closure and privacy observation", () => {
+  const delivery = read("resident-mini-program-delivery-policy.js");
+  const app = read("resident-mini-program.js");
+  const release = read("scripts/resident-mini-program-release.js");
+  for (const file of [
+    "resident-mini-program-platform/page-manifest.json",
+    "resident-mini-program-platform/wechat.project.template.json",
+    "resident-mini-program-platform/alipay.project.template.json",
+    "resident-mini-program-platform/privacy-map.json",
+    ".env.resident-mini-program.example"
+  ]) assert.equal(fs.existsSync(path.join(root, file)), true);
+  assert.match(delivery, /validatePlatformShell/);
+  assert.match(delivery, /sessionLifecycleDecision/);
+  assert.match(delivery, /beginMemberSwitch/);
+  assert.match(delivery, /reconcileBatchRead/);
+  assert.match(delivery, /redactTelemetry/);
+  assert.match(delivery, /releaseDecision/);
+  assert.match(app, /confirmMemberSwitch/);
+  assert.match(app, /markVisibleMessagesRead/);
+  assert.match(app, /observabilityQueue/);
+  assert.match(release, /noLocalhostInArtifacts/);
+  assert.match(release, /noTestCredentialsInArtifacts/);
+  assert.doesNotMatch(app, /console\.(?:log|info|warn|error)/);
 });

@@ -5,6 +5,7 @@ const path = require("node:path");
 
 const Core = require("../resident-mini-program-core");
 const Adapter = require("../resident-mini-program-adapter");
+const Delivery = require("../resident-mini-program-delivery-policy");
 
 const root = path.resolve(__dirname, "..");
 
@@ -50,7 +51,16 @@ function assessChineseCopy() {
     statuses: Core.findEnglishBusinessCopy(statusText),
     reasons: Core.findEnglishBusinessCopy(reasonText),
     platformFailures: Core.findEnglishBusinessCopy(bridgeText),
-    platformCapabilities: Core.findEnglishBusinessCopy(Object.values(Adapter.CAPABILITY_MESSAGES))
+    platformCapabilities: Core.findEnglishBusinessCopy(Object.values(Adapter.CAPABILITY_MESSAGES)),
+    deliveryStates: Core.findEnglishBusinessCopy([
+      Delivery.serviceViewDecision({ loading: true }).message,
+      Delivery.serviceViewDecision({ permission: false }).message,
+      Delivery.serviceViewDecision({ permission: true, network: "offline" }).message,
+      Delivery.serviceViewDecision({ permission: true, error: true }).message,
+      Delivery.serviceViewDecision({ permission: true, rows: [] }).message,
+      Delivery.beginMemberSwitch({}).reason,
+      Delivery.reconcileBatchRead([], {}, []).reason
+    ])
   };
   const violations = Object.entries(groups).flatMap(([group, rows]) => rows.map((text) => ({ group, text })));
   return {

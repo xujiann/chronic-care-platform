@@ -9,7 +9,7 @@ test("resident-visible shell, states and platform failures pass the Chinese copy
   const result = assessChineseCopy();
   assert.equal(result.ready, true);
   assert.deepEqual(result.violations, []);
-  assert.deepEqual(result.scannedGroups, ["shell", "statuses", "reasons", "platformFailures", "platformCapabilities"]);
+  assert.deepEqual(result.scannedGroups, ["shell", "statuses", "reasons", "platformFailures", "platformCapabilities", "deliveryStates"]);
 });
 
 test("Chinese copy gate catches English state regressions", () => {
