@@ -7424,8 +7424,35 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     }));
     assert.equal(sandboxAccess.response.status, 200);
     assert.equal(sandboxAccess.body.deidentified, true);
-    assert.equal(sandboxAccess.body.governance.reidentificationProhibited, true);
-    assert.equal(sandboxAccess.body.sourceCollections.includes("personalRecords"), true);
+    assert.equal(sandboxAccess.body.controls.reidentificationProhibited, true);
+    assert.equal(sandboxAccess.body.access.mode, "read-only");
+    assert.equal(sandboxAccess.body.access.contractId, "research-sandbox-read-model.v1");
+    assert.equal(Object.hasOwn(sandboxAccess.body, "sandboxToken"), false);
+    assert.equal(Object.hasOwn(sandboxAccess.body, "sourceCollections"), false);
+    const scopedReadModel = await api(
+      baseUrl,
+      `/api/research/datasets/${application.body.id}/read-model?purpose=${encodeURIComponent("approved cohort validation")}`,
+      authorized(researchInstitution.body.token)
+    );
+    assert.equal(scopedReadModel.response.status, 200);
+    assert.equal(scopedReadModel.body.readModel.contract.id, "research-sandbox-read-model.v1");
+    assert.equal(scopedReadModel.body.readModel.contract.mode, "read-only");
+    assert.deepEqual(scopedReadModel.body.readModel.provenance.readModelDependencies, ["researchDatasets"]);
+    assert.deepEqual(scopedReadModel.body.readModel.provenance.crossDomainReads, []);
+    assert.equal(scopedReadModel.body.readModel.provenance.rawRecordAccess, false);
+    assert.equal(JSON.stringify(scopedReadModel.body).includes("personalRecords"), false);
+    const crossInstitutionReadModel = await api(
+      baseUrl,
+      `/api/research/datasets/rd-hypertension-001/read-model?purpose=${encodeURIComponent("cross institution cohort validation")}`,
+      authorized(researchInstitution.body.token)
+    );
+    assert.equal(crossInstitutionReadModel.response.status, 403);
+    assert.equal(crossInstitutionReadModel.body.code, "RESEARCH_DATASET_SCOPE_DENIED");
+    const readModelAudits = await api(baseUrl, "/api/research/sandbox", authorized(commissionToken));
+    assert.equal(readModelAudits.body.recentAudits.some((item) => (
+      item.action === "read-model-query"
+      && String(item.target || "").includes(application.body.id)
+    )), true);
     const compliantExport = await api(baseUrl, `/api/research/datasets/${application.body.id}/compliant-exports`, authorized(researchInstitution.body.token, {
       method: "POST",
       body: JSON.stringify({
