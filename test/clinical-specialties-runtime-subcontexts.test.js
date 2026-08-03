@@ -18,7 +18,7 @@ const EXPECTED_COUNTS = {
   "clinical-blood": 31,
   "mutual-recognition-ingest": 9,
   "mutual-recognition-review": 8,
-  "emergency-signals": 5,
+  "emergency-signals": 6,
   "blood-innovation": 20
 };
 
