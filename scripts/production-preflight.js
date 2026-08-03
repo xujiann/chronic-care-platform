@@ -74,6 +74,30 @@ function evidenceBoundToRelease(records, manifest) {
   });
 }
 
+async function verifyExternalTrust(options, context) {
+  if (typeof options.externalTrustVerifier !== "function") {
+    return {
+      registryAttestationVerified: false,
+      productionEvidenceVerified: false,
+      detail: "external trust verifier is not configured"
+    };
+  }
+  try {
+    const result = await options.externalTrustVerifier(context);
+    return {
+      registryAttestationVerified: result?.registryAttestationVerified === true,
+      productionEvidenceVerified: result?.productionEvidenceVerified === true,
+      detail: String(result?.detail || "external trust verifier returned a decision").slice(0, 240)
+    };
+  } catch {
+    return {
+      registryAttestationVerified: false,
+      productionEvidenceVerified: false,
+      detail: "external trust verifier failed closed"
+    };
+  }
+}
+
 async function buildProductionPreflight(options = {}) {
   const root = options.root || ROOT;
   const manifest = options.manifest || JSON.parse(fs.readFileSync(options.packagePath || DEFAULT_PACKAGE, "utf8"));
@@ -100,6 +124,13 @@ async function buildProductionPreflight(options = {}) {
     cutover: options.cutover
   });
   const productionEvidence = loadProductionEvidence(options);
+  const externalTrust = await verifyExternalTrust(options, {
+    manifest,
+    registryEntry: registry.entries?.find((item) => item.releaseId === manifest.releaseId) || null,
+    registryVerification,
+    productionEvidence: productionEvidence.report,
+    evidenceRecords: productionEvidence.records
+  });
 
   const exactRegistryBinding = Boolean(registryEntry)
     && registryEntry.sourceSha === String(manifest.source?.commit || "").toLowerCase()
@@ -127,8 +158,8 @@ async function buildProductionPreflight(options = {}) {
     .map((item) => check(`preflight:${item.id}`, item.passed, item.detail, "live"));
   const evidenceReleaseBound = evidenceBoundToRelease(productionEvidence.records, manifest);
   const externalChecks = [
-    check("preflight:external-registry-attestation", validExternalAttestation(registryEntry?.externalAttestation), registryEntry?.externalAttestation?.evidenceRef || "controlled external registry/signing evidence is missing", "external-evidence"),
-    check("preflight:production-evidence-validation", productionEvidence.report?.ok === true && productionEvidence.report?.status === "go-decision-evidence-validated", productionEvidence.report?.status || "production release evidence is missing", "external-evidence"),
+    check("preflight:external-registry-attestation", validExternalAttestation(registryEntry?.externalAttestation) && externalTrust.registryAttestationVerified, externalTrust.registryAttestationVerified ? registryEntry?.externalAttestation?.evidenceRef : externalTrust.detail, "external-evidence"),
+    check("preflight:production-evidence-validation", productionEvidence.report?.ok === true && productionEvidence.report?.status === "go-decision-evidence-validated" && externalTrust.productionEvidenceVerified, externalTrust.productionEvidenceVerified ? productionEvidence.report?.status : externalTrust.detail, "external-evidence"),
     check("preflight:production-evidence-release-binding", evidenceReleaseBound, evidenceReleaseBound ? `${manifest.releaseId}/${manifest.artifact.digest}` : "every required evidence document must match the current release id and artifact digest", "external-evidence")
   ];
   const checks = [...softwareChecks, ...runtimeChecks, ...liveChecks, ...externalChecks];
@@ -181,7 +212,8 @@ async function buildProductionPreflight(options = {}) {
       ok: productionEvidence.report?.ok === true,
       status: productionEvidence.report?.status || "missing",
       evidenceFingerprint: productionEvidence.report?.evidenceFingerprint || "",
-      releaseBound: evidenceReleaseBound
+      releaseBound: evidenceReleaseBound,
+      externallyVerified: externalTrust.productionEvidenceVerified
     },
     checks,
     blockers: checks.filter((item) => !item.passed).map((item) => ({
@@ -269,5 +301,6 @@ module.exports = {
   loadProductionEvidence,
   parseArgs,
   renderMarkdown,
+  verifyExternalTrust,
   writeOutput
 };

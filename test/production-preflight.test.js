@@ -163,6 +163,42 @@ test("a claimed evidence result remains blocked when release id or artifact dige
   assert.equal(report.checks.find((item) => item.id === "preflight:production-evidence-release-binding").passed, false);
 });
 
+test("well-shaped local evidence cannot replace an external trust verifier", async () => {
+  const manifest = manifestFixture();
+  const registry = registryFixture(manifest, {
+    externalAttestation: {
+      required: true,
+      recorded: true,
+      evidenceRef: "controlled://registry/preflight-001",
+      evidenceDigest: `sha256:${"e".repeat(64)}`,
+      recordedAt: "2026-08-03T08:00:00.000Z",
+      recordedBy: "release-operator"
+    }
+  });
+  const records = Object.fromEntries(GATE_DEFINITIONS.map((definition) => [
+    definition.file,
+    { releaseId: manifest.releaseId, artifactDigest: manifest.artifact.digest }
+  ]));
+  const report = await buildProductionPreflight({
+    ...passingSoftwareOptions(manifest, registry),
+    productionEvidence: {
+      ok: true,
+      status: "go-decision-evidence-validated",
+      evidenceFingerprint: "locally-shaped-evidence"
+    },
+    evidenceRecords: records
+  });
+
+  assert.equal(report.productionEvidence.releaseBound, true);
+  assert.equal(report.productionEvidence.externallyVerified, false);
+  assert.equal(report.externalEvidenceReady, false);
+  assert.equal(report.productionReady, false);
+  assert.equal(
+    report.checks.find((item) => item.id === "preflight:external-registry-attestation").detail,
+    "external trust verifier is not configured"
+  );
+});
+
 test("production preflight rejects a registry entry detached from the deployment package source", async () => {
   const manifest = manifestFixture();
   const registry = registryFixture(manifest, { sourceSha: "d".repeat(40) });
