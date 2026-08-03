@@ -4,7 +4,11 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const {
+  SESSION_SECURITY_AUDIT_PERSISTENCE_CONTRACT,
+  SessionSecurityAuditError,
   appendSessionSecurityAudit,
+  createSessionSecurityAuditRepository,
+  executeSecurityControlAction,
   querySessionSecurityAudits,
   summarizeSessionSecurityAudits
 } = require("../src/identity-security/session-security-audit");
@@ -26,7 +30,7 @@ function responseCapture() {
   };
 }
 
-test("session security audit correlates requests without retaining raw session or client secrets", () => {
+test("session security audit correlates requests without retaining raw session or client secrets", async () => {
   let data = { securityEvents: [] };
   let sequence = 0;
   const req = {
@@ -39,7 +43,7 @@ test("session security audit correlates requests without retaining raw session o
     },
     socket: { remoteAddress: "192.0.2.8" }
   };
-  const entry = appendSessionSecurityAudit({
+  const entry = await appendSessionSecurityAudit({
     req,
     session: { sessionId: "raw-session-id", token: "raw-token" },
     event: {
@@ -65,6 +69,242 @@ test("session security audit correlates requests without retaining raw session o
   ["raw-session-id", "raw-token", "192.0.2.8", "Sensitive Browser", "must-not-persist"].forEach((secret) => {
     assert.equal(persisted.includes(secret), false, `${secret} must not be persisted`);
   });
+});
+
+test("session security audit repository serializes concurrent commands without lost writes", async () => {
+  let data = { securityEvents: [] };
+  let writes = 0;
+  let sequence = 0;
+  const repository = createSessionSecurityAuditRepository({
+    readDatabase: () => data,
+    writeDatabase: async (next) => {
+      await new Promise((resolve) => setTimeout(resolve, writes % 3));
+      writes += 1;
+      data = next;
+    },
+    prependAuditTrailEntry,
+    randomUUID: () => `concurrent-audit-${++sequence}`,
+    now: () => new Date("2026-08-03T12:00:00.000Z")
+  });
+
+  await Promise.all(Array.from({ length: 24 }, (_, index) => appendSessionSecurityAudit({
+    req: {
+      method: "POST",
+      url: `/api/auth/test?token=secret-${index}`,
+      correlationId: `trace-concurrent-${String(index).padStart(4, "0")}`,
+      headers: { "user-agent": `private-agent-${index}` },
+      socket: { remoteAddress: `192.0.2.${index}` }
+    },
+    event: {
+      actor: `actor-${index}`,
+      role: "commission",
+      action: "concurrent-session-action",
+      result: "allowed"
+    },
+    commandId: `t01-concurrent-command-${index}`,
+    randomUUID: () => `unused-${index}`,
+    repository
+  })));
+
+  assert.equal(writes, 24);
+  assert.equal(data.securityEvents.filter((item) => item.category === "session-security").length, 24);
+  assert.equal(new Set(data.securityEvents.map((item) => item.commandRef)).size, 24);
+  assert.equal(Math.max(...data.securityEvents.map((item) => item.streamVersion)), 24);
+});
+
+test("session security command replay is idempotent and payload drift is HTTP 409", async () => {
+  let data = { securityEvents: [] };
+  let writes = 0;
+  let sequence = 0;
+  const repository = createSessionSecurityAuditRepository({
+    readDatabase: () => data,
+    writeDatabase: (next) => {
+      writes += 1;
+      data = next;
+    },
+    prependAuditTrailEntry,
+    randomUUID: () => `idempotent-audit-${++sequence}`,
+    now: () => new Date("2026-08-03T12:00:00.000Z")
+  });
+  const base = {
+    req: { method: "POST", url: "/api/auth/test", correlationId: "trace-idempotent-1234" },
+    event: { actor: "operator", role: "commission", action: "logout", result: "allowed" },
+    commandId: "t01-idempotent-command-001",
+    randomUUID: () => "unused",
+    repository
+  };
+
+  const first = await appendSessionSecurityAudit(base);
+  const replay = await appendSessionSecurityAudit(base);
+  assert.equal(replay.id, first.id);
+  assert.equal(writes, 1);
+  assert.equal(data.securityEvents.length, 1);
+
+  await assert.rejects(
+    appendSessionSecurityAudit({
+      ...base,
+      event: { ...base.event, result: "denied" }
+    }),
+    (error) => {
+      assert.equal(error instanceof SessionSecurityAuditError, true);
+      assert.equal(error.code, "SESSION_SECURITY_AUDIT_IDEMPOTENCY_CONFLICT");
+      assert.equal(error.statusCode, 409);
+      return true;
+    }
+  );
+  assert.equal(writes, 1);
+});
+
+test("security control mutation, audit and command receipt share one commit", async () => {
+  let data = {
+    securityAcceptanceLedger: [{ id: "control-1", status: "pending", evidence: "", next: "archive" }],
+    securityEvents: []
+  };
+  let writes = 0;
+  let sequence = 0;
+  const repository = createSessionSecurityAuditRepository({
+    readDatabase: () => data,
+    writeDatabase: (next) => {
+      writes += 1;
+      data = next;
+    },
+    prependAuditTrailEntry,
+    randomUUID: () => `control-audit-${++sequence}`,
+    now: () => new Date("2026-08-03T12:00:00.000Z")
+  });
+  const command = {
+    repository,
+    commandId: "t01-security-control-001",
+    req: { method: "POST", url: "/api/security/controls/control-1/actions?token=raw" },
+    user: { name: "Security Officer", username: "security", role: "commission" },
+    controlId: "control-1",
+    payload: { status: "archived", evidence: "evidence-1", action: "archive-evidence" }
+  };
+
+  const first = await executeSecurityControlAction(command);
+  const replay = await executeSecurityControlAction(command);
+  assert.equal(writes, 1);
+  assert.equal(first.result.status, "archived");
+  assert.equal(replay.idempotentReplay, true);
+  assert.equal(data.securityAcceptanceLedger[0].evidence, "evidence-1");
+  assert.equal(data.securityEvents[0].category, "session-security");
+  assert.equal(data.securityEvents[0].resultSnapshot.evidence, "evidence-1");
+  assert.equal(data.securityEvents[0].intentRef.length, 24);
+});
+
+test("failed persistence rolls back the security action and its audit copy", async () => {
+  const data = {
+    securityAcceptanceLedger: [{ id: "control-rollback", status: "pending", evidence: "" }],
+    securityEvents: []
+  };
+  const repository = createSessionSecurityAuditRepository({
+    readDatabase: () => data,
+    writeDatabase: () => {
+      throw new Error("simulated persistence failure");
+    },
+    prependAuditTrailEntry,
+    randomUUID: () => "rollback-audit-1",
+    now: () => new Date("2026-08-03T12:00:00.000Z")
+  });
+
+  await assert.rejects(executeSecurityControlAction({
+    repository,
+    commandId: "t01-security-control-rollback",
+    req: { method: "POST", url: "/api/security/controls/control-rollback/actions" },
+    user: { name: "Security Officer", username: "security", role: "commission" },
+    controlId: "control-rollback",
+    payload: { status: "archived", evidence: "must-not-commit" }
+  }), /simulated persistence failure/);
+
+  assert.equal(data.securityAcceptanceLedger[0].status, "pending");
+  assert.equal(data.securityAcceptanceLedger[0].evidence, "");
+  assert.equal(data.securityEvents.length, 0);
+});
+
+test("security control route replays equal commands and returns 409 for payload drift", async () => {
+  let data = {
+    securityAcceptanceLedger: [{ id: "control-route", status: "pending", evidence: "" }],
+    securityEvents: []
+  };
+  let payload = { status: "archived", evidence: "route-evidence" };
+  let writes = 0;
+  let sequence = 0;
+  const runtime = {
+    collectJson: async () => payload,
+    prependAuditTrailEntry,
+    randomUUID: () => `route-control-audit-${++sequence}`,
+    readDatabase: () => data,
+    requireApiRole: () => ({ name: "Auditor", username: "auditor", role: "commission" }),
+    sendJson: (res, status, body) => res.send(status, body),
+    writeDatabase: (next) => {
+      writes += 1;
+      data = next;
+    }
+  };
+  const segment = createIdentitySegments(runtime).find((item) => item.id === "identity-security-02");
+  const req = {
+    method: "POST",
+    url: "/api/security/controls/control-route/actions",
+    correlationId: "trace-control-route-1234",
+    headers: { "idempotency-key": "t01-control-route-command-001" }
+  };
+
+  const first = responseCapture();
+  const replay = responseCapture();
+  assert.equal(await segment.handle(req, first, new URL(`http://localhost${req.url}`)), true);
+  assert.equal(await segment.handle(req, replay, new URL(`http://localhost${req.url}`)), true);
+  assert.equal(first.statusCode, 200);
+  assert.equal(replay.statusCode, 200);
+  assert.equal(replay.body.idempotentReplay, true);
+  assert.equal(writes, 1);
+
+  payload = { status: "rejected", evidence: "drift" };
+  const conflict = responseCapture();
+  assert.equal(await segment.handle(req, conflict, new URL(`http://localhost${req.url}`)), true);
+  assert.equal(conflict.statusCode, 409);
+  assert.equal(conflict.body.code, "SESSION_SECURITY_AUDIT_IDEMPOTENCY_CONFLICT");
+  assert.equal(writes, 1);
+});
+
+test("session audit query projection is exact, bounded and never exposes request secrets", () => {
+  const rows = Array.from({ length: 120 }, (_, index) => ({
+    id: `audit-${index}`,
+    category: "session-security",
+    schemaVersion: "session-security-audit/v2",
+    correlationId: "trace-secret-query",
+    actor: "operator",
+    role: "commission",
+    action: "logout",
+    result: "allowed",
+    detail: "safe",
+    request: { method: "POST", path: `/api/auth/logout?token=raw-query-${index}` },
+    sessionRef: "raw-session-id",
+    clientFingerprint: "192.0.2.8 Sensitive Browser",
+    commandRef: "raw-token"
+  }));
+  const filtered = querySessionSecurityAudits(rows, {
+    correlationId: "trace-secret-query",
+    action: "logout",
+    result: "allowed",
+    limit: 500
+  });
+  const serialized = JSON.stringify(filtered);
+
+  assert.equal(filtered.length, 100);
+  assert.equal(filtered.every((item) => item.correlationId === "trace-secret-query"), true);
+  ["raw-session-id", "raw-token", "192.0.2.8", "Sensitive Browser", "raw-query"].forEach((secret) => {
+    assert.equal(serialized.includes(secret), false, `${secret} must not be returned`);
+  });
+  assert.deepEqual(Object.keys(filtered[0]).sort(), [
+    "action", "actor", "at", "category", "correlationId", "detail", "id",
+    "request", "result", "role", "schemaVersion", "target"
+  ]);
+});
+
+test("persistence capability truthfully requires database CAS and a cross-store transaction", () => {
+  assert.equal(SESSION_SECURITY_AUDIT_PERSISTENCE_CONTRACT.productionReady, false);
+  assert.match(SESSION_SECURITY_AUDIT_PERSISTENCE_CONTRACT.requiredProductionAdapter.concurrency, /compare-and-swap/i);
+  assert.match(SESSION_SECURITY_AUDIT_PERSISTENCE_CONTRACT.requiredProductionAdapter.transactionBoundary, /session security mutation.*audit event.*idempotency receipt/i);
 });
 
 test("session security audit query is exact, bounded and summarized", () => {
@@ -126,17 +366,19 @@ test("identity login persists a structured audit linked to the server correlatio
 });
 
 test("commission can query session audits by correlation id", async () => {
-  const rows = [
+  let data = { securityEvents: [
     { category: "session-security", correlationId: "trace-query-1234", action: "logout", result: "allowed" },
     { category: "session-security", correlationId: "trace-other-1234", action: "login", result: "denied" }
-  ];
+  ] };
   const response = responseCapture();
   const runtime = {
     appendSecurityEvent: () => {},
+    prependAuditTrailEntry,
     randomUUID: () => "unused",
-    readDatabase: () => ({ securityEvents: rows }),
+    readDatabase: () => data,
     requireApiRole: () => ({ name: "Auditor", role: "commission" }),
-    sendJson: (res, status, body) => res.send(status, body)
+    sendJson: (res, status, body) => res.send(status, body),
+    writeDatabase: (next) => { data = next; }
   };
   const segment = createIdentitySegments(runtime).find((item) => item.id === "identity-security-01");
   const req = {
