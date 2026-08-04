@@ -174,6 +174,8 @@ test("candidate review remains NO-GO until all reports share one package and eve
     },
     monitoring: {
       ready: true,
+      releaseId: RELEASE_ID,
+      packageFingerprint: FINGERPRINT,
       productionReady: false
     },
     rehearsal
@@ -191,7 +193,11 @@ test("candidate review remains NO-GO until all reports share one package and eve
       releaseId: RELEASE_ID,
       packageFingerprint: FINGERPRINT
     },
-    monitoring: { ready: false },
+    monitoring: {
+      ready: false,
+      releaseId: RELEASE_ID,
+      packageFingerprint: FINGERPRINT
+    },
     rehearsal
   }, { now: NOW });
   assert.equal(blocked.decision, "NO-GO");
@@ -208,7 +214,11 @@ test("candidate review remains NO-GO until all reports share one package and eve
       releaseId: RELEASE_ID,
       packageFingerprint: `sha256:${"b".repeat(64)}`
     },
-    monitoring: { ready: true },
+    monitoring: {
+      ready: true,
+      releaseId: RELEASE_ID,
+      packageFingerprint: FINGERPRINT
+    },
     rehearsal
   }, { now: NOW });
   assert.equal(drifted.decision, "NO-GO");

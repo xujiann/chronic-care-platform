@@ -28,6 +28,8 @@ const RECEIPT_FIELDS = new Set([
   "schemaVersion",
   "campaignId",
   "campaignDigest",
+  "releaseId",
+  "packageFingerprint",
   "interfaceId",
   "scenarioId",
   "runId",
@@ -356,6 +358,8 @@ function createExternalJointTestReceiptSubject(receipt = {}) {
     schemaVersion: clean(receipt.schemaVersion, 80),
     campaignId: clean(receipt.campaignId, 160),
     campaignDigest: clean(receipt.campaignDigest, 80),
+    releaseId: clean(receipt.releaseId, 160),
+    packageFingerprint: clean(receipt.packageFingerprint, 80),
     interfaceId: clean(receipt.interfaceId, 160),
     scenarioId: clean(receipt.scenarioId, 120),
     runId: clean(receipt.runId, 160),
@@ -504,6 +508,8 @@ function evaluateReceipt(options) {
     schema: subject.schemaVersion === "external-joint-test-scenario-receipt-v1",
     campaign: subject.campaignId === campaign.campaignId
       && subject.campaignDigest === campaign.campaignDigest,
+    releaseBinding: subject.releaseId === options.releaseId
+      && subject.packageFingerprint === options.packageFingerprint,
     interface: subject.interfaceId === item.id,
     scenario: subject.scenarioId === scenario.id,
     run: IDENTIFIER.test(subject.runId),
@@ -549,6 +555,8 @@ function evaluateReceipt(options) {
 function buildRegionalJointTestEvidenceProjection(evaluation = {}) {
   const base = Object.freeze({
     schema: "regional-joint-test-evidence-v1",
+    releaseId: clean(evaluation.releaseId, 160),
+    packageFingerprint: clean(evaluation.packageFingerprint, 80),
     registryDigest: clean(evaluation.campaignDigest, 80),
     contracts: Object.freeze((evaluation.interfaces || []).map((item) => Object.freeze({
       contractId: item.id,
@@ -585,6 +593,12 @@ function evaluateExternalJointTestCampaign(options = {}) {
   if (bundle.schemaVersion !== "external-joint-test-evidence-bundle-v1"
     || clean(bundle.campaignId, 160) !== campaign.campaignId
     || clean(bundle.campaignDigest, 80) !== campaign.campaignDigest
+    || !IDENTIFIER.test(clean(bundle.releaseId, 160))
+    || !SHA256.test(clean(bundle.packageFingerprint, 80))
+    || (options.releaseId
+      && clean(options.releaseId, 160) !== clean(bundle.releaseId, 160))
+    || (options.packageFingerprint
+      && clean(options.packageFingerprint, 80) !== clean(bundle.packageFingerprint, 80))
     || !Array.isArray(bundle.receipts)) {
     throw jointTestError(
       "EXTERNAL_JOINT_TEST_EVIDENCE_BUNDLE_INVALID",
@@ -592,6 +606,8 @@ function evaluateExternalJointTestCampaign(options = {}) {
     );
   }
   const now = timestamp(options.now || new Date().toISOString());
+  const releaseId = clean(bundle.releaseId, 160);
+  const packageFingerprint = clean(bundle.packageFingerprint, 80);
   if (!Number.isFinite(now)) {
     throw jointTestError(
       "EXTERNAL_JOINT_TEST_EVALUATION_TIME_INVALID",
@@ -619,7 +635,9 @@ function evaluateExternalJointTestCampaign(options = {}) {
         duplicate: receipts.length > 1,
         keys,
         revocations,
-        now
+        now,
+        releaseId,
+        packageFingerprint
       });
     });
     return Object.freeze({
@@ -638,6 +656,8 @@ function evaluateExternalJointTestCampaign(options = {}) {
     schema: "external-joint-test-campaign-evaluation-v1",
     campaignId: campaign.campaignId,
     campaignDigest: campaign.campaignDigest,
+    releaseId,
+    packageFingerprint,
     evaluatedAt: new Date(now).toISOString(),
     interfaces: Object.freeze(interfaces),
     summary: Object.freeze({

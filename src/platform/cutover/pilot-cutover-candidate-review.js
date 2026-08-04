@@ -25,6 +25,7 @@ const CONTROL_DEFINITIONS = Object.freeze([
     nextAction: "Archive fresh dual-signed joint-test receipts for every required lane.",
     ready: (reports) => reports.jointTests?.ready === true
       || reports.jointTests?.jointTestReady === true
+      || reports.jointTests?.externalEvidenceVerified === true
   }),
   Object.freeze({
     id: "monitoring-security-acceptance",
@@ -73,6 +74,7 @@ function buildPilotCutoverCandidateReview(reports = {}, options = {}) {
     reports.authorization?.ledger?.packageFingerprint,
     reports.preproduction?.packageFingerprint,
     reports.jointTests?.packageFingerprint,
+    reports.monitoring?.packageFingerprint,
     reports.rehearsal?.packageFingerprint
   ].map((value) => clean(value, 80)).filter(Boolean);
   const releaseIds = [
@@ -80,12 +82,13 @@ function buildPilotCutoverCandidateReview(reports = {}, options = {}) {
     reports.authorization?.ledger?.releaseId,
     reports.preproduction?.releaseId,
     reports.jointTests?.releaseId,
+    reports.monitoring?.releaseId,
     reports.rehearsal?.releaseId
   ].map((value) => clean(value, 160)).filter(Boolean);
   const bindings = Object.freeze({
-    packageFingerprint: packageFingerprints.length >= 4
+    packageFingerprint: packageFingerprints.length >= 6
       && new Set(packageFingerprints).size === 1,
-    releaseId: releaseIds.length >= 4 && new Set(releaseIds).size === 1
+    releaseId: releaseIds.length >= 6 && new Set(releaseIds).size === 1
   });
   const ready = blockers.length === 0 && Object.values(bindings).every(Boolean);
   const projection = {

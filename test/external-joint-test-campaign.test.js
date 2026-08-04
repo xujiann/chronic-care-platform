@@ -23,6 +23,8 @@ const {
 const EXECUTED_AT = "2026-08-04T10:00:00.000Z";
 const EVALUATED_AT = "2026-08-04T12:00:00.000Z";
 const EXPIRES_AT = "2026-08-06T10:00:00.000Z";
+const RELEASE_ID = "release-20260804";
+const PACKAGE_FINGERPRINT = `sha256:${"b".repeat(64)}`;
 
 function signingContext(campaign) {
   const platform = generateKeyPairSync("ed25519");
@@ -92,6 +94,8 @@ function evidenceFixture() {
         schemaVersion: "external-joint-test-scenario-receipt-v1",
         campaignId: campaign.campaignId,
         campaignDigest: campaign.campaignDigest,
+        releaseId: RELEASE_ID,
+        packageFingerprint: PACKAGE_FINGERPRINT,
         interfaceId: item.id,
         scenarioId: scenario.id,
         runId: `joint-test-run-${String(sequence).padStart(3, "0")}`,
@@ -136,6 +140,8 @@ function evidenceFixture() {
       schemaVersion: "external-joint-test-evidence-bundle-v1",
       campaignId: campaign.campaignId,
       campaignDigest: campaign.campaignDigest,
+      releaseId: RELEASE_ID,
+      packageFingerprint: PACKAGE_FINGERPRINT,
       receipts,
       revocations: []
     }
@@ -169,15 +175,20 @@ test("complete fresh receipts require two independent Ed25519 attestations and p
   assert.equal(result.summary.required, 96);
   assert.equal(result.summary.verified, 96);
   assert.equal(result.externalEvidenceVerified, true);
+  assert.equal(result.releaseId, RELEASE_ID);
+  assert.equal(result.packageFingerprint, PACKAGE_FINGERPRINT);
   assert.equal(result.decision, "JOINT-TEST-PASSED");
   assert.equal(result.productionReady, false);
   assert.equal(result.evidenceInferred, false);
   assert.equal(result.regionalJointTestEvidence.externalEvidenceVerified, true);
+  assert.equal(result.regionalJointTestEvidence.packageFingerprint, PACKAGE_FINGERPRINT);
   const projection = result.regionalJointTestEvidence;
   const expectedFingerprint = createTechnicalEvidenceFingerprint(
     projection.schema,
     {
       schema: projection.schema,
+      releaseId: projection.releaseId,
+      packageFingerprint: projection.packageFingerprint,
       registryDigest: projection.registryDigest,
       contracts: projection.contracts,
       externalEvidenceVerified: projection.externalEvidenceVerified,

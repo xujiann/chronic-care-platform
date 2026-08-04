@@ -14,6 +14,15 @@ const {
 const {
   buildPilotCutoverCandidateReview
 } = require("../src/platform/cutover/pilot-cutover-candidate-review");
+const {
+  evaluateExternalJointTestCampaign
+} = require("../src/platform/integration/external-joint-test-campaign");
+const {
+  buildPilotCutoverAlertProjection
+} = require("../src/platform/cutover/pilot-cutover-alert-lifecycle");
+const {
+  evaluatePilotCutoverMonitoringAcceptanceFile
+} = require("../src/platform/cutover/pilot-cutover-monitoring-acceptance");
 
 const MAX_REPORT_BYTES = 1024 * 1024;
 
@@ -80,6 +89,40 @@ function run(parsed = parseArgs(), runtime = {}) {
       exitCode: parsed.options["require-ready"] === true && !report.ready ? 2 : 0
     };
   }
+  if (parsed.command === "joint-test") {
+    const report = evaluateExternalJointTestCampaign({
+      campaignFile: requireOption(parsed.options, "campaign"),
+      trustRegistryFile: requireOption(parsed.options, "trust-registry"),
+      evidenceBundle: readReport(parsed.options, "evidence"),
+      releaseId: parsed.options["release-id"],
+      packageFingerprint: parsed.options["package-fingerprint"],
+      now
+    });
+    return {
+      report,
+      exitCode: parsed.options["require-ready"] === true
+        && !report.externalEvidenceVerified
+        ? 2
+        : 0
+    };
+  }
+  if (parsed.command === "monitoring") {
+    const journal = buildPilotCutoverAlertProjection({
+      file: requireOption(parsed.options, "journal"),
+      now
+    });
+    const report = evaluatePilotCutoverMonitoringAcceptanceFile({
+      file: requireOption(parsed.options, "input"),
+      journal,
+      releaseId: parsed.options["release-id"],
+      packageFingerprint: parsed.options["package-fingerprint"],
+      now
+    });
+    return {
+      report,
+      exitCode: parsed.options["require-ready"] === true && !report.ready ? 2 : 0
+    };
+  }
   if (parsed.command === "candidate") {
     const report = buildPilotCutoverCandidateReview({
       authorization: readReport(parsed.options, "authorization"),
@@ -96,7 +139,9 @@ function run(parsed = parseArgs(), runtime = {}) {
         : 0
     };
   }
-  throw Object.assign(new Error("command must be environment, rehearsal or candidate"), {
+  throw Object.assign(new Error(
+    "command must be environment, joint-test, monitoring, rehearsal or candidate"
+  ), {
     code: "PLATFORM_PREPRODUCTION_COMMAND_INVALID"
   });
 }

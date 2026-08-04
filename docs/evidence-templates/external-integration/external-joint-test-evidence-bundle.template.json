@@ -2,11 +2,15 @@
   "schemaVersion": "external-joint-test-evidence-bundle-v1",
   "campaignId": "regional-preproduction-joint-test-20260804",
   "campaignDigest": "sha256:<64-hex-from-campaign-plan>",
+  "releaseId": "<immutable-release-id>",
+  "packageFingerprint": "sha256:<64-hex-from-release-package>",
   "receipts": [
     {
       "schemaVersion": "external-joint-test-scenario-receipt-v1",
       "campaignId": "regional-preproduction-joint-test-20260804",
       "campaignDigest": "sha256:<64-hex-from-campaign-plan>",
+      "releaseId": "<immutable-release-id>",
+      "packageFingerprint": "sha256:<64-hex-from-release-package>",
       "interfaceId": "his-referral-v1",
       "scenarioId": "happy-path",
       "runId": "<site-run-id>",
