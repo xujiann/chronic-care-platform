@@ -35,11 +35,16 @@ function candidate() {
         }
       },
       reconciliation: {
+        schema: "shadow-relay-control-plane-v1",
         ok: true,
         domains: { referral: { ok: true }, emergency: { ok: true } },
         durableCheckpointVerified: true,
         faultRecoveryVerified: true,
-        payloadsExposed: false
+        chainValid: true,
+        technicalEvidenceFingerprint: `sha256:${"2".repeat(64)}`,
+        payloadsExposed: false,
+        externalEvidenceVerified: false,
+        productionReady: false
       },
       jointTests: { externalEvidenceVerified: true },
       businessLoop: { ok: true },
@@ -119,4 +124,11 @@ test("evidence drift or missing external evidence forces NO-GO", () => {
   const missing = candidate();
   missing.reports.jointTests.externalEvidenceVerified = false;
   assert.equal(evaluatePilotCutover(missing, NOW).decision, "NO-GO");
+  const unbound = candidate();
+  unbound.reports.reconciliation.technicalEvidenceFingerprint = `sha256:${"8".repeat(64)}`;
+  unbound.authorization.evidenceFingerprint = createPilotCutoverEvidenceFingerprint(unbound);
+  assert.equal(evaluatePilotCutover(unbound, NOW).decision, "NO-GO");
+  const unchained = candidate();
+  unchained.reports.reconciliation.chainValid = false;
+  assert.equal(evaluatePilotCutover(unchained, NOW).decision, "NO-GO");
 });

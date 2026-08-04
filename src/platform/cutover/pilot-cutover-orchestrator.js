@@ -119,6 +119,9 @@ function evaluatePilotCutover(input = {}, now = new Date().toISOString()) {
   const evidenceDigestChecks = Object.freeze(Object.fromEntries(EVIDENCE_DIGEST_IDS.map((id) => [
     id,
     SHA256.test(clean(input.evidenceDigests?.[id], 80))
+      && (id !== "reconciliation"
+        || clean(input.evidenceDigests?.reconciliation, 80)
+          === clean(input.reports?.reconciliation?.technicalEvidenceFingerprint, 80))
   ])));
   const release = Object.freeze({
     releaseId: Boolean(clean(input.release?.releaseId, 160)),
@@ -129,12 +132,17 @@ function evaluatePilotCutover(input = {}, now = new Date().toISOString()) {
     adapterRuntime: input.reports?.adapterRuntime?.localChecks?.schemaVerified === true
       && input.reports?.adapterRuntime?.localChecks?.adaptersConfigured === true
       && input.reports?.adapterRuntime?.localChecks?.adapterWritesEvidenceGated === true,
-    reconciliation: input.reports?.reconciliation?.ok === true
+    reconciliation: input.reports?.reconciliation?.schema === "shadow-relay-control-plane-v1"
+      && input.reports?.reconciliation?.ok === true
       && input.reports?.reconciliation?.domains?.referral?.ok === true
       && input.reports?.reconciliation?.domains?.emergency?.ok === true
       && input.reports?.reconciliation?.durableCheckpointVerified === true
       && input.reports?.reconciliation?.faultRecoveryVerified === true
-      && input.reports?.reconciliation?.payloadsExposed === false,
+      && input.reports?.reconciliation?.chainValid === true
+      && SHA256.test(clean(input.reports?.reconciliation?.technicalEvidenceFingerprint, 80))
+      && input.reports?.reconciliation?.payloadsExposed === false
+      && input.reports?.reconciliation?.externalEvidenceVerified === false
+      && input.reports?.reconciliation?.productionReady === false,
     businessLoop: input.reports?.businessLoop?.ok === true,
     operations: input.reports?.operations?.localReady === true
   });

@@ -17,6 +17,9 @@ const { PlatformObservability } = require("./src/platform/observability/request-
 const {
   createProductionAdapterRuntime
 } = require("./src/platform/composition/production-adapter-runtime");
+const {
+  openSqliteShadowRelayOperations
+} = require("./src/platform/operations/sqlite-shadow-relay-operations");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
 const { MemorySessionStore, PostgresSessionStore, SqliteSessionStore, createSqliteSessionSchema } = require("./session-store");
 const {
@@ -506,6 +509,71 @@ async function productionAdapterRuntimeReadiness() {
       credentialsExposed: false,
       boundary: "The runtime status is blocked. This response does not verify schemas, start workers, or authorize production cutover."
     });
+  }
+}
+
+function blockedShadowRelayControlPlane(error) {
+  const maximumAgeMinutes = Math.min(24 * 60, Math.max(
+    1,
+    Number(process.env.PLATFORM_SHADOW_RECONCILIATION_MAX_AGE_MINUTES) || 60
+  ));
+  const checks = Object.freeze({
+    chainValid: false,
+    relaySucceeded: false,
+    reconciliationMatched: false,
+    reconciliationCoversRelay: false,
+    durableCheckpointVerified: false,
+    faultRecoveryVerified: false,
+    reconciliationFresh: false
+  });
+  const domain = Object.freeze({
+    ok: false,
+    checks,
+    latestRelayReceiptDigest: "",
+    latestReconciliationReceiptDigest: "",
+    ageMinutes: null,
+    receipts: 0,
+    payloadsExposed: false,
+    productionReady: false
+  });
+  return Object.freeze({
+    schema: "shadow-relay-control-plane-v1",
+    ok: false,
+    generatedAt: new Date().toISOString(),
+    maximumAgeMinutes,
+    domains: Object.freeze({ referral: domain, emergency: domain }),
+    durableCheckpointVerified: false,
+    faultRecoveryVerified: false,
+    technicalEvidenceFingerprint: "",
+    receipts: 0,
+    chainValid: false,
+    error: Object.freeze({
+      code: String(error?.code || "SHADOW_RELAY_CONTROL_PLANE_UNAVAILABLE").slice(0, 120),
+      message: "shadow relay operations evidence is unavailable"
+    }),
+    payloadsExposed: false,
+    externalEvidenceVerified: false,
+    cutoverAuthorized: false,
+    productionPrimary: false,
+    productionReady: false,
+    boundary: "This status is closed and verifies no external delivery, site acceptance, disaster recovery, approval, or production cutover."
+  });
+}
+
+async function shadowRelayControlPlaneReadiness() {
+  let operations = null;
+  try {
+    operations = openSqliteShadowRelayOperations({
+      file: process.env.PLATFORM_SHADOW_OPERATIONS_FILE,
+      readOnly: true
+    });
+    return await operations.report({
+      maximumAgeMinutes: process.env.PLATFORM_SHADOW_RECONCILIATION_MAX_AGE_MINUTES
+    });
+  } catch (error) {
+    return blockedShadowRelayControlPlane(error);
+  } finally {
+    if (operations) await operations.close();
   }
 }
 let sessionCleanupTimer = null;
@@ -27682,6 +27750,7 @@ function createRuntimeCapabilitySource() {
   appendResearchAudit,
   appendSecurityEvent,
   productionAdapterRuntimeReadiness,
+  shadowRelayControlPlaneReadiness,
   applyAppointmentIntegrationReconciliationAction,
   applyCitizenLifecycleAction,
   applyCitizenOperationsAction,
@@ -28377,6 +28446,7 @@ module.exports = {
   productionSessionRetentionErrors,
   productionSessionStoreErrors,
   productionAdapterRuntimeReadiness,
+  shadowRelayControlPlaneReadiness,
   readDatabase,
   requireDigitalHospitalExecutionWorker,
   server,

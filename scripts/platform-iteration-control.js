@@ -16,10 +16,13 @@ const ARTIFACTS = Object.freeze({
   "iteration-2": [
     "src/platform/operations/shadow-outbox-relay.js",
     "src/platform/operations/sqlite-shadow-relay-checkpoint.js",
+    "src/platform/operations/sqlite-shadow-relay-operations.js",
     "src/platform/operations/domain-shadow-relay-runtime.js",
     "scripts/platform-shadow-relay.js",
     "deploy/platform-shadow-relay@.service.template",
-    "deploy/platform-shadow-relay@.timer.template"
+    "deploy/platform-shadow-relay@.timer.template",
+    "deploy/platform-shadow-reconcile@.service.template",
+    "deploy/platform-shadow-reconcile@.timer.template"
   ],
   "iteration-3": [
     "config/regional-integration-contracts.json",
