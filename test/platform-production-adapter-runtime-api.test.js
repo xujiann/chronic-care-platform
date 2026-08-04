@@ -98,11 +98,15 @@ test("production adapter runtime API is commission-only, read-only and payload-s
 
 test("server pilot cutover control plane fails closed without a package", async () => {
   const previousFile = process.env.PLATFORM_PILOT_CUTOVER_INPUT_FILE;
+  const previousLedger = process.env.PLATFORM_PILOT_CUTOVER_AUTHORIZATION_LEDGER_FILE;
   delete process.env.PLATFORM_PILOT_CUTOVER_INPUT_FILE;
+  delete process.env.PLATFORM_PILOT_CUTOVER_AUTHORIZATION_LEDGER_FILE;
   try {
     const report = await pilotCutoverControlPlaneReadiness();
-    assert.equal(report.schema, "pilot-cutover-decision-v1");
+    assert.equal(report.schema, "pilot-cutover-authorization-control-v1");
     assert.equal(report.decision, "NO-GO");
+    assert.equal(report.checks.authorizationLedger, false);
+    assert.equal(report.checks.externalEvidenceRegistry, false);
     assert.equal(report.cutoverExecutionAuthorized, false);
     assert.equal(report.productionPrimary, false);
     assert.equal(report.productionReady, false);
@@ -110,6 +114,8 @@ test("server pilot cutover control plane fails closed without a package", async 
   } finally {
     if (previousFile === undefined) delete process.env.PLATFORM_PILOT_CUTOVER_INPUT_FILE;
     else process.env.PLATFORM_PILOT_CUTOVER_INPUT_FILE = previousFile;
+    if (previousLedger === undefined) delete process.env.PLATFORM_PILOT_CUTOVER_AUTHORIZATION_LEDGER_FILE;
+    else process.env.PLATFORM_PILOT_CUTOVER_AUTHORIZATION_LEDGER_FILE = previousLedger;
   }
 });
 
