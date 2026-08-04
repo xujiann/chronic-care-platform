@@ -1,0 +1,23 @@
+[Unit]
+Description=Health Platform pilot cutover metadata alert worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=health-platform-alert
+Group=health-platform-alert
+EnvironmentFile=/etc/health-platform/platform-production-adapters.env
+ExecStart=/usr/bin/node /opt/health-platform/scripts/platform-cutover-alert-worker.js run-once
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/health-platform/alerts
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=true
+MemoryDenyWriteExecute=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

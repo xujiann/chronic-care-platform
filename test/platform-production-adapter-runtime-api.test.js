@@ -53,6 +53,33 @@ test("production adapter runtime API is commission-only, read-only and payload-s
       cutoverExecutionAuthorized: false,
       productionReady: false
     }),
+    pilotCutoverAlertControlReadiness: async () => ({
+      schema: "pilot-cutover-alert-control-status-v1",
+      status: "blocked",
+      summary: { total: 1, open: 1, critical: 1, deadLetter: 0, recovered: 0 },
+      failClosed: true,
+      cutoverExecutionAuthorized: false,
+      productionReady: false
+    }),
+    executePilotCutoverAlertCommand: async (command) => ({
+      schema: "pilot-cutover-alert-command-result-v1",
+      action: command.action,
+      event: {
+        eventId: "event-1",
+        sequence: 2,
+        type: "alert-acknowledged",
+        alertFingerprint: command.alertFingerprint,
+        recordedAt: "2026-08-05T08:00:00.000Z",
+        actorAccount: command.actorAccount,
+        eventDigest: `sha256:${"a".repeat(64)}`
+      },
+      cutoverExecutionAuthorized: false,
+      productionReady: false
+    }),
+    collectJson: async () => ({
+      evidenceRef: "ticket://alerts/acknowledgement",
+      evidenceDigest: `sha256:${"b".repeat(64)}`
+    }),
     requireApiRole: () => ({ name: "commission-user", role: "commission" }),
     sendJson: (_res, status, payload) => { response = { status, payload }; }
   };
@@ -113,6 +140,29 @@ test("production adapter runtime API is commission-only, read-only and payload-s
   assert.equal(response.payload.schema, "pilot-cutover-control-health-v1");
   assert.equal(response.payload.status, "blocked");
   assert.equal(events[4].action, "pilot-cutover-control-health-read");
+
+  const alertHandled = await segment.handle(
+    { method: "GET" },
+    {},
+    new URL("http://localhost/api/production-adapters/pilot-cutover/alerts")
+  );
+  assert.equal(alertHandled, true);
+  assert.equal(response.status, 200);
+  assert.equal(response.payload.schema, "pilot-cutover-alert-control-status-v1");
+  assert.equal(response.payload.productionReady, false);
+  assert.equal(events[5].action, "pilot-cutover-alert-control-read");
+
+  const commandHandled = await segment.handle(
+    { method: "POST" },
+    {},
+    new URL("http://localhost/api/production-adapters/pilot-cutover/alerts/ledger-chain-invalid%3Aabc/acknowledge")
+  );
+  assert.equal(commandHandled, true);
+  assert.equal(response.status, 200);
+  assert.equal(response.payload.action, "acknowledge");
+  assert.equal(response.payload.event.actorAccount, "commission-user");
+  assert.equal(response.payload.cutoverExecutionAuthorized, false);
+  assert.equal(events[6].action, "pilot-cutover-alert-acknowledge");
 });
 
 test("server pilot cutover health fails closed without controlled evidence", async () => {

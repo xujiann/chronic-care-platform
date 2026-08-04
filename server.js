@@ -35,6 +35,10 @@ const {
 const {
   evaluatePilotCutoverTrustProvider
 } = require("./src/identity-security/pilot-cutover-trust-provider");
+const {
+  applyPilotCutoverAlertCommand,
+  buildPilotCutoverAlertControlStatus
+} = require("./src/platform/cutover/pilot-cutover-alert-runtime");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
 const { MemorySessionStore, PostgresSessionStore, SqliteSessionStore, createSqliteSessionSchema } = require("./session-store");
 const {
@@ -749,6 +753,17 @@ async function pilotCutoverControlHealthReadiness() {
       })
     });
   }
+}
+
+async function pilotCutoverAlertControlReadiness() {
+  return buildPilotCutoverAlertControlStatus({ env: process.env });
+}
+
+async function executePilotCutoverAlertCommand(options = {}) {
+  return applyPilotCutoverAlertCommand({
+    ...options,
+    env: process.env
+  });
 }
 let sessionCleanupTimer = null;
 let sessionCleanupState = {
@@ -27926,6 +27941,8 @@ function createRuntimeCapabilitySource() {
   productionAdapterRuntimeReadiness,
   shadowRelayControlPlaneReadiness,
   operationalControlPlaneReadiness,
+  executePilotCutoverAlertCommand,
+  pilotCutoverAlertControlReadiness,
   pilotCutoverControlPlaneReadiness,
   pilotCutoverControlHealthReadiness,
   applyAppointmentIntegrationReconciliationAction,
@@ -28625,6 +28642,8 @@ module.exports = {
   productionAdapterRuntimeReadiness,
   shadowRelayControlPlaneReadiness,
   operationalControlPlaneReadiness,
+  executePilotCutoverAlertCommand,
+  pilotCutoverAlertControlReadiness,
   pilotCutoverControlPlaneReadiness,
   pilotCutoverControlHealthReadiness,
   readDatabase,

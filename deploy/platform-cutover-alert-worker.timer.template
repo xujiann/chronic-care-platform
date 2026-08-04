@@ -1,0 +1,12 @@
+[Unit]
+Description=Run pilot cutover metadata alert worker
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=10s
+Persistent=true
+Unit=platform-cutover-alert-worker.service
+
+[Install]
+WantedBy=timers.target
