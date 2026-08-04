@@ -4,7 +4,7 @@ const ROUTE_SEGMENT_ID = "platform-governance-06";
 const SUBDOMAIN = "production-operations";
 
 function createRouteSegment(runtime) {
-  const { appendSecurityEvent, buildProductionReleaseEvidencePublicSummary, buildProductionSecurityAcceptanceCenter, buildRuntimeProductionGoNoGoCenter, collectJson, normalizeProductionGoNoGoApprovalAction, normalizeProductionGoNoGoDecision, normalizeProductionSecurityFindingAction, normalizeProductionSecurityReleaseApprovalAction, normalizeState, operationalControlPlaneReadiness, pilotCutoverControlHealthReadiness, pilotCutoverControlPlaneReadiness, productionAdapterRuntimeReadiness, randomUUID, readDatabase, requireApiRole, sendJson, shadowRelayControlPlaneReadiness, writeDatabase } = runtime;
+  const { appendSecurityEvent, buildProductionReleaseEvidencePublicSummary, buildProductionSecurityAcceptanceCenter, buildRuntimeProductionGoNoGoCenter, collectJson, executePilotCutoverAlertCommand, normalizeProductionGoNoGoApprovalAction, normalizeProductionGoNoGoDecision, normalizeProductionSecurityFindingAction, normalizeProductionSecurityReleaseApprovalAction, normalizeState, operationalControlPlaneReadiness, pilotCutoverAlertControlReadiness, pilotCutoverControlHealthReadiness, pilotCutoverControlPlaneReadiness, productionAdapterRuntimeReadiness, randomUUID, readDatabase, requireApiRole, sendJson, shadowRelayControlPlaneReadiness, writeDatabase } = runtime;
   return {
       id: "platform-governance-06",
       domain: "platform-governance",
@@ -86,6 +86,75 @@ function createRouteSegment(runtime) {
           detail: `${report.status || "blocked"}; alerts=${Number(report.alerts?.length) || 0}; execution=false`
         });
         sendJson(res, 200, report);
+        return true;
+      }
+
+    if (req.method === "GET" && url.pathname === "/api/production-adapters/pilot-cutover/alerts") {
+        const user = requireApiRole(req, res, ["commission"], url.pathname);
+        if (!user) return true;
+        const report = await pilotCutoverAlertControlReadiness();
+        appendSecurityEvent({
+          actor: user.name,
+          role: user.role,
+          action: "pilot-cutover-alert-control-read",
+          target: url.pathname,
+          result: "allowed",
+          detail: `${report.status || "blocked"}; open=${Number(report.summary?.open) || 0}; deadLetter=${Number(report.summary?.deadLetter) || 0}; execution=false`
+        });
+        sendJson(res, 200, report);
+        return true;
+      }
+
+    const pilotCutoverAlertActionMatch = url.pathname.match(
+      /^\/api\/production-adapters\/pilot-cutover\/alerts\/([^/]+)\/(acknowledge|escalate|recover|redrive)$/
+    );
+    if (req.method === "POST" && pilotCutoverAlertActionMatch) {
+        const user = requireApiRole(
+          req,
+          res,
+          ["commission"],
+          "/api/production-adapters/pilot-cutover/alerts/:fingerprint/:action"
+        );
+        if (!user) return true;
+        const payload = await collectJson(req);
+        const alertFingerprint = decodeURIComponent(pilotCutoverAlertActionMatch[1]);
+        const action = pilotCutoverAlertActionMatch[2];
+        try {
+          const result = await executePilotCutoverAlertCommand({
+            action,
+            alertFingerprint,
+            actorAccount: user.name,
+            evidenceRef: payload.evidenceRef,
+            evidenceDigest: payload.evidenceDigest,
+            level: payload.level,
+            ownerGroup: payload.ownerGroup
+          });
+          appendSecurityEvent({
+            actor: user.name,
+            role: user.role,
+            action: `pilot-cutover-alert-${action}`,
+            target: alertFingerprint,
+            result: "allowed",
+            detail: `sequence=${result.event.sequence}; execution=false`
+          });
+          sendJson(res, 200, result);
+        } catch (error) {
+          appendSecurityEvent({
+            actor: user.name,
+            role: user.role,
+            action: `pilot-cutover-alert-${action}`,
+            target: alertFingerprint,
+            result: "denied",
+            detail: String(error?.code || "PILOT_CUTOVER_ALERT_COMMAND_FAILED").slice(0, 120)
+          });
+          sendJson(res, Number(error?.statusCode) || 409, {
+            error: "Conflict",
+            code: String(error?.code || "PILOT_CUTOVER_ALERT_COMMAND_FAILED").slice(0, 120),
+            message: "pilot cutover alert command was rejected",
+            cutoverExecutionAuthorized: false,
+            productionReady: false
+          });
+        }
         return true;
       }
 

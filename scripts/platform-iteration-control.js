@@ -32,10 +32,15 @@ const ARTIFACTS = Object.freeze({
   ],
   "iteration-4": [
     "src/platform/cutover/pilot-cutover-alert-lifecycle.js",
+    "src/platform/cutover/pilot-cutover-alert-runtime.js",
     "src/platform/cutover/pilot-cutover-monitoring-acceptance.js",
+    "scripts/platform-cutover-alert-worker.js",
+    "deploy/platform-cutover-alert-worker.service.template",
+    "deploy/platform-cutover-alert-worker.timer.template",
     "deploy/pilot-cutover-monitoring.env.template",
     "docs/evidence-templates/pilot-cutover-monitoring-acceptance-v1.json",
     "test/pilot-cutover-alert-lifecycle.test.js",
+    "test/pilot-cutover-alert-runtime.test.js",
     "test/pilot-cutover-monitoring-acceptance.test.js"
   ],
   "iteration-5": [
