@@ -2,7 +2,7 @@
   "schemaVersion": "platform-iteration-program-v1",
   "programId": "production-adapter-composition-20260804",
   "integrationBranch": "main",
-  "baselineTag": "baseline/governance-20260804-production-adapters-v1",
+  "baselineTag": "baseline/governance-20260804-platform-iterations-v1",
   "policy": {
     "integrationOwner": "T00",
     "orderedExecution": true,
