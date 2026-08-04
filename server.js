@@ -29,6 +29,12 @@ const {
 const {
   evaluatePilotCutoverControlHealth
 } = require("./src/platform/cutover/pilot-cutover-observability");
+const {
+  createPilotCutoverTrustVerifier
+} = require("./src/platform/cutover/pilot-cutover-trust-verifier");
+const {
+  evaluatePilotCutoverTrustProvider
+} = require("./src/identity-security/pilot-cutover-trust-provider");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
 const { MemorySessionStore, PostgresSessionStore, SqliteSessionStore, createSqliteSessionSchema } = require("./session-store");
 const {
@@ -623,6 +629,33 @@ async function operationalControlPlaneReadiness() {
   }
 }
 
+function configuredPilotCutoverTrustProvider() {
+  const snapshotFile = String(
+    process.env.PLATFORM_PILOT_CUTOVER_TRUST_PROVIDER_SNAPSHOT_FILE || ""
+  ).trim();
+  const trustAnchorsFile = String(
+    process.env.PLATFORM_PILOT_CUTOVER_TRUST_PROVIDER_ANCHORS_FILE || ""
+  ).trim();
+  if (!snapshotFile && !trustAnchorsFile) return null;
+  const provider = evaluatePilotCutoverTrustProvider({
+    snapshotFile,
+    trustAnchorsFile,
+    maximumSnapshotAgeMinutes:
+      process.env.PLATFORM_PILOT_CUTOVER_TRUST_PROVIDER_MAX_AGE_MINUTES,
+    expiryWarningHours:
+      process.env.PLATFORM_PILOT_CUTOVER_TRUST_KEY_EXPIRY_WARNING_HOURS
+  });
+  if (provider.health?.status === "blocked" || !provider.registry?.keys?.length) {
+    throw Object.assign(new Error(
+      provider.health?.message || "pilot cutover trust provider is blocked"
+    ), {
+      code: provider.health?.code || "PILOT_CUTOVER_TRUST_PROVIDER_BLOCKED",
+      providerHealth: provider.health
+    });
+  }
+  return provider;
+}
+
 function blockedPilotCutoverControlPlane(error) {
   return Object.freeze({
     schema: "pilot-cutover-authorization-control-v1",
@@ -657,25 +690,65 @@ function blockedPilotCutoverControlPlane(error) {
 
 async function pilotCutoverControlPlaneReadiness() {
   try {
-    return evaluatePilotCutoverAuthorizationLedger({
+    const provider = configuredPilotCutoverTrustProvider();
+    const report = evaluatePilotCutoverAuthorizationLedger({
       packageFile: process.env.PLATFORM_PILOT_CUTOVER_INPUT_FILE,
       ledgerFile: process.env.PLATFORM_PILOT_CUTOVER_AUTHORIZATION_LEDGER_FILE,
-      trustRegistryFile: process.env.PLATFORM_PILOT_CUTOVER_TRUST_REGISTRY_FILE,
+      trustVerifier: provider
+        ? createPilotCutoverTrustVerifier({ registry: provider.registry })
+        : undefined,
+      trustRegistryFile: provider
+        ? undefined
+        : process.env.PLATFORM_PILOT_CUTOVER_TRUST_REGISTRY_FILE,
       rehearsalMaximumAgeHours: process.env.PLATFORM_PILOT_CUTOVER_REHEARSAL_MAX_AGE_HOURS
     });
+    return provider
+      ? Object.freeze({ ...report, trustProvider: provider.health })
+      : report;
   } catch (error) {
-    return blockedPilotCutoverControlPlane(error);
+    const report = blockedPilotCutoverControlPlane(error);
+    return error.providerHealth
+      ? Object.freeze({ ...report, trustProvider: error.providerHealth })
+      : report;
   }
 }
 
 async function pilotCutoverControlHealthReadiness() {
-  return evaluatePilotCutoverControlHealth({
-    packageFile: process.env.PLATFORM_PILOT_CUTOVER_INPUT_FILE,
-    ledgerFile: process.env.PLATFORM_PILOT_CUTOVER_AUTHORIZATION_LEDGER_FILE,
-    trustRegistryFile: process.env.PLATFORM_PILOT_CUTOVER_TRUST_REGISTRY_FILE,
-    rehearsalMaximumAgeHours: process.env.PLATFORM_PILOT_CUTOVER_REHEARSAL_MAX_AGE_HOURS,
-    warningHours: process.env.PLATFORM_PILOT_CUTOVER_EVIDENCE_WARNING_HOURS
-  });
+  try {
+    const provider = configuredPilotCutoverTrustProvider();
+    const report = evaluatePilotCutoverControlHealth({
+      packageFile: process.env.PLATFORM_PILOT_CUTOVER_INPUT_FILE,
+      ledgerFile: process.env.PLATFORM_PILOT_CUTOVER_AUTHORIZATION_LEDGER_FILE,
+      trustVerifier: provider
+        ? createPilotCutoverTrustVerifier({ registry: provider.registry })
+        : undefined,
+      trustRegistryFile: provider
+        ? undefined
+        : process.env.PLATFORM_PILOT_CUTOVER_TRUST_REGISTRY_FILE,
+      rehearsalMaximumAgeHours: process.env.PLATFORM_PILOT_CUTOVER_REHEARSAL_MAX_AGE_HOURS,
+      warningHours: process.env.PLATFORM_PILOT_CUTOVER_EVIDENCE_WARNING_HOURS
+    });
+    return provider
+      ? Object.freeze({ ...report, trustProvider: provider.health })
+      : report;
+  } catch (error) {
+    const report = evaluatePilotCutoverControlHealth({
+      control: null,
+      packageFile: "",
+      ledgerFile: "",
+      trustRegistryFile: ""
+    });
+    return Object.freeze({
+      ...report,
+      trustProvider: error.providerHealth || Object.freeze({
+        schema: "pilot-cutover-trust-provider-health-v1",
+        status: "blocked",
+        code: String(error.code || "PILOT_CUTOVER_TRUST_PROVIDER_BLOCKED"),
+        productionReady: false,
+        cutoverExecutionAuthorized: false
+      })
+    });
+  }
 }
 let sessionCleanupTimer = null;
 let sessionCleanupState = {

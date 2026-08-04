@@ -1,0 +1,92 @@
+{
+  "schemaVersion": "external-joint-test-campaign-registry-v1",
+  "campaignId": "regional-preproduction-joint-test-20260804",
+  "environment": "pre-production",
+  "maximumEvidenceAgeHours": 168,
+  "interfaces": [
+    {
+      "id": "his-referral-v1",
+      "system": "HIS",
+      "contractRef": "cmdb://integration-contracts/his-referral-v1",
+      "externalParty": "pilot-hospital-his",
+      "operations": ["submit-referral", "query-acceptance", "cancel-referral"]
+    },
+    {
+      "id": "emr-clinical-summary-v1",
+      "system": "EMR",
+      "contractRef": "cmdb://integration-contracts/emr-clinical-summary-v1",
+      "externalParty": "pilot-hospital-emr",
+      "operations": ["publish-document-reference", "query-clinical-summary"]
+    },
+    {
+      "id": "lis-result-v1",
+      "system": "LIS",
+      "contractRef": "cmdb://integration-contracts/lis-result-v1",
+      "externalParty": "pilot-hospital-lis",
+      "operations": ["receive-observation-result", "acknowledge-result"]
+    },
+    {
+      "id": "pacs-imaging-v1",
+      "system": "PACS",
+      "contractRef": "cmdb://integration-contracts/pacs-imaging-v1",
+      "externalParty": "pilot-hospital-pacs",
+      "operations": ["query-study", "publish-report-reference"]
+    },
+    {
+      "id": "oidc-federation-v1",
+      "system": "OIDC",
+      "contractRef": "cmdb://integration-contracts/oidc-federation-v1",
+      "externalParty": "regional-identity-provider",
+      "operations": ["authorize", "exchange-code", "revoke-session"]
+    },
+    {
+      "id": "sms-notification-v1",
+      "system": "SMS",
+      "contractRef": "cmdb://integration-contracts/sms-notification-v1",
+      "externalParty": "regional-message-provider",
+      "operations": ["send-message", "receive-delivery-report"]
+    },
+    {
+      "id": "insurance-settlement-v1",
+      "system": "INSURANCE",
+      "contractRef": "cmdb://integration-contracts/insurance-settlement-v1",
+      "externalParty": "regional-insurance-platform",
+      "operations": ["pre-settle", "settle", "reverse-settlement"]
+    },
+    {
+      "id": "payment-refund-v1",
+      "system": "PAYMENT",
+      "contractRef": "cmdb://integration-contracts/payment-refund-v1",
+      "externalParty": "payment-clearing-provider",
+      "operations": ["charge", "query-transaction", "refund"]
+    },
+    {
+      "id": "digital-certificate-v1",
+      "system": "CERTIFICATE",
+      "contractRef": "cmdb://integration-contracts/digital-certificate-v1",
+      "externalParty": "regional-certificate-platform",
+      "operations": ["issue-reference", "query-status", "revoke-reference"]
+    },
+    {
+      "id": "public-health-direct-report-v1",
+      "system": "PUBLIC_HEALTH",
+      "contractRef": "cmdb://integration-contracts/public-health-direct-report-v1",
+      "externalParty": "regional-public-health-platform",
+      "operations": ["submit-minimized-report", "receive-disposition", "reconcile-report"]
+    },
+    {
+      "id": "siem-security-event-v1",
+      "system": "SIEM",
+      "contractRef": "cmdb://integration-contracts/siem-security-event-v1",
+      "externalParty": "regional-security-operations-center",
+      "operations": ["publish-security-event", "receive-alert-acknowledgement"]
+    },
+    {
+      "id": "duty-alert-ticket-v1",
+      "system": "DUTY_TICKETING",
+      "contractRef": "cmdb://integration-contracts/duty-alert-ticket-v1",
+      "externalParty": "regional-operations-center",
+      "operations": ["create-incident", "escalate-incident", "close-incident"]
+    }
+  ]
+}

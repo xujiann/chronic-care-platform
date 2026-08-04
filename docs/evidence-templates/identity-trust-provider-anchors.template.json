@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "pilot-cutover-provider-trust-anchors-v1",
+  "generatedAt": "<ISO-8601-timestamp>",
+  "providers": [
+    {
+      "providerId": "<controlled-provider-id>",
+      "keyId": "<provider-root-key-id>",
+      "algorithm": "Ed25519",
+      "status": "active",
+      "validFrom": "<ISO-8601-timestamp>",
+      "validUntil": "<ISO-8601-timestamp>",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\n<provider-root-public-key>\n-----END PUBLIC KEY-----\n"
+    }
+  ],
+  "boundary": "Pinned provider public roots only. Never store private keys, credentials, tokens or patient data."
+}

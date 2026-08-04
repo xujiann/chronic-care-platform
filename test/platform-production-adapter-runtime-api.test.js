@@ -162,6 +162,38 @@ test("server pilot cutover control plane fails closed without a package", async 
   }
 });
 
+test("configured remote trust provider never falls back to a static registry", async () => {
+  const names = [
+    "PLATFORM_PILOT_CUTOVER_TRUST_PROVIDER_SNAPSHOT_FILE",
+    "PLATFORM_PILOT_CUTOVER_TRUST_PROVIDER_ANCHORS_FILE",
+    "PLATFORM_PILOT_CUTOVER_TRUST_REGISTRY_FILE"
+  ];
+  const previous = Object.fromEntries(names.map((name) => [name, process.env[name]]));
+  process.env.PLATFORM_PILOT_CUTOVER_TRUST_PROVIDER_SNAPSHOT_FILE =
+    "C:\\controlled\\missing-provider-snapshot.json";
+  process.env.PLATFORM_PILOT_CUTOVER_TRUST_PROVIDER_ANCHORS_FILE =
+    "C:\\controlled\\missing-provider-anchors.json";
+  process.env.PLATFORM_PILOT_CUTOVER_TRUST_REGISTRY_FILE =
+    "C:\\controlled\\must-not-be-used-as-fallback.json";
+  try {
+    const [control, health] = await Promise.all([
+      pilotCutoverControlPlaneReadiness(),
+      pilotCutoverControlHealthReadiness()
+    ]);
+    assert.equal(control.decision, "NO-GO");
+    assert.equal(control.trustProvider.status, "blocked");
+    assert.equal(control.cutoverExecutionAuthorized, false);
+    assert.equal(health.status, "blocked");
+    assert.equal(health.trustProvider.status, "blocked");
+    assert.equal(health.cutoverExecutionAuthorized, false);
+  } finally {
+    names.forEach((name) => {
+      if (previous[name] === undefined) delete process.env[name];
+      else process.env[name] = previous[name];
+    });
+  }
+});
+
 test("server operational control plane fails closed without an input file", async () => {
   const previousFile = process.env.PLATFORM_OPERATIONAL_CONTROL_INPUT_FILE;
   delete process.env.PLATFORM_OPERATIONAL_CONTROL_INPUT_FILE;

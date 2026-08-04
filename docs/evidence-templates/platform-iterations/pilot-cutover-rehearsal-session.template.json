@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "pilot-cutover-rehearsal-session-v1",
+  "sessionId": "<rehearsal-id>",
+  "environment": "pre-production",
+  "releaseId": "<release-id>",
+  "packageFingerprint": "sha256:<64-lowercase-hex>",
+  "coordinatorAccount": "<release-commander-account>",
+  "openedAt": "<ISO-8601>",
+  "closedAt": "<ISO-8601>",
+  "maximumRollbackMinutes": 30,
+  "seats": [
+    { "id": "release-commander", "account": "<unique-account>", "evidenceRef": "evidence://<ref>", "evidenceDigest": "sha256:<64-lowercase-hex>", "confirmedAt": "<ISO-8601>" },
+    { "id": "business-owner", "account": "<unique-account>", "evidenceRef": "evidence://<ref>", "evidenceDigest": "sha256:<64-lowercase-hex>", "confirmedAt": "<ISO-8601>" },
+    { "id": "platform-operations", "account": "<unique-account>", "evidenceRef": "evidence://<ref>", "evidenceDigest": "sha256:<64-lowercase-hex>", "confirmedAt": "<ISO-8601>" },
+    { "id": "security-compliance", "account": "<unique-account>", "evidenceRef": "evidence://<ref>", "evidenceDigest": "sha256:<64-lowercase-hex>", "confirmedAt": "<ISO-8601>" },
+    { "id": "data-platform", "account": "<unique-account>", "evidenceRef": "evidence://<ref>", "evidenceDigest": "sha256:<64-lowercase-hex>", "confirmedAt": "<ISO-8601>" },
+    { "id": "institution-coordinator", "account": "<unique-account>", "evidenceRef": "evidence://<ref>", "evidenceDigest": "sha256:<64-lowercase-hex>", "confirmedAt": "<ISO-8601>" },
+    { "id": "independent-observer", "account": "<unique-account>", "evidenceRef": "evidence://<ref>", "evidenceDigest": "sha256:<64-lowercase-hex>", "confirmedAt": "<ISO-8601>" }
+  ],
+  "checkpoints": [
+    { "id": "freeze-writes", "passed": true, "evidenceRef": "evidence://<ref>", "evidenceDigest": "sha256:<64-lowercase-hex>", "completedAt": "<ISO-8601>" },
+    { "id": "snapshot", "passed": true, "evidenceRef": "evidence://<ref>", "evidenceDigest": "sha256:<64-lowercase-hex>", "completedAt": "<ISO-8601>" },
+    { "id": "switch-read", "passed": true, "evidenceRef": "evidence://<ref>", "evidenceDigest": "sha256:<64-lowercase-hex>", "completedAt": "<ISO-8601>" },
+    { "id": "verify-business-loop", "passed": true, "evidenceRef": "evidence://<ref>", "evidenceDigest": "sha256:<64-lowercase-hex>", "completedAt": "<ISO-8601>" },
+    { "id": "rollback", "passed": true, "evidenceRef": "evidence://<ref>", "evidenceDigest": "sha256:<64-lowercase-hex>", "completedAt": "<ISO-8601>" },
+    { "id": "post-rollback-verify", "passed": true, "evidenceRef": "evidence://<ref>", "evidenceDigest": "sha256:<64-lowercase-hex>", "completedAt": "<ISO-8601>" }
+  ],
+  "observations": [
+    { "id": "business-success-and-error-rate", "passed": true, "evidenceRef": "evidence://<ref>", "evidenceDigest": "sha256:<64-lowercase-hex>", "observedAt": "<ISO-8601>" },
+    { "id": "outbox-lag-and-reconciliation", "passed": true, "evidenceRef": "evidence://<ref>", "evidenceDigest": "sha256:<64-lowercase-hex>", "observedAt": "<ISO-8601>" },
+    { "id": "data-consistency-and-late-arrivals", "passed": true, "evidenceRef": "evidence://<ref>", "evidenceDigest": "sha256:<64-lowercase-hex>", "observedAt": "<ISO-8601>" },
+    { "id": "security-alerts-and-access-anomalies", "passed": true, "evidenceRef": "evidence://<ref>", "evidenceDigest": "sha256:<64-lowercase-hex>", "observedAt": "<ISO-8601>" },
+    { "id": "institution-feedback-and-support-cases", "passed": true, "evidenceRef": "evidence://<ref>", "evidenceDigest": "sha256:<64-lowercase-hex>", "observedAt": "<ISO-8601>" },
+    { "id": "evidence-ledger-expiry-revocation-and-chain", "passed": true, "evidenceRef": "evidence://<ref>", "evidenceDigest": "sha256:<64-lowercase-hex>", "observedAt": "<ISO-8601>" }
+  ],
+  "rollbackCommand": {
+    "phrase": "ROLLBACK PILOT <release-id>",
+    "issuedBy": "<release-commander-account>",
+    "acknowledgedBy": "<platform-operations-account>",
+    "witnessedBy": "<independent-observer-account>",
+    "issuedAt": "<ISO-8601>",
+    "acknowledgedAt": "<ISO-8601>",
+    "actualRollbackMinutes": "<measured-number>"
+  }
+}

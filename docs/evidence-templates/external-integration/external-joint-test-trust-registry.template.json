@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "external-joint-test-trust-registry-v1",
+  "generatedAt": "<ISO-8601>",
+  "keys": [
+    {
+      "keyId": "<platform-key-id>",
+      "account": "<platform-owner-account>",
+      "party": "platform",
+      "algorithm": "Ed25519",
+      "status": "active",
+      "allowedInterfaceIds": ["his-referral-v1"],
+      "validFrom": "<ISO-8601>",
+      "validUntil": "<ISO-8601>",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\n<platform-public-key-only>\n-----END PUBLIC KEY-----"
+    },
+    {
+      "keyId": "<external-key-id>",
+      "account": "<external-owner-account>",
+      "party": "external",
+      "algorithm": "Ed25519",
+      "status": "active",
+      "allowedInterfaceIds": ["his-referral-v1"],
+      "validFrom": "<ISO-8601>",
+      "validUntil": "<ISO-8601>",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\n<external-public-key-only>\n-----END PUBLIC KEY-----"
+    }
+  ]
+}

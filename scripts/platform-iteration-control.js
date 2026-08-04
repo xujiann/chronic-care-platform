@@ -11,55 +11,44 @@ const ROOT = path.resolve(__dirname, "..");
 const PROGRAM_FILE = path.join(ROOT, "config", "platform-iteration-program.json");
 const ARTIFACTS = Object.freeze({
   "iteration-1": [
-    "src/platform/composition/production-adapter-runtime.js",
-    "scripts/production-adapter-runtime.js",
-    "deploy/platform-production-adapters.env.template"
+    "src/identity-security/pilot-cutover-trust-provider.js",
+    "deploy/identity-trust-provider.env.template",
+    "docs/evidence-templates/identity-trust-provider-anchors.template.json",
+    "docs/evidence-templates/identity-trust-provider-snapshot.template.json",
+    "test/pilot-cutover-trust-provider.test.js"
   ],
   "iteration-2": [
-    "src/platform/operations/shadow-outbox-relay.js",
-    "src/platform/operations/sqlite-shadow-relay-checkpoint.js",
-    "src/platform/operations/sqlite-shadow-relay-operations.js",
-    "src/platform/operations/domain-shadow-relay-runtime.js",
-    "scripts/platform-shadow-relay.js",
-    "deploy/platform-shadow-relay@.service.template",
-    "deploy/platform-shadow-relay@.timer.template",
-    "deploy/platform-shadow-reconcile@.service.template",
-    "deploy/platform-shadow-reconcile@.timer.template"
+    "src/platform/cutover/preproduction-environment-readiness.js",
+    "docs/evidence-templates/platform-iterations/preproduction-environment-evidence.template.json",
+    "test/preproduction-six-iteration-control.test.js"
   ],
   "iteration-3": [
-    "config/regional-integration-contracts.json",
-    "src/platform/integration/regional-joint-test.js",
-    "scripts/regional-joint-test.js"
+    "config/external-joint-test-campaign.json",
+    "src/platform/integration/external-joint-test-campaign.js",
+    "src/http/routes/integration/external-joint-test.js",
+    "docs/evidence-templates/external-integration/external-joint-test-evidence-bundle.template.json",
+    "docs/evidence-templates/external-integration/external-joint-test-trust-registry.template.json",
+    "test/external-joint-test-campaign.test.js"
   ],
   "iteration-4": [
-    "src/platform/orchestration/regional-business-loop.js"
+    "src/platform/cutover/pilot-cutover-alert-lifecycle.js",
+    "src/platform/cutover/pilot-cutover-monitoring-acceptance.js",
+    "deploy/pilot-cutover-monitoring.env.template",
+    "docs/evidence-templates/pilot-cutover-monitoring-acceptance-v1.json",
+    "test/pilot-cutover-alert-lifecycle.test.js",
+    "test/pilot-cutover-monitoring-acceptance.test.js"
   ],
   "iteration-5": [
-    "config/platform-operational-controls.json",
-    "src/platform/governance/technical-evidence.js",
-    "src/platform/governance/operational-control-plane.js",
-    "src/platform/governance/operational-control-runtime.js",
-    "scripts/platform-operational-control.js",
-    "docs/evidence-templates/platform-iterations/operational-control-input.template.json"
+    "src/platform/cutover/pilot-cutover-rehearsal-session.js",
+    "docs/evidence-templates/platform-iterations/pilot-cutover-rehearsal-session.template.json",
+    "test/preproduction-six-iteration-control.test.js"
   ],
   "iteration-6": [
-    "src/platform/cutover/pilot-cutover-orchestrator.js",
-    "src/platform/cutover/pilot-cutover-package.js",
-    "src/platform/cutover/pilot-cutover-authorization-ledger.js",
-    "src/platform/cutover/pilot-cutover-trust-verifier.js",
-    "src/platform/cutover/pilot-cutover-rehearsal.js",
-    "src/platform/cutover/pilot-cutover-observability.js",
-    "src/platform/cutover/pilot-cutover-command-plan.js",
-    "scripts/platform-cutover-package.js",
-    "scripts/platform-cutover-authorization.js",
-    "docs/evidence-templates/platform-iterations/pilot-cutover.template.json",
-    "docs/evidence-templates/platform-iterations/pilot-cutover-package-manifest.template.json",
-    "docs/evidence-templates/platform-iterations/pilot-cutover-register-evidence.template.json",
-    "docs/evidence-templates/platform-iterations/pilot-cutover-record-approval.template.json",
-    "docs/evidence-templates/platform-iterations/pilot-cutover-revoke.template.json",
-    "docs/evidence-templates/platform-iterations/pilot-cutover-trust-registry.template.json",
-    "docs/evidence-templates/platform-iterations/pilot-cutover-record-rehearsal.template.json",
-    "docs/试点切换预生产演练与现场指挥手册-2026-08-04.md"
+    "src/platform/cutover/pilot-cutover-candidate-review.js",
+    "scripts/platform-preproduction-control.js",
+    "deploy/platform-production-adapters.env.template",
+    "docs/预生产六迭代交付与验收手册-2026-08-04.md",
+    "test/platform-preproduction-control-cli.test.js"
   ]
 });
 

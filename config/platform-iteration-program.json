@@ -1,6 +1,6 @@
 {
   "schemaVersion": "platform-iteration-program-v1",
-  "programId": "production-adapter-composition-20260804",
+  "programId": "preproduction-six-iteration-control-20260804",
   "integrationBranch": "main",
   "baselineTag": "baseline/governance-20260804-rehearsal-trust-observability-v1",
   "policy": {
@@ -14,72 +14,76 @@
   "iterations": [
     {
       "id": "iteration-1",
-      "name": "统一装配与迁移演练",
+      "name": "可信身份与远程签名",
       "deliverables": [
-        "统一开发规则",
-        "生产适配器组合根",
-        "运行时与工作进程入口",
-        "数据库迁移只读校验"
+        "远程信任提供方快照",
+        "固定根签名与身份职责范围绑定",
+        "密钥轮换冻结吊销退役过期",
+        "失败关闭健康检查"
       ],
-      "requiredLocalGates": ["rules", "composition", "schema-rehearsal"],
-      "requiredExternalGates": []
+      "requiredLocalGates": ["provider-attestation", "identity-scope-binding", "key-lifecycle", "fail-closed-health"],
+      "requiredExternalGates": ["real-kms-hsm-provider-snapshot"]
     },
     {
       "id": "iteration-2",
-      "name": "影子转发与一致性恢复",
+      "name": "预生产环境与恢复验收",
       "deliverables": [
-        "本地事务发件箱到PostgreSQL的幂等影子转发",
-        "摘要级对账",
-        "故障注入与恢复游标"
+        "五类基础组件独立复核",
+        "四类故障恢复场景",
+        "RPO与RTO目标校验",
+        "发布包和环境绑定"
       ],
-      "requiredLocalGates": ["shadow-relay", "digest-reconciliation", "fault-recovery"],
-      "requiredExternalGates": []
+      "requiredLocalGates": ["preproduction-components", "recovery-scenarios", "rpo-rto", "release-binding"],
+      "requiredExternalGates": ["controlled-preproduction-evidence"]
     },
     {
       "id": "iteration-3",
-      "name": "真实集成准备",
+      "name": "外部双签名联调战役",
       "deliverables": [
-        "HIS/EMR/LIS/PACS契约清单",
-        "联调执行包",
-        "受控证据引用校验"
+        "十二类外部系统契约",
+        "八类正常与异常场景",
+        "九十六项双签回执",
+        "发布包绑定与撤销校验"
       ],
-      "requiredLocalGates": ["integration-contracts", "joint-test-tooling"],
+      "requiredLocalGates": ["twelve-system-contracts", "ninety-six-scenarios", "dual-signature-verification", "release-binding"],
       "requiredExternalGates": ["signed-joint-test-receipts"]
     },
     {
       "id": "iteration-4",
-      "name": "区域业务闭环",
+      "name": "监控告警与安全验收",
       "deliverables": [
-        "居民授权闭环",
-        "转诊交付闭环",
-        "临床急救回执闭环"
+        "证据密钥签名账本和演练告警",
+        "SIEM与Webhook可靠投递",
+        "确认升级恢复与死信重放",
+        "哈希链和独立安全复核"
       ],
-      "requiredLocalGates": ["resident-loop", "referral-loop", "clinical-loop"],
-      "requiredExternalGates": ["pilot-institution-acceptance"]
+      "requiredLocalGates": ["alert-candidates", "reliable-delivery", "ack-escalate-recover", "acceptance-validator"],
+      "requiredExternalGates": ["signed-monitoring-security-acceptance"]
     },
     {
       "id": "iteration-5",
-      "name": "安全与运营治理",
+      "name": "七席位预生产切换演练",
       "deliverables": [
-        "最小权限与审计门禁",
-        "监控告警演练矩阵",
-        "数据质量与保留策略"
+        "七个唯一职责账号",
+        "六个切换与回滚检查点",
+        "精确回滚口令和时间预算",
+        "T+1六类观察面"
       ],
-      "requiredLocalGates": ["security-controls", "monitoring-controls", "data-governance"],
-      "requiredExternalGates": ["security-assessment", "verified-alert-routes"]
+      "requiredLocalGates": ["seven-duty-seats", "six-checkpoints", "rollback-command", "t-plus-one-observation"],
+      "requiredExternalGates": ["signed-human-rehearsal-receipt"]
     },
     {
       "id": "iteration-6",
-      "name": "试点切换与发布判定",
+      "name": "统一候选评审与发布阻断",
       "deliverables": [
-        "试点切换清单",
-        "容灾与回滚演练包",
-        "证据指纹绑定的GO/NO-GO判定"
+        "五类控制报告统一绑定",
+        "阻断项责任人与后续动作",
+        "GO-CANDIDATE与执行权限分离",
+        "唯一集成基线"
       ],
-      "requiredLocalGates": ["cutover-package", "rollback-package", "go-no-go-validator"],
+      "requiredLocalGates": ["common-release-binding", "candidate-review", "fail-closed-boundary", "single-integration-baseline"],
       "requiredExternalGates": [
-        "dr-rehearsal",
-        "site-acceptance",
+        "current-external-evidence",
         "four-party-go-no-go"
       ]
     }

@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "external-joint-test-evidence-bundle-v1",
+  "campaignId": "regional-preproduction-joint-test-20260804",
+  "campaignDigest": "sha256:<64-hex-from-campaign-plan>",
+  "releaseId": "<immutable-release-id>",
+  "packageFingerprint": "sha256:<64-hex-from-release-package>",
+  "receipts": [
+    {
+      "schemaVersion": "external-joint-test-scenario-receipt-v1",
+      "campaignId": "regional-preproduction-joint-test-20260804",
+      "campaignDigest": "sha256:<64-hex-from-campaign-plan>",
+      "releaseId": "<immutable-release-id>",
+      "packageFingerprint": "sha256:<64-hex-from-release-package>",
+      "interfaceId": "his-referral-v1",
+      "scenarioId": "happy-path",
+      "runId": "<site-run-id>",
+      "executedAt": "<ISO-8601>",
+      "expiresAt": "<ISO-8601-no-more-than-168-hours-after-execution>",
+      "result": "passed",
+      "traceRef": "evidence://external-joint-test/<interface>/<scenario>/trace",
+      "receiptRef": "artifact://external-joint-test/<interface>/<scenario>/receipt",
+      "requestDigest": "sha256:<64-hex>",
+      "responseDigest": "sha256:<64-hex>",
+      "assertions": {
+        "accepted": true,
+        "correlationBound": true,
+        "receiptReturned": true
+      },
+      "attestations": [
+        {
+          "schemaVersion": "external-joint-test-attestation-v1",
+          "party": "platform",
+          "keyId": "<active-platform-public-key-id>",
+          "account": "<platform-owner-account>",
+          "algorithm": "Ed25519",
+          "issuedAt": "<ISO-8601>",
+          "nonce": "<unique-nonce-at-least-8-characters>",
+          "subjectDigest": "sha256:<digest-of-canonical-receipt-subject>",
+          "signature": "<base64url-Ed25519-signature>"
+        },
+        {
+          "schemaVersion": "external-joint-test-attestation-v1",
+          "party": "external",
+          "keyId": "<active-external-public-key-id>",
+          "account": "<external-owner-account>",
+          "algorithm": "Ed25519",
+          "issuedAt": "<ISO-8601>",
+          "nonce": "<unique-nonce-at-least-8-characters>",
+          "subjectDigest": "sha256:<digest-of-canonical-receipt-subject>",
+          "signature": "<base64url-Ed25519-signature>"
+        }
+      ]
+    }
+  ],
+  "revocations": [
+    {
+      "subjectDigest": "sha256:<revoked-receipt-subject-digest>",
+      "revokedAt": "<ISO-8601>",
+      "evidenceRef": "evidence://external-joint-test/revocations/<id>",
+      "evidenceDigest": "sha256:<64-hex>"
+    }
+  ]
+}
