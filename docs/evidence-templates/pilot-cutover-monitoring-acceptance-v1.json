@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "pilot-cutover-monitoring-acceptance-v1",
+  "status": "not-collected",
+  "releaseId": "",
+  "packageFingerprint": "",
+  "monitoringOwnerAccount": "",
+  "securityReviewerAccount": "",
+  "observedWindow": {
+    "startedAt": "",
+    "completedAt": ""
+  },
+  "checks": [
+    {
+      "id": "metadata-minimization",
+      "status": "pending",
+      "evidenceRef": "",
+      "evidenceDigest": ""
+    },
+    {
+      "id": "siem-or-webhook-delivery",
+      "status": "pending",
+      "evidenceRef": "",
+      "evidenceDigest": ""
+    },
+    {
+      "id": "duty-acknowledgement",
+      "status": "pending",
+      "evidenceRef": "",
+      "evidenceDigest": ""
+    },
+    {
+      "id": "p0-escalation",
+      "status": "pending",
+      "evidenceRef": "",
+      "evidenceDigest": ""
+    },
+    {
+      "id": "receiver-outage-dead-letter-redrive",
+      "status": "pending",
+      "evidenceRef": "",
+      "evidenceDigest": ""
+    },
+    {
+      "id": "verified-recovery",
+      "status": "pending",
+      "evidenceRef": "",
+      "evidenceDigest": ""
+    }
+  ],
+  "journalHeadDigest": "",
+  "acceptanceEvidenceRef": "",
+  "acceptanceEvidenceDigest": "",
+  "boundary": {
+    "metadataOnly": true,
+    "patientDataIncluded": false,
+    "secretsIncluded": false,
+    "productionReady": false
+  }
+}
