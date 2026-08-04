@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "pilot-cutover-trust-registry-v1",
+  "generatedAt": "<ISO-8601-timestamp>",
+  "keys": [
+    {
+      "keyId": "<controlled-key-id>",
+      "account": "<identity-account>",
+      "algorithm": "Ed25519",
+      "status": "active",
+      "scopes": [
+        "<security-assessment|monitoring-drill|dr-rehearsal|site-acceptance|platform-operations|security-compliance|data-platform|project-owner|rehearsal-coordinator>"
+      ],
+      "validFrom": "<ISO-8601-timestamp>",
+      "validUntil": "<ISO-8601-timestamp>",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\n<base64-public-key>\n-----END PUBLIC KEY-----\n"
+    }
+  ],
+  "boundary": "Public keys and identity metadata only. Never include private keys, credentials, tokens or patient data."
+}

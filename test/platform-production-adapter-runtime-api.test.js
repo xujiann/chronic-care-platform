@@ -8,6 +8,7 @@ const {
 } = require("../src/http/routes/platform-governance/production-operations");
 const {
   operationalControlPlaneReadiness,
+  pilotCutoverControlHealthReadiness,
   pilotCutoverControlPlaneReadiness,
   shadowRelayControlPlaneReadiness
 } = require("../server");
@@ -43,6 +44,13 @@ test("production adapter runtime API is commission-only, read-only and payload-s
       decision: "NO-GO",
       cutoverExecutionAuthorized: false,
       productionPrimary: false,
+      productionReady: false
+    }),
+    pilotCutoverControlHealthReadiness: async () => ({
+      schema: "pilot-cutover-control-health-v1",
+      status: "blocked",
+      alerts: [],
+      cutoverExecutionAuthorized: false,
       productionReady: false
     }),
     requireApiRole: () => ({ name: "commission-user", role: "commission" }),
@@ -94,6 +102,41 @@ test("production adapter runtime API is commission-only, read-only and payload-s
   assert.equal(response.payload.decision, "NO-GO");
   assert.equal(response.payload.cutoverExecutionAuthorized, false);
   assert.equal(events[3].action, "pilot-cutover-control-plane-read");
+
+  const healthHandled = await segment.handle(
+    { method: "GET" },
+    {},
+    new URL("http://localhost/api/production-adapters/pilot-cutover/health")
+  );
+  assert.equal(healthHandled, true);
+  assert.equal(response.status, 200);
+  assert.equal(response.payload.schema, "pilot-cutover-control-health-v1");
+  assert.equal(response.payload.status, "blocked");
+  assert.equal(events[4].action, "pilot-cutover-control-health-read");
+});
+
+test("server pilot cutover health fails closed without controlled evidence", async () => {
+  const names = [
+    "PLATFORM_PILOT_CUTOVER_INPUT_FILE",
+    "PLATFORM_PILOT_CUTOVER_AUTHORIZATION_LEDGER_FILE",
+    "PLATFORM_PILOT_CUTOVER_TRUST_REGISTRY_FILE"
+  ];
+  const previous = Object.fromEntries(names.map((name) => [name, process.env[name]]));
+  names.forEach((name) => delete process.env[name]);
+  try {
+    const report = await pilotCutoverControlHealthReadiness();
+    assert.equal(report.schema, "pilot-cutover-control-health-v1");
+    assert.equal(report.status, "blocked");
+    assert.equal(report.decision, "NO-GO");
+    assert.equal(report.signals.ledgerChain, false);
+    assert.equal(report.cutoverExecutionAuthorized, false);
+    assert.equal(report.productionReady, false);
+  } finally {
+    names.forEach((name) => {
+      if (previous[name] === undefined) delete process.env[name];
+      else process.env[name] = previous[name];
+    });
+  }
 });
 
 test("server pilot cutover control plane fails closed without a package", async () => {

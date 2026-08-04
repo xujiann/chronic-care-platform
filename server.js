@@ -26,6 +26,9 @@ const {
 const {
   evaluatePilotCutoverAuthorizationLedger
 } = require("./src/platform/cutover/pilot-cutover-authorization-ledger");
+const {
+  evaluatePilotCutoverControlHealth
+} = require("./src/platform/cutover/pilot-cutover-observability");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
 const { MemorySessionStore, PostgresSessionStore, SqliteSessionStore, createSqliteSessionSchema } = require("./session-store");
 const {
@@ -635,7 +638,9 @@ function blockedPilotCutoverControlPlane(error) {
       disasterRecovery: false,
       approvals: false,
       authorizationLedger: false,
-      externalEvidenceRegistry: false
+      externalEvidenceRegistry: false,
+      trustedIdentitySignatures: false,
+      preProductionRehearsal: false
     }),
     error: Object.freeze({
       code: String(error?.code || "PILOT_CUTOVER_CONTROL_UNAVAILABLE").slice(0, 120),
@@ -654,11 +659,23 @@ async function pilotCutoverControlPlaneReadiness() {
   try {
     return evaluatePilotCutoverAuthorizationLedger({
       packageFile: process.env.PLATFORM_PILOT_CUTOVER_INPUT_FILE,
-      ledgerFile: process.env.PLATFORM_PILOT_CUTOVER_AUTHORIZATION_LEDGER_FILE
+      ledgerFile: process.env.PLATFORM_PILOT_CUTOVER_AUTHORIZATION_LEDGER_FILE,
+      trustRegistryFile: process.env.PLATFORM_PILOT_CUTOVER_TRUST_REGISTRY_FILE,
+      rehearsalMaximumAgeHours: process.env.PLATFORM_PILOT_CUTOVER_REHEARSAL_MAX_AGE_HOURS
     });
   } catch (error) {
     return blockedPilotCutoverControlPlane(error);
   }
+}
+
+async function pilotCutoverControlHealthReadiness() {
+  return evaluatePilotCutoverControlHealth({
+    packageFile: process.env.PLATFORM_PILOT_CUTOVER_INPUT_FILE,
+    ledgerFile: process.env.PLATFORM_PILOT_CUTOVER_AUTHORIZATION_LEDGER_FILE,
+    trustRegistryFile: process.env.PLATFORM_PILOT_CUTOVER_TRUST_REGISTRY_FILE,
+    rehearsalMaximumAgeHours: process.env.PLATFORM_PILOT_CUTOVER_REHEARSAL_MAX_AGE_HOURS,
+    warningHours: process.env.PLATFORM_PILOT_CUTOVER_EVIDENCE_WARNING_HOURS
+  });
 }
 let sessionCleanupTimer = null;
 let sessionCleanupState = {
@@ -27837,6 +27854,7 @@ function createRuntimeCapabilitySource() {
   shadowRelayControlPlaneReadiness,
   operationalControlPlaneReadiness,
   pilotCutoverControlPlaneReadiness,
+  pilotCutoverControlHealthReadiness,
   applyAppointmentIntegrationReconciliationAction,
   applyCitizenLifecycleAction,
   applyCitizenOperationsAction,
@@ -28535,6 +28553,7 @@ module.exports = {
   shadowRelayControlPlaneReadiness,
   operationalControlPlaneReadiness,
   pilotCutoverControlPlaneReadiness,
+  pilotCutoverControlHealthReadiness,
   readDatabase,
   requireDigitalHospitalExecutionWorker,
   server,
