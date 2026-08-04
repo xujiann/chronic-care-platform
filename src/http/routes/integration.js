@@ -1,6 +1,7 @@
 "use strict";
 
 const clinicalResultExchange = require("./t08-clinical-result-exchange");
+const externalJointTest = require("./integration/external-joint-test");
 
 function createRouteSegments(runtime) {
   const { APPOINTMENT_CONTRACT_ID, PHYSICAL_EXAM_CONTRACT_ID, appendDataAccessLog, appendSecurityEvent, applyObjectLifecycle, buildIntegrationSample, canAccessResident, canAccessSecureAttachment, collectJson, createObjectDownloadIntent, createObjectUploadIntent, dispatchFinancialRequest, dispatchHospitalRequest, finalizeObjectUpload, hospitalConnectorCenter, landAppointmentIntegrationEvent, landPhysicalExamIntegrationEvent, normalizeHospitalConnectorDomain, normalizeIntegrationEvent, objectStorageCenter, prependAuditTrailEntry, randomUUID, readDatabase, requireApiRole, sendJson, summarizeIntegrationGateway, updateIntegrationEvent, validateAttachmentMetadata, verifyIntegrationSignature, writeDatabase } = runtime;
@@ -764,6 +765,7 @@ function createRouteSegments(runtime) {
         return false;
       }
     },
+    ...externalJointTest.createRouteSegments(runtime),
   ];
 }
 
