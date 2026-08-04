@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "pilot-cutover-trust-provider-snapshot-v1",
+  "generatedAt": "<ISO-8601-timestamp>",
+  "expiresAt": "<ISO-8601-timestamp>",
+  "provider": {
+    "providerId": "<controlled-provider-id>",
+    "type": "<aws-kms|azure-key-vault|hashicorp-vault|remote-signing-service>",
+    "instanceRef": "vault://<controlled-provider-reference>",
+    "directoryRevision": "<immutable-directory-revision>"
+  },
+  "identities": [
+    {
+      "account": "<platform-account>",
+      "directorySubject": "identity://<controlled-directory-subject>",
+      "status": "active",
+      "roles": ["<approved-duty-role>"],
+      "authorizedScopes": ["<approved-evidence-gate-or-approval-role>"],
+      "requiredForCutover": true
+    }
+  ],
+  "keys": [
+    {
+      "keyId": "<provider-key-id>",
+      "account": "<platform-account>",
+      "role": "<approved-duty-role>",
+      "algorithm": "Ed25519",
+      "status": "<active|frozen|revoked|retired>",
+      "scopes": ["<approved-evidence-gate-or-approval-role>"],
+      "validFrom": "<ISO-8601-timestamp>",
+      "validUntil": "<ISO-8601-timestamp>",
+      "providerKeyRef": "vault://<non-secret-provider-key-reference>",
+      "rotation": {
+        "previousKeyId": "<optional-previous-key-id>"
+      },
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\n<signing-public-key>\n-----END PUBLIC KEY-----\n"
+    }
+  ],
+  "attestation": {
+    "schemaVersion": "pilot-cutover-provider-attestation-v1",
+    "keyId": "<provider-root-key-id>",
+    "algorithm": "Ed25519",
+    "issuedAt": "<ISO-8601-timestamp>",
+    "nonce": "<unique-provider-snapshot-nonce>",
+    "subjectDigest": "sha256:<64-lowercase-hex>",
+    "signature": "<base64url-ed25519-signature>"
+  },
+  "boundary": "Provider-signed public metadata only. The platform never receives or persists signing private keys."
+}
