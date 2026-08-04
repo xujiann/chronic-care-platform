@@ -8,6 +8,7 @@ const {
 } = require("../src/http/routes/platform-governance/production-operations");
 const {
   operationalControlPlaneReadiness,
+  pilotCutoverControlPlaneReadiness,
   shadowRelayControlPlaneReadiness
 } = require("../server");
 
@@ -35,6 +36,13 @@ test("production adapter runtime API is commission-only, read-only and payload-s
       externalReady: false,
       operationalReady: false,
       sensitiveDataExposed: false,
+      productionReady: false
+    }),
+    pilotCutoverControlPlaneReadiness: async () => ({
+      schema: "pilot-cutover-decision-v1",
+      decision: "NO-GO",
+      cutoverExecutionAuthorized: false,
+      productionPrimary: false,
       productionReady: false
     }),
     requireApiRole: () => ({ name: "commission-user", role: "commission" }),
@@ -75,6 +83,34 @@ test("production adapter runtime API is commission-only, read-only and payload-s
   assert.equal(response.payload.operationalReady, false);
   assert.equal(events[2].action, "operational-control-plane-read");
   assert.doesNotMatch(JSON.stringify(response), /password|secret|patient/i);
+
+  const cutoverHandled = await segment.handle(
+    { method: "GET" },
+    {},
+    new URL("http://localhost/api/production-adapters/pilot-cutover")
+  );
+  assert.equal(cutoverHandled, true);
+  assert.equal(response.status, 200);
+  assert.equal(response.payload.decision, "NO-GO");
+  assert.equal(response.payload.cutoverExecutionAuthorized, false);
+  assert.equal(events[3].action, "pilot-cutover-control-plane-read");
+});
+
+test("server pilot cutover control plane fails closed without a package", async () => {
+  const previousFile = process.env.PLATFORM_PILOT_CUTOVER_INPUT_FILE;
+  delete process.env.PLATFORM_PILOT_CUTOVER_INPUT_FILE;
+  try {
+    const report = await pilotCutoverControlPlaneReadiness();
+    assert.equal(report.schema, "pilot-cutover-decision-v1");
+    assert.equal(report.decision, "NO-GO");
+    assert.equal(report.cutoverExecutionAuthorized, false);
+    assert.equal(report.productionPrimary, false);
+    assert.equal(report.productionReady, false);
+    assert.equal(report.patientDataExposed, false);
+  } finally {
+    if (previousFile === undefined) delete process.env.PLATFORM_PILOT_CUTOVER_INPUT_FILE;
+    else process.env.PLATFORM_PILOT_CUTOVER_INPUT_FILE = previousFile;
+  }
 });
 
 test("server operational control plane fails closed without an input file", async () => {

@@ -3,7 +3,9 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { evaluatePilotCutover } = require("../src/platform/cutover/pilot-cutover-orchestrator");
+const {
+  evaluatePilotCutoverFile
+} = require("../src/platform/cutover/pilot-cutover-package");
 
 const ROOT = path.resolve(__dirname, "..");
 const PROGRAM_FILE = path.join(ROOT, "config", "platform-iteration-program.json");
@@ -42,7 +44,10 @@ const ARTIFACTS = Object.freeze({
   ],
   "iteration-6": [
     "src/platform/cutover/pilot-cutover-orchestrator.js",
-    "docs/evidence-templates/platform-iterations/pilot-cutover.template.json"
+    "src/platform/cutover/pilot-cutover-package.js",
+    "scripts/platform-cutover-package.js",
+    "docs/evidence-templates/platform-iterations/pilot-cutover.template.json",
+    "docs/evidence-templates/platform-iterations/pilot-cutover-package-manifest.template.json"
   ]
 });
 
@@ -89,8 +94,10 @@ function buildIterationProgramReport(program = JSON.parse(fs.readFileSync(PROGRA
 
 function run(args = parseArgs()) {
   if (args["cutover-input"]) {
-    const input = JSON.parse(fs.readFileSync(path.resolve(String(args["cutover-input"])), "utf8"));
-    const report = evaluatePilotCutover(input, args.now || new Date().toISOString());
+    const report = evaluatePilotCutoverFile({
+      file: args["cutover-input"],
+      now: args.now || new Date().toISOString()
+    });
     return { report, exitCode: report.decision === "GO-CANDIDATE" ? 0 : 1 };
   }
   const report = buildIterationProgramReport();
