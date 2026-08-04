@@ -6,10 +6,17 @@ const {
   evaluatePilotCutoverAuthorizationLedger,
   loadLedgerCommandInput
 } = require("../src/platform/cutover/pilot-cutover-authorization-ledger");
+const {
+  evaluatePilotCutoverControlHealth
+} = require("../src/platform/cutover/pilot-cutover-observability");
+const {
+  buildPilotCutoverCommandPlan
+} = require("../src/platform/cutover/pilot-cutover-command-plan");
 
 const COMMAND_TYPES = Object.freeze({
   "register-evidence": "evidence-registered",
   "record-approval": "approval-recorded",
+  "record-rehearsal": "rehearsal-recorded",
   revoke: "evidence-revoked"
 });
 
@@ -59,6 +66,8 @@ function run(parsed = parseArgs(), runtime = {}) {
     const report = evaluatePilotCutoverAuthorizationLedger({
       packageFile: parsed.options.package,
       ledgerFile: parsed.options.ledger,
+      trustRegistryFile: parsed.options["trust-registry"],
+      rehearsalMaximumAgeHours: parsed.options["rehearsal-max-age-hours"],
       now: parsed.options.now || runtime.now
     });
     return {
@@ -69,8 +78,31 @@ function run(parsed = parseArgs(), runtime = {}) {
         : 0
     };
   }
+  if (parsed.command === "health") {
+    const report = evaluatePilotCutoverControlHealth({
+      packageFile: parsed.options.package,
+      ledgerFile: parsed.options.ledger,
+      trustRegistryFile: parsed.options["trust-registry"],
+      rehearsalMaximumAgeHours: parsed.options["rehearsal-max-age-hours"],
+      warningHours: parsed.options["warning-hours"],
+      now: parsed.options.now || runtime.now
+    });
+    return {
+      report,
+      exitCode: parsed.options["require-healthy"] === true && report.status !== "healthy" ? 2 : 0
+    };
+  }
+  if (parsed.command === "plan") {
+    return {
+      report: buildPilotCutoverCommandPlan({
+        releaseId: parsed.options["release-id"],
+        packageFingerprint: parsed.options["package-fingerprint"]
+      }),
+      exitCode: 0
+    };
+  }
   throw Object.assign(
-    new Error("command must be register-evidence, record-approval, revoke or status"),
+    new Error("command must be register-evidence, record-approval, record-rehearsal, revoke, status, health or plan"),
     { code: "PILOT_CUTOVER_AUTHORIZATION_COMMAND_INVALID" }
   );
 }

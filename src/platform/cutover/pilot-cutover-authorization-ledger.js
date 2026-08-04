@@ -19,6 +19,13 @@ const {
   sha256,
   stableStringify
 } = require("../governance/technical-evidence");
+const {
+  createPilotCutoverTrustVerifier
+} = require("./pilot-cutover-trust-verifier");
+const {
+  evaluatePilotCutoverRehearsal,
+  validatePilotCutoverRehearsal
+} = require("./pilot-cutover-rehearsal");
 
 const MAX_LEDGER_BYTES = 4 * 1024 * 1024;
 const MAX_EVENT_BYTES = 32 * 1024;
@@ -27,7 +34,8 @@ const EVENT_SCHEMA = "pilot-cutover-authorization-event-v1";
 const EVENT_TYPES = Object.freeze([
   "evidence-registered",
   "evidence-revoked",
-  "approval-recorded"
+  "approval-recorded",
+  "rehearsal-recorded"
 ]);
 const REQUIRED_EXTERNAL_GATES = Object.freeze([
   "security-assessment",
@@ -138,6 +146,7 @@ function validatePayload(type, payload, events = []) {
   if (type === "evidence-registered") validateEvidencePayload(payload);
   if (type === "approval-recorded") validateApprovalPayload(payload);
   if (type === "evidence-revoked") validateRevocationPayload(payload, events);
+  if (type === "rehearsal-recorded") validatePilotCutoverRehearsal(payload);
 }
 
 function validateEvent(event, index, previousDigest, events = []) {
@@ -330,6 +339,9 @@ function buildAuthorizationLedgerProjection(options = {}) {
   const revokedEventIds = new Set(events
     .filter((event) => event.type === "evidence-revoked")
     .map((event) => event.payload.targetEventId));
+  const verifyTrust = (event) => event && typeof options.trustVerifier?.verifyEvent === "function"
+    ? options.trustVerifier.verifyEvent(event, new Date(now).toISOString())
+    : Object.freeze({ trusted: false, checks: Object.freeze({ verifierConfigured: false }) });
   const evidenceEvents = events.filter((event) =>
     event.type === "evidence-registered"
     && event.payload.packageFingerprint === packageFingerprint);
@@ -341,7 +353,8 @@ function buildAuthorizationLedgerProjection(options = {}) {
       && !revokedEventIds.has(event.eventId)
       && event.payload.releaseId === releaseId
       && Date.parse(event.payload.issuedAt) <= now
-      && Date.parse(event.payload.expiresAt) > now];
+      && Date.parse(event.payload.expiresAt) > now
+      && verifyTrust(event).trusted === true];
   })));
 
   const approvalEvents = events.filter((event) =>
@@ -363,7 +376,9 @@ function buildAuthorizationLedgerProjection(options = {}) {
         Date.parse(event.payload.approvedAt) <= now
         && Date.parse(event.payload.expiresAt) > now),
     rollbackOwner: rollbackOwners.size === 1
-      && Boolean(clean([...rollbackOwners][0], 160))
+      && Boolean(clean([...rollbackOwners][0], 160)),
+    trusted: approvalRows.length === APPROVAL_ROLES.length
+      && approvalRows.every((event) => verifyTrust(event).trusted === true)
   });
   const approvalsReady = Object.values(approvalChecks).every(Boolean);
   const approvedAt = approvalsReady
@@ -388,6 +403,54 @@ function buildAuthorizationLedgerProjection(options = {}) {
     })))
   });
   const revoked = events.filter((event) => event.type === "evidence-revoked").length;
+  const latestRehearsal = events
+    .filter((event) =>
+      event.type === "rehearsal-recorded"
+      && event.payload.packageFingerprint === packageFingerprint)
+    .at(-1);
+  const rehearsal = evaluatePilotCutoverRehearsal({
+    event: latestRehearsal,
+    revokedEventIds,
+    releaseId,
+    packageFingerprint,
+    trustVerifier: options.trustVerifier,
+    maximumAgeHours: options.rehearsalMaximumAgeHours,
+    now: new Date(now).toISOString()
+  });
+  const selectedTrustEvents = [
+    ...REQUIRED_EXTERNAL_GATES.map((gateId) => latestEvidence.get(gateId)).filter(Boolean),
+    ...APPROVAL_ROLES.map((role) => latestApprovals.get(role)).filter(Boolean),
+    latestRehearsal
+  ].filter(Boolean);
+  const trustRows = selectedTrustEvents.map((event) => Object.freeze({
+    eventId: event.eventId,
+    type: event.type,
+    result: verifyTrust(event)
+  }));
+  const nonces = selectedTrustEvents
+    .map((event) => clean(event.payload?.attestation?.nonce, 120))
+    .filter(Boolean);
+  const trustChecks = Object.freeze({
+    verifierConfigured: typeof options.trustVerifier?.verifyEvent === "function",
+    allSelectedEventsTrusted: selectedTrustEvents.length === REQUIRED_EXTERNAL_GATES.length
+      + APPROVAL_ROLES.length + 1
+      && trustRows.every((row) => row.result.trusted === true),
+    noncesUnique: nonces.length === selectedTrustEvents.length
+      && new Set(nonces).size === nonces.length
+  });
+  const trustReady = Object.values(trustChecks).every(Boolean);
+  const lifecycle = Object.freeze(events
+    .filter((event) => ["evidence-registered", "approval-recorded", "rehearsal-recorded"].includes(event.type))
+    .map((event) => Object.freeze({
+      eventId: event.eventId,
+      type: event.type,
+      scope: event.payload.gateId || event.payload.role || "rehearsal-coordinator",
+      recordedAt: event.recordedAt,
+      expiresAt: event.payload.expiresAt || "",
+      completedAt: event.payload.completedAt || "",
+      revoked: revokedEventIds.has(event.eventId),
+      trusted: verifyTrust(event).trusted === true
+    })));
   return Object.freeze({
     schema: "pilot-cutover-authorization-ledger-projection-v1",
     evaluatedAt: new Date(now).toISOString(),
@@ -401,9 +464,15 @@ function buildAuthorizationLedgerProjection(options = {}) {
     evidenceReady: Object.values(evidenceChecks).every(Boolean),
     approvalChecks,
     approvalsReady,
+    trustChecks,
+    trustReady,
+    trust: Object.freeze(trustRows),
+    lifecycle,
+    rehearsal,
+    rehearsalReady: rehearsal.ready,
     authorization,
     productionReady: false,
-    boundary: "Ledger entries are metadata-only records. Validation does not authenticate a human identity, execute cutover, or make production primary."
+    boundary: "Ledger entries are metadata-only records. Ed25519 verification authenticates registered event keys only; it does not execute cutover or make production primary."
   });
 }
 
@@ -419,6 +488,12 @@ function evaluatePilotCutoverAuthorizationLedger(options = {}) {
       "authorization ledger package binding does not match the immutable package"
     );
   }
+  const trustRegistryFile = options.trustRegistryFile
+    || options.env?.PLATFORM_PILOT_CUTOVER_TRUST_REGISTRY_FILE
+    || process.env.PLATFORM_PILOT_CUTOVER_TRUST_REGISTRY_FILE;
+  const trustVerifier = options.trustVerifier || (trustRegistryFile
+    ? createPilotCutoverTrustVerifier({ file: trustRegistryFile })
+    : undefined);
   const ledger = buildAuthorizationLedgerProjection({
     file: options.ledgerFile
       || options.env?.PLATFORM_PILOT_CUTOVER_AUTHORIZATION_LEDGER_FILE
@@ -426,7 +501,11 @@ function evaluatePilotCutoverAuthorizationLedger(options = {}) {
     events: options.events,
     packageFingerprint,
     releaseId: input.release.releaseId,
-    now: options.now
+    now: options.now,
+    trustVerifier,
+    rehearsalMaximumAgeHours: options.rehearsalMaximumAgeHours
+      ?? options.env?.PLATFORM_PILOT_CUTOVER_REHEARSAL_MAX_AGE_HOURS
+      ?? process.env.PLATFORM_PILOT_CUTOVER_REHEARSAL_MAX_AGE_HOURS
   });
   const decision = evaluatePilotCutover({
     ...structuredClone(input),
@@ -434,7 +513,9 @@ function evaluatePilotCutoverAuthorizationLedger(options = {}) {
   }, options.now || new Date().toISOString());
   const goCandidate = decision.decision === "GO-CANDIDATE"
     && ledger.evidenceReady
-    && ledger.approvalsReady;
+    && ledger.approvalsReady
+    && ledger.trustReady
+    && ledger.rehearsalReady;
   return Object.freeze({
     ...decision,
     schema: "pilot-cutover-authorization-control-v1",
@@ -442,13 +523,15 @@ function evaluatePilotCutoverAuthorizationLedger(options = {}) {
     checks: Object.freeze({
       ...decision.checks,
       authorizationLedger: ledger.chainValid,
-      externalEvidenceRegistry: ledger.evidenceReady
+      externalEvidenceRegistry: ledger.evidenceReady,
+      trustedIdentitySignatures: ledger.trustReady,
+      preProductionRehearsal: ledger.rehearsalReady
     }),
     ledger,
     cutoverExecutionAuthorized: false,
     productionPrimary: false,
     productionReady: false,
-    boundary: "GO-CANDIDATE requires an intact ledger, current external evidence and four independent approvals bound to this package. Execution remains a separate human-controlled operation."
+    boundary: "GO-CANDIDATE requires an intact ledger, current external evidence, four independent signed approvals and a fresh signed pre-production rehearsal bound to this package. Execution remains a separate human-controlled operation."
   });
 }
 

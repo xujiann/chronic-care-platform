@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "pilot-cutover-record-rehearsal-v1",
+  "actorAccount": "<rehearsal-coordinator-account>",
+  "recordedAt": "<ISO-8601-timestamp>",
+  "payload": {
+    "schemaVersion": "pilot-cutover-rehearsal-v1",
+    "rehearsalId": "<rehearsal-id>",
+    "environment": "pre-production",
+    "releaseId": "<release-id>",
+    "packageFingerprint": "sha256:<pilot-package-fingerprint>",
+    "coordinatorAccount": "<rehearsal-coordinator-account>",
+    "rollbackOwner": "<rollback-owner-account>",
+    "startedAt": "<ISO-8601-timestamp>",
+    "completedAt": "<ISO-8601-timestamp>",
+    "maximumRollbackMinutes": 60,
+    "actualRollbackMinutes": 0,
+    "result": "passed",
+    "checkpoints": [
+      {
+        "id": "freeze-writes",
+        "passed": true,
+        "evidenceRef": "evidence://<controlled-reference>",
+        "evidenceDigest": "sha256:<evidence-digest>"
+      },
+      {
+        "id": "snapshot",
+        "passed": true,
+        "evidenceRef": "evidence://<controlled-reference>",
+        "evidenceDigest": "sha256:<evidence-digest>"
+      },
+      {
+        "id": "switch-read",
+        "passed": true,
+        "evidenceRef": "evidence://<controlled-reference>",
+        "evidenceDigest": "sha256:<evidence-digest>"
+      },
+      {
+        "id": "verify-business-loop",
+        "passed": true,
+        "evidenceRef": "evidence://<controlled-reference>",
+        "evidenceDigest": "sha256:<evidence-digest>"
+      },
+      {
+        "id": "rollback",
+        "passed": true,
+        "evidenceRef": "evidence://<controlled-reference>",
+        "evidenceDigest": "sha256:<evidence-digest>"
+      },
+      {
+        "id": "post-rollback-verify",
+        "passed": true,
+        "evidenceRef": "evidence://<controlled-reference>",
+        "evidenceDigest": "sha256:<evidence-digest>"
+      }
+    ],
+    "attestation": {
+      "schemaVersion": "pilot-cutover-attestation-v1",
+      "keyId": "<registered-public-key-id>",
+      "algorithm": "Ed25519",
+      "issuedAt": "<ISO-8601-timestamp>",
+      "nonce": "<unique-attestation-nonce>",
+      "subjectDigest": "sha256:<canonical-subject-digest>",
+      "signature": "<base64url-ed25519-signature>"
+    }
+  },
+  "boundary": "Metadata-only pre-production rehearsal record. It cannot execute production cutover."
+}

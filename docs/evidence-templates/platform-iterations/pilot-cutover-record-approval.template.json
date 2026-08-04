@@ -1,6 +1,6 @@
 {
   "schemaVersion": "pilot-cutover-record-approval-v1",
-  "actorAccount": "<ledger-writer-account>",
+  "actorAccount": "<independent-approver-account>",
   "recordedAt": "<ISO-8601-timestamp>",
   "payload": {
     "role": "<platform-operations|security-compliance|data-platform|project-owner>",
@@ -11,7 +11,16 @@
     "approvedAt": "<ISO-8601-timestamp>",
     "expiresAt": "<ISO-8601-timestamp>",
     "confirmation": "APPROVE PILOT CUTOVER",
-    "rollbackOwner": "<rollback-owner-account>"
+    "rollbackOwner": "<rollback-owner-account>",
+    "attestation": {
+      "schemaVersion": "pilot-cutover-attestation-v1",
+      "keyId": "<registered-public-key-id>",
+      "algorithm": "Ed25519",
+      "issuedAt": "<ISO-8601-timestamp>",
+      "nonce": "<unique-attestation-nonce>",
+      "subjectDigest": "sha256:<canonical-subject-digest>",
+      "signature": "<base64url-ed25519-signature>"
+    }
   },
-  "boundary": "Recording metadata does not authenticate the approver or execute cutover. Verify identity and evidence outside the repository."
+  "boundary": "The signature authenticates a registered public key and bound metadata only. It does not execute cutover."
 }

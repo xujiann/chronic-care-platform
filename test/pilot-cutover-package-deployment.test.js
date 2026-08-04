@@ -14,6 +14,9 @@ test("deployment and iteration artifacts expose the immutable cutover package co
   );
   assert.match(env, /^PLATFORM_PILOT_CUTOVER_INPUT_FILE=$/m);
   assert.match(env, /^PLATFORM_PILOT_CUTOVER_AUTHORIZATION_LEDGER_FILE=$/m);
+  assert.match(env, /^PLATFORM_PILOT_CUTOVER_TRUST_REGISTRY_FILE=$/m);
+  assert.match(env, /^PLATFORM_PILOT_CUTOVER_REHEARSAL_MAX_AGE_HOURS=24$/m);
+  assert.match(env, /^PLATFORM_PILOT_CUTOVER_EVIDENCE_WARNING_HOURS=24$/m);
   const manifest = JSON.parse(fs.readFileSync(
     path.join(
       ROOT,
@@ -45,6 +48,8 @@ test("deployment and iteration artifacts expose the immutable cutover package co
   for (const [file, schemaVersion] of [
     ["pilot-cutover-register-evidence.template.json", "pilot-cutover-register-evidence-v1"],
     ["pilot-cutover-record-approval.template.json", "pilot-cutover-record-approval-v1"],
+    ["pilot-cutover-record-rehearsal.template.json", "pilot-cutover-record-rehearsal-v1"],
+    ["pilot-cutover-trust-registry.template.json", "pilot-cutover-trust-registry-v1"],
     ["pilot-cutover-revoke.template.json", "pilot-cutover-revoke-v1"]
   ]) {
     const template = JSON.parse(fs.readFileSync(

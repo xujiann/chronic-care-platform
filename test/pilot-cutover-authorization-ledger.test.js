@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
+const { generateKeyPairSync, sign } = require("node:crypto");
 const {
   APPROVAL_ROLES,
   EVIDENCE_DIGEST_IDS,
@@ -18,6 +19,14 @@ const {
   evaluatePilotCutoverAuthorizationLedger,
   readAuthorizationLedger
 } = require("../src/platform/cutover/pilot-cutover-authorization-ledger");
+const {
+  createPilotCutoverTrustSubject,
+  createPilotCutoverTrustVerifier
+} = require("../src/platform/cutover/pilot-cutover-trust-verifier");
+const {
+  sha256,
+  stableStringify
+} = require("../src/platform/governance/technical-evidence");
 const { run: runAuthorizationCli } = require("../scripts/platform-cutover-authorization");
 
 const NOW = "2030-08-04T12:00:00.000Z";
@@ -135,14 +144,69 @@ function candidatePackage() {
   return input;
 }
 
-function appendCompleteLedger(file, fingerprint) {
+function trustFixture() {
+  const identities = [
+    ...REQUIRED_EXTERNAL_GATES.map((scope, index) => ({
+      account: `verifier-${index}`,
+      scope
+    })),
+    ...APPROVAL_ROLES.map((scope, index) => ({
+      account: `approver-${index}`,
+      scope
+    })),
+    { account: "rehearsal-coordinator", scope: "rehearsal-coordinator" }
+  ];
+  const privateKeys = new Map();
+  const keys = identities.map(({ account, scope }, index) => {
+    const pair = generateKeyPairSync("ed25519");
+    const keyId = `key-${index + 1}`;
+    privateKeys.set(keyId, pair.privateKey);
+    return {
+      keyId,
+      account,
+      algorithm: "Ed25519",
+      status: "active",
+      scopes: [scope],
+      validFrom: "2030-08-01T00:00:00.000Z",
+      validUntil: "2030-08-10T00:00:00.000Z",
+      publicKeyPem: pair.publicKey.export({ type: "spki", format: "pem" })
+    };
+  });
+  const registry = {
+    schemaVersion: "pilot-cutover-trust-registry-v1",
+    generatedAt: "2030-08-04T08:00:00.000Z",
+    keys
+  };
+  const verifier = createPilotCutoverTrustVerifier({ registry });
+  function attest(type, actorAccount, body, nonce) {
+    const key = keys.find((row) => row.account === actorAccount);
+    const subject = createPilotCutoverTrustSubject({
+      type,
+      actorAccount,
+      payload: body
+    });
+    return {
+      schemaVersion: "pilot-cutover-attestation-v1",
+      keyId: key.keyId,
+      algorithm: "Ed25519",
+      issuedAt: "2030-08-04T09:30:00.000Z",
+      nonce,
+      subjectDigest: sha256(subject),
+      signature: sign(
+        null,
+        Buffer.from(stableStringify(subject)),
+        privateKeys.get(key.keyId)
+      ).toString("base64url")
+    };
+  }
+  return { attest, registry, verifier };
+}
+
+function appendCompleteLedger(file, fingerprint, trust = trustFixture()) {
   const evidenceEvents = REQUIRED_EXTERNAL_GATES.map((gateId, index) =>
-    appendAuthorizationEvent({
-      file,
-      type: "evidence-registered",
-      actorAccount: "ledger-writer",
-      recordedAt: `2030-08-04T10:0${index}:00.000Z`,
-      payload: {
+    {
+      const actorAccount = `verifier-${index}`;
+      const payload = {
         gateId,
         releaseId: RELEASE_ID,
         packageFingerprint: fingerprint,
@@ -151,18 +215,28 @@ function appendCompleteLedger(file, fingerprint) {
         issuedAt: "2030-08-04T09:00:00.000Z",
         expiresAt: "2030-08-05T09:00:00.000Z",
         issuerAccount: `issuer-${index}`,
-        verifierAccount: `verifier-${index}`
-      }
-    }));
-  const approvalEvents = APPROVAL_ROLES.map((role, index) =>
-    appendAuthorizationEvent({
+        verifierAccount: actorAccount
+      };
+      payload.attestation = trust.attest(
+        "evidence-registered",
+        actorAccount,
+        payload,
+        `evidence-nonce-${index}`
+      );
+      return appendAuthorizationEvent({
       file,
-      type: "approval-recorded",
-      actorAccount: "ledger-writer",
-      recordedAt: `2030-08-04T11:0${index}:00.000Z`,
-      payload: {
+      type: "evidence-registered",
+      actorAccount,
+      recordedAt: `2030-08-04T10:0${index}:00.000Z`,
+      payload
+      });
+    });
+  const approvalEvents = APPROVAL_ROLES.map((role, index) =>
+    {
+      const actorAccount = `approver-${index}`;
+      const payload = {
         role,
-        account: `approver-${index}`,
+        account: actorAccount,
         packageFingerprint: fingerprint,
         evidenceRef: `evidence://pilot/approval/${role}`,
         evidenceDigest: `sha256:${String(index + 5).repeat(64)}`,
@@ -170,9 +244,62 @@ function appendCompleteLedger(file, fingerprint) {
         expiresAt: "2030-08-04T14:00:00.000Z",
         confirmation: "APPROVE PILOT CUTOVER",
         rollbackOwner: "rollback-owner"
-      }
-    }));
-  return { evidenceEvents, approvalEvents };
+      };
+      payload.attestation = trust.attest(
+        "approval-recorded",
+        actorAccount,
+        payload,
+        `approval-nonce-${index}`
+      );
+      return appendAuthorizationEvent({
+      file,
+      type: "approval-recorded",
+      actorAccount,
+      recordedAt: `2030-08-04T11:0${index}:00.000Z`,
+      payload
+      });
+    });
+  const rehearsalPayload = {
+    schemaVersion: "pilot-cutover-rehearsal-v1",
+    rehearsalId: "rehearsal-20300804",
+    environment: "pre-production",
+    releaseId: RELEASE_ID,
+    packageFingerprint: fingerprint,
+    coordinatorAccount: "rehearsal-coordinator",
+    rollbackOwner: "rollback-owner",
+    startedAt: "2030-08-04T08:00:00.000Z",
+    completedAt: "2030-08-04T09:00:00.000Z",
+    maximumRollbackMinutes: 60,
+    actualRollbackMinutes: 18,
+    result: "passed",
+    checkpoints: [
+      "freeze-writes",
+      "snapshot",
+      "switch-read",
+      "verify-business-loop",
+      "rollback",
+      "post-rollback-verify"
+    ].map((id, index) => ({
+      id,
+      passed: true,
+      evidenceRef: `evidence://pilot/rehearsal/${id}`,
+      evidenceDigest: `sha256:${String(index + 1).repeat(64)}`
+    }))
+  };
+  rehearsalPayload.attestation = trust.attest(
+    "rehearsal-recorded",
+    "rehearsal-coordinator",
+    rehearsalPayload,
+    "rehearsal-nonce-1"
+  );
+  const rehearsalEvent = appendAuthorizationEvent({
+    file,
+    type: "rehearsal-recorded",
+    actorAccount: "rehearsal-coordinator",
+    recordedAt: "2030-08-04T09:05:00.000Z",
+    payload: rehearsalPayload
+  });
+  return { evidenceEvents, approvalEvents, rehearsalEvent, trust };
 }
 
 test("append-only ledger validates its chain and projects current independent evidence", () => {
@@ -182,17 +309,20 @@ test("append-only ledger validates its chain and projects current independent ev
     const fingerprint = `sha256:${"a".repeat(64)}`;
     const appended = appendCompleteLedger(file, fingerprint);
     const events = readAuthorizationLedger(file);
-    assert.equal(events.length, 8);
+    assert.equal(events.length, 9);
     assert.equal(events[0].sequence, 1);
-    assert.equal(events[7].previousEventDigest, events[6].eventDigest);
+    assert.equal(events[8].previousEventDigest, events[7].eventDigest);
     const projection = buildAuthorizationLedgerProjection({
       events,
       releaseId: RELEASE_ID,
       packageFingerprint: fingerprint,
-      now: NOW
+      now: NOW,
+      trustVerifier: appended.trust.verifier
     });
     assert.equal(projection.evidenceReady, true);
     assert.equal(projection.approvalsReady, true);
+    assert.equal(projection.trustReady, true);
+    assert.equal(projection.rehearsalReady, true);
     assert.equal(projection.authorization.approvals.length, 4);
 
     appendAuthorizationEvent({
@@ -210,7 +340,8 @@ test("append-only ledger validates its chain and projects current independent ev
       file,
       releaseId: RELEASE_ID,
       packageFingerprint: fingerprint,
-      now: NOW
+      now: NOW,
+      trustVerifier: appended.trust.verifier
     });
     assert.equal(revoked.approvalsReady, false);
     assert.equal(revoked.authorization.decision, "NO-GO");
@@ -226,15 +357,18 @@ test("complete ledger can produce only a non-executing GO candidate bound to one
     const packageFile = path.join(directory, "package.json");
     const input = candidatePackage();
     fs.writeFileSync(packageFile, JSON.stringify(input));
-    appendCompleteLedger(ledgerFile, input.candidateEvidenceFingerprint);
+    const appended = appendCompleteLedger(ledgerFile, input.candidateEvidenceFingerprint);
     const report = evaluatePilotCutoverAuthorizationLedger({
       packageFile,
       ledgerFile,
-      now: NOW
+      now: NOW,
+      trustVerifier: appended.trust.verifier
     });
     assert.equal(report.decision, "GO-CANDIDATE");
     assert.equal(report.checks.authorizationLedger, true);
     assert.equal(report.checks.externalEvidenceRegistry, true);
+    assert.equal(report.checks.trustedIdentitySignatures, true);
+    assert.equal(report.checks.preProductionRehearsal, true);
     assert.equal(report.cutoverExecutionAuthorized, false);
     assert.equal(report.productionPrimary, false);
     assert.equal(report.productionReady, false);
@@ -242,7 +376,8 @@ test("complete ledger can produce only a non-executing GO candidate bound to one
     const expired = evaluatePilotCutoverAuthorizationLedger({
       packageFile,
       ledgerFile,
-      now: "2030-08-06T12:00:00.000Z"
+      now: "2030-08-06T12:00:00.000Z",
+      trustVerifier: appended.trust.verifier
     });
     assert.equal(expired.decision, "NO-GO");
   } finally {

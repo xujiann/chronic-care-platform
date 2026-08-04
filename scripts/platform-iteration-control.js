@@ -46,13 +46,20 @@ const ARTIFACTS = Object.freeze({
     "src/platform/cutover/pilot-cutover-orchestrator.js",
     "src/platform/cutover/pilot-cutover-package.js",
     "src/platform/cutover/pilot-cutover-authorization-ledger.js",
+    "src/platform/cutover/pilot-cutover-trust-verifier.js",
+    "src/platform/cutover/pilot-cutover-rehearsal.js",
+    "src/platform/cutover/pilot-cutover-observability.js",
+    "src/platform/cutover/pilot-cutover-command-plan.js",
     "scripts/platform-cutover-package.js",
     "scripts/platform-cutover-authorization.js",
     "docs/evidence-templates/platform-iterations/pilot-cutover.template.json",
     "docs/evidence-templates/platform-iterations/pilot-cutover-package-manifest.template.json",
     "docs/evidence-templates/platform-iterations/pilot-cutover-register-evidence.template.json",
     "docs/evidence-templates/platform-iterations/pilot-cutover-record-approval.template.json",
-    "docs/evidence-templates/platform-iterations/pilot-cutover-revoke.template.json"
+    "docs/evidence-templates/platform-iterations/pilot-cutover-revoke.template.json",
+    "docs/evidence-templates/platform-iterations/pilot-cutover-trust-registry.template.json",
+    "docs/evidence-templates/platform-iterations/pilot-cutover-record-rehearsal.template.json",
+    "docs/试点切换预生产演练与现场指挥手册-2026-08-04.md"
   ]
 });
 
