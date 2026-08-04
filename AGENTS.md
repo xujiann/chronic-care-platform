@@ -3,7 +3,7 @@
 This repository uses one integration line:
 
 - integration and release branch: `main`
-- process baseline: `baseline/governance-20260804-rehearsal-trust-observability-v1`
+- process baseline: `baseline/governance-20260804-preproduction-six-iterations-v1`
 - ownership manifest: `config/process-workstreams.json`
 
 Before changing a protected runtime file, identify the process from the current
