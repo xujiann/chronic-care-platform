@@ -4,7 +4,7 @@ const ROUTE_SEGMENT_ID = "platform-governance-06";
 const SUBDOMAIN = "production-operations";
 
 function createRouteSegment(runtime) {
-  const { appendSecurityEvent, buildProductionReleaseEvidencePublicSummary, buildProductionSecurityAcceptanceCenter, buildRuntimeProductionGoNoGoCenter, collectJson, normalizeProductionGoNoGoApprovalAction, normalizeProductionGoNoGoDecision, normalizeProductionSecurityFindingAction, normalizeProductionSecurityReleaseApprovalAction, normalizeState, productionAdapterRuntimeReadiness, randomUUID, readDatabase, requireApiRole, sendJson, writeDatabase } = runtime;
+  const { appendSecurityEvent, buildProductionReleaseEvidencePublicSummary, buildProductionSecurityAcceptanceCenter, buildRuntimeProductionGoNoGoCenter, collectJson, normalizeProductionGoNoGoApprovalAction, normalizeProductionGoNoGoDecision, normalizeProductionSecurityFindingAction, normalizeProductionSecurityReleaseApprovalAction, normalizeState, productionAdapterRuntimeReadiness, randomUUID, readDatabase, requireApiRole, sendJson, shadowRelayControlPlaneReadiness, writeDatabase } = runtime;
   return {
       id: "platform-governance-06",
       domain: "platform-governance",
@@ -20,6 +20,22 @@ function createRouteSegment(runtime) {
           target: url.pathname,
           result: "allowed",
           detail: `${report.mode || "blocked"}; workersEligible=${report.workersEligible === true}; production gate closed`
+        });
+        sendJson(res, 200, report);
+        return true;
+      }
+
+    if (req.method === "GET" && url.pathname === "/api/production-adapters/shadow-relay") {
+        const user = requireApiRole(req, res, ["commission"], url.pathname);
+        if (!user) return true;
+        const report = await shadowRelayControlPlaneReadiness();
+        appendSecurityEvent({
+          actor: user.name,
+          role: user.role,
+          action: "shadow-relay-control-plane-read",
+          target: url.pathname,
+          result: "allowed",
+          detail: `${report.ok === true ? "verified" : "blocked"}; receipts=${Number(report.receipts) || 0}; production gate closed`
         });
         sendJson(res, 200, report);
         return true;

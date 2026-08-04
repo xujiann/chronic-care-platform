@@ -18,6 +18,7 @@
   },
   "reports": {
     "reconciliation": {
+      "schema": "shadow-relay-control-plane-v1",
       "ok": false,
       "domains": {
         "referral": { "ok": false },
@@ -25,7 +26,11 @@
       },
       "durableCheckpointVerified": false,
       "faultRecoveryVerified": false,
-      "payloadsExposed": false
+      "chainValid": false,
+      "technicalEvidenceFingerprint": "sha256:<must-equal-evidenceDigests.reconciliation>",
+      "payloadsExposed": false,
+      "externalEvidenceVerified": false,
+      "productionReady": false
     }
   },
   "authorization": {
