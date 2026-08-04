@@ -23,6 +23,9 @@ const {
 const {
   evaluateOperationalControlRuntime
 } = require("./src/platform/governance/operational-control-runtime");
+const {
+  evaluatePilotCutoverFile
+} = require("./src/platform/cutover/pilot-cutover-package");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
 const { MemorySessionStore, PostgresSessionStore, SqliteSessionStore, createSqliteSessionSchema } = require("./session-store");
 const {
@@ -614,6 +617,44 @@ async function operationalControlPlaneReadiness() {
     return evaluateOperationalControlRuntime({ env: process.env });
   } catch (error) {
     return blockedOperationalControlPlane(error);
+  }
+}
+
+function blockedPilotCutoverControlPlane(error) {
+  return Object.freeze({
+    schema: "pilot-cutover-decision-v1",
+    evaluatedAt: new Date().toISOString(),
+    decision: "NO-GO",
+    evidenceFingerprint: "",
+    checks: Object.freeze({
+      immutableRelease: false,
+      evidenceDigests: false,
+      localGates: false,
+      externalGates: false,
+      rollback: false,
+      disasterRecovery: false,
+      approvals: false
+    }),
+    error: Object.freeze({
+      code: String(error?.code || "PILOT_CUTOVER_CONTROL_UNAVAILABLE").slice(0, 120),
+      message: "pilot cutover evidence package is unavailable"
+    }),
+    cutoverExecutionAuthorized: false,
+    productionPrimary: false,
+    productionReady: false,
+    secretsExposed: false,
+    patientDataExposed: false,
+    boundary: "This status is closed and cannot authorize or execute production cutover."
+  });
+}
+
+async function pilotCutoverControlPlaneReadiness() {
+  try {
+    return evaluatePilotCutoverFile({
+      file: process.env.PLATFORM_PILOT_CUTOVER_INPUT_FILE
+    });
+  } catch (error) {
+    return blockedPilotCutoverControlPlane(error);
   }
 }
 let sessionCleanupTimer = null;
@@ -27792,6 +27833,7 @@ function createRuntimeCapabilitySource() {
   productionAdapterRuntimeReadiness,
   shadowRelayControlPlaneReadiness,
   operationalControlPlaneReadiness,
+  pilotCutoverControlPlaneReadiness,
   applyAppointmentIntegrationReconciliationAction,
   applyCitizenLifecycleAction,
   applyCitizenOperationsAction,
@@ -28489,6 +28531,7 @@ module.exports = {
   productionAdapterRuntimeReadiness,
   shadowRelayControlPlaneReadiness,
   operationalControlPlaneReadiness,
+  pilotCutoverControlPlaneReadiness,
   readDatabase,
   requireDigitalHospitalExecutionWorker,
   server,

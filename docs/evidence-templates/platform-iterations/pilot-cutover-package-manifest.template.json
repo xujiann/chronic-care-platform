@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "pilot-cutover-package-manifest-v1",
+  "release": {
+    "releaseId": "<immutable-release-id>",
+    "sourceCommit": "<40-character-commit>",
+    "artifactDigest": "sha256:<64-hex>"
+  },
+  "reportFiles": {
+    "adapterRuntime": "<absolute-path-to-adapter-runtime-report>",
+    "reconciliation": "<absolute-path-to-shadow-reconciliation-report>",
+    "jointTests": "<absolute-path-to-joint-test-evidence-report>",
+    "businessLoop": "<absolute-path-to-business-loop-report>",
+    "operations": "<absolute-path-to-operational-control-report>",
+    "externalReleaseEvidence": "<absolute-path-to-external-release-evidence-report>"
+  },
+  "rollbackFile": "<absolute-path-to-rollback-evidence>",
+  "disasterRecoveryFile": "<absolute-path-to-disaster-recovery-evidence>",
+  "boundary": "All paths must be absolute and point to metadata-only JSON files. The builder never creates external receipts, approvals or production authorization."
+}
