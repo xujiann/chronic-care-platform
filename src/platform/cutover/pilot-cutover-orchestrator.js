@@ -1,6 +1,10 @@
 "use strict";
 
 const { createHash } = require("node:crypto");
+const {
+  assertMetadataOnly,
+  createTechnicalEvidenceFingerprint
+} = require("../governance/technical-evidence");
 
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
 const COMMIT = /^[a-f0-9]{40}$/;
@@ -49,6 +53,79 @@ function createPilotCutoverEvidenceFingerprint(input = {}) {
     clean(input.evidenceDigests?.[id], 80)
   ]));
   return sha256({ release, evidenceDigests });
+}
+
+function createRollbackEvidenceFingerprint(input = {}) {
+  return createTechnicalEvidenceFingerprint(
+    "pilot-cutover-rollback-evidence-v1",
+    input
+  );
+}
+
+function createDisasterRecoveryEvidenceFingerprint(input = {}) {
+  return createTechnicalEvidenceFingerprint(
+    "pilot-cutover-disaster-recovery-evidence-v1",
+    input
+  );
+}
+
+function createPilotCutoverEvidenceBindings(input = {}) {
+  const adapter = input.reports?.adapterRuntime || {};
+  const jointTests = input.reports?.jointTests || {};
+  const businessLoop = input.reports?.businessLoop || {};
+  const operations = input.reports?.operations || {};
+  return Object.freeze({
+    adapterRuntime: createTechnicalEvidenceFingerprint(
+      "platform-production-adapter-runtime-v1",
+      {
+        schema: adapter.schema,
+        mode: adapter.mode,
+        adapters: adapter.adapters,
+        schemas: adapter.schemas,
+        localChecks: adapter.localChecks,
+        externalAuthorization: adapter.externalAuthorization,
+        workersEligible: adapter.workersEligible
+      }
+    ),
+    reconciliation: clean(input.reports?.reconciliation?.technicalEvidenceFingerprint, 80),
+    jointTests: createTechnicalEvidenceFingerprint(
+      "regional-joint-test-evidence-v1",
+      {
+        schema: jointTests.schema,
+        registryDigest: jointTests.registryDigest,
+        contracts: jointTests.contracts,
+        externalEvidenceVerified: jointTests.externalEvidenceVerified,
+        evidenceInferred: jointTests.evidenceInferred
+      }
+    ),
+    businessLoop: createTechnicalEvidenceFingerprint(
+      "regional-business-loop-report-v1",
+      {
+        schema: businessLoop.schema,
+        ok: businessLoop.ok,
+        loopId: businessLoop.loopId,
+        phase: businessLoop.phase,
+        version: businessLoop.version,
+        checks: businessLoop.checks,
+        eventChainDigest: businessLoop.eventChainDigest
+      }
+    ),
+    operations: createTechnicalEvidenceFingerprint(
+      "platform-operational-control-report-v1",
+      {
+        schema: operations.schema,
+        domains: operations.domains,
+        localReady: operations.localReady,
+        externalReady: operations.externalReady,
+        operationalReady: operations.operationalReady,
+        externalEvidenceInferred: operations.externalEvidenceInferred,
+        sensitiveDataExposed: operations.sensitiveDataExposed
+      }
+    ),
+    externalReleaseEvidence: clean(input.reports?.externalReleaseEvidence?.evidenceFingerprint, 80),
+    rollback: createRollbackEvidenceFingerprint(input.rollback),
+    disasterRecovery: createDisasterRecoveryEvidenceFingerprint(input.disasterRecovery)
+  });
 }
 
 function validateRollback(input = {}) {
@@ -115,13 +192,14 @@ function validateApprovals(input = {}, fingerprint, now) {
 }
 
 function evaluatePilotCutover(input = {}, now = new Date().toISOString()) {
+  assertMetadataOnly(input, "cutover");
   const fingerprint = createPilotCutoverEvidenceFingerprint(input);
+  const evidenceBindings = createPilotCutoverEvidenceBindings(input);
   const evidenceDigestChecks = Object.freeze(Object.fromEntries(EVIDENCE_DIGEST_IDS.map((id) => [
     id,
     SHA256.test(clean(input.evidenceDigests?.[id], 80))
-      && (id !== "reconciliation"
-        || clean(input.evidenceDigests?.reconciliation, 80)
-          === clean(input.reports?.reconciliation?.technicalEvidenceFingerprint, 80))
+      && SHA256.test(evidenceBindings[id])
+      && clean(input.evidenceDigests?.[id], 80) === evidenceBindings[id]
   ])));
   const release = Object.freeze({
     releaseId: Boolean(clean(input.release?.releaseId, 160)),
@@ -129,7 +207,10 @@ function evaluatePilotCutover(input = {}, now = new Date().toISOString()) {
     artifactDigest: SHA256.test(clean(input.release?.artifactDigest, 80))
   });
   const local = Object.freeze({
-    adapterRuntime: input.reports?.adapterRuntime?.localChecks?.schemaVerified === true
+    adapterRuntime: input.reports?.adapterRuntime?.schema === "platform-production-adapter-runtime-v1"
+      && clean(input.reports?.adapterRuntime?.technicalEvidenceFingerprint, 80)
+        === evidenceBindings.adapterRuntime
+      && input.reports?.adapterRuntime?.localChecks?.schemaVerified === true
       && input.reports?.adapterRuntime?.localChecks?.adaptersConfigured === true
       && input.reports?.adapterRuntime?.localChecks?.adapterWritesEvidenceGated === true,
     reconciliation: input.reports?.reconciliation?.schema === "shadow-relay-control-plane-v1"
@@ -143,11 +224,20 @@ function evaluatePilotCutover(input = {}, now = new Date().toISOString()) {
       && input.reports?.reconciliation?.payloadsExposed === false
       && input.reports?.reconciliation?.externalEvidenceVerified === false
       && input.reports?.reconciliation?.productionReady === false,
-    businessLoop: input.reports?.businessLoop?.ok === true,
-    operations: input.reports?.operations?.localReady === true
+    businessLoop: input.reports?.businessLoop?.schema === "regional-business-loop-report-v1"
+      && clean(input.reports?.businessLoop?.technicalEvidenceFingerprint, 80)
+        === evidenceBindings.businessLoop
+      && input.reports?.businessLoop?.ok === true,
+    operations: input.reports?.operations?.schema === "platform-operational-control-report-v1"
+      && clean(input.reports?.operations?.technicalEvidenceFingerprint, 80)
+        === evidenceBindings.operations
+      && input.reports?.operations?.localReady === true
   });
   const external = Object.freeze({
-    jointTests: input.reports?.jointTests?.externalEvidenceVerified === true,
+    jointTests: input.reports?.jointTests?.schema === "regional-joint-test-evidence-v1"
+      && clean(input.reports?.jointTests?.technicalEvidenceFingerprint, 80)
+        === evidenceBindings.jointTests
+      && input.reports?.jointTests?.externalEvidenceVerified === true,
     operations: input.reports?.operations?.externalReady === true,
     releaseEvidence: input.reports?.externalReleaseEvidence?.ok === true
       && SHA256.test(clean(input.reports?.externalReleaseEvidence?.evidenceFingerprint, 80))
@@ -174,6 +264,7 @@ function evaluatePilotCutover(input = {}, now = new Date().toISOString()) {
     details: Object.freeze({
       release,
       evidenceDigests: evidenceDigestChecks,
+      evidenceBindings,
       local,
       external,
       rollback,
@@ -193,6 +284,9 @@ module.exports = {
   APPROVAL_ROLES,
   EVIDENCE_DIGEST_IDS,
   createPilotCutoverEvidenceFingerprint,
+  createPilotCutoverEvidenceBindings,
+  createRollbackEvidenceFingerprint,
+  createDisasterRecoveryEvidenceFingerprint,
   evaluatePilotCutover,
   validateApprovals,
   validateDisasterRecovery,

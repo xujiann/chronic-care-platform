@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "platform-operational-control-input-v1",
+  "snapshot": {
+    "security": {
+      "roleBindings": [
+        { "role": "runtime-reader", "reviewed": false, "excessPrivileges": 0 },
+        { "role": "delivery-worker", "reviewed": false, "excessPrivileges": 0 },
+        { "role": "audit-writer", "reviewed": false, "excessPrivileges": 0 },
+        { "role": "security-reviewer", "reviewed": false, "excessPrivileges": 0 }
+      ],
+      "auditRepository": { "healthy": false, "appendOnly": false },
+      "keyAgeDays": -1,
+      "openCriticalFindings": 1
+    },
+    "monitoring": {
+      "signals": [
+        { "id": "worker-lag", "healthy": false, "ageSeconds": -1 },
+        { "id": "dead-letter-count", "healthy": false, "ageSeconds": -1 },
+        { "id": "delivery-failure-rate", "healthy": false, "ageSeconds": -1 },
+        { "id": "database-pool-saturation", "healthy": false, "ageSeconds": -1 },
+        { "id": "audit-write-failure", "healthy": false, "ageSeconds": -1 }
+      ],
+      "drills": [
+        { "id": "delivery", "passed": false, "receiptRef": "" },
+        { "id": "retry", "passed": false, "receiptRef": "" },
+        { "id": "escalation", "passed": false, "receiptRef": "" },
+        { "id": "recovery", "passed": false, "receiptRef": "" }
+      ],
+      "onCallOwner": "",
+      "escalationPolicyRef": ""
+    },
+    "dataGovernance": {
+      "generatedAt": "",
+      "checks": [
+        { "id": "identity-uniqueness", "passed": false, "reportDigest": "" },
+        { "id": "referral-integrity", "passed": false, "reportDigest": "" },
+        { "id": "clinical-receipt-integrity", "passed": false, "reportDigest": "" },
+        { "id": "retention-execution", "passed": false, "reportDigest": "" }
+      ],
+      "auditRetentionDays": 365,
+      "exports": {
+        "metadataOnly": true,
+        "patientDataIncluded": false,
+        "secretsIncluded": false
+      }
+    }
+  },
+  "externalEvidence": [],
+  "boundary": "Only metadata, controlled references and SHA-256 digests are permitted. Keep all local checks false until measured, and never include credentials, patient data or raw provider payloads."
+}

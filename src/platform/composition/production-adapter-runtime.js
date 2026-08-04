@@ -7,6 +7,9 @@ const ReferralWorker = require("../../care-coordination/referral-delivery-worker
 const EmergencyPostgres = require("../../clinical-specialties/emergency-signal-delivery-postgres");
 const EmergencyTransport = require("../../clinical-specialties/emergency-signal-delivery-transport");
 const EmergencyWorker = require("../../clinical-specialties/emergency-signal-delivery-worker");
+const {
+  createTechnicalEvidenceFingerprint
+} = require("../governance/technical-evidence");
 
 const MODES = new Set(["disabled", "rehearsal", "shadow", "cutover-gated"]);
 const REQUIRED_APPROVAL_ROLES = Object.freeze([
@@ -191,14 +194,21 @@ function createProductionAdapterRuntime(options = {}) {
       workerIdentityConfigured: Boolean(config.workerId),
       workerActivationRequested: config.workerActivationRequested
     });
-    return Object.freeze({
+    const projection = Object.freeze({
       schema: config.schema,
       mode: config.mode,
       adapters: Object.freeze(adapters),
       schemas: Object.freeze(Object.fromEntries(schemaReports)),
       localChecks,
       externalAuthorization: authorization,
-      workersEligible: Object.values(localChecks).every(Boolean) && authorization.ok,
+      workersEligible: Object.values(localChecks).every(Boolean) && authorization.ok
+    });
+    return Object.freeze({
+      ...projection,
+      technicalEvidenceFingerprint: createTechnicalEvidenceFingerprint(
+        config.schema,
+        projection
+      ),
       productionPrimary: false,
       productionReady: false,
       credentialsExposed: false,

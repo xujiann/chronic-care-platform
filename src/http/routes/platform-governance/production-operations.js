@@ -4,7 +4,7 @@ const ROUTE_SEGMENT_ID = "platform-governance-06";
 const SUBDOMAIN = "production-operations";
 
 function createRouteSegment(runtime) {
-  const { appendSecurityEvent, buildProductionReleaseEvidencePublicSummary, buildProductionSecurityAcceptanceCenter, buildRuntimeProductionGoNoGoCenter, collectJson, normalizeProductionGoNoGoApprovalAction, normalizeProductionGoNoGoDecision, normalizeProductionSecurityFindingAction, normalizeProductionSecurityReleaseApprovalAction, normalizeState, productionAdapterRuntimeReadiness, randomUUID, readDatabase, requireApiRole, sendJson, shadowRelayControlPlaneReadiness, writeDatabase } = runtime;
+  const { appendSecurityEvent, buildProductionReleaseEvidencePublicSummary, buildProductionSecurityAcceptanceCenter, buildRuntimeProductionGoNoGoCenter, collectJson, normalizeProductionGoNoGoApprovalAction, normalizeProductionGoNoGoDecision, normalizeProductionSecurityFindingAction, normalizeProductionSecurityReleaseApprovalAction, normalizeState, operationalControlPlaneReadiness, productionAdapterRuntimeReadiness, randomUUID, readDatabase, requireApiRole, sendJson, shadowRelayControlPlaneReadiness, writeDatabase } = runtime;
   return {
       id: "platform-governance-06",
       domain: "platform-governance",
@@ -36,6 +36,22 @@ function createRouteSegment(runtime) {
           target: url.pathname,
           result: "allowed",
           detail: `${report.ok === true ? "verified" : "blocked"}; receipts=${Number(report.receipts) || 0}; production gate closed`
+        });
+        sendJson(res, 200, report);
+        return true;
+      }
+
+    if (req.method === "GET" && url.pathname === "/api/production-adapters/operational-control") {
+        const user = requireApiRole(req, res, ["commission"], url.pathname);
+        if (!user) return true;
+        const report = await operationalControlPlaneReadiness();
+        appendSecurityEvent({
+          actor: user.name,
+          role: user.role,
+          action: "operational-control-plane-read",
+          target: url.pathname,
+          result: "allowed",
+          detail: `${report.operationalReady === true ? "verified" : "blocked"}; local=${report.localReady === true}; external=${report.externalReady === true}; production gate closed`
         });
         sendJson(res, 200, report);
         return true;

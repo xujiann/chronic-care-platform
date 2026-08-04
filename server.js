@@ -20,6 +20,9 @@ const {
 const {
   openSqliteShadowRelayOperations
 } = require("./src/platform/operations/sqlite-shadow-relay-operations");
+const {
+  evaluateOperationalControlRuntime
+} = require("./src/platform/governance/operational-control-runtime");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
 const { MemorySessionStore, PostgresSessionStore, SqliteSessionStore, createSqliteSessionSchema } = require("./session-store");
 const {
@@ -574,6 +577,43 @@ async function shadowRelayControlPlaneReadiness() {
     return blockedShadowRelayControlPlane(error);
   } finally {
     if (operations) await operations.close();
+  }
+}
+
+function blockedOperationalControlPlane(error) {
+  const blockedDomain = Object.freeze({
+    localReady: false,
+    externalReady: false,
+    checks: Object.freeze({}),
+    externalEvidence: Object.freeze({ ok: false, accepted: Object.freeze([]), required: Object.freeze([]) })
+  });
+  return Object.freeze({
+    schema: "platform-operational-control-report-v1",
+    domains: Object.freeze({
+      security: blockedDomain,
+      monitoring: blockedDomain,
+      dataGovernance: blockedDomain
+    }),
+    localReady: false,
+    externalReady: false,
+    operationalReady: false,
+    externalEvidenceInferred: false,
+    sensitiveDataExposed: false,
+    technicalEvidenceFingerprint: "",
+    error: Object.freeze({
+      code: String(error?.code || "OPERATIONAL_CONTROL_RUNTIME_UNAVAILABLE").slice(0, 120),
+      message: "operational control evidence is unavailable"
+    }),
+    productionReady: false,
+    boundary: "This status is closed and does not infer assessment, alert-route, retention, data-owner, approval, or production evidence."
+  });
+}
+
+async function operationalControlPlaneReadiness() {
+  try {
+    return evaluateOperationalControlRuntime({ env: process.env });
+  } catch (error) {
+    return blockedOperationalControlPlane(error);
   }
 }
 let sessionCleanupTimer = null;
@@ -27751,6 +27791,7 @@ function createRuntimeCapabilitySource() {
   appendSecurityEvent,
   productionAdapterRuntimeReadiness,
   shadowRelayControlPlaneReadiness,
+  operationalControlPlaneReadiness,
   applyAppointmentIntegrationReconciliationAction,
   applyCitizenLifecycleAction,
   applyCitizenOperationsAction,
@@ -28447,6 +28488,7 @@ module.exports = {
   productionSessionStoreErrors,
   productionAdapterRuntimeReadiness,
   shadowRelayControlPlaneReadiness,
+  operationalControlPlaneReadiness,
   readDatabase,
   requireDigitalHospitalExecutionWorker,
   server,

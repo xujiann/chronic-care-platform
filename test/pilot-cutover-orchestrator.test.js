@@ -6,6 +6,7 @@ const test = require("node:test");
 const {
   APPROVAL_ROLES,
   EVIDENCE_DIGEST_IDS,
+  createPilotCutoverEvidenceBindings,
   createPilotCutoverEvidenceFingerprint,
   evaluatePilotCutover
 } = require("../src/platform/cutover/pilot-cutover-orchestrator");
@@ -22,17 +23,19 @@ function candidate() {
       sourceCommit: "a".repeat(40),
       artifactDigest: `sha256:${"b".repeat(64)}`
     },
-    evidenceDigests: Object.fromEntries(EVIDENCE_DIGEST_IDS.map((id, index) => [
-      id,
-      `sha256:${((index % 6) + 1).toString().repeat(64)}`
-    ])),
     reports: {
       adapterRuntime: {
+        schema: "platform-production-adapter-runtime-v1",
+        mode: "cutover-gated",
+        adapters: {},
+        schemas: {},
         localChecks: {
           schemaVerified: true,
           adaptersConfigured: true,
           adapterWritesEvidenceGated: true
-        }
+        },
+        externalAuthorization: { ok: true },
+        workersEligible: true
       },
       reconciliation: {
         schema: "shadow-relay-control-plane-v1",
@@ -46,9 +49,31 @@ function candidate() {
         externalEvidenceVerified: false,
         productionReady: false
       },
-      jointTests: { externalEvidenceVerified: true },
-      businessLoop: { ok: true },
-      operations: { localReady: true, externalReady: true },
+      jointTests: {
+        schema: "regional-joint-test-evidence-v1",
+        registryDigest: `sha256:${"3".repeat(64)}`,
+        contracts: [],
+        externalEvidenceVerified: true,
+        evidenceInferred: false
+      },
+      businessLoop: {
+        schema: "regional-business-loop-report-v1",
+        ok: true,
+        loopId: "loop-1",
+        phase: "closed",
+        version: 6,
+        checks: { closed: true },
+        eventChainDigest: `sha256:${"4".repeat(64)}`
+      },
+      operations: {
+        schema: "platform-operational-control-report-v1",
+        domains: {},
+        localReady: true,
+        externalReady: true,
+        operationalReady: true,
+        externalEvidenceInferred: false,
+        sensitiveDataExposed: false
+      },
       externalReleaseEvidence: {
         ok: true,
         evidenceFingerprint: `sha256:${"c".repeat(64)}`
@@ -78,6 +103,15 @@ function candidate() {
       verifierAccount: "dr-verifier"
     }
   };
+  let bindings = createPilotCutoverEvidenceBindings(input);
+  input.reports.adapterRuntime.technicalEvidenceFingerprint = bindings.adapterRuntime;
+  input.reports.jointTests.technicalEvidenceFingerprint = bindings.jointTests;
+  input.reports.businessLoop.technicalEvidenceFingerprint = bindings.businessLoop;
+  input.reports.operations.technicalEvidenceFingerprint = bindings.operations;
+  bindings = createPilotCutoverEvidenceBindings(input);
+  input.evidenceDigests = Object.fromEntries(
+    EVIDENCE_DIGEST_IDS.map((id) => [id, bindings[id]])
+  );
   const fingerprint = createPilotCutoverEvidenceFingerprint(input);
   input.authorization = {
     decision: "GO",
@@ -131,4 +165,24 @@ test("evidence drift or missing external evidence forces NO-GO", () => {
   const unchained = candidate();
   unchained.reports.reconciliation.chainValid = false;
   assert.equal(evaluatePilotCutover(unchained, NOW).decision, "NO-GO");
+  const changedOperations = candidate();
+  changedOperations.reports.operations.localReady = false;
+  changedOperations.authorization.evidenceFingerprint =
+    createPilotCutoverEvidenceFingerprint(changedOperations);
+  assert.equal(evaluatePilotCutover(changedOperations, NOW).decision, "NO-GO");
+});
+
+test("cutover evidence rejects sensitive metadata fields", () => {
+  const input = candidate();
+  input.reports.operations.rawPayload = "must-not-enter-cutover-evidence";
+  assert.throws(
+    () => evaluatePilotCutover(input, NOW),
+    (error) => error.code === "TECHNICAL_EVIDENCE_SENSITIVE_FIELD"
+  );
+  const patientBearing = candidate();
+  patientBearing.reports.operations.patient = { id: "forbidden" };
+  assert.throws(
+    () => evaluatePilotCutover(patientBearing, NOW),
+    (error) => error.code === "TECHNICAL_EVIDENCE_SENSITIVE_FIELD"
+  );
 });
