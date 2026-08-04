@@ -168,3 +168,20 @@ test("central composition forwards pool TLS evidence and the injected transport 
   assert.equal(captured.referralTransport.fetchImpl, fetchImpl);
   await runtime.close();
 });
+
+test("shadow relay eligibility is adapter-local and never grants production cutover", async () => {
+  const runtime = createProductionAdapterRuntime({
+    env: { ...productionEnv(), PLATFORM_PRODUCTION_ADAPTER_MODE: "shadow" },
+    factories: fakeFactories(),
+    now: () => NOW
+  });
+  const before = await runtime.shadowRelayReadiness("referral");
+  assert.equal(before.eligible, false);
+  assert.equal(before.checks.schemaVerified, false);
+  const verified = await runtime.shadowRelayReadiness("referral", { verifySchema: true });
+  assert.equal(verified.eligible, true);
+  assert.equal(verified.externalAuthorizationRequired, false);
+  assert.equal(verified.productionReady, false);
+  assert.equal(verified.productionPrimary, false);
+  await runtime.close();
+});

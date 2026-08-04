@@ -132,15 +132,23 @@ function createRuntimeAdapter({
           stagedEvents.push(structuredClone(event));
         }
       });
+      const existingOutbox = Array.isArray(data[OUTBOX_COLLECTION]) ? data[OUTBOX_COLLECTION] : [];
+      const existingDeliveryRows = existingOutbox.filter((row) =>
+        row?.action === "domain-event-outbox" && row?.owner === DOMAIN);
+      const relaySequenceStart = existingDeliveryRows.reduce(
+        (maximum, row) => Math.max(maximum, Number(row.relaySequence) || 0),
+        existingDeliveryRows.length
+      );
       data[OUTBOX_COLLECTION] = [
-        ...stagedEvents.map((event) => ({
+        ...stagedEvents.map((event, index) => ({
           ...event,
           action: "domain-event-outbox",
           owner: DOMAIN,
+          relaySequence: relaySequenceStart + index + 1,
           outboxStatus: "pending",
           delivery: createEmergencySignalDelivery(event, { now: event.occurredAt })
         })),
-        ...(Array.isArray(data[OUTBOX_COLLECTION]) ? data[OUTBOX_COLLECTION] : [])
+        ...existingOutbox
       ];
       if (command?.id) {
         data[INBOX_COLLECTION] = [

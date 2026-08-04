@@ -83,8 +83,10 @@ test("emergency signal update commits owned aggregate and versioned event in one
   assert.equal(state[OUTBOX_COLLECTION][0].id, result.event.id);
   assert.equal(state[OUTBOX_COLLECTION][0].outboxStatus, "pending");
   assert.equal(state[OUTBOX_COLLECTION][0].owner, DOMAIN);
+  assert.equal(state[OUTBOX_COLLECTION][0].relaySequence, 1);
   assert.equal(state[OUTBOX_COLLECTION][0].delivery.schema, "emergency-signal-delivery.v1");
   assert.equal(state[OUTBOX_COLLECTION][0].delivery.status, "pending");
+  assert.equal(state[OUTBOX_COLLECTION][0].relaySequence, 1);
   assert.equal(state[OUTBOX_COLLECTION][0].delivery.productionReady, false);
   assert.equal(state[INBOX_COLLECTION].length, 1);
   assert.equal(state[INBOX_COLLECTION][0].commandId, "command-emergency-001");

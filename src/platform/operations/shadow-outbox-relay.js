@@ -43,7 +43,10 @@ function normalizeRelayEvent(input = {}) {
     id,
     sequence,
     payloadDigest,
-    payload: structuredClone(input.payload)
+    payload: structuredClone(input.payload),
+    metadata: input.metadata && typeof input.metadata === "object" && !Array.isArray(input.metadata)
+      ? structuredClone(input.metadata)
+      : Object.freeze({})
   });
 }
 
@@ -131,7 +134,8 @@ async function runShadowOutboxRelayOnce(options = {}) {
       ? await options.project(structuredClone(event.payload), {
         id: event.id,
         sequence: event.sequence,
-        payloadDigest: event.payloadDigest
+        payloadDigest: event.payloadDigest,
+        metadata: structuredClone(event.metadata)
       })
       : structuredClone(event.payload);
     const result = await options.sink.enqueue(projected);

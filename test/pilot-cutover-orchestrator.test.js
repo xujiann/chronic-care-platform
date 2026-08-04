@@ -34,7 +34,13 @@ function candidate() {
           adapterWritesEvidenceGated: true
         }
       },
-      reconciliation: { ok: true },
+      reconciliation: {
+        ok: true,
+        domains: { referral: { ok: true }, emergency: { ok: true } },
+        durableCheckpointVerified: true,
+        faultRecoveryVerified: true,
+        payloadsExposed: false
+      },
       jointTests: { externalEvidenceVerified: true },
       businessLoop: { ok: true },
       operations: { localReady: true, externalReady: true },

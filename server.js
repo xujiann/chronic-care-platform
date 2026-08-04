@@ -14,6 +14,9 @@ const {
   validateScorecard
 } = require("./src/platform/governance/service-extraction");
 const { PlatformObservability } = require("./src/platform/observability/request-context");
+const {
+  createProductionAdapterRuntime
+} = require("./src/platform/composition/production-adapter-runtime");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
 const { MemorySessionStore, PostgresSessionStore, SqliteSessionStore, createSqliteSessionSchema } = require("./session-store");
 const {
@@ -481,6 +484,30 @@ validateOwnershipManifest();
 let runtimeSessionStoreInstance = null;
 let runtimeSessionStoreKey = "";
 let digitalHospitalExecutionServiceInstance = null;
+let productionAdapterRuntimeInstance = null;
+
+async function productionAdapterRuntimeReadiness() {
+  try {
+    if (!productionAdapterRuntimeInstance) {
+      productionAdapterRuntimeInstance = createProductionAdapterRuntime({ env: process.env });
+    }
+    return await productionAdapterRuntimeInstance.readiness({ verifySchemas: false });
+  } catch (error) {
+    return Object.freeze({
+      schema: "platform-production-adapter-runtime-v1",
+      mode: "blocked",
+      error: Object.freeze({
+        code: String(error?.code || "PLATFORM_PRODUCTION_ADAPTER_RUNTIME_INVALID").slice(0, 120),
+        message: String(error?.message || "production adapter runtime configuration is invalid").slice(0, 240)
+      }),
+      workersEligible: false,
+      productionPrimary: false,
+      productionReady: false,
+      credentialsExposed: false,
+      boundary: "The runtime status is blocked. This response does not verify schemas, start workers, or authorize production cutover."
+    });
+  }
+}
 let sessionCleanupTimer = null;
 let sessionCleanupState = {
   status: "not-run",
@@ -27654,6 +27681,7 @@ function createRuntimeCapabilitySource() {
   appendReferralTeleconsultationNotifications,
   appendResearchAudit,
   appendSecurityEvent,
+  productionAdapterRuntimeReadiness,
   applyAppointmentIntegrationReconciliationAction,
   applyCitizenLifecycleAction,
   applyCitizenOperationsAction,
@@ -28309,6 +28337,10 @@ async function stopServer() {
     digitalHospitalExecutionServiceInstance.close();
     digitalHospitalExecutionServiceInstance = null;
   }
+  if (productionAdapterRuntimeInstance) {
+    await productionAdapterRuntimeInstance.close();
+    productionAdapterRuntimeInstance = null;
+  }
   if (runtimeSessionStoreInstance && typeof runtimeSessionStoreInstance.close === "function") {
     await runtimeSessionStoreInstance.close();
   }
@@ -28344,6 +28376,7 @@ module.exports = {
   productionSessionSecretErrors,
   productionSessionRetentionErrors,
   productionSessionStoreErrors,
+  productionAdapterRuntimeReadiness,
   readDatabase,
   requireDigitalHospitalExecutionWorker,
   server,

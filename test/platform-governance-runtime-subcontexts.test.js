@@ -18,7 +18,7 @@ test("platform governance segments use distinct least-privilege service contexts
       "site-launch-evidence": 4,
       "digital-hospital-pilot": 17,
       "digital-hospital-readiness": 21,
-      "production-operations": 15,
+      "production-operations": 16,
       "digital-hospital-governance": 54,
       "phase2-operations": 54,
       "mutual-recognition-overview": 4,

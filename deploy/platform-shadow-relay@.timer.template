@@ -1,0 +1,12 @@
+[Unit]
+Description=Schedule health platform %i PostgreSQL shadow outbox relay
+
+[Timer]
+OnBootSec=45s
+OnUnitActiveSec=15s
+RandomizedDelaySec=3s
+Persistent=true
+Unit=platform-shadow-relay@%i.service
+
+[Install]
+WantedBy=timers.target

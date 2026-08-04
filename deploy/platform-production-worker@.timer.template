@@ -1,0 +1,12 @@
+[Unit]
+Description=Schedule health platform %i production delivery worker
+
+[Timer]
+OnBootSec=60s
+OnUnitActiveSec=20s
+RandomizedDelaySec=5s
+Persistent=false
+Unit=platform-production-worker@%i.service
+
+[Install]
+WantedBy=timers.target

@@ -615,6 +615,21 @@ function createEmergencySignalPostgresRepository(options = {}) {
     });
   }
 
+  async function shadowSnapshot() {
+    return withClient(pool(), "BEGIN READ ONLY", async (client) => {
+      const result = await client.query(`
+        SELECT event_id, event_payload_sha256, created_at
+        FROM health_platform.emergency_signal_delivery_outbox
+        ORDER BY created_at, event_id
+      `);
+      return Object.freeze(result.rows.map((row, index) => Object.freeze({
+        id: String(row.event_id),
+        sequence: index + 1,
+        payloadDigest: String(row.event_payload_sha256)
+      })));
+    });
+  }
+
   async function close() {
     if (ownedPool) {
       await ownedPool.end();
@@ -630,6 +645,7 @@ function createEmergencySignalPostgresRepository(options = {}) {
     fail,
     replay,
     operations,
+    shadowSnapshot,
     verifySchema,
     close
   });
