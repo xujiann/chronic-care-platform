@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "regional-integration-contract-registry-v1",
+  "contracts": [
+    {
+      "id": "his-referral-v1",
+      "system": "HIS",
+      "direction": "bidirectional",
+      "protocol": "HTTPS-JSON",
+      "endpointEnv": "REGIONAL_HIS_ENDPOINT",
+      "credentialRefEnv": "REGIONAL_HIS_CREDENTIAL_REF",
+      "operations": ["submit-referral", "query-acceptance", "cancel-referral"],
+      "correlationFields": ["requestId", "correlationId", "referralId"],
+      "jointTestStatus": "pending-external"
+    },
+    {
+      "id": "emr-clinical-summary-v1",
+      "system": "EMR",
+      "direction": "bidirectional",
+      "protocol": "FHIR-R4-HTTPS",
+      "endpointEnv": "REGIONAL_EMR_ENDPOINT",
+      "credentialRefEnv": "REGIONAL_EMR_CREDENTIAL_REF",
+      "operations": ["publish-document-reference", "query-clinical-summary"],
+      "correlationFields": ["requestId", "correlationId", "documentDigest"],
+      "jointTestStatus": "pending-external"
+    },
+    {
+      "id": "lis-result-v1",
+      "system": "LIS",
+      "direction": "inbound",
+      "protocol": "HL7V2-OVER-MTLS",
+      "endpointEnv": "REGIONAL_LIS_ENDPOINT",
+      "credentialRefEnv": "REGIONAL_LIS_CREDENTIAL_REF",
+      "operations": ["receive-observation-result", "acknowledge-result"],
+      "correlationFields": ["requestId", "correlationId", "specimenId"],
+      "jointTestStatus": "pending-external"
+    },
+    {
+      "id": "pacs-imaging-v1",
+      "system": "PACS",
+      "direction": "bidirectional",
+      "protocol": "DICOMWEB-HTTPS",
+      "endpointEnv": "REGIONAL_PACS_ENDPOINT",
+      "credentialRefEnv": "REGIONAL_PACS_CREDENTIAL_REF",
+      "operations": ["query-study", "publish-report-reference"],
+      "correlationFields": ["requestId", "correlationId", "studyInstanceUidDigest"],
+      "jointTestStatus": "pending-external"
+    }
+  ]
+}

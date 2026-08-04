@@ -18,6 +18,15 @@ const {
 
 const manifest = loadManifest();
 
+test("process manifest pins the unique integration baseline and evidence policy", () => {
+  assert.equal(manifest.integrationBranch, "main");
+  assert.equal(manifest.baselineTag, "baseline/governance-20260804-platform-iterations-v1");
+  assert.equal(manifest.developmentPolicy.singleIntegrationBaseline, true);
+  assert.equal(manifest.developmentPolicy.integrationOwner, "T00");
+  assert.equal(manifest.developmentPolicy.externalEvidenceCannotBeInferred, true);
+  assert.equal(manifest.developmentPolicy.productionDefaultDecision, "NO-GO");
+});
+
 test("process manifest assigns every domain route exactly once", () => {
   const routeOwners = new Map();
   Object.entries(manifest.processes).forEach(([processId, process]) => {
